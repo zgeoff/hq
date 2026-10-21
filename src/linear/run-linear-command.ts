@@ -1,4 +1,4 @@
-import { statSync } from 'node:fs';
+import { readdirSync, statSync } from 'node:fs';
 import type { Flags } from '../cli.ts';
 import type { Out } from '../commands.ts';
 import { HqError } from '../errors.ts';
@@ -9,6 +9,9 @@ import { readIssuePages } from './read-issue-pages.ts';
 import { readTeamStateNames } from './read-team-state-names.ts';
 import type { LinearCall } from './types.ts';
 import { writeIssuePages } from './write-issue-pages.ts';
+
+// A page left by an earlier run would be read as part of this one.
+const PAGE_FILE = /^issues-\d+\.json$/u;
 
 // `hq linear issues`: the issues of a team in some states, as page files that the triage scripts read.
 export async function runLinearCommand(call: LinearCall, flags: Flags): Promise<Out> {
@@ -24,6 +27,9 @@ export async function runLinearCommand(call: LinearCall, flags: Flags): Promise<
   }
   if (!probeDirectory(out)) {
     throw new HqError('bad_args', `--out must be an existing directory: ${out}`);
+  }
+  if (readdirSync(out).some((entry) => PAGE_FILE.test(entry))) {
+    throw new HqError('bad_args', `${out} already holds issue pages; use an empty directory`);
   }
   const known = await readTeamStateNames(call, team);
   const states = pickStateNames(requested, known, team);

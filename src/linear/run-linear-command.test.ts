@@ -226,6 +226,27 @@ test('it refuses an --out that is a file as bad_args', () => {
   expect(failed).rejects.toMatchObject({ code: 'bad_args' });
 });
 
+test('it refuses an --out that already holds an issue page as bad_args, keeping every file', () => {
+  const ctx = setupTest();
+  writeFileSync(join(ctx.directory, 'issues-3.json'), '{"issues":[]}');
+  writeFileSync(join(ctx.directory, 'notes.txt'), 'brew at 90 degrees');
+
+  const failed = runLinearCommand(ctx.call, { team: 'KET', state: 'Ready', out: ctx.directory });
+
+  expect(failed).rejects.toMatchObject({ code: 'bad_args', message: `${ctx.directory} already holds issue pages; use an empty directory` });
+  expect(readdirSync(ctx.directory).toSorted()).toStrictEqual(['issues-3.json', 'notes.txt']);
+});
+
+test('it writes into an --out that holds only files that are not issue pages', async () => {
+  const ctx = setupTest();
+  linearWorkflowStates.push({ team: 'KET', name: 'Ready' });
+  writeFileSync(join(ctx.directory, 'issues-final.json'), '{}');
+
+  await runLinearCommand(ctx.call, { team: 'KET', state: 'Ready', out: ctx.directory });
+
+  expect(readdirSync(ctx.directory).toSorted()).toStrictEqual(['issues-1.json', 'issues-final.json']);
+});
+
 test.each([
   ['--team', { state: 'Ready', out: tmpdir() }],
   ['--state', { team: 'KET', out: tmpdir() }],
