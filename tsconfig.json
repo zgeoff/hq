@@ -16,7 +16,6 @@
   "include": [
     "src",
     "test",
-    "e2e",
     "mocks",
     "scripts/lint-changed.ts",
     "scripts/lint-changed.test.ts",
