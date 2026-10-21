@@ -1,4 +1,5 @@
 import { readdirSync, statSync } from 'node:fs';
+import { z } from 'zod';
 import type { Flags } from '../cli.ts';
 import type { Out } from '../commands.ts';
 import { HqError } from '../errors.ts';
@@ -49,15 +50,17 @@ function requireFlag(value: string | undefined, name: string): string {
   return value;
 }
 
+// A time without an offset would be read in the local zone.
+const updatedSinceSchema = z.union([z.iso.datetime({ offset: true }), z.iso.date()]);
+
 function parseUpdatedSince(raw: string | undefined): string | undefined {
   if (raw === undefined) {
     return undefined;
   }
-  const time = new Date(raw);
-  if (Number.isNaN(time.getTime())) {
-    throw new HqError('bad_args', `--updated-since must be an ISO time, not "${raw}"`);
+  if (!updatedSinceSchema.safeParse(raw).success) {
+    throw new HqError('bad_args', `--updated-since must be an ISO date-time with an offset or Z, or a date YYYY-MM-DD, not "${raw}"`);
   }
-  return time.toISOString();
+  return new Date(raw).toISOString();
 }
 
 function probeDirectory(path: string): boolean {

@@ -127,12 +127,33 @@ test('it sends --updated-since as a filter, so only issues updated at or after t
   expect(JSON.parse(page)).toStrictEqual({ issues: [{ id: 'KET-2' }, { id: 'KET-3' }] });
 });
 
-test('it refuses an --updated-since that is no time as bad_args', () => {
+test.each(['last tuesday-ish', '2026-10-15T00:00:00', '2026-10-15 08:30', '15/10/2026'])('it refuses an --updated-since of %p as bad_args', (raw) => {
   const ctx = setupTest();
 
-  const failed = runLinearCommand(ctx.call, { team: 'KET', state: 'Ready', out: ctx.directory, 'updated-since': 'last tuesday-ish' });
+  const failed = runLinearCommand(ctx.call, { team: 'KET', state: 'Ready', out: ctx.directory, 'updated-since': raw });
 
-  expect(failed).rejects.toMatchObject({ code: 'bad_args' });
+  expect(failed).rejects.toMatchObject({ code: 'bad_args', message: `--updated-since must be an ISO date-time with an offset or Z, or a date YYYY-MM-DD, not "${raw}"` });
+});
+
+test.each([
+  ['2026-10-15', '2026-10-15T00:00:00.000Z'],
+  ['2026-10-15T02:00:00+02:00', '2026-10-15T00:00:00.000Z'],
+])('it sends an --updated-since of %p as %p', async (raw, gte) => {
+  const ctx = setupTest();
+  const filters: unknown[] = [];
+  linearWorkflowStates.push({ team: 'KET', name: 'Ready' });
+  server.events.on('request:start', async (info) => {
+    const sent = await info.request.clone().json();
+    const body = z.object({ variables: z.object({ filter: z.unknown().optional() }) }).parse(sent);
+    if (body.variables.filter !== undefined) {
+      filters.push(body.variables.filter);
+    }
+  });
+  onTestFinished(() => server.events.removeAllListeners());
+
+  await runLinearCommand(ctx.call, { team: 'KET', state: 'Ready', out: ctx.directory, 'updated-since': raw });
+
+  expect(filters).toStrictEqual([{ team: { key: { eq: 'KET' } }, state: { name: { in: ['Ready'] } }, updatedAt: { gte } }]);
 });
 
 test('it writes only the fields --fields names, in the connector order', async () => {
