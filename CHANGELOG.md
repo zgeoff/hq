@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+`hq linear issues` writes a team's Linear issues to page files that the triage scripts read.
+
+- New: `hq linear issues --team <key> --state <name>[,<name>...] [--updated-since <ISO time>] [--fields <list>] --out <dir>`. State names are matched without regard to case; a name the team lacks is refused as `bad_args`, listing the team's states. `--out` must be an existing directory.
+- It reads 100 issues a request and writes each page as `<dir>/issues-<n>.json` holding `{"issues":[...]}`, then prints the paths one per line. With `--json` it prints `{ files, issues }`. A failed Linear call, or an answer that does not parse, exits non-zero and writes no file.
+- Each issue carries `id`, `title`, `url`, `status`, `statusType`, `project` (`{"name"}` or null), `priority` (`{"value","name"}`), `labels` (`[{"name"}]`), `parentId`, `createdAt`, `updatedAt`, `completedAt`, `canceledAt` and `description`. `--fields` picks a subset; an unknown field is `bad_args`.
+- `audit-issues.sh`, `inflow.sh` and `overlap-candidates.sh` read the files as they are.
+
 ## 0.81.1 — 2026-10-22
 
 3 fixes found while fixing the first review, and 4 skill changes that merged in the old repo after this tree began.

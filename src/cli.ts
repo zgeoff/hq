@@ -262,6 +262,7 @@ import { syncKinds } from './kinds/sync-kinds.ts';
 import { syncLinear } from './kinds/sync-linear.ts';
 import { weeksBack } from './kinds/weeks-back.ts';
 import { makeAuditedLinearCaller } from './linear/make-audited-linear-caller.ts';
+import { runLinearCommand } from './linear/run-linear-command.ts';
 import { mergedRuns } from './sizes/merged-runs.ts';
 import { parseSize } from './sizes/parse-size.ts';
 import { prFacts } from './sizes/pr-facts.ts';
@@ -423,6 +424,10 @@ const OPTIONS = {
   'budget-mb': { type: 'string' },
   grant: { type: 'string' },
   target: { type: 'string' },
+  team: { type: 'string' },
+  'updated-since': { type: 'string' },
+  fields: { type: 'string' },
+  out: { type: 'string' },
 } as const;
 
 export type Flags = ReturnType<typeof parse>['values'];
@@ -2027,6 +2032,7 @@ export const GROUPS: Record<string, (c: Ctx) => Promise<Out>> = {
   answers: (c) => Promise.resolve(runAnswersCommand(c.db, c.flags)),
   grant: (c) => runGrantCommand(c.db, c.verb, c.rest, c.flags),
   kinds: (c) => kindsCommand(c.db, c.verb, c.flags),
+  linear: (context) => runLinearCommand(makeAuditedLinearCaller(context.db, context.run), context.flags),
   goals: (c) => goalsCommand(c.db, c.verb, c.rest, c.flags),
   defs: (c) => defsCommand(c.db, c.verb, c.rest, c.flags),
   repo: async (c) => {
