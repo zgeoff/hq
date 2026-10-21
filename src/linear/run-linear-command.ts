@@ -13,7 +13,6 @@ import { writeIssuePages } from './write-issue-pages.ts';
 // A page left by an earlier run would be read as part of this one.
 const PAGE_FILE = /^issues-\d+\.json$/u;
 
-// `hq linear issues`: the issues of a team in some states, as page files that the triage scripts read.
 export async function runLinearCommand(call: LinearCall, flags: Flags): Promise<Out> {
   const team = requireFlag(flags.team, 'team');
   const requested = requireFlag(flags.state, 'state')

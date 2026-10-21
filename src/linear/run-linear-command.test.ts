@@ -14,7 +14,6 @@ import { makeLinearCaller } from './make-linear-caller.ts';
 import { resetKey } from './reset-key.ts';
 import { runLinearCommand } from './run-linear-command.ts';
 
-// A directory for the page files and a Linear caller that reads an invented key through a fake 1Password.
 function setupTest() {
   const directory = mkdtempSync(join(tmpdir(), 'hq-linear-issues-'));
   const run = mock<Runner>(() => Promise.resolve<RunResult>({ code: 0, stdout: 'lin_api_INVENTEDkettleKEY0042\n', stderr: '' }));
@@ -324,8 +323,7 @@ test('it runs each triage script to exit 0 over every issue on the pages hq line
   const states = ['Backlog', 'Ready', 'In Review', 'Done'];
   linearWorkflowStates.push(...states.map((name) => ({ team: 'GEO', name })));
 
-  // 120 open issues, each in a project of its own with a type, size, area and priority, so the audit
-  // finds no gap; GEO-3 and GEO-110 are the one pair, and they sit on different pages.
+  // The triage scripts sort issue ids by the number after "GEO-", so these issues carry GEO ids.
   const open = Array.from({ length: 120 }, (_, index) => {
     const paired = index === 2 || index === 109;
     return {

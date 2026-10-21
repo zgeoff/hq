@@ -72,8 +72,6 @@ const pageSchema = z.object({ issues: issuesSchema });
 
 export type IssuePage = Record<string, unknown>[];
 
-// Every page of the filter's issues, each issue cut to the fields asked for. A failure on any page
-// throws before the caller holds a page, so nothing is half read.
 export async function readIssuePages(call: LinearCall, filter: IssuesFilter, fields: IssueField[]): Promise<IssuePage[]> {
   const pages: IssuePage[] = [];
   let after: string | null = null;
