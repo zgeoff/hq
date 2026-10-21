@@ -2,7 +2,7 @@ import { statSync } from 'node:fs';
 import type { Flags } from '../cli.ts';
 import type { Out } from '../commands.ts';
 import { HqError } from '../errors.ts';
-import { parseIssueFields } from './issue-fields.ts';
+import { parseIssueFields } from './parse-issue-fields.ts';
 import { pickStateNames } from './pick-state-names.ts';
 import type { IssuesFilter } from './read-issue-pages.ts';
 import { readIssuePages } from './read-issue-pages.ts';

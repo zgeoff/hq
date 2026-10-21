@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { HqError } from '../errors.ts';
-import type { IssueField } from './issue-fields.ts';
+import type { IssueField } from './parse-issue-fields.ts';
 import type { LinearCall } from './types.ts';
 
 export const PAGE_SIZE = 100;
