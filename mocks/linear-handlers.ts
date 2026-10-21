@@ -3,14 +3,13 @@ import { z } from 'zod';
 import type { ReadyPageAnswer } from '../src/lanes/read-linear-ready.ts';
 import type { ReadyIssue } from '../src/lanes/types.ts';
 import type { IssuesFilter } from '../src/linear/read-issue-pages.ts';
-import { PAGE_SIZE } from '../src/linear/read-issue-pages.ts';
 
 export const LINEAR_GRAPHQL_URL = 'https://api.linear.app/graphql';
 
 // Linear's GraphQL API, answering as the key's user, kettle-bot. A query with team and state
 // variables is the Ready query, answered in one page from the issues in that team and state. An
 // `ids` query answers the issues whose identifier, or a previous one, is among the ids. A `filter`
-// query answers one page of 100 of the issues that match its team key, state names and updatedAt
+// query answers one page, of its `first` size, of the issues that match its team key, state names and updatedAt
 // bound, and a `teamKey` query the workflow states of that team. A `slugID`
 // query answers the documents with that slug ID, and an `id` query that document.
 export const linearHandlers = [http.post(LINEAR_GRAPHQL_URL, (info) => readLinearAnswer(info))];
@@ -40,7 +39,8 @@ async function readLinearAnswer(info: LinearRequest): Promise<Response> {
   const body: unknown = await info.request.json().catch(() => null);
   const variables = typeof body === 'object' && body !== null && 'variables' in body && typeof body.variables === 'object' && body.variables !== null ? body.variables : {};
   if ('filter' in variables) {
-    return HttpResponse.json({ data: buildIssuesPageAnswer(variables) });
+    const query = typeof body === 'object' && body !== null && 'query' in body && typeof body.query === 'string' ? body.query : '';
+    return HttpResponse.json({ data: buildIssuesPageAnswer(variables, query) });
   }
   if ('teamKey' in variables) {
     return HttpResponse.json({ data: { workflowStates: { nodes: linearWorkflowStates.filter((state) => state.team === variables.teamKey).map((state) => ({ name: state.name })) } } });
@@ -81,12 +81,16 @@ interface IssuesPageVariables {
 
 const DEFAULT_TIME = '2026-10-01T00:00:00.000Z';
 
-function buildIssuesPageAnswer(variables: IssuesPageVariables) {
+// Linear answers 50 issues a page when the query sets no `first`.
+const DEFAULT_FIRST = 50;
+
+function buildIssuesPageAnswer(variables: IssuesPageVariables, query: string) {
   const filter: IssuesFilter = filterSchema.parse(variables.filter);
+  const first = Number(/\bfirst:\s*(?<first>\d+)/u.exec(query)?.groups?.['first'] ?? DEFAULT_FIRST);
   const start = typeof variables.after === 'string' ? Number(variables.after) : 0;
   const matching = linearIssues.filter((issue) => isInFilter(issue, filter));
-  const nodes = matching.slice(start, start + PAGE_SIZE).map((issue) => buildIssuePageNode(issue));
-  const next = start + PAGE_SIZE;
+  const nodes = matching.slice(start, start + first).map((issue) => buildIssuePageNode(issue));
+  const next = start + first;
   return { issues: { nodes, pageInfo: { hasNextPage: next < matching.length, endCursor: next < matching.length ? String(next) : null } } };
 }
 

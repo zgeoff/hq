@@ -28,6 +28,15 @@ function setupTest() {
 
 test('it writes two page files for 150 issues, 100 then 50, each holding only an issues array', async () => {
   const ctx = setupTest();
+  const firsts: string[] = [];
+  server.events.on('request:start', async (info) => {
+    const sent = await info.request.clone().json();
+    const body = z.object({ query: z.string(), variables: z.object({ filter: z.unknown().optional() }) }).parse(sent);
+    if (body.variables.filter !== undefined) {
+      firsts.push(/\bfirst:\s*(?<first>\d+)/u.exec(body.query)?.groups?.['first'] ?? 'none');
+    }
+  });
+  onTestFinished(() => server.events.removeAllListeners());
   linearWorkflowStates.push({ team: 'KET', name: 'Ready' });
   linearIssues.push(...Array.from({ length: 150 }, (_, index) => ({ identifier: `KET-${index + 1}`, team: 'KET', state: 'Ready', stateType: 'unstarted', previousIdentifiers: [], project: null, labels: [], parent: null })));
 
@@ -40,6 +49,7 @@ test('it writes two page files for 150 issues, 100 then 50, each holding only an
   const second = pageSchema.parse(JSON.parse(secondText));
   expect(out.data).toStrictEqual({ files: [join(ctx.directory, 'issues-1.json'), join(ctx.directory, 'issues-2.json')], issues: 150 });
   expect(out.text).toBe(`${join(ctx.directory, 'issues-1.json')}\n${join(ctx.directory, 'issues-2.json')}`);
+  expect(firsts).toStrictEqual(['100', '100']);
   expect(first.issues).toHaveLength(100);
   expect(second.issues).toHaveLength(50);
   expect(readdirSync(ctx.directory).toSorted()).toStrictEqual(['issues-1.json', 'issues-2.json']);

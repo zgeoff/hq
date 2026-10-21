@@ -3,7 +3,7 @@ import { HqError } from '../errors.ts';
 import type { IssueField } from './parse-issue-fields.ts';
 import type { LinearCall } from './types.ts';
 
-export const PAGE_SIZE = 100;
+const PAGE_SIZE = 100;
 const MAX_PAGES = 200;
 
 // A GraphQL filter on the issues of one team, in the given states, updated at or after a time.

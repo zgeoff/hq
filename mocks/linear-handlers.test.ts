@@ -1,4 +1,5 @@
 import { expect, test } from 'bun:test';
+import { z } from 'zod';
 import { LINEAR_GRAPHQL_URL, linearDocuments, linearIssues } from './linear-handlers.ts';
 
 test('it answers the Ready query with the issues in its team and state only', async () => {
@@ -73,4 +74,23 @@ test('it answers any other query as the key user', async () => {
   const answer: unknown = await response.json();
 
   expect(answer).toStrictEqual({ data: { viewer: { id: 'kettle-bot' } } });
+});
+
+test('it answers an issues page query with as many issues as its first asks for, and a cursor to the rest', async () => {
+  linearIssues.push(
+    { identifier: 'KET-1', team: 'KET', state: 'Ready', stateType: 'unstarted', previousIdentifiers: [], project: null, labels: [], parent: null },
+    { identifier: 'KET-2', team: 'KET', state: 'Ready', stateType: 'unstarted', previousIdentifiers: [], project: null, labels: [], parent: null },
+    { identifier: 'KET-3', team: 'KET', state: 'Ready', stateType: 'unstarted', previousIdentifiers: [], project: null, labels: [], parent: null },
+  );
+  const filter = { team: { key: { eq: 'KET' } }, state: { name: { in: ['Ready'] } } };
+  const nodeSchema = z.object({ identifier: z.string() });
+  const issuesSchema = z.object({ nodes: z.array(nodeSchema), pageInfo: z.unknown() });
+  const answerSchema = z.object({ data: z.object({ issues: issuesSchema }) });
+
+  const response = await fetch(LINEAR_GRAPHQL_URL, { method: 'POST', body: JSON.stringify({ query: 'query { issues(first: 2, after: $after, filter: $filter) { nodes { identifier } } }', variables: { after: null, filter } }) });
+  const sent: unknown = await response.json();
+  const answer = answerSchema.parse(sent);
+
+  expect(answer.data.issues.nodes.map((node) => node.identifier)).toStrictEqual(['KET-1', 'KET-2']);
+  expect(answer.data.issues.pageInfo).toStrictEqual({ hasNextPage: true, endCursor: '2' });
 });
