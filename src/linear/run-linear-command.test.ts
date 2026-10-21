@@ -309,6 +309,52 @@ test('it writes no page file when the second page is not what Linear promises', 
   expect(readdirSync(ctx.directory)).toStrictEqual([]);
 });
 
+test('it stops at 200 pages, asks Linear for no page past them and writes no file', () => {
+  const ctx = setupTest();
+  const sent: unknown[] = [];
+  server.events.on('request:start', async (info) => {
+    const body: unknown = await info.request.clone().json();
+    sent.push(body);
+  });
+  onTestFinished(() => server.events.removeAllListeners());
+  linearWorkflowStates.push({ team: 'KET', name: 'Ready' });
+  server.use(buildStubLinearIssuePages(Array.from({ length: 200 }, (_, index) => ({ issues: { nodes: [], pageInfo: { hasNextPage: true, endCursor: `c${index + 1}` } } }))));
+
+  const failed = runLinearCommand(ctx.call, { team: 'KET', state: 'Ready', out: ctx.directory });
+
+  expect(failed).rejects.toMatchObject({ code: 'linear_failed', message: 'more than 20000 issues match; hq reads no further' });
+  expect(sent).toHaveLength(201);
+  expect(readdirSync(ctx.directory)).toStrictEqual([]);
+});
+
+test('it fails as linear_failed when Linear says another page follows but gives no cursor', () => {
+  const ctx = setupTest();
+  linearWorkflowStates.push({ team: 'KET', name: 'Ready' });
+  server.use(buildStubLinearIssuePages([{ issues: { nodes: [], pageInfo: { hasNextPage: true, endCursor: null } } }]));
+
+  const failed = runLinearCommand(ctx.call, { team: 'KET', state: 'Ready', out: ctx.directory });
+
+  expect(failed).rejects.toMatchObject({ code: 'linear_failed', message: 'Linear says another page follows but gave no cursor' });
+  expect(readdirSync(ctx.directory)).toStrictEqual([]);
+});
+
+test('it fails as linear_failed when the workflow states answer is not what Linear promises', () => {
+  const ctx = setupTest();
+  server.use(http.post(LINEAR_GRAPHQL_URL, () => HttpResponse.json({ data: { workflowStates: { nodes: [{ label: 'Ready' }] } } })));
+
+  const failed = runLinearCommand(ctx.call, { team: 'KET', state: 'Ready', out: ctx.directory });
+
+  expect(failed).rejects.toMatchObject({ code: 'linear_failed', message: "Linear's workflow states answer has an unexpected shape: workflowStates.nodes.0.name" });
+});
+
+test.each(['Ready,', 'Ready, ,Done'])('it refuses a --state of %p, which names an empty state, as bad_args', (state) => {
+  const ctx = setupTest();
+
+  const failed = runLinearCommand(ctx.call, { team: 'KET', state, out: ctx.directory });
+
+  expect(failed).rejects.toMatchObject({ code: 'bad_args', message: '--state is a comma-separated list of state names, with none empty' });
+});
+
 test('it fails with the error and writes no file when Linear answers 500', () => {
   const ctx = setupTest();
   server.use(http.post(LINEAR_GRAPHQL_URL, () => HttpResponse.json({ errors: [{ message: 'invented: Linear is unwell' }] }, { status: 500 })));
