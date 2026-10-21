@@ -20,7 +20,7 @@ function setupTest() {
   return { directory, call: makeLinearCaller(run), scripts: join(import.meta.dir, '../skills/linear-triage/scripts') };
 }
 
-test('the triage scripts exit 0 and read every issue on the pages hq linear issues wrote', async () => {
+test('it runs each triage script to exit 0 over every issue on the pages hq linear issues wrote', async () => {
   const ctx = setupTest();
   const states = ['Backlog', 'Ready', 'In Review', 'Done'];
   linearWorkflowStates.push(...states.map((name) => ({ team: 'GEO', name })));

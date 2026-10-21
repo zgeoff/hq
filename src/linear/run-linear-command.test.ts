@@ -270,7 +270,7 @@ test('it fails with the error and writes no file when Linear answers 500', () =>
   expect(readdirSync(ctx.directory)).toStrictEqual([]);
 });
 
-test('hq linear issues --json prints the files and the issue count', async () => {
+test('it prints the files and the issue count for hq linear issues --json', async () => {
   const ctx = setupTest();
   const fresh = freshDb();
   const log = console.log;
