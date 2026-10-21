@@ -369,6 +369,17 @@ test('it removes the pages it wrote, and only those, when a page write fails', (
   expect(readdirSync(ctx.directory).toSorted()).toStrictEqual(['issues-final.json', 'notes.txt']);
 });
 
+test('it removes every other page it wrote when one page cannot be removed', async () => {
+  const ctx = setupTest();
+  linearWorkflowStates.push({ team: 'KET', name: 'Ready' });
+  linearIssues.push(...Array.from({ length: 250 }, (_, index) => ({ identifier: `KET-${index + 1}`, team: 'KET', state: 'Ready', stateType: 'unstarted', previousIdentifiers: [], project: null, labels: [], parent: null })));
+
+  const failed = runLinearCommand({ ...ctx.deps, files: buildStubIssueFiles('issues-3.json', 'issues-1.json') }, { team: 'KET', state: 'Ready', out: ctx.directory });
+
+  await expect(failed).rejects.toThrow(`a page write failed, and these pages could not be removed: ${join(ctx.directory, 'issues-1.json')}`);
+  expect(readdirSync(ctx.directory)).toStrictEqual(['issues-1.json']);
+});
+
 test('it fails with the error and writes no file when Linear answers 500', () => {
   const ctx = setupTest();
   server.use(http.post(LINEAR_GRAPHQL_URL, () => HttpResponse.json({ errors: [{ message: 'invented: Linear is unwell' }] }, { status: 500 })));

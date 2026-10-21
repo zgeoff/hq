@@ -14,10 +14,29 @@ export function writeIssuePages(files: IssueFiles, directory: string, pages: Iss
     }
   } catch (error) {
     // A cut-short set of pages would read as the whole team, and would refuse the retry.
-    for (const path of written) {
-      files.rmSync(path, { force: true });
+    const stuck = removePages(files, written);
+    if (stuck.length === 0) {
+      throw error;
     }
-    throw error;
+    throw new AggregateError([error, ...stuck.map((left) => left.error)], `a page write failed, and these pages could not be removed: ${stuck.map((left) => left.path).join(', ')}`, { cause: error });
   }
   return written;
+}
+
+interface StuckPage {
+  path: string;
+  error: unknown;
+}
+
+// Tries every page, so one failed removal leaves no other page behind.
+function removePages(files: IssueFiles, paths: string[]): StuckPage[] {
+  const stuck: StuckPage[] = [];
+  for (const path of paths) {
+    try {
+      files.rmSync(path, { force: true });
+    } catch (error) {
+      stuck.push({ path, error });
+    }
+  }
+  return stuck;
 }
