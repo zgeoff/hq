@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { HttpResponse, http } from 'msw';
 import { z } from 'zod';
+import { buildStubLinearIssuePages } from '../../mocks/build-stub-linear-issue-pages.ts';
 import { LINEAR_GRAPHQL_URL, linearIssues, linearWorkflowStates } from '../../mocks/linear-handlers.ts';
 import { server } from '../../mocks/node.ts';
 import { freshDb } from '../../test/helpers.ts';
@@ -27,13 +28,10 @@ function setupTest() {
 
 test('it writes two page files for 150 issues, 100 then 50, each holding only an issues array', async () => {
   const ctx = setupTest();
-  const firsts: string[] = [];
+  const sent: unknown[] = [];
   server.events.on('request:start', async (info) => {
-    const sent = await info.request.clone().json();
-    const body = z.object({ query: z.string(), variables: z.object({ filter: z.unknown().optional() }) }).parse(sent);
-    if (body.variables.filter !== undefined) {
-      firsts.push(/\bfirst:\s*(?<first>\d+)/u.exec(body.query)?.groups?.['first'] ?? 'none');
-    }
+    const body: unknown = await info.request.clone().json();
+    sent.push(body);
   });
   onTestFinished(() => server.events.removeAllListeners());
   linearWorkflowStates.push({ team: 'KET', name: 'Ready' });
@@ -48,7 +46,12 @@ test('it writes two page files for 150 issues, 100 then 50, each holding only an
   const second = pageSchema.parse(JSON.parse(secondText));
   expect(out.data).toStrictEqual({ files: [join(ctx.directory, 'issues-1.json'), join(ctx.directory, 'issues-2.json')], issues: 150 });
   expect(out.text).toBe(`${join(ctx.directory, 'issues-1.json')}\n${join(ctx.directory, 'issues-2.json')}`);
-  expect(firsts).toStrictEqual(['100', '100']);
+  const filter = { team: { key: { eq: 'KET' } }, state: { name: { in: ['Ready'] } } };
+  expect(sent).toStrictEqual([
+    { query: expect.any(String), variables: { teamKey: 'KET' } },
+    { query: expect.stringContaining('issues(first: 100,'), variables: { after: null, filter } },
+    { query: expect.stringContaining('issues(first: 100,'), variables: { after: '100', filter } },
+  ]);
   expect(first.issues).toHaveLength(100);
   expect(second.issues).toHaveLength(50);
   expect(readdirSync(ctx.directory).toSorted()).toStrictEqual(['issues-1.json', 'issues-2.json']);
@@ -104,7 +107,7 @@ test('it refuses a team that holds no states as bad_args', () => {
 
 test('it sends --updated-since as a filter, so only issues updated at or after the time come back', async () => {
   const ctx = setupTest();
-  const filters: unknown[] = [];
+  const sent: unknown[] = [];
   linearWorkflowStates.push({ team: 'KET', name: 'Ready' });
   linearIssues.push(
     { identifier: 'KET-1', team: 'KET', state: 'Ready', stateType: 'unstarted', previousIdentifiers: [], project: null, labels: [], parent: null, updatedAt: '2026-10-14T23:59:59.000Z' },
@@ -112,18 +115,18 @@ test('it sends --updated-since as a filter, so only issues updated at or after t
     { identifier: 'KET-3', team: 'KET', state: 'Ready', stateType: 'unstarted', previousIdentifiers: [], project: null, labels: [], parent: null, updatedAt: '2026-10-20T08:30:00.000Z' },
   );
   server.events.on('request:start', async (info) => {
-    const sent = await info.request.clone().json();
-    const body = z.object({ variables: z.object({ filter: z.unknown().optional() }) }).parse(sent);
-    if (body.variables.filter !== undefined) {
-      filters.push(body.variables.filter);
-    }
+    const body: unknown = await info.request.clone().json();
+    sent.push(body);
   });
   onTestFinished(() => server.events.removeAllListeners());
 
   await runLinearCommand(ctx.call, { team: 'KET', state: 'Ready', out: ctx.directory, 'updated-since': '2026-10-15T00:00:00Z', fields: 'id' });
 
   const page = readFileSync(join(ctx.directory, 'issues-1.json'), 'utf8');
-  expect(filters).toStrictEqual([{ team: { key: { eq: 'KET' } }, state: { name: { in: ['Ready'] } }, updatedAt: { gte: '2026-10-15T00:00:00.000Z' } }]);
+  expect(sent).toStrictEqual([
+    { query: expect.any(String), variables: { teamKey: 'KET' } },
+    { query: expect.any(String), variables: { after: null, filter: { team: { key: { eq: 'KET' } }, state: { name: { in: ['Ready'] } }, updatedAt: { gte: '2026-10-15T00:00:00.000Z' } } } },
+  ]);
   expect(JSON.parse(page)).toStrictEqual({ issues: [{ id: 'KET-2' }, { id: 'KET-3' }] });
 });
 
@@ -140,20 +143,20 @@ test.each([
   ['2026-10-15T02:00:00+02:00', '2026-10-15T00:00:00.000Z'],
 ])('it sends an --updated-since of %p as %p', async (raw, gte) => {
   const ctx = setupTest();
-  const filters: unknown[] = [];
+  const sent: unknown[] = [];
   linearWorkflowStates.push({ team: 'KET', name: 'Ready' });
   server.events.on('request:start', async (info) => {
-    const sent = await info.request.clone().json();
-    const body = z.object({ variables: z.object({ filter: z.unknown().optional() }) }).parse(sent);
-    if (body.variables.filter !== undefined) {
-      filters.push(body.variables.filter);
-    }
+    const body: unknown = await info.request.clone().json();
+    sent.push(body);
   });
   onTestFinished(() => server.events.removeAllListeners());
 
   await runLinearCommand(ctx.call, { team: 'KET', state: 'Ready', out: ctx.directory, 'updated-since': raw });
 
-  expect(filters).toStrictEqual([{ team: { key: { eq: 'KET' } }, state: { name: { in: ['Ready'] } }, updatedAt: { gte } }]);
+  expect(sent).toStrictEqual([
+    { query: expect.any(String), variables: { teamKey: 'KET' } },
+    { query: expect.any(String), variables: { after: null, filter: { team: { key: { eq: 'KET' } }, state: { name: { in: ['Ready'] } }, updatedAt: { gte } } } },
+  ]);
 });
 
 test('it writes only the fields --fields names, in the connector order', async () => {
@@ -292,18 +295,12 @@ test.each([
 test('it writes no page file when the second page is not what Linear promises', () => {
   const ctx = setupTest();
   const good = { identifier: 'KET-1', title: 'Descale the kettle', url: 'https://linear.invalid/issue/KET-1', state: { name: 'Ready', type: 'unstarted' }, project: null, priority: 0, priorityLabel: 'No priority', labels: { nodes: [] }, parent: null, createdAt: '2026-10-01T00:00:00.000Z', updatedAt: '2026-10-01T00:00:00.000Z', completedAt: null, canceledAt: null, description: null };
-  const bodySchema = z.object({ variables: z.object({ after: z.string().nullish(), teamKey: z.string().optional() }) });
+  linearWorkflowStates.push({ team: 'KET', name: 'Ready' });
   server.use(
-    http.post(LINEAR_GRAPHQL_URL, async (info) => {
-      const sent = await info.request.json();
-      const body = bodySchema.parse(sent);
-      if (body.variables.teamKey !== undefined) {
-        return HttpResponse.json({ data: { workflowStates: { nodes: [{ name: 'Ready' }] } } });
-      }
-      return body.variables.after === null
-        ? HttpResponse.json({ data: { issues: { nodes: [good], pageInfo: { hasNextPage: true, endCursor: 'c1' } } } })
-        : HttpResponse.json({ data: { issues: { nodes: [{ identifier: 'KET-2' }], pageInfo: { hasNextPage: false, endCursor: null } } } });
-    }),
+    buildStubLinearIssuePages([
+      { issues: { nodes: [good], pageInfo: { hasNextPage: true, endCursor: 'c1' } } },
+      { issues: { nodes: [{ identifier: 'KET-2' }], pageInfo: { hasNextPage: false, endCursor: null } } },
+    ]),
   );
 
   const failed = runLinearCommand(ctx.call, { team: 'KET', state: 'Ready', out: ctx.directory });
