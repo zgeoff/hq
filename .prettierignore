@@ -1,0 +1,7 @@
+# Repo-sync copies from zgeoff/tools (.github/workflows/repo-sync.yml); each sync overwrites them.
+.claude/skills/docs-writing/
+.claude/skills/testing/
+.claude/skills/code-style/
+
+# A verbatim copy of zgeoff/tools socket.yml, which uses single quotes.
+socket.yml

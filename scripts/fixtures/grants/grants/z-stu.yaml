@@ -1,0 +1,16 @@
+- id: merge
+  label: "Merge"
+  outcome: allow
+  note: "merge a paper kite PR once its checks pass."
+- id: runs
+  label: "Runs"
+  outcome: allow
+  note: "open and close runs for the kite fleet."
+- id: news
+  label: "News"
+  outcome: allow
+  note: "post kite news after each merge."
+- id: decisions
+  label: "Decisions"
+  outcome: allow
+  note: "decide a small kite call yourself, unless it involves {still-ask}."

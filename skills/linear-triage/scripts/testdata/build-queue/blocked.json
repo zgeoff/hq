@@ -1,0 +1,12 @@
+[
+  {
+    "question": "May the preview use a sandbox?",
+    "recommendation": "Use the garden sandbox",
+    "session": "cccccccc-9001-4000-8000-000000000001",
+    "issue": "GEO-9190"
+  },
+  {
+    "question": "Which sample should Mira test?",
+    "recommendation": "Use the blue sample"
+  }
+]

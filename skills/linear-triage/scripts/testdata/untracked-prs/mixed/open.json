@@ -1,0 +1,130 @@
+[
+  {
+    "data": {
+      "search": {
+        "pageInfo": {
+          "hasNextPage": true,
+          "endCursor": "fixture-next"
+        },
+        "nodes": [
+          {
+            "number": 9303,
+            "title": "Add the orchard demo",
+            "url": "https://github.com/zgeoff/paper-orchard/pull/9303",
+            "body": "",
+            "headRefName": "sample-9303",
+            "state": "OPEN",
+            "mergedAt": null,
+            "isDraft": true,
+            "repository": {
+              "name": "paper-orchard"
+            }
+          },
+          {
+            "number": 9302,
+            "title": "Repair the lantern view",
+            "url": "https://github.com/zgeoff/lantern-demo/pull/9302",
+            "body": "",
+            "headRefName": "sample-9302",
+            "state": "OPEN",
+            "mergedAt": null,
+            "isDraft": false,
+            "repository": {
+              "name": "lantern-demo"
+            }
+          },
+          {
+            "number": 9310,
+            "title": "GEO-9300: add a side gate",
+            "url": "https://github.com/zgeoff/lantern-demo/pull/9310",
+            "body": "",
+            "headRefName": "sample-9310",
+            "state": "OPEN",
+            "mergedAt": null,
+            "isDraft": false,
+            "repository": {
+              "name": "lantern-demo"
+            }
+          },
+          {
+            "number": 9311,
+            "title": "Add a narrow gate",
+            "url": "https://github.com/zgeoff/lantern-demo/pull/9311",
+            "body": "",
+            "headRefName": "sample/geo-9301-gate",
+            "state": "OPEN",
+            "mergedAt": null,
+            "isDraft": false,
+            "repository": {
+              "name": "lantern-demo"
+            }
+          },
+          {
+            "number": 9312,
+            "title": "Paint the gate",
+            "url": "https://github.com/zgeoff/lantern-demo/pull/9312",
+            "body": "Contributes to gEo-9302.",
+            "headRefName": "sample-9312",
+            "state": "OPEN",
+            "mergedAt": null,
+            "isDraft": false,
+            "repository": {
+              "name": "lantern-demo"
+            }
+          }
+        ]
+      }
+    }
+  },
+  {
+    "data": {
+      "search": {
+        "pageInfo": {
+          "hasNextPage": false,
+          "endCursor": null
+        },
+        "nodes": [
+          {
+            "number": 9314,
+            "title": "Document the sample",
+            "url": "https://github.com/zgeoff/nixie-definitions/pull/9314",
+            "body": "",
+            "headRefName": "sample-9314",
+            "state": "OPEN",
+            "mergedAt": null,
+            "isDraft": false,
+            "repository": {
+              "name": "nixie-definitions"
+            }
+          },
+          {
+            "number": 9315,
+            "title": "Adjust the sample queue",
+            "url": "https://github.com/zgeoff/hq/pull/9315",
+            "body": "",
+            "headRefName": "sample-9315",
+            "state": "OPEN",
+            "mergedAt": null,
+            "isDraft": false,
+            "repository": {
+              "name": "hq"
+            }
+          },
+          {
+            "number": 9301,
+            "title": "Show XGEO-9304 as sample text",
+            "url": "https://github.com/zgeoff/lantern-demo/pull/9301",
+            "body": null,
+            "headRefName": "sample-9301",
+            "state": "OPEN",
+            "mergedAt": null,
+            "isDraft": false,
+            "repository": {
+              "name": "lantern-demo"
+            }
+          }
+        ]
+      }
+    }
+  }
+]

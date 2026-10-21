@@ -1,0 +1,105 @@
+// Every HQ_* setting (and REVIEW_DIR) hq reads, in one schema. config() parses the environment on
+// each call, so a test that changes a variable between cases sees the change. A bad value throws
+// bad_config naming the variable. Settings with a default that depends on HOME or on another
+// setting stay optional here; the code that needs one applies its own fallback.
+import { z } from 'zod';
+import { HqError } from '../errors.ts';
+
+// An integer of milliseconds or minutes. 0 is allowed: a test sets a wait to 0, and a threshold of 0 means "at once".
+const count = (dflt: number) => z.coerce.number().int().nonnegative().default(dflt);
+// A wait that falls back to its default when the value is unusable (not a number, negative); the
+// caller clamps the top end. A bad value here has never been an error.
+const lenientWait = (dflt: number) => z.coerce.number().nonnegative().finite().catch(dflt).default(dflt);
+const text = () => z.string().optional();
+
+const shape = {
+  // Minutes and milliseconds.
+  HQ_REVIEW_LOCK_WAIT_MS: count(300_000),
+  HQ_LANES_FREE_MIN: count(10),
+  HQ_LANES_REPEAT_MIN: count(30),
+  HQ_LANES_FOLLOW_MIN: count(10),
+  HQ_LANES_READY_FRESH_MIN: count(30),
+  HQ_LANES_READY_ZERO_FRESH_MIN: count(180),
+  HQ_LANES_READY_STALE_MIN: count(120),
+  HQ_RUN_FINAL_MIN: count(30),
+  HQ_RUN_REVIEW_MIN: count(60),
+  HQ_RUN_QUIET_MIN: count(60),
+  HQ_RUN_REPEAT_MIN: count(30),
+  HQ_SEARCH_GAP_MS: count(2_100),
+  HQ_REF_LOCK_RETRY_MS: count(3_000),
+  HQ_SYNC_GIT_TIMEOUT_MS: count(40_000),
+  HQ_FETCH_RETRY_MS: count(10_000),
+  HQ_RC_POLL_MS: lenientWait(15_000),
+  HQ_SEND_WAIT_MS: lenientWait(15_000),
+  HQ_RESTORE_WAIT_MS: lenientWait(180_000),
+  // Quiet hours, "03-07": start and end hour in Sydney.
+  HQ_QUIET: z
+    .string()
+    .regex(/^\d{1,2}-\d{1,2}$/)
+    .default('03-07'),
+  HQ_STATS_CUTOFF: z.string().default('2026-10-14T20:00:00Z'),
+  // Anything but "off" leaves notifications on; anything but "1" is not a live run.
+  HQ_NOTIFY: text(),
+  HQ_LIVE: text(),
+  // Paths and names. Each default is built where it is used.
+  REVIEW_DIR: text(),
+  HQ_REPOS: text(),
+  HQ_PROJECTS: text(),
+  HQ_NOSLOP_OP_SETTINGS: text(),
+  HQ_NOSLOP_STORE: text(),
+  HQ_CAPACITY: text(),
+  HQ_BACKUP_DIR: text(),
+  HQ_BACKUP_PASSWORD_FILE: text(),
+  HQ_BACKUP_REMOTE_ENV: text(),
+  HQ_BACKUP_DB: text(),
+  HQ_BACKUP_DIRS: text(),
+  HQ_DB: text(),
+  HQ_LIVECHECK_TO: text(),
+  HQ_CLAUDE_JSON: text(),
+  HQ_ATC_SOCKET: text(),
+  HQ_ATC_STATE: text(),
+  HQ_REPAIR_BACKUPS: text(),
+  HQ_CLAUDE_PROJECTS: text(),
+  HQ_AS: text(),
+  HQ_DEFINITIONS_DIR: text(),
+  HQ_PRIVATE_DIR: text(),
+  HQ_DEFS_SOURCE_FILE: text(),
+  HQ_NOW: text(),
+  HQ_ORCHESTRATOR: text(),
+  HQ_OWNER: text(),
+  HQ_REPO_LOOP_PROMPT: text(),
+  HQ_LOCAL_CONFIG: text(),
+  HQ_NOSLOP_OP_VAULT: text(),
+  HQ_NOSLOP_OP_ITEM: text(),
+  HQ_LINEAR_OP_REF: text(),
+  HQ_PROBE_TARGET: text(),
+  HQ_PROBE_READY: text(),
+  HQ_CLOUD_METRICS_URL: text(),
+  HQ_CLOUD_HOST: text(),
+  HQ_PROBE_CONTROL: text(),
+  HQ_RESTART_LOG: text(),
+};
+
+const schema = z.object(shape);
+export type HqConfig = z.infer<typeof schema>;
+
+// HOME, NODE_ENV, ATC_SESSION_ID and OP_SERVICE_ACCOUNT_TOKEN are read straight from the
+// environment, but a test overrides them by name too.
+export type ConfigName = keyof typeof shape | 'HOME' | 'NODE_ENV' | 'ATC_SESSION_ID' | 'OP_SERVICE_ACCOUNT_TOKEN';
+
+// What each setting must be, for the message.
+const RULES: Partial<Record<ConfigName, string>> = {
+  HQ_QUIET: 'two hours like 03-07',
+};
+
+const NUMBER_RULE = 'a whole number, 0 or more';
+
+export function config(env: Record<string, string | undefined> = process.env): HqConfig {
+  const input: Record<string, string | undefined> = {};
+  for (const k of Object.keys(shape)) input[k] = env[k];
+  const r = schema.safeParse(input);
+  if (r.success) return r.data;
+  const name = String(r.error.issues[0]!.path[0]) as ConfigName;
+  const rule = RULES[name] ?? (/_(MIN|MS)$/.test(name) ? NUMBER_RULE : 'valid');
+  throw new HqError('bad_config', `${name} must be ${rule}, got '${input[name] ?? ''}'`, { setting: name });
+}

@@ -1,0 +1,44 @@
+[
+  {
+    "id": "GEO-930",
+    "title": "atc: keep queued messages across a restart",
+    "status": "Ready",
+    "project": { "name": "Atc roadmap" },
+    "labels": [{ "name": "Bug" }, { "name": "atc" }]
+  },
+  {
+    "id": "GEO-931",
+    "title": "atc: keep unanswered messages across a daemon restart",
+    "status": "Backlog",
+    "project": { "name": "Atc roadmap" },
+    "labels": [{ "name": "Bug" }, { "name": "atc" }]
+  },
+  {
+    "id": "GEO-932",
+    "title": "hq: split read-schema.ts into one export per module",
+    "status": "Ready",
+    "project": { "name": "Hq maintenance" },
+    "labels": [{ "name": "Chore" }, { "name": "hq" }]
+  },
+  {
+    "id": "GEO-933",
+    "title": "hq: split imps.ts into one export per module",
+    "status": "Ready",
+    "project": { "name": "Hq maintenance" },
+    "labels": [{ "name": "Chore" }, { "name": "hq" }]
+  },
+  {
+    "id": "GEO-934",
+    "title": "tools: bump oxlint to 1.90 across the repos",
+    "status": "Ready",
+    "project": { "name": "Tools maintenance" },
+    "labels": [{ "name": "Chore" }, { "name": "tools" }]
+  },
+  {
+    "id": "GEO-935",
+    "title": "tools: bump oxfmt to 0.12 across the repos",
+    "status": "Ready",
+    "project": { "name": "Tools maintenance" },
+    "labels": [{ "name": "Chore" }, { "name": "tools" }]
+  }
+]

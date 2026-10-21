@@ -1,0 +1,10 @@
+{
+  "files": [
+    {
+      "path": "packages/std/src/index.ts"
+    },
+    {
+      "path": "bun.lock"
+    }
+  ]
+}

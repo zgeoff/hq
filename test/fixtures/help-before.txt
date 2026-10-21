@@ -1,0 +1,115 @@
+hq 0.79.0: headquarters for the z- sessions. Every command takes --json.
+
+  hq status                                   the open item, what is next and why it waits
+  hq version [--json]                         hq's version and schema, and the commit the installed binary was built from
+  hq capabilities [--json] [--require X.Y.Z]  commands, JSON shapes, version; --require fails if hq is older
+  hq open [id] [--force]                      open the next call or proposal (one at a time)
+  hq hold --reason TEXT | hq release          hold the queue, or let it go
+  hq band                                     the fleet in one line: needs you, Nix, lanes, CI, reviews (the z-stu band reads --json)
+  hq pane                                     the detail behind the band: needs you with links, Nix today, lanes, reviews, shipped today, news (z-stu's /hq pane reads --json)
+  hq whois <session-id>                       the declared fleet name hq fleet last saw under a session id
+  hq pins                                     pinned atc sessions, longest idle first
+  hq console [--port N]                       a local page to answer calls, proposals and to-dos
+
+  hq restart [--force]                        restart the atc daemon (detached), then wake
+  hq wake [--dry-run] [--wait SECONDS]        message the sessions the last restart cut off
+  hq wake list | add <session> [--note T] | remove <session> | import <file>
+
+  hq review <[owner/]repo> <pr> [--no-watch] [--repo-dir D] [--effort high|medium] [--full] [--redesign F] [--fixes-only]  review in a worktree, then CI and open threads: noslop for repos on the noslop list (--full: the whole PR, not only new commits; --redesign F: one round past the cap, once per PR, for a finding that forced a redesign; --fixes-only: check the fixes answered since the last round with no new review, not a round, inside the cap or past it), else Codex (effort by risk, allow-or-deny pass only for a gate change)
+  hq review check <[owner/]repo> <pr> [--repo-dir D]  noslop check of the PR: pass or fail, and the findings still open; records the round
+  hq review gate <[owner/]repo> <pr> [--repo-dir D]  may the PR merge: exit 0 on green CI plus, for a noslop PR, a review on record and no open finding (or the owner's override at this head), else merge_blocked with the reason
+  hq pr status <[owner/]repo> <pr> | answer <repo> <pr> lgtm|changes|reject --source S [--note T] | override <repo> <pr> --source S --note T | accept-risk <repo> <pr> <finding-id> --source S --note T | next <repo> <pr> <session>|--clear   the PR's record (gate, the owner's answer, who holds the next step; stale when the head moved): read it before you message a session about a PR
+  hq noslop [on|off <repo...> | pin <sha> [--force <reason>] | report [--since ISO]]   the repos noslop reviews, the pinned commit and its clone
+  hq repair advisor-400 <session> | --file T.jsonl [--apply]  mend a stopped Claude session that fails every turn with "unexpected tool_use_id found in advisor_tool_result blocks"; dry run unless --apply, backup first
+                                             (checkout: --repo-dir, ~/projects/<repo>, else hq's own clone)
+
+  hq run add <issue> --title T [--session ID] [--where imp|local|none] [--next T] [--gate T] [--geoff-chat] [--ready-since TIME] [--size S|M|L|XL --lines N] [--lane LANE]
+  hq run size <issue> --size S|M|L|XL --lines N   triage's size guess (lines changed, tests included)
+  hq run list [--all] | show <issue|session> [--notes N] | watchlist [--write FILE] | sweep
+  hq run session <issue> <id> [--add|--remove] a relaunch (new main session), or a helper joins/leaves
+  hq run lane <issue> (<lane> | --lane LANE)   set a run's delivery lane (pacing.json lanes)
+  hq run reopen <issue> [--next T]   a done or dropped run back to working
+  hq run state <issue> <working|blocked|merged|deploying|deploy-held|live-check> [--next T] [--waits-on T|none] [--waits-on-geoff|--not-geoff] [--check owed|none]
+  hq run check <issue> owed|none    whether a live check is owed once the release ships (unset counts as owed; none sends the run to done)
+  hq run ship [--dry-run]            one release pass now: a run whose merged PRs all shipped in a release moves to live-check, or done when no check is owed (the watcher does it every 10 min)
+  hq run done|drop <issue> [--note T] | next|gate|title <issue> <text> | geoff-chat <issue> on|off
+  hq run pr <issue> <repo#n|URL> | final <pr> --sha S [--fixed N] [--followups GEO-1,GEO-2] | reviewing <pr> | reviewed <pr> --sha S [--recheck]
+  hq run merged|closed <pr> | note <issue|session> <text> [--label L]
+  hq run unmerge <pr> [--reason T]   undo a wrong merged mark: the PR is open again in hq (hq run merged asks GitHub first)
+  hq run unfinal <pr> [--reason T]   clear a final mark the head has moved past; the sweep stops flagging the PR until the next final
+
+  hq lanes [status|log] [--limit N]           watcher state, nudges and whether slots dropped
+  hq lanes start [--interval SECONDS] | stop  install, enable and start the watcher unit (default every 300s); stop disables it
+  hq lanes tick                               one look now
+  hq stats [--since 7d|36h|TIME] [--around MARK]   numbers someone acts on: waits on the owner, merge to live, idle capacity, flow
+  hq answers [--since 7d|36h|TIME]   the owner's answers in the window: calls, proposals, console reviews and typed lines (--json for the weekly audit)
+  hq kinds [--weeks 8] | hq kinds sync [--weeks 8]   bug share per Sydney week: merged PRs by title kind and by Linear issue type, closed issues by type; sync backfills from GitHub and Linear
+  hq goals [--days 14] | hq goals sync [--days 14]   team goals per Sydney day and week: cloud deploy-prod runs, z-delivery DEPLOY/HOLD, CI runs, failures, cancels, re-runs and minutes, PRs merged and closed unmerged
+  hq goals targets | hq goals target <goal> <op> <value> | <goal> none   the 7 goals' targets (bugs, features, deploys, downtime, ciwaste, mustfix, cost); op is one of < <= >= >; none clears
+  hq goals weekly [--dry-run] | hq goals weekly skip [DATE] --reason T   the Monday 17:00 Sydney goals review to z-stu: print it, send it now, or leave a Monday alone
+  hq goals account [KEY NAME|none]           name a Claude usage account (KEY is 12 hex characters; NAME a slug of 24 characters at most); with no arguments lists the names
+  hq goals daily [--dry-run] | hq goals daily skip [DATE] --reason T   the 18:00 Sydney goals check-in to z-stu: print it, send it now, or leave a day alone
+  hq defs [status] | hq defs setup hq|private | hq defs check [hq] | hq defs use hq | hq defs sync   where the fleet's skills (hq-defs) and start prompts (hq-private) come from; sync fast-forwards both (the watcher does it each tick)
+  hq repo archive-history <from> <to> [--dry-run]   move the history of one repo name to another in hq.db and noslop's store (hq hq-archive, and back); backs both up first, refuses on a repeated key or a running noslop
+  hq morning [status] | hq morning skip [--date YYYY-MM-DD] --reason T | hq morning tick   the 08:15 Sydney morning-reports job
+  hq followup add GEO-n --backfill --at TIME [--from repo#n] | hq followup [list] | hq followup drop GEO-n   review follow-ups counted by hand
+  hq typed add --to SESSION --text T|--text-file F --source call:ID|proposal:ID|console:ID|chat:SESSION@TIME   log a line typed into a session as the owner
+  hq typed [list] [--session S] [--limit N]   the typed-line log, newest first
+  hq mark add --kind skills|grant|hq|other --text T [--ref URL|repo#n|GEO-n] [--at TIME] [--grant NAME] | hq mark [list] [--since 7d] | hq mark drop ID | hq mark grant ID NAME
+  hq grant act NAME --target ISSUE|PR|COMMAND [--note T] | hq grant [actions] [--since 7d]   record an action taken under a named standing grant; actions lists each named grant with its actions in the window, one line each
+  hq fleet [status] [--prompts] | ensure [--dry-run] [--now NAME,...]   the declared z- sessions and stale prompts (--json checks prompts only with --prompts); ensure spawns a missing one (never a duplicate); --now skips the wait for those names (a deliberate re-home)
+  hq fleet rc NAME                           the Remote Control helper (ensure starts it after a spawn): types /remote-control once if it is off, never if it is on or unclear
+  hq fleet timer install | remove            run ensure every 5 minutes
+  hq refusals [--days 7] [--by reason|session|tool]  auto-mode refusals in local Claude transcripts, newest first; --by tallies
+  hq refusals scan [--since 14d] [--budget-mb N]  scan the transcripts now (the watcher does it every tick); --since widens the backfill
+  hq capacity                                 the newest capacity sample (impd, cloud, Claude, CI, PC), thresholds and open alerts
+  hq capacity sample                          read capacity now, store it, send due alerts (the watcher does it every tick)
+  hq capacity log [--hours 24]                stored samples, newest first
+  hq capacity set KEY VALUE | KEY --reset     set a threshold, or put it back to the default
+  hq probe [status] [--days 7]               the Nix uptime probe: last sample and ready check, open outage or unready episode, downtime, outages and unready episodes in the window
+  hq probe run                               one check of Nix's /health/live (the timer's command)
+  hq probe timer install | remove            run the probe every minute
+  hq fleet remove NAME | restore NAME        retire a declared name (ensure never spawns it; drops its wake entry), or take it back
+  hq backup [status] | run | test [--remote]  encrypted restic snapshots of hq.db, z-sessions and z- transcripts
+  hq backup restore --to DIR [--snapshot ID] [--remote]   restore into an empty directory (never over live state)
+  hq backup timer install | remove           the hourly systemd user timer
+  hq health [check]                          read-only checks on this PC: units, restart loops, disk, memory, atc, watcher
+  hq health settings | set KEY [VALUE]       thresholds (no VALUE: back to the default)
+  hq health tick                             one watcher step: tell z-stu about new problems, file news for cleared ones
+  hq news [--all] [--limit N]                unread items for the owner, grouped by topic
+  hq news add --topic merge|release|deploy|fix|report|other --text T [--from S] [--issue GEO-n] [--link URL] [--tag SLUG] [--needs-geoff]
+                                             file one line; only --needs-geoff messages z-stu
+  hq news read --upto N                      mark items up to N read
+  hq outbox [drop ID]                        unsent messages; drop one
+  hq outbox forward FROM TO | forward FROM --remove | forwards   send a retired session's messages to its successor
+  hq lanes hold --minutes N --reason TEXT    pause slot nudges (at most 24h; ends by itself) | hq lanes release
+  hq lanes ready --lane name=n,... [--ready-total N] [--skipped "GEO-1=reason;GEO-2=reason"]
+                                             hq reads Ready per lane from Linear every 10 min; this reports it by hand when that read fails (fresh 30 min, a 0 for 3 h); a lane with free slots and 0 Ready lends to an area short of slots;
+                                             --ready-total is every Ready issue seen in Linear, --skipped the ones not counted, each with a reason
+  hq lanes ready --count N                    report a total Ready count only (the old form)
+
+  hq call|proposal add <id> (--title T --question Q (--body TEXT | --body-file F|-) | --item F|-)
+                           [--issues GEO-1,GEO-2] [--for SESSION] [--order N|none]
+  hq call|proposal stu <id> --view T
+  hq call|proposal open [id] [--force]
+  hq call|proposal answer <id> (--answer WORDS | --answer-file F|-)
+  hq call|proposal apply <id> --to typed:<session>|linear:<GEO-n>|none [--note T]
+  hq call|proposal later <id> [--until ISO|+4h]   default: next 07:00 Sydney
+  hq call|proposal skip <id> [--reason T]
+  hq call|proposal close <id> --reason T
+  hq call|proposal show <id> [--history]
+  hq call|proposal list [--state queued,open,...|all]
+
+  hq unblock add (--task T | --item F|-) [--id SLUG] [--minutes N] [--unblocks GEO-1:high,GEO-2:urgent]
+                 [--rank N] [--notify z-delivery,...] [--done-when issue:GEO-1|pr:repo#1|doc:ID]...
+  hq unblock list [--state open|done|dropped|all]
+  hq unblock new | pushed --upto N            items since the last push; move the cursor to N
+  hq unblock done|drop <id> [--note T]
+  hq unblock later <id> [--until ISO|+4h]   default: next 07:00 Sydney
+  hq unblock rank <id> <N|none>
+  hq unblock done-when <id> <issue:GEO-1|pr:repo#1|doc:ID>...
+  hq unblock show <id> [--history]
+
+  hq outbox [list] | hq outbox flush [--retry]  atc messages hq owes other sessions
+
+Who you are: --by, else HQ_AS, else your atc session's name.

@@ -1,0 +1,6 @@
+[
+  {
+    "type": "text",
+    "text": "{\"issues\": [{\"id\": \"GEO-9206\", \"title\": \"Plant the corner pot\", \"url\": \"https://linear.example/issue/GEO-9206\", \"status\": \"Todo\", \"statusType\": \"unstarted\", \"project\": \"Lantern Garden\", \"priority\": {\"value\": 3, \"name\": \"Medium\"}, \"labels\": [\"Feature\", \"M\", \"Garden\"], \"parentId\": \"GEO-9205\", \"updatedAt\": \"2026-10-15T00:00:00Z\"}, {\"id\": \"GEO-9203\", \"title\": \"Count the red lanterns\", \"url\": \"https://linear.example/issue/GEO-9203\", \"status\": \"In Progress\", \"statusType\": \"started\", \"project\": \"Lantern Garden\", \"priority\": {\"value\": 3, \"name\": \"Medium\"}, \"labels\": [\"Bug\", \"S\", \"Garden\"], \"parentId\": null, \"updatedAt\": \"2026-10-13T00:00:00Z\"}]}"
+  }
+]

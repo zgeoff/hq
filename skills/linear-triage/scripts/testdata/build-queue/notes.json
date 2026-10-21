@@ -1,0 +1,18 @@
+{
+  "GEO-9101": {
+    "question": "Use the dusk palette?",
+    "recommendation": "Use dusk"
+  },
+  "GEO-9102": {
+    "question": "Use the dusk palette?",
+    "recommendation": "Use dusk"
+  },
+  "GEO-9103": "Repair the counter before the preview",
+  "GEO-9104": {
+    "resolved": true
+  },
+  "GEO-9105": {
+    "question": "Use a two-tile path?",
+    "recommendation": "Use two tiles"
+  }
+}

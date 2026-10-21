@@ -1,0 +1,140 @@
+{
+  "kind": "daily",
+  "date": "2026-10-15",
+  "dateLabel": "Thursday 15 October",
+  "totals": {
+    "prs": 7,
+    "repos": 2,
+    "issues": 5,
+    "added": 2345,
+    "removed": 1234,
+    "closed": 2
+  },
+  "closed": [
+    {
+      "type": "Bug",
+      "count": 1
+    },
+    {
+      "type": "Chore",
+      "count": 1
+    }
+  ],
+  "days": null,
+  "groups": [
+    {
+      "project": "Lantern Garden",
+      "issues": 2,
+      "prs": 3,
+      "burndown": null,
+      "rows": [
+        {
+          "issue": "GEO-9401",
+          "title": "Repair the lantern latch",
+          "url": "https://linear.example/issue/GEO-9401",
+          "state": "closed",
+          "status": "Done",
+          "type": "Bug",
+          "marker": "🐛",
+          "priority": 1,
+          "flag": "🚨",
+          "prs": [
+            {
+              "repo": "lantern-demo",
+              "number": 9401,
+              "url": "https://github.com/zgeoff/lantern-demo/pull/9401"
+            }
+          ]
+        },
+        {
+          "issue": "GEO-9402",
+          "title": "Add the dusk path",
+          "url": "https://linear.example/issue/GEO-9402",
+          "state": "open",
+          "status": "In Review",
+          "type": "Feature",
+          "marker": "✨",
+          "priority": 2,
+          "flag": "❗",
+          "prs": [
+            {
+              "repo": "lantern-demo",
+              "number": 9402,
+              "url": "https://github.com/zgeoff/lantern-demo/pull/9402"
+            },
+            {
+              "repo": "lantern-demo",
+              "number": 9403,
+              "url": "https://github.com/zgeoff/lantern-demo/pull/9403"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "Paper Orchard",
+      "issues": 1,
+      "prs": 1,
+      "burndown": null,
+      "rows": [
+        {
+          "issue": "GEO-9403",
+          "title": "Sweep the paper leaves",
+          "url": "https://linear.example/issue/GEO-9403",
+          "state": "closed",
+          "status": "Done",
+          "type": "Chore",
+          "marker": "🧹",
+          "priority": 3,
+          "flag": null,
+          "prs": [
+            {
+              "repo": "paper-orchard",
+              "number": 9404,
+              "url": "https://github.com/zgeoff/paper-orchard/pull/9404"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "No project",
+      "issues": 1,
+      "prs": 1,
+      "burndown": null,
+      "rows": [
+        {
+          "issue": "GEO-9404",
+          "title": "Draw the spare planter",
+          "url": "https://linear.example/issue/GEO-9404",
+          "state": "canceled",
+          "status": "Canceled",
+          "type": null,
+          "marker": "▫️",
+          "priority": 0,
+          "flag": null,
+          "prs": [
+            {
+              "repo": "paper-orchard",
+              "number": 9405,
+              "url": "https://github.com/zgeoff/paper-orchard/pull/9405"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "stillOpen": null,
+  "noIssue": [
+    {
+      "repo": "paper-orchard",
+      "number": 9407,
+      "url": "https://github.com/zgeoff/paper-orchard/pull/9407",
+      "title": "add a paper kite"
+    }
+  ],
+  "missing": [
+    "GEO-9499"
+  ],
+  "fetchGap": null
+}

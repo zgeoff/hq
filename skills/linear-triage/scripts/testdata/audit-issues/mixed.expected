@@ -1,0 +1,112 @@
+{
+  "checkedAt": "2026-10-16T00:00:00Z",
+  "open": 10,
+  "counts": {
+    "inTriage": 2,
+    "missingProject": 2,
+    "missingType": 1,
+    "missingPriority": 2,
+    "missingSize": 2,
+    "missingArea": 2,
+    "stale": 3,
+    "needsGeoff": 1
+  },
+  "triage": [
+    {
+      "id": "GEO-9201",
+      "title": "Sort the seed tray",
+      "url": "https://linear.example/issue/GEO-9201",
+      "status": "Triage",
+      "project": null,
+      "type": null,
+      "size": null,
+      "areas": [],
+      "priority": 0,
+      "idleDays": 14,
+      "needsGeoff": true,
+      "missing": [
+        "project",
+        "type",
+        "priority",
+        "size",
+        "area"
+      ],
+      "stale": true
+    },
+    {
+      "id": "GEO-9209",
+      "title": "Check the border stones",
+      "url": "https://linear.example/issue/GEO-9209",
+      "status": "Triage",
+      "project": "Lantern Garden",
+      "type": "Feature",
+      "size": "M",
+      "areas": [
+        "Garden"
+      ],
+      "priority": 3,
+      "idleDays": 13,
+      "needsGeoff": false,
+      "missing": [],
+      "stale": false
+    }
+  ],
+  "incomplete": [
+    {
+      "id": "GEO-9208",
+      "title": "Add a bench",
+      "url": "https://linear.example/issue/GEO-9208",
+      "status": "Todo",
+      "project": null,
+      "type": "Chore",
+      "size": null,
+      "areas": [],
+      "priority": 0,
+      "idleDays": 1,
+      "needsGeoff": false,
+      "missing": [
+        "project",
+        "priority",
+        "size",
+        "area"
+      ],
+      "stale": false
+    }
+  ],
+  "stale": [
+    {
+      "id": "GEO-9202",
+      "title": "Sketch the garden arch",
+      "url": "https://linear.example/issue/GEO-9202",
+      "status": "Backlog",
+      "project": "Lantern Garden",
+      "type": "Design",
+      "size": null,
+      "areas": [
+        "Garden"
+      ],
+      "priority": 3,
+      "idleDays": 14,
+      "needsGeoff": false,
+      "missing": [],
+      "stale": true
+    },
+    {
+      "id": "GEO-9203",
+      "title": "Count the red lanterns",
+      "url": "https://linear.example/issue/GEO-9203",
+      "status": "In Progress",
+      "project": "Lantern Garden",
+      "type": "Bug",
+      "size": "S",
+      "areas": [
+        "Garden"
+      ],
+      "priority": 3,
+      "idleDays": 3,
+      "needsGeoff": false,
+      "missing": [],
+      "stale": true
+    }
+  ]
+}

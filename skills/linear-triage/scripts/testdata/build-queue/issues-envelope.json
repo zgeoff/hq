@@ -1,0 +1,6 @@
+[
+  {
+    "type": "text",
+    "text": "{\"issues\": [{\"id\": \"GEO-9106\", \"title\": \"Name the garden gate\", \"url\": \"https://linear.example/issue/GEO-9106\", \"status\": \"Todo\", \"statusType\": \"unstarted\", \"project\": \"Lantern Garden\", \"priority\": {\"value\": 0, \"name\": \"No priority\"}, \"labels\": [\"Feature\", \"M\", \"Garden\"], \"parentId\": null, \"updatedAt\": \"2026-10-15T00:00:00Z\"}]}"
+  }
+]

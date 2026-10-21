@@ -1,0 +1,74 @@
+[
+  {
+    "id": "GEO-9401",
+    "title": "Repair the lantern latch",
+    "url": "https://linear.example/issue/GEO-9401",
+    "status": "Done",
+    "statusType": "completed",
+    "project": "Lantern Garden",
+    "priority": 1,
+    "labels": ["Bug", "S", "Garden"],
+    "parentId": null,
+    "updatedAt": "2026-10-15T00:00:00Z"
+  },
+  {
+    "id": "GEO-9402",
+    "title": "Add the dusk path",
+    "url": "https://linear.example/issue/GEO-9402",
+    "status": "In Review",
+    "statusType": "started",
+    "project": "Lantern Garden",
+    "priority": {
+      "value": 2,
+      "name": "High"
+    },
+    "labels": ["Feature", "M", "Garden"],
+    "parentId": null,
+    "updatedAt": "2026-10-15T00:00:00Z"
+  },
+  {
+    "id": "GEO-9410",
+    "title": "Choose a seed label",
+    "url": "https://linear.example/issue/GEO-9410",
+    "status": "Triage",
+    "statusType": "triage",
+    "project": "Lantern Garden",
+    "priority": {
+      "value": 3,
+      "name": "Medium"
+    },
+    "labels": ["Feature", "M", "Garden"],
+    "parentId": null,
+    "updatedAt": "2026-10-15T00:00:00Z"
+  },
+  {
+    "id": "GEO-9411",
+    "title": "Discard a draft path",
+    "url": "https://linear.example/issue/GEO-9411",
+    "status": "Canceled",
+    "statusType": "canceled",
+    "project": "Lantern Garden",
+    "priority": {
+      "value": 3,
+      "name": "Medium"
+    },
+    "labels": ["Feature", "M", "Garden"],
+    "parentId": null,
+    "updatedAt": "2026-10-15T00:00:00Z"
+  },
+  {
+    "id": "GEO-9412",
+    "title": "Duplicate a path",
+    "url": "https://linear.example/issue/GEO-9412",
+    "status": "Duplicate",
+    "statusType": "duplicate",
+    "project": "Lantern Garden",
+    "priority": {
+      "value": 3,
+      "name": "Medium"
+    },
+    "labels": ["Feature", "M", "Garden"],
+    "parentId": null,
+    "updatedAt": "2026-10-15T00:00:00Z"
+  }
+]

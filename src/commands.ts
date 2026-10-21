@@ -1,0 +1,252 @@
+// The command registry: one row per hq command. `run()` in cli.ts dispatches through it and
+// `HELP` is rendered from it, so a command's usage, summary and read-only flag live in one place.
+// The table is data except `handler`, so `hq capabilities --json` can print it.
+import type { Database } from 'bun:sqlite';
+import type { Flags } from './cli.ts';
+import type { Runner } from './runner/types.ts';
+
+export interface Out {
+  data: Record<string, unknown>;
+  text: string;
+}
+
+// What a handler gets. `db` is opened by `run()` before dispatch; help and version never open it.
+export interface Ctx {
+  db: Database;
+  noun: string;
+  verb: string | undefined;
+  rest: string[];
+  flags: Flags;
+
+  // The runner hq review and hq noslop spawn their tools through: the real one, or the fake a test gives main().
+  run: Runner;
+}
+
+// How a row appears in `hq help`, where that differs from the row itself. Every field is optional:
+// a missing one is the row's own. `summary: null` prints no summary; an array is a summary over
+// several lines; `pad` is the spaces between usage and summary (default: pad to column 46, at
+// least 2); `below` puts the summary on the lines under the usage.
+interface HelpEntry {
+  usage?: string;
+  summary?: string | readonly string[] | null;
+  pad?: number;
+  below?: boolean;
+}
+
+interface Spec {
+  group: string; // which command group in cli.ts handles it (see GROUPS there)
+  nouns: readonly string[]; // `call|proposal` is one row with two nouns
+  verbs: readonly string[] | null; // null: any verb, and no verb
+  bare: boolean; // also the row for the noun with no verb
+  usage: string;
+  summary: string;
+  section: string; // the block of `hq help` it is printed in
+  readOnly: boolean; // never writes the db and never sends anything, whatever its flags
+  // undefined: one line from usage and summary. false: not a line of its own (another row's line
+  // covers it, or it is internal). One or more entries: the lines it prints.
+  help?: false | HelpEntry | readonly HelpEntry[];
+}
+
+export interface Command extends Spec {
+  handler: (c: Ctx) => Promise<Out>;
+}
+
+// The group functions live in cli.ts, which imports this module for HELP at load, so this module
+// cannot import them back. cli.ts hands them over with registerGroups before it runs a command.
+// (Not a dynamic import of cli.ts: a handler would wait on the entry module, which is waiting on it.)
+let groups: Record<string, (c: Ctx) => Promise<Out>> | null = null;
+
+export function registerGroups(g: Record<string, (c: Ctx) => Promise<Out>>): void {
+  groups = g;
+}
+
+const via = (group: string) => async (c: Ctx): Promise<Out> => {
+  const fn = groups?.[group];
+  if (!fn) throw new Error(`command group ${group} is not registered`);
+  return fn(c);
+};
+
+const SPECS: readonly Spec[] = [
+  { group: 'status', nouns: ['status'], verbs: null, bare: false, usage: 'hq status', summary: 'the open item, what is next and why it waits', section: 'queue', readOnly: true },
+  { group: 'version', nouns: ['version'], verbs: null, bare: false, usage: 'hq version [--json]', summary: "hq's version and schema, and the commit the installed binary was built from", section: 'queue', readOnly: true },
+  { group: 'capabilities', nouns: ['capabilities'], verbs: null, bare: false, usage: 'hq capabilities [--json] [--require X.Y.Z]', summary: 'commands, JSON shapes, version; --require fails if hq is older', section: 'queue', readOnly: true },
+  { group: 'open', nouns: ['open'], verbs: null, bare: false, usage: 'hq open [id] [--force]', summary: 'open the next call or proposal (one at a time)', section: 'queue', readOnly: false },
+  { group: 'hold', nouns: ['hold'], verbs: null, bare: false, usage: 'hq hold --reason TEXT', summary: 'hold the queue', section: 'queue', readOnly: false, help: { usage: 'hq hold --reason TEXT | hq release', summary: 'hold the queue, or let it go' } },
+  { group: 'release', nouns: ['release'], verbs: null, bare: false, usage: 'hq release', summary: 'let the held queue go', section: 'queue', readOnly: false, help: false },
+  { group: 'band', nouns: ['band'], verbs: null, bare: false, usage: 'hq band', summary: 'the fleet in one line: needs you, Nix, lanes, CI, reviews (the z-stu band reads --json)', section: 'queue', readOnly: true },
+  { group: 'pane', nouns: ['pane'], verbs: null, bare: false, usage: 'hq pane', summary: "the detail behind the band: needs you with links, Nix today, lanes, reviews, shipped today, news (z-stu's /hq pane reads --json)", section: 'queue', readOnly: true },
+  { group: 'whois', nouns: ['whois'], verbs: null, bare: false, usage: 'hq whois <session-id>', summary: 'the declared fleet name hq fleet last saw under a session id', section: 'queue', readOnly: true },
+  { group: 'pins', nouns: ['pins'], verbs: null, bare: false, usage: 'hq pins', summary: 'pinned atc sessions, longest idle first', section: 'queue', readOnly: true },
+  { group: 'console', nouns: ['console'], verbs: null, bare: false, usage: 'hq console [--port N]', summary: 'a local page to answer calls, proposals and to-dos', section: 'queue', readOnly: false },
+  { group: 'restart', nouns: ['restart'], verbs: null, bare: false, usage: 'hq restart [--force]', summary: 'restart the atc daemon (detached), then wake', section: 'restart', readOnly: false },
+  { group: 'wake', nouns: ['wake'], verbs: [], bare: true, usage: 'hq wake [--dry-run] [--wait SECONDS]', summary: 'message the sessions the last restart cut off', section: 'restart', readOnly: false },
+  { group: 'wake', nouns: ['wake'], verbs: ['list'], bare: false, usage: 'hq wake list', summary: 'the sessions on the wake list', section: 'restart', readOnly: true, help: { usage: 'hq wake list | add <session> [--note T] | remove <session> | import <file>', summary: null } },
+  { group: 'wake', nouns: ['wake'], verbs: ['add'], bare: false, usage: 'hq wake add <session> [--note T]', summary: 'put a session on the wake list', section: 'restart', readOnly: false, help: false },
+  { group: 'wake', nouns: ['wake'], verbs: ['remove'], bare: false, usage: 'hq wake remove <session>', summary: 'take a session off the wake list', section: 'restart', readOnly: false, help: false },
+  { group: 'wake', nouns: ['wake'], verbs: ['import'], bare: false, usage: 'hq wake import <file>', summary: 'add the sessions in a wake-sessions file', section: 'restart', readOnly: false, help: false },
+  { group: 'review', nouns: ['review'], verbs: null, bare: false, usage: 'hq review <[owner/]repo> <pr> [--no-watch] [--repo-dir D] [--effort high|medium] [--full] [--redesign F] [--fixes-only]', summary: 'review in a worktree, then CI and open threads: noslop for repos on the noslop list (--full: the whole PR, not only new commits; --redesign F: one round past the cap, once per PR, for a finding that forced a redesign; --fixes-only: check the fixes answered since the last round with no new review, not a round, inside the cap or past it), else Codex (effort by risk, allow-or-deny pass only for a gate change)', section: 'review', readOnly: false },
+  { group: 'review', nouns: ['review'], verbs: ['check'], bare: false, usage: 'hq review check <[owner/]repo> <pr> [--repo-dir D]', summary: 'noslop check of the PR: pass or fail, and the findings still open; records the round', section: 'review', readOnly: false },
+  { group: 'review', nouns: ['review'], verbs: ['gate'], bare: false, usage: 'hq review gate <[owner/]repo> <pr> [--repo-dir D]', summary: "may the PR merge: exit 0 on green CI plus, for a noslop PR, a review on record and no open finding (or the owner's override at this head), else merge_blocked with the reason", section: 'review', readOnly: false },
+  { group: 'pr', nouns: ['pr'], verbs: ['status'], bare: false, usage: 'hq pr status <[owner/]repo> <pr>', summary: "the PR's record: gate, the owner's answer, who holds the next step; stale when the head moved", section: 'review', readOnly: false, help: { usage: 'hq pr status <[owner/]repo> <pr> | answer <repo> <pr> lgtm|changes|reject --source S [--note T] | override <repo> <pr> --source S --note T | accept-risk <repo> <pr> <finding-id> --source S --note T | next <repo> <pr> <session>|--clear', summary: "the PR's record (gate, the owner's answer, who holds the next step; stale when the head moved): read it before you message a session about a PR", pad: 3 } },
+  { group: 'pr', nouns: ['pr'], verbs: ['answer'], bare: false, usage: 'hq pr answer <[owner/]repo> <pr> lgtm|changes|reject --source chat:ID|console:ID|call:ID [--note T]', summary: "record the owner's answer at the PR's head now (--source says where they said it; changes needs --note)", section: 'review', readOnly: false, help: false },
+  { group: 'pr', nouns: ['pr'], verbs: ['override'], bare: false, usage: 'hq pr override <[owner/]repo> <pr> --source chat:ID|console:ID|call:ID --note T', summary: "record the owner's override of every open finding at the PR's head now (the merge gate honours it only at that head and never over red CI; chat: needs the owner's own session)", section: 'review', readOnly: false, help: false },
+  { group: 'pr', nouns: ['pr'], verbs: ['accept-risk'], bare: false, usage: 'hq pr accept-risk <[owner/]repo> <pr> <finding-id> --source chat:ID|console:ID|call:ID --note T', summary: "record the owner's acceptance of one finding's risk (the merge gate passes an accepted-risk finding only with this record; chat: needs the owner's own session)", section: 'review', readOnly: false, help: false },
+  { group: 'pr', nouns: ['pr'], verbs: ['next'], bare: false, usage: 'hq pr next <[owner/]repo> <pr> <session> | --clear', summary: 'set which declared session holds the next step of the PR, or clear it', section: 'review', readOnly: false, help: false },
+  { group: 'noslop', nouns: ['noslop'], verbs: ['show'], bare: true, usage: 'hq noslop', summary: 'the repos noslop reviews, the pinned commit and its clone', section: 'review', readOnly: true, help: { usage: 'hq noslop [on|off <repo...> | pin <sha> [--force <reason>] | report [--since ISO]]', summary: 'the repos noslop reviews, the pinned commit and its clone', pad: 3 } },
+  { group: 'noslop', nouns: ['noslop'], verbs: ['on', 'off'], bare: false, usage: 'hq noslop on|off <repo...>', summary: 'turn noslop on or off for repos (sorted, repeatable)', section: 'review', readOnly: false, help: false },
+  { group: 'noslop', nouns: ['noslop'], verbs: ['pin'], bare: false, usage: 'hq noslop pin <sha> [--force <reason>]', summary: 'check hq\'s own noslop clone out at a commit, install it, back up and count noslop\'s store around a migration, and record the commit; refused while noslop runs unless --force', section: 'review', readOnly: false, help: false },
+  { group: 'noslop', nouns: ['noslop'], verbs: ['report'], bare: false, usage: 'hq noslop report [--since ISO]', summary: 'per PR and in total: reviews, extra rounds, findings, answered, wall time, and churn (rounds with a new finding, repeat-class, late, main-merge findings)', section: 'review', readOnly: true, help: false },
+  { group: 'repair', nouns: ['repair'], verbs: ['advisor-400'], bare: false, usage: 'hq repair advisor-400 <session> | --file T.jsonl [--apply]', summary: 'mend a stopped Claude session that fails every turn with "unexpected tool_use_id found in advisor_tool_result blocks"; dry run unless --apply, backup first (checkout: --repo-dir, ~/projects/<repo>, else hq\'s own clone)', section: 'review', readOnly: false, help: { summary: ['mend a stopped Claude session that fails every turn with "unexpected tool_use_id found in advisor_tool_result blocks"; dry run unless --apply, backup first', '(checkout: --repo-dir, ~/projects/<repo>, else hq\'s own clone)'] } },
+  { group: 'run', nouns: ['run'], verbs: ['add'], bare: false, usage: 'hq run add <issue> --title T [--session ID] [--where imp|local|none] [--next T] [--gate T] [--geoff-chat] [--ready-since TIME] [--size S|M|L|XL --lines N] [--lane LANE]', summary: 'put an issue on the board', section: 'runs', readOnly: false, help: { summary: null } },
+  { group: 'run', nouns: ['run'], verbs: ['size'], bare: false, usage: 'hq run size <issue> --size S|M|L|XL --lines N', summary: 'triage\'s size guess (lines changed, tests included)', section: 'runs', readOnly: false, help: { pad: 3 } },
+  { group: 'run', nouns: ['run'], verbs: ['list'], bare: true, usage: 'hq run list [--all]', summary: 'the board', section: 'runs', readOnly: true, help: { usage: 'hq run list [--all] | show <issue|session> [--notes N] | watchlist [--write FILE] | sweep', summary: null } },
+  { group: 'run', nouns: ['run'], verbs: ['show'], bare: false, usage: 'hq run show <issue|session> [--notes N]', summary: 'one run with its sessions and notes', section: 'runs', readOnly: true, help: false },
+  { group: 'run', nouns: ['run'], verbs: ['watchlist'], bare: false, usage: 'hq run watchlist [--write FILE]', summary: 'the sessions with an active run', section: 'runs', readOnly: false, help: false },
+  { group: 'run', nouns: ['run'], verbs: ['sweep'], bare: false, usage: 'hq run sweep', summary: 'record the sessions\' notes and flag what needs attention', section: 'runs', readOnly: false, help: false },
+  { group: 'run', nouns: ['run'], verbs: ['session'], bare: false, usage: 'hq run session <issue> <id> [--add|--remove]', summary: 'a relaunch (new main session), or a helper joins/leaves', section: 'runs', readOnly: false, help: { pad: 1 } },
+  { group: 'run', nouns: ['run'], verbs: ['lane'], bare: false, usage: 'hq run lane <issue> (<lane> | --lane LANE)', summary: 'set a run\'s delivery lane (pacing.json lanes)', section: 'runs', readOnly: false, help: { pad: 3 } },
+  { group: 'run', nouns: ['run'], verbs: ['reopen'], bare: false, usage: 'hq run reopen <issue> [--next T]', summary: 'a done or dropped run back to working', section: 'runs', readOnly: false, help: { pad: 3 } },
+  { group: 'run', nouns: ['run'], verbs: ['state'], bare: false, usage: 'hq run state <issue> <working|blocked|merged|deploying|deploy-held|live-check> [--next T] [--waits-on T|none] [--waits-on-geoff|--not-geoff] [--check owed|none]', summary: 'move a run to a state', section: 'runs', readOnly: false, help: { summary: null } },
+  { group: 'run', nouns: ['run'], verbs: ['check'], bare: false, usage: 'hq run check <issue> owed|none', summary: 'whether a live check is owed once the release ships (unset counts as owed; none sends the run to done)', section: 'runs', readOnly: false, help: { pad: 4 } },
+  { group: 'run', nouns: ['run'], verbs: ['ship'], bare: false, usage: 'hq run ship [--dry-run]', summary: 'one release pass now: a run whose merged PRs all shipped in a release moves to live-check, or done when no check is owed (the watcher does it every 10 min)', section: 'runs', readOnly: false, help: { pad: 12 } },
+  { group: 'run', nouns: ['run'], verbs: ['done', 'drop'], bare: false, usage: 'hq run done|drop <issue> [--note T]', summary: 'take a run off the board, done or dropped', section: 'runs', readOnly: false, help: { usage: 'hq run done|drop <issue> [--note T] | next|gate|title <issue> <text> | geoff-chat <issue> on|off', summary: null } },
+  { group: 'run', nouns: ['run'], verbs: ['next', 'gate', 'title'], bare: false, usage: 'hq run next|gate|title <issue> <text>', summary: 'set what is next, the gate, or the title', section: 'runs', readOnly: false, help: false },
+  { group: 'run', nouns: ['run'], verbs: ['geoff-chat'], bare: false, usage: 'hq run geoff-chat <issue> on|off', summary: 'whether the owner is chatting with the run', section: 'runs', readOnly: false, help: false },
+  { group: 'run', nouns: ['run'], verbs: ['pr'], bare: false, usage: 'hq run pr <issue> <repo#n|URL>', summary: 'attach a PR to a run', section: 'runs', readOnly: false, help: { usage: 'hq run pr <issue> <repo#n|URL> | final <pr> --sha S [--fixed N] [--followups GEO-1,GEO-2] | reviewing <pr> | reviewed <pr> --sha S [--recheck]', summary: null } },
+  { group: 'run', nouns: ['run'], verbs: ['final'], bare: false, usage: 'hq run final <pr> --sha S [--fixed N] [--followups GEO-1,GEO-2]', summary: 'mark a PR final at a head', section: 'runs', readOnly: false, help: false },
+  { group: 'run', nouns: ['run'], verbs: ['reviewing'], bare: false, usage: 'hq run reviewing <pr>', summary: 'a review of the PR has started', section: 'runs', readOnly: false, help: false },
+  { group: 'run', nouns: ['run'], verbs: ['reviewed'], bare: false, usage: 'hq run reviewed <pr> --sha S [--recheck]', summary: 'a review round of the PR is done', section: 'runs', readOnly: false, help: false },
+  { group: 'run', nouns: ['run'], verbs: ['merged', 'closed'], bare: false, usage: 'hq run merged|closed <pr>', summary: 'the PR merged, or closed unmerged', section: 'runs', readOnly: false, help: { usage: 'hq run merged|closed <pr> | note <issue|session> <text> [--label L]', summary: null } },
+  { group: 'run', nouns: ['run'], verbs: ['note'], bare: false, usage: 'hq run note <issue|session> <text> [--label L]', summary: 'add a note to a run', section: 'runs', readOnly: false, help: false },
+  { group: 'run', nouns: ['run'], verbs: ['unmerge'], bare: false, usage: 'hq run unmerge <pr> [--reason T]', summary: 'undo a wrong merged mark: the PR is open again in hq (hq run merged asks GitHub first)', section: 'runs', readOnly: false, help: { pad: 3 } },
+  { group: 'run', nouns: ['run'], verbs: ['unfinal'], bare: false, usage: 'hq run unfinal <pr> [--reason T]', summary: 'clear a final mark the head has moved past; the sweep stops flagging the PR until the next final', section: 'runs', readOnly: false, help: { pad: 3 } },
+  { group: 'lanes', nouns: ['lanes'], verbs: ['status', 'log'], bare: true, usage: 'hq lanes [status|log] [--limit N]', summary: 'watcher state, nudges and whether slots dropped', section: 'ops', readOnly: true },
+  { group: 'lanes', nouns: ['lanes'], verbs: ['start'], bare: false, usage: 'hq lanes start [--interval SECONDS]', summary: 'install, enable and start the watcher unit', section: 'ops', readOnly: false, help: { usage: 'hq lanes start [--interval SECONDS] | stop', summary: 'install, enable and start the watcher unit (default every 300s); stop disables it' } },
+  { group: 'lanes', nouns: ['lanes'], verbs: ['stop'], bare: false, usage: 'hq lanes stop', summary: 'disable the watcher unit', section: 'ops', readOnly: false, help: false },
+  { group: 'lanes', nouns: ['lanes'], verbs: ['tick'], bare: false, usage: 'hq lanes tick', summary: 'one look now', section: 'ops', readOnly: false },
+  { group: 'lanes', nouns: ['lanes'], verbs: ['watch'], bare: false, usage: 'hq lanes watch [--interval SECONDS]', summary: 'the watcher unit\'s loop (internal)', section: 'ops', readOnly: false, help: false },
+  { group: 'stats', nouns: ['stats'], verbs: null, bare: false, usage: 'hq stats [--since 7d|36h|TIME] [--around MARK]', summary: 'numbers someone acts on: waits on the owner, merge to live, idle capacity, flow', section: 'ops', readOnly: false, help: { pad: 3 } },
+  { group: 'answers', nouns: ['answers'], verbs: null, bare: false, usage: 'hq answers [--since 7d|36h|TIME]', summary: "the owner's answers in the window: calls, proposals, console reviews and typed lines (--json for the weekly audit)", section: 'ops', readOnly: true, help: { pad: 3 } },
+  { group: 'kinds', nouns: ['kinds'], verbs: ['list'], bare: true, usage: 'hq kinds [--weeks 8]', summary: 'bug share per Sydney week', section: 'ops', readOnly: true, help: { usage: 'hq kinds [--weeks 8] | hq kinds sync [--weeks 8]', summary: 'bug share per Sydney week: merged PRs by title kind and by Linear issue type, closed issues by type; sync backfills from GitHub and Linear', pad: 3 } },
+  { group: 'kinds', nouns: ['kinds'], verbs: ['sync'], bare: false, usage: 'hq kinds sync [--weeks 8]', summary: 'backfill from GitHub and Linear', section: 'ops', readOnly: false, help: false },
+  { group: 'goals', nouns: ['goals'], verbs: ['list'], bare: true, usage: 'hq goals [--days 14]', summary: 'team goals per Sydney day and week', section: 'ops', readOnly: true, help: { usage: 'hq goals [--days 14] | hq goals sync [--days 14]', summary: 'team goals per Sydney day and week: cloud deploy-prod runs, z-delivery DEPLOY/HOLD, CI runs, failures, cancels, re-runs and minutes, PRs merged and closed unmerged', pad: 3 } },
+  { group: 'goals', nouns: ['goals'], verbs: ['sync'], bare: false, usage: 'hq goals sync [--days 14]', summary: 'backfill goals data from GitHub', section: 'ops', readOnly: false, help: false },
+  { group: 'goals', nouns: ['goals'], verbs: ['targets'], bare: false, usage: 'hq goals targets', summary: 'the 7 goals\' targets', section: 'ops', readOnly: true, help: { usage: 'hq goals targets | hq goals target <goal> <op> <value> | <goal> none', summary: 'the 7 goals\' targets (bugs, features, deploys, downtime, ciwaste, mustfix, cost); op is one of < <= >= >; none clears', pad: 3 } },
+  { group: 'goals', nouns: ['goals'], verbs: ['target'], bare: false, usage: 'hq goals target <goal> <op> <value> | <goal> none', summary: 'set or clear one goal\'s target', section: 'ops', readOnly: false, help: false },
+  { group: 'goals', nouns: ['goals'], verbs: ['weekly'], bare: false, usage: 'hq goals weekly [--dry-run] | hq goals weekly skip [DATE] --reason T', summary: 'the Monday 17:00 Sydney goals review to z-stu: print it, send it now, or leave a Monday alone', section: 'ops', readOnly: false, help: { pad: 3 } },
+  { group: 'goals', nouns: ['goals'], verbs: ['account'], bare: false, usage: 'hq goals account [KEY NAME|none]', summary: 'name a Claude usage account (KEY is 12 hex characters; NAME a slug of 24 characters at most); with no arguments lists the names', section: 'ops', readOnly: false, help: { pad: 11 } },
+  { group: 'goals', nouns: ['goals'], verbs: ['daily'], bare: false, usage: 'hq goals daily [--dry-run] | hq goals daily skip [DATE] --reason T', summary: 'the 18:00 Sydney goals check-in to z-stu: print it, send it now, or leave a day alone', section: 'ops', readOnly: false, help: { pad: 3 } },
+  { group: 'defs', nouns: ['defs'], verbs: ['status'], bare: true, usage: 'hq defs [status]', summary: 'where the fleet\'s skills and start prompts come from', section: 'ops', readOnly: true, help: { usage: 'hq defs [status] | hq defs setup hq|private | hq defs check [hq] | hq defs use hq | hq defs sync', summary: 'where the fleet\'s skills (hq-defs) and start prompts (hq-private) come from; sync fast-forwards both (the watcher does it each tick)', pad: 3 } },
+  { group: 'defs', nouns: ['defs'], verbs: ['setup'], bare: false, usage: 'hq defs setup hq|private', summary: 'clone the hq-defs checkout, or hq-private (the start prompts)', section: 'ops', readOnly: false, help: false },
+  { group: 'defs', nouns: ['defs'], verbs: ['check'], bare: false, usage: 'hq defs check [hq]', summary: 'preflight checks on the definitions source and on hq-private: origins, every start prompt, the grants', section: 'ops', readOnly: false, help: false },
+  { group: 'defs', nouns: ['defs'], verbs: ['use'], bare: false, usage: 'hq defs use hq', summary: 'switch the definitions source', section: 'ops', readOnly: false, help: false },
+  { group: 'defs', nouns: ['defs'], verbs: ['sync'], bare: false, usage: 'hq defs sync', summary: 'fast-forward the hq-defs and hq-private checkouts', section: 'ops', readOnly: false, help: false },
+  { group: 'repo', nouns: ['repo'], verbs: ['archive-history'], bare: false, usage: 'hq repo archive-history <from> <to> [--dry-run]', summary: 'move the history of one repo name to another in hq.db and noslop\'s store (hq hq-archive, and back); backs both up first, refuses on a repeated key or a running noslop', section: 'ops', readOnly: false, help: { pad: 3 } },
+  { group: 'morning', nouns: ['morning'], verbs: ['status'], bare: true, usage: 'hq morning [status]', summary: 'the 08:15 Sydney morning-reports job', section: 'ops', readOnly: true, help: { usage: 'hq morning [status] | hq morning skip [--date YYYY-MM-DD] --reason T | hq morning tick', pad: 3 } },
+  { group: 'morning', nouns: ['morning'], verbs: ['skip'], bare: false, usage: 'hq morning skip [--date YYYY-MM-DD] --reason T', summary: 'leave a day alone', section: 'ops', readOnly: false, help: false },
+  { group: 'morning', nouns: ['morning'], verbs: ['tick'], bare: false, usage: 'hq morning tick', summary: 'one step of the morning-reports job', section: 'ops', readOnly: false, help: false },
+  { group: 'followup', nouns: ['followup'], verbs: ['add'], bare: false, usage: 'hq followup add GEO-n --backfill --at TIME [--from repo#n]', summary: 'review follow-ups counted by hand', section: 'ops', readOnly: false, help: { usage: 'hq followup add GEO-n --backfill --at TIME [--from repo#n] | hq followup [list] | hq followup drop GEO-n', pad: 3 } },
+  { group: 'followup', nouns: ['followup'], verbs: ['list'], bare: true, usage: 'hq followup [list]', summary: 'the follow-ups counted by hand', section: 'ops', readOnly: true, help: false },
+  { group: 'followup', nouns: ['followup'], verbs: ['drop'], bare: false, usage: 'hq followup drop GEO-n', summary: 'drop a hand-counted follow-up', section: 'ops', readOnly: false, help: false },
+  { group: 'typed', nouns: ['typed'], verbs: ['add'], bare: false, usage: 'hq typed add --to SESSION --text T|--text-file F --source call:ID|proposal:ID|console:ID|chat:SESSION@TIME', summary: 'log a line typed into a session as the owner', section: 'ops', readOnly: false, help: { pad: 3 } },
+  { group: 'typed', nouns: ['typed'], verbs: ['list'], bare: true, usage: 'hq typed [list] [--session S] [--limit N]', summary: 'the typed-line log, newest first', section: 'ops', readOnly: true },
+  { group: 'mark', nouns: ['mark'], verbs: ['add'], bare: false, usage: 'hq mark add --kind skills|grant|hq|other --text T [--ref URL|repo#n|GEO-n] [--at TIME] [--grant NAME]', summary: 'record a change on the timeline', section: 'ops', readOnly: false, help: { usage: 'hq mark add --kind skills|grant|hq|other --text T [--ref URL|repo#n|GEO-n] [--at TIME] [--grant NAME] | hq mark [list] [--since 7d] | hq mark drop ID | hq mark grant ID NAME', summary: null } },
+  { group: 'mark', nouns: ['mark'], verbs: ['list'], bare: true, usage: 'hq mark [list] [--since 7d]', summary: 'the marks on the timeline', section: 'ops', readOnly: true, help: false },
+  { group: 'mark', nouns: ['mark'], verbs: ['grant'], bare: false, usage: 'hq mark grant ID NAME', summary: 'name a grant mark, so sessions can record actions under it', section: 'ops', readOnly: false, help: false },
+  { group: 'grant', nouns: ['grant'], verbs: ['act'], bare: false, usage: 'hq grant act NAME --target ISSUE|PR|COMMAND [--note T]', summary: 'record an action taken under a named standing grant', section: 'ops', readOnly: false, help: { usage: 'hq grant act NAME --target ISSUE|PR|COMMAND [--note T] | hq grant [actions] [--since 7d]', summary: 'record an action taken under a named standing grant; actions lists each named grant with its actions in the window, one line each', pad: 3 } },
+  { group: 'grant', nouns: ['grant'], verbs: ['actions'], bare: true, usage: 'hq grant [actions] [--since 7d]', summary: 'each named grant with its actions in the window', section: 'ops', readOnly: true, help: false },
+  { group: 'mark', nouns: ['mark'], verbs: ['drop'], bare: false, usage: 'hq mark drop ID', summary: 'drop a mark', section: 'ops', readOnly: false, help: false },
+  { group: 'fleet', nouns: ['fleet'], verbs: ['status'], bare: true, usage: 'hq fleet [status]', summary: 'the declared z- sessions', section: 'ops', readOnly: true, help: { usage: 'hq fleet [status] [--prompts] | ensure [--dry-run] [--now NAME,...]', summary: 'the declared z- sessions and stale prompts (--json checks prompts only with --prompts); ensure spawns a missing one (never a duplicate); --now skips the wait for those names (a deliberate re-home)', pad: 3 } },
+  { group: 'fleet', nouns: ['fleet'], verbs: ['ensure'], bare: false, usage: 'hq fleet ensure [--dry-run] [--now NAME,...]', summary: 'spawn a missing declared session', section: 'ops', readOnly: false, help: false },
+  { group: 'fleet', nouns: ['fleet'], verbs: ['rc'], bare: false, usage: 'hq fleet rc NAME', summary: 'the Remote Control helper (ensure starts it after a spawn): types /remote-control once if it is off, never if it is on or unclear', section: 'ops', readOnly: false, help: { pad: 27 } },
+  { group: 'fleet', nouns: ['fleet'], verbs: ['timer'], bare: false, usage: 'hq fleet timer install | remove', summary: 'run ensure every 5 minutes', section: 'ops', readOnly: false, help: { pad: 12 } },
+  { group: 'refusals', nouns: ['refusals'], verbs: ['list'], bare: true, usage: 'hq refusals [--days 7] [--by reason|session|tool]', summary: 'auto-mode refusals in local Claude transcripts, newest first; --by tallies', section: 'ops', readOnly: true },
+  { group: 'refusals', nouns: ['refusals'], verbs: ['scan'], bare: false, usage: 'hq refusals scan [--since 14d] [--budget-mb N]', summary: 'scan the transcripts now (the watcher does it every tick); --since widens the backfill', section: 'ops', readOnly: false },
+  { group: 'capacity', nouns: ['capacity'], verbs: ['show'], bare: true, usage: 'hq capacity', summary: 'the newest capacity sample (impd, cloud, Claude, CI, PC), thresholds and open alerts', section: 'ops', readOnly: true },
+  { group: 'capacity', nouns: ['capacity'], verbs: ['sample'], bare: false, usage: 'hq capacity sample', summary: 'read capacity now, store it, send due alerts (the watcher does it every tick)', section: 'ops', readOnly: false },
+  { group: 'capacity', nouns: ['capacity'], verbs: ['log'], bare: false, usage: 'hq capacity log [--hours 24]', summary: 'stored samples, newest first', section: 'ops', readOnly: true },
+  { group: 'capacity', nouns: ['capacity'], verbs: ['set'], bare: false, usage: 'hq capacity set KEY VALUE | KEY --reset', summary: 'set a threshold, or put it back to the default', section: 'ops', readOnly: false },
+  { group: 'probe', nouns: ['probe'], verbs: ['status'], bare: true, usage: 'hq probe [status] [--days 7]', summary: 'the Nix uptime probe: last sample and ready check, open outage or unready episode, downtime, outages and unready episodes in the window', section: 'ops', readOnly: true, help: { pad: 15 } },
+  { group: 'probe', nouns: ['probe'], verbs: ['run'], bare: false, usage: 'hq probe run', summary: 'one check of Nix\'s /health/live (the timer\'s command)', section: 'ops', readOnly: false, help: { pad: 31 } },
+  { group: 'probe', nouns: ['probe'], verbs: ['timer'], bare: false, usage: 'hq probe timer install | remove', summary: 'run the probe every minute', section: 'ops', readOnly: false, help: { pad: 12 } },
+  { group: 'fleet', nouns: ['fleet'], verbs: ['remove', 'restore'], bare: false, usage: 'hq fleet remove NAME | restore NAME', summary: 'retire a declared name (ensure never spawns it; drops its wake entry), or take it back', section: 'ops', readOnly: false, help: { pad: 8 } },
+  { group: 'backup', nouns: ['backup'], verbs: ['status'], bare: true, usage: 'hq backup [status]', summary: 'encrypted restic snapshots of hq.db, z-sessions and z- transcripts', section: 'ops', readOnly: true, help: { usage: 'hq backup [status] | run | test [--remote]' } },
+  { group: 'backup', nouns: ['backup'], verbs: ['run'], bare: false, usage: 'hq backup run', summary: 'take a snapshot now', section: 'ops', readOnly: false, help: false },
+  { group: 'backup', nouns: ['backup'], verbs: ['test'], bare: false, usage: 'hq backup test [--remote]', summary: 'restore the newest snapshot into a scratch folder and check it', section: 'ops', readOnly: false, help: false },
+  { group: 'backup', nouns: ['backup'], verbs: ['restore'], bare: false, usage: 'hq backup restore --to DIR [--snapshot ID] [--remote]', summary: 'restore into an empty directory (never over live state)', section: 'ops', readOnly: false, help: { pad: 3 } },
+  { group: 'backup', nouns: ['backup'], verbs: ['timer'], bare: false, usage: 'hq backup timer install | remove', summary: 'the hourly systemd user timer', section: 'ops', readOnly: false, help: { pad: 11 } },
+  { group: 'health', nouns: ['health'], verbs: ['check'], bare: true, usage: 'hq health [check]', summary: 'read-only checks on this PC: units, restart loops, disk, memory, atc, watcher', section: 'ops', readOnly: false, help: { pad: 26 } },
+  { group: 'health', nouns: ['health'], verbs: ['settings'], bare: false, usage: 'hq health settings', summary: 'the thresholds', section: 'ops', readOnly: true, help: { usage: 'hq health settings | set KEY [VALUE]', summary: 'thresholds (no VALUE: back to the default)', pad: 7 } },
+  { group: 'health', nouns: ['health'], verbs: ['set'], bare: false, usage: 'hq health set KEY [VALUE]', summary: 'set a threshold (no VALUE: back to the default)', section: 'ops', readOnly: false, help: false },
+  { group: 'health', nouns: ['health'], verbs: ['tick'], bare: false, usage: 'hq health tick', summary: 'one watcher step: tell z-stu about new problems, file news for cleared ones', section: 'ops', readOnly: false, help: { pad: 29 } },
+  { group: 'news', nouns: ['news'], verbs: ['list'], bare: true, usage: 'hq news [--all] [--limit N]', summary: 'unread items for the owner, grouped by topic', section: 'ops', readOnly: true, help: { pad: 16 } },
+  { group: 'news', nouns: ['news'], verbs: ['add'], bare: false, usage: 'hq news add --topic merge|release|deploy|fix|report|other --text T [--from S] [--issue GEO-n] [--link URL] [--tag SLUG] [--needs-geoff]', summary: 'file one line', section: 'ops', readOnly: false, help: { summary: 'file one line; only --needs-geoff messages z-stu', below: true } },
+  { group: 'news', nouns: ['news'], verbs: ['read'], bare: false, usage: 'hq news read --upto N', summary: 'mark items up to N read', section: 'ops', readOnly: false, help: { pad: 22 } },
+  { group: 'outbox', nouns: ['outbox'], verbs: ['list'], bare: true, usage: 'hq outbox [list]', summary: 'the unsent messages', section: 'outbox', readOnly: true, help: false },
+  { group: 'outbox', nouns: ['outbox'], verbs: ['drop'], bare: false, usage: 'hq outbox drop ID', summary: 'drop one unsent message', section: 'ops', readOnly: false, help: { usage: 'hq outbox [drop ID]', summary: 'unsent messages; drop one', pad: 24 } },
+  { group: 'outbox', nouns: ['outbox'], verbs: ['forward'], bare: false, usage: 'hq outbox forward FROM TO | forward FROM --remove', summary: 'send a retired session\'s messages to its successor', section: 'ops', readOnly: false, help: { usage: 'hq outbox forward FROM TO | forward FROM --remove | forwards', pad: 3 } },
+  { group: 'outbox', nouns: ['outbox'], verbs: ['forwards'], bare: false, usage: 'hq outbox forwards', summary: 'the forwards in force', section: 'ops', readOnly: true, help: false },
+  { group: 'lanes', nouns: ['lanes'], verbs: ['hold'], bare: false, usage: 'hq lanes hold --minutes N --reason TEXT', summary: 'pause slot nudges (at most 24h; ends by itself)', section: 'ops', readOnly: false, help: { summary: 'pause slot nudges (at most 24h; ends by itself) | hq lanes release', pad: 4 } },
+  { group: 'lanes', nouns: ['lanes'], verbs: ['release'], bare: false, usage: 'hq lanes release', summary: 'end a nudge pause now', section: 'ops', readOnly: false, help: false },
+  { group: 'lanes', nouns: ['lanes'], verbs: ['ready'], bare: false, usage: 'hq lanes ready --lane name=n,... [--ready-total N] [--skipped "GEO-1=reason;GEO-2=reason"]', summary: 'report Ready per lane by hand, or a total count', section: 'ops', readOnly: false, help: [{ summary: ['hq reads Ready per lane from Linear every 10 min; this reports it by hand when that read fails (fresh 30 min, a 0 for 3 h); a lane with free slots and 0 Ready lends to an area short of slots;', '--ready-total is every Ready issue seen in Linear, --skipped the ones not counted, each with a reason'], below: true }, { usage: 'hq lanes ready --count N', summary: 'report a total Ready count only (the old form)' }] },
+  { group: 'ask', nouns: ['call', 'proposal'], verbs: ['add'], bare: false, usage: 'hq call|proposal add <id> (--title T --question Q (--body TEXT | --body-file F|-) | --item F|-)\n                         [--issues GEO-1,GEO-2] [--for SESSION] [--order N|none]', summary: 'queue a new item (--item: the console\'s JSON item)', section: 'asks', readOnly: false, help: { summary: null } },
+  { group: 'ask', nouns: ['call', 'proposal'], verbs: ['stu'], bare: false, usage: 'hq call|proposal stu <id> --view T', summary: 'set Stu\'s view of an item', section: 'asks', readOnly: false, help: { summary: null } },
+  { group: 'ask', nouns: ['call', 'proposal'], verbs: ['open'], bare: false, usage: 'hq call|proposal open [id] [--force]', summary: 'open an item', section: 'asks', readOnly: false, help: { summary: null } },
+  { group: 'ask', nouns: ['call', 'proposal'], verbs: ['answer'], bare: false, usage: 'hq call|proposal answer <id> (--answer WORDS | --answer-file F|-)', summary: 'record the owner\'s answer', section: 'asks', readOnly: false, help: { summary: null } },
+  { group: 'ask', nouns: ['call', 'proposal'], verbs: ['apply'], bare: false, usage: 'hq call|proposal apply <id> --to typed:<session>|linear:<GEO-n>|none [--note T]', summary: 'record where an answer went', section: 'asks', readOnly: false, help: { summary: null } },
+  { group: 'ask', nouns: ['call', 'proposal'], verbs: ['later'], bare: false, usage: 'hq call|proposal later <id> [--until ISO|+4h]', summary: 'put an item off', section: 'asks', readOnly: false, help: { summary: 'default: next 07:00 Sydney', pad: 3 } },
+  { group: 'ask', nouns: ['call', 'proposal'], verbs: ['skip'], bare: false, usage: 'hq call|proposal skip <id> [--reason T]', summary: 'skip an item', section: 'asks', readOnly: false, help: { summary: null } },
+  { group: 'ask', nouns: ['call', 'proposal'], verbs: ['close'], bare: false, usage: 'hq call|proposal close <id> --reason T', summary: 'close an item', section: 'asks', readOnly: false, help: { summary: null } },
+  { group: 'ask', nouns: ['call', 'proposal'], verbs: ['show'], bare: false, usage: 'hq call|proposal show <id> [--history]', summary: 'one item', section: 'asks', readOnly: true, help: { summary: null } },
+  { group: 'ask', nouns: ['call', 'proposal'], verbs: ['list'], bare: false, usage: 'hq call|proposal list [--state queued,open,...|all]', summary: 'the items', section: 'asks', readOnly: true, help: { summary: null } },
+  { group: 'unblock', nouns: ['unblock'], verbs: ['add'], bare: false, usage: 'hq unblock add (--task T | --item F|-) [--id SLUG] [--minutes N] [--unblocks GEO-1:high,GEO-2:urgent]\n               [--rank N] [--notify z-delivery,...] [--done-when issue:GEO-1|pr:repo#1|doc:ID]...', summary: 'queue an unblock item', section: 'unblock', readOnly: false, help: { summary: null } },
+  { group: 'unblock', nouns: ['unblock'], verbs: ['list'], bare: false, usage: 'hq unblock list [--state open|done|dropped|all]', summary: 'the unblock items', section: 'unblock', readOnly: true, help: { summary: null } },
+  { group: 'unblock', nouns: ['unblock'], verbs: ['new', 'pushed'], bare: false, usage: 'hq unblock new | pushed --upto N', summary: 'items since the last push; move the cursor to N', section: 'unblock', readOnly: false },
+  { group: 'unblock', nouns: ['unblock'], verbs: ['done', 'drop'], bare: false, usage: 'hq unblock done|drop <id> [--note T]', summary: 'close an unblock item', section: 'unblock', readOnly: false, help: { summary: null } },
+  { group: 'unblock', nouns: ['unblock'], verbs: ['later'], bare: false, usage: 'hq unblock later <id> [--until ISO|+4h]', summary: 'hide an item from the console until then', section: 'unblock', readOnly: false, help: { summary: 'default: next 07:00 Sydney', pad: 3 } },
+  { group: 'unblock', nouns: ['unblock'], verbs: ['rank'], bare: false, usage: 'hq unblock rank <id> <N|none>', summary: 'rank an unblock item', section: 'unblock', readOnly: false, help: { summary: null } },
+  { group: 'unblock', nouns: ['unblock'], verbs: ['done-when'], bare: false, usage: 'hq unblock done-when <id> <issue:GEO-1|pr:repo#1|doc:ID>...', summary: 'close an item when a condition settles', section: 'unblock', readOnly: false, help: { summary: null } },
+  { group: 'unblock', nouns: ['unblock'], verbs: ['show'], bare: false, usage: 'hq unblock show <id> [--history]', summary: 'one unblock item', section: 'unblock', readOnly: true, help: { summary: null } },
+  { group: 'outbox', nouns: ['outbox'], verbs: ['flush'], bare: false, usage: 'hq outbox flush [--retry]', summary: 'send the messages hq owes other sessions', section: 'outbox', readOnly: false, help: { usage: 'hq outbox [list] | hq outbox flush [--retry]', summary: 'atc messages hq owes other sessions' } },
+];
+
+export const COMMANDS: readonly Command[] = SPECS.map((s) => ({ ...s, handler: via(s.group) }));
+
+// The row for `hq <noun> [verb]`: the row that lists the verb; else, with no verb, the noun's bare
+// row; else the noun's catch-all (verbs null); else the noun's first row. That last step keeps a
+// verb no row lists inside its group, whose function reports the error it always did. Every row
+// of a group shares the group's function, so which row answers does not change what runs.
+export function lookup(noun: string, verb: string | undefined, commands: readonly Command[] = COMMANDS): Command | undefined {
+  const rows = commands.filter((c) => c.nouns.includes(noun));
+  const exact = verb === undefined ? rows.find((c) => c.bare) : rows.find((c) => c.verbs?.includes(verb));
+  return exact ?? rows.find((c) => c.verbs === null) ?? rows[0];
+}
+
+const HELP_SUMMARY_COLUMN = 46; // where a summary starts when the usage is short enough
+const HELP_CONTINUATION = 45; // where the second and later summary lines start
+
+function helpLines(c: Command, e: HelpEntry): string[] {
+  const usage = (e.usage ?? c.usage).split('\n');
+  const summary = e.summary === undefined ? [c.summary] : e.summary === null ? [] : typeof e.summary === 'string' ? [e.summary] : [...e.summary];
+  const lines = usage.map((l) => `  ${l}`);
+  if (!summary.length) return lines;
+  if (e.below) return [...lines, ...summary.map((s) => ' '.repeat(HELP_CONTINUATION) + s)];
+  const last = lines.length - 1;
+  lines[last] += ' '.repeat(e.pad ?? Math.max(2, HELP_SUMMARY_COLUMN - lines[last]!.length)) + summary[0];
+  return [...lines, ...summary.slice(1).map((s) => ' '.repeat(HELP_CONTINUATION) + s)];
+}
+
+// `hq help`: the first line, then each section's lines in table order, a blank line between sections.
+export function renderHelp(version: string, commands: readonly Command[] = COMMANDS): string {
+  const sections: string[][] = [];
+  let prev: string | null = null;
+  for (const c of commands) {
+    if (c.help === false) continue;
+    for (const e of c.help === undefined ? [{}] : Array.isArray(c.help) ? c.help : [c.help as HelpEntry]) {
+      if (c.section !== prev) sections.push([]);
+      prev = c.section;
+      sections.at(-1)!.push(...helpLines(c, e));
+    }
+  }
+  return [`hq ${version}: headquarters for the z- sessions. Every command takes --json.`, '', sections.map((s) => s.join('\n')).join('\n\n'), '', 'Who you are: --by, else HQ_AS, else your atc session\'s name.'].join('\n');
+}

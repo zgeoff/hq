@@ -1,0 +1,51 @@
+{
+  "checkedAt": "2026-10-16T00:00:00Z",
+  "imp": {
+    "budgetMib": 8192,
+    "committedMib": 4096,
+    "freeMib": 4096,
+    "room": true
+  },
+  "providers": {
+    "codex": {
+      "error": "no Codex session log with rate limits in the last 7 days",
+      "threshold": 80,
+      "unattended": false,
+      "target": "local",
+      "room": false
+    },
+    "claude": {
+      "used": 40,
+      "windows": {
+        "fiveHour": 40,
+        "sevenDay": 25
+      },
+      "resetsAt": "2026-10-16T04:00:00Z",
+      "source": "fixture cache",
+      "cached": true,
+      "threshold": 95,
+      "unattended": true,
+      "target": "imp",
+      "room": true
+    }
+  },
+  "design": {
+    "slots": 1,
+    "open": 0,
+    "room": true
+  },
+  "lanes": {
+    "imp": {
+      "workshop": 2
+    },
+    "local": {
+      "studio": 2
+    }
+  },
+  "launch": {
+    "size": "M",
+    "provider": "claude",
+    "agent": "claude",
+    "target": "imp"
+  }
+}

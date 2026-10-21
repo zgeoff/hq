@@ -1,0 +1,17 @@
+{
+  "checkedAt": "2026-10-16T00:00:00Z",
+  "open": 3,
+  "counts": {
+    "inTriage": 0,
+    "missingProject": 0,
+    "missingType": 0,
+    "missingPriority": 0,
+    "missingSize": 0,
+    "missingArea": 0,
+    "stale": 0,
+    "needsGeoff": 0
+  },
+  "triage": [],
+  "incomplete": [],
+  "stale": []
+}

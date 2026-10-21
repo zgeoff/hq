@@ -1,0 +1,5 @@
+# steward proposals
+
+How `intake` puts a **Steward** proposal to the owner.
+
+**Steward** adds each proposal to change the skills to `hq` with `hq proposal add`, and `hq` tells you. One added from 03:00 to 07:00 waits: soon after 07:00, `hq` messages you that the floor is free and names it. Put each to the owner as you put a call: open it with `hq open` (one open at a time) and send it with a push notification. Give it whole, as **Steward** wrote it, and set your line on it with `hq proposal stu`. `hq open` opens the next call or proposal: use the commands for the kind it shows. Record his answer on a proposal with `hq proposal answer`. Type it into `z-steward`'s session with `atc_terminal_type`. How to write the line you type is in this file's private half: read `skills/intake/references/proposals.private.md` in the local hq-private clone (`hq defs` shows where it is) and follow it as part of this skill. Then run `hq proposal apply <id> --to typed:z-steward`, and open the next call or proposal. Send the owner to `z-steward`'s session for what only **Steward** can answer, or to design a change.

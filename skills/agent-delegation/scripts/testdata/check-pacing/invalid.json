@@ -1,0 +1,41 @@
+{
+  "lanes": {
+    "imp": {
+      "nixie-slice": 2,
+      "nixie-maintenance": 1,
+      "atc": "two",
+      "imp": 2,
+      "cloud": 1,
+      "Bad Name": 1
+    },
+    "local": {
+      "flexible": 5,
+      "atc": 1
+    }
+  },
+  "imp": {
+    "impMib": 2048
+  },
+  "providers": {
+    "codex": {
+      "agent": "codex",
+      "threshold": 80,
+      "unattended": false,
+      "target": "local"
+    },
+    "claude": {
+      "agent": "claude",
+      "threshold": 95,
+      "unattended": true,
+      "target": "cloud",
+      "localFallback": 2
+    }
+  },
+  "routes": {
+    "S": ["codex", "claude", "gpt"],
+    "M": ["codex", "claude"],
+    "L": ["claude"],
+    "XL": ["claude"]
+  },
+  "extra": 1
+}

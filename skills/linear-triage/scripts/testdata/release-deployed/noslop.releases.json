@@ -1,0 +1,14 @@
+[
+  [
+    {
+      "tag_name": "@noslop/cli@0.4.8",
+      "draft": false,
+      "created_at": "2026-10-11T00:00:00Z"
+    },
+    {
+      "tag_name": "@noslop/cli@0.4.9",
+      "draft": true,
+      "created_at": "2026-10-13T00:00:00Z"
+    }
+  ]
+]

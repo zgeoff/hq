@@ -1,0 +1,6 @@
+[
+  {
+    "type": "text",
+    "text": "{\"issues\": [{\"id\": \"GEO-2003\", \"createdAt\": \"2026-10-19T12:00:00Z\", \"description\": \"A plain request with no PR.\"}, {\"id\": \"GEO-2008\", \"createdAt\": \"2026-10-10T00:00:00Z\", \"completedAt\": \"2026-10-19T07:00:00Z\"}, {\"id\": \"GEO-2009\", \"createdAt\": \"2026-10-11T00:00:00Z\", \"completedAt\": \"2026-10-19T07:30:00Z\"}, {\"id\": \"GEO-2010\", \"createdAt\": \"2026-10-12T00:00:00Z\", \"canceledAt\": \"2026-10-19T08:30:00Z\"}]}"
+  }
+]

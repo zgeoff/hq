@@ -1,0 +1,8 @@
+- id: skills
+  label: "Skills"
+  outcome: allow
+  note: "edit the kite skills."
+- id: fixes
+  label: "Fixes"
+  outcome: allow
+  note: "merge a kite skill fix with no real choice in it. Bring me a new grant, and {still-ask}."

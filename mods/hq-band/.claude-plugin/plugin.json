@@ -1,0 +1,6 @@
+{
+  "name": "hq-band",
+  "version": "0.2.0",
+  "description": "z-stu's fleet band: one line above the prompt from hq band --json; inert in every other session",
+  "types": "./types/index.d.ts"
+}

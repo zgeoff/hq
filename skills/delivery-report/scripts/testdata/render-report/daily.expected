@@ -1,0 +1,19 @@
+**Thursday 15 October: 7 PRs across 2 repos, covering 5 issues, 2 closed.**
+
+Closed: 1 bug, 1 chore.
+
+**Lantern Garden** (2 issues, 3 PRs)
+- ✅ 🐛 🚨 [(GEO-9401) Repair the lantern latch](https://linear.example/issue/GEO-9401) - [#9401](https://github.com/zgeoff/lantern-demo/pull/9401)
+- 🔄 ✨ ❗ [(GEO-9402) Add the dusk path](https://linear.example/issue/GEO-9402) - [#9402](https://github.com/zgeoff/lantern-demo/pull/9402), [#9403](https://github.com/zgeoff/lantern-demo/pull/9403) · In Review
+
+**Paper Orchard** (1 issue, 1 PR)
+- ✅ 🧹 [(GEO-9403) Sweep the paper leaves](https://linear.example/issue/GEO-9403) - [#9404](https://github.com/zgeoff/paper-orchard/pull/9404)
+
+**No project** (1 issue, 1 PR)
+- ❌ ▫️ [(GEO-9404) Draw the spare planter](https://linear.example/issue/GEO-9404) - [#9405](https://github.com/zgeoff/paper-orchard/pull/9405) · Canceled
+
+**No issue** (1 PR)
+- paper-orchard: [add a paper kite](https://github.com/zgeoff/paper-orchard/pull/9407)
+
+Not found in Linear: GEO-9499.
+

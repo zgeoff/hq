@@ -1,0 +1,62 @@
+[
+  {
+    "id": "GEO-9220",
+    "title": "Water the sample beds",
+    "url": "https://linear.example/issue/GEO-9220",
+    "status": "Todo",
+    "statusType": "unstarted",
+    "project": "Lantern Garden",
+    "priority": {
+      "value": 3,
+      "name": "Medium"
+    },
+    "labels": ["Feature", "M", "Garden"],
+    "parentId": null,
+    "updatedAt": "2026-10-15T00:00:00Z"
+  },
+  {
+    "id": "GEO-9221",
+    "title": "Inspect the copper pots",
+    "url": "https://linear.example/issue/GEO-9221",
+    "status": "Todo",
+    "statusType": "unstarted",
+    "project": "Lantern Garden",
+    "priority": {
+      "value": 3,
+      "name": "Medium"
+    },
+    "labels": ["Investigation", "Garden"],
+    "parentId": null,
+    "updatedAt": "2026-10-15T00:00:00Z"
+  },
+  {
+    "id": "GEO-9222",
+    "title": "Plan the pebble pattern",
+    "url": "https://linear.example/issue/GEO-9222",
+    "status": "Todo",
+    "statusType": "unstarted",
+    "project": "Lantern Garden",
+    "priority": {
+      "value": 3,
+      "name": "Medium"
+    },
+    "labels": ["Design", "Garden"],
+    "parentId": null,
+    "updatedAt": "2026-10-15T00:00:00Z"
+  },
+  {
+    "id": "GEO-9223",
+    "title": "Finish the gate sample",
+    "url": "https://linear.example/issue/GEO-9223",
+    "status": "Done",
+    "statusType": "completed",
+    "project": "Lantern Garden",
+    "priority": {
+      "value": 3,
+      "name": "Medium"
+    },
+    "labels": ["Feature", "M", "Garden"],
+    "parentId": null,
+    "updatedAt": "2026-10-15T00:00:00Z"
+  }
+]

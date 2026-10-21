@@ -1,0 +1,14 @@
+[
+  {
+    "id": "GEO-9405",
+    "title": "Retire the moth lamp",
+    "url": "https://linear.example/issue/GEO-9405",
+    "status": "Canceled",
+    "statusType": "canceled",
+    "project": "Lantern Garden",
+    "priority": 3,
+    "labels": ["Chore", "S", "Garden"],
+    "parentId": null,
+    "updatedAt": "2026-10-16T00:00:00Z"
+  }
+]

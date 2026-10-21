@@ -1,0 +1,35 @@
+{
+  "checkedAt": "2026-10-16T00:00:00Z",
+  "open": 2,
+  "counts": {
+    "inTriage": 0,
+    "missingProject": 0,
+    "missingType": 0,
+    "missingPriority": 0,
+    "missingSize": 0,
+    "missingArea": 1,
+    "stale": 0,
+    "needsGeoff": 0
+  },
+  "triage": [],
+  "incomplete": [
+    {
+      "id": "GEO-9241",
+      "title": "Sort the seed drawers",
+      "url": "https://linear.example/issue/GEO-9241",
+      "status": "Todo",
+      "project": "Lantern Garden",
+      "type": "Chore",
+      "size": "S",
+      "areas": [],
+      "priority": 3,
+      "idleDays": 1,
+      "needsGeoff": false,
+      "missing": [
+        "area"
+      ],
+      "stale": false
+    }
+  ],
+  "stale": []
+}

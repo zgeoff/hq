@@ -1,0 +1,54 @@
+{
+  "name": "hq",
+  "version": "0.80.0",
+  "private": true,
+  "bin": {
+    "hq": "src/cli.ts"
+  },
+  "type": "module",
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "tsrs --noEmit",
+    "deadcode": "knip",
+    "fmt": "oxfmt '**/*.{md,yml,yaml,json}'",
+    "fmt:check": "oxfmt --check '**/*.{md,yml,yaml,json}'",
+    "check:skills": "bun scripts/check-skills.ts",
+    "test:scripts": "sh scripts/test-scripts.sh",
+    "install-bin": "sh scripts/install.sh",
+    "lint:changed": "bun scripts/lint-changed.ts",
+    "grants": "bun scripts/grants.ts",
+    "check:grants": "bun scripts/grants.ts --check"
+  },
+  "dependencies": {
+    "@orpc/client": "1.15.7",
+    "@orpc/server": "1.15.7",
+    "@orpc/standard-server-peer": "1.15.7",
+    "@orpc/tanstack-query": "1.15.7",
+    "@tanstack/react-query": "5.104.4",
+    "@tanstack/react-router": "1.170.45",
+    "@zgeoff/std": "0.3.0",
+    "geist": "1.8.1",
+    "kysely": "0.29.6",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "ts-pattern": "5.9.0",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@happy-dom/global-registrator": "21.0.3",
+    "@stylistic/eslint-plugin": "5.10.0",
+    "@testing-library/dom": "10.4.2",
+    "@testing-library/react": "16.3.3",
+    "@tsconfig/strictest": "2.0.8",
+    "@types/bun": "latest",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@zgeoff/oxlint-config": "0.6.1",
+    "knip": "6.42.1",
+    "msw": "2.15.0",
+    "oxfmt": "^0.72.0",
+    "oxlint": "1.88.0",
+    "tsrs": "0.18.0-ts7.1.0-dev.20260929",
+    "typescript": "7.0.2"
+  }
+}

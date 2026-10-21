@@ -1,0 +1,12 @@
+# Both owners act through one GitHub login, so GitHub can't enforce this file. It records the
+# path rule Geoff agreed: each session merges only the PRs in its own paths.
+
+# z-q
+/src/ @zgeoff
+/test/ @zgeoff
+/scripts/ @zgeoff
+
+# z-steward
+/skills/ @zgeoff
+/docs/ @zgeoff
+/.claude/ @zgeoff

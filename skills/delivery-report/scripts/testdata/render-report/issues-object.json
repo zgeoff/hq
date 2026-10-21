@@ -1,0 +1,31 @@
+{
+  "issues": [
+    {
+      "id": "GEO-9403",
+      "title": "Sweep the paper leaves",
+      "url": "https://linear.example/issue/GEO-9403",
+      "status": "Done",
+      "statusType": "completed",
+      "project": "Paper Orchard",
+      "priority": {
+        "value": 3,
+        "name": "Medium"
+      },
+      "labels": ["Chore", "S", "Orchard"],
+      "parentId": null,
+      "updatedAt": "2026-10-15T00:00:00Z"
+    },
+    {
+      "id": "GEO-9404",
+      "title": "Draw the spare planter",
+      "url": "https://linear.example/issue/GEO-9404",
+      "status": "Canceled",
+      "statusType": "canceled",
+      "project": null,
+      "priority": 0,
+      "labels": [],
+      "parentId": null,
+      "updatedAt": "2026-10-15T00:00:00Z"
+    }
+  ]
+}
