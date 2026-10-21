@@ -65,21 +65,14 @@ test('the triage scripts exit 0 and read every issue on the pages hq linear issu
   const inflow = await $`bash ${ctx.scripts}/inflow.sh --since 2026-10-01T00:00:00Z --until 2026-10-22T00:00:00Z ${files}`.nothrow().quiet();
   const overlap = await $`bash ${ctx.scripts}/overlap-candidates.sh ${files}`.nothrow().quiet();
 
-  expect({
-    written: written.data,
-    exits: [audit.exitCode, inflow.exitCode, overlap.exitCode],
-    auditOpen: JSON.parse(audit.stdout.toString()).open,
-    auditCounts: JSON.parse(audit.stdout.toString()).counts,
-    inflow: JSON.parse(inflow.stdout.toString()),
-    overlap: overlap.stdout.toString(),
-    overlapNote: overlap.stderr.toString(),
-  }).toStrictEqual({
-    written: { files, issues: 123 },
-    exits: [0, 0, 0],
-    auditOpen: 120,
-    auditCounts: { inTriage: 0, missingProject: 0, missingType: 0, missingPriority: 0, missingSize: 0, missingArea: 0, stale: 0, needsGeoff: 0 },
-    inflow: { since: '2026-10-01T00:00:00Z', until: '2026-10-22T00:00:00Z', filed: 123, planned: 0, reactive: 123, closed: 3, flag: true, fromPR: [] },
-    overlap: 'GEO-3\tGEO-110\t1\tgasket, hinge, lid, replace, teapot\n',
-    overlapNote: '1 pair(s) above the threshold\n',
-  });
+  expect(written.data).toStrictEqual({ files, issues: 123 });
+  expect(audit.exitCode).toBe(0);
+  expect(inflow.exitCode).toBe(0);
+  expect(overlap.exitCode).toBe(0);
+  const auditOut = JSON.parse(audit.stdout.toString());
+  expect(auditOut.open).toBe(120);
+  expect(auditOut.counts).toStrictEqual({ inTriage: 0, missingProject: 0, missingType: 0, missingPriority: 0, missingSize: 0, missingArea: 0, stale: 0, needsGeoff: 0 });
+  expect(JSON.parse(inflow.stdout.toString())).toStrictEqual({ since: '2026-10-01T00:00:00Z', until: '2026-10-22T00:00:00Z', filed: 123, planned: 0, reactive: 123, closed: 3, flag: true, fromPR: [] });
+  expect(overlap.stdout.toString()).toBe('GEO-3\tGEO-110\t1\tgasket, hinge, lid, replace, teapot\n');
+  expect(overlap.stderr.toString()).toBe('1 pair(s) above the threshold\n');
 });

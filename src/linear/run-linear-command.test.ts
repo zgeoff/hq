@@ -37,12 +37,11 @@ test('it writes two page files for 150 issues, 100 then 50, each holding only an
   const secondText = readFileSync(join(ctx.directory, 'issues-2.json'), 'utf8');
   const first = pageSchema.parse(JSON.parse(firstText));
   const second = pageSchema.parse(JSON.parse(secondText));
-  expect({ data: out.data, text: out.text, counts: [first.issues.length, second.issues.length], directory: readdirSync(ctx.directory).toSorted() }).toStrictEqual({
-    data: { files: [join(ctx.directory, 'issues-1.json'), join(ctx.directory, 'issues-2.json')], issues: 150 },
-    text: `${join(ctx.directory, 'issues-1.json')}\n${join(ctx.directory, 'issues-2.json')}`,
-    counts: [100, 50],
-    directory: ['issues-1.json', 'issues-2.json'],
-  });
+  expect(out.data).toStrictEqual({ files: [join(ctx.directory, 'issues-1.json'), join(ctx.directory, 'issues-2.json')], issues: 150 });
+  expect(out.text).toBe(`${join(ctx.directory, 'issues-1.json')}\n${join(ctx.directory, 'issues-2.json')}`);
+  expect(first.issues).toHaveLength(100);
+  expect(second.issues).toHaveLength(50);
+  expect(readdirSync(ctx.directory).toSorted()).toStrictEqual(['issues-1.json', 'issues-2.json']);
 });
 
 test('it writes one page holding an empty issues array when nothing matches', async () => {
@@ -51,7 +50,8 @@ test('it writes one page holding an empty issues array when nothing matches', as
 
   const out = await runLinearCommand(ctx.call, { team: 'KET', state: 'Ready', out: ctx.directory });
 
-  expect({ issues: out.data['issues'], page: readFileSync(join(ctx.directory, 'issues-1.json'), 'utf8') }).toStrictEqual({ issues: 0, page: '{"issues":[]}' });
+  expect(out.data['issues']).toBe(0);
+  expect(readFileSync(join(ctx.directory, 'issues-1.json'), 'utf8')).toBe('{"issues":[]}');
 });
 
 test('it matches state names without regard to case and reads only those states', async () => {
@@ -113,10 +113,8 @@ test('it sends --updated-since as a filter, so only issues updated at or after t
   await runLinearCommand(ctx.call, { team: 'KET', state: 'Ready', out: ctx.directory, 'updated-since': '2026-10-15T00:00:00Z', fields: 'id' });
 
   const page = readFileSync(join(ctx.directory, 'issues-1.json'), 'utf8');
-  expect({ filters, page: JSON.parse(page) }).toStrictEqual({
-    filters: [{ team: { key: { eq: 'KET' } }, state: { name: { in: ['Ready'] } }, updatedAt: { gte: '2026-10-15T00:00:00.000Z' } }],
-    page: { issues: [{ id: 'KET-2' }, { id: 'KET-3' }] },
-  });
+  expect(filters).toStrictEqual([{ team: { key: { eq: 'KET' } }, state: { name: { in: ['Ready'] } }, updatedAt: { gte: '2026-10-15T00:00:00.000Z' } }]);
+  expect(JSON.parse(page)).toStrictEqual({ issues: [{ id: 'KET-2' }, { id: 'KET-3' }] });
 });
 
 test('it refuses an --updated-since that is no time as bad_args', () => {
@@ -285,5 +283,6 @@ test('hq linear issues --json prints the files and the issue count', async () =>
 
   const code = await main(['linear', 'issues', '--team', 'KET', '--state', 'ready', '--out', ctx.directory, '--fields', 'id', '--json'], ctx.run);
 
-  expect({ code, printed: JSON.parse(printed.join('')) }).toStrictEqual({ code: 0, printed: { ok: true, files: [join(ctx.directory, 'issues-1.json')], issues: 1 } });
+  expect(code).toBe(0);
+  expect(JSON.parse(printed.join(''))).toStrictEqual({ ok: true, files: [join(ctx.directory, 'issues-1.json')], issues: 1 });
 });
