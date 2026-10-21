@@ -45,7 +45,7 @@ import { formatItemLines } from './format-item-lines.ts';
 import { formatUnblockLater } from './format-unblock-later.ts';
 import { runItemCommand } from './run-item-command.ts';
 import { checkFleetBuild } from './roles/check-fleet-build.ts';
-import { readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { checkLanesBuild } from './lanes/check-lanes-build.ts';
 import { rolesByName } from './roles/roles-by-name.ts';
 import { withStaleBuild } from './roles/with-stale-build.ts';
@@ -2032,7 +2032,7 @@ export const GROUPS: Record<string, (c: Ctx) => Promise<Out>> = {
   answers: (c) => Promise.resolve(runAnswersCommand(c.db, c.flags)),
   grant: (c) => runGrantCommand(c.db, c.verb, c.rest, c.flags),
   kinds: (c) => kindsCommand(c.db, c.verb, c.flags),
-  linear: (context) => runLinearCommand({ call: makeAuditedLinearCaller(context.db, context.run), files: { statSync, readdirSync, writeFileSync } }, context.flags),
+  linear: (context) => runLinearCommand({ call: makeAuditedLinearCaller(context.db, context.run), files: { statSync, readdirSync, writeFileSync, rmSync } }, context.flags),
   goals: (c) => goalsCommand(c.db, c.verb, c.rest, c.flags),
   defs: (c) => defsCommand(c.db, c.verb, c.rest, c.flags),
   repo: async (c) => {

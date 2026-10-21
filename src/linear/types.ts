@@ -16,6 +16,12 @@ export interface IssueFiles {
   statSync: (path: string) => { isDirectory: () => boolean };
   readdirSync: (path: string) => string[];
   writeFileSync: (path: string, text: string) => void;
+  rmSync: (path: string, options: ForceRemove) => void;
+}
+
+// A page the failed write never created is no error to remove.
+interface ForceRemove {
+  force: true;
 }
 
 // What hq linear issues reaches Linear and the filesystem through.

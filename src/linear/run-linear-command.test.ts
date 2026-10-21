@@ -8,6 +8,7 @@ import { z } from 'zod';
 import { buildStubLinearIssuePages } from '../../mocks/build-stub-linear-issue-pages.ts';
 import { LINEAR_GRAPHQL_URL, linearIssues, linearWorkflowStates } from '../../mocks/linear-handlers.ts';
 import { server } from '../../mocks/node.ts';
+import { buildStubIssueFiles } from '../../test/build-stub-issue-files.ts';
 import { freshDb } from '../../test/helpers.ts';
 import { main } from '../cli.ts';
 import { overrideEnv } from '../config/override-env.ts';
@@ -23,7 +24,7 @@ function setupTest() {
   resetKey();
   onTestFinished(resetKey);
   onTestFinished(overrideEnv('OP_SERVICE_ACCOUNT_TOKEN', 'invented-token'));
-  return { directory, run, deps: { call: makeLinearCaller(run), files: { statSync, readdirSync, writeFileSync } }, scripts: join(import.meta.dir, '../../skills/linear-triage/scripts') };
+  return { directory, run, deps: { call: makeLinearCaller(run), files: { statSync, readdirSync, writeFileSync, rmSync } }, scripts: join(import.meta.dir, '../../skills/linear-triage/scripts') };
 }
 
 test('it writes two page files for 150 issues, 100 then 50, each holding only an issues array', async () => {
@@ -353,6 +354,19 @@ test.each(['Ready,', 'Ready, ,Done'])('it refuses a --state of %p, which names a
   const failed = runLinearCommand(ctx.deps, { team: 'KET', state, out: ctx.directory });
 
   expect(failed).rejects.toMatchObject({ code: 'bad_args', message: '--state is a comma-separated list of state names, with none empty' });
+});
+
+test('it removes the pages it wrote, and only those, when a page write fails', () => {
+  const ctx = setupTest();
+  linearWorkflowStates.push({ team: 'KET', name: 'Ready' });
+  linearIssues.push(...Array.from({ length: 250 }, (_, index) => ({ identifier: `KET-${index + 1}`, team: 'KET', state: 'Ready', stateType: 'unstarted', previousIdentifiers: [], project: null, labels: [], parent: null })));
+  writeFileSync(join(ctx.directory, 'notes.txt'), 'brew at 90 degrees');
+  writeFileSync(join(ctx.directory, 'issues-final.json'), '{}');
+
+  const failed = runLinearCommand({ ...ctx.deps, files: buildStubIssueFiles('issues-2.json') }, { team: 'KET', state: 'Ready', out: ctx.directory });
+
+  expect(failed).rejects.toThrow(`ENOSPC: no space left on device, write '${join(ctx.directory, 'issues-2.json')}'`);
+  expect(readdirSync(ctx.directory).toSorted()).toStrictEqual(['issues-final.json', 'notes.txt']);
 });
 
 test('it fails with the error and writes no file when Linear answers 500', () => {
