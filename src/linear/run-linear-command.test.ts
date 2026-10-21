@@ -1,6 +1,6 @@
 import { $ } from 'bun';
 import { expect, mock, onTestFinished, test } from 'bun:test';
-import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { HttpResponse, http } from 'msw';
@@ -23,7 +23,7 @@ function setupTest() {
   resetKey();
   onTestFinished(resetKey);
   onTestFinished(overrideEnv('OP_SERVICE_ACCOUNT_TOKEN', 'invented-token'));
-  return { directory, run, call: makeLinearCaller(run), scripts: join(import.meta.dir, '../../skills/linear-triage/scripts') };
+  return { directory, run, deps: { call: makeLinearCaller(run), files: { statSync, readdirSync, writeFileSync } }, scripts: join(import.meta.dir, '../../skills/linear-triage/scripts') };
 }
 
 test('it writes two page files for 150 issues, 100 then 50, each holding only an issues array', async () => {
@@ -37,7 +37,7 @@ test('it writes two page files for 150 issues, 100 then 50, each holding only an
   linearWorkflowStates.push({ team: 'KET', name: 'Ready' });
   linearIssues.push(...Array.from({ length: 150 }, (_, index) => ({ identifier: `KET-${index + 1}`, team: 'KET', state: 'Ready', stateType: 'unstarted', previousIdentifiers: [], project: null, labels: [], parent: null })));
 
-  const out = await runLinearCommand(ctx.call, { team: 'KET', state: 'Ready', out: ctx.directory });
+  const out = await runLinearCommand(ctx.deps, { team: 'KET', state: 'Ready', out: ctx.directory });
 
   const pageSchema = z.object({ issues: z.array(z.unknown()) }).strict();
   const firstText = readFileSync(join(ctx.directory, 'issues-1.json'), 'utf8');
@@ -61,7 +61,7 @@ test('it writes one page holding an empty issues array when nothing matches', as
   const ctx = setupTest();
   linearWorkflowStates.push({ team: 'KET', name: 'Ready' });
 
-  const out = await runLinearCommand(ctx.call, { team: 'KET', state: 'Ready', out: ctx.directory });
+  const out = await runLinearCommand(ctx.deps, { team: 'KET', state: 'Ready', out: ctx.directory });
 
   expect(out.data['issues']).toBe(0);
   expect(readFileSync(join(ctx.directory, 'issues-1.json'), 'utf8')).toBe('{"issues":[]}');
@@ -76,7 +76,7 @@ test('it matches state names without regard to case and reads only those states'
     { identifier: 'KET-3', team: 'KET', state: 'Backlog', stateType: 'backlog', previousIdentifiers: [], project: null, labels: [], parent: null },
   );
 
-  await runLinearCommand(ctx.call, { team: 'KET', state: 'ready, IN REVIEW', out: ctx.directory, fields: 'id,status' });
+  await runLinearCommand(ctx.deps, { team: 'KET', state: 'ready, IN REVIEW', out: ctx.directory, fields: 'id,status' });
 
   const page = readFileSync(join(ctx.directory, 'issues-1.json'), 'utf8');
   expect(JSON.parse(page)).toStrictEqual({
@@ -91,7 +91,7 @@ test('it refuses a state the team lacks as bad_args, listing the team states, an
   const ctx = setupTest();
   linearWorkflowStates.push({ team: 'KET', name: 'Backlog' }, { team: 'KET', name: 'Ready' }, { team: 'KET', name: 'In Review' });
 
-  const failed = runLinearCommand(ctx.call, { team: 'KET', state: 'Ready,Steeping', out: ctx.directory });
+  const failed = runLinearCommand(ctx.deps, { team: 'KET', state: 'Ready,Steeping', out: ctx.directory });
 
   expect(failed).rejects.toMatchObject({ code: 'bad_args', message: 'unknown state "Steeping" in team KET; its states are Backlog, Ready, In Review' });
   expect(readdirSync(ctx.directory)).toStrictEqual([]);
@@ -100,7 +100,7 @@ test('it refuses a state the team lacks as bad_args, listing the team states, an
 test('it refuses a team that holds no states as bad_args', () => {
   const ctx = setupTest();
 
-  const failed = runLinearCommand(ctx.call, { team: 'TEA', state: 'Ready', out: ctx.directory });
+  const failed = runLinearCommand(ctx.deps, { team: 'TEA', state: 'Ready', out: ctx.directory });
 
   expect(failed).rejects.toMatchObject({ code: 'bad_args', message: 'Linear has no workflow states for team TEA: check the team key' });
 });
@@ -120,7 +120,7 @@ test('it sends --updated-since as a filter, so only issues updated at or after t
   });
   onTestFinished(() => server.events.removeAllListeners());
 
-  await runLinearCommand(ctx.call, { team: 'KET', state: 'Ready', out: ctx.directory, 'updated-since': '2026-10-15T00:00:00Z', fields: 'id' });
+  await runLinearCommand(ctx.deps, { team: 'KET', state: 'Ready', out: ctx.directory, 'updated-since': '2026-10-15T00:00:00Z', fields: 'id' });
 
   const page = readFileSync(join(ctx.directory, 'issues-1.json'), 'utf8');
   expect(sent).toStrictEqual([
@@ -133,7 +133,7 @@ test('it sends --updated-since as a filter, so only issues updated at or after t
 test.each(['last tuesday-ish', '2026-10-15T00:00:00', '2026-10-15 08:30', '15/10/2026'])('it refuses an --updated-since of %p as bad_args', (raw) => {
   const ctx = setupTest();
 
-  const failed = runLinearCommand(ctx.call, { team: 'KET', state: 'Ready', out: ctx.directory, 'updated-since': raw });
+  const failed = runLinearCommand(ctx.deps, { team: 'KET', state: 'Ready', out: ctx.directory, 'updated-since': raw });
 
   expect(failed).rejects.toMatchObject({ code: 'bad_args', message: `--updated-since must be an ISO date-time with an offset or Z, or a date YYYY-MM-DD, not "${raw}"` });
 });
@@ -151,7 +151,7 @@ test.each([
   });
   onTestFinished(() => server.events.removeAllListeners());
 
-  await runLinearCommand(ctx.call, { team: 'KET', state: 'Ready', out: ctx.directory, 'updated-since': raw });
+  await runLinearCommand(ctx.deps, { team: 'KET', state: 'Ready', out: ctx.directory, 'updated-since': raw });
 
   expect(sent).toStrictEqual([
     { query: expect.any(String), variables: { teamKey: 'KET' } },
@@ -164,7 +164,7 @@ test('it writes only the fields --fields names, in the connector order', async (
   linearWorkflowStates.push({ team: 'KET', name: 'Ready' });
   linearIssues.push({ identifier: 'KET-1', team: 'KET', state: 'Ready', stateType: 'unstarted', previousIdentifiers: [], project: null, labels: [], parent: null, title: 'Descale the kettle' });
 
-  await runLinearCommand(ctx.call, { team: 'KET', state: 'Ready', out: ctx.directory, fields: 'updatedAt, title,id' });
+  await runLinearCommand(ctx.deps, { team: 'KET', state: 'Ready', out: ctx.directory, fields: 'updatedAt, title,id' });
 
   const page = readFileSync(join(ctx.directory, 'issues-1.json'), 'utf8');
   expect(JSON.parse(page)).toStrictEqual({ issues: [{ id: 'KET-1', title: 'Descale the kettle', updatedAt: '2026-10-01T00:00:00.000Z' }] });
@@ -173,7 +173,7 @@ test('it writes only the fields --fields names, in the connector order', async (
 test('it refuses an unknown field as bad_args', () => {
   const ctx = setupTest();
 
-  const failed = runLinearCommand(ctx.call, { team: 'KET', state: 'Ready', out: ctx.directory, fields: 'id,colour' });
+  const failed = runLinearCommand(ctx.deps, { team: 'KET', state: 'Ready', out: ctx.directory, fields: 'id,colour' });
 
   expect(failed).rejects.toMatchObject({ code: 'bad_args', message: expect.stringContaining('unknown field "colour"') });
 });
@@ -201,7 +201,7 @@ test('it writes each issue in the connector shape with all 14 fields', async () 
     { identifier: 'KET-8', team: 'KET', state: 'Done', stateType: 'canceled', previousIdentifiers: [], project: null, labels: [], parent: null, canceledAt: '2026-10-03T00:00:00.000Z' },
   );
 
-  await runLinearCommand(ctx.call, { team: 'KET', state: 'Done', out: ctx.directory });
+  await runLinearCommand(ctx.deps, { team: 'KET', state: 'Done', out: ctx.directory });
 
   const page = readFileSync(join(ctx.directory, 'issues-1.json'), 'utf8');
   expect(JSON.parse(page)).toStrictEqual({
@@ -245,7 +245,7 @@ test('it writes each issue in the connector shape with all 14 fields', async () 
 test('it refuses an --out that is missing as bad_args', () => {
   const ctx = setupTest();
 
-  const failed = runLinearCommand(ctx.call, { team: 'KET', state: 'Ready', out: join(ctx.directory, 'missing') });
+  const failed = runLinearCommand(ctx.deps, { team: 'KET', state: 'Ready', out: join(ctx.directory, 'missing') });
 
   expect(failed).rejects.toMatchObject({ code: 'bad_args', message: `--out must be an existing directory: ${join(ctx.directory, 'missing')}` });
 });
@@ -254,7 +254,7 @@ test('it refuses an --out that is a file as bad_args', () => {
   const ctx = setupTest();
   writeFileSync(join(ctx.directory, 'afile'), '');
 
-  const failed = runLinearCommand(ctx.call, { team: 'KET', state: 'Ready', out: join(ctx.directory, 'afile') });
+  const failed = runLinearCommand(ctx.deps, { team: 'KET', state: 'Ready', out: join(ctx.directory, 'afile') });
 
   expect(failed).rejects.toMatchObject({ code: 'bad_args' });
 });
@@ -264,7 +264,7 @@ test('it refuses an --out that already holds an issue page as bad_args, keeping 
   writeFileSync(join(ctx.directory, 'issues-3.json'), '{"issues":[]}');
   writeFileSync(join(ctx.directory, 'notes.txt'), 'brew at 90 degrees');
 
-  const failed = runLinearCommand(ctx.call, { team: 'KET', state: 'Ready', out: ctx.directory });
+  const failed = runLinearCommand(ctx.deps, { team: 'KET', state: 'Ready', out: ctx.directory });
 
   expect(failed).rejects.toMatchObject({ code: 'bad_args', message: `${ctx.directory} already holds issue pages; use an empty directory` });
   expect(readdirSync(ctx.directory).toSorted()).toStrictEqual(['issues-3.json', 'notes.txt']);
@@ -275,7 +275,7 @@ test('it writes into an --out that holds only files that are not issue pages', a
   linearWorkflowStates.push({ team: 'KET', name: 'Ready' });
   writeFileSync(join(ctx.directory, 'issues-final.json'), '{}');
 
-  await runLinearCommand(ctx.call, { team: 'KET', state: 'Ready', out: ctx.directory });
+  await runLinearCommand(ctx.deps, { team: 'KET', state: 'Ready', out: ctx.directory });
 
   expect(readdirSync(ctx.directory).toSorted()).toStrictEqual(['issues-1.json', 'issues-final.json']);
 });
@@ -287,7 +287,7 @@ test.each([
 ])('it refuses a call without %s as bad_args', (flag, flags) => {
   const ctx = setupTest();
 
-  const failed = runLinearCommand(ctx.call, flags);
+  const failed = runLinearCommand(ctx.deps, flags);
 
   expect(failed).rejects.toMatchObject({ code: 'bad_args', message: `hq linear issues needs ${flag}` });
 });
@@ -303,7 +303,7 @@ test('it writes no page file when the second page is not what Linear promises', 
     ]),
   );
 
-  const failed = runLinearCommand(ctx.call, { team: 'KET', state: 'Ready', out: ctx.directory });
+  const failed = runLinearCommand(ctx.deps, { team: 'KET', state: 'Ready', out: ctx.directory });
 
   expect(failed).rejects.toMatchObject({ code: 'linear_failed', message: "Linear's issues answer has an unexpected shape: issues.nodes.0.title" });
   expect(readdirSync(ctx.directory)).toStrictEqual([]);
@@ -320,7 +320,7 @@ test('it stops at 200 pages, asks Linear for no page past them and writes no fil
   linearWorkflowStates.push({ team: 'KET', name: 'Ready' });
   server.use(buildStubLinearIssuePages(Array.from({ length: 200 }, (_, index) => ({ issues: { nodes: [], pageInfo: { hasNextPage: true, endCursor: `c${index + 1}` } } }))));
 
-  const failed = runLinearCommand(ctx.call, { team: 'KET', state: 'Ready', out: ctx.directory });
+  const failed = runLinearCommand(ctx.deps, { team: 'KET', state: 'Ready', out: ctx.directory });
 
   expect(failed).rejects.toMatchObject({ code: 'linear_failed', message: 'more than 20000 issues match; hq reads no further' });
   expect(sent).toHaveLength(201);
@@ -332,7 +332,7 @@ test('it fails as linear_failed when Linear says another page follows but gives 
   linearWorkflowStates.push({ team: 'KET', name: 'Ready' });
   server.use(buildStubLinearIssuePages([{ issues: { nodes: [], pageInfo: { hasNextPage: true, endCursor: null } } }]));
 
-  const failed = runLinearCommand(ctx.call, { team: 'KET', state: 'Ready', out: ctx.directory });
+  const failed = runLinearCommand(ctx.deps, { team: 'KET', state: 'Ready', out: ctx.directory });
 
   expect(failed).rejects.toMatchObject({ code: 'linear_failed', message: 'Linear says another page follows but gave no cursor' });
   expect(readdirSync(ctx.directory)).toStrictEqual([]);
@@ -342,7 +342,7 @@ test('it fails as linear_failed when the workflow states answer is not what Line
   const ctx = setupTest();
   server.use(http.post(LINEAR_GRAPHQL_URL, () => HttpResponse.json({ data: { workflowStates: { nodes: [{ label: 'Ready' }] } } })));
 
-  const failed = runLinearCommand(ctx.call, { team: 'KET', state: 'Ready', out: ctx.directory });
+  const failed = runLinearCommand(ctx.deps, { team: 'KET', state: 'Ready', out: ctx.directory });
 
   expect(failed).rejects.toMatchObject({ code: 'linear_failed', message: "Linear's workflow states answer has an unexpected shape: workflowStates.nodes.0.name" });
 });
@@ -350,7 +350,7 @@ test('it fails as linear_failed when the workflow states answer is not what Line
 test.each(['Ready,', 'Ready, ,Done'])('it refuses a --state of %p, which names an empty state, as bad_args', (state) => {
   const ctx = setupTest();
 
-  const failed = runLinearCommand(ctx.call, { team: 'KET', state, out: ctx.directory });
+  const failed = runLinearCommand(ctx.deps, { team: 'KET', state, out: ctx.directory });
 
   expect(failed).rejects.toMatchObject({ code: 'bad_args', message: '--state is a comma-separated list of state names, with none empty' });
 });
@@ -359,7 +359,7 @@ test('it fails with the error and writes no file when Linear answers 500', () =>
   const ctx = setupTest();
   server.use(http.post(LINEAR_GRAPHQL_URL, () => HttpResponse.json({ errors: [{ message: 'invented: Linear is unwell' }] }, { status: 500 })));
 
-  const failed = runLinearCommand(ctx.call, { team: 'KET', state: 'Ready', out: ctx.directory });
+  const failed = runLinearCommand(ctx.deps, { team: 'KET', state: 'Ready', out: ctx.directory });
 
   expect(failed).rejects.toMatchObject({ code: 'linear_failed', message: 'Linear answered 500: invented: Linear is unwell' });
   expect(readdirSync(ctx.directory)).toStrictEqual([]);
@@ -419,7 +419,7 @@ test('it runs each triage script to exit 0 over every issue on the pages hq line
     completedAt: '2026-10-12T00:00:00.000Z',
   }));
   linearIssues.push(...open, ...done);
-  const written = await runLinearCommand(ctx.call, { team: 'GEO', state: states.join(','), out: ctx.directory });
+  const written = await runLinearCommand(ctx.deps, { team: 'GEO', state: states.join(','), out: ctx.directory });
   const files = [join(ctx.directory, 'issues-1.json'), join(ctx.directory, 'issues-2.json')];
 
   const audit = await $`bash ${ctx.scripts}/audit-issues.sh --now 2026-10-22T00:00:00Z ${files}`.nothrow().quiet();

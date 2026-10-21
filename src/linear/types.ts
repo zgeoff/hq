@@ -11,6 +11,19 @@ export interface LinearIssue {
 // A Linear GraphQL call; tests pass a fake.
 export type LinearCall = (query: string, variables: Record<string, unknown>) => Promise<unknown>;
 
+// The filesystem calls hq linear issues makes on its --out directory; the CLI passes node:fs.
+export interface IssueFiles {
+  statSync: (path: string) => { isDirectory: () => boolean };
+  readdirSync: (path: string) => string[];
+  writeFileSync: (path: string, text: string) => void;
+}
+
+// What hq linear issues reaches Linear and the filesystem through.
+export interface LinearCommandDeps {
+  call: LinearCall;
+  files: IssueFiles;
+}
+
 export interface Node {
   identifier: string;
   title: string;

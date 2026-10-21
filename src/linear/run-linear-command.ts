@@ -1,4 +1,3 @@
-import { readdirSync, statSync } from 'node:fs';
 import { z } from 'zod';
 import type { Flags } from '../cli.ts';
 import type { Out } from '../commands.ts';
@@ -8,13 +7,13 @@ import { pickStateNames } from './pick-state-names.ts';
 import type { IssuesFilter } from './read-issue-pages.ts';
 import { readIssuePages } from './read-issue-pages.ts';
 import { readTeamStateNames } from './read-team-state-names.ts';
-import type { LinearCall } from './types.ts';
+import type { IssueFiles, LinearCommandDeps } from './types.ts';
 import { writeIssuePages } from './write-issue-pages.ts';
 
 // A page left by an earlier run would be read as part of this one.
 const PAGE_FILE = /^issues-\d+\.json$/u;
 
-export async function runLinearCommand(call: LinearCall, flags: Flags): Promise<Out> {
+export async function runLinearCommand(deps: LinearCommandDeps, flags: Flags): Promise<Out> {
   const team = requireFlag(flags.team, 'team');
   const requested = requireFlag(flags.state, 'state')
     .split(',')
@@ -25,20 +24,20 @@ export async function runLinearCommand(call: LinearCall, flags: Flags): Promise<
   if (requested.some((name) => name === '')) {
     throw new HqError('bad_args', '--state is a comma-separated list of state names, with none empty');
   }
-  if (!probeDirectory(out)) {
+  if (!probeDirectory(deps.files, out)) {
     throw new HqError('bad_args', `--out must be an existing directory: ${out}`);
   }
-  if (readdirSync(out).some((entry) => PAGE_FILE.test(entry))) {
+  if (deps.files.readdirSync(out).some((entry) => PAGE_FILE.test(entry))) {
     throw new HqError('bad_args', `${out} already holds issue pages; use an empty directory`);
   }
-  const known = await readTeamStateNames(call, team);
+  const known = await readTeamStateNames(deps.call, team);
   const states = pickStateNames(requested, known, team);
   const filter: IssuesFilter = { team: { key: { eq: team } }, state: { name: { in: states } } };
   if (updatedSince !== undefined) {
     filter.updatedAt = { gte: updatedSince };
   }
-  const pages = await readIssuePages(call, filter, fields);
-  const files = writeIssuePages(out, pages);
+  const pages = await readIssuePages(deps.call, filter, fields);
+  const files = writeIssuePages(deps.files, out, pages);
   const issues = pages.reduce((total, page) => total + page.length, 0);
   return { data: { files, issues }, text: files.join('\n') };
 }
@@ -63,9 +62,9 @@ function parseUpdatedSince(raw: string | undefined): string | undefined {
   return new Date(raw).toISOString();
 }
 
-function probeDirectory(path: string): boolean {
+function probeDirectory(files: IssueFiles, path: string): boolean {
   try {
-    return statSync(path).isDirectory();
+    return files.statSync(path).isDirectory();
   } catch {
     return false;
   }
