@@ -9,6 +9,7 @@ import { LINEAR_GRAPHQL_URL, linearIssues, linearWorkflowStates } from '../../mo
 import { server } from '../../mocks/node.ts';
 import { freshDb } from '../../test/helpers.ts';
 import { main } from '../cli.ts';
+import { overrideEnv } from '../config/override-env.ts';
 import type { RunResult, Runner } from '../runner/types.ts';
 import { makeLinearCaller } from './make-linear-caller.ts';
 import { resetKey } from './reset-key.ts';
@@ -20,8 +21,7 @@ function setupTest() {
   onTestFinished(() => rmSync(directory, { recursive: true, force: true }));
   resetKey();
   onTestFinished(resetKey);
-  process.env['OP_SERVICE_ACCOUNT_TOKEN'] = 'invented-token';
-  onTestFinished(() => delete process.env['OP_SERVICE_ACCOUNT_TOKEN']);
+  onTestFinished(overrideEnv('OP_SERVICE_ACCOUNT_TOKEN', 'invented-token'));
   return { directory, run, call: makeLinearCaller(run), scripts: join(import.meta.dir, '../../skills/linear-triage/scripts') };
 }
 
