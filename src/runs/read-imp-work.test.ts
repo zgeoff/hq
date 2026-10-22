@@ -2,8 +2,8 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { realRunner } from '../runner/real-runner.ts';
-import type { RunResult, Runner } from '../runner/types.ts';
+import { buildStubImpRunner } from '../../test/build-stub-imp-runner.ts';
+import type { RunResult } from '../runner/types.ts';
 import { readImpWork } from './read-imp-work.ts';
 
 // A clone of a bare remote with one pushed commit, and a runner that answers `imp ls --json` with
@@ -19,18 +19,8 @@ function setupTest(exec: RunResult | 'local') {
   git(['-C', clone, 'add', '.']);
   git(['-C', clone, 'commit', '-q', '-m', 'add kettle lid']);
   git(['-C', clone, 'push', '-q', 'origin', 'main']);
-  const commands: string[][] = [];
-  const run: Runner = (cmd, opts) => {
-    commands.push(cmd);
-    if (cmd[1] === 'ls') {
-      return Promise.resolve({ code: 0, stdout: JSON.stringify([{ name: 'home-0000c001aaaa4aaa8aaa' }, { name: 'home-0000b001aaaa4aaa8aaa' }]), stderr: '' });
-    }
-    if (exec === 'local') {
-      return realRunner(cmd.slice(cmd.indexOf('--') + 1), opts);
-    }
-    return Promise.resolve(exec);
-  };
-  return { run, commands, clone, git, session: '0000b001-aaaa-4aaa-8aaa-aaaaaaaaaaaa' };
+  const imps = buildStubImpRunner(exec === 'local' ? { imps: ['home-0000c001aaaa4aaa8aaa', 'home-0000b001aaaa4aaa8aaa'] } : { imps: ['home-0000c001aaaa4aaa8aaa', 'home-0000b001aaaa4aaa8aaa'], exec });
+  return { run: imps.run, commands: imps.commands, clone, git, session: '0000b001-aaaa-4aaa-8aaa-aaaaaaaaaaaa' };
 }
 
 test('an imp whose clone has every commit on a remote branch and nothing uncommitted has all its work pushed; the check runs in the session imp and folder', async () => {

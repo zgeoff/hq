@@ -1,6 +1,7 @@
 import { expect, onTestFinished, test } from 'bun:test';
+import { buildStubFleetClient } from '../../test/build-stub-fleet-client.ts';
 import { freshDb } from '../../test/helpers.ts';
-import type { FleetClient, FleetSession, StaleOps } from '../fleet/types.ts';
+import type { FleetSession } from '../fleet/types.ts';
 import { addRun } from './add-run.ts';
 import { getRun } from './get-run.ts';
 import { runWrapUp } from './run-wrap-up.ts';
@@ -8,7 +9,7 @@ import { setGeoffChat } from './set-geoff-chat.ts';
 import { setState } from './set-state.ts';
 import type { ImpWork } from './types.ts';
 
-// A closed run on a fake atc that lists the run's session, its sub-session and an unrelated
+// A closed run on a stub atc that lists the run's session, its sub-session and an unrelated
 // session, and records every call the wrap-up makes. An imp session's first forget asks to
 // confirm the destroy.
 function setupTest(place: 'local' | 'imp', options: { geoffChat?: boolean; impWork?: () => Promise<ImpWork> } = {}) {
@@ -20,41 +21,23 @@ function setupTest(place: 'local' | 'imp', options: { geoffChat?: boolean; impWo
     setGeoffChat(fresh.db, 'GEO-9801', true, 'z-delivery');
   }
   setState(fresh.db, 'GEO-9801', 'done', {}, 'z-delivery');
-  const calls: string[] = [];
   const checked: string[] = [];
   const opened: string[] = [];
-  const sessions: FleetSession[] = [
-    { id: ids.root, name: 'kettle-agent', alive: true, cwd: '/workspace/kettle' },
-    { id: ids.child, name: 'kettle-helper', alive: true, parent: ids.root, cwd: '/workspace/kettle' },
-    { id: '0000a003-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'teapot-agent', alive: true },
-  ];
-  const record = (line: string) => {
-    calls.push(line);
-    return Promise.resolve();
-  };
-  const client: FleetClient & StaleOps = {
-    sessions: () => Promise.resolve(sessions),
-    spawn: () => Promise.reject(new Error('the wrap-up spawns nothing')),
-    pin: (id) => record(`pin ${id.slice(0, 8)}`),
-    details: () => Promise.reject(new Error('the wrap-up reads no details')),
-    message: () => Promise.reject(new Error('the wrap-up reads no message')),
-    kill: (id) => record(`kill ${id.slice(0, 8)}`),
-    unpin: (id) => record(`unpin ${id.slice(0, 8)}`),
-    forget: (id, confirmToken) => {
-      calls.push(`forget ${id.slice(0, 8)}${confirmToken === undefined ? '' : ` ${confirmToken}`}`);
-      if (place === 'imp' && id === ids.root && confirmToken === undefined) {
-        return Promise.resolve({ forgotten: false, confirmToken: 'token-kettle' });
-      }
-      return Promise.resolve({ forgotten: true });
-    },
-  };
+  const fleet = buildStubFleetClient({
+    sessions: [
+      { id: ids.root, name: 'kettle-agent', alive: true, cwd: '/workspace/kettle' },
+      { id: ids.child, name: 'kettle-helper', alive: true, parent: ids.root, cwd: '/workspace/kettle' },
+      { id: '0000a003-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'teapot-agent', alive: true },
+    ],
+    forgets: place === 'imp' ? { [ids.root]: [{ forgotten: false, confirmToken: 'token-kettle' }] } : {},
+  });
   const wrapUp = () =>
     runWrapUp(
       fresh.db,
       {
         openClient: () => {
           opened.push('atc');
-          return Promise.resolve(client);
+          return Promise.resolve(fleet.client);
         },
         readImpWork: (session) => {
           checked.push(`${session.id.slice(0, 8)} ${session.cwd}`);
@@ -65,7 +48,7 @@ function setupTest(place: 'local' | 'imp', options: { geoffChat?: boolean; impWo
       'z-delivery',
     );
   const notes = () => fresh.db.query("SELECT label, text FROM run_notes WHERE issue = 'GEO-9801'").all();
-  return { db: fresh.db, ids, calls, checked, opened, wrapUp, notes };
+  return { db: fresh.db, ids, calls: fleet.calls, checked, opened, wrapUp, notes };
 }
 
 test('done forgets the run session and its sub-session, the sub-session first, and leaves other sessions alone', async () => {
@@ -144,29 +127,15 @@ test('done forgets the one atc session that a short session id on the run starts
     { id: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true },
     { id: '0000a002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'teapot-agent', alive: true },
   ];
-  const calls: string[] = [];
-  const record = (line: string) => {
-    calls.push(line);
-    return Promise.resolve();
-  };
-  const client: FleetClient & StaleOps = {
-    sessions: () => Promise.resolve(sessions),
-    spawn: () => Promise.reject(new Error('the wrap-up spawns nothing')),
-    pin: (id) => record(`pin ${id}`),
-    details: () => Promise.reject(new Error('the wrap-up reads no details')),
-    message: () => Promise.reject(new Error('the wrap-up reads no message')),
-    kill: (id) => record(`kill ${id}`),
-    unpin: (id) => record(`unpin ${id}`),
-    forget: (id) => record(`forget ${id}`).then(() => ({ forgotten: true })),
-  };
-  const deps = { openClient: () => Promise.resolve(client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')) };
+  const fleet = buildStubFleetClient({ sessions });
+  const deps = { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')) };
   addRun(fresh.db, { issue: 'GEO-9811', title: 'Invented kettle descaler', place: 'local', session: '0000a001', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
   setState(fresh.db, 'GEO-9811', 'done', {}, 'z-delivery');
 
   const wrapUp = await runWrapUp(fresh.db, deps, 'GEO-9811', 'z-delivery');
 
   expect(wrapUp).toStrictEqual({ forgotten: ['0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa'], destroyed: [], kept: [], failed: [] });
-  expect(calls).toStrictEqual(['unpin 0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'kill 0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'unpin 0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'forget 0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa']);
+  expect(fleet.calls).toStrictEqual(['unpin 0000a001', 'kill 0000a001', 'unpin 0000a001', 'forget 0000a001']);
 });
 
 test('done forgets no session for a short session id that several atc sessions start, and records the failure', async () => {
@@ -176,27 +145,13 @@ test('done forgets no session for a short session id that several atc sessions s
     { id: '0000b001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'teapot-agent', alive: true },
     { id: '0000b001-bbbb-4bbb-8bbb-bbbbbbbbbbbb', name: 'teapot-helper', alive: true },
   ];
-  const calls: string[] = [];
-  const record = (line: string) => {
-    calls.push(line);
-    return Promise.resolve();
-  };
-  const client: FleetClient & StaleOps = {
-    sessions: () => Promise.resolve(sessions),
-    spawn: () => Promise.reject(new Error('the wrap-up spawns nothing')),
-    pin: (id) => record(`pin ${id}`),
-    details: () => Promise.reject(new Error('the wrap-up reads no details')),
-    message: () => Promise.reject(new Error('the wrap-up reads no message')),
-    kill: (id) => record(`kill ${id}`),
-    unpin: (id) => record(`unpin ${id}`),
-    forget: (id) => record(`forget ${id}`).then(() => ({ forgotten: true })),
-  };
-  const deps = { openClient: () => Promise.resolve(client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')) };
+  const fleet = buildStubFleetClient({ sessions });
+  const deps = { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')) };
   addRun(fresh.db, { issue: 'GEO-9812', title: 'Invented teapot cosy', place: 'local', session: '0000b001', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
   setState(fresh.db, 'GEO-9812', 'done', {}, 'z-delivery');
 
   const wrapUp = await runWrapUp(fresh.db, deps, 'GEO-9812', 'z-delivery');
 
   expect(wrapUp).toStrictEqual({ forgotten: [], destroyed: [], kept: [], failed: [{ id: '0000b001', reason: '2 sessions start with 0000b001; give more of the id' }] });
-  expect(calls).toStrictEqual([]);
+  expect(fleet.calls).toStrictEqual([]);
 });
