@@ -1,17 +1,7 @@
 {
-  "lanes": {
-    "imp": {
-      "nixie-slice": 2,
-      "nixie-maintenance": 1,
-      "atc": "two",
-      "imp": 2,
-      "cloud": 1,
-      "Bad Name": 1
-    },
-    "local": {
-      "flexible": 5,
-      "atc": 1
-    }
+  "slots": {
+    "imp": "seven",
+    "local": 200
   },
   "imp": {
     "impMib": 2048

@@ -15,7 +15,7 @@ Keep each pending change's Linear issue open, with a comment saying it waits for
 
 ## launching the upgrade
 
-Launch one Claude session on the `local` target, in `~/projects/atc` with no `workspace`, named "atc upgrade to <version>", or "atc restart" when only config changes are pending, with the brief below. The brief's Permissions block is in this file's private half: read `skills/agent-delegation/references/atc-upgrade.private.md` in the local hq-private clone (`hq defs` shows where it is) and follow it as part of this skill. Tell the owner the session name, the pending changes it loads, and that the connector can't reach his computer for about a minute while the daemon restarts.
+Launch one Claude session on the `local` target, in `~/projects/atc` with no `workspace`, named "atc upgrade to <version>", or "atc restart" when only config changes are pending, with the brief below. The brief's Permissions block is in this file's private half: read `skills/release/references/atc-upgrade.private.md` in the local hq-private clone (`hq defs` shows where it is) and follow it as part of this skill. Tell the owner the session name, the pending changes it loads, and that the connector can't reach his computer for about a minute while the daemon restarts.
 
 ```text
 Upgrade atc on this machine to the latest release and restart it.

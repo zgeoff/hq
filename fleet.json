@@ -17,7 +17,16 @@
       "model": "opus",
       "wake": false,
       "roles": ["orchestrator"],
-      "note": "woken by name"
+      "note": "the foreman; woken by name"
+    },
+    {
+      "name": "z-release",
+      "skill": "release",
+      "cwd": "defs",
+      "model": "opus",
+      "wake": true,
+      "roles": ["release"],
+      "note": "merge to live: releases, deploys, host switches"
     },
     {
       "name": "z-triage",
@@ -26,14 +35,6 @@
       "model": "opus",
       "wake": true,
       "roles": ["triage"]
-    },
-    {
-      "name": "z-steward",
-      "skill": "definitions-stewardship",
-      "cwd": "defs",
-      "model": "opus",
-      "wake": true,
-      "roles": ["steward"]
     },
     {
       "name": "z-qa",
@@ -63,5 +64,5 @@
       "roles": ["developer"]
     }
   ],
-  "forwards": { "z-refine": "z-triage" }
+  "forwards": { "z-refine": "z-triage", "z-steward": "z-triage" }
 }

@@ -2,11 +2,8 @@
 
 Before your next action, read these again, since compaction dropped them:
 
-- `skills/delivery-lead/references/releases.md`: when merged work deploys, and the hard rules.
-- `skills/agent-delegation/references/pacing.md`: the launch steps and `capacity.sh`.
-- `docs/sessions.md`: your state file's sections, and the `hq run` commands.
-- `~/.local/share/z-sessions/delivery.md`, then `hq run list`.
+- `~/.local/share/z-sessions/delivery.md`, then `hq run list` and `hq lanes`: what you wait on, and the runs in your care.
+- `skills/agent-delegation/references/briefs.md`, before you write a brief or message a running agent.
+- Re-arm the event watch, as agent-delegation's Watching says.
 
-hq reads Ready per lane from Linear itself. Report a count with `hq lanes ready` only when the `ready count` line in `hq lanes` is older than 2 hours, and then only a count you read from every Ready page this tick.
-
-The compact hook reprints `delivery-lead/SKILL.md`, `agent-delegation/SKILL.md` and `briefs.md` beside this file.
+The compact hook reprints `delivery-lead/SKILL.md` and `agent-delegation/SKILL.md` beside this file.

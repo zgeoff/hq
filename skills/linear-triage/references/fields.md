@@ -39,7 +39,7 @@ An issue may take several PRs, such as a stack for one change or one PR in each 
 | Urgent   | is broken and blocks other work, or exposes a secret, or a security hole that something running today can reach. A hole that nothing can reach yet is High: note in a comment what would make it reachable              |
 | High     | sits on the critical path of an active project, or has a deadline its text states within the next 14 days, or is a small change that helps the owner evaluate the system as he uses it, such as a nixie context counter |
 | Medium   | is committed work with no date pressure                                                                                                                                                                                 |
-| Low      | is nice to have, or parked                                                                                                                                                                                              |
+| Low      | is nice to have                                                                                                                                                                                                         |
 
 **Project.** A project holds an outcome, and its issues are the slices. Set a project to In Progress when one of its issues is In Progress or In Review, and comment why: its status is a fact about its work, not a decision. Judge High against that status. Never move a project back, pause it or complete it. Put each issue in the project whose outcome it serves. Upkeep that serves no outcome, such as Chores and small Bugs, goes in its area's `<area> maintenance` project. A feature or design that serves no outcome project goes in its area's `<area> roadmap` project; create that project when the area has none. When several issues in a roadmap project share an outcome, propose a project of their own. When an area has none, or the work needs a new outcome, flag one issue of the cluster with `Needs Geoff` and propose the project once, listing the other issues in the comment.
 
@@ -49,6 +49,6 @@ An issue may take several PRs, such as a stack for one change or one PR in each 
 
 **Enabler.** Add the `enabler` label to an issue whose work unblocks or speeds up other work, such as review-tool and gate fixes, pre-push and test flakes, sync and CI fixes, and the GEO-1540 alignment rollouts. It changes no priority: within one priority, **Delivery** launches an `enabler` issue ahead of a one-off fix. Leave it off a fix that helps only its own issue. Add it as you groom each issue, and on a full pass to each open issue it fits. Create the label, ungrouped, when the team has none.
 
-**Process.** `z-steward` adds the `process` label to a process-improvement issue once the owner has judged it worth pursuing and signed off its design. Never add it yourself, and never remove it. Groom the issue like any other.
+**Parked.** Only the owner adds or removes the `parked` label. An issue that carries it stays out of Ready whatever its priority, so leave it in Backlog. Groom it like any other.
 
 **Stale.** An issue is stale when it's In Progress with no PR or agent session activity for 3 days, or in Triage or Backlog with no update for 14 days. In Review isn't stale: it waits on a merge.

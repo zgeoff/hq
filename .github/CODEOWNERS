@@ -6,7 +6,7 @@
 /test/ @zgeoff
 /scripts/ @zgeoff
 
-# z-steward
+# the owner: skills, docs and hooks change only with his lgtm
 /skills/ @zgeoff
 /docs/ @zgeoff
 /.claude/ @zgeoff

@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # Checks pacing.json against pacing.schema.json, both beside this folder, and that each
-# route names only known providers, at least one lane exists, no lane name appears in both places,
-# and each lane in lends exists.
+# route names only known providers.
 # Handles the schema keywords pacing.schema.json uses; an unknown keyword fails the check.
 # Usage: check-pacing.sh [<pacing JSON>]. Prints each problem and exits 1, or prints "ok".
 set -euo pipefail
@@ -51,12 +50,7 @@ jq -r -n --slurpfile doc "$file" --slurpfile schema "$schema" '
   | [ ($p | check($root; "pacing")),
       ($o.routes | objects | to_entries[] | .key as $size | .value | arrays | .[] | strings
         | select(. as $name | $o.providers | objects | has($name) | not)
-        | "pacing.routes.\($size): unknown provider \(.)"),
-      ($o.lanes | objects | (.imp | objects | keys) as $imp | (.local | objects | keys) as $local
-        | ($imp - ($imp - $local))[] | "pacing.lanes: \(.) is in both imp and local"),
-      ($o.lanes | objects | select([.imp, .local | objects | keys[]] | length == 0) | "pacing.lanes: no lanes at all"),
-      ($o.lends | objects | keys[] | select(. as $lane | [$o.lanes | objects | (.imp, .local) | objects | keys[]] | index($lane) | not)
-        | "pacing.lends: \(.) is not a lane")
+        | "pacing.routes.\($size): unknown provider \(.)")
     ] as $problems
   | if ($problems | length) == 0 then "ok" else ($problems | join("\n") + "\n" | halt_error(1)) end
 '

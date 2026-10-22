@@ -14,7 +14,7 @@
           },
           {
             "type": "command",
-            "command": "\"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/print-skill.sh delivery-lead skills/agent-delegation/references/briefs.md"
+            "command": "\"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/print-skill.sh release skills/release/SKILL.md"
           },
           {
             "type": "command",
@@ -23,10 +23,6 @@
           {
             "type": "command",
             "command": "\"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/print-skill.sh intake skills/intake/SKILL.md"
-          },
-          {
-            "type": "command",
-            "command": "\"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/print-skill.sh definitions-stewardship skills/definitions-stewardship/SKILL.md"
           },
           {
             "type": "command",
@@ -42,6 +38,10 @@
           },
           {
             "type": "command",
+            "command": "\"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/print-skill.sh release .claude/hooks/after-compaction/release.md"
+          },
+          {
+            "type": "command",
             "command": "\"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/print-skill.sh linear-triage .claude/hooks/after-compaction/triage.md"
           },
           {
@@ -50,15 +50,22 @@
           },
           {
             "type": "command",
-            "command": "\"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/print-skill.sh definitions-stewardship .claude/hooks/after-compaction/steward.md"
-          },
-          {
-            "type": "command",
             "command": "\"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/print-skill.sh preview-qa .claude/hooks/after-compaction/qa.md"
           },
           {
             "type": "command",
             "command": "\"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/print-skill.sh pr-review .claude/hooks/after-compaction/review.md"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun \"$CLAUDE_PROJECT_DIR/.claude/hooks/skill-gate/skill-gate.ts\""
           }
         ]
       }

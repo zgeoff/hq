@@ -30,7 +30,7 @@ test('it counts a child of the memory issue in memory', () => {
   expect(result.counts['memory']).toBe(2);
 });
 
-test('it skips hq projects, Design and nixie-definitions maintenance issues with their reasons, and still counts them in the total', () => {
+test('it skips hq projects and Design issues with their reasons, launches nixie-definitions maintenance, and still counts every issue in the total', () => {
   const rules = validateLaneRules(rulesTable, Object.keys(rulesTable.lanes));
 
   const result = classifyReady(
@@ -41,7 +41,6 @@ test('it skips hq projects, Design and nixie-definitions maintenance issues with
   expect(result.skipped).toStrictEqual([
     { issue: 'GEO-3001', reason: 'hq: z-q builds hq' },
     { issue: 'GEO-3002', reason: 'Design: design slot' },
-    { issue: 'GEO-3003', reason: "z-steward's" },
   ]);
   expect(result.total).toBe(4);
   expect(result.counts['cloud']).toBe(1);

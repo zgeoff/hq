@@ -251,15 +251,15 @@ test('a known id missing from the list waits 30 minutes, and comes back without 
 });
 
 test('remove retires a declared name: ensure skips it and its wake entry goes; restore takes it back', async () => {
-  wakeAdd(db, { id: 'id-steward', name: 'z-steward' }, null, 'z-q');
-  expect(retireName(db, 'z-steward', 'z-stu', true)).toEqual({ changed: true, wakeRemoved: 1 });
-  expect(declaredFleet(db).map((e) => e.name)).not.toContain('z-steward');
+  wakeAdd(db, { id: 'id-release', name: 'z-release' }, null, 'z-q');
+  expect(retireName(db, 'z-release', 'z-stu', true)).toEqual({ changed: true, wakeRemoved: 1 });
+  expect(declaredFleet(db).map((entry) => entry.name)).not.toContain('z-release');
   expect(wakeList(db)).toHaveLength(0);
-  expect(retireName(db, 'z-steward', 'z-stu', true).changed).toBe(false);
+  expect(retireName(db, 'z-release', 'z-stu', true).changed).toBe(false);
   expect(() => retireName(db, 'z-refine', 'z-stu', true)).toThrow('not a declared fleet name'); // dropped in the merge
-  expect(retireName(db, 'z-steward', 'z-stu', false).changed).toBe(true);
-  expect(declaredFleet(db).map((e) => e.name)).toContain('z-steward');
-  expect(declaredFleet(db).map((e) => e.name)).toEqual(['z-stu', 'z-delivery', 'z-triage', 'z-steward', 'z-qa', 'z-review', 'z-q']);
+  expect(retireName(db, 'z-release', 'z-stu', false).changed).toBe(true);
+  expect(declaredFleet(db).map((entry) => entry.name)).toContain('z-release');
+  expect(declaredFleet(db).map((entry) => entry.name)).toEqual(['z-stu', 'z-delivery', 'z-release', 'z-triage', 'z-qa', 'z-review', 'z-q']);
 });
 
 test('a role prompt comes from origin/main: a working-tree edit is ignored, a merge is picked up, a missing file is refused', () => {

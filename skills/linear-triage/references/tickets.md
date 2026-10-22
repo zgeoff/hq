@@ -2,7 +2,7 @@
 
 A Ready issue doubles as the agent's brief, so write it for an agent with no context: it can't see your chat with the owner, and it may not be able to open Linear at all.
 
-Contents: sections · Ready · finish line by type · Actions · saving an issue · examples (a Ready bug, a Ready design issue)
+Contents: [sections](#sections) · [Ready](#ready) · [finish line by type](#finish-line-by-type) · [Actions](#actions) · [saving an issue](#saving-an-issue) · [examples](#examples)
 
 ## sections
 
@@ -33,7 +33,7 @@ Move an issue to Ready when all of these hold:
 - Its work isn't already done: no merged PR is attached, and `hq run show <issue>` shows no run at `merged`, `live-check` or `done`. When one is, move the issue to In Review instead, or to Done for a done run.
 - The work fits one agent. It may take several PRs; split it into sub-issues under the same project only when its parts can ship on their own.
 
-Never move an issue with the `vers` area label to Ready: the owner picks which vers issues reach Ready. Groom its fields and flag its questions as usual, and leave it in Backlog.
+Leave an issue with the `vers` area label in Backlog: the owner picks which vers issues reach Ready, and a vers issue in Ready launches. Groom its fields and flag its questions as usual, and leave it in Backlog.
 
 A missing project doesn't hold an issue back from Ready. Flag the project question as the Project rule in `fields.md` says.
 

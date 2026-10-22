@@ -1,23 +1,8 @@
 {
   "designSlots": 1,
-  "lanes": {
-    "imp": {
-      "nixie-slice": 2,
-      "nixie-maintenance": 1,
-      "atc": 1,
-      "imp": 1,
-      "cloud": 1,
-      "memory": 1
-    },
-    "local": {
-      "flexible": 2,
-      "cleanup": 3,
-      "process": 1
-    }
-  },
-  "lends": {
-    "cleanup": false,
-    "memory": false
+  "slots": {
+    "imp": 7,
+    "local": 6
   },
   "imp": {
     "impMib": 2048

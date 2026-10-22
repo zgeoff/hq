@@ -20,7 +20,7 @@ cat > "$bin/hq" <<'HQ'
 cat <<'JSON'
 {"declared":[
   {"name":"z-stu","skill":"intake"},{"name":"z-delivery","skill":"delivery-lead"},
-  {"name":"z-triage","skill":"linear-triage"},{"name":"z-steward","skill":"definitions-stewardship"},
+  {"name":"z-triage","skill":"linear-triage"},{"name":"z-release","skill":"release"},
   {"name":"z-qa","skill":"preview-qa"},{"name":"z-review","skill":"pr-review"},{"name":"z-q","skill":null}],
  "last":{"steps":[{"name":"z-stu","id":"id-stu"},{"name":"z-delivery","id":"id-delivery"}]}}
 JSON
@@ -55,7 +55,7 @@ expect_some id-delivery z-delivery delivery-lead skills/delivery-lead/SKILL.md
 expect_some id-new z-triage linear-triage skills/linear-triage/SKILL.md
 expect_some id-new z-qa preview-qa skills/preview-qa/SKILL.md
 expect_some id-new z-review pr-review skills/pr-review/SKILL.md
-expect_some id-new z-steward definitions-stewardship .claude/hooks/after-compaction/steward.md
+expect_some id-new z-release release .claude/hooks/after-compaction/release.md
 expect_none id-new z-review delivery-lead skills/delivery-lead/SKILL.md
 for name in "" z-q z-delivery-old helper-1 stu z-qa-old; do
   expect_none id-new "$name" delivery-lead skills/delivery-lead/SKILL.md
