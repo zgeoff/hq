@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test';
 import { Database } from 'bun:sqlite';
-import { chmodSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ensurePassword } from '../src/backup/ensure-password.ts';
 import { lastBackup } from '../src/backup/last-backup.ts';
@@ -78,6 +78,18 @@ test.skipIf(!hasRestic)('copies to a configured remote, and a bad remote fails t
   expect(bad.remote).toMatch(/^failed:/);
   expect(await snapshots(realRunner, false)).toHaveLength(2);
   expect(lastBackup(db).lastOk).toBe(r.at);
+}, 120_000);
+
+test.skipIf(!hasRestic)('it finds the restored hq.db where the snapshot staged it, when the backup dir has moved since', async () => {
+  db.exec("CREATE TABLE kettle (note TEXT); INSERT INTO kettle VALUES ('whistles twice')");
+  const backedUp = await runBackup(db, realRunner, 'z-q');
+  expect(backedUp.ok).toBe(true);
+  mkdirSync(`${dir}/moved`, { recursive: true });
+  renameSync(`${dir}/backup`, `${dir}/moved/backup`);
+  process.env['HQ_BACKUP_DIR'] = `${dir}/moved/backup`;
+
+  const back = await restore(realRunner, `${dir}/restored`, { snapshot: 'latest', remote: false });
+  expect(back.db).toBe(join(`${dir}/restored`, dir, 'backup/staging/hq.db'));
 }, 120_000);
 
 test('a remote env file needs RESTIC_REPOSITORY; values are read, not echoed', () => {
