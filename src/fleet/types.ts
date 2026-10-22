@@ -36,6 +36,11 @@ export interface DriftClient {
   prompt(id: string): Promise<string | undefined>; // atc's session.get `prompt`
 }
 
+// Reads a session's compaction count from its Claude Code transcript, in its cwd or the entry's.
+export interface TranscriptReader {
+  compactions: (session: FleetSession, fallbackCwd: string) => Promise<number>;
+}
+
 export interface FleetSession {
   id: string;
   name: string;
