@@ -80,6 +80,14 @@ test('the validator rejects a bad file and names the field', () => {
   expect(() => validateRoles(skill)).toThrow('sessions[0].prompt');
 });
 
+test('the validator takes a release session, and the release role lists its holders', () => {
+  const withRelease = valid();
+  withRelease.sessions.push(one('z-ee', ['release']));
+
+  expect(validateRoles(withRelease).sessions.map((session) => session.roles)).toStrictEqual([['owner'], ['orchestrator'], ['reviewer'], ['qa', 'triage'], ['release']]);
+  expect(Array.isArray(rolesByName().release)).toBe(true);
+});
+
 test('a declared forward needs no meta row, and a meta row wins', () => {
   const { db, cleanup } = freshDb();
   try {
