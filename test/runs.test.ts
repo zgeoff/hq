@@ -341,6 +341,15 @@ describe('the sweep', () => {
     finalPr(db, 'widgets#12', 'def5678', 'z-delivery'); // a final works again
   });
 
+  test('unmerge drops the merge commit and the shipment of the wrong merge, and the event keeps them', () => {
+    add();
+    addPr(db, 'GEO-9001', 'widgets#12', 'z-delivery');
+    closePr(db, 'widgets#12', { to: 'merged', actor: 'z-review' });
+    db.query("UPDATE run_prs SET merge_sha = ?, shipped_tag = 'widgets@1.0.0', shipped_at = '2026-10-15T00:00:00Z' WHERE ref = 'widgets#12'").run('c'.repeat(40));
+    expect(unmergePr(db, 'widgets#12', 'z-review', 'merged the wrong branch')).toMatchObject({ state: 'open', merge_sha: null, shipped_tag: null, shipped_at: null });
+    expect(db.query("SELECT json_extract(data, '$.merge_sha') AS sha, json_extract(data, '$.shipped_tag') AS tag, json_extract(data, '$.shipped_at') AS shipped FROM events WHERE action = 'unmerged'").get()).toStrictEqual({ sha: 'c'.repeat(40), tag: 'widgets@1.0.0', shipped: '2026-10-15T00:00:00Z' });
+  });
+
   test('a review started recently, or a review of the final head, silences it', () => {
     add();
     addPr(db, 'GEO-9001', 'widgets#12', 'z-delivery');
