@@ -9,10 +9,8 @@
 // skipped on first sight. Each file streams line by line; a refusal's tool comes from the
 // tool_use ids seen before it, kept per file across scans. Local transcripts only.
 import type { Database } from 'bun:sqlite';
-import { closeSync, openSync, readSync, readdirSync, statSync } from 'node:fs';
-import { join, sep } from 'node:path';
-import { AtcClient } from '../atc/atc-client.ts';
-import type { SessionInfo } from '../atc/session-schema.ts';
+import { closeSync, openSync, readSync } from 'node:fs';
+import { sep } from 'node:path';
 import { iso } from '../clock/iso.ts';
 import { now } from '../clock/now.ts';
 import { getProjectsDir } from '../repair/get-projects-dir.ts';
@@ -23,7 +21,9 @@ import { DEADLINE_MS } from './deadline-ms.ts';
 import { MARK } from './mark.ts';
 import { MAX_LINE } from './max-line.ts';
 import { parseRefusal as refusalOf } from './parse-refusal.ts';
-import type { Found, ScanOptions, ScanResult, Tool, Who } from './types.ts';
+import { readSessionNames as whoBySession } from './read-session-names.ts';
+import { readTranscriptList as listTranscripts } from './read-transcript-list.ts';
+import type { Found, ScanOptions, ScanResult, Tool } from './types.ts';
 
 export async function scanRefusals(db: Database, o: ScanOptions = {}): Promise<ScanResult> {
   const SLICE = 8 * 1024 * 1024,
@@ -150,51 +150,6 @@ function readAt(fd: number, start: number, len: number): Buffer {
     got += n;
   }
   return buf.subarray(0, got);
-}
-
-function listTranscripts(dir: string): { path: string; size: number; mtimeMs: number }[] {
-  let names: string[];
-  try {
-    names = readdirSync(dir, { recursive: true }) as string[];
-  } catch (error) {
-    // No projects folder means nothing to scan; any other failure would hide a tree hq cannot read.
-    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
-      return [];
-    }
-    throw error;
-  }
-  const out: { path: string; size: number; mtimeMs: number }[] = [];
-  for (const n of names) {
-    if (!n.endsWith('.jsonl')) continue;
-    const path = join(dir, n);
-    try {
-      const s = statSync(path);
-      if (s.isFile()) out.push({ path, size: s.size, mtimeMs: s.mtimeMs });
-    } catch {
-      // gone since the listing
-    }
-  }
-  return out.sort((a, b) => b.mtimeMs - a.mtimeMs);
-}
-
-async function whoBySession(get: ScanOptions['sessions']): Promise<Map<string, Who>> {
-  const map = new Map<string, Who>();
-  try {
-    const list = get ? await get() : await atcSessions();
-    for (const s of list) if (s.agentSessionID) map.set(s.agentSessionID, { id: s.id, name: s.name });
-  } catch {
-    // atc down: the rows keep no session name
-  }
-  return map;
-}
-
-async function atcSessions(): Promise<SessionInfo[]> {
-  const c = await AtcClient.open(undefined, 1500);
-  try {
-    return await c.sessions();
-  } finally {
-    c.close();
-  }
 }
 
 // A tool_use map entry ages out after this many newer ones: a tool_result follows its tool_use
