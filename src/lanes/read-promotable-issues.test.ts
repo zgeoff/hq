@@ -88,3 +88,21 @@ test('it takes Questions to settle in place of Scope', async () => {
 
   expect(issues).toStrictEqual([{ identifier: 'GEO-9806', title: 'design the kettle' }]);
 });
+
+test('it leaves out an issue whose Scope keeps the empty In and Out fields of the template', async () => {
+  const app = setupTest();
+  const call = app.answerWith([{ identifier: 'GEO-9807', title: 'scope the kettle', description: app.filled.replace('In: the element.\nOut: none stated.', 'In:\nOut:') }]);
+
+  const issues = await readPromotableIssues(call, 'GEO');
+
+  expect(issues).toStrictEqual([]);
+});
+
+test('it takes In and Out fields whose items sit on the lines below them', async () => {
+  const app = setupTest();
+  const call = app.answerWith([{ identifier: 'GEO-9808', title: 'list the widgets', description: app.filled.replace('In: the element.\nOut: none stated.', 'In:\n- the element\nOut:\n- the lid') }]);
+
+  const issues = await readPromotableIssues(call, 'GEO');
+
+  expect(issues).toStrictEqual([{ identifier: 'GEO-9808', title: 'list the widgets' }]);
+});
