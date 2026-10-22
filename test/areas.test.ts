@@ -39,8 +39,10 @@ const T0 = '2026-10-16T01:00:00Z';
 const atMin = (m: number) => at(new Date(Date.parse(T0) + m * 60_000).toISOString());
 const PACING = { lanes: { imp: { 'nixie-slice': 3, 'nixie-maintenance': 2, atc: 2, imp: 2, cloud: 1 }, local: { flexible: 2 } } };
 const LANES = parseLanes(PACING);
+// oxlint-disable-next-line zgeoff/setup-test-only -- this file's shared beforeEach state is GEO-1318's lint debt
 const SLOTS = parsePacingSlots(PACING);
 const cap = (freeMib: number) => ({ imp: { freeMib, room: true }, providers: { claude: { room: true, unattended: true, target: 'imp' } } });
+// oxlint-disable-next-line zgeoff/setup-test-only, zgeoff/no-top-level-arrow -- this file's shared beforeEach state is GEO-1318's lint debt
 const sample = (freeMib: number) => ({ cap: cap(freeMib), impMib: 2048, error: null, lanes: LANES, slots: SLOTS });
 const run = (issue: string, lane: string | null, place: 'imp' | 'local' = 'imp') =>
   addRun(db, { issue, title: 'Invented kettle work', place, session: null, next: 'Agent working.', gate: null, geoffChat: false, lane, actor: 'z-delivery' });
@@ -143,9 +145,11 @@ test('the watcher nudges with the picks after 10 min, and again only on a change
   expect(tick(db, sample(16384), 'hq-lanes').why).toContain('nothing changed');
   run('GEO-21', 'nixie-slice');
   atMin(16);
-  expect(tick(db, sample(16384), 'hq-lanes').nudged).toBe(true); // a launch took GEO-21: the picks changed
-  expect(msgs()).toHaveLength(1); // the newer nudge replaced the unsent one
-  expect(msgs()[0]!.text).toContain('Take, in this order: GEO-22.');
+
+  // A launch took GEO-21, so the picks changed; the newer nudge replaced the unsent one.
+  expect(tick(db, sample(16_384), 'hq-lanes').nudged).toBe(true);
+  expect(msgs()).toHaveLength(1);
+  expect(msgs()[0]?.text).toContain('Take, in this order: GEO-22.');
 });
 
 test('the samples count the slots the plan fills from the first free minute; only the nudge waits', () => {
@@ -159,11 +163,11 @@ test('the samples count the slots the plan fills from the first free minute; onl
 });
 
 test('impd at its non-Nix line holds the pool\'s imp slots and says why; a stale reading holds them all', () => {
+  const reading = { cap: cap(8192), impMib: 2048, error: null, lanes: LANES, slots: SLOTS };
   const readImpFree = () => {
-      const pool = readSlotPlan(db, reading)?.pool;
-      return [pool?.impFree, pool?.held];
-    },
-    reading = { cap: cap(8192), impMib: 2048, error: null, lanes: LANES, slots: SLOTS };
+    const pool = readSlotPlan(db, reading)?.pool;
+    return [pool?.impFree, pool?.held];
+  };
   db.query('DELETE FROM capacity_samples').run();
   setCapacitySetting(db, 'nonnixMaxMib', null, 'z-delivery');
   createCapacitySample(db, { at: T0, nonnixAwakeMib: 14_336 });
@@ -244,11 +248,13 @@ test('the sample records the eligible issues the Ready read holds, the hand coun
   atMin(1);
   tick(db, sample(16384), 'hq-lanes');
   expect(eligible()).toStrictEqual({ eligible: 2, slots: 2 });
+
   // No Ready read and no hand report: unknown, and every free slot counts.
   db.query("DELETE FROM meta WHERE key = 'lanes_ready_issues'").run();
   atMin(2);
   tick(db, sample(16384), 'hq-lanes');
   expect(eligible()).toStrictEqual({ eligible: null, slots: 10 });
+
   // A hand report stands in while the read is missing.
   reportReady(db, 5, 'z-delivery');
   atMin(3);

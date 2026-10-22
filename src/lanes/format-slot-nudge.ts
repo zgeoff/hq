@@ -12,7 +12,7 @@ export function formatSlotNudge(slotPlan: SlotPlan, minutes: number): string {
   const parts = [
     ...(picks.length === 0 ? [] : [`${free}. Take, in this order: ${picks.join(', ')}.`]),
     ...slotPlan.plan.lent.map((lent) => `Reserved for ${lent.area} with nothing eligible, lent: ${lent.slots}.`),
-    ...(slotPlan.design === null ? [] : [`Design slot free: take ${slotPlan.design}.`]),
+    ...(slotPlan.design === null ? [] : [`For the design slot, when it is free: ${slotPlan.design}.`]),
   ];
   return `${parts.join(' ')} ${tail}`;
 }

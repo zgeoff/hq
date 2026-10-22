@@ -37,7 +37,8 @@ export function tick(db: Database, sample: Sample, actor: string): TickResult {
       const eligible = slotPlan?.eligible ?? eligibleNow(db).count;
       db.query('INSERT INTO lanes_samples (at, free_mib, slots, eligible, error) VALUES (?, ?, ?, ?, ?)').run(at, freeMib, slots, eligible, sample.error);
       if (!sample.error) {
-        checkReadyStale(db, t, slotPlan ? slotPlan.pool.free : slots, actor);
+        const freeSlots = slotPlan ? slotPlan.pool.free : slots;
+        checkReadyStale(db, t, freeSlots, actor);
       }
 
       // Follow up: did free slots drop after a nudge?
@@ -68,7 +69,8 @@ export function tick(db: Database, sample: Sample, actor: string): TickResult {
       if (sample.error) return result(false, `no reading: ${sample.error}`, getMeta(db, 'lanes_free_since'));
       if (slots === 0) {
         setMeta(db, 'lanes_free_since', null);
-        return result(false, slotPlan && slotPlan.pool.free > 0 ? `${slotPlan.pool.free} slot(s) free, nothing eligible` : 'lanes full', null);
+        const why = slotPlan && slotPlan.pool.free > 0 ? `${slotPlan.pool.free} slot(s) free, nothing eligible` : 'lanes full';
+        return result(false, why, null);
       }
       let since = getMeta(db, 'lanes_free_since');
       if (!since) {
@@ -76,7 +78,9 @@ export function tick(db: Database, sample: Sample, actor: string): TickResult {
         setMeta(db, 'lanes_free_since', since);
       }
       const minutes = Math.floor((t.getTime() - new Date(since).getTime()) / 60_000);
-      if (minutes < LANES.freeMinutes()) return result(false, `free for ${minutes} min, under ${LANES.freeMinutes()}`, since);
+      if (minutes < LANES.freeMinutes()) {
+        return result(false, `free for ${minutes} min, under ${LANES.freeMinutes()}`, since);
+      }
 
       const hold = getLanesHold(db);
       if (hold) {
@@ -87,7 +91,7 @@ export function tick(db: Database, sample: Sample, actor: string): TickResult {
       const detail = slotPlan ? JSON.stringify({ picks: slotPlan.plan?.picks.map((pick) => pick.issue) ?? null, design: slotPlan.design, free: slotPlan.pool.free }) : null;
       const last = db.query('SELECT at, slots, eligible, detail FROM lanes_nudges ORDER BY id DESC LIMIT 1').get() as { at: string; slots: number; eligible: number | null; detail: string | null } | null;
       if (last && last.at >= since) {
-        const same = detail !== null ? last.detail === detail : last.slots === slots && last.eligible === eligible;
+        const same = detail === null ? last.slots === slots && last.eligible === eligible : last.detail === detail;
         const age = (t.getTime() - new Date(last.at).getTime()) / 60_000;
         if (same && age < LANES.repeatMinutes()) return result(false, `nudged ${Math.floor(age)} min ago, nothing changed`, since);
       }
@@ -100,10 +104,12 @@ export function tick(db: Database, sample: Sample, actor: string): TickResult {
     .immediate();
 }
 
-// The slots worth filling: each pick and the design slot's issue, or every free slot while Ready is unknown.
+// The slots worth filling: each pick, or every free slot while Ready is unknown. The design slot's
+// issue never counts: hq cannot see whether a Design session holds that slot, so it rides along in a
+// nudge the pool sends and starts none.
 function countWanted(slotPlan: NonNullable<ReturnType<typeof readSlotPlan>>): number {
   if (slotPlan.plan === null) {
     return slotPlan.pool.free;
   }
-  return slotPlan.plan.picks.length + (slotPlan.design === null ? 0 : 1);
+  return slotPlan.plan.picks.length;
 }

@@ -24,21 +24,21 @@ function setupTest() {
     { identifier: 'GEO-9805', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 },
   ];
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
-  return { db: fresh.db, readySeeds, sample };
-}
-
-async function seedReady(ctx: ReturnType<typeof setupTest>, seeds: ReadyNodeSeed[]): Promise<void> {
-  await readLinearReady(ctx.db, makePagedCall(buildReadyPage(seeds, null)), 'hq-lanes', validateLaneRules(rulesTable, null));
-}
-
-function addLocalRun(ctx: ReturnType<typeof setupTest>, issue: string): void {
-  addRun(ctx.db, { issue, title: 'Descale the kettle', place: 'local', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: null, actor: 'z-delivery' });
+  const rules = validateLaneRules(rulesTable, null);
+  const seedReady = async (seeds: ReadyNodeSeed[]): Promise<void> => {
+    const call = makePagedCall(buildReadyPage(seeds, null));
+    await readLinearReady(fresh.db, call, 'hq-lanes', rules);
+  };
+  const addLocalRun = (issue: string): void => {
+    addRun(fresh.db, { issue, title: 'Descale the kettle', place: 'local', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: null, actor: 'z-delivery' });
+  };
+  return { db: fresh.db, readySeeds, sample, seedReady, addLocalRun };
 }
 
 test('a focus set changes what the next plan picks, and the running run keeps its slot', async () => {
   const ctx = setupTest();
-  await seedReady(ctx, ctx.readySeeds);
-  addLocalRun(ctx, 'GEO-9805');
+  await ctx.seedReady(ctx.readySeeds);
+  ctx.addLocalRun('GEO-9805');
   const before = readSlotPlan(ctx.db, ctx.sample);
 
   await runFocusCommand({ db: ctx.db, call: makeStateCall([], []), actor: 'kettle-owner', verb: 'set', rest: ['bug,maintenance'], reserves: ['nixie=1'] });
@@ -57,10 +57,10 @@ test('a focus set changes what the next plan picks, and the running run keeps it
 
 test('a reserve its area fills with running runs keeps no slot, read from the areas of the Ready read', async () => {
   const ctx = setupTest();
-  await seedReady(ctx, [...ctx.readySeeds, { identifier: 'GEO-9806', project: 'kettle roadmap', type: 'Feature', labels: ['nixie'], priority: 2 }]);
-  addLocalRun(ctx, 'GEO-9806');
+  await ctx.seedReady([...ctx.readySeeds, { identifier: 'GEO-9806', project: 'kettle roadmap', type: 'Feature', labels: ['nixie'], priority: 2 }]);
+  ctx.addLocalRun('GEO-9806');
   at('2026-10-15T20:10:00Z');
-  await seedReady(ctx, ctx.readySeeds);
+  await ctx.seedReady(ctx.readySeeds);
 
   await runFocusCommand({ db: ctx.db, call: makeStateCall([], []), actor: 'kettle-owner', verb: 'set', rest: ['maintenance'], reserves: ['nixie=1'] });
 
@@ -69,7 +69,7 @@ test('a reserve its area fills with running runs keeps no slot, read from the ar
 
 test('a reserved slot with nothing eligible in its area is lent to the focus work', async () => {
   const ctx = setupTest();
-  await seedReady(ctx, ctx.readySeeds);
+  await ctx.seedReady(ctx.readySeeds);
 
   await runFocusCommand({ db: ctx.db, call: makeStateCall([], []), actor: 'kettle-owner', verb: 'set', rest: ['bug'], reserves: ['imp=2'] });
 

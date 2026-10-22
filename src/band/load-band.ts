@@ -38,10 +38,10 @@ function buildNixSegment(db: Database, at: Date): BandSegment {
 // is 15 minutes fresh, or when the imp cap, all full, would cross one ("plan 18/16 GiB").
 async function loadLanesSegment(db: Database, pacingFile: string, at: Date): Promise<BandSegment> {
   const pacing = await loadPacing(pacingFile);
-  return pacing.slots === null ? { key: 'lanes', text: 'lanes ?', tone: 'warn' } : buildLanesFromConfig(db, at, pacing.slots, pacing.impMib);
+  return pacing.slots === null ? { key: 'lanes', text: 'lanes ?', tone: 'warn' } : loadLanesFromConfig(db, at, pacing.slots, pacing.impMib);
 }
 
-function buildLanesFromConfig(db: Database, at: Date, slots: PacingSlots, impMib: number): BandSegment {
+function loadLanesFromConfig(db: Database, at: Date, slots: PacingSlots, impMib: number): BandSegment {
   const impd = loadImpdLine(db, at, impMib),
     plan = formatPlanOverage(buildLanePlan(slots.imp, impMib, capacitySettings(db))),
     running = readRunningByPlace(db, at),

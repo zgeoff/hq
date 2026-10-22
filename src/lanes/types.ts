@@ -20,7 +20,9 @@ export interface Sample {
   impMib: number;
   error: string | null;
   lanes?: LaneConfig[] | null; // pacing.json's lanes; absent or null: one pool of imp slots
-  slots?: PacingSlots | null; // the pool's caps; absent or null with the lanes
+
+  // The pool's caps; absent or null with the lanes.
+  slots?: PacingSlots | null;
 }
 
 export interface TickResult {

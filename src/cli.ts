@@ -1828,7 +1828,7 @@ async function lanesCommand(db: Database, verb: string | undefined, flags: Flags
             formatLineRoom(loadImpRoom(db, { budgetSlots: slotsFrom(sample.cap ?? {}, sample.impMib).slots, impMib: sample.impMib })),
             ...formatSlotPlan(slotPlan),
             ...(readyNote ? [`  ${readyNote.line}`, ...skippedLines(readyNote).map((l) => `  ${l}`)] : []),
-            ...(parked.length > 0 ? [`  parked, not counted (blocked with no session awake, or working with every session gone): ${parked.map((p) => p.issue).join(', ')}`] : []),
+            ...(parked.length > 0 ? [`  parked, not counted (blocked with no session awake, or working with every session gone): ${parked.map((parkedRun) => parkedRun.issue).join(', ')}`] : []),
           ]
         : [`lanes: no slot plan (${sample.error ?? `no lanes in ${pacingPath()}`})`];
       const lines = [

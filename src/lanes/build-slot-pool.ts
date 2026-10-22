@@ -1,4 +1,5 @@
 import type { ImpRoom } from '../areas/types.ts';
+import type { RunningByPlace } from './read-running-by-place.ts';
 import type { PacingSlots } from './types.ts';
 
 export interface SlotPool {
@@ -16,7 +17,7 @@ export interface SlotPool {
 
 // The lanes' slots as one pool: pacing.json's imp and local slot caps, less the runs that hold a slot.
 // Imp slots stay under capacity.sh's budget and impd's non-Nix line (room; null: no reading).
-export function buildSlotPool(slots: PacingSlots, running: { imp: number; local: number }, room: ImpRoom | null): SlotPool {
+export function buildSlotPool(slots: PacingSlots, running: Pick<RunningByPlace, 'imp' | 'local'>, room: ImpRoom | null): SlotPool {
   const impSize = slots.imp;
   const localSize = slots.local;
   const impOpen = Math.max(0, impSize - running.imp);

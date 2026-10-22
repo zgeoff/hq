@@ -27,7 +27,8 @@ export interface SlotPlan {
   // Every eligible issue not on the board; null while unknown.
   eligible: number | null;
 
-  // The Design issue the design slot takes, outside the pool; null when it has no room or no issue.
+  // The Design issue the design slot takes next, outside the pool; null when capacity.sh gives it no
+  // room or no Design issue waits. hq cannot see whether a Design session holds the slot now.
   design: string | null;
 }
 
@@ -60,8 +61,10 @@ function readOnBoard(db: Database): Set<string> {
   return new Set(rows.map((row) => row.issue));
 }
 
+const AREAS_SCHEMA = z.record(z.string(), z.array(z.string()));
+
 function readRunningByArea(db: Database, issues: readonly string[]): Record<string, number> {
-  const areas = metaJson(db, ISSUE_AREAS_KEY, z.record(z.string(), z.array(z.string())), {});
+  const areas = metaJson(db, ISSUE_AREAS_KEY, AREAS_SCHEMA, {});
   const counts: Record<string, number> = {};
   for (const area of issues.flatMap((issue) => areas[issue] ?? [])) {
     counts[area] = (counts[area] ?? 0) + 1;
