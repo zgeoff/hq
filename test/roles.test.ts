@@ -145,6 +145,14 @@ test('removing a stored override refuses when the declared forward it brings bac
   expect(forwardOf(db, from!)).toBe(declaredTo);
 });
 
+test('the validator takes a release session, and the release role lists its holders', () => {
+  const withRelease = valid();
+  withRelease.sessions.push(one('z-ee', ['release']));
+
+  expect(validateRoles(withRelease).sessions.map((session) => session.roles)).toStrictEqual([['owner'], ['orchestrator'], ['reviewer'], ['qa', 'triage'], ['release']]);
+  expect(Array.isArray(rolesByName().release)).toBe(true);
+});
+
 test('a retired role holder is left out of the roles', () => {
   const r = rolesByName([roleName('reviewer')]);
   expect(r.reviewer).toBeNull();
