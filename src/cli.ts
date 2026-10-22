@@ -318,7 +318,7 @@ import type { Probe } from './health/types.ts';
 import { repairAdvisor400 } from './repair/repair-advisor400.ts';
 import { HqError } from './errors.ts';
 
-export const VERSION = '0.82.0';
+export const VERSION = '0.83.0';
 
 const OPTIONS = {
   json: { type: 'boolean' },

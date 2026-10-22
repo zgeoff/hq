@@ -40,9 +40,7 @@ type PeerRequest = Parameters<ServerPeerHandleRequestFn>[0];
 
 const CODEC = new StandardRPCCodec(new StandardRPCSerializer(new StandardRPCJsonSerializer()));
 
-// A daemon on a unix socket that speaks atc's protocol 8 peer wire: one JSON message per line, the
-// hello first, a refusal under {code, message, data}. It answers each procedure in `procedures`
-// (keyed by the dotted method name) and refuses any other as unknown_method. The caller stops it.
+// A stand-in for atc's protocol 11 daemon, so hq's tests never reach the live daemon.
 export function startStubAtcDaemon(path: string, procedures: Record<string, StubProcedure>, options: StubAtcOptions = {}): StubAtcDaemon {
   const requests: StubAtcRequest[] = [],
     server = Bun.listen<Connection>({ unix: path, socket: buildHandlers(procedures, requests, options) });
@@ -50,8 +48,8 @@ export function startStubAtcDaemon(path: string, procedures: Record<string, Stub
 }
 
 function buildHandlers(procedures: Record<string, StubProcedure>, requests: StubAtcRequest[], options: StubAtcOptions): SocketHandler<Connection> {
-  const daemon: DaemonIdentity = { build: options.build ?? '7.0.0', protocol: options.protocol ?? 8 },
-    router = buildRouter(procedures, requests, daemon);
+  const daemon: DaemonIdentity = { build: options.build ?? '7.1.0', protocol: options.protocol ?? 11 };
+  const router = buildRouter(procedures, requests, daemon);
   return {
     open(socket) {
       const peer = new ServerPeer((message) => {
@@ -105,5 +103,5 @@ function buildHelloResult(input: unknown, daemon: DaemonIdentity) {
       message: `${hello.client} speaks protocol v${hello.protocol ?? 'unknown'}, daemon ${daemon.build} speaks v${daemon.protocol}; restart the daemon so both run the same build`,
     });
   }
-  return { daemon: daemon.build, daemonID: 'd-invented', limits: { maxLine: 1_048_576, maxChunk: 65_536 }, idempotency: { completedRetentionMs: 86_400_000 }, lastUsedAgent: 'claude' };
+  return { daemon: daemon.build, daemonID: 'd-invented', peerSession: null, limits: { maxLine: 1_048_576, maxChunk: 65_536 }, idempotency: { completedRetentionMs: 86_400_000 }, lastUsedAgent: 'claude' };
 }

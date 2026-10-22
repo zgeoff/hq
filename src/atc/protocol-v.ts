@@ -1,1 +1,1 @@
-export const PROTOCOL_V = 8;
+export const PROTOCOL_V = 11;

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.83.0 — 2026-10-22
+
+hq speaks atc's protocol 11, the version on atc main after its restart events and the kernel's peer session.
+
+- hq sends protocol 11 in its hello. atc refuses any other version, so this hq cannot reach an atc 7.0.0 daemon, which speaks 8: install this hq in the same window as the atc release that speaks 11.
+- Nothing else hq sends or reads changed: the new restart events and the hello's `peerSession` are not used, and the events cursor keeps its form.
+
 ## 0.82.0 — 2026-10-22
 
 `hq linear issues` writes a team's Linear issues to page files that the triage scripts read.
