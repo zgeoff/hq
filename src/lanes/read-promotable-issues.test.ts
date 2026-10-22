@@ -1,5 +1,13 @@
-import { expect, test } from 'bun:test';
+import { expect, mock, onTestFinished, test } from 'bun:test';
+import { HttpResponse, http } from 'msw';
+import { LINEAR_GRAPHQL_URL } from '../../mocks/linear-handlers.ts';
+import { server } from '../../mocks/node.ts';
+import { freshDb } from '../../test/helpers.ts';
+import { main } from '../cli.ts';
+import { overrideEnv } from '../config/override-env.ts';
+import { resetKey } from '../linear/reset-key.ts';
 import type { LinearCall } from '../linear/types.ts';
+import type { RunResult, Runner } from '../runner/types.ts';
 import { readPromotableIssues } from './read-promotable-issues.ts';
 
 interface IssueSeed {
@@ -95,5 +103,41 @@ test('it collects the promotable issues from every Backlog page, asking for each
       { after: null, team: 'GEO', state: 'Backlog' },
       { after: 'kettle-page-2', team: 'GEO', state: 'Backlog' },
     ],
+  ]);
+});
+
+test('hq lanes promotable --json prints the promotable Backlog issues of the lanes team', async () => {
+  const fresh = freshDb();
+  const run = mock<Runner>(() => Promise.resolve<RunResult>({ code: 0, stdout: 'lin_api_INVENTEDkettleKEY0042\n', stderr: '' }));
+  const log = console.log;
+  const printed: string[] = [];
+  const asked: unknown[] = [];
+  onTestFinished(fresh.cleanup);
+  resetKey();
+  onTestFinished(resetKey);
+  onTestFinished(overrideEnv('OP_SERVICE_ACCOUNT_TOKEN', 'invented-token'));
+  console.log = (line: string) => void printed.push(line);
+  onTestFinished(() => (console.log = log));
+  const description =
+    '## Outcome\n\nThe kettle whistles.\n\n## Context\n\n- Project: kitchen\n\n## Scope\n\nIn: the whistle.\nOut: none stated.\n\n## Acceptance\n\n- [ ] The kettle whistles in a test (unit test)\n\n## Actions\n\nCode delivery\n';
+  const relations = { nodes: [], pageInfo: { hasNextPage: false } };
+  const nodes = [
+    { identifier: 'GEO-9813', title: 'fit the whistle', description, labels: { nodes: [] }, inverseRelations: relations },
+    { identifier: 'GEO-9814', title: 'paint the whistle', description, labels: { nodes: [{ name: 'parked' }] }, inverseRelations: relations },
+  ];
+  server.use(
+    http.post(LINEAR_GRAPHQL_URL, async ({ request }) => {
+      const body: unknown = await request.json();
+      asked.push(body);
+      return HttpResponse.json({ data: { issues: { nodes, pageInfo: { hasNextPage: false, endCursor: null } } } });
+    }),
+  );
+
+  const code = await main(['lanes', 'promotable', '--json'], run);
+
+  expect([code, JSON.parse(printed.join('')), asked]).toStrictEqual([
+    0,
+    { ok: true, issues: [{ identifier: 'GEO-9813', title: 'fit the whistle' }] },
+    [{ query: expect.stringContaining('issues(first: 50,'), variables: { after: null, team: 'GEO', state: 'Backlog' } }],
   ]);
 });

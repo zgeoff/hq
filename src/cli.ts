@@ -1748,7 +1748,7 @@ async function newsCommand(db: Database, verb: string | undefined, flags: Flags)
   }
 }
 
-async function lanesCommand(db: Database, verb: string | undefined, flags: Flags): Promise<Out> {
+async function lanesCommand(db: Database, verb: string | undefined, flags: Flags, run: Runner): Promise<Out> {
   const by = () => actor(db, flags);
   switch (verb) {
     case 'tick': {
@@ -1785,7 +1785,7 @@ async function lanesCommand(db: Database, verb: string | undefined, flags: Flags
       return { data: { released: had }, text: had ? 'Slot nudges resume from the next look.' : 'No lanes hold to release.' };
     }
     case 'promotable': {
-      const issues = await readPromotableIssues(makeAuditedLinearCaller(db, realRunner), rulesTable.team);
+      const issues = await readPromotableIssues(makeAuditedLinearCaller(db, run), rulesTable.team);
       return { data: { issues }, text: issues.length > 0 ? issues.map((issue) => `${issue.identifier}  ${issue.title}`).join('\n') : 'No Backlog issue is ready to promote.' };
     }
     case 'ready': {
@@ -2065,7 +2065,7 @@ export const GROUPS: Record<string, (c: Ctx) => Promise<Out>> = {
   refusals: (c) => refusalsCommand(c.db, c.verb, c.flags),
   run: (c) => runCommand(c.db, c.verb, c.rest, c.flags),
   lanes: async (context) => {
-    const out = await lanesCommand(context.db, context.verb, context.flags);
+    const out = await lanesCommand(context.db, context.verb, context.flags, context.run);
     return context.verb === undefined || context.verb === 'status' || context.verb === 'log' ? withStaleBuild(out, checkLanesBuild((path) => readFileSync(path, 'utf8'))) : out;
   },
   stats: (c) => statsCommand(c.db, c.flags),
