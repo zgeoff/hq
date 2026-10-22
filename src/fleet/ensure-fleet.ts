@@ -103,6 +103,8 @@ function dropLease(db: Database, token: string): void {
     if (held?.token === token) setMeta(db, LEASE, null);
   }).immediate();
 }
+const FLEET_UNPINNED = 'fleet_unpinned';
+
 async function ensureOnce(db: Database, client: FleetClient, opts: { dryRun: boolean; actor: string; fleet?: FleetEntry[]; now?: string[]; rc?: RcDeps }): Promise<EnsureStep[]> {
   // A missing name waits GRACE_MIN before a spawn (a restore after a daemon restart keeps its id);
   // a known id atc doesn't list waits UNLISTED_GRACE_MIN; a z- session doesn't sleep for an hour,
@@ -120,6 +122,9 @@ async function ensureOnce(db: Database, client: FleetClient, opts: { dryRun: boo
   const missing = metaJson(db, 'fleet_missing_since', strMap, {});
   // The ids hq knows for each name: the last seen live, and the wake list's.
   const known = metaJson(db, 'fleet_ids', strMap, {});
+
+  // A spawned session whose pin failed: the live path pins it again until a pin holds.
+  const unpinned = metaJson(db, FLEET_UNPINNED, strMap, {});
   const knownIds = (name: string) => [...new Set([known[name], ...wakeList(db).filter((w) => w.name === name).map((w) => w.session_id)].filter((x): x is string => !!x))];
   // atc writes this record when a restart ends; the restore runs around then.
   let restartAt: number | null = null;
@@ -133,7 +138,13 @@ async function ensureOnce(db: Database, client: FleetClient, opts: { dryRun: boo
     if (live.length === 1) known[e.name] = live[0]!.id;
     if (live.length) {
       delete missing[e.name];
-      steps.push(live.length === 1 ? { name: e.name, action: 'ok', detail: live[0]!.id.slice(0, 8), id: live[0]!.id } : { name: e.name, action: 'duplicates', detail: `${live.length} live sessions share the name; hq stops none` });
+      const [only] = live;
+      if (live.length === 1 && only) {
+        const pinFailure = opts.dryRun ? null : await retryPin(client, unpinned, e.name, only.id);
+        steps.push({ name: e.name, action: 'ok', detail: `${only.id.slice(0, 8)}${pinFailure ? `; still unpinned (${pinFailure}), so the next check pins it again` : ''}`, id: only.id });
+      } else {
+        steps.push({ name: e.name, action: 'duplicates', detail: `${live.length} live sessions share the name; hq stops none` });
+      }
       continue;
     }
     // Its known session, under any name: live (renamed), or one atc still means to run (asleep, restoring).
@@ -182,14 +193,17 @@ async function ensureOnce(db: Database, client: FleetClient, opts: { dryRun: boo
       // overlap (a --now and the timer, or two --now) read the same one and share the key.
       missing[e.name] = claimMissing(db, e.name, missing[e.name]!);
       const id = await createFleetSession(client, e, prompt, `hq-fleet-${e.name}-${missing[e.name]}`);
-      await client.pin(id).catch(() => {});
+      const pinFailure = await pinSession(client, id);
+      if (pinFailure) {
+        unpinned[e.name] = id;
+      }
       if (e.wake) {
         for (const w of wakeList(db).filter((w) => w.name === e.name && w.session_id !== id)) wakeRemove(db, w.session_id, opts.actor);
         wakeAdd(db, { id, name: e.name }, null, opts.actor);
       }
       delete missing[e.name];
       known[e.name] = id;
-      const step: EnsureStep = { name: e.name, action: 'spawned', detail: `${id.slice(0, 8)} after ${Math.floor(gone)} min without a live session${hurry.has(e.name) ? ' (--now)' : ''}`, id };
+      const step: EnsureStep = { name: e.name, action: 'spawned', detail: `${id.slice(0, 8)} after ${Math.floor(gone)} min without a live session${hurry.has(e.name) ? ' (--now)' : ''}${pinFailure ? `; the pin failed (${pinFailure}), so the next check pins it again` : ''}`, id };
       if (e.remoteControl) {
         setPending(db, e.name, { id, since: iso(t) });
         helpers.push({ name: e.name, step });
@@ -215,6 +229,9 @@ async function ensureOnce(db: Database, client: FleetClient, opts: { dryRun: boo
   }
   db.transaction(() => {
     setMeta(db, 'fleet_missing_since', JSON.stringify(missing));
+    if (!opts.dryRun) {
+      setMeta(db, FLEET_UNPINNED, JSON.stringify(unpinned));
+    }
     setMeta(db, 'fleet_ids', JSON.stringify(known));
     setMeta(db, 'fleet_last', JSON.stringify({ at: iso(t), dryRun: opts.dryRun, steps }));
     const told = steps.filter((step) => !rcReported.has(step) && (step.action === 'spawned' || step.action === 'failed' || step.action === 'duplicates' || step.action === 'remote control'));
@@ -260,6 +277,28 @@ async function startHelper(rc: RcDeps, name: string): Promise<string | null> {
     return r.code === 0 ? null : (r.stderr || r.stdout).trim() || `exit ${r.code}`;
   } catch (e) {
     return String((e as Error).message ?? e);
+  }
+}
+
+// Pins the live session when its spawn's pin failed. Returns the failure, or null when it is pinned.
+async function retryPin(client: FleetClient, unpinned: Record<string, string>, name: string, id: string): Promise<string | null> {
+  if (unpinned[name] !== id) {
+    delete unpinned[name];
+    return null;
+  }
+  const failure = await pinSession(client, id);
+  if (!failure) {
+    delete unpinned[name];
+  }
+  return failure;
+}
+
+async function pinSession(client: FleetClient, id: string): Promise<string | null> {
+  try {
+    await client.pin(id);
+    return null;
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error);
   }
 }
 

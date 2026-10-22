@@ -111,6 +111,27 @@ test('a live session is left alone; a missing one waits out the grace, then spaw
   expect(spawns).toHaveLength(1); // never a second
 });
 
+test('it reports a failed pin after a spawn, and pins the live session on the next check', async () => {
+  const stub = fake([{ id: 'id-teapot', name: 'z-teapot', alive: true }]);
+  const flaky: FleetClient = { ...stub.client, pin: () => Promise.reject(new Error('invented pin refusal')) };
+  await ensureFleet(db, stub.client, { dryRun: false, actor: 'hq-fleet', fleet });
+  atMin(10);
+  const spawned = await ensureFleet(db, flaky, { dryRun: false, actor: 'hq-fleet', fleet });
+  atMin(15);
+
+  const checked = await ensureFleet(db, stub.client, { dryRun: false, actor: 'hq-fleet', fleet });
+
+  expect(spawned[0]).toMatchObject({ name: 'z-kettle', action: 'spawned', detail: expect.stringContaining('the pin failed (invented pin refusal), so the next check pins it again') });
+  expect(outbox()).toStrictEqual([{ target: 'z-stu', text: expect.stringContaining('the pin failed (invented pin refusal)') }]);
+  const spawnedID = spawned[0]?.id;
+  if (!spawnedID) {
+    throw new Error('the spawn step carries no session id');
+  }
+  expect(checked[0]).toStrictEqual({ name: 'z-kettle', action: 'ok', detail: spawnedID.slice(0, 8), id: spawnedID });
+  expect(stub.pins).toStrictEqual([spawnedID]);
+  expect(getMeta(db, 'fleet_unpinned')).toBe('{}');
+});
+
 test('duplicates are reported, never stopped; a restoring session is waited for', async () => {
   const { client, spawns } = fake([
     { id: 'a', name: 'z-kettle', alive: true },
