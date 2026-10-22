@@ -25,6 +25,11 @@ import { AtcClient } from './atc/atc-client.ts';
 import { fleetIds } from './atc/fleet-ids.ts';
 import { sessionGetSchema } from './atc/session-get-schema.ts';
 import { makeFleetClient } from './fleet/make-fleet-client.ts';
+import { hasStaleOps } from './fleet/has-stale-ops.ts';
+import { formatWrapUp } from './runs/format-wrap-up.ts';
+import { readImpWork } from './runs/read-imp-work.ts';
+import { runWrapUp } from './runs/run-wrap-up.ts';
+import type { WrapUpDeps } from './runs/run-wrap-up.ts';
 import { sessionListRequiredSchema } from './atc/session-list-required-schema.ts';
 import { fmtIdle } from './pins/fmt-idle.ts';
 import { listPins } from './pins/list-pins.ts';
@@ -71,7 +76,7 @@ import { setLiveCheck } from './runs/set-live-check.ts';
 import { setSession } from './runs/set-session.ts';
 import { setState } from './runs/set-state.ts';
 import { sweepNow } from './runs/sweep-now.ts';
-import type { LiveCheck, RunView } from './runs/types.ts';
+import type { LiveCheck, RunView, WrapUp } from './runs/types.ts';
 import { unfinalPr } from './runs/unfinal-pr.ts';
 import { unmergePr } from './runs/unmerge-pr.ts';
 import { viewRun } from './runs/view-run.ts';
@@ -783,6 +788,30 @@ async function expandSession(raw: string): Promise<string> {
   }
 }
 
+// The atc connection opens only when a session needs it, and closes after.
+async function runDoneWrapUp(db: Database, issue: string, actorName: string): Promise<WrapUp> {
+  const opened: AtcClient[] = [];
+  const deps: WrapUpDeps = {
+    openClient: async () => {
+      const atc = await AtcClient.open();
+      opened.push(atc);
+      const fleetClient = makeFleetClient(atc);
+      if (!hasStaleOps(fleetClient)) {
+        throw new HqError('internal', 'the atc client lacks stop, unpin and forget');
+      }
+      return fleetClient;
+    },
+    readImpWork: (session) => readImpWork(realRunner, session.id, session.cwd),
+  };
+  try {
+    return await runWrapUp(db, deps, issue, actorName);
+  } finally {
+    for (const atc of opened) {
+      atc.close();
+    }
+  }
+}
+
 async function runCommand(db: Database, verb: string | undefined, args: string[], flags: Flags): Promise<Out> {
   const by = () => actor(db, flags);
   const arg = (i: number, what: string) => need(args[i], what);
@@ -859,11 +888,16 @@ ${r.result === 'added' ? 'On the board.' : 'Already on the board.'}` };
       if (!r.dryRun) setMeta(db, CHECKED_AT, iso(now()));
       return { data: { ...r }, text };
     }
-    case 'done':
+    case 'done': {
+      const actorName = await by();
+      const closed = setState(db, arg(0, 'issue'), 'done', { note: flags.note ?? flags.reason ?? null }, actorName);
+      const wrapUp = await runDoneWrapUp(db, closed.issue, actorName);
+      return { data: { run: closed, wrapUp }, text: `${runLine(closed)}\n${formatWrapUp(wrapUp)}\nDone. Off the board.` };
+    }
     case 'drop': {
-      const r = setState(db, arg(0, 'issue'), verb === 'done' ? 'done' : 'dropped', { note: flags.note ?? flags.reason ?? null }, await by());
-      return { data: { run: r }, text: `${runLine(r)}
-${verb === 'done' ? 'Done. Off the board.' : 'Dropped.'}` };
+      const actorName = await by();
+      const dropped = setState(db, arg(0, 'issue'), 'dropped', { note: flags.note ?? flags.reason ?? null }, actorName);
+      return { data: { run: dropped }, text: `${runLine(dropped)}\nDropped.` };
     }
     case 'next':
     case 'gate':

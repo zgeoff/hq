@@ -43,6 +43,10 @@ export interface FleetSession {
 
   // atc 4.15+: the folders the session was spawned with
   pluginDirs?: readonly string[] | null | undefined;
+
+  // the session this one is a sub-session of, and its working directory inside its host
+  parent?: string | null | undefined;
+  cwd?: string | null | undefined;
 }
 
 // What hq fleet asks atc's session.spawn for.
@@ -56,8 +60,8 @@ export interface SpawnRequest {
   pluginDirs?: string[];
 }
 
-// atc's session.forget: forgotten, or refused. A confirmToken answer means atc wants a second call
-// that hq never makes.
+// atc's session.forget: forgotten, or refused. A confirmToken answer means the forget destroys the
+// session's host, and atc wants a second call that carries the token.
 interface ForgetResult {
   forgotten: boolean;
   confirmToken?: string | undefined;
@@ -70,7 +74,7 @@ export interface StaleOps {
   message: (id: string) => Promise<MessageGet>;
   kill: (id: string) => Promise<void>;
   unpin: (id: string) => Promise<void>;
-  forget: (id: string) => Promise<ForgetResult>;
+  forget: (id: string, confirmToken?: string) => Promise<ForgetResult>;
 }
 
 export interface FleetClient extends Partial<StaleOps> {
