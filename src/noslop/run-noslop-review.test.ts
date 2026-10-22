@@ -99,10 +99,20 @@ test('it removes the issue file even when the worktree cleanup cannot take the l
     file = `${ctx.base}/widgets7-issue-${process.pid}.md`,
     review = { ...ctx.reviewContext(fake.run), linear: readKettleIssue, lock: buildLockThatTimesOut() };
 
-  await expect(runNoslopReview(review)).rejects.toThrow('the lock is held');
+  await runNoslopReview(review);
 
   expect(fake.of('bun').at(-1)?.cmd).toContain('--issue-file');
   expect(existsSync(file)).toBe(false);
+});
+
+test('it records a review that ran and logs the cleanup error when the worktree cleanup cannot take the lock', async () => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
+
+  await runNoslopReview({ ...ctx.reviewContext(fake.run), lock: buildLockThatTimesOut() });
+
+  expect(ctx.db.query("SELECT kind, ok FROM noslop_rounds WHERE repo = 'widgets' AND pr = 7").all()).toStrictEqual([{ kind: 'review', ok: 1 }]);
+  expect(ctx.db.query("SELECT json_extract(data, '$.error') AS error FROM events WHERE action = 'cleanup_failed'").all()).toStrictEqual([{ error: 'the lock is held' }]);
 });
 
 test('it reviews without an issue file when the PR links none', async () => {

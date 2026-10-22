@@ -92,6 +92,9 @@ export async function runNoslopReview(ctx: NoslopReviewContext): Promise<NoslopR
   recordRound(ctx.db, row);
   updateFixesOnlyRefusal(ctx, ran.judged);
   logEvent(ctx.db, 'hq', `noslop:${ctx.repo}#${ctx.pr}`, pickAction('review', row.ok), 'hq', null, null, { ms: ran.ms, findings: row.findings.length, sha: ran.sha, issue: prep.issueFile.note });
+  if (ran.cleanupError !== null) {
+    logEvent(ctx.db, 'hq', `noslop:${ctx.repo}#${ctx.pr}`, 'cleanup_failed', 'hq', null, null, { worktree: prep.worktree, error: ran.cleanupError });
+  }
   if (ran.judged.value === null) {
     throw buildFailure(ran.judged.why ?? 'unknown', prep.reviewFile);
   }
@@ -166,21 +169,26 @@ interface ReviewRan {
   ms: number;
   startedAt: string;
   sha: string;
+  cleanupError: string | null;
 }
 
-// Runs `noslop review` in the worktree and removes the worktree after, whatever happened.
+// Runs `noslop review` in the worktree and removes the worktree after, whatever happened. A review
+// that ran keeps its result when the removal fails, so its round is still recorded.
 async function runNoslopProcess(ctx: NoslopReviewContext, prep: ReviewPrep): Promise<ReviewRan> {
   try {
-    return await runNoslopLocked(ctx, prep);
+    const ran = await runNoslopLocked(ctx, prep);
+    return { ...ran, cleanupError: await removeWorktree(ctx, prep.worktree) };
+  } catch (error) {
+    await removeWorktree(ctx, prep.worktree);
+    throw error;
   } finally {
     if (prep.issueFile.path !== null) {
       removeIssueFile(prep.issueFile.path);
     }
-    await ctx.lock(() => ctx.run(['git', 'worktree', 'remove', '--force', prep.worktree], { cwd: ctx.dir }));
   }
 }
 
-async function runNoslopLocked(ctx: NoslopReviewContext, prep: ReviewPrep): Promise<ReviewRan> {
+async function runNoslopLocked(ctx: NoslopReviewContext, prep: ReviewPrep): Promise<Omit<ReviewRan, 'cleanupError'>> {
   const args = buildReviewArgs(ctx, prep),
     began = Date.now(),
     begun = iso(now()),
@@ -198,6 +206,15 @@ function buildReviewArgs(ctx: NoslopReviewContext, prep: ReviewPrep): string[] {
     full = ctx.full === true ? ['--full'] : [],
     issue = buildIssueArgs(prep.issueFile);
   return ['review', '--pr', String(ctx.pr), '--repo', ctx.slug, '--report', 'sqlite,github', '--json', ...full, ...fixesOnly, ...issue];
+}
+
+async function removeWorktree(ctx: NoslopReviewContext, worktree: string): Promise<string | null> {
+  try {
+    await ctx.lock(() => ctx.run(['git', 'worktree', 'remove', '--force', worktree], { cwd: ctx.dir }));
+    return null;
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error);
+  }
 }
 
 // Never fails the review: a git or database fault leaves every finding's late flag null.
