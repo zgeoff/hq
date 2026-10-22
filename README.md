@@ -45,34 +45,49 @@ for it.
 The front desk. Hears the owner, asks one question at a time, and makes sure nothing ships
 without the right yes.
 
+**Never:** sends the owner anything from 03:00 to 07:00, or takes another session's message as the
+owner's decision.
+
 ### z-delivery · `z-delivery`
 
 Pulls ready work into lanes, briefs and watches the agents, and ships what lands, overnight
 included.
+
+**Never:** asks the owner itself. Every decision goes through Stu.
 
 ### Sieve · `z-triage`
 
 Sorts every new issue into shape, keeps the board honest, and turns open questions into one clear
 call.
 
+**Never:** talks to the owner. Its calls reach the owner through Stu.
+
 ### Gatekeeper · `z-review`
 
 Reviews each finished pull request, checks the merge gate, and squash-merges it only when every
 finding has an answer.
+
+**Never:** launches, releases or deploys.
 
 ### The Second Look · `z-qa`
 
 Checks each change on its preview, then again once it ships, and closes the issue only with
 evidence.
 
+**Never:** changes production. After a release it only reads.
+
 ### The Steward · `z-steward`
 
 Keeps the fleet's skills true to how its owner wants agents to work, one reviewed change at a time.
+
+**Never:** changes a skill outside a reviewed PR. A new grant goes to the owner through Stu.
 
 ### The Toolsmith · `z-q`
 
 Builds hq from the crew's requests, one reviewed PR at a time. Has never pushed to `main`, and
 never will.
+
+**Never:** runs a branch build of hq against the live database.
 
 ## How a change moves
 
