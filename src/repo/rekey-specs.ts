@@ -16,6 +16,10 @@ export interface RekeySpec {
   // holds the column, so a re-key cannot collide.
   key: string[] | null;
 
+  // The meta row whose value is a JSON object keyed by this kind: the re-key changes the keys of
+  // that object, and two keys of the object that would repeat collide.
+  metaKey?: string;
+
   // The key columns the unique index reads as COALESCE(column, 0), so a null and a 0 repeat.
   zeroIfNull?: string[];
   table: string;
@@ -38,6 +42,7 @@ export const REKEY_SPECS: Record<RekeyStore, RekeySpec[]> = {
     { table: 'grant_actions', column: 'target', kind: 'ref', key: null },
     { table: 'marks', column: 'ref', kind: 'url', key: null },
     { table: 'news', column: 'link', kind: 'url', key: null },
+    { table: 'meta', column: 'value', kind: 'ref', key: null, metaKey: 'stats_pr_facts_v2' },
   ],
   noslop: [
     { table: 'reviews', column: 'repo', kind: 'slug', key: null },

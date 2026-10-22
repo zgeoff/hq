@@ -1,4 +1,5 @@
 import type { Database } from 'bun:sqlite';
+import { z } from 'zod';
 import { buildRekeySql } from './build-rekey-sql.ts';
 import type { RekeySpec, RepoNames } from './rekey-specs.ts';
 
@@ -16,6 +17,9 @@ function readKeyColumn(spec: RekeySpec, alias: string, name: string): string {
 // A row that holds the new name already, with the same key as a row about to take it. The join
 // pairs each row to re-key with the row it would become; a pair means the unique key would repeat.
 function readSpecCollisions(db: Database, spec: RekeySpec, names: RepoNames): string[] {
+  if (spec.metaKey !== undefined) {
+    return readMetaCollisions(db, spec.metaKey, spec, names);
+  }
   if (spec.key === null) {
     return [];
   }
@@ -32,4 +36,12 @@ function readSpecCollisions(db: Database, spec: RekeySpec, names: RepoNames): st
 // The keys that would repeat after the re-key, for the specs whose unique key holds the column.
 export function readRekeyCollisions(db: Database, specs: RekeySpec[], names: RepoNames): string[] {
   return specs.flatMap((spec) => readSpecCollisions(db, spec, names));
+}
+
+const MetaKeysSchema = z.array(z.object({ value: z.string() }));
+
+function readMetaCollisions(db: Database, metaKey: string, spec: RekeySpec, names: RepoNames): string[] {
+  const rekey = buildRekeySql(spec, 'm."key"', names);
+  const select = `SELECT n."key" AS value FROM "meta" AS row, json_each(row."value") AS m JOIN json_each(row."value") AS n ON n."key" = ${rekey.newValue} WHERE row."key" = ? AND ${rekey.fromWhere}`;
+  return MetaKeysSchema.parse(db.query(select).all(...rekey.newParams, metaKey, ...rekey.fromParams)).map((row) => `meta.${metaKey}=${row.value}`);
 }
