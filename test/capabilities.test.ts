@@ -169,7 +169,11 @@ function checkShape(name: string, actual: unknown): void {
 }
 
 test('shape: status', async () => {
-  checkShape('status', (await hq('status')).json);
+  const status = await hq('status');
+  const keys = SHAPES['status']?.keys ?? [];
+
+  expect(keys).not.toHaveLength(0);
+  expect(keys.flatMap((key) => missing(status.json, key) ?? [])).toStrictEqual([]);
 });
 
 test('shape: fleet', async () => {
