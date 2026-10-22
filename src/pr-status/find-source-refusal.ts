@@ -26,7 +26,7 @@ export function findSourceRefusal(db: Database, ref: PRRef, source: string, prob
 
 const CallRowSchema = z.object({ title: z.string() });
 
-const AnswerDataSchema = z.object({ title: z.string().optional() });
+const AnswerDataSchema = z.object({ answer: z.string(), title: z.string().optional() });
 
 // --by and HQ_AS are the caller's own words, so only a console answer or an `hq call answer` that
 // atc placed in z-stu's session (marked ownerSession) is the owner's.
@@ -39,9 +39,13 @@ function findCallRefusal(db: Database, ref: PRRef, source: string, id: string): 
   if (answer === null) {
     return `${source} has no owner answer for its current round, in the console or by \`hq call answer\` from the owner's session (z-stu), found through ATC_SESSION_ID`;
   }
-  const title = AnswerDataSchema.parse(JSON.parse(answer.data)).title ?? call.title;
+  const data = AnswerDataSchema.parse(JSON.parse(answer.data)),
+    title = data.title ?? call.title;
   if (!hasPRName(title, ref)) {
     return `${source} does not name ${ref.slug}#${ref.pr} in the title the owner answered`;
+  }
+  if (!isYes(data.answer)) {
+    return `the owner's answer to ${source} is not a yes: "${data.answer}"`;
   }
   return null;
 }
@@ -67,3 +71,9 @@ function hasPRName(title: string, ref: PRRef): boolean {
   return pattern.test(title);
 }
 
+// The option the console stores before ` | ` (or the whole answer) is the owner's decision. Only a
+// plain Yes grants: words such as "Yes, but not yet" are the owner's to weigh, never hq's.
+function isYes(answer: string): boolean {
+  const option = answer.split(' | ')[0] ?? '';
+  return /^yes[.!]?$/iu.test(option.trim());
+}

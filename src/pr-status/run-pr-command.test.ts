@@ -620,6 +620,33 @@ test.each([
   expect(ctx.db.query("SELECT COUNT(*) AS total FROM events WHERE action IN ('pr-override', 'pr-accepted-risk')").get()).toStrictEqual({ total: 1 });
 });
 
+test.each(['No', 'No | Not this head.', 'Yes, but not yet', 'Later'])('it refuses a call: source for a call the owner answered %p in the console, and records nothing', async (note) => {
+  const ctx = setupTest();
+  ctx.fileCall('KET-31', 'Override widgets#7?');
+  recordConsoleAnswer(ctx.db, { id: 'KET-31', option: '', note, actor: 'owner' });
+
+  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'call:KET-31', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: `--source refused: the owner's answer to call:KET-31 is not a yes: "${note}"; ask z-stu to record it` });
+  expect(ctx.db.query("SELECT COUNT(*) AS total FROM events WHERE action = 'pr-override'").get()).toStrictEqual({ total: 0 });
+});
+
+test('it refuses a call: source for a call the owner answered No by hq call answer in the z-stu session', async () => {
+  const ctx = setupTest();
+  ctx.fileCall('KET-32', 'Override widgets#7?');
+  answerAsk(ctx.db, { id: 'KET-32', kind: 'call', answer: 'No', actor: 'z-stu', ownerSession: true });
+
+  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'call:KET-32', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: `--source refused: the owner's answer to call:KET-32 is not a yes: "No"; ask z-stu to record it` });
+});
+
+test.each(['yes', 'Yes.', 'Yes | Descale it first.'])('it accepts a call: source for a call the owner answered %p in the console', async (note) => {
+  const ctx = setupTest();
+  ctx.fileCall('KET-33', 'Override widgets#7?');
+  recordConsoleAnswer(ctx.db, { id: 'KET-33', option: '', note, actor: 'owner' });
+
+  await ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'call:KET-33', note: 'Ship it.' });
+
+  expect(ctx.db.query("SELECT COUNT(*) AS total FROM events WHERE action = 'pr-override'").get()).toStrictEqual({ total: 1 });
+});
+
 test.each(['override', 'accept-risk'])('it refuses a console: source for %s that no console answer backs', async (verb) => {
   const ctx = setupTest();
 
