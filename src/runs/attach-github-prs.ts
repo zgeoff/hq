@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { iso } from '../clock/iso.ts';
 import { cleanEnv } from '../runner/clean-env.ts';
 import type { Runner } from '../runner/types.ts';
+import { OWNER } from '../releases/owner.ts';
 import { IN_SCOPE } from '../scope/in-scope.ts';
 import { CLOSED_RUN_STATES } from '../transitions/closed-run-states.ts';
 import { addPr } from './add-pr.ts';
@@ -19,6 +20,10 @@ export interface AttachResult {
   attached: string[];
   errors: string[];
 
+  // PRs by another author than the owner, left unattached and unreported: an outsider could fill
+  // the errors otherwise.
+  skipped: number;
+
   // Every repo's merged search answered in full, so no merged PR since mergedSince was missed.
   mergedSearched: boolean;
 }
@@ -33,6 +38,7 @@ export async function attachGitHubPRs(db: Database, run: Runner, mergedSince: Da
   const mergedSearched = searched.filter((result) => result.label === 'merged').every((result) => result.complete);
 
   // A PR merged since the last pass may also show in the open search if GitHub's index lags.
+  const skipped = searched.reduce((total, result) => total + result.skipped, 0);
   const prs = [...new Map(searched.flatMap((result) => result.prs).map((pr) => [`${pr.repo}#${pr.number}`, pr])).values()];
   const plan = planAttachments(prs, readAttachedRefs(db), readOpenRuns(db));
   const attached: string[] = [];
@@ -46,7 +52,7 @@ export async function attachGitHubPRs(db: Database, run: Runner, mergedSince: Da
       errors.push(`${step.ref}: ${reason}`);
     }
   }
-  return { attached, errors, mergedSearched };
+  return { attached, errors, mergedSearched, skipped };
 }
 
 // gh search prs answers at most 1000 a search, so each repo in scope gets its own.
@@ -56,30 +62,36 @@ interface RepoSearch {
   label: string;
   prs: OpenPR[];
   errors: string[];
+  skipped: number;
 
   // The search answered and fit under its limit.
   complete: boolean;
 }
 
 async function readRepoPRs(run: Runner, repo: string, search: Search): Promise<RepoSearch> {
-  const found = await run(['gh', 'search', 'prs', '--repo', `zgeoff/${repo}`, ...search.filter, '--json', 'number,repository,body', '--limit', String(SEARCH_LIMIT)], { env: cleanEnv() });
+  const found = await run(['gh', 'search', 'prs', '--repo', `zgeoff/${repo}`, ...search.filter, '--json', 'number,repository,body,author', '--limit', String(SEARCH_LIMIT)], { env: cleanEnv() });
   if (found.code !== 0) {
-    return { label: search.label, prs: [], errors: [`${search.label} PR search in ${repo} failed (gh exit ${found.code}): ${(found.stderr || found.stdout).trim().slice(0, 200)}`], complete: false };
+    return { label: search.label, prs: [], errors: [`${search.label} PR search in ${repo} failed (gh exit ${found.code}): ${(found.stderr || found.stdout).trim().slice(0, 200)}`], complete: false, skipped: 0 };
   }
   const answer = readSearch(found.stdout);
   if (answer === null) {
-    return { label: search.label, prs: [], errors: [`${search.label} PR search in ${repo} gave an unreadable answer`], complete: false };
+    return { label: search.label, prs: [], errors: [`${search.label} PR search in ${repo} gave an unreadable answer`], complete: false, skipped: 0 };
   }
-  const prs = answer.filter((pr) => pr.repository.name === repo).map((pr) => ({ repo, number: pr.number, body: pr.body ?? '' }));
+
+  const inRepo = answer.filter((pr) => pr.repository.name === repo);
+
+  // On a public repo anyone can open a PR whose body names a run, and an open PR holds its run back.
+  const prs = inRepo.filter((pr) => pr.author?.login === OWNER).map((pr) => ({ repo, number: pr.number, body: pr.body ?? '' }));
 
   // A full answer may have cut PRs off, and those stay unattached until a search finds them.
   const complete = answer.length < SEARCH_LIMIT;
   const errors = complete ? [] : [`${search.label} PR search in ${repo} gave ${SEARCH_LIMIT} PRs, its limit, so PRs past it are not attached`];
-  return { label: search.label, prs, errors, complete };
+  return { label: search.label, prs, errors, complete, skipped: inRepo.length - prs.length };
 }
 
 const REPOSITORY = z.object({ name: z.string() });
-const PR = z.object({ number: z.number().int(), repository: REPOSITORY, body: z.string().nullable() });
+const AUTHOR = z.object({ login: z.string() });
+const PR = z.object({ number: z.number().int(), repository: REPOSITORY, body: z.string().nullable(), author: AUTHOR.nullish() });
 const FOUND = z.array(PR);
 
 function readSearch(stdout: string): z.infer<typeof FOUND> | null {

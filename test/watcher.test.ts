@@ -296,7 +296,7 @@ test('it marks a run PR merged from GitHub and attaches an opened PR to its run 
   const calls: string[] = [];
   const gh = buildStubGitHubFactsRunner({
     views: { 'kettle#4': JSON.stringify({ state: 'MERGED', mergedAt: '2026-10-15T19:00:00Z', mergeCommit: { oid: 'a'.repeat(40) } }) },
-    search: JSON.stringify([{ number: 9, repository: { name: 'hq' }, body: 'Contributes to GEO-9822' }]),
+    search: JSON.stringify([{ number: 9, repository: { name: 'hq' }, author: { login: 'zgeoff' }, body: 'Contributes to GEO-9822' }]),
     calls,
     fallback: capacity,
   });

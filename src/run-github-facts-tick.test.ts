@@ -75,7 +75,7 @@ test('a PR opened and merged between two passes attaches to its run and gets its
   addRun(ctx.db, { issue: 'GEO-9831', title: 'Invented teapot work', place: 'none', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: null, actor: 'kettle-bot' });
   const gh = buildStubGitHubFactsRunner({
     search: '[]',
-    merged: JSON.stringify([{ number: 15, repository: { name: 'hq' }, body: 'Fixes GEO-9831' }]),
+    merged: JSON.stringify([{ number: 15, repository: { name: 'hq' }, author: { login: 'zgeoff' }, body: 'Fixes GEO-9831' }]),
     views: { 'hq#15': JSON.stringify({ state: 'MERGED', mergedAt: '2026-10-20T00:55:00Z', mergeCommit: { oid: 'b'.repeat(40) } }) },
   });
 
