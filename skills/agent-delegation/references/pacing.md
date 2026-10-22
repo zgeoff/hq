@@ -1,6 +1,6 @@
 # pacing
 
-**Delivery** launches a session only while 3 limits all have room: imp capacity, provider quota, and design slots, and while the lane it fills has room. `scripts/capacity.sh` reads them all and picks the provider, so you make one call before a launch instead of several. [pacing.json](../pacing.json) holds the thresholds, the routes, the design slots and the lanes.
+**Delivery** launches a session only while imp capacity and provider quota both have room, and while the lane it fills has room. A design launch also needs a free design slot. `scripts/capacity.sh` reads them all and picks the provider, so you make one call before a launch instead of several. [pacing.json](../pacing.json) holds the thresholds, the routes, the design slots and the lanes.
 
 ## Before a launch
 
