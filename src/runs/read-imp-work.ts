@@ -4,9 +4,9 @@ import type { ImpWork } from './types.ts';
 
 const impListSchema = z.array(z.looseObject({ name: z.string() }));
 
-// Lists each worktree's uncommitted changes, then the commits no remote branch holds from any local
-// branch or worktree HEAD, detached or not. Any line out means unpushed work. A failed git call exits
-// nonzero: none runs inside a pipe, whose status would be the last command's.
+// Lists each worktree's uncommitted changes, the stash count, then the commits no remote branch holds
+// from any branch or worktree HEAD, detached or not. Any line out means unpushed work. A failed git
+// call exits nonzero: none runs inside a pipe, whose status would be the last command's.
 const CHECK_SCRIPT = [
   'set -eu',
   'cd "$1"',
@@ -18,6 +18,8 @@ const CHECK_SCRIPT = [
   String.raw`    if [ -n "$change" ]; then printf "%s: %s\n" "$tree" "$change"; fi`,
   '  done',
   'done',
+  'stashes=$(git stash list) || exit 1',
+  String.raw`if [ -n "$stashes" ]; then printf "%s: %d stash entries\n" "$PWD" "$(printf "%s\n" "$stashes" | wc -l)"; fi`,
   String.raw`heads=$(printf "%s\n" "$trees" | sed -n "s/^HEAD //p")`,
   'git log --oneline $heads --branches --not --remotes',
 ].join('\n');

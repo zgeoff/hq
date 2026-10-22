@@ -161,3 +161,23 @@ test('a session with no working directory gives no answer, and runs nothing', as
   expect(work).toStrictEqual({ state: 'unknown', detail: 'atc gave no working directory for the session' });
   expect(imps.commands).toStrictEqual([]);
 });
+
+test('a stash entry is unpushed work, and the detail gives the count', async () => {
+  const ctx = setupTest();
+  const clone = join(ctx.directory, 'kettle');
+  ctx.git(['init', '-q', '--bare', '-b', 'main', join(ctx.directory, 'remote.git')]);
+  ctx.git(['clone', '-q', join(ctx.directory, 'remote.git'), clone]);
+  writeFileSync(join(clone, 'lid.ts'), 'export const lid = 1;\n');
+  ctx.git(['-C', clone, 'add', '.']);
+  ctx.git(['-C', clone, 'commit', '-q', '-m', 'add kettle lid']);
+  ctx.git(['-C', clone, 'push', '-q', 'origin', 'main']);
+  const imps = buildStubImpRunner({ imps: ['home-0000b001aaaa4aaa8aaa'] });
+  writeFileSync(join(clone, 'lid.ts'), 'export const lid = 2;\n');
+  ctx.git(['-C', clone, 'stash', '-q']);
+  writeFileSync(join(clone, 'lid.ts'), 'export const lid = 3;\n');
+  ctx.git(['-C', clone, 'stash', '-q']);
+
+  const work = await readImpWork(imps.run, '0000b001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', clone);
+
+  expect(work).toStrictEqual({ state: 'unpushed', detail: `home-0000b001aaaa4aaa8aaa: ${clone}: 2 stash entries` });
+});
