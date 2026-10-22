@@ -48,12 +48,12 @@ const EventDataSchema = z.object({ data: z.string() }).nullable();
 // issues and session may belong to a later round.
 const UNKNOWN_ROUND: RoundFacts = { title: null, issues: [], forSession: null };
 
-// The actions that can change an ask's title, issues or session.
-const CHANGE_ACTIONS: Record<'ask', string[]> = { ask: ['added', 'updated', 'reasked', 'requeued'] };
+// The actions that can change an ask's or an unblock item's title, issues, session or link.
+const CHANGE_ACTIONS: Record<'ask' | 'unblock', string[]> = { ask: ['added', 'updated', 'reasked', 'requeued'], unblock: ['added', 'item', 'reopened', 'updated'] };
 
-// True when an event after this answer may have changed what the ask stands for, so the ask as it
+// True when an event after this answer may have changed what the item stands for, so the item as it
 // stands now no longer tells what the owner answered.
-function isChangedSince(db: Database, subject: 'ask', answer: AnswerEvent): boolean {
+function isChangedSince(db: Database, subject: 'ask' | 'unblock', answer: AnswerEvent): boolean {
   const actions = CHANGE_ACTIONS[subject];
   return db.query(`SELECT 1 FROM events WHERE subject = ? AND subject_id = ? AND seq > ? AND action IN (${actions.map(() => '?').join(', ')}) LIMIT 1`).get(subject, answer.id, answer.seq, ...actions) !== null;
 }
@@ -83,8 +83,9 @@ function loadReviewAnswers(db: Database, window: AnswerWindow): Answer[] {
       return [];
     }
 
-    // A review from before its facts were kept is read against the item as it stands now.
-    const facts = data.facts ?? { title: item.title ?? item.task, issues: item.unblocks.map((unblock) => unblock.issue), session: item.added_by, ref: findSubjectLink(item)?.url ?? null };
+    // A review from before its facts were kept is read against the item as it stands now, unless the
+    // item changed after it: its title, issues, session and PR are then unknown.
+    const facts = data.facts ?? (isChangedSince(db, 'unblock', r) ? { title: null, issues: [], session: null, ref: null } : { title: item.title ?? item.task, issues: item.unblocks.map((unblock) => unblock.issue), session: item.added_by, ref: findSubjectLink(item)?.url ?? null });
     return [{ source: 'review', id: item.id, kind: 'review', title: facts.title, issues: facts.issues, session: facts.session, picked: REVIEW_LABELS[data.review], stuPick: null, words: data.note, ref: facts.ref, via: r.actor, at: r.at }];
   });
 }

@@ -150,6 +150,17 @@ test("it lists an earlier round's answer with no title, issues or session when n
   expect(loadAnswers(db, { from: NOON_SYDNEY, to: '2026-10-14T04:00:00Z' }).map((answer) => [answer.title, answer.issues, answer.session, answer.words])).toStrictEqual([[null, [], null, 'Long']]);
 });
 
+test('it lists a review answer from before its facts were kept with no title or PR once its id comes back for another PR', () => {
+  const db = setupTest();
+  createUnblockItems(db, { 'review-7': { task: 'Review kettle#8 and say lgtm', links: [{ label: 'kettle#8', url: 'https://github.com/kettle-co/kettle/pull/8', subject: true }] } });
+  recordConsoleReview(db, { id: 'review-7', review: 'lgtm', note: '', actor: 'console' });
+  db.run("UPDATE events SET data = json_remove(data, '$.facts') WHERE action = 'console-review'");
+  at('2026-10-14T03:00:00Z');
+  createUnblockItems(db, { 'review-7': { task: 'Review kettle#9 and say lgtm', links: [{ label: 'kettle#9', url: 'https://github.com/kettle-co/kettle/pull/9', subject: true }] } });
+
+  expect(loadAnswers(db, { from: NOON_SYDNEY, to: '2026-10-14T04:00:00Z' }).map((answer) => [answer.title, answer.session, answer.ref])).toStrictEqual([[null, null, null]]);
+});
+
 test('hq answers --json lists the last 7 days by default, and --since sets the window', async () => {
   const db = createTwoTypedLines(setupTest()),
     log = spyOn(console, 'log').mockImplementation((line: string) => printed.push(line)),
