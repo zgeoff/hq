@@ -14,6 +14,8 @@ import type { Capacity } from '../src/lanes/types.ts';
 import { setCapacitySetting } from '../src/capacity/set-capacity-setting.ts';
 import { createCapacitySample } from './create-capacity-sample.ts';
 import { FOUR_AM_SYDNEY, NOON_SYDNEY, at, freshDb } from './helpers.ts';
+import { setForward } from '../src/outbox/set-forward.ts';
+import { orchestratorName } from '../src/wake/orchestrator-name.ts';
 
 let db: Database;
 let cleanup: () => void;
@@ -152,6 +154,29 @@ test('a hold pauses nudges, drops an unsent one, and ends by itself', () => {
   atMin(71);
   expect(getLanesHold(db)).toBeNull();
   expect(tick(db, sample(16384), 'hq-lanes').nudged).toBe(true); // the free time kept counting
+});
+
+test('it drops an unsent nudge at the forwarded orchestrator when the lanes are held', () => {
+  setForward(db, orchestratorName(), 'z-other');
+  tick(db, sample(16_384), 'hq-lanes');
+  atMin(10);
+  tick(db, sample(16_384), 'hq-lanes');
+
+  holdLanes(db, 60, 'host switch', 'z-delivery');
+
+  expect(msgs()).toStrictEqual([]);
+});
+
+test('it drops an unsent nudge at the forwarded orchestrator once the lanes are full', () => {
+  setForward(db, orchestratorName(), 'z-other');
+  tick(db, sample(16_384), 'hq-lanes');
+  atMin(10);
+  tick(db, sample(16_384), 'hq-lanes');
+  atMin(15);
+
+  tick(db, sample(0), 'hq-lanes');
+
+  expect(msgs()).toStrictEqual([]);
 });
 
 test('release ends a hold early; bad holds are refused', () => {

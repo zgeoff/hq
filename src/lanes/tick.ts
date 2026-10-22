@@ -12,7 +12,6 @@ import { metaJson } from '../db/meta-json.ts';
 import { setMeta } from '../db/set-meta.ts';
 import { strMap } from '../db/str-map.ts';
 import { logEvent } from '../log-event.ts';
-import { dropTopic } from '../outbox/drop-topic.ts';
 import { enqueue } from '../outbox/enqueue.ts';
 import { orchestratorName } from '../wake/orchestrator-name.ts';
 import { checkReadyStale } from './check-ready-stale.ts';
@@ -22,6 +21,7 @@ import { LANES } from './lanes.ts';
 import { lanesNow } from './lanes-now.ts';
 import { loadImpRoom } from './load-imp-room.ts';
 import { nudgeText } from './nudge-text.ts';
+import { removeLaneNudges } from './remove-lane-nudges.ts';
 import { slotsFrom } from './slots-from.ts';
 import type { Sample, TickResult } from './types.ts';
 
@@ -85,7 +85,9 @@ export function tick(db: Database, sample: Sample, actor: string): TickResult {
 
       // Only the newest unsent nudge may go out, and none once the lanes are full:
       // an atc outage never ends in a burst of stale nudges.
-      if (slots === 0 && !sample.error) dropTopic(db, orchestratorName(), 'lanes');
+      if (slots === 0 && !sample.error) {
+        removeLaneNudges(db);
+      }
       if (sample.error) return result(false, `no reading: ${sample.error}`, getMeta(db, 'lanes_free_since'));
       if (slots === 0) {
         setMeta(db, 'lanes_free_since', null);
@@ -103,7 +105,7 @@ export function tick(db: Database, sample: Sample, actor: string): TickResult {
 
       const hold = getLanesHold(db);
       if (hold) {
-        dropTopic(db, orchestratorName(), 'lanes');
+        removeLaneNudges(db);
         return result(false, `held until ${hold.until}: ${hold.reason}`, since);
       }
 

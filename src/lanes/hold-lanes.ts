@@ -4,9 +4,8 @@ import { now } from '../clock/now.ts';
 import { setMeta } from '../db/set-meta.ts';
 import { HqError } from '../errors.ts';
 import { logEvent } from '../log-event.ts';
-import { dropTopic } from '../outbox/drop-topic.ts';
-import { orchestratorName } from '../wake/orchestrator-name.ts';
 import { MAX_HOLD_MINUTES } from './max-hold-minutes.ts';
+import { removeLaneNudges } from './remove-lane-nudges.ts';
 import type { LanesHold } from './types.ts';
 
 export function holdLanes(db: Database, minutes: number, reason: string, actor: string): LanesHold {
@@ -16,7 +15,7 @@ export function holdLanes(db: Database, minutes: number, reason: string, actor: 
     .transaction(() => {
       const h = { until: iso(new Date(now().getTime() + minutes * 60_000)), reason: reason.trim(), by: actor };
       setMeta(db, 'lanes_hold', JSON.stringify(h));
-      dropTopic(db, orchestratorName(), 'lanes');
+      removeLaneNudges(db);
       logEvent(db, 'hq', 'lanes', 'held', actor, null, null, { ...h, minutes });
       return h;
     })
