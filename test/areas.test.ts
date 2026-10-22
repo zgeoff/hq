@@ -152,6 +152,17 @@ test('the watcher nudges with the picks after 10 min, and again only on a change
   expect(msgs()[0]?.text).toContain('Take, in this order: GEO-22.');
 });
 
+test('a Design issue alone starts no nudge, though the plan names it for the design slot', () => {
+  setMeta(db, 'lanes_ready_issues', JSON.stringify({ at: T0, eligible: [], design: [buildReadyIssue('GEO-24', { type: 'Design' })] }));
+  const withDesign = { ...sample(16_384), cap: { ...cap(16_384), design: { room: true } } };
+  tick(db, withDesign, 'hq-lanes');
+  atMin(10);
+
+  const result = tick(db, withDesign, 'hq-lanes');
+
+  expect([readSlotPlan(db, withDesign)?.design, result.nudged, result.why, msgs()]).toStrictEqual(['GEO-24', false, '10 slot(s) free, nothing eligible', []]);
+});
+
 test('the samples count the slots the plan fills from the first free minute; only the nudge waits', () => {
   setMeta(db, 'lanes_ready_issues', JSON.stringify({ at: T0, eligible: ['GEO-21', 'GEO-22', 'GEO-23'].map((issue) => buildReadyIssue(issue)), design: [] }));
   for (const m of [0, 5, 10]) {
