@@ -316,6 +316,28 @@ test('it reports a partial re-key that names the backups when the store refuses 
   }
 });
 
+test('it reports a partial re-key that names the backups when the store refuses a write open after hq.db commits', async () => {
+  const ctx = setupTest();
+  ctx.createHistoryRows('hq', 0);
+  ctx.createStoreRows('hq', 0);
+  const writeRefused = new Error('invented: the store opens read-only');
+
+  const failure = await ctx.archive('hq', 'hq-archive', {
+    openStore: (file, options) => {
+      if ('create' in options) {
+        throw writeRefused;
+      }
+      return new Database(file, options);
+    },
+  }).then(
+    () => null,
+    (error: unknown) => error,
+  );
+
+  expect(failure).toMatchObject({ code: 'rekey_partial', message: expect.stringContaining("hq.db was re-keyed but noslop's store was not (invented: the store opens read-only). The backups are ") });
+  expect(ctx.db.query('SELECT repo FROM merged_prs').all()).toStrictEqual([{ repo: 'hq-archive' }]);
+});
+
 test('it works on hq.db alone when noslop has no store', async () => {
   const ctx = setupTest();
   ctx.createHistoryRows('hq', 0);

@@ -107,12 +107,13 @@ function writeArchiveRecord(input: ArchiveInput, before: ArchiveSide[], backups:
 }
 
 function runStoreRekey(input: ArchiveInput, names: RepoNames, backups: string[]): void {
-  const store = input.openStore(input.store, { create: true });
+  let store: Database | null = null;
   try {
+    store = input.openStore(input.store, { create: true });
     runRekey(store, REKEY_SPECS.noslop, names);
   } catch (error) {
     throw new HqError('rekey_partial', `hq.db was re-keyed but noslop's store was not (${error instanceof Error ? error.message : String(error)}). The backups are ${backups.join(' and ')}.`, { backups });
   } finally {
-    store.close();
+    store?.close();
   }
 }
