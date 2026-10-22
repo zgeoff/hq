@@ -15,7 +15,8 @@ export interface ThroughputLine {
   alerts: ThroughputAlert[];
 }
 
-// A check-in line over the Sydney day so far, [from, at).
+// A check-in line over [from, at): the Sydney day so far when it prints, the window just read from
+// Linear when it alerts.
 export type ThroughputReader = (db: Database, from: Date, at: Date) => ThroughputLine;
 
 export type IssueSource = 'owner' | 'design' | 'agent' | 'review' | 'live check' | 'bot';

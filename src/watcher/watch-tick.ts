@@ -93,8 +93,10 @@ export async function watchTick(db: Database, d: WatchDeps): Promise<boolean> {
         setMeta(db, 'kinds_synced_at', at());
         if (!k.left) setMeta(db, 'kinds_ok_at', at()); // what the daily check-in trusts, with linear_synced_at
         if (k.days.length) clearGhAuth(db); // syncKinds throws on a failed gh call: a fetched day means GitHub answered
-        await step('Linear issue types', () => syncLinear(db, makeAuditedLinearCaller(db, d.run), new Date(Date.now() - 2 * 86_400_000)));
-        const alerted = sendThroughputAlerts(db, d.me, now());
+        const linearAt = now();
+        const linearFrom = new Date(linearAt.getTime() - 2 * 86_400_000);
+        await step('Linear issue types', () => syncLinear(db, makeAuditedLinearCaller(db, d.run), linearFrom, linearAt));
+        const alerted = sendThroughputAlerts(db, d.me, linearFrom, linearAt);
         if (alerted.length > 0) {
           d.log(`${at()} goals: told triage about ${alerted.join(', ')}`);
         }

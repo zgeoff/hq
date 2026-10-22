@@ -80,8 +80,8 @@ test('a filing that points at a PR with no follow-up record is counted, and tria
     new Date(ctx.now),
   );
 
-  const first = sendThroughputAlerts(ctx.db, 'hq-lanes', new Date(ctx.now));
-  const second = sendThroughputAlerts(ctx.db, 'hq-lanes', new Date('2026-10-16T07:30:00Z'));
+  const first = sendThroughputAlerts(ctx.db, 'hq-lanes', new Date('2026-10-14T00:00:00Z'), new Date(ctx.now));
+  const second = sendThroughputAlerts(ctx.db, 'hq-lanes', new Date('2026-10-14T00:00:00Z'), new Date('2026-10-16T07:30:00Z'));
 
   expect({ first, second, line: ctx.findLine('Bad filings') }).toStrictEqual({
     first: ['bad-filing:GEO-9801', 'bad-filing:GEO-9802'],
@@ -99,7 +99,7 @@ test('a filing z-review recorded is a review issue, not a bad filing, and sends 
   await syncLinear(ctx.db, makeThroughputLinearCall([buildFiledNode('GEO-9801', null, { attachments: { nodes: [{ url: 'https://github.com/zgeoff/widgets/pull/7' }] } })]), new Date('2026-10-14T00:00:00Z'), new Date(ctx.now));
   addFollowup(ctx.db, { issue: 'GEO-9801', fromRef: 'widgets#7', actor: 'z-review' });
 
-  expect({ sent: sendThroughputAlerts(ctx.db, 'hq-lanes', new Date(ctx.now)), issues: ctx.findLine('Issues'), bad: ctx.findLine('Bad filings') }).toStrictEqual({
+  expect({ sent: sendThroughputAlerts(ctx.db, 'hq-lanes', new Date('2026-10-14T00:00:00Z'), new Date(ctx.now)), issues: ctx.findLine('Issues'), bad: ctx.findLine('Bad filings') }).toStrictEqual({
     sent: [],
     issues: '- Issues: today 1 filed (owner 0, design 0, agent 0, review 1, live check 0, bot 0), 0 closed; target none –',
     bad: '- Bad filings: today 0; target 0 🟢 green',
@@ -143,8 +143,8 @@ test('an In Progress issue with no run, or an open run on a closed issue, is sta
   ];
   await syncLinear(ctx.db, makeThroughputLinearCall([], started), new Date('2026-10-14T00:00:00Z'), new Date(ctx.now));
 
-  const first = sendThroughputAlerts(ctx.db, 'hq-lanes', new Date(ctx.now));
-  const second = sendThroughputAlerts(ctx.db, 'hq-lanes', new Date(ctx.now));
+  const first = sendThroughputAlerts(ctx.db, 'hq-lanes', new Date('2026-10-14T00:00:00Z'), new Date(ctx.now));
+  const second = sendThroughputAlerts(ctx.db, 'hq-lanes', new Date('2026-10-14T00:00:00Z'), new Date(ctx.now));
 
   expect({ first, second, line: ctx.findLine('Stale') }).toStrictEqual({
     first: ['stale:in-progress:GEO-9801', 'stale:open-run:GEO-9804'],
@@ -190,12 +190,22 @@ test('a failed read of the filed issues leaves the lines unavailable, with no co
   const failing: LinearCall = (query, variables) => (query.includes('createdAt: {') ? Promise.reject(new Error('Linear answered 502: invented outage')) : working(query, variables));
 
   const error = await syncLinear(ctx.db, failing, new Date('2026-10-14T00:00:00Z'), new Date(ctx.now)).catch((caught: unknown) => caught);
-  const failed = { line: ctx.findLine('Bad filings'), sent: sendThroughputAlerts(ctx.db, 'hq-lanes', new Date(ctx.now)) };
+  const failed = { line: ctx.findLine('Bad filings'), sent: sendThroughputAlerts(ctx.db, 'hq-lanes', new Date('2026-10-14T00:00:00Z'), new Date(ctx.now)) };
   await syncLinear(ctx.db, working, new Date('2026-10-14T00:00:00Z'), new Date(ctx.now));
 
   expect({ error, failed, recovered: ctx.findLine('Bad filings') }).toStrictEqual({
     error: new Error('Linear answered 502: invented outage'),
     failed: { line: '- Bad filings: Linear read failed, last read 2026-10-16T06:00:00Z; target 0 –', sent: [] },
     recovered: '- Bad filings: today 1 (GEO-9801 from widgets#7); target 0 🔴 red',
+  });
+});
+
+test('a filing read just after Sydney midnight but filed just before it still alerts, and stays off the line for today', async () => {
+  const ctx = setupTest();
+  await syncLinear(ctx.db, makeThroughputLinearCall([buildFiledNode('GEO-9801', 'From widgets#7\n\nThe widget drops a retry.', { createdAt: '2026-10-15T12:55:00Z' })]), new Date('2026-10-14T00:00:00Z'), new Date(ctx.now));
+
+  expect({ sent: sendThroughputAlerts(ctx.db, 'hq-lanes', new Date('2026-10-14T07:00:00Z'), new Date(ctx.now)), line: ctx.findLine('Bad filings') }).toStrictEqual({
+    sent: ['bad-filing:GEO-9801'],
+    line: '- Bad filings: today 0; target 0 🟢 green',
   });
 });
