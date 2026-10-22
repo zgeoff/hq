@@ -90,6 +90,10 @@ hq 0.79.0: headquarters for the z- sessions. Every command takes --json.
                                              hq reads the Ready issues from Linear every 10 min; this reports Ready by hand when that read fails (fresh 30 min, a 0 for 3 h), and the nudge then names no issues;
                                              --ready-total is every Ready issue seen in Linear, --skipped the ones not counted, each with a reason
   hq lanes ready --count N                    report a total Ready count only (the old form)
+  hq lanes skip <issue> --until <ISO time|GEO-n> --reason TEXT
+                                             leave one Ready issue out of the lanes' picks until the time passes or GEO-n is Done or Canceled
+  hq lanes skip list                          each skip with its until and reason
+  hq lanes skip drop <issue>                  end a skip now: the lanes may pick the issue from their next look
   hq focus [show] | clear                     the lanes' focus with each term's Ready and Backlog matches; clear goes back to all eligible work by priority
   hq focus set <term>[,<term>...] [--reserve <area>=<n>]...
                                              steer what free lane slots take, from the next tick; terms in priority order, filters in a term joined by ":":

@@ -9,8 +9,10 @@ import { readFocus } from '../focus/read-focus.ts';
 import type { Focus, FocusPlan } from '../focus/types.ts';
 import { buildSlotPool } from './build-slot-pool.ts';
 import type { SlotPool } from './build-slot-pool.ts';
+import { isSkipActive } from './is-skip-active.ts';
 import { ISSUE_AREAS_KEY } from './issue-areas-key.ts';
 import { loadImpRoom } from './load-imp-room.ts';
+import { readLaneSkips } from './read-lane-skips.ts';
 import { readReadySnapshot } from './read-ready-snapshot.ts';
 import { readRunningByPlace } from './read-running-by-place.ts';
 import type { ReadySnapshot } from './ready-snapshot.ts';
@@ -40,16 +42,16 @@ export function readSlotPlan(db: Database, sample: Sample, at: Date = now()): Sl
   }
   const running = readRunningByPlace(db, at);
   const room = loadImpRoom(db, { budgetSlots: slotsFrom(sample.cap, sample.impMib).slots, impMib: sample.impMib }, at);
-  const pool = buildSlotPool(sample.slots, running, room);
+  const pool = buildSlotPool(sample.slots, running, room, sample.localRoom ?? null);
   const focus = readFocus(db);
   const snapshot = readReadySnapshot(db, at);
   if (snapshot === null) {
     return { pool, focus, plan: null, eligible: null, design: null };
   }
-  const onBoard = readOnBoard(db);
-  const queue = buildFocusQueue(snapshot.eligible, focus?.terms ?? [], onBoard);
+  const leftOut = readLeftOut(db, at);
+  const queue = buildFocusQueue(snapshot.eligible, focus?.terms ?? [], leftOut);
   const plan = buildFocusPlan(queue, pool.free, focus?.reserves ?? [], readRunningByArea(db, running.issues));
-  const design = sample.cap.design?.room === true ? findDesignPick(snapshot, onBoard) : null;
+  const design = sample.cap.design?.room === true ? findDesignPick(snapshot, leftOut) : null;
   return { pool, focus, plan, eligible: queue.length, design };
 }
 
@@ -57,9 +59,11 @@ const issuesSchema = z.array(z.object({ issue: z.string() }));
 
 // Every issue with a run, whether or not it holds a slot now: the lanes never pick it again. A closed
 // run counts too, since the Ready read can still hold its issue and addRun refuses it until a reopen.
-function readOnBoard(db: Database): Set<string> {
+// An issue with an active skip is left out too, from the first look after the skip is set.
+function readLeftOut(db: Database, at: Date): Set<string> {
   const rows = issuesSchema.parse(db.query('SELECT issue FROM runs').all());
-  return new Set(rows.map((row) => row.issue));
+  const skipped = readLaneSkips(db).filter((skip) => isSkipActive(skip, at));
+  return new Set([...rows.map((row) => row.issue), ...skipped.map((skip) => skip.issue)]);
 }
 
 const AREAS_SCHEMA = z.record(z.string(), z.array(z.string()));

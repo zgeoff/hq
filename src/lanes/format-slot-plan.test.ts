@@ -8,7 +8,7 @@ test('hq lanes prints the local sessions against their cap, the focus and the pi
   // A pool of 4 imp and 3 local slots, 2 of them running locally, under focus `bug` with a vers
   // reserve lent and a Design issue waiting.
   const slotPlan: SlotPlan = {
-    pool: { impSize: 4, localSize: 3, impRunning: 1, localRunning: 2, impFree: 2, localFree: 1, free: 3, held: 'impd at line' },
+    pool: { impSize: 4, localSize: 3, impRunning: 1, localRunning: 2, impFree: 2, localFree: 1, free: 3, held: 'impd at line', localHeld: null },
     focus: { terms: parseFocusTerms('bug'), reserves: [{ area: 'vers', slots: 1 }], setAt: '2026-10-15T20:00:00Z', setBy: 'kettle-owner' },
     plan: {
       picks: [
@@ -35,7 +35,7 @@ test('the nudge names the free slots and each pick with its focus term', () => {
   // A pool of 4 imp and 3 local slots, 2 of them running locally, under focus `bug` with a vers
   // reserve lent and a Design issue waiting.
   const slotPlan: SlotPlan = {
-    pool: { impSize: 4, localSize: 3, impRunning: 1, localRunning: 2, impFree: 2, localFree: 1, free: 3, held: 'impd at line' },
+    pool: { impSize: 4, localSize: 3, impRunning: 1, localRunning: 2, impFree: 2, localFree: 1, free: 3, held: 'impd at line', localHeld: null },
     focus: { terms: parseFocusTerms('bug'), reserves: [{ area: 'vers', slots: 1 }], setAt: '2026-10-15T20:00:00Z', setBy: 'kettle-owner' },
     plan: {
       picks: [

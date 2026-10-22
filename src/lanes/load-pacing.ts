@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { parseLanes } from '../areas/parse-lanes.ts';
 import type { LaneConfig } from '../areas/types.ts';
+import { parseLocalRoom } from './parse-local-room.ts';
 import { parsePacingSlots } from './parse-pacing-slots.ts';
 import type { PacingSlots } from './types.ts';
 
@@ -8,6 +9,9 @@ export interface Pacing {
   impMib: number;
   lanes: LaneConfig[] | null;
   slots: PacingSlots | null;
+
+  // The local sessions unattended providers may run on this host; null: no cap but the local slots.
+  localRoom: number | null;
   error: string | null;
 }
 
@@ -15,7 +19,7 @@ const fileSchema = z.object({ lanes: z.unknown(), slots: z.unknown() }).partial(
 
 const impSchema = z.object({ imp: z.object({ impMib: z.number() }) });
 
-// pacing.json's imp size, lanes and slot caps. A file hq can't read, or one with neither lanes nor
+// pacing.json's imp size, lanes, slot caps and local room. A file hq can't read, or one with neither lanes nor
 // slots, gives one pool of imp slots. Lanes or slots it refuses give an error, so the watcher nudges
 // nothing on a config it can't read.
 export async function loadPacing(path: string): Promise<Pacing> {
@@ -26,13 +30,13 @@ export async function loadPacing(path: string): Promise<Pacing> {
   const imp = impSchema.safeParse(file);
   const impMib = imp.success ? imp.data.imp.impMib : DEFAULT_IMP_MIB;
   if (shape.lanes === undefined && shape.slots === undefined) {
-    return { impMib, lanes: null, slots: null, error: null };
+    return { impMib, lanes: null, slots: null, localRoom: null, error: null };
   }
   try {
-    return { impMib, lanes: parseLanes(file), slots: parsePacingSlots(file), error: null };
+    return { impMib, lanes: parseLanes(file), slots: parsePacingSlots(file), localRoom: parseLocalRoom(file), error: null };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    return { impMib, lanes: null, slots: null, error: `pacing.json: ${message}` };
+    return { impMib, lanes: null, slots: null, localRoom: null, error: `pacing.json: ${message}` };
   }
 }
 
