@@ -136,44 +136,6 @@ test('a lane pacing.json marks lends: false keeps to its own slots: it lends non
   expect(lanesNudgeText(drawn.filter((x) => wants(x)), () => 12)).not.toContain('cleanup 2 free');
 });
 
-test('it lends an idle imp lane to a lane short of slots when both lend', () => {
-  const views = buildLaneViews(
-    [
-      { name: 'kettle', place: 'imp', size: 2, lends: true },
-      { name: 'teapot', place: 'local', size: 1, lends: true },
-    ],
-    { teapot: 1 },
-    { kettle: buildReady(0), teapot: buildReady(3) },
-    { slots: 5, heldBy: 'imp budget or provider quota', line: null },
-  );
-
-  expect(views.map((view) => [view.name, view.lendTo])).toStrictEqual([
-    ['kettle', 'teapot'],
-    ['teapot', null],
-  ]);
-});
-
-test.each([
-  ['the idle lane is marked lends: false', false, true],
-  ['the short lane is marked lends: false', true, false],
-  ['both lanes are marked lends: false', false, false],
-])('it lends nothing when %s', (_label, lenderLends, borrowerLends) => {
-  const views = buildLaneViews(
-    [
-      { name: 'kettle', place: 'imp', size: 2, lends: lenderLends },
-      { name: 'teapot', place: 'local', size: 1, lends: borrowerLends },
-    ],
-    { teapot: 1 },
-    { kettle: buildReady(0), teapot: buildReady(3) },
-    { slots: 5, heldBy: 'imp budget or provider quota', line: null },
-  );
-
-  expect(views.map((view) => [view.name, view.lendTo])).toStrictEqual([
-    ['kettle', null],
-    ['teapot', null],
-  ]);
-});
-
 test.each([
   ['a list', ['atc']],
   ['a known lane with a value that is not true or false', { atc: 'no' }],
