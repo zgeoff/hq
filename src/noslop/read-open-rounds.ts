@@ -18,7 +18,22 @@ export function readOpenRounds(dir: string): OpenRound[] {
     .filter((found) => found.match !== null)
     .map((found) => ({ name: found.name, repo: found.match?.groups?.['repo'] ?? '', pr: found.match?.groups?.['pr'] ?? '', pid: Number(found.match?.groups?.['pid']) }))
     .filter((found) => found.pid !== process.pid && pidAlive(found.pid))
-    .map((found) => ({ ref: `${found.repo}#${found.pr}`, pid: found.pid, startedAt: iso(statSync(`${dir}/${found.name}`).mtime) }));
+    .flatMap((found) => {
+      const startedAt = readStartedAt(`${dir}/${found.name}`);
+      return startedAt === null ? [] : [{ ref: `${found.repo}#${found.pr}`, pid: found.pid, startedAt }];
+    });
+}
+
+// A review removes its worktree as it ends, which can fall between the scan and this read.
+function readStartedAt(path: string): string | null {
+  try {
+    return iso(statSync(path).mtime);
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+      return null;
+    }
+    throw error;
+  }
 }
 
 function readNames(dir: string): string[] {

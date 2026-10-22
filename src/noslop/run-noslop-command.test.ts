@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 import { expect, onTestFinished, spyOn, test } from 'bun:test';
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, renameSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, renameSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { buildFakeRunner } from '../../test/noslop-fake.ts';
@@ -240,6 +240,18 @@ test('it refuses a pin while a review round is open, and names the PR', async ()
   });
 
   expect(loadNoslopSettings(ctx.db).sha).toBeNull();
+});
+
+test('it pins when a live review removes its worktree between the scan and the read', async () => {
+  const ctx = setupTest();
+  const sleeper = Bun.spawn(['sleep', '30']);
+  onTestFinished(() => sleeper.kill());
+  mkdirSync(join(ctx.base, 'reviews'), { recursive: true });
+  symlinkSync(join(ctx.base, 'reviews', 'removed'), join(ctx.base, 'reviews', `hq354-noslop-${sleeper.pid}`));
+
+  await runNoslopCommand({ run: buildFakeRunner().run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester' });
+
+  expect(loadNoslopSettings(ctx.db).sha).toBe(FULL_SHA);
 });
 
 test('it ignores a review folder whose process is gone', async () => {
