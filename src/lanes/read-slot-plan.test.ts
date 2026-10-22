@@ -109,6 +109,16 @@ test('a skip set after the Ready read leaves its issue out of the picks at the n
   expect([plan?.plan?.picks.map((pick) => pick.issue), plan?.eligible]).toStrictEqual([['GEO-9805', 'GEO-9804', 'GEO-9802'], 4]);
 });
 
+test('a skip whose time has passed stops leaving its issue out, with no fresh Ready read', async () => {
+  const ctx = setupTest();
+  await ctx.seedReady(ctx.readySeeds);
+  writeLaneSkip(ctx.db, { issue: 'GEO-9801', until: '2026-10-15T20:10:00Z', reason: 'held for ten minutes', actor: 'z-delivery', at: new Date('2026-10-15T20:00:00Z') });
+
+  const plan = readSlotPlan(ctx.db, ctx.sample, new Date('2026-10-15T20:15:00Z'));
+
+  expect(plan?.plan?.picks.map((pick) => pick.issue)).toStrictEqual(['GEO-9801', 'GEO-9805', 'GEO-9804']);
+});
+
 test('local slots free none, and say why, when the localFallback is used up', async () => {
   const ctx = setupTest();
   await ctx.seedReady(ctx.readySeeds);
