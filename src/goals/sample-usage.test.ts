@@ -142,3 +142,11 @@ test('once the folder holds account files, the old single file is left alone', (
   sampleUsage(db, new Date('2026-10-16T05:00:00Z'));
   expect(rows().map((r) => (r as { account: string }).account)).toEqual([B]);
 });
+
+test('it lets a failed insert of an account reading reach the caller', () => {
+  mkdirSync(getUsageDir(), { recursive: true });
+  writeFileSync(`${getUsageDir()}/abcdef012345.json`, JSON.stringify({ account: 'abcdef012345', windows: { fiveHour: 1, sevenDay: 2 } }));
+  db.run(`CREATE TRIGGER refuse_usage BEFORE INSERT ON usage_samples BEGIN SELECT RAISE(ABORT, 'invented full database'); END`);
+
+  expect(() => sampleUsage(db)).toThrow('invented full database');
+});

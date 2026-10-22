@@ -2,9 +2,12 @@ import type { Database } from 'bun:sqlite';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { iso } from '../clock/iso.ts';
 import { now } from '../clock/now.ts';
+import { z } from 'zod';
 import { ACCOUNT_KEY } from './account-key.ts';
 import { getUsageCache } from './get-usage-cache.ts';
 import { getUsageDir } from './get-usage-dir.ts';
+
+const lastAt = z.object({ at: z.string().nullable() });
 
 // One usage_samples row per account whose claude-usage/<account>.json is newer than that account's
 // last row (at = the file's mtime). A file counts only when its account is 12 hex characters and
@@ -23,15 +26,19 @@ export function sampleUsage(db: Database, at: Date = now()): boolean {
     let stored = false;
     for (const name of files.toSorted()) {
       const key = name.slice(0, -5);
-      try {
-        const file = `${getUsageDir()}/${name}`;
-        const r = ACCOUNT_KEY.test(key) ? readings(file) : null;
-        if (!r || r.account !== key) continue;
-        const when = iso(new Date(statSync(file).mtimeMs));
-        const last = (db.query('SELECT MAX(at) AS at FROM usage_samples WHERE account = ?').get(key) as { at: string | null }).at;
-        if (last !== null && when <= last) continue;
-        if (insert.run(when, key, r.five, r.seven).changes > 0) stored = true;
-      } catch {}
+      const reading = readAccountFile(`${getUsageDir()}/${name}`, key);
+      if (!reading) {
+        continue;
+      }
+
+      // Outside the file read's catch: a failed query or insert reaches the caller.
+      const last = lastAt.parse(db.query('SELECT MAX(at) AS at FROM usage_samples WHERE account = ?').get(key));
+      if (last.at !== null && reading.when <= last.at) {
+        continue;
+      }
+      if (insert.run(reading.when, key, reading.five, reading.seven).changes > 0) {
+        stored = true;
+      }
     }
     return stored;
   }
@@ -42,6 +49,20 @@ export function sampleUsage(db: Database, at: Date = now()): boolean {
   const last = db.query('SELECT account, five_hour, seven_day FROM usage_samples ORDER BY at DESC LIMIT 1').get() as { account: string; five_hour: number | null; seven_day: number | null } | null;
   if (last && last.account === account && last.five_hour === r.five && last.seven_day === r.seven) return false;
   return insert.run(iso(at), account, r.five, r.seven).changes > 0;
+}
+
+// One account's file: its percentages and its mtime, or null when the file is unreadable, holds no
+// usable percentage, or names another account than its base name.
+function readAccountFile(file: string, key: string): { five: number | null; seven: number | null; when: string } | null {
+  const reading = ACCOUNT_KEY.test(key) ? readings(file) : null;
+  if (!reading || reading.account !== key) {
+    return null;
+  }
+  try {
+    return { five: reading.five, seven: reading.seven, when: iso(new Date(statSync(file).mtimeMs)) };
+  } catch {
+    return null;
+  }
 }
 
 // The two percentages of a cache file, or null when it holds no usable one.
