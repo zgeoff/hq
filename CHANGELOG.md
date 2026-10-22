@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.90.0 — 2026-10-23
+
+The hq-defs dependency install runs no lifecycle script (z-review's suggestion on 0.85.0).
+
+- hq runs `bun install --frozen-lockfile --ignore-scripts` in hq-defs, so neither a dependency's script nor the repo's own runs in the shared checkout. hq's package.json has none today.
+
 ## 0.89.0 — 2026-10-23
 
 A review round that noslop stored counts as a round, even when noslop's post of it to GitHub failed (GEO-1673).
