@@ -122,6 +122,14 @@ test.skipIf(!hasRestic)('a remote secret never reaches argv, errors or events; R
   }
 }, 120_000);
 
+test('it writes the password exactly once when first runs start together', async () => {
+  const go = String(Date.now() + 2000);
+  const script = `const { ensurePassword } = await import(${JSON.stringify(join(import.meta.dir, '../src/backup/ensure-password.ts'))}); while (Date.now() < Number(process.env.GO)) {} console.log(JSON.stringify(ensurePassword().created))`;
+  const runs = Array.from({ length: 12 }, () => Bun.spawn(['bun', '-e', script], { env: { ...process.env, GO: go }, stdout: 'pipe' }));
+  const created = await Promise.all(runs.map((run) => new Response(run.stdout).text()));
+  expect(created.map((line) => line.trim()).toSorted()).toStrictEqual(['false', 'false', 'false', 'false', 'false', 'false', 'false', 'false', 'false', 'false', 'false', 'true']);
+});
+
 test('an existing password file is tightened to 0600', () => {
   mkdirSync(`${dir}/cfg`, { recursive: true });
   writeFileSync(requireEnv('HQ_BACKUP_PASSWORD_FILE'), 'invented-key\n');
