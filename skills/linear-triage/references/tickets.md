@@ -30,6 +30,7 @@ Move an issue to Ready when all of these hold:
 - Every section is filled in, and Acceptance has at least one check with its evidence.
 - Every blocking issue is Done, or every PR of it has merged in the repo this issue builds in, and this issue needs nothing the blocker's release adds. Name which in the Ready comment.
 - What its Acceptance exercises beyond the issue's own work exists, or the issue that builds it is linked as a blocker. When the text says it waits on a later stage or a slice, link that issue as a blocker first.
+- Its work isn't already done: no merged PR is attached, and `hq run show <issue>` shows no run at `merged`, `live-check` or `done`. When one is, move the issue to In Review instead, or to Done for a done run.
 - The work fits one agent. It may take several PRs; split it into sub-issues under the same project only when its parts can ship on their own.
 
 Never move an issue with the `vers` area label to Ready: the owner picks which vers issues reach Ready. Groom its fields and flag its questions as usual, and leave it in Backlog.
