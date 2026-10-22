@@ -59,8 +59,10 @@ function removeDeadLock(lock: string): boolean {
   try {
     mkdirSync(takeover);
   } catch {
-    // A takeover lasts milliseconds, so an old one is from a process that died inside it.
-    if (Date.now() - readMtimeMs(takeover) <= TAKEOVER_STALE_MS) {
+    // A takeover lasts milliseconds, so an old one is from a process that died inside it. One that
+    // ended before the read is not old: a new takeover may already hold its name.
+    const startedMs = readMtimeMs(takeover);
+    if (startedMs === null || Date.now() - startedMs <= TAKEOVER_STALE_MS) {
       return false;
     }
     rmSync(takeover, { recursive: true, force: true });
@@ -78,11 +80,11 @@ function removeDeadLock(lock: string): boolean {
   }
 }
 
-function readMtimeMs(path: string): number {
+function readMtimeMs(path: string): number | null {
   try {
     return statSync(path).mtimeMs;
   } catch {
-    return 0;
+    return null;
   }
 }
 
