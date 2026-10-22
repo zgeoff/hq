@@ -104,6 +104,19 @@ test('stop stops the unit and disables an enabled one, so a reboot leaves it off
   expect(transient.calls).toEqual(['systemctl --user stop hq-lanes.service', 'systemctl --user show -p UnitFileState --value hq-lanes.service']);
 });
 
+test('it refuses a stop whose unit-file state read fails, rather than skipping the disable', () => {
+  const failed = fakeSystemctl('enabled', 'UnitFileState');
+
+  expect(stopLanes(failed.run)).rejects.toMatchObject({ code: 'systemctl_failed', message: expect.stringContaining('invented failure on UnitFileState') });
+});
+
+test('it refuses a start whose transient read fails, before it writes the unit', () => {
+  const failed = fakeSystemctl('no', 'Transient');
+
+  expect(installLanes(failed.run, { home, exec: ['/opt/invented/hq'], interval: 60, processEnv: {} })).rejects.toMatchObject({ code: 'systemctl_failed' });
+  expect(existsSync(unitPath(home))).toBe(false);
+});
+
 // install.sh with stub bun and systemctl on PATH: the stub build makes ~/.local/bin/hq a
 // wrapper around this checkout, so install.sh and a direct `hq lanes start` run the same hq.
 test('install.sh and hq lanes start write the same unit and make the same systemctl calls', async () => {
