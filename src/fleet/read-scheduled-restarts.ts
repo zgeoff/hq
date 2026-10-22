@@ -1,23 +1,16 @@
 import type { Database } from 'bun:sqlite';
-import { STALE_LIMITS } from './stale-limits.ts';
+import { collectScheduledSessions } from './collect-scheduled-sessions.ts';
+import { pickScheduledReason } from './pick-scheduled-reason.ts';
 import { readCompactionCount } from './read-compaction-count.ts';
 import { recordSessionStarts } from './record-session-starts.ts';
-import { SCHEDULED_ROLES } from './scheduled-roles.ts';
 import type { FleetEntry, FleetSession } from './types.ts';
 
-// The scheduled restarts due now, by name, each with why: a session of a scheduled role is due
-// 6 h after its start, or after 3 compactions since it, whichever comes first. The transcript is
-// read only when the age alone does not make the session due.
+// The scheduled restarts due now, by name, each with why. Records the starts of the scheduled
+// sessions, and reads a transcript only when the age alone does not make its session due.
 export async function readScheduledRestarts(db: Database, fleet: FleetEntry[], sessions: Record<string, FleetSession>, nowMs: number): Promise<Record<string, string>> {
-  const live: Record<string, FleetSession> = {};
-  const due: Record<string, string> = {};
-  for (const entry of fleet) {
-    const session = sessions[entry.name];
-    if (session && entry.roles?.some((role) => SCHEDULED_ROLES.includes(role)) === true) {
-      live[entry.name] = session;
-    }
-  }
+  const live = collectScheduledSessions(fleet, sessions);
   const starts = recordSessionStarts(db, live);
+  const due: Record<string, string> = {};
   for (const entry of fleet) {
     const session = live[entry.name];
     const start = starts[entry.name];
@@ -33,11 +26,10 @@ export async function readScheduledRestarts(db: Database, fleet: FleetEntry[], s
 }
 
 async function readDueReason(entry: FleetEntry, session: FleetSession, ageMs: number): Promise<string | null> {
-  if (ageMs >= STALE_LIMITS.scheduleAgeMs) {
-    return `${STALE_LIMITS.scheduleAgeMs / 3_600_000} h since start`;
+  const byAge = pickScheduledReason(ageMs, null);
+  if (byAge !== null) {
+    return byAge;
   }
-  if ((await readCompactionCount(session, entry.cwd)) >= STALE_LIMITS.scheduleCompactions) {
-    return `${STALE_LIMITS.scheduleCompactions} compactions since start`;
-  }
-  return null;
+  const compactions = await readCompactionCount(session, entry.cwd);
+  return pickScheduledReason(ageMs, compactions);
 }
