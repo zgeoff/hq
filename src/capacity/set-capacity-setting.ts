@@ -10,17 +10,21 @@ import type { CapacitySettings } from './types.ts';
 
 export function setCapacitySetting(db: Database, key: string, value: string | null, actor: string): CapacitySettings {
   if (!(key in CAPACITY_DEFAULTS)) throw new HqError('bad_args', `unknown setting ${key}: one of ${Object.keys(CAPACITY_DEFAULTS).join(', ')}`);
-  const cur = metaJson(db, 'capacity_settings', BLOB, {});
-  if (value === null) delete cur[key];
-  else {
-    const n = Number(value);
-    if (value.trim() === '' || !Number.isFinite(n) || n < 0) throw new HqError('bad_args', `${key} must be a number, 0 or more`);
-    requireImpVcpus(key, n);
-    cur[key] = n;
-  }
-  setMeta(db, 'capacity_settings', JSON.stringify(cur));
-  logEvent(db, 'hq', 'capacity', 'setting', actor, null, null, { key, value });
-  return capacitySettings(db);
+  return db
+    .transaction((): CapacitySettings => {
+      const cur = metaJson(db, 'capacity_settings', BLOB, {});
+      if (value === null) delete cur[key];
+      else {
+        const n = Number(value);
+        if (value.trim() === '' || !Number.isFinite(n) || n < 0) throw new HqError('bad_args', `${key} must be a number, 0 or more`);
+        requireImpVcpus(key, n);
+        cur[key] = n;
+      }
+      setMeta(db, 'capacity_settings', JSON.stringify(cur));
+      logEvent(db, 'hq', 'capacity', 'setting', actor, null, null, { key, value });
+      return capacitySettings(db);
+    })
+    .immediate();
 }
 
 // One more imp's vCPUs divide the room under the vCPU line, so 0 would leave that line unchecked.

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test';
 import type { Database } from 'bun:sqlite';
+import { join } from 'node:path';
 import { owner } from '../src/owner.ts';
 import { loadCapacityLine } from '../src/capacity/load-capacity-line.ts';
 import { capacitySettings } from '../src/capacity/capacity-settings.ts';
@@ -292,6 +293,17 @@ test('an alert that reopens in quiet hours drops its old held recovery', async (
   const n = outbox().length;
   await sampleAt(world({ nonnix: 20_000 }), new Date(Date.parse(FOUR_AM_SYDNEY) + 3 * 3_600_000));
   expect(outbox().slice(n).some((m) => m.text.includes('back under'))).toBe(false);
+});
+
+test('it keeps every setting when processes set different ones at once', async () => {
+  const go = String(Date.now() + 2000);
+  const keys = ['nonnixMaxMib', 'nonnixMaxVcpus', 'impVcpus', 'cloudMinAvailGiB', 'claudeSevenDayPct', 'claudeFiveHourPct', 'opDailyPct', 'holdSamples'];
+  const runs = keys.map((key) =>
+    Bun.spawn(['bun', '-e', `const { openDb } = await import(${JSON.stringify(join(import.meta.dir, '../src/db/open-db.ts'))}); const { setCapacitySetting } = await import(${JSON.stringify(join(import.meta.dir, '../src/capacity/set-capacity-setting.ts'))}); const db = openDb(); while (Date.now() < Number(process.env.GO)) {} setCapacitySetting(db, ${JSON.stringify(key)}, '7', 'z-stu');`], { env: { ...process.env, GO: go } }),
+  );
+  const exits = await Promise.all(runs.map((run) => run.exited));
+  expect(exits).toStrictEqual([0, 0, 0, 0, 0, 0, 0, 0]);
+  expect(capacitySettings(db)).toStrictEqual({ nonnixMaxMib: 7, nonnixMaxVcpus: 7, impVcpus: 7, cloudMinAvailGiB: 7, claudeSevenDayPct: 7, claudeFiveHourPct: 7, opDailyPct: 7, holdSamples: 7 });
 });
 
 test('settings: set, reset, bad key, bad value; each change is logged', () => {
