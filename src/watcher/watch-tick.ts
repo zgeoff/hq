@@ -46,7 +46,10 @@ const msg = (e: unknown) => String((e as Error).message ?? e);
 // One pass. True when the tick completed: the lanes reading, the sweep and the send all ran.
 export async function watchTick(db: Database, d: WatchDeps): Promise<boolean> {
   const ms = d.stepMs ?? STEP_MS;
-  const step = <T,>(what: string, f: () => Promise<T>) => withDeadline(f(), ms, what);
+  const step = <T,>(what: string, start: (signal: AbortSignal) => Promise<T>) => {
+    const abandon = new AbortController();
+    return withDeadline(start(abandon.signal), ms, what, abandon);
+  };
   const at = () => iso(now());
   // Outside the tick's try: git needs neither atc nor the capacity reading.
   for (const r of runAllTreeSyncs(db, d.me)) {
@@ -90,16 +93,23 @@ export async function watchTick(db: Database, d: WatchDeps): Promise<boolean> {
       // Team-goals numbers: every day of the last LOOKBACK_DAYS not yet fetched (after a gap, the
       // weekly's two weeks fill again), at most every 30 min.
       if (Date.now() - Date.parse(getMeta(db, 'goals_synced_at') ?? '1970-01-01T00:00:00Z') > 30 * 60_000) {
-        const g = await step('team goals', () => syncGoals(db, d.run, { from: new Date(Date.now() - LOOKBACK_DAYS * 86_400_000), maxRepoDays: 80, env: cleanEnv() })),
-          spendFailure = await step('Actions spend', () => refreshActionsSpend(db, d.run, now(), cleanEnv()));
+        const goals = await step('team goals', (signal) => syncGoals(db, d.run, { from: new Date(Date.now() - LOOKBACK_DAYS * 86_400_000), maxRepoDays: 80, env: cleanEnv(), signal }));
+        const spendFailure = await step('Actions spend', () => refreshActionsSpend(db, d.run, now(), cleanEnv()));
         setMeta(db, 'goals_synced_at', at()); // the 30-min throttle: set even when a fetch failed
+
         // What the daily check-in trusts: repo-days and deploy-prod runs the caps left are not yet counted.
-        if (g.errors.length === 0 && g.left === 0 && g.deployLeft === 0) {
+        if (goals.errors.length === 0 && goals.left === 0 && goals.deployLeft === 0) {
           setMeta(db, 'goals_ok_at', at());
         }
-        if (!g.errors.some(isGhAuthFailure)) clearGhAuth(db);
-        for (const e of g.errors) noteGhAuth(db, e);
-        if (g.errors.length) d.log(`${at()} team goals: ${g.errors.length} fetch(es) failed: ${g.errors.slice(0, 2).join('; ')}`);
+        if (!goals.errors.some(isGhAuthFailure)) {
+          clearGhAuth(db);
+        }
+        for (const failure of goals.errors) {
+          noteGhAuth(db, failure);
+        }
+        if (goals.errors.length > 0) {
+          d.log(`${at()} team goals: ${goals.errors.length} fetch(es) failed: ${goals.errors.slice(0, 2).join('; ')}`);
+        }
         if (spendFailure) {
           d.log(`${at()} Actions spend unknown: ${spendFailure}`);
         }

@@ -14,8 +14,15 @@ import { toUTCDay } from './to-utc-day.ts';
 
 const DAY = 86_400_000;
 
+interface SyncGoalsOptions {
+  from: Date;
+  env?: RunOpts['env'];
+  maxRepoDays?: number;
+  signal?: AbortSignal;
+}
+
 // Every UTC day from `from` to today not yet done, for every repo and for closed PRs.
-export async function syncGoals(db: Database, run: Runner, opts: { from: Date; env?: RunOpts['env']; maxRepoDays?: number }, at: Date = now()): Promise<{ days: number; runs: number; closed: number; left: number; deployRuns: number; deployLeft: number; errors: string[] }> {
+export async function syncGoals(db: Database, run: Runner, opts: SyncGoalsOptions, at: Date = now()): Promise<{ days: number; runs: number; closed: number; left: number; deployRuns: number; deployLeft: number; errors: string[] }> {
   const all = buildUTCDays(opts.from, at),
     errors: string[] = [],
     names = await loadRepos(run, opts.env),
@@ -28,7 +35,8 @@ export async function syncGoals(db: Database, run: Runner, opts: { from: Date; e
   const todo = want.slice(0, opts.maxRepoDays ?? want.length);
   const left = want.length - todo.length;
   const worker = async () => {
-    for (let job = todo.shift(); job; job = todo.shift()) {
+    // An aborted sync takes no new job: a step given up on stops instead of running on.
+    for (let job = todo.shift(); job && !opts.signal?.aborted; job = todo.shift()) {
       try {
         const n = await syncRunsDay(db, run, job[0], job[1], opts.env, at); // not runs += await: the workers would lose counts
         runs += n;
@@ -39,6 +47,7 @@ export async function syncGoals(db: Database, run: Runner, opts: { from: Date; e
     }
   };
   await Promise.all(Array.from({ length: 4 }, worker));
+  opts.signal?.throwIfAborted();
   const dep = await syncDeploys(db, run, opts.env, at, DEPLOY_BATCH, opts.from);
   errors.push(...dep.errors);
   let first = true;
@@ -46,6 +55,7 @@ export async function syncGoals(db: Database, run: Runner, opts: { from: Date; e
     if (isDayDone(db, 'closed', '*', d)) {
       continue;
     }
+    opts.signal?.throwIfAborted();
     if (!first && getSearchGap() > 0) {
       await Bun.sleep(getSearchGap());
     }

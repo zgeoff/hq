@@ -190,6 +190,28 @@ test.each([
   expect(db.query('SELECT COUNT(*) AS n FROM goal_days').get()).toEqual({ n: 0 });
 });
 
+test('it takes no new repo-day once the sync is aborted', async () => {
+  const abandon = new AbortController();
+  const answer = gh({}, {}, IN_SCOPE);
+  const fetched: string[] = [];
+  const runner: Runner = (cmd, opts) => {
+    const path = cmd.find((part) => part.includes('/actions/runs?'));
+    if (path) {
+      fetched.push(path);
+      abandon.abort();
+    }
+    return answer(cmd, opts);
+  };
+
+  const stopped = await syncGoals(db, runner, { from: new Date('2026-10-02T00:00:00Z'), signal: abandon.signal }).then(
+    () => null,
+    (error: unknown) => error,
+  );
+
+  expect(stopped).toMatchObject({ name: 'AbortError' });
+  expect(fetched.length).toBeLessThanOrEqual(4);
+});
+
 test('loadRepos() keeps only the repos in scope, and the list matches repo-facts.md', async () => {
   const doc = await Bun.file(`${import.meta.dir}/../../docs/skill-development/repo-facts.md`).text(),
     scoped = await loadRepos(() => Promise.resolve({ code: 0, stdout: JSON.stringify([{ name: 'atc', isArchived: false }, { name: 'decree', isArchived: false }, { name: 'brand-new', isArchived: false }]), stderr: '' }));
