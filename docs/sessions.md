@@ -6,7 +6,7 @@ A fifth session, `z-q`, is the team developer. It builds `hq`, the sessions' own
 
 A sixth session, `z-qa`, runs live checks, so the owner's real Nix stays untouched (GEO-924): on a PR's preview environment before the merge, and read-only on production once the release ships. `z-delivery` sends it each preview check, and `hq` tells it when a release ships. It answers with pass, fail or needs-Geoff per item, and closes an issue once its live check passes. `z-stu` agrees its start prompt, and `hq fleet` starts it.
 
-A seventh session, `z-review`, reviews and merges each delivery PR at its FINAL note, then tells `z-delivery` "merged, ready to release". It never launches, releases or deploys. `z-stu` agreed its start prompt under the owner's grant of 2026-10-17, and `hq fleet` starts it.
+A seventh session, `z-review`, reviews and merges each delivery PR at its FINAL note, then tells `z-delivery` "merged, ready to release". It also reviews and merges the PRs in zgeoff/hq, zgeoff/hq-private and zgeoff/noslop, noslop's release PRs included. It never launches, releases or deploys. `z-stu` agreed its start prompt under the owner's grant of 2026-10-17, and `hq fleet` starts it.
 
 | Session      | Skill                                  | Wakes                                                          | Talks to the owner                                            |
 | ------------ | -------------------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------- |
