@@ -12,7 +12,8 @@ trap 'rm -rf "$work"' EXIT
 # The stand-in gh. STATE, AUTHOR, BRANCH, FILES (filename<TAB>status lines),
 # HEAD_BLOB (each file's blob at the PR head) and SOURCE_BLOBS (one blob per
 # tools commit, newest first) shape each case; TEXT_FAIL makes every content
-# read of a workflow caller fail; HEAD_TEXT and SOURCE_TEXT are
+# read of a workflow caller fail, and FILES_FAIL makes the file list fail after
+# its rows; HEAD_TEXT and SOURCE_TEXT are
 # the PR head's and tools main's content of a workflow caller. BASE_BLOB is a
 # file's blob at the PR base, and the manifest at tools commit old1 also syncs
 # .claude/skills/y/SKILL.md, which tools main has retired.
@@ -40,7 +41,9 @@ case $args in
   "api repos/zgeoff/tools/contents/sync/"*"?ref=old1"*) echo "${SOURCE_BLOBS##* }" ;;
   "api repos/zgeoff/demo/contents/"*"ref=base1"*) echo "$BASE_BLOB" ;;
   "api repos/zgeoff/demo/contents/"*) echo "$HEAD_BLOB" ;;
-  "api repos/zgeoff/demo/pulls/7/files"*) printf '%b\n' "$FILES" ;;
+  "api repos/zgeoff/demo/pulls/7/files"*)
+    printf '%b\n' "$FILES"
+    [ -z "${FILES_FAIL:-}" ] || { echo "HTTP 502 on page 2" >&2; exit 1; } ;;
   *) echo "unexpected gh call: $args" >&2; exit 2 ;;
 esac
 EOF
@@ -139,6 +142,11 @@ caller 'uses: zgeoff/tools/.github/workflows/bun-checks.yml@main' 'uses: zgeoff/
 export TEXT_FAIL=1
 expect "a workflow caller whose text cannot be read fails" 1 "no: .github/workflows/pr.yml could not be read at head1"
 unset TEXT_FAIL
+
+set_case
+export FILES_FAIL=1
+expect "a changed-file list that fails after some rows fails" 1 "no: the PR's changed files could not be read: HTTP 502 on page 2"
+unset FILES_FAIL
 
 set_case
 export STATE=MERGED

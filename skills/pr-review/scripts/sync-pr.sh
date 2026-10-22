@@ -37,6 +37,14 @@ base=$(jq -r .baseRefOid <<<"$pr_json")
 [ "$author" = app/zgeoff-sync-bot ] || fail "the author is $author, not the repo-sync App"
 case $branch in repo-sync/zgeoff-tools | sync/*) ;; *) fail "the branch $branch is not a repo-sync branch" ;; esac
 
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT
+
+# A process substitution hides gh's exit status, so a page that fails after some rows
+# would leave the rest unchecked: read the whole list first.
+gh api "repos/zgeoff/$repo/pulls/$pr/files" --paginate --jq '.[] | [.filename, .status] | @tsv' >"$work/files.tsv" 2>"$work/files.err" ||
+  fail "the PR's changed files could not be read: $(cat "$work/files.err")"
+
 tools_main=$(gh api repos/zgeoff/tools/commits/main --jq .sha)
 manifest=$(gh api "repos/zgeoff/tools/contents/sync/manifest.json?ref=$tools_main" --jq .content | base64 -d)
 
@@ -102,7 +110,7 @@ while IFS=$'\t' read -r path status; do
     *) fail "$path is $status" ;;
   esac
   count=$((count + 1))
-done < <(gh api "repos/zgeoff/$repo/pulls/$pr/files" --paginate --jq '.[] | [.filename, .status] | @tsv')
+done <"$work/files.tsv"
 
 [ "$count" -gt 0 ] || fail "the PR changes no files"
 echo "ok: $count files equal their sources on tools main (head ${tools_main:0:7})"
