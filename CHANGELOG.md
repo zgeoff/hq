@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.85.0 — 2026-10-23
+
+hq-defs gets its dependencies, so the repo's scripts run there (z-steward: `check:skills` failed in hq-defs with "Cannot find package 'ts-pattern'").
+
+- After each sync of hq-defs, hq runs `bun install --frozen-lockfile` there when `node_modules` is missing or `bun.lock` differs from the last good install.
+- A failed install turns the hq-defs line red for `hq health`, keeps the sync, and runs again on the next tick. hq-private never installs.
+
 ## 0.83.0 — 2026-10-22
 
 hq speaks atc's protocol 11, the version on atc main after its restart events and the kernel's peer session.

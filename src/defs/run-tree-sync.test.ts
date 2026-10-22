@@ -118,3 +118,18 @@ test('it reports a detached tree when local main is ahead of origin/main, and le
   expect(tree.git('rev-parse', 'main')).toBe(main);
   expect(tree.git('branch', '--show-current')).toBe('');
 });
+
+test('it installs hq-defs dependencies after a sync, and never in hq-private', () => {
+  const ctx = createTreeFixture();
+  const both = ctx.createBoth();
+  const installs: string[] = [];
+  both.hq.writeCommit({ 'bun.lock': '{"lockfileVersion": 1}\n' });
+  writeFileSync(`${both.private.dir}/bun.lock`, '{"lockfileVersion": 1}\n');
+  const install = (directory: string) => {
+    installs.push(directory);
+    return { code: 0, err: '' };
+  };
+  expect(runTreeSyncTick(ctx.db, 'hq-lanes', 'hq', install)).toMatchObject({ ok: true, line: expect.stringContaining('installed its dependencies') });
+  expect(runTreeSyncTick(ctx.db, 'hq-lanes', 'private', install)?.line).not.toContain('installed');
+  expect(installs).toStrictEqual([both.hq.dir]);
+});
