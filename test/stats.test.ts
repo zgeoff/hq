@@ -169,6 +169,14 @@ test('marks: add, refuse bad ones, list, and one per hq version', () => {
   expect(listMarks(db).map((x) => x.kind)).toEqual(['grant', 'hq']);
 });
 
+test('it keeps no version mark when the checkpoint write fails, so the next run marks the version once', () => {
+  db.exec("CREATE TEMP TRIGGER refuse_checkpoint BEFORE INSERT ON meta WHEN NEW.key = 'marked_version' BEGIN SELECT RAISE(ABORT, 'invented refusal'); END");
+  expect(() => markVersion(db, '9.9.9', 'hq-lanes')).toThrow('invented refusal');
+  db.exec('DROP TRIGGER refuse_checkpoint');
+  markVersion(db, '9.9.9', 'hq-lanes');
+  expect(listMarks(db).map((mark) => mark.text)).toStrictEqual(['hq 9.9.9 running']);
+});
+
 test('drop removes a mistaken mark and keeps what it said in the event', () => {
   const m = addMark(db, { kind: 'skills', text: 'Invented skills tidy-up', ref: 'widgets#3', at: null, actor: 'z-steward' });
   expect(dropMark(db, m.id, 'z-q')?.text).toBe('Invented skills tidy-up');
