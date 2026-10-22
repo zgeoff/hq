@@ -85,6 +85,21 @@ test('it keeps open an item that was closed and reopened while GitHub was read, 
   expect(getUnblock(ctx.db, 'review')?.state).toBe('open');
 });
 
+test('it keeps open a review that a re-add replaced with a new task while GitHub was read, and reports it', async () => {
+  const ctx = setupTest();
+  createUnblockItems(ctx.db, { review: { task: 'Review kettle#4 and say lgtm', links: [{ label: 'kettle#4', url: 'https://github.com/kettle-co/kettle/pull/4', subject: true }] } });
+  const github = makePRStateGh({ states: { 'kettle-co/kettle#4': 'MERGED' } });
+  const run: Runner = (cmd, opts) => {
+    addUnblock(ctx.db, { id: 'review', task: 'Run the live check on the new kettle', minutes: null, unblocks: [], notify: [], actor: 'kettle-triage' });
+    return github(cmd, opts);
+  };
+
+  const outcome = await checkUnblockConditions(ctx.db, { run, call: ctx.call }, 'kettle-bot');
+
+  expect(outcome).toStrictEqual({ settled: [], dropped: [], errors: ['review: unblock item review changed while its conditions were read; the next pass checks it again'] });
+  expect(getUnblock(ctx.db, 'review')).toMatchObject({ state: 'open', task: 'Run the live check on the new kettle' });
+});
+
 test('it keeps a dropped review item open once a plain re-add reopens it with a new task', async () => {
   const ctx = setupTest();
   createUnblockItems(ctx.db, { review: { task: 'Review kettle#4 and say lgtm', links: [{ label: 'kettle#4', url: 'https://github.com/kettle-co/kettle/pull/4', subject: true }] } });
