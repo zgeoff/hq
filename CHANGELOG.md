@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.92.0 — 2026-10-23
+
+Four features land together: `hq refs`, three throughput lines in `hq goals daily`, agent notes with `hq lanes promotable`, and `hq focus` with slot caps.
+
+### `hq refs [--days N]` shows which skill references each role's sessions open, from the Claude Code transcripts.
+
+- For each role, each reference under its skills' `references/` folders, with how many of that role's sessions opened it in the last N days (7 by default), zeros first. A Read of the file or a shell command that names its path counts; one session counts once.
+- The transcript scan that `hq refusals` used moves into shared helpers, so both commands find sessions the same way.
+
+### `hq goals daily` gains three throughput lines, and z-review records each follow-up it files.
+
+- Issues: issues filed against closed in the Sydney day, with filed split by source: owner, design, agent, review, live check, bot. No target.
+- Bad filings: issues created that point at a PR with no follow-up record from z-review. Target 0; z-triage gets one message per issue.
+- Stale: In Progress issues with no run and no session, and open runs whose issue is closed. Target 0 older than 24 hours; z-triage gets each one once.
+- `hq followup add GEO-n --from repo#n` records a review follow-up without `--backfill`.
+
+### Agent notes reach z-delivery, and `hq lanes promotable` lists the Backlog issues ready to move to Ready.
+
+- A `decision` or `blocked` note from a delivery agent goes to the orchestrator as `<label> from GEO-n (<session>): <text>`, once. `progress` notes stay in the feed.
+- `hq lanes promotable` lists Backlog issues whose blockers are all Done and whose sections are filled, leaving out `parked` ones. It reads Linear and changes nothing.
+
+### `hq focus` steers what free lane slots take, and the lane plan fills one slot pool under caps from pacing.json.
+
+- `hq focus show|set|clear`: terms split by `,`, filters inside a term by `:`. A stored area stays readable when the area list changes.
+- Ready issues carry their type, priority, age and project labels. A project with no class label counts as roadmap.
+- The caps come from pacing.json `slots` (imp plus local), read at each tick. The band and the impd plan count against them, and the band turns amber when any cap is over. Lends leave the help.
+- The Design slot is one reserved slot outside the caps; its issue starts no nudge. Closed runs stay off the Ready picks.
+- `hq lanes` prints the local sessions against their cap.
+
 ## 0.91.0 — 2026-10-23
 
 `hq run done` wraps up the run's sessions, so z-delivery no longer does it by hand (GEO-1688).
