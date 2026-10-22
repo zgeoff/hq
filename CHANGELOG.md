@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.93.0 — 2026-10-23
+
+Two features land together: scheduled restarts for the orchestrator and release sessions, and the owner-held path gate.
+
+### hq restarts orchestrator and release sessions on a schedule.
+
+- A session of either role is due 6 hours after its start, or after 3 compactions since it, whichever comes first. hq reads the transcript only when the age alone does not decide.
+- hq keeps each session's start by its current id, so a restored session keeps its first start. A busy session is never asked, and the save request says why the restart is due.
+
+### The merge gate holds a PR that changes owner-held paths until the owner's lgtm is on record at its head.
+
+- Owner-held paths: hq's `skills/` and `fleet.json`; hq-private's `skills/`, `grants/`, `docs/sessions*` and every `session-prompt.md`.
+- The lgtm counts from the answer sources hq already takes: `console:`, or a `chat:` or `call:` answer recorded with the owner's words.
+- The gate reads the PR's files from GitHub, renamed files' old paths included, and fails closed on a read error or past 3000 files. It re-reads the head after every check.
+
 ## 0.92.0 — 2026-10-23
 
 Four features land together: `hq refs`, three throughput lines in `hq goals daily`, agent notes with `hq lanes promotable`, and `hq focus` with slot caps.

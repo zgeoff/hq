@@ -10,11 +10,11 @@ test('it blocks a PR that changes no owner-held file when the head moved after i
 });
 
 test('it blocks owner-held files with no lgtm, naming each file once and the command', () => {
-  expect(pickOwnerHeldVerdict({ repo: 'widgets', pr: 7, held: ['skills/kettle/SKILL.md', 'skills/kettle/SKILL.md'], lgtm: false, head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', headNow: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678' })).toStrictEqual({ pass: false, reason: "the PR changes owner-held files (skills/kettle/SKILL.md) and needs the owner's lgtm at a1b2c3d: hq pr answer widgets 7 lgtm, from the console" });
+  expect(pickOwnerHeldVerdict({ repo: 'widgets', pr: 7, held: ['skills/kettle/SKILL.md', 'skills/kettle/SKILL.md'], lgtm: false, head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', headNow: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678' })).toStrictEqual({ pass: false, reason: "the PR changes owner-held files (skills/kettle/SKILL.md) and needs the owner's lgtm at a1b2c3d: hq pr answer widgets 7 lgtm --source <where the owner said it>" });
 });
 
 test('it names the first three owner-held files and counts the rest', () => {
-  expect(pickOwnerHeldVerdict({ repo: 'widgets', pr: 7, held: ['skills/a/SKILL.md', 'skills/b/SKILL.md', 'skills/c/SKILL.md', 'skills/d/SKILL.md'], lgtm: false, head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', headNow: null })).toStrictEqual({ pass: false, reason: "the PR changes owner-held files (skills/a/SKILL.md, skills/b/SKILL.md, skills/c/SKILL.md and 1 more) and needs the owner's lgtm at a1b2c3d: hq pr answer widgets 7 lgtm, from the console" });
+  expect(pickOwnerHeldVerdict({ repo: 'widgets', pr: 7, held: ['skills/a/SKILL.md', 'skills/b/SKILL.md', 'skills/c/SKILL.md', 'skills/d/SKILL.md'], lgtm: false, head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', headNow: null })).toStrictEqual({ pass: false, reason: "the PR changes owner-held files (skills/a/SKILL.md, skills/b/SKILL.md, skills/c/SKILL.md and 1 more) and needs the owner's lgtm at a1b2c3d: hq pr answer widgets 7 lgtm --source <where the owner said it>" });
 });
 
 test('it blocks an lgtm when the head moved while the gate ran', () => {
