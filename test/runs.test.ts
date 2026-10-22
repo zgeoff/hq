@@ -111,6 +111,16 @@ describe('note signals', () => {
     expect(listRuns(db)[0]!.prs[0]).toMatchObject({ ref: 'widgets#12', final_sha: 'abc1234', final_source: 'marker:test' });
   });
 
+  test('a note whose final notice cannot be queued is not kept, so the same marker marks it final on a retry', () => {
+    add();
+    db.run("CREATE TEMP TRIGGER refuse_notice BEFORE INSERT ON outbox BEGIN SELECT RAISE(ABORT, 'invented: outbox refused'); END");
+    expect(() => addNote(db, 'GEO-9001', 'FINAL widgets#12 abc1234 all green', null, 'z-delivery')).toThrow('invented: outbox refused');
+    expect(db.query('SELECT COUNT(*) AS total FROM run_notes').get()).toStrictEqual({ total: 0 });
+    db.run('DROP TRIGGER refuse_notice');
+    addNote(db, 'GEO-9001', 'FINAL widgets#12 abc1234 all green', null, 'z-delivery');
+    expect(db.query("SELECT topic FROM outbox WHERE topic = 'final:widgets#12'").all()).toStrictEqual([{ topic: 'final:widgets#12' }]);
+  });
+
   test('a note that marks a PR final leaves an event with the note id and the sha', () => {
     add();
     const note = addNote(db, 'GEO-9001', 'FINAL widgets#12 abc1234 all green', null, 'z-delivery');

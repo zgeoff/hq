@@ -1,4 +1,5 @@
 import type { Database } from 'bun:sqlite';
+import { z } from 'zod';
 import { normalizePrRef } from './normalize-pr-ref.ts';
 import { PR_IN_TEXT } from './pr-in-text.ts';
 import { scheduleFinalReview as markFinal } from './schedule-final-review.ts';
@@ -34,14 +35,7 @@ export function applyNoteSignals(db: Database, issue: string, text: string, sour
   let final: string | null = null;
   const mark = FINAL_MARK.exec(text);
   if (mark) {
-    try {
-      const { ref } = normalizePrRef(mark[1]!);
-      const owner = db.query('SELECT issue FROM run_prs WHERE ref = ?').get(ref) as { issue: string } | null;
-      if (!owner) attachPr(db, issue, ref);
-      if ((!owner || owner.issue === issue) && markFinal(db, { ref, sha: String(mark[2]), source: `marker:${source}`, actor, note })) {
-        final = ref;
-      }
-    } catch {}
+    final = applyFinalMark(db, { issue, ref: mark[1] ?? '', sha: mark[2] ?? '', source: `marker:${source}`, actor, note });
   } else {
     const phrase = FINAL_PHRASE.exec(text);
     if (phrase) {
@@ -60,6 +54,40 @@ export function applyNoteSignals(db: Database, issue: string, text: string, sour
     }
   }
   return { prs: found, final };
+}
+
+interface FinalMarkInput {
+  issue: string;
+  ref: string;
+  sha: string;
+  source: string;
+  actor: string;
+  note: number | null;
+}
+
+const RunPrOwnerSchema = z.object({ issue: z.string() }).nullable();
+
+// Only a marker whose ref does not parse is passed over; a failed write aborts the note.
+function applyFinalMark(db: Database, input: FinalMarkInput): string | null {
+  const ref = parseMarkedRef(input.ref);
+  if (ref === null) {
+    return null;
+  }
+  const owner = RunPrOwnerSchema.parse(db.query('SELECT issue FROM run_prs WHERE ref = ?').get(ref));
+  if (owner === null) {
+    attachPr(db, input.issue, ref);
+  } else if (owner.issue !== input.issue) {
+    return null;
+  }
+  return markFinal(db, { ref, sha: input.sha, source: input.source, actor: input.actor, note: input.note }) ? ref : null;
+}
+
+function parseMarkedRef(raw: string): string | null {
+  try {
+    return normalizePrRef(raw).ref;
+  } catch {
+    return null;
+  }
 }
 
 function mentionedPrs(text: string): string[] {
