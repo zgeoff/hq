@@ -1,9 +1,9 @@
 import type { Database } from 'bun:sqlite';
-import { match } from 'ts-pattern';
 import { z } from 'zod';
 import { HqError } from '../errors.ts';
 import { restartStaleSession } from '../fleet/restart-stale-session.ts';
 import type { FleetClient, FleetSession, StaleOps } from '../fleet/types.ts';
+import { buildWrapUpPlan } from './build-wrap-up-plan.ts';
 import { fullSessionId } from './full-session-id.ts';
 import { requireRun } from './require-run.ts';
 import type { ImpWork, WrapUp } from './types.ts';
@@ -79,17 +79,15 @@ interface TreePass {
 
 async function wrapUpTree(pass: TreePass, root: FleetSession): Promise<void> {
   const children = collectChildren(pass.sessions, root.id);
+  let work: ImpWork | null = null;
   if (pass.onImp) {
-    const work = await readImpWorkSafely(pass.deps, root);
-    const reason = match(work)
-      .with({ state: 'pushed' }, () => null)
-      .with({ state: 'unpushed' }, (found) => `its imp holds unpushed work (${found.detail}), so the imp stays`)
-      .with({ state: 'unknown' }, (found) => `the unpushed-work check could not run (${found.detail}), so the imp stays`)
-      .exhaustive();
-    if (reason !== null) {
-      pass.wrapUp.kept.push({ id: root.id, reason }, ...children.map((child) => ({ id: child.id, reason: 'its parent session stays' })));
-      return;
-    }
+    work = await readImpWorkSafely(pass.deps, root);
+  }
+  const childIDs = children.map((child) => child.id);
+  const plan = buildWrapUpPlan(root.id, childIDs, work);
+  if (plan.kind === 'keep') {
+    pass.wrapUp.kept.push(...plan.kept);
+    return;
   }
 
   // A sub-session takes its parent's pin, and atc refuses to forget one under a pinned parent.
@@ -107,7 +105,7 @@ async function wrapUpTree(pass: TreePass, root: FleetSession): Promise<void> {
       pass.wrapUp.failed.push({ id: child.id, reason: toMessage(error) });
     }
   }
-  if (!pass.onImp) {
+  if (!plan.destroyImp) {
     try {
       await restartStaleSession(pass.client, root.id);
       pass.wrapUp.forgotten.push(root.id);

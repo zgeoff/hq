@@ -136,3 +136,7 @@ export interface WrapUp {
   kept: KeptSession[];
   failed: KeptSession[];
 }
+
+// What the wrap-up does with one session tree: keep every session, each with why, or forget them
+// all, destroying the root's imp when the run is on one.
+export type WrapUpPlan = { kind: 'keep'; kept: KeptSession[] } | { kind: 'forget'; destroyImp: boolean };
