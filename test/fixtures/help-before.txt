@@ -53,7 +53,7 @@ hq 0.79.0: headquarters for the z- sessions. Every command takes --json.
   hq defs [status] | hq defs setup hq|private | hq defs check [hq] | hq defs use hq | hq defs sync   where the fleet's skills (hq-defs) and start prompts (hq-private) come from; sync fast-forwards both (the watcher does it each tick)
   hq repo archive-history <from> <to> [--dry-run]   move the history of one repo name to another in hq.db and noslop's store (hq hq-archive, and back); backs both up first, refuses on a repeated key or a running noslop
   hq morning [status] | hq morning skip [--date YYYY-MM-DD] --reason T | hq morning tick   the 08:15 Sydney morning-reports job
-  hq followup add GEO-n --backfill --at TIME [--from repo#n] | hq followup [list] | hq followup drop GEO-n   review follow-ups counted by hand
+  hq followup add GEO-n --from repo#n | add GEO-n --backfill --at TIME [--from repo#n] | hq followup [list] | hq followup drop GEO-n   record a review follow-up
   hq typed add --to SESSION --text T|--text-file F --source call:ID|proposal:ID|console:ID|chat:SESSION@TIME   log a line typed into a session as the owner
   hq typed [list] [--session S] [--limit N]   the typed-line log, newest first
   hq mark add --kind skills|grant|hq|other --text T [--ref URL|repo#n|GEO-n] [--at TIME] [--grant NAME] | hq mark [list] [--since 7d] | hq mark drop ID | hq mark grant ID NAME
