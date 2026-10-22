@@ -21,3 +21,11 @@ export interface ReferenceOptions {
   days: number;
   sessions?: () => Promise<SessionInfo[]>;
 }
+
+// The start of a line a chunk did not finish: its parts and their length, or `skipping` once it
+// has grown past the longest line read.
+export interface ChunkCarry {
+  parts: Buffer[];
+  length: number;
+  skipping: boolean;
+}

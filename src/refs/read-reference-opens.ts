@@ -6,6 +6,9 @@ import { z } from 'zod';
 import { MAX_LINE } from '../refusals/max-line.ts';
 import { parseJSONLine } from '../refusals/parse-json-line.ts';
 import { readTranscriptList } from '../refusals/read-transcript-list.ts';
+import { buildChunkLines } from './build-chunk-lines.ts';
+import { REFERENCE_MARK } from './reference-mark.ts';
+import type { ChunkCarry } from './types.ts';
 
 // Claude session id -> the references it opened, as `<skill>/references/<file>`.
 export async function readReferenceOpens(directory: string, since: Date, until: Date): Promise<Map<string, Set<string>>> {
@@ -22,33 +25,16 @@ export async function readReferenceOpens(directory: string, since: Date, until: 
   return opens;
 }
 
-const REFERENCE_MARK = Buffer.from('/references/');
-
-// Only the whole lines of a chunk that holds a references path are split and passed on; a line
-// that spans chunks is carried, and one longer than MAX_LINE is passed over.
+// A line that spans chunks is carried; the reader passes on what each chunk completes.
 async function readFileOpens(path: string, onLine: (line: Buffer) => void): Promise<void> {
-  let carry: Buffer[] = [];
-  let carryLength = 0;
-  let skipping = false;
+  let carry: ChunkCarry = { parts: [], length: 0, skipping: false };
   try {
     for await (const chunk of Bun.file(path).stream()) {
-      const buffer = Buffer.from(chunk.buffer, chunk.byteOffset, chunk.byteLength);
-      const first = buffer.indexOf(0x0a);
-      if (first === -1) {
-        [carry, carryLength, skipping] = buildCarry(carry, carryLength, skipping, buffer);
-        continue;
+      const decoded = buildChunkLines(carry, Buffer.from(chunk.buffer, chunk.byteOffset, chunk.byteLength), MAX_LINE);
+      for (const line of decoded.lines) {
+        onLine(line);
       }
-      if (!skipping && carryLength + first <= MAX_LINE) {
-        onLine(Buffer.concat([...carry, buffer.subarray(0, first)]));
-      }
-      const last = buffer.lastIndexOf(0x0a);
-      const middle = buffer.subarray(first + 1, last);
-      if (middle.includes(REFERENCE_MARK)) {
-        for (const line of splitLines(middle)) {
-          onLine(line);
-        }
-      }
-      [carry, carryLength, skipping] = buildCarry([], 0, false, buffer.subarray(last + 1));
+      carry = decoded.carry;
     }
   } catch (error) {
     // Gone since the listing: nothing to count. Any other failure would leave its opens uncounted.
@@ -57,27 +43,9 @@ async function readFileOpens(path: string, onLine: (line: Buffer) => void): Prom
     }
     throw error;
   }
-  if (!skipping && carryLength) {
-    onLine(Buffer.concat(carry));
+  if (!carry.skipping && carry.length > 0) {
+    onLine(Buffer.concat(carry.parts));
   }
-}
-
-function buildCarry(carry: Buffer[], carryLength: number, skipping: boolean, rest: Buffer): [Buffer[], number, boolean] {
-  if (skipping || carryLength + rest.length > MAX_LINE) {
-    return [[], 0, true];
-  }
-  return [[...carry, Buffer.from(rest)], carryLength + rest.length, false];
-}
-
-function splitLines(block: Buffer): Buffer[] {
-  const lines: Buffer[] = [];
-  let start = 0;
-  for (let newline = block.indexOf(0x0a); newline !== -1; newline = block.indexOf(0x0a, start)) {
-    lines.push(block.subarray(start, newline));
-    start = newline + 1;
-  }
-  lines.push(block.subarray(start));
-  return lines;
 }
 
 const USE_MARK = Buffer.from('"tool_use"');
