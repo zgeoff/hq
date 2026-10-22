@@ -918,8 +918,9 @@ ${r.result === 'added' ? 'On the board.' : 'Already on the board.'}` };
       return { data: { run: r }, text: runLine(r) };
     }
     case 'place': {
-      const r = setPlace(db, arg(0, 'issue'), arg(1, 'place (imp, local or none)'), flags.note ?? null, await by());
-      return { data: { run: r }, text: `${runLine(r)}\nNow ${r.place}.` };
+      const actorName = await by();
+      const placed = setPlace(db, { issue: arg(0, 'issue'), place: arg(1, 'place (imp, local or none)'), note: flags.note ?? null, actor: actorName });
+      return { data: { run: placed }, text: `${runLine(placed)}\nNow ${placed.place}.` };
     }
     case 'geoff-chat': {
       const r = setGeoffChat(db, arg(0, 'issue'), arg(1, 'on or off') === 'on', await by());
