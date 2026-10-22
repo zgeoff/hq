@@ -1,5 +1,5 @@
 import { HqError } from '../errors.ts';
-import type { PriorRounds } from './get-prior-rounds.ts';
+import type { PriorRounds } from './read-prior-rounds.ts';
 
 export type Engine = 'codex' | 'noslop';
 

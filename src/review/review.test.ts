@@ -73,7 +73,7 @@ test('reviews in a worktree, removes it, and reports checks and threads', async 
   const remove = lines.findIndex((l) => l.startsWith('git worktree remove --force'));
   expect(add).toBeLessThan(codex);
   expect(codex).toBeLessThan(remove);
-  expect(calls[codex]!.opts?.cwd).toBe(`${dir}/widgets7`);
+  expect(calls[codex]!.opts?.cwd).toBe(`${dir}/zgeoff/widgets/7`);
   expect(lines.some((l) => l.includes('--watch'))).toBe(true);
 });
 
@@ -125,7 +125,7 @@ test('a second, read-only Codex pass asks the allow-or-deny question and its ans
   expect(calls[exec]!.cmd.slice(0, 4)).toEqual(['codex', 'exec', '-s', 'read-only']);
   expect(calls[exec]!.cmd.at(-1)).toContain(ALLOW_DENY_QUESTION);
   expect(calls[exec]!.cmd.at(-1)).toContain('git diff origin/main...HEAD');
-  expect(calls[exec]!.opts?.cwd).toBe(`${dir}/widgets7`);
+  expect(calls[exec]!.opts?.cwd).toBe(`${dir}/zgeoff/widgets/7`);
   expect(exec).toBeLessThan(lines.findIndex((l) => l.startsWith('git worktree remove')));
   expect(r.allowDeny).toEqual({ code: 0, answer: 'src/gate.ts:12 denies an unknown input; test/hostile.ts holds its table.', skipped: null });
   const file = await Bun.file(r.reviewFile).text();
@@ -154,12 +154,12 @@ test('both Codex passes run with TMPDIR in the review\'s own folder, told to lea
     const passes = calls.filter((c) => c.cmd[0] === 'codex');
     expect(passes).toHaveLength(2);
     for (const c of passes) {
-      expect(c.opts?.env?.['TMPDIR']).toBe(`${dir}/widgets7-tmp`);
+      expect(c.opts?.env?.['TMPDIR']).toBe(`${dir}/zgeoff/widgets/7-tmp`);
       expect(c.opts?.env?.['ATC_SESSION_ID']).toBeUndefined();
       expect(c.cmd).toContain(`developer_instructions=${JSON.stringify(NO_TMP)}`);
     }
     expect(seen).toEqual([true, true]);
-    expect(existsSync(`${dir}/widgets7-tmp`)).toBe(false);
+    expect(existsSync(`${dir}/zgeoff/widgets/7-tmp`)).toBe(false);
   }
   expect(NO_TMP).toContain('never set BUN_INSTALL_CACHE_DIR or BUN_TMPDIR, and make no folder in /tmp');
 });
@@ -352,7 +352,7 @@ test('a repo with bun.lock gets a frozen install without scripts in the worktree
     where = texts.indexOf('bun install --frozen-lockfile --ignore-scripts');
   expect(where).toBeGreaterThan(texts.findIndex((l) => l.startsWith('git worktree add')));
   expect(where).toBeLessThan(texts.findIndex((l) => l.startsWith('codex review')));
-  expect(fakeRun.calls[where]?.opts?.cwd).toBe(`${dir}/widgets7`);
+  expect(fakeRun.calls[where]?.opts?.cwd).toBe(`${dir}/zgeoff/widgets/7`);
   expect(result.install).toEqual({ detail: 'bun install --frozen-lockfile --ignore-scripts', ok: true, ran: true });
 });
 
@@ -371,8 +371,15 @@ test('a repo without bun.lock gets no install', async () => {
   expect(result.install).toEqual({ detail: 'no bun.lock', ok: true, ran: false });
 });
 
-test('a review file of a zgeoff repo keeps its old name, and another owner\'s gets the owner', () => {
-  expect([buildReviewStem('zgeoff', 'widgets', 7), buildReviewStem('ZGeoff', 'Widgets', 7), buildReviewStem('other', 'widgets', 7)]).toStrictEqual(['widgets7', 'widgets7', 'other-widgets7']);
+test('it files a review under its owner, repo and PR, in lowercase', () => {
+  expect([buildReviewStem('zgeoff', 'widgets', 7), buildReviewStem('ZGeoff', 'Widgets', 7), buildReviewStem('other', 'widgets', 7)]).toStrictEqual(['zgeoff/widgets/7', 'zgeoff/widgets/7', 'other/widgets/7']);
+});
+
+test.each([
+  ['zgeoff', 'kettle1', 2, 'zgeoff', 'kettle', 12],
+  ['zgeoff', 'other-widgets', 7, 'other', 'widgets', 7],
+])('it gives %s/%s#%d and %s/%s#%d different review stems', (firstOwner, firstRepo, firstPR, secondOwner, secondRepo, secondPR) => {
+  expect(buildReviewStem(firstOwner, firstRepo, firstPR)).not.toBe(buildReviewStem(secondOwner, secondRepo, secondPR));
 });
 
 test('it checks out the fetched PR head commit, never origin/<headRefName>, so a fork branch named like ours cannot pick our code', async () => {
@@ -380,7 +387,7 @@ test('it checks out the fetched PR head commit, never origin/<headRefName>, so a
   await review(run, 'widgets', 7, { watch: false });
   const lines = calls.map((c) => c.cmd.join(' '));
   expect(lines).toContain('git fetch -q origin refs/pull/7/head');
-  expect(lines.find((l) => l.startsWith('git worktree add'))).toBe(`git worktree add -q --detach ${dir}/widgets7 a1b2c3d4e5f60718293a4b5c6d7e8f9012345678`);
+  expect(lines.find((l) => l.startsWith('git worktree add'))).toBe(`git worktree add -q --detach ${dir}/zgeoff/widgets/7 a1b2c3d4e5f60718293a4b5c6d7e8f9012345678`);
   expect(lines.some((l) => l.includes('origin/feat'))).toBe(false);
 });
 

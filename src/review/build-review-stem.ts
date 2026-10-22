@@ -1,7 +1,6 @@
-// The stem of a PR's review files: "<repo><pr>" for a zgeoff repo, as it has always been, and
-// "<owner>-<repo><pr>" for any other owner, so two owners' repos of one name never share a file.
-// Lowercase, since GitHub names ignore case.
+// The stem of a PR's review files: "<owner>/<repo>/<pr>" below the review folder. GitHub names hold
+// "-", "." and digits but never "/", so no two PRs share a stem. Lowercase, since GitHub names
+// ignore case.
 export function buildReviewStem(owner: string, repo: string, pr: number): string {
-  const lower = repo.toLowerCase();
-  return owner.toLowerCase() === 'zgeoff' ? `${lower}${pr}` : `${owner.toLowerCase()}-${lower}${pr}`;
+  return `${owner.toLowerCase()}/${repo.toLowerCase()}/${pr}`;
 }

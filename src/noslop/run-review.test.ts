@@ -98,8 +98,20 @@ test('it refuses --full for a PR on Codex, and runs nothing', async () => {
 });
 
 test('it finishes a PR that already had a Codex review file on Codex', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner();
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
+  ctx.listWidgets();
+  mkdirSync(join(ctx.base, 'zgeoff/widgets'), { recursive: true });
+  writeFileSync(join(ctx.base, 'zgeoff/widgets/7-review.md'), 'No findings.\n');
+
+  await expect(runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false })).resolves.toMatchObject({ codexCode: 0 });
+
+  expect(fake.of('bun')).toStrictEqual([]);
+});
+
+test('it finishes a PR on Codex whose review file has the flat name from before review folders', async () => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
   ctx.listWidgets();
   writeFileSync(join(ctx.base, 'widgets7-review.md'), 'No findings.\n');
 

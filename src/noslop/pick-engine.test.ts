@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import type { PriorRounds } from './get-prior-rounds.ts';
+import type { PriorRounds } from './read-prior-rounds.ts';
 import type { Engine } from './pick-engine.ts';
 import { pickEngine } from './pick-engine.ts';
 

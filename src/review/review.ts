@@ -1,6 +1,7 @@
 // hq review <repo> <pr>: a Codex review of the PR head against its base, in a
 // throwaway worktree, then CI checks and the count of open review threads.
 import { appendFileSync, mkdirSync, rmSync } from 'node:fs';
+import { dirname } from 'node:path';
 import { HqError } from '../errors.ts';
 import type { Runner } from '../runner/types.ts';
 import { cleanEnv } from '../runner/clean-env.ts';
@@ -34,7 +35,7 @@ export async function review(run: Runner, rawRepo: string, pr: number, opts: { w
   const slug = `${owner}/${repo}`;
   const dir = await checkout(run, slug, repo, opts.repoDir);
   const S = reviewDir();
-  mkdirSync(S, { recursive: true });
+  mkdirSync(dirname(wt), { recursive: true });
 
   const refs = JSON.parse(await must(run, ['gh', 'pr', 'view', String(pr), '-R', slug, '--json', 'headRefName,headRefOid,baseRefName'])) as { headRefName: string; headRefOid: string; baseRefName: string };
   const head = refs.headRefName;
