@@ -3,6 +3,9 @@ import { metaJson } from '../db/meta-json.ts';
 import { setMeta } from '../db/set-meta.ts';
 import { logEvent } from '../log-event.ts';
 import type { TreeName } from '../prompts/trees.ts';
+import { TREES } from '../prompts/trees.ts';
+import type { Install } from './run-deps-install.ts';
+import { runBunInstall, runDepsInstall } from './run-deps-install.ts';
 import { runTreeSync } from './run-tree-sync.ts';
 import { TREE_META } from './tree-meta.ts';
 import { TREE_SYNC } from './tree-sync.ts';
@@ -13,10 +16,16 @@ interface SyncWho {
   tree: TreeName;
 }
 
-// The watcher's step, and `hq defs sync`: sync one tree, remember the result for hq health, log a move.
-export function runTreeSyncTick(db: Database, actor: string, tree: TreeName = 'hq'): TreeSync | null {
+// The watcher's step, and `hq defs sync`: sync one tree, remember the result for hq health, log a
+// move. hq-defs then gets its dependencies when they are missing or stale.
+export function runTreeSyncTick(db: Database, actor: string, tree: TreeName = 'hq', install: Install = runBunInstall): TreeSync | null {
   const synced = runTreeSync(tree);
-  return synced ? writeSyncResult(db, { actor, tree }, synced) : null;
+  if (!synced) {
+    return null;
+  }
+  const installed = tree === 'hq' && synced.ok ? runDepsInstall(db, TREES.hq.dir(), actor, install) : null;
+  const result = installed ? { ...synced, ok: installed.ok, line: `${synced.line}; ${installed.line}` } : synced;
+  return writeSyncResult(db, { actor, tree }, result);
 }
 
 function writeSyncResult(db: Database, who: SyncWho, synced: TreeSync): TreeSync {
