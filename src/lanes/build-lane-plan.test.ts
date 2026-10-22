@@ -9,9 +9,9 @@ test.each([
   ['it puts 9 imp slots of 1024 MiB over the vCPU line only', 9, 1024, { slots: 9, mib: 9216, vcpus: 18, overMib: false, overVcpus: true }],
 ])('%s', (_case, impSlots, impMib, plan) => {
   const lanes = [
-    { name: 'kettle', place: 'imp' as const, size: impSlots - 1, lends: true },
-    { name: 'teapot', place: 'imp' as const, size: 1, lends: true },
-    { name: 'flexible', place: 'local' as const, size: 5, lends: true },
+    { name: 'kettle', place: 'imp' as const, size: impSlots - 1 },
+    { name: 'teapot', place: 'imp' as const, size: 1 },
+    { name: 'flexible', place: 'local' as const, size: 5 },
   ];
 
   expect(buildLanePlan(lanes, impMib, { ...CAPACITY_DEFAULTS, nonnixMaxMib: 16_384, nonnixMaxVcpus: 16, impVcpus: 2 })).toStrictEqual({ ...plan, maxMib: 16_384, maxVcpus: 16 });

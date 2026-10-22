@@ -27,12 +27,12 @@ test('a file with no lanes gives one pool of imp slots and no error', async () =
   expect(pacing).toStrictEqual({ impMib: 4096, lanes: null, error: null });
 });
 
-test('lanes with lends are read', async () => {
-  const pacing = await loadPacing(writePacing(setupTest(), { lanes: { imp: { cleanup: 2, atc: 1 }, local: {} }, lends: { cleanup: false } }));
-  expect(pacing.lanes?.map((lane) => `${lane.name}:${lane.lends}`)).toStrictEqual(['cleanup:false', 'atc:true']);
+test('a lends key is read past, no longer refused', async () => {
+  const pacing = await loadPacing(writePacing(setupTest(), { lanes: { imp: { cleanup: 2, atc: 1 }, local: {} }, lends: { teapot: false } }));
+  expect(pacing).toStrictEqual({ impMib: 2048, lanes: [{ name: 'cleanup', place: 'imp', size: 2 }, { name: 'atc', place: 'imp', size: 1 }], error: null });
 });
 
-test('lends pacing.json gets wrong is an error, so the watcher nudges nothing', async () => {
-  const pacing = await loadPacing(writePacing(setupTest(), { lanes: { imp: { cleanup: 2 }, local: {} }, lends: { teapot: false } }));
-  expect(pacing).toStrictEqual({ impMib: 2048, lanes: null, error: 'pacing.json: pacing.json lends: bad entry teapot' });
+test('a lane pacing.json gets wrong is an error, so the watcher nudges nothing', async () => {
+  const pacing = await loadPacing(writePacing(setupTest(), { lanes: { imp: { 'Bad Teapot': 2 }, local: {} } }));
+  expect(pacing).toStrictEqual({ impMib: 2048, lanes: null, error: 'pacing.json: pacing.json lanes: bad lane imp.Bad Teapot' });
 });

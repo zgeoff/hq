@@ -148,7 +148,7 @@ test('a pacing.json hq refuses says why under Lanes, and draws no heat map', asy
   const app = setupTest(),
     base = writeRefusedPacing(app),
     shown = await loadPane(base, app.pacing, CONSOLE, AT);
-  expect([shown.heat, shown.markdown.split('\n\n')[2]]).toStrictEqual([[], "## Lanes\nhq can't read the lanes: pacing.json: pacing.json lends: bad entry teapot"]);
+  expect([shown.heat, shown.markdown.split('\n\n')[2]]).toStrictEqual([[], "## Lanes\nhq can't read the lanes: pacing.json: pacing.json lanes: bad lane imp.Bad Teapot"]);
 });
 
 // Closes every outage and adds one probe sample whose target and control both gave `ok`.
@@ -166,6 +166,6 @@ function writeOpenOutage(app: ReturnType<typeof setupTest>): Database {
 }
 
 function writeRefusedPacing(app: ReturnType<typeof setupTest>): Database {
-  writeFileSync(app.pacing, JSON.stringify({ lanes: { imp: { cleanup: 3 }, local: {} }, lends: { teapot: false } }));
+  writeFileSync(app.pacing, JSON.stringify({ lanes: { imp: { 'Bad Teapot': 3 }, local: {} } }));
   return app.db;
 }

@@ -165,7 +165,8 @@ import { getLanesHold } from './lanes/get-lanes-hold.ts';
 import { holdLanes } from './lanes/hold-lanes.ts';
 import { idleSlotMinutes } from './lanes/idle-slot-minutes.ts';
 import { formatLineRoom } from './lanes/format-line-room.ts';
-import { lanesNow } from './lanes/lanes-now.ts';
+import { readSlotPlan } from './lanes/read-slot-plan.ts';
+import { formatSlotPlan } from './lanes/format-slot-plan.ts';
 import { loadImpRoom } from './lanes/load-imp-room.ts';
 import { LANES } from './lanes/lanes.ts';
 import { nudgeLog } from './lanes/nudge-log.ts';
@@ -1818,21 +1819,18 @@ async function lanesCommand(db: Database, verb: string | undefined, flags: Flags
       const ready = eligibleNow(db);
       const hold = getLanesHold(db);
       const sample = await readCapacity(realRunner);
-      const views = lanesNow(db, sample);
-      const unlaned = runningByLane(db)[''] ?? 0;
+      const slotPlan = readSlotPlan(db, sample);
       const readyNote = readySummary(db, LANES.readyFreshMinutes());
       const parked = parkedRuns(db);
-      const laneLines = views
+      const laneLines = slotPlan
         ? [
             `imp room now: ${slotsFrom(sample.cap!, sample.impMib).slots} slot(s) (${sample.cap!.imp?.freeMib ?? '?'} MiB free; 0 when no unattended imp provider has quota)`,
             formatLineRoom(loadImpRoom(db, { budgetSlots: slotsFrom(sample.cap ?? {}, sample.impMib).slots, impMib: sample.impMib })),
-            'lanes (running/size, free now, Ready):',
-            ...views.map((v) => `  ${v.name.padEnd(18)} ${v.place.padEnd(5)} ${v.running}/${v.size}, ${v.free} free${v.held === null ? '' : ` (${Math.max(0, v.size - v.running)} free by lane, held: ${v.held})`}, ${v.ready === null ? `Ready ${v.readyAt ? 'stale' : 'unknown'}` : `${v.ready} Ready`}${v.lendTo ? `; lends to ${v.lendTo}` : ''}`),
+            ...formatSlotPlan(slotPlan),
             ...(readyNote ? [`  ${readyNote.line}`, ...skippedLines(readyNote).map((l) => `  ${l}`)] : []),
-            ...(unlaned ? [`  ${unlaned} running run(s) with no lane: hq run lane <issue> <lane>`] : []),
-            ...(parked.length > 0 ? [`  parked, not counted (blocked with no session awake, or working with every session gone): ${parked.map((p) => `${p.issue} (${p.lane || 'no lane'})`).join(', ')}`] : []),
+            ...(parked.length > 0 ? [`  parked, not counted (blocked with no session awake, or working with every session gone): ${parked.map((p) => p.issue).join(', ')}`] : []),
           ]
-        : [`lanes: no per-lane view (${sample.error ?? `no lanes in ${pacingPath()}`})`];
+        : [`lanes: no slot plan (${sample.error ?? `no lanes in ${pacingPath()}`})`];
       const lines = [
         `watcher: ${unit.stdout.trim() || 'inactive'} (${enabled})`,
         ...laneLines,
@@ -1844,7 +1842,7 @@ async function lanesCommand(db: Database, verb: string | undefined, flags: Flags
         nudges.length ? 'nudges (newest first):' : 'nudges: none yet',
         ...nudges.map((n) => `  ${n.at} ${n.slots} free for ${n.free_minutes} min, eligible ${n.eligible ?? '?'} → after: ${n.slots_after ?? 'pending'}`),
       ];
-      return { data: { watcher: unit.stdout.trim() || 'inactive', enabled, hold, lanes: views, unlaned, last, ready, idle24h: gap24, nudges }, text: lines.join('\n') };
+      return { data: { watcher: unit.stdout.trim() || 'inactive', enabled, hold, plan: slotPlan, last, ready, idle24h: gap24, nudges }, text: lines.join('\n') };
     }
     default:
       throw new HqError('bad_args', `unknown command: hq lanes ${verb}`);

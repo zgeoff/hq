@@ -4,6 +4,9 @@ import type { LaneConfig } from '../areas/types.ts';
 export interface Capacity {
   imp?: { freeMib?: number; room?: boolean; error?: string };
   providers?: Record<string, { room?: boolean; unattended?: boolean; target?: string }>;
+
+  // capacity.sh's design slots: room while fewer Design sessions wait on the owner than it allows.
+  design?: { room?: boolean };
 }
 
 export interface Sample {

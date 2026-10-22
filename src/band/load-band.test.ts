@@ -167,10 +167,10 @@ test('CI stored over 2 hours ago is unknown in amber', async () => {
   await expect(loadBand(ctx.db, ctx.pacing, new Date('2026-10-15T03:00:00Z')).then((band) => band.segments[3])).resolves.toStrictEqual({ key: 'ci', text: 'CI ?', tone: 'warn' });
 });
 
-// A pacing.json whose lends names a lane it lacks, which hq refuses.
+// A pacing.json with a lane name hq refuses.
 test('a pacing.json hq cannot read shows lanes unknown, not a failure', async () => {
   const ctx = setupTest();
-  writeFileSync(ctx.pacing, JSON.stringify({ lanes: { imp: { cleanup: 3 }, local: {} }, lends: { teapot: false } }));
+  writeFileSync(ctx.pacing, JSON.stringify({ lanes: { imp: { 'Bad Teapot': 3 }, local: {} } }));
 
   await expect(loadBand(ctx.db, ctx.pacing, new Date('2026-10-15T01:00:00Z')).then((band) => band.segments[2])).resolves.toStrictEqual({ key: 'lanes', text: 'lanes ?', tone: 'warn' });
 });
