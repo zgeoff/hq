@@ -45,7 +45,7 @@ Out, as the owner decided on 2026-10-17 (decision D-repo-scope):
 
 ## setup
 
-Run `bun install` once. It installs oxfmt and the lefthook pre-commit hook, which formats staged markdown, YAML, and JSON files and runs the prose check on docs. CI fails a PR whose files oxfmt would change; `bun run fmt` fixes them.
+Run `bun install` once. It installs oxfmt; no pre-commit hook runs. Before you commit, run `bun run fmt` to format markdown, YAML, and JSON files, and `bun run check:skills` after a skill change. CI fails a PR whose files oxfmt would change.
 
 ## writing
 
