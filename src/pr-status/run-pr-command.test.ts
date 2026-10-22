@@ -1,9 +1,11 @@
 import { expect, onTestFinished, spyOn, test } from 'bun:test';
+import { applyAskItem } from '../apply-ask-item.ts';
 import { addAsk } from '../asks/add-ask.ts';
 import { answerAsk } from '../asks/answer-ask.ts';
 import { openAsk } from '../asks/open-ask.ts';
 import { overrideEnv } from '../config/override-env.ts';
 import { logEvent } from '../log-event.ts';
+import { parseItemInput } from '../parse-item-input.ts';
 import { recordConsoleAnswer } from '../record-console-answer.ts';
 import { buildFakeRunner } from '../../test/noslop-fake.ts';
 import { NOON_SYDNEY, at, fakeAtc, freshDb } from '../../test/helpers.ts';
@@ -647,10 +649,10 @@ test.each(['yes', 'Yes.', 'Yes | Descale it first.'])('it accepts a call: source
   expect(ctx.db.query("SELECT COUNT(*) AS total FROM events WHERE action = 'pr-override'").get()).toStrictEqual({ total: 1 });
 });
 
-test.each(['override', 'accept-risk'])('it refuses a console: source for %s that no console answer backs', async (verb) => {
+test.each(['override', 'accept-risk'])('it refuses a console: source for %s that names no call', async (verb) => {
   const ctx = setupTest();
 
-  await expect(ctx.asOwner(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), verb, ['widgets', '7', 'aaaa'], { source: 'console:KET-6', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: '--source refused: console:KET-6 is not an answer the console wrote; ask z-stu to record it' });
+  await expect(ctx.asOwner(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), verb, ['widgets', '7', 'aaaa'], { source: 'console:KET-6', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: '--source refused: console:KET-6 is not a call in hq; ask z-stu to record it' });
 });
 
 test('it refuses a console: source whose only event is a mark, not an answer', async () => {
@@ -660,13 +662,52 @@ test('it refuses a console: source whose only event is a mark, not an answer', a
   await expect(ctx.asOwner(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'console:KET-7', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args' });
 });
 
-test.each(['console-answer', 'console-review'])('it accepts a console: source backed by a %s event', async (action) => {
+test('it refuses a console: source that is a review answer, for an override', async () => {
   const ctx = setupTest();
-  logEvent(ctx.db, 'ask', 'KET-8', action, 'owner', null, null, {});
+  logEvent(ctx.db, 'unblock', 'review-8', 'console-review', 'owner', null, null, { review: 'lgtm', note: null });
 
-  await ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'accept-risk', ['widgets', '7', 'aaaa'], { source: 'console:KET-8', note: 'Ship it.' });
+  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'console:review-8', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: '--source refused: console:review-8 is not a call in hq; ask z-stu to record it' });
+  expect(ctx.db.query("SELECT COUNT(*) AS total FROM events WHERE action = 'pr-override'").get()).toStrictEqual({ total: 0 });
+});
 
-  expect(ctx.db.query("SELECT subject_id, data FROM events WHERE action = 'pr-accepted-risk'").all()).toStrictEqual([{ subject_id: 'pr:widgets#7', data: JSON.stringify({ finding: 'aaaa', source: 'console:KET-8', note: 'Ship it.' }) }]);
+test('it refuses a console: source for a call whose options grant nothing, even when the owner answered Yes', async () => {
+  const ctx = setupTest();
+  applyAskItem(ctx.db, { kind: 'call', id: 'KET-41', issues: [], forSession: null, actor: 'z-kettle' }, parseItemInput('call', JSON.stringify({ title: 'Override widgets#7?', question: 'Override widgets#7?', options: [{ label: 'Yes', effect: 'Merge it.' }, { label: 'No', effect: 'Wait.' }] })), 'Override widgets#7?');
+  recordConsoleAnswer(ctx.db, { id: 'KET-41', option: 'Yes', note: '', actor: 'owner' });
+
+  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'console:KET-41', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: '--source refused: the option the owner picked in console:KET-41 ("Yes") grants no override; ask z-stu to record it' });
+});
+
+test.each([
+  { mismatch: 'an action', verb: 'override', rest: ['widgets', '7'], grants: { action: 'accept-risk', pr: 'zgeoff/widgets#7', finding: 'aaaa' }, why: 'accept-risk of zgeoff/widgets#7 finding aaaa, not override of zgeoff/widgets#7' },
+  { mismatch: 'a repo', verb: 'override', rest: ['widgets', '7'], grants: { action: 'override', pr: 'zgeoff/teapots#7' }, why: 'override of zgeoff/teapots#7, not override of zgeoff/widgets#7' },
+  { mismatch: 'a PR', verb: 'override', rest: ['widgets', '7'], grants: { action: 'override', pr: 'zgeoff/widgets#8' }, why: 'override of zgeoff/widgets#8, not override of zgeoff/widgets#7' },
+  { mismatch: 'a finding', verb: 'accept-risk', rest: ['widgets', '7', 'aaaa'], grants: { action: 'accept-risk', pr: 'zgeoff/widgets#7', finding: 'bbbb' }, why: 'accept-risk of zgeoff/widgets#7 finding bbbb, not accept-risk of zgeoff/widgets#7 finding aaaa' },
+])('it refuses a console: source whose picked option grants $mismatch other than the one asked for', async (row) => {
+  const ctx = setupTest();
+  applyAskItem(ctx.db, { kind: 'call', id: 'KET-40', issues: [], forSession: null, actor: 'z-kettle' }, parseItemInput('call', JSON.stringify({ title: 'Override?', question: 'Merge past the findings?', options: [{ label: 'Override', effect: 'Merge it.', grants: row.grants }, { label: 'Wait', effect: 'Fix them first.' }] })), 'Merge past the findings?');
+  recordConsoleAnswer(ctx.db, { id: 'KET-40', option: 'Override', note: '', actor: 'owner' });
+
+  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), row.verb, [...row.rest], { source: 'console:KET-40', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: `--source refused: the option the owner picked in console:KET-40 grants ${row.why}; ask z-stu to record it` });
+  expect(ctx.db.query("SELECT COUNT(*) AS total FROM events WHERE action IN ('pr-override', 'pr-accepted-risk')").get()).toStrictEqual({ total: 0 });
+});
+
+test('it refuses a source whose owner picked the option that grants nothing', async () => {
+  const ctx = setupTest();
+  applyAskItem(ctx.db, { kind: 'call', id: 'KET-43', issues: [], forSession: null, actor: 'z-kettle' }, parseItemInput('call', JSON.stringify({ title: 'Override?', question: 'Merge past the findings?', options: [{ label: 'Override', effect: 'Merge it.', grants: { action: 'override', pr: 'zgeoff/widgets#7' } }, { label: 'Wait', effect: 'Fix them first.' }] })), 'Merge past the findings?');
+  recordConsoleAnswer(ctx.db, { id: 'KET-43', option: 'Wait', note: 'Fix the spout first.', actor: 'owner' });
+
+  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'call:KET-43', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: '--source refused: the option the owner picked in call:KET-43 ("Wait") grants no override; ask z-stu to record it' });
+});
+
+test.each(['console:KET-42', 'call:KET-42'])('it records an accepted risk from %s when the picked option grants it, whatever its label', async (source) => {
+  const ctx = setupTest();
+  applyAskItem(ctx.db, { kind: 'call', id: 'KET-42', issues: [], forSession: null, actor: 'z-kettle' }, parseItemInput('call', JSON.stringify({ title: 'Accept the spout risk?', question: 'Accept finding aaaa on widgets#7?', options: [{ label: 'Accept it', effect: 'It merges with the risk.', grants: { action: 'accept-risk', pr: 'zgeoff/widgets#7', finding: 'aaaa' } }, { label: 'Fix it', effect: 'Fix it first.' }] })), 'Accept finding aaaa on widgets#7?');
+  recordConsoleAnswer(ctx.db, { id: 'KET-42', option: 'Accept it', note: 'Low risk.', actor: 'owner' });
+
+  await ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'accept-risk', ['widgets', '7', 'aaaa'], { source, note: 'Ship it.' });
+
+  expect(ctx.db.query("SELECT subject_id, data FROM events WHERE action = 'pr-accepted-risk'").all()).toStrictEqual([{ subject_id: 'pr:widgets#7', data: JSON.stringify({ finding: 'aaaa', source, note: 'Ship it.' }) }]);
 });
 
 test.each([

@@ -1,5 +1,6 @@
 import { expect, test } from 'bun:test';
 import { parseItemInput } from './parse-item-input.ts';
+import type { ItemOption } from './parse-item-input.ts';
 
 const KETTLE_CALL = {
   title: 'Mint the kettle tokens',
@@ -59,6 +60,27 @@ test('it keeps the spaces and line breaks around a text', () => {
 
   expect(item.question).toBe('  Mint them?\n');
   expect(item.details).toStrictEqual([{ heading: 'Log', text: '\n  line one\n' }]);
+});
+
+test('it reads a call option that grants an override or an accepted risk', () => {
+  const options: ItemOption[] = [
+    { label: 'Override', effect: 'It merges past the findings.', grants: { action: 'override', pr: 'zgeoff/kettle#4' } },
+    { label: 'Accept it', effect: 'It merges with the risk.', grants: { action: 'accept-risk', pr: 'zgeoff/kettle#4', finding: 'aaaa' } },
+  ];
+
+  expect(parseItemInput('call', JSON.stringify({ title: 'Lid', question: 'Merge kettle#4?', options })).options).toStrictEqual(options);
+});
+
+test.each([
+  ['an override that names a finding', 'call', { action: 'override', pr: 'zgeoff/kettle#4', finding: 'aaaa' }, 'an override grant names none'],
+  ['an accepted risk with no finding', 'call', { action: 'accept-risk', pr: 'zgeoff/kettle#4' }, 'an accept-risk grant names its finding'],
+  ['a PR that is not owner/repo#number', 'call', { action: 'override', pr: 'kettle#4' }, 'must be <owner>/<repo>#<number>'],
+  ['an action hq does not know', 'call', { action: 'merge', pr: 'zgeoff/kettle#4' }, 'options.0.grants.action'],
+  ['a grant on a proposal option', 'proposal', { action: 'override', pr: 'zgeoff/kettle#4' }, 'only a call\'s option does'],
+] as const)('it refuses %s', (_case, kind, grants, why) => {
+  const item = { title: 'Lid', question: 'Merge kettle#4?', diff: { now: 'Open.', would: 'Merged.' }, options: [{ label: 'Go', effect: 'It merges.', grants }, { label: 'Wait', effect: 'It waits.' }] };
+
+  expect(() => parseItemInput(kind, JSON.stringify(item))).toThrow(why);
 });
 
 test('an unblock item may mark one GitHub PR link as its subject', () => {

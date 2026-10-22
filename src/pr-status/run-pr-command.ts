@@ -13,6 +13,7 @@ import { buildPRStatusView } from './build-pr-status-view.ts';
 import { findOwnerOverride } from './find-owner-override.ts';
 import type { OwnerOverride } from './find-owner-override.ts';
 import { findSourceRefusal } from './find-source-refusal.ts';
+import type { OwnerAction } from './find-source-refusal.ts';
 import { findPRStatus } from './find-pr-status.ts';
 import { formatOverrideLine } from './format-override-line.ts';
 import { formatPRStatus } from './format-pr-status.ts';
@@ -130,7 +131,7 @@ function parseAnswerArgs(flags: Flags, rawAnswer: string | undefined): AnswerArg
 }
 
 async function runOverride(input: PRCommandInput, ref: PRRef): Promise<Out> {
-  const source = await requireOwnerSource(input, ref);
+  const source = await requireOwnerSource(input, ref, { action: 'override' });
   const note = input.flags.note?.trim() ?? '';
   if (note === '') {
     throw new HqError('bad_args', '--note is required: why the owner overrides the open findings at this head');
@@ -140,10 +141,10 @@ async function runOverride(input: PRCommandInput, ref: PRRef): Promise<Out> {
   return { data: { override: { repo: ref.repo, pr: ref.pr, head: context.head, source, note } }, text: `Recorded the owner's override of the open findings for ${ref.repo}#${ref.pr} at ${context.head.slice(0, 7)} (${source}): ${note}` };
 }
 
-async function requireOwnerSource(input: PRCommandInput, ref: PRRef): Promise<string> {
+async function requireOwnerSource(input: PRCommandInput, ref: PRRef, wanted: OwnerAction): Promise<string> {
   const source = requireAnswerSource(input.flags.source);
   const probe: OwnerProbe = source.startsWith('chat:') ? await input.readOwnerSession() : { verdict: 'other' };
-  const refusal = findSourceRefusal(input.db, ref, source, probe);
+  const refusal = findSourceRefusal(input.db, { ref, wanted, source }, probe);
   if (refusal !== null) {
     throw new HqError('bad_args', `--source refused: ${refusal}; ask ${roleName('owner')} to record it`);
   }
@@ -160,11 +161,11 @@ async function readAnswerContext(input: PRCommandInput, ref: PRRef): Promise<{ h
 }
 
 async function runAcceptRisk(input: PRCommandInput, ref: PRRef, finding: string | undefined): Promise<Out> {
-  const source = await requireOwnerSource(input, ref);
-  const note = input.flags.note?.trim() ?? '';
   if (finding === undefined || finding.trim() === '') {
     throw new HqError('bad_args', 'usage: hq pr accept-risk <repo> <pr> <finding-id> --source S --note T');
   }
+  const source = await requireOwnerSource(input, ref, { action: 'accept-risk', finding });
+  const note = input.flags.note?.trim() ?? '';
   if (note === '') {
     throw new HqError('bad_args', '--note is required: why the owner accepts this risk');
   }

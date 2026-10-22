@@ -7,6 +7,7 @@ import { parsePRURL } from './parse-pr-url.ts';
 
 export type ItemInput = z.output<ReturnType<typeof defineItemInputSchema>>;
 export type ItemOption = NonNullable<ItemInput['options']>[number];
+export type ItemGrant = NonNullable<ItemOption['grants']>;
 export type ItemDetail = ItemInput['details'][number];
 
 // The part stored in the row's `item` column: everything but the title, question and Stu's view,
@@ -37,7 +38,8 @@ function defineItemInputSchema() {
   const DetailSchema = z.strictObject({ heading: defineText(), text: defineText(), code: defineText().optional() }),
     DiffSchema = z.strictObject({ now: defineText(), would: defineText() }),
     LinkSchema = z.strictObject({ label: defineText(), url: z.url({ protocol: /^https?$/u }), subject: z.literal(true).optional() }),
-    OptionSchema = z.strictObject({ label: defineText(), effect: defineText(), recommended: z.boolean().optional() }),
+    GrantSchema = z.strictObject({ action: z.enum(['override', 'accept-risk']), pr: z.string().regex(/^[\w.-]+\/[\w.-]+#\d+$/u, 'must be <owner>/<repo>#<number>'), finding: defineText().optional() }),
+    OptionSchema = z.strictObject({ label: defineText(), effect: defineText(), recommended: z.boolean().optional(), grants: GrantSchema.optional() }),
     UnblocksSchema = z.strictObject({ id: defineText(), title: defineText() });
   return z.strictObject({
     title: defineText().max(TITLE_MAX),
@@ -74,7 +76,24 @@ function checkKind(kind: ItemKind, item: ItemInput): void {
   if (kind === 'proposal' && item.diff === undefined) {
     throw new HqError('bad_args', '--item: a proposal needs its diff ({now, would})');
   }
+  checkGrants(kind, item);
   checkSubject(kind, item);
+}
+
+// Only a call's option grants an action, and an accepted risk names its finding while an override
+// names none.
+function checkGrants(kind: ItemKind, item: ItemInput): void {
+  for (const option of item.options ?? []) {
+    if (option.grants === undefined) {
+      continue;
+    }
+    if (kind !== 'call') {
+      throw new HqError('bad_args', `--item: a ${kind} option grants nothing; only a call's option does`);
+    }
+    if ((option.grants.action === 'accept-risk') !== (option.grants.finding !== undefined)) {
+      throw new HqError('bad_args', `--item: option "${option.label}": an accept-risk grant names its finding, and an override grant names none`);
+    }
+  }
 }
 
 // A subject link marks the PR an unblock item is about (a review, lgtm or merge ask): the watcher
