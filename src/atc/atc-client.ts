@@ -7,7 +7,7 @@ import { ATC_WRITES } from './atc-writes.ts';
 import { messageSchema } from './message-schema.ts';
 import { openAtcPeer } from './open-atc-peer.ts';
 import type { AtcPeer } from './open-atc-peer.ts';
-import { sessionListSchema } from './session-list-schema.ts';
+import { sessionListRequiredSchema } from './session-list-required-schema.ts';
 import type { SessionInfo } from './session-schema.ts';
 import { socketPath } from './socket-path.ts';
 import { writeRefusal } from './write-refusal.ts';
@@ -39,7 +39,10 @@ export class AtcClient {
   }
 
   async sessions(): Promise<SessionInfo[]> {
-    this.sessionCache ??= (await this.call('session.list', {}, sessionListSchema)).sessions ?? [];
+    if (this.sessionCache === null) {
+      const listed = await this.call('session.list', {}, sessionListRequiredSchema);
+      this.sessionCache = listed.sessions;
+    }
     return this.sessionCache;
   }
 

@@ -30,6 +30,18 @@ test('it lists the sessions the daemon answers with', async () => {
   expect(peer.sessions()).resolves.toStrictEqual([{ id: 's1-a', name: 'kettle', alive: true, state: 'running' }]);
 });
 
+test('it rejects a session list answer with no list as a bad atc answer', async () => {
+  const ctx = setupTest();
+  const daemon = startStubAtcDaemon(ctx.path, { 'session.list': () => ({}) });
+  const peer = await AtcClient.open(ctx.path);
+  onTestFinished(() => {
+    peer.close();
+    daemon.stop();
+  });
+
+  expect(peer.sessions()).rejects.toMatchObject({ code: 'bad_atc_answer' });
+});
+
 test('it asks the daemon for a session by id', async () => {
   const ctx = setupTest(),
     daemon = startStubAtcDaemon(ctx.path, { 'session.get': () => ({ session: { id: 's1-a' }, prompt: 'boil water', lastActivityAt: 1700, pending: null, result: null, sessionRecord: null }) }),
