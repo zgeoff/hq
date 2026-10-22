@@ -23,6 +23,7 @@ function setupTest() {
   return {
     triage: '11111111-2222-4333-8444-555555555555',
     stranger: '99999999-2222-4333-8444-555555555555',
+    directory: fresh.dir,
     references: (names: string[]) => {
       mkdirSync(join(definitions, 'skills/linear-triage/references'), { recursive: true });
       for (const name of names) {
@@ -144,4 +145,27 @@ test('a read after long lines, across stream chunks, still counts', async () => 
     { role: 'triage', reference: 'linear-triage/references/spout.md' },
     { role: 'triage', reference: 'linear-triage/references/widgets.md' },
   ]);
+});
+
+test('hq refs fails with atc_unreachable instead of reporting zeros when atc does not answer', async () => {
+  const ctx = setupTest();
+  ctx.references(['kettle.md']);
+  ctx.transcript('-work-defs/s.jsonl', [ctx.read(ctx.triage, '/d/skills/linear-triage/references/kettle.md')], 1);
+  onTestFinished(overrideEnv('HQ_ATC_SOCKET', join(ctx.directory, 'no-kettle-here.sock')));
+  const log = spyOn(console, 'log').mockImplementation(() => {});
+  onTestFinished(() => log.mockRestore());
+
+  await main(['refs', '--json']);
+
+  expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toStrictEqual({
+    ok: false,
+    error: { code: 'atc_unreachable', message: "hq refs needs atc's session list to give each transcript its role: Error: Failed to connect" },
+  });
+});
+
+test('a session list that fails fails the unopened list instead of listing every reference', async () => {
+  const ctx = setupTest();
+  ctx.references(['kettle.md', 'widgets.md']);
+
+  await expect(readUnopenedReferences({ days: 7, sessions: () => Promise.reject(new Error('atc kettle is cold')) })).rejects.toThrow("hq refs needs atc's session list to give each transcript its role: Error: atc kettle is cold");
 });

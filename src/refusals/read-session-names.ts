@@ -1,4 +1,4 @@
-import { AtcClient } from '../atc/atc-client.ts';
+import { readAtcSessions } from '../atc/read-atc-sessions.ts';
 import type { SessionInfo } from '../atc/session-schema.ts';
 import type { Who } from './types.ts';
 
@@ -17,13 +17,4 @@ export async function readSessionNames(get?: () => Promise<SessionInfo[]>): Prom
     // atc down: no session names
   }
   return map;
-}
-
-async function readAtcSessions(): Promise<SessionInfo[]> {
-  const client = await AtcClient.open(undefined, 1500);
-  try {
-    return await client.sessions();
-  } finally {
-    client.close();
-  }
 }

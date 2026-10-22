@@ -16,7 +16,7 @@ export interface RoleSkills {
   skills: string[];
 }
 
-// `sessions` is atc's list; tests pass their own.
+// `sessions` is atc's list; tests pass their own. A failure fails the read.
 export interface ReferenceOptions {
   days: number;
   sessions?: () => Promise<SessionInfo[]>;
