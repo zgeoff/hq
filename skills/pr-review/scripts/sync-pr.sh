@@ -14,8 +14,8 @@
 # (main or sync-vN) made equal. A removed file passes only when tools main no
 # longer syncs it and either its copy at the PR base equals, in the same way, a
 # source that an earlier tools manifest delivered to its path, or the source
-# moved to one that the same entry still delivers and whose target exists at the
-# PR head: the sync's retired-files commit, which deletes a renamed file's old
+# moved to one that the same entry still delivers and whose target at the PR
+# head equals it in the same way: the sync's retired-files commit, which deletes a renamed file's old
 # copy whatever its content. A Markdown file also matches its source once the
 # blocks that need a file the repo's entry does not deliver to it are dropped,
 # as the sync drops them. Prints "ok: ..." and
@@ -184,7 +184,8 @@ ensure_clone() {
 
 # renamed_removal <path>: an earlier manifest delivered path from a source that
 # an entry still delivering it has since renamed to a source whose target
-# exists at the PR head. The sync deletes the old copy then, whatever its
+# equals its source at the PR head, as the sync wrote it, so the sync delivered
+# the replacement. The sync deletes the old copy then, whatever its
 # content (zgeoff/tools scripts/remove-retired-sync-files.sh). A target that
 # the entry's `except` list keeps from this repo is not written, so it does not
 # count.
@@ -194,7 +195,7 @@ renamed_removal() {
     [ -n "$old_source" ] || continue
     while IFS=$'\t' read -r new_source new_target; do
       [ "$new_source" != "$old_source" ] || continue
-      [ "$(blob "zgeoff/$repo" "$new_target" "$head")" != missing ] || continue
+      matches "$new_target" "$head" "$new_source" || continue
       ensure_clone
       git -C "$work/tools" log --follow --name-only --format= -- "$new_source" >"$work/follow.txt" 2>"$work/clone.err" ||
         fail "the history of $new_source could not be read: $(cat "$work/clone.err")"

@@ -248,6 +248,10 @@ export FILES='.claude/skills/old/SKILL.md\tremoved' BASE_BLOB=edited HEAD_BLOB=m
 expect "a rename whose new target is missing at the PR head fails" 1 "no: .claude/skills/old/SKILL.md is removed, but its copy matches no source"
 
 set_case
+export FILES='.claude/skills/old/SKILL.md\tremoved' BASE_BLOB=edited HEAD_BLOB=unrelated SOURCE_BLOBS='b1 b0'
+expect "a rename whose new target holds unrelated content at the PR head fails" 1 "no: .claude/skills/old/SKILL.md is removed, but its copy matches no source"
+
+set_case
 export FILES='.claude/skills/lone/SKILL.md\tremoved' BASE_BLOB=edited HEAD_BLOB=b1
 expect "a removed file with no rename in the history and an edited copy fails" 1 "no: .claude/skills/lone/SKILL.md is removed, but its copy matches no source"
 
