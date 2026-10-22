@@ -216,6 +216,8 @@ import { CHECKED_AT } from './releases/checked-at.ts';
 import { formatShippedAt } from './releases/format-shipped-at.ts';
 import { shipRuns } from './releases/ship-runs.ts';
 
+import { formatReferenceLines } from './refs/format-reference-lines.ts';
+import { readReferenceCounts } from './refs/read-reference-counts.ts';
 import { BY } from './refusals/by.ts';
 import { countRefusals as tally } from './refusals/count-refusals.ts';
 import { formatRefusalLine as refusalLine } from './refusals/format-refusal-line.ts';
@@ -1960,6 +1962,18 @@ async function refusalsCommand(db: Database, verb: string | undefined, flags: Fl
   return { data: { items: rows }, text: rows.length ? rows.map(refusalLine).join('\n') : `No refusals in the last ${days} day(s).` };
 }
 
+async function refsCommand(verb: string | undefined, flags: Flags): Promise<Out> {
+  if (verb !== undefined) {
+    throw new HqError('bad_args', 'hq refs [--days 7]');
+  }
+  const days = parseDays(flags.days, 'days', 7);
+  if (days > 365) {
+    throw new HqError('bad_args', '--days must be 1 to 365');
+  }
+  const items = await readReferenceCounts({ days });
+  return { data: { days, items }, text: formatReferenceLines(items, days) };
+}
+
 async function repairCommand(verb: string | undefined, rest: string[], flags: Flags): Promise<Out> {
   if (verb !== 'advisor-400') throw new HqError('bad_args', 'hq repair advisor-400 <session> [--file T.jsonl] [--apply]');
   return await repairAdvisor400(rest[0], toExactOptional({ file: flags.file as string | undefined, apply: Boolean(flags.apply) }));
@@ -2056,6 +2070,7 @@ export const GROUPS: Record<string, (c: Ctx) => Promise<Out>> = {
   pr: (c) => runPRCommand({ run: realRunner, db: c.db, verb: c.verb, rest: c.rest, flags: c.flags, actor: () => actor(c.db, c.flags), readOwnerSession: () => readOwnerSession(c.db, readOwnerProbeDeps()) }),
   noslop: async (c) => runNoslopCommand({ run: c.run, db: c.db, verb: c.verb, rest: c.rest, since: typeof c.flags.since === 'string' ? c.flags.since : undefined, force: c.flags.force === true, actor: await actor(c.db, c.flags) }),
   repair: (c) => repairCommand(c.verb, c.rest, c.flags),
+  refs: (context) => refsCommand(context.verb, context.flags),
   refusals: (c) => refusalsCommand(c.db, c.verb, c.flags),
   run: (c) => runCommand(c.db, c.verb, c.rest, c.flags),
   lanes: async (context) => {

@@ -63,6 +63,7 @@ hq 0.79.0: headquarters for the z- sessions. Every command takes --json.
   hq fleet timer install | remove            run ensure every 5 minutes
   hq refusals [--days 7] [--by reason|session|tool]  auto-mode refusals in local Claude transcripts, newest first; --by tallies
   hq refusals scan [--since 14d] [--budget-mb N]  scan the transcripts now (the watcher does it every tick); --since widens the backfill
+  hq refs [--days 7]                          each role's skill references and how many of its sessions opened each; zeros first
   hq capacity                                 the newest capacity sample (impd, cloud, Claude, CI, PC), thresholds and open alerts
   hq capacity sample                          read capacity now, store it, send due alerts (the watcher does it every tick)
   hq capacity log [--hours 24]                stored samples, newest first
