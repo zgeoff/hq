@@ -1,45 +1,60 @@
-# hq
+<div align="center">
+  <h1>hq</h1>
 
-The z- sessions' own tool for running the system: typed state objects with
-transitions, `--json` on every command, and atc messages to the sessions a
-change matters to. Built and kept by z-q.
+  <p>
+    <a href="./docs/sessions.md">The sessions</a> •
+    <a href="./CHANGELOG.md">Changelog</a> •
+    <a href="./REQUESTS.md">Requests</a>
+  </p>
+</div>
 
-- Runtime: Bun + TypeScript, `bun:sqlite` in WAL mode.
-- Binary: `~/.local/bin/hq` (`bun run install-bin`).
-- Database: `~/.local/share/z-sessions/hq.db` (override with `HQ_DB`).
-- Local settings: machine-specific values live in `${XDG_CONFIG_HOME:-$HOME/.config}/hq/local.json`
-  (override the path with `HQ_LOCAL_CONFIG`), never in tracked code. The file is a flat JSON object
-  of strings, and hq never writes it. A variable set in the environment wins over the file. Only
-  seven keys are read from it: `HQ_NOSLOP_OP_VAULT` and `HQ_NOSLOP_OP_ITEM` (the 1Password vault and
-  item of noslop's GitHub app), `HQ_LINEAR_OP_REF` (the `op://` ref of the Linear key),
-  `HQ_PROBE_TARGET` and `HQ_PROBE_READY` (the Nix live and ready URLs), `HQ_CLOUD_METRICS_URL`
-  (the cloud host's metrics page that `hq capacity` reads), and `HQ_CLOUD_HOST` (the cloud host's
-  ssh name, which the preview-qa skill reads). A command that needs a missing key
-  refuses with `bad_config` naming the key and the file; `hq health` shows whether all seven are set.
+The command line and shared ledger of a crew of seven Claude Code sessions that run one owner's software team.
 
-See CHANGELOG.md for what shipped and REQUESTS.md for what sessions asked for.
+The crew triages issues, delivers them through agents, reviews and merges the PRs, and checks each
+release live. hq is where they keep score: runs, review rounds, merge gates, calls for the owner,
+and grants, in one SQLite file, with `--json` on every command. In its first 8 days hq shipped 219
+releases, tracked 688 runs, counted 2,234 merged PRs across 14 repos, and recorded 1,985 review
+rounds on 892 PRs.
 
-## What hq moves by itself
+## Quick start
 
-- hq attaches an open or newly merged PR to the run its body names with a line starting
-  `Fixes GEO-n` or `Contributes to GEO-n`. `Related to` never attaches.
-- hq checks GitHub on a schedule and marks a run PR merged or closed as GitHub reports it.
-- Runs in tools, noslop, hq and vers move to live-check (or done) from their release facts, as the other release repos already do.
-- hq reads Ready per lane from Linear on a schedule, by lanes.json's rules.
-- hq closes an open unblock item as done once a condition it was given holds.
-- `hq run pr`, `hq run merged` and `hq run closed` still work, and a run does not need them.
+hq needs [Bun](https://bun.sh) and a local [atc](https://github.com/zgeoff/atc) daemon.
 
-## Changes
+```sh
+bun install
+bun run install-bin   # builds ~/.local/bin/hq
+hq status             # the open call for the owner, what is next and why it waits
+```
 
-Every change reaches `main` through a pull request. A ruleset on `main` refuses direct pushes,
-force pushes and deletion, and needs the `check` job green. Nobody bypasses it: merges never use
-`--admin`.
+A real line, from the PR that moved hq to atc's protocol 11: `hq review gate hq 9` printed
+`may merge: noslop findings: none open; CI green at b061edc`.
 
-1. Branch from `main` and open a PR.
-2. CI (`.github/workflows/check.yml`) runs `bun run fmt:check` (oxfmt on markdown, YAML and
-   JSON), `bun run typecheck` and `bun test`.
-3. Before the merge, run `codex review --base origin/main` on the branch. Answer every finding:
-   fix it, or say why not. Post the review and the answers as a PR comment.
-4. Merge only PRs in your own paths. `.github/CODEOWNERS` records them: z-q owns `src/`,
-   `test/` and `scripts/`; z-steward owns `skills/` and `docs/`. Both act through one GitHub
-   login, so GitHub can't enforce the file.
+## The crew
+
+| Session    | Name            | Job                                     |
+| ---------- | --------------- | --------------------------------------- |
+| z-stu      | Stu             | the front desk: one question at a time  |
+| z-delivery | z-delivery      | fills the lanes and ships what lands    |
+| z-triage   | Sieve           | shapes each new issue into one call     |
+| z-review   | (to come)       | reviews and merges on the gate          |
+| z-qa       | The Second Look | checks each change live, with evidence  |
+| z-steward  | The Steward     | keeps the skills true, one PR at a time |
+| z-q        | The Toolsmith   | builds hq from the crew's requests      |
+
+[Meet the crew](./docs/crew.md).
+
+## Checks
+
+Every change reaches `main` through a PR, a noslop review and green CI. Locally, run
+`bun run fmt:check`, `bun run typecheck`, `bun run lint:changed` and `bun test`.
+
+## Layout
+
+- `src/`: the CLI, one folder per command family, and the schema migrations in `src/db/`.
+- `skills/`: the crew's skills, one folder per role.
+- `docs/`: how the sessions work together.
+- `mods/`: the status band for the owner's main session.
+
+## Documentation
+
+Start with [the sessions](./docs/sessions.md). `hq --help` lists every command.
