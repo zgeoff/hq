@@ -300,7 +300,7 @@ test('it writes no page file when the second page is not what Linear promises', 
   server.use(
     buildStubLinearIssuePages([
       { issues: { nodes: [good], pageInfo: { hasNextPage: true, endCursor: 'c1' } } },
-      { issues: { nodes: [{ identifier: 'KET-2' }], pageInfo: { hasNextPage: false, endCursor: null } } },
+      { issues: { nodes: [{ ...good, title: null }], pageInfo: { hasNextPage: false, endCursor: null } } },
     ]),
   );
 
