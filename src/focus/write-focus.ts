@@ -1,16 +1,15 @@
 import type { Database } from 'bun:sqlite';
 import { iso } from '../clock/iso.ts';
-import { now } from '../clock/now.ts';
 import { logEvent } from '../log-event.ts';
 import { addNews } from '../news/add-news.ts';
 import { formatFocusLine } from './format-focus-line.ts';
 import type { Focus, FocusReserve, FocusTerm } from './types.ts';
 
 // Sets the focus, logs it and posts it to hq news, in one transaction. The lanes read it at their
-// next tick; running work keeps its slots.
-export function writeFocus(db: Database, terms: readonly FocusTerm[], reserves: readonly FocusReserve[], actor: string): Focus {
+// next tick; running work keeps its slots. The caller reads the clock and passes the set time.
+export function writeFocus(db: Database, terms: readonly FocusTerm[], reserves: readonly FocusReserve[], actor: string, at: Date): Focus {
   const MAX_LINE = 300;
-  const focus: Focus = { terms: [...terms], reserves: [...reserves], setAt: iso(now()), setBy: actor };
+  const focus: Focus = { terms: [...terms], reserves: [...reserves], setAt: iso(at), setBy: actor };
   const line = formatFocusLine(focus);
   const shown = line.length > MAX_LINE ? `${line.slice(0, MAX_LINE - 1)}…` : line;
   db.transaction(() => {

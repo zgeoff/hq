@@ -2084,7 +2084,7 @@ export const GROUPS: Record<string, (c: Ctx) => Promise<Out>> = {
     const out = await lanesCommand(context.db, context.verb, context.flags, context.run);
     return context.verb === undefined || context.verb === 'status' || context.verb === 'log' ? withStaleBuild(out, checkLanesBuild((path) => readFileSync(path, 'utf8'))) : out;
   },
-  focus: async (context) => runFocusCommand({ db: context.db, call: makeAuditedLinearCaller(context.db, context.run), actor: await actor(context.db, context.flags), verb: context.verb, rest: context.rest, reserves: context.flags.reserve ?? [] }),
+  focus: async (context) => runFocusCommand({ db: context.db, call: makeAuditedLinearCaller(context.db, context.run), actor: await actor(context.db, context.flags), at: now(), verb: context.verb, rest: context.rest, reserves: context.flags.reserve ?? [] }),
   stats: (c) => statsCommand(c.db, c.flags),
   answers: (c) => Promise.resolve(runAnswersCommand(c.db, c.flags)),
   grant: (c) => runGrantCommand(c.db, c.verb, c.rest, c.flags),
