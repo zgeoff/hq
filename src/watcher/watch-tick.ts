@@ -6,6 +6,7 @@ import { now } from '../clock/now.ts';
 import { getMeta } from '../db/get-meta.ts';
 import { setMeta } from '../db/set-meta.ts';
 import { runAllTreeSyncs } from '../defs/run-all-tree-syncs.ts';
+import { HqError } from '../errors.ts';
 import { clearGhAuth } from '../ghauth/clear-gh-auth.ts';
 import { isGhAuthFailure } from '../ghauth/is-gh-auth-failure.ts';
 import { noteGhAuth } from '../ghauth/note-gh-auth.ts';
@@ -43,12 +44,35 @@ const LOOKBACK_DAYS = 15;
 
 const msg = (e: unknown) => String((e as Error).message ?? e);
 
+// The steps each watcher has started and not yet seen settle. A step the deadline gave up on stays
+// here until its work stops, so a later pass never runs a second copy beside it.
+const UNSETTLED = new WeakMap<WatchDeps, Set<string>>();
+
+function readUnsettled(d: WatchDeps): Set<string> {
+  let names = UNSETTLED.get(d);
+  if (names === undefined) {
+    names = new Set();
+    UNSETTLED.set(d, names);
+  }
+  return names;
+}
+
 // One pass. True when the tick completed: the lanes reading, the sweep and the send all ran.
 export async function watchTick(db: Database, d: WatchDeps): Promise<boolean> {
   const ms = d.stepMs ?? STEP_MS;
+  const unsettled = readUnsettled(d);
   const step = <T,>(what: string, start: (signal: AbortSignal) => Promise<T>) => {
+    if (unsettled.has(what)) {
+      return Promise.reject(new HqError('busy', `${what} from an earlier pass is still running`));
+    }
     const abandon = new AbortController();
-    return withDeadline(start(abandon.signal), ms, what, abandon);
+    const work = start(abandon.signal);
+    unsettled.add(what);
+    void work.then(
+      () => unsettled.delete(what),
+      () => unsettled.delete(what),
+    );
+    return withDeadline(work, ms, what, abandon);
   };
   const at = () => iso(now());
   // Outside the tick's try: git needs neither atc nor the capacity reading.

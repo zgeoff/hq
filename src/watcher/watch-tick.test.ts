@@ -201,3 +201,37 @@ test('it closes the items whose Linear issue is Done and whose document is decid
   expect(getUnblock(ctx.db, 'descale-plan')?.note).toBe('settled: doc:descaling-plan-abc123def456 decided');
   expect(logs.filter((line) => line.includes('unblock conditions'))).toStrictEqual(['2026-10-15T20:00:00Z unblock conditions: closed steam-test, descale-plan as done']);
 });
+
+test('a goals sync the deadline gave up on is not started again until it stops', async () => {
+  const ctx = setupTest();
+  onTestFinished(overrideEnv('HQ_NOW', '2026-10-16T07:00:00Z'));
+  for (const key of ['kinds_synced_at', 'kinds_ok_at', 'linear_synced_at']) {
+    setMeta(ctx.db, key, '2026-10-16T06:55:00Z');
+  }
+  let release = () => {};
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const goals = makeGoalsRunner({ code: 0, stdout: JSON.stringify({ usageItems: [] }), stderr: '' });
+  const repoLists: string[][] = [];
+  const run: Runner = async (cmd, opts) => {
+    if (cmd[0] === 'gh' && cmd[1] === 'repo' && cmd[2] === 'list') {
+      repoLists.push(cmd);
+      await held;
+    }
+    return goals(cmd, opts);
+  };
+  const logs: string[] = [];
+  const deps = { me: 'hq-lanes', run, log: (line: string) => logs.push(line), stepMs: 50, steps: { runs: () => Promise.resolve(), weekly: () => Promise.resolve(false), health: () => Promise.resolve({ opened: [], cleared: [] }) } };
+
+  await watchTick(ctx.db, deps);
+  setMeta(ctx.db, 'goals_synced_at', '1970-01-01T00:00:00Z');
+  await watchTick(ctx.db, deps);
+  const whileHeld = repoLists.length;
+  release();
+  await Bun.sleep(20);
+  setMeta(ctx.db, 'goals_synced_at', '1970-01-01T00:00:00Z');
+  await watchTick(ctx.db, deps);
+
+  expect({ whileHeld, after: repoLists.length, skipped: logs.some((line) => line.endsWith('team goals failed: team goals from an earlier pass is still running')) }).toStrictEqual({ whileHeld: 1, after: 2, skipped: true });
+});
