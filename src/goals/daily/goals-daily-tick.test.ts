@@ -47,7 +47,7 @@ test('nothing before 18:00', () => {
   expect(outbox()).toEqual([]);
 });
 
-test('at 18:00 one message goes to z-stu: 7 goal lines and the incidents; a second tick sends nothing', () => {
+test('at 18:00 one message goes to z-stu: 7 goal lines, 3 throughput lines and the incidents; a second tick sends nothing', () => {
   synced(syd('2026-10-16', '17:50'));
   const r = tick('2026-10-16', '18:01');
   expect(r.run).toMatchObject({ job: 'goals-daily', key: '2026-10-16', result: 'queued', detail: null });
@@ -56,10 +56,10 @@ test('at 18:00 one message goes to z-stu: 7 goal lines and the incidents; a seco
   expect(msg).toMatchObject({ target: 'z-stu', status: 'pending', topic: 'job:goals-daily:2026-10-16' });
   const lines = msg!.text.split('\n');
   expect(lines[0]).toBe('Goals check-in, Fri 16 Oct:');
-  expect(lines).toHaveLength(10);
-  expect(lines.slice(1, 8).map((l) => l.split(':')[0])).toEqual(['- Bug share', '- Feature + Improvement share', '- deploy-prod success', '- Nix downtime', '- CI minutes wasted', '- First review must-fix', '- Cost']);
-  expect(lines[8]).toBe('Capacity: no recent reading');
-  expect(lines[9]).toBe('Incidents today: none');
+  expect(lines).toHaveLength(13);
+  expect(lines.slice(1, 11).map((goalLine) => goalLine.split(':')[0])).toEqual(['- Bug share', '- Feature + Improvement share', '- deploy-prod success', '- Nix downtime', '- CI minutes wasted', '- First review must-fix', '- Cost', '- Issues', '- Bad filings', '- Stale']);
+  expect(lines[11]).toBe('Capacity: no recent reading');
+  expect(lines[12]).toBe('Incidents today: none');
   for (const l of lines) expect(l.length).toBeLessThan(160);
   expect(lines[1]).toBe('- Bug share: today no data (0 typed PRs), week so far no data (0 typed PRs); target <20% by 2 Nov –');
   expect(tick('2026-10-16', '18:06')).toEqual({ run: null, waiting: null });

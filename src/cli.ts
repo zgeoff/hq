@@ -296,6 +296,7 @@ import { readFetchCheck } from './defs/read-fetch-check.ts';
 import { readTreeCheck } from './defs/read-tree-check.ts';
 import { useSource } from './defs/use-source.ts';
 import { addBackfill } from './followups/add-backfill.ts';
+import { addFollowup } from './followups/add-followup.ts';
 import { dropFollowup } from './followups/drop-followup.ts';
 import { listFollowups } from './followups/list-followups.ts';
 import { parseFixed } from './followups/parse-fixed.ts';
@@ -1365,9 +1366,9 @@ async function morningCommand(db: Database, verb: string | undefined, flags: Fla
 async function followupCommand(db: Database, verb: string | undefined, args: string[], flags: Flags): Promise<Out> {
   switch (verb) {
     case 'add': {
-      if (!flags.backfill) throw new HqError('bad_args', 'hq followup add is for the hand count from Linear: pass --backfill. A PR reports its own follow-ups with hq run final --followups');
-      const f = addBackfill(db, { issue: need(args[0], 'issue'), fromRef: flags.from ?? null, at: need(flags.at, 'at'), actor: await actor(db, flags) });
-      return { data: { followup: f }, text: `Counted ${f.issue} (${f.source}), filed ${f.filed_at}${f.from_ref ? ` from ${f.from_ref}` : ''}` };
+      const by = await actor(db, flags);
+      const followup = flags.backfill ? addBackfill(db, { issue: need(args[0], 'issue'), fromRef: flags.from ?? null, at: need(flags.at, 'at'), actor: by }) : addFollowup(db, { issue: need(args[0], 'issue'), fromRef: need(flags.from, 'from'), actor: by });
+      return { data: { followup }, text: `Counted ${followup.issue} (${followup.source}), filed ${followup.filed_at}${followup.from_ref ? ` from ${followup.from_ref}` : ''}` };
     }
     case 'drop': {
       const issue = need(args[0], 'issue');

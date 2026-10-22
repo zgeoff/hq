@@ -4,7 +4,7 @@ export interface Followup {
   issue: string;
   from_ref: string | null;
   filed_at: string;
-  source: 'final' | 'linear backfill';
+  source: 'final' | 'linear backfill' | 'review';
   added_by: string;
   added_at: string;
 }
