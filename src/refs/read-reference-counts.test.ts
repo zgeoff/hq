@@ -179,3 +179,23 @@ test.skipIf(process.getuid?.() === 0)('a transcript hq cannot read fails the cou
 
   await expect(readReferenceCounts({ days: 7, sessions })).rejects.toMatchObject({ code: 'EACCES' });
 });
+
+test('hq refs --days 14 counts an open from eight days ago', async () => {
+  const ctx = setupTest();
+  ctx.references(['kettle.md', 'widgets.md']);
+  ctx.transcript('-work-defs/old.jsonl', [ctx.read(ctx.triage, '/d/skills/linear-triage/references/kettle.md', '2026-10-09T00:00:00.000Z')], 8);
+  ctx.startAtc([{ id: 'id-triage', name: 'z-triage', alive: true, state: 'done', agentSessionID: ctx.triage }]);
+  const log = spyOn(console, 'log').mockImplementation(() => {});
+  onTestFinished(() => log.mockRestore());
+
+  await main(['refs', '--days', '14', '--json']);
+
+  expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toStrictEqual({
+    ok: true,
+    days: 14,
+    items: [
+      { role: 'triage', reference: 'linear-triage/references/kettle.md', count: 1 },
+      { role: 'triage', reference: 'linear-triage/references/widgets.md', count: 0 },
+    ],
+  });
+});
