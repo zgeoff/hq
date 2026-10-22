@@ -50,6 +50,30 @@ test('it answers a hello on its own protocol and records it', async () => {
   expect(daemon.requests).toStrictEqual([{ method: 'daemon.hello', input: { client: 'hq', protocol: 11, auth: { scheme: 'none' } } }]);
 });
 
+test('it answers a hello on its own protocol with no peer session, as atc does for a peer outside a session', async () => {
+  const ctx = setupTest(),
+    daemon = startStubAtcDaemon(ctx.path, {}),
+    lines = Promise.withResolvers<unknown>(),
+    socket = await Bun.connect({
+      unix: ctx.path,
+      socket: {
+        data(_socket, chunk) {
+          lines.resolve(JSON.parse(new TextDecoder().decode(chunk)));
+        },
+      },
+    });
+  onTestFinished(() => {
+    socket.end();
+    daemon.stop();
+  });
+
+  // oxlint-disable-next-line id-length -- atc's wire names its fields i, p, u and b
+  socket.write(`${JSON.stringify({ i: '1', p: { u: '/daemon/hello', b: { json: { client: 'hq', protocol: 11 } } } })}\n`);
+
+  // oxlint-disable-next-line id-length -- atc's wire names its fields p and b
+  await expect(lines.promise).resolves.toMatchObject({ i: '1', p: { b: { json: { daemon: '7.1.0', peerSession: null } } } });
+});
+
 test('it records each procedure it answers under its dotted method name', async () => {
   const ctx = setupTest(),
     daemon = startStubAtcDaemon(ctx.path, { 'session.list': () => ({ sessions: [] }) }),
