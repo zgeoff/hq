@@ -1,0 +1,2 @@
+# The engine lays these types at each load; they belong to the Claude Code build, not the mod.
+.claude-plugin/types/

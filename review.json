@@ -1,0 +1,17 @@
+{
+  "extends": "github:zgeoff/noslop-config",
+  "instructions": [
+    "**/AGENTS.md",
+    "**/CLAUDE.md",
+    "**/SKILL.md",
+    ".claude/**/*.md",
+    ".cursor/rules/**",
+    "skills/**/*.md"
+  ],
+  "synced": [
+    "socket.yml",
+    ".claude/skills/testing/**",
+    ".claude/skills/docs-writing/**",
+    ".claude/skills/code-style/**"
+  ]
+}

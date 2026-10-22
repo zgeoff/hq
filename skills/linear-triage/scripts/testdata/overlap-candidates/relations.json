@@ -1,0 +1,29 @@
+[
+  {
+    "id": "GEO-1309",
+    "title": "Add the @zgeoff/checks runner with a shell check",
+    "relations": {
+      "blocks": [
+        {
+          "id": "GEO-1310",
+          "title": "x"
+        },
+        {
+          "id": "GEO-1311",
+          "title": "x"
+        },
+        {
+          "id": "GEO-1312",
+          "title": "x"
+        },
+        {
+          "id": "GEO-1313",
+          "title": "x"
+        }
+      ],
+      "blockedBy": [],
+      "relatedTo": [],
+      "duplicateOf": null
+    }
+  }
+]

@@ -1,0 +1,40 @@
+[
+  {
+    "data": {
+      "search": {
+        "pageInfo": {
+          "hasNextPage": false,
+          "endCursor": null
+        },
+        "nodes": [
+          {
+            "number": 9304,
+            "title": "Add a paper tree",
+            "url": "https://github.com/zgeoff/paper-orchard/pull/9304",
+            "body": "",
+            "headRefName": "sample-9304",
+            "state": "MERGED",
+            "mergedAt": "2026-10-15T09:00:00Z",
+            "isDraft": false,
+            "repository": {
+              "name": "paper-orchard"
+            }
+          },
+          {
+            "number": 9316,
+            "title": "Add the trellis (GEO-9305)",
+            "url": "https://github.com/zgeoff/paper-orchard/pull/9316",
+            "body": "",
+            "headRefName": "sample-9316",
+            "state": "MERGED",
+            "mergedAt": "2026-10-15T08:00:00Z",
+            "isDraft": false,
+            "repository": {
+              "name": "paper-orchard"
+            }
+          }
+        ]
+      }
+    }
+  }
+]

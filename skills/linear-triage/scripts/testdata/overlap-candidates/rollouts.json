@@ -1,0 +1,74 @@
+[
+  {
+    "id": "GEO-1001",
+    "title": "atc: adopt the strict-imports lint rule",
+    "status": "Backlog",
+    "project": "Atc",
+    "labels": ["atc"]
+  },
+  {
+    "id": "GEO-1002",
+    "title": "impz: adopt the strict-imports lint rule",
+    "status": "Ready",
+    "project": "Impz",
+    "labels": ["impz"]
+  },
+  {
+    "id": "GEO-1003",
+    "title": "Bump the shared lint config in cloud",
+    "status": "Backlog",
+    "project": "Cloud",
+    "labels": ["cloud"]
+  },
+  {
+    "id": "GEO-1004",
+    "title": "Bump the shared lint config in vers",
+    "status": "Backlog",
+    "project": "Vers",
+    "labels": ["vers"]
+  },
+  {
+    "id": "GEO-1005",
+    "title": "split widgets.ts into modules",
+    "status": "Backlog",
+    "project": "Atc",
+    "labels": ["atc"]
+  },
+  {
+    "id": "GEO-1006",
+    "title": "split gadgets.ts into modules",
+    "status": "Backlog",
+    "project": "Atc",
+    "labels": ["atc"]
+  },
+  {
+    "id": "GEO-1007",
+    "title": "atc: adopt the strict-imports lint rule",
+    "status": "Done",
+    "project": "Atc",
+    "labels": ["atc"]
+  },
+  {
+    "id": "GEO-1008",
+    "title": "nixie: retry a failed push to the queue",
+    "status": "Backlog",
+    "project": "Nixie",
+    "labels": ["nixie"]
+  },
+  {
+    "id": "GEO-1009",
+    "title": "cloud: cut the long functions so max-params can come on",
+    "status": "Backlog",
+    "project": "Tools",
+    "labels": ["cloud"],
+    "parentId": "GEO-1000"
+  },
+  {
+    "id": "GEO-1010",
+    "title": "vers: cut the long functions so max-params can come on",
+    "status": "Backlog",
+    "project": "Tools",
+    "labels": ["vers"],
+    "parentId": "GEO-1000"
+  }
+]

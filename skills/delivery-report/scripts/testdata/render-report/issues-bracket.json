@@ -1,0 +1,14 @@
+[
+  {
+    "id": "GEO-9401",
+    "title": "Repair the lantern] latch [a\\b]",
+    "url": "https://linear.example/issue/GEO-9401",
+    "status": "Done",
+    "statusType": "completed",
+    "project": "Lantern Garden",
+    "priority": 1,
+    "labels": ["Bug", "S", "Garden"],
+    "parentId": null,
+    "updatedAt": "2026-10-15T00:00:00Z"
+  }
+]

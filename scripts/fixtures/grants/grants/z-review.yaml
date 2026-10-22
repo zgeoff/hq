@@ -1,0 +1,4 @@
+- id: reviews
+  label: "Reviews"
+  outcome: allow
+  note: "run kite reviews and answer their threads."

@@ -1,0 +1,234 @@
+import type { Database } from 'bun:sqlite';
+import { expect, mock, onTestFinished, test } from 'bun:test';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { HttpResponse, http } from 'msw';
+import { LINEAR_GRAPHQL_URL, linearDocuments, linearIssues } from '../../mocks/linear-handlers.ts';
+import { server } from '../../mocks/node.ts';
+import { createCapacitySample } from '../../test/create-capacity-sample.ts';
+import { freshDb } from '../../test/helpers.ts';
+import { readReadyByLane } from '../areas/read-ready-by-lane.ts';
+import { setCapacitySetting } from '../capacity/set-capacity-setting.ts';
+import { overrideEnv } from '../config/override-env.ts';
+import { setMeta } from '../db/set-meta.ts';
+import { loadActionsSpend } from '../goals/load-actions-spend.ts';
+import { addUnblock } from '../unblock/add-unblock.ts';
+import { getUnblock } from '../unblock/get-unblock.ts';
+import { makePRStateGh } from '../../test/make-pr-state-gh.ts';
+import { resetKey } from '../linear/reset-key.ts';
+import type { RunResult, Runner } from '../runner/types.ts';
+import { watchTick } from './watch-tick.ts';
+
+// A database, a home with no live checkout or usage cache, quiet notices, a clean Linear key cache,
+// and a 1Password token.
+function setupTest() {
+  const fresh = freshDb(),
+    xdg = process.env['XDG_CACHE_HOME'];
+  onTestFinished(fresh.cleanup);
+  onTestFinished(overrideEnv('HOME', fresh.dir));
+  delete process.env['XDG_CACHE_HOME'];
+  onTestFinished(() => xdg !== undefined && (process.env['XDG_CACHE_HOME'] = xdg));
+  onTestFinished(overrideEnv('HQ_NOTIFY', 'off'));
+  onTestFinished(overrideEnv('HQ_LINEAR_OP_REF', 'op://kettle/teapot-key/credential'));
+  resetKey();
+  onTestFinished(resetKey);
+  process.env['OP_SERVICE_ACCOUNT_TOKEN'] = 'invented-token';
+  onTestFinished(() => delete process.env['OP_SERVICE_ACCOUNT_TOKEN']);
+  return { db: fresh.db, directory: fresh.dir };
+}
+
+// At 07:00 Sydney, with the goals sync fresh and the kinds sync last run 10 hours earlier, so only
+// the kinds sync and its Linear side are due. GitHub finds no merged PRs and Linear no closed issues.
+test('a due kinds sync reads the Linear key from 1Password once and records that read for the weekly audit', async () => {
+  const answers: Record<string, RunResult> = {
+      bash: { code: 0, stdout: JSON.stringify({ imp: { freeMib: 0, room: false }, providers: { claude: { room: false, unattended: true, target: 'imp' } } }), stderr: '' },
+      gh: { code: 0, stdout: '[]', stderr: '' },
+      op: { code: 0, stdout: 'lin_api_INVENTEDkettleKEY0042\n', stderr: '' },
+    },
+    ctx = setupTest(),
+    run = mock<Runner>((cmd) => Promise.resolve(answers[cmd[0] ?? ''] ?? { code: 1, stdout: '', stderr: 'invented: no answer for this command' }));
+  onTestFinished(overrideEnv('HQ_NOW', '2026-10-15T20:00:00Z'));
+  for (const key of ['goals_synced_at', 'goals_ok_at', 'linear_synced_at']) {
+    setMeta(ctx.db, key, '2026-10-15T20:00:00Z');
+  }
+  setMeta(ctx.db, 'kinds_synced_at', '2026-10-15T10:00:00Z');
+  server.use(http.post('https://api.linear.app/graphql', () => HttpResponse.json({ data: { issues: { nodes: [], pageInfo: { hasNextPage: false, endCursor: null } } } })));
+
+  await expect(
+    watchTick(ctx.db, { me: 'hq-lanes', run, log: () => {}, stepMs: 200, steps: { runs: () => Promise.resolve(), weekly: () => Promise.resolve(false), health: () => Promise.resolve({ opened: [], cleared: [] }) } }).then(() => ({
+      keyReads: run.mock.calls.map(([cmd]) => cmd).filter((cmd) => cmd[0] === 'op'),
+      events: ctx.db.query("SELECT actor, data FROM events WHERE subject = 'hq' AND subject_id = 'op' AND action = 'read'").all(),
+    })),
+  ).resolves.toStrictEqual({ keyReads: [['op', 'read', 'op://kettle/teapot-key/credential']], events: [{ actor: 'linear', data: '{"consumer":"linear","requests":3}' }] });
+});
+
+// At 18:00 Sydney with the kinds sync fresh and the goals sync never run, so the goals sync is due.
+// gh answers the billing usage call with `billing` and every other call with an empty list.
+function makeGoalsRunner(billing: RunResult): Runner {
+  return (cmd) => {
+    if (cmd[0] === 'gh' && cmd.some((arg) => arg.includes('settings/billing/usage'))) {
+      return Promise.resolve(billing);
+    }
+    if (cmd[0] === 'gh') {
+      return Promise.resolve({ code: 0, stdout: '[]', stderr: '' });
+    }
+    return Promise.resolve({ code: 1, stdout: '', stderr: 'invented: no answer for this command' });
+  };
+}
+
+function runGoalsTick(db: Database, run: Runner): Promise<boolean> {
+  onTestFinished(overrideEnv('HQ_NOW', '2026-10-16T07:00:00Z'));
+  for (const key of ['kinds_synced_at', 'kinds_ok_at', 'linear_synced_at']) {
+    setMeta(db, key, '2026-10-16T06:55:00Z');
+  }
+  return watchTick(db, { me: 'hq-lanes', run, log: () => {}, stepMs: 10_000, steps: { runs: () => Promise.resolve(), weekly: () => Promise.resolve(false), health: () => Promise.resolve({ opened: [], cleared: [] }) } });
+}
+
+test("the watcher's goals sync stores the month's Actions spend from GitHub billing", async () => {
+  const ctx = setupTest();
+  await runGoalsTick(ctx.db, makeGoalsRunner({ code: 0, stdout: JSON.stringify({ usageItems: [{ product: 'actions', netAmount: 12.5 }] }), stderr: '' }));
+
+  expect(loadActionsSpend(ctx.db, new Date('2026-10-16T07:00:00Z'))).toBe(12.5);
+});
+
+test("the watcher's goals sync replaces an earlier good Actions spend with unknown when gh fails", async () => {
+  const ctx = setupTest();
+  setMeta(ctx.db, 'actions_spend', JSON.stringify({ at: '2026-10-16T06:30:00Z', month: '2026-10', net: 4 }));
+  await runGoalsTick(ctx.db, makeGoalsRunner({ code: 1, stdout: '', stderr: 'invented: HTTP 403' }));
+
+  expect(loadActionsSpend(ctx.db, new Date('2026-10-16T07:00:00Z'))).toBeNull();
+});
+
+// At 20:00 UTC with every other sync fresh, so only the Ready pass is due. Linear holds three
+// Ready issues and one in Todo.
+test('a due Ready pass writes the counts before the lanes tick, and the logged eligible shows them', async () => {
+  const ctx = setupTest();
+  const lanes = { imp: { 'nixie-slice': 2, 'nixie-maintenance': 1, atc: 1, imp: 1, cloud: 1, memory: 1 }, local: { flexible: 2, cleanup: 3, process: 1 } };
+  mkdirSync(`${ctx.directory}/scripts`, { recursive: true });
+  writeFileSync(`${ctx.directory}/pacing.json`, JSON.stringify({ lanes, lends: { cleanup: false, memory: false } }));
+  onTestFinished(overrideEnv('HQ_CAPACITY', `${ctx.directory}/scripts/capacity.sh`));
+  onTestFinished(overrideEnv('HQ_NOW', '2026-10-15T20:00:00Z'));
+  const capacity = JSON.stringify({ imp: { freeMib: 16_384, room: true }, providers: { claude: { room: true, unattended: true, target: 'imp' } } });
+  const run: Runner = (command) => {
+    const stdout = command[0] === 'op' ? 'lin_api_INVENTED\n' : capacity;
+    return Promise.resolve({ code: 0, stdout, stderr: '' });
+  };
+  linearIssues.push(
+    { identifier: 'GEO-1', team: 'GEO', state: 'Ready', stateType: 'unstarted', previousIdentifiers: [], project: 'atc roadmap', labels: [], parent: null },
+    { identifier: 'GEO-2', team: 'GEO', state: 'Ready', stateType: 'unstarted', previousIdentifiers: [], project: 'atc maintenance', labels: [], parent: null },
+    { identifier: 'GEO-3', team: 'GEO', state: 'Ready', stateType: 'unstarted', previousIdentifiers: [], project: 'imp roadmap', labels: [], parent: null },
+    { identifier: 'GEO-4', team: 'GEO', state: 'Todo', stateType: 'unstarted', previousIdentifiers: [], project: 'atc roadmap', labels: [], parent: null },
+  );
+  const received = mock<(body: unknown) => void>();
+  server.use(
+    http.post(LINEAR_GRAPHQL_URL, async (info) => {
+      const body: unknown = await info.request.clone().json();
+      received(body);
+    }),
+  );
+  setCapacitySetting(ctx.db, 'nonnixMaxMib', '65536', 'z-delivery');
+  setCapacitySetting(ctx.db, 'nonnixMaxVcpus', '1000', 'z-delivery');
+  for (let minutes = -5; minutes <= 105; minutes += 5) {
+    createCapacitySample(ctx.db, { at: new Date(Date.parse('2026-10-15T20:00:00Z') + minutes * 60_000).toISOString().replace('.000Z', 'Z'), nonnixAwakeMib: 0 });
+  }
+  for (const key of ['kinds_synced_at', 'goals_synced_at', 'goals_ok_at', 'kinds_ok_at', 'linear_synced_at']) {
+    setMeta(ctx.db, key, '2026-10-15T20:00:00Z');
+  }
+  const logs: string[] = [];
+
+  await watchTick(ctx.db, { me: 'hq-lanes', run, log: (line) => logs.push(line), stepMs: 2000, steps: { runs: () => Promise.resolve(), weekly: () => Promise.resolve(false), health: () => Promise.resolve({ opened: [], cleared: [] }) } });
+
+  const counts = readReadyByLane(ctx.db, 30);
+  expect([counts['atc']?.n, counts['imp']?.n]).toStrictEqual([2, 1]);
+  expect(logs.find((line) => line.includes('slots='))).toContain('eligible=3');
+  expect(received.mock.calls).toMatchObject([[{ variables: { team: 'GEO', state: 'Ready' } }]]);
+});
+
+// At 20:00 UTC with every other sync fresh. The open item waits on an issue, whose Linear read
+// fails with a 500, and on a PR that GitHub reports merged.
+test('it closes an item whose PR merged as done in a due unblock pass, and logs it and the failed issue read by item', async () => {
+  const ctx = setupTest();
+  const logs: string[] = [];
+  const capacity = JSON.stringify({ imp: { freeMib: 0, room: false }, providers: { claude: { room: false, unattended: true, target: 'imp' } } });
+  const fallback: Runner = (command) => Promise.resolve({ code: 0, stdout: command[0] === 'op' ? 'lin_api_INVENTED\n' : capacity, stderr: '' });
+  const run = makePRStateGh({ states: { 'kettle-co/kettle#4': 'MERGED' }, fallback });
+  onTestFinished(overrideEnv('HQ_NOW', '2026-10-15T20:00:00Z'));
+  for (const key of ['kinds_synced_at', 'goals_synced_at', 'goals_ok_at', 'kinds_ok_at', 'linear_synced_at', 'lanes_ready_linear_at']) {
+    setMeta(ctx.db, key, '2026-10-15T20:00:00Z');
+  }
+  addUnblock(ctx.db, {
+    id: 'approve-kettle',
+    task: 'Approve the invented kettle app',
+    minutes: null,
+    unblocks: [],
+    notify: [],
+    actor: 'kettle-triage',
+    doneWhen: [
+      { kind: 'issue', ref: 'GEO-9' },
+      { kind: 'pr', ref: 'kettle-co/kettle#4' },
+    ],
+  });
+  server.use(http.post(LINEAR_GRAPHQL_URL, () => HttpResponse.json({ errors: [{ message: 'invented: Linear is unwell' }] }, { status: 500 })));
+
+  await watchTick(ctx.db, { me: 'hq-lanes', run, log: (line) => logs.push(line), stepMs: 2000, steps: { runs: () => Promise.resolve(), weekly: () => Promise.resolve(false), health: () => Promise.resolve({ opened: [], cleared: [] }) } });
+
+  expect(getUnblock(ctx.db, 'approve-kettle')?.state).toBe('done');
+  expect(logs.filter((line) => line.includes('unblock conditions'))).toStrictEqual([
+    '2026-10-15T20:00:00Z unblock conditions: closed approve-kettle as done',
+    "2026-10-15T20:00:00Z unblock conditions: approve-kettle: can't read issue:GEO-9: Linear answered 500: invented: Linear is unwell",
+  ]);
+  expect(ctx.db.query("SELECT actor, data FROM events WHERE subject = 'hq' AND subject_id = 'op' AND action = 'read'").all()).toStrictEqual([{ actor: 'linear', data: '{"consumer":"linear","requests":3}' }]);
+});
+
+// At 20:00 UTC with every other sync fresh. Linear holds the issue as Done and the decision record
+// as decided, and answers both over HTTP.
+test('it closes the items whose Linear issue is Done and whose document is decided in a due unblock pass', async () => {
+  const ctx = setupTest();
+  const logs: string[] = [];
+  const capacity = JSON.stringify({ imp: { freeMib: 0, room: false }, providers: { claude: { room: false, unattended: true, target: 'imp' } } });
+  const run: Runner = (command) => Promise.resolve({ code: 0, stdout: command[0] === 'op' ? 'lin_api_INVENTED\n' : capacity, stderr: '' });
+  onTestFinished(overrideEnv('HQ_NOW', '2026-10-15T20:00:00Z'));
+  for (const key of ['kinds_synced_at', 'goals_synced_at', 'goals_ok_at', 'kinds_ok_at', 'linear_synced_at', 'lanes_ready_linear_at']) {
+    setMeta(ctx.db, key, '2026-10-15T20:00:00Z');
+  }
+  linearIssues.push({ identifier: 'KET-7', team: 'KET', state: 'Done', stateType: 'completed', previousIdentifiers: [], project: null, labels: [], parent: null });
+  linearDocuments.push({ id: '5d6f1a52-8c3e-4b1f-9a77-0c2e4d6b8a10', slugID: 'abc123def456', content: 'Status: decided on 3 Mar 2026. The board approved the invented descaling plan.' });
+  addUnblock(ctx.db, { id: 'steam-test', task: 'Run the steam test', minutes: null, unblocks: [], notify: [], actor: 'kettle-triage', doneWhen: [{ kind: 'issue', ref: 'KET-7' }] });
+  addUnblock(ctx.db, { id: 'descale-plan', task: 'Approve the descaling plan', minutes: null, unblocks: [], notify: [], actor: 'kettle-triage', doneWhen: [{ kind: 'doc', ref: 'descaling-plan-abc123def456' }] });
+
+  await watchTick(ctx.db, { me: 'hq-lanes', run, log: (line) => logs.push(line), stepMs: 2000, steps: { runs: () => Promise.resolve(), weekly: () => Promise.resolve(false), health: () => Promise.resolve({ opened: [], cleared: [] }) } });
+
+  expect(getUnblock(ctx.db, 'steam-test')?.note).toBe('settled: issue:KET-7 Done');
+  expect(getUnblock(ctx.db, 'descale-plan')?.note).toBe('settled: doc:descaling-plan-abc123def456 decided');
+  expect(logs.filter((line) => line.includes('unblock conditions'))).toStrictEqual(['2026-10-15T20:00:00Z unblock conditions: closed steam-test, descale-plan as done']);
+});
+
+test('a goals sync the deadline gave up on is not started again until it stops', async () => {
+  const ctx = setupTest();
+  onTestFinished(overrideEnv('HQ_NOW', '2026-10-16T07:00:00Z'));
+  for (const key of ['kinds_synced_at', 'kinds_ok_at', 'linear_synced_at']) {
+    setMeta(ctx.db, key, '2026-10-16T06:55:00Z');
+  }
+  const held = Promise.withResolvers<void>();
+  const goals = makeGoalsRunner({ code: 0, stdout: JSON.stringify({ usageItems: [] }), stderr: '' });
+  const repoLists: string[][] = [];
+  const run: Runner = async (cmd, opts) => {
+    if (cmd[0] === 'gh' && cmd[1] === 'repo' && cmd[2] === 'list') {
+      repoLists.push(cmd);
+      await held.promise;
+    }
+    return goals(cmd, opts);
+  };
+  const logs: string[] = [];
+  const deps = { me: 'hq-lanes', run, log: (line: string) => logs.push(line), stepMs: 50, steps: { runs: () => Promise.resolve(), weekly: () => Promise.resolve(false), health: () => Promise.resolve({ opened: [], cleared: [] }) } };
+
+  await watchTick(ctx.db, deps);
+  setMeta(ctx.db, 'goals_synced_at', '1970-01-01T00:00:00Z');
+  await watchTick(ctx.db, deps);
+  const whileHeld = repoLists.length;
+  held.resolve();
+  await Bun.sleep(20);
+  setMeta(ctx.db, 'goals_synced_at', '1970-01-01T00:00:00Z');
+  await watchTick(ctx.db, deps);
+
+  expect({ whileHeld, after: repoLists.length, skipped: logs.some((line) => line.endsWith('team goals failed: team goals from an earlier pass is still running')) }).toStrictEqual({ whileHeld: 1, after: 2, skipped: true });
+});

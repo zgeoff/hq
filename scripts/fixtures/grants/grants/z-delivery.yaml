@@ -1,0 +1,8 @@
+- id: deploy
+  label: "Deploy"
+  outcome: allow
+  note: "deploy the kite site after a green build."
+- id: release
+  label: "Release"
+  outcome: allow
+  note: "publish a kite release when its notes are written."

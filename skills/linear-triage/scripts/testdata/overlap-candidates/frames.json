@@ -1,0 +1,100 @@
+[
+  {
+    "id": "GEO-1309",
+    "title": "Add the @zgeoff/checks runner with a shell check",
+    "status": "Backlog",
+    "project": "tools",
+    "labels": []
+  },
+  {
+    "id": "GEO-1310",
+    "title": "Add a docs check to @zgeoff/checks",
+    "status": "Backlog",
+    "project": "tools",
+    "labels": []
+  },
+  {
+    "id": "GEO-1311",
+    "title": "Add a workflows check (actionlint) to @zgeoff/checks",
+    "status": "Backlog",
+    "project": "tools",
+    "labels": []
+  },
+  {
+    "id": "GEO-1312",
+    "title": "Add a commits check (commitlint) to @zgeoff/checks",
+    "status": "Backlog",
+    "project": "tools",
+    "labels": []
+  },
+  {
+    "id": "GEO-1313",
+    "title": "Add a local-paths check to @zgeoff/checks",
+    "status": "Backlog",
+    "project": "tools",
+    "labels": []
+  },
+  {
+    "id": "GEO-657",
+    "title": "vers: drop the hono age-gate exclude once its release matures",
+    "status": "Backlog",
+    "project": "vers",
+    "labels": []
+  },
+  {
+    "id": "GEO-658",
+    "title": "vers: drop the nanoid age-gate exclude once its release matures",
+    "status": "Backlog",
+    "project": "vers",
+    "labels": []
+  },
+  {
+    "id": "GEO-674",
+    "title": "vers: drop the qs age-gate exclude once its release matures",
+    "status": "Backlog",
+    "project": "vers",
+    "labels": []
+  },
+  {
+    "id": "GEO-676",
+    "title": "vers: drop the oxlint-config age-gate exclude once its release matures",
+    "status": "Backlog",
+    "project": "vers",
+    "labels": []
+  },
+  {
+    "id": "GEO-940",
+    "title": "vers: keep the hono age-gate exclude once its release matures",
+    "status": "Backlog",
+    "project": "vers",
+    "labels": []
+  },
+  {
+    "id": "GEO-950",
+    "title": "Make the parser accept unknown fields",
+    "status": "Backlog",
+    "project": "tools",
+    "labels": []
+  },
+  {
+    "id": "GEO-951",
+    "title": "Make the parser reject unknown fields",
+    "status": "Backlog",
+    "project": "tools",
+    "labels": []
+  },
+  {
+    "id": "GEO-952",
+    "title": "Allow the parser to accept unknown fields",
+    "status": "Backlog",
+    "project": "tools",
+    "labels": []
+  },
+  {
+    "id": "GEO-953",
+    "title": "Allow the parser to reject unknown fields",
+    "status": "Backlog",
+    "project": "tools",
+    "labels": []
+  }
+]

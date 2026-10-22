@@ -1,0 +1,32 @@
+[
+  {
+    "id": "GEO-9240",
+    "title": "Tidy the potting shed",
+    "url": "https://linear.example/issue/GEO-9240",
+    "status": "Todo",
+    "statusType": "unstarted",
+    "project": "Lantern Garden",
+    "priority": {
+      "value": 3,
+      "name": "Medium"
+    },
+    "labels": ["Chore", "S", "Garden", "quality"],
+    "parentId": null,
+    "updatedAt": "2026-10-15T00:00:00Z"
+  },
+  {
+    "id": "GEO-9241",
+    "title": "Sort the seed drawers",
+    "url": "https://linear.example/issue/GEO-9241",
+    "status": "Todo",
+    "statusType": "unstarted",
+    "project": "Lantern Garden",
+    "priority": {
+      "value": 3,
+      "name": "Medium"
+    },
+    "labels": ["Chore", "S", "quality", "enabler"],
+    "parentId": null,
+    "updatedAt": "2026-10-15T00:00:00Z"
+  }
+]

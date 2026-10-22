@@ -1,0 +1,4 @@
+- id: issues
+  label: "Issues"
+  outcome: allow
+  note: "label and close kite issues."

@@ -1,0 +1,67 @@
+{
+  "sessions": [
+    {
+      "name": "z-stu",
+      "skill": "intake",
+      "cwd": "defs",
+      "model": "opus",
+      "wake": true,
+      "remoteControl": true,
+      "pluginDirs": ["~/projects/hq/mods/hq-band"],
+      "roles": ["owner"]
+    },
+    {
+      "name": "z-delivery",
+      "skill": "delivery-lead",
+      "cwd": "defs",
+      "model": "opus",
+      "wake": false,
+      "roles": ["orchestrator"],
+      "note": "woken by name"
+    },
+    {
+      "name": "z-triage",
+      "skill": "linear-triage",
+      "cwd": "defs",
+      "model": "opus",
+      "wake": true,
+      "roles": ["triage"]
+    },
+    {
+      "name": "z-steward",
+      "skill": "definitions-stewardship",
+      "cwd": "defs",
+      "model": "opus",
+      "wake": true,
+      "roles": ["steward"]
+    },
+    {
+      "name": "z-qa",
+      "skill": "preview-qa",
+      "cwd": "defs",
+      "model": "opus",
+      "wake": true,
+      "roles": ["qa"],
+      "note": "GEO-924"
+    },
+    {
+      "name": "z-review",
+      "skill": "pr-review",
+      "cwd": "defs",
+      "model": "sonnet",
+      "wake": true,
+      "roles": ["reviewer"],
+      "note": "reviews and merges final PRs (hq#100)"
+    },
+    {
+      "name": "z-q",
+      "skill": null,
+      "cwd": "hq",
+      "model": "opus",
+      "wake": true,
+      "prompt": "z-q-prompt.md",
+      "roles": ["developer"]
+    }
+  ],
+  "forwards": { "z-refine": "z-triage" }
+}

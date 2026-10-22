@@ -1,0 +1,165 @@
+{
+  "checkedAt": "2026-10-16T00:00:00Z",
+  "prs": [
+    {
+      "pr": "nixie#101",
+      "merged": true,
+      "mergedAt": "2026-10-10T12:00:00Z",
+      "release": "v0.90.0",
+      "pinned": "v0.90.0",
+      "pinFile": "infra/Pulumi.prod.yaml",
+      "deployed": true,
+      "reason": "production pin contains release"
+    },
+    {
+      "pr": "atc#201",
+      "merged": true,
+      "mergedAt": "2026-10-10T12:00:00Z",
+      "release": "@zgeoff/atc@9.80.0",
+      "pinned": "@zgeoff/atc@9.80.0",
+      "pinFile": "nixos/packages/atc.nix",
+      "deployed": true,
+      "reason": "production pin contains release"
+    },
+    {
+      "pr": "nixie#102",
+      "merged": true,
+      "mergedAt": "2026-10-10T12:00:00Z",
+      "release": "v0.91.0",
+      "pinned": "v0.90.0",
+      "pinFile": "infra/Pulumi.prod.yaml",
+      "deployed": false,
+      "reason": "production pin does not contain release"
+    },
+    {
+      "pr": "impz#301",
+      "merged": true,
+      "mergedAt": "2026-10-10T12:00:00Z",
+      "release": "v8.70.0",
+      "pinned": "abcd1234",
+      "pinFile": "nixos/flake.nix",
+      "deployed": true,
+      "reason": "production pin contains release"
+    },
+    {
+      "pr": "cloud#401",
+      "merged": true,
+      "mergedAt": "2026-10-10T12:00:00Z",
+      "release": null,
+      "pinned": null,
+      "pinFile": null,
+      "deployed": true,
+      "reason": "deploys on merge; a failed deploy-prod run would make this wrong"
+    },
+    {
+      "pr": "nixie#103",
+      "merged": false,
+      "mergedAt": null,
+      "release": null,
+      "pinned": null,
+      "pinFile": null,
+      "deployed": false,
+      "reason": "not merged"
+    },
+    {
+      "pr": "nixie#104",
+      "merged": true,
+      "mergedAt": "2026-10-10T12:00:00Z",
+      "release": null,
+      "pinned": "v0.90.0",
+      "pinFile": "infra/Pulumi.prod.yaml",
+      "deployed": false,
+      "reason": "not released yet"
+    },
+    {
+      "pr": "tools#601",
+      "merged": true,
+      "mergedAt": "2026-10-10T12:00:00Z",
+      "release": "@zgeoff/std@0.3.0",
+      "pinned": null,
+      "pinFile": null,
+      "deployed": true,
+      "reason": "a published release of each changed package contains merge"
+    },
+    {
+      "pr": "auto-mode#501",
+      "merged": true,
+      "mergedAt": "2026-10-10T12:00:00Z",
+      "release": "auto-mode-v0.80.0",
+      "pinned": "auto-mode-v0.81.0",
+      "pinFile": "images/agent/Dockerfile",
+      "deployed": true,
+      "reason": "production pin contains release"
+    },
+    {
+      "pr": "vers#402",
+      "merged": true,
+      "mergedAt": "2026-10-10T12:00:00Z",
+      "release": null,
+      "pinned": null,
+      "pinFile": null,
+      "deployed": true,
+      "reason": "deploys on merge"
+    },
+    {
+      "pr": "nixie#105",
+      "merged": true,
+      "mergedAt": "2026-10-10T12:00:00Z",
+      "release": "v0.90.0",
+      "pinned": "v0.90.0",
+      "pinFile": "infra/Pulumi.prod.yaml",
+      "deployed": true,
+      "reason": "production pin contains release"
+    },
+    {
+      "pr": "nixie#101",
+      "merged": true,
+      "mergedAt": "2026-10-10T12:00:00Z",
+      "release": "v0.90.0",
+      "pinned": "v0.90.0",
+      "pinFile": "infra/Pulumi.prod.yaml",
+      "deployed": true,
+      "reason": "production pin contains release"
+    },
+    {
+      "pr": "noslop#701",
+      "merged": true,
+      "mergedAt": "2026-10-12T12:00:00Z",
+      "release": null,
+      "pinned": null,
+      "pinFile": null,
+      "deployed": false,
+      "reason": "not released yet: @noslop/cli"
+    },
+    {
+      "pr": "hq#801",
+      "merged": true,
+      "mergedAt": "2026-10-12T12:00:00Z",
+      "release": "9.40.0",
+      "pinned": null,
+      "pinFile": null,
+      "deployed": true,
+      "reason": "installed hq contains merge"
+    },
+    {
+      "pr": "tools#602",
+      "merged": true,
+      "mergedAt": "2026-10-10T13:00:00Z",
+      "release": null,
+      "pinned": null,
+      "pinFile": null,
+      "deployed": false,
+      "reason": "not released yet: @zgeoff/tsconfig"
+    },
+    {
+      "pr": "hq#802",
+      "merged": true,
+      "mergedAt": "2026-10-14T12:00:00Z",
+      "release": "9.40.0",
+      "pinned": null,
+      "pinFile": null,
+      "deployed": false,
+      "reason": "installed hq does not contain merge yet"
+    }
+  ]
+}

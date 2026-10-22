@@ -1,0 +1,58 @@
+[
+  {
+    "id": "GEO-2001",
+    "createdAt": "2026-10-19T06:00:00.000Z",
+    "completedAt": null,
+    "canceledAt": null,
+    "description": "From widgets#12\n\nA retry loop never stops."
+  },
+  {
+    "id": "GEO-2002",
+    "createdAt": "2026-10-19T09:30:00Z",
+    "completedAt": null,
+    "canceledAt": null,
+    "description": "Found while reviewing https://github.com/someone/gadgets/pull/7 in the parser."
+  },
+  {
+    "id": "GEO-2003",
+    "createdAt": "2026-10-19T12:00:00Z",
+    "completedAt": null,
+    "canceledAt": null,
+    "description": "A plain request with no PR."
+  },
+  {
+    "id": "GEO-2004",
+    "createdAt": "2026-10-18T05:59:59Z",
+    "completedAt": "2026-10-19T08:00:00Z",
+    "canceledAt": null,
+    "description": "Filed the day before the window, closed inside it."
+  },
+  {
+    "id": "GEO-2005",
+    "createdAt": "2026-10-10T00:00:00Z",
+    "completedAt": null,
+    "canceledAt": "2026-10-19T10:00:00Z",
+    "description": null
+  },
+  {
+    "id": "GEO-2006",
+    "createdAt": "2026-10-10T00:00:00Z",
+    "completedAt": "2026-10-20T06:00:00Z",
+    "canceledAt": null,
+    "description": "Closed at the window end, so outside it."
+  },
+  {
+    "id": "GEO-2007",
+    "createdAt": "2026-10-19T05:59:59Z",
+    "completedAt": null,
+    "canceledAt": null,
+    "description": "From widgets#3, a second before the window."
+  },
+  {
+    "id": "GEO-2011",
+    "createdAt": "2026-10-19T15:00:00Z",
+    "completedAt": null,
+    "canceledAt": null,
+    "description": "From design https://linear.app/example/document/widget-plan-1a2b\n\nRoll the widget rule out."
+  }
+]

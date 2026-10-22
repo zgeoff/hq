@@ -1,0 +1,147 @@
+{
+  "kind": "weekly",
+  "start": "2026-10-12T00:00:00Z",
+  "totals": {
+    "prs": 6,
+    "repos": 2,
+    "issues": 4,
+    "added": 2345,
+    "removed": 1234
+  },
+  "prs": [
+    {
+      "number": 9401,
+      "url": "https://github.com/zgeoff/lantern-demo/pull/9401",
+      "repo": "lantern-demo",
+      "title": "Add sample for GEO-9401",
+      "day": "2026-10-15",
+      "issue": "GEO-9401"
+    },
+    {
+      "number": 9402,
+      "url": "https://github.com/zgeoff/lantern-demo/pull/9402",
+      "repo": "lantern-demo",
+      "title": "Add sample for GEO-9402",
+      "day": "2026-10-15",
+      "issue": "GEO-9402"
+    },
+    {
+      "number": 9403,
+      "url": "https://github.com/zgeoff/lantern-demo/pull/9403",
+      "repo": "lantern-demo",
+      "title": "Add sample for GEO-9402",
+      "day": "2026-10-16",
+      "issue": "GEO-9402"
+    },
+    {
+      "number": 9404,
+      "url": "https://github.com/zgeoff/paper-orchard/pull/9404",
+      "repo": "paper-orchard",
+      "title": "Add sample for GEO-9403",
+      "day": "2026-10-16",
+      "issue": "GEO-9403"
+    },
+    {
+      "number": 9406,
+      "url": "https://github.com/zgeoff/paper-orchard/pull/9406",
+      "repo": "paper-orchard",
+      "title": "Add sample for GEO-9499",
+      "day": "2026-10-16",
+      "issue": "GEO-9499"
+    },
+    {
+      "number": 9407,
+      "url": "https://github.com/zgeoff/paper-orchard/pull/9407",
+      "repo": "paper-orchard",
+      "title": "chore(samples): add a paper kite",
+      "day": "2026-10-16",
+      "issue": null
+    }
+  ],
+  "byIssue": [
+    {
+      "issue": "GEO-9401",
+      "prs": [
+        {
+          "number": 9401,
+          "url": "https://github.com/zgeoff/lantern-demo/pull/9401",
+          "repo": "lantern-demo",
+          "title": "Add sample for GEO-9401",
+          "day": "2026-10-15",
+          "issue": "GEO-9401"
+        }
+      ]
+    },
+    {
+      "issue": "GEO-9402",
+      "prs": [
+        {
+          "number": 9402,
+          "url": "https://github.com/zgeoff/lantern-demo/pull/9402",
+          "repo": "lantern-demo",
+          "title": "Add sample for GEO-9402",
+          "day": "2026-10-15",
+          "issue": "GEO-9402"
+        },
+        {
+          "number": 9403,
+          "url": "https://github.com/zgeoff/lantern-demo/pull/9403",
+          "repo": "lantern-demo",
+          "title": "Add sample for GEO-9402",
+          "day": "2026-10-16",
+          "issue": "GEO-9402"
+        }
+      ]
+    },
+    {
+      "issue": "GEO-9403",
+      "prs": [
+        {
+          "number": 9404,
+          "url": "https://github.com/zgeoff/paper-orchard/pull/9404",
+          "repo": "paper-orchard",
+          "title": "Add sample for GEO-9403",
+          "day": "2026-10-16",
+          "issue": "GEO-9403"
+        }
+      ]
+    },
+    {
+      "issue": "GEO-9499",
+      "prs": [
+        {
+          "number": 9406,
+          "url": "https://github.com/zgeoff/paper-orchard/pull/9406",
+          "repo": "paper-orchard",
+          "title": "Add sample for GEO-9499",
+          "day": "2026-10-16",
+          "issue": "GEO-9499"
+        }
+      ]
+    },
+    {
+      "issue": "GEO-9405",
+      "prs": [
+        {
+          "number": 9407,
+          "url": "https://github.com/zgeoff/lantern-demo/pull/9407",
+          "repo": "lantern-demo",
+          "title": "Add sample for GEO-9405",
+          "day": "2026-10-16",
+          "issue": "GEO-9405"
+        }
+      ]
+    }
+  ],
+  "noIssue": [
+    {
+      "number": 9407,
+      "url": "https://github.com/zgeoff/paper-orchard/pull/9407",
+      "repo": "paper-orchard",
+      "title": "chore(samples): add a paper kite",
+      "day": "2026-10-16",
+      "issue": null
+    }
+  ],
+  "searchCount": 7
+}

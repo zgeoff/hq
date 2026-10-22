@@ -1,0 +1,46 @@
+{
+  "designSlots": 1,
+  "lanes": {
+    "imp": {
+      "nixie-slice": 2,
+      "nixie-maintenance": 1,
+      "atc": 1,
+      "imp": 1,
+      "cloud": 1,
+      "memory": 1
+    },
+    "local": {
+      "flexible": 2,
+      "cleanup": 3,
+      "process": 1
+    }
+  },
+  "lends": {
+    "cleanup": false,
+    "memory": false
+  },
+  "imp": {
+    "impMib": 2048
+  },
+  "providers": {
+    "codex": {
+      "agent": "codex",
+      "threshold": 80,
+      "unattended": false,
+      "target": "local"
+    },
+    "claude": {
+      "agent": "claude",
+      "threshold": 95,
+      "unattended": true,
+      "target": "imp",
+      "localFallback": 2
+    }
+  },
+  "routes": {
+    "S": ["codex", "claude"],
+    "M": ["codex", "claude"],
+    "L": ["claude"],
+    "XL": ["claude"]
+  }
+}

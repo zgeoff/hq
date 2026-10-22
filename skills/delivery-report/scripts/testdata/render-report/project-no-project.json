@@ -1,0 +1,21 @@
+[
+  {
+    "id": "GEO-9409",
+    "title": "Oil the gate hinge",
+    "url": "https://linear.example/issue/GEO-9409",
+    "status": "Todo",
+    "statusType": "unstarted",
+    "project": null,
+    "priority": 3,
+    "labels": ["Chore"]
+  },
+  {
+    "id": "GEO-9410",
+    "title": "Count the stepping stones",
+    "url": "https://linear.example/issue/GEO-9410",
+    "status": "Done",
+    "statusType": "completed",
+    "priority": 4,
+    "labels": ["Chore"]
+  }
+]

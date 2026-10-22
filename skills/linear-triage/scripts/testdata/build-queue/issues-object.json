@@ -1,0 +1,46 @@
+{
+  "issues": [
+    {
+      "id": "GEO-9101",
+      "title": "Choose the lantern palette",
+      "url": "https://linear.example/issue/GEO-9101",
+      "status": "Todo",
+      "statusType": "unstarted",
+      "project": "Lantern Garden",
+      "priority": {
+        "value": 2,
+        "name": "High"
+      },
+      "labels": ["Feature", "M", "Garden"],
+      "parentId": null,
+      "updatedAt": "2026-10-15T00:00:00Z"
+    },
+    {
+      "id": "GEO-9105",
+      "title": "Choose a path width",
+      "url": "https://linear.example/issue/GEO-9105",
+      "status": "Todo",
+      "statusType": "unstarted",
+      "project": "Lantern Garden",
+      "priority": 2,
+      "labels": ["Feature", "M", "Garden"],
+      "parentId": null,
+      "updatedAt": "2026-10-13T00:00:00Z"
+    },
+    {
+      "id": "GEO-9103",
+      "title": "Repair the seed counter",
+      "url": "https://linear.example/issue/GEO-9103",
+      "status": "Todo",
+      "statusType": "unstarted",
+      "project": "Lantern Garden",
+      "priority": {
+        "value": 1,
+        "name": "Urgent"
+      },
+      "labels": ["Feature", "M", "Garden"],
+      "parentId": null,
+      "updatedAt": "2026-10-15T00:00:00Z"
+    }
+  ]
+}

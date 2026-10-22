@@ -1,0 +1,7 @@
+pacing: missing designSlots
+pacing.lanes.imp.atc: want integer, got string
+pacing.lanes.imp.Bad Name: bad name
+pacing.providers.claude.target: "cloud" is not one of ["imp","local"]
+pacing: unexpected key extra
+pacing.routes.S: unknown provider gpt
+pacing.lanes: atc is in both imp and local

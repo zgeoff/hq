@@ -1,0 +1,46 @@
+{
+  "issues": [
+    {
+      "id": "GEO-9211",
+      "title": "Retire the spare arch",
+      "url": "https://linear.example/issue/GEO-9211",
+      "status": "Done",
+      "statusType": "completed",
+      "project": null,
+      "priority": 0,
+      "labels": [],
+      "parentId": null,
+      "updatedAt": "2026-10-15T00:00:00Z"
+    },
+    {
+      "id": "GEO-9212",
+      "title": "Discard the spare bench",
+      "url": "https://linear.example/issue/GEO-9212",
+      "status": "Canceled",
+      "statusType": "canceled",
+      "project": "Lantern Garden",
+      "priority": {
+        "value": 3,
+        "name": "Medium"
+      },
+      "labels": ["Feature", "M", "Garden"],
+      "parentId": null,
+      "updatedAt": "2026-10-15T00:00:00Z"
+    },
+    {
+      "id": "GEO-9213",
+      "title": "Duplicate the border task",
+      "url": "https://linear.example/issue/GEO-9213",
+      "status": "Duplicate",
+      "statusType": "duplicate",
+      "project": "Lantern Garden",
+      "priority": {
+        "value": 3,
+        "name": "Medium"
+      },
+      "labels": ["Feature", "M", "Garden"],
+      "parentId": null,
+      "updatedAt": "2026-10-15T00:00:00Z"
+    }
+  ]
+}

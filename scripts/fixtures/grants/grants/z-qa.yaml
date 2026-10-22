@@ -1,0 +1,8 @@
+- id: github
+  label: "GitHub"
+  outcome: allow
+  note: "read zgeoff PRs and their comments."
+- id: previews
+  label: "Previews"
+  outcome: allow
+  note: "open the paper kite preview and click through it."

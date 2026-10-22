@@ -1,0 +1,39 @@
+[
+  {
+    "id": "GEO-990",
+    "title": "Warm the invented lantern cache before each build",
+    "status": "Ready",
+    "project": "Lanterns",
+    "labels": []
+  },
+  {
+    "id": "GEO-991",
+    "title": "Warm the invented lantern cache before each build: part one",
+    "status": "Backlog",
+    "project": "Lanterns",
+    "labels": [],
+    "parentId": "GEO-990"
+  },
+  {
+    "id": "GEO-992",
+    "title": "Prune stale invented kettle records nightly",
+    "status": "Ready",
+    "project": "Lanterns",
+    "labels": []
+  },
+  {
+    "id": "GEO-993",
+    "title": "Prune stale invented kettle records every night",
+    "status": "Ready",
+    "project": "Lanterns",
+    "labels": []
+  },
+  {
+    "id": "GEO-995",
+    "title": "Prune stale invented kettle records nightly, first slice",
+    "status": "Backlog",
+    "project": "Lanterns",
+    "labels": [],
+    "parent": { "identifier": "GEO-992" }
+  }
+]

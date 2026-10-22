@@ -1,0 +1,7 @@
+# gitleaks' default rules, with the invented values the tests use allowed by the words they carry.
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "invented test values"
+stopwords = ["invent", "kettle", "abcdef"]

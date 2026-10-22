@@ -1,0 +1,44 @@
+[
+  {
+    "id": "GEO-9102",
+    "title": "Choose the map palette",
+    "url": "https://linear.example/issue/GEO-9102",
+    "status": "Todo",
+    "statusType": "unstarted",
+    "project": "Lantern Garden",
+    "priority": {
+      "value": 3,
+      "name": "Medium"
+    },
+    "labels": ["Feature", "M", "Garden"],
+    "parentId": null,
+    "updatedAt": "2026-10-15T00:00:00Z"
+  },
+  {
+    "id": "GEO-9103",
+    "title": "Repair the seed counter",
+    "url": "https://linear.example/issue/GEO-9103",
+    "status": "Todo",
+    "statusType": "unstarted",
+    "project": "Lantern Garden",
+    "priority": {
+      "value": 1,
+      "name": "Urgent"
+    },
+    "labels": ["Feature", "M", "Garden"],
+    "parentId": null,
+    "updatedAt": "2026-10-15T00:00:00Z"
+  },
+  {
+    "id": "GEO-9104",
+    "title": "Archive the old garden sketch",
+    "url": "https://linear.example/issue/GEO-9104",
+    "status": "Todo",
+    "statusType": "unstarted",
+    "project": "Lantern Garden",
+    "priority": 0,
+    "labels": ["Feature", "M", "Garden"],
+    "parentId": null,
+    "updatedAt": "2026-10-15T00:00:00Z"
+  }
+]

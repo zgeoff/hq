@@ -1,0 +1,10 @@
+GEO-950	GEO-952	1	accept, fields, parser, unknown
+GEO-951	GEO-953	1	fields, parser, reject, unknown
+GEO-657	GEO-940	0.88	age, exclude, gate, hono, matures, once, release
+GEO-952	GEO-953	0.8	allow, fields, parser, unknown
+GEO-658	GEO-940	0.75	age, exclude, gate, matures, once, release
+GEO-674	GEO-940	0.75	age, exclude, gate, matures, once, release
+GEO-676	GEO-940	0.75	age, exclude, gate, matures, once, release
+GEO-950	GEO-951	0.75	fields, parser, unknown
+GEO-950	GEO-953	0.75	fields, parser, unknown
+GEO-951	GEO-952	0.75	fields, parser, unknown

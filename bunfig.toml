@@ -1,0 +1,3 @@
+[test]
+pathIgnorePatterns = ["mods/**"]
+preload = ["./test/msw-preload.ts", "./test/env-preload.ts"]

@@ -1,0 +1,40 @@
+[
+  {
+    "data": {
+      "search": {
+        "pageInfo": {
+          "hasNextPage": false,
+          "endCursor": null
+        },
+        "nodes": [
+          {
+            "number": 9320,
+            "title": "GEO-9320: add a sample",
+            "url": "https://github.com/zgeoff/lantern-demo/pull/9320",
+            "body": "",
+            "headRefName": "sample-9320",
+            "state": "OPEN",
+            "mergedAt": null,
+            "isDraft": false,
+            "repository": {
+              "name": "lantern-demo"
+            }
+          },
+          {
+            "number": 9321,
+            "title": "Record the sample",
+            "url": "https://github.com/zgeoff/hq/pull/9321",
+            "body": "",
+            "headRefName": "sample-9321",
+            "state": "OPEN",
+            "mergedAt": null,
+            "isDraft": false,
+            "repository": {
+              "name": "hq"
+            }
+          }
+        ]
+      }
+    }
+  }
+]

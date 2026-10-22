@@ -1,0 +1,97 @@
+[
+  {
+    "id": "GEO-901",
+    "title": "cloud: move the check runner to one central job",
+    "status": "Ready",
+    "project": "Tools",
+    "labels": ["Chore", "S", "tools"],
+    "description": "Replace the per-repo runners."
+  },
+  {
+    "id": "GEO-905",
+    "title": "Move check runner into a central job",
+    "status": "Backlog",
+    "project": "Tools",
+    "labels": ["Chore", "M", "tools"],
+    "description": "One job runs every check."
+  },
+  {
+    "id": "GEO-902",
+    "title": "tools: add `bun run lint:zones` to each repo",
+    "status": "In Progress",
+    "project": "Tools",
+    "labels": ["Feature", "M", "tools"],
+    "description": "Reads `sync/lint/zones.json` in every repo."
+  },
+  {
+    "id": "GEO-906",
+    "title": "Add the zones lint to the release check",
+    "status": "Ready",
+    "project": "Tools",
+    "labels": ["Feature", "S", "tools"],
+    "description": "The release check reads sync/lint/zones.json too."
+  },
+  {
+    "id": "GEO-903",
+    "title": "Fix the login page colour",
+    "status": "Backlog",
+    "project": "Tools",
+    "labels": ["Bug", "S", "tools"]
+  },
+  {
+    "id": "GEO-907",
+    "title": "Rotate the backup key",
+    "status": "Ready",
+    "project": "Tools",
+    "labels": ["Chore", "S", "tools"]
+  },
+  {
+    "id": "GEO-908",
+    "title": "Rename the widget cache folder",
+    "status": "Backlog",
+    "project": "Tools",
+    "labels": ["Chore", "S", "tools"]
+  },
+  {
+    "id": "GEO-909",
+    "title": "Rename widget cache folder",
+    "status": "Backlog",
+    "project": "Tools",
+    "labels": ["Chore", "S", "tools"]
+  },
+  {
+    "id": "GEO-914",
+    "title": "Move the check runner to a central job",
+    "status": "Done",
+    "project": "Tools",
+    "labels": ["Chore", "S", "tools"]
+  },
+  {
+    "id": "GEO-915",
+    "title": "tools: drop the hono override once its dependents resolve a patched release",
+    "status": "Backlog",
+    "project": "Tools",
+    "labels": ["Chore", "S", "tools"]
+  },
+  {
+    "id": "GEO-916",
+    "title": "tools: drop the qs override once its dependents resolve a patched release",
+    "status": "Backlog",
+    "project": "Tools",
+    "labels": ["Chore", "S", "tools"]
+  },
+  {
+    "id": "GEO-917",
+    "title": "atc: split the files over 500 lines",
+    "status": "Ready",
+    "project": "Tools",
+    "labels": ["Chore", "M", "tools"]
+  },
+  {
+    "id": "GEO-918",
+    "title": "impz: split the files over 500 lines",
+    "status": "Ready",
+    "project": "Tools",
+    "labels": ["Chore", "M", "tools"]
+  }
+]

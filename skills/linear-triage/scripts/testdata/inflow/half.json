@@ -1,0 +1,23 @@
+{
+  "issues": [
+    {
+      "id": "GEO-2101",
+      "createdAt": "2026-10-19T07:00:00Z",
+      "completedAt": null,
+      "canceledAt": null,
+      "description": "A new request."
+    },
+    {
+      "id": "GEO-2102",
+      "createdAt": "2026-10-01T00:00:00Z",
+      "completedAt": "2026-10-19T07:00:00Z",
+      "canceledAt": null
+    },
+    {
+      "id": "GEO-2103",
+      "createdAt": "2026-10-01T00:00:00Z",
+      "completedAt": null,
+      "canceledAt": "2026-10-19T08:00:00Z"
+    }
+  ]
+}
