@@ -17,6 +17,8 @@ import { syncGoals } from '../goals/sync-goals.ts';
 import { goalsWeeklyTick } from '../goals/weekly/goals-weekly-tick.ts';
 import { syncKinds } from '../kinds/sync-kinds.ts';
 import { syncLinear } from '../kinds/sync-linear.ts';
+import { syncRunIssues } from '../linear/sync-run-issues.ts';
+import { dropCanceledRuns } from '../runs/drop-canceled-runs.ts';
 import { readCapacity } from '../lanes/read-capacity.ts';
 import { readLanes } from '../lanes/read-lanes.ts';
 import { tick } from '../lanes/tick.ts';
@@ -137,6 +139,21 @@ export async function watchTick(db: Database, d: WatchDeps): Promise<boolean> {
     } catch (e) {
       noteGhAuth(db, msg(e));
       d.log(`${at()} releases failed: ${msg(e)}`);
+    }
+    try {
+      // The Linear state of each open run's issue, at most every 10 min: the sweep alerts on a
+      // closed one, and a run whose issue was canceled before any merge is dropped here.
+      if (Date.now() - Date.parse(getMeta(db, 'run_issues_checked_at') ?? '1970-01-01T00:00:00Z') > 10 * 60_000) {
+        // The throttle: set even when the read fails.
+        setMeta(db, 'run_issues_checked_at', at());
+        await step('run issues in Linear', () => syncRunIssues(db, makeAuditedLinearCaller(db, d.run)));
+        const dropped = dropCanceledRuns(db, d.me);
+        if (dropped.length > 0) {
+          d.log(`${at()} run issues: dropped ${dropped.join(', ')}, canceled in Linear before any merge`);
+        }
+      }
+    } catch (error) {
+      d.log(`${at()} run issues in Linear failed: ${msg(error)}`);
     }
     try {
       const conditions = await step('unblock conditions', () => runUnblockConditionsTick(db, { call: makeAuditedLinearCaller(db, d.run), run: d.run }, d.me));

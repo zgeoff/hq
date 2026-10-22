@@ -1,6 +1,7 @@
 import type { Database } from 'bun:sqlite';
 import type { SessionInfo } from '../atc/session-schema.ts';
 import { countMinutesSince as mins } from './count-minutes-since.ts';
+import { readClosedIssueAlerts } from './read-closed-issue-alerts.ts';
 import { listRuns } from './list-runs.ts';
 import { sameSha } from './same-sha.ts';
 import { SWEEP_MINUTES as SWEEP } from './sweep-minutes.ts';
@@ -50,7 +51,7 @@ export function findAlerts(db: Database, sessions: SessionInfo[], activity: Map<
       }
     }
   }
-  return alerts;
+  return [...alerts, ...readClosedIssueAlerts(db)];
 }
 
 // The run's active sessions, and with no active main session, the main one that ended last when the

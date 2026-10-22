@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.87.0 — 2026-10-23
+
+The sweep now sees an open run whose Linear issue is closed (z-delivery: an audit found 41).
+
+- Every 10 minutes the watcher reads the Linear state of each open run's issue.
+- The run sweep alerts on each open run whose issue is Done or Canceled in Linear, with what to do: `hq run done`, `hq run drop`, or a look first when a PR is still open. A merged run on its way to live raises nothing, since a "Fixes" merge closes the issue before the release.
+- hq drops a run by itself only when Linear canceled its issue, the run has no open or merged PR, and a clean GitHub pass in the same tick saw that. It notes why on the run and tells z-delivery in one message.
+
 ## 0.86.0 — 2026-10-23
 
 `/hq close` closes the hq pane in z-stu's session. Before, it opened the pane again, so the pane could not be closed.
