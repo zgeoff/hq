@@ -168,3 +168,15 @@ test('hq followup add GEO-n --from repo#n records a review follow-up without --b
 
   expect(ctx.db.query('SELECT issue, from_ref, filed_at, source, added_by FROM followups').all()).toStrictEqual([{ issue: 'GEO-9807', from_ref: 'widgets#7', filed_at: ctx.now, source: 'review', added_by: 'z-review' }]);
 });
+
+test('the Linear sync stamps the filed and In Progress issues with the time it was given, not the clock', async () => {
+  const ctx = setupTest();
+  const at = '2026-10-16T05:00:00Z';
+
+  await syncLinear(ctx.db, makeThroughputLinearCall([buildFiledNode('GEO-9801', 'Descale the kettle.')], [{ identifier: 'GEO-9802', startedAt: '2026-10-16T01:00:00Z' }]), new Date('2026-10-14T00:00:00Z'), new Date(at));
+
+  expect({
+    filed: ctx.db.query('SELECT issue, fetched_at FROM linear_filed').all(),
+    started: ctx.db.query('SELECT issue, fetched_at FROM linear_started').all(),
+  }).toStrictEqual({ filed: [{ issue: 'GEO-9801', fetched_at: at }], started: [{ issue: 'GEO-9802', fetched_at: at }] });
+});

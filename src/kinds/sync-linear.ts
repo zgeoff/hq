@@ -24,7 +24,7 @@ export async function syncLinear(db: Database, call: LinearCall, from: Date, at:
     throw e;
   }
   const filed = await syncFiled(db, call, from, at);
-  const started = await syncStarted(db, call);
+  const started = await syncStarted(db, call, at);
   setMeta(db, 'linear_throughput_at', iso(at));
   return { closed, typed, filed, started };
 }

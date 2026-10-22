@@ -36,7 +36,7 @@ export async function syncFiled(db: Database, call: LinearCall, from: Date, to: 
   for (let page = 0; page < 40; page++) {
     const answer = await call(query, { after, from: iso(from), to: iso(to) });
     const issues = filedPageSchema.parse(answer).issues;
-    const fetchedAt = iso(now());
+    const fetchedAt = iso(to);
     db.transaction(() => {
       for (const node of issues.nodes) {
         const description = node.description ?? '';
