@@ -90,6 +90,11 @@ hq 0.79.0: headquarters for the z- sessions. Every command takes --json.
                                              hq reads Ready per lane from Linear every 10 min; this reports it by hand when that read fails (fresh 30 min, a 0 for 3 h); a lane with free slots and 0 Ready lends to an area short of slots;
                                              --ready-total is every Ready issue seen in Linear, --skipped the ones not counted, each with a reason
   hq lanes ready --count N                    report a total Ready count only (the old form)
+  hq focus [show] | clear                     the lanes' focus with each term's Ready and Backlog matches; clear goes back to all eligible work by priority
+  hq focus set <term>[,<term>...] [--reserve <area>=<n>]...
+                                             steer what free lane slots take, from the next tick; terms in priority order, filters in a term joined by ":":
+                                             maintenance|roadmap, bug|feature|chore|improvement|investigation, an area, project=<name>, label=<name>, urgent|high+|medium+;
+                                             a reserve keeps n slots for an area and lends them while it has nothing eligible
 
   hq call|proposal add <id> (--title T --question Q (--body TEXT | --body-file F|-) | --item F|-)
                            [--issues GEO-1,GEO-2] [--for SESSION] [--order N|none]
