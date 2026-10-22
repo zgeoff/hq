@@ -140,6 +140,15 @@ test('it reports a failed memory-pressure read as a problem', async () => {
   expect(result.unknown).toContain('memory:pressure');
 });
 
+test('it clears a problem whose line spans two lines, filing the news on one line', () => {
+  const checks = [{ key: 'backup', ok: false, line: 'hq backup: last error: invented sqlite3 failure\ndatabase is locked' }];
+  applyHealth(db, checks, {}, 'hq-lanes');
+
+  applyHealth(db, [{ key: 'backup', ok: true, line: 'hq backup: last good 0.5 h ago' }], {}, 'hq-lanes');
+
+  expect(listNews(db, { all: false, limit: 10 }).map((news) => news.text)).toStrictEqual([expect.stringContaining('Cleared: hq backup: last error: invented sqlite3 failure database is locked (open since')]);
+});
+
 test('a command that hangs counts as a failed read', async () => {
   const p = probe(world());
   const hang: Probe = { ...p, run: async (cmd) => (cmd[0] === 'df' ? new Promise(() => {}) : p.run(cmd)) };

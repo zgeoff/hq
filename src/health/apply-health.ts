@@ -35,7 +35,7 @@ export function applyHealth(db: Database, checks: Check[], samples: Samples, act
       }
       for (const c of cleared) {
         logEvent(db, 'hq', 'health', 'cleared', actor, null, null, { key: c.key });
-        addNews(db, { from: 'hq-health', topic: 'fix', text: `Cleared: ${c.line} (open since ${c.since})`.slice(0, 400), issue: null, link: null, needsGeoff: false });
+        addNews(db, { from: 'hq-health', topic: 'fix', text: `Cleared: ${c.line.replaceAll(/\s*[\r\n]+\s*/gu, ' ')} (open since ${c.since})`.slice(0, 400), issue: null, link: null, needsGeoff: false });
       }
       return { checks, opened, cleared };
     })
