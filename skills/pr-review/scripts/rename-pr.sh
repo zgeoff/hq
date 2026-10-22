@@ -59,7 +59,13 @@ base=$(jq -r .baseRefOid <<<"$pr_json")
 head=$(jq -r .headRefOid <<<"$pr_json")
 [ "$state" = OPEN ] || fail "the PR is $state"
 
-gh api "repos/zgeoff/$repo/pulls/$pr/files" --paginate | jq -s 'add // []' >"$work/files.json"
+# The changed files at the pinned head, not the PR's file list: that list follows the PR's
+# current head, so a push while this runs could hide a file from the comparison.
+gh api "repos/zgeoff/$repo/compare/$base...$head?per_page=100" --paginate >"$work/compare.json" ||
+  fail "the changes from $base to $head could not be read"
+jq -s '[.[].files // [] | .[]] | unique_by(.filename)' "$work/compare.json" >"$work/files.json"
+# The compare API lists at most 300 files, so a longer list may be cut short.
+[ "$(jq length "$work/files.json")" -lt 300 ] || fail "the PR changes 300 or more files, more than the compare API lists"
 
 # text <path> <ref>: the file's content at the ref. Each path segment is URL-encoded, since
 # a PR names its files and a "#" or "?" in a raw name would cut the ref off the URL.
@@ -313,6 +319,9 @@ while IFS=$'\t' read -r name status prev; do
   [ -z "$diff" ] || fail "$name: $diff"
   count=$((count + 1))
 done <"$work/guarded.tsv"
+
+now=$(gh pr view "$pr" -R "zgeoff/$repo" --json headRefOid --jq .headRefOid)
+[ "$now" = "$head" ] || fail "the PR head moved from $head to $now while the check ran"
 
 list=$(awk -F'\t' '{ print $2 " -> " $3 }' "$work/pairs.tsv" | sort -u | paste -sd, - | sed 's/,/, /g')
 echo "ok: $count skill files are pure renames of ${list:-nothing}"

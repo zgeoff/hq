@@ -10,15 +10,21 @@ work=$(mktemp -d "${TMPDIR:-$here}/rename-pr-test.XXXXXX")
 trap 'rm -rf "$work"' EXIT
 
 # The stand-in gh. STATE shapes the pr view; $CASE/entries holds one JSON line per
-# changed file, and $CASE/<ref>/<path> holds a file's text at base1 or head1.
+# file changed from base1 to head1, and $CASE/<ref>/<path> holds a file's text at base1
+# or head1. $CASE/current-entries, when present, is the PR's file list at a newer head,
+# and $CASE/moved makes every pr view after the first report head2.
 cat >"$work/gh" <<'GH'
 #!/usr/bin/env bash
 set -euo pipefail
 args="$*"
 case $args in
+  "pr view"*"--jq .headRefOid")
+    if [ -f "$CASE/moved" ]; then echo head2; else echo head1; fi ;;
   "pr view"*)
     printf '{"state":"%s","baseRefOid":"base1","headRefOid":"head1"}\n' "$STATE" ;;
-  "api repos/zgeoff/demo/pulls/7/files"*) jq -s . "$CASE/entries" ;;
+  "api repos/zgeoff/demo/compare/base1...head1?per_page=100 --paginate") jq -s '{files: .}' "$CASE/entries" ;;
+  "api repos/zgeoff/demo/pulls/7/files"*)
+    if [ -f "$CASE/current-entries" ]; then jq -s . "$CASE/current-entries"; else jq -s . "$CASE/entries"; fi ;;
   "api repos/zgeoff/demo/contents/"*"--jq .content")
     # Parse the URL as an HTTP client does: a fragment never reaches the server, the
     # query starts at the first "?", the path is percent-decoded, and no ref means
@@ -353,5 +359,20 @@ put base1 "$cut" $'# Demo\n\nRun `check --strict`.'
 put head1 "$cut" $'# Demo\n\nRun `check --loose`.'
 put base1 skills/demo/run $'# Demo\n\nRun `check --strict`.'
 expect "a # in a skill file name cannot point the head read at the base" 1 "no: $cut: Run \`check --loose\`."
+
+new_case
+code_rename
+skill_case $'# Demo\n\nCall `findFreePorts` before launch.' $'# Demo\n\nCall `reservePorts` before launch.'
+entry skills/demo/references/rules.md modified ""
+put base1 skills/demo/references/rules.md $'# Rules\n\nAsk the owner first.'
+put head1 skills/demo/references/rules.md $'# Rules\n\nSkip the owner.'
+grep -v 'rules.md' "$CASE/entries" >"$CASE/current-entries"
+expect "a skill edit at the pinned head fails even when the PR's current file list leaves it out" 1 "no: skills/demo/references/rules.md: Skip the owner."
+
+new_case
+code_rename
+skill_case $'# Demo\n\nCall `findFreePorts` before launch.' $'# Demo\n\nCall `reservePorts` before launch.'
+: >"$CASE/moved"
+expect "a PR whose head moves while the check runs fails" 1 "no: the PR head moved from head1 to head2 while the check ran"
 
 [ "$failures" -eq 0 ]
