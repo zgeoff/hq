@@ -26,9 +26,9 @@ export function measure(db: Database, from: Date, to: Date, at: Date = now()): M
   const d = g.deploys;
   const ok = d?.applied_ok ?? 0;
   const dn = d ? d.applied_ok + d.applied_failed + d.applied_cancelled : 0;
-  const side = d ? `${d.held ? `, ${d.held} held` : ''}${d.no_apply ? `, ${d.no_apply} no-apply` : ''}${d.unclassified ? `, ${d.unclassified} not yet classified` : ''}` : '';
+  const side = d ? `${d.held ? `, ${d.held} held` : ''}${d.no_apply ? `, ${d.no_apply} no-apply` : ''}${d.unknown ? `, ${d.unknown} unknown outcome` : ''}${d.unclassified ? `, ${d.unclassified} not yet classified` : ''}` : '';
   const base = share(pct(ok, dn), dn, 'applies', `${Math.round((100 * ok) / (dn || 1))}% (${ok}/${dn} applies)`);
-  const deploys: Measure = { ...base, detail: `${base.detail}${side}`, ...(side ? { extra: side } : {}), ...(d?.unclassified ? { unclassified: d.unclassified } : {}) };
+  const deploys: Measure = { ...base, detail: `${base.detail}${side}`, ...(side ? { extra: side } : {}), ...(d?.unclassified ? { unclassified: d.unclassified } : {}), ...(d?.unknown ? { unknown: d.unknown } : {}) };
 
   const dt = downtime(db, from, new Date(t));
   // A window the probe saw only blind (the PC offline) holds no reading of Nix: no data, never green.

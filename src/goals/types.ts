@@ -22,6 +22,9 @@ export interface Measure {
   blind?: number; // downtime only: minutes the probe could not see
   ci?: number; // cost only: CI minutes in the window
   unclassified?: number; // deploys only: completed runs not yet read from GitHub; the value is partial, never judged
+
+  // deploys only: classified runs whose outcome hq could not read; the value is partial, never judged
+  unknown?: number;
   extra?: string; // deploys only: what the rate leaves out (holds, no-apply runs, unclassified), for the reports
   missing?: number; // past days in the window whose data hq has not fetched: the value is incomplete, never judged
 }
@@ -35,7 +38,9 @@ export interface GoalRow {
   from: string;
   to: string;
   partial: boolean;
-  deploys: { runs: number; ok: number; failed: number; cancelled: number; running: number; applied_ok: number; applied_failed: number; applied_cancelled: number; held: number; no_apply: number; unclassified: number } | null; // null: before the workflow existed; the applied_* to unclassified fields come from deploy_runs
+
+  // null: before the workflow existed; the applied_* to unclassified fields come from deploy_runs
+  deploys: { runs: number; ok: number; failed: number; cancelled: number; running: number; applied_ok: number; applied_failed: number; applied_cancelled: number; held: number; no_apply: number; unknown: number; unclassified: number } | null;
   log: { deploy: number; hold: number } | null; // null: before the log starts
   ci: { runs: number; failed: number; cancelled: number; reruns: number; minutes: number; wasteMinutes: number; rawMinutes: number; rawWasteMinutes: number; missing: number }; // raw: unrounded, for target checks
   merged: number;

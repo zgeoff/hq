@@ -123,6 +123,18 @@ test('deploy-prod with a run not yet classified keeps its value but gets no colo
   expect(verdict(DEFAULT_TARGETS.deploys, r)).toBe('none');
 });
 
+test('it names an unknown deploy outcome and withholds the colour while one remains', () => {
+  for (let index = 0; index < 9; index++) {
+    deployRun(100 + index, 'applied_ok');
+  }
+  deployRun(200, 'unknown', { conclusion: 'success' });
+
+  const result = measure(db, FROM, TO, NOW).deploys;
+
+  expect(result).toMatchObject({ value: 100, unknown: 1, detail: '100% (9/9 applies), 1 unknown outcome' });
+  expect(verdict(DEFAULT_TARGETS.deploys, result)).toBe('none');
+});
+
 test('deploy-prod with no applies has no data, still naming holds', () => {
   deployRun(1, 'held', { conclusion: 'failure' });
   deployRun(2, 'no_apply');

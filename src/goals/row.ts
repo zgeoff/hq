@@ -36,7 +36,7 @@ export function row(db: Database, label: string, lo: number, hi: number, at: Dat
     from,
     to,
     partial: hi > at.getTime(),
-    deploys: depFirst.t && to > depFirst.t ? { runs: dep.length, ok: dep.filter((r) => r.conclusion === 'success').length, failed: dep.filter((r) => FAILED.includes(r.conclusion ?? '')).length, cancelled: dep.filter((r) => r.conclusion === 'cancelled').length, running: dep.filter((r) => r.status !== 'completed').length, applied_ok: kind('applied_ok'), applied_failed: kind('applied_failed'), applied_cancelled: kind('cancelled'), held: kind('held'), no_apply: kind('no_apply'), unclassified: dep.filter((r) => r.status === 'completed' && !classified(r)).length } : null,
+    deploys: depFirst.t && to > depFirst.t ? { runs: dep.length, ok: dep.filter((run) => run.conclusion === 'success').length, failed: dep.filter((run) => FAILED.includes(run.conclusion ?? '')).length, cancelled: dep.filter((run) => run.conclusion === 'cancelled').length, running: dep.filter((run) => run.status !== 'completed').length, applied_ok: kind('applied_ok'), applied_failed: kind('applied_failed'), applied_cancelled: kind('cancelled'), held: kind('held'), no_apply: kind('no_apply'), unknown: kind('unknown'), unclassified: dep.filter((run) => run.status === 'completed' && !classified(run)).length } : null,
     log: log.from && to > log.from ? { deploy: inLog.filter((e) => e.kind === 'DEPLOY').length, hold: inLog.filter((e) => e.kind === 'HOLD').length } : null,
     ci: {
       runs: rs.length,
