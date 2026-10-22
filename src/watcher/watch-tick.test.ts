@@ -68,20 +68,21 @@ test('a due kinds sync reads the Linear key from 1Password once and records that
 // side are due. Linear holds one issue filed today that points at a PR with no follow-up record.
 test('a due Linear sync tells triage about a bad filing once across two passes', async () => {
   const answers: Record<string, RunResult> = {
-      bash: { code: 0, stdout: JSON.stringify({ imp: { freeMib: 0, room: false }, providers: { claude: { room: false, unattended: true, target: 'imp' } } }), stderr: '' },
-      gh: { code: 0, stdout: '[]', stderr: '' },
-      op: { code: 0, stdout: 'lin_api_INVENTEDkettleKEY0042\n', stderr: '' },
-    },
-    ctx = setupTest(),
-    run: Runner = (cmd) => Promise.resolve(answers[cmd[0] ?? ''] ?? { code: 1, stdout: '', stderr: 'invented: no answer for this command' });
+    bash: { code: 0, stdout: JSON.stringify({ imp: { freeMib: 0, room: false }, providers: { claude: { room: false, unattended: true, target: 'imp' } } }), stderr: '' },
+    gh: { code: 0, stdout: '[]', stderr: '' },
+    op: { code: 0, stdout: 'lin_api_INVENTEDkettleKEY0042\n', stderr: '' },
+  };
+  const ctx = setupTest();
+  const run: Runner = (cmd) => Promise.resolve(answers[cmd[0] ?? ''] ?? { code: 1, stdout: '', stderr: 'invented: no answer for this command' });
   onTestFinished(overrideEnv('HQ_NOW', '2026-10-16T07:00:00Z'));
   for (const key of ['goals_synced_at', 'goals_ok_at', 'linear_synced_at']) {
     setMeta(ctx.db, key, '2026-10-16T07:00:00Z');
   }
   const filed = [buildFiledNode('GEO-9801', 'From widgets#7\n\nThe widget drops a retry.')];
   server.use(
-    http.post('https://api.linear.app/graphql', async ({ request }) => {
-      const body = z.object({ query: z.string() }).parse(await request.json());
+    http.post('https://api.linear.app/graphql', async (resolver) => {
+      const json = await resolver.request.json();
+      const body = z.object({ query: z.string() }).parse(json);
       const nodes = body.query.includes('createdAt: {') ? filed : [];
       return HttpResponse.json({ data: { issues: { nodes, pageInfo: { hasNextPage: false, endCursor: null } } } });
     }),

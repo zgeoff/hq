@@ -4,10 +4,9 @@ import { enqueue } from '../../outbox/enqueue.ts';
 import { findRoleName } from '../../roles/find-role-name.ts';
 import { THROUGHPUT_LINES } from './throughput-lines.ts';
 
-// Each throughput item a line flags in [from, at) goes to the triage session as its own message,
-// once: the event that records the send is the mark, so a later pass skips it. The caller passes the
-// window it just read from Linear, not the Sydney day: an issue filed just before midnight and read
-// just after still alerts.
+// Each item a line flags in [from, at) goes to triage as its own message, once: the send's event is
+// the mark a later pass skips on. [from, at) is the window just read from Linear, not the Sydney
+// day, so an issue filed just before midnight and read just after still alerts.
 export function sendThroughputAlerts(db: Database, actor: string, from: Date, at: Date): string[] {
   const triage = findRoleName('triage');
   if (triage === null) {
