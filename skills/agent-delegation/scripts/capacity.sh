@@ -34,14 +34,22 @@ imp_room() {
 }
 
 # The usage endpoint rate-limits (429) when a tick tries several lanes in a row, so a good
-# reading is reused for 2 minutes. A failed call is never cached: it still means no room.
+# reading is reused for 2 minutes, from the active account's own copy only: the owner rotates
+# accounts, and another account's reading says nothing about this one. A failed call is never
+# cached: it still means no room.
 claude_cache="${XDG_CACHE_HOME:-$HOME/.cache}/z-capacity/claude-usage.json"
 claude_usage() {
-  local token out email account
-  if [ -f "$claude_cache" ] && [ $(( $(date +%s) - $(stat -c %Y "$claude_cache") )) -lt 120 ]; then
-    out=$(jq -ce 'select(.used | type == "number") | . + {cached: true}' "$claude_cache" 2>/dev/null) && { echo "$out"; return; }
+  local token out email account="" account_cache=""
+  # The token and `claude auth status` both follow CLAUDE_CONFIG_DIR, so they name one account,
+  # named by a short hash of the login email (never the token).
+  email=$(timeout 10 claude auth status --json 2>/dev/null | jq -r '.email // empty' 2>/dev/null) || true
+  if [ -n "$email" ]; then
+    account=$(printf '%s' "$email" | sha256sum | cut -c1-12)
+    account_cache="${claude_cache%.json}/$account.json"
   fi
-  # The token and `claude auth status` both follow CLAUDE_CONFIG_DIR, so they name one account.
+  if [ -n "$account_cache" ] && [ -f "$account_cache" ] && [ $(( $(date +%s) - $(stat -c %Y "$account_cache") )) -lt 120 ]; then
+    out=$(jq -ce 'select(.used | type == "number") | . + {cached: true}' "$account_cache" 2>/dev/null) && { echo "$out"; return; }
+  fi
   token=$(jq -r '.claudeAiOauth.accessToken // empty' "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/.credentials.json" 2>/dev/null) || true
   [ -n "$token" ] || { echo '{"error": "no Claude login on this machine"}'; return; }
   out=$(curl -sf --max-time 15 https://api.anthropic.com/api/oauth/usage \
@@ -56,13 +64,10 @@ claude_usage() {
   if ! jq -e '.used | type == "number"' <<< "$out" > /dev/null 2>&1; then
     echo '{"error": "Claude usage endpoint failed"}'; return
   fi
-  # The owner rotates Claude accounts, so each reading also names its account, as a short hash of the
-  # login email (never the token), and keeps a per-account copy that hq samples for cost.
-  email=$(timeout 10 claude auth status --json 2>/dev/null | jq -r '.email // empty' 2>/dev/null) || true
-  if [ -n "$email" ]; then
-    account=$(printf '%s' "$email" | sha256sum | cut -c1-12)
+  # Each reading names its account and keeps the per-account copy that hq samples for cost.
+  if [ -n "$account" ]; then
     out=$(jq -c --arg account "$account" '. + {account: $account}' <<< "$out")
-    mkdir -p "${claude_cache%.json}" && printf '%s\n' "$out" > "${claude_cache%.json}/$account.json"
+    mkdir -p "${claude_cache%.json}" && printf '%s\n' "$out" > "$account_cache"
   fi
   mkdir -p "$(dirname "$claude_cache")" && printf '%s\n' "$out" > "$claude_cache"
   echo "$out"

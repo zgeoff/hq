@@ -56,14 +56,16 @@ HOME="$tmp/home"
 XDG_CACHE_HOME="$tmp/cache"
 FORBIDDEN_CALLS="$tmp/forbidden-calls"
 export PATH HOME XDG_CACHE_HOME FORBIDDEN_CALLS
-mkdir -p "$HOME/.codex/sessions" "$XDG_CACHE_HOME/z-capacity"
+account=$(printf '%s' gardener@example.test | sha256sum | cut -c1-12)
+per="$XDG_CACHE_HOME/z-capacity/claude-usage/$account.json"
+mkdir -p "$HOME/.codex/sessions" "$XDG_CACHE_HOME/z-capacity/claude-usage"
 fail=0
 
 check() { # case, imp fixture, Claude cache fixture, script arguments
   name=$1 IMP_FIXTURE="$fixtures/$2"
-  cp "$fixtures/$3" "$XDG_CACHE_HOME/z-capacity/claude-usage.json"
+  cp "$fixtures/$3" "$per"
   # The stubbed epoch and this mtime match exactly, so the cache is always fresh.
-  touch -d 2026-10-16T00:00:00Z "$XDG_CACHE_HOME/z-capacity/claude-usage.json"
+  touch -d 2026-10-16T00:00:00Z "$per"
   export IMP_FIXTURE
   shift 3
   : > "$FORBIDDEN_CALLS"
@@ -90,14 +92,27 @@ check lane-full imp-room.json claude-room.json --size M --lane workshop --lane-o
 check design-full imp-room.json claude-room.json --design --design-open 1
 check quota imp-room.json claude-full.json --size L
 
+# A fresh reading of another account is never reused: the active account, with no login here,
+# reads live and finds none.
+rm -f "$per"
+other="$XDG_CACHE_HOME/z-capacity/claude-usage/$(printf '%s' potter@example.test | sha256sum | cut -c1-12).json"
+cp "$fixtures/claude-room.json" "$other"
+cp "$fixtures/claude-room.json" "$XDG_CACHE_HOME/z-capacity/claude-usage.json"
+touch -d 2026-10-16T00:00:00Z "$other" "$XDG_CACHE_HOME/z-capacity/claude-usage.json"
+IMP_FIXTURE="$fixtures/imp-room.json" bash "$tmp/skill/scripts/capacity.sh" > "$tmp/actual" 2> "$tmp/stderr" || true
+if [ "$("$REAL_JQ" -r '.providers.claude.error // "cached"' "$tmp/actual")" = 'no Claude login on this machine' ]; then
+  printf 'ok another account reading is not reused\n'
+else
+  printf 'FAIL another account reading is not reused\n'; cat "$tmp/actual" "$tmp/stderr"; fail=1
+fi
+rm -f "$other"
+
 # A live reading (no fresh cache) names its account and keeps a per-account copy.
 rm -f "$XDG_CACHE_HOME/z-capacity/claude-usage.json"
 mkdir -p "$HOME/.claude"
 printf '%s\n' '{"claudeAiOauth": {"accessToken": "fixture-token"}}' > "$HOME/.claude/.credentials.json"
 IMP_FIXTURE="$fixtures/imp-room.json" CURL_FIXTURE="$fixtures/claude-live.json" ALLOW_CURL=1 \
   bash "$tmp/skill/scripts/capacity.sh" > "$tmp/actual" 2> "$tmp/stderr" || true
-account=$(printf '%s' gardener@example.test | sha256sum | cut -c1-12)
-per="$XDG_CACHE_HOME/z-capacity/claude-usage/$account.json"
 if [ -f "$per" ] && cmp -s "$per" "$XDG_CACHE_HOME/z-capacity/claude-usage.json" \
     && [ "$("$REAL_JQ" -r '"\(.account) \(.used)"' "$per")" = "$account 55" ] \
     && ! grep -q fixture-token "$per" && ! grep -q gardener "$per"; then
