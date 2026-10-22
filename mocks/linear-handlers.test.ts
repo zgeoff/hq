@@ -36,8 +36,8 @@ test('it answers the issues query with the issues whose identifier, or a previou
     data: {
       issues: {
         nodes: [
-          { identifier: 'KET-1', previousIdentifiers: [], state: { type: 'completed' } },
-          { identifier: 'TEA-3', previousIdentifiers: ['KET-2'], state: { type: 'canceled' } },
+          { identifier: 'KET-1', previousIdentifiers: [], state: { type: 'completed' }, title: 'Invented issue', completedAt: null, canceledAt: null, labels: { nodes: [] } },
+          { identifier: 'TEA-3', previousIdentifiers: ['KET-2'], state: { type: 'canceled' }, title: 'Invented issue', completedAt: null, canceledAt: null, labels: { nodes: [] } },
         ],
       },
     },
