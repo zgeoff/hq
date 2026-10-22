@@ -6,8 +6,8 @@ const WORD = /^[a-z][a-z-]*$/;
 
 const alts = (tok: string) => tok.split('|').filter((x) => WORD.test(x));
 
-// The help writes an optional verb ([status]) and an optional positional ([id]) alike, so a
-// bracketed word is a verb only when verbsOf names it for the top.
+// hq's help writes an optional verb ([status]) and an optional positional ([id]) with the same
+// brackets, so the brackets alone cannot tell them apart.
 export function parseHelp(help: string, verbsOf?: (top: string) => readonly string[] | null | undefined): Form[] {
   const forms: Form[] = [];
   let last: Form[] = [];
