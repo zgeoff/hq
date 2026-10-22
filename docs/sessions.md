@@ -68,12 +68,11 @@ Each session keeps its saved state in a file of its own under `~/.local/share/z-
 - `hq` reads the agents' notes from atc's event feed itself, and marks a PR final from a note that starts `FINAL <repo>#<n> <head sha>`. It keeps the note only when the sending session is already on an open run as hq reads it (GEO-1550); for a FINAL from a session that was not, mark the PR by hand with `hq run final <repo>#<n> --sha <sha>`. A FINAL never writes the PR record, so "No record" from `hq pr status` says nothing about it: read the final mark in `hq run show <issue>`. Its watcher flags a final PR with no review after 30 minutes, an exited session, and a session quiet for 60 minutes, helpers included.
 - Before each re-arm of the event watch, `hq run watchlist --write <file>` writes the session list it reads.
 
-`z-delivery` keeps the rest in `delivery.md`, in 4 sections, in this order:
+`z-delivery` keeps the rest in `delivery.md`, in 3 sections, in this order:
 
-1. **Waiting on Geoff:** each question, approval, merge or hands-on task, such as a live check, that waits on him, one line each. `z-triage` reads this section on each check.
-2. **Cursors:** the atc events cursor and the "POST-REVIEW LIST given at" line.
-3. **Holds:** each temporary hold, with the condition that ends it.
-4. **Log:** one dated line per change `z-delivery` makes, including each "You should …" line it types into an agent's session.
+1. **Cursors:** the atc events cursor and the "POST-REVIEW LIST given at" line.
+2. **Holds:** each temporary hold, with the condition that ends it.
+3. **Log:** one dated line per change `z-delivery` makes, including each "You should …" line it types into an agent's session.
 
 A rule with no end condition belongs in the skills, so `z-delivery` sends it to `z-steward` and keeps it out of the file. `z-delivery` follows the file over its own memory, and keeps it to current state, under 15 KB. At the start of each tick, it checks the size with `wc -c` and the date of the oldest log line, and moves every log line older than 24 hours into `delivery-archive.md` beside it. If the file is still over 15 KB, it moves the oldest remaining log lines too, never another section. Then it rereads the whole file, deletes every line that is done or no longer true in the first 3 sections, never the Log, and moves each line that sits in the wrong section, before any other action in that tick, since a stale section, such as an old restart command, leads the tick wrong.
 
