@@ -46,4 +46,18 @@ for mode in default calls singles prs; do
 done
 check empty empty.expected
 check empty-prs empty-prs.expected --prs
+
+# An input named on the command line that cannot be read stops the run before any queue prints.
+for option in --blocked --notes --untracked; do
+  if bash "$here/build-queue.sh" "$option" "$tmp/absent.json" > "$tmp/actual" 2> "$tmp/stderr"; then
+    printf 'FAIL unreadable %s: script exited zero\n' "$option"
+    fail=1
+  elif [ -s "$tmp/actual" ] || ! grep -qF -- "$option $tmp/absent.json cannot be read" "$tmp/stderr"; then
+    printf 'FAIL unreadable %s: output printed or the error does not name the file\n' "$option"
+    cat "$tmp/actual" "$tmp/stderr"
+    fail=1
+  else
+    printf 'ok unreadable %s\n' "$option"
+  fi
+done
 exit "$fail"

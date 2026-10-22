@@ -33,6 +33,16 @@ while [ $# -gt 0 ]; do
   esac
 done
 
+# A file named on the command line must be readable: an absent one would otherwise read as no
+# decisions, and the queue would say that nothing needs the owner.
+read_input() { # option, path
+  [ "$2" = /dev/null ] && return 0
+  cat -- "$2" || { echo "build-queue.sh: $1 $2 cannot be read" >&2; exit 1; }
+}
+blocked_text=$(read_input --blocked "$blocked")
+notes_text=$(read_input --notes "$notes")
+untracked_text=$(read_input --untracked "$untracked")
+
 pages=$(mktemp)
 trap 'rm -f "$pages"' EXIT
 if [ $# -gt 0 ]; then
@@ -49,9 +59,9 @@ fi
 
 jq -n -r \
   --arg mode "$mode" \
-  --slurpfile blocked <(cat "$blocked"; echo) \
-  --slurpfile notes <(cat "$notes"; echo) \
-  --slurpfile untracked <(cat "$untracked"; echo) \
+  --slurpfile blocked <(printf '%s\n' "$blocked_text") \
+  --slurpfile notes <(printf '%s\n' "$notes_text") \
+  --slurpfile untracked <(printf '%s\n' "$untracked_text") \
   --slurpfile issues "$pages" \
   --arg today "$(TZ=Australia/Sydney date +'%A %-d %B')" '
   ($blocked[0] // []) as $b
