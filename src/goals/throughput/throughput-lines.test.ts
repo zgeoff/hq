@@ -209,3 +209,16 @@ test('a filing read just after Sydney midnight but filed just before it still al
     line: '- Bad filings: today 0; target 0 🟢 green',
   });
 });
+
+test('an In Progress issue with an active session and no open run is not stale', async () => {
+  const ctx = setupTest();
+  addRun(ctx.db, { issue: 'GEO-9801', title: 'Invented kettle work', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, actor: 'z-delivery' });
+  ctx.db.run(`UPDATE runs SET closed_at = '2026-10-15T07:00:00Z' WHERE issue = 'GEO-9801'`);
+  ctx.db.run(`INSERT INTO run_sessions (session_id, issue, active, added_at) VALUES ('id-kettle', 'GEO-9801', 1, '2026-10-14T07:00:00Z')`);
+  await syncLinear(ctx.db, makeThroughputLinearCall([], [{ identifier: 'GEO-9801', startedAt: '2026-10-14T07:00:00Z' }]), new Date('2026-10-14T00:00:00Z'), new Date(ctx.now));
+
+  expect({ sent: sendThroughputAlerts(ctx.db, 'hq-lanes', new Date('2026-10-14T00:00:00Z'), new Date(ctx.now)), line: ctx.findLine('Stale') }).toStrictEqual({
+    sent: [],
+    line: '- Stale: 0 older than 24h, 0 in all; target 0 older than 24h 🟢 green',
+  });
+});
