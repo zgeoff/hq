@@ -63,6 +63,10 @@ test('it carries XDG_CONFIG_HOME, which locates the local settings file, into th
   });
 });
 
+test('it writes a relative HQ_DB into the watcher unit as an absolute path', () => {
+  expect(lanesEnv('/home/invented', { HQ_DB: './invented/hq.db' })['HQ_DB']).toBe(join(process.cwd(), 'invented', 'hq.db'));
+});
+
 test('start writes the file, then reloads, enables and restarts the unit', async () => {
   const { run, calls } = fakeSystemctl('');
   const r = await installLanes(run, { home, exec: ['/opt/invented/hq'], interval: null, processEnv: {} });
