@@ -41,7 +41,7 @@ test('a focus set changes what the next plan picks, and the running run keeps it
   ctx.addLocalRun('GEO-9805');
   const before = readSlotPlan(ctx.db, ctx.sample);
 
-  await runFocusCommand({ db: ctx.db, call: makeStateCall([], []), actor: 'kettle-owner', verb: 'set', rest: ['bug,maintenance'], reserves: ['nixie=1'] });
+  await runFocusCommand({ db: ctx.db, call: makeStateCall([], []), actor: 'kettle-owner', at: new Date('2026-10-15T20:00:00Z'), verb: 'set', rest: ['bug,maintenance'], reserves: ['nixie=1'] });
   const after = readSlotPlan(ctx.db, ctx.sample);
 
   expect(before?.plan?.picks.map((pick) => pick.issue)).toStrictEqual(['GEO-9801', 'GEO-9804']);
@@ -62,7 +62,7 @@ test('a reserve its area fills with running runs keeps no slot, read from the ar
   at('2026-10-15T20:10:00Z');
   await ctx.seedReady(ctx.readySeeds);
 
-  await runFocusCommand({ db: ctx.db, call: makeStateCall([], []), actor: 'kettle-owner', verb: 'set', rest: ['maintenance'], reserves: ['nixie=1'] });
+  await runFocusCommand({ db: ctx.db, call: makeStateCall([], []), actor: 'kettle-owner', at: new Date('2026-10-15T20:10:00Z'), verb: 'set', rest: ['maintenance'], reserves: ['nixie=1'] });
 
   expect(readSlotPlan(ctx.db, ctx.sample)?.plan?.picks.map((pick) => pick.issue)).toStrictEqual(['GEO-9802', 'GEO-9803']);
 });
@@ -71,7 +71,7 @@ test('a reserved slot with nothing eligible in its area is lent to the focus wor
   const ctx = setupTest();
   await ctx.seedReady(ctx.readySeeds);
 
-  await runFocusCommand({ db: ctx.db, call: makeStateCall([], []), actor: 'kettle-owner', verb: 'set', rest: ['bug'], reserves: ['imp=2'] });
+  await runFocusCommand({ db: ctx.db, call: makeStateCall([], []), actor: 'kettle-owner', at: new Date('2026-10-15T20:00:00Z'), verb: 'set', rest: ['bug'], reserves: ['imp=2'] });
 
   expect(readSlotPlan(ctx.db, ctx.sample)?.plan).toStrictEqual({
     picks: [

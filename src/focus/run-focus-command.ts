@@ -50,7 +50,7 @@ export function runFocusCommand(deps: FocusCommandDeps): Promise<FocusOut> {
       }
       const terms = parseFocusTerms(raw);
       const reserves = parseFocusReserves(deps.reserves);
-      const focus = writeFocus(deps.db, terms, reserves, deps.actor, deps.at);
+      const focus = writeFocus(deps.db, { terms, reserves, actor: deps.actor, at: deps.at });
       const counts = await readCounts(deps.call, focus.terms);
       const shown = formatShown(focus, counts);
       return { data: shown.data, text: `Focus set; the lanes use it from their next tick, and running work keeps its slots.\n${shown.text}` };
