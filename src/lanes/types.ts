@@ -72,3 +72,9 @@ export interface ReadyIssue {
   labels: string[];
   parent: string | null;
 }
+
+// A Backlog issue that triage may promote to Ready.
+export interface PromotableIssue {
+  identifier: string;
+  title: string;
+}

@@ -267,6 +267,8 @@ import { syncKinds } from './kinds/sync-kinds.ts';
 import { syncLinear } from './kinds/sync-linear.ts';
 import { weeksBack } from './kinds/weeks-back.ts';
 import { makeAuditedLinearCaller } from './linear/make-audited-linear-caller.ts';
+import { readPromotableIssues } from './lanes/read-promotable-issues.ts';
+import rulesTable from '../lanes.json';
 import { runLinearCommand } from './linear/run-linear-command.ts';
 import { mergedRuns } from './sizes/merged-runs.ts';
 import { parseSize } from './sizes/parse-size.ts';
@@ -1781,6 +1783,10 @@ async function lanesCommand(db: Database, verb: string | undefined, flags: Flags
     case 'release': {
       const had = releaseLanes(db, await by());
       return { data: { released: had }, text: had ? 'Slot nudges resume from the next look.' : 'No lanes hold to release.' };
+    }
+    case 'promotable': {
+      const issues = await readPromotableIssues(makeAuditedLinearCaller(db, realRunner), rulesTable.team);
+      return { data: { issues }, text: issues.length > 0 ? issues.map((issue) => `${issue.identifier}  ${issue.title}`).join('\n') : 'No Backlog issue is ready to promote.' };
     }
     case 'ready': {
       if (flags.lane) {
