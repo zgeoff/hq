@@ -1,8 +1,10 @@
 import type { Database } from 'bun:sqlite';
 import { match } from 'ts-pattern';
 import { z } from 'zod';
+import { HqError } from '../errors.ts';
 import { restartStaleSession } from '../fleet/restart-stale-session.ts';
 import type { FleetClient, FleetSession, StaleOps } from '../fleet/types.ts';
+import { fullSessionId } from './full-session-id.ts';
 import { requireRun } from './require-run.ts';
 import type { ImpWork, WrapUp } from './types.ts';
 import { writeWrapUpNote } from './write-wrap-up-note.ts';
@@ -32,7 +34,8 @@ export async function runWrapUp(db: Database, deps: WrapUpDeps, issue: string, a
     try {
       const client = await deps.openClient();
       const sessions = await client.sessions();
-      const roots = sessions.filter((session) => ids.includes(session.id) && !ids.includes(session.parent ?? ''));
+      const fullIDs = await resolveSessionIDs(ids, sessions, wrapUp);
+      const roots = sessions.filter((session) => fullIDs.includes(session.id) && !fullIDs.includes(session.parent ?? ''));
       for (const root of roots) {
         await wrapUpTree({ client, deps, sessions, wrapUp, onImp: run.place === 'imp' }, root);
       }
@@ -43,6 +46,22 @@ export async function runWrapUp(db: Database, deps: WrapUpDeps, issue: string, a
   }
   writeWrapUpNote(db, issue, wrapUp, actor);
   return wrapUp;
+}
+
+// A run may hold a short session id, so each is matched to the one atc session it starts. A
+// session atc no longer lists is gone already; a prefix that several sessions start is not guessed.
+async function resolveSessionIDs(ids: string[], sessions: FleetSession[], wrapUp: WrapUp): Promise<string[]> {
+  const fullIDs: string[] = [];
+  for (const id of ids) {
+    try {
+      fullIDs.push(await fullSessionId(() => Promise.resolve(sessions), id));
+    } catch (error) {
+      if (!(error instanceof HqError && error.code === 'no_such_session')) {
+        wrapUp.failed.push({ id, reason: toMessage(error) });
+      }
+    }
+  }
+  return fullIDs;
 }
 
 interface TreePass {

@@ -136,3 +136,67 @@ test('a check that fails, or cannot answer, counts as unpushed work and keeps th
   expect(unknownWrapUp.kept[0]).toStrictEqual({ id: unknown.ids.root, reason: 'the unpushed-work check could not run (imp exec exited 255), so the imp stays' });
   expect([...thrown.calls, ...unknown.calls]).toStrictEqual([]);
 });
+
+test('done forgets the one atc session that a short session id on the run starts', async () => {
+  const fresh = freshDb();
+  onTestFinished(fresh.cleanup);
+  const sessions: FleetSession[] = [
+    { id: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true },
+    { id: '0000a002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'teapot-agent', alive: true },
+  ];
+  const calls: string[] = [];
+  const record = (line: string) => {
+    calls.push(line);
+    return Promise.resolve();
+  };
+  const client: FleetClient & StaleOps = {
+    sessions: () => Promise.resolve(sessions),
+    spawn: () => Promise.reject(new Error('the wrap-up spawns nothing')),
+    pin: (id) => record(`pin ${id}`),
+    details: () => Promise.reject(new Error('the wrap-up reads no details')),
+    message: () => Promise.reject(new Error('the wrap-up reads no message')),
+    kill: (id) => record(`kill ${id}`),
+    unpin: (id) => record(`unpin ${id}`),
+    forget: (id) => record(`forget ${id}`).then(() => ({ forgotten: true })),
+  };
+  const deps = { openClient: () => Promise.resolve(client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')) };
+  addRun(fresh.db, { issue: 'GEO-9811', title: 'Invented kettle descaler', place: 'local', session: '0000a001', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
+  setState(fresh.db, 'GEO-9811', 'done', {}, 'z-delivery');
+
+  const wrapUp = await runWrapUp(fresh.db, deps, 'GEO-9811', 'z-delivery');
+
+  expect(wrapUp).toStrictEqual({ forgotten: ['0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa'], destroyed: [], kept: [], failed: [] });
+  expect(calls).toStrictEqual(['unpin 0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'kill 0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'unpin 0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'forget 0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa']);
+});
+
+test('done forgets no session for a short session id that several atc sessions start, and records the failure', async () => {
+  const fresh = freshDb();
+  onTestFinished(fresh.cleanup);
+  const sessions: FleetSession[] = [
+    { id: '0000b001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'teapot-agent', alive: true },
+    { id: '0000b001-bbbb-4bbb-8bbb-bbbbbbbbbbbb', name: 'teapot-helper', alive: true },
+  ];
+  const calls: string[] = [];
+  const record = (line: string) => {
+    calls.push(line);
+    return Promise.resolve();
+  };
+  const client: FleetClient & StaleOps = {
+    sessions: () => Promise.resolve(sessions),
+    spawn: () => Promise.reject(new Error('the wrap-up spawns nothing')),
+    pin: (id) => record(`pin ${id}`),
+    details: () => Promise.reject(new Error('the wrap-up reads no details')),
+    message: () => Promise.reject(new Error('the wrap-up reads no message')),
+    kill: (id) => record(`kill ${id}`),
+    unpin: (id) => record(`unpin ${id}`),
+    forget: (id) => record(`forget ${id}`).then(() => ({ forgotten: true })),
+  };
+  const deps = { openClient: () => Promise.resolve(client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')) };
+  addRun(fresh.db, { issue: 'GEO-9812', title: 'Invented teapot cosy', place: 'local', session: '0000b001', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
+  setState(fresh.db, 'GEO-9812', 'done', {}, 'z-delivery');
+
+  const wrapUp = await runWrapUp(fresh.db, deps, 'GEO-9812', 'z-delivery');
+
+  expect(wrapUp).toStrictEqual({ forgotten: [], destroyed: [], kept: [], failed: [{ id: '0000b001', reason: '2 sessions start with 0000b001; give more of the id' }] });
+  expect(calls).toStrictEqual([]);
+});
