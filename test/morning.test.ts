@@ -9,6 +9,7 @@ import { sydneyUtc } from '../src/morning/sydney-utc.ts';
 import { sydney } from '../src/morning/sydney.ts';
 import { windows } from '../src/morning/windows.ts';
 import { at, freshDb } from './helpers.ts';
+import { setForward } from '../src/outbox/set-forward.ts';
 
 let db: Database;
 let cleanup: () => void;
@@ -85,4 +86,19 @@ test('hq health: quiet before 08:45, then flags a missing run or a failed send',
   skipMorning(db, '2026-10-25', 'away', 'z-q');
   morningTick(db, 'hq-lanes', syd('2026-10-19', '08:16'));
   expect(morningCheck(db, syd('2026-10-19', '09:00'))).toMatchObject({ ok: true, line: expect.stringContaining('queued today') });
+});
+
+test('it sees a failed morning message queued while the owner session is forwarded', () => {
+  setForward(db, 'z-stu', 'z-other');
+  morningTick(db, 'hq-lanes', syd('2026-10-17', '08:16'));
+  db.query(`UPDATE outbox SET status = 'failed'`).run();
+
+  expect(morningCheck(db, syd('2026-10-17', '08:50'))).toMatchObject({ ok: false, line: expect.stringContaining('failed to send') });
+});
+
+test('it lists the send status of a morning message forwarded after it was queued', () => {
+  morningTick(db, 'hq-lanes', syd('2026-10-17', '08:16'));
+  setForward(db, 'z-stu', 'z-other');
+
+  expect(recentRuns(db).map((run) => [run.key, run.sent])).toStrictEqual([['2026-10-17', 'pending']]);
 });
