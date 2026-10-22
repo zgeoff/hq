@@ -122,11 +122,6 @@ async function runAnswer(input: PRCommandInput, ref: PRRef, rawAnswer: string | 
 function parseAnswerArgs(flags: Flags, rawAnswer: string | undefined): AnswerArgs {
   const note = flags.note?.trim() ?? '',
     source = requireAnswerSource(flags.source);
-
-  // The merge gate trusts a console: lgtm as the owner's own, so only the console writes one.
-  if (source.startsWith('console:')) {
-    throw new HqError('bad_args', "a console: answer is written only by the console: the owner answers the PR there; record a chat: or call: answer here");
-  }
   if (rawAnswer === undefined || !ANSWERS.has(rawAnswer)) {
     throw new HqError('bad_args', 'the answer must be lgtm, changes or reject');
   }

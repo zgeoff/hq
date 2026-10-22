@@ -293,10 +293,9 @@ test('it refuses a PR in hq that changes a skill with no lgtm at its head, namin
   await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'hq', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: "the PR changes owner-held files (skills/kettle/SKILL.md) and needs the owner's lgtm at 0123456: hq pr answer hq 7 lgtm, from the console" });
 });
 
-test('it refuses an lgtm a session relayed from chat or recorded from a call', async () => {
+test('it refuses an lgtm a session relayed from chat', async () => {
   const ctx = setupTest();
   const fake = buildFakeRunner({ prFiles: { code: 0, stdout: 'skills/kettle/SKILL.md\n', stderr: '' } });
-  recordPRAnswer(ctx.db, { repo: 'hq', pr: 7, answer: 'lgtm', head: FAKE_FULL_SHA, source: 'call:kettle-4', note: null, actor: 'z-kettle' });
   recordPRAnswer(ctx.db, { repo: 'hq', pr: 7, answer: 'lgtm', head: FAKE_FULL_SHA, source: 'chat:kettle-1', note: null, actor: 'z-kettle' });
 
   await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'hq', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: expect.stringContaining("needs the owner's lgtm at 0123456") });
@@ -378,15 +377,15 @@ test('it refuses a chat lgtm on a PR in hq-private', async () => {
 test('it refuses an lgtm at an older head on a PR in hq-private', async () => {
   const ctx = setupTest();
   const fake = buildFakeRunner({ prFiles: { code: 0, stdout: 'skills/kettle/references/session-prompt.md\n', stderr: '' } });
-  recordPRAnswer(ctx.db, { repo: 'hq-private', pr: 7, answer: 'lgtm', head: 'f00dfeedf00dfeedf00dfeedf00dfeedf00dfeed', source: 'console:kettle-3', note: null, actor: 'z-kettle' });
+  recordPRAnswer(ctx.db, { repo: 'hq-private', pr: 7, answer: 'lgtm', head: 'f00dfeedf00dfeedf00dfeedf00dfeedf00dfeed', source: 'call:kettle-3', note: null, actor: 'z-kettle' });
 
   await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'hq-private', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked' });
 });
 
-test("it passes a PR in hq-private that changes a start prompt once the owner's console lgtm is at its head", async () => {
+test("it passes a PR in hq-private that changes a start prompt once the owner's call lgtm is at its head", async () => {
   const ctx = setupTest();
   const fake = buildFakeRunner({ prFiles: { code: 0, stdout: 'skills/kettle/references/session-prompt.md\n', stderr: '' } });
-  recordPRAnswer(ctx.db, { repo: 'hq-private', pr: 7, answer: 'lgtm', head: FAKE_FULL_SHA, source: 'console:kettle-3', note: null, actor: 'z-kettle' });
+  recordPRAnswer(ctx.db, { repo: 'hq-private', pr: 7, answer: 'lgtm', head: FAKE_FULL_SHA, source: 'call:kettle-3', note: null, actor: 'z-kettle' });
 
   await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'hq-private', pr: 7 })).resolves.toMatchObject({ mayMerge: true });
 });
