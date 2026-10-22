@@ -9,7 +9,9 @@ import { checkUnblockConditions } from './check-unblock-conditions.ts';
 import { overrideEnv } from './config/override-env.ts';
 import { makeLinearCaller } from './linear/make-linear-caller.ts';
 import { resetKey } from './linear/reset-key.ts';
+import type { Runner } from './runner/types.ts';
 import { addUnblock } from './unblock/add-unblock.ts';
+import { closeUnblock } from './unblock/close-unblock.ts';
 import { getUnblock } from './unblock/get-unblock.ts';
 
 function setupTest() {
@@ -65,6 +67,22 @@ test('it keeps an item open and reports it when its subject PR cannot be read', 
 
   expect(outcome).toStrictEqual({ settled: [], dropped: [], errors: ["lost: can't read kettle-co/kettle#4 (gh exit 1): invented: no such PR"] });
   expect(getUnblock(ctx.db, 'lost')?.state).toBe('open');
+});
+
+test('it keeps open an item that was closed and reopened while GitHub was read, and reports it', async () => {
+  const ctx = setupTest();
+  createUnblockItems(ctx.db, { review: { task: 'Review kettle#4 and say lgtm', links: [{ label: 'kettle#4', url: 'https://github.com/kettle-co/kettle/pull/4', subject: true }] } });
+  const github = makePRStateGh({ states: { 'kettle-co/kettle#4': 'MERGED' } });
+  const run: Runner = (cmd, opts) => {
+    closeUnblock(ctx.db, 'review', 'done', null, 'z-stu');
+    createUnblockItems(ctx.db, { review: { task: 'Review kettle#4 and say lgtm', links: [{ label: 'kettle#4', url: 'https://github.com/kettle-co/kettle/pull/4', subject: true }] } });
+    return github(cmd, opts);
+  };
+
+  const outcome = await checkUnblockConditions(ctx.db, { run, call: ctx.call }, 'kettle-bot');
+
+  expect(outcome).toStrictEqual({ settled: [], dropped: [], errors: ['review: unblock item review was closed and reopened while its conditions were read; the next pass checks it again'] });
+  expect(getUnblock(ctx.db, 'review')?.state).toBe('open');
 });
 
 test('it keeps a dropped review item open once a plain re-add reopens it with a new task', async () => {

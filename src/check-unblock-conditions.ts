@@ -5,7 +5,7 @@ import type { LinearCall } from './linear/types.ts';
 import type { PRRef } from './parse-pr-url.ts';
 import { parsePRURL } from './parse-pr-url.ts';
 import type { Runner } from './runner/types.ts';
-import { closeUnblock } from './unblock/close-unblock.ts';
+import { dropUnblock } from './unblock/drop-unblock.ts';
 import { listUnblocks } from './unblock/list-unblocks.ts';
 import { makeConditionReader } from './unblock/make-condition-reader.ts';
 import { readIssueVerdicts } from './unblock/read-issue-verdicts.ts';
@@ -58,12 +58,12 @@ async function checkItem(pass: ItemPass, item: UnblockItem): Promise<ItemOutcome
   const closure = pickClosure(conditions, readSubject);
   try {
     match(closure)
-      .with({ to: 'done' }, (done) => settleUnblock(pass.db, item.id, done.note, pass.actor))
-      .with({ to: 'dropped' }, (dropped) => closeUnblock(pass.db, item.id, 'dropped', dropped.note, pass.actor))
+      .with({ to: 'done' }, (done) => settleUnblock(pass.db, item, done.note, pass.actor))
+      .with({ to: 'dropped' }, (dropped) => dropUnblock(pass.db, item, dropped.note, pass.actor))
       .with({ to: 'open' }, () => null)
       .exhaustive();
   } catch (error) {
-    // The owner closed it between the list and now.
+    // The owner closed it, or it was closed and reopened, between the list and now.
     return { id: item.id, closed: 'open', errors: [...errors, `${item.id}: ${error instanceof Error ? error.message : String(error)}`] };
   }
   return { id: item.id, closed: closure.to, errors };
