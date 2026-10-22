@@ -10,6 +10,7 @@ function setupTest() {
   onTestFinished(() => rmSync(dir, { recursive: true, force: true }));
   runGit(dir, ['init', '--quiet', '--initial-branch=main']);
   return {
+    directory: dir,
     // Commits kettle.ts as `before`, then deletes it and stages `after`: the diff lint:changed reads.
     splitKettle: (before: string, after: Record<string, string>): ReturnType<typeof parseChanges> => {
       writeFileSync(join(dir, 'kettle.ts'), before);
@@ -49,6 +50,12 @@ test('a file deleted and split into new ones, read from git, counts as moved', (
 
   expect([2, 3, 4, 5].map((line) => checkLine(split, line))).toStrictEqual([false, false, false, false]);
   expect(checkLine(split, 1)).toBe(true);
+});
+
+test('it rejects a base that git cannot resolve instead of reading no changes', () => {
+  const ctx = setupTest();
+
+  expect(() => readDiff('origin/no-such-base', ctx.directory)).toThrow(/^git diff --merge-base origin\/no-such-base failed \(128\): fatal: /u);
 });
 
 function checkLine(changes: ReturnType<typeof parseChanges>, line: number): boolean {

@@ -7,5 +7,8 @@ export function readDiff(base: string, cwd: string = process.cwd()): string {
   if (result.error !== undefined) {
     throw result.error;
   }
+  if (result.status !== 0) {
+    throw new Error(`git diff --merge-base ${base} failed (${result.status ?? result.signal}): ${result.stderr.trim()}`);
+  }
   return result.stdout;
 }
