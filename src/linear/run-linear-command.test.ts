@@ -390,7 +390,7 @@ test('it fails with the error and writes no file when Linear answers 500', () =>
   expect(readdirSync(ctx.directory)).toStrictEqual([]);
 });
 
-test('it prints the files and the issue count for hq linear issues --json', async () => {
+test('it prints the files and the issue count for hq linear issues --json, and records the key read for the audit', async () => {
   const ctx = setupTest();
   const fresh = freshDb();
   const log = console.log;
@@ -405,6 +405,7 @@ test('it prints the files and the issue count for hq linear issues --json', asyn
 
   expect(code).toBe(0);
   expect(JSON.parse(printed.join(''))).toStrictEqual({ ok: true, files: [join(ctx.directory, 'issues-1.json')], issues: 1 });
+  expect(fresh.db.query("SELECT actor, data FROM events WHERE subject = 'hq' AND subject_id = 'op' AND action = 'read'").all()).toStrictEqual([{ actor: 'linear', data: JSON.stringify({ consumer: 'linear', requests: 3 }) }]);
 });
 
 test('it runs each triage script to exit 0 over every issue on the pages hq linear issues wrote', async () => {
