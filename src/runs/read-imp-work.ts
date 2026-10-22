@@ -4,9 +4,9 @@ import type { ImpWork } from './types.ts';
 
 const impListSchema = z.array(z.looseObject({ name: z.string() }));
 
-// Lists each worktree's uncommitted changes, then the commits that no remote branch holds. Any
-// line out means unpushed work. Each git call's failure exits the script nonzero: no git call runs
-// inside a pipe, whose status would be the last command's.
+// Lists each worktree's uncommitted changes, then the commits no remote branch holds from any local
+// branch or worktree HEAD, detached or not. Any line out means unpushed work. A failed git call exits
+// nonzero: none runs inside a pipe, whose status would be the last command's.
 const CHECK_SCRIPT = [
   'set -eu',
   'cd "$1"',
@@ -19,7 +19,8 @@ const CHECK_SCRIPT = [
   '    if [ -n "$change" ]; then printf "%s: %s\\n" "$tree" "$change"; fi',
   '  done',
   'done',
-  'git log --oneline HEAD --branches --not --remotes',
+  'heads=$(printf "%s\\n" "$trees" | sed -n "s/^HEAD //p")',
+  'git log --oneline $heads --branches --not --remotes',
 ].join('\n');
 
 const IMP_CALL_MS = 120_000;

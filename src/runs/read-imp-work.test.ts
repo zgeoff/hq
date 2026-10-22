@@ -94,3 +94,16 @@ test('a worktree whose status check fails gives no answer, even when every other
 
   expect(work.state).toBe('unknown');
 });
+
+test('a commit no remote branch holds on the detached HEAD of a second worktree is unpushed work', async () => {
+  const app = setupTest('local');
+  const tree = join(app.clone, '..', 'kettle-base');
+  app.git(['-C', app.clone, 'worktree', 'add', '-q', '--detach', tree]);
+  writeFileSync(join(tree, 'base.ts'), 'export const base = 1;\n');
+  app.git(['-C', tree, 'add', '.']);
+  app.git(['-C', tree, 'commit', '-q', '-m', 'add kettle base']);
+
+  const work = await readImpWork(app.run, app.session, app.clone);
+
+  expect(work.state === 'unpushed' && work.detail.endsWith(' add kettle base')).toBe(true);
+});
