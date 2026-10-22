@@ -1,6 +1,6 @@
 import type { MessageGet } from '../atc/message-get-schema.ts';
 import type { RcState } from '../rc/types.ts';
-import type { Role } from '../roles/role-names.ts';
+import type { StaleCommit } from './parse-stale-commit.ts';
 import type { Runner } from '../runner/types.ts';
 
 export interface FleetEntry {
@@ -10,7 +10,9 @@ export interface FleetEntry {
   prompt: string; // main:<path> (read from origin/main) or an absolute path outside any repo
   wake: boolean; // keep it on hq's wake list
   skill?: string | null; // the role skill in the definitions repo; null for a session with a prompt file of its own
-  roles?: Role[];
+
+  // read by name, so a role fleet.json adds before ROLE_NAMES knows it still counts
+  roles?: readonly string[];
 
   // Claude Code plugin folders passed to atc's spawn; atc gives each as --plugin-dir
   pluginDirs?: string[];
@@ -34,6 +36,11 @@ export interface DriftClient {
   prompt(id: string): Promise<string | undefined>; // atc's session.get `prompt`
 }
 
+// Reads a session's compaction count from its Claude Code transcript, in its cwd or the entry's.
+export interface TranscriptReader {
+  lines: (session: FleetSession, fallbackCwd: string) => AsyncIterable<string>;
+}
+
 export interface FleetSession {
   id: string;
   name: string;
@@ -47,7 +54,15 @@ export interface FleetSession {
   // the session this one is a sub-session of, and its working directory inside its host
   parent?: string | null | undefined;
   cwd?: string | null | undefined;
+
+  // when atc made the session, in ms, and Claude's own session id, which names its transcript
+  createdAt?: number | null | undefined;
+  agentSessionID?: string | null | undefined;
 }
+
+// Why hq restarts a session: its prompt is stale (the commit it first read stale at, and the
+// latest change), or a scheduled restart is due.
+export type RestartCause = { kind: 'stale'; commit: string; latest: StaleCommit } | { kind: 'scheduled'; why: string };
 
 // What hq fleet asks atc's session.spawn for.
 export interface SpawnRequest {

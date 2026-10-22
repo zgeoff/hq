@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
-// meta fleet_refresh: where each stale session stands in the restart.
+// meta fleet_refresh: where each stale session stands in the restart. `scheduled` holds why a
+// scheduled restart is due; without it the restart is for a stale prompt.
 export const refreshSchema = z.record(
   z.string(),
   z.object({
@@ -11,6 +12,7 @@ export const refreshSchema = z.record(
     retryAt: z.string().optional(),
     skips: z.number(),
     reported: z.boolean().optional(),
+    scheduled: z.string().optional(),
   }),
 );
 export type RefreshMap = z.infer<typeof refreshSchema>;

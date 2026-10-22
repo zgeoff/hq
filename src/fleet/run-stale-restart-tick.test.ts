@@ -20,7 +20,15 @@ const KETTLE = 'skills/kettle/references/session-prompt.md',
   OLD_PROMPT = 'You are Kettle. Boil water slowly.',
   URN = 'skills/urn/references/session-prompt.md';
 
-function setupTest(config: { sessions?: { id: string; name: string; state: string }[]; cwd?: string } = {}) {
+interface RosterSession {
+  id: string;
+  name: string;
+  state: string;
+  createdAt?: number;
+  agentSessionID?: string;
+}
+
+function setupTest(config: { sessions?: RosterSession[]; cwd?: string } = {}) {
   resetFetchCache();
   const base = freshDb(),
     kettle: FleetEntry = { name: 'z-kettle', cwd: config.cwd ?? `${base.dir}/work`, model: 'opus', prompt: `main:${KETTLE}`, wake: false },
@@ -34,7 +42,9 @@ function setupTest(config: { sessions?: { id: string; name: string; state: strin
   onTestFinished(overrideEnv('HQ_ATC_STATE', `${base.dir}/atc-state`));
   onTestFinished(overrideEnv('HQ_CLAUDE_JSON', `${base.dir}/claude.json`));
   onTestFinished(overrideEnv('HQ_QUIET', undefined));
+  onTestFinished(overrideEnv('HQ_CLAUDE_PROJECTS', `${base.dir}/projects`));
   mkdirSync(`${base.dir}/work`, { recursive: true });
+  mkdirSync(`${base.dir}/projects/-work`, { recursive: true });
   writeFileSync(`${base.dir}/claude.json`, JSON.stringify({ projects: { [`${base.dir}/work`]: { hasTrustDialogAccepted: true } } }));
   for (const session of roster) {
     const prompt = session.name === 'z-urn' ? 'You are Urn. Keep the water cold.' : OLD_PROMPT;
@@ -47,6 +57,16 @@ function setupTest(config: { sessions?: { id: string; name: string; state: strin
     kettle,
     urn,
     steward,
+    delivery: { ...kettle, name: 'z-delivery', roles: ['orchestrator'] } satisfies FleetEntry,
+    release: { ...kettle, name: 'z-ship', roles: ['release'] } satisfies FleetEntry,
+    deliveryAgent: '0000aaaa-1111-4222-8333-444455556666',
+
+    // A Claude Code transcript with a user turn and `compactions` compact boundaries.
+    writeTranscript(agentSessionID: string, compactions: number) {
+      const user = JSON.stringify({ type: 'user', message: { role: 'user', content: 'boil the kettle' }, timestamp: NOON_SYDNEY });
+      const boundary = JSON.stringify({ type: 'system', subtype: 'compact_boundary', content: 'Conversation compacted', timestamp: NOON_SYDNEY, compactMetadata: { trigger: 'auto' } });
+      writeFileSync(`${base.dir}/projects/-work/${agentSessionID}.jsonl`, `${[user, ...Array.from({ length: compactions }, () => boundary)].join('\n')}\n`);
+    },
 
     // The 5-minute timer at a time, then the watcher's flush.
     async tickAt(time: string, fleet: FleetEntry[]) {
@@ -62,6 +82,9 @@ function setupTest(config: { sessions?: { id: string; name: string; state: strin
     outboxTo: (target: string) => base.db.query('SELECT target, text FROM outbox WHERE target = ? ORDER BY id').all(target) as { target: string; text: string }[],
     setState(id: string, state: string) {
       Object.assign(roster.find((s) => s.id === id) ?? {}, { state });
+    },
+    setCreatedAt(id: string, createdAt: number) {
+      Object.assign(roster.find((session) => session.id === id) ?? {}, { createdAt });
     },
     setId(id: string, next: string) {
       Object.assign(roster.find((s) => s.id === id) ?? {}, { id: next });
@@ -560,4 +583,147 @@ test('it never restarts a session whose prompt hq-private cannot supply', async 
   expect(ctx.atc.sent).toStrictEqual([]);
   expect(ctx.atc.calls.map((call) => call.method)).not.toContain('session.kill');
   expect(ctx.staleSince()).toStrictEqual({});
+});
+
+test('it restarts an orchestrator session six hours after its start, through the save request', async () => {
+  const ctx = setupTest({ sessions: [{ id: 'id-delivery', name: 'z-delivery', state: 'done', createdAt: Date.parse(NOON_SYDNEY) - 6 * 3_600_000 }] });
+  ctx.atc.prompts.set('id-delivery', NEW_PROMPT);
+
+  await ctx.tick(0, [ctx.delivery]);
+  ctx.atc.messages.set('m-1', { status: 'answered', answer: 'saved' });
+  await ctx.tick(5, [ctx.delivery]);
+
+  expect(ctx.atc.sent.map((message) => [message.session, message.text])).toStrictEqual([
+    [
+      'id-delivery',
+      'hq: z-delivery, your scheduled restart is due (6 h since start). hq restarts you from main once you have saved your state. Save it now, then answer this message with the atc answer tool: `saved`, or `busy` to defer.',
+    ],
+  ]);
+  expect(ctx.atc.calls.map((call) => call.method)).toStrictEqual(['session.kill', 'session.update', 'session.forget', 'session.spawn', 'session.update']);
+  expect(ctx.db.query(`SELECT action, data FROM events WHERE action IN ('save-requested', 'scheduled-restarted') ORDER BY seq`).all()).toStrictEqual([
+    { action: 'save-requested', data: JSON.stringify({ name: 'z-delivery', sessionId: 'id-delivery', reason: '6 h since start' }) },
+    { action: 'scheduled-restarted', data: JSON.stringify({ name: 'z-delivery', sessionId: 'id-delivery', reason: '6 h since start' }) },
+  ]);
+  expect(ctx.db.query('SELECT text FROM news').all()).toStrictEqual([{ text: 'z-delivery restarted from main; scheduled restart, 6 h since start' }]);
+});
+
+test('it restarts an orchestrator session one hour old after three compactions since its start', async () => {
+  const ctx = setupTest({ sessions: [{ id: 'id-delivery', name: 'z-delivery', state: 'done', createdAt: Date.parse(NOON_SYDNEY) - 1 * 3_600_000, agentSessionID: '0000aaaa-1111-4222-8333-444455556666' }] });
+  ctx.atc.prompts.set('id-delivery', NEW_PROMPT);
+  ctx.writeTranscript(ctx.deliveryAgent, 3);
+
+  await ctx.tick(0, [ctx.delivery]);
+  ctx.atc.messages.set('m-1', { status: 'answered', answer: 'saved' });
+  await ctx.tick(5, [ctx.delivery]);
+
+  expect(ctx.atc.sent.map((message) => message.text)).toStrictEqual([expect.stringContaining('your scheduled restart is due (3 compactions since start)')]);
+  expect(ctx.db.query(`SELECT json_extract(data, '$.reason') AS reason FROM events WHERE action = 'scheduled-restarted'`).all()).toStrictEqual([{ reason: '3 compactions since start' }]);
+  expect(ctx.atc.calls.filter((call) => call.method === 'session.spawn')).toMatchObject([{ input: { name: 'z-delivery' } }]);
+});
+
+test('it leaves an orchestrator session alone at five hours and two compactions', async () => {
+  const ctx = setupTest({ sessions: [{ id: 'id-delivery', name: 'z-delivery', state: 'done', createdAt: Date.parse(NOON_SYDNEY) - 5 * 3_600_000, agentSessionID: '0000aaaa-1111-4222-8333-444455556666' }] });
+  ctx.atc.prompts.set('id-delivery', NEW_PROMPT);
+  ctx.writeTranscript(ctx.deliveryAgent, 2);
+
+  await ctx.tick(0, [ctx.delivery]);
+  await ctx.tick(55, [ctx.delivery]);
+
+  expect(ctx.atc.sent).toStrictEqual([]);
+  expect(ctx.refresh()).toStrictEqual({});
+});
+
+test('it keeps the recorded start when atc reports a newer createdAt for the same session', async () => {
+  const ctx = setupTest({ sessions: [{ id: 'id-delivery', name: 'z-delivery', state: 'done', createdAt: Date.parse(NOON_SYDNEY) - 1 * 3_600_000 }] });
+  ctx.atc.prompts.set('id-delivery', NEW_PROMPT);
+
+  await ctx.tick(0, [ctx.delivery]);
+  ctx.setCreatedAt('id-delivery', Date.parse(NOON_SYDNEY) + 4 * 3_600_000);
+  await ctx.tick(300, [ctx.delivery]);
+
+  expect(ctx.atc.sent.map((message) => [message.session, message.text])).toStrictEqual([['id-delivery', expect.stringContaining('your scheduled restart is due (6 h since start)')]]);
+});
+
+test('it restarts a release session on the same schedule', async () => {
+  const ctx = setupTest({ sessions: [{ id: 'id-ship', name: 'z-ship', state: 'done', createdAt: Date.parse(NOON_SYDNEY) - 6 * 3_600_000 }] });
+  ctx.atc.prompts.set('id-ship', NEW_PROMPT);
+
+  await ctx.tick(0, [ctx.release]);
+  ctx.atc.messages.set('m-1', { status: 'answered', answer: 'saved' });
+  await ctx.tick(5, [ctx.release]);
+
+  expect(ctx.db.query(`SELECT json_extract(data, '$.name') AS name, json_extract(data, '$.reason') AS reason FROM events WHERE action = 'scheduled-restarted'`).all()).toStrictEqual([
+    { name: 'z-ship', reason: '6 h since start' },
+  ]);
+});
+
+test('it never schedules a restart for a session of another role, or of none', async () => {
+  const ctx = setupTest({
+    sessions: [
+      { id: 'id-kettle', name: 'z-kettle', state: 'done', createdAt: Date.parse(NOON_SYDNEY) - 7 * 3_600_000, agentSessionID: '0000aaaa-1111-4222-8333-444455556666' },
+      { id: 'id-dev', name: 'z-dev', state: 'done', createdAt: Date.parse(NOON_SYDNEY) - 7 * 3_600_000 },
+    ],
+  });
+  ctx.atc.prompts.set('id-kettle', NEW_PROMPT);
+  ctx.atc.prompts.set('id-dev', NEW_PROMPT);
+  ctx.writeTranscript(ctx.deliveryAgent, 4);
+
+  await ctx.tick(0, [ctx.kettle, { ...ctx.kettle, name: 'z-dev', roles: ['developer'] }]);
+
+  expect(ctx.atc.sent).toStrictEqual([]);
+  expect(ctx.refresh()).toStrictEqual({});
+});
+
+test('it does not restart the new session again while it is younger than the limits', async () => {
+  const ctx = setupTest({ sessions: [{ id: 'id-delivery', name: 'z-delivery', state: 'done', createdAt: Date.parse(NOON_SYDNEY) - 6 * 3_600_000, agentSessionID: '0000aaaa-1111-4222-8333-444455556666' }] });
+  ctx.atc.prompts.set('id-delivery', NEW_PROMPT);
+  ctx.writeTranscript(ctx.deliveryAgent, 3);
+
+  await ctx.tick(0, [ctx.delivery]);
+  ctx.atc.messages.set('m-1', { status: 'answered', answer: 'saved' });
+  await ctx.tick(5, [ctx.delivery]);
+  for (const minutes of [10, 120, 300, 360]) {
+    await ctx.tick(minutes, [ctx.delivery]);
+  }
+
+  expect(ctx.atc.sent).toHaveLength(1);
+  expect(ctx.atc.calls.filter((call) => call.method === 'session.kill')).toHaveLength(1);
+  expect(ctx.refresh()).toStrictEqual({});
+});
+
+test('it asks again six hours after the new session started', async () => {
+  const ctx = setupTest({ sessions: [{ id: 'id-delivery', name: 'z-delivery', state: 'done', createdAt: Date.parse(NOON_SYDNEY) - 6 * 3_600_000 }] });
+  ctx.atc.prompts.set('id-delivery', NEW_PROMPT);
+
+  await ctx.tick(0, [ctx.delivery]);
+  ctx.atc.messages.set('m-1', { status: 'answered', answer: 'saved' });
+  await ctx.tick(5, [ctx.delivery]);
+  await ctx.tick(10, [ctx.delivery]);
+  await ctx.tick(371, [ctx.delivery]);
+
+  expect(ctx.atc.sent.map((message) => message.session)).toStrictEqual(['id-delivery', 'spawned-1']);
+});
+
+test('it keeps a deferred scheduled restart waiting out its backoff though the prompt reads current', async () => {
+  const ctx = setupTest({ sessions: [{ id: 'id-delivery', name: 'z-delivery', state: 'done', createdAt: Date.parse(NOON_SYDNEY) - 6 * 3_600_000 }] });
+  ctx.atc.prompts.set('id-delivery', NEW_PROMPT);
+
+  await ctx.tick(0, [ctx.delivery]);
+  ctx.atc.messages.set('m-1', { status: 'answered', answer: 'busy' });
+  await ctx.tick(5, [ctx.delivery]);
+  await ctx.tick(30, [ctx.delivery]);
+
+  expect(ctx.atc.sent).toHaveLength(1);
+  expect(ctx.refresh()['z-delivery']).toMatchObject({ phase: 'idle', skips: 1, scheduled: '6 h since start' });
+});
+
+test.each(['running', 'needs_you'])('it never asks a %s session that is due a scheduled restart', async (state) => {
+  const ctx = setupTest({ sessions: [{ id: 'id-delivery', name: 'z-delivery', state, createdAt: Date.parse(NOON_SYDNEY) - 7 * 3_600_000 }] });
+  ctx.atc.prompts.set('id-delivery', NEW_PROMPT);
+
+  await ctx.tick(0, [ctx.delivery]);
+  await ctx.tick(5, [ctx.delivery]);
+
+  expect(ctx.atc.sent).toStrictEqual([]);
+  expect(ctx.atc.calls).toStrictEqual([]);
 });
