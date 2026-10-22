@@ -16,7 +16,11 @@ trap 'rm -rf "$work"' EXIT
 # its rows; HEAD_TEXT and SOURCE_TEXT are
 # the PR head's and tools main's content of a workflow caller. BASE_BLOB is a
 # file's blob at the PR base, and the manifest at tools commit old1 also syncs
-# .claude/skills/y/SKILL.md, which tools main has retired. A file read is parsed as an
+# .claude/skills/y/SKILL.md, which tools main has retired, and also delivered
+# .claude/skills/old/SKILL.md and .claude/skills/lone/SKILL.md for the skill-n
+# entry, which tools main still delivers as .claude/skills/new/SKILL.md. The
+# skill-blk entry keeps references/kotlin.md and withholds references/rust.md
+# from zgeoff/demo, whatever the case of the name. A file read is parsed as an
 # HTTP client does: a fragment never reaches the server, the path is percent-decoded,
 # and a read with no ref gets the default branch, whose blob is default-<repo>.
 cat >"$work/gh" <<'EOF'
@@ -36,9 +40,9 @@ case $args in
     printf '{"state":"%s","author":{"login":"%s"},"headRefName":"%s","headRefOid":"head1","baseRefOid":"base1"}\n' "$STATE" "$AUTHOR" "$BRANCH" ;;
   "api repos/zgeoff/tools/commits/main"*) echo main1 ;;
   "api repos/zgeoff/tools/contents/sync/manifest.json?ref=old1"*)
-    printf '[{"name":"skill-y","files":[{"source":"sync/skills/y/SKILL.md","target":".claude/skills/y/SKILL.md"}]}]' | base64 ;;
+    printf '[{"name":"skill-y","files":[{"source":"sync/skills/y/SKILL.md","target":".claude/skills/y/SKILL.md"}]},{"name":"skill-n","files":[{"source":"sync/skills/old/SKILL.md","target":".claude/skills/old/SKILL.md"},{"source":"sync/skills/lone/SKILL.md","target":".claude/skills/lone/SKILL.md"}]}]' | base64 ;;
   "api repos/zgeoff/tools/contents/sync/manifest.json"*)
-    printf '[{"name":"skill-x","files":[{"source":"sync/skills/x/SKILL.md","target":".claude/skills/x/SKILL.md"}]},{"name":"callers","files":[{"source":"sync/workflow-callers/pr.yml","target":".github/workflows/pr.yml"}]},{"name":"skill-odd","files":[{"source":"sync/skills/odd/odd #1?%%41.md","target":".claude/skills/odd/odd #1?%%41.md"}]}]' | base64 ;;
+    printf '[{"name":"skill-x","files":[{"source":"sync/skills/x/SKILL.md","target":".claude/skills/x/SKILL.md"}]},{"name":"callers","files":[{"source":"sync/workflow-callers/pr.yml","target":".github/workflows/pr.yml"}]},{"name":"skill-odd","files":[{"source":"sync/skills/odd/odd #1?%%41.md","target":".claude/skills/odd/odd #1?%%41.md"}]},{"name":"skill-blk","files":[{"source":"sync/skills/blk/SKILL.md","target":".claude/skills/blk/SKILL.md"},{"source":"sync/skills/blk/references/rust.md","target":".claude/skills/blk/references/rust.md","except":["ZGeoff/Demo"]},{"source":"sync/skills/blk/references/kotlin.md","target":".claude/skills/blk/references/kotlin.md","except":["zgeoff/other"]}]},{"name":"skill-n","files":[{"source":"sync/skills/new/SKILL.md","target":".claude/skills/new/SKILL.md"}]}]' | base64 ;;
   *"--jq .content"*)
     [ -z "${TEXT_FAIL:-}" ] || { echo "HTTP 502" >&2; exit 1; }
     case $args in
@@ -58,6 +62,24 @@ case $args in
 esac
 EOF
 chmod +x "$work/gh"
+
+# The tools history the rename check clones: skill-n's source moved from
+# sync/skills/old/ to sync/skills/new/, and sync/skills/lone/ was deleted.
+tools_repo="$work/tools-fixture"
+git init -q "$tools_repo"
+git -C "$tools_repo" config user.email test@example.com
+git -C "$tools_repo" config user.name test
+git -C "$tools_repo" config uploadpack.allowFilter true
+mkdir -p "$tools_repo/sync/skills/old" "$tools_repo/sync/skills/lone"
+printf '# Skill\n\nA body long enough for git to see the same file after a move.\n' >"$tools_repo/sync/skills/old/SKILL.md"
+printf '# Lone\n\nA second file that is deleted, never moved.\n' >"$tools_repo/sync/skills/lone/SKILL.md"
+git -C "$tools_repo" add -A
+git -C "$tools_repo" commit -q -m "feat: add the skills"
+mkdir -p "$tools_repo/sync/skills/new"
+git -C "$tools_repo" mv sync/skills/old/SKILL.md sync/skills/new/SKILL.md
+git -C "$tools_repo" rm -q sync/skills/lone/SKILL.md
+git -C "$tools_repo" commit -q -m "refactor: move the skill"
+export SYNC_PR_TOOLS_REPO="file://$tools_repo"
 
 failures=0
 # expect <name> <exit code> <output prefix>, with the case's variables exported.
@@ -161,6 +183,77 @@ unset FILES_FAIL
 set_case
 export FILES='.claude/skills/odd/odd #1?%41.md\tmodified'
 expect "a synced file whose name holds #, ? and % is read at its own path and ref" 0 "ok: 1 files"
+
+# block <head text> <source text>: .claude/skills/blk/SKILL.md, whose blob differs, with the
+# text of the PR head and of tools main.
+block() {
+  export FILES='.claude/skills/blk/SKILL.md\tmodified' HEAD_BLOB=edited
+  export HEAD_TEXT="$1" SOURCE_TEXT="$2"
+}
+rust='<!-- repo-sync needs ./references/rust.md -->\n\nFor Rust, read [Rust](./references/rust.md).\n\n<!-- repo-sync end -->\n\n'
+kotlin='<!-- repo-sync needs ./references/kotlin.md -->\n\nFor Kotlin, read [Kotlin](./references/kotlin.md).\n\n<!-- repo-sync end -->\n\n'
+http='Read [HTTP](./references/http.md).'
+
+set_case
+block "# Demo\\n\\n$http" "# Demo\\n\\n$rust$http"
+expect "a Markdown file equals its source once the block for a withheld file is dropped" 0 "ok: 1 files"
+
+set_case
+block "# Demo\\n\\n$kotlin$http" "# Demo\\n\\n$rust$kotlin$http"
+expect "a block for a file the repo receives keeps its marker lines" 0 "ok: 1 files"
+
+set_case
+block "# Demo\\n\\n$http" "# Demo\\n\\n<!-- repo-sync needs ./references/../references/rust.md -->\\n\\nRust.\\n\\n<!-- repo-sync end -->\\n\\n$http"
+expect "a needed path is normalised before it is compared" 0 "ok: 1 files"
+
+set_case
+block "# Demo\\n\\n$kotlin$http" "# Demo\\n\\n$rust$kotlin$http"
+export SOURCE_BLOBS='b2 b1'
+expect "a dropped block is compared with every source version, not only the newest" 0 "ok: 1 files"
+
+set_case
+block "# Demo\\n\\n${kotlin//Kotlin, read/Kotlin, see}$http" "# Demo\\n\\n$rust$kotlin$http"
+expect "a hand edit inside a kept block fails" 1 "no: .claude/skills/blk/SKILL.md matches"
+
+set_case
+block "# Demo\\n\\n$http Edited." "# Demo\\n\\n$rust$http"
+expect "a hand edit elsewhere in a file with a dropped block fails" 1 "no: .claude/skills/blk/SKILL.md matches"
+
+set_case
+block "# Demo\\n\\n$http" "# Demo\\n\\n$rust$kotlin$http"
+expect "a block dropped that the repo receives fails" 1 "no: .claude/skills/blk/SKILL.md matches"
+
+set_case
+block "# Demo\\n\\n$rust$http" "# Demo\\n\\n$rust$http"
+expect "a block left in the copy that the sync would drop fails" 1 "no: .claude/skills/blk/SKILL.md matches"
+
+set_case
+block "# Demo\\n\\n$http" "# Demo\\n\\n<!-- repo-sync needs ./references/rust.md -->\\n\\nFor Rust.\\n\\n$http"
+expect "a block that never closes fails" 1 "no: .claude/skills/blk/SKILL.md matches"
+
+set_case
+block "# Demo\\n\\n$http" "<!-- repo-sync needs ./references/rust.md -->\\n<!-- repo-sync needs ./references/kotlin.md -->\\n<!-- repo-sync end -->\\n\\n$http"
+expect "a block opened inside another block fails" 1 "no: .claude/skills/blk/SKILL.md matches"
+
+set_case
+block "# Demo\\n\\n$http" "# Demo\\n\\n<!-- repo-sync end -->\\n\\n$http"
+expect "a close with no open fails" 1 "no: .claude/skills/blk/SKILL.md matches"
+
+set_case
+export FILES='.claude/skills/old/SKILL.md\tremoved' BASE_BLOB=edited HEAD_BLOB=b1
+expect "a removed file whose source was renamed passes with an edited old copy" 0 "ok: 1 files"
+
+set_case
+export FILES='.claude/skills/old/SKILL.md\tremoved' BASE_BLOB=edited HEAD_BLOB=missing
+expect "a rename whose new target is missing at the PR head fails" 1 "no: .claude/skills/old/SKILL.md is removed, but its copy matches no source"
+
+set_case
+export FILES='.claude/skills/lone/SKILL.md\tremoved' BASE_BLOB=edited HEAD_BLOB=b1
+expect "a removed file with no rename in the history and an edited copy fails" 1 "no: .claude/skills/lone/SKILL.md is removed, but its copy matches no source"
+
+set_case
+export FILES='.claude/skills/old/SKILL.md\tremoved' BASE_BLOB=edited HEAD_BLOB=b1
+SYNC_PR_TOOLS_REPO="file://$work/no-such-repo" expect "a failed clone of the tools history fails with its reason" 1 "no: tools could not be cloned from file://"
 
 set_case
 export STATE=MERGED
