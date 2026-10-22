@@ -137,6 +137,7 @@ import { formatDriftLines } from './fleet/format-drift-lines.ts';
 import { ensureFleet } from './fleet/ensure-fleet.ts';
 import { loadFleetLast } from './fleet/load-fleet-last.ts';
 import { fleetTimerUnits } from './fleet/fleet-timer-units.ts';
+import { removeTimer } from './fleet/remove-timer.ts';
 import { fleetTrustChecks } from './fleet/fleet-trust-checks.ts';
 import { buildFleetChecks } from './fleet/build-fleet-checks.ts';
 import { findPluginDrift } from './fleet/find-plugin-drift.ts';
@@ -1439,13 +1440,6 @@ async function installTimer(unit: string, u: { service: string; timer: string })
   }
 }
 
-async function removeTimer(unit: string): Promise<void> {
-  const dir = `${process.env['HOME']}/.config/systemd/user`;
-  await realRunner(['systemctl', '--user', 'disable', '--now', `${unit}.timer`], { env: cleanEnv() });
-  for (const f of [`${unit}.service`, `${unit}.timer`]) await Bun.file(`${dir}/${f}`).delete().catch(() => {});
-  await realRunner(['systemctl', '--user', 'daemon-reload'], { env: cleanEnv() });
-}
-
 const rcDeps = (): RcDeps => ({ state: (id) => rcState(id), run: realRunner, self: selfCommand() });
 
 async function fleetCommand(db: Database, verb: string | undefined, args: string[], flags: Flags): Promise<Out> {
@@ -1556,7 +1550,7 @@ async function fleetCommand(db: Database, verb: string | undefined, args: string
         return { data: { unit: `${FLEET_UNIT}.timer` }, text: `Fleet check every 5 min (${FLEET_UNIT}.timer).` };
       }
       if (args[0] === 'remove') {
-        await removeTimer(FLEET_UNIT);
+        await removeTimer(realRunner, { directory: `${process.env['HOME']}/.config/systemd/user`, unit: FLEET_UNIT, env: cleanEnv() });
         return { data: { removed: true }, text: 'Fleet timer off.' };
       }
       throw new HqError('bad_args', 'hq fleet timer install|remove');
@@ -1606,7 +1600,7 @@ async function probeCommand(db: Database, verb: string | undefined, args: string
         return { data: { unit: `${PROBE_UNIT}.timer` }, text: `Nix probe every minute (${PROBE_UNIT}.timer).` };
       }
       if (args[0] === 'remove') {
-        await removeTimer(PROBE_UNIT);
+        await removeTimer(realRunner, { directory: `${process.env['HOME']}/.config/systemd/user`, unit: PROBE_UNIT, env: cleanEnv() });
         return { data: { removed: true }, text: 'Probe timer off.' };
       }
       throw new HqError('bad_args', 'hq probe timer install|remove');
@@ -1673,9 +1667,7 @@ async function backupCommand(db: Database, verb: string | undefined, args: strin
         return { data: { unit: `${BACKUP_UNIT}.timer`, passwordCreated: p.created }, text: `Hourly timer on (${BACKUP_UNIT}.timer).${p.created ? ` A new restic password is at ${p.path}: store it off this PC.` : ''}` };
       }
       if (args[0] === 'remove') {
-        await realRunner(['systemctl', '--user', 'disable', '--now', `${BACKUP_UNIT}.timer`], { env: cleanEnv() });
-        for (const f of [`${BACKUP_UNIT}.service`, `${BACKUP_UNIT}.timer`]) await Bun.file(`${dir}/${f}`).delete().catch(() => {});
-        await realRunner(['systemctl', '--user', 'daemon-reload'], { env: cleanEnv() });
+        await removeTimer(realRunner, { directory: dir, unit: BACKUP_UNIT, env: cleanEnv() });
         return { data: { removed: true }, text: 'Hourly timer off. The snapshots stay.' };
       }
       throw new HqError('bad_args', 'hq backup timer install|remove');
