@@ -33,7 +33,7 @@ test('it raises nothing for a run whose issue is open in Linear or unknown to hq
   expect(readClosedIssueAlerts(ctx.db)).toStrictEqual([]);
 });
 
-test('it raises nothing for a merged run on its way to live, since a Fixes merge closes the issue early', () => {
+test('it raises nothing for a merged run on its way to live, owed a check or not, since a Fixes merge closes the issue early', () => {
   const ctx = setupTest();
   ctx.addKettleRun('GEO-9813');
   addPr(ctx.db, 'GEO-9813', 'kettle#13', 'kettle-bot');
@@ -88,7 +88,6 @@ test('it tells done from dropped for each closed issue by what the run still owe
       line: 'GEO-9824: Done in Linear while hq has it working; done with no merged PR: hq run done GEO-9824 or hq run drop GEO-9824',
     },
     { key: 'linear:GEO-9825', fingerprint: 'completed:live-check', issue: 'GEO-9825', line: 'GEO-9825: Done in Linear while hq has it live-check; if the live check passed, hq run done GEO-9825' },
-    { key: 'linear:GEO-9826', fingerprint: 'completed:merged', issue: 'GEO-9826', line: 'GEO-9826: Done in Linear while hq has it merged; nothing is owed: hq run done GEO-9826' },
     {
       key: 'linear:GEO-9827',
       fingerprint: 'completed:blocked',
