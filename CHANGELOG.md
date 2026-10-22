@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.88.0 — 2026-10-23
+
+fleet.json may give a session the `release` role, for the z-release session the fleet throughput design adds.
+
+- `release` joins the role names. A role with several holders, it needs no holder, so today's fleet.json stays valid.
+- `steward` stays until the fleet.json that drops z-steward merges.
+
 ## 0.87.0 — 2026-10-23
 
 The sweep now sees an open run whose Linear issue is closed (z-delivery: an audit found 41).
