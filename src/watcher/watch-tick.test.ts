@@ -235,8 +235,8 @@ test('a goals sync the deadline gave up on is not started again until it stops',
   expect({ whileHeld, after: repoLists.length, skipped: logs.some((line) => line.endsWith('team goals failed: team goals from an earlier pass is still running')) }).toStrictEqual({ whileHeld: 1, after: 2, skipped: true });
 });
 
-// At 20:00 UTC with every other sync fresh and a full GitHub pass at 19:59. Linear holds the run's
-// issue as canceled at 19:00, and the run has no PR.
+// At 20:00 UTC with every other sync fresh and the GitHub pass due, where gh finds no PRs. Linear
+// holds the run's issue as canceled at 19:00, and the run has no PR.
 test('a due run-issue pass drops a run whose issue Linear canceled, tells z-delivery, and waits 10 minutes before the next read', async () => {
   const ctx = setupTest();
   const logs: string[] = [];
@@ -248,10 +248,9 @@ test('a due run-issue pass drops a run whose issue Linear canceled, tells z-deli
   const runIssueReads: string[] = [];
   const deps = { me: 'hq-lanes', run, log: (line: string) => logs.push(line), stepMs: 2000, steps: { runs: () => Promise.resolve(), weekly: () => Promise.resolve(false), health: () => Promise.resolve({ opened: [], cleared: [] }) } };
   onTestFinished(overrideEnv('HQ_NOW', '2026-10-15T20:00:00Z'));
-  for (const key of ['kinds_synced_at', 'goals_synced_at', 'goals_ok_at', 'kinds_ok_at', 'linear_synced_at', 'lanes_ready_linear_at', 'run_prs_checked_at']) {
+  for (const key of ['kinds_synced_at', 'goals_synced_at', 'goals_ok_at', 'kinds_ok_at', 'linear_synced_at', 'lanes_ready_linear_at']) {
     setMeta(ctx.db, key, '2026-10-15T20:00:00Z');
   }
-  setMeta(ctx.db, 'run_prs_merged_since', '2026-10-15T19:59:00Z');
   addRun(ctx.db, { issue: 'KET-8', title: 'Invented kettle work', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
   linearIssues.push({ identifier: 'KET-8', team: 'KET', state: 'Canceled', stateType: 'canceled', canceledAt: '2026-10-15T19:00:00.000Z', previousIdentifiers: [], project: null, labels: [], parent: null });
   addRun(ctx.db, { issue: 'KET-9', title: 'Invented kettle work', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
@@ -273,4 +272,25 @@ test('a due run-issue pass drops a run whose issue Linear canceled, tells z-deli
   expect(ctx.db.query('SELECT target FROM outbox').all()).toStrictEqual([{ target: 'z-delivery' }]);
   expect(logs.filter((line) => line.includes('run issues'))).toStrictEqual(['2026-10-15T20:00:00Z run issues: dropped KET-8, canceled in Linear before any merge']);
   expect(runIssueReads).toStrictEqual(['2026-10-15T20:00:00Z']);
+});
+
+// At 20:00 UTC with every other sync fresh and the GitHub pass due, where every gh call fails.
+// Linear holds the run's issue as canceled at 19:00.
+test('a run-issue pass drops nothing when this tick\'s GitHub pass did not read every PR', async () => {
+  const ctx = setupTest();
+  const capacity = JSON.stringify({ imp: { freeMib: 0, room: false }, providers: { claude: { room: false, unattended: true, target: 'imp' } } });
+  const answers: Record<string, RunResult> = { gh: { code: 1, stdout: '', stderr: 'invented: GitHub is down' }, op: { code: 0, stdout: 'lin_api_INVENTED\n', stderr: '' } };
+  const run: Runner = (command) => Promise.resolve(answers[command[0] ?? ''] ?? { code: 0, stdout: capacity, stderr: '' });
+  onTestFinished(overrideEnv('HQ_NOW', '2026-10-15T20:00:00Z'));
+  for (const key of ['kinds_synced_at', 'goals_synced_at', 'goals_ok_at', 'kinds_ok_at', 'linear_synced_at', 'lanes_ready_linear_at']) {
+    setMeta(ctx.db, key, '2026-10-15T20:00:00Z');
+  }
+  setMeta(ctx.db, 'run_prs_merged_since', '2026-10-15T19:59:00Z');
+  addRun(ctx.db, { issue: 'KET-10', title: 'Invented kettle work', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
+  linearIssues.push({ identifier: 'KET-10', team: 'KET', state: 'Canceled', stateType: 'canceled', canceledAt: '2026-10-15T19:00:00.000Z', previousIdentifiers: [], project: null, labels: [], parent: null });
+
+  await watchTick(ctx.db, { me: 'hq-lanes', run, log: () => {}, stepMs: 2000, steps: { runs: () => Promise.resolve(), weekly: () => Promise.resolve(false), health: () => Promise.resolve({ opened: [], cleared: [] }) } });
+
+  expect(ctx.db.query("SELECT state FROM runs WHERE issue = 'KET-10'").get()).toStrictEqual({ state: 'working' });
+  expect(ctx.db.query("SELECT state FROM linear_issues WHERE issue = 'KET-10'").get()).toStrictEqual({ state: 'canceled' });
 });

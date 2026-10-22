@@ -8,7 +8,7 @@ import { setState } from './set-state.ts';
 const ISSUES = z.array(z.object({ issue: z.string() }));
 
 // The one run state Linear decides alone: an issue canceled while its run has no open or merged PR,
-// seen by a full GitHub pass that ran after the cancellation, so a PR opened just before it counts.
+// seen by a clean GitHub pass that started after the cancellation, so a PR opened before it counts.
 export function dropCanceledRuns(db: Database, actor: string, githubAt: string | null): string[] {
   if (githubAt === null) {
     return [];
