@@ -4,8 +4,6 @@ import { parseJSON } from './parse-json.ts';
 
 const PrintedReviewSchema = z.object({ reviewID: z.string(), head: z.string() });
 
-// Whether noslop's store holds the review that a run printed, at the head it printed. A store that
-// cannot be read, or has no reviews table yet, holds no review.
 export function probeStoredReview(store: string, stdout: string): boolean {
   const printed = PrintedReviewSchema.safeParse(parseJSON(stdout));
   if (!printed.success) {
