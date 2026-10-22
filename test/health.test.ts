@@ -130,6 +130,16 @@ test('a failed read neither clears open problems nor drops restart samples', asy
   expect(texts.at(-1)).toContain('kettle.service is restart-looping'); // the 100 sample survived the failed read
 });
 
+test('it reports a failed memory-pressure read as a problem', async () => {
+  const healthy = probe(world());
+  const unreadable: Probe = { ...healthy, readFile: (path) => (path.endsWith('pressure/memory') ? Promise.reject(new Error('invented read failure')) : healthy.readFile(path)) };
+
+  const result = await runChecks(unreadable, healthSettings(db), {}, new Date(NOON_SYDNEY));
+
+  expect(result.checks).toContainEqual({ key: 'memory:pressure-read', ok: false, line: "can't read /proc/pressure/memory" });
+  expect(result.unknown).toContain('memory:pressure');
+});
+
 test('a command that hangs counts as a failed read', async () => {
   const p = probe(world());
   const hang: Probe = { ...p, run: async (cmd) => (cmd[0] === 'df' ? new Promise(() => {}) : p.run(cmd)) };

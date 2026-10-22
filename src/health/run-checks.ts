@@ -85,6 +85,7 @@ export async function runChecks(p: Probe, s: HealthSettings, prev: Samples, at: 
     const high = avg60 >= s.memSomeAvg60;
     checks.push({ key: 'memory:pressure', ok: !high, line: `memory pressure: some avg60 ${avg60}%${high ? `, at or over ${s.memSomeAvg60}%` : ''}` });
   } catch {
+    checks.push({ key: 'memory:pressure-read', ok: false, line: "can't read /proc/pressure/memory" });
     unknown.push('memory:pressure');
   }
   try {
