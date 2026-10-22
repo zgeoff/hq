@@ -23,6 +23,21 @@ export interface Sample {
 
   // The pool's caps; absent or null with the lanes.
   slots?: PacingSlots | null;
+
+  // The local sessions an unattended provider may run on this host (pacing.json's localFallback);
+  // absent or null when one targets local, so only the local cap counts.
+  localRoom?: number | null;
+}
+
+// A Ready issue the lanes leave out until a time passes or another issue is Done or Canceled.
+export interface LaneSkip {
+  issue: string;
+
+  // An ISO time, or the identifier of the issue it waits on.
+  until: string;
+  reason: string;
+  by: string;
+  at: string;
 }
 
 export interface TickResult {

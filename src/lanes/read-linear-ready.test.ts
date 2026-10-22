@@ -2,14 +2,18 @@ import { expect, mock, onTestFinished, test } from 'bun:test';
 import rulesTable from '../../lanes.json';
 import { buildReadyPage, makePagedCall } from '../../test/build-ready-page.ts';
 import { at, freshDb } from '../../test/helpers.ts';
+import { makeSkipStateCall } from '../../test/make-skip-state-call.ts';
 import { readySummary } from '../areas/ready-summary.ts';
 import { readReadyByLane } from '../areas/read-ready-by-lane.ts';
 import { reportLaneReady } from '../areas/report-lane-ready.ts';
 import type { LinearCall } from '../linear/types.ts';
 import { getMeta } from '../db/get-meta.ts';
+import { readLaneSkips } from './read-lane-skips.ts';
 import { readLinearReady } from './read-linear-ready.ts';
 import { readReadySnapshot } from './read-ready-snapshot.ts';
+import { readSkipUnread } from './read-skip-unread.ts';
 import { validateLaneRules } from './validate-lane-rules.ts';
+import { writeLaneSkip } from './write-lane-skip.ts';
 
 function setupTest() {
   const fresh = freshDb();
@@ -178,4 +182,85 @@ test('it keeps the areas of a running issue after it leaves Ready', async () => 
   await readLinearReady(ctx.db, makePagedCall(buildReadyPage([], null)), 'hq-lanes', rules);
 
   expect(JSON.parse(getMeta(ctx.db, 'lanes_issue_areas') ?? 'null')).toStrictEqual({ 'GEO-9801': ['nixie'] });
+});
+
+test('it lists a skipped Ready issue among the skipped with its until and reason, in no lane', async () => {
+  const ctx = setupTest();
+  const rules = validateLaneRules(rulesTable, Object.keys(rulesTable.lanes));
+  writeLaneSkip(ctx.db, { issue: 'GEO-9851', until: '2026-10-16T09:00:00Z', reason: 'the kettle vendor answers tomorrow', actor: 'z-delivery', at: new Date('2026-10-15T20:00:00Z') });
+
+  await readLinearReady(ctx.db, makeSkipStateCall([{ identifier: 'GEO-9851', project: 'atc roadmap' }], {}), 'hq-lanes', rules);
+
+  expect(readySummary(ctx.db, 30)).toMatchObject({ total: 1, eligible: 0, unexplained: 0, skipped: [{ issue: 'GEO-9851', reason: 'skipped until 2026-10-16T09:00:00Z: the kettle vendor answers tomorrow' }] });
+});
+
+test('it drops a skip until a time once the time passes, and counts the issue in its lane again', async () => {
+  const ctx = setupTest();
+  const rules = validateLaneRules(rulesTable, Object.keys(rulesTable.lanes));
+  writeLaneSkip(ctx.db, { issue: 'GEO-9851', until: '2026-10-15T20:30:00Z', reason: 'the kettle vendor answers tonight', actor: 'z-delivery', at: new Date('2026-10-15T20:00:00Z') });
+  at('2026-10-15T20:31:00Z');
+
+  await readLinearReady(ctx.db, makeSkipStateCall([{ identifier: 'GEO-9851', project: 'atc roadmap' }], {}), 'hq-lanes', rules);
+
+  expect(readLaneSkips(ctx.db)).toStrictEqual([]);
+  expect(readySummary(ctx.db, 30)).toMatchObject({ total: 1, eligible: 1, skipped: [] });
+  expect(ctx.db.query("SELECT actor, data FROM events WHERE action = 'skip-ended'").all()).toStrictEqual([
+    { actor: 'hq-lanes', data: JSON.stringify({ issue: 'GEO-9851', until: '2026-10-15T20:30:00Z', reason: 'the kettle vendor answers tonight' }) },
+  ]);
+});
+
+test('it drops a skip until an issue once Linear reads that issue Done', async () => {
+  const ctx = setupTest();
+  const rules = validateLaneRules(rulesTable, Object.keys(rulesTable.lanes));
+  writeLaneSkip(ctx.db, { issue: 'GEO-9852', until: 'GEO-9859', reason: 'waits on the descaler PR', actor: 'z-delivery', at: new Date('2026-10-15T20:00:00Z') });
+
+  await readLinearReady(ctx.db, makeSkipStateCall([{ identifier: 'GEO-9852', project: 'atc roadmap' }], { 'GEO-9859': 'completed' }), 'hq-lanes', rules);
+
+  expect(readLaneSkips(ctx.db)).toStrictEqual([]);
+  expect(readySummary(ctx.db, 30)).toMatchObject({ total: 1, eligible: 1, skipped: [] });
+});
+
+test('it keeps a skip until an issue that Linear reads still open', async () => {
+  const ctx = setupTest();
+  const rules = validateLaneRules(rulesTable, Object.keys(rulesTable.lanes));
+  writeLaneSkip(ctx.db, { issue: 'GEO-9852', until: 'GEO-9859', reason: 'waits on the descaler PR', actor: 'z-delivery', at: new Date('2026-10-15T20:00:00Z') });
+
+  await readLinearReady(ctx.db, makeSkipStateCall([{ identifier: 'GEO-9852', project: 'atc roadmap' }], { 'GEO-9859': 'started' }), 'hq-lanes', rules);
+
+  expect(readLaneSkips(ctx.db).map((skip) => skip.issue)).toStrictEqual(['GEO-9852']);
+});
+
+test('it keeps a skip until an issue when the state read fails, and still writes the Ready counts', async () => {
+  const ctx = setupTest();
+  const rules = validateLaneRules(rulesTable, Object.keys(rulesTable.lanes));
+  writeLaneSkip(ctx.db, { issue: 'GEO-9852', until: 'GEO-9859', reason: 'waits on the descaler PR', actor: 'z-delivery', at: new Date('2026-10-15T20:00:00Z') });
+
+  await readLinearReady(ctx.db, makeSkipStateCall([{ identifier: 'GEO-9852', project: 'atc roadmap' }], new Error('Linear answered 502: invented outage')), 'hq-lanes', rules);
+
+  expect(readLaneSkips(ctx.db)).toStrictEqual([{ issue: 'GEO-9852', until: 'GEO-9859', reason: 'waits on the descaler PR', by: 'z-delivery', at: '2026-10-15T20:00:00Z' }]);
+  expect(readySummary(ctx.db, 30)).toMatchObject({ total: 1, eligible: 0, skipped: [{ issue: 'GEO-9852', reason: 'skipped until GEO-9859: waits on the descaler PR' }] });
+  expect(readSkipUnread(ctx.db)).toStrictEqual({ 'GEO-9859': "can't read issue:GEO-9859: Linear answered 502: invented outage" });
+});
+
+test('it keeps a skip until an issue Linear does not hold, and records why', async () => {
+  const ctx = setupTest();
+  const rules = validateLaneRules(rulesTable, Object.keys(rulesTable.lanes));
+  writeLaneSkip(ctx.db, { issue: 'GEO-9852', until: 'GEO-9859', reason: 'waits on the descaler PR', actor: 'z-delivery', at: new Date('2026-10-15T20:00:00Z') });
+
+  await readLinearReady(ctx.db, makeSkipStateCall([{ identifier: 'GEO-9852', project: 'atc roadmap' }], {}), 'hq-lanes', rules);
+
+  expect(readLaneSkips(ctx.db).map((skip) => skip.issue)).toStrictEqual(['GEO-9852']);
+  expect(readSkipUnread(ctx.db)).toStrictEqual({ 'GEO-9859': 'Linear has no issue GEO-9859' });
+});
+
+test('it clears an unread until issue once a later read answers for it', async () => {
+  const ctx = setupTest();
+  const rules = validateLaneRules(rulesTable, Object.keys(rulesTable.lanes));
+  writeLaneSkip(ctx.db, { issue: 'GEO-9852', until: 'GEO-9859', reason: 'waits on the descaler PR', actor: 'z-delivery', at: new Date('2026-10-15T20:00:00Z') });
+  await readLinearReady(ctx.db, makeSkipStateCall([{ identifier: 'GEO-9852', project: 'atc roadmap' }], new Error('Linear answered 502: invented outage')), 'hq-lanes', rules);
+  at('2026-10-15T20:10:00Z');
+
+  await readLinearReady(ctx.db, makeSkipStateCall([{ identifier: 'GEO-9852', project: 'atc roadmap' }], { 'GEO-9859': 'started' }), 'hq-lanes', rules);
+
+  expect(readSkipUnread(ctx.db)).toStrictEqual({});
 });

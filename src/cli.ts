@@ -176,6 +176,8 @@ import { formatLanePlan } from './lanes/format-lane-plan.ts';
 import { readCapacity } from './lanes/read-capacity.ts';
 import { readLanes } from './lanes/read-lanes.ts';
 import { releaseLanes } from './lanes/release-lanes.ts';
+import { parseLaneSkipArgs } from './lanes/parse-lane-skip-args.ts';
+import { runLaneSkipCommand } from './lanes/run-lane-skip-command.ts';
 import { reportReady } from './lanes/report-ready.ts';
 import { slotsFrom } from './lanes/slots-from.ts';
 import { tick } from './lanes/tick.ts';
@@ -1754,7 +1756,10 @@ async function newsCommand(db: Database, verb: string | undefined, flags: Flags)
   }
 }
 
-async function lanesCommand(db: Database, verb: string | undefined, flags: Flags, run: Runner): Promise<Out> {
+async function lanesCommand(context: Pick<Ctx, 'db' | 'verb' | 'rest' | 'flags' | 'run'>): Promise<Out> {
+  const db = context.db;
+  const verb = context.verb;
+  const flags = context.flags;
   const by = () => actor(db, flags);
   switch (verb) {
     case 'tick': {
@@ -1790,8 +1795,12 @@ async function lanesCommand(db: Database, verb: string | undefined, flags: Flags
       const had = releaseLanes(db, await by());
       return { data: { released: had }, text: had ? 'Slot nudges resume from the next look.' : 'No lanes hold to release.' };
     }
+    case 'skip': {
+      const args = parseLaneSkipArgs(context.rest, flags.until, flags.reason);
+      return runLaneSkipCommand({ db, actor: await by(), at: now(), args });
+    }
     case 'promotable': {
-      const issues = await readPromotableIssues(makeAuditedLinearCaller(db, run), rulesTable.team);
+      const issues = await readPromotableIssues(makeAuditedLinearCaller(db, context.run), rulesTable.team);
       return { data: { issues }, text: issues.length > 0 ? issues.map((issue) => `${issue.identifier}  ${issue.title}`).join('\n') : 'No Backlog issue is ready to promote.' };
     }
     case 'ready': {
@@ -2081,7 +2090,7 @@ export const GROUPS: Record<string, (c: Ctx) => Promise<Out>> = {
   refusals: (c) => refusalsCommand(c.db, c.verb, c.flags),
   run: (c) => runCommand(c.db, c.verb, c.rest, c.flags),
   lanes: async (context) => {
-    const out = await lanesCommand(context.db, context.verb, context.flags, context.run);
+    const out = await lanesCommand(context);
     return context.verb === undefined || context.verb === 'status' || context.verb === 'log' ? withStaleBuild(out, checkLanesBuild((path) => readFileSync(path, 'utf8'))) : out;
   },
   focus: async (context) => runFocusCommand({ db: context.db, call: makeAuditedLinearCaller(context.db, context.run), actor: await actor(context.db, context.flags), at: now(), verb: context.verb, rest: context.rest, reserves: context.flags.reserve ?? [] }),

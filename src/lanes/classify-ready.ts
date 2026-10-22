@@ -1,5 +1,5 @@
 import type { Skipped } from '../areas/types.ts';
-import type { LaneRule, LaneRules, ReadyIssue } from './types.ts';
+import type { LaneRule, LaneRules, LaneSkip, ReadyIssue } from './types.ts';
 
 export interface ClassifiedReady {
   counts: Record<string, number>;
@@ -8,8 +8,9 @@ export interface ClassifiedReady {
 }
 
 // Every Ready issue to one lane, or to skipped with a reason. First match wins: the exclusions, the
-// lanes in lanes.json's order, then the fallback. counts holds every lane in the rules, zeros included.
-export function classifyReady(issues: ReadyIssue[], rules: LaneRules): ClassifiedReady {
+// skips set with hq lanes skip, the lanes in lanes.json's order, then the fallback. counts holds every
+// lane in the rules, zeros included.
+export function classifyReady(issues: ReadyIssue[], rules: LaneRules, skips: readonly LaneSkip[]): ClassifiedReady {
   const entries = Object.entries(rules.lanes);
   const ordered = entries.filter(([, rule]) => !rule.fallback);
   const fallback = entries.find(([, rule]) => rule.fallback)?.[0] ?? '';
@@ -19,6 +20,11 @@ export function classifyReady(issues: ReadyIssue[], rules: LaneRules): Classifie
     const excluded = rules.exclude.find((rule) => hasAny(rule.projects, issue.project) || rule.labels.some((label) => hasAny(issue.labels, label)));
     if (excluded) {
       skipped.push({ issue: issue.identifier, reason: excluded.reason });
+      continue;
+    }
+    const skip = skips.find((entry) => entry.issue === issue.identifier);
+    if (skip) {
+      skipped.push({ issue: issue.identifier, reason: `skipped until ${skip.until}: ${skip.reason}` });
       continue;
     }
     const lane = ordered.find(([, rule]) => isTakenBy(rule, issue))?.[0] ?? fallback;
