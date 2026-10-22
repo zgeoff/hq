@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test';
 import type { Database } from 'bun:sqlite';
+import { z } from 'zod';
 import { morningCheck } from '../src/morning/morning-check.ts';
 import { morningText } from '../src/morning/morning-text.ts';
 import { morningTick } from '../src/morning/morning-tick.ts';
@@ -101,4 +102,21 @@ test('it lists the send status of a morning message forwarded after it was queue
   setForward(db, 'z-stu', 'z-other');
 
   expect(recentRuns(db).map((run) => [run.key, run.sent])).toStrictEqual([['2026-10-17', 'pending']]);
+});
+
+test('it links a morning run queued under a forward to its event alone', () => {
+  setForward(db, 'z-stu', 'z-other');
+  morningTick(db, 'hq-lanes', syd('2026-10-17', '08:16'));
+  const queuedRow = db.query('SELECT event_seq FROM outbox').get();
+
+  expect(recentRuns(db).map((run) => [run.key, run.outbox_key, run.sent])).toStrictEqual([['2026-10-17', `hq-ev${z.object({ event_seq: z.number() }).parse(queuedRow).event_seq}`, 'pending']]);
+});
+
+test('it reads the send status of a morning run whose key also names the target', () => {
+  setForward(db, 'z-stu', 'z-other');
+  morningTick(db, 'hq-lanes', syd('2026-10-17', '08:16'));
+  db.query(`UPDATE job_runs SET outbox_key = outbox_key || '-z-stu'`).run();
+  db.query(`UPDATE outbox SET status = 'failed'`).run();
+
+  expect(recentRuns(db).map((run) => [run.key, run.sent])).toStrictEqual([['2026-10-17', 'failed']]);
 });

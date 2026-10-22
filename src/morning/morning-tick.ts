@@ -28,7 +28,8 @@ export function morningTick(db: Database, actor: string, at: Date = now()): JobR
       const late = past(s, LATE);
       const seq = logEvent(db, 'hq', `job:${JOB}`, 'ran', actor, null, null, { key: s.date, late });
       enqueue(db, seq, TARGET, morningText(windows(at), late), `job:${JOB}:${s.date}`); // a topic per day: one day never supersedes another
-      db.query('INSERT INTO job_runs (job, key, at, result, detail, outbox_key) VALUES (?, ?, ?, ?, ?, ?)').run(JOB, s.date, iso(at), 'queued', late ? 'late' : null, `hq-ev${seq}-${TARGET}`);
+      const detail = late ? 'late' : null;
+      db.query('INSERT INTO job_runs (job, key, at, result, detail, outbox_key) VALUES (?, ?, ?, ?, ?, ?)').run(JOB, s.date, iso(at), 'queued', detail, `hq-ev${seq}`);
       return getRun(db, s.date);
     })
     .immediate();
