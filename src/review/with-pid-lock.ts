@@ -2,11 +2,20 @@ import { mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } 
 import { HqError } from '../errors.ts';
 import { pidAlive } from '../rc/pid-alive.ts';
 
-// One review of a PR at a time, since its reviews share one worktree and one set of files. A review
-// runs for many minutes, so a second call fails at once, and only a lock whose process is gone is
-// taken over: an age limit would hand a running review's worktree to the next call.
-export async function withPRLock<T>(lock: string, ref: string, fn: () => Promise<T>): Promise<T> {
-  createPRLock(lock, ref);
+const LOCK_POLL_MS = 250;
+
+// A lock held for as long as its process lives: a lock whose process is gone is taken over, and no
+// age limit applies, since one would hand a lock to the next caller while a slow holder still runs.
+// A held lock is waited on for up to waitMs, then refused; `what` names the holder in the refusal.
+export async function withPidLock<T>(lock: string, what: string, fn: () => Promise<T>, waitMs = 0): Promise<T> {
+  const start = Date.now();
+  while (!tryCreateLock(lock)) {
+    if (Date.now() - start >= waitMs) {
+      const holder = readHolder(lock);
+      throw new HqError('locked', `${what} holds ${lock}${holder === null ? '' : ` (pid ${holder})`}; wait for it to end`);
+    }
+    await Bun.sleep(LOCK_POLL_MS);
+  }
   try {
     return await fn();
   } finally {
@@ -15,7 +24,7 @@ export async function withPRLock<T>(lock: string, ref: string, fn: () => Promise
 }
 
 // The lock is staged with its pid file and renamed into place, so no reader sees a lock without one.
-function createPRLock(lock: string, ref: string): void {
+function tryCreateLock(lock: string): boolean {
   const staged = `${lock}.${process.pid}`;
   rmSync(staged, { recursive: true, force: true });
   mkdirSync(staged);
@@ -23,7 +32,7 @@ function createPRLock(lock: string, ref: string): void {
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       renameSync(staged, lock);
-      return;
+      return true;
     } catch (error) {
       const code = error instanceof Error && 'code' in error ? error.code : undefined;
       if (code !== 'EEXIST' && code !== 'ENOTEMPTY') {
@@ -33,12 +42,11 @@ function createPRLock(lock: string, ref: string): void {
     }
     const holder = readHolder(lock);
     if ((holder !== null && pidAlive(holder)) || !removeDeadLock(lock)) {
-      rmSync(staged, { recursive: true, force: true });
-      throw new HqError('locked', `another review of ${ref} runs${holder === null ? '' : ` (pid ${holder})`}; wait for it to end`);
+      break;
     }
   }
   rmSync(staged, { recursive: true, force: true });
-  throw new HqError('locked', `another review of ${ref} took the lock ${lock}; wait for it to end`);
+  return false;
 }
 
 const TAKEOVER_STALE_MS = 60_000;

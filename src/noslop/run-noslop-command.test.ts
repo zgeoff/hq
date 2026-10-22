@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 import { expect, onTestFinished, spyOn, test } from 'bun:test';
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, renameSync, rmSync, symlinkSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, renameSync, rmSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { buildFakeRunner } from '../../test/noslop-fake.ts';
@@ -154,6 +154,21 @@ test('it keeps a repo turned on and a repo turned off while the store migration 
   await runNoslopCommand({ run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester' });
 
   expect(loadNoslopSettings(ctx.db)).toStrictEqual({ repos: ['widgets'], sha: FULL_SHA });
+});
+
+test('it refuses a pin while another pin\'s process still runs, however old its lock is', async () => {
+  const ctx = setupTest();
+  const sleeper = Bun.spawn(['sleep', '30']);
+  onTestFinished(() => sleeper.kill());
+  onTestFinished(overrideEnv('HQ_REVIEW_LOCK_WAIT_MS', '0'));
+  const lock = join(ctx.base, 'reviews', '.lock-zgeoff-noslop-clone');
+  mkdirSync(lock, { recursive: true });
+  writeFileSync(join(lock, 'pid'), String(sleeper.pid));
+  utimesSync(lock, new Date(Date.now() - 3_600_000), new Date(Date.now() - 3_600_000));
+
+  await expect(runNoslopCommand({ run: buildFakeRunner().run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester' })).rejects.toMatchObject({ code: 'locked' });
+
+  expect(loadNoslopSettings(ctx.db).sha).toBeNull();
 });
 
 test('it runs two overlapping pins one after the other', async () => {

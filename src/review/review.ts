@@ -23,7 +23,7 @@ import { riskTier } from './risk-tier.ts';
 import { runCommand as must } from './run-command.ts';
 import { runInstall } from './run-install.ts';
 import type { Effort, ReviewResult } from './types.ts';
-import { withPRLock } from './with-pr-lock.ts';
+import { withPidLock } from './with-pid-lock.ts';
 import { withRepoLock } from './with-repo-lock.ts';
 
 const PRRefs = z.object({ headRefName: z.string(), headRefOid: z.string(), baseRefName: z.string() });
@@ -42,7 +42,7 @@ export async function review(run: Runner, rawRepo: string, pr: number, opts: { w
   mkdirSync(dirname(wt), { recursive: true });
 
   // CI is read after the lock goes, since --watch can wait on CI for as long as it runs.
-  const done = await withPRLock(`${wt}.lock`, `${slug}#${pr}`, async () => {
+  const done = await withPidLock(`${wt}.lock`, `a review of ${slug}#${pr}`, async () => {
     const view = await must(run, ['gh', 'pr', 'view', String(pr), '-R', slug, '--json', 'headRefName,headRefOid,baseRefName']);
     const refs = PRRefs.parse(JSON.parse(view));
     const head = refs.headRefName;
