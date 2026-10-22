@@ -45,9 +45,14 @@ type RoundFacts = z.infer<typeof RoundFactsSchema>;
 
 const EventDataSchema = z.object({ data: z.string() }).nullable();
 
-// The title, issues and session the ask held when this answer came, from the last change before it;
-// null for an ask whose changes predate those facts, which is then read as it stands now.
+// The title, issues and session the ask held when this answer came: kept on the answer, or else
+// from the last change before it; null for an ask whose events predate those facts, which is then
+// read as it stands now.
 function loadRoundFacts(db: Database, answer: AnswerEvent): RoundFacts | null {
+  const kept = RoundFactsSchema.safeParse(JSON.parse(answer.data));
+  if (kept.success) {
+    return kept.data;
+  }
   const row = EventDataSchema.parse(db.query(`SELECT data FROM events WHERE subject = 'ask' AND subject_id = ? AND action IN ('added', 'updated', 'reasked', 'requeued') AND json_extract(data, '$.title') IS NOT NULL AND seq < ? ORDER BY seq DESC LIMIT 1`).get(answer.id, answer.seq));
   return row === null ? null : RoundFactsSchema.parse(JSON.parse(row.data));
 }

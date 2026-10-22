@@ -107,6 +107,18 @@ test('it reads an answer as words once new text cleared the options of a call st
   expect(loadAnswers(db, { from: NOON_SYDNEY, to: '2026-10-14T04:00:00Z' }).map((answer) => [answer.picked, answer.stuPick, answer.words])).toStrictEqual([[null, null, 'Yes']]);
 });
 
+test("it lists an earlier round's answer with that round's title, issues and session when its change events hold none of them", () => {
+  const db = setupTest();
+  addAsk(db, { kind: 'call', id: 'kettle-handle', title: 'Pick a handle', question: 'Wood or steel?', body: 'Wood or steel?', issues: ['GEO-9003'], forSession: 'kettle-bot', actor: 'kettle-bot' });
+  db.run("UPDATE events SET data = json_remove(data, '$.title', '$.issues', '$.forSession') WHERE subject = 'ask'");
+  openAsk(db, { id: 'kettle-handle', force: true, actor: 'kettle-bot' });
+  answerAsk(db, { id: 'kettle-handle', kind: 'call', answer: 'Wood', actor: 'teapot-bot' });
+  at('2026-10-14T03:00:00Z');
+  addAsk(db, { kind: 'call', id: 'kettle-handle', title: 'Pick a base', question: 'Flat or round?', body: 'Flat or round?', issues: ['GEO-9004'], forSession: 'teapot-bot', actor: 'kettle-bot' });
+
+  expect(loadAnswers(db, { from: NOON_SYDNEY, to: '2026-10-14T04:00:00Z' }).map((answer) => [answer.title, answer.issues, answer.session, answer.words])).toStrictEqual([['Pick a handle', ['GEO-9003'], 'kettle-bot', 'Wood']]);
+});
+
 test('hq answers --json lists the last 7 days by default, and --since sets the window', async () => {
   const db = createTwoTypedLines(setupTest()),
     log = spyOn(console, 'log').mockImplementation((line: string) => printed.push(line)),

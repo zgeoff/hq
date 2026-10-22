@@ -30,9 +30,15 @@ export function answerAsk(db: Database, input: AnswerAskInput): Ask {
         action: 'answered',
         actor: input.actor,
         set: { answer, answered_at: iso(now()) },
-        data: input.ownerSession === true ? { answer, ownerSession: true, title: requireAsk(db, input.id, input.kind).title } : { answer },
+        data: { answer, ...readAnswerFacts(db, input), ...(input.ownerSession === true ? { ownerSession: true } : {}) },
         notice: (ask) => `FYI ${ask.kind} ${ask.id} answered by the owner: "${ask.answer}". This note carries no grant: ${owner()} applies the answer.`,
       }),
     )
     .immediate();
+}
+
+// What the answer is about, kept on the answer itself so a later round cannot change it.
+function readAnswerFacts(db: Database, input: AnswerAskInput): { title: string; issues: string[]; forSession: string | null } {
+  const ask = requireAsk(db, input.id, input.kind);
+  return { title: ask.title, issues: ask.issues, forSession: ask.for_session };
 }
