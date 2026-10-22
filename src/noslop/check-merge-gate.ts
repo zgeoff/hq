@@ -21,6 +21,7 @@ import { readNoslopFindings } from './read-noslop-findings.ts';
 import { readOKReviews } from './read-ok-reviews.ts';
 import { readPRFiles } from './read-pr-files.ts';
 import { pickNoslopVerdict } from './pick-noslop-verdict.ts';
+import { pickOwnerHeldVerdict } from './pick-owner-held-verdict.ts';
 import type { NoslopGateFacts } from './pick-noslop-verdict.ts';
 import { resolveEngine } from './resolve-engine.ts';
 import type { PRRequest } from './run-review-check.ts';
@@ -74,22 +75,14 @@ async function checkOwnerHeld(request: PRRequest, parsed: ParsedRepo, head: stri
     return;
   }
   const files = await readPRFiles(request.run, buildSlug(parsed), request.pr);
-  const held = [...new Set(files.filter((file) => isHeld(file)))];
-  if (held.length === 0) {
-    return;
-  }
-  if (readHeadLgtm(request.db, parsed.repo, request.pr, head) === null) {
-    throw buildBlock(parsed, request.pr, `the PR changes owner-held files (${formatHeld(held)}) and needs the owner's lgtm at ${head.slice(0, 7)}: hq pr answer ${parsed.repo} ${request.pr} lgtm, from the console`);
-  }
+  const lgtm = readHeadLgtm(request.db, parsed.repo, request.pr, head);
   const headNow = await readPRHead(request.run, buildSlug(parsed), request.pr);
-  if (headNow !== head) {
-    throw buildBlock(parsed, request.pr, `the PR's head moved from ${head.slice(0, 7)} while the gate ran, so no pass: run the gate again`);
-  }
-}
-
-function formatHeld(held: string[]): string {
-  const shown = held.slice(0, 3).join(', ');
-  return held.length > 3 ? `${shown} and ${held.length - 3} more` : shown;
+  match(pickOwnerHeldVerdict({ repo: parsed.repo, pr: request.pr, held: files.filter(isHeld), lgtm: lgtm !== null, head, headNow }))
+    .with({ pass: true }, () => null)
+    .with({ pass: false }, (blocked) => {
+      throw buildBlock(parsed, request.pr, blocked.reason);
+    })
+    .exhaustive();
 }
 
 function buildBlock(parsed: ParsedRepo, pr: number, reason: string): HqError {
