@@ -22,6 +22,7 @@ import { getUnblock } from '../src/unblock/get-unblock.ts';
 import { at, fakeAtc, freshDb } from './helpers.ts';
 import { buildStubGitHubFactsRunner } from './build-stub-github-facts-runner.ts';
 import { makePRStateGh } from './make-pr-state-gh.ts';
+import { IN_SCOPE } from '../src/scope/in-scope.ts';
 
 let db: Database;
 let dir: string;
@@ -225,6 +226,31 @@ test('the watcher holds goals_ok_at while the cap leaves deploy-prod runs unclas
   setMeta(db, 'goals_synced_at', old);
   await watchTick(db, deps({}, goalsRunner()));
   expect(getMeta(db, 'goals_ok_at')).toBe('2026-10-15T20:00:00Z'); // none left
+});
+
+test('it holds goals_ok_at while the cap leaves repo-days unfetched', async () => {
+  const old = '2026-10-15T10:00:00Z';
+  setMeta(db, 'goals_synced_at', old);
+  setMeta(db, 'goals_ok_at', old);
+  const repos = JSON.stringify(IN_SCOPE.map((name) => ({ name, isArchived: false })));
+  const noRuns = JSON.stringify({ total_count: 0, workflow_runs: [] });
+  const sync = goalsRunner();
+
+  await watchTick(
+    db,
+    deps({}, (cmd, opts) => {
+      if (cmd[0] === 'gh' && cmd[1] === 'repo') {
+        return Promise.resolve({ code: 0, stdout: repos, stderr: '' });
+      }
+      if (cmd[0] === 'gh' && cmd.some((part) => part.includes('/actions/runs?'))) {
+        return Promise.resolve({ code: 0, stdout: noRuns, stderr: '' });
+      }
+      return sync(cmd, opts);
+    }),
+  );
+
+  expect(getMeta(db, 'goals_synced_at')).toBe('2026-10-15T20:00:00Z');
+  expect(getMeta(db, 'goals_ok_at')).toBe(old);
 });
 
 test('the refusals step logs a count when it finds some, stays quiet on none, and never fails the tick', async () => {

@@ -93,7 +93,10 @@ export async function watchTick(db: Database, d: WatchDeps): Promise<boolean> {
         const g = await step('team goals', () => syncGoals(db, d.run, { from: new Date(Date.now() - LOOKBACK_DAYS * 86_400_000), maxRepoDays: 80, env: cleanEnv() })),
           spendFailure = await step('Actions spend', () => refreshActionsSpend(db, d.run, now(), cleanEnv()));
         setMeta(db, 'goals_synced_at', at()); // the 30-min throttle: set even when a fetch failed
-        if (!g.errors.length && !g.deployLeft) setMeta(db, 'goals_ok_at', at()); // what the daily check-in trusts; runs left unclassified by the cap are not yet counted
+        // What the daily check-in trusts: repo-days and deploy-prod runs the caps left are not yet counted.
+        if (g.errors.length === 0 && g.left === 0 && g.deployLeft === 0) {
+          setMeta(db, 'goals_ok_at', at());
+        }
         if (!g.errors.some(isGhAuthFailure)) clearGhAuth(db);
         for (const e of g.errors) noteGhAuth(db, e);
         if (g.errors.length) d.log(`${at()} team goals: ${g.errors.length} fetch(es) failed: ${g.errors.slice(0, 2).join('; ')}`);
