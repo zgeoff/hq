@@ -65,6 +65,19 @@ test('wait on the owner: call queue → answer → apply, and run time waiting o
   expect(statsText(s)).toContain('67% matched by the word "Geoff" or "the owner"');
 });
 
+test('it counts a wait as exact only from when the explicit flag was set', () => {
+  run('GEO-1');
+  setState(db, 'GEO-1', 'blocked', { waitsOn: "Geoff's yes" }, 'z-delivery');
+  atMin(10);
+  setState(db, 'GEO-1', 'blocked', { waitsOn: "Geoff's yes", waitsOnGeoff: true }, 'z-delivery');
+  atMin(20);
+  setState(db, 'GEO-1', 'working', { waitsOn: null, waitsOnGeoff: false }, 'z-delivery');
+
+  const stats = computeStats(db, { from: T0, to: until(30), gh: null });
+
+  expect([stats.geoff.runGeoffWait.medianMin, stats.geoff.runWaitExactShare]).toStrictEqual([20, 0.5]);
+});
+
 test('a run blocked on "the owner" counts as waiting on the owner, as one blocked on "Geoff" does', () => {
   run('GEO-1');
   setState(db, 'GEO-1', 'blocked', { waitsOn: "the owner's yes" }, 'z-delivery');

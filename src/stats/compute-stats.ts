@@ -67,7 +67,7 @@ export function computeStats(db: Database, opts: { from: string; to: string; gh:
         nextExact = false;
       }
       if (e.to_state === 'done' || e.to_state === 'dropped') next = false;
-      if (next !== geoff) {
+      if (next !== geoff || (geoff && nextExact !== exact)) {
         close(e.at);
         geoff = next;
         since = e.at;
