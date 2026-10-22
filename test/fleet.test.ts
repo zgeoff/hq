@@ -132,6 +132,28 @@ test('it reports a failed pin after a spawn, and pins the live session on the ne
   expect(getMeta(db, 'fleet_unpinned')).toBe('{}');
 });
 
+test('it keeps a failed pin to retry when a later step of the same check throws', async () => {
+  const stub = rcFake([]);
+  const broken: FleetClient = { ...stub.client, pin: () => Promise.reject(new Error('invented pin refusal')) };
+  const brokenRC: RcDeps = {
+    ...stub.rc,
+    state: () => {
+      throw new Error('invented Remote Control read failure');
+    },
+  };
+  await ensureFleet(db, stub.client, { dryRun: false, actor: 'hq-fleet', fleet: rcFleet(), rc: stub.rc });
+  atMin(10);
+
+  const failed = await ensureFleet(db, broken, { dryRun: false, actor: 'hq-fleet', fleet: rcFleet(), rc: brokenRC }).then(
+    () => null,
+    (error: unknown) => error,
+  );
+
+  expect(failed).toBeInstanceOf(Error);
+  expect(stub.spawns).toHaveLength(1);
+  expect(JSON.parse(getMeta(db, 'fleet_unpinned') ?? '{}')).toStrictEqual({ 'z-kettle': expect.any(String) });
+});
+
 test('duplicates are reported, never stopped; a restoring session is waited for', async () => {
   const { client, spawns } = fake([
     { id: 'a', name: 'z-kettle', alive: true },

@@ -196,6 +196,7 @@ async function ensureOnce(db: Database, client: FleetClient, opts: { dryRun: boo
       const pinFailure = await pinSession(client, id);
       if (pinFailure) {
         unpinned[e.name] = id;
+        writeUnpinned(db, e.name, id);
       }
       if (e.wake) {
         for (const w of wakeList(db).filter((w) => w.name === e.name && w.session_id !== id)) wakeRemove(db, w.session_id, opts.actor);
@@ -308,4 +309,11 @@ async function createFleetSession(client: FleetClient, e: FleetEntry, prompt: st
   const request: SpawnRequest = { cwd: e.cwd, name: e.name, prompt, model: e.model, agent: 'claude', idempotencyKey, ...(e.pluginDirs ? { pluginDirs: e.pluginDirs } : {}) },
     spawned = await client.spawn(request);
   return spawned.id;
+}
+
+// Stored at once, so a later step that throws before the run's last write cannot lose the retry.
+function writeUnpinned(db: Database, name: string, id: string): void {
+  db.transaction(() => {
+    setMeta(db, FLEET_UNPINNED, JSON.stringify({ ...metaJson(db, FLEET_UNPINNED, strMap, {}), [name]: id }));
+  }).immediate();
 }
