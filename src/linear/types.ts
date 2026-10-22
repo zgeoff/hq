@@ -37,3 +37,6 @@ export interface Node {
   canceledAt: string | null;
   labels: { nodes: { name: string; parent: { name: string } | null }[] };
 }
+
+// Where a filed issue came from, as hq reads it from Linear.
+export type FiledSource = 'owner' | 'design' | 'agent' | 'live check' | 'bot';

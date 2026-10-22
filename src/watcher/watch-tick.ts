@@ -11,6 +11,7 @@ import { clearGhAuth } from '../ghauth/clear-gh-auth.ts';
 import { isGhAuthFailure } from '../ghauth/is-gh-auth-failure.ts';
 import { noteGhAuth } from '../ghauth/note-gh-auth.ts';
 import { goalsDailyTick } from '../goals/daily/goals-daily-tick.ts';
+import { sendThroughputAlerts } from '../goals/throughput/send-throughput-alerts.ts';
 import { refreshActionsSpend } from '../goals/refresh-actions-spend.ts';
 import { sampleUsage } from '../goals/sample-usage.ts';
 import { syncGoals } from '../goals/sync-goals.ts';
@@ -92,7 +93,13 @@ export async function watchTick(db: Database, d: WatchDeps): Promise<boolean> {
         setMeta(db, 'kinds_synced_at', at());
         if (!k.left) setMeta(db, 'kinds_ok_at', at()); // what the daily check-in trusts, with linear_synced_at
         if (k.days.length) clearGhAuth(db); // syncKinds throws on a failed gh call: a fetched day means GitHub answered
-        await step('Linear issue types', () => syncLinear(db, makeAuditedLinearCaller(db, d.run), new Date(Date.now() - 2 * 86_400_000)));
+        const linearAt = now();
+        const linearFrom = new Date(linearAt.getTime() - 2 * 86_400_000);
+        await step('Linear issue types', () => syncLinear(db, makeAuditedLinearCaller(db, d.run), linearFrom, linearAt));
+        const alerted = sendThroughputAlerts(db, d.me, linearFrom, linearAt);
+        if (alerted.length > 0) {
+          d.log(`${at()} goals: told triage about ${alerted.join(', ')}`);
+        }
         if (k.days.length > 2) d.log(`${at()} merged PR kinds: fetched ${k.days.join(', ')}`);
       }
     } catch (e) {

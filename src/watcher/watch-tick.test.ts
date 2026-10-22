@@ -5,6 +5,7 @@ import { HttpResponse, http } from 'msw';
 import { z } from 'zod';
 import { LINEAR_GRAPHQL_URL, linearDocuments, linearIssues } from '../../mocks/linear-handlers.ts';
 import { server } from '../../mocks/node.ts';
+import { buildFiledNode } from '../../test/build-filed-node.ts';
 import { createCapacitySample } from '../../test/create-capacity-sample.ts';
 import { freshDb } from '../../test/helpers.ts';
 import { readReadyByLane } from '../areas/read-ready-by-lane.ts';
@@ -61,6 +62,46 @@ test('a due kinds sync reads the Linear key from 1Password once and records that
       events: ctx.db.query("SELECT actor, data FROM events WHERE subject = 'hq' AND subject_id = 'op' AND action = 'read'").all(),
     })),
   ).resolves.toStrictEqual({ keyReads: [['op', 'read', 'op://kettle/teapot-key/credential']], events: [{ actor: 'linear', data: '{"consumer":"linear","requests":3}' }] });
+});
+
+// At 18:00 Sydney with the kinds sync last run 10 hours earlier, so the kinds sync and its Linear
+// side are due. Linear holds one issue filed today that points at a PR with no follow-up record.
+test('a due Linear sync tells triage about a bad filing once across two passes', async () => {
+  const answers: Record<string, RunResult> = {
+    bash: { code: 0, stdout: JSON.stringify({ imp: { freeMib: 0, room: false }, providers: { claude: { room: false, unattended: true, target: 'imp' } } }), stderr: '' },
+    gh: { code: 0, stdout: '[]', stderr: '' },
+    op: { code: 0, stdout: 'lin_api_INVENTEDkettleKEY0042\n', stderr: '' },
+  };
+  const ctx = setupTest();
+  const run: Runner = (cmd) => Promise.resolve(answers[cmd[0] ?? ''] ?? { code: 1, stdout: '', stderr: 'invented: no answer for this command' });
+  onTestFinished(overrideEnv('HQ_NOW', '2026-10-16T07:00:00Z'));
+  for (const key of ['goals_synced_at', 'goals_ok_at', 'linear_synced_at']) {
+    setMeta(ctx.db, key, '2026-10-16T07:00:00Z');
+  }
+  const filed = [buildFiledNode('GEO-9801', 'From widgets#7\n\nThe widget drops a retry.')];
+  server.use(
+    http.post('https://api.linear.app/graphql', async (resolver) => {
+      const json = await resolver.request.json();
+      const body = z.object({ query: z.string() }).parse(json);
+      const nodes = body.query.includes('createdAt: {') ? filed : [];
+      return HttpResponse.json({ data: { issues: { nodes, pageInfo: { hasNextPage: false, endCursor: null } } } });
+    }),
+  );
+  const pass = () => {
+    setMeta(ctx.db, 'kinds_synced_at', '2026-10-15T21:00:00Z');
+    return watchTick(ctx.db, { me: 'hq-lanes', run, log: () => {}, stepMs: 10_000, steps: { runs: () => Promise.resolve(), weekly: () => Promise.resolve(false), health: () => Promise.resolve({ opened: [], cleared: [] }) } });
+  };
+
+  await pass();
+  await pass();
+
+  expect({
+    alerted: ctx.db.query("SELECT subject_id FROM events WHERE subject = 'hq' AND action = 'alerted'").all(),
+    outbox: ctx.db.query("SELECT target, text FROM outbox WHERE topic LIKE 'goals-alert:%'").all(),
+  }).toStrictEqual({
+    alerted: [{ subject_id: 'goals-alert:bad-filing:GEO-9801' }],
+    outbox: [{ target: 'z-triage', text: "Bad filing: GEO-9801 points at widgets#7, but z-review has no follow-up record for it. If it came from that PR's review, record it: hq followup add GEO-9801 --from widgets#7" }],
+  });
 });
 
 // At 18:00 Sydney with the kinds sync fresh and the goals sync never run, so the goals sync is due.

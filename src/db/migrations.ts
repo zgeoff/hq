@@ -556,4 +556,33 @@ export const MIGRATIONS: string[] = [
   // v37: the conditions that settle an open unblock item by themselves, as a JSON array of
   // {kind: 'issue' | 'pr' | 'doc', ref}. NULL: none, so the item waits for the owner.
   `ALTER TABLE unblocks ADD COLUMN done_when TEXT;`,
+
+  // v38: the check-in's throughput lines: each filed issue's source and the PR it points at (never
+  // its description), the issues In Progress at the last read, and 'review' follow-ups. SQLite
+  // can't change a CHECK, so followups is rebuilt with every row kept.
+  `CREATE TABLE linear_filed (
+    issue      TEXT PRIMARY KEY,
+    created_at TEXT NOT NULL,
+    source     TEXT NOT NULL CHECK (source IN ('owner', 'design', 'agent', 'live check', 'bot')),
+    pr_ref     TEXT,
+    fetched_at TEXT NOT NULL
+  );
+  CREATE INDEX linear_filed_created ON linear_filed (created_at);
+  CREATE TABLE linear_started (
+    issue      TEXT PRIMARY KEY,
+    started_at TEXT NOT NULL,
+    fetched_at TEXT NOT NULL
+  );
+  CREATE TABLE followups_v38 (
+    issue    TEXT PRIMARY KEY,
+    from_ref TEXT,
+    filed_at TEXT NOT NULL,
+    source   TEXT NOT NULL CHECK (source IN ('final', 'linear backfill', 'review')),
+    added_by TEXT NOT NULL,
+    added_at TEXT NOT NULL
+  );
+  INSERT INTO followups_v38 (issue, from_ref, filed_at, source, added_by, added_at) SELECT issue, from_ref, filed_at, source, added_by, added_at FROM followups;
+  DROP TABLE followups;
+  ALTER TABLE followups_v38 RENAME TO followups;
+  CREATE INDEX followups_filed ON followups (filed_at);`,
 ];

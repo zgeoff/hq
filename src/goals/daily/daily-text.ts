@@ -21,6 +21,8 @@ import { goalTargets } from '../goal-targets.ts';
 import { loadCostGoal } from '../load-cost-goal.ts';
 import { measure } from '../measure.ts';
 import { targetLine } from '../target-line.ts';
+import { THROUGHPUT_LINES } from '../throughput/throughput-lines.ts';
+import type { ThroughputLine } from '../throughput/types.ts';
 import type { Measure } from '../types.ts';
 import { verdict } from '../verdict.ts';
 
@@ -45,8 +47,9 @@ export function dailyText(db: Database, at: Date = now()): string {
     const part = (m: Measure) => `${m.shown} (${num(m.n)} ${m.unit}${m.missing ? `, ${m.missing} day(s) not fetched` : ''})${m.extra ?? ''}`;
     return formatFittedLine(`- ${GOAL_NAMES[k]}: today ${part(t)}, week so far ${part(w)}`, `; target ${target} ${v}`);
   };
+  const throughput = (read: ThroughputLine) => formatFittedLine(`- ${read.name}: ${read.detail}`, `; target ${read.target} ${mark[read.verdict]}`);
   const ready = readySummary(db, LANES.readyFreshMinutes());
-  return [`Goals check-in, ${head}:`, ...GOAL_KEYS.map(line), ...(ready ? [ready.line] : []), cap(capacityLine(db, at)), cap(`Incidents today: ${incidents(db, midnight, at)}`)].join('\n');
+  return [`Goals check-in, ${head}:`, ...GOAL_KEYS.map((key) => line(key)), ...THROUGHPUT_LINES.map((read) => throughput(read(db, midnight, at))), ...(ready ? [ready.line] : []), cap(capacityLine(db, at)), cap(`Incidents today: ${incidents(db, midnight, at)}`)].join('\n');
 }
 
 function incidents(db: Database, from: Date, at: Date): string {
