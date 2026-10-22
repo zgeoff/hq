@@ -1,4 +1,5 @@
 import type { Database } from 'bun:sqlite';
+import { match } from 'ts-pattern';
 import { metaJson } from '../db/meta-json.ts';
 import { logEvent } from '../log-event.ts';
 import { addNews } from '../news/add-news.ts';
@@ -21,7 +22,7 @@ export function recordStaleRestarts(db: Database, restarted: RestartedSession[],
     const step = steps?.find((s) => s.name === r.name),
       why = step ? `${step.action}: ${step.detail}` : 'ensure did not finish';
     if (step?.action === 'spawned') {
-      addNews(db, { from: actor, topic: 'other', text: `${r.name} restarted from main; its old prompt predated ${r.commit}`, issue: null, link: null, needsGeoff: false });
+      addNews(db, { from: actor, topic: 'other', text: `${r.name} restarted from main; ${formatNewsReason(r)}`, issue: null, link: null, needsGeoff: false });
     } else {
       sendRestartFailure(db, r, why, actor);
     }
@@ -30,12 +31,26 @@ export function recordStaleRestarts(db: Database, restarted: RestartedSession[],
   writeFleetRefresh(db, refresh);
 }
 
+function formatNewsReason(restarted: RestartedSession): string {
+  return match(restarted.cause)
+    .with({ kind: 'stale' }, (stale) => `its old prompt predated ${stale.commit}`)
+    .with({ kind: 'scheduled' }, (scheduled) => `scheduled restart, ${scheduled.why}`)
+    .exhaustive();
+}
+
 function sendRestartFailure(db: Database, restarted: RestartedSession, why: string, actor: string): void {
   const seq = logEvent(db, 'hq', 'fleet', 'urgent', actor, null, null, { name: restarted.name, why });
   enqueue(
     db,
     seq,
     owner(),
-    `hq fleet: ${restarted.name} was stopped and forgotten for a stale prompt (main ${restarted.commit}) but not spawned again (${why}). A later 5-minute check spawns it; look if it does not.`,
+    `hq fleet: ${restarted.name} was stopped and forgotten for ${formatFailureReason(restarted)} but not spawned again (${why}). A later 5-minute check spawns it; look if it does not.`,
   );
+}
+
+function formatFailureReason(restarted: RestartedSession): string {
+  return match(restarted.cause)
+    .with({ kind: 'stale' }, (stale) => `a stale prompt (main ${stale.commit})`)
+    .with({ kind: 'scheduled' }, (scheduled) => `a scheduled restart (${scheduled.why})`)
+    .exhaustive();
 }
