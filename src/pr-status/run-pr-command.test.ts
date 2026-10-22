@@ -729,6 +729,28 @@ test.each(['console:KET-42', 'call:KET-42'])('it records an accepted risk from %
 });
 
 test.each([
+  { verb: 'override', rest: ['widgets', '7'], grants: { action: 'override', pr: 'zgeoff/widgets#7', head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678' }, why: 'override of zgeoff/widgets#7 at a1b2c3d, not override of zgeoff/widgets#7 at b9c8d7e' },
+  { verb: 'accept-risk', rest: ['widgets', '7', 'aaaa'], grants: { action: 'accept-risk', pr: 'zgeoff/widgets#7', finding: 'aaaa', head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678' }, why: 'accept-risk of zgeoff/widgets#7 finding aaaa at a1b2c3d, not accept-risk of zgeoff/widgets#7 finding aaaa at b9c8d7e' },
+])('it refuses a grant of $verb made for one head once the PR has another', async (row) => {
+  const ctx = setupTest();
+  applyAskItem(ctx.db, { kind: 'call', id: 'KET-44', issues: [], forSession: null, actor: 'z-kettle' }, parseItemInput('call', JSON.stringify({ title: 'Merge widgets#7?', question: 'Merge past the findings?', options: [{ label: 'Go', effect: 'Merge it.', grants: row.grants }, { label: 'Wait', effect: 'Fix them first.' }] })), 'Merge past the findings?');
+  recordConsoleAnswer(ctx.db, { id: 'KET-44', option: 'Go', note: '', actor: 'owner' });
+
+  await expect(ctx.asOther(ctx.headAt('b9c8d7e6f5a40312213f4e5d6c7b8a9087654321'), row.verb, [...row.rest], { source: 'console:KET-44', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: `--source refused: the option the owner picked in console:KET-44 grants ${row.why}; ask z-stu to record it` });
+  expect(ctx.db.query("SELECT COUNT(*) AS total FROM events WHERE action IN ('pr-override', 'pr-accepted-risk')").get()).toStrictEqual({ total: 0 });
+});
+
+test('it records an override from a grant made for the head the PR has now', async () => {
+  const ctx = setupTest();
+  applyAskItem(ctx.db, { kind: 'call', id: 'KET-45', issues: [], forSession: null, actor: 'z-kettle' }, parseItemInput('call', JSON.stringify({ title: 'Merge widgets#7?', question: 'Merge past the findings?', options: [{ label: 'Go', effect: 'Merge it.', grants: { action: 'override', pr: 'zgeoff/widgets#7', head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678' } }, { label: 'Wait', effect: 'Fix them first.' }] })), 'Merge past the findings?');
+  recordConsoleAnswer(ctx.db, { id: 'KET-45', option: 'Go', note: '', actor: 'owner' });
+
+  await ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'console:KET-45', note: 'Ship it.' });
+
+  expect(ctx.db.query("SELECT json_extract(data, '$.head') AS head FROM events WHERE action = 'pr-override'").all()).toStrictEqual([{ head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678' }]);
+});
+
+test.each([
   ['no finding id', ['widgets', '7'], { source: 'chat:kettle-12', note: 'Ship it.' }],
   ['no note', ['widgets', '7', 'aaaa'], { source: 'chat:kettle-12' }],
 ])('it refuses accept-risk with %s', async (_case, rest, flags) => {

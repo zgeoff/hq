@@ -38,7 +38,7 @@ function defineItemInputSchema() {
   const DetailSchema = z.strictObject({ heading: defineText(), text: defineText(), code: defineText().optional() }),
     DiffSchema = z.strictObject({ now: defineText(), would: defineText() }),
     LinkSchema = z.strictObject({ label: defineText(), url: z.url({ protocol: /^https?$/u }), subject: z.literal(true).optional() }),
-    GrantSchema = z.strictObject({ action: z.enum(['override', 'accept-risk']), pr: z.string().regex(/^[\w.-]+\/[\w.-]+#\d+$/u, 'must be <owner>/<repo>#<number>'), finding: defineText().optional() }),
+    GrantSchema = z.strictObject({ action: z.enum(['override', 'accept-risk']), pr: z.string().regex(/^[\w.-]+\/[\w.-]+#\d+$/u, 'must be <owner>/<repo>#<number>'), finding: defineText().optional(), head: z.string().regex(/^[0-9a-f]{40}$/u, 'must be a 40-character commit sha').optional() }),
     OptionSchema = z.strictObject({ label: defineText(), effect: defineText(), recommended: z.boolean().optional(), grants: GrantSchema.optional() }),
     UnblocksSchema = z.strictObject({ id: defineText(), title: defineText() });
   return z.strictObject({

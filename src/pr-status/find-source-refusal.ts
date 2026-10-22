@@ -13,6 +13,9 @@ export interface SourceRequest {
   ref: PRRef;
   wanted: OwnerAction;
   source: string;
+
+  // The PR's head as gh gives it now; null when gh could not read it.
+  head: string | null;
 }
 
 // chat: has no record to check, so only the owner's own session may give it. A console: or call:
@@ -104,23 +107,27 @@ function findGrantRefusal(check: CallCheck, options: ItemOption[], answer: strin
     return `the option the owner picked in ${check.source} ("${picked}") grants no ${check.wanted.action}`;
   }
   if (!isMatchingGrant(option.grants, check)) {
-    return `the option the owner picked in ${check.source} grants ${formatGrant(option.grants)}, not ${formatWanted(check)}`;
+    return `the option the owner picked in ${check.source} grants ${formatGrant(option.grants)}, not ${formatWanted(check, option.grants)}`;
   }
   return null;
 }
 
 function isMatchingGrant(grant: ItemGrant, check: CallCheck): boolean {
   const finding = check.wanted.action === 'accept-risk' ? check.wanted.finding : undefined;
-  return grant.action === check.wanted.action && grant.pr.toLowerCase() === `${check.ref.slug}#${check.ref.pr}`.toLowerCase() && grant.finding === finding;
+  const atHead = grant.head === undefined || grant.head === check.head;
+  return grant.action === check.wanted.action && grant.pr.toLowerCase() === `${check.ref.slug}#${check.ref.pr}`.toLowerCase() && grant.finding === finding && atHead;
 }
 
 function formatGrant(grant: ItemGrant): string {
-  return `${grant.action} of ${grant.pr}${grant.finding === undefined ? '' : ` finding ${grant.finding}`}`;
+  const finding = grant.finding === undefined ? '' : ` finding ${grant.finding}`;
+  const head = grant.head === undefined ? '' : ` at ${grant.head.slice(0, 7)}`;
+  return `${grant.action} of ${grant.pr}${finding}${head}`;
 }
 
-function formatWanted(check: CallCheck): string {
+function formatWanted(check: CallCheck, grant: ItemGrant): string {
   const finding = check.wanted.action === 'accept-risk' ? ` finding ${check.wanted.finding}` : '';
-  return `${check.wanted.action} of ${check.ref.slug}#${check.ref.pr}${finding}`;
+  const head = grant.head === undefined ? '' : ` at ${check.head === null ? 'a head gh could not read' : check.head.slice(0, 7)}`;
+  return `${check.wanted.action} of ${check.ref.slug}#${check.ref.pr}${finding}${head}`;
 }
 
 function hasPRName(title: string, ref: PRRef): boolean {
