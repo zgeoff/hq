@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import type { Database } from 'bun:sqlite';
+import { applyAskItem } from '../src/apply-ask-item.ts';
 import { addAsk } from '../src/asks/add-ask.ts';
 import { answerAsk } from '../src/asks/answer-ask.ts';
 import { applyAsk } from '../src/asks/apply-ask.ts';
@@ -14,6 +15,7 @@ import { skipAsk } from '../src/asks/skip-ask.ts';
 import type { AddInput } from '../src/asks/types.ts';
 import { waitReasons } from '../src/asks/wait-reasons.ts';
 import { iso } from '../src/clock/iso.ts';
+import { parseItemInput } from '../src/parse-item-input.ts';
 import { FOUR_AM_SYDNEY, NOON_SYDNEY, at, freshDb } from './helpers.ts';
 
 let db: Database;
@@ -117,6 +119,26 @@ describe('add', () => {
     const readded = addAsk(db, call({ forSession: 'z-kettle' }));
     expect(readded.result).toBe('updated');
     expect(getAsk(db, 'geo-1-paint')?.for_session).toBe('z-kettle');
+  });
+
+  test('it drops the structured fields when a free-text re-add changes the text', () => {
+    applyAskItem(db, { kind: 'call', id: 'geo-1-paint', issues: ['GEO-1'], forSession: null, actor: 'z-refine' }, parseItemInput('call', JSON.stringify({ title: 'Paint the shed', question: 'Green or grey?', options: [{ label: 'Green', effect: 'Green.' }, { label: 'Grey', effect: 'Grey.' }] })), 'Green or grey?');
+    addAsk(db, call({ title: 'Paint the shed', question: 'Green or grey?', body: 'The shed needs paint before the frost.' }));
+    expect(getAsk(db, 'geo-1-paint')).toMatchObject({ body: 'The shed needs paint before the frost.', item: null });
+  });
+
+  test('it drops the structured fields when a free-text re-add asks a new question', () => {
+    applyAskItem(db, { kind: 'call', id: 'geo-1-paint', issues: ['GEO-1'], forSession: null, actor: 'z-refine' }, parseItemInput('call', JSON.stringify({ title: 'Paint the shed', question: 'Green or grey?', options: [{ label: 'Green', effect: 'Green.' }, { label: 'Grey', effect: 'Grey.' }] })), 'Green or grey?');
+    openAsk(db, { force: false, actor: 'z-stu' });
+    answerAsk(db, { id: 'geo-1-paint', kind: 'call', answer: 'Green', actor: 'z-stu' });
+    addAsk(db, call({ question: 'Which green?' }));
+    expect(getAsk(db, 'geo-1-paint')).toMatchObject({ state: 'queued', question: 'Which green?', item: null });
+  });
+
+  test('it keeps the structured fields when a re-add changes only the order', () => {
+    applyAskItem(db, { kind: 'call', id: 'geo-1-paint', issues: ['GEO-1'], forSession: null, actor: 'z-refine' }, parseItemInput('call', JSON.stringify({ title: 'Paint the shed', question: 'Green or grey?', options: [{ label: 'Green', effect: 'Green.' }, { label: 'Grey', effect: 'Grey.' }] })), 'Green or grey?');
+    addAsk(db, call({ title: 'Paint the shed', question: 'Green or grey?', body: 'Green or grey?', forSession: null, order: 3 }));
+    expect(getAsk(db, 'geo-1-paint')?.item?.options).toStrictEqual([{ label: 'Green', effect: 'Green.' }, { label: 'Grey', effect: 'Grey.' }]);
   });
 
   test('an open item keeps the question the owner saw', () => {

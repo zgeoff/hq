@@ -56,7 +56,7 @@ export function addAsk(db: Database, input: AddInput): AddResult {
       if (!sameQuestion && (ASK_TRANSITIONS.reasked.from as readonly AskState[]).includes(prev.state)) {
         checkAsk(prev.id, 'reasked', prev.state);
         db.query(
-          `UPDATE asks SET title=?, question=?, body=?, issues=?, for_session=?, send_order=?, state='queued', round=round+1, due_at=NULL,
+          `UPDATE asks SET title=?, question=?, body=?, issues=?, for_session=?, send_order=?, item=NULL, state='queued', round=round+1, due_at=NULL,
              answer=NULL, answered_at=NULL, applied_to=NULL, applied_note=NULL, applied_at=NULL, close_reason=NULL,
              opened_at=NULL, queued_at=?, updated_at=? WHERE id=?`,
         ).run(input.title, input.question, input.body, issues, input.forSession ?? prev.for_session, orderOf(prev, input), t, t, prev.id);
@@ -110,15 +110,20 @@ function changed(prev: Ask, input: AddInput): boolean {
   );
 }
 
+// New text drops the structured fields, which describe the old text: the console shows an item's
+// fields over its body. A caller that files fields writes them again after this.
 function updateText(db: Database, prev: Ask, input: AddInput, t: string): void {
   if (!changed(prev, input)) return;
-  db.query(`UPDATE asks SET title=?, question=?, body=?, issues=?, for_session=?, send_order=?, updated_at=? WHERE id=?`).run(
+  const newText = prev.title !== input.title || prev.question !== input.question || prev.body !== input.body;
+  const clearItem = newText ? 1 : 0;
+  db.query(`UPDATE asks SET title=?, question=?, body=?, issues=?, for_session=?, send_order=?, item=CASE WHEN ? THEN NULL ELSE item END, updated_at=? WHERE id=?`).run(
     input.title,
     input.question,
     input.body,
     JSON.stringify(input.issues),
     input.forSession ?? prev.for_session,
     orderOf(prev, input),
+    clearItem,
     t,
     prev.id,
   );
