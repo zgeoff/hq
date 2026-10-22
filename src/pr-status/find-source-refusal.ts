@@ -62,6 +62,9 @@ function findCallRefusal(db: Database, check: CallCheck): string | null {
   if (!hasPRName(title, check.ref)) {
     return `${check.source} does not name ${check.ref.slug}#${check.ref.pr} in the title the owner answered`;
   }
+  if (!hasActionName(title, check.wanted)) {
+    return `${check.source} does not name ${formatAction(check.wanted)} in the title the owner answered`;
+  }
   if (!isYes(data.answer)) {
     return `the owner's answer to ${check.source} is not a yes: "${data.answer}"`;
   }
@@ -124,6 +127,17 @@ function hasPRName(title: string, ref: PRRef): boolean {
   const owner = ref.slug.split('/')[0] ?? '';
   const pattern = new RegExp(`(?<![\\w./-])(?:${RegExp.escape(owner)}/)?${RegExp.escape(ref.repo)}#${ref.pr}(?!\\d)`, 'iu');
   return pattern.test(title);
+}
+
+function hasActionName(title: string, wanted: OwnerAction): boolean {
+  return match(wanted)
+    .with({ action: 'override' }, () => /(?<![\w-])override(?![\w-])/iu.test(title))
+    .with({ action: 'accept-risk' }, (risk) => /(?<![\w-])accept-risk(?![\w-])/iu.test(title) && new RegExp(`(?<![\\w-])${RegExp.escape(risk.finding)}(?![\\w-])`, 'iu').test(title))
+    .exhaustive();
+}
+
+function formatAction(wanted: OwnerAction): string {
+  return wanted.action === 'override' ? 'an override' : `accept-risk of finding ${wanted.finding}`;
 }
 
 // The option the console stores before ` | ` (or the whole answer) is the owner's decision. Only a

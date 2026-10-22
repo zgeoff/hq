@@ -545,9 +545,12 @@ test('it refuses a call: source for an hq call answer recorded with no owner-ses
   await expect(ctx.asOwner(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'call:KET-4', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: "--source refused: call:KET-4 has no owner answer for its current round, in the console or by `hq call answer` from the owner's session (z-stu), found through ATC_SESSION_ID; ask z-stu to record it" });
 });
 
-test.each(['override', 'accept-risk'])('it accepts a call: source for %s from a call answered by hq call answer in the z-stu session', async (verb) => {
+test.each([
+  ['override', 'Override widgets#7 now?'],
+  ['accept-risk', 'Accept-risk aaaa on widgets#7?'],
+])('it accepts a call: source for %s from a call answered by hq call answer in the z-stu session', async (verb, title) => {
   const ctx = setupTest();
-  ctx.fileCall('KET-11', 'Pour widgets#7 now?');
+  ctx.fileCall('KET-11', title);
   await expect(ctx.answerByCLI('KET-11', 'id-stu')).resolves.toBe(0);
 
   await ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), verb, ['widgets', '7', 'aaaa'], { source: 'call:KET-11', note: 'Ship it.' });
@@ -584,9 +587,9 @@ test.each([
   ['hq call answer in the z-stu session', async (ctx: ReturnType<typeof setupTest>) => await ctx.answerByCLI('KET-22', 'id-stu')],
 ])('it accepts a call: source for the PR a refiled call names once the owner answers the new round in %s', async (_case, answerNewRound) => {
   const ctx = setupTest();
-  ctx.fileCall('KET-22', 'Pour widgets#7 now?');
+  ctx.fileCall('KET-22', 'Override widgets#7 now?');
   ctx.answerInConsole('KET-22');
-  ctx.refileCall('KET-22', 'Pour widgets#8 now?');
+  ctx.refileCall('KET-22', 'Override widgets#8 now?');
   await answerNewRound(ctx);
 
   await ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '8'], { source: 'call:KET-22', note: 'Ship it.' });
@@ -609,9 +612,9 @@ test.each([
 });
 
 test.each([
-  ['override', 'Pour widgets#7 now?'],
-  ['accept-risk', 'Pour zgeoff/widgets#7 now?'],
-  ['override', 'Widgets#7: pour?'],
+  ['override', 'Override widgets#7 now?'],
+  ['accept-risk', 'Accept-risk aaaa on zgeoff/widgets#7?'],
+  ['override', 'Widgets#7: override?'],
 ])('it accepts a call: source for %s from a console-answered call titled %s', async (verb, title) => {
   const ctx = setupTest();
   ctx.fileCall('KET-5', title);
@@ -620,6 +623,21 @@ test.each([
   await ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), verb, ['widgets', '7', 'aaaa'], { source: 'call:KET-5', note: 'Ship it.' });
 
   expect(ctx.db.query("SELECT COUNT(*) AS total FROM events WHERE action IN ('pr-override', 'pr-accepted-risk')").get()).toStrictEqual({ total: 1 });
+});
+
+test.each([
+  { verb: 'override', rest: ['widgets', '7'], title: 'Pour widgets#7 now?', why: 'an override' },
+  { verb: 'override', rest: ['widgets', '7'], title: 'Accept-risk aaaa on widgets#7?', why: 'an override' },
+  { verb: 'accept-risk', rest: ['widgets', '7', 'aaaa'], title: 'Override widgets#7?', why: 'accept-risk of finding aaaa' },
+  { verb: 'accept-risk', rest: ['widgets', '7', 'aaaa'], title: 'Accept-risk bbbb on widgets#7?', why: 'accept-risk of finding aaaa' },
+  { verb: 'accept-risk', rest: ['widgets', '7', 'aaaa'], title: 'Accept-risk aaaab on widgets#7?', why: 'accept-risk of finding aaaa' },
+])('it refuses a call: source for $verb from a Yes to the call titled $title, and records nothing', async (row) => {
+  const ctx = setupTest();
+  ctx.fileCall('KET-34', row.title);
+  ctx.answerInConsole('KET-34');
+
+  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), row.verb, [...row.rest], { source: 'call:KET-34', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: `--source refused: call:KET-34 does not name ${row.why} in the title the owner answered; ask z-stu to record it` });
+  expect(ctx.db.query("SELECT COUNT(*) AS total FROM events WHERE action IN ('pr-override', 'pr-accepted-risk')").get()).toStrictEqual({ total: 0 });
 });
 
 test.each(['No', 'No | Not this head.', 'Yes, but not yet', 'Later'])('it refuses a call: source for a call the owner answered %p in the console, and records nothing', async (note) => {
