@@ -1552,7 +1552,7 @@ async function fleetCommand(db: Database, verb: string | undefined, args: string
     }
     case 'timer': {
       if (args[0] === 'install') {
-        await installTimer(FLEET_UNIT, fleetTimerUnits(selfCommand().join(' ')));
+        await installTimer(FLEET_UNIT, fleetTimerUnits(selfCommand().join(' '), process.env));
         return { data: { unit: `${FLEET_UNIT}.timer` }, text: `Fleet check every 5 min (${FLEET_UNIT}.timer).` };
       }
       if (args[0] === 'remove') {
@@ -1602,7 +1602,7 @@ async function probeCommand(db: Database, verb: string | undefined, args: string
     }
     case 'timer': {
       if (args[0] === 'install') {
-        await installTimer(PROBE_UNIT, buildProbeTimerUnits(selfCommand().join(' ')));
+        await installTimer(PROBE_UNIT, buildProbeTimerUnits(selfCommand().join(' '), process.env));
         return { data: { unit: `${PROBE_UNIT}.timer` }, text: `Nix probe every minute (${PROBE_UNIT}.timer).` };
       }
       if (args[0] === 'remove') {
