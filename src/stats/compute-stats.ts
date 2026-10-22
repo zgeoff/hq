@@ -2,9 +2,13 @@
 // a number from fewer than THIN samples says so. Rows from before CUTOFF (the bulk import)
 // are left out: their times mark the import, not the work.
 import type { Database } from 'bun:sqlite';
+import { z } from 'zod';
 import { dist } from './dist.ts';
 import { getCutoff as cutoff } from './get-cutoff.ts';
 import type { GhMerge, Oldest, Stats } from './types.ts';
+
+const MergedPRsSchema = z.array(z.object({ ref: z.string(), merged_at: z.string() }));
+const MergeDataSchema = z.object({ ref: z.string() });
 
 const mins = (a: string, b: string) => (Date.parse(b) - Date.parse(a)) / 60_000;
 const clip = (s: string, lo: string, hi: string) => (s < lo ? lo : s > hi ? hi : s);
@@ -80,10 +84,14 @@ export function computeStats(db: Database, opts: { from: string; to: string; gh:
 
   // ---- merged to live
   // A merge that `hq run unmerge` took back did not happen: its later 'unmerged' event cancels it.
+  // A merge counts from when GitHub merged it, which hq can see minutes after the event it logs.
+  const mergedPRs = MergedPRsSchema.parse(db.query(`SELECT ref, merged_at FROM run_prs WHERE state = 'merged' AND merged_at IS NOT NULL`).all());
+  const mergedAt = new Map(mergedPRs.map((pr) => [pr.ref, pr.merged_at]));
   const merges: { issue: string; at: string; data: string }[] = [];
   for (const e of db.query(`SELECT subject_id AS issue, action, at, data FROM events WHERE subject = 'run' AND action IN ('merged', 'unmerged') ORDER BY seq`).all() as { issue: string; action: string; at: string; data: string }[]) {
     if (e.action === 'merged') {
-      merges.push({ issue: e.issue, at: e.at, data: e.data });
+      const merged = MergeDataSchema.parse(JSON.parse(e.data));
+      merges.push({ issue: e.issue, at: mergedAt.get(merged.ref) ?? e.at, data: e.data });
       continue;
     }
     const ref = (JSON.parse(e.data) as { ref?: string }).ref;

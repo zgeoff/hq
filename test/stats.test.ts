@@ -104,6 +104,20 @@ test('merged to live, the backlog by repo, review rework and cycle time', () => 
   expect(headline(s)).toContain('merge→live 2.0h (n=1), 1 waiting');
 });
 
+test('it times merged to live from when GitHub merged the PR, not from when hq saw it', () => {
+  run('GEO-1');
+  addPr(db, 'GEO-1', 'widgets#1', 'z-delivery');
+  atMin(10);
+  closePr(db, 'widgets#1', { to: 'merged', actor: 'github', facts: { mergedAt: until(0), mergeSha: null } });
+  setState(db, 'GEO-1', 'merged', {}, 'z-delivery');
+  atMin(20);
+  setState(db, 'GEO-1', 'done', {}, 'z-delivery');
+
+  const live = computeStats(db, { from: T0, to: until(30), gh: null }).live;
+  expect(live.mergeToDone.n).toBe(1);
+  expect(live.mergeToDone.medianMin).toBe(20);
+});
+
 test('idle capacity counts only while Ready work waited; a stale count is flagged; nudges convert', () => {
   const sample = (m: number, slots: number, eligible: number | null) => db.query('INSERT INTO lanes_samples (at, free_mib, slots, eligible) VALUES (?, 0, ?, ?)').run(until(m), slots, eligible);
   sample(0, 2, 3); // 2 slots × 10 min while ready
