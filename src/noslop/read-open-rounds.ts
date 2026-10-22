@@ -9,8 +9,7 @@ export interface OpenRound {
 }
 
 // hq writes a round's row only when it ends, so an open round shows as the throwaway worktree its
-// review runs in (`<repo>+<pr>-noslop-<pid>` in the review folder) whose process is alive. A round
-// under the old name still counts, so a pin waits for it, but its ref names the stem, not a guess.
+// review runs in (`<repo>+<pr>-noslop-<pid>` in the review folder) whose process is alive.
 export function readOpenRounds(dir: string): OpenRound[] {
   return readNames(dir).flatMap((name) => {
     const found = parseWorktreeName(name);
