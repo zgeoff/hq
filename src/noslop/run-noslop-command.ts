@@ -109,16 +109,20 @@ interface PinPlan {
 }
 
 async function updatePinStored(args: NoslopArgs, plan: PinPlan): Promise<StoreMigration> {
-  // Settings load after the slow install so a repo enabled meanwhile by `hq noslop on` is kept.
   const pinned = await updateNoslopClone(args.run, resolveNoslopDir(), plan.commit),
     requireIdle = plan.force === undefined ? () => requireNoslopIdle(args.run) : undefined,
-    settings = loadNoslopSettings(args.db),
     stored = await runStoreMigration({ run: args.run, store: plan.store, clone: pinned.clone, sha: pinned.sha, requireIdle }).catch((error: unknown) => {
       writeMigrationFailure(args.db, pinned.sha, error);
       throw error;
-    });
-  writeNoslopSettings(args.db, { repos: settings.repos, sha: pinned.sha });
-  logEvent(args.db, 'hq', 'noslop', 'pinned', args.actor, settings.sha, pinned.sha, buildPinData(stored, plan.force));
+    }),
+
+    // `hq noslop on` and `off` take no clone lock, so the list is read in the same transaction as the write.
+    before = args.db.transaction(() => {
+      const settings = loadNoslopSettings(args.db);
+      writeNoslopSettings(args.db, { repos: settings.repos, sha: pinned.sha });
+      return settings;
+    }).immediate();
+  logEvent(args.db, 'hq', 'noslop', 'pinned', args.actor, before.sha, pinned.sha, buildPinData(stored, plan.force));
   return stored;
 }
 

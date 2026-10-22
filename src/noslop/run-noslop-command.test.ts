@@ -136,6 +136,26 @@ test('it keeps a repo turned on while the install runs', async () => {
   expect(loadNoslopSettings(ctx.db).repos).toStrictEqual(['widgets']);
 });
 
+test('it keeps a repo turned on and a repo turned off while the store migration runs', async () => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ storeQuery: buildStubStoreQuery(ctx.store, [ADD_0007]) });
+  const paths = buildPinPaths(ctx.base);
+  const run: Runner = (cmd, opts) => {
+    if (cmd.includes('query')) {
+      updateNoslopRepos(ctx.db, 'on', ['widgets']);
+      updateNoslopRepos(ctx.db, 'off', ['atc']);
+    }
+    return fake.run(cmd, opts);
+  };
+  updateNoslopRepos(ctx.db, 'on', ['atc']);
+  createStubNoslopStore(ctx.store, { migrations: HELD_NAMES, tables: { dispositions: 3, reviews: 2 } });
+  createStubNoslopClone(paths.folder, NEW_NAMES);
+
+  await runNoslopCommand({ run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester' });
+
+  expect(loadNoslopSettings(ctx.db)).toStrictEqual({ repos: ['widgets'], sha: FULL_SHA });
+});
+
 test('it runs two overlapping pins one after the other', async () => {
   const ctx = setupTest(),
     events: string[] = [],
