@@ -27,3 +27,9 @@ test('it makes a relative HQ_DB absolute against the installing directory', () =
 test('it refuses a setting with a quote, naming it', () => {
   expect(() => fleetTimerUnits('/bin/hq', { HOME: '/home/kettle', HQ_OWNER: 'tea"pot' })).toThrow(expect.objectContaining({ code: 'bad_config', message: expect.stringContaining('HQ_OWNER') }));
 });
+
+test('it carries XDG_CONFIG_HOME, which locates the local settings file, into the fleet service', () => {
+  const units = fleetTimerUnits('/bin/hq', { HOME: '/home/kettle', XDG_CONFIG_HOME: '/srv/kettle/config' });
+
+  expect(units.service).toInclude('Environment="XDG_CONFIG_HOME=/srv/kettle/config"\nExecStart=/bin/hq fleet ensure\n');
+});

@@ -1,6 +1,12 @@
+// The local settings file sits under XDG_CONFIG_HOME, which the systemd manager may lack, so the unit
+// carries it beside hq's own settings.
 export function lanesEnv(home: string, processEnv: Record<string, string | undefined>): Record<string, string> {
   const env: Record<string, string> = { PATH: `${home}/.local/bin:${home}/.bun/bin:/usr/local/bin:/usr/bin:/bin` };
-  for (const [k, v] of Object.entries(processEnv)) if (k.startsWith('HQ_') && v !== undefined) env[k] = v;
+  for (const [name, value] of Object.entries(processEnv)) {
+    if ((name.startsWith('HQ_') || name === 'XDG_CONFIG_HOME') && value !== undefined) {
+      env[name] = value;
+    }
+  }
   env['HQ_AS'] = 'hq-lanes';
   return env;
 }

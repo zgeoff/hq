@@ -55,6 +55,14 @@ test("the unit carries hq's own settings and names itself hq-lanes", () => {
   expect(env).toEqual({ PATH: '/home/invented/.local/bin:/home/invented/.bun/bin:/usr/local/bin:/usr/bin:/bin', HQ_DB: '/data/hq.db', HQ_AS: 'hq-lanes' });
 });
 
+test('it carries XDG_CONFIG_HOME, which locates the local settings file, into the watcher unit', () => {
+  expect(lanesEnv('/home/invented', { XDG_CONFIG_HOME: '/srv/invented/config', HOME: '/home/invented' })).toStrictEqual({
+    PATH: '/home/invented/.local/bin:/home/invented/.bun/bin:/usr/local/bin:/usr/bin:/bin',
+    XDG_CONFIG_HOME: '/srv/invented/config',
+    HQ_AS: 'hq-lanes',
+  });
+});
+
 test('start writes the file, then reloads, enables and restarts the unit', async () => {
   const { run, calls } = fakeSystemctl('');
   const r = await installLanes(run, { home, exec: ['/opt/invented/hq'], interval: null, processEnv: {} });
