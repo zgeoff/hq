@@ -190,6 +190,7 @@ test('hq fleet --json gives each session its skill and roles, plus the roles and
   expect(j.roles.reviewer).toBe(roleName('reviewer'));
   expect(j.roles.developer).toEqual(['z-q']);
   expect(j.forwards['z-refine']).toBe(declaredForwards()['z-refine']);
+
   // The compact hook (.claude/hooks/print-skill.sh) reads these: change it with them.
   for (const e of j.declared) expect(Object.keys(e)).toEqual(expect.arrayContaining(['name', 'skill']));
   expect('last' in j).toBe(true);
