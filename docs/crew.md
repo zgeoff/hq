@@ -19,9 +19,10 @@ included. Skill: `delivery-lead`.
 Sorts every new issue into shape, keeps the board honest, and turns open questions into one clear
 call. Skill: `linear-triage`.
 
-## z-review
+## Gatekeeper (z-review)
 
-(Pitch to come.) Reviews and merges PRs on the gate. Skill: `pr-review`.
+Reviews each finished pull request, checks the merge gate, and squash-merges it only when every
+finding has an answer. Skill: `pr-review`.
 
 ## The Second Look (z-qa)
 
