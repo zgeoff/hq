@@ -25,6 +25,7 @@ const REVIEW: NoslopReviewOutcome = {
   fixesOnly: false,
   fullDropped: false,
   round: 1,
+  postFailed: null,
 };
 
 test('hq review prints a version 6 review\'s files no call read, with their reasons, after the findings', () => {
@@ -46,6 +47,21 @@ test('hq review says --full was dropped on a later round, before the issue line'
     '== engine: noslop (commit 0123456, depth standard)',
     '== --full dropped: round 2 reviews only the commits since round 1.',
     '== issue: GEO-9701 (linked in the PR body)',
+  ]);
+});
+
+test('hq review tells the caller to post a review noslop stored but did not post, after the findings line', () => {
+  expect(formatNoslopReview({ ...REVIEW, postFailed: 'exit 1: the github reporter failed: HTTP 500' }).split('\n').slice(2, 5)).toStrictEqual([
+    '== noslop: 1 finding(s), full output: /reviews/widgets7-noslop.json',
+    '== not posted: noslop stored this review but did not post it to GitHub (exit 1: the github reporter failed: HTTP 500). Run noslop post /reviews/widgets7-noslop.json to finish the post.',
+    '  - [P2] correctness: Kettle never boils (00112233445566aa)',
+  ]);
+});
+
+test('hq review --fixes-only tells the caller to post a run noslop stored but did not post, after its first line', () => {
+  expect(formatNoslopReview({ ...REVIEW, findings: [], fixesOnly: true, postFailed: 'exit 1: the github reporter failed: HTTP 500' }).split('\n').slice(0, 2)).toStrictEqual([
+    '== engine: noslop (commit 0123456), fixes only: 0 fix(es) checked, full output: /reviews/widgets7-noslop.json',
+    '== not posted: noslop stored this review but did not post it to GitHub (exit 1: the github reporter failed: HTTP 500). Run noslop post /reviews/widgets7-noslop.json to finish the post.',
   ]);
 });
 

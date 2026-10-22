@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.89.0 — 2026-10-23
+
+A review round that noslop stored counts as a round, even when noslop's post of it to GitHub failed (GEO-1673).
+
+- When noslop exits non-zero and its store holds the review it printed at that head, hq records the round as ok, with its findings, and notes that the post failed. `--fixes-only` and the gate then read it as the last review.
+- `hq review` prints a `not posted` line that tells the caller to run `noslop post <file>` to finish the post.
+- A run that failed before noslop stored its review still records the round as failed.
+
 ## 0.88.0 — 2026-10-23
 
 fleet.json may give a session the `release` role, for the z-release session the fleet throughput design adds.

@@ -1,4 +1,4 @@
-import type { Database } from 'bun:sqlite';
+import { Database } from 'bun:sqlite';
 import { expect, onTestFinished, test } from 'bun:test';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -55,6 +55,7 @@ function setupTest() {
       scratch: base,
       clone: join(base, 'noslop'),
       sha: 'abc1234abc1234abc1234abc1234abc1234abc12',
+      store: join(base, 'store.sqlite'),
       lock: (fn) => fn(),
     }),
   };
@@ -265,6 +266,64 @@ test('it counts the failed calls in the stored round', async () => {
   await expect(runNoslopReview(ctx.reviewContext(fake.run))).rejects.toMatchObject({ code: 'noslop_failed' });
 
   expect(ctx.db.query('SELECT failed_calls FROM noslop_rounds').get()).toStrictEqual({ failed_calls: 2 });
+});
+
+test('it records a review noslop stored but could not post to GitHub as a round, with its findings and the failed post', async () => {
+  const ctx = setupTest();
+  const store = new Database(join(ctx.base, 'store.sqlite'), { create: true });
+  const fake = buildFakeRunner({ noslopReview: { code: 1, stdout: FAKE_REVIEW_JSON, stderr: 'the github reporter failed: HTTP 500' } });
+  store.run('CREATE TABLE reviews (review_id TEXT PRIMARY KEY, repo TEXT NOT NULL, pull_request INTEGER, head TEXT NOT NULL)');
+  store.query('INSERT INTO reviews (review_id, repo, pull_request, head) VALUES (?, ?, ?, ?)').run('r1', 'zgeoff/widgets', 7, 'feat');
+  store.close();
+
+  const result = await runNoslopReview(ctx.reviewContext(fake.run));
+
+  expect(result.postFailed).toBe('exit 1: the github reporter failed: HTTP 500');
+  expect(result.findings).toStrictEqual([{ id: '00112233445566aa', lens: 'correctness', severity: 'high', title: 'Kettle never boils' }]);
+  expect(ctx.db.query('SELECT kind, ok, head, error, findings FROM noslop_rounds').all()).toStrictEqual([
+    {
+      kind: 'review',
+      ok: 1,
+      head: 'feat',
+      error: 'stored, but not posted to GitHub: exit 1: the github reporter failed: HTTP 500',
+      findings: JSON.stringify([{ id: '00112233445566aa', lens: 'correctness', severity: 'high', title: 'Kettle never boils', criterion: null, rule: null, path: null, startLine: null, endLine: null, writtenByChange: null, late: null }]),
+    },
+  ]);
+});
+
+test('it records no review when noslop exits 1 before its store holds the review it printed', async () => {
+  const ctx = setupTest();
+  const store = new Database(join(ctx.base, 'store.sqlite'), { create: true });
+  const fake = buildFakeRunner({ noslopReview: { code: 1, stdout: FAKE_REVIEW_JSON, stderr: 'the sqlite reporter failed: disk full' } });
+  store.run('CREATE TABLE reviews (review_id TEXT PRIMARY KEY, repo TEXT NOT NULL, pull_request INTEGER, head TEXT NOT NULL)');
+  store.query('INSERT INTO reviews (review_id, repo, pull_request, head) VALUES (?, ?, ?, ?)').run('r0', 'zgeoff/widgets', 7, 'feat');
+  store.close();
+
+  await expect(runNoslopReview(ctx.reviewContext(fake.run))).rejects.toMatchObject({ code: 'noslop_failed' });
+
+  expect(ctx.db.query('SELECT ok, error FROM noslop_rounds').all()).toStrictEqual([{ ok: 0, error: 'exit 1: the sqlite reporter failed: disk full' }]);
+});
+
+test('it records no review when noslop exits 1 and has no store yet', async () => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ noslopReview: { code: 1, stdout: FAKE_REVIEW_JSON, stderr: 'the sqlite reporter failed: no data folder' } });
+
+  await expect(runNoslopReview(ctx.reviewContext(fake.run))).rejects.toMatchObject({ code: 'noslop_failed' });
+
+  expect(ctx.db.query('SELECT ok, error FROM noslop_rounds').all()).toStrictEqual([{ ok: 0, error: 'exit 1: the sqlite reporter failed: no data folder' }]);
+});
+
+test('it records no review when noslop exits 1 with output that is no review, even when its store holds one', async () => {
+  const ctx = setupTest();
+  const store = new Database(join(ctx.base, 'store.sqlite'), { create: true });
+  const fake = buildFakeRunner({ noslopReview: { code: 1, stdout: 'Review done.', stderr: 'the github reporter failed: HTTP 500' } });
+  store.run('CREATE TABLE reviews (review_id TEXT PRIMARY KEY, repo TEXT NOT NULL, pull_request INTEGER, head TEXT NOT NULL)');
+  store.query('INSERT INTO reviews (review_id, repo, pull_request, head) VALUES (?, ?, ?, ?)').run('r1', 'zgeoff/widgets', 7, 'feat');
+  store.close();
+
+  await expect(runNoslopReview(ctx.reviewContext(fake.run))).rejects.toMatchObject({ code: 'noslop_failed' });
+
+  expect(ctx.db.query('SELECT ok, error FROM noslop_rounds').all()).toStrictEqual([{ ok: 0, error: 'exit 1: the github reporter failed: HTTP 500' }]);
 });
 
 test('it blanks a credential that noslop echoes in its error output', async () => {
