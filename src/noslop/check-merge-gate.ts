@@ -1,12 +1,14 @@
 import { match } from 'ts-pattern';
 import { HqError } from '../errors.ts';
 import { findAcceptedRisks } from '../pr-status/find-accepted-risks.ts';
+import { readHeadLgtm } from '../pr-status/read-head-lgtm.ts';
 import { findOwnerOverride } from '../pr-status/find-owner-override.ts';
 import { readPRHead } from '../pr-status/read-pr-head.ts';
 import { assertPR } from './assert-pr.ts';
 import { buildSlug } from './build-slug.ts';
 import { checkCIGreen } from './check-ci-green.ts';
 import { collectOpenFindingIDs } from './collect-open-finding-ids.ts';
+import { findOwnerHeldTest } from './find-owner-held-test.ts';
 import { isBotAuthor } from './is-bot-author.ts';
 import type { PRAuthor } from './is-bot-author.ts';
 import { isNoslopListed } from './is-noslop-listed.ts';
@@ -17,7 +19,9 @@ import { readGateFacts } from './read-gate-facts.ts';
 import type { GateFacts } from './read-gate-facts.ts';
 import { readNoslopFindings } from './read-noslop-findings.ts';
 import { readOKReviews } from './read-ok-reviews.ts';
+import { readPRFiles } from './read-pr-files.ts';
 import { pickNoslopVerdict } from './pick-noslop-verdict.ts';
+import { pickOwnerHeldVerdict } from './pick-owner-held-verdict.ts';
 import type { NoslopGateFacts } from './pick-noslop-verdict.ts';
 import { resolveEngine } from './resolve-engine.ts';
 import type { PRRequest } from './run-review-check.ts';
@@ -44,6 +48,7 @@ export async function checkMergeGate(request: PRRequest, onHead?: OnGateHead): P
       throw buildBlock(parsed, request.pr, red.reason);
     })
     .exhaustive();
+  await checkOwnerHeld(request, parsed, facts.headRefOid);
   if (unreviewed !== null) {
     return { mayMerge: true, reason: unreviewed, reviewed: false };
   }
@@ -60,6 +65,23 @@ function readUnreviewedRoute(request: PRRequest, parsed: ParsedRepo, author: PRA
   return match(resolveEngine(request.db, parsed.owner, parsed.repo, request.pr).engine)
     .with('codex', () => 'on Codex: green CI is enough')
     .with('noslop', () => null)
+    .exhaustive();
+}
+
+// On every route: a change to an owner-held path needs the owner's own lgtm at the head.
+async function checkOwnerHeld(request: PRRequest, parsed: ParsedRepo, head: string): Promise<void> {
+  const isHeld = findOwnerHeldTest(parsed);
+  if (isHeld === null) {
+    return;
+  }
+  const files = await readPRFiles(request.run, buildSlug(parsed), request.pr);
+  const lgtm = readHeadLgtm(request.db, parsed.repo, request.pr, head);
+  const headNow = await readPRHead(request.run, buildSlug(parsed), request.pr);
+  match(pickOwnerHeldVerdict({ repo: parsed.repo, pr: request.pr, held: files.filter((file) => isHeld(file)), lgtm: lgtm !== null, head, headNow }))
+    .with({ pass: true }, () => null)
+    .with({ pass: false }, (blocked) => {
+      throw buildBlock(parsed, request.pr, blocked.reason);
+    })
     .exhaustive();
 }
 

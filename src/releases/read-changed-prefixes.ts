@@ -1,7 +1,9 @@
 import type { Runner } from '../runner/types.ts';
 import { HqError } from '../errors.ts';
+import { isFileRecord } from './is-file-record.ts';
 import { OWNER } from './owner.ts';
 import { parseChangedPrefixes } from './parse-changed-prefixes.ts';
+import { parseFileRecord } from './parse-file-record.ts';
 import { runGH } from './run-gh.ts';
 
 const FILES_LIMIT = 3000;
@@ -12,7 +14,7 @@ export async function readChangedPrefixes(run: Runner, repo: string, number: str
   if (!content.trim()) {
     throw new HqError('bad_config', `release-please-config.json of ${repo} is empty`);
   }
-  const records = listed.split('\n').filter((record) => record !== '');
+  const records = listed.split('\n').filter((record) => isFileRecord(record));
 
   // GitHub lists at most 3000 files of a PR, so a full list may hide a changed package.
   if (records.length >= FILES_LIMIT) {
@@ -20,5 +22,5 @@ export async function readChangedPrefixes(run: Runner, repo: string, number: str
   }
 
   // A renamed file also changed the package it left, which GitHub gives only as previous_filename.
-  return parseChangedPrefixes(content, records.flatMap((record) => record.split('\t')));
+  return parseChangedPrefixes(content, records.flatMap((record) => parseFileRecord(record)));
 }

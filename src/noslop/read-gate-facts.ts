@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { HqError } from '../errors.ts';
 import { boundedRunner } from '../runner/bounded-runner.ts';
+import { toRunFailure } from '../runner/to-run-failure.ts';
 import type { Runner } from '../runner/types.ts';
 import { CALL_MS } from '../watcher/call-ms.ts';
 import { parseJSON } from './parse-json.ts';
@@ -19,7 +20,7 @@ export type GateCheck = GateFacts['statusCheckRollup'][number];
 
 // One GitHub read, so the head, author and checks describe the same moment.
 export async function readGateFacts(run: Runner, slug: string, pr: number): Promise<GateFacts> {
-  const result = await boundedRunner(run, CALL_MS)(['gh', 'pr', 'view', String(pr), '-R', slug, '--json', 'headRefOid,author,statusCheckRollup']).catch((error: unknown) => ({ code: 1, stdout: '', stderr: String(error) }));
+  const result = await boundedRunner(run, CALL_MS)(['gh', 'pr', 'view', String(pr), '-R', slug, '--json', 'headRefOid,author,statusCheckRollup']).catch(toRunFailure);
   const parsed = result.code === 0 ? FactsSchema.safeParse(parseJSON(result.stdout)) : null;
   if (parsed?.success !== true) {
     throw new HqError('merge_blocked', `could not read the PR's head, author and checks from GitHub, so the gate cannot pass: ${(result.stderr || result.stdout).trim().slice(0, 300)}`);
