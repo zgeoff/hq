@@ -37,7 +37,7 @@ interface CallCheck extends SourceRequest {
   id: string;
 
   // A console: source counts only through a grant; a call: source on a call with no grants keeps
-  // the plain-Yes rule.
+  // the plain-Yes rule, for accept-risk only.
   needsGrant: boolean;
 }
 
@@ -64,6 +64,11 @@ function findCallRefusal(db: Database, check: CallCheck): string | null {
   const options = readRoundOptions(db, check.id, answer.seq);
   if (check.needsGrant || options.some((option) => option.grants !== undefined)) {
     return findGrantRefusal(check, options, data.answer);
+  }
+
+  // A plain yes names no head, so its first use could pass a head the owner never saw.
+  if (check.wanted.action === 'override') {
+    return `${check.source} has no option that grants the override: an override needs the owner to pick an option whose grants name the PR and the head, and a plain yes names no head`;
   }
   const title = data.title ?? call.title;
   if (!hasPRName(title, check.ref)) {

@@ -7,7 +7,7 @@ hq starts from a clean tree in a new repo, and the first full review's fixes lan
 The cloud metrics URL comes from the local settings file as `HQ_CLOUD_METRICS_URL`; the capacity line calls the host `cloud`. `HQ_CLOUD_HOST` holds the cloud host's ssh name, which the preview-qa skill reads, and `hq health` lists it when it is missing.
 
 - An owner source for `hq pr override` and `hq pr accept-risk` now has to name the PR and the action it approves. What it must hold is in this file's private half: read `CHANGELOG.private.md` in the local hq-private clone (`hq defs` shows where it is).
-- A call option whose `grants` approves an override now has to name the `head` the owner approved; one with no head is refused as a source.
+- An override source must be a call option whose `grants` names the PR and the `head` the owner approved. A grant with no head is refused, and a plain Yes to a `call:` now counts for `hq pr accept-risk` only, since it names no head.
 - The watcher skips a step that an earlier pass gave up on until that step stops, so a slow goals sync never runs twice at once.
 - `hq answers` shows an old answer's title, issues, session and PR as unknown when its item changed after it, instead of the item's current ones.
 - `hq review` checks out the PR's own head commit, not a branch of the same name, so a fork PR is reviewed as itself. The rename check in the pr-review skill escapes each path in the GitHub contents URL.
