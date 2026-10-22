@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.82.0 — 2026-10-22
 
 `hq linear issues` writes a team's Linear issues to page files that the triage scripts read.
 
