@@ -141,13 +141,13 @@ test("the watcher's goals sync replaces an earlier good Actions spend with unkno
   expect(loadActionsSpend(ctx.db, new Date('2026-10-16T07:00:00Z'))).toBeNull();
 });
 
-// At 20:00 UTC with every other sync fresh, so only the Ready pass is due. Linear holds three
+// At 20:00 UTC with every other sync fresh, so only the Ready pass is due. pacing.json gives only slot
+// caps, so the lane rules stand on their own. Linear holds three
 // Ready issues and one in Todo.
 test('a due Ready pass writes the counts before the lanes tick, and the logged eligible shows them', async () => {
   const ctx = setupTest();
-  const lanes = { imp: { 'nixie-slice': 2, 'nixie-maintenance': 1, atc: 1, imp: 1, cloud: 1, memory: 1 }, local: { flexible: 2, cleanup: 3, process: 1 } };
   mkdirSync(`${ctx.directory}/scripts`, { recursive: true });
-  writeFileSync(`${ctx.directory}/pacing.json`, JSON.stringify({ lanes, lends: { cleanup: false, memory: false } }));
+  writeFileSync(`${ctx.directory}/pacing.json`, JSON.stringify({ slots: { imp: 7, local: 6 } }));
   onTestFinished(overrideEnv('HQ_CAPACITY', `${ctx.directory}/scripts/capacity.sh`));
   onTestFinished(overrideEnv('HQ_NOW', '2026-10-15T20:00:00Z'));
   const capacity = JSON.stringify({ imp: { freeMib: 16_384, room: true }, providers: { claude: { room: true, unattended: true, target: 'imp' } } });

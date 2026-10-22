@@ -27,7 +27,7 @@ export async function loadPane(db: Database, pacingFile: string, consoleURL: str
   const config = await loadPacing(pacingFile),
     held = collectHeldIssues(db, at),
     lanes = config.lanes ?? [],
-    overage = formatPlanOverage(buildLanePlan(lanes, config.impMib, capacitySettings(db))),
+    overage = formatPlanOverage(buildLanePlan(config.slots?.imp ?? 0, config.impMib, capacitySettings(db))),
     sections = [loadNeedsYouSection(db, consoleURL), loadNixSection(db, at), renderLanesSection(lanes, held, config.error, overage), loadReviewsSection(db, at), loadShippedSection(db, consoleURL, at), loadNewsSection(db)];
   return { at: iso(at), markdown: sections.join('\n\n'), heat: lanes.map((lane) => buildHeatRow(lane, held)) };
 }

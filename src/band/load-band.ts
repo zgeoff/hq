@@ -1,6 +1,4 @@
 import type { Database } from 'bun:sqlite';
-import { runningByLane } from '../areas/running-by-lane.ts';
-import type { LaneConfig } from '../areas/types.ts';
 import { capacitySettings } from '../capacity/capacity-settings.ts';
 import type { CapacitySettings } from '../capacity/types.ts';
 import { iso } from '../clock/iso.ts';
@@ -9,6 +7,8 @@ import { loadConsoleItems } from '../load-console-items.ts';
 import { buildLanePlan } from '../lanes/build-lane-plan.ts';
 import { formatPlanOverage } from '../lanes/format-plan-overage.ts';
 import { loadPacing } from '../lanes/load-pacing.ts';
+import { readRunningByPlace } from '../lanes/read-running-by-place.ts';
+import type { PacingSlots } from '../lanes/types.ts';
 import { match } from 'ts-pattern';
 import { loadNixState } from './load-nix-state.ts';
 import type { Band, BandSegment } from './types.ts';
@@ -33,21 +33,20 @@ function buildNixSegment(db: Database, at: Date): BandSegment {
     .exhaustive();
 }
 
-// Running runs against the lanes' sizes, then impd's non-Nix use against its lines. A lane that
-// borrows a slot counts every run it holds, so the total is true use. Amber when the runs exceed
-// the sizes, when one more imp would cross either impd line, when no impd reading is 15 minutes fresh,
-// or when the imp lanes' sizes, all full, would cross one ("plan 18/16 GiB").
+// The runs that hold a slot against the slot caps, then impd's non-Nix use against its lines. Amber
+// when the runs exceed the caps, when one more imp would cross either impd line, when no impd reading
+// is 15 minutes fresh, or when the imp cap, all full, would cross one ("plan 18/16 GiB").
 async function loadLanesSegment(db: Database, pacingFile: string, at: Date): Promise<BandSegment> {
   const pacing = await loadPacing(pacingFile);
-  return pacing.lanes === null ? { key: 'lanes', text: 'lanes ?', tone: 'warn' } : buildLanesFromConfig(db, at, pacing.lanes, pacing.impMib);
+  return pacing.slots === null ? { key: 'lanes', text: 'lanes ?', tone: 'warn' } : buildLanesFromConfig(db, at, pacing.slots, pacing.impMib);
 }
 
-function buildLanesFromConfig(db: Database, at: Date, lanes: readonly LaneConfig[], impMib: number): BandSegment {
+function buildLanesFromConfig(db: Database, at: Date, slots: PacingSlots, impMib: number): BandSegment {
   const impd = loadImpdLine(db, at, impMib),
-    plan = formatPlanOverage(buildLanePlan(lanes, impMib, capacitySettings(db))),
-    running = runningByLane(db, at),
-    size = lanes.reduce((sum, lane) => sum + lane.size, 0),
-    used = lanes.reduce((sum, lane) => sum + (running[lane.name] ?? 0), 0);
+    plan = formatPlanOverage(buildLanePlan(slots.imp, impMib, capacitySettings(db))),
+    running = readRunningByPlace(db, at),
+    size = slots.imp + slots.local,
+    used = running.imp + running.local;
   return { key: 'lanes', text: `lanes ${used}/${size} (${impd.text}${plan === null ? '' : `; ${plan}`})`, tone: impd.near || used > size || plan !== null ? 'warn' : 'ok' };
 }
 

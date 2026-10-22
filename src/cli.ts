@@ -1834,7 +1834,7 @@ async function lanesCommand(db: Database, verb: string | undefined, flags: Flags
       const lines = [
         `watcher: ${unit.stdout.trim() || 'inactive'} (${enabled})`,
         ...laneLines,
-        ...(sample.lanes ? [formatLanePlan(buildLanePlan(sample.lanes, sample.impMib, capacitySettings(db)))] : []),
+        ...(sample.slots ? [formatLanePlan(buildLanePlan(sample.slots.imp, sample.impMib, capacitySettings(db)))] : []),
         ...(hold ? [`hold: nudges paused until ${hold.until} (${hold.by}: ${hold.reason})`] : []),
         `last sample: ${last ? JSON.stringify(last) : 'none'}`,
         `ready count: ${ready.count ?? 'unknown'}${ready.at ? ` (reported ${ready.at})` : ''}`,
