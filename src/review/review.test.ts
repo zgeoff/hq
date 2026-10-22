@@ -32,12 +32,7 @@ afterEach(() => {
 // The diff the fake checkout holds: by default a small gate change, so both passes run at medium.
 let diffPaths = 'src/gate.ts';
 let diffText = '+++ b/src/gate.ts\n+  if (!known.has(kettle)) return deny(kettle);\n';
-// The PR head GitHub reports, and the commit that fetching refs/pull/<n>/head gives.
-let headOid = 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678';
-let fetchedOid = 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678';
 beforeEach(() => {
-  headOid = 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678';
-  fetchedOid = 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678';
   diffPaths = 'src/gate.ts';
   diffText = '+++ b/src/gate.ts\n+  if (!known.has(kettle)) return deny(kettle);\n';
 });
@@ -51,8 +46,12 @@ function fake(fail: string | null = null, origin = 'git@github.com:zgeoff/widget
     if (line === 'git remote get-url origin') return { code: 0, stdout: `${origin}\n`, stderr: '' };
     if (line === 'git diff --name-only origin/main...HEAD') return { code: 0, stdout: `${diffPaths}\n`, stderr: '' };
     if (line === 'git diff origin/main...HEAD') return { code: 0, stdout: diffText, stderr: '' };
-    if (line.includes('--json headRefName,headRefOid,baseRefName')) return { code: 0, stdout: `{"headRefName":"feat","headRefOid":"${headOid}","baseRefName":"main"}`, stderr: '' };
-    if (line === 'git rev-parse FETCH_HEAD') return { code: 0, stdout: `${fetchedOid}\n`, stderr: '' };
+    if (line.includes('--json headRefName,headRefOid,baseRefName')) {
+      return { code: 0, stdout: '{"headRefName":"feat","headRefOid":"a1b2c3d4e5f60718293a4b5c6d7e8f9012345678","baseRefName":"main"}', stderr: '' };
+    }
+    if (line === 'git rev-parse FETCH_HEAD') {
+      return { code: 0, stdout: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678\n', stderr: '' };
+    }
     if (cmd[0] === 'codex' && opts?.stdoutFile) await Bun.write(opts.stdoutFile, 'thinking\nline a\nline b\nNo findings.\n');
     if (cmd[0] === 'codex' && cmd[1] === 'exec') await Bun.write(cmd[cmd.indexOf('-o') + 1]!, 'src/gate.ts:12 denies an unknown input; test/hostile.ts holds its table.\n');
     if (line.includes('--json name,state,bucket')) return { code: 0, stdout: '[{"name":"test","state":"SUCCESS","bucket":"pass"},{"name":"lint","state":"FAILURE","bucket":"fail"}]', stderr: '' };
@@ -73,7 +72,7 @@ test('reviews in a worktree, removes it, and reports checks and threads', async 
   const remove = lines.findIndex((l) => l.startsWith('git worktree remove --force'));
   expect(add).toBeLessThan(codex);
   expect(codex).toBeLessThan(remove);
-  expect(calls[codex]!.opts?.cwd).toBe(`${dir}/zgeoff/widgets/7`);
+  expect(calls[codex]?.opts?.cwd).toBe(`${dir}/zgeoff/widgets/7`);
   expect(lines.some((l) => l.includes('--watch'))).toBe(true);
 });
 
@@ -125,7 +124,7 @@ test('a second, read-only Codex pass asks the allow-or-deny question and its ans
   expect(calls[exec]!.cmd.slice(0, 4)).toEqual(['codex', 'exec', '-s', 'read-only']);
   expect(calls[exec]!.cmd.at(-1)).toContain(ALLOW_DENY_QUESTION);
   expect(calls[exec]!.cmd.at(-1)).toContain('git diff origin/main...HEAD');
-  expect(calls[exec]!.opts?.cwd).toBe(`${dir}/zgeoff/widgets/7`);
+  expect(calls[exec]?.opts?.cwd).toBe(`${dir}/zgeoff/widgets/7`);
   expect(exec).toBeLessThan(lines.findIndex((l) => l.startsWith('git worktree remove')));
   expect(r.allowDeny).toEqual({ code: 0, answer: 'src/gate.ts:12 denies an unknown input; test/hostile.ts holds its table.', skipped: null });
   const file = await Bun.file(r.reviewFile).text();
@@ -376,43 +375,80 @@ test('it files a review under its owner, repo and PR, in lowercase', () => {
 });
 
 test.each([
-  ['zgeoff', 'kettle1', 2, 'zgeoff', 'kettle', 12],
-  ['zgeoff', 'other-widgets', 7, 'other', 'widgets', 7],
-])('it gives %s/%s#%d and %s/%s#%d different review stems', (firstOwner, firstRepo, firstPR, secondOwner, secondRepo, secondPR) => {
-  expect(buildReviewStem(firstOwner, firstRepo, firstPR)).not.toBe(buildReviewStem(secondOwner, secondRepo, secondPR));
+  ['zgeoff/kettle1#2 and zgeoff/kettle#12', { owner: 'zgeoff', repo: 'kettle1', pr: 2 }, { owner: 'zgeoff', repo: 'kettle', pr: 12 }],
+  ['zgeoff/other-widgets#7 and other/widgets#7', { owner: 'zgeoff', repo: 'other-widgets', pr: 7 }, { owner: 'other', repo: 'widgets', pr: 7 }],
+])('it gives %s different review stems', (_label, first, second) => {
+  expect(buildReviewStem(first.owner, first.repo, first.pr)).not.toBe(buildReviewStem(second.owner, second.repo, second.pr));
 });
 
 test('it checks out the fetched PR head commit, never origin/<headRefName>, so a fork branch named like ours cannot pick our code', async () => {
-  const { run, calls } = fake();
-  await review(run, 'widgets', 7, { watch: false });
-  const lines = calls.map((c) => c.cmd.join(' '));
+  const stub = fake();
+  await review(stub.run, 'widgets', 7, { watch: false });
+  const lines = stub.calls.map((call) => call.cmd.join(' '));
   expect(lines).toContain('git fetch -q origin refs/pull/7/head');
-  expect(lines.find((l) => l.startsWith('git worktree add'))).toBe(`git worktree add -q --detach ${dir}/zgeoff/widgets/7 a1b2c3d4e5f60718293a4b5c6d7e8f9012345678`);
-  expect(lines.some((l) => l.includes('origin/feat'))).toBe(false);
+  expect(lines.find((line) => line.startsWith('git worktree add'))).toBe(`git worktree add -q --detach ${dir}/zgeoff/widgets/7 a1b2c3d4e5f60718293a4b5c6d7e8f9012345678`);
+  expect(lines.some((line) => line.includes('origin/feat'))).toBe(false);
 });
 
 test('it refuses to review when the fetched pull ref is not the PR head GitHub reports', async () => {
-  fetchedOid = '0000000000000000000000000000000000000bad';
-  const { run, calls } = fake();
+  const stub = fake();
+  const run: Runner = (cmd, opts) => (cmd.join(' ') === 'git rev-parse FETCH_HEAD' ? Promise.resolve({ code: 0, stdout: '0000000000000000000000000000000000000bad\n', stderr: '' }) : stub.run(cmd, opts));
   await expect(review(run, 'widgets', 7, { watch: false })).rejects.toMatchObject({ code: 'head_moved' });
-  expect(calls.some((c) => c.cmd.join(' ').startsWith('git worktree add'))).toBe(false);
+  expect(stub.calls.some((call) => call.cmd.join(' ').startsWith('git worktree add'))).toBe(false);
 });
 
 test('it reports the checks as unknown, with gh\'s error and no check, when gh pr checks fails with no output', async () => {
-  const r = await review(fake('gh pr checks').run, 'widgets', 7, { watch: false });
-  expect([r.checks, r.checksError]).toStrictEqual([[], 'gh pr checks failed (1): boom']);
+  const result = await review(fake('gh pr checks').run, 'widgets', 7, { watch: false });
+  expect([result.checks, result.checksError]).toStrictEqual([[], 'gh pr checks failed (1): boom']);
 });
 
 test('it reads a PR with no checks as an empty list', async () => {
-  const { run: base } = fake();
-  const run: Runner = async (cmd, opts) => (cmd.join(' ').startsWith('gh pr checks') ? { code: 1, stdout: '', stderr: "no checks reported on the 'feat' branch\n" } : base(cmd, opts));
-  const r = await review(run, 'widgets', 7, { watch: false });
-  expect([r.checks, r.checksError]).toStrictEqual([[], null]);
+  const stub = fake();
+  const run: Runner = (cmd, opts) => (cmd.join(' ').startsWith('gh pr checks') ? Promise.resolve({ code: 1, stdout: '', stderr: "no checks reported on the 'feat' branch\n" }) : stub.run(cmd, opts));
+  const result = await review(run, 'widgets', 7, { watch: false });
+  expect([result.checks, result.checksError]).toStrictEqual([[], null]);
 });
 
 test('it keeps the failed checks of a gh pr checks that exits nonzero with a check list', async () => {
-  const { run: base } = fake();
-  const run: Runner = async (cmd, opts) => (cmd.join(' ').startsWith('gh pr checks') ? { code: 1, stdout: '[{"name":"lint","state":"FAILURE","bucket":"fail"}]', stderr: '' } : base(cmd, opts));
-  const r = await review(run, 'widgets', 7, { watch: false });
-  expect([r.checks, r.checksError]).toStrictEqual([[{ name: 'lint', state: 'FAILURE', bucket: 'fail' }], null]);
+  const stub = fake();
+  const run: Runner = (cmd, opts) => (cmd.join(' ').startsWith('gh pr checks') ? Promise.resolve({ code: 1, stdout: '[{"name":"lint","state":"FAILURE","bucket":"fail"}]', stderr: '' }) : stub.run(cmd, opts));
+  const result = await review(run, 'widgets', 7, { watch: false });
+  expect([result.checks, result.checksError]).toStrictEqual([[{ name: 'lint', state: 'FAILURE', bucket: 'fail' }], null]);
+});
+
+test('it refuses a second review of a PR while one runs, and leaves the first one\'s worktree alone', async () => {
+  const stub = fake();
+  const started = Promise.withResolvers<void>();
+  const release = Promise.withResolvers<void>();
+  const run: Runner = async (cmd, opts) => {
+    if (cmd[0] === 'codex' && cmd[1] === 'review') {
+      started.resolve();
+      await release.promise;
+    }
+    return stub.run(cmd, opts);
+  };
+  const first = review(run, 'widgets', 7, { watch: false });
+  await started.promise;
+  const worktreeCalls = stub.calls.filter((call) => call.cmd[1] === 'worktree').length;
+
+  const second = await review(run, 'widgets', 7, { watch: false }).then(() => null, (error: unknown) => error);
+  const worktreeCallsAfter = stub.calls.filter((call) => call.cmd[1] === 'worktree').length;
+  release.resolve();
+
+  expect(second).toMatchObject({ code: 'locked' });
+  const firstResult = await first;
+  expect(worktreeCallsAfter).toBe(worktreeCalls);
+  expect(firstResult.codexCode).toBe(0);
+  expect(existsSync(`${dir}/zgeoff/widgets/7.lock`)).toBe(false);
+});
+
+test('it takes over the lock of a review whose process is gone', async () => {
+  const gone = Bun.spawnSync(['true']).pid;
+  mkdirSync(`${dir}/zgeoff/widgets/7.lock`, { recursive: true });
+  await Bun.write(`${dir}/zgeoff/widgets/7.lock/pid`, String(gone));
+
+  const result = await review(fake().run, 'widgets', 7, { watch: false });
+
+  expect(result.codexCode).toBe(0);
+  expect(existsSync(`${dir}/zgeoff/widgets/7.lock`)).toBe(false);
 });

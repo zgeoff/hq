@@ -2,6 +2,7 @@
 // throwaway worktree, then CI checks and the count of open review threads.
 import { appendFileSync, mkdirSync, rmSync } from 'node:fs';
 import { dirname } from 'node:path';
+import { z } from 'zod';
 import { HqError } from '../errors.ts';
 import type { Runner } from '../runner/types.ts';
 import { cleanEnv } from '../runner/clean-env.ts';
@@ -22,7 +23,10 @@ import { riskTier } from './risk-tier.ts';
 import { runCommand as must } from './run-command.ts';
 import { runInstall } from './run-install.ts';
 import type { Effort, ReviewResult } from './types.ts';
+import { withPRLock } from './with-pr-lock.ts';
 import { withRepoLock } from './with-repo-lock.ts';
+
+const PRRefs = z.object({ headRefName: z.string(), headRefOid: z.string(), baseRefName: z.string() });
 
 export async function review(run: Runner, rawRepo: string, pr: number, opts: { watch: boolean; owner?: string; repoDir?: string; effort?: Effort }): Promise<ReviewResult> {
   if (opts.effort !== undefined && opts.effort !== REVIEW_EFFORT && opts.effort !== RISK_EFFORT) throw new HqError('bad_args', `--effort must be ${REVIEW_EFFORT} or ${RISK_EFFORT}`);
@@ -37,60 +41,68 @@ export async function review(run: Runner, rawRepo: string, pr: number, opts: { w
   const S = reviewDir();
   mkdirSync(dirname(wt), { recursive: true });
 
-  const refs = JSON.parse(await must(run, ['gh', 'pr', 'view', String(pr), '-R', slug, '--json', 'headRefName,headRefOid,baseRefName'])) as { headRefName: string; headRefOid: string; baseRefName: string };
-  const head = refs.headRefName;
-  const base = refs.baseRefName;
-  // A fork's branch can share a name with one of origin's, so origin/<headRefName> may not be the PR's code.
-  await withRepoLock(S, slug, async () => {
-    await must(run, ['git', 'fetch', '-q', 'origin'], dir);
-    await must(run, ['git', 'fetch', '-q', 'origin', `refs/pull/${pr}/head`], dir);
-    const fetched = await must(run, ['git', 'rev-parse', 'FETCH_HEAD'], dir);
-    if (fetched !== refs.headRefOid) throw new HqError('head_moved', `refs/pull/${pr}/head is ${fetched}, but the PR head is ${refs.headRefOid}; try again`);
-  });
-  let allowDenyCode: number | null = null,
-    codexCode: number,
-    gate: { run: boolean; reason: string },
-    install: ReviewResult['install'] = { ran: false, ok: true, detail: 'no install' },
-    tier: ReviewResult['effort'];
-  rmSync(wt, { recursive: true, force: true });
-  await withRepoLock(S, slug, async () => {
-    await run(['git', 'worktree', 'prune'], { cwd: dir });
-    await must(run, ['git', 'worktree', 'add', '-q', '--detach', wt, refs.headRefOid], dir);
-  });
-  try {
-    rmSync(reviewFile, { force: true });
-    rmSync(answerFile, { force: true });
-    rmSync(tmp, { recursive: true, force: true });
-    mkdirSync(tmp, { recursive: true });
-    const env = cleanEnv({ TMPDIR: tmp });
-    install = await runInstall(run, wt, env);
-    const names = await run(['git', 'diff', '--name-only', `origin/${base}...HEAD`], { cwd: wt });
-    const patch = await run(['git', 'diff', `origin/${base}...HEAD`], { cwd: wt });
-    const paths = names.code === 0 ? names.stdout.split('\n').filter(Boolean) : null;
-    const diff = patch.code === 0 ? patch.stdout : null;
-    const auto: { effort: Effort; reason: string } = paths && diff !== null ? riskTier(paths, diff) : { effort: RISK_EFFORT, reason: 'the diff could not be read' };
-    tier = opts.effort ? { effort: opts.effort, reason: `--effort ${opts.effort} (by risk: ${auto.effort}, ${auto.reason})`, forced: true } : { ...auto, forced: false };
-    gate = allowDenyNeeded(paths, diff);
-    const NO_TMP_ARGS = ['-c', `developer_instructions=${tomlString(await codexInstructions())}`, '-c', `model_reasoning_effort=${tier.effort}`];
-    const CACHE_ARGS = ['-c', `sandbox_workspace_write.writable_roots=${JSON.stringify([bunCacheDir()])}`];
-    codexCode = (await run(['codex', 'review', ...NO_TMP_ARGS, ...CACHE_ARGS, '--base', `origin/${base}`], { cwd: wt, env, stdoutFile: reviewFile })).code;
-    const said = await Bun.file(reviewFile).text().catch(() => '');
-    const m = CODEX_UNAVAILABLE.exec(said);
-    if (m) throw new HqError('codex_unavailable', `codex gave no review ("${m[0]}"): this is no review, not a pass. Use another reviewer. Codex output: ${reviewFile}`);
-    if (gate.run) allowDenyCode = (await run(['codex', 'exec', '-s', 'read-only', ...NO_TMP_ARGS, '-o', answerFile, allowDenyPacket(base)], { cwd: wt, env })).code;
-  } finally {
-    await withRepoLock(S, slug, () => run(['git', 'worktree', 'remove', '--force', wt], { cwd: dir }));
-    rmSync(tmp, { recursive: true, force: true });
-  }
-  const text = await Bun.file(reviewFile).text().catch(() => '');
-  const codexTail = text.trimEnd().split('\n').slice(-3).join('\n');
-  const skipped = gate.run ? null : gate.reason;
-  const answer = skipped ? `allow-or-deny pass skipped: ${skipped}` : (await Bun.file(answerFile).text().catch(() => '')).trim() || `(no answer; codex exit ${allowDenyCode})`;
-  appendFileSync(reviewFile, `\n\n## Install\n\n${install.ok ? install.detail : `FAILED: ${install.detail}. Codex could not run the repo's tests; treat this review as static.`}\n`);
-  appendFileSync(reviewFile, `\n\n## Effort\n\n${tier.effort} (${tier.reason})\n\n## Allow-or-deny\n\n${ALLOW_DENY_QUESTION}\n\n${answer}\n`);
-  rmSync(answerFile, { force: true });
+  // CI is read after the lock goes, since --watch can wait on CI for as long as it runs.
+  const done = await withPRLock(`${wt}.lock`, `${slug}#${pr}`, async () => {
+    const view = await must(run, ['gh', 'pr', 'view', String(pr), '-R', slug, '--json', 'headRefName,headRefOid,baseRefName']);
+    const refs = PRRefs.parse(JSON.parse(view));
+    const head = refs.headRefName;
+    const base = refs.baseRefName;
 
-  return { repo, pr, head, base, reviewFile, codexCode, codexTail, effort: tier, allowDeny: { code: allowDenyCode, answer, skipped }, ...(await readCIState(run, slug, pr, opts.watch)), install };
+    // A fork's branch can share a name with one of origin's, so origin/<headRefName> may not be the PR's code.
+    await withRepoLock(S, slug, async () => {
+      await must(run, ['git', 'fetch', '-q', 'origin'], dir);
+      await must(run, ['git', 'fetch', '-q', 'origin', `refs/pull/${pr}/head`], dir);
+      const fetched = await must(run, ['git', 'rev-parse', 'FETCH_HEAD'], dir);
+      if (fetched !== refs.headRefOid) {
+        throw new HqError('head_moved', `refs/pull/${pr}/head is ${fetched}, but the PR head is ${refs.headRefOid}; try again`);
+      }
+    });
+    let allowDenyCode: number | null = null,
+      codexCode: number,
+      gate: { run: boolean; reason: string },
+      install: ReviewResult['install'] = { ran: false, ok: true, detail: 'no install' },
+      tier: ReviewResult['effort'];
+    rmSync(wt, { recursive: true, force: true });
+    await withRepoLock(S, slug, async () => {
+      await run(['git', 'worktree', 'prune'], { cwd: dir });
+      await must(run, ['git', 'worktree', 'add', '-q', '--detach', wt, refs.headRefOid], dir);
+    });
+    try {
+      rmSync(reviewFile, { force: true });
+      rmSync(answerFile, { force: true });
+      rmSync(tmp, { recursive: true, force: true });
+      mkdirSync(tmp, { recursive: true });
+      const env = cleanEnv({ TMPDIR: tmp });
+      install = await runInstall(run, wt, env);
+      const names = await run(['git', 'diff', '--name-only', `origin/${base}...HEAD`], { cwd: wt });
+      const patch = await run(['git', 'diff', `origin/${base}...HEAD`], { cwd: wt });
+      const paths = names.code === 0 ? names.stdout.split('\n').filter(Boolean) : null;
+      const diff = patch.code === 0 ? patch.stdout : null;
+      const auto: { effort: Effort; reason: string } = paths && diff !== null ? riskTier(paths, diff) : { effort: RISK_EFFORT, reason: 'the diff could not be read' };
+      tier = opts.effort ? { effort: opts.effort, reason: `--effort ${opts.effort} (by risk: ${auto.effort}, ${auto.reason})`, forced: true } : { ...auto, forced: false };
+      gate = allowDenyNeeded(paths, diff);
+      const NO_TMP_ARGS = ['-c', `developer_instructions=${tomlString(await codexInstructions())}`, '-c', `model_reasoning_effort=${tier.effort}`];
+      const CACHE_ARGS = ['-c', `sandbox_workspace_write.writable_roots=${JSON.stringify([bunCacheDir()])}`];
+      codexCode = (await run(['codex', 'review', ...NO_TMP_ARGS, ...CACHE_ARGS, '--base', `origin/${base}`], { cwd: wt, env, stdoutFile: reviewFile })).code;
+      const said = await Bun.file(reviewFile).text().catch(() => '');
+      const m = CODEX_UNAVAILABLE.exec(said);
+      if (m) throw new HqError('codex_unavailable', `codex gave no review ("${m[0]}"): this is no review, not a pass. Use another reviewer. Codex output: ${reviewFile}`);
+      if (gate.run) allowDenyCode = (await run(['codex', 'exec', '-s', 'read-only', ...NO_TMP_ARGS, '-o', answerFile, allowDenyPacket(base)], { cwd: wt, env })).code;
+    } finally {
+      await withRepoLock(S, slug, () => run(['git', 'worktree', 'remove', '--force', wt], { cwd: dir }));
+      rmSync(tmp, { recursive: true, force: true });
+    }
+    const text = await Bun.file(reviewFile).text().catch(() => '');
+    const codexTail = text.trimEnd().split('\n').slice(-3).join('\n');
+    const skipped = gate.run ? null : gate.reason;
+    const answer = skipped ? `allow-or-deny pass skipped: ${skipped}` : (await Bun.file(answerFile).text().catch(() => '')).trim() || `(no answer; codex exit ${allowDenyCode})`;
+    appendFileSync(reviewFile, `\n\n## Install\n\n${install.ok ? install.detail : `FAILED: ${install.detail}. Codex could not run the repo's tests; treat this review as static.`}\n`);
+    appendFileSync(reviewFile, `\n\n## Effort\n\n${tier.effort} (${tier.reason})\n\n## Allow-or-deny\n\n${ALLOW_DENY_QUESTION}\n\n${answer}\n`);
+    rmSync(answerFile, { force: true });
+
+    return { repo, pr, head, base, reviewFile, codexCode, codexTail, effort: tier, allowDeny: { code: allowDenyCode, answer, skipped }, install };
+  });
+  return { ...done, ...(await readCIState(run, slug, pr, opts.watch)) };
 }
 
 // A TOML basic string: JSON's escapes are all valid TOML; DEL is the one control JSON leaves raw.
