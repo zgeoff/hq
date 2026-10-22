@@ -31,7 +31,7 @@ export function addAsk(db: Database, input: AddInput): AddResult {
           `INSERT INTO asks (id, kind, title, question, body, issues, filed_by, for_session, send_order, state, queued_at, created_at, updated_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', ?, ?, ?)`,
         ).run(input.id, input.kind, input.title, input.question, input.body, issues, input.actor, input.forSession, input.order ?? null, t, t, t);
-        const seq = logEvent(db, 'ask', input.id, 'added', input.actor, null, 'queued', { body: input.body });
+        const seq = logEvent(db, 'ask', input.id, 'added', input.actor, null, 'queued', { body: input.body, ...readRoundFacts(db, input.id) });
         notifyIfOther(db, { seq, target: owner(), actor: input.actor, text: `${input.kind} ready: ${input.id}: ${input.title}. Read it with: hq ${input.kind} show ${input.id}`, topic: `ready:${input.id}` });
         markTold(db, input.id, input.actor);
         return { ask: getAsk(db, input.id)!, result: 'added' };
@@ -60,7 +60,7 @@ export function addAsk(db: Database, input: AddInput): AddResult {
              answer=NULL, answered_at=NULL, applied_to=NULL, applied_note=NULL, applied_at=NULL, close_reason=NULL,
              opened_at=NULL, queued_at=?, updated_at=? WHERE id=?`,
         ).run(input.title, input.question, input.body, issues, input.forSession ?? prev.for_session, orderOf(prev, input), t, t, prev.id);
-        const seq = logEvent(db, 'ask', prev.id, 'reasked', input.actor, prev.state, 'queued', { body: input.body, round: prev.round + 1 });
+        const seq = logEvent(db, 'ask', prev.id, 'reasked', input.actor, prev.state, 'queued', { body: input.body, round: prev.round + 1, ...readRoundFacts(db, prev.id) });
         notifyIfOther(db, { seq, target: owner(), actor: input.actor, text: `${input.kind} ready (new question): ${prev.id}: ${input.title}. Read it with: hq ${input.kind} show ${prev.id}`, topic: `ready:${prev.id}` });
         markTold(db, prev.id, input.actor);
         return { ask: getAsk(db, prev.id)!, result: 'reasked' };
@@ -83,6 +83,7 @@ export function addAsk(db: Database, input: AddInput): AddResult {
         const seq = logEvent(db, 'ask', prev.id, 'requeued', input.actor, prev.state, 'queued', {
           body: input.body,
           ...(newRound ? { round: prev.round + 1, previous_answer: prev.answer } : {}),
+          ...readRoundFacts(db, prev.id),
         });
         notifyIfOther(db, { seq, target: owner(), actor: input.actor, text: `${input.kind} ready again: ${prev.id}: ${input.title}. Read it with: hq ${input.kind} show ${prev.id}`, topic: `ready:${prev.id}` });
         markTold(db, prev.id, input.actor);
@@ -127,13 +128,20 @@ function updateText(db: Database, prev: Ask, input: AddInput, t: string): void {
     t,
     prev.id,
   );
-  logEvent(db, 'ask', prev.id, 'updated', input.actor, prev.state, prev.state, { body: input.body, order: orderOf(prev, input) });
+  logEvent(db, 'ask', prev.id, 'updated', input.actor, prev.state, prev.state, { body: input.body, order: orderOf(prev, input), ...readRoundFacts(db, prev.id) });
 }
 
 function updateIssuesOnly(db: Database, prev: Ask, input: AddInput, t: string): void {
   if (JSON.stringify(prev.issues) === JSON.stringify(input.issues)) return;
   db.query(`UPDATE asks SET issues=?, updated_at=? WHERE id=?`).run(JSON.stringify(input.issues), t, prev.id);
-  logEvent(db, 'ask', prev.id, 'updated', input.actor, prev.state, prev.state, { issues: input.issues });
+  logEvent(db, 'ask', prev.id, 'updated', input.actor, prev.state, prev.state, readRoundFacts(db, prev.id));
+}
+
+// What an answer is about, kept with each change so an answer from an earlier round is read
+// against the title, issues and session it was given to.
+function readRoundFacts(db: Database, id: string): { title: string; issues: string[]; forSession: string | null } {
+  const ask = requireAsk(db, id);
+  return { title: ask.title, issues: ask.issues, forSession: ask.for_session };
 }
 
 // The owner knows about an item it filed itself, or one it heard about while

@@ -2,6 +2,7 @@ import type { Database } from 'bun:sqlite';
 import { expect, onTestFinished, spyOn, test } from 'bun:test';
 import { createUnblockItems } from '../../test/create-unblock-items.ts';
 import { NOON_SYDNEY, at, freshDb } from '../../test/helpers.ts';
+import { addAsk } from '../asks/add-ask.ts';
 import { answerAsk } from '../asks/answer-ask.ts';
 import { applyAskItem } from '../apply-ask-item.ts';
 import { main } from '../cli.ts';
@@ -62,6 +63,22 @@ test('a re-asked call lists each round\'s answer once, read against that round\'
     ['2026-10-14T03:00:00Z', 'The red one', true, null, 'console'],
   ]);
   expect(loadAnswers(db, { from: '2026-10-14T02:00:00Z', to: '2026-10-14T04:00:00Z' }).map((a) => a.at)).toStrictEqual(['2026-10-14T03:00:00Z']);
+});
+
+test("it lists an earlier round's answer with the title, issues and session that round had", () => {
+  const db = setupTest();
+  addAsk(db, { kind: 'call', id: 'kettle-spout', title: 'Pick a spout', question: 'Long or short?', body: 'Long or short?', issues: ['GEO-9001'], forSession: 'kettle-bot', actor: 'kettle-bot' });
+  openAsk(db, { id: 'kettle-spout', force: true, actor: 'kettle-bot' });
+  answerAsk(db, { id: 'kettle-spout', kind: 'call', answer: 'Long', actor: 'teapot-bot' });
+  at('2026-10-14T03:00:00Z');
+  addAsk(db, { kind: 'call', id: 'kettle-spout', title: 'Pick a lid', question: 'Hinged or loose?', body: 'Hinged or loose?', issues: ['GEO-9002'], forSession: 'teapot-bot', actor: 'kettle-bot' });
+  openAsk(db, { id: 'kettle-spout', force: true, actor: 'kettle-bot' });
+  answerAsk(db, { id: 'kettle-spout', kind: 'call', answer: 'Hinged', actor: 'teapot-bot' });
+
+  expect(loadAnswers(db, { from: NOON_SYDNEY, to: '2026-10-14T04:00:00Z' }).map((answer) => [answer.title, answer.issues, answer.session, answer.words])).toStrictEqual([
+    ['Pick a spout', ['GEO-9001'], 'kettle-bot', 'Long'],
+    ['Pick a lid', ['GEO-9002'], 'teapot-bot', 'Hinged'],
+  ]);
 });
 
 test('hq answers --json lists the last 7 days by default, and --since sets the window', async () => {

@@ -1,4 +1,5 @@
 import type { Database } from 'bun:sqlite';
+import { z } from 'zod';
 import { getAsk } from '../asks/get-ask.ts';
 import { findSubjectLink } from '../find-subject-link.ts';
 import type { ItemOption } from '../parse-item-input.ts';
@@ -34,8 +35,22 @@ function loadAskAnswers(db: Database, window: AnswerWindow): Answer[] {
     if (ask === null) {
       return [];
     }
-    return [{ source: 'ask', id: ask.id, kind: ask.kind, title: ask.title, issues: ask.issues, session: ask.for_session, ...parsePickedOption(data.answer, loadRoundOptions(db, r)), ref: null, via: r.actor, at: r.at }];
+    const round = loadRoundFacts(db, r) ?? { title: ask.title, issues: ask.issues, forSession: ask.for_session };
+    return [{ source: 'ask', id: ask.id, kind: ask.kind, title: round.title, issues: round.issues, session: round.forSession, ...parsePickedOption(data.answer, loadRoundOptions(db, r)), ref: null, via: r.actor, at: r.at }];
   });
+}
+
+const RoundFactsSchema = z.object({ title: z.string(), issues: z.array(z.string()), forSession: z.string().nullable() });
+
+type RoundFacts = z.infer<typeof RoundFactsSchema>;
+
+const EventDataSchema = z.object({ data: z.string() }).nullable();
+
+// The title, issues and session the ask held when this answer came, from the last change before it;
+// null for an ask whose changes predate those facts, which is then read as it stands now.
+function loadRoundFacts(db: Database, answer: AnswerEvent): RoundFacts | null {
+  const row = EventDataSchema.parse(db.query(`SELECT data FROM events WHERE subject = 'ask' AND subject_id = ? AND action IN ('added', 'updated', 'reasked', 'requeued') AND json_extract(data, '$.title') IS NOT NULL AND seq < ? ORDER BY seq DESC LIMIT 1`).get(answer.id, answer.seq));
+  return row === null ? null : RoundFactsSchema.parse(JSON.parse(row.data));
 }
 
 // The options the ask showed when this answer came: its last `item` event before the answer, so
