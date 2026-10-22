@@ -172,3 +172,48 @@ test('done forgets no session for a short session id that several atc sessions s
   expect(wrapUp).toStrictEqual({ forgotten: [], destroyed: [], kept: [], failed: [{ id: '0000b001', reason: '2 sessions start with 0000b001; give more of the id' }] });
   expect(fleet.calls).toStrictEqual([]);
 });
+
+test('a confirmed destroy that atc refuses pins the session again and records the failure; the run stays done', async () => {
+  const ctx = setupTest();
+  addRun(ctx.db, { issue: 'GEO-9801', title: 'Invented kettle descaler', place: 'imp', session: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
+  setState(ctx.db, 'GEO-9801', 'done', {}, 'z-delivery');
+  const fleet = buildStubFleetClient({
+    sessions: [{ id: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, cwd: '/workspace/kettle' }],
+    forgets: { '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa': [{ forgotten: false, confirmToken: 'token-kettle' }, { forgotten: false }] },
+  });
+
+  const wrapUp = await runWrapUp(ctx.db, { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.resolve({ state: 'pushed' }) }, 'GEO-9801', 'z-delivery');
+
+  expect(wrapUp).toStrictEqual({
+    forgotten: [],
+    destroyed: [],
+    kept: [],
+    failed: [{ id: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', reason: 'atc did not forget the session after the confirmed destroy; pinned it again' }],
+  });
+  expect(fleet.calls).toStrictEqual(['unpin 0000a001', 'kill 0000a001', 'forget 0000a001', 'forget 0000a001 token-kettle', 'pin 0000a001']);
+  expect(ctx.db.query("SELECT label, text FROM run_notes WHERE issue = 'GEO-9801'").all()).toStrictEqual([
+    { label: 'wrap-up', text: 'Wrap-up: failed 0000a001 (atc did not forget the session after the confirmed destroy; pinned it again).' },
+  ]);
+  expect(getRun(ctx.db, 'GEO-9801')?.state).toBe('done');
+});
+
+test('a refused confirmed destroy whose pin atc also refuses records both failures', async () => {
+  const ctx = setupTest();
+  addRun(ctx.db, { issue: 'GEO-9801', title: 'Invented kettle descaler', place: 'imp', session: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
+  setState(ctx.db, 'GEO-9801', 'done', {}, 'z-delivery');
+  const fleet = buildStubFleetClient({
+    sessions: [{ id: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, cwd: '/workspace/kettle' }],
+    forgets: { '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa': [{ forgotten: false, confirmToken: 'token-kettle' }, { forgotten: false }] },
+    pinFailures: ['0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa'],
+  });
+
+  const wrapUp = await runWrapUp(ctx.db, { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.resolve({ state: 'pushed' }) }, 'GEO-9801', 'z-delivery');
+
+  expect(wrapUp).toStrictEqual({
+    forgotten: [],
+    destroyed: [],
+    kept: [],
+    failed: [{ id: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', reason: 'atc did not forget the session after the confirmed destroy; pinning it again failed too (atc refused the pin)' }],
+  });
+  expect(fleet.calls).toStrictEqual(['unpin 0000a001', 'kill 0000a001', 'forget 0000a001', 'forget 0000a001 token-kettle', 'pin 0000a001']);
+});
