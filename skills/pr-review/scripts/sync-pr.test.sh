@@ -16,11 +16,21 @@ trap 'rm -rf "$work"' EXIT
 # its rows; HEAD_TEXT and SOURCE_TEXT are
 # the PR head's and tools main's content of a workflow caller. BASE_BLOB is a
 # file's blob at the PR base, and the manifest at tools commit old1 also syncs
-# .claude/skills/y/SKILL.md, which tools main has retired.
+# .claude/skills/y/SKILL.md, which tools main has retired. A file read is parsed as an
+# HTTP client does: a fragment never reaches the server, the path is percent-decoded,
+# and a read with no ref gets the default branch, whose blob is default-<repo>.
 cat >"$work/gh" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 args="$*"
+if [[ ${2:-} == repos/*/contents/* && ${2:-} != */sync/manifest.json* ]]; then
+  url=${2%%#*}
+  path=${url%%\?*}
+  query=
+  [[ $url != *\?* ]] || query=${url#*\?}
+  [[ $query =~ (^|&)ref=([^&]*) ]] || { name=${path%%/contents/*}; echo "default-${name##*/}"; exit 0; }
+  args="api $(printf '%b' "${path//%/\\x}")?ref=${BASH_REMATCH[2]} ${*:3}"
+fi
 case $args in
   "pr view"*)
     printf '{"state":"%s","author":{"login":"%s"},"headRefName":"%s","headRefOid":"head1","baseRefOid":"base1"}\n' "$STATE" "$AUTHOR" "$BRANCH" ;;
@@ -28,7 +38,7 @@ case $args in
   "api repos/zgeoff/tools/contents/sync/manifest.json?ref=old1"*)
     printf '[{"name":"skill-y","files":[{"source":"sync/skills/y/SKILL.md","target":".claude/skills/y/SKILL.md"}]}]' | base64 ;;
   "api repos/zgeoff/tools/contents/sync/manifest.json"*)
-    printf '[{"name":"skill-x","files":[{"source":"sync/skills/x/SKILL.md","target":".claude/skills/x/SKILL.md"}]},{"name":"callers","files":[{"source":"sync/workflow-callers/pr.yml","target":".github/workflows/pr.yml"}]}]' | base64 ;;
+    printf '[{"name":"skill-x","files":[{"source":"sync/skills/x/SKILL.md","target":".claude/skills/x/SKILL.md"}]},{"name":"callers","files":[{"source":"sync/workflow-callers/pr.yml","target":".github/workflows/pr.yml"}]},{"name":"skill-odd","files":[{"source":"sync/skills/odd/odd #1?%%41.md","target":".claude/skills/odd/odd #1?%%41.md"}]}]' | base64 ;;
   *"--jq .content"*)
     [ -z "${TEXT_FAIL:-}" ] || { echo "HTTP 502" >&2; exit 1; }
     case $args in
@@ -147,6 +157,10 @@ set_case
 export FILES_FAIL=1
 expect "a changed-file list that fails after some rows fails" 1 "no: the PR's changed files could not be read: HTTP 502 on page 2"
 unset FILES_FAIL
+
+set_case
+export FILES='.claude/skills/odd/odd #1?%41.md\tmodified'
+expect "a synced file whose name holds #, ? and % is read at its own path and ref" 0 "ok: 1 files"
 
 set_case
 export STATE=MERGED
