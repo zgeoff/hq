@@ -4,6 +4,7 @@ import { writeIssues } from '../linear/write-issues.ts';
 import { addPr } from './add-pr.ts';
 import { addRun } from './add-run.ts';
 import { closePr } from './close-pr.ts';
+import { findAlerts } from './find-alerts.ts';
 import { readClosedIssueAlerts } from './read-closed-issue-alerts.ts';
 import { setLiveCheck } from './set-live-check.ts';
 import { setState } from './set-state.ts';
@@ -104,4 +105,19 @@ test('it skips a run hq already closed', () => {
   ctx.closeInLinear('GEO-9831', 'completed');
 
   expect(readClosedIssueAlerts(ctx.db)).toStrictEqual([]);
+});
+
+test('the sweep\'s alert list carries the closed-issue alert', () => {
+  const ctx = setupTest();
+  ctx.addKettleRun('GEO-9832');
+  ctx.closeInLinear('GEO-9832', 'completed');
+
+  expect(findAlerts(ctx.db, [], new Map(), new Date('2026-10-21T03:00:00Z'))).toStrictEqual([
+    {
+      key: 'linear:GEO-9832',
+      fingerprint: 'completed:working',
+      issue: 'GEO-9832',
+      line: 'GEO-9832: Done in Linear while hq has it working; done with no merged PR: hq run done GEO-9832 or hq run drop GEO-9832',
+    },
+  ]);
 });
