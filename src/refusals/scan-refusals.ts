@@ -74,11 +74,18 @@ export async function scanRefusals(db: Database, o: ScanOptions = {}): Promise<S
     const found: Found[] = [];
     // A whole line. A scan that resumed mid-line (after an oversized one) gets a fragment here,
     // which fails to parse and is skipped.
+    // The two checks are independent: a tool_use whose input quotes the refusal mark is still a
+    // tool_use that a later refusal names.
     const line = (b: Buffer) => {
+      if (b.includes(useB)) {
+        for (const use of toolUses(b.toString('utf8'))) {
+          remember(tools, use);
+        }
+      }
       if (b.includes(markB)) {
         const x = refusalOf(b.toString('utf8'), tools);
         if (x) found.push(x);
-      } else if (b.includes(useB)) for (const e of toolUses(b.toString('utf8'))) remember(tools, e);
+      }
     };
     let [pos, carry, carryLen, skipping, left] = [offset, [] as Buffer[], 0, false, false];
     const from = offset;

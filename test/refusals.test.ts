@@ -62,6 +62,12 @@ test('a refusal is found by its structured field, with the tool, input and reaso
   expect(JSON.stringify(rows())).not.toContain('drop me');
 });
 
+test('it names the tool of a refused call whose input quotes the refusal mark', async () => {
+  file('p/s.jsonl', jl(tu('toolu_5', 'Bash', { command: 'rg automode-blocked trace.jsonl' }), refused('toolu_5', 'reading transcripts')));
+  await scan();
+  expect(rows().map((x) => [x['tool'], x['input'], x['reason']])).toStrictEqual([['Bash', 'rg automode-blocked trace.jsonl', 'reading transcripts']]);
+});
+
 test('input is the command or the path; any other tool shows nothing; the reason may be absent or in text parts', async () => {
   const parts = refused('toolu_4', null);
   (parts.message.content[0] as { content: unknown }).content = [{ type: 'text', text: 'Blocked.\nReason: the part reason\n' }];
