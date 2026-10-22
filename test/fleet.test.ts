@@ -4,6 +4,7 @@ import type { Database } from 'bun:sqlite';
 import { mkdirSync, symlinkSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { claimMissing } from '../src/fleet/claim-missing.ts';
+import { checkRcMarker } from '../src/fleet/check-rc-marker.ts';
 import { claimTyping } from '../src/fleet/claim-typing.ts';
 import { declaredFleet } from '../src/fleet/declared-fleet.ts';
 import { ensureFleet } from '../src/fleet/ensure-fleet.ts';
@@ -610,6 +611,28 @@ test('the helper loops until the session is done, then types and tells z-stu thr
   expect(step).toMatchObject({ action: 'remote control' });
   expect(told().at(-1)).toBe('hq fleet: z-kettle id-k: typed /remote-control z-kettle; Remote Control is on.');
   expect(await rcWatch(db, f.client, f.rc, 'z-kettle', 'hq-fleet')).toBeNull(); // no marker: quiet
+});
+
+test('it queues the Remote Control report in the transaction that removes the marker', async () => {
+  const stub = rcFake(buildKettle('done'), [ON]);
+  mark();
+  atMin(5);
+
+  const result = await checkRcMarker(db, { client: stub.client, rc: stub.rc, name: 'z-kettle', known: {}, actor: 'hq-fleet', replaced: 'finish' });
+
+  expect(result.kind).toBe('done');
+  expect(pending()).toStrictEqual({});
+  expect(told()).toStrictEqual(['hq fleet: z-kettle id-k: Remote Control was already on; hq typed nothing.']);
+});
+
+test('it reports a Remote Control result from the 5-minute check once', async () => {
+  const stub = rcFake(buildKettle('done'), [ON]);
+  mark();
+  atMin(5);
+
+  await ensure(stub);
+
+  expect(told()).toStrictEqual(['hq fleet: z-kettle id-k: Remote Control was already on; hq typed nothing.']);
 });
 
 test('the helper exits quietly when the marker is replaced by a newer spawn', async () => {

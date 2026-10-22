@@ -1,10 +1,16 @@
 import type { Database } from 'bun:sqlite';
 import { logEvent } from '../log-event.ts';
+import { owner } from '../owner.ts';
+import { isQuiet } from '../clock/is-quiet.ts';
 import { iso } from '../clock/iso.ts';
 import { now } from '../clock/now.ts';
+import { metaJson } from '../db/meta-json.ts';
 import { setMeta } from '../db/set-meta.ts';
+import { enqueue } from '../outbox/enqueue.ts';
 import type { RcState } from '../rc/types.ts';
 import { claimTyping } from './claim-typing.ts';
+import { formatStep } from './format-step.ts';
+import { HELD } from './held.ts';
 import { loadRcPending as rcPending } from './load-rc-pending.ts';
 import { RC_MAX_MIN } from './rc-max-min.ts';
 import { RC_PENDING } from './rc-pending.ts';
@@ -85,7 +91,9 @@ function releaseTyping(db: Database, name: string, id: string): void {
   }).immediate();
 }
 
-// Ends a marker: removes it, logs one event. Null when the marker is gone or belongs to another spawn.
+// Ends a marker: removes it, logs one event, and queues its report in the same transaction, so a
+// process that stops after the removal cannot lose the report. Null when the marker is gone or
+// belongs to another spawn.
 function rcFinish(db: Database, name: string, p: RcPending, action: EnsureStep['action'], text: string, data: Record<string, unknown>, actor: string, claim: string | undefined = p.typedAt, alarm?: string): RcEval {
   const sid = p.id.slice(0, 8);
   return db
@@ -96,7 +104,19 @@ function rcFinish(db: Database, name: string, p: RcPending, action: EnsureStep['
       if (cur.typedAt !== claim) return { kind: 'wait' };
       setPending(db, name, null);
       const seq = logEvent(db, 'hq', 'fleet', 'remote-control', actor, null, null, { name, id: p.id, ...data });
-      return { kind: 'done', seq, step: { name, action, detail: `${sid}: ${text}`, message: alarm ?? `${name} ${sid}: ${text}`, id: p.id, ...(alarm ? { urgent: true } : {}) } };
+      const step: EnsureStep = { name, action, detail: `${sid}: ${text}`, message: alarm ?? `${name} ${sid}: ${text}`, id: p.id, ...(alarm ? { urgent: true } : {}) };
+      deliverStep(db, seq, step);
+      return { kind: 'done', seq, step };
     })
     .immediate();
+}
+
+// Quiet hours hold the report, as they hold ensure's; an urgent one goes out at once.
+function deliverStep(db: Database, seq: number, step: EnsureStep): void {
+  const text = `hq fleet: ${formatStep(step)}.`;
+  if (isQuiet(now()) && !step.urgent) {
+    setMeta(db, 'fleet_held', JSON.stringify([...metaJson(db, 'fleet_held', HELD, []), { seq, text }]));
+    return;
+  }
+  enqueue(db, seq, owner(), text);
 }

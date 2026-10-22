@@ -199,6 +199,7 @@ async function ensureOnce(db: Database, client: FleetClient, opts: { dryRun: boo
       steps.push({ name: e.name, action: 'failed', detail: String((err as Error).message ?? err) });
     }
   }
+  const rcReported = new Set<EnsureStep>();
   if (!opts.dryRun && opts.rc) {
     // The helper reads the known ids, so they are stored before it starts.
     if (helpers.length) setMeta(db, 'fleet_ids', JSON.stringify(known));
@@ -206,13 +207,17 @@ async function ensureOnce(db: Database, client: FleetClient, opts: { dryRun: boo
       const err = await startHelper(opts.rc, h.name);
       if (err) h.step.detail += `; the Remote Control helper did not start (${err}), so the next 5-minute check does it`;
     }
-    steps.push(...(await remoteControlTick(db, client, opts.rc, known, opts.actor)));
+
+    // Each marker's report is queued as the marker ends, so ensure's own message leaves it out.
+    const reported = await remoteControlTick(db, client, opts.rc, known, opts.actor);
+    steps.push(...reported);
+    reported.forEach((step) => rcReported.add(step));
   }
   db.transaction(() => {
     setMeta(db, 'fleet_missing_since', JSON.stringify(missing));
     setMeta(db, 'fleet_ids', JSON.stringify(known));
     setMeta(db, 'fleet_last', JSON.stringify({ at: iso(t), dryRun: opts.dryRun, steps }));
-    const told = steps.filter((s) => s.action === 'spawned' || s.action === 'failed' || s.action === 'duplicates' || s.action === 'remote control');
+    const told = steps.filter((step) => !rcReported.has(step) && (step.action === 'spawned' || step.action === 'failed' || step.action === 'duplicates' || step.action === 'remote control'));
     if (!opts.dryRun && told.length) {
       const seq = logEvent(db, 'hq', 'fleet', 'ensured', opts.actor, null, null, { steps: told });
       const text = `hq fleet: ${told.map(sayStep).join('; ')}.`;
