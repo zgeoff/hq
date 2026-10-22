@@ -1,7 +1,9 @@
 // Lints only the lines a branch changes against its base: hq takes the shared rules unchanged, and
 // its older code comes into line as it is touched. A new file is linted whole, except for code the
-// branch only moved: a run of 3 or more added lines, each matching a line the branch deletes.
+// branch only moved: a run of 3 or more added lines, each matching a line the branch deletes. A
+// branch onto a base with no package.json imports the tree into an empty repo, and lints nothing.
 import { spawnSync } from 'node:child_process';
+import { probeImportBase } from './probe-import-base.ts';
 import { readDiff } from './read-diff.ts';
 
 interface Diagnostic {
@@ -170,6 +172,10 @@ function printFound(found: readonly Diagnostic[], files: readonly string[], base
 }
 
 function runMain(base: string): number {
+  if (probeImportBase(base)) {
+    console.log(`lint:changed: the merge base with ${base} holds no package.json, so this branch imports the tree and changes no linted line`);
+    return 0;
+  }
   const changes = parseChanges(readDiff(base)),
     files = [...new Set([...changes.lines.keys(), ...changes.whole])];
   if (files.length === 0) {
