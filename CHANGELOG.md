@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.86.0 — 2026-10-23
+
+`/hq close` closes the hq pane in z-stu's session. Before, it opened the pane again, so the pane could not be closed.
+
+- `/hq` still opens the pane, and its argument hint now shows `[close]`.
+
 ## 0.85.0 — 2026-10-23
 
 hq-defs gets its dependencies, so the repo's scripts run there (z-steward: `check:skills` failed in hq-defs with "Cannot find package 'ts-pattern'").

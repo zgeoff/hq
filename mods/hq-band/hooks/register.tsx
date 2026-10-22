@@ -24,7 +24,7 @@ export function register(on: On): void {
         await update($, LIVE, () => true);
         await refreshAll($);
         $.clock.every(REFRESH_MS, () => refreshAll($));
-        await $.command.register({ name: 'hq', description: "The fleet in detail: what needs you, Nix, lanes, reviews, today's merges, news" });
+        await $.command.register({ name: 'hq', description: "The fleet in detail: what needs you, Nix, lanes, reviews, today's merges, news", argumentHint: '[close]' });
       }
     } catch {
       // A whois that fails or times out leaves the band inert for the session.
@@ -36,6 +36,10 @@ export function register(on: On): void {
     const isLive = await read($, LIVE);
     if (!isLive) {
       return next(e);
+    }
+    if (e.args.trim() === 'close') {
+      await $.ui.close({ id: PANE_ID });
+      return { text: 'Closed the hq pane.' };
     }
     await refreshPane($);
     await $.ui.open({ id: PANE_ID, title: 'hq' });
