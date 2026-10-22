@@ -4,8 +4,6 @@ The z- sessions' own tool for running the system: typed state objects with
 transitions, `--json` on every command, and atc messages to the sessions a
 change matters to. Built and kept by z-q.
 
-Throwaway by design: hq retires when nixie runs skills and jobs itself (GEO-235).
-
 - Runtime: Bun + TypeScript, `bun:sqlite` in WAL mode.
 - Binary: `~/.local/bin/hq` (`bun run install-bin`).
 - Database: `~/.local/share/z-sessions/hq.db` (override with `HQ_DB`).
