@@ -1,7 +1,7 @@
 import { createReadStream, existsSync } from 'node:fs';
 import { createInterface } from 'node:readline';
-import { z } from 'zod';
 import { transcriptPath } from '../repair/transcript-path.ts';
+import { isCompactionBoundary } from './is-compaction-boundary.ts';
 import type { FleetSession } from './types.ts';
 
 // The compactions in a session's Claude Code transcript: each writes a system entry of subtype
@@ -22,24 +22,13 @@ export async function readCompactionCount(session: FleetSession, fallbackCwd: st
   }
 }
 
-const MARK = '"compact_boundary"';
-
+// The file read: each line goes to isCompactionBoundary, which holds the decision.
 async function readBoundaryCount(path: string): Promise<number> {
   let count = 0;
   for await (const line of createInterface({ input: createReadStream(path), crlfDelay: Infinity })) {
-    if (line.includes(MARK) && isBoundary(line)) {
+    if (isCompactionBoundary(line)) {
       count += 1;
     }
   }
   return count;
-}
-
-const boundarySchema = z.looseObject({ type: z.literal('system'), subtype: z.literal('compact_boundary') });
-
-function isBoundary(line: string): boolean {
-  try {
-    return boundarySchema.safeParse(JSON.parse(line)).success;
-  } catch {
-    return false;
-  }
 }
