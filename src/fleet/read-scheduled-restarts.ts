@@ -1,5 +1,6 @@
 import type { Database } from 'bun:sqlite';
 import { collectScheduledSessions } from './collect-scheduled-sessions.ts';
+import { isCompactionBoundary } from './is-compaction-boundary.ts';
 import { pickScheduledReason } from './pick-scheduled-reason.ts';
 import { recordSessionStarts } from './record-session-starts.ts';
 import type { FleetEntry, FleetSession, TranscriptReader } from './types.ts';
@@ -35,6 +36,22 @@ async function readDueReason(transcripts: TranscriptReader, entry: FleetEntry, s
   if (byAge !== null) {
     return byAge;
   }
-  const compactions = await transcripts.compactions(session, entry.cwd);
+  const compactions = await readCompactions(transcripts, entry, session);
   return pickScheduledReason(ageMs, compactions);
+}
+
+// The compactions since the session started: its transcript starts with it, so every boundary
+// counts. 0 when the transcript cannot be read.
+async function readCompactions(transcripts: TranscriptReader, entry: FleetEntry, session: FleetSession): Promise<number> {
+  let count = 0;
+  try {
+    for await (const line of transcripts.lines(session, entry.cwd)) {
+      if (isCompactionBoundary(line)) {
+        count += 1;
+      }
+    }
+  } catch {
+    return 0;
+  }
+  return count;
 }

@@ -17,7 +17,7 @@ import type { MessageLookup, MessageReply } from './parse-message-reply.ts';
 import { pickAskedOutcome } from './pick-asked-outcome.ts';
 import type { AskedAnswer, AskedOutcome } from './pick-asked-outcome.ts';
 import { promptDrift } from './prompt-drift.ts';
-import { readCompactionCount } from './read-compaction-count.ts';
+import { readTranscriptLines } from './read-transcript-lines.ts';
 import { readScheduledRestarts } from './read-scheduled-restarts.ts';
 import { recordStaleSince } from './record-stale-since.ts';
 import { refreshSchema } from './refresh-schema.ts';
@@ -90,7 +90,7 @@ async function readStalePass(db: Database, client: FleetClient & StaleOps, opts:
     sessions: view.sessions,
     drift: view.drift,
     stale: recordStaleSince(db, view.drift, toLiveIDs(view.sessions)),
-    scheduled: await readScheduledRestarts({ db, transcripts: { compactions: readCompactionCount } }, opts.fleet, view.sessions, time.getTime()),
+    scheduled: await readScheduledRestarts({ db, transcripts: { lines: readTranscriptLines } }, opts.fleet, view.sessions, time.getTime()),
     refresh: metaJson(db, 'fleet_refresh', refreshSchema, {}),
     restarted: [],
     acted: false,

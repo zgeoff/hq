@@ -14,9 +14,10 @@ function setupTest(compactions: number) {
     delivery,
     read,
     transcripts: {
-      compactions: (session: FleetSession, fallbackCwd: string) => {
+      async *lines(session: FleetSession, fallbackCwd: string) {
         read.push(`${session.id} ${fallbackCwd}`);
-        return Promise.resolve(compactions);
+        yield '{"type":"user","message":{"content":"warm the kettle"}}';
+        yield* Array.from({ length: compactions }, () => '{"type":"system","subtype":"compact_boundary"}');
       },
     },
   };

@@ -38,7 +38,7 @@ export interface DriftClient {
 
 // Reads a session's compaction count from its Claude Code transcript, in its cwd or the entry's.
 export interface TranscriptReader {
-  compactions: (session: FleetSession, fallbackCwd: string) => Promise<number>;
+  lines: (session: FleetSession, fallbackCwd: string) => AsyncIterable<string>;
 }
 
 export interface FleetSession {
