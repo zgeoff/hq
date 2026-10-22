@@ -2,8 +2,11 @@ import { realRunner } from '../src/runner/real-runner.ts';
 import type { RunResult, Runner } from '../src/runner/types.ts';
 
 export interface StubImpAnswers {
-  imps: string[]; // the names `imp ls --json` lists
-  exec?: RunResult; // what `imp exec` answers; without it, the command after `--` runs here
+  // the names `imp ls --json` lists
+  imps: string[];
+
+  // what `imp exec` answers; without it, the command after `--` runs here
+  exec?: RunResult;
 }
 
 export interface StubImpRunner {

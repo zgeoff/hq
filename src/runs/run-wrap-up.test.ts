@@ -26,7 +26,7 @@ test('done forgets the run session and its sub-session, the sub-session first, a
       { id: '0000a003-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'teapot-agent', alive: true },
     ],
   });
-  const readImpWork = mock((_session: FleetSession) => Promise.resolve<ImpWork>({ state: 'pushed' }));
+  const readImpWork = mock<(session: FleetSession) => Promise<ImpWork>>(() => Promise.resolve({ state: 'pushed' }));
 
   const wrapUp = await runWrapUp(ctx.db, { openClient: () => Promise.resolve(fleet.client), readImpWork }, 'GEO-9801', 'z-delivery');
 
@@ -62,7 +62,7 @@ test('done keeps an imp that holds unpushed work, with its session and sub-sessi
       { id: '0000a002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-helper', alive: true, parent: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', cwd: '/workspace/kettle' },
     ],
   });
-  const readImpWork = mock((_session: FleetSession) => Promise.resolve<ImpWork>({ state: 'unpushed', detail: 'home-0000a001aaaa4aaa8aaa: 3f2a1bc add kettle lid' }));
+  const readImpWork = mock<(session: FleetSession) => Promise<ImpWork>>(() => Promise.resolve({ state: 'unpushed', detail: 'home-0000a001aaaa4aaa8aaa: 3f2a1bc add kettle lid' }));
 
   const wrapUp = await runWrapUp(ctx.db, { openClient: () => Promise.resolve(fleet.client), readImpWork }, 'GEO-9801', 'z-delivery');
 

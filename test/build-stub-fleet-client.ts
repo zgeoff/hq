@@ -7,12 +7,16 @@ export interface StubFleetAnswers {
 
   // per session id, what its forget calls answer in turn; a forget past the list forgets the session
   forgets?: Record<string, ForgetAnswer[]>;
-  pinFailures?: string[]; // session ids whose pin atc refuses
+
+  // session ids whose pin atc refuses
+  pinFailures?: string[];
 }
 
 export interface StubFleetClient {
   client: FleetClient & StaleOps;
-  calls: string[]; // each pin, unpin, kill and forget in order, as `<verb> <first 8 of the id>[ <token>]`
+
+  // each pin, unpin, kill and forget in order, as `<verb> <first 8 of the id>[ <token>]`
+  calls: string[];
 }
 
 // An atc fleet client that lists the given sessions and answers the wrap-up's session operations.

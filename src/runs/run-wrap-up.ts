@@ -54,7 +54,8 @@ async function resolveSessionIDs(ids: string[], sessions: FleetSession[], wrapUp
   const fullIDs: string[] = [];
   for (const id of ids) {
     try {
-      fullIDs.push(await fullSessionId(() => Promise.resolve(sessions), id));
+      const fullID = await fullSessionId(() => Promise.resolve(sessions), id);
+      fullIDs.push(fullID);
     } catch (error) {
       if (!(error instanceof HqError && error.code === 'no_such_session')) {
         wrapUp.failed.push({ id, reason: toMessage(error) });
@@ -62,6 +63,10 @@ async function resolveSessionIDs(ids: string[], sessions: FleetSession[], wrapUp
     }
   }
   return fullIDs;
+}
+
+function toMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 interface TreePass {
@@ -129,10 +134,6 @@ async function readImpWorkSafely(deps: WrapUpDeps, session: FleetSession): Promi
   } catch (error) {
     return { state: 'unknown', detail: toMessage(error) };
   }
-}
-
-function toMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
 
 // Stops the session and forgets it; when atc asks to confirm the destroy of its imp, confirms it.
