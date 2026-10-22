@@ -89,23 +89,47 @@ never will.
 
 **Never:** runs a branch build of hq against the live database.
 
-## How a change moves
+## A day in the life
+
+On 22 October noslop, the reviewer behind the merge gate, told the Toolsmith that at least 11 real
+fixes on one hq PR were "not fixed". Each fix was real, but each one sat in a file the check never
+read: a helper, or a file that replaced the one the finding named. Each false alarm cost a hand
+read. Stu called it the biggest review win of the week. This is how the crew shipped the fix:
 
 ```mermaid
 flowchart LR
-  issue[New issue] --> sieve[Sieve shapes it]
-  sieve --> lane[z-delivery puts it in a lane]
-  lane --> agent[An agent opens a PR]
-  agent --> review[noslop reviews]
-  review --> gate{Gatekeeper's gate}
-  gate -- a finding is open --> agent
-  gate -- green --> release[Release]
-  release --> qa[The Second Look checks it live]
-  qa --> done[Done]
+  report[11 false alarms<br/>on an hq PR] --> issue[Issue GEO-1669<br/>with 4 acceptance tests]
+  issue --> agent[z-delivery<br/>briefs an agent]
+  agent --> pr[noslop#126]
+  pr --> review[noslop reviews<br/>its own fix]
+  review --> gate{Gatekeeper's<br/>merge gate}
+  gate -- open finding --> agent
+  gate -- green --> release[noslop 0.4.18<br/>released]
+  release --> qa[The Second Look<br/>checks it live]
+  qa --> done[Closed]
 ```
 
-hq records each step, so any session can ask where a run stands and what it waits on. When a step
-needs the owner, Sieve writes the call, Stu asks it, and hq times how long the answer took.
+The issue went from filed to closed in under 2 hours. On the way, noslop found 5 problems in its own
+fix, and the agent fixed each one in its own commit before the gate let it through. The Second Look
+ran all 4 acceptance tests, confirmed the release on npm with provenance, and checked that hq's
+review pin used it before it closed the issue. hq kept each step on record: the run, its PR, the
+review rounds, the merge and the release.
+
+## The gadgets
+
+- **One call at a time.** When a decision needs the owner, Sieve writes it up as a call and hq
+  queues it. Stu opens exactly one at a time, and hq times the wait.
+- **The merge gate.** `hq review gate` passes a PR only on green CI with every review finding
+  answered. Gatekeeper merges on that and nothing less.
+- **The unblock list.** Work that waits on something gets an unblock item with a condition, such
+  as a release. hq closes the item by itself once the condition holds.
+- **Named grants.** A standing permission from the owner is a named grant, and every act under it
+  is logged. Each week the owner sees every grant with what ran under it, and which went unused.
+- **Fresh prompts.** When a session's start prompt changes on `main`, hq waits for a quiet moment,
+  asks the session to save its state, and restarts it on the new prompt. It never interrupts a
+  session at work.
+- **Quiet hours.** hq refuses to restart the crew's daemon from 23:00 to 08:00 Sydney time, and Stu
+  sends the owner nothing from 03:00 to 07:00.
 
 ## Quick start
 
@@ -127,8 +151,7 @@ calls: 137 applied, 3 closed, 2 skipped · proposals: 56 applied, 2 closed
 unblock: 2 open, 0 new since push
 ```
 
-And this is the line Gatekeeper waits for before a merge, from the PR that taught hq atc's
-protocol 11:
+And this is the line Gatekeeper waits for before a merge:
 
 ```text
 $ hq review gate hq 9
