@@ -72,3 +72,25 @@ test('a check that exits nonzero, a folder that is no clone, a missing imp or a 
   expect(noImp).toStrictEqual({ state: 'unknown', detail: 'no imp ends with 0000d001aaaa4aaa8aaa' });
   expect(noFolder).toStrictEqual({ state: 'unknown', detail: 'atc gave no working directory for the session' });
 });
+
+test('an uncommitted change in a second worktree whose path holds a space is unpushed work', async () => {
+  const app = setupTest('local');
+  const tree = join(app.clone, '..', 'kettle spout');
+  app.git(['-C', app.clone, 'worktree', 'add', '-q', '-b', 'spout', tree]);
+  writeFileSync(join(tree, 'spout.ts'), 'export const spout = 1;\n');
+
+  const work = await readImpWork(app.run, app.session, app.clone);
+
+  expect(work).toStrictEqual({ state: 'unpushed', detail: `home-0000b001aaaa4aaa8aaa: ${tree}: ?? spout.ts` });
+});
+
+test('a worktree whose status check fails gives no answer, even when every other check passes', async () => {
+  const app = setupTest('local');
+  const tree = join(app.clone, '..', 'kettle-handle');
+  app.git(['-C', app.clone, 'worktree', 'add', '-q', '-b', 'handle', tree]);
+  rmSync(tree, { recursive: true, force: true });
+
+  const work = await readImpWork(app.run, app.session, app.clone);
+
+  expect(work.state).toBe('unknown');
+});

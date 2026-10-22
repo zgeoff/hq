@@ -5,11 +5,20 @@ import type { ImpWork } from './types.ts';
 const impListSchema = z.array(z.looseObject({ name: z.string() }));
 
 // Lists each worktree's uncommitted changes, then the commits that no remote branch holds. Any
-// line out means unpushed work; a failed step exits nonzero.
+// line out means unpushed work. Each git call's failure exits the script nonzero: no git call runs
+// inside a pipe, whose status would be the last command's.
 const CHECK_SCRIPT = [
   'set -eu',
   'cd "$1"',
-  'for tree in $(git worktree list --porcelain | sed -n "s/^worktree //p"); do git -C "$tree" status --porcelain | sed "s|^|$tree: |"; done',
+  'trees=$(git worktree list --porcelain) || exit 1',
+  'printf "%s\\n" "$trees" | while IFS= read -r line; do',
+  '  case "$line" in "worktree "*) ;; *) continue ;; esac',
+  '  tree=${line#worktree }',
+  '  changes=$(git -C "$tree" status --porcelain) || exit 1',
+  '  printf "%s\\n" "$changes" | while IFS= read -r change; do',
+  '    if [ -n "$change" ]; then printf "%s: %s\\n" "$tree" "$change"; fi',
+  '  done',
+  'done',
   'git log --oneline HEAD --branches --not --remotes',
 ].join('\n');
 
