@@ -1657,9 +1657,9 @@ async function backupCommand(db: Database, verb: string | undefined, args: strin
       const dir = `${process.env['HOME']}/.config/systemd/user`;
       if (args[0] === 'install') {
         const p = ensurePassword();
-        const u = timerUnits(selfCommand().join(' '));
-        await Bun.write(`${dir}/${BACKUP_UNIT}.service`, u.service);
-        await Bun.write(`${dir}/${BACKUP_UNIT}.timer`, u.timer);
+        const units = timerUnits(selfCommand().join(' '), process.env);
+        await Bun.write(`${dir}/${BACKUP_UNIT}.service`, units.service);
+        await Bun.write(`${dir}/${BACKUP_UNIT}.timer`, units.timer);
         for (const cmd of [['daemon-reload'], ['enable', '--now', `${BACKUP_UNIT}.timer`]]) {
           const r = await realRunner(['systemctl', '--user', ...cmd], { env: cleanEnv() });
           if (r.code !== 0) throw new HqError('timer_failed', `systemctl --user ${cmd.join(' ')}: ${(r.stderr || r.stdout).trim()}`);
