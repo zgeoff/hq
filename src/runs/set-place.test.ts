@@ -15,9 +15,9 @@ test('it moves an open run to another place and logs the move with its note', ()
   const ctx = setupTest();
   addRun(ctx.db, { issue: 'GEO-9891', title: 'Descale the kettle', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: null, actor: 'z-delivery' });
 
-  const run = setPlace(ctx.db, { issue: 'GEO-9891', place: 'local', note: 'its session runs on this host', actor: 'z-delivery' });
+  const placed = setPlace(ctx.db, { issue: 'GEO-9891', place: 'local', note: 'its session runs on this host', actor: 'z-delivery' });
 
-  expect(run.place).toBe('local');
+  expect(placed).toMatchObject({ ok: true, run: { place: 'local' } });
   expect(ctx.db.query("SELECT actor, from_state, to_state, data FROM events WHERE subject_id = 'GEO-9891' AND action = 'place'").all()).toStrictEqual([
     { actor: 'z-delivery', from_state: 'imp', to_state: 'local', data: JSON.stringify({ note: 'its session runs on this host' }) },
   ]);
@@ -51,13 +51,13 @@ test('it refuses a place that is not imp, local or none as bad_args', () => {
   const ctx = setupTest();
   addRun(ctx.db, { issue: 'GEO-9891', title: 'Descale the kettle', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: null, actor: 'z-delivery' });
 
-  expect(() => setPlace(ctx.db, { issue: 'GEO-9891', place: 'cloud', note: null, actor: 'z-delivery' })).toThrow(expect.objectContaining({ code: 'bad_args', message: 'place must be imp, local or none, not "cloud"' }));
+  expect(setPlace(ctx.db, { issue: 'GEO-9891', place: 'cloud', note: null, actor: 'z-delivery' })).toStrictEqual({ ok: false, refusal: 'place must be imp, local or none, not "cloud"' });
 });
 
 test('it refuses the place the run already has, and logs nothing', () => {
   const ctx = setupTest();
   addRun(ctx.db, { issue: 'GEO-9893', title: 'Fill the kettle', place: 'local', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: null, actor: 'z-delivery' });
 
-  expect(() => setPlace(ctx.db, { issue: 'GEO-9893', place: 'local', note: null, actor: 'z-delivery' })).toThrow(expect.objectContaining({ code: 'bad_args', message: 'GEO-9893 is already local' }));
+  expect(setPlace(ctx.db, { issue: 'GEO-9893', place: 'local', note: null, actor: 'z-delivery' })).toStrictEqual({ ok: false, refusal: 'GEO-9893 is already local' });
   expect(ctx.db.query("SELECT count(*) AS total FROM events WHERE action = 'place'").get()).toStrictEqual({ total: 0 });
 });

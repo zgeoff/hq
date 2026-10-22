@@ -920,7 +920,10 @@ ${r.result === 'added' ? 'On the board.' : 'Already on the board.'}` };
     case 'place': {
       const actorName = await by();
       const placed = setPlace(db, { issue: arg(0, 'issue'), place: arg(1, 'place (imp, local or none)'), note: flags.note ?? null, actor: actorName });
-      return { data: { run: placed }, text: `${runLine(placed)}\nNow ${placed.place}.` };
+      if (!placed.ok) {
+        throw new HqError('bad_args', placed.refusal);
+      }
+      return { data: { run: placed.run }, text: `${runLine(placed.run)}\nNow ${placed.run.place}.` };
     }
     case 'geoff-chat': {
       const r = setGeoffChat(db, arg(0, 'issue'), arg(1, 'on or off') === 'on', await by());
