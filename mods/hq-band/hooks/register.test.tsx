@@ -56,9 +56,10 @@ interface HqAnswers {
 
 // hq answering from `answers`, the environment of an atc session, a clock the test moves, and the
 // engine's own band beneath the plugin. Returns the argv and time limit of every run hq got, and
-// the commands the mod registered and the panes it opened.
+// the commands the mod registered and the panes it opened and closed.
 function setupTest(on: On, answers: HqAnswers) {
   const clock = mock.clock(on),
+    closed: string[] = [],
     commands: string[] = [],
     limits: (number | undefined)[] = [],
     opened: string[] = [],
@@ -78,12 +79,16 @@ function setupTest(on: On, answers: HqAnswers) {
     opened.push(e.id);
     return { value: { isPlaced: true } };
   });
+  on('ui.close', (_$, pane) => {
+    closed.push(pane.id);
+    return { value: undefined };
+  });
   on('command.run', () => ({ text: 'the engine answered' }));
   on('ui.render', { component: 'AbovePrompt' }, ($, e) => {
     const elements = $.ui.resolve(e);
     return <elements.Box key="engine" />;
   });
-  return { ran, limits, commands, opened, clock };
+  return { ran, limits, commands, opened, closed, clock };
 }
 
 for (const [name, whois] of INERT) {
@@ -133,6 +138,16 @@ test('in z-stu /hq opens a pane: the heat map as a Raster on the terminal, block
     shownRaster = await paneTerminal.find({ key: 'heat-cleanup' }),
     shownText = await paneDesktop.find({ key: 'heat-cleanup' });
   expect([app.commands, app.opened, opened.text, shownBand?.type, shownRaster?.type, shownText?.text, shownDetail?.text]).toEqual([['hq'], ['hq'], 'Opened the hq pane.', 'Box', 'Raster', '████░░', PANE.markdown]);
+});
+
+// The rule knows only bun:test's `test`, not the one claude-code/testing exports.
+// oxlint-disable-next-line zgeoff/setup-test-only
+test('in z-stu /hq close closes the hq pane and opens none', async ($, on) => {
+  const app = setupTest(on, { whois: STU_WHOIS, band: WORKING_BAND, pane: WORKING_PANE });
+  await openBand($, app, { advanceMs: 0, hasSurvey: false });
+  await $.command.run(HQ_RUN);
+  const ran = await $.command.run({ ...HQ_RUN, args: 'close' });
+  expect([app.opened, app.closed, ran.text]).toEqual([['hq'], ['hq'], 'Closed the hq pane.']);
 });
 
 test('in z-stu each slot is two Raster cells: held green while the lane has room, held amber when full, free shaded; a 0-slot lane draws none', async ($, on) => {

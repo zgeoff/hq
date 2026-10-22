@@ -10,7 +10,7 @@ The line comes from `hq band --json`, which reads only what hq already stores. h
 
 ## /hq
 
-`/hq` opens a pane with the detail behind the band: what needs Geoff with its links, Nix today, a heat map of the lanes with the runs that hold each slot, reviews in flight, what merged today, and the newest news. It comes from `hq pane --json`, read with the band each minute. The terminal draws the heat map as a Raster, two columns to a slot: green while the lane has room, amber when it is full.
+`/hq` opens a pane with the detail behind the band, and `/hq close` closes it. The pane shows what needs Geoff with its links, Nix today, a heat map of the lanes with the runs that hold each slot, reviews in flight, what merged today, and the newest news. It comes from `hq pane --json`, read with the band each minute. The terminal draws the heat map as a Raster, two columns to a slot: green while the lane has room, amber when it is full.
 
 ## Only z-stu
 
