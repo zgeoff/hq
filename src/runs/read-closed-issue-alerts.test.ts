@@ -93,7 +93,7 @@ test('it tells done from dropped for each closed issue by what the run still owe
       key: 'linear:GEO-9827',
       fingerprint: 'completed:blocked',
       issue: 'GEO-9827',
-      line: 'GEO-9827: Done in Linear while hq has it blocked; its PRs merged: hq run state GEO-9827 merged, or hq run done GEO-9827',
+      line: 'GEO-9827: Done in Linear while hq has it blocked; its PRs merged: hq run state GEO-9827 merged, and the release pass closes it once they ship',
     },
   ]);
 });

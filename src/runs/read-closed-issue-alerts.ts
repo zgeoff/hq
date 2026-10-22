@@ -50,7 +50,7 @@ function pickAction(run: RunView, linear: 'completed' | 'canceled'): string | nu
     return `if the live check passed, hq run done ${run.issue}`;
   }
   if (run.state === 'working' || run.state === 'blocked') {
-    return `its PRs merged: hq run state ${run.issue} merged, or hq run done ${run.issue}`;
+    return `its PRs merged: hq run state ${run.issue} merged, and the release pass closes it once they ship`;
   }
   return null;
 }
