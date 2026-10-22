@@ -1,5 +1,6 @@
 import { HqError } from '../errors.ts';
 import { isFileRecord } from '../releases/is-file-record.ts';
+import { parseFileRecord } from '../releases/parse-file-record.ts';
 import { boundedRunner } from '../runner/bounded-runner.ts';
 import { toRunFailure } from '../runner/to-run-failure.ts';
 import type { Runner } from '../runner/types.ts';
@@ -18,5 +19,5 @@ export async function readPRFiles(run: Runner, slug: string, pr: number): Promis
   if (records.length >= FILES_LIMIT) {
     throw new HqError('merge_blocked', `the PR lists ${FILES_LIMIT} changed files, GitHub's limit, so the gate cannot see them all`);
   }
-  return records.flatMap((record) => record.split('\t'));
+  return records.flatMap(parseFileRecord);
 }

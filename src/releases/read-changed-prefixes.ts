@@ -3,6 +3,7 @@ import { HqError } from '../errors.ts';
 import { isFileRecord } from './is-file-record.ts';
 import { OWNER } from './owner.ts';
 import { parseChangedPrefixes } from './parse-changed-prefixes.ts';
+import { parseFileRecord } from './parse-file-record.ts';
 import { runGH } from './run-gh.ts';
 
 const FILES_LIMIT = 3000;
@@ -21,5 +22,5 @@ export async function readChangedPrefixes(run: Runner, repo: string, number: str
   }
 
   // A renamed file also changed the package it left, which GitHub gives only as previous_filename.
-  return parseChangedPrefixes(content, records.flatMap((record) => record.split('\t')));
+  return parseChangedPrefixes(content, records.flatMap(parseFileRecord));
 }
