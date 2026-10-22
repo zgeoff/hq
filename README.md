@@ -42,50 +42,56 @@ for it.
 
 ### Stu · `z-stu`
 
-The front desk. Hears the owner, asks one question at a time, and makes sure nothing ships
-without the right yes.
+The front desk, and the only session the owner talks to. Stu hears the owner, asks one question at
+a time, and carries each answer to the session that needs it. Nothing ships without the right yes.
 
 **Never:** sends the owner anything from 03:00 to 07:00, or takes another session's message as the
 owner's decision.
 
-### z-delivery · `z-delivery`
+### Night Shift · `z-delivery`
 
-Pulls ready work into lanes, briefs and watches the agents, and ships what lands, overnight
-included.
+Keeps every lane full, pulling the next ready issue the moment a slot frees up, briefing an agent
+and following it to a final pull request. When a merge lands, Night Shift cuts the release, rolls
+out the deploy and hands the live check on, at 3 a.m. if that is when it lands. The fleet keeps
+moving while everyone else sleeps.
 
-**Never:** asks the owner itself. Every decision goes through Stu.
+**Never:** merges ahead of Gatekeeper, or ships work that has not passed review.
 
 ### Sieve · `z-triage`
 
 Sorts every new issue into shape, keeps the board honest, and turns open questions into one clear
-call.
+call. Sieve sweeps the whole board every hour, so by the time a question reaches the owner, it has
+its options and its recommendation.
 
 **Never:** talks to the owner. Its calls reach the owner through Stu.
 
 ### Gatekeeper · `z-review`
 
 Reviews each finished pull request, checks the merge gate, and squash-merges it only when every
-finding has an answer.
+finding has an answer. A PR that says "done" is a claim, and Gatekeeper reads the diff before it
+believes one.
 
 **Never:** launches, releases or deploys.
 
 ### The Second Look · `z-qa`
 
-Checks each change on its preview, then again once it ships, and closes the issue only with
-evidence.
+Checks each change on its preview before the merge, then again once it ships, and closes the issue
+only with evidence. Every item gets a verdict: pass, fail, or needs the owner.
 
 **Never:** changes production. After a release it only reads.
 
 ### The Steward · `z-steward`
 
 Keeps the fleet's skills true to how its owner wants agents to work, one reviewed change at a time.
+Every session sends its feedback here, and the Steward turns it into a skill change and tells each
+session whose rules moved.
 
 **Never:** changes a skill outside a reviewed PR. A new grant goes to the owner through Stu.
 
 ### The Toolsmith · `z-q`
 
-Builds hq from the crew's requests, one reviewed PR at a time. Has never pushed to `main`, and
-never will.
+Builds hq from the crew's requests, one reviewed PR at a time. Any session can ask for a command,
+and most get it the same night: 219 releases in 8 days. Has never pushed to `main`, and never will.
 
 **Never:** runs a branch build of hq against the live database.
 
@@ -99,7 +105,7 @@ read. Stu called it the biggest review win of the week. This is how the crew shi
 ```mermaid
 flowchart LR
   report[11 false alarms<br/>on an hq PR] --> issue[Issue GEO-1669<br/>with 4 acceptance tests]
-  issue --> agent[z-delivery<br/>briefs an agent]
+  issue --> agent[Night Shift<br/>briefs an agent]
   agent --> pr[noslop#126]
   pr --> review[noslop reviews<br/>its own fix]
   review --> gate{Gatekeeper's<br/>merge gate}
