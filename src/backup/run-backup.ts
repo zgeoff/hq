@@ -1,10 +1,10 @@
 // hq backup: an hourly, encrypted restic snapshot of hq's state and the z- sessions'
 // transcripts, kept locally and copied off this PC when a remote is configured.
 // hq.db goes in through sqlite's online backup, never as a raw file copy.
-import type { Database } from 'bun:sqlite';
-import { randomBytes } from 'node:crypto';
-import { existsSync, linkSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { Database } from 'bun:sqlite';
+import { existsSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
+import { z } from 'zod';
 import { iso } from '../clock/iso.ts';
 import { now } from '../clock/now.ts';
 import { setMeta } from '../db/set-meta.ts';
@@ -26,7 +26,7 @@ export async function runBackup(db: Database, run: Runner, actor: string): Promi
   const started = Date.now();
   const at = iso(now());
   const result: BackupRun = { at, ok: false, snapshot: null, remote: 'not configured', error: null, seconds: 0 };
-  let lock: string | null = null;
+  let lock: Database | null = null;
   try {
     ensurePassword();
     mkdirSync(backupPaths().state, { recursive: true, mode: 0o700 });
@@ -81,7 +81,7 @@ export async function runBackup(db: Database, run: Runner, actor: string): Promi
   } finally {
     if (lock !== null) {
       rmSync(staging(), { recursive: true, force: true });
-      rmSync(lock, { force: true });
+      removeStagingLock(lock);
     }
   }
   result.seconds = Math.round((Date.now() - started) / 1000);
@@ -93,55 +93,30 @@ export async function runBackup(db: Database, run: Runner, actor: string): Promi
   return result;
 }
 
-// One staging dir, so runs take turns. A killed run leaves a dead lock: only the holder of the
-// takeover file removes one, after reading the dead pid again under that hold, so a live lock is
-// never removed and the exclusive create picks one winner.
-function createStagingLock(): string {
-  const path = join(backupPaths().state, 'staging.lock');
-  for (;;) {
-    if (tryCreateLock(path)) {
-      return path;
-    }
-    const holder = readLockHolder(path);
-    if (holder !== null && isRunning(holder)) {
-      throw new HqError('backup_busy', `another hq backup is running (pid ${holder}); this run left its staging dir alone`);
-    }
-    removeDeadLock(path);
-  }
-}
+const HolderSchema = z.object({ pid: z.number() }).nullable();
 
-// The pid is written to a file of this run's own and linked into place, so a lock is never seen
-// half written.
-function tryCreateLock(path: string): boolean {
-  const own = `${path}.${process.pid}-${randomBytes(4).toString('hex')}`;
-  writeFileSync(own, String(process.pid), { mode: 0o600 });
-  try {
-    linkSync(own, path);
-    return true;
-  } catch (error) {
-    if (hasCode(error, 'EEXIST')) {
-      return false;
-    }
-    throw error;
-  } finally {
-    rmSync(own, { force: true });
-  }
-}
-
-function hasCode(error: unknown, code: string): boolean {
-  return error instanceof Error && 'code' in error && error.code === code;
-}
-
-// null when the lock went away since the create failed.
-function readLockHolder(path: string): number | null {
-  try {
-    return Number(readFileSync(path, 'utf8').trim());
-  } catch (error) {
-    if (hasCode(error, 'ENOENT')) {
+// One staging dir, so runs take turns. The holder's pid sits in a database of its own, so reading
+// it, finding its run gone and writing this run's pid is one write transaction: two runs can never
+// both take a dead holder's place, and no file is ever removed on a guess.
+function createStagingLock(): Database {
+  const lock = new Database(join(backupPaths().state, 'staging-lock.sqlite'), { create: true });
+  lock.run('PRAGMA busy_timeout = 5000');
+  const holder = lock
+    .transaction((): number | null => {
+      lock.run('CREATE TABLE IF NOT EXISTS holder (id INTEGER PRIMARY KEY CHECK (id = 1), pid INTEGER NOT NULL)');
+      const row = HolderSchema.parse(lock.query('SELECT pid FROM holder WHERE id = 1').get());
+      if (row !== null && isRunning(row.pid)) {
+        return row.pid;
+      }
+      lock.query('INSERT OR REPLACE INTO holder (id, pid) VALUES (1, ?)').run(process.pid);
       return null;
-    }
-    throw error;
+    })
+    .immediate();
+  if (holder !== null) {
+    lock.close();
+    throw new HqError('backup_busy', `another hq backup is running (pid ${holder}); this run left its staging dir alone`);
   }
+  return lock;
 }
 
 function isRunning(pid: number): boolean {
@@ -152,30 +127,7 @@ function isRunning(pid: number): boolean {
     process.kill(pid, 0);
     return true;
   } catch (error) {
-    return hasCode(error, 'EPERM');
-  }
-}
-
-function removeDeadLock(path: string): void {
-  const takeover = `${path}.takeover`;
-  if (!tryCreateLock(takeover)) {
-    const taker = readLockHolder(takeover);
-    if (taker !== null && isRunning(taker)) {
-      throw new HqError('backup_busy', `another hq backup is taking over a dead staging lock (pid ${taker}); this run left its staging dir alone`);
-    }
-
-    // A run killed during its own takeover left it. Clearing it is unguarded, so only that double
-    // fault, a killed run and then a killed takeover, can still let two runs in.
-    rmSync(takeover, { force: true });
-    return;
-  }
-  try {
-    const holder = readLockHolder(path);
-    if (holder !== null && !isRunning(holder)) {
-      rmSync(path, { force: true });
-    }
-  } finally {
-    rmSync(takeover, { force: true });
+    return error instanceof Error && 'code' in error && error.code === 'EPERM';
   }
 }
 
@@ -191,4 +143,9 @@ function redact(text: string, extra: Record<string, string>): string {
   let out = text;
   for (const v of Object.values(extra)) if (v.length >= 4) out = out.split(v).join('***');
   return out;
+}
+
+function removeStagingLock(lock: Database): void {
+  lock.query('DELETE FROM holder WHERE pid = ?').run(process.pid);
+  lock.close();
 }
