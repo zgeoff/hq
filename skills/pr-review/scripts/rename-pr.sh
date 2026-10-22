@@ -61,9 +61,12 @@ head=$(jq -r .headRefOid <<<"$pr_json")
 
 gh api "repos/zgeoff/$repo/pulls/$pr/files" --paginate | jq -s 'add // []' >"$work/files.json"
 
-# text <path> <ref>: the file's content at the ref.
+# text <path> <ref>: the file's content at the ref. Each path segment is URL-encoded, since
+# a PR names its files and a "#" or "?" in a raw name would cut the ref off the URL.
 text() {
-  gh api "repos/zgeoff/$repo/contents/$1?ref=$2" --jq .content | base64 -d
+  local path
+  path=$(jq -rn --arg p "$1" '$p | split("/") | map(@uri) | join("/")')
+  gh api "repos/zgeoff/$repo/contents/$path?ref=$(jq -rn --arg r "$2" '$r | @uri')" --jq .content | base64 -d
 }
 
 # Each changed file: name, status, previous name ("-" when none), guarded (1 or 0),

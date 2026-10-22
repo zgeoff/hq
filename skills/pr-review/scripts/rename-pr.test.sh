@@ -20,9 +20,17 @@ case $args in
     printf '{"state":"%s","baseRefOid":"base1","headRefOid":"head1"}\n' "$STATE" ;;
   "api repos/zgeoff/demo/pulls/7/files"*) jq -s . "$CASE/entries" ;;
   "api repos/zgeoff/demo/contents/"*"--jq .content")
-    spec=${2#repos/zgeoff/demo/contents/}
-    path=${spec%%\?ref=*}
-    ref=${spec##*\?ref=}
+    # Parse the URL as an HTTP client does: a fragment never reaches the server, the
+    # query starts at the first "?", the path is percent-decoded, and no ref means
+    # the default branch, which holds the base.
+    url=${2#repos/zgeoff/demo/contents/}
+    url=${url%%#*}
+    path=${url%%\?*}
+    query=
+    [[ $url != *\?* ]] || query=${url#*\?}
+    ref=base1
+    [[ ! $query =~ (^|&)ref=([^&]*) ]] || ref=${BASH_REMATCH[2]}
+    path=$(printf '%b' "${path//%/\\x}")
     [ -f "$CASE/$ref/$path" ] || { echo "HTTP 404" >&2; exit 1; }
     base64 <"$CASE/$ref/$path" ;;
   *) echo "unexpected gh call: $args" >&2; exit 2 ;;
@@ -328,5 +336,22 @@ put base1 src/a.md 'Text.'
 put head1 src/b.md 'Text.'
 skill_case $'# Demo\n\nSee `data.md` here.' $'# Demo\n\nSee `datb.md` here.'
 expect "a dotted basename inside a longer token does not rename it" 1 "no: $skill: See \`datb.md\` here."
+
+new_case
+code_rename
+odd='skills/demo/odd #1?%41.md'
+entry "$odd" modified ""
+put base1 "$odd" $'# Demo\n\nCall `findFreePorts` before launch.'
+put head1 "$odd" $'# Demo\n\nCall `reservePorts` before launch.'
+expect "a skill file whose name holds #, ? and % is read at its own path" 0 "ok: 1 skill files are pure renames of findFreePorts -> reservePorts"
+
+new_case
+code_rename
+cut='skills/demo/run#x?y%41.md'
+entry "$cut" modified ""
+put base1 "$cut" $'# Demo\n\nRun `check --strict`.'
+put head1 "$cut" $'# Demo\n\nRun `check --loose`.'
+put base1 skills/demo/run $'# Demo\n\nRun `check --strict`.'
+expect "a # in a skill file name cannot point the head read at the base" 1 "no: $cut: Run \`check --loose\`."
 
 [ "$failures" -eq 0 ]
