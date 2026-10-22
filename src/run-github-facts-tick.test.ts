@@ -1,6 +1,7 @@
 import { expect, mock, onTestFinished, test } from 'bun:test';
 import { buildStubGitHubFactsRunner } from '../test/build-stub-github-facts-runner.ts';
 import { freshDb } from '../test/helpers.ts';
+import { setMeta } from './db/set-meta.ts';
 import type { Runner } from './runner/types.ts';
 import { addRun } from './runs/add-run.ts';
 import { runGitHubFactsTick } from './run-github-facts-tick.ts';
@@ -55,6 +56,20 @@ test('it keeps the merged-search position after a pass whose merged search faile
 
   const since = calls.filter((call) => call.includes('--merged-at') && call.includes('zgeoff/hq ')).map((call) => call.split(' ')[6]);
   expect(since).toStrictEqual(['>=2026-10-18T01:00:00Z', '>=2026-10-19T00:00:00Z']);
+});
+
+test('it keeps the window of a failed merged search when no position was recorded yet, so the next pass searches it', async () => {
+  const ctx = setupTest();
+  const calls: string[] = [];
+  const stub = buildStubGitHubFactsRunner({ search: '[]', calls });
+  const failing: Runner = (cmd, opts) => (cmd.includes('--merged-at') ? Promise.resolve({ code: 1, stdout: '', stderr: 'invented: rate limited' }) : stub(cmd, opts));
+  setMeta(ctx.db, 'run_prs_checked_at', '2026-10-19T01:00:00Z');
+
+  await runGitHubFactsTick(ctx.db, failing, new Date('2026-10-22T01:00:00Z'));
+  await runGitHubFactsTick(ctx.db, stub, new Date('2026-10-22T01:10:00Z'));
+
+  const since = calls.filter((call) => call.includes('--merged-at') && call.includes('zgeoff/hq ')).map((call) => call.split(' ')[6]);
+  expect(since).toStrictEqual(['>=2026-10-19T00:00:00Z']);
 });
 
 test('it moves the merged-search position after a pass whose merged search answered in full', async () => {

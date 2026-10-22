@@ -30,6 +30,9 @@ export async function runGitHubFactsTick(db: Database, run: Runner, at: Date = n
   const attach = await attachGitHubPRs(db, run, mergedSince);
   if (attach.mergedSearched) {
     setMeta(db, MERGED_SINCE, iso(at));
+  } else if (getMeta(db, MERGED_SINCE) === null) {
+    // The throttle moved on, so with no position yet the next pass would start from this one.
+    setMeta(db, MERGED_SINCE, iso(new Date(reach + 60 * 60_000)));
   }
   const closed = await closeGitHubRunPRs(db, run);
   return { closed: closed.closed, attached: attach.attached, errors: [...closed.errors, ...attach.errors] };
