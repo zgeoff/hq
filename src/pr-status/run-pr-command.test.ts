@@ -697,9 +697,9 @@ test('it refuses a console: source for a call whose options grant nothing, even 
 });
 
 test.each([
-  { mismatch: 'an action', verb: 'override', rest: ['widgets', '7'], grants: { action: 'accept-risk', pr: 'zgeoff/widgets#7', finding: 'aaaa' }, why: 'accept-risk of zgeoff/widgets#7 finding aaaa, not override of zgeoff/widgets#7' },
-  { mismatch: 'a repo', verb: 'override', rest: ['widgets', '7'], grants: { action: 'override', pr: 'zgeoff/teapots#7' }, why: 'override of zgeoff/teapots#7, not override of zgeoff/widgets#7' },
-  { mismatch: 'a PR', verb: 'override', rest: ['widgets', '7'], grants: { action: 'override', pr: 'zgeoff/widgets#8' }, why: 'override of zgeoff/widgets#8, not override of zgeoff/widgets#7' },
+  { mismatch: 'an action', verb: 'override', rest: ['widgets', '7'], grants: { action: 'accept-risk', pr: 'zgeoff/widgets#7', finding: 'aaaa', head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678' }, why: 'accept-risk of zgeoff/widgets#7 finding aaaa at a1b2c3d, not override of zgeoff/widgets#7 at a1b2c3d' },
+  { mismatch: 'a repo', verb: 'override', rest: ['widgets', '7'], grants: { action: 'override', pr: 'zgeoff/teapots#7', head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678' }, why: 'override of zgeoff/teapots#7 at a1b2c3d, not override of zgeoff/widgets#7 at a1b2c3d' },
+  { mismatch: 'a PR', verb: 'override', rest: ['widgets', '7'], grants: { action: 'override', pr: 'zgeoff/widgets#8', head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678' }, why: 'override of zgeoff/widgets#8 at a1b2c3d, not override of zgeoff/widgets#7 at a1b2c3d' },
   { mismatch: 'a finding', verb: 'accept-risk', rest: ['widgets', '7', 'aaaa'], grants: { action: 'accept-risk', pr: 'zgeoff/widgets#7', finding: 'bbbb' }, why: 'accept-risk of zgeoff/widgets#7 finding bbbb, not accept-risk of zgeoff/widgets#7 finding aaaa' },
 ])('it refuses a console: source whose picked option grants $mismatch other than the one asked for', async (row) => {
   const ctx = setupTest();
@@ -752,7 +752,6 @@ test('it records an override from a grant made for the head the PR has now', asy
 
 test.each([
   ['a plain Yes', [{ label: 'Yes', effect: 'Merge it.' }, { label: 'No', effect: 'Wait.' }]],
-  ['a grant with no head', [{ label: 'Yes', effect: 'Merge it.', grants: { action: 'override', pr: 'zgeoff/widgets#7' } }, { label: 'Wait', effect: 'Fix them first.' }]],
 ])('it refuses a call: source from %s that already backs an override at another head, and keeps the first', async (_case, options) => {
   const ctx = setupTest();
   applyAskItem(ctx.db, { kind: 'call', id: 'KET-46', issues: [], forSession: null, actor: 'z-kettle' }, parseItemInput('call', JSON.stringify({ title: 'Override widgets#7?', question: 'Merge past the findings?', options })), 'Merge past the findings?');
@@ -761,6 +760,14 @@ test.each([
 
   await expect(ctx.asOther(ctx.headAt('b9c8d7e6f5a40312213f4e5d6c7b8a9087654321'), 'override', ['widgets', '7'], { source: 'call:KET-46', note: 'Ship it again.' })).rejects.toMatchObject({ code: 'bad_args', message: '--source refused: call:KET-46 already backs an override of zgeoff/widgets#7 at a1b2c3d, and the owner answered it for that head only; ask z-stu to record it' });
   expect(ctx.db.query("SELECT json_extract(data, '$.head') AS head FROM events WHERE action = 'pr-override'").all()).toStrictEqual([{ head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678' }]);
+});
+
+test('it refuses a console: source whose picked option grants an override with no head', async () => {
+  const ctx = setupTest();
+  applyAskItem(ctx.db, { kind: 'call', id: 'KET-49', issues: [], forSession: null, actor: 'z-kettle' }, parseItemInput('call', JSON.stringify({ title: 'Override widgets#7?', question: 'Merge past the findings?', options: [{ label: 'Go', effect: 'Merge it.', grants: { action: 'override', pr: 'zgeoff/widgets#7' } }, { label: 'Wait', effect: 'Fix them first.' }] })), 'Merge past the findings?');
+  recordConsoleAnswer(ctx.db, { id: 'KET-49', option: 'Go', note: '', actor: 'owner' });
+
+  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'console:KET-49', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: '--source refused: the option the owner picked in console:KET-49 grants an override with no head: an override grant names the head the owner approved; ask z-stu to record it' });
 });
 
 test('it accepts a call: source at a new head once the owner answers a new round, after it backed an override at the old head', async () => {

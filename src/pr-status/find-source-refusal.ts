@@ -108,6 +108,9 @@ function findGrantRefusal(check: CallCheck, options: ItemOption[], answer: strin
   if (option?.grants === undefined) {
     return `the option the owner picked in ${check.source} ("${picked}") grants no ${check.wanted.action}`;
   }
+  if (check.wanted.action === 'override' && option.grants.head === undefined) {
+    return `the option the owner picked in ${check.source} grants an override with no head: an override grant names the head the owner approved`;
+  }
   if (!isMatchingGrant(option.grants, check)) {
     return `the option the owner picked in ${check.source} grants ${formatGrant(option.grants)}, not ${formatWanted(check, option.grants)}`;
   }
