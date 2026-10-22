@@ -138,6 +138,18 @@ test('it reads a review answer from before its facts were kept against the item 
   expect(loadAnswers(db, { from: NOON_SYDNEY, to: '2026-10-14T04:00:00Z' }).map((answer) => [answer.title, answer.ref, answer.words])).toStrictEqual([['Review kettle#7 and say lgtm', 'https://github.com/kettle-co/kettle/pull/7', 'Wider lid.']]);
 });
 
+test("it lists an earlier round's answer with no title, issues or session when no event kept them and the ask changed after", () => {
+  const db = setupTest();
+  addAsk(db, { kind: 'call', id: 'kettle-spout', title: 'Pick a spout', question: 'Long or short?', body: 'Long or short?', issues: ['GEO-9005'], forSession: 'kettle-bot', actor: 'kettle-bot' });
+  openAsk(db, { id: 'kettle-spout', force: true, actor: 'kettle-bot' });
+  answerAsk(db, { id: 'kettle-spout', kind: 'call', answer: 'Long', actor: 'teapot-bot' });
+  at('2026-10-14T03:00:00Z');
+  addAsk(db, { kind: 'call', id: 'kettle-spout', title: 'Pick a lid', question: 'Flat or domed?', body: 'Flat or domed?', issues: ['GEO-9006'], forSession: 'teapot-bot', actor: 'kettle-bot' });
+  db.run("UPDATE events SET data = json_remove(data, '$.title', '$.issues', '$.forSession') WHERE subject = 'ask'");
+
+  expect(loadAnswers(db, { from: NOON_SYDNEY, to: '2026-10-14T04:00:00Z' }).map((answer) => [answer.title, answer.issues, answer.session, answer.words])).toStrictEqual([[null, [], null, 'Long']]);
+});
+
 test('hq answers --json lists the last 7 days by default, and --since sets the window', async () => {
   const db = createTwoTypedLines(setupTest()),
     log = spyOn(console, 'log').mockImplementation((line: string) => printed.push(line)),

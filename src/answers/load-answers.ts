@@ -33,20 +33,34 @@ function loadAskAnswers(db: Database, window: AnswerWindow): Answer[] {
     if (ask === null) {
       return [];
     }
-    const round = loadRoundFacts(db, r) ?? { title: ask.title, issues: ask.issues, forSession: ask.for_session };
+    const round = loadRoundFacts(db, r) ?? (isChangedSince(db, 'ask', r) ? UNKNOWN_ROUND : { title: ask.title, issues: ask.issues, forSession: ask.for_session });
     return [{ source: 'ask', id: ask.id, kind: ask.kind, title: round.title, issues: round.issues, session: round.forSession, ...parsePickedOption(data.answer, readRoundOptions(db, r.id, r.seq)), ref: null, via: r.actor, at: r.at }];
   });
 }
 
 const RoundFactsSchema = z.object({ title: z.string(), issues: z.array(z.string()), forSession: z.string().nullable() });
 
-type RoundFacts = z.infer<typeof RoundFactsSchema>;
+type RoundFacts = { title: string | null; issues: string[]; forSession: string | null };
 
 const EventDataSchema = z.object({ data: z.string() }).nullable();
 
+// What an answer whose round facts are lost shows: the ask changed after it, so its current title,
+// issues and session may belong to a later round.
+const UNKNOWN_ROUND: RoundFacts = { title: null, issues: [], forSession: null };
+
+// The actions that can change an ask's title, issues or session.
+const CHANGE_ACTIONS: Record<'ask', string[]> = { ask: ['added', 'updated', 'reasked', 'requeued'] };
+
+// True when an event after this answer may have changed what the ask stands for, so the ask as it
+// stands now no longer tells what the owner answered.
+function isChangedSince(db: Database, subject: 'ask', answer: AnswerEvent): boolean {
+  const actions = CHANGE_ACTIONS[subject];
+  return db.query(`SELECT 1 FROM events WHERE subject = ? AND subject_id = ? AND seq > ? AND action IN (${actions.map(() => '?').join(', ')}) LIMIT 1`).get(subject, answer.id, answer.seq, ...actions) !== null;
+}
+
 // The title, issues and session the ask held when this answer came: kept on the answer, or else
 // from the last change before it; null for an ask whose events predate those facts, which is then
-// read as it stands now.
+// read as it stands now unless it changed after the answer.
 function loadRoundFacts(db: Database, answer: AnswerEvent): RoundFacts | null {
   const kept = RoundFactsSchema.safeParse(JSON.parse(answer.data));
   if (kept.success) {
