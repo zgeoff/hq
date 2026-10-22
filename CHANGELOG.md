@@ -1,8 +1,17 @@
 # Changelog
 
-## Unreleased
+## 0.81.0 — 2026-10-22
+
+hq starts from a clean tree in a new repo, and the first full review's fixes land with it.
 
 The cloud metrics URL comes from the local settings file as `HQ_CLOUD_METRICS_URL`; the capacity line calls the host `cloud`. `HQ_CLOUD_HOST` holds the cloud host's ssh name, which the preview-qa skill reads, and `hq health` lists it when it is missing.
+
+- An owner source for `hq pr override` and `hq pr accept-risk` now has to name the PR and the action it approves. What it must hold is in this file's private half: read `CHANGELOG.private.md` in the local hq-private clone (`hq defs` shows where it is).
+- `hq review` checks out the PR's own head commit, not a branch of the same name, so a fork PR is reviewed as itself. The rename check in the pr-review skill escapes each path in the GitHub contents URL.
+- `hq repo archive-history` also moves the cached PR facts of the stats, in the same transaction, and counts them on `--dry-run`.
+- The fleet and probe timers carry the installing shell's `HQ_*` settings and `XDG_CONFIG_HOME` into their units, with `HQ_DB` made absolute. A timer removal checks each systemctl step before it deletes the unit files.
+- Fixes to the backup password and lock, the outbox flush, ask changes, unblock closures, the merged-PR search position, stats merge times, the morning and daily checks, and more: each is named in its own commit.
+- `lint:changed` lints nothing on a branch whose base holds no `package.json`, which is only the import of the tree into an empty repo.
 
 ## 0.80.0 — 2026-10-22
 
