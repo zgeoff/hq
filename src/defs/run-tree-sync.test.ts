@@ -133,3 +133,14 @@ test('it installs hq-defs dependencies after a sync, and never in hq-private', (
   expect(runTreeSyncTick(ctx.db, 'hq-lanes', 'private', install)?.line).not.toContain('installed');
   expect(installs).toStrictEqual([both.hq.dir]);
 });
+
+test('a failed hq-defs install turns the synced tree red and keeps it red for hq health', () => {
+  const ctx = createTreeFixture();
+  const both = ctx.createBoth();
+  both.hq.writeCommit({ 'bun.lock': '{"lockfileVersion": 1}\n' });
+
+  const result = runTreeSyncTick(ctx.db, 'hq-lanes', 'hq', () => ({ code: 1, err: 'invented lockfile mismatch' }));
+
+  expect(result).toMatchObject({ ok: false, line: expect.stringContaining('bun install failed (1): invented lockfile mismatch') });
+  expect(getMeta(ctx.db, 'defs_tree_sync')).toContain('"ok":false');
+});
