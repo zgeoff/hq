@@ -46,3 +46,24 @@ test('it lists the complete Backlog issue whose blockers are Done and leaves out
 
   expect([issues, app.variables]).toStrictEqual([[{ identifier: 'GEO-9801', title: 'boil the kettle' }], [{ after: null, team: 'GEO', state: 'Backlog' }]]);
 });
+
+test('it rejects a Backlog answer with an unexpected shape', async () => {
+  const call: LinearCall = () => Promise.resolve({ issues: { nodes: [{ identifier: 'GEO-9809' }], pageInfo: { hasNextPage: false, endCursor: null } } });
+
+  const read = readPromotableIssues(call, 'GEO');
+
+  await expect(read).rejects.toMatchObject({ code: 'linear_failed', message: "Linear's Backlog answer has an unexpected shape: issues.nodes.0.title" });
+});
+
+test('it stops after twenty Backlog pages that each name another page', async () => {
+  const cursors: unknown[] = [];
+  const call: LinearCall = (_query, vars) => {
+    cursors.push(vars['after']);
+    return Promise.resolve({ issues: { nodes: [], pageInfo: { hasNextPage: true, endCursor: `widget-${cursors.length}` } } });
+  };
+
+  const read = readPromotableIssues(call, 'GEO');
+
+  await expect(read).rejects.toMatchObject({ code: 'linear_failed', message: 'more than 1000 Backlog issues; hq reads no further' });
+  expect(cursors).toHaveLength(20);
+});
