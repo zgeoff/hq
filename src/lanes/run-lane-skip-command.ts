@@ -4,6 +4,7 @@ import { HqError } from '../errors.ts';
 import { ISSUE } from '../followups/issue.ts';
 import { isSkipActive } from './is-skip-active.ts';
 import { readLaneSkips } from './read-lane-skips.ts';
+import { readSkipUnread } from './read-skip-unread.ts';
 import { removeLaneSkip } from './remove-lane-skip.ts';
 import { writeLaneSkip } from './write-lane-skip.ts';
 
@@ -29,8 +30,9 @@ export function runLaneSkipCommand(deps: LaneSkipCommandDeps): SkipOut {
   return match(deps.rest)
     .with(['list'], () => {
       const skips = readLaneSkips(deps.db).filter((skip) => isSkipActive(skip, deps.at));
-      const lines = skips.map((skip) => `  ${skip.issue} until ${skip.until}: ${skip.reason} (${skip.by}, ${skip.at})`);
-      return { data: { skips }, text: skips.length === 0 ? 'No lane skips.' : ['Lane skips:', ...lines].join('\n') };
+      const unread = readSkipUnread(deps.db);
+      const lines = skips.map((skip) => `  ${skip.issue} until ${skip.until}: ${skip.reason} (${skip.by}, ${skip.at})${formatUnread(unread[skip.until])}`);
+      return { data: { skips, unread }, text: skips.length === 0 ? 'No lane skips.' : ['Lane skips:', ...lines].join('\n') };
     })
     .with(['drop', P.string], ([, issue]) => {
       const dropped = removeLaneSkip(deps.db, issue, deps.actor);
@@ -49,6 +51,10 @@ export function runLaneSkipCommand(deps: LaneSkipCommandDeps): SkipOut {
     .otherwise((rest) => {
       throw new HqError('bad_args', `unknown command: hq lanes skip ${rest.join(' ')}; ${USAGE}`);
     });
+}
+
+function formatUnread(error: string | undefined): string {
+  return error === undefined ? '' : `; hq cannot tell when it ends: ${error}`;
 }
 
 function needFlag(value: string | undefined, name: string): string {

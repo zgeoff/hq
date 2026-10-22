@@ -146,7 +146,7 @@ test('hq lanes skip sets, lists and drops a skip through the spawned CLI', async
   const after = await hq('list');
 
   expect(set.code).toBe(0);
-  expect(JSON.parse(listed.stdout)).toStrictEqual({ ok: true, skips: [{ issue: 'GEO-9881', until: 'GEO-9889', reason: 'waits on the descaler PR', by: 'z-delivery', at: NOON_SYDNEY }] });
+  expect(JSON.parse(listed.stdout)).toStrictEqual({ ok: true, skips: [{ issue: 'GEO-9881', until: 'GEO-9889', reason: 'waits on the descaler PR', by: 'z-delivery', at: NOON_SYDNEY }], unread: {} });
   expect(JSON.parse(dropped.stdout)).toStrictEqual({ ok: true, issue: 'GEO-9881', dropped: true });
-  expect(JSON.parse(after.stdout)).toStrictEqual({ ok: true, skips: [] });
+  expect(JSON.parse(after.stdout)).toStrictEqual({ ok: true, skips: [], unread: {} });
 });

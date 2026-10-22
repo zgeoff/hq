@@ -1,5 +1,6 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { freshDb } from '../../test/helpers.ts';
+import { setMeta } from '../db/set-meta.ts';
 import { readLaneSkips } from './read-lane-skips.ts';
 import { runLaneSkipCommand } from './run-lane-skip-command.ts';
 
@@ -37,6 +38,16 @@ test('it lists only the skips still in force', () => {
   const out = runLaneSkipCommand({ db: ctx.db, actor: 'z-delivery', at: new Date('2026-10-15T22:00:00Z'), rest: ['list'], until: undefined, reason: undefined });
 
   expect(out.text).toBe('Lane skips:\n  GEO-9862 until GEO-9869: waits on the descaler PR (z-delivery, 2026-10-15T20:00:00Z)');
+});
+
+test('it lists why hq cannot tell when a skip ends, after a Ready tick failed to read its until issue', () => {
+  const ctx = setupTest();
+  runLaneSkipCommand({ db: ctx.db, actor: 'z-delivery', at: new Date('2026-10-15T20:00:00Z'), rest: ['GEO-9862'], until: 'GEO-9869', reason: 'waits on the descaler PR' });
+  setMeta(ctx.db, 'lanes_skips_unread', JSON.stringify({ 'GEO-9869': 'Linear has no issue GEO-9869' }));
+
+  const out = runLaneSkipCommand({ db: ctx.db, actor: 'z-delivery', at: new Date('2026-10-15T20:05:00Z'), rest: ['list'], until: undefined, reason: undefined });
+
+  expect(out.text).toBe('Lane skips:\n  GEO-9862 until GEO-9869: waits on the descaler PR (z-delivery, 2026-10-15T20:00:00Z); hq cannot tell when it ends: Linear has no issue GEO-9869');
 });
 
 test('it drops a skip and logs it, and says so when the issue had none', () => {
