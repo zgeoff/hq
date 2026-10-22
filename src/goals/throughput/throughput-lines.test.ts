@@ -1,10 +1,9 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { buildFiledNode } from '../../../test/build-filed-node.ts';
-import { fetchedDays, freshDb } from '../../../test/helpers.ts';
+import { freshDb } from '../../../test/helpers.ts';
 import { makeThroughputLinearCall } from '../../../test/make-throughput-linear-call.ts';
 import { main } from '../../cli.ts';
 import { overrideEnv } from '../../config/override-env.ts';
-import { setMeta } from '../../db/set-meta.ts';
 import { addFollowup } from '../../followups/add-followup.ts';
 import { syncLinear } from '../../kinds/sync-linear.ts';
 import type { LinearCall } from '../../linear/types.ts';
@@ -13,7 +12,7 @@ import { dailyText } from '../daily/daily-text.ts';
 import { sendThroughputAlerts } from './send-throughput-alerts.ts';
 
 // A database at 18:00 on Fri 16 Oct in Sydney (07:00Z; the Sydney day began at 13:00Z on 15 Oct),
-// with the goals data fresh and HOME in its folder.
+// with HOME in its folder.
 function setupTest() {
   const fresh = freshDb();
   const home = process.env['HOME'];
@@ -25,10 +24,6 @@ function setupTest() {
   onTestFinished(() => {
     process.env['HOME'] = home;
   });
-  fetchedDays(fresh.db);
-  for (const key of ['goals_ok_at', 'kinds_ok_at', 'linear_synced_at']) {
-    setMeta(fresh.db, key, '2026-10-16T06:50:00Z');
-  }
   return {
     db: fresh.db,
     now,
