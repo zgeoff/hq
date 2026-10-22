@@ -55,14 +55,16 @@ text() {
 # matches <path> <ref> <source>: the repo's file at ref equals the source at
 # one of the last 30 tools main commits that changed the source.
 matches() {
-  local path=$1 ref=$2 source=$3 ours ours_text="" commit
+  local path=$1 ref=$2 source=$3 ours ours_text="" theirs_text commit
   ours=$(blob "zgeoff/$repo" "$path" "$ref")
   [ "$ours" != missing ] || return 1
   for commit in $(gh api "repos/zgeoff/tools/commits?sha=$tools_main&path=$source&per_page=30" --jq '.[].sha'); do
     [ "$(blob zgeoff/tools "$source" "$commit")" != "$ours" ] || return 0
     case $path in .github/workflows/*) ;; *) continue ;; esac
-    [ -n "$ours_text" ] || ours_text=$(text "zgeoff/$repo" "$path" "$ref")
-    [ "$(text zgeoff/tools "$source" "$commit")" != "$ours_text" ] || return 0
+    # The caller's || turns errexit off in here, so a failed read must be checked by hand.
+    [ -n "$ours_text" ] || ours_text=$(text "zgeoff/$repo" "$path" "$ref") || fail "$path could not be read at $ref"
+    theirs_text=$(text zgeoff/tools "$source" "$commit") || fail "$source could not be read at tools commit $commit"
+    [ "$theirs_text" != "$ours_text" ] || return 0
   done
   return 1
 }

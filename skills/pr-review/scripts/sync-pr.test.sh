@@ -11,7 +11,8 @@ trap 'rm -rf "$work"' EXIT
 
 # The stand-in gh. STATE, AUTHOR, BRANCH, FILES (filename<TAB>status lines),
 # HEAD_BLOB (each file's blob at the PR head) and SOURCE_BLOBS (one blob per
-# tools commit, newest first) shape each case; HEAD_TEXT and SOURCE_TEXT are
+# tools commit, newest first) shape each case; TEXT_FAIL makes every content
+# read of a workflow caller fail; HEAD_TEXT and SOURCE_TEXT are
 # the PR head's and tools main's content of a workflow caller. BASE_BLOB is a
 # file's blob at the PR base, and the manifest at tools commit old1 also syncs
 # .claude/skills/y/SKILL.md, which tools main has retired.
@@ -28,6 +29,7 @@ case $args in
   "api repos/zgeoff/tools/contents/sync/manifest.json"*)
     printf '[{"name":"skill-x","files":[{"source":"sync/skills/x/SKILL.md","target":".claude/skills/x/SKILL.md"}]},{"name":"callers","files":[{"source":"sync/workflow-callers/pr.yml","target":".github/workflows/pr.yml"}]}]' | base64 ;;
   *"--jq .content"*)
+    [ -z "${TEXT_FAIL:-}" ] || { echo "HTTP 502" >&2; exit 1; }
     case $args in
       *"repos/zgeoff/demo/"*) printf '%b\n' "$HEAD_TEXT" | base64 ;;
       *"ref=main1"*) printf '%b\n' "$SOURCE_TEXT" | base64 ;;
@@ -131,6 +133,12 @@ expect "a workflow caller with another workflow fails" 1 "no: .github/workflows/
 set_case
 caller 'uses: actions/checkout@v5' 'uses: actions/checkout@main'
 expect "a workflow caller with another action ref fails" 1 "no: .github/workflows/pr.yml matches"
+
+set_case
+caller 'uses: zgeoff/tools/.github/workflows/bun-checks.yml@main' 'uses: zgeoff/tools/.github/workflows/bun-checks.yml@main'
+export TEXT_FAIL=1
+expect "a workflow caller whose text cannot be read fails" 1 "no: .github/workflows/pr.yml could not be read at head1"
+unset TEXT_FAIL
 
 set_case
 export STATE=MERGED
