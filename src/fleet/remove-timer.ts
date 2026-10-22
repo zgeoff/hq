@@ -1,3 +1,4 @@
+import { rm } from 'node:fs/promises';
 import { toExactOptional } from '@zgeoff/std';
 import { HqError } from '../errors.ts';
 import type { Runner } from '../runner/types.ts';
@@ -16,9 +17,12 @@ export async function removeTimer(run: Runner, removal: TimerRemoval): Promise<v
     throw new HqError('timer_failed', `systemctl --user disable --now ${removal.unit}.timer: ${(disabled.stderr || disabled.stdout).trim()}`);
   }
   for (const file of [`${removal.unit}.service`, `${removal.unit}.timer`]) {
-    await Bun.file(`${removal.directory}/${file}`)
-      .delete()
-      .catch(() => {});
+    const path = `${removal.directory}/${file}`;
+
+    // force skips only a file that is already gone; any other failure still throws.
+    await rm(path, { force: true }).catch((error: unknown) => {
+      throw new HqError('timer_failed', `could not delete ${path}: ${error instanceof Error ? error.message : String(error)}`);
+    });
   }
   const reloaded = await run(['systemctl', '--user', 'daemon-reload'], toExactOptional({ env: removal.env }));
   if (reloaded.code !== 0) {

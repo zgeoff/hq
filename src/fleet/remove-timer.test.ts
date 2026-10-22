@@ -1,5 +1,5 @@
 import { expect, mock, onTestFinished, test } from 'bun:test';
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { RunResult, Runner } from '../runner/types.ts';
@@ -57,4 +57,13 @@ test('it refuses when the reload fails', () => {
   };
 
   expect(removeTimer((cmd) => Promise.resolve(answers[cmd.join(' ')] ?? { code: 0, stdout: '', stderr: '' }), { directory: ctx.directory, unit: 'hq-kettle' })).rejects.toMatchObject({ code: 'timer_failed' });
+});
+
+test('it reports a unit file it cannot delete, naming the path', () => {
+  const ctx = setupTest();
+  mkdirSync(join(ctx.directory, 'hq-kettle.timer'));
+
+  const removed = removeTimer(() => Promise.resolve({ code: 0, stdout: '', stderr: '' }), { directory: ctx.directory, unit: 'hq-kettle' });
+
+  expect(removed).rejects.toMatchObject({ code: 'timer_failed', message: expect.stringContaining(join(ctx.directory, 'hq-kettle.timer')) });
 });
