@@ -23,10 +23,12 @@ export async function flush(db: Database, opts: { retryFailed?: boolean; ids?: n
   let client: AtcClient;
   try {
     client = await AtcClient.open();
-  } catch (e) {
-    markFailed(db, rows, String((e as Error).message ?? e));
-    result.failed = rows.length;
-    result.errors.push(String((e as Error).message ?? e));
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    result.failed = markFailed(db, rows, reason);
+    if (result.failed > 0) {
+      result.errors.push(reason);
+    }
     return result;
   }
   try {
@@ -62,7 +64,10 @@ export async function flush(db: Database, opts: { retryFailed?: boolean; ids?: n
       } catch (e) {
         const msg = String((e as Error).message ?? e);
         if (!still()) continue; // the row moved on; its new target gets its own try
-        markFailed(db, [row], msg);
+        // Another flush sent it meanwhile: that is no failure of this one.
+        if (markFailed(db, [{ id: row.id, idem_key: cur.idem_key }], msg) === 0) {
+          continue;
+        }
         result.failed++;
         result.errors.push(`${row.target}: ${msg}`);
       }
@@ -73,7 +78,8 @@ export async function flush(db: Database, opts: { retryFailed?: boolean; ids?: n
   return result;
 }
 
-function markFailed(db: Database, rows: OutboxRow[], error: string): void {
-  const q = db.query(`UPDATE outbox SET status='failed', attempts=attempts+1, last_error=? WHERE id=?`);
-  for (const r of rows) q.run(error, r.id);
+// Another flush may have sent the row, or a forward rekeyed it, while this one waited on atc.
+function markFailed(db: Database, rows: Pick<OutboxRow, 'id' | 'idem_key'>[], error: string): number {
+  const update = db.query(`UPDATE outbox SET status='failed', attempts=attempts+1, last_error=? WHERE id=? AND idem_key=? AND status != 'sent'`);
+  return rows.reduce((marked, row) => marked + update.run(error, row.id, row.idem_key).changes, 0);
 }

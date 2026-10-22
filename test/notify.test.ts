@@ -27,6 +27,7 @@ beforeEach(() => {
 afterEach(() => {
   atc?.stop();
   atc = null;
+  delete process.env['HQ_ATC_SOCKET'];
   cleanup();
 });
 
@@ -53,6 +54,16 @@ test('a dead daemon keeps the message for a retry, and the retry reuses its key'
   expect(await flush(db)).toMatchObject({ sent: 0 }); // failed rows wait for --retry
   expect(await flush(db, { retryFailed: true })).toMatchObject({ sent: 1 });
   expect(atc.sent[0]!.idempotencyKey).toBe(row.idem_key);
+});
+
+test('it leaves a row sent when another flush sent it while this one failed to reach atc', async () => {
+  process.env['HQ_ATC_SOCKET'] = `${dir}/nobody-home.sock`;
+  file('tidy-docs');
+  const pending = flush(db);
+  db.query("UPDATE outbox SET status = 'sent', attempts = 1, sent_at = ?").run(NOON_SYDNEY);
+  const result = await pending;
+  expect(result).toMatchObject({ failed: 0, errors: [] });
+  expect(db.query('SELECT status, attempts, last_error FROM outbox').all()).toStrictEqual([{ status: 'sent', attempts: 1, last_error: null }]);
 });
 
 test('a fleet session renamed under hq still gets its message, by the id hq fleet recorded', async () => {
