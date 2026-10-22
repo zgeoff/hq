@@ -184,12 +184,12 @@ test('a failed read of the filed issues leaves the lines unavailable, with no co
   const working = makeThroughputLinearCall(filed);
   const failing: LinearCall = (query, variables) => (query.includes('createdAt: {') ? Promise.reject(new Error('Linear answered 502: invented outage')) : working(query, variables));
 
-  const error = await syncLinear(ctx.db, failing, new Date('2026-10-14T00:00:00Z'), new Date(ctx.now)).catch((caught: unknown) => caught);
+  const failure = await syncLinear(ctx.db, failing, new Date('2026-10-14T00:00:00Z'), new Date(ctx.now)).catch((error: unknown) => error);
   const failed = { line: ctx.findLine('Bad filings'), sent: sendThroughputAlerts(ctx.db, 'hq-lanes', new Date('2026-10-14T00:00:00Z'), new Date(ctx.now)) };
   await syncLinear(ctx.db, working, new Date('2026-10-14T00:00:00Z'), new Date(ctx.now));
 
-  expect({ error, failed, recovered: ctx.findLine('Bad filings') }).toStrictEqual({
-    error: new Error('Linear answered 502: invented outage'),
+  expect({ failure, failed, recovered: ctx.findLine('Bad filings') }).toStrictEqual({
+    failure: new Error('Linear answered 502: invented outage'),
     failed: { line: '- Bad filings: Linear read failed, last read 2026-10-16T06:00:00Z; target 0 –', sent: [] },
     recovered: '- Bad filings: today 1 (GEO-9801 from widgets#7); target 0 🔴 red',
   });
