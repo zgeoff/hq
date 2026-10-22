@@ -14,7 +14,7 @@ export async function readChangedPrefixes(run: Runner, repo: string, number: str
   if (!content.trim()) {
     throw new HqError('bad_config', `release-please-config.json of ${repo} is empty`);
   }
-  const records = listed.split('\n').filter(isFileRecord);
+  const records = listed.split('\n').filter((record) => isFileRecord(record));
 
   // GitHub lists at most 3000 files of a PR, so a full list may hide a changed package.
   if (records.length >= FILES_LIMIT) {
