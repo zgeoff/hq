@@ -6,10 +6,8 @@ const WORD = /^[a-z][a-z-]*$/;
 
 const alts = (tok: string) => tok.split('|').filter((x) => WORD.test(x));
 
-// The help text as forms. A usage is a line's text before its first run of 2+ spaces; a
-// continuation line that starts with [ or ( adds its flags to the forms just above it. The help
-// writes an optional verb ([status]) and an optional positional ([id]) alike, so a bracketed word
-// is a verb only when verbsOf names it for the top; a top verbsOf does not know keeps that reading.
+// The help writes an optional verb ([status]) and an optional positional ([id]) alike, so a
+// bracketed word is a verb only when verbsOf names it for the top.
 export function parseHelp(help: string, verbsOf?: (top: string) => readonly string[] | null | undefined): Form[] {
   const forms: Form[] = [];
   let last: Form[] = [];
