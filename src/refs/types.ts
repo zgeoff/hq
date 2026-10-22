@@ -19,7 +19,5 @@ export interface RoleSkills {
 // `sessions` is atc's list; tests pass their own.
 export interface ReferenceOptions {
   days: number;
-  projectsDirectory?: string;
-  definitionsDirectory?: string;
   sessions?: () => Promise<SessionInfo[]>;
 }

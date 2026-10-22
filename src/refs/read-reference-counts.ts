@@ -17,10 +17,10 @@ export async function readReferenceCounts(options: ReferenceOptions): Promise<Re
   const since = new Date(until.getTime() - options.days * 86_400_000);
   const roles = buildRoleSkills(ROLES);
   // oxlint-disable-next-line new-cap -- DEFS is the definitions folder's accessor, called as every module calls it
-  const definitionsDirectory = options.definitionsDirectory ?? DEFS();
+  const definitionsDirectory = DEFS();
   const skills = [...new Set(roles.flatMap((role) => role.skills))];
   const references = new Map(skills.map((skill) => [skill, readSkillReferences(definitionsDirectory, skill)]));
-  const opens = await readReferenceOpens(options.projectsDirectory ?? getProjectsDir(), since, until);
+  const opens = await readReferenceOpens(getProjectsDir(), since, until);
   const who = await readSessionNames(options.sessions);
   const names = new Map([...who].map(([session, { name }]) => [session, name]));
   return buildReferenceCounts(roles, references, opens, names);
