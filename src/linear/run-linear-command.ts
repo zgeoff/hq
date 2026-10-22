@@ -1,8 +1,7 @@
-import { z } from 'zod';
 import type { Flags } from '../cli.ts';
 import type { Out } from '../commands.ts';
 import { HqError } from '../errors.ts';
-import { parseIssueFields } from './parse-issue-fields.ts';
+import { parseLinearIssuesFlags } from './parse-linear-issues-flags.ts';
 import { pickStateNames } from './pick-state-names.ts';
 import type { IssuesFilter } from './read-issue-pages.ts';
 import { readIssuePages } from './read-issue-pages.ts';
@@ -14,52 +13,23 @@ import { writeIssuePages } from './write-issue-pages.ts';
 const PAGE_FILE = /^issues-\d+\.json$/u;
 
 export async function runLinearCommand(deps: LinearCommandDeps, flags: Flags): Promise<Out> {
-  const team = requireFlag(flags.team, 'team');
-  const requested = requireFlag(flags.state, 'state')
-    .split(',')
-    .map((name) => name.trim());
-  const out = requireFlag(flags.out, 'out');
-  const fields = parseIssueFields(flags.fields);
-  const updatedSince = parseUpdatedSince(flags['updated-since']);
-  if (requested.some((name) => name === '')) {
-    throw new HqError('bad_args', '--state is a comma-separated list of state names, with none empty');
+  const input = parseLinearIssuesFlags(flags);
+  if (!probeDirectory(deps.files, input.out)) {
+    throw new HqError('bad_args', `--out must be an existing directory: ${input.out}`);
   }
-  if (!probeDirectory(deps.files, out)) {
-    throw new HqError('bad_args', `--out must be an existing directory: ${out}`);
+  if (deps.files.readdirSync(input.out).some((entry) => PAGE_FILE.test(entry))) {
+    throw new HqError('bad_args', `${input.out} already holds issue pages; use an empty directory`);
   }
-  if (deps.files.readdirSync(out).some((entry) => PAGE_FILE.test(entry))) {
-    throw new HqError('bad_args', `${out} already holds issue pages; use an empty directory`);
+  const known = await readTeamStateNames(deps.call, input.team);
+  const states = pickStateNames(input.states, known, input.team);
+  const filter: IssuesFilter = { team: { key: { eq: input.team } }, state: { name: { in: states } } };
+  if (input.updatedSince !== undefined) {
+    filter.updatedAt = { gte: input.updatedSince };
   }
-  const known = await readTeamStateNames(deps.call, team);
-  const states = pickStateNames(requested, known, team);
-  const filter: IssuesFilter = { team: { key: { eq: team } }, state: { name: { in: states } } };
-  if (updatedSince !== undefined) {
-    filter.updatedAt = { gte: updatedSince };
-  }
-  const pages = await readIssuePages(deps.call, filter, fields);
-  const files = writeIssuePages(deps.files, out, pages);
+  const pages = await readIssuePages(deps.call, filter, input.fields);
+  const files = writeIssuePages(deps.files, input.out, pages);
   const issues = pages.reduce((total, page) => total + page.length, 0);
   return { data: { files, issues }, text: files.join('\n') };
-}
-
-function requireFlag(value: string | undefined, name: string): string {
-  if (value === undefined || value === '') {
-    throw new HqError('bad_args', `hq linear issues needs --${name}`);
-  }
-  return value;
-}
-
-// A time without an offset would be read in the local zone.
-const updatedSinceSchema = z.union([z.iso.datetime({ offset: true }), z.iso.date()]);
-
-function parseUpdatedSince(raw: string | undefined): string | undefined {
-  if (raw === undefined) {
-    return undefined;
-  }
-  if (!updatedSinceSchema.safeParse(raw).success) {
-    throw new HqError('bad_args', `--updated-since must be an ISO date-time with an offset or Z, or a date YYYY-MM-DD, not "${raw}"`);
-  }
-  return new Date(raw).toISOString();
 }
 
 function probeDirectory(files: IssueFiles, path: string): boolean {
