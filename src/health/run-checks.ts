@@ -34,9 +34,12 @@ export async function runChecks(p: Probe, s: HealthSettings, prev: Samples, at: 
   const samples: Samples = {};
   const cutoff = at.getTime() - s.restartWindowMin * 60_000;
   let loops = 0;
+  let unread = 0;
   for (const scope of ['user', 'system'] as const) {
     const counts = await restartCounts(p.run, scope);
     if (!counts) {
+      unread++;
+      checks.push({ key: `restarts:${scope}`, ok: false, line: `can't read ${scope} unit restart counts (systemctl failed)` });
       unknown.push(`restart-loop:${scope}:`);
       for (const [k, v] of Object.entries(prev)) if (k.startsWith(`${scope}:`)) samples[k] = v;
       continue;
@@ -54,7 +57,9 @@ export async function runChecks(p: Probe, s: HealthSettings, prev: Samples, at: 
       }
     }
   }
-  if (!loops) checks.push({ key: 'restart-loop', ok: true, line: 'no restart loops' });
+  if (!loops && !unread) {
+    checks.push({ key: 'restart-loop', ok: true, line: 'no restart loops' });
+  }
 
   // /tmp too: on this PC it's a 16 GB tmpfs, and agent build caches filled it once (2026-10-16).
   const df = await out(p.run, ['df', '-P', '-B1', '/', p.home, '/tmp']);

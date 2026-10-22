@@ -123,7 +123,7 @@ test('a failed read neither clears open problems nor drops restart samples', asy
   expect(outbox()).toHaveLength(1);
   const r = await step(world({ broken: true }), 5);
   expect(r.cleared).toEqual([]);
-  expect(r.opened.map((c) => c.key).sort()).toEqual(['disk', 'systemd:system', 'systemd:user']);
+  expect(r.opened.map((check) => check.key).toSorted()).toEqual(['disk', 'restarts:system', 'restarts:user', 'systemd:system', 'systemd:user']);
   await step(world({ failedUser: ['teapot.service'], availBytes: 2 * 2 ** 30, restarts: { 'kettle.service': 106 } }), 10);
   const texts = outbox().map((m) => m.text);
   expect(texts.filter((t) => t.includes('teapot.service'))).toHaveLength(1); // no second alert
@@ -147,6 +147,17 @@ test('it clears a problem whose line spans two lines, filing the news on one lin
   applyHealth(db, [{ key: 'backup', ok: true, line: 'hq backup: last good 0.5 h ago' }], {}, 'hq-lanes');
 
   expect(listNews(db, { all: false, limit: 10 }).map((news) => news.text)).toStrictEqual([expect.stringContaining('Cleared: hq backup: last error: invented sqlite3 failure database is locked (open since')]);
+});
+
+test('it reports a failed restart-count read as a problem, not as no restart loops', async () => {
+  const healthy = probe(world());
+  const unreadable: Probe = { ...healthy, run: (cmd) => (cmd.includes('show') ? Promise.resolve({ code: 1, stdout: '', stderr: 'invented bus error' }) : healthy.run(cmd)) };
+
+  const result = await runChecks(unreadable, healthSettings(db), {}, new Date(NOON_SYDNEY));
+
+  expect(result.checks).toContainEqual({ key: 'restarts:user', ok: false, line: "can't read user unit restart counts (systemctl failed)" });
+  expect(result.checks).not.toContainEqual(expect.objectContaining({ key: 'restart-loop' }));
+  expect(result.unknown).toContain('restart-loop:user:');
 });
 
 test('a command that hangs counts as a failed read', async () => {
