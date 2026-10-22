@@ -43,7 +43,7 @@ An issue moves to Ready when every section is filled, every blocker is Done, and
 agent, as [tickets.md](references/tickets.md) says. Priority doesn't hold an issue back: a Low issue
 reaches Ready like any other. Three rules keep an issue out:
 
-- **`parked`:** the owner parked it. Only he adds or removes the label, so leave it alone.
+- **`parked`:** the owner parked it. The label is how hq sees a park, so `hq lanes promotable` leaves the issue out. Only the owner decides a park, as [fields.md](references/fields.md) says.
 - **vers:** the owner picks which vers issues reach Ready. Groom them, and leave them in Backlog.
 - **An unplanned nixie slice:** a slice is planned with the owner into sub-issues first, as
   [fields.md](references/fields.md) says.
@@ -51,7 +51,8 @@ reaches Ready like any other. Three rules keep an issue out:
 ## A pass
 
 A **full pass** covers every open issue, once a day. A **light pass** covers Triage and the issues
-updated since your last pass; run it every other time.
+updated since your last pass; run it every other time. Both passes promote: step 5 runs on every
+pass, so an issue that meets the criteria reaches Ready within one run, not the next full pass.
 
 ```text
 - [ ] 1. Fetch the issues for this pass, and save every page
@@ -82,10 +83,12 @@ updated since your last pass; run it every other time.
    issue already holds the information: add `Code delivery` as the Action for a Bug, Feature,
    Improvement or Chore that lacks one, and record as a relation a blocker its text names. This is
    your work, never a question for the owner.
-5. **Close, free and promote.** Check completion and what each closed or merged blocker frees, as
-   [closing.md](references/closing.md) says. Then run `hq lanes promotable`: it lists each Backlog
-   issue whose blockers are Done and whose sections are complete. Move each to Ready, with a
-   comment that names the blocker that closed or the criteria it now meets.
+5. **Close, free and promote,** on a light pass as on a full one. Check completion and what each
+   closed or merged blocker frees, as [closing.md](references/closing.md) says. Then run
+   `hq lanes promotable`: it reads Backlog from Linear itself, so a light pass's smaller fetch
+   misses nothing, and it lists each Backlog issue whose blockers are Done and whose sections are
+   complete. Move each to Ready, with a comment that names the blocker that closed or the criteria
+   it now meets.
 6. **Compare,** on a full pass, as [overlap.md](references/overlap.md) says.
 7. **Flag,** as below.
 8. **End the pass without a message.** Save "TRIAGE PASS at <start time>" in

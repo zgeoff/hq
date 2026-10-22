@@ -49,6 +49,6 @@ An issue may take several PRs, such as a stack for one change or one PR in each 
 
 **Enabler.** Add the `enabler` label to an issue whose work unblocks or speeds up other work, such as review-tool and gate fixes, pre-push and test flakes, sync and CI fixes, and the GEO-1540 alignment rollouts. It changes no priority: within one priority, **Delivery** launches an `enabler` issue ahead of a one-off fix. Leave it off a fix that helps only its own issue. Add it as you groom each issue, and on a full pass to each open issue it fits. Create the label, ungrouped, when the team has none.
 
-**Parked.** Only the owner adds or removes the `parked` label. An issue that carries it stays out of Ready whatever its priority, so leave it in Backlog. Groom it like any other.
+**Parked.** Only the owner parks or unparks an issue. An issue that carries the `parked` label stays out of Ready whatever its priority, so leave it in Backlog. Groom it like any other. Create the label, ungrouped, when the team has none. When the owner parks or unparks an issue in words, in its text or a comment, rather than with the label, add or remove the label to match, with a comment that quotes his words. The label is how `hq lanes promotable` sees a park, and a park held only in words lets the issue back into Ready.
 
 **Stale.** An issue is stale when it's In Progress with no PR or agent session activity for 3 days, or in Triage or Backlog with no update for 14 days. In Review isn't stale: it waits on a merge.
