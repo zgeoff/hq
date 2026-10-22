@@ -60,7 +60,8 @@ test('it lists the complete Backlog issue whose blockers are Done and leaves out
 });
 
 test('it rejects a Backlog answer with an unexpected shape', async () => {
-  const call: LinearCall = () => Promise.resolve({ issues: { nodes: [{ identifier: 'GEO-9809' }], pageInfo: { hasNextPage: false, endCursor: null } } });
+  const answer = { issues: { nodes: [{ identifier: 'GEO-9809' }], pageInfo: { hasNextPage: false, endCursor: null } } };
+  const call: LinearCall = () => Promise.resolve(answer);
 
   const read = readPromotableIssues(call, 'GEO');
 
@@ -126,8 +127,8 @@ test('hq lanes promotable --json prints the promotable Backlog issues of the lan
     { identifier: 'GEO-9814', title: 'paint the whistle', description, labels: { nodes: [{ name: 'parked' }] }, inverseRelations: relations },
   ];
   server.use(
-    http.post(LINEAR_GRAPHQL_URL, async ({ request }) => {
-      const body: unknown = await request.json();
+    http.post(LINEAR_GRAPHQL_URL, async (info) => {
+      const body: unknown = await info.request.json();
       asked.push(body);
       return HttpResponse.json({ data: { issues: { nodes, pageInfo: { hasNextPage: false, endCursor: null } } } });
     }),
