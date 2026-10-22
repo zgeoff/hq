@@ -1,5 +1,6 @@
 import type { Runner } from '../runner/types.ts';
 import { HqError } from '../errors.ts';
+import { isFileRecord } from './is-file-record.ts';
 import { OWNER } from './owner.ts';
 import { parseChangedPrefixes } from './parse-changed-prefixes.ts';
 import { runGH } from './run-gh.ts';
@@ -12,7 +13,7 @@ export async function readChangedPrefixes(run: Runner, repo: string, number: str
   if (!content.trim()) {
     throw new HqError('bad_config', `release-please-config.json of ${repo} is empty`);
   }
-  const records = listed.split('\n').filter((record) => record !== '');
+  const records = listed.split('\n').filter(isFileRecord);
 
   // GitHub lists at most 3000 files of a PR, so a full list may hide a changed package.
   if (records.length >= FILES_LIMIT) {
