@@ -2,7 +2,7 @@
 
 Seven permanent atc sessions run on the owner's computer. Four of them run the roles that `docs/skill-development/roles-design.md` in zgeoff/hq-private records: `z-stu`, which the owner calls Stu, runs the main thread, the one conversation with the owner, and the other three run the background roles. Each session loads its own skill from a checkout of this repo, holds only that role's grants, and hands work to the others through Linear or an atc message.
 
-A fifth session, `z-q`, is the team developer. It builds `hq`, the sessions' own command-line tool, in the private repo zgeoff/hq, which also holds the fleet's skills. It works through PRs there, since the ruleset refuses pushes to `main`, and tracks requests in the repo rather than in Linear. The README says who owns which paths.
+A fifth session, `z-q`, is the team developer. It builds `hq`, the sessions' own command-line tool, in this repo, zgeoff/hq, which also holds the fleet's skills. It works through PRs there, since the ruleset refuses pushes to `main`, and tracks requests in the repo rather than in Linear. The README says who owns which paths.
 
 A sixth session, `z-qa`, runs live checks, so the owner's real Nix stays untouched (GEO-924): on a PR's preview environment before the merge, and read-only on production once the release ships. `z-delivery` sends it each preview check, and `hq` tells it when a release ships. It answers with pass, fail or needs-Geoff per item, and closes an issue once its live check passes. `z-stu` agrees its start prompt, and `hq fleet` starts it.
 
