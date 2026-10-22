@@ -1,9 +1,10 @@
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { HqError } from '../errors.ts';
 import { boundedRunner } from '../runner/bounded-runner.ts';
 import type { Runner } from '../runner/types.ts';
 import { buildRunDir } from './build-run-dir.ts';
+import { INSTALL_MARKER } from './install-marker.ts';
 import { requireOK } from './require-ok.ts';
 
 export interface PinResult {
@@ -28,10 +29,10 @@ async function requireClone(run: Runner, clone: string): Promise<void> {
   await requireOK(run, ['gh', 'repo', 'clone', 'zgeoff/noslop', clone, '--', '-q'], dirname(clone));
 }
 
-// The commit's folder, made once: an installed folder is reused as it is.
+// The commit's folder, made once: a folder whose install completed is reused as it is.
 async function createRunDir(run: Runner, base: string, full: string): Promise<PinResult> {
   const clone = buildRunDir(base, full);
-  if (existsSync(`${clone}/node_modules`)) {
+  if (existsSync(`${clone}/${INSTALL_MARKER}`)) {
     return { sha: full, clone };
   }
   await run(['git', 'worktree', 'remove', '--force', clone], { cwd: base });
@@ -55,4 +56,6 @@ async function runNoslopInstall(run: Runner, clone: string): Promise<void> {
     const out = (install.stderr || install.stdout).trim().slice(-TAIL_CHARS);
     throw new HqError('command_failed', `bun install in ${clone} failed (${install.code}): ${out}`);
   }
+  mkdirSync(`${clone}/node_modules`, { recursive: true });
+  writeFileSync(`${clone}/${INSTALL_MARKER}`, '');
 }
