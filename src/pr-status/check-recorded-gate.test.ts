@@ -10,6 +10,7 @@ import { overrideEnv } from '../config/override-env.ts';
 import { openDb } from '../db/open-db.ts';
 import { setMeta } from '../db/set-meta.ts';
 import { checkRecordedGate } from './check-recorded-gate.ts';
+import { recordPRAnswer } from './record-pr-answer.ts';
 
 function setupTest() {
   const base = mkdtempSync(join(tmpdir(), 'hq-pr-gate-')),
@@ -143,4 +144,33 @@ test('it keeps the last seen head when a gate none follows a recorded head', asy
   await checkRecordedGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 });
 
   expect(ctx.db.query('SELECT head, gate, gate_head FROM pr_status').all()).toStrictEqual([{ head: FAKE_FULL_SHA, gate: 'none', gate_head: null }]);
+});
+
+test('it records a fail at the head it read when a reviewed PR changes an owner-held file without the lgtm', async () => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ prFiles: { code: 0, stdout: 'skills/kettle/SKILL.md\n', stderr: '' } });
+  createListedReview(ctx.db, { repo: 'hq', pr: 7, head: FAKE_FULL_SHA });
+
+  await expect(checkRecordedGate({ run: fake.run, db: ctx.db, rawRepo: 'hq', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: expect.stringContaining("needs the owner's lgtm at 0123456") });
+
+  expect(ctx.db.query('SELECT gate, gate_head FROM pr_status').all()).toStrictEqual([{ gate: 'fail', gate_head: FAKE_FULL_SHA }]);
+});
+
+test('it records no gate when an unreviewed PR changes an owner-held file without the lgtm', async () => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ prFiles: { code: 0, stdout: 'skills/kettle/SKILL.md\n', stderr: '' } });
+
+  await expect(checkRecordedGate({ run: fake.run, db: ctx.db, rawRepo: 'hq', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked' });
+
+  expect(ctx.db.query('SELECT COUNT(*) AS count FROM pr_status').get()).toStrictEqual({ count: 0 });
+});
+
+test("it records gate none for an unreviewed PR that changes an owner-held file under the owner's lgtm", async () => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ prFiles: { code: 0, stdout: 'skills/kettle/SKILL.md\n', stderr: '' } });
+  recordPRAnswer(ctx.db, { repo: 'hq', pr: 7, answer: 'lgtm', head: FAKE_FULL_SHA, source: 'console:kettle-2', note: null, actor: 'z-kettle' });
+
+  await expect(checkRecordedGate({ run: fake.run, db: ctx.db, rawRepo: 'hq', pr: 7 })).resolves.toStrictEqual({ mayMerge: true, reason: 'not a noslop repo: green CI is enough', reviewed: false });
+
+  expect(ctx.db.query('SELECT gate, gate_head FROM pr_status').all()).toStrictEqual([{ gate: 'none', gate_head: null }]);
 });

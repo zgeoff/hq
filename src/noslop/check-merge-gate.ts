@@ -1,12 +1,14 @@
 import { match } from 'ts-pattern';
 import { HqError } from '../errors.ts';
 import { findAcceptedRisks } from '../pr-status/find-accepted-risks.ts';
+import { readHeadLgtm } from '../pr-status/read-head-lgtm.ts';
 import { findOwnerOverride } from '../pr-status/find-owner-override.ts';
 import { readPRHead } from '../pr-status/read-pr-head.ts';
 import { assertPR } from './assert-pr.ts';
 import { buildSlug } from './build-slug.ts';
 import { checkCIGreen } from './check-ci-green.ts';
 import { collectOpenFindingIDs } from './collect-open-finding-ids.ts';
+import { findOwnerHeldTest } from './find-owner-held-test.ts';
 import { isBotAuthor } from './is-bot-author.ts';
 import type { PRAuthor } from './is-bot-author.ts';
 import { isNoslopListed } from './is-noslop-listed.ts';
@@ -17,6 +19,7 @@ import { readGateFacts } from './read-gate-facts.ts';
 import type { GateFacts } from './read-gate-facts.ts';
 import { readNoslopFindings } from './read-noslop-findings.ts';
 import { readOKReviews } from './read-ok-reviews.ts';
+import { readPRFiles } from './read-pr-files.ts';
 import { pickNoslopVerdict } from './pick-noslop-verdict.ts';
 import type { NoslopGateFacts } from './pick-noslop-verdict.ts';
 import { resolveEngine } from './resolve-engine.ts';
@@ -44,6 +47,7 @@ export async function checkMergeGate(request: PRRequest, onHead?: OnGateHead): P
       throw buildBlock(parsed, request.pr, red.reason);
     })
     .exhaustive();
+  await checkOwnerHeld(request, parsed, facts.headRefOid);
   if (unreviewed !== null) {
     return { mayMerge: true, reason: unreviewed, reviewed: false };
   }
@@ -61,6 +65,31 @@ function readUnreviewedRoute(request: PRRequest, parsed: ParsedRepo, author: PRA
     .with('codex', () => 'on Codex: green CI is enough')
     .with('noslop', () => null)
     .exhaustive();
+}
+
+// On every route: a change to an owner-held path needs the owner's own lgtm at the head.
+async function checkOwnerHeld(request: PRRequest, parsed: ParsedRepo, head: string): Promise<void> {
+  const isHeld = findOwnerHeldTest(parsed);
+  if (isHeld === null) {
+    return;
+  }
+  const files = await readPRFiles(request.run, buildSlug(parsed), request.pr);
+  const held = [...new Set(files.filter((file) => isHeld(file)))];
+  if (held.length === 0) {
+    return;
+  }
+  if (readHeadLgtm(request.db, parsed.repo, request.pr, head) === null) {
+    throw buildBlock(parsed, request.pr, `the PR changes owner-held files (${formatHeld(held)}) and needs the owner's lgtm at ${head.slice(0, 7)}: hq pr answer ${parsed.repo} ${request.pr} lgtm, from the console`);
+  }
+  const headNow = await readPRHead(request.run, buildSlug(parsed), request.pr);
+  if (headNow !== head) {
+    throw buildBlock(parsed, request.pr, `the PR's head moved from ${head.slice(0, 7)} while the gate ran, so no pass: run the gate again`);
+  }
+}
+
+function formatHeld(held: string[]): string {
+  const shown = held.slice(0, 3).join(', ');
+  return held.length > 3 ? `${shown} and ${held.length - 3} more` : shown;
 }
 
 function buildBlock(parsed: ParsedRepo, pr: number, reason: string): HqError {
