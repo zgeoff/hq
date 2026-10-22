@@ -155,6 +155,14 @@ function buildIssuesAnswer(ids: unknown) {
   const asked = Array.isArray(ids) ? ids : [];
   const nodes = linearIssues
     .filter((issue) => [issue.identifier, ...issue.previousIdentifiers].some((identifier) => asked.includes(identifier)))
-    .map((issue) => ({ identifier: issue.identifier, previousIdentifiers: issue.previousIdentifiers, state: { type: issue.stateType } }));
+    .map((issue) => ({
+      identifier: issue.identifier,
+      previousIdentifiers: issue.previousIdentifiers,
+      state: { type: issue.stateType },
+      title: issue.title ?? 'Invented issue',
+      completedAt: issue.completedAt ?? null,
+      canceledAt: issue.canceledAt ?? null,
+      labels: { nodes: issue.labels.map((name) => ({ name, parent: null })) },
+    }));
   return { issues: { nodes } };
 }

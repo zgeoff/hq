@@ -17,6 +17,8 @@ import { syncGoals } from '../goals/sync-goals.ts';
 import { goalsWeeklyTick } from '../goals/weekly/goals-weekly-tick.ts';
 import { syncKinds } from '../kinds/sync-kinds.ts';
 import { syncLinear } from '../kinds/sync-linear.ts';
+import { syncRunIssues } from '../linear/sync-run-issues.ts';
+import { dropCanceledRuns } from '../runs/drop-canceled-runs.ts';
 import { readCapacity } from '../lanes/read-capacity.ts';
 import { readLanes } from '../lanes/read-lanes.ts';
 import { tick } from '../lanes/tick.ts';
@@ -153,8 +155,15 @@ export async function watchTick(db: Database, d: WatchDeps): Promise<boolean> {
       noteGhAuth(db, msg(error));
       d.log(`${at()} unblock conditions failed: ${msg(error)}`);
     }
+
+    // Set only by a GitHub pass in this tick that read every PR: the one pass a drop may trust.
+    let cleanGitHubAt: string | null = null;
     try {
+      const factsAt = at();
       const facts = await step('run PRs on GitHub', () => runGitHubFactsTick(db, d.run));
+      if (facts && facts.errors.length === 0) {
+        cleanGitHubAt = factsAt;
+      }
       if (facts && facts.closed.length > 0) {
         d.log(`${at()} run PRs: closed ${facts.closed.join(', ')} as GitHub reports`);
       }
@@ -169,6 +178,22 @@ export async function watchTick(db: Database, d: WatchDeps): Promise<boolean> {
     } catch (error) {
       noteGhAuth(db, msg(error));
       d.log(`${at()} run PRs failed: ${msg(error)}`);
+    }
+    try {
+      // The Linear state of each open run's issue, at most every 10 min: the sweep alerts on a
+      // closed issue. A run whose issue was canceled with no open or merged PR drops only after a
+      // clean GitHub pass in this same tick has attached every new PR.
+      if (now().getTime() - Date.parse(getMeta(db, 'run_issues_checked_at') ?? '1970-01-01T00:00:00Z') > 10 * 60_000) {
+        // The throttle: set even when the read fails.
+        setMeta(db, 'run_issues_checked_at', at());
+        await step('run issues in Linear', () => syncRunIssues(db, makeAuditedLinearCaller(db, d.run)));
+        const dropped = dropCanceledRuns(db, d.me, cleanGitHubAt);
+        if (dropped.length > 0) {
+          d.log(`${at()} run issues: dropped ${dropped.join(', ')}, canceled in Linear before any merge`);
+        }
+      }
+    } catch (error) {
+      d.log(`${at()} run issues in Linear failed: ${msg(error)}`);
     }
     try {
       if (sampleUsage(db)) d.log(`${at()} Claude usage: new reading stored`);
