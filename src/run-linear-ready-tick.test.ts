@@ -91,3 +91,12 @@ test('it records a failed pacing read as the error and asks Linear nothing', asy
   expect(getMeta(ctx.db, 'lanes_ready_linear_error')).toBe("can't read invented pacing.json");
   expect(call).not.toHaveBeenCalled();
 });
+
+test('it reads Ready when pacing.json gives only slot caps and names no lanes', async () => {
+  const ctx = setupTest();
+  const call = mock<LinearCall>(() => Promise.resolve(buildReadyPage([{ identifier: 'GEO-9801' }], null)));
+
+  const read = await runLinearReadyTick(ctx.db, { call, readLanes: () => Promise.resolve(null), actor: 'hq-lanes', deadlineMs: 2000 });
+
+  expect([read, getMeta(ctx.db, 'lanes_ready_linear_error')]).toStrictEqual([true, null]);
+});

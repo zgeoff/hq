@@ -12,7 +12,8 @@ const rulesSchema = z.strictObject({ team: z.string().min(1), readyState: z.stri
 
 // lanes.json checked against pacing.json's lane names: every lane it names exists there, each lane
 // matches something, every pacing.json lane has rules, and exactly one lane is the fallback.
-export function validateLaneRules(raw: unknown, pacingLanes: string[]): LaneRules {
+// pacingLanes null: pacing.json gives only slot caps, so the rules stand on their own.
+export function validateLaneRules(raw: unknown, pacingLanes: string[] | null): LaneRules {
   const parsed = rulesSchema.safeParse(raw);
   if (!parsed.success) {
     const issue = parsed.error.issues.at(0);
@@ -20,7 +21,7 @@ export function validateLaneRules(raw: unknown, pacingLanes: string[]): LaneRule
   }
   const rules = parsed.data;
   for (const [name, lane] of Object.entries(rules.lanes)) {
-    if (!pacingLanes.includes(name)) {
+    if (pacingLanes !== null && !pacingLanes.includes(name)) {
       throw new HqError('bad_lanes', `lanes.json: lane ${name} is not in pacing.json (${pacingLanes.join(', ')})`);
     }
     const matches = lane.issues.length + lane.projects.length + lane.labels.length + lane.childrenOf.length;
@@ -31,7 +32,7 @@ export function validateLaneRules(raw: unknown, pacingLanes: string[]): LaneRule
       throw new HqError('bad_lanes', `lanes.json: lane ${name} matches nothing`);
     }
   }
-  for (const name of pacingLanes) {
+  for (const name of pacingLanes ?? []) {
     if (!(name in rules.lanes)) {
       throw new HqError('bad_lanes', `lanes.json: pacing.json lane ${name} has no rules`);
     }

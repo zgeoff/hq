@@ -4,13 +4,13 @@ import { loadPacing } from './load-pacing.ts';
 import { pacingPath } from './pacing-path.ts';
 import type { Capacity, Sample } from './types.ts';
 
-// capacity.sh's reading with pacing.json's lanes. A capacity failure is the sample's error first;
+// capacity.sh's reading with pacing.json's lanes and slot caps. A capacity failure is the sample's error first;
 // with capacity read, lanes pacing.json refuses are.
 export async function readCapacity(run: Runner): Promise<Sample> {
   const pacing = await loadPacing(pacingPath()),
     ran = await run(['bash', LANES.capacityScript()]),
     read = parseCapacityRun(ran);
-  return { cap: read.cap, impMib: pacing.impMib, lanes: pacing.lanes, error: read.cap === null ? read.error : pacing.error };
+  return { cap: read.cap, impMib: pacing.impMib, lanes: pacing.lanes, slots: pacing.slots, error: read.cap === null ? read.error : pacing.error };
 }
 
 interface CapacityRead {

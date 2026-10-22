@@ -17,7 +17,7 @@ const READ_AT = 'lanes_ready_linear_at';
 // the stale alert, and a page that answers after the deadline writes nothing. False when not due.
 interface LinearReadyTickDeps {
   call: LinearCall;
-  readLanes: () => Promise<LaneConfig[]>;
+  readLanes: () => Promise<LaneConfig[] | null>;
   actor: string;
   deadlineMs: number;
 }
@@ -37,10 +37,7 @@ export async function runLinearReadyTick(db: Database, deps: LinearReadyTickDeps
   };
   try {
     const lanes = await deps.readLanes();
-    const rules = validateLaneRules(
-      rulesTable,
-      lanes.map((lane) => lane.name),
-    );
+    const rules = validateLaneRules(rulesTable, lanes?.map((lane) => lane.name) ?? null);
     await withDeadline(readLinearReady(db, cancellableCall, deps.actor, rules), deps.deadlineMs, 'lanes Ready from Linear');
   } catch (error) {
     abandoned.abort();

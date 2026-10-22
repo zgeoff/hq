@@ -67,7 +67,7 @@ async function readCounts(call: LinearCall, terms: readonly FocusTerm[]): Promis
   if (terms.length === 0) {
     return { counts: [], error: null };
   }
-  const rules = validateLaneRules(rulesTable, Object.keys(rulesTable.lanes));
+  const rules = validateLaneRules(rulesTable, null);
   try {
     const [ready, backlog] = await Promise.all([readTeamIssues(call, rules.team, rules.readyState), readTeamIssues(call, rules.team, BACKLOG_STATE)]);
     const at = new Date(0).toISOString();

@@ -9,11 +9,18 @@ export interface Capacity {
   design?: { room?: boolean };
 }
 
+// The slot caps by place the lanes' pool fills (pacing.json `slots`, or its lanes summed).
+export interface PacingSlots {
+  imp: number;
+  local: number;
+}
+
 export interface Sample {
   cap: Capacity | null;
   impMib: number;
   error: string | null;
   lanes?: LaneConfig[] | null; // pacing.json's lanes; absent or null: one pool of imp slots
+  slots?: PacingSlots | null; // the pool's caps; absent or null with the lanes
 }
 
 export interface TickResult {

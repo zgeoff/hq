@@ -34,12 +34,12 @@ export interface SlotPlan {
 // The lanes' plan for this look: the pool's free slots, filled from the focus terms in order, then any
 // other eligible work. A focus change shows at the next look; running runs keep their slots.
 export function readSlotPlan(db: Database, sample: Sample, at: Date = now()): SlotPlan | null {
-  if (!sample.lanes || !sample.cap) {
+  if (!sample.slots || !sample.cap) {
     return null;
   }
   const running = readRunningByPlace(db, at);
   const room = loadImpRoom(db, { budgetSlots: slotsFrom(sample.cap, sample.impMib).slots, impMib: sample.impMib }, at);
-  const pool = buildSlotPool(sample.lanes, running, room);
+  const pool = buildSlotPool(sample.slots, running, room);
   const focus = readFocus(db);
   const snapshot = readReadySnapshot(db, at);
   if (snapshot === null) {

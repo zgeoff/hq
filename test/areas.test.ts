@@ -19,6 +19,7 @@ import { idleSlotMinutes } from '../src/lanes/idle-slot-minutes.ts';
 import { reportReady } from '../src/lanes/report-ready.ts';
 import { formatLineRoom } from '../src/lanes/format-line-room.ts';
 import { loadImpRoom } from '../src/lanes/load-imp-room.ts';
+import { parsePacingSlots } from '../src/lanes/parse-pacing-slots.ts';
 import { readSlotPlan } from '../src/lanes/read-slot-plan.ts';
 import { tick } from '../src/lanes/tick.ts';
 import { checkReadyStale } from '../src/lanes/check-ready-stale.ts';
@@ -38,8 +39,9 @@ const T0 = '2026-10-16T01:00:00Z';
 const atMin = (m: number) => at(new Date(Date.parse(T0) + m * 60_000).toISOString());
 const PACING = { lanes: { imp: { 'nixie-slice': 3, 'nixie-maintenance': 2, atc: 2, imp: 2, cloud: 1 }, local: { flexible: 2 } } };
 const LANES = parseLanes(PACING);
+const SLOTS = parsePacingSlots(PACING);
 const cap = (freeMib: number) => ({ imp: { freeMib, room: true }, providers: { claude: { room: true, unattended: true, target: 'imp' } } });
-const sample = (freeMib: number) => ({ cap: cap(freeMib), impMib: 2048, error: null, lanes: LANES });
+const sample = (freeMib: number) => ({ cap: cap(freeMib), impMib: 2048, error: null, lanes: LANES, slots: SLOTS });
 const run = (issue: string, lane: string | null, place: 'imp' | 'local' = 'imp') =>
   addRun(db, { issue, title: 'Invented kettle work', place, session: null, next: 'Agent working.', gate: null, geoffChat: false, lane, actor: 'z-delivery' });
 const msgs = () => db.query('SELECT text FROM outbox').all() as { text: string }[];
@@ -150,7 +152,7 @@ test('the samples count the slots the plan fills from the first free minute; onl
   setMeta(db, 'lanes_ready_issues', JSON.stringify({ at: T0, eligible: ['GEO-21', 'GEO-22', 'GEO-23'].map((issue) => buildReadyIssue(issue)), design: [] }));
   for (const m of [0, 5, 10]) {
     atMin(m);
-    tick(db, { ...sample(0), lanes: LANES }, 'hq-lanes');
+    tick(db, { ...sample(0), lanes: LANES, slots: SLOTS }, 'hq-lanes');
   }
   expect((db.query('SELECT slots FROM lanes_samples ORDER BY seq').all() as { slots: number }[]).map((r) => r.slots)).toEqual([2, 2, 2]);
   expect(idleSlotMinutes(db, 1).slotMinutes).toBe(20);
@@ -161,7 +163,7 @@ test('impd at its non-Nix line holds the pool\'s imp slots and says why; a stale
       const pool = readSlotPlan(db, reading)?.pool;
       return [pool?.impFree, pool?.held];
     },
-    reading = { cap: cap(8192), impMib: 2048, error: null, lanes: LANES };
+    reading = { cap: cap(8192), impMib: 2048, error: null, lanes: LANES, slots: SLOTS };
   db.query('DELETE FROM capacity_samples').run();
   setCapacitySetting(db, 'nonnixMaxMib', null, 'z-delivery');
   createCapacitySample(db, { at: T0, nonnixAwakeMib: 14_336 });
@@ -179,9 +181,9 @@ test('with no lanes in pacing.json, the one imp pool is held under impd\'s non-N
   db.query('DELETE FROM capacity_samples').run();
   setCapacitySetting(db, 'nonnixMaxMib', null, 'z-delivery');
   createCapacitySample(db, { at: T0, nonnixAwakeMib: 14_336 });
-  expect(tick(db, { ...sample(8192), lanes: null }, 'hq-lanes').slots).toBe(1);
+  expect(tick(db, { ...sample(8192), lanes: null, slots: null }, 'hq-lanes').slots).toBe(1);
   createCapacitySample(db, { at: T0, nonnixAwakeMib: 16_384 });
-  expect(tick(db, { ...sample(8192), lanes: null }, 'hq-lanes').slots).toBe(0);
+  expect(tick(db, { ...sample(8192), lanes: null, slots: null }, 'hq-lanes').slots).toBe(0);
 });
 
 test('hq run lane takes two words, one quoted word, or --lane', () => {
@@ -319,7 +321,7 @@ test('a blocked run waiting on the owner whose session is idle 15 min holds no s
 });
 
 test('a slot a gone session frees on imp stays held while impd is at its line', () => {
-  const reading = { cap: cap(8192), impMib: 2048, error: null, lanes: LANES };
+  const reading = { cap: cap(8192), impMib: 2048, error: null, lanes: LANES, slots: SLOTS };
   addRun(db, { issue: 'GEO-10', title: 'Invented kettle work', place: 'imp', session: '00000011-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
   db.query('DELETE FROM capacity_samples').run();
   setCapacitySetting(db, 'nonnixMaxMib', null, 'z-delivery');
