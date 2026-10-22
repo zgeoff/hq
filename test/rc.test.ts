@@ -123,17 +123,20 @@ test('rcState reads the config named by HQ_CLAUDE_JSON and leaves the file as it
 });
 
 test('no code in src writes, renames, locks or opens for writing the Claude Code config file', () => {
-  const files = readdirSync(join(import.meta.dir, '..', 'src')).filter((f) => f.endsWith('.ts')),
-    mentions = /getClaudeJson|HQ_CLAUDE_JSON|\.claude\.json/u;
+  const files = readdirSync(join(import.meta.dir, '..', 'src'), { recursive: true, encoding: 'utf8' }).filter((file) => file.endsWith('.ts') && !file.endsWith('.test.ts'));
+  const mentions = /getClaudeJson|HQ_CLAUDE_JSON|\.claude\.json/u;
   const writers = /writeFileSync|appendFileSync|renameSync|copyFileSync|unlinkSync|rmSync|openSync|createWriteStream|Bun\.write|\.delete\(|flock|chmod/;
   const offenders: string[] = [];
+  const checked: string[] = [];
   for (const f of files) {
     const text = readFileSync(join(import.meta.dir, '..', 'src', f), 'utf8');
     // A file that mentions the config path and also writes anywhere is checked line by line.
     if (!mentions.test(text)) continue;
+    checked.push(f);
     text.split('\n').forEach((line, i) => {
       if (writers.test(line)) offenders.push(`${f}:${i + 1}: ${line.trim()}`);
     });
   }
-  expect(offenders).toEqual([]);
+  expect(checked).toStrictEqual(expect.arrayContaining(['trust/get-claude-json.ts', 'rc/rc-state.ts']));
+  expect(offenders).toStrictEqual([]);
 });
