@@ -145,9 +145,9 @@ export async function shipRuns(db: Database, run: Runner, at: Date = now(), opts
           continue;
         }
         if (found) {
-          s.tag = found.tag;
-          s.at = found.at ?? iso(at);
-          save(s);
+          const shipped = { ...s, tag: found.tag, at: found.at ?? iso(at) };
+          save(shipped);
+          Object.assign(s, shipped);
           res.shippedPrs++;
         }
       } catch (e) {

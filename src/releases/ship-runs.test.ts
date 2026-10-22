@@ -46,6 +46,27 @@ test('it ships a tools PR once the one package it changed has a release holding 
   expect(ctx.readPr('tools#5')).toStrictEqual({ merge_sha: buildMockSha(5), shipped_tag: 'alpha@1.0.0', shipped_at: '2026-10-15T00:00:00Z' });
 });
 
+test('it moves no run whose shipment write failed, and reports the failure', async () => {
+  const ctx = setupTest();
+  createMergedRun(ctx.db, 'GEO-72', ['tools#7']);
+  ctx.db.run("CREATE TEMP TRIGGER refuse_shipment BEFORE UPDATE OF shipped_at ON run_prs WHEN NEW.shipped_at IS NOT NULL BEGIN SELECT RAISE(ABORT, 'invented: shipment refused'); END");
+  const run = buildStubSourceGH(
+    {
+      shas: { 'tools#7': buildMockSha(7) },
+      contains: { 'alpha@1.0.0': [buildMockSha(7)] },
+      releases: { tools: [buildMockRelease('alpha@1.0.0', '2026-10-15T00:00:00Z')] },
+      config: { tools: { packages: { 'packages/alpha': { component: 'alpha' } } } },
+      files: { 'tools#7': ['packages/alpha/src/a.ts'] },
+    },
+    ctx.calls,
+  );
+
+  const result = await shipRuns(ctx.db, run, ctx.now);
+
+  expect([result.moved, result.shippedPrs, result.errors]).toStrictEqual([[], 0, ['tools#7: invented: shipment refused']]);
+  expect(getRun(ctx.db, 'GEO-72')?.state).toBe('merged');
+});
+
 test('it waits on a tools PR while one of two changed packages has no release, then ships it with the latest-published one', async () => {
   const ctx = setupTest();
   createMergedRun(ctx.db, 'GEO-71', ['tools#6']);
