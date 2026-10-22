@@ -142,6 +142,14 @@ test('closed issues page through Linear; PR issues are typed, and an unknown id 
   ]);
 });
 
+test('it counts an issue Linear closed a millisecond into Monday in that week', async () => {
+  await syncClosed(db, () => Promise.resolve({ issues: { nodes: [node('GEO-7', 'Bug', { completedAt: '2026-10-11T13:00:00.001Z' })], pageInfo: { hasNextPage: false, endCursor: null } } }), new Date('2026-10-11T13:00:00Z'));
+
+  const [previous, current] = kindWeeks(db, 2);
+  expect(current?.issues.Bug).toBe(1);
+  expect(previous?.issues.Bug).toBe(0);
+});
+
 test('each issue counts in the Sydney week it closed; the three bug shares', async () => {
   const ins = db.query('INSERT INTO merged_prs (repo, number, merged_at, title, kind, issue) VALUES (?, ?, ?, ?, ?, ?)');
   ins.run('atc', 1, '2026-10-12T01:00:00Z', 'fix: one', 'fix', 'GEO-1');
