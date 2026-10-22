@@ -1,3 +1,4 @@
+import type { IssueType } from '../linear/issue-types.ts';
 import type { LaneConfig } from '../areas/types.ts';
 
 export interface Capacity {
@@ -65,11 +66,16 @@ export interface LaneRules {
   lanes: Record<string, LaneRule>;
 }
 
-// A Ready issue as Linear reports it.
+// A Ready issue as Linear reports it. labels holds every label name, the Type label included;
+// priority is Linear's: 1 urgent to 4 low, 0 none.
 export interface ReadyIssue {
   identifier: string;
   project: string | null;
+  projectLabels: string[];
   labels: string[];
+  type: IssueType;
+  priority: number;
+  createdAt: string;
   parent: string | null;
 }
 
