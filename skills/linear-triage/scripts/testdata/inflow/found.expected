@@ -1,0 +1,19 @@
+{
+  "since": "2026-10-19T06:00:00Z",
+  "until": "2026-10-20T06:00:00Z",
+  "filed": 3,
+  "planned": 0,
+  "reactive": 3,
+  "closed": 0,
+  "flag": true,
+  "fromPR": [
+    {
+      "id": "GEO-2201",
+      "pr": "zgeoff/widgets#41"
+    },
+    {
+      "id": "GEO-2202",
+      "pr": "zgeoff/gadgets#7"
+    }
+  ]
+}

@@ -42,6 +42,7 @@ jq -s --arg since "$since" --arg until "$until" '
   def within: . != null and (epoch >= ($since | epoch)) and (epoch < ($until | epoch));
   def source: (.description // "")
     | ((capture("^From (?<pr>[A-Za-z0-9_.-]+#[0-9]+)").pr | "zgeoff/\(.)")
+       // (capture("Found by the .*? agent on (?<pr>[A-Za-z0-9_.-]+#[0-9]+)").pr | "zgeoff/\(.)")
        // (capture("github\\.com/(?<owner>[A-Za-z0-9_.-]+)/(?<repo>[A-Za-z0-9_.-]+)/pull/(?<n>[0-9]+)") | "\(.owner)/\(.repo)#\(.n)"));
   def planned: (.description // "") | test("^From design ");
   (map(unwrap) | add // [] | unique_by(.id)) as $issues

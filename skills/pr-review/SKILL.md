@@ -39,7 +39,7 @@ A repo-sync PR skips noslop and merges on green CI once every file it changes is
 
 ### The daily sweep
 
-Once a day, list every open update-bot PR across zgeoff with `gh search prs --owner zgeoff --state open --author app/renovate --limit 200`. Renovate merges its own patch, security, minor and lock-file PRs on green CI, and every bump of `@zgeoff/*` or the tools sync ref, but some stay open. For each PR it lists:
+Once a day, list every open update-bot PR across zgeoff with `gh search prs --owner zgeoff --state open --author app/renovate --limit 200`: some of the PRs that Renovate merges itself stay open. For each PR it lists:
 
 - **One of those kinds, CI green:** squash-merge it, with no review. A zgeoff/cloud one that changes `nixos/` or `packages/topology/` needs its NixOS check run first, as step 5 says.
 - **One of those kinds, CI red:** send it to `z-delivery`, which launches an agent to make it green; merge it once CI is green.
@@ -56,4 +56,4 @@ A stack merges in one call, never layer by layer: merge it as [stacks.md](refere
 
 - When a ruleset blocks a merge, tell `z-delivery` what blocks it.
 - Message only the agents whose PRs you review, `z-delivery`, and `z-stu` with a repo-sync PR that would drop a local edit. Never type into an agent's session.
-- Quote no the owner message in a PR comment.
+- Quote no message of the owner's in a PR comment.
