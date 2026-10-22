@@ -434,6 +434,13 @@ test('it refuses a PR in hq whose head moved after the lgtm check', async () => 
   await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'hq', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: expect.stringContaining('head moved') });
 });
 
+test('it refuses a PR in hq that changes only source files when its head moved after the file read', async () => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ prFiles: { code: 0, stdout: 'src/kettle.ts\n', stderr: '' }, prHead: { code: 0, stdout: JSON.stringify({ headRefOid: 'f00dfeedf00dfeedf00dfeedf00dfeedf00dfeed' }), stderr: '' } });
+
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'hq', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: "the PR's head moved from 0123456 while the gate ran, so no pass: run the gate again" });
+});
+
 test('it reads no changed files for a repo with no owner-held paths', async () => {
   const ctx = setupTest();
   const fake = buildFakeRunner();
