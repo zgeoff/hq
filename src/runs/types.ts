@@ -96,6 +96,7 @@ export interface FeedEvent {
 export interface IngestResult {
   read: number;
   notes: number;
+  routed: number;
   finals: string[];
   unmatched: number;
   reset: boolean;

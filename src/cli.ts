@@ -269,6 +269,8 @@ import { syncKinds } from './kinds/sync-kinds.ts';
 import { syncLinear } from './kinds/sync-linear.ts';
 import { weeksBack } from './kinds/weeks-back.ts';
 import { makeAuditedLinearCaller } from './linear/make-audited-linear-caller.ts';
+import { readPromotableIssues } from './lanes/read-promotable-issues.ts';
+import rulesTable from '../lanes.json';
 import { runLinearCommand } from './linear/run-linear-command.ts';
 import { mergedRuns } from './sizes/merged-runs.ts';
 import { parseSize } from './sizes/parse-size.ts';
@@ -753,8 +755,8 @@ async function watchRuns(db: Database, me: string): Promise<void> {
   const c = await AtcClient.open();
   try {
     const ing = await ingestNotes(db, c);
-    if (ing.notes || ing.reset || ing.bootstrapped) {
-      console.log(`${iso(now())} notes: ${ing.notes} recorded${ing.finals.length ? `, final: ${ing.finals.join(', ')}` : ''}${ing.reset ? ', feed cursor reset' : ''}${ing.bootstrapped ? ', feed cursor started at the end' : ''}`);
+    if (ing.notes > 0 || ing.routed > 0 || ing.reset || ing.bootstrapped) {
+      console.log(`${iso(now())} notes: ${ing.notes} recorded${ing.routed ? `, ${ing.routed} routed to ${orchestratorName()}` : ''}${ing.finals.length > 0 ? `, final: ${ing.finals.join(', ')}` : ''}${ing.reset ? ', feed cursor reset' : ''}${ing.bootstrapped ? ', feed cursor started at the end' : ''}`);
     }
     const sw = await sweepNow(db, c, me);
     if (sw.sent.length) console.log(`${iso(now())} sweep: told ${orchestratorName()} about ${sw.sent.map((a) => a.key).join(', ')}`);
@@ -1749,7 +1751,7 @@ async function newsCommand(db: Database, verb: string | undefined, flags: Flags)
   }
 }
 
-async function lanesCommand(db: Database, verb: string | undefined, flags: Flags): Promise<Out> {
+async function lanesCommand(db: Database, verb: string | undefined, flags: Flags, run: Runner): Promise<Out> {
   const by = () => actor(db, flags);
   switch (verb) {
     case 'tick': {
@@ -1784,6 +1786,10 @@ async function lanesCommand(db: Database, verb: string | undefined, flags: Flags
     case 'release': {
       const had = releaseLanes(db, await by());
       return { data: { released: had }, text: had ? 'Slot nudges resume from the next look.' : 'No lanes hold to release.' };
+    }
+    case 'promotable': {
+      const issues = await readPromotableIssues(makeAuditedLinearCaller(db, run), rulesTable.team);
+      return { data: { issues }, text: issues.length > 0 ? issues.map((issue) => `${issue.identifier}  ${issue.title}`).join('\n') : 'No Backlog issue is ready to promote.' };
     }
     case 'ready': {
       if (flags.lane) {
@@ -2075,7 +2081,7 @@ export const GROUPS: Record<string, (c: Ctx) => Promise<Out>> = {
   refusals: (c) => refusalsCommand(c.db, c.verb, c.flags),
   run: (c) => runCommand(c.db, c.verb, c.rest, c.flags),
   lanes: async (context) => {
-    const out = await lanesCommand(context.db, context.verb, context.flags);
+    const out = await lanesCommand(context.db, context.verb, context.flags, context.run);
     return context.verb === undefined || context.verb === 'status' || context.verb === 'log' ? withStaleBuild(out, checkLanesBuild((path) => readFileSync(path, 'utf8'))) : out;
   },
   stats: (c) => statsCommand(c.db, c.flags),

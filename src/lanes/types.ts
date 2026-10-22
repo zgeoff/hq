@@ -72,3 +72,18 @@ export interface ReadyIssue {
   labels: string[];
   parent: string | null;
 }
+
+// A Backlog issue that triage may promote to Ready.
+export interface PromotableIssue {
+  identifier: string;
+  title: string;
+}
+
+// A Backlog issue as the promotion check sees it: the state type of each issue that blocks it, and
+// whether Linear holds more relations than the one page hq read.
+export interface BacklogIssue {
+  description: string | null;
+  labels: string[];
+  blockerStates: string[];
+  moreRelations: boolean;
+}
