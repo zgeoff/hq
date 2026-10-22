@@ -1,6 +1,7 @@
 import { mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { HqError } from '../errors.ts';
 import { pidAlive } from '../rc/pid-alive.ts';
+import { isStaleTakeover } from './is-stale-takeover.ts';
 
 const LOCK_POLL_MS = 250;
 
@@ -49,8 +50,6 @@ function tryCreateLock(lock: string): boolean {
   return false;
 }
 
-const TAKEOVER_STALE_MS = 60_000;
-
 // Takeovers run one at a time under their own lock, and each checks the holder again inside it:
 // two callers that both saw a dead holder would otherwise each remove the lock, the second one
 // removing the lock the first had just installed. False when another takeover is under way.
@@ -59,10 +58,7 @@ function removeDeadLock(lock: string): boolean {
   try {
     mkdirSync(takeover);
   } catch {
-    // A takeover lasts milliseconds, so an old one is from a process that died inside it. One that
-    // ended before the read is not old: a new takeover may already hold its name.
-    const startedMs = readMtimeMs(takeover);
-    if (startedMs === null || Date.now() - startedMs <= TAKEOVER_STALE_MS) {
+    if (!isStaleTakeover(readMtimeMs(takeover), Date.now())) {
       return false;
     }
     rmSync(takeover, { recursive: true, force: true });
