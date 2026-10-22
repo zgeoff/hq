@@ -147,7 +147,9 @@ test('in z-stu /hq close closes the hq pane and opens none', async ($, on) => {
   await openBand($, app, { advanceMs: 0, hasSurvey: false });
   await $.command.run(HQ_RUN);
   const ran = await $.command.run({ ...HQ_RUN, args: 'close' });
-  expect([app.opened, app.closed, ran.text]).toEqual([['hq'], ['hq'], 'Closed the hq pane.']);
+  expect(app.opened).toEqual(['hq']);
+  expect(app.closed).toEqual(['hq']);
+  expect(ran.text).toBe('Closed the hq pane.');
 });
 
 test('in z-stu each slot is two Raster cells: held green while the lane has room, held amber when full, free shaded; a 0-slot lane draws none', async ($, on) => {
