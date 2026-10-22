@@ -1,5 +1,5 @@
 import { expect, onTestFinished, spyOn, test } from 'bun:test';
-import { mkdirSync, utimesSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, utimesSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { at, fakeAtc, freshDb } from '../../test/helpers.ts';
 import { main } from '../cli.ts';
@@ -168,4 +168,14 @@ test('a session list that fails fails the unopened list instead of listing every
   ctx.references(['kettle.md', 'widgets.md']);
 
   await expect(readUnopenedReferences({ days: 7, sessions: () => Promise.reject(new Error('atc kettle is cold')) })).rejects.toThrow("hq refs needs atc's session list to give each transcript its role: Error: atc kettle is cold");
+});
+
+test.skipIf(process.getuid?.() === 0)('a transcript hq cannot read fails the counts instead of leaving its opens uncounted', async () => {
+  const ctx = setupTest();
+  ctx.references(['kettle.md']);
+  ctx.transcript('-work-defs/locked.jsonl', [ctx.read(ctx.triage, '/d/skills/linear-triage/references/kettle.md')], 1);
+  chmodSync(join(ctx.directory, 'projects/-work-defs/locked.jsonl'), 0o000);
+  const sessions = () => Promise.resolve([{ id: 'id-triage', name: 'z-triage', alive: true, state: 'done', agentSessionID: ctx.triage }]);
+
+  await expect(readReferenceCounts({ days: 7, sessions })).rejects.toMatchObject({ code: 'EACCES' });
 });

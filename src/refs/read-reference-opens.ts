@@ -50,9 +50,12 @@ async function readFileOpens(path: string, onLine: (line: Buffer) => void): Prom
       }
       [carry, carryLength, skipping] = buildCarry([], 0, false, buffer.subarray(last + 1));
     }
-  } catch {
-    // gone or unreadable since the listing
-    return;
+  } catch (error) {
+    // Gone since the listing: nothing to count. Any other failure would leave its opens uncounted.
+    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+      return;
+    }
+    throw error;
   }
   if (!skipping && carryLength) {
     onLine(Buffer.concat(carry));
