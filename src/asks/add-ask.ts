@@ -102,6 +102,7 @@ const orderOf = (prev: Ask, input: AddInput) => (input.order === undefined ? pre
 function changed(prev: Ask, input: AddInput): boolean {
   return (
     prev.send_order !== orderOf(prev, input) ||
+    prev.for_session !== (input.forSession ?? prev.for_session) ||
     prev.title !== input.title ||
     prev.question !== input.question ||
     prev.body !== input.body ||

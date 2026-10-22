@@ -112,6 +112,13 @@ describe('add', () => {
     expect(nextEligible(db)?.id).toBe('geo-1-paint');
   });
 
+  test('it moves a queued call to the session a re-add names with --for, and the text is the same', () => {
+    addAsk(db, call());
+    const readded = addAsk(db, call({ forSession: 'z-kettle' }));
+    expect(readded.result).toBe('updated');
+    expect(getAsk(db, 'geo-1-paint')?.for_session).toBe('z-kettle');
+  });
+
   test('an open item keeps the question the owner saw', () => {
     addAsk(db, call());
     openAsk(db, { force: false, actor: 'z-stu' });
