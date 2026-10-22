@@ -176,6 +176,7 @@ import { formatLanePlan } from './lanes/format-lane-plan.ts';
 import { readCapacity } from './lanes/read-capacity.ts';
 import { readLanes } from './lanes/read-lanes.ts';
 import { releaseLanes } from './lanes/release-lanes.ts';
+import { parseLaneSkipArgs } from './lanes/parse-lane-skip-args.ts';
 import { runLaneSkipCommand } from './lanes/run-lane-skip-command.ts';
 import { reportReady } from './lanes/report-ready.ts';
 import { slotsFrom } from './lanes/slots-from.ts';
@@ -1795,7 +1796,8 @@ async function lanesCommand(context: Pick<Ctx, 'db' | 'verb' | 'rest' | 'flags' 
       return { data: { released: had }, text: had ? 'Slot nudges resume from the next look.' : 'No lanes hold to release.' };
     }
     case 'skip': {
-      return runLaneSkipCommand({ db, actor: await by(), at: now(), rest: context.rest, until: flags.until, reason: flags.reason });
+      const args = parseLaneSkipArgs(context.rest, flags.until, flags.reason);
+      return runLaneSkipCommand({ db, actor: await by(), at: now(), args });
     }
     case 'promotable': {
       const issues = await readPromotableIssues(makeAuditedLinearCaller(db, context.run), rulesTable.team);
