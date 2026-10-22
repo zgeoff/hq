@@ -147,8 +147,8 @@ test('in z-stu /hq close closes the hq pane and opens none', async ($, on) => {
   await openBand($, app, { advanceMs: 0, hasSurvey: false });
   await $.command.run(HQ_RUN);
   const ran = await $.command.run({ ...HQ_RUN, args: 'close' });
-  expect(app.opened).toEqual(['hq']);
-  expect(app.closed).toEqual(['hq']);
+  expect(app.opened).toStrictEqual(['hq']);
+  expect(app.closed).toStrictEqual(['hq']);
   expect(ran.text).toBe('Closed the hq pane.');
 });
 
