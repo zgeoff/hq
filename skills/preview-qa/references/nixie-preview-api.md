@@ -18,7 +18,7 @@ The API is oRPC under `/rpc`. Every call is a `POST` with the header `x-nixie-cl
 Reach the preview's imp from this PC with:
 
 ```sh
-HQ_CLOUD_HOST=$(jq -r '.HQ_CLOUD_HOST // empty' "${HQ_LOCAL_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/hq/local.json}")
+HQ_CLOUD_HOST=${HQ_CLOUD_HOST:-$(jq -r '.HQ_CLOUD_HOST // empty' "${HQ_LOCAL_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/hq/local.json}")}
 : "${HQ_CLOUD_HOST:?HQ_CLOUD_HOST is not set: run hq health}"
 ssh root@"$HQ_CLOUD_HOST" "docker exec imp-host impz exec <preview imp> -- sh -c 'cd /srv/preview/preview && <command>'"
 ```
