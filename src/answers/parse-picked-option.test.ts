@@ -16,3 +16,11 @@ test('an answer that matches no label exactly picks nothing and is all words', (
   expect(parsePickedOption('Descale it soon', OPTIONS)).toStrictEqual({ picked: null, stuPick: null, words: 'Descale it soon' });
   expect(parsePickedOption('Descale it', [])).toStrictEqual({ picked: null, stuPick: null, words: 'Descale it' });
 });
+
+test.each([
+  ['Keep | archive', { picked: 'Keep | archive', stuPick: false, words: null }],
+  ['Keep | archive | Before Friday.', { picked: 'Keep | archive', stuPick: false, words: 'Before Friday.' }],
+  ['Keep | Before Friday.', { picked: 'Keep', stuPick: true, words: 'Before Friday.' }],
+])('it picks the option whose whole label the answer %p holds, before a shorter label that leads it', (answer, picked) => {
+  expect(parsePickedOption(answer, [{ label: 'Keep', effect: 'It stays.', recommended: true }, { label: 'Keep | archive', effect: 'It moves to the archive.' }])).toStrictEqual(picked);
+});
