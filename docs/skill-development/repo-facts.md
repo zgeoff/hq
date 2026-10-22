@@ -51,6 +51,6 @@ Run `bun install` once. It installs oxfmt; no pre-commit hook runs. Before you c
 
 Load the `docs-writing` skill for technical documentation: `readme.md` files, `docs/`, `linear/`, and this file. Run its `check-prose.sh` over the files you touched.
 
-Skip `docs-writing` for `skills/`. Those files are prompts for a model, and their style follows [the Anthropic digest](docs/skill-development/anthropic-guidance.md).
+Skip `docs-writing` for `skills/`. Those files are prompts for a model, and their style follows [the Anthropic digest](anthropic-guidance.md).
 
 `.claude/skills/docs-writing` is a copy of the shared skill in `zgeoff/tools` (`sync/skills/docs-writing`); update it from there rather than editing it here.
