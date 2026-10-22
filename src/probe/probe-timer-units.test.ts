@@ -31,3 +31,20 @@ test('it carries the selected database into the probe service as an absolute pat
       `Environment="HQ_DB=${join(process.cwd(), 'kettle', 'state.db')}"\nExecStart=/bin/hq probe run\n`,
   );
 });
+
+test('it carries the local settings file into the probe service as an absolute path', () => {
+  const units = buildProbeTimerUnits('/bin/hq', { HOME: '/home/kettle', HQ_LOCAL_CONFIG: './kettle/local.json' });
+
+  expect(units.service).toInclude(`Environment="HQ_LOCAL_CONFIG=${join(process.cwd(), 'kettle', 'local.json')}"\n`);
+});
+
+test.each([
+  ['HQ_PRIVATE_DIR', './kettle/private', join(process.cwd(), 'kettle', 'private')],
+  ['HQ_CLAUDE_JSON', 'kettle/claude.json', join(process.cwd(), 'kettle', 'claude.json')],
+  ['HQ_BACKUP_DIRS', 'kettle/one:/srv/two', `${join(process.cwd(), 'kettle', 'one')}:/srv/two`],
+  ['HQ_PROBE_CONTROL', 'https://kettle.invalid/zen', 'https://kettle.invalid/zen'],
+])('it writes %s into the probe service resolved against the installing directory', (name, value, expected) => {
+  const units = buildProbeTimerUnits('/bin/hq', { HOME: '/home/kettle', [name]: value });
+
+  expect(units.service).toInclude(`Environment="${name}=${expected}"\n`);
+});
