@@ -1,7 +1,6 @@
 import type { Database } from 'bun:sqlite';
-import { getMeta } from '../../db/get-meta.ts';
 import { roleName } from '../../roles/role-name.ts';
-import { buildUnreadLine } from './build-unread-line.ts';
+import { findUnreadLine } from './find-unread-line.ts';
 import { formatItemList } from './format-item-list.ts';
 import { readFiledIssues } from './read-filed-issues.ts';
 import type { ThroughputLine } from './types.ts';
@@ -10,8 +9,9 @@ const NAME = 'Bad filings';
 
 // Issues filed today that point at a PR, but that z-review did not record as a follow-up. Target 0.
 export function readBadFilingsLine(db: Database, from: Date, at: Date): ThroughputLine {
-  if (getMeta(db, 'linear_throughput_at') === null) {
-    return buildUnreadLine(NAME, '0');
+  const unread = findUnreadLine(db, NAME, '0');
+  if (unread !== null) {
+    return unread;
   }
   const bad = readFiledIssues(db, from, at).flatMap((filed) => (filed.prRef !== null && filed.source !== 'review' ? [{ issue: filed.issue, prRef: filed.prRef }] : []));
   const reviewer = roleName('reviewer');

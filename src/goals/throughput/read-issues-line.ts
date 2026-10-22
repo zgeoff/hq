@@ -1,8 +1,7 @@
 import type { Database } from 'bun:sqlite';
 import { z } from 'zod';
 import { iso } from '../../clock/iso.ts';
-import { getMeta } from '../../db/get-meta.ts';
-import { buildUnreadLine } from './build-unread-line.ts';
+import { findUnreadLine } from './find-unread-line.ts';
 import { readFiledIssues } from './read-filed-issues.ts';
 import type { IssueSource, ThroughputLine } from './types.ts';
 
@@ -12,8 +11,9 @@ const SOURCES: readonly IssueSource[] = ['owner', 'design', 'agent', 'review', '
 
 // Issues filed against issues closed (completed or canceled), with no target.
 export function readIssuesLine(db: Database, from: Date, at: Date): ThroughputLine {
-  if (getMeta(db, 'linear_throughput_at') === null) {
-    return buildUnreadLine(NAME, 'none');
+  const unread = findUnreadLine(db, NAME, 'none');
+  if (unread !== null) {
+    return unread;
   }
   const filed = readFiledIssues(db, from, at);
   const closed = countSchema.parse(db.query(`SELECT COUNT(*) AS count FROM linear_issues WHERE state IN ('completed', 'canceled') AND closed_at >= ? AND closed_at < ?`).get(iso(from), iso(at)));

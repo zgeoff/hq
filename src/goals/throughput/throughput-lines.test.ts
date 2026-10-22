@@ -7,6 +7,7 @@ import { overrideEnv } from '../../config/override-env.ts';
 import { setMeta } from '../../db/set-meta.ts';
 import { addFollowup } from '../../followups/add-followup.ts';
 import { syncLinear } from '../../kinds/sync-linear.ts';
+import type { LinearCall } from '../../linear/types.ts';
 import { addRun } from '../../runs/add-run.ts';
 import { dailyText } from '../daily/daily-text.ts';
 import { sendThroughputAlerts } from './send-throughput-alerts.ts';
@@ -179,4 +180,22 @@ test('the Linear sync stamps the filed and In Progress issues with the time it w
     filed: ctx.db.query('SELECT issue, fetched_at FROM linear_filed').all(),
     started: ctx.db.query('SELECT issue, fetched_at FROM linear_started').all(),
   }).toStrictEqual({ filed: [{ issue: 'GEO-9801', fetched_at: at }], started: [{ issue: 'GEO-9802', fetched_at: at }] });
+});
+
+test('a failed read of the filed issues leaves the lines unavailable, with no colour and no alerts, until a read succeeds', async () => {
+  const ctx = setupTest();
+  const filed = [buildFiledNode('GEO-9801', 'From widgets#7\n\nThe widget drops a retry.')];
+  await syncLinear(ctx.db, makeThroughputLinearCall([]), new Date('2026-10-14T00:00:00Z'), new Date('2026-10-16T06:00:00Z'));
+  const working = makeThroughputLinearCall(filed);
+  const failing: LinearCall = (query, variables) => (query.includes('createdAt: {') ? Promise.reject(new Error('Linear answered 502: invented outage')) : working(query, variables));
+
+  const error = await syncLinear(ctx.db, failing, new Date('2026-10-14T00:00:00Z'), new Date(ctx.now)).catch((caught: unknown) => caught);
+  const failed = { line: ctx.findLine('Bad filings'), sent: sendThroughputAlerts(ctx.db, 'hq-lanes', new Date(ctx.now)) };
+  await syncLinear(ctx.db, working, new Date('2026-10-14T00:00:00Z'), new Date(ctx.now));
+
+  expect({ error, failed, recovered: ctx.findLine('Bad filings') }).toStrictEqual({
+    error: new Error('Linear answered 502: invented outage'),
+    failed: { line: '- Bad filings: Linear read failed, last read 2026-10-16T06:00:00Z; target 0 –', sent: [] },
+    recovered: '- Bad filings: today 1 (GEO-9801 from widgets#7); target 0 🔴 red',
+  });
 });

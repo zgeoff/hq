@@ -10,7 +10,8 @@ import { syncStarted } from '../linear/sync-started.ts';
 
 // The Linear side of a sync: closed issues and the types of issues merged PRs name, then the
 // issues filed and In Progress. An error never holds back the GitHub side, and a failed read of the
-// filed or In Progress issues never holds back the issue types the check-in trusts.
+// filed or In Progress issues never holds back the issue types the check-in trusts; it marks the
+// throughput lines unavailable until a later read succeeds.
 export async function syncLinear(db: Database, call: LinearCall, from: Date, at: Date = now()): Promise<{ closed: number; typed: number; filed: number; started: number }> {
   let closed = 0;
   let typed = 0;
@@ -23,8 +24,16 @@ export async function syncLinear(db: Database, call: LinearCall, from: Date, at:
     setMeta(db, 'linear_error', String((e as Error).message ?? e).slice(0, 300));
     throw e;
   }
-  const filed = await syncFiled(db, call, from, at);
-  const started = await syncStarted(db, call, at);
-  setMeta(db, 'linear_throughput_at', iso(at));
+  let filed = 0;
+  let started = 0;
+  try {
+    filed = await syncFiled(db, call, from, at);
+    started = await syncStarted(db, call, at);
+    setMeta(db, 'linear_throughput_at', iso(at));
+    setMeta(db, 'linear_throughput_error', '');
+  } catch (e) {
+    setMeta(db, 'linear_throughput_error', String((e as Error).message ?? e).slice(0, 300));
+    throw e;
+  }
   return { closed, typed, filed, started };
 }

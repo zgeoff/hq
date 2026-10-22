@@ -1,7 +1,6 @@
 import type { Database } from 'bun:sqlite';
 import { z } from 'zod';
-import { getMeta } from '../../db/get-meta.ts';
-import { buildUnreadLine } from './build-unread-line.ts';
+import { findUnreadLine } from './find-unread-line.ts';
 import { formatItemList } from './format-item-list.ts';
 import type { ThroughputAlert, ThroughputLine } from './types.ts';
 
@@ -11,8 +10,9 @@ const DAY_MS = 86_400_000;
 // In Progress issues with no open run and no session, and open runs whose issue is closed. Target 0
 // older than 24 hours; only those alert.
 export function readStaleLine(db: Database, _from: Date, at: Date): ThroughputLine {
-  if (getMeta(db, 'linear_throughput_at') === null) {
-    return buildUnreadLine(NAME, '0 older than 24h');
+  const unread = findUnreadLine(db, NAME, '0 older than 24h');
+  if (unread !== null) {
+    return unread;
   }
   const items = [...readUnrunItems(db), ...readClosedRunItems(db)];
   const old = items.filter((item) => at.getTime() - Date.parse(item.since) > DAY_MS);
