@@ -27,7 +27,7 @@ test('it drops a canceled run with no open or merged PR, notes why, and tells z-
   addPr(ctx.db, 'GEO-9842', 'kettle#42', 'kettle-bot');
   closePr(ctx.db, 'kettle#42', { to: 'closed', actor: 'kettle-bot' });
 
-  const dropped = dropCanceledRuns(ctx.db, 'hq-lanes');
+  const dropped = dropCanceledRuns(ctx.db, 'hq-lanes', '2026-10-21T02:00:00Z');
 
   expect(dropped).toStrictEqual(['GEO-9841', 'GEO-9842']);
   expect(ctx.db.query("SELECT issue, state, close_note FROM runs WHERE issue LIKE 'GEO-984%' ORDER BY issue").all()).toStrictEqual([
@@ -52,7 +52,16 @@ test('it keeps a canceled run with an open or merged PR, and every run whose iss
   ctx.addKettleRun('GEO-9853', 'open');
   ctx.addKettleRun('GEO-9854', 'completed');
 
-  expect(dropCanceledRuns(ctx.db, 'hq-lanes')).toStrictEqual([]);
+  expect(dropCanceledRuns(ctx.db, 'hq-lanes', '2026-10-21T02:00:00Z')).toStrictEqual([]);
   expect(ctx.db.query("SELECT state FROM runs WHERE issue LIKE 'GEO-985%' ORDER BY issue").all()).toStrictEqual([{ state: 'working' }, { state: 'merged' }, { state: 'working' }, { state: 'working' }]);
   expect(ctx.db.query('SELECT count(*) AS queued FROM outbox').get()).toStrictEqual({ queued: 0 });
+});
+
+test('it waits for a GitHub pass that ran after the cancellation before it drops a run', () => {
+  const ctx = setupTest();
+  ctx.addKettleRun('GEO-9871', 'canceled');
+
+  expect(dropCanceledRuns(ctx.db, 'hq-lanes', null)).toStrictEqual([]);
+  expect(dropCanceledRuns(ctx.db, 'hq-lanes', '2026-10-21T01:00:00Z')).toStrictEqual([]);
+  expect(dropCanceledRuns(ctx.db, 'hq-lanes', '2026-10-21T02:00:00Z')).toStrictEqual(['GEO-9871']);
 });

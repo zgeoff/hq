@@ -141,21 +141,6 @@ export async function watchTick(db: Database, d: WatchDeps): Promise<boolean> {
       d.log(`${at()} releases failed: ${msg(e)}`);
     }
     try {
-      // The Linear state of each open run's issue, at most every 10 min: the sweep alerts on a
-      // closed one, and a run whose issue was canceled before any merge is dropped here.
-      if (Date.now() - Date.parse(getMeta(db, 'run_issues_checked_at') ?? '1970-01-01T00:00:00Z') > 10 * 60_000) {
-        // The throttle: set even when the read fails.
-        setMeta(db, 'run_issues_checked_at', at());
-        await step('run issues in Linear', () => syncRunIssues(db, makeAuditedLinearCaller(db, d.run)));
-        const dropped = dropCanceledRuns(db, d.me);
-        if (dropped.length > 0) {
-          d.log(`${at()} run issues: dropped ${dropped.join(', ')}, canceled in Linear before any merge`);
-        }
-      }
-    } catch (error) {
-      d.log(`${at()} run issues in Linear failed: ${msg(error)}`);
-    }
-    try {
       const conditions = await step('unblock conditions', () => runUnblockConditionsTick(db, { call: makeAuditedLinearCaller(db, d.run), run: d.run }, d.me));
       if (conditions && conditions.settled.length > 0) {
         d.log(`${at()} unblock conditions: closed ${conditions.settled.join(', ')} as done`);
@@ -186,6 +171,22 @@ export async function watchTick(db: Database, d: WatchDeps): Promise<boolean> {
     } catch (error) {
       noteGhAuth(db, msg(error));
       d.log(`${at()} run PRs failed: ${msg(error)}`);
+    }
+    try {
+      // The Linear state of each open run's issue, at most every 10 min, after the GitHub pass has
+      // attached new PRs: the sweep alerts on a closed issue, and a run whose issue was canceled
+      // with no open or merged PR is dropped here.
+      if (Date.now() - Date.parse(getMeta(db, 'run_issues_checked_at') ?? '1970-01-01T00:00:00Z') > 10 * 60_000) {
+        // The throttle: set even when the read fails.
+        setMeta(db, 'run_issues_checked_at', at());
+        await step('run issues in Linear', () => syncRunIssues(db, makeAuditedLinearCaller(db, d.run)));
+        const dropped = dropCanceledRuns(db, d.me, getMeta(db, 'run_prs_merged_since'));
+        if (dropped.length > 0) {
+          d.log(`${at()} run issues: dropped ${dropped.join(', ')}, canceled in Linear before any merge`);
+        }
+      }
+    } catch (error) {
+      d.log(`${at()} run issues in Linear failed: ${msg(error)}`);
     }
     try {
       if (sampleUsage(db)) d.log(`${at()} Claude usage: new reading stored`);
