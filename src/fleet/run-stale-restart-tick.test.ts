@@ -83,6 +83,9 @@ function setupTest(config: { sessions?: RosterSession[]; cwd?: string } = {}) {
     setState(id: string, state: string) {
       Object.assign(roster.find((s) => s.id === id) ?? {}, { state });
     },
+    setCreatedAt(id: string, createdAt: number) {
+      Object.assign(roster.find((session) => session.id === id) ?? {}, { createdAt });
+    },
     setId(id: string, next: string) {
       Object.assign(roster.find((s) => s.id === id) ?? {}, { id: next });
       server.prompts.set(next, OLD_PROMPT);
@@ -628,6 +631,17 @@ test('it leaves an orchestrator session alone at five hours and two compactions'
 
   expect(ctx.atc.sent).toStrictEqual([]);
   expect(ctx.refresh()).toStrictEqual({});
+});
+
+test('it keeps the recorded start when atc reports a newer createdAt for the same session', async () => {
+  const ctx = setupTest({ sessions: [{ id: 'id-delivery', name: 'z-delivery', state: 'done', createdAt: Date.parse(NOON_SYDNEY) - 1 * 3_600_000 }] });
+  ctx.atc.prompts.set('id-delivery', NEW_PROMPT);
+
+  await ctx.tick(0, [ctx.delivery]);
+  ctx.setCreatedAt('id-delivery', Date.parse(NOON_SYDNEY) + 4 * 3_600_000);
+  await ctx.tick(300, [ctx.delivery]);
+
+  expect(ctx.atc.sent.map((message) => [message.session, message.text])).toStrictEqual([['id-delivery', expect.stringContaining('your scheduled restart is due (6 h since start)')]]);
 });
 
 test('it restarts a release session on the same schedule', async () => {
