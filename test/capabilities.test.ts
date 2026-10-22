@@ -178,7 +178,11 @@ test('shape: status', async () => {
 
 test('shape: fleet', async () => {
   setMeta(db, 'fleet_last', JSON.stringify({ at: '2026-10-14T01:00:00Z', dryRun: false, steps: [{ name: 'z-kettle', action: 'ok', detail: 'invented', id: 'id-kettle' }] }));
-  checkShape('fleet', (await hq('fleet')).json);
+  const fleet = await hq('fleet');
+  const keys = SHAPES['fleet']?.keys ?? [];
+
+  expect(keys).not.toHaveLength(0);
+  expect(keys.flatMap((key) => missing(fleet.json, key) ?? [])).toStrictEqual([]);
 });
 
 test('shape: fleet shows promptCheck for a declared session that is live in atc, and says so in the text', async () => {
