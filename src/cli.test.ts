@@ -65,6 +65,34 @@ test('it warns in hq lanes status when the checkout lanes.json differs from the 
   expect(JSON.parse(stdout)).toMatchObject({ staleBuild: `the installed hq carries an older lanes.json than ${fresh.dir}/projects/hq/lanes.json: the Ready read uses the old rules until \`bun run install-bin\` runs there` });
 });
 
+test('hq run place moves an imp run to local through the spawned CLI, and hq lanes counts it as local', async () => {
+  const fresh = freshDb();
+  onTestFinished(fresh.cleanup);
+  mkdirSync(`${fresh.dir}/bin`);
+  writeFileSync(`${fresh.dir}/bin/systemctl`, '#!/bin/sh\nexit 3\n');
+  chmodSync(`${fresh.dir}/bin/systemctl`, 0o755);
+  mkdirSync(`${fresh.dir}/skill/scripts`, { recursive: true });
+  writeFileSync(`${fresh.dir}/skill/scripts/capacity.sh`, `echo '${JSON.stringify({ imp: { freeMib: 0, room: false } })}'\n`);
+  writeFileSync(`${fresh.dir}/skill/pacing.json`, JSON.stringify({ slots: { imp: 2, local: 2 } }));
+  const hq = async (...args: string[]): Promise<{ code: number; stdout: string }> => {
+    const child = Bun.spawn(['bun', join(import.meta.dir, 'cli.ts'), ...args, '--json'], {
+      stdout: 'pipe',
+      stderr: 'pipe',
+      env: { ...process.env, HOME: fresh.dir, HQ_DB: fresh.path, HQ_PROJECTS: `${fresh.dir}/projects`, HQ_CAPACITY: `${fresh.dir}/skill/scripts/capacity.sh`, HQ_NOTIFY: 'off', HQ_NOW: NOON_SYDNEY, HQ_AS: 'z-delivery', PATH: `${fresh.dir}/bin:${process.env['PATH']}` },
+    });
+    const [code, stdout] = await Promise.all([child.exited, new Response(child.stdout).text()]);
+    return { code, stdout };
+  };
+  await hq('run', 'add', 'GEO-9894', '--title', 'Descale the kettle', '--where', 'imp');
+
+  const placed = await hq('run', 'place', 'GEO-9894', 'local', '--note', 'its session runs on this host');
+  const lanes = await hq('lanes');
+
+  expect(placed.code).toBe(0);
+  expect(JSON.parse(placed.stdout)).toMatchObject({ run: { issue: 'GEO-9894', place: 'local' } });
+  expect(JSON.parse(lanes.stdout)).toMatchObject({ plan: { pool: { impRunning: 0, localRunning: 1 } } });
+});
+
 test('hq run done closes the run, forgets its session through atc, and notes the wrap-up on the run', async () => {
   const fresh = freshDb();
   onTestFinished(fresh.cleanup);

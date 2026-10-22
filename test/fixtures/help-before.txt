@@ -28,6 +28,7 @@ hq 0.79.0: headquarters for the z- sessions. Every command takes --json.
   hq run list [--all] | show <issue|session> [--notes N] | watchlist [--write FILE] | sweep
   hq run session <issue> <id> [--add|--remove] a relaunch (new main session), or a helper joins/leaves
   hq run lane <issue> (<lane> | --lane LANE)   set a run's delivery lane (pacing.json lanes)
+  hq run place <issue> imp|local|none [--note T]  move an open run to where its session runs; the lanes count it there
   hq run reopen <issue> [--next T]   a done or dropped run back to working
   hq run state <issue> <working|blocked|merged|deploying|deploy-held|live-check> [--next T] [--waits-on T|none] [--waits-on-geoff|--not-geoff] [--check owed|none]
   hq run check <issue> owed|none    whether a live check is owed once the release ships (unset counts as owed; none sends the run to done)

@@ -72,6 +72,7 @@ import { reviewedPr } from './runs/reviewed-pr.ts';
 import { sameSha } from './runs/same-sha.ts';
 import { setField } from './runs/set-field.ts';
 import { setGeoffChat } from './runs/set-geoff-chat.ts';
+import { setPlace } from './runs/set-place.ts';
 import { setLiveCheck } from './runs/set-live-check.ts';
 import { setSession } from './runs/set-session.ts';
 import { setState } from './runs/set-state.ts';
@@ -915,6 +916,10 @@ ${r.result === 'added' ? 'On the board.' : 'Already on the board.'}` };
       const value = arg(1, verb);
       const r = setField(db, arg(0, 'issue'), verb, verb === 'gate' && value === 'none' ? null : value, await by());
       return { data: { run: r }, text: runLine(r) };
+    }
+    case 'place': {
+      const r = setPlace(db, arg(0, 'issue'), arg(1, 'place (imp, local or none)'), flags.note ?? null, await by());
+      return { data: { run: r }, text: `${runLine(r)}\nNow ${r.place}.` };
     }
     case 'geoff-chat': {
       const r = setGeoffChat(db, arg(0, 'issue'), arg(1, 'on or off') === 'on', await by());
