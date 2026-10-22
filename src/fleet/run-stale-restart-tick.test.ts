@@ -702,3 +702,14 @@ test('it keeps a deferred scheduled restart waiting out its backoff though the p
   expect(ctx.atc.sent).toHaveLength(1);
   expect(ctx.refresh()['z-delivery']).toMatchObject({ phase: 'idle', skips: 1, scheduled: '6 h since start' });
 });
+
+test.each(['running', 'needs_you'])('it never asks a %s session that is due a scheduled restart', async (state) => {
+  const ctx = setupTest({ sessions: [{ id: 'id-delivery', name: 'z-delivery', state, createdAt: Date.parse(NOON_SYDNEY) - 7 * 3_600_000 }] });
+  ctx.atc.prompts.set('id-delivery', NEW_PROMPT);
+
+  await ctx.tick(0, [ctx.delivery]);
+  await ctx.tick(5, [ctx.delivery]);
+
+  expect(ctx.atc.sent).toStrictEqual([]);
+  expect(ctx.atc.calls).toStrictEqual([]);
+});
