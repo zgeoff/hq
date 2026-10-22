@@ -6,6 +6,7 @@ import { at, freshDb } from '../../test/helpers.ts';
 import { makeStateCall } from '../../test/make-state-call.ts';
 import { runFocusCommand } from '../focus/run-focus-command.ts';
 import { addRun } from '../runs/add-run.ts';
+import { setState } from '../runs/set-state.ts';
 import { readLinearReady } from './read-linear-ready.ts';
 import { readSlotPlan } from './read-slot-plan.ts';
 import { validateLaneRules } from './validate-lane-rules.ts';
@@ -81,4 +82,15 @@ test('a reserved slot with nothing eligible in its area is lent to the focus wor
     ],
     lent: [{ area: 'imp', slots: 2 }],
   });
+});
+
+test('a closed run still in the Ready read stays out of the picks', async () => {
+  const ctx = setupTest();
+  await ctx.seedReady(ctx.readySeeds);
+  ctx.addLocalRun('GEO-9801');
+  setState(ctx.db, 'GEO-9801', 'dropped', { note: 'kettle recalled' }, 'z-delivery');
+
+  const plan = readSlotPlan(ctx.db, ctx.sample);
+
+  expect([plan?.plan?.picks.map((pick) => pick.issue), plan?.eligible]).toStrictEqual([['GEO-9805', 'GEO-9804', 'GEO-9802'], 4]);
 });

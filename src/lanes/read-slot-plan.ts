@@ -55,9 +55,10 @@ export function readSlotPlan(db: Database, sample: Sample, at: Date = now()): Sl
 
 const issuesSchema = z.array(z.object({ issue: z.string() }));
 
-// Every run still on the board, whether or not it holds a slot now: the lanes never pick it again.
+// Every issue with a run, whether or not it holds a slot now: the lanes never pick it again. A closed
+// run counts too, since the Ready read can still hold its issue and addRun refuses it until a reopen.
 function readOnBoard(db: Database): Set<string> {
-  const rows = issuesSchema.parse(db.query("SELECT issue FROM runs WHERE state NOT IN ('done', 'dropped')").all());
+  const rows = issuesSchema.parse(db.query('SELECT issue FROM runs').all());
   return new Set(rows.map((row) => row.issue));
 }
 
