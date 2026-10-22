@@ -189,15 +189,23 @@ async function runAskStep(pass: StalePass, turn: StaleTurn): Promise<void> {
   if ((await readBusyReason(pass, turn.session)) !== null) {
     return;
   }
-  const eventSeq = sendSaveRequest(pass.db, turn.entry.name, turn.session.id, parseStaleCommit(turn.reading.since));
-  pass.refresh[turn.entry.name] = {
-    sessionId: turn.session.id,
-    phase: 'asked',
-    askedAt: iso(pass.t),
-    eventSeq,
-    skips: turn.held?.skips ?? 0,
-    ...(turn.held?.reported ? { reported: true } : {}),
-  };
+
+  // The request and its asked phase commit together, so a stop between them cannot leave a sent
+  // request whose answer the next pass does not track.
+  pass.db
+    .transaction(() => {
+      const eventSeq = sendSaveRequest(pass.db, turn.entry.name, turn.session.id, parseStaleCommit(turn.reading.since));
+      pass.refresh[turn.entry.name] = {
+        sessionId: turn.session.id,
+        phase: 'asked',
+        askedAt: iso(pass.t),
+        eventSeq,
+        skips: turn.held?.skips ?? 0,
+        ...(turn.held?.reported ? { reported: true } : {}),
+      };
+      writeFleetRefresh(pass.db, pass.refresh);
+    })
+    .immediate();
   pass.acted = true;
 }
 
