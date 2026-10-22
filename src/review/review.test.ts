@@ -32,7 +32,12 @@ afterEach(() => {
 // The diff the fake checkout holds: by default a small gate change, so both passes run at medium.
 let diffPaths = 'src/gate.ts';
 let diffText = '+++ b/src/gate.ts\n+  if (!known.has(kettle)) return deny(kettle);\n';
+// The PR head GitHub reports, and the commit that fetching refs/pull/<n>/head gives.
+let headOid = 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678';
+let fetchedOid = 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678';
 beforeEach(() => {
+  headOid = 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678';
+  fetchedOid = 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678';
   diffPaths = 'src/gate.ts';
   diffText = '+++ b/src/gate.ts\n+  if (!known.has(kettle)) return deny(kettle);\n';
 });
@@ -46,7 +51,8 @@ function fake(fail: string | null = null, origin = 'git@github.com:zgeoff/widget
     if (line === 'git remote get-url origin') return { code: 0, stdout: `${origin}\n`, stderr: '' };
     if (line === 'git diff --name-only origin/main...HEAD') return { code: 0, stdout: `${diffPaths}\n`, stderr: '' };
     if (line === 'git diff origin/main...HEAD') return { code: 0, stdout: diffText, stderr: '' };
-    if (line.includes('--json headRefName,baseRefName')) return { code: 0, stdout: '{"headRefName":"feat","baseRefName":"main"}', stderr: '' };
+    if (line.includes('--json headRefName,headRefOid,baseRefName')) return { code: 0, stdout: `{"headRefName":"feat","headRefOid":"${headOid}","baseRefName":"main"}`, stderr: '' };
+    if (line === 'git rev-parse FETCH_HEAD') return { code: 0, stdout: `${fetchedOid}\n`, stderr: '' };
     if (cmd[0] === 'codex' && opts?.stdoutFile) await Bun.write(opts.stdoutFile, 'thinking\nline a\nline b\nNo findings.\n');
     if (cmd[0] === 'codex' && cmd[1] === 'exec') await Bun.write(cmd[cmd.indexOf('-o') + 1]!, 'src/gate.ts:12 denies an unknown input; test/hostile.ts holds its table.\n');
     if (line.includes('--json name,state,bucket')) return { code: 0, stdout: '[{"name":"test","state":"SUCCESS","bucket":"pass"},{"name":"lint","state":"FAILURE","bucket":"fail"}]', stderr: '' };
@@ -367,4 +373,20 @@ test('a repo without bun.lock gets no install', async () => {
 
 test('a review file of a zgeoff repo keeps its old name, and another owner\'s gets the owner', () => {
   expect([buildReviewStem('zgeoff', 'widgets', 7), buildReviewStem('ZGeoff', 'Widgets', 7), buildReviewStem('other', 'widgets', 7)]).toStrictEqual(['widgets7', 'widgets7', 'other-widgets7']);
+});
+
+test('it checks out the fetched PR head commit, never origin/<headRefName>, so a fork branch named like ours cannot pick our code', async () => {
+  const { run, calls } = fake();
+  await review(run, 'widgets', 7, { watch: false });
+  const lines = calls.map((c) => c.cmd.join(' '));
+  expect(lines).toContain('git fetch -q origin refs/pull/7/head');
+  expect(lines.find((l) => l.startsWith('git worktree add'))).toBe(`git worktree add -q --detach ${dir}/widgets7 a1b2c3d4e5f60718293a4b5c6d7e8f9012345678`);
+  expect(lines.some((l) => l.includes('origin/feat'))).toBe(false);
+});
+
+test('it refuses to review when the fetched pull ref is not the PR head GitHub reports', async () => {
+  fetchedOid = '0000000000000000000000000000000000000bad';
+  const { run, calls } = fake();
+  await expect(review(run, 'widgets', 7, { watch: false })).rejects.toMatchObject({ code: 'head_moved' });
+  expect(calls.some((c) => c.cmd.join(' ').startsWith('git worktree add'))).toBe(false);
 });

@@ -269,7 +269,12 @@ test('shape: review', async () => {
     if (line === 'git remote get-url origin') return { code: 0, stdout: 'git@github.com:zgeoff/widgets.git\n', stderr: '' };
     if (line === 'git diff --name-only origin/main...HEAD') return { code: 0, stdout: 'src/kettle.ts\n', stderr: '' };
     if (line === 'git diff origin/main...HEAD') return { code: 0, stdout: '+++ b/src/kettle.ts\n+  boil();\n', stderr: '' };
-    if (line.includes('--json headRefName,baseRefName')) return { code: 0, stdout: '{"headRefName":"feat","baseRefName":"main"}', stderr: '' };
+    if (line.includes('--json headRefName,headRefOid,baseRefName')) {
+      return { code: 0, stdout: '{"headRefName":"feat","headRefOid":"a1b2c3d4e5f60718293a4b5c6d7e8f9012345678","baseRefName":"main"}', stderr: '' };
+    }
+    if (line === 'git rev-parse FETCH_HEAD') {
+      return { code: 0, stdout: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678\n', stderr: '' };
+    }
     if (cmd[0] === 'codex' && opts?.stdoutFile) await Bun.write(opts.stdoutFile, 'No findings.\n');
     if (line.includes('--json name,state,bucket')) return { code: 0, stdout: '[{"name":"test","state":"SUCCESS","bucket":"pass"}]', stderr: '' };
     if (cmd[1] === 'api') return { code: 0, stdout: '0\n', stderr: '' };

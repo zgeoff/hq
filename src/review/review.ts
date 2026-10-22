@@ -36,10 +36,16 @@ export async function review(run: Runner, rawRepo: string, pr: number, opts: { w
   const S = reviewDir();
   mkdirSync(S, { recursive: true });
 
-  await withRepoLock(S, slug, () => must(run, ['git', 'fetch', '-q', 'origin'], dir));
-  const refs = JSON.parse(await must(run, ['gh', 'pr', 'view', String(pr), '-R', slug, '--json', 'headRefName,baseRefName'])) as { headRefName: string; baseRefName: string };
+  const refs = JSON.parse(await must(run, ['gh', 'pr', 'view', String(pr), '-R', slug, '--json', 'headRefName,headRefOid,baseRefName'])) as { headRefName: string; headRefOid: string; baseRefName: string };
   const head = refs.headRefName;
   const base = refs.baseRefName;
+  // A fork's branch can share a name with one of origin's, so origin/<headRefName> may not be the PR's code.
+  await withRepoLock(S, slug, async () => {
+    await must(run, ['git', 'fetch', '-q', 'origin'], dir);
+    await must(run, ['git', 'fetch', '-q', 'origin', `refs/pull/${pr}/head`], dir);
+    const fetched = await must(run, ['git', 'rev-parse', 'FETCH_HEAD'], dir);
+    if (fetched !== refs.headRefOid) throw new HqError('head_moved', `refs/pull/${pr}/head is ${fetched}, but the PR head is ${refs.headRefOid}; try again`);
+  });
   let allowDenyCode: number | null = null,
     codexCode: number,
     gate: { run: boolean; reason: string },
@@ -48,7 +54,7 @@ export async function review(run: Runner, rawRepo: string, pr: number, opts: { w
   rmSync(wt, { recursive: true, force: true });
   await withRepoLock(S, slug, async () => {
     await run(['git', 'worktree', 'prune'], { cwd: dir });
-    await must(run, ['git', 'worktree', 'add', '-q', '--detach', wt, `origin/${head}`], dir);
+    await must(run, ['git', 'worktree', 'add', '-q', '--detach', wt, refs.headRefOid], dir);
   });
   try {
     rmSync(reviewFile, { force: true });

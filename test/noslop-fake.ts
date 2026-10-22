@@ -118,6 +118,9 @@ function pickGhAnswer(script: FakeScript, line: string): RunResult | null {
   if (line.includes('--json headRefName,baseRefName')) {
     return buildResult(JSON.stringify({ headRefName: 'feat', baseRefName: 'main', body: script.prBody ?? '' }));
   }
+  if (line.includes('--json headRefName,headRefOid,baseRefName')) {
+    return buildResult(JSON.stringify({ headRefName: 'feat', headRefOid: FAKE_FULL_SHA, baseRefName: 'main' }));
+  }
   if (line.includes('--json headRefOid,author,statusCheckRollup')) {
     return script.prFacts ?? buildResult(JSON.stringify({ headRefOid: FAKE_FULL_SHA, author: JSON.parse(script.author ?? '{"author":{"login":"zgeoff","is_bot":false}}').author, statusCheckRollup: [{ __typename: 'CheckRun', name: 'test', status: 'COMPLETED', conclusion: 'SUCCESS' }] }));
   }
@@ -169,7 +172,7 @@ function pickAnswer(script: FakeScript, cmd: string[]): RunResult {
   if (line === 'git remote get-url origin') {
     return buildResult('git@github.com:zgeoff/widgets.git\n');
   }
-  if (line === 'git rev-parse HEAD') {
+  if (line === 'git rev-parse HEAD' || line === 'git rev-parse FETCH_HEAD') {
     return buildResult(`${FAKE_FULL_SHA}\n`);
   }
   if (cmd[1] === 'rev-list' && cmd[2] === '--parents') {
