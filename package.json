@@ -1,6 +1,6 @@
 {
   "name": "hq",
-  "version": "0.88.0",
+  "version": "0.89.0",
   "private": true,
   "bin": {
     "hq": "src/cli.ts"
