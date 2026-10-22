@@ -10,24 +10,28 @@ interface IssueSeed {
   blockerStates?: string[];
 }
 
-// A fake Linear that answers the Backlog query with one page of the given issues and records the
-// variables.
+// A fake Linear that answers the Backlog query with the given pages of issues, one per call in
+// order, each but the last naming a cursor for the next, and records the variables.
 function setupTest() {
   const variables: Record<string, unknown>[] = [];
-  const answerWith = (seeds: IssueSeed[]): LinearCall => {
-    const nodes = seeds.map((seed) => ({
-      identifier: seed.identifier,
-      title: seed.title,
-      description: seed.description,
-      labels: { nodes: (seed.labels ?? []).map((name) => ({ name })) },
-      inverseRelations: {
-        nodes: (seed.blockerStates ?? []).map((type, index) => ({ type: 'blocks', issue: { identifier: `GEO-97${index}`, state: { type } } })),
-        pageInfo: { hasNextPage: false },
-      },
-    }));
+  const answerWith = (...pages: IssueSeed[][]): LinearCall => {
+    const answers = pages.map((seeds, index) => {
+      const nodes = seeds.map((seed) => ({
+        identifier: seed.identifier,
+        title: seed.title,
+        description: seed.description,
+        labels: { nodes: (seed.labels ?? []).map((name) => ({ name })) },
+        inverseRelations: {
+          nodes: (seed.blockerStates ?? []).map((type, blocker) => ({ type: 'blocks', issue: { identifier: `GEO-97${blocker}`, state: { type } } })),
+          pageInfo: { hasNextPage: false },
+        },
+      }));
+      const last = index === pages.length - 1;
+      return { issues: { nodes, pageInfo: { hasNextPage: !last, endCursor: last ? null : `kettle-page-${index + 2}` } } };
+    });
     return (_query, vars) => {
       variables.push(vars);
-      return Promise.resolve({ issues: { nodes, pageInfo: { hasNextPage: false, endCursor: null } } });
+      return Promise.resolve(answers[variables.length - 1]);
     };
   };
   return { variables, answerWith };
@@ -66,4 +70,30 @@ test('it stops after twenty Backlog pages that each name another page', async ()
 
   await expect(read).rejects.toMatchObject({ code: 'linear_failed', message: 'more than 1000 Backlog issues; hq reads no further' });
   expect(cursors).toHaveLength(20);
+});
+
+test('it collects the promotable issues from every Backlog page, asking for each next page by its cursor', async () => {
+  const app = setupTest();
+  const description =
+    '## Outcome\n\nThe widgets ship.\n\n## Context\n\n- Project: workshop\n\n## Scope\n\nIn: the crate.\nOut: none stated.\n\n## Acceptance\n\n- [ ] The widgets ship in a test (unit test)\n\n## Actions\n\nCode delivery\n';
+  const call = app.answerWith(
+    [{ identifier: 'GEO-9810', title: 'crate the widgets', description }],
+    [
+      { identifier: 'GEO-9811', title: 'label the crates', description, labels: ['parked'] },
+      { identifier: 'GEO-9812', title: 'load the van', description },
+    ],
+  );
+
+  const issues = await readPromotableIssues(call, 'GEO');
+
+  expect([issues, app.variables]).toStrictEqual([
+    [
+      { identifier: 'GEO-9810', title: 'crate the widgets' },
+      { identifier: 'GEO-9812', title: 'load the van' },
+    ],
+    [
+      { after: null, team: 'GEO', state: 'Backlog' },
+      { after: 'kettle-page-2', team: 'GEO', state: 'Backlog' },
+    ],
+  ]);
 });
