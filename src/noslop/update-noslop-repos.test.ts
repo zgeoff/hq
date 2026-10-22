@@ -59,3 +59,30 @@ test.each([
   expect(() => updateNoslopRepos(ctx.db, 'on', names)).toThrow(/bare repo name|at least one repo/u);
   expect(loadNoslopSettings(ctx.db).repos).toStrictEqual([]);
 });
+
+test('it keeps a repo another hq process turns on while this change waits for the database', async () => {
+  const ctx = setupTest();
+  const other = Bun.spawn(
+    [
+      'bun',
+      '-e',
+      "const { Database } = require('bun:sqlite'); const db = new Database(process.env.KETTLE_DB); db.exec('PRAGMA busy_timeout = 5000; BEGIN IMMEDIATE'); db.query(\"INSERT INTO meta (key, value) VALUES ('noslop', ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value\").run(JSON.stringify({ repos: ['widgets'], sha: null })); console.log('held'); await Bun.sleep(300); db.exec('COMMIT');",
+    ],
+    { env: { ...Bun.env, KETTLE_DB: join(ctx.base, 'hq.db') }, stdout: 'pipe' },
+  );
+  onTestFinished(() => other.kill());
+  const reader = other.stdout.getReader();
+  let said = '';
+  while (!said.includes('held')) {
+    const chunk = await reader.read();
+    if (chunk.done) {
+      break;
+    }
+    said += new TextDecoder().decode(chunk.value);
+  }
+
+  updateNoslopRepos(ctx.db, 'on', ['atc']);
+  await other.exited;
+
+  expect(loadNoslopSettings(ctx.db).repos).toStrictEqual(['atc', 'widgets']);
+});
