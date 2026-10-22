@@ -356,6 +356,8 @@ test('it refuses a PR in hq that moves a skill out of skills/', async () => {
   const fake = buildFakeRunner({ prFiles: { code: 0, stdout: 'attic/SKILL.md\tskills/kettle/SKILL.md\n', stderr: '' } });
 
   await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'hq', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: expect.stringContaining('owner-held files (skills/kettle/SKILL.md)') });
+
+  expect(fake.lines().filter((line) => line.includes('/files?'))).toStrictEqual(['gh api --paginate repos/zgeoff/hq/pulls/7/files?per_page=100 --jq .[] | [.filename, .previous_filename // empty] | @tsv']);
 });
 
 test('it refuses a PR in hq-private that changes a start prompt with no lgtm at its head', async () => {
