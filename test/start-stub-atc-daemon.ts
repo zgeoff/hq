@@ -40,9 +40,7 @@ type PeerRequest = Parameters<ServerPeerHandleRequestFn>[0];
 
 const CODEC = new StandardRPCCodec(new StandardRPCSerializer(new StandardRPCJsonSerializer()));
 
-// A daemon on a unix socket that speaks atc's protocol 11 peer wire: one JSON message per line, the
-// hello first, a refusal under {code, message, data}. It answers each procedure in `procedures`
-// (keyed by the dotted method name) and refuses any other as unknown_method. The caller stops it.
+// A stand-in for atc's protocol 11 daemon, so hq's tests never reach the live daemon.
 export function startStubAtcDaemon(path: string, procedures: Record<string, StubProcedure>, options: StubAtcOptions = {}): StubAtcDaemon {
   const requests: StubAtcRequest[] = [],
     server = Bun.listen<Connection>({ unix: path, socket: buildHandlers(procedures, requests, options) });
