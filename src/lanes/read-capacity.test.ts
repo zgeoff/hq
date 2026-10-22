@@ -28,3 +28,9 @@ test('good lanes read with capacity carry no error', async () => {
   const sample = await readCapacity(realRunner);
   expect([sample.lanes, sample.error]).toStrictEqual([[{ name: 'cleanup', place: 'imp', size: 2 }], null]);
 });
+
+test("the sample carries pacing.json's local room, an unattended imp provider's localFallback", async () => {
+  writeFileSync(setupTest(), JSON.stringify({ slots: { imp: 4, local: 6 }, providers: { kettle: { unattended: true, target: 'imp', localFallback: 2 } } }));
+  const sample = await readCapacity(realRunner);
+  expect(sample.localRoom).toBe(2);
+});
