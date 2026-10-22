@@ -271,6 +271,7 @@ import { weeksBack } from './kinds/weeks-back.ts';
 import { makeAuditedLinearCaller } from './linear/make-audited-linear-caller.ts';
 import { readPromotableIssues } from './lanes/read-promotable-issues.ts';
 import rulesTable from '../lanes.json';
+import { runFocusCommand } from './focus/run-focus-command.ts';
 import { runLinearCommand } from './linear/run-linear-command.ts';
 import { mergedRuns } from './sizes/merged-runs.ts';
 import { parseSize } from './sizes/parse-size.ts';
@@ -438,6 +439,7 @@ const OPTIONS = {
   'updated-since': { type: 'string' },
   fields: { type: 'string' },
   out: { type: 'string' },
+  reserve: { type: 'string', multiple: true },
 } as const;
 
 export type Flags = ReturnType<typeof parse>['values'];
@@ -2084,6 +2086,7 @@ export const GROUPS: Record<string, (c: Ctx) => Promise<Out>> = {
     const out = await lanesCommand(context.db, context.verb, context.flags, context.run);
     return context.verb === undefined || context.verb === 'status' || context.verb === 'log' ? withStaleBuild(out, checkLanesBuild((path) => readFileSync(path, 'utf8'))) : out;
   },
+  focus: async (context) => runFocusCommand({ db: context.db, call: makeAuditedLinearCaller(context.db, context.run), actor: await actor(context.db, context.flags), verb: context.verb, rest: context.rest, reserves: context.flags.reserve ?? [] }),
   stats: (c) => statsCommand(c.db, c.flags),
   answers: (c) => Promise.resolve(runAnswersCommand(c.db, c.flags)),
   grant: (c) => runGrantCommand(c.db, c.verb, c.rest, c.flags),

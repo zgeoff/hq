@@ -1,0 +1,27 @@
+import type { Database } from 'bun:sqlite';
+import { iso } from '../clock/iso.ts';
+import { now } from '../clock/now.ts';
+import { logEvent } from '../log-event.ts';
+import { addNews } from '../news/add-news.ts';
+import { formatFocusLine } from './format-focus-line.ts';
+import type { Focus, FocusReserve, FocusTerm } from './types.ts';
+
+// Sets the focus, logs it and posts it to hq news, in one transaction. The lanes read it at their
+// next tick; running work keeps its slots.
+export function writeFocus(db: Database, terms: readonly FocusTerm[], reserves: readonly FocusReserve[], actor: string): Focus {
+  const MAX_LINE = 300;
+  const focus: Focus = { terms: [...terms], reserves: [...reserves], setAt: iso(now()), setBy: actor };
+  const line = formatFocusLine(focus);
+  const shown = line.length > MAX_LINE ? `${line.slice(0, MAX_LINE - 1)}…` : line;
+  db.transaction(() => {
+    db.query('INSERT INTO focus (id, terms, reserves, set_at, set_by) VALUES (1, ?, ?, ?, ?) ON CONFLICT (id) DO UPDATE SET terms = excluded.terms, reserves = excluded.reserves, set_at = excluded.set_at, set_by = excluded.set_by').run(
+      JSON.stringify(focus.terms),
+      JSON.stringify(focus.reserves),
+      focus.setAt,
+      actor,
+    );
+    logEvent(db, 'hq', 'focus', 'focus-set', actor, null, null, { terms: focus.terms.map((term) => term.text), reserves: focus.reserves });
+    addNews(db, { from: actor, topic: 'other', text: `Lanes focus set: ${shown}. It applies from the next lanes tick.`, issue: null, link: null, needsGeoff: false, tag: 'focus' });
+  }).immediate();
+  return focus;
+}
