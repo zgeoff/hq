@@ -29,7 +29,7 @@ export const SHAPES: Record<string, { command: string; keys: string[] }> = {
   },
   review: {
     command: 'hq review <repo> <pr> --json',
-    keys: ['ok', 'repo', 'pr', 'head', 'base', 'effort.effort', 'effort.reason', 'allowDeny.skipped', 'codexCode', 'checks[].name', 'checks[].state', 'openThreads'],
+    keys: ['ok', 'repo', 'pr', 'head', 'base', 'effort.effort', 'effort.reason', 'allowDeny.skipped', 'codexCode', 'checks[].name', 'checks[].state', 'checksError', 'openThreads'],
   },
   'pr status': {
     command: 'hq pr status <repo> <pr> --json',
@@ -56,6 +56,6 @@ export const SHAPES: Record<string, { command: string; keys: string[] }> = {
   },
   'review (noslop)': {
     command: 'hq review <repo> <pr> --json, on a PR that noslop reviews',
-    keys: ['ok', 'engine', 'repo', 'pr', 'head', 'base', 'sha', 'depth?', 'findings', 'notReviewed', 'round', 'fixesOnly', 'fixChecks[]?.findingID', 'fixChecks[]?.fixed', 'fixChecks[]?.reason', 'fixChecks[]?.title', 'checks[].name', 'checks[].state', 'openThreads'],
+    keys: ['ok', 'engine', 'repo', 'pr', 'head', 'base', 'sha', 'depth?', 'findings', 'notReviewed', 'round', 'fixesOnly', 'fixChecks[]?.findingID', 'fixChecks[]?.fixed', 'fixChecks[]?.reason', 'fixChecks[]?.title', 'checks[].name', 'checks[].state', 'checksError', 'openThreads'],
   },
 };

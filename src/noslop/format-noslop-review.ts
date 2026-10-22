@@ -32,7 +32,7 @@ function formatFixesOnly(r: NoslopReviewOutcome): string {
     `== engine: noslop (commit ${r.sha.slice(0, 7)}), fixes only: ${r.fixChecks.length} fix(es) checked, full output: ${r.reviewFile}`,
     ...r.fixChecks.map(formatFixCheck),
     ...formatNotReviewed(r.notReviewed),
-    `== noslop check: ${r.checks.find((c) => c.name === 'noslop')?.state ?? 'none'}`,
+    `== noslop check: ${r.checksError === null ? (r.checks.find((check) => check.name === 'noslop')?.state ?? 'none') : 'unknown'}`,
     ...formatChecks(r),
   ].join('\n');
 }

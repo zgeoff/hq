@@ -1,22 +1,40 @@
+import { toExactOptional } from '@zgeoff/std';
+import { z } from 'zod';
 import type { Runner } from '../runner/types.ts';
-import type { CIState, ReviewResult } from './types.ts';
+import type { CIState } from './types.ts';
 
 // The PR's CI checks (after waiting for them, when asked) and its count of unresolved review
 // threads: the part of a review that is the same whichever reviewer ran.
 export async function readCIState(run: Runner, slug: string, pr: number, watch: boolean): Promise<CIState> {
-  return { checks: await readChecks(run, slug, pr, watch), openThreads: await readOpenThreads(run, slug, pr) };
+  return { ...(await readChecks(run, slug, pr, watch)), openThreads: await readOpenThreads(run, slug, pr) };
 }
 
-async function readChecks(run: Runner, slug: string, pr: number, watch: boolean): Promise<ReviewResult['checks']> {
+const Checks = z.array(z.object({ name: z.string(), state: z.string(), bucket: z.string().optional() }));
+
+// gh exits 1 with this on stderr, even with --json, for a PR that has no checks.
+const NO_CHECKS = /no checks reported/u;
+
+async function readChecks(run: Runner, slug: string, pr: number, watch: boolean): Promise<Pick<CIState, 'checks' | 'checksError'>> {
   if (watch) {
     await run(['gh', 'pr', 'checks', String(pr), '-R', slug, '--watch', '--interval', '30']);
   }
   const out = await run(['gh', 'pr', 'checks', String(pr), '-R', slug, '--json', 'name,state,bucket']);
-  let checks: ReviewResult['checks'] = [];
+  if (out.code !== 0 && NO_CHECKS.test(out.stderr)) {
+    return { checks: [], checksError: null };
+  }
+  const parsed = Checks.safeParse(parseJSONText(out.stdout));
+  if (parsed.success) {
+    return { checks: parsed.data.map((check) => toExactOptional(check)), checksError: null };
+  }
+  return { checks: [], checksError: `gh pr checks failed (${out.code}): ${(out.stderr || out.stdout).trim().slice(0, 300)}` };
+}
+
+function parseJSONText(text: string): unknown {
   try {
-    checks = JSON.parse(out.stdout) as ReviewResult['checks'];
-  } catch {}
-  return checks;
+    return JSON.parse(text);
+  } catch {
+    return undefined;
+  }
 }
 
 function buildThreadQuery(slug: string, pr: number): string {

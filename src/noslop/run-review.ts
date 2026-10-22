@@ -62,6 +62,7 @@ export interface NoslopReviewOutcome extends NoslopReviewResult {
   // The run was a --fixes-only run, which is not a round.
   fixesOnly: boolean;
   checks: ReviewResult['checks'];
+  checksError: string | null;
   openThreads: number | null;
 
   // --full was asked for, but this is round 2 or later, which reviews only the commits since round 1.
@@ -116,7 +117,7 @@ async function runNoslopReviewWithCI(request: ReviewRequest, parsed: ParsedRepo,
   const folder = createScratchDir(),
     ran = await withRepoLock(folder, `${buildSlug(parsed)}-pr${request.pr}`, () => runOpenRound(requireOpenRound(request, parsed), parsed, sha, folder), ROUND_LOCK_STALE_MS),
     state = await readCIState(request.run, buildSlug(parsed), request.pr, request.watch);
-  return { ...ran.result, fixChecks: buildTitledFixChecks(ran.result.fixChecks, loadFindingTitles(request, parsed)), fixesOnly: request.fixesOnly === true, checks: state.checks, openThreads: state.openThreads, fullDropped: ran.open.fullDropped, round: ran.open.round };
+  return { ...ran.result, fixChecks: buildTitledFixChecks(ran.result.fixChecks, loadFindingTitles(request, parsed)), fixesOnly: request.fixesOnly === true, checks: state.checks, checksError: state.checksError, openThreads: state.openThreads, fullDropped: ran.open.fullDropped, round: ran.open.round };
 }
 
 // The title of each finding the PR's ok reviews stored, by finding id.

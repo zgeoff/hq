@@ -397,3 +397,22 @@ test('it refuses to review when the fetched pull ref is not the PR head GitHub r
   await expect(review(run, 'widgets', 7, { watch: false })).rejects.toMatchObject({ code: 'head_moved' });
   expect(calls.some((c) => c.cmd.join(' ').startsWith('git worktree add'))).toBe(false);
 });
+
+test('it reports the checks as unknown, with gh\'s error and no check, when gh pr checks fails with no output', async () => {
+  const r = await review(fake('gh pr checks').run, 'widgets', 7, { watch: false });
+  expect([r.checks, r.checksError]).toStrictEqual([[], 'gh pr checks failed (1): boom']);
+});
+
+test('it reads a PR with no checks as an empty list', async () => {
+  const { run: base } = fake();
+  const run: Runner = async (cmd, opts) => (cmd.join(' ').startsWith('gh pr checks') ? { code: 1, stdout: '', stderr: "no checks reported on the 'feat' branch\n" } : base(cmd, opts));
+  const r = await review(run, 'widgets', 7, { watch: false });
+  expect([r.checks, r.checksError]).toStrictEqual([[], null]);
+});
+
+test('it keeps the failed checks of a gh pr checks that exits nonzero with a check list', async () => {
+  const { run: base } = fake();
+  const run: Runner = async (cmd, opts) => (cmd.join(' ').startsWith('gh pr checks') ? { code: 1, stdout: '[{"name":"lint","state":"FAILURE","bucket":"fail"}]', stderr: '' } : base(cmd, opts));
+  const r = await review(run, 'widgets', 7, { watch: false });
+  expect([r.checks, r.checksError]).toStrictEqual([[{ name: 'lint', state: 'FAILURE', bucket: 'fail' }], null]);
+});

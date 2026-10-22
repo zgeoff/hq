@@ -19,6 +19,7 @@ const REVIEW: NoslopReviewOutcome = {
   sha: '0123456789abcdef0123456789abcdef01234567',
   issue: { issue: 'GEO-9701', attached: true, why: 'linked in the PR body' },
   checks: [],
+  checksError: null,
   openThreads: 1,
   fixChecks: [],
   fixesOnly: false,
