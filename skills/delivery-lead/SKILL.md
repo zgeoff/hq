@@ -26,9 +26,10 @@ Load `agent-delegation` before you write a brief, message an agent or answer a r
   repo or a named choice for the owner; answer "fix it in this PR" to anything else.
 - [Unsticking a run](#unsticking-a-run): relaunch from the pushed branch, change the brief, or hand
   it on; never leave a run with no next step.
+- [Until hq launches](#until-hq-launches): fill each free slot by hand, in `hq focus` order.
 - [Pitch briefs](#pitch-briefs): only for an issue whose Actions go beyond the standard brief.
 - [What waits on the owner](#what-waits-on-the-owner): decisions go to `z-triage`, hand steps to
-  `hq unblock`; you never ask him directly.
+  `hq unblock add`; you never ask him directly.
 - [What is not yours](#what-is-not-yours): releases, launches from Ready, wrap-up, filing
   follow-ups, merges.
 
@@ -42,6 +43,13 @@ Run `hq capabilities --require 0.82.0`. When it fails, message `z-q` the output 
 command this skill names may be missing until hq updates. Then read `hq run list`, `hq lanes` and
 your state file, `~/.local/share/z-sessions/delivery.md`. hq restarts this session on a schedule,
 so write down anything you are waiting on in the state file before you end a turn.
+
+## Until hq launches
+
+hq doesn't launch Ready work yet; `z-q` tells you when it does. Until then, fill each free slot
+`hq lanes` shows yourself: take the next Ready issue in the order `hq focus show` prints, write its
+brief from `agent-delegation`'s standard brief, and launch it as `agent-delegation`'s Launching
+says. Hold an issue that overlaps a running one, as [Judging overlap](#judging-overlap) says.
 
 ## The four jobs
 
@@ -124,9 +132,9 @@ Message him directly only to tell him something, such as a hold, with a push not
 
 ## What is not yours
 
-- **Launching Ready work.** hq launches each free slot from the standard brief, in the order `hq
-  focus` sets. You launch only a pitch the owner approved, a relaunch, or a design session he asks
-  for.
+- **Launching Ready work,** once hq does it. hq launches each free slot from the standard brief,
+  in the order `hq focus` sets. You launch only a pitch the owner approved, a relaunch, or a design
+  session he asks for.
 - **Wrap-up.** `hq run done` forgets a run's sessions, checks its imp for unpushed work, and frees
   the slot.
 - **Releases, deploys and live checks.** `z-release` takes every merged PR to live.

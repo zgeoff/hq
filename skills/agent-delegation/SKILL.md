@@ -11,7 +11,8 @@ description:
 hq launches each Ready issue from the standard brief in
 [templates/brief.md](templates/brief.md), and wraps each run up with `hq run done`. This skill covers
 the launches hq can't do, which are pitch launches, relaunches, and design and ad-hoc sessions, and
-everything you do while an agent runs. Each atc tool's description covers how to call it.
+everything you do while an agent runs. Until hq launches Ready work itself, `z-delivery` launches it
+by hand from the same template, as `delivery-lead` says. Each atc tool's description covers how to call it.
 
 The owner's instructions in chat take precedence over this skill.
 
