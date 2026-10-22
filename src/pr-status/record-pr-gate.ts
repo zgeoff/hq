@@ -13,6 +13,6 @@ export type PRGateResult = { gate: Exclude<PRGate, 'none'>; head: string } | { g
 export async function recordPRGate(db: Database, key: PRKey, result: PRGateResult, actor: string): Promise<void> {
   const at = iso(now()),
     fields = result.head === null ? { gate: result.gate, gate_head: null, gate_at: at } : { head: result.head, gate: result.gate, gate_head: result.head, gate_at: at };
-  await upsertPRStatus(db, key.repo, key.pr, fields);
+  upsertPRStatus(db, key.repo, key.pr, fields);
   logEvent(db, 'hq', `pr:${key.repo}#${key.pr}`, 'pr-gate', actor, null, null, { gate: result.gate, head: result.head });
 }

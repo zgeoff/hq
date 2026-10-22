@@ -115,7 +115,7 @@ async function runAnswer(input: PRCommandInput, ref: PRRef, rawAnswer: string | 
   const args = parseAnswerArgs(input.flags, rawAnswer),
     head = await readPRHead(input.run, ref.slug, ref.pr),
     context = await readAnswerContext(input, ref, head);
-  await recordPRAnswer(input.db, { repo: ref.repo, pr: ref.pr, ...args, head: context.head, actor: context.actor });
+  recordPRAnswer(input.db, { repo: ref.repo, pr: ref.pr, ...args, head: context.head, actor: context.actor });
   return await readOut(input, ref, context.head);
 }
 
