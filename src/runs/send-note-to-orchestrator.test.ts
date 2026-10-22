@@ -4,6 +4,7 @@ import { AtcClient } from '../atc/atc-client.ts';
 import { addRun } from './add-run.ts';
 import { FROM_START } from './from-start.ts';
 import { ingestNotes } from './ingest-notes.ts';
+import { sendNoteToOrchestrator } from './send-note-to-orchestrator.ts';
 
 // A database, and a fake atc with an empty feed that knows the kettle session.
 function setupTest() {
@@ -79,4 +80,12 @@ test('two decision notes at the same time each reach the orchestrator once acros
     { target: 'z-delivery', text: 'decision from GEO-9832 (kettle): descale with vinegar' },
     { target: 'z-delivery', text: 'decision from GEO-9832 (kettle): keep the old lid' },
   ]);
+});
+
+test('a decision note goes to the target the caller names', () => {
+  const app = setupTest();
+
+  const sent = sendNoteToOrchestrator(app.db, { at: Date.parse(NOON_SYDNEY), session: app.kettle, name: 'kettle', kind: 'note', detail: 'buy a new kettle', label: 'decision', cursor: 'kettle-1' }, 'teapot-lead');
+
+  expect([sent, app.outbox()]).toStrictEqual([true, [{ target: 'teapot-lead', text: 'decision from (no run) (kettle): buy a new kettle' }]]);
 });

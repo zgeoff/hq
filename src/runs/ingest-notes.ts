@@ -7,6 +7,7 @@ import { setMeta } from '../db/set-meta.ts';
 import { applyNoteSignals } from './apply-note-signals.ts';
 import { cursorIndex } from './cursor-index.ts';
 import { FROM_START } from './from-start.ts';
+import { orchestratorName } from '../wake/orchestrator-name.ts';
 import { sendNoteToOrchestrator } from './send-note-to-orchestrator.ts';
 import type { FeedEvent, IngestResult } from './types.ts';
 import { updateRunTime as touch } from './update-run-time.ts';
@@ -19,6 +20,7 @@ export async function ingestNotes(db: Database, client: AtcClient, opts: { maxPa
     result: IngestResult = { read: 0, notes: 0, routed: 0, finals: [], unmatched: 0, reset: false, bootstrapped: false };
   let cursor = getMeta(db, CURSOR_KEY);
   const maxPages = opts.maxPages ?? 50;
+  const orchestrator = orchestratorName();
 
   if (!cursor) {
     // First run: skip the history, start at the end of the feed.
@@ -54,7 +56,7 @@ export async function ingestNotes(db: Database, client: AtcClient, opts: { maxPa
       for (const e of r.events) {
         result.read++;
         if (e.kind !== 'note' || !e.detail) continue;
-        if (sendNoteToOrchestrator(db, e)) {
+        if (sendNoteToOrchestrator(db, e, orchestrator)) {
           result.routed++;
         }
         const row = db
