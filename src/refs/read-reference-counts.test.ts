@@ -7,8 +7,8 @@ import { overrideEnv } from '../config/override-env.ts';
 import { readReferenceCounts } from './read-reference-counts.ts';
 import { readUnopenedReferences } from './read-unopened-references.ts';
 
-// A temp definitions tree with four linear-triage references (fleet.json gives that skill to the
-// triage role), and a temp projects dir of invented transcripts written relative to HQ_NOW.
+// A temp definitions tree for linear-triage references (fleet.json gives that skill to the triage
+// role), and a temp projects dir of invented transcripts written relative to HQ_NOW.
 function setupTest() {
   const fresh = freshDb();
   const now = '2026-10-17T00:00:00Z';
@@ -20,13 +20,15 @@ function setupTest() {
   onTestFinished(overrideEnv('HQ_DEFINITIONS_DIR', definitions));
   onTestFinished(overrideEnv('HQ_CLAUDE_PROJECTS', projects));
   onTestFinished(overrideEnv('HQ_NOTIFY', 'off'));
-  mkdirSync(join(definitions, 'skills/linear-triage/references'), { recursive: true });
-  for (const name of ['kettle.md', 'widgets.md', 'teapot.md', 'spout.md']) {
-    writeFileSync(join(definitions, 'skills/linear-triage/references', name), `# ${name}\n`);
-  }
   return {
     triage: '11111111-2222-4333-8444-555555555555',
     stranger: '99999999-2222-4333-8444-555555555555',
+    references: (names: string[]) => {
+      mkdirSync(join(definitions, 'skills/linear-triage/references'), { recursive: true });
+      for (const name of names) {
+        writeFileSync(join(definitions, 'skills/linear-triage/references', name), `# ${name}\n`);
+      }
+    },
     read: (session: string, path: string, timestamp = '2026-10-16T01:00:00.000Z', extra: object = {}) =>
       JSON.stringify({ type: 'assistant', sessionId: session, timestamp, message: { role: 'assistant', content: [{ type: 'tool_use', id: 'toolu_read', name: 'Read', input: { file_path: path } }] }, ...extra }),
     bash: (session: string, command: string) =>
@@ -48,6 +50,7 @@ function setupTest() {
 
 test('hq refs --days 7 counts distinct sessions per reference, zeros first, inside the window only', async () => {
   const ctx = setupTest();
+  ctx.references(['kettle.md', 'widgets.md', 'teapot.md', 'spout.md']);
   const defs = '/work/defs/skills/linear-triage/references';
   ctx.transcript(
     '-work-defs/fresh.jsonl',
@@ -82,6 +85,7 @@ test('hq refs --days 7 counts distinct sessions per reference, zeros first, insi
 
 test('hq refs --json gives every pair with its count', async () => {
   const ctx = setupTest();
+  ctx.references(['kettle.md', 'widgets.md', 'teapot.md', 'spout.md']);
   ctx.transcript('-work-defs/s.jsonl', [ctx.bash(ctx.triage, 'sed -n 1,20p ~/defs/skills/linear-triage/references/teapot.md')], 1);
   ctx.startAtc([{ id: 'id-triage', name: 'z-triage', alive: true, state: 'done', agentSessionID: ctx.triage }]);
   const log = spyOn(console, 'log').mockImplementation(() => {});
@@ -103,6 +107,7 @@ test('hq refs --json gives every pair with its count', async () => {
 
 test('two sessions of one role that open the same reference count as 2', async () => {
   const ctx = setupTest();
+  ctx.references(['kettle.md', 'widgets.md', 'teapot.md', 'spout.md']);
   const second = '22222222-2222-4333-8444-555555555555';
   ctx.transcript('-work-defs/a.jsonl', [ctx.read(ctx.triage, '/d/skills/linear-triage/references/kettle.md')], 1);
   ctx.transcript('-work-defs/b.jsonl', [ctx.read(second, '/d/skills/linear-triage/references/kettle.md')], 2);
@@ -118,6 +123,7 @@ test('two sessions of one role that open the same reference count as 2', async (
 
 test('the unopened list holds the zero pairs for the goals line', async () => {
   const ctx = setupTest();
+  ctx.references(['kettle.md', 'widgets.md', 'teapot.md', 'spout.md']);
   ctx.transcript('-work-defs/s.jsonl', [ctx.read(ctx.triage, '/d/skills/linear-triage/references/kettle.md'), ctx.read(ctx.triage, '/d/skills/linear-triage/references/spout.md')], 1);
   const sessions = () => Promise.resolve([{ id: 'id-triage', name: 'z-triage', alive: true, state: 'done', agentSessionID: ctx.triage }]);
 
@@ -129,6 +135,7 @@ test('the unopened list holds the zero pairs for the goals line', async () => {
 
 test('a read after long lines, across stream chunks, still counts', async () => {
   const ctx = setupTest();
+  ctx.references(['kettle.md', 'widgets.md', 'teapot.md', 'spout.md']);
   const padding = JSON.stringify({ type: 'user', sessionId: ctx.triage, message: { content: 'widgets '.repeat(200_000) } });
   ctx.transcript('-work-defs/s.jsonl', [padding, ctx.read(ctx.triage, '/d/skills/linear-triage/references/kettle.md'), padding, ctx.read(ctx.triage, '/d/skills/linear-triage/references/teapot.md', '2026-10-16T03:00:00.000Z', { note: 'kettle '.repeat(100_000) })], 1);
   const sessions = () => Promise.resolve([{ id: 'id-triage', name: 'z-triage', alive: true, state: 'done', agentSessionID: ctx.triage }]);
