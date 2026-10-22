@@ -213,6 +213,13 @@ test('a line whose newline arrives past the line limit is skipped, and the next 
   expect(rows().map((x) => x['reason'])).toStrictEqual(['short enough']);
 });
 
+test('a scan fails when the projects folder cannot be listed', async () => {
+  rmSync(proj(), { recursive: true });
+  writeFileSync(proj(), 'not a folder');
+
+  await expect(scan()).rejects.toMatchObject({ code: 'ENOTDIR' });
+});
+
 test('a malformed line is skipped, and the scan goes on', async () => {
   file('p/s.jsonl', `{"toolDenialKind":"automode-blocked", broken\n${jl(tu('t1', 'Bash', { command: 'a' }), refused('t1', 'ok'))}`);
   expect((await scan()).refusals_added).toBe(1);

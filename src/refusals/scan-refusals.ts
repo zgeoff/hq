@@ -156,8 +156,12 @@ function listTranscripts(dir: string): { path: string; size: number; mtimeMs: nu
   let names: string[];
   try {
     names = readdirSync(dir, { recursive: true }) as string[];
-  } catch {
-    return []; // no projects dir: nothing to scan
+  } catch (error) {
+    // No projects folder means nothing to scan; any other failure would hide a tree hq cannot read.
+    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+      return [];
+    }
+    throw error;
   }
   const out: { path: string; size: number; mtimeMs: number }[] = [];
   for (const n of names) {
