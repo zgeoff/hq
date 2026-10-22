@@ -25,6 +25,16 @@ interface AnswerEvent {
   at: string;
 }
 
+interface RoundFacts {
+  title: string | null;
+  issues: string[];
+  forSession: string | null;
+}
+
+// What an answer whose round facts are lost shows: the ask changed after it, so its current title,
+// issues and session may belong to a later round.
+const UNKNOWN_ROUND: RoundFacts = { title: null, issues: [], forSession: null };
+
 function loadAskAnswers(db: Database, window: AnswerWindow): Answer[] {
   const rows = db.query(`SELECT seq, subject_id AS id, actor, data, at FROM events WHERE subject = 'ask' AND action IN ('answered', 'answered-unopened') AND at >= ? AND at < ? ORDER BY seq`).all(window.from, window.to) as AnswerEvent[];
   return rows.flatMap((r) => {
@@ -40,13 +50,7 @@ function loadAskAnswers(db: Database, window: AnswerWindow): Answer[] {
 
 const RoundFactsSchema = z.object({ title: z.string(), issues: z.array(z.string()), forSession: z.string().nullable() });
 
-type RoundFacts = { title: string | null; issues: string[]; forSession: string | null };
-
 const EventDataSchema = z.object({ data: z.string() }).nullable();
-
-// What an answer whose round facts are lost shows: the ask changed after it, so its current title,
-// issues and session may belong to a later round.
-const UNKNOWN_ROUND: RoundFacts = { title: null, issues: [], forSession: null };
 
 // The actions that can change an ask's or an unblock item's title, issues, session or link.
 const CHANGE_ACTIONS: Record<'ask' | 'unblock', string[]> = { ask: ['added', 'updated', 'reasked', 'requeued'], unblock: ['added', 'item', 'reopened', 'updated'] };
