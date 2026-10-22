@@ -51,17 +51,17 @@ test('it answers a hello on its own protocol and records it', async () => {
 });
 
 test('it answers a hello on its own protocol with no peer session, as atc does for a peer outside a session', async () => {
-  const ctx = setupTest(),
-    daemon = startStubAtcDaemon(ctx.path, {}),
-    lines = Promise.withResolvers<unknown>(),
-    socket = await Bun.connect({
-      unix: ctx.path,
-      socket: {
-        data(_socket, chunk) {
-          lines.resolve(JSON.parse(new TextDecoder().decode(chunk)));
-        },
+  const ctx = setupTest();
+  const daemon = startStubAtcDaemon(ctx.path, {});
+  const lines = Promise.withResolvers<unknown>();
+  const socket = await Bun.connect({
+    unix: ctx.path,
+    socket: {
+      data(_socket, chunk) {
+        lines.resolve(JSON.parse(new TextDecoder().decode(chunk)));
       },
-    });
+    },
+  });
   onTestFinished(() => {
     socket.end();
     daemon.stop();
