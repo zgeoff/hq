@@ -119,15 +119,17 @@ test('an impd reading over 15 minutes old shows impd unknown and turns lanes amb
 });
 
 test.each([
-  ['a lane that borrows a slot counts every run it holds, in plain', 4, 'lanes 4/4 (impd 8/16 GiB, 6/16 vCPU)', 'ok'],
-  ['runs over the lanes\' sizes show the real number in amber', 5, 'lanes 5/4 (impd 8/16 GiB, 6/16 vCPU)', 'warn'],
-] as const)('%s', async (_case, count, text, tone) => {
+  ['imp runs within the imp cap show in plain', 'imp', 3, 'lanes 3/4 (impd 8/16 GiB, 6/16 vCPU)', 'ok'],
+  ['imp runs over the imp cap show in amber though the total fits', 'imp', 4, 'lanes 4/4 (impd 8/16 GiB, 6/16 vCPU)', 'warn'],
+  ['local runs over the local cap show in amber though the total fits', 'local', 3, 'lanes 3/4 (impd 8/16 GiB, 6/16 vCPU)', 'warn'],
+  ['runs over both caps together show the real number in amber', 'imp', 5, 'lanes 5/4 (impd 8/16 GiB, 6/16 vCPU)', 'warn'],
+] as const)('%s', async (_case, place, count, text, tone) => {
   const ctx = setupTest();
   writeFileSync(ctx.pacing, JSON.stringify({ imp: { impMib: 2048 }, lanes: { imp: { cleanup: 3 }, local: { flexible: 1 } } }));
   ctx.db.query("INSERT INTO capacity_samples (at, nonnix_awake_mib, nonnix_awake_vcpus) VALUES ('2026-10-15T00:55:00Z', 8192, 6)").run();
   ctx.db
-    .query("WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < ?) INSERT INTO runs (issue, title, place, state, lane, created_at, updated_at) SELECT 'GEO-970' || i, 'Fit the long spout', 'imp', 'working', 'cleanup', '2026-10-15T00:00:00Z', '2026-10-15T00:00:00Z' FROM n")
-    .run(count);
+    .query("WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < ?) INSERT INTO runs (issue, title, place, state, lane, created_at, updated_at) SELECT 'GEO-970' || i, 'Fit the long spout', ?, 'working', 'cleanup', '2026-10-15T00:00:00Z', '2026-10-15T00:00:00Z' FROM n")
+    .run(count, place);
 
   await expect(loadBand(ctx.db, ctx.pacing, new Date('2026-10-15T01:00:00Z')).then((band) => band.segments[2])).resolves.toStrictEqual({ key: 'lanes', text, tone });
 });

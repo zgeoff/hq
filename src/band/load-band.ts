@@ -34,7 +34,7 @@ function buildNixSegment(db: Database, at: Date): BandSegment {
 }
 
 // The runs that hold a slot against the slot caps, then impd's non-Nix use against its lines. Amber
-// when the runs exceed the caps, when one more imp would cross either impd line, when no impd reading
+// when the runs of either place exceed its cap, when one more imp would cross either impd line, when no impd reading
 // is 15 minutes fresh, or when the imp cap, all full, would cross one ("plan 18/16 GiB").
 async function loadLanesSegment(db: Database, pacingFile: string, at: Date): Promise<BandSegment> {
   const pacing = await loadPacing(pacingFile);
@@ -45,9 +45,10 @@ function loadLanesFromConfig(db: Database, at: Date, slots: PacingSlots, impMib:
   const impd = loadImpdLine(db, at, impMib),
     plan = formatPlanOverage(buildLanePlan(slots.imp, impMib, capacitySettings(db))),
     running = readRunningByPlace(db, at),
+    over = running.imp > slots.imp || running.local > slots.local,
     size = slots.imp + slots.local,
     used = running.imp + running.local;
-  return { key: 'lanes', text: `lanes ${used}/${size} (${impd.text}${plan === null ? '' : `; ${plan}`})`, tone: impd.near || used > size || plan !== null ? 'warn' : 'ok' };
+  return { key: 'lanes', text: `lanes ${used}/${size} (${impd.text}${plan === null ? '' : `; ${plan}`})`, tone: impd.near || over || plan !== null ? 'warn' : 'ok' };
 }
 
 interface ImpdLine {
