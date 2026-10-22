@@ -119,6 +119,25 @@ test("it lists an earlier round's answer with that round's title, issues and ses
   expect(loadAnswers(db, { from: NOON_SYDNEY, to: '2026-10-14T04:00:00Z' }).map((answer) => [answer.title, answer.issues, answer.session, answer.words])).toStrictEqual([['Pick a handle', ['GEO-9003'], 'kettle-bot', 'Wood']]);
 });
 
+test('it lists a review answer with the PR it was about, after its id comes back for another PR', () => {
+  const db = setupTest();
+  createUnblockItems(db, { 'review-5': { task: 'Review kettle#5 and say lgtm', links: [{ label: 'kettle#5', url: 'https://github.com/kettle-co/kettle/pull/5', subject: true }] } });
+  recordConsoleReview(db, { id: 'review-5', review: 'lgtm', note: '', actor: 'console' });
+  at('2026-10-14T03:00:00Z');
+  createUnblockItems(db, { 'review-5': { task: 'Review kettle#6 and say lgtm', links: [{ label: 'kettle#6', url: 'https://github.com/kettle-co/kettle/pull/6', subject: true }] } });
+
+  expect(loadAnswers(db, { from: NOON_SYDNEY, to: '2026-10-14T04:00:00Z' }).map((answer) => [answer.title, answer.ref])).toStrictEqual([['Review kettle#5 and say lgtm', 'https://github.com/kettle-co/kettle/pull/5']]);
+});
+
+test('it reads a review answer from before its facts were kept against the item as it stands', () => {
+  const db = setupTest();
+  createUnblockItems(db, { 'review-6': { task: 'Review kettle#7 and say lgtm', links: [{ label: 'kettle#7', url: 'https://github.com/kettle-co/kettle/pull/7', subject: true }] } });
+  recordConsoleReview(db, { id: 'review-6', review: 'changes', note: 'Wider lid.', actor: 'console' });
+  db.run("UPDATE events SET data = json_remove(data, '$.facts') WHERE action = 'console-review'");
+
+  expect(loadAnswers(db, { from: NOON_SYDNEY, to: '2026-10-14T04:00:00Z' }).map((answer) => [answer.title, answer.ref, answer.words])).toStrictEqual([['Review kettle#7 and say lgtm', 'https://github.com/kettle-co/kettle/pull/7', 'Wider lid.']]);
+});
+
 test('hq answers --json lists the last 7 days by default, and --since sets the window', async () => {
   const db = createTwoTypedLines(setupTest()),
     log = spyOn(console, 'log').mockImplementation((line: string) => printed.push(line)),

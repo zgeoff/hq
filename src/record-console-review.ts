@@ -27,7 +27,7 @@ export function recordConsoleReview(db: Database, input: ConsoleReviewInput): Un
     .transaction((): UnblockItem => {
       const answer = formatReviewAnswer(requireReviewInput(db, input)),
         item = applyReview(db, input, answer),
-        seq = logEvent(db, 'unblock', item.id, 'console-review', input.actor, null, null, { review: input.review, note: input.note.trim() === '' ? null : input.note });
+        seq = logEvent(db, 'unblock', item.id, 'console-review', input.actor, null, null, { review: input.review, note: input.note.trim() === '' ? null : input.note, facts: buildReviewFacts(item) });
       enqueue(db, seq, roleName('owner'), `console answer: review ${item.id}: ${answer}`);
       return item;
     })
@@ -60,4 +60,9 @@ function applyReview(db: Database, input: ConsoleReviewInput, text: string): Unb
   }
   const state = input.review === 'reject' ? 'dropped' : 'done';
   return closeUnblock(db, input.id, state, text, input.actor);
+}
+
+// What the review was about, kept on the answer so a later item under the same id cannot change it.
+function buildReviewFacts(item: UnblockItem): { title: string; issues: string[]; session: string; ref: string | null } {
+  return { title: item.title ?? item.task, issues: item.unblocks.map((unblock) => unblock.issue), session: item.added_by, ref: findSubjectLink(item)?.url ?? null };
 }

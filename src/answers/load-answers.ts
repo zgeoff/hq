@@ -3,7 +3,6 @@ import { z } from 'zod';
 import { getAsk } from '../asks/get-ask.ts';
 import { readRoundOptions } from '../asks/read-round-options.ts';
 import { findSubjectLink } from '../find-subject-link.ts';
-import type { ConsoleReview } from '../record-console-review.ts';
 import { REVIEW_LABELS } from '../review-labels.ts';
 import type { Typed } from '../typed/types.ts';
 import { typedSource } from '../typed/typed-source.ts';
@@ -57,15 +56,22 @@ function loadRoundFacts(db: Database, answer: AnswerEvent): RoundFacts | null {
   return row === null ? null : RoundFactsSchema.parse(JSON.parse(row.data));
 }
 
+const ReviewFactsSchema = z.object({ title: z.string(), issues: z.array(z.string()), session: z.string(), ref: z.string().nullable() });
+
+const ReviewDataSchema = z.object({ note: z.string().nullable(), review: z.enum(['lgtm', 'changes', 'later', 'reject']), facts: ReviewFactsSchema.optional() });
+
 function loadReviewAnswers(db: Database, window: AnswerWindow): Answer[] {
   const rows = db.query(`SELECT seq, subject_id AS id, actor, data, at FROM events WHERE subject = 'unblock' AND action = 'console-review' AND at >= ? AND at < ? ORDER BY seq`).all(window.from, window.to) as AnswerEvent[];
   return rows.flatMap((r) => {
-    const data = JSON.parse(r.data) as { note: string | null; review: ConsoleReview },
-      item = getUnblock(db, r.id);
+    const data = ReviewDataSchema.parse(JSON.parse(r.data));
+    const item = getUnblock(db, r.id);
     if (item === null) {
       return [];
     }
-    return [{ source: 'review', id: item.id, kind: 'review', title: item.title ?? item.task, issues: item.unblocks.map((u) => u.issue), session: item.added_by, picked: REVIEW_LABELS[data.review], stuPick: null, words: data.note, ref: findSubjectLink(item)?.url ?? null, via: r.actor, at: r.at }];
+
+    // A review from before its facts were kept is read against the item as it stands now.
+    const facts = data.facts ?? { title: item.title ?? item.task, issues: item.unblocks.map((unblock) => unblock.issue), session: item.added_by, ref: findSubjectLink(item)?.url ?? null };
+    return [{ source: 'review', id: item.id, kind: 'review', title: facts.title, issues: facts.issues, session: facts.session, picked: REVIEW_LABELS[data.review], stuPick: null, words: data.note, ref: facts.ref, via: r.actor, at: r.at }];
   });
 }
 
