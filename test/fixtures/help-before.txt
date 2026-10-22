@@ -44,6 +44,7 @@ hq 0.79.0: headquarters for the z- sessions. Every command takes --json.
   hq stats [--since 7d|36h|TIME] [--around MARK]   numbers someone acts on: waits on the owner, merge to live, idle capacity, flow
   hq answers [--since 7d|36h|TIME]   the owner's answers in the window: calls, proposals, console reviews and typed lines (--json for the weekly audit)
   hq kinds [--weeks 8] | hq kinds sync [--weeks 8]   bug share per Sydney week: merged PRs by title kind and by Linear issue type, closed issues by type; sync backfills from GitHub and Linear
+  hq linear issues --team KEY --state NAME[,NAME...] [--updated-since TIME] [--fields LIST] --out DIR  write the team's issues in those states to DIR/issues-N.json, 100 to a page, for the triage scripts to read
   hq goals [--days 14] | hq goals sync [--days 14]   team goals per Sydney day and week: cloud deploy-prod runs, z-delivery DEPLOY/HOLD, CI runs, failures, cancels, re-runs and minutes, PRs merged and closed unmerged
   hq goals targets | hq goals target <goal> <op> <value> | <goal> none   the 7 goals' targets (bugs, features, deploys, downtime, ciwaste, mustfix, cost); op is one of < <= >= >; none clears
   hq goals weekly [--dry-run] | hq goals weekly skip [DATE] --reason T   the Monday 17:00 Sydney goals review to z-stu: print it, send it now, or leave a Monday alone

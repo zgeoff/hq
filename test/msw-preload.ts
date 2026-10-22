@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll } from 'bun:test';
-import { linearDocuments, linearIssues } from '../mocks/linear-handlers.ts';
+import { linearDocuments, linearIssues, linearWorkflowStates } from '../mocks/linear-handlers.ts';
 import { server } from '../mocks/node.ts';
 
 beforeAll(() => {
@@ -18,6 +18,7 @@ afterEach(() => {
   server.resetHandlers();
   linearIssues.length = 0;
   linearDocuments.length = 0;
+  linearWorkflowStates.length = 0;
 });
 
 afterAll(() => {
