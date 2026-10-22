@@ -1,13 +1,12 @@
 import { z } from 'zod';
 import { HqError } from '../errors.ts';
 import type { LinearCall } from '../linear/types.ts';
-import { isDescriptionComplete } from './is-description-complete.ts';
+import { isIssuePromotable } from './is-issue-promotable.ts';
 import type { PromotableIssue } from './types.ts';
 
 const MAX_PAGES = 20;
 const PAGE_SIZE = 50;
 const BACKLOG_STATE = 'Backlog';
-const PARKED_LABEL = 'parked';
 
 // inverseRelations holds the relations that point at the issue: a `blocks` one names its blocker.
 const QUERY = `query($after: String, $team: String!, $state: String!) {
@@ -43,9 +42,8 @@ const issuesSchema = z.object({ nodes: z.array(nodeSchema), pageInfo: pageInfoSc
 
 const pageSchema = z.object({ issues: issuesSchema });
 
-// Reads the team's Backlog and keeps the issues triage may promote: every blocker completed, every
-// section filled, and no parked label. An issue with more relations than one page shows is left
-// out, since hq cannot see all its blockers. Reads only; triage moves the issues.
+// Reads the team's Backlog page by page and keeps the issues isIssuePromotable passes. Reads only;
+// triage moves the issues.
 export async function readPromotableIssues(call: LinearCall, team: string): Promise<PromotableIssue[]> {
   const promotable: PromotableIssue[] = [];
   let after: string | null = null;
@@ -59,10 +57,14 @@ export async function readPromotableIssues(call: LinearCall, team: string): Prom
       throw new HqError('linear_failed', `Linear's Backlog answer has an unexpected shape: ${parsed.error.issues.at(0)?.path.join('.')}`);
     }
     for (const node of parsed.data.issues.nodes) {
-      const parked = node.labels.nodes.some((label) => label.name === PARKED_LABEL);
       const blockers = node.inverseRelations.nodes.filter((relation) => relation.type === 'blocks');
-      const unblocked = !node.inverseRelations.pageInfo.hasNextPage && blockers.every((relation) => relation.issue.state.type === 'completed');
-      if (!parked && unblocked && isDescriptionComplete(node.description)) {
+      const issue = {
+        description: node.description,
+        labels: node.labels.nodes.map((label) => label.name),
+        blockerStates: blockers.map((relation) => relation.issue.state.type),
+        moreRelations: node.inverseRelations.pageInfo.hasNextPage,
+      };
+      if (isIssuePromotable(issue)) {
         promotable.push({ identifier: node.identifier, title: node.title });
       }
     }

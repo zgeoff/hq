@@ -78,3 +78,12 @@ export interface PromotableIssue {
   identifier: string;
   title: string;
 }
+
+// A Backlog issue as the promotion check sees it: the state type of each issue that blocks it, and
+// whether Linear holds more relations than the one page hq read.
+export interface BacklogIssue {
+  description: string | null;
+  labels: string[];
+  blockerStates: string[];
+  moreRelations: boolean;
+}
