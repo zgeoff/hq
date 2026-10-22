@@ -92,6 +92,42 @@ test.skipIf(!hasRestic)('it finds the restored hq.db where the snapshot staged i
   expect(back.db).toBe(join(`${dir}/restored`, dir, 'backup/staging/hq.db'));
 }, 120_000);
 
+test("it refuses to back up while another run holds the staging dir, and leaves that run's staged copy alone", async () => {
+  mkdirSync(`${dir}/backup/staging`, { recursive: true });
+  writeFileSync(`${dir}/backup/staging/hq.db`, 'the other run staged this');
+  writeFileSync(`${dir}/backup/staging.lock`, String(process.pid));
+
+  const result = await runBackup(db, realRunner, 'z-q');
+  expect(result).toMatchObject({ ok: false, error: `another hq backup is running (pid ${process.pid}); this run left its staging dir alone` });
+  expect(readFileSync(`${dir}/backup/staging/hq.db`, 'utf8')).toBe('the other run staged this');
+  expect(readFileSync(`${dir}/backup/staging.lock`, 'utf8')).toBe(String(process.pid));
+});
+
+test('it lets one run take over a dead staging lock when several find it at once', async () => {
+  const gone = Bun.spawn(['true']);
+  await gone.exited;
+  mkdirSync(`${dir}/backup`, { recursive: true });
+  writeFileSync(`${dir}/backup/staging.lock`, String(gone.pid));
+  const go = String(Date.now() + 2000);
+  const script = `const { openDb } = await import(${JSON.stringify(join(import.meta.dir, '../src/db/open-db.ts'))}); const { runBackup } = await import(${JSON.stringify(join(import.meta.dir, '../src/backup/run-backup.ts'))}); const slow = async () => { await Bun.sleep(300); return { code: 0, stdout: 'ok', stderr: '' }; }; while (Date.now() < Number(process.env.GO)) {} const result = await runBackup(openDb(), slow, 'z-q'); console.log(result.ok ? 'ran' : 'busy');`;
+  const runs = Array.from({ length: 8 }, () => Bun.spawn(['bun', '-e', script], { env: { ...process.env, GO: go }, stdout: 'pipe' }));
+
+  const outcomes = await Promise.all(runs.map((run) => new Response(run.stdout).text()));
+
+  expect(outcomes.map((line) => line.trim()).toSorted()).toStrictEqual(['busy', 'busy', 'busy', 'busy', 'busy', 'busy', 'busy', 'ran']);
+});
+
+test.skipIf(!hasRestic)('it takes over a staging lock whose run is gone, and releases it when done', async () => {
+  const gone = Bun.spawn(['true']);
+  await gone.exited;
+  mkdirSync(`${dir}/backup`, { recursive: true });
+  writeFileSync(`${dir}/backup/staging.lock`, String(gone.pid));
+
+  const result = await runBackup(db, realRunner, 'z-q');
+  expect(result.error).toBeNull();
+  expect(existsSync(`${dir}/backup/staging.lock`)).toBe(false);
+}, 120_000);
+
 test('a remote env file needs RESTIC_REPOSITORY; values are read, not echoed', () => {
   mkdirSync(`${dir}/cfg`, { recursive: true });
   writeFileSync(requireEnv('HQ_BACKUP_REMOTE_ENV'), 'AWS_ACCESS_KEY_ID=invented\n');

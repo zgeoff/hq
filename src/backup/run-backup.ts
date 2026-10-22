@@ -2,7 +2,8 @@
 // transcripts, kept locally and copied off this PC when a remote is configured.
 // hq.db goes in through sqlite's online backup, never as a raw file copy.
 import type { Database } from 'bun:sqlite';
-import { existsSync, mkdirSync, rmSync } from 'node:fs';
+import { randomBytes } from 'node:crypto';
+import { existsSync, linkSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { iso } from '../clock/iso.ts';
 import { now } from '../clock/now.ts';
@@ -25,9 +26,11 @@ export async function runBackup(db: Database, run: Runner, actor: string): Promi
   const started = Date.now();
   const at = iso(now());
   const result: BackupRun = { at, ok: false, snapshot: null, remote: 'not configured', error: null, seconds: 0 };
+  let lock: string | null = null;
   try {
     ensurePassword();
     mkdirSync(backupPaths().state, { recursive: true, mode: 0o700 });
+    lock = createStagingLock();
     const local = ['-r', localRepo()];
     await ensureRepo(run, local, {}, []);
 
@@ -76,7 +79,10 @@ export async function runBackup(db: Database, run: Runner, actor: string): Promi
   } catch (e) {
     result.error = String((e as Error).message ?? e);
   } finally {
-    rmSync(staging(), { recursive: true, force: true });
+    if (lock !== null) {
+      rmSync(staging(), { recursive: true, force: true });
+      rmSync(lock, { force: true });
+    }
   }
   result.seconds = Math.round((Date.now() - started) / 1000);
   db.transaction(() => {
@@ -85,6 +91,92 @@ export async function runBackup(db: Database, run: Runner, actor: string): Promi
     logEvent(db, 'hq', 'backup', result.ok ? 'backed-up' : 'backup-failed', actor, null, null, { ...result });
   }).immediate();
   return result;
+}
+
+// One staging dir, so runs take turns. A killed run leaves a dead lock: only the holder of the
+// takeover file removes one, after reading the dead pid again under that hold, so a live lock is
+// never removed and the exclusive create picks one winner.
+function createStagingLock(): string {
+  const path = join(backupPaths().state, 'staging.lock');
+  for (;;) {
+    if (tryCreateLock(path)) {
+      return path;
+    }
+    const holder = readLockHolder(path);
+    if (holder !== null && isRunning(holder)) {
+      throw new HqError('backup_busy', `another hq backup is running (pid ${holder}); this run left its staging dir alone`);
+    }
+    removeDeadLock(path);
+  }
+}
+
+// The pid is written to a file of this run's own and linked into place, so a lock is never seen
+// half written.
+function tryCreateLock(path: string): boolean {
+  const own = `${path}.${process.pid}-${randomBytes(4).toString('hex')}`;
+  writeFileSync(own, String(process.pid), { mode: 0o600 });
+  try {
+    linkSync(own, path);
+    return true;
+  } catch (error) {
+    if (hasCode(error, 'EEXIST')) {
+      return false;
+    }
+    throw error;
+  } finally {
+    rmSync(own, { force: true });
+  }
+}
+
+function hasCode(error: unknown, code: string): boolean {
+  return error instanceof Error && 'code' in error && error.code === code;
+}
+
+// null when the lock went away since the create failed.
+function readLockHolder(path: string): number | null {
+  try {
+    return Number(readFileSync(path, 'utf8').trim());
+  } catch (error) {
+    if (hasCode(error, 'ENOENT')) {
+      return null;
+    }
+    throw error;
+  }
+}
+
+function isRunning(pid: number): boolean {
+  if (!Number.isInteger(pid) || pid <= 0) {
+    return false;
+  }
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return hasCode(error, 'EPERM');
+  }
+}
+
+function removeDeadLock(path: string): void {
+  const takeover = `${path}.takeover`;
+  if (!tryCreateLock(takeover)) {
+    const taker = readLockHolder(takeover);
+    if (taker !== null && isRunning(taker)) {
+      throw new HqError('backup_busy', `another hq backup is taking over a dead staging lock (pid ${taker}); this run left its staging dir alone`);
+    }
+
+    // A run killed during its own takeover left it. Clearing it is unguarded, so only that double
+    // fault, a killed run and then a killed takeover, can still let two runs in.
+    rmSync(takeover, { force: true });
+    return;
+  }
+  try {
+    const holder = readLockHolder(path);
+    if (holder !== null && !isRunning(holder)) {
+      rmSync(path, { force: true });
+    }
+  } finally {
+    rmSync(takeover, { force: true });
+  }
 }
 
 async function ensureRepo(run: Runner, repoArgs: string[], extra: Record<string, string>, initArgs: string[]): Promise<boolean> {
