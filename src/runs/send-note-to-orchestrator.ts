@@ -1,4 +1,5 @@
 import type { Database } from 'bun:sqlite';
+import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { logEvent } from '../log-event.ts';
 import { enqueue } from '../outbox/enqueue.ts';
@@ -10,13 +11,14 @@ const ROUTED_LABELS = new Set(['decision', 'blocked']);
 const RunIssueSchema = z.object({ issue: z.string() }).nullable();
 
 // Queue a decision or blocked note for the orchestrator, inside the caller's transaction.
-// An events row keyed on the session and the note's time records each sent
-// note, so a restart or a feed reset never sends it twice.
+// An events row keyed on the session, the note's time and a hash of its label and text records each
+// sent note, so a restart or a feed reset never sends it twice and two notes at one time both go.
 export function sendNoteToOrchestrator(db: Database, event: FeedEvent): boolean {
   if (event.label === undefined || !ROUTED_LABELS.has(event.label) || !event.detail) {
     return false;
   }
-  const key = `${event.session}@${new Date(event.at).toISOString()}`;
+  const digest = createHash('sha256').update(`${event.label}\n${event.detail}`).digest('hex');
+  const key = `${event.session}@${new Date(event.at).toISOString()}#${digest.slice(0, 16)}`;
   if (db.query(`SELECT 1 FROM events WHERE subject = 'run' AND subject_id = ? AND action = 'note-routed'`).get(key)) {
     return false;
   }

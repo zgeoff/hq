@@ -57,3 +57,21 @@ test('a progress note is not routed', async () => {
 
   expect(app.outbox()).toStrictEqual([]);
 });
+
+test('two decision notes at the same time each reach the orchestrator once across two ticks', async () => {
+  const app = setupTest();
+  const at = Date.parse(NOON_SYDNEY);
+  app.feed.push(
+    { at, session: app.kettle, name: 'kettle', kind: 'note', detail: 'descale with vinegar', label: 'decision' },
+    { at, session: app.kettle, name: 'kettle', kind: 'note', detail: 'keep the old lid', label: 'decision' },
+  );
+
+  await app.tick();
+  app.rewind();
+  await app.tick();
+
+  expect(app.outbox()).toStrictEqual([
+    { target: 'z-delivery', text: 'decision from GEO-9832 (kettle): descale with vinegar' },
+    { target: 'z-delivery', text: 'decision from GEO-9832 (kettle): keep the old lid' },
+  ]);
+});
