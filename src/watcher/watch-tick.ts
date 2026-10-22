@@ -44,19 +44,6 @@ const LOOKBACK_DAYS = 15;
 
 const msg = (e: unknown) => String((e as Error).message ?? e);
 
-// The steps each watcher has started and not yet seen settle. A step the deadline gave up on stays
-// here until its work stops, so a later pass never runs a second copy beside it.
-const UNSETTLED = new WeakMap<WatchDeps, Set<string>>();
-
-function readUnsettled(d: WatchDeps): Set<string> {
-  let names = UNSETTLED.get(d);
-  if (names === undefined) {
-    names = new Set();
-    UNSETTLED.set(d, names);
-  }
-  return names;
-}
-
 // One pass. True when the tick completed: the lanes reading, the sweep and the send all ran.
 export async function watchTick(db: Database, d: WatchDeps): Promise<boolean> {
   const ms = d.stepMs ?? STEP_MS;
@@ -68,10 +55,7 @@ export async function watchTick(db: Database, d: WatchDeps): Promise<boolean> {
     const abandon = new AbortController();
     const work = start(abandon.signal);
     unsettled.add(what);
-    void work.then(
-      () => unsettled.delete(what),
-      () => unsettled.delete(what),
-    );
+    void forgetWhenSettled(work, () => unsettled.delete(what));
     return withDeadline(work, ms, what, abandon);
   };
   const at = () => iso(now());
@@ -262,5 +246,29 @@ export async function watchTick(db: Database, d: WatchDeps): Promise<boolean> {
   } catch (e) {
     d.log(`${at()} tick failed: ${msg(e)}`);
     return false;
+  }
+}
+
+// The steps each watcher has started and not yet seen settle. A step the deadline gave up on stays
+// here until its work stops, so a later pass never runs a second copy beside it.
+const UNSETTLED = new WeakMap<WatchDeps, Set<string>>();
+
+function readUnsettled(deps: WatchDeps): Set<string> {
+  let names = UNSETTLED.get(deps);
+  if (names === undefined) {
+    names = new Set();
+    UNSETTLED.set(deps, names);
+  }
+  return names;
+}
+
+// The step's own caller reports its failure; this only waits for the work to stop.
+async function forgetWhenSettled(work: Promise<unknown>, forget: () => void): Promise<void> {
+  try {
+    await work;
+  } catch {
+    // reported by the caller of withDeadline
+  } finally {
+    forget();
   }
 }

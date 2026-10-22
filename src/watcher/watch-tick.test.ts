@@ -208,16 +208,13 @@ test('a goals sync the deadline gave up on is not started again until it stops',
   for (const key of ['kinds_synced_at', 'kinds_ok_at', 'linear_synced_at']) {
     setMeta(ctx.db, key, '2026-10-16T06:55:00Z');
   }
-  let release = () => {};
-  const held = new Promise<void>((resolve) => {
-    release = resolve;
-  });
+  const held = Promise.withResolvers<void>();
   const goals = makeGoalsRunner({ code: 0, stdout: JSON.stringify({ usageItems: [] }), stderr: '' });
   const repoLists: string[][] = [];
   const run: Runner = async (cmd, opts) => {
     if (cmd[0] === 'gh' && cmd[1] === 'repo' && cmd[2] === 'list') {
       repoLists.push(cmd);
-      await held;
+      await held.promise;
     }
     return goals(cmd, opts);
   };
@@ -228,7 +225,7 @@ test('a goals sync the deadline gave up on is not started again until it stops',
   setMeta(ctx.db, 'goals_synced_at', '1970-01-01T00:00:00Z');
   await watchTick(ctx.db, deps);
   const whileHeld = repoLists.length;
-  release();
+  held.resolve();
   await Bun.sleep(20);
   setMeta(ctx.db, 'goals_synced_at', '1970-01-01T00:00:00Z');
   await watchTick(ctx.db, deps);
