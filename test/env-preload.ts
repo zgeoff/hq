@@ -6,6 +6,10 @@ import { join } from 'node:path';
 // writes one in a temp dir and points HQ_LOCAL_CONFIG at it.
 process.env['HQ_LOCAL_CONFIG'] = join(tmpdir(), 'hq-tests-no-local-config', 'local.json');
 
+// No test reads noslop's real store, which lives under the data home: this directory never exists. A
+// test that needs a store makes one in a temp dir and points XDG_DATA_HOME at that dir.
+process.env['XDG_DATA_HOME'] = join(tmpdir(), 'hq-tests-no-data-home');
+
 // A run from an agent's shell inherits its atc session id, and `hq call answer` then asks the real
 // atc whether that session is the owner's. A test that needs a session id sets its own.
 delete process.env['ATC_SESSION_ID'];

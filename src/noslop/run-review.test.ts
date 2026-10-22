@@ -1,3 +1,4 @@
+import { Database } from 'bun:sqlite';
 import { expect, onTestFinished, spyOn, test } from 'bun:test';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -28,6 +29,15 @@ function setupTest() {
   onTestFinished(overrideEnv('REVIEW_DIR', base));
   onTestFinished(overrideEnv('HQ_PROJECTS', join(base, 'projects')));
   onTestFinished(overrideEnv('HQ_REPOS', join(base, 'repos')));
+  const dataHome = process.env['XDG_DATA_HOME'];
+  process.env['XDG_DATA_HOME'] = join(base, 'data');
+  onTestFinished(() => {
+    if (dataHome === undefined) {
+      delete process.env['XDG_DATA_HOME'];
+    } else {
+      process.env['XDG_DATA_HOME'] = dataHome;
+    }
+  });
 
   return {
     base,
@@ -547,6 +557,24 @@ test('it runs --fixes-only when a fixed answer in a finding thread names a commi
   await expect(runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false, fixesOnly: true })).resolves.toMatchObject({ fixesOnly: true });
 
   expect(fake.of('bun')[0]?.cmd).toContain('--fixes-only');
+});
+
+test('it runs --fixes-only after a round whose review noslop stored but could not post to GitHub', async () => {
+  const ctx = setupTest();
+  const reviewHead = 'aaaa000000000000000000000000000000000001';
+  const stored = buildFakeRunner({ noslopReview: { code: 1, stdout: JSON.stringify({ ...JSON.parse(FAKE_REVIEW_JSON), head: reviewHead, base: null }), stderr: 'the github reporter failed: HTTP 500' } });
+  const fixesOnly = buildFakeRunner({ noslopReview: { code: 0, stdout: JSON.stringify({ version: 7, head: 'feat', base: 'main', depth: 'standard', findings: [], failedCalls: [], notReviewed: [], notReviewedByLens: [], fixChecks: [] }), stderr: '' }, git: { [`git rev-list --reverse --first-parent ${reviewHead}..refs/hq/pr/7`]: { code: 0, stdout: 'cccc000000000000000000000000000000000002\n', stderr: '' } }, reviewComments: [JSON.stringify({ id: 1, in_reply_to_id: null, body: 'Kettle never boils\n<!-- noslop:finding {"id":"00112233445566aa"} -->' }), JSON.stringify({ id: 2, in_reply_to_id: 1, body: 'fixed cccc000' })].join('\n') });
+  ctx.listWidgets();
+  mkdirSync(join(ctx.base, 'data', 'noslop'), { recursive: true });
+  const store = new Database(join(ctx.base, 'data', 'noslop', 'store.sqlite'), { create: true });
+  store.run('CREATE TABLE reviews (review_id TEXT PRIMARY KEY, repo TEXT NOT NULL, pull_request INTEGER, head TEXT NOT NULL)');
+  store.query('INSERT INTO reviews (review_id, repo, pull_request, head) VALUES (?, ?, ?, ?)').run('r1', 'zgeoff/widgets', 7, reviewHead);
+  store.close();
+  await runReview({ run: stored.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false });
+
+  await expect(runReview({ run: fixesOnly.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false, fixesOnly: true })).resolves.toMatchObject({ fixesOnly: true, round: 1, fixChecks: [] });
+
+  expect(fixesOnly.of('bun')[0]?.cmd).toContain('--fixes-only');
 });
 
 test('it runs --fixes-only when a fixed answer in an issue comment names a commit since the last review', async () => {

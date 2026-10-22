@@ -21,6 +21,7 @@ import type { NoslopSecrets } from './load-noslop-secrets.ts';
 import { parseReviewRun } from './parse-review-run.ts';
 import type { FixCheck, NotReviewedFile, ReviewFinding, ReviewOutput } from './parse-review-run.ts';
 import { pickAction } from './pick-action.ts';
+import { probeStoredReview } from './probe-stored-review.ts';
 import { recordRound } from './record-round.ts';
 import type { RecordedFinding, RoundRow } from './record-round.ts';
 import { removeIssueFile } from './remove-issue-file.ts';
@@ -44,6 +45,9 @@ export interface NoslopReviewContext {
   // Hq's pinned clone of noslop, and the commit it is pinned to.
   clone: string;
   sha: string;
+
+  // The store noslop writes each review to before it posts the review to GitHub.
+  store: string;
 
   // Runs a function under the repo's lock.
   lock: <T>(fn: () => Promise<T>) => Promise<T>;
@@ -82,24 +86,31 @@ export interface NoslopReviewResult {
   ms: number;
   sha: string;
   issue: IssueNote;
+
+  // Why noslop failed after it stored the review, when the post to GitHub is all that is left; null
+  // when noslop posted the review.
+  postFailed: string | null;
 }
 
-// A noslop review of the PR head, run in a throwaway worktree of the base. Any failure is recorded
-// with ok = 0 and thrown as noslop_failed; it never falls back to another reviewer.
+// A noslop review of the PR head, run in a throwaway worktree of the base. Any failure before noslop
+// stored the review is recorded with ok = 0 and thrown as noslop_failed; it never falls back to
+// another reviewer.
 export async function runNoslopReview(ctx: NoslopReviewContext): Promise<NoslopReviewResult> {
   const prep = await createReviewPrep(ctx),
     ran = await runNoslopProcess(ctx, prep),
     row = await collectReviewRow(ctx, ran);
   recordRound(ctx.db, row);
   updateFixesOnlyRefusal(ctx, ran.judged);
-  logEvent(ctx.db, 'hq', `noslop:${ctx.repo}#${ctx.pr}`, pickAction('review', row.ok), 'hq', null, null, { ms: ran.ms, findings: row.findings.length, sha: ran.sha, issue: prep.issueFile.note });
+  // oxlint-disable-next-line zgeoff/no-abbreviated-names -- grandfathered key of the review event
+  logEvent(ctx.db, 'hq', `noslop:${ctx.repo}#${ctx.pr}`, pickAction('review', row.ok), 'hq', null, null, { ms: ran.ms, findings: row.findings.length, sha: ran.sha, issue: prep.issueFile.note, postFailed: ran.postFailed });
   if (ran.cleanupError !== null) {
     logEvent(ctx.db, 'hq', `noslop:${ctx.repo}#${ctx.pr}`, 'cleanup_failed', 'hq', null, null, { worktree: prep.worktree, error: ran.cleanupError });
   }
   if (ran.judged.value === null) {
     throw buildFailure(ran.judged.why ?? 'unknown', prep.reviewFile);
   }
-  return { engine: 'noslop', repo: ctx.repo, pr: ctx.pr, head: prep.refs.headRefName, base: prep.refs.baseRefName, reviewFile: prep.reviewFile, depth: ran.judged.value.depth, findings: ran.judged.value.findings, notReviewed: ran.judged.value.notReviewed, fixChecks: ran.judged.value.fixChecks, ms: ran.ms, sha: ran.sha, issue: prep.issueFile.note };
+  // oxlint-disable-next-line zgeoff/no-abbreviated-names -- grandfathered property of the review result
+  return { engine: 'noslop', repo: ctx.repo, pr: ctx.pr, head: prep.refs.headRefName, base: prep.refs.baseRefName, reviewFile: prep.reviewFile, depth: ran.judged.value.depth, findings: ran.judged.value.findings, notReviewed: ran.judged.value.notReviewed, fixChecks: ran.judged.value.fixChecks, ms: ran.ms, sha: ran.sha, issue: prep.issueFile.note, postFailed: ran.postFailed };
 }
 
 // A --fixes-only run noslop refused is kept against the head it was asked to check, whatever its
@@ -167,6 +178,7 @@ async function createReviewIssueFile(ctx: NoslopReviewContext, refs: PRRefs, wor
 
 interface ReviewRan {
   judged: Judged<ReviewOutput>;
+  postFailed: string | null;
   ms: number;
   startedAt: string;
   sha: string;
@@ -197,7 +209,21 @@ async function runNoslopLocked(ctx: NoslopReviewContext, prep: ReviewPrep): Prom
     proc = await boundedRunner(ctx.run, REVIEW_TIMEOUT_MS)(command, { cwd: prep.worktree, env: buildNoslopEnv(prep.secrets) }),
     verdict = parseReviewRun(proc.code, proc.stdout, getTail(proc.stderr, prep.secrets), REVIEW_TIMEOUT_MS);
   await Bun.write(prep.reviewFile, proc.stdout);
-  return { judged: verdict, ms: Date.now() - began, startedAt: begun, sha: ctx.sha };
+  // oxlint-disable-next-line zgeoff/no-abbreviated-names -- grandfathered property of the recorded round
+  return { ...readPostFailedReview(ctx.store, proc.stdout, verdict), ms: Date.now() - began, startedAt: begun, sha: ctx.sha };
+}
+
+// noslop prints the review, then writes it to its store, then posts it to GitHub. A run that failed
+// with the printed review in its store failed only the post: the review is a round all the same.
+function readPostFailedReview(store: string, stdout: string, verdict: Judged<ReviewOutput>): Pick<ReviewRan, 'judged' | 'postFailed'> {
+  if (verdict.value !== null) {
+    return { judged: verdict, postFailed: null };
+  }
+  const printed = parseReviewRun(0, stdout, '', REVIEW_TIMEOUT_MS);
+  if (printed.value === null || !probeStoredReview(store, stdout)) {
+    return { judged: verdict, postFailed: null };
+  }
+  return { judged: printed, postFailed: verdict.why ?? 'unknown' };
 }
 
 export const REVIEW_TIMEOUT_MS = 900_000;
@@ -248,7 +274,7 @@ async function collectReviewRow(ctx: NoslopReviewContext, ran: ReviewRan): Promi
     failedCalls: ran.judged.failedCalls,
     conclusion: null,
     open: [],
-    error: ran.judged.why,
+    error: ran.postFailed === null ? ran.judged.why : `stored, but not posted to GitHub: ${ran.postFailed}`,
     sha: ran.sha,
     full: ctx.full === true,
     redesign: ctx.redesign ?? null,

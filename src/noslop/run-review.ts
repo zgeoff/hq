@@ -27,6 +27,7 @@ import { readOKReviews } from './read-ok-reviews.ts';
 import type { OKReviewRecord } from './read-ok-reviews.ts';
 import { requirePinned } from './require-pinned.ts';
 import { resolveEngine } from './resolve-engine.ts';
+import { resolveNoslopDefaultStore } from './resolve-noslop-default-store.ts';
 import { resolveNoslopDir } from './resolve-noslop-dir.ts';
 import { REVIEW_TIMEOUT_MS, runNoslopReview } from './run-noslop-review.ts';
 import type { NoslopReviewContext, NoslopReviewResult } from './run-noslop-review.ts';
@@ -268,6 +269,7 @@ async function createNoslopContext(request: ReviewRequest, parsed: ParsedRepo, s
     scratch,
     clone: buildRunDir(resolveNoslopDir(), sha),
     sha,
+    store: resolveNoslopDefaultStore(process.env),
     lock: (fn) => withRepoLock(scratch, buildSlug(parsed), fn),
     full: request.full,
     redesign: request.redesign,
