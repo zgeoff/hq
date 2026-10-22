@@ -77,7 +77,7 @@ async function checkOwnerHeld(request: PRRequest, parsed: ParsedRepo, head: stri
   const files = await readPRFiles(request.run, buildSlug(parsed), request.pr);
   const lgtm = readHeadLgtm(request.db, parsed.repo, request.pr, head);
   const headNow = await readPRHead(request.run, buildSlug(parsed), request.pr);
-  match(pickOwnerHeldVerdict({ repo: parsed.repo, pr: request.pr, held: files.filter(isHeld), lgtm: lgtm !== null, head, headNow }))
+  match(pickOwnerHeldVerdict({ repo: parsed.repo, pr: request.pr, held: files.filter((file) => isHeld(file)), lgtm: lgtm !== null, head, headNow }))
     .with({ pass: true }, () => null)
     .with({ pass: false }, (blocked) => {
       throw buildBlock(parsed, request.pr, blocked.reason);
