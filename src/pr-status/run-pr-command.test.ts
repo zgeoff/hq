@@ -770,6 +770,15 @@ test('it refuses a console: source whose picked option grants an override with n
   await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'console:KET-49', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: '--source refused: the option the owner picked in console:KET-49 grants an override with no head: an override grant names the head the owner approved; ask z-stu to record it' });
 });
 
+test('it refuses a console: source for an answer that already backs an override through call: at another head', async () => {
+  const ctx = setupTest();
+  applyAskItem(ctx.db, { kind: 'call', id: 'KET-47', issues: [], forSession: null, actor: 'z-kettle' }, parseItemInput('call', JSON.stringify({ title: 'Override widgets#7?', question: 'Merge past the findings?', options: [{ label: 'Yes', effect: 'Merge it.' }, { label: 'No', effect: 'Wait.' }] })), 'Merge past the findings?');
+  recordConsoleAnswer(ctx.db, { id: 'KET-47', option: 'Yes', note: '', actor: 'owner' });
+  await ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'call:KET-47', note: 'Ship it.' });
+
+  await expect(ctx.asOther(ctx.headAt('b9c8d7e6f5a40312213f4e5d6c7b8a9087654321'), 'override', ['widgets', '7'], { source: 'console:KET-47', note: 'Ship it again.' })).rejects.toMatchObject({ code: 'bad_args', message: '--source refused: console:KET-47 already backs an override of zgeoff/widgets#7 at a1b2c3d, and the owner answered it for that head only; ask z-stu to record it' });
+});
+
 test('it accepts a call: source at a new head once the owner answers a new round, after it backed an override at the old head', async () => {
   const ctx = setupTest();
   ctx.fileCall('KET-48', 'Override widgets#7?');

@@ -80,9 +80,14 @@ function findCallRefusal(db: Database, check: CallCheck): string | null {
 
 const OverrideHeadsSchema = z.array(z.object({ head: z.string() }));
 
-// Only overrides since the owner's current answer: a new answer is a new approval.
+// Only overrides since the owner's current answer: a new answer is a new approval. call:<id> and
+// console:<id> name the same answer, so an override under either form counts.
 function findOverrideAtOtherHead(db: Database, check: CallCheck, answerSeq: number): string | null {
-  const rows = OverrideHeadsSchema.parse(db.query("SELECT json_extract(data, '$.head') AS head FROM events WHERE subject = 'hq' AND subject_id = ? AND action = 'pr-override' AND json_extract(data, '$.source') = ? AND seq > ? ORDER BY seq").all(`pr:${check.ref.repo}#${check.ref.pr}`, check.source, answerSeq));
+  const rows = OverrideHeadsSchema.parse(
+    db
+      .query("SELECT json_extract(data, '$.head') AS head FROM events WHERE subject = 'hq' AND subject_id = ? AND action = 'pr-override' AND json_extract(data, '$.source') IN (?, ?) AND seq > ? ORDER BY seq")
+      .all(`pr:${check.ref.repo}#${check.ref.pr}`, `call:${check.id}`, `console:${check.id}`, answerSeq),
+  );
   return rows.find((row) => row.head !== check.head)?.head ?? null;
 }
 
