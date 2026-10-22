@@ -176,7 +176,7 @@ export async function watchTick(db: Database, d: WatchDeps): Promise<boolean> {
       // The Linear state of each open run's issue, at most every 10 min, after the GitHub pass has
       // attached new PRs: the sweep alerts on a closed issue, and a run whose issue was canceled
       // with no open or merged PR is dropped here.
-      if (Date.now() - Date.parse(getMeta(db, 'run_issues_checked_at') ?? '1970-01-01T00:00:00Z') > 10 * 60_000) {
+      if (now().getTime() - Date.parse(getMeta(db, 'run_issues_checked_at') ?? '1970-01-01T00:00:00Z') > 10 * 60_000) {
         // The throttle: set even when the read fails.
         setMeta(db, 'run_issues_checked_at', at());
         await step('run issues in Linear', () => syncRunIssues(db, makeAuditedLinearCaller(db, d.run)));

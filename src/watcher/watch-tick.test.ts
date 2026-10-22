@@ -2,6 +2,7 @@ import type { Database } from 'bun:sqlite';
 import { expect, mock, onTestFinished, test } from 'bun:test';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { HttpResponse, http } from 'msw';
+import { z } from 'zod';
 import { LINEAR_GRAPHQL_URL, linearDocuments, linearIssues } from '../../mocks/linear-handlers.ts';
 import { server } from '../../mocks/node.ts';
 import { createCapacitySample } from '../../test/create-capacity-sample.ts';
@@ -11,6 +12,7 @@ import { setCapacitySetting } from '../capacity/set-capacity-setting.ts';
 import { overrideEnv } from '../config/override-env.ts';
 import { setMeta } from '../db/set-meta.ts';
 import { loadActionsSpend } from '../goals/load-actions-spend.ts';
+import { addRun } from '../runs/add-run.ts';
 import { addUnblock } from '../unblock/add-unblock.ts';
 import { getUnblock } from '../unblock/get-unblock.ts';
 import { makePRStateGh } from '../../test/make-pr-state-gh.ts';
@@ -231,4 +233,44 @@ test('a goals sync the deadline gave up on is not started again until it stops',
   await watchTick(ctx.db, deps);
 
   expect({ whileHeld, after: repoLists.length, skipped: logs.some((line) => line.endsWith('team goals failed: team goals from an earlier pass is still running')) }).toStrictEqual({ whileHeld: 1, after: 2, skipped: true });
+});
+
+// At 20:00 UTC with every other sync fresh and a full GitHub pass at 19:59. Linear holds the run's
+// issue as canceled at 19:00, and the run has no PR.
+test('a due run-issue pass drops a run whose issue Linear canceled, tells z-delivery, and waits 10 minutes before the next read', async () => {
+  const ctx = setupTest();
+  const logs: string[] = [];
+  const capacity = JSON.stringify({ imp: { freeMib: 0, room: false }, providers: { claude: { room: false, unattended: true, target: 'imp' } } });
+  const answers: Record<string, string> = { op: 'lin_api_INVENTED\n', gh: '[]' };
+  const run: Runner = (command) => Promise.resolve({ code: 0, stdout: answers[command[0] ?? ''] ?? capacity, stderr: '' });
+  const variables = z.object({ ids: z.array(z.string()).optional() });
+  const readIds = z.object({ variables: variables.optional() });
+  const runIssueReads: string[] = [];
+  const deps = { me: 'hq-lanes', run, log: (line: string) => logs.push(line), stepMs: 2000, steps: { runs: () => Promise.resolve(), weekly: () => Promise.resolve(false), health: () => Promise.resolve({ opened: [], cleared: [] }) } };
+  onTestFinished(overrideEnv('HQ_NOW', '2026-10-15T20:00:00Z'));
+  for (const key of ['kinds_synced_at', 'goals_synced_at', 'goals_ok_at', 'kinds_ok_at', 'linear_synced_at', 'lanes_ready_linear_at', 'run_prs_checked_at']) {
+    setMeta(ctx.db, key, '2026-10-15T20:00:00Z');
+  }
+  setMeta(ctx.db, 'run_prs_merged_since', '2026-10-15T19:59:00Z');
+  addRun(ctx.db, { issue: 'KET-8', title: 'Invented kettle work', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
+  linearIssues.push({ identifier: 'KET-8', team: 'KET', state: 'Canceled', stateType: 'canceled', canceledAt: '2026-10-15T19:00:00.000Z', previousIdentifiers: [], project: null, labels: [], parent: null });
+  addRun(ctx.db, { issue: 'KET-9', title: 'Invented kettle work', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
+  server.use(
+    http.post(LINEAR_GRAPHQL_URL, async (info) => {
+      const raw: unknown = await info.request.clone().json();
+      const body = readIds.parse(raw);
+      if (body.variables?.ids?.includes('KET-9')) {
+        runIssueReads.push(process.env['HQ_NOW'] ?? '');
+      }
+    }),
+  );
+
+  await watchTick(ctx.db, deps);
+  onTestFinished(overrideEnv('HQ_NOW', '2026-10-15T20:05:00Z'));
+  await watchTick(ctx.db, deps);
+
+  expect(ctx.db.query("SELECT state, close_note FROM runs WHERE issue = 'KET-8'").get()).toStrictEqual({ state: 'dropped', close_note: 'Linear canceled the issue before any PR merged' });
+  expect(ctx.db.query('SELECT target FROM outbox').all()).toStrictEqual([{ target: 'z-delivery' }]);
+  expect(logs.filter((line) => line.includes('run issues'))).toStrictEqual(['2026-10-15T20:00:00Z run issues: dropped KET-8, canceled in Linear before any merge']);
+  expect(runIssueReads).toStrictEqual(['2026-10-15T20:00:00Z']);
 });
