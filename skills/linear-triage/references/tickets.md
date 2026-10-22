@@ -46,14 +46,14 @@ Each type adds one condition:
 
 ## finish line by type
 
-| Type          | Done when                                                                                         |
-| ------------- | ------------------------------------------------------------------------------------------------- |
-| Bug           | the reproduction no longer fails, and a regression test or eval case covers it                    |
-| Feature       | every acceptance check passes with its evidence                                                   |
-| Improvement   | the improvement is shown with evidence, and existing behaviour is unchanged except where intended |
-| Chore         | the upkeep is done, and checks show nothing a user notices changed                                |
-| Design        | decisions are recorded in a Linear document, and follow-up issues are filed                       |
-| Investigation | findings and a recommendation are written up, with follow-up issues if any                        |
+| Type          | Done when                                                                                                                                        |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Bug           | the reproduction no longer fails, and a regression test or eval case covers it                                                                   |
+| Feature       | every acceptance check passes with its evidence                                                                                                  |
+| Improvement   | the improvement is shown with evidence, and existing behaviour is unchanged except where intended                                                |
+| Chore         | the upkeep is done, and checks show nothing a user notices changed; no live-check item unless it publishes an artifact or rolls out across repos |
+| Design        | decisions are recorded in a Linear document, and follow-up issues are filed                                                                      |
+| Investigation | findings and a recommendation are written up, with follow-up issues if any                                                                       |
 
 A sweep applies a rule across a repo, such as a lint rollout or a layout change. Its Scope names the rules it applies, at a pinned zgeoff/tools tag, and the files or areas in scope. Its Acceptance says when it is done. A defect found outside that scope is fixed in the sweep's PR under the delivery brief's rule, never as another round on this ticket.
 
