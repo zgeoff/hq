@@ -2,13 +2,20 @@ import { expect, test } from 'bun:test';
 import { buildReadyPage, makePagedCall } from './build-ready-page.ts';
 
 test('it shapes seeds as Linear answers, with no project, labels or parent by default', () => {
-  const page = buildReadyPage([{ identifier: 'GEO-1' }, { identifier: 'GEO-2', project: 'invented project', labels: ['invented label'], parent: 'GEO-1' }], null);
+  const page = buildReadyPage([{ identifier: 'GEO-1' }, { identifier: 'GEO-2', project: 'invented project', projectLabels: ['maintenance'], labels: ['invented label'], type: 'Bug', priority: 2, createdAt: '2026-10-02T00:00:00.000Z', parent: 'GEO-1' }], null);
 
   expect(page).toStrictEqual({
     issues: {
       nodes: [
-        { identifier: 'GEO-1', project: null, labels: { nodes: [] }, parent: null },
-        { identifier: 'GEO-2', project: { name: 'invented project' }, labels: { nodes: [{ name: 'invented label' }] }, parent: { identifier: 'GEO-1' } },
+        { identifier: 'GEO-1', priority: 0, createdAt: '2026-10-01T00:00:00.000Z', project: null, labels: { nodes: [] }, parent: null },
+        {
+          identifier: 'GEO-2',
+          priority: 2,
+          createdAt: '2026-10-02T00:00:00.000Z',
+          project: { name: 'invented project', labels: { nodes: [{ name: 'maintenance' }] } },
+          labels: { nodes: [{ name: 'invented label', parent: null }, { name: 'Bug', parent: { name: 'Type' } }] },
+          parent: { identifier: 'GEO-1' },
+        },
       ],
       pageInfo: { hasNextPage: false, endCursor: null },
     },

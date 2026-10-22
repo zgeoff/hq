@@ -1,6 +1,6 @@
 import { HttpResponse, http } from 'msw';
 import { z } from 'zod';
-import type { ReadyPageAnswer } from '../src/lanes/read-linear-ready.ts';
+import type { ReadyPageAnswer } from '../src/lanes/read-team-issues.ts';
 import type { ReadyIssue } from '../src/lanes/types.ts';
 import type { IssuesFilter } from '../src/linear/read-issue-pages.ts';
 
@@ -84,6 +84,27 @@ const DEFAULT_TIME = '2026-10-01T00:00:00.000Z';
 // Linear answers 50 issues a page when the query sets no `first`.
 const DEFAULT_FIRST = 50;
 
+export interface LinearIssueRecord extends Pick<ReadyIssue, 'identifier' | 'project' | 'labels' | 'parent'> {
+  team: string;
+  state: string;
+
+  // Linear's state type, such as completed or canceled.
+  stateType: string;
+  previousIdentifiers: string[];
+
+  // What an issues page carries beyond the Ready query's core; each has a default. A type becomes a
+  // label in the Type group.
+  projectLabels?: string[];
+  type?: string;
+  title?: string;
+  priority?: { value: number; name: string };
+  createdAt?: string;
+  updatedAt?: string;
+  completedAt?: string | null;
+  canceledAt?: string | null;
+  description?: string | null;
+}
+
 function buildIssuesPageAnswer(variables: IssuesPageVariables, query: string) {
   const filter: IssuesFilter = filterSchema.parse(variables.filter);
   const first = Number(/\bfirst:\s*(?<first>\d+)/u.exec(query)?.groups?.['first'] ?? DEFAULT_FIRST);
@@ -118,24 +139,6 @@ function buildIssuePageNode(issue: LinearIssueRecord) {
   };
 }
 
-export interface LinearIssueRecord extends ReadyIssue {
-  team: string;
-  state: string;
-
-  // Linear's state type, such as completed or canceled.
-  stateType: string;
-  previousIdentifiers: string[];
-
-  // What an issues page carries beyond the Ready query; each has a default.
-  title?: string;
-  priority?: { value: number; name: string };
-  createdAt?: string;
-  updatedAt?: string;
-  completedAt?: string | null;
-  canceledAt?: string | null;
-  description?: string | null;
-}
-
 // The issues Linear holds; test/msw-preload.ts empties it after each test.
 export const linearIssues: LinearIssueRecord[] = [];
 
@@ -144,8 +147,10 @@ function buildReadyAnswer(team: unknown, state: unknown): ReadyPageAnswer {
     .filter((issue) => issue.team === team && issue.state === state)
     .map((issue) => ({
       identifier: issue.identifier,
-      project: issue.project === null ? null : { name: issue.project },
-      labels: { nodes: issue.labels.map((name) => ({ name })) },
+      priority: issue.priority?.value ?? 0,
+      createdAt: issue.createdAt ?? DEFAULT_TIME,
+      project: issue.project === null ? null : { name: issue.project, labels: { nodes: (issue.projectLabels ?? []).map((name) => ({ name })) } },
+      labels: { nodes: [...issue.labels.map((name) => ({ name, parent: null })), ...(issue.type === undefined ? [] : [{ name: issue.type, parent: { name: 'Type' } }])] },
       parent: issue.parent === null ? null : { identifier: issue.parent },
     }));
   return { issues: { nodes, pageInfo: { hasNextPage: false, endCursor: null } } };

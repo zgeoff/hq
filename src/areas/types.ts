@@ -3,9 +3,6 @@ export interface LaneConfig {
   name: string;
   place: Place;
   size: number;
-
-  // false: the lane neither lends its free slots nor borrows another's (pacing.json `lends`).
-  lends: boolean;
 }
 
 export interface Skipped {
@@ -25,21 +22,6 @@ export interface ReadySummary {
   skipped: Skipped[];
   unexplained: number;
   line: string;
-}
-
-export interface LaneView {
-  name: string;
-  place: Place;
-  size: number;
-  running: number;
-
-  // Free after the imp memory cap and impd's non-Nix line; held names why an imp lane has fewer
-  // free than its own count allows.
-  free: number;
-  held: string | null;
-  ready: number | null; // null: unknown or stale
-  readyAt: string | null;
-  lendTo: string | null; // free, no Ready of its own: the area its slots can go to
 }
 
 export interface AwakeSession {

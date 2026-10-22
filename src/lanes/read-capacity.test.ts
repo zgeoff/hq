@@ -17,14 +17,14 @@ function setupTest(): string {
   return join(dir, 'pacing.json');
 }
 
-test('lends pacing.json gets wrong is the sample\'s error, though capacity read, so the watcher sends no fill nudge', async () => {
-  writeFileSync(setupTest(), JSON.stringify({ lanes: { imp: { cleanup: 2 }, local: {} }, lends: { teapot: false } }));
+test('a lane pacing.json gets wrong is the sample\'s error, though capacity read, so the watcher sends no fill nudge', async () => {
+  writeFileSync(setupTest(), JSON.stringify({ lanes: { imp: { 'Bad Teapot': 2 }, local: {} } }));
   const sample = await readCapacity(realRunner);
-  expect([sample.cap?.imp?.freeMib, sample.lanes, sample.error]).toStrictEqual([8192, null, 'pacing.json: pacing.json lends: bad entry teapot']);
+  expect([sample.cap?.imp?.freeMib, sample.lanes, sample.error]).toStrictEqual([8192, null, 'pacing.json: pacing.json lanes: bad lane imp.Bad Teapot']);
 });
 
 test('good lanes read with capacity carry no error', async () => {
-  writeFileSync(setupTest(), JSON.stringify({ lanes: { imp: { cleanup: 2 }, local: {} }, lends: { cleanup: false } }));
+  writeFileSync(setupTest(), JSON.stringify({ lanes: { imp: { cleanup: 2 }, local: {} } }));
   const sample = await readCapacity(realRunner);
-  expect([sample.lanes?.map((lane) => lane.lends), sample.error]).toStrictEqual([[false], null]);
+  expect([sample.lanes, sample.error]).toStrictEqual([[{ name: 'cleanup', place: 'imp', size: 2 }], null]);
 });

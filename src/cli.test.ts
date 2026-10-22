@@ -96,3 +96,33 @@ test('hq run done closes the run, forgets its session through atc, and notes the
   expect(fresh.db.query("SELECT state FROM runs WHERE issue = 'GEO-9821'").get()).toStrictEqual({ state: 'done' });
   expect(fresh.db.query("SELECT label, text FROM run_notes WHERE issue = 'GEO-9821'").all()).toStrictEqual([{ label: 'wrap-up', text: 'Wrap-up: forgot 0000a001.' }]);
 });
+
+test('hq focus set, show and clear run through the spawned CLI, with a repeated --reserve', async () => {
+  const fresh = freshDb();
+  onTestFinished(fresh.cleanup);
+  mkdirSync(`${fresh.dir}/bin`);
+  writeFileSync(`${fresh.dir}/bin/op`, '#!/bin/sh\necho "op: no session" >&2\nexit 1\n');
+  chmodSync(`${fresh.dir}/bin/op`, 0o755);
+  const hq = async (...args: string[]): Promise<{ code: number; stdout: string }> => {
+    const child = Bun.spawn(['bun', join(import.meta.dir, 'cli.ts'), 'focus', ...args, '--json'], {
+      stdout: 'pipe',
+      stderr: 'pipe',
+      env: { ...process.env, HOME: fresh.dir, HQ_DB: fresh.path, HQ_NOTIFY: 'off', HQ_NOW: NOON_SYDNEY, HQ_AS: 'z-delivery', PATH: `${fresh.dir}/bin:${process.env['PATH']}` },
+    });
+    const [code, stdout] = await Promise.all([child.exited, new Response(child.stdout).text()]);
+    return { code, stdout };
+  };
+
+  const set = await hq('set', 'bug,nixie:feature', '--reserve', 'nixie=1', '--reserve', 'hq=2');
+  const shown = await hq('show');
+  const cleared = await hq('clear');
+  const after = await hq('show');
+
+  expect(set.code).toBe(0);
+  expect(JSON.parse(shown.stdout)).toMatchObject({
+    focus: { terms: [{ text: 'bug' }, { text: 'nixie:feature' }], reserves: [{ area: 'nixie', slots: 1 }, { area: 'hq', slots: 2 }], setBy: 'z-delivery' },
+    counts: null,
+  });
+  expect(JSON.parse(cleared.stdout)).toMatchObject({ cleared: true });
+  expect(JSON.parse(after.stdout)).toMatchObject({ focus: null });
+});

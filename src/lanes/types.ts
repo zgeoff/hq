@@ -1,8 +1,18 @@
+import type { IssueType } from '../linear/issue-types.ts';
 import type { LaneConfig } from '../areas/types.ts';
 
 export interface Capacity {
   imp?: { freeMib?: number; room?: boolean; error?: string };
   providers?: Record<string, { room?: boolean; unattended?: boolean; target?: string }>;
+
+  // capacity.sh's design slots: room while fewer Design sessions wait on the owner than it allows.
+  design?: { room?: boolean };
+}
+
+// The slot caps by place the lanes' pool fills (pacing.json `slots`, or its lanes summed).
+export interface PacingSlots {
+  imp: number;
+  local: number;
 }
 
 export interface Sample {
@@ -10,6 +20,9 @@ export interface Sample {
   impMib: number;
   error: string | null;
   lanes?: LaneConfig[] | null; // pacing.json's lanes; absent or null: one pool of imp slots
+
+  // The pool's caps; absent or null with the lanes.
+  slots?: PacingSlots | null;
 }
 
 export interface TickResult {
@@ -65,11 +78,16 @@ export interface LaneRules {
   lanes: Record<string, LaneRule>;
 }
 
-// A Ready issue as Linear reports it.
+// A Ready issue as Linear reports it. labels holds every label name, the Type label included;
+// priority is Linear's: 1 urgent to 4 low, 0 none.
 export interface ReadyIssue {
   identifier: string;
   project: string | null;
+  projectLabels: string[];
   labels: string[];
+  type: IssueType;
+  priority: number;
+  createdAt: string;
   parent: string | null;
 }
 

@@ -8,6 +8,7 @@ import { reportLaneReady } from '../areas/report-lane-ready.ts';
 import type { LinearCall } from '../linear/types.ts';
 import { getMeta } from '../db/get-meta.ts';
 import { readLinearReady } from './read-linear-ready.ts';
+import { readReadySnapshot } from './read-ready-snapshot.ts';
 import { validateLaneRules } from './validate-lane-rules.ts';
 
 function setupTest() {
@@ -133,4 +134,48 @@ test('it refuses a malformed later page and keeps the previous counts', async ()
   await expect(readLinearReady(ctx.db, call, 'hq-lanes', rules)).rejects.toThrow("Linear's Ready answer has an unexpected shape: issues.nodes.0.identifier");
 
   expect(getMeta(ctx.db, 'lanes_ready_by_lane')).toBe(before);
+});
+
+test('it keeps the eligible Ready issues and the Design issues apart, and leaves the other exclusions out', async () => {
+  const ctx = setupTest();
+  const rules = validateLaneRules(rulesTable, Object.keys(rulesTable.lanes));
+  const call = makePagedCall(
+    buildReadyPage(
+      [
+        { identifier: 'GEO-9801', project: 'atc roadmap', labels: ['atc'] },
+        { identifier: 'GEO-9802', labels: ['Design', 'nixie'] },
+        { identifier: 'GEO-9803', project: 'hq roadmap', labels: ['hq'] },
+      ],
+      null,
+    ),
+  );
+
+  await readLinearReady(ctx.db, call, 'hq-lanes', rules);
+
+  const snapshot = readReadySnapshot(ctx.db);
+
+  expect(snapshot?.eligible.map((issue) => issue.identifier)).toStrictEqual(['GEO-9801']);
+  expect(snapshot?.design.map((issue) => issue.identifier)).toStrictEqual(['GEO-9802']);
+  expect(JSON.parse(getMeta(ctx.db, 'lanes_issue_areas') ?? 'null')).toStrictEqual({ 'GEO-9801': ['atc'], 'GEO-9802': ['nixie'] });
+});
+
+test('it treats the Ready issues as unknown once the read is 30 min old', async () => {
+  const ctx = setupTest();
+  const rules = validateLaneRules(rulesTable, Object.keys(rulesTable.lanes));
+  await readLinearReady(ctx.db, makePagedCall(buildReadyPage([{ identifier: 'GEO-9801' }], null)), 'hq-lanes', rules);
+  at('2026-10-15T20:31:00Z');
+
+  expect(readReadySnapshot(ctx.db)).toBeNull();
+});
+
+test('it keeps the areas of a running issue after it leaves Ready', async () => {
+  const ctx = setupTest();
+  const rules = validateLaneRules(rulesTable, Object.keys(rulesTable.lanes));
+  await readLinearReady(ctx.db, makePagedCall(buildReadyPage([{ identifier: 'GEO-9801', labels: ['nixie'] }, { identifier: 'GEO-9802', labels: ['vers'] }], null)), 'hq-lanes', rules);
+  ctx.db.query("INSERT INTO runs (issue, title, place, state, created_at, updated_at) VALUES ('GEO-9801', 'Polish the kettle', 'imp', 'working', '2026-10-15T20:00:00Z', '2026-10-15T20:00:00Z')").run();
+  at('2026-10-15T20:10:00Z');
+
+  await readLinearReady(ctx.db, makePagedCall(buildReadyPage([], null)), 'hq-lanes', rules);
+
+  expect(JSON.parse(getMeta(ctx.db, 'lanes_issue_areas') ?? 'null')).toStrictEqual({ 'GEO-9801': ['nixie'] });
 });

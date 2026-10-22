@@ -1,40 +1,54 @@
-// Lanes by area (pacing.json `lanes`): slots are shares, not reservations. A free slot with no
-// Ready work lends to an area with more Ready than room, nixie areas first and flexible last. A
-// lane that `lends` maps to false (cleanup, memory) neither lends nor borrows.
+// pacing.json `lanes`: hq sums the slot counts by place into one pool (imp and local); the names stay
+// for hq run lane and the band. `lends` is no longer read: hq focus reserves slots for an area instead.
+import { z } from 'zod';
 import { HqError } from '../errors.ts';
+import { parseSlotCounts } from '../lanes/parse-slot-counts.ts';
 import type { LaneConfig } from './types.ts';
 
-// pacing.json's `lanes`: { imp: { name: size }, local: { name: size } }, and `lends`: { name: false }
-// for lanes that keep to their own slots. Bad entries are refused.
-export function parseLanes(raw: unknown): LaneConfig[] {
-  const NAME = /^[a-z][a-z0-9-]{0,39}$/u,
-    lanes = (raw as { lanes?: Record<string, Record<string, unknown>> } | null)?.lanes;
-  if (!lanes || typeof lanes !== 'object') throw new HqError('no_lanes', 'pacing.json has no lanes');
-  const out: LaneConfig[] = [];
-  for (const place of Object.keys(lanes)) {
-    if (place !== 'imp' && place !== 'local') throw new HqError('no_lanes', `pacing.json lanes: unknown place "${place}"`);
-    for (const [name, size] of Object.entries(lanes[place] ?? {})) {
-      if (!NAME.test(name) || !Number.isInteger(size) || (size as number) < 0 || (size as number) > 100) throw new HqError('no_lanes', `pacing.json lanes: bad lane ${place}.${name}`);
-      if (out.some((l) => l.name === name)) throw new HqError('no_lanes', `pacing.json lanes: ${name} appears twice`);
-      out.push({ name, place, size: size as number, lends: true });
-    }
-  }
-  if (!out.length) throw new HqError('no_lanes', 'pacing.json has no lanes');
-  return mergeLends(out, (raw as { lends?: unknown }).lends);
-}
+const NAME = /^[a-z][a-z0-9-]{0,39}$/u;
 
-function mergeLends(lanes: LaneConfig[], raw: unknown): LaneConfig[] {
-  if (raw === undefined) {
-    return lanes;
+const MAX_SIZE = 100;
+
+const fileSchema = z.object({ lanes: z.unknown(), slots: z.unknown() }).partial();
+
+const placesSchema = z.record(z.string(), z.record(z.string(), z.unknown()));
+
+const sizeSchema = z.number().int().min(0).max(MAX_SIZE);
+
+// pacing.json's `lanes`: { imp: { name: size }, local: { name: size } }. Bad entries are refused. A
+// file with `slots` and no `lanes` gives one lane per place, named after it.
+export function parseLanes(raw: unknown): LaneConfig[] {
+  const parsed = fileSchema.safeParse(raw);
+  const file = parsed.success ? parsed.data : {};
+  if (file.lanes === undefined && file.slots !== undefined) {
+    const counts = parseSlotCounts(file.slots);
+    return [
+      { name: 'imp', place: 'imp', size: counts.imp },
+      { name: 'local', place: 'local', size: counts.local },
+    ];
   }
-  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
-    throw new HqError('no_lanes', 'pacing.json lends: must map lane names to true or false');
+  const places = placesSchema.safeParse(file.lanes);
+  if (!places.success) {
+    throw new HqError('no_lanes', 'pacing.json has no lanes');
   }
-  const lends = new Map(Object.entries(raw));
-  for (const [name, value] of lends) {
-    if (typeof value !== 'boolean' || !lanes.some((lane) => lane.name === name)) {
-      throw new HqError('no_lanes', `pacing.json lends: bad entry ${name}`);
+  const out: LaneConfig[] = [];
+  for (const [place, lanes] of Object.entries(places.data)) {
+    if (place !== 'imp' && place !== 'local') {
+      throw new HqError('no_lanes', `pacing.json lanes: unknown place "${place}"`);
+    }
+    for (const [name, rawSize] of Object.entries(lanes)) {
+      const size = sizeSchema.safeParse(rawSize);
+      if (!NAME.test(name) || !size.success) {
+        throw new HqError('no_lanes', `pacing.json lanes: bad lane ${place}.${name}`);
+      }
+      if (out.some((lane) => lane.name === name)) {
+        throw new HqError('no_lanes', `pacing.json lanes: ${name} appears twice`);
+      }
+      out.push({ name, place, size: size.data });
     }
   }
-  return lanes.map((lane) => ({ ...lane, lends: lends.get(lane.name) !== false }));
+  if (out.length === 0) {
+    throw new HqError('no_lanes', 'pacing.json has no lanes');
+  }
+  return out;
 }

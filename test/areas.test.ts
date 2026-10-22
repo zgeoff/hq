@@ -2,9 +2,6 @@ import { afterEach, beforeEach, expect, test } from 'bun:test';
 import type { Database } from 'bun:sqlite';
 import { checkLane } from '../src/areas/check-lane.ts';
 import { laneArgs } from '../src/areas/lane-args.ts';
-import { buildLaneViews } from '../src/areas/build-lane-views.ts';
-import { lanesNudgeText } from '../src/areas/lanes-nudge-text.ts';
-import { wants } from '../src/areas/wants.ts';
 import { parkedRuns } from '../src/areas/parked-runs.ts';
 import { parseLanes } from '../src/areas/parse-lanes.ts';
 import { parseReadyTotal } from '../src/areas/parse-ready-total.ts';
@@ -21,8 +18,9 @@ import { eligibleNow } from '../src/lanes/eligible-now.ts';
 import { idleSlotMinutes } from '../src/lanes/idle-slot-minutes.ts';
 import { reportReady } from '../src/lanes/report-ready.ts';
 import { formatLineRoom } from '../src/lanes/format-line-room.ts';
-import { lanesNow } from '../src/lanes/lanes-now.ts';
 import { loadImpRoom } from '../src/lanes/load-imp-room.ts';
+import { parsePacingSlots } from '../src/lanes/parse-pacing-slots.ts';
+import { readSlotPlan } from '../src/lanes/read-slot-plan.ts';
 import { tick } from '../src/lanes/tick.ts';
 import { checkReadyStale } from '../src/lanes/check-ready-stale.ts';
 import { setMeta } from '../src/db/set-meta.ts';
@@ -31,6 +29,7 @@ import { addNote } from '../src/runs/add-note.ts';
 import { addRun } from '../src/runs/add-run.ts';
 import { setState } from '../src/runs/set-state.ts';
 import { setCapacitySetting } from '../src/capacity/set-capacity-setting.ts';
+import { buildReadyIssue } from './build-ready-issue.ts';
 import { createCapacitySample } from './create-capacity-sample.ts';
 import { at, freshDb } from './helpers.ts';
 
@@ -40,8 +39,11 @@ const T0 = '2026-10-16T01:00:00Z';
 const atMin = (m: number) => at(new Date(Date.parse(T0) + m * 60_000).toISOString());
 const PACING = { lanes: { imp: { 'nixie-slice': 3, 'nixie-maintenance': 2, atc: 2, imp: 2, cloud: 1 }, local: { flexible: 2 } } };
 const LANES = parseLanes(PACING);
+// oxlint-disable-next-line zgeoff/setup-test-only -- this file's shared beforeEach state is GEO-1318's lint debt
+const SLOTS = parsePacingSlots(PACING);
 const cap = (freeMib: number) => ({ imp: { freeMib, room: true }, providers: { claude: { room: true, unattended: true, target: 'imp' } } });
-const sample = (freeMib: number) => ({ cap: cap(freeMib), impMib: 2048, error: null, lanes: LANES });
+// oxlint-disable-next-line zgeoff/setup-test-only, zgeoff/no-top-level-arrow -- this file's shared beforeEach state is GEO-1318's lint debt
+const sample = (freeMib: number) => ({ cap: cap(freeMib), impMib: 2048, error: null, lanes: LANES, slots: SLOTS });
 const run = (issue: string, lane: string | null, place: 'imp' | 'local' = 'imp') =>
   addRun(db, { issue, title: 'Invented kettle work', place, session: null, next: 'Agent working.', gate: null, geoffChat: false, lane, actor: 'z-delivery' });
 const msgs = () => db.query('SELECT text FROM outbox').all() as { text: string }[];
@@ -94,62 +96,6 @@ test('running counts by lane; a local run with no lane is flexible; a lane note 
   expect(() => setRunLane(db, 'GEO-404', 'cloud', 'z-delivery')).toThrow('no run GEO-404');
 });
 
-test('free slots per lane under the imp memory cap, filled in pacing.json order', () => {
-  const v = buildLaneViews(LANES, { 'nixie-slice': 1, atc: 2 }, {}, { slots: 3, heldBy: 'impd at line', line: null });
-  expect(v.map((x) => [x.name, x.free])).toEqual([
-    ['nixie-slice', 2],
-    ['nixie-maintenance', 1],
-    ['atc', 0],
-    ['imp', 0],
-    ['cloud', 0],
-    ['flexible', 2],
-  ]);
-});
-
-test('an imp lane with 0 Ready lends to an area short of slots, nixie first, flexible last', () => {
-  const v = buildLaneViews(LANES, { 'nixie-slice': 3 }, { 'nixie-slice': buildReady(4), atc: buildReady(0), imp: buildReady(0), cloud: buildReady(0), flexible: buildReady(5), 'nixie-maintenance': buildReady(1) }, { slots: 10, heldBy: 'imp budget or provider quota', line: null });
-  const by = Object.fromEntries(v.map((x) => [x.name, x]));
-
-  // nixie-slice has 4 Ready and 0 free
-  expect(by['atc']?.lendTo).toBe('nixie-slice');
-
-  // still 2 short after atc's 2
-  expect(by['imp']?.lendTo).toBe('nixie-slice');
-
-  // nixie is covered; flexible has 5 Ready, 2 free
-  expect(by['cloud']?.lendTo).toBe('flexible');
-  expect(by['nixie-maintenance']!.lendTo).toBeNull();
-  expect(v.filter(wants).map((x) => x.name)).toEqual(['nixie-maintenance', 'atc', 'imp', 'cloud', 'flexible']);
-  expect(lanesNudgeText(v.filter(wants), () => 12)).toContain('atc 2 free for 12 min (0 Ready; lend to nixie-slice)');
-  // Nobody short: a lane with 0 Ready isn't worth a nudge.
-  expect(buildLaneViews(LANES, {}, { atc: buildReady(0), flexible: buildReady(0) }, { slots: 10, heldBy: 'imp budget or provider quota', line: null }).find((x) => x.name === 'atc')?.lendTo).toBeNull();
-  expect(buildLaneViews(LANES, {}, { atc: buildReady(0), flexible: buildReady(0) }, { slots: 10, heldBy: 'imp budget or provider quota', line: null }).some((x) => x.name === 'atc' && wants(x))).toBe(false);
-});
-
-test('a lane pacing.json marks lends: false keeps to its own slots: it lends none, and none are lent to it', () => {
-  const config = parseLanes({ ...PACING, lanes: { imp: { ...PACING.lanes.imp, cleanup: 2 }, local: { ...PACING.lanes.local, memory: 1 } }, lends: { cleanup: false, memory: false } }),
-    drawn = buildLaneViews(config, { memory: 1 }, { cleanup: buildReady(0), atc: buildReady(0), memory: buildReady(3), 'nixie-slice': buildReady(9) }, { slots: 20, heldBy: 'imp budget or provider quota', line: null }),
-    named = Object.fromEntries(drawn.map((x) => [x.name, x]));
-  expect(config.filter((l) => !l.lends).map((l) => l.name)).toStrictEqual(['cleanup', 'memory']);
-  expect([named['cleanup']?.free, named['cleanup']?.lendTo, named['atc']?.lendTo]).toStrictEqual([2, null, 'nixie-slice']);
-  expect(buildLaneViews(config, { memory: 1 }, { cleanup: buildReady(0), atc: buildReady(0), memory: buildReady(3) }, { slots: 20, heldBy: 'imp budget or provider quota', line: null }).map((x) => x.lendTo)).toStrictEqual(Array.from(config, () => null));
-  expect(lanesNudgeText(drawn.filter((x) => wants(x)), () => 12)).not.toContain('cleanup 2 free');
-});
-
-test.each([
-  ['a list', ['atc']],
-  ['a known lane with a value that is not true or false', { atc: 'no' }],
-  ['a known lane with 0', { atc: 0 }],
-  ['an unknown lane', { teapot: false }],
-  ['null', null],
-])('pacing.json lends is refused when it is %s', (_name, lends) => {
-  expect(() => parseLanes({ ...PACING, lends })).toThrow('pacing.json lends');
-});
-
-test('pacing.json lends true keeps a lane lending', () => {
-  expect(parseLanes({ ...PACING, lends: { atc: true } }).every((l) => l.lends)).toBe(true);
-});
-
 test('a per-lane Ready report also sets the total; a total-only report keeps the per-lane counts and detail', () => {
   reportLaneReady(db, parseReady(LANES, 'atc=2,flexible=1'), 'z-delivery', { total: 5, skipped: [{ issue: 'GEO-1', reason: 'invented reason' }] });
   expect(eligibleNow(db)).toEqual({ count: 3, at: T0 });
@@ -186,55 +132,63 @@ test('a reported 0 Ready stays fresh for its own, longer window', () => {
   expect(readReadyByLane(db, 30, 180)['flexible']?.n).toBeNull();
 });
 
-test('the watcher nudges by lane after 10 min, and again only on a change or after 30 min', () => {
-  reportLaneReady(db, parseReady(LANES, 'nixie-slice=2,nixie-maintenance=0,atc=0,imp=0,cloud=0,flexible=0'), 'z-delivery');
+test('the watcher nudges with the picks after 10 min, and again only on a change or after 30 min', () => {
+  setMeta(db, 'lanes_ready_issues', JSON.stringify({ at: T0, eligible: [buildReadyIssue('GEO-21', { priority: 2 }), buildReadyIssue('GEO-22', { priority: 3 })], design: [] }));
   expect(tick(db, sample(16384), 'hq-lanes').nudged).toBe(false);
   atMin(10);
-  reportLaneReady(db, parseReady(LANES, 'nixie-slice=2,nixie-maintenance=0,atc=0,imp=0,cloud=0,flexible=0'), 'z-delivery');
   const r = tick(db, sample(16384), 'hq-lanes');
   expect(r.nudged).toBe(true);
-  expect(msgs()[0]?.text).toMatchInlineSnapshot(
-    `"Lanes with free slots: nixie-slice 3 free for 10 min (2 Ready). Fill them now; a lent run counts in the lane it runs in. (hq lanes; you pick the issues and write the briefs. hq reads Ready from Linear every 10 min; when a lane shows Ready unknown, report it with hq lanes ready --lane name=n,...)"`,
+  expect(msgs()[0]?.text).toBe(
+    '10 slots free for 10 min (imp 8, local 2). Take, in this order: GEO-21, GEO-22. (hq lanes shows the plan, hq focus the focus; capacity.sh still picks the provider and where it runs, and you write the briefs.)',
   );
   atMin(15);
   expect(tick(db, sample(16384), 'hq-lanes').why).toContain('nothing changed');
-  run('GEO-1', 'nixie-slice');
+  run('GEO-21', 'nixie-slice');
   atMin(16);
-  expect(tick(db, sample(16384), 'hq-lanes').nudged).toBe(true); // a launch changed nixie-slice to 2 free: a change
-  expect(msgs()).toHaveLength(1); // the newer nudge replaced the unsent one
-  expect(msgs()[0]!.text).toContain('nixie-slice 2 free for 16 min (2 Ready)');
+
+  // A launch took GEO-21, so the picks changed; the newer nudge replaced the unsent one.
+  expect(tick(db, sample(16_384), 'hq-lanes').nudged).toBe(true);
+  expect(msgs()).toHaveLength(1);
+  expect(msgs()[0]?.text).toContain('Take, in this order: GEO-22.');
 });
 
-test('the samples count a lane from its first free minute; only the nudge waits', () => {
-  reportLaneReady(db, parseReady(LANES, 'flexible=3'), 'z-delivery');
+test('a Design issue alone starts no nudge, though the plan names it for the design slot', () => {
+  setMeta(db, 'lanes_ready_issues', JSON.stringify({ at: T0, eligible: [], design: [buildReadyIssue('GEO-24', { type: 'Design' })] }));
+  const withDesign = { ...sample(16_384), cap: { ...cap(16_384), design: { room: true } } };
+  tick(db, withDesign, 'hq-lanes');
+  atMin(10);
+
+  const result = tick(db, withDesign, 'hq-lanes');
+
+  expect([readSlotPlan(db, withDesign)?.design, result.nudged, result.why, msgs()]).toStrictEqual(['GEO-24', false, '10 slot(s) free, nothing eligible', []]);
+});
+
+test('the samples count the slots the plan fills from the first free minute; only the nudge waits', () => {
+  setMeta(db, 'lanes_ready_issues', JSON.stringify({ at: T0, eligible: ['GEO-21', 'GEO-22', 'GEO-23'].map((issue) => buildReadyIssue(issue)), design: [] }));
   for (const m of [0, 5, 10]) {
     atMin(m);
-    tick(db, { ...sample(0), lanes: LANES }, 'hq-lanes');
+    tick(db, { ...sample(0), lanes: LANES, slots: SLOTS }, 'hq-lanes');
   }
   expect((db.query('SELECT slots FROM lanes_samples ORDER BY seq').all() as { slots: number }[]).map((r) => r.slots)).toEqual([2, 2, 2]);
   expect(idleSlotMinutes(db, 1).slotMinutes).toBe(20);
 });
 
-test('impd at its non-Nix line holds the lanes\' free slots and says why; a stale reading holds them all', () => {
-  const readImpFree = () => (lanesNow(db, reading) ?? []).filter((v) => v.place === 'imp').map((v) => [v.name, v.free, v.held]),
-    reading = { cap: cap(8192), impMib: 2048, error: null, lanes: LANES };
+test('impd at its non-Nix line holds the pool\'s imp slots and says why; a stale reading holds them all', () => {
+  const reading = { cap: cap(8192), impMib: 2048, error: null, lanes: LANES, slots: SLOTS };
+  const readImpFree = () => {
+    const pool = readSlotPlan(db, reading)?.pool;
+    return [pool?.impFree, pool?.held];
+  };
   db.query('DELETE FROM capacity_samples').run();
   setCapacitySetting(db, 'nonnixMaxMib', null, 'z-delivery');
   createCapacitySample(db, { at: T0, nonnixAwakeMib: 14_336 });
-  expect(readImpFree()).toStrictEqual([
-    ['nixie-slice', 1, 'impd at line'],
-    ['nixie-maintenance', 0, 'impd at line'],
-    ['atc', 0, 'impd at line'],
-    ['imp', 0, 'impd at line'],
-    ['cloud', 0, 'impd at line'],
-  ]);
+  expect(readImpFree()).toStrictEqual([1, 'impd at line']);
   expect(formatLineRoom(loadImpRoom(db, { budgetSlots: 4, impMib: 2048 }))).toBe('impd non-Nix line: 14336/16384 MiB, 0/1000 vCPUs awake; 1 imp slot(s) to fill, set by impd at line');
   createCapacitySample(db, { at: T0, nonnixAwakeMib: 16_384 });
-  reportLaneReady(db, parseReady(LANES, 'nixie-slice=2'), 'z-delivery');
-  expect(readImpFree().map((v) => v[1])).toStrictEqual([0, 0, 0, 0, 0]);
+  expect(readImpFree()).toStrictEqual([0, 'impd at line']);
   expect(tick(db, reading, 'hq-lanes').slots).toBe(2);
   atMin(16);
-  expect(readImpFree()[0]).toStrictEqual(['nixie-slice', 0, 'no fresh impd reading']);
+  expect(readImpFree()).toStrictEqual([0, 'no fresh impd reading']);
   expect(formatLineRoom(loadImpRoom(db, { budgetSlots: 4, impMib: 2048 }))).toBe('impd non-Nix line: no fresh reading, so every imp slot is held');
 });
 
@@ -242,25 +196,9 @@ test('with no lanes in pacing.json, the one imp pool is held under impd\'s non-N
   db.query('DELETE FROM capacity_samples').run();
   setCapacitySetting(db, 'nonnixMaxMib', null, 'z-delivery');
   createCapacitySample(db, { at: T0, nonnixAwakeMib: 14_336 });
-  expect(tick(db, { ...sample(8192), lanes: null }, 'hq-lanes').slots).toBe(1);
+  expect(tick(db, { ...sample(8192), lanes: null, slots: null }, 'hq-lanes').slots).toBe(1);
   createCapacitySample(db, { at: T0, nonnixAwakeMib: 16_384 });
-  expect(tick(db, { ...sample(8192), lanes: null }, 'hq-lanes').slots).toBe(0);
-});
-
-test("a lane that just opened waits its own 10 min, not another lane's", () => {
-  reportLaneReady(db, parseReady(LANES, 'nixie-slice=0,nixie-maintenance=0,atc=0,imp=0,cloud=0,flexible=3'), 'z-delivery');
-  run('GEO-1', 'cloud');
-  tick(db, sample(32768), 'hq-lanes'); // flexible is free; cloud is full
-  atMin(10);
-  reportLaneReady(db, parseReady(LANES, 'nixie-slice=0,nixie-maintenance=0,atc=0,imp=0,cloud=1,flexible=3'), 'z-delivery');
-  setState(db, 'GEO-1', 'merged', {}, 'z-delivery'); // cloud opens now
-  expect(tick(db, sample(32768), 'hq-lanes').nudged).toBe(true);
-  expect(msgs()[0]!.text).toContain('flexible 2 free for 10 min');
-  expect(msgs()[0]!.text).not.toContain('cloud');
-  atMin(20);
-  reportLaneReady(db, parseReady(LANES, 'nixie-slice=0,nixie-maintenance=0,atc=0,imp=0,cloud=1,flexible=3'), 'z-delivery');
-  tick(db, sample(32768), 'hq-lanes');
-  expect(msgs()[0]!.text).toContain('cloud 1 free for 10 min');
+  expect(tick(db, { ...sample(8192), lanes: null, slots: null }, 'hq-lanes').slots).toBe(0);
 });
 
 test('hq run lane takes two words, one quoted word, or --lane', () => {
@@ -312,27 +250,27 @@ test('a blocked run with no session awake is parked, whatever it waits on: its s
   expect(runningByLane(db)).toEqual({ atc: 3 });
 });
 
-test('the sample records eligible 0 when every free lane reported 0, and unknown only with no report', () => {
+test('the sample records the eligible issues the Ready read holds, the hand count while it is stale, and unknown with neither', () => {
   const eligible = () => (db.query('SELECT eligible, slots FROM lanes_samples ORDER BY seq DESC LIMIT 1').get() as { eligible: number | null; slots: number });
-  reportLaneReady(db, parseReady(LANES, 'nixie-slice=0,nixie-maintenance=0,atc=0,imp=0,cloud=0,flexible=0'), 'z-delivery');
+  setMeta(db, 'lanes_ready_issues', JSON.stringify({ at: T0, eligible: [], design: [] }));
   tick(db, sample(16384), 'hq-lanes');
-  expect(eligible().eligible).toBe(0);
-  // One free lane reported, the rest never did: the report counts.
-  db.query("DELETE FROM meta WHERE key = 'lanes_ready_by_lane'").run();
-  reportLaneReady(db, parseReady(LANES, 'atc=2'), 'z-delivery');
+  expect(eligible()).toStrictEqual({ eligible: 0, slots: 0 });
+  setMeta(db, 'lanes_ready_issues', JSON.stringify({ at: T0, eligible: [buildReadyIssue('GEO-21'), buildReadyIssue('GEO-22')], design: [] }));
   atMin(1);
   tick(db, sample(16384), 'hq-lanes');
-  expect(eligible().eligible).toBe(2);
-  // No report at all: unknown.
-  db.query("DELETE FROM meta WHERE key = 'lanes_ready_by_lane'").run();
+  expect(eligible()).toStrictEqual({ eligible: 2, slots: 2 });
+
+  // No Ready read and no hand report: unknown, and every free slot counts.
+  db.query("DELETE FROM meta WHERE key = 'lanes_ready_issues'").run();
   atMin(2);
   tick(db, sample(16384), 'hq-lanes');
-  expect(eligible().eligible).toBeNull();
-  // Reports gone stale: unknown again.
-  reportLaneReady(db, parseReady(LANES, 'atc=2'), 'z-delivery');
-  atMin(40);
+  expect(eligible()).toStrictEqual({ eligible: null, slots: 10 });
+
+  // A hand report stands in while the read is missing.
+  reportReady(db, 5, 'z-delivery');
+  atMin(3);
   tick(db, sample(16384), 'hq-lanes');
-  expect(eligible().eligible).toBeNull();
+  expect(eligible().eligible).toBe(5);
 });
 
 const SK = 'GEO-1=blocked by GEO-9;GEO-2=needs a design call';
@@ -399,15 +337,15 @@ test('a blocked run waiting on the owner whose session is idle 15 min holds no s
   expect(runningByLane(db)).toEqual({ flexible: 0 });
 });
 
-test('a slot a gone session frees in an imp lane stays held while impd is at its line', () => {
-  const reading = { cap: cap(8192), impMib: 2048, error: null, lanes: LANES };
+test('a slot a gone session frees on imp stays held while impd is at its line', () => {
+  const reading = { cap: cap(8192), impMib: 2048, error: null, lanes: LANES, slots: SLOTS };
   addRun(db, { issue: 'GEO-10', title: 'Invented kettle work', place: 'imp', session: '00000011-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
   db.query('DELETE FROM capacity_samples').run();
   setCapacitySetting(db, 'nonnixMaxMib', null, 'z-delivery');
   atMin(6);
   createCapacitySample(db, { at: new Date(Date.parse(T0) + 6 * 60_000).toISOString().replace('.000Z', 'Z'), nonnixAwakeMib: 18_432 });
   recordAwake(db, []);
-  expect([runningByLane(db), (lanesNow(db, reading) ?? []).find((view) => view.name === 'cloud')]).toMatchObject([{ cloud: 0 }, { name: 'cloud', free: 0, held: 'impd at line' }]);
+  expect([runningByLane(db), readSlotPlan(db, reading)?.pool]).toMatchObject([{ cloud: 0 }, { impRunning: 0, impFree: 0, held: 'impd at line' }]);
 });
 
 test('an awake session idle 15 min parks its blocked-on-the-owner run; a turn or a state change counts it again', () => {
@@ -458,11 +396,6 @@ test('a turn between two sweeps restarts the idle clock from atc\'s last activit
   recordAwake(db, [{ alive: true, id, state: 'needs_you' }], new Map([[id, Date.parse(T0) + 9 * 60_000]]));
   expect(parkedRuns(db)).toEqual([{ issue: 'GEO-6', lane: 'imp' }]);
 });
-
-// One lane's Ready count, reported at T0.
-function buildReady(n: number): { n: number; at: string } {
-  return { n, at: T0 };
-}
 
 test('the stale alert names the last Linear read\'s error and gives the hand report as the fallback', () => {
   reportReady(db, 4, 'z-delivery');

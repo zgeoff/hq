@@ -21,7 +21,7 @@ import { syncLinear } from '../kinds/sync-linear.ts';
 import { syncRunIssues } from '../linear/sync-run-issues.ts';
 import { dropCanceledRuns } from '../runs/drop-canceled-runs.ts';
 import { readCapacity } from '../lanes/read-capacity.ts';
-import { readLanes } from '../lanes/read-lanes.ts';
+import { readPacingLanes } from '../lanes/read-pacing-lanes.ts';
 import { tick } from '../lanes/tick.ts';
 import { runLinearReadyTick } from '../run-linear-ready-tick.ts';
 import { makeAuditedLinearCaller } from '../linear/make-audited-linear-caller.ts';
@@ -71,7 +71,7 @@ export async function watchTick(db: Database, d: WatchDeps): Promise<boolean> {
     }
   }
   try {
-    await runLinearReadyTick(db, { call: makeAuditedLinearCaller(db, d.run), readLanes, actor: d.me, deadlineMs: ms });
+    await runLinearReadyTick(db, { call: makeAuditedLinearCaller(db, d.run), readLanes: readPacingLanes, actor: d.me, deadlineMs: ms });
   } catch (error) {
     d.log(`${at()} lanes Ready from Linear failed: ${msg(error)}`);
   }

@@ -119,17 +119,19 @@ test('an impd reading over 15 minutes old shows impd unknown and turns lanes amb
 });
 
 test.each([
-  ['a lane that borrows a slot counts every run it holds, in plain', 4, 'lanes 4/4 (impd 8/16 GiB, 6/16 vCPU)', 'ok'],
-  ['runs over the lanes\' sizes show the real number in amber', 5, 'lanes 5/4 (impd 8/16 GiB, 6/16 vCPU)', 'warn'],
-] as const)('%s', async (_case, count, text, tone) => {
+  { title: 'imp runs within the imp cap show in plain', place: 'imp', count: 3, text: 'lanes 3/4 (impd 8/16 GiB, 6/16 vCPU)', tone: 'ok' },
+  { title: 'imp runs over the imp cap show in amber though the total fits', place: 'imp', count: 4, text: 'lanes 4/4 (impd 8/16 GiB, 6/16 vCPU)', tone: 'warn' },
+  { title: 'local runs over the local cap show in amber though the total fits', place: 'local', count: 3, text: 'lanes 3/4 (impd 8/16 GiB, 6/16 vCPU)', tone: 'warn' },
+  { title: 'runs over both caps together show the real number in amber', place: 'imp', count: 5, text: 'lanes 5/4 (impd 8/16 GiB, 6/16 vCPU)', tone: 'warn' },
+] as const)('$title', async (row) => {
   const ctx = setupTest();
   writeFileSync(ctx.pacing, JSON.stringify({ imp: { impMib: 2048 }, lanes: { imp: { cleanup: 3 }, local: { flexible: 1 } } }));
   ctx.db.query("INSERT INTO capacity_samples (at, nonnix_awake_mib, nonnix_awake_vcpus) VALUES ('2026-10-15T00:55:00Z', 8192, 6)").run();
   ctx.db
-    .query("WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < ?) INSERT INTO runs (issue, title, place, state, lane, created_at, updated_at) SELECT 'GEO-970' || i, 'Fit the long spout', 'imp', 'working', 'cleanup', '2026-10-15T00:00:00Z', '2026-10-15T00:00:00Z' FROM n")
-    .run(count);
+    .query("WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < ?) INSERT INTO runs (issue, title, place, state, lane, created_at, updated_at) SELECT 'GEO-970' || i, 'Fit the long spout', ?, 'working', 'cleanup', '2026-10-15T00:00:00Z', '2026-10-15T00:00:00Z' FROM n")
+    .run(row.count, row.place);
 
-  await expect(loadBand(ctx.db, ctx.pacing, new Date('2026-10-15T01:00:00Z')).then((band) => band.segments[2])).resolves.toStrictEqual({ key: 'lanes', text, tone });
+  await expect(loadBand(ctx.db, ctx.pacing, new Date('2026-10-15T01:00:00Z')).then((band) => band.segments[2])).resolves.toStrictEqual({ key: 'lanes', text: row.text, tone: row.tone });
 });
 
 test('a failed push run after a passing one is CI red', async () => {
@@ -167,10 +169,10 @@ test('CI stored over 2 hours ago is unknown in amber', async () => {
   await expect(loadBand(ctx.db, ctx.pacing, new Date('2026-10-15T03:00:00Z')).then((band) => band.segments[3])).resolves.toStrictEqual({ key: 'ci', text: 'CI ?', tone: 'warn' });
 });
 
-// A pacing.json whose lends names a lane it lacks, which hq refuses.
+// A pacing.json with a lane name hq refuses.
 test('a pacing.json hq cannot read shows lanes unknown, not a failure', async () => {
   const ctx = setupTest();
-  writeFileSync(ctx.pacing, JSON.stringify({ lanes: { imp: { cleanup: 3 }, local: {} }, lends: { teapot: false } }));
+  writeFileSync(ctx.pacing, JSON.stringify({ lanes: { imp: { 'Bad Teapot': 3 }, local: {} } }));
 
   await expect(loadBand(ctx.db, ctx.pacing, new Date('2026-10-15T01:00:00Z')).then((band) => band.segments[2])).resolves.toStrictEqual({ key: 'lanes', text: 'lanes ?', tone: 'warn' });
 });

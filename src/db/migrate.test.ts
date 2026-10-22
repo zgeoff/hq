@@ -87,7 +87,7 @@ test('it adds done_when to unblocks in v37 and keeps every row', () => {
   expect(db.query('PRAGMA user_version').get()).toStrictEqual({ user_version: 37 });
 });
 
-test('v38 lets a follow-up be a review one, keeps every follow-up, and makes v38 the newest schema', () => {
+test('v38 lets a follow-up be a review one and keeps every follow-up', () => {
   const base = mkdtempSync(join(tmpdir(), 'hq-migrate-v38-'));
   const db = new Database(join(base, 'hq.db'), { create: true, strict: true });
   const path = join(base, 'hq.db');
@@ -97,12 +97,27 @@ test('v38 lets a follow-up be a review one, keeps every follow-up, and makes v38
   migrate(db, path, false, MIGRATIONS.slice(0, 37));
   db.query("INSERT INTO followups (issue, from_ref, filed_at, source, added_by, added_at) VALUES ('GEO-9801', 'kettle#3', '2026-10-14T01:00:00Z', 'final', 'z-kettle', '2026-10-14T01:00:00Z')").run();
 
-  expect(migrate(db, path, true)).not.toBeNull();
+  expect(migrate(db, path, true, MIGRATIONS.slice(0, 38))).not.toBeNull();
   db.query("INSERT INTO followups (issue, from_ref, filed_at, source, added_by, added_at) VALUES ('GEO-9802', 'widgets#7', '2026-10-15T01:00:00Z', 'review', 'z-kettle', '2026-10-15T01:00:00Z')").run();
   expect(db.query('SELECT issue, from_ref, source FROM followups ORDER BY issue').all()).toStrictEqual([
     { issue: 'GEO-9801', from_ref: 'kettle#3', source: 'final' },
     { issue: 'GEO-9802', from_ref: 'widgets#7', source: 'review' },
   ]);
   expect(db.query("SELECT name FROM pragma_table_info('linear_filed') ORDER BY cid").all()).toStrictEqual(['issue', 'created_at', 'source', 'pr_ref', 'fetched_at'].map((name) => ({ name })));
-  expect(db.query('PRAGMA user_version').get()).toStrictEqual({ user_version: 38 });
+});
+
+test('it adds the focus table in v39, keeps every row, and makes v39 the newest schema', () => {
+  const base = mkdtempSync(join(tmpdir(), 'hq-migrate-v39-'));
+  const db = new Database(join(base, 'hq.db'), { create: true, strict: true });
+  const path = join(base, 'hq.db');
+  onTestFinished(() => rmSync(base, { recursive: true, force: true }));
+  onTestFinished(() => db.close());
+  db.exec('PRAGMA journal_mode = WAL;');
+  migrate(db, path, false, MIGRATIONS.slice(0, 38));
+  db.query("INSERT INTO meta (key, value) VALUES ('kettle', 'warm')").run();
+
+  expect(migrate(db, path, true)).not.toBeNull();
+  expect(db.query('SELECT key, value FROM meta').all()).toStrictEqual([{ key: 'kettle', value: 'warm' }]);
+  expect(db.query("SELECT name FROM pragma_table_info('focus') ORDER BY cid").all()).toStrictEqual(['id', 'terms', 'reserves', 'set_at', 'set_by'].map((name) => ({ name })));
+  expect(db.query('PRAGMA user_version').get()).toStrictEqual({ user_version: 39 });
 });

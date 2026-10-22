@@ -585,4 +585,14 @@ export const MIGRATIONS: string[] = [
   DROP TABLE followups;
   ALTER TABLE followups_v38 RENAME TO followups;
   CREATE INDEX followups_filed ON followups (filed_at);`,
+
+  // v39: the owner's focus for the lanes, one row while set. terms: the ordered terms as parsed
+  // JSON; reserves: [{area, slots}]. hq focus clear deletes the row.
+  `CREATE TABLE focus (
+    id       INTEGER PRIMARY KEY CHECK (id = 1),
+    terms    TEXT NOT NULL,
+    reserves TEXT NOT NULL,
+    set_at   TEXT NOT NULL,
+    set_by   TEXT NOT NULL
+  );`,
 ];

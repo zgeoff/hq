@@ -3,14 +3,20 @@ import type { LinearCall } from '../src/linear/types.ts';
 export interface ReadyNodeSeed {
   identifier: string;
   project?: string | null;
+  projectLabels?: string[];
   labels?: string[];
+  type?: string;
+  priority?: number;
+  createdAt?: string;
   parent?: string | null;
 }
 
 interface ReadyNode {
   identifier: string;
-  project: { name: string } | null;
-  labels: { nodes: { name: string }[] };
+  priority: number;
+  createdAt: string;
+  project: { name: string; labels: { nodes: { name: string }[] } } | null;
+  labels: { nodes: { name: string; parent: { name: string } | null }[] };
   parent: { identifier: string } | null;
 }
 
@@ -18,12 +24,15 @@ interface ReadyPage {
   issues: { nodes: ReadyNode[]; pageInfo: { hasNextPage: boolean; endCursor: string | null } };
 }
 
-// A page of Linear's answer to the Ready query. A non-null `endCursor` says another page follows.
+// A page of Linear's answer to the issues query. A non-null `endCursor` says another page follows.
+// A seed's type becomes a label in the Type group; priority defaults to 0 (none).
 export function buildReadyPage(seeds: ReadyNodeSeed[], endCursor: string | null): ReadyPage {
   const nodes = seeds.map((seed) => ({
     identifier: seed.identifier,
-    project: seed.project === undefined || seed.project === null ? null : { name: seed.project },
-    labels: { nodes: (seed.labels ?? []).map((name) => ({ name })) },
+    priority: seed.priority ?? 0,
+    createdAt: seed.createdAt ?? '2026-10-01T00:00:00.000Z',
+    project: seed.project === undefined || seed.project === null ? null : { name: seed.project, labels: { nodes: (seed.projectLabels ?? []).map((name) => ({ name })) } },
+    labels: { nodes: [...(seed.labels ?? []).map((name) => ({ name, parent: null })), ...(seed.type === undefined ? [] : [{ name: seed.type, parent: { name: 'Type' } }])] },
     parent: seed.parent === undefined || seed.parent === null ? null : { identifier: seed.parent },
   }));
   return { issues: { nodes, pageInfo: { hasNextPage: endCursor !== null, endCursor } } };

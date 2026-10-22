@@ -10,6 +10,10 @@ test('it refuses a lane that pacing.json lacks', () => {
   expect(() => validateLaneRules(rulesTable, ['nixie-slice', 'nixie-maintenance', 'atc', 'imp', 'memory', 'flexible', 'cleanup', 'process'])).toThrow('lane cloud is not in pacing.json');
 });
 
+test('it checks the rules on their own when pacing.json gives only slot caps', () => {
+  expect(validateLaneRules(rulesTable, null).team).toBe('GEO');
+});
+
 test('it refuses two fallback lanes', () => {
   const raw = { team: 'GEO', readyState: 'Ready', exclude: [], lanes: { atc: { fallback: true }, flexible: { fallback: true } } };
 
