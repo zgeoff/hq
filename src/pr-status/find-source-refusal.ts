@@ -56,6 +56,10 @@ function findCallRefusal(db: Database, check: CallCheck): string | null {
   if (answer === null) {
     return `${check.source} has no owner answer for its current round, in the console or by \`hq call answer\` from the owner's session (z-stu), found through ATC_SESSION_ID`;
   }
+  const reused = check.wanted.action === 'override' ? findOverrideAtOtherHead(db, check, answer.seq) : null;
+  if (reused !== null) {
+    return `${check.source} already backs an override of ${check.ref.slug}#${check.ref.pr} at ${reused.slice(0, 7)}, and the owner answered it for that head only`;
+  }
   const data = AnswerDataSchema.parse(JSON.parse(answer.data));
   const options = getRoundOptions(db, check.id, answer.seq);
   if (check.needsGrant || options.some((option) => option.grants !== undefined)) {
@@ -72,6 +76,14 @@ function findCallRefusal(db: Database, check: CallCheck): string | null {
     return `the owner's answer to ${check.source} is not a yes: "${data.answer}"`;
   }
   return null;
+}
+
+const OverrideHeadsSchema = z.array(z.object({ head: z.string() }));
+
+// Only overrides since the owner's current answer: a new answer is a new approval.
+function findOverrideAtOtherHead(db: Database, check: CallCheck, answerSeq: number): string | null {
+  const rows = OverrideHeadsSchema.parse(db.query("SELECT json_extract(data, '$.head') AS head FROM events WHERE subject = 'hq' AND subject_id = ? AND action = 'pr-override' AND json_extract(data, '$.source') = ? AND seq > ? ORDER BY seq").all(`pr:${check.ref.repo}#${check.ref.pr}`, check.source, answerSeq));
+  return rows.find((row) => row.head !== check.head)?.head ?? null;
 }
 
 const OwnerAnswerSchema = z.object({ seq: z.number(), data: z.string() });

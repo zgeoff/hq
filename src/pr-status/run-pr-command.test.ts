@@ -751,6 +751,32 @@ test('it records an override from a grant made for the head the PR has now', asy
 });
 
 test.each([
+  ['a plain Yes', [{ label: 'Yes', effect: 'Merge it.' }, { label: 'No', effect: 'Wait.' }]],
+  ['a grant with no head', [{ label: 'Yes', effect: 'Merge it.', grants: { action: 'override', pr: 'zgeoff/widgets#7' } }, { label: 'Wait', effect: 'Fix them first.' }]],
+])('it refuses a call: source from %s that already backs an override at another head, and keeps the first', async (_case, options) => {
+  const ctx = setupTest();
+  applyAskItem(ctx.db, { kind: 'call', id: 'KET-46', issues: [], forSession: null, actor: 'z-kettle' }, parseItemInput('call', JSON.stringify({ title: 'Override widgets#7?', question: 'Merge past the findings?', options })), 'Merge past the findings?');
+  recordConsoleAnswer(ctx.db, { id: 'KET-46', option: 'Yes', note: '', actor: 'owner' });
+  await ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'call:KET-46', note: 'Ship it.' });
+
+  await expect(ctx.asOther(ctx.headAt('b9c8d7e6f5a40312213f4e5d6c7b8a9087654321'), 'override', ['widgets', '7'], { source: 'call:KET-46', note: 'Ship it again.' })).rejects.toMatchObject({ code: 'bad_args', message: '--source refused: call:KET-46 already backs an override of zgeoff/widgets#7 at a1b2c3d, and the owner answered it for that head only; ask z-stu to record it' });
+  expect(ctx.db.query("SELECT json_extract(data, '$.head') AS head FROM events WHERE action = 'pr-override'").all()).toStrictEqual([{ head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678' }]);
+});
+
+test('it accepts a call: source at a new head once the owner answers a new round, after it backed an override at the old head', async () => {
+  const ctx = setupTest();
+  ctx.fileCall('KET-48', 'Override widgets#7?');
+  ctx.answerInConsole('KET-48');
+  await ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'call:KET-48', note: 'Ship it.' });
+  ctx.refileCall('KET-48', 'Override widgets#7 at its new head?');
+  ctx.answerInConsole('KET-48');
+
+  await ctx.asOther(ctx.headAt('b9c8d7e6f5a40312213f4e5d6c7b8a9087654321'), 'override', ['widgets', '7'], { source: 'call:KET-48', note: 'Ship it again.' });
+
+  expect(ctx.db.query("SELECT json_extract(data, '$.head') AS head FROM events WHERE action = 'pr-override' ORDER BY seq").all()).toStrictEqual([{ head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678' }, { head: 'b9c8d7e6f5a40312213f4e5d6c7b8a9087654321' }]);
+});
+
+test.each([
   ['no finding id', ['widgets', '7'], { source: 'chat:kettle-12', note: 'Ship it.' }],
   ['no note', ['widgets', '7', 'aaaa'], { source: 'chat:kettle-12' }],
 ])('it refuses accept-risk with %s', async (_case, rest, flags) => {
