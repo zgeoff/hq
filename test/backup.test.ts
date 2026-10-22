@@ -61,6 +61,30 @@ test.skipIf(!hasRestic)('backs up hq.db online plus the dirs, restores them, and
   expect(lastBackup(db).test).toMatchObject({ ok: true });
 }, 120_000);
 
+test('a second restore into the same directory is refused while the first runs, and the lock goes when it ends', async () => {
+  const listed = Promise.withResolvers<void>();
+  const calls: string[] = [];
+  const run: Runner = async (cmd) => {
+    calls.push(cmd[3] ?? '');
+    if (cmd[3] === 'snapshots') {
+      await listed.promise;
+      return { code: 0, stdout: JSON.stringify([{ paths: ['/invented/staging/hq.db'] }]), stderr: '' };
+    }
+    return { code: 0, stdout: '', stderr: '' };
+  };
+  const first = restore(run, `${dir}/restored`, { snapshot: 'latest', remote: false });
+
+  const second = await restore(run, `${dir}/restored`, { snapshot: 'latest', remote: false }).then(
+    () => null,
+    (error: unknown) => error,
+  );
+  listed.resolve();
+
+  expect(second).toMatchObject({ code: 'restore_busy' });
+  await expect(first).resolves.toStrictEqual({ to: `${dir}/restored`, db: null });
+  expect([calls, existsSync(`${dir}/restored.restore-lock`)]).toStrictEqual([['snapshots', 'restore'], false]);
+});
+
 test.skipIf(!hasRestic)('copies to a configured remote, and a bad remote fails the run without losing the local snapshot', async () => {
   mkdirSync(`${dir}/cfg`, { recursive: true });
   writeFileSync(requireEnv('HQ_BACKUP_REMOTE_ENV'), `# invented remote\nRESTIC_REPOSITORY=${dir}/remote-repo\n`);
