@@ -1,0 +1,25 @@
+{
+  "issues": [
+    {
+      "id": "GEO-2201",
+      "createdAt": "2026-10-19T07:00:00Z",
+      "completedAt": null,
+      "canceledAt": null,
+      "description": "## Outcome\n\nThe widget loads.\n\n## Context\n\n* Found by the <issue id=\"x\" href=\"https://linear.app/x/issue/GEO-2100/y\">GEO-2100</issue> agent on widgets#41 (head abc1234): the loader skips a retry."
+    },
+    {
+      "id": "GEO-2202",
+      "createdAt": "2026-10-19T08:00:00Z",
+      "completedAt": null,
+      "canceledAt": null,
+      "description": "Found by the GEO-2100 agent on gadgets#7: a stale comment."
+    },
+    {
+      "id": "GEO-2203",
+      "createdAt": "2026-10-19T09:00:00Z",
+      "completedAt": null,
+      "canceledAt": null,
+      "description": "A request the owner filed."
+    }
+  ]
+}

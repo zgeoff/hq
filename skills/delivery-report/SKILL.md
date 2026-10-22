@@ -9,7 +9,7 @@ The owner asks for this report when he wants to see what got delivered. Send it 
 
 ## The period
 
-A report covers a calendar period in the owner's local time, Australia/Sydney:
+A report covers a calendar period in the owner's local time, Australia/Sydney: one day for the daily report, and Monday to Sunday for the weekly report.
 
 The daily report groups the issues by project, with each project's burndown. The weekly report adds line counts, and PRs and issues per day.
 

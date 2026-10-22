@@ -4,7 +4,8 @@
 # it (one Done, one Canceled), beside one closed at the window's end, which is outside it. A second
 # page in the connector's envelope repeats one issue and closes 3 more. half.json files exactly
 # half as many as it closes, so it is not flagged. planned.json files 2 and closes 2, but one of the
-# 2 is a design follow-up, so only 1 is reactive and the day is not flagged.
+# 2 is a design follow-up, so only 1 is reactive and the day is not flagged. found.json files 2
+# issues whose Context says "Found by the <issue> agent on <repo>#<n>", which count as from a PR.
 set -eu
 here=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 fixtures="$here/testdata/inflow"
@@ -36,6 +37,7 @@ check day "$fixtures/day.json"
 check pages "$fixtures/day.json" "$fixtures/envelope.json"
 check half "$fixtures/half.json"
 check planned "$fixtures/planned.json"
+check found "$fixtures/found.json"
 
 # With no --since, it prints its usage and exits 2.
 if bash "$here/inflow.sh" "$fixtures/day.json" > /dev/null 2> "$tmp/stderr"; then
