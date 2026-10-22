@@ -36,6 +36,11 @@ test('the help text becomes forms: alternations, optional verbs, continuation li
   ]);
 });
 
+test('it fails an unknown word after a top whose only verb is optional', () => {
+  const forms = parseHelp('  hq fleet [status] [--prompts]   the sessions');
+  expect(check(forms, usesIn('skills/x/SKILL.md', '`hq fleet sttaus`')).map((problem) => problem.why)).toStrictEqual(['hq fleet sttaus: no such command in hq --help (hq fleet takes status)']);
+});
+
 test('lines that match the help pass', () => {
   expect(
     why(

@@ -31,11 +31,16 @@ export function parseHelp(help: string): Form[] {
       if (!top.length) continue;
       const head = rest[0] ?? '';
       let verbs: (string | null)[];
+      const optionalVerb = /^\[[a-z|-]+\]$/u.test(head);
       if (alts(head).length && !head.startsWith('[')) verbs = alts(head);
-      else if (/^\[[a-z|-]+\]$/.test(head)) verbs = [null, ...alts(head.slice(1, -1))];
-      else verbs = [null];
+      else if (optionalVerb) {
+        verbs = [null, ...alts(head.slice(1, -1))];
+      } else {
+        verbs = [null];
+      }
       // A positional: <x>, or [x] that is not a flag or a verb list.
-      const positional = rest.some((x) => /^<[^>]+>$/.test(x) || /^\[[a-z][a-z ]*\]$/.test(x));
+      const args = optionalVerb ? rest.slice(1) : rest;
+      const positional = args.some((token) => /^<[^>]+>$/u.test(token) || /^\[[a-z][a-z ]*\]$/u.test(token));
       for (const t of top) for (const v of verbs) {
         const f: Form = { top: t, verb: v, flags: flagsIn(seg), positional };
         forms.push(f);
