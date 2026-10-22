@@ -22,7 +22,7 @@ test('it attaches a PR to the open run its Fixes line names, with its URL and a 
 
   const result = await attachGitHubPRs(ctx.db, buildStubGitHubFactsRunner({ search: JSON.stringify([{ number: 12, repository: { name: 'hq' }, body: 'Descale the kettle.\n\nFixes GEO-9811\n' }]), calls }), new Date('2026-10-20T00:00:00Z'));
 
-  expect(result).toStrictEqual({ attached: ['hq#12 to GEO-9811'], errors: [] });
+  expect(result).toStrictEqual({ attached: ['hq#12 to GEO-9811'], errors: [], mergedSearched: true });
   expect(calls).toStrictEqual(IN_SCOPE.flatMap((repo) => [`gh search prs --repo zgeoff/${repo} --state open --json number,repository,body --limit 1000`, `gh search prs --repo zgeoff/${repo} --merged-at >=2026-10-20T00:00:00Z --json number,repository,body --limit 1000`]));
   expect(ctx.db.query('SELECT ref, issue, url FROM run_prs ORDER BY ref').all()).toStrictEqual([{ ref: 'hq#12', issue: 'GEO-9811', url: 'https://github.com/zgeoff/hq/pull/12' }]);
   expect(ctx.db.query("SELECT actor FROM events WHERE action = 'pr'").all()).toStrictEqual([{ actor: 'hq-github' }]);
@@ -43,7 +43,7 @@ test('it attaches nothing for a Related to line', async () => {
 
   const result = await attachGitHubPRs(ctx.db, buildStubGitHubFactsRunner({ search: JSON.stringify([{ number: 12, repository: { name: 'hq' }, body: 'Related to GEO-9811' }]) }), new Date('2026-10-20T00:00:00Z'));
 
-  expect(result).toStrictEqual({ attached: [], errors: [] });
+  expect(result).toStrictEqual({ attached: [], errors: [], mergedSearched: true });
   expect(ctx.db.query('SELECT ref, issue, url FROM run_prs ORDER BY ref').all()).toStrictEqual([]);
 });
 
@@ -63,7 +63,7 @@ test('it attaches no PR to a closed run', async () => {
 
   const result = await attachGitHubPRs(ctx.db, buildStubGitHubFactsRunner({ search: JSON.stringify([{ number: 12, repository: { name: 'hq' }, body: 'Fixes GEO-9811' }]) }), new Date('2026-10-20T00:00:00Z'));
 
-  expect(result).toStrictEqual({ attached: [], errors: [] });
+  expect(result).toStrictEqual({ attached: [], errors: [], mergedSearched: true });
   expect(ctx.db.query('SELECT ref, issue, url FROM run_prs ORDER BY ref').all()).toStrictEqual([]);
 });
 
@@ -76,7 +76,7 @@ test('it leaves a PR already on a run, open or closed, where it is', async () =>
 
   const result = await attachGitHubPRs(ctx.db, buildStubGitHubFactsRunner({ search: JSON.stringify([{ number: 12, repository: { name: 'hq' }, body: 'Fixes GEO-9811' }]) }), new Date('2026-10-20T00:00:00Z'));
 
-  expect(result).toStrictEqual({ attached: [], errors: [] });
+  expect(result).toStrictEqual({ attached: [], errors: [], mergedSearched: true });
   expect(ctx.db.query('SELECT ref, issue, url FROM run_prs ORDER BY ref').all()).toStrictEqual([{ ref: 'hq#12', issue: 'GEO-9812', url: null }]);
 });
 
@@ -87,7 +87,7 @@ test('it attaches a PR to neither of two open runs its lines name, and reports t
 
   const result = await attachGitHubPRs(ctx.db, buildStubGitHubFactsRunner({ search: JSON.stringify([{ number: 12, repository: { name: 'hq' }, body: 'Fixes GEO-9811\nContributes to GEO-9812' }]) }), new Date('2026-10-20T00:00:00Z'));
 
-  expect(result).toStrictEqual({ attached: [], errors: ['hq#12: its body names GEO-9811 and GEO-9812, so hq attaches it to neither'] });
+  expect(result).toStrictEqual({ attached: [], errors: ['hq#12: its body names GEO-9811 and GEO-9812, so hq attaches it to neither'], mergedSearched: true });
   expect(ctx.db.query('SELECT ref, issue, url FROM run_prs ORDER BY ref').all()).toStrictEqual([]);
 });
 
@@ -101,7 +101,7 @@ test('it reports a repo whose search failed, and still attaches from the others'
     return Promise.resolve(answer);
   }, new Date('2026-10-20T00:00:00Z'));
 
-  expect(result).toStrictEqual({ attached: ['hq#12 to GEO-9811'], errors: ['open PR search in atc failed (gh exit 1): invented: rate limited', 'merged PR search in atc failed (gh exit 1): invented: rate limited'] });
+  expect(result).toStrictEqual({ attached: ['hq#12 to GEO-9811'], errors: ['open PR search in atc failed (gh exit 1): invented: rate limited', 'merged PR search in atc failed (gh exit 1): invented: rate limited'], mergedSearched: false });
 });
 
 test('it attaches nothing and reports a search answer it cannot read', async () => {
@@ -110,7 +110,7 @@ test('it attaches nothing and reports a search answer it cannot read', async () 
 
   const result = await attachGitHubPRs(ctx.db, buildStubGitHubFactsRunner({ search: 'not json' }), new Date('2026-10-20T00:00:00Z'));
 
-  expect(result).toStrictEqual({ attached: [], errors: IN_SCOPE.map((repo) => `open PR search in ${repo} gave an unreadable answer`) });
+  expect(result).toStrictEqual({ attached: [], errors: IN_SCOPE.map((repo) => `open PR search in ${repo} gave an unreadable answer`), mergedSearched: true });
   expect(ctx.db.query('SELECT ref FROM run_prs').all()).toStrictEqual([]);
 });
 
@@ -124,7 +124,7 @@ test('it says when the search answer fills its limit, as PRs past it go unattach
     return Promise.resolve({ code: 0, stdout, stderr: '' });
   }, new Date('2026-10-20T00:00:00Z'));
 
-  expect(result).toStrictEqual({ attached: [], errors: ['open PR search in hq gave 1000 PRs, its limit, so PRs past it are not attached'] });
+  expect(result).toStrictEqual({ attached: [], errors: ['open PR search in hq gave 1000 PRs, its limit, so PRs past it are not attached'], mergedSearched: true });
 });
 
 test('it attaches a PR that merged since the last pass and no longer shows as open', async () => {
@@ -133,7 +133,7 @@ test('it attaches a PR that merged since the last pass and no longer shows as op
 
   const result = await attachGitHubPRs(ctx.db, buildStubGitHubFactsRunner({ search: '[]', merged: JSON.stringify([{ number: 14, repository: { name: 'hq' }, body: 'Fixes GEO-9811' }]) }), new Date('2026-10-20T00:00:00Z'));
 
-  expect(result).toStrictEqual({ attached: ['hq#14 to GEO-9811'], errors: [] });
+  expect(result).toStrictEqual({ attached: ['hq#14 to GEO-9811'], errors: [], mergedSearched: true });
   expect(ctx.db.query('SELECT ref, issue FROM run_prs').all()).toStrictEqual([{ ref: 'hq#14', issue: 'GEO-9811' }]);
 });
 
@@ -144,5 +144,5 @@ test('it attaches a PR once when both the open and the merged search find it', a
 
   const result = await attachGitHubPRs(ctx.db, buildStubGitHubFactsRunner({ search: found, merged: found }), new Date('2026-10-20T00:00:00Z'));
 
-  expect(result).toStrictEqual({ attached: ['hq#14 to GEO-9811'], errors: [] });
+  expect(result).toStrictEqual({ attached: ['hq#14 to GEO-9811'], errors: [], mergedSearched: true });
 });

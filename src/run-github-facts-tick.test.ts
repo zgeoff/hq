@@ -1,6 +1,7 @@
 import { expect, mock, onTestFinished, test } from 'bun:test';
 import { buildStubGitHubFactsRunner } from '../test/build-stub-github-facts-runner.ts';
 import { freshDb } from '../test/helpers.ts';
+import type { Runner } from './runner/types.ts';
 import { addRun } from './runs/add-run.ts';
 import { runGitHubFactsTick } from './run-github-facts-tick.ts';
 import { IN_SCOPE } from './scope/in-scope.ts';
@@ -40,6 +41,33 @@ test('the merged search reaches back a day on a first pass, and to an hour befor
 
   const since = calls.filter((call) => call.includes('--merged-at') && call.includes('zgeoff/hq ')).map((call) => call.split(' ')[6]);
   expect(since).toStrictEqual(['>=2026-10-19T01:00:00Z', '>=2026-10-19T01:10:00Z', '>=2026-10-20T00:10:00Z']);
+});
+
+test('it keeps the merged-search position after a pass whose merged search failed, and the next pass searches from it', async () => {
+  const ctx = setupTest();
+  const calls: string[] = [];
+  const stub = buildStubGitHubFactsRunner({ search: '[]', calls });
+  const failing: Runner = (cmd, opts) => (cmd.includes('--merged-at') ? Promise.resolve({ code: 1, stdout: '', stderr: 'invented: rate limited' }) : stub(cmd, opts));
+
+  await runGitHubFactsTick(ctx.db, stub, new Date('2026-10-19T01:00:00Z'));
+  await runGitHubFactsTick(ctx.db, failing, new Date('2026-10-22T01:00:00Z'));
+  await runGitHubFactsTick(ctx.db, stub, new Date('2026-10-22T01:10:00Z'));
+
+  const since = calls.filter((call) => call.includes('--merged-at') && call.includes('zgeoff/hq ')).map((call) => call.split(' ')[6]);
+  expect(since).toStrictEqual(['>=2026-10-18T01:00:00Z', '>=2026-10-19T00:00:00Z']);
+});
+
+test('it moves the merged-search position after a pass whose merged search answered in full', async () => {
+  const ctx = setupTest();
+  const calls: string[] = [];
+  const stub = buildStubGitHubFactsRunner({ search: '[]', calls });
+
+  await runGitHubFactsTick(ctx.db, stub, new Date('2026-10-19T01:00:00Z'));
+  await runGitHubFactsTick(ctx.db, stub, new Date('2026-10-22T01:00:00Z'));
+  await runGitHubFactsTick(ctx.db, stub, new Date('2026-10-22T01:10:00Z'));
+
+  const since = calls.filter((call) => call.includes('--merged-at') && call.includes('zgeoff/hq ')).map((call) => call.split(' ')[6]);
+  expect(since).toStrictEqual(['>=2026-10-18T01:00:00Z', '>=2026-10-19T00:00:00Z', '>=2026-10-21T01:10:00Z']);
 });
 
 test('a PR opened and merged between two passes attaches to its run and gets its merge in one pass', async () => {

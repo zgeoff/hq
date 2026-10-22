@@ -15,13 +15,22 @@ interface Search {
   filter: string[];
 }
 
+export interface AttachResult {
+  attached: string[];
+  errors: string[];
+
+  // Every repo's merged search answered in full, so no merged PR since mergedSince was missed.
+  mergedSearched: boolean;
+}
+
 // A PR opened and merged between two passes never shows as open, so only the merged search finds it.
-export async function attachGitHubPRs(db: Database, run: Runner, mergedSince: Date): Promise<{ attached: string[]; errors: string[] }> {
+export async function attachGitHubPRs(db: Database, run: Runner, mergedSince: Date): Promise<AttachResult> {
   const searches: Search[] = [
     { label: 'open', filter: ['--state', 'open'] },
     { label: 'merged', filter: ['--merged-at', `>=${iso(mergedSince)}`] },
   ];
   const searched = await Promise.all(IN_SCOPE.flatMap((repo) => searches.map((search) => readRepoPRs(run, repo, search))));
+  const mergedSearched = searched.filter((result) => result.label === 'merged').every((result) => result.complete);
 
   // A PR merged since the last pass may also show in the open search if GitHub's index lags.
   const prs = [...new Map(searched.flatMap((result) => result.prs).map((pr) => [`${pr.repo}#${pr.number}`, pr])).values()];
@@ -37,26 +46,36 @@ export async function attachGitHubPRs(db: Database, run: Runner, mergedSince: Da
       errors.push(`${step.ref}: ${reason}`);
     }
   }
-  return { attached, errors };
+  return { attached, errors, mergedSearched };
 }
 
 // gh search prs answers at most 1000 a search, so each repo in scope gets its own.
 const SEARCH_LIMIT = 1000;
 
-async function readRepoPRs(run: Runner, repo: string, search: Search): Promise<{ prs: OpenPR[]; errors: string[] }> {
+interface RepoSearch {
+  label: string;
+  prs: OpenPR[];
+  errors: string[];
+
+  // The search answered and fit under its limit.
+  complete: boolean;
+}
+
+async function readRepoPRs(run: Runner, repo: string, search: Search): Promise<RepoSearch> {
   const found = await run(['gh', 'search', 'prs', '--repo', `zgeoff/${repo}`, ...search.filter, '--json', 'number,repository,body', '--limit', String(SEARCH_LIMIT)], { env: cleanEnv() });
   if (found.code !== 0) {
-    return { prs: [], errors: [`${search.label} PR search in ${repo} failed (gh exit ${found.code}): ${(found.stderr || found.stdout).trim().slice(0, 200)}`] };
+    return { label: search.label, prs: [], errors: [`${search.label} PR search in ${repo} failed (gh exit ${found.code}): ${(found.stderr || found.stdout).trim().slice(0, 200)}`], complete: false };
   }
   const answer = readSearch(found.stdout);
   if (answer === null) {
-    return { prs: [], errors: [`${search.label} PR search in ${repo} gave an unreadable answer`] };
+    return { label: search.label, prs: [], errors: [`${search.label} PR search in ${repo} gave an unreadable answer`], complete: false };
   }
   const prs = answer.filter((pr) => pr.repository.name === repo).map((pr) => ({ repo, number: pr.number, body: pr.body ?? '' }));
 
   // A full answer may have cut PRs off, and those stay unattached until a search finds them.
-  const errors = answer.length >= SEARCH_LIMIT ? [`${search.label} PR search in ${repo} gave ${SEARCH_LIMIT} PRs, its limit, so PRs past it are not attached`] : [];
-  return { prs, errors };
+  const complete = answer.length < SEARCH_LIMIT;
+  const errors = complete ? [] : [`${search.label} PR search in ${repo} gave ${SEARCH_LIMIT} PRs, its limit, so PRs past it are not attached`];
+  return { label: search.label, prs, errors, complete };
 }
 
 const REPOSITORY = z.object({ name: z.string() });
