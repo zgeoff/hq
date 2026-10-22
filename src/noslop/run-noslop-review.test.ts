@@ -76,7 +76,7 @@ test('it asks noslop for a full review only when told to', async () => {
 test('it hands noslop the linked Linear issue in a file, then removes the file', async () => {
   const ctx = setupTest(),
     fake = buildFakeRunner({ prBody: 'Fixes GEO-12', noslopHelp: { code: 0, stdout: '  --issue-file <path>\n', stderr: '' } }),
-    file = `${ctx.base}/widgets7-issue-${process.pid}.md`,
+    file = `${ctx.base}/widgets+7-issue-${process.pid}.md`,
     runAndRead: Runner = async (cmd, opts) => {
       const at = cmd.indexOf('--issue-file');
       if (at > 0) {
@@ -96,7 +96,7 @@ test('it hands noslop the linked Linear issue in a file, then removes the file',
 test('it removes the issue file even when the worktree cleanup cannot take the lock', async () => {
   const ctx = setupTest(),
     fake = buildFakeRunner({ prBody: 'Fixes GEO-12', noslopHelp: { code: 0, stdout: '  --issue-file <path>\n', stderr: '' } }),
-    file = `${ctx.base}/widgets7-issue-${process.pid}.md`,
+    file = `${ctx.base}/widgets+7-issue-${process.pid}.md`,
     review = { ...ctx.reviewContext(fake.run), linear: readKettleIssue, lock: buildLockThatTimesOut() };
 
   await runNoslopReview(review);
@@ -162,7 +162,7 @@ test('it runs noslop from the pinned clone with its own bunfig, in the worktree 
     'sqlite,github',
     '--json',
   ]);
-  expect(fake.of('bun')[0]?.opts?.cwd).toBe(`${ctx.base}/widgets7-noslop-${process.pid}`);
+  expect(fake.of('bun')[0]?.opts?.cwd).toBe(`${ctx.base}/widgets+7-noslop-${process.pid}`);
   expect(fake.of('bun')[0]?.opts?.timeoutMs).toBe(900_000);
 });
 
@@ -175,7 +175,7 @@ test('it fetches the PR head and removes the worktree after the review', async (
   expect(fake.lines().filter((l) => l.startsWith('git fetch'))).toStrictEqual(['git fetch -q origin', 'git fetch -q origin pull/7/head']);
   expect(fake.lines().findIndex((l) => l.startsWith('git worktree add -q --detach'))).toBeLessThan(fake.lines().findIndex((l) => l.startsWith('bun ')));
   expect(fake.lines().findIndex((l) => l.startsWith('bun '))).toBeLessThan(fake.lines().findIndex((l) => l.startsWith('git worktree remove --force')));
-  expect(fake.lines().find((l) => l.startsWith('git worktree add'))).toBe(`git worktree add -q --detach ${ctx.base}/widgets7-noslop-${process.pid} origin/main`);
+  expect(fake.lines().find((line) => line.startsWith('git worktree add'))).toBe(`git worktree add -q --detach ${ctx.base}/widgets+7-noslop-${process.pid} origin/main`);
 });
 
 test('it gives the credentials to the noslop child only, and the 1Password token to the op children only', async () => {
@@ -220,7 +220,7 @@ test.each([
 
   await expect(runNoslopReview(ctx.reviewContext(fake.run))).rejects.toMatchObject({
     code: 'noslop_failed',
-    message: expect.stringContaining(`noslop gave no review (${why}): this is no review, not a pass. Output: ${ctx.base}/widgets7-noslop.json`),
+    message: expect.stringContaining(`noslop gave no review (${why}): this is no review, not a pass. Output: ${ctx.base}/widgets+7-noslop.json`),
   });
 
   expect(ctx.db.query('SELECT ok, error, kind FROM noslop_rounds').all()).toStrictEqual([{ ok: 0, error: why, kind: 'review' }]);

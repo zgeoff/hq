@@ -9,6 +9,7 @@ import { boundedRunner } from '../runner/bounded-runner.ts';
 import type { Runner } from '../runner/types.ts';
 import { buildFailure } from './build-failure.ts';
 import { buildIssueArgs } from './build-issue-args.ts';
+import { buildRoundStem } from './build-round-stem.ts';
 import { buildNoslopCommand } from './build-noslop-command.ts';
 import { buildNoslopEnv } from './build-noslop-env.ts';
 import { collectLateFlags } from './collect-late-flags.ts';
@@ -131,9 +132,9 @@ interface ReviewPrep {
 // is unique per process: a second review of the same PR never removes this one's worktree.
 async function createReviewPrep(ctx: NoslopReviewContext): Promise<ReviewPrep> {
   const refs = await readPRRefs(ctx),
-    reviewFile = `${ctx.scratch}/${ctx.repo}${ctx.pr}-noslop.json`,
+    reviewFile = `${ctx.scratch}/${buildRoundStem(ctx.repo, ctx.pr)}-noslop.json`,
     secrets = await loadNoslopSecrets(ctx.run, () => recordOpRead(ctx.db, 'noslop', 1)),
-    worktree = `${ctx.scratch}/${ctx.repo}${ctx.pr}-noslop-${process.pid}`;
+    worktree = `${ctx.scratch}/${buildRoundStem(ctx.repo, ctx.pr)}-noslop-${process.pid}`;
   rmSync(worktree, { recursive: true, force: true });
   rmSync(reviewFile, { force: true });
   await createWorktree(ctx, worktree, refs.baseRefName);
@@ -161,7 +162,7 @@ async function createReviewIssueFile(ctx: NoslopReviewContext, refs: PRRefs, wor
   if (ctx.linear === undefined) {
     return { path: null, note: { issue: null, attached: false, why: 'no Linear reader' } };
   }
-  return await createIssueFile({ run: ctx.run, linear: ctx.linear, clone: ctx.clone, cwd: worktree, body: refs.body ?? '', path: `${ctx.scratch}/${ctx.repo}${ctx.pr}-issue-${process.pid}.md` });
+  return await createIssueFile({ run: ctx.run, linear: ctx.linear, clone: ctx.clone, cwd: worktree, body: refs.body ?? '', path: `${ctx.scratch}/${buildRoundStem(ctx.repo, ctx.pr)}-issue-${process.pid}.md` });
 }
 
 interface ReviewRan {
