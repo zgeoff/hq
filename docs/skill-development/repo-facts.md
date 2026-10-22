@@ -1,6 +1,6 @@
 # fleet skills
 
-The skills, start prompts and design records for the `z-` atc sessions, which `hq fleet` loads from this repo's `main`. Nix's persona and `nixie.yaml` stay in [nixie-definitions](https://github.com/zgeoff/nixie-definitions), which [nixie](https://github.com/zgeoff/nixie) reads. Seven `z-` atc sessions run them, one per role; [sessions.md](../sessions.md) covers them.
+The skills for the `z-` atc sessions, which `hq defs` keeps in step with this repo's `main`. Their start prompts, grants and design records live in [hq-private](https://github.com/zgeoff/hq-private): `hq fleet` reads each start prompt from that repo's `origin/main`, and refuses one it cannot read. Nix's persona and `nixie.yaml` stay in [nixie-definitions](https://github.com/zgeoff/nixie-definitions), which [nixie](https://github.com/zgeoff/nixie) reads. Seven `z-` atc sessions run them, one per role; [sessions.md](../sessions.md) covers them.
 
 ## working on the skills
 
