@@ -244,7 +244,7 @@ async function ensureOnce(db: Database, client: FleetClient, opts: { dryRun: boo
       if (isQuiet(t)) setMeta(db, 'fleet_held', JSON.stringify([...metaJson(db, 'fleet_held', HELD, []), { seq, text }]));
       else enqueue(db, seq, owner(), text);
     }
-    if (!isQuiet(t)) {
+    if (!opts.dryRun && !isQuiet(t)) {
       const held = metaJson(db, 'fleet_held', HELD, []);
       for (const h of held) enqueue(db, h.seq, owner(), `${h.text} (held over quiet hours)`);
       setMeta(db, 'fleet_held', null);

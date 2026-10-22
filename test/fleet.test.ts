@@ -154,6 +154,16 @@ test('it keeps a failed pin to retry when a later step of the same check throws'
   expect(JSON.parse(getMeta(db, 'fleet_unpinned') ?? '{}')).toStrictEqual({ 'z-kettle': expect.any(String) });
 });
 
+test('it leaves the reports held over quiet hours alone in a dry run', async () => {
+  const stub = fake([{ id: 'id-teapot', name: 'z-teapot', alive: true }, { id: 'id-kettle', name: 'z-kettle', alive: true }]);
+  setMeta(db, 'fleet_held', JSON.stringify([{ seq: 1, text: 'hq fleet: z-kettle spawned (invented).' }]));
+
+  await ensureFleet(db, stub.client, { dryRun: true, actor: 'hq-fleet', fleet });
+
+  expect(outbox()).toStrictEqual([]);
+  expect(JSON.parse(getMeta(db, 'fleet_held') ?? 'null')).toStrictEqual([{ seq: 1, text: 'hq fleet: z-kettle spawned (invented).' }]);
+});
+
 test('duplicates are reported, never stopped; a restoring session is waited for', async () => {
   const { client, spawns } = fake([
     { id: 'a', name: 'z-kettle', alive: true },
