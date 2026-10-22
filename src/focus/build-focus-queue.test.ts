@@ -34,6 +34,17 @@ test('inside a term it orders by priority with none last, then enabler, then qua
   expect(queue.map((entry) => entry.issue.identifier)).toStrictEqual(['GEO-9806', 'GEO-9805', 'GEO-9804', 'GEO-9803', 'GEO-9802', 'GEO-9801']);
 });
 
+test('between two enabler issues of one priority it takes the one with quality first', () => {
+  const issues = [
+    buildReadyIssue('GEO-9801', { priority: 2, labels: ['enabler'], createdAt: '2026-09-01T00:00:00.000Z' }),
+    buildReadyIssue('GEO-9802', { priority: 2, labels: ['enabler', 'quality'], createdAt: '2026-10-01T00:00:00.000Z' }),
+  ];
+
+  const queue = buildFocusQueue(issues, [], new Set());
+
+  expect(queue.map((entry) => entry.issue.identifier)).toStrictEqual(['GEO-9802', 'GEO-9801']);
+});
+
 test('it leaves out issues on the board and Design issues', () => {
   const issues = [buildReadyIssue('GEO-9801'), buildReadyIssue('GEO-9802', { type: 'Design' }), buildReadyIssue('GEO-9803')];
 
