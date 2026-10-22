@@ -750,8 +750,8 @@ async function watchRuns(db: Database, me: string): Promise<void> {
   const c = await AtcClient.open();
   try {
     const ing = await ingestNotes(db, c);
-    if (ing.notes || ing.reset || ing.bootstrapped) {
-      console.log(`${iso(now())} notes: ${ing.notes} recorded${ing.finals.length ? `, final: ${ing.finals.join(', ')}` : ''}${ing.reset ? ', feed cursor reset' : ''}${ing.bootstrapped ? ', feed cursor started at the end' : ''}`);
+    if (ing.notes > 0 || ing.routed > 0 || ing.reset || ing.bootstrapped) {
+      console.log(`${iso(now())} notes: ${ing.notes} recorded${ing.routed ? `, ${ing.routed} routed to ${orchestratorName()}` : ''}${ing.finals.length > 0 ? `, final: ${ing.finals.join(', ')}` : ''}${ing.reset ? ', feed cursor reset' : ''}${ing.bootstrapped ? ', feed cursor started at the end' : ''}`);
     }
     const sw = await sweepNow(db, c, me);
     if (sw.sent.length) console.log(`${iso(now())} sweep: told ${orchestratorName()} about ${sw.sent.map((a) => a.key).join(', ')}`);
