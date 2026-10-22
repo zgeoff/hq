@@ -5,11 +5,16 @@ import { makeStateCall } from '../../test/make-state-call.ts';
 import { readFocus } from './read-focus.ts';
 import { runFocusCommand } from './run-focus-command.ts';
 
-// readySeeds and backlogSeeds: a kettle team's issues, one of them in an hq project, which the lanes
-// never take.
 function setupTest() {
   const fresh = freshDb();
   onTestFinished(fresh.cleanup);
+  return { db: fresh.db };
+}
+
+test('set stores the terms and reserves, and prints each term with its Ready and Backlog matches', async () => {
+  const ctx = setupTest();
+
+  // GEO-9804 sits in an hq project, which the lanes never take.
   const readySeeds: ReadyNodeSeed[] = [
     { identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Bug', labels: ['nixie'] },
     { identifier: 'GEO-9802', project: 'kettle maintenance', projectLabels: ['maintenance'], type: 'Chore', labels: ['vers'] },
@@ -17,13 +22,8 @@ function setupTest() {
     { identifier: 'GEO-9804', project: 'hq roadmap', type: 'Bug', labels: ['hq'] },
   ];
   const backlogSeeds: ReadyNodeSeed[] = [{ identifier: 'GEO-9805', project: 'kettle roadmap', type: 'Bug', labels: ['atc'] }];
-  return { db: fresh.db, readySeeds, backlogSeeds };
-}
 
-test('set stores the terms and reserves, and prints each term with its Ready and Backlog matches', async () => {
-  const ctx = setupTest();
-
-  const out = await runFocusCommand({ db: ctx.db, call: makeStateCall(ctx.readySeeds, ctx.backlogSeeds), actor: 'kettle-owner', at: new Date('2026-10-15T20:00:00Z'), verb: 'set', rest: ['bug,maintenance'], reserves: ['nixie=1'] });
+  const out = await runFocusCommand({ db: ctx.db, call: makeStateCall(readySeeds, backlogSeeds), actor: 'kettle-owner', at: new Date('2026-10-15T20:00:00Z'), verb: 'set', rest: ['bug,maintenance'], reserves: ['nixie=1'] });
 
   expect(readFocus(ctx.db)).toStrictEqual({
     terms: [
@@ -58,7 +58,7 @@ test('set logs an event and posts the change to hq news', async () => {
 test('set refuses an unknown term and stores nothing', async () => {
   const ctx = setupTest();
 
-  const refused = runFocusCommand({ db: ctx.db, call: makeStateCall(ctx.readySeeds, ctx.backlogSeeds), actor: 'kettle-owner', at: new Date('2026-10-15T20:00:00Z'), verb: 'set', rest: ['bug,teapots'], reserves: [] });
+  const refused = runFocusCommand({ db: ctx.db, call: makeStateCall([], []), actor: 'kettle-owner', at: new Date('2026-10-15T20:00:00Z'), verb: 'set', rest: ['bug,teapots'], reserves: [] });
 
   await expect(refused).rejects.toThrow('focus: unknown filter "teapots" in term "teapots"');
   expect(readFocus(ctx.db)).toBeNull();
@@ -67,7 +67,7 @@ test('set refuses an unknown term and stores nothing', async () => {
 
 test('set refuses an unknown filter key and a bad reserve, and stores nothing', async () => {
   const ctx = setupTest();
-  const call = makeStateCall(ctx.readySeeds, ctx.backlogSeeds);
+  const call = makeStateCall([], []);
 
   await expect(runFocusCommand({ db: ctx.db, call, actor: 'kettle-owner', at: new Date('2026-10-15T20:00:00Z'), verb: 'set', rest: ['bug:owner=kettle'], reserves: [] })).rejects.toThrow('focus: unknown filter "owner=kettle" in term "bug:owner=kettle"');
   await expect(runFocusCommand({ db: ctx.db, call, actor: 'kettle-owner', at: new Date('2026-10-15T20:00:00Z'), verb: 'set', rest: ['bug'], reserves: ['teapots=1'] })).rejects.toThrow('focus: bad --reserve "teapots=1"');
@@ -76,9 +76,16 @@ test('set refuses an unknown filter key and a bad reserve, and stores nothing', 
 
 test('show prints the match counts of the focus set now', async () => {
   const ctx = setupTest();
+  const readySeeds: ReadyNodeSeed[] = [
+    { identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Bug', labels: ['nixie'] },
+    { identifier: 'GEO-9802', project: 'kettle maintenance', projectLabels: ['maintenance'], type: 'Chore', labels: ['vers'] },
+    { identifier: 'GEO-9803', project: 'kettle roadmap', projectLabels: ['roadmap'], type: 'Feature', labels: ['nixie'] },
+    { identifier: 'GEO-9804', project: 'hq roadmap', type: 'Bug', labels: ['hq'] },
+  ];
+  const backlogSeeds: ReadyNodeSeed[] = [{ identifier: 'GEO-9805', project: 'kettle roadmap', type: 'Bug', labels: ['atc'] }];
   await runFocusCommand({ db: ctx.db, call: makeStateCall([], []), actor: 'kettle-owner', at: new Date('2026-10-15T20:00:00Z'), verb: 'set', rest: ['project=kettle roadmap:bug'], reserves: [] });
 
-  const out = await runFocusCommand({ db: ctx.db, call: makeStateCall(ctx.readySeeds, ctx.backlogSeeds), actor: 'kettle-owner', at: new Date('2026-10-15T20:00:00Z'), verb: undefined, rest: [], reserves: [] });
+  const out = await runFocusCommand({ db: ctx.db, call: makeStateCall(readySeeds, backlogSeeds), actor: 'kettle-owner', at: new Date('2026-10-15T20:00:00Z'), verb: undefined, rest: [], reserves: [] });
 
   expect(out.text).toBe(['Focus (set 2026-10-15T20:00:00Z by kettle-owner): project=kettle roadmap:bug', '  1. project=kettle roadmap:bug: 1 Ready, 1 Backlog', '  then any other eligible work'].join('\n'));
 });
