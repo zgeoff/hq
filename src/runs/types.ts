@@ -117,3 +117,26 @@ export interface FinalMark {
   actor: string;
   note: number | null;
 }
+
+// What a check of an imp's workspace found: every commit on a remote branch and nothing
+// uncommitted, work that is not pushed, or no answer.
+export type ImpWork = { state: 'pushed' } | { state: 'unpushed'; detail: string } | { state: 'unknown'; detail: string };
+
+// A session the wrap-up left in atc, and why.
+export interface KeptSession {
+  id: string;
+  reason: string;
+}
+
+// What `hq run done` did with the run's sessions: forgotten, forgotten with their imp destroyed,
+// kept on purpose, or failed.
+export interface WrapUp {
+  forgotten: string[];
+  destroyed: string[];
+  kept: KeptSession[];
+  failed: KeptSession[];
+}
+
+// What the wrap-up does with one session tree: keep every session, each with why, or forget them
+// all, destroying the root's imp when the run is on one.
+export type WrapUpPlan = { kind: 'keep'; kept: KeptSession[] } | { kind: 'forget'; destroyImp: boolean };

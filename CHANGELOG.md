@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.91.0 — 2026-10-23
+
+`hq run done` wraps up the run's sessions, so z-delivery no longer does it by hand (GEO-1688).
+
+- It unpins and forgets each of the run's sessions and their sub-sessions, unless the owner chats on the run.
+- On an imp, it first checks every worktree for uncommitted changes and commits no remote holds. Unpushed work, or a check that cannot run, keeps the imp and its session; the run still closes.
+- It notes on the run which sessions it forgot, destroyed or kept, and why.
+
 ## 0.90.0 — 2026-10-23
 
 The hq-defs dependency install runs no lifecycle script (z-review's suggestion on 0.85.0).

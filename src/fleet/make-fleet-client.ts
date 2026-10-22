@@ -36,8 +36,9 @@ export function makeFleetClient(c: AtcClient): FleetClient {
     message: (id) => c.call('message.get', { message: id }, messageGetSchema),
     kill: async (id) => void (await c.request('session.kill', { session: id, stopOnly: true })),
     unpin: async (id) => void (await c.request('session.update', { session: id, pinned: false })),
-    forget: async (id) => {
-      const got = await c.call('session.forget', { session: id, refusePinned: true }, forgetSchema);
+    forget: async (id, confirmToken) => {
+      const params = confirmToken === undefined ? { session: id, refusePinned: true } : { session: id, refusePinned: true, confirmToken };
+      const got = await c.call('session.forget', params, forgetSchema);
       return { forgotten: got.forgotten === true, confirmToken: got.confirmToken };
     },
   };
