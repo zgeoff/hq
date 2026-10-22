@@ -19,5 +19,5 @@ export async function readPRFiles(run: Runner, slug: string, pr: number): Promis
   if (records.length >= FILES_LIMIT) {
     throw new HqError('merge_blocked', `the PR lists ${FILES_LIMIT} changed files, GitHub's limit, so the gate cannot see them all`);
   }
-  return records.flatMap(parseFileRecord);
+  return records.flatMap((record) => parseFileRecord(record));
 }

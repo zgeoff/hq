@@ -22,5 +22,5 @@ export async function readChangedPrefixes(run: Runner, repo: string, number: str
   }
 
   // A renamed file also changed the package it left, which GitHub gives only as previous_filename.
-  return parseChangedPrefixes(content, records.flatMap(parseFileRecord));
+  return parseChangedPrefixes(content, records.flatMap((record) => parseFileRecord(record)));
 }
