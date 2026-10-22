@@ -56,7 +56,7 @@ export function addAsk(db: Database, input: AddInput): AddResult {
       if (!sameQuestion && (ASK_TRANSITIONS.reasked.from as readonly AskState[]).includes(prev.state)) {
         checkAsk(prev.id, 'reasked', prev.state);
         db.query(
-          `UPDATE asks SET title=?, question=?, body=?, issues=?, for_session=?, send_order=?, item=NULL, state='queued', round=round+1, due_at=NULL,
+          `UPDATE asks SET title=?, question=?, body=?, issues=?, for_session=?, send_order=?, item=NULL, stu_view=NULL, state='queued', round=round+1, due_at=NULL,
              answer=NULL, answered_at=NULL, applied_to=NULL, applied_note=NULL, applied_at=NULL, close_reason=NULL,
              opened_at=NULL, queued_at=?, updated_at=? WHERE id=?`,
         ).run(input.title, input.question, input.body, issues, input.forSession ?? prev.for_session, orderOf(prev, input), t, t, prev.id);

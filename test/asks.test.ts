@@ -121,6 +121,14 @@ describe('add', () => {
     expect(getAsk(db, 'geo-1-paint')?.for_session).toBe('z-kettle');
   });
 
+  test('it drops the recommendation when a changed question starts a new round', () => {
+    applyAskItem(db, { kind: 'call', id: 'geo-1-paint', issues: ['GEO-1'], forSession: null, actor: 'z-refine' }, parseItemInput('call', JSON.stringify({ title: 'Paint the shed', question: 'Green or grey?', stuView: 'Grey hides the dirt.', options: [{ label: 'Green', effect: 'Green.' }, { label: 'Grey', effect: 'Grey.', recommended: true }] })), 'Green or grey?');
+    openAsk(db, { id: 'geo-1-paint', force: true, actor: 'z-refine' });
+    answerAsk(db, { id: 'geo-1-paint', kind: 'call', answer: 'Grey', actor: 'z-stu' });
+    addAsk(db, call({ title: 'Paint the fence', question: 'One coat or two?', body: 'One coat or two?' }));
+    expect(getAsk(db, 'geo-1-paint')).toMatchObject({ question: 'One coat or two?', stu_view: null, item: null });
+  });
+
   test('it drops the structured fields when a free-text re-add changes the text', () => {
     applyAskItem(db, { kind: 'call', id: 'geo-1-paint', issues: ['GEO-1'], forSession: null, actor: 'z-refine' }, parseItemInput('call', JSON.stringify({ title: 'Paint the shed', question: 'Green or grey?', options: [{ label: 'Green', effect: 'Green.' }, { label: 'Grey', effect: 'Grey.' }] })), 'Green or grey?');
     addAsk(db, call({ title: 'Paint the shed', question: 'Green or grey?', body: 'The shed needs paint before the frost.' }));
