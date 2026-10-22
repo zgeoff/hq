@@ -1,11 +1,9 @@
 import type { Database } from 'bun:sqlite';
 import { iso } from '../clock/iso.ts';
-import { setMeta } from '../db/set-meta.ts';
 import { HqError } from '../errors.ts';
 import { ISSUE } from '../followups/issue.ts';
-import { logEvent } from '../log-event.ts';
-import { LANE_SKIPS_KEY, readLaneSkips } from './read-lane-skips.ts';
 import type { LaneSkip } from './types.ts';
+import { writeSkipMove } from './write-skip-move.ts';
 
 export interface SkipChange {
   issue: string;
@@ -26,12 +24,7 @@ export function writeLaneSkip(db: Database, change: SkipChange): LaneSkip {
     throw new HqError('bad_args', '--reason must say why');
   }
   const skip: LaneSkip = { issue: change.issue, until: parseUntil(change.until, change.issue, change.at), reason, by: change.actor, at: iso(change.at) };
-  db.transaction(() => {
-    const others = readLaneSkips(db).filter((stored) => stored.issue !== skip.issue);
-    const skips = [...others, skip].toSorted((left, right) => left.issue.localeCompare(right.issue));
-    setMeta(db, LANE_SKIPS_KEY, JSON.stringify(skips));
-    logEvent(db, 'hq', 'lanes', 'skip-set', change.actor, null, null, { issue: skip.issue, until: skip.until, reason: skip.reason });
-  }).immediate();
+  db.transaction(() => writeSkipMove(db, 'skip-set', skip, change.actor)).immediate();
   return skip;
 }
 
