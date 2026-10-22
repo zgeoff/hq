@@ -41,7 +41,5 @@ while read -r name want; do
   fi
 done <<'CASES'
 two-values.json.txt pacing: want one JSON value, got 2
-no-lanes.json pacing.lanes: no lanes at all
-lends-unknown.json pacing.lends: gallery is not a lane
 CASES
 exit "$fail"

@@ -33,14 +33,7 @@ sites:
     voice: first
     after: "."
     tree: private
-  - file: skills/definitions-stewardship/SKILL.md
-    voice: third
-    after: " still go to him."
-  - file: skills/definitions-stewardship/references/session-prompt.md
-    voice: first
-    after: "."
-    tree: private
-  - file: skills/delivery-lead/references/releases.md
+  - file: skills/release/SKILL.md
     voice: third
     after: "."
   - file: docs/skill-development/roles-design.md

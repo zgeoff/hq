@@ -1,6 +1,6 @@
 # investigation brief
 
-The template for an Investigation issue's launch prompt. Its placeholders name parts of the delivery brief in [briefs.md](briefs.md).
+The template for an Investigation issue's launch prompt. Its placeholders name parts of the delivery brief in `templates/brief.md`.
 
 ```text
 Find out <question> for <GEO-n>, to inform <decision>.

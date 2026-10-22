@@ -1,6 +1,6 @@
 # nixie preview API
 
-How to drive a nixie preview until its `preview/README.md` covers it (GEO-1078). `z-qa` worked these steps out on 2026-10-17. Once the README has them, follow the README and delete this file.
+How to drive a nixie preview where its `preview/README.md` doesn't cover a step. Where the README covers a step, follow the README, because it changes with the preview.
 
 ## Calls
 

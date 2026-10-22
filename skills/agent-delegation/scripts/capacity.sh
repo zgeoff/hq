@@ -3,26 +3,20 @@
 # object. With --size or --design it adds a launch decision: the provider to launch on, or
 # why nothing can launch.
 # Usage: capacity.sh [--size S|M|L|XL | --design] [--design-open <n>] [--local-open <n>]
-#                    [--lane <lane> --lane-open <n>]
 #   --design-open  design sessions that wait on the owner now (default 0)
 #   --local-open   delivery sessions running on this host now (default 0)
-#   --lane         the lane in pacing.json's lanes this launch fills; it then runs where that
-#                  lane lives, imp or local, with no fallback, and only while the lane has room
-#   --lane-open    delivery sessions running in that lane now (default 0)
 # Reads pacing.json beside this folder. Needs jq, curl and imp. Never prints a key.
 set -euo pipefail
 
 here=$(cd "$(dirname "$0")" && pwd)
 pacing=$(cat "$here/../pacing.json")
-size="" design=false design_open=0 local_open=0 lane="" lane_open=0
+size="" design=false design_open=0 local_open=0
 while [ $# -gt 0 ]; do
   case $1 in
     --size) size=$2; shift 2 ;;
     --design) design=true; shift ;;
     --design-open) design_open=$2; shift 2 ;;
     --local-open) local_open=$2; shift 2 ;;
-    --lane) lane=$2; shift 2 ;;
-    --lane-open) lane_open=$2; shift 2 ;;
     *) echo "capacity.sh: unknown option $1" >&2; exit 2 ;;
   esac
 done
@@ -33,7 +27,7 @@ imp_room() {
     || echo '{"error": "imp info failed"}'
 }
 
-# The usage endpoint rate-limits (429) when a tick tries several lanes in a row, so a good
+# The usage endpoint rate-limits (429) when a tick tries several launches in a row, so a good
 # reading is reused for 2 minutes, from the active account's own copy only: the owner rotates
 # accounts, and another account's reading says nothing about this one. A failed call is never
 # cached: it still means no room.
@@ -102,8 +96,7 @@ jq -n \
   --argjson imp "$(read_json imp_room)" \
   --argjson claude "$(read_json claude_usage)" \
   --argjson codex "$(read_json codex_usage)" \
-  --arg size "$size" --argjson design "$design" --argjson open "$design_open" --argjson localOpen "$local_open" \
-  --arg lane "$lane" --argjson laneOpen "$lane_open" '
+  --arg size "$size" --argjson design "$design" --argjson open "$design_open" --argjson localOpen "$local_open" '
   {claude: $claude, codex: $codex} as $read
   | ($imp | if .error then . + {room: false} else
       . + {freeMib: (.budgetMib - .committedMib)}
@@ -114,30 +107,20 @@ jq -n \
         room: (($read[$k].used // null) != null and $read[$k].used < $p.threshold)
       })})) as $providers
   | {slots: $pacing.designSlots, open: $open, room: ($open < $pacing.designSlots)} as $designOut
-  | (if $lane == "" then null
-     elif $pacing.lanes.imp[$lane] then {lane: $lane, where: "imp", size: $pacing.lanes.imp[$lane]}
-     elif $pacing.lanes.local[$lane] then {lane: $lane, where: "local", size: $pacing.lanes.local[$lane]}
-     else error("unknown lane " + $lane) end) as $laneOut
-  # Where a provider launches now. In a lane: where the lane lives, if the provider can run there.
-  # Otherwise: its target, or this host when the imps are full and its localFallback cap has
-  # room, or null when neither has room.
+  # Where a provider launches now: its target, or this host when the imps are full and its
+  # localFallback cap has room, or null when neither has room.
   | def place($p): $pacing.providers[$p] as $c
-      | if $laneOut != null then
-          if $laneOut.where == "local" then (if $c.target == "local" or $c.localFallback then "local" else null end)
-          elif $c.target == "imp" and $impOut.room then "imp" else null end
-        elif $c.target != "imp" or $impOut.room then $c.target
+      | if $c.target != "imp" or $impOut.room then $c.target
         elif ($c.localFallback // 0) > $localOpen then "local" else null end;
-    def laneFull: $laneOut != null and $laneOpen >= $laneOut.size;
   {
       checkedAt: (now | todate),
       imp: $impOut,
       providers: $providers,
       design: $designOut,
-      lanes: $pacing.lanes
+      slots: $pacing.slots
     }
   | if $design then . + {launch: (
       if ($designOut.room | not) then {provider: null, reason: "every design slot is taken"}
-      elif laneFull then {provider: null, reason: ("the " + $lane + " lane is full")}
       elif (place("claude") == null) then {provider: null, reason: "no imp room"}
       elif $providers.claude.room then {provider: "claude", agent: $pacing.providers.claude.agent, target: place("claude")}
       else {provider: null, reason: "Claude is at its quota threshold"} end)}
@@ -145,11 +128,9 @@ jq -n \
       ($pacing.routes[$size] // error("unknown size " + $size)) as $route
       | [$route[] | select($providers[.].unattended and $providers[.].room)] as $open
       | [$open[] | select(place(.) != null)][0] as $pick
-      | if laneFull then {size: $size, provider: null, reason: ("the " + $lane + " lane is full")}
-        elif $pick then {size: $size, provider: $pick, agent: $pacing.providers[$pick].agent, target: place($pick)}
-          + (if $laneOut then {lane: $lane} else {} end)
+      | if $pick then {size: $size, provider: $pick, agent: $pacing.providers[$pick].agent, target: place($pick)}
         elif ($open | length) > 0 then {size: $size, provider: null,
-          reason: (if $laneOut.where == "local" then "no provider on the route runs on this host" else "no imp room" end)}
+          reason: "no imp room"}
         else {size: $size, provider: null, reason: ("no provider on the " + $size + " route has room for unattended work")} end)}
     else . end
 '

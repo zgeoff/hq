@@ -88,7 +88,6 @@ check() { # case, imp fixture, Claude cache fixture, script arguments
 check readout imp-room.json claude-room.json
 check size-imp imp-room.json claude-room.json --size M
 check size-local imp-full.json claude-room.json --size S --local-open 1
-check lane-full imp-room.json claude-room.json --size M --lane workshop --lane-open 2
 check design-full imp-room.json claude-room.json --design --design-open 1
 check quota imp-room.json claude-full.json --size L
 

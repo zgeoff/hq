@@ -1,12 +1,8 @@
 {
   "designSlots": 1,
-  "lanes": {
-    "imp": {
-      "workshop": 2
-    },
-    "local": {
-      "studio": 2
-    }
+  "slots": {
+    "imp": 2,
+    "local": 2
   },
   "imp": {
     "impMib": 2048

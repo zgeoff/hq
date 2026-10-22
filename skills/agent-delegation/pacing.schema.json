@@ -3,31 +3,29 @@
   "title": "pacing.json",
   "description": "Delivery's launch limits, read by capacity.sh and hq. scripts/check-pacing.sh checks pacing.json against this schema, and that every route names a known provider.",
   "type": "object",
-  "required": ["designSlots", "lanes", "imp", "providers", "routes"],
+  "required": ["designSlots", "slots", "imp", "providers", "routes"],
   "additionalProperties": false,
   "properties": {
     "designSlots": {
       "type": "integer",
       "minimum": 0
     },
-    "lanes": {
+    "slots": {
       "type": "object",
+      "description": "How many delivery sessions run on the imps and on this host.",
       "required": ["imp", "local"],
       "additionalProperties": false,
       "properties": {
         "imp": {
-          "$ref": "#/$defs/laneSizes"
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
         },
         "local": {
-          "$ref": "#/$defs/laneSizes"
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
         }
-      }
-    },
-    "lends": {
-      "type": "object",
-      "description": "Lanes that neither lend their free slots nor borrow another's, mapped to false. A lane left out lends and borrows.",
-      "additionalProperties": {
-        "type": "boolean"
       }
     },
     "imp": {
@@ -69,17 +67,6 @@
     }
   },
   "$defs": {
-    "laneSizes": {
-      "type": "object",
-      "propertyNames": {
-        "pattern": "^[a-z][a-z0-9-]{0,39}$"
-      },
-      "additionalProperties": {
-        "type": "integer",
-        "minimum": 0,
-        "maximum": 100
-      }
-    },
     "provider": {
       "type": "object",
       "required": ["agent", "threshold", "unattended", "target"],

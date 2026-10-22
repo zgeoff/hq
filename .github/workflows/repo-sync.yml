@@ -21,7 +21,7 @@ jobs:
     uses: zgeoff/tools/.github/workflows/repo-sync.yml@sync-v23
     with:
       skip: editorconfig
-      include: skill-testing, skill-docs-writing, skill-code-style, skill-ci-design
+      include: skill-testing, skill-docs-writing, skill-code-style, skill-ci-design, skill-skill-writing, hook-skill-gate
     secrets:
       REPO_SYNC_APP_CLIENT_ID: ${{ secrets.REPO_SYNC_APP_CLIENT_ID }}
       REPO_SYNC_APP_PRIVATE_KEY: ${{ secrets.REPO_SYNC_APP_PRIVATE_KEY }}

@@ -1,6 +1,6 @@
 # example: delivery brief for a small bug
 
-The delivery brief in [briefs.md](briefs.md), filled in.
+The delivery brief in `templates/brief.md`, filled in.
 
 ```text
 /goal A ready PR in zgeoff/auto-mode for GEO-92, with evidence for each acceptance item and the review answered

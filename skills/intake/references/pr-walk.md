@@ -4,7 +4,7 @@ How `intake` briefs a helper session that walks the owner through a batch of PRs
 
 A PR walk is a review of PRs whose data is worth looking at, such as findings answered accepted-risk, or PRs that took more than 2 review rounds. Start a helper session for each walk, so the walk stays out of the main chat, and give it the brief below. Fill the slots in `<angle brackets>`. What the brief's record line and each agreed change in its report hold is in this file's private half: read `skills/intake/references/pr-walk.private.md` in the local hq-private clone (`hq defs` shows where it is) and follow it as part of this skill. Paste them into the brief in place of their slots.
 
-After each walk, bring the fault list in the brief up to date from the helper's report. Add a new fault, mark one a later change has fixed, and name the issue or PR that carries it. That update is a skill change, so send it to `z-steward`.
+After each walk, bring the fault list in the brief up to date from the helper's report. Add a new fault, mark one a later change has fixed, and name the issue or PR that carries it. That update is a skill change: file it as an issue in Triage, since a skill changes only through a PR the owner approves.
 
 ## The brief
 

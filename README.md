@@ -50,12 +50,20 @@ owner's decision.
 
 ### Night Shift · `z-delivery`
 
-Keeps every lane full, pulling the next ready issue the moment a slot frees up, briefing an agent
-and following it to a final pull request. When a merge lands, Night Shift cuts the release, rolls
-out the deploy and hands the live check on, at 3 a.m. if that is when it lands. The fleet keeps
-moving while everyone else sleeps.
+The foreman. hq launches the next ready issue the moment a slot frees up; Night Shift steps in when
+an agent needs a judgement. It unsticks a run that stalls, answers an agent that wants to leave
+something unfixed with "fix it in this PR", writes the briefs that need a pitch, and keeps two
+agents out of the same files.
 
-**Never:** merges ahead of Gatekeeper, or ships work that has not passed review.
+**Never:** files an issue from a PR, or merges.
+
+### Launch Control · `z-release`
+
+Takes every merge to live: the nightly release batch, cloud deploys, bump PRs, host switches and atc
+upgrades, at 3 a.m. if that is when it lands. Before a release that allows no rollback, it backs up
+Nix's memory and proves the backup restores.
+
+**Never:** sends test traffic to production Nix.
 
 ### Sieve · `z-triage`
 
@@ -67,8 +75,9 @@ its options and its recommendation.
 
 ### Gatekeeper · `z-review`
 
-Reviews each finished pull request, checks the merge gate, and squash-merges it only when every
-finding has an answer. A PR that says "done" is a claim, and Gatekeeper reads the diff before it
+Reviews every pull request, checks the merge gate, and squash-merges it only when every finding has
+an answer. It is also the only one that files an issue from a PR, and only when the fix is in
+another repo or needs the owner's choice. A PR that says "done" is a claim, and Gatekeeper reads the diff before it
 believes one.
 
 **Never:** launches, releases or deploys.
@@ -79,14 +88,6 @@ Checks each change on its preview before the merge, then again once it ships, an
 only with evidence. Every item gets a verdict: pass, fail, or needs the owner.
 
 **Never:** changes production. After a release it only reads.
-
-### The Steward · `z-steward`
-
-Keeps the fleet's skills true to how its owner wants agents to work, one reviewed change at a time.
-Every session sends its feedback here, and the Steward turns it into a skill change and tells each
-session whose rules moved.
-
-**Never:** changes a skill outside a reviewed PR. A new grant goes to the owner through Stu.
 
 ### The Toolsmith · `z-q`
 

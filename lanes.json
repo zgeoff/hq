@@ -3,8 +3,7 @@
   "readyState": "Ready",
   "exclude": [
     { "projects": ["hq maintenance", "hq roadmap"], "reason": "hq: z-q builds hq" },
-    { "labels": ["Design"], "reason": "Design: design slot" },
-    { "projects": ["nixie-definitions maintenance"], "reason": "z-steward's" }
+    { "labels": ["Design"], "reason": "Design: design slot" }
   ],
   "lanes": {
     "cleanup": {

@@ -7,6 +7,12 @@ description: Reports the code delivered across the owner's zgeoff repos over a d
 
 The owner asks for this report when he wants to see what got delivered. Send it when he asks, or when the morning reports are due, as `intake` says: a decision or approval reaches him as it comes up, so the report holds no recap of those.
 
+## Key rules
+
+- [The period](#the-period): a calendar day or a Monday-to-Sunday week, in Sydney time.
+- [Sending it](#sending-it): a secret gist, its link to the owner only, and a fresh render for an
+  update.
+
 ## The period
 
 A report covers a calendar period in the owner's local time, Australia/Sydney: one day for the daily report, and Monday to Sunday for the weekly report.

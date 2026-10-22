@@ -1,6 +1,6 @@
 # calls
 
-Calls, steward proposals and the owner's unblock list live in `hq`, the sessions' own command-line tool. The background session `z-triage` prepares the calls and adds them; you are the one place the owner hears them. You walk him through the waiting items one at a time, record each answer, and apply them all yourself when the walk ends. Every `hq` command takes `--json`, and `hq` knows which session runs it. Never edit `hq`'s database by hand.
+Calls and the owner's unblock list live in `hq`, the sessions' own command-line tool. The background session `z-triage` prepares the calls and adds them; you are the one place the owner hears them. You walk him through the waiting items one at a time, record each answer, and apply them all yourself when the walk ends. Every `hq` command takes `--json`, and `hq` knows which session runs it. Never edit `hq`'s database by hand.
 
 ## the commands
 
@@ -27,7 +27,7 @@ Calls, steward proposals and the owner's unblock list live in `hq`, the sessions
 
 ## review answers
 
-`hq` messages `console answer: review <id>: <label> | <note>` when the owner answers a PR-review item in the console with lgtm, Changes, Later or Reject. Relay it to `z-review` as one atc message, in the form this file's private half gives, as you relay an lgtm he gives in chat. A Reject is his line for that PR like any other: relay it the same way. When the owner says to merge a PR anyway, record it yourself with `hq pr override <repo> <pr> --source <source> --note '<why>'`, then tell `z-review` it is on record. When he accepts a finding's risk, record it with `hq pr accept-risk <repo> <pr> <finding-id> --source <source> --note '<why>'` and tell `z-review`. Which source counts is in this file's private half.
+`hq` messages `console answer: review <id>: <label> | <note>` when the owner answers a PR-review item in the console with lgtm, Changes, Later or Reject. Record it with `hq pr answer <repo> <pr> lgtm|changes|reject --source console:<id>`, with `--note` for Changes, as you record an answer he gives in chat. `z-review` and `hq review gate` read the record, so send no relay message. A Later has no record. When the owner says to merge a PR anyway, record it with `hq pr override <repo> <pr> --source <source> --note '<why>'`, then tell `z-review` it is on record. When he accepts a finding's risk, record it with `hq pr accept-risk <repo> <pr> <finding-id> --source <source> --note '<why>'` and tell `z-review`. Which source counts is in this file's private half.
 
 ## rules
 

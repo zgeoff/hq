@@ -24,6 +24,8 @@ jobs:
           LINT_BASE: origin/${{ github.base_ref }}
       # GEO-989: every `hq …` line in skills/ against hq --help
       - run: bun run check:skills
+      # The shared skill-writing check: 0 errors and 0 warnings in every skill
+      - run: bun run check:skill-writing
       # GEO-1046: each generated copy of grants/ matches its data
       - run: bun run check:grants
       # GEO-983: shellcheck and the shell tests of the skill scripts. shellcheck is pinned to the
