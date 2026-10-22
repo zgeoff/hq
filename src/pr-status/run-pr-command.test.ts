@@ -136,6 +136,13 @@ test.each([
   expect(ctx.db.query('SELECT COUNT(*) AS n FROM pr_status').get()).toStrictEqual({ n: 0 });
 });
 
+test('it refuses a console: answer, which only the console writes, and stores nothing', async () => {
+  const ctx = setupTest();
+
+  await expect(ctx.answer(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'lgtm', { source: 'console:kettle-9' })).rejects.toMatchObject({ code: 'bad_args', message: expect.stringContaining('written only by the console') });
+  expect(ctx.db.query('SELECT COUNT(*) AS rows FROM pr_status').get()).toStrictEqual({ rows: 0 });
+});
+
 test('it refuses an answer with no --source flag at all, and stores nothing', async () => {
   const ctx = setupTest();
 
@@ -170,7 +177,7 @@ test('it refuses an answer when gh cannot give the head, and stores nothing', as
 
 test('it prints the stored record and says stale is unknown when gh cannot give the head', async () => {
   const ctx = setupTest();
-  await ctx.answer(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'reject', { source: 'console:review-7', note: 'Wrong spout.' });
+  await ctx.answer(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'reject', { source: 'call:review-7', note: 'Wrong spout.' });
 
   await expect(runPRCommand({ run: ctx.ghDown().run, db: ctx.db, verb: 'status', rest: ['widgets', '7'], flags: {}, actor: ctx.actor, readOwnerSession: () => Promise.resolve({ verdict: 'other' }) })).resolves.toStrictEqual({
     data: {
@@ -185,7 +192,7 @@ test('it prints the stored record and says stale is unknown when gh cannot give 
         gateStale: false,
         answer: 'reject',
         answerHead: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678',
-        answerSource: 'console:review-7',
+        answerSource: 'call:review-7',
         answerNote: 'Wrong spout.',
         answerAt: '2026-10-14T01:00:00Z',
         answerStale: false,
@@ -198,7 +205,7 @@ test('it prints the stored record and says stale is unknown when gh cannot give 
     text: [
       'widgets#7  last seen head a1b2c3d',
       'gate: not recorded',
-      'answer: reject at a1b2c3d via console:review-7 (2026-10-14T01:00:00Z): Wrong spout.',
+      'answer: reject at a1b2c3d via call:review-7 (2026-10-14T01:00:00Z): Wrong spout.',
       'next: nobody',
       'The PR head could not be read, so stale is unknown.',
     ].join('\n'),
