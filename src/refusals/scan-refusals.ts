@@ -116,7 +116,10 @@ export async function scanRefusals(db: Database, o: ScanOptions = {}): Promise<S
             break;
           }
           if (skipping) skipping = false;
-          else line(carryLen ? Buffer.concat([...carry, buf.subarray(i, nl)]) : buf.subarray(i, nl));
+          else if (carryLen + nl - i <= maxLine) {
+            const whole = carryLen ? Buffer.concat([...carry, buf.subarray(i, nl)]) : buf.subarray(i, nl);
+            line(whole);
+          }
           [carry, carryLen, i] = [[], 0, nl + 1];
           offset = base + i;
         }

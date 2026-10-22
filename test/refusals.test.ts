@@ -202,6 +202,17 @@ test('a scan that stops inside an oversized line resumes on a fragment, which is
   expect((db.query('SELECT tools FROM refusal_files WHERE path = ?').get(p) as { tools: string }).tools).not.toContain('automode');
 });
 
+test('a line whose newline arrives past the line limit is skipped, and the next line is read', async () => {
+  const MiB = 1024 * 1024;
+  const long = refused('t1', 'too long to keep', { pad: 'z'.repeat(1.8 * MiB) });
+  file('p/s.jsonl', jl(tu('t1', 'Bash', { command: 'ls' }), long, tu('t2', 'Bash', { command: 'pwd' }), refused('t2', 'short enough')));
+
+  const result = await scan({ sliceBytes: MiB, maxLineBytes: 1.5 * MiB });
+
+  expect(result).toMatchObject({ refusals_added: 1, files_left: 0 });
+  expect(rows().map((x) => x['reason'])).toStrictEqual(['short enough']);
+});
+
 test('a malformed line is skipped, and the scan goes on', async () => {
   file('p/s.jsonl', `{"toolDenialKind":"automode-blocked", broken\n${jl(tu('t1', 'Bash', { command: 'a' }), refused('t1', 'ok'))}`);
   expect((await scan()).refusals_added).toBe(1);
