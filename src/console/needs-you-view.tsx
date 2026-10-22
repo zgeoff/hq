@@ -27,10 +27,17 @@ interface Answered {
   at: number;
 }
 
+interface NeedsYouViewProps {
+  // How often an open page reads hq's list again; tests shorten it.
+  refreshMs?: number;
+}
+
 // Needs you: one item at a time. A click or a key answers at once, with no confirm; the answer goes
 // to hq, a toast confirms it, and the next item slides in. An answered item stays hidden only until
-// hq's list is fetched again, so one put off until later comes back when it is due.
-export function NeedsYouView() {
+// hq's list is fetched again, so one put off until later comes back when it is due. An open page
+// reads the list again every minute, so a new or newly due item shows without a reload.
+export function NeedsYouView(props: NeedsYouViewProps) {
+  const refreshMs = props.refreshMs ?? 60_000;
   const [answered, setAnswered] = useState<Answered[]>([]),
     [offset, setOffset] = useState(0),
     [notes, setNotes] = useState<ReadonlyMap<string, string>>(new Map()),
@@ -41,7 +48,7 @@ export function NeedsYouView() {
       setToast(next);
       globalThis.setTimeout(() => setToast((t) => (t === next ? null : t)), 2400);
     },
-    list = useQuery(consoleAPI.items.list.queryOptions()),
+    list = useQuery(consoleAPI.items.list.queryOptions({ refetchInterval: refreshMs })),
     noteRef = useRef<HTMLTextAreaElement | null>(null),
     pending = buildRotation(
       (list.data ?? []).filter((i) => !answered.some((a) => a.id === i.id && a.at > list.dataUpdatedAt)),

@@ -1,7 +1,7 @@
 import { expect, onTestFinished, spyOn, test } from 'bun:test';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, environmentManager } from '@tanstack/react-query';
 import { createUnblockItems } from '../../test/create-unblock-items.ts';
 import { NOON_SYDNEY, at, freshDb } from '../../test/helpers.ts';
 import { setupPageDOM } from '../../test/setup-page-dom.ts';
@@ -38,7 +38,7 @@ async function setupTest() {
     await main(['call', 'add', id, '--item', file, '--order', order, '--json']);
   }
   await main(['unblock', 'add', '--id', 'lid', '--task', 'Fit the new lid on the kettle', '--json']);
-  return { db: fresh.db, library: await setupPageDOM(`http://127.0.0.1:${server.port}/`) };
+  return { db: fresh.db, directory: fresh.dir, library: await setupPageDOM(`http://127.0.0.1:${server.port}/`) };
 }
 
 test('the owner answers by click, key and note, Ask Stu copies its prompt, a review takes review words, and a to-do put off comes back when due', async () => {
@@ -126,3 +126,26 @@ test('the owner answers by click, key and note, Ask Stu copies its prompt, a rev
   });
   await lib.within(document.body).findByText('Fit the new lid on the kettle');
 }, 20_000);
+
+test('it shows an item that arrives while the page stays open', async () => {
+  const app = await setupTest();
+  const queryClient = new QueryClient();
+  const view = await import('./needs-you-view.tsx');
+
+  // Query took this process for a server when it loaded, and a server schedules no refresh.
+  environmentManager.setIsServer(() => false);
+  onTestFinished(() => environmentManager.setIsServer(() => true));
+  app.library.render(
+    <QueryClientProvider client={queryClient}>
+      <view.NeedsYouView refreshMs={100} />
+    </QueryClientProvider>,
+  );
+  await app.library.within(document.body).findByText('Mint the kettle tokens tonight?');
+  const file = join(app.directory, 'descale.json');
+  writeFileSync(file, JSON.stringify({ ...KETTLE_CALL, title: 'Descale the kettle', question: 'Descale the kettle first?' }));
+  await main(['call', 'add', 'descale', '--item', file, '--order', '0', '--json']);
+
+  const shown = await app.library.within(document.body).findByText('Descale the kettle first?', {}, { timeout: 3000 });
+
+  expect(shown).toBeTruthy();
+});
