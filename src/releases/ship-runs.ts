@@ -161,38 +161,51 @@ export async function shipRuns(db: Database, run: Runner, at: Date = now(), opts
     setMeta(db, COMPARED, JSON.stringify(keepCompared(compared, waiting)));
   }
 
-  for (const c of candidates) {
-    if (!c.refs.every((ref) => states.get(ref)?.at)) {
-      continue;
+  // The moves and the message that tells of them commit together: a pass that stops between them
+  // would leave runs moved that the next pass never tells anyone about.
+  const moveShipped = () => {
+    for (const c of candidates) {
+      if (!c.refs.every((ref) => states.get(ref)?.at)) {
+        continue;
+      }
+      const prs = c.refs.map((ref) => buildShippedPR(states.get(ref)));
+      const destination = (liveCheck: string | null) => (liveCheck === 'none' ? ('done' as const) : ('live-check' as const));
+      if (dryRun) {
+        const to = destination(c.run.live_check);
+        res.moved.push({ issue: c.run.issue, to, prs });
+        continue;
+      }
+      const moved = db
+        .transaction((): ShipMove['to'] | null => {
+          // The run may have changed while GitHub was asked: look again.
+          const now0 = db.query('SELECT * FROM runs WHERE issue = ?').get(c.run.issue) as Run | null;
+          if (!now0 || !SHIPPABLE.includes(now0.state)) return null;
+          const cur = prsOf(c.run.issue);
+          if (cur.some((p) => p.state === 'open') || cur.filter((p) => p.state === 'merged').map((p) => p.ref).join() !== c.refs.join()) return null;
+          // Decide the destination from the live_check read here, not the one read before GitHub was asked.
+          const to = destination(now0.live_check);
+          const where = [...new Set(prs.map((pr) => formatShippedAt(pr.tag)))].join(', ');
+          const done = to === 'done';
+          setState(db, c.run.issue, to, { next: done ? `Shipped ${where}; no live check owed.` : `Shipped ${where}: run the live check, then hq run done ${c.run.issue}.`, waitsOn: null, note: done ? `Shipped ${where}` : null }, ACTOR);
+          logEvent(db, 'run', c.run.issue, 'shipped', ACTOR, now0.state, to, { prs });
+          return to;
+        })
+        .immediate();
+      if (moved) {
+        res.moved.push({ issue: c.run.issue, to: moved, prs });
+      }
     }
-    const prs = c.refs.map((ref) => buildShippedPR(states.get(ref)));
-    const destination = (liveCheck: string | null) => (liveCheck === 'none' ? ('done' as const) : ('live-check' as const));
-    if (dryRun) {
-      const to = destination(c.run.live_check);
-      res.moved.push({ issue: c.run.issue, to, prs });
-      continue;
+    if (!dryRun && res.moved.length > 0) {
+      tellShipped(db, res.moved);
     }
-    const moved = db
-      .transaction((): ShipMove['to'] | null => {
-        // The run may have changed while GitHub was asked: look again.
-        const now0 = db.query('SELECT * FROM runs WHERE issue = ?').get(c.run.issue) as Run | null;
-        if (!now0 || !SHIPPABLE.includes(now0.state)) return null;
-        const cur = prsOf(c.run.issue);
-        if (cur.some((p) => p.state === 'open') || cur.filter((p) => p.state === 'merged').map((p) => p.ref).join() !== c.refs.join()) return null;
-        // Decide the destination from the live_check read here, not the one read before GitHub was asked.
-        const to = destination(now0.live_check);
-        const where = [...new Set(prs.map((pr) => formatShippedAt(pr.tag)))].join(', ');
-        const done = to === 'done';
-        setState(db, c.run.issue, to, { next: done ? `Shipped ${where}; no live check owed.` : `Shipped ${where}: run the live check, then hq run done ${c.run.issue}.`, waitsOn: null, note: done ? `Shipped ${where}` : null }, ACTOR);
-        logEvent(db, 'run', c.run.issue, 'shipped', ACTOR, now0.state, to, { prs });
-        return to;
-      })
-      .immediate();
-    if (moved) res.moved.push({ issue: c.run.issue, to: moved, prs });
+  };
+  if (dryRun) {
+    moveShipped();
+  } else {
+    db.transaction(moveShipped).immediate();
   }
 
   if (!dryRun) {
-    if (res.moved.length) tellShipped(db, res.moved);
     recordErrors(db, res.errors);
   }
   return res;

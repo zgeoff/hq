@@ -223,6 +223,24 @@ test('it ships a vers PR at its merge time', async () => {
   expect(ctx.calls.filter((call) => call.includes('/compare/') || call.includes('/releases'))).toStrictEqual([]);
 });
 
+test('it moves no run when the message about the move cannot be queued, so the next pass moves it and tells of it', async () => {
+  const ctx = setupTest();
+  createMergedRun(ctx.db, 'GEO-92', ['vers#6']);
+  ctx.db.exec("CREATE TEMP TRIGGER refuse_shipped BEFORE INSERT ON outbox WHEN NEW.topic LIKE 'run-shipped:%' BEGIN SELECT RAISE(ABORT, 'invented refusal'); END");
+  const failure = await shipRuns(ctx.db, buildStubSourceGH({ shas: { 'vers#6': buildMockSha(6) }, contains: {} }, ctx.calls), ctx.now).then(
+    () => null,
+    (error: unknown) => error,
+  );
+  const stateAfterFailure = getRun(ctx.db, 'GEO-92')?.state;
+  ctx.db.exec('DROP TRIGGER refuse_shipped');
+
+  await shipRuns(ctx.db, buildStubSourceGH({ shas: { 'vers#6': buildMockSha(6) }, contains: {} }, ctx.calls), ctx.now);
+
+  expect(failure).toMatchObject({ message: 'invented refusal' });
+  expect(stateAfterFailure).toBe('merged');
+  expect(ctx.db.query("SELECT text FROM outbox WHERE target = 'z-qa'").all()).toStrictEqual([{ text: 'Shipped, now live-check: GEO-92 (vers#6 at merge). Run the live check, then hq run done GEO-92.' }]);
+});
+
 test('it tells a PR shipped at its merge as shipped at merge', async () => {
   const ctx = setupTest();
   createMergedRun(ctx.db, 'GEO-91', ['vers#5']);
