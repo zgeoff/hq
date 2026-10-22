@@ -107,6 +107,17 @@ test('it reads an answer as words once new text cleared the options of a call st
   expect(loadAnswers(db, { from: NOON_SYDNEY, to: '2026-10-14T04:00:00Z' }).map((answer) => [answer.picked, answer.stuPick, answer.words])).toStrictEqual([[null, null, 'Yes']]);
 });
 
+test('it reads an answer against the options it was given, after new text cleared them', () => {
+  const db = setupTest();
+  applyAskItem(db, { kind: 'call', id: 'kettle-lid', issues: [], forSession: null, actor: 'kettle-bot' }, parseItemInput('call', JSON.stringify({ title: 'Pick a lid', question: 'Which lid?', options: [{ label: 'Glass', effect: 'You see the water.', recommended: true }, { label: 'Steel', effect: 'It lasts.' }] })), 'Which lid?');
+  openAsk(db, { id: 'kettle-lid', force: true, actor: 'kettle-bot' });
+  answerAsk(db, { id: 'kettle-lid', kind: 'call', answer: 'Glass', actor: 'teapot-bot' });
+  at('2026-10-14T03:00:00Z');
+  addAsk(db, { kind: 'call', id: 'kettle-lid', title: 'Pick a lid', question: 'Which lid, for the tall kettle?', body: 'Which lid, for the tall kettle?', issues: [], forSession: null, actor: 'kettle-bot' });
+
+  expect(loadAnswers(db, { from: NOON_SYDNEY, to: '2026-10-14T04:00:00Z' }).map((answer) => [answer.picked, answer.stuPick, answer.words])).toStrictEqual([['Glass', true, null]]);
+});
+
 test("it lists an earlier round's answer with that round's title, issues and session when its change events hold none of them", () => {
   const db = setupTest();
   addAsk(db, { kind: 'call', id: 'kettle-handle', title: 'Pick a handle', question: 'Wood or steel?', body: 'Wood or steel?', issues: ['GEO-9003'], forSession: 'kettle-bot', actor: 'kettle-bot' });
