@@ -247,7 +247,7 @@ test('it refuses a pin while a review round is open, and names the PR', async ()
   const ctx = setupTest(),
     sleeper = Bun.spawn(['sleep', '30']);
   onTestFinished(() => sleeper.kill());
-  mkdirSync(join(ctx.base, 'reviews', `hq354-noslop-${sleeper.pid}`), { recursive: true });
+  mkdirSync(join(ctx.base, 'reviews', `hq+354-noslop-${sleeper.pid}`), { recursive: true });
 
   await expect(runNoslopCommand({ run: buildFakeRunner().run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester' })).rejects.toMatchObject({
     code: 'noslop_busy',
@@ -273,7 +273,7 @@ test('it ignores a review folder whose process is gone', async () => {
   const ctx = setupTest(),
     gone = Bun.spawn(['true']);
   await gone.exited;
-  mkdirSync(join(ctx.base, 'reviews', `hq354-noslop-${gone.pid}`), { recursive: true });
+  mkdirSync(join(ctx.base, 'reviews', `hq+354-noslop-${gone.pid}`), { recursive: true });
 
   await runNoslopCommand({ run: buildFakeRunner().run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester' });
 

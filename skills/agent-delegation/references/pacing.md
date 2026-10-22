@@ -34,7 +34,7 @@ A design session the owner asks for launches at once, whatever the slots, and co
   - Codex: the last local Codex session log, so it shows the quota as of that session.
 - A provider with `unattended` false never gets a launch from the route, though its quota shows.
 
-When `capacity.sh` holds a launch because every provider on the route is over its threshold, tell the owner as it happens, with the soonest `resetsAt`. Tell him the same way when a readout fails, with its `error`. Record each under "Waiting on Geoff" in your saved state, and tell him once per hold. Any other hold, such as no imp room or a full design slot, is routine: say nothing.
+When `capacity.sh` holds a launch because every provider on the route is over its threshold, tell the owner as it happens, with the soonest `resetsAt`. Tell him the same way when a readout fails, with its `error`. File each with `hq unblock add`, close it with `hq unblock done` when the hold ends, and tell him once per hold. Any other hold, such as no imp room or a full design slot, is routine: say nothing.
 
 ## Changing the settings
 

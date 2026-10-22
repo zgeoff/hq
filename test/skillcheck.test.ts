@@ -1,8 +1,10 @@
 import { expect, test } from 'bun:test';
 import { join } from 'node:path';
 import { HELP } from '../src/cli.ts';
+import { COMMANDS } from '../src/commands.ts';
 import { checkSkills } from '../src/skillcheck/check-skills.ts';
 import { check } from '../src/skillcheck/check.ts';
+import { findKnownVerbs } from '../src/skillcheck/find-known-verbs.ts';
 import { parseHelp } from '../src/skillcheck/parse-help.ts';
 import { usesIn } from '../src/skillcheck/uses-in.ts';
 
@@ -39,6 +41,16 @@ test('the help text becomes forms: alternations, optional verbs, continuation li
 test('it fails an unknown word after a top whose only verb is optional', () => {
   const forms = parseHelp('  hq fleet [status] [--prompts]   the sessions');
   expect(check(forms, usesIn('skills/x/SKILL.md', '`hq fleet sttaus`')).map((problem) => problem.why)).toStrictEqual(['hq fleet sttaus: no such command in hq --help (hq fleet takes status)']);
+});
+
+test('it reads [id] as a positional and [status] as a verb by the verbs each command takes', () => {
+  const forms = parseHelp('  hq open [id] [--force]   the next call\n  hq fleet [status]   the sessions', (top) => findKnownVerbs([{ nouns: ['open'], verbs: null }, { nouns: ['fleet'], verbs: ['status'] }], top));
+  expect(forms.map((form) => `${form.top} ${form.verb ?? '-'}${form.positional ? ' +pos' : ''}`)).toStrictEqual(['open - +pos', 'fleet -', 'fleet status']);
+});
+
+test('it passes hq open with a word-like id and fails hq fleet with a misspelt verb, against the real help', () => {
+  const forms = parseHelp(HELP, (top) => findKnownVerbs(COMMANDS, top));
+  expect(check(forms, usesIn('skills/x/SKILL.md', '`hq open kettle-12` `hq fleet sttaus`')).map((problem) => problem.why)).toStrictEqual(['hq fleet sttaus: no such command in hq --help (hq fleet takes status, ensure, rc, timer, remove, restore)']);
 });
 
 test('lines that match the help pass', () => {

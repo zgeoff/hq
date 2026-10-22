@@ -48,15 +48,19 @@ gh api "repos/zgeoff/$repo/pulls/$pr/files" --paginate --jq '.[] | [.filename, .
 tools_main=$(gh api repos/zgeoff/tools/commits/main --jq .sha)
 manifest=$(gh api "repos/zgeoff/tools/contents/sync/manifest.json?ref=$tools_main" --jq .content | base64 -d)
 
+script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=skills/pr-review/scripts/contents-path.sh
+. "$script_dir/contents-path.sh"
+
 # blob <owner/repo> <path> <ref>: the file's git blob sha, or "missing".
 blob() {
-  gh api "repos/$1/contents/$2?ref=$3" --jq .sha 2>/dev/null || echo missing
+  gh api "$(contents_path "$1" "$2" "$3")" --jq .sha 2>/dev/null || echo missing
 }
 
 # text <owner/repo> <path> <ref>: the file's content, with each zgeoff/tools
 # workflow ref (main or sync-vN) on a uses: line replaced by @REF.
 text() {
-  gh api "repos/$1/contents/$2?ref=$3" --jq .content 2>/dev/null | base64 -d |
+  gh api "$(contents_path "$1" "$2" "$3")" --jq .content 2>/dev/null | base64 -d |
     sed -E 's#(uses:[[:space:]]*zgeoff/tools/[^@[:space:]]+)@(main|sync-v[0-9]+)#\1@REF#'
 }
 

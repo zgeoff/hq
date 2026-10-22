@@ -6,9 +6,9 @@ const WORD = /^[a-z][a-z-]*$/;
 
 const alts = (tok: string) => tok.split('|').filter((x) => WORD.test(x));
 
-// The help text as forms. A usage is a line's text before its first run of 2+ spaces; a
-// continuation line that starts with [ or ( adds its flags to the forms just above it.
-export function parseHelp(help: string): Form[] {
+// hq's help writes an optional verb ([status]) and an optional positional ([id]) with the same
+// brackets, so the brackets alone cannot tell them apart.
+export function parseHelp(help: string, verbsOf?: (top: string) => readonly string[] | null | undefined): Form[] {
   const forms: Form[] = [];
   let last: Form[] = [];
   let top: string[] = [];
@@ -31,7 +31,7 @@ export function parseHelp(help: string): Form[] {
       if (!top.length) continue;
       const head = rest[0] ?? '';
       let verbs: (string | null)[];
-      const optionalVerb = /^\[[a-z|-]+\]$/u.test(head);
+      const optionalVerb = /^\[[a-z|-]+\]$/u.test(head) && isVerbList(top, alts(head.slice(1, -1)), verbsOf);
       if (alts(head).length && !head.startsWith('[')) verbs = alts(head);
       else if (optionalVerb) {
         verbs = [null, ...alts(head.slice(1, -1))];
@@ -49,6 +49,13 @@ export function parseHelp(help: string): Form[] {
     }
   }
   return forms;
+}
+
+function isVerbList(tops: string[], words: string[], verbsOf: ((top: string) => readonly string[] | null | undefined) | undefined): boolean {
+  return tops.every((top) => {
+    const known = verbsOf?.(top);
+    return known === undefined || (known !== null && words.every((word) => known.includes(word)));
+  });
 }
 
 // Split on " | " outside brackets and parentheses.

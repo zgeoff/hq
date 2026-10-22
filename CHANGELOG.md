@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.81.1 — 2026-10-22
+
+3 fixes found while fixing the first review, and 4 skill changes that merged in the old repo after this tree began.
+
+- The sync gate in the pr-review skill escapes each path in its GitHub contents reads, as the rename check does.
+- A noslop round's worktree and files are named `<repo>+<pr>`, so `kettle1` PR 2 and `kettle` PR 12 no longer share a name. A worktree under the old name still holds a pin, and is shown by its old name.
+- The skill check reads a bracketed word as a verb only when hq lists it as one, so `hq open [id]` takes an id.
+- Skills: each unblock item gets the condition that ends it; z-delivery files owner steps with `hq unblock add` and sends decisions to z-triage; z-stu records overrides and accepted risks; which credentials are z-delivery's is in the private halves.
+
 ## 0.81.0 — 2026-10-22
 
 hq starts from a clean tree in a new repo, and the first full review's fixes land with it.

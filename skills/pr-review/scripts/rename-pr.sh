@@ -67,12 +67,13 @@ jq -s '[.[].files // [] | .[]] | unique_by(.filename)' "$work/compare.json" >"$w
 # The compare API lists at most 300 files, so a longer list may be cut short.
 [ "$(jq length "$work/files.json")" -lt 300 ] || fail "the PR changes 300 or more files, more than the compare API lists"
 
-# text <path> <ref>: the file's content at the ref. Each path segment is URL-encoded, since
-# a PR names its files and a "#" or "?" in a raw name would cut the ref off the URL.
+script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=skills/pr-review/scripts/contents-path.sh
+. "$script_dir/contents-path.sh"
+
+# text <path> <ref>: the file's content at the ref.
 text() {
-  local path
-  path=$(jq -rn --arg p "$1" '$p | split("/") | map(@uri) | join("/")')
-  gh api "repos/zgeoff/$repo/contents/$path?ref=$(jq -rn --arg r "$2" '$r | @uri')" --jq .content | base64 -d
+  gh api "$(contents_path "zgeoff/$repo" "$1" "$2")" --jq .content | base64 -d
 }
 
 # Each changed file: name, status, previous name ("-" when none), guarded (1 or 0),
@@ -285,7 +286,6 @@ while IFS=$'\t' read -r name status prev; do
   esac
 done <"$work/code.tsv"
 
-script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 jq -s . "$work/decls.jsonl" |
   bun "$script_dir/rename-decls.ts" |
   jq -r '.[] | [.old, .new] | @tsv' >"$work/candidates.tsv" || fail "the TypeScript parser failed"
