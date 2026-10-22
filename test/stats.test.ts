@@ -131,6 +131,28 @@ test('it times merged to live from when GitHub merged the PR, not from when hq s
   expect(live.mergeToDone.medianMin).toBe(20);
 });
 
+test('it takes the latest GitHub merge time as the last merge, whatever order hq saw the merges in', () => {
+  run('GEO-1');
+  addPr(db, 'GEO-1', 'widgets#1', 'z-delivery');
+  addPr(db, 'GEO-1', 'widgets#2', 'z-delivery');
+  run('GEO-2');
+  addPr(db, 'GEO-2', 'widgets#3', 'z-delivery');
+  addPr(db, 'GEO-2', 'gadgets#4', 'z-delivery');
+  atMin(130);
+  closePr(db, 'widgets#1', { to: 'merged', actor: 'github', facts: { mergedAt: until(120), mergeSha: null } });
+  closePr(db, 'widgets#2', { to: 'merged', actor: 'github', facts: { mergedAt: until(60), mergeSha: null } });
+  closePr(db, 'gadgets#4', { to: 'merged', actor: 'github', facts: { mergedAt: until(110), mergeSha: null } });
+  closePr(db, 'widgets#3', { to: 'merged', actor: 'github', facts: { mergedAt: until(50), mergeSha: null } });
+  setState(db, 'GEO-1', 'merged', {}, 'z-delivery');
+  setState(db, 'GEO-2', 'merged', {}, 'z-delivery');
+  atMin(180);
+  setState(db, 'GEO-1', 'done', {}, 'z-delivery');
+
+  const live = computeStats(db, { from: T0, to: until(190), gh: null }).live;
+
+  expect([live.mergeToDone.medianMin, live.backlog]).toStrictEqual([60, { total: 1, byRepo: { gadgets: 1 }, oldest: { id: 'GEO-2', ageMin: 80 } }]);
+});
+
 test('idle capacity counts only while Ready work waited; a stale count is flagged; nudges convert', () => {
   const sample = (m: number, slots: number, eligible: number | null) => db.query('INSERT INTO lanes_samples (at, free_mib, slots, eligible) VALUES (?, 0, ?, ?)').run(until(m), slots, eligible);
   sample(0, 2, 3); // 2 slots × 10 min while ready

@@ -98,6 +98,7 @@ export function computeStats(db: Database, opts: { from: string; to: string; gh:
     const i = merges.findLastIndex((m) => (JSON.parse(m.data) as { ref?: string }).ref === ref);
     if (i >= 0) merges.splice(i, 1);
   }
+  merges.sort((left, right) => left.at.localeCompare(right.at));
   const lastMerge = new Map<string, { at: string; repo: string }>();
   const mergeTimes: number[] = [];
   const perRepo: Record<string, number[]> = {};
