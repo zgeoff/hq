@@ -81,6 +81,32 @@ test("it lists an earlier round's answer with the title, issues and session that
   ]);
 });
 
+test('it reads a free-text answer to a re-asked call as words, not as a pick from the options the earlier round had', () => {
+  const db = setupTest();
+  applyAskItem(db, { kind: 'call', id: 'kettle-boil', issues: [], forSession: null, actor: 'kettle-bot' }, parseItemInput('call', JSON.stringify({ title: 'Boil the kettle', question: 'Boil it now?', options: [{ label: 'Yes', effect: 'It boils.', recommended: true }, { label: 'No', effect: 'It waits.' }] })), 'Boil it now?');
+  openAsk(db, { id: 'kettle-boil', force: true, actor: 'kettle-bot' });
+  answerAsk(db, { id: 'kettle-boil', kind: 'call', answer: 'No', actor: 'teapot-bot' });
+  at('2026-10-14T03:00:00Z');
+  addAsk(db, { kind: 'call', id: 'kettle-boil', title: 'Boil the kettle', question: 'Boil it twice?', body: 'Boil it twice?', issues: [], forSession: null, actor: 'kettle-bot' });
+  openAsk(db, { id: 'kettle-boil', force: true, actor: 'kettle-bot' });
+  answerAsk(db, { id: 'kettle-boil', kind: 'call', answer: 'Yes', actor: 'teapot-bot' });
+
+  expect(loadAnswers(db, { from: NOON_SYDNEY, to: '2026-10-14T04:00:00Z' }).map((answer) => [answer.picked, answer.stuPick, answer.words])).toStrictEqual([
+    ['No', false, null],
+    [null, null, 'Yes'],
+  ]);
+});
+
+test('it reads an answer as words once new text cleared the options of a call still in line', () => {
+  const db = setupTest();
+  applyAskItem(db, { kind: 'call', id: 'kettle-fill', issues: [], forSession: null, actor: 'kettle-bot' }, parseItemInput('call', JSON.stringify({ title: 'Fill the kettle', question: 'Fill it?', options: [{ label: 'Yes', effect: 'It fills.', recommended: true }, { label: 'No', effect: 'It stays empty.' }] })), 'Fill it?');
+  addAsk(db, { kind: 'call', id: 'kettle-fill', title: 'Fill the kettle halfway', question: 'Fill it?', body: 'Fill it?', issues: [], forSession: null, actor: 'kettle-bot' });
+  openAsk(db, { id: 'kettle-fill', force: true, actor: 'kettle-bot' });
+  answerAsk(db, { id: 'kettle-fill', kind: 'call', answer: 'Yes', actor: 'teapot-bot' });
+
+  expect(loadAnswers(db, { from: NOON_SYDNEY, to: '2026-10-14T04:00:00Z' }).map((answer) => [answer.picked, answer.stuPick, answer.words])).toStrictEqual([[null, null, 'Yes']]);
+});
+
 test('hq answers --json lists the last 7 days by default, and --since sets the window', async () => {
   const db = createTwoTypedLines(setupTest()),
     log = spyOn(console, 'log').mockImplementation((line: string) => printed.push(line)),

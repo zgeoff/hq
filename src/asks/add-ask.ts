@@ -128,7 +128,7 @@ function updateText(db: Database, prev: Ask, input: AddInput, t: string): void {
     t,
     prev.id,
   );
-  logEvent(db, 'ask', prev.id, 'updated', input.actor, prev.state, prev.state, { body: input.body, order: orderOf(prev, input), ...readRoundFacts(db, prev.id) });
+  logEvent(db, 'ask', prev.id, 'updated', input.actor, prev.state, prev.state, { body: input.body, order: orderOf(prev, input), ...readRoundFacts(db, prev.id), ...(newText ? { itemCleared: 1 } : {}) });
 }
 
 function updateIssuesOnly(db: Database, prev: Ask, input: AddInput, t: string): void {

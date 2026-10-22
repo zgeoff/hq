@@ -776,6 +776,17 @@ test('it accepts a call: source at a new head once the owner answers a new round
   expect(ctx.db.query("SELECT json_extract(data, '$.head') AS head FROM events WHERE action = 'pr-override' ORDER BY seq").all()).toStrictEqual([{ head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678' }, { head: 'b9c8d7e6f5a40312213f4e5d6c7b8a9087654321' }]);
 });
 
+test('it refuses a call: source whose answer picks a grant label the call showed before it was re-asked as free text', async () => {
+  const ctx = setupTest();
+  applyAskItem(ctx.db, { kind: 'call', id: 'KET-47', issues: [], forSession: null, actor: 'z-kettle' }, parseItemInput('call', JSON.stringify({ title: 'Override widgets#7?', question: 'Merge past the findings?', options: [{ label: 'Go', effect: 'Merge it.', grants: { action: 'override', pr: 'zgeoff/widgets#7' } }, { label: 'Wait', effect: 'Fix them first.' }] })), 'Merge past the findings?');
+  recordConsoleAnswer(ctx.db, { id: 'KET-47', option: 'Wait', note: '', actor: 'owner' });
+  ctx.refileCall('KET-47', 'Override widgets#7?');
+  recordConsoleAnswer(ctx.db, { id: 'KET-47', option: '', note: 'Go', actor: 'owner' });
+
+  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'call:KET-47', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: `--source refused: the owner's answer to call:KET-47 is not a yes: "Go"; ask z-stu to record it` });
+  expect(ctx.db.query("SELECT COUNT(*) AS total FROM events WHERE action = 'pr-override'").get()).toStrictEqual({ total: 0 });
+});
+
 test.each([
   ['no finding id', ['widgets', '7'], { source: 'chat:kettle-12', note: 'Ship it.' }],
   ['no note', ['widgets', '7', 'aaaa'], { source: 'chat:kettle-12' }],

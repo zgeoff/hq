@@ -1,9 +1,8 @@
 import type { Database } from 'bun:sqlite';
 import { z } from 'zod';
 import { getAsk } from '../asks/get-ask.ts';
+import { readRoundOptions } from '../asks/read-round-options.ts';
 import { findSubjectLink } from '../find-subject-link.ts';
-import type { ItemOption } from '../parse-item-input.ts';
-import { parseStoredExtras } from '../parse-stored-extras.ts';
 import type { ConsoleReview } from '../record-console-review.ts';
 import { REVIEW_LABELS } from '../review-labels.ts';
 import type { Typed } from '../typed/types.ts';
@@ -36,7 +35,7 @@ function loadAskAnswers(db: Database, window: AnswerWindow): Answer[] {
       return [];
     }
     const round = loadRoundFacts(db, r) ?? { title: ask.title, issues: ask.issues, forSession: ask.for_session };
-    return [{ source: 'ask', id: ask.id, kind: ask.kind, title: round.title, issues: round.issues, session: round.forSession, ...parsePickedOption(data.answer, loadRoundOptions(db, r)), ref: null, via: r.actor, at: r.at }];
+    return [{ source: 'ask', id: ask.id, kind: ask.kind, title: round.title, issues: round.issues, session: round.forSession, ...parsePickedOption(data.answer, readRoundOptions(db, r.id, r.seq)), ref: null, via: r.actor, at: r.at }];
   });
 }
 
@@ -51,13 +50,6 @@ const EventDataSchema = z.object({ data: z.string() }).nullable();
 function loadRoundFacts(db: Database, answer: AnswerEvent): RoundFacts | null {
   const row = EventDataSchema.parse(db.query(`SELECT data FROM events WHERE subject = 'ask' AND subject_id = ? AND action IN ('added', 'updated', 'reasked', 'requeued') AND json_extract(data, '$.title') IS NOT NULL AND seq < ? ORDER BY seq DESC LIMIT 1`).get(answer.id, answer.seq));
   return row === null ? null : RoundFactsSchema.parse(JSON.parse(row.data));
-}
-
-// The options the ask showed when this answer came: its last `item` event before the answer, so
-// an answer from an earlier round is read against that round's options, not the current ones.
-function loadRoundOptions(db: Database, answer: AnswerEvent): ItemOption[] {
-  const row = db.query(`SELECT data FROM events WHERE subject = 'ask' AND subject_id = ? AND action = 'item' AND seq < ? ORDER BY seq DESC LIMIT 1`).get(answer.id, answer.seq) as { data: string } | null;
-  return row === null ? [] : (parseStoredExtras((JSON.parse(row.data) as { item: string }).item)?.options ?? []);
 }
 
 function loadReviewAnswers(db: Database, window: AnswerWindow): Answer[] {

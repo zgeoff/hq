@@ -2,7 +2,7 @@ import type { Database } from 'bun:sqlite';
 import { match } from 'ts-pattern';
 import { z } from 'zod';
 import type { ItemGrant, ItemOption } from '../parse-item-input.ts';
-import { parseStoredExtras } from '../parse-stored-extras.ts';
+import { readRoundOptions } from '../asks/read-round-options.ts';
 import type { PRRef } from './parse-pr-ref.ts';
 import type { OwnerProbe } from './read-owner-session.ts';
 
@@ -61,7 +61,7 @@ function findCallRefusal(db: Database, check: CallCheck): string | null {
     return `${check.source} already backs an override of ${check.ref.slug}#${check.ref.pr} at ${reused.slice(0, 7)}, and the owner answered it for that head only`;
   }
   const data = AnswerDataSchema.parse(JSON.parse(answer.data));
-  const options = getRoundOptions(db, check.id, answer.seq);
+  const options = readRoundOptions(db, check.id, answer.seq);
   if (check.needsGrant || options.some((option) => option.grants !== undefined)) {
     return findGrantRefusal(check, options, data.answer);
   }
@@ -99,16 +99,6 @@ function findCurrentOwnerAnswer(db: Database, id: string): z.infer<typeof OwnerA
   }
   const refiled = db.query("SELECT 1 FROM events WHERE subject = 'ask' AND subject_id = ? AND action IN ('reasked', 'requeued') AND seq > ? LIMIT 1").get(id, answer.seq);
   return refiled === null ? answer : null;
-}
-
-const ItemEventSchema = z.object({ data: z.string() }).nullable();
-
-const ItemDataSchema = z.object({ item: z.string() });
-
-// The options the call showed when the owner answered: its last `item` event before the answer.
-function getRoundOptions(db: Database, id: string, answerSeq: number): ItemOption[] {
-  const row = ItemEventSchema.parse(db.query("SELECT data FROM events WHERE subject = 'ask' AND subject_id = ? AND action = 'item' AND seq < ? ORDER BY seq DESC LIMIT 1").get(id, answerSeq));
-  return row === null ? [] : (parseStoredExtras(ItemDataSchema.parse(JSON.parse(row.data)).item)?.options ?? []);
 }
 
 // The option the console stores before ` | ` (or the whole answer) is the one the owner picked.
