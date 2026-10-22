@@ -7,9 +7,13 @@ import { makeStateCall } from '../../test/make-state-call.ts';
 import { runFocusCommand } from '../focus/run-focus-command.ts';
 import { addRun } from '../runs/add-run.ts';
 import { setState } from '../runs/set-state.ts';
+import { formatSlotPlan } from './format-slot-plan.ts';
+import { parseLocalRoom } from './parse-local-room.ts';
 import { readLinearReady } from './read-linear-ready.ts';
 import { readSlotPlan } from './read-slot-plan.ts';
+import { tick } from './tick.ts';
 import { validateLaneRules } from './validate-lane-rules.ts';
+import { writeLaneSkip } from './write-lane-skip.ts';
 
 // Three local slots and no imp ones, so impd's line plays no part. readySeeds: a kettle team's Ready
 // issues; GEO-9805 runs in one local slot already.
@@ -93,4 +97,53 @@ test('a closed run still in the Ready read stays out of the picks', async () => 
   const plan = readSlotPlan(ctx.db, ctx.sample);
 
   expect([plan?.plan?.picks.map((pick) => pick.issue), plan?.eligible]).toStrictEqual([['GEO-9805', 'GEO-9804', 'GEO-9802'], 4]);
+});
+
+test('a skip set after the Ready read leaves its issue out of the picks at the next look', async () => {
+  const ctx = setupTest();
+  await ctx.seedReady(ctx.readySeeds);
+  writeLaneSkip(ctx.db, { issue: 'GEO-9801', until: 'GEO-9899', reason: 'waits on the descaler PR', actor: 'z-delivery', at: new Date('2026-10-15T20:00:00Z') });
+
+  const plan = readSlotPlan(ctx.db, ctx.sample);
+
+  expect([plan?.plan?.picks.map((pick) => pick.issue), plan?.eligible]).toStrictEqual([['GEO-9805', 'GEO-9804', 'GEO-9802'], 4]);
+});
+
+test('local slots free none, and say why, when the localFallback is used up', async () => {
+  const ctx = setupTest();
+  await ctx.seedReady(ctx.readySeeds);
+  ctx.addLocalRun('GEO-9804');
+  ctx.addLocalRun('GEO-9805');
+
+  const plan = readSlotPlan(ctx.db, { ...ctx.sample, localRoom: 2 });
+  if (plan === null) {
+    throw new Error('no slot plan');
+  }
+
+  expect(plan.pool).toStrictEqual({ impSize: 0, localSize: 3, impRunning: 0, localRunning: 2, impFree: 0, localFree: 0, free: 0, held: null, localHeld: 'no unattended provider can start local work: localFallback 2 in use' });
+  expect(plan.plan?.picks).toStrictEqual([]);
+  expect(formatSlotPlan(plan)[0]).toBe('slots (running/size, free now): imp 0/0, 0 free; local 2/3, 0 free (no unattended provider can start local work: localFallback 2 in use)');
+});
+
+test('the tick nudges for no local slot when the localFallback is used up', async () => {
+  const ctx = setupTest();
+  await ctx.seedReady(ctx.readySeeds);
+  ctx.addLocalRun('GEO-9804');
+  ctx.addLocalRun('GEO-9805');
+
+  const result = tick(ctx.db, { ...ctx.sample, localRoom: 2 }, 'hq-lanes');
+
+  expect([result.slots, result.nudged, result.why]).toStrictEqual([0, false, 'lanes full']);
+});
+
+test('local slots stay free by count when an unattended provider targets local', async () => {
+  const ctx = setupTest();
+  await ctx.seedReady(ctx.readySeeds);
+  ctx.addLocalRun('GEO-9804');
+  ctx.addLocalRun('GEO-9805');
+  const localRoom = parseLocalRoom({ providers: { teapot: { unattended: true, target: 'local' }, kettle: { unattended: true, target: 'imp', localFallback: 2 } } });
+
+  const plan = readSlotPlan(ctx.db, { ...ctx.sample, localRoom });
+
+  expect([plan?.pool.localFree, plan?.pool.localHeld, plan?.plan?.picks.map((pick) => pick.issue)]).toStrictEqual([1, null, ['GEO-9801']]);
 });

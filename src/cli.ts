@@ -1755,7 +1755,10 @@ async function newsCommand(db: Database, verb: string | undefined, flags: Flags)
   }
 }
 
-async function lanesCommand(db: Database, verb: string | undefined, rest: string[], flags: Flags, run: Runner): Promise<Out> {
+async function lanesCommand(context: Pick<Ctx, 'db' | 'verb' | 'rest' | 'flags' | 'run'>): Promise<Out> {
+  const db = context.db;
+  const verb = context.verb;
+  const flags = context.flags;
   const by = () => actor(db, flags);
   switch (verb) {
     case 'tick': {
@@ -1791,10 +1794,11 @@ async function lanesCommand(db: Database, verb: string | undefined, rest: string
       const had = releaseLanes(db, await by());
       return { data: { released: had }, text: had ? 'Slot nudges resume from the next look.' : 'No lanes hold to release.' };
     }
-    case 'skip':
-      return runLaneSkipCommand({ db, actor: await by(), at: now(), rest, until: flags.until, reason: flags.reason });
+    case 'skip': {
+      return runLaneSkipCommand({ db, actor: await by(), at: now(), rest: context.rest, until: flags.until, reason: flags.reason });
+    }
     case 'promotable': {
-      const issues = await readPromotableIssues(makeAuditedLinearCaller(db, run), rulesTable.team);
+      const issues = await readPromotableIssues(makeAuditedLinearCaller(db, context.run), rulesTable.team);
       return { data: { issues }, text: issues.length > 0 ? issues.map((issue) => `${issue.identifier}  ${issue.title}`).join('\n') : 'No Backlog issue is ready to promote.' };
     }
     case 'ready': {
@@ -2084,7 +2088,7 @@ export const GROUPS: Record<string, (c: Ctx) => Promise<Out>> = {
   refusals: (c) => refusalsCommand(c.db, c.verb, c.flags),
   run: (c) => runCommand(c.db, c.verb, c.rest, c.flags),
   lanes: async (context) => {
-    const out = await lanesCommand(context.db, context.verb, context.rest, context.flags, context.run);
+    const out = await lanesCommand(context);
     return context.verb === undefined || context.verb === 'status' || context.verb === 'log' ? withStaleBuild(out, checkLanesBuild((path) => readFileSync(path, 'utf8'))) : out;
   },
   focus: async (context) => runFocusCommand({ db: context.db, call: makeAuditedLinearCaller(context.db, context.run), actor: await actor(context.db, context.flags), at: now(), verb: context.verb, rest: context.rest, reserves: context.flags.reserve ?? [] }),

@@ -126,3 +126,27 @@ test('hq focus set, show and clear run through the spawned CLI, with a repeated 
   expect(JSON.parse(cleared.stdout)).toMatchObject({ cleared: true });
   expect(JSON.parse(after.stdout)).toMatchObject({ focus: null });
 });
+
+test('hq lanes skip sets, lists and drops a skip through the spawned CLI', async () => {
+  const fresh = freshDb();
+  onTestFinished(fresh.cleanup);
+  const hq = async (...args: string[]): Promise<{ code: number; stdout: string }> => {
+    const child = Bun.spawn(['bun', join(import.meta.dir, 'cli.ts'), 'lanes', 'skip', ...args, '--json'], {
+      stdout: 'pipe',
+      stderr: 'pipe',
+      env: { ...process.env, HOME: fresh.dir, HQ_DB: fresh.path, HQ_NOTIFY: 'off', HQ_NOW: NOON_SYDNEY, HQ_AS: 'z-delivery' },
+    });
+    const [code, stdout] = await Promise.all([child.exited, new Response(child.stdout).text()]);
+    return { code, stdout };
+  };
+
+  const set = await hq('GEO-9881', '--until', 'GEO-9889', '--reason', 'waits on the descaler PR');
+  const listed = await hq('list');
+  const dropped = await hq('drop', 'GEO-9881');
+  const after = await hq('list');
+
+  expect(set.code).toBe(0);
+  expect(JSON.parse(listed.stdout)).toStrictEqual({ ok: true, skips: [{ issue: 'GEO-9881', until: 'GEO-9889', reason: 'waits on the descaler PR', by: 'z-delivery', at: NOON_SYDNEY }] });
+  expect(JSON.parse(dropped.stdout)).toStrictEqual({ ok: true, issue: 'GEO-9881', dropped: true });
+  expect(JSON.parse(after.stdout)).toStrictEqual({ ok: true, skips: [] });
+});

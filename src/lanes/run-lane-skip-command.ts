@@ -1,5 +1,5 @@
 import type { Database } from 'bun:sqlite';
-import { match, P } from 'ts-pattern';
+import { P, match } from 'ts-pattern';
 import { HqError } from '../errors.ts';
 import { ISSUE } from '../followups/issue.ts';
 import { isSkipActive } from './is-skip-active.ts';
@@ -43,8 +43,11 @@ export function runLaneSkipCommand(deps: LaneSkipCommandDeps): SkipOut {
       const skip = writeLaneSkip(deps.db, { issue, until: needFlag(deps.until, 'until'), reason: needFlag(deps.reason, 'reason'), actor: deps.actor, at: deps.at });
       return { data: { skip }, text: `Skipped ${skip.issue} until ${skip.until}: ${skip.reason}. The lanes leave it out from their next look; hq lanes skip drop ${skip.issue} ends it sooner.` };
     })
+    .with([], () => {
+      throw new HqError('bad_args', USAGE);
+    })
     .otherwise((rest) => {
-      throw new HqError('bad_args', rest.length === 0 ? USAGE : `unknown command: hq lanes skip ${rest.join(' ')}; ${USAGE}`);
+      throw new HqError('bad_args', `unknown command: hq lanes skip ${rest.join(' ')}; ${USAGE}`);
     });
 }
 

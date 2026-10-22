@@ -13,7 +13,7 @@ export function removeEndedSkips(db: Database, settled: ReadonlySet<string>, act
     return [];
   }
   const kept = skips.filter((skip) => !ended.includes(skip));
-  setMeta(db, LANE_SKIPS_KEY, kept.length === 0 ? null : JSON.stringify(kept));
+  setMeta(db, LANE_SKIPS_KEY, JSON.stringify(kept));
   for (const skip of ended) {
     logEvent(db, 'hq', 'lanes', 'skip-ended', actor, null, null, { issue: skip.issue, until: skip.until, reason: skip.reason });
   }

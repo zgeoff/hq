@@ -12,7 +12,7 @@ export function removeLaneSkip(db: Database, issue: string, actor: string): bool
       if (kept.length === skips.length) {
         return false;
       }
-      setMeta(db, LANE_SKIPS_KEY, kept.length === 0 ? null : JSON.stringify(kept));
+      setMeta(db, LANE_SKIPS_KEY, JSON.stringify(kept));
       logEvent(db, 'hq', 'lanes', 'skip-dropped', actor, null, null, { issue });
       return true;
     })
