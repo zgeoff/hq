@@ -31,7 +31,7 @@ export function makeConditionReader(deps: ConditionReaderDeps): (condition: Done
       .with('issue', () => Promise.resolve(deps.issues.get(condition.ref) ?? { kind: 'waiting' as const }))
       .with('pr', () => readOnce(reads, `pr:${condition.ref}`, () => readPRCondition(deps.run, condition.ref)))
       .with('doc', () => readOnce(reads, `doc:${condition.ref}`, () => readDocumentVerdict(deps.call, condition.ref)))
-      .with('release', () => readSafely(async () => pickReleaseVerdict(await readReleasesOnce(releases, deps.run, condition.ref), owner.added_at)))
+      .with('release', () => readSafely(() => readReleaseVerdict(releases, deps.run, condition.ref, owner.added_at)))
       .with('date', () => Promise.resolve(pickDateVerdict(condition.ref, deps.at)))
       .exhaustive();
 }
@@ -53,6 +53,11 @@ async function readSafely(read: () => Promise<ConditionVerdict>): Promise<Condit
 function readPRCondition(run: Runner, ref: string): Promise<ConditionVerdict> {
   const pr = parsePRCondition(ref);
   return pr === null ? Promise.resolve({ kind: 'failed', error: `cannot read pr:${ref} as owner/repo#n` }) : readPRVerdict(run, pr);
+}
+
+async function readReleaseVerdict(releases: Map<string, Promise<PublishedRelease[]>>, run: Runner, repo: string, since: string): Promise<ConditionVerdict> {
+  const published = await readReleasesOnce(releases, run, repo);
+  return pickReleaseVerdict(published, since);
 }
 
 function readReleasesOnce(releases: Map<string, Promise<PublishedRelease[]>>, run: Runner, repo: string): Promise<PublishedRelease[]> {

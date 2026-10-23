@@ -61,7 +61,7 @@ function buildFromExtras(extras: ItemExtras): Pick<ConsoleItem, 'deadline' | 'ti
 }
 
 function loadDueTodos(db: Database, t: string): UnblockItem[] {
-  return listUnblocks(db, 'open').filter((u) => u.kind !== 'watch' && (u.due_at === null || u.due_at <= t));
+  return listUnblocks(db, 'open').filter((item) => item.kind !== 'watch' && (item.due_at === null || item.due_at <= t));
 }
 
 function buildUnblockItem(u: UnblockItem): ConsoleItem {
