@@ -1,3 +1,4 @@
+import { match } from 'ts-pattern';
 import { buildMoveCandidates } from './build-move-candidates.ts';
 import type { TargetMode } from './build-move-candidates.ts';
 import { parseLineSegments } from './parse-line-segments.ts';
@@ -92,16 +93,12 @@ function compareSegments(file: string, oldSegments: Segment[], newSegments: Segm
 }
 
 function compareSegment(file: string, oldSegment: Segment, newSegment: Segment): LineChange {
-  if (oldSegment.kind === 'version') {
-    return { ok: true, moves: [] };
-  }
-  if (oldSegment.kind === 'dest') {
-    return compareDestination(file, oldSegment.value, newSegment.value);
-  }
-  if (oldSegment.kind === 'code') {
-    return compareCode(file, oldSegment.value.slice(1, -1), newSegment.value.slice(1, -1));
-  }
-  return refuse('the words of the line changed');
+  return match(oldSegment.kind)
+    .with('version', (): LineChange => ({ ok: true, moves: [] }))
+    .with('dest', () => compareDestination(file, oldSegment.value, newSegment.value))
+    .with('code', () => compareCode(file, oldSegment.value.slice(1, -1), newSegment.value.slice(1, -1)))
+    .with('text', () => refuse('the words of the line changed'))
+    .exhaustive();
 }
 
 function compareDestination(file: string, from: string, to: string): LineChange {
