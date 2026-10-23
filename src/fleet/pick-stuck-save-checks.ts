@@ -17,7 +17,7 @@ export function pickStuckSaveChecks(refresh: RefreshMap, unread: readonly Unread
     if (entry.phase !== 'asked' || askedAt === undefined || entry.answerReadAt !== undefined || at.getTime() - Date.parse(askedAt) <= STUCK_MS) {
       return [];
     }
-    const last = unread.filter((answer) => answer.sessionId === entry.sessionId && answer.at >= askedAt).at(-1);
+    const last = unread.findLast((answer) => answer.sessionId === entry.sessionId && answer.at >= askedAt);
     if (last === undefined) {
       return [];
     }

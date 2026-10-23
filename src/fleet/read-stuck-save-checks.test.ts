@@ -17,7 +17,8 @@ function setupTest() {
   const base = freshDb();
   onTestFinished(base.cleanup);
   const kettle: FleetEntry = { name: 'z-kettle', cwd: `${base.dir}/work`, model: 'opus', prompt: 'main:skills/kettle/references/session-prompt.md', wake: false };
-  const server = fakeAtc(base.dir, [Object.assign({ id: 'id-kettle', name: 'z-kettle', state: 'done', alive: true }, { pinned: true })]);
+  const session = { id: 'id-kettle', name: 'z-kettle', state: 'done', alive: true, pinned: true };
+  const server = fakeAtc(base.dir, [session]);
   onTestFinished(server.stop);
   createDefsRepo(base.dir, { 'skills/kettle/references/session-prompt.md': '```text\nYou are Kettle. Boil water when asked.\n```\n' });
   server.prompts.set('id-kettle', 'You are Kettle. Boil water slowly.');
