@@ -135,7 +135,7 @@ async function readImpWorkSafely(deps: WrapUpDeps, session: FleetSession): Promi
 }
 
 // Stops the session and forgets it; when atc asks to confirm the destroy of its imp, confirms it.
-// A failure leaves it unpinned, as forgetWrappedSession says why.
+// A failure leaves it unpinned: a pin means the session needs the owner, and this is not that.
 async function removeImpSession(pass: TreePass, id: string): Promise<void> {
   try {
     await pass.client.kill(id);
