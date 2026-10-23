@@ -229,7 +229,7 @@ test('it joins the stuck save request checks to the run when the probe supplies 
   ]);
 });
 
-test('it reports a stuck save request check that cannot read its state as a problem', async () => {
+test('it reports a stuck save request check that cannot read its state as a problem, and keeps the open per-session problems open', async () => {
   const result = await runChecks(
     {
       ...probe(world()),
@@ -245,6 +245,7 @@ test('it reports a stuck save request check that cannot read its state as a prob
   expect(result.checks.filter((check) => check.key.startsWith('fleet-save-unread'))).toStrictEqual([
     { key: 'fleet-save-unread', ok: false, line: "fleet: can't read the save requests hq asked (meta fleet_refresh or its events)" },
   ]);
+  expect(result.unknown).toContain('fleet-save-unread:');
 });
 
 test('the private-tree check joins the run when the probe supplies it, and is absent otherwise', async () => {

@@ -135,6 +135,7 @@ export async function runChecks(p: Probe, s: HealthSettings, prev: Samples, at: 
   try {
     checks.push(...(p.stuckSaves?.(at) ?? []));
   } catch {
+    unknown.push('fleet-save-unread:');
     checks.push({ key: 'fleet-save-unread', ok: false, line: "fleet: can't read the save requests hq asked (meta fleet_refresh or its events)" });
   }
   try {
