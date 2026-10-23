@@ -5,13 +5,15 @@ import type { Command, HelpEntry } from './commands.ts';
 export function renderHelp(version: string, commands: readonly Command[] = COMMANDS): string {
   const sections: string[][] = [];
   let previous: string | null = null;
+  let current: string[] = [];
   for (const command of commands) {
     for (const entry of toHelpEntries(command)) {
       if (command.section !== previous) {
-        sections.push([]);
+        current = [];
+        sections.push(current);
       }
       previous = command.section;
-      sections.at(-1)?.push(...formatHelpLines(command, entry));
+      current.push(...formatHelpLines(command, entry));
     }
   }
   return [`hq ${version}: headquarters for the z- sessions. Every command takes --json.`, '', sections.map((section) => section.join('\n')).join('\n\n'), '', "Who you are: --by, else HQ_AS, else your atc session's name."].join('\n');
