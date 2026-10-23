@@ -763,22 +763,14 @@ test('hq run ship lists a run whose helper is still active as left, and moves no
   await hq('run', 'session', 'GEO-513', '513ab0c0-0000-4000-8000-00000000beef', '--add');
 
   // A stand-in gh on PATH that answers the merge commit; a vers PR needs no other call.
-  const path0 = process.env['PATH'];
   const bin = `${dir}/bin`;
   mkdirSync(bin);
   writeFileSync(`${bin}/gh`, ['#!/bin/sh', `echo '{"mergeCommit":{"oid":"${'c'.repeat(40)}"}}'`, ''].join('\n'));
   chmodSync(`${bin}/gh`, 0o755);
-  process.env['PATH'] = `${bin}:${path0}`;
-  try {
-    out = [];
 
-    const code = await main(['run', 'ship']);
+  const ran = Bun.spawnSync(['bun', 'src/cli.ts', 'run', 'ship'], { env: { ...process.env, HQ_DB: path, HQ_NOTIFY: 'off', PATH: `${bin}:${process.env['PATH'] ?? ''}` } });
 
-    expect(code).toBe(0);
-    expect(out.join('\n')).toBe('Moved nothing.\n1 PR(s) newly marked shipped; 0 compare call(s).\n  left: GEO-513 has session 513ab0c0 still active');
-  } finally {
-    process.env['PATH'] = path0;
-  }
+  expect([ran.exitCode, ran.stdout.toString()]).toStrictEqual([0, 'Moved nothing.\n1 PR(s) newly marked shipped; 0 compare call(s).\n  left: GEO-513 has session 513ab0c0 still active\n']);
 });
 
 test('hq run ship lists a run put in deploy-held after its release as left held', async () => {
