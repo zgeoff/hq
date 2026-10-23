@@ -90,6 +90,10 @@ export interface StaleOps {
   kill: (id: string) => Promise<void>;
   unpin: (id: string) => Promise<void>;
   forget: (id: string, confirmToken?: string) => Promise<ForgetResult>;
+
+  // A forget that stops a live session itself, for a destroy where a separate stop would suspend the
+  // imp first and outlast the call.
+  forgetLive: (id: string, confirmToken?: string) => Promise<ForgetResult>;
 }
 
 export interface FleetClient extends Partial<StaleOps> {

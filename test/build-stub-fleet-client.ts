@@ -15,7 +15,7 @@ export interface StubFleetAnswers {
 export interface StubFleetClient {
   client: FleetClient & StaleOps;
 
-  // each pin, unpin, kill and forget in order, as `<verb> <first 8 of the id>[ <token>]`
+  // each pin, unpin, kill, forget and forget-live in order, as `<verb> <first 8 of the id>[ <token>]`
   calls: string[];
 }
 
@@ -44,6 +44,10 @@ export function buildStubFleetClient(answers: StubFleetAnswers): StubFleetClient
     unpin: (id) => record('unpin', id),
     forget: (id, confirmToken) => {
       calls.push(`forget ${id.slice(0, 8)}${confirmToken === undefined ? '' : ` ${confirmToken}`}`);
+      return Promise.resolve(forgets.get(id)?.shift() ?? { forgotten: true });
+    },
+    forgetLive: (id, confirmToken) => {
+      calls.push(`forget-live ${id.slice(0, 8)}${confirmToken === undefined ? '' : ` ${confirmToken}`}`);
       return Promise.resolve(forgets.get(id)?.shift() ?? { forgotten: true });
     },
   };

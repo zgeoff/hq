@@ -134,12 +134,12 @@ async function readImpWorkSafely(deps: WrapUpDeps, session: FleetSession): Promi
   }
 }
 
-// Stops the session and forgets it; when atc asks to confirm the destroy of its imp, confirms it.
+// Forgets the live session, which stops it, and confirms the destroy of its imp when atc asks. A
+// separate stop first would suspend a cloud imp, which outlasts the atc call.
 // A failure leaves it unpinned: a pin means the session needs the owner, and this is not that.
 async function removeImpSession(pass: TreePass, id: string): Promise<void> {
   try {
-    await pass.client.kill(id);
-    const first = await pass.client.forget(id);
+    const first = await pass.client.forgetLive(id);
     if (first.confirmToken === undefined) {
       if (!first.forgotten) {
         throw new Error('atc did not forget the session');
@@ -147,7 +147,7 @@ async function removeImpSession(pass: TreePass, id: string): Promise<void> {
       pass.wrapUp.forgotten.push(id);
       return;
     }
-    const confirmed = await pass.client.forget(id, first.confirmToken);
+    const confirmed = await pass.client.forgetLive(id, first.confirmToken);
     if (!confirmed.forgotten) {
       throw new Error('atc did not forget the session after the confirmed destroy');
     }
