@@ -1,9 +1,9 @@
 import type { Database } from 'bun:sqlite';
 import type { SessionInfo } from '../atc/session-schema.ts';
 import { countMinutesSince as mins } from './count-minutes-since.ts';
+import { isFinalAnswered } from './is-final-answered.ts';
 import { readClosedIssueAlerts } from './read-closed-issue-alerts.ts';
 import { listRuns } from './list-runs.ts';
-import { sameSha } from './same-sha.ts';
 import { SWEEP_MINUTES as SWEEP } from './sweep-minutes.ts';
 import type { Alert, RunSession } from './types.ts';
 
@@ -14,7 +14,9 @@ export function findAlerts(db: Database, sessions: SessionInfo[], activity: Map<
   for (const r of listRuns(db)) {
     for (const p of r.prs) {
       if (p.state !== 'open' || !p.final_sha || !p.final_at) continue;
-      if (sameSha(p.reviewed_sha, p.final_sha)) continue;
+      if (isFinalAnswered(p)) {
+        continue;
+      }
       // A blocked run waits on something outside the PR (a release, a yes); its review can wait too.
       if (r.state === 'blocked') continue;
       if (mins(p.final_at, at) < SWEEP.finalMinutes()) continue;
@@ -35,7 +37,9 @@ export function findAlerts(db: Database, sessions: SessionInfo[], activity: Map<
         // Its work is handed in: a PR final and reviewed at its head. A session put to sleep
         // until its merge window is not lost work (z-delivery, GEO-957).
         const open = r.prs.filter((p) => p.state === 'open');
-        if (!active.helper && open.length && open.every((p) => p.final_sha && sameSha(p.reviewed_sha, p.final_sha))) continue;
+        if (!active.helper && open.length > 0 && open.every((pr) => pr.final_sha && isFinalAnswered(pr))) {
+          continue;
+        }
         alerts.push({ key: `session:${active.session_id}`, fingerprint: 'exited', issue: r.issue, line: `${r.issue}: ${who} has exited; ${formatExitHint(r.issue, active)}` });
         continue;
       }

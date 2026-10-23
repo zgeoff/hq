@@ -69,7 +69,7 @@ import { notesFor } from './runs/notes-for.ts';
 import { resolveRun } from './runs/resolve-run.ts';
 import { reviewStarted } from './runs/review-started.ts';
 import { reviewedPr } from './runs/reviewed-pr.ts';
-import { sameSha } from './runs/same-sha.ts';
+import { formatPRTag } from './runs/format-pr-tag.ts';
 import { setField } from './runs/set-field.ts';
 import { setGeoffChat } from './runs/set-geoff-chat.ts';
 import { setPlace } from './runs/set-place.ts';
@@ -783,10 +783,7 @@ function runLine(r: RunView): string {
   const sess = `${s ? `${s.session_id.slice(0, 8)} (${r.place})` : 'no session'}${helpers.length ? ` + helper ${helpers.join(', ')}` : ''}`;
   const prs = r.prs.length
     ? r.prs
-        .map((p) => {
-          const tag = p.state !== 'open' ? p.state : p.final_sha ? (sameSha(p.reviewed_sha, p.final_sha) ? `reviewed r${p.review_round}` : `final ${p.final_sha.slice(0, 7)}`) : 'open';
-          return `${p.ref} ${tag}`;
-        })
+        .map((pr) => `${pr.ref} ${formatPRTag(pr)}`)
         .join(', ')
     : 'none yet';
   const extra = [r.live_check ? `live check: ${r.live_check}` : null, r.gate ? `gate: ${r.gate}` : null, r.waits_on ? `waits on ${r.waits_on}` : null, r.geoff_chat ? 'the owner chats' : null].filter(Boolean).join('; ');
