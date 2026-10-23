@@ -54,6 +54,20 @@ test('it shows the record on its own line of hq pr status', async () => {
   expect(status.text).toContain('answer: none');
 });
 
+test('it shows the record in hq pr status for a fresh PR with no other record', async () => {
+  const ctx = setupTest();
+  const stub = await createStubPRRepo({ root: ctx.root, repo: 'widgets', pr: 7, history: [{ 'AGENTS.md': 'Needs bun 1.3.4.\n' }], change: { 'AGENTS.md': 'Needs bun 1.4.0.\n' } });
+  const fake = buildFakeRunner({ realGit: true, prFiles: { code: 0, stdout: 'AGENTS.md\n', stderr: '' }, ...buildStubPRHead(stub.head) });
+  await runPRCommand({ run: fake.run, db: ctx.db, verb: 'mechanical', rest: ['widgets', '7'], flags: {}, actor: () => Promise.resolve('z-review'), readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) });
+
+  const status = await runPRCommand({ run: fake.run, db: ctx.db, verb: 'status', rest: ['widgets', '7'], flags: {}, actor: () => Promise.resolve('z-review'), readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) });
+
+  expect(status).toStrictEqual({
+    data: { pr: null, reviewRecords: { mechanical: { files: ['AGENTS.md'], lines: 1 }, exemption: null } },
+    text: 'No record for widgets#7.\nz-review: mechanical edits proved by hq (1 lines in AGENTS.md)',
+  });
+});
+
 test('it refuses an edit hq does not prove, names the line, and records nothing', async () => {
   const ctx = setupTest();
   const stub = await createStubPRRepo({ root: ctx.root, repo: 'widgets', pr: 7, history: [{ 'AGENTS.md': 'Boil the water.\nPour.\n' }], change: { 'AGENTS.md': 'Boil the water.\nSteam.\n' } });
