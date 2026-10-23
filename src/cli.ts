@@ -339,6 +339,7 @@ import type { Probe } from './health/types.ts';
 import { repairAdvisor400 } from './repair/repair-advisor400.ts';
 import { HqError } from './errors.ts';
 import { HELP } from './help.ts';
+import { readMoveRefusal } from './runs/read-move-refusal.ts';
 import { VERSION } from './version.ts';
 
 const OPTIONS = {
@@ -883,6 +884,10 @@ ${r.result === 'added' ? 'On the board.' : 'Already on the board.'}` };
       return { data: { run: r }, text: `${runLine(r)}\nReopened.` };
     }
     case 'state': {
+      const refusal = readMoveRefusal(db, arg(0, 'issue'), arg(1, 'state'), flags.force === true);
+      if (refusal !== null) {
+        throw new HqError('bad_state', refusal);
+      }
       const [issue, state] = [arg(0, 'issue'), arg(1, 'state')],
         actorName = await by(),
         r = setState(db, issue, state, toExactOptional({ liveCheck: flags.check as LiveCheck | undefined, next: flags.next, waitsOn: parseWaitsOn(flags['waits-on']), note: flags.note ?? null, reopen: Boolean(flags.reopen), waitsOnGeoff: parseGeoffFlag(flags) }), actorName);
