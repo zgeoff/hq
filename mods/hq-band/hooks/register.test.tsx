@@ -140,8 +140,6 @@ test('in z-stu /hq opens a pane: the heat map as a Raster on the terminal, block
   expect([app.commands, app.opened, opened.text, shownBand?.type, shownRaster?.type, shownText?.text, shownDetail?.text]).toEqual([['hq'], ['hq'], 'Opened the hq pane.', 'Box', 'Raster', '████░░', PANE.markdown]);
 });
 
-// The rule knows only bun:test's `test`, not the one claude-code/testing exports.
-// oxlint-disable-next-line zgeoff/setup-test-only
 test('in z-stu /hq close closes the hq pane and opens none', async ($, on) => {
   const app = setupTest(on, { whois: STU_WHOIS, band: WORKING_BAND, pane: WORKING_PANE });
   await openBand($, app, { advanceMs: 0, hasSurvey: false });
