@@ -183,7 +183,11 @@ test('it marks an item with no condition as recheck in hq unblock list after 3 d
       title: null,
       due_at: null,
       done_when: [],
+      kind: 'owner',
+      deadline: null,
+      overdue_told_at: null,
       recheck: true,
+      overdue: false,
     },
   ]);
 });
@@ -213,7 +217,11 @@ test('it does not mark an item with no condition as recheck in hq unblock list a
       title: null,
       due_at: null,
       done_when: [],
+      kind: 'owner',
+      deadline: null,
+      overdue_told_at: null,
       recheck: false,
+      overdue: false,
     },
   ]);
 });
@@ -243,7 +251,11 @@ test('it never marks an item with a condition as recheck in hq unblock list', as
       title: null,
       due_at: null,
       done_when: [{ kind: 'issue', ref: 'KET-7' }],
+      kind: 'owner',
+      deadline: null,
+      overdue_told_at: null,
       recheck: false,
+      overdue: false,
     },
   ]);
 });
