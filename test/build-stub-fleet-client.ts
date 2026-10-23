@@ -8,8 +8,8 @@ export interface StubFleetAnswers {
   // per session id, what its forget calls answer in turn; a forget past the list forgets the session
   forgets?: Record<string, ForgetAnswer[]>;
 
-  // session ids whose pin atc refuses
-  pinFailures?: string[];
+  // session ids whose kill atc does not answer
+  killFailures?: string[];
 }
 
 export interface StubFleetClient {
@@ -33,14 +33,14 @@ export function buildStubFleetClient(answers: StubFleetAnswers): StubFleetClient
     spawn: () => Promise.reject(new Error('the stub fleet client spawns nothing')),
     details: () => Promise.reject(new Error('the stub fleet client reads no details')),
     message: () => Promise.reject(new Error('the stub fleet client reads no message')),
-    pin: (id) => {
-      calls.push(`pin ${id.slice(0, 8)}`);
-      if (answers.pinFailures?.includes(id) === true) {
-        return Promise.reject(new Error('atc refused the pin'));
+    pin: (id) => record('pin', id),
+    kill: (id) => {
+      calls.push(`kill ${id.slice(0, 8)}`);
+      if (answers.killFailures?.includes(id) === true) {
+        return Promise.reject(new Error('atc did not answer session.kill'));
       }
       return Promise.resolve();
     },
-    kill: (id) => record('kill', id),
     unpin: (id) => record('unpin', id),
     forget: (id, confirmToken) => {
       calls.push(`forget ${id.slice(0, 8)}${confirmToken === undefined ? '' : ` ${confirmToken}`}`);
