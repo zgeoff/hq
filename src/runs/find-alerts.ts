@@ -12,7 +12,6 @@ import { probeOpenUnblockWait } from './probe-open-unblock-wait.ts';
 import { SWEEP_MINUTES as SWEEP } from './sweep-minutes.ts';
 import type { Alert, RunPr, RunSession } from './types.ts';
 
-// What z-delivery should look at now, from the rows, the sessions and their activity.
 export function findAlerts(db: Database, sessions: SessionInfo[], activity: Map<string, number | null>, at: Date): Alert[] {
   const alerts: Alert[] = [];
   const byId = new Map(sessions.map((s) => [s.id, s]));
