@@ -29,7 +29,7 @@ test('it counts a moved run in its new place for the lanes', () => {
 
   setPlace(ctx.db, { issue: 'GEO-9891', place: 'local', note: null, actor: 'z-delivery' });
 
-  expect(readRunningByPlace(ctx.db)).toStrictEqual({ imp: 0, local: 1, issues: ['GEO-9891'] });
+  expect(readRunningByPlace(ctx.db)).toStrictEqual({ imp: 0, local: 1, issues: ['GEO-9891'], localSource: null });
 });
 
 test('it refuses an issue with no run as not_found', () => {
