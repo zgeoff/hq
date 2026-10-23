@@ -1,12 +1,15 @@
+import { match } from 'ts-pattern';
 import { z } from 'zod';
 import { checkout } from '../review/checkout.ts';
 import type { Runner } from '../runner/types.ts';
 import { buildHeadRef } from './build-head-ref.ts';
-import { buildRenameKey } from './build-rename-key.ts';
 import { collectMovePaths } from './collect-move-paths.ts';
 import { GitReadError } from './git-read-error.ts';
 import type { HeldDiff, MoveFacts } from './mechanical-types.ts';
 import { parseJSON } from './parse-json.ts';
+import { parseRenameLog } from './parse-rename-log.ts';
+import { parseTreeEntry } from './parse-tree-entry.ts';
+import { pickRenames } from './pick-renames.ts';
 import { readCommitSha } from './read-commit-sha.ts';
 
 export interface HeldDiffRequest {
@@ -78,38 +81,31 @@ async function runGit(request: HeldDiffRequest, directory: string, args: string[
 }
 
 async function readMoveFacts(request: HeldDiffRequest, directory: string, mergeBase: string, pairs: [string, string][]): Promise<MoveFacts> {
-  const facts: MoveFacts = { baseBlobs: new Map(), headBlobs: new Map(), renames: new Set() };
+  const baseBlobs = new Map<string, string | null>();
+  const headBlobs = new Map<string, string | null>();
   for (const path of new Set(pairs.flat())) {
-    const baseBlob = await readEntry(request, directory, mergeBase, path);
-    const headBlob = await readEntry(request, directory, request.head, path);
-    facts.baseBlobs.set(path, baseBlob);
-    facts.headBlobs.set(path, headBlob);
+    const atBase = await readEntry(request, directory, mergeBase, path);
+    const atHead = await readEntry(request, directory, request.head, path);
+    baseBlobs.set(path, atBase);
+    headBlobs.set(path, atHead);
   }
+  const logged: [string, string][] = [];
   for (const [from, to] of pairs) {
-    if (facts.baseBlobs.get(from) === null) {
+    if (baseBlobs.get(from) === null) {
       const log = await runGit(request, directory, ['log', '--no-color', '--diff-filter=R', '-M', '--name-status', '--format=', mergeBase, '--', from, to]);
-      for (const line of log.split('\n')) {
-        const [status, oldPath, newPath] = line.split('\t');
-        if (status?.startsWith('R') === true && oldPath !== undefined && newPath !== undefined) {
-          facts.renames.add(buildRenameKey(oldPath, newPath));
-        }
-      }
+      logged.push(...parseRenameLog(log));
     }
   }
-  return facts;
+  return { baseBlobs, headBlobs, renames: pickRenames(pairs, baseBlobs, logged) };
 }
 
-// The tree entry of `path` at `revision` as git's `<mode> <type> <object>`; null when the path is
-// absent there. A directory or a symlink gives its own mode, so it never equals a regular file.
 async function readEntry(request: HeldDiffRequest, directory: string, revision: string, path: string): Promise<string | null> {
   const listed = await runGit(request, directory, ['ls-tree', '--full-tree', revision, '--', path]);
-  const entries = listed.split('\n').filter((line) => line !== '');
-  if (entries.length === 0) {
-    return null;
-  }
-  const [entry = '', listedPath] = entries[0]?.split('\t') ?? [];
-  if (entries.length !== 1 || listedPath !== path) {
-    throw new GitReadError(`git listed ${entries.length} tree entries for ${path} at ${revision.slice(0, 7)}, not the one path asked for`);
-  }
-  return entry;
+  return match(parseTreeEntry(listed, path))
+    .with({ kind: 'absent' }, () => null)
+    .with({ kind: 'entry' }, (found) => found.entry)
+    .with({ kind: 'unexpected' }, (found) => {
+      throw new GitReadError(`git listed ${found.count} tree entries for ${path} at ${revision.slice(0, 7)}, not the one path asked for`);
+    })
+    .exhaustive();
 }
