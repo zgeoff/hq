@@ -45,7 +45,8 @@ test('it counts the awake local session of a merged run', () => {
 
   const running = readRunningByPlace(ctx.db);
 
-  expect([running.local, running.localSource]).toStrictEqual([2, '2 live sessions here']);
+  expect(running.local).toBe(2);
+  expect(running.localSource).toBe('2 live sessions here');
 });
 
 test('it counts a helper session of a flexible-lane run beside its main session', () => {
@@ -59,7 +60,8 @@ test('it counts a helper session of a flexible-lane run beside its main session'
 
   const running = readRunningByPlace(ctx.db);
 
-  expect([running.local, running.localSource]).toStrictEqual([2, '2 live sessions here']);
+  expect(running.local).toBe(2);
+  expect(running.localSource).toBe('2 live sessions here');
 });
 
 test("it leaves out a fleet session hq fleet knows, though a run lists it", () => {
