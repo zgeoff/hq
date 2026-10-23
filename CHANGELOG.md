@@ -1,34 +1,5 @@
 # Changelog
 
-## 0.94.0 — 2026-10-23
-
-Lanes match the slots that sessions really fill, and `hq unblock` gets watch items. Schema v40.
-
-### `hq lanes skip` leaves a Ready issue out of the plan until a time passes or an issue closes.
-
-- `hq lanes skip <issue> --until <ISO|GEO-n> --reason T`, with `list` and `drop`. An until issue hq cannot read shows its error in `list`.
-
-### The local slot count follows what runs on this host.
-
-- Free local slots are capped by the room an unattended provider has here: `localFallback` minus the local runs. `localFallback` is now 6.
-- When the awake sessions on this host that belong to runs outnumber the runs filed local, they set the count, whatever their run's state, place or lane. The fleet's own sessions are left out. `hq lanes` shows the source, for example `local 7/6, 0 free (7 live sessions here)`.
-- A run filed imp whose awake sessions all run here counts as local only.
-
-### `hq run place <issue> imp|local|none [--note T]` moves an open run to another place.
-
-- The move and its note are logged, and `hq lanes` counts the run at its new place at once.
-
-### `hq unblock` watch items wait on an event, not on the owner.
-
-- `--done-when` also takes `release:<repo>` (the first GitHub release after the add, drafts and prereleases skipped) and `date:<ISO>`.
-- `--notify <session>` messages that session once when the item settles. `--deadline <ISO>` marks it overdue and tells the adder, the notify sessions and the owner's session once.
-- `--kind watch` items stay out of the console's needs-owner list, the band's count and `hq unblock new`. `hq status` counts them as watching.
-- Migration v40 adds `kind`, `deadline` and `overdue_told_at` to `unblocks`.
-
-### Skills
-
-- linear-triage promotes on every pass, and records a park the owner gives in words with the `parked` label.
-
 ## 0.93.0 — 2026-10-23
 
 Two features land together: scheduled restarts for the orchestrator and release sessions, and the owner-held path gate.
