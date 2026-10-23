@@ -33,6 +33,18 @@ test('it counts a run filed imp whose session runs here among the local runs whe
   expect(readRunningByPlace(ctx.db)).toStrictEqual({ imp: 0, local: 4, issues: ['GEO-9911', 'GEO-9912', 'GEO-9913', 'GEO-9914'], localSource: null });
 });
 
+test('it keeps a run filed imp with awake sessions on both hosts in imp, and counts its session here as local', () => {
+  const ctx = setupTest();
+  addRun(ctx.db, { issue: 'GEO-9915', title: 'Descale the kettle', place: 'imp', session: 'a0000015-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
+  setSession(ctx.db, 'GEO-9915', 'a0000016-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'z-delivery', 'add');
+  recordAwake(ctx.db, [
+    { id: 'a0000015-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, state: 'running', locator: { targetID: 'imp-kettle' } },
+    { id: 'a0000016-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-helper', alive: true, state: 'running', locator: { targetID: 'local' } },
+  ]);
+
+  expect(readRunningByPlace(ctx.db)).toStrictEqual({ imp: 1, local: 1, issues: ['GEO-9915'], localSource: '1 live session here' });
+});
+
 test('it counts the awake local session of a merged run', () => {
   const ctx = setupTest();
   addRun(ctx.db, { issue: 'GEO-9902', title: 'Polish the teapot', place: 'local', session: 'a0000002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
