@@ -85,18 +85,22 @@ export async function shipRuns(db: Database, run: Runner, at: Date = now(), opts
 
   const failedGates = new Set<string>();
   const gates = new Map<string, Gate>();
-  const getGate = async (repo: string, name: string): Promise<Gate | null> => {
+  const readGateOnce = async (repo: string, name: string): Promise<Gate | null> => {
     const key = `${repo}:${name}`;
-    if (failedGates.has(key)) return null;
+    if (failedGates.has(key)) {
+      return null;
+    }
     const have = gates.get(key);
-    if (have) return have;
+    if (have) {
+      return have;
+    }
     try {
       const gate = await readGate(run, repo, name);
       gates.set(key, gate);
       return gate;
-    } catch (e) {
+    } catch (error) {
       failedGates.add(key);
-      err(`${repo}: ${(e as Error).message}`);
+      err(`${repo}: ${String(error instanceof Error ? error.message : error)}`);
       return null;
     }
   };
@@ -135,7 +139,7 @@ export async function shipRuns(db: Database, run: Runner, at: Date = now(), opts
     readBuild: opts.readBuild ?? readInstalledBuild,
     contains,
     getReleases,
-    getGate,
+    readGate: readGateOnce,
     isCapped: () => res.compares >= MAX_COMPARES,
     hasFailed: (repo: string) => failedRepos.has(repo),
   };

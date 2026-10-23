@@ -25,12 +25,25 @@ async function readBuildShipment(deps: ShipDeps, state: PrState, sha: string): P
   if (!build.commit || build.dirty !== false) {
     return null;
   }
+
   // A build from an unpushed commit waits.
   const held = await readHeld(deps, state.repo, sha, build.commit);
   if (held === 'cap') {
     return 'cap';
   }
   return held ? { tag: `build:${build.commit.slice(0, 7)}`, at: null } : null;
+}
+
+// A head GitHub does not know, such as an unpushed commit or a ref not made yet, holds nothing.
+async function readHeld(deps: ShipDeps, repo: string, sha: string, head: string): Promise<boolean | 'cap'> {
+  try {
+    return await deps.contains(repo, sha, head);
+  } catch (error) {
+    if (isNotFound(error)) {
+      return false;
+    }
+    throw error;
+  }
 }
 
 async function readPackagesShipment(deps: ShipDeps, state: PrState, sha: string): Promise<Shipment | null | 'cap'> {
@@ -53,14 +66,13 @@ async function readReleaseShipment(deps: ShipDeps, state: PrState, sha: string):
   return list ? readOldestContaining(list, (tag) => deps.contains(state.repo, sha, tag)) : null;
 }
 
-// A gated PR needs the gate's ref as well as the source's. That ref may not exist yet, which holds nothing.
 async function readRefShipment(deps: ShipDeps, state: PrState, sha: string, source: Extract<Source, { kind: 'ref' }>): Promise<Shipment | null | 'cap'> {
   const found = await readReleaseShipment(deps, state, sha);
   const gated = source.gated;
   if (found === null || found === 'cap' || gated === undefined) {
     return found;
   }
-  const gate = await deps.getGate(state.repo, gated.gate);
+  const gate = await deps.readGate(state.repo, gated.gate);
   if (gate === null) {
     return null;
   }
@@ -73,13 +85,4 @@ async function readRefShipment(deps: ShipDeps, state: PrState, sha: string, sour
     return 'cap';
   }
   return held ? { tag: gated.ref, at: null } : null;
-}
-
-function readHeld(deps: ShipDeps, repo: string, sha: string, head: string): Promise<boolean | 'cap'> {
-  return deps.contains(repo, sha, head).catch((error: unknown) => {
-    if (isNotFound(error)) {
-      return false;
-    }
-    throw error;
-  });
 }

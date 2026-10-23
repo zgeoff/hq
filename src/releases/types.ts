@@ -46,7 +46,7 @@ export interface ShipDeps {
   readBuild: () => Build;
   contains: (repo: string, sha: string, tag: string) => Promise<boolean | 'cap'>;
   getReleases: (repo: string) => Promise<Release[] | null>;
-  getGate: (repo: string, name: string) => Promise<Gate | null>;
+  readGate: (repo: string, name: string) => Promise<Gate | null>;
   isCapped: () => boolean;
   hasFailed: (repo: string) => boolean;
 }

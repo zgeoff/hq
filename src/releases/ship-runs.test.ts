@@ -425,15 +425,16 @@ test('it leaves a cloud PR unshipped, with no file or gates read, while deployed
 test('it asks deployed/prod again on every pass', async () => {
   const ctx = setupTest();
   createMergedRun(ctx.db, 'GEO-9803', ['cloud#44']);
+  const prodHolds: string[] = [];
   const facts = {
     shas: { 'cloud#44': buildMockSha(44) },
-    contains: { 'deployed/prod': [] as string[] },
+    contains: { 'deployed/prod': prodHolds },
     tags: { 'deployed/prod': buildMockSha(4200) },
     gates: { cloud: 'gates:\n  nixos:\n    paths:\n      - nixos/**\n' },
     files: { 'cloud#44': ['infra/kettle.ts'] },
   };
   await shipRuns(ctx.db, buildStubSourceGH(facts, ctx.calls), ctx.now);
-  facts.contains['deployed/prod'] = [buildMockSha(44)];
+  prodHolds.push(buildMockSha(44));
 
   const second = await shipRuns(ctx.db, buildStubSourceGH(facts, ctx.calls), ctx.now);
 

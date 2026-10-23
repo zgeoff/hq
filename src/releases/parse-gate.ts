@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import { HqError } from '../errors.ts';
 
-const GATES = z.object({ gates: z.record(z.string(), z.object({ paths: z.array(z.string()).min(1), ignore: z.array(z.string()).optional() })) });
+const GATE = z.object({ paths: z.array(z.string()).min(1), ignore: z.array(z.string()).optional() });
+const GATES = z.object({ gates: z.record(z.string(), GATE) });
 
 export interface Gate {
   paths: string[];
