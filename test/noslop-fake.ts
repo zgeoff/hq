@@ -27,9 +27,14 @@ export interface FakeScript {
   // What `gh pr view --json headRefOid` answers; the fixed full sha when absent.
   prHead?: RunResult;
 
-  // What `gh pr view --json headRefOid,author,statusCheckRollup` answers: one passing CI check
+  // What `gh pr view --json headRefOid,author,statusCheckRollup,baseRefName` answers: one passing CI check
   // on the fixed head, with the author above, when absent.
   prFacts?: RunResult;
+
+  // What `gh api …/contents/.github/workflows?ref=<ref>` answers at the head, and at the base branch
+  // `main` (the head's answer when baseWorkflows is absent): the folder is there when both are absent.
+  workflows?: RunResult;
+  baseWorkflows?: RunResult;
 
   // What `gh api --paginate …/pulls/<pr>/files` prints: a path a line, with a renamed file's old
   // path after a tab. One source file when absent.
@@ -129,7 +134,7 @@ function pickGhAnswer(script: FakeScript, line: string): RunResult | null {
     return buildResult(JSON.stringify({ headRefName: 'feat', headRefOid: FAKE_FULL_SHA, baseRefName: 'main' }));
   }
   if (line.includes('--json headRefOid,author,statusCheckRollup')) {
-    return script.prFacts ?? buildResult(JSON.stringify({ headRefOid: FAKE_FULL_SHA, author: JSON.parse(script.author ?? '{"author":{"login":"zgeoff","is_bot":false}}').author, statusCheckRollup: [{ __typename: 'CheckRun', name: 'test', status: 'COMPLETED', conclusion: 'SUCCESS' }] }));
+    return script.prFacts ?? buildResult(JSON.stringify({ headRefOid: FAKE_FULL_SHA, baseRefName: 'main', author: JSON.parse(script.author ?? '{"author":{"login":"zgeoff","is_bot":false}}').author, statusCheckRollup: [{ __typename: 'CheckRun', name: 'test', status: 'COMPLETED', conclusion: 'SUCCESS' }] }));
   }
   if (line.includes('--json headRefOid')) {
     return script.prHead ?? buildResult(JSON.stringify({ headRefOid: FAKE_FULL_SHA }));
@@ -139,6 +144,9 @@ function pickGhAnswer(script: FakeScript, line: string): RunResult | null {
   }
   if (line.includes('--json name,state,bucket')) {
     return buildResult('[{"name":"test","state":"SUCCESS","bucket":"pass"}]');
+  }
+  if (line.startsWith('gh api repos/') && line.includes('/contents/.github/workflows?ref=')) {
+    return (line.includes('?ref=main ') ? script.baseWorkflows : undefined) ?? script.workflows ?? buildResult('');
   }
   if (line.startsWith('gh api --paginate repos/') && line.includes('/files?')) {
     return script.prFiles ?? buildResult('src/kettle.ts\n');
