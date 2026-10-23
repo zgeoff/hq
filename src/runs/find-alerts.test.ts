@@ -41,7 +41,21 @@ test('it raises a FINAL alert for a PR whose only review came before its FINAL, 
     .run();
 
   expect(findAlerts(ctx.db, [], new Map(), new Date('2026-10-21T03:00:00Z'))).toStrictEqual([
-    { key: 'pr:kettle#23', fingerprint: 'final:abc1234', issue: 'GEO-9823', line: 'kettle#23 (GEO-9823) final at abc1234 for 120 min, no review; head moved since your review at def5678 [from marker:kettle]' },
+    { key: 'pr:kettle#23', fingerprint: 'final:abc1234', issue: 'GEO-9823', line: 'kettle#23 (GEO-9823) final at abc1234 for 120 min, no review; head moved since your review at def5678 (a restack? a passed hq review kettle 23 records the new head) [from marker:kettle]' },
+  ]);
+});
+
+test('it names a new PR or an override for a PR whose head moved after its last allowed round', () => {
+  const ctx = setupTest();
+  addRun(ctx.db, { issue: 'GEO-9825', title: 'Invented kettle work', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
+  addPr(ctx.db, 'GEO-9825', 'kettle#25', 'kettle-bot');
+  ctx.db
+    .query("UPDATE run_prs SET final_sha = 'abc1234', final_at = '2026-10-21T01:00:00Z', final_source = 'marker:kettle', review_started_at = '2026-10-21T00:30:00Z', reviewed_sha = 'def5678', review_round = 1, reviewed_at = '2026-10-21T00:45:00Z' WHERE ref = 'kettle#25'")
+    .run();
+  ctx.db.query("INSERT INTO noslop_rounds (repo, pr, kind, started_at, ended_at, ms, ok, head, depth, sha) VALUES ('kettle', 25, 'review', '2026-10-21T00:30:00Z', '2026-10-21T00:45:00Z', 900000, 1, 'def5678', 'light', 'aaa1111')").run();
+
+  expect(findAlerts(ctx.db, [], new Map(), new Date('2026-10-21T03:00:00Z'))).toStrictEqual([
+    { key: 'pr:kettle#25', fingerprint: 'final:abc1234', issue: 'GEO-9825', line: 'kettle#25 (GEO-9825) final at abc1234 for 120 min, no review; head moved since your review at def5678 (a restack at the round cap? a new PR gets its own first round, or z-stu records an override) [from marker:kettle]' },
   ]);
 });
 
