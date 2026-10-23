@@ -22,4 +22,4 @@ Check that it is the SHA you reviewed. When it differs, the head moved after you
 cd <checkout of the repo> && gh stack merge <top PR> --yes --squash
 ```
 
-Check the result with `gh pr view <top PR> -R <owner>/<repo> --json state` in a separate call. The merge is all or nothing: GitHub squash-merges each layer in order, or merges none and reports why; act on the reason it prints. Then check each layer as step 7 says, and hand on every layer's merge in one message.
+Check the result with `gh pr view <top PR> -R <owner>/<repo> --json state` in a separate call. The merge is all or nothing: GitHub squash-merges each layer in order, or merges none and reports why; act on the reason it prints. Then check each layer as After the merge in `SKILL.md` says, and hand on every layer's merge in one message.

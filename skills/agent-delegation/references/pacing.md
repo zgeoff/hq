@@ -5,9 +5,8 @@ also needs a free design slot. `scripts/capacity.sh` reads them all and picks th
 call stands in for several. [pacing.json](../pacing.json) holds the slot counts, the thresholds,
 the routes and the design slots.
 
-hq fills each free slot from Ready itself, in the order `hq focus show` prints, with the same
-check. Run `capacity.sh` yourself only for a launch you make: a pitch launch, a relaunch, or a design
-or ad-hoc session.
+Run `capacity.sh` before every launch: a Ready issue, a pitch launch, a relaunch, or a design or
+ad-hoc session. Take Ready issues in the order `hq focus show` prints.
 
 ## Before a launch
 
@@ -17,7 +16,7 @@ or ad-hoc session.
    session, pass `--design` in place of `--size`. Launch an Investigation as an M.
 4. Read `launch`:
    - `provider` set: spawn with `agent` set to `launch.agent`, on the target `launch.target` names:
-     `imp` for an imp target, `local` for this host. On Claude, prefer Opus.
+     `imp` for an imp target, `local` for this host.
    - `provider` null: hold the launch. `reason` says which limit is full.
 
 Work that reads the owner's personal data, such as his memories, the event log or Nix's
@@ -56,7 +55,7 @@ in the same PR.
   imps run at most 7, since impd's 16 GiB line for agents fits 8.
 - `providers.<name>.threshold`: the percent of either window at which launches on that provider
   stop.
-- `providers.<name>.unattended`: whether hq or you may launch unattended work there.
+- `providers.<name>.unattended`: whether unattended work may launch there.
 - `providers.<name>.localFallback`: how many delivery sessions may run on this host when the imps
   are full.
 - `providers.<name>.target`: where that provider's sessions run, `imp` or `local`. Codex runs on

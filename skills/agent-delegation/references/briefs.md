@@ -9,8 +9,8 @@ only that repo's vault.
 
 ## The delivery brief
 
-The template is [templates/brief.md](../templates/brief.md). hq renders it for each Ready issue it
-launches; fill it the same way for a relaunch or a pitch launch. Each placeholder holds:
+The template is [templates/brief.md](../templates/brief.md). Fill it for every delivery launch: a
+Ready issue, a relaunch or a pitch launch. Each placeholder holds:
 
 | Placeholder        | What goes in                                                                                                                                                 |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -66,5 +66,5 @@ brief:
 
 ## Other briefs
 
-A design session, an Investigation and an atc upgrade each have their own template: the reference
-list in `SKILL.md` names them.
+A design session and an Investigation each have their own template: the reference list in
+`SKILL.md` names them.

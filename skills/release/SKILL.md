@@ -65,7 +65,7 @@ marks a merge whose paths are all tests `test-only`.
 Ask `z-review` to merge each repo's release PR once a day, from 01:00 to 03:00 Sydney time: "Merge
 the release PR: <repo>#<n>." The release bot's "chore(main): release …" PRs change only the
 version and changelog, so they need green CI and no review. Then publish the releases and the
-zgeoff/tools npm packages, including a `republish_paths` dispatch, so the 05:41 pipeline run bumps
+zgeoff/tools npm packages, including a `republish_paths` dispatch, so the morning pipeline run bumps
 the pins and nixie is live by 07:00.
 
 Release now, outside the batch, for an Urgent issue, a bug broken in production, a security fix,

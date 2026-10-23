@@ -1,7 +1,7 @@
 <!--
-The standard delivery brief. hq renders it for each Ready issue it launches, and you use it for a
-relaunch or a pitch launch. hq fills each {{placeholder}}; agent-delegation's briefs.md says what
-each one holds. Everything outside the placeholders reaches the agent word for word.
+The standard delivery brief, for a Ready issue, a relaunch or a pitch launch. agent-delegation's
+briefs.md says what each {{placeholder}} holds. Everything outside the placeholders reaches the
+agent word for word.
 -->
 
 ```text

@@ -30,6 +30,6 @@ gh api repos/zgeoff/<repo>/issues/<n>/comments --paginate --jq '.[] | select(.cr
 
 Give the mark as `YYYY-MM-DDTHH:MM:SSZ` in UTC, since GitHub's `created_at` is UTC. Count each answer that cites none of the sources that show the owner's words. Which sources those are is in this file's private half: read `skills/intake/references/noslop-checkin.private.md` in the local hq-private clone (`hq defs` shows where it is) and follow it as part of this skill.
 
-Flag each PR with `repeatClass` above 0 that opened after 2026-10-19T05:00Z (read its `createdAt` with `gh pr view <n> -R zgeoff/<repo> --json createdAt`), each PR with `mainMerge` above 0, and each PR with a failed review.
+Flag each PR with `mainMerge` above 0, each PR with a failed review, and each PR with `repeatClass` above 0 that opened after 2026-10-19T05:00Z, when the delivery brief gained its rule to fix a whole class of finding in one push. Read a PR's `createdAt` with `gh pr view <n> -R zgeoff/<repo> --json createdAt`.
 
 Post one `hq news add --topic report` line that holds the reviews and failed reviews, the findings by severity and by outcome, the churn totals, the count of `accepted-risk` answers without the owner's words, and the flagged PRs. For each PR with such an answer, also add it to the owner's list with `hq unblock add --task "<repo>#<n>: accepted-risk answer cites no word of the owner's"`.

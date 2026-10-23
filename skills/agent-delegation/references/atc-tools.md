@@ -10,4 +10,8 @@ Each atc tool's own description covers how to call it. These points cover what i
 
 ## A session that fails every turn
 
-When every turn fails with `API Error: 400 ... unexpected tool_use_id found in advisor_tool_result blocks`, the session can't recover by itself. Relaunch by default: save its scratch files and evidence, relaunch from its brief and pushed branch with a new `idempotencyKey`, and forget the old one. When keeping the session's context is worth more than a fresh start, stop the session, run `hq repair advisor-400 <session>` for a dry run, and ask the owner to approve the exact command `hq repair advisor-400 <session> --apply`, since the classifier blocks an agent from writing a transcript without his yes. If the repaired session still fails, relaunch. If it holds uncommitted or unpushed work, stop it with `atc_session_stop` instead, which keeps the work, and tell the owner. Keep the advisor on.
+When every turn fails with `API Error: 400 ... unexpected tool_use_id found in advisor_tool_result blocks`, the session can't recover by itself. Keep the advisor on whichever way you take.
+
+- **Relaunch, the default.** Save its scratch files and evidence, relaunch from its brief and pushed branch with a new `idempotencyKey`, and forget the old session.
+- **Repair it,** when its context is worth more than a fresh start. Stop the session, run `hq repair advisor-400 <session>` for a dry run, and ask the owner to approve the exact command `hq repair advisor-400 <session> --apply`, because the classifier blocks an agent from writing a transcript without his yes. Relaunch when the repaired session still fails.
+- **Keep it stopped,** when it holds uncommitted or unpushed work. Stop it with `atc_session_stop`, which keeps the work, and tell the owner.
