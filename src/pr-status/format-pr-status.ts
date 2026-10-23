@@ -1,5 +1,5 @@
-import { formatHeldFiles } from './format-held-files.ts';
 import { formatOverrideLine } from './format-override-line.ts';
+import { formatReviewRecordsLine } from './format-review-records-line.ts';
 import type { PRStatusView } from './types.ts';
 
 // The record in words. A stale line says `stale at <short head>`, the head it was recorded at.
@@ -8,7 +8,7 @@ export function formatPRStatus(view: PRStatusView): string {
   if (view.override !== null) {
     lines.push(formatOverrideLine(view.override));
   }
-  const records = formatRecordsLine(view);
+  const records = formatReviewRecordsLine(view.reviewRecords);
   if (records !== null) {
     lines.push(records);
   }
@@ -39,21 +39,6 @@ function formatAnswerLine(view: PRStatusView): string {
 
 function formatNextLine(view: PRStatusView): string {
   return view.next === null ? 'next: nobody' : `next: ${view.next}${formatWhen(view.nextAt)}`;
-}
-
-function formatRecordsLine(view: PRStatusView): string | null {
-  const mechanical = view.reviewRecords.mechanical;
-  const exemption = view.reviewRecords.exemption;
-  const parts = [
-    mechanical === null ? null : `mechanical edits proved by hq (${mechanical.lines} lines in ${formatHeldFiles(mechanical.files)})`,
-    exemption === null ? null : `exempt under the ${exemption.rule} rule, not proved by hq: ${exemption.note}${formatExemptFiles(exemption.files)}`,
-  ].filter((part): part is string => part !== null);
-  return parts.length === 0 ? null : `z-review: ${parts.join('; ')}`;
-}
-
-// Every file the exemption covered, so none is cut from the owner's view.
-function formatExemptFiles(files: string[]): string {
-  return files.length === 0 ? '' : ` (held files: ${files.join(', ')})`;
 }
 
 function formatHead(view: PRStatusView): string {

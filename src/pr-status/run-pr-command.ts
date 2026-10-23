@@ -18,8 +18,10 @@ import { findSourceRefusal } from './find-source-refusal.ts';
 import type { SourceRequest } from './find-source-refusal.ts';
 import { findPRStatus } from './find-pr-status.ts';
 import { formatOverrideLine } from './format-override-line.ts';
+import { formatReviewRecordsLine } from './format-review-records-line.ts';
 import { formatPRStatus } from './format-pr-status.ts';
 import { hasPROverride } from './has-pr-override.ts';
+import { hasReviewerRecord } from './has-reviewer-record.ts';
 import { parsePRRef } from './parse-pr-ref.ts';
 import type { PRRef } from './parse-pr-ref.ts';
 import type { OwnerProbe } from './read-owner-session.ts';
@@ -83,25 +85,38 @@ async function runStatus(input: PRCommandInput, ref: PRRef): Promise<Out> {
   return await refreshStatus(input, ref, row);
 }
 
-// A PR with no record may still hold the owner's override, which the reviewer needs to see; gh is
-// read only when an override was ever recorded.
+// A PR with no record may still hold the owner's override or z-review's records, which the reviewer
+// needs to see; gh is read only when one was ever recorded.
 async function readUnrecordedStatus(input: PRCommandInput, ref: PRRef): Promise<Out> {
   const none: Out = { data: { pr: null }, text: `No record for ${ref.repo}#${ref.pr}.` };
-  if (!hasPROverride(input.db, ref.repo, ref.pr)) {
+  if (!hasPROverride(input.db, ref.repo, ref.pr) && !hasReviewerRecord(input.db, ref.repo, ref.pr)) {
     return none;
   }
   const head = await readPRHead(input.run, ref.slug, ref.pr);
   const override = findStandingOverride(input, ref, head);
-  if (override === null) {
+  const records = readStandingRecords(input, ref, head);
+  const shown = override === null ? null : { head: override.head, source: override.source, note: override.note, at: override.at };
+  const recordsLine = formatReviewRecordsLine(records);
+  if (shown === null && recordsLine === null) {
     return none;
   }
-  const shown = { head: override.head, source: override.source, note: override.note, at: override.at };
-  return { data: { pr: null, override: shown }, text: `${none.text}\n${formatOverrideLine(shown)}` };
+  const lines = [none.text, shown === null ? null : formatOverrideLine(shown), recordsLine].filter((line): line is string => line !== null);
+  return { data: { pr: null, ...(shown === null ? {} : { override: shown }), ...(recordsLine === null ? {} : { reviewRecords: records }) }, text: lines.join('\n') };
 }
 
 // The override that stands at the head now; none when the head is unknown.
 function findStandingOverride(input: PRCommandInput, ref: PRRef, head: string | null): OwnerOverride | null {
   return head === null ? null : findOwnerOverride(input.db, ref.repo, ref.pr, head);
+}
+
+// z-review's records that stand at the head; none when the head is unknown.
+function readStandingRecords(input: PRCommandInput, ref: PRRef, head: string | null): PRStatusView['reviewRecords'] {
+  if (head === null) {
+    return { mechanical: null, exemption: null };
+  }
+  const mechanical = readHeadMechanical(input.db, ref.repo, ref.pr, head);
+  const exemption = readHeadExemption(input.db, ref.repo, ref.pr, head);
+  return { mechanical: mechanical === null ? null : { files: mechanical.files, lines: mechanical.lines }, exemption: exemption === null ? null : { rule: exemption.rule, note: exemption.note, files: exemption.files } };
 }
 
 // The record against the head gh gives now; that head is also stored as the one hq last saw.
@@ -115,16 +130,6 @@ async function refreshStatus(input: PRCommandInput, ref: PRRef, row: PRStatusRow
 
 function buildOut(view: PRStatusView): Out {
   return { data: { pr: view }, text: formatPRStatus(view) };
-}
-
-// z-review's records that stand at the head; none when the head is unknown.
-function readStandingRecords(input: PRCommandInput, ref: PRRef, head: string | null): PRStatusView['reviewRecords'] {
-  if (head === null) {
-    return { mechanical: null, exemption: null };
-  }
-  const mechanical = readHeadMechanical(input.db, ref.repo, ref.pr, head);
-  const exemption = readHeadExemption(input.db, ref.repo, ref.pr, head);
-  return { mechanical: mechanical === null ? null : { files: mechanical.files, lines: mechanical.lines }, exemption: exemption === null ? null : { rule: exemption.rule, note: exemption.note, files: exemption.files } };
 }
 
 interface AnswerArgs {
