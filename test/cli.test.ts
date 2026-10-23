@@ -607,6 +607,20 @@ test('hq run check and state --check set live_check, and show it', async () => {
   expect((await hq('run', 'state', 'GEO-509', 'deploying', '--check', 'maybe')).code).not.toBe(0);
 });
 
+test('hq run state refuses to move a run past its merge while a PR is open, and --force moves it', async () => {
+  await hq('run', 'add', 'GEO-512', '--session', '512ab0c0-0000-4000-8000-00000000beef', '--title', 'Invented kettle stack', '--where', 'none');
+  await hq('run', 'pr', 'GEO-512', 'vers#30');
+
+  const refused = await hq('run', 'state', 'GEO-512', 'deploy-held', '--next', 'Waits on the kettle release.');
+  const forced = await hq('run', 'state', 'GEO-512', 'deploy-held', '--next', 'Waits on the kettle release.', '--force');
+
+  expect([refused.code, refused.json.error]).toStrictEqual([
+    1,
+    { code: 'bad_state', message: 'GEO-512 still has open PR vers#30 and active session 512ab0c0, so its work is not finished: it moves to merged when its last PR merges and its session ends. Pass --force to move it to deploy-held now.' },
+  ]);
+  expect([forced.code, forced.json.run.state]).toStrictEqual([0, 'deploy-held']);
+});
+
 test('hq lanes ready refuses --skipped and --ready-total without --lane', async () => {
   expect((await hq('lanes', 'ready', '--count', '3', '--ready-total', '5')).code).not.toBe(0);
   expect((await hq('lanes', 'ready', '--count', '3', '--skipped', 'GEO-1=x')).code).not.toBe(0);
