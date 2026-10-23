@@ -3,6 +3,7 @@ import { freshDb } from '../../test/helpers.ts';
 import { addPr } from './add-pr.ts';
 import { addRun } from './add-run.ts';
 import { findAlerts } from './find-alerts.ts';
+import { recordPROverride } from '../pr-status/record-pr-override.ts';
 
 function setupTest() {
   const fresh = freshDb();
@@ -56,6 +57,30 @@ test('it names a new PR or an override for a PR whose head moved after its last 
 
   expect(findAlerts(ctx.db, [], new Map(), new Date('2026-10-21T03:00:00Z'))).toStrictEqual([
     { key: 'pr:kettle#25', fingerprint: 'final:abc1234', issue: 'GEO-9825', line: 'kettle#25 (GEO-9825) final at abc1234 for 120 min, no review; head moved since your review at def5678 (a restack at the round cap? a new PR gets its own first round, or z-stu records an override) [from marker:kettle]' },
+  ]);
+});
+
+test('it raises no FINAL alert for a PR with an owner override at its FINAL head', () => {
+  const ctx = setupTest();
+  addRun(ctx.db, { issue: 'GEO-9826', title: 'Invented kettle work', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
+  addPr(ctx.db, 'GEO-9826', 'kettle#26', 'kettle-bot');
+  ctx.db
+    .query("UPDATE run_prs SET final_sha = 'abc1234', final_at = '2026-10-21T01:00:00Z', final_source = 'marker:kettle', reviewed_sha = 'def5678', review_round = 2, reviewed_at = '2026-10-21T00:45:00Z' WHERE ref = 'kettle#26'")
+    .run();
+  recordPROverride(ctx.db, { repo: 'kettle', pr: 26, head: 'abc1234', source: 'chat:kettle-chat@2026-10-21T01:30:00Z', note: 'Invented: the restack kept each fix.', actor: 'kettle-bot' });
+
+  expect(findAlerts(ctx.db, [], new Map(), new Date('2026-10-21T03:00:00Z'))).toStrictEqual([]);
+});
+
+test('it raises a FINAL alert for a PR whose owner override is at an older head', () => {
+  const ctx = setupTest();
+  addRun(ctx.db, { issue: 'GEO-9827', title: 'Invented kettle work', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
+  addPr(ctx.db, 'GEO-9827', 'kettle#27', 'kettle-bot');
+  ctx.db.query("UPDATE run_prs SET final_sha = 'abc1234', final_at = '2026-10-21T01:00:00Z', final_source = 'marker:kettle' WHERE ref = 'kettle#27'").run();
+  recordPROverride(ctx.db, { repo: 'kettle', pr: 27, head: 'fed9876', source: 'chat:kettle-chat@2026-10-21T00:30:00Z', note: 'Invented: an older head.', actor: 'kettle-bot' });
+
+  expect(findAlerts(ctx.db, [], new Map(), new Date('2026-10-21T03:00:00Z'))).toStrictEqual([
+    { key: 'pr:kettle#27', fingerprint: 'final:abc1234', issue: 'GEO-9827', line: 'kettle#27 (GEO-9827) final at abc1234 for 120 min, no review [from marker:kettle]' },
   ]);
 });
 

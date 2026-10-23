@@ -1,13 +1,14 @@
 import type { Database } from 'bun:sqlite';
 import type { SessionInfo } from '../atc/session-schema.ts';
 import { planRoundCap } from '../noslop/plan-round-cap.ts';
+import { findOwnerOverride } from '../pr-status/find-owner-override.ts';
 import { readOKReviews } from '../noslop/read-ok-reviews.ts';
 import { countMinutesSince as mins } from './count-minutes-since.ts';
 import { isFinalAnswered } from './is-final-answered.ts';
 import { readClosedIssueAlerts } from './read-closed-issue-alerts.ts';
 import { listRuns } from './list-runs.ts';
 import { SWEEP_MINUTES as SWEEP } from './sweep-minutes.ts';
-import type { Alert, RunSession } from './types.ts';
+import type { Alert, RunPr, RunSession } from './types.ts';
 
 // What z-delivery should look at now. Pure over the rows, the sessions and their activity.
 export function findAlerts(db: Database, sessions: SessionInfo[], activity: Map<string, number | null>, at: Date): Alert[] {
@@ -16,7 +17,7 @@ export function findAlerts(db: Database, sessions: SessionInfo[], activity: Map<
   for (const r of listRuns(db)) {
     for (const p of r.prs) {
       if (p.state !== 'open' || !p.final_sha || !p.final_at) continue;
-      if (isFinalAnswered(p)) {
+      if (readFinalAnswered(db, p)) {
         continue;
       }
       // A blocked run waits on something outside the PR (a release, a yes); its review can wait too.
@@ -39,7 +40,7 @@ export function findAlerts(db: Database, sessions: SessionInfo[], activity: Map<
         // Its work is handed in: a PR final and reviewed at its head. A session put to sleep
         // until its merge window is not lost work (z-delivery, GEO-957).
         const open = r.prs.filter((p) => p.state === 'open');
-        if (!active.helper && open.length > 0 && open.every((pr) => pr.final_sha && isFinalAnswered(pr))) {
+        if (!active.helper && open.length > 0 && open.every((pr) => pr.final_sha && readFinalAnswered(db, pr))) {
           continue;
         }
         alerts.push({ key: `session:${active.session_id}`, fingerprint: 'exited', issue: r.issue, line: `${r.issue}: ${who} has exited; ${formatExitHint(r.issue, active)}` });
@@ -58,6 +59,12 @@ export function findAlerts(db: Database, sessions: SessionInfo[], activity: Map<
     }
   }
   return [...alerts, ...readClosedIssueAlerts(db)];
+}
+
+// The owner's override at the FINAL's head stands for its review, which no round could give.
+function readFinalAnswered(db: Database, pr: RunPr): boolean {
+  const [repo = '', number = ''] = pr.ref.split('#');
+  return isFinalAnswered(pr) || (pr.final_sha !== null && findOwnerOverride(db, repo, Number(number), pr.final_sha) !== null);
 }
 
 function readRestackHint(db: Database, ref: string): string {
