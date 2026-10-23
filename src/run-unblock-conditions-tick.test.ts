@@ -1,8 +1,9 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { NOON_SYDNEY, at, freshDb } from '../test/helpers.ts';
 import { runUnblockConditionsTick } from './run-unblock-conditions-tick.ts';
+import { addUnblock } from './unblock/add-unblock.ts';
 
-// No open item has a subject link or a condition, so the pass never calls gh or Linear.
+// No open item has a subject link or a condition that reads gh or Linear, so the pass never calls them.
 function setupTest() {
   at(NOON_SYDNEY);
   const fresh = freshDb();
@@ -22,6 +23,15 @@ test('it runs the first pass', async () => {
   const outcome = await runUnblockConditionsTick(ctx.db, ctx.deps, 'kettle-bot', new Date('2026-10-14T01:00:00Z'));
 
   expect(outcome).toStrictEqual({ settled: [], dropped: [], errors: [], overdue: [] });
+});
+
+test('it checks a date condition at the tick time, not the clock', async () => {
+  const ctx = setupTest();
+  addUnblock(ctx.db, { id: 'steam-date', task: 'Check the steam log', minutes: null, unblocks: [], notify: ['kettle-qa'], actor: 'kettle-triage', kind: 'watch', doneWhen: [{ kind: 'date', ref: '2026-10-14T03:00:00Z' }] });
+
+  const outcome = await runUnblockConditionsTick(ctx.db, ctx.deps, 'kettle-bot', new Date('2026-10-14T03:05:00Z'));
+
+  expect(outcome).toStrictEqual({ settled: ['steam-date'], dropped: [], errors: [], overdue: [] });
 });
 
 test('it skips a pass 9 min after the last one', async () => {
