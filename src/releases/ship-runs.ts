@@ -33,6 +33,8 @@ import { keepCompared } from './keep-compared.ts';
 import { MAX_COMPARES } from './max-compares.ts';
 import { OWNER } from './owner.ts';
 import { parseReleases } from './parse-releases.ts';
+import type { Gate } from './parse-gate.ts';
+import { readGate } from './read-gate.ts';
 import { readPackageReleases } from './read-package-releases.ts';
 import { readShipment } from './read-shipment.ts';
 import { runGH as gh } from './run-gh.ts';
@@ -81,6 +83,29 @@ export async function shipRuns(db: Database, run: Runner, at: Date = now(), opts
     }
   };
 
+  const failedGates = new Set<string>();
+  const gates = new Map<string, Gate>();
+  const readGateOnce = async (repo: string, name: string): Promise<Gate | null> => {
+    const key = `${repo}:${name}`;
+    if (failedGates.has(key)) {
+      return null;
+    }
+    const have = gates.get(key);
+    if (have) {
+      return have;
+    }
+    try {
+      const gate = await readGate(run, repo, name);
+      gates.set(key, gate);
+      return gate;
+    } catch (error) {
+      failedGates.add(key);
+      const message = error instanceof Error ? error.message : String(error);
+      err(`${repo}: ${message}`);
+      return null;
+    }
+  };
+
   // A release tag or a build commit never moves, so its answer holds across passes: a scan the
   // compare cap cut off resumes instead of starting over. A moving ref is asked again each pass.
   const compared = new Map(Object.entries(metaJson(db, COMPARED, COMPARED_ROWS, {})));
@@ -115,6 +140,7 @@ export async function shipRuns(db: Database, run: Runner, at: Date = now(), opts
     readBuild: opts.readBuild ?? readInstalledBuild,
     contains,
     getReleases,
+    readGate: readGateOnce,
     isCapped: () => res.compares >= MAX_COMPARES,
     hasFailed: (repo: string) => failedRepos.has(repo),
   };

@@ -18,11 +18,17 @@ export interface StubSourceFacts {
 
   // compare heads GitHub does not know, which gh answers with its 404 text
   unknownHeads?: string[];
+
+  // tag name, such as deployed/prod, to the commit it points at; a tag not listed is not found
+  tags?: Record<string, string>;
+
+  // repo to the raw text of its .github/gates.yml at main; a repo not listed has none
+  gates?: Record<string, string>;
 }
 
 // A fake gh for the release sources: merge commits, compares, the paged release list, the
-// release-please config at a commit and a PR's files. A call it does not know fails. Every call's
-// line goes into `calls`.
+// release-please config at a commit, a PR's files, a tag's commit and the gates file at main. A call
+// it does not know fails. Every call's line goes into `calls`.
 export function buildStubSourceGH(facts: StubSourceFacts, calls: string[]): Runner {
   return (cmd) => {
     const line = cmd.join(' ');
@@ -63,10 +69,24 @@ function answer(facts: StubSourceFacts, line: string): RunResult {
     if (body === undefined) {
       return NOT_FOUND;
     }
-    const wrapped = Buffer.from(JSON.stringify(body)).toString('base64').replaceAll(/(?<chunk>.{60})/gu, '$<chunk>\n');
-    return buildAnswer(`${wrapped}\n`);
+    return buildAnswer(buildContent(JSON.stringify(body)));
+  }
+  const tag = /^gh api repos\/zgeoff\/[\w-]+\/git\/ref\/tags\/(?<name>\S+)$/u.exec(line)?.groups;
+  if (tag) {
+    const sha = facts.tags?.[tag['name'] ?? ''];
+    return sha ? buildAnswer(JSON.stringify({ ref: `refs/tags/${tag['name']}`, object: { sha, type: 'commit' } })) : { code: 1, stdout: '', stderr: 'gh: Not Found (HTTP 404)\n' };
+  }
+  const gates = /^gh api repos\/zgeoff\/(?<repo>[\w-]+)\/contents\/\.github\/gates\.yml\?ref=main --jq \.content$/u.exec(line)?.groups;
+  if (gates) {
+    const text = facts.gates?.[gates['repo'] ?? ''];
+    return text === undefined ? { code: 1, stdout: '', stderr: 'gh: Not Found (HTTP 404)\n' } : buildAnswer(buildContent(text));
   }
   return { code: 1, stdout: '', stderr: `unexpected ${line}` };
+}
+
+// The contents API gives a file as base64 wrapped at 60 characters a line.
+function buildContent(text: string): string {
+  return `${Buffer.from(text).toString('base64').replaceAll(/(?<chunk>.{60})/gu, '$<chunk>\n')}\n`;
 }
 
 function buildAnswer(stdout: string): RunResult {
