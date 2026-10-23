@@ -5,7 +5,7 @@ import type { Runner } from '../runner/types.ts';
 import { buildHeadRef } from './build-head-ref.ts';
 import { collectMovePaths } from './collect-move-paths.ts';
 import { GitReadError } from './git-read-error.ts';
-import type { HeldDiff, MoveFacts } from './mechanical-types.ts';
+import type { HeldDiff, MoveFacts } from './types.ts';
 import { parseJSON } from './parse-json.ts';
 import { parseRenameLog } from './parse-rename-log.ts';
 import { parseTreeEntry } from './parse-tree-entry.ts';

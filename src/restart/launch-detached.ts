@@ -1,6 +1,6 @@
 import { iso } from '../clock/iso.ts';
 import { now } from '../clock/now.ts';
-import { PATH_SETTINGS } from '../config/config.ts';
+import { PATH_SETTINGS } from '../config/path-settings.ts';
 import { HqError } from '../errors.ts';
 import { resolveUnitSetting } from '../fleet/resolve-unit-setting.ts';
 import type { Runner } from '../runner/types.ts';

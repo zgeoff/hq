@@ -6,14 +6,16 @@
     "test/**/*.test.ts",
     "mocks/**/*.test.ts",
     "src/console/main.tsx",
-    "mods/hq-band/hooks/register.tsx"
+    "mods/hq-band/hooks/register.tsx",
+    ".claude/hooks/*/*.ts"
   ],
   "project": [
     "src/**/*.{ts,tsx}",
     "scripts/**/*.ts",
     "test/**/*.ts",
     "mocks/**/*.ts",
-    "mods/**/*.{ts,tsx}"
+    "mods/**/*.{ts,tsx}",
+    ".claude/hooks/**/*.ts"
   ],
   "ignoreDependencies": ["geist", "@stylistic/eslint-plugin", "claude-code"]
 }

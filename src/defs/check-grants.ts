@@ -6,11 +6,6 @@ const OUTPUT_LINES = 10;
 // Starts a command and waits for it. Tests pass a fake to pin the command line.
 export type GrantsSpawn = (argv: string[], cwd: string) => Bun.SyncSubprocess<'pipe', 'pipe'>;
 
-// The installed hq is a compiled binary, where process.execPath is hq itself, so bun is named.
-export function spawnGrants(argv: string[], cwd: string): Bun.SyncSubprocess<'pipe', 'pipe'> {
-  return Bun.spawnSync(argv, { cwd, timeout: 60_000 });
-}
-
 // The grants check on hq-private, run from the hq-defs checkout: a clone of hq, so it holds
 // scripts/grants.ts and the still-ask list. hq-private has no CI of its own.
 export function checkGrants(hqDir: string, privateDir: string, spawn: GrantsSpawn): Check {

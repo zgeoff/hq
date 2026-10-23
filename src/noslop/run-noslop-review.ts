@@ -28,6 +28,7 @@ import { removeIssueFile } from './remove-issue-file.ts';
 import { requireOK } from './require-ok.ts';
 import { writeFixesOnlyRefusal } from './write-fixes-only-refusal.ts';
 import type { Judged } from './types.ts';
+import { REVIEW_TIMEOUT_MS } from './review-timeout-ms.ts';
 
 export interface NoslopReviewContext {
   run: Runner;
@@ -225,8 +226,6 @@ function readPostFailedReview(store: string, stdout: string, verdict: Judged<Rev
   }
   return { judged: printed, postFailed: verdict.why ?? 'unknown' };
 }
-
-export const REVIEW_TIMEOUT_MS = 900_000;
 
 function buildReviewArgs(ctx: NoslopReviewContext, prep: ReviewPrep): string[] {
   const fixesOnly = ctx.fixesOnly === true ? ['--fixes-only'] : [],

@@ -1,5 +1,5 @@
 import { buildRenameKey } from './build-rename-key.ts';
-import type { MoveClaim, MoveFacts } from './mechanical-types.ts';
+import type { MoveClaim, MoveFacts } from './types.ts';
 
 const REGULAR_FILE = /^100(?:644|755) blob [0-9a-f]+$/u;
 

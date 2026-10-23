@@ -5,7 +5,7 @@ import type { Socket, SocketHandler } from 'bun';
 import { HqError } from '../errors.ts';
 import { buildOutboundQueue } from './build-outbound-queue.ts';
 import type { OutboundQueue } from './build-outbound-queue.ts';
-import { buildOlderProtocolError } from './mismatch.ts';
+import { buildOlderProtocolError } from './build-older-protocol-error.ts';
 import { PROTOCOL_V } from './protocol-v.ts';
 import { toHqError } from './to-hq-error.ts';
 import { withTimeout } from './with-timeout.ts';

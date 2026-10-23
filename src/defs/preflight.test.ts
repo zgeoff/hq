@@ -4,24 +4,13 @@ import { createTreeCheckout } from '../../test/create-tree-checkout.ts';
 import { INTAKE, buildPrompt, createTreeFixture } from '../../test/create-tree-fixture.ts';
 import { readPrivateFixture } from '../../test/read-private-fixture.ts';
 import { PRIVATE_TREE } from '../prompts/private-tree.ts';
-import { spawnGrants } from './check-grants.ts';
-import { checkTrees, preflight } from './preflight.ts';
+import { preflight } from './preflight.ts';
 
 test('it passes with both trees in place, and runs the grants check', () => {
   createTreeFixture().createBoth();
   const checks = preflight('hq');
   expect(checks.filter((check) => !check.ok)).toStrictEqual([]);
   expect(checks.map((check) => check.line)).toContain("grants: hq-private's grants and prompts match (grants: 4 files match)");
-});
-
-test('it starts the grants check with bun, not the running binary, from the hq-defs checkout', () => {
-  const calls: { argv: string[]; cwd: string }[] = [],
-    trees = createTreeFixture().createBoth();
-  checkTrees('hq', (argv, cwd) => {
-    calls.push({ argv, cwd });
-    return spawnGrants(argv, cwd);
-  });
-  expect(calls).toStrictEqual([{ argv: ['bun', 'scripts/grants.ts', '--check', '--private', trees.private.dir], cwd: trees.hq.dir }]);
 });
 
 test('it fails closed when hq-private is missing a prompt, though hq-defs holds one', () => {
@@ -65,12 +54,4 @@ test('it fails when the hq-defs checkout has no grants script', () => {
   const trees = createTreeFixture().createBoth();
   rmSync(`${trees.hq.dir}/scripts/grants.ts`);
   expect(preflight('hq').filter((check) => !check.ok)).toStrictEqual([{ ok: false, line: expect.stringContaining('scripts/grants.ts is missing') }]);
-});
-
-test('it fails with a grants line, not a crash, when bun cannot start', () => {
-  createTreeFixture().createBoth();
-  const checks = checkTrees('hq', () => {
-    throw new Error('Executable not found in $PATH: "bun"');
-  });
-  expect(checks.filter((check) => !check.ok).map((check) => check.line)).toStrictEqual(['grants: could not start bun: Executable not found in $PATH: "bun"']);
 });

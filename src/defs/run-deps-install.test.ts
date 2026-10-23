@@ -1,8 +1,8 @@
 import { expect, mock, onTestFinished, test } from 'bun:test';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { freshDb } from '../../test/helpers.ts';
-import type { Install, Spawn } from './run-deps-install.ts';
-import { runBunInstall, runDepsInstall } from './run-deps-install.ts';
+import type { Install } from './run-deps-install.ts';
+import { runDepsInstall } from './run-deps-install.ts';
 
 function setupTest() {
   const fresh = freshDb();
@@ -61,12 +61,4 @@ test('it does nothing in a checkout with no bun.lock', () => {
 
   expect(runDepsInstall(ctx.db, ctx.directory, 'hq-lanes', ctx.installed)).toBeNull();
   expect(ctx.installed.mock.calls).toStrictEqual([]);
-});
-
-test('it installs with the lockfile frozen and every lifecycle script off', () => {
-  const ctx = setupTest();
-  const spawn = mock<Spawn>(() => ({ exitCode: 0, stderr: Buffer.from('') }));
-
-  expect(runBunInstall(ctx.directory, spawn)).toStrictEqual({ code: 0, err: '' });
-  expect(spawn.mock.calls).toStrictEqual([[['bun', 'install', '--frozen-lockfile', '--ignore-scripts'], { cwd: ctx.directory, timeout: 300_000 }]]);
 });

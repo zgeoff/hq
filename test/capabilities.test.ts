@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { HELP, VERSION, main } from '../src/cli.ts';
+import { main } from '../src/cli.ts';
+import { HELP } from '../src/help.ts';
+import { VERSION } from '../src/version.ts';
 import { compareSemver } from '../src/capabilities/compare-semver.ts';
 import { SHAPES } from '../src/capabilities/shapes.ts';
 import { COMMANDS } from '../src/commands.ts';

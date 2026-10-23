@@ -1,5 +1,5 @@
 import type { PRStatusRow } from '../kdb.ts';
-import type { OwnerOverride } from './find-owner-override.ts';
+import type { OwnerOverride } from './read-owner-overrides.ts';
 import type { PRStatusView } from './types.ts';
 
 // The record with its stale flags, against the PR's head now (null when it could not be read).

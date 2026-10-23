@@ -2,7 +2,7 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { HELP } from '../cli.ts';
+import { HELP } from '../help.ts';
 import { checkSkills } from './check-skills.ts';
 
 test('it passes a skill that writes hq open with a word-like id', () => {

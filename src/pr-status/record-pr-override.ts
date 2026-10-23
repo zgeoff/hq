@@ -1,7 +1,6 @@
 import type { Database } from 'bun:sqlite';
 import { logEvent } from '../log-event.ts';
-
-export const OVERRIDE_SCOPE = 'open-findings';
+import { OVERRIDE_SCOPE } from './override-scope.ts';
 
 export interface PROverrideInput {
   repo: string;

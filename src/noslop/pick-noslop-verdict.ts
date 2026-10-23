@@ -1,5 +1,5 @@
 import { match } from 'ts-pattern';
-import type { OwnerOverride } from '../pr-status/find-owner-override.ts';
+import type { OwnerOverride } from '../pr-status/read-owner-overrides.ts';
 
 type NoslopFindingsRead = { read: true; open: string[] } | { read: false; error: string };
 

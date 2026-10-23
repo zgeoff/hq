@@ -1,8 +1,7 @@
 import type { Database } from 'bun:sqlite';
 import { z } from 'zod';
 import { metaJson } from '../db/meta-json.ts';
-
-export const SKIP_UNREAD_KEY = 'lanes_skips_unread';
+import { SKIP_UNREAD_KEY } from './skip-unread-key.ts';
 
 // The until issues the last Ready tick could not read from Linear, each with why; their skips stay
 // in force until a read settles them.

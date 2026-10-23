@@ -1,7 +1,7 @@
 import type { Database } from 'bun:sqlite';
 import type { SessionInfo } from '../atc/session-schema.ts';
 import { planRoundCap } from '../noslop/plan-round-cap.ts';
-import { readOwnerOverrides } from '../pr-status/find-owner-override.ts';
+import { readOwnerOverrides } from '../pr-status/read-owner-overrides.ts';
 import { readOKReviews } from '../noslop/read-ok-reviews.ts';
 import { countMinutesSince as mins } from './count-minutes-since.ts';
 import { isFinalAnswered } from './is-final-answered.ts';
