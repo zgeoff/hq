@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { setWALMode } from './set-wal-mode.ts';
 
-// A new database file and a second connection to it that already holds the write lock.
+// A new database file and two connections to it: the one under test and a holder for its write lock.
 function setupTest() {
   const stack = new DisposableStack();
   onTestFinished(() => stack.dispose());
@@ -13,7 +13,6 @@ function setupTest() {
   stack.defer(() => rmSync(directory, { recursive: true, force: true }));
   const holder = new Database(join(directory, 'kettle.db'), { create: true, strict: true });
   stack.defer(() => holder.close());
-  holder.exec('BEGIN IMMEDIATE');
   const db = new Database(join(directory, 'kettle.db'), { strict: true });
   stack.defer(() => db.close());
   return { db, holder };
@@ -21,6 +20,7 @@ function setupTest() {
 
 test('it switches a new database to WAL once the connection that holds the write lock lets go', () => {
   const ctx = setupTest();
+  ctx.holder.exec('BEGIN IMMEDIATE');
   const sleep = mock(() => ctx.holder.exec('ROLLBACK'));
 
   setWALMode(ctx.db, 5000, sleep);
@@ -31,12 +31,14 @@ test('it switches a new database to WAL once the connection that holds the write
 
 test('it fails with database is locked once the timeout has passed', () => {
   const ctx = setupTest();
+  ctx.holder.exec('BEGIN IMMEDIATE');
 
   expect(() => setWALMode(ctx.db, 50)).toThrow('database is locked');
 });
 
 test('it throws an error other than a busy database at once, with no retry', () => {
   const ctx = setupTest();
+  ctx.holder.exec('BEGIN IMMEDIATE');
   const sleep = mock(() => {});
   ctx.db.exec('BEGIN');
 
