@@ -397,7 +397,7 @@ Removes code, screenshots and a retired shim that hq no longer needs, and adds a
 
 - `hq noslop backfill` is gone, with its modules, tests, `--store` and `--dry-run` handling on `hq noslop`.
 - The retired `nixie-definitions` defs-source shim is gone, and so is the `defs-switch` health check. A defs-source file that names anything but `hq` now fails with `bad_defs_source`, and `hq defs use nixie-definitions` fails like any other unknown source.
-- The unused `src/releases/last-errors.ts` and 11 unreferenced screenshots in `docs/band/` and `docs/console/` are deleted.
+- The unused `src/releases/last-errors.ts` and 11 unreferenced screenshots of the band and the console are deleted.
 - Types that nothing imported lose their `export`.
 - `bun run deadcode` runs knip over the source, scripts, tests and the hq-band mod.
 - Code comments no longer quote the owner.
@@ -891,7 +891,7 @@ The noslop area moves into `src/noslop/`, one exported function per file, named 
 - An answer is stored as `<label> | <note>`, the label alone, or the note alone, verbatim. With nothing else open, the item opens and is answered as `hq call open` and `hq call answer` would. While another item is open with the owner, it goes straight to answered under a new transition, `answered-unopened`, and the open one stays open.
 - A to-do's Done and Skip close it as `hq unblock done` and `drop` do; Later puts it off to the next morning.
 - Each answer sends the owner session one message, `console answer: <kind> <id>: <answer>`. If it fails, the answer stays recorded, the page shows an orange toast, and the outbox retries.
-- The page is React with TanStack Router and Query, built by Bun into the binary, with Geist bundled from npm. It follows the Main and MainDark boards, light and dark, with the keys `1`–`9`, `y`, `i`/`Esc`, `Enter`, `j`/`k` and `?`. Screenshots are in `docs/console/`.
+- The page is React with TanStack Router and Query, built by Bun into the binary, with Geist bundled from npm. It follows the Main and MainDark boards, light and dark, with the keys `1`–`9`, `y`, `i`/`Esc`, `Enter`, `j`/`k` and `?`.
 - `lint:changed` now lints `.tsx` files too.
 
 ## 0.40.1 — 2026-10-18
