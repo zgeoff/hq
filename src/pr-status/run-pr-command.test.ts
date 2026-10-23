@@ -43,11 +43,11 @@ function setupTest() {
     headAt: (head: string) => buildFakeRunner({ prHead: { code: 0, stdout: JSON.stringify({ headRefOid: head }), stderr: '' } }),
     ghDown: () => buildFakeRunner({ prHead: { code: 1, stdout: '', stderr: 'gh: could not resolve to a PullRequest' } }),
     actor: () => Promise.resolve('z-kettle'),
-    override: async (fake: ReturnType<typeof buildFakeRunner>, flags: Flags) => await runPRCommand({ run: fake.run, db: fresh.db, verb: 'override', rest: ['widgets', '7'], flags, actor: () => Promise.resolve('z-kettle'), readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) }),
-    asOwner: async (fake: ReturnType<typeof buildFakeRunner>, verb: string, rest: string[], flags: Flags) => await runPRCommand({ run: fake.run, db: fresh.db, verb, rest, flags, actor: () => Promise.resolve('z-kettle'), readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) }),
-    asOther: async (fake: ReturnType<typeof buildFakeRunner>, verb: string, rest: string[], flags: Flags) => await runPRCommand({ run: fake.run, db: fresh.db, verb, rest, flags, actor: () => Promise.resolve('z-kettle'), readOwnerSession: () => Promise.resolve({ verdict: 'other' }) }),
-    status: async (fake: ReturnType<typeof buildFakeRunner>) => await runPRCommand({ run: fake.run, db: fresh.db, verb: 'status', rest: ['widgets', '7'], flags: {}, actor: () => Promise.resolve('z-kettle'), readOwnerSession: () => Promise.resolve({ verdict: 'other' }) }),
-    answer: async (fake: ReturnType<typeof buildFakeRunner>, answer: string, flags: Flags) => await runPRCommand({ run: fake.run, db: fresh.db, verb: 'answer', rest: ['widgets', '7', answer], flags, actor: () => Promise.resolve('z-kettle'), readOwnerSession: () => Promise.resolve({ verdict: 'other' }) }),
+    override: async (fake: ReturnType<typeof buildFakeRunner>, flags: Flags) => await runPRCommand({ run: fake.run, db: fresh.db, verb: 'override', rest: ['widgets', '7'], flags, actor: () => Promise.resolve('z-kettle'), readOwnerSession: () => Promise.resolve({ verdict: 'owner' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) }),
+    asOwner: async (fake: ReturnType<typeof buildFakeRunner>, verb: string, rest: string[], flags: Flags) => await runPRCommand({ run: fake.run, db: fresh.db, verb, rest, flags, actor: () => Promise.resolve('z-kettle'), readOwnerSession: () => Promise.resolve({ verdict: 'owner' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) }),
+    asOther: async (fake: ReturnType<typeof buildFakeRunner>, verb: string, rest: string[], flags: Flags) => await runPRCommand({ run: fake.run, db: fresh.db, verb, rest, flags, actor: () => Promise.resolve('z-kettle'), readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) }),
+    status: async (fake: ReturnType<typeof buildFakeRunner>) => await runPRCommand({ run: fake.run, db: fresh.db, verb: 'status', rest: ['widgets', '7'], flags: {}, actor: () => Promise.resolve('z-kettle'), readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) }),
+    answer: async (fake: ReturnType<typeof buildFakeRunner>, answer: string, flags: Flags) => await runPRCommand({ run: fake.run, db: fresh.db, verb: 'answer', rest: ['widgets', '7', answer], flags, actor: () => Promise.resolve('z-kettle'), readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) }),
   };
 }
 
@@ -55,7 +55,7 @@ test('it shows a changes answer at the head it was given, with its source and no
   const ctx = setupTest();
   await ctx.answer(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'changes', { source: 'chat:kettle-12', note: 'Descale it first.' });
 
-  await expect(runPRCommand({ run: ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678').run, db: ctx.db, verb: 'status', rest: ['widgets', '7'], flags: {}, actor: ctx.actor, readOwnerSession: () => Promise.resolve({ verdict: 'other' }) })).resolves.toStrictEqual({
+  await expect(runPRCommand({ run: ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678').run, db: ctx.db, verb: 'status', rest: ['widgets', '7'], flags: {}, actor: ctx.actor, readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) })).resolves.toStrictEqual({
     data: {
       pr: {
         repo: 'widgets',
@@ -87,7 +87,7 @@ test.each(['lgtm', 'changes'])('it marks an older %s answer stale at the head it
   const ctx = setupTest();
   await ctx.answer(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), answer, { source: 'call:kettle-3', note: 'Shorter spout.' });
 
-  await expect(runPRCommand({ run: ctx.headAt('b9c8d7e6f5a40312213f4e5d6c7b8a9087654321').run, db: ctx.db, verb: 'status', rest: ['widgets', '7'], flags: {}, actor: ctx.actor, readOwnerSession: () => Promise.resolve({ verdict: 'other' }) })).resolves.toStrictEqual({
+  await expect(runPRCommand({ run: ctx.headAt('b9c8d7e6f5a40312213f4e5d6c7b8a9087654321').run, db: ctx.db, verb: 'status', rest: ['widgets', '7'], flags: {}, actor: ctx.actor, readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) })).resolves.toStrictEqual({
     data: {
       pr: {
         repo: 'widgets',
@@ -119,7 +119,7 @@ test('it keeps the PR head hq last saw on the record', async () => {
   const ctx = setupTest();
   await ctx.answer(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'lgtm', { source: 'chat:kettle-1' });
 
-  await runPRCommand({ run: ctx.headAt('b9c8d7e6f5a40312213f4e5d6c7b8a9087654321').run, db: ctx.db, verb: 'status', rest: ['widgets', '7'], flags: {}, actor: ctx.actor, readOwnerSession: () => Promise.resolve({ verdict: 'other' }) });
+  await runPRCommand({ run: ctx.headAt('b9c8d7e6f5a40312213f4e5d6c7b8a9087654321').run, db: ctx.db, verb: 'status', rest: ['widgets', '7'], flags: {}, actor: ctx.actor, readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) });
 
   expect(ctx.db.query('SELECT head, answer_head FROM pr_status').all()).toStrictEqual([{ head: 'b9c8d7e6f5a40312213f4e5d6c7b8a9087654321', answer_head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678' }]);
 });
@@ -174,7 +174,7 @@ test('it prints the stored record and says stale is unknown when gh cannot give 
   const ctx = setupTest();
   await ctx.answer(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'reject', { source: 'console:review-7', note: 'Wrong spout.' });
 
-  await expect(runPRCommand({ run: ctx.ghDown().run, db: ctx.db, verb: 'status', rest: ['widgets', '7'], flags: {}, actor: ctx.actor, readOwnerSession: () => Promise.resolve({ verdict: 'other' }) })).resolves.toStrictEqual({
+  await expect(runPRCommand({ run: ctx.ghDown().run, db: ctx.db, verb: 'status', rest: ['widgets', '7'], flags: {}, actor: ctx.actor, readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) })).resolves.toStrictEqual({
     data: {
       pr: {
         repo: 'widgets',
@@ -211,7 +211,7 @@ test('it prints the stored record and says stale is unknown when gh cannot give 
 test('it says a PR has no record, without calling gh', async () => {
   const ctx = setupTest(),
     fake = ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'),
-    shown = await runPRCommand({ run: fake.run, db: ctx.db, verb: 'status', rest: ['widgets', '9'], flags: {}, actor: ctx.actor, readOwnerSession: () => Promise.resolve({ verdict: 'other' }) });
+    shown = await runPRCommand({ run: fake.run, db: ctx.db, verb: 'status', rest: ['widgets', '9'], flags: {}, actor: ctx.actor, readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) });
 
   expect(shown).toStrictEqual({ data: { pr: null }, text: 'No record for widgets#9.' });
   expect(fake.calls).toStrictEqual([]);
@@ -221,13 +221,13 @@ test('it reads the record of a PR named with the zgeoff owner', async () => {
   const ctx = setupTest(),
     fake = ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678');
 
-  await expect(runPRCommand({ run: fake.run, db: ctx.db, verb: 'status', rest: ['zgeoff/widgets', '9'], flags: {}, actor: ctx.actor, readOwnerSession: () => Promise.resolve({ verdict: 'other' }) })).resolves.toStrictEqual({ data: { pr: null }, text: 'No record for widgets#9.' });
+  await expect(runPRCommand({ run: fake.run, db: ctx.db, verb: 'status', rest: ['zgeoff/widgets', '9'], flags: {}, actor: ctx.actor, readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) })).resolves.toStrictEqual({ data: { pr: null }, text: 'No record for widgets#9.' });
 });
 
 test.each(['status', 'answer', 'next'])('it refuses hq pr %s for a PR of an owner other than zgeoff, and stores nothing', async (verb) => {
   const ctx = setupTest();
 
-  await expect(runPRCommand({ run: ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678').run, db: ctx.db, verb, rest: ['kettle-co/widgets', '7', 'lgtm'], flags: { source: 'chat:kettle-12' }, actor: ctx.actor, readOwnerSession: () => Promise.resolve({ verdict: 'other' }) })).rejects.toMatchObject({
+  await expect(runPRCommand({ run: ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678').run, db: ctx.db, verb, rest: ['kettle-co/widgets', '7', 'lgtm'], flags: { source: 'chat:kettle-12' }, actor: ctx.actor, readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) })).rejects.toMatchObject({
     code: 'bad_args',
     message: "hq pr keeps records for zgeoff's PRs only, not kettle-co/widgets; give the bare repo name or zgeoff/<repo>",
   });
@@ -246,7 +246,7 @@ test('it logs an event for an answer', async () => {
 test('it sets who holds the next step, and shows the record against the head gh gives now', async () => {
   const ctx = setupTest();
 
-  await expect(runPRCommand({ run: ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678').run, db: ctx.db, verb: 'next', rest: ['widgets', '7', 'z-stu'], flags: {}, actor: ctx.actor, readOwnerSession: () => Promise.resolve({ verdict: 'other' }) })).resolves.toStrictEqual({
+  await expect(runPRCommand({ run: ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678').run, db: ctx.db, verb: 'next', rest: ['widgets', '7', 'z-stu'], flags: {}, actor: ctx.actor, readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) })).resolves.toStrictEqual({
     data: {
       pr: {
         repo: 'widgets',
@@ -277,23 +277,23 @@ test('it sets who holds the next step, and shows the record against the head gh 
 test('it logs an event for a next step', async () => {
   const ctx = setupTest();
 
-  await runPRCommand({ run: ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678').run, db: ctx.db, verb: 'next', rest: ['widgets', '7', 'z-stu'], flags: {}, actor: ctx.actor, readOwnerSession: () => Promise.resolve({ verdict: 'other' }) });
+  await runPRCommand({ run: ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678').run, db: ctx.db, verb: 'next', rest: ['widgets', '7', 'z-stu'], flags: {}, actor: ctx.actor, readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) });
 
   expect(ctx.db.query("SELECT action FROM events WHERE subject_id = 'pr:widgets#7'").all()).toStrictEqual([{ action: 'pr-next' }]);
 });
 
 test('it says the head was never seen and could not be read when gh is down for a next step on a PR with no record', async () => {
   const ctx = setupTest(),
-    shown = await runPRCommand({ run: ctx.ghDown().run, db: ctx.db, verb: 'next', rest: ['widgets', '7', 'z-stu'], flags: {}, actor: ctx.actor, readOwnerSession: () => Promise.resolve({ verdict: 'other' }) });
+    shown = await runPRCommand({ run: ctx.ghDown().run, db: ctx.db, verb: 'next', rest: ['widgets', '7', 'z-stu'], flags: {}, actor: ctx.actor, readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) });
 
   expect(shown.text).toBe(['widgets#7  head never seen', 'gate: not recorded', 'answer: none', 'next: z-stu (2026-10-14T01:00:00Z)', 'The PR head could not be read, so stale is unknown.'].join('\n'));
 });
 
 test('it clears who holds the next step', async () => {
   const ctx = setupTest();
-  await runPRCommand({ run: ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678').run, db: ctx.db, verb: 'next', rest: ['widgets', '7', 'z-stu'], flags: {}, actor: ctx.actor, readOwnerSession: () => Promise.resolve({ verdict: 'other' }) });
+  await runPRCommand({ run: ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678').run, db: ctx.db, verb: 'next', rest: ['widgets', '7', 'z-stu'], flags: {}, actor: ctx.actor, readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) });
 
-  await runPRCommand({ run: ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678').run, db: ctx.db, verb: 'next', rest: ['widgets', '7'], flags: { clear: true }, actor: ctx.actor, readOwnerSession: () => Promise.resolve({ verdict: 'other' }) });
+  await runPRCommand({ run: ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678').run, db: ctx.db, verb: 'next', rest: ['widgets', '7'], flags: { clear: true }, actor: ctx.actor, readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) });
 
   expect(ctx.db.query('SELECT next, next_at FROM pr_status').all()).toStrictEqual([{ next: null, next_at: null }]);
 });
@@ -301,7 +301,7 @@ test('it clears who holds the next step', async () => {
 test('it refuses a next step held by a session that is not declared, naming the declared ones', async () => {
   const ctx = setupTest();
 
-  await expect(runPRCommand({ run: ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678').run, db: ctx.db, verb: 'next', rest: ['widgets', '7', 'z-nobody'], flags: {}, actor: ctx.actor, readOwnerSession: () => Promise.resolve({ verdict: 'other' }) })).rejects.toMatchObject({ code: 'bad_args', message: expect.stringContaining('z-stu') });
+  await expect(runPRCommand({ run: ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678').run, db: ctx.db, verb: 'next', rest: ['widgets', '7', 'z-nobody'], flags: {}, actor: ctx.actor, readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) })).rejects.toMatchObject({ code: 'bad_args', message: expect.stringContaining('z-stu') });
 
   expect(ctx.db.query('SELECT COUNT(*) AS n FROM pr_status').get()).toStrictEqual({ n: 0 });
 });
@@ -309,7 +309,7 @@ test('it refuses a next step held by a session that is not declared, naming the 
 test('it refuses a next step with neither a session nor --clear, with the usage', async () => {
   const ctx = setupTest();
 
-  await expect(runPRCommand({ run: ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678').run, db: ctx.db, verb: 'next', rest: ['widgets', '7'], flags: {}, actor: ctx.actor, readOwnerSession: () => Promise.resolve({ verdict: 'other' }) })).rejects.toMatchObject({
+  await expect(runPRCommand({ run: ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678').run, db: ctx.db, verb: 'next', rest: ['widgets', '7'], flags: {}, actor: ctx.actor, readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) })).rejects.toMatchObject({
     code: 'bad_args',
     message: 'usage: hq pr next <repo> <pr> <session> | --clear',
   });
@@ -320,7 +320,7 @@ test('it refuses a next step with neither a session nor --clear, with the usage'
 test('it refuses a next step that gives both a session and --clear', async () => {
   const ctx = setupTest();
 
-  await expect(runPRCommand({ run: ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678').run, db: ctx.db, verb: 'next', rest: ['widgets', '7', 'z-stu'], flags: { clear: true }, actor: ctx.actor, readOwnerSession: () => Promise.resolve({ verdict: 'other' }) })).rejects.toMatchObject({
+  await expect(runPRCommand({ run: ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678').run, db: ctx.db, verb: 'next', rest: ['widgets', '7', 'z-stu'], flags: { clear: true }, actor: ctx.actor, readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) })).rejects.toMatchObject({
     code: 'bad_args',
     message: 'give a session or --clear, not both; usage: hq pr next <repo> <pr> <session> | --clear',
   });
@@ -332,7 +332,7 @@ test('it shows a gate none plainly, as a PR noslop does not review', async () =>
   const ctx = setupTest();
   ctx.db.query("INSERT INTO pr_status (repo, pr, head, gate, gate_head, gate_at, updated_at) VALUES ('widgets', 7, NULL, 'none', NULL, '2026-10-14T01:00:00Z', '2026-10-14T01:00:00Z')").run();
 
-  await expect(runPRCommand({ run: ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678').run, db: ctx.db, verb: 'status', rest: ['widgets', '7'], flags: {}, actor: ctx.actor, readOwnerSession: () => Promise.resolve({ verdict: 'other' }) })).resolves.toStrictEqual({
+  await expect(runPRCommand({ run: ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678').run, db: ctx.db, verb: 'status', rest: ['widgets', '7'], flags: {}, actor: ctx.actor, readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) })).resolves.toStrictEqual({
     data: {
       pr: {
         repo: 'widgets',
@@ -364,7 +364,7 @@ test("it marks a gate recorded at an older head stale once the PR has a new head
   const ctx = setupTest();
   ctx.db.query("INSERT INTO pr_status (repo, pr, head, gate, gate_head, gate_at, updated_at) VALUES ('widgets', 7, 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', 'pass', 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', '2026-10-14T01:00:00Z', '2026-10-14T01:00:00Z')").run();
 
-  await expect(runPRCommand({ run: ctx.headAt('b9c8d7e6f5a40312213f4e5d6c7b8a9087654321').run, db: ctx.db, verb: 'status', rest: ['widgets', '7'], flags: {}, actor: ctx.actor, readOwnerSession: () => Promise.resolve({ verdict: 'other' }) })).resolves.toStrictEqual({
+  await expect(runPRCommand({ run: ctx.headAt('b9c8d7e6f5a40312213f4e5d6c7b8a9087654321').run, db: ctx.db, verb: 'status', rest: ['widgets', '7'], flags: {}, actor: ctx.actor, readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) })).resolves.toStrictEqual({
     data: {
       pr: {
         repo: 'widgets',
@@ -396,7 +396,7 @@ test("it shows a gate recorded at the PR's head now as not stale", async () => {
   const ctx = setupTest();
   ctx.db.query("INSERT INTO pr_status (repo, pr, head, gate, gate_head, gate_at, updated_at) VALUES ('widgets', 7, 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', 'pass', 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', '2026-10-14T01:00:00Z', '2026-10-14T01:00:00Z')").run();
 
-  await expect(runPRCommand({ run: ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678').run, db: ctx.db, verb: 'status', rest: ['widgets', '7'], flags: {}, actor: ctx.actor, readOwnerSession: () => Promise.resolve({ verdict: 'other' }) })).resolves.toStrictEqual({
+  await expect(runPRCommand({ run: ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678').run, db: ctx.db, verb: 'status', rest: ['widgets', '7'], flags: {}, actor: ctx.actor, readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) })).resolves.toStrictEqual({
     data: {
       pr: {
         repo: 'widgets',
@@ -519,7 +519,7 @@ test('it refuses a chat: source with the cause when atc cannot say whether the c
   const ctx = setupTest();
 
   await expect(
-    runPRCommand({ run: ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678').run, db: ctx.db, verb: 'override', rest: ['widgets', '7'], flags: { source: 'chat:kettle-12', note: 'Ship it.' }, actor: ctx.actor, readOwnerSession: () => Promise.resolve({ verdict: 'unknown', cause: 'connect ENOENT /run/teapot.sock' }) }),
+    runPRCommand({ run: ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678').run, db: ctx.db, verb: 'override', rest: ['widgets', '7'], flags: { source: 'chat:kettle-12', note: 'Ship it.' }, actor: ctx.actor, readOwnerSession: () => Promise.resolve({ verdict: 'unknown', cause: 'connect ENOENT /run/teapot.sock' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) }),
   ).rejects.toMatchObject({ code: 'bad_args', message: '--source refused: a chat: source is accepted only from the session of the owner (z-stu), and atc could not say whether this caller is it: connect ENOENT /run/teapot.sock; ask z-stu to record it' });
 });
 

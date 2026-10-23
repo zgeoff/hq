@@ -23,6 +23,7 @@ import { hasPROverride } from './has-pr-override.ts';
 import { parsePRRef } from './parse-pr-ref.ts';
 import type { PRRef } from './parse-pr-ref.ts';
 import type { OwnerProbe } from './read-owner-session.ts';
+import type { RoleProbe } from './read-role-session.ts';
 import { readPRHead } from './read-pr-head.ts';
 import { recordPRAnswer } from './record-pr-answer.ts';
 import { recordPRAcceptedRisk } from './record-pr-accepted-risk.ts';
@@ -42,6 +43,7 @@ export interface PRCommandInput {
   flags: Flags;
   actor: () => Promise<string>;
   readOwnerSession: () => Promise<OwnerProbe>;
+  readReviewerSession: () => Promise<RoleProbe>;
 }
 
 const ANSWERS = new Set(['lgtm', 'changes', 'reject']),

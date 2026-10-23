@@ -15,7 +15,8 @@ import { recordPRMechanical } from './record-pr-mechanical.ts';
 // the first file and line and records nothing.
 export async function runPRMechanical(input: PRCommandInput, ref: PRRef): Promise<Out> {
   const actor = await input.actor();
-  const hold = await readReviewHold(input.run, ref, actor);
+  const probe = await input.readReviewerSession();
+  const hold = await readReviewHold(input.run, ref, actor, probe);
   const read = await readHeldDiffs({ run: input.run, slug: ref.slug, repo: ref.repo, pr: ref.pr, head: hold.head, paths: hold.files, repoDir: input.flags['repo-dir'] }).catch((error: unknown) => {
     throw new HqError('git_unreadable', `hq could not read the diff of ${ref.slug}#${ref.pr} to prove it: ${error instanceof Error ? error.message : String(error)}`);
   });

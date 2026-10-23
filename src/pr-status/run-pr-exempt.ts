@@ -20,7 +20,8 @@ export async function runPRExempt(input: PRCommandInput, ref: PRRef): Promise<Ou
     throw new HqError('bad_args', `usage: hq pr exempt <repo> <pr> --rule ${EXEMPT_RULES.join('|')} --note <why the rule covers the PR>`);
   }
   const actor = await input.actor();
-  const hold = await readReviewHold(input.run, ref, actor);
+  const probe = await input.readReviewerSession();
+  const hold = await readReviewHold(input.run, ref, actor, probe);
   recordPRExemption(input.db, { repo: ref.repo, pr: ref.pr, head: hold.head, rule, note, files: hold.files, actor });
   const reviewer = roleName('reviewer');
   const caveat = rule === 'repo-sync' ? `${reviewer}'s call, not proved by hq; hq did not check the files against the sync source` : `${reviewer}'s call, not proved by hq`;

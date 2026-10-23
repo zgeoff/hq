@@ -43,6 +43,7 @@ import { findFleetName } from './atc/find-fleet-name.ts';
 import { createStoreBackup } from './noslop/create-store-backup.ts';
 import { runNoslopCommand } from './noslop/run-noslop-command.ts';
 import { readOwnerSession } from './pr-status/read-owner-session.ts';
+import { readRoleSession } from './pr-status/read-role-session.ts';
 import type { OwnerProbeDeps } from './pr-status/read-owner-session.ts';
 import { runPRCommand } from './pr-status/run-pr-command.ts';
 import { runReviewCommand } from './review-command.ts';
@@ -2101,7 +2102,7 @@ export const GROUPS: Record<string, (c: Ctx) => Promise<Out>> = {
   wake: (c) => wakeCommand(c.db, c.verb, c.rest, c.flags),
   review: (c) => runReviewCommand(c),
   // oxlint-disable-next-line id-length -- grandfathered handler parameter shared by every entry of this table
-  pr: (c) => runPRCommand({ run: realRunner, db: c.db, verb: c.verb, rest: c.rest, flags: c.flags, actor: () => actor(c.db, c.flags), readOwnerSession: () => readOwnerSession(c.db, readOwnerProbeDeps()) }),
+  pr: (c) => runPRCommand({ run: realRunner, db: c.db, verb: c.verb, rest: c.rest, flags: c.flags, actor: () => actor(c.db, c.flags), readOwnerSession: () => readOwnerSession(c.db, readOwnerProbeDeps()), readReviewerSession: () => readRoleSession(c.db, readOwnerProbeDeps(), 'reviewer') }),
   noslop: async (c) => runNoslopCommand({ run: c.run, db: c.db, verb: c.verb, rest: c.rest, since: typeof c.flags.since === 'string' ? c.flags.since : undefined, force: c.flags.force === true, actor: await actor(c.db, c.flags) }),
   repair: (c) => repairCommand(c.verb, c.rest, c.flags),
   refs: (context) => refsCommand(context.verb, context.flags),
