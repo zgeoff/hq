@@ -81,8 +81,8 @@ async function runGit(request: HeldDiffRequest, directory: string, args: string[
 async function readMoveFacts(request: HeldDiffRequest, directory: string, mergeBase: string, pairs: [string, string][]): Promise<MoveFacts> {
   const facts: MoveFacts = { baseBlobs: new Map(), headBlobs: new Map(), renames: new Set() };
   for (const path of new Set(pairs.flat())) {
-    const baseBlob = await readBlob(request, directory, `${mergeBase}:${path}`);
-    const headBlob = await readBlob(request, directory, `${request.head}:${path}`);
+    const baseBlob = await readEntry(request, directory, mergeBase, path);
+    const headBlob = await readEntry(request, directory, request.head, path);
     facts.baseBlobs.set(path, baseBlob);
     facts.headBlobs.set(path, headBlob);
   }
@@ -100,11 +100,17 @@ async function readMoveFacts(request: HeldDiffRequest, directory: string, mergeB
   return facts;
 }
 
-// The blob a `rev:path` names; null when the path is absent there (git exits 1).
-async function readBlob(request: HeldDiffRequest, directory: string, revision: string): Promise<string | null> {
-  const result = await request.run(['git', 'rev-parse', '--verify', '-q', revision], { cwd: directory });
-  if (result.code === 1) {
+// The tree entry of `path` at `revision` as git's `<mode> <type> <object>`; null when the path is
+// absent there. A directory or a symlink gives its own mode, so it never equals a regular file.
+async function readEntry(request: HeldDiffRequest, directory: string, revision: string, path: string): Promise<string | null> {
+  const listed = await runGit(request, directory, ['ls-tree', '--full-tree', revision, '--', path]);
+  const entries = listed.split('\n').filter((line) => line !== '');
+  if (entries.length === 0) {
     return null;
   }
-  return requireOK(result.code, result.stdout, result.stderr, `rev-parse ${revision}`).trim();
+  const [entry = '', listedPath] = entries[0]?.split('\t') ?? [];
+  if (entries.length !== 1 || listedPath !== path) {
+    throw new GitReadError(`git listed ${entries.length} tree entries for ${path} at ${revision.slice(0, 7)}, not the one path asked for`);
+  }
+  return entry;
 }

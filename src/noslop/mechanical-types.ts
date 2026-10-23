@@ -13,7 +13,8 @@ export interface MoveClaim {
   candidates: [from: string, to: string][];
 }
 
-// What git says about the paths of the claims. A blob id is null when the path is absent.
+// What git says about the paths of the claims: each path's tree entry as `<mode> <type> <object>`,
+// null when the path is absent.
 export interface MoveFacts {
   baseBlobs: Map<string, string | null>;
   headBlobs: Map<string, string | null>;
