@@ -9,6 +9,7 @@ import type { HeldDiff, MoveFacts } from './mechanical-types.ts';
 import { parseJSON } from './parse-json.ts';
 import { parseRenameLog } from './parse-rename-log.ts';
 import { parseTreeEntry } from './parse-tree-entry.ts';
+import { pickHistoryReads } from './pick-history-reads.ts';
 import { pickRenames } from './pick-renames.ts';
 import { readCommitSha } from './read-commit-sha.ts';
 
@@ -90,11 +91,9 @@ async function readMoveFacts(request: HeldDiffRequest, directory: string, mergeB
     headBlobs.set(path, atHead);
   }
   const logged: [string, string][] = [];
-  for (const [from, to] of pairs) {
-    if (baseBlobs.get(from) === null) {
-      const log = await runGit(request, directory, ['log', '-z', '--no-color', '--diff-filter=R', '-M', '--name-status', '--format=', mergeBase, '--', from, to]);
-      logged.push(...parseRenameLog(log));
-    }
+  for (const [from, to] of pickHistoryReads(pairs, baseBlobs)) {
+    const log = await runGit(request, directory, ['log', '-z', '--no-color', '--diff-filter=R', '-M', '--name-status', '--format=', mergeBase, '--', from, to]);
+    logged.push(...parseRenameLog(log));
   }
   return { baseBlobs, headBlobs, renames: pickRenames(pairs, baseBlobs, logged) };
 }
