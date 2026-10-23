@@ -10,11 +10,32 @@ import { buildAwakeSchema } from './build-awake-schema.ts';
 import { isPresentSession } from './is-present-session.ts';
 import type { AwakeSession } from './types.ts';
 
+// The fleet's own sessions: the names fleet.json declares, and each id hq fleet last saw live under
+// a declared name.
+interface FleetSessions {
+  names: ReadonlySet<string>;
+  ids: ReadonlySet<string>;
+}
+
 // An asleep session (its vm or harness suspended, or meant to sleep and not alive) is not awake,
 // but it is present: only a session atc no longer lists, or one that ended, is gone.
 export function recordAwake(db: Database, sessions: AwakeSession[], activity: ReadonlyMap<string, number | null> = new Map()): void {
   const awake = sessions.filter((s) => s.alive && s.lifecycle?.vm !== 'asleep' && s.lifecycle?.harness !== 'suspended').map((s) => s.id);
-  setMeta(db, AWAKE, formatAwakeReading(db, sessions, awake, activity));
+  const fleet: FleetSessions = { names: new Set(getDeclaredSessions().map((declared) => declared.name)), ids: new Set(Object.values(fleetIds(db))) };
+  setMeta(db, AWAKE, formatAwakeReading({ sessions, awake, activity, fleet, previousIdle: readIdleSince(db) }));
+}
+
+interface AwakeLook {
+  sessions: readonly AwakeSession[];
+  awake: readonly string[];
+  activity: ReadonlyMap<string, number | null>;
+  fleet: FleetSessions;
+  previousIdle: Readonly<Record<string, string>>;
+}
+
+function formatAwakeReading(look: AwakeLook): string {
+  const idle = buildIdleSince(look.previousIdle, look.sessions, look.awake, look.activity);
+  return JSON.stringify({ at: iso(now()), ids: look.awake, idle, present: look.sessions.filter((session) => isPresentSession(session)).map((session) => session.id), local: collectLocalAwake(look.sessions, look.awake, look.fleet) });
 }
 
 // When each awake session was first seen idle (any atc state but running), kept across sweeps.
@@ -37,17 +58,9 @@ function pickIdleSince(previous: string | undefined, lastActivity: number | null
   return since;
 }
 
-function formatAwakeReading(db: Database, sessions: readonly AwakeSession[], awake: readonly string[], activity: ReadonlyMap<string, number | null>): string {
-  const idle = buildIdleSince(readIdleSince(db), sessions, awake, activity);
-  return JSON.stringify({ at: iso(now()), ids: awake, idle, present: sessions.filter((session) => isPresentSession(session)).map((session) => session.id), local: collectLocalAwake(db, sessions, awake) });
-}
-
-// The awake sessions atc places on this PC, the fleet's own sessions left out: those fleet.json
-// declares by name, and any id hq fleet last saw live under a declared name.
-function collectLocalAwake(db: Database, sessions: readonly AwakeSession[], awake: readonly string[]): string[] {
-  const names = new Set(getDeclaredSessions().map((declared) => declared.name));
-  const ids = new Set(Object.values(fleetIds(db)));
-  return sessions.filter((session) => awake.includes(session.id) && session.locator?.targetID === 'local' && !ids.has(session.id) && !names.has(session.name ?? '')).map((session) => session.id);
+// The awake sessions atc places on this PC, the fleet's own sessions left out.
+function collectLocalAwake(sessions: readonly AwakeSession[], awake: readonly string[], fleet: FleetSessions): string[] {
+  return sessions.filter((session) => awake.includes(session.id) && session.locator?.targetID === 'local' && !fleet.ids.has(session.id) && !fleet.names.has(session.name ?? '')).map((session) => session.id);
 }
 
 function readIdleSince(db: Database): Record<string, string> {
