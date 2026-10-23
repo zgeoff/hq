@@ -41,7 +41,7 @@ test('it raises a FINAL alert for a PR whose only review came before its FINAL, 
     .run();
 
   expect(findAlerts(ctx.db, [], new Map(), new Date('2026-10-21T03:00:00Z'))).toStrictEqual([
-    { key: 'pr:kettle#23', fingerprint: 'final:abc1234', issue: 'GEO-9823', line: 'kettle#23 (GEO-9823) final at abc1234 for 120 min, no review; head moved since your review at def5678 [from marker:kettle]' },
+    { key: 'pr:kettle#23', fingerprint: 'final:abc1234', issue: 'GEO-9823', line: 'kettle#23 (GEO-9823) final at abc1234 for 120 min, no review; head moved since your review at def5678 (a restack? a passed hq review kettle 23 records the new head) [from marker:kettle]' },
   ]);
 });
 
