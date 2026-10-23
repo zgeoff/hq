@@ -8,10 +8,12 @@ export interface WaitClock {
   sleep: (pauseMs: number) => void;
 }
 
+const SYSTEM_CLOCK: WaitClock = { now: () => Date.now(), sleep: (pauseMs) => Bun.sleepSync(pauseMs) };
+
 // SQLite never runs the busy handler for a switch into WAL: the switch upgrades a read lock to a
 // write lock, and SQLite refuses that upgrade at once when another connection holds the write lock.
 // Two hq processes that open a new database together would otherwise fail with "database is locked".
-export function setWALMode(db: Database, timeoutMs: number, clock: WaitClock = { now: Date.now, sleep: Bun.sleepSync }): void {
+export function setWALMode(db: Database, timeoutMs: number, clock: WaitClock = SYSTEM_CLOCK): void {
   const deadline = clock.now() + timeoutMs;
   while (!trySetWALMode(db, clock, deadline)) {
     clock.sleep(RETRY_MS);
