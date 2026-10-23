@@ -24,8 +24,21 @@ export async function runPRMechanical(input: PRCommandInput, ref: PRRef): Promis
   if (!proof.pass) {
     throw new HqError('not_mechanical', `hq does not prove ${ref.slug}#${ref.pr} mechanical at ${hold.head.slice(0, 7)}: ${proof.reason}; it needs the owner's lgtm`);
   }
-  recordPRMechanical(input.db, { repo: ref.repo, pr: ref.pr, head: hold.head, files: proof.files, lines: proof.lines, actor });
-  const text = `${roleName('reviewer')} approved mechanical skill edits on ${ref.repo}#${ref.pr} at ${hold.head.slice(0, 7)}: ${formatHeldFiles(proof.files)} (${proof.lines} lines)`;
-  addNews(input.db, { from: actor, topic: 'merge', text, issue: null, link: null, needsGeoff: false });
+  const text = formatMechanicalNews(ref, hold.head, proof.files, proof.lines);
+  input.db.transaction(() => {
+    recordPRMechanical(input.db, { repo: ref.repo, pr: ref.pr, head: hold.head, files: proof.files, lines: proof.lines, actor });
+    addNews(input.db, { from: actor, topic: 'merge', text, issue: null, link: null, needsGeoff: false });
+  })();
   return { data: { mechanical: { repo: ref.repo, pr: ref.pr, head: hold.head, files: proof.files, lines: proof.lines } }, text: `Recorded ${text}` };
+}
+
+const NEWS_LIMIT = 400;
+
+// One news line, built before anything is recorded: when the files do not fit, the line counts them
+// and points to `hq pr status`, which lists all of them.
+function formatMechanicalNews(ref: PRRef, head: string, files: string[], lines: number): string {
+  const lead = `${roleName('reviewer')} approved mechanical skill edits on ${ref.repo}#${ref.pr} at ${head.slice(0, 7)}: `;
+  const tail = ` (${lines} lines)`;
+  const listed = `${lead}${formatHeldFiles(files)}${tail}`;
+  return listed.length <= NEWS_LIMIT ? listed : `${lead}${files.length} held files, all listed by hq pr status ${ref.repo} ${ref.pr}${tail}`;
 }

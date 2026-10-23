@@ -22,12 +22,14 @@ export async function runPRExempt(input: PRCommandInput, ref: PRRef): Promise<Ou
   const actor = await input.actor();
   const probe = await input.readReviewerSession();
   const hold = await readReviewHold(input.run, ref, actor, probe);
-  recordPRExemption(input.db, { repo: ref.repo, pr: ref.pr, head: hold.head, rule, note, files: hold.files, actor });
   const reviewer = roleName('reviewer');
   const caveat = rule === 'repo-sync' ? `${reviewer}'s call, not proved by hq; hq did not check the files against the sync source` : `${reviewer}'s call, not proved by hq`;
   const lead = `${reviewer} exempted ${ref.repo}#${ref.pr} at ${hold.head.slice(0, 7)} from the instruction-file hold under the ${rule} rule (${caveat}): ${listFiles(rule, hold.files, ref)}`;
   const text = `${lead}. Note: ${note}`.slice(0, NEWS_LIMIT);
-  addNews(input.db, { from: actor, topic: 'merge', text, issue: null, link: null, needsGeoff: false });
+  input.db.transaction(() => {
+    recordPRExemption(input.db, { repo: ref.repo, pr: ref.pr, head: hold.head, rule, note, files: hold.files, actor });
+    addNews(input.db, { from: actor, topic: 'merge', text, issue: null, link: null, needsGeoff: false });
+  })();
   return { data: { exemption: { repo: ref.repo, pr: ref.pr, head: hold.head, rule, note, files: hold.files } }, text: `Recorded ${text}` };
 }
 

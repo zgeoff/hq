@@ -68,6 +68,25 @@ test('it shows the record in hq pr status for a fresh PR with no other record', 
   });
 });
 
+test('it counts three long held paths in a news line that fits, and records them all', async () => {
+  const ctx = setupTest();
+  const paths = ['a', 'b', 'c'].map((letter) => `skills/${letter.repeat(104)}/SKILL.md`);
+  const stub = await createStubPRRepo({
+    root: ctx.root,
+    repo: 'widgets',
+    pr: 7,
+    history: [Object.fromEntries(paths.map((path) => [path, 'Needs bun 1.3.4.\n']))],
+    change: Object.fromEntries(paths.map((path) => [path, 'Needs bun 1.4.0.\n'])),
+  });
+  const fake = buildFakeRunner({ realGit: true, prFiles: { code: 0, stdout: `${paths.join('\n')}\n`, stderr: '' }, ...buildStubPRHead(stub.head) });
+
+  const out = await runPRCommand({ run: fake.run, db: ctx.db, verb: 'mechanical', rest: ['widgets', '7'], flags: {}, actor: () => Promise.resolve('z-review'), readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) });
+
+  expect(paths.map((path) => path.length)).toStrictEqual([120, 120, 120]);
+  expect(out.data).toStrictEqual({ mechanical: { repo: 'widgets', pr: 7, head: stub.head, files: paths, lines: 3 } });
+  expect(listNews(ctx.db, { all: true, limit: 10 }).map((item) => item.text)).toStrictEqual([`z-review approved mechanical skill edits on widgets#7 at ${stub.head.slice(0, 7)}: 3 held files, all listed by hq pr status widgets 7 (3 lines)`]);
+});
+
 test('it refuses an edit hq does not prove, names the line, and records nothing', async () => {
   const ctx = setupTest();
   const stub = await createStubPRRepo({ root: ctx.root, repo: 'widgets', pr: 7, history: [{ 'AGENTS.md': 'Boil the water.\nPour.\n' }], change: { 'AGENTS.md': 'Boil the water.\nSteam.\n' } });
