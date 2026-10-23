@@ -21,7 +21,7 @@ export function findAlerts(db: Database, sessions: SessionInfo[], activity: Map<
       if (r.state === 'blocked') continue;
       if (mins(p.final_at, at) < SWEEP.finalMinutes()) continue;
       if (p.review_started_at && p.review_started_at >= p.final_at && mins(p.review_started_at, at) < SWEEP.reviewMinutes()) continue;
-      const moved = p.reviewed_sha ? `; head moved since your review at ${p.reviewed_sha.slice(0, 7)}` : '';
+      const moved = p.reviewed_sha ? `; head moved since your review at ${p.reviewed_sha.slice(0, 7)}${formatRestackHint(p.ref)}` : '';
       alerts.push({
         key: `pr:${p.ref}`,
         fingerprint: `final:${p.final_sha}`,
@@ -56,6 +56,13 @@ export function findAlerts(db: Database, sessions: SessionInfo[], activity: Map<
     }
   }
   return [...alerts, ...readClosedIssueAlerts(db)];
+}
+
+// A restack moves the head with no new review; a --fixes-only round maps the reviewed head onto it
+// by patch id and records the new head, which a third `hq run reviewed` would refuse.
+function formatRestackHint(ref: string): string {
+  const [repo, pr] = ref.split('#');
+  return ` (a restack? hq review ${repo} ${pr} --fixes-only records the new head)`;
 }
 
 // The run's active sessions, and with no active main session, the main one that ended last when the
