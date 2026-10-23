@@ -51,7 +51,7 @@ const BaseSchema = z.object({ baseRefName: z.string().min(1) });
 // Fetches the PR's head and base into refs of hq's own, checks the head is the one asked for, and
 // gives the ref of the base.
 async function readBaseRef(request: HeldDiffRequest, directory: string): Promise<string> {
-  const view = await request.run(['gh', 'pr', 'view', String(request.pr), '-R', request.slug, '--json', 'headRefName,baseRefName,body'], { cwd: directory });
+  const view = await request.run(['gh', 'pr', 'view', String(request.pr), '-R', request.slug, '--json', 'baseRefName'], { cwd: directory });
   const parsed = view.code === 0 ? BaseSchema.safeParse(parseJSON(view.stdout)) : null;
   if (parsed?.success !== true) {
     throw new GitReadError(`could not read the base branch of ${request.slug}#${request.pr} from GitHub`);
