@@ -1,9 +1,10 @@
 import { match } from 'ts-pattern';
-import { isGateTouched } from './is-gate-touched.ts';
 import { isNotFound } from './is-not-found.ts';
 import { readChangedFiles } from './read-changed-files.ts';
 import { readOldestContaining } from './read-oldest-containing.ts';
 import { readPackageRelease } from './read-package-release.ts';
+import { pickRefShipment } from './pick-ref-shipment.ts';
+import type { RefFacts } from './pick-ref-shipment.ts';
 import { getPRNumber } from './get-pr-number.ts';
 import { getSource } from './get-source.ts';
 import { readChangedPrefixes } from './read-changed-prefixes.ts';
@@ -66,23 +67,28 @@ async function readReleaseShipment(deps: ShipDeps, state: PrState, sha: string):
   return list ? readOldestContaining(list, (tag) => deps.contains(state.repo, sha, tag)) : null;
 }
 
+// Makes the reads pickRefShipment asks for, one at a time, until it decides.
 async function readRefShipment(deps: ShipDeps, state: PrState, sha: string, source: Extract<Source, { kind: 'ref' }>): Promise<Shipment | null | 'cap'> {
-  const found = await readReleaseShipment(deps, state, sha);
   const gated = source.gated;
-  if (found === null || found === 'cap' || gated === undefined) {
-    return found;
+  const facts: RefFacts = { found: await readReleaseShipment(deps, state, sha), gatedRef: gated?.ref ?? null };
+  for (;;) {
+    const step = pickRefShipment(facts);
+    if (step.kind === 'done') {
+      return step.result;
+    }
+    if (gated === undefined) {
+      throw new Error('a ref source with no gate asked for a gated read');
+    }
+    await match(step)
+      .with({ kind: 'read-gate' }, async () => {
+        facts.gate = await deps.readGate(state.repo, gated.gate);
+      })
+      .with({ kind: 'read-files' }, async () => {
+        facts.files = await readChangedFiles(deps.run, state.repo, getPRNumber(state.ref));
+      })
+      .with({ kind: 'read-held' }, async () => {
+        facts.held = await readHeld(deps, state.repo, sha, gated.ref);
+      })
+      .exhaustive();
   }
-  const gate = await deps.readGate(state.repo, gated.gate);
-  if (gate === null) {
-    return null;
-  }
-  const files = await readChangedFiles(deps.run, state.repo, getPRNumber(state.ref));
-  if (!isGateTouched(gate, files)) {
-    return found;
-  }
-  const held = await readHeld(deps, state.repo, sha, gated.ref);
-  if (held === 'cap') {
-    return 'cap';
-  }
-  return held ? { tag: gated.ref, at: null } : null;
 }
