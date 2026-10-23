@@ -67,7 +67,7 @@ test('it raises no FINAL alert for a PR with an owner override at its FINAL head
   ctx.db
     .query("UPDATE run_prs SET final_sha = 'abc1234', final_at = '2026-10-21T01:00:00Z', final_source = 'marker:kettle', reviewed_sha = 'def5678', review_round = 2, reviewed_at = '2026-10-21T00:45:00Z' WHERE ref = 'kettle#26'")
     .run();
-  recordPROverride(ctx.db, { repo: 'kettle', pr: 26, head: 'abc1234', source: 'chat:kettle-chat@2026-10-21T01:30:00Z', note: 'Invented: the restack kept each fix.', actor: 'kettle-bot' });
+  recordPROverride(ctx.db, { repo: 'kettle', pr: 26, head: 'abc1234aaaabbbbccccddddeeeeffff00001111', source: 'chat:kettle-chat@2026-10-21T01:30:00Z', note: 'Invented: the restack kept each fix.', actor: 'kettle-bot' });
 
   expect(findAlerts(ctx.db, [], new Map(), new Date('2026-10-21T03:00:00Z'))).toStrictEqual([]);
 });

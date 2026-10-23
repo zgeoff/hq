@@ -1,10 +1,11 @@
 import type { Database } from 'bun:sqlite';
 import type { SessionInfo } from '../atc/session-schema.ts';
 import { planRoundCap } from '../noslop/plan-round-cap.ts';
-import { findOwnerOverride } from '../pr-status/find-owner-override.ts';
+import { readOwnerOverrides } from '../pr-status/find-owner-override.ts';
 import { readOKReviews } from '../noslop/read-ok-reviews.ts';
 import { countMinutesSince as mins } from './count-minutes-since.ts';
 import { isFinalAnswered } from './is-final-answered.ts';
+import { sameSha } from './same-sha.ts';
 import { readClosedIssueAlerts } from './read-closed-issue-alerts.ts';
 import { listRuns } from './list-runs.ts';
 import { SWEEP_MINUTES as SWEEP } from './sweep-minutes.ts';
@@ -61,10 +62,11 @@ export function findAlerts(db: Database, sessions: SessionInfo[], activity: Map<
   return [...alerts, ...readClosedIssueAlerts(db)];
 }
 
-// The owner's override at the FINAL's head stands for its review, which no round could give.
+// The owner's override at the FINAL's head stands for its review, which no round could give. A
+// FINAL may carry a short sha, and an override the full one.
 function readFinalAnswered(db: Database, pr: RunPr): boolean {
   const [repo = '', number = ''] = pr.ref.split('#');
-  return isFinalAnswered(pr) || (pr.final_sha !== null && findOwnerOverride(db, repo, Number(number), pr.final_sha) !== null);
+  return isFinalAnswered(pr) || readOwnerOverrides(db, repo, Number(number)).some((override) => sameSha(override.head, pr.final_sha));
 }
 
 function readRestackHint(db: Database, ref: string): string {
