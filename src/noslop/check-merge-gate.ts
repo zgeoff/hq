@@ -61,8 +61,14 @@ async function checkCI(request: PRRequest, parsed: ParsedRepo, facts: GateFacts)
   if (!('noChecks' in verdict)) {
     throw buildBlock(parsed, request.pr, verdict.reason);
   }
-  const noCI = await probeNoCI(request.run, buildSlug(parsed), facts.headRefOid);
-  if (!noCI) {
+  const headHasNoCI = await probeNoCI(request.run, buildSlug(parsed), facts.headRefOid);
+  if (!headHasNoCI) {
+    throw buildBlock(parsed, request.pr, verdict.reason);
+  }
+
+  // A PR that deletes the workflows of a repo with CI has none at its head, so the base must agree.
+  const baseHasNoCI = await probeNoCI(request.run, buildSlug(parsed), facts.baseRefName);
+  if (!baseHasNoCI) {
     throw buildBlock(parsed, request.pr, verdict.reason);
   }
   return true;

@@ -190,6 +190,7 @@ test('it lets a PR with no checks merge when GitHub says the head holds no workf
 
   await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).resolves.toStrictEqual({ mayMerge: true, reason: `not a noslop repo: green CI is enough; the repo runs no CI at ${FAKE_FULL_SHA.slice(0, 7)}`, reviewed: false });
   expect(fake.lines()).toContain(`gh api repos/zgeoff/widgets/contents/.github/workflows?ref=${FAKE_FULL_SHA} --silent`);
+  expect(fake.lines()).toContain('gh api repos/zgeoff/widgets/contents/.github/workflows?ref=main --silent');
 });
 
 test.each([
@@ -201,6 +202,14 @@ test.each([
   const fake = buildFakeRunner({ prFacts: buildStubGateFacts({ head: FAKE_FULL_SHA, checks: [] }), workflows });
 
   await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: 'the head has no CI checks, so CI has not passed' });
+});
+
+test('it blocks a PR with no checks that deletes the workflows its base branch holds', async () => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ prFacts: buildStubGateFacts({ head: FAKE_FULL_SHA, checks: [] }), workflows: { code: 1, stdout: '', stderr: 'gh: Not Found (HTTP 404)' }, baseWorkflows: { code: 0, stdout: '', stderr: '' } });
+
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: 'the head has no CI checks, so CI has not passed' });
+  expect(fake.lines()).toContain('gh api repos/zgeoff/widgets/contents/.github/workflows?ref=main --silent');
 });
 
 test('it never reads the workflows when the head has checks', async () => {
