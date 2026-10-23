@@ -58,11 +58,11 @@ export function findAlerts(db: Database, sessions: SessionInfo[], activity: Map<
   return [...alerts, ...readClosedIssueAlerts(db)];
 }
 
-// A restack moves the head with no new review; a --fixes-only round maps the reviewed head onto it
-// by patch id and records the new head, which a third `hq run reviewed` would refuse.
+// A restack moves the head with no new review. A passed review round records the new head, which a
+// third `hq run reviewed` would refuse; --fixes-only serves only when each reviewed patch maps.
 function formatRestackHint(ref: string): string {
   const [repo, pr] = ref.split('#');
-  return ` (a restack? hq review ${repo} ${pr} --fixes-only records the new head)`;
+  return ` (a restack? a passed hq review ${repo} ${pr} records the new head)`;
 }
 
 // The run's active sessions, and with no active main session, the main one that ended last when the
