@@ -31,17 +31,17 @@ function checkRefreshMove(name: string, from: RefreshEntry | undefined, to: Refr
   }
 }
 
-function toMovePhase(entry: RefreshEntry | undefined, sessionId: string | undefined): RefreshPhase | 'none' {
-  if (entry === undefined || (sessionId !== undefined && entry.sessionId !== sessionId)) {
-    return 'none';
-  }
-  return entry.phase;
-}
-
 function toPhaseFields(entry: RefreshEntry | undefined): Omit<RefreshEntry, 'answerReadAt'> | undefined {
   if (entry === undefined) {
     return undefined;
   }
   const { answerReadAt: _, ...fields } = entry;
   return fields;
+}
+
+function toMovePhase(entry: RefreshEntry | undefined, sessionId: string | undefined): RefreshPhase | 'none' {
+  if (entry === undefined || (sessionId !== undefined && entry.sessionId !== sessionId)) {
+    return 'none';
+  }
+  return entry.phase;
 }
