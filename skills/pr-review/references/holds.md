@@ -10,17 +10,29 @@ and zgeoff/hq-private when it changes `skills/`, [fleet.json](../../../fleet.jso
 is its `SKILL.md`, its references and the scripts it runs. `hq review gate` refuses such a PR in hq
 and hq-private until his lgtm is on record at its head.
 
-These don't wait for him:
+`hq review gate` holds such a PR in every other zgeoff repo too, except zgeoff/nixie-definitions,
+until a record at its head clears it. A test file or test data in a skill's folder is not held, and
+neither is a PR a bot opened.
 
-- A test file or test data in a skill's folder alone.
-- A formatting-only change: one that `git diff -w --ignore-blank-lines origin/<base>...<head sha> -- <skill paths>`
-  shows no change for.
-- A PR in zgeoff/nixie-definitions.
-- A PR your Boundary rules grant covers.
-- A PR whose skill change only rolls the shared ci-design skill out to a repo or syncs it. A new rule
-  inside ci-design itself, in zgeoff/tools, still waits.
-- A pure rename: `scripts/rename-pr.sh <repo> <pr>` prints `ok`.
-- A repo-sync PR, as the update-bots reference says.
+Clear these yourself with a record at the PR's head. A push after it voids the record, and each
+record goes into `hq news`:
+
+- **A mechanical edit:** `hq pr mechanical <repo> <pr>`. hq proves it from the diff and passes only a
+  link or path target that moved to the same file, a version number, or a table re-padded with no
+  cell changed. When hq refuses, the PR waits for him.
+- **An exception hq does not prove:** `hq pr exempt <repo> <pr> --rule <rule> --note <why>`, with
+  one of these rules:
+  - `formatting`: read the raw diff, and never rely on `git diff -w` showing nothing. Record it only
+    when no line inside a code block, a command, or YAML or JSON changes, whitespace included. A
+    prose re-wrap and blank lines between paragraphs count; any other whitespace change waits for
+    him.
+  - `rename`: `scripts/rename-pr.sh <repo> <pr>` prints `ok`.
+  - `repo-sync`: a repo-sync PR, as the update-bots reference says.
+  - `ci-design-sync`: the skill change only rolls the shared ci-design skill out to a repo or syncs
+    it. A new rule inside ci-design itself, in zgeoff/tools, still waits.
+  - `boundary`: your Boundary rules grant covers the PR.
+
+In zgeoff/hq and zgeoff/hq-private, neither record counts: those PRs wait for his lgtm.
 
 File each PR that waits with `hq unblock add --task '<lgtm repo#n: what it changes>' --done-when pr:<repo>#<n>`.
 Send any decision it needs to `z-triage` by message.

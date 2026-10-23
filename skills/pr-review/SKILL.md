@@ -81,7 +81,8 @@ and keep its finding open: the gate doesn't pass while one is open. File each it
 
 - **The owner's lgtm,** on a PR that changes a repo's `AGENTS.md` or its skills, and on every PR
   that changes hq's `skills/` or [fleet.json](../../fleet.json), or hq-private's skills, grants or session docs.
-  [holds.md](references/holds.md) has the exceptions and how his answer is recorded.
+  [holds.md](references/holds.md) has the exceptions, the records that clear a mechanical edit or
+  an exception, and how his answer is recorded.
 - **A preview check,** on a PR with a preview comment, as [holds.md](references/holds.md) says.
 - **The NixOS check,** on a zgeoff/cloud PR that changes `nixos/` or `packages/topology/`: dispatch
   `bun run ops:nixos-checks -- <its branch>` from a zgeoff/cloud checkout on its final head, check

@@ -101,6 +101,10 @@ PR only on it, so send no relay message. A "later" has no record: leave the PR w
 to merge a PR anyway, record it with `hq pr override`; when he accepts a finding's risk, with
 `hq pr accept-risk`; then tell `z-review` it is on record.
 
+Put no skill edit to him that `z-review` clears with a record: a moved link or path, a version
+number or a re-padded table (`hq pr mechanical`), or an exception `hq pr exempt` names. `z-review`
+sends you only the PRs those records cannot clear.
+
 ## Calls
 
 When `z-triage` says a call is ready, or the one item you give the owner is a call, put it as
