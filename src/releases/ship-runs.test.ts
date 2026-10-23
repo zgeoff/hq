@@ -2,6 +2,7 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { overrideEnv } from '../config/override-env.ts';
 import { shipRuns } from './ship-runs.ts';
 import { getRun } from '../runs/get-run.ts';
+import { setState } from '../runs/set-state.ts';
 import { buildMockRelease } from '../../test/build-mock-release.ts';
 import { buildMockSha } from '../../test/build-mock-sha.ts';
 import { buildStubSourceGH } from '../../test/build-stub-source-gh.ts';
@@ -351,4 +352,31 @@ test('it waits on an hq PR, with no error, when GitHub does not know the clean i
   expect(result.moved).toStrictEqual([]);
   expect(result.errors).toStrictEqual([]);
   expect(getRun(ctx.db, 'GEO-84')?.state).toBe('merged');
+});
+
+test('it leaves a run alone that was put in deploy-held after the release that holds its PR', async () => {
+  const ctx = setupTest();
+  createMergedRun(ctx.db, 'GEO-91', ['vers#6']);
+  ctx.setMergedAt('vers#6', '2026-10-12T05:06:07Z');
+  setState(ctx.db, 'GEO-91', 'deploy-held', { next: 'Waits on the kettle host to switch.' }, 'z-release');
+  const run = buildStubSourceGH({ shas: { 'vers#6': buildMockSha(6) }, contains: {} }, ctx.calls);
+
+  const result = await shipRuns(ctx.db, run, ctx.now);
+
+  expect(result.moved).toStrictEqual([]);
+  expect(result.held).toStrictEqual(['GEO-91']);
+  expect(getRun(ctx.db, 'GEO-91')?.state).toBe('deploy-held');
+});
+
+test('it ships a run that was put in deploy-held before the release that holds its PR', async () => {
+  const ctx = setupTest();
+  createMergedRun(ctx.db, 'GEO-92', ['vers#7']);
+  ctx.setMergedAt('vers#7', '2026-10-15T05:06:07Z');
+  setState(ctx.db, 'GEO-92', 'deploy-held', { next: 'Waits on the kettle release.' }, 'z-release');
+  const run = buildStubSourceGH({ shas: { 'vers#7': buildMockSha(7) }, contains: {} }, ctx.calls);
+
+  const result = await shipRuns(ctx.db, run, ctx.now);
+
+  expect(result.moved).toStrictEqual([{ issue: 'GEO-92', to: 'live-check', prs: [{ ref: 'vers#7', tag: null, shipped_at: '2026-10-15T05:06:07Z' }] }]);
+  expect(result.held).toStrictEqual([]);
 });

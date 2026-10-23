@@ -39,12 +39,14 @@ import { runGH as gh } from './run-gh.ts';
 import { SHIPPABLE } from './shippable.ts';
 import { shippedText } from './shipped-text.ts';
 import { SOURCES } from './sources.ts';
+import { isHeldPastShip } from './is-held-past-ship.ts';
+import { readHeldAt } from './read-held-at.ts';
 import type { PrState, Release, ShipMove, ShipResult, Source } from './types.ts';
 
 // One pass. A dry run reads from GitHub but writes nothing.
 export async function shipRuns(db: Database, run: Runner, at: Date = now(), opts: { dryRun?: boolean; readBuild?: () => Build } = {}): Promise<ShipResult> {
   const dryRun = !!opts.dryRun;
-  const res: ShipResult = { dryRun, moved: [], shippedPrs: 0, compares: 0, deferred: 0, errors: [] };
+  const res: ShipResult = { dryRun, moved: [], shippedPrs: 0, compares: 0, deferred: 0, held: [], errors: [] };
   const err = (m: string) => res.errors.push(m);
 
   const runs = db.query(`SELECT * FROM runs WHERE state IN ('merged','deploying','deploy-held') ORDER BY created_at`).all() as Run[];
@@ -165,7 +167,12 @@ export async function shipRuns(db: Database, run: Runner, at: Date = now(), opts
   // would leave runs moved that the next pass never tells anyone about.
   const moveShipped = () => {
     for (const c of candidates) {
-      if (!c.refs.every((ref) => states.get(ref)?.at)) {
+      const shippedAt = c.refs.flatMap((ref) => states.get(ref)?.at ?? []);
+      if (shippedAt.length < c.refs.length) {
+        continue;
+      }
+      if (c.run.state === 'deploy-held' && isHeldPastShip(readHeldAt(db, c.run.issue), shippedAt)) {
+        res.held.push(c.run.issue);
         continue;
       }
       const prs = c.refs.map((ref) => buildShippedPR(states.get(ref)));
@@ -180,6 +187,9 @@ export async function shipRuns(db: Database, run: Runner, at: Date = now(), opts
           // The run may have changed while GitHub was asked: look again.
           const now0 = db.query('SELECT * FROM runs WHERE issue = ?').get(c.run.issue) as Run | null;
           if (!now0 || !SHIPPABLE.includes(now0.state)) return null;
+          if (now0.state === 'deploy-held' && isHeldPastShip(readHeldAt(db, c.run.issue), shippedAt)) {
+            return null;
+          }
           const cur = prsOf(c.run.issue);
           if (cur.some((p) => p.state === 'open') || cur.filter((p) => p.state === 'merged').map((p) => p.ref).join() !== c.refs.join()) return null;
           // Decide the destination from the live_check read here, not the one read before GitHub was asked.

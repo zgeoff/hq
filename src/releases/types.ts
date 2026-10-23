@@ -20,6 +20,8 @@ export interface ShipResult {
   shippedPrs: number; // PRs newly found in a release (stored unless a dry run)
   compares: number;
   deferred: number; // PRs left for the next pass by the compare cap
+  // Deploy-held runs left alone: held after the releases that hold their PRs.
+  held: string[];
   errors: string[];
 }
 

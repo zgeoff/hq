@@ -741,6 +741,31 @@ test('hq run ship prints a vers PR shipped at its merge as at merge', async () =
   }
 });
 
+test('hq run ship lists a run put in deploy-held after its release as left held', async () => {
+  await hq('run', 'add', 'GEO-511', '--title', 'Invented kettle work', '--where', 'none');
+  await hq('run', 'pr', 'GEO-511', 'vers#21');
+  closePr(db(), 'vers#21', { to: 'merged', actor: 'hq-github', facts: { mergedAt: '2026-10-10T03:04:05Z', mergeSha: null } });
+  await hq('run', 'state', 'GEO-511', 'deploy-held', '--next', 'Waits on the kettle host to switch.');
+
+  // A stand-in gh on PATH that answers the merge commit; a vers PR needs no other call.
+  const path0 = process.env['PATH'];
+  const bin = `${dir}/bin`;
+  mkdirSync(bin);
+  writeFileSync(`${bin}/gh`, ['#!/bin/sh', `echo '{"mergeCommit":{"oid":"${'b'.repeat(40)}"}}'`, ''].join('\n'));
+  chmodSync(`${bin}/gh`, 0o755);
+  process.env['PATH'] = `${bin}:${path0}`;
+  try {
+    out = [];
+
+    const code = await main(['run', 'ship']);
+
+    expect(code).toBe(0);
+    expect(out.join('\n')).toBe('Moved nothing.\n1 PR(s) newly marked shipped; 0 compare call(s).\n  left held: GEO-511 was put in deploy-held after the release that holds its PRs');
+  } finally {
+    process.env['PATH'] = path0;
+  }
+});
+
 test('hq pr override and accept-risk refuse a chat source named by --by and HQ_AS when no session id proves the owner', async () => {
   const saved = process.env['ATC_SESSION_ID'];
   delete process.env['ATC_SESSION_ID'];
