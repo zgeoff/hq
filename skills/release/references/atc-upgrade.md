@@ -1,6 +1,6 @@
 # upgrading atc
 
-The owner's atc daemon runs as the systemd user unit `atc-daemon.service`, with a listener at the address in its config. The connector you use is the atc gateway, which runs on another machine and reaches the daemon through that listener. Upgrading means installing the new binary and restarting the daemon with `hq restart`. It runs atc's own `atc daemon restart`, which restarts the daemon through its systemd unit and restores the fleet, then messages every interrupted session so none waits idle. Never restart the daemon with `systemctl` or a bare `atc daemon restart`. A restart ends every session the daemon hosts, and the gateway can't reach the daemon until it is back. The daemon restores every session by itself, and `hq restart` then wakes each one.
+The owner's atc daemon runs as the systemd user unit `atc-daemon.service`. The connector you use is the atc gateway, which runs on another machine and reaches the daemon through the daemon's listener, so the gateway can't reach the daemon while it restarts. Upgrading means installing the new binary and restarting the daemon with `hq restart`. Never restart it with `systemctl` or a bare `atc daemon restart`, because only `hq restart` wakes each interrupted session after the daemon restores it. A restart ends every session the daemon hosts.
 
 ## when
 
@@ -32,7 +32,7 @@ Steps:
 3. Run the install script.
 4. Apply the deploy notes, and any pending config change that config.json doesn't hold yet: back up config.json and the unit file, make the edits, run atc config migrate --write to drop keys atc no longer reads, and run systemctl --user daemon-reload. List each edit for the report.
 5. From 23:00 to 08:00 Sydney time hq restart refuses: stop and report, with steps 1 to 4 done. Otherwise send a note through your ATC bridge tool (named note, or report on an older build), with the old build, the new build, and the config and unit edits with their backup paths.
-6. Start the restart with hq restart. It starts at once, and logs each step to ~/.local/state/hq/hq-restart-<time>.log, or under $XDG_STATE_HOME/hq/. Logs from before hq 0.65.0 stay in ~/.local/state/atc/.
+6. Start the restart with hq restart. It starts at once, and logs each step to ~/.local/state/hq/hq-restart-<time>.log, or under $XDG_STATE_HOME/hq/.
 7. The restart ends this session's turn; the daemon restores the session and hq wakes it. When a message asks you to verify the upgrade, check: atc-daemon.service is active, exactly one atc daemon process runs and it has --listen, daemon.json's pid matches it, atc --version shows the new build, and each pending change passes its live check. Report each result, with the log.
 
 Finish line: the new build running in atc-daemon.service, every pending change validated, and reported.

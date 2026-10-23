@@ -60,11 +60,11 @@ A sweep applies a rule across a repo, such as a lint rollout or a layout change.
 
 A shared change that rolls out to several repos, such as a zgeoff/tools lint release, a sync, or a shared rule, gets one umbrella issue, never one issue per repo. Its Scope holds a checklist with one box per repo, and its Acceptance is every box ticked. Each repo's PR names it as `Contributes to GEO-<n>`, and `z-review` ticks that repo's box when it merges the PR. A vers part stays out: keep it as its own issue in Backlog, related to the umbrella, so the owner still picks which vers work reaches Ready. When you groom a Triage issue that is one repo's part of a shared change, search the open issues for the same change in other repos: make the oldest non-vers issue the umbrella, with a box for each repo but vers, and mark the others Duplicate of it. The overlap check's `--rollouts` run finds the ones already past Triage.
 
-Every refactor, migration or architecture project ends with a cleanup issue that removes the project's own scaffolding (decision D-cleanup-issue). When such a project has none, file it: a Chore in that project, blocked by every other open issue in it, so it launches last. Its Scope lists each artefact the project added for the move: maps, wave or move scripts, codemods, compat shims, cutover flags, and knip or lint exceptions kept for the migration. Its Acceptance is one search per artefact on `main`, such as `git grep -n <name>`, that finds nothing. The project is not Done until this issue is Done.
+Every refactor, migration or architecture project ends with a cleanup issue that removes the project's own scaffolding. When such a project has none, file it: a Chore in that project, blocked by every other open issue in it, so it launches last. Its Scope lists each artefact the project added for the move: maps, wave or move scripts, codemods, compat shims, cutover flags, and knip or lint exceptions kept for the migration. Its Acceptance is one search per artefact on `main`, such as `git grep -n <name>`, that finds nothing. The project is not Done until this issue is Done.
 
 The PR that adds a lint rule turns it on in its own repo and fixes it there; it never turns the rule off there. Write this into its Scope.
 
-A pass over an instruction document, such as an `AGENTS.md`, a doc or a skill, is one pass: keep or cut each item. When a machine could check a kept item, write the check in the same PR when it belongs in the same repo, and file it as its own ticket only when it belongs in another repo. Write lists as bullets, such as one bullet per check, with its command and where its rules live. Each document gets its own PR, with the reason to keep, cut or rewrite each item in its description. A PR that changes a repo's `AGENTS.md` or its skills waits for the owner's review, except in zgeoff/hq and zgeoff/nixie-definitions, so flag its ticket for his review with the PR's link; `z-review` merges it once he says lgtm. Flag a pass over any other document only when he asks.
+A pass over an instruction document, such as an `AGENTS.md`, a doc or a skill, is one pass: keep or cut each item. When a machine could check a kept item, write the check in the same PR when it belongs in the same repo, and file it as its own ticket only when it belongs in another repo. Write lists as bullets, such as one bullet per check, with its command and where its rules live. Each document gets its own PR, with the reason to keep, cut or rewrite each item in its description. A PR that changes a repo's `AGENTS.md` or its skills waits for the owner's review, except in zgeoff/nixie-definitions, so flag its ticket for his review with the PR's link; `z-review` merges it once he says lgtm. Flag a pass over any other document only when he asks.
 
 ## Actions
 
@@ -140,7 +140,7 @@ The owner can leave an agent working end to end, and most tasks finish with no i
 ## Context
 
 - Project: auto-mode
-- Comparison with Anthropic's auto mode: GEO-94
+- Comparison with Anthropic's auto mode (link)
 - Current eval reports (links)
 - Premise from the owner: eliminating risk is impossible; usability is key; risk is a trade-off; catastrophic failures are a different class from risk.
 

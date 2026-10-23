@@ -29,8 +29,7 @@ record goes into `hq news`:
   - `rename`: `scripts/rename-pr.sh <repo> <pr>` prints `ok`.
   - `repo-sync`: a repo-sync PR, as the update-bots reference says.
   - `ci-design-sync`: the skill change only rolls the shared ci-design skill out to a repo or syncs
-    it. A new rule inside ci-design itself, in zgeoff/tools, still waits.
-  - `boundary`: your Boundary rules grant covers the PR.
+    it. A new rule inside ci-design itself, in zgeoff/tools, waits for him.
 
 In zgeoff/hq and zgeoff/hq-private, neither record counts: those PRs wait for his lgtm.
 

@@ -3,7 +3,7 @@ name: linear-triage
 description:
   How z-triage keeps the owner's Linear workspace accurate - every open issue groomed to the ticket
   standard and moved to Ready as soon as it meets the criteria - acts on hq's daily alerts, and
-  prepares the calls that put open questions to the owner. Load it for the hourly pass and check,
+  prepares the calls that put open questions to the owner. Load it for each loop run's pass and check,
   when a session asks you to check now, when hq sends an alert, or before you write or rewrite an
   issue.
 ---

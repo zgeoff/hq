@@ -50,10 +50,10 @@ owner's decision.
 
 ### Night Shift · `z-delivery`
 
-The foreman. hq launches the next ready issue the moment a slot frees up; Night Shift steps in when
-an agent needs a judgement. It unsticks a run that stalls, answers an agent that wants to leave
-something unfixed with "fix it in this PR", writes the briefs that need a pitch, and keeps two
-agents out of the same files.
+The foreman. Night Shift launches the next ready issue the moment a slot frees up, and steps in
+when an agent needs a judgement. It unsticks a run that stalls, answers an agent that wants to
+leave something unfixed with "fix it in this PR", writes the briefs that need a pitch, and keeps
+two agents out of the same files.
 
 **Never:** files an issue from a PR, or merges.
 

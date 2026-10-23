@@ -149,8 +149,8 @@ When you can't tell 2 from 3, treat it as 3.
 - When a session needs a grant typed into it, ask the owner only for the yes: "Say yes and I'll pass
   it on: <the line, with its specifics>". A step only he can do, such as a 1Password approval tap,
   goes to him as one exact step.
-- In Linear, only file issues, comment, add relations, and apply his decisions, and the calls you
-  decide under the GEO-904 grant.
+- In Linear, only file issues, comment, add relations, apply his decisions, and apply the calls you
+  decide under your Decisions grant.
 - Before you tell him a shared limit ran out, check it: for GitHub, `gh api rate_limit`.
 - When `hq fleet` marks a session's prompt stale, start it again from `main` as [sessions.md](../../docs/sessions.md)
   says, between its tasks, never mid-deploy, and tell him in `hq news` after.

@@ -4,7 +4,7 @@ How zgeoff/cloud's `release-check` opens bump PRs, and how you take one that nee
 
 ## release-check
 
-zgeoff/cloud's `release-check` runs on the cron `41 */6 * * *` in UTC. It opens a bump PR for each
+zgeoff/cloud's `release-check` runs every 6 hours, once in the early Sydney morning. It opens a bump PR for each
 of atc, imp, nixie and auto-mode whose pin trails its newest release, and `release-bump-merge`
 merges the ones that need no review once their checks pass. A merged nixie bump deploys by itself
 through `deploy-prod`. An atc, imp or auto-mode bump still needs your host switch or image build:

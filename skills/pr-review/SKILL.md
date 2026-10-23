@@ -43,7 +43,7 @@ Run `hq capabilities --require 0.82.0` at the start of a session and after a com
 says `FINAL <repo>#<n> <head sha>`. A new final with a different sha means the head moved: review
 that head. Another session that opens a PR, such as `z-q`, messages you its PR and head. Keep the
 PRs in flight in `~/.local/share/z-sessions/review.md`. `hq review` records the review marks for a
-noslop round; for a PR it still sends to Codex, run `hq run reviewing <pr>` and
+noslop round; for a PR that gets a Codex review, run `hq run reviewing <pr>` and
 `hq run reviewed <pr> --sha <S>` by hand.
 
 1. **Check it is ready.** It is not a draft, CI passes on its current head apart from the `noslop`

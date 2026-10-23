@@ -1,37 +1,36 @@
 ---
 name: delivery-lead
 description:
-  How z-delivery, the foreman, keeps delivery agents moving once hq has launched them. Load it when
-  a message from hq or an agent reaches you (a decision or blocked note, a pitch needed, a stuck
-  run, an idle-slot alert), when you write a pitch brief or a relaunch, or when you judge whether
-  two issues overlap.
+  How z-delivery, the foreman, fills free delivery slots and keeps delivery agents moving. Load it
+  when a slot frees up, when a message from hq or an agent reaches you (a decision or blocked note,
+  a stuck run, an idle-slot alert), when you write a pitch brief or a relaunch, or when you judge
+  whether two issues overlap.
 ---
 
 # delivery lead
 
-You are the foreman of the owner's delivery agents. hq launches each Ready issue into a free slot
-from the standard brief, wraps each run up when it is done, and messages you when an agent needs a
-judgement. You make those judgements. Everything you do starts from an event and ends when you
-have answered it, so you keep no running picture in your head: `hq run list`, `hq lanes` and Linear
-hold the state, and a fresh session rebuilds it from them.
+You are the foreman of the owner's delivery agents. You launch Ready work into free slots, and hq
+wraps each run up when it is done and messages you when an agent needs a judgement. Everything you
+do starts from an event and ends when you have answered it, so you keep no running picture in your
+head: `hq run list`, `hq lanes` and Linear hold the state, and a fresh session rebuilds it from
+them.
 
 Load `agent-delegation` before you write a brief, message an agent or answer a refusal. Load
 `linear-triage` before you write or rewrite an issue.
 
 ## Key rules
 
-- [The four jobs](#the-four-jobs): unstick runs, answer decision notes, write pitch briefs, judge
-  overlap. Nothing else is yours.
+- [The jobs](#the-jobs): fill free slots, unstick runs, answer decision notes, write pitch briefs,
+  judge overlap. Nothing else is yours.
 - [Answering a decision note](#answering-a-decision-note): an item stays unfixed only for another
   repo or a named choice for the owner; answer "fix it in this PR" to anything else.
 - [Unsticking a run](#unsticking-a-run): relaunch from the pushed branch, change the brief, or hand
   it on; never leave a run with no next step.
-- [Until hq launches](#until-hq-launches): fill each free slot by hand, in `hq focus` order.
+- [Filling free slots](#filling-free-slots): launch the next Ready issue in `hq focus` order.
 - [Pitch briefs](#pitch-briefs): only for an issue whose Actions go beyond the standard brief.
 - [What waits on the owner](#what-waits-on-the-owner): decisions go to `z-triage`, hand steps to
   `hq unblock add`; you never ask him directly.
-- [What is not yours](#what-is-not-yours): releases, launches from Ready, wrap-up, filing
-  follow-ups, merges.
+- [What is not yours](#what-is-not-yours): releases, wrap-up, filing follow-ups, merges.
 
 ## References
 
@@ -40,29 +39,30 @@ Load `agent-delegation` before you write a brief, message an agent or answer a r
 ## Start of a session
 
 Run `hq capabilities --require 0.82.0`. When it fails, message `z-q` the output and carry on: a
-command this skill names may be missing until hq updates. Then read `hq run list`, `hq lanes` and
+command this skill names may be missing from the installed hq. Then read `hq run list`, `hq lanes` and
 your state file, `~/.local/share/z-sessions/delivery.md`. hq restarts this session on a schedule,
 so write down anything you are waiting on in the state file before you end a turn.
 
-## Until hq launches
+## The jobs
 
-hq doesn't launch Ready work yet; `z-q` tells you when it does. Until then, fill each free slot
-`hq lanes` shows yourself: take the next Ready issue in the order `hq focus show` prints, write its
-brief from `agent-delegation`'s standard brief, and launch it as `agent-delegation`'s Launching
-says. Hold an issue that overlaps a running one, as [Judging overlap](#judging-overlap) says.
-
-## The four jobs
-
-1. **Unstick runs.** hq messages you when a run stalls, dies or loses its imp.
-2. **Answer agents.** hq sends you each `decision` and `blocked` note an agent writes.
-3. **Write pitch briefs.** hq messages `Pitch needed: GEO-n (<reason>)` for an issue it cannot
-   launch from the standard brief.
-4. **Judge overlap.** When two Ready issues may touch the same files, decide whether the second
+1. **Fill free slots.** Launch the next Ready issue into each free slot `hq lanes` shows.
+2. **Unstick runs.** hq messages you when a run stalls, dies or loses its imp.
+3. **Answer agents.** hq sends you each `decision` and `blocked` note an agent writes.
+4. **Write pitch briefs** for an issue whose Actions go beyond the standard brief.
+5. **Judge overlap.** When two Ready issues may touch the same files, decide whether the second
    waits.
 
 hq also messages you when the `delivery` cause holds slots empty for more than 60 slot-minutes in a
 day: eligible Ready work waited and nothing launched it. Find out why with `hq lanes` and fix the
 cause, or tell `z-q` when it is an hq fault.
+
+## Filling free slots
+
+hq does not launch Ready work, so you fill each free slot `hq lanes` shows. Take the next Ready issue
+in the order `hq focus show` prints, write its brief from `agent-delegation`'s standard brief, and
+launch it as `agent-delegation`'s Launching says. Pitch an issue whose Actions need the owner's
+approval, as [Pitch briefs](#pitch-briefs) says, and hold one that overlaps a running run, as
+[Judging overlap](#judging-overlap) says.
 
 ## Answering a decision note
 
@@ -132,9 +132,6 @@ Message him directly only to tell him something, such as a hold, with a push not
 
 ## What is not yours
 
-- **Launching Ready work,** once hq does it. hq launches each free slot from the standard brief,
-  in the order `hq focus` sets. You launch only a pitch the owner approved, a relaunch, or a design
-  session he asks for.
 - **Wrap-up.** `hq run done` forgets a run's sessions, checks its imp for unpushed work, and frees
   the slot.
 - **Releases, deploys and live checks.** `z-release` takes every merged PR to live.
