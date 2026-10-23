@@ -114,13 +114,14 @@ hq 0.79.0: headquarters for the z- sessions. Every command takes --json.
   hq call|proposal list [--state queued,open,...|all]
 
   hq unblock add (--task T | --item F|-) [--id SLUG] [--minutes N] [--unblocks GEO-1:high,GEO-2:urgent]
-                 [--rank N] [--notify z-delivery,...] [--done-when issue:GEO-1|pr:repo#1|doc:ID]...
+                 [--rank N] [--notify z-delivery,...] [--done-when issue:GEO-1|pr:repo#1|doc:ID|release:repo|date:ISO]...
+                 [--kind owner|watch] [--deadline ISO]
   hq unblock list [--state open|done|dropped|all]
   hq unblock new | pushed --upto N            items since the last push; move the cursor to N
   hq unblock done|drop <id> [--note T]
   hq unblock later <id> [--until ISO|+4h]   default: next 07:00 Sydney
   hq unblock rank <id> <N|none>
-  hq unblock done-when <id> <issue:GEO-1|pr:repo#1|doc:ID>...
+  hq unblock done-when <id> <issue:GEO-1|pr:repo#1|doc:ID|release:repo|date:ISO>...
   hq unblock show <id> [--history]
 
   hq outbox [list] | hq outbox flush [--retry]  atc messages hq owes other sessions

@@ -5,6 +5,7 @@ import type { LinearCall } from './linear/types.ts';
 import type { PRRef } from './parse-pr-url.ts';
 import { parsePRURL } from './parse-pr-url.ts';
 import type { Runner } from './runner/types.ts';
+import { now } from './clock/now.ts';
 import { dropUnblock } from './unblock/drop-unblock.ts';
 import { listUnblocks } from './unblock/list-unblocks.ts';
 import { makeConditionReader } from './unblock/make-condition-reader.ts';
@@ -12,35 +13,42 @@ import { readIssueVerdicts } from './unblock/read-issue-verdicts.ts';
 import { pickClosure } from './unblock/pick-closure.ts';
 import { settleUnblock } from './unblock/settle-unblock.ts';
 import type { ConditionVerdict, DoneWhen, UnblockItem } from './unblock/types.ts';
+import { writeOverdueNotice } from './unblock/write-overdue-notice.ts';
 
 export interface ConditionsDeps {
   call: LinearCall;
   run: Runner;
+  ownerSession: string;
 }
 
 export interface ConditionsResult {
   settled: string[];
   dropped: string[];
   errors: string[];
+
+  // The items whose deadline passed in this pass, their sessions told.
+  overdue: string[];
 }
 
-export async function checkUnblockConditions(db: Database, deps: ConditionsDeps, actor: string): Promise<ConditionsResult> {
+export async function checkUnblockConditions(db: Database, deps: ConditionsDeps, actor: string, at: Date = now()): Promise<ConditionsResult> {
   const items = listUnblocks(db, 'open');
   const issueRefs = [...new Set(items.flatMap((item) => item.done_when.filter((condition) => condition.kind === 'issue').map((condition) => condition.ref)))];
   const issues = issueRefs.length > 0 ? await readIssueVerdicts(deps.call, issueRefs) : new Map<string, ConditionVerdict>();
-  const readCondition = makeConditionReader({ ...deps, issues });
+  const readCondition = makeConditionReader({ ...deps, issues, at });
   const outcomes = await Promise.all(items.map((item) => checkItem({ actor, db, readCondition }, item)));
+  const stillOpen = outcomes.filter((outcome) => outcome.closed === 'open');
   return {
     settled: outcomes.flatMap((outcome) => (outcome.closed === 'done' ? [outcome.id] : [])),
     dropped: outcomes.flatMap((outcome) => (outcome.closed === 'dropped' ? [outcome.id] : [])),
     errors: outcomes.flatMap((outcome) => outcome.errors),
+    overdue: stillOpen.filter((outcome) => writeOverdueNotice(db, { id: outcome.id, actor, at, ownerSession: deps.ownerSession })).map((outcome) => outcome.id),
   };
 }
 
 interface ItemPass {
   actor: string;
   db: Database;
-  readCondition: (condition: DoneWhen) => Promise<ConditionVerdict>;
+  readCondition: (condition: DoneWhen, owner: UnblockItem) => Promise<ConditionVerdict>;
 }
 
 interface ItemOutcome {
@@ -52,8 +60,8 @@ interface ItemOutcome {
 async function checkItem(pass: ItemPass, item: UnblockItem): Promise<ItemOutcome> {
   const subject = findSubjectPR(item);
   const subjectRef = subject ? `${subject.owner}/${subject.repo}#${subject.number}` : null;
-  const conditions = await Promise.all(item.done_when.map(async (condition) => ({ condition, verdict: await pass.readCondition(condition) })));
-  const readSubject = subjectRef ? { ref: subjectRef, verdict: await pass.readCondition({ kind: 'pr', ref: subjectRef }) } : null;
+  const conditions = await Promise.all(item.done_when.map(async (condition) => ({ condition, verdict: await pass.readCondition(condition, item) })));
+  const readSubject = subjectRef ? { ref: subjectRef, verdict: await pass.readCondition({ kind: 'pr', ref: subjectRef }, item) } : null;
   const errors = [...new Set([...conditions, readSubject].flatMap((read) => (read?.verdict.kind === 'failed' ? [`${item.id}: ${read.verdict.error}`] : [])))];
   const closure = pickClosure(conditions, readSubject);
   try {

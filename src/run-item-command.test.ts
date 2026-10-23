@@ -164,6 +164,16 @@ test('hq unblock add --item makes a to-do with Done, Later and Skip', async () =
   ]);
 });
 
+test('hq unblock add --item keeps --kind watch and --deadline, so the watch stays off the console', async () => {
+  const app = setupTest();
+
+  const code = await main(['unblock', 'add', '--id', 'lid-watch', '--item', app.writeItem('watch.json', LID_TODO), '--kind', 'watch', '--deadline', '2026-10-20T00:00:00Z', '--json']);
+
+  expect(code).toBe(0);
+  expect(getUnblock(app.db, 'lid-watch')).toMatchObject({ kind: 'watch', deadline: '2026-10-20T00:00:00Z' });
+  expect(loadConsoleItems(app.db)).toStrictEqual([]);
+});
+
 test('an unchanged hq unblock add --item is a no-op that keeps its subject link', async () => {
   const app = setupTest(),
     body = { title: 'Review kettle#4', question: 'Review kettle#4 and say lgtm', links: [{ label: 'kettle#4', url: 'https://github.com/kettle-co/kettle/pull/4', subject: true }] },

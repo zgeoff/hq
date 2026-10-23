@@ -7,10 +7,14 @@ export interface Unblocked {
   priority: Priority;
 }
 
+// release: owner/repo, settled by a release published after the item was added; date: an ISO time.
 export interface DoneWhen {
-  kind: 'issue' | 'pr' | 'doc';
+  kind: 'issue' | 'pr' | 'doc' | 'release' | 'date';
   ref: string;
 }
+
+// owner: the item needs the owner's hands; watch: it waits on an event and stays off their lists.
+export type UnblockKind = 'owner' | 'watch';
 
 export interface UnblockItem {
   id: string;
@@ -32,6 +36,9 @@ export interface UnblockItem {
   item: string | null;
   due_at: string | null;
   done_when: DoneWhen[];
+  kind: UnblockKind;
+  deadline: string | null;
+  overdue_told_at: string | null;
 }
 
 export type Row = Omit<UnblockItem, 'unblocks' | 'notify' | 'done_when'> & { unblocks: string; notify: string; done_when: string | null };
@@ -52,6 +59,11 @@ export interface UnblockInput {
 
   // undefined keeps the stored conditions of an open item; given, they are added to them.
   doneWhen?: DoneWhen[];
+
+  // undefined keeps an open item's stored kind and deadline; a new or reopened item takes owner and
+  // no deadline.
+  kind?: UnblockKind;
+  deadline?: string | null;
 }
 
 // A closed item that already unblocked one of the same issues. A reworded

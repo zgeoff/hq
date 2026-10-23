@@ -5,7 +5,7 @@ export function parseUnblockRow(r: Row): UnblockItem {
   return { ...r, unblocks: JSON.parse(r.unblocks), notify: JSON.parse(r.notify), done_when: parseDoneWhenColumn(r.done_when) };
 }
 
-const doneWhenSchema = z.array(z.object({ kind: z.enum(['issue', 'pr', 'doc']), ref: z.string() }));
+const doneWhenSchema = z.array(z.object({ kind: z.enum(['issue', 'pr', 'doc', 'release', 'date']), ref: z.string() }));
 
 function parseDoneWhenColumn(column: string | null): DoneWhen[] {
   if (column === null) {

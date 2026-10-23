@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { LINEAR_GRAPHQL_URL, linearDocuments, linearIssues } from '../../mocks/linear-handlers.ts';
 import { server } from '../../mocks/node.ts';
 import { buildFiledNode } from '../../test/build-filed-node.ts';
+import { buildStubProgramRunner } from '../../test/build-stub-program-runner.ts';
 import { createCapacitySample } from '../../test/create-capacity-sample.ts';
 import { freshDb } from '../../test/helpers.ts';
 import { readReadyByLane } from '../areas/read-ready-by-lane.ts';
@@ -243,6 +244,25 @@ test('it closes the items whose Linear issue is Done and whose document is decid
   expect(getUnblock(ctx.db, 'steam-test')?.note).toBe('settled: issue:KET-7 Done');
   expect(getUnblock(ctx.db, 'descale-plan')?.note).toBe('settled: doc:descaling-plan-abc123def456 decided');
   expect(logs.filter((line) => line.includes('unblock conditions'))).toStrictEqual(['2026-10-15T20:00:00Z unblock conditions: closed steam-test, descale-plan as done']);
+});
+
+// At 20:00 UTC with every other sync fresh: a watch whose deadline passed at 19:00 waits on nothing hq reads.
+test('it logs the items a due unblock pass found overdue', async () => {
+  const ctx = setupTest();
+  const logs: string[] = [];
+  const run = buildStubProgramRunner({
+    bash: { code: 0, stdout: JSON.stringify({ imp: { freeMib: 0, room: false }, providers: { claude: { room: false, unattended: true, target: 'imp' } } }), stderr: '' },
+    gh: { code: 0, stdout: '[]', stderr: '' },
+  });
+  onTestFinished(overrideEnv('HQ_NOW', '2026-10-15T20:00:00Z'));
+  for (const key of ['kinds_synced_at', 'goals_synced_at', 'goals_ok_at', 'kinds_ok_at', 'linear_synced_at', 'lanes_ready_linear_at']) {
+    setMeta(ctx.db, key, '2026-10-15T20:00:00Z');
+  }
+  addUnblock(ctx.db, { id: 'kettle-watch', task: 'Live-check the kettle once it ships', minutes: null, unblocks: [], notify: ['kettle-qa'], actor: 'kettle-triage', kind: 'watch', deadline: '2026-10-15T19:00:00Z' });
+
+  await watchTick(ctx.db, { me: 'hq-lanes', run, log: (line) => logs.push(line), stepMs: 2000, steps: { runs: () => Promise.resolve(), weekly: () => Promise.resolve(false), health: () => Promise.resolve({ opened: [], cleared: [] }) } });
+
+  expect(logs.filter((line) => line.includes('unblock conditions'))).toStrictEqual(['2026-10-15T20:00:00Z unblock conditions: overdue, sessions told: kettle-watch']);
 });
 
 test('a goals sync the deadline gave up on is not started again until it stops', async () => {

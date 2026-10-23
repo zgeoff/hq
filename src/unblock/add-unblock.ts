@@ -28,6 +28,9 @@ export function addUnblock(
       const fields = [input.task, input.minutes, JSON.stringify(input.unblocks), rank, JSON.stringify(input.notify)] as const;
       if (prev && prev.state === 'open') {
         const doneWhen = mergeDoneWhen(prev.done_when, input.doneWhen ?? []);
+        const kind = input.kind ?? prev.kind;
+        const deadline = input.deadline === undefined ? prev.deadline : input.deadline;
+        const toldAt = deadline === prev.deadline ? prev.overdue_told_at : null;
         const clear = input.fromItem === true ? '' : ', title=NULL, item=NULL',
           same =
             prev.task === input.task &&
@@ -36,10 +39,12 @@ export function addUnblock(
             prev.rank === rank &&
             doneWhen.length === prev.done_when.length &&
             JSON.stringify(prev.notify) === fields[4] &&
+            prev.kind === kind &&
+            prev.deadline === deadline &&
             (input.fromItem === true || (prev.title === null && prev.item === null));
         if (same) return { item: prev, result: 'noop' as const, warnings: [] };
         checkUnblock(prev.id, 'updated', prev.state);
-        db.query(`UPDATE unblocks SET task=?, minutes=?, unblocks=?, rank=?, notify=?, done_when=?${clear}, updated_at=? WHERE id=?`).run(...fields, toColumn(doneWhen), t, prev.id);
+        db.query(`UPDATE unblocks SET task=?, minutes=?, unblocks=?, rank=?, notify=?, done_when=?, kind=?, deadline=?, overdue_told_at=?${clear}, updated_at=? WHERE id=?`).run(...fields, toColumn(doneWhen), kind, deadline, toldAt, t, prev.id);
         logEvent(db, 'unblock', prev.id, 'updated', input.actor, 'open', 'open', { task: input.task, ...(doneWhen.length === prev.done_when.length ? {} : { done_when: doneWhen }) });
         return { item: getUnblock(db, prev.id)!, result: 'updated' as const, warnings: [] };
       }
@@ -47,17 +52,17 @@ export function addUnblock(
       if (prev) {
         checkUnblock(prev.id, 'reopened', prev.state);
         db.query(
-          `UPDATE unblocks SET task=?, minutes=?, unblocks=?, rank=?, notify=?, done_when=?, state='open', added_by=?, added_seq=?, added_at=?, closed_at=NULL, note=NULL, due_at=NULL, title=NULL, item=NULL, updated_at=? WHERE id=?`,
-        ).run(...fields, toColumn(input.doneWhen ?? []), input.actor, seq, t, t, prev.id);
+          `UPDATE unblocks SET task=?, minutes=?, unblocks=?, rank=?, notify=?, done_when=?, kind=?, deadline=?, overdue_told_at=NULL, state='open', added_by=?, added_seq=?, added_at=?, closed_at=NULL, note=NULL, due_at=NULL, title=NULL, item=NULL, updated_at=? WHERE id=?`,
+        ).run(...fields, toColumn(input.doneWhen ?? []), input.kind ?? 'owner', input.deadline ?? null, input.actor, seq, t, t, prev.id);
         logEvent(db, 'unblock', prev.id, 'reopened', input.actor, prev.state, 'open', { task: input.task });
         return { item: getUnblock(db, prev.id)!, result: 'reopened' as const, warnings: closedForIssues(db, input.unblocks.map((x) => x.issue), prev.id) };
       }
       const id = input.id ?? `u${seq}`;
       if (getUnblock(db, id)) throw new HqError('id_taken', `unblock id ${id} exists: pass --id`);
       db.query(
-        `INSERT INTO unblocks (id, task, minutes, unblocks, rank, notify, done_when, added_by, state, added_seq, added_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'open', ?, ?, ?)`,
-      ).run(id, ...fields, toColumn(input.doneWhen ?? []), input.actor, seq, t, t);
+        `INSERT INTO unblocks (id, task, minutes, unblocks, rank, notify, done_when, kind, deadline, added_by, state, added_seq, added_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?, ?, ?)`,
+      ).run(id, ...fields, toColumn(input.doneWhen ?? []), input.kind ?? 'owner', input.deadline ?? null, input.actor, seq, t, t);
       logEvent(db, 'unblock', id, 'added', input.actor, null, 'open', { task: input.task });
       return { item: getUnblock(db, id)!, result: 'added' as const, warnings: closedForIssues(db, input.unblocks.map((x) => x.issue), id) };
     })

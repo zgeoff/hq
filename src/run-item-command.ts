@@ -13,6 +13,7 @@ import { setStuView } from './set-stu-view.ts';
 import { setUnblockLater } from './set-unblock-later.ts';
 import { parseDoneWhen } from './unblock/parse-done-when.ts';
 import { parseUnblocks } from './unblock/parse-unblocks.ts';
+import { parseWatchFlags } from './unblock/parse-watch-flags.ts';
 import type { DoneWhen } from './unblock/types.ts';
 
 type ItemFlags = Record<string, string | string[] | boolean | undefined>;
@@ -54,6 +55,7 @@ async function runUnblockItemAdd(input: ItemCommandInput): Promise<Out> {
         unblocks: parseUnblocks(readFlag(input.flags, 'unblocks') ?? ''),
         notify: readList(input.flags, 'notify'),
         doneWhen: readDoneWhen(input.flags),
+        ...parseWatchFlags(readFlag(input.flags, 'kind'), readFlag(input.flags, 'deadline')),
         ...(rank === undefined ? {} : { rank }),
         actor: input.actor,
       },

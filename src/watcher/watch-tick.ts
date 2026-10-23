@@ -148,12 +148,15 @@ export async function watchTick(db: Database, d: WatchDeps): Promise<boolean> {
       d.log(`${at()} releases failed: ${msg(e)}`);
     }
     try {
-      const conditions = await step('unblock conditions', () => runUnblockConditionsTick(db, { call: makeAuditedLinearCaller(db, d.run), run: d.run }, d.me));
+      const conditions = await step('unblock conditions', () => runUnblockConditionsTick(db, { call: makeAuditedLinearCaller(db, d.run), run: d.run, ownerSession: owner() }, d.me));
       if (conditions && conditions.settled.length > 0) {
         d.log(`${at()} unblock conditions: closed ${conditions.settled.join(', ')} as done`);
       }
       if (conditions && conditions.dropped.length > 0) {
         d.log(`${at()} unblock conditions: dropped ${conditions.dropped.join(', ')}`);
+      }
+      if (conditions && conditions.overdue.length > 0) {
+        d.log(`${at()} unblock conditions: overdue, sessions told: ${conditions.overdue.join(', ')}`);
       }
       for (const problem of conditions?.errors ?? []) {
         d.log(`${at()} unblock conditions: ${problem}`);

@@ -206,7 +206,9 @@ import { addDoneWhen } from './unblock/add-done-when.ts';
 import { addUnblock } from './unblock/add-unblock.ts';
 import { closeUnblock } from './unblock/close-unblock.ts';
 import { getUnblock } from './unblock/get-unblock.ts';
+import { isOverdue } from './unblock/is-overdue.ts';
 import { isRecheck } from './unblock/is-recheck.ts';
+import { parseWatchFlags } from './unblock/parse-watch-flags.ts';
 import { listUnblocks } from './unblock/list-unblocks.ts';
 import { markPushed } from './unblock/mark-pushed.ts';
 import { newSincePush } from './unblock/new-since-push.ts';
@@ -427,6 +429,7 @@ const OPTIONS = {
   reset: { type: 'boolean' },
   around: { type: 'string' },
   kind: { type: 'string' },
+  deadline: { type: 'string' },
   ref: { type: 'string' },
   at: { type: 'string' },
   remote: { type: 'boolean' },
@@ -577,7 +580,9 @@ function unblockLine(u: UnblockItem, i?: number): string {
   const state = u.state === 'open' ? '' : ` [${u.state}]`;
   const doneWhen = u.done_when.length > 0 ? ` · done when ${formatDoneWhen(u.done_when)}` : '';
   const recheck = isRecheck(u, now()) ? ' · recheck' : '';
-  return `${n}${u.task}${mins}${what}${doneWhen} · added ${u.added_at}${rank} · id ${u.id}${state}${recheck}${formatUnblockLater(u)}`;
+  const watch = u.kind === 'watch' ? ' · watch' : '';
+  const deadline = u.deadline === null ? '' : ` · deadline ${u.deadline}${isOverdue(u, now()) ? ' OVERDUE' : ''}`;
+  return `${n}${u.task}${watch}${mins}${what}${doneWhen}${deadline} · added ${u.added_at}${rank} · id ${u.id}${state}${recheck}${formatUnblockLater(u)}`;
 }
 
 function flushNote(f: (FlushResult & { pending?: number }) | null): string {
@@ -701,6 +706,7 @@ async function unblockCommand(db: Database, verb: string, args: string[], flags:
         rank: flags.rank === undefined ? undefined : intFlag(flags.rank, 'rank'),
         notify: list(flags.notify),
         doneWhen: (flags['done-when'] ?? []).map((raw) => parseDoneWhen(raw)),
+        ...parseWatchFlags(flags.kind, flags.deadline),
         actor: await by(),
       });
       const warn = r.warnings.map(
@@ -711,7 +717,7 @@ async function unblockCommand(db: Database, verb: string, args: string[], flags:
     case 'list': {
       const state = (flags.state ?? 'open') as 'open' | 'done' | 'dropped' | 'all';
       const items = listUnblocks(db, state);
-      return { data: { items: items.map((item) => ({ ...item, recheck: isRecheck(item, now()) })) }, text: items.length > 0 ? items.map((item) => unblockLine(item)).join('\n') : 'Nothing needs the owner\'s hands. Remarkable.' };
+      return { data: { items: items.map((item) => ({ ...item, recheck: isRecheck(item, now()), overdue: isOverdue(item, now()) })) }, text: items.length > 0 ? items.map((item) => unblockLine(item)).join('\n') : 'Nothing needs the owner\'s hands. Remarkable.' };
     }
     case 'new': {
       const items = newSincePush(db);
@@ -739,7 +745,7 @@ async function unblockCommand(db: Database, verb: string, args: string[], flags:
     case 'done-when': {
       const conditions = args.slice(1).map((raw) => parseDoneWhen(raw));
       if (conditions.length === 0) {
-        throw new HqError('bad_args', 'hq unblock done-when <id> <issue:GEO-1|pr:repo#1|doc:ID>...');
+        throw new HqError('bad_args', 'hq unblock done-when <id> <issue:GEO-1|pr:repo#1|doc:ID|release:repo|date:ISO>...');
       }
       const who = await by();
       const item = addDoneWhen(db, need(args[0], 'id (first argument)'), conditions, who);
@@ -749,7 +755,7 @@ async function unblockCommand(db: Database, verb: string, args: string[], flags:
       const u = getUnblock(db, need(args[0], 'id (first argument)'));
       if (!u) throw new HqError('not_found', `no unblock item ${args[0]}`);
       const h = flags.history ? history(db, 'unblock', u.id) : undefined;
-      return { data: { item: { ...u, recheck: isRecheck(u, now()) }, ...(h ? { history: h } : {}) }, text: unblockLine(u) };
+      return { data: { item: { ...u, recheck: isRecheck(u, now()), overdue: isOverdue(u, now()) }, ...(h ? { history: h } : {}) }, text: unblockLine(u) };
     }
     default:
       throw new HqError('bad_args', `unknown command: hq unblock ${verb}`);
@@ -1921,7 +1927,9 @@ function status(db: Database): Out {
   for (const c of counts) byKind[c.kind]![c.state] = c.n;
   const later = db.query(`SELECT id, kind, due_at FROM asks WHERE state='later' ORDER BY due_at, id`).all() as { id: string; kind: Kind; due_at: string }[];
   const nextLater = later[0] ?? null;
-  const unblockOpen = listUnblocks(db, 'open').length;
+  const openUnblocks = listUnblocks(db, 'open');
+  const unblockOpen = openUnblocks.filter((item) => item.kind !== 'watch').length;
+  const unblockWatching = openUnblocks.length - unblockOpen;
   const unblockNew = newSincePush(db).length;
   const outbox = db.query(`SELECT status, COUNT(*) AS n FROM outbox WHERE status != 'sent' GROUP BY status`).all() as { status: string; n: number }[];
   const ob = Object.fromEntries(outbox.map((o) => [o.status, o.n]));
@@ -1933,7 +1941,7 @@ function status(db: Database): Out {
     next ? `NEXT: ${askLine(next)}${waits.length ? `\n  waits: ${waits.join('; ')}` : '\n  ready to open'}` : 'NEXT: none',
     `calls: ${fmtCounts(byKind['call'] ?? {})} · proposals: ${fmtCounts(byKind['proposal'] ?? {})}`,
     later.length ? `later:\n${later.map((l) => `  ${l.kind} ${l.id} due ${l.due_at}`).join('\n')}` : null,
-    `unblock: ${unblockOpen} open, ${unblockNew} new since push`,
+    `unblock: ${unblockOpen} open, ${unblockNew} new since push${unblockWatching > 0 ? `, ${unblockWatching} watching` : ''}`,
     hold ? `HOLD: ${hold.reason} (since ${hold.since}, by ${hold.by})` : null,
     ob['pending'] || ob['failed'] ? `outbox: ${ob['pending'] ?? 0} pending, ${ob['failed'] ?? 0} failed (hq outbox flush --retry)` : null,
   ].filter(Boolean);
@@ -1946,7 +1954,7 @@ function status(db: Database): Out {
       counts: byKind,
       nextLater,
       later,
-      unblock: { open: unblockOpen, newSincePush: unblockNew },
+      unblock: { open: unblockOpen, newSincePush: unblockNew, watching: unblockWatching },
       hold,
       outbox: { pending: ob['pending'] ?? 0, failed: ob['failed'] ?? 0 },
     },

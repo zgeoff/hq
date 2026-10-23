@@ -1,5 +1,5 @@
 // What the console's Needs you view shows: every call and proposal the owner can answer now, then every
-// open unblock item, each as one Item (console brief). An item filed as free text shows its body as
+// open unblock item but a watch, each as one Item (console brief). An item filed as free text shows its body as
 // one details section and no options, so the owner answers it in the note box.
 import type { Database } from 'bun:sqlite';
 import type { Ask } from './asks/types.ts';
@@ -61,7 +61,7 @@ function buildFromExtras(extras: ItemExtras): Pick<ConsoleItem, 'deadline' | 'ti
 }
 
 function loadDueTodos(db: Database, t: string): UnblockItem[] {
-  return listUnblocks(db, 'open').filter((u) => u.due_at === null || u.due_at <= t);
+  return listUnblocks(db, 'open').filter((item) => item.kind !== 'watch' && (item.due_at === null || item.due_at <= t));
 }
 
 function buildUnblockItem(u: UnblockItem): ConsoleItem {

@@ -80,6 +80,15 @@ test('status names why the next item waits', async () => {
   expect((await hq('status')).json.waits).toEqual([]);
 });
 
+test('status counts a watch apart from the open items that need the owner', async () => {
+  await hq('unblock', 'add', '--id', 'descale', '--task', 'Descale the kettle');
+  await hq('unblock', 'add', '--id', 'kettle-release', '--task', 'Live-check the kettle release', '--kind', 'watch', '--done-when', 'release:kettle-co/kettle');
+
+  const status = await hq('status');
+
+  expect(status.json.unblock).toStrictEqual({ open: 1, newSincePush: 1, watching: 1 });
+});
+
 test('unblock add, list, new, pushed', async () => {
   await hq('unblock', 'add', '--id', 'kettle', '--task', 'Try the kettle', '--minutes', '5', '--unblocks', 'GEO-2:high');
   expect((await hq('unblock', 'list')).json.items).toHaveLength(1);
@@ -183,7 +192,11 @@ test('it marks an item with no condition as recheck in hq unblock list after 3 d
       title: null,
       due_at: null,
       done_when: [],
+      kind: 'owner',
+      deadline: null,
+      overdue_told_at: null,
       recheck: true,
+      overdue: false,
     },
   ]);
 });
@@ -213,7 +226,11 @@ test('it does not mark an item with no condition as recheck in hq unblock list a
       title: null,
       due_at: null,
       done_when: [],
+      kind: 'owner',
+      deadline: null,
+      overdue_told_at: null,
       recheck: false,
+      overdue: false,
     },
   ]);
 });
@@ -243,7 +260,11 @@ test('it never marks an item with a condition as recheck in hq unblock list', as
       title: null,
       due_at: null,
       done_when: [{ kind: 'issue', ref: 'KET-7' }],
+      kind: 'owner',
+      deadline: null,
+      overdue_told_at: null,
       recheck: false,
+      overdue: false,
     },
   ]);
 });

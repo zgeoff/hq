@@ -16,5 +16,5 @@ export async function runUnblockConditionsTick(db: Database, deps: ConditionsDep
     return null;
   }
   setMeta(db, CHECKED_AT, iso(at));
-  return await checkUnblockConditions(db, deps, actor);
+  return await checkUnblockConditions(db, deps, actor, at);
 }

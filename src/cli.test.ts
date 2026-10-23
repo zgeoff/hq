@@ -93,6 +93,28 @@ test('hq run place moves an imp run to local through the spawned CLI, and hq lan
   expect(JSON.parse(lanes.stdout)).toMatchObject({ plan: { pool: { impRunning: 0, localRunning: 1 } } });
 });
 
+test('hq unblock add files a watch with a deadline, and hq unblock list shows it overdue once the deadline passes', async () => {
+  const fresh = freshDb();
+  onTestFinished(fresh.cleanup);
+  const hq = async (now: string, ...args: string[]): Promise<{ code: number; stdout: string }> => {
+    const child = Bun.spawn(['bun', join(import.meta.dir, 'cli.ts'), 'unblock', ...args], {
+      stdout: 'pipe',
+      stderr: 'pipe',
+      env: { ...process.env, HOME: fresh.dir, HQ_DB: fresh.path, HQ_NOTIFY: 'off', HQ_NOW: now, HQ_AS: 'kettle-qa' },
+    });
+    const [code, stdout] = await Promise.all([child.exited, new Response(child.stdout).text()]);
+    return { code, stdout };
+  };
+  const added = await hq(NOON_SYDNEY, 'add', '--id', 'kettle-release', '--task', 'Live-check the kettle release', '--kind', 'watch', '--deadline', '2026-10-14T02:00:00Z', '--done-when', 'release:kettle-co/kettle', '--json');
+
+  const listed = await hq('2026-10-14T02:30:00Z', 'list');
+  const json = await hq('2026-10-14T02:30:00Z', 'list', '--json');
+
+  expect(added.code).toBe(0);
+  expect(listed.stdout).toBe('Live-check the kettle release · watch · done when release:kettle-co/kettle · deadline 2026-10-14T02:00:00Z OVERDUE · added 2026-10-14T01:00:00Z · id kettle-release\n');
+  expect(JSON.parse(json.stdout)).toMatchObject({ items: [{ id: 'kettle-release', kind: 'watch', deadline: '2026-10-14T02:00:00Z', overdue: true }] });
+});
+
 test('hq run done closes the run, forgets its session through atc, and notes the wrap-up on the run', async () => {
   const fresh = freshDb();
   onTestFinished(fresh.cleanup);
