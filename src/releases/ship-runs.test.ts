@@ -542,3 +542,28 @@ test('it reads the gates file once in a pass for two cloud PRs', async () => {
 
   expect(ctx.calls.filter((call) => call.includes('gates.yml'))).toHaveLength(1);
 });
+
+test('it reads a failed gates file once in a pass for two cloud PRs, records one error, and ships neither', async () => {
+  const ctx = setupTest();
+  createMergedRun(ctx.db, 'GEO-9810', ['cloud#51']);
+  createMergedRun(ctx.db, 'GEO-9811', ['cloud#52']);
+  const run = buildStubSourceGH(
+    {
+      shas: { 'cloud#51': buildMockSha(51), 'cloud#52': buildMockSha(52) },
+      contains: { 'deployed/prod': [buildMockSha(51), buildMockSha(52)] },
+      tags: { 'deployed/prod': buildMockSha(4200) },
+      files: { 'cloud#51': ['infra/kettle.ts'], 'cloud#52': ['infra/teapot.ts'] },
+    },
+    ctx.calls,
+  );
+
+  const result = await shipRuns(ctx.db, run, ctx.now);
+
+  expect(ctx.calls.filter((call) => call.includes('gates.yml'))).toHaveLength(1);
+  expect(result.errors).toStrictEqual(['cloud: gates of cloud failed (1): gh: Not Found (HTTP 404)']);
+  expect(result.moved).toStrictEqual([]);
+  expect([ctx.readPr('cloud#51'), ctx.readPr('cloud#52')]).toStrictEqual([
+    { merge_sha: buildMockSha(51), shipped_tag: null, shipped_at: null },
+    { merge_sha: buildMockSha(52), shipped_tag: null, shipped_at: null },
+  ]);
+});
