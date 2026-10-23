@@ -1,6 +1,6 @@
-// `hq pr status`, `hq pr answer`, `hq pr override`, `hq pr accept-risk` and `hq pr next`: the one
-// record every session reads before it messages another session about a PR. Only an override and an
-// accepted risk change what the merge gate passes.
+// `hq pr status|answer|override|accept-risk|mechanical|exempt|next`: the one record every session
+// reads before it messages another session about a PR. Only an override, an accepted risk and
+// z-review's two records change what the merge gate passes.
 import type { Database } from 'bun:sqlite';
 import type { Flags } from '../cli.ts';
 import type { Out } from '../commands.ts';
@@ -10,22 +10,29 @@ import { getDeclaredSessions } from '../roles/get-declared-sessions.ts';
 import { roleName } from '../roles/role-name.ts';
 import type { Runner } from '../runner/types.ts';
 import { buildPRStatusView } from './build-pr-status-view.ts';
+import { readHeadExemption } from './read-head-exemption.ts';
+import { readHeadMechanical } from './read-head-mechanical.ts';
 import { findOwnerOverride } from './find-owner-override.ts';
 import type { OwnerOverride } from './find-owner-override.ts';
 import { findSourceRefusal } from './find-source-refusal.ts';
 import type { SourceRequest } from './find-source-refusal.ts';
 import { findPRStatus } from './find-pr-status.ts';
 import { formatOverrideLine } from './format-override-line.ts';
+import { formatReviewRecordsLine } from './format-review-records-line.ts';
 import { formatPRStatus } from './format-pr-status.ts';
 import { hasPROverride } from './has-pr-override.ts';
+import { hasReviewerRecord } from './has-reviewer-record.ts';
 import { parsePRRef } from './parse-pr-ref.ts';
 import type { PRRef } from './parse-pr-ref.ts';
 import type { OwnerProbe } from './read-owner-session.ts';
+import type { RoleProbe } from './read-role-session.ts';
 import { readPRHead } from './read-pr-head.ts';
 import { recordPRAnswer } from './record-pr-answer.ts';
 import { recordPRAcceptedRisk } from './record-pr-accepted-risk.ts';
 import { recordPROverride } from './record-pr-override.ts';
 import { recordPRNext } from './record-pr-next.ts';
+import { runPRExempt } from './run-pr-exempt.ts';
+import { runPRMechanical } from './run-pr-mechanical.ts';
 import { requireAnswerSource } from './require-answer-source.ts';
 import type { PRAnswer, PRStatusView } from './types.ts';
 import { updatePRHead } from './update-pr-head.ts';
@@ -38,6 +45,7 @@ export interface PRCommandInput {
   flags: Flags;
   actor: () => Promise<string>;
   readOwnerSession: () => Promise<OwnerProbe>;
+  readReviewerSession: () => Promise<RoleProbe>;
 }
 
 const ANSWERS = new Set(['lgtm', 'changes', 'reject']),
@@ -57,10 +65,16 @@ export async function runPRCommand(input: PRCommandInput): Promise<Out> {
   if (input.verb === 'accept-risk') {
     return await runAcceptRisk(input, parsePRRef(rawRepo, rawPR), third);
   }
+  if (input.verb === 'mechanical') {
+    return await runPRMechanical(input, parsePRRef(rawRepo, rawPR));
+  }
+  if (input.verb === 'exempt') {
+    return await runPRExempt(input, parsePRRef(rawRepo, rawPR));
+  }
   if (input.verb === 'next') {
     return await runNext(input, parsePRRef(rawRepo, rawPR), third);
   }
-  throw new HqError('bad_args', 'usage: hq pr status|answer|override|accept-risk|next <repo> <pr>');
+  throw new HqError('bad_args', 'usage: hq pr status|answer|override|accept-risk|mechanical|exempt|next <repo> <pr>');
 }
 
 async function runStatus(input: PRCommandInput, ref: PRRef): Promise<Out> {
@@ -71,25 +85,38 @@ async function runStatus(input: PRCommandInput, ref: PRRef): Promise<Out> {
   return await refreshStatus(input, ref, row);
 }
 
-// A PR with no record may still hold the owner's override, which the reviewer needs to see; gh is
-// read only when an override was ever recorded.
+// A PR with no record may still hold the owner's override or z-review's records, which the reviewer
+// needs to see; gh is read only when one was ever recorded.
 async function readUnrecordedStatus(input: PRCommandInput, ref: PRRef): Promise<Out> {
   const none: Out = { data: { pr: null }, text: `No record for ${ref.repo}#${ref.pr}.` };
-  if (!hasPROverride(input.db, ref.repo, ref.pr)) {
+  if (!hasPROverride(input.db, ref.repo, ref.pr) && !hasReviewerRecord(input.db, ref.repo, ref.pr)) {
     return none;
   }
   const head = await readPRHead(input.run, ref.slug, ref.pr);
   const override = findStandingOverride(input, ref, head);
-  if (override === null) {
+  const records = readStandingRecords(input, ref, head);
+  const shown = override === null ? null : { head: override.head, source: override.source, note: override.note, at: override.at };
+  const recordsLine = formatReviewRecordsLine(records);
+  if (shown === null && recordsLine === null) {
     return none;
   }
-  const shown = { head: override.head, source: override.source, note: override.note, at: override.at };
-  return { data: { pr: null, override: shown }, text: `${none.text}\n${formatOverrideLine(shown)}` };
+  const lines = [none.text, shown === null ? null : formatOverrideLine(shown), recordsLine].filter((line): line is string => line !== null);
+  return { data: { pr: null, ...(shown === null ? {} : { override: shown }), ...(recordsLine === null ? {} : { reviewRecords: records }) }, text: lines.join('\n') };
 }
 
 // The override that stands at the head now; none when the head is unknown.
 function findStandingOverride(input: PRCommandInput, ref: PRRef, head: string | null): OwnerOverride | null {
   return head === null ? null : findOwnerOverride(input.db, ref.repo, ref.pr, head);
+}
+
+// z-review's records that stand at the head; none when the head is unknown.
+function readStandingRecords(input: PRCommandInput, ref: PRRef, head: string | null): PRStatusView['reviewRecords'] {
+  if (head === null) {
+    return { mechanical: null, exemption: null };
+  }
+  const mechanical = readHeadMechanical(input.db, ref.repo, ref.pr, head);
+  const exemption = readHeadExemption(input.db, ref.repo, ref.pr, head);
+  return { mechanical: mechanical === null ? null : { files: mechanical.files, lines: mechanical.lines }, exemption: exemption === null ? null : { rule: exemption.rule, note: exemption.note, files: exemption.files } };
 }
 
 // The record against the head gh gives now; that head is also stored as the one hq last saw.
@@ -98,7 +125,7 @@ async function refreshStatus(input: PRCommandInput, ref: PRRef, row: PRStatusRow
   if (current !== null) {
     await updatePRHead(input.db, ref.repo, ref.pr, current);
   }
-  return buildOut(buildPRStatusView(row, current, findStandingOverride(input, ref, current)));
+  return buildOut(buildPRStatusView(row, current, findStandingOverride(input, ref, current), readStandingRecords(input, ref, current)));
 }
 
 function buildOut(view: PRStatusView): Out {
@@ -211,7 +238,7 @@ function requireNextHolder(flags: Flags, session: string | undefined): string | 
 // The record after an answer, against the head that answer was just stored at.
 async function readOut(input: PRCommandInput, ref: PRRef, head: string): Promise<Out> {
   const row = await readWrittenRow(input, ref);
-  return buildOut(buildPRStatusView(row, head, findStandingOverride(input, ref, head)));
+  return buildOut(buildPRStatusView(row, head, findStandingOverride(input, ref, head), readStandingRecords(input, ref, head)));
 }
 
 async function readWrittenRow(input: PRCommandInput, ref: PRRef): Promise<PRStatusRow> {

@@ -1,4 +1,5 @@
 import { formatOverrideLine } from './format-override-line.ts';
+import { formatReviewRecordsLine } from './format-review-records-line.ts';
 import type { PRStatusView } from './types.ts';
 
 // The record in words. A stale line says `stale at <short head>`, the head it was recorded at.
@@ -6,6 +7,10 @@ export function formatPRStatus(view: PRStatusView): string {
   const lines = [`${view.repo}#${view.pr}  ${formatHead(view)}`, formatGateLine(view), formatAnswerLine(view), formatNextLine(view)];
   if (view.override !== null) {
     lines.push(formatOverrideLine(view.override));
+  }
+  const records = formatReviewRecordsLine(view.reviewRecords);
+  if (records !== null) {
+    lines.push(records);
   }
   if (!view.headKnown) {
     lines.push('The PR head could not be read, so stale is unknown.');

@@ -25,6 +25,9 @@ export interface PRStatusView {
 
   // The owner's override of noslop's refusal at the head now, when one stands.
   override: { head: string; source: string; note: string; at: string } | null;
+
+  // z-review's records at the head now. Neither is an owner answer.
+  reviewRecords: { mechanical: { files: string[]; lines: number } | null; exemption: { rule: string; note: string; files: string[] } | null };
   updatedAt: string;
 }
 

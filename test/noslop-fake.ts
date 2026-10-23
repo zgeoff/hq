@@ -122,6 +122,9 @@ function pickGhAnswer(script: FakeScript, line: string): RunResult | null {
   if (line.includes('--json headRefName,baseRefName')) {
     return buildResult(JSON.stringify({ headRefName: 'feat', baseRefName: 'main', body: script.prBody ?? '' }));
   }
+  if (line.endsWith('--json baseRefName')) {
+    return buildResult(JSON.stringify({ baseRefName: 'main' }));
+  }
   if (line.includes('--json headRefName,headRefOid,baseRefName')) {
     return buildResult(JSON.stringify({ headRefName: 'feat', headRefOid: FAKE_FULL_SHA, baseRefName: 'main' }));
   }

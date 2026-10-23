@@ -8,6 +8,8 @@ import { assertPR } from './assert-pr.ts';
 import { buildSlug } from './build-slug.ts';
 import { checkCIGreen } from './check-ci-green.ts';
 import { collectOpenFindingIDs } from './collect-open-finding-ids.ts';
+import { checkInstructionHold } from './check-instruction-hold.ts';
+import { findInstructionHeldTest } from './find-instruction-held-test.ts';
 import { findOwnerHeldTest } from './find-owner-held-test.ts';
 import { isBotAuthor } from './is-bot-author.ts';
 import type { PRAuthor } from './is-bot-author.ts';
@@ -48,7 +50,7 @@ export async function checkMergeGate(request: PRRequest, onHead?: OnGateHead): P
       throw buildBlock(parsed, request.pr, red.reason);
     })
     .exhaustive();
-  await checkOwnerHeld(request, parsed, facts.headRefOid);
+  await checkOwnerHeld(request, parsed, facts);
   if (unreviewed !== null) {
     return { mayMerge: true, reason: unreviewed, reviewed: false };
   }
@@ -68,16 +70,26 @@ function readUnreviewedRoute(request: PRRequest, parsed: ParsedRepo, author: PRA
     .exhaustive();
 }
 
-// On every route: a change to an owner-held path needs the owner's own lgtm at the head.
-async function checkOwnerHeld(request: PRRequest, parsed: ParsedRepo, head: string): Promise<void> {
-  const isHeld = findOwnerHeldTest(parsed);
-  if (isHeld === null) {
+// On every route: a change to an owner-held path needs the owner's own lgtm at the head, and a change
+// to a repo instruction file needs it unless hq clears that hold.
+async function checkOwnerHeld(request: PRRequest, parsed: ParsedRepo, facts: GateFacts): Promise<void> {
+  const ownerHeld = findOwnerHeldTest(parsed);
+  const instructionHeld = findInstructionHeldTest(parsed);
+  if (ownerHeld === null && instructionHeld === null) {
     return;
   }
+  const isHeld = ownerHeld ?? (() => false);
+  const isInstruction = instructionHeld ?? (() => false);
+  const head = facts.headRefOid;
   const files = await readPRFiles(request.run, buildSlug(parsed), request.pr);
-  const lgtm = readHeadLgtm(request.db, parsed.repo, request.pr, head);
+  const lgtm = readHeadLgtm(request.db, parsed.repo, request.pr, head) !== null;
+  const instruction = files.filter((file) => isInstruction(file));
+  if (ownerHeld === null && instruction.length === 0) {
+    return;
+  }
+  const hold = instruction.length === 0 ? { clear: true, hint: '' } : await checkInstructionHold(request, parsed, { head, author: facts.author, files: instruction, lgtm });
   const headNow = await readPRHead(request.run, buildSlug(parsed), request.pr);
-  match(pickOwnerHeldVerdict({ repo: parsed.repo, pr: request.pr, held: files.filter((file) => isHeld(file)), lgtm: lgtm !== null, head, headNow }))
+  match(pickOwnerHeldVerdict({ repo: parsed.repo, pr: request.pr, held: files.filter((file) => isHeld(file)), instruction, instructionClear: hold.clear, instructionHint: hold.hint, lgtm, head, headNow }))
     .with({ pass: true }, () => null)
     .with({ pass: false }, (blocked) => {
       throw buildBlock(parsed, request.pr, blocked.reason);
