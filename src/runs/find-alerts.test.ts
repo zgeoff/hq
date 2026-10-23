@@ -164,14 +164,16 @@ test('it raises the FINAL alert for a run whose wait names no open unblock item'
   ]);
 });
 
-test('it raises no exited alert for a helper asleep in its suspended imp', () => {
+test('it raises no exited or quiet alert for a helper asleep in its suspended imp, three hours after its last activity', () => {
   const ctx = setupTest();
   addRun(ctx.db, { issue: 'GEO-9841', title: 'Invented kettle work', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
   setSession(ctx.db, 'GEO-9841', '98410000-0000-4000-8000-000000000001', 'kettle-bot', 'add');
 
   const asleep = { id: '98410000-0000-4000-8000-000000000001', name: 'kettle helper', alive: false, state: 'exited', lifecycle: { desired: 'run', vm: 'asleep', harness: 'suspended' } };
 
-  expect(findAlerts(ctx.db, [asleep], new Map(), new Date('2026-10-21T03:00:00Z'))).toStrictEqual([]);
+  const activity = new Map([['98410000-0000-4000-8000-000000000001', Date.parse('2026-10-21T00:00:00Z')]]);
+
+  expect(findAlerts(ctx.db, [asleep], activity, new Date('2026-10-21T03:00:00Z'))).toStrictEqual([]);
 });
 
 test('it raises the exited alert for a helper atc lists as ended', () => {
