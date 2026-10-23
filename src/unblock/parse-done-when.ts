@@ -1,4 +1,4 @@
-import { iso } from '../clock/iso.ts';
+import { toExactISO } from '../clock/to-exact-iso.ts';
 import { HqError } from '../errors.ts';
 import type { DoneWhen } from './types.ts';
 
@@ -30,7 +30,7 @@ export function parseDoneWhen(raw: string): DoneWhen {
       return { kind, ref: `${groups['owner'] ?? DEFAULT_OWNER}/${groups['repo']}` };
     }
   } else if (kind === 'date' && ISO_TIME.test(ref) && !Number.isNaN(Date.parse(ref))) {
-    return { kind, ref: iso(new Date(ref)) };
+    return { kind, ref: toExactISO(new Date(ref)) };
   }
   throw new HqError('bad_args', `cannot read --done-when "${raw}": use issue:GEO-1, pr:repo#1 or pr:owner/repo#1, doc:<Linear document id, slug or URL>, release:repo or release:owner/repo, or date:<ISO time, such as 2026-11-02T09:00:00Z>`);
 }

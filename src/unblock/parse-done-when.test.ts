@@ -13,6 +13,7 @@ test.each<[string, DoneWhen]>([
   ['release:kettle-co/kettle', { kind: 'release', ref: 'kettle-co/kettle' }],
   ['date:2026-11-02T09:00:00.000Z', { kind: 'date', ref: '2026-11-02T09:00:00Z' }],
   ['date:2026-11-02T20:00:00+11:00', { kind: 'date', ref: '2026-11-02T09:00:00Z' }],
+  ['date:2026-11-02T09:00:00.900Z', { kind: 'date', ref: '2026-11-02T09:00:00.900Z' }],
 ])('it reads %s', (raw, expected) => {
   expect(parseDoneWhen(raw)).toStrictEqual(expected);
 });

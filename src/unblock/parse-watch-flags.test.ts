@@ -5,6 +5,10 @@ test('it reads a watch kind and a deadline, the deadline in UTC', () => {
   expect(parseWatchFlags('watch', '2026-11-02T20:00:00+11:00')).toStrictEqual({ kind: 'watch', deadline: '2026-11-02T09:00:00Z' });
 });
 
+test('it keeps the milliseconds of a deadline', () => {
+  expect(parseWatchFlags(undefined, '2026-11-02T09:00:00.900Z')).toStrictEqual({ deadline: '2026-11-02T09:00:00.900Z' });
+});
+
 test('it leaves out both when neither is given, so a refresh keeps the stored ones', () => {
   expect(parseWatchFlags(undefined, undefined)).toStrictEqual({});
 });

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { iso } from '../clock/iso.ts';
+import { toExactISO } from '../clock/to-exact-iso.ts';
 import { HqError } from '../errors.ts';
 import type { UnblockKind } from './types.ts';
 
@@ -26,7 +26,7 @@ export function parseWatchFlags(kind: string | undefined, deadline: string | und
     if (!ISO_TIME.test(deadline) || Number.isNaN(Date.parse(deadline))) {
       throw new HqError('bad_args', `--deadline takes an ISO time, such as 2026-11-02T09:00:00Z, not "${deadline.slice(0, 60)}"`);
     }
-    fields.deadline = iso(new Date(deadline));
+    fields.deadline = toExactISO(new Date(deadline));
   }
   return fields;
 }
