@@ -11,9 +11,6 @@ import { recordPRExemption } from './record-pr-exemption.ts';
 
 const NEWS_LIMIT = 400;
 
-// What is left of the line once the lead's fixed words and a short note are counted.
-const FILE_LIST_LIMIT = 150;
-
 // `hq pr exempt`: z-review's record that a policy exception covers the PR's repo instruction files
 // at this head. hq proves none of the rules, and the news line says so.
 export async function runPRExempt(input: PRCommandInput, ref: PRRef): Promise<Out> {
@@ -32,6 +29,9 @@ export async function runPRExempt(input: PRCommandInput, ref: PRRef): Promise<Ou
   addNews(input.db, { from: actor, topic: 'merge', text, issue: null, link: null, needsGeoff: false });
   return { data: { exemption: { repo: ref.repo, pr: ref.pr, head: hold.head, rule, note, files: hold.files } }, text: `Recorded ${text}` };
 }
+
+// What is left of the line once the lead's fixed words and a short note are counted.
+const FILE_LIST_LIMIT = 150;
 
 // A repo-sync exemption lists every held file, so the owner can spot an extra edit. When the whole
 // list cannot fit one news line, the line counts them and points to `hq pr status`, which lists
