@@ -1,6 +1,6 @@
 import type { Database } from 'bun:sqlite';
 import { HqError } from '../errors.ts';
-import { findUnfinishedWork } from './find-unfinished-work.ts';
+import { readUnfinishedWork } from './read-unfinished-work.ts';
 import { resolveRun } from './resolve-run.ts';
 
 const UNFINISHED_STATES = new Set(['working', 'blocked']);
@@ -12,7 +12,7 @@ export function requireFinishedRun(db: Database, issue: string, state: string, f
   if (force || !UNFINISHED_STATES.has(run.state) || !PAST_MERGE_STATES.has(state)) {
     return;
   }
-  const unfinished = findUnfinishedWork(db, run.issue);
+  const unfinished = readUnfinishedWork(db, run.issue);
   if (unfinished !== null) {
     throw new HqError('bad_state', `${run.issue} still has ${unfinished}, so its work is not finished: it moves to merged when its last PR merges and its session ends. Pass --force to move it to ${state} now.`);
   }
