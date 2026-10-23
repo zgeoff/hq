@@ -20,6 +20,11 @@ test.each<[string, RefreshMap, RefreshMap]>([
   ['restarting to idle', { 'z-kettle': { sessionId: 'id-kettle', phase: 'restarting', skips: 0 } }, { 'z-kettle': { sessionId: 'id-kettle', phase: 'idle', skips: 1, retryAt: '2026-10-14T04:11:00Z' } }],
   ['restarting to no entry', { 'z-kettle': { sessionId: 'id-kettle', phase: 'restarting', skips: 0 } }, {}],
   ['an unchanged restarting entry', { 'z-kettle': { sessionId: 'id-kettle', phase: 'restarting', skips: 0 } }, { 'z-kettle': { sessionId: 'id-kettle', phase: 'restarting', skips: 0 } }],
+  [
+    'an asked entry to the same entry with a new answer read time',
+    { 'z-kettle': { sessionId: 'id-kettle', phase: 'asked', askedAt: '2026-10-14T03:01:00Z', answerReadAt: '2026-10-14T03:06:00Z', eventSeq: 7, skips: 0 } },
+    { 'z-kettle': { sessionId: 'id-kettle', phase: 'asked', askedAt: '2026-10-14T03:01:00Z', answerReadAt: '2026-10-14T03:11:00Z', eventSeq: 7, skips: 0 } },
+  ],
 ])('it writes the move from %s', (_, stored, next) => {
   const ctx = setupTest();
   setMeta(ctx.db, 'fleet_refresh', JSON.stringify(stored));
@@ -35,6 +40,7 @@ test.each<[string, RefreshMap, RefreshMap]>([
   ['idle to restarting', { 'z-kettle': { sessionId: 'id-kettle', phase: 'idle', skips: 1 } }, { 'z-kettle': { sessionId: 'id-kettle', phase: 'restarting', skips: 1 } }],
   ['restarting to asked', { 'z-kettle': { sessionId: 'id-kettle', phase: 'restarting', skips: 0 } }, { 'z-kettle': { sessionId: 'id-kettle', phase: 'asked', eventSeq: 9, skips: 0 } }],
   ['asked to asked again', { 'z-kettle': { sessionId: 'id-kettle', phase: 'asked', eventSeq: 7, skips: 0 } }, { 'z-kettle': { sessionId: 'id-kettle', phase: 'asked', eventSeq: 8, skips: 0 } }],
+  ['asked to asked again with an answer read time', { 'z-kettle': { sessionId: 'id-kettle', phase: 'asked', eventSeq: 7, skips: 0 } }, { 'z-kettle': { sessionId: 'id-kettle', phase: 'asked', answerReadAt: '2026-10-14T03:11:00Z', eventSeq: 8, skips: 0 } }],
   ['asked for another session id to restarting', { 'z-kettle': { sessionId: 'id-kettle', phase: 'asked', eventSeq: 7, skips: 0 } }, { 'z-kettle': { sessionId: 'id-kettle-2', phase: 'restarting', eventSeq: 7, skips: 0 } }],
 ])('it refuses the move from %s and keeps the stored map', (_, stored, next) => {
   const ctx = setupTest();
