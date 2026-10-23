@@ -12,23 +12,23 @@ export interface RunningByPlace {
   // The running issues that hold a slot, parked ones left out.
   issues: string[];
 
-  // Why local is more than the runs filed local hold, or null when those runs set it.
+  // Why local is more than the runs here hold, or null when those runs set it.
   localSource: string | null;
 }
 
 const rowsSchema = z.array(z.object({ issue: z.string(), place: z.enum(['imp', 'local']) }));
 
-// The runs that hold a slot now, by where they run: working or blocked with an agent, less the
-// parked ones (a blocked run with no session awake, a working run whose sessions are gone). With a
-// fresh atc reading, local is at least the awake sessions on this PC that any run lists, whatever the
-// run's state, place or lane, and a run filed imp whose awake sessions are all here counts local only.
+// The runs that hold a slot, by place, less the parked ones. A fresh atc reading counts a run filed imp
+// whose awake sessions are all here as local, and lifts local to the awake sessions here that any run
+// lists, whatever its state, place or lane.
 export function readRunningByPlace(db: Database, at: Date = now()): RunningByPlace {
   const parked = new Set(parkedRuns(db, at).map((run) => run.issue));
   const rows = rowsSchema.parse(db.query(`SELECT issue, place FROM runs WHERE place != 'none' AND state IN (${RUNNING.map(() => '?').join(', ')}) ORDER BY issue`).all(...RUNNING));
   const holding = rows.filter((row) => !parked.has(row.issue));
-  const filedLocal = holding.filter((row) => row.place === 'local').length;
   const live = readLiveLocal(db, at);
-  const imp = holding.filter((row) => row.place === 'imp' && !live?.hereOnly.has(row.issue)).length;
+  const movedHere = holding.filter((row) => row.place === 'imp' && live?.hereOnly.has(row.issue) === true).length;
+  const filedLocal = holding.filter((row) => row.place === 'local').length + movedHere;
+  const imp = holding.filter((row) => row.place === 'imp').length - movedHere;
   const issues = holding.map((row) => row.issue);
   if (live === null || live.sessions <= filedLocal) {
     return { imp, local: filedLocal, issues, localSource: null };

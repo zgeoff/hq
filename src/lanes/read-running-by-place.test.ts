@@ -22,6 +22,17 @@ test('it counts a run filed imp whose awake session runs here as local, not imp'
   expect(readRunningByPlace(ctx.db)).toStrictEqual({ imp: 0, local: 1, issues: ['GEO-9901'], localSource: '1 live session here' });
 });
 
+test('it counts a run filed imp whose session runs here among the local runs when those runs outnumber the live sessions', () => {
+  const ctx = setupTest();
+  addRun(ctx.db, { issue: 'GEO-9911', title: 'Descale the kettle', place: 'local', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
+  addRun(ctx.db, { issue: 'GEO-9912', title: 'Polish the teapot', place: 'local', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
+  addRun(ctx.db, { issue: 'GEO-9913', title: 'Fill the kettle', place: 'local', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
+  addRun(ctx.db, { issue: 'GEO-9914', title: 'Warm the teapot', place: 'imp', session: 'a0000014-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
+  recordAwake(ctx.db, [{ id: 'a0000014-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'teapot-agent', alive: true, state: 'running', locator: { targetID: 'local' } }]);
+
+  expect(readRunningByPlace(ctx.db)).toStrictEqual({ imp: 0, local: 4, issues: ['GEO-9911', 'GEO-9912', 'GEO-9913', 'GEO-9914'], localSource: null });
+});
+
 test('it counts the awake local session of a merged run', () => {
   const ctx = setupTest();
   addRun(ctx.db, { issue: 'GEO-9902', title: 'Polish the teapot', place: 'local', session: 'a0000002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
