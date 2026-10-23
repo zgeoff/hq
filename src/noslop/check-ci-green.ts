@@ -1,7 +1,7 @@
 import { match } from 'ts-pattern';
 import type { GateCheck } from './read-gate-facts.ts';
 
-export type CIVerdict = { green: true } | { green: false; reason: string };
+export type CIVerdict = { green: true } | { green: false; reason: string } | { green: false; noChecks: true; reason: string };
 
 const NOSLOP_CHECK = 'noslop';
 
@@ -10,7 +10,7 @@ const NOSLOP_CHECK = 'noslop';
 export function checkCIGreen(checks: readonly GateCheck[]): CIVerdict {
   const counted = pickNewestRuns(checks).filter((check) => pickName(check) !== NOSLOP_CHECK);
   if (counted.length === 0) {
-    return { green: false, reason: 'the head has no CI checks, so CI has not passed' };
+    return { green: false, noChecks: true, reason: 'the head has no CI checks, so CI has not passed' };
   }
   const failing = counted.filter((check) => !isPassing(check)).map((check) => `${pickName(check)} (${pickState(check)})`);
   return failing.length === 0 ? { green: true } : { green: false, reason: `CI is not green: ${failing.join(', ')}` };

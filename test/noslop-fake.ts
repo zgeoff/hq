@@ -31,6 +31,9 @@ export interface FakeScript {
   // on the fixed head, with the author above, when absent.
   prFacts?: RunResult;
 
+  // What `gh api …/contents/.github/workflows?ref=<head>` answers: the folder is there when absent.
+  workflows?: RunResult;
+
   // What `gh api --paginate …/pulls/<pr>/files` prints: a path a line, with a renamed file's old
   // path after a tab. One source file when absent.
   prFiles?: RunResult;
@@ -139,6 +142,9 @@ function pickGhAnswer(script: FakeScript, line: string): RunResult | null {
   }
   if (line.includes('--json name,state,bucket')) {
     return buildResult('[{"name":"test","state":"SUCCESS","bucket":"pass"}]');
+  }
+  if (line.startsWith('gh api repos/') && line.includes('/contents/.github/workflows?ref=')) {
+    return script.workflows ?? buildResult('');
   }
   if (line.startsWith('gh api --paginate repos/') && line.includes('/files?')) {
     return script.prFiles ?? buildResult('src/kettle.ts\n');

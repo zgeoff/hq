@@ -24,6 +24,7 @@ import { readOKReviews } from './read-ok-reviews.ts';
 import { readPRFiles } from './read-pr-files.ts';
 import { pickNoslopVerdict } from './pick-noslop-verdict.ts';
 import { pickOwnerHeldVerdict } from './pick-owner-held-verdict.ts';
+import { probeNoCI } from './probe-no-ci.ts';
 import type { NoslopGateFacts } from './pick-noslop-verdict.ts';
 import { resolveEngine } from './resolve-engine.ts';
 import type { PRRequest } from './run-review-check.ts';
@@ -44,17 +45,28 @@ export async function checkMergeGate(request: PRRequest, onHead?: OnGateHead): P
   if (unreviewed === null) {
     onHead?.(facts.headRefOid);
   }
-  match(checkCIGreen(facts.statusCheckRollup))
-    .with({ green: true }, () => null)
-    .with({ green: false }, (red) => {
-      throw buildBlock(parsed, request.pr, red.reason);
-    })
-    .exhaustive();
+  const noCI = await checkCI(request, parsed, facts);
   await checkOwnerHeld(request, parsed, facts);
   if (unreviewed !== null) {
-    return { mayMerge: true, reason: unreviewed, reviewed: false };
+    return { mayMerge: true, reason: noCI ? `${unreviewed}; the repo runs no CI at ${facts.headRefOid.slice(0, 7)}` : unreviewed, reviewed: false };
   }
   return await checkNoslopGate(request, parsed, facts);
+}
+
+// True when the head has no checks because the repo runs no CI on it; throws when CI is not green.
+async function checkCI(request: PRRequest, parsed: ParsedRepo, facts: GateFacts): Promise<boolean> {
+  const verdict = checkCIGreen(facts.statusCheckRollup);
+  if (verdict.green) {
+    return false;
+  }
+  if (!('noChecks' in verdict)) {
+    throw buildBlock(parsed, request.pr, verdict.reason);
+  }
+  const noCI = await probeNoCI(request.run, buildSlug(parsed), facts.headRefOid);
+  if (!noCI) {
+    throw buildBlock(parsed, request.pr, verdict.reason);
+  }
+  return true;
 }
 
 function readUnreviewedRoute(request: PRRequest, parsed: ParsedRepo, author: PRAuthor): string | null {
