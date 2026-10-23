@@ -19,7 +19,7 @@ test('it counts a run filed imp whose awake session runs here as local, not imp'
   addRun(ctx.db, { issue: 'GEO-9901', title: 'Descale the kettle', place: 'imp', session: 'a0000001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
   recordAwake(ctx.db, [{ id: 'a0000001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, state: 'running', locator: { targetID: 'local' } }]);
 
-  expect(readRunningByPlace(ctx.db)).toStrictEqual({ imp: 0, local: 1, issues: ['GEO-9901'], localSource: '1 live session here' });
+  expect(readRunningByPlace(ctx.db)).toStrictEqual({ imp: 0, local: 1, issues: ['GEO-9901'], localSource: null });
 });
 
 test('it counts a run filed imp whose session runs here among the local runs when those runs outnumber the live sessions', () => {
