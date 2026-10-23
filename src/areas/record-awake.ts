@@ -2,7 +2,9 @@ import type { Database } from 'bun:sqlite';
 import { iso } from '../clock/iso.ts';
 import { now } from '../clock/now.ts';
 import { metaJson } from '../db/meta-json.ts';
+import { fleetIds } from '../atc/fleet-ids.ts';
 import { setMeta } from '../db/set-meta.ts';
+import { getDeclaredSessions } from '../roles/get-declared-sessions.ts';
 import { AWAKE } from './awake.ts';
 import { buildAwakeSchema } from './build-awake-schema.ts';
 import { isPresentSession } from './is-present-session.ts';
@@ -37,7 +39,15 @@ function pickIdleSince(previous: string | undefined, lastActivity: number | null
 
 function formatAwakeReading(db: Database, sessions: readonly AwakeSession[], awake: readonly string[], activity: ReadonlyMap<string, number | null>): string {
   const idle = buildIdleSince(readIdleSince(db), sessions, awake, activity);
-  return JSON.stringify({ at: iso(now()), ids: awake, idle, present: sessions.filter((session) => isPresentSession(session)).map((session) => session.id) });
+  return JSON.stringify({ at: iso(now()), ids: awake, idle, present: sessions.filter((session) => isPresentSession(session)).map((session) => session.id), local: collectLocalAwake(db, sessions, awake) });
+}
+
+// The awake sessions atc places on this PC, the fleet's own sessions left out: those fleet.json
+// declares by name, and any id hq fleet last saw live under a declared name.
+function collectLocalAwake(db: Database, sessions: readonly AwakeSession[], awake: readonly string[]): string[] {
+  const names = new Set(getDeclaredSessions().map((declared) => declared.name));
+  const ids = new Set(Object.values(fleetIds(db)));
+  return sessions.filter((session) => awake.includes(session.id) && session.locator?.targetID === 'local' && !ids.has(session.id) && !names.has(session.name ?? '')).map((session) => session.id);
 }
 
 function readIdleSince(db: Database): Record<string, string> {

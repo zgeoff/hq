@@ -8,7 +8,7 @@ test('hq lanes prints the local sessions against their cap, the focus and the pi
   // A pool of 4 imp and 3 local slots, 2 of them running locally, under focus `bug` with a vers
   // reserve lent and a Design issue waiting.
   const slotPlan: SlotPlan = {
-    pool: { impSize: 4, localSize: 3, impRunning: 1, localRunning: 2, impFree: 2, localFree: 1, free: 3, held: 'impd at line', localHeld: null },
+    pool: { impSize: 4, localSize: 3, impRunning: 1, localRunning: 2, impFree: 2, localFree: 1, free: 3, held: 'impd at line', localHeld: null, localSource: null },
     focus: { terms: parseFocusTerms('bug'), reserves: [{ area: 'vers', slots: 1 }], setAt: '2026-10-15T20:00:00Z', setBy: 'kettle-owner' },
     plan: {
       picks: [
@@ -35,7 +35,7 @@ test('the nudge names the free slots and each pick with its focus term', () => {
   // A pool of 4 imp and 3 local slots, 2 of them running locally, under focus `bug` with a vers
   // reserve lent and a Design issue waiting.
   const slotPlan: SlotPlan = {
-    pool: { impSize: 4, localSize: 3, impRunning: 1, localRunning: 2, impFree: 2, localFree: 1, free: 3, held: 'impd at line', localHeld: null },
+    pool: { impSize: 4, localSize: 3, impRunning: 1, localRunning: 2, impFree: 2, localFree: 1, free: 3, held: 'impd at line', localHeld: null, localSource: null },
     focus: { terms: parseFocusTerms('bug'), reserves: [{ area: 'vers', slots: 1 }], setAt: '2026-10-15T20:00:00Z', setBy: 'kettle-owner' },
     plan: {
       picks: [
@@ -51,4 +51,16 @@ test('the nudge names the free slots and each pick with its focus term', () => {
   expect(formatSlotNudge(slotPlan, 12)).toBe(
     '3 slots free for 12 min (imp 2, local 1). Take, in this order: GEO-9801 (focus 1: bug), GEO-9802. Reserved for vers with nothing eligible, lent: 1. For the design slot, when it is free: GEO-9803. (hq lanes shows the plan, hq focus the focus; capacity.sh still picks the provider and where it runs, and you write the briefs.)',
   );
+});
+
+test('hq lanes names the live sessions here when they set the local count', () => {
+  const slotPlan: SlotPlan = {
+    pool: { impSize: 4, localSize: 6, impRunning: 1, localRunning: 7, impFree: 3, localFree: 0, free: 3, held: null, localHeld: null, localSource: '7 live sessions here' },
+    focus: null,
+    plan: null,
+    eligible: null,
+    design: null,
+  };
+
+  expect(formatSlotPlan(slotPlan)[0]).toBe('slots (running/size, free now): imp 1/4, 3 free; local 7/6, 0 free (7 live sessions here)');
 });
