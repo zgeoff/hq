@@ -34,12 +34,17 @@ test('it raises nothing for a run whose issue is open in Linear or unknown to hq
   expect(readClosedIssueAlerts(ctx.db)).toStrictEqual([]);
 });
 
-test('it raises nothing for a merged run on its way to live, owed a check or not, since a Fixes merge closes the issue early', () => {
+test('it raises nothing for a merged or live-check run on its way to live, owed a check or not, since a Fixes merge closes the issue early', () => {
   const ctx = setupTest();
   ctx.addKettleRun('GEO-9813');
   addPr(ctx.db, 'GEO-9813', 'kettle#13', 'kettle-bot');
   closePr(ctx.db, 'kettle#13', { to: 'merged', actor: 'kettle-bot' });
   ctx.closeInLinear('GEO-9813', 'completed');
+  ctx.addKettleRun('GEO-9814');
+  addPr(ctx.db, 'GEO-9814', 'kettle#14', 'kettle-bot');
+  closePr(ctx.db, 'kettle#14', { to: 'merged', actor: 'kettle-bot' });
+  setState(ctx.db, 'GEO-9814', 'live-check', {}, 'kettle-bot');
+  ctx.closeInLinear('GEO-9814', 'completed');
 
   expect(readClosedIssueAlerts(ctx.db)).toStrictEqual([]);
 });
@@ -57,11 +62,6 @@ test('it tells done from dropped for each closed issue by what the run still owe
   ctx.closeInLinear('GEO-9823', 'completed');
   ctx.addKettleRun('GEO-9824');
   ctx.closeInLinear('GEO-9824', 'completed');
-  ctx.addKettleRun('GEO-9825');
-  addPr(ctx.db, 'GEO-9825', 'kettle#25', 'kettle-bot');
-  closePr(ctx.db, 'kettle#25', { to: 'merged', actor: 'kettle-bot' });
-  setState(ctx.db, 'GEO-9825', 'live-check', {}, 'kettle-bot');
-  ctx.closeInLinear('GEO-9825', 'completed');
   ctx.addKettleRun('GEO-9826');
   addPr(ctx.db, 'GEO-9826', 'kettle#26', 'kettle-bot');
   closePr(ctx.db, 'kettle#26', { to: 'merged', actor: 'kettle-bot' });
@@ -88,7 +88,6 @@ test('it tells done from dropped for each closed issue by what the run still owe
       issue: 'GEO-9824',
       line: 'GEO-9824: Done in Linear while hq has it working; done with no merged PR: hq run done GEO-9824 or hq run drop GEO-9824',
     },
-    { key: 'linear:GEO-9825', fingerprint: 'completed:live-check', issue: 'GEO-9825', line: 'GEO-9825: Done in Linear while hq has it live-check; if the live check passed, hq run done GEO-9825' },
     {
       key: 'linear:GEO-9827',
       fingerprint: 'completed:blocked',
