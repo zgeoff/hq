@@ -74,9 +74,9 @@ function requireOK(code: number, stdout: string, stderr: string, what: string): 
 }
 
 // A PR's paths reach git as pathspecs, so each is read literally: a held file named with a glob or a
-// pathspec magic word must not select another path, or none.
+// pathspec magic word must not select another path, or none. Git prints no path quoted.
 async function runGit(request: HeldDiffRequest, directory: string, args: string[]): Promise<string> {
-  const result = await request.run(['git', '--literal-pathspecs', ...args], { cwd: directory });
+  const result = await request.run(['git', '-c', 'core.quotePath=false', '--literal-pathspecs', ...args], { cwd: directory });
   return requireOK(result.code, result.stdout, result.stderr, args.join(' '));
 }
 
@@ -92,7 +92,7 @@ async function readMoveFacts(request: HeldDiffRequest, directory: string, mergeB
   const logged: [string, string][] = [];
   for (const [from, to] of pairs) {
     if (baseBlobs.get(from) === null) {
-      const log = await runGit(request, directory, ['log', '--no-color', '--diff-filter=R', '-M', '--name-status', '--format=', mergeBase, '--', from, to]);
+      const log = await runGit(request, directory, ['log', '-z', '--no-color', '--diff-filter=R', '-M', '--name-status', '--format=', mergeBase, '--', from, to]);
       logged.push(...parseRenameLog(log));
     }
   }
@@ -100,7 +100,7 @@ async function readMoveFacts(request: HeldDiffRequest, directory: string, mergeB
 }
 
 async function readEntry(request: HeldDiffRequest, directory: string, revision: string, path: string): Promise<string | null> {
-  const listed = await runGit(request, directory, ['ls-tree', '--full-tree', revision, '--', path]);
+  const listed = await runGit(request, directory, ['ls-tree', '-z', '--full-tree', revision, '--', path]);
   return match(parseTreeEntry(listed, path))
     .with({ kind: 'absent' }, () => null)
     .with({ kind: 'entry' }, (found) => found.entry)

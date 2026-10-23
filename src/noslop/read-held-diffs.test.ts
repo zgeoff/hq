@@ -88,3 +88,23 @@ test('it refuses to read when the pull head is not the head asked for', async ()
 
   await expect(readHeldDiffs({ run: ctx.fake.run, slug: 'zgeoff/widgets', repo: 'widgets', pr: 7, head: 'f00dfeedf00dfeedf00dfeedf00dfeedf00dfeed', paths: ['AGENTS.md'] })).rejects.toThrow('does not hold the PR\'s head f00dfee');
 });
+
+test.each<{ name: string; history: Record<string, string | null>[]; change: Record<string, string | null> }>([
+  {
+    name: 'a move the PR makes',
+    history: [{ 'docs/old.md': 'Steep for four minutes.\n', 'skills/kettle/SKILL.md': 'See [tea](../../docs/old.md).\n' }],
+    change: { 'docs/old.md': null, 'docs/caf\u00E9.md': 'Steep for four minutes.\n', 'skills/kettle/SKILL.md': 'See [tea](../../docs/caf\u00E9.md).\n' },
+  },
+  {
+    name: 'a move the base branch made before the PR',
+    history: [{ 'docs/old.md': 'Steep for four minutes.\n', 'skills/kettle/SKILL.md': 'See [tea](../../docs/old.md).\n' }, { 'docs/old.md': null, 'docs/caf\u00E9.md': 'Steep for four minutes.\n' }],
+    change: { 'skills/kettle/SKILL.md': 'See [tea](../../docs/caf\u00E9.md).\n' },
+  },
+])('it proves $name to a non-ASCII path', async (row) => {
+  const ctx = setupTest();
+  const stub = await createStubPRRepo({ root: ctx.root, repo: 'widgets', pr: 7, history: row.history, change: row.change });
+
+  const read = await readHeldDiffs({ run: ctx.fake.run, slug: 'zgeoff/widgets', repo: 'widgets', pr: 7, head: stub.head, paths: ['skills/kettle/SKILL.md'] });
+
+  expect(proveMechanical(read.files, read.facts)).toStrictEqual({ pass: true, files: ['skills/kettle/SKILL.md'], lines: 1 });
+});
