@@ -1,9 +1,9 @@
 import type { Database } from 'bun:sqlite';
 import { z } from 'zod';
 import { HqError } from '../errors.ts';
-import { restartStaleSession } from '../fleet/restart-stale-session.ts';
 import type { FleetClient, FleetSession, StaleOps } from '../fleet/types.ts';
 import { buildWrapUpPlan } from './build-wrap-up-plan.ts';
+import { forgetWrappedSession } from './forget-wrapped-session.ts';
 import { fullSessionId } from './full-session-id.ts';
 import { requireRun } from './require-run.ts';
 import type { ImpWork, WrapUp } from './types.ts';
@@ -99,7 +99,7 @@ async function wrapUpTree(pass: TreePass, root: FleetSession): Promise<void> {
   }
   for (const child of children) {
     try {
-      await restartStaleSession(pass.client, child.id);
+      await forgetWrappedSession(pass.client, child.id);
       pass.wrapUp.forgotten.push(child.id);
     } catch (error) {
       pass.wrapUp.failed.push({ id: child.id, reason: toMessage(error) });
@@ -107,7 +107,7 @@ async function wrapUpTree(pass: TreePass, root: FleetSession): Promise<void> {
   }
   if (!plan.destroyImp) {
     try {
-      await restartStaleSession(pass.client, root.id);
+      await forgetWrappedSession(pass.client, root.id);
       pass.wrapUp.forgotten.push(root.id);
     } catch (error) {
       pass.wrapUp.failed.push({ id: root.id, reason: toMessage(error) });
@@ -135,7 +135,7 @@ async function readImpWorkSafely(deps: WrapUpDeps, session: FleetSession): Promi
 }
 
 // Stops the session and forgets it; when atc asks to confirm the destroy of its imp, confirms it.
-// A failure pins the session again.
+// A failure leaves it unpinned: a pin means the session needs the owner, and this is not that.
 async function removeImpSession(pass: TreePass, id: string): Promise<void> {
   try {
     await pass.client.kill(id);
@@ -154,16 +154,6 @@ async function removeImpSession(pass: TreePass, id: string): Promise<void> {
     pass.wrapUp.forgotten.push(id);
     pass.wrapUp.destroyed.push(id);
   } catch (error) {
-    const pinned = await writePinAgain(pass.client, id);
-    pass.wrapUp.failed.push({ id, reason: `${toMessage(error)}${pinned}` });
-  }
-}
-
-async function writePinAgain(client: FleetClient, id: string): Promise<string> {
-  try {
-    await client.pin(id);
-    return '; pinned it again';
-  } catch (error) {
-    return `; pinning it again failed too (${toMessage(error)})`;
+    pass.wrapUp.failed.push({ id, reason: toMessage(error) });
   }
 }

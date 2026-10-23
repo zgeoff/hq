@@ -25,13 +25,13 @@ test('a forget answers the scripted answers for its session in turn, then forget
   expect(fleet.calls).toStrictEqual(['forget 0000a001', 'forget 0000a001 token-kettle', 'forget 0000a001', 'forget 0000a002']);
 });
 
-test('a pin of a session atc refuses to pin fails, and is recorded', async () => {
-  const fleet = buildStubFleetClient({ sessions: [], pinFailures: ['0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa'] });
+test('a kill of a session atc does not answer fails, and is recorded', async () => {
+  const fleet = buildStubFleetClient({ sessions: [], killFailures: ['0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa'] });
 
-  const refused = fleet.client.pin('0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+  const refused = fleet.client.kill('0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
 
-  await expect(refused).rejects.toThrow('atc refused the pin');
-  expect(fleet.calls).toStrictEqual(['pin 0000a001']);
+  await expect(refused).rejects.toThrow('atc did not answer session.kill');
+  expect(fleet.calls).toStrictEqual(['kill 0000a001']);
 });
 
 test('the client spawns nothing and reads no details or message', async () => {
