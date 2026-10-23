@@ -14,8 +14,6 @@ export interface StubFleetAnswers {
 
 export interface StubFleetClient {
   client: FleetClient & StaleOps;
-
-  // each pin, unpin, kill, forget and forget-live in order, as `<verb> <first 8 of the id>[ <token>]`
   calls: string[];
 }
 
