@@ -41,5 +41,10 @@ export function makeFleetClient(c: AtcClient): FleetClient {
       const got = await c.call('session.forget', params, forgetSchema);
       return { forgotten: got.forgotten === true, confirmToken: got.confirmToken };
     },
+    forgetLive: async (id, confirmToken) => {
+      const params = confirmToken === undefined ? { session: id, refusePinned: true, refuseLive: false } : { session: id, refusePinned: true, refuseLive: false, confirmToken };
+      const got = await c.call('session.forget', params, forgetSchema);
+      return { forgotten: got.forgotten === true, confirmToken: got.confirmToken };
+    },
   };
 }

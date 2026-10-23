@@ -101,7 +101,7 @@ test('done destroys an imp whose work is all pushed, confirming the destroy atc 
   const wrapUp = await runWrapUp(ctx.db, { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.resolve({ state: 'pushed' }) }, 'GEO-9801', 'z-delivery');
 
   expect(wrapUp).toStrictEqual({ forgotten: ['0000a002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa'], destroyed: ['0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa'], kept: [], failed: [] });
-  expect(fleet.calls).toStrictEqual(['unpin 0000a001', 'kill 0000a002', 'unpin 0000a002', 'forget 0000a002', 'kill 0000a001', 'forget 0000a001', 'forget 0000a001 token-kettle']);
+  expect(fleet.calls).toStrictEqual(['unpin 0000a001', 'kill 0000a002', 'unpin 0000a002', 'forget 0000a002', 'forget-live 0000a001', 'forget-live 0000a001 token-kettle']);
   expect(ctx.db.query("SELECT label, text FROM run_notes WHERE issue = 'GEO-9801'").all()).toStrictEqual([{ label: 'wrap-up', text: 'Wrap-up: forgot 0000a002, 0000a001; destroyed the imp of 0000a001.' }]);
 });
 
@@ -190,25 +190,25 @@ test('a confirmed destroy that atc refuses leaves the session unpinned and recor
     kept: [],
     failed: [{ id: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', reason: 'atc did not forget the session after the confirmed destroy' }],
   });
-  expect(fleet.calls).toStrictEqual(['unpin 0000a001', 'kill 0000a001', 'forget 0000a001', 'forget 0000a001 token-kettle']);
+  expect(fleet.calls).toStrictEqual(['unpin 0000a001', 'forget-live 0000a001', 'forget-live 0000a001 token-kettle']);
   expect(ctx.db.query("SELECT label, text FROM run_notes WHERE issue = 'GEO-9801'").all()).toStrictEqual([
     { label: 'wrap-up', text: 'Wrap-up: failed 0000a001 (atc did not forget the session after the confirmed destroy).' },
   ]);
   expect(getRun(ctx.db, 'GEO-9801')?.state).toBe('done');
 });
 
-test('a kill atc does not answer leaves the session unpinned and records the failure; the run stays done', async () => {
+test('an imp destroy forgets the live session with no separate stop, which a cloud imp outlasts', async () => {
   const ctx = setupTest();
   addRun(ctx.db, { issue: 'GEO-9801', title: 'Invented kettle descaler', place: 'imp', session: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
   setState(ctx.db, 'GEO-9801', 'done', {}, 'z-delivery');
   const fleet = buildStubFleetClient({
     sessions: [{ id: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, cwd: '/workspace/kettle' }],
     killFailures: ['0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa'],
+    forgets: { '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa': [{ forgotten: false, confirmToken: 'token-kettle' }] },
   });
 
   const wrapUp = await runWrapUp(ctx.db, { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.resolve({ state: 'pushed' }) }, 'GEO-9801', 'z-delivery');
 
-  expect(wrapUp).toStrictEqual({ forgotten: [], destroyed: [], kept: [], failed: [{ id: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', reason: 'atc did not answer session.kill' }] });
-  expect(fleet.calls).toStrictEqual(['unpin 0000a001', 'kill 0000a001']);
-  expect(getRun(ctx.db, 'GEO-9801')?.state).toBe('done');
+  expect(wrapUp).toStrictEqual({ forgotten: ['0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa'], destroyed: ['0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa'], kept: [], failed: [] });
+  expect(fleet.calls).toStrictEqual(['unpin 0000a001', 'forget-live 0000a001', 'forget-live 0000a001 token-kettle']);
 });
