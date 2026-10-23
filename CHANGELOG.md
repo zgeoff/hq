@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.95.0 — 2026-10-23
+
+Shipping tracks the host build for cloud, a manual hold sticks, and fixes to the sweep, health and wrap-up.
+
+### A cloud PR on a host-build path ships only once `deployed/host` holds its merge.
+
+- The paths come from cloud's `.github/gates.yml` (`gates.nixos.paths` minus `ignore`), read once per pass at main; hq copies none.
+- Such a PR needs both `deployed/prod` and `deployed/host`, and is told as "Shipped in deployed/host". A missing tag or an unreadable gates file keeps it unshipped.
+
+### Fixes
+
+- The ship pass leaves alone a run put in `deploy-held` at or after the release that holds its PRs, and `hq run ship` lists it as left held. A hold from before the release still ships.
+- The sweep clears a FINAL alert once a review round that started after the FINAL has passed, so a PR reviewed at a newer head stops re-alerting. The exited-session alert and the `hq run` line use the same rule.
+- `hq health` shows a ✗ when a stale-restart save request has been asked for over an hour and no read of its answer has worked for over an hour.
+- `hq run done` leaves a session unpinned when it cannot stop or forget it, since a pin means the session needs the owner.
+- Opening the database retries the switch into WAL while another process holds the write lock, which SQLite does not wait for.
+
 ## 0.94.0 — 2026-10-23
 
 Lanes match the slots that sessions really fill, and `hq unblock` gets watch items. Schema v40.
