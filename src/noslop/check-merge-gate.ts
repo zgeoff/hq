@@ -53,7 +53,6 @@ export async function checkMergeGate(request: PRRequest, onHead?: OnGateHead): P
   return await checkNoslopGate(request, parsed, facts);
 }
 
-// True when the head has no checks because the repo runs no CI on it; throws when CI is not green.
 async function checkCI(request: PRRequest, parsed: ParsedRepo, facts: GateFacts): Promise<boolean> {
   const verdict = checkCIGreen(facts.statusCheckRollup);
   if (verdict.green) {
