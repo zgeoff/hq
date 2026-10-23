@@ -9,7 +9,7 @@ import { refreshSchema } from './refresh-schema.ts';
 export function readStuckSaveChecks(db: Database, at: Date): Check[] {
   const refresh = metaJson(db, 'fleet_refresh', refreshSchema, {});
   const askedAts = Object.values(refresh).flatMap((entry) => (entry.phase === 'asked' && entry.askedAt !== undefined ? [entry.askedAt] : []));
-  const earliest = askedAts.toSorted()[0];
+  const [earliest] = askedAts.toSorted();
   const unread = earliest === undefined ? [] : readUnreadAnswers(db, earliest);
   return pickStuckSaveChecks(refresh, unread, at);
 }
