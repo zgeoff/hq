@@ -155,6 +155,9 @@ export async function watchTick(db: Database, d: WatchDeps): Promise<boolean> {
       if (conditions && conditions.dropped.length > 0) {
         d.log(`${at()} unblock conditions: dropped ${conditions.dropped.join(', ')}`);
       }
+      if (conditions && conditions.overdue.length > 0) {
+        d.log(`${at()} unblock conditions: overdue, sessions told: ${conditions.overdue.join(', ')}`);
+      }
       for (const problem of conditions?.errors ?? []) {
         d.log(`${at()} unblock conditions: ${problem}`);
       }
