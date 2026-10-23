@@ -1,3 +1,5 @@
+import { EXEMPT_RULES } from '../pr-status/exempt-rules.ts';
+
 export interface OwnerHeldFacts {
   repo: string;
   pr: number;
@@ -23,7 +25,7 @@ export function pickOwnerHeldVerdict(facts: OwnerHeldFacts): OwnerHeldVerdict {
     return { pass: false, reason: `the PR changes owner-held files (${formatHeld(held)}) and needs the owner's lgtm at ${facts.head.slice(0, 7)}: ${answer}` };
   }
   if (instruction.length > 0 && !facts.instructionClear) {
-    const records = `z-review records a mechanical edit with hq pr mechanical ${facts.repo} ${facts.pr}, or a policy exception with hq pr exempt ${facts.repo} ${facts.pr} --rule boundary|ci-design-sync|rename|repo-sync --note <why>`;
+    const records = `z-review records a mechanical edit with hq pr mechanical ${facts.repo} ${facts.pr}, or a policy exception with hq pr exempt ${facts.repo} ${facts.pr} --rule ${EXEMPT_RULES.join('|')} --note <why>`;
     return { pass: false, reason: `the PR changes repo instruction files (${formatHeld(instruction)}) and needs the owner's lgtm at ${facts.head.slice(0, 7)}: ${answer}; ${records}; ${facts.instructionHint}` };
   }
   if (facts.headNow !== facts.head) {

@@ -46,7 +46,7 @@ export async function checkInstructionHold(request: PRRequest, parsed: ParsedRep
 
 async function readDiffFact(request: PRRequest, parsed: ParsedRepo, input: InstructionHoldInput): Promise<HeldDiffFact> {
   return await readHeldDiffs({ run: request.run, slug: buildSlug(parsed), repo: parsed.repo, pr: request.pr, head: input.head, paths: input.files, repoDir: request.repoDir }).then(
-    (diffs): HeldDiffFact => ({ kind: 'read', formattingOnly: diffs.formattingOnly, proof: proveMechanical(diffs.files, diffs.facts) }),
+    (diffs): HeldDiffFact => ({ kind: 'read', proof: proveMechanical(diffs.files, diffs.facts) }),
     (error: unknown): HeldDiffFact => ({ kind: 'failed', error: error instanceof Error ? error.message : String(error) }),
   );
 }

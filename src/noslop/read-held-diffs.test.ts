@@ -25,7 +25,6 @@ test('it reads the diff of a held file against the merge base, not against the m
   const read = await readHeldDiffs({ run: ctx.fake.run, slug: 'zgeoff/widgets', repo: 'widgets', pr: 7, head: stub.head, paths: ['AGENTS.md'] });
 
   expect(read.files).toStrictEqual([{ path: 'AGENTS.md', diff: expect.stringContaining('@@ -1 +1 @@\n-Boil.\n+Steam.\n') }]);
-  expect(read.formattingOnly).toBe(false);
 });
 
 test('it keeps a line moved two lines down as two hunks when the clone asks git to join near hunks', async () => {
@@ -40,32 +39,13 @@ test('it keeps a line moved two lines down as two hunks when the clone asks git 
   expect(proveMechanical(read.files, read.facts)).toMatchObject({ pass: false });
 });
 
-test('it reads a held file whose name starts with pathspec magic as that file alone, so its change is no formatting-only change', async () => {
+test('it reads a held file whose name starts with pathspec magic as that file alone', async () => {
   const ctx = setupTest();
   const stub = await createStubPRRepo({ root: ctx.root, repo: 'widgets', pr: 7, history: [{ ':(attr:kettle)x/AGENTS.md': 'Boil.\n' }], change: { ':(attr:kettle)x/AGENTS.md': 'Pour it all away.\n' } });
 
   const read = await readHeldDiffs({ run: ctx.fake.run, slug: 'zgeoff/widgets', repo: 'widgets', pr: 7, head: stub.head, paths: [':(attr:kettle)x/AGENTS.md'] });
 
-  expect(read.formattingOnly).toBe(false);
   expect(read.files).toStrictEqual([{ path: ':(attr:kettle)x/AGENTS.md', diff: expect.stringContaining('-Boil.\n+Pour it all away.\n') }]);
-});
-
-test('it does not report a space added inside a line as formatting only', async () => {
-  const ctx = setupTest();
-  const stub = await createStubPRRepo({ root: ctx.root, repo: 'widgets', pr: 7, history: [{ 'AGENTS.md': 'Run `rm -rf /tmp/cache` after a brew.\n' }], change: { 'AGENTS.md': 'Run `rm -rf /tmp/ cache` after a brew.\n' } });
-
-  const read = await readHeldDiffs({ run: ctx.fake.run, slug: 'zgeoff/widgets', repo: 'widgets', pr: 7, head: stub.head, paths: ['AGENTS.md'] });
-
-  expect(read.formattingOnly).toBe(false);
-});
-
-test('it reports a change of blank lines and trailing spaces as formatting only', async () => {
-  const ctx = setupTest();
-  const stub = await createStubPRRepo({ root: ctx.root, repo: 'widgets', pr: 7, history: [{ 'AGENTS.md': 'Boil the water.\n' }], change: { 'AGENTS.md': 'Boil the water.  \n\n' } });
-
-  const read = await readHeldDiffs({ run: ctx.fake.run, slug: 'zgeoff/widgets', repo: 'widgets', pr: 7, head: stub.head, paths: ['AGENTS.md'] });
-
-  expect(read.formattingOnly).toBe(true);
 });
 
 test('it reads the blobs of a file the PR moved', async () => {

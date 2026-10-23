@@ -33,7 +33,7 @@ test('it blocks repo instruction files hq does not clear, naming the commands an
   expect(pickOwnerHeldVerdict({ repo: 'widgets', pr: 7, held: [], instruction: ['skills/kettle/SKILL.md'], instructionClear: false, instructionHint: 'hq does not prove the edits mechanical: skills/kettle/SKILL.md line 4: the words of the line changed', lgtm: false, head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', headNow: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678' })).toStrictEqual({
     pass: false,
     reason:
-      "the PR changes repo instruction files (skills/kettle/SKILL.md) and needs the owner's lgtm at a1b2c3d: hq pr answer widgets 7 lgtm --source <where the owner said it>; z-review records a mechanical edit with hq pr mechanical widgets 7, or a policy exception with hq pr exempt widgets 7 --rule boundary|ci-design-sync|rename|repo-sync --note <why>; hq does not prove the edits mechanical: skills/kettle/SKILL.md line 4: the words of the line changed",
+      "the PR changes repo instruction files (skills/kettle/SKILL.md) and needs the owner's lgtm at a1b2c3d: hq pr answer widgets 7 lgtm --source <where the owner said it>; z-review records a mechanical edit with hq pr mechanical widgets 7, or a policy exception with hq pr exempt widgets 7 --rule boundary|ci-design-sync|rename|repo-sync|formatting --note <why>; hq does not prove the edits mechanical: skills/kettle/SKILL.md line 4: the words of the line changed",
   });
 });
 

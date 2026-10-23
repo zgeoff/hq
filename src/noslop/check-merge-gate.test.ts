@@ -557,12 +557,15 @@ test('it ignores a mechanical record that someone other than z-review wrote', as
   await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked' });
 });
 
-test('it passes a formatting-only change to an instruction file with no record', async () => {
+test.each([
+  { name: 'blank lines and a trailing space', before: 'Boil the water.\n', after: 'Boil the water. \n\n' },
+  { name: 'a trailing space after a shell continuation backslash', before: '```sh\nkettle boil \\\n  --fast\n```\n', after: '```sh\nkettle boil \\ \n  --fast\n```\n' },
+])('it holds an instruction file whose only change is $name, with no record', async (row) => {
   const ctx = setupTest();
-  const stub = await createStubPRRepo({ root: ctx.base, repo: 'widgets', pr: 7, history: [{ 'skills/kettle/SKILL.md': 'Boil the water.\n' }], change: { 'skills/kettle/SKILL.md': 'Boil the water. \n\n' } });
+  const stub = await createStubPRRepo({ root: ctx.base, repo: 'widgets', pr: 7, history: [{ 'skills/kettle/SKILL.md': row.before }], change: { 'skills/kettle/SKILL.md': row.after } });
   const fake = buildFakeRunner({ realGit: true, prFiles: { code: 0, stdout: 'skills/kettle/SKILL.md\n', stderr: '' }, ...buildStubPRHead(stub.head) });
 
-  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).resolves.toMatchObject({ mayMerge: true });
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked' });
 });
 
 test('it holds a space added inside a command in an instruction file for the owner, with no record', async () => {
@@ -592,7 +595,7 @@ test('it passes an instruction file change on the owner\'s lgtm at the head and 
   expect(fake.of('git')).toStrictEqual([]);
 });
 
-test.each(['boundary', 'ci-design-sync', 'rename', 'repo-sync'] as const)('it passes an instruction file change on z-review\'s %s exemption at the head, reading no diff', async (rule) => {
+test.each(['boundary', 'ci-design-sync', 'rename', 'repo-sync', 'formatting'] as const)('it passes an instruction file change on z-review\'s %s exemption at the head, reading no diff', async (rule) => {
   const ctx = setupTest();
   const fake = buildFakeRunner({ prFiles: { code: 0, stdout: 'skills/kettle/SKILL.md\n', stderr: '' } });
   recordPRExemption(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA, rule, note: 'Covered by the kettle grant.', files: ['skills/kettle/SKILL.md'], actor: 'z-review' });
