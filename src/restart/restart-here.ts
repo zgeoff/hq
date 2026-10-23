@@ -6,7 +6,6 @@ import type { Database } from 'bun:sqlite';
 import { iso } from '../clock/iso.ts';
 import { now } from '../clock/now.ts';
 import { config } from '../config/config.ts';
-import { defsSource } from '../prompts/defs-source.ts';
 import type { Runner } from '../runner/types.ts';
 import { cleanEnv } from '../runner/clean-env.ts';
 import { connectWithRetry } from '../wake/connect-with-retry.ts';
@@ -73,7 +72,6 @@ export async function restartHere(db: Database, run: Runner, actor: string, forc
     wake = await runWake(db, toExactOptional({ dryRun: false, waitMs: 60_000, actor, last: last ?? undefined }));
     for (const s of wake.sent) await write(`${s.error ? 'failed' : 'messaged'} ${s.session} ${s.name} (${s.reason})${s.error ? `: ${s.error}` : `: ${s.message}`}`);
     for (const s of wake.skipped) await write(`skipped ${s.session || '-'} ${s.name}: ${s.why}`);
-    if (wake.loopPrompt) await write(`loop prompt: ${wake.loopPrompt.source === 'main' ? `from ${defsSource()}'s origin/main` : `none (origin/main read failed: ${wake.loopPrompt.error})`}`);
   } catch (e) {
     wake = { error: String((e as Error).message ?? e) };
     await write(`wake failed: ${wake.error}`);

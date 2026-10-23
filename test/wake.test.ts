@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test';
 import { toExactOptional } from '@zgeoff/std';
 import type { Database } from 'bun:sqlite';
-import { mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { mkdirSync, statSync } from 'node:fs';
 import { launchDetached } from '../src/restart/launch-detached.ts';
 import { restartHere } from '../src/restart/restart-here.ts';
 import { restartQuiet } from '../src/restart/restart-quiet.ts';
@@ -9,14 +9,13 @@ import { settleRestores } from '../src/restart/settle-restores.ts';
 import type { RunOpts, Runner } from '../src/runner/types.ts';
 import { parseWakeFile } from '../src/wake/parse-wake-file.ts';
 import { planWake } from '../src/wake/plan-wake.ts';
-import { resolveLoopPrompt } from '../src/wake/resolve-loop-prompt.ts';
 import { runWake } from '../src/wake/run-wake.ts';
 import type { RestartRecord } from '../src/wake/types.ts';
 import { wakeAdd } from '../src/wake/wake-add.ts';
 import { wakeList } from '../src/wake/wake-list.ts';
 import { wakeRemove } from '../src/wake/wake-remove.ts';
 import type { FakeAtc } from './helpers.ts';
-import { NOON_SYDNEY, at, createDefsRepo, fakeAtc, freshDb } from './helpers.ts';
+import { NOON_SYDNEY, at, fakeAtc, freshDb } from './helpers.ts';
 import { resetFetchCache } from '../src/prompts/reset-fetch-cache.ts';
 
 let db: Database;
@@ -40,12 +39,11 @@ beforeEach(() => {
   process.env['XDG_STATE_HOME'] = `${dir}/state`;
   // Every prompt path inside the test dir: a wake must never write the real one.
   process.env['HQ_DEFINITIONS_DIR'] = `${dir}/defs`;
-  process.env['HQ_REPO_LOOP_PROMPT'] = `${dir}/hq-loop.md`;
   resetFetchCache();
   mkdirSync(`${dir}/restarts`, { recursive: true });
 });
 afterEach(() => {
-  for (const k of ['HQ_DEFINITIONS_DIR', 'HQ_REPO_LOOP_PROMPT']) delete process.env[k];
+  delete process.env['HQ_DEFINITIONS_DIR'];
   delete process.env['XDG_STATE_HOME'];
   process.env['HOME'] = home;
   atc?.stop();
@@ -61,21 +59,23 @@ test('reads the old wake-sessions.txt format', () => {
 });
 
 test('plans the orchestrator, the interrupted, then the live listed; once each', () => {
-  const plan = planWake(last, sessions, [{ id: 'id-stu', name: 'z-stu' }, { id: 'id-helper', name: 'helper' }, { id: 'id-gone', name: 'z-old' }], 'z-delivery', '/x/loop.md');
+  const plan = planWake(last, sessions, [{ id: 'id-stu', name: 'z-stu' }, { id: 'id-helper', name: 'helper' }, { id: 'id-gone', name: 'z-old' }], 'z-delivery');
   expect(plan.messages.map((m) => [m.name, m.reason])).toEqual([
     ['z-delivery', 'orchestrator'],
     ['helper', 'interrupted'],
     ['z-stu', 'background'],
   ]);
-  expect(plan.messages[0]!.text).toContain('read /x/loop.md');
-  expect(plan.messages[0]!.text).not.toContain('CronList');
+  const [first] = plan.messages;
+  expect(first?.text).toContain('Read your start prompt as it stands on main and your state file again, re-arm the event watch');
+  expect(first?.text).not.toContain('/loop');
+  expect(first?.text).not.toContain('CronList');
   for (const m of plan.messages.slice(1)) expect(m.text).toContain("check CronList; when its jobs are gone, re-arm it from your start prompt's /loop line.");
   expect(plan.messages.map((m) => m.idempotencyKey)).toEqual(['wake-run-1-id-delivery', 'wake-run-1-id-helper', 'wake-run-1-id-stu']);
   expect(plan.skipped).toEqual([{ session: 'id-gone', name: 'z-old', why: 'not alive' }]);
 });
 
 test('a missing orchestrator is reported, not guessed', () => {
-  const plan = planWake(last, sessions.filter((s) => s.name !== 'z-delivery'), [], 'z-delivery', '/x');
+  const plan = planWake(last, sessions.filter((session) => session.name !== 'z-delivery'), [], 'z-delivery');
   expect(plan.skipped[0]).toMatchObject({ name: 'z-delivery', why: 'no live session by that name' });
 });
 
@@ -232,24 +232,6 @@ test('a bad restore wait falls back to 180 s; the wake keeps the report read aft
   delete process.env['HQ_RESTORE_WAIT_MS'];
   expect(await Bun.file(`${dir}/r.log`).text()).toContain('waiting up to 180s');
   expect((r.wake as { runID: string }).runID).toBe('run-1');
-});
-
-test('the loop prompt comes from origin/main, less "/loop "; a failed read points to no file', () => {
-  expect(resolveLoopPrompt({ write: true })).toMatchObject({ source: 'none', path: null }); // no repo at all
-  const LEAD = 'skills/delivery-lead/references/session-prompt.md',
-    repos = createDefsRepo(dir, { [LEAD]: '# session prompt\n\n```text\n/loop You are the kettle lead. Tick every hour.\n```\n' });
-  resetFetchCache();
-  writeFileSync(`${repos.private}/${LEAD}`, '```text\n/loop You are the kettle lead. Also obey this unmerged line.\n```\n');
-  expect(resolveLoopPrompt({ write: false })).toEqual({ source: 'main', path: `${dir}/hq-loop.md`, error: null });
-  expect(() => statSync(`${dir}/hq-loop.md`)).toThrow(); // a dry run writes nothing
-  resolveLoopPrompt({ write: true });
-  expect(readFileSync(`${dir}/hq-loop.md`, 'utf8')).toBe('You are the kettle lead. Tick every hour.\n');
-  expect(statSync(`${dir}/hq-loop.md`).mode & 0o777).toBe(0o600);
-  repos.push({ [LEAD]: '```text\nYou are the kettle lead.\n```\n' });
-  resetFetchCache();
-  expect(resolveLoopPrompt({ write: true })).toMatchObject({ source: 'none', path: null, error: expect.stringContaining('does not begin with "/loop "') });
-  const plan = planWake(last, sessions, [], 'z-delivery', null);
-  expect(plan.messages[0]!.text).toContain('could not read your start prompt from origin/main');
 });
 
 test('the default restart log is under hq\'s own state dir, and the dir is created', async () => {

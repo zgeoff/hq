@@ -67,7 +67,6 @@ const shape = {
   HQ_NOW: text(),
   HQ_ORCHESTRATOR: text(),
   HQ_OWNER: text(),
-  HQ_REPO_LOOP_PROMPT: path(),
   HQ_LOCAL_CONFIG: path(),
   HQ_NOSLOP_OP_VAULT: text(),
   HQ_NOSLOP_OP_ITEM: text(),
