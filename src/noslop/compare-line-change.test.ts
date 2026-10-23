@@ -33,6 +33,10 @@ test('it claims a moved path in a code span, resolved both ways', () => {
   });
 });
 
+test('it claims a moved code path from a skill up to the repo root, by the one resolution that stays in the repo', () => {
+  expect(compareLineChange('skills/kettle/SKILL.md', 'Read `../../docs/old.md`.', 'Read `../../docs/new.md`.')).toStrictEqual({ ok: true, moves: [[['docs/old.md', 'docs/new.md']]] });
+});
+
 test('it claims a moved target inside a table cell', () => {
   expect(compareLineChange('skills/kettle/SKILL.md', '| care | [steps](refs/a.md) |', '| care | [steps](refs/b.md) |')).toStrictEqual({ ok: true, moves: [[['skills/kettle/refs/a.md', 'skills/kettle/refs/b.md']]] });
 });

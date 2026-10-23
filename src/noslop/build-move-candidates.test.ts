@@ -19,3 +19,7 @@ test('it resolves a leading slash to the root only', () => {
 test('it gives none for a target that leaves the repo', () => {
   expect(buildMoveCandidates('SKILL.md', '../old.md', 'new.md', ['file'])).toBeNull();
 });
+
+test('it keeps the resolution that stays in the repo when the other leaves it', () => {
+  expect(buildMoveCandidates('skills/kettle/SKILL.md', '../../docs/old.md', '../../docs/new.md', ['file', 'root'])).toStrictEqual([['docs/old.md', 'docs/new.md']]);
+});
