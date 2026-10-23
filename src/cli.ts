@@ -905,6 +905,7 @@ ${r.result === 'added' ? 'On the board.' : 'Already on the board.'}` };
         ...r.moved.map((move) => `  ${move.issue} -> ${move.to}: ${move.prs.map((pr) => `${pr.ref} ${formatShippedAt(pr.tag)} (${pr.shipped_at})`).join(', ')}`),
         `${r.shippedPrs} PR(s) ${r.dryRun ? 'found' : 'newly marked'} shipped; ${r.compares} compare call(s)${r.deferred ? `; ${r.deferred} PR(s) left for the next pass` : ''}.`,
         ...r.held.map((issue) => `  left held: ${issue} was put in deploy-held after the release that holds its PRs`),
+        ...r.busy.map((left) => `  left: ${left.issue} has session ${left.session.slice(0, 8)} still active`),
         ...r.errors.map((e) => `  error: ${e}`),
       ].join('\n');
       if (!r.dryRun) setMeta(db, CHECKED_AT, iso(now()));

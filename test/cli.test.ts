@@ -755,6 +755,32 @@ test('hq run ship prints a vers PR shipped at its merge as at merge', async () =
   }
 });
 
+test('hq run ship lists a run whose helper is still active as left, and moves nothing', async () => {
+  await hq('run', 'add', 'GEO-513', '--title', 'Invented kettle work', '--where', 'none');
+  await hq('run', 'pr', 'GEO-513', 'vers#22');
+  closePr(db(), 'vers#22', { to: 'merged', actor: 'hq-github', facts: { mergedAt: '2026-10-20T03:04:05Z', mergeSha: null } });
+  await hq('run', 'state', 'GEO-513', 'merged');
+  await hq('run', 'session', 'GEO-513', '513ab0c0-0000-4000-8000-00000000beef', '--add');
+
+  // A stand-in gh on PATH that answers the merge commit; a vers PR needs no other call.
+  const path0 = process.env['PATH'];
+  const bin = `${dir}/bin`;
+  mkdirSync(bin);
+  writeFileSync(`${bin}/gh`, ['#!/bin/sh', `echo '{"mergeCommit":{"oid":"${'c'.repeat(40)}"}}'`, ''].join('\n'));
+  chmodSync(`${bin}/gh`, 0o755);
+  process.env['PATH'] = `${bin}:${path0}`;
+  try {
+    out = [];
+
+    const code = await main(['run', 'ship']);
+
+    expect(code).toBe(0);
+    expect(out.join('\n')).toBe('Moved nothing.\n1 PR(s) newly marked shipped; 0 compare call(s).\n  left: GEO-513 has session 513ab0c0 still active');
+  } finally {
+    process.env['PATH'] = path0;
+  }
+});
+
 test('hq run ship lists a run put in deploy-held after its release as left held', async () => {
   await hq('run', 'add', 'GEO-511', '--title', 'Invented kettle work', '--where', 'none');
   await hq('run', 'pr', 'GEO-511', 'vers#21');

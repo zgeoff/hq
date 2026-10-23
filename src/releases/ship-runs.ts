@@ -43,12 +43,13 @@ import { shippedText } from './shipped-text.ts';
 import { SOURCES } from './sources.ts';
 import { isHeldPastShip } from './is-held-past-ship.ts';
 import { readHeldAt } from './read-held-at.ts';
+import { readActiveSession } from '../runs/read-active-session.ts';
 import type { PrState, Release, ShipMove, ShipResult, Source } from './types.ts';
 
 // One pass. A dry run reads from GitHub but writes nothing.
 export async function shipRuns(db: Database, run: Runner, at: Date = now(), opts: { dryRun?: boolean; readBuild?: () => Build } = {}): Promise<ShipResult> {
   const dryRun = !!opts.dryRun;
-  const res: ShipResult = { dryRun, moved: [], shippedPrs: 0, compares: 0, deferred: 0, held: [], errors: [] };
+  const res: ShipResult = { dryRun, moved: [], shippedPrs: 0, compares: 0, deferred: 0, held: [], busy: [], errors: [] };
   const err = (m: string) => res.errors.push(m);
 
   const runs = db.query(`SELECT * FROM runs WHERE state IN ('merged','deploying','deploy-held') ORDER BY created_at`).all() as Run[];
@@ -197,6 +198,11 @@ export async function shipRuns(db: Database, run: Runner, at: Date = now(), opts
       if (shippedAt.length < c.refs.length) {
         continue;
       }
+      const busy = readActiveSession(db, c.run.issue);
+      if (busy !== null) {
+        res.busy.push({ issue: c.run.issue, session: busy });
+        continue;
+      }
       if (c.run.state === 'deploy-held' && isHeldPastShip(readHeldAt(db, c.run.issue), shippedAt)) {
         res.held.push(c.run.issue);
         continue;
@@ -213,6 +219,9 @@ export async function shipRuns(db: Database, run: Runner, at: Date = now(), opts
           // The run may have changed while GitHub was asked: look again.
           const now0 = db.query('SELECT * FROM runs WHERE issue = ?').get(c.run.issue) as Run | null;
           if (!now0 || !SHIPPABLE.includes(now0.state)) return null;
+          if (readActiveSession(db, c.run.issue) !== null) {
+            return null;
+          }
           if (now0.state === 'deploy-held' && isHeldPastShip(readHeldAt(db, c.run.issue), shippedAt)) {
             return null;
           }

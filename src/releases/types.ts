@@ -24,6 +24,9 @@ export interface ShipResult {
   deferred: number; // PRs left for the next pass by the compare cap
   // Deploy-held runs left alone: held after the releases that hold their PRs.
   held: string[];
+
+  // Runs left alone while a session on them, a helper's included, is still active.
+  busy: { issue: string; session: string }[];
   errors: string[];
 }
 
