@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { LINEAR_GRAPHQL_URL, linearDocuments, linearIssues } from '../../mocks/linear-handlers.ts';
 import { server } from '../../mocks/node.ts';
 import { buildFiledNode } from '../../test/build-filed-node.ts';
+import { buildStubProgramRunner } from '../../test/build-stub-program-runner.ts';
 import { createCapacitySample } from '../../test/create-capacity-sample.ts';
 import { freshDb } from '../../test/helpers.ts';
 import { readReadyByLane } from '../areas/read-ready-by-lane.ts';
@@ -249,8 +250,10 @@ test('it closes the items whose Linear issue is Done and whose document is decid
 test('it logs the items a due unblock pass found overdue', async () => {
   const ctx = setupTest();
   const logs: string[] = [];
-  const capacity = JSON.stringify({ imp: { freeMib: 0, room: false }, providers: { claude: { room: false, unattended: true, target: 'imp' } } });
-  const run: Runner = (command) => Promise.resolve({ code: 0, stdout: command[0] === 'op' ? 'lin_api_INVENTED\n' : capacity, stderr: '' });
+  const run = buildStubProgramRunner({
+    bash: { code: 0, stdout: JSON.stringify({ imp: { freeMib: 0, room: false }, providers: { claude: { room: false, unattended: true, target: 'imp' } } }), stderr: '' },
+    gh: { code: 0, stdout: '[]', stderr: '' },
+  });
   onTestFinished(overrideEnv('HQ_NOW', '2026-10-15T20:00:00Z'));
   for (const key of ['kinds_synced_at', 'goals_synced_at', 'goals_ok_at', 'kinds_ok_at', 'linear_synced_at', 'lanes_ready_linear_at']) {
     setMeta(ctx.db, key, '2026-10-15T20:00:00Z');
