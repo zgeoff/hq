@@ -56,6 +56,19 @@ test('it points a repo-sync news line to hq pr status when the file list is too 
   expect(status.text).toContain(`(held files: ${files.join(', ')})`);
 });
 
+test('it shows the exemption in hq pr status for a fresh PR with no other record', async () => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ prFiles: { code: 0, stdout: 'skills/kettle/SKILL.md\n', stderr: '' } });
+  await runPRCommand({ run: fake.run, db: ctx.db, verb: 'exempt', rest: ['widgets', '7'], flags: { rule: 'formatting', note: 'Only blank lines moved.' }, actor: () => Promise.resolve('z-review'), readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) });
+
+  const status = await runPRCommand({ run: fake.run, db: ctx.db, verb: 'status', rest: ['widgets', '7'], flags: {}, actor: () => Promise.resolve('z-review'), readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) });
+
+  expect(status).toStrictEqual({
+    data: { pr: null, reviewRecords: { mechanical: null, exemption: { rule: 'formatting', note: 'Only blank lines moved.', files: ['skills/kettle/SKILL.md'] } } },
+    text: 'No record for widgets#7.\nz-review: exempt under the formatting rule, not proved by hq: Only blank lines moved. (held files: skills/kettle/SKILL.md)',
+  });
+});
+
 test('it keeps one news line to 400 characters', async () => {
   const ctx = setupTest();
   const fake = buildFakeRunner({ prFiles: { code: 0, stdout: 'skills/kettle/SKILL.md\nAGENTS.md\n', stderr: '' } });
