@@ -1,6 +1,6 @@
 // After an atc daemon restart, message every session the restart cut off, every
 // live session on the wake list (its background waits died with the daemon),
-// and the orchestrator, whose loop wakeup died too.
+// and the orchestrator, whose event watch died too.
 import { toExactOptional } from '@zgeoff/std';
 import type { Database } from 'bun:sqlite';
 import { logEvent } from '../log-event.ts';
@@ -8,7 +8,6 @@ import { connectWithRetry } from './connect-with-retry.ts';
 import { orchestratorName } from './orchestrator-name.ts';
 import { planWake } from './plan-wake.ts';
 import { readLastRestart } from './read-last-restart.ts';
-import { resolveLoopPrompt } from './resolve-loop-prompt.ts';
 import type { RestartRecord, WakeResult } from './types.ts';
 import { wakeList } from './wake-list.ts';
 
@@ -16,9 +15,10 @@ export async function runWake(db: Database, opts: { dryRun: boolean; waitMs: num
   const last = opts.last ?? (await readLastRestart());
   const client = await connectWithRetry(opts.waitMs);
   try {
-    const loop = resolveLoopPrompt({ write: !opts.dryRun });
-    const plan = planWake(last, await client.sessions(), wakeList(db).map((e) => ({ id: e.session_id, name: e.name })), orchestratorName(), loop.path);
-    const result: WakeResult = { runID: last.runID, sent: [], skipped: plan.skipped, dryRun: opts.dryRun, loopPrompt: loop };
+    const live = await client.sessions();
+    const listed = wakeList(db).map((entry) => ({ id: entry.session_id, name: entry.name }));
+    const plan = planWake(last, live, listed, orchestratorName());
+    const result: WakeResult = { runID: last.runID, sent: [], skipped: plan.skipped, dryRun: opts.dryRun };
     for (const m of plan.messages) {
       if (opts.dryRun) {
         result.sent.push({ session: m.session, name: m.name, reason: m.reason });

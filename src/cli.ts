@@ -1892,7 +1892,6 @@ async function wakeCommand(db: Database, verb: string | undefined, args: string[
         `${r.dryRun ? 'Would wake' : 'Woke'} after restart ${r.runID}:`,
         ...r.sent.map((s) => `  ${s.error ? '✕' : '✓'} ${s.name} (${s.reason})${s.error ? `: ${s.error}` : ''}`),
         ...r.skipped.map((s) => `  - ${s.name}: ${s.why}`),
-        ...(r.loopPrompt ? [`loop prompt: ${r.loopPrompt.source === 'main' ? `from ${defsSource()}'s origin/main (${r.loopPrompt.path})` : `none: the read from origin/main failed (${r.loopPrompt.error}); the wake says to re-arm from the start prompt on main`}`] : []),
       ];
       return { data: { ...r }, text: lines.join('\n') };
     }

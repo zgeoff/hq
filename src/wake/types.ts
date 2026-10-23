@@ -37,5 +37,4 @@ export interface WakeResult {
   sent: { session: string; name: string; reason: WakeReason; message?: string; error?: string }[];
   skipped: WakePlan['skipped'];
   dryRun: boolean;
-  loopPrompt?: { path: string | null; source: 'main' | 'none'; error: string | null };
 }
