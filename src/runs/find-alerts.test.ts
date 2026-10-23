@@ -109,3 +109,16 @@ test('it raises an exited alert for a session whose PR was reviewed only before 
 
   expect(lines).toContain('GEO-9825: session 66666666 has exited; check for its PR or final note');
 });
+
+test('it raises no exited alert for a session whose PR has an owner override at its FINAL head', () => {
+  const ctx = setupTest();
+  const session = '77777777-8888-4999-8aaa-bbbbbbbbbbbb';
+  addRun(ctx.db, { issue: 'GEO-9828', title: 'Invented kettle work', place: 'imp', session, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
+  addPr(ctx.db, 'GEO-9828', 'kettle#28', 'kettle-bot');
+  ctx.db
+    .query("UPDATE run_prs SET final_sha = 'abc1234', final_at = '2026-10-21T01:00:00Z', final_source = 'marker:kettle', reviewed_sha = 'def5678', review_round = 2, reviewed_at = '2026-10-21T00:45:00Z' WHERE ref = 'kettle#28'")
+    .run();
+  recordPROverride(ctx.db, { repo: 'kettle', pr: 28, head: 'abc1234aaaabbbbccccddddeeeeffff00001111', source: 'chat:kettle-chat@2026-10-21T01:30:00Z', note: 'Invented: the restack kept each fix.', actor: 'kettle-bot' });
+
+  expect(findAlerts(ctx.db, [{ id: session, name: 'kettle', alive: false, state: 'exited' }], new Map(), new Date('2026-10-21T03:00:00Z'))).toStrictEqual([]);
+});
