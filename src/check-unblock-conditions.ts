@@ -6,7 +6,6 @@ import type { PRRef } from './parse-pr-url.ts';
 import { parsePRURL } from './parse-pr-url.ts';
 import type { Runner } from './runner/types.ts';
 import { now } from './clock/now.ts';
-import { owner } from './owner.ts';
 import { dropUnblock } from './unblock/drop-unblock.ts';
 import { listUnblocks } from './unblock/list-unblocks.ts';
 import { makeConditionReader } from './unblock/make-condition-reader.ts';
@@ -19,6 +18,7 @@ import { writeOverdueNotice } from './unblock/write-overdue-notice.ts';
 export interface ConditionsDeps {
   call: LinearCall;
   run: Runner;
+  ownerSession: string;
 }
 
 export interface ConditionsResult {
@@ -37,12 +37,11 @@ export async function checkUnblockConditions(db: Database, deps: ConditionsDeps,
   const readCondition = makeConditionReader({ ...deps, issues, at });
   const outcomes = await Promise.all(items.map((item) => checkItem({ actor, db, readCondition }, item)));
   const stillOpen = outcomes.filter((outcome) => outcome.closed === 'open');
-  const ownerSession = owner();
   return {
     settled: outcomes.flatMap((outcome) => (outcome.closed === 'done' ? [outcome.id] : [])),
     dropped: outcomes.flatMap((outcome) => (outcome.closed === 'dropped' ? [outcome.id] : [])),
     errors: outcomes.flatMap((outcome) => outcome.errors),
-    overdue: stillOpen.filter((outcome) => writeOverdueNotice(db, { id: outcome.id, actor, at, ownerSession })).map((outcome) => outcome.id),
+    overdue: stillOpen.filter((outcome) => writeOverdueNotice(db, { id: outcome.id, actor, at, ownerSession: deps.ownerSession })).map((outcome) => outcome.id),
   };
 }
 

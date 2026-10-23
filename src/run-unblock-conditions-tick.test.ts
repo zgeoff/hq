@@ -13,6 +13,7 @@ function setupTest() {
     deps: {
       run: () => Promise.resolve({ code: 1, stdout: '', stderr: 'invented: not called' }),
       call: () => Promise.reject(new Error('invented: Linear not called')),
+      ownerSession: 'kettle-owner',
     },
   };
 }
