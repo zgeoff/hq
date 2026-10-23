@@ -1,5 +1,6 @@
 import type { Database } from 'bun:sqlite';
 import type { SessionInfo } from '../atc/session-schema.ts';
+import { isPresentSession } from '../areas/is-present-session.ts';
 import { planRoundCap } from '../noslop/plan-round-cap.ts';
 import { readOwnerOverrides } from '../pr-status/read-owner-overrides.ts';
 import { readOKReviews } from '../noslop/read-ok-reviews.ts';
@@ -40,7 +41,7 @@ export function findAlerts(db: Database, sessions: SessionInfo[], activity: Map<
     for (const active of findWatchedSessions(r.sessions)) {
       const who = `${active.helper ? 'helper ' : ''}session ${active.session_id.slice(0, 8)}`;
       const s = byId.get(active.session_id);
-      if (!s || !s.alive) {
+      if (!s || !isPresentSession(s)) {
         // Its work is handed in: a PR final and reviewed at its head. A session put to sleep
         // until its merge window is not lost work (z-delivery, GEO-957).
         const open = r.prs.filter((p) => p.state === 'open');
@@ -48,6 +49,11 @@ export function findAlerts(db: Database, sessions: SessionInfo[], activity: Map<
           continue;
         }
         alerts.push({ key: `session:${active.session_id}`, fingerprint: 'exited', issue: r.issue, line: `${r.issue}: ${who} has exited; ${formatExitHint(r.issue, active)}` });
+        continue;
+      }
+
+      // Asleep in its suspended imp, as for a host switch: present, but with no activity to read.
+      if (!s.alive) {
         continue;
       }
       if (r.geoff_chat) continue;
