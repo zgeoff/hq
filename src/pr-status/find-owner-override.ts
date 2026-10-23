@@ -14,14 +14,19 @@ export interface OwnerOverride {
 
 const OverrideRowsSchema = z.array(z.object({ seq: z.number(), at: z.string(), data: z.string() }));
 
-// One override event that does not parse voids them all, so a gap never lets an older one stand.
 export function findOwnerOverride(db: Database, repo: string, pr: number, head: string): OwnerOverride | null {
+  return readOwnerOverrides(db, repo, pr).findLast((override) => override.head === head) ?? null;
+}
+
+// The PR's overrides of open findings from an owner's answer, oldest first. One override event that
+// does not parse voids them all, so a gap never lets an older one stand.
+export function readOwnerOverrides(db: Database, repo: string, pr: number): OwnerOverride[] {
   const rows = OverrideRowsSchema.parse(db.query("SELECT seq, at, data FROM events WHERE subject = 'hq' AND subject_id = ? AND action = 'pr-override' ORDER BY seq").all(`pr:${repo}#${pr}`));
   const overrides = rows.map((row) => parseOverride(row));
   if (overrides.includes(null)) {
-    return null;
+    return [];
   }
-  return overrides.findLast((override) => override !== null && override.scope === OVERRIDE_SCOPE && override.head === head && isAnswerSource(override.source)) ?? null;
+  return overrides.filter((override): override is OwnerOverride => override !== null && override.scope === OVERRIDE_SCOPE && isAnswerSource(override.source));
 }
 
 type OverrideRow = z.infer<typeof OverrideRowsSchema>[number];
