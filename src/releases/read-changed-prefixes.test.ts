@@ -50,5 +50,5 @@ test("it refuses a PR whose file list fills GitHub's 3000-file limit, as its cha
   const files = Array.from({ length: 3000 }, (_, index) => `docs/page-${index}.md`);
   const run = buildStubSourceGH({ shas: {}, contains: {}, config: { tools: { packages: { 'packages/alpha': { component: 'alpha' } } } }, files: { 'tools#5': files } }, []);
 
-  await expect(readChangedPrefixes(run, 'tools', '5', buildMockSha(5))).rejects.toMatchObject({ code: 'too_many_files', message: "tools#5 lists 3000 files, GitHub's limit, so its changed packages are unknown" });
+  await expect(readChangedPrefixes(run, 'tools', '5', buildMockSha(5))).rejects.toMatchObject({ code: 'too_many_files', message: "tools#5 lists 3000 files, GitHub's limit, so its changed files are unknown" });
 });
