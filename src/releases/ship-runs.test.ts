@@ -2,6 +2,7 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { overrideEnv } from '../config/override-env.ts';
 import { shipRuns } from './ship-runs.ts';
 import { getRun } from '../runs/get-run.ts';
+import { setSession } from '../runs/set-session.ts';
 import { setState } from '../runs/set-state.ts';
 import { buildMockRelease } from '../../test/build-mock-release.ts';
 import { buildMockSha } from '../../test/build-mock-sha.ts';
@@ -45,6 +46,27 @@ test('it ships a tools PR once the one package it changed has a release holding 
 
   expect(result.moved).toStrictEqual([{ issue: 'GEO-70', to: 'live-check', prs: [{ ref: 'tools#5', tag: 'alpha@1.0.0', shipped_at: '2026-10-15T00:00:00Z' }] }]);
   expect(ctx.readPr('tools#5')).toStrictEqual({ merge_sha: buildMockSha(5), shipped_tag: 'alpha@1.0.0', shipped_at: '2026-10-15T00:00:00Z' });
+});
+
+test('it leaves a shipped run alone while a helper added after its merge is still active, and ships it once the helper ends', async () => {
+  const ctx = setupTest();
+  createMergedRun(ctx.db, 'GEO-74', ['tools#9']);
+  setSession(ctx.db, 'GEO-74', '7e1b0a74-0000-4000-8000-000000000074', 'z-delivery', 'add');
+  const facts = {
+    shas: { 'tools#9': buildMockSha(9) },
+    contains: { 'alpha@1.0.0': [buildMockSha(9)] },
+    releases: { tools: [buildMockRelease('alpha@1.0.0', '2026-10-15T00:00:00Z')] },
+    config: { tools: { packages: { 'packages/alpha': { component: 'alpha' } } } },
+    files: { 'tools#9': ['packages/alpha/src/a.ts'] },
+  };
+
+  const busy = await shipRuns(ctx.db, buildStubSourceGH(facts, ctx.calls), ctx.now);
+  const stateWhileBusy = getRun(ctx.db, 'GEO-74')?.state;
+  setSession(ctx.db, 'GEO-74', '7e1b0a74-0000-4000-8000-000000000074', 'z-delivery', 'remove');
+  const freed = await shipRuns(ctx.db, buildStubSourceGH(facts, ctx.calls), ctx.now);
+
+  expect([busy.moved, busy.busy, stateWhileBusy]).toStrictEqual([[], [{ issue: 'GEO-74', session: '7e1b0a74-0000-4000-8000-000000000074' }], 'merged']);
+  expect(freed.moved).toStrictEqual([{ issue: 'GEO-74', to: 'live-check', prs: [{ ref: 'tools#9', tag: 'alpha@1.0.0', shipped_at: '2026-10-15T00:00:00Z' }] }]);
 });
 
 test('it moves no run whose shipment write failed, and reports the failure', async () => {
