@@ -19,8 +19,9 @@ export function writeFleetRefresh(db: Database, refresh: RefreshMap): void {
 
 type RefreshEntry = RefreshMap[string];
 
+// A new answer read time changes no phase, so it is no move.
 function checkRefreshMove(name: string, from: RefreshEntry | undefined, to: RefreshEntry | undefined): void {
-  if (isDeepStrictEqual(from, to)) {
+  if (isDeepStrictEqual(toPhaseFields(from), toPhaseFields(to))) {
     return;
   }
   const fromPhase = toMovePhase(from, to?.sessionId),
@@ -28,6 +29,14 @@ function checkRefreshMove(name: string, from: RefreshEntry | undefined, to: Refr
   if (!REFRESH_TRANSITIONS[fromPhase].includes(toPhase)) {
     throw new HqError('bad_refresh_move', `fleet_refresh: ${name} cannot move from ${fromPhase} to ${toPhase}`);
   }
+}
+
+function toPhaseFields(entry: RefreshEntry | undefined): Omit<RefreshEntry, 'answerReadAt'> | undefined {
+  if (entry === undefined) {
+    return undefined;
+  }
+  const { answerReadAt: _, ...fields } = entry;
+  return fields;
 }
 
 function toMovePhase(entry: RefreshEntry | undefined, sessionId: string | undefined): RefreshPhase | 'none' {

@@ -237,7 +237,7 @@ async function runAskStep(pass: StalePass, turn: StaleTurn): Promise<void> {
 }
 
 async function runAskedStep(pass: StalePass, turn: StaleTurn, asked: Entry): Promise<void> {
-  const outcome = await readAskedOutcome(pass, turn.session, asked);
+  const outcome = await readAskedOutcome(pass, turn, asked);
   if (outcome === 'wait' || (outcome === 'restart' && pass.acted)) {
     return;
   }
@@ -274,31 +274,33 @@ async function readBusyReason(pass: StalePass, session: FleetSession): Promise<s
   return checkQuietPoint(pass.db, { id: session.id, name: session.name, state: session.state, lastActivityAt: details.lastActivityAt }, pass.time.getTime());
 }
 
-async function readAskedOutcome(pass: StalePass, session: FleetSession, asked: Entry): Promise<AskedOutcome> {
-  const answer = await readAskedAnswer(pass, session, asked);
+async function readAskedOutcome(pass: StalePass, turn: StaleTurn, asked: Entry): Promise<AskedOutcome> {
+  const answer = await readAskedAnswer(pass, turn, asked);
   return pickAskedOutcome({ answer, askedAtMs: Date.parse(asked.askedAt ?? iso(pass.time)), nowMs: pass.time.getTime() });
 }
 
-async function readAskedAnswer(pass: StalePass, session: FleetSession, asked: Entry): Promise<AskedAnswer> {
-  const reply = await readAnswerFor(pass, session, asked);
+async function readAskedAnswer(pass: StalePass, turn: StaleTurn, asked: Entry): Promise<AskedAnswer> {
+  const reply = await readAnswerFor(pass, turn, asked);
   if (reply.kind !== 'saved') {
     return reply;
   }
-  return { ...reply, busyReason: await readBusyReason(pass, session) };
+  return { ...reply, busyReason: await readBusyReason(pass, turn.session) };
 }
 
-async function readAnswerFor(pass: StalePass, session: FleetSession, asked: Entry): Promise<MessageReply> {
-  const lookup = await readMessageLookup(pass, session, asked);
+async function readAnswerFor(pass: StalePass, turn: StaleTurn, asked: Entry): Promise<MessageReply> {
+  const lookup = await readMessageLookup(pass, turn, asked);
   return parseMessageReply(lookup);
 }
 
-async function readMessageLookup(pass: StalePass, session: FleetSession, asked: Entry): Promise<MessageLookup> {
+async function readMessageLookup(pass: StalePass, turn: StaleTurn, asked: Entry): Promise<MessageLookup> {
+  const session = turn.session;
   const row = pass.db.query('SELECT message_id FROM outbox WHERE event_seq = ? AND message_id IS NOT NULL').get(asked.eventSeq ?? -1) as { message_id: string } | null;
   if (!row) {
     return { kind: 'unsent' };
   }
   try {
     const got = await pass.client.message(row.message_id);
+    pass.refresh[turn.entry.name] = { ...asked, answerReadAt: iso(pass.time) };
     return { kind: 'read', status: got.status, answer: got.answer, answeredAt: got.answeredAt };
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);

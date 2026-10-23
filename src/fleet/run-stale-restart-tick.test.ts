@@ -490,6 +490,18 @@ test('it logs a failed message lookup and keeps the save request open past the t
   expect(ctx.atc.calls).toStrictEqual([]);
 });
 
+test('it records when atc last answered the read of an asked save request, and keeps that time through a failed read', async () => {
+  const ctx = setupTest();
+  await ctx.tick(0, [ctx.kettle]);
+  await ctx.tick(121, [ctx.kettle]);
+  await ctx.tick(126, [ctx.kettle]);
+  ctx.atc.messageFailures.add('m-1');
+
+  await ctx.tick(131, [ctx.kettle]);
+
+  expect(ctx.refresh()['z-kettle']).toMatchObject({ phase: 'asked', askedAt: '2026-10-14T03:01:00Z', answerReadAt: '2026-10-14T03:06:00Z' });
+});
+
 test('it waits, then restarts, when the activity of the saved answer itself is recent', async () => {
   const answeredAt = Date.parse(NOON_SYDNEY) + 125 * 60_000,
     ctx = setupTest();

@@ -23,6 +23,9 @@ export interface Probe {
   // Are the machine-specific settings (env or the local file) all set?
   localConfig?: () => Check;
   fleetTrust?: () => Check[]; // is every fleet folder trusted by Claude Code?
+
+  // Can hq read the answer to each save request it asked?
+  stuckSaves?: (at: Date) => Check[];
   watcher?: (at: Date) => Check | null; // has the watcher completed a tick lately? // is hq-defs' working tree on origin/main?
   defsFetch?: () => Check | null; // can hq fetch the definitions' main (hq)? Checked at most hourly
 }
