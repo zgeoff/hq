@@ -1,14 +1,7 @@
-export interface Segment {
-  kind: 'text' | 'version' | 'code' | 'dest';
-  value: string;
-}
-
-// A version is `v` with two or three numeric parts, or exactly three bare numeric parts, with at
-// most a known pre-release tag. A bare `1.5`, an IP address or a `1.2-hour` is prose or a value.
-export const VERSION = /^(?:v\d+\.\d+(?:\.\d+)?|\d+\.\d+\.\d+)(?:-(?:alpha|beta|rc)(?:\.\d+)*)?$/u;
+import type { Segment } from './segment.ts';
+import { parseTextSegments } from './parse-text-segments.ts';
 
 const REFERENCE_DEFINITION = /^(?<lead>\s{0,3}\[[^\]]+\]:\s*)(?<destination>\S+)/u;
-const VERSION_IN_TEXT = /(?<![\w./-])(?:v\d+\.\d+(?:\.\d+)?|\d+\.\d+\.\d+)(?:-(?:alpha|beta|rc)(?:\.\d+)*)?(?![\w-]|\.\d)/gu;
 
 // A Markdown line as text, version tokens, whole code spans and link destinations (inline or a
 // reference definition's), in order.
@@ -20,19 +13,6 @@ export function parseLineSegments(line: string): Segment[] {
   const lead = reference.groups?.['lead'] ?? '';
   const destination = reference.groups?.['destination'] ?? '';
   return [{ kind: 'text', value: lead }, { kind: 'dest', value: destination }, ...parseInline(line.slice(lead.length + destination.length))];
-}
-
-// Text only, with its version tokens set apart.
-export function parseTextSegments(text: string): Segment[] {
-  const segments: Segment[] = [];
-  let last = 0;
-  for (const match of text.matchAll(VERSION_IN_TEXT)) {
-    pushText(segments, text.slice(last, match.index));
-    segments.push({ kind: 'version', value: match[0] });
-    last = match.index + match[0].length;
-  }
-  pushText(segments, text.slice(last));
-  return segments;
 }
 
 const INLINE = /`[^`\n]+`|\]\((?<destination>[^)\s]*)(?:\s+"[^"]*")?\)/gu;
@@ -53,10 +33,4 @@ function parseInline(text: string): Segment[] {
   }
   segments.push(...parseTextSegments(text.slice(last)));
   return segments;
-}
-
-function pushText(segments: Segment[], value: string): void {
-  if (value !== '') {
-    segments.push({ kind: 'text', value });
-  }
 }

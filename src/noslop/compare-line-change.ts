@@ -1,7 +1,9 @@
 import { buildMoveCandidates } from './build-move-candidates.ts';
 import type { TargetMode } from './build-move-candidates.ts';
-import { VERSION, parseLineSegments, parseTextSegments } from './parse-line-segments.ts';
-import type { Segment } from './parse-line-segments.ts';
+import { parseLineSegments } from './parse-line-segments.ts';
+import { parseTextSegments } from './parse-text-segments.ts';
+import type { Segment } from './segment.ts';
+import { VERSION } from './version-pattern.ts';
 
 type Candidates = [string, string][];
 
