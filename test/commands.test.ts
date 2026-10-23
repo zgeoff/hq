@@ -1,8 +1,14 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { GROUPS, HELP, VERSION, main } from '../src/cli.ts';
-import { COMMANDS, lookup, renderHelp, type Command } from '../src/commands.ts';
+import { main } from '../src/cli.ts';
+import { GROUP_HANDLERS } from '../src/group-handlers.ts';
+import { HELP } from '../src/help.ts';
+import { VERSION } from '../src/version.ts';
+import type { Command } from '../src/commands.ts';
+import { COMMANDS } from '../src/commands.ts';
+import { lookup } from '../src/lookup.ts';
+import { renderHelp } from '../src/render-help.ts';
 import { NOON_SYDNEY, at, freshDb } from './helpers.ts';
 
 const root = join(import.meta.dir, '..');
@@ -48,7 +54,7 @@ test('no two rows claim the same noun and verb', () => {
 
 test('every row names a group that exists and has the fields a capabilities listing needs', () => {
   for (const c of COMMANDS) {
-    expect(GROUPS[c.group], c.usage).toBeDefined();
+    expect(GROUP_HANDLERS.has(c.group), c.usage).toBe(true);
     expect(c.nouns.length).toBeGreaterThan(0);
     expect(c.usage.startsWith('hq ')).toBe(true);
     expect(c.summary.length).toBeGreaterThan(0);

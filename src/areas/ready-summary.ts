@@ -1,7 +1,7 @@
 import type { Database } from 'bun:sqlite';
 import { now } from '../clock/now.ts';
 import { metaJson } from '../db/meta-json.ts';
-import { READY_DETAIL } from './ready-by-lane.ts';
+import { READY_DETAIL } from './ready-detail.ts';
 import { readReadyByLane } from './read-ready-by-lane.ts';
 import type { ReadySummary, Skipped } from './types.ts';
 

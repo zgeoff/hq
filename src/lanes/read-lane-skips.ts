@@ -1,9 +1,8 @@
 import type { Database } from 'bun:sqlite';
 import { z } from 'zod';
 import { metaJson } from '../db/meta-json.ts';
+import { LANE_SKIPS_KEY } from './lane-skips-key.ts';
 import type { LaneSkip } from './types.ts';
-
-export const LANE_SKIPS_KEY = 'lanes_skips';
 
 const skipsSchema = z.array(z.object({ issue: z.string(), until: z.string(), reason: z.string(), by: z.string(), at: z.string() }));
 

@@ -88,7 +88,9 @@ import { boundedRunner } from './runner/bounded-runner.ts';
 import { cleanEnv } from './runner/clean-env.ts';
 import { realRunner } from './runner/real-runner.ts';
 import type { Runner } from './runner/types.ts';
-import { type Ctx, type Out, lookup, registerGroups, renderHelp } from './commands.ts';
+import type { Ctx, Out } from './commands.ts';
+import { registerGroups } from './register-groups.ts';
+import { lookup } from './lookup.ts';
 import { z } from 'zod';
 import { config } from './config/config.ts';
 import { toExactOptional } from '@zgeoff/std';
@@ -336,8 +338,8 @@ import { setHealthSetting } from './health/set-health-setting.ts';
 import type { Probe } from './health/types.ts';
 import { repairAdvisor400 } from './repair/repair-advisor400.ts';
 import { HqError } from './errors.ts';
-
-export const VERSION = '0.95.0';
+import { HELP } from './help.ts';
+import { VERSION } from './version.ts';
 
 const OPTIONS = {
   json: { type: 'boolean' },
@@ -457,9 +459,6 @@ export type Flags = ReturnType<typeof parse>['values'];
 function parse(argv: string[]) {
   return parseArgs({ args: argv, options: OPTIONS, allowPositionals: true, strict: true });
 }
-
-// Rendered from the command registry (src/commands.ts).
-export const HELP = renderHelp(VERSION);
 
 async function readText(inline: string | undefined, file: string | undefined, what: string): Promise<string> {
   if (inline !== undefined && file !== undefined) throw new HqError('bad_args', `give --${what} or --${what}-file, not both`);
@@ -2077,7 +2076,7 @@ async function outboxCommand(db: Database, verb: string | undefined, rest: strin
 }
 
 // Each command group's entry point, keyed by the `group` a registry row names (src/commands.ts).
-export const GROUPS: Record<string, (c: Ctx) => Promise<Out>> = {
+const GROUPS: Record<string, (context: Ctx) => Promise<Out>> = {
   status: async (c) => status(c.db),
   open: (c) => openCommand(c.db, c.verb, c.flags),
   hold: (c) => holdCommand(c.db, c.flags),

@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 import { join } from 'node:path';
-import { HELP } from '../src/cli.ts';
+import { HELP } from '../src/help.ts';
 import { COMMANDS } from '../src/commands.ts';
 import { checkSkills } from '../src/skillcheck/check-skills.ts';
 import { check } from '../src/skillcheck/check.ts';

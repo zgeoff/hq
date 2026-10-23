@@ -1,4 +1,4 @@
-import type { MoveFacts } from '../src/noslop/mechanical-types.ts';
+import type { MoveFacts } from '../src/noslop/types.ts';
 
 interface StubMoveFacts {
   base?: [string, string | null][];

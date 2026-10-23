@@ -3,6 +3,7 @@
 // The table is data except `handler`, so `hq capabilities --json` can print it.
 import type { Database } from 'bun:sqlite';
 import type { Flags } from './cli.ts';
+import { GROUP_HANDLERS } from './group-handlers.ts';
 import type { Runner } from './runner/types.ts';
 
 export interface Out {
@@ -26,7 +27,7 @@ export interface Ctx {
 // a missing one is the row's own. `summary: null` prints no summary; an array is a summary over
 // several lines; `pad` is the spaces between usage and summary (default: pad to column 46, at
 // least 2); `below` puts the summary on the lines under the usage.
-interface HelpEntry {
+export interface HelpEntry {
   usage?: string;
   summary?: string | readonly string[] | null;
   pad?: number;
@@ -51,17 +52,8 @@ export interface Command extends Spec {
   handler: (c: Ctx) => Promise<Out>;
 }
 
-// The group functions live in cli.ts, which imports this module for HELP at load, so this module
-// cannot import them back. cli.ts hands them over with registerGroups before it runs a command.
-// (Not a dynamic import of cli.ts: a handler would wait on the entry module, which is waiting on it.)
-let groups: Record<string, (c: Ctx) => Promise<Out>> | null = null;
-
-export function registerGroups(g: Record<string, (c: Ctx) => Promise<Out>>): void {
-  groups = g;
-}
-
 const via = (group: string) => async (c: Ctx): Promise<Out> => {
-  const fn = groups?.[group];
+  const fn = GROUP_HANDLERS.get(group);
   if (!fn) throw new Error(`command group ${group} is not registered`);
   return fn(c);
 };
@@ -221,42 +213,3 @@ const SPECS: readonly Spec[] = [
 ];
 
 export const COMMANDS: readonly Command[] = SPECS.map((s) => ({ ...s, handler: via(s.group) }));
-
-// The row for `hq <noun> [verb]`: the row that lists the verb; else, with no verb, the noun's bare
-// row; else the noun's catch-all (verbs null); else the noun's first row. That last step keeps a
-// verb no row lists inside its group, whose function reports the error it always did. Every row
-// of a group shares the group's function, so which row answers does not change what runs.
-export function lookup(noun: string, verb: string | undefined, commands: readonly Command[] = COMMANDS): Command | undefined {
-  const rows = commands.filter((c) => c.nouns.includes(noun));
-  const exact = verb === undefined ? rows.find((c) => c.bare) : rows.find((c) => c.verbs?.includes(verb));
-  return exact ?? rows.find((c) => c.verbs === null) ?? rows[0];
-}
-
-const HELP_SUMMARY_COLUMN = 46; // where a summary starts when the usage is short enough
-const HELP_CONTINUATION = 45; // where the second and later summary lines start
-
-function helpLines(c: Command, e: HelpEntry): string[] {
-  const usage = (e.usage ?? c.usage).split('\n');
-  const summary = e.summary === undefined ? [c.summary] : e.summary === null ? [] : typeof e.summary === 'string' ? [e.summary] : [...e.summary];
-  const lines = usage.map((l) => `  ${l}`);
-  if (!summary.length) return lines;
-  if (e.below) return [...lines, ...summary.map((s) => ' '.repeat(HELP_CONTINUATION) + s)];
-  const last = lines.length - 1;
-  lines[last] += ' '.repeat(e.pad ?? Math.max(2, HELP_SUMMARY_COLUMN - lines[last]!.length)) + summary[0];
-  return [...lines, ...summary.slice(1).map((s) => ' '.repeat(HELP_CONTINUATION) + s)];
-}
-
-// `hq help`: the first line, then each section's lines in table order, a blank line between sections.
-export function renderHelp(version: string, commands: readonly Command[] = COMMANDS): string {
-  const sections: string[][] = [];
-  let prev: string | null = null;
-  for (const c of commands) {
-    if (c.help === false) continue;
-    for (const e of c.help === undefined ? [{}] : Array.isArray(c.help) ? c.help : [c.help as HelpEntry]) {
-      if (c.section !== prev) sections.push([]);
-      prev = c.section;
-      sections.at(-1)!.push(...helpLines(c, e));
-    }
-  }
-  return [`hq ${version}: headquarters for the z- sessions. Every command takes --json.`, '', sections.map((s) => s.join('\n')).join('\n\n'), '', 'Who you are: --by, else HQ_AS, else your atc session\'s name.'].join('\n');
-}

@@ -13,7 +13,7 @@ import { buildPRStatusView } from './build-pr-status-view.ts';
 import { readHeadExemption } from './read-head-exemption.ts';
 import { readHeadMechanical } from './read-head-mechanical.ts';
 import { findOwnerOverride } from './find-owner-override.ts';
-import type { OwnerOverride } from './find-owner-override.ts';
+import type { OwnerOverride } from './read-owner-overrides.ts';
 import { findSourceRefusal } from './find-source-refusal.ts';
 import type { SourceRequest } from './find-source-refusal.ts';
 import { findPRStatus } from './find-pr-status.ts';

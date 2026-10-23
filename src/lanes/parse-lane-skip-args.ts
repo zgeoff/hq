@@ -1,10 +1,9 @@
 import { P, match } from 'ts-pattern';
 import { HqError } from '../errors.ts';
 import { ISSUE } from '../followups/issue.ts';
+import { LANE_SKIP_USAGE } from './lane-skip-usage.ts';
 
 export type LaneSkipArgs = { kind: 'list' } | { kind: 'drop'; issue: string } | { kind: 'set'; issue: string; until: string; reason: string };
-
-export const LANE_SKIP_USAGE = 'usage: hq lanes skip <issue> --until <ISO time|GEO-n> --reason TEXT | hq lanes skip list | hq lanes skip drop <issue>';
 
 // hq lanes skip's words after the verb, with its --until and --reason flags, as one command. Anything
 // else is bad_args with the usage.

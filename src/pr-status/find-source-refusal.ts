@@ -7,7 +7,7 @@ import type { PRRef } from './parse-pr-ref.ts';
 import type { OwnerProbe } from './read-owner-session.ts';
 
 // What the source must grant: an override of the open findings, or the risk of one finding.
-export type OwnerAction = { action: 'override' } | { action: 'accept-risk'; finding: string };
+type OwnerAction = { action: 'override' } | { action: 'accept-risk'; finding: string };
 
 export interface SourceRequest {
   ref: PRRef;

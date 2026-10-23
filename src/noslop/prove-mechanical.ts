@@ -1,6 +1,6 @@
 import { analyzeHeldDiffs } from './analyze-held-diffs.ts';
 import { isMovedTarget } from './is-moved-target.ts';
-import type { HeldDiff, MechanicalProof, MoveFacts } from './mechanical-types.ts';
+import type { HeldDiff, MechanicalProof, MoveFacts } from './types.ts';
 
 // Whether the held files' diffs are mechanical edits, proved from the diffs and git's facts about
 // the moved targets alone. No word from a reviewer enters it.

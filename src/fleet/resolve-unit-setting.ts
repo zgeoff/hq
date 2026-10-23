@@ -1,5 +1,5 @@
 import { resolve } from 'node:path';
-import { PATH_SETTINGS } from '../config/config.ts';
+import { PATH_SETTINGS } from '../config/path-settings.ts';
 
 // A unit runs from another directory than the shell that wrote it, so a setting that names a file
 // is made absolute against the writing shell's directory.

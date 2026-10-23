@@ -1,5 +1,5 @@
 import { match } from 'ts-pattern';
-import type { MechanicalProof } from './mechanical-types.ts';
+import type { MechanicalProof } from './types.ts';
 
 // The diff at the head: not read yet, unreadable, or read with hq's proof of it.
 export type HeldDiffFact = { kind: 'unread' } | { kind: 'failed'; error: string } | { kind: 'read'; proof: MechanicalProof };

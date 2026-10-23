@@ -1,8 +1,8 @@
 import type { ReadyIssue } from '../lanes/types.ts';
 
-export type FocusClass = 'maintenance' | 'roadmap';
-export type FocusType = 'bug' | 'feature' | 'chore' | 'improvement' | 'investigation';
-export type FocusPriority = 'urgent' | 'high+' | 'medium+';
+type FocusClass = 'maintenance' | 'roadmap';
+type FocusType = 'bug' | 'feature' | 'chore' | 'improvement' | 'investigation';
+type FocusPriority = 'urgent' | 'high+' | 'medium+';
 
 // One filter of a term. An issue matches a term when it matches every filter in it.
 export type FocusFilter =

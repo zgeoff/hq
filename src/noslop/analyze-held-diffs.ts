@@ -1,6 +1,6 @@
 import { compareLineChange } from './compare-line-change.ts';
 import { parseFileDiff } from './parse-file-diff.ts';
-import type { HeldDiff, MoveClaim } from './mechanical-types.ts';
+import type { HeldDiff, MoveClaim } from './types.ts';
 
 export type HeldAnalysis = { ok: true; claims: MoveClaim[]; lines: number } | { ok: false; reason: string };
 
