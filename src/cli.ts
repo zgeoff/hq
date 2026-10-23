@@ -26,6 +26,7 @@ import { fleetIds } from './atc/fleet-ids.ts';
 import { sessionGetSchema } from './atc/session-get-schema.ts';
 import { makeFleetClient } from './fleet/make-fleet-client.ts';
 import { hasStaleOps } from './fleet/has-stale-ops.ts';
+import { readStuckSaveChecks } from './fleet/read-stuck-save-checks.ts';
 import { formatWrapUp } from './runs/format-wrap-up.ts';
 import { readImpWork } from './runs/read-imp-work.ts';
 import { runWrapUp } from './runs/run-wrap-up.ts';
@@ -1040,6 +1041,7 @@ function realProbe(db: Database): Probe {
     defsTree: (at) => readTreeCheck(db, at),
     privateTree: (at) => readTreeCheck(db, at, 'private'),
     fleetTrust: () => fleetTrustChecks(declaredFleet(db)),
+    stuckSaves: (at) => readStuckSaveChecks(db, at),
     probe: (at) => probeHealth(db, at),
     localConfig: () => readLocalConfigCheck(),
     watcher: (at) => {

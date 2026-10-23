@@ -216,6 +216,37 @@ test('the local settings check joins the run when the probe supplies it, and is 
   expect([none.checks.some((c) => c.key === 'local-config'), some.checks.find((c) => c.key === 'local-config')]).toStrictEqual([false, { key: 'local-config', ok: false, line: 'local settings: HQ_PROBE_READY not set' }]);
 });
 
+test('it joins the stuck save request checks to the run when the probe supplies them', async () => {
+  const result = await runChecks(
+    { ...probe(world()), stuckSaves: () => [{ key: 'fleet-save-unread:z-kettle', ok: false, line: 'fleet: z-kettle (session id-kettl) was asked to save at 2026-10-14T03:01:00Z, and every read of its answer since failed: invented failure' }] },
+    HEALTH_DEFAULTS,
+    {},
+    new Date(NOON_SYDNEY),
+  );
+
+  expect(result.checks.filter((check) => check.key.startsWith('fleet-save-unread'))).toStrictEqual([
+    { key: 'fleet-save-unread:z-kettle', ok: false, line: 'fleet: z-kettle (session id-kettl) was asked to save at 2026-10-14T03:01:00Z, and every read of its answer since failed: invented failure' },
+  ]);
+});
+
+test('it reports a stuck save request check that cannot read its state as a problem', async () => {
+  const result = await runChecks(
+    {
+      ...probe(world()),
+      stuckSaves: () => {
+        throw new Error('invented: bad fleet_refresh');
+      },
+    },
+    HEALTH_DEFAULTS,
+    {},
+    new Date(NOON_SYDNEY),
+  );
+
+  expect(result.checks.filter((check) => check.key.startsWith('fleet-save-unread'))).toStrictEqual([
+    { key: 'fleet-save-unread', ok: false, line: "fleet: can't read the save requests hq asked (meta fleet_refresh or its events)" },
+  ]);
+});
+
 test('the private-tree check joins the run when the probe supplies it, and is absent otherwise', async () => {
   const none = await runChecks(probe(world()), HEALTH_DEFAULTS, {}, new Date(NOON_SYDNEY)),
     some = await runChecks({ ...probe(world()), privateTree: () => ({ key: 'private-tree', ok: false, line: 'hq-private: no checkout' }) }, HEALTH_DEFAULTS, {}, new Date(NOON_SYDNEY));
