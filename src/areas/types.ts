@@ -26,7 +26,9 @@ export interface ReadySummary {
 
 export interface AwakeSession {
   id: string;
+  name?: string;
   alive: boolean;
+  locator?: { targetID?: string | null | undefined } | null | undefined;
   lifecycle?: { desired?: string; vm?: string; harness?: string };
   state?: string;
 }

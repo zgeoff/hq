@@ -130,7 +130,7 @@ test('local slots free none, and say why, when the localFallback is used up', as
     throw new Error('no slot plan');
   }
 
-  expect(plan.pool).toStrictEqual({ impSize: 0, localSize: 3, impRunning: 0, localRunning: 2, impFree: 0, localFree: 0, free: 0, held: null, localHeld: 'no unattended provider can start local work: localFallback 2 in use' });
+  expect(plan.pool).toStrictEqual({ impSize: 0, localSize: 3, impRunning: 0, localRunning: 2, impFree: 0, localFree: 0, free: 0, held: null, localHeld: 'no unattended provider can start local work: localFallback 2 in use', localSource: null });
   expect(plan.plan?.picks).toStrictEqual([]);
   expect(formatSlotPlan(plan)[0]).toBe('slots (running/size, free now): imp 0/0, 0 free; local 2/3, 0 free (no unattended provider can start local work: localFallback 2 in use)');
 });

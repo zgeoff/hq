@@ -6,7 +6,8 @@ import type { SlotPlan } from './read-slot-plan.ts';
 export function formatSlotPlan(slotPlan: SlotPlan): string[] {
   const pool = slotPlan.pool;
   const held = pool.held === null ? '' : ` (${Math.max(0, pool.impSize - pool.impRunning)} free by count, held: ${pool.held})`;
-  const localHeld = pool.localHeld === null ? '' : ` (${pool.localHeld})`;
+  const localNotes = [pool.localSource, pool.localHeld].filter((note) => note !== null);
+  const localHeld = localNotes.length === 0 ? '' : ` (${localNotes.join('; ')})`;
   const plan = slotPlan.plan;
   return [
     `slots (running/size, free now): imp ${pool.impRunning}/${pool.impSize}, ${pool.impFree} free${held}; local ${pool.localRunning}/${pool.localSize}, ${pool.localFree} free${localHeld}`,
