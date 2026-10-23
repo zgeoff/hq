@@ -30,7 +30,6 @@ record goes into `hq news`:
   - `repo-sync`: a repo-sync PR, as the update-bots reference says.
   - `ci-design-sync`: the skill change only rolls the shared ci-design skill out to a repo or syncs
     it. A new rule inside ci-design itself, in zgeoff/tools, waits for him.
-  - `boundary`: your Boundary rules grant covers the PR.
 
 In zgeoff/hq and zgeoff/hq-private, neither record counts: those PRs wait for his lgtm.
 
