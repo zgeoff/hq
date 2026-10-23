@@ -6,6 +6,8 @@ import { createStubPRRepo } from '../../test/create-stub-pr-repo.ts';
 import { buildFakeRunner } from '../../test/noslop-fake.ts';
 import { overrideEnv } from '../config/override-env.ts';
 import { buildRenameKey } from './build-rename-key.ts';
+import { realRunner } from '../runner/real-runner.ts';
+import { proveMechanical } from './prove-mechanical.ts';
 import { readHeldDiffs } from './read-held-diffs.ts';
 
 function setupTest() {
@@ -24,6 +26,18 @@ test('it reads the diff of a held file against the merge base, not against the m
 
   expect(read.files).toStrictEqual([{ path: 'AGENTS.md', diff: expect.stringContaining('@@ -1 +1 @@\n-Boil.\n+Steam.\n') }]);
   expect(read.formattingOnly).toBe(false);
+});
+
+test('it keeps a line moved two lines down as two hunks when the clone asks git to join near hunks', async () => {
+  const ctx = setupTest();
+  const stub = await createStubPRRepo({ root: ctx.root, repo: 'widgets', pr: 7, history: [{ 'AGENTS.md': 'Fill the kettle.\nBoil.\nPour.\nServe.\n' }], change: { 'AGENTS.md': 'Boil.\nPour.\nFill the kettle.\nServe.\n' } });
+  await realRunner(['git', 'config', 'diff.interHunkContext', '3'], { cwd: stub.directory });
+  await realRunner(['git', 'config', 'color.diff', 'always'], { cwd: stub.directory });
+
+  const read = await readHeldDiffs({ run: ctx.fake.run, slug: 'zgeoff/widgets', repo: 'widgets', pr: 7, head: stub.head, paths: ['AGENTS.md'] });
+
+  expect(read.files).toStrictEqual([{ path: 'AGENTS.md', diff: expect.stringContaining('@@ -1 +0,0 @@\n-Fill the kettle.\n@@ -3,0 +3 @@ Pour.\n+Fill the kettle.\n') }]);
+  expect(proveMechanical(read.files, read.facts)).toMatchObject({ pass: false });
 });
 
 test('it reports a whitespace-only change as formatting only', async () => {

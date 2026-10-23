@@ -26,7 +26,7 @@ export interface HeldDiffRead {
   facts: MoveFacts;
 }
 
-const DIFF_FLAGS = ['--no-ext-diff', '--no-textconv'];
+const DIFF_FLAGS = ['--no-ext-diff', '--no-textconv', '--no-color', '--inter-hunk-context=0'];
 
 // The held files' changes between the merge base and the head, read from hq's checkout of the repo
 // at exactly `head`, with what git says about every target a diff claims moved. Throws a
@@ -88,7 +88,7 @@ async function readMoveFacts(request: HeldDiffRequest, directory: string, mergeB
   }
   for (const [from, to] of pairs) {
     if (facts.baseBlobs.get(from) === null) {
-      const log = await runGit(request, directory, ['log', '--diff-filter=R', '-M', '--name-status', '--format=', mergeBase, '--', from, to]);
+      const log = await runGit(request, directory, ['log', '--no-color', '--diff-filter=R', '-M', '--name-status', '--format=', mergeBase, '--', from, to]);
       for (const line of log.split('\n')) {
         const [status, oldPath, newPath] = line.split('\t');
         if (status?.startsWith('R') === true && oldPath !== undefined && newPath !== undefined) {
