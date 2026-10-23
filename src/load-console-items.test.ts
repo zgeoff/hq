@@ -3,6 +3,7 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { createUnblockItems } from '../test/create-unblock-items.ts';
 import { NOON_SYDNEY, at, freshDb } from '../test/helpers.ts';
 import { loadConsoleItems } from './load-console-items.ts';
+import { addUnblock } from './unblock/add-unblock.ts';
 
 function setupTest(): Database {
   const fresh = freshDb();
@@ -22,4 +23,12 @@ test('an unblock item with a subject PR is a review with review buttons; any oth
     ['approve-app', 'todo', ['Done', 'Later', 'Skip']],
     ['review-4', 'review', ['lgtm', 'Changes', 'Later', 'Reject (no key)']],
   ]);
+});
+
+test('a watch item stays out of the needs-owner list', () => {
+  const db = setupTest();
+  addUnblock(db, { id: 'descale', task: 'Descale the kettle', minutes: null, unblocks: [], notify: [], actor: 'kettle-triage' });
+  addUnblock(db, { id: 'kettle-release', task: 'Live-check the kettle release', minutes: null, unblocks: [], notify: ['kettle-qa'], actor: 'kettle-triage', kind: 'watch', doneWhen: [{ kind: 'release', ref: 'kettle-co/kettle' }] });
+
+  expect(loadConsoleItems(db).map((item) => item.id)).toStrictEqual(['descale']);
 });

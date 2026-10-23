@@ -3,6 +3,7 @@ import { HttpResponse, http } from 'msw';
 import { LINEAR_GRAPHQL_URL, linearDocuments, linearIssues } from '../mocks/linear-handlers.ts';
 import { server } from '../mocks/node.ts';
 import { NOON_SYDNEY, at, freshDb } from '../test/helpers.ts';
+import { buildStubReleaseGH } from '../test/build-stub-release-gh.ts';
 import { createUnblockItems } from '../test/create-unblock-items.ts';
 import { makePRStateGh } from '../test/make-pr-state-gh.ts';
 import { checkUnblockConditions } from './check-unblock-conditions.ts';
@@ -379,4 +380,96 @@ test('it closes an item as done, not dropped, when its condition and its subject
   const outcome = await checkUnblockConditions(ctx.db, { run: makePRStateGh({ states: { 'kettle-co/kettle#4': 'MERGED' } }), call: ctx.call }, 'kettle-bot');
 
   expect(outcome).toStrictEqual({ settled: ['review'], dropped: [], errors: [], overdue: [] });
+});
+
+test('a release watch tells its sessions once, when a release newer than the watch appears', async () => {
+  const ctx = setupTest();
+  addUnblock(ctx.db, { id: 'kettle-release', task: 'Live-check the kettle release', minutes: null, unblocks: [], notify: ['kettle-qa'], actor: 'kettle-triage', kind: 'watch', doneWhen: [{ kind: 'release', ref: 'kettle-co/kettle' }] });
+  const older = { tag_name: 'v1.1.0', draft: false, prerelease: false, published_at: '2026-10-10T00:00:00Z' };
+  const newer = { tag_name: 'v1.2.0', draft: false, prerelease: false, published_at: '2026-10-14T03:00:00Z' };
+  const before = await checkUnblockConditions(ctx.db, { run: buildStubReleaseGH({ 'kettle-co/kettle': [older] }, []), call: ctx.call }, 'kettle-bot');
+
+  const fired = await checkUnblockConditions(ctx.db, { run: buildStubReleaseGH({ 'kettle-co/kettle': [newer, older] }, []), call: ctx.call }, 'kettle-bot');
+  const after = await checkUnblockConditions(ctx.db, { run: buildStubReleaseGH({ 'kettle-co/kettle': [newer, older] }, []), call: ctx.call }, 'kettle-bot');
+
+  expect(before).toStrictEqual({ settled: [], dropped: [], errors: [], overdue: [] });
+  expect(fired).toStrictEqual({ settled: ['kettle-release'], dropped: [], errors: [], overdue: [] });
+  expect(after).toStrictEqual({ settled: [], dropped: [], errors: [], overdue: [] });
+  expect(ctx.db.query('SELECT target, text FROM outbox ORDER BY target').all()).toStrictEqual([
+    { target: 'kettle-qa', text: 'Watch "Live-check the kettle release" (unblock kettle-release) is met, settled: release:kettle-co/kettle released v1.2.0. It is closed: do what it waited for.' },
+    { target: 'kettle-triage', text: 'Watch "Live-check the kettle release" (unblock kettle-release) is met, settled: release:kettle-co/kettle released v1.2.0. It is closed: do what it waited for.' },
+  ]);
+});
+
+test('a release watch leaves out drafts and prereleases', async () => {
+  const ctx = setupTest();
+  addUnblock(ctx.db, { id: 'kettle-release', task: 'Live-check the kettle release', minutes: null, unblocks: [], notify: ['kettle-qa'], actor: 'kettle-triage', kind: 'watch', doneWhen: [{ kind: 'release', ref: 'kettle-co/kettle' }] });
+  const run = buildStubReleaseGH(
+    {
+      'kettle-co/kettle': [
+        { tag_name: 'v1.3.0-rc.1', draft: false, prerelease: true, published_at: '2026-10-14T03:00:00Z' },
+        { tag_name: 'v1.3.0', draft: true, prerelease: false, published_at: null },
+      ],
+    },
+    [],
+  );
+
+  const outcome = await checkUnblockConditions(ctx.db, { run, call: ctx.call }, 'kettle-bot');
+
+  expect(outcome).toStrictEqual({ settled: [], dropped: [], errors: [], overdue: [] });
+});
+
+test('a release watch stays open and reports it when the release list cannot be read', async () => {
+  const ctx = setupTest();
+  addUnblock(ctx.db, { id: 'teapot-release', task: 'Live-check the teapot release', minutes: null, unblocks: [], notify: [], actor: 'kettle-triage', kind: 'watch', doneWhen: [{ kind: 'release', ref: 'kettle-co/teapot' }] });
+
+  const outcome = await checkUnblockConditions(ctx.db, { run: buildStubReleaseGH({}, []), call: ctx.call }, 'kettle-bot');
+
+  expect(outcome).toStrictEqual({ settled: [], dropped: [], errors: ['teapot-release: releases of kettle-co/teapot failed (1): gh: Not Found (HTTP 404)'], overdue: [] });
+  expect(getUnblock(ctx.db, 'teapot-release')?.state).toBe('open');
+});
+
+test('a date condition settles once, at its time', async () => {
+  const ctx = setupTest();
+  addUnblock(ctx.db, { id: 'steam-date', task: 'Check the steam log after the weekend', minutes: null, unblocks: [], notify: ['kettle-qa'], actor: 'kettle-triage', kind: 'watch', doneWhen: [{ kind: 'date', ref: '2026-10-14T02:00:00Z' }] });
+  const before = await checkUnblockConditions(ctx.db, { run: buildStubReleaseGH({}, []), call: ctx.call }, 'kettle-bot', new Date('2026-10-14T01:59:59Z'));
+
+  const fired = await checkUnblockConditions(ctx.db, { run: buildStubReleaseGH({}, []), call: ctx.call }, 'kettle-bot', new Date('2026-10-14T02:00:00Z'));
+  const after = await checkUnblockConditions(ctx.db, { run: buildStubReleaseGH({}, []), call: ctx.call }, 'kettle-bot', new Date('2026-10-14T02:10:00Z'));
+
+  expect(before.settled).toStrictEqual([]);
+  expect(fired.settled).toStrictEqual(['steam-date']);
+  expect(after.settled).toStrictEqual([]);
+  expect(getUnblock(ctx.db, 'steam-date')?.note).toBe('settled: date:2026-10-14T02:00:00Z passed');
+  expect(ctx.db.query("SELECT count(*) AS total FROM outbox WHERE target = 'kettle-qa'").get()).toStrictEqual({ total: 1 });
+});
+
+test('an item past its deadline tells the adder, the notify session and the owner session once', async () => {
+  const ctx = setupTest();
+  onTestFinished(overrideEnv('HQ_OWNER', 'kettle-owner'));
+  addUnblock(ctx.db, { id: 'kettle-release', task: 'Live-check the kettle release', minutes: null, unblocks: [], notify: ['kettle-qa'], actor: 'kettle-triage', kind: 'watch', deadline: '2026-10-14T00:30:00Z', doneWhen: [{ kind: 'release', ref: 'kettle-co/kettle' }] });
+  const run = buildStubReleaseGH({ 'kettle-co/kettle': [] }, []);
+
+  const first = await checkUnblockConditions(ctx.db, { run, call: ctx.call }, 'kettle-bot');
+  const second = await checkUnblockConditions(ctx.db, { run, call: ctx.call }, 'kettle-bot');
+
+  expect(first.overdue).toStrictEqual(['kettle-release']);
+  expect(second.overdue).toStrictEqual([]);
+  const text = '"Live-check the kettle release" (unblock kettle-release) is overdue: its deadline 2026-10-14T00:30:00Z passed and release:kettle-co/kettle has not happened.';
+  expect(ctx.db.query('SELECT target, text FROM outbox ORDER BY target').all()).toStrictEqual([
+    { target: 'kettle-owner', text },
+    { target: 'kettle-qa', text },
+    { target: 'kettle-triage', text },
+  ]);
+  expect(getUnblock(ctx.db, 'kettle-release')?.overdue_told_at).toBe('2026-10-14T01:00:00Z');
+});
+
+test('an item whose deadline has not passed tells no one', async () => {
+  const ctx = setupTest();
+  addUnblock(ctx.db, { id: 'kettle-release', task: 'Live-check the kettle release', minutes: null, unblocks: [], notify: ['kettle-qa'], actor: 'kettle-triage', kind: 'watch', deadline: '2026-10-14T01:30:00Z', doneWhen: [{ kind: 'release', ref: 'kettle-co/kettle' }] });
+
+  const outcome = await checkUnblockConditions(ctx.db, { run: buildStubReleaseGH({ 'kettle-co/kettle': [] }, []), call: ctx.call }, 'kettle-bot');
+
+  expect(outcome.overdue).toStrictEqual([]);
+  expect(ctx.db.query('SELECT count(*) AS total FROM outbox').get()).toStrictEqual({ total: 0 });
 });
