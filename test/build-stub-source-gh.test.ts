@@ -39,6 +39,27 @@ test('it round-trips a release-please config through base64 and fails a repo wit
   expect(missing.code).toBe(1);
 });
 
+test("it answers a listed tag with its commit and fails an unlisted one as gh does a 404", async () => {
+  const run = buildStubSourceGH({ shas: {}, contains: {}, tags: { 'deployed/prod': buildMockSha(9) } }, []);
+
+  const found = await run(['gh', 'api', 'repos/zgeoff/kettle/git/ref/tags/deployed/prod'], {});
+  const missing = await run(['gh', 'api', 'repos/zgeoff/kettle/git/ref/tags/deployed/host'], {});
+
+  expect(JSON.parse(found.stdout)).toStrictEqual({ ref: 'refs/tags/deployed/prod', object: { sha: buildMockSha(9), type: 'commit' } });
+  expect(missing).toStrictEqual({ code: 1, stdout: '', stderr: 'gh: Not Found (HTTP 404)\n' });
+});
+
+test('it round-trips the gates file at main through base64, and fails a repo with none', async () => {
+  const text = 'gates:\n  host:\n    paths:\n      - nixos/**\n';
+  const run = buildStubSourceGH({ shas: {}, contains: {}, gates: { kettle: text } }, []);
+
+  const found = await run(['gh', 'api', 'repos/zgeoff/kettle/contents/.github/gates.yml?ref=main', '--jq', '.content'], {});
+  const missing = await run(['gh', 'api', 'repos/zgeoff/teapot/contents/.github/gates.yml?ref=main', '--jq', '.content'], {});
+
+  expect(Buffer.from(found.stdout, 'base64').toString('utf8')).toBe(text);
+  expect(missing).toStrictEqual({ code: 1, stdout: '', stderr: 'gh: Not Found (HTTP 404)\n' });
+});
+
 test('it answers a compare with a head GitHub does not know as gh does a 404', async () => {
   const sha = buildMockSha(7);
   const run = buildStubSourceGH({ shas: {}, contains: {}, unknownHeads: [buildMockSha(8)] }, []);

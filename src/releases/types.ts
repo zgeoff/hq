@@ -1,7 +1,9 @@
 import type { Build } from '../build/read-build.ts';
 import type { Runner } from '../runner/types.ts';
+import type { Gate } from './parse-gate.ts';
 
-export type Source = { kind: 'releases'; tag: RegExp } | { kind: 'ref'; ref: string } | { kind: 'packages' } | { kind: 'build' } | { kind: 'merge' };
+// A ref source with `gated` holds a PR that changes a path of that gate only once `gated.ref` holds it too.
+export type Source = { kind: 'releases'; tag: RegExp } | { kind: 'ref'; ref: string; gated?: { gate: string; ref: string } } | { kind: 'packages' } | { kind: 'build' } | { kind: 'merge' };
 
 export interface Release {
   tag: string;
@@ -44,6 +46,7 @@ export interface ShipDeps {
   readBuild: () => Build;
   contains: (repo: string, sha: string, tag: string) => Promise<boolean | 'cap'>;
   getReleases: (repo: string) => Promise<Release[] | null>;
+  getGate: (repo: string, name: string) => Promise<Gate | null>;
   isCapped: () => boolean;
   hasFailed: (repo: string) => boolean;
 }

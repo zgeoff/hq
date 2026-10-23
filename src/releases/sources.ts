@@ -7,7 +7,8 @@ export const SOURCES: Record<string, Source> = {
   'auto-mode': { kind: 'releases', tag: /^auto-mode-v\d/ },
   atc: { kind: 'releases', tag: /^@zgeoff\/atc@\d/ },
   // A moving tag: its commit time is not a release time, so a PR ships "now", when first seen contained.
-  cloud: { kind: 'ref', ref: 'deployed/prod' },
+  // A change to the host's NixOS build reaches prod only through a host switch, which moves deployed/host.
+  cloud: { kind: 'ref', ref: 'deployed/prod', gated: { gate: 'nixos', ref: 'deployed/host' } },
 
   // Release-please monorepos: a PR ships once each package it changes has a published release holding it.
   tools: { kind: 'packages' },

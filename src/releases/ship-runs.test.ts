@@ -380,3 +380,164 @@ test('it ships a run that was put in deploy-held before the release that holds i
   expect(result.moved).toStrictEqual([{ issue: 'GEO-92', to: 'live-check', prs: [{ ref: 'vers#7', tag: null, shipped_at: '2026-10-15T05:06:07Z' }] }]);
   expect(result.held).toStrictEqual([]);
 });
+
+test('it ships a cloud PR that changes no host-build path once deployed/prod holds its merge, stamped with now', async () => {
+  const ctx = setupTest();
+  createMergedRun(ctx.db, 'GEO-9801', ['cloud#42']);
+  const run = buildStubSourceGH(
+    {
+      shas: { 'cloud#42': buildMockSha(42) },
+      contains: { 'deployed/prod': [buildMockSha(42)] },
+      tags: { 'deployed/prod': buildMockSha(4200) },
+      gates: { cloud: 'gates:\n  nixos:\n    paths:\n      - nixos/**\n' },
+      files: { 'cloud#42': ['infra/kettle.ts', 'docs/kettle.md'] },
+    },
+    ctx.calls,
+  );
+
+  const result = await shipRuns(ctx.db, run, ctx.now);
+
+  expect(result.moved).toStrictEqual([{ issue: 'GEO-9801', to: 'live-check', prs: [{ ref: 'cloud#42', tag: 'deployed/prod', shipped_at: NOON_SYDNEY }] }]);
+  expect(ctx.calls.filter((call) => call.includes('deployed/host'))).toStrictEqual([]);
+});
+
+test('it leaves a cloud PR unshipped, with no file or gates read, while deployed/prod does not hold its merge', async () => {
+  const ctx = setupTest();
+  createMergedRun(ctx.db, 'GEO-9802', ['cloud#43']);
+  const run = buildStubSourceGH(
+    {
+      shas: { 'cloud#43': buildMockSha(43) },
+      contains: { 'deployed/prod': [] },
+      tags: { 'deployed/prod': buildMockSha(4200) },
+      gates: { cloud: 'gates:\n  nixos:\n    paths:\n      - nixos/**\n' },
+      files: { 'cloud#43': ['infra/kettle.ts'] },
+    },
+    ctx.calls,
+  );
+
+  const result = await shipRuns(ctx.db, run, ctx.now);
+
+  expect(result.moved).toStrictEqual([]);
+  expect(result.errors).toStrictEqual([]);
+  expect(ctx.calls.filter((call) => call.includes('/files?') || call.includes('gates.yml'))).toStrictEqual([]);
+});
+
+test('it asks deployed/prod again on every pass', async () => {
+  const ctx = setupTest();
+  createMergedRun(ctx.db, 'GEO-9803', ['cloud#44']);
+  const facts = {
+    shas: { 'cloud#44': buildMockSha(44) },
+    contains: { 'deployed/prod': [] as string[] },
+    tags: { 'deployed/prod': buildMockSha(4200) },
+    gates: { cloud: 'gates:\n  nixos:\n    paths:\n      - nixos/**\n' },
+    files: { 'cloud#44': ['infra/kettle.ts'] },
+  };
+  await shipRuns(ctx.db, buildStubSourceGH(facts, ctx.calls), ctx.now);
+  facts.contains['deployed/prod'] = [buildMockSha(44)];
+
+  const second = await shipRuns(ctx.db, buildStubSourceGH(facts, ctx.calls), ctx.now);
+
+  expect(second.moved.map((move) => move.issue)).toStrictEqual(['GEO-9803']);
+});
+
+test('it waits on a cloud PR that changes a host-build path while only deployed/prod holds its merge', async () => {
+  const ctx = setupTest();
+  createMergedRun(ctx.db, 'GEO-9804', ['cloud#45']);
+  const run = buildStubSourceGH(
+    {
+      shas: { 'cloud#45': buildMockSha(45) },
+      contains: { 'deployed/prod': [buildMockSha(45)], 'deployed/host': [] },
+      tags: { 'deployed/prod': buildMockSha(4200) },
+      gates: { cloud: 'gates:\n  nixos:\n    paths:\n      - nixos/**\n      - bun.lock\n' },
+      files: { 'cloud#45': ['docs/kettle.md', 'nixos/hosts/kettle/configuration.nix'] },
+    },
+    ctx.calls,
+  );
+
+  const result = await shipRuns(ctx.db, run, ctx.now);
+
+  expect(result.moved).toStrictEqual([]);
+  expect(result.errors).toStrictEqual([]);
+  expect(ctx.readPr('cloud#45')).toStrictEqual({ merge_sha: buildMockSha(45), shipped_tag: null, shipped_at: null });
+});
+
+test('it ships a cloud PR that changes a host-build path in deployed/host once both refs hold its merge', async () => {
+  const ctx = setupTest();
+  createMergedRun(ctx.db, 'GEO-9805', ['cloud#46']);
+  const run = buildStubSourceGH(
+    {
+      shas: { 'cloud#46': buildMockSha(46) },
+      contains: { 'deployed/prod': [buildMockSha(46)], 'deployed/host': [buildMockSha(46)] },
+      tags: { 'deployed/prod': buildMockSha(4200) },
+      gates: { cloud: 'gates:\n  nixos:\n    paths:\n      - nixos/**\n      - bun.lock\n' },
+      files: { 'cloud#46': ['bun.lock'] },
+    },
+    ctx.calls,
+  );
+
+  const result = await shipRuns(ctx.db, run, ctx.now);
+
+  expect(result.moved).toStrictEqual([{ issue: 'GEO-9805', to: 'live-check', prs: [{ ref: 'cloud#46', tag: 'deployed/host', shipped_at: NOON_SYDNEY }] }]);
+});
+
+test('it keeps a cloud PR that changes a host-build path unshipped, with no error, while deployed/host does not exist', async () => {
+  const ctx = setupTest();
+  createMergedRun(ctx.db, 'GEO-9806', ['cloud#47']);
+  const run = buildStubSourceGH(
+    {
+      shas: { 'cloud#47': buildMockSha(47) },
+      contains: { 'deployed/prod': [buildMockSha(47)] },
+      unknownHeads: ['deployed/host'],
+      tags: { 'deployed/prod': buildMockSha(4200) },
+      gates: { cloud: 'gates:\n  nixos:\n    paths:\n      - nixos/**\n' },
+      files: { 'cloud#47': ['nixos/flake.lock'] },
+    },
+    ctx.calls,
+  );
+
+  const result = await shipRuns(ctx.db, run, ctx.now);
+
+  expect(result.moved).toStrictEqual([]);
+  expect(result.errors).toStrictEqual([]);
+  expect(getRun(ctx.db, 'GEO-9806')?.state).toBe('merged');
+});
+
+test('it keeps a cloud PR unshipped and records the error when the gates file cannot be read', async () => {
+  const ctx = setupTest();
+  createMergedRun(ctx.db, 'GEO-9807', ['cloud#48']);
+  const run = buildStubSourceGH(
+    {
+      shas: { 'cloud#48': buildMockSha(48) },
+      contains: { 'deployed/prod': [buildMockSha(48)], 'deployed/host': [buildMockSha(48)] },
+      tags: { 'deployed/prod': buildMockSha(4200) },
+      files: { 'cloud#48': ['infra/kettle.ts'] },
+    },
+    ctx.calls,
+  );
+
+  const result = await shipRuns(ctx.db, run, ctx.now);
+
+  expect(result.moved).toStrictEqual([]);
+  expect(result.errors).toStrictEqual(['cloud: gates of cloud failed (1): gh: Not Found (HTTP 404)']);
+  expect(ctx.readPr('cloud#48')).toStrictEqual({ merge_sha: buildMockSha(48), shipped_tag: null, shipped_at: null });
+});
+
+test('it reads the gates file once in a pass for two cloud PRs', async () => {
+  const ctx = setupTest();
+  createMergedRun(ctx.db, 'GEO-9808', ['cloud#49']);
+  createMergedRun(ctx.db, 'GEO-9809', ['cloud#50']);
+  const run = buildStubSourceGH(
+    {
+      shas: { 'cloud#49': buildMockSha(49), 'cloud#50': buildMockSha(50) },
+      contains: { 'deployed/prod': [buildMockSha(49), buildMockSha(50)] },
+      tags: { 'deployed/prod': buildMockSha(4200) },
+      gates: { cloud: 'gates:\n  nixos:\n    paths:\n      - nixos/**\n' },
+      files: { 'cloud#49': ['infra/kettle.ts'], 'cloud#50': ['infra/teapot.ts'] },
+    },
+    ctx.calls,
+  );
+
+  await shipRuns(ctx.db, run, ctx.now);
+
+  expect(ctx.calls.filter((call) => call.includes('gates.yml'))).toHaveLength(1);
+});

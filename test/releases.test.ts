@@ -187,20 +187,6 @@ test('only releases with the repo tag pattern count', async () => {
   expect(r.moved.map((m) => `${m.issue} ${m.prs[0]!.tag}`).sort()).toEqual(['GEO-7 @zgeoff/atc@1.0.0', 'GEO-8 auto-mode-v0.4.0']);
 });
 
-test('cloud ships when deployed/prod contains the merge, stamped with now', async () => {
-  mergedRun('GEO-9', ['cloud#42']);
-  const w = world({ shas: { 'cloud#42': sha(42) }, contains: { 'deployed/prod': [sha(42)] } });
-  const calls: string[] = [];
-  const r = await shipRuns(db, gh(w, calls), T);
-  expect(calls.some((c) => c.includes('git/ref/tags/deployed/prod'))).toBe(true);
-  expect(r.moved[0]!.prs[0]).toEqual({ ref: 'cloud#42', tag: 'deployed/prod', shipped_at: NOON_SYDNEY });
-  expect(getRun(db, 'GEO-9')!.state).toBe('live-check');
-  // Not contained: stays.
-  mergedRun('GEO-10', ['cloud#43']);
-  w.shas['cloud#43'] = sha(43);
-  expect((await shipRuns(db, gh(w), T)).moved).toEqual([]);
-});
-
 test('blocked, working, live-check and done runs are untouched', async () => {
   mergedRun('GEO-20', ['nixie#5']);
   setState(db, 'GEO-20', 'blocked', {}, 'z-delivery');
@@ -256,16 +242,6 @@ test('a pass the compare cap cut off resumes: the next pass asks only what it ha
   const second = await shipRuns(db, gh(scene), T);
   expect([first.compares, first.deferred]).toEqual([60, 1]);
   expect([second.compares, second.deferred]).toEqual([1, 0]);
-});
-
-test('a moving ref is asked again on every pass', async () => {
-  mergedRun('GEO-11', ['cloud#44']);
-  const scene = world({ shas: { 'cloud#44': sha(44) }, contains: { 'deployed/prod': [] } });
-  const first = await shipRuns(db, gh(scene), T);
-  scene.contains['deployed/prod'] = [sha(44)];
-  const second = await shipRuns(db, gh(scene), T);
-  expect(first.moved).toEqual([]);
-  expect(second.moved.map((move) => move.issue)).toEqual(['GEO-11']);
 });
 
 test('runs that have not shipped cannot hold back the rest: the next pass starts where the last ran out', async () => {
