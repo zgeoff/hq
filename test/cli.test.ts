@@ -80,6 +80,15 @@ test('status names why the next item waits', async () => {
   expect((await hq('status')).json.waits).toEqual([]);
 });
 
+test('status counts a watch apart from the open items that need the owner', async () => {
+  await hq('unblock', 'add', '--id', 'descale', '--task', 'Descale the kettle');
+  await hq('unblock', 'add', '--id', 'kettle-release', '--task', 'Live-check the kettle release', '--kind', 'watch', '--done-when', 'release:kettle-co/kettle');
+
+  const status = await hq('status');
+
+  expect(status.json.unblock).toStrictEqual({ open: 1, newSincePush: 1, watching: 1 });
+});
+
 test('unblock add, list, new, pushed', async () => {
   await hq('unblock', 'add', '--id', 'kettle', '--task', 'Try the kettle', '--minutes', '5', '--unblocks', 'GEO-2:high');
   expect((await hq('unblock', 'list')).json.items).toHaveLength(1);

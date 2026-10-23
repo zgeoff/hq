@@ -1954,7 +1954,7 @@ function status(db: Database): Out {
       counts: byKind,
       nextLater,
       later,
-      unblock: { open: unblockOpen, newSincePush: unblockNew },
+      unblock: { open: unblockOpen, newSincePush: unblockNew, watching: unblockWatching },
       hold,
       outbox: { pending: ob['pending'] ?? 0, failed: ob['failed'] ?? 0 },
     },
