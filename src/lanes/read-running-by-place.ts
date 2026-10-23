@@ -18,8 +18,6 @@ export interface RunningByPlace {
 
 const rowsSchema = z.array(z.object({ issue: z.string(), place: z.enum(['imp', 'local']) }));
 
-const sessionsSchema = z.array(z.object({ issue: z.string(), session_id: z.string() }));
-
 // The runs that hold a slot now, by where they run: working or blocked with an agent, less the
 // parked ones (a blocked run with no session awake, a working run whose sessions are gone). With a
 // fresh atc reading, local is at least the awake sessions on this PC that any run lists, whatever the
@@ -45,6 +43,8 @@ interface LiveLocal {
   // The runs whose awake sessions all run on this PC.
   hereOnly: Set<string>;
 }
+
+const sessionsSchema = z.array(z.object({ issue: z.string(), session_id: z.string() }));
 
 // Null with no fresh reading, or one from before the sweep recorded the local sessions.
 function readLiveLocal(db: Database, at: Date): LiveLocal | null {
