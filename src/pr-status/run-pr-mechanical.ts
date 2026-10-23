@@ -17,7 +17,7 @@ export async function runPRMechanical(input: PRCommandInput, ref: PRRef): Promis
   const actor = await input.actor();
   const probe = await input.readReviewerSession();
   const hold = await readReviewHold(input.run, ref, actor, probe);
-  const read = await readHeldDiffs({ run: input.run, slug: ref.slug, repo: ref.repo, pr: ref.pr, head: hold.head, paths: hold.files, repoDir: input.flags['repo-dir'] }).catch((error: unknown) => {
+  const read = await readHeldDiffs({ run: input.run, slug: ref.slug, repo: ref.repo, pr: ref.pr, head: hold.head, paths: hold.files }).catch((error: unknown) => {
     throw new HqError('git_unreadable', `hq could not read the diff of ${ref.slug}#${ref.pr} to prove it: ${error instanceof Error ? error.message : String(error)}`);
   });
   const proof = proveMechanical(read.files, read.facts);
