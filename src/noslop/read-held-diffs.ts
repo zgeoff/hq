@@ -20,7 +20,8 @@ export interface HeldDiffRequest {
 }
 
 export interface HeldDiffRead {
-  // `git diff -w --ignore-blank-lines` over the held files shows nothing.
+  // `git diff --ignore-blank-lines --ignore-space-at-eol` over the held files shows nothing: only
+  // blank lines and trailing spaces changed. Space inside a line can change a command, so it counts.
   formattingOnly: boolean;
   files: HeldDiff[];
   facts: MoveFacts;
@@ -36,7 +37,7 @@ export async function readHeldDiffs(request: HeldDiffRequest): Promise<HeldDiffR
   const base = await readBaseRef(request, directory);
   const mergeBaseOutput = await runGit(request, directory, ['merge-base', request.head, base]);
   const mergeBase = mergeBaseOutput.trim();
-  const formatting = await runGit(request, directory, ['diff', '-w', '--ignore-blank-lines', ...DIFF_FLAGS, mergeBase, request.head, '--', ...request.paths]);
+  const formatting = await runGit(request, directory, ['diff', '--ignore-blank-lines', '--ignore-space-at-eol', ...DIFF_FLAGS, mergeBase, request.head, '--', ...request.paths]);
   const files: HeldDiff[] = [];
   for (const path of request.paths) {
     const diff = await runGit(request, directory, ['diff', '-M', '--unified=0', ...DIFF_FLAGS, mergeBase, request.head, '--', path]);

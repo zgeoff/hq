@@ -50,9 +50,18 @@ test('it reads a held file whose name starts with pathspec magic as that file al
   expect(read.files).toStrictEqual([{ path: ':(attr:kettle)x/AGENTS.md', diff: expect.stringContaining('-Boil.\n+Pour it all away.\n') }]);
 });
 
-test('it reports a whitespace-only change as formatting only', async () => {
+test('it does not report a space added inside a line as formatting only', async () => {
   const ctx = setupTest();
-  const stub = await createStubPRRepo({ root: ctx.root, repo: 'widgets', pr: 7, history: [{ 'AGENTS.md': 'Boil the water.\n' }], change: { 'AGENTS.md': 'Boil  the water.\n\n' } });
+  const stub = await createStubPRRepo({ root: ctx.root, repo: 'widgets', pr: 7, history: [{ 'AGENTS.md': 'Run `rm -rf /tmp/cache` after a brew.\n' }], change: { 'AGENTS.md': 'Run `rm -rf /tmp/ cache` after a brew.\n' } });
+
+  const read = await readHeldDiffs({ run: ctx.fake.run, slug: 'zgeoff/widgets', repo: 'widgets', pr: 7, head: stub.head, paths: ['AGENTS.md'] });
+
+  expect(read.formattingOnly).toBe(false);
+});
+
+test('it reports a change of blank lines and trailing spaces as formatting only', async () => {
+  const ctx = setupTest();
+  const stub = await createStubPRRepo({ root: ctx.root, repo: 'widgets', pr: 7, history: [{ 'AGENTS.md': 'Boil the water.\n' }], change: { 'AGENTS.md': 'Boil the water.  \n\n' } });
 
   const read = await readHeldDiffs({ run: ctx.fake.run, slug: 'zgeoff/widgets', repo: 'widgets', pr: 7, head: stub.head, paths: ['AGENTS.md'] });
 

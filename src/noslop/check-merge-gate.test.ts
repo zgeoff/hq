@@ -559,10 +559,18 @@ test('it ignores a mechanical record that someone other than z-review wrote', as
 
 test('it passes a formatting-only change to an instruction file with no record', async () => {
   const ctx = setupTest();
-  const stub = await createStubPRRepo({ root: ctx.base, repo: 'widgets', pr: 7, history: [{ 'skills/kettle/SKILL.md': 'Boil the water.\n' }], change: { 'skills/kettle/SKILL.md': 'Boil  the water.\n' } });
+  const stub = await createStubPRRepo({ root: ctx.base, repo: 'widgets', pr: 7, history: [{ 'skills/kettle/SKILL.md': 'Boil the water.\n' }], change: { 'skills/kettle/SKILL.md': 'Boil the water. \n\n' } });
   const fake = buildFakeRunner({ realGit: true, prFiles: { code: 0, stdout: 'skills/kettle/SKILL.md\n', stderr: '' }, ...buildStubPRHead(stub.head) });
 
   await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).resolves.toMatchObject({ mayMerge: true });
+});
+
+test('it holds a space added inside a command in an instruction file for the owner, with no record', async () => {
+  const ctx = setupTest();
+  const stub = await createStubPRRepo({ root: ctx.base, repo: 'widgets', pr: 7, history: [{ 'skills/kettle/SKILL.md': 'Run `rm -rf /tmp/cache` after a brew.\n' }], change: { 'skills/kettle/SKILL.md': 'Run `rm -rf /tmp/ cache` after a brew.\n' } });
+  const fake = buildFakeRunner({ realGit: true, prFiles: { code: 0, stdout: 'skills/kettle/SKILL.md\n', stderr: '' }, ...buildStubPRHead(stub.head) });
+
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked' });
 });
 
 test('it passes an instruction file change by a bot with no record and reads no diff', async () => {
