@@ -40,6 +40,16 @@ test('it keeps a line moved two lines down as two hunks when the clone asks git 
   expect(proveMechanical(read.files, read.facts)).toMatchObject({ pass: false });
 });
 
+test('it reads a held file whose name starts with pathspec magic as that file alone, so its change is no formatting-only change', async () => {
+  const ctx = setupTest();
+  const stub = await createStubPRRepo({ root: ctx.root, repo: 'widgets', pr: 7, history: [{ ':(attr:kettle)x/AGENTS.md': 'Boil.\n' }], change: { ':(attr:kettle)x/AGENTS.md': 'Pour it all away.\n' } });
+
+  const read = await readHeldDiffs({ run: ctx.fake.run, slug: 'zgeoff/widgets', repo: 'widgets', pr: 7, head: stub.head, paths: [':(attr:kettle)x/AGENTS.md'] });
+
+  expect(read.formattingOnly).toBe(false);
+  expect(read.files).toStrictEqual([{ path: ':(attr:kettle)x/AGENTS.md', diff: expect.stringContaining('-Boil.\n+Pour it all away.\n') }]);
+});
+
 test('it reports a whitespace-only change as formatting only', async () => {
   const ctx = setupTest();
   const stub = await createStubPRRepo({ root: ctx.root, repo: 'widgets', pr: 7, history: [{ 'AGENTS.md': 'Boil the water.\n' }], change: { 'AGENTS.md': 'Boil  the water.\n\n' } });

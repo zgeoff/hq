@@ -73,8 +73,10 @@ function requireOK(code: number, stdout: string, stderr: string, what: string): 
   return stdout;
 }
 
+// A PR's paths reach git as pathspecs, so each is read literally: a held file named with a glob or a
+// pathspec magic word must not select another path, or none.
 async function runGit(request: HeldDiffRequest, directory: string, args: string[]): Promise<string> {
-  const result = await request.run(['git', ...args], { cwd: directory });
+  const result = await request.run(['git', '--literal-pathspecs', ...args], { cwd: directory });
   return requireOK(result.code, result.stdout, result.stderr, args.join(' '));
 }
 
