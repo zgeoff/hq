@@ -70,12 +70,12 @@ test('it reports a stuck save request 61 minutes after the ask when every read o
     {
       key: 'fleet-save-unread:z-kettle',
       ok: false,
-      line: "fleet: z-kettle (session id-kettl) was asked to save at 2026-10-14T03:01:00Z, and every read of its answer since failed: invented message.get failure",
+      line: 'fleet: z-kettle (session id-kettl) was asked to save at 2026-10-14T03:01:00Z, and no read of its answer has worked for over an hour: invented message.get failure',
     },
   ]);
 });
 
-test('it reports no stuck save request 61 minutes after the ask when one read of its answer succeeded', async () => {
+test('it reports no stuck save request 61 minutes after the ask when a read of its answer succeeded within the last hour', async () => {
   const ctx = setupTest();
   await ctx.tick(0);
   await ctx.tick(121);
@@ -87,4 +87,24 @@ test('it reports no stuck save request 61 minutes after the ask when one read of
   const checks = readStuckSaveChecks(ctx.db, new Date('2026-10-14T04:02:00Z'));
 
   expect(checks).toStrictEqual([{ key: 'fleet-save-unread', ok: true, line: 'fleet: hq can read the answer to every save request it asked' }]);
+});
+
+test('it reports a stuck save request when one read succeeded just after the ask and no read has worked for 61 minutes since', async () => {
+  const ctx = setupTest();
+  await ctx.tick(0);
+  await ctx.tick(121);
+  await ctx.tick(126);
+  ctx.atc.messageFailures.add('m-1');
+  await ctx.tick(131);
+  await ctx.tick(186);
+
+  const checks = readStuckSaveChecks(ctx.db, new Date('2026-10-14T04:07:00Z'));
+
+  expect(checks).toStrictEqual([
+    {
+      key: 'fleet-save-unread:z-kettle',
+      ok: false,
+      line: 'fleet: z-kettle (session id-kettl) was asked to save at 2026-10-14T03:01:00Z, and no read of its answer has worked for over an hour: invented message.get failure',
+    },
+  ]);
 });
