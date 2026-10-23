@@ -122,7 +122,7 @@ function readStandingRecords(input: PRCommandInput, ref: PRRef, head: string | n
   }
   const mechanical = readHeadMechanical(input.db, ref.repo, ref.pr, head);
   const exemption = readHeadExemption(input.db, ref.repo, ref.pr, head);
-  return { mechanical: mechanical === null ? null : { files: mechanical.files, lines: mechanical.lines }, exemption: exemption === null ? null : { rule: exemption.rule, note: exemption.note } };
+  return { mechanical: mechanical === null ? null : { files: mechanical.files, lines: mechanical.lines }, exemption: exemption === null ? null : { rule: exemption.rule, note: exemption.note, files: exemption.files } };
 }
 
 interface AnswerArgs {

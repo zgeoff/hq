@@ -3,10 +3,12 @@ export interface Segment {
   value: string;
 }
 
-export const VERSION = /^v?\d+(?:\.\d+){1,3}(?:-[0-9A-Za-z.]+)?$/u;
+// A version is `v` with two or three numeric parts, or exactly three bare numeric parts, with at
+// most a known pre-release tag. A bare `1.5`, an IP address or a `1.2-hour` is prose or a value.
+export const VERSION = /^(?:v\d+\.\d+(?:\.\d+)?|\d+\.\d+\.\d+)(?:-(?:alpha|beta|rc)(?:\.\d+)*)?$/u;
 
 const REFERENCE_DEFINITION = /^(?<lead>\s{0,3}\[[^\]]+\]:\s*)(?<destination>\S+)/u;
-const VERSION_IN_TEXT = /(?<![\w./-])v?\d+(?:\.\d+){1,3}(?:-[0-9A-Za-z.]*[0-9A-Za-z])?(?![\w-]|\.\d)/gu;
+const VERSION_IN_TEXT = /(?<![\w./-])(?:v\d+\.\d+(?:\.\d+)?|\d+\.\d+\.\d+)(?:-(?:alpha|beta|rc)(?:\.\d+)*)?(?![\w-]|\.\d)/gu;
 
 // A Markdown line as text, version tokens, whole code spans and link destinations (inline or a
 // reference definition's), in order.

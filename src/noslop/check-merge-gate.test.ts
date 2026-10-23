@@ -530,6 +530,15 @@ test('it blocks a mechanical edit that z-review has not recorded, naming the com
   await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: expect.stringContaining('hq pr mechanical widgets 7') });
 });
 
+test('it blocks an instruction file change when hq cannot read the diff at the gate head', async () => {
+  const ctx = setupTest();
+  await createStubPRRepo({ root: ctx.base, repo: 'widgets', pr: 7, history: [{ 'AGENTS.md': 'Needs bun 1.3.4.\n' }], change: { 'AGENTS.md': 'Needs bun 1.4.0.\n' } });
+  const fake = buildFakeRunner({ realGit: true, prFiles: { code: 0, stdout: 'AGENTS.md\n', stderr: '' }, ...buildStubPRHead('f00dfeedf00dfeedf00dfeedf00dfeedf00dfeed') });
+  recordPRMechanical(ctx.db, { repo: 'widgets', pr: 7, head: 'f00dfeedf00dfeedf00dfeedf00dfeedf00dfeed', files: ['AGENTS.md'], lines: 1, actor: 'z-review' });
+
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: expect.stringContaining('hq could not read the diff to prove it') });
+});
+
 test('it ignores a mechanical record at an older head', async () => {
   const ctx = setupTest();
   const stub = await createStubPRRepo({ root: ctx.base, repo: 'widgets', pr: 7, history: [{ 'AGENTS.md': 'Needs bun 1.3.4.\n' }], change: { 'AGENTS.md': 'Needs bun 1.4.0.\n' } });
@@ -578,7 +587,7 @@ test('it passes an instruction file change on the owner\'s lgtm at the head and 
 test.each(['boundary', 'ci-design-sync', 'rename', 'repo-sync'] as const)('it passes an instruction file change on z-review\'s %s exemption at the head, reading no diff', async (rule) => {
   const ctx = setupTest();
   const fake = buildFakeRunner({ prFiles: { code: 0, stdout: 'skills/kettle/SKILL.md\n', stderr: '' } });
-  recordPRExemption(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA, rule, note: 'Covered by the kettle grant.', actor: 'z-review' });
+  recordPRExemption(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA, rule, note: 'Covered by the kettle grant.', files: ['skills/kettle/SKILL.md'], actor: 'z-review' });
 
   await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).resolves.toMatchObject({ mayMerge: true });
 
@@ -588,7 +597,7 @@ test.each(['boundary', 'ci-design-sync', 'rename', 'repo-sync'] as const)('it pa
 test('it ignores an exemption at an older head', async () => {
   const ctx = setupTest();
   const fake = buildFakeRunner({ prFiles: { code: 0, stdout: 'skills/kettle/SKILL.md\n', stderr: '' } });
-  recordPRExemption(ctx.db, { repo: 'widgets', pr: 7, head: 'f00dfeedf00dfeedf00dfeedf00dfeedf00dfeed', rule: 'rename', note: 'Covered by the kettle grant.', actor: 'z-review' });
+  recordPRExemption(ctx.db, { repo: 'widgets', pr: 7, head: 'f00dfeedf00dfeedf00dfeedf00dfeedf00dfeed', rule: 'rename', note: 'Covered by the kettle grant.', files: ['skills/kettle/SKILL.md'], actor: 'z-review' });
 
   await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: expect.stringContaining('repo instruction files (skills/kettle/SKILL.md)') });
 });
@@ -597,7 +606,7 @@ test('it holds skills in hq to the owner\'s lgtm whatever z-review records', asy
   const ctx = setupTest();
   const fake = buildFakeRunner({ prFiles: { code: 0, stdout: 'skills/kettle/SKILL.md\n', stderr: '' } });
   recordPRMechanical(ctx.db, { repo: 'hq', pr: 7, head: FAKE_FULL_SHA, files: ['skills/kettle/SKILL.md'], lines: 1, actor: 'z-review' });
-  recordPRExemption(ctx.db, { repo: 'hq', pr: 7, head: FAKE_FULL_SHA, rule: 'rename', note: 'Covered by the kettle grant.', actor: 'z-review' });
+  recordPRExemption(ctx.db, { repo: 'hq', pr: 7, head: FAKE_FULL_SHA, rule: 'rename', note: 'Covered by the kettle grant.', files: ['skills/kettle/SKILL.md'], actor: 'z-review' });
 
   await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'hq', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: expect.stringContaining("owner-held files (skills/kettle/SKILL.md) and needs the owner's lgtm") });
 });
@@ -606,7 +615,7 @@ test('it holds skills in hq-private to the owner\'s lgtm whatever z-review recor
   const ctx = setupTest();
   const fake = buildFakeRunner({ prFiles: { code: 0, stdout: 'skills/kettle/SKILL.md\n', stderr: '' } });
   recordPRMechanical(ctx.db, { repo: 'hq-private', pr: 7, head: FAKE_FULL_SHA, files: ['skills/kettle/SKILL.md'], lines: 1, actor: 'z-review' });
-  recordPRExemption(ctx.db, { repo: 'hq-private', pr: 7, head: FAKE_FULL_SHA, rule: 'rename', note: 'Covered by the kettle grant.', actor: 'z-review' });
+  recordPRExemption(ctx.db, { repo: 'hq-private', pr: 7, head: FAKE_FULL_SHA, rule: 'rename', note: 'Covered by the kettle grant.', files: ['skills/kettle/SKILL.md'], actor: 'z-review' });
 
   await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'hq-private', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: expect.stringContaining("owner-held files (skills/kettle/SKILL.md) and needs the owner's lgtm") });
 });
@@ -614,7 +623,7 @@ test('it holds skills in hq-private to the owner\'s lgtm whatever z-review recor
 test('it holds an owner-held path even when the instruction files of the PR are cleared', async () => {
   const ctx = setupTest();
   const fake = buildFakeRunner({ prFiles: { code: 0, stdout: `skills/kettle/SKILL.md\nfleet.json\n`, stderr: '' } });
-  recordPRExemption(ctx.db, { repo: 'hq', pr: 7, head: FAKE_FULL_SHA, rule: 'rename', note: 'Covered by the kettle grant.', actor: 'z-review' });
+  recordPRExemption(ctx.db, { repo: 'hq', pr: 7, head: FAKE_FULL_SHA, rule: 'rename', note: 'Covered by the kettle grant.', files: ['skills/kettle/SKILL.md'], actor: 'z-review' });
 
   await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'hq', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: expect.stringContaining('owner-held files (skills/kettle/SKILL.md, fleet.json)') });
 });

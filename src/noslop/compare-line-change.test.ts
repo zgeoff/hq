@@ -50,6 +50,10 @@ test.each([
   ['a table row with another cell count', '| kettle | boils |', '| kettle | boils | fast |'],
   ['a table row indented differently', '| kettle | boils |', '  | kettle | boils |'],
   ['a number that is not a version', 'Wait 10 minutes.', 'Wait 12 minutes.'],
+  ['a two-part number in prose', 'Wait 1.5 seconds.', 'Wait 30.0 seconds.'],
+  ['an IP address', 'Bind to 127.0.0.1 only.', 'Bind to 0.0.0.0 only.'],
+  ['a two-part number in a code span', 'Run `kettle --max 1.5`.', 'Run `kettle --max 99.0`.'],
+  ['a duration with a word suffix', 'Run a 1.2-hour soak.', 'Run a 9.9-day soak.'],
   ['a target that leaves the repo', '[care](../../../a.md)', '[care](../../../b.md)'],
 ])('it refuses %s', (_label, oldLine, newLine) => {
   expect(compareLineChange('skills/kettle/SKILL.md', oldLine, newLine)).toMatchObject({ ok: false });

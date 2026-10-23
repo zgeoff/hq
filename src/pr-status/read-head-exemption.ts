@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { EXEMPT_RULES } from './exempt-rules.ts';
 import { readReviewerEvents } from './read-reviewer-events.ts';
 
-const ExemptionSchema = z.object({ head: z.string(), rule: z.enum(EXEMPT_RULES), note: z.string() });
+const ExemptionSchema = z.object({ head: z.string(), rule: z.enum(EXEMPT_RULES), note: z.string(), files: z.array(z.string()).default([]) });
 
 // z-review's record that a policy exception covers the PR's held edits, at exactly this head; null
 // when there is none. A push after the record voids it.
