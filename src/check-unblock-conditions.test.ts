@@ -35,7 +35,7 @@ test('it drops an item whose subject PR merged or closed, with a note and no mes
 
   const outcome = await checkUnblockConditions(ctx.db, { run, call: ctx.call }, 'kettle-bot');
 
-  expect(outcome).toStrictEqual({ settled: [], dropped: ['review-4', 'review-5'], errors: [] });
+  expect(outcome).toStrictEqual({ settled: [], dropped: ['review-4', 'review-5'], errors: [], overdue: [] });
   expect(getUnblock(ctx.db, 'review-4')?.state).toBe('dropped');
   expect(getUnblock(ctx.db, 'review-4')?.note).toBe('kettle-co/kettle#4 merged on GitHub');
   expect(getUnblock(ctx.db, 'review-5')?.note).toBe('kettle-co/kettle#5 closed on GitHub');
@@ -54,7 +54,7 @@ test('it never drops an item whose PR is linked only as context, and asks GitHub
 
   const outcome = await checkUnblockConditions(ctx.db, { run, call: ctx.call }, 'kettle-bot');
 
-  expect(outcome).toStrictEqual({ settled: [], dropped: [], errors: [] });
+  expect(outcome).toStrictEqual({ settled: [], dropped: [], errors: [], overdue: [] });
   expect(calls).toStrictEqual([]);
   expect(getUnblock(ctx.db, 'approve-app')?.state).toBe('open');
 });
@@ -65,7 +65,7 @@ test('it keeps an item open and reports it when its subject PR cannot be read', 
 
   const outcome = await checkUnblockConditions(ctx.db, { run: makePRStateGh({ states: {} }), call: ctx.call }, 'kettle-bot');
 
-  expect(outcome).toStrictEqual({ settled: [], dropped: [], errors: ["lost: can't read kettle-co/kettle#4 (gh exit 1): invented: no such PR"] });
+  expect(outcome).toStrictEqual({ settled: [], dropped: [], errors: ["lost: can't read kettle-co/kettle#4 (gh exit 1): invented: no such PR"], overdue: [] });
   expect(getUnblock(ctx.db, 'lost')?.state).toBe('open');
 });
 
@@ -81,7 +81,7 @@ test('it keeps open an item that was closed and reopened while GitHub was read, 
 
   const outcome = await checkUnblockConditions(ctx.db, { run, call: ctx.call }, 'kettle-bot');
 
-  expect(outcome).toStrictEqual({ settled: [], dropped: [], errors: ['review: unblock item review was closed and reopened while its conditions were read; the next pass checks it again'] });
+  expect(outcome).toStrictEqual({ settled: [], dropped: [], errors: ['review: unblock item review was closed and reopened while its conditions were read; the next pass checks it again'], overdue: [] });
   expect(getUnblock(ctx.db, 'review')?.state).toBe('open');
 });
 
@@ -96,7 +96,7 @@ test('it keeps open a review that a re-add replaced with a new task while GitHub
 
   const outcome = await checkUnblockConditions(ctx.db, { run, call: ctx.call }, 'kettle-bot');
 
-  expect(outcome).toStrictEqual({ settled: [], dropped: [], errors: ['review: unblock item review changed while its conditions were read; the next pass checks it again'] });
+  expect(outcome).toStrictEqual({ settled: [], dropped: [], errors: ['review: unblock item review changed while its conditions were read; the next pass checks it again'], overdue: [] });
   expect(getUnblock(ctx.db, 'review')).toMatchObject({ state: 'open', task: 'Run the live check on the new kettle' });
 });
 
@@ -109,7 +109,7 @@ test('it keeps a dropped review item open once a plain re-add reopens it with a 
 
   const outcome = await checkUnblockConditions(ctx.db, deps, 'kettle-bot');
 
-  expect(outcome).toStrictEqual({ settled: [], dropped: [], errors: [] });
+  expect(outcome).toStrictEqual({ settled: [], dropped: [], errors: [], overdue: [] });
   expect(getUnblock(ctx.db, 'review')?.state).toBe('open');
 });
 
@@ -120,7 +120,7 @@ test('it keeps an open review item open once a plain re-add gives it a new task'
 
   const outcome = await checkUnblockConditions(ctx.db, { run: makePRStateGh({ states: { 'kettle-co/kettle#4': 'MERGED' } }), call: ctx.call }, 'kettle-bot');
 
-  expect(outcome).toStrictEqual({ settled: [], dropped: [], errors: [] });
+  expect(outcome).toStrictEqual({ settled: [], dropped: [], errors: [], overdue: [] });
   expect(getUnblock(ctx.db, 'review')?.item).toBeNull();
 });
 
@@ -131,7 +131,7 @@ test('it keeps an open review item open once a plain re-add repeats its task', a
 
   const outcome = await checkUnblockConditions(ctx.db, { run: makePRStateGh({ states: { 'kettle-co/kettle#4': 'MERGED' } }), call: ctx.call }, 'kettle-bot');
 
-  expect(outcome).toStrictEqual({ settled: [], dropped: [], errors: [] });
+  expect(outcome).toStrictEqual({ settled: [], dropped: [], errors: [], overdue: [] });
   expect(getUnblock(ctx.db, 'review')?.item).toBeNull();
 });
 
@@ -145,7 +145,7 @@ test.each([
 
   const outcome = await checkUnblockConditions(ctx.db, { run: makePRStateGh({ states: {} }), call: ctx.call }, 'kettle-bot');
 
-  expect(outcome).toStrictEqual({ settled: ['steam-test'], dropped: [], errors: [] });
+  expect(outcome).toStrictEqual({ settled: ['steam-test'], dropped: [], errors: [], overdue: [] });
   expect(getUnblock(ctx.db, 'steam-test')?.state).toBe('done');
   expect(getUnblock(ctx.db, 'steam-test')?.note).toBe(`settled: issue:KET-7 ${word}`);
   expect(ctx.db.query('SELECT target, text FROM outbox ORDER BY target').all()).toStrictEqual([
@@ -161,7 +161,7 @@ test('it leaves an item open and sends nothing while its issue is in progress', 
 
   const outcome = await checkUnblockConditions(ctx.db, { run: makePRStateGh({ states: {} }), call: ctx.call }, 'kettle-bot');
 
-  expect(outcome).toStrictEqual({ settled: [], dropped: [], errors: [] });
+  expect(outcome).toStrictEqual({ settled: [], dropped: [], errors: [], overdue: [] });
   expect(getUnblock(ctx.db, 'steam-test')?.state).toBe('open');
   expect(ctx.db.query('SELECT count(*) AS total FROM outbox').get()).toStrictEqual({ total: 0 });
 });
@@ -209,7 +209,7 @@ test('it asks Linear in batches of 100 issues and settles an item whose issue is
 
   const outcome = await checkUnblockConditions(ctx.db, { run: makePRStateGh({ states: {} }), call: ctx.call }, 'kettle-bot');
 
-  expect(outcome).toStrictEqual({ settled: ['kettle-101'], dropped: [], errors: [] });
+  expect(outcome).toStrictEqual({ settled: ['kettle-101'], dropped: [], errors: [], overdue: [] });
   expect(getUnblock(ctx.db, 'kettle-101')?.note).toBe('settled: issue:KET-101 Done');
   expect(asked.mock.calls).toStrictEqual([
     [{ query: expect.any(String), variables: { ids: numbers.slice(0, 100).map((number) => `KET-${number}`) } }],
@@ -226,7 +226,7 @@ test.each([
 
   const outcome = await checkUnblockConditions(ctx.db, { run: makePRStateGh({ states: { 'kettle-co/kettle#4': state } }), call: ctx.call }, 'kettle-bot');
 
-  expect(outcome).toStrictEqual({ settled: ['merge-app'], dropped: [], errors: [] });
+  expect(outcome).toStrictEqual({ settled: ['merge-app'], dropped: [], errors: [], overdue: [] });
   expect(getUnblock(ctx.db, 'merge-app')?.state).toBe('done');
   expect(getUnblock(ctx.db, 'merge-app')?.note).toBe(`settled: pr:kettle-co/kettle#4 ${word}`);
 });
@@ -250,7 +250,7 @@ test.each([
 
   const outcome = await checkUnblockConditions(ctx.db, { run: makePRStateGh({ states: {} }), call: ctx.call }, 'kettle-bot');
 
-  expect(outcome).toStrictEqual({ settled: ['descale-plan'], dropped: [], errors: [] });
+  expect(outcome).toStrictEqual({ settled: ['descale-plan'], dropped: [], errors: [], overdue: [] });
   expect(getUnblock(ctx.db, 'descale-plan')?.note).toBe('settled: doc:descaling-plan-abc123def456 decided');
   expect(asked.mock.calls).toStrictEqual([[{ query: expect.any(String), variables: { slugID: 'abc123def456' } }]]);
 });
@@ -269,7 +269,7 @@ test('it closes an item as done when the document its ID names reads Status: dec
 
   const outcome = await checkUnblockConditions(ctx.db, { run: makePRStateGh({ states: {} }), call: ctx.call }, 'kettle-bot');
 
-  expect(outcome).toStrictEqual({ settled: ['descale-plan'], dropped: [], errors: [] });
+  expect(outcome).toStrictEqual({ settled: ['descale-plan'], dropped: [], errors: [], overdue: [] });
   expect(getUnblock(ctx.db, 'descale-plan')?.state).toBe('done');
   expect(getUnblock(ctx.db, 'descale-plan')?.note).toBe('settled: doc:5d6f1a52-8c3e-4b1f-9a77-0c2e4d6b8a10 decided');
   expect(asked.mock.calls).toStrictEqual([[{ query: expect.any(String), variables: { id: '5d6f1a52-8c3e-4b1f-9a77-0c2e4d6b8a10' } }]]);
@@ -290,7 +290,7 @@ test.each([
 
   const outcome = await checkUnblockConditions(ctx.db, { run: makePRStateGh({ states: {} }), call: ctx.call }, 'kettle-bot');
 
-  expect(outcome).toStrictEqual({ settled: [], dropped: [], errors: [] });
+  expect(outcome).toStrictEqual({ settled: [], dropped: [], errors: [], overdue: [] });
   expect(getUnblock(ctx.db, 'descale-plan')?.state).toBe('open');
 });
 
@@ -309,7 +309,7 @@ test('it closes an item when the second of its two conditions settles', async ()
 
   const outcome = await checkUnblockConditions(ctx.db, { run: makePRStateGh({ states: { 'kettle-co/kettle#4': 'MERGED' } }), call: ctx.call }, 'kettle-bot');
 
-  expect(outcome).toStrictEqual({ settled: ['steam-test'], dropped: [], errors: [] });
+  expect(outcome).toStrictEqual({ settled: ['steam-test'], dropped: [], errors: [], overdue: [] });
   expect(getUnblock(ctx.db, 'steam-test')?.note).toBe('settled: pr:kettle-co/kettle#4 merged');
 });
 
@@ -323,7 +323,7 @@ test('it keeps an item open and reports it when Linear fails, and still settles 
 
   const outcome = await checkUnblockConditions(ctx.db, { run: makePRStateGh({ states: { 'kettle-co/kettle#4': 'MERGED' } }), call: ctx.call }, 'kettle-bot');
 
-  expect(outcome).toStrictEqual({ settled: ['merge-app'], dropped: [], errors: ["steam-test: can't read issue:KET-7: Linear answered 500: invented: Linear is down"] });
+  expect(outcome).toStrictEqual({ settled: ['merge-app'], dropped: [], errors: ["steam-test: can't read issue:KET-7: Linear answered 500: invented: Linear is down"], overdue: [] });
   expect(getUnblock(ctx.db, 'steam-test')?.state).toBe('open');
 });
 
@@ -333,7 +333,7 @@ test('it reports an issue Linear does not know and leaves its item open', async 
 
   const outcome = await checkUnblockConditions(ctx.db, { run: makePRStateGh({ states: {} }), call: ctx.call }, 'kettle-bot');
 
-  expect(outcome).toStrictEqual({ settled: [], dropped: [], errors: ['steam-test: Linear has no issue KET-9'] });
+  expect(outcome).toStrictEqual({ settled: [], dropped: [], errors: ['steam-test: Linear has no issue KET-9'], overdue: [] });
   expect(getUnblock(ctx.db, 'steam-test')?.state).toBe('open');
 });
 
@@ -344,7 +344,7 @@ test('it reports a PR whose gh answer has an unexpected shape and leaves its ite
 
   const outcome = await checkUnblockConditions(ctx.db, { run: () => Promise.resolve(answer), call: ctx.call }, 'kettle-bot');
 
-  expect(outcome).toStrictEqual({ settled: [], dropped: [], errors: ["merge-app: gh's answer for kettle-co/kettle#4 has an unexpected shape"] });
+  expect(outcome).toStrictEqual({ settled: [], dropped: [], errors: ["merge-app: gh's answer for kettle-co/kettle#4 has an unexpected shape"], overdue: [] });
 });
 
 test('it reports a stored PR condition with no owner and asks gh nothing', async () => {
@@ -354,7 +354,7 @@ test('it reports a stored PR condition with no owner and asks gh nothing', async
 
   const outcome = await checkUnblockConditions(ctx.db, { run: makePRStateGh({ states: {}, calls }), call: ctx.call }, 'kettle-bot');
 
-  expect(outcome).toStrictEqual({ settled: [], dropped: [], errors: ['merge-app: cannot read pr:kettle#4 as owner/repo#n'] });
+  expect(outcome).toStrictEqual({ settled: [], dropped: [], errors: ['merge-app: cannot read pr:kettle#4 as owner/repo#n'], overdue: [] });
   expect(calls).toStrictEqual([]);
 });
 
@@ -365,7 +365,7 @@ test('it settles an issue that moved to another team by the identifier it was fi
 
   const outcome = await checkUnblockConditions(ctx.db, { run: makePRStateGh({ states: {} }), call: ctx.call }, 'kettle-bot');
 
-  expect(outcome).toStrictEqual({ settled: ['steam-test'], dropped: [], errors: [] });
+  expect(outcome).toStrictEqual({ settled: ['steam-test'], dropped: [], errors: [], overdue: [] });
   expect(getUnblock(ctx.db, 'steam-test')?.note).toBe('settled: issue:KET-7 Done');
 });
 
@@ -378,5 +378,5 @@ test('it closes an item as done, not dropped, when its condition and its subject
 
   const outcome = await checkUnblockConditions(ctx.db, { run: makePRStateGh({ states: { 'kettle-co/kettle#4': 'MERGED' } }), call: ctx.call }, 'kettle-bot');
 
-  expect(outcome).toStrictEqual({ settled: ['review'], dropped: [], errors: [] });
+  expect(outcome).toStrictEqual({ settled: ['review'], dropped: [], errors: [], overdue: [] });
 });

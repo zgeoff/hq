@@ -595,4 +595,11 @@ export const MIGRATIONS: string[] = [
     set_at   TEXT NOT NULL,
     set_by   TEXT NOT NULL
   );`,
+
+  // v40: watch items. kind: 'owner' for an item that needs the owner's hands, 'watch' for one that
+  // waits on an event and stays off the owner's lists. deadline: the ISO time past which the item is
+  // overdue; overdue_told_at: when hq told the sessions so, NULL until then.
+  `ALTER TABLE unblocks ADD COLUMN kind TEXT NOT NULL DEFAULT 'owner' CHECK (kind IN ('owner', 'watch'));
+  ALTER TABLE unblocks ADD COLUMN deadline TEXT;
+  ALTER TABLE unblocks ADD COLUMN overdue_told_at TEXT;`,
 ];

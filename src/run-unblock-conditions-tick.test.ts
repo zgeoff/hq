@@ -21,7 +21,7 @@ test('it runs the first pass', async () => {
 
   const outcome = await runUnblockConditionsTick(ctx.db, ctx.deps, 'kettle-bot', new Date('2026-10-14T01:00:00Z'));
 
-  expect(outcome).toStrictEqual({ settled: [], dropped: [], errors: [] });
+  expect(outcome).toStrictEqual({ settled: [], dropped: [], errors: [], overdue: [] });
 });
 
 test('it skips a pass 9 min after the last one', async () => {
@@ -39,5 +39,5 @@ test('it runs a pass 10 min after the last one', async () => {
 
   const outcome = await runUnblockConditionsTick(ctx.db, ctx.deps, 'kettle-bot', new Date('2026-10-14T01:10:00Z'));
 
-  expect(outcome).toStrictEqual({ settled: [], dropped: [], errors: [] });
+  expect(outcome).toStrictEqual({ settled: [], dropped: [], errors: [], overdue: [] });
 });
