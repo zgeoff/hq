@@ -10,8 +10,16 @@ export function settleUnblock(db: Database, checked: UnblockItem, note: string, 
     note,
     actor,
     checked,
-    tell: (item, unblocked) => ({ sessions: [...new Set([item.added_by, ...item.notify])].filter((session) => session !== owner()), text: formatSettled(item, note, unblocked) }),
+    tell: (item, unblocked) => ({ sessions: pickSettledSessions(item, owner()), text: formatSettled(item, note, unblocked) }),
   });
+}
+
+// The owner's session is left out of an owner item's news, but a watch keeps every session its
+// --notify names, the owner's included: a watch never shows on the owner's lists.
+function pickSettledSessions(item: UnblockItem, ownerSession: string): string[] {
+  const adder = item.added_by === ownerSession ? [] : [item.added_by];
+  const notify = item.kind === 'watch' ? item.notify : item.notify.filter((session) => session !== ownerSession);
+  return [...new Set([...adder, ...notify])];
 }
 
 function formatSettled(item: UnblockItem, note: string, unblocked: string): string {

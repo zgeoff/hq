@@ -401,6 +401,19 @@ test('a release watch tells its sessions once, when a release newer than the wat
   ]);
 });
 
+test("a settled watch tells the owner's session when its --notify names it, and an owner item does not", async () => {
+  const ctx = setupTest();
+  onTestFinished(overrideEnv('HQ_OWNER', 'kettle-owner'));
+  addUnblock(ctx.db, { id: 'steam-watch', task: 'Check the steam log', minutes: null, unblocks: [], notify: ['kettle-owner'], actor: 'kettle-triage', kind: 'watch', doneWhen: [{ kind: 'date', ref: '2026-10-14T00:00:00Z' }] });
+  addUnblock(ctx.db, { id: 'steam-todo', task: 'Wipe the steam vent', minutes: null, unblocks: [], notify: ['kettle-owner'], actor: 'kettle-triage', doneWhen: [{ kind: 'date', ref: '2026-10-14T00:00:00Z' }] });
+
+  await checkUnblockConditions(ctx.db, { run: buildStubReleaseGH({}, []), call: ctx.call }, 'kettle-bot');
+
+  expect(ctx.db.query("SELECT text FROM outbox WHERE target = 'kettle-owner'").all()).toStrictEqual([
+    { text: 'Watch "Check the steam log" (unblock steam-watch) is met, settled: date:2026-10-14T00:00:00Z passed. It is closed: do what it waited for.' },
+  ]);
+});
+
 test('a release watch leaves out drafts and prereleases', async () => {
   const ctx = setupTest();
   addUnblock(ctx.db, { id: 'kettle-release', task: 'Live-check the kettle release', minutes: null, unblocks: [], notify: ['kettle-qa'], actor: 'kettle-triage', kind: 'watch', doneWhen: [{ kind: 'release', ref: 'kettle-co/kettle' }] });
