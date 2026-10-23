@@ -388,6 +388,7 @@ const OPTIONS = {
   effort: { type: 'string' },
   require: { type: 'string' },
   'repo-dir': { type: 'string' },
+  rule: { type: 'string' },
   session: { type: 'string' },
   where: { type: 'string' },
   next: { type: 'string' },

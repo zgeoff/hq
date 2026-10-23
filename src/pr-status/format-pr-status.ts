@@ -1,3 +1,4 @@
+import { formatHeldFiles } from './format-held-files.ts';
 import { formatOverrideLine } from './format-override-line.ts';
 import type { PRStatusView } from './types.ts';
 
@@ -6,6 +7,10 @@ export function formatPRStatus(view: PRStatusView): string {
   const lines = [`${view.repo}#${view.pr}  ${formatHead(view)}`, formatGateLine(view), formatAnswerLine(view), formatNextLine(view)];
   if (view.override !== null) {
     lines.push(formatOverrideLine(view.override));
+  }
+  const records = formatRecordsLine(view);
+  if (records !== null) {
+    lines.push(records);
   }
   if (!view.headKnown) {
     lines.push('The PR head could not be read, so stale is unknown.');
@@ -34,6 +39,16 @@ function formatAnswerLine(view: PRStatusView): string {
 
 function formatNextLine(view: PRStatusView): string {
   return view.next === null ? 'next: nobody' : `next: ${view.next}${formatWhen(view.nextAt)}`;
+}
+
+function formatRecordsLine(view: PRStatusView): string | null {
+  const mechanical = view.reviewRecords.mechanical;
+  const exemption = view.reviewRecords.exemption;
+  const parts = [
+    mechanical === null ? null : `mechanical edits proved by hq (${mechanical.lines} lines in ${formatHeldFiles(mechanical.files)})`,
+    exemption === null ? null : `exempt under the ${exemption.rule} rule, not proved by hq: ${exemption.note}`,
+  ].filter((part): part is string => part !== null);
+  return parts.length === 0 ? null : `z-review: ${parts.join('; ')}`;
 }
 
 function formatHead(view: PRStatusView): string {

@@ -3,7 +3,7 @@ import type { OwnerOverride } from './find-owner-override.ts';
 import type { PRStatusView } from './types.ts';
 
 // The record with its stale flags, against the PR's head now (null when it could not be read).
-export function buildPRStatusView(row: PRStatusRow, current: string | null, override: OwnerOverride | null): PRStatusView {
+export function buildPRStatusView(row: PRStatusRow, current: string | null, override: OwnerOverride | null, reviewRecords: PRStatusView['reviewRecords']): PRStatusView {
   return {
     repo: row.repo,
     pr: row.pr,
@@ -22,6 +22,7 @@ export function buildPRStatusView(row: PRStatusRow, current: string | null, over
     next: row.next,
     nextAt: row.next_at,
     override: override === null ? null : { head: override.head, source: override.source, note: override.note, at: override.at },
+    reviewRecords,
     updatedAt: row.updated_at,
   };
 }
