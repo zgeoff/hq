@@ -1,4 +1,3 @@
-import { formatHeldFiles } from './format-held-files.ts';
 import type { PRStatusView } from './types.ts';
 
 // z-review's records at the head as one line; null when there is none.
@@ -6,7 +5,7 @@ export function formatReviewRecordsLine(records: PRStatusView['reviewRecords']):
   const mechanical = records.mechanical;
   const exemption = records.exemption;
   const parts = [
-    mechanical === null ? null : `mechanical edits proved by hq (${mechanical.lines} lines in ${formatHeldFiles(mechanical.files)})`,
+    mechanical === null ? null : `mechanical edits proved by hq (${mechanical.lines} lines in ${mechanical.files.join(', ')})`,
     exemption === null ? null : `exempt under the ${exemption.rule} rule, not proved by hq: ${exemption.note}${formatExemptFiles(exemption.files)}`,
   ].filter((part): part is string => part !== null);
   return parts.length === 0 ? null : `z-review: ${parts.join('; ')}`;
