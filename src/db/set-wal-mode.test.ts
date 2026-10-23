@@ -7,13 +7,15 @@ import { setWALMode } from './set-wal-mode.ts';
 
 // A new database file and a second connection to it that already holds the write lock.
 function setupTest() {
+  const stack = new DisposableStack();
+  onTestFinished(() => stack.dispose());
   const directory = mkdtempSync(join(tmpdir(), 'hq-wal-'));
-  onTestFinished(() => rmSync(directory, { recursive: true, force: true }));
+  stack.defer(() => rmSync(directory, { recursive: true, force: true }));
   const holder = new Database(join(directory, 'kettle.db'), { create: true, strict: true });
-  onTestFinished(() => holder.close());
+  stack.defer(() => holder.close());
   holder.exec('BEGIN IMMEDIATE');
   const db = new Database(join(directory, 'kettle.db'), { strict: true });
-  onTestFinished(() => db.close());
+  stack.defer(() => db.close());
   return { db, holder };
 }
 
