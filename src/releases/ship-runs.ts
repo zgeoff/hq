@@ -100,7 +100,8 @@ export async function shipRuns(db: Database, run: Runner, at: Date = now(), opts
       return gate;
     } catch (error) {
       failedGates.add(key);
-      err(`${repo}: ${String(error instanceof Error ? error.message : error)}`);
+      const message = error instanceof Error ? error.message : String(error);
+      err(`${repo}: ${message}`);
       return null;
     }
   };
