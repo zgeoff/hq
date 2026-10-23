@@ -3,10 +3,10 @@ import { AtcClient } from '../atc/atc-client.ts';
 import { fakeAtc, freshDb } from '../../test/helpers.ts';
 import { makeFleetClient } from './make-fleet-client.ts';
 
-async function setupTest() {
+async function setupTest(sessions: { id: string; name: string; alive: boolean; state: string }[]) {
   const base = freshDb();
   onTestFinished(base.cleanup);
-  const server = fakeAtc(base.dir, [{ id: '0000c001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, state: 'running' }]);
+  const server = fakeAtc(base.dir, sessions);
   onTestFinished(server.stop);
   const atc = await AtcClient.open(server.path);
   onTestFinished(() => atc.close());
@@ -14,7 +14,7 @@ async function setupTest() {
 }
 
 test('forgetLive asks atc to forget a live session, which stops it, and keeps refusing a pinned one', async () => {
-  const ctx = await setupTest();
+  const ctx = await setupTest([{ id: '0000c001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, state: 'running' }]);
 
   await ctx.client.forgetLive?.('0000c001-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
   await ctx.client.forgetLive?.('0000c001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'token-kettle');
