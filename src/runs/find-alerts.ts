@@ -8,10 +8,11 @@ import { isFinalAnswered } from './is-final-answered.ts';
 import { sameSha } from './same-sha.ts';
 import { readClosedIssueAlerts } from './read-closed-issue-alerts.ts';
 import { listRuns } from './list-runs.ts';
+import { probeOpenUnblockWait } from './probe-open-unblock-wait.ts';
 import { SWEEP_MINUTES as SWEEP } from './sweep-minutes.ts';
 import type { Alert, RunPr, RunSession } from './types.ts';
 
-// What z-delivery should look at now. Pure over the rows, the sessions and their activity.
+// What z-delivery should look at now, from the rows, the sessions and their activity.
 export function findAlerts(db: Database, sessions: SessionInfo[], activity: Map<string, number | null>, at: Date): Alert[] {
   const alerts: Alert[] = [];
   const byId = new Map(sessions.map((s) => [s.id, s]));
@@ -23,6 +24,9 @@ export function findAlerts(db: Database, sessions: SessionInfo[], activity: Map<
       }
       // A blocked run waits on something outside the PR (a release, a yes); its review can wait too.
       if (r.state === 'blocked') continue;
+      if (probeOpenUnblockWait(db, r.waits_on)) {
+        continue;
+      }
       if (mins(p.final_at, at) < SWEEP.finalMinutes()) continue;
       if (p.review_started_at && p.review_started_at >= p.final_at && mins(p.review_started_at, at) < SWEEP.reviewMinutes()) continue;
       const moved = p.reviewed_sha ? `; head moved since your review at ${p.reviewed_sha.slice(0, 7)}${readRestackHint(db, p.ref)}` : '';
