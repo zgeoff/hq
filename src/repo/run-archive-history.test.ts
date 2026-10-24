@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 import { expect, onTestFinished, test } from 'bun:test';
-import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { createHistoryRows, createLookalikeRows, createStoreRows, createStoreTables } from '../../test/create-history-databases.ts';
 import { freshDb } from '../../test/helpers.ts';
@@ -9,6 +9,10 @@ import type { RunResult } from '../runner/types.ts';
 import { REKEY_SPECS } from './rekey-specs.ts';
 import type { ArchiveInput } from './run-archive-history.ts';
 import { runArchiveHistory } from './run-archive-history.ts';
+
+// root writes into a read-only folder, so a chmod cannot make a move fail there; Bun 1.4's skipIf
+// takes a boolean and has no in-body skip.
+const isRoot = process.getuid?.() === 0;
 
 function runQuiet(): Promise<RunResult> {
   return Promise.resolve({ code: 1, stdout: '', stderr: '' });
@@ -398,6 +402,27 @@ test('it refuses a file where a folder of a review file\'s new path belongs, nam
   expect(readdirSync(`${ctx.dir}/reviews/zgeoff/hq`)).toStrictEqual(['12-review.md']);
   expect(readHistoryRows(ctx.db)).toStrictEqual(before);
   expect(readBackupNames(ctx.path)).toStrictEqual([]);
+});
+
+test.skipIf(isRoot)('it reports a partial re-key that names the backups when a review file cannot move after the databases commit', async () => {
+  const ctx = setupTest();
+  ctx.createHistoryRows('hq', 0);
+  ctx.createStoreRows('hq', 0);
+  mkdirSync(`${ctx.dir}/reviews/zgeoff/hq`, { recursive: true });
+  mkdirSync(`${ctx.dir}/reviews/zgeoff/hq-archive`, { recursive: true });
+  writeFileSync(`${ctx.dir}/reviews/zgeoff/hq/12-review.md`, 'kettle review');
+  chmodSync(`${ctx.dir}/reviews/zgeoff/hq-archive`, 0o500);
+  onTestFinished(() => existsSync(`${ctx.dir}/reviews/zgeoff/hq-archive`) && chmodSync(`${ctx.dir}/reviews/zgeoff/hq-archive`, 0o700));
+
+  const failure = await ctx.archive('hq', 'hq-archive').then(
+    () => null,
+    (error: unknown) => error,
+  );
+
+  expect(failure).toMatchObject({ code: 'rekey_partial', message: expect.stringContaining("hq.db and noslop's store were re-keyed but the review files were not all moved"), data: { backups: [expect.stringContaining('hq.db.bak-archive-'), expect.stringContaining('store.sqlite.bak-archive-')] } });
+  expect(readBackupNames(ctx.path)).toHaveLength(1);
+  expect(ctx.db.query('SELECT repo FROM merged_prs').all()).toStrictEqual([{ repo: 'hq-archive' }]);
+  expect(readdirSync(`${ctx.dir}/reviews/zgeoff/hq`)).toStrictEqual(['12-review.md']);
 });
 
 test('it lists the review files it would move on a dry run, and moves none', async () => {
