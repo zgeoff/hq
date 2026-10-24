@@ -15,6 +15,9 @@ interface IssueSeed {
   title: string;
   description: string;
   labels?: string[];
+  typeLabel?: string;
+  project?: string;
+  priority?: number;
   blockerStates?: string[];
 }
 
@@ -28,7 +31,11 @@ function setupTest() {
         identifier: seed.identifier,
         title: seed.title,
         description: seed.description,
-        labels: { nodes: (seed.labels ?? []).map((name) => ({ name })) },
+        priority: seed.priority ?? 0,
+        createdAt: '2026-10-01T00:00:00Z',
+        project: seed.project === undefined ? null : { name: seed.project, labels: { nodes: [{ name: 'maintenance' }] } },
+        parent: null,
+        labels: { nodes: [...(seed.labels ?? []).map((name) => ({ name })), ...(seed.typeLabel === undefined ? [] : [{ name: seed.typeLabel, parent: { name: 'Type' } }])] },
         inverseRelations: {
           nodes: (seed.blockerStates ?? []).map((type, blocker) => ({ type: 'blocks', issue: { identifier: `GEO-97${blocker}`, state: { type } } })),
           pageInfo: { hasNextPage: false },
@@ -50,13 +57,21 @@ test('it lists the complete Backlog issue whose blockers are Done and leaves out
   const description =
     '## Outcome\n\nThe kettle boils.\n\n## Context\n\n- Project: kitchen\n\n## Scope\n\nIn: the element.\nOut: none stated.\n\n## Acceptance\n\n- [ ] The kettle boils in a test (unit test)\n\n## Actions\n\nCode delivery\n';
   const call = app.answerWith([
-    { identifier: 'GEO-9801', title: 'boil the kettle', description, blockerStates: ['completed'] },
+    { identifier: 'GEO-9801', title: 'boil the kettle', description, blockerStates: ['completed'], labels: ['atc'], typeLabel: 'Bug', project: 'kitchen', priority: 2 },
     { identifier: 'GEO-9802', title: 'pour the tea', description, blockerStates: ['completed', 'unstarted'] },
   ]);
 
   const issues = await readPromotableIssues(call, 'GEO');
 
-  expect([issues, app.variables]).toStrictEqual([[{ identifier: 'GEO-9801', title: 'boil the kettle' }], [{ after: null, team: 'GEO', state: 'Backlog' }]]);
+  expect([issues, app.variables]).toStrictEqual([
+      [
+        {
+          identifier: 'GEO-9801',
+          title: 'boil the kettle',
+          facts: { identifier: 'GEO-9801', project: 'kitchen', projectLabels: ['maintenance'], labels: ['atc', 'Bug'], type: 'Bug', priority: 2, createdAt: '2026-10-01T00:00:00Z', parent: null },
+        },
+      ],
+      [{ after: null, team: 'GEO', state: 'Backlog' }]]);
 });
 
 test('it rejects a Backlog answer with an unexpected shape', async () => {
@@ -97,8 +112,8 @@ test('it collects the promotable issues from every Backlog page, asking for each
 
   expect([issues, app.variables]).toStrictEqual([
     [
-      { identifier: 'GEO-9810', title: 'crate the widgets' },
-      { identifier: 'GEO-9812', title: 'load the van' },
+      expect.objectContaining({ identifier: 'GEO-9810', title: 'crate the widgets' }),
+      expect.objectContaining({ identifier: 'GEO-9812', title: 'load the van' }),
     ],
     [
       { after: null, team: 'GEO', state: 'Backlog' },
@@ -123,8 +138,8 @@ test('hq lanes promotable --json prints the promotable Backlog issues of the lan
     '## Outcome\n\nThe kettle whistles.\n\n## Context\n\n- Project: kitchen\n\n## Scope\n\nIn: the whistle.\nOut: none stated.\n\n## Acceptance\n\n- [ ] The kettle whistles in a test (unit test)\n\n## Actions\n\nCode delivery\n';
   const relations = { nodes: [], pageInfo: { hasNextPage: false } };
   const nodes = [
-    { identifier: 'GEO-9813', title: 'fit the whistle', description, labels: { nodes: [] }, inverseRelations: relations },
-    { identifier: 'GEO-9814', title: 'paint the whistle', description, labels: { nodes: [{ name: 'parked' }] }, inverseRelations: relations },
+    { identifier: 'GEO-9813', title: 'fit the whistle', description, priority: 0, createdAt: '2026-10-01T00:00:00Z', project: null, parent: null, labels: { nodes: [] }, inverseRelations: relations },
+    { identifier: 'GEO-9814', title: 'paint the whistle', description, priority: 0, createdAt: '2026-10-01T00:00:00Z', project: null, parent: null, labels: { nodes: [{ name: 'parked' }] }, inverseRelations: relations },
   ];
   server.use(
     http.post(LINEAR_GRAPHQL_URL, async (info) => {

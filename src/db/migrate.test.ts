@@ -140,7 +140,7 @@ test('it adds kind, deadline and overdue_told_at to unblocks in v40, and keeps e
   expect(db.query('PRAGMA user_version').get()).toStrictEqual({ user_version: 40 });
 });
 
-test('it adds the Claude window reset times in v41, NULL on every older row, and makes v41 the newest schema', () => {
+test('it adds the Claude window reset times in v41, NULL on every older row', () => {
   const base = mkdtempSync(join(tmpdir(), 'hq-migrate-v41-'));
   const db = new Database(join(base, 'hq.db'), { create: true, strict: true });
   const path = join(base, 'hq.db');
@@ -150,8 +150,25 @@ test('it adds the Claude window reset times in v41, NULL on every older row, and
   migrate(db, path, false, MIGRATIONS.slice(0, 40));
   db.query("INSERT INTO usage_samples (at, account, five_hour, seven_day) VALUES ('2026-10-14T01:00:00Z', 'abcdef012345', 10, 20)").run();
 
-  expect(migrate(db, path, true)).not.toBeNull();
+  expect(migrate(db, path, true, MIGRATIONS.slice(0, 41))).not.toBeNull();
   expect(db.query('SELECT account, five_hour_resets_at, seven_day_resets_at FROM usage_samples').all()).toStrictEqual([{ account: 'abcdef012345', five_hour_resets_at: null, seven_day_resets_at: null }]);
   expect(db.query("SELECT name FROM pragma_table_info('capacity_samples') WHERE name LIKE 'claude_%_resets_at' ORDER BY name").all()).toStrictEqual([{ name: 'claude_five_hour_resets_at' }, { name: 'claude_seven_day_resets_at' }]);
   expect(db.query('PRAGMA user_version').get()).toStrictEqual({ user_version: 41 });
+});
+
+test('it adds the slot-minutes table in v42, refuses a cause outside the three, and makes v42 the newest schema', () => {
+  const base = mkdtempSync(join(tmpdir(), 'hq-migrate-v42-'));
+  const db = new Database(join(base, 'hq.db'), { create: true, strict: true });
+  const path = join(base, 'hq.db');
+  onTestFinished(() => rmSync(base, { recursive: true, force: true }));
+  onTestFinished(() => db.close());
+  db.exec('PRAGMA journal_mode = WAL;');
+  migrate(db, path, false, MIGRATIONS.slice(0, 41));
+
+  expect(migrate(db, path, true)).not.toBeNull();
+  db.query("INSERT INTO slot_minutes (day, cause, minutes) VALUES ('2026-10-14', 'delivery', 12.5)").run();
+  expect(db.query('SELECT day, cause, minutes FROM slot_minutes').all()).toStrictEqual([{ day: '2026-10-14', cause: 'delivery', minutes: 12.5 }]);
+  expect(() => db.query("INSERT INTO slot_minutes (day, cause, minutes) VALUES ('2026-10-14', 'kettle', 1)").run()).toThrow(/CHECK constraint failed/u);
+  expect(() => db.query("INSERT INTO slot_minutes (day, cause, minutes) VALUES ('2026-10-14', 'delivery', 1)").run()).toThrow(/UNIQUE constraint failed/u);
+  expect(db.query('PRAGMA user_version').get()).toStrictEqual({ user_version: 42 });
 });

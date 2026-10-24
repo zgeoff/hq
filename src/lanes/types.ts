@@ -40,6 +40,21 @@ export interface LaneSkip {
   at: string;
 }
 
+// Why free slots sit empty: Ready work waits (delivery), Backlog work waits for triage (triage), or
+// none exists (supply). Unknown while the Ready or Backlog read is missing or stale.
+export type SlotCauseName = 'delivery' | 'triage' | 'supply';
+
+// null: no free slot, or Ready work has waited under the grace time.
+export interface SlotCause {
+  cause: SlotCauseName | 'unknown' | null;
+  slots: number;
+  since: string | null;
+  readyAgeMinutes: number | null;
+
+  // How long eligible Ready work has waited while the cause is still null; null otherwise.
+  waitingMinutes: number | null;
+}
+
 export interface TickResult {
   at: string;
   freeMib: number | null;
@@ -50,6 +65,7 @@ export interface TickResult {
   nudged: boolean;
   why: string;
   error: string | null;
+  slotCause: SlotCause;
 }
 
 // A hold pauses the nudges while z-delivery keeps slots free on purpose (a host switch,
@@ -110,6 +126,7 @@ export interface ReadyIssue {
 export interface PromotableIssue {
   identifier: string;
   title: string;
+  facts: ReadyIssue;
 }
 
 // A Backlog issue as the promotion check sees it: the state type of each issue that blocks it, and

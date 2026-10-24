@@ -6,6 +6,8 @@ import { getMeta } from './db/get-meta.ts';
 import { setMeta } from './db/set-meta.ts';
 import rulesTable from '../lanes.json';
 import { readLinearReady } from './lanes/read-linear-ready.ts';
+import { readPromotableFocus } from './lanes/read-promotable-focus.ts';
+import { writePromotableFocus } from './lanes/write-promotable-focus.ts';
 import { validateLaneRules } from './lanes/validate-lane-rules.ts';
 import type { Runner } from './runner/types.ts';
 import type { LinearCall } from './linear/types.ts';
@@ -15,7 +17,9 @@ const READ_AT = 'lanes_ready_linear_at';
 
 // At most every 10 min, read Ready per lane from Linear by lanes.json's rules. The throttle is set
 // before the read, so a failed or late pass waits its 10 min too; the failure is kept in meta for
-// the stale alert, and a page that answers after the deadline writes nothing. False when not due.
+// the stale alert, and a page that answers after the deadline writes nothing. After a good Ready read
+// it counts the Backlog issues triage may promote that the focus asks for, with unknown on a failed
+// read. False when not due.
 interface LinearReadyTickDeps {
   call: LinearCall;
   run: Runner;
@@ -47,5 +51,10 @@ export async function runLinearReadyTick(db: Database, deps: LinearReadyTickDeps
     throw error;
   }
   setMeta(db, 'lanes_ready_linear_error', null);
+  try {
+    await withDeadline(readPromotableFocus(db, cancellableCall, rulesTable.team), deps.deadlineMs, 'Backlog promotable count', abandoned);
+  } catch {
+    writePromotableFocus(db, null);
+  }
   return true;
 }

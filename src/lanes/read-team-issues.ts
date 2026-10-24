@@ -1,8 +1,7 @@
 import { z } from 'zod';
 import { HqError } from '../errors.ts';
-import { ISSUE_TYPES } from '../linear/issue-types.ts';
-import type { IssueType } from '../linear/issue-types.ts';
 import type { LinearCall } from '../linear/types.ts';
+import { pickIssueType } from './pick-issue-type.ts';
 import type { ReadyIssue } from './types.ts';
 
 const MAX_PAGES = 20;
@@ -65,14 +64,9 @@ function toReadyIssue(node: z.infer<typeof nodeSchema>): ReadyIssue {
     project: node.project?.name ?? null,
     projectLabels: node.project?.labels.nodes.map((label) => label.name) ?? [],
     labels: node.labels.nodes.map((label) => label.name),
-    type: pickType(node.labels.nodes),
+    type: pickIssueType(node.labels.nodes),
     priority: node.priority,
     createdAt: node.createdAt,
     parent: node.parent?.identifier ?? null,
   };
-}
-
-function pickType(labels: z.infer<typeof labelSchema>[]): IssueType {
-  const typeLabel = labels.find((label) => label.parent?.name === 'Type');
-  return ISSUE_TYPES.find((type) => type === typeLabel?.name) ?? 'none';
 }

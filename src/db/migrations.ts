@@ -609,4 +609,13 @@ export const MIGRATIONS: string[] = [
   ALTER TABLE usage_samples ADD COLUMN seven_day_resets_at TEXT;
   ALTER TABLE capacity_samples ADD COLUMN claude_five_hour_resets_at TEXT;
   ALTER TABLE capacity_samples ADD COLUMN claude_seven_day_resets_at TEXT;`,
+
+  // v42: slot-minutes by cause per Sydney day: the minutes the lanes' free slots sat empty, tagged
+  // with why. Each lanes look adds onto the day it falls in.
+  `CREATE TABLE slot_minutes (
+    day     TEXT NOT NULL,
+    cause   TEXT NOT NULL CHECK (cause IN ('delivery', 'triage', 'supply')),
+    minutes REAL NOT NULL,
+    PRIMARY KEY (day, cause)
+  );`,
 ];

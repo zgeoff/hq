@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { HqError } from '../errors.ts';
 import type { LinearCall } from '../linear/types.ts';
 import { isIssuePromotable } from './is-issue-promotable.ts';
+import { pickIssueType } from './pick-issue-type.ts';
 import type { PromotableIssue } from './types.ts';
 
 const MAX_PAGES = 20;
@@ -12,8 +13,10 @@ const BACKLOG_STATE = 'Backlog';
 const QUERY = `query($after: String, $team: String!, $state: String!) {
   issues(first: ${PAGE_SIZE}, after: $after, filter: { team: { key: { eq: $team } }, state: { name: { eq: $state } } }) {
     nodes {
-      identifier title description
-      labels { nodes { name } }
+      identifier title description priority createdAt
+      project { name labels { nodes { name } } }
+      parent { identifier }
+      labels { nodes { name parent { name } } }
       inverseRelations(first: 50) { nodes { type issue { identifier state { type } } } pageInfo { hasNextPage } }
     }
     pageInfo { hasNextPage endCursor }
@@ -30,11 +33,25 @@ const relationPageInfoSchema = z.object({ hasNextPage: z.boolean() });
 
 const relationsSchema = z.object({ nodes: z.array(relationSchema), pageInfo: relationPageInfoSchema });
 
-const labelSchema = z.object({ name: z.string() });
+const nameSchema = z.object({ name: z.string() });
+
+const labelSchema = z.object({ name: z.string(), parent: nameSchema.nullish() });
+
+const projectSchema = z.object({ name: z.string(), labels: z.object({ nodes: z.array(nameSchema) }) });
 
 const labelsSchema = z.object({ nodes: z.array(labelSchema) });
 
-const nodeSchema = z.object({ identifier: z.string(), title: z.string(), description: z.string().nullable(), labels: labelsSchema, inverseRelations: relationsSchema });
+const nodeSchema = z.object({
+  identifier: z.string(),
+  title: z.string(),
+  description: z.string().nullable(),
+  priority: z.number(),
+  createdAt: z.string(),
+  project: projectSchema.nullable(),
+  parent: z.object({ identifier: z.string() }).nullable(),
+  labels: labelsSchema,
+  inverseRelations: relationsSchema,
+});
 
 const pageInfoSchema = z.object({ hasNextPage: z.boolean(), endCursor: z.string().nullable() });
 
@@ -42,8 +59,8 @@ const issuesSchema = z.object({ nodes: z.array(nodeSchema), pageInfo: pageInfoSc
 
 const pageSchema = z.object({ issues: issuesSchema });
 
-// Reads the team's Backlog page by page and keeps the issues isIssuePromotable passes. Reads only;
-// triage moves the issues.
+// Reads the team's Backlog page by page and keeps the issues isIssuePromotable passes, each with the
+// facts the focus matches on. Reads only; triage moves the issues.
 export async function readPromotableIssues(call: LinearCall, team: string): Promise<PromotableIssue[]> {
   const promotable: PromotableIssue[] = [];
   let after: string | null = null;
@@ -65,7 +82,20 @@ export async function readPromotableIssues(call: LinearCall, team: string): Prom
         moreRelations: node.inverseRelations.pageInfo.hasNextPage,
       };
       if (isIssuePromotable(issue)) {
-        promotable.push({ identifier: node.identifier, title: node.title });
+        promotable.push({
+          identifier: node.identifier,
+          title: node.title,
+          facts: {
+            identifier: node.identifier,
+            project: node.project?.name ?? null,
+            projectLabels: node.project?.labels.nodes.map((label) => label.name) ?? [],
+            labels: issue.labels,
+            type: pickIssueType(node.labels.nodes),
+            priority: node.priority,
+            createdAt: node.createdAt,
+            parent: node.parent?.identifier ?? null,
+          },
+        });
       }
     }
     if (!parsed.data.issues.pageInfo.hasNextPage) {
