@@ -157,6 +157,7 @@ async function createNoslopContext(plan: RoundPlan, parsed: ParsedRepo, sha: str
     lock: (fn) => withRepoLock(scratch, buildSlug(parsed), fn),
     full: request.full,
     fixesOnly: plan.fixesOnly,
+    capForced: plan.emergencyCap !== null,
     linear: makeAuditedLinearCaller(request.db, request.run),
   };
 }

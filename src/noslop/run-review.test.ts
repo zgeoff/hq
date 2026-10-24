@@ -308,7 +308,7 @@ test('it runs the second review as fix checks only, and says so, when the emerge
   await expect(runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false })).resolves.toMatchObject({ engine: 'noslop', fixesOnly: true, emergencyCap: 1, capNote: 'fix checks only: emergency cap 1 reached for widgets; no new findings' });
 
   expect(fake.of('bun').map((call) => call.cmd.includes('--fixes-only'))).toStrictEqual([false, true]);
-  expect(ctx.db.query('SELECT confirm FROM noslop_rounds ORDER BY id').all()).toStrictEqual([{ confirm: 0 }, { confirm: 1 }]);
+  expect(ctx.db.query('SELECT confirm, cap_forced FROM noslop_rounds ORDER BY id').all()).toStrictEqual([{ confirm: 0, cap_forced: 0 }, { confirm: 1, cap_forced: 1 }]);
 });
 
 test('it applies an emergency cap stored under the repo name in another case, as the noslop list matches it', async () => {
@@ -445,7 +445,7 @@ test('it passes --fixes-only straight to noslop, with no review on record, and r
   expect(fake.of('bun')[0]?.cmd).toContain('--fixes-only');
   expect(fake.of('bun')[0]?.cmd).not.toContain('--full');
   expect(fake.lines().filter((line) => line.startsWith('git rev-list'))).toStrictEqual([]);
-  expect(ctx.db.query('SELECT confirm, kind, ok FROM noslop_rounds ORDER BY id DESC LIMIT 1').get()).toStrictEqual({ confirm: 1, kind: 'review', ok: 1 });
+  expect(ctx.db.query('SELECT confirm, cap_forced, kind, ok FROM noslop_rounds ORDER BY id DESC LIMIT 1').get()).toStrictEqual({ confirm: 1, cap_forced: 0, kind: 'review', ok: 1 });
 });
 
 test('it leaves the head a hand-run --fixes-only run ran on unmarked, and counts no round', async () => {
@@ -471,6 +471,17 @@ test('it marks the head a fix-checks-only run past the emergency cap ran on revi
 
   expect(ctx.db.query("SELECT reviewed_sha, review_round FROM run_prs WHERE ref = 'widgets#7'").get()).toStrictEqual({ reviewed_sha: FAKE_FULL_SHA, review_round: 0 });
   expect(ctx.db.query("SELECT COUNT(*) AS rounds FROM noslop_rounds WHERE confirm = 0").get()).toStrictEqual({ rounds: 1 });
+});
+
+test('it records a hand-run --fixes-only run past the emergency cap as not forced by the cap', async () => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
+  ctx.setCap('widgets', 1);
+  ctx.addReview('[]', 'f00dfeedf00dfeedf00dfeedf00dfeedf00dfeed');
+
+  await runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false, fixesOnly: true });
+
+  expect(ctx.db.query('SELECT confirm, cap_forced FROM noslop_rounds ORDER BY id DESC LIMIT 1').get()).toStrictEqual({ confirm: 1, cap_forced: 0 });
 });
 
 test('it passes --fixes-only to noslop when the PR has no review at all, past any cap', async () => {

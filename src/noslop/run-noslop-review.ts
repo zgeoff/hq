@@ -22,6 +22,7 @@ import { parseReviewRun } from './parse-review-run.ts';
 import type { FixCheck, NotReviewedFile, ReviewFinding, ReviewOutput } from './parse-review-run.ts';
 import { pickAction } from './pick-action.ts';
 import { probeStoredReview } from './probe-stored-review.ts';
+import { POST_FAILED_PREFIX } from './post-failed-prefix.ts';
 import { recordRound } from './record-round.ts';
 import type { RecordedFinding, RoundRow } from './record-round.ts';
 import { removeIssueFile } from './remove-issue-file.ts';
@@ -57,6 +58,9 @@ export interface NoslopReviewContext {
 
   // Fix checks only (`noslop review --fixes-only`), recorded as a review that is not a round.
   fixesOnly?: boolean | undefined;
+
+  // The repo's emergency cap forced the fix-checks-only run.
+  capForced?: boolean | undefined;
 
   // Reads the Linear issue the PR links, for noslop's intent lens. Without it no issue is attached.
   linear?: LinearCall | undefined;
@@ -253,10 +257,11 @@ async function collectReviewRow(ctx: NoslopReviewContext, ran: ReviewRan): Promi
     failedCalls: ran.judged.failedCalls,
     conclusion: null,
     open: [],
-    error: ran.postFailed === null ? ran.judged.why : `stored, but not posted to GitHub: ${ran.postFailed}`,
+    error: ran.postFailed === null ? ran.judged.why : `${POST_FAILED_PREFIX}${ran.postFailed}`,
     sha: ran.sha,
     full: ctx.full === true,
     confirm: ctx.fixesOnly === true,
+    capForced: ctx.capForced === true,
   };
 }
 

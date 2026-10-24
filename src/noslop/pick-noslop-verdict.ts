@@ -4,12 +4,17 @@ import type { OwnerOverride } from '../pr-status/read-owner-overrides.ts';
 type NoslopFindingsRead = { read: true; open: string[]; listed: number } | { read: false; error: string };
 
 export type NoslopGateFacts =
-  | { reviewed: false; repo: string; pr: number }
-  | { reviewed: true; repo: string; pr: number; head: string; reviewedHead: string | null; recorded: number; findings: NoslopFindingsRead; override: OwnerOverride | null; headNow: string | null };
+  | { reviewed: false; repo: string; pr: number; unpostedHead: string | null }
+  | { reviewed: true; repo: string; pr: number; head: string; reviewedHead: string | null; recorded: number; unpostedHead: string | null; findings: NoslopFindingsRead; override: OwnerOverride | null; headNow: string | null };
 
 export type NoslopVerdict = { pass: true; reason: string } | { pass: false; reason: string };
 
+// `unpostedHead` is the head when a review that counts read it but was not posted to GitHub, and no
+// posted one did; `recorded` counts the distinct findings the PR's posted reviews recorded.
 export function pickNoslopVerdict(facts: NoslopGateFacts): NoslopVerdict {
+  if (facts.unpostedHead !== null) {
+    return { pass: false, reason: `noslop's review at ${facts.unpostedHead.slice(0, 7)} was not posted to GitHub; run hq review again` };
+  }
   return match(facts)
     .with({ reviewed: false }, (unreviewed) => ({ pass: false as const, reason: `noslop has no completed review of this PR, so no pass: hq review ${unreviewed.repo} ${unreviewed.pr}` }))
     .with({ reviewed: true }, (reviewed) =>
@@ -32,8 +37,8 @@ function pickReadVerdict(facts: ReviewedFacts, found: Extract<NoslopFindingsRead
   if (!atHead && facts.override === null) {
     return { pass: false, reason: `noslop has not reviewed head ${facts.head.slice(0, 7)}; run hq review ${facts.repo} ${facts.pr}` };
   }
-  if (atHead && facts.recorded > 0 && found.listed === 0) {
-    return { pass: false, reason: `noslop's findings list is empty, but its review of ${facts.head.slice(0, 7)} recorded ${facts.recorded} finding${facts.recorded === 1 ? '' : 's'}, so no pass` };
+  if (facts.recorded > 0 && found.listed === 0) {
+    return { pass: false, reason: `noslop's findings list is empty, but its reviews of this PR recorded ${facts.recorded} finding${facts.recorded === 1 ? '' : 's'}, so no pass` };
   }
   if (facts.headNow !== facts.head) {
     return { pass: false, reason: `the PR's head moved from ${facts.head.slice(0, 7)} while the gate ran, so no pass: run the gate again` };
