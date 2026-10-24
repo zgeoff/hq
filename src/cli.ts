@@ -189,6 +189,7 @@ import { readLanes } from './lanes/read-lanes.ts';
 import { releaseLanes } from './lanes/release-lanes.ts';
 import { parseLanesCapArgs } from './lanes/cap/parse-lanes-cap-args.ts';
 import { runLanesCapCommand } from './lanes/cap/run-lanes-cap-command.ts';
+import { readCapClock } from './lanes/cap/read-cap-clock.ts';
 import { readFallbackCapView } from './lanes/cap/read-fallback-cap-view.ts';
 import { formatCapLine } from './lanes/cap/format-cap-line.ts';
 import { parseLaneSkipArgs } from './lanes/parse-lane-skip-args.ts';
@@ -1823,11 +1824,7 @@ async function lanesCommand(context: Pick<Ctx, 'db' | 'verb' | 'rest' | 'flags' 
     }
     case 'cap': {
       const args = parseLanesCapArgs(context.rest, flags.until, flags.reason);
-
-      // A change reads the wall clock, not now(): HQ_NOW is the caller's to set, and a pinned future
-      // time would read the owner's cap as ended and let z-delivery replace it.
-      const capAt = args.kind === 'show' ? now() : new Date();
-      return runLanesCapCommand({ db, at: capAt, args, probe: readOwnerProbeDeps() });
+      return runLanesCapCommand({ db, at: readCapClock(args), args, probe: readOwnerProbeDeps() });
     }
     case 'skip': {
       const args = parseLaneSkipArgs(context.rest, flags.until, flags.reason);
