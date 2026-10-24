@@ -60,7 +60,7 @@
       "cwd": "hq",
       "model": "opus",
       "wake": true,
-      "prompt": "z-q-prompt.md",
+      "prompt": "main:prompts/z-q.md",
       "roles": ["developer"]
     }
   ],

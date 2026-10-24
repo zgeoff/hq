@@ -61,6 +61,7 @@ export function readPrivateFixture(): PrivateFixture {
   privateFiles["grants/z-qa.yaml"] =
     '- id: water\n  label: Water\n  outcome: allow\n  note: "pour the water."\n';
   privateFiles["docs/skill-development/roles-design.md"] = `Ask before ${SPAN}.\n`;
+  privateFiles["prompts/z-q.md"] = "You are an invented developer.\n";
   return {
     hqFiles: {
       "scripts/grants.ts": readFileSync(resolve(import.meta.dir, "../scripts/grants.ts"), "utf8"),
