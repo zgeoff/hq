@@ -9,8 +9,8 @@ import { serveConsoleControl } from './serve-console-control.ts';
 async function setupTest(onLogin: () => ControlReply) {
   const directory = mkdtempSync(join(tmpdir(), 'hq-console-control-'));
   const path = join(directory, 'run', 'hq-console.sock');
-  const control = await serveConsoleControl(path, onLogin);
   onTestFinished(() => rmSync(directory, { recursive: true, force: true }));
+  const control = await serveConsoleControl(path, onLogin);
   onTestFinished(control.stop);
   return { path, control };
 }
