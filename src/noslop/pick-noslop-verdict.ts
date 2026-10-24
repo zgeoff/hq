@@ -39,7 +39,7 @@ function pickReviewedVerdict(facts: Extract<NoslopGateFacts, { overridden: false
   if (facts.summary.head !== facts.head) {
     return { pass: false, reason: `noslop has not reviewed head ${facts.head.slice(0, 7)} (its last review read ${facts.summary.head.slice(0, 7)}); run hq review ${facts.repo} ${facts.pr}` };
   }
-  const check = pickCheckBlock(facts);
+  const check = pickCheckBlock(facts, facts.summary.updatedAt);
   if (check !== null) {
     return { pass: false, reason: check };
   }
@@ -51,13 +51,16 @@ function pickReviewedVerdict(facts: Extract<NoslopGateFacts, { overridden: false
 
 // noslop's check also fails on what its summary head cannot show, such as failed review calls or a
 // rejected merge resolution, so the gate takes its conclusion rather than restate its rules.
-function pickCheckBlock(facts: Extract<NoslopGateFacts, { overridden: false }>): string | null {
+function pickCheckBlock(facts: Extract<NoslopGateFacts, { overridden: false }>, summaryUpdatedAt: string): string | null {
   const at = facts.head.slice(0, 7);
   if (!facts.check.found) {
     return `${facts.check.reason}, so no pass: hq review ${facts.repo} ${facts.pr}`;
   }
   if (facts.check.status !== 'completed') {
     return `noslop's check at ${at} is ${facts.check.status}, so no pass: wait for it to finish`;
+  }
+  if (facts.check.completedAt === null || Date.parse(facts.check.completedAt) < Date.parse(summaryUpdatedAt)) {
+    return `noslop's check at ${at} predates its latest summary, so it does not judge that review; rerun hq review ${facts.repo} ${facts.pr}`;
   }
   if (facts.check.conclusion !== 'success') {
     return `noslop's check at ${at} is ${facts.check.conclusion ?? 'without a conclusion'}: ${facts.check.title ?? 'no title'}`;

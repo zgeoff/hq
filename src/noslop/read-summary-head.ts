@@ -2,7 +2,7 @@ import { z } from 'zod';
 import type { Runner } from '../runner/types.ts';
 import { parseJSON } from './parse-json.ts';
 
-export type SummaryHead = { found: true; head: string } | { found: false; reason: string };
+export type SummaryHead = { found: true; head: string; updatedAt: string } | { found: false; reason: string };
 
 const MARKER_START = '<!-- noslop:summary ';
 
@@ -14,7 +14,7 @@ const NOSLOP_LOGIN = 'noslop-review[bot]';
 // the noslop App posted that opens a summary marker.
 export async function readSummaryHead(run: Runner, slug: string, pr: number): Promise<SummaryHead> {
   const path = `repos/${slug}/issues/${pr}/comments`;
-  const result = await run(['gh', 'api', path, '--paginate', '--jq', '.[] | {login: .user.login, body}']);
+  const result = await run(['gh', 'api', path, '--paginate', '--jq', '.[] | {login: .user.login, body, updatedAt: .updated_at}']);
   if (result.code !== 0) {
     return { found: false, reason: `gh cannot read the comments of the PR (${(result.stderr || result.stdout).trim().slice(0, 300)})` };
   }
@@ -26,12 +26,14 @@ export async function readSummaryHead(run: Runner, slug: string, pr: number): Pr
   if (newest === undefined) {
     return { found: false, reason: 'noslop has posted no review summary on the PR' };
   }
-  return parseMarkerHead(newest.body);
+  return parseMarkerHead(newest);
 }
 
-const CommentSchema = z.object({ login: z.string().nullish(), body: z.string().nullable().transform((body) => body ?? '') });
+const CommentSchema = z.object({ login: z.string().nullish(), body: z.string().nullable().transform((body) => body ?? ''), updatedAt: z.iso.datetime() });
 
-function parseComments(text: string): z.output<typeof CommentSchema>[] | null {
+type Comment = z.output<typeof CommentSchema>;
+
+function parseComments(text: string): Comment[] | null {
   const parsed = z
     .array(CommentSchema)
     .safeParse(
@@ -49,12 +51,12 @@ const MarkerSchema = z.looseObject({ head: z.string().regex(/^[0-9a-f]{40}$/u) }
 
 // The newest summary comment is the summary, so one whose marker does not close or parse blocks,
 // rather than fall back to an older one. A `>` in the marker is a JSON escape, which JSON.parse undoes.
-function parseMarkerHead(body: string): SummaryHead {
-  const json = SUMMARY_MARKER.exec(body)?.groups?.['json'];
+function parseMarkerHead(comment: Comment): SummaryHead {
+  const json = SUMMARY_MARKER.exec(comment.body)?.groups?.['json'];
   const marker = json === undefined ? undefined : parseJSON(json);
   const parsed = MarkerSchema.safeParse(marker);
   if (!parsed.success) {
     return { found: false, reason: "hq cannot read the head in noslop's summary marker on the PR" };
   }
-  return { found: true, head: parsed.data.head };
+  return { found: true, head: parsed.data.head, updatedAt: comment.updatedAt };
 }

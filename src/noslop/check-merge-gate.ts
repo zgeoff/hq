@@ -85,10 +85,10 @@ function readUnreviewedRoute(request: PRRequest, parsed: ParsedRepo, author: PRA
   if (isBotAuthor(author)) {
     return 'bot PR: green CI is enough';
   }
-  return match(resolveEngine(request.db, parsed.owner, parsed.repo, request.pr).engine)
-    .with('codex', () => 'on Codex: green CI is enough')
-    .with('noslop', () => null)
-    .exhaustive();
+
+  // Refuses a listed repo with no pinned commit, so such a PR cannot pass on CI alone.
+  resolveEngine(request.db, parsed.owner, parsed.repo);
+  return null;
 }
 
 // On every route: a change to an owner-held path needs the owner's own lgtm at the head, and a change

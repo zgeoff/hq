@@ -2,7 +2,7 @@ import { z } from 'zod';
 import type { Runner } from '../runner/types.ts';
 import { parseJSON } from './parse-json.ts';
 
-export type NoslopCheck = { found: true; status: string; conclusion: string | null; title: string | null } | { found: false; reason: string };
+export type NoslopCheck = { found: true; status: string; conclusion: string | null; title: string | null; completedAt: string | null } | { found: false; reason: string };
 
 // The App's slug: a workflow job named `noslop` runs under another app, and the PR's check rollup
 // does not name the app, so only this REST read can tell the two apart.
@@ -10,7 +10,7 @@ const NOSLOP_APP = 'noslop-review';
 
 const NOSLOP_CHECK = 'noslop';
 
-const CheckRunSchema = z.object({ id: z.number(), name: z.string(), app: z.string().nullable(), status: z.string(), conclusion: z.string().nullable(), title: z.string().nullable() });
+const CheckRunSchema = z.object({ id: z.number(), name: z.string(), app: z.string().nullable(), status: z.string(), conclusion: z.string().nullable(), title: z.string().nullable(), completedAt: z.iso.datetime().nullable() });
 
 type CheckRun = z.output<typeof CheckRunSchema>;
 
@@ -18,7 +18,7 @@ type CheckRun = z.output<typeof CheckRunSchema>;
 // order it creates them, and a re-run can start in the same second as the run it replaces.
 export async function readNoslopCheck(run: Runner, slug: string, sha: string): Promise<NoslopCheck> {
   const path = `repos/${slug}/commits/${sha}/check-runs?check_name=${NOSLOP_CHECK}&filter=all&per_page=100`;
-  const result = await run(['gh', 'api', path, '--paginate', '--jq', '.check_runs[] | {id, name, app: .app.slug, status, conclusion, title: .output.title}']);
+  const result = await run(['gh', 'api', path, '--paginate', '--jq', '.check_runs[] | {id, name, app: .app.slug, status, conclusion, title: .output.title, completedAt: .completed_at}']);
   if (result.code !== 0) {
     return { found: false, reason: `gh cannot read the check runs at ${sha.slice(0, 7)} (${(result.stderr || result.stdout).trim().slice(0, 300)})` };
   }
@@ -30,7 +30,7 @@ export async function readNoslopCheck(run: Runner, slug: string, sha: string): P
   if (newest === null) {
     return { found: false, reason: `noslop has no check at ${sha.slice(0, 7)}` };
   }
-  return { found: true, status: newest.status, conclusion: newest.conclusion, title: newest.title };
+  return { found: true, status: newest.status, conclusion: newest.conclusion, title: newest.title, completedAt: newest.completedAt };
 }
 
 function parseRuns(text: string): CheckRun[] | null {

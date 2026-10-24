@@ -98,40 +98,39 @@ test('it refuses --full for a PR on Codex, and runs nothing', async () => {
   expect(fake.of('bun')).toStrictEqual([]);
 });
 
-test('it finishes a PR that already had a Codex review file on Codex', async () => {
+test('it reviews a listed repo\'s PR on noslop though a Codex review file of the PR exists', async () => {
   const ctx = setupTest();
   const fake = buildFakeRunner();
   ctx.listWidgets();
   mkdirSync(join(ctx.base, 'zgeoff/widgets'), { recursive: true });
   writeFileSync(join(ctx.base, 'zgeoff/widgets/7-review.md'), 'No findings.\n');
 
-  await expect(runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false })).resolves.toMatchObject({ codexCode: 0 });
+  await expect(runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false })).resolves.toMatchObject({ engine: 'noslop' });
 
-  expect(fake.of('bun')).toStrictEqual([]);
+  expect(fake.of('codex')).toStrictEqual([]);
 });
 
-test('it finishes a PR on Codex whose review file has the flat name from before review folders', async () => {
+test('it reviews a listed repo\'s PR on noslop though a Codex review file of the PR has the flat name from before review folders', async () => {
   const ctx = setupTest();
   const fake = buildFakeRunner();
   ctx.listWidgets();
   writeFileSync(join(ctx.base, 'widgets7-review.md'), 'No findings.\n');
 
-  await expect(runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false })).resolves.toMatchObject({ codexCode: 0 });
+  await expect(runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false })).resolves.toMatchObject({ engine: 'noslop' });
 
-  expect(fake.of('bun')).toStrictEqual([]);
+  expect(fake.of('codex')).toStrictEqual([]);
 });
 
-test('it finishes a PR that already had a Codex round in a run on Codex', async () => {
+test('it reviews a listed repo\'s PR on noslop though a run already gave it a Codex round', async () => {
   const ctx = setupTest(),
     fake = buildFakeRunner();
   ctx.listWidgets();
   ctx.db.exec('PRAGMA foreign_keys = OFF');
   ctx.db.query("INSERT INTO run_prs (ref, issue, state, review_round, added_at, updated_at) VALUES ('widgets#7', 'GEO-1', 'open', 1, '2026-10-18T00:00:00Z', '2026-10-18T00:00:00Z')").run();
 
-  await runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false });
+  await expect(runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false })).resolves.toMatchObject({ engine: 'noslop' });
 
-  expect(fake.of('codex').length).toBeGreaterThan(0);
-  expect(fake.of('bun')).toStrictEqual([]);
+  expect(fake.of('codex')).toStrictEqual([]);
 });
 
 test('it keeps a PR on noslop once noslop has reviewed it, even with a Codex file beside it', async () => {

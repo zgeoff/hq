@@ -2,6 +2,7 @@ import type { Database } from 'bun:sqlite';
 import { dbPath } from '../db/db-path.ts';
 import { HqError } from '../errors.ts';
 import { resolveNoslopDefaultStore } from '../noslop/resolve-noslop-default-store.ts';
+import { reviewDir } from '../review/review-dir.ts';
 import type { Runner } from '../runner/types.ts';
 import { formatArchiveHistory } from './format-archive-history.ts';
 import type { RepoNames } from './rekey-specs.ts';
@@ -44,6 +45,7 @@ async function runArchiveCommand(args: RepoCommandArgs, names: RepoNames): Promi
     dryRun: args.dryRun,
     from: names.from,
     openStore: args.openStore,
+    reviewDir: reviewDir(),
     run: args.run,
     store: resolveNoslopDefaultStore(process.env),
     to: names.to,

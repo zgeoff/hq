@@ -75,7 +75,7 @@ export async function runReview(request: ReviewRequest): Promise<ReviewResult | 
   assertPR(request.pr);
   requireNoConfirm(request);
   const parsed = parseLowerRepo(request.rawRepo, request.owner),
-    picked = resolveEngine(request.db, parsed.owner, parsed.repo, request.pr);
+    picked = resolveEngine(request.db, parsed.owner, parsed.repo);
   if (picked.engine === 'codex') {
     requireCodexFlags(request, parsed);
     return await review(request.run, request.rawRepo, request.pr, toExactOptional({ watch: request.watch, owner: request.owner, repoDir: request.repoDir, effort: request.effort }));

@@ -5,10 +5,11 @@ export type CIVerdict = { green: true } | { green: false; reason: string } | { g
 
 const NOSLOP_CHECK = 'noslop';
 
-// noslop's own check is skipped here because the gate's noslop route reads it by app, beside the
-// summary head and findings. GitHub keeps a re-run in the rollup beside the run it replaced.
+// noslop's App check is skipped here because the gate's noslop route reads it by app, beside the
+// summary head and findings. The rollup names no app, but a GitHub Actions job carries its workflow's
+// name and an App check none. GitHub keeps a re-run in the rollup beside the run it replaced.
 export function checkCIGreen(checks: readonly GateCheck[]): CIVerdict {
-  const counted = pickNewestRuns(checks).filter((check) => pickName(check) !== NOSLOP_CHECK);
+  const counted = pickNewestRuns(checks).filter((check) => !isNoslopAppCheck(check));
   if (counted.length === 0) {
     return { green: false, noChecks: true, reason: 'the head has no CI checks, so CI has not passed' };
   }
@@ -65,6 +66,13 @@ function isPassing(check: GateCheck): boolean {
   return match(check)
     .with({ __typename: 'CheckRun' }, (run) => run.status === 'COMPLETED' && run.conclusion !== null && PASSING.has(run.conclusion))
     .with({ __typename: 'StatusContext' }, (status) => status.state === 'SUCCESS')
+    .exhaustive();
+}
+
+function isNoslopAppCheck(check: GateCheck): boolean {
+  return match(check)
+    .with({ __typename: 'CheckRun' }, (run) => run.name === NOSLOP_CHECK && (run.workflowName ?? '') === '')
+    .with({ __typename: 'StatusContext' }, () => false)
     .exhaustive();
 }
 

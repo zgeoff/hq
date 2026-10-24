@@ -16,5 +16,12 @@ export function formatArchiveHistory(history: ArchiveHistory): string {
   const backups = history.backups.length > 0 ? [`backups: ${history.backups.join(', ')}`] : [],
     head = history.dryRun ? `Dry run: nothing changed. Re-keying ${history.from} → ${history.to} would leave:` : `Re-keyed ${history.from} → ${history.to}:`,
     sides = history.before.flatMap((side) => formatSide(history, side, history.after.find((next) => next.store === side.store)));
-  return [head, ...sides, ...backups].join('\n');
+  return [head, ...sides, ...formatReviewFiles(history.reviewFiles), ...backups].join('\n');
+}
+
+function formatReviewFiles(reviewFiles: ArchiveHistory['reviewFiles']): string[] {
+  if (reviewFiles.length === 0) {
+    return [];
+  }
+  return ['review files:', ...reviewFiles.map((move) => `  ${move.from} → ${move.to}${move.collides ? ' (would collide)' : ''}`)];
 }

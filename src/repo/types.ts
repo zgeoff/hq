@@ -16,6 +16,16 @@ export interface ArchiveHistory {
   before: ArchiveSide[];
   dryRun: boolean;
   from: string;
+
+  // The review files the re-key moves, or for a dry run would move.
+  reviewFiles: ReviewMove[];
+  to: string;
+}
+
+// One review file of the repo being left, where the re-key puts it, and whether a file is there already.
+export interface ReviewMove {
+  collides: boolean;
+  from: string;
   to: string;
 }
 

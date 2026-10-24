@@ -2,6 +2,7 @@ import { Database } from 'bun:sqlite';
 import { expect, onTestFinished, test } from 'bun:test';
 import { createHistoryRows, createStoreRows, createStoreTables } from '../../test/create-history-databases.ts';
 import { freshDb } from '../../test/helpers.ts';
+import { overrideEnv } from '../config/override-env.ts';
 import { createStoreBackup } from '../noslop/create-store-backup.ts';
 import type { RunResult } from '../runner/types.ts';
 import { runRepoCommand } from './run-repo-command.ts';
@@ -26,6 +27,7 @@ function setupTest() {
   const base = freshDb();
   onTestFinished(base.cleanup);
   onTestFinished(createDataHomeOverride(`${base.dir}/xdg`));
+  onTestFinished(overrideEnv('REVIEW_DIR', `${base.dir}/reviews`));
   createStoreTables(`${base.dir}/xdg/noslop/store.sqlite`);
   return {
     ...base,
