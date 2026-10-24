@@ -63,15 +63,14 @@ test('it lists the complete Backlog issue whose blockers are Done and leaves out
 
   const issues = await readPromotableIssues(call, 'GEO');
 
-  expect([issues, app.variables]).toStrictEqual([
-      [
-        {
-          identifier: 'GEO-9801',
-          title: 'boil the kettle',
-          facts: { identifier: 'GEO-9801', project: 'kitchen', projectLabels: ['maintenance'], labels: ['atc', 'Bug'], type: 'Bug', priority: 2, createdAt: '2026-10-01T00:00:00Z', parent: null },
-        },
-      ],
-      [{ after: null, team: 'GEO', state: 'Backlog' }]]);
+  expect(issues).toStrictEqual([
+    {
+      identifier: 'GEO-9801',
+      title: 'boil the kettle',
+      facts: { identifier: 'GEO-9801', project: 'kitchen', projectLabels: ['maintenance'], labels: ['atc', 'Bug'], type: 'Bug', priority: 2, createdAt: '2026-10-01T00:00:00Z', parent: null },
+    },
+  ]);
+  expect(app.variables).toStrictEqual([{ after: null, team: 'GEO', state: 'Backlog' }]);
 });
 
 test('it rejects a Backlog answer with an unexpected shape', async () => {
@@ -110,15 +109,21 @@ test('it collects the promotable issues from every Backlog page, asking for each
 
   const issues = await readPromotableIssues(call, 'GEO');
 
-  expect([issues, app.variables]).toStrictEqual([
-    [
-      expect.objectContaining({ identifier: 'GEO-9810', title: 'crate the widgets' }),
-      expect.objectContaining({ identifier: 'GEO-9812', title: 'load the van' }),
-    ],
-    [
-      { after: null, team: 'GEO', state: 'Backlog' },
-      { after: 'kettle-page-2', team: 'GEO', state: 'Backlog' },
-    ],
+  expect(issues).toStrictEqual([
+    {
+      identifier: 'GEO-9810',
+      title: 'crate the widgets',
+      facts: { identifier: 'GEO-9810', project: null, projectLabels: [], labels: [], type: 'none', priority: 0, createdAt: '2026-10-01T00:00:00Z', parent: null },
+    },
+    {
+      identifier: 'GEO-9812',
+      title: 'load the van',
+      facts: { identifier: 'GEO-9812', project: null, projectLabels: [], labels: [], type: 'none', priority: 0, createdAt: '2026-10-01T00:00:00Z', parent: null },
+    },
+  ]);
+  expect(app.variables).toStrictEqual([
+    { after: null, team: 'GEO', state: 'Backlog' },
+    { after: 'kettle-page-2', team: 'GEO', state: 'Backlog' },
   ]);
 });
 
