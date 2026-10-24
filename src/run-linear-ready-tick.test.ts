@@ -173,7 +173,6 @@ test('it records an unknown count when the Backlog read answers within a fresh d
   const held = buildHeldLinearCall();
   const ran = runLinearReadyTick(ctx.db, { call: held.call, run: buildStubGitHubFactsRunner({}), readLanes: () => Promise.resolve(lanes), actor: 'hq-lanes', deadlineMs: 100, now: clock.now });
 
-  // Ready takes 60 of the 100 ms, so the Backlog read has 40 left; a fresh 100 ms would outlast its answer at 70.
   clock.sleep(60);
   jest.advanceTimersByTime(60);
   held.ready.resolve(buildReadyPage([], null));
