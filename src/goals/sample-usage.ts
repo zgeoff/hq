@@ -93,9 +93,9 @@ function readings(file: string): (WindowResets & { account: unknown; five: numbe
   }
 }
 
+const RESET_TIME = z.iso.datetime({ offset: true });
+
 function readResetTime(value: unknown): string | null {
-  if (typeof value !== 'string' || Number.isNaN(Date.parse(value))) {
-    return null;
-  }
-  return iso(new Date(value));
+  const parsed = RESET_TIME.safeParse(value);
+  return parsed.success ? iso(new Date(parsed.data)) : null;
 }

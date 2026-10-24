@@ -152,7 +152,7 @@ test('it lets a failed insert of an account reading reach the caller', () => {
 });
 
 test("an account file's reset times are stored per window, and a reset that is not a time is left out", () => {
-  accountFile(A, { account: A, windows: { fiveHour: 10, sevenDay: 40 }, resets: { fiveHour: '2026-10-16T05:00:00.000Z', sevenDay: 'soon' } }, '2026-10-16T01:00:00Z');
+  accountFile(A, { account: A, windows: { fiveHour: 10, sevenDay: 40 }, resets: { fiveHour: '2026-10-16T05:00:00.123456+00:00', sevenDay: 'October 20, 2026 08:00:00 GMT' } }, '2026-10-16T01:00:00Z');
   sampleUsage(db, new Date('2026-10-16T05:00:00Z'));
   expect(db.query('SELECT account, five_hour_resets_at, seven_day_resets_at FROM usage_samples').all()).toStrictEqual([{ account: A, five_hour_resets_at: '2026-10-16T05:00:00Z', seven_day_resets_at: null }]);
 });
