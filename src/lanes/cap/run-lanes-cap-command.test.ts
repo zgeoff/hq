@@ -7,7 +7,6 @@ import { runLanesCapCommand } from './run-lanes-cap-command.ts';
 function setupTest() {
   const fresh = freshDb();
   onTestFinished(fresh.cleanup);
-  setMeta(fresh.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'z-delivery': 'kettle-2' }));
   const owner = { openClient: () => Promise.resolve({ peerSession: 'kettle-1', close: () => {} }) };
   const delivery = { openClient: () => Promise.resolve({ peerSession: 'kettle-2', close: () => {} }) };
   const stranger = { openClient: () => Promise.resolve({ peerSession: 'kettle-9', close: () => {} }) };
@@ -16,6 +15,7 @@ function setupTest() {
 
 test('it shows no cap and the working count when none is set', async () => {
   const ctx = setupTest();
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'z-delivery': 'kettle-2' }));
 
   const out = await runLanesCapCommand({ db: ctx.db, at: new Date('2026-10-15T00:00:00Z'), args: { kind: 'show' }, probe: ctx.stranger });
 
@@ -25,6 +25,7 @@ test('it shows no cap and the working count when none is set', async () => {
 
 test('it sets a cap from the owner, files an event and news, and shows it', async () => {
   const ctx = setupTest();
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'z-delivery': 'kettle-2' }));
 
   await runLanesCapCommand({ db: ctx.db, at: new Date('2026-10-15T00:00:00Z'), args: { kind: 'set', cap: 7, until: 'Mon 08:00', reason: 'weekend pacing' }, probe: ctx.owner });
   const shown = await runLanesCapCommand({ db: ctx.db, at: new Date('2026-10-15T00:00:00Z'), args: { kind: 'show' }, probe: ctx.stranger });
@@ -36,6 +37,7 @@ test('it sets a cap from the owner, files an event and news, and shows it', asyn
 
 test('it lifts a cap from the owner, files an event and news, and shows no cap', async () => {
   const ctx = setupTest();
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'z-delivery': 'kettle-2' }));
   await runLanesCapCommand({ db: ctx.db, at: new Date('2026-10-15T00:00:00Z'), args: { kind: 'set', cap: 7, until: null, reason: null }, probe: ctx.owner });
 
   await runLanesCapCommand({ db: ctx.db, at: new Date('2026-10-15T00:00:00Z'), args: { kind: 'off', reason: 'the quota is back' }, probe: ctx.owner });
@@ -47,6 +49,7 @@ test('it lifts a cap from the owner, files an event and news, and shows no cap',
 
 test('it says there is no cap to lift, and files nothing', async () => {
   const ctx = setupTest();
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'z-delivery': 'kettle-2' }));
 
   const out = await runLanesCapCommand({ db: ctx.db, at: new Date('2026-10-15T00:00:00Z'), args: { kind: 'off', reason: null }, probe: ctx.owner });
 
@@ -56,6 +59,7 @@ test('it says there is no cap to lift, and files nothing', async () => {
 
 test('it lets the owner raise a cap', async () => {
   const ctx = setupTest();
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'z-delivery': 'kettle-2' }));
   await runLanesCapCommand({ db: ctx.db, at: new Date('2026-10-15T00:00:00Z'), args: { kind: 'set', cap: 7, until: null, reason: null }, probe: ctx.owner });
 
   const out = await runLanesCapCommand({ db: ctx.db, at: new Date('2026-10-15T00:00:00Z'), args: { kind: 'set', cap: 12, until: null, reason: null }, probe: ctx.owner });
@@ -65,6 +69,7 @@ test('it lets the owner raise a cap', async () => {
 
 test('it lets the delivery lead set a cap where none exists, recorded under its name', async () => {
   const ctx = setupTest();
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'z-delivery': 'kettle-2' }));
 
   const out = await runLanesCapCommand({ db: ctx.db, at: new Date('2026-10-15T00:00:00Z'), args: { kind: 'set', cap: 4, until: null, reason: 'quota' }, probe: ctx.delivery });
 
@@ -73,6 +78,7 @@ test('it lets the delivery lead set a cap where none exists, recorded under its 
 
 test('it lets the delivery lead lower a cap and keeps the until it does not replace', async () => {
   const ctx = setupTest();
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'z-delivery': 'kettle-2' }));
   await runLanesCapCommand({ db: ctx.db, at: new Date('2026-10-15T00:00:00Z'), args: { kind: 'set', cap: 7, until: '2026-10-20T00:00:00Z', reason: 'weekend pacing' }, probe: ctx.owner });
 
   const out = await runLanesCapCommand({ db: ctx.db, at: new Date('2026-10-15T00:00:00Z'), args: { kind: 'set', cap: 5, until: null, reason: null }, probe: ctx.delivery });
@@ -82,6 +88,7 @@ test('it lets the delivery lead lower a cap and keeps the until it does not repl
 
 test('it refuses the delivery lead raising a cap and leaves it as it was', async () => {
   const ctx = setupTest();
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'z-delivery': 'kettle-2' }));
   await runLanesCapCommand({ db: ctx.db, at: new Date('2026-10-15T00:00:00Z'), args: { kind: 'set', cap: 7, until: null, reason: null }, probe: ctx.owner });
   const before = getMeta(ctx.db, 'lanes_cap');
 
@@ -93,6 +100,7 @@ test('it refuses the delivery lead raising a cap and leaves it as it was', async
 
 test('it refuses the delivery lead lifting a cap', async () => {
   const ctx = setupTest();
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'z-delivery': 'kettle-2' }));
   await runLanesCapCommand({ db: ctx.db, at: new Date('2026-10-15T00:00:00Z'), args: { kind: 'set', cap: 7, until: null, reason: null }, probe: ctx.owner });
 
   const refused = runLanesCapCommand({ db: ctx.db, at: new Date('2026-10-15T00:00:00Z'), args: { kind: 'off', reason: null }, probe: ctx.delivery });
@@ -102,6 +110,7 @@ test('it refuses the delivery lead lifting a cap', async () => {
 
 test('it refuses a caller that is neither the owner nor the delivery lead', () => {
   const ctx = setupTest();
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'z-delivery': 'kettle-2' }));
 
   const refused = runLanesCapCommand({ db: ctx.db, at: new Date('2026-10-15T00:00:00Z'), args: { kind: 'set', cap: 4, until: null, reason: null }, probe: ctx.stranger });
 
@@ -111,6 +120,7 @@ test('it refuses a caller that is neither the owner nor the delivery lead', () =
 
 test('it refuses a caller atc places in no session', () => {
   const ctx = setupTest();
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'z-delivery': 'kettle-2' }));
 
   const refused = runLanesCapCommand({ db: ctx.db, at: new Date('2026-10-15T00:00:00Z'), args: { kind: 'set', cap: 4, until: null, reason: null }, probe: { openClient: () => Promise.resolve({ peerSession: null, close: () => {} }) } });
 
@@ -119,6 +129,7 @@ test('it refuses a caller atc places in no session', () => {
 
 test('it refuses every change while atc cannot be reached', () => {
   const ctx = setupTest();
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'z-delivery': 'kettle-2' }));
 
   const refused = runLanesCapCommand({ db: ctx.db, at: new Date('2026-10-15T00:00:00Z'), args: { kind: 'set', cap: 4, until: null, reason: null }, probe: { openClient: () => Promise.reject(new Error('connect ENOENT atc.sock')) } });
 
@@ -128,6 +139,7 @@ test('it refuses every change while atc cannot be reached', () => {
 
 test('it refuses an until in the past', () => {
   const ctx = setupTest();
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'z-delivery': 'kettle-2' }));
 
   const refused = runLanesCapCommand({ db: ctx.db, at: new Date('2026-10-15T00:00:00Z'), args: { kind: 'set', cap: 4, until: '2026-10-14T00:00:00Z', reason: null }, probe: ctx.owner });
 
@@ -136,6 +148,7 @@ test('it refuses an until in the past', () => {
 
 test('it reports a malformed stored cap, applies none, and lets the owner replace it', async () => {
   const ctx = setupTest();
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'z-delivery': 'kettle-2' }));
   setMeta(ctx.db, 'lanes_cap', '{"cap":"many"}');
 
   const shown = await runLanesCapCommand({ db: ctx.db, at: new Date('2026-10-15T00:00:00Z'), args: { kind: 'show' }, probe: ctx.stranger });
@@ -148,6 +161,7 @@ test('it reports a malformed stored cap, applies none, and lets the owner replac
 
 test('it reports a stored cap that is not JSON', async () => {
   const ctx = setupTest();
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'z-delivery': 'kettle-2' }));
   setMeta(ctx.db, 'lanes_cap', 'seven');
 
   const shown = await runLanesCapCommand({ db: ctx.db, at: new Date('2026-10-15T00:00:00Z'), args: { kind: 'show' }, probe: ctx.stranger });

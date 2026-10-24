@@ -8,11 +8,8 @@ export interface BurnWindow extends BurnRate {
   window: '7-day' | '5-hour';
   method: 'least-squares';
 
-  // The time to the launch limit at the burn so far; null with too few samples.
   atRate: LimitProjection | null;
 
-  // The same at the cap: the burn per working session times the cap; null with no cap, no working
-  // session, or too few samples.
   atCap: (LimitProjection & { ratePerHour: number }) | null;
 }
 
@@ -34,8 +31,6 @@ export interface CapacityHintInput {
   at: Date;
 }
 
-// The burn of the last hours and how soon it reaches the launch limit, at today's rate and at the
-// cap. No history of the working count is stored, so the current count stands in for its average.
 export function buildCapacityHint(input: CapacityHintInput): CapacityHint {
   const sevenDay = buildWindow(input, '7-day', input.samples.map((sample) => ({ at: sample.at, percent: sample.seven_day, resetsAt: sample.seven_day_resets_at })));
   const fiveHour = buildWindow(input, '5-hour', input.samples.map((sample) => ({ at: sample.at, percent: sample.five_hour, resetsAt: sample.five_hour_resets_at })));

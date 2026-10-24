@@ -11,8 +11,6 @@ const COUNT = z
   .transform(Number)
   .pipe(z.number().int());
 
-// hq lanes cap's words after the verb, with its --until and --reason flags, as one command. Anything
-// else is bad_args with the usage.
 export function parseLanesCapArgs(rest: readonly string[], until: string | undefined, reason: string | undefined): LanesCapArgs {
   const [first, ...extra] = rest;
   if (extra.length > 0) {

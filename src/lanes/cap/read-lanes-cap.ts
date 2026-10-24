@@ -6,8 +6,6 @@ import { LANES_CAP_KEY } from './lanes-cap-key.ts';
 
 export type StoredCap = { kind: 'none' } | { kind: 'set'; cap: LanesCap } | { kind: 'bad'; error: string };
 
-// The stored cap. A value that is not JSON or does not fit the schema reads as bad, which the lanes
-// treat as no cap and hq lanes cap reports.
 export function readLanesCap(db: Database): StoredCap {
   const raw = getMeta(db, LANES_CAP_KEY);
   if (raw === null) {

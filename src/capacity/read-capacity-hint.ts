@@ -7,7 +7,6 @@ import { readUsageSamples } from './read-usage-samples.ts';
 
 const HINT_HOURS = 2;
 
-// The Claude burn from the usage samples of the last 2 hours, against the launch limit.
 export function readCapacityHint(db: Database, limit: number, at: Date): CapacityHint {
   const samples = readUsageSamples(db, at, HINT_HOURS);
   return buildCapacityHint({ samples, hours: HINT_HOURS, limit, working: countWorking(db, at).count, cap: readActiveCap(db, at)?.cap ?? null, at });

@@ -6,8 +6,6 @@ import type { UsageSample } from './usage-sample.ts';
 
 const rowsSchema = z.array(USAGE_SAMPLE);
 
-// The current account's Claude usage samples of the last `hours` hours, oldest first. The current
-// account is the one the newest sample names.
 export function readUsageSamples(db: Database, at: Date, hours: number): UsageSample[] {
   const newest = db.query('SELECT account FROM usage_samples WHERE at <= ? ORDER BY at DESC LIMIT 1').get(iso(at));
   const account = z.object({ account: z.string() }).nullable().parse(newest);

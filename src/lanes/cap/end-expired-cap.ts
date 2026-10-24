@@ -6,9 +6,6 @@ import { isCapEnded } from './is-cap-ended.ts';
 import { readLanesCap } from './read-lanes-cap.ts';
 import { writeLanesCap } from './write-lanes-cap.ts';
 
-// Clears a cap whose until has passed and tells the delivery lead its slots are free again. The
-// cap is gone once cleared, so the news and the message go out once per cap. The caller holds the
-// transaction.
 export function endExpiredCap(db: Database, at: Date, actor: string): void {
   const stored = readLanesCap(db);
   if (stored.kind !== 'set' || !isCapEnded(stored.cap, at)) {

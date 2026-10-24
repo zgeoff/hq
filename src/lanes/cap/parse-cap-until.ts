@@ -6,8 +6,6 @@ import { ISO_TIME } from '../iso-time.ts';
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const SYDNEY_TIME = /^(?<weekday>Sun|Mon|Tue|Wed|Thu|Fri|Sat) (?<hour>\d{2}):(?<minute>\d{2})$/iu;
 
-// --until as an ISO time after `at`: an ISO time, or a Sydney wall time such as `Mon 08:00`, which is
-// the next such moment after `at`. Anything else is bad_args.
 export function parseCapUntil(text: string, at: Date): string {
   const wall = SYDNEY_TIME.exec(text);
   if (wall !== null) {

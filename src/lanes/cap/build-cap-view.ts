@@ -10,7 +10,6 @@ export interface CapView {
   working: number;
   limitedBy: 'cap' | 'pool' | null;
 
-  // Whether working counts awake sessions, or the working runs as no atc reading is fresh.
   workingFrom: WorkingCount['from'];
 }
 

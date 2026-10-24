@@ -5,19 +5,15 @@ export interface BurnPoint {
 }
 
 export interface BurnRate {
-  // The samples after the window's latest reset that carry a reading.
   samples: number;
   latest: number | null;
 
-  // Percent per hour by least squares; null with fewer than 3 samples.
   ratePerHour: number | null;
   since: string | null;
 }
 
 const MIN_SAMPLES = 3;
 
-// The burn of one usage window. A window reset (the reset time moving on, or the reading falling)
-// starts the fit again, so only the samples after the latest reset count.
 export function buildBurnRate(points: readonly BurnPoint[]): BurnRate {
   const read = points.filter((point) => point.percent !== null);
   const start = getResetStart(read);

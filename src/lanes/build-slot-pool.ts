@@ -11,7 +11,6 @@ export interface SlotPool {
   localFree: number;
   free: number;
 
-  // The free slots the cap leaves out: true when the cap, not the pool, holds slots back.
   capHeld: boolean;
 
   // Why fewer imp slots are free than the imp size leaves, or null when none is held back.
@@ -28,12 +27,10 @@ interface SlotLimits {
   room: ImpRoom | null;
   localRoom: number | null;
 
-  // The cap less the working sessions; null: no cap.
   capRoom: number | null;
 }
 
 // The lanes' slots as one pool: pacing.json's imp and local slot caps, less the runs that hold a slot.
-// The cap's room (the cap less the working sessions; null: no cap) takes free slots off the pool's.
 // Imp slots stay under capacity.sh's budget and impd's non-Nix line (room; null: no reading). Local
 // slots stay under localRoom, what unattended providers may run on this host (null: no cap but the size).
 export function buildSlotPool(slots: PacingSlots, running: Pick<RunningByPlace, 'imp' | 'local' | 'localSource'>, limits: SlotLimits): SlotPool {

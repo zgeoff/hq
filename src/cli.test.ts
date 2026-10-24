@@ -236,7 +236,7 @@ test('hq lanes shows the cause of the empty slots and the minutes by cause for t
   });
 });
 
-test('hq lanes cap sets a cap for the owner session, shows it back, and hq lanes --json carries it', async () => {
+test('hq lanes cap sets a cap for the owner session, and shows it back', async () => {
   const fresh = freshDb();
   const printed: string[] = [];
   const log = console.log;
@@ -254,6 +254,29 @@ test('hq lanes cap sets a cap for the owner session, shows it back, and hq lanes
 
   expect([setCode, showCode]).toStrictEqual([0, 0]);
   expect(JSON.parse(printed[1] ?? '{}')).toMatchObject({ ok: true, cap: { cap: 7, until: '2026-10-18T21:00:00Z', reason: 'weekend pacing', by: 'z-stu' } });
+});
+
+test('hq lanes --json carries the stored cap with the working count and what limits the slots', async () => {
+  const fresh = freshDb();
+  onTestFinished(fresh.cleanup);
+  mkdirSync(`${fresh.dir}/bin`);
+  writeFileSync(`${fresh.dir}/bin/systemctl`, '#!/bin/sh\nexit 3\n');
+  chmodSync(`${fresh.dir}/bin/systemctl`, 0o755);
+  mkdirSync(`${fresh.dir}/skill/scripts`, { recursive: true });
+  writeFileSync(`${fresh.dir}/skill/scripts/capacity.sh`, `echo '${JSON.stringify({ imp: { freeMib: 0, room: false } })}'\n`);
+  writeFileSync(`${fresh.dir}/skill/pacing.json`, JSON.stringify({ slots: { imp: 0, local: 2 } }));
+  setMeta(fresh.db, 'lanes_ready_issues', JSON.stringify({ at: '2026-10-14T00:55:00Z', eligible: [], design: [] }));
+  setMeta(fresh.db, 'lanes_promotable_focus', JSON.stringify({ at: '2026-10-14T00:50:00Z', count: 3, focus: '[]' }));
+  setMeta(fresh.db, 'lanes_cap', JSON.stringify({ cap: 1, until: '2026-10-18T21:00:00Z', reason: 'weekend pacing', by: 'z-stu', at: '2026-10-14T00:00:00Z' }));
+  const child = Bun.spawn(['bun', join(import.meta.dir, 'cli.ts'), 'lanes', '--json'], {
+    stdout: 'pipe',
+    stderr: 'pipe',
+    env: { ...process.env, HOME: fresh.dir, HQ_DB: fresh.path, HQ_PROJECTS: `${fresh.dir}/projects`, HQ_CAPACITY: `${fresh.dir}/skill/scripts/capacity.sh`, HQ_NOTIFY: 'off', HQ_NOW: NOON_SYDNEY, HQ_AS: 'z-delivery', PATH: `${fresh.dir}/bin:${process.env['PATH']}` },
+  });
+
+  const [, stdout] = await Promise.all([child.exited, new Response(child.stdout).text()]);
+
+  expect(JSON.parse(stdout).cap).toStrictEqual({ cap: 1, until: '2026-10-18T21:00:00Z', reason: 'weekend pacing', by: 'z-stu', working: 0, limitedBy: 'cap', workingFrom: 'runs' });
 });
 
 test('hq lanes cap refuses a caller that is not the owner or the delivery lead, and stores nothing', async () => {

@@ -14,17 +14,12 @@ import { readLanesCap } from './read-lanes-cap.ts';
 export interface CapMove {
   action: CapAction;
 
-  // The cap after a cap-set; the cap that went for the others.
   cap: LanesCap;
   actor: string;
 
-  // Why this move was made, for the news item.
   reason: string | null;
 }
 
-// The one write to the stored cap: checks the move against the table, stores the cap after it, logs
-// it, and files a news item naming who made it and why. Gives the event's seq. The caller holds the
-// transaction.
 export function writeLanesCap(db: Database, move: CapMove): number {
   const stored = readLanesCap(db);
   const from: CapState = stored.kind === 'set' ? 'set' : 'none';

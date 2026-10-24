@@ -7,7 +7,6 @@ import { readDesignIssues } from '../read-design-issues.ts';
 export interface WorkingCount {
   count: number;
 
-  // sessions: awake sessions of working runs. runs: the working runs, as no atc reading is fresh.
   from: 'sessions' | 'runs';
 }
 
@@ -15,8 +14,6 @@ const runsSchema = z.array(z.object({ issue: z.string() }));
 
 const rowsSchema = z.array(z.object({ issue: z.string(), session_id: z.string() }));
 
-// What the cap counts: the awake sessions (helpers too) of working runs, less Design runs and the
-// fleet's own sessions. Runs that wait on someone else hold no session worth capping.
 export function countWorking(db: Database, at: Date): WorkingCount {
   const design = readDesignIssues(db);
   const reading = readFreshAwake(db, at);

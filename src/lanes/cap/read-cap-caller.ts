@@ -5,8 +5,6 @@ import { roleName } from '../../roles/role-name.ts';
 
 export type CapCaller = { kind: 'owner' | 'delivery'; by: string } | { kind: 'other' } | { kind: 'unknown'; cause: string };
 
-// Who is asking, from the session atc found for the caller's process and nothing the caller says.
-// A session counts only when it is the id hq fleet recorded for the role.
 export async function readCapCaller(db: Database, deps: OwnerProbeDeps): Promise<CapCaller> {
   try {
     const client = await deps.openClient();

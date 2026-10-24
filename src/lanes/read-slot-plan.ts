@@ -39,7 +39,6 @@ export interface SlotPlan {
 
   skipped: LaneSkip[];
 
-  // The cap on working sessions, with the count it holds against; cap null when none is set.
   cap: CapView;
 }
 

@@ -3,7 +3,6 @@ import type { CapAction } from './cap-transitions.ts';
 import type { LanesCap } from './lanes-cap.ts';
 import type { CapCaller } from './read-cap-caller.ts';
 
-// A change already checked against the clock: the until is an ISO time.
 export type CapRequest = { kind: 'off'; reason: string | null } | { kind: 'set'; cap: number; until: string | null; reason: string | null };
 
 export interface CapChangeInput {
@@ -15,8 +14,6 @@ export interface CapChangeInput {
 
 export type CapDecision = { ok: true; action: CapAction; cap: LanesCap; reason: string | null; by: string } | { ok: true; action: null } | { ok: false; message: string };
 
-// Who may change the cap: the owner's session any way; the delivery lead's only to set one where
-// none exists or to lower it, keeping the until and reason it does not replace.
 export function decideCapChange(input: CapChangeInput): CapDecision {
   const owner = roleName('owner');
   const delivery = roleName('orchestrator');

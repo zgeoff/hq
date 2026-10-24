@@ -22,7 +22,6 @@ export interface LanesCapCommandDeps {
   at: Date;
   args: LanesCapArgs;
 
-  // How the caller is found: atc's peer session, never a name the caller gives.
   probe: OwnerProbeDeps;
 }
 
@@ -31,7 +30,6 @@ interface CapOut {
   text: string;
 }
 
-// hq lanes cap: show the cap and the working count, set it, or lift it.
 export function runLanesCapCommand(deps: LanesCapCommandDeps): Promise<CapOut> {
   return match(deps.args)
     .with({ kind: 'show' }, () => Promise.resolve(showCap(deps)))
