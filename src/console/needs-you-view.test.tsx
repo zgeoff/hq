@@ -4,7 +4,10 @@ import { join } from 'node:path';
 import { QueryClient, QueryClientProvider, environmentManager } from '@tanstack/react-query';
 import { createUnblockItems } from '../../test/create-unblock-items.ts';
 import { NOON_SYDNEY, at, freshDb } from '../../test/helpers.ts';
+import { createSignedInAuth } from '../../test/create-signed-in-auth.ts';
 import { setupPageDOM } from '../../test/setup-page-dom.ts';
+import { createConsoleAPI } from './console-api.ts';
+import { ConsoleAPIContext } from './console-api-context.ts';
 import { getAsk } from '../asks/get-ask.ts';
 import { main } from '../cli.ts';
 import { overrideEnv } from '../config/override-env.ts';
@@ -24,7 +27,8 @@ const KETTLE_CALL = {
 
 async function setupTest() {
   const fresh = freshDb(),
-    server = createConsoleServer({ db: fresh.db, port: 0, actor: 'console', run: () => Promise.resolve({ code: 1, stdout: '', stderr: 'no gh in this test' }), assets: new Map(), notify: () => Promise.resolve(true), loadShipped: () => Promise.reject(new Error('no report in this test')) }),
+    signedIn = createSignedInAuth(),
+    server = createConsoleServer({ db: fresh.db, auth: signedIn.auth, port: 0, actor: 'console', run: () => Promise.resolve({ code: 1, stdout: '', stderr: 'no gh in this test' }), assets: new Map(), notify: () => Promise.resolve(true), loadShipped: () => Promise.reject(new Error('no report in this test')) }),
     spy = spyOn(console, 'log').mockImplementation(() => {});
   at(NOON_SYDNEY);
   onTestFinished(fresh.cleanup);
@@ -38,7 +42,8 @@ async function setupTest() {
     await main(['call', 'add', id, '--item', file, '--order', order, '--json']);
   }
   await main(['unblock', 'add', '--id', 'lid', '--task', 'Fit the new lid on the kettle', '--json']);
-  return { db: fresh.db, directory: fresh.dir, library: await setupPageDOM(`http://127.0.0.1:${server.port}/`) };
+  const library = await setupPageDOM(`http://127.0.0.1:${server.port}/`);
+  return { db: fresh.db, directory: fresh.dir, library: { ...library, api: createConsoleAPI(() => signedIn.session) } };
 }
 
 test('the owner answers by click, key and note, Ask Stu copies its prompt, a review takes review words, and a to-do put off comes back when due', async () => {
@@ -49,9 +54,11 @@ test('the owner answers by click, key and note, Ask Stu copies its prompt, a rev
     write = spyOn(navigator.clipboard, 'writeText');
   createUnblockItems(app.db, { 'review-4': { task: 'Review kettle#4 and say lgtm', links: [{ label: 'kettle#4', url: 'https://github.com/kettle-co/kettle/pull/4', subject: true }] } });
   lib.render(
+    <ConsoleAPIContext value={lib.api}>
     <QueryClientProvider client={queryClient}>
       <view.NeedsYouView />
-    </QueryClientProvider>,
+    </QueryClientProvider>
+    </ConsoleAPIContext>,
   );
   await lib.within(document.body).findByText('Mint the kettle tokens tonight?');
 
@@ -136,9 +143,11 @@ test('it shows an item that arrives while the page stays open', async () => {
   environmentManager.setIsServer(() => false);
   onTestFinished(() => environmentManager.setIsServer(() => true));
   app.library.render(
+    <ConsoleAPIContext value={app.library.api}>
     <QueryClientProvider client={queryClient}>
       <view.NeedsYouView refreshMs={100} />
-    </QueryClientProvider>,
+    </QueryClientProvider>
+    </ConsoleAPIContext>,
   );
   await app.library.within(document.body).findByText('Mint the kettle tokens tonight?');
   const file = join(app.directory, 'descale.json');

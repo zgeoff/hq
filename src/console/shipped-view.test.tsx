@@ -2,14 +2,19 @@ import { expect, onTestFinished, spyOn, test } from 'bun:test';
 import { QueryClient, QueryClientProvider, environmentManager } from '@tanstack/react-query';
 import { buildRenderedReport } from '../../test/build-rendered-report.ts';
 import { freshDb } from '../../test/helpers.ts';
+import { createSignedInAuth } from '../../test/create-signed-in-auth.ts';
 import { setupPageDOM } from '../../test/setup-page-dom.ts';
+import { createConsoleAPI } from './console-api.ts';
+import { ConsoleAPIContext } from './console-api-context.ts';
 import { createConsoleServer } from '../create-console-server.ts';
 import type { ShippedPeriod } from '../shipped/types.ts';
 
 async function setupTest(asked: ShippedPeriod[]) {
   const fresh = freshDb(),
+    signedIn = createSignedInAuth(),
     server = createConsoleServer({
       db: fresh.db,
+      auth: signedIn.auth,
       port: 0,
       actor: 'console', run: () => Promise.resolve({ code: 1, stdout: '', stderr: 'no gh in this test' }),
       assets: new Map(),
@@ -23,7 +28,8 @@ async function setupTest(asked: ShippedPeriod[]) {
   onTestFinished(fresh.cleanup);
   onTestFinished(() => spy.mockRestore());
   onTestFinished(() => server.stop(true));
-  return await setupPageDOM(`http://127.0.0.1:${server.port}/shipped`);
+  const lib = await setupPageDOM(`http://127.0.0.1:${server.port}/shipped`);
+  return { ...lib, api: createConsoleAPI(() => signedIn.session) };
 }
 
 test('Shipped opens on today; a click on Yesterday and the w key each read and show their period', async () => {
@@ -32,9 +38,11 @@ test('Shipped opens on today; a click on Yesterday and the w key each read and s
     page = lib.within(document.body),
     view = await import('./shipped-view.tsx');
   lib.render(
+    <ConsoleAPIContext value={lib.api}>
     <QueryClientProvider client={new QueryClient()}>
       <view.ShippedView />
-    </QueryClientProvider>,
+    </QueryClientProvider>
+    </ConsoleAPIContext>,
   );
   await page.findByText(/^The kettle report for today:/u);
   lib.fireEvent.click(page.getByRole('button', { name: /Yesterday/u }));
@@ -56,9 +64,11 @@ test('an open page reads its report again on its own, so a new day shows without
   environmentManager.setIsServer(() => false);
   onTestFinished(() => environmentManager.setIsServer(() => true));
   lib.render(
+    <ConsoleAPIContext value={lib.api}>
     <QueryClientProvider client={new QueryClient()}>
       <view.ShippedView refreshMs={150} />
-    </QueryClientProvider>,
+    </QueryClientProvider>
+    </ConsoleAPIContext>,
   );
   await lib.waitFor(() => expect(asked.length).toBeGreaterThanOrEqual(3));
   expect(new Set(asked)).toStrictEqual(new Set(['today']));
@@ -69,9 +79,11 @@ test('? lists the Shipped keys and the keys every tab shares, and Esc closes the
     page = lib.within(document.body),
     view = await import('./shipped-view.tsx');
   lib.render(
+    <ConsoleAPIContext value={lib.api}>
     <QueryClientProvider client={new QueryClient()}>
       <view.ShippedView />
-    </QueryClientProvider>,
+    </QueryClientProvider>
+    </ConsoleAPIContext>,
   );
   await page.findByText(/^The kettle report for today:/u);
   lib.act(() => {

@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { match } from 'ts-pattern';
 import type { ShippedPeriod } from '../shipped/types.ts';
-import { consoleAPI } from './console-api.ts';
+import { useConsoleAPI } from './console-api-context.ts';
 import { ConsoleTabs } from './console-tabs.tsx';
 import { KeyHelp } from './key-help.tsx';
 import { pickShippedKey } from './pick-shipped-key.ts';
@@ -21,6 +21,7 @@ export function ShippedView(props: ShippedViewProps) {
   const refreshMs = props.refreshMs ?? 5 * 60_000,
     [period, setPeriod] = useState<ShippedPeriod>('today'),
     [help, setHelp] = useState(false),
+    consoleAPI = useConsoleAPI(),
     report = useQuery(consoleAPI.shipped.report.queryOptions({ input: { period }, staleTime: refreshMs, refetchInterval: refreshMs }));
 
   useEffect(() => {

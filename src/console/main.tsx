@@ -1,22 +1,28 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { RouterProvider } from '@tanstack/react-router';
-import { StrictMode } from 'react';
+import { QueryClient } from '@tanstack/react-query';
 import { createRoot } from 'react-dom/client';
+import { createConsoleAPI } from './console-api.ts';
 import { createConsoleAppRouter } from './create-console-app-router.tsx';
+import { readTabSession } from './read-tab-session.ts';
+import { SESSION_STORAGE_KEY } from './session-storage-key.ts';
 import { restoreTheme } from './restore-theme.ts';
+import { startConsolePage } from './start-console-page.tsx';
 
-const queryClient = new QueryClient({ defaultOptions: { queries: { refetchOnWindowFocus: true, retry: 1 } } }),
-  root = document.querySelector('#root'),
-  router = createConsoleAppRouter();
+const root = document.querySelector('#root');
 
 restoreTheme(document.documentElement, () => globalThis.localStorage);
 
 if (root !== null) {
-  createRoot(root).render(
-    <StrictMode>
-      <QueryClientProvider client={queryClient}>
-        <RouterProvider router={router} />
-      </QueryClientProvider>
-    </StrictMode>,
-  );
+  await startConsolePage({
+    render: (view) => createRoot(root).render(view),
+    router: createConsoleAppRouter(),
+    api: createConsoleAPI(() => readTabSession(() => globalThis.sessionStorage.getItem(SESSION_STORAGE_KEY))),
+    queryClient: new QueryClient({ defaultOptions: { queries: { refetchOnWindowFocus: true, retry: 1 } } }),
+    login: {
+      hash: globalThis.location.hash,
+      origin: globalThis.location.origin,
+      storage: () => globalThis.sessionStorage,
+      clearHash: () => globalThis.history.replaceState(null, '', globalThis.location.pathname),
+      post: (url, body) => fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body }),
+    },
+  });
 }

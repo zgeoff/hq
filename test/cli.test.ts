@@ -877,3 +877,10 @@ test.each([
 
   expect([answered.code, db().query("SELECT json_extract(data, '$.ownerSession') AS mark FROM events WHERE subject_id = 'KET-34' AND action = 'answered'").all()]).toStrictEqual([0, [{ mark }]]);
 });
+
+test('hq console login with no console running says how to start one, and prints no link', async () => {
+  const refused = await hq('console', 'login');
+
+  expect(refused.code).toBe(1);
+  expect(refused.json.error).toStrictEqual({ code: 'not_running', message: expect.stringContaining('no hq console answers at /nonexistent/hq-test-no-console.sock: start it with hq console in your own terminal') });
+});

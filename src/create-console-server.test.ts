@@ -16,6 +16,9 @@ import type { ShippedPeriod } from './shipped/types.ts';
 import { roleName } from './roles/role-name.ts';
 import { getUnblock } from './unblock/get-unblock.ts';
 import { FAKE_FULL_SHA, buildFakeRunner } from '../test/noslop-fake.ts';
+import { createSignedInAuth } from '../test/create-signed-in-auth.ts';
+import { SESSION_HEADER } from './console-auth/session-header.ts';
+import { z } from 'zod';
 import { createUnblockItems } from '../test/create-unblock-items.ts';
 
 const KETTLE_CALL = {
@@ -28,11 +31,13 @@ const KETTLE_CALL = {
     stuView: 'Minting now keeps the morning boil on time.',
     details: [{ heading: 'Evidence', text: 'The last boil took 9 min.' }],
   },
-  PAGE = '<!doctype html><div id="root"></div>';
+  PAGE = '<!doctype html><div id="root"></div>',
+  SWAPPED = z.object({ session: z.string() });
 
 function setupTest(told = true, loadShipped: ConsoleServerInput['loadShipped'] = () => Promise.reject(new Error('no report in this test')), run: ConsoleServerInput['run'] = () => Promise.resolve({ code: 1, stdout: '', stderr: 'no gh in this test' })) {
   const fresh = freshDb(),
-    server = createConsoleServer({ db: fresh.db, port: 0, actor: 'console', run, assets: new Map([['/', () => new Response(PAGE)]]), notify: () => Promise.resolve(told), loadShipped }),
+    signedIn = createSignedInAuth(),
+    server = createConsoleServer({ db: fresh.db, auth: signedIn.auth, port: 0, actor: 'console', run, assets: new Map([['/', () => new Response(PAGE)]]), notify: () => Promise.resolve(told), loadShipped }),
     spy = spyOn(console, 'log').mockImplementation(() => {}),
     url = `http://127.0.0.1:${server.port}`;
   at(NOON_SYDNEY);
@@ -44,7 +49,9 @@ function setupTest(told = true, loadShipped: ConsoleServerInput['loadShipped'] =
   return {
     db: fresh.db,
     base: url,
-    client: createORPCClient(new RPCLink({ url: `${url}/rpc` })) as RouterClient<ConsoleRouter>,
+    auth: signedIn.auth,
+    session: signedIn.session,
+    client: createORPCClient<RouterClient<ConsoleRouter>>(new RPCLink({ url: `${url}/rpc`, headers: { [SESSION_HEADER]: signedIn.session } })),
     addCall: async (id: string, item: unknown = KETTLE_CALL) => {
       const file = join(fresh.dir, `${id}.json`);
       writeFileSync(file, JSON.stringify(item));
@@ -212,4 +219,50 @@ test('it tells the owner session about a review answer when the PR record cannot
   app.db.exec('DROP TABLE pr_status');
 
   await expect(app.client.unblock.review({ id: 'review-4', review: 'lgtm', note: '' })).resolves.toStrictEqual({ id: 'review-4', state: 'done', told: true });
+});
+
+test.each([
+  ['no session', {}],
+  ['a wrong session', { [SESSION_HEADER]: 'invented-kettle-session' }],
+])('a local POST with the console Host and no Origin but %s records no answer', async (_label, headers: Record<string, string>) => {
+  const app = setupTest();
+  await app.addCall('kettle-mint');
+
+  const sent = await fetch(`${app.base}/rpc/items/answer`, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify({ json: { id: 'kettle-mint', option: 'Yes, mint them', note: '' } }) });
+
+  expect(sent.status).toBe(401);
+  expect(getAsk(app.db, 'kettle-mint')?.state).toBe('queued');
+});
+
+test('a login token swaps once for a session that opens the API, and the swap says no-store', async () => {
+  const app = setupTest();
+  const token = app.auth.mintLogin();
+  const swap = (body: string) => fetch(`${app.base}/auth/exchange`, { method: 'POST', headers: { 'content-type': 'application/json' }, body });
+
+  const first = await swap(JSON.stringify({ token }));
+  const firstBody: unknown = await first.json();
+  const session = SWAPPED.parse(firstBody).session;
+  const again = await swap(JSON.stringify({ token }));
+  const asGet = await fetch(`${app.base}/auth/exchange`);
+  const listed = await fetch(`${app.base}/rpc/items/list`, { method: 'POST', headers: { 'content-type': 'application/json', [SESSION_HEADER]: session }, body: '{}' });
+
+  expect(first.headers.get('cache-control')).toBe('no-store');
+  expect(again.status).toBe(403);
+  expect(asGet.status).toBe(405);
+  expect(listed.status).toBe(200);
+});
+
+test('no login token or console session reaches an hq.db row', async () => {
+  const app = setupTest();
+  const token = app.auth.mintLogin();
+  await app.addCall('kettle-mint');
+  const exchanged = await fetch(`${app.base}/auth/exchange`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token }) });
+  const exchangedBody: unknown = await exchanged.json();
+  const swapped = SWAPPED.parse(exchangedBody);
+  await app.client.items.answer({ id: 'kettle-mint', option: 'Yes, mint them', note: '' });
+
+  const tables = z.array(z.object({ name: z.string() })).parse(app.db.query("SELECT name FROM sqlite_master WHERE type = 'table'").all());
+  const dump = tables.map((table) => JSON.stringify(app.db.query(`SELECT * FROM "${table.name}"`).all())).join('\n');
+
+  expect([token, swapped.session, app.session].filter((secret) => dump.includes(secret))).toStrictEqual([]);
 });

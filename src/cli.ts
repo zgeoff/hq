@@ -44,6 +44,7 @@ import { runNoslopCommand } from './noslop/run-noslop-command.ts';
 import { readOwnerSession } from './pr-status/read-owner-session.ts';
 import { identitySocketPath } from './atc/identity-socket-path.ts';
 import { OWNER_PROBE_OPENER } from './pr-status/owner-probe-opener.ts';
+import { runConsoleLogin } from './console-auth/run-console-login.ts';
 import { runCallAnswer } from './asks/run-call-answer.ts';
 import { readRoleSession } from './pr-status/read-role-session.ts';
 import type { OwnerProbeDeps } from './pr-status/read-owner-session.ts';
@@ -2091,7 +2092,12 @@ const GROUPS: Record<string, (context: Ctx) => Promise<Out>> = {
       name = findFleetName(c.db, id);
     return Promise.resolve({ data: { session: id, name }, text: name ?? `${id} is no declared fleet session` });
   },
-  console: (c) => runConsole(c.db, intFlag(c.flags.port, 'port')),
+  console: async (command) => {
+    if (command.verb === 'login') {
+      return await runConsoleLogin();
+    }
+    return await runConsole(command.db, intFlag(command.flags.port, 'port'), { isTTY: process.stdout.isTTY === true, openClient: readOwnerProbeDeps().openClient });
+  },
   restart: (c) => restartCommand(c.db, c.flags),
   wake: (c) => wakeCommand(c.db, c.verb, c.rest, c.flags),
   review: (c) => runReviewCommand(c),
