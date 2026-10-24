@@ -162,3 +162,29 @@ test('it sends nothing while no slot is free and impd holds none back', async ()
 
   expect(ctx.sent()).toStrictEqual([]);
 });
+
+test('it drops the unsent alert once an issue stops being skipped', async () => {
+  const ctx = setupTest();
+  await ctx.seedReady(ctx.ready);
+  ctx.skip('GEO-9801', 'pr:impz#654');
+  ctx.skip('GEO-9802', 'GEO-9899');
+  tick(ctx.db, ctx.sample, 'hq-lanes');
+  removeLaneSkip(ctx.db, 'GEO-9802', 'z-delivery');
+
+  tick(ctx.db, ctx.sample, 'hq-lanes');
+
+  expect(ctx.sent()).toStrictEqual([]);
+});
+
+test('it drops the unsent alert once a lanes hold starts', async () => {
+  const ctx = setupTest();
+  await ctx.seedReady(ctx.ready);
+  ctx.skip('GEO-9801', 'pr:impz#654');
+  ctx.skip('GEO-9802', 'GEO-9899');
+  tick(ctx.db, ctx.sample, 'hq-lanes');
+  holdLanes(ctx.db, 60, 'host switch', 'z-delivery');
+
+  tick(ctx.db, ctx.sample, 'hq-lanes');
+
+  expect(ctx.sent()).toStrictEqual([]);
+});
