@@ -33,8 +33,6 @@ export interface SlotPlan {
   // room or no Design issue waits. hq cannot see whether a Design session holds the slot now.
   design: string | null;
 
-  // The active skips whose issue is eligible and has no run: the work the lanes would take but for
-  // the skip. Empty while the Ready read is unknown.
   skipped: LaneSkip[];
 }
 
