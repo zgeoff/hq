@@ -4,8 +4,12 @@ import { iso } from './clock/iso.ts';
 import { now } from './clock/now.ts';
 import { getMeta } from './db/get-meta.ts';
 import { setMeta } from './db/set-meta.ts';
+import { buildFocusKey } from './focus/build-focus-key.ts';
+import { readFocus } from './focus/read-focus.ts';
 import rulesTable from '../lanes.json';
 import { readLinearReady } from './lanes/read-linear-ready.ts';
+import { readPromotableFocusCount } from './lanes/read-promotable-focus-count.ts';
+import { writePromotableFocus } from './lanes/write-promotable-focus.ts';
 import { validateLaneRules } from './lanes/validate-lane-rules.ts';
 import type { Runner } from './runner/types.ts';
 import type { LinearCall } from './linear/types.ts';
@@ -22,6 +26,7 @@ interface LinearReadyTickDeps {
   readLanes: () => Promise<LaneConfig[] | null>;
   actor: string;
   deadlineMs: number;
+  now?: () => number;
 }
 
 export async function runLinearReadyTick(db: Database, deps: LinearReadyTickDeps): Promise<boolean> {
@@ -37,6 +42,8 @@ export async function runLinearReadyTick(db: Database, deps: LinearReadyTickDeps
     abandoned.signal.throwIfAborted();
     return answer;
   };
+  const readClock = deps.now ?? (() => performance.now());
+  const startedAt = readClock();
   try {
     const lanes = await deps.readLanes();
     const rules = validateLaneRules(rulesTable, lanes?.map((lane) => lane.name) ?? null);
@@ -47,5 +54,12 @@ export async function runLinearReadyTick(db: Database, deps: LinearReadyTickDeps
     throw error;
   }
   setMeta(db, 'lanes_ready_linear_error', null);
+  const leftMs = Math.max(0, deps.deadlineMs - (readClock() - startedAt));
+  const focus = readFocus(db);
+  const backlog = await withDeadline(readPromotableFocusCount(cancellableCall, rulesTable.team, focus), leftMs, 'Backlog promotable count', abandoned).then(
+    (count) => ({ count, error: null }),
+    (error: unknown) => ({ count: null, error: (error instanceof Error ? error.message : String(error)).slice(0, 300) }),
+  );
+  writePromotableFocus(db, { ...backlog, focus: buildFocusKey(focus), at });
   return true;
 }

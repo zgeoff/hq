@@ -54,10 +54,17 @@ export interface ShippedCacheRow {
   expires_at: string | null;
 }
 
+interface SlotMinutesRow {
+  day: string;
+  cause: 'delivery' | 'triage' | 'supply';
+  minutes: number;
+}
+
 export interface HqTables {
   capacity_samples: CapacitySampleRow;
   pr_status: PRStatusRow;
   shipped_cache: ShippedCacheRow;
+  slot_minutes: SlotMinutesRow;
 }
 
 // hq owns the Database, so close() does nothing. bun:sqlite statements take their parameters

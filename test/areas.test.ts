@@ -148,8 +148,9 @@ test('the watcher nudges with the picks after 10 min, and again only on a change
 
   // A launch took GEO-21, so the picks changed; the newer nudge replaced the unsent one.
   expect(tick(db, sample(16_384), 'hq-lanes').nudged).toBe(true);
-  expect(msgs()).toHaveLength(1);
-  expect(msgs()[0]?.text).toContain('Take, in this order: GEO-22.');
+  const nudges = msgs().filter((message) => message.text.includes('Take, in this order'));
+  expect(nudges).toHaveLength(1);
+  expect(nudges[0]?.text).toContain('Take, in this order: GEO-22.');
 });
 
 test('a Design issue alone starts no nudge, though the plan names it for the design slot', () => {

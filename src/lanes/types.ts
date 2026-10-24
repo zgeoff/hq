@@ -40,6 +40,20 @@ export interface LaneSkip {
   at: string;
 }
 
+export type SlotCauseName = 'delivery' | 'triage' | 'supply';
+
+export type SlotCauseUnknownReason = 'ready_never_read' | 'ready_stale' | 'backlog_unknown' | 'backlog_focus_changed' | 'backlog_stale';
+
+export interface SlotCause {
+  cause: SlotCauseName | 'unknown' | null;
+  slots: number;
+  since: string | null;
+  readyAgeMinutes: number | null;
+  reason: SlotCauseUnknownReason | null;
+  waitingMinutes: number | null;
+  backlogError: string | null;
+}
+
 export interface TickResult {
   at: string;
   freeMib: number | null;
@@ -50,6 +64,7 @@ export interface TickResult {
   nudged: boolean;
   why: string;
   error: string | null;
+  slotCause: SlotCause;
 }
 
 // A hold pauses the nudges while z-delivery keeps slots free on purpose (a host switch,
@@ -110,6 +125,7 @@ export interface ReadyIssue {
 export interface PromotableIssue {
   identifier: string;
   title: string;
+  facts: ReadyIssue;
 }
 
 // A Backlog issue as the promotion check sees it: the state type of each issue that blocks it, and

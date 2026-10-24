@@ -1,10 +1,12 @@
 // hq lanes: watch delivery capacity and nudge z-delivery when agent slots sit
 // free while Ready work waits. hq names the issues the focus picks; z-delivery launches them.
 import type { Database } from 'bun:sqlite';
+import { z } from 'zod';
 import { iso } from '../clock/iso.ts';
 import { now } from '../clock/now.ts';
 import { getMeta } from '../db/get-meta.ts';
 import { setMeta } from '../db/set-meta.ts';
+import { sydney } from '../morning/sydney.ts';
 import { logEvent } from '../log-event.ts';
 import { enqueue } from '../outbox/enqueue.ts';
 import { orchestratorName } from '../wake/orchestrator-name.ts';
@@ -16,10 +18,14 @@ import { getLanesHold } from './get-lanes-hold.ts';
 import { LANES } from './lanes.ts';
 import { loadImpRoom } from './load-imp-room.ts';
 import { nudgeText } from './nudge-text.ts';
+import { readSlotMinutes } from './read-slot-minutes.ts';
 import { readSlotPlan } from './read-slot-plan.ts';
 import { removeLaneNudges } from './remove-lane-nudges.ts';
+import { sendSlotCauseAlert } from './send-slot-cause-alert.ts';
 import { slotsFrom } from './slots-from.ts';
-import type { Sample, TickResult } from './types.ts';
+import { trackSlotCause } from './track-slot-cause.ts';
+import type { Sample, SlotCause, SlotCauseName, TickResult } from './types.ts';
+import { writeSlotMinutes } from './write-slot-minutes.ts';
 
 // One look: record the sample, follow up old nudges, nudge if the gap is long
 // enough and the state changed or the repeat time passed.
@@ -36,11 +42,16 @@ export function tick(db: Database, sample: Sample, actor: string): TickResult {
       // oxlint-disable-next-line one-var -- the tick's one-const-per-line style is GEO-1318's lint debt
       const slots = slotPlan ? countWanted(slotPlan) : loadImpRoom(db, { budgetSlots: impSlots, impMib: sample.impMib }).slots;
       const eligible = slotPlan?.eligible ?? eligibleNow(db).count;
+      const previous = z.object({ at: z.string() }).nullable().parse(db.query('SELECT at FROM lanes_samples ORDER BY seq DESC LIMIT 1').get());
       db.query('INSERT INTO lanes_samples (at, free_mib, slots, eligible, error) VALUES (?, ?, ?, ?, ?)').run(at, freeMib, slots, eligible, sample.error);
       if (!sample.error) {
         const freeSlots = slotPlan ? slotPlan.pool.free : slots;
         checkReadyStale(db, t, freeSlots, actor);
       }
+
+      const slotCause = trackSlotCause(db, slotPlan, t);
+      writeEmptySlotMinutes(db, { slotCause, previousAt: previous?.at ?? null, at: t });
+      sendSlotCauseAlerts(db, { free: slotCause.slots, at: t, actor });
 
       // Follow up: did free slots drop after a nudge?
       const due = db.query('SELECT id, at FROM lanes_nudges WHERE slots_after IS NULL').all() as { id: number; at: string }[];
@@ -60,6 +71,7 @@ export function tick(db: Database, sample: Sample, actor: string): TickResult {
         nudged,
         why,
         error: sample.error,
+        slotCause,
       });
 
       // Only the newest unsent nudge may go out, and none once nothing is left to fill:
@@ -116,4 +128,39 @@ function countWanted(slotPlan: NonNullable<ReturnType<typeof readSlotPlan>>): nu
     return slotPlan.pool.free;
   }
   return slotPlan.plan.picks.length;
+}
+
+interface EmptySlotLook {
+  slotCause: SlotCause;
+  previousAt: string | null;
+  at: Date;
+}
+
+// Adds the slot-minutes since the previous look (at most 30) to the look's cause on its Sydney day;
+// no cause, or an unknown one, adds nothing.
+function writeEmptySlotMinutes(db: Database, look: EmptySlotLook): void {
+  const cause = look.slotCause.cause;
+  if (cause === null || cause === 'unknown' || look.previousAt === null) {
+    return;
+  }
+  const minutes = look.slotCause.slots * Math.min(Math.max(0, look.at.getTime() - Date.parse(look.previousAt)) / 60_000, 30);
+  writeSlotMinutes(db, sydney(look.at).date, cause, minutes);
+}
+
+const SLOT_CAUSES: SlotCauseName[] = ['delivery', 'triage', 'supply'];
+
+interface SlotAlertLook {
+  free: number;
+  at: Date;
+  actor: string;
+}
+
+// Every cause at 60 for the day alerts its owner, so an alert held back by quiet hours goes at the
+// first look after them, whatever the cause is then.
+function sendSlotCauseAlerts(db: Database, look: SlotAlertLook): void {
+  const day = sydney(look.at).date;
+  const totals = readSlotMinutes(db, day);
+  for (const cause of SLOT_CAUSES) {
+    sendSlotCauseAlert(db, { day, cause, minutes: totals[cause], free: look.free, at: look.at, actor: look.actor });
+  }
 }

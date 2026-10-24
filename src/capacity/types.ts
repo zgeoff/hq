@@ -28,7 +28,7 @@ export interface CapacityInput {
 
 // What a rule reads from pacing.json: the imp lanes' plan (null when no lanes were read) and Claude's
 // launch limit (null when none was read).
-export interface RuleContext {
+interface RuleContext {
   plan: LanePlan | null;
   claudeLaunchPct: number | null;
 }

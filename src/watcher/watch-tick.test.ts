@@ -12,8 +12,11 @@ import { freshDb } from '../../test/helpers.ts';
 import { readReadyByLane } from '../areas/read-ready-by-lane.ts';
 import { setCapacitySetting } from '../capacity/set-capacity-setting.ts';
 import { overrideEnv } from '../config/override-env.ts';
+import { metaJson } from '../db/meta-json.ts';
 import { setMeta } from '../db/set-meta.ts';
 import { loadActionsSpend } from '../goals/load-actions-spend.ts';
+import { PROMOTABLE_FOCUS } from '../lanes/promotable-focus.ts';
+import { PROMOTABLE_FOCUS_KEY } from '../lanes/promotable-focus-key.ts';
 import { addRun } from '../runs/add-run.ts';
 import { addUnblock } from '../unblock/add-unblock.ts';
 import { getUnblock } from '../unblock/get-unblock.ts';
@@ -184,7 +187,8 @@ test('a due Ready pass writes the counts before the lanes tick, and the logged e
   const counts = readReadyByLane(ctx.db, 30);
   expect([counts['atc']?.n, counts['imp']?.n]).toStrictEqual([2, 1]);
   expect(logs.find((line) => line.includes('slots='))).toContain('eligible=3');
-  expect(received.mock.calls).toMatchObject([[{ variables: { team: 'GEO', state: 'Ready' } }]]);
+  expect(received.mock.calls).toMatchObject([[{ variables: { team: 'GEO', state: 'Ready' } }], [{ variables: { team: 'GEO', state: 'Backlog' } }]]);
+  expect(metaJson(ctx.db, PROMOTABLE_FOCUS_KEY, PROMOTABLE_FOCUS, null)).toStrictEqual({ at: '2026-10-15T20:00:00Z', count: 0, focus: '[]', error: null });
 });
 
 // At 20:00 UTC with every other sync fresh. The open item waits on an issue, whose Linear read

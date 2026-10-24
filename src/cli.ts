@@ -282,7 +282,10 @@ import { syncKinds } from './kinds/sync-kinds.ts';
 import { syncLinear } from './kinds/sync-linear.ts';
 import { weeksBack } from './kinds/weeks-back.ts';
 import { makeAuditedLinearCaller } from './linear/make-audited-linear-caller.ts';
+import { formatSlotCause } from './lanes/format-slot-cause.ts';
 import { readPromotableIssues } from './lanes/read-promotable-issues.ts';
+import { readSlotCause } from './lanes/read-slot-cause.ts';
+import { readSlotMinutes } from './lanes/read-slot-minutes.ts';
 import rulesTable from '../lanes.json';
 import { runFocusCommand } from './focus/run-focus-command.ts';
 import { runLinearCommand } from './linear/run-linear-command.ts';
@@ -1814,7 +1817,8 @@ async function lanesCommand(context: Pick<Ctx, 'db' | 'verb' | 'rest' | 'flags' 
       return runLaneSkipCommand({ db, actor: await by(), at: now(), args });
     }
     case 'promotable': {
-      const issues = await readPromotableIssues(makeAuditedLinearCaller(db, context.run), rulesTable.team);
+      const backlog = await readPromotableIssues(makeAuditedLinearCaller(db, context.run), rulesTable.team);
+      const issues = backlog.map((issue) => ({ identifier: issue.identifier, title: issue.title }));
       return { data: { issues }, text: issues.length > 0 ? issues.map((issue) => `${issue.identifier}  ${issue.title}`).join('\n') : 'No Backlog issue is ready to promote.' };
     }
     case 'ready': {
@@ -1843,6 +1847,9 @@ async function lanesCommand(context: Pick<Ctx, 'db' | 'verb' | 'rest' | 'flags' 
       const hold = getLanesHold(db);
       const sample = await readCapacity(realRunner);
       const slotPlan = readSlotPlan(db, sample);
+      const lookAt = now();
+      const slotCause = readSlotCause(db, slotPlan, lookAt);
+      const slotMinutesToday = readSlotMinutes(db, sydney(lookAt).date);
       const readyNote = readySummary(db, LANES.readyFreshMinutes());
       const parked = parkedRuns(db);
       const laneLines = slotPlan
@@ -1850,6 +1857,7 @@ async function lanesCommand(context: Pick<Ctx, 'db' | 'verb' | 'rest' | 'flags' 
             `imp room now: ${slotsFrom(sample.cap!, sample.impMib).slots} slot(s) (${sample.cap!.imp?.freeMib ?? '?'} MiB free; 0 when no unattended imp provider has quota)`,
             formatLineRoom(loadImpRoom(db, { budgetSlots: slotsFrom(sample.cap ?? {}, sample.impMib).slots, impMib: sample.impMib })),
             ...formatSlotPlan(slotPlan),
+            ...formatSlotCause(slotCause, slotMinutesToday),
             ...(readyNote ? [`  ${readyNote.line}`, ...skippedLines(readyNote).map((l) => `  ${l}`)] : []),
             ...(parked.length > 0 ? [`  parked, not counted (blocked with no session awake, or working with every session gone): ${parked.map((parkedRun) => parkedRun.issue).join(', ')}`] : []),
           ]
@@ -1865,7 +1873,8 @@ async function lanesCommand(context: Pick<Ctx, 'db' | 'verb' | 'rest' | 'flags' 
         nudges.length ? 'nudges (newest first):' : 'nudges: none yet',
         ...nudges.map((n) => `  ${n.at} ${n.slots} free for ${n.free_minutes} min, eligible ${n.eligible ?? '?'} → after: ${n.slots_after ?? 'pending'}`),
       ];
-      return { data: { watcher: unit.stdout.trim() || 'inactive', enabled, hold, plan: slotPlan, last, ready, idle24h: gap24, nudges }, text: lines.join('\n') };
+      const slotCauses = { now: { cause: slotCause.cause, slots: slotCause.slots, since: slotCause.since, readyAgeMinutes: slotCause.readyAgeMinutes, reason: slotCause.reason, backlogError: slotCause.backlogError }, today: slotMinutesToday };
+      return { data: { watcher: unit.stdout.trim() || 'inactive', enabled, hold, plan: slotPlan, slotCauses, last, ready, idle24h: gap24, nudges }, text: lines.join('\n') };
     }
     default:
       throw new HqError('bad_args', `unknown command: hq lanes ${verb}`);
