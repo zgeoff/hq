@@ -1,4 +1,5 @@
 import { expect, test } from 'bun:test';
+import { setImmediate } from 'node:timers/promises';
 import { makeBacklogCall } from './make-backlog-call.ts';
 
 test('it answers the Backlog query with the issues given, each with a Type label', async () => {
@@ -17,8 +18,16 @@ test('it answers the Ready query with an empty page', async () => {
   expect(answer).toMatchObject({ issues: { nodes: [] } });
 });
 
-test('it fails the Backlog query when given null', async () => {
-  const call = makeBacklogCall(null);
+test('it fails the Backlog query as an outage', async () => {
+  const call = makeBacklogCall('outage');
 
   await expect(call('query', { state: 'Backlog' })).rejects.toThrow('invented outage');
+});
+
+test('it leaves the Backlog query unanswered when silent', async () => {
+  const call = makeBacklogCall('silent');
+
+  const first = await Promise.race([call('query', { state: 'Backlog' }).then(() => 'answered'), setImmediate().then(() => 'unanswered')]);
+
+  expect(first).toBe('unanswered');
 });

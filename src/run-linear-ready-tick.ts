@@ -18,8 +18,8 @@ const READ_AT = 'lanes_ready_linear_at';
 // At most every 10 min, read Ready per lane from Linear by lanes.json's rules. The throttle is set
 // before the read, so a failed or late pass waits its 10 min too; the failure is kept in meta for
 // the stale alert, and a page that answers after the deadline writes nothing. After a good Ready read
-// it counts the Backlog issues triage may promote that the focus asks for, with unknown on a failed
-// read. False when not due.
+// it counts the Backlog issues triage may promote that the focus asks for, in the time the Ready
+// read left of the one deadline, with unknown on a failed or late read. False when not due.
 interface LinearReadyTickDeps {
   call: LinearCall;
   run: Runner;
@@ -41,6 +41,7 @@ export async function runLinearReadyTick(db: Database, deps: LinearReadyTickDeps
     abandoned.signal.throwIfAborted();
     return answer;
   };
+  const startedAt = performance.now();
   try {
     const lanes = await deps.readLanes();
     const rules = validateLaneRules(rulesTable, lanes?.map((lane) => lane.name) ?? null);
@@ -51,7 +52,8 @@ export async function runLinearReadyTick(db: Database, deps: LinearReadyTickDeps
     throw error;
   }
   setMeta(db, 'lanes_ready_linear_error', null);
-  const count = await withDeadline(readPromotableFocusCount(db, cancellableCall, rulesTable.team), deps.deadlineMs, 'Backlog promotable count', abandoned).catch(() => null);
+  const leftMs = Math.max(0, deps.deadlineMs - (performance.now() - startedAt));
+  const count = await withDeadline(readPromotableFocusCount(db, cancellableCall, rulesTable.team), leftMs, 'Backlog promotable count', abandoned).catch(() => null);
   writePromotableFocus(db, count);
   return true;
 }

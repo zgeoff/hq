@@ -135,9 +135,20 @@ test('it counts only the promotable Backlog issues a focus term matches', async 
 
 test('it records an unknown count, never none, when the Backlog read fails', async () => {
   const ctx = setupTest();
-  const call = makeBacklogCall(null);
+  const call = makeBacklogCall('outage');
 
   const ran = await runLinearReadyTick(ctx.db, { call, run: buildStubGitHubFactsRunner({}), readLanes: () => Promise.resolve(ctx.lanes), actor: 'hq-lanes', deadlineMs: 2000 });
+
+  expect(ran).toBe(true);
+  expect(getMeta(ctx.db, 'lanes_promotable_focus')).toBe('{"at":"2026-10-15T20:00:00Z","count":null}');
+  expect(getMeta(ctx.db, 'lanes_ready_linear_error')).toBeNull();
+});
+
+test('it records an unknown count when the Backlog read misses the deadline the Ready read started', async () => {
+  const ctx = setupTest();
+  const call = makeBacklogCall('silent');
+
+  const ran = await runLinearReadyTick(ctx.db, { call, run: buildStubGitHubFactsRunner({}), readLanes: () => Promise.resolve(ctx.lanes), actor: 'hq-lanes', deadlineMs: 200 });
 
   expect(ran).toBe(true);
   expect(getMeta(ctx.db, 'lanes_promotable_focus')).toBe('{"at":"2026-10-15T20:00:00Z","count":null}');
