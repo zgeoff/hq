@@ -227,3 +227,21 @@ test('it drops the unsent alert once a lanes hold starts', async () => {
 
   expect(ctx.sent()).toStrictEqual([]);
 });
+
+test('it tells again after a hold that dropped the unsent alert ends', async () => {
+  const ctx = setupTest();
+  await ctx.seedReady([
+    { identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 },
+    { identifier: 'GEO-9802', project: 'kettle roadmap', type: 'Bug', labels: ['vers'], priority: 3 },
+  ]);
+  ctx.skip('GEO-9801', 'pr:impz#654');
+  ctx.skip('GEO-9802', 'GEO-9899');
+  tick(ctx.db, ctx.sample, 'hq-lanes');
+  holdLanes(ctx.db, 20, 'host switch', 'z-delivery');
+  tick(ctx.db, ctx.sample, 'hq-lanes');
+  at('2026-10-15T20:25:00Z');
+
+  tick(ctx.db, ctx.sample, 'hq-lanes');
+
+  expect(ctx.told()).toStrictEqual({ total: 2 });
+});

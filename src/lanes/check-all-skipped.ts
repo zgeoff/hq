@@ -28,7 +28,10 @@ export function checkAllSkipped(db: Database, slotPlan: SlotPlan, actor: string)
     return false;
   }
   if (getLanesHold(db)) {
-    removeAllSkippedAlerts(db);
+    // An alert the hold drops unsent is owed again once the hold ends.
+    if (removeAllSkippedAlerts(db) > 0) {
+      setMeta(db, TOLD, null);
+    }
     return false;
   }
   const key = `${held ? 'held' : 'free'} ${slotPlan.skipped.map((skip) => `${skip.issue} ${skip.until}`).toSorted().join(', ')}`;
@@ -44,10 +47,9 @@ export function checkAllSkipped(db: Database, slotPlan: SlotPlan, actor: string)
 }
 
 // A queued alert sits at the orchestrator's forwarded destination, not under its own name.
-function removeAllSkippedAlerts(db: Database): void {
+function removeAllSkippedAlerts(db: Database): number {
   const orchestrator = orchestratorName();
-  dropTopic(db, orchestrator, TOPIC);
-  dropTopic(db, forwardOf(db, orchestrator), TOPIC);
+  return dropTopic(db, orchestrator, TOPIC) + dropTopic(db, forwardOf(db, orchestrator), TOPIC);
 }
 
 interface ImpRun {
