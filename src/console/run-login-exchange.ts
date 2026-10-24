@@ -1,3 +1,5 @@
+import { EXCHANGE_PATH, ExchangeReplySchema } from '../console-auth/login-exchange.ts';
+import type { ExchangeRequest } from '../console-auth/login-exchange.ts';
 import { SESSION_STORAGE_KEY } from './session-storage-key.ts';
 
 interface LoginPage {
@@ -16,11 +18,13 @@ export async function runLoginExchange(page: LoginPage): Promise<'signed-in' | '
     return page.storage.getItem(SESSION_STORAGE_KEY) === null ? 'none' : 'signed-in';
   }
   page.clearHash();
-  const answer = await page.post(`${page.origin}/auth/exchange`, JSON.stringify({ token }));
+  const request: ExchangeRequest = { token };
+  const answer = await page.post(`${page.origin}${EXCHANGE_PATH}`, JSON.stringify(request));
   const body: unknown = answer.ok ? await answer.json() : null;
-  if (typeof body !== 'object' || body === null || !('session' in body) || typeof body.session !== 'string') {
+  const reply = ExchangeReplySchema.safeParse(body);
+  if (!reply.success) {
     return 'refused';
   }
-  page.storage.setItem(SESSION_STORAGE_KEY, body.session);
+  page.storage.setItem(SESSION_STORAGE_KEY, reply.data.session);
   return 'signed-in';
 }

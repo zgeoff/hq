@@ -4,7 +4,10 @@ import { RPCHandler } from '@orpc/server/fetch';
 import { buildConsoleRouter } from './build-console-router.ts';
 import { checkConsoleRequest } from './check-console-request.ts';
 import type { ConsoleAuth } from './console-auth/create-console-auth.ts';
+import { EXCHANGE_PATH, ExchangeRequestSchema } from './console-auth/login-exchange.ts';
+import type { ExchangeReplySchema } from './console-auth/login-exchange.ts';
 import { SESSION_HEADER } from './console-auth/session-header.ts';
+import type { z } from 'zod';
 import type { ConsoleAssets } from './load-console-assets.ts';
 import type { Runner } from './runner/types.ts';
 import type { ShippedPeriod, ShippedReport } from './shipped/types.ts';
@@ -36,7 +39,7 @@ export function createConsoleServer(input: ConsoleServerInput): Server<undefined
         return applyFrameGuard(new Response('hq console: this request does not come from the console page\n', { status: 403 }));
       }
       const path = new URL(req.url).pathname;
-      if (path === '/auth/exchange') {
+      if (path === EXCHANGE_PATH) {
         const exchanged = await readExchange(input.auth, req);
         return applyFrameGuard(exchanged);
       }
@@ -60,12 +63,13 @@ async function readExchange(auth: ConsoleAuth, req: Request): Promise<Response> 
     return new Response('hq console: exchange a login token with POST\n', { status: 405 });
   }
   const body: unknown = await req.json().catch(() => null);
-  const token = typeof body === 'object' && body !== null && 'token' in body && typeof body.token === 'string' ? body.token : '';
-  const session = auth.exchange(token);
+  const asked = ExchangeRequestSchema.safeParse(body);
+  const session = asked.success ? auth.exchange(asked.data.token) : null;
   if (session === null) {
     return new Response('hq console: that login link is used or unknown; hq console login prints a new one on the terminal where hq console runs\n', { status: 403 });
   }
-  return Response.json({ session }, { headers: { 'cache-control': 'no-store' } });
+  const reply: z.infer<typeof ExchangeReplySchema> = { session };
+  return Response.json(reply, { headers: { 'cache-control': 'no-store' } });
 }
 
 // The Shipped tab's path loads the same page, whose router shows the tab.
