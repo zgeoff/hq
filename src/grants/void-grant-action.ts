@@ -8,13 +8,11 @@ import { addNews } from '../news/add-news.ts';
 import type { OwnerProbeDeps } from '../pr-status/read-owner-session.ts';
 import { roleName } from '../roles/role-name.ts';
 import { GrantActionRowSchema } from './grant-action-row-schema.ts';
-import type { GrantVoidArgs } from './parse-grant-void-args.ts';
 import { pickGrantVoider } from './pick-grant-voider.ts';
 import { readGrantVoidCaller } from './read-grant-void-caller.ts';
-import type { GrantVoidCaller } from './read-grant-void-caller.ts';
-import type { GrantActionRow } from './types.ts';
+import type { GrantActionRow, GrantVoidArgs, GrantVoidCaller } from './types.ts';
 
-export interface GrantVoidDeps {
+interface GrantVoidDeps {
   db: Database;
   args: GrantVoidArgs;
   probe: OwnerProbeDeps;

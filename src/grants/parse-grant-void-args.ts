@@ -1,12 +1,8 @@
 import { z } from 'zod';
 import { HqError } from '../errors.ts';
+import type { GrantVoidArgs } from './types.ts';
 
-export interface GrantVoidArgs {
-  id: number;
-  reason: string;
-}
-
-const GRANT_VOID_USAGE = 'hq grant void ACT-ID --reason TEXT';
+const GRANT_VOID_USAGE = 'hq grant void ACT-ID --reason T';
 
 const ARGS = z.object({
   id: z

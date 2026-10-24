@@ -62,3 +62,10 @@ export interface GrantWindow {
   from: string;
   to: string;
 }
+
+export interface GrantVoidArgs {
+  id: number;
+  reason: string;
+}
+
+export type GrantVoidCaller = { kind: 'session'; id: string } | { kind: 'unknown'; cause: string };

@@ -1,6 +1,5 @@
 import type { OwnerProbeDeps } from '../pr-status/read-owner-session.ts';
-
-export type GrantVoidCaller = { kind: 'session'; id: string } | { kind: 'unknown'; cause: string };
+import type { GrantVoidCaller } from './types.ts';
 
 // Only the caller's session as atc's daemon found it from the kernel counts: never --by, HQ_AS or
 // ATC_SESSION_ID, which are the caller's own words.

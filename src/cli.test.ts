@@ -355,6 +355,12 @@ test('hq capacity --json carries the Claude burn hint from the usage samples', a
 test('hq grant void refuses bad arguments through the spawned CLI, and writes nothing', async () => {
   const fresh = freshDb();
   onTestFinished(fresh.cleanup);
+  at(NOON_SYDNEY);
+  createGrantMark(fresh.db, { text: 'kettle PRs merge on green CI', ref: null, at: null, name: 'kettle-merges', actor: 'kettle-bot' });
+  recordGrantAction(fresh.db, { grant: 'kettle-merges', target: 'kettle#9', note: null, actor: 'teapot-bot' });
+  const actionsBefore = fresh.db.query('SELECT * FROM grant_actions ORDER BY id').all();
+  const eventsBefore = fresh.db.query('SELECT * FROM events ORDER BY seq').all();
+  const newsBefore = fresh.db.query('SELECT * FROM news ORDER BY id').all();
   const hq = async (...args: string[]): Promise<{ code: number; stdout: string }> => {
     const child = Bun.spawn(['bun', join(import.meta.dir, 'cli.ts'), 'grant', 'void', ...args, '--json'], {
       stdout: 'pipe',
@@ -365,14 +371,17 @@ test('hq grant void refuses bad arguments through the spawned CLI, and writes no
     return { code, stdout };
   };
 
-  const noReason = await hq('4');
+  const noReason = await hq('1');
   const badID = await hq('kettle', '--reason', 'wrong PR');
-  const blankReason = await hq('4', '--reason', '  ');
+  const blankReason = await hq('1', '--reason', '  ');
 
   expect([noReason.code, badID.code, blankReason.code]).toStrictEqual([1, 1, 1]);
   expect(JSON.parse(noReason.stdout)).toMatchObject({ ok: false, error: { code: 'bad_args', message: expect.stringContaining('--reason is required') } });
   expect(JSON.parse(badID.stdout)).toMatchObject({ ok: false, error: { code: 'bad_args', message: expect.stringContaining('the act id must be a positive whole number') } });
   expect(JSON.parse(blankReason.stdout)).toMatchObject({ ok: false, error: { code: 'bad_args', message: expect.stringContaining('--reason must say why') } });
+  expect(fresh.db.query('SELECT * FROM grant_actions ORDER BY id').all()).toStrictEqual(actionsBefore);
+  expect(fresh.db.query('SELECT * FROM events ORDER BY seq').all()).toStrictEqual(eventsBefore);
+  expect(fresh.db.query('SELECT * FROM news ORDER BY id').all()).toStrictEqual(newsBefore);
 });
 
 test('hq grant void refuses a caller atc cannot name, whatever --by and HQ_AS claim, and the act stays', async () => {

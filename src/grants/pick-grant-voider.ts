@@ -1,5 +1,5 @@
 import { roleName } from '../roles/role-name.ts';
-import type { GrantVoidCaller } from './read-grant-void-caller.ts';
+import type { GrantVoidCaller } from './types.ts';
 
 // The name the caller may void under: the act's own actor when the caller is the session hq fleet
 // recorded for it, else the owner when the caller is the owner's session, else null.
