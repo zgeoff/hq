@@ -2,6 +2,7 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { appendFileSync, mkdtempSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { z } from 'zod';
 
 // Each build runs in a clone of this checkout, so a test can dirty or drop the tree without
 // touching the checkout itself.
@@ -55,17 +56,21 @@ test('it marks a build outside git as installed from an unknown, dirty commit, s
   expect(ran.stderr.toString()).toBe('hq: HQ_NOW is ignored in the installed hq\n');
 });
 
-test('it builds a binary that ignores HQ_NOW and HQ_QUIET, warns once each on stderr, and keeps stdout JSON', () => {
+test('it builds a binary that stamps a new item with the real time despite HQ_NOW, warns once each for HQ_NOW and HQ_QUIET, and keeps stdout JSON', () => {
   const ctx = setupTest();
   ctx.readBuiltVersion();
   const home = mkdtempSync(join(tmpdir(), 'hq-install-home-'));
   onTestFinished(() => rmSync(home, { recursive: true, force: true }));
+  const before = Math.floor(Date.now() / 1000) * 1000;
 
-  const ran = Bun.spawnSync([join(ctx.directory, 'hq'), 'units', 'scrub', '--json'], {
+  const ran = Bun.spawnSync([join(ctx.directory, 'hq'), 'unblock', 'add', '--id', 'descale', '--task', 'Descale the kettle', '--by', 'tester', '--json'], {
     env: { ...process.env, HOME: home, HQ_DB: join(home, 'hq.db'), HQ_NOW: '2031-03-04T05:06:07Z', HQ_QUIET: 'teapot' },
   });
+  const after = Date.now();
 
   expect(ran.exitCode).toBe(0);
   expect(ran.stderr.toString()).toBe('hq: HQ_NOW is ignored in the installed hq\nhq: HQ_QUIET is ignored in the installed hq\n');
-  expect(JSON.parse(ran.stdout.toString())).toStrictEqual({ ok: true, changed: [] });
+  const out = z.object({ ok: z.literal(true), item: z.object({ added_at: z.iso.datetime() }) }).parse(JSON.parse(ran.stdout.toString()));
+  expect(Date.parse(out.item.added_at)).toBeGreaterThanOrEqual(before);
+  expect(Date.parse(out.item.added_at)).toBeLessThanOrEqual(after);
 });
