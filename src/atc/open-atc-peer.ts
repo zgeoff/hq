@@ -13,9 +13,6 @@ import { withTimeout } from './with-timeout.ts';
 export interface AtcPeer {
   send: (method: string, params: Record<string, unknown>) => Promise<Record<string, unknown>>;
   stop: () => void;
-
-  // The caller's session as the daemon found it from the kernel: null outside any session, undefined
-  // when the daemon's hello carries no peerSession at all.
   peerSession: string | null | undefined;
 }
 
