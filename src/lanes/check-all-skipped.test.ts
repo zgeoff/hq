@@ -188,3 +188,18 @@ test('it drops the unsent alert once a lanes hold starts', async () => {
 
   expect(ctx.sent()).toStrictEqual([]);
 });
+
+test('it tells again when the impd line comes to hold the slots while the skips stay the same', async () => {
+  const ctx = setupTest();
+  await ctx.seedReady(ctx.ready);
+  ctx.skip('GEO-9801', 'pr:impz#654');
+  ctx.skip('GEO-9802', 'GEO-9899');
+  tick(ctx.db, ctx.sample, 'hq-lanes');
+  setCapacitySetting(ctx.db, 'nonnixMaxMib', '65536', 'z-delivery');
+  setCapacitySetting(ctx.db, 'nonnixMaxVcpus', '1000', 'z-delivery');
+  createCapacitySample(ctx.db, { at: '2026-10-15T19:58:00Z', nonnixAwakeMib: 65_536 });
+
+  tick(ctx.db, ctx.heldSample, 'hq-lanes');
+
+  expect(ctx.told()).toStrictEqual({ total: 2 });
+});
