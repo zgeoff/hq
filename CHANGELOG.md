@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.97.0 — 2026-10-24
+
+Owner and reviewer checks now trust only the caller that atc finds, and the console needs a one-use login link.
+
+### The console signs the owner in with a one-use link before any call.
+
+- `hq console` prints a link with a one-use token only on a terminal outside every atc session. The page swaps it for a session that each `/rpc` call carries.
+- Any other local process can no longer post an answer that hq counts as the owner's.
+
+### Owner and reviewer checks read the caller from atc's kernel-found session.
+
+- hq compares atc's `peerSession` with the session that `hq fleet` recorded, not `ATC_SESSION_ID`, and it opens atc only at the uid's own socket.
+- `hq pr answer` runs the owner check: `chat:` needs the owner's own session, and `console:` needs the owner's console review at the current head.
+
+### z-q's start prompt comes from hq-private's main.
+
+- `fleet.json` names it as `main:prompts/z-q.md`. A session with no skill may now take a `main:` prompt.
+
+### Fixes
+
+- `hq call later` and `hq unblock later` put a call off to today's 07:00 Sydney when it is still ahead.
+- Wrap-up skips a session removed from the run and keeps any session tree that holds a pinned session.
+- `hq lanes` keeps an issue with the `hq` label out of delivery slots in any project.
+- The sweep marks a run PR closed when GitHub shows it closed unmerged, and drops its alert.
+
 ## 0.96.0 — 2026-10-24
 
 The merge gate holds repo instruction files, and runs, the sweep and the ship pass leave working sessions alone.
