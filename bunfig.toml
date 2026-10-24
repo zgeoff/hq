@@ -1,3 +1,6 @@
 [test]
 pathIgnorePatterns = ["mods/**"]
 preload = ["./test/msw-preload.ts", "./test/env-preload.ts", "./test/restic-preload.ts"]
+# CI runs `bun test` itself, so the random order lives here: a test that leans on another's state
+# fails, and the printed `--seed` replays the order
+randomize = true
