@@ -4,6 +4,7 @@ import type { Database } from 'bun:sqlite';
 import { z } from 'zod';
 import { iso } from '../clock/iso.ts';
 import { now } from '../clock/now.ts';
+import { readWallClock } from '../clock/read-wall-clock.ts';
 import { getMeta } from '../db/get-meta.ts';
 import { setMeta } from '../db/set-meta.ts';
 import { sydney } from '../morning/sydney.ts';
@@ -35,7 +36,7 @@ export function tick(db: Database, sample: Sample, actor: string): TickResult {
     .transaction((): TickResult => {
       const t = now();
       const at = iso(t);
-      endExpiredCap(db, t, actor);
+      endExpiredCap(db, readWallClock(), actor);
       const slotPlan = readSlotPlan(db, sample, t);
       const { freeMib, slots: impSlots } = sample.cap ? slotsFrom(sample.cap, sample.impMib) : { freeMib: null, slots: 0 };
 

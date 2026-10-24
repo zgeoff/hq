@@ -6,6 +6,7 @@ import { buildStubGitHubFactsRunner } from '../../test/build-stub-github-facts-r
 import { createCapacitySample } from '../../test/create-capacity-sample.ts';
 import { at, freshDb } from '../../test/helpers.ts';
 import { makeStateCall } from '../../test/make-state-call.ts';
+import { iso } from '../clock/iso.ts';
 import { setMeta } from '../db/set-meta.ts';
 import { runFocusCommand } from '../focus/run-focus-command.ts';
 import { readLinearReady } from './read-linear-ready.ts';
@@ -395,10 +396,25 @@ test('it keeps a cap whose time has not passed', () => {
   const ctx = setupTest();
   at('2026-10-14T01:00:00Z');
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
-  setMeta(ctx.db, 'lanes_cap', JSON.stringify({ cap: 2, until: '2026-10-14T01:30:00Z', reason: 'quota', by: 'z-stu', at: '2026-10-14T00:00:00Z' }));
+  const until = iso(new Date(Date.now() + 3_600_000));
+  setMeta(ctx.db, 'lanes_cap', JSON.stringify({ cap: 2, until, reason: 'quota', by: 'z-stu', at: '2026-10-14T00:00:00Z' }));
 
   tick(ctx.db, sample, 'hq-lanes');
 
   expect(ctx.db.query("SELECT COUNT(*) AS total FROM events WHERE action = 'cap-ended'").get()).toStrictEqual({ total: 0 });
   expect(ctx.db.query("SELECT value FROM meta WHERE key = 'lanes_cap'").get()).not.toBeNull();
+});
+
+test('it keeps a cap the wall clock has not reached while HQ_NOW pins a later time', () => {
+  const ctx = setupTest();
+  at('2099-01-01T00:00:00Z');
+  const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
+  const stored = JSON.stringify({ cap: 7, until: '2098-01-01T00:00:00Z', reason: 'kettle descaling', by: 'z-stu', at: '2026-10-14T00:00:00Z' });
+  setMeta(ctx.db, 'lanes_cap', stored);
+
+  tick(ctx.db, sample, 'hq-lanes');
+
+  expect(ctx.db.query("SELECT value FROM meta WHERE key = 'lanes_cap'").get()).toStrictEqual({ value: stored });
+  expect(ctx.db.query("SELECT COUNT(*) AS total FROM events WHERE action = 'cap-ended'").get()).toStrictEqual({ total: 0 });
+  expect(ctx.db.query("SELECT COUNT(*) AS total FROM outbox WHERE text LIKE 'Lanes cap%'").get()).toStrictEqual({ total: 0 });
 });
