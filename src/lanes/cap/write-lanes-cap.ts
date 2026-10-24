@@ -26,7 +26,7 @@ export function writeLanesCap(db: Database, move: CapMove): number {
   }
   const value = row.to === 'set' ? JSON.stringify(move.cap) : null;
   setMeta(db, LANES_CAP_KEY, value);
-  const detail = move.cap === null ? { error: move.error, reason: move.reason } : { cap: move.cap.cap, until: move.cap.until, reason: move.cap.reason, by: move.cap.by };
+  const detail = move.cap === null ? { error: move.error, reason: move.reason } : { cap: move.cap.cap, until: move.cap.until, reason: move.reason, by: move.cap.by };
   const seq = logEvent(db, 'hq', 'lanes', move.action, move.actor, from, row.to, detail);
   addNews(db, { from: move.actor, topic: 'other', text: formatCapNews(move), issue: null, link: null, needsGeoff: false });
   return seq;

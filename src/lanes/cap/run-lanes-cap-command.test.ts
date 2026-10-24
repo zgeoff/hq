@@ -47,6 +47,16 @@ test('it lifts a cap from the owner, files an event and news, and shows no cap',
   expect(ctx.db.query('SELECT text FROM news ORDER BY id DESC LIMIT 1').get()).toStrictEqual({ text: 'z-stu lifted the lanes cap of 7 (the quota is back)' });
 });
 
+test('it records the reason given for the lift in the event, not the reason the cap was set for', async () => {
+  const ctx = setupTest();
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'z-delivery': 'kettle-2' }));
+  await runLanesCapCommand({ db: ctx.db, at: new Date('2026-10-15T00:00:00Z'), args: { kind: 'set', cap: 7, until: null, reason: 'kettle descaling' }, probe: ctx.owner });
+
+  await runLanesCapCommand({ db: ctx.db, at: new Date('2026-10-15T00:00:00Z'), args: { kind: 'off', reason: 'kettle descaled' }, probe: ctx.owner });
+
+  expect(ctx.db.query("SELECT data FROM events WHERE subject_id = 'lanes' AND action = 'cap-off'").get()).toStrictEqual({ data: JSON.stringify({ cap: 7, until: null, reason: 'kettle descaled', by: 'z-stu' }) });
+});
+
 test('it says there is no cap to lift, and files nothing', async () => {
   const ctx = setupTest();
   setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'z-delivery': 'kettle-2' }));
