@@ -2,6 +2,7 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { freshDb } from '../../../test/helpers.ts';
 import { getMeta } from '../../db/get-meta.ts';
 import { setMeta } from '../../db/set-meta.ts';
+import type { OwnerProbeClient } from '../../pr-status/read-owner-session.ts';
 import { runLanesCapCommand } from './run-lanes-cap-command.ts';
 
 function setupTest() {
@@ -151,9 +152,11 @@ test('it judges the delivery lead against the cap stored when it writes, not bef
   setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'z-delivery': 'kettle-2' }));
   await runLanesCapCommand({ db: ctx.db, at: new Date('2026-10-15T00:00:00Z'), args: { kind: 'set', cap: 7, until: null, reason: null }, probe: ctx.owner });
   const lowered = JSON.stringify({ cap: 3, until: null, reason: 'owner lowered it meanwhile', by: 'z-stu', at: '2026-10-15T00:00:00Z' });
-  const slowDelivery = { openClient: () => (setMeta(ctx.db, 'lanes_cap', lowered), Promise.resolve({ peerSession: 'kettle-2', close: () => {} })) };
+  const atcAnswer = Promise.withResolvers<OwnerProbeClient>();
 
-  const refused = runLanesCapCommand({ db: ctx.db, at: new Date('2026-10-15T00:00:00Z'), args: { kind: 'set', cap: 5, until: null, reason: null }, probe: slowDelivery });
+  const refused = runLanesCapCommand({ db: ctx.db, at: new Date('2026-10-15T00:00:00Z'), args: { kind: 'set', cap: 5, until: null, reason: null }, probe: { openClient: () => atcAnswer.promise } });
+  setMeta(ctx.db, 'lanes_cap', lowered);
+  atcAnswer.resolve({ peerSession: 'kettle-2', close: () => {} });
 
   await expect(refused).rejects.toThrow('z-delivery may only lower the lanes cap (now 3)');
   expect(getMeta(ctx.db, 'lanes_cap')).toBe(lowered);
