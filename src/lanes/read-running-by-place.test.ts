@@ -2,6 +2,7 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { at, freshDb } from '../../test/helpers.ts';
 import { recordAwake } from '../areas/record-awake.ts';
 import { setMeta } from '../db/set-meta.ts';
+import { writeIssues } from '../linear/write-issues.ts';
 import { addRun } from '../runs/add-run.ts';
 import { setSession } from '../runs/set-session.ts';
 import { setState } from '../runs/set-state.ts';
@@ -107,4 +108,35 @@ test('it falls back to the runs filed local on a reading from before the sweep r
   setMeta(ctx.db, 'atc_awake', JSON.stringify({ at: '2026-10-15T20:00:00Z', ids: ['a0000009-aaaa-4aaa-8aaa-aaaaaaaaaaaa'], idle: {}, present: ['a0000009-aaaa-4aaa-8aaa-aaaaaaaaaaaa'] }));
 
   expect(readRunningByPlace(ctx.db)).toStrictEqual({ imp: 1, local: 0, issues: ['GEO-9908'], impIssues: ['GEO-9908'], localSource: null });
+});
+
+test('it leaves a Design run and its awake session here out of the slot counts, as the Design slot holds it', () => {
+  const ctx = setupTest();
+  writeIssues(ctx.db, [{ issue: 'GEO-9921', type: 'Design', title: 'Design: a quieter kettle whistle', state: 'open', closed_at: null }]);
+  addRun(ctx.db, { issue: 'GEO-9921', title: 'Design: a quieter kettle whistle', place: 'local', session: 'a0000021-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'The owner chats.', gate: null, geoffChat: true, lane: 'flexible', actor: 'z-delivery' });
+  addRun(ctx.db, { issue: 'GEO-9922', title: 'Descale the kettle', place: 'local', session: 'a0000022-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
+  recordAwake(ctx.db, [
+    { id: 'a0000021-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'whistle-design', alive: true, state: 'running', locator: { targetID: 'local' } },
+    { id: 'a0000022-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, state: 'running', locator: { targetID: 'local' } },
+  ]);
+
+  expect(readRunningByPlace(ctx.db)).toStrictEqual({ imp: 0, local: 1, issues: ['GEO-9922'], impIssues: [], localSource: null });
+});
+
+test('it counts an owner-chat Investigation run here against the local slots', () => {
+  const ctx = setupTest();
+  writeIssues(ctx.db, [{ issue: 'GEO-9923', type: 'Investigation', title: 'Spike: how loud a kettle may whistle', state: 'open', closed_at: null }]);
+  addRun(ctx.db, { issue: 'GEO-9923', title: 'Spike: how loud a kettle may whistle', place: 'local', session: 'a0000023-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'The owner chats.', gate: null, geoffChat: true, lane: 'flexible', actor: 'z-delivery' });
+  recordAwake(ctx.db, [{ id: 'a0000023-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'whistle-spike', alive: true, state: 'running', locator: { targetID: 'local' } }]);
+
+  expect(readRunningByPlace(ctx.db)).toStrictEqual({ imp: 0, local: 1, issues: ['GEO-9923'], impIssues: [], localSource: null });
+});
+
+test('it leaves a Design run filed imp out of the imp count', () => {
+  const ctx = setupTest();
+  writeIssues(ctx.db, [{ issue: 'GEO-9924', type: 'Design', title: 'Design: a teapot lid that stays on', state: 'open', closed_at: null }]);
+  addRun(ctx.db, { issue: 'GEO-9924', title: 'Design: a teapot lid that stays on', place: 'imp', session: 'a0000024-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'The owner chats.', gate: null, geoffChat: true, lane: 'cloud', actor: 'z-delivery' });
+  recordAwake(ctx.db, [{ id: 'a0000024-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'lid-design', alive: true, state: 'running', locator: { targetID: 'imp-teapot' } }]);
+
+  expect(readRunningByPlace(ctx.db)).toStrictEqual({ imp: 0, local: 0, issues: [], impIssues: [], localSource: null });
 });
