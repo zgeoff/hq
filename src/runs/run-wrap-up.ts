@@ -86,6 +86,11 @@ interface TreePass {
 
 async function wrapUpTree(pass: TreePass, root: FleetSession): Promise<void> {
   const children = collectChildren(pass.sessions, root.id);
+  const tree = [...children, root];
+  if (tree.some((session) => session.pinned === true)) {
+    pass.wrapUp.kept.push(...tree.map((session) => ({ id: session.id, reason: 'pinned in atc' })));
+    return;
+  }
   let work: ImpWork | null = null;
   if (pass.onImp) {
     work = await readImpWorkSafely(pass.deps, root);

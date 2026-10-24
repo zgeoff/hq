@@ -233,3 +233,37 @@ test('done leaves a session removed from the run alone, even when the remove and
   expect([wrapUp.forgotten, fleet.calls.some((call) => call.includes('0000a002'))]).toStrictEqual([['0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa'], false]);
 });
 
+
+test('done never unpins, forgets or destroys a pinned session on the run, even when it ended in the second the run closed', async () => {
+  const ctx = setupTest();
+  at(NOON_SYDNEY);
+  addRun(ctx.db, { issue: 'GEO-9801', title: 'Invented kettle descaler', place: 'imp', session: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
+  setSession(ctx.db, 'GEO-9801', '0000a002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'z-delivery', 'add');
+  setState(ctx.db, 'GEO-9801', 'done', {}, 'z-delivery');
+  const fleet = buildStubFleetClient({
+    sessions: [
+      { id: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, cwd: '/workspace/kettle' },
+      { id: '0000a002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-owner-chat', alive: true, pinned: true, cwd: '/workspace/kettle' },
+    ],
+  });
+
+  const wrapUp = await runWrapUp(ctx.db, { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.resolve({ state: 'pushed' }) }, 'GEO-9801', 'z-delivery');
+
+  expect([wrapUp.kept, fleet.calls.some((call) => call.includes('0000a002'))]).toStrictEqual([[{ id: '0000a002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', reason: 'pinned in atc' }], false]);
+});
+
+test('done keeps a whole session tree when one of its sub-sessions is pinned', async () => {
+  const ctx = setupTest();
+  addRun(ctx.db, { issue: 'GEO-9801', title: 'Invented kettle descaler', place: 'local', session: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
+  setState(ctx.db, 'GEO-9801', 'done', {}, 'z-delivery');
+  const fleet = buildStubFleetClient({
+    sessions: [
+      { id: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true },
+      { id: '0000a002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-helper', alive: true, pinned: true, parent: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+    ],
+  });
+
+  const wrapUp = await runWrapUp(ctx.db, { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')) }, 'GEO-9801', 'z-delivery');
+
+  expect([wrapUp.kept.map((kept) => kept.id), fleet.calls]).toStrictEqual([['0000a002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa'], []]);
+});
