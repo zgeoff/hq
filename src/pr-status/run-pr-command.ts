@@ -14,6 +14,7 @@ import { readHeadExemption } from './read-head-exemption.ts';
 import { readHeadMechanical } from './read-head-mechanical.ts';
 import { findOwnerOverride } from './find-owner-override.ts';
 import type { OwnerOverride } from './read-owner-overrides.ts';
+import { readAnswerSourceRefusal } from './read-answer-source-refusal.ts';
 import { findSourceRefusal } from './find-source-refusal.ts';
 import type { SourceRequest } from './find-source-refusal.ts';
 import { findPRStatus } from './find-pr-status.ts';
@@ -141,7 +142,12 @@ interface AnswerArgs {
 async function runAnswer(input: PRCommandInput, ref: PRRef, rawAnswer: string | undefined): Promise<Out> {
   const args = parseAnswerArgs(input.flags, rawAnswer),
     head = await readPRHead(input.run, ref.slug, ref.pr),
-    context = await readAnswerContext(input, ref, head);
+    context = await readAnswerContext(input, ref, head),
+    probe: OwnerProbe = args.source.startsWith('chat:') ? await input.readOwnerSession() : { verdict: 'other' },
+    refusal = readAnswerSourceRefusal(input.db, { ref, answer: args.answer, source: args.source, head: context.head }, probe);
+  if (refusal !== null) {
+    throw new HqError('bad_args', `--source refused: ${refusal}; ask ${roleName('owner')} to record it`);
+  }
   recordPRAnswer(input.db, { repo: ref.repo, pr: ref.pr, ...args, head: context.head, actor: context.actor });
   return await readOut(input, ref, context.head);
 }

@@ -36,7 +36,7 @@ function setupTest() {
     asOwner: async (fake: ReturnType<typeof buildFakeRunner>, verb: string, rest: string[], flags: Flags) => await runPRCommand({ run: fake.run, db: fresh.db, verb, rest, flags, actor: () => Promise.resolve('z-kettle'), readOwnerSession: () => Promise.resolve({ verdict: 'owner' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) }),
     asOther: async (fake: ReturnType<typeof buildFakeRunner>, verb: string, rest: string[], flags: Flags) => await runPRCommand({ run: fake.run, db: fresh.db, verb, rest, flags, actor: () => Promise.resolve('z-kettle'), readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) }),
     status: async (fake: ReturnType<typeof buildFakeRunner>) => await runPRCommand({ run: fake.run, db: fresh.db, verb: 'status', rest: ['widgets', '7'], flags: {}, actor: () => Promise.resolve('z-kettle'), readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) }),
-    answer: async (fake: ReturnType<typeof buildFakeRunner>, answer: string, flags: Flags) => await runPRCommand({ run: fake.run, db: fresh.db, verb: 'answer', rest: ['widgets', '7', answer], flags, actor: () => Promise.resolve('z-kettle'), readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) }),
+    answer: async (fake: ReturnType<typeof buildFakeRunner>, answer: string, flags: Flags) => await runPRCommand({ run: fake.run, db: fresh.db, verb: 'answer', rest: ['widgets', '7', answer], flags, actor: () => Promise.resolve('z-kettle'), readOwnerSession: () => Promise.resolve({ verdict: 'owner' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) }),
   };
 }
 
@@ -74,7 +74,7 @@ test('it shows a changes answer at the head it was given, with its source and no
 
 test.each(['lgtm', 'changes'])('it marks an older %s answer stale at the head it was given once the PR has a new head', async (answer) => {
   const ctx = setupTest();
-  await ctx.answer(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), answer, { source: 'call:kettle-3', note: 'Shorter spout.' });
+  await ctx.answer(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), answer, { source: 'chat:kettle-3', note: 'Shorter spout.' });
 
   await expect(runPRCommand({ run: ctx.headAt('b9c8d7e6f5a40312213f4e5d6c7b8a9087654321').run, db: ctx.db, verb: 'status', rest: ['widgets', '7'], flags: {}, actor: ctx.actor, readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) })).resolves.toStrictEqual({
     data: {
@@ -89,7 +89,7 @@ test.each(['lgtm', 'changes'])('it marks an older %s answer stale at the head it
         gateStale: false,
         answer,
         answerHead: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678',
-        answerSource: 'call:kettle-3',
+        answerSource: 'chat:kettle-3',
         answerNote: 'Shorter spout.',
         answerAt: '2026-10-14T01:00:00Z',
         answerStale: true,
@@ -100,7 +100,7 @@ test.each(['lgtm', 'changes'])('it marks an older %s answer stale at the head it
         updatedAt: '2026-10-14T01:00:00Z',
       },
     },
-    text: ['widgets#7  head b9c8d7e', 'gate: not recorded', `answer: ${answer} stale at a1b2c3d via call:kettle-3 (2026-10-14T01:00:00Z): Shorter spout.`, 'next: nobody'].join('\n'),
+    text: ['widgets#7  head b9c8d7e', 'gate: not recorded', `answer: ${answer} stale at a1b2c3d via chat:kettle-3 (2026-10-14T01:00:00Z): Shorter spout.`, 'next: nobody'].join('\n'),
   });
 });
 
@@ -161,7 +161,7 @@ test('it refuses an answer when gh cannot give the head, and stores nothing', as
 
 test('it prints the stored record and says stale is unknown when gh cannot give the head', async () => {
   const ctx = setupTest();
-  await ctx.answer(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'reject', { source: 'console:review-7', note: 'Wrong spout.' });
+  await ctx.answer(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'reject', { source: 'chat:review-7', note: 'Wrong spout.' });
 
   await expect(runPRCommand({ run: ctx.ghDown().run, db: ctx.db, verb: 'status', rest: ['widgets', '7'], flags: {}, actor: ctx.actor, readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) })).resolves.toStrictEqual({
     data: {
@@ -176,7 +176,7 @@ test('it prints the stored record and says stale is unknown when gh cannot give 
         gateStale: false,
         answer: 'reject',
         answerHead: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678',
-        answerSource: 'console:review-7',
+        answerSource: 'chat:review-7',
         answerNote: 'Wrong spout.',
         answerAt: '2026-10-14T01:00:00Z',
         answerStale: false,
@@ -190,7 +190,7 @@ test('it prints the stored record and says stale is unknown when gh cannot give 
     text: [
       'widgets#7  last seen head a1b2c3d',
       'gate: not recorded',
-      'answer: reject at a1b2c3d via console:review-7 (2026-10-14T01:00:00Z): Wrong spout.',
+      'answer: reject at a1b2c3d via chat:review-7 (2026-10-14T01:00:00Z): Wrong spout.',
       'next: nobody',
       'The PR head could not be read, so stale is unknown.',
     ].join('\n'),
@@ -814,4 +814,84 @@ test.each([
   const ctx = setupTest();
 
   await expect(ctx.asOwner(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'accept-risk', rest, flags)).rejects.toMatchObject({ code: 'bad_args' });
+});
+
+test('it refuses an owner answer with a chat: source from a session that is not the owner, and stores nothing', async () => {
+  const ctx = setupTest();
+
+  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'answer', ['widgets', '7', 'lgtm'], { source: 'chat:kettle-12' })).rejects.toMatchObject({
+    code: 'bad_args',
+    message: '--source refused: a chat: source is accepted only from the session of the owner (z-stu), as atc finds the caller; this caller is not it; ask z-stu to record it',
+  });
+  expect(ctx.db.query('SELECT COUNT(*) AS total FROM pr_status').get()).toStrictEqual({ total: 0 });
+});
+
+test('it takes a console: source that names the owner console review of this PR, stored by the console at the head now', async () => {
+  const ctx = setupTest();
+  logEvent(ctx.db, 'unblock', 'review-9', 'console-review', 'console', null, null, { review: 'lgtm', note: null, facts: { title: 'Review widgets#7', issues: [], session: 'z-kettle', ref: 'https://github.com/zgeoff/widgets/pull/7' } });
+  logEvent(ctx.db, 'hq', 'pr:widgets#7', 'pr-answer', 'console', null, null, { answer: 'lgtm', head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', source: 'console:review-9', note: null });
+
+  const answered = await ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'answer', ['widgets', '7', 'lgtm'], { source: 'console:review-9' });
+
+  expect(answered.text).toContain('answer: lgtm at a1b2c3d via console:review-9');
+});
+
+test.each([
+  { case: 'names no console review', review: null, stored: null, why: 'console:review-9 names no owner review in the console' },
+  { case: 'reviews another PR', review: { review: 'lgtm', note: null, facts: { title: 'Review teapots#7', issues: [], session: 'z-kettle', ref: 'https://github.com/zgeoff/teapots/pull/7' } }, stored: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', why: 'console:review-9 is not the owner\'s console review of zgeoff/widgets#7' },
+  { case: 'has no PR on an older review', review: { review: 'lgtm', note: null }, stored: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', why: 'console:review-9 is not the owner\'s console review of zgeoff/widgets#7' },
+  { case: 'gave another answer', review: { review: 'changes', note: 'Descale it.', facts: { title: 'Review widgets#7', issues: [], session: 'z-kettle', ref: 'https://github.com/zgeoff/widgets/pull/7' } }, stored: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', why: "the owner's console review console:review-9 is changes, not lgtm" },
+  { case: 'was stored at an older head', review: { review: 'lgtm', note: null, facts: { title: 'Review widgets#7', issues: [], session: 'z-kettle', ref: 'https://github.com/zgeoff/widgets/pull/7' } }, stored: 'b9c8d7e6f5a40312213f4e5d6c7b8a9087654321', why: 'the console stored console:review-9 at no head or another head, not a1b2c3d, the head gh gives now' },
+])('it refuses a console: source that $case, and stores nothing', async (row) => {
+  const ctx = setupTest();
+  if (row.review !== null) {
+    logEvent(ctx.db, 'unblock', 'review-9', 'console-review', 'console', null, null, row.review);
+  }
+  if (row.stored !== null) {
+    logEvent(ctx.db, 'hq', 'pr:widgets#7', 'pr-answer', 'console', null, null, { answer: 'lgtm', head: row.stored, source: 'console:review-9', note: null });
+  }
+
+  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'answer', ['widgets', '7', 'lgtm'], { source: 'console:review-9' })).rejects.toMatchObject({ code: 'bad_args', message: `--source refused: ${row.why}; ask z-stu to record it` });
+  expect(ctx.db.query('SELECT COUNT(*) AS total FROM pr_status').get()).toStrictEqual({ total: 0 });
+});
+
+test('it refuses a console: source written by a session other than the console, at the head now', async () => {
+  const ctx = setupTest();
+  logEvent(ctx.db, 'unblock', 'review-9', 'console-review', 'console', null, null, { review: 'lgtm', note: null, facts: { title: 'Review widgets#7', issues: [], session: 'z-kettle', ref: 'https://github.com/zgeoff/widgets/pull/7' } });
+  logEvent(ctx.db, 'hq', 'pr:widgets#7', 'pr-answer', 'z-kettle', null, null, { answer: 'lgtm', head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', source: 'console:review-9', note: null });
+
+  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'answer', ['widgets', '7', 'lgtm'], { source: 'console:review-9' })).rejects.toMatchObject({ code: 'bad_args' });
+});
+
+test('it takes a call: source the owner answered with a plain Yes on a call that names the PR', async () => {
+  const ctx = setupTest();
+  ctx.fileCall('KET-50', 'lgtm widgets#7?');
+  ctx.answerInConsole('KET-50');
+
+  const answered = await ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'answer', ['widgets', '7', 'lgtm'], { source: 'call:KET-50' });
+
+  expect(answered.text).toContain('answer: lgtm at a1b2c3d via call:KET-50');
+});
+
+test.each([
+  { case: 'that names another PR', title: 'lgtm teapots#7?', answer: true, why: 'call:KET-51 does not name zgeoff/widgets#7 in the title the owner answered' },
+  { case: 'that the owner has not answered', title: 'lgtm widgets#7?', answer: false, why: "call:KET-51 has no owner answer for its current round, in the console or by `hq call answer` from the owner's session (z-stu), as atc finds the caller" },
+])('it refuses a call: source $case, and stores nothing', async (row) => {
+  const ctx = setupTest();
+  ctx.fileCall('KET-51', row.title);
+  if (row.answer) {
+    ctx.answerInConsole('KET-51');
+  }
+
+  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'answer', ['widgets', '7', 'lgtm'], { source: 'call:KET-51' })).rejects.toMatchObject({ code: 'bad_args', message: `--source refused: ${row.why}; ask z-stu to record it` });
+  expect(ctx.db.query('SELECT COUNT(*) AS total FROM pr_status').get()).toStrictEqual({ total: 0 });
+});
+
+test('it refuses a call: source for lgtm when the owner answered the call with something other than a plain Yes, and stores nothing', async () => {
+  const ctx = setupTest();
+  ctx.fileCall('KET-52', 'lgtm widgets#7?');
+  recordConsoleAnswer(ctx.db, { id: 'KET-52', option: '', note: 'No', actor: 'owner' });
+
+  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'answer', ['widgets', '7', 'lgtm'], { source: 'call:KET-52' })).rejects.toMatchObject({ code: 'bad_args', message: '--source refused: the owner\'s answer to call:KET-52 is not a plain yes: "No"; ask z-stu to record it' });
+  expect(ctx.db.query('SELECT COUNT(*) AS total FROM pr_status').get()).toStrictEqual({ total: 0 });
 });
