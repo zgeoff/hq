@@ -1,5 +1,6 @@
 import { expect, jest, mock, onTestFinished, test } from 'bun:test';
 import { setImmediate } from 'node:timers/promises';
+import { buildStubClock } from '../test/build-stub-clock.ts';
 import { buildStubGitHubFactsRunner } from '../test/build-stub-github-facts-runner.ts';
 import { buildReadyPage, makePagedCall } from '../test/build-ready-page.ts';
 import { makeBacklogCall } from '../test/make-backlog-call.ts';
@@ -159,9 +160,11 @@ test('it records an unknown count when the Backlog read misses the deadline the 
 
 test('it records an unknown count when the Backlog read answers within a fresh deadline but after the one the Ready read started', async () => {
   const ctx = setupTest();
+  at('2026-10-15T20:00:00Z');
   const lanes = ['nixie-slice', 'nixie-maintenance', 'atc', 'imp', 'cloud', 'memory', 'flexible', 'cleanup', 'process'].map((name) => buildMockLaneConfig(name));
   jest.useFakeTimers();
   onTestFinished(() => jest.useRealTimers());
+  const clock = buildStubClock(0);
   const ready = Promise.withResolvers<unknown>();
   const backlog = Promise.withResolvers<unknown>();
   const backlogAsked = Promise.withResolvers<void>();
@@ -172,12 +175,14 @@ test('it records an unknown count when the Backlog read answers within a fresh d
     backlogAsked.resolve();
     return backlog.promise;
   };
-  const ran = runLinearReadyTick(ctx.db, { call, run: buildStubGitHubFactsRunner({}), readLanes: () => Promise.resolve(lanes), actor: 'hq-lanes', deadlineMs: 100 });
+  const ran = runLinearReadyTick(ctx.db, { call, run: buildStubGitHubFactsRunner({}), readLanes: () => Promise.resolve(lanes), actor: 'hq-lanes', deadlineMs: 100, now: clock.now });
 
   // Ready takes 60 of the 100 ms, so the Backlog read has 40 left; a fresh 100 ms would outlast its answer at 70.
+  clock.sleep(60);
   jest.advanceTimersByTime(60);
   ready.resolve(buildReadyPage([], null));
   await backlogAsked.promise;
+  clock.sleep(70);
   jest.advanceTimersByTime(70);
   backlog.resolve({ issues: { nodes: [], pageInfo: { hasNextPage: false, endCursor: null } } });
   const read = await ran;

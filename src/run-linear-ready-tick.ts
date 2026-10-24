@@ -28,6 +28,7 @@ interface LinearReadyTickDeps {
   readLanes: () => Promise<LaneConfig[] | null>;
   actor: string;
   deadlineMs: number;
+  now?: () => number;
 }
 
 export async function runLinearReadyTick(db: Database, deps: LinearReadyTickDeps): Promise<boolean> {
@@ -43,7 +44,8 @@ export async function runLinearReadyTick(db: Database, deps: LinearReadyTickDeps
     abandoned.signal.throwIfAborted();
     return answer;
   };
-  const startedAt = performance.now();
+  const readClock = deps.now ?? (() => performance.now());
+  const startedAt = readClock();
   try {
     const lanes = await deps.readLanes();
     const rules = validateLaneRules(rulesTable, lanes?.map((lane) => lane.name) ?? null);
@@ -54,7 +56,7 @@ export async function runLinearReadyTick(db: Database, deps: LinearReadyTickDeps
     throw error;
   }
   setMeta(db, 'lanes_ready_linear_error', null);
-  const leftMs = Math.max(0, deps.deadlineMs - (performance.now() - startedAt));
+  const leftMs = Math.max(0, deps.deadlineMs - (readClock() - startedAt));
   const focus = readFocus(db);
   const count = await withDeadline(readPromotableFocusCount(cancellableCall, rulesTable.team, focus), leftMs, 'Backlog promotable count', abandoned).catch(() => null);
   writePromotableFocus(db, { count, focus: buildFocusKey(focus), at });
