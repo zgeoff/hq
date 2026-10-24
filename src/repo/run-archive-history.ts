@@ -1,6 +1,7 @@
 import type { Database } from 'bun:sqlite';
 import { randomBytes } from 'node:crypto';
-import { existsSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, renameSync, rmSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { iso } from '../clock/iso.ts';
 import { now } from '../clock/now.ts';
 import { HqError } from '../errors.ts';
@@ -10,10 +11,11 @@ import type { Runner } from '../runner/types.ts';
 import { buildExpectedSide } from './build-expected-side.ts';
 import { checkArchiveNames } from './check-archive-names.ts';
 import { readArchiveSide } from './read-archive-side.ts';
+import { readReviewMoves } from './read-review-moves.ts';
 import type { RepoNames } from './rekey-specs.ts';
 import { REKEY_SPECS } from './rekey-specs.ts';
 import { runRekey } from './run-rekey.ts';
-import type { ArchiveHistory, ArchiveSide, CreateBackup, OpenStore } from './types.ts';
+import type { ArchiveHistory, ArchiveSide, CreateBackup, OpenStore, ReviewMove } from './types.ts';
 
 export interface ArchiveInput {
   actor: string;
@@ -25,6 +27,9 @@ export interface ArchiveInput {
   dryRun: boolean;
   from: string;
   openStore: OpenStore;
+
+  // The folder that holds the review files; it may not exist.
+  reviewDir: string;
   run: Runner;
 
   // noslop's store file; it may not exist.
@@ -32,18 +37,20 @@ export interface ArchiveInput {
   to: string;
 }
 
-// Moves the history of one repo name to another in hq.db and in noslop's store: the rows that name
-// the repo, and nothing else. A refused run and a dry run change nothing and write no backup.
+// Moves the history of one repo name to another in hq.db, in noslop's store and in the review
+// folder: the rows that name the repo and its review files, and nothing else. A refused run and a
+// dry run change nothing and write no backup.
 export async function runArchiveHistory(input: ArchiveInput): Promise<ArchiveHistory> {
   checkArchiveNames(input.from, input.to);
   const before = readSides(input, { from: input.from, to: input.to });
-  requireHistory(before, input.from);
+  const reviewFiles = readReviewMoves(input.reviewDir, { from: input.from, to: input.to });
+  requireHistory(before, reviewFiles, input.from);
   if (input.dryRun) {
-    return { dryRun: true, from: input.from, to: input.to, before, after: before.map((side) => buildExpectedSide(side)), backups: [] };
+    return { dryRun: true, from: input.from, to: input.to, before, after: before.map((side) => buildExpectedSide(side)), backups: [], reviewFiles };
   }
-  requireNoCollisions(before);
+  requireNoCollisions(before, reviewFiles);
   await requireNoslopQuiet(input.run);
-  return applyArchive(input, before);
+  return applyArchive(input, before, reviewFiles);
 }
 
 function readSides(input: ArchiveInput, names: RepoNames): ArchiveSide[] {
@@ -60,17 +67,19 @@ function readStoreSide(input: ArchiveInput, names: RepoNames): ArchiveSide {
   }
 }
 
-function requireHistory(sides: ArchiveSide[], from: string): void {
+function requireHistory(sides: ArchiveSide[], reviewFiles: ReviewMove[], from: string): void {
   const rows = sides.flatMap((side) => side.counts).reduce((total, count) => total + count.from, 0);
-  if (rows === 0) {
-    throw new HqError('nothing_to_rekey', `no row in hq.db or in noslop's store names ${from}: nothing to re-key`);
+  if (rows === 0 && reviewFiles.length === 0) {
+    throw new HqError('nothing_to_rekey', `no row in hq.db or in noslop's store, and no review file, names ${from}: nothing to re-key`);
   }
 }
 
-function requireNoCollisions(sides: ArchiveSide[]): void {
-  const keys = sides.flatMap((side) => side.collisions.map((key) => `${side.store === 'hq' ? 'hq.db' : 'noslop store'}: ${key}`));
+function requireNoCollisions(sides: ArchiveSide[], reviewFiles: ReviewMove[]): void {
+  const rows = sides.flatMap((side) => side.collisions.map((key) => `${side.store === 'hq' ? 'hq.db' : 'noslop store'}: ${key}`));
+  const files = reviewFiles.filter((move) => move.collides).map((move) => `review file: ${move.to}`);
+  const keys = [...rows, ...files];
   if (keys.length > 0) {
-    throw new HqError('rekey_collision', `${keys.length} row(s) would repeat a key after the re-key; nothing changed:\n${keys.map((key) => `  ${key}`).join('\n')}`, { keys });
+    throw new HqError('rekey_collision', `${keys.length} row(s) or file(s) would repeat a key after the re-key; nothing changed:\n${keys.map((key) => `  ${key}`).join('\n')}`, { keys });
   }
 }
 
@@ -81,16 +90,17 @@ async function requireNoslopQuiet(run: Runner): Promise<void> {
   }
 }
 
+function applyArchive(input: ArchiveInput, before: ArchiveSide[], reviewFiles: ReviewMove[]): ArchiveHistory {
+  const backups = createArchiveBackups(input);
+  runRekeys(input, before, backups);
+  writeReviewMoves(input, reviewFiles, backups);
+  return writeArchiveRecord(input, before, { backups, reviewFiles });
+}
+
 function createArchiveBackups(input: ArchiveInput): string[] {
   const files = existsSync(input.store) ? [input.dbFile, input.store] : [input.dbFile],
     stamp = `${iso(now()).replaceAll(/[-:]/gu, '')}-${randomBytes(2).toString('hex')}`;
   return files.map((file) => input.createBackup(file, 'archive', stamp));
-}
-
-function applyArchive(input: ArchiveInput, before: ArchiveSide[]): ArchiveHistory {
-  const backups = createArchiveBackups(input);
-  runRekeys(input, before, backups);
-  return writeArchiveRecord(input, before, backups);
 }
 
 function runRekeys(input: ArchiveInput, before: ArchiveSide[], backups: string[]): void {
@@ -98,12 +108,6 @@ function runRekeys(input: ArchiveInput, before: ArchiveSide[], backups: string[]
   if (before.some((side) => side.store === 'noslop')) {
     runStoreRekey(input, { from: input.from, to: input.to }, backups);
   }
-}
-
-function writeArchiveRecord(input: ArchiveInput, before: ArchiveSide[], backups: string[]): ArchiveHistory {
-  const after = readSides(input, { from: input.from, to: input.to });
-  logEvent(input.db, 'hq', 'repo', 'archive-history', input.actor, input.from, input.to, { backups, rows: after.flatMap((side) => side.counts) });
-  return { dryRun: false, from: input.from, to: input.to, before, after, backups };
 }
 
 function runStoreRekey(input: ArchiveInput, names: RepoNames, backups: string[]): void {
@@ -116,4 +120,34 @@ function runStoreRekey(input: ArchiveInput, names: RepoNames, backups: string[])
   } finally {
     store?.close();
   }
+}
+
+function writeReviewMoves(input: ArchiveInput, reviewFiles: ReviewMove[], backups: string[]): void {
+  try {
+    for (const move of reviewFiles) {
+      mkdirSync(dirname(move.to), { recursive: true });
+      renameSync(move.from, move.to);
+    }
+    removeEmptyReviewFolder(join(input.reviewDir, 'zgeoff', input.from.toLowerCase()));
+  } catch (error) {
+    throw new HqError('rekey_partial', `hq.db and noslop's store were re-keyed but the review files were not all moved (${error instanceof Error ? error.message : String(error)}). The backups are ${backups.join(' and ')}.`, { backups });
+  }
+}
+
+function removeEmptyReviewFolder(folder: string): void {
+  const holdsFile = existsSync(folder) && readdirSync(folder, { recursive: true, withFileTypes: true }).some((entry) => !entry.isDirectory());
+  if (existsSync(folder) && !holdsFile) {
+    rmSync(folder, { recursive: true });
+  }
+}
+
+interface ArchiveWrites {
+  backups: string[];
+  reviewFiles: ReviewMove[];
+}
+
+function writeArchiveRecord(input: ArchiveInput, before: ArchiveSide[], writes: ArchiveWrites): ArchiveHistory {
+  const after = readSides(input, { from: input.from, to: input.to });
+  logEvent(input.db, 'hq', 'repo', 'archive-history', input.actor, input.from, input.to, { backups: writes.backups, rows: after.flatMap((side) => side.counts), reviewFiles: writes.reviewFiles.map((move) => ({ from: move.from, to: move.to })) });
+  return { dryRun: false, from: input.from, to: input.to, before, after, backups: writes.backups, reviewFiles: writes.reviewFiles };
 }

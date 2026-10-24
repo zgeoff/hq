@@ -10,6 +10,10 @@ process.env['HQ_LOCAL_CONFIG'] = join(tmpdir(), 'hq-tests-no-local-config', 'loc
 // test that needs a store makes one in a temp dir and points XDG_DATA_HOME at that dir.
 process.env['XDG_DATA_HOME'] = join(tmpdir(), 'hq-tests-no-data-home');
 
+// No test reads or moves the real review files: this directory never exists. A test that needs
+// review files makes them in a temp dir and points REVIEW_DIR at it.
+process.env['REVIEW_DIR'] = join(tmpdir(), 'hq-tests-no-review-dir');
+
 // A run from an agent's shell inherits its atc session id, and `hq call answer` then asks the real
 // atc whether that session is the owner's. A test that needs a session id sets its own.
 delete process.env['ATC_SESSION_ID'];

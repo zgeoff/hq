@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 import { expect, onTestFinished, test } from 'bun:test';
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { createHistoryRows, createLookalikeRows, createStoreRows, createStoreTables } from '../../test/create-history-databases.ts';
 import { freshDb } from '../../test/helpers.ts';
@@ -35,6 +35,7 @@ function setupTest() {
         dryRun: false,
         from,
         openStore: (file, options) => new Database(file, options),
+        reviewDir: `${base.dir}/reviews`,
         run: runQuiet,
         store,
         to,
@@ -347,6 +348,63 @@ test('it works on hq.db alone when noslop has no store', async () => {
     expect(result.before.map((side) => side.store)).toStrictEqual(['hq']);
     expect(ctx.db.query('SELECT repo FROM merged_prs').all()).toStrictEqual([{ repo: 'hq-archive' }]);
   }
+});
+
+test("it moves the repo's review files, in its folder and in the flat names, and leaves other repos' files alone", async () => {
+  const ctx = setupTest();
+  ctx.createHistoryRows('hq', 0);
+  mkdirSync(`${ctx.dir}/reviews/zgeoff/hq`, { recursive: true });
+  mkdirSync(`${ctx.dir}/reviews/zgeoff/hq-private`, { recursive: true });
+  writeFileSync(`${ctx.dir}/reviews/zgeoff/hq/12-review.md`, 'kettle review');
+  writeFileSync(`${ctx.dir}/reviews/zgeoff/hq-private/12-review.md`, 'teapot review');
+  writeFileSync(`${ctx.dir}/reviews/hq7-review.md`, 'old kettle review');
+  writeFileSync(`${ctx.dir}/reviews/hq-private7-review.md`, 'old teapot review');
+
+  const result = await ctx.archive('hq', 'hq-archive');
+
+  expect(result.reviewFiles).toStrictEqual([
+    { from: `${ctx.dir}/reviews/zgeoff/hq/12-review.md`, to: `${ctx.dir}/reviews/zgeoff/hq-archive/12-review.md`, collides: false },
+    { from: `${ctx.dir}/reviews/hq7-review.md`, to: `${ctx.dir}/reviews/hq-archive7-review.md`, collides: false },
+  ]);
+  expect(readdirSync(`${ctx.dir}/reviews`, { recursive: true }).map(String).toSorted()).toStrictEqual(['hq-archive7-review.md', 'hq-private7-review.md', 'zgeoff', 'zgeoff/hq-archive', 'zgeoff/hq-archive/12-review.md', 'zgeoff/hq-private', 'zgeoff/hq-private/12-review.md']);
+});
+
+test('it refuses a review file that would land on another, names it, and moves and changes nothing', async () => {
+  const ctx = setupTest();
+  ctx.createHistoryRows('hq', 0);
+  mkdirSync(`${ctx.dir}/reviews/zgeoff/hq`, { recursive: true });
+  mkdirSync(`${ctx.dir}/reviews/zgeoff/hq-archive`, { recursive: true });
+  writeFileSync(`${ctx.dir}/reviews/zgeoff/hq/12-review.md`, 'kettle review');
+  writeFileSync(`${ctx.dir}/reviews/zgeoff/hq-archive/12-review.md`, 'archived kettle review');
+  const before = readHistoryRows(ctx.db);
+
+  await expect(ctx.archive('hq', 'hq-archive')).rejects.toMatchObject({ code: 'rekey_collision', message: expect.stringContaining(`review file: ${ctx.dir}/reviews/zgeoff/hq-archive/12-review.md`) });
+
+  expect(readdirSync(`${ctx.dir}/reviews/zgeoff/hq`)).toStrictEqual(['12-review.md']);
+  expect(readHistoryRows(ctx.db)).toStrictEqual(before);
+  expect(readBackupNames(ctx.path)).toStrictEqual([]);
+});
+
+test('it lists the review files it would move on a dry run, and moves none', async () => {
+  const ctx = setupTest();
+  ctx.createHistoryRows('hq', 0);
+  mkdirSync(`${ctx.dir}/reviews`, { recursive: true });
+  writeFileSync(`${ctx.dir}/reviews/hq7-review.md`, 'old kettle review');
+
+  const result = await ctx.archive('hq', 'hq-archive', { dryRun: true });
+
+  expect(result.reviewFiles).toStrictEqual([{ from: `${ctx.dir}/reviews/hq7-review.md`, to: `${ctx.dir}/reviews/hq-archive7-review.md`, collides: false }]);
+  expect(readdirSync(`${ctx.dir}/reviews`)).toStrictEqual(['hq7-review.md']);
+});
+
+test('it moves the review files of a repo that has no rows left', async () => {
+  const ctx = setupTest();
+  mkdirSync(`${ctx.dir}/reviews`, { recursive: true });
+  writeFileSync(`${ctx.dir}/reviews/hq7-review.md`, 'old kettle review');
+
+  await ctx.archive('hq', 'hq-archive');
+
+  expect(readdirSync(`${ctx.dir}/reviews`)).toStrictEqual(['hq-archive7-review.md']);
 });
 
 test('it logs one event naming both repos and the backups', async () => {
