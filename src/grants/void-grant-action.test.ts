@@ -1,5 +1,7 @@
 import { expect, onTestFinished, test } from 'bun:test';
+import { join } from 'node:path';
 import { NOON_SYDNEY, at, freshDb } from '../../test/helpers.ts';
+import { AtcClient } from '../atc/atc-client.ts';
 import { setMeta } from '../db/set-meta.ts';
 import type { OwnerProbeDeps } from '../pr-status/read-owner-session.ts';
 import { createGrantMark } from './create-grant-mark.ts';
@@ -11,6 +13,7 @@ function setupTest() {
   onTestFinished(fresh.cleanup);
   return {
     db: fresh.db,
+    directory: fresh.dir,
     probeAs: (peerSession: string | null | undefined): OwnerProbeDeps => ({ openClient: () => Promise.resolve({ peerSession, close: () => {} }) }),
   };
 }
@@ -83,16 +86,16 @@ test.each([
   expect(ctx.db.query('SELECT voided_at FROM grant_actions').all()).toStrictEqual([{ voided_at: null }]);
 });
 
-test('an unreachable atc refuses the void and says why', async () => {
+test('an atc daemon with no socket at its path refuses the void and says why', async () => {
   const ctx = setupTest();
   at(NOON_SYDNEY);
   setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'teapot-bot': 'kettle-2', 'kettle-bot': 'kettle-3' }));
   createGrantMark(ctx.db, { text: 'kettle PRs merge on green CI', ref: 'kettle#3', at: null, name: 'kettle-merges', actor: 'kettle-bot' });
   recordGrantAction(ctx.db, { grant: 'kettle-merges', target: 'kettle#9', note: null, actor: 'teapot-bot' });
 
-  await expect(voidGrantAction({ db: ctx.db, args: { id: 1, reason: 'wrong PR' }, probe: { openClient: () => Promise.reject(new Error('socket is gone')) }, clock: () => new Date('2026-10-14T03:00:00Z') })).rejects.toMatchObject({
+  await expect(voidGrantAction({ db: ctx.db, args: { id: 1, reason: 'wrong PR' }, probe: { openClient: () => AtcClient.open(join(ctx.directory, 'no-atc-daemon.sock'), 1500) }, clock: () => new Date('2026-10-14T03:00:00Z') })).rejects.toMatchObject({
     code: 'not_allowed',
-    message: 'only teapot-bot, who logged grant action 1, or z-stu may void it; atc cannot say who is calling (socket is gone)',
+    message: 'only teapot-bot, who logged grant action 1, or z-stu may void it; atc cannot say who is calling (Failed to connect)',
   });
   expect(ctx.db.query('SELECT voided_at FROM grant_actions').all()).toStrictEqual([{ voided_at: null }]);
 });
