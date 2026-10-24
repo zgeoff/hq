@@ -69,5 +69,5 @@ test('it reports unknown when the daemon names no caller session', async () => {
 
   const caller = await readCapCaller(ctx.db, { openClient: () => Promise.resolve({ peerSession: undefined, close: () => {} }) });
 
-  expect(caller.kind).toBe('unknown');
+  expect(caller).toStrictEqual({ kind: 'unknown', cause: "atc's hello names no caller session, so this daemon predates protocol 11 and cannot say who is asking" });
 });

@@ -40,7 +40,7 @@ test('it refuses the delivery lead raising a cap', () => {
 test('it refuses the delivery lead keeping a cap at the same count', () => {
   const decision = decideCapChange({ caller: { kind: 'delivery', by: 'z-delivery' }, current: { cap: 7, until: '2026-10-19T21:00:00Z', reason: 'weekend pacing', by: 'z-stu', at: '2026-10-15T00:00:00Z' }, request: { kind: 'set', cap: 7, until: null, reason: null }, at: '2026-10-16T00:00:00Z' });
 
-  expect(decision.ok).toBe(false);
+  expect(decision).toStrictEqual({ ok: false, message: 'z-delivery may only lower the lanes cap (now 7), not raise or keep it; z-stu may' });
 });
 
 test('it refuses the delivery lead lifting a cap', () => {
