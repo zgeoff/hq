@@ -40,10 +40,19 @@ test('it marks a build from a tree with uncommitted changes as dirty', () => {
   expect(ctx.readBuiltVersion()).toMatchObject({ commit: ctx.head, dirty: true });
 });
 
-test('it names no commit for a build outside git', () => {
+test('it marks a build outside git as installed from an unknown, dirty commit, so it ignores HQ_NOW', () => {
   const ctx = setupTest();
   rmSync(join(ctx.tree, '.git'), { recursive: true, force: true });
-  expect(ctx.readBuiltVersion()).toMatchObject({ commit: null, dirty: null });
+  expect(ctx.readBuiltVersion()).toMatchObject({ commit: 'unknown', dirty: true });
+  const home = mkdtempSync(join(tmpdir(), 'hq-install-home-'));
+  onTestFinished(() => rmSync(home, { recursive: true, force: true }));
+
+  const ran = Bun.spawnSync([join(ctx.directory, 'hq'), 'units', 'scrub', '--json'], {
+    env: { ...process.env, HOME: home, HQ_DB: join(home, 'hq.db'), HQ_NOW: '2031-03-04T05:06:07Z' },
+  });
+
+  expect(ran.exitCode).toBe(0);
+  expect(ran.stderr.toString()).toBe('hq: HQ_NOW is ignored in the installed hq\n');
 });
 
 test('it builds a binary that ignores HQ_NOW and HQ_QUIET, warns once each on stderr, and keeps stdout JSON', () => {
