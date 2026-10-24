@@ -80,6 +80,20 @@ test('the validator rejects a bad file and names the field', () => {
   expect(() => validateRoles(skill)).toThrow('sessions[0].prompt');
 });
 
+test.each(['kettle-prompt.md', 'main:prompts/kettle.md'])('prompt %s passes for a session with no skill', (prompt) => {
+  const table = valid();
+  table.sessions[0] = one('z-aa', ['owner'], { skill: null, prompt });
+
+  expect(validateRoles(table).sessions[0]).toMatchObject({ prompt });
+});
+
+test.each(['prompts/kettle.md', 'main:', 'main:../kettle.md', 'main:prompts/../kettle.md', 'main:/etc/kettle.md'])('prompt %s is refused by name', (prompt) => {
+  const table = valid();
+  table.sessions[0] = one('z-aa', ['owner'], { skill: null, prompt });
+
+  expect(() => validateRoles(table)).toThrow('sessions[0].prompt');
+});
+
 test('the validator takes a release session, and the release role lists its holders', () => {
   const withRelease = valid();
   withRelease.sessions.push(one('z-ee', ['release']));

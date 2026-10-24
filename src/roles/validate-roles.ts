@@ -47,8 +47,8 @@ export function validateRoles(raw: unknown): RolesTable {
     if (s['pluginDirs'] !== undefined && !isPluginDirs(s['pluginDirs'])) {
       return bad(`${at}.pluginDirs`, 'must be a non-empty list of folders, each absolute or starting with ~/, without a .. segment');
     }
-    if (s['prompt'] !== undefined && (typeof s['prompt'] !== 'string' || !s['prompt'] || s['prompt'].includes('/'))) {
-      return bad(`${at}.prompt`, 'must be a file name');
+    if (s['prompt'] !== undefined && !isPromptSource(s['prompt'])) {
+      return bad(`${at}.prompt`, 'must be a file name, or main:<path> in hq-private without a .. segment');
     }
     if (s['note'] !== undefined && typeof s['note'] !== 'string') {
       return bad(`${at}.note`, 'must be text');
@@ -84,6 +84,18 @@ export function validateRoles(raw: unknown): RolesTable {
 }
 
 // atc's spawn refuses any other form, so a bad list fails here, not at the spawn.
+// A file name under ~/.local/share/z-sessions, or a path that hq reads from hq-private's origin/main.
+function isPromptSource(value: unknown): value is string {
+  if (typeof value !== 'string' || !value) {
+    return false;
+  }
+  if (!value.startsWith('main:')) {
+    return !value.includes('/');
+  }
+  const rel = value.slice('main:'.length);
+  return /^[A-Za-z0-9._-][A-Za-z0-9._/-]*$/u.test(rel) && !rel.split('/').includes('..');
+}
+
 function isPluginDirs(v: unknown): boolean {
   return Array.isArray(v) && v.length > 0 && v.every((d) => typeof d === 'string' && (d.startsWith('/') || d.startsWith('~/')) && !d.split('/').includes('..'));
 }

@@ -12,7 +12,9 @@ export interface DeclaredSession {
 
   // Claude Code plugin folders this session alone loads, passed to atc's spawn
   pluginDirs?: string[];
-  prompt?: string; // a file under ~/.local/share/z-sessions, for a session with no skill
+
+  // for a session with no skill: a file under ~/.local/share/z-sessions, or main:<path> in hq-private
+  prompt?: string;
   note?: string;
   roles: Role[];
 }
