@@ -21,9 +21,6 @@ export interface RunningByPlace {
 
 const rowsSchema = z.array(z.object({ issue: z.string(), place: z.enum(['imp', 'local']) }));
 
-// The runs that hold a slot, by place, less the parked ones and the Design ones the Design slot holds.
-// A fresh atc reading counts a run filed imp whose awake sessions are all here as local, and lifts
-// local to the awake sessions here that any run lists.
 export function readRunningByPlace(db: Database, at: Date = now()): RunningByPlace {
   const parked = new Set(parkedRuns(db, at).map((run) => run.issue));
   const design = readDesignIssues(db);
