@@ -1,6 +1,6 @@
 # closing, freeing and promoting issues
 
-Step 5 of a pass: close each issue whose work is done, free the issues its close unblocks, and promote each Backlog issue that meets the Ready criteria.
+Step 5 of a pass: close each issue whose work is done or no longer worth doing, free the issues its close unblocks, and promote each Backlog issue that meets the Ready criteria.
 
 ## completion
 
@@ -16,6 +16,17 @@ Judge only the written acceptance. An extra the PR adds beyond it, such as a tes
 What counts as live differs by repo, and `release-deployed.sh` holds each rule. Two cases have no production pin: a merge in zgeoff/tools or zgeoff/noslop is live once a published release of each package it changes contains it, and an hq merge is live once the hq installed on this host was built from a commit that contains it. The script shows `deployed: null` for an hq built from source or from a dirty tree.
 
 An In Progress issue is stale when neither its agent nor its PR moved in 3 days. Find the agent with `atc_sessions_list`, whose session names carry the issue ID, and the PR with `gh search prs GEO-<n> --owner zgeoff`. Give a stale one `Needs Geoff` and the comment "Stale: nothing has moved since <date>. Recommend <keep, relaunch, or close>, because <reason>."
+
+## obsolete Backlog issues
+
+On a full pass, check each Backlog issue in the audit's `stale` list, the ones untouched for 14 days or more, for whether its work is still worth doing. Leave out vers feature work, which only the owner decides. Close an issue as Canceled, or as Duplicate of the issue that covered it, when you find one of these, and comment the evidence:
+
+- **Overtaken:** a decision record or a merged change made it moot. Name the record or the PR.
+- **Gone:** the code or files it names no longer exist. Name the paths and the commit that removed them.
+- **Covered:** a closed issue did its work. Name that issue.
+- **Reversed:** a later decision reversed its premise. Link the decision.
+
+When the evidence covers only part of an issue, or you are unsure, close nothing. Add the issue to the obsolescence list in `~/.local/share/z-sessions/triage.md`, with the evidence you found and your recommendation. On the first full pass of each week, flag every issue on that list with the same question, word for word: "Are these Backlog issues still worth doing?" The check then puts them to the owner as one call. Empty the list once you have flagged them.
 
 ## what a closed or merged blocker frees
 
