@@ -81,3 +81,11 @@ test('it lists a skipped issue among the skipped with its until and reason, in n
   expect(result.skipped).toStrictEqual([{ issue: 'GEO-9871', reason: 'skipped until GEO-9879: waits on the kettle PR' }]);
   expect(result.counts['cloud']).toBe(1);
 });
+
+test('it skips an hq-labelled issue that sits in another project, since z-q builds hq', () => {
+  const rules = validateLaneRules(rulesTable, Object.keys(rulesTable.lanes));
+
+  const result = classifyReady([buildReadyIssue('GEO-3002', { project: 'Security hardening', labels: ['hq'] })], rules, []);
+
+  expect(result.skipped).toStrictEqual([{ issue: 'GEO-3002', reason: 'hq: z-q builds hq' }]);
+});

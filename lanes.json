@@ -2,7 +2,11 @@
   "team": "GEO",
   "readyState": "Ready",
   "exclude": [
-    { "projects": ["hq maintenance", "hq roadmap"], "reason": "hq: z-q builds hq" },
+    {
+      "projects": ["hq maintenance", "hq roadmap"],
+      "labels": ["hq"],
+      "reason": "hq: z-q builds hq"
+    },
     { "labels": ["Design"], "reason": "Design: design slot" }
   ],
   "lanes": {
