@@ -40,7 +40,7 @@ export async function runLinearReadyTick(db: Database, deps: LinearReadyTickDeps
   try {
     const lanes = await deps.readLanes();
     const rules = validateLaneRules(rulesTable, lanes?.map((lane) => lane.name) ?? null);
-    await withDeadline(readLinearReady(db, cancellableCall, deps.actor, rules, deps.run), deps.deadlineMs, 'lanes Ready from Linear');
+    await withDeadline(readLinearReady(db, { call: cancellableCall, run: deps.run, actor: deps.actor, rules }), deps.deadlineMs, 'lanes Ready from Linear');
   } catch (error) {
     abandoned.abort();
     setMeta(db, 'lanes_ready_linear_error', (error instanceof Error ? error.message : String(error)).slice(0, 300));

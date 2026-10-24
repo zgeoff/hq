@@ -27,26 +27,33 @@ import type { LaneRules, ReadyIssue } from './types.ts';
 
 const MAX_SKIPPED = 100;
 
+interface LinearReadyDeps {
+  call: LinearCall;
+  run: Runner;
+  actor: string;
+  rules: LaneRules;
+}
+
 // Reads every Ready issue of the team, page by page, then reports the counts per lane and keeps the
 // issues for the focus plan, in one write. A failure on any page throws before anything is written,
 // so the last counts and issues stay as they were. The same write drops the skips that ended; a skip
-// whose until issue Linear or until PR GitHub could not read stays, and the issue is kept with why for hq lanes skip list.
-// oxlint-disable-next-line max-params -- the watcher's runner joins the four arguments every caller already passes
-export async function readLinearReady(db: Database, call: LinearCall, actor: string, rules: LaneRules, run: Runner): Promise<void> {
-  const untils = await readUntils(db, call, run);
-  const issues = await readTeamIssues(call, rules.team, rules.readyState);
+// whose until issue Linear or until PR GitHub could not read stays, and the issue is kept with why for
+// hq lanes skip list.
+export async function readLinearReady(db: Database, deps: LinearReadyDeps): Promise<void> {
+  const untils = await readUntils(db, deps.call, deps.run);
+  const issues = await readTeamIssues(deps.call, deps.rules.team, deps.rules.readyState);
   const at = now();
-  const snapshot = buildReadySnapshot(issues, rules, iso(at));
+  const snapshot = buildReadySnapshot(issues, deps.rules, iso(at));
   db.transaction(() => {
-    removeEndedSkips(db, untils.settled, actor, at);
+    removeEndedSkips(db, untils.settled, deps.actor, at);
     setMeta(db, SKIP_UNREAD_KEY, JSON.stringify(untils.unread));
-    const classified = classifyReady(issues, rules, readLaneSkips(db).filter((skip) => isSkipActive(skip, at)));
+    const classified = classifyReady(issues, deps.rules, readLaneSkips(db).filter((skip) => isSkipActive(skip, at)));
     const skipped = classified.skipped.slice(0, MAX_SKIPPED);
 
     // The summary counts every Ready issue past the eligible and the listed skipped as unexplained, so
     // the skipped issues cut from the list leave the total too.
     const total = classified.total - (classified.skipped.length - skipped.length);
-    reportLaneReady(db, classified.counts, actor, { total, skipped, logOnlyChanges: true });
+    reportLaneReady(db, classified.counts, deps.actor, { total, skipped, logOnlyChanges: true });
     setMeta(db, READY_ISSUES_KEY, JSON.stringify(snapshot));
     writeIssueAreas(db, [...snapshot.eligible, ...snapshot.design]);
   }).immediate();
@@ -61,34 +68,29 @@ interface Untils {
 // those it could not read with why; a failed read is not thrown. It reads before Ready, so a call the
 // caller's deadline aborts here still fails the Ready read and nothing is written.
 async function readUntils(db: Database, call: LinearCall, run: Runner): Promise<Untils> {
-  const [issues, prs] = await Promise.all([readUntilIssues(db, call), readUntilPRs(db, run)]);
+  const untils = [...new Set(readLaneSkips(db).map((skip) => skip.until))];
+  const [issues, prs] = await Promise.all([readUntilIssues(call, untils.filter((until) => ISSUE.test(until))), readUntilPRs(run, untils)]);
   return { settled: new Set([...issues.settled, ...prs.settled]), unread: { ...issues.unread, ...prs.unread } };
 }
 
-async function readUntilIssues(db: Database, call: LinearCall): Promise<Untils> {
-  const waited = [...new Set(readLaneSkips(db).map((skip) => skip.until).filter((until) => ISSUE.test(until)))];
+async function readUntilIssues(call: LinearCall, waited: readonly string[]): Promise<Untils> {
   if (waited.length === 0) {
     return { settled: new Set(), unread: {} };
   }
-  const verdicts = await readIssueVerdicts(call, waited);
+  const verdicts = await readIssueVerdicts(call, [...waited]);
   const settled = new Set(waited.filter((issue) => verdicts.get(issue)?.kind === 'settled'));
   const unread = Object.fromEntries(waited.flatMap((issue) => collectFailure(issue, verdicts.get(issue))));
   return { settled, unread };
 }
 
-async function readUntilPRs(db: Database, run: Runner): Promise<Untils> {
-  const waited = [...new Set(readLaneSkips(db).map((skip) => skip.until).filter((until) => parsePRUntil(until) !== null))];
-  const answers = await Promise.all(waited.map((until) => readGitHubPR(run, parsePRUntil(until)?.ref ?? '')));
-  const settled = new Set<string>();
-  const unread: Record<string, string> = {};
-  for (const [index, until] of waited.entries()) {
-    const answer = answers[index];
-    if (answer && 'error' in answer) {
-      unread[until] = answer.error;
-    } else if (answer && answer.state !== 'OPEN') {
-      settled.add(until);
-    }
-  }
+async function readUntilPRs(run: Runner, untils: readonly string[]): Promise<Untils> {
+  const waited = untils.flatMap((until) => {
+    const pr = parsePRUntil(until);
+    return pr === null ? [] : [{ until, ref: pr.ref }];
+  });
+  const answers = await Promise.all(waited.map(async (pr) => ({ until: pr.until, answer: await readGitHubPR(run, pr.ref) })));
+  const settled = new Set(answers.filter((read) => 'state' in read.answer && read.answer.state !== 'OPEN').map((read) => read.until));
+  const unread = Object.fromEntries(answers.flatMap((read) => ('error' in read.answer ? [[read.until, read.answer.error]] : [])));
   return { settled, unread };
 }
 
