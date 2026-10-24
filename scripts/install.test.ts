@@ -16,6 +16,7 @@ function setupTest() {
   // .gitignore names node_modules/, which matches no symlink; without this the clean tree reads dirty.
   appendFileSync(join(tree, '.git/info/exclude'), 'node_modules\n');
   return {
+    directory,
     tree,
     head: Bun.spawnSync(['git', 'rev-parse', 'HEAD'], { cwd: tree }).stdout.toString().trim(),
     readBuiltVersion: () => {
@@ -43,4 +44,19 @@ test('it names no commit for a build outside git', () => {
   const ctx = setupTest();
   rmSync(join(ctx.tree, '.git'), { recursive: true, force: true });
   expect(ctx.readBuiltVersion()).toMatchObject({ commit: null, dirty: null });
+});
+
+test('it builds a binary that ignores HQ_NOW and HQ_QUIET, warns once each on stderr, and keeps stdout JSON', () => {
+  const ctx = setupTest();
+  ctx.readBuiltVersion();
+  const home = mkdtempSync(join(tmpdir(), 'hq-install-home-'));
+  onTestFinished(() => rmSync(home, { recursive: true, force: true }));
+
+  const ran = Bun.spawnSync([join(ctx.directory, 'hq'), 'units', 'scrub', '--json'], {
+    env: { ...process.env, HOME: home, HQ_DB: join(home, 'hq.db'), HQ_NOW: '2031-03-04T05:06:07Z', HQ_QUIET: 'teapot' },
+  });
+
+  expect(ran.exitCode).toBe(0);
+  expect(ran.stderr.toString()).toBe('hq: HQ_NOW is ignored in the installed hq\nhq: HQ_QUIET is ignored in the installed hq\n');
+  expect(JSON.parse(ran.stdout.toString())).toStrictEqual({ ok: true, changed: [] });
 });

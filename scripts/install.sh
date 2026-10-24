@@ -1,6 +1,7 @@
 #!/bin/sh
 # Build hq into ~/.local/bin. When the lanes watcher is installed or running, `hq lanes start`
 # rewrites its user unit, enables it and restarts it: it keeps the old code otherwise.
+# Units written by an older hq lose HQ_NOW and HQ_QUIET first, so the restart is clean.
 # HQ_INSTALL_OUT builds to another path and leaves the lanes watcher alone, for tests.
 set -e
 out=${HQ_INSTALL_OUT:-$HOME/.local/bin/hq}
@@ -18,6 +19,10 @@ fi
 bun build src/cli.ts --compile --no-compile-autoload-dotenv --no-compile-autoload-bunfig "$@" --outfile "$out"
 if [ -n "${HQ_INSTALL_OUT:-}" ]; then
   exit 0
+fi
+# The installed hq ignores HQ_NOW and HQ_QUIET, and a unit written before that may still carry them.
+if command -v systemctl >/dev/null 2>&1; then
+  "$out" units scrub
 fi
 if command -v systemctl >/dev/null 2>&1 && { systemctl --user is-enabled --quiet hq-lanes 2>/dev/null || systemctl --user is-active --quiet hq-lanes; }; then
   ~/.local/bin/hq lanes start
