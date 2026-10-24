@@ -166,7 +166,7 @@ async function createNoslopContext(plan: RoundPlan, parsed: ParsedRepo, sha: str
 function writeRoundMark(plan: RoundPlan, parsed: ParsedRepo): void {
   const found = findLastReviewRound(plan.request.db, parsed.repo, plan.request.pr);
   if (found?.ok === 1 && found.head !== null && SHA.test(found.head)) {
-    writeReviewed(plan.request.db, parsed.repo, plan.request.pr, found.head, { countsRound: !plan.fixesOnly });
+    writeReviewed(plan.request.db, parsed.repo, plan.request.pr, { head: found.head, countsRound: !plan.fixesOnly });
   }
 }
 
