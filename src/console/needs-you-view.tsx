@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import type { ConsoleItem } from '../load-console-items.ts';
-import { consoleAPI } from './console-api.ts';
+import type { ConsoleAPI } from './console-api.ts';
+import { useConsoleAPI } from './console-api-context.ts';
 import { ConsoleTabs } from './console-tabs.tsx';
 import { formatAskStu } from './format-ask-stu.ts';
 import { ItemCard } from './item-card.tsx';
@@ -48,6 +49,7 @@ export function NeedsYouView(props: NeedsYouViewProps) {
       setToast(next);
       globalThis.setTimeout(() => setToast((t) => (t === next ? null : t)), 2400);
     },
+    consoleAPI = useConsoleAPI(),
     list = useQuery(consoleAPI.items.list.queryOptions({ refetchInterval: refreshMs })),
     noteRef = useRef<HTMLTextAreaElement | null>(null),
     pending = buildRotation(
@@ -56,7 +58,7 @@ export function NeedsYouView(props: NeedsYouViewProps) {
     ),
     queryClient = useQueryClient(),
     send = useMutation({
-      mutationFn: async (choice: Choice) => await sendChoice(choice),
+      mutationFn: async (choice: Choice) => await sendChoice(consoleAPI, choice),
       onSuccess: (told, choice) => {
         setAnswered((a) => [...a, { id: choice.item.id, at: Date.now() }]);
         setNotes((n) => new Map(n).set(choice.item.id, ''));
@@ -181,7 +183,7 @@ const NEEDS_YOU_KEYS = [
   TODO_MARKS: Record<string, 'done' | 'later' | 'skip'> = { Done: 'done', Later: 'later', Skip: 'skip' };
 
 // Whether the owner session got the message; the answer is recorded either way.
-async function sendChoice(choice: Choice): Promise<boolean> {
+async function sendChoice(consoleAPI: ConsoleAPI, choice: Choice): Promise<boolean> {
   const mark = TODO_MARKS[choice.label],
     review = REVIEW_ANSWERS[choice.label];
   if (choice.item.kind === 'review' && review !== undefined) {
@@ -192,10 +194,10 @@ async function sendChoice(choice: Choice): Promise<boolean> {
     const marked = await consoleAPI.unblock.mark.call({ id: choice.item.id, mark, note: choice.note });
     return marked.told;
   }
-  return await sendAnswer(choice);
+  return await sendAnswer(consoleAPI, choice);
 }
 
-async function sendAnswer(choice: Choice): Promise<boolean> {
+async function sendAnswer(consoleAPI: ConsoleAPI, choice: Choice): Promise<boolean> {
   const result = await consoleAPI.items.answer.call({ id: choice.item.id, option: choice.label, note: choice.note });
   return result.told;
 }

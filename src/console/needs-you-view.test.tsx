@@ -6,7 +6,8 @@ import { createUnblockItems } from '../../test/create-unblock-items.ts';
 import { NOON_SYDNEY, at, freshDb } from '../../test/helpers.ts';
 import { createSignedInAuth } from '../../test/create-signed-in-auth.ts';
 import { setupPageDOM } from '../../test/setup-page-dom.ts';
-import { SESSION_STORAGE_KEY } from './session-storage-key.ts';
+import { createConsoleAPI } from './console-api.ts';
+import { ConsoleAPIContext } from './console-api-context.ts';
 import { getAsk } from '../asks/get-ask.ts';
 import { main } from '../cli.ts';
 import { overrideEnv } from '../config/override-env.ts';
@@ -42,8 +43,7 @@ async function setupTest() {
   }
   await main(['unblock', 'add', '--id', 'lid', '--task', 'Fit the new lid on the kettle', '--json']);
   const library = await setupPageDOM(`http://127.0.0.1:${server.port}/`);
-  globalThis.sessionStorage.setItem(SESSION_STORAGE_KEY, signedIn.session);
-  return { db: fresh.db, directory: fresh.dir, library };
+  return { db: fresh.db, directory: fresh.dir, library: { ...library, api: createConsoleAPI(() => signedIn.session) } };
 }
 
 test('the owner answers by click, key and note, Ask Stu copies its prompt, a review takes review words, and a to-do put off comes back when due', async () => {
@@ -54,9 +54,11 @@ test('the owner answers by click, key and note, Ask Stu copies its prompt, a rev
     write = spyOn(navigator.clipboard, 'writeText');
   createUnblockItems(app.db, { 'review-4': { task: 'Review kettle#4 and say lgtm', links: [{ label: 'kettle#4', url: 'https://github.com/kettle-co/kettle/pull/4', subject: true }] } });
   lib.render(
+    <ConsoleAPIContext value={lib.api}>
     <QueryClientProvider client={queryClient}>
       <view.NeedsYouView />
-    </QueryClientProvider>,
+    </QueryClientProvider>
+    </ConsoleAPIContext>,
   );
   await lib.within(document.body).findByText('Mint the kettle tokens tonight?');
 
@@ -141,9 +143,11 @@ test('it shows an item that arrives while the page stays open', async () => {
   environmentManager.setIsServer(() => false);
   onTestFinished(() => environmentManager.setIsServer(() => true));
   app.library.render(
+    <ConsoleAPIContext value={app.library.api}>
     <QueryClientProvider client={queryClient}>
       <view.NeedsYouView refreshMs={100} />
-    </QueryClientProvider>,
+    </QueryClientProvider>
+    </ConsoleAPIContext>,
   );
   await app.library.within(document.body).findByText('Mint the kettle tokens tonight?');
   const file = join(app.directory, 'descale.json');

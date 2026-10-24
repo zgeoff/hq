@@ -3,6 +3,8 @@ import type { QueryClient } from '@tanstack/react-query';
 import { RouterProvider } from '@tanstack/react-router';
 import { StrictMode } from 'react';
 import type { ReactNode } from 'react';
+import type { ConsoleAPI } from './console-api.ts';
+import { ConsoleAPIContext } from './console-api-context.ts';
 import type { createConsoleAppRouter } from './create-console-app-router.tsx';
 import { runLoginExchange } from './run-login-exchange.ts';
 import type { LoginOutcome, LoginPage } from './run-login-exchange.ts';
@@ -12,6 +14,7 @@ export interface ConsolePageDeps {
   login: LoginPage;
   router: ReturnType<typeof createConsoleAppRouter>;
   queryClient: QueryClient;
+  api: ConsoleAPI;
   render: (view: ReactNode) => void;
 }
 
@@ -21,9 +24,11 @@ export async function startConsolePage(deps: ConsolePageDeps): Promise<LoginOutc
   deps.render(
     <StrictMode>
       {outcome === 'signed-in' ? (
-        <QueryClientProvider client={deps.queryClient}>
-          <RouterProvider router={deps.router} />
-        </QueryClientProvider>
+        <ConsoleAPIContext value={deps.api}>
+          <QueryClientProvider client={deps.queryClient}>
+            <RouterProvider router={deps.router} />
+          </QueryClientProvider>
+        </ConsoleAPIContext>
       ) : (
         <SignInNotice outcome={outcome} />
       )}

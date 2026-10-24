@@ -1,6 +1,9 @@
 import { QueryClient } from '@tanstack/react-query';
 import { createRoot } from 'react-dom/client';
+import { createConsoleAPI } from './console-api.ts';
 import { createConsoleAppRouter } from './create-console-app-router.tsx';
+import { readTabSession } from './read-tab-session.ts';
+import { SESSION_STORAGE_KEY } from './session-storage-key.ts';
 import { restoreTheme } from './restore-theme.ts';
 import { startConsolePage } from './start-console-page.tsx';
 
@@ -12,6 +15,7 @@ if (root !== null) {
   await startConsolePage({
     render: (view) => createRoot(root).render(view),
     router: createConsoleAppRouter(),
+    api: createConsoleAPI(() => readTabSession(() => globalThis.sessionStorage.getItem(SESSION_STORAGE_KEY))),
     queryClient: new QueryClient({ defaultOptions: { queries: { refetchOnWindowFocus: true, retry: 1 } } }),
     login: {
       hash: globalThis.location.hash,

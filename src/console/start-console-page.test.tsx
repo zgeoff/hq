@@ -6,6 +6,7 @@ import { setupPageDOM } from '../../test/setup-page-dom.ts';
 import { createConsoleAuth } from '../console-auth/create-console-auth.ts';
 import type { ConsoleAuth } from '../console-auth/create-console-auth.ts';
 import { createConsoleServer } from '../create-console-server.ts';
+import { createConsoleAPI } from './console-api.ts';
 import { SESSION_STORAGE_KEY } from './session-storage-key.ts';
 
 // The real page start against a console server, from a tab at `hash`, rendered into the page DOM.
@@ -24,6 +25,7 @@ async function setupTest(hash: (auth: ConsoleAuth) => string) {
     render: (view) => void lib.render(view),
     router: routes.createConsoleAppRouter(createMemoryHistory({ initialEntries: ['/'] })),
     queryClient: new QueryClient(),
+    api: createConsoleAPI(() => globalThis.sessionStorage.getItem(SESSION_STORAGE_KEY) ?? ''),
     login: {
       hash: hash(auth),
       origin: `http://127.0.0.1:${server.port}`,
