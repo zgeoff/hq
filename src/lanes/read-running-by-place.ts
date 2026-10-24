@@ -12,6 +12,9 @@ export interface RunningByPlace {
   // The running issues that hold a slot, parked ones left out.
   issues: string[];
 
+  // Those of them that hold an imp slot.
+  impIssues: string[];
+
   // Why local is more than the runs here hold, or null when those runs set it.
   localSource: string | null;
 }
@@ -28,13 +31,14 @@ export function readRunningByPlace(db: Database, at: Date = now()): RunningByPla
   const live = readLiveLocal(db, at);
   const movedHere = holding.filter((row) => row.place === 'imp' && live?.hereOnly.has(row.issue) === true).length;
   const filedLocal = holding.filter((row) => row.place === 'local').length + movedHere;
-  const imp = holding.filter((row) => row.place === 'imp').length - movedHere;
+  const impIssues = holding.filter((row) => row.place === 'imp' && live?.hereOnly.has(row.issue) !== true).map((row) => row.issue);
+  const imp = impIssues.length;
   const issues = holding.map((row) => row.issue);
   if (live === null || live.sessions <= filedLocal) {
-    return { imp, local: filedLocal, issues, localSource: null };
+    return { imp, local: filedLocal, issues, impIssues, localSource: null };
   }
   const plural = live.sessions === 1 ? '' : 's';
-  return { imp, local: live.sessions, issues, localSource: `${live.sessions} live session${plural} here` };
+  return { imp, local: live.sessions, issues, impIssues, localSource: `${live.sessions} live session${plural} here` };
 }
 
 interface LiveLocal {

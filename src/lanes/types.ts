@@ -29,11 +29,11 @@ export interface Sample {
   localRoom?: number | null;
 }
 
-// A Ready issue the lanes leave out until a time passes or another issue is Done or Canceled.
+// A Ready issue the lanes leave out until a time passes, another issue is Done or Canceled, or a PR merges or closes.
 export interface LaneSkip {
   issue: string;
 
-  // An ISO time, or the identifier of the issue it waits on.
+  // An ISO time, the identifier of the issue it waits on, or `pr:repo#n` for a zgeoff PR it waits on.
   until: string;
   reason: string;
   by: string;

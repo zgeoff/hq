@@ -7,6 +7,7 @@ import { setMeta } from './db/set-meta.ts';
 import rulesTable from '../lanes.json';
 import { readLinearReady } from './lanes/read-linear-ready.ts';
 import { validateLaneRules } from './lanes/validate-lane-rules.ts';
+import type { Runner } from './runner/types.ts';
 import type { LinearCall } from './linear/types.ts';
 import { withDeadline } from './watcher/with-deadline.ts';
 
@@ -17,6 +18,7 @@ const READ_AT = 'lanes_ready_linear_at';
 // the stale alert, and a page that answers after the deadline writes nothing. False when not due.
 interface LinearReadyTickDeps {
   call: LinearCall;
+  run: Runner;
   readLanes: () => Promise<LaneConfig[] | null>;
   actor: string;
   deadlineMs: number;
@@ -38,7 +40,7 @@ export async function runLinearReadyTick(db: Database, deps: LinearReadyTickDeps
   try {
     const lanes = await deps.readLanes();
     const rules = validateLaneRules(rulesTable, lanes?.map((lane) => lane.name) ?? null);
-    await withDeadline(readLinearReady(db, cancellableCall, deps.actor, rules), deps.deadlineMs, 'lanes Ready from Linear');
+    await withDeadline(readLinearReady(db, { call: cancellableCall, run: deps.run, actor: deps.actor, rules }), deps.deadlineMs, 'lanes Ready from Linear');
   } catch (error) {
     abandoned.abort();
     setMeta(db, 'lanes_ready_linear_error', (error instanceof Error ? error.message : String(error)).slice(0, 300));

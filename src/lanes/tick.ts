@@ -8,6 +8,7 @@ import { setMeta } from '../db/set-meta.ts';
 import { logEvent } from '../log-event.ts';
 import { enqueue } from '../outbox/enqueue.ts';
 import { orchestratorName } from '../wake/orchestrator-name.ts';
+import { checkAllSkipped } from './check-all-skipped.ts';
 import { checkReadyStale } from './check-ready-stale.ts';
 import { eligibleNow } from './eligible-now.ts';
 import { formatSlotNudge } from './format-slot-nudge.ts';
@@ -67,6 +68,9 @@ export function tick(db: Database, sample: Sample, actor: string): TickResult {
         removeLaneNudges(db);
       }
       if (sample.error) return result(false, `no reading: ${sample.error}`, getMeta(db, 'lanes_free_since'));
+      if (slotPlan) {
+        checkAllSkipped(db, slotPlan, actor);
+      }
       if (slots === 0) {
         setMeta(db, 'lanes_free_since', null);
         const why = slotPlan && slotPlan.pool.free > 0 ? `${slotPlan.pool.free} slot(s) free, nothing eligible` : 'lanes full';

@@ -17,7 +17,7 @@ import { readReadySnapshot } from './read-ready-snapshot.ts';
 import { readRunningByPlace } from './read-running-by-place.ts';
 import type { ReadySnapshot } from './ready-snapshot.ts';
 import { slotsFrom } from './slots-from.ts';
-import type { Sample } from './types.ts';
+import type { LaneSkip, Sample } from './types.ts';
 
 export interface SlotPlan {
   pool: SlotPool;
@@ -32,6 +32,8 @@ export interface SlotPlan {
   // The Design issue the design slot takes next, outside the pool; null when capacity.sh gives it no
   // room or no Design issue waits. hq cannot see whether a Design session holds the slot now.
   design: string | null;
+
+  skipped: LaneSkip[];
 }
 
 // The lanes' plan for this look: the pool's free slots, filled from the focus terms in order, then any
@@ -46,24 +48,26 @@ export function readSlotPlan(db: Database, sample: Sample, at: Date = now()): Sl
   const focus = readFocus(db);
   const snapshot = readReadySnapshot(db, at);
   if (snapshot === null) {
-    return { pool, focus, plan: null, eligible: null, design: null };
+    return { pool, focus, plan: null, eligible: null, design: null, skipped: [] };
   }
-  const leftOut = readLeftOut(db, at);
+  const runIssues = readRunIssues(db);
+  const activeSkips = readLaneSkips(db).filter((skip) => isSkipActive(skip, at));
+  const leftOut = new Set([...runIssues, ...activeSkips.map((skip) => skip.issue)]);
   const queue = buildFocusQueue(snapshot.eligible, focus?.terms ?? [], leftOut);
   const plan = buildFocusPlan(queue, pool.free, focus?.reserves ?? [], readRunningByArea(db, running.issues));
   const design = sample.cap.design?.room === true ? findDesignPick(snapshot, leftOut) : null;
-  return { pool, focus, plan, eligible: queue.length, design };
+  const eligibleIssues = new Set(snapshot.eligible.map((issue) => issue.identifier));
+  const skipped = activeSkips.filter((skip) => eligibleIssues.has(skip.issue) && !runIssues.has(skip.issue));
+  return { pool, focus, plan, eligible: queue.length, design, skipped };
 }
 
 const issuesSchema = z.array(z.object({ issue: z.string() }));
 
-// Every issue with a run, whether or not it holds a slot now: the lanes never pick it again. A closed
+// The issues with a run, whether or not it holds a slot now: the lanes never pick it again. A closed
 // run counts too, since the Ready read can still hold its issue and addRun refuses it until a reopen.
-// An issue with an active skip is left out too, from the first look after the skip is set.
-function readLeftOut(db: Database, at: Date): Set<string> {
+function readRunIssues(db: Database): Set<string> {
   const rows = issuesSchema.parse(db.query('SELECT issue FROM runs').all());
-  const skipped = readLaneSkips(db).filter((skip) => isSkipActive(skip, at));
-  return new Set([...rows.map((row) => row.issue), ...skipped.map((skip) => skip.issue)]);
+  return new Set(rows.map((row) => row.issue));
 }
 
 const AREAS_SCHEMA = z.record(z.string(), z.array(z.string()));

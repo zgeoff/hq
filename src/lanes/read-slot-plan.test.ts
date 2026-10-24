@@ -2,6 +2,7 @@ import { expect, onTestFinished, test } from 'bun:test';
 import rulesTable from '../../lanes.json';
 import { buildReadyPage, makePagedCall } from '../../test/build-ready-page.ts';
 import type { ReadyNodeSeed } from '../../test/build-ready-page.ts';
+import { buildStubGitHubFactsRunner } from '../../test/build-stub-github-facts-runner.ts';
 import { at, freshDb } from '../../test/helpers.ts';
 import { makeStateCall } from '../../test/make-state-call.ts';
 import { runFocusCommand } from '../focus/run-focus-command.ts';
@@ -32,7 +33,7 @@ function setupTest() {
   const rules = validateLaneRules(rulesTable, null);
   const seedReady = async (seeds: ReadyNodeSeed[]): Promise<void> => {
     const call = makePagedCall(buildReadyPage(seeds, null));
-    await readLinearReady(fresh.db, call, 'hq-lanes', rules);
+    await readLinearReady(fresh.db, { call, run: buildStubGitHubFactsRunner({}), actor: 'hq-lanes', rules });
   };
   const addLocalRun = (issue: string): void => {
     addRun(fresh.db, { issue, title: 'Descale the kettle', place: 'local', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: null, actor: 'z-delivery' });
@@ -107,6 +108,22 @@ test('a skip set after the Ready read leaves its issue out of the picks at the n
   const plan = readSlotPlan(ctx.db, ctx.sample);
 
   expect([plan?.plan?.picks.map((pick) => pick.issue), plan?.eligible]).toStrictEqual([['GEO-9805', 'GEO-9804', 'GEO-9802'], 4]);
+});
+
+test('the plan lists the active skips of eligible Ready issues, leaving out those with a run or not in Ready', async () => {
+  const ctx = setupTest();
+  await ctx.seedReady(ctx.readySeeds);
+  const skip = (issue: string): void => {
+    writeLaneSkip(ctx.db, { issue, until: 'pr:impz#654', reason: 'waits on the descaler PR', actor: 'z-delivery', at: new Date('2026-10-15T20:00:00Z') });
+  };
+  skip('GEO-9801');
+  skip('GEO-9805');
+  skip('GEO-9890');
+  ctx.addLocalRun('GEO-9805');
+
+  const plan = readSlotPlan(ctx.db, ctx.sample);
+
+  expect(plan?.skipped).toStrictEqual([{ issue: 'GEO-9801', until: 'pr:impz#654', reason: 'waits on the descaler PR', by: 'z-delivery', at: '2026-10-15T20:00:00Z' }]);
 });
 
 test('a skip whose time has passed stops leaving its issue out, with no fresh Ready read', async () => {
