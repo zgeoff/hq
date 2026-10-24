@@ -915,3 +915,18 @@ test('it blocks the merge when CODEOWNERS has no owner section', async () => {
 
   await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'hq', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: expect.stringContaining('has no "# the owner" section') });
 });
+
+test('it confirms the base commit is readable before it takes two CODEOWNERS 404s as no file', async () => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ prFiles: { code: 0, stdout: 'src/x.ts\n', stderr: '' } });
+
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'hq-private', pr: 7 })).resolves.toMatchObject({ mayMerge: true });
+  expect(fake.lines()).toContain(`gh api repos/zgeoff/hq-private/commits/${FAKE_BASE_SHA} --silent`);
+});
+
+test('it blocks the merge when both CODEOWNERS paths answer 404 and the base commit cannot be read', async () => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ prFiles: { code: 0, stdout: 'src/x.ts\n', stderr: '' }, baseCommit: { code: 1, stdout: '', stderr: 'gh: Not Found (HTTP 404)' } });
+
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'hq', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: expect.stringContaining("could not read the PR's base ba5eba5 to confirm the repo has no CODEOWNERS") });
+});

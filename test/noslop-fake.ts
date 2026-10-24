@@ -39,6 +39,9 @@ export interface FakeScript {
   // a 404 for any key it lacks.
   contents?: Record<string, RunResult>;
 
+  // What `gh api repos/<slug>/commits/<sha> --silent` answers: the commit is readable when absent.
+  baseCommit?: RunResult;
+
   // What `gh api --paginate …/pulls/<pr>/files` prints: a path a line, with a renamed file's old
   // path after a tab. One source file when absent.
   prFiles?: RunResult;
@@ -153,6 +156,9 @@ function pickGhAnswer(script: FakeScript, line: string): RunResult | null {
   }
   if (line.startsWith('gh api repos/') && line.includes('/check-runs?check_name=noslop')) {
     return script.noslopChecks ?? buildResult(`${JSON.stringify({ id: 9001, name: 'noslop', app: 'noslop-review', status: 'completed', conclusion: 'success', title: 'No findings need attention.', completedAt: '2026-10-14T01:00:05Z' })}\n`);
+  }
+  if (/^gh api repos\/[^/]+\/[^/]+\/commits\/[0-9a-f]+ --silent$/u.test(line)) {
+    return script.baseCommit ?? buildResult('');
   }
   if (line.startsWith('gh api graphql')) {
     return buildResult('1\n');
