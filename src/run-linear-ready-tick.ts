@@ -6,7 +6,7 @@ import { getMeta } from './db/get-meta.ts';
 import { setMeta } from './db/set-meta.ts';
 import rulesTable from '../lanes.json';
 import { readLinearReady } from './lanes/read-linear-ready.ts';
-import { readPromotableFocus } from './lanes/read-promotable-focus.ts';
+import { readPromotableFocusCount } from './lanes/read-promotable-focus-count.ts';
 import { writePromotableFocus } from './lanes/write-promotable-focus.ts';
 import { validateLaneRules } from './lanes/validate-lane-rules.ts';
 import type { Runner } from './runner/types.ts';
@@ -51,10 +51,7 @@ export async function runLinearReadyTick(db: Database, deps: LinearReadyTickDeps
     throw error;
   }
   setMeta(db, 'lanes_ready_linear_error', null);
-  try {
-    await withDeadline(readPromotableFocus(db, cancellableCall, rulesTable.team), deps.deadlineMs, 'Backlog promotable count', abandoned);
-  } catch {
-    writePromotableFocus(db, null);
-  }
+  const count = await withDeadline(readPromotableFocusCount(db, cancellableCall, rulesTable.team), deps.deadlineMs, 'Backlog promotable count', abandoned).catch(() => null);
+  writePromotableFocus(db, count);
   return true;
 }

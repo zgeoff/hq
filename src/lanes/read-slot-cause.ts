@@ -3,6 +3,7 @@ import { getMeta } from '../db/get-meta.ts';
 import { metaJson } from '../db/meta-json.ts';
 import { buildSlotCause } from './build-slot-cause.ts';
 import { CAUSE_SINCE } from './cause-since.ts';
+import { LANES } from './lanes.ts';
 import { PROMOTABLE_FOCUS } from './promotable-focus.ts';
 import { PROMOTABLE_FOCUS_KEY } from './promotable-focus-key.ts';
 import { READY_ISSUES_KEY } from './ready-issues-key.ts';
@@ -23,6 +24,7 @@ export function readSlotCause(db: Database, slotPlan: SlotPlan | null, at: Date)
     readyAt: snapshot?.at ?? null,
     promotable: metaJson(db, PROMOTABLE_FOCUS_KEY, PROMOTABLE_FOCUS, null),
     causeSince: metaJson(db, CAUSE_SINCE_KEY, CAUSE_SINCE, null),
+    freshMinutes: LANES.readyFreshMinutes(),
     at,
   });
 }

@@ -1,4 +1,3 @@
-import { LANES } from './lanes.ts';
 import type { SlotCause } from './types.ts';
 
 // Ready work that has waited this long beside a free slot is a delivery gap; before that, hq tags
@@ -14,6 +13,9 @@ export interface SlotCauseInput {
   readyAt: string | null;
   promotable: { at: string; count: number | null } | null;
   causeSince: { cause: string; since: string } | null;
+
+  // How old a Backlog count may be and still count.
+  freshMinutes: number;
   at: Date;
 }
 
@@ -36,7 +38,7 @@ export function buildSlotCause(input: SlotCauseInput): SlotCause {
     return { ...base, cause: null, since: input.eligibleSince, waitingMinutes };
   }
   const promotable = input.promotable;
-  if (promotable === null || promotable.count === null || input.at.getTime() - Date.parse(promotable.at) > LANES.readyFreshMinutes() * 60_000) {
+  if (promotable === null || promotable.count === null || input.at.getTime() - Date.parse(promotable.at) > input.freshMinutes * 60_000) {
     return { ...base, cause: 'unknown', since: sinceOf('unknown') };
   }
   const cause = promotable.count > 0 ? 'triage' : 'supply';

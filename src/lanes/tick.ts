@@ -50,7 +50,8 @@ export function tick(db: Database, sample: Sample, actor: string): TickResult {
       }
 
       const slotCause = trackSlotCause(db, slotPlan, t);
-      countEmptySlots(db, { slotCause, previousAt: previous?.at ?? null, at: t, actor });
+      writeEmptySlotMinutes(db, { slotCause, previousAt: previous?.at ?? null, at: t });
+      sendSlotCauseAlerts(db, { free: slotCause.slots, at: t, actor });
 
       // Follow up: did free slots drop after a nudge?
       const due = db.query('SELECT id, at FROM lanes_nudges WHERE slots_after IS NULL').all() as { id: number; at: string }[];
@@ -129,27 +130,37 @@ function countWanted(slotPlan: NonNullable<ReturnType<typeof readSlotPlan>>): nu
   return slotPlan.plan.picks.length;
 }
 
-const SLOT_CAUSES: SlotCauseName[] = ['delivery', 'triage', 'supply'];
-
 interface EmptySlotLook {
   slotCause: SlotCause;
   previousAt: string | null;
   at: Date;
-  actor: string;
 }
 
 // Adds the slot-minutes since the previous look (at most 30) to the look's cause on its Sydney day;
-// no cause, or an unknown one, adds nothing. Every cause at 60 for the day then alerts its owner, so
-// an alert held back by quiet hours goes at the first look after them, whatever the cause is then.
-function countEmptySlots(db: Database, look: EmptySlotLook): void {
+// no cause, or an unknown one, adds nothing.
+function writeEmptySlotMinutes(db: Database, look: EmptySlotLook): void {
   const cause = look.slotCause.cause;
-  const day = sydney(look.at).date;
-  if (cause !== null && cause !== 'unknown' && look.previousAt !== null) {
-    const minutes = look.slotCause.slots * Math.min(Math.max(0, look.at.getTime() - Date.parse(look.previousAt)) / 60_000, 30);
-    writeSlotMinutes(db, day, cause, minutes);
+  if (cause === null || cause === 'unknown' || look.previousAt === null) {
+    return;
   }
+  const minutes = look.slotCause.slots * Math.min(Math.max(0, look.at.getTime() - Date.parse(look.previousAt)) / 60_000, 30);
+  writeSlotMinutes(db, sydney(look.at).date, cause, minutes);
+}
+
+const SLOT_CAUSES: SlotCauseName[] = ['delivery', 'triage', 'supply'];
+
+interface SlotAlertLook {
+  free: number;
+  at: Date;
+  actor: string;
+}
+
+// Every cause at 60 for the day alerts its owner, so an alert held back by quiet hours goes at the
+// first look after them, whatever the cause is then.
+function sendSlotCauseAlerts(db: Database, look: SlotAlertLook): void {
+  const day = sydney(look.at).date;
   const totals = readSlotMinutes(db, day);
-  for (const alertCause of SLOT_CAUSES) {
-    sendSlotCauseAlert(db, { day, cause: alertCause, minutes: totals[alertCause], free: look.slotCause.slots, at: look.at, actor: look.actor });
+  for (const cause of SLOT_CAUSES) {
+    sendSlotCauseAlert(db, { day, cause, minutes: totals[cause], free: look.free, at: look.at, actor: look.actor });
   }
 }
