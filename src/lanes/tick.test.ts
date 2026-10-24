@@ -3,6 +3,7 @@ import rulesTable from '../../lanes.json';
 import { buildReadyPage, makePagedCall } from '../../test/build-ready-page.ts';
 import type { ReadyNodeSeed } from '../../test/build-ready-page.ts';
 import { buildStubGitHubFactsRunner } from '../../test/build-stub-github-facts-runner.ts';
+import { createCapacitySample } from '../../test/create-capacity-sample.ts';
 import { at, freshDb } from '../../test/helpers.ts';
 import { makeStateCall } from '../../test/make-state-call.ts';
 import { setMeta } from '../db/set-meta.ts';
@@ -331,6 +332,28 @@ test('it counts no slot-minutes while the cap, not the pool, holds the free slot
   expect(result.slotCause).toStrictEqual({ cause: null, slots: 0, since: null, readyAgeMinutes: 20, reason: null, waitingMinutes: null, backlogError: null });
   expect(result.nudged).toBe(false);
   expect(readSlotMinutes(ctx.db, '2026-10-14')).toStrictEqual({ delivery: 0, triage: 0, supply: 0 });
+});
+
+test('it offers the imp room as free slots when pacing has no lanes and no cap is set', () => {
+  const ctx = setupTest();
+  at('2026-10-14T01:00:00Z');
+  createCapacitySample(ctx.db, { at: '2026-10-14T00:55:00Z', nonnixAwakeMib: 0 });
+
+  const result = tick(ctx.db, { cap: { imp: { freeMib: 4096 }, providers: { kettle: { room: true, unattended: true, target: 'imp' } } }, impMib: 2048, error: null }, 'hq-lanes');
+
+  expect(result.slots).toBe(2);
+});
+
+test('it offers no slot when pacing has no lanes and a cap of zero holds the imp room', () => {
+  const ctx = setupTest();
+  at('2026-10-14T01:00:00Z');
+  createCapacitySample(ctx.db, { at: '2026-10-14T00:55:00Z', nonnixAwakeMib: 0 });
+  setMeta(ctx.db, 'lanes_cap', JSON.stringify({ cap: 0, until: null, reason: 'kettle descaling', by: 'z-stu', at: '2026-10-14T00:00:00Z' }));
+
+  const result = tick(ctx.db, { cap: { imp: { freeMib: 4096 }, providers: { kettle: { room: true, unattended: true, target: 'imp' } } }, impMib: 2048, error: null }, 'hq-lanes');
+
+  expect(result).toMatchObject({ slots: 0, nudged: false, why: 'none (cap reached)' });
+  expect(ctx.db.query("SELECT COUNT(*) AS total FROM outbox WHERE text LIKE 'Lanes%'").get()).toStrictEqual({ total: 0 });
 });
 
 test('it counts slot-minutes for the free slots the cap leaves', async () => {

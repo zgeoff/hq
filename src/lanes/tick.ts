@@ -11,13 +11,13 @@ import { logEvent } from '../log-event.ts';
 import { enqueue } from '../outbox/enqueue.ts';
 import { orchestratorName } from '../wake/orchestrator-name.ts';
 import { endExpiredCap } from './cap/end-expired-cap.ts';
+import { readCappedImpRoom } from './cap/read-capped-imp-room.ts';
 import { checkAllSkipped } from './check-all-skipped.ts';
 import { checkReadyStale } from './check-ready-stale.ts';
 import { eligibleNow } from './eligible-now.ts';
 import { formatSlotNudge } from './format-slot-nudge.ts';
 import { getLanesHold } from './get-lanes-hold.ts';
 import { LANES } from './lanes.ts';
-import { loadImpRoom } from './load-imp-room.ts';
 import { nudgeText } from './nudge-text.ts';
 import { readSlotMinutes } from './read-slot-minutes.ts';
 import { readSlotPlan } from './read-slot-plan.ts';
@@ -41,8 +41,8 @@ export function tick(db: Database, sample: Sample, actor: string): TickResult {
 
       // With lanes: the slots worth filling now, the issues the plan picks (every free slot while Ready
       // is unknown). Else one pool of imp slots, under impd's non-Nix line as the lanes are.
-      // oxlint-disable-next-line one-var -- the tick's one-const-per-line style is GEO-1318's lint debt
-      const slots = slotPlan ? countWanted(slotPlan) : loadImpRoom(db, { budgetSlots: impSlots, impMib: sample.impMib }).slots;
+      const look = slotPlan ? { slots: countWanted(slotPlan), capHeld: slotPlan.pool.capHeld } : readCappedImpRoom(db, { budgetSlots: impSlots, impMib: sample.impMib }, t);
+      const slots = look.slots;
       const eligible = slotPlan?.eligible ?? eligibleNow(db).count;
       const previous = z.object({ at: z.string() }).nullable().parse(db.query('SELECT at FROM lanes_samples ORDER BY seq DESC LIMIT 1').get());
       db.query('INSERT INTO lanes_samples (at, free_mib, slots, eligible, error) VALUES (?, ?, ?, ?, ?)').run(at, freeMib, slots, eligible, sample.error);
@@ -87,8 +87,7 @@ export function tick(db: Database, sample: Sample, actor: string): TickResult {
       }
       if (slots === 0) {
         setMeta(db, 'lanes_free_since', null);
-        const why = slotPlan && slotPlan.pool.free > 0 ? `${slotPlan.pool.free} slot(s) free, nothing eligible` : 'lanes full';
-        return result(false, why, null);
+        return result(false, formatNoSlotWhy(slotPlan, look.capHeld), null);
       }
       let since = getMeta(db, 'lanes_free_since');
       if (!since) {
@@ -165,4 +164,11 @@ function sendSlotCauseAlerts(db: Database, look: SlotAlertLook): void {
   for (const cause of SLOT_CAUSES) {
     sendSlotCauseAlert(db, { day, cause, minutes: totals[cause], free: look.free, at: look.at, actor: look.actor });
   }
+}
+
+function formatNoSlotWhy(slotPlan: ReturnType<typeof readSlotPlan>, capHeld: boolean): string {
+  if (slotPlan && slotPlan.pool.free > 0) {
+    return `${slotPlan.pool.free} slot(s) free, nothing eligible`;
+  }
+  return capHeld ? 'none (cap reached)' : 'lanes full';
 }
