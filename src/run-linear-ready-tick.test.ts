@@ -1,5 +1,6 @@
 import { expect, jest, mock, onTestFinished, test } from 'bun:test';
 import { setImmediate } from 'node:timers/promises';
+import { buildHeldLinearCall } from '../test/build-held-linear-call.ts';
 import { buildStubClock } from '../test/build-stub-clock.ts';
 import { buildStubGitHubFactsRunner } from '../test/build-stub-github-facts-runner.ts';
 import { buildReadyPage, makePagedCall } from '../test/build-ready-page.ts';
@@ -165,26 +166,17 @@ test('it records an unknown count when the Backlog read answers within a fresh d
   jest.useFakeTimers();
   onTestFinished(() => jest.useRealTimers());
   const clock = buildStubClock(0);
-  const ready = Promise.withResolvers<unknown>();
-  const backlog = Promise.withResolvers<unknown>();
-  const backlogAsked = Promise.withResolvers<void>();
-  const call: LinearCall = (_query, variables) => {
-    if (variables['state'] !== 'Backlog') {
-      return ready.promise;
-    }
-    backlogAsked.resolve();
-    return backlog.promise;
-  };
-  const ran = runLinearReadyTick(ctx.db, { call, run: buildStubGitHubFactsRunner({}), readLanes: () => Promise.resolve(lanes), actor: 'hq-lanes', deadlineMs: 100, now: clock.now });
+  const held = buildHeldLinearCall();
+  const ran = runLinearReadyTick(ctx.db, { call: held.call, run: buildStubGitHubFactsRunner({}), readLanes: () => Promise.resolve(lanes), actor: 'hq-lanes', deadlineMs: 100, now: clock.now });
 
   // Ready takes 60 of the 100 ms, so the Backlog read has 40 left; a fresh 100 ms would outlast its answer at 70.
   clock.sleep(60);
   jest.advanceTimersByTime(60);
-  ready.resolve(buildReadyPage([], null));
-  await backlogAsked.promise;
+  held.ready.resolve(buildReadyPage([], null));
+  await held.backlogAsked;
   clock.sleep(70);
   jest.advanceTimersByTime(70);
-  backlog.resolve({ issues: { nodes: [], pageInfo: { hasNextPage: false, endCursor: null } } });
+  held.backlog.resolve({ issues: { nodes: [], pageInfo: { hasNextPage: false, endCursor: null } } });
   const read = await ran;
 
   expect(read).toBe(true);
