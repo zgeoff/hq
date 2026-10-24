@@ -9,7 +9,7 @@ interface StubAuthor {
 // passing check, a human author) and the bare head read.
 export function buildStubPRHead(head: string, author?: StubAuthor): Pick<FakeScript, 'prFacts' | 'prHead'> {
   return {
-    prFacts: { code: 0, stdout: JSON.stringify({ headRefOid: head, baseRefName: 'main', author: author ?? { login: 'zgeoff', is_bot: false }, statusCheckRollup: [{ __typename: 'CheckRun', name: 'test', status: 'COMPLETED', conclusion: 'SUCCESS' }] }), stderr: '' },
+    prFacts: { code: 0, stdout: JSON.stringify({ headRefOid: head, baseRefName: 'main', baseRefOid: 'ba5eba5eba5eba5eba5eba5eba5eba5eba5eba5e', author: author ?? { login: 'zgeoff', is_bot: false }, statusCheckRollup: [{ __typename: 'CheckRun', name: 'test', status: 'COMPLETED', conclusion: 'SUCCESS' }] }), stderr: '' },
     prHead: { code: 0, stdout: JSON.stringify({ headRefOid: head }), stderr: '' },
   };
 }
