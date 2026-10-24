@@ -10,6 +10,7 @@ export interface BurnRate {
 
   ratePerHour: number | null;
   since: string | null;
+  reset: boolean;
 }
 
 const MIN_SAMPLES = 3;
@@ -20,13 +21,15 @@ export function buildBurnRate(points: readonly BurnPoint[]): BurnRate {
   const kept = read.slice(start);
   const latest = kept.at(-1)?.percent ?? null;
   const since = kept.at(0)?.at ?? null;
+  const reset = start > 0;
   if (kept.length < MIN_SAMPLES) {
-    return { samples: kept.length, latest, ratePerHour: null, since };
+    return { samples: kept.length, latest, ratePerHour: null, since, reset };
   }
-  return { samples: kept.length, latest, ratePerHour: fitSlope(kept), since };
+  return { samples: kept.length, latest, ratePerHour: fitSlope(kept), since, reset };
 }
 
 const RESET_JUMP_MS = 60_000;
+const RESET_DROP_POINTS = 10;
 
 function getResetStart(read: readonly BurnPoint[]): number {
   let start = 0;
@@ -36,7 +39,7 @@ function getResetStart(read: readonly BurnPoint[]): number {
     if (previous === undefined || current === undefined) {
       continue;
     }
-    const fell = (current.percent ?? 0) < (previous.percent ?? 0);
+    const fell = (previous.percent ?? 0) - (current.percent ?? 0) >= RESET_DROP_POINTS;
     const moved = previous.resetsAt !== null && current.resetsAt !== null && Date.parse(current.resetsAt) - Date.parse(previous.resetsAt) > RESET_JUMP_MS;
     if (fell || moved) {
       start = index;

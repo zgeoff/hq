@@ -11,7 +11,8 @@ export function formatCapacityHint(hint: CapacityHint): string[] {
 }
 
 function formatWindow(window: BurnWindow, hint: CapacityHint): string {
-  const head = `${window.window}, last ${hint.hours} h, ${window.samples} sample${window.samples === 1 ? '' : 's'}`;
+  const span = window.reset && window.since !== null ? `since ${formatClock(window.since)} (window reset)` : `last ${hint.hours} h`;
+  const head = `${window.window}, ${span}, ${window.samples} sample${window.samples === 1 ? '' : 's'}`;
   if (window.ratePerHour === null || window.latest === null || window.atRate === null) {
     return `${head}: too few samples`;
   }
@@ -19,6 +20,11 @@ function formatWindow(window: BurnWindow, hint: CapacityHint): string {
   const atRate = `at today's rate ${formatProjection(window.atRate, hint.limit)}`;
   const atCap = window.atCap === null || hint.cap === null ? '' : `; at the cap of ${hint.cap} (${formatRate(window.atCap.ratePerHour)}%/h) ${formatProjection(window.atCap, hint.limit)}`;
   return `${head}: ${rate}; ${atRate}${atCap}`;
+}
+
+function formatClock(time: string): string {
+  const date = new Date(time);
+  return `${String(date.getUTCHours()).padStart(2, '0')}:${String(date.getUTCMinutes()).padStart(2, '0')}Z`;
 }
 
 function formatRate(rate: number): string {

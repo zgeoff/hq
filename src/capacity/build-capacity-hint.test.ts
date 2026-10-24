@@ -11,6 +11,7 @@ test('it projects the time to the limit at today rate and at the cap', () => {
     latest: 16,
     ratePerHour: 4,
     since: '2026-10-14T01:00:00Z',
+    reset: false,
     atRate: { kind: 'in', hours: 19.75, at: '2026-10-14T22:15:00Z' },
     atCap: { kind: 'in', hours: 9.875, at: '2026-10-14T12:22:30Z', ratePerHour: 8 },
   });
