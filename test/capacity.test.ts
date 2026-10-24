@@ -203,8 +203,8 @@ test('cloud and Claude thresholds open one alert each; several in a tick make on
   expect(sent).toHaveLength(1);
   expect(sent[0]!.text).toContain('3 things are over their line');
   expect(sent[0]?.text).toContain('- cloud: 3.0 GiB memory available, under 4 GiB (of 31.3 GiB)');
-  expect(sent[0]!.text).toContain('- Claude: 7-day usage at 90%, at or over 85% (account abcdef)');
-  expect(sent[0]!.text).toContain('- Claude: 5-hour usage at 95%, at or over 90%');
+  expect(sent[0]?.text).toContain('- Claude: 7-day usage at 90%, early warning at 85% (account abcdef)');
+  expect(sent[0]?.text).toContain('- Claude: 5-hour usage at 95%, early warning at 90%');
 });
 
 test('the PC never alerts, however low it is', async () => {

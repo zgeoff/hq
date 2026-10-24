@@ -13,5 +13,5 @@ import { writeCapacitySample as storeSample } from './write-capacity-sample.ts';
 export async function sampleCapacity(db: Database, probe: CapacityProbe, actor: string, at: Date = now()): Promise<{ reading: Reading; tick: CapacityTick }> {
   const reading = await readCapacity(db, probe, at);
   await storeSample(db, reading);
-  return { reading, tick: evaluateCapacity(db, { reading, plan: probe.plan ?? null }, actor, at) };
+  return { reading, tick: evaluateCapacity(db, { reading, plan: probe.plan ?? null, claudeLaunchPct: probe.claudeLaunchPct ?? null }, actor, at) };
 }

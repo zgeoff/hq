@@ -37,3 +37,18 @@ test.each([
 
   await expect(runCapacityStep(ctx.db, ctx.probe, ctx.pacing, 'hq-lanes').then((step) => step.tick.opened)).resolves.toStrictEqual(opened);
 });
+
+test("the Claude alert names pacing.json's launch limit", async () => {
+  const ctx = setupTest();
+  writeFileSync(ctx.pacing, JSON.stringify({ imp: { impMib: 2048 }, providers: { claude: { threshold: 95, unattended: true, target: 'imp' } } }));
+  ctx.db.query('INSERT INTO usage_samples (at, account, five_hour, seven_day) VALUES (?, ?, ?, ?)').run('2026-10-14T00:58:00Z', 'abcdef012345', 10, 91);
+  onTestFinished(overrideEnv('HQ_NOW', '2026-10-14T01:00:00Z'));
+  await runCapacityStep(ctx.db, ctx.probe, ctx.pacing, 'hq-lanes');
+  process.env['HQ_NOW'] = '2026-10-14T01:05:00Z';
+
+  await runCapacityStep(ctx.db, ctx.probe, ctx.pacing, 'hq-lanes');
+
+  expect(ctx.db.query("SELECT DISTINCT text FROM outbox WHERE text LIKE '%Claude%'").all()).toStrictEqual([
+    { text: 'Capacity watch: something is over its line.\n- Claude: 7-day usage at 91%, early warning at 85% (launch limit 95%) (account abcdef)\nhq capacity shows every reading. hq changed nothing.' },
+  ]);
+});

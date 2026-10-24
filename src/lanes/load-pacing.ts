@@ -12,12 +12,19 @@ export interface Pacing {
 
   // The local sessions unattended providers may run on this host; null: no cap but the local slots.
   localRoom: number | null;
+
+  // Claude's launch limit, providers.claude.threshold, in percent; null when the file gives none.
+  claudeLaunchPct: number | null;
   error: string | null;
 }
 
 const fileSchema = z.object({ lanes: z.unknown(), slots: z.unknown() }).partial();
 
 const impSchema = z.object({ imp: z.object({ impMib: z.number() }) });
+
+const claudeProviderSchema = z.object({ threshold: z.number() });
+
+const claudeSchema = z.object({ providers: z.object({ claude: claudeProviderSchema }) });
 
 // pacing.json's imp size, lanes, slot caps and local room. A file hq can't read, or one with neither lanes nor
 // slots, gives one pool of imp slots. Lanes or slots it refuses give an error, so the watcher nudges
@@ -29,14 +36,16 @@ export async function loadPacing(path: string): Promise<Pacing> {
   const shape = parsed.success ? parsed.data : {};
   const imp = impSchema.safeParse(file);
   const impMib = imp.success ? imp.data.imp.impMib : DEFAULT_IMP_MIB;
+  const claude = claudeSchema.safeParse(file);
+  const claudeLaunchPct = claude.success ? claude.data.providers.claude.threshold : null;
   if (shape.lanes === undefined && shape.slots === undefined) {
-    return { impMib, lanes: null, slots: null, localRoom: null, error: null };
+    return { impMib, lanes: null, slots: null, localRoom: null, claudeLaunchPct, error: null };
   }
   try {
-    return { impMib, lanes: parseLanes(file), slots: parsePacingSlots(file), localRoom: parseLocalRoom(file), error: null };
+    return { impMib, lanes: parseLanes(file), slots: parsePacingSlots(file), localRoom: parseLocalRoom(file), claudeLaunchPct, error: null };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    return { impMib, lanes: null, slots: null, localRoom: null, error: `pacing.json: ${message}` };
+    return { impMib, lanes: null, slots: null, localRoom: null, claudeLaunchPct, error: `pacing.json: ${message}` };
   }
 }
 
