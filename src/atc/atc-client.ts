@@ -21,6 +21,11 @@ export class AtcClient {
     this.peer = peer;
   }
 
+  // Who is asking, as the daemon found it from the kernel; see AtcPeer.
+  get peerSession(): string | null | undefined {
+    return this.peer.peerSession;
+  }
+
   static async open(path = socketPath(), timeoutMs = 3000): Promise<AtcClient> {
     const peer = await openAtcPeer(path, timeoutMs);
     return new AtcClient(peer);

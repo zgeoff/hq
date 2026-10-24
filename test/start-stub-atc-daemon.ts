@@ -23,6 +23,12 @@ export interface StubAtcDaemon {
 export interface StubAtcOptions {
   build?: string;
   protocol?: number;
+
+  // the caller's session the hello names; null by default, as for a caller outside any session
+  peerSession?: string | null;
+
+  // a hello with no peerSession field at all, as from a daemon older than protocol 11
+  helloWithoutPeerSession?: boolean;
 }
 
 interface Connection {
@@ -34,6 +40,8 @@ interface Connection {
 interface DaemonIdentity {
   build: string;
   protocol: number;
+  peerSession: string | null;
+  helloWithoutPeerSession: boolean;
 }
 
 type PeerRequest = Parameters<ServerPeerHandleRequestFn>[0];
@@ -48,7 +56,7 @@ export function startStubAtcDaemon(path: string, procedures: Record<string, Stub
 }
 
 function buildHandlers(procedures: Record<string, StubProcedure>, requests: StubAtcRequest[], options: StubAtcOptions): SocketHandler<Connection> {
-  const daemon: DaemonIdentity = { build: options.build ?? '7.1.0', protocol: options.protocol ?? 11 };
+  const daemon: DaemonIdentity = { build: options.build ?? '7.1.0', protocol: options.protocol ?? 11, peerSession: options.peerSession ?? null, helloWithoutPeerSession: options.helloWithoutPeerSession ?? false };
   const router = buildRouter(procedures, requests, daemon);
   return {
     open(socket) {
@@ -103,5 +111,10 @@ function buildHelloResult(input: unknown, daemon: DaemonIdentity) {
       message: `${hello.client} speaks protocol v${hello.protocol ?? 'unknown'}, daemon ${daemon.build} speaks v${daemon.protocol}; restart the daemon so both run the same build`,
     });
   }
-  return { daemon: daemon.build, daemonID: 'd-invented', peerSession: null, limits: { maxLine: 1_048_576, maxChunk: 65_536 }, idempotency: { completedRetentionMs: 86_400_000 }, lastUsedAgent: 'claude' };
+  const result = { daemon: daemon.build, daemonID: 'd-invented', peerSession: daemon.peerSession, limits: { maxLine: 1_048_576, maxChunk: 65_536 }, idempotency: { completedRetentionMs: 86_400_000 }, lastUsedAgent: 'claude' };
+  if (daemon.helloWithoutPeerSession) {
+    const { peerSession: _omitted, ...older } = result;
+    return older;
+  }
+  return result;
 }

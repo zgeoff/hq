@@ -1,33 +1,19 @@
 import type { Database } from 'bun:sqlite';
-import { fleetIds } from '../atc/fleet-ids.ts';
-import { roleName } from '../roles/role-name.ts';
+import { readRoleSession } from './read-role-session.ts';
 
 export interface OwnerProbeClient {
-  resolve: (target: string, known: Record<string, string>) => Promise<{ id: string }>;
+  peerSession: string | null | undefined;
   close: () => void;
 }
 
 export type OwnerProbe = { verdict: 'owner' } | { verdict: 'other' } | { verdict: 'unknown'; cause: string };
 
 export interface OwnerProbeDeps {
-  sessionID?: string;
   openClient: () => Promise<OwnerProbeClient>;
 }
 
-// --by and HQ_AS are the caller's own words, so only the session id resolved through atc counts.
+// Whether the caller is the owner's session, by the rule readRoleSession states.
 export async function readOwnerSession(db: Database, deps: OwnerProbeDeps): Promise<OwnerProbe> {
-  if (deps.sessionID === undefined || deps.sessionID === '') {
-    return { verdict: 'other' };
-  }
-  try {
-    const client = await deps.openClient();
-    try {
-      const owner = await client.resolve(roleName('owner'), fleetIds(db));
-      return owner.id === deps.sessionID ? { verdict: 'owner' } : { verdict: 'other' };
-    } finally {
-      client.close();
-    }
-  } catch (error) {
-    return { verdict: 'unknown', cause: error instanceof Error ? error.message : String(error) };
-  }
+  const probe = await readRoleSession(db, deps, 'owner');
+  return probe.verdict === 'match' ? { verdict: 'owner' } : probe;
 }

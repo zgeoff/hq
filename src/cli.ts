@@ -19,7 +19,6 @@ import type { Ask, Kind } from './asks/types.ts';
 import { waitReasons } from './asks/wait-reasons.ts';
 import { logEvent } from './log-event.ts';
 import { owner } from './owner.ts';
-import { match } from 'ts-pattern';
 import type { AskState } from './transitions/ask-states.ts';
 import { AtcClient } from './atc/atc-client.ts';
 import { fleetIds } from './atc/fleet-ids.ts';
@@ -43,6 +42,8 @@ import { findFleetName } from './atc/find-fleet-name.ts';
 import { createStoreBackup } from './noslop/create-store-backup.ts';
 import { runNoslopCommand } from './noslop/run-noslop-command.ts';
 import { readOwnerSession } from './pr-status/read-owner-session.ts';
+import { identitySocketPath } from './atc/identity-socket-path.ts';
+import { runCallAnswer } from './asks/run-call-answer.ts';
 import { readRoleSession } from './pr-status/read-role-session.ts';
 import type { OwnerProbeDeps } from './pr-status/read-owner-session.ts';
 import { runPRCommand } from './pr-status/run-pr-command.ts';
@@ -514,14 +515,13 @@ function getHome(): string {
 
 const list = (v: string | undefined) => (v ?? '').split(',').map((s) => s.trim()).filter(Boolean);
 
-// The acting session's name: --by, HQ_AS, or the atc session hq runs inside.
+// The owner and reviewer checks ask the daemon at the uid's own socket who is calling.
 function readOwnerProbeDeps(): OwnerProbeDeps {
-  const sessionID = process.env['ATC_SESSION_ID'];
-  return sessionID === undefined ? { openClient: openOwnerProbeClient } : { sessionID, openClient: openOwnerProbeClient };
+  return { openClient: openOwnerProbeClient };
 }
 
 function openOwnerProbeClient(): Promise<AtcClient> {
-  return AtcClient.open(undefined, 1500);
+  return AtcClient.open(identitySocketPath(), 1500);
 }
 
 async function actor(db: Database, flags: Flags): Promise<string> {
@@ -642,18 +642,8 @@ async function askCommand(db: Database, kind: Kind, verb: string, args: string[]
       const askID = needId();
       const text = await readText(flags.answer, flags['answer-file'], 'answer');
       const who = await by();
-      const probe = kind === 'call' ? await readOwnerSession(db, readOwnerProbeDeps()) : null;
-      const ownerSession =
-        probe === null
-          ? false
-          : match(probe)
-              .with({ verdict: 'owner' }, () => true)
-              .with({ verdict: 'other' }, () => false)
-              .with({ verdict: 'unknown' }, (failed) => {
-                throw new HqError('atc_unreachable', `atc could not say whether this caller is the owner's session (${owner()}), so the answer is not saved: ${failed.cause}. Run it again once atc answers, or answer in the console`);
-              })
-              .exhaustive();
-      const answered = answerAsk(db, { id: askID, kind, answer: text, actor: who, ownerSession });
+      const input = { id: askID, kind, answer: text, actor: who };
+      const answered = kind === 'call' ? await runCallAnswer(db, input, () => readOwnerSession(db, readOwnerProbeDeps())) : answerAsk(db, input);
       return { data: { [kind]: answered }, text: `${askLine(answered)}\nAnswer saved word for word. Apply it, then: hq ${kind} apply ${answered.id} --to ...` };
     }
     case 'apply': {
