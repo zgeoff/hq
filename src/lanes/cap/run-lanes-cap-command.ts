@@ -14,6 +14,7 @@ import type { LanesCap } from './lanes-cap.ts';
 import { parseCapUntil } from './parse-cap-until.ts';
 import type { LanesCapArgs } from './parse-lanes-cap-args.ts';
 import { readCapCaller } from './read-cap-caller.ts';
+import type { CapCaller } from './read-cap-caller.ts';
 import { readLanesCap } from './read-lanes-cap.ts';
 import { writeLanesCap } from './write-lanes-cap.ts';
 
@@ -55,9 +56,20 @@ function showCap(deps: LanesCapCommandDeps): CapOut {
 
 async function changeCap(deps: LanesCapCommandDeps, args: Exclude<LanesCapArgs, { kind: 'show' }>): Promise<CapOut> {
   const request = toCapRequest(args, deps.at);
+  const caller = await readCapCaller(deps.db, deps.probe);
+  return deps.db.transaction(() => writeCapChange(deps, caller, request)).immediate();
+}
+
+function toCapRequest(args: Exclude<LanesCapArgs, { kind: 'show' }>, at: Date): CapRequest {
+  if (args.kind === 'off') {
+    return args;
+  }
+  return { kind: 'set', cap: args.cap, until: args.until === null ? null : parseCapUntil(args.until, at), reason: args.reason };
+}
+
+function writeCapChange(deps: LanesCapCommandDeps, caller: CapCaller, request: CapRequest): CapOut {
   const stored = readLanesCap(deps.db);
   const current = stored.kind === 'set' && !isCapEnded(stored.cap, deps.at) ? stored.cap : null;
-  const caller = await readCapCaller(deps.db, deps.probe);
   const decision = decideCapChange({ caller, current, request, at: iso(deps.at) });
   if (!decision.ok) {
     throw new HqError('not_allowed', decision.message);
@@ -66,15 +78,8 @@ async function changeCap(deps: LanesCapCommandDeps, args: Exclude<LanesCapArgs, 
     return { data: { cap: null }, text: 'There is no cap to lift.' };
   }
   const by = decision.by;
-  deps.db.transaction(() => writeLanesCap(deps.db, { action: decision.action, cap: decision.cap, actor: by, reason: decision.reason })).immediate();
+  writeLanesCap(deps.db, { action: decision.action, cap: decision.cap, actor: by, reason: decision.reason });
   return { data: { cap: decision.action === 'cap-set' ? decision.cap : null, by }, text: formatChange(decision.action, decision.cap) };
-}
-
-function toCapRequest(args: Exclude<LanesCapArgs, { kind: 'show' }>, at: Date): CapRequest {
-  if (args.kind === 'off') {
-    return args;
-  }
-  return { kind: 'set', cap: args.cap, until: args.until === null ? null : parseCapUntil(args.until, at), reason: args.reason };
 }
 
 function formatChange(action: 'cap-set' | 'cap-off' | 'cap-ended', cap: LanesCap): string {

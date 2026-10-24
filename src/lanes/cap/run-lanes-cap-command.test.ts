@@ -98,6 +98,19 @@ test('it refuses the delivery lead raising a cap and leaves it as it was', async
   expect(getMeta(ctx.db, 'lanes_cap')).toBe(before);
 });
 
+test('it judges the delivery lead against the cap stored when it writes, not before atc answered', async () => {
+  const ctx = setupTest();
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'z-delivery': 'kettle-2' }));
+  await runLanesCapCommand({ db: ctx.db, at: new Date('2026-10-15T00:00:00Z'), args: { kind: 'set', cap: 7, until: null, reason: null }, probe: ctx.owner });
+  const lowered = JSON.stringify({ cap: 3, until: null, reason: 'owner lowered it meanwhile', by: 'z-stu', at: '2026-10-15T00:00:00Z' });
+  const slowDelivery = { openClient: () => (setMeta(ctx.db, 'lanes_cap', lowered), Promise.resolve({ peerSession: 'kettle-2', close: () => {} })) };
+
+  const refused = runLanesCapCommand({ db: ctx.db, at: new Date('2026-10-15T00:00:00Z'), args: { kind: 'set', cap: 5, until: null, reason: null }, probe: slowDelivery });
+
+  await expect(refused).rejects.toThrow('z-delivery may only lower the lanes cap (now 3)');
+  expect(getMeta(ctx.db, 'lanes_cap')).toBe(lowered);
+});
+
 test('it refuses the delivery lead lifting a cap', async () => {
   const ctx = setupTest();
   setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'z-delivery': 'kettle-2' }));
