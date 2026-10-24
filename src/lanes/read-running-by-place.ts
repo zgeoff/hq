@@ -21,14 +21,12 @@ export interface RunningByPlace {
 
 const rowsSchema = z.array(z.object({ issue: z.string(), place: z.enum(['imp', 'local']) }));
 
-// The runs that hold a slot, by place, less the parked ones. A fresh atc reading counts a run filed imp
-// whose awake sessions are all here as local, and lifts local to the awake sessions here that any run
-// lists, whatever its state, place or lane.
 export function readRunningByPlace(db: Database, at: Date = now()): RunningByPlace {
   const parked = new Set(parkedRuns(db, at).map((run) => run.issue));
+  const design = readDesignIssues(db);
   const rows = rowsSchema.parse(db.query(`SELECT issue, place FROM runs WHERE place != 'none' AND state IN (${RUNNING.map(() => '?').join(', ')}) ORDER BY issue`).all(...RUNNING));
-  const holding = rows.filter((row) => !parked.has(row.issue));
-  const live = readLiveLocal(db, at);
+  const holding = rows.filter((row) => !parked.has(row.issue) && !design.has(row.issue));
+  const live = readLiveLocal(db, at, design);
   const movedHere = holding.filter((row) => row.place === 'imp' && live?.hereOnly.has(row.issue) === true).length;
   const filedLocal = holding.filter((row) => row.place === 'local').length + movedHere;
   const impIssues = holding.filter((row) => row.place === 'imp' && live?.hereOnly.has(row.issue) !== true).map((row) => row.issue);
@@ -41,6 +39,13 @@ export function readRunningByPlace(db: Database, at: Date = now()): RunningByPla
   return { imp, local: live.sessions, issues, impIssues, localSource: `${live.sessions} live session${plural} here` };
 }
 
+const designSchema = z.array(z.object({ issue: z.string() }));
+
+function readDesignIssues(db: Database): Set<string> {
+  const rows = designSchema.parse(db.query("SELECT issue FROM linear_issues WHERE type = 'Design'").all());
+  return new Set(rows.map((row) => row.issue));
+}
+
 interface LiveLocal {
   sessions: number;
 
@@ -51,14 +56,14 @@ interface LiveLocal {
 const sessionsSchema = z.array(z.object({ issue: z.string(), session_id: z.string() }));
 
 // Null with no fresh reading, or one from before the sweep recorded the local sessions.
-function readLiveLocal(db: Database, at: Date): LiveLocal | null {
+function readLiveLocal(db: Database, at: Date, design: ReadonlySet<string>): LiveLocal | null {
   const reading = readFreshAwake(db, at);
   if (reading?.local === undefined) {
     return null;
   }
   const awake = new Set(reading.ids);
   const here = new Set(reading.local);
-  const rows = sessionsSchema.parse(db.query('SELECT DISTINCT issue, session_id FROM run_sessions').all()).filter((row) => awake.has(row.session_id));
+  const rows = sessionsSchema.parse(db.query('SELECT DISTINCT issue, session_id FROM run_sessions').all()).filter((row) => awake.has(row.session_id) && !design.has(row.issue));
   const sessions = new Set(rows.filter((row) => here.has(row.session_id)).map((row) => row.session_id)).size;
   const elsewhere = new Set(rows.filter((row) => !here.has(row.session_id)).map((row) => row.issue));
   const hereOnly = new Set(rows.filter((row) => here.has(row.session_id) && !elsewhere.has(row.issue)).map((row) => row.issue));
