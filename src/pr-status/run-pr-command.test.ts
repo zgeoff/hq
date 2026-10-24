@@ -1,17 +1,16 @@
-import { expect, onTestFinished, spyOn, test } from 'bun:test';
+import { expect, onTestFinished, test } from 'bun:test';
 import { applyAskItem } from '../apply-ask-item.ts';
 import { addAsk } from '../asks/add-ask.ts';
 import { answerAsk } from '../asks/answer-ask.ts';
 import { openAsk } from '../asks/open-ask.ts';
-import { overrideEnv } from '../config/override-env.ts';
 import { logEvent } from '../log-event.ts';
 import { parseItemInput } from '../parse-item-input.ts';
 import { recordConsoleAnswer } from '../record-console-answer.ts';
 import { buildFakeRunner } from '../../test/noslop-fake.ts';
-import { NOON_SYDNEY, at, fakeAtc, freshDb } from '../../test/helpers.ts';
-import { main } from '../cli.ts';
+import { NOON_SYDNEY, at, freshDb } from '../../test/helpers.ts';
 import type { Flags } from '../cli.ts';
 import { runPRCommand } from './run-pr-command.ts';
+import { runCallAnswer } from '../asks/run-call-answer.ts';
 
 function setupTest() {
   const fresh = freshDb();
@@ -28,17 +27,7 @@ function setupTest() {
       openAsk(fresh.db, { id, force: true, actor: 'z-stu' });
     },
     answerInHq: (id: string) => answerAsk(fresh.db, { id, kind: 'call', answer: 'Yes', actor: 'z-stu' }),
-    answerByCLI: async (id: string, sessionID: string, extra: string[] = []) => {
-      const atc = fakeAtc(fresh.dir);
-      onTestFinished(atc.stop);
-      onTestFinished(overrideEnv('HQ_ATC_SOCKET', atc.path));
-      onTestFinished(overrideEnv('ATC_SESSION_ID', sessionID));
-      onTestFinished(overrideEnv('HQ_AS', undefined));
-      onTestFinished(overrideEnv('HQ_NOTIFY', 'off'));
-      const log = spyOn(console, 'log').mockImplementation(() => {});
-      onTestFinished(() => log.mockRestore());
-      return await main(['call', 'answer', id, '--answer', 'Yes', ...extra]);
-    },
+    answerByHqCall: async (id: string, verdict: 'owner' | 'other', actor = 'z-stu') => await runCallAnswer(fresh.db, { id, kind: 'call', answer: 'Yes', actor }, () => Promise.resolve({ verdict })),
     answerInConsole: (id: string) => recordConsoleAnswer(fresh.db, { id, option: '', note: 'Yes', actor: 'owner' }),
     headAt: (head: string) => buildFakeRunner({ prHead: { code: 0, stdout: JSON.stringify({ headRefOid: head }), stderr: '' } }),
     ghDown: () => buildFakeRunner({ prHead: { code: 1, stdout: '', stderr: 'gh: could not resolve to a PullRequest' } }),
@@ -510,7 +499,7 @@ test('it shows a standing override for a PR with no record, in text and in JSON'
 test.each(['override', 'accept-risk'])('it refuses a chat: source for %s from a caller that is not the owner session, and records nothing', async (verb) => {
   const ctx = setupTest();
 
-  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), verb, ['widgets', '7', 'aaaa'], { source: 'chat:kettle-12', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: '--source refused: a chat: source is accepted only from the session of the owner (z-stu), found through ATC_SESSION_ID; this caller is not it; ask z-stu to record it' });
+  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), verb, ['widgets', '7', 'aaaa'], { source: 'chat:kettle-12', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: '--source refused: a chat: source is accepted only from the session of the owner (z-stu), as atc finds the caller; this caller is not it; ask z-stu to record it' });
 
   expect(ctx.db.query("SELECT COUNT(*) AS total FROM events WHERE action IN ('pr-override', 'pr-accepted-risk')").get()).toStrictEqual({ total: 0 });
 });
@@ -541,7 +530,7 @@ test('it refuses a call: source for a call the owner has not answered', async ()
   const ctx = setupTest();
   ctx.fileCall('KET-4', 'Pour widgets#7 now?');
 
-  await expect(ctx.asOwner(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'call:KET-4', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: "--source refused: call:KET-4 has no owner answer for its current round, in the console or by `hq call answer` from the owner's session (z-stu), found through ATC_SESSION_ID; ask z-stu to record it" });
+  await expect(ctx.asOwner(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'call:KET-4', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: "--source refused: call:KET-4 has no owner answer for its current round, in the console or by `hq call answer` from the owner's session (z-stu), as atc finds the caller; ask z-stu to record it" });
 });
 
 test('it refuses a call: source for an hq call answer recorded with no owner-session mark', async () => {
@@ -549,13 +538,13 @@ test('it refuses a call: source for an hq call answer recorded with no owner-ses
   ctx.fileCall('KET-4', 'Pour widgets#7 now?');
   ctx.answerInHq('KET-4');
 
-  await expect(ctx.asOwner(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'call:KET-4', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: "--source refused: call:KET-4 has no owner answer for its current round, in the console or by `hq call answer` from the owner's session (z-stu), found through ATC_SESSION_ID; ask z-stu to record it" });
+  await expect(ctx.asOwner(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'call:KET-4', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: "--source refused: call:KET-4 has no owner answer for its current round, in the console or by `hq call answer` from the owner's session (z-stu), as atc finds the caller; ask z-stu to record it" });
 });
 
 test('it accepts a call: source for accept-risk from a call answered by hq call answer in the z-stu session', async () => {
   const ctx = setupTest();
   ctx.fileCall('KET-11', 'Accept-risk aaaa on widgets#7?');
-  await expect(ctx.answerByCLI('KET-11', 'id-stu')).resolves.toBe(0);
+  await ctx.answerByHqCall('KET-11', 'owner');
 
   await ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'accept-risk', ['widgets', '7', 'aaaa'], { source: 'call:KET-11', note: 'Ship it.' });
 
@@ -565,9 +554,9 @@ test('it accepts a call: source for accept-risk from a call answered by hq call 
 test('it refuses a call: source answered by hq call answer --by z-stu from another session, and records nothing', async () => {
   const ctx = setupTest();
   ctx.fileCall('KET-12', 'Pour widgets#7 now?');
-  await expect(ctx.answerByCLI('KET-12', 'id-refine', ['--by', 'z-stu'])).resolves.toBe(0);
+  await ctx.answerByHqCall('KET-12', 'other');
 
-  await expect(ctx.asOwner(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'call:KET-12', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: "--source refused: call:KET-12 has no owner answer for its current round, in the console or by `hq call answer` from the owner's session (z-stu), found through ATC_SESSION_ID; ask z-stu to record it" });
+  await expect(ctx.asOwner(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'call:KET-12', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: "--source refused: call:KET-12 has no owner answer for its current round, in the console or by `hq call answer` from the owner's session (z-stu), as atc finds the caller; ask z-stu to record it" });
   expect(ctx.db.query("SELECT actor FROM events WHERE subject_id = 'KET-12' AND action = 'answered'").all()).toStrictEqual([{ actor: 'z-stu' }]);
   expect(ctx.db.query("SELECT COUNT(*) AS total FROM events WHERE action = 'pr-override'").get()).toStrictEqual({ total: 0 });
 });
@@ -577,7 +566,7 @@ test('it refuses a call: source for the PR a refiled call names until the owner 
   ctx.fileCall('KET-21', 'Pour widgets#7 now?');
   ctx.answerInConsole('KET-21');
   ctx.refileCall('KET-21', 'Pour widgets#8 now?');
-  const refusal = "--source refused: call:KET-21 has no owner answer for its current round, in the console or by `hq call answer` from the owner's session (z-stu), found through ATC_SESSION_ID; ask z-stu to record it";
+  const refusal = "--source refused: call:KET-21 has no owner answer for its current round, in the console or by `hq call answer` from the owner's session (z-stu), as atc finds the caller; ask z-stu to record it";
 
   await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '8'], { source: 'call:KET-21', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: refusal });
   await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'call:KET-21', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: refusal });
@@ -588,7 +577,7 @@ test('it refuses a call: source for the PR a refiled call names until the owner 
 
 test.each([
   ['the console', (ctx: ReturnType<typeof setupTest>) => Promise.resolve(ctx.answerInConsole('KET-22'))],
-  ['hq call answer in the z-stu session', async (ctx: ReturnType<typeof setupTest>) => await ctx.answerByCLI('KET-22', 'id-stu')],
+  ['hq call answer in the z-stu session', async (ctx: ReturnType<typeof setupTest>) => await ctx.answerByHqCall('KET-22', 'owner')],
 ])('it accepts a call: source for the PR a refiled call names once the owner answers the new round in %s', async (_case, answerNewRound) => {
   const ctx = setupTest();
   ctx.fileCall('KET-22', 'Accept-risk aaaa on widgets#7?');
@@ -627,7 +616,7 @@ test.each(['Accept-risk aaaa on zgeoff/widgets#7?', 'Widgets#7: accept-risk aaaa
 
 test.each([
   ['the console', (ctx: ReturnType<typeof setupTest>) => Promise.resolve(ctx.answerInConsole('KET-5'))],
-  ['hq call answer in the z-stu session', async (ctx: ReturnType<typeof setupTest>) => await ctx.answerByCLI('KET-5', 'id-stu')],
+  ['hq call answer in the z-stu session', async (ctx: ReturnType<typeof setupTest>) => await ctx.answerByHqCall('KET-5', 'owner')],
 ])('it refuses a call: source for override from a plain Yes in %s, since a plain yes names no head', async (_case, answer) => {
   const ctx = setupTest();
   ctx.fileCall('KET-5', 'Override widgets#7 now?');

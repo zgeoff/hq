@@ -1,80 +1,41 @@
-import { expect, onTestFinished, test } from "bun:test";
-import { freshDb } from "../../test/helpers.ts";
-import { readOwnerSession } from "./read-owner-session.ts";
-import type { OwnerProbeClient } from "./read-owner-session.ts";
+import { expect, onTestFinished, test } from 'bun:test';
+import { overrideEnv } from '../config/override-env.ts';
+import { setMeta } from '../db/set-meta.ts';
+import { freshDb } from '../../test/helpers.ts';
+import { readOwnerSession } from './read-owner-session.ts';
+import type { OwnerProbeClient } from './read-owner-session.ts';
 
 function setupTest() {
   const fresh = freshDb();
   onTestFinished(fresh.cleanup);
-  const opened: string[] = [];
-  const closed: boolean[] = [];
-  const client = (ownerID: string): OwnerProbeClient => ({
-    resolve: (target) => {
-      opened.push(target);
-      return Promise.resolve({ id: ownerID });
-    },
+  const closed: string[] = [];
+  const client = (peerSession: string | null | undefined): OwnerProbeClient => ({
+    peerSession,
     close: () => {
-      closed.push(true);
+      closed.push('closed');
     },
   });
-  return { db: fresh.db, opened, closed, client };
+  return { db: fresh.db, client, closed };
 }
 
-test("it refuses a caller with no session id even when HQ_AS and --by name the owner", async () => {
+test("it accepts the caller atc finds in the owner's recorded session", async () => {
   const ctx = setupTest();
-  const savedAs = process.env["HQ_AS"];
-  process.env["HQ_AS"] = "z-stu";
-  onTestFinished(() => {
-    if (savedAs === undefined) {
-      delete process.env["HQ_AS"];
-    } else {
-      process.env["HQ_AS"] = savedAs;
-    }
-  });
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'sess-owner' }));
 
-  await expect(
-    readOwnerSession(ctx.db, {
-      sessionID: "",
-      openClient: () => Promise.resolve(ctx.client("sess-owner")),
-    }),
-  ).resolves.toStrictEqual({ verdict: "other" });
-  await expect(
-    readOwnerSession(ctx.db, { openClient: () => Promise.resolve(ctx.client("sess-owner")) }),
-  ).resolves.toStrictEqual({ verdict: "other" });
-  expect(ctx.opened).toStrictEqual([]);
+  await expect(readOwnerSession(ctx.db, { openClient: () => Promise.resolve(ctx.client('sess-owner')) })).resolves.toStrictEqual({ verdict: 'owner' });
 });
 
-test("it refuses a session id that is not the owner session", async () => {
+test("it refuses another session, even one HQ_AS names as the owner", async () => {
   const ctx = setupTest();
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'sess-owner' }));
+  onTestFinished(overrideEnv('HQ_AS', 'z-stu'));
 
-  await expect(
-    readOwnerSession(ctx.db, {
-      sessionID: "sess-kettle",
-      openClient: () => Promise.resolve(ctx.client("sess-owner")),
-    }),
-  ).resolves.toStrictEqual({ verdict: "other" });
-  expect(ctx.opened).toStrictEqual(["z-stu"]);
+  await expect(readOwnerSession(ctx.db, { openClient: () => Promise.resolve(ctx.client('sess-kettle')) })).resolves.toStrictEqual({ verdict: 'other' });
 });
 
-test("it accepts the session id atc resolves the owner to", async () => {
+test('it keeps the cause when atc is unreachable, rather than calling the caller another session', async () => {
   const ctx = setupTest();
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'sess-owner' }));
 
-  await expect(
-    readOwnerSession(ctx.db, {
-      sessionID: "sess-owner",
-      openClient: () => Promise.resolve(ctx.client("sess-owner")),
-    }),
-  ).resolves.toStrictEqual({ verdict: "owner" });
-  expect(ctx.closed).toStrictEqual([true]);
-});
-
-test("it keeps the cause when atc is unreachable, rather than calling the caller another session", async () => {
-  const ctx = setupTest();
-
-  await expect(
-    readOwnerSession(ctx.db, {
-      sessionID: "sess-owner",
-      openClient: () => Promise.reject(new Error("no socket")),
-    }),
-  ).resolves.toStrictEqual({ verdict: "unknown", cause: "no socket" });
+  await expect(readOwnerSession(ctx.db, { openClient: () => Promise.reject(new Error('no socket')) })).resolves.toStrictEqual({ verdict: 'unknown', cause: 'no socket' });
 });

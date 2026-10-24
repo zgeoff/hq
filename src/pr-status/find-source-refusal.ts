@@ -28,7 +28,7 @@ export function findSourceRefusal(db: Database, request: SourceRequest, probe: O
   }
   return match(probe)
     .with({ verdict: 'owner' }, () => null)
-    .with({ verdict: 'other' }, () => 'a chat: source is accepted only from the session of the owner (z-stu), found through ATC_SESSION_ID; this caller is not it')
+    .with({ verdict: 'other' }, () => 'a chat: source is accepted only from the session of the owner (z-stu), as atc finds the caller; this caller is not it')
     .with({ verdict: 'unknown' }, (failed) => `a chat: source is accepted only from the session of the owner (z-stu), and atc could not say whether this caller is it: ${failed.cause}`)
     .exhaustive();
 }
@@ -54,7 +54,7 @@ function findCallRefusal(db: Database, check: CallCheck): string | null {
   }
   const answer = findCurrentOwnerAnswer(db, check.id);
   if (answer === null) {
-    return `${check.source} has no owner answer for its current round, in the console or by \`hq call answer\` from the owner's session (z-stu), found through ATC_SESSION_ID`;
+    return `${check.source} has no owner answer for its current round, in the console or by \`hq call answer\` from the owner's session (z-stu), as atc finds the caller`;
   }
   const reused = check.wanted.action === 'override' ? findOverrideAtOtherHead(db, check, answer.seq) : null;
   if (reused !== null) {

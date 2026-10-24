@@ -9,6 +9,8 @@ import { migrate } from '../src/db/migrate.ts';
 import { MIGRATIONS } from '../src/db/migrations.ts';
 import { openDb } from '../src/db/open-db.ts';
 import { setMeta } from '../src/db/set-meta.ts';
+import { startStubAtcDaemon } from './start-stub-atc-daemon.ts';
+import { OWNER_PROBE_OPENER } from '../src/pr-status/owner-probe-opener.ts';
 import { overrideEnv } from '../src/config/override-env.ts';
 import { isHeatList } from '../mods/hq-band/hooks/is-heat-list.ts';
 import { isSegmentList } from '../mods/hq-band/hooks/is-segment-list.ts';
@@ -821,6 +823,7 @@ interface HistoryEvent {
 test('hq call answer refuses and saves nothing when atc cannot say whether the caller is the owner session', async () => {
   onTestFinished(overrideEnv('ATC_SESSION_ID', 'id-stu'));
   onTestFinished(overrideEnv('HQ_ATC_SOCKET', `${dir}/no-kettle-here.sock`));
+  setMeta(db(), 'fleet_ids', JSON.stringify({ 'z-stu': 'id-stu' }));
   await hq('call', 'add', 'KET-31', '--title', 'Pour widgets#7 now?', '--question', 'Boil?', '--body', 'Invented.');
   await hq('open');
 
@@ -833,4 +836,44 @@ test('hq call answer refuses and saves nothing when atc cannot say whether the c
     "atc could not say whether this caller is the owner's session (z-stu), so the answer is not saved: Failed to connect. Run it again once atc answers, or answer in the console",
   ]);
   expect([shown.json.call.state, shown.json.history.map((event: HistoryEvent) => event.action)]).toStrictEqual(['open', ['added', 'opened']]);
+});
+
+test("hq call answer ignores a daemon at HQ_ATC_SOCKET that names the owner's session, and saves nothing", async () => {
+  const daemon = startStubAtcDaemon(`${dir}/forged-kettle.sock`, {}, { peerSession: 'id-stu' });
+  onTestFinished(daemon.stop);
+  onTestFinished(overrideEnv('HQ_ATC_SOCKET', daemon.path));
+  onTestFinished(overrideEnv('ATC_SESSION_ID', 'id-stu'));
+  setMeta(db(), 'fleet_ids', JSON.stringify({ 'z-stu': 'id-stu' }));
+  await hq('call', 'add', 'KET-32', '--title', 'Pour widgets#8 now?', '--question', 'Boil?', '--body', 'Invented.');
+  await hq('open');
+
+  const answered = await hq('call', 'answer', 'KET-32', '--answer', 'Yes');
+
+  expect([answered.code === 0, answered.json.error.code, daemon.requests]).toStrictEqual([false, 'atc_unreachable', []]);
+});
+
+test("hq call answer from a caller hq cannot place as the owner saves the answer with no owner mark", async () => {
+  await hq('call', 'add', 'KET-33', '--title', 'Pour widgets#9 now?', '--question', 'Boil?', '--body', 'Invented.');
+  await hq('open');
+
+  const answered = await hq('call', 'answer', 'KET-33', '--answer', 'Yes', '--by', 'z-stu');
+
+  expect([answered.code, db().query("SELECT json_extract(data, '$.ownerSession') AS mark FROM events WHERE subject_id = 'KET-33' AND action = 'answered'").all()]).toStrictEqual([0, [{ mark: null }]]);
+});
+
+test.each([
+  ["the owner's recorded session", 'id-stu', 1],
+  ['another session', 'id-kettle', null],
+])('hq call answer from a caller atc finds in %s saves the answer with the right owner mark', async (_case, peerSession, mark) => {
+  OWNER_PROBE_OPENER.open = () => Promise.resolve({ peerSession, close: () => {} });
+  onTestFinished(() => {
+    OWNER_PROBE_OPENER.open = null;
+  });
+  setMeta(db(), 'fleet_ids', JSON.stringify({ 'z-stu': 'id-stu' }));
+  await hq('call', 'add', 'KET-34', '--title', 'Pour widgets#10 now?', '--question', 'Boil?', '--body', 'Invented.');
+  await hq('open');
+
+  const answered = await hq('call', 'answer', 'KET-34', '--answer', 'Yes');
+
+  expect([answered.code, db().query("SELECT json_extract(data, '$.ownerSession') AS mark FROM events WHERE subject_id = 'KET-34' AND action = 'answered'").all()]).toStrictEqual([0, [{ mark }]]);
 });
