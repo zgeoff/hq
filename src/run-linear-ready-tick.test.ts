@@ -1,4 +1,4 @@
-import { expect, mock, onTestFinished, test } from 'bun:test';
+import { expect, jest, mock, onTestFinished, test } from 'bun:test';
 import { setImmediate } from 'node:timers/promises';
 import { buildStubGitHubFactsRunner } from '../test/build-stub-github-facts-runner.ts';
 import { buildReadyPage, makePagedCall } from '../test/build-ready-page.ts';
@@ -155,4 +155,32 @@ test('it records an unknown count when the Backlog read misses the deadline the 
   expect(ran).toBe(true);
   expect(getMeta(ctx.db, 'lanes_promotable_focus')).toBe('{"at":"2026-10-15T20:00:00Z","count":null,"focus":"[]"}');
   expect(getMeta(ctx.db, 'lanes_ready_linear_error')).toBeNull();
+});
+
+test('it records an unknown count when the Backlog read answers within a fresh deadline but after the one the Ready read started', async () => {
+  const ctx = setupTest();
+  const lanes = ['nixie-slice', 'nixie-maintenance', 'atc', 'imp', 'cloud', 'memory', 'flexible', 'cleanup', 'process'].map((name) => buildMockLaneConfig(name));
+  jest.useFakeTimers();
+  onTestFinished(() => jest.useRealTimers());
+  const ready = Promise.withResolvers<unknown>();
+  const backlog = Promise.withResolvers<unknown>();
+  const backlogAsked = Promise.withResolvers<void>();
+  const call: LinearCall = (_query, variables) => {
+    if (variables['state'] !== 'Backlog') {
+      return ready.promise;
+    }
+    backlogAsked.resolve();
+    return backlog.promise;
+  };
+  const ran = runLinearReadyTick(ctx.db, { call, run: buildStubGitHubFactsRunner({}), readLanes: () => Promise.resolve(lanes), actor: 'hq-lanes', deadlineMs: 100 });
+
+  // Ready takes 60 of the 100 ms, so the Backlog read has 40 left; a fresh 100 ms would outlast its answer at 70.
+  jest.advanceTimersByTime(60);
+  ready.resolve(buildReadyPage([], null));
+  await backlogAsked.promise;
+  jest.advanceTimersByTime(70);
+  backlog.resolve({ issues: { nodes: [], pageInfo: { hasNextPage: false, endCursor: null } } });
+
+  expect(await ran).toBe(true);
+  expect(getMeta(ctx.db, 'lanes_promotable_focus')).toBe('{"at":"2026-10-15T20:00:00Z","count":null,"focus":"[]"}');
 });
