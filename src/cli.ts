@@ -1873,7 +1873,7 @@ async function lanesCommand(context: Pick<Ctx, 'db' | 'verb' | 'rest' | 'flags' 
         nudges.length ? 'nudges (newest first):' : 'nudges: none yet',
         ...nudges.map((n) => `  ${n.at} ${n.slots} free for ${n.free_minutes} min, eligible ${n.eligible ?? '?'} → after: ${n.slots_after ?? 'pending'}`),
       ];
-      const slotCauses = { now: { cause: slotCause.cause, slots: slotCause.slots, since: slotCause.since, readyAgeMinutes: slotCause.readyAgeMinutes, reason: slotCause.reason }, today: slotMinutesToday };
+      const slotCauses = { now: { cause: slotCause.cause, slots: slotCause.slots, since: slotCause.since, readyAgeMinutes: slotCause.readyAgeMinutes, reason: slotCause.reason, backlogError: slotCause.backlogError }, today: slotMinutesToday };
       return { data: { watcher: unit.stdout.trim() || 'inactive', enabled, hold, plan: slotPlan, slotCauses, last, ready, idle24h: gap24, nudges }, text: lines.join('\n') };
     }
     default:

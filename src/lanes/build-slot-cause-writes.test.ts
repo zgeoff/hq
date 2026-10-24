@@ -17,7 +17,7 @@ test('it keeps the Ready-waiting clock and the stored cause when the capacity re
     false,
   );
 
-  expect(writes).toStrictEqual({ eligibleSince: '2026-10-14T00:55:00Z', move: null, slotCause: { cause: null, slots: 0, since: null, readyAgeMinutes: 2, reason: null, waitingMinutes: null } });
+  expect(writes).toStrictEqual({ eligibleSince: '2026-10-14T00:55:00Z', move: null, slotCause: { cause: null, slots: 0, since: null, readyAgeMinutes: 2, reason: null, waitingMinutes: null, backlogError: null } });
 });
 
 test('it clears the Ready-waiting clock and ends the stored cause when no slot is free', () => {
@@ -36,7 +36,7 @@ test('it clears the Ready-waiting clock and ends the stored cause when no slot i
     true,
   );
 
-  expect(writes).toStrictEqual({ eligibleSince: null, move: { action: 'cause-ended', to: 'none' }, slotCause: { cause: null, slots: 0, since: null, readyAgeMinutes: 2, reason: null, waitingMinutes: null } });
+  expect(writes).toStrictEqual({ eligibleSince: null, move: { action: 'cause-ended', to: 'none' }, slotCause: { cause: null, slots: 0, since: null, readyAgeMinutes: 2, reason: null, waitingMinutes: null, backlogError: null } });
 });
 
 test('it clears the Ready-waiting clock when no Ready issue is eligible', () => {
@@ -46,7 +46,7 @@ test('it clears the Ready-waiting clock when no Ready issue is eligible', () => 
       eligible: 0,
       eligibleSince: '2026-10-14T00:55:00Z',
       readyAt: '2026-10-14T00:58:00Z',
-      promotable: { at: '2026-10-14T00:58:00Z', count: 0, focus: '[]' },
+      promotable: { at: '2026-10-14T00:58:00Z', count: 0, focus: '[]', error: null },
       focus: '[]',
       causeSince: { cause: 'supply', since: '2026-10-14T00:40:00Z' },
       freshMinutes: 30,
@@ -74,7 +74,7 @@ test('it starts the Ready-waiting clock at the look when eligible Ready work fir
     true,
   );
 
-  expect(writes).toStrictEqual({ eligibleSince: '2026-10-14T01:00:00Z', move: null, slotCause: { cause: null, slots: 2, since: '2026-10-14T01:00:00Z', readyAgeMinutes: 2, reason: null, waitingMinutes: 0 } });
+  expect(writes).toStrictEqual({ eligibleSince: '2026-10-14T01:00:00Z', move: null, slotCause: { cause: null, slots: 2, since: '2026-10-14T01:00:00Z', readyAgeMinutes: 2, reason: null, waitingMinutes: 0, backlogError: null } });
 });
 
 test('it begins a cause at the look when none was stored', () => {
@@ -84,7 +84,7 @@ test('it begins a cause at the look when none was stored', () => {
       eligible: 0,
       eligibleSince: null,
       readyAt: '2026-10-14T00:58:00Z',
-      promotable: { at: '2026-10-14T00:58:00Z', count: 3, focus: '[]' },
+      promotable: { at: '2026-10-14T00:58:00Z', count: 3, focus: '[]', error: null },
       focus: '[]',
       causeSince: null,
       freshMinutes: 30,
@@ -93,7 +93,7 @@ test('it begins a cause at the look when none was stored', () => {
     true,
   );
 
-  expect(writes).toStrictEqual({ eligibleSince: null, move: { action: 'cause-began', to: 'triage' }, slotCause: { cause: 'triage', slots: 2, since: '2026-10-14T01:00:00Z', readyAgeMinutes: 2, reason: null, waitingMinutes: null } });
+  expect(writes).toStrictEqual({ eligibleSince: null, move: { action: 'cause-began', to: 'triage' }, slotCause: { cause: 'triage', slots: 2, since: '2026-10-14T01:00:00Z', readyAgeMinutes: 2, reason: null, waitingMinutes: null, backlogError: null } });
 });
 
 test('it changes the stored cause at the look when the look finds another', () => {
@@ -103,7 +103,7 @@ test('it changes the stored cause at the look when the look finds another', () =
       eligible: 0,
       eligibleSince: null,
       readyAt: '2026-10-14T00:58:00Z',
-      promotable: { at: '2026-10-14T00:58:00Z', count: 0, focus: '[]' },
+      promotable: { at: '2026-10-14T00:58:00Z', count: 0, focus: '[]', error: null },
       focus: '[]',
       causeSince: { cause: 'triage', since: '2026-10-14T00:40:00Z' },
       freshMinutes: 30,
@@ -112,7 +112,7 @@ test('it changes the stored cause at the look when the look finds another', () =
     true,
   );
 
-  expect(writes).toStrictEqual({ eligibleSince: null, move: { action: 'cause-changed', to: 'supply' }, slotCause: { cause: 'supply', slots: 2, since: '2026-10-14T01:00:00Z', readyAgeMinutes: 2, reason: null, waitingMinutes: null } });
+  expect(writes).toStrictEqual({ eligibleSince: null, move: { action: 'cause-changed', to: 'supply' }, slotCause: { cause: 'supply', slots: 2, since: '2026-10-14T01:00:00Z', readyAgeMinutes: 2, reason: null, waitingMinutes: null, backlogError: null } });
 });
 
 test('it writes no move and keeps the stored start when the look finds the stored cause', () => {
@@ -122,7 +122,7 @@ test('it writes no move and keeps the stored start when the look finds the store
       eligible: 0,
       eligibleSince: null,
       readyAt: '2026-10-14T00:58:00Z',
-      promotable: { at: '2026-10-14T00:58:00Z', count: 3, focus: '[]' },
+      promotable: { at: '2026-10-14T00:58:00Z', count: 3, focus: '[]', error: null },
       focus: '[]',
       causeSince: { cause: 'triage', since: '2026-10-14T00:40:00Z' },
       freshMinutes: 30,
@@ -131,7 +131,7 @@ test('it writes no move and keeps the stored start when the look finds the store
     true,
   );
 
-  expect(writes).toStrictEqual({ eligibleSince: null, move: null, slotCause: { cause: 'triage', slots: 2, since: '2026-10-14T00:40:00Z', readyAgeMinutes: 2, reason: null, waitingMinutes: null } });
+  expect(writes).toStrictEqual({ eligibleSince: null, move: null, slotCause: { cause: 'triage', slots: 2, since: '2026-10-14T00:40:00Z', readyAgeMinutes: 2, reason: null, waitingMinutes: null, backlogError: null } });
 });
 
 test('it ends the stored cause when eligible Ready work is still inside its grace time', () => {

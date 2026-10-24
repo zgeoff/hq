@@ -15,7 +15,8 @@ function formatNow(slotCause: SlotCause): string {
     return `none yet, Ready waiting ${slotCause.waitingMinutes ?? 0} min`;
   }
   if (slotCause.reason !== null) {
-    return `unknown, ${formatUnknown(slotCause.reason, slotCause.readyAgeMinutes)}`;
+    const error = slotCause.backlogError === null ? '' : ` (${slotCause.backlogError})`;
+    return `unknown, ${formatUnknown(slotCause.reason, slotCause.readyAgeMinutes)}${error}`;
   }
   const since = slotCause.since === null ? '' : ` since ${slotCause.since}`;
   return `${slotCause.cause}, ${slotCause.slots} free slot(s)${since}`;

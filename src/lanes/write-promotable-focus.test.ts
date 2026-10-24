@@ -13,7 +13,7 @@ function setupTest() {
 test('it stores the count with the time the caller gives and the focus the count used', () => {
   const ctx = setupTest();
 
-  writePromotableFocus(ctx.db, { count: 4, focus: '["bug"]', at: new Date('2026-10-14T01:00:00Z') });
+  writePromotableFocus(ctx.db, { count: 4, focus: '["bug"]', at: new Date('2026-10-14T01:00:00Z'), error: null });
 
-  expect(getMeta(ctx.db, PROMOTABLE_FOCUS_KEY)).toBe(String.raw`{"at":"2026-10-14T01:00:00Z","count":4,"focus":"[\"bug\"]"}`);
+  expect(getMeta(ctx.db, PROMOTABLE_FOCUS_KEY)).toBe(String.raw`{"at":"2026-10-14T01:00:00Z","count":4,"focus":"[\"bug\"]","error":null}`);
 });

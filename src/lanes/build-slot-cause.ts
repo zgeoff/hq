@@ -11,7 +11,7 @@ export interface SlotCauseInput {
   eligible: number | null;
   eligibleSince: string | null;
   readyAt: string | null;
-  promotable: { at: string; count: number | null; focus: string } | null;
+  promotable: { at: string; count: number | null; focus: string; error: string | null } | null;
 
   // The buildFocusKey of the focus set now; a Backlog count from another focus does not count.
   focus: string;
@@ -25,7 +25,7 @@ export interface SlotCauseInput {
 // The cause of the empty slots at an instant. Pure: the caller reads the clocks and counts.
 export function buildSlotCause(input: SlotCauseInput): SlotCause {
   const readyAgeMinutes = input.readyAt === null ? null : Math.floor((input.at.getTime() - Date.parse(input.readyAt)) / 60_000);
-  const base = { slots: input.free, readyAgeMinutes, reason: null, waitingMinutes: null };
+  const base = { slots: input.free, readyAgeMinutes, reason: null, waitingMinutes: null, backlogError: null };
   if (input.free === 0) {
     return { ...base, cause: null, since: null };
   }
@@ -42,7 +42,7 @@ export function buildSlotCause(input: SlotCauseInput): SlotCause {
   }
   const promotable = input.promotable;
   if (promotable === null || promotable.count === null) {
-    return { ...base, cause: 'unknown', reason: 'backlog_unknown', since: sinceOf('unknown') };
+    return { ...base, cause: 'unknown', reason: 'backlog_unknown', since: sinceOf('unknown'), backlogError: promotable?.error ?? null };
   }
   if (promotable.focus !== input.focus) {
     return { ...base, cause: 'unknown', reason: 'backlog_focus_changed', since: sinceOf('unknown') };

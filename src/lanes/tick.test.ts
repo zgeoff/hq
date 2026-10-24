@@ -35,7 +35,7 @@ test('it tags no cause and counts no minutes while Ready work has waited 10 minu
 
   const result = tick(ctx.db, sample, 'hq-lanes');
 
-  expect(result.slotCause).toStrictEqual({ cause: null, slots: 3, since: '2026-10-14T01:00:00Z', readyAgeMinutes: 4, reason: null, waitingMinutes: 4 });
+  expect(result.slotCause).toStrictEqual({ cause: null, slots: 3, since: '2026-10-14T01:00:00Z', readyAgeMinutes: 4, reason: null, waitingMinutes: 4, backlogError: null });
   expect(readSlotMinutes(ctx.db, '2026-10-14')).toStrictEqual({ delivery: 0, triage: 0, supply: 0 });
 });
 
@@ -51,7 +51,7 @@ test('it tags delivery once Ready work has waited more than 10 minutes, and coun
 
   const result = tick(ctx.db, sample, 'hq-lanes');
 
-  expect(result.slotCause).toStrictEqual({ cause: 'delivery', slots: 3, since: '2026-10-14T01:11:00Z', readyAgeMinutes: 11, reason: null, waitingMinutes: null });
+  expect(result.slotCause).toStrictEqual({ cause: 'delivery', slots: 3, since: '2026-10-14T01:11:00Z', readyAgeMinutes: 11, reason: null, waitingMinutes: null, backlogError: null });
   expect(readSlotMinutes(ctx.db, '2026-10-14')).toStrictEqual({ delivery: 18, triage: 0, supply: 0 });
 });
 
@@ -99,7 +99,7 @@ test('it keeps the grace time running through a look whose capacity read failed'
 
   const result = tick(ctx.db, sample, 'hq-lanes');
 
-  expect(result.slotCause).toStrictEqual({ cause: 'delivery', slots: 3, since: '2026-10-14T01:12:00Z', readyAgeMinutes: 12, reason: null, waitingMinutes: null });
+  expect(result.slotCause).toStrictEqual({ cause: 'delivery', slots: 3, since: '2026-10-14T01:12:00Z', readyAgeMinutes: 12, reason: null, waitingMinutes: null, backlogError: null });
   expect(readSlotMinutes(ctx.db, '2026-10-14').delivery).toBe(21);
 });
 
@@ -108,13 +108,13 @@ test('it tags triage when no Ready work waits and Backlog work asks for promotio
   at('2026-10-14T01:00:00Z');
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
   await ctx.seedReady([]);
-  writePromotableFocus(ctx.db, { count: 2, focus: '[]', at: new Date('2026-10-14T01:00:00Z') });
+  writePromotableFocus(ctx.db, { count: 2, focus: '[]', at: new Date('2026-10-14T01:00:00Z'), error: null });
   tick(ctx.db, sample, 'hq-lanes');
   at('2026-10-14T01:05:00Z');
 
   const result = tick(ctx.db, sample, 'hq-lanes');
 
-  expect(result.slotCause).toStrictEqual({ cause: 'triage', slots: 3, since: '2026-10-14T01:00:00Z', readyAgeMinutes: 5, reason: null, waitingMinutes: null });
+  expect(result.slotCause).toStrictEqual({ cause: 'triage', slots: 3, since: '2026-10-14T01:00:00Z', readyAgeMinutes: 5, reason: null, waitingMinutes: null, backlogError: null });
   expect(readSlotMinutes(ctx.db, '2026-10-14')).toStrictEqual({ delivery: 0, triage: 15, supply: 0 });
 });
 
@@ -123,7 +123,7 @@ test('it tags supply when no Ready work waits and no Backlog issue matches the f
   at('2026-10-14T01:00:00Z');
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
   await ctx.seedReady([]);
-  writePromotableFocus(ctx.db, { count: 0, focus: '[]', at: new Date('2026-10-14T01:00:00Z') });
+  writePromotableFocus(ctx.db, { count: 0, focus: '[]', at: new Date('2026-10-14T01:00:00Z'), error: null });
   tick(ctx.db, sample, 'hq-lanes');
   at('2026-10-14T01:05:00Z');
 
@@ -138,7 +138,7 @@ test('it tags unknown and counts nothing when the Backlog count is unknown', asy
   at('2026-10-14T01:00:00Z');
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
   await ctx.seedReady([]);
-  writePromotableFocus(ctx.db, { count: null, focus: '[]', at: new Date('2026-10-14T01:00:00Z') });
+  writePromotableFocus(ctx.db, { count: null, focus: '[]', at: new Date('2026-10-14T01:00:00Z'), error: null });
   tick(ctx.db, sample, 'hq-lanes');
   at('2026-10-14T01:05:00Z');
 
@@ -155,14 +155,14 @@ test('it tags unknown and counts nothing when the focus has changed since the Ba
   at('2026-10-14T01:00:00Z');
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
   await ctx.seedReady([]);
-  writePromotableFocus(ctx.db, { count: 2, focus: '[]', at: new Date('2026-10-14T01:00:00Z') });
+  writePromotableFocus(ctx.db, { count: 2, focus: '[]', at: new Date('2026-10-14T01:00:00Z'), error: null });
   tick(ctx.db, sample, 'hq-lanes');
   at('2026-10-14T01:05:00Z');
   await runFocusCommand({ db: ctx.db, call: makeStateCall([], []), actor: 'kettle-owner', at: new Date('2026-10-14T01:04:00Z'), verb: 'set', rest: ['bug'], reserves: [] });
 
   const result = tick(ctx.db, sample, 'hq-lanes');
 
-  expect(result.slotCause).toStrictEqual({ cause: 'unknown', slots: 3, since: '2026-10-14T01:05:00Z', readyAgeMinutes: 5, reason: 'backlog_focus_changed', waitingMinutes: null });
+  expect(result.slotCause).toStrictEqual({ cause: 'unknown', slots: 3, since: '2026-10-14T01:05:00Z', readyAgeMinutes: 5, reason: 'backlog_focus_changed', waitingMinutes: null, backlogError: null });
   expect(readSlotMinutes(ctx.db, '2026-10-14')).toStrictEqual({ delivery: 0, triage: 0, supply: 0 });
 });
 
@@ -176,7 +176,7 @@ test('it tags unknown with the age of the Ready data and counts nothing when the
 
   const result = tick(ctx.db, sample, 'hq-lanes');
 
-  expect(result.slotCause).toStrictEqual({ cause: 'unknown', slots: 3, since: '2026-10-14T01:42:00Z', readyAgeMinutes: 42, reason: 'ready_stale', waitingMinutes: null });
+  expect(result.slotCause).toStrictEqual({ cause: 'unknown', slots: 3, since: '2026-10-14T01:42:00Z', readyAgeMinutes: 42, reason: 'ready_stale', waitingMinutes: null, backlogError: null });
   expect(readSlotMinutes(ctx.db, '2026-10-14')).toStrictEqual({ delivery: 0, triage: 0, supply: 0 });
 });
 
@@ -190,7 +190,7 @@ test('it tags no cause when no slot is free', async () => {
 
   const result = tick(ctx.db, { ...sample, slots: { imp: 0, local: 0 } }, 'hq-lanes');
 
-  expect(result.slotCause).toStrictEqual({ cause: null, slots: 0, since: null, readyAgeMinutes: 20, reason: null, waitingMinutes: null });
+  expect(result.slotCause).toStrictEqual({ cause: null, slots: 0, since: null, readyAgeMinutes: 20, reason: null, waitingMinutes: null, backlogError: null });
   expect(readSlotMinutes(ctx.db, '2026-10-14').delivery).toBe(0);
 });
 
@@ -220,7 +220,7 @@ test('it tells the triage session at any hour when triage reaches 60 slot-minute
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
   at('2026-10-14T17:00:00Z');
   await ctx.seedReady([]);
-  writePromotableFocus(ctx.db, { count: 1, focus: '[]', at: new Date('2026-10-14T17:00:00Z') });
+  writePromotableFocus(ctx.db, { count: 1, focus: '[]', at: new Date('2026-10-14T17:00:00Z'), error: null });
   tick(ctx.db, sample, 'hq-lanes');
   at('2026-10-14T17:30:00Z');
 
@@ -234,13 +234,13 @@ test('it tells the triage and delivery sessions during quiet hours while the sup
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
   at('2026-10-14T17:00:00Z');
   await ctx.seedReady([]);
-  writePromotableFocus(ctx.db, { count: 0, focus: '[]', at: new Date('2026-10-14T17:00:00Z') });
+  writePromotableFocus(ctx.db, { count: 0, focus: '[]', at: new Date('2026-10-14T17:00:00Z'), error: null });
   tick(ctx.db, sample, 'hq-lanes');
   at('2026-10-14T17:30:00Z');
   tick(ctx.db, sample, 'hq-lanes');
   at('2026-10-14T18:00:00Z');
   await ctx.seedReady([]);
-  writePromotableFocus(ctx.db, { count: 2, focus: '[]', at: new Date('2026-10-14T18:00:00Z') });
+  writePromotableFocus(ctx.db, { count: 2, focus: '[]', at: new Date('2026-10-14T18:00:00Z'), error: null });
   tick(ctx.db, sample, 'hq-lanes');
   await ctx.seedReady([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
   at('2026-10-14T18:01:00Z');
@@ -262,14 +262,14 @@ test('it holds the supply alert for the owner through quiet hours and sends it a
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
   at('2026-10-14T17:00:00Z');
   await ctx.seedReady([]);
-  writePromotableFocus(ctx.db, { count: 0, focus: '[]', at: new Date('2026-10-14T17:00:00Z') });
+  writePromotableFocus(ctx.db, { count: 0, focus: '[]', at: new Date('2026-10-14T17:00:00Z'), error: null });
   tick(ctx.db, sample, 'hq-lanes');
   at('2026-10-14T17:30:00Z');
   tick(ctx.db, sample, 'hq-lanes');
   const quiet = ctx.queued();
   at('2026-10-14T20:00:00Z');
   await ctx.seedReady([]);
-  writePromotableFocus(ctx.db, { count: 0, focus: '[]', at: new Date('2026-10-14T20:00:00Z') });
+  writePromotableFocus(ctx.db, { count: 0, focus: '[]', at: new Date('2026-10-14T20:00:00Z'), error: null });
 
   tick(ctx.db, sample, 'hq-lanes');
 
@@ -282,14 +282,14 @@ test('it sends the owner the held supply alert at the first look after quiet hou
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
   at('2026-10-14T17:00:00Z');
   await ctx.seedReady([]);
-  writePromotableFocus(ctx.db, { count: 0, focus: '[]', at: new Date('2026-10-14T17:00:00Z') });
+  writePromotableFocus(ctx.db, { count: 0, focus: '[]', at: new Date('2026-10-14T17:00:00Z'), error: null });
   tick(ctx.db, sample, 'hq-lanes');
   at('2026-10-14T17:30:00Z');
   tick(ctx.db, sample, 'hq-lanes');
   const quiet = ctx.queued();
   at('2026-10-14T20:00:00Z');
   await ctx.seedReady([]);
-  writePromotableFocus(ctx.db, { count: 2, focus: '[]', at: new Date('2026-10-14T20:00:00Z') });
+  writePromotableFocus(ctx.db, { count: 2, focus: '[]', at: new Date('2026-10-14T20:00:00Z'), error: null });
 
   const result = tick(ctx.db, sample, 'hq-lanes');
 
@@ -306,7 +306,7 @@ test('it adds a look to the Sydney day it falls in, with no split at midnight', 
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
   at('2026-10-14T12:59:00Z');
   await ctx.seedReady([]);
-  writePromotableFocus(ctx.db, { count: 0, focus: '[]', at: new Date('2026-10-14T12:59:00Z') });
+  writePromotableFocus(ctx.db, { count: 0, focus: '[]', at: new Date('2026-10-14T12:59:00Z'), error: null });
   tick(ctx.db, sample, 'hq-lanes');
   at('2026-10-14T13:03:00Z');
 

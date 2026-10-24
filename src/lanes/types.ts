@@ -60,6 +60,7 @@ export interface SlotCause {
 
   // How long eligible Ready work has waited while the cause is still null; null otherwise.
   waitingMinutes: number | null;
+  backlogError: string | null;
 }
 
 export interface TickResult {

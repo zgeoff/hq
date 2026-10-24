@@ -58,7 +58,10 @@ export async function runLinearReadyTick(db: Database, deps: LinearReadyTickDeps
   setMeta(db, 'lanes_ready_linear_error', null);
   const leftMs = Math.max(0, deps.deadlineMs - (readClock() - startedAt));
   const focus = readFocus(db);
-  const count = await withDeadline(readPromotableFocusCount(cancellableCall, rulesTable.team, focus), leftMs, 'Backlog promotable count', abandoned).catch(() => null);
-  writePromotableFocus(db, { count, focus: buildFocusKey(focus), at });
+  const backlog = await withDeadline(readPromotableFocusCount(cancellableCall, rulesTable.team, focus), leftMs, 'Backlog promotable count', abandoned).then(
+    (count) => ({ count, error: null }),
+    (error: unknown) => ({ count: null, error: (error instanceof Error ? error.message : String(error)).slice(0, 300) }),
+  );
+  writePromotableFocus(db, { ...backlog, focus: buildFocusKey(focus), at });
   return true;
 }

@@ -230,7 +230,7 @@ test('hq lanes shows the cause of the empty slots and the minutes by cause for t
   expect(text).toInclude('cause: triage, 2 free slot(s) since 2026-10-14T00:40:00Z');
   expect(text).toInclude('empty slot-minutes today (Sydney): delivery 12, triage 41, supply 0');
   expect(JSON.parse(json).slotCauses).toStrictEqual({
-    now: { cause: 'triage', slots: 2, since: '2026-10-14T00:40:00Z', readyAgeMinutes: 5, reason: null },
+    now: { cause: 'triage', slots: 2, since: '2026-10-14T00:40:00Z', readyAgeMinutes: 5, reason: null, backlogError: null },
     today: { delivery: 12.4, triage: 40.6, supply: 0 },
   });
 });
