@@ -448,7 +448,7 @@ test('it passes --fixes-only straight to noslop, with no review on record, and r
   expect(ctx.db.query('SELECT confirm, kind, ok FROM noslop_rounds ORDER BY id DESC LIMIT 1').get()).toStrictEqual({ confirm: 1, kind: 'review', ok: 1 });
 });
 
-test('it marks the head a --fixes-only run ran on reviewed, without counting a round', async () => {
+test('it leaves the head a hand-run --fixes-only run ran on unmarked, and counts no round', async () => {
   const ctx = setupTest();
   const fake = buildFakeRunner({ noslopReview: { code: 0, stdout: FAKE_REVIEW_JSON.replace('"head":"feat"', `"head":"${FAKE_FULL_SHA}"`), stderr: '' } });
   ctx.listWidgets();
@@ -456,7 +456,7 @@ test('it marks the head a --fixes-only run ran on reviewed, without counting a r
 
   await runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false, fixesOnly: true });
 
-  expect(ctx.db.query("SELECT reviewed_sha, review_round FROM run_prs WHERE ref = 'widgets#7'").get()).toStrictEqual({ reviewed_sha: FAKE_FULL_SHA, review_round: 0 });
+  expect(ctx.db.query("SELECT reviewed_sha, review_round FROM run_prs WHERE ref = 'widgets#7'").get()).toStrictEqual({ reviewed_sha: null, review_round: 0 });
   expect(ctx.db.query("SELECT COUNT(*) AS rounds FROM noslop_rounds WHERE confirm = 0").get()).toStrictEqual({ rounds: 0 });
 });
 

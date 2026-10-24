@@ -38,7 +38,7 @@ export interface ReviewRequest extends PRRequest {
   // Ask noslop for a full review of the PR. Codex PRs refuse it.
   full?: boolean | undefined;
 
-  // A plain pass-through to `noslop review --fixes-only`: no basis check, no refusal, not a round.
+  // A plain pass-through to `noslop review --fixes-only`: no basis check, no refusal, not a round, no reviewed mark.
   fixesOnly?: boolean | undefined;
 
   // The removed --confirm flag: still read, only so that it is refused with a pointer.
@@ -161,9 +161,12 @@ async function createNoslopContext(plan: RoundPlan, parsed: ParsedRepo, sha: str
   };
 }
 
-// Every completed run marks the head it ran on, as a session's `hq run reviewed --sha` must, so the
-// sweep stops calling the head unreviewed. Only a full review counts as a round.
+// A run the merge gate counts marks the head it ran on, as a session's `hq run reviewed --sha` must,
+// so the sweep stops calling the head unreviewed. Only a full review counts as a round.
 function writeRoundMark(plan: RoundPlan, parsed: ParsedRepo): void {
+  if (plan.fixesOnly && plan.emergencyCap === null) {
+    return;
+  }
   const found = findLastReviewRound(plan.request.db, parsed.repo, plan.request.pr);
   if (found?.ok === 1 && found.head !== null && SHA.test(found.head)) {
     writeReviewed(plan.request.db, parsed.repo, plan.request.pr, { head: found.head, countsRound: !plan.fixesOnly });
