@@ -270,3 +270,22 @@ test('done keeps a whole session tree when one of its sub-sessions is pinned', a
   expect(wrapUp.kept.map((kept) => kept.id)).toStrictEqual(['0000a002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa']);
   expect(fleet.calls).toStrictEqual([]);
 });
+
+test('a remove by full id leaves another session that shares its first eight characters in wrap-up', async () => {
+  const ctx = setupTest();
+  at(NOON_SYDNEY);
+  addRun(ctx.db, { issue: 'GEO-9801', title: 'Invented kettle descaler', place: 'local', session: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
+  setSession(ctx.db, 'GEO-9801', '0000a001-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'z-delivery', 'add');
+  setSession(ctx.db, 'GEO-9801', '0000a001-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'z-delivery', 'remove');
+  setState(ctx.db, 'GEO-9801', 'done', {}, 'z-delivery');
+  const fleet = buildStubFleetClient({
+    sessions: [
+      { id: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true },
+      { id: '0000a001-bbbb-4bbb-8bbb-bbbbbbbbbbbb', name: 'kettle-owner-chat', alive: true },
+    ],
+  });
+
+  const wrapUp = await runWrapUp(ctx.db, { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')) }, 'GEO-9801', 'z-delivery');
+
+  expect(wrapUp.forgotten).toStrictEqual(['0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa']);
+});
