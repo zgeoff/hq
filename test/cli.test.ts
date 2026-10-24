@@ -10,6 +10,7 @@ import { MIGRATIONS } from '../src/db/migrations.ts';
 import { openDb } from '../src/db/open-db.ts';
 import { setMeta } from '../src/db/set-meta.ts';
 import { startStubAtcDaemon } from './start-stub-atc-daemon.ts';
+import { OWNER_PROBE_OPENER } from '../src/pr-status/owner-probe-opener.ts';
 import { overrideEnv } from '../src/config/override-env.ts';
 import { isHeatList } from '../mods/hq-band/hooks/is-heat-list.ts';
 import { isSegmentList } from '../mods/hq-band/hooks/is-segment-list.ts';
@@ -858,4 +859,21 @@ test("hq call answer from a caller hq cannot place as the owner saves the answer
   const answered = await hq('call', 'answer', 'KET-33', '--answer', 'Yes', '--by', 'z-stu');
 
   expect([answered.code, db().query("SELECT json_extract(data, '$.ownerSession') AS mark FROM events WHERE subject_id = 'KET-33' AND action = 'answered'").all()]).toStrictEqual([0, [{ mark: null }]]);
+});
+
+test.each([
+  ["the owner's recorded session", 'id-stu', 1],
+  ['another session', 'id-kettle', null],
+])('hq call answer from a caller atc finds in %s saves the answer with the right owner mark', async (_case, peerSession, mark) => {
+  OWNER_PROBE_OPENER.open = () => Promise.resolve({ peerSession, close: () => {} });
+  onTestFinished(() => {
+    OWNER_PROBE_OPENER.open = null;
+  });
+  setMeta(db(), 'fleet_ids', JSON.stringify({ 'z-stu': 'id-stu' }));
+  await hq('call', 'add', 'KET-34', '--title', 'Pour widgets#10 now?', '--question', 'Boil?', '--body', 'Invented.');
+  await hq('open');
+
+  const answered = await hq('call', 'answer', 'KET-34', '--answer', 'Yes');
+
+  expect([answered.code, db().query("SELECT json_extract(data, '$.ownerSession') AS mark FROM events WHERE subject_id = 'KET-34' AND action = 'answered'").all()]).toStrictEqual([0, [{ mark }]]);
 });

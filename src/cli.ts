@@ -43,6 +43,7 @@ import { createStoreBackup } from './noslop/create-store-backup.ts';
 import { runNoslopCommand } from './noslop/run-noslop-command.ts';
 import { readOwnerSession } from './pr-status/read-owner-session.ts';
 import { identitySocketPath } from './atc/identity-socket-path.ts';
+import { OWNER_PROBE_OPENER } from './pr-status/owner-probe-opener.ts';
 import { runCallAnswer } from './asks/run-call-answer.ts';
 import { readRoleSession } from './pr-status/read-role-session.ts';
 import type { OwnerProbeDeps } from './pr-status/read-owner-session.ts';
@@ -516,7 +517,7 @@ function getHome(): string {
 const list = (v: string | undefined) => (v ?? '').split(',').map((s) => s.trim()).filter(Boolean);
 
 function readOwnerProbeDeps(): OwnerProbeDeps {
-  return { openClient: openOwnerProbeClient };
+  return { openClient: OWNER_PROBE_OPENER.open ?? openOwnerProbeClient };
 }
 
 function openOwnerProbeClient(): Promise<AtcClient> {
