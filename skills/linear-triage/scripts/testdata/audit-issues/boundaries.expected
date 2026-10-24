@@ -1,6 +1,6 @@
 {
   "checkedAt": "2026-10-16T00:00:00Z",
-  "open": 5,
+  "open": 6,
   "counts": {
     "inTriage": 0,
     "missingProject": 0,
@@ -8,7 +8,7 @@
     "missingPriority": 0,
     "missingSize": 0,
     "missingArea": 0,
-    "stale": 2,
+    "stale": 3,
     "needsGeoff": 0
   },
   "triage": [],
@@ -16,7 +16,7 @@
   "stale": [
     {
       "id": "GEO-903",
-      "title": "backlog exactly 14 days",
+      "title": "backlog filed exactly 14 days, edited yesterday",
       "url": "https://linear.app/x/issue/GEO-903",
       "status": "Backlog",
       "project": "Tools",
@@ -26,7 +26,26 @@
         "tools"
       ],
       "priority": 3,
+      "idleDays": 1,
+      "ageDays": 14,
+      "needsGeoff": false,
+      "missing": [],
+      "stale": true
+    },
+    {
+      "id": "GEO-906",
+      "title": "backlog page without createdAt, idle 14 days",
+      "url": "https://linear.app/x/issue/GEO-906",
+      "status": "Backlog",
+      "project": "Tools",
+      "type": "Bug",
+      "size": "S",
+      "areas": [
+        "tools"
+      ],
+      "priority": 3,
       "idleDays": 14,
+      "ageDays": 14,
       "needsGeoff": false,
       "missing": [],
       "stale": true
@@ -44,6 +63,7 @@
       ],
       "priority": 3,
       "idleDays": 3,
+      "ageDays": 3,
       "needsGeoff": false,
       "missing": [],
       "stale": true

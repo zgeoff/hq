@@ -1,7 +1,7 @@
 [
   {
     "id": "GEO-901",
-    "title": "backlog 13 days 23 hours",
+    "title": "backlog filed 13 days 23 hours, edited yesterday",
     "url": "https://linear.app/x/issue/GEO-901",
     "status": "Backlog",
     "statusType": "backlog",
@@ -9,11 +9,12 @@
     "priority": 3,
     "labels": ["Bug", "S", "tools"],
     "parentId": null,
-    "updatedAt": "2026-10-02T01:00:00.250Z"
+    "updatedAt": "2026-10-15T00:00:00Z",
+    "createdAt": "2026-10-02T01:00:00.250Z"
   },
   {
     "id": "GEO-902",
-    "title": "backlog half a second under 14 days",
+    "title": "backlog filed half a second under 14 days, edited yesterday",
     "url": "https://linear.app/x/issue/GEO-902",
     "status": "Backlog",
     "statusType": "backlog",
@@ -21,11 +22,12 @@
     "priority": 3,
     "labels": ["Bug", "S", "tools"],
     "parentId": null,
-    "updatedAt": "2026-10-02T00:00:00.500Z"
+    "updatedAt": "2026-10-15T00:00:00Z",
+    "createdAt": "2026-10-02T00:00:00.500Z"
   },
   {
     "id": "GEO-903",
-    "title": "backlog exactly 14 days",
+    "title": "backlog filed exactly 14 days, edited yesterday",
     "url": "https://linear.app/x/issue/GEO-903",
     "status": "Backlog",
     "statusType": "backlog",
@@ -33,7 +35,8 @@
     "priority": 3,
     "labels": ["Bug", "S", "tools"],
     "parentId": null,
-    "updatedAt": "2026-10-02T00:00:00.000Z"
+    "updatedAt": "2026-10-15T00:00:00Z",
+    "createdAt": "2026-10-02T00:00:00.000Z"
   },
   {
     "id": "GEO-904",
@@ -58,5 +61,17 @@
     "labels": ["Bug", "S", "tools"],
     "parentId": null,
     "updatedAt": "2026-10-12T23:59:59.250Z"
+  },
+  {
+    "id": "GEO-906",
+    "title": "backlog page without createdAt, idle 14 days",
+    "url": "https://linear.app/x/issue/GEO-906",
+    "status": "Backlog",
+    "statusType": "backlog",
+    "project": "Tools",
+    "priority": 3,
+    "labels": ["Bug", "S", "tools"],
+    "parentId": null,
+    "updatedAt": "2026-10-02T00:00:00.000Z"
   }
 ]
