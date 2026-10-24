@@ -13,7 +13,7 @@ interface UnitsCommand {
 
 export async function runUnitsCommand(command: UnitsCommand): Promise<Out> {
   if (command.verb !== 'scrub') {
-    throw new HqError('bad_args', 'hq units scrub');
+    throw new HqError('bad_args', `unknown command: hq units ${command.verb ?? ''}`.trimEnd());
   }
   const changed = await scrubUnits(command.run, { directory: unitDir(command.home), ...(command.env ? { env: command.env } : {}) });
   return {
