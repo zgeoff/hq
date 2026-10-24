@@ -1,13 +1,19 @@
 import type { Database } from 'bun:sqlite';
-import { expect, onTestFinished, test } from 'bun:test';
+import { expect, mock, onTestFinished, test } from 'bun:test';
 import { chmodSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { HttpResponse, http } from 'msw';
 import rulesTable from '../lanes.json';
+import { LINEAR_GRAPHQL_URL, linearIssues } from '../mocks/linear-handlers.ts';
+import { server } from '../mocks/node.ts';
 import { NOON_SYDNEY, fakeAtc, freshDb } from '../test/helpers.ts';
 import { main } from './cli.ts';
 import { overrideEnv } from './config/override-env.ts';
 import { setMeta } from './db/set-meta.ts';
 import { loadActionsSpend } from './goals/load-actions-spend.ts';
+import { readReadySnapshot } from './lanes/read-ready-snapshot.ts';
+import { resetKey } from './linear/reset-key.ts';
+import type { RunResult, Runner } from './runner/types.ts';
 import { addRun } from './runs/add-run.ts';
 
 // A database at noon Sydney, quiet notices and console, and a stand-in gh on PATH for
@@ -348,4 +354,58 @@ test('hq capacity --json carries the Claude burn hint from the usage samples', a
 
   expect(code).toBe(0);
   expect(JSON.parse(stdout)).toMatchObject({ hint: { hours: 2, limit: 95, account: 'kettle01', windows: [{ window: '7-day', samples: 2, ratePerHour: null }, { window: '5-hour', samples: 2, ratePerHour: null }] } });
+});
+
+test('hq lanes tick --refresh reads Ready from Linear inside the 10 min throttle, then ticks', async () => {
+  const fresh = freshDb();
+  const run = mock<Runner>(() => Promise.resolve<RunResult>({ code: 0, stdout: 'lin_api_INVENTEDkettleKEY0042\n', stderr: '' }));
+  const log = console.log;
+  const printed: string[] = [];
+  onTestFinished(fresh.cleanup);
+  resetKey();
+  onTestFinished(resetKey);
+  onTestFinished(overrideEnv('OP_SERVICE_ACCOUNT_TOKEN', 'invented-token'));
+  onTestFinished(overrideEnv('HQ_NOW', NOON_SYDNEY));
+  onTestFinished(overrideEnv('HQ_NOTIFY', 'off'));
+  onTestFinished(overrideEnv('HQ_AS', 'kettle-lanes'));
+  onTestFinished(overrideEnv('HQ_CAPACITY', `${fresh.dir}/defs/scripts/capacity.sh`));
+  console.log = (line: string) => void printed.push(line);
+  onTestFinished(() => (console.log = log));
+  mkdirSync(`${fresh.dir}/defs/scripts`, { recursive: true });
+  writeFileSync(`${fresh.dir}/defs/scripts/capacity.sh`, `echo '${JSON.stringify({ imp: { freeMib: 0, room: false } })}'\n`);
+  writeFileSync(`${fresh.dir}/defs/pacing.json`, JSON.stringify({ slots: { imp: 2, local: 2 } }));
+  setMeta(fresh.db, 'lanes_ready_linear_at', '2026-10-14T00:58:00Z');
+  linearIssues.push({ identifier: 'GEO-9861', team: 'GEO', state: 'Ready', stateType: 'unstarted', previousIdentifiers: [], project: null, labels: [], parent: null });
+
+  const code = await main(['lanes', 'tick', '--refresh'], run);
+
+  expect(code).toBe(0);
+  expect(printed.join('\n')).toBe('Read Ready from Linear.\n1 slot(s) free (0 MiB); free for 0 min, under 10');
+  expect(readReadySnapshot(fresh.db, new Date(NOON_SYDNEY))?.eligible.map((issue) => issue.identifier)).toStrictEqual(['GEO-9861']);
+});
+
+test('hq lanes tick --refresh reports a failed Ready read, still ticks, and exits 0', async () => {
+  const fresh = freshDb();
+  const run = mock<Runner>(() => Promise.resolve<RunResult>({ code: 0, stdout: 'lin_api_INVENTEDkettleKEY0042\n', stderr: '' }));
+  const log = console.log;
+  const printed: string[] = [];
+  onTestFinished(fresh.cleanup);
+  resetKey();
+  onTestFinished(resetKey);
+  onTestFinished(overrideEnv('OP_SERVICE_ACCOUNT_TOKEN', 'invented-token'));
+  onTestFinished(overrideEnv('HQ_NOW', NOON_SYDNEY));
+  onTestFinished(overrideEnv('HQ_NOTIFY', 'off'));
+  onTestFinished(overrideEnv('HQ_AS', 'kettle-lanes'));
+  onTestFinished(overrideEnv('HQ_CAPACITY', `${fresh.dir}/defs/scripts/capacity.sh`));
+  console.log = (line: string) => void printed.push(line);
+  onTestFinished(() => (console.log = log));
+  mkdirSync(`${fresh.dir}/defs/scripts`, { recursive: true });
+  writeFileSync(`${fresh.dir}/defs/scripts/capacity.sh`, `echo '${JSON.stringify({ imp: { freeMib: 0, room: false } })}'\n`);
+  writeFileSync(`${fresh.dir}/defs/pacing.json`, JSON.stringify({ slots: { imp: 2, local: 2 } }));
+  server.use(http.post(LINEAR_GRAPHQL_URL, () => HttpResponse.text('invented kettle maintenance', { status: 503 })));
+
+  const code = await main(['lanes', 'tick', '--refresh'], run);
+
+  expect(code).toBe(0);
+  expect(printed.join('\n')).toBe('Ready read from Linear failed: Linear answered 503: no data\n2 slot(s) free (0 MiB); free for 0 min, under 10');
 });
