@@ -24,8 +24,9 @@ if [ -n "${HQ_INSTALL_OUT:-}" ]; then
   exit 0
 fi
 # The installed hq ignores HQ_NOW and HQ_QUIET, and a unit written before that may still carry them.
+# A failed scrub must not stop the lanes restart below, or hq-lanes keeps running the old binary.
 if command -v systemctl >/dev/null 2>&1; then
-  "$out" units scrub
+  "$out" units scrub || echo "install: hq units scrub failed, so a unit may still set HQ_NOW or HQ_QUIET; run hq units scrub again" >&2
 fi
 if command -v systemctl >/dev/null 2>&1 && { systemctl --user is-enabled --quiet hq-lanes 2>/dev/null || systemctl --user is-active --quiet hq-lanes; }; then
   ~/.local/bin/hq lanes start
