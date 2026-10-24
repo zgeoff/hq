@@ -252,7 +252,8 @@ test('hq lanes cap sets a cap for the owner session, and shows it back', async (
   const setCode = await main(['lanes', 'cap', '7', '--until', 'Mon 08:00', '--reason', 'weekend pacing', '--json']);
   const showCode = await main(['lanes', 'cap', '--json']);
 
-  expect([setCode, showCode]).toStrictEqual([0, 0]);
+  expect(setCode).toBe(0);
+  expect(showCode).toBe(0);
   expect(JSON.parse(printed[1] ?? '{}')).toMatchObject({ ok: true, cap: { cap: 7, until: '2026-10-18T21:00:00Z', reason: 'weekend pacing', by: 'z-stu' } });
 });
 
