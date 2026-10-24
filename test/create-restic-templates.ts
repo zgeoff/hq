@@ -1,20 +1,20 @@
 import { Database } from 'bun:sqlite';
-import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { buildResticTemplateKey } from './build-restic-template-key.ts';
 import { writeCheapResticKey } from './write-cheap-restic-key.ts';
 
 // Every restic repo the tests make shares this password, so one pair of templates serves them all.
 export const RESTIC_TEST_PASSWORD = 'invented-kettle-password';
 
-// An empty `local` and `remote` repo, built once per machine under a lock. A calibrated key costs
-// about 0.75 s per restic call, so each key is rewritten cheap. The remote is initialised from the
-// local with hq's flags for a new remote, so `restic copy` between copies of the two works.
+// An empty `local` and `remote` repo, built once per restic version and builder source, under a lock.
+// A calibrated key costs about 0.75 s per restic call, so each key is rewritten cheap. The remote is
+// initialised with hq's flags for a new remote, so `restic copy` between copies of the two works.
 export function createResticTemplates(): string {
   const version = Bun.spawnSync(['restic', 'version']).stdout.toString();
-  const rewrite = readFileSync(join(import.meta.dir, 'write-cheap-restic-key.ts'), 'utf8');
-  const key = createHash('sha256').update(`${version}\n${RESTIC_TEST_PASSWORD}\n${rewrite}`).digest('hex').slice(0, 16);
+  const sources = ['create-restic-templates.ts', 'write-cheap-restic-key.ts'].map((name) => readFileSync(join(import.meta.dir, name), 'utf8'));
+  const key = buildResticTemplateKey(version, [RESTIC_TEST_PASSWORD, ...sources]);
   const root = join(tmpdir(), 'hq-tests-restic-template');
   const templates = join(root, key);
   if (existsSync(templates)) {
