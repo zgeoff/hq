@@ -1,7 +1,9 @@
 import { HqError } from '../errors.ts';
+import { ControlReplySchema, encodeControlLine } from './control-protocol.ts';
+import type { ControlReply } from './control-protocol.ts';
 
 // Asks the running console to print a new login link on its own terminal, and returns its reply.
-export async function askConsoleLogin(path: string): Promise<string> {
+export async function askConsoleLogin(path: string): Promise<ControlReply> {
   const reply = Promise.withResolvers<string>();
   let answer = '';
   try {
@@ -9,7 +11,7 @@ export async function askConsoleLogin(path: string): Promise<string> {
       unix: path,
       socket: {
         open(socket) {
-          socket.write('login\n');
+          socket.write(encodeControlLine({ request: 'login' }));
         },
         data(_socket, chunk) {
           answer += Buffer.from(chunk).toString('utf8');
@@ -25,5 +27,11 @@ export async function askConsoleLogin(path: string): Promise<string> {
   } catch (error) {
     throw new HqError('not_running', `no hq console answers at ${path}: start it with hq console in your own terminal (${error instanceof Error ? error.message : String(error)})`);
   }
-  return await reply.promise;
+  const raw = await reply.promise;
+  const json = raw === '' ? 'null' : raw;
+  const parsed = ControlReplySchema.safeParse(JSON.parse(json));
+  if (!parsed.success) {
+    throw new HqError('bad_answer', `the console's control socket gave a reply hq cannot read: ${raw.slice(0, 80)}`);
+  }
+  return parsed.data;
 }

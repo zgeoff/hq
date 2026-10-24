@@ -6,7 +6,7 @@ test("a login request prints the new link on the console's terminal, and the rep
 
   const reply = answerLoginRequest({ ok: true }, () => 'http://127.0.0.1:4317/#t=kettle-token', (line) => printed.push(line));
 
-  expect(reply).toBe('printed');
+  expect(reply).toStrictEqual({ status: 'printed' });
   expect(printed).toStrictEqual(['hq console: open http://127.0.0.1:4317/#t=kettle-token  (one use; it replaces the last link)']);
 });
 
@@ -16,7 +16,7 @@ test('a console started off the owner terminal refuses, prints nothing and mints
 
   const reply = answerLoginRequest({ ok: false, reason: 'its output is not a terminal' }, () => `kettle-token-${++minted}`, (line) => printed.push(line));
 
-  expect(reply).toBe('refused: its output is not a terminal');
+  expect(reply).toStrictEqual({ status: 'refused', reason: 'its output is not a terminal' });
   expect(printed).toStrictEqual([]);
   expect(minted).toBe(0);
 });
