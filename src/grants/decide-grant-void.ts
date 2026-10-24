@@ -1,3 +1,4 @@
+import { match } from 'ts-pattern';
 import { GRANT_ACT_TRANSITIONS } from './grant-act-transitions.ts';
 import type { GrantActState, GrantActionRow, GrantVoidArgs, GrantVoidCaller } from './types.ts';
 
@@ -21,11 +22,13 @@ export function decideGrantVoid(input: GrantVoidInput): GrantVoidDecision {
   if (action === null) {
     return { ok: false, code: 'not_found', message: `no grant action ${input.request.id}`, state: null };
   }
-  const caller = input.caller;
-  const voidedBy = caller.kind === 'session' ? [action.actor, input.owner].find((name) => input.fleetIDs[name] === caller.id) : undefined;
+  const verdict = match(input.caller)
+    .with({ kind: 'session' }, (session) => ({ voidedBy: [action.actor, input.owner].find((name) => input.fleetIDs[name] === session.id), cause: '' }))
+    .with({ kind: 'unknown' }, (unknown) => ({ voidedBy: undefined, cause: `; atc cannot say who is calling (${unknown.cause})` }))
+    .exhaustive();
+  const voidedBy = verdict.voidedBy;
   if (voidedBy === undefined) {
-    const cause = caller.kind === 'unknown' ? `; atc cannot say who is calling (${caller.cause})` : '';
-    return { ok: false, code: 'not_allowed', message: `only ${action.actor}, who logged grant action ${action.id}, or ${input.owner} may void it${cause}`, state: null };
+    return { ok: false, code: 'not_allowed', message: `only ${action.actor}, who logged grant action ${action.id}, or ${input.owner} may void it${verdict.cause}`, state: null };
   }
   const from: GrantActState = action.voided_at === null ? 'live' : 'void';
   const move = GRANT_ACT_TRANSITIONS['grant-void'];
