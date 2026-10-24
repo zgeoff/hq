@@ -2,6 +2,7 @@ import { expect, onTestFinished, test } from 'bun:test';
 import rulesTable from '../../lanes.json';
 import { buildReadyPage, makePagedCall } from '../../test/build-ready-page.ts';
 import type { ReadyNodeSeed } from '../../test/build-ready-page.ts';
+import { buildStubGitHubFactsRunner } from '../../test/build-stub-github-facts-runner.ts';
 import { at, freshDb } from '../../test/helpers.ts';
 import { makeStateCall } from '../../test/make-state-call.ts';
 import { runFocusCommand } from '../focus/run-focus-command.ts';
@@ -32,7 +33,7 @@ function setupTest() {
   const rules = validateLaneRules(rulesTable, null);
   const seedReady = async (seeds: ReadyNodeSeed[]): Promise<void> => {
     const call = makePagedCall(buildReadyPage(seeds, null));
-    await readLinearReady(fresh.db, call, 'hq-lanes', rules);
+    await readLinearReady(fresh.db, call, 'hq-lanes', rules, buildStubGitHubFactsRunner({}));
   };
   const addLocalRun = (issue: string): void => {
     addRun(fresh.db, { issue, title: 'Descale the kettle', place: 'local', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: null, actor: 'z-delivery' });

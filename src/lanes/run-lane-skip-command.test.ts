@@ -65,8 +65,8 @@ test('it drops a skip and logs it, and says so when the issue had none', () => {
 
 test.each([
   { label: 'a past time', until: '2026-10-15T19:00:00Z', reason: 'held', message: '--until 2026-10-15T19:00:00Z has passed; give a later time' },
-  { label: 'an until that is no time or issue', until: 'tomorrow', reason: 'held', message: '--until takes an ISO time, such as 2026-11-02T09:00:00Z, or an issue like GEO-123, not "tomorrow"' },
-  { label: 'an until naming the issue itself', until: 'GEO-9861', reason: 'held', message: '--until names GEO-9861 itself; give another issue or a time' },
+  { label: 'an until that is no time, issue or PR', until: 'tomorrow', reason: 'held', message: '--until takes an ISO time, such as 2026-11-02T09:00:00Z, an issue like GEO-123, or a PR like pr:repo#12, not "tomorrow"' },
+  { label: 'an until naming the issue itself', until: 'GEO-9861', reason: 'held', message: '--until names GEO-9861 itself; give another issue, a PR or a time' },
   { label: 'an empty reason', until: '2026-10-16T09:00:00Z', reason: '  ', message: '--reason must say why' },
 ])('it refuses $label with bad_args and stores nothing', (row) => {
   const ctx = setupTest();

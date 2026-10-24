@@ -3,6 +3,7 @@ import { iso } from '../clock/iso.ts';
 import { HqError } from '../errors.ts';
 import { ISSUE } from '../followups/issue.ts';
 import type { LaneSkip } from './types.ts';
+import { parsePRUntil } from './pr-until.ts';
 import { writeSkipMove } from './write-skip-move.ts';
 
 export interface SkipChange {
@@ -33,13 +34,20 @@ const ISO_TIME = /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-
 function parseUntil(until: string, issue: string, at: Date): string {
   if (ISSUE.test(until)) {
     if (until === issue) {
-      throw new HqError('bad_args', `--until names ${issue} itself; give another issue or a time`);
+      throw new HqError('bad_args', `--until names ${issue} itself; give another issue, a PR or a time`);
     }
     return until;
   }
+  const pr = parsePRUntil(until);
+  if (pr) {
+    if (pr.owner !== null && pr.owner !== 'zgeoff') {
+      throw new HqError('bad_args', `--until pr:${pr.owner}/... is refused: hq reads only zgeoff PRs`);
+    }
+    return `pr:${pr.ref}`;
+  }
   const time = Date.parse(until);
   if (!ISO_TIME.test(until) || Number.isNaN(time)) {
-    throw new HqError('bad_args', `--until takes an ISO time, such as 2026-11-02T09:00:00Z, or an issue like GEO-123, not "${until.slice(0, 60)}"`);
+    throw new HqError('bad_args', `--until takes an ISO time, such as 2026-11-02T09:00:00Z, an issue like GEO-123, or a PR like pr:repo#12, not "${until.slice(0, 60)}"`);
   }
   if (time <= at.getTime()) {
     throw new HqError('bad_args', `--until ${until} has passed; give a later time`);

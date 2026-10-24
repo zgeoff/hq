@@ -71,7 +71,7 @@ export async function watchTick(db: Database, d: WatchDeps): Promise<boolean> {
     }
   }
   try {
-    await runLinearReadyTick(db, { call: makeAuditedLinearCaller(db, d.run), readLanes: readPacingLanes, actor: d.me, deadlineMs: ms });
+    await runLinearReadyTick(db, { call: makeAuditedLinearCaller(db, d.run), run: d.run, readLanes: readPacingLanes, actor: d.me, deadlineMs: ms });
   } catch (error) {
     d.log(`${at()} lanes Ready from Linear failed: ${msg(error)}`);
   }
