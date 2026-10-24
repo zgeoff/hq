@@ -320,3 +320,19 @@ test('it still sends a read to a socket the test did not name', async () => {
 
   expect(peer.request('session.list')).resolves.toStrictEqual({ sessions: [] });
 });
+
+test.each([
+  ['the session it names', { peerSession: 'kettle-1' }, 'kettle-1'],
+  ['null for a caller outside any session', { peerSession: null }, null],
+  ['undefined when the hello has no peerSession field', { helloWithoutPeerSession: true }, undefined],
+])("it keeps the hello's caller session: %s", async (_case, options, expected) => {
+  const ctx = setupTest();
+  const daemon = startStubAtcDaemon(ctx.path, {}, options);
+  const peer = await AtcClient.open(ctx.path);
+  onTestFinished(() => {
+    peer.close();
+    daemon.stop();
+  });
+
+  expect(peer.peerSession).toBe(expected);
+});

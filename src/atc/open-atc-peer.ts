@@ -13,6 +13,7 @@ import { withTimeout } from './with-timeout.ts';
 export interface AtcPeer {
   send: (method: string, params: Record<string, unknown>) => Promise<Record<string, unknown>>;
   stop: () => void;
+  peerSession: string | null | undefined;
 }
 
 type PeerRequest = Parameters<StandardLinkClient<object>['call']>[0];
@@ -36,8 +37,9 @@ export async function openAtcPeer(path: string, timeoutMs: number): Promise<AtcP
   const state = buildPeerState();
   state.socket = await withTimeout(Bun.connect({ unix: path, socket: buildHandlers(state) }), timeoutMs, `atc daemon not reachable at ${path}`);
   state.queue = buildOutboundQueue(state.socket);
+  let hello: Record<string, unknown>;
   try {
-    await sendCall(state, 'daemon.hello', { client: 'hq', protocol: PROTOCOL_V, auth: { scheme: 'none' } }, timeoutMs);
+    hello = await sendCall(state, 'daemon.hello', { client: 'hq', protocol: PROTOCOL_V, auth: { scheme: 'none' } }, timeoutMs);
   } catch (error) {
     stopPeer(state, 'hello failed', toHqError(error));
     throw error;
@@ -46,6 +48,7 @@ export async function openAtcPeer(path: string, timeoutMs: number): Promise<AtcP
   return {
     send: (method, params) => sendCall(state, method, params, timeoutMs),
     stop: () => stopPeer(state, 'client closed', new HqError('atc_unreachable', 'client closed')),
+    peerSession: findPeerSession(hello),
   };
 }
 
@@ -153,6 +156,17 @@ function toRecord(value: unknown): Record<string, unknown> {
     return Object.fromEntries(Object.entries(value));
   }
   return {};
+}
+
+function findPeerSession(hello: Record<string, unknown>): string | null | undefined {
+  const value = hello['peerSession'];
+  if (typeof value === 'string' && value !== '') {
+    return value;
+  }
+  if (value === null) {
+    return null;
+  }
+  return undefined;
 }
 
 // A daemon on the older line protocol frames with a version and no peer message id.
