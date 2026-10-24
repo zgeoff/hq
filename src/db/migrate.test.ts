@@ -173,7 +173,7 @@ test('it adds the slot-minutes table in v42 and refuses a cause outside the thre
   expect(db.query('PRAGMA user_version').get()).toStrictEqual({ user_version: 42 });
 });
 
-test('it adds the void columns to grant_actions in v43, keeps every row as it was, and makes v43 the newest schema', () => {
+test('it adds the void columns to grant_actions in v43 and keeps every row as it was', () => {
   const base = mkdtempSync(join(tmpdir(), 'hq-migrate-v43-'));
   const db = new Database(join(base, 'hq.db'), { create: true, strict: true });
   const path = join(base, 'hq.db');
@@ -183,10 +183,26 @@ test('it adds the void columns to grant_actions in v43, keeps every row as it wa
   migrate(db, path, false, MIGRATIONS.slice(0, 42));
   db.query("INSERT INTO grant_actions (grant_name, target, note, actor, at) VALUES ('kettle-merges', 'kettle#9', 'on green', 'teapot-bot', '2026-10-14T01:00:00Z'), ('kettle-merges', 'kettle#10', NULL, 'kettle-bot', '2026-10-14T02:00:00Z')").run();
 
-  expect(migrate(db, path, true)).not.toBeNull();
+  expect(migrate(db, path, true, MIGRATIONS.slice(0, 43))).not.toBeNull();
   expect(db.query('SELECT id, grant_name, target, note, actor, at, voided_at, voided_by, void_reason FROM grant_actions ORDER BY id').all()).toStrictEqual([
     { id: 1, grant_name: 'kettle-merges', target: 'kettle#9', note: 'on green', actor: 'teapot-bot', at: '2026-10-14T01:00:00Z', voided_at: null, voided_by: null, void_reason: null },
     { id: 2, grant_name: 'kettle-merges', target: 'kettle#10', note: null, actor: 'kettle-bot', at: '2026-10-14T02:00:00Z', voided_at: null, voided_by: null, void_reason: null },
   ]);
   expect(db.query('PRAGMA user_version').get()).toStrictEqual({ user_version: 43 });
+});
+
+test('it adds slot_usage in v44, accepts slots 1 to 4 only, and makes v44 the newest schema', () => {
+  const base = mkdtempSync(join(tmpdir(), 'hq-migrate-v44-'));
+  const db = new Database(join(base, 'hq.db'), { create: true, strict: true });
+  const path = join(base, 'hq.db');
+  onTestFinished(() => rmSync(base, { recursive: true, force: true }));
+  onTestFinished(() => db.close());
+  db.exec('PRAGMA journal_mode = WAL;');
+  migrate(db, path, false, MIGRATIONS.slice(0, 43));
+
+  expect(migrate(db, path, true)).not.toBeNull();
+  db.query("INSERT INTO slot_usage (at, slot, status, five_hour, five_hour_resets_at, seven_day, seven_day_resets_at, working_lanes) VALUES ('2026-10-14T01:00:00Z', 2, '200', 12.5, '2026-10-14T05:00:00Z', 40, '2026-10-18T01:00:00Z', 3)").run();
+  expect(db.query('SELECT slot, status, five_hour, seven_day, working_lanes FROM slot_usage').all()).toStrictEqual([{ slot: 2, status: '200', five_hour: 12.5, seven_day: 40, working_lanes: 3 }]);
+  expect(() => db.query("INSERT INTO slot_usage (at, slot, status, working_lanes) VALUES ('2026-10-14T01:00:00Z', 5, '200', 0)").run()).toThrow(/CHECK constraint failed/u);
+  expect(db.query('PRAGMA user_version').get()).toStrictEqual({ user_version: 44 });
 });
