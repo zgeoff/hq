@@ -10,10 +10,8 @@ import { CAUSE_SINCE_KEY } from './cause-since-key.ts';
 import { ELIGIBLE_SINCE_KEY } from './eligible-since-key.ts';
 import type { SlotCause } from './types.ts';
 
-// One look at the empty slots: starts the clock when a free slot meets eligible Ready work, clears it
-// only when free slots or eligible Ready work are known to be 0, and leaves it while either is
-// unknown. Then it tags the slots with their cause and keeps when that cause began, which an unknown
-// capacity leaves as it was.
+// One look: the Ready-waiting clock clears only when free slots or eligible Ready work are known to be
+// 0, and an unknown capacity leaves both it and the cause's start as they were.
 export function trackSlotCause(db: Database, slotPlan: SlotPlan | null, at: Date): SlotCause {
   if (slotPlan !== null && (slotPlan.pool.free === 0 || slotPlan.eligible === 0)) {
     setMeta(db, ELIGIBLE_SINCE_KEY, null);
