@@ -1,4 +1,5 @@
 import { QueryClient } from '@tanstack/react-query';
+import { createRoot } from 'react-dom/client';
 import { createConsoleAppRouter } from './create-console-app-router.tsx';
 import { restoreTheme } from './restore-theme.ts';
 import { startConsolePage } from './start-console-page.tsx';
@@ -9,7 +10,7 @@ restoreTheme(document.documentElement, () => globalThis.localStorage);
 
 if (root !== null) {
   await startConsolePage({
-    root,
+    render: (view) => createRoot(root).render(view),
     router: createConsoleAppRouter(),
     queryClient: new QueryClient({ defaultOptions: { queries: { refetchOnWindowFocus: true, retry: 1 } } }),
     login: {
