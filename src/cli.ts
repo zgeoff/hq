@@ -189,6 +189,8 @@ import { readLanes } from './lanes/read-lanes.ts';
 import { releaseLanes } from './lanes/release-lanes.ts';
 import { parseLanesCapArgs } from './lanes/cap/parse-lanes-cap-args.ts';
 import { runLanesCapCommand } from './lanes/cap/run-lanes-cap-command.ts';
+import { readFallbackCapView } from './lanes/cap/read-fallback-cap-view.ts';
+import { formatCapLine } from './lanes/cap/format-cap-line.ts';
 import { parseLaneSkipArgs } from './lanes/parse-lane-skip-args.ts';
 import { runLaneSkipCommand } from './lanes/run-lane-skip-command.ts';
 import { reportReady } from './lanes/report-ready.ts';
@@ -1867,6 +1869,8 @@ async function lanesCommand(context: Pick<Ctx, 'db' | 'verb' | 'rest' | 'flags' 
       const slotMinutesToday = readSlotMinutes(db, sydney(lookAt).date);
       const readyNote = readySummary(db, LANES.readyFreshMinutes());
       const parked = parkedRuns(db);
+      const capView = slotPlan?.cap ?? readFallbackCapView(db, sample, lookAt);
+      const fallbackCapLine = slotPlan ? null : formatCapLine(capView);
       const laneLines = slotPlan
         ? [
             `imp room now: ${slotsFrom(sample.cap!, sample.impMib).slots} slot(s) (${sample.cap!.imp?.freeMib ?? '?'} MiB free; 0 when no unattended imp provider has quota)`,
@@ -1876,7 +1880,7 @@ async function lanesCommand(context: Pick<Ctx, 'db' | 'verb' | 'rest' | 'flags' 
             ...(readyNote ? [`  ${readyNote.line}`, ...skippedLines(readyNote).map((l) => `  ${l}`)] : []),
             ...(parked.length > 0 ? [`  parked, not counted (blocked with no session awake, or working with every session gone): ${parked.map((parkedRun) => parkedRun.issue).join(', ')}`] : []),
           ]
-        : [`lanes: no slot plan (${sample.error ?? `no lanes in ${pacingPath()}`})`];
+        : [`lanes: no slot plan (${sample.error ?? `no lanes in ${pacingPath()}`})`, ...(fallbackCapLine === null ? [] : [fallbackCapLine])];
       const lines = [
         `watcher: ${unit.stdout.trim() || 'inactive'} (${enabled})`,
         ...laneLines,
@@ -1889,7 +1893,7 @@ async function lanesCommand(context: Pick<Ctx, 'db' | 'verb' | 'rest' | 'flags' 
         ...nudges.map((n) => `  ${n.at} ${n.slots} free for ${n.free_minutes} min, eligible ${n.eligible ?? '?'} → after: ${n.slots_after ?? 'pending'}`),
       ];
       const slotCauses = { now: { cause: slotCause.cause, slots: slotCause.slots, since: slotCause.since, readyAgeMinutes: slotCause.readyAgeMinutes, reason: slotCause.reason, backlogError: slotCause.backlogError }, today: slotMinutesToday };
-      return { data: { watcher: unit.stdout.trim() || 'inactive', enabled, hold, plan: slotPlan, cap: slotPlan?.cap ?? null, slotCauses, last, ready, idle24h: gap24, nudges }, text: lines.join('\n') };
+      return { data: { watcher: unit.stdout.trim() || 'inactive', enabled, hold, plan: slotPlan, cap: capView, slotCauses, last, ready, idle24h: gap24, nudges }, text: lines.join('\n') };
     }
     default:
       throw new HqError('bad_args', `unknown command: hq lanes ${verb}`);

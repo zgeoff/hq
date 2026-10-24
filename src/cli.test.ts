@@ -316,6 +316,48 @@ test('hq lanes --json carries the stored cap with the working count and what lim
   expect(JSON.parse(stdout).cap).toStrictEqual({ cap: 1, until: '2026-10-18T21:00:00Z', reason: 'weekend pacing', by: 'z-stu', working: 0, limitedBy: 'cap', workingFrom: 'runs' });
 });
 
+test('hq lanes --json carries the stored cap the watcher enforces when pacing has no lanes', async () => {
+  const fresh = freshDb();
+  onTestFinished(fresh.cleanup);
+  mkdirSync(`${fresh.dir}/bin`);
+  writeFileSync(`${fresh.dir}/bin/systemctl`, '#!/bin/sh\nexit 3\n');
+  chmodSync(`${fresh.dir}/bin/systemctl`, 0o755);
+  mkdirSync(`${fresh.dir}/skill/scripts`, { recursive: true });
+  writeFileSync(`${fresh.dir}/skill/scripts/capacity.sh`, `echo '${JSON.stringify({ imp: { freeMib: 0, room: false } })}'\n`);
+  writeFileSync(`${fresh.dir}/skill/pacing.json`, '{}');
+  setMeta(fresh.db, 'lanes_cap', JSON.stringify({ cap: 0, until: '2026-10-18T21:00:00Z', reason: 'kettle descaling', by: 'z-stu', at: '2026-10-14T00:00:00Z' }));
+  const child = Bun.spawn(['bun', join(import.meta.dir, 'cli.ts'), 'lanes', '--json'], {
+    stdout: 'pipe',
+    stderr: 'pipe',
+    env: { ...process.env, HOME: fresh.dir, HQ_DB: fresh.path, HQ_PROJECTS: `${fresh.dir}/projects`, HQ_CAPACITY: `${fresh.dir}/skill/scripts/capacity.sh`, HQ_NOTIFY: 'off', HQ_NOW: NOON_SYDNEY, HQ_AS: 'z-delivery', PATH: `${fresh.dir}/bin:${process.env['PATH']}` },
+  });
+
+  const [, stdout] = await Promise.all([child.exited, new Response(child.stdout).text()]);
+
+  expect(JSON.parse(stdout)).toMatchObject({ plan: null, cap: { cap: 0, until: '2026-10-18T21:00:00Z', reason: 'kettle descaling', by: 'z-stu', working: 0, limitedBy: 'pool', workingFrom: 'runs' } });
+});
+
+test('hq lanes prints the stored cap under the missing slot plan when pacing has no lanes', async () => {
+  const fresh = freshDb();
+  onTestFinished(fresh.cleanup);
+  mkdirSync(`${fresh.dir}/bin`);
+  writeFileSync(`${fresh.dir}/bin/systemctl`, '#!/bin/sh\nexit 3\n');
+  chmodSync(`${fresh.dir}/bin/systemctl`, 0o755);
+  mkdirSync(`${fresh.dir}/skill/scripts`, { recursive: true });
+  writeFileSync(`${fresh.dir}/skill/scripts/capacity.sh`, `echo '${JSON.stringify({ imp: { freeMib: 0, room: false } })}'\n`);
+  writeFileSync(`${fresh.dir}/skill/pacing.json`, '{}');
+  setMeta(fresh.db, 'lanes_cap', JSON.stringify({ cap: 0, until: '2026-10-18T21:00:00Z', reason: 'kettle descaling', by: 'z-stu', at: '2026-10-14T00:00:00Z' }));
+  const child = Bun.spawn(['bun', join(import.meta.dir, 'cli.ts'), 'lanes'], {
+    stdout: 'pipe',
+    stderr: 'pipe',
+    env: { ...process.env, HOME: fresh.dir, HQ_DB: fresh.path, HQ_PROJECTS: `${fresh.dir}/projects`, HQ_CAPACITY: `${fresh.dir}/skill/scripts/capacity.sh`, HQ_NOTIFY: 'off', HQ_NOW: NOON_SYDNEY, HQ_AS: 'z-delivery', PATH: `${fresh.dir}/bin:${process.env['PATH']}` },
+  });
+
+  const [, stdout] = await Promise.all([child.exited, new Response(child.stdout).text()]);
+
+  expect(stdout.split('\n').slice(1, 3)).toStrictEqual([expect.stringMatching(/^lanes: no slot plan /u), 'cap: 0 until Mon 08:00 Sydney (kettle descaling), 0 working (counted by run: the atc reading is stale)']);
+});
+
 test('hq capacity --json carries the Claude burn hint from the usage samples', async () => {
   const fresh = freshDb();
   onTestFinished(fresh.cleanup);
