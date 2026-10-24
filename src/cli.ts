@@ -515,7 +515,6 @@ function getHome(): string {
 
 const list = (v: string | undefined) => (v ?? '').split(',').map((s) => s.trim()).filter(Boolean);
 
-// The owner and reviewer checks ask the daemon at the uid's own socket who is calling.
 function readOwnerProbeDeps(): OwnerProbeDeps {
   return { openClient: openOwnerProbeClient };
 }
