@@ -6,7 +6,9 @@ import { now } from '../clock/now.ts';
 import { getMeta } from '../db/get-meta.ts';
 import { setMeta } from '../db/set-meta.ts';
 import { logEvent } from '../log-event.ts';
+import { dropTopic } from '../outbox/drop-topic.ts';
 import { enqueue } from '../outbox/enqueue.ts';
+import { forwardOf } from '../outbox/forward-of.ts';
 import { orchestratorName } from '../wake/orchestrator-name.ts';
 import { getLanesHold } from './get-lanes-hold.ts';
 import { IMP_LINE_HELD } from './imp-line-held.ts';
@@ -26,9 +28,11 @@ export function checkAllSkipped(db: Database, slotPlan: SlotPlan, actor: string)
   const held = [IMP_LINE_HELD.memory, IMP_LINE_HELD.vcpu].some((line) => line === slotPlan.pool.held);
   if (slotPlan.eligible !== 0 || slotPlan.skipped.length === 0 || (slotPlan.pool.free === 0 && !held)) {
     setMeta(db, TOLD, null);
+    removeAllSkippedAlerts(db);
     return false;
   }
   if (getLanesHold(db)) {
+    removeAllSkippedAlerts(db);
     return false;
   }
   const key = `${held ? 'held' : 'free'} ${slotPlan.skipped.map((skip) => `${skip.issue} ${skip.until}`).toSorted().join(', ')}`;
@@ -41,6 +45,13 @@ export function checkAllSkipped(db: Database, slotPlan: SlotPlan, actor: string)
   enqueue(db, seq, orchestratorName(), formatAllSkipped(slotPlan, { held, heldSlots, impRuns }), TOPIC);
   setMeta(db, TOLD, key);
   return true;
+}
+
+// A queued alert sits at the orchestrator's forwarded destination, not under its own name.
+function removeAllSkippedAlerts(db: Database): void {
+  const orchestrator = orchestratorName();
+  dropTopic(db, orchestrator, TOPIC);
+  dropTopic(db, forwardOf(db, orchestrator), TOPIC);
 }
 
 interface ImpRun {
