@@ -37,9 +37,10 @@ function setupTest() {
 }
 
 test('it lets a PR with a late 1-line commit after the last review merge when no finding is open, and runs no noslop check', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner();
-  createListedReview(ctx.db, { repo: 'widgets', pr: 7, head: 'f00dfeedf00dfeedf00dfeedf00dfeedf00dfeed' });
+  const ctx = setupTest();
+  const stub = await createStubPRRepo({ root: ctx.base, repo: 'widgets', pr: 7, history: [{ 'kettle.md': 'Fill.\nBoil.\nPour.\n' }], change: { 'kettle.md': 'Fill.\nBoil.\nSteep.\n' } });
+  const fake = buildFakeRunner(buildStubPRHead(stub.head));
+  createListedReview(ctx.db, { repo: 'widgets', pr: 7, head: stub.baseHead });
 
   await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).resolves.toMatchObject({ mayMerge: true, reviewed: true });
 
