@@ -624,6 +624,7 @@ export const MIGRATIONS: string[] = [
   `ALTER TABLE grant_actions ADD COLUMN voided_at TEXT;
   ALTER TABLE grant_actions ADD COLUMN voided_by TEXT;
   ALTER TABLE grant_actions ADD COLUMN void_reason TEXT;`,
+
   // v44: what each Claude subscription slot (1-4) reported on one read. status: the HTTP status as
   // text, or op-failed or request-failed when no answer came; the figures are NULL without one.
   // working_lanes: the working lane count when the slots were read.

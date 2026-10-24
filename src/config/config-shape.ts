@@ -41,6 +41,7 @@ export const CONFIG_SHAPE = {
   HQ_REPOS: path(),
   HQ_PROJECTS: path(),
   HQ_NOSLOP_OP_SETTINGS: path(),
+  HQ_SLOTS_OP_SETTINGS: path(),
   HQ_NOSLOP_STORE: path(),
   HQ_CAPACITY: path(),
   HQ_BACKUP_DIR: path(),
