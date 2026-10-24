@@ -8,7 +8,8 @@ import { PROMOTABLE_FOCUS_KEY } from './promotable-focus-key.ts';
 import { READY_ISSUES_KEY } from './ready-issues-key.ts';
 import { READY_SNAPSHOT } from './ready-snapshot.ts';
 import type { SlotPlan } from './read-slot-plan.ts';
-import { CAUSE_SINCE_KEY, ELIGIBLE_SINCE_KEY } from './slot-cause-keys.ts';
+import { CAUSE_SINCE_KEY } from './cause-since-key.ts';
+import { ELIGIBLE_SINCE_KEY } from './eligible-since-key.ts';
 import type { SlotCause } from './types.ts';
 
 // The cause of the empty slots now, from the clocks the lanes tick keeps. It writes nothing, so hq

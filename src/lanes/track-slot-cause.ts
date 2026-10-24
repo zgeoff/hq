@@ -6,7 +6,8 @@ import { setMeta } from '../db/set-meta.ts';
 import { CAUSE_SINCE } from './cause-since.ts';
 import { readSlotCause } from './read-slot-cause.ts';
 import type { SlotPlan } from './read-slot-plan.ts';
-import { CAUSE_SINCE_KEY, ELIGIBLE_SINCE_KEY } from './slot-cause-keys.ts';
+import { CAUSE_SINCE_KEY } from './cause-since-key.ts';
+import { ELIGIBLE_SINCE_KEY } from './eligible-since-key.ts';
 import type { SlotCause } from './types.ts';
 
 // One look at the empty slots: starts the clock when a free slot meets eligible Ready work (and
