@@ -1,6 +1,8 @@
 import type { Database } from 'bun:sqlite';
 import { getMeta } from '../db/get-meta.ts';
 import { metaJson } from '../db/meta-json.ts';
+import { buildFocusKey } from '../focus/build-focus-key.ts';
+import { readFocus } from '../focus/read-focus.ts';
 import { buildSlotCause } from './build-slot-cause.ts';
 import { CAUSE_SINCE } from './cause-since.ts';
 import { LANES } from './lanes.ts';
@@ -23,6 +25,7 @@ export function readSlotCause(db: Database, slotPlan: SlotPlan | null, at: Date)
     eligibleSince: getMeta(db, ELIGIBLE_SINCE_KEY),
     readyAt: snapshot?.at ?? null,
     promotable: metaJson(db, PROMOTABLE_FOCUS_KEY, PROMOTABLE_FOCUS, null),
+    focus: buildFocusKey(readFocus(db)),
     causeSince: metaJson(db, CAUSE_SINCE_KEY, CAUSE_SINCE, null),
     freshMinutes: LANES.readyFreshMinutes(),
     at,

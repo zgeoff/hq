@@ -31,6 +31,12 @@ test('it says the Backlog count is unavailable when that count failed', () => {
   expect(lines.at(0)).toBe('cause: unknown, Backlog count unavailable');
 });
 
+test('it says the Backlog count was made for an earlier focus when the focus has changed since', () => {
+  const lines = formatSlotCause({ cause: 'unknown', slots: 2, since: null, readyAgeMinutes: 5, reason: 'backlog_focus_changed', waitingMinutes: null }, { delivery: 12.4, triage: 0, supply: 3.6 });
+
+  expect(lines.at(0)).toBe('cause: unknown, Backlog count made for an earlier focus');
+});
+
 test('it says the Backlog count is stale when that count is older than the fresh time', () => {
   const lines = formatSlotCause({ cause: 'unknown', slots: 2, since: null, readyAgeMinutes: 5, reason: 'backlog_stale', waitingMinutes: null }, { delivery: 12.4, triage: 0, supply: 3.6 });
 

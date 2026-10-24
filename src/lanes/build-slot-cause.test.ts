@@ -7,8 +7,9 @@ test('it names a stale Ready read as the reason when the snapshot is 30 min 30 s
     eligible: null,
     eligibleSince: null,
     readyAt: '2026-10-14T00:29:30Z',
-    promotable: { at: '2026-10-14T00:55:00Z', count: 3 },
+    promotable: { at: '2026-10-14T00:55:00Z', count: 3, focus: '[]' },
     causeSince: null,
+    focus: '[]',
     freshMinutes: 30,
     at: new Date('2026-10-14T01:00:00Z'),
   });
@@ -22,8 +23,9 @@ test('it names a Ready read that never ran as the reason when no snapshot exists
     eligible: null,
     eligibleSince: null,
     readyAt: null,
-    promotable: { at: '2026-10-14T00:55:00Z', count: 3 },
+    promotable: { at: '2026-10-14T00:55:00Z', count: 3, focus: '[]' },
     causeSince: null,
+    focus: '[]',
     freshMinutes: 30,
     at: new Date('2026-10-14T01:00:00Z'),
   });
@@ -37,8 +39,9 @@ test('it names an unknown Backlog count as the reason when the count failed', ()
     eligible: 0,
     eligibleSince: null,
     readyAt: '2026-10-14T00:55:00Z',
-    promotable: { at: '2026-10-14T00:55:00Z', count: null },
+    promotable: { at: '2026-10-14T00:55:00Z', count: null, focus: '[]' },
     causeSince: null,
+    focus: '[]',
     freshMinutes: 30,
     at: new Date('2026-10-14T01:00:00Z'),
   });
@@ -52,8 +55,9 @@ test('it names a stale Backlog count as the reason when the count is older than 
     eligible: 0,
     eligibleSince: null,
     readyAt: '2026-10-14T00:55:00Z',
-    promotable: { at: '2026-10-14T00:29:30Z', count: 3 },
+    promotable: { at: '2026-10-14T00:29:30Z', count: 3, focus: '[]' },
     causeSince: null,
+    focus: '[]',
     freshMinutes: 30,
     at: new Date('2026-10-14T01:00:00Z'),
   });
@@ -69,9 +73,26 @@ test('it tags delivery once Ready work has waited 10 min 30 s beside a free slot
     readyAt: '2026-10-14T00:55:00Z',
     promotable: null,
     causeSince: null,
+    focus: '[]',
     freshMinutes: 30,
     at: new Date('2026-10-14T01:00:00Z'),
   });
 
   expect(slotCause).toStrictEqual({ cause: 'delivery', slots: 2, since: null, readyAgeMinutes: 5, reason: null, waitingMinutes: null });
+});
+
+test('it names a Backlog count made for an earlier focus as the reason when the focus has changed', () => {
+  const slotCause = buildSlotCause({
+    free: 2,
+    eligible: 0,
+    eligibleSince: null,
+    readyAt: '2026-10-14T00:55:00Z',
+    promotable: { at: '2026-10-14T00:55:00Z', count: 3, focus: '["bug"]' },
+    causeSince: null,
+    focus: '["roadmap"]',
+    freshMinutes: 30,
+    at: new Date('2026-10-14T01:00:00Z'),
+  });
+
+  expect(slotCause).toStrictEqual({ cause: 'unknown', slots: 2, since: null, readyAgeMinutes: 5, reason: 'backlog_focus_changed', waitingMinutes: null });
 });

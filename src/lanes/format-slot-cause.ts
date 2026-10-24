@@ -26,6 +26,7 @@ function formatUnknown(reason: SlotCauseUnknownReason, readyAgeMinutes: number |
     .with('ready_never_read', () => 'Ready never read')
     .with('ready_stale', () => `Ready data ${readyAgeMinutes ?? '?'} min old`)
     .with('backlog_unknown', () => 'Backlog count unavailable')
+    .with('backlog_focus_changed', () => 'Backlog count made for an earlier focus')
     .with('backlog_stale', () => 'Backlog count stale')
     .exhaustive();
 }

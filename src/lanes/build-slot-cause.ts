@@ -11,7 +11,10 @@ export interface SlotCauseInput {
   eligible: number | null;
   eligibleSince: string | null;
   readyAt: string | null;
-  promotable: { at: string; count: number | null } | null;
+  promotable: { at: string; count: number | null; focus: string } | null;
+
+  // The buildFocusKey of the focus set now; a Backlog count from another focus does not count.
+  focus: string;
   causeSince: { cause: string; since: string } | null;
 
   // How old a Backlog count may be and still count.
@@ -40,6 +43,9 @@ export function buildSlotCause(input: SlotCauseInput): SlotCause {
   const promotable = input.promotable;
   if (promotable === null || promotable.count === null) {
     return { ...base, cause: 'unknown', reason: 'backlog_unknown', since: sinceOf('unknown') };
+  }
+  if (promotable.focus !== input.focus) {
+    return { ...base, cause: 'unknown', reason: 'backlog_focus_changed', since: sinceOf('unknown') };
   }
   if (input.at.getTime() - Date.parse(promotable.at) > input.freshMinutes * 60_000) {
     return { ...base, cause: 'unknown', reason: 'backlog_stale', since: sinceOf('unknown') };

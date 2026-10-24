@@ -117,7 +117,7 @@ test('it counts every promotable Backlog issue while no focus is set', async () 
 
   await runLinearReadyTick(ctx.db, { call, run: buildStubGitHubFactsRunner({}), readLanes: () => Promise.resolve(ctx.lanes), actor: 'hq-lanes', deadlineMs: 2000 });
 
-  expect(getMeta(ctx.db, 'lanes_promotable_focus')).toBe('{"at":"2026-10-15T20:00:00Z","count":2}');
+  expect(getMeta(ctx.db, 'lanes_promotable_focus')).toBe('{"at":"2026-10-15T20:00:00Z","count":2,"focus":"[]"}');
 });
 
 test('it counts only the promotable Backlog issues a focus term matches', async () => {
@@ -130,7 +130,7 @@ test('it counts only the promotable Backlog issues a focus term matches', async 
 
   await runLinearReadyTick(ctx.db, { call, run: buildStubGitHubFactsRunner({}), readLanes: () => Promise.resolve(ctx.lanes), actor: 'hq-lanes', deadlineMs: 2000 });
 
-  expect(getMeta(ctx.db, 'lanes_promotable_focus')).toBe('{"at":"2026-10-15T20:00:00Z","count":1}');
+  expect(getMeta(ctx.db, 'lanes_promotable_focus')).toBe(String.raw`{"at":"2026-10-15T20:00:00Z","count":1,"focus":"[\"bug\"]"}`);
 });
 
 test('it records an unknown count, never none, when the Backlog read fails', async () => {
@@ -140,7 +140,7 @@ test('it records an unknown count, never none, when the Backlog read fails', asy
   const ran = await runLinearReadyTick(ctx.db, { call, run: buildStubGitHubFactsRunner({}), readLanes: () => Promise.resolve(ctx.lanes), actor: 'hq-lanes', deadlineMs: 2000 });
 
   expect(ran).toBe(true);
-  expect(getMeta(ctx.db, 'lanes_promotable_focus')).toBe('{"at":"2026-10-15T20:00:00Z","count":null}');
+  expect(getMeta(ctx.db, 'lanes_promotable_focus')).toBe('{"at":"2026-10-15T20:00:00Z","count":null,"focus":"[]"}');
   expect(getMeta(ctx.db, 'lanes_ready_linear_error')).toBeNull();
 });
 
@@ -151,6 +151,6 @@ test('it records an unknown count when the Backlog read misses the deadline the 
   const ran = await runLinearReadyTick(ctx.db, { call, run: buildStubGitHubFactsRunner({}), readLanes: () => Promise.resolve(ctx.lanes), actor: 'hq-lanes', deadlineMs: 200 });
 
   expect(ran).toBe(true);
-  expect(getMeta(ctx.db, 'lanes_promotable_focus')).toBe('{"at":"2026-10-15T20:00:00Z","count":null}');
+  expect(getMeta(ctx.db, 'lanes_promotable_focus')).toBe('{"at":"2026-10-15T20:00:00Z","count":null,"focus":"[]"}');
   expect(getMeta(ctx.db, 'lanes_ready_linear_error')).toBeNull();
 });

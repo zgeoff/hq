@@ -4,6 +4,8 @@ import { iso } from './clock/iso.ts';
 import { now } from './clock/now.ts';
 import { getMeta } from './db/get-meta.ts';
 import { setMeta } from './db/set-meta.ts';
+import { buildFocusKey } from './focus/build-focus-key.ts';
+import { readFocus } from './focus/read-focus.ts';
 import rulesTable from '../lanes.json';
 import { readLinearReady } from './lanes/read-linear-ready.ts';
 import { readPromotableFocusCount } from './lanes/read-promotable-focus-count.ts';
@@ -53,7 +55,8 @@ export async function runLinearReadyTick(db: Database, deps: LinearReadyTickDeps
   }
   setMeta(db, 'lanes_ready_linear_error', null);
   const leftMs = Math.max(0, deps.deadlineMs - (performance.now() - startedAt));
-  const count = await withDeadline(readPromotableFocusCount(db, cancellableCall, rulesTable.team), leftMs, 'Backlog promotable count', abandoned).catch(() => null);
-  writePromotableFocus(db, count);
+  const focus = readFocus(db);
+  const count = await withDeadline(readPromotableFocusCount(cancellableCall, rulesTable.team, focus), leftMs, 'Backlog promotable count', abandoned).catch(() => null);
+  writePromotableFocus(db, { count, focus: buildFocusKey(focus) });
   return true;
 }
