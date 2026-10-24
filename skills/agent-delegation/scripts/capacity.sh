@@ -49,9 +49,11 @@ claude_usage() {
   out=$(curl -sf --max-time 15 https://api.anthropic.com/api/oauth/usage \
     -H "Authorization: Bearer $token" -H 'anthropic-beta: oauth-2025-04-20' \
     | jq -c '{fiveHour: .five_hour.utilization, sevenDay: .seven_day.utilization} as $w
+      | {fiveHour: .five_hour.resets_at, sevenDay: .seven_day.resets_at} as $r
       | [.five_hour, .seven_day] | map(select(. != null)) | {
         used: (map(.utilization) | max),
         windows: $w,
+        resets: $r,
         resetsAt: (max_by(.utilization).resets_at),
         source: "oauth usage endpoint (undocumented; active account only)"
       }' 2>/dev/null) || out=""
