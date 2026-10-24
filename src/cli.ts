@@ -1847,8 +1847,9 @@ async function lanesCommand(context: Pick<Ctx, 'db' | 'verb' | 'rest' | 'flags' 
       const hold = getLanesHold(db);
       const sample = await readCapacity(realRunner);
       const slotPlan = readSlotPlan(db, sample);
-      const slotCause = readSlotCause(db, slotPlan, now());
-      const slotMinutesToday = readSlotMinutes(db, sydney(now()).date);
+      const lookAt = now();
+      const slotCause = readSlotCause(db, slotPlan, lookAt);
+      const slotMinutesToday = readSlotMinutes(db, sydney(lookAt).date);
       const readyNote = readySummary(db, LANES.readyFreshMinutes());
       const parked = parkedRuns(db);
       const laneLines = slotPlan

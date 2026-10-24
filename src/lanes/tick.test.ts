@@ -103,7 +103,7 @@ test('it tags triage when no Ready work waits and Backlog work asks for promotio
   const ctx = setupTest();
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
   await ctx.seedReady([]);
-  writePromotableFocus(ctx.db, { count: 2, focus: '[]' });
+  writePromotableFocus(ctx.db, { count: 2, focus: '[]', at: new Date('2026-10-14T01:00:00Z') });
   tick(ctx.db, sample, 'hq-lanes');
   at('2026-10-14T01:05:00Z');
 
@@ -117,7 +117,7 @@ test('it tags supply when no Ready work waits and no Backlog issue matches the f
   const ctx = setupTest();
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
   await ctx.seedReady([]);
-  writePromotableFocus(ctx.db, { count: 0, focus: '[]' });
+  writePromotableFocus(ctx.db, { count: 0, focus: '[]', at: new Date('2026-10-14T01:00:00Z') });
   tick(ctx.db, sample, 'hq-lanes');
   at('2026-10-14T01:05:00Z');
 
@@ -131,7 +131,7 @@ test('it tags unknown and counts nothing when the Backlog count is unknown', asy
   const ctx = setupTest();
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
   await ctx.seedReady([]);
-  writePromotableFocus(ctx.db, { count: null, focus: '[]' });
+  writePromotableFocus(ctx.db, { count: null, focus: '[]', at: new Date('2026-10-14T01:00:00Z') });
   tick(ctx.db, sample, 'hq-lanes');
   at('2026-10-14T01:05:00Z');
 
@@ -147,7 +147,7 @@ test('it tags unknown and counts nothing when the focus has changed since the Ba
   const ctx = setupTest();
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
   await ctx.seedReady([]);
-  writePromotableFocus(ctx.db, { count: 2, focus: '[]' });
+  writePromotableFocus(ctx.db, { count: 2, focus: '[]', at: new Date('2026-10-14T01:00:00Z') });
   tick(ctx.db, sample, 'hq-lanes');
   at('2026-10-14T01:05:00Z');
   await runFocusCommand({ db: ctx.db, call: makeStateCall([], []), actor: 'kettle-owner', at: new Date('2026-10-14T01:04:00Z'), verb: 'set', rest: ['bug'], reserves: [] });
@@ -209,7 +209,7 @@ test('it tells the triage session at any hour when triage reaches 60 slot-minute
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
   at('2026-10-14T17:00:00Z');
   await ctx.seedReady([]);
-  writePromotableFocus(ctx.db, { count: 1, focus: '[]' });
+  writePromotableFocus(ctx.db, { count: 1, focus: '[]', at: new Date('2026-10-14T17:00:00Z') });
   tick(ctx.db, sample, 'hq-lanes');
   at('2026-10-14T17:30:00Z');
 
@@ -223,13 +223,13 @@ test('it tells the triage and delivery sessions during quiet hours while the sup
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
   at('2026-10-14T17:00:00Z');
   await ctx.seedReady([]);
-  writePromotableFocus(ctx.db, { count: 0, focus: '[]' });
+  writePromotableFocus(ctx.db, { count: 0, focus: '[]', at: new Date('2026-10-14T17:00:00Z') });
   tick(ctx.db, sample, 'hq-lanes');
   at('2026-10-14T17:30:00Z');
   tick(ctx.db, sample, 'hq-lanes');
   at('2026-10-14T18:00:00Z');
   await ctx.seedReady([]);
-  writePromotableFocus(ctx.db, { count: 2, focus: '[]' });
+  writePromotableFocus(ctx.db, { count: 2, focus: '[]', at: new Date('2026-10-14T18:00:00Z') });
   tick(ctx.db, sample, 'hq-lanes');
   await ctx.seedReady([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
   at('2026-10-14T18:01:00Z');
@@ -251,14 +251,14 @@ test('it holds the supply alert for the owner through quiet hours and sends it a
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
   at('2026-10-14T17:00:00Z');
   await ctx.seedReady([]);
-  writePromotableFocus(ctx.db, { count: 0, focus: '[]' });
+  writePromotableFocus(ctx.db, { count: 0, focus: '[]', at: new Date('2026-10-14T17:00:00Z') });
   tick(ctx.db, sample, 'hq-lanes');
   at('2026-10-14T17:30:00Z');
   tick(ctx.db, sample, 'hq-lanes');
   const quiet = ctx.queued();
   at('2026-10-14T20:00:00Z');
   await ctx.seedReady([]);
-  writePromotableFocus(ctx.db, { count: 0, focus: '[]' });
+  writePromotableFocus(ctx.db, { count: 0, focus: '[]', at: new Date('2026-10-14T20:00:00Z') });
 
   tick(ctx.db, sample, 'hq-lanes');
 
@@ -271,14 +271,14 @@ test('it sends the owner the held supply alert at the first look after quiet hou
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
   at('2026-10-14T17:00:00Z');
   await ctx.seedReady([]);
-  writePromotableFocus(ctx.db, { count: 0, focus: '[]' });
+  writePromotableFocus(ctx.db, { count: 0, focus: '[]', at: new Date('2026-10-14T17:00:00Z') });
   tick(ctx.db, sample, 'hq-lanes');
   at('2026-10-14T17:30:00Z');
   tick(ctx.db, sample, 'hq-lanes');
   const quiet = ctx.queued();
   at('2026-10-14T20:00:00Z');
   await ctx.seedReady([]);
-  writePromotableFocus(ctx.db, { count: 2, focus: '[]' });
+  writePromotableFocus(ctx.db, { count: 2, focus: '[]', at: new Date('2026-10-14T20:00:00Z') });
 
   const result = tick(ctx.db, sample, 'hq-lanes');
 
@@ -295,7 +295,7 @@ test('it adds a look to the Sydney day it falls in, with no split at midnight', 
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
   at('2026-10-14T12:59:00Z');
   await ctx.seedReady([]);
-  writePromotableFocus(ctx.db, { count: 0, focus: '[]' });
+  writePromotableFocus(ctx.db, { count: 0, focus: '[]', at: new Date('2026-10-14T12:59:00Z') });
   tick(ctx.db, sample, 'hq-lanes');
   at('2026-10-14T13:03:00Z');
 

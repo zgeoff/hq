@@ -57,6 +57,6 @@ export async function runLinearReadyTick(db: Database, deps: LinearReadyTickDeps
   const leftMs = Math.max(0, deps.deadlineMs - (performance.now() - startedAt));
   const focus = readFocus(db);
   const count = await withDeadline(readPromotableFocusCount(cancellableCall, rulesTable.team, focus), leftMs, 'Backlog promotable count', abandoned).catch(() => null);
-  writePromotableFocus(db, { count, focus: buildFocusKey(focus) });
+  writePromotableFocus(db, { count, focus: buildFocusKey(focus), at });
   return true;
 }
