@@ -12,7 +12,6 @@ export interface OwnerProbeDeps {
   openClient: () => Promise<OwnerProbeClient>;
 }
 
-// Whether the caller is the owner's session, by the rule readRoleSession states.
 export async function readOwnerSession(db: Database, deps: OwnerProbeDeps): Promise<OwnerProbe> {
   const probe = await readRoleSession(db, deps, 'owner');
   return probe.verdict === 'match' ? { verdict: 'owner' } : probe;
