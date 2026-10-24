@@ -4,6 +4,7 @@
     "scripts/*.ts",
     "src/**/*.test.{ts,tsx}",
     "test/**/*.test.ts",
+    "test/run-stub-*.ts",
     "mocks/**/*.test.ts",
     "src/console/main.tsx",
     "mods/hq-band/hooks/register.tsx",
