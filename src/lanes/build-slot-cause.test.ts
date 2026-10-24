@@ -60,3 +60,18 @@ test('it names a stale Backlog count as the reason when the count is older than 
 
   expect(slotCause).toStrictEqual({ cause: 'unknown', slots: 2, since: null, readyAgeMinutes: 5, reason: 'backlog_stale', waitingMinutes: null });
 });
+
+test('it tags delivery once Ready work has waited 10 min 30 s beside a free slot', () => {
+  const slotCause = buildSlotCause({
+    free: 2,
+    eligible: 1,
+    eligibleSince: '2026-10-14T00:49:30Z',
+    readyAt: '2026-10-14T00:55:00Z',
+    promotable: null,
+    causeSince: null,
+    freshMinutes: 30,
+    at: new Date('2026-10-14T01:00:00Z'),
+  });
+
+  expect(slotCause).toStrictEqual({ cause: 'delivery', slots: 2, since: null, readyAgeMinutes: 5, reason: null, waitingMinutes: null });
+});

@@ -31,11 +31,11 @@ export function buildSlotCause(input: SlotCauseInput): SlotCause {
     return { ...base, cause: 'unknown', reason: input.readyAt === null ? 'ready_never_read' : 'ready_stale', since: sinceOf('unknown') };
   }
   if (input.eligible > 0) {
-    const waitingMinutes = input.eligibleSince === null ? 0 : Math.floor((input.at.getTime() - Date.parse(input.eligibleSince)) / 60_000);
-    if (waitingMinutes > DELIVERY_GRACE_MINUTES) {
+    const waitingMs = input.eligibleSince === null ? 0 : input.at.getTime() - Date.parse(input.eligibleSince);
+    if (waitingMs > DELIVERY_GRACE_MINUTES * 60_000) {
       return { ...base, cause: 'delivery', since: sinceOf('delivery') };
     }
-    return { ...base, cause: null, since: input.eligibleSince, waitingMinutes };
+    return { ...base, cause: null, since: input.eligibleSince, waitingMinutes: Math.floor(waitingMs / 60_000) };
   }
   const promotable = input.promotable;
   if (promotable === null || promotable.count === null) {
