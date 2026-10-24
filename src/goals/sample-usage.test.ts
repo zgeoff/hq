@@ -162,3 +162,15 @@ test('the single cache file stores its reset times too', () => {
   sampleUsage(db, new Date('2026-10-16T01:00:00Z'));
   expect(db.query('SELECT five_hour_resets_at, seven_day_resets_at FROM usage_samples').all()).toStrictEqual([{ five_hour_resets_at: '2026-10-16T04:00:00Z', seven_day_resets_at: '2026-10-20T08:00:00Z' }]);
 });
+
+test('the single cache file stores a new row when only its reset times change', () => {
+  cache({ used: 62, windows: { fiveHour: 18, sevenDay: 62 } });
+  sampleUsage(db, new Date('2026-10-16T01:00:00Z'));
+  cache({ used: 62, windows: { fiveHour: 18, sevenDay: 62 }, resets: { fiveHour: '2026-10-16T04:00:00Z', sevenDay: '2026-10-20T08:00:00Z' } });
+
+  expect(sampleUsage(db, new Date('2026-10-16T01:05:00Z'))).toBe(true);
+  expect(db.query('SELECT at, five_hour_resets_at, seven_day_resets_at FROM usage_samples ORDER BY at').all()).toStrictEqual([
+    { at: '2026-10-16T01:00:00Z', five_hour_resets_at: null, seven_day_resets_at: null },
+    { at: '2026-10-16T01:05:00Z', five_hour_resets_at: '2026-10-16T04:00:00Z', seven_day_resets_at: '2026-10-20T08:00:00Z' },
+  ]);
+});

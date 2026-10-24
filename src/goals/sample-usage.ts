@@ -9,6 +9,8 @@ import { getUsageDir } from './get-usage-dir.ts';
 
 const lastAt = z.object({ at: z.string().nullable() });
 
+const LAST_ROW = z.object({ account: z.string(), five_hour: z.number().nullable(), seven_day: z.number().nullable(), five_hour_resets_at: z.string().nullable(), seven_day_resets_at: z.string().nullable() }).nullable();
+
 // One usage_samples row per account whose claude-usage/<account>.json is newer than that account's
 // last row (at = the file's mtime). A file counts only when its account is 12 hex characters and
 // equals the file's base name; others are skipped without a word. With no such folder or no
@@ -46,8 +48,10 @@ export function sampleUsage(db: Database, at: Date = now()): boolean {
   const r = readings(f);
   if (!r) return false;
   const account = typeof r.account === 'string' && ACCOUNT_KEY.test(r.account) ? r.account : 'active';
-  const last = db.query('SELECT account, five_hour, seven_day FROM usage_samples ORDER BY at DESC LIMIT 1').get() as { account: string; five_hour: number | null; seven_day: number | null } | null;
-  if (last && last.account === account && last.five_hour === r.five && last.seven_day === r.seven) return false;
+  const last = LAST_ROW.parse(db.query('SELECT account, five_hour, seven_day, five_hour_resets_at, seven_day_resets_at FROM usage_samples ORDER BY at DESC LIMIT 1').get());
+  if (isSameReading(last, { ...r, account })) {
+    return false;
+  }
   return insert.run(iso(at), account, r.five, r.seven, r.fiveResetsAt, r.sevenResetsAt).changes > 0;
 }
 
@@ -98,4 +102,9 @@ const RESET_TIME = z.iso.datetime({ offset: true });
 function readResetTime(value: unknown): string | null {
   const parsed = RESET_TIME.safeParse(value);
   return parsed.success ? iso(new Date(parsed.data)) : null;
+}
+
+// The single cache file read again with nothing new: the same account, percentages and resets.
+function isSameReading(last: z.output<typeof LAST_ROW>, reading: WindowResets & { account: string; five: number | null; seven: number | null }): boolean {
+  return last !== null && last.account === reading.account && last.five_hour === reading.five && last.seven_day === reading.seven && last.five_hour_resets_at === reading.fiveResetsAt && last.seven_day_resets_at === reading.sevenResetsAt;
 }
