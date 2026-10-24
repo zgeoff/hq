@@ -456,15 +456,13 @@ test.each([
   expect(fake.of('bun')).toStrictEqual([]);
 });
 
-test('it lets a PR that started on Codex merge on green CI without reading findings', async () => {
+test('it gates a listed repo\'s PR on noslop though a Codex review file of the PR exists', async () => {
   const ctx = setupTest(),
-    fake = buildFakeRunner();
+    fake = buildFakeRunner({ noslopFindings: buildStubFindings('open') });
   setMeta(ctx.db, 'noslop', JSON.stringify({ repos: ['widgets'], sha: '0123456789abcdef0123456789abcdef01234567' }));
   writeFileSync(join(ctx.base, 'widgets7-review.md'), 'No findings.\n');
 
-  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).resolves.toStrictEqual({ mayMerge: true, reason: 'on Codex: green CI is enough', reviewed: false });
-
-  expect(fake.of('bun')).toStrictEqual([]);
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked' });
 });
 
 test('it refuses a PR in hq that changes a skill with no lgtm at its head, naming the file', async () => {

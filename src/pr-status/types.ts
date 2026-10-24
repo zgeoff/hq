@@ -1,6 +1,6 @@
 export type PRAnswer = 'lgtm' | 'changes' | 'reject';
 
-// 'none': the gate passed because noslop does not review the PR (not listed, a bot's PR, on Codex).
+// 'none': the gate passed because noslop does not review the PR (not listed, or a bot's PR).
 export type PRGate = 'pass' | 'fail' | 'none';
 
 // A PR's record as the commands show it. A stale answer or gate was recorded at a head that is not

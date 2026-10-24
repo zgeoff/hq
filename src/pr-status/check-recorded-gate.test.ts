@@ -78,15 +78,15 @@ test("it records gate none with no head for a bot's PR, which noslop never revie
   expect(ctx.db.query('SELECT repo, pr, head, gate, gate_head FROM pr_status').all()).toStrictEqual([{ repo: 'widgets', pr: 7, head: null, gate: 'none', gate_head: null }]);
 });
 
-test('it records gate none with no head for a PR that is on Codex', async () => {
+test('it records a noslop gate, not gate none, for a listed repo\'s PR that has a Codex review file', async () => {
   const ctx = setupTest(),
     fake = buildFakeRunner();
   setMeta(ctx.db, 'noslop', JSON.stringify({ repos: ['widgets'], sha: '0123456789abcdef0123456789abcdef01234567' }));
   writeFileSync(join(ctx.base, 'widgets7-review.md'), 'No findings.\n');
 
-  await expect(checkRecordedGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).resolves.toStrictEqual({ mayMerge: true, reason: 'on Codex: green CI is enough', reviewed: false });
+  await expect(checkRecordedGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).resolves.toStrictEqual({ mayMerge: true, reason: `noslop findings: none open; CI green at ${FAKE_FULL_SHA.slice(0, 7)}`, reviewed: true });
 
-  expect(ctx.db.query('SELECT repo, pr, head, gate, gate_head FROM pr_status').all()).toStrictEqual([{ repo: 'widgets', pr: 7, head: null, gate: 'none', gate_head: null }]);
+  expect(ctx.db.query('SELECT repo, pr, head, gate, gate_head FROM pr_status').all()).toStrictEqual([{ repo: 'widgets', pr: 7, head: FAKE_FULL_SHA, gate: 'pass', gate_head: FAKE_FULL_SHA }]);
 });
 
 test('it stores nothing for a PR of an owner other than zgeoff', async () => {

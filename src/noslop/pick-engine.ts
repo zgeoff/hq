@@ -1,21 +1,15 @@
 import { HqError } from '../errors.ts';
-import type { PriorRounds } from './read-prior-rounds.ts';
 
 export type Engine = 'codex' | 'noslop';
 
-export interface EngineInput extends PriorRounds {
+export interface EngineInput {
   repo: string;
   listed: boolean;
   pinned: string | null;
 }
 
-// A listed repo gets noslop, except a PR that already had a Codex round finishes on Codex. A PR
-// that already had a noslop round keeps noslop while its repo stays listed. Unlisted: Codex.
 export function pickEngine(input: EngineInput): Engine {
   if (!input.listed) {
-    return 'codex';
-  }
-  if (!input.noslopBefore && input.codexBefore) {
     return 'codex';
   }
   if (input.pinned === null) {
