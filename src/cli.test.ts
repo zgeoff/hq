@@ -8,6 +8,7 @@ import { main } from './cli.ts';
 import { overrideEnv } from './config/override-env.ts';
 import { setMeta } from './db/set-meta.ts';
 import { loadActionsSpend } from './goals/load-actions-spend.ts';
+import { OWNER_PROBE_OPENER } from './pr-status/owner-probe-opener.ts';
 import { addRun } from './runs/add-run.ts';
 
 // A database at noon Sydney, quiet notices and console, and a stand-in gh on PATH for
@@ -233,4 +234,44 @@ test('hq lanes shows the cause of the empty slots and the minutes by cause for t
     now: { cause: 'triage', slots: 2, since: '2026-10-14T00:40:00Z', readyAgeMinutes: 5, reason: null, backlogError: null },
     today: { delivery: 12.4, triage: 40.6, supply: 0 },
   });
+});
+
+test('hq lanes cap sets a cap for the owner session, shows it back, and hq lanes --json carries it', async () => {
+  const fresh = freshDb();
+  const printed: string[] = [];
+  const log = console.log;
+  onTestFinished(fresh.cleanup);
+  onTestFinished(overrideEnv('HQ_NOW', NOON_SYDNEY));
+  onTestFinished(overrideEnv('HQ_NOTIFY', 'off'));
+  console.log = (line: string) => void printed.push(line);
+  onTestFinished(() => (console.log = log));
+  setMeta(fresh.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1' }));
+  OWNER_PROBE_OPENER.open = () => Promise.resolve({ peerSession: 'kettle-1', close: () => {} });
+  onTestFinished(() => (OWNER_PROBE_OPENER.open = null));
+
+  const setCode = await main(['lanes', 'cap', '7', '--until', 'Mon 08:00', '--reason', 'weekend pacing', '--json']);
+  const showCode = await main(['lanes', 'cap', '--json']);
+
+  expect([setCode, showCode]).toStrictEqual([0, 0]);
+  expect(JSON.parse(printed[1] ?? '{}')).toMatchObject({ ok: true, cap: { cap: 7, until: '2026-10-18T21:00:00Z', reason: 'weekend pacing', by: 'z-stu' } });
+});
+
+test('hq lanes cap refuses a caller that is not the owner or the delivery lead, and stores nothing', async () => {
+  const fresh = freshDb();
+  const printed: string[] = [];
+  const log = console.log;
+  onTestFinished(fresh.cleanup);
+  onTestFinished(overrideEnv('HQ_NOW', NOON_SYDNEY));
+  onTestFinished(overrideEnv('HQ_NOTIFY', 'off'));
+  console.log = (line: string) => void printed.push(line);
+  onTestFinished(() => (console.log = log));
+  setMeta(fresh.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1' }));
+  OWNER_PROBE_OPENER.open = () => Promise.resolve({ peerSession: 'kettle-9', close: () => {} });
+  onTestFinished(() => (OWNER_PROBE_OPENER.open = null));
+
+  const code = await main(['lanes', 'cap', '7', '--json']);
+
+  expect(code).not.toBe(0);
+  expect(JSON.parse(printed[0] ?? '{}')).toMatchObject({ ok: false, error: { code: 'not_allowed' } });
+  expect(fresh.db.query("SELECT value FROM meta WHERE key = 'lanes_cap'").get()).toBeNull();
 });

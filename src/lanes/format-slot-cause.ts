@@ -2,13 +2,13 @@ import { match } from 'ts-pattern';
 import type { SlotMinutes } from './read-slot-minutes.ts';
 import type { SlotCause, SlotCauseUnknownReason } from './types.ts';
 
-export function formatSlotCause(slotCause: SlotCause, today: SlotMinutes): string[] {
-  return [`cause: ${formatNow(slotCause)}`, `empty slot-minutes today (Sydney): delivery ${Math.round(today.delivery)}, triage ${Math.round(today.triage)}, supply ${Math.round(today.supply)}`];
+export function formatSlotCause(slotCause: SlotCause, today: SlotMinutes, capHeld: boolean): string[] {
+  return [`cause: ${formatNow(slotCause, capHeld)}`, `empty slot-minutes today (Sydney): delivery ${Math.round(today.delivery)}, triage ${Math.round(today.triage)}, supply ${Math.round(today.supply)}`];
 }
 
-function formatNow(slotCause: SlotCause): string {
+function formatNow(slotCause: SlotCause, capHeld: boolean): string {
   if (slotCause.slots === 0) {
-    return 'none (no free slot)';
+    return capHeld ? 'none (cap reached)' : 'none (no free slot)';
   }
   if (slotCause.cause === null) {
     return `none yet, Ready waiting ${slotCause.waitingMinutes ?? 0} min`;

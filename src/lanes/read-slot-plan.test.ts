@@ -7,6 +7,7 @@ import { at, freshDb } from '../../test/helpers.ts';
 import { makeStateCall } from '../../test/make-state-call.ts';
 import { runFocusCommand } from '../focus/run-focus-command.ts';
 import { addRun } from '../runs/add-run.ts';
+import { setMeta } from '../db/set-meta.ts';
 import { setState } from '../runs/set-state.ts';
 import { formatSlotPlan } from './format-slot-plan.ts';
 import { parseLocalRoom } from './parse-local-room.ts';
@@ -147,7 +148,7 @@ test('local slots free none, and say why, when the localFallback is used up', as
     throw new Error('no slot plan');
   }
 
-  expect(plan.pool).toStrictEqual({ impSize: 0, localSize: 3, impRunning: 0, localRunning: 2, impFree: 0, localFree: 0, free: 0, held: null, localHeld: 'no unattended provider can start local work: localFallback 2 in use', localSource: null });
+  expect(plan.pool).toStrictEqual({ impSize: 0, localSize: 3, impRunning: 0, localRunning: 2, impFree: 0, localFree: 0, free: 0, capHeld: false, held: null, localHeld: 'no unattended provider can start local work: localFallback 2 in use', localSource: null });
   expect(plan.plan?.picks).toStrictEqual([]);
   expect(formatSlotPlan(plan)[0]).toBe('slots (running/size, free now): imp 0/0, 0 free; local 2/3, 0 free (no unattended provider can start local work: localFallback 2 in use)');
 });
@@ -173,4 +174,61 @@ test('local slots stay free by count when an unattended provider targets local',
   const plan = readSlotPlan(ctx.db, { ...ctx.sample, localRoom });
 
   expect([plan?.pool.localFree, plan?.pool.localHeld, plan?.plan?.picks.map((pick) => pick.issue)]).toStrictEqual([1, null, ['GEO-9801']]);
+});
+
+test('a cap below the pool free slots takes the difference off the free slots and the picks', async () => {
+  const ctx = setupTest();
+  await ctx.seedReady(ctx.readySeeds);
+  ctx.addLocalRun('GEO-9805');
+  setMeta(ctx.db, 'lanes_cap', JSON.stringify({ cap: 2, until: null, reason: 'quota', by: 'z-stu', at: '2026-10-15T19:00:00Z' }));
+
+  const plan = readSlotPlan(ctx.db, ctx.sample);
+
+  expect(plan?.pool.free).toBe(1);
+  expect(plan?.plan?.picks.map((pick) => pick.issue)).toStrictEqual(['GEO-9801']);
+  expect(plan?.cap).toStrictEqual({ cap: 2, until: null, reason: 'quota', by: 'z-stu', working: 1, limitedBy: 'cap', workingFrom: 'runs' });
+});
+
+test('a cap above the pool free slots leaves the pool in charge', async () => {
+  const ctx = setupTest();
+  await ctx.seedReady(ctx.readySeeds);
+  ctx.addLocalRun('GEO-9805');
+  setMeta(ctx.db, 'lanes_cap', JSON.stringify({ cap: 9, until: null, reason: null, by: 'z-stu', at: '2026-10-15T19:00:00Z' }));
+
+  const plan = readSlotPlan(ctx.db, ctx.sample);
+
+  expect(plan?.pool.free).toBe(2);
+  expect(plan?.cap.limitedBy).toBe('pool');
+});
+
+test('a cap of zero frees no slot and picks nothing', async () => {
+  const ctx = setupTest();
+  await ctx.seedReady(ctx.readySeeds);
+  setMeta(ctx.db, 'lanes_cap', JSON.stringify({ cap: 0, until: null, reason: 'freeze', by: 'z-stu', at: '2026-10-15T19:00:00Z' }));
+
+  const plan = readSlotPlan(ctx.db, ctx.sample);
+
+  expect(plan?.pool.free).toBe(0);
+  expect(plan?.plan?.picks).toStrictEqual([]);
+});
+
+test('a cap whose time has passed no longer limits the slots', async () => {
+  const ctx = setupTest();
+  await ctx.seedReady(ctx.readySeeds);
+  setMeta(ctx.db, 'lanes_cap', JSON.stringify({ cap: 0, until: '2026-10-15T19:30:00Z', reason: 'freeze', by: 'z-stu', at: '2026-10-15T19:00:00Z' }));
+
+  const plan = readSlotPlan(ctx.db, ctx.sample);
+
+  expect(plan?.pool.free).toBe(3);
+  expect(plan?.cap.limitedBy).toBeNull();
+});
+
+test('a malformed stored cap limits nothing', async () => {
+  const ctx = setupTest();
+  await ctx.seedReady(ctx.readySeeds);
+  setMeta(ctx.db, 'lanes_cap', '{"cap":-3}');
+
+  const plan = readSlotPlan(ctx.db, ctx.sample);
+
+  expect(plan?.pool.free).toBe(3);
 });

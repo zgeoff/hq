@@ -1,3 +1,4 @@
+import { formatCapLine } from './cap/format-cap-line.ts';
 import { formatFocusLine } from '../focus/format-focus-line.ts';
 import type { SlotPlan } from './read-slot-plan.ts';
 
@@ -9,8 +10,10 @@ export function formatSlotPlan(slotPlan: SlotPlan): string[] {
   const localNotes = [pool.localSource, pool.localHeld].filter((note) => note !== null);
   const localHeld = localNotes.length === 0 ? '' : ` (${localNotes.join('; ')})`;
   const plan = slotPlan.plan;
+  const capLine = formatCapLine(slotPlan.cap);
   return [
     `slots (running/size, free now): imp ${pool.impRunning}/${pool.impSize}, ${pool.impFree} free${held}; local ${pool.localRunning}/${pool.localSize}, ${pool.localFree} free${localHeld}`,
+    ...(capLine === null ? [] : [capLine]),
     `local: ${pool.localRunning} of ${pool.localSize} delivery sessions on this host`,
     `focus: ${slotPlan.focus === null ? 'none (all eligible work by priority)' : formatFocusLine(slotPlan.focus)}`,
     plan === null ? 'next: Ready unknown (no fresh read from Linear)' : `next: ${plan.picks.length === 0 ? 'nothing' : plan.picks.map((pick) => pick.issue).join(', ')} (${slotPlan.eligible ?? 0} eligible)`,

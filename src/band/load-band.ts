@@ -6,6 +6,9 @@ import { now } from '../clock/now.ts';
 import { loadConsoleItems } from '../load-console-items.ts';
 import { buildLanePlan } from '../lanes/build-lane-plan.ts';
 import { formatPlanOverage } from '../lanes/format-plan-overage.ts';
+import { countWorking } from '../lanes/cap/count-working.ts';
+import { formatCapUntil } from '../lanes/cap/format-cap-until.ts';
+import { readActiveCap } from '../lanes/cap/read-active-cap.ts';
 import { loadPacing } from '../lanes/load-pacing.ts';
 import { readRunningByPlace } from '../lanes/read-running-by-place.ts';
 import type { PacingSlots } from '../lanes/types.ts';
@@ -48,7 +51,14 @@ function loadLanesFromConfig(db: Database, at: Date, slots: PacingSlots, impMib:
     over = running.imp > slots.imp || running.local > slots.local,
     size = slots.imp + slots.local,
     used = running.imp + running.local;
-  return { key: 'lanes', text: `lanes ${used}/${size} (${impd.text}${plan === null ? '' : `; ${plan}`})`, tone: impd.near || over || plan !== null ? 'warn' : 'ok' };
+  const detail = `${impd.text}${plan === null ? '' : `; ${plan}`}`;
+  const cap = readActiveCap(db, at);
+  const tone = impd.near || over || plan !== null ? 'warn' : 'ok';
+  if (cap === null) {
+    return { key: 'lanes', text: `lanes ${used}/${size} (${detail})`, tone };
+  }
+  const until = cap.until === null ? '' : ` until ${formatCapUntil(cap.until)}`;
+  return { key: 'lanes', text: `lanes ${countWorking(db, at).count}/${cap.cap} (cap of ${size}${until}; ${detail})`, tone };
 }
 
 interface ImpdLine {

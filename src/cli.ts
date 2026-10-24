@@ -184,6 +184,8 @@ import { formatLanePlan } from './lanes/format-lane-plan.ts';
 import { readCapacity } from './lanes/read-capacity.ts';
 import { readLanes } from './lanes/read-lanes.ts';
 import { releaseLanes } from './lanes/release-lanes.ts';
+import { parseLanesCapArgs } from './lanes/cap/parse-lanes-cap-args.ts';
+import { runLanesCapCommand } from './lanes/cap/run-lanes-cap-command.ts';
 import { parseLaneSkipArgs } from './lanes/parse-lane-skip-args.ts';
 import { runLaneSkipCommand } from './lanes/run-lane-skip-command.ts';
 import { reportReady } from './lanes/report-ready.ts';
@@ -1812,6 +1814,10 @@ async function lanesCommand(context: Pick<Ctx, 'db' | 'verb' | 'rest' | 'flags' 
       const had = releaseLanes(db, await by());
       return { data: { released: had }, text: had ? 'Slot nudges resume from the next look.' : 'No lanes hold to release.' };
     }
+    case 'cap': {
+      const args = parseLanesCapArgs(context.rest, flags.until, flags.reason);
+      return runLanesCapCommand({ db, at: now(), args, probe: readOwnerProbeDeps() });
+    }
     case 'skip': {
       const args = parseLaneSkipArgs(context.rest, flags.until, flags.reason);
       return runLaneSkipCommand({ db, actor: await by(), at: now(), args });
@@ -1857,7 +1863,7 @@ async function lanesCommand(context: Pick<Ctx, 'db' | 'verb' | 'rest' | 'flags' 
             `imp room now: ${slotsFrom(sample.cap!, sample.impMib).slots} slot(s) (${sample.cap!.imp?.freeMib ?? '?'} MiB free; 0 when no unattended imp provider has quota)`,
             formatLineRoom(loadImpRoom(db, { budgetSlots: slotsFrom(sample.cap ?? {}, sample.impMib).slots, impMib: sample.impMib })),
             ...formatSlotPlan(slotPlan),
-            ...formatSlotCause(slotCause, slotMinutesToday),
+            ...formatSlotCause(slotCause, slotMinutesToday, slotPlan.pool.capHeld),
             ...(readyNote ? [`  ${readyNote.line}`, ...skippedLines(readyNote).map((l) => `  ${l}`)] : []),
             ...(parked.length > 0 ? [`  parked, not counted (blocked with no session awake, or working with every session gone): ${parked.map((parkedRun) => parkedRun.issue).join(', ')}`] : []),
           ]
@@ -1874,7 +1880,7 @@ async function lanesCommand(context: Pick<Ctx, 'db' | 'verb' | 'rest' | 'flags' 
         ...nudges.map((n) => `  ${n.at} ${n.slots} free for ${n.free_minutes} min, eligible ${n.eligible ?? '?'} → after: ${n.slots_after ?? 'pending'}`),
       ];
       const slotCauses = { now: { cause: slotCause.cause, slots: slotCause.slots, since: slotCause.since, readyAgeMinutes: slotCause.readyAgeMinutes, reason: slotCause.reason, backlogError: slotCause.backlogError }, today: slotMinutesToday };
-      return { data: { watcher: unit.stdout.trim() || 'inactive', enabled, hold, plan: slotPlan, slotCauses, last, ready, idle24h: gap24, nudges }, text: lines.join('\n') };
+      return { data: { watcher: unit.stdout.trim() || 'inactive', enabled, hold, plan: slotPlan, cap: slotPlan?.cap ?? null, slotCauses, last, ready, idle24h: gap24, nudges }, text: lines.join('\n') };
     }
     default:
       throw new HqError('bad_args', `unknown command: hq lanes ${verb}`);

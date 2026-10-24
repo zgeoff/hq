@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { createUnblockItems } from '../../test/create-unblock-items.ts';
 import { freshDb } from '../../test/helpers.ts';
 import { main } from '../cli.ts';
+import { setMeta } from '../db/set-meta.ts';
 import { overrideEnv } from '../config/override-env.ts';
 import { loadBand } from './load-band.ts';
 
@@ -35,6 +36,29 @@ test('all clear: nothing needs the owner, Nix is up, impd has room, CI passed, a
     'Needs you 0 · Nix up · lanes 1/4 (impd 8/16 GiB, 6/16 vCPU) · CI green · reviews 0',
     ['ok', 'ok', 'ok', 'ok', 'ok'],
   ]);
+});
+
+test('a cap turns the lanes segment into working over the cap, with the pool size, until and impd text', async () => {
+  const ctx = setupTest();
+  writeFileSync(ctx.pacing, JSON.stringify({ imp: { impMib: 2048 }, lanes: { imp: { cleanup: 3 }, local: { flexible: 1 } } }));
+  ctx.db.query("INSERT INTO capacity_samples (at, nonnix_awake_mib, nonnix_awake_vcpus) VALUES ('2026-10-15T00:55:00Z', 8192, 6)").run();
+  setMeta(ctx.db, 'lanes_cap', JSON.stringify({ cap: 2, until: '2026-10-18T21:00:00Z', reason: 'weekend pacing', by: 'z-stu', at: '2026-10-15T00:00:00Z' }));
+  await main(['run', 'add', 'GEO-9601', '--title', 'Fit the long spout', '--where', 'imp', '--json']);
+
+  const band = await loadBand(ctx.db, ctx.pacing, new Date('2026-10-15T01:00:00Z'));
+
+  expect(band.segments[2]).toStrictEqual({ key: 'lanes', text: 'lanes 1/2 (cap of 4 until Mon 08:00; impd 8/16 GiB, 6/16 vCPU)', tone: 'ok' });
+});
+
+test('a cap with no until leaves the until out of the lanes segment', async () => {
+  const ctx = setupTest();
+  writeFileSync(ctx.pacing, JSON.stringify({ imp: { impMib: 2048 }, lanes: { imp: { cleanup: 3 }, local: { flexible: 1 } } }));
+  ctx.db.query("INSERT INTO capacity_samples (at, nonnix_awake_mib, nonnix_awake_vcpus) VALUES ('2026-10-15T00:55:00Z', 8192, 6)").run();
+  setMeta(ctx.db, 'lanes_cap', JSON.stringify({ cap: 3, until: null, reason: null, by: 'z-stu', at: '2026-10-15T00:00:00Z' }));
+
+  const band = await loadBand(ctx.db, ctx.pacing, new Date('2026-10-15T01:00:00Z'));
+
+  expect(band.segments[2]?.text).toBe('lanes 0/3 (cap of 4; impd 8/16 GiB, 6/16 vCPU)');
 });
 
 test('something waiting on the owner turns Needs you red', async () => {

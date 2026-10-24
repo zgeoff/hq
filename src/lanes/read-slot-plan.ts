@@ -7,6 +7,10 @@ import { buildFocusQueue } from '../focus/build-focus-queue.ts';
 import { compareFocusIssues } from '../focus/compare-focus-issues.ts';
 import { readFocus } from '../focus/read-focus.ts';
 import type { Focus, FocusPlan } from '../focus/types.ts';
+import { buildCapView } from './cap/build-cap-view.ts';
+import type { CapView } from './cap/build-cap-view.ts';
+import { countWorking } from './cap/count-working.ts';
+import { readActiveCap } from './cap/read-active-cap.ts';
 import { buildSlotPool } from './build-slot-pool.ts';
 import type { SlotPool } from './build-slot-pool.ts';
 import { isSkipActive } from './is-skip-active.ts';
@@ -34,6 +38,9 @@ export interface SlotPlan {
   design: string | null;
 
   skipped: LaneSkip[];
+
+  // The cap on working sessions, with the count it holds against; cap null when none is set.
+  cap: CapView;
 }
 
 // The lanes' plan for this look: the pool's free slots, filled from the focus terms in order, then any
@@ -44,11 +51,15 @@ export function readSlotPlan(db: Database, sample: Sample, at: Date = now()): Sl
   }
   const running = readRunningByPlace(db, at);
   const room = loadImpRoom(db, { budgetSlots: slotsFrom(sample.cap, sample.impMib).slots, impMib: sample.impMib }, at);
-  const pool = buildSlotPool(sample.slots, running, room, sample.localRoom ?? null);
+  const active = readActiveCap(db, at);
+  const working = countWorking(db, at);
+  const capRoom = active === null ? null : Math.max(0, active.cap - working.count);
+  const pool = buildSlotPool(sample.slots, running, { room, localRoom: sample.localRoom ?? null, capRoom });
+  const cap = buildCapView(active, working, pool);
   const focus = readFocus(db);
   const snapshot = readReadySnapshot(db, at);
   if (snapshot === null) {
-    return { pool, focus, plan: null, eligible: null, design: null, skipped: [] };
+    return { pool, focus, plan: null, eligible: null, design: null, skipped: [], cap };
   }
   const runIssues = readRunIssues(db);
   const activeSkips = readLaneSkips(db).filter((skip) => isSkipActive(skip, at));
@@ -58,7 +69,7 @@ export function readSlotPlan(db: Database, sample: Sample, at: Date = now()): Sl
   const design = sample.cap.design?.room === true ? findDesignPick(snapshot, leftOut) : null;
   const eligibleIssues = new Set(snapshot.eligible.map((issue) => issue.identifier));
   const skipped = activeSkips.filter((skip) => eligibleIssues.has(skip.issue) && !runIssues.has(skip.issue));
-  return { pool, focus, plan, eligible: queue.length, design, skipped };
+  return { pool, focus, plan, eligible: queue.length, design, skipped, cap };
 }
 
 const issuesSchema = z.array(z.object({ issue: z.string() }));

@@ -10,6 +10,7 @@ import { sydney } from '../morning/sydney.ts';
 import { logEvent } from '../log-event.ts';
 import { enqueue } from '../outbox/enqueue.ts';
 import { orchestratorName } from '../wake/orchestrator-name.ts';
+import { endExpiredCap } from './cap/end-expired-cap.ts';
 import { checkAllSkipped } from './check-all-skipped.ts';
 import { checkReadyStale } from './check-ready-stale.ts';
 import { eligibleNow } from './eligible-now.ts';
@@ -34,6 +35,7 @@ export function tick(db: Database, sample: Sample, actor: string): TickResult {
     .transaction((): TickResult => {
       const t = now();
       const at = iso(t);
+      endExpiredCap(db, t, actor);
       const slotPlan = readSlotPlan(db, sample, t);
       const { freeMib, slots: impSlots } = sample.cap ? slotsFrom(sample.cap, sample.impMib) : { freeMib: null, slots: 0 };
 
