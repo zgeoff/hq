@@ -34,6 +34,18 @@ test('the session recorded for the act actor voids it, and the row, an event and
   expect(ctx.db.query('SELECT from_name, text FROM news').all()).toStrictEqual([{ from_name: 'teapot-bot', text: 'teapot-bot voided grant action 1 under kettle-merges (kettle#9): logged before the merge failed' }]);
 });
 
+test('a void of an act with a 400-character target keeps the whole reason in the news and shortens the target', async () => {
+  const ctx = setupTest();
+  at(NOON_SYDNEY);
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'teapot-bot': 'kettle-2', 'kettle-bot': 'kettle-3' }));
+  createGrantMark(ctx.db, { text: 'kettle PRs merge on green CI', ref: 'kettle#3', at: null, name: 'kettle-merges', actor: 'kettle-bot' });
+  recordGrantAction(ctx.db, { grant: 'kettle-merges', target: `bun run descale --kettle ${'k'.repeat(375)}`, note: null, actor: 'teapot-bot' });
+
+  await voidGrantAction({ db: ctx.db, args: { id: 1, reason: 'the descale ran against the wrong kettle' }, probe: ctx.probeAs('kettle-2') });
+
+  expect(ctx.db.query('SELECT text FROM news').all()).toStrictEqual([{ text: `teapot-bot voided grant action 1 under kettle-merges (bun run descale --kettle ${'k'.repeat(277)}…): the descale ran against the wrong kettle` }]);
+});
+
 test('the owner session voids an act another session logged, and the owner name is recorded', async () => {
   const ctx = setupTest();
   at(NOON_SYDNEY);

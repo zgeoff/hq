@@ -51,6 +51,13 @@ function formatWhoMayVoid(action: GrantActionRow): string {
   return `only ${action.actor}, who logged grant action ${action.id}, or ${roleName('owner')} may void it`;
 }
 
+const NEWS_MAX = 400;
+
+// News refuses a line over 400 characters, so a long target gives way and the reason stays whole.
 function formatNews(voider: string, action: GrantActionRow, reason: string): string {
-  return `${voider} voided grant action ${action.id} under ${action.grant_name} (${action.target}): ${reason}`.slice(0, 400);
+  const head = `${voider} voided grant action ${action.id} under ${action.grant_name} (`;
+  const tail = `): ${reason}`;
+  const room = NEWS_MAX - head.length - tail.length;
+  const target = action.target.length <= room ? action.target : `${action.target.slice(0, Math.max(0, room - 1))}…`;
+  return `${head}${target}${tail}`;
 }
