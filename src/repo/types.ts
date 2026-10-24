@@ -26,6 +26,9 @@ export interface ArchiveHistory {
 export interface ReviewMove {
   collides: boolean;
   from: string;
+
+  // Other known repos whose flat review file the name could also be, as <repo>#<pr>.
+  otherOwners: string[];
   to: string;
 }
 

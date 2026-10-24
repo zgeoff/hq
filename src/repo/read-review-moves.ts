@@ -4,9 +4,10 @@ import type { RepoNames } from './rekey-specs.ts';
 import type { ReviewMove } from './types.ts';
 
 // The review files of repo `from` and where the re-key puts them: the files below the
-// zgeoff/<repo> folder, and the flat <repo><pr>-review.md files from before that layout.
-export function readReviewMoves(reviewDir: string, names: RepoNames): ReviewMove[] {
-  return [...readNestedMoves(reviewDir, names), ...readFlatMoves(reviewDir, names)];
+// zgeoff/<repo> folder, and the flat <repo><pr>-review.md files from before that layout. `known`
+// holds the lowercased repo names a flat name could also belong to.
+export function readReviewMoves(reviewDir: string, names: RepoNames, known: ReadonlySet<string>): ReviewMove[] {
+  return [...readNestedMoves(reviewDir, names), ...readFlatMoves(reviewDir, names, known)];
 }
 
 function readNestedMoves(reviewDir: string, names: RepoNames): ReviewMove[] {
@@ -19,13 +20,13 @@ function readNestedMoves(reviewDir: string, names: RepoNames): ReviewMove[] {
     .filter((entry) => !entry.isDirectory())
     .map((entry) => join(entry.parentPath, entry.name))
     .toSorted()
-    .map((file) => readMove(reviewDir, file, join(toDir, relative(fromDir, file))));
+    .map((file) => readMove(reviewDir, file, join(toDir, relative(fromDir, file)), []));
 }
 
 // A file where a folder of the destination's path belongs blocks the move as surely as a file at
 // the destination does.
-function readMove(reviewDir: string, from: string, to: string): ReviewMove {
-  return { from, to, collides: existsSync(to) || probeBlockedFolder(reviewDir, dirname(to)) };
+function readMove(reviewDir: string, from: string, to: string, otherOwners: string[]): ReviewMove {
+  return { from, to, collides: existsSync(to) || probeBlockedFolder(reviewDir, dirname(to)), otherOwners };
 }
 
 function probeBlockedFolder(reviewDir: string, folder: string): boolean {
@@ -35,7 +36,7 @@ function probeBlockedFolder(reviewDir: string, folder: string): boolean {
   return folder !== join(reviewDir) && folder !== dirname(folder) && probeBlockedFolder(reviewDir, dirname(folder));
 }
 
-function readFlatMoves(reviewDir: string, names: RepoNames): ReviewMove[] {
+function readFlatMoves(reviewDir: string, names: RepoNames, known: ReadonlySet<string>): ReviewMove[] {
   if (!existsSync(reviewDir)) {
     return [];
   }
@@ -44,7 +45,14 @@ function readFlatMoves(reviewDir: string, names: RepoNames): ReviewMove[] {
     .filter((entry) => entry.isFile())
     .flatMap((entry) => {
       const pr = shape.exec(entry.name)?.groups?.['pr'];
-      return pr === undefined ? [] : [readMove(reviewDir, join(reviewDir, entry.name), join(reviewDir, `${names.to.toLowerCase()}${pr}-review.md`))];
+      return pr === undefined ? [] : [readMove(reviewDir, join(reviewDir, entry.name), join(reviewDir, `${names.to.toLowerCase()}${pr}-review.md`), collectOtherOwners(names.from.toLowerCase(), pr, known))];
     })
     .toSorted((first, second) => first.from.localeCompare(second.from));
+}
+
+// <repo><pr> splits wherever the digits start: widgets123 is also widgets1 #23 and widgets12 #3.
+function collectOtherOwners(from: string, pr: string, known: ReadonlySet<string>): string[] {
+  return Array.from({ length: pr.length - 1 }, (_, index) => index + 1)
+    .filter((split) => known.has(`${from}${pr.slice(0, split)}`))
+    .map((split) => `${from}${pr.slice(0, split)}#${Number(pr.slice(split))}`);
 }
