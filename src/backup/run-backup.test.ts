@@ -11,6 +11,7 @@ import { runBackup } from './run-backup.ts';
 import { snapshots } from './snapshots.ts';
 import type { Runner } from '../runner/types.ts';
 import { realRunner } from '../runner/real-runner.ts';
+import { createResticRepo } from '../../test/create-restic-repo.ts';
 import { freshDb, requireEnv } from '../../test/helpers.ts';
 
 // Real restic against temp repos. Skipped on a machine without restic, never in CI, which installs it.
@@ -30,13 +31,19 @@ beforeEach(() => {
   writeFileSync(`${dir}/transcripts/t1.jsonl`, '{"invented":"line"}\n');
   process.env['HQ_BACKUP_DB'] = requireEnv('HQ_DB');
   process.env['HQ_BACKUP_DIRS'] = `${dir}/sessions:${dir}/transcripts`;
+
+  // copies of one template share a repository ID, so each test keeps its own restic cache
+  process.env['XDG_CACHE_HOME'] = `${dir}/cache`;
 });
 afterEach(() => {
-  for (const k of ['HQ_BACKUP_DIR', 'HQ_BACKUP_PASSWORD_FILE', 'HQ_BACKUP_REMOTE_ENV', 'HQ_BACKUP_DB', 'HQ_BACKUP_DIRS']) delete process.env[k];
+  for (const name of ['HQ_BACKUP_DIR', 'HQ_BACKUP_PASSWORD_FILE', 'HQ_BACKUP_REMOTE_ENV', 'HQ_BACKUP_DB', 'HQ_BACKUP_DIRS', 'XDG_CACHE_HOME']) {
+    delete process.env[name];
+  }
   cleanup();
 });
 
 test.skipIf(!canRunRestic)('backs up hq.db online plus the dirs, restores them, and passes a restore test', async () => {
+  createResticRepo(`${dir}/backup/repo`, requireEnv('HQ_BACKUP_PASSWORD_FILE'), 'local');
   db.exec("CREATE TABLE kettle (note TEXT); INSERT INTO kettle VALUES ('whistles once')");
   const r = await runBackup(db, realRunner, 'z-q');
   expect(r.error).toBeNull();
@@ -59,7 +66,7 @@ test.skipIf(!canRunRestic)('backs up hq.db online plus the dirs, restores them, 
   expect(t.error).toBeNull();
   expect(t.ok).toBe(true);
   expect(lastBackup(db).test).toMatchObject({ ok: true });
-}, 120_000);
+});
 
 test('a second restore into the same directory is refused while the first runs, and the lock goes when it ends', async () => {
   const listed = Promise.withResolvers<void>();
@@ -85,26 +92,54 @@ test('a second restore into the same directory is refused while the first runs, 
   expect([calls, existsSync(`${dir}/restored.restore-lock`)]).toStrictEqual([['snapshots', 'restore'], false]);
 });
 
-test.skipIf(!canRunRestic)('copies to a configured remote, and a bad remote fails the run without losing the local snapshot', async () => {
+test.skipIf(!canRunRestic)('initialises a new remote with the local chunker params, copies to it, and restores from it', async () => {
+  createResticRepo(`${dir}/backup/repo`, requireEnv('HQ_BACKUP_PASSWORD_FILE'), 'local');
   mkdirSync(`${dir}/cfg`, { recursive: true });
   writeFileSync(requireEnv('HQ_BACKUP_REMOTE_ENV'), `# invented remote\nRESTIC_REPOSITORY=${dir}/remote-repo\n`);
-  const r = await runBackup(db, realRunner, 'z-q');
-  expect(r.error).toBeNull();
-  expect(r.remote).toBe('copied');
-  expect(await snapshots(realRunner, true)).toHaveLength(1);
-  const t = await restoreTest(db, realRunner, { remote: true, scratch: dir }, 'z-q');
-  expect(t.ok).toBe(true);
+  const inits: { argv: string[]; repository: string | undefined }[] = [];
 
+  // A real init calibrates its key for seconds; the remote template was built with these same flags.
+  const run: Runner = (cmd, opts) => {
+    if (cmd[1] !== 'init') {
+      return realRunner(cmd, opts);
+    }
+    inits.push({ argv: cmd, repository: opts?.env?.['RESTIC_REPOSITORY'] });
+    createResticRepo(`${dir}/remote-repo`, requireEnv('HQ_BACKUP_PASSWORD_FILE'), 'remote');
+    return Promise.resolve({ code: 0, stdout: '', stderr: '' });
+  };
+  const copied = await runBackup(db, run, 'z-q');
+  expect(copied.error).toBeNull();
+  expect(copied.remote).toBe('copied');
+  expect(inits).toStrictEqual([
+    {
+      argv: ['restic', 'init', '--from-repo', `${dir}/backup/repo`, '--from-password-file', requireEnv('HQ_BACKUP_PASSWORD_FILE'), '--copy-chunker-params'],
+      repository: `${dir}/remote-repo`,
+    },
+  ]);
+  const remoteSnapshots = await snapshots(realRunner, true);
+  expect(remoteSnapshots).toHaveLength(1);
+  const restored = await restoreTest(db, realRunner, { remote: true, scratch: dir }, 'z-q');
+  expect(restored.ok).toBe(true);
+});
+
+test.skipIf(!canRunRestic)('a bad remote fails the run without losing the local snapshot', async () => {
+  createResticRepo(`${dir}/backup/repo`, requireEnv('HQ_BACKUP_PASSWORD_FILE'), 'local');
+  const first = await runBackup(db, realRunner, 'z-q');
+  expect(first.ok).toBe(true);
+
+  mkdirSync(`${dir}/cfg`, { recursive: true });
   writeFileSync(requireEnv('HQ_BACKUP_REMOTE_ENV'), `RESTIC_REPOSITORY=${dir}/no/such/place/repo-file\n`);
   writeFileSync(`${dir}/no`, 'a file where a directory should be');
   const bad = await runBackup(db, realRunner, 'z-q');
   expect(bad.ok).toBe(false);
   expect(bad.remote).toMatch(/^failed:/);
-  expect(await snapshots(realRunner, false)).toHaveLength(2);
-  expect(lastBackup(db).lastOk).toBe(r.at);
-}, 120_000);
+  const localSnapshots = await snapshots(realRunner, false);
+  expect(localSnapshots).toHaveLength(2);
+  expect(lastBackup(db).lastOk).toBe(first.at);
+});
 
 test.skipIf(!canRunRestic)('it finds the restored hq.db where the snapshot staged it, when the backup dir has moved since', async () => {
+  createResticRepo(`${dir}/backup/repo`, requireEnv('HQ_BACKUP_PASSWORD_FILE'), 'local');
   db.exec("CREATE TABLE kettle (note TEXT); INSERT INTO kettle VALUES ('whistles twice')");
   const backedUp = await runBackup(db, realRunner, 'z-q');
   expect(backedUp.ok).toBe(true);
@@ -114,7 +149,7 @@ test.skipIf(!canRunRestic)('it finds the restored hq.db where the snapshot stage
 
   const back = await restore(realRunner, `${dir}/restored`, { snapshot: 'latest', remote: false });
   expect(back.db).toBe(join(`${dir}/restored`, dir, 'backup/staging/hq.db'));
-}, 120_000);
+});
 
 test("it refuses to back up while another run holds the staging dir, and leaves that run's staged copy alone", async () => {
   mkdirSync(`${dir}/backup/staging`, { recursive: true });
@@ -162,6 +197,7 @@ test('it lets one run take over a dead staging lock when several find it at once
 });
 
 test.skipIf(!canRunRestic)('it takes over a staging lock whose run is gone, and releases it when done', async () => {
+  createResticRepo(`${dir}/backup/repo`, requireEnv('HQ_BACKUP_PASSWORD_FILE'), 'local');
   const gone = Bun.spawn(['true']);
   await gone.exited;
   mkdirSync(`${dir}/backup`, { recursive: true });
@@ -173,7 +209,7 @@ test.skipIf(!canRunRestic)('it takes over a staging lock whose run is gone, and 
   expect(result.error).toBeNull();
   expect(held.query('SELECT pid FROM holder').all()).toStrictEqual([]);
   held.close();
-}, 120_000);
+});
 
 test('a remote env file needs RESTIC_REPOSITORY; values are read, not echoed', () => {
   mkdirSync(`${dir}/cfg`, { recursive: true });
@@ -183,7 +219,8 @@ test('a remote env file needs RESTIC_REPOSITORY; values are read, not echoed', (
   expect(readRemoteEnv()).toEqual({ RESTIC_REPOSITORY: 's3:https://example.com/bucket', AWS_SECRET_ACCESS_KEY: 'invented-secret' });
 });
 
-test.skipIf(!canRunRestic)('a remote secret never reaches argv, errors or events; RESTIC_HOST cannot hide the copy', async () => {
+test.skipIf(!canRunRestic)('a remote secret in the repository path never reaches argv, errors or events', async () => {
+  createResticRepo(`${dir}/backup/repo`, requireEnv('HQ_BACKUP_PASSWORD_FILE'), 'local');
   mkdirSync(`${dir}/cfg`, { recursive: true });
   const sentinel = 'INVENTED-SENTINEL-9f3a';
   writeFileSync(requireEnv('HQ_BACKUP_REMOTE_ENV'), `RESTIC_REPOSITORY=${dir}/missing-parent-${sentinel}/x/repo\nRESTIC_HOST=other-host\n`);
@@ -196,7 +233,12 @@ test.skipIf(!canRunRestic)('a remote secret never reaches argv, errors or events
   expect(argv.flat().join(' ')).not.toContain(sentinel);
   expect(JSON.stringify(bad)).not.toContain(sentinel);
   expect(JSON.stringify(db.query('SELECT data FROM events').all())).not.toContain(sentinel);
+});
 
+test.skipIf(!canRunRestic)('a remote secret in a rest: URL never reaches errors or events, which restic reshapes', async () => {
+  createResticRepo(`${dir}/backup/repo`, requireEnv('HQ_BACKUP_PASSWORD_FILE'), 'local');
+  mkdirSync(`${dir}/cfg`, { recursive: true });
+  const sentinel = 'INVENTED-SENTINEL-9f3a';
   // restic drops the rest: prefix in its errors, which beat a plain find-and-replace.
   writeFileSync(requireEnv('HQ_BACKUP_REMOTE_ENV'), `RESTIC_REPOSITORY=rest:http://user:${sentinel}@localhost:1/bad%zz\n`);
   const rest = await runBackup(db, realRunner, 'z-q');
@@ -204,7 +246,12 @@ test.skipIf(!canRunRestic)('a remote secret never reaches argv, errors or events
   expect(JSON.stringify(rest)).not.toContain(sentinel);
   expect(JSON.stringify(db.query('SELECT data FROM events').all())).not.toContain(sentinel);
   await expect(restoreTest(db, realRunner, { remote: true, scratch: dir }, 'z-q').then((t) => JSON.stringify(t))).resolves.not.toContain(sentinel);
+});
 
+test.skipIf(!canRunRestic)('RESTIC_HOST, in the remote env file or the environment, cannot hide the copy', async () => {
+  createResticRepo(`${dir}/backup/repo`, requireEnv('HQ_BACKUP_PASSWORD_FILE'), 'local');
+  createResticRepo(`${dir}/remote-repo`, requireEnv('HQ_BACKUP_PASSWORD_FILE'), 'remote');
+  mkdirSync(`${dir}/cfg`, { recursive: true });
   writeFileSync(requireEnv('HQ_BACKUP_REMOTE_ENV'), `RESTIC_REPOSITORY=${dir}/remote-repo\nRESTIC_HOST=other-host\n`);
   process.env['RESTIC_HOST'] = 'other-host';
   try {
@@ -215,7 +262,7 @@ test.skipIf(!canRunRestic)('a remote secret never reaches argv, errors or events
   } finally {
     delete process.env['RESTIC_HOST'];
   }
-}, 120_000);
+});
 
 test('it writes the password exactly once when first runs start together', async () => {
   const go = String(Date.now() + 2000);
