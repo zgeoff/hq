@@ -44,7 +44,7 @@ agent, as [tickets.md](references/tickets.md) says. Priority doesn't hold an iss
 reaches Ready like any other. Three rules keep an issue out:
 
 - **`parked`:** the owner parked it. The label is how hq sees a park, so `hq lanes promotable` leaves the issue out. Only the owner decides a park, as [fields.md](references/fields.md) says.
-- **vers:** the owner picks which vers issues reach Ready. Groom them, and leave them in Backlog.
+- **vers feature work:** the owner decides which vers Feature and Design issues, and any vers issue that changes game design or player experience, reach Ready. Groom them, and leave them in Backlog. Groom and make Ready every other vers issue, such as a bug, a chore, a fleet rollout or a code-quality change, like any other repo's.
 - **An unplanned nixie slice:** a slice is planned with the owner into sub-issues first, as
   [fields.md](references/fields.md) says.
 
