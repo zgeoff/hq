@@ -11,7 +11,6 @@ import type { Runner } from '../runner/types.ts';
 import { buildExpectedSide } from './build-expected-side.ts';
 import { checkArchiveNames } from './check-archive-names.ts';
 import { readArchiveSide } from './read-archive-side.ts';
-import { readKnownRepos } from './read-known-repos.ts';
 import { readReviewMoves } from './read-review-moves.ts';
 import type { RepoNames } from './rekey-specs.ts';
 import { REKEY_SPECS } from './rekey-specs.ts';
@@ -44,9 +43,8 @@ export interface ArchiveInput {
 export async function runArchiveHistory(input: ArchiveInput): Promise<ArchiveHistory> {
   checkArchiveNames(input.from, input.to);
   const before = readSides(input, { from: input.from, to: input.to });
-  const reviewFiles = readReviewMoves(input.reviewDir, { from: input.from, to: input.to }, readKnownRepos(input.db));
+  const reviewFiles = readReviewMoves(input.reviewDir, { from: input.from, to: input.to });
   requireHistory(before, reviewFiles, input.from);
-  requireOneOwner(reviewFiles);
   if (input.dryRun) {
     return { dryRun: true, from: input.from, to: input.to, before, after: before.map((side) => buildExpectedSide(side)), backups: [], reviewFiles };
   }
@@ -73,13 +71,6 @@ function requireHistory(sides: ArchiveSide[], reviewFiles: ReviewMove[], from: s
   const rows = sides.flatMap((side) => side.counts).reduce((total, count) => total + count.from, 0);
   if (rows === 0 && reviewFiles.length === 0) {
     throw new HqError('nothing_to_rekey', `no row in hq.db or in noslop's store, and no review file, names ${from}: nothing to re-key`);
-  }
-}
-
-function requireOneOwner(reviewFiles: ReviewMove[]): void {
-  const shared = reviewFiles.filter((move) => move.otherOwners.length > 0).map((move) => `${move.from} (could also be ${move.otherOwners.join(', ')})`);
-  if (shared.length > 0) {
-    throw new HqError('rekey_ambiguous', `${shared.length} flat review file(s) could also belong to another repo, so hq cannot tell whose they are. Rename them by hand to the folder layout, <owner>/<repo>/<pr>-review.md, then run again; nothing changed:\n${shared.map((line) => `  ${line}`).join('\n')}`, { files: shared });
   }
 }
 
