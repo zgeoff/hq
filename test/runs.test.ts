@@ -27,6 +27,7 @@ import { sweep } from '../src/runs/sweep.ts';
 import { unfinalPr } from '../src/runs/unfinal-pr.ts';
 import { unmergePr } from '../src/runs/unmerge-pr.ts';
 import { watchlist } from '../src/runs/watchlist.ts';
+import { buildStubGitHubFactsRunner } from './build-stub-github-facts-runner.ts';
 import { type FakeAtc, NOON_SYDNEY, at, fakeAtc, freshDb } from './helpers.ts';
 
 let db: Database;
@@ -192,8 +193,9 @@ describe('reading the event feed', () => {
     setSession(db, 'GEO-9003', BY_HAND, 'z-delivery', 'remove');
     atMin(6);
     try {
-      const afterSweep = await sweepNow(db, c, 'z-delivery'),
-        repeatSweep = await (atMin(6 + SWEEP_MINUTES.repeatMinutes()), sweepNow(db, c, 'z-delivery'));
+      const afterSweep = await sweepNow(db, c, buildStubGitHubFactsRunner({}), 'z-delivery');
+      atMin(6 + SWEEP_MINUTES.repeatMinutes());
+      const repeatSweep = await sweepNow(db, c, buildStubGitHubFactsRunner({}), 'z-delivery');
       expect([afterSweep.sent.map((a) => a.key), repeatSweep.sent.map((a) => a.key), afterSweep.sent[0]?.line]).toEqual([
         [`session:${S1}`],
         [`session:${S1}`],
