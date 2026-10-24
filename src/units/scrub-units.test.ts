@@ -1,5 +1,5 @@
 import { expect, onTestFinished, setSystemTime, test } from 'bun:test';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Runner } from '../runner/types.ts';
@@ -74,13 +74,13 @@ test('it leaves other files in the unit directory alone', async () => {
   const ctx = setupTest();
   onTestFinished(() => setSystemTime());
   setSystemTime(new Date('2026-10-14T01:00:00Z'));
-  mkdirSync(ctx.directory, { recursive: true });
   writeFileSync(join(ctx.directory, 'teapot.service'), '[Service]\nEnvironment="HQ_NOW=2031-03-04T05:06:07Z"\n');
 
   const changed = await scrubUnits(ctx.run, { directory: ctx.directory });
 
   expect(changed).toStrictEqual([]);
   expect(readFileSync(join(ctx.directory, 'teapot.service'), 'utf8')).toBe('[Service]\nEnvironment="HQ_NOW=2031-03-04T05:06:07Z"\n');
+  expect(ctx.calls).toStrictEqual([]);
 });
 
 test('it reports a failed reload', async () => {

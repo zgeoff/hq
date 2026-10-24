@@ -1687,7 +1687,6 @@ async function probeCommand(db: Database, verb: string | undefined, args: string
   }
 }
 
-
 async function backupCommand(db: Database, verb: string | undefined, args: string[], flags: Flags): Promise<Out> {
   const run: Runner = (cmd, opts) => realRunner(cmd, { ...opts, env: opts?.env ?? cleanEnv() });
   switch (verb) {

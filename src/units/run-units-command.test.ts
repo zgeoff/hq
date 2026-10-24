@@ -22,7 +22,7 @@ test('it reports the units it scrubbed and reloads systemd', async () => {
   const ctx = setupTest();
   writeFileSync(join(ctx.directory, 'hq-fleet.service'), '[Service]\nEnvironment="HQ_NOW=2031-03-04T05:06:07Z"\nEnvironment="HQ_LIVE=1"\n');
 
-  const out = await runUnitsCommand({ verb: 'scrub', run: ctx.run, home: ctx.home });
+  const out = await runUnitsCommand({ verb: 'scrub', run: ctx.run, home: ctx.home, env: { PATH: '/usr/bin' } });
 
   expect(out.data).toStrictEqual({ changed: ['hq-fleet.service'] });
   expect(out.text).toBe('Removed HQ_NOW and HQ_QUIET from hq-fleet.service; systemd reloaded.');
@@ -34,7 +34,7 @@ test('it says no unit needed scrubbing when every unit is clean', async () => {
   const ctx = setupTest();
   writeFileSync(join(ctx.directory, 'hq-lanes.service'), '[Service]\nEnvironment="HQ_LIVE=1"\n');
 
-  const out = await runUnitsCommand({ verb: 'scrub', run: ctx.run, home: ctx.home });
+  const out = await runUnitsCommand({ verb: 'scrub', run: ctx.run, home: ctx.home, env: { PATH: '/usr/bin' } });
 
   expect(out.data).toStrictEqual({ changed: [] });
   expect(out.text).toBe('No unit sets HQ_NOW or HQ_QUIET.');
@@ -44,7 +44,7 @@ test('it says no unit needed scrubbing when every unit is clean', async () => {
 test('it rejects an unknown verb with bad_args', async () => {
   const ctx = setupTest();
 
-  const refused = runUnitsCommand({ verb: 'bogus', run: ctx.run, home: ctx.home });
+  const refused = runUnitsCommand({ verb: 'bogus', run: ctx.run, home: ctx.home, env: { PATH: '/usr/bin' } });
 
   await expect(refused).rejects.toMatchObject({ code: 'bad_args', message: 'unknown command: hq units bogus' });
 });
@@ -52,7 +52,7 @@ test('it rejects an unknown verb with bad_args', async () => {
 test('it rejects a bare hq units with bad_args', async () => {
   const ctx = setupTest();
 
-  const refused = runUnitsCommand({ verb: undefined, run: ctx.run, home: ctx.home });
+  const refused = runUnitsCommand({ verb: undefined, run: ctx.run, home: ctx.home, env: { PATH: '/usr/bin' } });
 
   await expect(refused).rejects.toMatchObject({ code: 'bad_args', message: 'unknown command: hq units' });
 });
