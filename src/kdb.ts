@@ -17,6 +17,8 @@ export interface CapacitySampleRow {
   claude_account: string | null;
   claude_five_hour: number | null;
   claude_seven_day: number | null;
+  claude_five_hour_resets_at: string | null;
+  claude_seven_day_resets_at: string | null;
   claude_at: string | null;
   ci_minutes_today: number | null;
   pc_disk_free_bytes: number | null;

@@ -602,4 +602,11 @@ export const MIGRATIONS: string[] = [
   `ALTER TABLE unblocks ADD COLUMN kind TEXT NOT NULL DEFAULT 'owner' CHECK (kind IN ('owner', 'watch'));
   ALTER TABLE unblocks ADD COLUMN deadline TEXT;
   ALTER TABLE unblocks ADD COLUMN overdue_told_at TEXT;`,
+
+  // v41: when each Claude usage window resets, from capacity.sh's cache; NULL when the cache gave
+  // none, and for every row from before v41.
+  `ALTER TABLE usage_samples ADD COLUMN five_hour_resets_at TEXT;
+  ALTER TABLE usage_samples ADD COLUMN seven_day_resets_at TEXT;
+  ALTER TABLE capacity_samples ADD COLUMN claude_five_hour_resets_at TEXT;
+  ALTER TABLE capacity_samples ADD COLUMN claude_seven_day_resets_at TEXT;`,
 ];

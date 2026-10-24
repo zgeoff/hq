@@ -33,14 +33,14 @@ export const RULES: Rule[] = [
     label: 'Claude: 7-day usage',
     limit: (settings) => `the ${settings.claudeSevenDayPct}% early warning`,
     breached: (r, s) => (r.claude_seven_day === null ? null : r.claude_seven_day >= s.claudeSevenDayPct),
-    line: (reading, settings, names, ctx) => formatClaudeLine({ window: '7-day', usedPct: reading.claude_seven_day ?? 0, warnPct: settings.claudeSevenDayPct, launchPct: ctx.claudeLaunchPct, account: reading.claude_account === null ? null : accountName(names, reading.claude_account) }),
+    line: (reading, settings, names, ctx) => formatClaudeLine({ window: '7-day', usedPct: reading.claude_seven_day ?? 0, warnPct: settings.claudeSevenDayPct, launchPct: ctx.claudeLaunchPct, resetsAt: reading.claude_seven_day_resets_at, account: reading.claude_account === null ? null : accountName(names, reading.claude_account) }),
   },
   {
     key: 'claude:5h',
     label: 'Claude: 5-hour usage',
     limit: (settings) => `the ${settings.claudeFiveHourPct}% early warning`,
     breached: (r, s) => (r.claude_five_hour === null ? null : r.claude_five_hour >= s.claudeFiveHourPct),
-    line: (reading, settings, names, ctx) => formatClaudeLine({ window: '5-hour', usedPct: reading.claude_five_hour ?? 0, warnPct: settings.claudeFiveHourPct, launchPct: ctx.claudeLaunchPct, account: reading.claude_account === null ? null : accountName(names, reading.claude_account) }),
+    line: (reading, settings, names, ctx) => formatClaudeLine({ window: '5-hour', usedPct: reading.claude_five_hour ?? 0, warnPct: settings.claudeFiveHourPct, launchPct: ctx.claudeLaunchPct, resetsAt: reading.claude_five_hour_resets_at, account: reading.claude_account === null ? null : accountName(names, reading.claude_account) }),
   },
   {
     key: 'op:daily',

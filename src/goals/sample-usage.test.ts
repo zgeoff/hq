@@ -150,3 +150,27 @@ test('it lets a failed insert of an account reading reach the caller', () => {
 
   expect(() => sampleUsage(db)).toThrow('invented full database');
 });
+
+test("an account file's reset times are stored per window, and a reset that is not a time is left out", () => {
+  accountFile(A, { account: A, windows: { fiveHour: 10, sevenDay: 40 }, resets: { fiveHour: '2026-10-16T05:00:00.123456+00:00', sevenDay: 'October 20, 2026 08:00:00 GMT' } }, '2026-10-16T01:00:00Z');
+  sampleUsage(db, new Date('2026-10-16T05:00:00Z'));
+  expect(db.query('SELECT account, five_hour_resets_at, seven_day_resets_at FROM usage_samples').all()).toStrictEqual([{ account: A, five_hour_resets_at: '2026-10-16T05:00:00Z', seven_day_resets_at: null }]);
+});
+
+test('the single cache file stores its reset times too', () => {
+  cache({ used: 62, windows: { fiveHour: 18, sevenDay: 62 }, resets: { fiveHour: '2026-10-16T04:00:00Z', sevenDay: '2026-10-20T08:00:00Z' } });
+  sampleUsage(db, new Date('2026-10-16T01:00:00Z'));
+  expect(db.query('SELECT five_hour_resets_at, seven_day_resets_at FROM usage_samples').all()).toStrictEqual([{ five_hour_resets_at: '2026-10-16T04:00:00Z', seven_day_resets_at: '2026-10-20T08:00:00Z' }]);
+});
+
+test('the single cache file stores a new row when only its reset times change', () => {
+  cache({ used: 62, windows: { fiveHour: 18, sevenDay: 62 } });
+  sampleUsage(db, new Date('2026-10-16T01:00:00Z'));
+  cache({ used: 62, windows: { fiveHour: 18, sevenDay: 62 }, resets: { fiveHour: '2026-10-16T04:00:00Z', sevenDay: '2026-10-20T08:00:00Z' } });
+
+  expect(sampleUsage(db, new Date('2026-10-16T01:05:00Z'))).toBe(true);
+  expect(db.query('SELECT at, five_hour_resets_at, seven_day_resets_at FROM usage_samples ORDER BY at').all()).toStrictEqual([
+    { at: '2026-10-16T01:00:00Z', five_hour_resets_at: null, seven_day_resets_at: null },
+    { at: '2026-10-16T01:05:00Z', five_hour_resets_at: '2026-10-16T04:00:00Z', seven_day_resets_at: '2026-10-20T08:00:00Z' },
+  ]);
+});
