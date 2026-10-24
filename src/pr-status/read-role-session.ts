@@ -12,7 +12,6 @@ export type RoleProbe = { verdict: 'match' } | { verdict: 'other' } | { verdict:
 export async function readRoleSession(db: Database, deps: OwnerProbeDeps, role: SingleRole): Promise<RoleProbe> {
   const recorded = fleetIds(db)[roleName(role)];
 
-  // With no id on record no caller can be the role's session: refused, as "other" is.
   if (recorded === undefined || recorded === '') {
     return { verdict: 'other' };
   }
