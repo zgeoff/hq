@@ -1,10 +1,10 @@
-import { toExactOptional } from '@zgeoff/std';
 import { BACKUP_UNIT } from '../backup/backup-unit.ts';
-import { HqError } from '../errors.ts';
 import { FLEET_UNIT } from '../fleet/fleet-unit.ts';
 import { LANES_UNIT } from '../lanes-unit/lanes-unit.ts';
+import { runSystemctl } from '../lanes-unit/run-systemctl.ts';
 import { PROBE_UNIT } from '../probe/probe-unit.ts';
 import type { Runner } from '../runner/types.ts';
+import { probeLoadedClockSetting } from './probe-loaded-clock-setting.ts';
 import { stripClockSettings } from './strip-clock-settings.ts';
 
 interface Scrub {
@@ -12,15 +12,22 @@ interface Scrub {
   env?: Record<string, string | undefined>;
 }
 
+interface Scrubbed {
+  changed: string[];
+  reloaded: boolean;
+}
+
 const SERVICES = [LANES_UNIT, FLEET_UNIT, BACKUP_UNIT, PROBE_UNIT].map((unit) => `${unit}.service`);
 
-export async function scrubUnits(run: Runner, scrub: Scrub): Promise<string[]> {
+export async function scrubUnits(run: Runner, scrub: Scrub): Promise<Scrubbed> {
+  const present: string[] = [];
   const changed: string[] = [];
   for (const service of SERVICES) {
     const file = Bun.file(`${scrub.directory}/${service}`);
     if (!(await file.exists())) {
       continue;
     }
+    present.push(service);
     const before = await file.text();
     const after = stripClockSettings(before);
     if (after !== before) {
@@ -28,11 +35,12 @@ export async function scrubUnits(run: Runner, scrub: Scrub): Promise<string[]> {
       changed.push(service);
     }
   }
-  if (changed.length > 0) {
-    const reloaded = await run(['systemctl', '--user', 'daemon-reload'], toExactOptional({ env: scrub.env }));
-    if (reloaded.code !== 0) {
-      throw new HqError('systemctl_failed', `systemctl --user daemon-reload: ${(reloaded.stderr || reloaded.stdout).trim()}`);
-    }
+
+  // Clean files are not enough: after an earlier scrub's reload failed, systemd still runs the old settings.
+  const loadedStale = changed.length === 0 ? await probeLoadedClockSetting(run, present, scrub.env) : false;
+  const reloaded = changed.length > 0 || loadedStale;
+  if (reloaded) {
+    await runSystemctl(run, ['daemon-reload'], scrub.env);
   }
-  return changed;
+  return { changed, reloaded };
 }

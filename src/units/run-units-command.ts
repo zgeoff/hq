@@ -15,9 +15,9 @@ export async function runUnitsCommand(command: UnitsCommand): Promise<Out> {
   if (command.verb !== 'scrub') {
     throw new HqError('bad_args', `unknown command: hq units ${command.verb ?? ''}`.trimEnd());
   }
-  const changed = await scrubUnits(command.run, { directory: unitDir(command.home), env: command.env });
-  return {
-    data: { changed },
-    text: changed.length > 0 ? `Removed HQ_NOW and HQ_QUIET from ${changed.join(', ')}; systemd reloaded.` : 'No unit sets HQ_NOW or HQ_QUIET.',
-  };
+  const scrubbed = await scrubUnits(command.run, { directory: unitDir(command.home), env: command.env });
+  if (scrubbed.changed.length > 0) {
+    return { data: { ...scrubbed }, text: `Removed HQ_NOW and HQ_QUIET from ${scrubbed.changed.join(', ')}; systemd reloaded.` };
+  }
+  return { data: { ...scrubbed }, text: scrubbed.reloaded ? 'No unit file sets HQ_NOW or HQ_QUIET, but systemd still held one; systemd reloaded.' : 'No unit sets HQ_NOW or HQ_QUIET.' };
 }

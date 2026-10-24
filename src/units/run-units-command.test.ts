@@ -11,11 +11,12 @@ function setupTest() {
   const directory = join(home, '.config', 'systemd', 'user');
   mkdirSync(directory, { recursive: true });
   const calls: string[][] = [];
+  const stdout: Record<string, string> = {};
   const run: Runner = (cmd) => {
     calls.push(cmd);
-    return Promise.resolve({ code: 0, stdout: '', stderr: '' });
+    return Promise.resolve({ code: 0, stdout: stdout[cmd[2] ?? ''] ?? '', stderr: '' });
   };
-  return { home, directory, calls, run };
+  return { home, directory, calls, stdout, run };
 }
 
 test('it reports the units it scrubbed and reloads systemd', async () => {
@@ -24,7 +25,7 @@ test('it reports the units it scrubbed and reloads systemd', async () => {
 
   const out = await runUnitsCommand({ verb: 'scrub', run: ctx.run, home: ctx.home, env: { PATH: '/usr/bin' } });
 
-  expect(out.data).toStrictEqual({ changed: ['hq-fleet.service'] });
+  expect(out.data).toStrictEqual({ changed: ['hq-fleet.service'], reloaded: true });
   expect(out.text).toBe('Removed HQ_NOW and HQ_QUIET from hq-fleet.service; systemd reloaded.');
   expect(readFileSync(join(ctx.directory, 'hq-fleet.service'), 'utf8')).toBe('[Service]\nEnvironment="HQ_LIVE=1"\n');
   expect(ctx.calls).toStrictEqual([['systemctl', '--user', 'daemon-reload']]);
@@ -36,9 +37,19 @@ test('it says no unit needed scrubbing when every unit is clean', async () => {
 
   const out = await runUnitsCommand({ verb: 'scrub', run: ctx.run, home: ctx.home, env: { PATH: '/usr/bin' } });
 
-  expect(out.data).toStrictEqual({ changed: [] });
+  expect(out.data).toStrictEqual({ changed: [], reloaded: false });
   expect(out.text).toBe('No unit sets HQ_NOW or HQ_QUIET.');
-  expect(ctx.calls).toStrictEqual([]);
+});
+
+test('it says systemd reloaded when only the loaded unit still held a clock setting', async () => {
+  const ctx = setupTest();
+  writeFileSync(join(ctx.directory, 'hq-lanes.service'), '[Service]\nEnvironment="HQ_LIVE=1"\n');
+  ctx.stdout['show'] = 'HQ_QUIET=10-12 HQ_LIVE=1\n';
+
+  const out = await runUnitsCommand({ verb: 'scrub', run: ctx.run, home: ctx.home, env: { PATH: '/usr/bin' } });
+
+  expect(out.data).toStrictEqual({ changed: [], reloaded: true });
+  expect(out.text).toBe('No unit file sets HQ_NOW or HQ_QUIET, but systemd still held one; systemd reloaded.');
 });
 
 test('it rejects an unknown verb with bad_args', async () => {
