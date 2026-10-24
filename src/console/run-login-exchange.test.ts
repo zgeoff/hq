@@ -9,7 +9,7 @@ function setupTest(hash: string, answer: Response) {
   const page = {
     hash,
     origin: 'http://127.0.0.1:4317',
-    storage: { getItem: (key: string) => kept.get(key) ?? null, setItem: (key: string, value: string) => void kept.set(key, value) },
+    storage: () => ({ getItem: (key: string) => kept.get(key) ?? null, setItem: (key: string, value: string) => void kept.set(key, value) }),
     clearHash: () => {
       cleared = true;
     },
@@ -45,4 +45,22 @@ test('with no token, a tab that holds a session stays signed in and one that hol
   app.kept.set(SESSION_STORAGE_KEY, 'kettle-session');
   await expect(runLoginExchange(app.page)).resolves.toBe('signed-in');
   expect(app.posted).toStrictEqual([]);
+});
+
+test('a swap that cannot reach the console, or blocked storage, is a failure and stores nothing', async () => {
+  const unreachable = setupTest('#t=kettle-token', Response.json({}));
+  const blocked = setupTest('', Response.json({}));
+
+  const outcomes = [
+    await runLoginExchange({ ...unreachable.page, post: () => Promise.reject(new TypeError('Failed to fetch')) }),
+    await runLoginExchange({
+      ...blocked.page,
+      storage: () => {
+        throw new Error('SecurityError: storage is blocked');
+      },
+    }),
+  ];
+
+  expect(outcomes).toStrictEqual(['failed', 'failed']);
+  expect(unreachable.kept.size).toBe(0);
 });
