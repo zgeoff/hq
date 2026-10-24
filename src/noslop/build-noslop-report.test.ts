@@ -83,7 +83,6 @@ test('it adds two review rounds and a passing check into one PR report', () => {
       lateUnknown: 1,
       mainMerge: 0,
       mergeUnknown: 3,
-      redesign: null,
     },
   ]);
 });
@@ -203,14 +202,6 @@ test('it prints the churn line and the totals block', () => {
 
   expect(renderNoslopReport(buildNoslopReport(ctx.db))).toContain('  churn: 2 rounds with a new finding, 1 repeat-class, late 1 of 1, 1 main-merge (1 unknown)');
   expect(renderNoslopReport(buildNoslopReport(ctx.db))).toContain('totals: 1 PR\n  churn:');
-});
-
-test('it names the finding a PR\'s redesign round was asked for', () => {
-  const ctx = setupTest();
-  ctx.addRound({ findings: [FIND_A] });
-  ctx.addRound({ startedAt: '2026-10-18T02:00:00Z', redesign: FIND_A.id });
-
-  expect(buildNoslopReport(ctx.db)[0]).toMatchObject({ reviewsOk: 2, redesign: FIND_A.id });
 });
 
 test('it counts --confirm reviews apart from the rounds, and the text names them', () => {

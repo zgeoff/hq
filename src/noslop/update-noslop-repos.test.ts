@@ -26,7 +26,7 @@ test('it adds repos sorted and repeating a change changes nothing', () => {
   updateNoslopRepos(ctx.db, 'on', ['tools', 'atc']);
   updateNoslopRepos(ctx.db, 'on', ['atc']);
 
-  expect(loadNoslopSettings(ctx.db)).toStrictEqual({ repos: ['atc', 'tools'], sha: null });
+  expect(loadNoslopSettings(ctx.db)).toStrictEqual({ repos: ['atc', 'tools'], sha: null, caps: {} });
   expect(isNoslopListed(loadNoslopSettings(ctx.db), 'zgeoff', 'atc')).toBe(true);
   expect(isNoslopListed(loadNoslopSettings(ctx.db), 'someone-else', 'atc')).toBe(false);
 });
@@ -37,7 +37,7 @@ test('it removes repos and ignores one that was never listed', () => {
 
   updateNoslopRepos(ctx.db, 'off', ['tools', 'tools', 'nothing']);
 
-  expect(loadNoslopSettings(ctx.db)).toStrictEqual({ repos: ['atc'], sha: null });
+  expect(loadNoslopSettings(ctx.db)).toStrictEqual({ repos: ['atc'], sha: null, caps: {} });
 });
 
 test('it keeps the pinned commit when the list changes', () => {
@@ -46,7 +46,7 @@ test('it keeps the pinned commit when the list changes', () => {
 
   updateNoslopRepos(ctx.db, 'on', ['atc']);
 
-  expect(loadNoslopSettings(ctx.db)).toStrictEqual({ repos: ['atc'], sha: 'abc1234' });
+  expect(loadNoslopSettings(ctx.db)).toStrictEqual({ repos: ['atc'], sha: 'abc1234', caps: {} });
 });
 
 test.each([

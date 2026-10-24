@@ -1,5 +1,5 @@
 import type { Database } from 'bun:sqlite';
-import type { OpenFinding } from './parse-check-run.ts';
+import type { OpenFinding } from './types.ts';
 import { buildStoredFinding } from './build-stored-finding.ts';
 import type { ReviewFinding } from './parse-review-run.ts';
 
@@ -30,10 +30,7 @@ export interface RoundRow {
   // review with no output.
   special?: string | null | undefined;
 
-  // A review run with --redesign: the finding id it was asked for. Otherwise absent.
-  redesign?: string | null | undefined;
-
-  // A --fixes-only run, or a review of the removed --confirm: true. Not a round. Otherwise absent.
+  // A fix-checks-only run (--fixes-only, or past the emergency cap), or a review of the removed --confirm: true. Not a round. Otherwise absent.
   confirm?: boolean | undefined;
 
   // A check's title. Otherwise absent.
@@ -43,8 +40,8 @@ export interface RoundRow {
 export function recordRound(db: Database, row: RoundRow): void {
   const full = row.full === undefined ? null : toFlag(row.full);
   db.query(
-    `INSERT INTO noslop_rounds (repo, pr, kind, started_at, ended_at, ms, ok, head, base, depth, findings, failed_calls, conclusion, open, error, sha, full, title, special, redesign, confirm)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO noslop_rounds (repo, pr, kind, started_at, ended_at, ms, ok, head, base, depth, findings, failed_calls, conclusion, open, error, sha, full, title, special, confirm)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     row.repo,
     row.pr,
@@ -65,7 +62,6 @@ export function recordRound(db: Database, row: RoundRow): void {
     full,
     row.title ?? null,
     row.special ?? null,
-    row.redesign ?? null,
     toFlag(row.confirm === true),
   );
 }

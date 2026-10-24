@@ -23,6 +23,7 @@ import { resolveNoslopDefaultStore } from './resolve-noslop-default-store.ts';
 import { requireNoslopIdle } from './require-noslop-idle.ts';
 import { runStoreMigration } from './run-store-migration.ts';
 import type { StoreMigration } from './run-store-migration.ts';
+import { updateNoslopCap } from './update-noslop-cap.ts';
 import { updateNoslopClone } from './update-noslop-clone.ts';
 import { updateNoslopRepos } from './update-noslop-repos.ts';
 import { withCloneLock } from './with-clone-lock.ts';
@@ -42,6 +43,9 @@ export async function runNoslopCommand(args: NoslopArgs): Promise<Out> {
   if (args.verb === 'on' || args.verb === 'off') {
     return updateRepoList(args, args.verb);
   }
+  if (args.verb === 'cap') {
+    return updateCap(args);
+  }
   if (args.verb === 'pin') {
     return await updatePin(args);
   }
@@ -52,7 +56,7 @@ export async function runNoslopCommand(args: NoslopArgs): Promise<Out> {
   if (args.verb === undefined || args.verb === 'show') {
     return renderSettings(args.db);
   }
-  throw new HqError('bad_args', 'hq noslop [on <repo...> | off <repo...> | pin <sha> [--force <reason>] | report [--since ISO]]');
+  throw new HqError('bad_args', 'hq noslop [on <repo...> | off <repo...> | cap <repo> <n|off> | pin <sha> [--force <reason>] | report [--since ISO]]');
 }
 
 function updateRepoList(args: NoslopArgs, change: 'on' | 'off'): Out {
@@ -64,7 +68,7 @@ function updateRepoList(args: NoslopArgs, change: 'on' | 'off'): Out {
 
 function renderSettings(db: Database): Out {
   const settings = loadNoslopSettings(db);
-  return { data: { repos: settings.repos, sha: settings.sha, clone: resolveRunDir(settings) }, text: formatSettings(settings) };
+  return { data: { repos: settings.repos, caps: settings.caps, sha: settings.sha, clone: resolveRunDir(settings) }, text: formatSettings(settings) };
 }
 
 // The folder noslop runs from: the pinned commit's own, or the base clone before any pin.
@@ -77,9 +81,27 @@ function formatSettings(settings: NoslopSettings): string {
     repos = settings.repos.length > 0 ? settings.repos.join(', ') : 'none (noslop is off everywhere)';
   return [
     `repos: ${repos}`,
+    `emergency review cap: ${formatCaps(settings)}`,
     `pinned: ${settings.sha ?? 'nothing yet (hq noslop pin <sha>)'}`,
     `clone: ${clone}${existsSync(clone) ? '' : ' (not cloned yet)'}`,
   ].join('\n');
+}
+
+// The cap of each listed repo, or off; a repo with a cap that is not listed shows too.
+function formatCaps(settings: NoslopSettings): string {
+  const names = [...new Set([...settings.repos.map((name) => name.toLowerCase()), ...Object.keys(settings.caps)])].toSorted();
+  if (names.length === 0) {
+    return 'off everywhere (hq noslop cap <repo> <n>)';
+  }
+  return names.map((name) => `${name} ${settings.caps[name] ?? 'off'}`).join(', ');
+}
+
+function updateCap(args: NoslopArgs): Out {
+  const [repo, value] = args.rest;
+  const before = loadNoslopSettings(args.db);
+  const next = updateNoslopCap(args.db, repo, value);
+  logEvent(args.db, 'hq', 'noslop', 'cap', args.actor, JSON.stringify(before.caps), JSON.stringify(next.caps), { repo, cap: value });
+  return renderSettings(args.db);
 }
 
 async function updatePin(args: NoslopArgs): Promise<Out> {
@@ -119,7 +141,7 @@ async function updatePinStored(args: NoslopArgs, plan: PinPlan): Promise<StoreMi
     // `hq noslop on` and `off` take no clone lock, so the list is read in the same transaction as the write.
     before = args.db.transaction(() => {
       const settings = loadNoslopSettings(args.db);
-      writeNoslopSettings(args.db, { repos: settings.repos, sha: pinned.sha });
+      writeNoslopSettings(args.db, { ...settings, sha: pinned.sha });
       return settings;
     }).immediate();
   logEvent(args.db, 'hq', 'noslop', 'pinned', args.actor, before.sha, pinned.sha, buildPinData(stored, plan.force));

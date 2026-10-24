@@ -10,7 +10,6 @@ export function formatNoslopReview(r: NoslopReviewOutcome): string {
   const findings = r.findings.map((f) => `  - [${f.severity}] ${f.lens}: ${f.title} (${f.id})`);
   return [
     `== engine: noslop (commit ${r.sha.slice(0, 7)}, depth ${r.depth ?? 'unknown'})`,
-    ...formatFullDropped(r),
     `== issue: ${r.issue.issue ?? 'none'} (${r.issue.why})`,
     `== noslop: ${r.findings.length} finding(s), full output: ${r.reviewFile}`,
     ...formatPostFailed(r),
@@ -18,13 +17,6 @@ export function formatNoslopReview(r: NoslopReviewOutcome): string {
     ...formatNotReviewed(r.notReviewed),
     ...formatChecks(r),
   ].join('\n');
-}
-
-function formatFullDropped(r: NoslopReviewOutcome): string[] {
-  if (!r.fullDropped) {
-    return [];
-  }
-  return [`== --full dropped: round ${r.round} reviews only the commits since round 1.`];
 }
 
 // The review file holds the result exactly as noslop printed it, which is what `noslop post` reads.
@@ -35,9 +27,10 @@ function formatPostFailed(review: NoslopReviewOutcome): string[] {
   return [`== not posted: noslop stored this review but did not post it to GitHub (${review.postFailed}). Run noslop post ${review.reviewFile} to finish the post.`];
 }
 
-// A --fixes-only run raises no finding, so its text is the verdict on each fix and the check after.
+// A fix-checks-only run raises no finding, so its text is the verdict on each fix and the check after.
 function formatFixesOnly(r: NoslopReviewOutcome): string {
   return [
+    ...formatCapNote(r),
     `== engine: noslop (commit ${r.sha.slice(0, 7)}), fixes only: ${r.fixChecks.length} fix(es) checked, full output: ${r.reviewFile}`,
     ...formatPostFailed(r),
     ...r.fixChecks.map(formatFixCheck),
@@ -45,6 +38,13 @@ function formatFixesOnly(r: NoslopReviewOutcome): string {
     `== noslop check: ${r.checksError === null ? (r.checks.find((check) => check.name === 'noslop')?.state ?? 'none') : 'unknown'}`,
     ...formatChecks(r),
   ].join('\n');
+}
+
+function formatCapNote(outcome: NoslopReviewOutcome): string[] {
+  if (outcome.capNote === null) {
+    return [];
+  }
+  return [outcome.capNote];
 }
 
 function formatFixCheck(c: TitledFixCheck): string {

@@ -1,6 +1,6 @@
 // The top-level keys of the JSON other sessions parse today. `a[].b` means every element of the
 // array `a` has `b`. A trailing `?` marks a key that may be null or absent (`last?` is null before the
-// first ensure; `declared[].promptCheck` is present only while the session has a live atc session; a step's `id?` is absent while its session is not up; `depth?` is null when noslop gives none; `fixChecks[]?` is empty on a noslop review that is not --fixes-only); the keys under it are then not required. Hand-kept: test/capabilities.test.ts runs each command and checks every key
+// first ensure; `declared[].promptCheck` is present only while the session has a live atc session; a step's `id?` is absent while its session is not up; `depth?` is null when noslop gives none; `fixChecks[]?` is empty on a noslop review that ran no fix checks; `emergencyCap?` and `capNote?` are null unless the repo's emergency review cap turned the review into fix checks only); the keys under it are then not required. Hand-kept: test/capabilities.test.ts runs each command and checks every key
 // is in the real output, so this list cannot drift from the commands.
 export const SHAPES: Record<string, { command: string; keys: string[] }> = {
   fleet: {
@@ -56,6 +56,6 @@ export const SHAPES: Record<string, { command: string; keys: string[] }> = {
   },
   'review (noslop)': {
     command: 'hq review <repo> <pr> --json, on a PR that noslop reviews',
-    keys: ['ok', 'engine', 'repo', 'pr', 'head', 'base', 'sha', 'depth?', 'findings', 'notReviewed', 'round', 'fixesOnly', 'fixChecks[]?.findingID', 'fixChecks[]?.fixed', 'fixChecks[]?.reason', 'fixChecks[]?.title', 'checks[].name', 'checks[].state', 'checksError', 'openThreads'],
+    keys: ['ok', 'engine', 'repo', 'pr', 'head', 'base', 'sha', 'depth?', 'findings', 'notReviewed', 'round', 'fixesOnly', 'emergencyCap?', 'capNote?', 'fixChecks[]?.findingID', 'fixChecks[]?.fixed', 'fixChecks[]?.reason', 'fixChecks[]?.title', 'checks[].name', 'checks[].state', 'checksError', 'openThreads'],
   },
 };

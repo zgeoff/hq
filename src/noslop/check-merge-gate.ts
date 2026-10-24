@@ -27,7 +27,7 @@ import { pickOwnerHeldVerdict } from './pick-owner-held-verdict.ts';
 import { probeNoCI } from './probe-no-ci.ts';
 import type { NoslopGateFacts } from './pick-noslop-verdict.ts';
 import { resolveEngine } from './resolve-engine.ts';
-import type { PRRequest } from './run-review-check.ts';
+import type { PRRequest } from './types.ts';
 
 export interface GateOutcome {
   mayMerge: true;

@@ -1,7 +1,8 @@
 import { match } from 'ts-pattern';
 import type { NoslopFinding } from './read-noslop-findings.ts';
 
-// noslop's list does not show whether a deferral is valid, so a deferred finding counts as open.
+// hq trusts the state noslop gives each finding, answer-validity rules included. Its one rule of its
+// own: an accepted-risk answer counts only when the owner wrote it.
 export function collectOpenFindingIDs(findings: readonly NoslopFinding[], acceptedIDs: ReadonlySet<string>): string[] {
   return findings.filter((finding) => isBlocking(finding, acceptedIDs)).map((finding) => finding.id);
 }
@@ -9,7 +10,7 @@ export function collectOpenFindingIDs(findings: readonly NoslopFinding[], accept
 function isBlocking(finding: NoslopFinding, acceptedIDs: ReadonlySet<string>): boolean {
   return match(finding.state)
     .with('accepted-risk', () => !acceptedIDs.has(finding.id))
-    .with('open', 'deferred', () => true)
-    .with('fixed', 'not-a-defect', () => false)
+    .with('open', () => true)
+    .with('fixed', 'not-a-defect', 'deferred', () => false)
     .exhaustive();
 }

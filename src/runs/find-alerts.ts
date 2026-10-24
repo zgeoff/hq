@@ -1,9 +1,7 @@
 import type { Database } from 'bun:sqlite';
 import type { SessionInfo } from '../atc/session-schema.ts';
 import { isPresentSession } from '../areas/is-present-session.ts';
-import { planRoundCap } from '../noslop/plan-round-cap.ts';
 import { readOwnerOverrides } from '../pr-status/read-owner-overrides.ts';
-import { readOKReviews } from '../noslop/read-ok-reviews.ts';
 import { countMinutesSince as mins } from './count-minutes-since.ts';
 import { isFinalAnswered } from './is-final-answered.ts';
 import { sameSha } from './same-sha.ts';
@@ -29,7 +27,7 @@ export function findAlerts(db: Database, sessions: SessionInfo[], activity: Map<
       }
       if (mins(p.final_at, at) < SWEEP.finalMinutes()) continue;
       if (p.review_started_at && p.review_started_at >= p.final_at && mins(p.review_started_at, at) < SWEEP.reviewMinutes()) continue;
-      const moved = p.reviewed_sha ? `; head moved since your review at ${p.reviewed_sha.slice(0, 7)}${readRestackHint(db, p.ref)}` : '';
+      const moved = p.reviewed_sha ? `; head moved since your review at ${p.reviewed_sha.slice(0, 7)}${formatRestackHint(p.ref)}` : '';
       alerts.push({
         key: `pr:${p.ref}`,
         fingerprint: `final:${p.final_sha}`,
@@ -73,18 +71,14 @@ export function findAlerts(db: Database, sessions: SessionInfo[], activity: Map<
 
 // The owner's override at the FINAL's head stands for its review, which no round could give. A
 // FINAL may carry a short sha, and an override the full one.
+function formatRestackHint(ref: string): string {
+  const [repo = '', pr = ''] = ref.split('#');
+  return ` (a restack? a passed hq review ${repo} ${pr} records the new head)`;
+}
+
 function readFinalAnswered(db: Database, pr: RunPr): boolean {
   const [repo = '', number = ''] = pr.ref.split('#');
   return isFinalAnswered(pr) || readOwnerOverrides(db, repo, Number(number)).some((override) => sameSha(override.head, pr.final_sha));
-}
-
-function readRestackHint(db: Database, ref: string): string {
-  const [repo = '', pr = ''] = ref.split('#');
-  const plan = planRoundCap(readOKReviews(db, repo, Number(pr)).filter((review) => review.confirm === 0));
-  if (plan.cap !== null && plan.round > plan.cap) {
-    return ' (a restack at the round cap? a new PR gets its own first round, or z-stu records an override)';
-  }
-  return ` (a restack? a passed hq review ${repo} ${pr} records the new head)`;
 }
 
 // The run's active sessions, and with no active main session, the main one that ended last when the

@@ -29,7 +29,6 @@ test('it sums the churn across PRs in the totals', () => {
         lateUnknown: 0,
         mainMerge: 0,
         mergeUnknown: 2,
-        redesign: null,
       },
       {
         ref: 'gadgets#8',
@@ -52,7 +51,6 @@ test('it sums the churn across PRs in the totals', () => {
         lateUnknown: 1,
         mainMerge: 1,
         mergeUnknown: 0,
-        redesign: null,
       },
     ]),
   ).toStrictEqual({ prs: 2, roundsWithNew: 5, repeatClass: 1, classUnknown: 2, late: { n: 1, of: 3 }, lateUnknown: 1, mainMerge: 1, mergeUnknown: 2 });

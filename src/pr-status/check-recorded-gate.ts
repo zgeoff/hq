@@ -2,7 +2,7 @@ import { HqError } from '../errors.ts';
 import { checkMergeGate } from '../noslop/check-merge-gate.ts';
 import type { GateOutcome } from '../noslop/check-merge-gate.ts';
 import { parseLowerRepo } from '../noslop/parse-lower-repo.ts';
-import type { PRRequest } from '../noslop/run-review-check.ts';
+import type { PRRequest } from '../noslop/types.ts';
 import { OWNER } from '../releases/owner.ts';
 import { recordPRGate } from './record-pr-gate.ts';
 import type { PRGateResult } from './record-pr-gate.ts';

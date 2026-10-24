@@ -392,7 +392,6 @@ const OPTIONS = {
   limit: { type: 'string' },
   'no-watch': { type: 'boolean' },
   full: { type: 'boolean' },
-  redesign: { type: 'string' },
   'fixes-only': { type: 'boolean' },
   confirm: { type: 'boolean' },
   effort: { type: 'string' },

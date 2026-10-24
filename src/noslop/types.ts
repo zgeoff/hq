@@ -1,3 +1,15 @@
+import type { Database } from 'bun:sqlite';
+import type { Runner } from '../runner/types.ts';
+
+export interface PRRequest {
+  run: Runner;
+  db: Database;
+  rawRepo: string;
+  pr: number;
+  owner?: string | undefined;
+  repoDir?: string | undefined;
+}
+
 export interface Judged<T> {
   value: T | null;
   why: string | null;
@@ -45,3 +57,10 @@ export interface MoveFacts {
 }
 
 export type MechanicalProof = { pass: true; files: string[]; lines: number } | { pass: false; reason: string };
+
+// An open finding of a stored check round, as the `open` column holds it.
+export interface OpenFinding {
+  id: string;
+  title: string;
+  reason: string;
+}

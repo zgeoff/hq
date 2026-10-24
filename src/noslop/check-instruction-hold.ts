@@ -9,7 +9,7 @@ import { pickInstructionHold } from './pick-instruction-hold.ts';
 import type { HeldDiffFact, InstructionHoldFacts } from './pick-instruction-hold.ts';
 import { proveMechanical } from './prove-mechanical.ts';
 import { readHeldDiffs } from './read-held-diffs.ts';
-import type { PRRequest } from './run-review-check.ts';
+import type { PRRequest } from './types.ts';
 
 export interface InstructionHold {
   clear: boolean;

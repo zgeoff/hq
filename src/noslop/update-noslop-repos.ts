@@ -11,7 +11,7 @@ export function updateNoslopRepos(db: Database, change: 'on' | 'off', names: str
   return db
     .transaction(() => {
       const current = loadNoslopSettings(db);
-      const next: NoslopSettings = { repos: applyRepoChange(current.repos, change, names), sha: current.sha };
+      const next: NoslopSettings = { repos: applyRepoChange(current.repos, change, names), sha: current.sha, caps: current.caps };
       writeNoslopSettings(db, next);
       return next;
     })

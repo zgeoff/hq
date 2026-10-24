@@ -36,7 +36,7 @@ function setupTest() {
   return { base, db };
 }
 
-test('it lets a PR whose last review read an earlier head merge when no finding is open, and runs no noslop check', async () => {
+test('it lets a PR with a late 1-line commit after the last review merge when no finding is open, and runs no noslop check', async () => {
   const ctx = setupTest(),
     fake = buildFakeRunner();
   createListedReview(ctx.db, { repo: 'widgets', pr: 7, head: 'f00dfeedf00dfeedf00dfeedf00dfeedf00dfeed' });
@@ -65,15 +65,7 @@ test('it blocks a PR with an open finding, naming it', async () => {
   await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: '1 noslop finding is open: aaaa' });
 });
 
-test('it blocks a finding noslop lists as deferred', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner({ noslopFindings: buildStubFindings('deferred') });
-  createListedReview(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA });
-
-  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: '1 noslop finding is open: aaaa' });
-});
-
-test.each(['fixed', 'not-a-defect'])('it passes a finding in state %s', async (state) => {
+test.each(['fixed', 'not-a-defect', 'deferred'])('it passes a finding in state %s', async (state) => {
   const ctx = setupTest(),
     fake = buildFakeRunner({ noslopFindings: buildStubFindings(state) });
   createListedReview(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA });

@@ -321,10 +321,8 @@ test('shape: review (noslop)', async () => {
   process.env['HQ_PROJECTS'] = join(dir, 'projects');
   process.env['HQ_REPOS'] = join(dir, 'repos');
   setMeta(db, 'noslop', JSON.stringify({ repos: ['widgets'], sha: FAKE_FULL_SHA }));
-  db.query("INSERT INTO noslop_rounds (repo, pr, kind, started_at, ended_at, ms, ok, head, depth, special, findings, redesign, sha) VALUES ('widgets', 7, 'review', 'a', 'b', 1, 1, 'aaaa000000000000000000000000000000000001', 'standard', 'none', ?, NULL, 'x')").run('[{"id":"kettle0000000001","lens":"correctness","severity":"high","title":"Kettle never boils"}]');
+  db.query("INSERT INTO noslop_rounds (repo, pr, kind, started_at, ended_at, ms, ok, head, depth, special, findings, sha) VALUES ('widgets', 7, 'review', 'a', 'b', 1, 1, 'aaaa000000000000000000000000000000000001', 'standard', 'none', ?, 'x')").run('[{"id":"kettle0000000001","lens":"correctness","severity":"high","title":"Kettle never boils"}]');
   const fake = buildFakeRunner({
-      git: { 'git rev-list --reverse --first-parent aaaa000000000000000000000000000000000001..refs/hq/pr/7': { code: 0, stdout: 'cccc000000000000000000000000000000000002\n', stderr: '' } },
-      reviewComments: [JSON.stringify({ id: 1, in_reply_to_id: null, body: 'Kettle never boils\n<!-- noslop:finding {"id":"kettle0000000001"} -->' }), JSON.stringify({ id: 2, in_reply_to_id: 1, body: 'fixed cccc000' })].join('\n'),
       noslopReview: {
         code: 0,
         stdout: JSON.stringify({ version: 7, head: 'feat', base: 'main', depth: 'standard', findings: [], failedCalls: [], notReviewed: [], notReviewedByLens: [], fixChecks: [{ findingID: 'kettle0000000001', fixed: true, reason: 'the kettle boils now' }] }),
