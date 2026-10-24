@@ -30,7 +30,7 @@ export async function runWrapUp(db: Database, deps: WrapUpDeps, issue: string, a
          SELECT json_extract(data, '$.mode') FROM events
          WHERE subject = 'run' AND subject_id = rs.issue AND action = 'session'
            AND (json_extract(data, '$.session') = rs.session_id
-             OR (length(json_extract(data, '$.session')) < length(rs.session_id) AND substr(rs.session_id, 1, length(json_extract(data, '$.session'))) = json_extract(data, '$.session')))
+             OR (length(json_extract(data, '$.session')) = 8 AND substr(rs.session_id, 1, 8) = json_extract(data, '$.session')))
          ORDER BY seq DESC LIMIT 1), '') != 'remove')) ORDER BY added_at, session_id`,
     )
     .all(issue, run.closed_at);
