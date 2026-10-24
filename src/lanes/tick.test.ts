@@ -79,6 +79,20 @@ test('it restarts the grace time when no free slot meets Ready work for a look',
   expect(result.slotCause.waitingMinutes).toBe(0);
 });
 
+test('it keeps the grace time running through a look whose capacity read failed', async () => {
+  const ctx = setupTest();
+  await ctx.seedReady([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
+  tick(ctx.db, ctx.sample, 'hq-lanes');
+  at('2026-10-14T01:05:00Z');
+  tick(ctx.db, { ...ctx.sample, cap: null, error: 'capacity.sh timed out' }, 'hq-lanes');
+  at('2026-10-14T01:12:00Z');
+
+  const result = tick(ctx.db, ctx.sample, 'hq-lanes');
+
+  expect(result.slotCause).toStrictEqual({ cause: 'delivery', slots: 3, since: '2026-10-14T01:12:00Z', readyAgeMinutes: 12, reason: null, waitingMinutes: null });
+  expect(readSlotMinutes(ctx.db, '2026-10-14').delivery).toBe(21);
+});
+
 test('it tags triage when no Ready work waits and Backlog work asks for promotion', async () => {
   const ctx = setupTest();
   await ctx.seedReady([]);
