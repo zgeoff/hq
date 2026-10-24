@@ -21,7 +21,6 @@ export class AtcClient {
     this.peer = peer;
   }
 
-  // Who is asking, as the daemon found it from the kernel; see AtcPeer.
   get peerSession(): string | null | undefined {
     return this.peer.peerSession;
   }
