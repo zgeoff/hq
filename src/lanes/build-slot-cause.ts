@@ -22,13 +22,13 @@ export interface SlotCauseInput {
 // The cause of the empty slots at an instant. Pure: the caller reads the clocks and counts.
 export function buildSlotCause(input: SlotCauseInput): SlotCause {
   const readyAgeMinutes = input.readyAt === null ? null : Math.floor((input.at.getTime() - Date.parse(input.readyAt)) / 60_000);
-  const base = { slots: input.free, readyAgeMinutes, waitingMinutes: null };
+  const base = { slots: input.free, readyAgeMinutes, reason: null, waitingMinutes: null };
   if (input.free === 0) {
     return { ...base, cause: null, since: null };
   }
   const sinceOf = (cause: string): string | null => (input.causeSince?.cause === cause ? input.causeSince.since : null);
   if (input.eligible === null) {
-    return { ...base, cause: 'unknown', since: sinceOf('unknown') };
+    return { ...base, cause: 'unknown', reason: input.readyAt === null ? 'ready_never_read' : 'ready_stale', since: sinceOf('unknown') };
   }
   if (input.eligible > 0) {
     const waitingMinutes = input.eligibleSince === null ? 0 : Math.floor((input.at.getTime() - Date.parse(input.eligibleSince)) / 60_000);
@@ -38,8 +38,11 @@ export function buildSlotCause(input: SlotCauseInput): SlotCause {
     return { ...base, cause: null, since: input.eligibleSince, waitingMinutes };
   }
   const promotable = input.promotable;
-  if (promotable === null || promotable.count === null || input.at.getTime() - Date.parse(promotable.at) > input.freshMinutes * 60_000) {
-    return { ...base, cause: 'unknown', since: sinceOf('unknown') };
+  if (promotable === null || promotable.count === null) {
+    return { ...base, cause: 'unknown', reason: 'backlog_unknown', since: sinceOf('unknown') };
+  }
+  if (input.at.getTime() - Date.parse(promotable.at) > input.freshMinutes * 60_000) {
+    return { ...base, cause: 'unknown', reason: 'backlog_stale', since: sinceOf('unknown') };
   }
   const cause = promotable.count > 0 ? 'triage' : 'supply';
   return { ...base, cause, since: sinceOf(cause) };

@@ -1,0 +1,62 @@
+import { expect, test } from 'bun:test';
+import { buildSlotCause } from './build-slot-cause.ts';
+
+test('it names a stale Ready read as the reason when the snapshot is 30 min 30 s old', () => {
+  const slotCause = buildSlotCause({
+    free: 2,
+    eligible: null,
+    eligibleSince: null,
+    readyAt: '2026-10-14T00:29:30Z',
+    promotable: { at: '2026-10-14T00:55:00Z', count: 3 },
+    causeSince: null,
+    freshMinutes: 30,
+    at: new Date('2026-10-14T01:00:00Z'),
+  });
+
+  expect(slotCause).toStrictEqual({ cause: 'unknown', slots: 2, since: null, readyAgeMinutes: 30, reason: 'ready_stale', waitingMinutes: null });
+});
+
+test('it names a Ready read that never ran as the reason when no snapshot exists', () => {
+  const slotCause = buildSlotCause({
+    free: 2,
+    eligible: null,
+    eligibleSince: null,
+    readyAt: null,
+    promotable: { at: '2026-10-14T00:55:00Z', count: 3 },
+    causeSince: null,
+    freshMinutes: 30,
+    at: new Date('2026-10-14T01:00:00Z'),
+  });
+
+  expect(slotCause).toStrictEqual({ cause: 'unknown', slots: 2, since: null, readyAgeMinutes: null, reason: 'ready_never_read', waitingMinutes: null });
+});
+
+test('it names an unknown Backlog count as the reason when the count failed', () => {
+  const slotCause = buildSlotCause({
+    free: 2,
+    eligible: 0,
+    eligibleSince: null,
+    readyAt: '2026-10-14T00:55:00Z',
+    promotable: { at: '2026-10-14T00:55:00Z', count: null },
+    causeSince: null,
+    freshMinutes: 30,
+    at: new Date('2026-10-14T01:00:00Z'),
+  });
+
+  expect(slotCause).toStrictEqual({ cause: 'unknown', slots: 2, since: null, readyAgeMinutes: 5, reason: 'backlog_unknown', waitingMinutes: null });
+});
+
+test('it names a stale Backlog count as the reason when the count is older than the fresh time', () => {
+  const slotCause = buildSlotCause({
+    free: 2,
+    eligible: 0,
+    eligibleSince: null,
+    readyAt: '2026-10-14T00:55:00Z',
+    promotable: { at: '2026-10-14T00:29:30Z', count: 3 },
+    causeSince: null,
+    freshMinutes: 30,
+    at: new Date('2026-10-14T01:00:00Z'),
+  });
+
+  expect(slotCause).toStrictEqual({ cause: 'unknown', slots: 2, since: null, readyAgeMinutes: 5, reason: 'backlog_stale', waitingMinutes: null });
+});

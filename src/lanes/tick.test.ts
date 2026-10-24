@@ -33,7 +33,7 @@ test('it tags no cause and counts no minutes while Ready work has waited 10 minu
 
   const result = tick(ctx.db, ctx.sample, 'hq-lanes');
 
-  expect(result.slotCause).toStrictEqual({ cause: null, slots: 3, since: '2026-10-14T01:00:00Z', readyAgeMinutes: 4, waitingMinutes: 4 });
+  expect(result.slotCause).toStrictEqual({ cause: null, slots: 3, since: '2026-10-14T01:00:00Z', readyAgeMinutes: 4, reason: null, waitingMinutes: 4 });
   expect(readSlotMinutes(ctx.db, '2026-10-14')).toStrictEqual({ delivery: 0, triage: 0, supply: 0 });
 });
 
@@ -47,7 +47,7 @@ test('it tags delivery once Ready work has waited more than 10 minutes, and coun
 
   const result = tick(ctx.db, ctx.sample, 'hq-lanes');
 
-  expect(result.slotCause).toStrictEqual({ cause: 'delivery', slots: 3, since: '2026-10-14T01:11:00Z', readyAgeMinutes: 11, waitingMinutes: null });
+  expect(result.slotCause).toStrictEqual({ cause: 'delivery', slots: 3, since: '2026-10-14T01:11:00Z', readyAgeMinutes: 11, reason: null, waitingMinutes: null });
   expect(readSlotMinutes(ctx.db, '2026-10-14')).toStrictEqual({ delivery: 18, triage: 0, supply: 0 });
 });
 
@@ -88,7 +88,7 @@ test('it tags triage when no Ready work waits and Backlog work asks for promotio
 
   const result = tick(ctx.db, ctx.sample, 'hq-lanes');
 
-  expect(result.slotCause).toStrictEqual({ cause: 'triage', slots: 3, since: '2026-10-14T01:00:00Z', readyAgeMinutes: 5, waitingMinutes: null });
+  expect(result.slotCause).toStrictEqual({ cause: 'triage', slots: 3, since: '2026-10-14T01:00:00Z', readyAgeMinutes: 5, reason: null, waitingMinutes: null });
   expect(readSlotMinutes(ctx.db, '2026-10-14')).toStrictEqual({ delivery: 0, triage: 15, supply: 0 });
 });
 
@@ -115,6 +115,7 @@ test('it tags unknown and counts nothing when the Backlog count is unknown', asy
   const result = tick(ctx.db, ctx.sample, 'hq-lanes');
 
   expect(result.slotCause.cause).toBe('unknown');
+  expect(result.slotCause.reason).toBe('backlog_unknown');
   expect(result.slotCause.readyAgeMinutes).toBe(5);
   expect(readSlotMinutes(ctx.db, '2026-10-14')).toStrictEqual({ delivery: 0, triage: 0, supply: 0 });
 });
@@ -127,7 +128,7 @@ test('it tags unknown with the age of the Ready data and counts nothing when the
 
   const result = tick(ctx.db, ctx.sample, 'hq-lanes');
 
-  expect(result.slotCause).toStrictEqual({ cause: 'unknown', slots: 3, since: '2026-10-14T01:42:00Z', readyAgeMinutes: 42, waitingMinutes: null });
+  expect(result.slotCause).toStrictEqual({ cause: 'unknown', slots: 3, since: '2026-10-14T01:42:00Z', readyAgeMinutes: 42, reason: 'ready_stale', waitingMinutes: null });
   expect(readSlotMinutes(ctx.db, '2026-10-14')).toStrictEqual({ delivery: 0, triage: 0, supply: 0 });
 });
 
@@ -139,7 +140,7 @@ test('it tags no cause when no slot is free', async () => {
 
   const result = tick(ctx.db, { ...ctx.sample, slots: { imp: 0, local: 0 } }, 'hq-lanes');
 
-  expect(result.slotCause).toStrictEqual({ cause: null, slots: 0, since: null, readyAgeMinutes: 20, waitingMinutes: null });
+  expect(result.slotCause).toStrictEqual({ cause: null, slots: 0, since: null, readyAgeMinutes: 20, reason: null, waitingMinutes: null });
   expect(readSlotMinutes(ctx.db, '2026-10-14').delivery).toBe(0);
 });
 

@@ -1,6 +1,6 @@
-import { LANES } from './lanes.ts';
+import { match } from 'ts-pattern';
 import type { SlotMinutes } from './read-slot-minutes.ts';
-import type { SlotCause } from './types.ts';
+import type { SlotCause, SlotCauseUnknownReason } from './types.ts';
 
 // The two lines hq lanes prints: the cause of the empty slots now, and today's minutes by cause.
 export function formatSlotCause(slotCause: SlotCause, today: SlotMinutes): string[] {
@@ -14,19 +14,18 @@ function formatNow(slotCause: SlotCause): string {
   if (slotCause.cause === null) {
     return `none yet, Ready waiting ${slotCause.waitingMinutes ?? 0} min`;
   }
-  if (slotCause.cause === 'unknown') {
-    return `unknown, ${formatUnknown(slotCause.readyAgeMinutes)}`;
+  if (slotCause.reason !== null) {
+    return `unknown, ${formatUnknown(slotCause.reason, slotCause.readyAgeMinutes)}`;
   }
   const since = slotCause.since === null ? '' : ` since ${slotCause.since}`;
   return `${slotCause.cause}, ${slotCause.slots} free slot(s)${since}`;
 }
 
-function formatUnknown(readyAgeMinutes: number | null): string {
-  if (readyAgeMinutes === null) {
-    return 'Ready never read';
-  }
-  if (readyAgeMinutes > LANES.readyFreshMinutes()) {
-    return `Ready data ${readyAgeMinutes} min old`;
-  }
-  return 'Backlog count unavailable';
+function formatUnknown(reason: SlotCauseUnknownReason, readyAgeMinutes: number | null): string {
+  return match(reason)
+    .with('ready_never_read', () => 'Ready never read')
+    .with('ready_stale', () => `Ready data ${readyAgeMinutes ?? '?'} min old`)
+    .with('backlog_unknown', () => 'Backlog count unavailable')
+    .with('backlog_stale', () => 'Backlog count stale')
+    .exhaustive();
 }
