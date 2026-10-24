@@ -21,5 +21,6 @@ export function writeSlotCauseMove(db: Database, action: SlotCauseAction, to: Sl
   if (!targets.includes(to)) {
     throw new HqError('bad_state', `the slot cause is ${from}: ${action} cannot go to ${to}`, { state: from });
   }
-  setMeta(db, CAUSE_SINCE_KEY, to === 'none' ? null : JSON.stringify({ cause: to, since: iso(at) }));
+  const record = to === 'none' ? null : JSON.stringify({ cause: to, since: iso(at) });
+  setMeta(db, CAUSE_SINCE_KEY, record);
 }
