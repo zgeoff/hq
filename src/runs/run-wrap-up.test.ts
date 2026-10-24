@@ -230,7 +230,8 @@ test('done leaves a session removed from the run alone, even when the remove and
 
   const wrapUp = await runWrapUp(ctx.db, { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.resolve({ state: 'pushed' }) }, 'GEO-9801', 'z-delivery');
 
-  expect([wrapUp.forgotten, fleet.calls.some((call) => call.includes('0000a002'))]).toStrictEqual([['0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa'], false]);
+  expect(wrapUp.forgotten).toStrictEqual(['0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa']);
+  expect(fleet.calls.filter((call) => call.includes('0000a002'))).toStrictEqual([]);
 });
 
 
@@ -249,7 +250,8 @@ test('done never unpins, forgets or destroys a pinned session on the run, even w
 
   const wrapUp = await runWrapUp(ctx.db, { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.resolve({ state: 'pushed' }) }, 'GEO-9801', 'z-delivery');
 
-  expect([wrapUp.kept, fleet.calls.some((call) => call.includes('0000a002'))]).toStrictEqual([[{ id: '0000a002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', reason: 'pinned in atc' }], false]);
+  expect(wrapUp.kept).toStrictEqual([{ id: '0000a002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', reason: 'pinned in atc' }]);
+  expect(fleet.calls.filter((call) => call.includes('0000a002'))).toStrictEqual([]);
 });
 
 test('done keeps a whole session tree when one of its sub-sessions is pinned', async () => {
@@ -265,5 +267,6 @@ test('done keeps a whole session tree when one of its sub-sessions is pinned', a
 
   const wrapUp = await runWrapUp(ctx.db, { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')) }, 'GEO-9801', 'z-delivery');
 
-  expect([wrapUp.kept.map((kept) => kept.id), fleet.calls]).toStrictEqual([['0000a002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa'], []]);
+  expect(wrapUp.kept.map((kept) => kept.id)).toStrictEqual(['0000a002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa']);
+  expect(fleet.calls).toStrictEqual([]);
 });
