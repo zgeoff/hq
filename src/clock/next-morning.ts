@@ -1,7 +1,6 @@
 import { getSydneyParts } from './get-sydney-parts.ts';
 import { quietWindow } from './quiet-window.ts';
 
-// "Later" default from z-triage's check (the refinement skill's, before the merge): the first 07:00 Sydney after d.
 export function nextMorning(d: Date): Date {
   const p = getSydneyParts(d);
   const end = quietWindow().end;
