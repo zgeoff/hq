@@ -14,10 +14,10 @@ import { isCapEnded } from './is-cap-ended.ts';
 import type { LanesCap } from './lanes-cap.ts';
 import { parseCapUntil } from './parse-cap-until.ts';
 import type { LanesCapArgs } from './parse-lanes-cap-args.ts';
-import { readActiveCap } from './read-active-cap.ts';
 import { readCapCaller } from './read-cap-caller.ts';
 import type { CapCaller } from './read-cap-caller.ts';
 import { readLanesCap } from './read-lanes-cap.ts';
+import type { StoredCap } from './read-lanes-cap.ts';
 import { writeLanesCap } from './write-lanes-cap.ts';
 
 export interface LanesCapCommandDeps {
@@ -70,7 +70,8 @@ function toCapRequest(args: Exclude<LanesCapArgs, { kind: 'show' }>, at: Date): 
 }
 
 function writeCapChange(deps: LanesCapCommandDeps, caller: CapCaller, request: CapRequest): CapOut {
-  const current = readActiveCap(deps.db, deps.at);
+  const stored = readLanesCap(deps.db);
+  const current: StoredCap = stored.kind === 'set' && isCapEnded(stored.cap, deps.at) ? { kind: 'none' } : stored;
   const decision = decideCapChange({ caller, current, request, at: iso(deps.at) });
   if (!decision.ok) {
     throw new HqError('not_allowed', decision.message);
@@ -80,6 +81,10 @@ function writeCapChange(deps: LanesCapCommandDeps, caller: CapCaller, request: C
     return { data: { cap: null }, text: 'There is no cap to lift.' };
   }
   const by = decision.by;
+  if (decision.cap === null) {
+    writeLanesCap(deps.db, { action: decision.action, cap: null, error: decision.error, actor: by, reason: decision.reason });
+    return { data: { cap: null, by }, text: 'The unusable lanes cap is cleared; the slots obey the pool alone from the next look.' };
+  }
   writeLanesCap(deps.db, { action: decision.action, cap: decision.cap, actor: by, reason: decision.reason });
   return { data: { cap: decision.action === 'cap-set' ? decision.cap : null, by }, text: formatChange(decision.action, decision.cap) };
 }

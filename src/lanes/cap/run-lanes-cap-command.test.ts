@@ -210,6 +210,32 @@ test('it reports a malformed stored cap, applies none, and lets the owner replac
   expect(set.data).toMatchObject({ cap: { cap: 3 } });
 });
 
+test('it lets the owner lift an unusable stored cap, filing an event and news that name the fault', async () => {
+  const ctx = setupTest();
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'z-delivery': 'kettle-2' }));
+  setMeta(ctx.db, 'lanes_cap', 'seven');
+
+  const out = await runLanesCapCommand({ db: ctx.db, at: new Date('2026-10-15T00:00:00Z'), args: { kind: 'off', reason: 'teapot spilled' }, probe: ctx.owner });
+
+  expect(out).toStrictEqual({ data: { cap: null, by: 'z-stu' }, text: 'The unusable lanes cap is cleared; the slots obey the pool alone from the next look.' });
+  expect(getMeta(ctx.db, 'lanes_cap')).toBeNull();
+  expect(ctx.db.query("SELECT action, actor, from_state, to_state, data FROM events WHERE subject_id = 'lanes'").all()).toStrictEqual([
+    { action: 'cap-off', actor: 'z-stu', from_state: 'bad', to_state: 'none', data: JSON.stringify({ error: "meta 'lanes_cap' is not valid JSON", reason: 'teapot spilled' }) },
+  ]);
+  expect(ctx.db.query('SELECT from_name, text FROM news').all()).toStrictEqual([{ from_name: 'z-stu', text: "z-stu cleared an unusable lanes cap (teapot spilled): meta 'lanes_cap' is not valid JSON" }]);
+});
+
+test('it refuses the delivery lead lifting an unusable stored cap and leaves it', () => {
+  const ctx = setupTest();
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'z-delivery': 'kettle-2' }));
+  setMeta(ctx.db, 'lanes_cap', 'seven');
+
+  const refused = runLanesCapCommand({ db: ctx.db, at: new Date('2026-10-15T00:00:00Z'), args: { kind: 'off', reason: null }, probe: ctx.delivery });
+
+  expect(refused).rejects.toMatchObject({ code: 'not_allowed' });
+  expect(getMeta(ctx.db, 'lanes_cap')).toBe('seven');
+});
+
 test('it reports a stored cap that is not JSON', async () => {
   const ctx = setupTest();
   setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'z-delivery': 'kettle-2' }));
