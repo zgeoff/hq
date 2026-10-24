@@ -1,3 +1,4 @@
+import { isClockOverride } from '../clock/is-clock-override.ts';
 import { resolveUnitSetting } from '../fleet/resolve-unit-setting.ts';
 
 // The local settings file sits under XDG_CONFIG_HOME, which the systemd manager may lack, so the unit
@@ -6,7 +7,7 @@ export function lanesEnv(home: string, processEnv: Record<string, string | undef
   const env: Record<string, string> = { PATH: `${home}/.local/bin:${home}/.bun/bin:/usr/local/bin:/usr/bin:/bin` };
   for (const [name, value] of Object.entries(processEnv)) {
     const resolved = resolveUnitSetting(name, value);
-    if ((name.startsWith('HQ_') || name === 'XDG_CONFIG_HOME') && resolved !== undefined) {
+    if (((name.startsWith('HQ_') && !isClockOverride(name)) || name === 'XDG_CONFIG_HOME') && resolved !== undefined) {
       env[name] = resolved;
     }
   }

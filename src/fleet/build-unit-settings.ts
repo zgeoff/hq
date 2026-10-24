@@ -1,3 +1,4 @@
+import { isClockOverride } from '../clock/is-clock-override.ts';
 import { HqError } from '../errors.ts';
 import { resolveUnitSetting } from './resolve-unit-setting.ts';
 
@@ -5,7 +6,7 @@ import { resolveUnitSetting } from './resolve-unit-setting.ts';
 // shell's HQ_* settings and the XDG_CONFIG_HOME that locates the local settings file.
 export function buildUnitSettings(unit: string, env: Record<string, string | undefined>): string {
   return Object.entries(env)
-    .filter(([name]) => (name.startsWith('HQ_') && name !== 'HQ_AS') || name === 'XDG_CONFIG_HOME')
+    .filter(([name]) => (name.startsWith('HQ_') && name !== 'HQ_AS' && !isClockOverride(name)) || name === 'XDG_CONFIG_HOME')
     .toSorted(([left], [right]) => left.localeCompare(right))
     .flatMap(([name, value]) => buildEnvironmentLine(unit, name, resolveUnitSetting(name, value)))
     .join('');
