@@ -194,6 +194,29 @@ test('it holds the supply alert for the owner through quiet hours and sends it a
   expect(ctx.queued()).toStrictEqual([{ target: 'z-stu', text: 'Lanes: 180 slot-minutes empty today with no Ready work and no Backlog issue to promote (supply). Free slots: 3.' }]);
 });
 
+test('it sends the owner the held supply alert at the first look after quiet hours even when the cause has become triage', async () => {
+  const ctx = setupTest();
+  at('2026-10-14T17:00:00Z');
+  await ctx.seedReady([]);
+  writePromotableFocus(ctx.db, 0);
+  tick(ctx.db, ctx.sample, 'hq-lanes');
+  at('2026-10-14T17:30:00Z');
+  tick(ctx.db, ctx.sample, 'hq-lanes');
+  const quiet = ctx.queued();
+  at('2026-10-14T20:00:00Z');
+  await ctx.seedReady([]);
+  writePromotableFocus(ctx.db, 2);
+
+  const result = tick(ctx.db, ctx.sample, 'hq-lanes');
+
+  expect(result.slotCause.cause).toBe('triage');
+  expect(quiet).toStrictEqual([]);
+  expect(ctx.queued()).toStrictEqual([
+    { target: 'z-triage', text: 'Lanes: 90 slot-minutes empty today with no Ready work and Backlog issues waiting to be promoted (triage). Free slots: 3.' },
+    { target: 'z-stu', text: 'Lanes: 90 slot-minutes empty today with no Ready work and no Backlog issue to promote (supply). Free slots: 3.' },
+  ]);
+});
+
 test('it adds a look to the Sydney day it falls in, with no split at midnight', async () => {
   const ctx = setupTest();
   at('2026-10-14T12:59:00Z');

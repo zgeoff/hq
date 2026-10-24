@@ -24,7 +24,7 @@ import { removeLaneNudges } from './remove-lane-nudges.ts';
 import { sendSlotCauseAlert } from './send-slot-cause-alert.ts';
 import { slotsFrom } from './slots-from.ts';
 import { trackSlotCause } from './track-slot-cause.ts';
-import type { Sample, SlotCause, TickResult } from './types.ts';
+import type { Sample, SlotCause, SlotCauseName, TickResult } from './types.ts';
 import { writeSlotMinutes } from './write-slot-minutes.ts';
 
 // One look: record the sample, follow up old nudges, nudge if the gap is long
@@ -129,6 +129,8 @@ function countWanted(slotPlan: NonNullable<ReturnType<typeof readSlotPlan>>): nu
   return slotPlan.plan.picks.length;
 }
 
+const SLOT_CAUSES: SlotCauseName[] = ['delivery', 'triage', 'supply'];
+
 interface EmptySlotLook {
   slotCause: SlotCause;
   previousAt: string | null;
@@ -136,16 +138,18 @@ interface EmptySlotLook {
   actor: string;
 }
 
-// Adds the slot-minutes since the previous look (at most 30, so a gap in sampling counts little) to
-// the look's cause on its Sydney day, and alerts the cause's owner once the day's total reaches 60.
-// A look with no cause, or an unknown one, adds nothing.
+// Adds the slot-minutes since the previous look (at most 30) to the look's cause on its Sydney day;
+// no cause, or an unknown one, adds nothing. Every cause at 60 for the day then alerts its owner, so
+// an alert held back by quiet hours goes at the first look after them, whatever the cause is then.
 function countEmptySlots(db: Database, look: EmptySlotLook): void {
   const cause = look.slotCause.cause;
-  if (cause === null || cause === 'unknown' || look.previousAt === null) {
-    return;
-  }
   const day = sydney(look.at).date;
-  const minutes = look.slotCause.slots * Math.min(Math.max(0, look.at.getTime() - Date.parse(look.previousAt)) / 60_000, 30);
-  writeSlotMinutes(db, day, cause, minutes);
-  sendSlotCauseAlert(db, { day, cause, minutes: readSlotMinutes(db, day)[cause], free: look.slotCause.slots, at: look.at, actor: look.actor });
+  if (cause !== null && cause !== 'unknown' && look.previousAt !== null) {
+    const minutes = look.slotCause.slots * Math.min(Math.max(0, look.at.getTime() - Date.parse(look.previousAt)) / 60_000, 30);
+    writeSlotMinutes(db, day, cause, minutes);
+  }
+  const totals = readSlotMinutes(db, day);
+  for (const alertCause of SLOT_CAUSES) {
+    sendSlotCauseAlert(db, { day, cause: alertCause, minutes: totals[alertCause], free: look.slotCause.slots, at: look.at, actor: look.actor });
+  }
 }
