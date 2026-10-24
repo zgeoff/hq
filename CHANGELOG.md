@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.98.0 — 2026-10-24
+
+Claude usage alerts name when each window resets, and a lanes skip can wait on a PR.
+
+### Claude usage alerts name each window's reset time.
+
+- capacity.sh's Claude cache keeps a `resets` object with each window's reset time, beside `windows`.
+- Schema v41 stores the 5-hour and 7-day reset times in `usage_samples` and `capacity_samples`. Older rows hold NULL.
+- An alert reads `Claude: 7-day usage at 91%, early warning at 90% (launch limit 95%; resets 28 Oct 08:00Z)`, to the nearest minute.
+
+### A lanes skip can wait on a PR.
+
+- `hq lanes skip --until` takes `pr:<repo>#<n>` or a PR URL, and the skip ends when that PR merges or closes.
+- hq tells z-delivery when free slots meet a Ready list whose eligible issues are all skipped.
+
+### Fixes
+
+- The Claude usage alerts say "early warning" and name the launch limit.
+
+### Docs
+
+- The linear-triage skill holds only vers feature work for the owner, makes every other vers issue Ready, closes obsolete Backlog issues on a full pass, and batches the unsure ones weekly.
+
 ## 0.97.0 — 2026-10-24
 
 Owner and reviewer checks now trust only the caller that atc finds, and the console needs a one-use login link.
