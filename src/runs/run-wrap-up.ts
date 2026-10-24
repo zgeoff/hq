@@ -22,9 +22,17 @@ export interface WrapUpDeps {
 export async function runWrapUp(db: Database, deps: WrapUpDeps, issue: string, actor: string): Promise<WrapUp> {
   const run = requireRun(db, issue);
 
-  // A session removed from the run by hand before it closed is no longer the run's to forget.
+  // A session removed from the run by hand before it closed is no longer the run's to forget. Its
+  // end time alone cannot show that: a remove and the close can fall in the same second.
   const rows = db
-    .query("SELECT session_id FROM run_sessions WHERE issue = ? AND (ended_at IS NULL OR ended_by = 'sweep' OR ended_at = ?) ORDER BY added_at, session_id")
+    .query(
+      `SELECT session_id FROM run_sessions AS rs WHERE issue = ? AND (ended_at IS NULL OR ended_by = 'sweep' OR (ended_at = ? AND COALESCE((
+         SELECT json_extract(data, '$.mode') FROM events
+         WHERE subject = 'run' AND subject_id = rs.issue AND action = 'session'
+           AND (json_extract(data, '$.session') = rs.session_id
+             OR (length(json_extract(data, '$.session')) = 8 AND substr(rs.session_id, 1, 8) = json_extract(data, '$.session')))
+         ORDER BY seq DESC LIMIT 1), '') != 'remove')) ORDER BY added_at, session_id`,
+    )
     .all(issue, run.closed_at);
   const ids = rows.map((row) => sessionRowSchema.parse(row).session_id);
   const wrapUp: WrapUp = { forgotten: [], destroyed: [], kept: [], failed: [] };
@@ -79,6 +87,11 @@ interface TreePass {
 
 async function wrapUpTree(pass: TreePass, root: FleetSession): Promise<void> {
   const children = collectChildren(pass.sessions, root.id);
+  const tree = [...children, root];
+  if (tree.some((session) => session.pinned === true)) {
+    pass.wrapUp.kept.push(...tree.map((session) => ({ id: session.id, reason: 'pinned in atc' })));
+    return;
+  }
   let work: ImpWork | null = null;
   if (pass.onImp) {
     work = await readImpWorkSafely(pass.deps, root);

@@ -1,11 +1,12 @@
 import { expect, mock, onTestFinished, test } from 'bun:test';
 import { buildStubFleetClient } from '../../test/build-stub-fleet-client.ts';
-import { freshDb } from '../../test/helpers.ts';
+import { NOON_SYDNEY, at, freshDb } from '../../test/helpers.ts';
 import type { FleetSession } from '../fleet/types.ts';
 import { addRun } from './add-run.ts';
 import { getRun } from './get-run.ts';
 import { runWrapUp } from './run-wrap-up.ts';
 import { setGeoffChat } from './set-geoff-chat.ts';
+import { setSession } from './set-session.ts';
 import { setState } from './set-state.ts';
 import type { ImpWork } from './types.ts';
 
@@ -211,4 +212,80 @@ test('an imp destroy forgets the live session with no separate stop, which a clo
 
   expect(wrapUp).toStrictEqual({ forgotten: ['0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa'], destroyed: ['0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa'], kept: [], failed: [] });
   expect(fleet.calls).toStrictEqual(['unpin 0000a001', 'forget-live 0000a001', 'forget-live 0000a001 token-kettle']);
+});
+
+test('done leaves a session removed from the run alone, even when the remove and the close share a second', async () => {
+  const ctx = setupTest();
+  at(NOON_SYDNEY);
+  addRun(ctx.db, { issue: 'GEO-9801', title: 'Invented kettle descaler', place: 'imp', session: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
+  setSession(ctx.db, 'GEO-9801', '0000a002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'z-delivery', 'add');
+  setSession(ctx.db, 'GEO-9801', '0000a002', 'z-delivery', 'remove');
+  setState(ctx.db, 'GEO-9801', 'done', {}, 'z-delivery');
+  const fleet = buildStubFleetClient({
+    sessions: [
+      { id: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, cwd: '/workspace/kettle' },
+      { id: '0000a002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-owner-chat', alive: true, cwd: '/workspace/kettle' },
+    ],
+  });
+
+  const wrapUp = await runWrapUp(ctx.db, { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.resolve({ state: 'pushed' }) }, 'GEO-9801', 'z-delivery');
+
+  expect(wrapUp.forgotten).toStrictEqual(['0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa']);
+  expect(fleet.calls.filter((call) => call.includes('0000a002'))).toStrictEqual([]);
+});
+
+
+test('done never unpins, forgets or destroys a pinned session on the run, even when it ended in the second the run closed', async () => {
+  const ctx = setupTest();
+  at(NOON_SYDNEY);
+  addRun(ctx.db, { issue: 'GEO-9801', title: 'Invented kettle descaler', place: 'imp', session: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
+  setSession(ctx.db, 'GEO-9801', '0000a002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'z-delivery', 'add');
+  setState(ctx.db, 'GEO-9801', 'done', {}, 'z-delivery');
+  const fleet = buildStubFleetClient({
+    sessions: [
+      { id: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, cwd: '/workspace/kettle' },
+      { id: '0000a002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-owner-chat', alive: true, pinned: true, cwd: '/workspace/kettle' },
+    ],
+  });
+
+  const wrapUp = await runWrapUp(ctx.db, { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.resolve({ state: 'pushed' }) }, 'GEO-9801', 'z-delivery');
+
+  expect(wrapUp.kept).toStrictEqual([{ id: '0000a002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', reason: 'pinned in atc' }]);
+  expect(fleet.calls.filter((call) => call.includes('0000a002'))).toStrictEqual([]);
+});
+
+test('done keeps a whole session tree when one of its sub-sessions is pinned', async () => {
+  const ctx = setupTest();
+  addRun(ctx.db, { issue: 'GEO-9801', title: 'Invented kettle descaler', place: 'local', session: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
+  setState(ctx.db, 'GEO-9801', 'done', {}, 'z-delivery');
+  const fleet = buildStubFleetClient({
+    sessions: [
+      { id: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true },
+      { id: '0000a002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-helper', alive: true, pinned: true, parent: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+    ],
+  });
+
+  const wrapUp = await runWrapUp(ctx.db, { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')) }, 'GEO-9801', 'z-delivery');
+
+  expect(wrapUp.kept.map((kept) => kept.id)).toStrictEqual(['0000a002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa']);
+  expect(fleet.calls).toStrictEqual([]);
+});
+
+test('a remove by full id leaves another session that shares its first eight characters in wrap-up', async () => {
+  const ctx = setupTest();
+  at(NOON_SYDNEY);
+  addRun(ctx.db, { issue: 'GEO-9801', title: 'Invented kettle descaler', place: 'local', session: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
+  setSession(ctx.db, 'GEO-9801', '0000a001-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'z-delivery', 'add');
+  setSession(ctx.db, 'GEO-9801', '0000a001-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'z-delivery', 'remove');
+  setState(ctx.db, 'GEO-9801', 'done', {}, 'z-delivery');
+  const fleet = buildStubFleetClient({
+    sessions: [
+      { id: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true },
+      { id: '0000a001-bbbb-4bbb-8bbb-bbbbbbbbbbbb', name: 'kettle-owner-chat', alive: true },
+    ],
+  });
+
+  const wrapUp = await runWrapUp(ctx.db, { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')) }, 'GEO-9801', 'z-delivery');
+
+  expect(wrapUp.forgotten).toStrictEqual(['0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa']);
 });
