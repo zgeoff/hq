@@ -180,7 +180,8 @@ test('it records an unknown count when the Backlog read answers within a fresh d
   await backlogAsked.promise;
   jest.advanceTimersByTime(70);
   backlog.resolve({ issues: { nodes: [], pageInfo: { hasNextPage: false, endCursor: null } } });
+  const read = await ran;
 
-  expect(await ran).toBe(true);
+  expect(read).toBe(true);
   expect(getMeta(ctx.db, 'lanes_promotable_focus')).toBe('{"at":"2026-10-15T20:00:00Z","count":null,"focus":"[]"}');
 });
