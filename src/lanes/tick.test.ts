@@ -1,4 +1,4 @@
-import { expect, onTestFinished, test } from 'bun:test';
+import { expect, onTestFinished, setSystemTime, test } from 'bun:test';
 import rulesTable from '../../lanes.json';
 import { buildReadyPage, makePagedCall } from '../../test/build-ready-page.ts';
 import type { ReadyNodeSeed } from '../../test/build-ready-page.ts';
@@ -6,7 +6,6 @@ import { buildStubGitHubFactsRunner } from '../../test/build-stub-github-facts-r
 import { createCapacitySample } from '../../test/create-capacity-sample.ts';
 import { at, freshDb } from '../../test/helpers.ts';
 import { makeStateCall } from '../../test/make-state-call.ts';
-import { iso } from '../clock/iso.ts';
 import { setMeta } from '../db/set-meta.ts';
 import { runFocusCommand } from '../focus/run-focus-command.ts';
 import { readLinearReady } from './read-linear-ready.ts';
@@ -376,13 +375,17 @@ test('it counts slot-minutes for the free slots the cap leaves', async () => {
 
 test('it ends a cap whose time has passed once, with news and a message to the delivery lead', () => {
   const ctx = setupTest();
+  onTestFinished(() => setSystemTime());
   at('2026-10-14T01:00:00Z');
+  setSystemTime(new Date('2026-10-14T01:00:00Z'));
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
   setMeta(ctx.db, 'lanes_cap', JSON.stringify({ cap: 2, until: '2026-10-14T01:30:00Z', reason: 'quota', by: 'z-stu', at: '2026-10-14T00:00:00Z' }));
   tick(ctx.db, sample, 'hq-lanes');
   at('2026-10-14T01:31:00Z');
+  setSystemTime(new Date('2026-10-14T01:31:00Z'));
   tick(ctx.db, sample, 'hq-lanes');
   at('2026-10-14T01:40:00Z');
+  setSystemTime(new Date('2026-10-14T01:40:00Z'));
 
   tick(ctx.db, sample, 'hq-lanes');
 
@@ -394,10 +397,11 @@ test('it ends a cap whose time has passed once, with news and a message to the d
 
 test('it keeps a cap whose time has not passed', () => {
   const ctx = setupTest();
+  onTestFinished(() => setSystemTime());
   at('2026-10-14T01:00:00Z');
+  setSystemTime(new Date('2026-10-14T01:00:00Z'));
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
-  const until = iso(new Date(Date.now() + 3_600_000));
-  setMeta(ctx.db, 'lanes_cap', JSON.stringify({ cap: 2, until, reason: 'quota', by: 'z-stu', at: '2026-10-14T00:00:00Z' }));
+  setMeta(ctx.db, 'lanes_cap', JSON.stringify({ cap: 2, until: '2026-10-14T01:30:00Z', reason: 'quota', by: 'z-stu', at: '2026-10-14T00:00:00Z' }));
 
   tick(ctx.db, sample, 'hq-lanes');
 
@@ -407,8 +411,10 @@ test('it keeps a cap whose time has not passed', () => {
 
 test('it holds the slot plan to a cap the wall clock has not reached while HQ_NOW pins a later time', () => {
   const ctx = setupTest();
+  onTestFinished(() => setSystemTime());
   at('2099-01-01T00:00:00Z');
-  setMeta(ctx.db, 'lanes_cap', JSON.stringify({ cap: 0, until: '2098-01-01T00:00:00Z', reason: 'kettle descaling', by: 'z-stu', at: '2026-10-14T00:00:00Z' }));
+  setSystemTime(new Date('2026-10-14T01:00:00Z'));
+  setMeta(ctx.db, 'lanes_cap', JSON.stringify({ cap: 0, until: '2026-10-14T02:00:00Z', reason: 'kettle descaling', by: 'z-stu', at: '2026-10-14T00:00:00Z' }));
 
   const result = tick(ctx.db, { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } }, 'hq-lanes');
 
@@ -418,9 +424,11 @@ test('it holds the slot plan to a cap the wall clock has not reached while HQ_NO
 
 test('it holds the imp pool to a cap the wall clock has not reached while HQ_NOW pins a later time and pacing has no lanes', () => {
   const ctx = setupTest();
+  onTestFinished(() => setSystemTime());
   at('2099-01-01T00:00:00Z');
+  setSystemTime(new Date('2026-10-14T01:00:00Z'));
   createCapacitySample(ctx.db, { at: '2098-12-31T23:55:00Z', nonnixAwakeMib: 0 });
-  setMeta(ctx.db, 'lanes_cap', JSON.stringify({ cap: 0, until: '2098-01-01T00:00:00Z', reason: 'kettle descaling', by: 'z-stu', at: '2026-10-14T00:00:00Z' }));
+  setMeta(ctx.db, 'lanes_cap', JSON.stringify({ cap: 0, until: '2026-10-14T02:00:00Z', reason: 'kettle descaling', by: 'z-stu', at: '2026-10-14T00:00:00Z' }));
 
   const result = tick(ctx.db, { cap: { imp: { freeMib: 4096 }, providers: { kettle: { room: true, unattended: true, target: 'imp' } } }, impMib: 2048, error: null }, 'hq-lanes');
 
@@ -430,9 +438,11 @@ test('it holds the imp pool to a cap the wall clock has not reached while HQ_NOW
 
 test('it keeps a cap the wall clock has not reached while HQ_NOW pins a later time', () => {
   const ctx = setupTest();
+  onTestFinished(() => setSystemTime());
   at('2099-01-01T00:00:00Z');
+  setSystemTime(new Date('2026-10-14T01:00:00Z'));
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
-  const stored = JSON.stringify({ cap: 7, until: '2098-01-01T00:00:00Z', reason: 'kettle descaling', by: 'z-stu', at: '2026-10-14T00:00:00Z' });
+  const stored = JSON.stringify({ cap: 7, until: '2026-10-14T02:00:00Z', reason: 'kettle descaling', by: 'z-stu', at: '2026-10-14T00:00:00Z' });
   setMeta(ctx.db, 'lanes_cap', stored);
 
   tick(ctx.db, sample, 'hq-lanes');
