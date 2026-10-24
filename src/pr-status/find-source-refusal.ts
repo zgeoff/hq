@@ -5,6 +5,10 @@ import type { ItemGrant, ItemOption } from '../parse-item-input.ts';
 import { readRoundOptions } from '../asks/read-round-options.ts';
 import type { PRRef } from './parse-pr-ref.ts';
 import type { OwnerProbe } from './read-owner-session.ts';
+import { findChatRefusal } from './find-chat-refusal.ts';
+import { findCurrentOwnerAnswer } from './find-current-owner-answer.ts';
+import { hasPRName } from './has-pr-name.ts';
+import { isPlainYes } from './is-plain-yes.ts';
 
 // What the source must grant: an override of the open findings, or the risk of one finding.
 type OwnerAction = { action: 'override' } | { action: 'accept-risk'; finding: string };
@@ -26,11 +30,7 @@ export function findSourceRefusal(db: Database, request: SourceRequest, probe: O
   if (kind === 'call' || kind === 'console') {
     return findCallRefusal(db, { ...request, id, needsGrant: kind === 'console' });
   }
-  return match(probe)
-    .with({ verdict: 'owner' }, () => null)
-    .with({ verdict: 'other' }, () => 'a chat: source is accepted only from the session of the owner (z-stu), as atc finds the caller; this caller is not it')
-    .with({ verdict: 'unknown' }, (failed) => `a chat: source is accepted only from the session of the owner (z-stu), and atc could not say whether this caller is it: ${failed.cause}`)
-    .exhaustive();
+  return findChatRefusal(probe);
 }
 
 interface CallCheck extends SourceRequest {
@@ -77,7 +77,7 @@ function findCallRefusal(db: Database, check: CallCheck): string | null {
   if (!hasActionName(title, check.wanted)) {
     return `${check.source} does not name ${formatAction(check.wanted)} in the title the owner answered`;
   }
-  if (!isYes(data.answer)) {
+  if (!isPlainYes(data.answer)) {
     return `the owner's answer to ${check.source} is not a yes: "${data.answer}"`;
   }
   return null;
@@ -94,21 +94,6 @@ function findOverrideAtOtherHead(db: Database, check: CallCheck, answerSeq: numb
       .all(`pr:${check.ref.repo}#${check.ref.pr}`, `call:${check.id}`, `console:${check.id}`, answerSeq),
   );
   return rows.find((row) => row.head !== check.head)?.head ?? null;
-}
-
-const OwnerAnswerSchema = z.object({ seq: z.number(), data: z.string() });
-
-function findCurrentOwnerAnswer(db: Database, id: string): z.infer<typeof OwnerAnswerSchema> | null {
-  const answer = OwnerAnswerSchema.nullable().parse(
-    db
-      .query("SELECT seq, data FROM events WHERE subject = 'ask' AND subject_id = ? AND (action = 'console-answer' OR (action = 'answered' AND json_extract(data, '$.ownerSession') = 1)) ORDER BY seq DESC LIMIT 1")
-      .get(id),
-  );
-  if (answer === null) {
-    return null;
-  }
-  const refiled = db.query("SELECT 1 FROM events WHERE subject = 'ask' AND subject_id = ? AND action IN ('reasked', 'requeued') AND seq > ? LIMIT 1").get(id, answer.seq);
-  return refiled === null ? answer : null;
 }
 
 // The option the console stores before ` | ` (or the whole answer) is the one the owner picked.
@@ -145,12 +130,6 @@ function formatWanted(check: CallCheck, grant: ItemGrant): string {
   return `${check.wanted.action} of ${check.ref.slug}#${check.ref.pr}${finding}${head}`;
 }
 
-function hasPRName(title: string, ref: PRRef): boolean {
-  const owner = ref.slug.split('/')[0] ?? '';
-  const pattern = new RegExp(`(?<![\\w./-])(?:${RegExp.escape(owner)}/)?${RegExp.escape(ref.repo)}#${ref.pr}(?!\\d)`, 'iu');
-  return pattern.test(title);
-}
-
 function hasActionName(title: string, wanted: OwnerAction): boolean {
   return match(wanted)
     .with({ action: 'override' }, () => /(?<![\w-])override(?![\w-])/iu.test(title))
@@ -160,11 +139,4 @@ function hasActionName(title: string, wanted: OwnerAction): boolean {
 
 function formatAction(wanted: OwnerAction): string {
   return wanted.action === 'override' ? 'an override' : `accept-risk of finding ${wanted.finding}`;
-}
-
-// The option the console stores before ` | ` (or the whole answer) is the owner's decision. Only a
-// plain Yes grants: words such as "Yes, but not yet" are the owner's to weigh, never hq's.
-function isYes(answer: string): boolean {
-  const option = answer.split(' | ')[0] ?? '';
-  return /^yes[.!]?$/iu.test(option.trim());
 }
