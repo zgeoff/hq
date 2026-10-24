@@ -109,6 +109,7 @@ test('it reads Ready when pacing.json gives only slot caps and names no lanes', 
 
 test('it counts every promotable Backlog issue while no focus is set', async () => {
   const ctx = setupTest();
+  at('2026-10-15T20:00:00Z');
   const lanes = ['nixie-slice', 'nixie-maintenance', 'atc', 'imp', 'cloud', 'memory', 'flexible', 'cleanup', 'process'].map((name) => buildMockLaneConfig(name));
   const call = makeBacklogCall([
     { identifier: 'GEO-9901', project: 'kettle roadmap', type: 'Feature' },
@@ -123,6 +124,7 @@ test('it counts every promotable Backlog issue while no focus is set', async () 
 
 test('it counts only the promotable Backlog issues a focus term matches', async () => {
   const ctx = setupTest();
+  at('2026-10-15T20:00:00Z');
   const lanes = ['nixie-slice', 'nixie-maintenance', 'atc', 'imp', 'cloud', 'memory', 'flexible', 'cleanup', 'process'].map((name) => buildMockLaneConfig(name));
   await runFocusCommand({ db: ctx.db, call: makeStateCall([], []), actor: 'kettle-owner', at: new Date('2026-10-15T20:00:00Z'), verb: 'set', rest: ['bug'], reserves: [] });
   const call = makeBacklogCall([
@@ -137,6 +139,7 @@ test('it counts only the promotable Backlog issues a focus term matches', async 
 
 test('it records an unknown count, never none, when the Backlog read fails', async () => {
   const ctx = setupTest();
+  at('2026-10-15T20:00:00Z');
   const lanes = ['nixie-slice', 'nixie-maintenance', 'atc', 'imp', 'cloud', 'memory', 'flexible', 'cleanup', 'process'].map((name) => buildMockLaneConfig(name));
   const call = makeBacklogCall('outage');
 
@@ -149,6 +152,7 @@ test('it records an unknown count, never none, when the Backlog read fails', asy
 
 test('it records an unknown count when the Backlog read misses the deadline the Ready read started', async () => {
   const ctx = setupTest();
+  at('2026-10-15T20:00:00Z');
   const lanes = ['nixie-slice', 'nixie-maintenance', 'atc', 'imp', 'cloud', 'memory', 'flexible', 'cleanup', 'process'].map((name) => buildMockLaneConfig(name));
   const call = makeBacklogCall('silent');
 
