@@ -19,6 +19,7 @@ test('hq lanes prints the local sessions against their cap, the focus and the pi
     },
     eligible: 2,
     design: 'GEO-9803',
+    skipped: [],
   };
 
   expect(formatSlotPlan(slotPlan)).toStrictEqual([
@@ -46,6 +47,7 @@ test('the nudge names the free slots and each pick with its focus term', () => {
     },
     eligible: 2,
     design: 'GEO-9803',
+    skipped: [],
   };
 
   expect(formatSlotNudge(slotPlan, 12)).toBe(
@@ -60,6 +62,7 @@ test('hq lanes names the live sessions here when they set the local count', () =
     plan: null,
     eligible: null,
     design: null,
+    skipped: [],
   };
 
   expect(formatSlotPlan(slotPlan)[0]).toBe('slots (running/size, free now): imp 1/4, 3 free; local 7/6, 0 free (7 live sessions here)');
