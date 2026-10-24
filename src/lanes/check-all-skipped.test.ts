@@ -11,6 +11,7 @@ import { addRun } from '../runs/add-run.ts';
 import { holdLanes } from './hold-lanes.ts';
 import { readLinearReady } from './read-linear-ready.ts';
 import { setState } from '../runs/set-state.ts';
+import { setForward } from '../outbox/set-forward.ts';
 import { removeLaneSkip } from './remove-lane-skip.ts';
 import { tick } from './tick.ts';
 import { validateLaneRules } from './validate-lane-rules.ts';
@@ -244,4 +245,21 @@ test('it tells again after a hold that dropped the unsent alert ends', async () 
   tick(ctx.db, ctx.sample, 'hq-lanes');
 
   expect(ctx.told()).toStrictEqual({ total: 2 });
+});
+
+test('it drops the unsent alert at the destination z-delivery forwards to', async () => {
+  const ctx = setupTest();
+  await ctx.seedReady([
+    { identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 },
+    { identifier: 'GEO-9802', project: 'kettle roadmap', type: 'Bug', labels: ['vers'], priority: 3 },
+  ]);
+  ctx.skip('GEO-9801', 'pr:impz#654');
+  ctx.skip('GEO-9802', 'GEO-9899');
+  setForward(ctx.db, 'z-delivery', 'z-kettle-cover');
+  tick(ctx.db, ctx.sample, 'hq-lanes');
+  removeLaneSkip(ctx.db, 'GEO-9802', 'z-delivery');
+
+  tick(ctx.db, ctx.sample, 'hq-lanes');
+
+  expect([ctx.told(), ctx.sent()]).toStrictEqual([{ total: 1 }, []]);
 });
