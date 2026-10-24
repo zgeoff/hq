@@ -2,7 +2,6 @@ import { match } from 'ts-pattern';
 import type { SlotMinutes } from './read-slot-minutes.ts';
 import type { SlotCause, SlotCauseUnknownReason } from './types.ts';
 
-// The two lines hq lanes prints: the cause of the empty slots now, and today's minutes by cause.
 export function formatSlotCause(slotCause: SlotCause, today: SlotMinutes): string[] {
   return [`cause: ${formatNow(slotCause)}`, `empty slot-minutes today (Sydney): delivery ${Math.round(today.delivery)}, triage ${Math.round(today.triage)}, supply ${Math.round(today.supply)}`];
 }
