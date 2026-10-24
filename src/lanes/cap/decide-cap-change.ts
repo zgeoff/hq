@@ -12,7 +12,7 @@ export interface CapChangeInput {
   at: string;
 }
 
-export type CapDecision = { ok: true; action: CapAction; cap: LanesCap; reason: string | null; by: string } | { ok: true; action: null } | { ok: false; message: string };
+export type CapDecision = { ok: true; action: CapAction; cap: LanesCap; reason: string | null; by: string } | { ok: true; action: null; by: string } | { ok: false; message: string };
 
 export function decideCapChange(input: CapChangeInput): CapDecision {
   const owner = roleName('owner');
@@ -29,7 +29,7 @@ export function decideCapChange(input: CapChangeInput): CapDecision {
     if (caller.kind === 'delivery') {
       return { ok: false, message: `${delivery} may set a lanes cap or lower it, not lift it; ${owner} may` };
     }
-    return input.current === null ? { ok: true, action: null } : { ok: true, action: 'cap-off', cap: input.current, reason: request.reason, by: caller.by };
+    return input.current === null ? { ok: true, action: null, by: caller.by } : { ok: true, action: 'cap-off', cap: input.current, reason: request.reason, by: caller.by };
   }
   if (caller.kind === 'delivery' && input.current !== null && request.cap >= input.current.cap) {
     return { ok: false, message: `${delivery} may only lower the lanes cap (now ${input.current.cap}), not raise or keep it; ${owner} may` };

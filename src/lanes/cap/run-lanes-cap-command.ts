@@ -5,6 +5,7 @@ import { HqError } from '../../errors.ts';
 import type { OwnerProbeDeps } from '../../pr-status/read-owner-session.ts';
 import { buildCapView } from './build-cap-view.ts';
 import { countWorking } from './count-working.ts';
+import { endExpiredCap } from './end-expired-cap.ts';
 import { decideCapChange } from './decide-cap-change.ts';
 import type { CapRequest } from './decide-cap-change.ts';
 import { formatCapLine } from './format-cap-line.ts';
@@ -13,6 +14,7 @@ import { isCapEnded } from './is-cap-ended.ts';
 import type { LanesCap } from './lanes-cap.ts';
 import { parseCapUntil } from './parse-cap-until.ts';
 import type { LanesCapArgs } from './parse-lanes-cap-args.ts';
+import { readActiveCap } from './read-active-cap.ts';
 import { readCapCaller } from './read-cap-caller.ts';
 import type { CapCaller } from './read-cap-caller.ts';
 import { readLanesCap } from './read-lanes-cap.ts';
@@ -68,12 +70,12 @@ function toCapRequest(args: Exclude<LanesCapArgs, { kind: 'show' }>, at: Date): 
 }
 
 function writeCapChange(deps: LanesCapCommandDeps, caller: CapCaller, request: CapRequest): CapOut {
-  const stored = readLanesCap(deps.db);
-  const current = stored.kind === 'set' && !isCapEnded(stored.cap, deps.at) ? stored.cap : null;
+  const current = readActiveCap(deps.db, deps.at);
   const decision = decideCapChange({ caller, current, request, at: iso(deps.at) });
   if (!decision.ok) {
     throw new HqError('not_allowed', decision.message);
   }
+  endExpiredCap(deps.db, deps.at, decision.by);
   if (decision.action === null) {
     return { data: { cap: null }, text: 'There is no cap to lift.' };
   }

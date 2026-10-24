@@ -57,6 +57,44 @@ test('it says there is no cap to lift, and files nothing', async () => {
   expect(ctx.db.query("SELECT COUNT(*) AS total FROM events WHERE subject_id = 'lanes'").get()).toStrictEqual({ total: 0 });
 });
 
+test('it ends a cap whose time passed with no tick to clear it before setting the new one', async () => {
+  const ctx = setupTest();
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'z-delivery': 'kettle-2' }));
+  setMeta(ctx.db, 'lanes_cap', JSON.stringify({ cap: 2, until: '2026-10-14T21:00:00Z', reason: 'kettle descaling', by: 'z-stu', at: '2026-10-14T00:00:00Z' }));
+
+  await runLanesCapCommand({ db: ctx.db, at: new Date('2026-10-15T00:00:00Z'), args: { kind: 'set', cap: 6, until: null, reason: null }, probe: ctx.owner });
+
+  expect(ctx.db.query("SELECT action, actor, from_state, to_state FROM events WHERE subject_id = 'lanes' ORDER BY seq").all()).toStrictEqual([
+    { action: 'cap-ended', actor: 'z-stu', from_state: 'set', to_state: 'none' },
+    { action: 'cap-set', actor: 'z-stu', from_state: 'none', to_state: 'set' },
+  ]);
+  expect(ctx.db.query('SELECT text FROM news ORDER BY id').all()).toStrictEqual([{ text: 'Lanes cap 2 ended (set until Thu 08:00)' }, { text: 'z-stu capped working delivery sessions at 6' }]);
+  expect(ctx.db.query('SELECT target, text FROM outbox').all()).toStrictEqual([{ target: 'z-delivery', text: 'Lanes cap 2 ended (set until Thu 08:00): slots are free again, so fill whatever the pool leaves free.' }]);
+});
+
+test('it ends a cap whose time passed when the owner lifts it, and says there is no cap to lift', async () => {
+  const ctx = setupTest();
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'z-delivery': 'kettle-2' }));
+  setMeta(ctx.db, 'lanes_cap', JSON.stringify({ cap: 2, until: '2026-10-14T21:00:00Z', reason: 'kettle descaling', by: 'z-stu', at: '2026-10-14T00:00:00Z' }));
+
+  const out = await runLanesCapCommand({ db: ctx.db, at: new Date('2026-10-15T00:00:00Z'), args: { kind: 'off', reason: null }, probe: ctx.owner });
+
+  expect(out.text).toBe('There is no cap to lift.');
+  expect(ctx.db.query("SELECT action FROM events WHERE subject_id = 'lanes'").all()).toStrictEqual([{ action: 'cap-ended' }]);
+  expect(getMeta(ctx.db, 'lanes_cap')).toBeNull();
+});
+
+test('it leaves a cap whose time passed for the tick when the caller is refused', () => {
+  const ctx = setupTest();
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'z-delivery': 'kettle-2' }));
+  setMeta(ctx.db, 'lanes_cap', JSON.stringify({ cap: 2, until: '2026-10-14T21:00:00Z', reason: 'kettle descaling', by: 'z-stu', at: '2026-10-14T00:00:00Z' }));
+
+  const refused = runLanesCapCommand({ db: ctx.db, at: new Date('2026-10-15T00:00:00Z'), args: { kind: 'set', cap: 6, until: null, reason: null }, probe: ctx.stranger });
+
+  expect(refused).rejects.toMatchObject({ code: 'not_allowed' });
+  expect(ctx.db.query("SELECT COUNT(*) AS total FROM events WHERE subject_id = 'lanes'").get()).toStrictEqual({ total: 0 });
+});
+
 test('it lets the owner raise a cap', async () => {
   const ctx = setupTest();
   setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'z-delivery': 'kettle-2' }));
