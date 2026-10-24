@@ -40,25 +40,16 @@ export interface LaneSkip {
   at: string;
 }
 
-// Why free slots sit empty: Ready work waits (delivery), Backlog work waits for triage (triage), or
-// none exists (supply). Unknown while the Ready or Backlog read is missing or stale.
 export type SlotCauseName = 'delivery' | 'triage' | 'supply';
 
-// The input that made a cause unknown: no Ready read yet, a stale one, or a Backlog count that failed,
-// was made for another focus, or is stale.
 export type SlotCauseUnknownReason = 'ready_never_read' | 'ready_stale' | 'backlog_unknown' | 'backlog_focus_changed' | 'backlog_stale';
 
-// null: no free slot, or Ready work has waited under the grace time.
 export interface SlotCause {
   cause: SlotCauseName | 'unknown' | null;
   slots: number;
   since: string | null;
   readyAgeMinutes: number | null;
-
-  // Why the cause is unknown; null for any other cause.
   reason: SlotCauseUnknownReason | null;
-
-  // How long eligible Ready work has waited while the cause is still null; null otherwise.
   waitingMinutes: number | null;
   backlogError: string | null;
 }
