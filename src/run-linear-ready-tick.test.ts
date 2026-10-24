@@ -15,9 +15,7 @@ function setupTest() {
   const fresh = freshDb();
   onTestFinished(fresh.cleanup);
   at('2026-10-15T20:00:00Z');
-  const lanes = ['nixie-slice', 'nixie-maintenance', 'atc', 'imp', 'cloud', 'memory', 'flexible', 'cleanup', 'process'].map((name) => buildMockLaneConfig(name));
-
-  return { db: fresh.db, lanes };
+  return { db: fresh.db };
 }
 
 test('it records the error and sets the throttle when the read throws', async () => {
@@ -109,35 +107,38 @@ test('it reads Ready when pacing.json gives only slot caps and names no lanes', 
 
 test('it counts every promotable Backlog issue while no focus is set', async () => {
   const ctx = setupTest();
+  const lanes = ['nixie-slice', 'nixie-maintenance', 'atc', 'imp', 'cloud', 'memory', 'flexible', 'cleanup', 'process'].map((name) => buildMockLaneConfig(name));
   const call = makeBacklogCall([
     { identifier: 'GEO-9901', project: 'kettle roadmap', type: 'Feature' },
     { identifier: 'GEO-9902', project: 'kettle roadmap', type: 'Bug', labels: ['parked'] },
     { identifier: 'GEO-9903', project: 'kettle roadmap', type: 'Bug' },
   ]);
 
-  await runLinearReadyTick(ctx.db, { call, run: buildStubGitHubFactsRunner({}), readLanes: () => Promise.resolve(ctx.lanes), actor: 'hq-lanes', deadlineMs: 2000 });
+  await runLinearReadyTick(ctx.db, { call, run: buildStubGitHubFactsRunner({}), readLanes: () => Promise.resolve(lanes), actor: 'hq-lanes', deadlineMs: 2000 });
 
   expect(getMeta(ctx.db, 'lanes_promotable_focus')).toBe('{"at":"2026-10-15T20:00:00Z","count":2,"focus":"[]"}');
 });
 
 test('it counts only the promotable Backlog issues a focus term matches', async () => {
   const ctx = setupTest();
+  const lanes = ['nixie-slice', 'nixie-maintenance', 'atc', 'imp', 'cloud', 'memory', 'flexible', 'cleanup', 'process'].map((name) => buildMockLaneConfig(name));
   await runFocusCommand({ db: ctx.db, call: makeStateCall([], []), actor: 'kettle-owner', at: new Date('2026-10-15T20:00:00Z'), verb: 'set', rest: ['bug'], reserves: [] });
   const call = makeBacklogCall([
     { identifier: 'GEO-9901', project: 'kettle roadmap', type: 'Feature' },
     { identifier: 'GEO-9903', project: 'kettle roadmap', type: 'Bug' },
   ]);
 
-  await runLinearReadyTick(ctx.db, { call, run: buildStubGitHubFactsRunner({}), readLanes: () => Promise.resolve(ctx.lanes), actor: 'hq-lanes', deadlineMs: 2000 });
+  await runLinearReadyTick(ctx.db, { call, run: buildStubGitHubFactsRunner({}), readLanes: () => Promise.resolve(lanes), actor: 'hq-lanes', deadlineMs: 2000 });
 
   expect(getMeta(ctx.db, 'lanes_promotable_focus')).toBe(String.raw`{"at":"2026-10-15T20:00:00Z","count":1,"focus":"[\"bug\"]"}`);
 });
 
 test('it records an unknown count, never none, when the Backlog read fails', async () => {
   const ctx = setupTest();
+  const lanes = ['nixie-slice', 'nixie-maintenance', 'atc', 'imp', 'cloud', 'memory', 'flexible', 'cleanup', 'process'].map((name) => buildMockLaneConfig(name));
   const call = makeBacklogCall('outage');
 
-  const ran = await runLinearReadyTick(ctx.db, { call, run: buildStubGitHubFactsRunner({}), readLanes: () => Promise.resolve(ctx.lanes), actor: 'hq-lanes', deadlineMs: 2000 });
+  const ran = await runLinearReadyTick(ctx.db, { call, run: buildStubGitHubFactsRunner({}), readLanes: () => Promise.resolve(lanes), actor: 'hq-lanes', deadlineMs: 2000 });
 
   expect(ran).toBe(true);
   expect(getMeta(ctx.db, 'lanes_promotable_focus')).toBe('{"at":"2026-10-15T20:00:00Z","count":null,"focus":"[]"}');
@@ -146,9 +147,10 @@ test('it records an unknown count, never none, when the Backlog read fails', asy
 
 test('it records an unknown count when the Backlog read misses the deadline the Ready read started', async () => {
   const ctx = setupTest();
+  const lanes = ['nixie-slice', 'nixie-maintenance', 'atc', 'imp', 'cloud', 'memory', 'flexible', 'cleanup', 'process'].map((name) => buildMockLaneConfig(name));
   const call = makeBacklogCall('silent');
 
-  const ran = await runLinearReadyTick(ctx.db, { call, run: buildStubGitHubFactsRunner({}), readLanes: () => Promise.resolve(ctx.lanes), actor: 'hq-lanes', deadlineMs: 200 });
+  const ran = await runLinearReadyTick(ctx.db, { call, run: buildStubGitHubFactsRunner({}), readLanes: () => Promise.resolve(lanes), actor: 'hq-lanes', deadlineMs: 200 });
 
   expect(ran).toBe(true);
   expect(getMeta(ctx.db, 'lanes_promotable_focus')).toBe('{"at":"2026-10-15T20:00:00Z","count":null,"focus":"[]"}');
