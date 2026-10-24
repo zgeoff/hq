@@ -190,6 +190,33 @@ test('it tells the triage session at any hour when triage reaches 60 slot-minute
   expect(ctx.queued()).toStrictEqual([{ target: 'z-triage', text: 'Lanes: 90 slot-minutes empty today with no Ready work and Backlog issues waiting to be promoted (triage). Free slots: 3.' }]);
 });
 
+test('it tells the triage and delivery sessions during quiet hours while the supply alert waits', async () => {
+  const ctx = setupTest();
+  at('2026-10-14T17:00:00Z');
+  await ctx.seedReady([]);
+  writePromotableFocus(ctx.db, 0);
+  tick(ctx.db, ctx.sample, 'hq-lanes');
+  at('2026-10-14T17:30:00Z');
+  tick(ctx.db, ctx.sample, 'hq-lanes');
+  at('2026-10-14T18:00:00Z');
+  await ctx.seedReady([]);
+  writePromotableFocus(ctx.db, 2);
+  tick(ctx.db, ctx.sample, 'hq-lanes');
+  await ctx.seedReady([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
+  at('2026-10-14T18:01:00Z');
+  tick(ctx.db, ctx.sample, 'hq-lanes');
+  at('2026-10-14T18:12:00Z');
+  tick(ctx.db, ctx.sample, 'hq-lanes');
+  at('2026-10-14T18:23:00Z');
+
+  tick(ctx.db, ctx.sample, 'hq-lanes');
+
+  expect(ctx.queued()).toStrictEqual([
+    { target: 'z-triage', text: 'Lanes: 90 slot-minutes empty today with no Ready work and Backlog issues waiting to be promoted (triage). Free slots: 3.' },
+    { target: 'z-delivery', text: 'Lanes: 66 slot-minutes empty today with Ready work waiting (delivery). Free slots: 3.' },
+  ]);
+});
+
 test('it holds the supply alert for the owner through quiet hours and sends it at the first look after them', async () => {
   const ctx = setupTest();
   at('2026-10-14T17:00:00Z');
