@@ -20,9 +20,6 @@ const TOLD = 'lanes_all_skipped_told';
 // alert unsent.
 const TOPIC = 'lanes-all-skipped';
 
-// Tells z-delivery once per spell that every eligible Ready issue is skipped while slots sit free or
-// impd's line holds imp slots back. A change of the held flag or the skip set tells again, and a look
-// where the condition fails ends the spell. A lanes hold sends nothing.
 export function checkAllSkipped(db: Database, slotPlan: SlotPlan, actor: string): boolean {
   const held = [IMP_LINE_HELD.memory, IMP_LINE_HELD.vcpu].some((line) => line === slotPlan.pool.held);
   if (slotPlan.eligible !== 0 || slotPlan.skipped.length === 0 || (slotPlan.pool.free === 0 && !held)) {
