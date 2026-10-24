@@ -62,7 +62,7 @@ stream | jq -n --unbuffered -r --arg self "$self" --argjson ids "$ids" '
 ' || status=$?
 
 if [ -z "$input" ]; then
-  echo "ENDED atc events closed the stream (exit $status), so this watch is down. Start it again; if it ends at once again, read atc_events_read at each check-in instead and tell the steward."
+  echo "ENDED atc events closed the stream (exit $status), so this watch is down. Start it again; if it ends at once again, read atc_events_read at each check-in instead and tell z-triage."
   exit 1
 fi
 exit "$status"
