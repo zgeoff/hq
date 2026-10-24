@@ -7,11 +7,16 @@ import { PROBE_UNIT } from '../probe/probe-unit.ts';
 import type { Runner } from '../runner/types.ts';
 import { stripClockSettings } from './strip-clock-settings.ts';
 
+interface Scrub {
+  directory: string;
+  env?: Record<string, string | undefined>;
+}
+
 const SERVICES = [LANES_UNIT, FLEET_UNIT, BACKUP_UNIT, PROBE_UNIT].map((unit) => `${unit}.service`);
 
 // Rewrite each hq service file that sets a clock override, then reload systemd if any changed.
 // Returns the files it changed; a missing directory or file is skipped.
-export async function scrubUnits(run: Runner, scrub: { directory: string; env?: Record<string, string | undefined> }): Promise<string[]> {
+export async function scrubUnits(run: Runner, scrub: Scrub): Promise<string[]> {
   const changed: string[] = [];
   for (const service of SERVICES) {
     const file = Bun.file(`${scrub.directory}/${service}`);

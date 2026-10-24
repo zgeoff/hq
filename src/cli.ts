@@ -2170,7 +2170,7 @@ const GROUPS: Record<string, (context: Ctx) => Promise<Out>> = {
   probe: (c) => probeCommand(c.db, c.verb, c.rest, c.flags),
   backup: (c) => backupCommand(c.db, c.verb, c.rest, c.flags),
   capacity: (c) => capacityCommand(c.db, c.verb, c.rest, c.flags),
-  units: (c) => runUnitsCommand({ verb: c.verb, run: c.run, home: getHome(), env: cleanEnv() }),
+  units: (context) => runUnitsCommand({ verb: context.verb, run: context.run, home: getHome(), env: cleanEnv() }),
   health: (c) => healthCommand(c.db, c.verb, c.rest, c.flags),
   news: (c) => newsCommand(c.db, c.verb, c.flags),
   outbox: (c) => outboxCommand(c.db, c.verb, c.rest, c.flags),
