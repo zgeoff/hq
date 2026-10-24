@@ -174,6 +174,17 @@ test('it pins hq\'s own clone and records the full sha, keeping the list', async
   expect(fake.calls.map((c) => c.opts?.cwd)).toStrictEqual([undefined, `${ctx.base}/repos/zgeoff`, paths.base, paths.base, paths.base, paths.base, paths.base, paths.folder]);
 });
 
+test('it keeps a configured emergency cap when it pins', async () => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
+  updateNoslopRepos(ctx.db, 'on', ['widgets']);
+  await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'cap', rest: ['widgets', '2'], since: undefined, actor: 'tester' });
+
+  await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester' });
+
+  expect(loadNoslopSettings(ctx.db)).toStrictEqual({ repos: ['widgets'], sha: '0123456789abcdef0123456789abcdef01234567', caps: { widgets: 2 } });
+});
+
 test('it keeps a repo turned on while the install runs', async () => {
   const ctx = setupTest(),
     fake = buildFakeRunner(),
