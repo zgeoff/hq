@@ -1,5 +1,5 @@
 import { Database } from 'bun:sqlite';
-import { expect, onTestFinished, spyOn, test } from 'bun:test';
+import { expect, mock, onTestFinished, spyOn, test } from 'bun:test';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, renameSync, rmSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -54,7 +54,7 @@ test('it shows noslop off everywhere, with no pin, until someone turns it on', a
   const ctx = setupTest(),
     fake = buildFakeRunner();
 
-  await expect(runNoslopCommand({ run: fake.run, db: ctx.db, verb: undefined, rest: [], since: undefined, actor: 'tester' })).resolves.toStrictEqual({
+  await expect(runNoslopCommand({ run: fake.run, db: ctx.db, verb: undefined, rest: [], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) })).resolves.toStrictEqual({
     data: { repos: [], caps: {}, sha: null, clone: `${ctx.base}/repos/zgeoff/noslop` },
     text: `repos: none (noslop is off everywhere)\nemergency review cap: off everywhere (hq noslop cap <repo> <n>)\npinned: nothing yet (hq noslop pin <sha>)\nclone: ${ctx.base}/repos/zgeoff/noslop (not cloned yet)`,
   });
@@ -64,38 +64,64 @@ test('it turns repos on and off, sorted, and the second identical call changes n
   const ctx = setupTest(),
     fake = buildFakeRunner();
 
-  await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'on', rest: ['tools', 'atc'], since: undefined, actor: 'tester' });
-  await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'on', rest: ['tools', 'atc'], since: undefined, actor: 'tester' });
+  await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'on', rest: ['tools', 'atc'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) });
+  await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'on', rest: ['tools', 'atc'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) });
   expect(loadNoslopSettings(ctx.db).repos).toStrictEqual(['atc', 'tools']);
 
-  await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'off', rest: ['tools'], since: undefined, actor: 'tester' });
-  await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'off', rest: ['tools'], since: undefined, actor: 'tester' });
+  await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'off', rest: ['tools'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) });
+  await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'off', rest: ['tools'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) });
 
   expect(loadNoslopSettings(ctx.db).repos).toStrictEqual(['atc']);
   expect(fake.calls).toStrictEqual([]);
 });
 
-test('it sets a repo\'s emergency review cap, shows it in the listing, and logs who set it', async () => {
+test('it sets a repo\'s emergency review cap for the owner\'s session, shows it in the listing, and logs the owner as who set it', async () => {
   const ctx = setupTest();
   const fake = buildFakeRunner();
-  await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'on', rest: ['atc', 'tools'], since: undefined, actor: 'tester' });
+  await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'on', rest: ['atc', 'tools'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) });
 
-  const shown = await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'cap', rest: ['Tools', '2'], since: undefined, actor: 'tester' });
+  const shown = await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'cap', rest: ['Tools', '2'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) });
 
   expect(shown.data).toMatchObject({ repos: ['atc', 'tools'], caps: { tools: 2 } });
   expect(shown.text).toContain('emergency review cap: atc off, tools 2');
   expect(loadNoslopSettings(ctx.db)).toMatchObject({ repos: ['atc', 'tools'], caps: { tools: 2 } });
-  expect(ctx.db.query("SELECT action, actor FROM events WHERE subject_id = 'noslop' AND action = 'cap'").all()).toStrictEqual([{ action: 'cap', actor: 'tester' }]);
+  expect(ctx.db.query("SELECT action, actor FROM events WHERE subject_id = 'noslop' AND action = 'cap'").all()).toStrictEqual([{ action: 'cap', actor: 'z-stu' }]);
+});
+
+test('it refuses to change a repo\'s emergency review cap for another session, and stores nothing', async () => {
+  const ctx = setupTest();
+
+  await expect(runNoslopCommand({ run: buildFakeRunner().run, db: ctx.db, verb: 'cap', rest: ['tools', '2'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'other' }) })).rejects.toMatchObject({ code: 'not_allowed', message: "only z-stu may change a repo's emergency review cap, and this session is not z-stu's" });
+
+  expect(loadNoslopSettings(ctx.db).caps).toStrictEqual({});
+  expect(ctx.db.query("SELECT action FROM events WHERE subject_id = 'noslop' AND action = 'cap'").all()).toStrictEqual([]);
+});
+
+test('it refuses to change a repo\'s emergency review cap when atc cannot tell whose session it is, naming the cause', async () => {
+  const ctx = setupTest();
+
+  await expect(runNoslopCommand({ run: buildFakeRunner().run, db: ctx.db, verb: 'cap', rest: ['tools', '2'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'unknown', cause: 'atc is not answering on the kettle socket' }) })).rejects.toMatchObject({ code: 'not_allowed', message: "hq could not check through atc that this is z-stu's session (atc is not answering on the kettle socket), so the emergency review cap is unchanged" });
+
+  expect(loadNoslopSettings(ctx.db).caps).toStrictEqual({});
+});
+
+test('it turns a repo on without asking atc whose session it is', async () => {
+  const ctx = setupTest();
+  const readOwnerSession = mock(() => Promise.resolve({ verdict: 'other' as const }));
+
+  await runNoslopCommand({ run: buildFakeRunner().run, db: ctx.db, verb: 'on', rest: ['atc'], since: undefined, actor: 'tester', readOwnerSession });
+
+  expect(readOwnerSession).not.toHaveBeenCalled();
 });
 
 test('it turns a repo\'s emergency review cap off again, and keeps the other caps and the repo list', async () => {
   const ctx = setupTest();
   const fake = buildFakeRunner();
-  await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'on', rest: ['atc'], since: undefined, actor: 'tester' });
-  await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'cap', rest: ['atc', '1'], since: undefined, actor: 'tester' });
-  await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'cap', rest: ['tools', '3'], since: undefined, actor: 'tester' });
+  await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'on', rest: ['atc'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) });
+  await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'cap', rest: ['atc', '1'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) });
+  await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'cap', rest: ['tools', '3'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) });
 
-  await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'cap', rest: ['atc', 'off'], since: undefined, actor: 'tester' });
+  await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'cap', rest: ['atc', 'off'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) });
 
   expect(loadNoslopSettings(ctx.db)).toStrictEqual({ repos: ['atc'], sha: null, caps: { tools: 3 } });
 });
@@ -103,10 +129,10 @@ test('it turns a repo\'s emergency review cap off again, and keeps the other cap
 test('it keeps the caps when a repo is turned off', async () => {
   const ctx = setupTest();
   const fake = buildFakeRunner();
-  await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'on', rest: ['atc'], since: undefined, actor: 'tester' });
-  await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'cap', rest: ['atc', '2'], since: undefined, actor: 'tester' });
+  await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'on', rest: ['atc'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) });
+  await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'cap', rest: ['atc', '2'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) });
 
-  await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'off', rest: ['atc'], since: undefined, actor: 'tester' });
+  await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'off', rest: ['atc'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) });
 
   expect(loadNoslopSettings(ctx.db)).toStrictEqual({ repos: [], sha: null, caps: { atc: 2 } });
 });
@@ -123,7 +149,7 @@ test.each([
 ])('it refuses hq noslop cap with %s', async (_label, rest, words) => {
   const ctx = setupTest();
 
-  await expect(runNoslopCommand({ run: buildFakeRunner().run, db: ctx.db, verb: 'cap', rest, since: undefined, actor: 'tester' })).rejects.toMatchObject({ code: 'bad_args', message: expect.stringContaining(words) });
+  await expect(runNoslopCommand({ run: buildFakeRunner().run, db: ctx.db, verb: 'cap', rest, since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) })).rejects.toMatchObject({ code: 'bad_args', message: expect.stringContaining(words) });
 
   expect(loadNoslopSettings(ctx.db).caps).toStrictEqual({});
 });
@@ -131,7 +157,7 @@ test.each([
 test('it logs who turned a repo on', async () => {
   const ctx = setupTest();
 
-  await runNoslopCommand({ run: buildFakeRunner().run, db: ctx.db, verb: 'on', rest: ['atc'], since: undefined, actor: 'tester' });
+  await runNoslopCommand({ run: buildFakeRunner().run, db: ctx.db, verb: 'on', rest: ['atc'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) });
 
   expect(ctx.db.query("SELECT subject_id, action, actor, to_state FROM events WHERE subject_id = 'noslop'").all()).toStrictEqual([{ subject_id: 'noslop', action: 'on', actor: 'tester', to_state: 'atc' }]);
 });
@@ -146,7 +172,7 @@ test.each([
   const ctx = setupTest(),
     fake = buildFakeRunner();
 
-  await expect(runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest, since: undefined, actor: 'tester' })).rejects.toMatchObject({ code: 'bad_args' });
+  await expect(runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest, since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) })).rejects.toMatchObject({ code: 'bad_args' });
 
   expect(fake.calls).toStrictEqual([]);
   expect(loadNoslopSettings(ctx.db).sha).toBeNull();
@@ -158,7 +184,7 @@ test('it pins hq\'s own clone and records the full sha, keeping the list', async
     paths = buildPinPaths(ctx.base);
   updateNoslopRepos(ctx.db, 'on', ['atc']);
 
-  await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester' });
+  await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) });
 
   expect(loadNoslopSettings(ctx.db)).toStrictEqual({ repos: ['atc'], sha: '0123456789abcdef0123456789abcdef01234567', caps: {} });
   expect(fake.lines()).toStrictEqual([
@@ -178,9 +204,9 @@ test('it keeps a configured emergency cap when it pins', async () => {
   const ctx = setupTest();
   const fake = buildFakeRunner();
   updateNoslopRepos(ctx.db, 'on', ['widgets']);
-  await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'cap', rest: ['widgets', '2'], since: undefined, actor: 'tester' });
+  await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'cap', rest: ['widgets', '2'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) });
 
-  await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester' });
+  await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) });
 
   expect(loadNoslopSettings(ctx.db)).toStrictEqual({ repos: ['widgets'], sha: '0123456789abcdef0123456789abcdef01234567', caps: { widgets: 2 } });
 });
@@ -195,7 +221,7 @@ test('it keeps a repo turned on while the install runs', async () => {
       return fake.run(cmd, opts);
     };
 
-  await runNoslopCommand({ run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester' });
+  await runNoslopCommand({ run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) });
 
   expect(loadNoslopSettings(ctx.db).repos).toStrictEqual(['widgets']);
 });
@@ -215,7 +241,7 @@ test('it keeps a repo turned on and a repo turned off while the store migration 
   createStubNoslopStore(ctx.store, { migrations: HELD_NAMES, tables: { dispositions: 3, reviews: 2 } });
   createStubNoslopClone(paths.folder, NEW_NAMES);
 
-  await runNoslopCommand({ run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester' });
+  await runNoslopCommand({ run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) });
 
   expect(loadNoslopSettings(ctx.db)).toStrictEqual({ repos: ['widgets'], sha: FULL_SHA, caps: {} });
 });
@@ -230,7 +256,7 @@ test('it refuses a pin while another pin\'s process still runs, however old its 
   writeFileSync(join(lock, 'pid'), String(sleeper.pid));
   utimesSync(lock, new Date(Date.now() - 3_600_000), new Date(Date.now() - 3_600_000));
 
-  await expect(runNoslopCommand({ run: buildFakeRunner().run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester' })).rejects.toMatchObject({ code: 'locked' });
+  await expect(runNoslopCommand({ run: buildFakeRunner().run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) })).rejects.toMatchObject({ code: 'locked' });
 
   expect(loadNoslopSettings(ctx.db).sha).toBeNull();
 });
@@ -251,7 +277,7 @@ test('it runs two overlapping pins one after the other', async () => {
       }
       return await fake.run(cmd, opts);
     },
-    started = ['aaaaaaa', 'bbbbbbb'].map((sha) => runNoslopCommand({ run, db: ctx.db, verb: 'pin', rest: [sha], since: undefined, actor: 'tester' }));
+    started = ['aaaaaaa', 'bbbbbbb'].map((sha) => runNoslopCommand({ run, db: ctx.db, verb: 'pin', rest: [sha], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) }));
 
   await atGate.promise;
   events.push('released');
@@ -265,9 +291,9 @@ test('it keeps the old pin when the checkout fails', async () => {
   const ctx = setupTest(),
     runner = buildFakeRunner();
   updateNoslopRepos(ctx.db, 'on', ['atc']);
-  await runNoslopCommand({ run: runner.run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester' });
+  await runNoslopCommand({ run: runner.run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) });
 
-  await expect(runNoslopCommand({ run: () => Promise.resolve({ code: 1, stdout: '', stderr: 'bad object' }), db: ctx.db, verb: 'pin', rest: ['fffffff'], since: undefined, actor: 'tester' })).rejects.toMatchObject({ code: 'command_failed' });
+  await expect(runNoslopCommand({ run: () => Promise.resolve({ code: 1, stdout: '', stderr: 'bad object' }), db: ctx.db, verb: 'pin', rest: ['fffffff'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) })).rejects.toMatchObject({ code: 'command_failed' });
 
   expect(loadNoslopSettings(ctx.db).sha).toBe('0123456789abcdef0123456789abcdef01234567');
 });
@@ -282,7 +308,7 @@ test('it refuses a pin while a noslop CLI runs, names it, and checks nothing out
   const ctx = setupTest(),
     fake = buildFakeRunner({ pgrep: { code: 0, stdout: '4242 bun --config=/x/bunfig.toml /x/apps/cli/src/cli.ts review --pr 354\n', stderr: '' } });
 
-  await expect(runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester' })).rejects.toMatchObject({
+  await expect(runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) })).rejects.toMatchObject({
     code: 'noslop_busy',
     message: expect.stringContaining('process 4242: bun --config=/x/bunfig.toml /x/apps/cli/src/cli.ts review --pr 354'),
   });
@@ -295,7 +321,7 @@ test('it leaves hq itself out of the processes it names', async () => {
   const ctx = setupTest(),
     fake = buildFakeRunner({ pgrep: { code: 0, stdout: `${process.pid} bun /x/apps/cli/src/cli.ts\n`, stderr: '' } });
 
-  await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester' });
+  await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) });
 
   expect(loadNoslopSettings(ctx.db).sha).toBe(FULL_SHA);
 });
@@ -304,7 +330,7 @@ test.each([[2], [127]])('it refuses a pin when pgrep fails with exit %d', async 
   const ctx = setupTest(),
     fake = buildFakeRunner({ pgrep: { code, stdout: '', stderr: 'pgrep: invalid' } });
 
-  await expect(runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester' })).rejects.toMatchObject({ code: 'noslop_busy', message: expect.stringContaining('hq cannot tell') });
+  await expect(runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) })).rejects.toMatchObject({ code: 'noslop_busy', message: expect.stringContaining('hq cannot tell') });
 
   expect(loadNoslopSettings(ctx.db).sha).toBeNull();
 });
@@ -315,7 +341,7 @@ test('it refuses a pin while a review round is open, and names the PR', async ()
   onTestFinished(() => sleeper.kill());
   mkdirSync(join(ctx.base, 'reviews', `hq+354-noslop-${sleeper.pid}`), { recursive: true });
 
-  await expect(runNoslopCommand({ run: buildFakeRunner().run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester' })).rejects.toMatchObject({
+  await expect(runNoslopCommand({ run: buildFakeRunner().run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) })).rejects.toMatchObject({
     code: 'noslop_busy',
     message: expect.stringMatching(/round hq#354 \(review process \d+\), started \d{4}-/u),
   });
@@ -330,7 +356,7 @@ test('it pins when a live review removes its worktree between the scan and the r
   mkdirSync(join(ctx.base, 'reviews'), { recursive: true });
   symlinkSync(join(ctx.base, 'reviews', 'removed'), join(ctx.base, 'reviews', `hq354-noslop-${sleeper.pid}`));
 
-  await runNoslopCommand({ run: buildFakeRunner().run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester' });
+  await runNoslopCommand({ run: buildFakeRunner().run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) });
 
   expect(loadNoslopSettings(ctx.db).sha).toBe(FULL_SHA);
 });
@@ -341,7 +367,7 @@ test('it ignores a review folder whose process is gone', async () => {
   await gone.exited;
   mkdirSync(join(ctx.base, 'reviews', `hq+354-noslop-${gone.pid}`), { recursive: true });
 
-  await runNoslopCommand({ run: buildFakeRunner().run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester' });
+  await runNoslopCommand({ run: buildFakeRunner().run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) });
 
   expect(loadNoslopSettings(ctx.db).sha).toBe(FULL_SHA);
 });
@@ -350,7 +376,7 @@ test('it refuses --force with no reason as bad_args, and runs nothing', async ()
   const ctx = setupTest(),
     fake = buildFakeRunner();
 
-  await expect(runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456'], force: true, since: undefined, actor: 'tester' })).rejects.toMatchObject({ code: 'bad_args' });
+  await expect(runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456'], force: true, since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) })).rejects.toMatchObject({ code: 'bad_args' });
 
   expect(fake.calls).toStrictEqual([]);
 });
@@ -362,7 +388,7 @@ test('it goes on with --force and a reason while noslop runs, still backs up and
   createStubNoslopStore(ctx.store, { migrations: HELD_NAMES, tables: { dispositions: 3 } });
   createStubNoslopClone(paths.folder, NEW_NAMES);
 
-  await expect(runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456', 'invented', 'reason'], force: true, since: undefined, actor: 'tester' })).resolves.toMatchObject({
+  await expect(runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456', 'invented', 'reason'], force: true, since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) })).resolves.toMatchObject({
     text: expect.stringContaining('dispositions 3 → 3'),
   });
 
@@ -378,7 +404,7 @@ test('it pins with no store migration, no backup and no store query when the sto
   createStubNoslopStore(ctx.store, { migrations: NEW_NAMES, tables: { dispositions: 2 } });
   createStubNoslopClone(paths.folder, NEW_NAMES);
 
-  await expect(runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester' })).resolves.toMatchObject({ text: `repos: none (noslop is off everywhere)\nemergency review cap: off everywhere (hq noslop cap <repo> <n>)\npinned: ${FULL_SHA}\nclone: ${paths.folder}\nno store migration` });
+  await expect(runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) })).resolves.toMatchObject({ text: `repos: none (noslop is off everywhere)\nemergency review cap: off everywhere (hq noslop cap <repo> <n>)\npinned: ${FULL_SHA}\nclone: ${paths.folder}\nno store migration` });
 
   expect(ctx.readBackups()).toStrictEqual([]);
   expect(fake.of('bun')).toStrictEqual([]);
@@ -392,7 +418,7 @@ test('it backs up the store, counts every table and pins when a migration is new
   createStubNoslopStore(ctx.store, { migrations: HELD_NAMES, tables: { dispositions: 3, reviews: 2 } });
   createStubNoslopClone(paths.folder, NEW_NAMES);
 
-  await expect(runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester' })).resolves.toMatchObject({
+  await expect(runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) })).resolves.toMatchObject({
     text: expect.stringMatching(/\nstore migration: 0007-dispositions-by-pull-request; backup \S+\.bak-0123456-\d{8}T\d{6}Z; dispositions 3 → 3, kysely_migration 6 → 7, reviews 2 → 2$/u),
   });
 
@@ -407,7 +433,7 @@ test('it refuses a pin when HQ_NOSLOP_STORE names a store noslop does not open, 
     fake = buildFakeRunner();
   onTestFinished(overrideEnv('HQ_NOSLOP_STORE', join(ctx.base, 'other-store.sqlite')));
 
-  await expect(runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester' })).rejects.toMatchObject({
+  await expect(runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) })).rejects.toMatchObject({
     code: 'bad_args',
     message: expect.stringContaining(ctx.store),
   });
@@ -423,7 +449,7 @@ test('it migrates the store noslop opens, when HQ_NOSLOP_STORE names that same f
   createStubNoslopStore(ctx.store, { migrations: HELD_NAMES, tables: { dispositions: 3 } });
   createStubNoslopClone(paths.folder, NEW_NAMES);
 
-  await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester' });
+  await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) });
 
   expect(ctx.readBackups()).toHaveLength(1);
 });
@@ -440,7 +466,7 @@ test('it refuses a pin when noslop starts during the install, removes the backup
   createStubNoslopStore(ctx.store, { migrations: HELD_NAMES, tables: { dispositions: 3 } });
   createStubNoslopClone(paths.folder, NEW_NAMES);
 
-  await expect(runNoslopCommand({ run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester' })).rejects.toMatchObject({ code: 'noslop_busy', message: expect.stringContaining('4242') });
+  await expect(runNoslopCommand({ run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) })).rejects.toMatchObject({ code: 'noslop_busy', message: expect.stringContaining('4242') });
 
   expect(fake.of('bun')).toStrictEqual([]);
   expect(ctx.readBackups()).toStrictEqual([]);
@@ -454,7 +480,7 @@ test('it runs the store query from an empty folder, not from a repo', async () =
   createStubNoslopStore(ctx.store, { migrations: HELD_NAMES, tables: { dispositions: 1 } });
   createStubNoslopClone(paths.folder, NEW_NAMES);
 
-  await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester' });
+  await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) });
 
   expect(fake.of('bun').map((call) => call.cmd[1])).toStrictEqual([`--config=${paths.folder}/bunfig.toml`]);
   expect(fake.of('bun').map((call) => call.opts?.cwd?.startsWith(tmpdir()))).toStrictEqual([true]);
@@ -468,7 +494,7 @@ test('it refuses and keeps the old pin when a table loses rows in the migration,
   createStubNoslopStore(ctx.store, { migrations: HELD_NAMES, tables: { dispositions: 3 } });
   createStubNoslopClone(paths.folder, NEW_NAMES);
 
-  await expect(runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester' })).rejects.toMatchObject({
+  await expect(runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) })).rejects.toMatchObject({
     code: 'store_migration_failed',
     message: expect.stringMatching(/dispositions 3 -> 1[\s\S]*the backup is \S+store\.sqlite\.bak-0123456-\d{8}T\d{6}Z\./u),
   });
@@ -484,9 +510,9 @@ test('it refuses the next pin after a migration lost rows, naming the backup, wh
     paths = buildPinPaths(ctx.base);
   createStubNoslopStore(ctx.store, { migrations: HELD_NAMES, tables: { dispositions: 3 } });
   createStubNoslopClone(paths.folder, NEW_NAMES);
-  await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester' }).catch((error: unknown) => failures.push(error));
+  await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) }).catch((error: unknown) => failures.push(error));
 
-  await expect(runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester' })).rejects.toMatchObject({
+  await expect(runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) })).rejects.toMatchObject({
     code: 'store_migration_failed',
     message: expect.stringMatching(/0007-dispositions-by-pull-request[\s\S]*cp \S+store\.sqlite\.bak-0123456-\d{8}T\d{6}Z \S+store\.sqlite\. Every pin stays refused until then\.$/u),
     data: { backup: join(ctx.base, 'data', 'noslop', ctx.readBackups()[0] ?? 'none'), names: ['0007-dispositions-by-pull-request'] },
@@ -506,10 +532,10 @@ test('it pins again once the store is restored from the backup, migrating it ane
     restored = buildFakeRunner({ storeQuery: buildStubStoreQuery(ctx.store, [ADD_0007]) });
   createStubNoslopStore(ctx.store, { migrations: HELD_NAMES, tables: { dispositions: 3 } });
   createStubNoslopClone(paths.folder, NEW_NAMES);
-  await runNoslopCommand({ run: buildFakeRunner({ storeQuery: buildStubStoreQuery(ctx.store, [ADD_0007, 'DELETE FROM dispositions WHERE id > 1']) }).run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester' }).catch((error: unknown) => failures.push(error));
+  await runNoslopCommand({ run: buildFakeRunner({ storeQuery: buildStubStoreQuery(ctx.store, [ADD_0007, 'DELETE FROM dispositions WHERE id > 1']) }).run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) }).catch((error: unknown) => failures.push(error));
   renameSync(join(ctx.base, 'data', 'noslop', ctx.readBackups()[0] ?? 'none'), ctx.store);
 
-  await expect(runNoslopCommand({ run: restored.run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester' })).resolves.toMatchObject({
+  await expect(runNoslopCommand({ run: restored.run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) })).resolves.toMatchObject({
     text: expect.stringContaining('store migration: 0007-dispositions-by-pull-request; backup'),
   });
 
@@ -527,9 +553,9 @@ test('it refuses the pin after a failed migration even with --force', async () =
     paths = buildPinPaths(ctx.base);
   createStubNoslopStore(ctx.store, { migrations: HELD_NAMES, tables: { dispositions: 3 } });
   createStubNoslopClone(paths.folder, NEW_NAMES);
-  await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester' }).catch((error: unknown) => failures.push(error));
+  await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) }).catch((error: unknown) => failures.push(error));
 
-  await expect(runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456', 'invented', 'reason'], force: true, since: undefined, actor: 'tester' })).rejects.toMatchObject({
+  await expect(runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456', 'invented', 'reason'], force: true, since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) })).rejects.toMatchObject({
     code: 'store_migration_failed',
     message: expect.stringContaining('Every pin stays refused until then.'),
   });
@@ -545,7 +571,7 @@ test('it refuses and keeps the old pin when a migration name is missing after th
   createStubNoslopStore(ctx.store, { migrations: HELD_NAMES, tables: { dispositions: 3 } });
   createStubNoslopClone(paths.folder, NEW_NAMES);
 
-  await expect(runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester' })).rejects.toMatchObject({
+  await expect(runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) })).rejects.toMatchObject({
     code: 'store_migration_failed',
     message: expect.stringContaining('0007-dispositions-by-pull-request'),
   });
@@ -560,7 +586,7 @@ test('it refuses when the store query fails', async () => {
   createStubNoslopStore(ctx.store, { migrations: HELD_NAMES, tables: { dispositions: 3 } });
   createStubNoslopClone(paths.folder, NEW_NAMES);
 
-  await expect(runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester' })).rejects.toMatchObject({
+  await expect(runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) })).rejects.toMatchObject({
     code: 'store_migration_failed',
     message: expect.stringContaining('no such column'),
   });
@@ -574,7 +600,7 @@ test('it refuses when the migration names of the new noslop cannot be read', asy
   createStubNoslopStore(ctx.store, { migrations: HELD_NAMES, tables: { dispositions: 3 } });
   createStubNoslopClone(paths.folder, []);
 
-  await expect(runNoslopCommand({ run: buildFakeRunner().run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester' })).rejects.toMatchObject({ code: 'store_unreadable' });
+  await expect(runNoslopCommand({ run: buildFakeRunner().run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) })).rejects.toMatchObject({ code: 'store_unreadable' });
 
   expect(loadNoslopSettings(ctx.db).sha).toBeNull();
   expect(ctx.readBackups()).toStrictEqual([]);
@@ -587,7 +613,7 @@ test('it refuses when the store holds no migration table', async () => {
   createStubNoslopStore(ctx.store, { migrations: [], tables: { dispositions: 1 } });
   buildStubStoreQuery(ctx.store, ['DROP TABLE kysely_migration'])();
 
-  await expect(runNoslopCommand({ run: buildFakeRunner().run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester' })).rejects.toMatchObject({ code: 'store_unreadable' });
+  await expect(runNoslopCommand({ run: buildFakeRunner().run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) })).rejects.toMatchObject({ code: 'store_unreadable' });
 
   expect(loadNoslopSettings(ctx.db).sha).toBeNull();
 });
@@ -597,7 +623,7 @@ test('it pins with no backup when there is no store file', async () => {
     paths = buildPinPaths(ctx.base);
   createStubNoslopClone(paths.folder, NEW_NAMES);
 
-  await expect(runNoslopCommand({ run: buildFakeRunner().run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester' })).resolves.toMatchObject({
+  await expect(runNoslopCommand({ run: buildFakeRunner().run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) })).resolves.toMatchObject({
     text: `repos: none (noslop is off everywhere)\nemergency review cap: off everywhere (hq noslop cap <repo> <n>)\npinned: ${FULL_SHA}\nclone: ${paths.folder}\nno store migration (no store at ${ctx.store})`,
   });
 
@@ -626,7 +652,7 @@ test('it reports the rounds as data and text', async () => {
     sha: 'abc1234',
   });
 
-  await expect(runNoslopCommand({ run: buildFakeRunner().run, db: ctx.db, verb: 'report', rest: [], since: '2026-10-18T00:00:00Z', actor: 'tester' })).resolves.toMatchObject({
+  await expect(runNoslopCommand({ run: buildFakeRunner().run, db: ctx.db, verb: 'report', rest: [], since: '2026-10-18T00:00:00Z', actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) })).resolves.toMatchObject({
     data: { reports: [{ ref: 'widgets#7', reviewsOk: 1, findings: 1, roundsWithNew: 1, late: { n: 0, of: 0 } }], totals: { prs: 1, roundsWithNew: 1, repeatClass: 0, classUnknown: 0, late: { n: 0, of: 0 }, lateUnknown: 0, mainMerge: 0, mergeUnknown: 1 } },
     text: expect.stringContaining('widgets#7\n  reviews: 1 ok, 0 failed (0 extra rounds)'),
   });
@@ -635,7 +661,7 @@ test('it reports the rounds as data and text', async () => {
 test('it refuses a verb it does not know', async () => {
   const ctx = setupTest();
 
-  await expect(runNoslopCommand({ run: buildFakeRunner().run, db: ctx.db, verb: 'enable', rest: [], since: undefined, actor: 'tester' })).rejects.toMatchObject({ code: 'bad_args' });
+  await expect(runNoslopCommand({ run: buildFakeRunner().run, db: ctx.db, verb: 'enable', rest: [], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) })).rejects.toMatchObject({ code: 'bad_args' });
 });
 
 test('it answers hq noslop on and hq noslop through the cli, as JSON', async () => {

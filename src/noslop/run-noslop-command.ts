@@ -1,5 +1,6 @@
 import type { Database } from 'bun:sqlite';
 import { existsSync } from 'node:fs';
+import { match } from 'ts-pattern';
 import { z } from 'zod';
 import { iso } from '../clock/iso.ts';
 import { now } from '../clock/now.ts';
@@ -9,6 +10,8 @@ import { setMeta } from '../db/set-meta.ts';
 import { logEvent } from '../log-event.ts';
 import type { Out } from '../commands.ts';
 import { HqError } from '../errors.ts';
+import type { OwnerProbe } from '../pr-status/read-owner-session.ts';
+import { roleName } from '../roles/role-name.ts';
 import type { Runner } from '../runner/types.ts';
 import { buildNoslopReport } from './build-noslop-report.ts';
 import { buildNoslopTotals } from './build-noslop-totals.ts';
@@ -38,6 +41,7 @@ export interface NoslopArgs {
   since: string | undefined;
   force?: boolean | undefined;
   actor: string;
+  readOwnerSession: () => Promise<OwnerProbe>;
 }
 
 export async function runNoslopCommand(args: NoslopArgs): Promise<Out> {
@@ -45,7 +49,7 @@ export async function runNoslopCommand(args: NoslopArgs): Promise<Out> {
     return updateRepoList(args, args.verb);
   }
   if (args.verb === 'cap') {
-    return updateCap(args);
+    return await updateCap(args);
   }
   if (args.verb === 'pin') {
     return await updatePin(args);
@@ -97,12 +101,29 @@ function formatCaps(settings: NoslopSettings): string {
   return names.map((name) => `${name} ${settings.caps[name] ?? 'off'}`).join(', ');
 }
 
-function updateCap(args: NoslopArgs): Out {
+async function updateCap(args: NoslopArgs): Promise<Out> {
   const parsed = parseCapArgs(args.rest);
+  await requireOwnerSession(args);
   const before = loadNoslopSettings(args.db);
   const next = updateNoslopCap(args.db, parsed.repo, parsed.cap);
-  logEvent(args.db, 'hq', 'noslop', 'cap', args.actor, JSON.stringify(before.caps), JSON.stringify(next.caps), { repo: parsed.repo, cap: parsed.cap });
+  logEvent(args.db, 'hq', 'noslop', 'cap', roleName('owner'), JSON.stringify(before.caps), JSON.stringify(next.caps), { repo: parsed.repo, cap: parsed.cap });
   return renderSettings(args.db);
+}
+
+// The caller is known only through atc's peer session: a flag or an environment variable names
+// whoever the caller claims to be.
+async function requireOwnerSession(args: NoslopArgs): Promise<void> {
+  const probe = await args.readOwnerSession();
+  const owner = roleName('owner');
+  match(probe)
+    .with({ verdict: 'owner' }, () => null)
+    .with({ verdict: 'other' }, () => {
+      throw new HqError('not_allowed', `only ${owner} may change a repo's emergency review cap, and this session is not ${owner}'s`);
+    })
+    .with({ verdict: 'unknown' }, (unknown) => {
+      throw new HqError('not_allowed', `hq could not check through atc that this is ${owner}'s session (${unknown.cause}), so the emergency review cap is unchanged`);
+    })
+    .exhaustive();
 }
 
 async function updatePin(args: NoslopArgs): Promise<Out> {

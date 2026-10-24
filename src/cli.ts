@@ -2112,7 +2112,7 @@ const GROUPS: Record<string, (context: Ctx) => Promise<Out>> = {
   review: (c) => runReviewCommand(c),
   // oxlint-disable-next-line id-length -- grandfathered handler parameter shared by every entry of this table
   pr: (c) => runPRCommand({ run: realRunner, db: c.db, verb: c.verb, rest: c.rest, flags: c.flags, actor: () => actor(c.db, c.flags), readOwnerSession: () => readOwnerSession(c.db, readOwnerProbeDeps()), readReviewerSession: () => readRoleSession(c.db, readOwnerProbeDeps(), 'reviewer') }),
-  noslop: async (c) => runNoslopCommand({ run: c.run, db: c.db, verb: c.verb, rest: c.rest, since: typeof c.flags.since === 'string' ? c.flags.since : undefined, force: c.flags.force === true, actor: await actor(c.db, c.flags) }),
+  noslop: async (command) => runNoslopCommand({ run: command.run, db: command.db, verb: command.verb, rest: command.rest, since: typeof command.flags.since === 'string' ? command.flags.since : undefined, force: command.flags.force === true, actor: await actor(command.db, command.flags), readOwnerSession: () => readOwnerSession(command.db, readOwnerProbeDeps()) }),
   repair: (c) => repairCommand(c.verb, c.rest, c.flags),
   refs: (context) => refsCommand(context.verb, context.flags),
   refusals: (c) => refusalsCommand(c.db, c.verb, c.flags),
