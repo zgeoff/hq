@@ -33,7 +33,7 @@ When the agent says every finding has its answer and it pushed no new commit, ru
 
 ### The emergency cap
 
-`hq noslop` shows each repo's emergency cap, which is off by default. Past the cap, `hq review` runs fix checks only and says so in its output. No new finding comes, so don't wait for one: the gate passes once every finding has its answer and the fix calls confirm the fixes. A PR that reaches the cap means the reviewer keeps finding new things: tell `z-stu`, so the lens prompts and the agents' rules get fixed.
+`hq noslop` shows each repo's emergency cap, which is off by default. Past the cap, `hq review` runs fix checks only and says so in its output. No new finding comes, so don't wait for one: the gate passes once every finding has its answer and the fix calls confirm the fixes. A push past the cap that answers no finding `fixed` leaves noslop's review on the older head, so the gate holds the PR until the owner overrides it or `z-stu` lifts the cap for one full review. A PR that reaches the cap means the reviewer keeps finding new things: tell `z-stu`, so the lens prompts and the agents' rules get fixed.
 
 ## An owner override
 
