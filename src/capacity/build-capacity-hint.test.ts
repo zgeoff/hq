@@ -17,6 +17,13 @@ test('it projects the time to the limit at today rate and at the cap', () => {
   });
 });
 
+test('it projects from the time of the latest sample, not the time of the query', () => {
+  const hint = buildCapacityHint({ samples: [{ at: '2026-10-14T01:00:00Z', account: 'kettle01', five_hour: null, seven_day: 70, five_hour_resets_at: null, seven_day_resets_at: null }, { at: '2026-10-14T01:30:00Z', account: 'kettle01', five_hour: null, seven_day: 75, five_hour_resets_at: null, seven_day_resets_at: null }, { at: '2026-10-14T02:00:00Z', account: 'kettle01', five_hour: null, seven_day: 80, five_hour_resets_at: null, seven_day_resets_at: null }], hours: 2, limit: 95, working: 1, cap: 2, at: new Date('2026-10-14T02:20:00Z') });
+
+  expect(hint.windows[0]?.atRate).toStrictEqual({ kind: 'in', hours: expect.closeTo(70 / 60, 10), at: '2026-10-14T03:30:00Z' });
+  expect(hint.windows[0]?.atCap).toStrictEqual({ kind: 'in', hours: expect.closeTo(25 / 60, 10), at: '2026-10-14T02:45:00Z', ratePerHour: 20 });
+});
+
 test('it leaves the projection at the cap out with no cap', () => {
   const hint = buildCapacityHint({ samples: [{ at: '2026-10-14T01:00:00Z', account: 'kettle01', five_hour: null, seven_day: 10, five_hour_resets_at: null, seven_day_resets_at: null }, { at: '2026-10-14T01:30:00Z', account: 'kettle01', five_hour: null, seven_day: 12, five_hour_resets_at: null, seven_day_resets_at: null }, { at: '2026-10-14T02:00:00Z', account: 'kettle01', five_hour: null, seven_day: 14, five_hour_resets_at: null, seven_day_resets_at: null }, { at: '2026-10-14T02:30:00Z', account: 'kettle01', five_hour: null, seven_day: 16, five_hour_resets_at: null, seven_day_resets_at: null }], hours: 2, limit: 95, working: 2, cap: null, at: new Date('2026-10-14T02:30:00Z') });
 

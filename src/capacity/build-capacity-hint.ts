@@ -40,13 +40,15 @@ export function buildCapacityHint(input: CapacityHintInput): CapacityHint {
 function buildWindow(input: CapacityHintInput, window: BurnWindow['window'], points: Parameters<typeof buildBurnRate>[0]): BurnWindow {
   const burn = buildBurnRate(points);
   const base = { ...burn, window, method: 'least-squares' as const };
-  if (burn.latest === null || burn.ratePerHour === null) {
+  const latestAt = points.findLast((point) => point.percent !== null)?.at;
+  if (burn.latest === null || burn.ratePerHour === null || latestAt === undefined) {
     return { ...base, atRate: null, atCap: null };
   }
-  const atRate = buildLimitProjection(burn.latest, burn.ratePerHour, input.limit, input.at);
+  const reading = { percent: burn.latest, at: new Date(latestAt) };
+  const atRate = buildLimitProjection(reading, burn.ratePerHour, input.limit, input.at);
   if (input.cap === null || input.working === 0) {
     return { ...base, atRate, atCap: null };
   }
   const capRate = (burn.ratePerHour / input.working) * input.cap;
-  return { ...base, atRate, atCap: { ...buildLimitProjection(burn.latest, capRate, input.limit, input.at), ratePerHour: capRate } };
+  return { ...base, atRate, atCap: { ...buildLimitProjection(reading, capRate, input.limit, input.at), ratePerHour: capRate } };
 }
