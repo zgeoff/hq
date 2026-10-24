@@ -51,7 +51,7 @@ export interface FleetSession {
   // atc 4.15+: the folders the session was spawned with
   pluginDirs?: readonly string[] | null | undefined;
 
-  // the owner's mark: hq never forgets or destroys a pinned session
+  // the owner's mark: run wrap-up keeps a pinned session
   pinned?: boolean | null | undefined;
 
   // the session this one is a sub-session of, and its working directory inside its host
