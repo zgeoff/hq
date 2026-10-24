@@ -37,3 +37,9 @@ test('it finds no section in a file without the owner heading', () => {
 test('it finds an empty owner section when no pattern follows the heading', () => {
   expect(parseOwnerPatterns('# the owner\n\n# z-q\n/src/ @zgeoff\n')).toStrictEqual([]);
 });
+
+test('it keeps the section going past a note between two owner patterns', () => {
+  const text = '# the owner\n/docs/ @zgeoff\n# hooks too\n/.claude/ @zgeoff\n';
+
+  expect(parseOwnerPatterns(text)).toStrictEqual(['/docs/', '/.claude/']);
+});
