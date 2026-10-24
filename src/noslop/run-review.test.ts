@@ -311,6 +311,15 @@ test('it runs the second review as fix checks only, and says so, when the emerge
   expect(ctx.db.query('SELECT confirm FROM noslop_rounds ORDER BY id').all()).toStrictEqual([{ confirm: 0 }, { confirm: 1 }]);
 });
 
+test('it applies an emergency cap stored under the repo name in another case, as the noslop list matches it', async () => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
+  ctx.setCap('Widgets', 1);
+  ctx.addRound('review', 1, 'standard', 'none');
+
+  await expect(runReview({ run: fake.run, db: ctx.db, rawRepo: 'zgeoff/widgets', pr: 7, watch: false })).resolves.toMatchObject({ fixesOnly: true, emergencyCap: 1 });
+});
+
 test('it runs the second review in full when the emergency cap is off', async () => {
   const ctx = setupTest(),
     fake = buildFakeRunner();

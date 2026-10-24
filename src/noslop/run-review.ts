@@ -13,6 +13,7 @@ import { assertPR } from './assert-pr.ts';
 import { buildRunDir } from './build-run-dir.ts';
 import { buildSlug } from './build-slug.ts';
 import { findLastReviewRound } from './find-last-review-round.ts';
+import { findNoslopCap } from './find-noslop-cap.ts';
 import { SHA } from '../runs/sha.ts';
 import { writeReviewStarted } from '../runs/write-review-started.ts';
 import { writeReviewed } from '../runs/write-reviewed.ts';
@@ -173,7 +174,7 @@ function writeRoundMark(plan: RoundPlan, parsed: ParsedRepo): void {
 // past the cap, the review runs fix checks only and raises no new finding.
 function planRound(request: ReviewRequest, parsed: ParsedRepo): RoundPlan {
   const started = readOKReviews(request.db, parsed.repo, request.pr).filter((okReview) => okReview.confirm === 0).length;
-  const cap = loadNoslopSettings(request.db).caps[parsed.repo] ?? null;
+  const cap = findNoslopCap(loadNoslopSettings(request.db), parsed.owner, parsed.repo);
   if (request.fixesOnly === true) {
     return { request, round: started, fixesOnly: true, emergencyCap: null };
   }
