@@ -33,7 +33,7 @@ Run `hq capabilities --require 0.82.0` at the start of a session and after a com
 - [tickets.md](references/tickets.md): the ticket standard, the Ready criteria and the Actions
   catalogue, before you write, rewrite or save an issue.
 - [fields.md](references/fields.md): the field and stale rules, before you set or correct a field.
-- [closing.md](references/closing.md): completion and freeing blockers, in step 5.
+- [closing.md](references/closing.md): completion, obsolete Backlog issues and freeing blockers, in step 5.
 - [overlap.md](references/overlap.md): comparing open issues, in step 6.
 - [check.md](references/check.md): the check's checklist, each time it runs.
 
@@ -59,7 +59,7 @@ pass, so an issue that meets the criteria reaches Ready within one run, not the 
 - [ ] 2. Run audit-issues.sh
 - [ ] 3. Groom each Triage issue
 - [ ] 4. Complete each incomplete issue
-- [ ] 5. Close what is done, free what it blocked, promote what is ready
+- [ ] 5. Close what is done or obsolete, free what it blocked, promote what is ready
 - [ ] 6. Full pass: compare open issues with each other
 - [ ] 7. Flag what only the owner can decide
 - [ ] 8. Save the TRIAGE PASS line, delete your scratch files; send no message
@@ -84,7 +84,8 @@ pass, so an issue that meets the criteria reaches Ready within one run, not the 
    Improvement or Chore that lacks one, and record as a relation a blocker its text names. This is
    your work, never a question for the owner.
 5. **Close, free and promote,** on a light pass as on a full one. Check completion and what each
-   closed or merged blocker frees, as [closing.md](references/closing.md) says. Then run
+   closed or merged blocker frees, as [closing.md](references/closing.md) says. On a full pass,
+   also close the obsolete Backlog issues it names, and gather the unsure ones. Then run
    `hq lanes promotable`: it reads Backlog from Linear itself, so a light pass's smaller fetch
    misses nothing, and it lists each Backlog issue whose blockers are Done and whose sections are
    complete. Move each to Ready, with a comment that names the blocker that closed or the criteria
