@@ -19,7 +19,7 @@ test('it counts a run filed imp whose awake session runs here as local, not imp'
   addRun(ctx.db, { issue: 'GEO-9901', title: 'Descale the kettle', place: 'imp', session: 'a0000001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
   recordAwake(ctx.db, [{ id: 'a0000001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, state: 'running', locator: { targetID: 'local' } }]);
 
-  expect(readRunningByPlace(ctx.db)).toStrictEqual({ imp: 0, local: 1, issues: ['GEO-9901'], localSource: null });
+  expect(readRunningByPlace(ctx.db)).toStrictEqual({ imp: 0, local: 1, issues: ['GEO-9901'], impIssues: [], localSource: null });
 });
 
 test('it counts a run filed imp whose session runs here among the local runs when those runs outnumber the live sessions', () => {
@@ -30,7 +30,7 @@ test('it counts a run filed imp whose session runs here among the local runs whe
   addRun(ctx.db, { issue: 'GEO-9914', title: 'Warm the teapot', place: 'imp', session: 'a0000014-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
   recordAwake(ctx.db, [{ id: 'a0000014-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'teapot-agent', alive: true, state: 'running', locator: { targetID: 'local' } }]);
 
-  expect(readRunningByPlace(ctx.db)).toStrictEqual({ imp: 0, local: 4, issues: ['GEO-9911', 'GEO-9912', 'GEO-9913', 'GEO-9914'], localSource: null });
+  expect(readRunningByPlace(ctx.db)).toStrictEqual({ imp: 0, local: 4, issues: ['GEO-9911', 'GEO-9912', 'GEO-9913', 'GEO-9914'], impIssues: [], localSource: null });
 });
 
 test('it keeps a run filed imp with awake sessions on both hosts in imp, and counts its session here as local', () => {
@@ -42,7 +42,7 @@ test('it keeps a run filed imp with awake sessions on both hosts in imp, and cou
     { id: 'a0000016-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-helper', alive: true, state: 'running', locator: { targetID: 'local' } },
   ]);
 
-  expect(readRunningByPlace(ctx.db)).toStrictEqual({ imp: 1, local: 1, issues: ['GEO-9915'], localSource: '1 live session here' });
+  expect(readRunningByPlace(ctx.db)).toStrictEqual({ imp: 1, local: 1, issues: ['GEO-9915'], impIssues: ['GEO-9915'], localSource: '1 live session here' });
 });
 
 test('it counts the awake local session of a merged run', () => {
@@ -82,7 +82,7 @@ test("it leaves out a fleet session hq fleet knows, though a run lists it", () =
   addRun(ctx.db, { issue: 'GEO-9905', title: 'Descale the kettle', place: 'imp', session: 'a0000006-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
   recordAwake(ctx.db, [{ id: 'a0000006-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'z-kettle', alive: true, state: 'running', locator: { targetID: 'local' } }]);
 
-  expect(readRunningByPlace(ctx.db)).toStrictEqual({ imp: 1, local: 0, issues: ['GEO-9905'], localSource: null });
+  expect(readRunningByPlace(ctx.db)).toStrictEqual({ imp: 1, local: 0, issues: ['GEO-9905'], impIssues: ['GEO-9905'], localSource: null });
 });
 
 test('it leaves out an awake session atc places on another host', () => {
@@ -90,7 +90,7 @@ test('it leaves out an awake session atc places on another host', () => {
   addRun(ctx.db, { issue: 'GEO-9906', title: 'Descale the kettle', place: 'imp', session: 'a0000007-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
   recordAwake(ctx.db, [{ id: 'a0000007-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, state: 'running', locator: { targetID: 'imp-kettle' } }]);
 
-  expect(readRunningByPlace(ctx.db)).toStrictEqual({ imp: 1, local: 0, issues: ['GEO-9906'], localSource: null });
+  expect(readRunningByPlace(ctx.db)).toStrictEqual({ imp: 1, local: 0, issues: ['GEO-9906'], impIssues: ['GEO-9906'], localSource: null });
 });
 
 test('it falls back to the runs filed local when the reading is over 15 min old', () => {
@@ -98,7 +98,7 @@ test('it falls back to the runs filed local when the reading is over 15 min old'
   addRun(ctx.db, { issue: 'GEO-9907', title: 'Descale the kettle', place: 'imp', session: 'a0000008-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
   recordAwake(ctx.db, [{ id: 'a0000008-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, state: 'running', locator: { targetID: 'local' } }]);
 
-  expect(readRunningByPlace(ctx.db, new Date('2026-10-15T20:16:00Z'))).toStrictEqual({ imp: 1, local: 0, issues: ['GEO-9907'], localSource: null });
+  expect(readRunningByPlace(ctx.db, new Date('2026-10-15T20:16:00Z'))).toStrictEqual({ imp: 1, local: 0, issues: ['GEO-9907'], impIssues: ['GEO-9907'], localSource: null });
 });
 
 test('it falls back to the runs filed local on a reading from before the sweep recorded local sessions', () => {
@@ -106,5 +106,5 @@ test('it falls back to the runs filed local on a reading from before the sweep r
   addRun(ctx.db, { issue: 'GEO-9908', title: 'Descale the kettle', place: 'imp', session: 'a0000009-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
   setMeta(ctx.db, 'atc_awake', JSON.stringify({ at: '2026-10-15T20:00:00Z', ids: ['a0000009-aaaa-4aaa-8aaa-aaaaaaaaaaaa'], idle: {}, present: ['a0000009-aaaa-4aaa-8aaa-aaaaaaaaaaaa'] }));
 
-  expect(readRunningByPlace(ctx.db)).toStrictEqual({ imp: 1, local: 0, issues: ['GEO-9908'], localSource: null });
+  expect(readRunningByPlace(ctx.db)).toStrictEqual({ imp: 1, local: 0, issues: ['GEO-9908'], impIssues: ['GEO-9908'], localSource: null });
 });

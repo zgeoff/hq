@@ -1,7 +1,5 @@
 import type { Database } from 'bun:sqlite';
 import { z } from 'zod';
-import { parkedRuns } from '../areas/parked-runs.ts';
-import { RUNNING } from '../areas/running.ts';
 import { now } from '../clock/now.ts';
 import { getMeta } from '../db/get-meta.ts';
 import { setMeta } from '../db/set-meta.ts';
@@ -12,6 +10,7 @@ import { forwardOf } from '../outbox/forward-of.ts';
 import { orchestratorName } from '../wake/orchestrator-name.ts';
 import { getLanesHold } from './get-lanes-hold.ts';
 import { IMP_LINE_HELD } from './imp-line-held.ts';
+import { readRunningByPlace } from './read-running-by-place.ts';
 import type { SlotPlan } from './read-slot-plan.ts';
 import type { LaneSkip } from './types.ts';
 
@@ -61,11 +60,9 @@ interface ImpRun {
 
 const impRunsSchema = z.array(z.object({ issue: z.string(), state: z.string() }));
 
-// The runs that hold an imp slot now, parked ones left out.
 function readImpRuns(db: Database): ImpRun[] {
-  const parked = new Set(parkedRuns(db, now()).map((run) => run.issue));
-  const rows = impRunsSchema.parse(db.query(`SELECT issue, state FROM runs WHERE place = 'imp' AND state IN (${RUNNING.map(() => '?').join(', ')}) ORDER BY issue`).all(...RUNNING));
-  return rows.filter((row) => !parked.has(row.issue));
+  const issues = readRunningByPlace(db, now()).impIssues;
+  return impRunsSchema.parse(db.query(`SELECT issue, state FROM runs WHERE issue IN (${issues.map(() => '?').join(', ')}) ORDER BY issue`).all(...issues));
 }
 
 interface AllSkippedView {
