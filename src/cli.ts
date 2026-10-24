@@ -1821,7 +1821,11 @@ async function lanesCommand(context: Pick<Ctx, 'db' | 'verb' | 'rest' | 'flags' 
     }
     case 'cap': {
       const args = parseLanesCapArgs(context.rest, flags.until, flags.reason);
-      return runLanesCapCommand({ db, at: now(), args, probe: readOwnerProbeDeps() });
+
+      // A change reads the wall clock, not now(): HQ_NOW is the caller's to set, and a pinned future
+      // time would read the owner's cap as ended and let z-delivery replace it.
+      const capAt = args.kind === 'show' ? now() : new Date();
+      return runLanesCapCommand({ db, at: capAt, args, probe: readOwnerProbeDeps() });
     }
     case 'skip': {
       const args = parseLaneSkipArgs(context.rest, flags.until, flags.reason);

@@ -249,12 +249,33 @@ test('hq lanes cap sets a cap for the owner session, and shows it back', async (
   OWNER_PROBE_OPENER.open = () => Promise.resolve({ peerSession: 'kettle-1', close: () => {} });
   onTestFinished(() => (OWNER_PROBE_OPENER.open = null));
 
-  const setCode = await main(['lanes', 'cap', '7', '--until', 'Mon 08:00', '--reason', 'weekend pacing', '--json']);
+  const setCode = await main(['lanes', 'cap', '7', '--reason', 'weekend pacing', '--json']);
   const showCode = await main(['lanes', 'cap', '--json']);
 
   expect(setCode).toBe(0);
   expect(showCode).toBe(0);
-  expect(JSON.parse(printed[1] ?? '{}')).toMatchObject({ ok: true, cap: { cap: 7, until: '2026-10-18T21:00:00Z', reason: 'weekend pacing', by: 'z-stu' } });
+  expect(JSON.parse(printed[1] ?? '{}')).toMatchObject({ ok: true, cap: { cap: 7, until: null, reason: 'weekend pacing', by: 'z-stu' } });
+});
+
+test('hq lanes cap judges a change by the wall clock, so a pinned future HQ_NOW cannot end the owner cap for the delivery lead', async () => {
+  const fresh = freshDb();
+  const printed: string[] = [];
+  const log = console.log;
+  onTestFinished(fresh.cleanup);
+  onTestFinished(overrideEnv('HQ_NOW', '2099-01-01T00:00:00Z'));
+  onTestFinished(overrideEnv('HQ_NOTIFY', 'off'));
+  console.log = (line: string) => void printed.push(line);
+  onTestFinished(() => (console.log = log));
+  setMeta(fresh.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'z-delivery': 'kettle-2' }));
+  setMeta(fresh.db, 'lanes_cap', JSON.stringify({ cap: 7, until: '2098-01-01T00:00:00Z', reason: 'kettle descaling', by: 'z-stu', at: '2026-10-14T00:00:00Z' }));
+  OWNER_PROBE_OPENER.open = () => Promise.resolve({ peerSession: 'kettle-2', close: () => {} });
+  onTestFinished(() => (OWNER_PROBE_OPENER.open = null));
+
+  const code = await main(['lanes', 'cap', '100', '--json']);
+
+  expect(code).not.toBe(0);
+  expect(JSON.parse(printed[0] ?? '{}')).toMatchObject({ ok: false, error: { code: 'not_allowed', message: 'z-delivery may only lower the lanes cap (now 7), not raise or keep it; z-stu may' } });
+  expect(fresh.db.query("SELECT value FROM meta WHERE key = 'lanes_cap'").get()).toStrictEqual({ value: JSON.stringify({ cap: 7, until: '2098-01-01T00:00:00Z', reason: 'kettle descaling', by: 'z-stu', at: '2026-10-14T00:00:00Z' }) });
 });
 
 test('hq lanes --json carries the stored cap with the working count and what limits the slots', async () => {
