@@ -1,11 +1,16 @@
 import { getSydneyParts } from './get-sydney-parts.ts';
 import { quietWindow } from './quiet-window.ts';
 
-// "Later" default from z-triage's check (the refinement skill's, before the merge): the first 07:00 Sydney on a later day.
 export function nextMorning(d: Date): Date {
   const p = getSydneyParts(d);
+  const end = quietWindow().end;
+  const today = sydneyToUtc(p.year, p.month, p.day, end);
+  if (today.getTime() > d.getTime()) {
+    return today;
+  }
+
   const tomorrow = new Date(Date.UTC(p.year, p.month - 1, p.day + 1));
-  return sydneyToUtc(tomorrow.getUTCFullYear(), tomorrow.getUTCMonth() + 1, tomorrow.getUTCDate(), quietWindow().end);
+  return sydneyToUtc(tomorrow.getUTCFullYear(), tomorrow.getUTCMonth() + 1, tomorrow.getUTCDate(), end);
 }
 
 // The UTC instant of a Sydney wall-clock time. DST-safe: correct the guess by
