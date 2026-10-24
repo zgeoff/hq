@@ -90,3 +90,17 @@ test("a Claude usage alert names its own window's reset", () => {
     'Capacity watch: 2 things are over their line.\n- Claude: 7-day usage at 91%, early warning at 85% (launch limit 95%; resets 28 Oct 08:00Z)\n- Claude: 5-hour usage at 95%, early warning at 90% (launch limit 95%; resets 15 Oct 04:00Z)\nhq capacity shows every reading. hq changed nothing.',
   ]);
 });
+
+test('a Claude reset prints to the nearest minute', () => {
+  const ctx = setupTest();
+  const reading = { at: '2026-10-15T01:00:00Z', impd_budget_mib: null, impd_used_mib: null, impd_committed_mib: null, nonnix_awake_mib: null, nonnix_awake_vcpus: null, nix_awake_mib: null, cloud_avail_bytes: null, cloud_total_bytes: null, claude_account: null, claude_five_hour: 10, claude_seven_day: 91, claude_five_hour_resets_at: null, claude_seven_day_resets_at: '2026-10-31T23:59:59Z', claude_at: '2026-10-15T01:00:00Z', ci_minutes_today: null, pc_disk_free_bytes: null, pc_mem_avail_bytes: null, op_account_used: null, op_account_limit: null, op_refused: null, errors: {} };
+  for (const minute of [0, 5]) {
+    checkCapacity(ctx.db, { reading, plan: null, claudeLaunchPct: 95 }, 'hq-lanes', new Date(Date.parse('2026-10-15T01:00:00Z') + minute * 60_000));
+  }
+
+  const rows = z.array(z.object({ text: z.string() })).parse(ctx.db.query('SELECT text FROM outbox ORDER BY id').all());
+
+  expect([...new Set(rows.map((row) => row.text))]).toStrictEqual([
+    'Capacity watch: something is over its line.\n- Claude: 7-day usage at 91%, early warning at 85% (launch limit 95%; resets 1 Nov 00:00Z)\nhq capacity shows every reading. hq changed nothing.',
+  ]);
+});
