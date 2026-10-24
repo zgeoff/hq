@@ -16,8 +16,6 @@ import { tick } from './tick.ts';
 import { validateLaneRules } from './validate-lane-rules.ts';
 import { writeLaneSkip } from './write-lane-skip.ts';
 
-// Three local slots and no imp ones: every look has free slots. heldSample: three imp slots under a
-// budget of eight, with impd's memory line already reached.
 function setupTest() {
   const fresh = freshDb();
   onTestFinished(fresh.cleanup);
