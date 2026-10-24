@@ -1,4 +1,5 @@
 import { expect, onTestFinished, test } from 'bun:test';
+import { overrideEnv } from '../config/override-env.ts';
 import { setMeta } from '../db/set-meta.ts';
 import { freshDb } from '../../test/helpers.ts';
 import type { OwnerProbeClient } from './read-owner-session.ts';
@@ -29,15 +30,7 @@ test("it matches a caller whose kernel-found session is the role's recorded sess
 test('it refuses a caller whose kernel-found session is another session, whatever ATC_SESSION_ID says', async () => {
   const ctx = setupTest();
   setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-review': 'kettle-1' }));
-  const saved = process.env['ATC_SESSION_ID'];
-  process.env['ATC_SESSION_ID'] = 'kettle-1';
-  onTestFinished(() => {
-    if (saved === undefined) {
-      delete process.env['ATC_SESSION_ID'];
-    } else {
-      process.env['ATC_SESSION_ID'] = saved;
-    }
-  });
+  onTestFinished(overrideEnv('ATC_SESSION_ID', 'kettle-1'));
 
   const probe = await readRoleSession(ctx.db, { openClient: () => Promise.resolve(ctx.client('kettle-2')) }, 'reviewer');
 

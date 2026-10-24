@@ -1,4 +1,5 @@
 import { expect, onTestFinished, test } from 'bun:test';
+import { overrideEnv } from '../config/override-env.ts';
 import { setMeta } from '../db/set-meta.ts';
 import { freshDb } from '../../test/helpers.ts';
 import { readOwnerSession } from './read-owner-session.ts';
@@ -27,15 +28,7 @@ test("it accepts the caller atc finds in the owner's recorded session", async ()
 test("it refuses another session, even one HQ_AS names as the owner", async () => {
   const ctx = setupTest();
   setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'sess-owner' }));
-  const saved = process.env['HQ_AS'];
-  process.env['HQ_AS'] = 'z-stu';
-  onTestFinished(() => {
-    if (saved === undefined) {
-      delete process.env['HQ_AS'];
-    } else {
-      process.env['HQ_AS'] = saved;
-    }
-  });
+  onTestFinished(overrideEnv('HQ_AS', 'z-stu'));
 
   await expect(readOwnerSession(ctx.db, { openClient: () => Promise.resolve(ctx.client('sess-kettle')) })).resolves.toStrictEqual({ verdict: 'other' });
 });
