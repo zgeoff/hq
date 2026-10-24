@@ -36,13 +36,14 @@ export function tick(db: Database, sample: Sample, actor: string): TickResult {
     .transaction((): TickResult => {
       const t = now();
       const at = iso(t);
-      endExpiredCap(db, readWallClock(), actor);
-      const slotPlan = readSlotPlan(db, sample, t);
+      const capAt = readWallClock();
+      endExpiredCap(db, capAt, actor);
+      const slotPlan = readSlotPlan(db, sample, t, capAt);
       const { freeMib, slots: impSlots } = sample.cap ? slotsFrom(sample.cap, sample.impMib) : { freeMib: null, slots: 0 };
 
       // With lanes: the slots worth filling now, the issues the plan picks (every free slot while Ready
       // is unknown). Else one pool of imp slots, under impd's non-Nix line as the lanes are.
-      const look = slotPlan ? { slots: countWanted(slotPlan), capHeld: slotPlan.pool.capHeld } : readCappedImpRoom(db, { budgetSlots: impSlots, impMib: sample.impMib }, t);
+      const look = slotPlan ? { slots: countWanted(slotPlan), capHeld: slotPlan.pool.capHeld } : readCappedImpRoom(db, { budgetSlots: impSlots, impMib: sample.impMib }, t, capAt);
       const slots = look.slots;
       const eligible = slotPlan?.eligible ?? eligibleNow(db).count;
       const previous = z.object({ at: z.string() }).nullable().parse(db.query('SELECT at FROM lanes_samples ORDER BY seq DESC LIMIT 1').get());

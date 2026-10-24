@@ -9,6 +9,6 @@ import { readCappedImpRoom } from './read-capped-imp-room.ts';
 
 export function readFallbackCapView(db: Database, sample: Sample, at: Date): CapView {
   const budgetSlots = sample.cap ? slotsFrom(sample.cap, sample.impMib).slots : 0;
-  const room = readCappedImpRoom(db, { budgetSlots, impMib: sample.impMib }, at);
+  const room = readCappedImpRoom(db, { budgetSlots, impMib: sample.impMib }, at, at);
   return buildCapView(readActiveCap(db, at), countWorking(db, at), { capHeld: room.capHeld });
 }

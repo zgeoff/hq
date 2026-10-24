@@ -405,6 +405,29 @@ test('it keeps a cap whose time has not passed', () => {
   expect(ctx.db.query("SELECT value FROM meta WHERE key = 'lanes_cap'").get()).not.toBeNull();
 });
 
+test('it holds the slot plan to a cap the wall clock has not reached while HQ_NOW pins a later time', () => {
+  const ctx = setupTest();
+  at('2099-01-01T00:00:00Z');
+  setMeta(ctx.db, 'lanes_cap', JSON.stringify({ cap: 0, until: '2098-01-01T00:00:00Z', reason: 'kettle descaling', by: 'z-stu', at: '2026-10-14T00:00:00Z' }));
+
+  const result = tick(ctx.db, { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } }, 'hq-lanes');
+
+  expect(result).toMatchObject({ slots: 0, nudged: false, why: 'none (cap reached)' });
+  expect(ctx.db.query("SELECT COUNT(*) AS total FROM outbox WHERE text LIKE 'Lanes%'").get()).toStrictEqual({ total: 0 });
+});
+
+test('it holds the imp pool to a cap the wall clock has not reached while HQ_NOW pins a later time and pacing has no lanes', () => {
+  const ctx = setupTest();
+  at('2099-01-01T00:00:00Z');
+  createCapacitySample(ctx.db, { at: '2098-12-31T23:55:00Z', nonnixAwakeMib: 0 });
+  setMeta(ctx.db, 'lanes_cap', JSON.stringify({ cap: 0, until: '2098-01-01T00:00:00Z', reason: 'kettle descaling', by: 'z-stu', at: '2026-10-14T00:00:00Z' }));
+
+  const result = tick(ctx.db, { cap: { imp: { freeMib: 4096 }, providers: { kettle: { room: true, unattended: true, target: 'imp' } } }, impMib: 2048, error: null }, 'hq-lanes');
+
+  expect(result).toMatchObject({ slots: 0, nudged: false, why: 'none (cap reached)' });
+  expect(ctx.db.query("SELECT COUNT(*) AS total FROM outbox WHERE text LIKE 'Lanes%'").get()).toStrictEqual({ total: 0 });
+});
+
 test('it keeps a cap the wall clock has not reached while HQ_NOW pins a later time', () => {
   const ctx = setupTest();
   at('2099-01-01T00:00:00Z');

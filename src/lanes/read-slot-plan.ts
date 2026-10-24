@@ -44,13 +44,13 @@ export interface SlotPlan {
 
 // The lanes' plan for this look: the pool's free slots, filled from the focus terms in order, then any
 // other eligible work. A focus change shows at the next look; running runs keep their slots.
-export function readSlotPlan(db: Database, sample: Sample, at: Date = now()): SlotPlan | null {
+export function readSlotPlan(db: Database, sample: Sample, at: Date = now(), capAt: Date = at): SlotPlan | null {
   if (!sample.slots || !sample.cap) {
     return null;
   }
   const running = readRunningByPlace(db, at);
   const room = loadImpRoom(db, { budgetSlots: slotsFrom(sample.cap, sample.impMib).slots, impMib: sample.impMib }, at);
-  const active = readActiveCap(db, at);
+  const active = readActiveCap(db, capAt);
   const working = countWorking(db, at);
   const capRoom = active === null ? null : Math.max(0, active.cap - working.count);
   const pool = buildSlotPool(sample.slots, running, { room, localRoom: sample.localRoom ?? null, capRoom });

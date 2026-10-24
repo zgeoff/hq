@@ -8,9 +8,9 @@ export interface CappedSlots {
   capHeld: boolean;
 }
 
-export function readCappedImpRoom(db: Database, size: Parameters<typeof loadImpRoom>[1], at: Date): CappedSlots {
+export function readCappedImpRoom(db: Database, size: Parameters<typeof loadImpRoom>[1], at: Date, capAt: Date): CappedSlots {
   const room = loadImpRoom(db, size, at).slots;
-  const active = readActiveCap(db, at);
+  const active = readActiveCap(db, capAt);
   if (active === null) {
     return { slots: room, capHeld: false };
   }
