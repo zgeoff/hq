@@ -850,3 +850,12 @@ test("hq call answer ignores a daemon at HQ_ATC_SOCKET that names the owner's se
 
   expect([answered.code === 0, answered.json.error.code, daemon.requests]).toStrictEqual([false, 'atc_unreachable', []]);
 });
+
+test("hq call answer from a caller hq cannot place as the owner saves the answer with no owner mark", async () => {
+  await hq('call', 'add', 'KET-33', '--title', 'Pour widgets#9 now?', '--question', 'Boil?', '--body', 'Invented.');
+  await hq('open');
+
+  const answered = await hq('call', 'answer', 'KET-33', '--answer', 'Yes', '--by', 'z-stu');
+
+  expect([answered.code, db().query("SELECT json_extract(data, '$.ownerSession') AS mark FROM events WHERE subject_id = 'KET-33' AND action = 'answered'").all()]).toStrictEqual([0, [{ mark: null }]]);
+});
