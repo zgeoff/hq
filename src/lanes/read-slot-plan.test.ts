@@ -214,10 +214,11 @@ test('a cap of zero frees no slot and picks nothing', async () => {
 
 test('a cap whose time has passed no longer limits the slots', async () => {
   const ctx = setupTest();
+  at('2026-10-15T20:00:00Z');
   await ctx.seedReady(ctx.readySeeds);
   setMeta(ctx.db, 'lanes_cap', JSON.stringify({ cap: 0, until: '2026-10-15T19:30:00Z', reason: 'freeze', by: 'z-stu', at: '2026-10-15T19:00:00Z' }));
 
-  const plan = readSlotPlan(ctx.db, ctx.sample);
+  const plan = readSlotPlan(ctx.db, ctx.sample, new Date('2026-10-15T20:00:00Z'));
 
   expect(plan?.pool.free).toBe(3);
   expect(plan?.cap.limitedBy).toBeNull();
