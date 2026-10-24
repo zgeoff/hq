@@ -7,8 +7,6 @@ import { answerAsk } from './answer-ask.ts';
 import type { AnswerAskInput } from './answer-ask.ts';
 import type { Ask } from './types.ts';
 
-// A call's answer, marked as the owner's only when atc finds the caller in the owner's session. When
-// atc cannot tell, nothing is saved: an unmarked answer would read as someone else's.
 export async function runCallAnswer(db: Database, input: Omit<AnswerAskInput, 'ownerSession'>, readProbe: () => Promise<OwnerProbe>): Promise<Ask> {
   const probe = await readProbe();
   const ownerSession = match(probe)
