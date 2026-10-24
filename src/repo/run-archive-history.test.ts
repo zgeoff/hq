@@ -385,6 +385,21 @@ test('it refuses a review file that would land on another, names it, and moves a
   expect(readBackupNames(ctx.path)).toStrictEqual([]);
 });
 
+test('it refuses a file where a folder of a review file\'s new path belongs, names it, and moves and changes nothing', async () => {
+  const ctx = setupTest();
+  ctx.createHistoryRows('hq', 0);
+  mkdirSync(`${ctx.dir}/reviews/zgeoff/hq`, { recursive: true });
+  writeFileSync(`${ctx.dir}/reviews/zgeoff/hq/12-review.md`, 'kettle review');
+  writeFileSync(`${ctx.dir}/reviews/zgeoff/hq-archive`, 'a stray kettle note');
+  const before = readHistoryRows(ctx.db);
+
+  await expect(ctx.archive('hq', 'hq-archive')).rejects.toMatchObject({ code: 'rekey_collision', message: expect.stringContaining(`review file: ${ctx.dir}/reviews/zgeoff/hq-archive/12-review.md`) });
+
+  expect(readdirSync(`${ctx.dir}/reviews/zgeoff/hq`)).toStrictEqual(['12-review.md']);
+  expect(readHistoryRows(ctx.db)).toStrictEqual(before);
+  expect(readBackupNames(ctx.path)).toStrictEqual([]);
+});
+
 test('it lists the review files it would move on a dry run, and moves none', async () => {
   const ctx = setupTest();
   ctx.createHistoryRows('hq', 0);

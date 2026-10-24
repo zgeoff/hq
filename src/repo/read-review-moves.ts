@@ -1,5 +1,5 @@
 import { existsSync, readdirSync, statSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { dirname, join, relative } from 'node:path';
 import type { RepoNames } from './rekey-specs.ts';
 import type { ReviewMove } from './types.ts';
 
@@ -19,11 +19,20 @@ function readNestedMoves(reviewDir: string, names: RepoNames): ReviewMove[] {
     .filter((entry) => !entry.isDirectory())
     .map((entry) => join(entry.parentPath, entry.name))
     .toSorted()
-    .map((file) => readMove(file, join(toDir, relative(fromDir, file))));
+    .map((file) => readMove(reviewDir, file, join(toDir, relative(fromDir, file))));
 }
 
-function readMove(from: string, to: string): ReviewMove {
-  return { from, to, collides: existsSync(to) };
+// A file where a folder of the destination's path belongs blocks the move as surely as a file at
+// the destination does.
+function readMove(reviewDir: string, from: string, to: string): ReviewMove {
+  return { from, to, collides: existsSync(to) || probeBlockedFolder(reviewDir, dirname(to)) };
+}
+
+function probeBlockedFolder(reviewDir: string, folder: string): boolean {
+  if (existsSync(folder) && !statSync(folder).isDirectory()) {
+    return true;
+  }
+  return folder !== join(reviewDir) && folder !== dirname(folder) && probeBlockedFolder(reviewDir, dirname(folder));
 }
 
 function readFlatMoves(reviewDir: string, names: RepoNames): ReviewMove[] {
@@ -35,7 +44,7 @@ function readFlatMoves(reviewDir: string, names: RepoNames): ReviewMove[] {
     .filter((entry) => entry.isFile())
     .flatMap((entry) => {
       const pr = shape.exec(entry.name)?.groups?.['pr'];
-      return pr === undefined ? [] : [readMove(join(reviewDir, entry.name), join(reviewDir, `${names.to.toLowerCase()}${pr}-review.md`))];
+      return pr === undefined ? [] : [readMove(reviewDir, join(reviewDir, entry.name), join(reviewDir, `${names.to.toLowerCase()}${pr}-review.md`))];
     })
     .toSorted((first, second) => first.from.localeCompare(second.from));
 }
