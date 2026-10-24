@@ -3,6 +3,8 @@
 // bad_config naming the variable. Settings with a default that depends on HOME or on another
 // setting stay optional here; the code that needs one applies its own fallback.
 import { z } from 'zod';
+import { CLOCK_OVERRIDES } from '../clock/clock-overrides.ts';
+import { isSourceRun } from '../clock/is-source-run.ts';
 import { HqError } from '../errors.ts';
 import { CONFIG_SHAPE } from './config-shape.ts';
 
@@ -24,6 +26,13 @@ export function config(env: Record<string, string | undefined> = process.env): H
   const input: Record<string, string | undefined> = {};
   for (const key of Object.keys(CONFIG_SHAPE)) {
     input[key] = env[key];
+  }
+
+  // The installed hq reads the real clock and the default quiet window, whatever the caller set.
+  if (!isSourceRun()) {
+    for (const name of CLOCK_OVERRIDES) {
+      input[name] = undefined;
+    }
   }
   const r = schema.safeParse(input);
   if (r.success) return r.data;

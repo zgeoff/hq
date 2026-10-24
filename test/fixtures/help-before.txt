@@ -77,6 +77,7 @@ hq 0.79.0: headquarters for the z- sessions. Every command takes --json.
   hq backup [status] | run | test [--remote]  encrypted restic snapshots of hq.db, z-sessions and z- transcripts
   hq backup restore --to DIR [--snapshot ID] [--remote]   restore into an empty directory (never over live state)
   hq backup timer install | remove           the hourly systemd user timer
+  hq units scrub                             remove HQ_NOW and HQ_QUIET from the installed units and reload systemd
   hq health [check]                          read-only checks on this PC: units, restart loops, disk, memory, atc, watcher
   hq health settings | set KEY [VALUE]       thresholds (no VALUE: back to the default)
   hq health tick                             one watcher step: tell z-stu about new problems, file news for cleared ones

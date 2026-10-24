@@ -150,6 +150,10 @@ import { formatDriftLines } from './fleet/format-drift-lines.ts';
 import { ensureFleet } from './fleet/ensure-fleet.ts';
 import { loadFleetLast } from './fleet/load-fleet-last.ts';
 import { fleetTimerUnits } from './fleet/fleet-timer-units.ts';
+import { runUnitsCommand } from './units/run-units-command.ts';
+import { writeClockWarnings } from './clock/write-clock-warnings.ts';
+import { FLEET_UNIT } from './fleet/fleet-unit.ts';
+import { BACKUP_UNIT } from './backup/backup-unit.ts';
 import { removeTimer } from './fleet/remove-timer.ts';
 import { fleetTrustChecks } from './fleet/fleet-trust-checks.ts';
 import { buildFleetChecks } from './fleet/build-fleet-checks.ts';
@@ -1503,8 +1507,6 @@ async function weeklyStats(db: Database, actor: string, run: Runner = realRunner
     .immediate();
 }
 
-const FLEET_UNIT = 'hq-fleet';
-
 async function installTimer(unit: string, u: { service: string; timer: string }): Promise<void> {
   const dir = `${process.env['HOME']}/.config/systemd/user`;
   await Bun.write(`${dir}/${unit}.service`, u.service);
@@ -1684,8 +1686,6 @@ async function probeCommand(db: Database, verb: string | undefined, args: string
       throw new HqError('bad_args', `unknown command: hq probe ${verb}`);
   }
 }
-
-const BACKUP_UNIT = 'hq-backup';
 
 async function backupCommand(db: Database, verb: string | undefined, args: string[], flags: Flags): Promise<Out> {
   const run: Runner = (cmd, opts) => realRunner(cmd, { ...opts, env: opts?.env ?? cleanEnv() });
@@ -2169,6 +2169,7 @@ const GROUPS: Record<string, (context: Ctx) => Promise<Out>> = {
   probe: (c) => probeCommand(c.db, c.verb, c.rest, c.flags),
   backup: (c) => backupCommand(c.db, c.verb, c.rest, c.flags),
   capacity: (c) => capacityCommand(c.db, c.verb, c.rest, c.flags),
+  units: (context) => runUnitsCommand({ verb: context.verb, run: context.run, home: getHome(), env: cleanEnv() }),
   health: (c) => healthCommand(c.db, c.verb, c.rest, c.flags),
   news: (c) => newsCommand(c.db, c.verb, c.flags),
   outbox: (c) => outboxCommand(c.db, c.verb, c.rest, c.flags),
@@ -2210,6 +2211,7 @@ function idsFlag(raw: string): number[] {
 // oxlint-disable-next-line zgeoff/function-verb -- the entry point that the bin and every CLI test call
 export async function main(argv: string[], runner: Runner = realRunner): Promise<number> {
   const json = argv.includes('--json');
+  writeClockWarnings(process.env, (line) => console.error(line));
   takeQueued(); // ids left by an earlier call in this process (a test, or one that threw) are not this command's
   try {
     const ran = await runArgv(argv, runner);
