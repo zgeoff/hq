@@ -56,6 +56,8 @@ export async function readCapacity(db: Database, probe: CapacityProbe, at: Date 
     claude_account: claude?.account ?? null,
     claude_five_hour: claude?.five ?? null,
     claude_seven_day: claude?.seven ?? null,
+    claude_five_hour_resets_at: claude?.fiveResetsAt ?? null,
+    claude_seven_day_resets_at: claude?.sevenResetsAt ?? null,
     claude_at: claude?.at ?? null,
     ci_minutes_today: ci,
     pc_disk_free_bytes: pc.disk,
