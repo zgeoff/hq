@@ -236,25 +236,40 @@ test('hq lanes shows the cause of the empty slots and the minutes by cause for t
   });
 });
 
-test('hq lanes cap sets a cap for the owner session, and shows it back', async () => {
+test('hq lanes cap shows the stored cap with the working count', async () => {
   const fresh = freshDb();
-  const printed: string[] = [];
-  const log = console.log;
   onTestFinished(fresh.cleanup);
-  onTestFinished(overrideEnv('HQ_NOW', NOON_SYDNEY));
-  onTestFinished(overrideEnv('HQ_NOTIFY', 'off'));
-  console.log = (line: string) => void printed.push(line);
-  onTestFinished(() => (console.log = log));
-  setMeta(fresh.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1' }));
-  OWNER_PROBE_OPENER.open = () => Promise.resolve({ peerSession: 'kettle-1', close: () => {} });
-  onTestFinished(() => (OWNER_PROBE_OPENER.open = null));
+  setMeta(fresh.db, 'lanes_cap', JSON.stringify({ cap: 7, until: '2026-10-18T21:00:00Z', reason: 'weekend pacing', by: 'z-stu', at: '2026-10-14T00:00:00Z' }));
+  const child = Bun.spawn(['bun', join(import.meta.dir, 'cli.ts'), 'lanes', 'cap', '--json'], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, HOME: fresh.dir, HQ_DB: fresh.path, HQ_NOTIFY: 'off', HQ_NOW: NOON_SYDNEY } });
 
-  const setCode = await main(['lanes', 'cap', '7', '--reason', 'weekend pacing', '--json']);
-  const showCode = await main(['lanes', 'cap', '--json']);
+  const [code, stdout] = await Promise.all([child.exited, new Response(child.stdout).text()]);
 
-  expect(setCode).toBe(0);
-  expect(showCode).toBe(0);
-  expect(JSON.parse(printed[1] ?? '{}')).toMatchObject({ ok: true, cap: { cap: 7, until: null, reason: 'weekend pacing', by: 'z-stu' } });
+  expect(code).toBe(0);
+  expect(JSON.parse(stdout)).toStrictEqual({ ok: true, cap: { cap: 7, until: '2026-10-18T21:00:00Z', reason: 'weekend pacing', by: 'z-stu', at: '2026-10-14T00:00:00Z' }, working: 0, workingFrom: 'runs', error: null });
+});
+
+test('hq lanes cap refuses a change while atc cannot say who is asking, and stores nothing', async () => {
+  const fresh = freshDb();
+  onTestFinished(fresh.cleanup);
+  setMeta(fresh.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'z-delivery': 'kettle-2' }));
+  const child = Bun.spawn(['bun', join(import.meta.dir, 'cli.ts'), 'lanes', 'cap', '7', '--json'], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, HOME: fresh.dir, HQ_DB: fresh.path, HQ_NOTIFY: 'off', HQ_NOW: NOON_SYDNEY, HQ_AS: 'z-stu' } });
+
+  const [code, stdout] = await Promise.all([child.exited, new Response(child.stdout).text()]);
+
+  expect(code).toBe(1);
+  expect(JSON.parse(stdout)).toStrictEqual({ ok: false, error: { code: 'not_allowed', message: expect.stringMatching(/^atc could not say who is asking, so the lanes cap stays as it is: /u) } });
+  expect(fresh.db.query("SELECT value FROM meta WHERE key = 'lanes_cap'").get()).toBeNull();
+});
+
+test('hq lanes cap refuses a count that is not a whole number', async () => {
+  const fresh = freshDb();
+  onTestFinished(fresh.cleanup);
+  const child = Bun.spawn(['bun', join(import.meta.dir, 'cli.ts'), 'lanes', 'cap', 'seven', '--json'], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, HOME: fresh.dir, HQ_DB: fresh.path, HQ_NOTIFY: 'off', HQ_NOW: NOON_SYDNEY } });
+
+  const [code, stdout] = await Promise.all([child.exited, new Response(child.stdout).text()]);
+
+  expect(code).toBe(1);
+  expect(JSON.parse(stdout)).toStrictEqual({ ok: false, error: { code: 'bad_args', message: 'hq lanes cap takes a whole number from 0, or off, not "seven"; hq lanes cap | cap <n> [--until <ISO time|Ddd HH:MM>] [--reason TEXT] | cap off [--reason TEXT]' } });
 });
 
 test('hq lanes cap judges a change by the wall clock, so a pinned future HQ_NOW cannot end the owner cap for the delivery lead', async () => {
@@ -301,41 +316,16 @@ test('hq lanes --json carries the stored cap with the working count and what lim
   expect(JSON.parse(stdout).cap).toStrictEqual({ cap: 1, until: '2026-10-18T21:00:00Z', reason: 'weekend pacing', by: 'z-stu', working: 0, limitedBy: 'cap', workingFrom: 'runs' });
 });
 
-test('hq lanes cap refuses a caller that is not the owner or the delivery lead, and stores nothing', async () => {
-  const fresh = freshDb();
-  const printed: string[] = [];
-  const log = console.log;
-  onTestFinished(fresh.cleanup);
-  onTestFinished(overrideEnv('HQ_NOW', NOON_SYDNEY));
-  onTestFinished(overrideEnv('HQ_NOTIFY', 'off'));
-  console.log = (line: string) => void printed.push(line);
-  onTestFinished(() => (console.log = log));
-  setMeta(fresh.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1' }));
-  OWNER_PROBE_OPENER.open = () => Promise.resolve({ peerSession: 'kettle-9', close: () => {} });
-  onTestFinished(() => (OWNER_PROBE_OPENER.open = null));
-
-  const code = await main(['lanes', 'cap', '7', '--json']);
-
-  expect(code).not.toBe(0);
-  expect(JSON.parse(printed[0] ?? '{}')).toMatchObject({ ok: false, error: { code: 'not_allowed' } });
-  expect(fresh.db.query("SELECT value FROM meta WHERE key = 'lanes_cap'").get()).toBeNull();
-});
-
 test('hq capacity --json carries the Claude burn hint from the usage samples', async () => {
   const fresh = freshDb();
-  const printed: string[] = [];
-  const log = console.log;
   onTestFinished(fresh.cleanup);
-  onTestFinished(overrideEnv('HQ_NOW', NOON_SYDNEY));
-  onTestFinished(overrideEnv('HQ_NOTIFY', 'off'));
-  console.log = (line: string) => void printed.push(line);
-  onTestFinished(() => (console.log = log));
   const insert = fresh.db.query('INSERT INTO usage_samples (at, account, five_hour, seven_day) VALUES (?, ?, ?, ?)');
   insert.run('2026-10-14T00:30:00Z', 'kettle01', 10, 20);
   insert.run('2026-10-14T01:00:00Z', 'kettle01', 12, 22);
+  const child = Bun.spawn(['bun', join(import.meta.dir, 'cli.ts'), 'capacity', 'show', '--json'], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, HOME: fresh.dir, HQ_DB: fresh.path, HQ_NOTIFY: 'off', HQ_NOW: NOON_SYDNEY } });
 
-  const code = await main(['capacity', 'show', '--json']);
+  const [code, stdout] = await Promise.all([child.exited, new Response(child.stdout).text()]);
 
   expect(code).toBe(0);
-  expect(JSON.parse(printed[0] ?? '{}')).toMatchObject({ hint: { hours: 2, limit: 95, account: 'kettle01', windows: [{ window: '7-day', samples: 2, ratePerHour: null }, { window: '5-hour', samples: 2, ratePerHour: null }] } });
+  expect(JSON.parse(stdout)).toMatchObject({ hint: { hours: 2, limit: 95, account: 'kettle01', windows: [{ window: '7-day', samples: 2, ratePerHour: null }, { window: '5-hour', samples: 2, ratePerHour: null }] } });
 });
