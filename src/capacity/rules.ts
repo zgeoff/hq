@@ -1,4 +1,5 @@
 import { accountName } from '../accounts/account-name.ts';
+import { formatClaudeLine } from './format-claude-line.ts';
 import { formatGiB as gib } from './format-gib.ts';
 import { formatPlanOverage } from '../lanes/format-plan-overage.ts';
 import { formatNumber as n0 } from './format-number.ts';
@@ -17,8 +18,8 @@ export const RULES: Rule[] = [
     key: 'lanes:plan',
     label: "the imp lanes' plan",
     limit: (s) => `${n0(s.nonnixMaxMib)} MiB and ${s.nonnixMaxVcpus} vCPUs`,
-    breached: (_r, _s, plan) => (plan === null ? null : plan.overMib || plan.overVcpus),
-    line: (_r, _s, _names, plan) => (plan === null ? 'pacing.json: no imp lanes read' : `pacing.json: the imp lanes' ${plan.slots} slots, all full, cross impd's non-Nix line (${formatPlanOverage(plan) ?? 'within both lines'}); shrink the imp lanes or raise the line`),
+    breached: (_r, _s, ctx) => (ctx.plan === null ? null : ctx.plan.overMib || ctx.plan.overVcpus),
+    line: (_r, _s, _names, ctx) => (ctx.plan === null ? 'pacing.json: no imp lanes read' : `pacing.json: the imp lanes' ${ctx.plan.slots} slots, all full, cross impd's non-Nix line (${formatPlanOverage(ctx.plan) ?? 'within both lines'}); shrink the imp lanes or raise the line`),
   },
   {
     key: 'cloud:memory',
@@ -30,16 +31,16 @@ export const RULES: Rule[] = [
   {
     key: 'claude:7d',
     label: 'Claude: 7-day usage',
-    limit: (s) => `${s.claudeSevenDayPct}%`,
+    limit: (settings) => `the ${settings.claudeSevenDayPct}% early warning`,
     breached: (r, s) => (r.claude_seven_day === null ? null : r.claude_seven_day >= s.claudeSevenDayPct),
-    line: (r, s, names) => `Claude: 7-day usage at ${Math.round(r.claude_seven_day!)}%, at or over ${s.claudeSevenDayPct}%${r.claude_account ? ` (account ${accountName(names, r.claude_account)})` : ''}`,
+    line: (reading, settings, names, ctx) => formatClaudeLine({ window: '7-day', usedPct: reading.claude_seven_day ?? 0, warnPct: settings.claudeSevenDayPct, launchPct: ctx.claudeLaunchPct, account: reading.claude_account === null ? null : accountName(names, reading.claude_account) }),
   },
   {
     key: 'claude:5h',
     label: 'Claude: 5-hour usage',
-    limit: (s) => `${s.claudeFiveHourPct}%`,
+    limit: (settings) => `the ${settings.claudeFiveHourPct}% early warning`,
     breached: (r, s) => (r.claude_five_hour === null ? null : r.claude_five_hour >= s.claudeFiveHourPct),
-    line: (r, s, names) => `Claude: 5-hour usage at ${Math.round(r.claude_five_hour!)}%, at or over ${s.claudeFiveHourPct}%${r.claude_account ? ` (account ${accountName(names, r.claude_account)})` : ''}`,
+    line: (reading, settings, names, ctx) => formatClaudeLine({ window: '5-hour', usedPct: reading.claude_five_hour ?? 0, warnPct: settings.claudeFiveHourPct, launchPct: ctx.claudeLaunchPct, account: reading.claude_account === null ? null : accountName(names, reading.claude_account) }),
   },
   {
     key: 'op:daily',

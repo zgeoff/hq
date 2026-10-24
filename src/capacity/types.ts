@@ -14,12 +14,23 @@ export interface CapacityProbe {
   // The imp lanes' plan from pacing.json, checked against impd's lines with each reading; left
   // out, no lanes were read.
   plan?: LanePlan | null;
+
+  // Claude's launch limit from pacing.json, named in the Claude usage alerts; left out, none was read.
+  claudeLaunchPct?: number | null;
 }
 
 // One reading to check, with the imp lanes' plan; null when no pacing.json lanes were read.
 export interface CapacityInput {
   reading: Reading;
   plan: LanePlan | null;
+  claudeLaunchPct?: number | null;
+}
+
+// What a rule reads from pacing.json: the imp lanes' plan (null when no lanes were read) and Claude's
+// launch limit (null when none was read).
+export interface RuleContext {
+  plan: LanePlan | null;
+  claudeLaunchPct: number | null;
 }
 
 export type Errors = Record<string, string>;
@@ -47,10 +58,9 @@ export interface Rule {
   limit: (s: CapacitySettings) => string;
   urgent?: boolean;
 
-  // true: breached; false: fine; null: no reading. `plan` is the imp lanes' plan; null when no
-  // pacing.json lanes were read.
-  breached: (r: Reading, s: CapacitySettings, plan: LanePlan | null) => boolean | null;
-  line: (r: Reading, s: CapacitySettings, names: Record<string, string>, plan: LanePlan | null) => string;
+  // true: breached; false: fine; null: no reading.
+  breached: (reading: Reading, settings: CapacitySettings, ctx: RuleContext) => boolean | null;
+  line: (reading: Reading, settings: CapacitySettings, names: Record<string, string>, ctx: RuleContext) => string;
 }
 
 export interface CapacityTick {

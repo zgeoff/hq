@@ -27,6 +27,7 @@ export function checkCapacity(db: Database, input: CapacityInput, actor: string,
         TAIL = 'hq capacity shows every reading. hq changed nothing.',
         r = input.reading,
         s = capacitySettings(db);
+      const ruleContext = { plan: input.plan, claudeLaunchPct: input.claudeLaunchPct ?? null };
       const hold = Math.max(1, Math.floor(s.holdSamples));
       const names = accountLabels(db);
       const open = openAlerts(db);
@@ -36,21 +37,26 @@ export function checkCapacity(db: Database, input: CapacityInput, actor: string,
       const cleared: string[] = [];
       let held = metaJson(db, 'capacity_held', HELD, []);
       for (const rule of RULES) {
-        const b = rule.breached(r, s, input.plan),
-          c = counts[rule.key] ?? { bad: 0, good: 0 },
-          current = open[rule.key];
-        if (b === null) continue;
-        if (b) [c.bad, c.good] = [c.bad + 1, 0];
-        else [c.bad, c.good] = [0, c.good + 1];
-        counts[rule.key] = c;
-        if (b && !current && c.bad >= hold) {
-          open[rule.key] = { since: stamp, line: rule.line(r, s, names, input.plan), told: false };
+        const breach = rule.breached(r, s, ruleContext);
+        const count = counts[rule.key] ?? { bad: 0, good: 0 };
+        const current = open[rule.key];
+        if (breach === null) {
+          continue;
+        }
+        if (breach) {
+          [count.bad, count.good] = [count.bad + 1, 0];
+        } else {
+          [count.bad, count.good] = [0, count.good + 1];
+        }
+        counts[rule.key] = count;
+        if (breach && !current && count.bad >= hold) {
+          open[rule.key] = { since: stamp, line: rule.line(r, s, names, ruleContext), told: false };
           opened.push(rule.key);
           // A recovery still held for an earlier run of this alert is stale now it is open again.
           held = held.filter((h) => h.key !== rule.key);
-        } else if (b && current) {
-          current.line = rule.line(r, s, names, input.plan);
-        } else if (!b && current && c.good >= hold) {
+        } else if (breach && current) {
+          current.line = rule.line(r, s, names, ruleContext);
+        } else if (!breach && current && count.good >= hold) {
           const o = current;
           delete open[rule.key];
           cleared.push(rule.key);
