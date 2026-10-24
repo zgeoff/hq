@@ -64,19 +64,3 @@ test('it prints one block per PR', () => {
     ].join('\n'),
   );
 });
-
-test('it names the finding a PR\'s redesign round was asked for, above the churn', () => {
-  const ctx = setupTest();
-  ctx.addRound({ findings: [FIND_A] });
-  ctx.addRound({ startedAt: '2026-10-18T02:00:00Z', redesign: FIND_A.id });
-
-  expect(renderNoslopReport(buildNoslopReport(ctx.db)).split('\n').slice(0, 7)).toStrictEqual([
-    'widgets#7',
-    '  reviews: 2 ok, 0 failed (1 extra round)',
-    '  findings: 1 (1 high)',
-    '  latest check: none',
-    '  wall time: 120 s',
-    '  redesign: aaaaaaaaaaaaaaaa',
-    '  churn: 1 round with a new finding, 0 repeat-class, late 0 of 0, 0 main-merge (1 unknown)',
-  ]);
-});

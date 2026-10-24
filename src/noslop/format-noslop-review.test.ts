@@ -23,7 +23,8 @@ const REVIEW: NoslopReviewOutcome = {
   openThreads: 1,
   fixChecks: [],
   fixesOnly: false,
-  fullDropped: false,
+  emergencyCap: null,
+  capNote: null,
   round: 1,
   postFailed: null,
 };
@@ -42,11 +43,12 @@ test('hq review prints a version 6 review\'s files no call read, with their reas
   ]);
 });
 
-test('hq review says --full was dropped on a later round, before the issue line', () => {
-  expect(formatNoslopReview({ ...REVIEW, fullDropped: true, round: 2 }).split('\n').slice(0, 3)).toStrictEqual([
-    '== engine: noslop (commit 0123456, depth standard)',
-    '== --full dropped: round 2 reviews only the commits since round 1.',
-    '== issue: GEO-9701 (linked in the PR body)',
+test('hq review says the emergency cap turned the review into fix checks only, before the engine line', () => {
+  const note = 'fix checks only: emergency cap 2 reached for widgets; no new findings';
+
+  expect(formatNoslopReview({ ...REVIEW, fixesOnly: true, emergencyCap: 2, capNote: note }).split('\n').slice(0, 2)).toStrictEqual([
+    note,
+    '== engine: noslop (commit 0123456), fixes only: 0 fix(es) checked, full output: /reviews/widgets7-noslop.json',
   ]);
 });
 

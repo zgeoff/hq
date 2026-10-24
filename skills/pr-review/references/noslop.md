@@ -4,15 +4,15 @@ noslop reviews the PRs on every repo `hq noslop` lists, after the agent's own se
 
 ## The review
 
-Run `hq review <repo> <pr>`. noslop posts each finding as a review comment by `noslop-review[bot]` that holds `<!-- noslop:finding` and the finding's 16-hex id, or as an issue comment by the same bot when the finding has no line in the diff. Its `### noslop` summary comment lists every finding and its state. The `noslop` check passes only when every finding has an answer, and it changes only when `hq review` runs again, never when someone replies.
+Run `hq review <repo> <pr>`. noslop posts each finding as a review comment by `noslop-review[bot]` that holds `<!-- noslop:finding` and the finding's 16-hex id, or as an issue comment by the same bot when the finding has no line in the diff. Its `### noslop` summary comment lists every finding and its state. The gate reads those states, not the `noslop` check.
 
 ## The answers
 
 A reply in the finding's own thread answers it. Its first line holds only the disposition: `fixed <sha>`, `not-a-defect <reason>`, `deferred <GEO-n>` or `accepted-risk <reason>`. noslop ignores an answer with anything after `fixed <sha>` on that line, so an explanation goes on the lines after it. An answer to an issue-comment finding is a new issue comment that starts with the finding's id. A reply never quotes the text `<!-- noslop:`, because hq and noslop read any comment that holds it as noslop's own and skip it.
 
-- **`fixed`** comes from the agent. It counts when that commit changes a file of the PR and the next review no longer reports the finding.
+- **`fixed`** comes from the agent. It counts once noslop's fix call confirms the fix at the PR's head, on the next `hq review`. A finding noslop reports again stays open.
 - **`not-a-defect`** comes from the agent, and holds only for a finding that is wrong, or a taste rule that doesn't apply, as [A taste finding](#a-taste-finding) says. A true finding, however small, is a defect: send it back to be fixed.
-- **`deferred`** holds only under the reason test in the follow-ups reference that `SKILL.md` lists. noslop refuses it on a line the PR added or changed.
+- **`deferred`** closes the finding. It holds only under the reason test in the follow-ups reference that `SKILL.md` lists. noslop refuses it on a line the PR added or changed.
 - **`accepted-risk`** needs the owner's answer, as [Your part](#your-part) says.
 
 ## A taste finding
@@ -25,23 +25,15 @@ For each item the agent's final report leaves unfixed, apply the reason test in 
 
 Reply `accepted-risk <reason>` only with the owner's answer. What makes his answer count, and how the reply cites it, is in this file's private half: read `skills/pr-review/references/noslop.private.md` in the local hq-private clone (`hq defs` shows where it is) and follow it as part of this skill. To get his answer, send the finding to `z-triage` as a decision, and hold the merge until it comes. Then ask `z-stu` to record it with `hq pr accept-risk <repo> <pr> <finding-id> --source <source> --note '<why>'`: the gate counts the finding as open until that record exists.
 
-## Rounds
+## Each review
 
-Run `hq review <repo> <pr>` again after each new FINAL note: it reviews the commits since the last round and checks the answers. noslop gives a PR 1 round when it is a sync, release or docs-only PR or its first review routed light, and 2 rounds otherwise. Past the cap, `hq review` refuses with `round_cap`. The only round past the cap is the `--redesign` round that `SKILL.md` describes.
+Run `hq review <repo> <pr>` again after each new FINAL note. Each run reviews only the code that changed since noslop's last review, and runs one fix call for each `fixed` answer. A late commit, such as a version bump, gets its own review, so a new finding can come from it. No round limit applies.
 
-### Fixes after the last round
+When the agent says every finding has its answer and it pushed no new commit, run `hq review <repo> <pr> --fixes-only`, since hq sends no FINAL for an unchanged head. It runs the fix calls with no new review and raises no new finding.
 
-A fix pushed after the last round counts only once a review reads it, so run `hq review <repo> <pr> --fixes-only` before the gate. It checks each fix answered since the last round and reports it fixed or not fixed. It raises no new finding and is not a round, so the cap doesn't stop it. Answer a fix it reports as not fixed by fixing it again.
+### The emergency cap
 
-`--fixes-only` refuses with `fixes_only_no_fix`, and names the commits, unless each commit since the last round is named by a `fixed <sha>` answer or is a merge of the PR's base branch. Code that no answer names and no round read doesn't merge in this PR, and that includes a fix spread over several commits. The agent moves that code to a new PR at once, under the same issue with "Contributes to", where it gets its own first round, or drops it. The same goes for code from a merge of any branch other than the base.
-
-When a merge of the base has conflict resolutions, noslop checks each one in the `--fixes-only` run. When it judges one not sound, `hq review --fixes-only` refuses with "noslop judged the conflict resolution of a merge not sound": send the agent each finding noslop raised on it, to answer like any other finding.
-
-`--fixes-only` needs an earlier round that read a head the branch still holds. After a rebase, hq maps the reviewed commits onto the new branch by patch id, and refuses when the rebase changed, dropped or reordered a reviewed commit, or when the rebased branch holds a merge.
-
-### An unchanged head
-
-When the agent says every finding has its answer and it pushed no new commit, run `hq review check <repo> <pr>`, since hq sends no FINAL for an unchanged head. It always exits 0: read the `conclusion` field of its JSON, `success` or `failure`, and its list of the findings still open.
+`hq noslop` shows each repo's emergency cap, which is off by default. Past the cap, `hq review` runs fix checks only and says so in its output. No new finding comes, so don't wait for one: the gate passes once every finding has its answer and the fix calls confirm the fixes. A push past the cap that answers no finding `fixed` leaves noslop's review on the older head, so the gate holds the PR until the owner overrides it or `z-stu` lifts the cap for one full review. A PR that reaches the cap means the reviewer keeps finding new things: tell `z-stu`, so the lens prompts and the agents' rules get fixed.
 
 ## An owner override
 
@@ -49,11 +41,11 @@ When the owner says to merge a PR anyway, in an answer that counts as this file'
 
 ## The gate
 
-`hq review gate <repo> <pr>` passes on green CI, a completed noslop review of the PR on record, and no open finding at the head, or the owner's override at that head. An accepted risk is not open. The gate refuses when the head moves while it runs. It doesn't check that a review read the head, so run `hq review` or `--fixes-only` after each push before you run the gate.
+`hq review gate <repo> <pr>` passes on green CI and no open finding, or the owner's override at that head. A finding is open until noslop's fix call confirms its fix, or it holds `not-a-defect`, `deferred <GEO-n>` or the owner's recorded `accepted-risk`. The gate refuses when the head moves while it runs. Run `hq review` after each push, before the gate, so noslop reads the new code.
 
 ## A head noslop hasn't read
 
-Run `hq review <repo> <pr>` first: it checks the late commits as its own round. Send the PR to `z-stu` under its noslop gap rule only when the round cap stops a new review, and you have read the fixes by hand and found them right.
+Run `hq review <repo> <pr>`: it reviews the late commits.
 
 ## When noslop fails to run
 

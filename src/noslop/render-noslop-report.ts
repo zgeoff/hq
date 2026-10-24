@@ -24,16 +24,8 @@ function formatPRReport(r: PRReport): string {
     `  findings: ${r.findings}${severities === '' ? '' : ` (${severities})`}`,
     `  latest check: ${r.latestCheck ?? 'none'}${answered}${open}`,
     `  wall time: ${formatSeconds(r.wallMs)}${span}`,
-    ...formatRedesign(r),
     formatChurn(r),
   ].join('\n');
-}
-
-function formatRedesign(r: PRReport): string[] {
-  if (r.redesign === null) {
-    return [];
-  }
-  return [`  redesign: ${r.redesign}`];
 }
 
 function formatSeconds(ms: number): string {

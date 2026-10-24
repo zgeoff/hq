@@ -13,7 +13,6 @@ export interface FakeScript {
   secrets?: Record<string, string>;
   opAnswer?: RunResult;
   noslopReview?: RunResult;
-  noslopCheck?: RunResult;
   noslopHelp?: RunResult;
 
   // What `noslop store query` answers, called on each run; an empty success when absent.
@@ -43,19 +42,13 @@ export interface FakeScript {
   // What `noslop findings --json` answers; no findings when absent.
   noslopFindings?: RunResult;
 
-  // Answers for git commands, by the whole command line (`git rev-list <L>..refs/hq/pr/7`).
-  git?: Record<string, RunResult>;
-
-  // What `gh api …/pulls/<pr>/comments` and `…/issues/<pr>/comments --paginate --jq` print: one
-  // compact JSON object a line. Empty when absent.
-  reviewComments?: string;
-  issueComments?: string;
-
-  // What the read of the issue comments' authors (`--jq` naming user.login) answers, for the summary
-  // marker; issueComments when absent.
+  // What the read of the PR's issue comments for noslop's summary marker prints, one compact JSON
+  // object a line: one summary comment by the noslop App at the fixed full sha when absent.
   markerComments?: RunResult;
 
-  commitPulls?: Record<string, string | RunResult>;
+  // What the read of the check runs named `noslop` at a commit prints, one compact JSON object a
+  // line: one completed, successful run by the noslop App when absent.
+  noslopChecks?: RunResult;
 
   // Run git for real, in the checkout the caller names, except `git remote get-url origin` and the
   // lines `git` answers: for a test on a real repo, with gh, op and noslop still faked.
@@ -72,8 +65,6 @@ export interface FakeRunner {
   // The calls of one program (op, bun, git, gh).
   of: (program: string) => FakeCall[];
 }
-
-const FAKE_CHECK_JSON = JSON.stringify({ conclusion: 'success', title: 'All answered', summary: 'Nothing open.', open: [] });
 
 export const FAKE_FULL_SHA = '0123456789abcdef0123456789abcdef01234567';
 
@@ -107,9 +98,6 @@ function pickOpAnswer(script: FakeScript): RunResult {
 }
 
 function pickBunAnswer(script: FakeScript, cmd: string[]): RunResult {
-  if (cmd[3] === 'check') {
-    return script.noslopCheck ?? buildResult(FAKE_CHECK_JSON);
-  }
   if (cmd[3] === 'findings') {
     return script.noslopFindings ?? buildResult(JSON.stringify({ findings: [] }));
   }
@@ -151,33 +139,21 @@ function pickGhAnswer(script: FakeScript, line: string): RunResult | null {
   if (line.startsWith('gh api --paginate repos/') && line.includes('/files?')) {
     return script.prFiles ?? buildResult('src/kettle.ts\n');
   }
-  if (line.startsWith('gh api repos/') && line.includes('/pulls/') && line.includes('/comments --paginate')) {
-    return buildResult(script.reviewComments ?? '');
+  if (line.startsWith('gh api repos/') && line.includes('/issues/') && line.includes('/comments --paginate') && line.includes('user.login')) {
+    return script.markerComments ?? buildResult(`${JSON.stringify({ login: 'noslop-review[bot]', body: `<!-- noslop:summary {"head":"${FAKE_FULL_SHA}","reviews":1} -->` })}\n`);
   }
-  if (line.startsWith('gh api repos/') && line.includes('/issues/') && line.includes('/comments --paginate') && line.includes('user.login') && script.markerComments !== undefined) {
-    return script.markerComments;
-  }
-  if (line.startsWith('gh api repos/') && line.includes('/issues/') && line.includes('/comments --paginate')) {
-    return buildResult(script.issueComments ?? '');
+  if (line.startsWith('gh api repos/') && line.includes('/check-runs?check_name=noslop')) {
+    return script.noslopChecks ?? buildResult(`${JSON.stringify({ id: 9001, name: 'noslop', app: 'noslop-review', status: 'completed', conclusion: 'success', title: 'No findings need attention.' })}\n`);
   }
   if (line.startsWith('gh api graphql')) {
     return buildResult('1\n');
-  }
-  const pulls = /^gh api repos\/[^/]+\/[^/]+\/commits\/(?<sha>[0-9a-f]+)\/pulls$/u.exec(line);
-  if (pulls !== null) {
-    const answer = script.commitPulls?.[pulls.groups?.['sha'] ?? ''] ?? '[]';
-    return typeof answer === 'string' ? buildResult(answer) : answer;
   }
   return null;
 }
 
 // oxlint-disable-next-line zgeoff/module-order -- grandfathered: helpers sit above the factory
 function pickAnswer(script: FakeScript, cmd: string[]): RunResult {
-  const line = cmd.join(' '),
-    scripted = cmd[0] === 'git' ? script.git?.[line] : undefined;
-  if (scripted !== undefined) {
-    return scripted;
-  }
+  const line = cmd.join(' ');
   if (cmd[0] === 'op') {
     return pickOpAnswer(script);
   }
@@ -210,7 +186,7 @@ function expandSha(short: string): string {
 
 function isRealGit(script: FakeScript, cmd: string[]): boolean {
   const line = cmd.join(' ');
-  return script.realGit === true && cmd[0] === 'git' && line !== 'git remote get-url origin' && script.git?.[line] === undefined;
+  return script.realGit === true && cmd[0] === 'git' && line !== 'git remote get-url origin';
 }
 
 export function buildFakeRunner(script: FakeScript = {}): FakeRunner {

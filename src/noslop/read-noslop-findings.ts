@@ -16,7 +16,7 @@ import { parseJSON } from './parse-json.ts';
 import type { ParsedRepo } from './parse-lower-repo.ts';
 import { requirePinned } from './require-pinned.ts';
 import { resolveNoslopDir } from './resolve-noslop-dir.ts';
-import type { PRRequest } from './run-review-check.ts';
+import type { PRRequest } from './types.ts';
 
 const FindingSchema = z.object({
   id: z.string(),

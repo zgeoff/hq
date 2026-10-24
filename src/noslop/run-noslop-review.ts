@@ -26,7 +26,6 @@ import { recordRound } from './record-round.ts';
 import type { RecordedFinding, RoundRow } from './record-round.ts';
 import { removeIssueFile } from './remove-issue-file.ts';
 import { requireOK } from './require-ok.ts';
-import { writeFixesOnlyRefusal } from './write-fixes-only-refusal.ts';
 import type { Judged } from './types.ts';
 import { REVIEW_TIMEOUT_MS } from './review-timeout-ms.ts';
 
@@ -56,14 +55,8 @@ export interface NoslopReviewContext {
   // Review the whole PR, not only the commits since the last round.
   full?: boolean | undefined;
 
-  // The finding id a --redesign round was asked for, recorded on the round.
-  redesign?: string | undefined;
-
-  // A --fixes-only run, recorded as a review that is not a round.
+  // Fix checks only (`noslop review --fixes-only`), recorded as a review that is not a round.
   fixesOnly?: boolean | undefined;
-
-  // On a --fixes-only run, the PR head hq fetched to check it; a refusal by noslop is kept against it.
-  fixesOnlyHead?: string | null | undefined;
 
   // Reads the Linear issue the PR links, for noslop's intent lens. Without it no issue is attached.
   linear?: LinearCall | undefined;
@@ -101,7 +94,6 @@ export async function runNoslopReview(ctx: NoslopReviewContext): Promise<NoslopR
     ran = await runNoslopProcess(ctx, prep),
     row = await collectReviewRow(ctx, ran);
   recordRound(ctx.db, row);
-  updateFixesOnlyRefusal(ctx, ran.judged);
   // oxlint-disable-next-line zgeoff/no-abbreviated-names -- grandfathered key of the review event
   logEvent(ctx.db, 'hq', `noslop:${ctx.repo}#${ctx.pr}`, pickAction('review', row.ok), 'hq', null, null, { ms: ran.ms, findings: row.findings.length, sha: ran.sha, issue: prep.issueFile.note, postFailed: ran.postFailed });
   if (ran.cleanupError !== null) {
@@ -112,18 +104,6 @@ export async function runNoslopReview(ctx: NoslopReviewContext): Promise<NoslopR
   }
   // oxlint-disable-next-line zgeoff/no-abbreviated-names -- grandfathered property of the review result
   return { engine: 'noslop', repo: ctx.repo, pr: ctx.pr, head: prep.refs.headRefName, base: prep.refs.baseRefName, reviewFile: prep.reviewFile, depth: ran.judged.value.depth, findings: ran.judged.value.findings, notReviewed: ran.judged.value.notReviewed, fixChecks: ran.judged.value.fixChecks, ms: ran.ms, sha: ran.sha, issue: prep.issueFile.note, postFailed: ran.postFailed };
-}
-
-// A --fixes-only run noslop refused is kept against the head it was asked to check, whatever its
-// words; any review noslop gives clears it.
-function updateFixesOnlyRefusal(ctx: NoslopReviewContext, judged: Judged<ReviewOutput>): void {
-  if (judged.value !== null) {
-    writeFixesOnlyRefusal(ctx.db, ctx.repo, ctx.pr, null);
-    return;
-  }
-  if (ctx.fixesOnly === true && typeof ctx.fixesOnlyHead === 'string') {
-    writeFixesOnlyRefusal(ctx.db, ctx.repo, ctx.pr, { head: ctx.fixesOnlyHead, why: judged.why ?? 'unknown' });
-  }
 }
 
 interface PRRefs {
@@ -276,7 +256,6 @@ async function collectReviewRow(ctx: NoslopReviewContext, ran: ReviewRan): Promi
     error: ran.postFailed === null ? ran.judged.why : `stored, but not posted to GitHub: ${ran.postFailed}`,
     sha: ran.sha,
     full: ctx.full === true,
-    redesign: ctx.redesign ?? null,
     confirm: ctx.fixesOnly === true,
   };
 }

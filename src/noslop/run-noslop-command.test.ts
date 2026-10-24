@@ -55,8 +55,8 @@ test('it shows noslop off everywhere, with no pin, until someone turns it on', a
     fake = buildFakeRunner();
 
   await expect(runNoslopCommand({ run: fake.run, db: ctx.db, verb: undefined, rest: [], since: undefined, actor: 'tester' })).resolves.toStrictEqual({
-    data: { repos: [], sha: null, clone: `${ctx.base}/repos/zgeoff/noslop` },
-    text: `repos: none (noslop is off everywhere)\npinned: nothing yet (hq noslop pin <sha>)\nclone: ${ctx.base}/repos/zgeoff/noslop (not cloned yet)`,
+    data: { repos: [], caps: {}, sha: null, clone: `${ctx.base}/repos/zgeoff/noslop` },
+    text: `repos: none (noslop is off everywhere)\nemergency review cap: off everywhere (hq noslop cap <repo> <n>)\npinned: nothing yet (hq noslop pin <sha>)\nclone: ${ctx.base}/repos/zgeoff/noslop (not cloned yet)`,
   });
 });
 
@@ -73,6 +73,59 @@ test('it turns repos on and off, sorted, and the second identical call changes n
 
   expect(loadNoslopSettings(ctx.db).repos).toStrictEqual(['atc']);
   expect(fake.calls).toStrictEqual([]);
+});
+
+test('it sets a repo\'s emergency review cap, shows it in the listing, and logs who set it', async () => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
+  await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'on', rest: ['atc', 'tools'], since: undefined, actor: 'tester' });
+
+  const shown = await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'cap', rest: ['Tools', '2'], since: undefined, actor: 'tester' });
+
+  expect(shown.data).toMatchObject({ repos: ['atc', 'tools'], caps: { tools: 2 } });
+  expect(shown.text).toContain('emergency review cap: atc off, tools 2');
+  expect(loadNoslopSettings(ctx.db)).toMatchObject({ repos: ['atc', 'tools'], caps: { tools: 2 } });
+  expect(ctx.db.query("SELECT action, actor FROM events WHERE subject_id = 'noslop' AND action = 'cap'").all()).toStrictEqual([{ action: 'cap', actor: 'tester' }]);
+});
+
+test('it turns a repo\'s emergency review cap off again, and keeps the other caps and the repo list', async () => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
+  await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'on', rest: ['atc'], since: undefined, actor: 'tester' });
+  await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'cap', rest: ['atc', '1'], since: undefined, actor: 'tester' });
+  await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'cap', rest: ['tools', '3'], since: undefined, actor: 'tester' });
+
+  await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'cap', rest: ['atc', 'off'], since: undefined, actor: 'tester' });
+
+  expect(loadNoslopSettings(ctx.db)).toStrictEqual({ repos: ['atc'], sha: null, caps: { tools: 3 } });
+});
+
+test('it keeps the caps when a repo is turned off', async () => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
+  await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'on', rest: ['atc'], since: undefined, actor: 'tester' });
+  await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'cap', rest: ['atc', '2'], since: undefined, actor: 'tester' });
+
+  await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'off', rest: ['atc'], since: undefined, actor: 'tester' });
+
+  expect(loadNoslopSettings(ctx.db)).toStrictEqual({ repos: [], sha: null, caps: { atc: 2 } });
+});
+
+test.each([
+  ['no repo', [], 'bare repo name'],
+  ['a repo with an owner', ['zgeoff/atc', '2'], 'bare repo name'],
+  ['no value', ['atc'], 'whole number'],
+  ['zero', ['atc', '0'], 'whole number'],
+  ['a word', ['atc', 'many'], 'whole number'],
+  ['a fraction', ['atc', '1.5'], 'whole number'],
+  ['a number past the safe integer range', ['atc', '1'.repeat(310)], 'whole number'],
+  ['an extra argument', ['atc', '2', 'extra'], 'nothing more'],
+])('it refuses hq noslop cap with %s', async (_label, rest, words) => {
+  const ctx = setupTest();
+
+  await expect(runNoslopCommand({ run: buildFakeRunner().run, db: ctx.db, verb: 'cap', rest, since: undefined, actor: 'tester' })).rejects.toMatchObject({ code: 'bad_args', message: expect.stringContaining(words) });
+
+  expect(loadNoslopSettings(ctx.db).caps).toStrictEqual({});
 });
 
 test('it logs who turned a repo on', async () => {
@@ -107,7 +160,7 @@ test('it pins hq\'s own clone and records the full sha, keeping the list', async
 
   await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester' });
 
-  expect(loadNoslopSettings(ctx.db)).toStrictEqual({ repos: ['atc'], sha: '0123456789abcdef0123456789abcdef01234567' });
+  expect(loadNoslopSettings(ctx.db)).toStrictEqual({ repos: ['atc'], sha: '0123456789abcdef0123456789abcdef01234567', caps: {} });
   expect(fake.lines()).toStrictEqual([
     String.raw`pgrep -af -- ${ctx.base.replaceAll('.', String.raw`\.`)}/repos/zgeoff/noslop[^ ]*/apps/cli/src/cli\.ts`,
     `gh repo clone zgeoff/noslop ${paths.base} -- -q`,
@@ -119,6 +172,17 @@ test('it pins hq\'s own clone and records the full sha, keeping the list', async
     'bun install --frozen-lockfile --ignore-scripts',
   ]);
   expect(fake.calls.map((c) => c.opts?.cwd)).toStrictEqual([undefined, `${ctx.base}/repos/zgeoff`, paths.base, paths.base, paths.base, paths.base, paths.base, paths.folder]);
+});
+
+test('it keeps a configured emergency cap when it pins', async () => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
+  updateNoslopRepos(ctx.db, 'on', ['widgets']);
+  await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'cap', rest: ['widgets', '2'], since: undefined, actor: 'tester' });
+
+  await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester' });
+
+  expect(loadNoslopSettings(ctx.db)).toStrictEqual({ repos: ['widgets'], sha: '0123456789abcdef0123456789abcdef01234567', caps: { widgets: 2 } });
 });
 
 test('it keeps a repo turned on while the install runs', async () => {
@@ -153,7 +217,7 @@ test('it keeps a repo turned on and a repo turned off while the store migration 
 
   await runNoslopCommand({ run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester' });
 
-  expect(loadNoslopSettings(ctx.db)).toStrictEqual({ repos: ['widgets'], sha: FULL_SHA });
+  expect(loadNoslopSettings(ctx.db)).toStrictEqual({ repos: ['widgets'], sha: FULL_SHA, caps: {} });
 });
 
 test('it refuses a pin while another pin\'s process still runs, however old its lock is', async () => {
@@ -314,7 +378,7 @@ test('it pins with no store migration, no backup and no store query when the sto
   createStubNoslopStore(ctx.store, { migrations: NEW_NAMES, tables: { dispositions: 2 } });
   createStubNoslopClone(paths.folder, NEW_NAMES);
 
-  await expect(runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester' })).resolves.toMatchObject({ text: `repos: none (noslop is off everywhere)\npinned: ${FULL_SHA}\nclone: ${paths.folder}\nno store migration` });
+  await expect(runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester' })).resolves.toMatchObject({ text: `repos: none (noslop is off everywhere)\nemergency review cap: off everywhere (hq noslop cap <repo> <n>)\npinned: ${FULL_SHA}\nclone: ${paths.folder}\nno store migration` });
 
   expect(ctx.readBackups()).toStrictEqual([]);
   expect(fake.of('bun')).toStrictEqual([]);
@@ -534,7 +598,7 @@ test('it pins with no backup when there is no store file', async () => {
   createStubNoslopClone(paths.folder, NEW_NAMES);
 
   await expect(runNoslopCommand({ run: buildFakeRunner().run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester' })).resolves.toMatchObject({
-    text: `repos: none (noslop is off everywhere)\npinned: ${FULL_SHA}\nclone: ${paths.folder}\nno store migration (no store at ${ctx.store})`,
+    text: `repos: none (noslop is off everywhere)\nemergency review cap: off everywhere (hq noslop cap <repo> <n>)\npinned: ${FULL_SHA}\nclone: ${paths.folder}\nno store migration (no store at ${ctx.store})`,
   });
 
   expect(existsSync(ctx.store)).toBe(false);
@@ -671,20 +735,4 @@ test('it parses --full on hq review and refuses it for a PR on Codex', async () 
   await expect(main(['review', 'widgets', '7', '--full', '--json'])).resolves.not.toBe(0);
 
   expect(JSON.parse(lines[0] ?? '')).toMatchObject({ ok: false, error: { code: 'bad_args' } });
-});
-
-test('it refuses hq review --redesign with no finding id', async () => {
-  const ctx = setupTest(),
-    lines: string[] = [],
-    logger = spyOn(console, 'log').mockImplementation((line: string) => {
-      lines.push(line);
-    });
-  onTestFinished(() => logger.mockRestore());
-  onTestFinished(overrideEnv('HQ_DB', join(ctx.base, 'cli.db')));
-  onTestFinished(overrideEnv('HQ_NOTIFY', 'off'));
-  onTestFinished(overrideEnv('REVIEW_DIR', ctx.base));
-
-  await expect(main(['review', 'widgets', '7', '--redesign', ' ', '--json'])).resolves.toBe(1);
-
-  expect(JSON.parse(lines[0] ?? '')).toMatchObject({ ok: false, error: { code: 'bad_redesign', message: '--redesign needs the id of the finding that forced the redesign' } });
 });

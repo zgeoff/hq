@@ -27,9 +27,6 @@ export interface PRReport {
   lateUnknown: number;
   mainMerge: number;
   mergeUnknown: number;
-
-  // The finding id the PR's --redesign round was asked for; null when it used none.
-  redesign: string | null;
 }
 
 export interface LateCount {
@@ -63,7 +60,6 @@ interface RoundRecord {
   conclusion: string | null;
   open: string;
   full: number | null;
-  redesign: string | null;
   confirm: number;
 }
 
@@ -117,7 +113,6 @@ function buildPRReport(rounds: RoundRecord[], earlier: RoundRecord[]): PRReport 
     openIDs: unresolved.map((o) => o.id),
     wallMs: rounds.reduce((sum, r) => sum + r.ms, 0),
     reviewToPassMs: findSpan(parts),
-    redesign: parts.okReviews.find((r) => r.redesign !== null)?.redesign ?? null,
     ...countChurn([...splitRounds(earlier).okReviews.map((r) => buildChurnReview(r, false)), ...parts.okReviews.map((r) => buildChurnReview(r, true))]),
   };
 }

@@ -5,8 +5,8 @@ export type CIVerdict = { green: true } | { green: false; reason: string } | { g
 
 const NOSLOP_CHECK = 'noslop';
 
-// noslop's own check is skipped because the gate reads noslop's findings itself. GitHub keeps a
-// re-run in the rollup beside the run it replaced.
+// noslop's own check is skipped here because the gate's noslop route reads it by app, beside the
+// summary head and findings. GitHub keeps a re-run in the rollup beside the run it replaced.
 export function checkCIGreen(checks: readonly GateCheck[]): CIVerdict {
   const counted = pickNewestRuns(checks).filter((check) => pickName(check) !== NOSLOP_CHECK);
   if (counted.length === 0) {

@@ -21,6 +21,6 @@ function setupTest() {
 test('it lists no repo until noslop is turned on', () => {
   const ctx = setupTest();
 
-  expect(loadNoslopSettings(ctx.db)).toStrictEqual({ repos: [], sha: null });
+  expect(loadNoslopSettings(ctx.db)).toStrictEqual({ repos: [], sha: null, caps: {} });
   expect(isNoslopListed(loadNoslopSettings(ctx.db), 'zgeoff', 'widgets')).toBe(false);
 });

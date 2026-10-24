@@ -1,4 +1,5 @@
 import { match } from 'ts-pattern';
+import { z } from 'zod';
 import { HqError } from '../errors.ts';
 import { findAcceptedRisks } from '../pr-status/find-accepted-risks.ts';
 import { readHeadLgtm } from '../pr-status/read-head-lgtm.ts';
@@ -19,15 +20,18 @@ import { parseLowerRepo } from './parse-lower-repo.ts';
 import type { ParsedRepo } from './parse-lower-repo.ts';
 import { readGateFacts } from './read-gate-facts.ts';
 import type { GateFacts } from './read-gate-facts.ts';
+import { readNoslopCheck } from './read-noslop-check.ts';
 import { readNoslopFindings } from './read-noslop-findings.ts';
 import { readOKReviews } from './read-ok-reviews.ts';
+import type { OKReviewRecord } from './read-ok-reviews.ts';
 import { readPRFiles } from './read-pr-files.ts';
+import { readSummaryHead } from './read-summary-head.ts';
 import { pickNoslopVerdict } from './pick-noslop-verdict.ts';
 import { pickOwnerHeldVerdict } from './pick-owner-held-verdict.ts';
 import { probeNoCI } from './probe-no-ci.ts';
 import type { NoslopGateFacts } from './pick-noslop-verdict.ts';
 import { resolveEngine } from './resolve-engine.ts';
-import type { PRRequest } from './run-review-check.ts';
+import type { PRRequest } from './types.ts';
 
 export interface GateOutcome {
   mayMerge: true;
@@ -129,18 +133,29 @@ async function checkNoslopGate(request: PRRequest, parsed: ParsedRepo, facts: Ga
 }
 
 async function readNoslopGateFacts(request: PRRequest, parsed: ParsedRepo, head: string): Promise<NoslopGateFacts> {
-  if (readOKReviews(request.db, parsed.repo, request.pr).length === 0) {
-    return { reviewed: false, repo: parsed.repo, pr: request.pr };
+  const override = findOwnerOverride(request.db, parsed.repo, request.pr, head);
+  if (override !== null) {
+    const findings = await readFindings(request, parsed);
+    const headNow = await readPRHead(request.run, buildSlug(parsed), request.pr);
+    return { overridden: true, head, override, findings, headNow };
   }
-  const findings = await readNoslopFindings(request, parsed).then(
-    (read) => ({ read: true as const, open: collectOpenFindingIDs(read, findAcceptedRisks(request.db, parsed.repo, request.pr)) }),
+  const summary = await readSummaryHead(request.run, buildSlug(parsed), request.pr);
+  const check = await readNoslopCheck(request.run, buildSlug(parsed), head);
+  const findings = await readFindings(request, parsed);
+  const headNow = await readPRHead(request.run, buildSlug(parsed), request.pr);
+  return { overridden: false, repo: parsed.repo, pr: request.pr, head, summary, check, recorded: countRecordedFindings(readOKReviews(request.db, parsed.repo, request.pr)), findings, headNow };
+}
+
+async function readFindings(request: PRRequest, parsed: ParsedRepo): Promise<NoslopGateFacts['findings']> {
+  return await readNoslopFindings(request, parsed).then(
+    (read) => ({ read: true as const, open: collectOpenFindingIDs(read, findAcceptedRisks(request.db, parsed.repo, request.pr)), listed: read.length }),
     (error: unknown) => ({ read: false as const, error: error instanceof Error ? error.message : String(error) }),
   );
-  return await match(findings)
-    .with({ read: false }, (failed): NoslopGateFacts => ({ reviewed: true, head, findings: failed, override: null, headNow: null }))
-    .with({ read: true }, async (found): Promise<NoslopGateFacts> => {
-      const headNow = await readPRHead(request.run, buildSlug(parsed), request.pr);
-      return { reviewed: true, head, findings: found, override: findOwnerOverride(request.db, parsed.repo, request.pr, head), headNow };
-    })
-    .exhaustive();
+}
+
+const StoredFindingIDs = z.array(z.object({ id: z.string() }));
+
+function countRecordedFindings(reviews: OKReviewRecord[]): number {
+  const ids = reviews.flatMap((review) => StoredFindingIDs.parse(JSON.parse(review.findings)).map((finding) => finding.id));
+  return new Set(ids).size;
 }

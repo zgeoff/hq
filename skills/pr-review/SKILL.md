@@ -29,7 +29,7 @@ Run `hq capabilities --require 0.82.0` at the start of a session and after a com
 
 ## References
 
-- [noslop.md](references/noslop.md): the noslop review, its answers, rounds and the gate, for any
+- [noslop.md](references/noslop.md): the noslop review, its answers, the emergency cap and the gate, for any
   repo `hq noslop` lists.
 - [follow-ups.md](references/follow-ups.md): the reason test and filing format, before you file
   an issue from a PR.
@@ -69,8 +69,8 @@ that fails back to the agent to fix in this PR, in 1 to 3 plain sentences with i
 and keep its finding open: the gate doesn't pass while one is open. File each item that holds as
 [follow-ups.md](references/follow-ups.md) says. Nobody else files from a PR.
 
-- When the agent has patched the same logic in 2 rounds, tell it to redesign it in this PR, then run
-  `hq review <repo> <pr> --redesign <finding-id>`: it gives one round past the cap, once per PR.
+- When the agent has patched the same logic twice, tell it to redesign that logic in this PR. The
+  next `hq review` reads the redesign like any other change.
 - A committed codemod or other script that made a one-off change goes back to the agent, because it
   belongs in a collapsed `<details>` block in the PR description. List the files the PR adds with
   `gh api repos/zgeoff/<repo>/pulls/<n>/files --paginate --jq '.[] | select(.status == "added") | .filename'`,
