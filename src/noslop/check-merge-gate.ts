@@ -20,6 +20,7 @@ import { parseLowerRepo } from './parse-lower-repo.ts';
 import type { ParsedRepo } from './parse-lower-repo.ts';
 import { readGateFacts } from './read-gate-facts.ts';
 import type { GateFacts } from './read-gate-facts.ts';
+import { readNoslopCheck } from './read-noslop-check.ts';
 import { readNoslopFindings } from './read-noslop-findings.ts';
 import { readOKReviews } from './read-ok-reviews.ts';
 import type { OKReviewRecord } from './read-ok-reviews.ts';
@@ -139,9 +140,10 @@ async function readNoslopGateFacts(request: PRRequest, parsed: ParsedRepo, head:
     return { overridden: true, head, override, findings, headNow };
   }
   const summary = await readSummaryHead(request.run, buildSlug(parsed), request.pr);
+  const check = await readNoslopCheck(request.run, buildSlug(parsed), head);
   const findings = await readFindings(request, parsed);
   const headNow = await readPRHead(request.run, buildSlug(parsed), request.pr);
-  return { overridden: false, repo: parsed.repo, pr: request.pr, head, summary, recorded: countRecordedFindings(readOKReviews(request.db, parsed.repo, request.pr)), findings, headNow };
+  return { overridden: false, repo: parsed.repo, pr: request.pr, head, summary, check, recorded: countRecordedFindings(readOKReviews(request.db, parsed.repo, request.pr)), findings, headNow };
 }
 
 async function readFindings(request: PRRequest, parsed: ParsedRepo): Promise<NoslopGateFacts['findings']> {

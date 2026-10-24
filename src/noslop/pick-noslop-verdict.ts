@@ -1,17 +1,18 @@
 import { match } from 'ts-pattern';
 import type { OwnerOverride } from '../pr-status/read-owner-overrides.ts';
+import type { NoslopCheck } from './read-noslop-check.ts';
 import type { SummaryHead } from './read-summary-head.ts';
 
 type NoslopFindingsRead = { read: true; open: string[]; listed: number } | { read: false; error: string };
 
 export type NoslopGateFacts =
   | { overridden: true; head: string; override: OwnerOverride; findings: NoslopFindingsRead; headNow: string | null }
-  | { overridden: false; repo: string; pr: number; head: string; summary: SummaryHead; recorded: number; findings: NoslopFindingsRead; headNow: string | null };
+  | { overridden: false; repo: string; pr: number; head: string; summary: SummaryHead; check: NoslopCheck; recorded: number; findings: NoslopFindingsRead; headNow: string | null };
 
 export type NoslopVerdict = { pass: true; reason: string } | { pass: false; reason: string };
 
-// `summary` is the head noslop's own last review read, from its summary comment on GitHub; `recorded`
-// counts the distinct findings the PR's reviews recorded in hq.
+// `summary` is the head noslop's own last review read, from its summary comment on GitHub; `check` is
+// noslop's own check run at the head; `recorded` counts the distinct findings the PR's reviews recorded in hq.
 export function pickNoslopVerdict(facts: NoslopGateFacts): NoslopVerdict {
   if (facts.headNow !== facts.head) {
     return { pass: false, reason: `the PR's head moved from ${facts.head.slice(0, 7)} while the gate ran, so no pass: run the gate again` };
@@ -38,10 +39,30 @@ function pickReviewedVerdict(facts: Extract<NoslopGateFacts, { overridden: false
   if (facts.summary.head !== facts.head) {
     return { pass: false, reason: `noslop has not reviewed head ${facts.head.slice(0, 7)} (its last review read ${facts.summary.head.slice(0, 7)}); run hq review ${facts.repo} ${facts.pr}` };
   }
+  const check = pickCheckBlock(facts);
+  if (check !== null) {
+    return { pass: false, reason: check };
+  }
   return match(facts.findings)
     .with({ read: false }, (failed): NoslopVerdict => ({ pass: false, reason: `could not read noslop's findings, so no pass: ${failed.error}` }))
     .with({ read: true }, (found) => pickFoundVerdict(facts, found))
     .exhaustive();
+}
+
+// noslop's check also fails on what its summary head cannot show, such as failed review calls or a
+// rejected merge resolution, so the gate takes its conclusion rather than restate its rules.
+function pickCheckBlock(facts: Extract<NoslopGateFacts, { overridden: false }>): string | null {
+  const at = facts.head.slice(0, 7);
+  if (!facts.check.found) {
+    return `${facts.check.reason}, so no pass: hq review ${facts.repo} ${facts.pr}`;
+  }
+  if (facts.check.status !== 'completed') {
+    return `noslop's check at ${at} is ${facts.check.status}, so no pass: wait for it to finish`;
+  }
+  if (facts.check.conclusion !== 'success') {
+    return `noslop's check at ${at} is ${facts.check.conclusion ?? 'without a conclusion'}: ${facts.check.title ?? 'no title'}`;
+  }
+  return null;
 }
 
 function pickFoundVerdict(facts: Extract<NoslopGateFacts, { overridden: false }>, found: Extract<NoslopFindingsRead, { read: true }>): NoslopVerdict {

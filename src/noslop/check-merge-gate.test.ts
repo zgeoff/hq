@@ -219,12 +219,77 @@ test('it refuses an override whose source is a session', async () => {
   await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: '1 noslop finding is open: aaaa' });
 });
 
-test('it ignores a failing noslop check run', async () => {
+test("it leaves a failing noslop check in the CI rollup to the noslop route, which reads noslop's own run by app", async () => {
   const ctx = setupTest(),
     fake = buildFakeRunner({ prFacts: buildStubGateFacts({ head: FAKE_FULL_SHA, checks: [{ __typename: 'CheckRun', name: 'test', status: 'COMPLETED', conclusion: 'SUCCESS' }, { __typename: 'CheckRun', name: 'noslop', status: 'COMPLETED', conclusion: 'FAILURE' }] }) });
   createListedReview(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA });
 
   await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).resolves.toMatchObject({ mayMerge: true });
+});
+
+test("it blocks a head whose summary noslop moved there though its review calls failed, when noslop's check failed", async () => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ noslopFindings: buildStubFindings('fixed'), noslopChecks: { code: 0, stdout: `${JSON.stringify({ id: 9001, name: 'noslop', app: 'noslop-review', status: 'completed', conclusion: 'failure', title: '3 review calls failed.' })}\n`, stderr: '' } });
+  createListedReview(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA });
+
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: "noslop's check at 0123456 is failure: 3 review calls failed." });
+});
+
+test("it blocks a head whose summary holds a rejected merge resolution, when noslop's check failed", async () => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ noslopChecks: { code: 0, stdout: `${JSON.stringify({ id: 9001, name: 'noslop', app: 'noslop-review', status: 'completed', conclusion: 'failure', title: 'The merge resolution was rejected.' })}\n`, stderr: '' } });
+  createListedReview(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA });
+
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: "noslop's check at 0123456 is failure: The merge resolution was rejected." });
+});
+
+test("it blocks when a workflow job named noslop passed but the noslop App's own run failed", async () => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ noslopChecks: { code: 0, stdout: [JSON.stringify({ id: 9002, name: 'noslop', app: 'github-actions', status: 'completed', conclusion: 'success', title: null }), JSON.stringify({ id: 9001, name: 'noslop', app: 'noslop-review', status: 'completed', conclusion: 'failure', title: '1 finding is open.' })].join('\n'), stderr: '' } });
+  createListedReview(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA });
+
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: "noslop's check at 0123456 is failure: 1 finding is open." });
+});
+
+test('it blocks when only a workflow job named noslop ran at the head and the noslop App has no run there', async () => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ noslopChecks: { code: 0, stdout: `${JSON.stringify({ id: 9002, name: 'noslop', app: 'github-actions', status: 'completed', conclusion: 'success', title: null })}\n`, stderr: '' } });
+  createListedReview(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA });
+
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: 'noslop has no check at 0123456, so no pass: hq review widgets 7' });
+});
+
+test("it blocks while noslop's check at the head is still running", async () => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ noslopChecks: { code: 0, stdout: `${JSON.stringify({ id: 9001, name: 'noslop', app: 'noslop-review', status: 'in_progress', conclusion: null, title: null })}\n`, stderr: '' } });
+  createListedReview(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA });
+
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: "noslop's check at 0123456 is in_progress, so no pass: wait for it to finish" });
+});
+
+test("it blocks when hq cannot read noslop's check at the head", async () => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ noslopChecks: { code: 1, stdout: '', stderr: 'HTTP 502: kettle gateway' } });
+  createListedReview(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA });
+
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: 'gh cannot read the check runs at 0123456 (HTTP 502: kettle gateway), so no pass: hq review widgets 7' });
+});
+
+test("it passes when noslop's newest check at the head succeeded after an older run failed, its summary is at the head and no finding is open", async () => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ noslopFindings: buildStubFindings('fixed'), noslopChecks: { code: 0, stdout: [JSON.stringify({ id: 9003, name: 'noslop', app: 'noslop-review', status: 'completed', conclusion: 'success', title: 'No findings need attention.' }), JSON.stringify({ id: 9001, name: 'noslop', app: 'noslop-review', status: 'completed', conclusion: 'failure', title: '1 finding is open.' })].join('\n'), stderr: '' } });
+  createListedReview(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA });
+
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).resolves.toStrictEqual({ mayMerge: true, reason: 'noslop findings: none open; CI green at 0123456', reviewed: true });
+});
+
+test("it passes an override at the head though noslop's check there failed", async () => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ noslopFindings: buildStubFindings('open'), noslopChecks: { code: 0, stdout: `${JSON.stringify({ id: 9001, name: 'noslop', app: 'noslop-review', status: 'completed', conclusion: 'failure', title: '1 finding is open.' })}\n`, stderr: '' } });
+  createListedReview(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA });
+  recordPROverride(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA, source: 'call:KET-2', note: 'Ship the kettle.', actor: 'z-kettle' });
+
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).resolves.toStrictEqual({ mayMerge: true, reason: "The owner's override at 0123456 (call:KET-2) stands for 1 open finding: aaaa", reviewed: true });
 });
 
 test.each([
