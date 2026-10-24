@@ -886,3 +886,12 @@ test.each([
   await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'answer', ['widgets', '7', 'lgtm'], { source: 'call:KET-51' })).rejects.toMatchObject({ code: 'bad_args', message: `--source refused: ${row.why}; ask z-stu to record it` });
   expect(ctx.db.query('SELECT COUNT(*) AS total FROM pr_status').get()).toStrictEqual({ total: 0 });
 });
+
+test('it refuses a call: source for lgtm when the owner answered the call with something other than a plain Yes, and stores nothing', async () => {
+  const ctx = setupTest();
+  ctx.fileCall('KET-52', 'lgtm widgets#7?');
+  recordConsoleAnswer(ctx.db, { id: 'KET-52', option: '', note: 'No', actor: 'owner' });
+
+  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'answer', ['widgets', '7', 'lgtm'], { source: 'call:KET-52' })).rejects.toMatchObject({ code: 'bad_args', message: '--source refused: the owner\'s answer to call:KET-52 is not a plain yes: "No"; ask z-stu to record it' });
+  expect(ctx.db.query('SELECT COUNT(*) AS total FROM pr_status').get()).toStrictEqual({ total: 0 });
+});
