@@ -1,4 +1,5 @@
 import { expect, onTestFinished, test } from 'bun:test';
+import { z } from 'zod';
 import rulesTable from '../../lanes.json';
 import { buildReadyPage, makePagedCall } from '../../test/build-ready-page.ts';
 import type { ReadyNodeSeed } from '../../test/build-ready-page.ts';
@@ -23,7 +24,7 @@ function setupTest() {
   at('2026-10-15T20:00:00Z');
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
   const heldSample = {
-    cap: { imp: { freeMib: 16384, room: true }, providers: { claude: { room: true, unattended: true, target: 'imp' as const } } },
+    cap: { imp: { freeMib: 16_384, room: true }, providers: { claude: { room: true, unattended: true, target: 'imp' as const } } },
     impMib: 2048,
     error: null,
     slots: { imp: 3, local: 0 },
@@ -35,19 +36,18 @@ function setupTest() {
   const skip = (issue: string, until: string): void => {
     writeLaneSkip(fresh.db, { issue, until, reason: 'waits on the kettle PR', actor: 'z-delivery', at: new Date('2026-10-15T20:00:00Z') });
   };
-  const sent = (): { target: string; text: string }[] => fresh.db.query("SELECT target, text FROM outbox WHERE topic = 'lanes-all-skipped'").all() as { target: string; text: string }[];
+  const sent = (): { target: string; text: string }[] => z.array(z.object({ target: z.string(), text: z.string() })).parse(fresh.db.query("SELECT target, text FROM outbox WHERE topic = 'lanes-all-skipped'").all());
   const told = (): unknown => fresh.db.query("SELECT count(*) AS total FROM events WHERE action = 'all-skipped'").get();
-  return { db: fresh.db, sample, heldSample, seedReady, skip, sent, told };
+  const ready: ReadyNodeSeed[] = [
+    { identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 },
+    { identifier: 'GEO-9802', project: 'kettle roadmap', type: 'Bug', labels: ['vers'], priority: 3 },
+  ];
+  return { db: fresh.db, ready, sample, heldSample, seedReady, skip, sent, told };
 }
-
-const READY = [
-  { identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 },
-  { identifier: 'GEO-9802', project: 'kettle roadmap', type: 'Bug', labels: ['vers'], priority: 3 },
-];
 
 test('it tells z-delivery once when slots are free and every eligible Ready issue is skipped', async () => {
   const ctx = setupTest();
-  await ctx.seedReady(READY);
+  await ctx.seedReady(ctx.ready);
   ctx.skip('GEO-9801', 'pr:impz#654');
   ctx.skip('GEO-9802', 'GEO-9899');
 
@@ -64,7 +64,7 @@ test('it tells z-delivery once when slots are free and every eligible Ready issu
 
 test('it tells again when the set of skips changes', async () => {
   const ctx = setupTest();
-  await ctx.seedReady(READY);
+  await ctx.seedReady(ctx.ready);
   ctx.skip('GEO-9801', 'pr:impz#654');
   ctx.skip('GEO-9802', 'GEO-9899');
   tick(ctx.db, ctx.sample, 'hq-lanes');
@@ -77,7 +77,7 @@ test('it tells again when the set of skips changes', async () => {
 
 test('it tells again in a new spell after an issue stops being skipped', async () => {
   const ctx = setupTest();
-  await ctx.seedReady(READY);
+  await ctx.seedReady(ctx.ready);
   ctx.skip('GEO-9801', 'pr:impz#654');
   ctx.skip('GEO-9802', 'GEO-9899');
   tick(ctx.db, ctx.sample, 'hq-lanes');
@@ -92,7 +92,7 @@ test('it tells again in a new spell after an issue stops being skipped', async (
 
 test('it sends nothing while a lanes hold is active', async () => {
   const ctx = setupTest();
-  await ctx.seedReady(READY);
+  await ctx.seedReady(ctx.ready);
   ctx.skip('GEO-9801', 'pr:impz#654');
   ctx.skip('GEO-9802', 'GEO-9899');
   holdLanes(ctx.db, 60, 'host switch', 'z-delivery');
@@ -104,7 +104,7 @@ test('it sends nothing while a lanes hold is active', async () => {
 
 test('it sends nothing while an eligible Ready issue is not skipped', async () => {
   const ctx = setupTest();
-  await ctx.seedReady(READY);
+  await ctx.seedReady(ctx.ready);
   ctx.skip('GEO-9801', 'pr:impz#654');
 
   tick(ctx.db, ctx.sample, 'hq-lanes');
@@ -114,12 +114,12 @@ test('it sends nothing while an eligible Ready issue is not skipped', async () =
 
 test('it names each imp run and its state when impd at its line holds the imp slots', async () => {
   const ctx = setupTest();
-  await ctx.seedReady(READY);
+  await ctx.seedReady(ctx.ready);
   ctx.skip('GEO-9801', 'pr:impz#654');
   ctx.skip('GEO-9802', 'GEO-9899');
   setCapacitySetting(ctx.db, 'nonnixMaxMib', '65536', 'z-delivery');
   setCapacitySetting(ctx.db, 'nonnixMaxVcpus', '1000', 'z-delivery');
-  createCapacitySample(ctx.db, { at: '2026-10-15T19:58:00Z', nonnixAwakeMib: 65536 });
+  createCapacitySample(ctx.db, { at: '2026-10-15T19:58:00Z', nonnixAwakeMib: 65_536 });
   addRun(ctx.db, { issue: 'GEO-9805', title: 'Descale the kettle', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: null, actor: 'z-delivery' });
   addRun(ctx.db, { issue: 'GEO-9806', title: 'Rinse the kettle', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: null, actor: 'z-delivery' });
   setState(ctx.db, 'GEO-9806', 'blocked', { note: 'waits on the vendor' }, 'z-delivery');

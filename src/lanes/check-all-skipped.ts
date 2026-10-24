@@ -14,15 +14,14 @@ import type { SlotPlan } from './read-slot-plan.ts';
 import type { LaneSkip } from './types.ts';
 
 const TOLD = 'lanes_all_skipped_told';
+
 // Its own topic: the nudge's topic is purged each look while no slot is wanted, which would drop this
 // alert unsent.
 const TOPIC = 'lanes-all-skipped';
-const MAX_LISTED = 20;
 
 // Tells z-delivery once per spell that every eligible Ready issue is skipped while slots sit free or
-// impd's line holds imp slots back. A spell is keyed by the held flag and the skip set, so a change
-// of either tells again; a look where the condition fails ends the spell. A lanes hold sends nothing
-// and leaves the spell as it is. Returns whether it sent.
+// impd's line holds imp slots back. A change of the held flag or the skip set tells again, and a look
+// where the condition fails ends the spell. A lanes hold sends nothing.
 export function checkAllSkipped(db: Database, slotPlan: SlotPlan, actor: string): boolean {
   const held = [IMP_LINE_HELD.memory, IMP_LINE_HELD.vcpu].some((line) => line === slotPlan.pool.held);
   if (slotPlan.eligible !== 0 || slotPlan.skipped.length === 0 || (slotPlan.pool.free === 0 && !held)) {
@@ -58,7 +57,13 @@ function readImpRuns(db: Database): ImpRun[] {
   return rows.filter((row) => !parked.has(row.issue));
 }
 
-function formatAllSkipped(slotPlan: SlotPlan, view: { held: boolean; heldSlots: number; impRuns: ImpRun[] }): string {
+interface AllSkippedView {
+  held: boolean;
+  heldSlots: number;
+  impRuns: ImpRun[];
+}
+
+function formatAllSkipped(slotPlan: SlotPlan, view: AllSkippedView): string {
   const clauses = [
     ...(slotPlan.pool.free > 0 ? [`${slotPlan.pool.free} slot(s) free`] : []),
     ...(view.held ? [`${view.heldSlots} imp slot(s) held by ${slotPlan.pool.held}`] : []),
@@ -68,11 +73,13 @@ function formatAllSkipped(slotPlan: SlotPlan, view: { held: boolean; heldSlots: 
   return `Lanes: ${clauses.join(', ')}, and every eligible Ready issue is skipped.${holding} Check each skip still holds: ${skips}. Drop one with hq lanes skip drop <issue>.`;
 }
 
-function formatSkip(skip: LaneSkip): string {
-  return `${skip.issue} until ${skip.until}: ${skip.reason}`;
-}
+const MAX_LISTED = 20;
 
 function formatCapped(items: readonly string[], separator: string): string {
   const shown = items.slice(0, MAX_LISTED).join(separator);
   return items.length > MAX_LISTED ? `${shown}${separator}and ${items.length - MAX_LISTED} more` : shown;
+}
+
+function formatSkip(skip: LaneSkip): string {
+  return `${skip.issue} until ${skip.until}: ${skip.reason}`;
 }
