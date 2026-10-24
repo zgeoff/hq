@@ -23,6 +23,7 @@ function setupTest() {
       }
       clones.push(target);
       mkdirSync(target, { recursive: true });
+      // oxlint-disable-next-line zgeoff/no-test-sleep -- the fault under test: a clone whose folder exists before its files
       await Bun.sleep(20);
       writeFileSync(join(target, 'kettle.txt'), `cloned ${clones.length}\n`);
       return { code: 0, stdout: '', stderr: '' };

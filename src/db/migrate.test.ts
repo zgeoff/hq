@@ -35,7 +35,7 @@ test.each([
     versions = await Promise.all(children.map(async (child) => await new Response(child.stdout).text().then((text) => text.trim())));
 
   expect({ seeded: behind.length, codes, stderrs, versions }).toStrictEqual({ seeded, codes: children.map(() => 0), stderrs: children.map(() => ''), versions: children.map(() => String(MIGRATIONS.length)) });
-}, 60_000);
+});
 
 test('v35 adds the pr_status table and keeps the rows already in the database', () => {
   const base = mkdtempSync(join(tmpdir(), 'hq-migrate-v35-')),

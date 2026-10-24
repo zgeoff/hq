@@ -16,8 +16,9 @@ export const realRunner: Runner = async (cmd, opts = {}) => {
     stdout: fd ?? 'pipe',
     stderr: fd ?? 'pipe',
   });
-  // TERM to the group at the deadline, KILL 2 s later even if the shell has gone: a descendant
-  // that ignored TERM must not live on.
+
+  // TERM to the group at the deadline, KILL killGraceMs later even if the shell has gone: a
+  // descendant that ignored TERM must not live on.
   let timedOut = false;
   const group = (sig: NodeJS.Signals) => {
     try {
@@ -31,8 +32,9 @@ export const realRunner: Runner = async (cmd, opts = {}) => {
     ? setTimeout(() => {
         timedOut = true;
         group('SIGTERM');
-        // Not unref'd: a one-shot hq command waits the 2 s, so the KILL lands before it exits.
-        setTimeout(() => group('SIGKILL'), 2_000);
+
+        // Not unref'd: a one-shot hq command waits out the grace, so the KILL lands before it exits.
+        setTimeout(() => group('SIGKILL'), opts.killGraceMs ?? 2000);
       }, opts.timeoutMs)
     : null;
   const done = (r: RunResult): RunResult => {
@@ -52,6 +54,11 @@ export const realRunner: Runner = async (cmd, opts = {}) => {
   }
   // With a deadline, the exit ends the wait: a grandchild holding a pipe open must not hang us.
   const code = await proc.exited;
-  const settle = (p: Promise<string>) => Promise.race([p, Bun.sleep(timedOut ? 500 : 1_000).then(() => '')]);
+  const settleMs = opts.settleMs ?? (timedOut ? 500 : 1000);
+  const silence = async () => {
+    await Bun.sleep(settleMs);
+    return '';
+  };
+  const settle = (output: Promise<string>) => Promise.race([output, silence()]);
   return done({ code, stdout: await settle(out), stderr: await settle(err) });
 };

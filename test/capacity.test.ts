@@ -135,7 +135,7 @@ test('a failed, malformed or hung source stores NULLs and an errors entry; the o
   expect(Date.now() - t).toBeLessThan(5_000); // each read gives up at its own deadline
   expect(hung.cloud_avail_bytes).toBeNull();
   expect(hung.errors['cloud']).toContain('no answer');
-}, 60_000);
+});
 
 test('a Claude sample older than 30 minutes is no reading', async () => {
   usage(minute(-40), 40, 62);

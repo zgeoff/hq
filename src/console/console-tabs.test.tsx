@@ -76,7 +76,9 @@ test('g s typed in the page\'s note box types text and switches nothing', async 
   const lib = await setupAppTest(),
     page = lib.within(document.body),
     routes = await import('./create-console-app-router.tsx'),
-    tabRouter = routes.createConsoleAppRouter(createMemoryHistory({ initialEntries: ['/'] }));
+    tabRouter = routes.createConsoleAppRouter(createMemoryHistory({ initialEntries: ['/'] })),
+    moves: string[] = [];
+  onTestFinished(tabRouter.history.subscribe((move) => moves.push(move.location.pathname)));
   await createKettleCall();
   lib.render(
     <ConsoleAPIContext value={lib.api}>
@@ -97,8 +99,14 @@ test('g s typed in the page\'s note box types text and switches nothing', async 
       lib.fireEvent.change(typedNote, { target: { value: `${typedNote.value}${key}` } });
     }
   }
-  await Bun.sleep(50);
-  expect([typedNote.value, tabRouter.state.location.pathname, page.queryByText(/^The kettle report:/u)]).toStrictEqual(['g s]', '/', null]);
+
+  // A ] outside the box does switch; once its page shows, any switch the typed keys made is recorded.
+  typedNote.blur();
+  lib.act(() => {
+    lib.fireEvent.keyDown(document.body, { key: ']' });
+  });
+  await page.findByText(/^The kettle report:/u);
+  expect([typedNote.value, moves]).toStrictEqual(['g s]', ['/shipped']]);
 });
 
 // One call on the Needs you tab, so the page shows its note box.

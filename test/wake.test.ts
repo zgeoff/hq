@@ -17,6 +17,7 @@ import { wakeRemove } from '../src/wake/wake-remove.ts';
 import type { FakeAtc } from './helpers.ts';
 import { NOON_SYDNEY, at, fakeAtc, freshDb } from './helpers.ts';
 import { resetFetchCache } from '../src/prompts/reset-fetch-cache.ts';
+import { waitFor } from './wait-for.ts';
 
 let db: Database;
 let dir: string;
@@ -225,7 +226,12 @@ test('a bad restore wait falls back to 180 s; the wake keeps the report read aft
   atc = fakeAtc(dir, sessions);
   const { run } = fakeRunner({ 'atc daemon restart': 1 });
   const p = restartHere(db, run, 'z-q', false);
-  await Bun.sleep(50);
+
+  // The wait line is logged once the report after the restart is read; only then is it rewritten.
+  await waitFor('the restore wait to start', async () => {
+    const log = await Bun.file(`${dir}/r.log`).text().catch(() => '');
+    return log.includes('waiting up to 180s');
+  });
   await Bun.write(`${dir}/restarts/last.json`, JSON.stringify({ runID: 'run-2', code: 0, restored: 0, total: 0 }));
   const r = await p;
   delete process.env['HQ_RESTART_LOG'];

@@ -58,7 +58,12 @@ export async function watchTick(db: Database, d: WatchDeps): Promise<boolean> {
     const abandon = new AbortController();
     const work = start(abandon.signal);
     unsettled.add(what);
-    void forgetWhenSettled(work, () => unsettled.delete(what));
+    void forgetWhenSettled(work, () => {
+      unsettled.delete(what);
+      if (abandon.signal.aborted) {
+        d.log(`${iso(now())} ${what} from an earlier pass stopped`);
+      }
+    });
     return withDeadline(work, ms, what, abandon);
   };
   const at = () => iso(now());
