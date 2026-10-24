@@ -1,17 +1,17 @@
-import { afterEach, beforeEach, expect, test } from 'bun:test';
+import { afterEach, beforeEach, expect, onTestFinished, test } from 'bun:test';
 import { Database } from 'bun:sqlite';
 import { chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { ensurePassword } from '../src/backup/ensure-password.ts';
-import { lastBackup } from '../src/backup/last-backup.ts';
-import { readRemoteEnv } from '../src/backup/read-remote-env.ts';
-import { restoreTest } from '../src/backup/restore-test.ts';
-import { restore } from '../src/backup/restore.ts';
-import { runBackup } from '../src/backup/run-backup.ts';
-import { snapshots } from '../src/backup/snapshots.ts';
-import type { Runner } from '../src/runner/types.ts';
-import { realRunner } from '../src/runner/real-runner.ts';
-import { freshDb, requireEnv } from './helpers.ts';
+import { ensurePassword } from './ensure-password.ts';
+import { lastBackup } from './last-backup.ts';
+import { readRemoteEnv } from './read-remote-env.ts';
+import { restoreTest } from './restore-test.ts';
+import { restore } from './restore.ts';
+import { runBackup } from './run-backup.ts';
+import { snapshots } from './snapshots.ts';
+import type { Runner } from '../runner/types.ts';
+import { realRunner } from '../runner/real-runner.ts';
+import { freshDb, requireEnv } from '../../test/helpers.ts';
 
 // Real restic against temp repos. Skipped where restic isn't installed.
 const hasRestic = Bun.which('restic') !== null && Bun.which('sqlite3') !== null;
@@ -140,24 +140,23 @@ test('it lets one run take over a dead staging lock when several find it at once
   held.close();
   const barrier = `${dir}/barrier`;
   mkdirSync(barrier);
-  const script = `const { openDb } = await import(${JSON.stringify(join(import.meta.dir, '../src/db/open-db.ts'))}); const { runBackup } = await import(${JSON.stringify(join(import.meta.dir, '../src/backup/run-backup.ts'))}); const { existsSync, writeFileSync } = await import('node:fs'); const slow = async () => { await Bun.sleep(100); return { code: 0, stdout: 'ok', stderr: '' }; }; const db = openDb(); writeFileSync(\`${barrier}/ready-\${process.pid}\`, ''); while (!existsSync('${barrier}/go')) { await Bun.sleep(5); } const result = await runBackup(db, slow, 'z-q'); console.log(result.ok ? 'ran' : 'busy');`;
+  const script = `const { openDb } = await import(${JSON.stringify(join(import.meta.dir, '../db/open-db.ts'))}); const { runBackup } = await import(${JSON.stringify(join(import.meta.dir, './run-backup.ts'))}); const { existsSync, writeFileSync } = await import('node:fs'); const slow = async () => { await Bun.sleep(100); return { code: 0, stdout: 'ok', stderr: '' }; }; const db = openDb(); writeFileSync(\`${barrier}/ready-\${process.pid}\`, ''); while (!existsSync('${barrier}/go')) { await Bun.sleep(5); } const result = await runBackup(db, slow, 'z-q'); console.log(result.ok ? 'ran' : 'busy');`;
   const runs = Array.from({ length: 8 }, () => Bun.spawn(['bun', '-e', script], { env: { ...process.env }, stdout: 'pipe' }));
   const waitUntilAllReady = async (): Promise<void> => {
     while (readdirSync(barrier).length < runs.length && runs.every((run) => run.exitCode === null)) {
       await Bun.sleep(5);
     }
   };
-  let outcomes: string[] = [];
-  try {
-    await waitUntilAllReady();
-    writeFileSync(`${barrier}/go`, '');
-    outcomes = await Promise.all(runs.map((run) => new Response(run.stdout).text()));
-  } finally {
+  onTestFinished(async () => {
     for (const run of runs) {
       run.kill();
     }
     await Promise.all(runs.map((run) => run.exited));
-  }
+  });
+  await waitUntilAllReady();
+  writeFileSync(`${barrier}/go`, '');
+
+  const outcomes = await Promise.all(runs.map((run) => new Response(run.stdout).text()));
 
   expect(outcomes.map((line) => line.trim()).toSorted()).toStrictEqual(['busy', 'busy', 'busy', 'busy', 'busy', 'busy', 'busy', 'ran']);
 });
@@ -220,7 +219,7 @@ test.skipIf(!hasRestic)('a remote secret never reaches argv, errors or events; R
 
 test('it writes the password exactly once when first runs start together', async () => {
   const go = String(Date.now() + 2000);
-  const script = `const { ensurePassword } = await import(${JSON.stringify(join(import.meta.dir, '../src/backup/ensure-password.ts'))}); while (Date.now() < Number(process.env.GO)) {} console.log(JSON.stringify(ensurePassword().created))`;
+  const script = `const { ensurePassword } = await import(${JSON.stringify(join(import.meta.dir, './ensure-password.ts'))}); while (Date.now() < Number(process.env.GO)) {} console.log(JSON.stringify(ensurePassword().created))`;
   const runs = Array.from({ length: 12 }, () => Bun.spawn(['bun', '-e', script], { env: { ...process.env, GO: go }, stdout: 'pipe' }));
   const created = await Promise.all(runs.map((run) => new Response(run.stdout).text()));
   expect(created.map((line) => line.trim()).toSorted()).toStrictEqual(['false', 'false', 'false', 'false', 'false', 'false', 'false', 'false', 'false', 'false', 'false', 'true']);
