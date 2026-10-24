@@ -12,7 +12,6 @@ export interface HostFacts {
 // XDG_RUNTIME_DIR, which the caller sets: a session could point the check at a daemon of its own.
 // It follows atc's rule from the uid instead: the runtime dir when there is one, else the state dir.
 export function identitySocketPath(host: HostFacts = readHostFacts()): string {
-  // A test reaches only the fake atc it injects: never the live daemon, even to read.
   if (host.inTest) {
     return '/nonexistent/hq-test-no-live-atc.sock';
   }
