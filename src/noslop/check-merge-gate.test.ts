@@ -269,6 +269,15 @@ test('it blocks a noslop PR that no noslop review has covered, even with no find
   await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: expect.stringContaining('no completed review') });
 });
 
+test('it blocks a PR whose only recorded review is a fixes-only run', async () => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
+  setMeta(ctx.db, 'noslop', JSON.stringify({ repos: ['widgets'], sha: '0123456789abcdef0123456789abcdef01234567' }));
+  ctx.db.query("INSERT INTO noslop_rounds (repo, pr, kind, started_at, ended_at, ms, ok, head, depth, special, findings, sha, confirm) VALUES ('widgets', 7, 'review', 'a', 'b', 1, 1, ?, 'standard', 'none', '[]', 'x', 1)").run(FAKE_FULL_SHA);
+
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: expect.stringContaining('no completed review') });
+});
+
 test('it blocks a PR whose head moved while the gate ran', async () => {
   const ctx = setupTest(),
     fake = buildFakeRunner({ prHead: { code: 0, stdout: JSON.stringify({ headRefOid: 'f00dfeedf00dfeedf00dfeedf00dfeedf00dfeed' }), stderr: '' } });

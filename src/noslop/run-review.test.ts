@@ -334,16 +334,24 @@ test('it counts only the full reviews against the emergency cap, not fix checks 
   await expect(runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false })).resolves.toMatchObject({ round: 2, fixesOnly: false });
 });
 
-test('it counts the emergency cap per PR, and drops --full past it', async () => {
+test('it counts the emergency cap per PR', async () => {
   const ctx = setupTest(),
     fake = buildFakeRunner();
   ctx.setCap('widgets', 1);
   ctx.addRound('review', 1, 'standard', 'none');
 
   await expect(runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 8, watch: false })).resolves.toMatchObject({ round: 1, fixesOnly: false });
+});
+
+test('it drops --full past the emergency cap', async () => {
+  const ctx = setupTest(),
+    fake = buildFakeRunner();
+  ctx.setCap('widgets', 1);
+  ctx.addRound('review', 1, 'standard', 'none');
+
   await expect(runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false, full: true })).resolves.toMatchObject({ fixesOnly: true, emergencyCap: 1 });
 
-  expect(fake.of('bun')[1]?.cmd).not.toContain('--full');
+  expect(fake.of('bun')[0]?.cmd).not.toContain('--full');
 });
 
 test('it lets only one of two reviews started together on one PR take the last full review before the cap', async () => {

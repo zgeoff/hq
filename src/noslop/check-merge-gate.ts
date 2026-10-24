@@ -129,7 +129,7 @@ async function checkNoslopGate(request: PRRequest, parsed: ParsedRepo, facts: Ga
 }
 
 async function readNoslopGateFacts(request: PRRequest, parsed: ParsedRepo, head: string): Promise<NoslopGateFacts> {
-  if (readOKReviews(request.db, parsed.repo, request.pr).length === 0) {
+  if (readOKReviews(request.db, parsed.repo, request.pr).filter((review) => review.confirm === 0).length === 0) {
     return { reviewed: false, repo: parsed.repo, pr: request.pr };
   }
   const findings = await readNoslopFindings(request, parsed).then(
