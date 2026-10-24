@@ -91,6 +91,16 @@ test('it blocks when only a hand-run fix-checks-only run read the new head', asy
   await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: 'noslop has not reviewed head 0123456; run hq review widgets 7' });
 });
 
+test('it blocks when a hand-run fix-checks-only run read the head after the full reviews reached the emergency cap', async () => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ noslopFindings: buildStubFindings('fixed') });
+  createListedReview(ctx.db, { repo: 'widgets', pr: 7, head: 'f00dfeedf00dfeedf00dfeedf00dfeedf00dfeed' });
+  setMeta(ctx.db, 'noslop', JSON.stringify({ repos: ['widgets'], sha: '0123456789abcdef0123456789abcdef01234567', caps: { widgets: 1 } }));
+  ctx.db.query("INSERT INTO noslop_rounds (repo, pr, kind, started_at, ended_at, ms, ok, head, depth, special, findings, sha, confirm) VALUES ('widgets', 7, 'review', 'a', 'b', 1, 1, ?, 'standard', 'none', '[]', 'x', 1)").run(FAKE_FULL_SHA);
+
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: 'noslop has not reviewed head 0123456; run hq review widgets 7' });
+});
+
 test('it passes open findings under an override at the head that no review read', async () => {
   const ctx = setupTest();
   const fake = buildFakeRunner({ noslopFindings: buildStubFindings('open') });
