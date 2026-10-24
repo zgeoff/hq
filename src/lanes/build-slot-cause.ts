@@ -6,23 +6,16 @@ const DELIVERY_GRACE_MINUTES = 10;
 
 export interface SlotCauseInput {
   free: number;
-
-  // Eligible Ready issues; null while the Ready read is missing or stale.
   eligible: number | null;
   eligibleSince: string | null;
   readyAt: string | null;
   promotable: { at: string; count: number | null; focus: string; error: string | null } | null;
-
-  // The buildFocusKey of the focus set now; a Backlog count from another focus does not count.
   focus: string;
   causeSince: { cause: string; since: string } | null;
-
-  // How old a Backlog count may be and still count.
   freshMinutes: number;
   at: Date;
 }
 
-// The cause of the empty slots at an instant. Pure: the caller reads the clocks and counts.
 export function buildSlotCause(input: SlotCauseInput): SlotCause {
   const readyAgeMinutes = input.readyAt === null ? null : Math.floor((input.at.getTime() - Date.parse(input.readyAt)) / 60_000);
   const base = { slots: input.free, readyAgeMinutes, reason: null, waitingMinutes: null, backlogError: null };
