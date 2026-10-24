@@ -30,6 +30,30 @@ test('it refuses a skip until a PR of another owner', () => {
   expect(() => writeLaneSkip(ctx.db, { issue: 'GEO-9901', until: 'pr:other/impz#1', reason: 'waits', actor: 'z-delivery', at: ctx.at })).toThrow('hq reads only zgeoff PRs');
 });
 
+test('it refuses a skip until a PR of another owner written as a URL in any form', () => {
+  const ctx = setupTest();
+  const forms = ['pr:github.com/other/impz/pull/1', 'pr:www.github.com/other/impz/pull/1', 'pr:https://www.github.com/other/impz/pull/1', 'pr:<https://github.com/other/impz/pull/1>'];
+
+  const refused = forms.map((until) => {
+    try {
+      writeLaneSkip(ctx.db, { issue: 'GEO-9901', until, reason: 'waits', actor: 'z-delivery', at: ctx.at });
+      return 'accepted';
+    } catch (error) {
+      return error instanceof Error ? error.message : 'unknown';
+    }
+  });
+
+  expect(refused).toStrictEqual(forms.map(() => '--until pr:other/... is refused: hq reads only zgeoff PRs'));
+});
+
+test('it accepts the zgeoff owner in any letter case', () => {
+  const ctx = setupTest();
+
+  const skip = writeLaneSkip(ctx.db, { issue: 'GEO-9901', until: 'pr:ZGeoff/impz#654', reason: 'waits', actor: 'z-delivery', at: ctx.at });
+
+  expect(skip.until).toBe('pr:impz#654');
+});
+
 test('it refuses a PR until that names no PR', () => {
   const ctx = setupTest();
 

@@ -2,8 +2,8 @@ import type { Database } from 'bun:sqlite';
 import { iso } from '../clock/iso.ts';
 import { HqError } from '../errors.ts';
 import { ISSUE } from '../followups/issue.ts';
-import type { LaneSkip } from './types.ts';
 import { parsePRUntil } from './pr-until.ts';
+import type { LaneSkip } from './types.ts';
 import { writeSkipMove } from './write-skip-move.ts';
 
 export interface SkipChange {
@@ -40,7 +40,7 @@ function parseUntil(until: string, issue: string, at: Date): string {
   }
   const pr = parsePRUntil(until);
   if (pr) {
-    if (pr.owner !== null && pr.owner !== 'zgeoff') {
+    if (pr.owner !== null && pr.owner.toLowerCase() !== 'zgeoff') {
       throw new HqError('bad_args', `--until pr:${pr.owner}/... is refused: hq reads only zgeoff PRs`);
     }
     return `pr:${pr.ref}`;
