@@ -23,11 +23,7 @@ export interface StubAtcDaemon {
 export interface StubAtcOptions {
   build?: string;
   protocol?: number;
-
-  // the caller's session the hello names; null by default, as for a caller outside any session
   peerSession?: string | null;
-
-  // a hello with no peerSession field at all, as from a daemon older than protocol 11
   helloWithoutPeerSession?: boolean;
 }
 
