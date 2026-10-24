@@ -54,7 +54,7 @@ export interface ShippedCacheRow {
   expires_at: string | null;
 }
 
-export interface SlotMinutesRow {
+interface SlotMinutesRow {
   day: string;
   cause: 'delivery' | 'triage' | 'supply';
   minutes: number;
