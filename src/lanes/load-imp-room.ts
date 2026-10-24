@@ -3,6 +3,7 @@ import type { ImpRoom } from '../areas/types.ts';
 import { capacitySettings } from '../capacity/capacity-settings.ts';
 import { iso } from '../clock/iso.ts';
 import { now } from '../clock/now.ts';
+import { IMP_LINE_HELD } from './imp-line-held.ts';
 
 // The imp slots the lanes may fill: capacity.sh's budget room, capped by the room under impd's
 // non-Nix memory and vCPU lines, the capacity watch's own settings. With no impd reading 15 min
@@ -35,5 +36,5 @@ function buildLineRoom(line: NonNullable<ImpRoom['line']>, size: ImpSize & { imp
   if (wholeSlots === size.budgetSlots) {
     return { slots: wholeSlots, heldBy: 'imp budget or provider quota', line };
   }
-  return { slots: wholeSlots, heldBy: wholeSlots === memorySlots ? 'impd at line' : 'impd at vCPU line', line };
+  return { slots: wholeSlots, heldBy: wholeSlots === memorySlots ? IMP_LINE_HELD.memory : IMP_LINE_HELD.vcpu, line };
 }
