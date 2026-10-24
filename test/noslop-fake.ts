@@ -42,6 +42,10 @@ export interface FakeScript {
   // What `noslop findings --json` answers; no findings when absent.
   noslopFindings?: RunResult;
 
+  // What the read of the PR's issue comments for noslop's summary marker prints, one compact JSON
+  // object a line: one summary comment by the noslop App at the fixed full sha when absent.
+  markerComments?: RunResult;
+
   // Run git for real, in the checkout the caller names, except `git remote get-url origin` and the
   // lines `git` answers: for a test on a real repo, with gh, op and noslop still faked.
   realGit?: boolean;
@@ -130,6 +134,9 @@ function pickGhAnswer(script: FakeScript, line: string): RunResult | null {
   }
   if (line.startsWith('gh api --paginate repos/') && line.includes('/files?')) {
     return script.prFiles ?? buildResult('src/kettle.ts\n');
+  }
+  if (line.startsWith('gh api repos/') && line.includes('/issues/') && line.includes('/comments --paginate') && line.includes('user.login')) {
+    return script.markerComments ?? buildResult(`${JSON.stringify({ login: 'noslop-review[bot]', body: `<!-- noslop:summary {"head":"${FAKE_FULL_SHA}","reviews":1} -->` })}\n`);
   }
   if (line.startsWith('gh api graphql')) {
     return buildResult('1\n');

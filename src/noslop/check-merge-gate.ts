@@ -24,9 +24,9 @@ import { readNoslopFindings } from './read-noslop-findings.ts';
 import { readOKReviews } from './read-ok-reviews.ts';
 import type { OKReviewRecord } from './read-ok-reviews.ts';
 import { readPRFiles } from './read-pr-files.ts';
+import { readSummaryHead } from './read-summary-head.ts';
 import { pickNoslopVerdict } from './pick-noslop-verdict.ts';
 import { pickOwnerHeldVerdict } from './pick-owner-held-verdict.ts';
-import { POST_FAILED_PREFIX } from './post-failed-prefix.ts';
 import { probeNoCI } from './probe-no-ci.ts';
 import type { NoslopGateFacts } from './pick-noslop-verdict.ts';
 import { resolveEngine } from './resolve-engine.ts';
@@ -132,38 +132,28 @@ async function checkNoslopGate(request: PRRequest, parsed: ParsedRepo, facts: Ga
 }
 
 async function readNoslopGateFacts(request: PRRequest, parsed: ParsedRepo, head: string): Promise<NoslopGateFacts> {
-  const reviews = readOKReviews(request.db, parsed.repo, request.pr);
-  const counting = reviews.filter((review) => isCountingReview(review));
-  const counted = counting.findLast((review) => !isPostFailed(review)) ?? null;
-  const unpostedHead = counted?.head !== head && counting.some((review) => review.head === head && isPostFailed(review)) ? head : null;
-  if (counted === null) {
-    return { reviewed: false, repo: parsed.repo, pr: request.pr, unpostedHead };
+  const override = findOwnerOverride(request.db, parsed.repo, request.pr, head);
+  if (override !== null) {
+    const findings = await readFindings(request, parsed);
+    const headNow = await readPRHead(request.run, buildSlug(parsed), request.pr);
+    return { overridden: true, head, override, findings, headNow };
   }
-  const known = { repo: parsed.repo, pr: request.pr, head, reviewedHead: counted.head, recorded: countRecordedFindings(reviews), unpostedHead };
-  const findings = await readNoslopFindings(request, parsed).then(
+  const summary = await readSummaryHead(request.run, buildSlug(parsed), request.pr);
+  const findings = await readFindings(request, parsed);
+  const headNow = await readPRHead(request.run, buildSlug(parsed), request.pr);
+  return { overridden: false, repo: parsed.repo, pr: request.pr, head, summary, recorded: countRecordedFindings(readOKReviews(request.db, parsed.repo, request.pr)), findings, headNow };
+}
+
+async function readFindings(request: PRRequest, parsed: ParsedRepo): Promise<NoslopGateFacts['findings']> {
+  return await readNoslopFindings(request, parsed).then(
     (read) => ({ read: true as const, open: collectOpenFindingIDs(read, findAcceptedRisks(request.db, parsed.repo, request.pr)), listed: read.length }),
     (error: unknown) => ({ read: false as const, error: error instanceof Error ? error.message : String(error) }),
   );
-  return await match(findings)
-    .with({ read: false }, (failed): NoslopGateFacts => ({ reviewed: true, ...known, findings: failed, override: null, headNow: null }))
-    .with({ read: true }, async (found): Promise<NoslopGateFacts> => {
-      const headNow = await readPRHead(request.run, buildSlug(parsed), request.pr);
-      return { reviewed: true, ...known, findings: found, override: findOwnerOverride(request.db, parsed.repo, request.pr, head), headNow };
-    })
-    .exhaustive();
-}
-
-function isCountingReview(review: OKReviewRecord): boolean {
-  return review.confirm === 0 || review.capForced === 1;
-}
-
-function isPostFailed(review: OKReviewRecord): boolean {
-  return review.error?.startsWith(POST_FAILED_PREFIX) === true;
 }
 
 const StoredFindingIDs = z.array(z.object({ id: z.string() }));
 
 function countRecordedFindings(reviews: OKReviewRecord[]): number {
-  const ids = reviews.filter((review) => !isPostFailed(review)).flatMap((review) => StoredFindingIDs.parse(JSON.parse(review.findings)).map((finding) => finding.id));
+  const ids = reviews.flatMap((review) => StoredFindingIDs.parse(JSON.parse(review.findings)).map((finding) => finding.id));
   return new Set(ids).size;
 }

@@ -618,8 +618,4 @@ export const MIGRATIONS: string[] = [
     minutes REAL NOT NULL,
     PRIMARY KEY (day, cause)
   );`,
-
-  // v43: 1 on a fix-checks-only run that the repo's emergency cap forced, which the merge gate counts;
-  // 0 on every other run, a hand-run --fixes-only and every row from before v43 included.
-  `ALTER TABLE noslop_rounds ADD COLUMN cap_forced INTEGER NOT NULL DEFAULT 0 CHECK (cap_forced IN (0, 1));`,
 ];

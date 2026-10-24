@@ -157,13 +157,13 @@ async function createNoslopContext(plan: RoundPlan, parsed: ParsedRepo, sha: str
     lock: (fn) => withRepoLock(scratch, buildSlug(parsed), fn),
     full: request.full,
     fixesOnly: plan.fixesOnly,
-    capForced: plan.emergencyCap !== null,
     linear: makeAuditedLinearCaller(request.db, request.run),
   };
 }
 
-// A run the merge gate counts marks the head it ran on, as a session's `hq run reviewed --sha` must,
-// so the sweep stops calling the head unreviewed. Only a full review counts as a round.
+// A full review, or a fix-checks-only run the emergency cap forced, marks the head it ran on so the
+// sweep stops calling the head unreviewed; a hand-run --fixes-only marks nothing. Only a full review
+// counts as a round.
 function writeRoundMark(plan: RoundPlan, parsed: ParsedRepo): void {
   if (plan.fixesOnly && plan.emergencyCap === null) {
     return;

@@ -33,9 +33,6 @@ export interface RoundRow {
   // A fix-checks-only run (--fixes-only, or past the emergency cap), or a review of the removed --confirm: true. Not a round. Otherwise absent.
   confirm?: boolean | undefined;
 
-  // A fix-checks-only run that the repo's emergency cap forced. Otherwise absent.
-  capForced?: boolean | undefined;
-
   // A check's title. Otherwise absent.
   title?: string | null | undefined;
 }
@@ -43,8 +40,8 @@ export interface RoundRow {
 export function recordRound(db: Database, row: RoundRow): void {
   const full = row.full === undefined ? null : toFlag(row.full);
   db.query(
-    `INSERT INTO noslop_rounds (repo, pr, kind, started_at, ended_at, ms, ok, head, base, depth, findings, failed_calls, conclusion, open, error, sha, full, title, special, confirm, cap_forced)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO noslop_rounds (repo, pr, kind, started_at, ended_at, ms, ok, head, base, depth, findings, failed_calls, conclusion, open, error, sha, full, title, special, confirm)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     row.repo,
     row.pr,
@@ -66,7 +63,6 @@ export function recordRound(db: Database, row: RoundRow): void {
     row.title ?? null,
     row.special ?? null,
     toFlag(row.confirm === true),
-    toFlag(row.capForced === true),
   );
 }
 

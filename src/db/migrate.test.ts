@@ -156,7 +156,7 @@ test('it adds the Claude window reset times in v41, NULL on every older row', ()
   expect(db.query('PRAGMA user_version').get()).toStrictEqual({ user_version: 41 });
 });
 
-test('it adds the slot-minutes table in v42 and refuses a cause outside the three', () => {
+test('it adds the slot-minutes table in v42, refuses a cause outside the three, and makes v42 the newest schema', () => {
   const base = mkdtempSync(join(tmpdir(), 'hq-migrate-v42-'));
   const db = new Database(join(base, 'hq.db'), { create: true, strict: true });
   const path = join(base, 'hq.db');
@@ -165,26 +165,10 @@ test('it adds the slot-minutes table in v42 and refuses a cause outside the thre
   db.exec('PRAGMA journal_mode = WAL;');
   migrate(db, path, false, MIGRATIONS.slice(0, 41));
 
-  expect(migrate(db, path, true, MIGRATIONS.slice(0, 42))).not.toBeNull();
+  expect(migrate(db, path, true)).not.toBeNull();
   db.query("INSERT INTO slot_minutes (day, cause, minutes) VALUES ('2026-10-14', 'delivery', 12.5)").run();
   expect(db.query('SELECT day, cause, minutes FROM slot_minutes').all()).toStrictEqual([{ day: '2026-10-14', cause: 'delivery', minutes: 12.5 }]);
   expect(() => db.query("INSERT INTO slot_minutes (day, cause, minutes) VALUES ('2026-10-14', 'kettle', 1)").run()).toThrow(/CHECK constraint failed/u);
   expect(() => db.query("INSERT INTO slot_minutes (day, cause, minutes) VALUES ('2026-10-14', 'delivery', 1)").run()).toThrow(/UNIQUE constraint failed/u);
   expect(db.query('PRAGMA user_version').get()).toStrictEqual({ user_version: 42 });
-});
-
-test('it adds the cap-forced flag to noslop runs in v43, 0 on every older row, and makes v43 the newest schema', () => {
-  const base = mkdtempSync(join(tmpdir(), 'hq-migrate-v43-'));
-  const db = new Database(join(base, 'hq.db'), { create: true, strict: true });
-  const path = join(base, 'hq.db');
-  onTestFinished(() => rmSync(base, { recursive: true, force: true }));
-  onTestFinished(() => db.close());
-  db.exec('PRAGMA journal_mode = WAL;');
-  migrate(db, path, false, MIGRATIONS.slice(0, 42));
-  db.query("INSERT INTO noslop_rounds (repo, pr, kind, started_at, ended_at, ms, ok, findings, sha, confirm) VALUES ('widgets', 7, 'review', 'a', 'b', 1, 1, '[]', 'x', 1)").run();
-
-  expect(migrate(db, path, true)).not.toBeNull();
-  expect(db.query('SELECT confirm, cap_forced FROM noslop_rounds').all()).toStrictEqual([{ confirm: 1, cap_forced: 0 }]);
-  expect(() => db.query("INSERT INTO noslop_rounds (repo, pr, kind, started_at, ended_at, ms, ok, findings, sha, cap_forced) VALUES ('widgets', 7, 'review', 'a', 'b', 1, 1, '[]', 'x', 2)").run()).toThrow(/CHECK constraint failed/u);
-  expect(db.query('PRAGMA user_version').get()).toStrictEqual({ user_version: 43 });
 });
