@@ -160,6 +160,8 @@ import { retireName } from './fleet/retire-name.ts';
 import { retiredNames } from './fleet/retired-names.ts';
 import type { FleetClient, PluginDrift, PromptDrift, RcDeps } from './fleet/types.ts';
 import { capacitySettings } from './capacity/capacity-settings.ts';
+import { formatCapacityHint } from './capacity/format-capacity-hint.ts';
+import { readCapacityHint } from './capacity/read-capacity-hint.ts';
 import { runCapacityStep } from './capacity/run-capacity-step.ts';
 import { latestSample } from './capacity/latest-sample.ts';
 import { openAlerts } from './capacity/open-alerts.ts';
@@ -178,12 +180,18 @@ import { formatSlotPlan } from './lanes/format-slot-plan.ts';
 import { loadImpRoom } from './lanes/load-imp-room.ts';
 import { LANES } from './lanes/lanes.ts';
 import { nudgeLog } from './lanes/nudge-log.ts';
+import { loadPacing } from './lanes/load-pacing.ts';
 import { pacingPath } from './lanes/pacing-path.ts';
 import { buildLanePlan } from './lanes/build-lane-plan.ts';
 import { formatLanePlan } from './lanes/format-lane-plan.ts';
 import { readCapacity } from './lanes/read-capacity.ts';
 import { readLanes } from './lanes/read-lanes.ts';
 import { releaseLanes } from './lanes/release-lanes.ts';
+import { parseLanesCapArgs } from './lanes/cap/parse-lanes-cap-args.ts';
+import { runLanesCapCommand } from './lanes/cap/run-lanes-cap-command.ts';
+import { readCapClock } from './lanes/cap/read-cap-clock.ts';
+import { readFallbackCapView } from './lanes/cap/read-fallback-cap-view.ts';
+import { formatCapLine } from './lanes/cap/format-cap-line.ts';
 import { parseLaneSkipArgs } from './lanes/parse-lane-skip-args.ts';
 import { runLaneSkipCommand } from './lanes/run-lane-skip-command.ts';
 import { reportReady } from './lanes/report-ready.ts';
@@ -1067,7 +1075,9 @@ async function capacityCommand(db: Database, verb: string | undefined, args: str
       const reading = await latestSample(db);
       const open = openAlerts(db);
       const lines = [reading ? readingText(reading) : 'No sample yet: hq capacity sample reads one now.', 'Thresholds:', ...thresholdLines(db, reading).map((l) => `  ${l}`), Object.keys(open).length ? 'Open alerts:' : 'No open alerts.', ...Object.values(open).map((o) => `  ${o.line} (since ${o.since}${o.told ? '' : ', not yet told'})`)];
-      return { data: { sample: reading, settings: capacitySettings(db), open }, text: lines.join('\n') };
+      const pacing = await loadPacing(pacingPath());
+      const hint = readCapacityHint(db, pacing.claudeLaunchPct ?? 95, now());
+      return { data: { sample: reading, hint, settings: capacitySettings(db), open }, text: [...lines, ...formatCapacityHint(hint)].join('\n') };
     }
     case 'sample': {
       const r = await capacityTick(db, await actor(db, flags));
@@ -1811,6 +1821,10 @@ async function lanesCommand(context: Pick<Ctx, 'db' | 'verb' | 'rest' | 'flags' 
       const had = releaseLanes(db, await by());
       return { data: { released: had }, text: had ? 'Slot nudges resume from the next look.' : 'No lanes hold to release.' };
     }
+    case 'cap': {
+      const args = parseLanesCapArgs(context.rest, flags.until, flags.reason);
+      return runLanesCapCommand({ db, at: readCapClock(args), args, probe: readOwnerProbeDeps() });
+    }
     case 'skip': {
       const args = parseLaneSkipArgs(context.rest, flags.until, flags.reason);
       return runLaneSkipCommand({ db, actor: await by(), at: now(), args });
@@ -1851,16 +1865,18 @@ async function lanesCommand(context: Pick<Ctx, 'db' | 'verb' | 'rest' | 'flags' 
       const slotMinutesToday = readSlotMinutes(db, sydney(lookAt).date);
       const readyNote = readySummary(db, LANES.readyFreshMinutes());
       const parked = parkedRuns(db);
+      const capView = slotPlan?.cap ?? readFallbackCapView(db, sample, lookAt);
+      const fallbackCapLine = slotPlan ? null : formatCapLine(capView);
       const laneLines = slotPlan
         ? [
             `imp room now: ${slotsFrom(sample.cap!, sample.impMib).slots} slot(s) (${sample.cap!.imp?.freeMib ?? '?'} MiB free; 0 when no unattended imp provider has quota)`,
             formatLineRoom(loadImpRoom(db, { budgetSlots: slotsFrom(sample.cap ?? {}, sample.impMib).slots, impMib: sample.impMib })),
             ...formatSlotPlan(slotPlan),
-            ...formatSlotCause(slotCause, slotMinutesToday),
+            ...formatSlotCause(slotCause, slotMinutesToday, slotPlan.pool.capHeld),
             ...(readyNote ? [`  ${readyNote.line}`, ...skippedLines(readyNote).map((l) => `  ${l}`)] : []),
             ...(parked.length > 0 ? [`  parked, not counted (blocked with no session awake, or working with every session gone): ${parked.map((parkedRun) => parkedRun.issue).join(', ')}`] : []),
           ]
-        : [`lanes: no slot plan (${sample.error ?? `no lanes in ${pacingPath()}`})`];
+        : [`lanes: no slot plan (${sample.error ?? `no lanes in ${pacingPath()}`})`, ...(fallbackCapLine === null ? [] : [fallbackCapLine])];
       const lines = [
         `watcher: ${unit.stdout.trim() || 'inactive'} (${enabled})`,
         ...laneLines,
@@ -1873,7 +1889,7 @@ async function lanesCommand(context: Pick<Ctx, 'db' | 'verb' | 'rest' | 'flags' 
         ...nudges.map((n) => `  ${n.at} ${n.slots} free for ${n.free_minutes} min, eligible ${n.eligible ?? '?'} → after: ${n.slots_after ?? 'pending'}`),
       ];
       const slotCauses = { now: { cause: slotCause.cause, slots: slotCause.slots, since: slotCause.since, readyAgeMinutes: slotCause.readyAgeMinutes, reason: slotCause.reason, backlogError: slotCause.backlogError }, today: slotMinutesToday };
-      return { data: { watcher: unit.stdout.trim() || 'inactive', enabled, hold, plan: slotPlan, slotCauses, last, ready, idle24h: gap24, nudges }, text: lines.join('\n') };
+      return { data: { watcher: unit.stdout.trim() || 'inactive', enabled, hold, plan: slotPlan, cap: capView, slotCauses, last, ready, idle24h: gap24, nudges }, text: lines.join('\n') };
     }
     default:
       throw new HqError('bad_args', `unknown command: hq lanes ${verb}`);

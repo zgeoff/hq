@@ -1,0 +1,257 @@
+import { expect, onTestFinished, test } from 'bun:test';
+import { freshDb } from '../../../test/helpers.ts';
+import { getMeta } from '../../db/get-meta.ts';
+import { setMeta } from '../../db/set-meta.ts';
+import type { OwnerProbeClient } from '../../pr-status/read-owner-session.ts';
+import { runLanesCapCommand } from './run-lanes-cap-command.ts';
+
+function setupTest() {
+  const fresh = freshDb();
+  onTestFinished(fresh.cleanup);
+  return { db: fresh.db };
+}
+
+test('it shows no cap and the working count when none is set', async () => {
+  const ctx = setupTest();
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'z-delivery': 'kettle-2' }));
+
+  const out = await runLanesCapCommand({ db: ctx.db, at: new Date('2026-10-15T00:00:00Z'), args: { kind: 'show' }, probe: { openClient: () => Promise.resolve({ peerSession: 'kettle-9', close: () => {} }) } });
+
+  expect(out.text).toBe('no cap, 0 working (counted by run: the atc reading is stale)');
+  expect(out.data).toStrictEqual({ cap: null, working: 0, workingFrom: 'runs', error: null });
+});
+
+test('it sets a cap from the owner, files an event and news, and shows it', async () => {
+  const ctx = setupTest();
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'z-delivery': 'kettle-2' }));
+
+  await runLanesCapCommand({ db: ctx.db, at: new Date('2026-10-15T00:00:00Z'), args: { kind: 'set', cap: 7, until: 'Mon 08:00', reason: 'weekend pacing' }, probe: { openClient: () => Promise.resolve({ peerSession: 'kettle-1', close: () => {} }) } });
+  const shown = await runLanesCapCommand({ db: ctx.db, at: new Date('2026-10-15T00:00:00Z'), args: { kind: 'show' }, probe: { openClient: () => Promise.resolve({ peerSession: 'kettle-9', close: () => {} }) } });
+
+  expect(shown.text).toBe('cap: 7 until Mon 08:00 Sydney (weekend pacing), 0 working (counted by run: the atc reading is stale)');
+  expect(ctx.db.query("SELECT action, actor, from_state, to_state FROM events WHERE subject_id = 'lanes'").all()).toStrictEqual([{ action: 'cap-set', actor: 'z-stu', from_state: 'none', to_state: 'set' }]);
+  expect(ctx.db.query('SELECT from_name, text FROM news').all()).toStrictEqual([{ from_name: 'z-stu', text: 'z-stu capped working delivery sessions at 7 until Mon 08:00 Sydney (weekend pacing)' }]);
+});
+
+test('it lifts a cap from the owner, files an event and news, and shows no cap', async () => {
+  const ctx = setupTest();
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'z-delivery': 'kettle-2' }));
+  await runLanesCapCommand({ db: ctx.db, at: new Date('2026-10-15T00:00:00Z'), args: { kind: 'set', cap: 7, until: null, reason: null }, probe: { openClient: () => Promise.resolve({ peerSession: 'kettle-1', close: () => {} }) } });
+
+  await runLanesCapCommand({ db: ctx.db, at: new Date('2026-10-15T00:00:00Z'), args: { kind: 'off', reason: 'the quota is back' }, probe: { openClient: () => Promise.resolve({ peerSession: 'kettle-1', close: () => {} }) } });
+
+  expect(getMeta(ctx.db, 'lanes_cap')).toBeNull();
+  expect(ctx.db.query("SELECT action FROM events WHERE subject_id = 'lanes' ORDER BY seq").all()).toStrictEqual([{ action: 'cap-set' }, { action: 'cap-off' }]);
+  expect(ctx.db.query('SELECT text FROM news ORDER BY id DESC LIMIT 1').get()).toStrictEqual({ text: 'z-stu lifted the lanes cap of 7 (the quota is back)' });
+});
+
+test('it records the reason given for the lift in the event, not the reason the cap was set for', async () => {
+  const ctx = setupTest();
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'z-delivery': 'kettle-2' }));
+  await runLanesCapCommand({ db: ctx.db, at: new Date('2026-10-15T00:00:00Z'), args: { kind: 'set', cap: 7, until: null, reason: 'kettle descaling' }, probe: { openClient: () => Promise.resolve({ peerSession: 'kettle-1', close: () => {} }) } });
+
+  await runLanesCapCommand({ db: ctx.db, at: new Date('2026-10-15T00:00:00Z'), args: { kind: 'off', reason: 'kettle descaled' }, probe: { openClient: () => Promise.resolve({ peerSession: 'kettle-1', close: () => {} }) } });
+
+  expect(ctx.db.query("SELECT data FROM events WHERE subject_id = 'lanes' AND action = 'cap-off'").get()).toStrictEqual({ data: JSON.stringify({ cap: 7, until: null, reason: 'kettle descaled', by: 'z-stu' }) });
+});
+
+test('it says there is no cap to lift, and files nothing', async () => {
+  const ctx = setupTest();
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'z-delivery': 'kettle-2' }));
+
+  const out = await runLanesCapCommand({ db: ctx.db, at: new Date('2026-10-15T00:00:00Z'), args: { kind: 'off', reason: null }, probe: { openClient: () => Promise.resolve({ peerSession: 'kettle-1', close: () => {} }) } });
+
+  expect(out.text).toBe('There is no cap to lift.');
+  expect(ctx.db.query("SELECT COUNT(*) AS total FROM events WHERE subject_id = 'lanes'").get()).toStrictEqual({ total: 0 });
+});
+
+test('it ends a cap whose time passed with no tick to clear it before setting the new one', async () => {
+  const ctx = setupTest();
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'z-delivery': 'kettle-2' }));
+  setMeta(ctx.db, 'lanes_cap', JSON.stringify({ cap: 2, until: '2026-10-14T21:00:00Z', reason: 'kettle descaling', by: 'z-stu', at: '2026-10-14T00:00:00Z' }));
+
+  await runLanesCapCommand({ db: ctx.db, at: new Date('2026-10-15T00:00:00Z'), args: { kind: 'set', cap: 6, until: null, reason: null }, probe: { openClient: () => Promise.resolve({ peerSession: 'kettle-1', close: () => {} }) } });
+
+  expect(ctx.db.query("SELECT action, actor, from_state, to_state FROM events WHERE subject_id = 'lanes' ORDER BY seq").all()).toStrictEqual([
+    { action: 'cap-ended', actor: 'z-stu', from_state: 'set', to_state: 'none' },
+    { action: 'cap-set', actor: 'z-stu', from_state: 'none', to_state: 'set' },
+  ]);
+  expect(ctx.db.query('SELECT text FROM news ORDER BY id').all()).toStrictEqual([{ text: 'Lanes cap 2 ended (set until Thu 08:00)' }, { text: 'z-stu capped working delivery sessions at 6' }]);
+  expect(ctx.db.query('SELECT target, text FROM outbox').all()).toStrictEqual([{ target: 'z-delivery', text: 'Lanes cap 2 ended (set until Thu 08:00): slots are free again, so fill whatever the pool leaves free.' }]);
+});
+
+test('it ends a cap whose time passed when the owner lifts it, and says there is no cap to lift', async () => {
+  const ctx = setupTest();
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'z-delivery': 'kettle-2' }));
+  setMeta(ctx.db, 'lanes_cap', JSON.stringify({ cap: 2, until: '2026-10-14T21:00:00Z', reason: 'kettle descaling', by: 'z-stu', at: '2026-10-14T00:00:00Z' }));
+
+  const out = await runLanesCapCommand({ db: ctx.db, at: new Date('2026-10-15T00:00:00Z'), args: { kind: 'off', reason: null }, probe: { openClient: () => Promise.resolve({ peerSession: 'kettle-1', close: () => {} }) } });
+
+  expect(out.text).toBe('There is no cap to lift.');
+  expect(ctx.db.query("SELECT action FROM events WHERE subject_id = 'lanes'").all()).toStrictEqual([{ action: 'cap-ended' }]);
+  expect(getMeta(ctx.db, 'lanes_cap')).toBeNull();
+});
+
+test('it leaves a cap whose time passed for the tick when the caller is refused', () => {
+  const ctx = setupTest();
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'z-delivery': 'kettle-2' }));
+  setMeta(ctx.db, 'lanes_cap', JSON.stringify({ cap: 2, until: '2026-10-14T21:00:00Z', reason: 'kettle descaling', by: 'z-stu', at: '2026-10-14T00:00:00Z' }));
+
+  const refused = runLanesCapCommand({ db: ctx.db, at: new Date('2026-10-15T00:00:00Z'), args: { kind: 'set', cap: 6, until: null, reason: null }, probe: { openClient: () => Promise.resolve({ peerSession: 'kettle-9', close: () => {} }) } });
+
+  expect(refused).rejects.toMatchObject({ code: 'not_allowed' });
+  expect(ctx.db.query("SELECT COUNT(*) AS total FROM events WHERE subject_id = 'lanes'").get()).toStrictEqual({ total: 0 });
+});
+
+test('it lets the owner raise a cap', async () => {
+  const ctx = setupTest();
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'z-delivery': 'kettle-2' }));
+  await runLanesCapCommand({ db: ctx.db, at: new Date('2026-10-15T00:00:00Z'), args: { kind: 'set', cap: 7, until: null, reason: null }, probe: { openClient: () => Promise.resolve({ peerSession: 'kettle-1', close: () => {} }) } });
+
+  const out = await runLanesCapCommand({ db: ctx.db, at: new Date('2026-10-15T00:00:00Z'), args: { kind: 'set', cap: 12, until: null, reason: null }, probe: { openClient: () => Promise.resolve({ peerSession: 'kettle-1', close: () => {} }) } });
+
+  expect(out.data).toMatchObject({ cap: { cap: 12, by: 'z-stu' } });
+});
+
+test('it lets the delivery lead set a cap where none exists, recorded under its name', async () => {
+  const ctx = setupTest();
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'z-delivery': 'kettle-2' }));
+
+  const out = await runLanesCapCommand({ db: ctx.db, at: new Date('2026-10-15T00:00:00Z'), args: { kind: 'set', cap: 4, until: null, reason: 'quota' }, probe: { openClient: () => Promise.resolve({ peerSession: 'kettle-2', close: () => {} }) } });
+
+  expect(out.data).toMatchObject({ cap: { cap: 4, by: 'z-delivery', reason: 'quota' } });
+});
+
+test('it lets the delivery lead lower a cap and keeps the until it does not replace', async () => {
+  const ctx = setupTest();
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'z-delivery': 'kettle-2' }));
+  await runLanesCapCommand({ db: ctx.db, at: new Date('2026-10-15T00:00:00Z'), args: { kind: 'set', cap: 7, until: '2026-10-20T00:00:00Z', reason: 'weekend pacing' }, probe: { openClient: () => Promise.resolve({ peerSession: 'kettle-1', close: () => {} }) } });
+
+  const out = await runLanesCapCommand({ db: ctx.db, at: new Date('2026-10-15T00:00:00Z'), args: { kind: 'set', cap: 5, until: null, reason: null }, probe: { openClient: () => Promise.resolve({ peerSession: 'kettle-2', close: () => {} }) } });
+
+  expect(out.data).toMatchObject({ cap: { cap: 5, until: '2026-10-20T00:00:00Z', reason: 'weekend pacing', by: 'z-delivery' } });
+});
+
+test('it refuses the delivery lead raising a cap and leaves it as it was', async () => {
+  const ctx = setupTest();
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'z-delivery': 'kettle-2' }));
+  await runLanesCapCommand({ db: ctx.db, at: new Date('2026-10-15T00:00:00Z'), args: { kind: 'set', cap: 7, until: null, reason: null }, probe: { openClient: () => Promise.resolve({ peerSession: 'kettle-1', close: () => {} }) } });
+  const before = getMeta(ctx.db, 'lanes_cap');
+
+  const refused = runLanesCapCommand({ db: ctx.db, at: new Date('2026-10-15T00:00:00Z'), args: { kind: 'set', cap: 9, until: null, reason: null }, probe: { openClient: () => Promise.resolve({ peerSession: 'kettle-2', close: () => {} }) } });
+
+  expect(refused).rejects.toMatchObject({ code: 'not_allowed' });
+  expect(getMeta(ctx.db, 'lanes_cap')).toBe(before);
+});
+
+test('it judges the delivery lead against the cap stored when it writes, not before atc answered', async () => {
+  const ctx = setupTest();
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'z-delivery': 'kettle-2' }));
+  await runLanesCapCommand({ db: ctx.db, at: new Date('2026-10-15T00:00:00Z'), args: { kind: 'set', cap: 7, until: null, reason: null }, probe: { openClient: () => Promise.resolve({ peerSession: 'kettle-1', close: () => {} }) } });
+  const lowered = JSON.stringify({ cap: 3, until: null, reason: 'owner lowered it meanwhile', by: 'z-stu', at: '2026-10-15T00:00:00Z' });
+  const atcAnswer = Promise.withResolvers<OwnerProbeClient>();
+
+  const refused = runLanesCapCommand({ db: ctx.db, at: new Date('2026-10-15T00:00:00Z'), args: { kind: 'set', cap: 5, until: null, reason: null }, probe: { openClient: () => atcAnswer.promise } });
+  setMeta(ctx.db, 'lanes_cap', lowered);
+  atcAnswer.resolve({ peerSession: 'kettle-2', close: () => {} });
+
+  await expect(refused).rejects.toThrow('z-delivery may only lower the lanes cap (now 3)');
+  expect(getMeta(ctx.db, 'lanes_cap')).toBe(lowered);
+});
+
+test('it refuses the delivery lead lifting a cap', async () => {
+  const ctx = setupTest();
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'z-delivery': 'kettle-2' }));
+  await runLanesCapCommand({ db: ctx.db, at: new Date('2026-10-15T00:00:00Z'), args: { kind: 'set', cap: 7, until: null, reason: null }, probe: { openClient: () => Promise.resolve({ peerSession: 'kettle-1', close: () => {} }) } });
+
+  const refused = runLanesCapCommand({ db: ctx.db, at: new Date('2026-10-15T00:00:00Z'), args: { kind: 'off', reason: null }, probe: { openClient: () => Promise.resolve({ peerSession: 'kettle-2', close: () => {} }) } });
+
+  expect(refused).rejects.toMatchObject({ code: 'not_allowed' });
+});
+
+test('it refuses a caller that is neither the owner nor the delivery lead', () => {
+  const ctx = setupTest();
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'z-delivery': 'kettle-2' }));
+
+  const refused = runLanesCapCommand({ db: ctx.db, at: new Date('2026-10-15T00:00:00Z'), args: { kind: 'set', cap: 4, until: null, reason: null }, probe: { openClient: () => Promise.resolve({ peerSession: 'kettle-9', close: () => {} }) } });
+
+  expect(refused).rejects.toThrow('only z-stu may change the lanes cap');
+  expect(getMeta(ctx.db, 'lanes_cap')).toBeNull();
+});
+
+test('it refuses a caller atc places in no session', () => {
+  const ctx = setupTest();
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'z-delivery': 'kettle-2' }));
+
+  const refused = runLanesCapCommand({ db: ctx.db, at: new Date('2026-10-15T00:00:00Z'), args: { kind: 'set', cap: 4, until: null, reason: null }, probe: { openClient: () => Promise.resolve({ peerSession: null, close: () => {} }) } });
+
+  expect(refused).rejects.toMatchObject({ code: 'not_allowed' });
+});
+
+test('it refuses every change while atc cannot be reached', () => {
+  const ctx = setupTest();
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'z-delivery': 'kettle-2' }));
+
+  const refused = runLanesCapCommand({ db: ctx.db, at: new Date('2026-10-15T00:00:00Z'), args: { kind: 'set', cap: 4, until: null, reason: null }, probe: { openClient: () => Promise.reject(new Error('connect ENOENT atc.sock')) } });
+
+  expect(refused).rejects.toThrow('connect ENOENT atc.sock');
+  expect(getMeta(ctx.db, 'lanes_cap')).toBeNull();
+});
+
+test('it refuses an until in the past', () => {
+  const ctx = setupTest();
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'z-delivery': 'kettle-2' }));
+
+  const refused = runLanesCapCommand({ db: ctx.db, at: new Date('2026-10-15T00:00:00Z'), args: { kind: 'set', cap: 4, until: '2026-10-14T00:00:00Z', reason: null }, probe: { openClient: () => Promise.resolve({ peerSession: 'kettle-1', close: () => {} }) } });
+
+  expect(refused).rejects.toThrow('has passed');
+});
+
+test('it reports a malformed stored cap, applies none, and lets the owner replace it', async () => {
+  const ctx = setupTest();
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'z-delivery': 'kettle-2' }));
+  setMeta(ctx.db, 'lanes_cap', '{"cap":"many"}');
+
+  const shown = await runLanesCapCommand({ db: ctx.db, at: new Date('2026-10-15T00:00:00Z'), args: { kind: 'show' }, probe: { openClient: () => Promise.resolve({ peerSession: 'kettle-9', close: () => {} }) } });
+  const set = await runLanesCapCommand({ db: ctx.db, at: new Date('2026-10-15T00:00:00Z'), args: { kind: 'set', cap: 3, until: null, reason: null }, probe: { openClient: () => Promise.resolve({ peerSession: 'kettle-1', close: () => {} }) } });
+
+  expect(shown.text).toStartWith('no cap, 0 working');
+  expect(shown.text).toInclude("the stored cap is unusable, so no cap applies: meta 'lanes_cap' is malformed at cap");
+  expect(set.data).toMatchObject({ cap: { cap: 3 } });
+});
+
+test('it lets the owner lift an unusable stored cap, filing an event and news that name the fault', async () => {
+  const ctx = setupTest();
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'z-delivery': 'kettle-2' }));
+  setMeta(ctx.db, 'lanes_cap', 'seven');
+
+  const out = await runLanesCapCommand({ db: ctx.db, at: new Date('2026-10-15T00:00:00Z'), args: { kind: 'off', reason: 'teapot spilled' }, probe: { openClient: () => Promise.resolve({ peerSession: 'kettle-1', close: () => {} }) } });
+
+  expect(out).toStrictEqual({ data: { cap: null, by: 'z-stu' }, text: 'The unusable lanes cap is cleared; the slots obey the pool alone from the next look.' });
+  expect(getMeta(ctx.db, 'lanes_cap')).toBeNull();
+  expect(ctx.db.query("SELECT action, actor, from_state, to_state, data FROM events WHERE subject_id = 'lanes'").all()).toStrictEqual([
+    { action: 'cap-off', actor: 'z-stu', from_state: 'bad', to_state: 'none', data: JSON.stringify({ error: "meta 'lanes_cap' is not valid JSON", reason: 'teapot spilled' }) },
+  ]);
+  expect(ctx.db.query('SELECT from_name, text FROM news').all()).toStrictEqual([{ from_name: 'z-stu', text: "z-stu cleared an unusable lanes cap (teapot spilled): meta 'lanes_cap' is not valid JSON" }]);
+});
+
+test('it refuses the delivery lead lifting an unusable stored cap and leaves it', () => {
+  const ctx = setupTest();
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'z-delivery': 'kettle-2' }));
+  setMeta(ctx.db, 'lanes_cap', 'seven');
+
+  const refused = runLanesCapCommand({ db: ctx.db, at: new Date('2026-10-15T00:00:00Z'), args: { kind: 'off', reason: null }, probe: { openClient: () => Promise.resolve({ peerSession: 'kettle-2', close: () => {} }) } });
+
+  expect(refused).rejects.toMatchObject({ code: 'not_allowed' });
+  expect(getMeta(ctx.db, 'lanes_cap')).toBe('seven');
+});
+
+test('it reports a stored cap that is not JSON', async () => {
+  const ctx = setupTest();
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'z-delivery': 'kettle-2' }));
+  setMeta(ctx.db, 'lanes_cap', 'seven');
+
+  const shown = await runLanesCapCommand({ db: ctx.db, at: new Date('2026-10-15T00:00:00Z'), args: { kind: 'show' }, probe: { openClient: () => Promise.resolve({ peerSession: 'kettle-9', close: () => {} }) } });
+
+  expect(shown.data).toMatchObject({ error: "meta 'lanes_cap' is not valid JSON" });
+});

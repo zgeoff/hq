@@ -11,6 +11,8 @@ export interface SlotPool {
   localFree: number;
   free: number;
 
+  capHeld: boolean;
+
   // Why fewer imp slots are free than the imp size leaves, or null when none is held back.
   held: string | null;
 
@@ -21,19 +23,28 @@ export interface SlotPool {
   localSource: string | null;
 }
 
+interface SlotLimits {
+  room: ImpRoom | null;
+  localRoom: number | null;
+
+  capRoom: number | null;
+}
+
 // The lanes' slots as one pool: pacing.json's imp and local slot caps, less the runs that hold a slot.
 // Imp slots stay under capacity.sh's budget and impd's non-Nix line (room; null: no reading). Local
 // slots stay under localRoom, what unattended providers may run on this host (null: no cap but the size).
-export function buildSlotPool(slots: PacingSlots, running: Pick<RunningByPlace, 'imp' | 'local' | 'localSource'>, room: ImpRoom | null, localRoom: number | null): SlotPool {
+export function buildSlotPool(slots: PacingSlots, running: Pick<RunningByPlace, 'imp' | 'local' | 'localSource'>, limits: SlotLimits): SlotPool {
   const impSize = slots.imp;
   const localSize = slots.local;
   const impOpen = Math.max(0, impSize - running.imp);
-  const impFree = Math.min(impOpen, room?.slots ?? 0);
+  const impFree = Math.min(impOpen, limits.room?.slots ?? 0);
   const localOpen = Math.max(0, localSize - running.local);
-  const localFree = localRoom === null ? localOpen : Math.min(localOpen, Math.max(0, localRoom - running.local));
-  const held = impFree < impOpen ? (room?.heldBy ?? 'no imp reading') : null;
-  const localHeld = localFree < localOpen && localRoom !== null ? formatLocalHeld(localFree, localRoom) : null;
-  return { impSize, localSize, impRunning: running.imp, localRunning: running.local, impFree, localFree, free: impFree + localFree, held, localHeld, localSource: running.localSource };
+  const localFree = limits.localRoom === null ? localOpen : Math.min(localOpen, Math.max(0, limits.localRoom - running.local));
+  const held = impFree < impOpen ? (limits.room?.heldBy ?? 'no imp reading') : null;
+  const localHeld = localFree < localOpen && limits.localRoom !== null ? formatLocalHeld(localFree, limits.localRoom) : null;
+  const poolFree = impFree + localFree;
+  const free = limits.capRoom === null ? poolFree : Math.min(poolFree, limits.capRoom);
+  return { impSize, localSize, impRunning: running.imp, localRunning: running.local, impFree, localFree, free, capHeld: free < poolFree, held, localHeld, localSource: running.localSource };
 }
 
 function formatLocalHeld(localFree: number, localRoom: number): string {

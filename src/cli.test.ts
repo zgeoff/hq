@@ -234,3 +234,118 @@ test('hq lanes shows the cause of the empty slots and the minutes by cause for t
     today: { delivery: 12.4, triage: 40.6, supply: 0 },
   });
 });
+
+test('hq lanes cap shows the stored cap with the working count', async () => {
+  const fresh = freshDb();
+  onTestFinished(fresh.cleanup);
+  setMeta(fresh.db, 'lanes_cap', JSON.stringify({ cap: 7, until: '2026-10-18T21:00:00Z', reason: 'weekend pacing', by: 'z-stu', at: '2026-10-14T00:00:00Z' }));
+  const child = Bun.spawn(['bun', join(import.meta.dir, 'cli.ts'), 'lanes', 'cap', '--json'], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, HOME: fresh.dir, HQ_DB: fresh.path, HQ_NOTIFY: 'off', HQ_NOW: NOON_SYDNEY } });
+
+  const [code, stdout] = await Promise.all([child.exited, new Response(child.stdout).text()]);
+
+  expect(code).toBe(0);
+  expect(JSON.parse(stdout)).toStrictEqual({ ok: true, cap: { cap: 7, until: '2026-10-18T21:00:00Z', reason: 'weekend pacing', by: 'z-stu', at: '2026-10-14T00:00:00Z' }, working: 0, workingFrom: 'runs', error: null });
+});
+
+test('hq lanes cap refuses a change while atc cannot say who is asking, and stores nothing', async () => {
+  const fresh = freshDb();
+  onTestFinished(fresh.cleanup);
+  setMeta(fresh.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'z-delivery': 'kettle-2' }));
+  const child = Bun.spawn(['bun', join(import.meta.dir, 'cli.ts'), 'lanes', 'cap', '7', '--json'], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, HOME: fresh.dir, HQ_DB: fresh.path, HQ_NOTIFY: 'off', HQ_NOW: NOON_SYDNEY, HQ_AS: 'z-stu' } });
+
+  const [code, stdout] = await Promise.all([child.exited, new Response(child.stdout).text()]);
+
+  expect(code).toBe(1);
+  expect(JSON.parse(stdout)).toStrictEqual({ ok: false, error: { code: 'not_allowed', message: expect.stringMatching(/^atc could not say who is asking, so the lanes cap stays as it is: /u) } });
+  expect(fresh.db.query("SELECT value FROM meta WHERE key = 'lanes_cap'").get()).toBeNull();
+});
+
+test('hq lanes cap refuses a count that is not a whole number', async () => {
+  const fresh = freshDb();
+  onTestFinished(fresh.cleanup);
+  const child = Bun.spawn(['bun', join(import.meta.dir, 'cli.ts'), 'lanes', 'cap', 'seven', '--json'], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, HOME: fresh.dir, HQ_DB: fresh.path, HQ_NOTIFY: 'off', HQ_NOW: NOON_SYDNEY } });
+
+  const [code, stdout] = await Promise.all([child.exited, new Response(child.stdout).text()]);
+
+  expect(code).toBe(1);
+  expect(JSON.parse(stdout)).toStrictEqual({ ok: false, error: { code: 'bad_args', message: 'hq lanes cap takes a whole number from 0, or off, not "seven"; hq lanes cap | cap <n> [--until <ISO time|Ddd HH:MM>] [--reason TEXT] | cap off [--reason TEXT]' } });
+});
+
+test('hq lanes --json carries the stored cap with the working count and what limits the slots', async () => {
+  const fresh = freshDb();
+  onTestFinished(fresh.cleanup);
+  mkdirSync(`${fresh.dir}/bin`);
+  writeFileSync(`${fresh.dir}/bin/systemctl`, '#!/bin/sh\nexit 3\n');
+  chmodSync(`${fresh.dir}/bin/systemctl`, 0o755);
+  mkdirSync(`${fresh.dir}/skill/scripts`, { recursive: true });
+  writeFileSync(`${fresh.dir}/skill/scripts/capacity.sh`, `echo '${JSON.stringify({ imp: { freeMib: 0, room: false } })}'\n`);
+  writeFileSync(`${fresh.dir}/skill/pacing.json`, JSON.stringify({ slots: { imp: 0, local: 2 } }));
+  setMeta(fresh.db, 'lanes_ready_issues', JSON.stringify({ at: '2026-10-14T00:55:00Z', eligible: [], design: [] }));
+  setMeta(fresh.db, 'lanes_promotable_focus', JSON.stringify({ at: '2026-10-14T00:50:00Z', count: 3, focus: '[]' }));
+  setMeta(fresh.db, 'lanes_cap', JSON.stringify({ cap: 1, until: '2026-10-18T21:00:00Z', reason: 'weekend pacing', by: 'z-stu', at: '2026-10-14T00:00:00Z' }));
+  const child = Bun.spawn(['bun', join(import.meta.dir, 'cli.ts'), 'lanes', '--json'], {
+    stdout: 'pipe',
+    stderr: 'pipe',
+    env: { ...process.env, HOME: fresh.dir, HQ_DB: fresh.path, HQ_PROJECTS: `${fresh.dir}/projects`, HQ_CAPACITY: `${fresh.dir}/skill/scripts/capacity.sh`, HQ_NOTIFY: 'off', HQ_NOW: NOON_SYDNEY, HQ_AS: 'z-delivery', PATH: `${fresh.dir}/bin:${process.env['PATH']}` },
+  });
+
+  const [, stdout] = await Promise.all([child.exited, new Response(child.stdout).text()]);
+
+  expect(JSON.parse(stdout).cap).toStrictEqual({ cap: 1, until: '2026-10-18T21:00:00Z', reason: 'weekend pacing', by: 'z-stu', working: 0, limitedBy: 'cap', workingFrom: 'runs' });
+});
+
+test('hq lanes --json carries the stored cap the watcher enforces when pacing has no lanes', async () => {
+  const fresh = freshDb();
+  onTestFinished(fresh.cleanup);
+  mkdirSync(`${fresh.dir}/bin`);
+  writeFileSync(`${fresh.dir}/bin/systemctl`, '#!/bin/sh\nexit 3\n');
+  chmodSync(`${fresh.dir}/bin/systemctl`, 0o755);
+  mkdirSync(`${fresh.dir}/skill/scripts`, { recursive: true });
+  writeFileSync(`${fresh.dir}/skill/scripts/capacity.sh`, `echo '${JSON.stringify({ imp: { freeMib: 0, room: false } })}'\n`);
+  writeFileSync(`${fresh.dir}/skill/pacing.json`, '{}');
+  setMeta(fresh.db, 'lanes_cap', JSON.stringify({ cap: 0, until: '2026-10-18T21:00:00Z', reason: 'kettle descaling', by: 'z-stu', at: '2026-10-14T00:00:00Z' }));
+  const child = Bun.spawn(['bun', join(import.meta.dir, 'cli.ts'), 'lanes', '--json'], {
+    stdout: 'pipe',
+    stderr: 'pipe',
+    env: { ...process.env, HOME: fresh.dir, HQ_DB: fresh.path, HQ_PROJECTS: `${fresh.dir}/projects`, HQ_CAPACITY: `${fresh.dir}/skill/scripts/capacity.sh`, HQ_NOTIFY: 'off', HQ_NOW: NOON_SYDNEY, HQ_AS: 'z-delivery', PATH: `${fresh.dir}/bin:${process.env['PATH']}` },
+  });
+
+  const [, stdout] = await Promise.all([child.exited, new Response(child.stdout).text()]);
+
+  expect(JSON.parse(stdout)).toMatchObject({ plan: null, cap: { cap: 0, until: '2026-10-18T21:00:00Z', reason: 'kettle descaling', by: 'z-stu', working: 0, limitedBy: 'pool', workingFrom: 'runs' } });
+});
+
+test('hq lanes prints the stored cap under the missing slot plan when pacing has no lanes', async () => {
+  const fresh = freshDb();
+  onTestFinished(fresh.cleanup);
+  mkdirSync(`${fresh.dir}/bin`);
+  writeFileSync(`${fresh.dir}/bin/systemctl`, '#!/bin/sh\nexit 3\n');
+  chmodSync(`${fresh.dir}/bin/systemctl`, 0o755);
+  mkdirSync(`${fresh.dir}/skill/scripts`, { recursive: true });
+  writeFileSync(`${fresh.dir}/skill/scripts/capacity.sh`, `echo '${JSON.stringify({ imp: { freeMib: 0, room: false } })}'\n`);
+  writeFileSync(`${fresh.dir}/skill/pacing.json`, '{}');
+  setMeta(fresh.db, 'lanes_cap', JSON.stringify({ cap: 0, until: '2026-10-18T21:00:00Z', reason: 'kettle descaling', by: 'z-stu', at: '2026-10-14T00:00:00Z' }));
+  const child = Bun.spawn(['bun', join(import.meta.dir, 'cli.ts'), 'lanes'], {
+    stdout: 'pipe',
+    stderr: 'pipe',
+    env: { ...process.env, HOME: fresh.dir, HQ_DB: fresh.path, HQ_PROJECTS: `${fresh.dir}/projects`, HQ_CAPACITY: `${fresh.dir}/skill/scripts/capacity.sh`, HQ_NOTIFY: 'off', HQ_NOW: NOON_SYDNEY, HQ_AS: 'z-delivery', PATH: `${fresh.dir}/bin:${process.env['PATH']}` },
+  });
+
+  const [, stdout] = await Promise.all([child.exited, new Response(child.stdout).text()]);
+
+  expect(stdout.split('\n').slice(1, 3)).toStrictEqual([expect.stringMatching(/^lanes: no slot plan /u), 'cap: 0 until Mon 08:00 Sydney (kettle descaling), 0 working (counted by run: the atc reading is stale)']);
+});
+
+test('hq capacity --json carries the Claude burn hint from the usage samples', async () => {
+  const fresh = freshDb();
+  onTestFinished(fresh.cleanup);
+  const insert = fresh.db.query('INSERT INTO usage_samples (at, account, five_hour, seven_day) VALUES (?, ?, ?, ?)');
+  insert.run('2026-10-14T00:30:00Z', 'kettle01', 10, 20);
+  insert.run('2026-10-14T01:00:00Z', 'kettle01', 12, 22);
+  const child = Bun.spawn(['bun', join(import.meta.dir, 'cli.ts'), 'capacity', 'show', '--json'], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, HOME: fresh.dir, HQ_DB: fresh.path, HQ_NOTIFY: 'off', HQ_NOW: NOON_SYDNEY } });
+
+  const [code, stdout] = await Promise.all([child.exited, new Response(child.stdout).text()]);
+
+  expect(code).toBe(0);
+  expect(JSON.parse(stdout)).toMatchObject({ hint: { hours: 2, limit: 95, account: 'kettle01', windows: [{ window: '7-day', samples: 2, ratePerHour: null }, { window: '5-hour', samples: 2, ratePerHour: null }] } });
+});

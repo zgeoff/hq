@@ -2,6 +2,7 @@ import type { Database } from 'bun:sqlite';
 import { iso } from '../clock/iso.ts';
 import { HqError } from '../errors.ts';
 import { ISSUE } from '../followups/issue.ts';
+import { ISO_TIME } from './iso-time.ts';
 import { parsePRUntil } from './pr-until.ts';
 import type { LaneSkip } from './types.ts';
 import { writeSkipMove } from './write-skip-move.ts';
@@ -28,8 +29,6 @@ export function writeLaneSkip(db: Database, change: SkipChange): LaneSkip {
   db.transaction(() => writeSkipMove(db, 'skip-set', skip, change.actor)).immediate();
   return skip;
 }
-
-const ISO_TIME = /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2}))?$/u;
 
 function parseUntil(until: string, issue: string, at: Date): string {
   if (ISSUE.test(until)) {

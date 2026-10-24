@@ -4,6 +4,7 @@ import { parkedRuns } from '../areas/parked-runs.ts';
 import { readFreshAwake } from '../areas/read-fresh-awake.ts';
 import { RUNNING } from '../areas/running.ts';
 import { now } from '../clock/now.ts';
+import { readDesignIssues } from './read-design-issues.ts';
 
 export interface RunningByPlace {
   imp: number;
@@ -37,13 +38,6 @@ export function readRunningByPlace(db: Database, at: Date = now()): RunningByPla
   }
   const plural = live.sessions === 1 ? '' : 's';
   return { imp, local: live.sessions, issues, impIssues, localSource: `${live.sessions} live session${plural} here` };
-}
-
-const designSchema = z.array(z.object({ issue: z.string() }));
-
-function readDesignIssues(db: Database): Set<string> {
-  const rows = designSchema.parse(db.query("SELECT issue FROM linear_issues WHERE type = 'Design'").all());
-  return new Set(rows.map((row) => row.issue));
 }
 
 interface LiveLocal {
