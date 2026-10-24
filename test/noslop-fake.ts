@@ -47,7 +47,7 @@ export interface FakeScript {
   markerComments?: RunResult;
 
   // What the read of the check runs named `noslop` at a commit prints, one compact JSON object a
-  // line: one completed, successful run by the noslop App when absent.
+  // line: one completed, successful run by the noslop App, newer than the default summary, when absent.
   noslopChecks?: RunResult;
 
   // Run git for real, in the checkout the caller names, except `git remote get-url origin` and the
@@ -140,10 +140,10 @@ function pickGhAnswer(script: FakeScript, line: string): RunResult | null {
     return script.prFiles ?? buildResult('src/kettle.ts\n');
   }
   if (line.startsWith('gh api repos/') && line.includes('/issues/') && line.includes('/comments --paginate') && line.includes('user.login')) {
-    return script.markerComments ?? buildResult(`${JSON.stringify({ login: 'noslop-review[bot]', body: `<!-- noslop:summary {"head":"${FAKE_FULL_SHA}","reviews":1} -->` })}\n`);
+    return script.markerComments ?? buildResult(`${JSON.stringify({ login: 'noslop-review[bot]', body: `<!-- noslop:summary {"head":"${FAKE_FULL_SHA}","reviews":1} -->`, updatedAt: '2026-10-14T01:00:00Z' })}\n`);
   }
   if (line.startsWith('gh api repos/') && line.includes('/check-runs?check_name=noslop')) {
-    return script.noslopChecks ?? buildResult(`${JSON.stringify({ id: 9001, name: 'noslop', app: 'noslop-review', status: 'completed', conclusion: 'success', title: 'No findings need attention.' })}\n`);
+    return script.noslopChecks ?? buildResult(`${JSON.stringify({ id: 9001, name: 'noslop', app: 'noslop-review', status: 'completed', conclusion: 'success', title: 'No findings need attention.', completedAt: '2026-10-14T01:00:05Z' })}\n`);
   }
   if (line.startsWith('gh api graphql')) {
     return buildResult('1\n');
