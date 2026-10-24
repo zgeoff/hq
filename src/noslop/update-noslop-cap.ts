@@ -35,7 +35,7 @@ function requireCap(value: string | undefined): number | null {
   if (value === 'off') {
     return null;
   }
-  if (value === undefined || !WHOLE_NUMBER.test(value) || Number(value) < 1) {
+  if (value === undefined || !WHOLE_NUMBER.test(value) || !Number.isSafeInteger(Number(value)) || Number(value) < 1) {
     throw new HqError('bad_args', 'hq noslop cap <repo> <n|off> needs a whole number of 1 or more, or off');
   }
   return Number(value);

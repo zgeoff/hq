@@ -118,6 +118,7 @@ test.each([
   ['zero', ['atc', '0'], 'whole number'],
   ['a word', ['atc', 'many'], 'whole number'],
   ['a fraction', ['atc', '1.5'], 'whole number'],
+  ['a number past the safe integer range', ['atc', '1'.repeat(310)], 'whole number'],
 ])('it refuses hq noslop cap with %s', async (_label, rest, words) => {
   const ctx = setupTest();
 
