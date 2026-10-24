@@ -7,18 +7,21 @@ import { REVIEW_MARK_ACTOR } from './review-mark-actor.ts';
 import type { RunPr } from './types.ts';
 import { updateRunTime as touch } from './update-run-time.ts';
 
-// No round limit here: noslop's round cap already ran before the round.
-export function writeReviewed(db: Database, repo: string, pr: number, head: string): void {
+export interface ReviewedMark {
+  countsRound: boolean;
+}
+
+export function writeReviewed(db: Database, repo: string, pr: number, head: string, mark: ReviewedMark): void {
   db.transaction(() => {
     const found = findOpenPR(db, repo, pr);
     if (found !== null) {
-      writeHead(db, found, head);
+      writeHead(db, found, head, mark);
     }
   }).immediate();
 }
 
-function writeHead(db: Database, found: Pick<RunPr, 'ref' | 'issue' | 'review_round'>, head: string): void {
-  const round = found.review_round + 1;
+function writeHead(db: Database, found: Pick<RunPr, 'ref' | 'issue' | 'review_round'>, head: string, mark: ReviewedMark): void {
+  const round = mark.countsRound ? found.review_round + 1 : found.review_round;
   const stamp = iso(now());
   db.query('UPDATE run_prs SET reviewed_sha = ?, review_round = ?, reviewed_at = ?, updated_at = ? WHERE ref = ?').run(head, round, stamp, stamp, found.ref);
   touch(db, found.issue);

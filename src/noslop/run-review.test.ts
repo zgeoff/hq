@@ -437,7 +437,31 @@ test('it passes --fixes-only straight to noslop, with no review on record, and r
   expect(fake.of('bun')[0]?.cmd).not.toContain('--full');
   expect(fake.lines().filter((line) => line.startsWith('git rev-list'))).toStrictEqual([]);
   expect(ctx.db.query('SELECT confirm, kind, ok FROM noslop_rounds ORDER BY id DESC LIMIT 1').get()).toStrictEqual({ confirm: 1, kind: 'review', ok: 1 });
-  expect(ctx.db.query("SELECT reviewed_sha FROM run_prs WHERE ref = 'widgets#7'").get()).toStrictEqual({ reviewed_sha: null });
+});
+
+test('it marks the head a --fixes-only run ran on reviewed, without counting a round', async () => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ noslopReview: { code: 0, stdout: FAKE_REVIEW_JSON.replace('"head":"feat"', `"head":"${FAKE_FULL_SHA}"`), stderr: '' } });
+  ctx.listWidgets();
+  createRunPR(ctx.db);
+
+  await runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false, fixesOnly: true });
+
+  expect(ctx.db.query("SELECT reviewed_sha, review_round FROM run_prs WHERE ref = 'widgets#7'").get()).toStrictEqual({ reviewed_sha: FAKE_FULL_SHA, review_round: 0 });
+  expect(ctx.db.query("SELECT COUNT(*) AS rounds FROM noslop_rounds WHERE confirm = 0").get()).toStrictEqual({ rounds: 0 });
+});
+
+test('it marks the head a fix-checks-only run past the emergency cap ran on reviewed, without counting a round', async () => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ noslopReview: { code: 0, stdout: FAKE_REVIEW_JSON.replace('"head":"feat"', `"head":"${FAKE_FULL_SHA}"`), stderr: '' } });
+  ctx.setCap('widgets', 1);
+  createRunPR(ctx.db);
+  ctx.addReview('[]', 'f00dfeedf00dfeedf00dfeedf00dfeedf00dfeed');
+
+  await expect(runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false })).resolves.toMatchObject({ fixesOnly: true, emergencyCap: 1, round: 1 });
+
+  expect(ctx.db.query("SELECT reviewed_sha, review_round FROM run_prs WHERE ref = 'widgets#7'").get()).toStrictEqual({ reviewed_sha: FAKE_FULL_SHA, review_round: 0 });
+  expect(ctx.db.query("SELECT COUNT(*) AS rounds FROM noslop_rounds WHERE confirm = 0").get()).toStrictEqual({ rounds: 1 });
 });
 
 test('it passes --fixes-only to noslop when the PR has no review at all, past any cap', async () => {

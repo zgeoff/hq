@@ -160,15 +160,12 @@ async function createNoslopContext(plan: RoundPlan, parsed: ParsedRepo, sha: str
   };
 }
 
-// A full review marks the head it reviewed, as a session's `hq run reviewed --sha` must. A fix-checks-only
-// run reads no lens over a head, so it marks none.
+// Every completed run marks the head it ran on, as a session's `hq run reviewed --sha` must, so the
+// sweep stops calling the head unreviewed. Only a full review counts as a round.
 function writeRoundMark(plan: RoundPlan, parsed: ParsedRepo): void {
-  if (plan.fixesOnly) {
-    return;
-  }
   const found = findLastReviewRound(plan.request.db, parsed.repo, plan.request.pr);
   if (found?.ok === 1 && found.head !== null && SHA.test(found.head)) {
-    writeReviewed(plan.request.db, parsed.repo, plan.request.pr, found.head);
+    writeReviewed(plan.request.db, parsed.repo, plan.request.pr, found.head, { countsRound: !plan.fixesOnly });
   }
 }
 
