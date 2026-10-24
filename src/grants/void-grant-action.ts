@@ -6,10 +6,11 @@ import { logEvent } from '../log-event.ts';
 import { addNews } from '../news/add-news.ts';
 import type { OwnerProbeDeps } from '../pr-status/read-owner-session.ts';
 import { roleName } from '../roles/role-name.ts';
+import { GRANT_ACT_TRANSITIONS } from './grant-act-transitions.ts';
 import { GrantActionRowSchema } from './grant-action-row-schema.ts';
 import { pickGrantVoider } from './pick-grant-voider.ts';
 import { readGrantVoidCaller } from './read-grant-void-caller.ts';
-import type { GrantActionRow, GrantVoidArgs, GrantVoidCaller } from './types.ts';
+import type { GrantActState, GrantActionRow, GrantVoidArgs, GrantVoidCaller } from './types.ts';
 
 interface GrantVoidDeps {
   db: Database;
@@ -37,12 +38,14 @@ function writeVoid(deps: GrantVoidDeps, caller: GrantVoidCaller): GrantActionRow
   if (voider === null) {
     throw new HqError('not_allowed', `${formatWhoMayVoid(action)}${caller.kind === 'unknown' ? `; atc cannot say who is calling (${caller.cause})` : ''}`);
   }
-  if (action.voided_at !== null) {
-    throw new HqError('bad_state', `grant action ${action.id} was already voided at ${action.voided_at} by ${action.voided_by}: ${action.void_reason}`);
+  const from: GrantActState = action.voided_at === null ? 'live' : 'void';
+  const move = GRANT_ACT_TRANSITIONS['grant-void'];
+  if (!move.from.includes(from)) {
+    throw new HqError('bad_state', `grant action ${action.id} was already voided at ${action.voided_at} by ${action.voided_by}: ${action.void_reason}`, { state: from });
   }
   const voidedAt = iso(deps.clock());
   db.query('UPDATE grant_actions SET voided_at = ?, voided_by = ?, void_reason = ? WHERE id = ?').run(voidedAt, voider, args.reason, action.id);
-  logEvent(db, 'hq', `grant:${action.grant_name}`, 'grant-void', voider, null, null, { id: action.id, target: action.target, reason: args.reason });
+  logEvent(db, 'hq', `grant:${action.grant_name}`, 'grant-void', voider, from, move.to, { id: action.id, target: action.target, reason: args.reason });
   addNews(db, { from: voider, topic: 'other', text: formatNews(voider, action, args.reason), issue: null, link: null, needsGeoff: false });
   return { ...action, voided_at: voidedAt, voided_by: voider, void_reason: args.reason };
 }

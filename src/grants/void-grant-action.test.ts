@@ -26,8 +26,8 @@ test('the session recorded for the act actor voids it, and the row, an event and
 
   expect(voided).toMatchObject({ id: 1, voided_at: '2026-10-14T03:00:00Z', voided_by: 'teapot-bot', void_reason: 'logged before the merge failed' });
   expect(ctx.db.query('SELECT target, voided_at, voided_by, void_reason FROM grant_actions').all()).toStrictEqual([{ target: 'kettle#9', voided_at: '2026-10-14T03:00:00Z', voided_by: 'teapot-bot', void_reason: 'logged before the merge failed' }]);
-  expect(ctx.db.query("SELECT subject, subject_id, actor, data FROM events WHERE action = 'grant-void'").all()).toStrictEqual([
-    { subject: 'hq', subject_id: 'grant:kettle-merges', actor: 'teapot-bot', data: JSON.stringify({ id: 1, target: 'kettle#9', reason: 'logged before the merge failed' }) },
+  expect(ctx.db.query("SELECT subject, subject_id, actor, from_state, to_state, data FROM events WHERE action = 'grant-void'").all()).toStrictEqual([
+    { subject: 'hq', subject_id: 'grant:kettle-merges', actor: 'teapot-bot', from_state: 'live', to_state: 'void', data: JSON.stringify({ id: 1, target: 'kettle#9', reason: 'logged before the merge failed' }) },
   ]);
   expect(ctx.db.query('SELECT from_name, text FROM news').all()).toStrictEqual([{ from_name: 'teapot-bot', text: 'teapot-bot voided grant action 1 under kettle-merges (kettle#9): logged before the merge failed' }]);
 });
@@ -118,7 +118,7 @@ test('an unknown act id is refused as not found', async () => {
   await expect(voidGrantAction({ db: ctx.db, args: { id: 7, reason: 'wrong PR' }, probe: ctx.probeAs('kettle-1'), clock: () => new Date('2026-10-14T03:00:00Z') })).rejects.toMatchObject({ code: 'not_found', message: 'no grant action 7' });
 });
 
-test('a second void is refused, naming when and by whom the act was voided and why', async () => {
+test('a void act has no move to void again, so a second void is refused, naming when, by whom and why it was voided', async () => {
   const ctx = setupTest();
   at(NOON_SYDNEY);
   setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'teapot-bot': 'kettle-2', 'kettle-bot': 'kettle-3' }));
@@ -129,6 +129,7 @@ test('a second void is refused, naming when and by whom the act was voided and w
   await expect(voidGrantAction({ db: ctx.db, args: { id: 1, reason: 'again' }, probe: ctx.probeAs('kettle-1'), clock: () => new Date('2026-10-14T03:00:00Z') })).rejects.toMatchObject({
     code: 'bad_state',
     message: 'grant action 1 was already voided at 2026-10-14T03:00:00Z by teapot-bot: wrong PR',
+    data: { state: 'void' },
   });
   expect(ctx.db.query('SELECT voided_by, void_reason FROM grant_actions').all()).toStrictEqual([{ voided_by: 'teapot-bot', void_reason: 'wrong PR' }]);
   expect(ctx.db.query("SELECT COUNT(*) AS total FROM events WHERE action = 'grant-void'").get()).toStrictEqual({ total: 1 });

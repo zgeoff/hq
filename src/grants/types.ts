@@ -69,3 +69,8 @@ export interface GrantVoidArgs {
 }
 
 export type GrantVoidCaller = { kind: 'session'; id: string } | { kind: 'unknown'; cause: string };
+
+// A logged grant act is live until it is voided, and a void act stays void.
+export type GrantActState = 'live' | 'void';
+
+export type GrantActMove = 'grant-void';
