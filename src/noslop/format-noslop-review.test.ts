@@ -51,6 +51,7 @@ test('hq review says the emergency cap turned the review into fix checks only, b
     '== engine: noslop (commit 0123456), fixes only: 0 fix(es) checked, full output: /reviews/widgets7-noslop.json',
   ]);
 });
+
 test('hq review tells the caller to post a review noslop stored but did not post, after the findings line', () => {
   expect(formatNoslopReview({ ...REVIEW, postFailed: 'exit 1: the github reporter failed: HTTP 500' }).split('\n').slice(2, 5)).toStrictEqual([
     '== noslop: 1 finding(s), full output: /reviews/widgets7-noslop.json',

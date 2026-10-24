@@ -550,4 +550,3 @@ test('it keeps counting a stored --confirm review as not a round', async () => {
 
   await expect(runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false })).resolves.toMatchObject({ round: 2 });
 });
-

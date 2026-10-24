@@ -64,4 +64,3 @@ test('it prints one block per PR', () => {
     ].join('\n'),
   );
 });
-

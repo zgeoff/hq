@@ -27,7 +27,6 @@ export interface PRReport {
   lateUnknown: number;
   mainMerge: number;
   mergeUnknown: number;
-
 }
 
 export interface LateCount {

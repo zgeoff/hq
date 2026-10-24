@@ -721,4 +721,3 @@ test('it parses --full on hq review and refuses it for a PR on Codex', async () 
 
   expect(JSON.parse(lines[0] ?? '')).toMatchObject({ ok: false, error: { code: 'bad_args' } });
 });
-

@@ -58,7 +58,6 @@ export interface FakeRunner {
   of: (program: string) => FakeCall[];
 }
 
-
 export const FAKE_FULL_SHA = '0123456789abcdef0123456789abcdef01234567';
 
 export const FAKE_REVIEW_JSON = JSON.stringify({
