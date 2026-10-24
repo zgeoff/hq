@@ -2,14 +2,18 @@ import { expect, onTestFinished, spyOn, test } from 'bun:test';
 import { QueryClient, QueryClientProvider, environmentManager } from '@tanstack/react-query';
 import { buildRenderedReport } from '../../test/build-rendered-report.ts';
 import { freshDb } from '../../test/helpers.ts';
+import { createSignedInAuth } from '../../test/create-signed-in-auth.ts';
 import { setupPageDOM } from '../../test/setup-page-dom.ts';
+import { SESSION_STORAGE_KEY } from './session-storage-key.ts';
 import { createConsoleServer } from '../create-console-server.ts';
 import type { ShippedPeriod } from '../shipped/types.ts';
 
 async function setupTest(asked: ShippedPeriod[]) {
   const fresh = freshDb(),
+    signedIn = createSignedInAuth(),
     server = createConsoleServer({
       db: fresh.db,
+      auth: signedIn.auth,
       port: 0,
       actor: 'console', run: () => Promise.resolve({ code: 1, stdout: '', stderr: 'no gh in this test' }),
       assets: new Map(),
@@ -23,7 +27,9 @@ async function setupTest(asked: ShippedPeriod[]) {
   onTestFinished(fresh.cleanup);
   onTestFinished(() => spy.mockRestore());
   onTestFinished(() => server.stop(true));
-  return await setupPageDOM(`http://127.0.0.1:${server.port}/shipped`);
+  const lib = await setupPageDOM(`http://127.0.0.1:${server.port}/shipped`);
+  globalThis.sessionStorage.setItem(SESSION_STORAGE_KEY, signedIn.session);
+  return lib;
 }
 
 test('Shipped opens on today; a click on Yesterday and the w key each read and show their period', async () => {

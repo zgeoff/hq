@@ -10,7 +10,9 @@ import { main } from '../cli.ts';
 import type { createConsoleAppRouter } from './create-console-app-router.tsx';
 import { overrideEnv } from '../config/override-env.ts';
 import { createConsoleServer } from '../create-console-server.ts';
+import { createSignedInAuth } from '../../test/create-signed-in-auth.ts';
 import { setupPageDOM } from '../../test/setup-page-dom.ts';
+import { SESSION_STORAGE_KEY } from './session-storage-key.ts';
 
 async function setupTest() {
   const lib = await setupPageDOM('http://127.0.0.1:4317/'),
@@ -21,8 +23,10 @@ async function setupTest() {
 // The console's own router over a memory history, on a console server with no items and a report.
 async function setupAppTest() {
   const fresh = freshDb(),
+    signedIn = createSignedInAuth(),
     server = createConsoleServer({
       db: fresh.db,
+      auth: signedIn.auth,
       port: 0,
       actor: 'console', run: () => Promise.resolve({ code: 1, stdout: '', stderr: 'no gh in this test' }),
       assets: new Map(),
@@ -33,7 +37,9 @@ async function setupAppTest() {
   onTestFinished(fresh.cleanup);
   onTestFinished(() => spy.mockRestore());
   onTestFinished(() => server.stop(true));
-  return await setupPageDOM(`http://127.0.0.1:${server.port}/`);
+  const lib = await setupPageDOM(`http://127.0.0.1:${server.port}/`);
+  globalThis.sessionStorage.setItem(SESSION_STORAGE_KEY, signedIn.session);
+  return lib;
 }
 
 test('g s from Needs you opens Shipped, g n returns, and ] and [ step between the pages', async () => {

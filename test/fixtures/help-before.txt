@@ -9,7 +9,8 @@ hq 0.79.0: headquarters for the z- sessions. Every command takes --json.
   hq pane                                     the detail behind the band: needs you with links, Nix today, lanes, reviews, shipped today, news (z-stu's /hq pane reads --json)
   hq whois <session-id>                       the declared fleet name hq fleet last saw under a session id
   hq pins                                     pinned atc sessions, longest idle first
-  hq console [--port N]                       a local page to answer calls, proposals and to-dos
+  hq console [--port N]                       a local page to answer calls, proposals and to-dos (prints a one-use login link in your own terminal)
+  hq console login                            ask the running console to print a new one-use login link on its own terminal
 
   hq restart [--force]                        restart the atc daemon (detached), then wake
   hq wake [--dry-run] [--wait SECONDS]        message the sessions the last restart cut off

@@ -4,7 +4,9 @@ import { join } from 'node:path';
 import { QueryClient, QueryClientProvider, environmentManager } from '@tanstack/react-query';
 import { createUnblockItems } from '../../test/create-unblock-items.ts';
 import { NOON_SYDNEY, at, freshDb } from '../../test/helpers.ts';
+import { createSignedInAuth } from '../../test/create-signed-in-auth.ts';
 import { setupPageDOM } from '../../test/setup-page-dom.ts';
+import { SESSION_STORAGE_KEY } from './session-storage-key.ts';
 import { getAsk } from '../asks/get-ask.ts';
 import { main } from '../cli.ts';
 import { overrideEnv } from '../config/override-env.ts';
@@ -24,7 +26,8 @@ const KETTLE_CALL = {
 
 async function setupTest() {
   const fresh = freshDb(),
-    server = createConsoleServer({ db: fresh.db, port: 0, actor: 'console', run: () => Promise.resolve({ code: 1, stdout: '', stderr: 'no gh in this test' }), assets: new Map(), notify: () => Promise.resolve(true), loadShipped: () => Promise.reject(new Error('no report in this test')) }),
+    signedIn = createSignedInAuth(),
+    server = createConsoleServer({ db: fresh.db, auth: signedIn.auth, port: 0, actor: 'console', run: () => Promise.resolve({ code: 1, stdout: '', stderr: 'no gh in this test' }), assets: new Map(), notify: () => Promise.resolve(true), loadShipped: () => Promise.reject(new Error('no report in this test')) }),
     spy = spyOn(console, 'log').mockImplementation(() => {});
   at(NOON_SYDNEY);
   onTestFinished(fresh.cleanup);
@@ -38,7 +41,9 @@ async function setupTest() {
     await main(['call', 'add', id, '--item', file, '--order', order, '--json']);
   }
   await main(['unblock', 'add', '--id', 'lid', '--task', 'Fit the new lid on the kettle', '--json']);
-  return { db: fresh.db, directory: fresh.dir, library: await setupPageDOM(`http://127.0.0.1:${server.port}/`) };
+  const library = await setupPageDOM(`http://127.0.0.1:${server.port}/`);
+  globalThis.sessionStorage.setItem(SESSION_STORAGE_KEY, signedIn.session);
+  return { db: fresh.db, directory: fresh.dir, library };
 }
 
 test('the owner answers by click, key and note, Ask Stu copies its prompt, a review takes review words, and a to-do put off comes back when due', async () => {

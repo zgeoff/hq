@@ -1,12 +1,5 @@
-import { existsSync } from 'node:fs';
-import { userInfo } from 'node:os';
-
-export interface HostFacts {
-  inTest: boolean;
-  uid: number;
-  homedir: string;
-  runtimeDirExists: boolean;
-}
+import { readHostFacts } from './read-host-facts.ts';
+import type { HostFacts } from './read-host-facts.ts';
 
 // The daemon's socket for a check of who is asking. It never comes from HQ_ATC_SOCKET, HOME or
 // XDG_RUNTIME_DIR, which the caller sets: a session could point the check at a daemon of its own.
@@ -19,9 +12,4 @@ export function identitySocketPath(host: HostFacts = readHostFacts()): string {
     return `/run/user/${host.uid}/atc-daemon.sock`;
   }
   return `${host.homedir}/.local/state/atc/atc-daemon.sock`;
-}
-
-function readHostFacts(): HostFacts {
-  const uid = process.getuid?.() ?? -1;
-  return { inTest: process.env['NODE_ENV'] === 'test', uid, homedir: userInfo().homedir, runtimeDirExists: existsSync(`/run/user/${uid}`) };
 }
