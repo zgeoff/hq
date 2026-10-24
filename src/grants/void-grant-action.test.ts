@@ -1,4 +1,4 @@
-import { expect, onTestFinished, setSystemTime, test } from 'bun:test';
+import { expect, onTestFinished, test } from 'bun:test';
 import { NOON_SYDNEY, at, freshDb } from '../../test/helpers.ts';
 import { setMeta } from '../db/set-meta.ts';
 import type { OwnerProbeDeps } from '../pr-status/read-owner-session.ts';
@@ -18,13 +18,11 @@ function setupTest() {
 test('the session recorded for the act actor voids it, and the row, an event and a news item say so', async () => {
   const ctx = setupTest();
   at(NOON_SYDNEY);
-  setSystemTime(new Date('2026-10-14T03:00:00Z'));
-  onTestFinished(() => setSystemTime());
   setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'teapot-bot': 'kettle-2', 'kettle-bot': 'kettle-3' }));
   createGrantMark(ctx.db, { text: 'kettle PRs merge on green CI', ref: 'kettle#3', at: null, name: 'kettle-merges', actor: 'kettle-bot' });
   recordGrantAction(ctx.db, { grant: 'kettle-merges', target: 'kettle#9', note: null, actor: 'teapot-bot' });
 
-  const voided = await voidGrantAction({ db: ctx.db, args: { id: 1, reason: 'logged before the merge failed' }, probe: ctx.probeAs('kettle-2') });
+  const voided = await voidGrantAction({ db: ctx.db, args: { id: 1, reason: 'logged before the merge failed' }, probe: ctx.probeAs('kettle-2'), clock: () => new Date('2026-10-14T03:00:00Z') });
 
   expect(voided).toMatchObject({ id: 1, voided_at: '2026-10-14T03:00:00Z', voided_by: 'teapot-bot', void_reason: 'logged before the merge failed' });
   expect(ctx.db.query('SELECT target, voided_at, voided_by, void_reason FROM grant_actions').all()).toStrictEqual([{ target: 'kettle#9', voided_at: '2026-10-14T03:00:00Z', voided_by: 'teapot-bot', void_reason: 'logged before the merge failed' }]);
@@ -41,7 +39,7 @@ test('a void of an act with a 400-character target keeps the whole reason in the
   createGrantMark(ctx.db, { text: 'kettle PRs merge on green CI', ref: 'kettle#3', at: null, name: 'kettle-merges', actor: 'kettle-bot' });
   recordGrantAction(ctx.db, { grant: 'kettle-merges', target: `bun run descale --kettle ${'k'.repeat(375)}`, note: null, actor: 'teapot-bot' });
 
-  await voidGrantAction({ db: ctx.db, args: { id: 1, reason: 'the descale ran against the wrong kettle' }, probe: ctx.probeAs('kettle-2') });
+  await voidGrantAction({ db: ctx.db, args: { id: 1, reason: 'the descale ran against the wrong kettle' }, probe: ctx.probeAs('kettle-2'), clock: () => new Date('2026-10-14T03:00:00Z') });
 
   expect(ctx.db.query('SELECT text FROM news').all()).toStrictEqual([{ text: `teapot-bot voided grant action 1 under kettle-merges (bun run descale --kettle ${'k'.repeat(277)}…): the descale ran against the wrong kettle` }]);
 });
@@ -53,7 +51,7 @@ test('the owner session voids an act another session logged, and the owner name 
   createGrantMark(ctx.db, { text: 'kettle PRs merge on green CI', ref: 'kettle#3', at: null, name: 'kettle-merges', actor: 'kettle-bot' });
   recordGrantAction(ctx.db, { grant: 'kettle-merges', target: 'kettle#9', note: null, actor: 'teapot-bot' });
 
-  const voided = await voidGrantAction({ db: ctx.db, args: { id: 1, reason: 'wrong PR' }, probe: ctx.probeAs('kettle-1') });
+  const voided = await voidGrantAction({ db: ctx.db, args: { id: 1, reason: 'wrong PR' }, probe: ctx.probeAs('kettle-1'), clock: () => new Date('2026-10-14T03:00:00Z') });
 
   expect(voided.voided_by).toBe('z-stu');
   expect(ctx.db.query("SELECT actor FROM events WHERE action = 'grant-void'").all()).toStrictEqual([{ actor: 'z-stu' }]);
@@ -66,7 +64,7 @@ test('another recorded session is refused, naming who may void the act, and noth
   createGrantMark(ctx.db, { text: 'kettle PRs merge on green CI', ref: 'kettle#3', at: null, name: 'kettle-merges', actor: 'kettle-bot' });
   recordGrantAction(ctx.db, { grant: 'kettle-merges', target: 'kettle#9', note: null, actor: 'teapot-bot' });
 
-  await expect(voidGrantAction({ db: ctx.db, args: { id: 1, reason: 'wrong PR' }, probe: ctx.probeAs('kettle-3') })).rejects.toMatchObject({ code: 'not_allowed', message: 'only teapot-bot, who logged grant action 1, or z-stu may void it' });
+  await expect(voidGrantAction({ db: ctx.db, args: { id: 1, reason: 'wrong PR' }, probe: ctx.probeAs('kettle-3'), clock: () => new Date('2026-10-14T03:00:00Z') })).rejects.toMatchObject({ code: 'not_allowed', message: 'only teapot-bot, who logged grant action 1, or z-stu may void it' });
   expect(ctx.db.query('SELECT voided_at FROM grant_actions').all()).toStrictEqual([{ voided_at: null }]);
   expect(ctx.db.query('SELECT COUNT(*) AS total FROM news').get()).toStrictEqual({ total: 0 });
 });
@@ -81,7 +79,7 @@ test.each([
   createGrantMark(ctx.db, { text: 'kettle PRs merge on green CI', ref: 'kettle#3', at: null, name: 'kettle-merges', actor: 'kettle-bot' });
   recordGrantAction(ctx.db, { grant: 'kettle-merges', target: 'kettle#9', note: null, actor: 'teapot-bot' });
 
-  await expect(voidGrantAction({ db: ctx.db, args: { id: 1, reason: 'wrong PR' }, probe: ctx.probeAs(peerSession) })).rejects.toMatchObject({ code: 'not_allowed' });
+  await expect(voidGrantAction({ db: ctx.db, args: { id: 1, reason: 'wrong PR' }, probe: ctx.probeAs(peerSession), clock: () => new Date('2026-10-14T03:00:00Z') })).rejects.toMatchObject({ code: 'not_allowed' });
   expect(ctx.db.query('SELECT voided_at FROM grant_actions').all()).toStrictEqual([{ voided_at: null }]);
 });
 
@@ -92,7 +90,7 @@ test('an unreachable atc refuses the void and says why', async () => {
   createGrantMark(ctx.db, { text: 'kettle PRs merge on green CI', ref: 'kettle#3', at: null, name: 'kettle-merges', actor: 'kettle-bot' });
   recordGrantAction(ctx.db, { grant: 'kettle-merges', target: 'kettle#9', note: null, actor: 'teapot-bot' });
 
-  await expect(voidGrantAction({ db: ctx.db, args: { id: 1, reason: 'wrong PR' }, probe: { openClient: () => Promise.reject(new Error('socket is gone')) } })).rejects.toMatchObject({
+  await expect(voidGrantAction({ db: ctx.db, args: { id: 1, reason: 'wrong PR' }, probe: { openClient: () => Promise.reject(new Error('socket is gone')) }, clock: () => new Date('2026-10-14T03:00:00Z') })).rejects.toMatchObject({
     code: 'not_allowed',
     message: 'only teapot-bot, who logged grant action 1, or z-stu may void it; atc cannot say who is calling (socket is gone)',
   });
@@ -107,7 +105,7 @@ test('a session with no recorded fleet id is refused even when its name matches 
   recordGrantAction(ctx.db, { grant: 'kettle-merges', target: 'kettle#9', note: null, actor: 'teapot-bot' });
   setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1' }));
 
-  await expect(voidGrantAction({ db: ctx.db, args: { id: 1, reason: 'wrong PR' }, probe: ctx.probeAs('kettle-2') })).rejects.toMatchObject({ code: 'not_allowed' });
+  await expect(voidGrantAction({ db: ctx.db, args: { id: 1, reason: 'wrong PR' }, probe: ctx.probeAs('kettle-2'), clock: () => new Date('2026-10-14T03:00:00Z') })).rejects.toMatchObject({ code: 'not_allowed' });
 });
 
 test('an unknown act id is refused as not found', async () => {
@@ -117,20 +115,18 @@ test('an unknown act id is refused as not found', async () => {
   createGrantMark(ctx.db, { text: 'kettle PRs merge on green CI', ref: 'kettle#3', at: null, name: 'kettle-merges', actor: 'kettle-bot' });
   recordGrantAction(ctx.db, { grant: 'kettle-merges', target: 'kettle#9', note: null, actor: 'teapot-bot' });
 
-  await expect(voidGrantAction({ db: ctx.db, args: { id: 7, reason: 'wrong PR' }, probe: ctx.probeAs('kettle-1') })).rejects.toMatchObject({ code: 'not_found', message: 'no grant action 7' });
+  await expect(voidGrantAction({ db: ctx.db, args: { id: 7, reason: 'wrong PR' }, probe: ctx.probeAs('kettle-1'), clock: () => new Date('2026-10-14T03:00:00Z') })).rejects.toMatchObject({ code: 'not_found', message: 'no grant action 7' });
 });
 
 test('a second void is refused, naming when and by whom the act was voided and why', async () => {
   const ctx = setupTest();
   at(NOON_SYDNEY);
-  setSystemTime(new Date('2026-10-14T03:00:00Z'));
-  onTestFinished(() => setSystemTime());
   setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'teapot-bot': 'kettle-2', 'kettle-bot': 'kettle-3' }));
   createGrantMark(ctx.db, { text: 'kettle PRs merge on green CI', ref: 'kettle#3', at: null, name: 'kettle-merges', actor: 'kettle-bot' });
   recordGrantAction(ctx.db, { grant: 'kettle-merges', target: 'kettle#9', note: null, actor: 'teapot-bot' });
-  await voidGrantAction({ db: ctx.db, args: { id: 1, reason: 'wrong PR' }, probe: ctx.probeAs('kettle-2') });
+  await voidGrantAction({ db: ctx.db, args: { id: 1, reason: 'wrong PR' }, probe: ctx.probeAs('kettle-2'), clock: () => new Date('2026-10-14T03:00:00Z') });
 
-  await expect(voidGrantAction({ db: ctx.db, args: { id: 1, reason: 'again' }, probe: ctx.probeAs('kettle-1') })).rejects.toMatchObject({
+  await expect(voidGrantAction({ db: ctx.db, args: { id: 1, reason: 'again' }, probe: ctx.probeAs('kettle-1'), clock: () => new Date('2026-10-14T03:00:00Z') })).rejects.toMatchObject({
     code: 'bad_state',
     message: 'grant action 1 was already voided at 2026-10-14T03:00:00Z by teapot-bot: wrong PR',
   });
@@ -138,16 +134,14 @@ test('a second void is refused, naming when and by whom the act was voided and w
   expect(ctx.db.query("SELECT COUNT(*) AS total FROM events WHERE action = 'grant-void'").get()).toStrictEqual({ total: 1 });
 });
 
-test('HQ_NOW does not set the voided time', async () => {
+test('the voided time comes from the given clock, never from HQ_NOW', async () => {
   const ctx = setupTest();
   at('2099-01-01T00:00:00Z');
-  setSystemTime(new Date('2026-10-14T03:00:00Z'));
-  onTestFinished(() => setSystemTime());
   setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'teapot-bot': 'kettle-2', 'kettle-bot': 'kettle-3' }));
   createGrantMark(ctx.db, { text: 'kettle PRs merge on green CI', ref: 'kettle#3', at: null, name: 'kettle-merges', actor: 'kettle-bot' });
   recordGrantAction(ctx.db, { grant: 'kettle-merges', target: 'kettle#9', note: null, actor: 'teapot-bot' });
 
-  const voided = await voidGrantAction({ db: ctx.db, args: { id: 1, reason: 'wrong PR' }, probe: ctx.probeAs('kettle-1') });
+  const voided = await voidGrantAction({ db: ctx.db, args: { id: 1, reason: 'wrong PR' }, probe: ctx.probeAs('kettle-1'), clock: () => new Date('2026-10-14T03:00:00Z') });
 
   expect(voided.voided_at).toBe('2026-10-14T03:00:00Z');
 });

@@ -266,6 +266,7 @@ import { renderVersion } from './build/render-version.ts';
 import { setMeta } from './db/set-meta.ts';
 import { iso } from './clock/iso.ts';
 import { now } from './clock/now.ts';
+import { readWallClock } from './clock/read-wall-clock.ts';
 import { accountLabels } from './accounts/account-labels.ts';
 import { setAccountLabel } from './accounts/set-account-label.ts';
 import { capabilities } from './capabilities/capabilities.ts';
@@ -1479,7 +1480,7 @@ async function runGrantCommand(db: Database, verb: string | undefined, args: str
     return { data: { action: recorded }, text: `Recorded ${recorded.id} under ${recorded.grant_name}: ${recorded.target}` };
   }
   if (verb === 'void') {
-    const voided = await voidGrantAction({ db, args: parseGrantVoidArgs(args, flags.reason), probe: readOwnerProbeDeps() });
+    const voided = await voidGrantAction({ db, args: parseGrantVoidArgs(args, flags.reason), probe: readOwnerProbeDeps(), clock: readWallClock });
     return { data: { action: voided }, text: `Voided ${voided.id} under ${voided.grant_name}: ${voided.target} (${voided.void_reason})` };
   }
   if (verb !== 'actions' && verb !== undefined) {

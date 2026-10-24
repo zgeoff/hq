@@ -1,5 +1,5 @@
 import type { Database } from 'bun:sqlite';
-import { expect, onTestFinished, setSystemTime, spyOn, test } from 'bun:test';
+import { expect, onTestFinished, spyOn, test } from 'bun:test';
 import { NOON_SYDNEY, at, freshDb } from '../../test/helpers.ts';
 import { main } from '../cli.ts';
 import { setMeta } from '../db/set-meta.ts';
@@ -43,9 +43,7 @@ test('a voided action leaves the count and the actions list and shows struck out
   createGrantMark(db, { text: 'kettle PRs merge on green CI', ref: 'kettle#3', at: null, name: 'kettle-merges', actor: 'kettle-bot' });
   recordGrantAction(db, { grant: 'kettle-merges', target: 'kettle#8', note: null, actor: 'teapot-bot' });
   recordGrantAction(db, { grant: 'kettle-merges', target: 'kettle#9', note: null, actor: 'teapot-bot' });
-  setSystemTime(new Date('2026-10-14T03:00:00Z'));
-  onTestFinished(() => setSystemTime());
-  await voidGrantAction({ db, args: { id: 1, reason: 'logged before the merge failed' }, probe: { openClient: () => Promise.resolve({ peerSession: 'kettle-2', close: () => {} }) } });
+  await voidGrantAction({ db, args: { id: 1, reason: 'logged before the merge failed' }, probe: { openClient: () => Promise.resolve({ peerSession: 'kettle-2', close: () => {} }) }, clock: () => new Date('2026-10-14T03:00:00Z') });
 
   const tallies = loadGrantTallies(db, { from: '2026-10-14T00:00:00Z', to: '2026-10-14T05:00:00Z' });
 
@@ -60,7 +58,7 @@ test('a grant whose only action is voided keeps its mark, which cannot be droppe
   setMeta(db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1' }));
   const mark = createGrantMark(db, { text: 'kettle PRs merge on green CI', ref: null, at: null, name: 'kettle-merges', actor: 'kettle-bot' });
   recordGrantAction(db, { grant: 'kettle-merges', target: 'kettle#8', note: null, actor: 'teapot-bot' });
-  await voidGrantAction({ db, args: { id: 1, reason: 'wrong PR' }, probe: { openClient: () => Promise.resolve({ peerSession: 'kettle-1', close: () => {} }) } });
+  await voidGrantAction({ db, args: { id: 1, reason: 'wrong PR' }, probe: { openClient: () => Promise.resolve({ peerSession: 'kettle-1', close: () => {} }) }, clock: () => new Date('2026-10-14T03:00:00Z') });
 
   expect(() => dropMark(db, mark.id, 'kettle-bot')).toThrow(`mark ${mark.id} is grant kettle-merges, with actions recorded under it; it stays`);
 });
@@ -71,7 +69,7 @@ test('a grant whose only action is voided keeps its name, which cannot be change
   setMeta(db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1' }));
   const mark = createGrantMark(db, { text: 'kettle PRs merge on green CI', ref: null, at: null, name: 'kettle-merges', actor: 'kettle-bot' });
   recordGrantAction(db, { grant: 'kettle-merges', target: 'kettle#8', note: null, actor: 'teapot-bot' });
-  await voidGrantAction({ db, args: { id: 1, reason: 'wrong PR' }, probe: { openClient: () => Promise.resolve({ peerSession: 'kettle-1', close: () => {} }) } });
+  await voidGrantAction({ db, args: { id: 1, reason: 'wrong PR' }, probe: { openClient: () => Promise.resolve({ peerSession: 'kettle-1', close: () => {} }) }, clock: () => new Date('2026-10-14T03:00:00Z') });
 
   expect(() => updateMarkGrantName(db, { id: mark.id, name: 'kettle-ships', actor: 'kettle-bot' })).toThrow('grant kettle-merges has actions recorded; it keeps its name');
 });
