@@ -506,7 +506,7 @@ test('it refuses --fixes-only with --full, and runs nothing', async () => {
     fake = buildFakeRunner();
   ctx.listWidgets();
 
-  await expect(runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false, fixesOnly: true, full: true })).rejects.toMatchObject({ code: 'bad_fixes_only', message: '--fixes-only runs no lens over the diff, so it cannot be given with --full' });
+  await expect(runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false, fixesOnly: true, full: true })).rejects.toMatchObject({ code: 'bad_fixes_only', message: '--fixes-only and --full contradict: --fixes-only runs no lens over the diff, and --full asks for a review of the whole PR' });
 
   expect(fake.calls).toStrictEqual([]);
 });

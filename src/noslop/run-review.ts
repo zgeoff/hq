@@ -80,7 +80,7 @@ export async function runReview(request: ReviewRequest): Promise<ReviewResult | 
     return await review(request.run, request.rawRepo, request.pr, toExactOptional({ watch: request.watch, owner: request.owner, repoDir: request.repoDir, effort: request.effort }));
   }
   if (request.fixesOnly === true && request.full === true) {
-    throw new HqError('bad_fixes_only', '--fixes-only runs no lens over the diff, so it cannot be given with --full');
+    throw new HqError('bad_fixes_only', '--fixes-only and --full contradict: --fixes-only runs no lens over the diff, and --full asks for a review of the whole PR');
   }
   return await runNoslopReviewWithCI(request, parsed, requirePinned(picked.sha));
 }
