@@ -160,6 +160,8 @@ import { retireName } from './fleet/retire-name.ts';
 import { retiredNames } from './fleet/retired-names.ts';
 import type { FleetClient, PluginDrift, PromptDrift, RcDeps } from './fleet/types.ts';
 import { capacitySettings } from './capacity/capacity-settings.ts';
+import { formatCapacityHint } from './capacity/format-capacity-hint.ts';
+import { readCapacityHint } from './capacity/read-capacity-hint.ts';
 import { runCapacityStep } from './capacity/run-capacity-step.ts';
 import { latestSample } from './capacity/latest-sample.ts';
 import { openAlerts } from './capacity/open-alerts.ts';
@@ -178,6 +180,7 @@ import { formatSlotPlan } from './lanes/format-slot-plan.ts';
 import { loadImpRoom } from './lanes/load-imp-room.ts';
 import { LANES } from './lanes/lanes.ts';
 import { nudgeLog } from './lanes/nudge-log.ts';
+import { loadPacing } from './lanes/load-pacing.ts';
 import { pacingPath } from './lanes/pacing-path.ts';
 import { buildLanePlan } from './lanes/build-lane-plan.ts';
 import { formatLanePlan } from './lanes/format-lane-plan.ts';
@@ -1070,7 +1073,9 @@ async function capacityCommand(db: Database, verb: string | undefined, args: str
       const reading = await latestSample(db);
       const open = openAlerts(db);
       const lines = [reading ? readingText(reading) : 'No sample yet: hq capacity sample reads one now.', 'Thresholds:', ...thresholdLines(db, reading).map((l) => `  ${l}`), Object.keys(open).length ? 'Open alerts:' : 'No open alerts.', ...Object.values(open).map((o) => `  ${o.line} (since ${o.since}${o.told ? '' : ', not yet told'})`)];
-      return { data: { sample: reading, settings: capacitySettings(db), open }, text: lines.join('\n') };
+      const pacing = await loadPacing(pacingPath());
+      const hint = readCapacityHint(db, pacing.claudeLaunchPct ?? 95, now());
+      return { data: { sample: reading, hint, settings: capacitySettings(db), open }, text: [...lines, ...formatCapacityHint(hint)].join('\n') };
     }
     case 'sample': {
       const r = await capacityTick(db, await actor(db, flags));

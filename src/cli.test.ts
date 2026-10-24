@@ -275,3 +275,22 @@ test('hq lanes cap refuses a caller that is not the owner or the delivery lead, 
   expect(JSON.parse(printed[0] ?? '{}')).toMatchObject({ ok: false, error: { code: 'not_allowed' } });
   expect(fresh.db.query("SELECT value FROM meta WHERE key = 'lanes_cap'").get()).toBeNull();
 });
+
+test('hq capacity --json carries the Claude burn hint from the usage samples', async () => {
+  const fresh = freshDb();
+  const printed: string[] = [];
+  const log = console.log;
+  onTestFinished(fresh.cleanup);
+  onTestFinished(overrideEnv('HQ_NOW', NOON_SYDNEY));
+  onTestFinished(overrideEnv('HQ_NOTIFY', 'off'));
+  console.log = (line: string) => void printed.push(line);
+  onTestFinished(() => (console.log = log));
+  const insert = fresh.db.query('INSERT INTO usage_samples (at, account, five_hour, seven_day) VALUES (?, ?, ?, ?)');
+  insert.run('2026-10-14T00:30:00Z', 'kettle01', 10, 20);
+  insert.run('2026-10-14T01:00:00Z', 'kettle01', 12, 22);
+
+  const code = await main(['capacity', 'show', '--json']);
+
+  expect(code).toBe(0);
+  expect(JSON.parse(printed[0] ?? '{}')).toMatchObject({ hint: { hours: 2, limit: 95, account: 'kettle01', windows: [{ window: '7-day', samples: 2, ratePerHour: null }, { window: '5-hour', samples: 2, ratePerHour: null }] } });
+});
