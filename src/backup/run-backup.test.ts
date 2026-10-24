@@ -13,8 +13,8 @@ import type { Runner } from '../runner/types.ts';
 import { realRunner } from '../runner/real-runner.ts';
 import { freshDb, requireEnv } from '../../test/helpers.ts';
 
-// Real restic against temp repos. Skipped where restic isn't installed.
-const hasRestic = Bun.which('restic') !== null && Bun.which('sqlite3') !== null;
+// Real restic against temp repos. Skipped on a machine without restic, never in CI, which installs it.
+const canRunRestic = process.env['CI'] !== undefined || (Bun.which('restic') !== null && Bun.which('sqlite3') !== null);
 
 let db: Database;
 let dir: string;
@@ -36,7 +36,7 @@ afterEach(() => {
   cleanup();
 });
 
-test.skipIf(!hasRestic)('backs up hq.db online plus the dirs, restores them, and passes a restore test', async () => {
+test.skipIf(!canRunRestic)('backs up hq.db online plus the dirs, restores them, and passes a restore test', async () => {
   db.exec("CREATE TABLE kettle (note TEXT); INSERT INTO kettle VALUES ('whistles once')");
   const r = await runBackup(db, realRunner, 'z-q');
   expect(r.error).toBeNull();
@@ -85,7 +85,7 @@ test('a second restore into the same directory is refused while the first runs, 
   expect([calls, existsSync(`${dir}/restored.restore-lock`)]).toStrictEqual([['snapshots', 'restore'], false]);
 });
 
-test.skipIf(!hasRestic)('copies to a configured remote, and a bad remote fails the run without losing the local snapshot', async () => {
+test.skipIf(!canRunRestic)('copies to a configured remote, and a bad remote fails the run without losing the local snapshot', async () => {
   mkdirSync(`${dir}/cfg`, { recursive: true });
   writeFileSync(requireEnv('HQ_BACKUP_REMOTE_ENV'), `# invented remote\nRESTIC_REPOSITORY=${dir}/remote-repo\n`);
   const r = await runBackup(db, realRunner, 'z-q');
@@ -104,7 +104,7 @@ test.skipIf(!hasRestic)('copies to a configured remote, and a bad remote fails t
   expect(lastBackup(db).lastOk).toBe(r.at);
 }, 120_000);
 
-test.skipIf(!hasRestic)('it finds the restored hq.db where the snapshot staged it, when the backup dir has moved since', async () => {
+test.skipIf(!canRunRestic)('it finds the restored hq.db where the snapshot staged it, when the backup dir has moved since', async () => {
   db.exec("CREATE TABLE kettle (note TEXT); INSERT INTO kettle VALUES ('whistles twice')");
   const backedUp = await runBackup(db, realRunner, 'z-q');
   expect(backedUp.ok).toBe(true);
@@ -161,7 +161,7 @@ test('it lets one run take over a dead staging lock when several find it at once
   expect(outcomes.map((line) => line.trim()).toSorted()).toStrictEqual(['busy', 'busy', 'busy', 'busy', 'busy', 'busy', 'busy', 'ran']);
 });
 
-test.skipIf(!hasRestic)('it takes over a staging lock whose run is gone, and releases it when done', async () => {
+test.skipIf(!canRunRestic)('it takes over a staging lock whose run is gone, and releases it when done', async () => {
   const gone = Bun.spawn(['true']);
   await gone.exited;
   mkdirSync(`${dir}/backup`, { recursive: true });
@@ -183,7 +183,7 @@ test('a remote env file needs RESTIC_REPOSITORY; values are read, not echoed', (
   expect(readRemoteEnv()).toEqual({ RESTIC_REPOSITORY: 's3:https://example.com/bucket', AWS_SECRET_ACCESS_KEY: 'invented-secret' });
 });
 
-test.skipIf(!hasRestic)('a remote secret never reaches argv, errors or events; RESTIC_HOST cannot hide the copy', async () => {
+test.skipIf(!canRunRestic)('a remote secret never reaches argv, errors or events; RESTIC_HOST cannot hide the copy', async () => {
   mkdirSync(`${dir}/cfg`, { recursive: true });
   const sentinel = 'INVENTED-SENTINEL-9f3a';
   writeFileSync(requireEnv('HQ_BACKUP_REMOTE_ENV'), `RESTIC_REPOSITORY=${dir}/missing-parent-${sentinel}/x/repo\nRESTIC_HOST=other-host\n`);
