@@ -294,6 +294,9 @@ import { syncKinds } from './kinds/sync-kinds.ts';
 import { syncLinear } from './kinds/sync-linear.ts';
 import { weeksBack } from './kinds/weeks-back.ts';
 import { makeAuditedLinearCaller } from './linear/make-audited-linear-caller.ts';
+import { readPacingLanes } from './lanes/read-pacing-lanes.ts';
+import { runLinearReadyTick } from './run-linear-ready-tick.ts';
+import { STEP_MS } from './watcher/step-ms.ts';
 import { formatSlotCause } from './lanes/format-slot-cause.ts';
 import { readPromotableIssues } from './lanes/read-promotable-issues.ts';
 import { readSlotCause } from './lanes/read-slot-cause.ts';
@@ -470,6 +473,7 @@ const OPTIONS = {
   fields: { type: 'string' },
   out: { type: 'string' },
   reserve: { type: 'string', multiple: true },
+  refresh: { type: 'boolean' },
 } as const;
 
 export type Flags = ReturnType<typeof parse>['values'];
@@ -1789,8 +1793,18 @@ async function lanesCommand(context: Pick<Ctx, 'db' | 'verb' | 'rest' | 'flags' 
   const by = () => actor(db, flags);
   switch (verb) {
     case 'tick': {
-      const r = tick(db, await readCapacity(realRunner), await by());
-      return { data: { ...r }, text: `${r.slots} slot(s) free${r.freeMib === null ? '' : ` (${r.freeMib} MiB)`}; ${r.nudged ? `nudged ${orchestratorName()}` : r.why}` };
+      const me = await by();
+      const run = boundedRunner(context.run, CALL_MS);
+      const refresh =
+        flags.refresh === true
+          ? await runLinearReadyTick(db, { call: makeAuditedLinearCaller(db, run), run, readLanes: readPacingLanes, actor: me, deadlineMs: STEP_MS, refresh: true }).then(
+              () => ({ error: null }),
+              (error: unknown) => ({ error: error instanceof Error ? error.message : String(error) }),
+            )
+          : null;
+      const capacity = await readCapacity(realRunner);
+      const look = tick(db, capacity, me);
+      return { data: { ...look, ...(refresh === null ? {} : { refresh }) }, text: `${formatRefreshLine(refresh)}${look.slots} slot(s) free${look.freeMib === null ? '' : ` (${look.freeMib} MiB)`}; ${look.nudged ? `nudged ${orchestratorName()}` : look.why}` };
     }
     case 'watch': {
       const interval = (intFlag(flags.interval, 'interval') ?? 300) * 1000;
@@ -1859,8 +1873,8 @@ async function lanesCommand(context: Pick<Ctx, 'db' | 'verb' | 'rest' | 'flags' 
       const ready = eligibleNow(db);
       const hold = getLanesHold(db);
       const sample = await readCapacity(realRunner);
-      const slotPlan = readSlotPlan(db, sample);
       const lookAt = now();
+      const slotPlan = readSlotPlan(db, sample, lookAt);
       const slotCause = readSlotCause(db, slotPlan, lookAt);
       const slotMinutesToday = readSlotMinutes(db, sydney(lookAt).date);
       const readyNote = readySummary(db, LANES.readyFreshMinutes());
@@ -1871,7 +1885,7 @@ async function lanesCommand(context: Pick<Ctx, 'db' | 'verb' | 'rest' | 'flags' 
         ? [
             `imp room now: ${slotsFrom(sample.cap!, sample.impMib).slots} slot(s) (${sample.cap!.imp?.freeMib ?? '?'} MiB free; 0 when no unattended imp provider has quota)`,
             formatLineRoom(loadImpRoom(db, { budgetSlots: slotsFrom(sample.cap ?? {}, sample.impMib).slots, impMib: sample.impMib })),
-            ...formatSlotPlan(slotPlan),
+            ...formatSlotPlan(slotPlan, lookAt),
             ...formatSlotCause(slotCause, slotMinutesToday, slotPlan.pool.capHeld),
             ...(readyNote ? [`  ${readyNote.line}`, ...skippedLines(readyNote).map((l) => `  ${l}`)] : []),
             ...(parked.length > 0 ? [`  parked, not counted (blocked with no session awake, or working with every session gone): ${parked.map((parkedRun) => parkedRun.issue).join(', ')}`] : []),
@@ -2243,6 +2257,13 @@ export async function main(argv: string[], runner: Runner = realRunner): Promise
     else console.error(`hq: ${err.message}`);
     return err.code === 'internal' ? 2 : 1;
   }
+}
+
+function formatRefreshLine(refresh: { error: string | null } | null): string {
+  if (refresh === null) {
+    return '';
+  }
+  return refresh.error === null ? 'Read Ready from Linear.\n' : `Ready read from Linear failed: ${refresh.error}\n`;
 }
 
 if (import.meta.main) process.exit(await main(process.argv.slice(2)));

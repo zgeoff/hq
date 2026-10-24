@@ -8,6 +8,8 @@ import { makeBacklogCall } from '../test/make-backlog-call.ts';
 import { buildMockLaneConfig } from '../test/build-mock-lane-config.ts';
 import { at, freshDb } from '../test/helpers.ts';
 import { getMeta } from './db/get-meta.ts';
+import { setMeta } from './db/set-meta.ts';
+import { readReadySnapshot } from './lanes/read-ready-snapshot.ts';
 import { runFocusCommand } from './focus/run-focus-command.ts';
 import { makeStateCall } from '../test/make-state-call.ts';
 import type { LinearCall } from './linear/types.ts';
@@ -57,6 +59,46 @@ test('it runs no second pass within 10 min', async () => {
   expect(second).toBe(false);
   expect(third).toBe(true);
   expect(call).toHaveBeenCalledTimes(4);
+});
+
+test('it reads now on refresh when the throttle says the read is not due', async () => {
+  const ctx = setupTest();
+  at('2026-10-15T20:09:00Z');
+  setMeta(ctx.db, 'lanes_ready_linear_at', '2026-10-15T20:05:00Z');
+  const call = mock<LinearCall>(() => Promise.resolve(buildReadyPage([{ identifier: 'GEO-9831' }], null)));
+
+  const read = await runLinearReadyTick(ctx.db, { call, run: buildStubGitHubFactsRunner({}), readLanes: () => Promise.resolve(null), actor: 'hq-lanes', deadlineMs: 2000, refresh: true });
+
+  expect(read).toBe(true);
+  expect(call).toHaveBeenCalled();
+  expect(getMeta(ctx.db, 'lanes_ready_linear_at')).toBe('2026-10-15T20:09:00Z');
+});
+
+test('it asks Linear nothing without refresh while the throttle says the read is not due', async () => {
+  const ctx = setupTest();
+  at('2026-10-15T20:09:00Z');
+  setMeta(ctx.db, 'lanes_ready_linear_at', '2026-10-15T20:05:00Z');
+  const call = mock<LinearCall>(() => Promise.resolve(buildReadyPage([{ identifier: 'GEO-9831' }], null)));
+
+  const read = await runLinearReadyTick(ctx.db, { call, run: buildStubGitHubFactsRunner({}), readLanes: () => Promise.resolve(null), actor: 'hq-lanes', deadlineMs: 2000 });
+
+  expect(read).toBe(false);
+  expect(call).not.toHaveBeenCalled();
+});
+
+test('it keeps the stored time of the last good Ready read when a refresh fails', async () => {
+  const ctx = setupTest();
+  at('2026-10-15T20:00:00Z');
+  await runLinearReadyTick(ctx.db, { call: makePagedCall(buildReadyPage([{ identifier: 'GEO-9832' }], null)), run: buildStubGitHubFactsRunner({}), readLanes: () => Promise.resolve(null), actor: 'hq-lanes', deadlineMs: 2000 });
+  at('2026-10-15T20:04:00Z');
+
+  const failure = await runLinearReadyTick(ctx.db, { call: makePagedCall(new Error('Linear answered 503: invented maintenance')), run: buildStubGitHubFactsRunner({}), readLanes: () => Promise.resolve(null), actor: 'hq-lanes', deadlineMs: 2000, refresh: true }).then(
+    () => null,
+    (error: unknown) => error,
+  );
+
+  expect(failure).toBeInstanceOf(Error);
+  expect(readReadySnapshot(ctx.db, new Date('2026-10-15T20:04:00Z'))?.at).toBe('2026-10-15T20:00:00Z');
 });
 
 test('it records a missed deadline as the error', async () => {

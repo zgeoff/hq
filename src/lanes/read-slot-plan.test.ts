@@ -111,6 +111,25 @@ test('a skip set after the Ready read leaves its issue out of the picks at the n
   expect([plan?.plan?.picks.map((pick) => pick.issue), plan?.eligible]).toStrictEqual([['GEO-9805', 'GEO-9804', 'GEO-9802'], 4]);
 });
 
+test('it gives the time the Ready read its picks come from was stored', async () => {
+  const ctx = setupTest();
+  at('2026-10-15T20:03:00Z');
+  await ctx.seedReady([{ identifier: 'GEO-9821', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 2 }]);
+
+  const plan = readSlotPlan(ctx.db, ctx.sample, new Date('2026-10-15T20:10:00Z'));
+
+  expect(plan?.readyReadAt).toBe('2026-10-15T20:03:00Z');
+});
+
+test('it gives no Ready read time with no Ready read', () => {
+  const ctx = setupTest();
+  at('2026-10-15T20:10:00Z');
+
+  const plan = readSlotPlan(ctx.db, ctx.sample, new Date('2026-10-15T20:10:00Z'));
+
+  expect(plan?.readyReadAt).toBeNull();
+});
+
 test('the plan lists the active skips of eligible Ready issues, leaving out those with a run or not in Ready', async () => {
   const ctx = setupTest();
   await ctx.seedReady(ctx.readySeeds);
@@ -150,7 +169,7 @@ test('local slots free none, and say why, when the localFallback is used up', as
 
   expect(plan.pool).toStrictEqual({ impSize: 0, localSize: 3, impRunning: 0, localRunning: 2, impFree: 0, localFree: 0, free: 0, capHeld: false, held: null, localHeld: 'no unattended provider can start local work: localFallback 2 in use', localSource: null });
   expect(plan.plan?.picks).toStrictEqual([]);
-  expect(formatSlotPlan(plan)[0]).toBe('slots (running/size, free now): imp 0/0, 0 free; local 2/3, 0 free (no unattended provider can start local work: localFallback 2 in use)');
+  expect(formatSlotPlan(plan, new Date('2026-10-15T20:00:00Z'))[0]).toBe('slots (running/size, free now): imp 0/0, 0 free; local 2/3, 0 free (no unattended provider can start local work: localFallback 2 in use)');
 });
 
 test('the tick nudges for no local slot when the localFallback is used up', async () => {

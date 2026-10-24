@@ -30,6 +30,9 @@ export interface SlotPlan {
   // What the free slots take, in order; null while the Ready read is unknown or stale.
   plan: FocusPlan | null;
 
+  // When the Ready read the plan comes from was stored; null with the plan.
+  readyReadAt: string | null;
+
   // Every eligible issue not on the board; null while unknown.
   eligible: number | null;
 
@@ -58,7 +61,7 @@ export function readSlotPlan(db: Database, sample: Sample, at: Date = now(), cap
   const focus = readFocus(db);
   const snapshot = readReadySnapshot(db, at);
   if (snapshot === null) {
-    return { pool, focus, plan: null, eligible: null, design: null, skipped: [], cap };
+    return { pool, focus, plan: null, readyReadAt: null, eligible: null, design: null, skipped: [], cap };
   }
   const runIssues = readRunIssues(db);
   const activeSkips = readLaneSkips(db).filter((skip) => isSkipActive(skip, at));
@@ -68,7 +71,7 @@ export function readSlotPlan(db: Database, sample: Sample, at: Date = now(), cap
   const design = sample.cap.design?.room === true ? findDesignPick(snapshot, leftOut) : null;
   const eligibleIssues = new Set(snapshot.eligible.map((issue) => issue.identifier));
   const skipped = activeSkips.filter((skip) => eligibleIssues.has(skip.issue) && !runIssues.has(skip.issue));
-  return { pool, focus, plan, eligible: queue.length, design, skipped, cap };
+  return { pool, focus, plan, readyReadAt: snapshot.at, eligible: queue.length, design, skipped, cap };
 }
 
 const issuesSchema = z.array(z.object({ issue: z.string() }));
