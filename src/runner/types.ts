@@ -13,6 +13,12 @@ export interface RunOpts {
   // Text written to the command's standard input; none when absent.
   stdin?: string;
   timeoutMs?: number; // kill the command after this long; it then exits 124, like timeout(1)
+
+  // After the deadline's TERM, how long before the KILL; 2 s when absent.
+  killGraceMs?: number;
+
+  // How long a timed command's output may trail its exit; 1 s, or 0.5 s once timed out, when absent.
+  settleMs?: number;
 }
 
 export type Runner = (cmd: string[], opts?: RunOpts) => Promise<RunResult>;

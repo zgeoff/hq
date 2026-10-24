@@ -140,13 +140,23 @@ test('a failing fetch is one quick attempt: no retry delay, state unknown', asyn
 test('slow session.get replies run together and are cut off at the budget as unknown', async () => {
   const many: FleetEntry[] = Array.from({ length: 7 }, (_, i) => ({ ...fleet[1]!, name: `z-pot${String.fromCharCode(97 + i)}` }));
   const sessions: FleetSession[] = many.map((e, i) => ({ id: `id-${i}`, name: e.name, alive: true }));
-  const slow: DriftClient = { prompt: (id) => new Promise((r) => setTimeout(() => r('You are Teapot.\nSteep the tea.'), id === 'id-6' ? 5_000 : 300)) };
-  const t0 = Date.now();
-  const r = await promptDrift(slow, many, sessions, {}, 1_000);
-  expect(Date.now() - t0).toBeLessThan(1_500); // seven 300 ms calls in parallel, one cut off at 1 s
-  expect(Object.values(r).filter((d) => d.state === 'current').length).toBe(6);
-  expect(r['z-potg']).toEqual({ state: 'unknown', since: null, hint: null, reason: 'atc session.get took over 1000 ms' });
-  expect(Object.keys(r)).toEqual(many.map((e) => e.name)); // declared order
+  const slow: DriftClient = {
+    prompt: async (id) => {
+      const replyMs = id === 'id-6' ? 5000 : 60;
+
+      // oxlint-disable-next-line zgeoff/no-test-sleep -- the workload under test: six 60 ms replies fit the budget only when they run together
+      await Bun.sleep(replyMs);
+      return 'You are Teapot.\nSteep the tea.';
+    },
+  };
+  const started = Date.now();
+  const drift = await promptDrift(slow, many, sessions, {}, 300);
+
+  // Seven 60 ms calls in parallel, one cut off at 0.3 s, each kept in declared order.
+  expect(Date.now() - started).toBeLessThan(600);
+  expect(Object.values(drift).filter((entry) => entry.state === 'current').length).toBe(6);
+  expect(drift['z-potg']).toEqual({ state: 'unknown', since: null, hint: null, reason: 'atc session.get took over 300 ms' });
+  expect(Object.keys(drift)).toEqual(many.map((entry) => entry.name));
 });
 
 test('a hint on a long line starts a little before the first character that differs', async () => {

@@ -18,6 +18,7 @@ import { addRun } from '../runs/add-run.ts';
 import { addUnblock } from '../unblock/add-unblock.ts';
 import { getUnblock } from '../unblock/get-unblock.ts';
 import { makePRStateGh } from '../../test/make-pr-state-gh.ts';
+import { waitFor } from '../../test/wait-for.ts';
 import { resetKey } from '../linear/reset-key.ts';
 import type { RunResult, Runner } from '../runner/types.ts';
 import { watchTick } from './watch-tick.ts';
@@ -289,7 +290,7 @@ test('a goals sync the deadline gave up on is not started again until it stops',
   await watchTick(ctx.db, deps);
   const whileHeld = repoLists.length;
   held.resolve();
-  await Bun.sleep(20);
+  await waitFor('the given-up goals sync to stop', () => logs.some((line) => line.endsWith('team goals from an earlier pass stopped')));
   setMeta(ctx.db, 'goals_synced_at', '1970-01-01T00:00:00Z');
   await watchTick(ctx.db, deps);
 

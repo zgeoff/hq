@@ -11,10 +11,12 @@ test('it gives its value once the process exits, after the given time', async ()
 test('it arrives after a deadline that expired while another answer blocked the event loop', async () => {
   const blocker = (async () => {
       await readAfterExit('first', 0.05);
-      Bun.sleepSync(600);
+      // oxlint-disable-next-line zgeoff/no-test-sleep -- the workload under test: an answer that blocks the event loop past both later events
+      Bun.sleepSync(300);
     })(),
     late = (async () => {
-      await Bun.sleep(300);
+      // oxlint-disable-next-line zgeoff/no-test-sleep -- the deadline under test: after the second exit, inside the block
+      await Bun.sleep(200);
       return 'deadline';
     })(),
     order: string[] = [],

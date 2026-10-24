@@ -132,7 +132,7 @@ test('the owner answers by click, key and note, Ask Stu copies its prompt, a rev
     await queryClient.invalidateQueries();
   });
   await lib.within(document.body).findByText('Fit the new lid on the kettle');
-}, 20_000);
+});
 
 test('it shows an item that arrives while the page stays open', async () => {
   const app = await setupTest();

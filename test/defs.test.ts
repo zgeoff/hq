@@ -18,6 +18,7 @@ import { setMeta } from '../src/db/set-meta.ts';
 import { createTreeCheckout } from './create-tree-checkout.ts';
 import { createHqDefsRepo, freshDb, requireEnv } from './helpers.ts';
 import { readPrivateFixture } from './read-private-fixture.ts';
+import { waitFor } from './wait-for.ts';
 
 let db: Database;
 let dir: string;
@@ -234,11 +235,12 @@ test('a hung fetch is stopped and releases the sync lock (GEO-1147)', () => {
 
 test("hq's own sync waits for its flock, then runs", async () => {
   readyHq();
-  const held = Bun.spawn(['flock', `${DEFS_SOURCES.hq.dir()}/.git/hq-sync.lock`, 'sleep', '1']);
-  await Bun.sleep(100);
+  const lock = `${DEFS_SOURCES.hq.dir()}/.git/hq-sync.lock`;
+  const held = Bun.spawn(['flock', lock, 'sleep', '0.5']);
+  await waitFor('the holder to take the flock', () => Bun.spawnSync(['flock', '-n', lock, 'true']).exitCode !== 0);
   const t0 = Date.now();
   expect(runTreeSync()).toMatchObject({ ok: true });
-  expect(Date.now() - t0).toBeGreaterThanOrEqual(700);
+  expect(Date.now() - t0).toBeGreaterThanOrEqual(300);
   await held.exited;
 });
 

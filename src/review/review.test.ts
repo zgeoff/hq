@@ -234,13 +234,19 @@ test('a real review that quotes the limit words in a diff or a finding still pas
 
 test('the repo lock lets one holder in at a time, and takes over a stale lock', async () => {
   const order: string[] = [];
+  const gate = Promise.withResolvers<void>();
   const hold = (tag: string) => withRepoLock(dir, 'zgeoff/widgets', async () => {
     order.push(`${tag} in`);
-    await Bun.sleep(30);
+    await gate.promise;
     order.push(`${tag} out`);
   });
-  await Promise.all([hold('a'), hold('b')]);
-  expect(order).toEqual(['a in', 'a out', 'b in', 'b out']);
+
+  // b finds the lock taken before its call returns, so it waits on it while a holds the gate.
+  const holders = [hold('a'), hold('b')];
+  order.push('released');
+  gate.resolve();
+  await Promise.all(holders);
+  expect(order).toEqual(['a in', 'released', 'a out', 'b in', 'b out']);
   // A lock left by a dead review, older than 10 minutes, is taken over.
   const { mkdirSync: mk, utimesSync } = await import('node:fs');
   mk(`${dir}/.lock-zgeoff-widgets`);

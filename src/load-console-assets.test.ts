@@ -13,4 +13,4 @@ test('run from source, it builds the page in memory with Geist inside its styles
   expect(page).toContain('<div id="root">');
   expect(style).toContain('data:font/woff2');
   expect(style).not.toContain('fonts.googleapis.com');
-}, 30_000);
+});

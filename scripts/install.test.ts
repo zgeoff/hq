@@ -31,16 +31,16 @@ function setupTest() {
 test('it builds a binary that names the clean commit it was built from', () => {
   const ctx = setupTest();
   expect(ctx.readBuiltVersion()).toMatchObject({ commit: ctx.head, dirty: false });
-}, 120_000);
+});
 
 test('it marks a build from a tree with uncommitted changes as dirty', () => {
   const ctx = setupTest();
   appendFileSync(join(ctx.tree, 'README.md'), '\nAn invented local edit.\n');
   expect(ctx.readBuiltVersion()).toMatchObject({ commit: ctx.head, dirty: true });
-}, 120_000);
+});
 
 test('it names no commit for a build outside git', () => {
   const ctx = setupTest();
   rmSync(join(ctx.tree, '.git'), { recursive: true, force: true });
   expect(ctx.readBuiltVersion()).toMatchObject({ commit: null, dirty: null });
-}, 120_000);
+});

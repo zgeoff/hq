@@ -163,4 +163,4 @@ test('install.sh and hq lanes start write the same unit and make the same system
   expect(viaInstall.calls).toBe(`--user is-enabled --quiet hq-lanes\n${viaStart.calls}`);
   expect(viaStart.calls).toBe('--user show -p Transient --value hq-lanes.service\n--user daemon-reload\n--user enable hq-lanes.service\n--user restart hq-lanes.service\n');
   expect(existsSync(join(home, '.config/systemd/user/hq-lanes.service'))).toBe(true);
-}, 60_000);
+});

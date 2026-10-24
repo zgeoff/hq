@@ -176,23 +176,25 @@ test('it runs two overlapping pins one after the other', async () => {
     events: string[] = [],
     fake = buildFakeRunner(),
     gate = Promise.withResolvers<void>(),
+    atGate = Promise.withResolvers<void>(),
     run: Runner = async (cmd, opts) => {
       if (cmd[0] === 'git' && cmd[1] === 'worktree' && cmd[2] === 'add') {
         events.push(`add ${cmd.at(-1)?.slice(0, 7)}`);
       }
       if (cmd[0] === 'bun' && events.length === 1) {
+        atGate.resolve();
         await gate.promise;
       }
       return await fake.run(cmd, opts);
     },
     started = ['aaaaaaa', 'bbbbbbb'].map((sha) => runNoslopCommand({ run, db: ctx.db, verb: 'pin', rest: [sha], since: undefined, actor: 'tester' }));
 
-  await Bun.sleep(600);
-  expect(events).toStrictEqual(['add aaaaaaa']);
+  await atGate.promise;
+  events.push('released');
   gate.resolve();
   await Promise.all(started);
 
-  expect(events).toStrictEqual(['add aaaaaaa', 'add bbbbbbb']);
+  expect(events).toStrictEqual(['add aaaaaaa', 'released', 'add bbbbbbb']);
 });
 
 test('it keeps the old pin when the checkout fails', async () => {

@@ -372,11 +372,13 @@ test('--now refuses a name outside the declared fleet and spawns nothing', async
 test('fleet ensure runs one at a time: an overlapping run is refused and spawns nothing', async () => {
   let release!: () => void;
   const gate = new Promise<void>((r) => (release = r));
+  const inSpawn = Promise.withResolvers<void>();
   const spawned: string[] = [];
   const client: FleetClient = {
     sessions: async () => [],
     spawn: async (p) => {
       spawned.push(p.idempotencyKey);
+      inSpawn.resolve();
       await gate;
       return { id: `id-${spawned.length}` };
     },
@@ -384,7 +386,7 @@ test('fleet ensure runs one at a time: an overlapping run is refused and spawns 
   };
   const one = fleet.slice(0, 1);
   const a = ensureFleet(db, client, { dryRun: false, actor: 'z-stu', fleet: one, now: ['z-kettle'] });
-  await Bun.sleep(20); // a is inside its spawn
+  await inSpawn.promise;
   await expect(ensureFleet(db, client, { dryRun: false, actor: 'hq-fleet', fleet: one, now: ['z-kettle'] })).rejects.toThrow('another hq fleet ensure is running (z-stu)');
   expect((await ensureFleet(db, client, { dryRun: true, actor: 'z-q', fleet: one }))[0]).toBeDefined(); // a dry run needs no lease
   release();
@@ -612,9 +614,12 @@ test('a stale tick cannot discard the result of a helper that claimed the marker
   atMin(5);
   let release!: () => void;
   const gate = new Promise<void>((r) => (release = r));
-  const stale: FleetClient = { ...f.client, sessions: async () => (await gate, f.client.sessions()) };
+  const waitsOnAtc = Promise.withResolvers<void>();
+  const stale: FleetClient = { ...f.client, sessions: async () => (waitsOnAtc.resolve(), await gate, f.client.sessions()) };
   const tick = ensureFleet(db, stale, { dryRun: false, actor: 'hq-fleet', fleet: rcFleet(), rc: f.rc });
-  await Bun.sleep(5); // the tick has read the marker (no typedAt) and waits on atc
+
+  // The tick has read the marker (no typedAt) and waits on atc.
+  await waitsOnAtc.promise;
   const step = await rcWatch(db, f.client, f.rc, 'z-kettle', 'hq-fleet'); // the helper claims, types, finishes
   expect(step).toMatchObject({ action: 'remote control' });
   release();
@@ -632,9 +637,14 @@ test('the helper and the 5-minute check on one marker type once between them', a
   // The helper is mid-typing when the tick looks: its submit holds until the tick has run.
   let release!: () => void;
   const gate = new Promise<void>((r) => (release = r));
-  const slow: FleetClient = { ...f.client, submit: async (id, text) => (await gate, f.client.submit!(id, text)) };
+  const inSubmit = Promise.withResolvers<void>();
+  const submit = f.client.submit;
+  if (submit === undefined) {
+    throw new Error('the stand-in client has no submit');
+  }
+  const slow: FleetClient = { ...f.client, submit: async (id, text) => (inSubmit.resolve(), await gate, submit(id, text)) };
   const helper = rcWatch(db, slow, f.rc, 'z-kettle', 'hq-fleet');
-  await Bun.sleep(5);
+  await inSubmit.promise;
   const tick = await ensure(f); // typedAt is set and recent: leaves it
   expect(tick.filter((x) => x.action === 'failed' || x.action === 'remote control')).toEqual([]);
   release();
