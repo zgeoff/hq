@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.96.0 — 2026-10-24
+
+The merge gate holds repo instruction files, and runs, the sweep and the ship pass leave working sessions alone.
+
+### The merge gate holds a change to a repo's instruction files until the owner or a proven record clears it.
+
+- AGENTS.md, `skills/` and `.claude/skills/` in zgeoff repos other than hq, hq-private and nixie-definitions are held. The owner's lgtm, a bot author, a z-review exemption, or a z-review mechanical record clears the hold.
+- hq proves a mechanical record again from the diff at the head. It passes only a version token, table padding, or a link or code path to the same file.
+- `hq pr mechanical` and `hq pr exempt` accept only z-review's atc session, and each adds an `hq news` line.
+
+### Fixes
+
+- `hq review gate` passes a PR in a repo that runs no CI, when the head and the base hold no `.github/workflows`.
+- `hq run state` refuses to move a working or blocked run past merged while it has an open PR or an active main session. `--force` overrides it.
+- The ship pass leaves a run alone while any session on it, a helper's included, is active.
+- `hq run done` destroys a cloud imp with one forget that stops its session, so a slow imp sleep no longer fails the call.
+- The sweep stays quiet on a run that waits on an open unblock item, on an asleep session, on a live-check run whose issue is Done, and on a FINAL with the owner's override at its head.
+- A moved-head alert says how to record the new head.
+- The restart wake tells z-delivery to re-arm its event watch.
+- The `hq pr` help line names `mechanical` and `exempt`.
+
 ## 0.95.0 — 2026-10-23
 
 Shipping tracks the host build for cloud, a manual hold sticks, and fixes to the sweep, health and wrap-up.
