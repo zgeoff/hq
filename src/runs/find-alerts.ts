@@ -71,14 +71,14 @@ export function findAlerts(db: Database, sessions: SessionInfo[], activity: Map<
 
 // The owner's override at the FINAL's head stands for its review, which no round could give. A
 // FINAL may carry a short sha, and an override the full one.
-function formatRestackHint(ref: string): string {
-  const [repo = '', pr = ''] = ref.split('#');
-  return ` (a restack? a passed hq review ${repo} ${pr} records the new head)`;
-}
-
 function readFinalAnswered(db: Database, pr: RunPr): boolean {
   const [repo = '', number = ''] = pr.ref.split('#');
   return isFinalAnswered(pr) || readOwnerOverrides(db, repo, Number(number)).some((override) => sameSha(override.head, pr.final_sha));
+}
+
+function formatRestackHint(ref: string): string {
+  const [repo = '', pr = ''] = ref.split('#');
+  return ` (a restack? a passed hq review ${repo} ${pr} records the new head)`;
 }
 
 // The run's active sessions, and with no active main session, the main one that ended last when the
