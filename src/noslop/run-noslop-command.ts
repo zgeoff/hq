@@ -13,6 +13,7 @@ import type { Runner } from '../runner/types.ts';
 import { buildNoslopReport } from './build-noslop-report.ts';
 import { buildNoslopTotals } from './build-noslop-totals.ts';
 import { buildRunDir } from './build-run-dir.ts';
+import { parseCapArgs } from './parse-cap-args.ts';
 import { readStoreMigrations } from './read-store-migrations.ts';
 import { loadNoslopSettings } from './load-noslop-settings.ts';
 import type { NoslopSettings } from './load-noslop-settings.ts';
@@ -97,10 +98,10 @@ function formatCaps(settings: NoslopSettings): string {
 }
 
 function updateCap(args: NoslopArgs): Out {
-  const [repo, value] = args.rest;
+  const parsed = parseCapArgs(args.rest);
   const before = loadNoslopSettings(args.db);
-  const next = updateNoslopCap(args.db, repo, value);
-  logEvent(args.db, 'hq', 'noslop', 'cap', args.actor, JSON.stringify(before.caps), JSON.stringify(next.caps), { repo, cap: value });
+  const next = updateNoslopCap(args.db, parsed.repo, parsed.cap);
+  logEvent(args.db, 'hq', 'noslop', 'cap', args.actor, JSON.stringify(before.caps), JSON.stringify(next.caps), { repo: parsed.repo, cap: parsed.cap });
   return renderSettings(args.db);
 }
 
