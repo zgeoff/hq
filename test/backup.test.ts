@@ -147,10 +147,17 @@ test('it lets one run take over a dead staging lock when several find it at once
       await Bun.sleep(5);
     }
   };
-  await waitUntilAllReady();
-  writeFileSync(`${barrier}/go`, '');
-
-  const outcomes = await Promise.all(runs.map((run) => new Response(run.stdout).text()));
+  let outcomes: string[] = [];
+  try {
+    await waitUntilAllReady();
+    writeFileSync(`${barrier}/go`, '');
+    outcomes = await Promise.all(runs.map((run) => new Response(run.stdout).text()));
+  } finally {
+    for (const run of runs) {
+      run.kill();
+    }
+    await Promise.all(runs.map((run) => run.exited));
+  }
 
   expect(outcomes.map((line) => line.trim()).toSorted()).toStrictEqual(['busy', 'busy', 'busy', 'busy', 'busy', 'busy', 'busy', 'ran']);
 });
