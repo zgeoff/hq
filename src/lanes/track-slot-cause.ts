@@ -9,6 +9,7 @@ import type { SlotPlan } from './read-slot-plan.ts';
 import { CAUSE_SINCE_KEY } from './cause-since-key.ts';
 import { ELIGIBLE_SINCE_KEY } from './eligible-since-key.ts';
 import type { SlotCause } from './types.ts';
+import { writeSlotCauseMove } from './write-slot-cause-move.ts';
 
 // One look: the Ready-waiting clock clears only when free slots or eligible Ready work are known to be
 // 0, and an unknown capacity leaves both it and the cause's start as they were.
@@ -22,14 +23,17 @@ export function trackSlotCause(db: Database, slotPlan: SlotPlan | null, at: Date
   if (slotPlan === null) {
     return slotCause;
   }
+  const kept = metaJson(db, CAUSE_SINCE_KEY, CAUSE_SINCE, null);
   if (slotCause.cause === null) {
-    setMeta(db, CAUSE_SINCE_KEY, null);
+    if (kept !== null) {
+      writeSlotCauseMove(db, 'cause-ended', 'none', at);
+    }
     return slotCause;
   }
-  const kept = metaJson(db, CAUSE_SINCE_KEY, CAUSE_SINCE, null);
   if (kept?.cause === slotCause.cause) {
     return slotCause;
   }
-  setMeta(db, CAUSE_SINCE_KEY, JSON.stringify({ cause: slotCause.cause, since: iso(at) }));
+  const action = kept === null ? 'cause-began' : 'cause-changed';
+  writeSlotCauseMove(db, action, slotCause.cause, at);
   return { ...slotCause, since: iso(at) };
 }
