@@ -24,6 +24,7 @@
       "areas": [],
       "priority": 3,
       "idleDays": 1,
+      "ageDays": 1,
       "needsGeoff": false,
       "missing": [
         "area"

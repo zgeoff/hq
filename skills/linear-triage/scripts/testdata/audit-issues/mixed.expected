@@ -23,6 +23,7 @@
       "areas": [],
       "priority": 0,
       "idleDays": 14,
+      "ageDays": 14,
       "needsGeoff": true,
       "missing": [
         "project",
@@ -46,6 +47,7 @@
       ],
       "priority": 3,
       "idleDays": 13,
+      "ageDays": 13,
       "needsGeoff": false,
       "missing": [],
       "stale": false
@@ -63,6 +65,7 @@
       "areas": [],
       "priority": 0,
       "idleDays": 1,
+      "ageDays": 1,
       "needsGeoff": false,
       "missing": [
         "project",
@@ -87,6 +90,7 @@
       ],
       "priority": 3,
       "idleDays": 14,
+      "ageDays": 14,
       "needsGeoff": false,
       "missing": [],
       "stale": true
@@ -104,6 +108,7 @@
       ],
       "priority": 3,
       "idleDays": 3,
+      "ageDays": 3,
       "needsGeoff": false,
       "missing": [],
       "stale": true

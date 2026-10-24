@@ -19,7 +19,7 @@ An In Progress issue is stale when neither its agent nor its PR moved in 3 days.
 
 ## obsolete Backlog issues
 
-On a full pass, check each Backlog issue in the audit's `stale` list, the ones untouched for 14 days or more, for whether its work is still worth doing. Leave out vers feature work, which only the owner decides. Close an issue as Canceled, or as Duplicate of the issue that covered it, when you find one of these, and comment the evidence:
+On a full pass, check each Backlog issue in the audit's `stale` list, the ones filed 14 days ago or more, for whether its work is still worth doing. Leave out vers feature work, which only the owner decides. Close an issue as Canceled, or as Duplicate of the issue that covered it, when you find one of these, and comment the evidence:
 
 - **Overtaken:** a decision record or a merged change made it moot. Name the record or the PR.
 - **Gone:** the code or files it names no longer exist. Name the paths and the commit that removed them.

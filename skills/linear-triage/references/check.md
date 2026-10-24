@@ -30,7 +30,7 @@ Copy this checklist into your notes, and tick each step as you finish it:
 
    A decision is open until the owner answers its call or its sender tells you it is settled, so keep each one in your saved state until then. Take them from two sources: the decisions other sessions sent you by message, and the `decision` and `blocked` notes in the atc events since the last "CHECK at" line. When `atc_events_read` refuses your saved cursor with `bad_args`, which follows an atc upgrade that changes the cursor format, read without a cursor, save the new one, and say in the check's line that notes from before that read may be missed. An item that needs the owner's hands rather than a decision, such as a live check, a design chat or a setup step, goes on the [unblock list](#unblock-list) instead.
 
-2. **Fetch the flagged issues:** team GEO's issues with the label `Needs Geoff`, with the fields `id`, `title`, `url`, `status`, `priority` and `updatedAt`. Save and audit every page as step 1 of the pass in `SKILL.md` says.
+2. **Fetch the flagged issues:** team GEO's issues with the label `Needs Geoff`, with the fields `id`, `title`, `url`, `status`, `priority`, `createdAt` and `updatedAt`. Save and audit every page as step 1 of the pass in `SKILL.md` says.
 3. **Complete the notes file** for each flagged issue it lacks.
 
    The notes file maps each issue ID to its question and a one-sentence recommendation, such as `{"GEO-9001": {"question": "Split GEO-9001 into slices?", "recommendation": "Yes, because 16 PRs landed and it is open."}}`. The pass writes its own flags into it, so read the latest comment only on a flag it lacks: an older flag, one set by hand, or every flag when the check runs alone.

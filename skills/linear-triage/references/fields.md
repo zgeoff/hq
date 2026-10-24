@@ -51,4 +51,4 @@ An issue may take several PRs, such as a stack for one change or one PR in each 
 
 **Parked.** Only the owner parks or unparks an issue. An issue that carries the `parked` label stays out of Ready whatever its priority, so leave it in Backlog. Groom it like any other. Create the label, ungrouped, when the team has none. When the owner parks or unparks an issue in words, in its text or a comment, rather than with the label, add or remove the label to match, with a comment that quotes his words. The label is how `hq lanes promotable` sees a park, and a park held only in words lets the issue back into Ready.
 
-**Stale.** An issue is stale when it's In Progress with no PR or agent session activity for 3 days, or in Triage or Backlog with no update for 14 days. In Review isn't stale: it waits on a merge.
+**Stale.** An issue is stale when it's In Progress with no PR or agent session activity for 3 days, or in Triage or Backlog 14 days after it was filed. The Triage and Backlog age counts from `createdAt`, not `updatedAt`, because label edits and grooming move `updatedAt` on nearly every issue. In Review isn't stale: it waits on a merge.
