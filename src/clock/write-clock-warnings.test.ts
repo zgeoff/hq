@@ -1,4 +1,5 @@
 import { expect, onTestFinished, setSystemTime, test } from 'bun:test';
+import { overrideBuild } from '../../test/override-build.ts';
 import { writeClockWarnings } from './write-clock-warnings.ts';
 
 function setupTest() {
@@ -6,19 +7,12 @@ function setupTest() {
   return {
     lines,
     write: (line: string) => lines.push(line),
-    installBuild: () => {
-      const saved = globalThis.HQ_BUILD;
-      globalThis.HQ_BUILD = { commit: 'abc1234', dirty: false };
-      onTestFinished(() => {
-        globalThis.HQ_BUILD = saved;
-      });
-    },
   };
 }
 
 test('it warns once for each clock setting the installed hq ignores', () => {
   const ctx = setupTest();
-  ctx.installBuild();
+  onTestFinished(overrideBuild({ commit: 'abc1234', dirty: false }));
   onTestFinished(() => setSystemTime());
   setSystemTime(new Date('2026-10-14T01:00:00Z'));
 
@@ -29,7 +23,7 @@ test('it warns once for each clock setting the installed hq ignores', () => {
 
 test('it says nothing in the installed hq when neither setting is set', () => {
   const ctx = setupTest();
-  ctx.installBuild();
+  onTestFinished(overrideBuild({ commit: 'abc1234', dirty: false }));
   onTestFinished(() => setSystemTime());
   setSystemTime(new Date('2026-10-14T01:00:00Z'));
 
