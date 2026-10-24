@@ -50,9 +50,12 @@ function readFlatMoves(reviewDir: string, names: RepoNames, known: ReadonlySet<s
     .toSorted((first, second) => first.from.localeCompare(second.from));
 }
 
-// <repo><pr> splits wherever the digits start: widgets123 is also widgets1 #23 and widgets12 #3.
+// <repo><pr> splits wherever the digits start, and a repo name may end in digits: widgets123 is
+// widgets #123, widgets1 #23 and widgets12 #3 alike.
 function collectOtherOwners(from: string, pr: string, known: ReadonlySet<string>): string[] {
-  return Array.from({ length: pr.length - 1 }, (_, index) => index + 1)
-    .filter((split) => known.has(`${from}${pr.slice(0, split)}`))
-    .map((split) => `${from}${pr.slice(0, split)}#${Number(pr.slice(split))}`);
+  const stem = `${from}${pr}`;
+  return [...known]
+    .filter((repo) => repo !== from && stem.startsWith(repo) && /^\d+$/u.test(stem.slice(repo.length)))
+    .toSorted()
+    .map((repo) => `${repo}#${Number(stem.slice(repo.length))}`);
 }

@@ -452,6 +452,21 @@ test('it refuses a flat review file whose name another known repo could own, nam
   expect(readBackupNames(ctx.path)).toStrictEqual([]);
 });
 
+test('it refuses a flat review file whose name a known repo with a shorter name could own, and moves and changes nothing', async () => {
+  const ctx = setupTest();
+  ctx.createHistoryRows('widgets1', 0);
+  ctx.db.query("INSERT INTO merged_prs (repo, number, merged_at, title, kind) VALUES ('widgets', 123, '2026-10-02T00:00:00Z', 'an invented sprocket change', 'fix')").run();
+  mkdirSync(`${ctx.dir}/reviews`, { recursive: true });
+  writeFileSync(`${ctx.dir}/reviews/widgets123-review.md`, 'old sprocket review');
+  const before = readHistoryRows(ctx.db);
+
+  await expect(ctx.archive('widgets1', 'widgets-archive')).rejects.toMatchObject({ code: 'rekey_ambiguous', data: { files: [`${ctx.dir}/reviews/widgets123-review.md (could also be widgets#123)`] } });
+
+  expect(readdirSync(`${ctx.dir}/reviews`)).toStrictEqual(['widgets123-review.md']);
+  expect(readHistoryRows(ctx.db)).toStrictEqual(before);
+  expect(readBackupNames(ctx.path)).toStrictEqual([]);
+});
+
 test('it refuses on a dry run a flat review file whose name a repo on the noslop list could own', async () => {
   const ctx = setupTest();
   ctx.createHistoryRows('widgets', 0);
