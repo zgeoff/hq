@@ -33,7 +33,7 @@ Move an issue to Ready when all of these hold:
 - Its work isn't already done: no merged PR is attached, and `hq run show <issue>` shows no run at `merged`, `live-check` or `done`. When one is, move the issue to In Review instead, or to Done for a done run.
 - The work fits one agent. It may take several PRs; split it into sub-issues under the same project only when its parts can ship on their own.
 
-Leave vers feature work in Backlog: the owner decides which vers Feature and Design issues, and any vers issue that changes game design or player experience, reach Ready, and a vers issue in Ready launches. Groom its fields and flag its questions as usual. Every other issue with the `vers` area label, such as a bug, a chore, a fleet rollout or a code-quality change, follows the same Ready rules as any other repo's.
+Leave vers feature work in Backlog: the owner decides which vers Feature and Design issues, and any vers issue that changes game design or player experience, reach Ready, and a vers issue in Ready launches. Groom its fields and flag its questions as usual. Every other issue with the `vers` area label, such as a bug, a chore, a fleet rollout or a code-quality change, follows the same Ready rules as any other repo's. When it is unclear whether a vers issue is feature work, treat it as feature work and flag the question.
 
 A missing project doesn't hold an issue back from Ready. Flag the project question as the Project rule in `fields.md` says.
 
