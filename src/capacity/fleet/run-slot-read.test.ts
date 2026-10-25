@@ -46,7 +46,7 @@ test('it reads four slots, stores one row each with the working lane count, and 
   );
   const result = await runSlotRead(ctx.db, run, new Date('2026-10-14T01:00:00Z'));
 
-  expect(result).toMatchObject({ kind: 'read', problems: ['slot 3: op read gave no token'] });
+  expect(result).toMatchObject({ kind: 'read', problems: ['slot 3: op read failed (exit 1)'] });
   expect(ctx.db.query('SELECT at, slot, status, five_hour, seven_day, working_lanes FROM slot_usage ORDER BY slot').all()).toStrictEqual([
     { at: '2026-10-14T01:00:00Z', slot: 1, status: '200', five_hour: 10, seven_day: 30, working_lanes: 1 },
     { at: '2026-10-14T01:00:00Z', slot: 2, status: '403', five_hour: null, seven_day: null, working_lanes: 1 },

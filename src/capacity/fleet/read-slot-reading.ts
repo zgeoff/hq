@@ -15,10 +15,11 @@ const BODY = JSON.stringify({ model: 'claude-haiku-4-5', max_tokens: 1, messages
 // One 1-token haiku request: /v1/messages answers a setup token with its account's rate-limit headers.
 export async function readSlotReading(run: Runner, opToken: string, slot: number): Promise<SlotReadResult> {
   const empty = { slot, five: null, fiveResetsAt: null, seven: null, sevenResetsAt: null };
-  const credential = await readSlotCredential(run, opToken, slot);
-  if (credential === null) {
-    return { reading: { ...empty, status: 'op-failed' }, problem: `slot ${slot}: op read gave no token` };
+  const read = await readSlotCredential(run, opToken, slot);
+  if (read.kind === 'failed') {
+    return { reading: { ...empty, status: 'op-failed' }, problem: `slot ${slot}: ${read.reason}` };
   }
+  const credential = read.credential;
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',

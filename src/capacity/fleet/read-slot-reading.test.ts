@@ -46,7 +46,7 @@ test('it makes no request when 1Password gives no token', async () => {
   );
   const result = await readSlotReading(run, 'ops_kettle-profile', 4);
 
-  expect(result).toStrictEqual({ reading: { slot: 4, status: 'op-failed', five: null, fiveResetsAt: null, seven: null, sevenResetsAt: null }, problem: 'slot 4: op read gave no token' });
+  expect(result).toStrictEqual({ reading: { slot: 4, status: 'op-failed', five: null, fiveResetsAt: null, seven: null, sevenResetsAt: null }, problem: 'slot 4: op read failed (exit 1)' });
   expect(requested).not.toHaveBeenCalled();
 });
 
