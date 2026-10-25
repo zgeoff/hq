@@ -7,6 +7,7 @@ import { migrate } from '../db/migrate.ts';
 import { MIGRATIONS } from '../db/migrations.ts';
 import { openDb } from '../db/open-db.ts';
 import { SCHEMA_VERSION } from '../db/schema-version.ts';
+import { recordRound } from './record-round.ts';
 
 function setupTest() {
   const base = mkdtempSync(join(tmpdir(), 'hq-noslop-')),
@@ -77,4 +78,17 @@ test('it upgrades a v32 database to v33 after taking a backup, leaving special a
 
   expect(stored.query('PRAGMA user_version').get()).toStrictEqual({ user_version: 33 });
   expect(stored.query('SELECT repo, special, redesign FROM noslop_rounds').get()).toStrictEqual({ repo: 'widgets', special: null, redesign: null });
+});
+
+test("it stores a review's patch-id and whether it was a base move, and stores none for a check", () => {
+  const ctx = setupTest();
+  // oxlint-disable-next-line zgeoff/no-abbreviated-names -- the property is RoundRow's own
+  const review = { repo: 'widgets', pr: 7, kind: 'review' as const, startedAt: '2026-10-14T01:00:00Z', endedAt: '2026-10-14T01:05:00Z', ms: 300_000, ok: true, head: 'b2b2b2b', base: 'a1a1a1a', depth: 'standard', findings: [], failedCalls: 0, conclusion: null, open: [], error: null, sha: 'c3c3c3c' };
+  recordRound(ctx.db, { ...review, patchId: 'd4d4d4d4', baseMove: true, confirm: true });
+  recordRound(ctx.db, { ...review, kind: 'check' });
+
+  expect(ctx.db.query('SELECT kind, patch_id, base_move, confirm FROM noslop_rounds ORDER BY id').all()).toStrictEqual([
+    { kind: 'review', patch_id: 'd4d4d4d4', base_move: 1, confirm: 1 },
+    { kind: 'check', patch_id: null, base_move: 0, confirm: 0 },
+  ]);
 });

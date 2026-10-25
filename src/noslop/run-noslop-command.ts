@@ -16,6 +16,7 @@ import type { Runner } from '../runner/types.ts';
 import { buildNoslopReport } from './build-noslop-report.ts';
 import { buildNoslopTotals } from './build-noslop-totals.ts';
 import { buildRunDir } from './build-run-dir.ts';
+import { fillRoundPatchIDs } from './fill-round-patch-ids.ts';
 import { parseCapArgs } from './parse-cap-args.ts';
 import { readStoreMigrations } from './read-store-migrations.ts';
 import { loadNoslopSettings } from './load-noslop-settings.ts';
@@ -55,6 +56,7 @@ export async function runNoslopCommand(args: NoslopArgs): Promise<Out> {
     return await updatePin(args);
   }
   if (args.verb === 'report') {
+    await fillRoundPatchIDs({ run: args.run, db: args.db, since: args.since });
     const reports = buildNoslopReport(args.db, args.since);
     return { data: { reports, totals: buildNoslopTotals(reports) }, text: renderNoslopReport(reports) };
   }

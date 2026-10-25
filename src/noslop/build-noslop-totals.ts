@@ -9,6 +9,7 @@ export interface NoslopTotals {
   lateUnknown: number;
   mainMerge: number;
   mergeUnknown: number;
+  baseMove: number;
 }
 
 // The churn figures summed across PRs.
@@ -23,5 +24,6 @@ export function buildNoslopTotals(reports: PRReport[]): NoslopTotals {
     lateUnknown: buildSum((r) => r.lateUnknown),
     mainMerge: buildSum((r) => r.mainMerge),
     mergeUnknown: buildSum((r) => r.mergeUnknown),
+    baseMove: buildSum((report) => report.baseMove),
   };
 }

@@ -25,6 +25,7 @@ const REVIEW: NoslopReviewOutcome = {
   fixesOnly: false,
   emergencyCap: null,
   capNote: null,
+  baseMove: null,
   round: 1,
   postFailed: null,
 };
@@ -48,6 +49,13 @@ test('hq review says the emergency cap turned the review into fix checks only, b
 
   expect(formatNoslopReview({ ...REVIEW, fixesOnly: true, emergencyCap: 2, capNote: note }).split('\n').slice(0, 2)).toStrictEqual([
     note,
+    '== engine: noslop (commit 0123456), fixes only: 0 fix(es) checked, full output: /reviews/widgets7-noslop.json',
+  ]);
+});
+
+test('hq review says only the base moved since the last review, before the engine line', () => {
+  expect(formatNoslopReview({ ...REVIEW, findings: [], fixesOnly: true, baseMove: 'b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2' }).split('\n').slice(0, 2)).toStrictEqual([
+    'fix checks only: only the base moved since the review at b2b2b2b (the same PR diff); not a round',
     '== engine: noslop (commit 0123456), fixes only: 0 fix(es) checked, full output: /reviews/widgets7-noslop.json',
   ]);
 });

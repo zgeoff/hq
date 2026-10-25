@@ -57,10 +57,10 @@ test('it prints one block per PR', () => {
       '  findings: 2 (1 high, 1 low)',
       '  latest check: failure, 1 answered, open: aaaaaaaaaaaaaaaa',
       '  wall time: 64 s',
-      '  churn: 1 round with a new finding, 0 repeat-class, late 0 of 0, 0 main-merge (2 unknown)',
+      '  churn: 1 round with a new finding, 0 repeat-class, late 0 of 0, 0 main-merge (2 unknown), 0 base-move',
       '',
       'totals: 1 PR',
-      '  churn: 1 round with a new finding, 0 repeat-class, late 0 of 0, 0 main-merge (2 unknown)',
+      '  churn: 1 round with a new finding, 0 repeat-class, late 0 of 0, 0 main-merge (2 unknown), 0 base-move',
     ].join('\n'),
   );
 });

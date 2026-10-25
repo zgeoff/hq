@@ -83,6 +83,7 @@ test('it adds two review rounds and a passing check into one PR report', () => {
       lateUnknown: 1,
       mainMerge: 0,
       mergeUnknown: 3,
+      baseMove: 0,
     },
   ]);
 });
@@ -142,7 +143,8 @@ test('it counts a repeat-class when a finding since --since repeats the class of
   ctx.addRound({ startedAt: '2026-10-18T01:00:00Z', findings: [{ ...FIND_B, lens: 'correctness', criterion: 'taste-rule', rule: 'boil-check' }] });
 
   expect(buildNoslopReport(ctx.db, '2026-10-18T00:00:00Z')[0]).toMatchObject({ reviewsOk: 1, extraRounds: 0, findings: 1, roundsWithNew: 1, repeatClass: 1, classUnknown: 0 });
-  expect(buildNoslopTotals(buildNoslopReport(ctx.db, '2026-10-18T00:00:00Z'))).toStrictEqual({ prs: 1, roundsWithNew: 1, repeatClass: 1, classUnknown: 0, late: { n: 0, of: 0 }, lateUnknown: 1, mainMerge: 0, mergeUnknown: 1 });
+  // oxlint-disable-next-line id-length -- the late count is keyed n
+  expect(buildNoslopTotals(buildNoslopReport(ctx.db, '2026-10-18T00:00:00Z'))).toStrictEqual({ prs: 1, roundsWithNew: 1, repeatClass: 1, classUnknown: 0, late: { n: 0, of: 0 }, lateUnknown: 1, mainMerge: 0, mergeUnknown: 1, baseMove: 0 });
 });
 
 test('it leaves out a PR whose rounds all began before --since', () => {
@@ -200,7 +202,7 @@ test('it prints the churn line and the totals block', () => {
   ctx.addRound({ findings: [{ ...FIND_A, criterion: 'taste-rule', rule: 'k' }] });
   ctx.addRound({ startedAt: '2026-10-18T02:00:00Z', findings: [{ ...FIND_B, lens: 'correctness', criterion: 'taste-rule', rule: 'k', late: true, writtenByChange: false }] });
 
-  expect(renderNoslopReport(buildNoslopReport(ctx.db))).toContain('  churn: 2 rounds with a new finding, 1 repeat-class, late 1 of 1, 1 main-merge (1 unknown)');
+  expect(renderNoslopReport(buildNoslopReport(ctx.db))).toContain('  churn: 2 rounds with a new finding, 1 repeat-class, late 1 of 1, 1 main-merge (1 unknown), 0 base-move');
   expect(renderNoslopReport(buildNoslopReport(ctx.db))).toContain('totals: 1 PR\n  churn:');
 });
 
@@ -212,4 +214,31 @@ test('it counts --confirm reviews apart from the rounds, and the text names them
 
   expect(buildNoslopReport(ctx.db)[0]).toMatchObject({ reviewsOk: 3, extraRounds: 1, confirmReviews: 1 });
   expect(renderNoslopReport(buildNoslopReport(ctx.db))).toContain('  reviews: 3 ok, 0 failed (1 extra round, 1 --confirm)');
+});
+
+test('a base-move run hq recorded counts as a base move, not an extra round or a fix-checks-only run', () => {
+  const ctx = setupTest();
+  ctx.addRound({ head: 'a1a1a1a', patchId: 'kettle-diff' });
+  ctx.addRound({ startedAt: '2026-10-18T02:00:00Z', head: 'b2b2b2b', patchId: 'kettle-diff', confirm: true, baseMove: true });
+
+  expect(buildNoslopReport(ctx.db)[0]).toMatchObject({ reviewsOk: 2, extraRounds: 0, confirmReviews: 0, baseMove: 1 });
+});
+
+test('a round from before v45 at a new head with the PR diff of the review before it counts as a base move', () => {
+  const ctx = setupTest();
+  ctx.addRound({ head: 'a1a1a1a', patchId: 'kettle-diff' });
+  ctx.addRound({ startedAt: '2026-10-18T02:00:00Z', head: 'b2b2b2b', patchId: 'kettle-diff' });
+  ctx.addRound({ startedAt: '2026-10-18T03:00:00Z', head: 'c3c3c3c', patchId: 'kettle-diff-with-lid' });
+  ctx.addRound({ startedAt: '2026-10-18T04:00:00Z', head: 'c3c3c3c', patchId: 'kettle-diff-with-lid' });
+
+  expect(buildNoslopReport(ctx.db)[0]).toMatchObject({ reviewsOk: 4, extraRounds: 2, baseMove: 1 });
+  expect(renderNoslopReport(buildNoslopReport(ctx.db))).toContain(', 0 main-merge, 1 base-move');
+});
+
+test('a round whose PR diff git could not read is never a base move', () => {
+  const ctx = setupTest();
+  ctx.addRound({ head: 'a1a1a1a', patchId: '' });
+  ctx.addRound({ startedAt: '2026-10-18T02:00:00Z', head: 'b2b2b2b', patchId: '' });
+
+  expect(buildNoslopReport(ctx.db)[0]).toMatchObject({ extraRounds: 1, baseMove: 0 });
 });

@@ -639,4 +639,10 @@ export const MIGRATIONS: string[] = [
     working_lanes       INTEGER NOT NULL,
     PRIMARY KEY (at, slot)
   );`,
+
+  // v45: patch_id: git's verbatim patch-id of the PR's own diff at the round's head, from the merge
+  // base of base and head; NULL before v45 or when git could not read it, '' once found unreadable.
+  // base_move: a fix-checks-only run hq ran because only the base moved since the last ok review.
+  `ALTER TABLE noslop_rounds ADD COLUMN patch_id TEXT;
+  ALTER TABLE noslop_rounds ADD COLUMN base_move INTEGER NOT NULL DEFAULT 0 CHECK (base_move IN (0, 1));`,
 ];

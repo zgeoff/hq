@@ -27,6 +27,10 @@ export interface PRReport {
   lateUnknown: number;
   mainMerge: number;
   mergeUnknown: number;
+
+  // Reviews at a new head whose PR diff equals the last ok review's: only the base moved. They are
+  // not extra rounds.
+  baseMove: number;
 }
 
 export interface LateCount {
@@ -61,6 +65,9 @@ interface RoundRecord {
   open: string;
   full: number | null;
   confirm: number;
+  head: string | null;
+  patch_id: string | null;
+  base_move: number;
 }
 
 function buildWindowReports(rows: RoundRecord[], cutoff: string): PRReport[] {
@@ -95,6 +102,7 @@ interface StoredOpen {
 // churn: they supply the finding ids seen and the classes cited before the window, and which review
 // came first. Every other field reads the rounds since the time.
 function buildPRReport(rounds: RoundRecord[], earlier: RoundRecord[]): PRReport {
+  const moves = collectBaseMoves([...splitRounds(earlier).okReviews, ...splitRounds(rounds).okReviews]);
   const parts = splitRounds(rounds),
     seen = collectFindings(parts.okReviews),
     tail = parts.checks.at(-1) ?? null,
@@ -104,8 +112,9 @@ function buildPRReport(rounds: RoundRecord[], earlier: RoundRecord[]): PRReport 
     reviewsOk: parts.okReviews.length,
     reviewsFailed: parts.reviews.length - parts.okReviews.length,
     fullReviews: parts.okReviews.filter((r) => r.full === 1).length,
-    extraRounds: Math.max(0, parts.okReviews.filter((r) => r.confirm !== 1).length - 1),
-    confirmReviews: parts.okReviews.filter((r) => r.confirm === 1).length,
+    extraRounds: Math.max(0, parts.okReviews.filter((review) => review.confirm !== 1 && !moves.has(review.id)).length - 1),
+    confirmReviews: parts.okReviews.filter((review) => review.confirm === 1 && !moves.has(review.id)).length,
+    baseMove: parts.okReviews.filter((review) => moves.has(review.id)).length,
     findings: seen.size,
     bySeverity: countSeverities(seen),
     latestCheck: tail?.conclusion ?? null,
@@ -115,6 +124,23 @@ function buildPRReport(rounds: RoundRecord[], earlier: RoundRecord[]): PRReport 
     reviewToPassMs: findSpan(parts),
     ...countChurn([...splitRounds(earlier).okReviews.map((r) => buildChurnReview(r, false)), ...parts.okReviews.map((r) => buildChurnReview(r, true))]),
   };
+}
+
+// The ids of the ok reviews that only moved the base: a base-move run hq recorded, or a round from
+// before v45 at a new head whose PR diff equals the ok review before it.
+function collectBaseMoves(okReviews: RoundRecord[]): Set<number> {
+  const moves = new Set<number>();
+  okReviews.forEach((review, index) => {
+    const last = okReviews[index - 1];
+    if (review.base_move === 1 || (last !== undefined && isSameDiff(last, review))) {
+      moves.add(review.id);
+    }
+  });
+  return moves;
+}
+
+function isSameDiff(last: RoundRecord, review: RoundRecord): boolean {
+  return review.patch_id !== null && review.patch_id !== '' && review.patch_id === last.patch_id && review.head !== last.head;
 }
 
 function buildChurnReview(round: RoundRecord, counted: boolean): ChurnReview {

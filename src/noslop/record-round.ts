@@ -35,13 +35,19 @@ export interface RoundRow {
 
   // A check's title. Otherwise absent.
   title?: string | null | undefined;
+
+  // A review: the verbatim patch-id of the PR's own diff at its head; null when git could not read it.
+  patchId?: string | null | undefined;
+
+  // A fix-checks-only run hq ran because only the base moved since the last ok review. Otherwise absent.
+  baseMove?: boolean | undefined;
 }
 
 export function recordRound(db: Database, row: RoundRow): void {
   const full = row.full === undefined ? null : toFlag(row.full);
   db.query(
-    `INSERT INTO noslop_rounds (repo, pr, kind, started_at, ended_at, ms, ok, head, base, depth, findings, failed_calls, conclusion, open, error, sha, full, title, special, confirm)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO noslop_rounds (repo, pr, kind, started_at, ended_at, ms, ok, head, base, depth, findings, failed_calls, conclusion, open, error, sha, full, title, special, confirm, patch_id, base_move)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     row.repo,
     row.pr,
@@ -63,6 +69,8 @@ export function recordRound(db: Database, row: RoundRow): void {
     row.title ?? null,
     row.special ?? null,
     toFlag(row.confirm === true),
+    row.patchId ?? null,
+    toFlag(row.baseMove === true),
   );
 }
 

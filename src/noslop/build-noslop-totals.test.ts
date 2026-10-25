@@ -2,7 +2,8 @@ import { expect, test } from 'bun:test';
 import { buildNoslopTotals } from './build-noslop-totals.ts';
 
 test('it counts no PRs and no churn for no reports', () => {
-  expect(buildNoslopTotals([])).toStrictEqual({ prs: 0, roundsWithNew: 0, repeatClass: 0, classUnknown: 0, late: { n: 0, of: 0 }, lateUnknown: 0, mainMerge: 0, mergeUnknown: 0 });
+  // oxlint-disable-next-line id-length -- the late count is keyed n
+  expect(buildNoslopTotals([])).toStrictEqual({ prs: 0, roundsWithNew: 0, repeatClass: 0, classUnknown: 0, late: { n: 0, of: 0 }, lateUnknown: 0, mainMerge: 0, mergeUnknown: 0, baseMove: 0 });
 });
 
 test('it sums the churn across PRs in the totals', () => {
@@ -29,6 +30,7 @@ test('it sums the churn across PRs in the totals', () => {
         lateUnknown: 0,
         mainMerge: 0,
         mergeUnknown: 2,
+        baseMove: 0,
       },
       {
         ref: 'gadgets#8',
@@ -51,7 +53,9 @@ test('it sums the churn across PRs in the totals', () => {
         lateUnknown: 1,
         mainMerge: 1,
         mergeUnknown: 0,
+        baseMove: 0,
       },
     ]),
-  ).toStrictEqual({ prs: 2, roundsWithNew: 5, repeatClass: 1, classUnknown: 2, late: { n: 1, of: 3 }, lateUnknown: 1, mainMerge: 1, mergeUnknown: 2 });
+  // oxlint-disable-next-line id-length -- the late count is keyed n
+  ).toStrictEqual({ prs: 2, roundsWithNew: 5, repeatClass: 1, classUnknown: 2, late: { n: 1, of: 3 }, lateUnknown: 1, mainMerge: 1, mergeUnknown: 2, baseMove: 0 });
 });
