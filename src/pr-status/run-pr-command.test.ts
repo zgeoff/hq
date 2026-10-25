@@ -438,6 +438,13 @@ test.each([
   ['no --source', { note: 'Rebased.' }],
   ['no --note', { source: 'chat:kettle-12' }],
   ['a blank --note', { source: 'chat:kettle-12', note: '  ' }],
+  ['an empty --check', { source: 'chat:kettle-12', note: 'Rebased.', check: [''] }],
+  ['a blank --check', { source: 'chat:kettle-12', note: 'Rebased.', check: ['  '] }],
+  ['a padded --check', { source: 'chat:kettle-12', note: 'Rebased.', check: [' preview'] }],
+  ['two --check values', { source: 'chat:kettle-12', note: 'Rebased.', check: ['preview', 'test'] }],
+  ['a --check and no --note', { source: 'chat:kettle-12', check: ['preview'] }],
+  ['a --check and no --source', { note: 'Rebased.', check: ['preview'] }],
+  ['a --check and a session --source', { source: 'session:z-kettle', note: 'Rebased.', check: ['preview'] }],
 ])('it refuses an override with %s, and records nothing', async (_case, flags) => {
   const ctx = setupTest();
 
@@ -916,22 +923,6 @@ test('it records a CI check override at the head now, holding the head, source, 
     { subject_id: 'pr:widgets#7', actor: 'z-kettle', data: JSON.stringify({ head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', source: 'chat:kettle-12', note: 'An intended infra change.', scope: 'ci-check', check: 'preview' }) },
   ]);
   expect(recorded.data).toStrictEqual({ ciOverride: { repo: 'widgets', pr: 7, head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', source: 'chat:kettle-12', note: 'An intended infra change.', check: 'preview' } });
-});
-
-test.each([
-  ['an empty --check', { source: 'chat:kettle-12', note: 'Rebased.', check: [''] }],
-  ['a blank --check', { source: 'chat:kettle-12', note: 'Rebased.', check: ['  '] }],
-  ['a padded --check', { source: 'chat:kettle-12', note: 'Rebased.', check: [' preview'] }],
-  ['two --check values', { source: 'chat:kettle-12', note: 'Rebased.', check: ['preview', 'test'] }],
-  ['no --note', { source: 'chat:kettle-12', check: ['preview'] }],
-  ['no --source', { note: 'Rebased.', check: ['preview'] }],
-  ['a session --source', { source: 'session:z-kettle', note: 'Rebased.', check: ['preview'] }],
-])('it refuses a CI check override with %s, and records nothing', async (_case, flags) => {
-  const ctx = setupTest();
-
-  await expect(ctx.override(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), flags)).rejects.toMatchObject({ code: 'bad_args' });
-
-  expect(ctx.db.query("SELECT COUNT(*) AS total FROM events WHERE action = 'pr-override'").get()).toStrictEqual({ total: 0 });
 });
 
 test('it refuses a CI check override from a caller that is not the owner session, and records nothing', async () => {
