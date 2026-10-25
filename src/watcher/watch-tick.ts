@@ -17,7 +17,6 @@ import { refreshActionsSpend } from '../goals/refresh-actions-spend.ts';
 import { sampleUsage } from '../goals/sample-usage.ts';
 import { syncGoals } from '../goals/sync-goals.ts';
 import { goalsWeeklyTick } from '../goals/weekly/goals-weekly-tick.ts';
-import { runGrantMarksTick } from '../grants/run-grant-marks-tick.ts';
 import { syncKinds } from '../kinds/sync-kinds.ts';
 import { syncLinear } from '../kinds/sync-linear.ts';
 import { syncRunIssues } from '../linear/sync-run-issues.ts';
@@ -78,7 +77,7 @@ export async function watchTick(db: Database, d: WatchDeps): Promise<boolean> {
     }
   }
   try {
-    const grants = runGrantMarksTick(db, d.me);
+    const grants = d.steps.grantMarks?.() ?? null;
     for (const mark of grants?.added ?? []) {
       d.log(`${at()} grant marks: added mark ${mark.id} for ${mark.grant_name} (${mark.ref})`);
     }

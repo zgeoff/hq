@@ -1,4 +1,5 @@
 import type { SlotReadRun } from '../capacity/fleet/run-slot-read.ts';
+import type { GrantMarkSync } from '../grants/sync-grant-marks.ts';
 import type { Runner } from '../runner/types.ts';
 
 interface WatchSteps {
@@ -8,6 +9,9 @@ interface WatchSteps {
   refusals?(): Promise<number>; // scan the transcripts; the refusals added
   slots?: (signal: AbortSignal) => Promise<{ read: SlotReadRun | null; news: boolean }>;
   capacity?(): Promise<{ opened: unknown[]; cleared: unknown[] }>; // sample capacity, alert on thresholds
+
+  // Mark the grants on hq-private's main that have none; null with no clone.
+  grantMarks?: () => GrantMarkSync | null;
 }
 
 export interface WatchDeps {

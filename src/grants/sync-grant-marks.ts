@@ -6,7 +6,7 @@ import { readGrantAdd } from './read-grant-add.ts';
 import type { MainGrant } from './read-main-grants.ts';
 import { readMainGrants } from './read-main-grants.ts';
 
-export interface RejectedGrant {
+interface RejectedGrant {
   grant: MainGrant;
   reason: string;
 }
