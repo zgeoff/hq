@@ -8,10 +8,10 @@ interface Bucket {
   hours: number;
 }
 
-export function buildHourProfile(series: readonly (readonly BurnPoint[])[]): (number | null)[] {
+export function buildHourProfile(series: readonly (readonly BurnPoint[])[], scaleAt: (time: string) => number): (number | null)[] {
   const buckets = new Map<string, Bucket>();
   for (const points of series) {
-    addDeltas(buckets, points);
+    addDeltas(buckets, points, scaleAt);
   }
   return Array.from({ length: 24 }, (_unused, hour) => {
     const rates = [...buckets.values()].filter((bucket) => bucket.hour === hour && bucket.hours > 0).map((bucket) => bucket.gained / bucket.hours);
@@ -21,7 +21,7 @@ export function buildHourProfile(series: readonly (readonly BurnPoint[])[]): (nu
 
 const HOUR_MS = 3_600_000;
 
-function addDeltas(buckets: Map<string, Bucket>, points: readonly BurnPoint[]): void {
+function addDeltas(buckets: Map<string, Bucket>, points: readonly BurnPoint[], scaleAt: (time: string) => number): void {
   const read = points.filter((point) => point.percent !== null);
   for (let index = 1; index < read.length; index += 1) {
     const previous = read[index - 1];
@@ -36,7 +36,7 @@ function addDeltas(buckets: Map<string, Bucket>, points: readonly BurnPoint[]): 
     }
     const key = `${before.year}-${before.month}-${before.day}-${before.hour}`;
     const bucket = buckets.get(key) ?? { hour: before.hour, gained: 0, hours: 0 };
-    bucket.gained += (current.percent ?? 0) - (previous.percent ?? 0);
+    bucket.gained += ((current.percent ?? 0) - (previous.percent ?? 0)) * scaleAt(previous.at);
     bucket.hours += (Date.parse(current.at) - Date.parse(previous.at)) / HOUR_MS;
     buckets.set(key, bucket);
   }

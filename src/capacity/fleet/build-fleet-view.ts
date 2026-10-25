@@ -10,6 +10,7 @@ import { collectAccountSeries } from './collect-account-series.ts';
 import { collectSlotReadings } from './collect-slot-readings.ts';
 import { findActiveSlot } from './find-active-slot.ts';
 import { findSafeCap } from './find-safe-cap.ts';
+import { makeLanesAt } from './make-lanes-at.ts';
 import { simulateFleet } from './simulate-fleet.ts';
 import type { SlotReadings } from './collect-slot-readings.ts';
 import type { FleetSlotView, FleetView, SimSlot, SlotRow } from './types.ts';
@@ -48,28 +49,27 @@ export function buildFleetView(input: FleetViewInput): FleetView {
   if (active === null || latest === null) {
     return { ...base, note: 'the active slot is unknown: no slot has the 7-day reset of the newest usage sample' };
   }
-  const profiles = buildProfiles(input.samples, latest.account, input.at);
+  const model = buildLaneModel(input.rows[0]?.at ?? null, buildLanePoints(input.rows, input.samples), input.at);
+  const lanesAt = makeLanesAt(input.rows);
+  const buildProfilesAt = (lanes: number) => buildProfiles(input.samples, latest.account, input.at, (time) => buildLaneFactor(model, lanesAt(time), lanes));
+  const profiles = buildProfilesAt(input.working);
   if (profiles === null) {
     return { ...base, note: 'too few usage samples for a burn rate' };
   }
-  const model = buildLaneModel(
-    input.rows[0]?.at ?? null,
-    buildLanePoints(input.rows, input.samples),
-    input.working,
-    input.at,
-  );
   const slots = buildSimSlots(newest, active, latest);
-  const simulate = (lanes: number) =>
-    simulateFleet({
+  const simulate = (lanes: number) => {
+    const scaled = lanes === input.working ? profiles : buildProfilesAt(lanes);
+    if (scaled === null) {
+      throw new Error('a burn profile that exists at one lane count exists at every lane count');
+    }
+    return simulateFleet({
       now: input.at,
       slots,
       active,
       limit: FLEET_LIMIT,
-      rateAt: (time) => {
-        const factor = buildLaneFactor(model, lanes);
-        return { five: profiles.five.rateAt(time) * factor, seven: profiles.seven.rateAt(time) * factor };
-      },
+      rateAt: (time) => ({ five: scaled.five.rateAt(time), seven: scaled.seven.rateAt(time) }),
     });
+  };
   if (!slots.some((slot) => slot.slot === active)) {
     return { ...base, note: 'the active slot has no 7-day figures in the newest usage sample' };
   }
@@ -99,12 +99,12 @@ function buildReadAgeMin(row: SlotRow, at: Date): number {
 
 const WEEK_MS = 7 * 86_400_000;
 
-function buildProfiles(samples: readonly UsageSample[], account: string, at: Date): { five: BlendedProfile; seven: BlendedProfile } | null {
+function buildProfiles(samples: readonly UsageSample[], account: string, at: Date, scaleAt: (time: string) => number): { five: BlendedProfile; seven: BlendedProfile } | null {
   const week = samples.filter((sample) => at.getTime() - Date.parse(sample.at) <= WEEK_MS);
   const active = week.filter((sample) => sample.account === account);
   const series = collectAccountSeries(week);
-  const five = buildBlendedProfile(toPoints(active, 'five_hour', 'five_hour_resets_at'), series.map((points) => toPoints(points, 'five_hour', 'five_hour_resets_at')), at);
-  const seven = buildBlendedProfile(toPoints(active, 'seven_day', 'seven_day_resets_at'), series.map((points) => toPoints(points, 'seven_day', 'seven_day_resets_at')), at);
+  const five = buildBlendedProfile(toPoints(active, 'five_hour', 'five_hour_resets_at'), series.map((points) => toPoints(points, 'five_hour', 'five_hour_resets_at')), at, scaleAt);
+  const seven = buildBlendedProfile(toPoints(active, 'seven_day', 'seven_day_resets_at'), series.map((points) => toPoints(points, 'seven_day', 'seven_day_resets_at')), at, scaleAt);
   return five === null || seven === null ? null : { five, seven };
 }
 

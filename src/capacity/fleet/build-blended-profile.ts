@@ -10,9 +10,12 @@ export interface BlendedProfile {
   rateAt: (time: Date) => number;
 }
 
-export function buildBlendedProfile(active: readonly BurnPoint[], history: readonly (readonly BurnPoint[])[], at: Date): BlendedProfile | null {
-  const recent = buildBurnRate(active.filter((point) => at.getTime() - Date.parse(point.at) <= RECENT_MS)).ratePerHour;
-  const hourly = buildHourProfile(history);
+export function buildBlendedProfile(active: readonly BurnPoint[], history: readonly (readonly BurnPoint[])[], at: Date, scaleAt: (time: string) => number): BlendedProfile | null {
+  const recentPoints = active.filter((point) => at.getTime() - Date.parse(point.at) <= RECENT_MS);
+  const slope = buildBurnRate(recentPoints).ratePerHour;
+  const newest = recentPoints.at(-1);
+  const recent = slope === null || newest === undefined ? null : slope * scaleAt(newest.at);
+  const hourly = buildHourProfile(history, scaleAt);
   const near = buildFilledRates(hourly.map((rate) => blend(recent, rate)));
   const far = buildFilledRates(hourly.map((rate) => rate ?? recent));
   if (near === null || far === null) {

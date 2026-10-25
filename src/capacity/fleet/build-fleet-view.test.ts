@@ -21,6 +21,35 @@ test('it forecasts a pause, the slots that cannot be a target left out, and the 
   expect(view.slots.map((slot) => slot.active)).toStrictEqual([true, false, false, false]);
 });
 
+test('it scales a burn measured at 2 lanes to 4 working lanes on the lane fit and finds the cap that avoids the pause at that rate', () => {
+  const rows: SlotRow[] = [
+    { at: '2026-10-14T01:00:00Z', slot: 1, status: '200', five: 0, fiveResetsAt: null, seven: 10, sevenResetsAt: '2026-10-21T13:00:00Z', workingLanes: 0 },
+    { at: '2026-10-14T02:00:00Z', slot: 1, status: '200', five: 0, fiveResetsAt: null, seven: 11, sevenResetsAt: '2026-10-21T13:00:00Z', workingLanes: 2 },
+    { at: '2026-10-14T03:00:00Z', slot: 1, status: '200', five: 0, fiveResetsAt: null, seven: 14, sevenResetsAt: '2026-10-21T13:00:00Z', workingLanes: 4 },
+    { at: '2026-10-14T04:00:00Z', slot: 1, status: '200', five: 0, fiveResetsAt: null, seven: 19, sevenResetsAt: '2026-10-21T13:00:00Z', workingLanes: 2 },
+    { at: '2026-10-21T00:00:00Z', slot: 1, status: '200', five: 0, fiveResetsAt: null, seven: 40, sevenResetsAt: '2026-10-21T13:00:00Z', workingLanes: 2 },
+  ];
+  const samples = [
+    { at: '2026-10-14T01:00:00Z', account: 'kettle01', five_hour: 0, seven_day: 10, five_hour_resets_at: null, seven_day_resets_at: '2026-10-21T13:00:00Z' },
+    { at: '2026-10-14T01:30:00Z', account: 'kettle01', five_hour: 0, seven_day: 10.5, five_hour_resets_at: null, seven_day_resets_at: '2026-10-21T13:00:00Z' },
+    { at: '2026-10-14T02:00:00Z', account: 'kettle01', five_hour: 0, seven_day: 11, five_hour_resets_at: null, seven_day_resets_at: '2026-10-21T13:00:00Z' },
+    { at: '2026-10-14T02:30:00Z', account: 'kettle01', five_hour: 0, seven_day: 12.5, five_hour_resets_at: null, seven_day_resets_at: '2026-10-21T13:00:00Z' },
+    { at: '2026-10-14T03:00:00Z', account: 'kettle01', five_hour: 0, seven_day: 14, five_hour_resets_at: null, seven_day_resets_at: '2026-10-21T13:00:00Z' },
+    { at: '2026-10-14T03:30:00Z', account: 'kettle01', five_hour: 0, seven_day: 16.5, five_hour_resets_at: null, seven_day_resets_at: '2026-10-21T13:00:00Z' },
+    { at: '2026-10-14T04:00:00Z', account: 'kettle01', five_hour: 0, seven_day: 19, five_hour_resets_at: null, seven_day_resets_at: '2026-10-21T13:00:00Z' },
+    { at: '2026-10-21T00:00:00Z', account: 'kettle01', five_hour: 0, seven_day: 40, five_hour_resets_at: null, seven_day_resets_at: '2026-10-21T13:00:00Z' },
+    { at: '2026-10-21T00:30:00Z', account: 'kettle01', five_hour: 0, seven_day: 41.5, five_hour_resets_at: null, seven_day_resets_at: '2026-10-21T13:00:00Z' },
+    { at: '2026-10-21T01:00:00Z', account: 'kettle01', five_hour: 0, seven_day: 43, five_hour_resets_at: null, seven_day_resets_at: '2026-10-21T13:00:00Z' },
+  ];
+
+  const view = buildFleetView({ at: new Date('2026-10-21T01:00:00Z'), notSetUp: null, rows, samples, working: 4, cap: null });
+
+  expect(view.scaled).toBeNull();
+  expect(view.ratePerHour?.seven).toBeCloseTo(5, 6);
+  expect(view.forecast?.pause).toStrictEqual({ start: '2026-10-21T11:30:00Z', end: '2026-10-21T13:00:00Z', hours: 1.5 });
+  expect(view.forecast?.safeCap).toStrictEqual({ lanes: 3, endsAt: '2026-10-21T13:00:00Z' });
+});
+
 test('it forecasts the pause on the night mean once a steep daytime slope is 2 hours old', () => {
   const rows: SlotRow[] = [{ at: '2026-10-15T04:30:00Z', slot: 1, status: '200', five: 0, fiveResetsAt: null, seven: 44, sevenResetsAt: '2026-10-21T00:00:00Z', workingLanes: 2 }];
   const samples = [

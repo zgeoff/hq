@@ -9,10 +9,23 @@ test('it averages the burn of the same Sydney hour across days', () => {
       { at: '2026-10-15T01:00:00Z', percent: 20, resetsAt: null },
       { at: '2026-10-15T01:30:00Z', percent: 21, resetsAt: null },
     ],
-  ]);
+  ], () => 1);
 
   expect(profile[12]).toBe(3);
   expect(profile[13]).toBeNull();
+});
+
+test('it scales each step by the factor for the time the step starts', () => {
+  const profile = buildHourProfile([
+    [
+      { at: '2026-10-14T01:00:00Z', percent: 10, resetsAt: null },
+      { at: '2026-10-14T01:30:00Z', percent: 12, resetsAt: null },
+      { at: '2026-10-15T01:00:00Z', percent: 20, resetsAt: null },
+      { at: '2026-10-15T01:30:00Z', percent: 21, resetsAt: null },
+    ],
+  ], (time) => (time.startsWith('2026-10-14') ? 0.5 : 3));
+
+  expect(profile[12]).toBe(4);
 });
 
 test('it leaves out a step across a window reset', () => {
@@ -22,7 +35,7 @@ test('it leaves out a step across a window reset', () => {
       { at: '2026-10-14T01:30:00Z', percent: 5, resetsAt: '2026-10-14T06:10:00Z' },
       { at: '2026-10-14T01:45:00Z', percent: 6, resetsAt: '2026-10-14T06:10:00Z' },
     ],
-  ]);
+  ], () => 1);
 
   expect(profile[12]).toBe(4);
 });
@@ -37,7 +50,7 @@ test('it pools the burn of two accounts in one hour and never takes a step from 
       { at: '2026-10-14T01:30:00Z', percent: 50, resetsAt: null },
       { at: '2026-10-14T01:45:00Z', percent: 51, resetsAt: null },
     ],
-  ]);
+  ], () => 1);
 
   expect(profile[12]).toBe(4);
 });
