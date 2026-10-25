@@ -171,3 +171,84 @@ test('it raises the exited alert for a helper atc lists as ended', () => {
 
   expect(findAlerts(ctx.db, [ended], new Map(), new Date('2026-10-21T03:00:00Z')).map((alert) => alert.line)).toStrictEqual(['GEO-9842: helper session 98420000 has exited; wrap it up, or hq run session GEO-9842 98420000 --remove']);
 });
+
+test('it raises no prompt-wait alert for a session waiting past the quiet limit whose open PR is final and reviewed at its head', () => {
+  const ctx = setupTest();
+  const session = '98510000-0000-4000-8000-000000000001';
+  addRun(ctx.db, { issue: 'GEO-9851', title: 'Invented kettle work', place: 'imp', session, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
+  addPr(ctx.db, 'GEO-9851', 'kettle#51', 'kettle-bot');
+  ctx.db.query("UPDATE run_prs SET final_sha = 'abc1234', final_at = '2026-10-21T01:00:00Z', final_source = 'marker:kettle', review_started_at = '2026-10-21T01:10:00Z', reviewed_sha = 'abc1234', review_round = 1, reviewed_at = '2026-10-21T01:20:00Z' WHERE ref = 'kettle#51'").run();
+
+  const activity = new Map([[session, Date.parse('2026-10-21T01:30:00Z')]]);
+
+  expect(findAlerts(ctx.db, [{ id: session, name: 'kettle', alive: true, state: 'needs_you' }], activity, new Date('2026-10-21T03:00:00Z'))).toStrictEqual([]);
+});
+
+test('it raises the prompt-wait alert for a session waiting past the quiet limit whose open PR is final but not reviewed', () => {
+  const ctx = setupTest();
+  const session = '98520000-0000-4000-8000-000000000001';
+  addRun(ctx.db, { issue: 'GEO-9852', title: 'Invented kettle work', place: 'imp', session, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
+  addPr(ctx.db, 'GEO-9852', 'kettle#52', 'kettle-bot');
+  ctx.db.query("UPDATE run_prs SET final_sha = 'abc1234', final_at = '2026-10-21T01:00:00Z', final_source = 'marker:kettle' WHERE ref = 'kettle#52'").run();
+
+  const activity = new Map([[session, Date.parse('2026-10-21T01:30:00Z')]]);
+
+  expect(findAlerts(ctx.db, [{ id: session, name: 'kettle', alive: true, state: 'needs_you' }], activity, new Date('2026-10-21T03:00:00Z'))).toStrictEqual([
+    { key: 'pr:kettle#52', fingerprint: 'final:abc1234', issue: 'GEO-9852', line: 'kettle#52 (GEO-9852) final at abc1234 for 120 min, no review [from marker:kettle]' },
+    { key: `session:${session}`, fingerprint: 'quiet:needs_you', issue: 'GEO-9852', line: 'GEO-9852: session 98520000 waits on a prompt for 90 min' },
+  ]);
+});
+
+test('it raises the prompt-wait alert for a session waiting past the quiet limit on a run with no open PR', () => {
+  const ctx = setupTest();
+  const session = '98530000-0000-4000-8000-000000000001';
+  addRun(ctx.db, { issue: 'GEO-9853', title: 'Invented kettle work', place: 'imp', session, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
+
+  const activity = new Map([[session, Date.parse('2026-10-21T01:30:00Z')]]);
+
+  expect(findAlerts(ctx.db, [{ id: session, name: 'kettle', alive: true, state: 'needs_you' }], activity, new Date('2026-10-21T03:00:00Z'))).toStrictEqual([
+    { key: `session:${session}`, fingerprint: 'quiet:needs_you', issue: 'GEO-9853', line: 'GEO-9853: session 98530000 waits on a prompt for 90 min' },
+  ]);
+});
+
+test('it raises the prompt-wait alert for a helper waiting past the quiet limit whose run PR is final and reviewed at its head', () => {
+  const ctx = setupTest();
+  const helper = '98540000-0000-4000-8000-000000000001';
+  addRun(ctx.db, { issue: 'GEO-9854', title: 'Invented kettle work', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
+  setSession(ctx.db, 'GEO-9854', helper, 'kettle-bot', 'add');
+  addPr(ctx.db, 'GEO-9854', 'kettle#54', 'kettle-bot');
+  ctx.db.query("UPDATE run_prs SET final_sha = 'abc1234', final_at = '2026-10-21T01:00:00Z', final_source = 'marker:kettle', review_started_at = '2026-10-21T01:10:00Z', reviewed_sha = 'abc1234', review_round = 1, reviewed_at = '2026-10-21T01:20:00Z' WHERE ref = 'kettle#54'").run();
+
+  const activity = new Map([[helper, Date.parse('2026-10-21T01:30:00Z')]]);
+
+  expect(findAlerts(ctx.db, [{ id: helper, name: 'kettle helper', alive: true, state: 'needs_you' }], activity, new Date('2026-10-21T03:00:00Z'))).toStrictEqual([
+    { key: `session:${helper}`, fingerprint: 'quiet:needs_you', issue: 'GEO-9854', line: 'GEO-9854: helper session 98540000 waits on a prompt for 90 min' },
+  ]);
+});
+
+test('it raises no quiet alert for an idle session past the quiet limit whose open PR is final and reviewed at its head', () => {
+  const ctx = setupTest();
+  const session = '98550000-0000-4000-8000-000000000001';
+  addRun(ctx.db, { issue: 'GEO-9855', title: 'Invented kettle work', place: 'imp', session, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
+  addPr(ctx.db, 'GEO-9855', 'kettle#55', 'kettle-bot');
+  ctx.db.query("UPDATE run_prs SET final_sha = 'abc1234', final_at = '2026-10-21T01:00:00Z', final_source = 'marker:kettle', review_started_at = '2026-10-21T01:10:00Z', reviewed_sha = 'abc1234', review_round = 1, reviewed_at = '2026-10-21T01:20:00Z' WHERE ref = 'kettle#55'").run();
+
+  const activity = new Map([[session, Date.parse('2026-10-21T01:30:00Z')]]);
+
+  expect(findAlerts(ctx.db, [{ id: session, name: 'kettle', alive: true, state: 'idle' }], activity, new Date('2026-10-21T03:00:00Z'))).toStrictEqual([]);
+});
+
+test('it raises the quiet alert for an idle session past the quiet limit whose open PR is final but not reviewed', () => {
+  const ctx = setupTest();
+  const session = '98560000-0000-4000-8000-000000000001';
+  addRun(ctx.db, { issue: 'GEO-9856', title: 'Invented kettle work', place: 'imp', session, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
+  addPr(ctx.db, 'GEO-9856', 'kettle#56', 'kettle-bot');
+  ctx.db.query("UPDATE run_prs SET final_sha = 'abc1234', final_at = '2026-10-21T01:00:00Z', final_source = 'marker:kettle' WHERE ref = 'kettle#56'").run();
+
+  const activity = new Map([[session, Date.parse('2026-10-21T01:30:00Z')]]);
+
+  expect(findAlerts(ctx.db, [{ id: session, name: 'kettle', alive: true, state: 'idle' }], activity, new Date('2026-10-21T03:00:00Z'))).toStrictEqual([
+    { key: 'pr:kettle#56', fingerprint: 'final:abc1234', issue: 'GEO-9856', line: 'kettle#56 (GEO-9856) final at abc1234 for 120 min, no review [from marker:kettle]' },
+    { key: `session:${session}`, fingerprint: 'quiet:idle', issue: 'GEO-9856', line: 'GEO-9856: session 98560000 quiet for 90 min' },
+  ]);
+});
