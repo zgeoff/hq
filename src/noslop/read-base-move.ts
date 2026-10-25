@@ -21,9 +21,6 @@ export interface BaseMoveRequest {
 
 const LastReviewSchema = z.object({ head: z.string().nullable(), patch_id: z.string().nullable() }).nullable();
 
-// The head of the PR's last ok review when the PR has moved to a new head with the same own diff:
-// only its base moved. Null otherwise, and whenever hq cannot tell, so the review runs as a round.
-// Only the last ok review counts: a push back to an older reviewed diff is a round.
 export async function readBaseMove(request: BaseMoveRequest): Promise<string | null> {
   const last = LastReviewSchema.parse(
     request.db.query("SELECT head, patch_id FROM noslop_rounds WHERE repo = ? AND pr = ? AND kind = 'review' AND ok = 1 ORDER BY id DESC LIMIT 1").get(request.repo, request.pr) ?? null,
