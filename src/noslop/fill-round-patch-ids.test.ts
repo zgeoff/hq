@@ -7,8 +7,8 @@ import { realRunner } from '../runner/real-runner.ts';
 import { buildNoslopReport } from './build-noslop-report.ts';
 import { fillRoundPatchIDs } from './fill-round-patch-ids.ts';
 
-// A database, and a real widgets repo under HQ_PROJECTS whose origin names zgeoff/widgets, with git
-// and commit helpers and a helper that stores a pre-v45 ok review with no patch-id.
+// A database, and an empty git repo for widgets, with git and commit helpers and a helper that
+// stores a pre-v45 ok review with no patch-id.
 async function setupTest() {
   const base = mkdtempSync(join(tmpdir(), 'hq-fill-patch-'));
   const directory = join(base, 'projects', 'widgets');
@@ -32,8 +32,6 @@ async function setupTest() {
     return await git('rev-parse', 'HEAD');
   };
   await git('init', '-q', '-b', 'main');
-  await git('remote', 'add', 'origin', 'git@github.com:zgeoff/widgets.git');
-  await commit('kettle.txt', 'boil\n', 'start');
   return {
     db,
     directory,
@@ -46,7 +44,7 @@ async function setupTest() {
 
 test('it gives pre-v45 reviews the patch-id of their PR diff, so the report finds the rebase onto a moved base', async () => {
   const ctx = await setupTest();
-  const firstBase = await ctx.git('rev-parse', 'main');
+  const firstBase = await ctx.commit('kettle.txt', 'boil\n', 'start');
   await ctx.git('checkout', '-q', '-b', 'pour');
   const first = await ctx.commit('pour.txt', 'pour\n', 'pour');
   await ctx.git('checkout', '-q', 'main');
@@ -76,7 +74,7 @@ test('it refuses a --since that is not a time before it reads any round', async 
 
 test('it leaves the patch-id unread for a repo hq has no checkout of, so a later report tries again', async () => {
   const ctx = await setupTest();
-  const head = await ctx.git('rev-parse', 'main');
+  const head = await ctx.commit('kettle.txt', 'boil\n', 'start');
   ctx.addReview('2026-10-18T01:00:00Z', head, head);
 
   const filled = await fillRoundPatchIDs({ run: realRunner, db: ctx.db, checkout: () => Promise.reject(new Error('invented: no clone of widgets')) });
