@@ -11,9 +11,9 @@ import { CONFIG_SHAPE } from './config-shape.ts';
 const schema = z.object(CONFIG_SHAPE);
 export type HqConfig = z.infer<typeof schema>;
 
-// HOME, NODE_ENV, ATC_SESSION_ID and OP_SERVICE_ACCOUNT_TOKEN are read straight from the
+// HOME, NODE_ENV, ATC_SESSION_ID, OP_SERVICE_ACCOUNT_TOKEN and PATH are read straight from the
 // environment, but a test overrides them by name too.
-export type ConfigName = keyof typeof CONFIG_SHAPE | 'HOME' | 'NODE_ENV' | 'ATC_SESSION_ID' | 'OP_SERVICE_ACCOUNT_TOKEN';
+export type ConfigName = keyof typeof CONFIG_SHAPE | 'HOME' | 'NODE_ENV' | 'ATC_SESSION_ID' | 'OP_SERVICE_ACCOUNT_TOKEN' | 'PATH';
 
 // What each setting must be, for the message.
 const RULES: Partial<Record<ConfigName, string>> = {

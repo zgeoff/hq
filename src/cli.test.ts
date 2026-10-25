@@ -455,17 +455,15 @@ test('hq capacity --refresh-slots reads the four slots through op and prints the
   const fresh = freshDb();
   const log = console.log;
   const lines: string[] = [];
-  const path0 = process.env['PATH'];
   const settings = `${fresh.dir}/settings.local.json`;
   onTestFinished(fresh.cleanup);
   onTestFinished(overrideEnv('HQ_NOW', NOON_SYDNEY));
   onTestFinished(overrideEnv('HQ_SLOTS_OP_SETTINGS', settings));
   onTestFinished(() => (console.log = log));
-  onTestFinished(() => (process.env['PATH'] = path0));
   mkdirSync(`${fresh.dir}/bin`);
   writeFileSync(`${fresh.dir}/bin/op`, '#!/bin/sh\nslot=$(echo "$2" | sed "s/.*token-\\([0-9]\\).*/\\1/")\necho "sk-ant-kettle-cli-$slot"\n');
   chmodSync(`${fresh.dir}/bin/op`, 0o755);
-  process.env['PATH'] = `${fresh.dir}/bin:${path0}`;
+  onTestFinished(overrideEnv('PATH', `${fresh.dir}/bin:${process.env['PATH']}`));
   writeFileSync(settings, JSON.stringify({ env: { OP_SERVICE_ACCOUNT_TOKEN: 'ops_kettle-profile-0001' } }));
   fresh.db.query('INSERT INTO usage_samples (at, account, five_hour, seven_day, five_hour_resets_at, seven_day_resets_at) VALUES (?, ?, ?, ?, ?, ?)').run('2026-10-14T00:55:00Z', 'abcdef012345', 5, 40, null, '2026-10-19T00:00:00Z');
   server.use(
