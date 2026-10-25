@@ -3,17 +3,18 @@ import { match } from 'ts-pattern';
 import { HqError } from '../../errors.ts';
 import { countWorking } from '../../lanes/cap/count-working.ts';
 import { readActiveCap } from '../../lanes/cap/read-active-cap.ts';
-import { readUsageSamples } from '../read-usage-samples.ts';
 import { buildFleetView } from './build-fleet-view.ts';
+import { readFleetUsageSamples } from './read-fleet-usage-samples.ts';
 import { readSlotOpToken } from './read-slot-op-token.ts';
 import { readSlotRows } from './read-slot-rows.ts';
 import type { FleetView } from './types.ts';
 
 const HISTORY_HOURS = 8 * 24;
+const SAMPLE_HOURS = 7 * 24;
 export async function readFleetView(db: Database, at: Date): Promise<FleetView> {
   const notSetUp = await readNotSetUp();
   const rows = readSlotRows(db, new Date(at.getTime() - HISTORY_HOURS * 3_600_000), at);
-  const samples = readUsageSamples(db, at, HISTORY_HOURS);
+  const samples = readFleetUsageSamples(db, at, SAMPLE_HOURS);
   return buildFleetView({ at, notSetUp, rows, samples, working: countWorking(db, at).count, cap: readActiveCap(db, at)?.cap ?? null });
 }
 

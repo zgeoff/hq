@@ -2,17 +2,27 @@ import { getSydneyParts } from '../../clock/get-sydney-parts.ts';
 import type { BurnPoint } from '../build-burn-rate.ts';
 import { isBurnReset } from '../is-burn-reset.ts';
 
-const HOUR_MS = 3_600_000;
-
 interface Bucket {
   hour: number;
   gained: number;
   hours: number;
 }
 
-export function buildHourProfile(points: readonly BurnPoint[]): (number | null)[] {
-  const read = points.filter((point) => point.percent !== null);
+export function buildHourProfile(series: readonly (readonly BurnPoint[])[]): (number | null)[] {
   const buckets = new Map<string, Bucket>();
+  for (const points of series) {
+    addDeltas(buckets, points);
+  }
+  return Array.from({ length: 24 }, (_unused, hour) => {
+    const rates = [...buckets.values()].filter((bucket) => bucket.hour === hour && bucket.hours > 0).map((bucket) => bucket.gained / bucket.hours);
+    return rates.length === 0 ? null : rates.reduce((sum, rate) => sum + rate, 0) / rates.length;
+  });
+}
+
+const HOUR_MS = 3_600_000;
+
+function addDeltas(buckets: Map<string, Bucket>, points: readonly BurnPoint[]): void {
+  const read = points.filter((point) => point.percent !== null);
   for (let index = 1; index < read.length; index += 1) {
     const previous = read[index - 1];
     const current = read[index];
@@ -30,8 +40,4 @@ export function buildHourProfile(points: readonly BurnPoint[]): (number | null)[
     bucket.hours += (Date.parse(current.at) - Date.parse(previous.at)) / HOUR_MS;
     buckets.set(key, bucket);
   }
-  return Array.from({ length: 24 }, (_unused, hour) => {
-    const rates = [...buckets.values()].filter((bucket) => bucket.hour === hour && bucket.hours > 0).map((bucket) => bucket.gained / bucket.hours);
-    return rates.length === 0 ? null : rates.reduce((sum, rate) => sum + rate, 0) / rates.length;
-  });
 }

@@ -4,9 +4,9 @@ import { buildHourProfile } from './build-hour-profile.ts';
 
 const RECENT_MS = 2 * 3_600_000;
 
-export function buildBlendedProfile(points: readonly BurnPoint[], at: Date): number[] | null {
-  const recent = buildBurnRate(points.filter((point) => at.getTime() - Date.parse(point.at) <= RECENT_MS)).ratePerHour;
-  const hourly = buildHourProfile(points);
+export function buildBlendedProfile(active: readonly BurnPoint[], history: readonly (readonly BurnPoint[])[], at: Date): number[] | null {
+  const recent = buildBurnRate(active.filter((point) => at.getTime() - Date.parse(point.at) <= RECENT_MS)).ratePerHour;
+  const hourly = buildHourProfile(history);
   const blended = hourly.map((rate) => blend(recent, rate));
   const known = blended.filter((rate) => rate !== null);
   if (known.length === 0) {

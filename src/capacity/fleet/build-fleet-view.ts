@@ -6,6 +6,7 @@ import { buildBlendedProfile } from './build-blended-profile.ts';
 import { buildLaneFactor } from './build-lane-factor.ts';
 import { buildLaneModel } from './build-lane-model.ts';
 import { buildLanePoints } from './build-lane-points.ts';
+import { collectAccountSeries } from './collect-account-series.ts';
 import { findActiveSlot } from './find-active-slot.ts';
 import { getNewestSlotRead } from './get-newest-slot-read.ts';
 import { findSafeCap } from './find-safe-cap.ts';
@@ -45,7 +46,7 @@ export function buildFleetView(input: FleetViewInput): FleetView {
   if (active === null || latest === null) {
     return { ...base, note: 'the active slot is unknown: no slot has the 7-day reset of the newest usage sample' };
   }
-  const profiles = buildProfiles(input.samples, input.at);
+  const profiles = buildProfiles(input.samples, latest.account, input.at);
   if (profiles === null) {
     return { ...base, note: 'too few usage samples for a burn rate' };
   }
@@ -92,10 +93,12 @@ function buildSlotView(row: SlotRow, active: number | null, at: Date): FleetSlot
 
 const WEEK_MS = 7 * 86_400_000;
 
-function buildProfiles(samples: readonly UsageSample[], at: Date): { five: number[]; seven: number[] } | null {
-  const recent = samples.filter((sample) => at.getTime() - Date.parse(sample.at) <= WEEK_MS);
-  const five = buildBlendedProfile(toPoints(recent, 'five_hour', 'five_hour_resets_at'), at);
-  const seven = buildBlendedProfile(toPoints(recent, 'seven_day', 'seven_day_resets_at'), at);
+function buildProfiles(samples: readonly UsageSample[], account: string, at: Date): { five: number[]; seven: number[] } | null {
+  const week = samples.filter((sample) => at.getTime() - Date.parse(sample.at) <= WEEK_MS);
+  const active = week.filter((sample) => sample.account === account);
+  const series = collectAccountSeries(week);
+  const five = buildBlendedProfile(toPoints(active, 'five_hour', 'five_hour_resets_at'), series.map((points) => toPoints(points, 'five_hour', 'five_hour_resets_at')), at);
+  const seven = buildBlendedProfile(toPoints(active, 'seven_day', 'seven_day_resets_at'), series.map((points) => toPoints(points, 'seven_day', 'seven_day_resets_at')), at);
   return five === null || seven === null ? null : { five, seven };
 }
 

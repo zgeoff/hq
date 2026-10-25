@@ -32,6 +32,26 @@ test('it forecasts no pause when the active slot never fills before a reset', ()
   expect(view.forecast).toStrictEqual({ switches: [], pause: null, safeCap: null, endsAt: '2026-10-19T00:00:00Z' });
 });
 
+test("it pools an earlier account's burn into the hour of the day and keeps the 2 h slope on the active account", () => {
+  const rows: SlotRow[] = [
+    { at: '2026-10-14T00:30:00Z', slot: 1, status: '200', five: 1, fiveResetsAt: null, seven: 11, sevenResetsAt: '2026-10-18T00:00:00Z', workingLanes: 2 },
+    { at: '2026-10-14T00:30:00Z', slot: 2, status: '200', five: 0, fiveResetsAt: null, seven: 70, sevenResetsAt: '2026-10-19T00:00:00Z', workingLanes: 2 },
+  ];
+  const samples = [
+    { at: '2026-10-13T01:00:00Z', account: 'teapot02', five_hour: 1, seven_day: 50, five_hour_resets_at: null, seven_day_resets_at: '2026-10-19T00:00:00Z' },
+    { at: '2026-10-13T01:30:00Z', account: 'teapot02', five_hour: 1, seven_day: 53, five_hour_resets_at: null, seven_day_resets_at: '2026-10-19T00:00:00Z' },
+    { at: '2026-10-14T00:00:00Z', account: 'kettle01', five_hour: 1, seven_day: 10, five_hour_resets_at: null, seven_day_resets_at: '2026-10-18T00:00:00Z' },
+    { at: '2026-10-14T00:10:00Z', account: 'teapot02', five_hour: 1, seven_day: 70, five_hour_resets_at: null, seven_day_resets_at: '2026-10-19T00:00:00Z' },
+    { at: '2026-10-14T00:30:00Z', account: 'kettle01', five_hour: 1, seven_day: 11, five_hour_resets_at: null, seven_day_resets_at: '2026-10-18T00:00:00Z' },
+    { at: '2026-10-14T01:00:00Z', account: 'kettle01', five_hour: 1, seven_day: 12, five_hour_resets_at: null, seven_day_resets_at: '2026-10-18T00:00:00Z' },
+  ];
+
+  const view = buildFleetView({ at: new Date('2026-10-14T01:00:00Z'), notSetUp: null, rows, samples, working: 2, cap: null });
+
+  expect(view.active).toBe(1);
+  expect(view.ratePerHour?.seven).toBeCloseTo(4, 6);
+});
+
 test('it says the active slot is unknown when no slot has the sample reset', () => {
   const rows: SlotRow[] = [{ at: '2026-10-14T00:30:00Z', slot: 1, status: '200', five: 1, fiveResetsAt: null, seven: 10, sevenResetsAt: '2026-10-18T00:00:00Z', workingLanes: 2 }];
   const samples = [{ at: '2026-10-14T01:00:00Z', account: 'abcdef012345', five_hour: 1, seven_day: 10, five_hour_resets_at: null, seven_day_resets_at: '2026-10-21T00:00:00Z' }];
