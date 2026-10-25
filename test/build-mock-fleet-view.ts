@@ -1,6 +1,5 @@
 import type { FleetView } from '../src/capacity/fleet/types.ts';
 
-// A fleet view with no pause forecast: active slot 1, no cap, 2 working lanes.
 export function buildMockFleetView(overrides: Partial<FleetView> = {}): FleetView {
   return {
     notSetUp: null,

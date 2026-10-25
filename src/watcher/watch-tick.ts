@@ -1,4 +1,5 @@
 import type { Database } from 'bun:sqlite';
+import { match } from 'ts-pattern';
 import { queueReminder } from '../asks/queue-reminder.ts';
 import { runCallReadyMorningTick } from '../asks/run-call-ready-morning-tick.ts';
 import { iso } from '../clock/iso.ts';
@@ -246,11 +247,17 @@ export async function watchTick(db: Database, d: WatchDeps): Promise<boolean> {
     try {
       const readSlots = d.steps.slots;
       const slots = readSlots ? await step('Claude slot reads', () => readSlots()) : null;
-      if (slots?.read?.kind === 'read') {
-        d.log(`${at()} Claude slots: read, ${slots.read.problems.length} problem(s)`);
-        for (const problem of slots.read.problems) {
-          d.log(`${at()} Claude slots: ${problem}`);
-        }
+      const read = slots?.read ?? null;
+      if (read !== null) {
+        match(read)
+          .with({ kind: 'read' }, (done) => {
+            d.log(`${at()} Claude slots: read, ${done.problems.length} problem(s)`);
+            for (const problem of done.problems) {
+              d.log(`${at()} Claude slots: ${problem}`);
+            }
+          })
+          .with({ kind: 'not-set-up' }, () => {})
+          .exhaustive();
       }
       if (slots?.news) {
         d.log(`${at()} Claude slots: fleet forecast news line added`);

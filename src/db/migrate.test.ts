@@ -191,7 +191,7 @@ test('it adds the void columns to grant_actions in v43 and keeps every row as it
   expect(db.query('PRAGMA user_version').get()).toStrictEqual({ user_version: 43 });
 });
 
-test('it adds slot_usage in v44, accepts slots 1 to 4 only, and makes v44 the newest schema', () => {
+test('it adds slot_usage in v44, stores a row in it and makes v44 the newest schema', () => {
   const base = mkdtempSync(join(tmpdir(), 'hq-migrate-v44-'));
   const db = new Database(join(base, 'hq.db'), { create: true, strict: true });
   const path = join(base, 'hq.db');
@@ -203,6 +203,17 @@ test('it adds slot_usage in v44, accepts slots 1 to 4 only, and makes v44 the ne
   expect(migrate(db, path, true)).not.toBeNull();
   db.query("INSERT INTO slot_usage (at, slot, status, five_hour, five_hour_resets_at, seven_day, seven_day_resets_at, working_lanes) VALUES ('2026-10-14T01:00:00Z', 2, '200', 12.5, '2026-10-14T05:00:00Z', 40, '2026-10-18T01:00:00Z', 3)").run();
   expect(db.query('SELECT slot, status, five_hour, seven_day, working_lanes FROM slot_usage').all()).toStrictEqual([{ slot: 2, status: '200', five_hour: 12.5, seven_day: 40, working_lanes: 3 }]);
-  expect(() => db.query("INSERT INTO slot_usage (at, slot, status, working_lanes) VALUES ('2026-10-14T01:00:00Z', 5, '200', 0)").run()).toThrow(/CHECK constraint failed/u);
   expect(db.query('PRAGMA user_version').get()).toStrictEqual({ user_version: 44 });
+});
+
+test('it rejects a slot_usage row for a slot outside 1 to 4', () => {
+  const base = mkdtempSync(join(tmpdir(), 'hq-migrate-v44-'));
+  const db = new Database(join(base, 'hq.db'), { create: true, strict: true });
+  const path = join(base, 'hq.db');
+  onTestFinished(() => rmSync(base, { recursive: true, force: true }));
+  onTestFinished(() => db.close());
+  db.exec('PRAGMA journal_mode = WAL;');
+  migrate(db, path, true);
+
+  expect(() => db.query("INSERT INTO slot_usage (at, slot, status, working_lanes) VALUES ('2026-10-14T01:00:00Z', 5, '200', 0)").run()).toThrow(/CHECK constraint failed/u);
 });

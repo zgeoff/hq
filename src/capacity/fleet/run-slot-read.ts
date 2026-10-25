@@ -1,4 +1,5 @@
 import type { Database } from 'bun:sqlite';
+import { match } from 'ts-pattern';
 import { countWorking } from '../../lanes/cap/count-working.ts';
 import type { Runner } from '../../runner/types.ts';
 import { readSlotOpToken } from './read-slot-op-token.ts';
@@ -9,17 +10,20 @@ import { writeSlotUsage } from './write-slot-usage.ts';
 
 export type SlotReadRun = { kind: 'not-set-up'; reason: string } | { kind: 'read'; readings: SlotReading[]; problems: string[] };
 
-// Reads the four slots one after another and stores what each said. A slot that fails is stored
-// with its failure status, so one bad slot never hides the others.
 export async function runSlotRead(db: Database, run: Runner, at: Date): Promise<SlotReadRun> {
   const opToken = await readSlotOpToken();
-  if (opToken.kind === 'not-set-up') {
-    return opToken;
-  }
+
+  return match(opToken)
+    .with({ kind: 'not-set-up' }, (notSetUp): Promise<SlotReadRun> => Promise.resolve(notSetUp))
+    .with({ kind: 'ready' }, (ready) => readReadySlots(db, run, at, ready.token))
+    .exhaustive();
+}
+
+async function readReadySlots(db: Database, run: Runner, at: Date, opToken: string): Promise<SlotReadRun> {
   const readings: SlotReading[] = [];
   const problems: string[] = [];
   for (const slot of SLOT_NUMBERS) {
-    const result = await readSlotReading(run, opToken.token, slot);
+    const result = await readSlotReading(run, opToken, slot);
     readings.push(result.reading);
     if (result.problem !== null) {
       problems.push(result.problem);

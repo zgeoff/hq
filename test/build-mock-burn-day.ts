@@ -2,8 +2,6 @@ import { getSydneyParts } from '../src/clock/get-sydney-parts.ts';
 import { iso } from '../src/clock/iso.ts';
 import type { BurnPoint } from '../src/capacity/build-burn-rate.ts';
 
-// Half-hourly points for one Sydney day from midnight of 14 Oct 2026: 4.4 points an hour from 08:00
-// to 18:00 and 0.7 an hour otherwise, with no window reset.
 export function buildMockBurnDay(): BurnPoint[] {
   const points: BurnPoint[] = [];
   let percent = 0;

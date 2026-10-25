@@ -58,3 +58,13 @@ test('it points at --refresh-slots when no slot has been read', () => {
 
   expect(view.note).toBe('no slot reads yet: hq capacity --refresh-slots reads them now');
 });
+
+test('it says the newest usage sample is old rather than the active slot is unknown when the sample is stale', () => {
+  const rows: SlotRow[] = [{ at: '2026-10-14T00:30:00Z', slot: 1, status: '200', five: 1, fiveResetsAt: null, seven: 10, sevenResetsAt: '2026-10-18T00:00:00Z', workingLanes: 2 }];
+  const samples = [{ at: '2026-10-14T00:00:00Z', account: 'abcdef012345', five_hour: 1, seven_day: 10, five_hour_resets_at: null, seven_day_resets_at: '2026-10-18T00:00:00Z' }];
+
+  const view = buildFleetView({ at: new Date('2026-10-14T01:00:00Z'), notSetUp: null, rows, samples, working: 2, cap: null });
+
+  expect(view.forecast).toBeNull();
+  expect(view.note).toBe('the newest usage sample is 60 min old');
+});

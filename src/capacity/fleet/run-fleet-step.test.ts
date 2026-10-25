@@ -14,21 +14,22 @@ function setupTest() {
   const fresh = freshDb();
   const directory = mkdtempSync(join(tmpdir(), 'hq-fleet-step-'));
   const path = join(directory, 'settings.local.json');
-  const run = mock<Runner>(() => Promise.resolve({ code: 0, stdout: 'sk-ant-kettle-fleet-token-0042\n', stderr: '' }));
 
   onTestFinished(fresh.cleanup);
   onTestFinished(() => rmSync(directory, { recursive: true, force: true }));
   onTestFinished(overrideEnv('HQ_SLOTS_OP_SETTINGS', path));
-  writeFileSync(path, JSON.stringify({ env: { OP_SERVICE_ACCOUNT_TOKEN: 'ops_kettle-profile-0001' } }));
-  server.use(http.post('https://api.anthropic.com/v1/messages', () => HttpResponse.json({}, { headers: { 'anthropic-ratelimit-unified-7d-utilization': '0.1', 'anthropic-ratelimit-unified-7d-reset': '1792400000' } })));
 
-  return { db: fresh.db, run };
+  return { db: fresh.db, path };
 }
 
 test('it reads the slots when there is no read yet', async () => {
   const ctx = setupTest();
+  const run = mock<Runner>(() => Promise.resolve({ code: 0, stdout: 'sk-ant-kettle-fleet-token-0042\n', stderr: '' }));
 
-  const step = await runFleetStep(ctx.db, ctx.run, new Date('2026-10-14T00:00:00Z'), false);
+  writeFileSync(ctx.path, JSON.stringify({ env: { OP_SERVICE_ACCOUNT_TOKEN: 'ops_kettle-profile-0001' } }));
+  server.use(http.post('https://api.anthropic.com/v1/messages', () => HttpResponse.json({}, { headers: { 'anthropic-ratelimit-unified-7d-utilization': '0.1', 'anthropic-ratelimit-unified-7d-reset': '1792400000' } })));
+
+  const step = await runFleetStep(ctx.db, run, new Date('2026-10-14T00:00:00Z'), false);
 
   expect(step.read?.kind).toBe('read');
   expect(ctx.db.query('SELECT COUNT(*) AS total FROM slot_usage').get()).toStrictEqual({ total: 4 });
@@ -36,9 +37,13 @@ test('it reads the slots when there is no read yet', async () => {
 
 test('it reads no slot when the newest read is under 2 hours old', async () => {
   const ctx = setupTest();
+  const run = mock<Runner>(() => Promise.resolve({ code: 0, stdout: 'sk-ant-kettle-fleet-token-0042\n', stderr: '' }));
 
-  await runFleetStep(ctx.db, ctx.run, new Date('2026-10-14T00:00:00Z'), false);
-  const step = await runFleetStep(ctx.db, ctx.run, new Date('2026-10-14T01:59:00Z'), false);
+  writeFileSync(ctx.path, JSON.stringify({ env: { OP_SERVICE_ACCOUNT_TOKEN: 'ops_kettle-profile-0001' } }));
+  server.use(http.post('https://api.anthropic.com/v1/messages', () => HttpResponse.json({}, { headers: { 'anthropic-ratelimit-unified-7d-utilization': '0.1', 'anthropic-ratelimit-unified-7d-reset': '1792400000' } })));
+
+  await runFleetStep(ctx.db, run, new Date('2026-10-14T00:00:00Z'), false);
+  const step = await runFleetStep(ctx.db, run, new Date('2026-10-14T01:59:00Z'), false);
 
   expect(step.read).toBeNull();
   expect(ctx.db.query('SELECT COUNT(*) AS total FROM slot_usage').get()).toStrictEqual({ total: 4 });
@@ -46,9 +51,13 @@ test('it reads no slot when the newest read is under 2 hours old', async () => {
 
 test('it reads the slots again when the newest read is 2 hours old', async () => {
   const ctx = setupTest();
+  const run = mock<Runner>(() => Promise.resolve({ code: 0, stdout: 'sk-ant-kettle-fleet-token-0042\n', stderr: '' }));
 
-  await runFleetStep(ctx.db, ctx.run, new Date('2026-10-14T00:00:00Z'), false);
-  const step = await runFleetStep(ctx.db, ctx.run, new Date('2026-10-14T02:00:00Z'), false);
+  writeFileSync(ctx.path, JSON.stringify({ env: { OP_SERVICE_ACCOUNT_TOKEN: 'ops_kettle-profile-0001' } }));
+  server.use(http.post('https://api.anthropic.com/v1/messages', () => HttpResponse.json({}, { headers: { 'anthropic-ratelimit-unified-7d-utilization': '0.1', 'anthropic-ratelimit-unified-7d-reset': '1792400000' } })));
+
+  await runFleetStep(ctx.db, run, new Date('2026-10-14T00:00:00Z'), false);
+  const step = await runFleetStep(ctx.db, run, new Date('2026-10-14T02:00:00Z'), false);
 
   expect(step.read?.kind).toBe('read');
   expect(ctx.db.query('SELECT COUNT(*) AS total FROM slot_usage').get()).toStrictEqual({ total: 8 });
@@ -56,9 +65,13 @@ test('it reads the slots again when the newest read is 2 hours old', async () =>
 
 test('it reads the slots now when forced, whatever the age of the newest read', async () => {
   const ctx = setupTest();
+  const run = mock<Runner>(() => Promise.resolve({ code: 0, stdout: 'sk-ant-kettle-fleet-token-0042\n', stderr: '' }));
 
-  await runFleetStep(ctx.db, ctx.run, new Date('2026-10-14T00:00:00Z'), false);
-  const step = await runFleetStep(ctx.db, ctx.run, new Date('2026-10-14T00:05:00Z'), true);
+  writeFileSync(ctx.path, JSON.stringify({ env: { OP_SERVICE_ACCOUNT_TOKEN: 'ops_kettle-profile-0001' } }));
+  server.use(http.post('https://api.anthropic.com/v1/messages', () => HttpResponse.json({}, { headers: { 'anthropic-ratelimit-unified-7d-utilization': '0.1', 'anthropic-ratelimit-unified-7d-reset': '1792400000' } })));
+
+  await runFleetStep(ctx.db, run, new Date('2026-10-14T00:00:00Z'), false);
+  const step = await runFleetStep(ctx.db, run, new Date('2026-10-14T00:05:00Z'), true);
 
   expect(step.read?.kind).toBe('read');
 });
@@ -71,6 +84,7 @@ test('it adds a news line for the forecast pause and leaks no token into it, the
     'Bearer sk-ant-kettle-slot-3': { status: 403, seven: '', reset: '' },
     'Bearer sk-ant-kettle-slot-4': { status: 200, seven: '0.97', reset: String(Date.parse('2026-10-18T06:00:00Z') / 1000) },
   };
+  writeFileSync(ctx.path, JSON.stringify({ env: { OP_SERVICE_ACCOUNT_TOKEN: 'ops_kettle-profile-0001' } }));
   const run = mock<Runner>((cmd) => Promise.resolve({ code: 0, stdout: `sk-ant-kettle-slot-${cmd[2]?.match(/token-(?<slot>\d)/u)?.groups?.['slot']}\n`, stderr: '' }));
 
   server.use(

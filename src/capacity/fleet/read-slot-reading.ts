@@ -6,8 +6,6 @@ import type { SlotReading } from './types.ts';
 
 export interface SlotReadResult {
   reading: SlotReading;
-
-  // Why no answer came, with the token redacted; null when the slot answered.
   problem: string | null;
 }
 
@@ -15,7 +13,6 @@ const REQUEST_MS = 15_000;
 const BODY = JSON.stringify({ model: 'claude-haiku-4-5', max_tokens: 1, messages: [{ role: 'user', content: 'hi' }] });
 
 // One 1-token haiku request: /v1/messages answers a setup token with its account's rate-limit headers.
-// The token lives in this call only.
 export async function readSlotReading(run: Runner, opToken: string, slot: number): Promise<SlotReadResult> {
   const empty = { slot, five: null, fiveResetsAt: null, seven: null, sevenResetsAt: null };
   const credential = await readSlotCredential(run, opToken, slot);

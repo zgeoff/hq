@@ -55,7 +55,7 @@ test('it pauses until the last reset when nothing frees a slot before then', () 
   const result = simulateFleet({
     now: new Date('2026-10-14T00:00:00Z'),
     slots: [
-      { slot: 1, five: 94, fiveResetsAt: null, seven: 50, sevenResetsAt: new Date('2026-10-16T00:00:00Z') },
+      { slot: 1, five: 94, fiveResetsAt: new Date('2026-10-16T00:00:00Z'), seven: 50, sevenResetsAt: new Date('2026-10-16T00:00:00Z') },
       { slot: 2, five: 0, fiveResetsAt: null, seven: 99, sevenResetsAt: new Date('2026-10-16T00:00:00Z') },
     ],
     active: 1,
@@ -106,4 +106,19 @@ test('it stops 8 days out when a 7-day reset is further away', () => {
   });
 
   expect(result.endsAt).toBe('2026-10-22T00:00:00Z');
+});
+
+test('it resets the 5-hour figure 5 hours after a slot with no 5-hour reset starts to burn', () => {
+  const result = simulateFleet({
+    now: new Date('2026-10-14T00:00:00Z'),
+    slots: [
+      { slot: 1, five: 0, fiveResetsAt: null, seven: 95, sevenResetsAt: new Date('2026-10-18T00:00:00Z') },
+      { slot: 2, five: 0, fiveResetsAt: null, seven: 10, sevenResetsAt: new Date('2026-10-18T00:00:00Z') },
+    ],
+    active: 1,
+    limit: 95,
+    rateAt: () => ({ five: 20, seven: 0 }),
+  });
+
+  expect(result.pause).toStrictEqual({ start: '2026-10-14T04:45:00Z', end: '2026-10-14T05:00:00Z', hours: 0.25 });
 });

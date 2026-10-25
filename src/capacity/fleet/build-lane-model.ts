@@ -4,7 +4,6 @@ import type { LaneModel } from './build-lane-factor.ts';
 
 const WEEK_MS = 7 * 86_400_000;
 
-// A fitted model once the slot reads cover 7 days, else a linear scale by lane count.
 export function buildLaneModel(oldestReadAt: string | null, points: readonly LanePoint[], current: number, at: Date): LaneModel {
   const covered = oldestReadAt !== null && Date.parse(oldestReadAt) <= at.getTime() - WEEK_MS;
   const fit = covered ? buildLaneFit(points) : null;

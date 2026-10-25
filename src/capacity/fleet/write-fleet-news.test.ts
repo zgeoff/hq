@@ -69,3 +69,14 @@ test('it announces a later pause again after a forecast with no pause', () => {
 
   expect(writeFleetNews(ctx.db, pausing)).toBe(true);
 });
+
+test('it adds nothing again for the same pause after a forecast that is missing', () => {
+  const ctx = setupTest();
+  const pausing = buildMockFleetView({ forecast: { switches: [], pause: { start: '2026-10-16T07:00:00Z', end: '2026-10-18T00:00:00Z', hours: 41 }, safeCap: { lanes: 2, endsAt: '2026-10-18T00:00:00Z' }, endsAt: '2026-10-18T00:00:00Z' } });
+
+  writeFleetNews(ctx.db, pausing);
+  writeFleetNews(ctx.db, buildMockFleetView({ forecast: null }));
+
+  expect(writeFleetNews(ctx.db, pausing)).toBe(false);
+  expect(ctx.db.query('SELECT COUNT(*) AS total FROM news').get()).toStrictEqual({ total: 1 });
+});

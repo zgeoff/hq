@@ -8,8 +8,6 @@ export interface LaneFit {
   perLane: number;
 }
 
-// rate = base + perLane x lanes by least squares. Null when the lane counts never differ or the
-// rate falls as lanes rise, since neither says what one more lane costs.
 export function buildLaneFit(points: readonly LanePoint[]): LaneFit | null {
   if (points.length < 3) {
     return null;

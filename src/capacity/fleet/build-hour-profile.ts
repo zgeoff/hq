@@ -10,8 +10,6 @@ interface Bucket {
   hours: number;
 }
 
-// The mean burn in points per hour for each Sydney hour of the day, over the hours the points
-// cover. A step across a window reset is left out. An hour with no step is null.
 export function buildHourProfile(points: readonly BurnPoint[]): (number | null)[] {
   const read = points.filter((point) => point.percent !== null);
   const buckets = new Map<string, Bucket>();

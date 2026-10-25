@@ -4,10 +4,8 @@ import type { SimInput, SimPause, SimResult, SimSlot, SimSwitch } from './types.
 const STEP_MS = 15 * 60_000;
 const STEP_HOURS = 0.25;
 const MAX_MS = 8 * 86_400_000;
+const FIVE_HOUR_MS = 5 * 3_600_000;
 
-// Steps from now in 15 minutes until every slot's next 7-day reset has passed, 8 days at most.
-// Only the active slot burns. At the limit on either window it hands over to the slot with the
-// most room; the fleet pauses when none is under the limit and resumes when a reset frees one.
 export function simulateFleet(input: SimInput): SimResult {
   const slots = input.slots.map((slot) => rollResets({ ...slot }, input.now));
   const endMs = Math.min(input.now.getTime() + MAX_MS, Math.max(...slots.map((slot) => slot.sevenResetsAt.getTime())));
@@ -42,16 +40,17 @@ export function simulateFleet(input: SimInput): SimResult {
       const rate = input.rateAt(new Date(time));
       burning.five = Math.min(100, burning.five + rate.five * STEP_HOURS);
       burning.seven = Math.min(100, burning.seven + rate.seven * STEP_HOURS);
+      if (burning.five > 0) {
+        burning.fiveResetsAt ??= new Date(time + FIVE_HOUR_MS);
+      }
     }
   }
   pause ??= pauseStart === null ? null : buildPause(pauseStart, endMs);
   return { switches, pause, endsAt: iso(new Date(endMs)) };
 }
 
-const FIVE_HOUR_MS = 5 * 3_600_000;
 const WEEK_MS = 7 * 86_400_000;
 
-// A window whose reset has passed drops to 0 and its next reset rolls on: 5 hours, or a week.
 function rollResets(slot: SimSlot, at: Date): SimSlot {
   while (slot.sevenResetsAt.getTime() <= at.getTime()) {
     slot.seven = 0;

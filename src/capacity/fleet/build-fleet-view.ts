@@ -1,3 +1,4 @@
+import { match } from 'ts-pattern';
 import { getSydneyParts } from '../../clock/get-sydney-parts.ts';
 import type { BurnPoint } from '../build-burn-rate.ts';
 import type { UsageSample } from '../usage-sample.ts';
@@ -12,17 +13,13 @@ import { simulateFleet } from './simulate-fleet.ts';
 import type { FleetSlotView, FleetView, SimSlot, SlotRow } from './types.ts';
 
 const FLEET_LIMIT = 95;
+const SAMPLE_MAX_AGE_MS = 30 * 60_000;
 
 export interface FleetViewInput {
   at: Date;
 
-  // Why the slot reads are not set up, or null.
   notSetUp: string | null;
-
-  // Every slot_usage row of the last 8 days, oldest first.
   rows: readonly SlotRow[];
-
-  // The newest account's usage_samples of the last 8 days, oldest first; none when the newest is stale.
   samples: readonly UsageSample[];
   working: number;
   cap: number | null;
@@ -30,7 +27,10 @@ export interface FleetViewInput {
 
 export function buildFleetView(input: FleetViewInput): FleetView {
   const newest = getNewestSlotRead(input.rows);
-  const latest = input.samples.at(-1) ?? null;
+  const newestSample = input.samples.at(-1) ?? null;
+  const sampleAgeMs = newestSample === null ? null : input.at.getTime() - Date.parse(newestSample.at);
+  const staleMs = sampleAgeMs !== null && sampleAgeMs > SAMPLE_MAX_AGE_MS ? sampleAgeMs : null;
+  const latest = staleMs === null ? newestSample : null;
   const active = findActiveSlot(newest, latest?.seven_day_resets_at ?? null);
   const base = { notSetUp: input.notSetUp, limit: FLEET_LIMIT, active, slots: newest.map((row) => buildSlotView(row, active, input.at)), lanes: { working: input.working, cap: input.cap }, ratePerHour: null, scaled: false, forecast: null };
   if (input.notSetUp !== null) {
@@ -38,6 +38,9 @@ export function buildFleetView(input: FleetViewInput): FleetView {
   }
   if (newest.length === 0) {
     return { ...base, note: 'no slot reads yet: hq capacity --refresh-slots reads them now' };
+  }
+  if (staleMs !== null) {
+    return { ...base, note: `the newest usage sample is ${Math.floor(staleMs / 60_000)} min old` };
   }
   if (active === null || latest === null) {
     return { ...base, note: 'the active slot is unknown: no slot has the 7-day reset of the newest usage sample' };
@@ -74,7 +77,10 @@ export function buildFleetView(input: FleetViewInput): FleetView {
   return {
     ...base,
     ratePerHour: { five: profiles.five[hour] ?? 0, seven: profiles.seven[hour] ?? 0 },
-    scaled: model.kind === 'scale',
+    scaled: match(model)
+      .with({ kind: 'scale' }, () => true)
+      .with({ kind: 'fit' }, () => false)
+      .exhaustive(),
     forecast: { switches: result.switches, pause: result.pause, safeCap, endsAt: result.endsAt },
     note: null,
   };
@@ -97,8 +103,6 @@ function toPoints(samples: readonly UsageSample[], percent: 'five_hour' | 'seven
   return samples.map((sample) => ({ at: sample.at, percent: sample[percent], resetsAt: sample[resets] }));
 }
 
-// A slot with no 7-day figures or reset is left out. The active slot takes the figures of the
-// newest usage sample, which is fresher than its last slot read.
 function buildSimSlots(newest: readonly SlotRow[], active: number, latest: UsageSample): SimSlot[] {
   const slots: SimSlot[] = [];
   for (const row of newest) {

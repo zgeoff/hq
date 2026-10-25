@@ -361,8 +361,7 @@ test('a run-issue pass drops nothing when this tick\'s GitHub pass did not read 
   expect(ctx.db.query("SELECT state FROM linear_issues WHERE issue = 'KET-10'").get()).toStrictEqual({ state: 'canceled' });
 });
 
-// At 20:00 UTC with every other sync fresh. The slots step reads the slots with one failing op read.
-test('it logs the Claude slot read and each problem it met, and a failing slots step, without stopping the tick', async () => {
+test('it logs the Claude slot read, each problem it met and the news line it added', async () => {
   const ctx = setupTest();
   const capacity = JSON.stringify({ imp: { freeMib: 0, room: false }, providers: { claude: { room: false, unattended: true, target: 'imp' } } });
   const answers: Record<string, RunResult> = { op: { code: 0, stdout: 'lin_api_INVENTED\n', stderr: '' } };
@@ -380,6 +379,25 @@ test('it logs the Claude slot read and each problem it met, and a failing slots 
     stepMs: 2000,
     steps: { runs: () => Promise.resolve(), weekly: () => Promise.resolve(false), health: () => Promise.resolve({ opened: [], cleared: [] }), slots: () => Promise.resolve({ read: { kind: 'read', readings: [], problems: ['slot 3: op read gave no token'] }, news: true }) },
   });
+
+  expect(logs.filter((line) => line.includes('Claude slots'))).toStrictEqual([
+    '2026-10-15T20:00:00Z Claude slots: read, 1 problem(s)',
+    '2026-10-15T20:00:00Z Claude slots: slot 3: op read gave no token',
+    '2026-10-15T20:00:00Z Claude slots: fleet forecast news line added',
+  ]);
+});
+
+test('it logs a failing Claude slots step without stopping the tick', async () => {
+  const ctx = setupTest();
+  const capacity = JSON.stringify({ imp: { freeMib: 0, room: false }, providers: { claude: { room: false, unattended: true, target: 'imp' } } });
+  const answers: Record<string, RunResult> = { op: { code: 0, stdout: 'lin_api_INVENTED\n', stderr: '' } };
+  const run: Runner = (command) => Promise.resolve(answers[command[0] ?? ''] ?? { code: 0, stdout: capacity, stderr: '' });
+  const logs: string[] = [];
+  onTestFinished(overrideEnv('HQ_NOW', '2026-10-15T20:00:00Z'));
+  for (const key of ['kinds_synced_at', 'goals_synced_at', 'goals_ok_at', 'kinds_ok_at', 'linear_synced_at', 'lanes_ready_linear_at']) {
+    setMeta(ctx.db, key, '2026-10-15T20:00:00Z');
+  }
+
   await watchTick(ctx.db, {
     me: 'hq-lanes',
     run,
@@ -388,10 +406,5 @@ test('it logs the Claude slot read and each problem it met, and a failing slots 
     steps: { runs: () => Promise.resolve(), weekly: () => Promise.resolve(false), health: () => Promise.resolve({ opened: [], cleared: [] }), slots: () => Promise.reject(new Error('invented: 1Password is down')) },
   });
 
-  expect(logs.filter((line) => line.includes('Claude slots'))).toStrictEqual([
-    '2026-10-15T20:00:00Z Claude slots: read, 1 problem(s)',
-    '2026-10-15T20:00:00Z Claude slots: slot 3: op read gave no token',
-    '2026-10-15T20:00:00Z Claude slots: fleet forecast news line added',
-    '2026-10-15T20:00:00Z Claude slots failed: invented: 1Password is down',
-  ]);
+  expect(logs.filter((line) => line.includes('Claude slots'))).toStrictEqual(['2026-10-15T20:00:00Z Claude slots failed: invented: 1Password is down']);
 });

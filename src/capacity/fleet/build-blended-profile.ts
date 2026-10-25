@@ -4,9 +4,6 @@ import { buildHourProfile } from './build-hour-profile.ts';
 
 const RECENT_MS = 2 * 3_600_000;
 
-// The burn in points per hour for each Sydney hour of the day: half the slope of the last 2 hours
-// and half the mean of that hour over the points given, or whichever of the two exists. An hour
-// with neither takes the mean of the others. Null when nothing gives a rate.
 export function buildBlendedProfile(points: readonly BurnPoint[], at: Date): number[] | null {
   const recent = buildBurnRate(points.filter((point) => at.getTime() - Date.parse(point.at) <= RECENT_MS)).ratePerHour;
   const hourly = buildHourProfile(points);

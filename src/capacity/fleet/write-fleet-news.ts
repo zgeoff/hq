@@ -10,12 +10,12 @@ const FINGERPRINT_KEY = 'fleet_forecast_fingerprint';
 const MOVE_MS = 30 * 60_000;
 const FINGERPRINT = z.object({ pauseStart: z.string(), cap: z.number().nullable() }).nullable();
 
-// One news line when the forecast pauses. It says so again only when the pause time moves 30
-// minutes or more, or the safe cap changes. A forecast with no pause forgets the last line, so a
-// later pause is news again. True when a line was added.
 export function writeFleetNews(db: Database, view: FleetView): boolean {
-  const pause = view.forecast?.pause ?? null;
-  if (view.forecast === null || pause === null) {
+  if (view.forecast === null) {
+    return false;
+  }
+  const pause = view.forecast.pause;
+  if (pause === null) {
     setMeta(db, FINGERPRINT_KEY, null);
     return false;
   }

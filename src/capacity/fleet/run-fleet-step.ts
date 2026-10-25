@@ -9,14 +9,11 @@ import type { FleetView } from './types.ts';
 import { writeFleetNews } from './write-fleet-news.ts';
 
 export interface FleetStep {
-  // Null when the slots were not read this time.
   read: SlotReadRun | null;
   view: FleetView;
   news: boolean;
 }
 
-// Reads the slots when the newest read is 2 hours old or more, or when `force` says so, then
-// builds the forecast from what is stored and adds its news line.
 export async function runFleetStep(db: Database, run: Runner, at: Date, force: boolean): Promise<FleetStep> {
   const due = force || isSlotReadDue(readNewestSlotReadAt(db), at);
   const read = due ? await runSlotRead(db, run, at) : null;

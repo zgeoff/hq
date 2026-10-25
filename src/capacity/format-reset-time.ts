@@ -1,7 +1,6 @@
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-// "28 Oct 08:00Z": the day, month and UTC time of an ISO time, to the nearest minute, since the usage
-// endpoint gives a reset a moment before the hour as often as after it.
+// The usage endpoint gives a reset a moment before the hour as often as after it, so round to the minute.
 export function formatResetTime(time: string): string {
   const MINUTE_MS = 60_000;
   const date = new Date(Math.round(Date.parse(time) / MINUTE_MS) * MINUTE_MS);
