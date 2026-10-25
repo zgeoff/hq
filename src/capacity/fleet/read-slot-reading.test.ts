@@ -76,13 +76,15 @@ test('it makes no request when 1Password gives no token', async () => {
 });
 
 test('it leaves both the slot token and the profile token out of a request failure that names them', async () => {
-  const run = mock<Runner>(() => Promise.resolve({ code: 0, stdout: 'sk-ant-kettle-slot-0042\n', stderr: '' }));
-  const httpClient = Object.assign(
-    mock(() => Promise.reject(new Error('invented proxy dropped sk-ant-kettle-slot-0042 minted by ops_kettle-profile'))),
-    { preconnect: fetch.preconnect },
-  );
+  const run = mock<Runner>(() => Promise.resolve({ code: 0, stdout: 'kettle-slot-credential-0042\n', stderr: '' }));
 
-  const result = await readSlotReading({ run, httpClient }, 'ops_kettle-profile', 1, new AbortController().signal);
+  server.use(
+    http.post(ANTHROPIC_MESSAGES_URL, () => {
+      // The interceptor turns only an error with code and errno, as a Node socket error has, into a fetch rejection.
+      throw Object.assign(new Error('invented proxy dropped kettle-slot-credential-0042 minted by kettle-profile-credential'), { code: 'ECONNRESET', errno: -104 });
+    }),
+  );
+  const result = await readSlotReading({ run, httpClient: fetch }, 'kettle-profile-credential', 1, new AbortController().signal);
 
   expect(result).toStrictEqual({ reading: { slot: 1, status: 'request-failed', five: null, fiveResetsAt: null, seven: null, sevenResetsAt: null }, problem: 'slot 1: invented proxy dropped [redacted] minted by [redacted]' });
 });
