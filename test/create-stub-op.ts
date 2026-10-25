@@ -6,6 +6,10 @@ interface StubOpOptions {
 
   // What `op read <reference>` prints, by op:// reference; any other reference fails.
   answers: Record<string, string>;
+
+  // What `op read <reference>` writes on stderr as it fails, by op:// reference, in place of the
+  // default message; op's own errors can echo what it was given.
+  failures?: Record<string, string>;
 }
 
 interface StubOp {
@@ -19,7 +23,7 @@ export function createStubOp(options: StubOpOptions): StubOp {
   const bin = join(options.directory, 'bin');
   const config = join(options.directory, 'op.json');
   mkdirSync(bin, { recursive: true });
-  writeFileSync(config, JSON.stringify({ answers: options.answers }));
+  writeFileSync(config, JSON.stringify({ answers: options.answers, failures: options.failures ?? {} }));
   writeFileSync(join(bin, 'op'), `#!/bin/sh\nexec '${process.execPath}' '${resolve(import.meta.dir, 'run-stub-op.ts')}' --config '${config}' "$@"\n`);
   chmodSync(join(bin, 'op'), 0o755);
   return { bin };

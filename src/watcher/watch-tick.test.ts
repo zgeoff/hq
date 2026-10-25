@@ -3,14 +3,19 @@ import { expect, mock, onTestFinished, test } from 'bun:test';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { HttpResponse, http } from 'msw';
 import { z } from 'zod';
+import { ANTHROPIC_MESSAGES_URL, slotUsage } from '../../mocks/anthropic-handlers.ts';
 import { LINEAR_GRAPHQL_URL, linearDocuments, linearIssues } from '../../mocks/linear-handlers.ts';
 import { server } from '../../mocks/node.ts';
 import { buildFiledNode } from '../../test/build-filed-node.ts';
 import { buildStubProgramRunner } from '../../test/build-stub-program-runner.ts';
 import { createCapacitySample } from '../../test/create-capacity-sample.ts';
+import { createStubOp } from '../../test/create-stub-op.ts';
 import { freshDb } from '../../test/helpers.ts';
 import { readReadyByLane } from '../areas/read-ready-by-lane.ts';
+import { readOptionalFile } from '../capacity/fleet/read-optional-file.ts';
+import { runFleetStep } from '../capacity/fleet/run-fleet-step.ts';
 import { setCapacitySetting } from '../capacity/set-capacity-setting.ts';
+import { now } from '../clock/now.ts';
 import { overrideEnv } from '../config/override-env.ts';
 import { metaJson } from '../db/meta-json.ts';
 import { setMeta } from '../db/set-meta.ts';
@@ -23,6 +28,7 @@ import { getUnblock } from '../unblock/get-unblock.ts';
 import { makePRStateGh } from '../../test/make-pr-state-gh.ts';
 import { waitFor } from '../../test/wait-for.ts';
 import { resetKey } from '../linear/reset-key.ts';
+import { realRunner } from '../runner/real-runner.ts';
 import type { RunResult, Runner } from '../runner/types.ts';
 import { watchTick } from './watch-tick.ts';
 
@@ -429,4 +435,62 @@ test('it logs a failing Claude slots step without stopping the tick', async () =
   });
 
   expect(logs.filter((line) => line.includes('Claude slots'))).toStrictEqual(['2026-10-15T20:00:00Z Claude slots failed: invented: 1Password is down']);
+});
+
+test('it logs no slot token and no profile token when op, a slot request and a slot answer name them', async () => {
+  const ctx = setupTest();
+  const capacity = JSON.stringify({ imp: { freeMib: 0, room: false }, providers: { claude: { room: false, unattended: true, target: 'imp' } } });
+  const answers: Record<string, RunResult> = { op: { code: 0, stdout: 'lin_api_INVENTED\n', stderr: '' } };
+  const run: Runner = (command) => Promise.resolve(answers[command[0] ?? ''] ?? { code: 0, stdout: capacity, stderr: '' });
+  const settings = `${ctx.directory}/settings.local.json`;
+  const logs: string[] = [];
+  const op = createStubOp({
+    directory: ctx.directory,
+    answers: {
+      'op://claude-slots/claude-setup-token-2/credential': 'kettle-slot-credential-2',
+      'op://claude-slots/claude-setup-token-3/credential': 'kettle-slot-credential-3',
+      'op://claude-slots/claude-setup-token-4/credential': 'kettle-slot-credential-4',
+    },
+    failures: { 'op://claude-slots/claude-setup-token-1/credential': '[ERROR] invented: kettle-slot-credential-1 is held back from kettle-profile-credential' },
+  });
+  const slotAnswers: Record<string, () => Response> = {
+    'Bearer kettle-slot-credential-2': () => {
+      // The interceptor turns only an error with code and errno, as a Node socket error has, into a fetch rejection.
+      throw Object.assign(new Error('invented proxy dropped kettle-slot-credential-2 minted by kettle-profile-credential'), { code: 'ECONNRESET', errno: -104 });
+    },
+    'Bearer kettle-slot-credential-3': () =>
+      HttpResponse.json(
+        { type: 'error', error: { type: 'api_error', message: 'invented outage for kettle-slot-credential-3 minted by kettle-profile-credential' } },
+        { status: 500, headers: { 'x-invented-echo': 'kettle-slot-credential-3 kettle-profile-credential' } },
+      ),
+  };
+  onTestFinished(overrideEnv('HQ_NOW', '2026-10-15T20:00:00Z'));
+  onTestFinished(overrideEnv('PATH', `${op.bin}:${process.env['PATH']}`));
+  for (const key of ['kinds_synced_at', 'goals_synced_at', 'goals_ok_at', 'kinds_ok_at', 'linear_synced_at', 'lanes_ready_linear_at']) {
+    setMeta(ctx.db, key, '2026-10-15T20:00:00Z');
+  }
+  writeFileSync(settings, JSON.stringify({ env: { OP_SERVICE_ACCOUNT_TOKEN: 'kettle-profile-credential' } }));
+  slotUsage.set('Bearer kettle-slot-credential-4', { seven: { utilization: 0.4, reset: 1_792_540_800 } });
+  server.use(http.post(ANTHROPIC_MESSAGES_URL, (info) => slotAnswers[info.request.headers.get('authorization') ?? '']?.()));
+
+  await watchTick(ctx.db, {
+    me: 'hq-lanes',
+    run,
+    log: (line) => logs.push(line),
+    stepMs: 10_000,
+    steps: {
+      runs: () => Promise.resolve(),
+      weekly: () => Promise.resolve(false),
+      health: () => Promise.resolve({ opened: [], cleared: [] }),
+      slots: (signal) => runFleetStep(ctx.db, { run: realRunner, httpClient: fetch, settings: { path: settings, readFile: readOptionalFile } }, now(), { force: false, signal }),
+    },
+  });
+
+  expect(logs.filter((line) => line.includes('Claude slots'))).toStrictEqual([
+    '2026-10-15T20:00:00Z Claude slots: read, 3 problem(s)',
+    '2026-10-15T20:00:00Z Claude slots: slot 1: op read failed (exit 1)',
+    '2026-10-15T20:00:00Z Claude slots: slot 2: invented proxy dropped [redacted] minted by [redacted]',
+    '2026-10-15T20:00:00Z Claude slots: slot 3: the messages API answered 500',
+  ]);
+  expect(logs.filter((line) => line.includes('kettle-slot-credential') || line.includes('kettle-profile-credential'))).toStrictEqual([]);
 });

@@ -28,6 +28,15 @@ test('it fails with exit 1, a message on stderr and nothing on stdout for a refe
   expect({ code: read.exitCode, stdout: read.stdout.toString(), stderr: read.stderr.toString() }).toStrictEqual({ code: 1, stdout: '', stderr: '[ERROR] could not read the secret: invented: no such item\n' });
 });
 
+test('it fails with exit 1 and its failure message on stderr for a reference in its failure table', () => {
+  const ctx = setupTest();
+  const stub = createStubOp({ directory: ctx.directory, answers: {}, failures: { 'op://kettle-vault/teapot-item/credential': '[ERROR] invented: the kettle is cold' } });
+
+  const read = Bun.spawnSync([join(stub.bin, 'op'), 'read', 'op://kettle-vault/teapot-item/credential']);
+
+  expect({ code: read.exitCode, stdout: read.stdout.toString(), stderr: read.stderr.toString() }).toStrictEqual({ code: 1, stdout: '', stderr: '[ERROR] invented: the kettle is cold\n' });
+});
+
 test('it fails a command other than read', () => {
   const ctx = setupTest();
   const stub = createStubOp({ directory: ctx.directory, answers: { 'op://kettle-vault/teapot-item/credential': 'sk-ant-kettle-stub-0001' } });
