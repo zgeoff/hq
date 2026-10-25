@@ -7,8 +7,7 @@ interface StubOpOptions {
   // What `op read <reference>` prints, by op:// reference; any other reference fails.
   answers: Record<string, string>;
 
-  // What `op read <reference>` writes on stderr as it fails, by op:// reference, in place of the
-  // default message; op's own errors can echo what it was given.
+  // op's own errors can echo what it was given.
   failures?: Record<string, string>;
 }
 
