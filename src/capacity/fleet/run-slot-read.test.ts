@@ -31,17 +31,20 @@ test('it reads four slots, stores one row each with the working lane count, and 
     'op://claude-slots/claude-setup-token-4/credential': { code: 0, stdout: 'sk-ant-kettle-slot-4\n', stderr: '' },
   };
   const run = mock<Runner>((cmd) => Promise.resolve(answers[cmd[2] ?? ''] ?? { code: 1, stdout: '', stderr: 'invented: no answer' }));
-  const usage = { 'anthropic-ratelimit-unified-5h-utilization': '0.1', 'anthropic-ratelimit-unified-5h-reset': '1792000000', 'anthropic-ratelimit-unified-7d-utilization': '0.3', 'anthropic-ratelimit-unified-7d-reset': '1792400000' };
-  const statuses: Record<string, number> = { 'Bearer sk-ant-kettle-slot-1': 200, 'Bearer sk-ant-kettle-slot-2': 403, 'Bearer sk-ant-kettle-slot-4': 200 };
+  const responses: Record<string, { status: number; headers: Record<string, string> }> = {
+    'Bearer sk-ant-kettle-slot-1': { status: 200, headers: { 'anthropic-ratelimit-unified-5h-utilization': '0.1', 'anthropic-ratelimit-unified-5h-reset': '1792000000', 'anthropic-ratelimit-unified-7d-utilization': '0.3', 'anthropic-ratelimit-unified-7d-reset': '1792400000' } },
+    'Bearer sk-ant-kettle-slot-2': { status: 403, headers: {} },
+    'Bearer sk-ant-kettle-slot-4': { status: 200, headers: { 'anthropic-ratelimit-unified-5h-utilization': '0.1', 'anthropic-ratelimit-unified-5h-reset': '1792000000', 'anthropic-ratelimit-unified-7d-utilization': '0.3', 'anthropic-ratelimit-unified-7d-reset': '1792400000' } },
+  };
 
   at('2026-10-14T01:00:00Z');
   writeFileSync(ctx.path, JSON.stringify({ env: { OP_SERVICE_ACCOUNT_TOKEN: 'ops_kettle-profile-0001' } }));
   addRun(ctx.db, { issue: 'GEO-9901', title: 'Descale the kettle', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
   server.use(
     http.post('https://api.anthropic.com/v1/messages', (info) => {
-      const status = statuses[info.request.headers.get('authorization') ?? ''] ?? 500;
+      const response = responses[info.request.headers.get('authorization') ?? ''] ?? { status: 500, headers: {} };
 
-      return HttpResponse.json({}, { status, headers: status === 200 ? usage : {} });
+      return HttpResponse.json({}, response);
     }),
   );
   const result = await runSlotRead(ctx.db, run, new Date('2026-10-14T01:00:00Z'));
@@ -67,7 +70,13 @@ test('it reads no slot and stores nothing when the slot reads are not set up', a
 
 test('it keeps every token out of the stored rows and the problems, even when the API echoes one', async () => {
   const ctx = setupTest();
-  const run = mock<Runner>((cmd) => Promise.resolve({ code: 0, stdout: `sk-ant-kettle-${cmd[2]?.includes('-1/') ? 'one' : 'other'}-token-0042\n`, stderr: '' }));
+  const tokens: Record<string, RunResult> = {
+    'op://claude-slots/claude-setup-token-1/credential': { code: 0, stdout: 'sk-ant-kettle-one-token-0042\n', stderr: '' },
+    'op://claude-slots/claude-setup-token-2/credential': { code: 0, stdout: 'sk-ant-kettle-other-token-0042\n', stderr: '' },
+    'op://claude-slots/claude-setup-token-3/credential': { code: 0, stdout: 'sk-ant-kettle-other-token-0042\n', stderr: '' },
+    'op://claude-slots/claude-setup-token-4/credential': { code: 0, stdout: 'sk-ant-kettle-other-token-0042\n', stderr: '' },
+  };
+  const run = mock<Runner>((cmd) => Promise.resolve(tokens[cmd[2] ?? ''] ?? { code: 1, stdout: '', stderr: 'invented: no such item' }));
 
   writeFileSync(ctx.path, JSON.stringify({ env: { OP_SERVICE_ACCOUNT_TOKEN: 'ops_kettle-profile-0001' } }));
   server.use(http.post('https://api.anthropic.com/v1/messages', (info) => HttpResponse.json({ error: `bad credential ${info.request.headers.get('authorization')}` }, { status: 403 })));

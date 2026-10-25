@@ -461,19 +461,31 @@ test('hq capacity --refresh-slots reads the four slots through op and prints the
   onTestFinished(overrideEnv('HQ_SLOTS_OP_SETTINGS', settings));
   onTestFinished(() => (console.log = log));
   mkdirSync(`${fresh.dir}/bin`);
-  writeFileSync(`${fresh.dir}/bin/op`, '#!/bin/sh\nslot=$(echo "$2" | sed "s/.*token-\\([0-9]\\).*/\\1/")\necho "sk-ant-kettle-cli-$slot"\n');
+  writeFileSync(
+    `${fresh.dir}/bin/op`,
+    [
+      '#!/bin/sh',
+      'case "$2" in',
+      '  op://claude-slots/claude-setup-token-1/credential) echo sk-ant-kettle-cli-1 ;;',
+      '  op://claude-slots/claude-setup-token-2/credential) echo sk-ant-kettle-cli-2 ;;',
+      '  op://claude-slots/claude-setup-token-3/credential) echo sk-ant-kettle-cli-3 ;;',
+      '  op://claude-slots/claude-setup-token-4/credential) echo sk-ant-kettle-cli-4 ;;',
+      '  *) echo "invented: no such item" >&2; exit 1 ;;',
+      'esac',
+      '',
+    ].join('\n'),
+  );
   chmodSync(`${fresh.dir}/bin/op`, 0o755);
   onTestFinished(overrideEnv('PATH', `${fresh.dir}/bin:${process.env['PATH']}`));
   writeFileSync(settings, JSON.stringify({ env: { OP_SERVICE_ACCOUNT_TOKEN: 'ops_kettle-profile-0001' } }));
   fresh.db.query('INSERT INTO usage_samples (at, account, five_hour, seven_day, five_hour_resets_at, seven_day_resets_at) VALUES (?, ?, ?, ?, ?, ?)').run('2026-10-14T00:55:00Z', 'abcdef012345', 5, 40, null, '2026-10-19T00:00:00Z');
-  server.use(
-    http.post('https://api.anthropic.com/v1/messages', (info) => {
-      const slot = info.request.headers.get('authorization')?.slice(-1);
-      const resetsAt = slot === '2' ? '2026-10-19T00:00:00Z' : `2026-10-2${slot}T00:00:00Z`;
-
-      return HttpResponse.json({}, { headers: { 'anthropic-ratelimit-unified-7d-utilization': '0.4', 'anthropic-ratelimit-unified-7d-reset': String(Date.parse(resetsAt) / 1000) } });
-    }),
-  );
+  const resets: Record<string, string> = {
+    'Bearer sk-ant-kettle-cli-1': '1792540800',
+    'Bearer sk-ant-kettle-cli-2': '1792368000',
+    'Bearer sk-ant-kettle-cli-3': '1792713600',
+    'Bearer sk-ant-kettle-cli-4': '1792800000',
+  };
+  server.use(http.post('https://api.anthropic.com/v1/messages', (info) => HttpResponse.json({}, { headers: { 'anthropic-ratelimit-unified-7d-utilization': '0.4', 'anthropic-ratelimit-unified-7d-reset': resets[info.request.headers.get('authorization') ?? ''] ?? '' } })));
   console.log = (line: string) => lines.push(line);
 
   await main(['capacity', '--refresh-slots']);

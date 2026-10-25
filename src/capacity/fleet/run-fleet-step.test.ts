@@ -7,7 +7,7 @@ import { server } from '../../../mocks/node.ts';
 import { freshDb } from '../../../test/helpers.ts';
 import { overrideEnv } from '../../config/override-env.ts';
 import { addRun } from '../../runs/add-run.ts';
-import type { Runner } from '../../runner/types.ts';
+import type { RunResult, Runner } from '../../runner/types.ts';
 import { runFleetStep } from './run-fleet-step.ts';
 
 function setupTest() {
@@ -78,20 +78,26 @@ test('it reads the slots now when forced, whatever the age of the newest read', 
 
 test('it adds a news line for the forecast pause and leaks no token into it, the rows or the result', async () => {
   const ctx = setupTest();
-  const figures: Record<string, { status: number; seven: string; reset: string }> = {
-    'Bearer sk-ant-kettle-slot-1': { status: 200, seven: '0.4', reset: String(Date.parse('2026-10-18T00:00:00Z') / 1000) },
-    'Bearer sk-ant-kettle-slot-2': { status: 200, seven: '0.96', reset: String(Date.parse('2026-10-18T12:00:00Z') / 1000) },
-    'Bearer sk-ant-kettle-slot-3': { status: 403, seven: '', reset: '' },
-    'Bearer sk-ant-kettle-slot-4': { status: 200, seven: '0.97', reset: String(Date.parse('2026-10-18T06:00:00Z') / 1000) },
+  const answers: Record<string, { status: number; headers: Record<string, string> }> = {
+    'Bearer sk-ant-kettle-slot-1': { status: 200, headers: { 'anthropic-ratelimit-unified-7d-utilization': '0.4', 'anthropic-ratelimit-unified-7d-reset': '1792281600' } },
+    'Bearer sk-ant-kettle-slot-2': { status: 200, headers: { 'anthropic-ratelimit-unified-7d-utilization': '0.96', 'anthropic-ratelimit-unified-7d-reset': '1792324800' } },
+    'Bearer sk-ant-kettle-slot-3': { status: 403, headers: {} },
+    'Bearer sk-ant-kettle-slot-4': { status: 200, headers: { 'anthropic-ratelimit-unified-7d-utilization': '0.97', 'anthropic-ratelimit-unified-7d-reset': '1792303200' } },
   };
-  writeFileSync(ctx.path, JSON.stringify({ env: { OP_SERVICE_ACCOUNT_TOKEN: 'ops_kettle-profile-0001' } }));
-  const run = mock<Runner>((cmd) => Promise.resolve({ code: 0, stdout: `sk-ant-kettle-slot-${cmd[2]?.match(/token-(?<slot>\d)/u)?.groups?.['slot']}\n`, stderr: '' }));
+  const tokens: Record<string, RunResult> = {
+    'op://claude-slots/claude-setup-token-1/credential': { code: 0, stdout: 'sk-ant-kettle-slot-1\n', stderr: '' },
+    'op://claude-slots/claude-setup-token-2/credential': { code: 0, stdout: 'sk-ant-kettle-slot-2\n', stderr: '' },
+    'op://claude-slots/claude-setup-token-3/credential': { code: 0, stdout: 'sk-ant-kettle-slot-3\n', stderr: '' },
+    'op://claude-slots/claude-setup-token-4/credential': { code: 0, stdout: 'sk-ant-kettle-slot-4\n', stderr: '' },
+  };
+  const run = mock<Runner>((cmd) => Promise.resolve(tokens[cmd[2] ?? ''] ?? { code: 1, stdout: '', stderr: 'invented: no such item' }));
 
+  writeFileSync(ctx.path, JSON.stringify({ env: { OP_SERVICE_ACCOUNT_TOKEN: 'ops_kettle-profile-0001' } }));
   server.use(
     http.post('https://api.anthropic.com/v1/messages', (info) => {
-      const answer = figures[info.request.headers.get('authorization') ?? ''];
+      const answer = answers[info.request.headers.get('authorization') ?? ''] ?? { status: 500, headers: {} };
 
-      return HttpResponse.json({}, { status: answer?.status ?? 500, headers: answer?.seven ? { 'anthropic-ratelimit-unified-7d-utilization': answer.seven, 'anthropic-ratelimit-unified-7d-reset': answer.reset } : {} });
+      return HttpResponse.json({}, answer);
     }),
   );
   for (const [index, time] of ['2026-10-13T23:30:00Z', '2026-10-14T00:00:00Z', '2026-10-14T00:30:00Z', '2026-10-14T01:00:00Z'].entries()) {
