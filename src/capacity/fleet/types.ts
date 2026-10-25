@@ -1,4 +1,15 @@
+import type { Runner } from '../../runner/types.ts';
 import type { ScaleReason } from './build-lane-factor.ts';
+
+export interface SlotSettings {
+  path: string;
+  readFile: (path: string) => Promise<string | null>;
+}
+
+export interface FleetIO {
+  run: Runner;
+  settings: SlotSettings;
+}
 
 export interface SlotReading {
   slot: number;
