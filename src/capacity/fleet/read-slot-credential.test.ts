@@ -17,6 +17,8 @@ test.each([
   ['a 401', 'invented: 401 Unauthorized for ops_kettle-profile', 'op read failed (exit 1): re-mint with op-mint hq'],
   ['a rate limit', 'invented: Too many requests for ops_kettle-profile', "op read failed (exit 1): 1Password's rate limit; op service-account ratelimit shows which limit and when it resets"],
   ['any other failure', 'invented: item not found in ops_kettle-profile', 'op read failed (exit 1)'],
+  ['a missing item that names its reference', '[ERROR] invented: could not read "op://claude-slots/claude-setup-token-2/credential": isn\'t an item', 'op read failed (exit 1)'],
+  ['an auth failure that also names its reference', '[ERROR] invented: op://claude-slots/claude-setup-token-2/credential: 401 Unauthorized', 'op read failed (exit 1): re-mint with op-mint hq'],
 ])('it words %s from stderr without quoting it', async (_label, stderr, reason) => {
   const run = mock<Runner>(() => Promise.resolve({ code: 1, stdout: '', stderr }));
 

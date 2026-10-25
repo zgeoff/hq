@@ -18,10 +18,14 @@ export async function readSlotCredential(run: Runner, opToken: string, slot: num
 
 const AUTH_FAILURE = /auth|sign.?in|token|unauthori[sz]ed|forbidden|401|403/iu;
 const RATE_LIMITED = /too many requests|rate.?limit/iu;
+const OP_REFERENCE = /op:\/\/\S+/gu;
 
+// op repeats the reference it was given, and the item name claude-setup-token-N would read as a
+// token failure.
 function pickFailureReason(stderr: string): string {
-  if (RATE_LIMITED.test(stderr)) {
+  const message = stderr.replaceAll(OP_REFERENCE, '');
+  if (RATE_LIMITED.test(message)) {
     return ": 1Password's rate limit; op service-account ratelimit shows which limit and when it resets";
   }
-  return AUTH_FAILURE.test(stderr) ? ': re-mint with op-mint hq' : '';
+  return AUTH_FAILURE.test(message) ? ': re-mint with op-mint hq' : '';
 }
