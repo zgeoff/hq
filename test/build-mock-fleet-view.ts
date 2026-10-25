@@ -8,7 +8,7 @@ export function buildMockFleetView(overrides: Partial<FleetView> = {}): FleetVie
     slots: [],
     lanes: { working: 2, cap: null },
     ratePerHour: { five: 2, seven: 1 },
-    scaled: false,
+    scaled: null,
     forecast: { switches: [], pause: null, safeCap: null, endsAt: '2026-10-18T00:00:00Z' },
     note: null,
     ...overrides,

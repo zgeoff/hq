@@ -1,3 +1,5 @@
+import type { ScaleReason } from './build-lane-factor.ts';
+
 export interface SlotReading {
   slot: number;
   status: string;
@@ -84,7 +86,7 @@ export interface FleetView {
   slots: FleetSlotView[];
   lanes: { working: number; cap: number | null };
   ratePerHour: { five: number; seven: number } | null;
-  scaled: boolean;
+  scaled: ScaleReason | null;
   forecast: FleetForecast | null;
   note: string | null;
 }

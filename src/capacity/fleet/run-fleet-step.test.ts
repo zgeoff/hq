@@ -110,7 +110,7 @@ test('it adds a news line for the forecast pause and leaks no token into it, the
   const everything = JSON.stringify([step, ctx.db.query('SELECT * FROM slot_usage').all(), ctx.db.query('SELECT * FROM news').all(), ctx.db.query('SELECT * FROM meta').all()]);
 
   expect(step.news).toBe(true);
-  expect(ctx.db.query('SELECT text FROM news').all()).toStrictEqual([{ text: 'Fleet forecast: every Claude slot is at 95% from 16 Oct 08:00Z for 40.0 h at the current rate; a cap of 1 lanes avoids it' }]);
+  expect(ctx.db.query('SELECT text FROM news').all()).toStrictEqual([{ text: 'Fleet forecast: every Claude slot is at 95% from 16 Oct 08:00Z for 40.0 h at the current rate; a cap of 1 lane avoids it' }]);
   expect(everything).not.toInclude('sk-ant-kettle');
   expect(everything).not.toInclude('ops_kettle');
 });

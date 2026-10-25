@@ -1,7 +1,9 @@
 import { match } from 'ts-pattern';
 import type { LaneFit } from './build-lane-fit.ts';
 
-export type LaneModel = { kind: 'fit'; fit: LaneFit; current: number } | { kind: 'scale'; current: number };
+export type ScaleReason = 'history' | 'no-fit';
+
+export type LaneModel = { kind: 'fit'; fit: LaneFit; current: number } | { kind: 'scale'; reason: ScaleReason; current: number };
 
 export function buildLaneFactor(model: LaneModel, lanes: number): number {
   return match(model)

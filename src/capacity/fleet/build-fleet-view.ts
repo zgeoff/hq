@@ -35,7 +35,7 @@ export function buildFleetView(input: FleetViewInput): FleetView {
   const staleMs = sampleAgeMs !== null && sampleAgeMs > SAMPLE_MAX_AGE_MS ? sampleAgeMs : null;
   const latest = staleMs === null ? newestSample : null;
   const active = findActiveSlot(newest, latest?.seven_day_resets_at ?? null);
-  const base = { notSetUp: input.notSetUp, limit: FLEET_LIMIT, active, slots: buildSlotViews(readings, active, input.at), lanes: { working: input.working, cap: input.cap }, ratePerHour: null, scaled: false, forecast: null };
+  const base = { notSetUp: input.notSetUp, limit: FLEET_LIMIT, active, slots: buildSlotViews(readings, active, input.at), lanes: { working: input.working, cap: input.cap }, ratePerHour: null, scaled: null, forecast: null };
   if (input.notSetUp !== null) {
     return { ...base, note: 'slot reads are not set up' };
   }
@@ -81,8 +81,8 @@ export function buildFleetView(input: FleetViewInput): FleetView {
     ...base,
     ratePerHour: { five: profiles.five[hour] ?? 0, seven: profiles.seven[hour] ?? 0 },
     scaled: match(model)
-      .with({ kind: 'scale' }, () => true)
-      .with({ kind: 'fit' }, () => false)
+      .with({ kind: 'scale' }, (scale) => scale.reason)
+      .with({ kind: 'fit' }, () => null)
       .exhaustive(),
     forecast: { switches: result.switches, pause: result.pause, safeCap, endsAt: result.endsAt },
     note: null,

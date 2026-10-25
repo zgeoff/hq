@@ -6,6 +6,9 @@ const WEEK_MS = 7 * 86_400_000;
 
 export function buildLaneModel(oldestReadAt: string | null, points: readonly LanePoint[], current: number, at: Date): LaneModel {
   const covered = oldestReadAt !== null && Date.parse(oldestReadAt) <= at.getTime() - WEEK_MS;
-  const fit = covered ? buildLaneFit(points) : null;
-  return fit === null ? { kind: 'scale', current } : { kind: 'fit', fit, current };
+  if (!covered) {
+    return { kind: 'scale', reason: 'history', current };
+  }
+  const fit = buildLaneFit(points);
+  return fit === null ? { kind: 'scale', reason: 'no-fit', current } : { kind: 'fit', fit, current };
 }

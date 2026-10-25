@@ -19,6 +19,15 @@ test('it adds one news line with the pause and the safe cap when the forecast pa
   expect(ctx.db.query('SELECT from_name, topic, text FROM news').all()).toStrictEqual([{ from_name: 'hq-capacity', topic: 'report', text: 'Fleet forecast: every Claude slot is at 95% from 16 Oct 07:00Z for 41.0 h at the current rate; a cap of 2 lanes avoids it' }]);
 });
 
+test('it says lane, not lanes, for a safe cap of one', () => {
+  const ctx = setupTest();
+  const view = buildMockFleetView({ forecast: { switches: [], pause: { start: '2026-10-16T07:00:00Z', end: '2026-10-18T00:00:00Z', hours: 41 }, safeCap: { lanes: 1, endsAt: '2026-10-18T00:00:00Z' }, endsAt: '2026-10-18T00:00:00Z' } });
+
+  writeFleetNews(ctx.db, view);
+
+  expect(ctx.db.query('SELECT text FROM news').all()).toStrictEqual([{ text: 'Fleet forecast: every Claude slot is at 95% from 16 Oct 07:00Z for 41.0 h at the current rate; a cap of 1 lane avoids it' }]);
+});
+
 test('it adds nothing again while the pause time moves under 30 minutes and the cap stays', () => {
   const ctx = setupTest();
   const first = buildMockFleetView({ forecast: { switches: [], pause: { start: '2026-10-16T07:00:00Z', end: '2026-10-18T00:00:00Z', hours: 41 }, safeCap: { lanes: 2, endsAt: '2026-10-18T00:00:00Z' }, endsAt: '2026-10-18T00:00:00Z' } });

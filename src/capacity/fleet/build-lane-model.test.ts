@@ -9,8 +9,17 @@ test('it scales linearly by lane count when the reads span under 7 days', () => 
     { lanes: 4, rate: 5 },
   ], 2, new Date('2026-10-14T00:00:00Z'));
 
-  expect(model.kind).toBe('scale');
+  expect(model).toStrictEqual({ kind: 'scale', reason: 'history', current: 2 });
   expect(buildLaneFactor(model, 3)).toBe(1.5);
+});
+
+test('it scales by lane count with the no-fit reason when 7 days of reads fit no line', () => {
+  const model = buildLaneModel('2026-10-06T00:00:00Z', [
+    { lanes: 2, rate: 3 },
+    { lanes: 2, rate: 4 },
+  ], 2, new Date('2026-10-14T00:00:00Z'));
+
+  expect(model).toStrictEqual({ kind: 'scale', reason: 'no-fit', current: 2 });
 });
 
 test('it fits the lane count once the reads span 7 days', () => {

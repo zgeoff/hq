@@ -24,7 +24,7 @@ export function writeFleetNews(db: Database, view: FleetView): boolean {
   if (last !== null && last.cap === cap && Math.abs(Date.parse(pause.start) - Date.parse(last.pauseStart)) < MOVE_MS) {
     return false;
   }
-  const advice = cap === null ? 'no lane cap avoids it' : `a cap of ${cap} lanes avoids it`;
+  const advice = cap === null ? 'no lane cap avoids it' : `a cap of ${cap} ${cap === 1 ? 'lane' : 'lanes'} avoids it`;
   addNews(db, { from: 'hq-capacity', topic: 'report', text: `Fleet forecast: every Claude slot is at ${view.limit}% from ${formatResetTime(pause.start)} for ${pause.hours.toFixed(1)} h at the current rate; ${advice}`, issue: null, link: null, needsGeoff: false });
   setMeta(db, FINGERPRINT_KEY, JSON.stringify({ pauseStart: pause.start, cap }));
   return true;

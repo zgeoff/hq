@@ -14,7 +14,7 @@ test('it forecasts a pause, the slots that cannot be a target left out, and the 
   const view = buildFleetView({ at: new Date('2026-10-14T01:00:00Z'), notSetUp: null, rows, samples, working: 2, cap: null });
 
   expect(view.active).toBe(1);
-  expect(view.scaled).toBe(true);
+  expect(view.scaled).toBe('history');
   expect(view.forecast?.pause).toStrictEqual({ start: '2026-10-16T08:00:00Z', end: '2026-10-18T00:00:00Z', hours: 40 });
   expect(view.forecast?.safeCap).toStrictEqual({ lanes: 1, endsAt: '2026-10-18T12:00:00Z' });
   expect(view.slots.map((slot) => slot.active)).toStrictEqual([true, false, false, false]);
