@@ -15,11 +15,88 @@ test('it forecasts a pause, the slots that cannot be a target left out, and the 
 
   const view = buildFleetView({ at: new Date('2026-10-14T01:00:00Z'), notSetUp: null, rows, samples, working: 2, cap: null });
 
-  expect(view.active).toBe(1);
-  expect(view.scaled).toBe('history');
-  expect(view.forecast?.pause).toStrictEqual({ start: '2026-10-16T08:00:00Z', end: '2026-10-18T00:00:00Z', hours: 40 });
-  expect(view.forecast?.safeCap).toStrictEqual({ lanes: 1, endsAt: '2026-10-18T12:00:00Z' });
-  expect(view.slots.map((slot) => slot.active)).toStrictEqual([true, false, false, false]);
+  expect(view).toMatchInlineSnapshot(`
+    {
+      "active": 1,
+      "forecast": {
+        "endsAt": "2026-10-18T12:00:00Z",
+        "pause": {
+          "end": "2026-10-18T00:00:00Z",
+          "hours": 40,
+          "start": "2026-10-16T08:00:00Z",
+        },
+        "safeCap": {
+          "endsAt": "2026-10-18T12:00:00Z",
+          "lanes": 1,
+        },
+        "switches": [
+          {
+            "at": "2026-10-18T00:00:00Z",
+            "from": null,
+            "to": 1,
+          },
+        ],
+      },
+      "lanes": {
+        "cap": null,
+        "working": 2,
+      },
+      "limit": 95,
+      "notSetUp": null,
+      "note": null,
+      "ratePerHour": {
+        "five": 2,
+        "seven": 1,
+      },
+      "scaled": "history",
+      "slots": [
+        {
+          "active": true,
+          "five": 20,
+          "fiveResetsAt": "2026-10-14T04:00:00Z",
+          "readAgeMin": 30,
+          "readAt": "2026-10-14T00:30:00Z",
+          "reading": "known",
+          "seven": 39,
+          "sevenResetsAt": "2026-10-18T00:00:00Z",
+          "slot": 1,
+          "status": "200",
+        },
+        {
+          "active": false,
+          "five": 0,
+          "fiveResetsAt": null,
+          "readAgeMin": 30,
+          "readAt": "2026-10-14T00:30:00Z",
+          "reading": "known",
+          "seven": 96,
+          "sevenResetsAt": "2026-10-18T12:00:00Z",
+          "slot": 2,
+          "status": "200",
+        },
+        {
+          "active": false,
+          "readAgeMin": 30,
+          "readAt": "2026-10-14T00:30:00Z",
+          "reading": "unknown",
+          "slot": 3,
+          "status": "403",
+        },
+        {
+          "active": false,
+          "five": 0,
+          "fiveResetsAt": null,
+          "readAgeMin": 30,
+          "readAt": "2026-10-14T00:30:00Z",
+          "reading": "known",
+          "seven": 97,
+          "sevenResetsAt": "2026-10-18T06:00:00Z",
+          "slot": 4,
+          "status": "200",
+        },
+      ],
+    }
+  `);
 });
 
 test('it scales a burn measured at 2 lanes to 4 working lanes on the lane fit and finds the cap that avoids the pause at that rate', () => {
