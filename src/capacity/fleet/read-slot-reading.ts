@@ -11,7 +11,7 @@ export interface SlotReadResult {
   problem: string | null;
 }
 
-const REQUEST_MS = 30_000;
+const REQUEST_MS = 15_000;
 const BODY = JSON.stringify({ model: 'claude-haiku-4-5', max_tokens: 1, messages: [{ role: 'user', content: 'hi' }] });
 
 // One 1-token haiku request: /v1/messages answers a setup token with its account's rate-limit headers.

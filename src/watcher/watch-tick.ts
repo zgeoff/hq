@@ -243,6 +243,21 @@ export async function watchTick(db: Database, d: WatchDeps): Promise<boolean> {
     } catch (error) {
       d.log(`${at()} weekly audit failed: ${msg(error)}`);
     }
+    try {
+      const readSlots = d.steps.slots;
+      const slots = readSlots ? await step('Claude slot reads', () => readSlots()) : null;
+      if (slots?.read?.kind === 'read') {
+        d.log(`${at()} Claude slots: read, ${slots.read.problems.length} problem(s)`);
+        for (const problem of slots.read.problems) {
+          d.log(`${at()} Claude slots: ${problem}`);
+        }
+      }
+      if (slots?.news) {
+        d.log(`${at()} Claude slots: fleet forecast news line added`);
+      }
+    } catch (error) {
+      d.log(`${at()} Claude slots failed: ${msg(error)}`);
+    }
     // After the goals sync (CI minutes come from it) and before the check-in that quotes the sample.
     try {
       const c = d.steps.capacity ? await step('capacity sample', () => d.steps.capacity!()) : null;

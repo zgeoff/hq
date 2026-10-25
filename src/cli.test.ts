@@ -7,6 +7,8 @@ import { NOON_SYDNEY, at, fakeAtc, freshDb } from '../test/helpers.ts';
 import { main } from './cli.ts';
 import { overrideEnv } from './config/override-env.ts';
 import { setMeta } from './db/set-meta.ts';
+import { HttpResponse, http } from 'msw';
+import { server } from '../mocks/node.ts';
 import { loadActionsSpend } from './goals/load-actions-spend.ts';
 import { createGrantMark } from './grants/create-grant-mark.ts';
 import { recordGrantAction } from './grants/record-grant-action.ts';
@@ -427,4 +429,56 @@ test('hq grant actions shows a voided act struck out with its reason in text and
 
   expect(text.trim()).toBe('kettle-merges (mark 1): 1: kettle#9 (teapot-bot); ~~kettle#8 (teapot-bot)~~ void act 1, 2026-10-14T01:30:00Z by z-stu: logged before the merge failed');
   expect(JSON.parse(json).grants[0].voided).toStrictEqual([{ id: 1, target: 'kettle#8', note: null, actor: 'teapot-bot', at: NOON_SYDNEY, voidedAt: '2026-10-14T01:30:00Z', voidedBy: 'z-stu', voidReason: 'logged before the merge failed' }]);
+});
+
+test('hq capacity says the slot reads are not set up, in text and in --json', async () => {
+  const fresh = freshDb();
+  const log = console.log;
+  const lines: string[] = [];
+  onTestFinished(fresh.cleanup);
+  onTestFinished(overrideEnv('HQ_NOW', NOON_SYDNEY));
+  onTestFinished(() => (console.log = log));
+  console.log = (line: string) => lines.push(line);
+
+  await main(['capacity']);
+  await main(['capacity', '--json']);
+
+  expect(lines[0]).toInclude('  fleet: no forecast, slot reads are not set up');
+  expect(JSON.parse(lines[1] ?? '{}').fleet).toMatchObject({ notSetUp: expect.stringContaining('no settings file at '), active: null, slots: [], forecast: null, note: 'slot reads are not set up' });
+});
+
+test('hq capacity --refresh-slots reads the four slots through op and prints the fleet block without a token', async () => {
+  const fresh = freshDb();
+  const log = console.log;
+  const lines: string[] = [];
+  const path0 = process.env['PATH'];
+  const settings = `${fresh.dir}/settings.local.json`;
+  onTestFinished(fresh.cleanup);
+  onTestFinished(overrideEnv('HQ_NOW', NOON_SYDNEY));
+  onTestFinished(overrideEnv('HQ_SLOTS_OP_SETTINGS', settings));
+  onTestFinished(() => (console.log = log));
+  onTestFinished(() => (process.env['PATH'] = path0));
+  mkdirSync(`${fresh.dir}/bin`);
+  writeFileSync(`${fresh.dir}/bin/op`, '#!/bin/sh\nslot=$(echo "$2" | sed "s/.*token-\\([0-9]\\).*/\\1/")\necho "sk-ant-kettle-cli-$slot"\n');
+  chmodSync(`${fresh.dir}/bin/op`, 0o755);
+  process.env['PATH'] = `${fresh.dir}/bin:${path0}`;
+  writeFileSync(settings, JSON.stringify({ env: { OP_SERVICE_ACCOUNT_TOKEN: 'ops_kettle-profile-0001' } }));
+  fresh.db.query('INSERT INTO usage_samples (at, account, five_hour, seven_day, five_hour_resets_at, seven_day_resets_at) VALUES (?, ?, ?, ?, ?, ?)').run('2026-10-14T00:55:00Z', 'abcdef012345', 5, 40, null, '2026-10-19T00:00:00Z');
+  server.use(
+    http.post('https://api.anthropic.com/v1/messages', (info) => {
+      const slot = info.request.headers.get('authorization')?.slice(-1);
+      const resetsAt = slot === '2' ? '2026-10-19T00:00:00Z' : `2026-10-2${slot}T00:00:00Z`;
+
+      return HttpResponse.json({}, { headers: { 'anthropic-ratelimit-unified-7d-utilization': '0.4', 'anthropic-ratelimit-unified-7d-reset': String(Date.parse(resetsAt) / 1000) } });
+    }),
+  );
+  console.log = (line: string) => lines.push(line);
+
+  await main(['capacity', '--refresh-slots']);
+
+  const text = lines.join('\n');
+  expect(text).toInclude('  slot 2 (active): 5h ?, 7d 40% (resets 19 Oct 00:00Z), read 0 min ago');
+  expect(text).toInclude('  slot 1: 5h ?, 7d 40% (resets 21 Oct 00:00Z), read 0 min ago');
+  expect(text).not.toInclude('sk-ant-kettle');
+  expect(fresh.db.query('SELECT COUNT(*) AS total FROM slot_usage').get()).toStrictEqual({ total: 4 });
 });
