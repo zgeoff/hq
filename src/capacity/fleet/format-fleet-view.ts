@@ -1,3 +1,4 @@
+import { match } from 'ts-pattern';
 import { formatResetTime } from '../format-reset-time.ts';
 import type { FleetSlotView, FleetView } from './types.ts';
 
@@ -8,21 +9,19 @@ export function formatFleetView(view: FleetView): string[] {
 }
 
 function formatSlot(slot: FleetSlotView): string {
-  const mark = slot.active ? ' (active)' : '';
-  const age = `read ${formatAge(slot.readAgeMin)} ago`;
-  if (slot.five === null && slot.seven === null) {
-    return `slot ${slot.slot}${mark}: no figures (${slot.status}), ${age}`;
-  }
-  return `slot ${slot.slot}${mark}: 5h ${formatWindow(slot.five, slot.fiveResetsAt)}, 7d ${formatWindow(slot.seven, slot.sevenResetsAt)}, ${age}`;
-}
-
-function formatAge(minutes: number): string {
-  return minutes >= 60 ? `${Math.floor(minutes / 60)} h ${minutes % 60} min` : `${minutes} min`;
+  return match(slot)
+    .with({ reading: 'known' }, (known) => `slot ${known.slot}${known.active ? ' (active)' : ''}: 5h ${formatWindow(known.five, known.fiveResetsAt)}, 7d ${formatWindow(known.seven, known.sevenResetsAt)}, read ${formatAge(known.readAgeMin)} ago`)
+    .with({ reading: 'unknown' }, (unknown) => `slot ${unknown.slot}: unknown, no reading with figures in the last 6 h (newest read ${unknown.status}, ${formatAge(unknown.readAgeMin)} ago)`)
+    .exhaustive();
 }
 
 function formatWindow(percent: number | null, resetsAt: string | null): string {
   const used = percent === null ? '?' : `${Math.round(percent)}%`;
   return resetsAt === null ? used : `${used} (resets ${formatResetTime(resetsAt)})`;
+}
+
+function formatAge(minutes: number): string {
+  return minutes >= 60 ? `${Math.floor(minutes / 60)} h ${minutes % 60} min` : `${minutes} min`;
 }
 
 function formatRate(rate: number): string {

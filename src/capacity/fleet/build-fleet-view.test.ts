@@ -52,6 +52,35 @@ test("it pools an earlier account's burn into the hour of the day and keeps the 
   expect(view.ratePerHour?.seven).toBeCloseTo(4, 6);
 });
 
+test('it keeps a slot whose newest read failed in the simulation on its last good reading', () => {
+  const rows: SlotRow[] = [
+    { at: '2026-10-14T00:00:00Z', slot: 1, status: '200', five: 1, fiveResetsAt: null, seven: 10, sevenResetsAt: '2026-10-18T00:00:00Z', workingLanes: 2 },
+    { at: '2026-10-14T00:00:00Z', slot: 2, status: '200', five: 0, fiveResetsAt: null, seven: 5, sevenResetsAt: '2026-10-19T00:00:00Z', workingLanes: 2 },
+    { at: '2026-10-14T00:30:00Z', slot: 1, status: '200', five: 1, fiveResetsAt: null, seven: 10, sevenResetsAt: '2026-10-18T00:00:00Z', workingLanes: 2 },
+    { at: '2026-10-14T00:30:00Z', slot: 2, status: 'request-failed', five: null, fiveResetsAt: null, seven: null, sevenResetsAt: null, workingLanes: 2 },
+  ];
+  const samples = ['2026-10-13T23:30:00Z', '2026-10-14T00:00:00Z', '2026-10-14T00:30:00Z', '2026-10-14T01:00:00Z'].map((at, index) => ({ at, account: 'abcdef012345', five_hour: 1, seven_day: 10 + index * 0.1, five_hour_resets_at: null, seven_day_resets_at: '2026-10-18T00:00:00Z' }));
+
+  const view = buildFleetView({ at: new Date('2026-10-14T01:00:00Z'), notSetUp: null, rows, samples, working: 2, cap: null });
+
+  expect(view.slots[1]).toStrictEqual({ reading: 'known', slot: 2, active: false, status: '200', five: 0, fiveResetsAt: null, seven: 5, sevenResetsAt: '2026-10-19T00:00:00Z', readAt: '2026-10-14T00:00:00Z', readAgeMin: 60 });
+  expect(view.forecast?.endsAt).toBe('2026-10-19T00:00:00Z');
+});
+
+test('it lists a slot with no good reading in 6 hours as unknown and leaves it out of the simulation', () => {
+  const rows: SlotRow[] = [
+    { at: '2026-10-13T18:00:00Z', slot: 2, status: '200', five: 0, fiveResetsAt: null, seven: 5, sevenResetsAt: '2026-10-19T00:00:00Z', workingLanes: 2 },
+    { at: '2026-10-14T00:30:00Z', slot: 1, status: '200', five: 1, fiveResetsAt: null, seven: 10, sevenResetsAt: '2026-10-18T00:00:00Z', workingLanes: 2 },
+    { at: '2026-10-14T00:30:00Z', slot: 2, status: '403', five: null, fiveResetsAt: null, seven: null, sevenResetsAt: null, workingLanes: 2 },
+  ];
+  const samples = ['2026-10-13T23:30:00Z', '2026-10-14T00:00:00Z', '2026-10-14T00:30:00Z', '2026-10-14T01:00:00Z'].map((at, index) => ({ at, account: 'abcdef012345', five_hour: 1, seven_day: 10 + index * 0.1, five_hour_resets_at: null, seven_day_resets_at: '2026-10-18T00:00:00Z' }));
+
+  const view = buildFleetView({ at: new Date('2026-10-14T01:00:00Z'), notSetUp: null, rows, samples, working: 2, cap: null });
+
+  expect(view.slots[1]).toStrictEqual({ reading: 'unknown', slot: 2, active: false, status: '403', readAt: '2026-10-14T00:30:00Z', readAgeMin: 30 });
+  expect(view.forecast?.endsAt).toBe('2026-10-18T00:00:00Z');
+});
+
 test('it says the active slot is unknown when no slot has the sample reset', () => {
   const rows: SlotRow[] = [{ at: '2026-10-14T00:30:00Z', slot: 1, status: '200', five: 1, fiveResetsAt: null, seven: 10, sevenResetsAt: '2026-10-18T00:00:00Z', workingLanes: 2 }];
   const samples = [{ at: '2026-10-14T01:00:00Z', account: 'abcdef012345', five_hour: 1, seven_day: 10, five_hour_resets_at: null, seven_day_resets_at: '2026-10-21T00:00:00Z' }];

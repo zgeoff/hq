@@ -7,10 +7,11 @@ import { buildLaneFactor } from './build-lane-factor.ts';
 import { buildLaneModel } from './build-lane-model.ts';
 import { buildLanePoints } from './build-lane-points.ts';
 import { collectAccountSeries } from './collect-account-series.ts';
+import { collectSlotReadings } from './collect-slot-readings.ts';
 import { findActiveSlot } from './find-active-slot.ts';
-import { getNewestSlotRead } from './get-newest-slot-read.ts';
 import { findSafeCap } from './find-safe-cap.ts';
 import { simulateFleet } from './simulate-fleet.ts';
+import type { SlotReadings } from './collect-slot-readings.ts';
 import type { FleetSlotView, FleetView, SimSlot, SlotRow } from './types.ts';
 
 const FLEET_LIMIT = 95;
@@ -27,17 +28,18 @@ export interface FleetViewInput {
 }
 
 export function buildFleetView(input: FleetViewInput): FleetView {
-  const newest = getNewestSlotRead(input.rows);
+  const readings = collectSlotReadings(input.rows, input.at);
+  const newest = readings.known;
   const newestSample = input.samples.at(-1) ?? null;
   const sampleAgeMs = newestSample === null ? null : input.at.getTime() - Date.parse(newestSample.at);
   const staleMs = sampleAgeMs !== null && sampleAgeMs > SAMPLE_MAX_AGE_MS ? sampleAgeMs : null;
   const latest = staleMs === null ? newestSample : null;
   const active = findActiveSlot(newest, latest?.seven_day_resets_at ?? null);
-  const base = { notSetUp: input.notSetUp, limit: FLEET_LIMIT, active, slots: newest.map((row) => buildSlotView(row, active, input.at)), lanes: { working: input.working, cap: input.cap }, ratePerHour: null, scaled: false, forecast: null };
+  const base = { notSetUp: input.notSetUp, limit: FLEET_LIMIT, active, slots: buildSlotViews(readings, active, input.at), lanes: { working: input.working, cap: input.cap }, ratePerHour: null, scaled: false, forecast: null };
   if (input.notSetUp !== null) {
     return { ...base, note: 'slot reads are not set up' };
   }
-  if (newest.length === 0) {
+  if (input.rows.length === 0) {
     return { ...base, note: 'no slot reads yet: hq capacity --refresh-slots reads them now' };
   }
   if (staleMs !== null) {
@@ -87,8 +89,14 @@ export function buildFleetView(input: FleetViewInput): FleetView {
   };
 }
 
-function buildSlotView(row: SlotRow, active: number | null, at: Date): FleetSlotView {
-  return { slot: row.slot, active: row.slot === active, status: row.status, five: row.five, fiveResetsAt: row.fiveResetsAt, seven: row.seven, sevenResetsAt: row.sevenResetsAt, readAt: row.at, readAgeMin: Math.max(0, Math.floor((at.getTime() - Date.parse(row.at)) / 60_000)) };
+function buildSlotViews(readings: SlotReadings, active: number | null, at: Date): FleetSlotView[] {
+  const known = readings.known.map((row): FleetSlotView => ({ reading: 'known', slot: row.slot, active: row.slot === active, status: row.status, five: row.five, fiveResetsAt: row.fiveResetsAt, seven: row.seven, sevenResetsAt: row.sevenResetsAt, readAt: row.at, readAgeMin: buildReadAgeMin(row, at) }));
+  const unknown = readings.unknown.map((row): FleetSlotView => ({ reading: 'unknown', slot: row.slot, active: false, status: row.status, readAt: row.at, readAgeMin: buildReadAgeMin(row, at) }));
+  return [...known, ...unknown].toSorted((left, right) => left.slot - right.slot);
+}
+
+function buildReadAgeMin(row: SlotRow, at: Date): number {
+  return Math.max(0, Math.floor((at.getTime() - Date.parse(row.at)) / 60_000));
 }
 
 const WEEK_MS = 7 * 86_400_000;

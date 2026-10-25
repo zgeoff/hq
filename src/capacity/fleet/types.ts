@@ -46,7 +46,10 @@ export interface SimResult {
   endsAt: string;
 }
 
-export interface FleetSlotView {
+export type FleetSlotView = KnownSlotView | UnknownSlotView;
+
+interface KnownSlotView {
+  reading: 'known';
   slot: number;
   active: boolean;
   status: string;
@@ -54,6 +57,15 @@ export interface FleetSlotView {
   fiveResetsAt: string | null;
   seven: number | null;
   sevenResetsAt: string | null;
+  readAt: string;
+  readAgeMin: number;
+}
+
+interface UnknownSlotView {
+  reading: 'unknown';
+  slot: number;
+  active: false;
+  status: string;
   readAt: string;
   readAgeMin: number;
 }
