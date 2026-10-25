@@ -3,10 +3,6 @@ import { dirname, join } from 'node:path';
 import type { TreeName } from '../src/prompts/trees.ts';
 import { TREES } from '../src/prompts/trees.ts';
 
-function runGit(cwd: string, ...args: string[]): string {
-  return runGitAt(cwd, undefined, ...args);
-}
-
 // The subject and time of a commit to origin; each defaults when left out.
 interface CommitShape {
   subject?: string;
@@ -32,7 +28,7 @@ export function createTreeCheckout(root: string, tree: TreeName, files: Record<s
         writeFileSync(join(origin, path), text);
       }
       runGit(origin, 'add', '-A');
-      runGitAt(origin, commit.at, 'commit', '-q', '-m', commit.subject ?? 'invented change');
+      runGit({ cwd: origin, at: commit.at }, 'commit', '-q', '-m', commit.subject ?? 'invented change');
     };
   mkdirSync(origin, { recursive: true });
   runGit(origin, 'init', '-q', '-b', 'main');
@@ -44,10 +40,16 @@ export function createTreeCheckout(root: string, tree: TreeName, files: Record<s
   return { dir, git: (...args) => runGit(dir, ...args), origin, writeCommit };
 }
 
-// A commit made with `at` set carries that time as both its author and its commit time.
-function runGitAt(cwd: string, at: string | undefined, ...args: string[]): string {
-  const env = at === undefined ? process.env : { ...process.env, GIT_AUTHOR_DATE: at, GIT_COMMITTER_DATE: at };
-  const run = Bun.spawnSync(['git', '-c', 'user.name=Test', '-c', 'user.email=test@example.com', '-c', 'commit.gpgsign=false', ...args], { cwd, env });
+interface DatedPlace {
+  cwd: string;
+  at?: string | undefined;
+}
+
+// A place given with `at` makes a commit there carry that time as both its author and commit time.
+function runGit(place: string | DatedPlace, ...args: string[]): string {
+  const dated: DatedPlace = typeof place === 'string' ? { cwd: place } : place;
+  const env = dated.at === undefined ? process.env : { ...process.env, GIT_AUTHOR_DATE: dated.at, GIT_COMMITTER_DATE: dated.at };
+  const run = Bun.spawnSync(['git', '-c', 'user.name=Test', '-c', 'user.email=test@example.com', '-c', 'commit.gpgsign=false', ...args], { cwd: dated.cwd, env });
   if (run.exitCode !== 0) {
     throw new Error(`git ${args.join(' ')}: ${run.stderr.toString()}`);
   }
