@@ -16,6 +16,7 @@ import { recordPRExemption } from '../pr-status/record-pr-exemption.ts';
 import { recordPRMechanical } from '../pr-status/record-pr-mechanical.ts';
 import { recordPRAcceptedRisk } from '../pr-status/record-pr-accepted-risk.ts';
 import { recordPRAnswer } from '../pr-status/record-pr-answer.ts';
+import { recordCICheckOverride } from '../pr-status/record-ci-check-override.ts';
 import { recordPROverride } from '../pr-status/record-pr-override.ts';
 import { checkMergeGate } from './check-merge-gate.ts';
 
@@ -180,7 +181,7 @@ test('it ignores a record of accepted risk whose source is not an owner source',
   createListedReview(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA });
   logEvent(ctx.db, 'hq', 'pr:widgets#7', 'pr-accepted-risk', 'z-kettle', null, null, { finding: 'aaaa', source: 'session:z-teapot', note: 'Fine.' });
 
-  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked' });
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: '1 noslop finding is open: aaaa' });
 });
 
 test('it passes open findings under an override at the head it read', async () => {
@@ -462,7 +463,7 @@ test('it gates a listed repo\'s PR on noslop though a Codex review file of the P
   setMeta(ctx.db, 'noslop', JSON.stringify({ repos: ['widgets'], sha: '0123456789abcdef0123456789abcdef01234567' }));
   writeFileSync(join(ctx.base, 'widgets7-review.md'), 'No findings.\n');
 
-  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked' });
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: '1 noslop finding is open: aaaa' });
 });
 
 test('it refuses a PR in hq that changes a skill with no lgtm at its head, naming the file', async () => {
@@ -558,7 +559,7 @@ test('it refuses an lgtm at an older head on a PR in hq-private', async () => {
   const fake = buildFakeRunner({ prFiles: { code: 0, stdout: 'skills/kettle/references/session-prompt.md\n', stderr: '' } });
   recordPRAnswer(ctx.db, { repo: 'hq-private', pr: 7, answer: 'lgtm', head: 'f00dfeedf00dfeedf00dfeedf00dfeedf00dfeed', source: 'call:kettle-3', note: null, actor: 'z-kettle' });
 
-  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'hq-private', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked' });
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'hq-private', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: '1 noslop finding is open: aaaa' });
 });
 
 test("it passes a PR in hq-private that changes a start prompt once the owner's call lgtm is at its head", async () => {
@@ -694,7 +695,7 @@ test('it holds a version change to a token that is not version-shaped', async ()
   const fake = buildFakeRunner({ realGit: true, prFiles: { code: 0, stdout: 'AGENTS.md\n', stderr: '' }, ...buildStubPRHead(stub.head) });
   recordPRMechanical(ctx.db, { repo: 'widgets', pr: 7, head: stub.head, files: ['AGENTS.md'], lines: 1, actor: 'z-review' });
 
-  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked' });
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: '1 noslop finding is open: aaaa' });
 });
 
 test('it blocks a mechanical edit that z-review has not recorded, naming the command', async () => {
@@ -720,7 +721,7 @@ test('it ignores a mechanical record at an older head', async () => {
   const fake = buildFakeRunner({ realGit: true, prFiles: { code: 0, stdout: 'AGENTS.md\n', stderr: '' }, ...buildStubPRHead(stub.head) });
   recordPRMechanical(ctx.db, { repo: 'widgets', pr: 7, head: 'f00dfeedf00dfeedf00dfeedf00dfeedf00dfeed', files: ['AGENTS.md'], lines: 1, actor: 'z-review' });
 
-  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked' });
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: '1 noslop finding is open: aaaa' });
 });
 
 test('it ignores a mechanical record that someone other than z-review wrote', async () => {
@@ -729,7 +730,7 @@ test('it ignores a mechanical record that someone other than z-review wrote', as
   const fake = buildFakeRunner({ realGit: true, prFiles: { code: 0, stdout: 'AGENTS.md\n', stderr: '' }, ...buildStubPRHead(stub.head) });
   recordPRMechanical(ctx.db, { repo: 'widgets', pr: 7, head: stub.head, files: ['AGENTS.md'], lines: 1, actor: 'z-kettle' });
 
-  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked' });
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: '1 noslop finding is open: aaaa' });
 });
 
 test.each([
@@ -740,7 +741,7 @@ test.each([
   const stub = await createStubPRRepo({ root: ctx.base, repo: 'widgets', pr: 7, history: [{ 'skills/kettle/SKILL.md': row.before }], change: { 'skills/kettle/SKILL.md': row.after } });
   const fake = buildFakeRunner({ realGit: true, prFiles: { code: 0, stdout: 'skills/kettle/SKILL.md\n', stderr: '' }, ...buildStubPRHead(stub.head) });
 
-  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked' });
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: '1 noslop finding is open: aaaa' });
 });
 
 test('it holds a space added inside a command in an instruction file for the owner, with no record', async () => {
@@ -748,7 +749,7 @@ test('it holds a space added inside a command in an instruction file for the own
   const stub = await createStubPRRepo({ root: ctx.base, repo: 'widgets', pr: 7, history: [{ 'skills/kettle/SKILL.md': 'Run `rm -rf /tmp/cache` after a brew.\n' }], change: { 'skills/kettle/SKILL.md': 'Run `rm -rf /tmp/ cache` after a brew.\n' } });
   const fake = buildFakeRunner({ realGit: true, prFiles: { code: 0, stdout: 'skills/kettle/SKILL.md\n', stderr: '' }, ...buildStubPRHead(stub.head) });
 
-  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked' });
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: '1 noslop finding is open: aaaa' });
 });
 
 test('it passes an instruction file change by a bot with no record and reads no diff', async () => {
@@ -929,4 +930,73 @@ test('it blocks the merge when both CODEOWNERS paths answer 404 and the base com
   const fake = buildFakeRunner({ prFiles: { code: 0, stdout: 'src/x.ts\n', stderr: '' }, baseCommit: { code: 1, stdout: '', stderr: 'gh: Not Found (HTTP 404)' } });
 
   await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'hq', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: expect.stringContaining("could not read the PR's base ba5eba5 to confirm the repo has no CODEOWNERS") });
+});
+
+test('it passes the named red check at the pinned head and names the override in the reason and the outcome', async () => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ noslopFindings: buildStubFindings('fixed'), prFacts: buildStubGateFacts({ head: FAKE_FULL_SHA, checks: [{ __typename: 'CheckRun', name: 'test', status: 'COMPLETED', conclusion: 'SUCCESS' }, { __typename: 'CheckRun', name: 'preview', status: 'COMPLETED', conclusion: 'FAILURE' }] }) });
+  createListedReview(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA });
+  recordCICheckOverride(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA, source: 'call:KET-2', note: 'Intended infra change.', actor: 'z-kettle', check: 'preview' });
+
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).resolves.toStrictEqual({
+    mayMerge: true,
+    reason: 'noslop findings: none open; CI green at 0123456 with preview overridden by the owner (call:KET-2)',
+    reviewed: true,
+    overriddenChecks: ['preview'],
+  });
+});
+
+test('it names the override on a repo off the noslop list', async () => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ prFacts: buildStubGateFacts({ head: FAKE_FULL_SHA, checks: [{ __typename: 'CheckRun', name: 'preview', status: 'COMPLETED', conclusion: 'FAILURE' }] }) });
+  recordCICheckOverride(ctx.db, { repo: 'gadgets', pr: 7, head: FAKE_FULL_SHA, source: 'call:KET-2', note: 'Intended infra change.', actor: 'z-kettle', check: 'preview' });
+
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'gadgets', pr: 7 })).resolves.toStrictEqual({
+    mayMerge: true,
+    reason: 'not a noslop repo: green CI is enough; CI check preview overridden by the owner (call:KET-2)',
+    reviewed: false,
+    overriddenChecks: ['preview'],
+  });
+});
+
+test.each([
+  ['a second red check', [{ __typename: 'CheckRun', name: 'preview', status: 'COMPLETED', conclusion: 'FAILURE' }, { __typename: 'CheckRun', name: 'test', status: 'COMPLETED', conclusion: 'FAILURE' }], 'CI is not green: test (FAILURE)'],
+  ['a pending named check', [{ __typename: 'CheckRun', name: 'preview', status: 'IN_PROGRESS', conclusion: null }], 'CI is not green: preview (IN_PROGRESS)'],
+  ['a named check that differs by case', [{ __typename: 'CheckRun', name: 'Preview', status: 'COMPLETED', conclusion: 'FAILURE' }], 'CI is not green: Preview (FAILURE)'],
+  ['two checks sharing the name', [{ __typename: 'CheckRun', name: 'preview', workflowName: 'a', status: 'COMPLETED', conclusion: 'FAILURE' }, { __typename: 'CheckRun', name: 'preview', workflowName: 'b', status: 'COMPLETED', conclusion: 'FAILURE' }], 'CI is not green: preview (FAILURE), preview (FAILURE)'],
+])('it blocks a CI override with %s', async (_label, checks, message) => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ noslopFindings: buildStubFindings('fixed'), prFacts: buildStubGateFacts({ head: FAKE_FULL_SHA, checks }) });
+  createListedReview(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA });
+  recordCICheckOverride(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA, source: 'call:KET-2', note: 'Intended infra change.', actor: 'z-kettle', check: 'preview' });
+
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message });
+});
+
+test('it blocks a CI override recorded at an older head', async () => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ noslopFindings: buildStubFindings('fixed'), prFacts: buildStubGateFacts({ head: FAKE_FULL_SHA, checks: [{ __typename: 'CheckRun', name: 'preview', status: 'COMPLETED', conclusion: 'FAILURE' }] }) });
+  createListedReview(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA });
+  recordCICheckOverride(ctx.db, { repo: 'widgets', pr: 7, head: 'f00dfeedf00dfeedf00dfeedf00dfeedf00dfeed', source: 'call:KET-2', note: 'Intended infra change.', actor: 'z-kettle', check: 'preview' });
+
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: 'CI is not green: preview (FAILURE)' });
+});
+
+test('it blocks every CI override once one override event for the PR does not parse', async () => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ noslopFindings: buildStubFindings('fixed'), prFacts: buildStubGateFacts({ head: FAKE_FULL_SHA, checks: [{ __typename: 'CheckRun', name: 'preview', status: 'COMPLETED', conclusion: 'FAILURE' }] }) });
+  createListedReview(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA });
+  recordCICheckOverride(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA, source: 'call:KET-2', note: 'Intended infra change.', actor: 'z-kettle', check: 'preview' });
+  logEvent(ctx.db, 'hq', 'pr:widgets#7', 'pr-override', 'z-kettle', null, null, { head: FAKE_FULL_SHA, scope: 'ci-check' });
+
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: 'CI is not green: preview (FAILURE)' });
+});
+
+test('it does not let a CI override pass an open finding', async () => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ noslopFindings: buildStubFindings('open'), prFacts: buildStubGateFacts({ head: FAKE_FULL_SHA, checks: [{ __typename: 'CheckRun', name: 'test', status: 'COMPLETED', conclusion: 'SUCCESS' }] }) });
+  createListedReview(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA });
+  recordCICheckOverride(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA, source: 'call:KET-2', note: 'Intended infra change.', actor: 'z-kettle', check: 'test' });
+
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: '1 noslop finding is open: aaaa' });
 });

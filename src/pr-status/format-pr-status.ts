@@ -1,3 +1,4 @@
+import { formatCIOverrideLine } from './format-ci-override-line.ts';
 import { formatOverrideLine } from './format-override-line.ts';
 import { formatReviewRecordsLine } from './format-review-records-line.ts';
 import type { PRStatusView } from './types.ts';
@@ -8,6 +9,7 @@ export function formatPRStatus(view: PRStatusView): string {
   if (view.override !== null) {
     lines.push(formatOverrideLine(view.override));
   }
+  lines.push(...view.ciOverrides.map((override) => formatCIOverrideLine(override)));
   const records = formatReviewRecordsLine(view.reviewRecords);
   if (records !== null) {
     lines.push(records);

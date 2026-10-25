@@ -1,20 +1,25 @@
 import { match } from 'ts-pattern';
 import type { GateCheck } from './read-gate-facts.ts';
 
-export type CIVerdict = { green: true } | { green: false; reason: string } | { green: false; noChecks: true; reason: string };
+export type CIVerdict = { green: true; overridden?: string[] } | { green: false; reason: string } | { green: false; noChecks: true; reason: string };
 
 const NOSLOP_CHECK = 'noslop';
 
 // noslop's App check is skipped here because the gate's noslop route reads it by app, beside the
 // summary head and findings. The rollup names no app, but a GitHub Actions job carries its workflow's
 // name and an App check none. GitHub keeps a re-run in the rollup beside the run it replaced.
-export function checkCIGreen(checks: readonly GateCheck[]): CIVerdict {
+export function checkCIGreen(checks: readonly GateCheck[], overrides: readonly string[]): CIVerdict {
   const counted = pickNewestRuns(checks).filter((check) => !isNoslopAppCheck(check));
   if (counted.length === 0) {
     return { green: false, noChecks: true, reason: 'the head has no CI checks, so CI has not passed' };
   }
-  const failing = counted.filter((check) => !isPassing(check)).map((check) => `${pickName(check)} (${pickState(check)})`);
-  return failing.length === 0 ? { green: true } : { green: false, reason: `CI is not green: ${failing.join(', ')}` };
+  const blocking = counted.filter((check) => !isPassing(check));
+  const waived = blocking.filter((check) => isWaived(check, counted, overrides));
+  const failing = blocking.filter((check) => !waived.includes(check)).map((check) => `${pickName(check)} (${pickState(check)})`);
+  if (failing.length > 0) {
+    return { green: false, reason: `CI is not green: ${failing.join(', ')}` };
+  }
+  return waived.length === 0 ? { green: true } : { green: true, overridden: waived.map((check) => pickName(check)) };
 }
 
 function pickNewestRuns(checks: readonly GateCheck[]): GateCheck[] {
@@ -76,10 +81,24 @@ function isNoslopAppCheck(check: GateCheck): boolean {
     .exhaustive();
 }
 
+// A red check passes only on an exact name the owner overrode, and only when no other counted check
+// carries that name, so a same-named check in another workflow cannot ride the override.
+function isWaived(check: GateCheck, counted: readonly GateCheck[], overrides: readonly string[]): boolean {
+  const name = pickName(check);
+  return overrides.includes(name) && isRed(check) && counted.filter((other) => pickName(other) === name).length === 1;
+}
+
 function pickName(check: GateCheck): string {
   return match(check)
     .with({ __typename: 'CheckRun' }, (run) => run.name)
     .with({ __typename: 'StatusContext' }, (status) => status.context)
+    .exhaustive();
+}
+
+function isRed(check: GateCheck): boolean {
+  return match(check)
+    .with({ __typename: 'CheckRun' }, (run) => run.status === 'COMPLETED' && run.conclusion === 'FAILURE')
+    .with({ __typename: 'StatusContext' }, (status) => status.state === 'FAILURE' || status.state === 'ERROR')
     .exhaustive();
 }
 

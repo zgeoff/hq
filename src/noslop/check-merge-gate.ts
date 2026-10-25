@@ -3,11 +3,14 @@ import { z } from 'zod';
 import { HqError } from '../errors.ts';
 import { findAcceptedRisks } from '../pr-status/find-accepted-risks.ts';
 import { readHeadLgtm } from '../pr-status/read-head-lgtm.ts';
+import { readHeadCIOverrides } from '../pr-status/read-head-ci-overrides.ts';
 import { findOwnerOverride } from '../pr-status/find-owner-override.ts';
 import { readPRHead } from '../pr-status/read-pr-head.ts';
 import { assertPR } from './assert-pr.ts';
 import { buildSlug } from './build-slug.ts';
 import { checkCIGreen } from './check-ci-green.ts';
+import { formatCIOverrideReason } from './format-ci-override-reason.ts';
+import type { CIOverrideUse } from './format-ci-override-reason.ts';
 import { collectOpenFindingIDs } from './collect-open-finding-ids.ts';
 import { checkInstructionHold } from './check-instruction-hold.ts';
 import { findInstructionHeldTest } from './find-instruction-held-test.ts';
@@ -37,30 +40,53 @@ export interface GateOutcome {
   mayMerge: true;
   reason: string;
   reviewed: boolean;
+  overriddenChecks?: string[];
 }
 
 export type OnGateHead = (head: string) => void;
 
 export async function checkMergeGate(request: PRRequest, onHead?: OnGateHead): Promise<GateOutcome> {
   assertPR(request.pr);
-  const parsed = parseLowerRepo(request.rawRepo, request.owner),
-    facts = await readGateFacts(request.run, buildSlug(parsed), request.pr),
-    unreviewed = readUnreviewedRoute(request, parsed, facts.author);
+  const parsed = parseLowerRepo(request.rawRepo, request.owner);
+  const facts = await readGateFacts(request.run, buildSlug(parsed), request.pr);
+  const unreviewed = readUnreviewedRoute(request, parsed, facts.author);
   if (unreviewed === null) {
     onHead?.(facts.headRefOid);
   }
-  const noCI = await checkCI(request, parsed, facts);
+  const ci = await checkCI(request, parsed, facts);
   await checkOwnerHeld(request, parsed, facts);
   if (unreviewed !== null) {
-    return { mayMerge: true, reason: noCI ? `${unreviewed}; the repo runs no CI at ${facts.headRefOid.slice(0, 7)}` : unreviewed, reviewed: false };
+    const reason = ci.noCI ? `${unreviewed}; the repo runs no CI at ${facts.headRefOid.slice(0, 7)}` : formatCIOverrideReason(unreviewed, facts.headRefOid.slice(0, 7), ci.used);
+    return { mayMerge: true, reason, reviewed: false, ...pickOverriddenChecks(ci.used) };
   }
-  return await checkNoslopGate(request, parsed, facts);
+  const outcome = await checkNoslopGate(request, parsed, facts);
+  return { ...outcome, reason: formatCIOverrideReason(outcome.reason, facts.headRefOid.slice(0, 7), ci.used), ...pickOverriddenChecks(ci.used) };
 }
 
-async function checkCI(request: PRRequest, parsed: ParsedRepo, facts: GateFacts): Promise<boolean> {
-  const verdict = checkCIGreen(facts.statusCheckRollup);
+function readUnreviewedRoute(request: PRRequest, parsed: ParsedRepo, author: PRAuthor): string | null {
+  if (!isNoslopListed(loadNoslopSettings(request.db), parsed.owner, parsed.repo)) {
+    return 'not a noslop repo: green CI is enough';
+  }
+  if (isBotAuthor(author)) {
+    return 'bot PR: green CI is enough';
+  }
+
+  // Refuses a listed repo with no pinned commit, so such a PR cannot pass on CI alone.
+  resolveEngine(request.db, parsed.owner, parsed.repo);
+  return null;
+}
+
+interface CIResult {
+  noCI: boolean;
+  used: CIOverrideUse[];
+}
+
+async function checkCI(request: PRRequest, parsed: ParsedRepo, facts: GateFacts): Promise<CIResult> {
+  const overrides = readHeadCIOverrides(request.db, parsed.repo, request.pr, facts.headRefOid);
+  const verdict = checkCIGreen(facts.statusCheckRollup, overrides.map((override) => override.check));
   if (verdict.green) {
-    return false;
+    const overridden = verdict.overridden ?? [];
+    return { noCI: false, used: overrides.filter((override) => overridden.includes(override.check)).map((override) => ({ check: override.check, source: override.source })) };
   }
   if (!('noChecks' in verdict)) {
     throw buildBlock(parsed, request.pr, verdict.reason);
@@ -75,20 +101,11 @@ async function checkCI(request: PRRequest, parsed: ParsedRepo, facts: GateFacts)
   if (!baseHasNoCI) {
     throw buildBlock(parsed, request.pr, verdict.reason);
   }
-  return true;
+  return { noCI: true, used: [] };
 }
 
-function readUnreviewedRoute(request: PRRequest, parsed: ParsedRepo, author: PRAuthor): string | null {
-  if (!isNoslopListed(loadNoslopSettings(request.db), parsed.owner, parsed.repo)) {
-    return 'not a noslop repo: green CI is enough';
-  }
-  if (isBotAuthor(author)) {
-    return 'bot PR: green CI is enough';
-  }
-
-  // Refuses a listed repo with no pinned commit, so such a PR cannot pass on CI alone.
-  resolveEngine(request.db, parsed.owner, parsed.repo);
-  return null;
+function buildBlock(parsed: ParsedRepo, pr: number, reason: string): HqError {
+  return new HqError('merge_blocked', reason, { repo: parsed.repo, pr });
 }
 
 // On every route: a change to an owner-held path needs the owner's own lgtm at the head, and a change
@@ -118,8 +135,8 @@ async function checkOwnerHeld(request: PRRequest, parsed: ParsedRepo, facts: Gat
     .exhaustive();
 }
 
-function buildBlock(parsed: ParsedRepo, pr: number, reason: string): HqError {
-  return new HqError('merge_blocked', reason, { repo: parsed.repo, pr });
+function pickOverriddenChecks(used: readonly CIOverrideUse[]): Pick<GateOutcome, 'overriddenChecks'> {
+  return used.length === 0 ? {} : { overriddenChecks: used.map((override) => override.check) };
 }
 
 async function checkNoslopGate(request: PRRequest, parsed: ParsedRepo, facts: GateFacts): Promise<GateOutcome> {
