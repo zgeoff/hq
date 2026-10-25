@@ -77,6 +77,17 @@ export async function watchTick(db: Database, d: WatchDeps): Promise<boolean> {
     }
   }
   try {
+    const grants = d.steps.grantMarks?.() ?? null;
+    for (const mark of grants?.added ?? []) {
+      d.log(`${at()} grant marks: added mark ${mark.id} for ${mark.grant_name} (${mark.ref})`);
+    }
+    for (const rejected of grants?.rejected ?? []) {
+      d.log(`${at()} grant marks: refused ${rejected.grant.name}: ${rejected.reason}`);
+    }
+  } catch (error) {
+    d.log(`${at()} grant marks failed: ${msg(error)}`);
+  }
+  try {
     await runLinearReadyTick(db, { call: makeAuditedLinearCaller(db, d.run), run: d.run, readLanes: readPacingLanes, actor: d.me, deadlineMs: ms });
   } catch (error) {
     d.log(`${at()} lanes Ready from Linear failed: ${msg(error)}`);

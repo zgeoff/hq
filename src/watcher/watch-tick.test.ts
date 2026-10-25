@@ -1,6 +1,6 @@
 import type { Database } from 'bun:sqlite';
 import { expect, mock, onTestFinished, test } from 'bun:test';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { HttpResponse, http } from 'msw';
 import { z } from 'zod';
 import { ANTHROPIC_MESSAGES_URL, slotUsage } from '../../mocks/anthropic-handlers.ts';
@@ -10,6 +10,7 @@ import { buildFiledNode } from '../../test/build-filed-node.ts';
 import { buildStubProgramRunner } from '../../test/build-stub-program-runner.ts';
 import { createCapacitySample } from '../../test/create-capacity-sample.ts';
 import { createStubOp } from '../../test/create-stub-op.ts';
+import { createTreeCheckout } from '../../test/create-tree-checkout.ts';
 import { freshDb } from '../../test/helpers.ts';
 import { readReadyByLane } from '../areas/read-ready-by-lane.ts';
 import { readOptionalFile } from '../capacity/fleet/read-optional-file.ts';
@@ -20,6 +21,7 @@ import { overrideEnv } from '../config/override-env.ts';
 import { metaJson } from '../db/meta-json.ts';
 import { setMeta } from '../db/set-meta.ts';
 import { loadActionsSpend } from '../goals/load-actions-spend.ts';
+import { runGrantMarksTick } from '../grants/run-grant-marks-tick.ts';
 import { PROMOTABLE_FOCUS } from '../lanes/promotable-focus.ts';
 import { PROMOTABLE_FOCUS_KEY } from '../lanes/promotable-focus-key.ts';
 import { addRun } from '../runs/add-run.ts';
@@ -435,6 +437,43 @@ test('it logs a failing Claude slots step without stopping the tick', async () =
   });
 
   expect(logs.filter((line) => line.includes('Claude slots'))).toStrictEqual(['2026-10-15T20:00:00Z Claude slots failed: invented: 1Password is down']);
+});
+
+test('it marks a grant that a fetched hq-private PR added, and logs each grant it refused', async () => {
+  const ctx = setupTest();
+  const capacity = JSON.stringify({ imp: { freeMib: 0, room: false }, providers: { claude: { room: false, unattended: true, target: 'imp' } } });
+  const answers: Record<string, RunResult> = { op: { code: 0, stdout: 'lin_api_INVENTED\n', stderr: '' } };
+  const run: Runner = (command) => Promise.resolve(answers[command[0] ?? ''] ?? { code: 0, stdout: capacity, stderr: '' });
+  const logs: string[] = [];
+  onTestFinished(overrideEnv('HQ_NOW', '2026-10-15T20:00:00Z'));
+  onTestFinished(overrideEnv('HQ_PRIVATE_DIR', `${ctx.directory}/hq-private`));
+  for (const key of ['kinds_synced_at', 'goals_synced_at', 'goals_ok_at', 'kinds_ok_at', 'linear_synced_at', 'lanes_ready_linear_at']) {
+    setMeta(ctx.db, key, '2026-10-15T20:00:00Z');
+  }
+  const tree = createTreeCheckout(ctx.directory, 'private', { 'grants/z-kettle.yaml': '[]\n' });
+  tree.writeCommit(
+    { 'grants/z-kettle.yaml': '- id: pour\n  label: "Pour"\n  outcome: allow\n- id: pour-the-water-slowly-into-the-pot\n  label: "Pour slowly"\n  outcome: allow\n' },
+    { subject: 'feat(grants): let z-kettle pour (#12)', at: '2026-10-13T09:00:00Z' },
+  );
+
+  await watchTick(ctx.db, {
+    me: 'hq-lanes',
+    run,
+    log: (line) => logs.push(line),
+    stepMs: 2000,
+    steps: {
+      runs: () => Promise.resolve(),
+      weekly: () => Promise.resolve(false),
+      health: () => Promise.resolve({ opened: [], cleared: [] }),
+      grantMarks: () => runGrantMarksTick(ctx.db, { directory: tree.dir, exists: existsSync }, 'hq-lanes'),
+    },
+  });
+
+  expect(ctx.db.query("SELECT at, ref, grant_name, added_by FROM marks WHERE kind = 'grant'").all()).toStrictEqual([{ at: '2026-10-13T09:00:00Z', ref: 'hq-private#12', grant_name: 'z-kettle-pour', added_by: 'hq-lanes' }]);
+  expect(logs.filter((line) => line.includes('grant marks'))).toStrictEqual([
+    '2026-10-15T20:00:00Z grant marks: added mark 1 for z-kettle-pour (hq-private#12)',
+    '2026-10-15T20:00:00Z grant marks: refused z-kettle-pour-the-water-slowly-into-the-pot: a grant name must be a slug of lowercase letters, digits and single hyphens, 40 characters at most',
+  ]);
 });
 
 test('it logs no slot token and no profile token when op, a slot request and a slot answer name them', async () => {
