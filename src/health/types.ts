@@ -19,6 +19,9 @@ export interface Probe {
 
   // is hq-private's working tree on origin/main? A missing checkout is a fault
   privateTree?: (at: Date) => Check | null;
+
+  // Has every grant on hq-private's main a named mark?
+  grantMarks?: () => Check | null;
   probe?: (at: Date) => Check | null; // the Nix uptime probe: stopped, or an outage open
   // Are the machine-specific settings (env or the local file) all set?
   localConfig?: () => Check;

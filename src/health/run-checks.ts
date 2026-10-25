@@ -124,7 +124,7 @@ export async function runChecks(p: Probe, s: HealthSettings, prev: Samples, at: 
   if (gw) checks.push(gw);
   const f = p.defsFetch?.();
   if (f) checks.push(f);
-  for (const tree of [p.defsTree?.(at), p.privateTree?.(at)]) {
+  for (const tree of [p.defsTree?.(at), p.privateTree?.(at), p.grantMarks?.()]) {
     if (tree) {
       checks.push(tree);
     }

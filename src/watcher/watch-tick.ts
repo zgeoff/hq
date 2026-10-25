@@ -17,6 +17,7 @@ import { refreshActionsSpend } from '../goals/refresh-actions-spend.ts';
 import { sampleUsage } from '../goals/sample-usage.ts';
 import { syncGoals } from '../goals/sync-goals.ts';
 import { goalsWeeklyTick } from '../goals/weekly/goals-weekly-tick.ts';
+import { runGrantMarksTick } from '../grants/run-grant-marks-tick.ts';
 import { syncKinds } from '../kinds/sync-kinds.ts';
 import { syncLinear } from '../kinds/sync-linear.ts';
 import { syncRunIssues } from '../linear/sync-run-issues.ts';
@@ -75,6 +76,13 @@ export async function watchTick(db: Database, d: WatchDeps): Promise<boolean> {
     } else if (r.sync && (r.sync.changed || r.sync.reattached || !r.sync.ok)) {
       d.log(`${at()} ${r.tree === 'hq' ? 'defs' : r.tree} tree: ${r.sync.line}`);
     }
+  }
+  try {
+    for (const mark of runGrantMarksTick(db, d.me)?.added ?? []) {
+      d.log(`${at()} grant marks: added mark ${mark.id} for ${mark.grant_name} (${mark.ref})`);
+    }
+  } catch (error) {
+    d.log(`${at()} grant marks failed: ${msg(error)}`);
   }
   try {
     await runLinearReadyTick(db, { call: makeAuditedLinearCaller(db, d.run), run: d.run, readLanes: readPacingLanes, actor: d.me, deadlineMs: ms });

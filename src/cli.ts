@@ -216,6 +216,8 @@ import { formatAnswerLine } from './answers/format-answer-line.ts';
 import { loadAnswers } from './answers/load-answers.ts';
 import { mergeAnswerWeeks } from './answers/merge-answer-weeks.ts';
 import { createGrantMark } from './grants/create-grant-mark.ts';
+import { readGrantMarksCheck } from './grants/read-grant-marks-check.ts';
+import { PRIVATE_TREE } from './prompts/private-tree.ts';
 import { formatGrantLine } from './grants/format-grant-line.ts';
 import { loadGrantTallies } from './grants/load-grant-tallies.ts';
 import { parseGrantVoidArgs } from './grants/parse-grant-void-args.ts';
@@ -1072,6 +1074,7 @@ function realProbe(db: Database): Probe {
     goalsWeekly: (at) => goalsWeeklyCheck(db, at),
     defsTree: (at) => readTreeCheck(db, at),
     privateTree: (at) => readTreeCheck(db, at, 'private'),
+    grantMarks: () => readGrantMarksCheck(db, PRIVATE_TREE.dir()),
     fleetTrust: () => fleetTrustChecks(declaredFleet(db)),
     stuckSaves: (at) => readStuckSaveChecks(db, at),
     probe: (at) => probeHealth(db, at),
