@@ -20,6 +20,7 @@ import { writeReviewed } from '../runs/write-reviewed.ts';
 import { parseLowerRepo } from './parse-lower-repo.ts';
 import type { ParsedRepo } from './parse-lower-repo.ts';
 import { readBaseMove } from './read-base-move.ts';
+import type { BaseMove } from './read-base-move.ts';
 import { readOKReviews } from './read-ok-reviews.ts';
 import { requirePinned } from './require-pinned.ts';
 import { resolveEngine } from './resolve-engine.ts';
@@ -123,7 +124,7 @@ async function runNoslopReviewWithCI(request: ReviewRequest, parsed: ParsedRepo,
     ROUND_LOCK_STALE_MS,
   );
   const state = await readCIState(request.run, buildSlug(parsed), request.pr, request.watch);
-  return { ...ran.result, fixChecks: buildTitledFixChecks(ran.result.fixChecks, loadFindingTitles(request, parsed)), fixesOnly: ran.plan.fixesOnly, emergencyCap: ran.plan.emergencyCap, capNote: formatCapNote(ran.plan.emergencyCap, parsed), baseMove: ran.plan.baseMove, checks: state.checks, checksError: state.checksError, openThreads: state.openThreads, round: ran.plan.round };
+  return { ...ran.result, fixChecks: buildTitledFixChecks(ran.result.fixChecks, loadFindingTitles(request, parsed)), fixesOnly: ran.plan.fixesOnly, emergencyCap: ran.plan.emergencyCap, capNote: formatCapNote(ran.plan.emergencyCap, parsed), baseMove: ran.plan.baseMove?.reviewed ?? null, checks: state.checks, checksError: state.checksError, openThreads: state.openThreads, round: ran.plan.round };
 }
 
 function createScratchDir(): string {
@@ -140,11 +141,11 @@ async function planBaseMove(plan: RoundPlan, parsed: ParsedRepo, scratch: string
   }
   const request = plan.request;
   const directory = await checkout(request.run, buildSlug(parsed), parsed.repo, request.repoDir);
-  const reviewed = await readBaseMove({ run: request.run, db: request.db, slug: buildSlug(parsed), repo: parsed.repo, pr: request.pr, directory, lock: (fn) => withRepoLock(scratch, buildSlug(parsed), fn) });
-  if (reviewed === null) {
+  const move = await readBaseMove({ run: request.run, db: request.db, slug: buildSlug(parsed), repo: parsed.repo, pr: request.pr, directory, lock: (fn) => withRepoLock(scratch, buildSlug(parsed), fn) });
+  if (move === null) {
     return plan;
   }
-  return { ...plan, round: plan.round - 1, fixesOnly: true, baseMove: reviewed };
+  return { ...plan, round: plan.round - 1, fixesOnly: true, baseMove: move };
 }
 
 interface RoundPlan {
@@ -153,8 +154,8 @@ interface RoundPlan {
   fixesOnly: boolean;
   emergencyCap: number | null;
 
-  // The last ok review's head when only the base moved since it; null otherwise.
-  baseMove: string | null;
+  // The base move found since the last full review; null when there was none.
+  baseMove: BaseMove | null;
 }
 
 interface RanRound {
@@ -188,19 +189,22 @@ async function createNoslopContext(plan: RoundPlan, parsed: ParsedRepo, sha: str
     lock: (fn) => withRepoLock(scratch, buildSlug(parsed), fn),
     full: request.full,
     fixesOnly: plan.fixesOnly,
-    baseMove: plan.baseMove !== null,
+    baseMove: plan.baseMove ?? undefined,
     linear: makeAuditedLinearCaller(request.db, request.run),
   };
 }
 
 // A full review, or a fix-checks-only run the emergency cap or a base move forced, marks the head it
 // ran on so the sweep stops calling the head unreviewed; a hand-run --fixes-only marks nothing. Only
-// a full review counts as a round.
+// a full review counts as a round. A base move marks only a run recorded as one, at the compared head.
 function writeRoundMark(plan: RoundPlan, parsed: ParsedRepo): void {
   if (plan.fixesOnly && plan.emergencyCap === null && plan.baseMove === null) {
     return;
   }
   const found = findLastReviewRound(plan.request.db, parsed.repo, plan.request.pr);
+  if (plan.baseMove !== null && found?.base_move !== 1) {
+    return;
+  }
   if (found?.ok === 1 && found.head !== null && SHA.test(found.head)) {
     writeReviewed(plan.request.db, parsed.repo, plan.request.pr, { head: found.head, countsRound: !plan.fixesOnly });
   }

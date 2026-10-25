@@ -19,9 +19,16 @@ export interface BaseMoveRequest {
   lock: <T>(fn: () => Promise<T>) => Promise<T>;
 }
 
+// A base move hq found: the head of the last full review, and the head and PR diff it compared.
+export interface BaseMove {
+  reviewed: string;
+  head: string;
+  patchId: string;
+}
+
 const LastReviewSchema = z.object({ head: z.string().nullable(), patch_id: z.string().nullable() }).nullable();
 
-export async function readBaseMove(request: BaseMoveRequest): Promise<string | null> {
+export async function readBaseMove(request: BaseMoveRequest): Promise<BaseMove | null> {
   const last = LastReviewSchema.parse(
     request.db.query("SELECT head, patch_id FROM noslop_rounds WHERE repo = ? AND pr = ? AND kind = 'review' AND ok = 1 AND confirm = 0 ORDER BY id DESC LIMIT 1").get(request.repo, request.pr) ?? null,
   );
@@ -37,7 +44,10 @@ export async function readBaseMove(request: BaseMoveRequest): Promise<string | n
     await request.run(['git', 'fetch', '-q', 'origin', `pull/${request.pr}/head`], { cwd: request.directory });
   });
   const patchID = await readPRPatchID(request.run, request.directory, `origin/${refs.baseRefName}`, refs.headRefOid);
-  return patchID === last.patch_id ? last.head : null;
+  if (patchID !== last.patch_id) {
+    return null;
+  }
+  return { reviewed: last.head, head: refs.headRefOid, patchId: patchID };
 }
 
 const RefsSchema = z.object({ headRefOid: z.string().min(1), baseRefName: z.string().min(1) });
