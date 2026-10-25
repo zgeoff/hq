@@ -7,6 +7,7 @@ import rulesTable from '../lanes.json';
 import { slotUsage } from '../mocks/anthropic-handlers.ts';
 import { LINEAR_GRAPHQL_URL, linearIssues } from '../mocks/linear-handlers.ts';
 import { server } from '../mocks/node.ts';
+import { createStubOp } from '../test/create-stub-op.ts';
 import { NOON_SYDNEY, at, fakeAtc, freshDb } from '../test/helpers.ts';
 import { main } from './cli.ts';
 import { overrideEnv } from './config/override-env.ts';
@@ -461,23 +462,16 @@ test('hq capacity --refresh-slots reads the four slots through op and prints the
   onTestFinished(overrideEnv('HQ_NOW', NOON_SYDNEY));
   onTestFinished(overrideEnv('HQ_SLOTS_OP_SETTINGS', settings));
   onTestFinished(() => (console.log = log));
-  mkdirSync(`${fresh.dir}/bin`);
-  writeFileSync(
-    `${fresh.dir}/bin/op`,
-    [
-      '#!/bin/sh',
-      'case "$2" in',
-      '  op://claude-slots/claude-setup-token-1/credential) echo sk-ant-kettle-cli-1 ;;',
-      '  op://claude-slots/claude-setup-token-2/credential) echo sk-ant-kettle-cli-2 ;;',
-      '  op://claude-slots/claude-setup-token-3/credential) echo sk-ant-kettle-cli-3 ;;',
-      '  op://claude-slots/claude-setup-token-4/credential) echo sk-ant-kettle-cli-4 ;;',
-      '  *) echo "invented: no such item" >&2; exit 1 ;;',
-      'esac',
-      '',
-    ].join('\n'),
-  );
-  chmodSync(`${fresh.dir}/bin/op`, 0o755);
-  onTestFinished(overrideEnv('PATH', `${fresh.dir}/bin:${process.env['PATH']}`));
+  const op = createStubOp({
+    directory: fresh.dir,
+    answers: {
+      'op://claude-slots/claude-setup-token-1/credential': 'sk-ant-kettle-cli-1',
+      'op://claude-slots/claude-setup-token-2/credential': 'sk-ant-kettle-cli-2',
+      'op://claude-slots/claude-setup-token-3/credential': 'sk-ant-kettle-cli-3',
+      'op://claude-slots/claude-setup-token-4/credential': 'sk-ant-kettle-cli-4',
+    },
+  });
+  onTestFinished(overrideEnv('PATH', `${op.bin}:${process.env['PATH']}`));
   writeFileSync(settings, JSON.stringify({ env: { OP_SERVICE_ACCOUNT_TOKEN: 'ops_kettle-profile-0001' } }));
   fresh.db.query('INSERT INTO usage_samples (at, account, five_hour, seven_day, five_hour_resets_at, seven_day_resets_at) VALUES (?, ?, ?, ?, ?, ?)').run('2026-10-14T00:55:00Z', 'abcdef012345', 5, 40, null, '2026-10-19T00:00:00Z');
   slotUsage.set('Bearer sk-ant-kettle-cli-1', { seven: { utilization: 0.4, reset: 1_792_540_800 } });
@@ -504,22 +498,15 @@ test('hq capacity --refresh-slots --json carries the refresh problems in the fle
   onTestFinished(overrideEnv('HQ_NOW', NOON_SYDNEY));
   onTestFinished(overrideEnv('HQ_SLOTS_OP_SETTINGS', settings));
   onTestFinished(() => (console.log = log));
-  mkdirSync(`${fresh.dir}/bin`);
-  writeFileSync(
-    `${fresh.dir}/bin/op`,
-    [
-      '#!/bin/sh',
-      'case "$2" in',
-      '  op://claude-slots/claude-setup-token-1/credential) echo sk-ant-kettle-cli-1 ;;',
-      '  op://claude-slots/claude-setup-token-2/credential) echo sk-ant-kettle-cli-2 ;;',
-      '  op://claude-slots/claude-setup-token-4/credential) echo sk-ant-kettle-cli-4 ;;',
-      '  *) echo "invented: no such item" >&2; exit 1 ;;',
-      'esac',
-      '',
-    ].join('\n'),
-  );
-  chmodSync(`${fresh.dir}/bin/op`, 0o755);
-  onTestFinished(overrideEnv('PATH', `${fresh.dir}/bin:${process.env['PATH']}`));
+  const op = createStubOp({
+    directory: fresh.dir,
+    answers: {
+      'op://claude-slots/claude-setup-token-1/credential': 'sk-ant-kettle-cli-1',
+      'op://claude-slots/claude-setup-token-2/credential': 'sk-ant-kettle-cli-2',
+      'op://claude-slots/claude-setup-token-4/credential': 'sk-ant-kettle-cli-4',
+    },
+  });
+  onTestFinished(overrideEnv('PATH', `${op.bin}:${process.env['PATH']}`));
   writeFileSync(settings, JSON.stringify({ env: { OP_SERVICE_ACCOUNT_TOKEN: 'ops_kettle-profile-0001' } }));
   slotUsage.set('Bearer sk-ant-kettle-cli-1', { seven: { utilization: 0.4, reset: 1_792_540_800 } });
   slotUsage.set('Bearer sk-ant-kettle-cli-2', { seven: { utilization: 0.4, reset: 1_792_540_800 } });
