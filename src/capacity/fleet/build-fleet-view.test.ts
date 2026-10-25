@@ -199,6 +199,23 @@ test('it keeps the 5-hour figure of an earlier newer sample when the newest samp
   expect(view.forecast?.switches[0]).toStrictEqual({ at: '2026-10-14T01:00:00Z', from: 1, to: 2 });
 });
 
+test('it keeps the slot read 5-hour reset still to come when the newest sample gives a 5-hour figure with no reset', () => {
+  const rows: SlotRow[] = [
+    { at: '2026-10-14T00:20:00Z', slot: 1, status: '200', five: 20, fiveResetsAt: '2026-10-14T04:00:00Z', seven: 30, sevenResetsAt: '2026-10-18T00:00:00Z', workingLanes: 2 },
+    { at: '2026-10-14T00:20:00Z', slot: 2, status: '200', five: 0, fiveResetsAt: null, seven: 94.9, sevenResetsAt: '2026-10-19T00:00:00Z', workingLanes: 2 },
+  ];
+  const samples = [
+    { at: '2026-10-13T23:30:00Z', account: 'kettle01', five_hour: 90, seven_day: 29, five_hour_resets_at: null, seven_day_resets_at: '2026-10-18T00:00:00Z' },
+    { at: '2026-10-14T00:00:00Z', account: 'kettle01', five_hour: 93, seven_day: 29.5, five_hour_resets_at: null, seven_day_resets_at: '2026-10-18T00:00:00Z' },
+    { at: '2026-10-14T00:30:00Z', account: 'kettle01', five_hour: 95, seven_day: 30, five_hour_resets_at: null, seven_day_resets_at: '2026-10-18T00:00:00Z' },
+    { at: '2026-10-14T01:00:00Z', account: 'kettle01', five_hour: 97, seven_day: 30.5, five_hour_resets_at: null, seven_day_resets_at: '2026-10-18T00:00:00Z' },
+  ];
+
+  const view = buildFleetView({ at: new Date('2026-10-14T01:00:00Z'), notSetUp: null, rows, samples, working: 2, cap: null });
+
+  expect(view.forecast?.pause).toStrictEqual({ start: '2026-10-14T01:15:00Z', end: '2026-10-14T04:00:00Z', hours: 2.75 });
+});
+
 test('it gives no rate and no forecast and says the samples are too few when only one usage sample matches', () => {
   const rows: SlotRow[] = [{ at: '2026-10-14T00:50:00Z', slot: 1, status: '200', five: 4, fiveResetsAt: '2026-10-14T03:00:00Z', seven: 30, sevenResetsAt: '2026-10-18T00:00:00Z', workingLanes: 2 }];
   const samples = [{ at: '2026-10-14T00:55:00Z', account: 'kettle01', five_hour: 5, seven_day: 31, five_hour_resets_at: '2026-10-14T03:00:00Z', seven_day_resets_at: '2026-10-18T00:00:00Z' }];

@@ -57,7 +57,7 @@ export function buildFleetView(input: FleetViewInput): FleetView {
   if (profiles === null) {
     return { ...base, note: 'too few usage samples for a burn rate' };
   }
-  const slots = buildSimSlots(newest, active, latest, input.samples);
+  const slots = buildSimSlots(newest, { active, latest, samples: input.samples, at: input.at });
   const simulate = (lanes: number) => {
     const scaled = lanes === input.working ? profiles : buildProfilesAt(lanes);
     if (scaled === null) {
@@ -113,11 +113,18 @@ function toPoints(samples: readonly UsageSample[], percent: 'five_hour' | 'seven
   return samples.map((sample) => ({ at: sample.at, percent: sample[percent], resetsAt: sample[resets] }));
 }
 
-function buildSimSlots(newest: readonly SlotRow[], active: number, latest: UsageSample, samples: readonly UsageSample[]): SimSlot[] {
+interface SimSlotContext {
+  active: number;
+  latest: UsageSample;
+  samples: readonly UsageSample[];
+  at: Date;
+}
+
+function buildSimSlots(newest: readonly SlotRow[], context: SimSlotContext): SimSlot[] {
   const slots: SimSlot[] = [];
   for (const row of newest) {
-    const account = row.slot === active ? latest.account : null;
-    const newer = collectNewerSamples(row, account, samples);
+    const account = row.slot === context.active ? context.latest.account : null;
+    const newer = collectNewerSamples(row, account, context.samples);
     const sevenSample = newer.findLast((sample) => sample.seven_day !== null && sample.seven_day_resets_at !== null);
     const seven = sevenSample === undefined ? row.seven : sevenSample.seven_day;
     const sevenResetsAt = sevenSample === undefined ? row.sevenResetsAt : sevenSample.seven_day_resets_at;
@@ -126,7 +133,7 @@ function buildSimSlots(newest: readonly SlotRow[], active: number, latest: Usage
     }
     const fiveSample = newer.findLast((sample) => sample.five_hour !== null);
     const five = fiveSample === undefined ? row.five : fiveSample.five_hour;
-    const fiveResetsAt = fiveSample === undefined ? row.fiveResetsAt : fiveSample.five_hour_resets_at;
+    const fiveResetsAt = fiveSample?.five_hour_resets_at ?? findKnownFiveReset(row, newer, context.at);
     slots.push({ slot: row.slot, five: five ?? 0, fiveResetsAt: fiveResetsAt === null ? null : new Date(fiveResetsAt), seven, sevenResetsAt: new Date(sevenResetsAt) });
   }
   return slots;
@@ -139,4 +146,11 @@ function collectNewerSamples(row: SlotRow, account: string | null, samples: read
   const newer = samples.filter((sample) => Date.parse(sample.at) > Date.parse(row.at));
   const matching = account === null ? newer.filter((sample) => rowResetsAt !== null && sample.seven_day_resets_at !== null && isSameSevenReset(sample.seven_day_resets_at, rowResetsAt)) : newer.filter((sample) => sample.account === account);
   return matching.toSorted((left, right) => Date.parse(left.at) - Date.parse(right.at));
+}
+
+// A 5-hour figure can arrive without its reset; the newest reset still to come from the read or an
+// older sample stands for it, so the simulator can still clear the window.
+function findKnownFiveReset(row: SlotRow, newer: readonly UsageSample[], at: Date): string | null {
+  const known = [row.fiveResetsAt, ...newer.map((sample) => sample.five_hour_resets_at)];
+  return known.findLast((resetsAt) => resetsAt !== null && Date.parse(resetsAt) > at.getTime()) ?? null;
 }
