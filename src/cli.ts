@@ -1831,7 +1831,7 @@ async function lanesCommand(context: Pick<Ctx, 'db' | 'verb' | 'rest' | 'flags' 
         weekly: () => weeklyStats(db, me, boundedRunner(realRunner, CALL_MS)),
         health: () => healthTick(db, me),
         capacity: () => capacityTick(db, me),
-        slots: () => runFleetStep(db, boundedRunner(realRunner, CALL_MS), now(), false),
+        slots: (signal: AbortSignal) => runFleetStep(db, boundedRunner(realRunner, CALL_MS), now(), { force: false, signal }),
         refusals: async () => {
           const scan = await scanRefusals(db);
           return scan.refusals_added;

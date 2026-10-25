@@ -14,10 +14,17 @@ export interface FleetStep {
   news: boolean;
 }
 
-export async function runFleetStep(db: Database, run: Runner, at: Date, force: boolean): Promise<FleetStep> {
-  const due = force || isSlotReadDue(readNewestSlotReadAt(db), at);
-  const read = due ? await runSlotRead(db, run, at) : null;
+export interface FleetStepOptions {
+  force: boolean;
+  signal: AbortSignal;
+}
+
+export async function runFleetStep(db: Database, run: Runner, at: Date, options: FleetStepOptions): Promise<FleetStep> {
+  const signal = options.signal;
+  const due = options.force || isSlotReadDue(readNewestSlotReadAt(db), at);
+  const read = due ? await runSlotRead(db, run, at, signal) : null;
   const view = await readFleetView(db, at);
+  signal.throwIfAborted();
   const news = view.notSetUp === null && writeFleetNews(db, view);
   return { read, view, news };
 }

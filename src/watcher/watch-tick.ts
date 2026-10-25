@@ -256,7 +256,7 @@ export async function watchTick(db: Database, d: WatchDeps): Promise<boolean> {
     }
     try {
       const readSlots = d.steps.slots;
-      const slots = readSlots ? await step('Claude slot reads', () => readSlots()) : null;
+      const slots = readSlots ? await step('Claude slot reads', (signal) => readSlots(signal)) : null;
       const read = slots?.read ?? null;
       if (read !== null) {
         match(read)

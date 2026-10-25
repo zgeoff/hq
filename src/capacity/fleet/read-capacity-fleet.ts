@@ -9,7 +9,7 @@ export async function readCapacityFleet(db: Database, run: Runner, at: Date, ref
   if (!refresh) {
     return { view: await readFleetView(db, at), problems: [] };
   }
-  const step = await runFleetStep(db, run, at, true);
+  const step = await runFleetStep(db, run, at, { force: true, signal: new AbortController().signal });
   const problems = match(step.read)
     .with(null, () => [])
     .with({ kind: 'not-set-up' }, () => [])

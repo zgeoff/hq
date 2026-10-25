@@ -14,6 +14,9 @@ export interface RunOpts {
   stdin?: string;
   timeoutMs?: number; // kill the command after this long; it then exits 124, like timeout(1)
 
+  // Aborting it kills the command; an already aborted signal starts no command and throws.
+  signal?: AbortSignal;
+
   // After the deadline's TERM, how long before the KILL; 2 s when absent.
   killGraceMs?: number;
 

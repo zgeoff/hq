@@ -10,25 +10,31 @@ import { writeSlotUsage } from './write-slot-usage.ts';
 
 export type SlotReadRun = { kind: 'not-set-up'; reason: string } | { kind: 'read'; readings: SlotReading[]; problems: string[] };
 
-export async function runSlotRead(db: Database, run: Runner, at: Date): Promise<SlotReadRun> {
+export async function runSlotRead(db: Database, run: Runner, at: Date, signal: AbortSignal): Promise<SlotReadRun> {
   const opToken = await readSlotOpToken();
 
   return match(opToken)
     .with({ kind: 'not-set-up' }, (notSetUp): Promise<SlotReadRun> => Promise.resolve(notSetUp))
-    .with({ kind: 'ready' }, (ready) => readReadySlots(db, run, at, ready.token))
+    .with({ kind: 'ready' }, (ready) => readReadySlots(db, run, at, { opToken: ready.token, signal }))
     .exhaustive();
 }
 
-async function readReadySlots(db: Database, run: Runner, at: Date, opToken: string): Promise<SlotReadRun> {
+interface SlotAccess {
+  opToken: string;
+  signal: AbortSignal;
+}
+
+async function readReadySlots(db: Database, run: Runner, at: Date, access: SlotAccess): Promise<SlotReadRun> {
   const readings: SlotReading[] = [];
   const problems: string[] = [];
   for (const slot of SLOT_NUMBERS) {
-    const result = await readSlotReading(run, opToken, slot);
+    const result = await readSlotReading(run, access.opToken, slot, access.signal);
     readings.push(result.reading);
     if (result.problem !== null) {
       problems.push(result.problem);
     }
   }
+  access.signal.throwIfAborted();
   writeSlotUsage(db, readings, countWorking(db, at).count, at);
   return { kind: 'read', readings, problems };
 }

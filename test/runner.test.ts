@@ -15,6 +15,22 @@ test('a hung command is killed at its deadline and reports 124', async () => {
   expect(Date.now() - t0).toBeLessThan(5_000);
 });
 
+test('an aborted signal kills a running command', async () => {
+  const abort = new AbortController();
+  const started = Date.now();
+  const pending = realRunner(['sleep', '30'], { signal: abort.signal });
+
+  abort.abort();
+  const result = await pending;
+
+  expect(result.code).not.toBe(0);
+  expect(Date.now() - started).toBeLessThan(5000);
+});
+
+test('a signal aborted before the call starts no command', () => {
+  expect(realRunner(['sleep', '30'], { signal: AbortSignal.abort() })).rejects.toMatchObject({ name: 'AbortError' });
+});
+
 test('a command that ignores TERM is killed once its grace runs out', async () => {
   const started = Date.now();
   const result = await realRunner(['bash', '-c', 'trap "" TERM; sleep 30'], { timeoutMs: 300, killGraceMs: 100 });

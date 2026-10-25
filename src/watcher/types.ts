@@ -6,7 +6,7 @@ interface WatchSteps {
   weekly(): Promise<boolean>; // the Monday stats line
   health(): Promise<{ opened: unknown[]; cleared: unknown[] }>;
   refusals?(): Promise<number>; // scan the transcripts; the refusals added
-  slots?: () => Promise<{ read: SlotReadRun | null; news: boolean }>;
+  slots?: (signal: AbortSignal) => Promise<{ read: SlotReadRun | null; news: boolean }>;
   capacity?(): Promise<{ opened: unknown[]; cleared: unknown[] }>; // sample capacity, alert on thresholds
 }
 
