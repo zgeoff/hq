@@ -24,6 +24,14 @@ test('it reads the CI overrides recorded at the head, newest record of a check w
   ]);
 });
 
+test('it reads no CI override at the head once an override event of the PR holds text that is not JSON', () => {
+  const ctx = setupTest();
+  recordCICheckOverride(ctx.db, { repo: 'widgets', pr: 7, head: 'b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2', source: 'chat:kettle-1', note: 'An intended infra change.', actor: 'z-kettle', check: 'preview' });
+  ctx.db.query("INSERT INTO events (subject, subject_id, action, actor, at, data) VALUES ('hq', 'pr:widgets#7', 'pr-override', 'z-kettle', '2026-10-14T01:05:00Z', '{')").run();
+
+  expect(readHeadCIOverrides(ctx.db, 'widgets', 7, 'b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2')).toStrictEqual([]);
+});
+
 test.each([
   ['at another head', 'pr:widgets#7', 'e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1', 'chat:kettle-1'],
   ['on another PR', 'pr:widgets#8', 'b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2', 'chat:kettle-1'],
