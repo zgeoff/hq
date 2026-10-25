@@ -10,7 +10,7 @@ export const realRunner: Runner = async (cmd, opts = {}) => {
   // A timed command runs in its own session (setsid), so the deadline reaches its whole process
   // group, not just the shell at the top of it.
   const proc = Bun.spawn(opts.timeoutMs ? ['setsid', ...cmd] : cmd, {
-    ...toExactOptional({ cwd: opts.cwd }),
+    ...toExactOptional({ cwd: opts.cwd, signal: opts.signal }),
     env: opts.env ?? cleanEnv(),
     stdin: opts.stdin === undefined ? 'ignore' : Buffer.from(opts.stdin),
     stdout: fd ?? 'pipe',

@@ -14,6 +14,11 @@ process.env['XDG_DATA_HOME'] = join(tmpdir(), 'hq-tests-no-data-home');
 // review files makes them in a temp dir and points REVIEW_DIR at it.
 process.env['REVIEW_DIR'] = join(tmpdir(), 'hq-tests-no-review-dir');
 
+// No test reads the real profile that holds the 1Password token for the Claude slot reads: this
+// file never exists. A test that needs one writes a file in a temp dir and points
+// HQ_SLOTS_OP_SETTINGS at it.
+process.env['HQ_SLOTS_OP_SETTINGS'] = join(tmpdir(), 'hq-tests-no-slots-settings', 'settings.local.json');
+
 // A run from an agent's shell inherits its atc session id, and `hq call answer` then asks the real
 // atc whether that session is the owner's. A test that needs a session id sets its own.
 delete process.env['ATC_SESSION_ID'];

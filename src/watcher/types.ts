@@ -1,3 +1,4 @@
+import type { SlotReadRun } from '../capacity/fleet/run-slot-read.ts';
 import type { Runner } from '../runner/types.ts';
 
 interface WatchSteps {
@@ -5,6 +6,7 @@ interface WatchSteps {
   weekly(): Promise<boolean>; // the Monday stats line
   health(): Promise<{ opened: unknown[]; cleared: unknown[] }>;
   refusals?(): Promise<number>; // scan the transcripts; the refusals added
+  slots?: (signal: AbortSignal) => Promise<{ read: SlotReadRun | null; news: boolean }>;
   capacity?(): Promise<{ opened: unknown[]; cleared: unknown[] }>; // sample capacity, alert on thresholds
 }
 

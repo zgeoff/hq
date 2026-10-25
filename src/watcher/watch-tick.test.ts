@@ -360,3 +360,73 @@ test('a run-issue pass drops nothing when this tick\'s GitHub pass did not read 
   expect(ctx.db.query("SELECT state FROM runs WHERE issue = 'KET-10'").get()).toStrictEqual({ state: 'working' });
   expect(ctx.db.query("SELECT state FROM linear_issues WHERE issue = 'KET-10'").get()).toStrictEqual({ state: 'canceled' });
 });
+
+test('it logs the Claude slot read, each problem it met and the news line it added', async () => {
+  const ctx = setupTest();
+  const capacity = JSON.stringify({ imp: { freeMib: 0, room: false }, providers: { claude: { room: false, unattended: true, target: 'imp' } } });
+  const answers: Record<string, RunResult> = { op: { code: 0, stdout: 'lin_api_INVENTED\n', stderr: '' } };
+  const run: Runner = (command) => Promise.resolve(answers[command[0] ?? ''] ?? { code: 0, stdout: capacity, stderr: '' });
+  const logs: string[] = [];
+  onTestFinished(overrideEnv('HQ_NOW', '2026-10-15T20:00:00Z'));
+  for (const key of ['kinds_synced_at', 'goals_synced_at', 'goals_ok_at', 'kinds_ok_at', 'linear_synced_at', 'lanes_ready_linear_at']) {
+    setMeta(ctx.db, key, '2026-10-15T20:00:00Z');
+  }
+
+  await watchTick(ctx.db, {
+    me: 'hq-lanes',
+    run,
+    log: (line) => logs.push(line),
+    stepMs: 2000,
+    steps: { runs: () => Promise.resolve(), weekly: () => Promise.resolve(false), health: () => Promise.resolve({ opened: [], cleared: [] }), slots: () => Promise.resolve({ read: { kind: 'read', readings: [], problems: ['slot 3: op read gave no token'] }, news: true }) },
+  });
+
+  expect(logs.filter((line) => line.includes('Claude slots'))).toStrictEqual([
+    '2026-10-15T20:00:00Z Claude slots: read, 1 problem(s)',
+    '2026-10-15T20:00:00Z Claude slots: slot 3: op read gave no token',
+    '2026-10-15T20:00:00Z Claude slots: fleet forecast news line added',
+  ]);
+});
+
+test('it hands the Claude slots step the signal its deadline aborts', async () => {
+  const ctx = setupTest();
+  const capacity = JSON.stringify({ imp: { freeMib: 0, room: false }, providers: { claude: { room: false, unattended: true, target: 'imp' } } });
+  const answers: Record<string, RunResult> = { op: { code: 0, stdout: 'lin_api_INVENTED\n', stderr: '' } };
+  const run: Runner = (command) => Promise.resolve(answers[command[0] ?? ''] ?? { code: 0, stdout: capacity, stderr: '' });
+  const slots = mock<(signal: AbortSignal) => Promise<never>>(() => new Promise<never>(() => {}));
+  onTestFinished(overrideEnv('HQ_NOW', '2026-10-15T20:00:00Z'));
+  for (const key of ['kinds_synced_at', 'goals_synced_at', 'goals_ok_at', 'kinds_ok_at', 'linear_synced_at', 'lanes_ready_linear_at']) {
+    setMeta(ctx.db, key, '2026-10-15T20:00:00Z');
+  }
+
+  await watchTick(ctx.db, {
+    me: 'hq-lanes',
+    run,
+    log: () => {},
+    stepMs: 200,
+    steps: { runs: () => Promise.resolve(), weekly: () => Promise.resolve(false), health: () => Promise.resolve({ opened: [], cleared: [] }), slots },
+  });
+
+  expect(slots.mock.calls[0]?.[0].aborted).toBe(true);
+});
+
+test('it logs a failing Claude slots step without stopping the tick', async () => {
+  const ctx = setupTest();
+  const capacity = JSON.stringify({ imp: { freeMib: 0, room: false }, providers: { claude: { room: false, unattended: true, target: 'imp' } } });
+  const answers: Record<string, RunResult> = { op: { code: 0, stdout: 'lin_api_INVENTED\n', stderr: '' } };
+  const run: Runner = (command) => Promise.resolve(answers[command[0] ?? ''] ?? { code: 0, stdout: capacity, stderr: '' });
+  const logs: string[] = [];
+  onTestFinished(overrideEnv('HQ_NOW', '2026-10-15T20:00:00Z'));
+  for (const key of ['kinds_synced_at', 'goals_synced_at', 'goals_ok_at', 'kinds_ok_at', 'linear_synced_at', 'lanes_ready_linear_at']) {
+    setMeta(ctx.db, key, '2026-10-15T20:00:00Z');
+  }
+
+  await watchTick(ctx.db, {
+    me: 'hq-lanes',
+    run,
+    log: (line) => logs.push(line),
+    stepMs: 2000,
+    steps: { runs: () => Promise.resolve(), weekly: () => Promise.resolve(false), health: () => Promise.resolve({ opened: [], cleared: [] }), slots: () => Promise.reject(new Error('invented: 1Password is down')) },
+  });
+
+  expect(logs.filter((line) => line.includes('Claude slots'))).toStrictEqual(['2026-10-15T20:00:00Z Claude slots failed: invented: 1Password is down']);
+});

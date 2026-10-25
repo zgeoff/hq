@@ -1,4 +1,5 @@
 import type { Database } from 'bun:sqlite';
+import { match } from 'ts-pattern';
 import { queueReminder } from '../asks/queue-reminder.ts';
 import { runCallReadyMorningTick } from '../asks/run-call-ready-morning-tick.ts';
 import { iso } from '../clock/iso.ts';
@@ -252,6 +253,27 @@ export async function watchTick(db: Database, d: WatchDeps): Promise<boolean> {
       }
     } catch (error) {
       d.log(`${at()} weekly audit failed: ${msg(error)}`);
+    }
+    try {
+      const readSlots = d.steps.slots;
+      const slots = readSlots ? await step('Claude slot reads', (signal) => readSlots(signal)) : null;
+      const read = slots?.read ?? null;
+      if (read !== null) {
+        match(read)
+          .with({ kind: 'read' }, (done) => {
+            d.log(`${at()} Claude slots: read, ${done.problems.length} problem(s)`);
+            for (const problem of done.problems) {
+              d.log(`${at()} Claude slots: ${problem}`);
+            }
+          })
+          .with({ kind: 'not-set-up' }, () => {})
+          .exhaustive();
+      }
+      if (slots?.news) {
+        d.log(`${at()} Claude slots: fleet forecast news line added`);
+      }
+    } catch (error) {
+      d.log(`${at()} Claude slots failed: ${msg(error)}`);
     }
     // After the goals sync (CI minutes come from it) and before the check-in that quotes the sample.
     try {

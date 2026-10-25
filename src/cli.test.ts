@@ -4,8 +4,10 @@ import { chmodSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { HttpResponse, http } from 'msw';
 import rulesTable from '../lanes.json';
+import { slotUsage } from '../mocks/anthropic-handlers.ts';
 import { LINEAR_GRAPHQL_URL, linearIssues } from '../mocks/linear-handlers.ts';
 import { server } from '../mocks/node.ts';
+import { createStubOp } from '../test/create-stub-op.ts';
 import { NOON_SYDNEY, at, fakeAtc, freshDb } from '../test/helpers.ts';
 import { main } from './cli.ts';
 import { overrideEnv } from './config/override-env.ts';
@@ -433,6 +435,87 @@ test('hq grant actions shows a voided act struck out with its reason in text and
 
   expect(text.trim()).toBe('kettle-merges (mark 1): 1: kettle#9 (teapot-bot); ~~kettle#8 (teapot-bot)~~ void act 1, 2026-10-14T01:30:00Z by z-stu: logged before the merge failed');
   expect(JSON.parse(json).grants[0].voided).toStrictEqual([{ id: 1, target: 'kettle#8', note: null, actor: 'teapot-bot', at: NOON_SYDNEY, voidedAt: '2026-10-14T01:30:00Z', voidedBy: 'z-stu', voidReason: 'logged before the merge failed' }]);
+});
+
+test('hq capacity says the slot reads are not set up, in text and in --json', async () => {
+  const fresh = freshDb();
+  const log = console.log;
+  const lines: string[] = [];
+  onTestFinished(fresh.cleanup);
+  onTestFinished(overrideEnv('HQ_NOW', NOON_SYDNEY));
+  onTestFinished(() => (console.log = log));
+  console.log = (line: string) => lines.push(line);
+
+  await main(['capacity']);
+  await main(['capacity', '--json']);
+
+  expect(lines[0]).toInclude('  fleet: no forecast, slot reads are not set up');
+  expect(JSON.parse(lines[1] ?? '{}').fleet).toMatchObject({ notSetUp: expect.stringContaining('no settings file at '), active: null, slots: [], forecast: null, note: 'slot reads are not set up' });
+});
+
+test('hq capacity --refresh-slots reads the four slots through op and prints the fleet block without a token', async () => {
+  const fresh = freshDb();
+  const log = console.log;
+  const lines: string[] = [];
+  const settings = `${fresh.dir}/settings.local.json`;
+  onTestFinished(fresh.cleanup);
+  onTestFinished(overrideEnv('HQ_NOW', NOON_SYDNEY));
+  onTestFinished(overrideEnv('HQ_SLOTS_OP_SETTINGS', settings));
+  onTestFinished(() => (console.log = log));
+  const op = createStubOp({
+    directory: fresh.dir,
+    answers: {
+      'op://claude-slots/claude-setup-token-1/credential': 'sk-ant-kettle-cli-1',
+      'op://claude-slots/claude-setup-token-2/credential': 'sk-ant-kettle-cli-2',
+      'op://claude-slots/claude-setup-token-3/credential': 'sk-ant-kettle-cli-3',
+      'op://claude-slots/claude-setup-token-4/credential': 'sk-ant-kettle-cli-4',
+    },
+  });
+  onTestFinished(overrideEnv('PATH', `${op.bin}:${process.env['PATH']}`));
+  writeFileSync(settings, JSON.stringify({ env: { OP_SERVICE_ACCOUNT_TOKEN: 'ops_kettle-profile-0001' } }));
+  fresh.db.query('INSERT INTO usage_samples (at, account, five_hour, seven_day, five_hour_resets_at, seven_day_resets_at) VALUES (?, ?, ?, ?, ?, ?)').run('2026-10-14T00:55:00Z', 'abcdef012345', 5, 40, null, '2026-10-19T00:00:00Z');
+  slotUsage.set('Bearer sk-ant-kettle-cli-1', { seven: { utilization: 0.4, reset: 1_792_540_800 } });
+  slotUsage.set('Bearer sk-ant-kettle-cli-2', { seven: { utilization: 0.4, reset: 1_792_368_000 } });
+  slotUsage.set('Bearer sk-ant-kettle-cli-3', { seven: { utilization: 0.4, reset: 1_792_713_600 } });
+  slotUsage.set('Bearer sk-ant-kettle-cli-4', { seven: { utilization: 0.4, reset: 1_792_800_000 } });
+  console.log = (line: string) => lines.push(line);
+
+  await main(['capacity', '--refresh-slots']);
+
+  const text = lines.join('\n');
+  expect(text).toInclude('  slot 2 (active): 5h ?, 7d 40% (resets 19 Oct 00:00Z), read 0 min ago');
+  expect(text).toInclude('  slot 1: 5h ?, 7d 40% (resets 21 Oct 00:00Z), read 0 min ago');
+  expect(text).not.toInclude('sk-ant-kettle');
+  expect(fresh.db.query('SELECT COUNT(*) AS total FROM slot_usage').get()).toStrictEqual({ total: 4 });
+});
+
+test('hq capacity --refresh-slots --json carries the refresh problems in the fleet block', async () => {
+  const fresh = freshDb();
+  const log = console.log;
+  const lines: string[] = [];
+  const settings = `${fresh.dir}/settings.local.json`;
+  onTestFinished(fresh.cleanup);
+  onTestFinished(overrideEnv('HQ_NOW', NOON_SYDNEY));
+  onTestFinished(overrideEnv('HQ_SLOTS_OP_SETTINGS', settings));
+  onTestFinished(() => (console.log = log));
+  const op = createStubOp({
+    directory: fresh.dir,
+    answers: {
+      'op://claude-slots/claude-setup-token-1/credential': 'sk-ant-kettle-cli-1',
+      'op://claude-slots/claude-setup-token-2/credential': 'sk-ant-kettle-cli-2',
+      'op://claude-slots/claude-setup-token-4/credential': 'sk-ant-kettle-cli-4',
+    },
+  });
+  onTestFinished(overrideEnv('PATH', `${op.bin}:${process.env['PATH']}`));
+  writeFileSync(settings, JSON.stringify({ env: { OP_SERVICE_ACCOUNT_TOKEN: 'ops_kettle-profile-0001' } }));
+  slotUsage.set('Bearer sk-ant-kettle-cli-1', { seven: { utilization: 0.4, reset: 1_792_540_800 } });
+  slotUsage.set('Bearer sk-ant-kettle-cli-2', { seven: { utilization: 0.4, reset: 1_792_540_800 } });
+  slotUsage.set('Bearer sk-ant-kettle-cli-4', { seven: { utilization: 0.4, reset: 1_792_540_800 } });
+  console.log = (line: string) => lines.push(line);
+
+  await main(['capacity', '--refresh-slots', '--json']);
+
+  expect(JSON.parse(lines.join('\n')).fleet.problems).toStrictEqual(['slot 3: op read failed (exit 1)']);
 });
 
 test('hq lanes tick --refresh reads Ready from Linear inside the 10 min throttle, then ticks', async () => {

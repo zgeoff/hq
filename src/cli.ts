@@ -172,6 +172,11 @@ import { openAlerts } from './capacity/open-alerts.ts';
 import { readingText } from './capacity/reading-text.ts';
 import { sampleLog } from './capacity/sample-log.ts';
 import { setCapacitySetting } from './capacity/set-capacity-setting.ts';
+import { formatFleetView } from './capacity/fleet/format-fleet-view.ts';
+import { readCapacityFleet } from './capacity/fleet/read-capacity-fleet.ts';
+import { readOptionalFile } from './capacity/fleet/read-optional-file.ts';
+import { runFleetStep } from './capacity/fleet/run-fleet-step.ts';
+import type { FleetIO } from './capacity/fleet/types.ts';
 import { thresholdLines } from './capacity/threshold-lines.ts';
 import { buildCapacityProbe } from './capacity/build-capacity-probe.ts';
 import { eligibleNow } from './lanes/eligible-now.ts';
@@ -456,6 +461,7 @@ const OPTIONS = {
   days: { type: 'string' },
   hours: { type: 'string' },
   reset: { type: 'boolean' },
+  'refresh-slots': { type: 'boolean' },
   around: { type: 'string' },
   kind: { type: 'string' },
   deadline: { type: 'string' },
@@ -1088,7 +1094,8 @@ async function capacityCommand(db: Database, verb: string | undefined, args: str
       const lines = [reading ? readingText(reading) : 'No sample yet: hq capacity sample reads one now.', 'Thresholds:', ...thresholdLines(db, reading).map((l) => `  ${l}`), Object.keys(open).length ? 'Open alerts:' : 'No open alerts.', ...Object.values(open).map((o) => `  ${o.line} (since ${o.since}${o.told ? '' : ', not yet told'})`)];
       const pacing = await loadPacing(pacingPath());
       const hint = readCapacityHint(db, pacing.claudeLaunchPct ?? 95, now());
-      return { data: { sample: reading, hint, settings: capacitySettings(db), open }, text: [...lines, ...formatCapacityHint(hint)].join('\n') };
+      const fleet = await readCapacityFleet(db, buildFleetIO(), now(), flags['refresh-slots'] === true);
+      return { data: { sample: reading, hint, settings: capacitySettings(db), open, fleet: { ...fleet.view, problems: fleet.problems } }, text: [...lines, ...formatCapacityHint(hint), ...formatFleetView(fleet.view), ...fleet.problems.map((problem) => `  ! ${problem}`)].join('\n') };
     }
     case 'sample': {
       const r = await capacityTick(db, await actor(db, flags));
@@ -1821,7 +1828,18 @@ async function lanesCommand(context: Pick<Ctx, 'db' | 'verb' | 'rest' | 'flags' 
       } catch (e) {
         console.log(`${iso(now())} version mark failed: ${String((e as Error).message ?? e)}`);
       }
-      return watchLoop(db, { me, run: boundedRunner(realRunner, CALL_MS), log: (l) => console.log(l), steps: { runs: () => watchRuns(db, me), weekly: () => weeklyStats(db, me, boundedRunner(realRunner, CALL_MS)), health: () => healthTick(db, me), capacity: () => capacityTick(db, me), refusals: async () => (await scanRefusals(db)).refusals_added } }, interval);
+      const steps = {
+        runs: () => watchRuns(db, me),
+        weekly: () => weeklyStats(db, me, boundedRunner(realRunner, CALL_MS)),
+        health: () => healthTick(db, me),
+        capacity: () => capacityTick(db, me),
+        slots: (signal: AbortSignal) => runFleetStep(db, buildFleetIO(), now(), { force: false, signal }),
+        refusals: async () => {
+          const scan = await scanRefusals(db);
+          return scan.refusals_added;
+        },
+      };
+      return watchLoop(db, { me, run: boundedRunner(realRunner, CALL_MS), log: (line) => console.log(line), steps }, interval);
     }
     case 'start': {
       const r = await installLanes(realRunner, { home: getHome(), exec: selfCommand(), interval: intFlag(flags.interval, 'interval'), processEnv: process.env, env: cleanEnv() });
@@ -2271,6 +2289,10 @@ function formatRefreshLine(refresh: { error: string | null } | null): string {
     return '';
   }
   return refresh.error === null ? 'Read Ready from Linear.\n' : `Ready read from Linear failed: ${refresh.error}\n`;
+}
+
+function buildFleetIO(): FleetIO {
+  return { run: boundedRunner(realRunner, CALL_MS), httpClient: fetch, settings: { path: config().HQ_SLOTS_OP_SETTINGS ?? `${getHome()}/projects/hq/.claude/settings.local.json`, readFile: readOptionalFile } };
 }
 
 if (import.meta.main) process.exit(await main(process.argv.slice(2)));
