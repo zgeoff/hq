@@ -117,13 +117,16 @@ function buildSimSlots(newest: readonly SlotRow[], active: number, latest: Usage
   const slots: SimSlot[] = [];
   for (const row of newest) {
     const sample = row.slot === active ? pickNewerThanRead(row, latest) : findNewerSample(row, samples);
-    const seven = sample === null ? row.seven : sample.seven_day;
-    const sevenResetsAt = sample === null ? row.sevenResetsAt : sample.seven_day_resets_at;
+    const sevenFromSample = sample !== null && sample.seven_day !== null && sample.seven_day_resets_at !== null;
+    const seven = sevenFromSample ? sample.seven_day : row.seven;
+    const sevenResetsAt = sevenFromSample ? sample.seven_day_resets_at : row.sevenResetsAt;
     if (seven === null || sevenResetsAt === null) {
       continue;
     }
-    const fiveResetsAt = sample === null ? row.fiveResetsAt : sample.five_hour_resets_at;
-    slots.push({ slot: row.slot, five: (sample === null ? row.five : sample.five_hour) ?? 0, fiveResetsAt: fiveResetsAt === null ? null : new Date(fiveResetsAt), seven, sevenResetsAt: new Date(sevenResetsAt) });
+    const fiveFromSample = sample !== null && sample.five_hour !== null;
+    const five = fiveFromSample ? sample.five_hour : row.five;
+    const fiveResetsAt = fiveFromSample ? sample.five_hour_resets_at : row.fiveResetsAt;
+    slots.push({ slot: row.slot, five: five ?? 0, fiveResetsAt: fiveResetsAt === null ? null : new Date(fiveResetsAt), seven, sevenResetsAt: new Date(sevenResetsAt) });
   }
   return slots;
 }

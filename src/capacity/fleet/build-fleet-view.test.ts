@@ -144,6 +144,43 @@ test('it starts the active slot from the newest usage sample when that sample is
   expect(view.forecast?.switches[0]).toStrictEqual({ at: '2026-10-14T16:00:00Z', from: 1, to: 2 });
 });
 
+test('it keeps the 5-hour figure of a slot read when the newer usage sample has none', () => {
+  const rows: SlotRow[] = [
+    { at: '2026-10-14T00:30:00Z', slot: 1, status: '200', five: 0, fiveResetsAt: null, seven: 93, sevenResetsAt: '2026-10-18T00:00:00Z', workingLanes: 2 },
+    { at: '2026-10-14T00:30:00Z', slot: 2, status: '200', five: 96, fiveResetsAt: '2026-10-14T04:00:00Z', seven: 40, sevenResetsAt: '2026-10-19T00:00:00Z', workingLanes: 2 },
+  ];
+  const samples = [
+    { at: '2026-10-13T23:30:00Z', account: 'kettle01', five_hour: 0, seven_day: 92.5, five_hour_resets_at: null, seven_day_resets_at: '2026-10-18T00:00:00Z' },
+    { at: '2026-10-14T00:00:00Z', account: 'kettle01', five_hour: 0, seven_day: 93, five_hour_resets_at: null, seven_day_resets_at: '2026-10-18T00:00:00Z' },
+    { at: '2026-10-14T00:30:00Z', account: 'kettle01', five_hour: 0, seven_day: 93.5, five_hour_resets_at: null, seven_day_resets_at: '2026-10-18T00:00:00Z' },
+    { at: '2026-10-14T00:45:00Z', account: 'teapot02', five_hour: null, seven_day: 41, five_hour_resets_at: null, seven_day_resets_at: '2026-10-19T00:00:00Z' },
+    { at: '2026-10-14T01:00:00Z', account: 'kettle01', five_hour: 0, seven_day: 94, five_hour_resets_at: null, seven_day_resets_at: '2026-10-18T00:00:00Z' },
+  ];
+
+  const view = buildFleetView({ at: new Date('2026-10-14T01:00:00Z'), notSetUp: null, rows, samples, working: 2, cap: null });
+
+  expect(view.active).toBe(1);
+  expect(view.forecast?.switches[0]).toStrictEqual({ at: '2026-10-14T04:00:00Z', from: null, to: 2 });
+});
+
+test('it keeps the 7-day figure of the active slot read when the newer usage sample has none', () => {
+  const rows: SlotRow[] = [
+    { at: '2026-10-14T00:30:00Z', slot: 1, status: '200', five: 0, fiveResetsAt: null, seven: 96, sevenResetsAt: '2026-10-18T00:00:00Z', workingLanes: 2 },
+    { at: '2026-10-14T00:30:00Z', slot: 2, status: '200', five: 0, fiveResetsAt: null, seven: 10, sevenResetsAt: '2026-10-19T00:00:00Z', workingLanes: 2 },
+  ];
+  const samples = [
+    { at: '2026-10-13T23:30:00Z', account: 'kettle01', five_hour: 0, seven_day: 94.5, five_hour_resets_at: null, seven_day_resets_at: '2026-10-18T00:00:00Z' },
+    { at: '2026-10-14T00:00:00Z', account: 'kettle01', five_hour: 0, seven_day: 95, five_hour_resets_at: null, seven_day_resets_at: '2026-10-18T00:00:00Z' },
+    { at: '2026-10-14T00:30:00Z', account: 'kettle01', five_hour: 0, seven_day: 95.5, five_hour_resets_at: null, seven_day_resets_at: '2026-10-18T00:00:00Z' },
+    { at: '2026-10-14T01:00:00Z', account: 'kettle01', five_hour: 0, seven_day: null, five_hour_resets_at: null, seven_day_resets_at: '2026-10-18T00:00:00Z' },
+  ];
+
+  const view = buildFleetView({ at: new Date('2026-10-14T01:00:00Z'), notSetUp: null, rows, samples, working: 2, cap: null });
+
+  expect(view.note).toBeNull();
+  expect(view.forecast?.switches[0]).toStrictEqual({ at: '2026-10-14T01:00:00Z', from: 1, to: 2 });
+});
+
 test('it keeps a slot whose newest read failed in the simulation on its last good reading', () => {
   const rows: SlotRow[] = [
     { at: '2026-10-14T00:00:00Z', slot: 1, status: '200', five: 1, fiveResetsAt: null, seven: 10, sevenResetsAt: '2026-10-18T00:00:00Z', workingLanes: 2 },
