@@ -116,30 +116,27 @@ function toPoints(samples: readonly UsageSample[], percent: 'five_hour' | 'seven
 function buildSimSlots(newest: readonly SlotRow[], active: number, latest: UsageSample, samples: readonly UsageSample[]): SimSlot[] {
   const slots: SimSlot[] = [];
   for (const row of newest) {
-    const sample = row.slot === active ? pickNewerThanRead(row, latest) : findNewerSample(row, samples);
-    const sevenFromSample = sample !== null && sample.seven_day !== null && sample.seven_day_resets_at !== null;
-    const seven = sevenFromSample ? sample.seven_day : row.seven;
-    const sevenResetsAt = sevenFromSample ? sample.seven_day_resets_at : row.sevenResetsAt;
+    const account = row.slot === active ? latest.account : null;
+    const newer = collectNewerSamples(row, account, samples);
+    const sevenSample = newer.findLast((sample) => sample.seven_day !== null && sample.seven_day_resets_at !== null);
+    const seven = sevenSample === undefined ? row.seven : sevenSample.seven_day;
+    const sevenResetsAt = sevenSample === undefined ? row.sevenResetsAt : sevenSample.seven_day_resets_at;
     if (seven === null || sevenResetsAt === null) {
       continue;
     }
-    const fiveFromSample = sample !== null && sample.five_hour !== null;
-    const five = fiveFromSample ? sample.five_hour : row.five;
-    const fiveResetsAt = fiveFromSample ? sample.five_hour_resets_at : row.fiveResetsAt;
+    const fiveSample = newer.findLast((sample) => sample.five_hour !== null);
+    const five = fiveSample === undefined ? row.five : fiveSample.five_hour;
+    const fiveResetsAt = fiveSample === undefined ? row.fiveResetsAt : fiveSample.five_hour_resets_at;
     slots.push({ slot: row.slot, five: five ?? 0, fiveResetsAt: fiveResetsAt === null ? null : new Date(fiveResetsAt), seven, sevenResetsAt: new Date(sevenResetsAt) });
   }
   return slots;
 }
 
-function pickNewerThanRead(row: SlotRow, sample: UsageSample): UsageSample | null {
-  return Date.parse(sample.at) > Date.parse(row.at) ? sample : null;
-}
-
-function findNewerSample(row: SlotRow, samples: readonly UsageSample[]): UsageSample | null {
+// A slot's samples newer than its read, oldest first: the active slot's by its account, another's by
+// its 7-day reset. Each window then takes the newest sample that holds a figure for it.
+function collectNewerSamples(row: SlotRow, account: string | null, samples: readonly UsageSample[]): UsageSample[] {
   const rowResetsAt = row.sevenResetsAt;
-  if (rowResetsAt === null) {
-    return null;
-  }
-  const matching = samples.filter((sample) => sample.seven_day_resets_at !== null && isSameSevenReset(sample.seven_day_resets_at, rowResetsAt) && Date.parse(sample.at) > Date.parse(row.at));
-  return matching.toSorted((left, right) => Date.parse(left.at) - Date.parse(right.at)).at(-1) ?? null;
+  const newer = samples.filter((sample) => Date.parse(sample.at) > Date.parse(row.at));
+  const matching = account === null ? newer.filter((sample) => rowResetsAt !== null && sample.seven_day_resets_at !== null && isSameSevenReset(sample.seven_day_resets_at, rowResetsAt)) : newer.filter((sample) => sample.account === account);
+  return matching.toSorted((left, right) => Date.parse(left.at) - Date.parse(right.at));
 }

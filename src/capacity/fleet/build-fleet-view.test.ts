@@ -181,6 +181,24 @@ test('it keeps the 7-day figure of the active slot read when the newer usage sam
   expect(view.forecast?.switches[0]).toStrictEqual({ at: '2026-10-14T01:00:00Z', from: 1, to: 2 });
 });
 
+test('it keeps the 5-hour figure of an earlier newer sample when the newest sample has only a 7-day figure', () => {
+  const rows: SlotRow[] = [
+    { at: '2026-10-14T00:20:00Z', slot: 1, status: '200', five: 0, fiveResetsAt: null, seven: 50, sevenResetsAt: '2026-10-18T00:00:00Z', workingLanes: 2 },
+    { at: '2026-10-14T00:20:00Z', slot: 2, status: '200', five: 0, fiveResetsAt: null, seven: 10, sevenResetsAt: '2026-10-19T00:00:00Z', workingLanes: 2 },
+  ];
+  const samples = [
+    { at: '2026-10-13T23:30:00Z', account: 'kettle01', five_hour: 90, seven_day: 49, five_hour_resets_at: '2026-10-14T03:00:00Z', seven_day_resets_at: '2026-10-18T00:00:00Z' },
+    { at: '2026-10-14T00:00:00Z', account: 'kettle01', five_hour: 93, seven_day: 49.5, five_hour_resets_at: '2026-10-14T03:00:00Z', seven_day_resets_at: '2026-10-18T00:00:00Z' },
+    { at: '2026-10-14T00:45:00Z', account: 'kettle01', five_hour: 96, seven_day: 50, five_hour_resets_at: '2026-10-14T03:00:00Z', seven_day_resets_at: '2026-10-18T00:00:00Z' },
+    { at: '2026-10-14T01:00:00Z', account: 'kettle01', five_hour: null, seven_day: 50.5, five_hour_resets_at: null, seven_day_resets_at: '2026-10-18T00:00:00Z' },
+  ];
+
+  const view = buildFleetView({ at: new Date('2026-10-14T01:00:00Z'), notSetUp: null, rows, samples, working: 2, cap: null });
+
+  expect(view.active).toBe(1);
+  expect(view.forecast?.switches[0]).toStrictEqual({ at: '2026-10-14T01:00:00Z', from: 1, to: 2 });
+});
+
 test('it gives no rate and no forecast and says the samples are too few when only one usage sample matches', () => {
   const rows: SlotRow[] = [{ at: '2026-10-14T00:50:00Z', slot: 1, status: '200', five: 4, fiveResetsAt: '2026-10-14T03:00:00Z', seven: 30, sevenResetsAt: '2026-10-18T00:00:00Z', workingLanes: 2 }];
   const samples = [{ at: '2026-10-14T00:55:00Z', account: 'kettle01', five_hour: 5, seven_day: 31, five_hour_resets_at: '2026-10-14T03:00:00Z', seven_day_resets_at: '2026-10-18T00:00:00Z' }];
