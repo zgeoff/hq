@@ -28,7 +28,7 @@ test('it reads the slots when there is no read yet', async () => {
   writeFileSync(ctx.path, JSON.stringify({ env: { OP_SERVICE_ACCOUNT_TOKEN: 'ops_kettle-profile-0001' } }));
   server.use(http.post('https://api.anthropic.com/v1/messages', () => HttpResponse.json({}, { headers: { 'anthropic-ratelimit-unified-7d-utilization': '0.1', 'anthropic-ratelimit-unified-7d-reset': '1792400000' } })));
 
-  const step = await runFleetStep(ctx.db, { run, settings: { path: ctx.path, readFile: readOptionalFile } },new Date('2026-10-14T00:00:00Z'), { force: false, signal: new AbortController().signal });
+  const step = await runFleetStep(ctx.db, { run, httpClient: fetch, settings: { path: ctx.path, readFile: readOptionalFile } },new Date('2026-10-14T00:00:00Z'), { force: false, signal: new AbortController().signal });
 
   expect(step.read?.kind).toBe('read');
   expect(ctx.db.query('SELECT COUNT(*) AS total FROM slot_usage').get()).toStrictEqual({ total: 4 });
@@ -41,8 +41,8 @@ test('it reads no slot when the newest read is under 2 hours old', async () => {
   writeFileSync(ctx.path, JSON.stringify({ env: { OP_SERVICE_ACCOUNT_TOKEN: 'ops_kettle-profile-0001' } }));
   server.use(http.post('https://api.anthropic.com/v1/messages', () => HttpResponse.json({}, { headers: { 'anthropic-ratelimit-unified-7d-utilization': '0.1', 'anthropic-ratelimit-unified-7d-reset': '1792400000' } })));
 
-  await runFleetStep(ctx.db, { run, settings: { path: ctx.path, readFile: readOptionalFile } },new Date('2026-10-14T00:00:00Z'), { force: false, signal: new AbortController().signal });
-  const step = await runFleetStep(ctx.db, { run, settings: { path: ctx.path, readFile: readOptionalFile } },new Date('2026-10-14T01:59:00Z'), { force: false, signal: new AbortController().signal });
+  await runFleetStep(ctx.db, { run, httpClient: fetch, settings: { path: ctx.path, readFile: readOptionalFile } },new Date('2026-10-14T00:00:00Z'), { force: false, signal: new AbortController().signal });
+  const step = await runFleetStep(ctx.db, { run, httpClient: fetch, settings: { path: ctx.path, readFile: readOptionalFile } },new Date('2026-10-14T01:59:00Z'), { force: false, signal: new AbortController().signal });
 
   expect(step.read).toBeNull();
   expect(ctx.db.query('SELECT COUNT(*) AS total FROM slot_usage').get()).toStrictEqual({ total: 4 });
@@ -55,8 +55,8 @@ test('it reads the slots again when the newest read is 2 hours old', async () =>
   writeFileSync(ctx.path, JSON.stringify({ env: { OP_SERVICE_ACCOUNT_TOKEN: 'ops_kettle-profile-0001' } }));
   server.use(http.post('https://api.anthropic.com/v1/messages', () => HttpResponse.json({}, { headers: { 'anthropic-ratelimit-unified-7d-utilization': '0.1', 'anthropic-ratelimit-unified-7d-reset': '1792400000' } })));
 
-  await runFleetStep(ctx.db, { run, settings: { path: ctx.path, readFile: readOptionalFile } },new Date('2026-10-14T00:00:00Z'), { force: false, signal: new AbortController().signal });
-  const step = await runFleetStep(ctx.db, { run, settings: { path: ctx.path, readFile: readOptionalFile } },new Date('2026-10-14T02:00:00Z'), { force: false, signal: new AbortController().signal });
+  await runFleetStep(ctx.db, { run, httpClient: fetch, settings: { path: ctx.path, readFile: readOptionalFile } },new Date('2026-10-14T00:00:00Z'), { force: false, signal: new AbortController().signal });
+  const step = await runFleetStep(ctx.db, { run, httpClient: fetch, settings: { path: ctx.path, readFile: readOptionalFile } },new Date('2026-10-14T02:00:00Z'), { force: false, signal: new AbortController().signal });
 
   expect(step.read?.kind).toBe('read');
   expect(ctx.db.query('SELECT COUNT(*) AS total FROM slot_usage').get()).toStrictEqual({ total: 8 });
@@ -69,8 +69,8 @@ test('it reads the slots now when forced, whatever the age of the newest read', 
   writeFileSync(ctx.path, JSON.stringify({ env: { OP_SERVICE_ACCOUNT_TOKEN: 'ops_kettle-profile-0001' } }));
   server.use(http.post('https://api.anthropic.com/v1/messages', () => HttpResponse.json({}, { headers: { 'anthropic-ratelimit-unified-7d-utilization': '0.1', 'anthropic-ratelimit-unified-7d-reset': '1792400000' } })));
 
-  await runFleetStep(ctx.db, { run, settings: { path: ctx.path, readFile: readOptionalFile } },new Date('2026-10-14T00:00:00Z'), { force: false, signal: new AbortController().signal });
-  const step = await runFleetStep(ctx.db, { run, settings: { path: ctx.path, readFile: readOptionalFile } },new Date('2026-10-14T00:05:00Z'), { force: true, signal: new AbortController().signal });
+  await runFleetStep(ctx.db, { run, httpClient: fetch, settings: { path: ctx.path, readFile: readOptionalFile } },new Date('2026-10-14T00:00:00Z'), { force: false, signal: new AbortController().signal });
+  const step = await runFleetStep(ctx.db, { run, httpClient: fetch, settings: { path: ctx.path, readFile: readOptionalFile } },new Date('2026-10-14T00:05:00Z'), { force: true, signal: new AbortController().signal });
 
   expect(step.read?.kind).toBe('read');
 });
@@ -105,7 +105,7 @@ test('it adds a news line for the forecast pause and leaks no token into it, the
   for (const issue of ['GEO-9901', 'GEO-9902']) {
     addRun(ctx.db, { issue, title: 'Descale the kettle', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
   }
-  const step = await runFleetStep(ctx.db, { run, settings: { path: ctx.path, readFile: readOptionalFile } },new Date('2026-10-14T01:00:00Z'), { force: false, signal: new AbortController().signal });
+  const step = await runFleetStep(ctx.db, { run, httpClient: fetch, settings: { path: ctx.path, readFile: readOptionalFile } },new Date('2026-10-14T01:00:00Z'), { force: false, signal: new AbortController().signal });
   const everything = JSON.stringify([step, ctx.db.query('SELECT * FROM slot_usage').all(), ctx.db.query('SELECT * FROM news').all(), ctx.db.query('SELECT * FROM meta').all()]);
 
   expect(step.news).toBe(true);
@@ -145,7 +145,7 @@ test('it stores no slot row and no news line when the step is aborted', async ()
     addRun(ctx.db, { issue, title: 'Descale the kettle', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
   }
 
-  const outcome = await runFleetStep(ctx.db, { run, settings: { path: ctx.path, readFile: readOptionalFile } },new Date('2026-10-14T01:00:00Z'), { force: false, signal: AbortSignal.abort() }).then(
+  const outcome = await runFleetStep(ctx.db, { run, httpClient: fetch, settings: { path: ctx.path, readFile: readOptionalFile } },new Date('2026-10-14T01:00:00Z'), { force: false, signal: AbortSignal.abort() }).then(
     () => null,
     (error: unknown) => error,
   );
@@ -175,7 +175,7 @@ test('it adds no news line when the step is aborted after a read it did not need
 
   const run = mock<Runner>(() => Promise.resolve({ code: 1, stdout: '', stderr: 'invented: must not run' }));
 
-  const outcome = await runFleetStep(ctx.db, { run, settings: { path: ctx.path, readFile: readOptionalFile } },new Date('2026-10-14T01:00:00Z'), { force: false, signal: AbortSignal.abort() }).then(
+  const outcome = await runFleetStep(ctx.db, { run, httpClient: fetch, settings: { path: ctx.path, readFile: readOptionalFile } },new Date('2026-10-14T01:00:00Z'), { force: false, signal: AbortSignal.abort() }).then(
     () => null,
     (error: unknown) => error,
   );

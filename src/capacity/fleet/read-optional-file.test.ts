@@ -16,12 +16,15 @@ test('it reads the text of a file that exists', async () => {
   const ctx = setupTest();
 
   writeFileSync(join(ctx.directory, 'teapot.txt'), 'short and stout\n');
+  const text = await readOptionalFile(join(ctx.directory, 'teapot.txt'));
 
-  expect(await readOptionalFile(join(ctx.directory, 'teapot.txt'))).toBe('short and stout\n');
+  expect(text).toBe('short and stout\n');
 });
 
 test('it gives null for a file that does not exist', async () => {
   const ctx = setupTest();
 
-  expect(await readOptionalFile(join(ctx.directory, 'missing.txt'))).toBeNull();
+  const text = await readOptionalFile(join(ctx.directory, 'missing.txt'));
+
+  expect(text).toBeNull();
 });

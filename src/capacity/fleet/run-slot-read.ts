@@ -27,7 +27,7 @@ async function readReadySlots(db: Database, io: FleetIO, at: Date, access: SlotA
   const readings: SlotReading[] = [];
   const problems: string[] = [];
   for (const slot of SLOT_NUMBERS) {
-    const result = await readSlotReading(io.run, access.opToken, slot, access.signal);
+    const result = await readSlotReading(io, access.opToken, slot, access.signal);
     readings.push(result.reading);
     if (result.problem !== null) {
       problems.push(result.problem);

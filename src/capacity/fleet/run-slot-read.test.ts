@@ -46,7 +46,7 @@ test('it reads four slots, stores one row each with the working lane count, and 
       return HttpResponse.json({}, response);
     }),
   );
-  const result = await runSlotRead(ctx.db, { run, settings: { path: ctx.path, readFile: readOptionalFile } },new Date('2026-10-14T01:00:00Z'), new AbortController().signal);
+  const result = await runSlotRead(ctx.db, { run, httpClient: fetch, settings: { path: ctx.path, readFile: readOptionalFile } },new Date('2026-10-14T01:00:00Z'), new AbortController().signal);
 
   expect(result).toMatchObject({ kind: 'read', problems: ['slot 3: op read failed (exit 1)'] });
   expect(ctx.db.query('SELECT at, slot, status, five_hour, seven_day, working_lanes FROM slot_usage ORDER BY slot').all()).toStrictEqual([
@@ -61,7 +61,7 @@ test('it reads no slot and stores nothing when the slot reads are not set up', a
   const ctx = setupTest();
   const run = mock<Runner>(() => Promise.resolve({ code: 1, stdout: '', stderr: 'invented: must not run' }));
 
-  const result = await runSlotRead(ctx.db, { run, settings: { path: ctx.path, readFile: readOptionalFile } },new Date('2026-10-14T01:00:00Z'), new AbortController().signal);
+  const result = await runSlotRead(ctx.db, { run, httpClient: fetch, settings: { path: ctx.path, readFile: readOptionalFile } },new Date('2026-10-14T01:00:00Z'), new AbortController().signal);
 
   expect(result).toStrictEqual({ kind: 'not-set-up', reason: `no settings file at ${ctx.path}` });
   expect(ctx.db.query('SELECT COUNT(*) AS total FROM slot_usage').get()).toStrictEqual({ total: 0 });
@@ -79,7 +79,7 @@ test('it keeps every token out of the stored rows and the problems, even when th
 
   writeFileSync(ctx.path, JSON.stringify({ env: { OP_SERVICE_ACCOUNT_TOKEN: 'ops_kettle-profile-0001' } }));
   server.use(http.post('https://api.anthropic.com/v1/messages', (info) => HttpResponse.json({ error: `bad credential ${info.request.headers.get('authorization')}` }, { status: 403 })));
-  const result = await runSlotRead(ctx.db, { run, settings: { path: ctx.path, readFile: readOptionalFile } },new Date('2026-10-14T01:00:00Z'), new AbortController().signal);
+  const result = await runSlotRead(ctx.db, { run, httpClient: fetch, settings: { path: ctx.path, readFile: readOptionalFile } },new Date('2026-10-14T01:00:00Z'), new AbortController().signal);
   const stored = JSON.stringify(ctx.db.query('SELECT * FROM slot_usage').all());
   const printed = JSON.stringify(result);
 

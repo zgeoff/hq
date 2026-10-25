@@ -2292,7 +2292,7 @@ function formatRefreshLine(refresh: { error: string | null } | null): string {
 }
 
 function buildFleetIO(): FleetIO {
-  return { run: boundedRunner(realRunner, CALL_MS), settings: { path: config().HQ_SLOTS_OP_SETTINGS ?? `${getHome()}/projects/hq/.claude/settings.local.json`, readFile: readOptionalFile } };
+  return { run: boundedRunner(realRunner, CALL_MS), httpClient: fetch, settings: { path: config().HQ_SLOTS_OP_SETTINGS ?? `${getHome()}/projects/hq/.claude/settings.local.json`, readFile: readOptionalFile } };
 }
 
 if (import.meta.main) process.exit(await main(process.argv.slice(2)));

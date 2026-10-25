@@ -17,7 +17,7 @@ test('it sends the one-token haiku request with the slot token and keeps the usa
       return HttpResponse.json({}, { headers: { 'anthropic-ratelimit-unified-5h-utilization': '0.2', 'anthropic-ratelimit-unified-5h-reset': '1792000000', 'anthropic-ratelimit-unified-7d-utilization': '0.5', 'anthropic-ratelimit-unified-7d-reset': '1792400000' } });
     }),
   );
-  const result = await readSlotReading(run, 'ops_kettle-profile', 2, new AbortController().signal);
+  const result = await readSlotReading({ run, httpClient: fetch }, 'ops_kettle-profile', 2, new AbortController().signal);
 
   expect(result).toStrictEqual({ reading: { slot: 2, status: '200', five: 20, fiveResetsAt: '2026-10-14T17:46:40Z', seven: 50, sevenResetsAt: '2026-10-19T08:53:20Z' }, problem: null });
   expect(received).toHaveBeenCalledTimes(1);
@@ -28,7 +28,7 @@ test('it keeps the status and no figures when the slot answers 403 without heade
   const run = mock<Runner>(() => Promise.resolve({ code: 0, stdout: 'sk-ant-kettle-slot-0042\n', stderr: '' }));
 
   server.use(http.post('https://api.anthropic.com/v1/messages', () => HttpResponse.json({ error: 'forbidden' }, { status: 403 })));
-  const result = await readSlotReading(run, 'ops_kettle-profile', 3, new AbortController().signal);
+  const result = await readSlotReading({ run, httpClient: fetch }, 'ops_kettle-profile', 3, new AbortController().signal);
 
   expect(result).toStrictEqual({ reading: { slot: 3, status: '403', five: null, fiveResetsAt: null, seven: null, sevenResetsAt: null }, problem: null });
 });
@@ -44,7 +44,7 @@ test('it makes no request when 1Password gives no token', async () => {
       return HttpResponse.json({});
     }),
   );
-  const result = await readSlotReading(run, 'ops_kettle-profile', 4, new AbortController().signal);
+  const result = await readSlotReading({ run, httpClient: fetch }, 'ops_kettle-profile', 4, new AbortController().signal);
 
   expect(result).toStrictEqual({ reading: { slot: 4, status: 'op-failed', five: null, fiveResetsAt: null, seven: null, sevenResetsAt: null }, problem: 'slot 4: op read failed (exit 1)' });
   expect(requested).not.toHaveBeenCalled();
@@ -54,7 +54,7 @@ test('it reports a failed request without the token', async () => {
   const run = mock<Runner>(() => Promise.resolve({ code: 0, stdout: 'sk-ant-kettle-slot-0042\n', stderr: '' }));
 
   server.use(http.post('https://api.anthropic.com/v1/messages', () => HttpResponse.error()));
-  const result = await readSlotReading(run, 'ops_kettle-profile', 1, new AbortController().signal);
+  const result = await readSlotReading({ run, httpClient: fetch }, 'ops_kettle-profile', 1, new AbortController().signal);
 
   expect(result.reading.status).toBe('request-failed');
   expect(result.problem).toStartWith('slot 1: ');

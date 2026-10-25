@@ -8,6 +8,7 @@ export interface SlotSettings {
 
 export interface FleetIO {
   run: Runner;
+  httpClient: typeof fetch;
   settings: SlotSettings;
 }
 
