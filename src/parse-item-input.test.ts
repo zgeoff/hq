@@ -77,6 +77,7 @@ test.each([
   ['a PR that is not owner/repo#number', 'call', { action: 'override', pr: 'kettle#4' }, 'must be <owner>/<repo>#<number>'],
   ['an action hq does not know', 'call', { action: 'merge', pr: 'zgeoff/kettle#4' }, 'options.0.grants.action'],
   ['a grant on a proposal option', 'proposal', { action: 'override', pr: 'zgeoff/kettle#4' }, 'only a call\'s option does'],
+  ['a grant that names a CI check', 'call', { action: 'override', pr: 'zgeoff/kettle#4', check: 'preview' }, 'check'],
   ['a grant head that is not a commit sha', 'call', { action: 'override', pr: 'zgeoff/kettle#4', head: 'a1b2c3d' }, 'must be a 40-character commit sha'],
 ] as const)('it refuses %s', (_case, kind, grants, why) => {
   const item = { title: 'Lid', question: 'Merge kettle#4?', diff: { now: 'Open.', would: 'Merged.' }, options: [{ label: 'Go', effect: 'It merges.', grants }, { label: 'Wait', effect: 'It waits.' }] };

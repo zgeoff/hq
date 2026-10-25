@@ -26,6 +26,10 @@ function setupTest() {
       addAsk(fresh.db, { kind: 'call', id, title, question: 'Boil again?', body: 'Body', issues: [], forSession: null, actor: 'z-kettle' });
       openAsk(fresh.db, { id, force: true, actor: 'z-stu' });
     },
+    fileGrantCall: (id: string, grants: Record<string, string>) => {
+      applyAskItem(fresh.db, { kind: 'call', id, issues: [], forSession: null, actor: 'z-kettle' }, parseItemInput('call', JSON.stringify({ title: 'Merge widgets#7?', question: 'Merge past the red check?', options: [{ label: 'Go', effect: 'Merge it.', grants }, { label: 'Wait', effect: 'Fix it first.' }] })), 'Merge past the red check?');
+      recordConsoleAnswer(fresh.db, { id, option: 'Go', note: '', actor: 'owner' });
+    },
     answerInHq: (id: string) => answerAsk(fresh.db, { id, kind: 'call', answer: 'Yes', actor: 'z-stu' }),
     answerByHqCall: async (id: string, verdict: 'owner' | 'other', actor = 'z-stu') => await runCallAnswer(fresh.db, { id, kind: 'call', answer: 'Yes', actor }, () => Promise.resolve({ verdict })),
     answerInConsole: (id: string) => recordConsoleAnswer(fresh.db, { id, option: '', note: 'Yes', actor: 'owner' }),
@@ -64,6 +68,7 @@ test('it shows a changes answer at the head it was given, with its source and no
         next: null,
         nextAt: null,
         override: null,
+        ciOverrides: [],
         reviewRecords: { mechanical: null, exemption: null },
         updatedAt: '2026-10-14T01:00:00Z',
       },
@@ -96,6 +101,7 @@ test.each(['lgtm', 'changes'])('it marks an older %s answer stale at the head it
         next: null,
         nextAt: null,
         override: null,
+        ciOverrides: [],
         reviewRecords: { mechanical: null, exemption: null },
         updatedAt: '2026-10-14T01:00:00Z',
       },
@@ -183,6 +189,7 @@ test('it prints the stored record and says stale is unknown when gh cannot give 
         next: null,
         nextAt: null,
         override: null,
+        ciOverrides: [],
         reviewRecords: { mechanical: null, exemption: null },
         updatedAt: '2026-10-14T01:00:00Z',
       },
@@ -255,6 +262,7 @@ test('it sets who holds the next step, and shows the record against the head gh 
         next: 'z-stu',
         nextAt: '2026-10-14T01:00:00Z',
         override: null,
+        ciOverrides: [],
         reviewRecords: { mechanical: null, exemption: null },
         updatedAt: '2026-10-14T01:00:00Z',
       },
@@ -341,6 +349,7 @@ test('it shows a gate none plainly, as a PR noslop does not review', async () =>
         next: null,
         nextAt: null,
         override: null,
+        ciOverrides: [],
         reviewRecords: { mechanical: null, exemption: null },
         updatedAt: '2026-10-14T01:00:00Z',
       },
@@ -373,6 +382,7 @@ test("it marks a gate recorded at an older head stale once the PR has a new head
         next: null,
         nextAt: null,
         override: null,
+        ciOverrides: [],
         reviewRecords: { mechanical: null, exemption: null },
         updatedAt: '2026-10-14T01:00:00Z',
       },
@@ -405,6 +415,7 @@ test("it shows a gate recorded at the PR's head now as not stale", async () => {
         next: null,
         nextAt: null,
         override: null,
+        ciOverrides: [],
         reviewRecords: { mechanical: null, exemption: null },
         updatedAt: '2026-10-14T01:00:00Z',
       },
@@ -427,6 +438,13 @@ test.each([
   ['no --source', { note: 'Rebased.' }],
   ['no --note', { source: 'chat:kettle-12' }],
   ['a blank --note', { source: 'chat:kettle-12', note: '  ' }],
+  ['an empty --check', { source: 'chat:kettle-12', note: 'Rebased.', check: [''] }],
+  ['a blank --check', { source: 'chat:kettle-12', note: 'Rebased.', check: ['  '] }],
+  ['a padded --check', { source: 'chat:kettle-12', note: 'Rebased.', check: [' preview'] }],
+  ['two --check values', { source: 'chat:kettle-12', note: 'Rebased.', check: ['preview', 'test'] }],
+  ['a --check and no --note', { source: 'chat:kettle-12', check: ['preview'] }],
+  ['a --check and no --source', { note: 'Rebased.', check: ['preview'] }],
+  ['a --check and a session --source', { source: 'session:z-kettle', note: 'Rebased.', check: ['preview'] }],
 ])('it refuses an override with %s, and records nothing', async (_case, flags) => {
   const ctx = setupTest();
 
@@ -894,4 +912,132 @@ test('it refuses a call: source for lgtm when the owner answered the call with s
 
   await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'answer', ['widgets', '7', 'lgtm'], { source: 'call:KET-52' })).rejects.toMatchObject({ code: 'bad_args', message: '--source refused: the owner\'s answer to call:KET-52 is not a plain yes: "No"; ask z-stu to record it' });
   expect(ctx.db.query('SELECT COUNT(*) AS total FROM pr_status').get()).toStrictEqual({ total: 0 });
+});
+
+test('it records a CI check override at the head now, holding the head, source, note, scope and check', async () => {
+  const ctx = setupTest();
+
+  const recorded = await ctx.override(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), { source: 'chat:kettle-12', note: 'An intended infra change.', check: ['preview'] });
+
+  expect(ctx.db.query("SELECT subject_id, actor, data FROM events WHERE action = 'pr-override'").all()).toStrictEqual([
+    { subject_id: 'pr:widgets#7', actor: 'z-kettle', data: JSON.stringify({ head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', source: 'chat:kettle-12', note: 'An intended infra change.', scope: 'ci-check', check: 'preview' }) },
+  ]);
+  expect(recorded.data).toStrictEqual({ ciOverride: { repo: 'widgets', pr: 7, head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', source: 'chat:kettle-12', note: 'An intended infra change.', check: 'preview' } });
+});
+
+test('it refuses a CI check override from a caller that is not the owner session, and records nothing', async () => {
+  const ctx = setupTest();
+
+  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'chat:kettle-12', note: 'Ship it.', check: ['preview'] })).rejects.toMatchObject({ code: 'bad_args' });
+
+  expect(ctx.db.query("SELECT COUNT(*) AS total FROM events WHERE action = 'pr-override'").get()).toStrictEqual({ total: 0 });
+});
+
+test('it refuses a CI check override when gh cannot give the head, and records nothing', async () => {
+  const ctx = setupTest();
+
+  await expect(ctx.override(ctx.ghDown(), { source: 'chat:kettle-12', note: 'Rebased.', check: ['preview'] })).rejects.toMatchObject({ code: 'head_unreadable' });
+
+  expect(ctx.db.query("SELECT COUNT(*) AS total FROM events WHERE action = 'pr-override'").get()).toStrictEqual({ total: 0 });
+});
+
+test('it shows a CI override at the head now, and not as the findings override', async () => {
+  const ctx = setupTest();
+  const head = ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678');
+  await ctx.answer(head, 'lgtm', { source: 'chat:kettle-1' });
+  await ctx.override(head, { source: 'chat:kettle-2', note: 'An intended infra change.', check: ['preview'] });
+
+  const shown = await ctx.status(head);
+
+  expect(shown.text).toInclude('ci override: preview at a1b2c3d via chat:kettle-2 (2026-10-14T01:00:00Z): An intended infra change.');
+  expect(shown.data).toStrictEqual({
+    pr: {
+      repo: 'widgets',
+      pr: 7,
+      head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678',
+      headKnown: true,
+      gate: null,
+      gateHead: null,
+      gateAt: null,
+      gateStale: false,
+      answer: 'lgtm',
+      answerHead: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678',
+      answerSource: 'chat:kettle-1',
+      answerNote: null,
+      answerAt: '2026-10-14T01:00:00Z',
+      answerStale: false,
+      next: null,
+      nextAt: null,
+      override: null,
+      ciOverrides: [{ check: 'preview', head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', source: 'chat:kettle-2', note: 'An intended infra change.', at: '2026-10-14T01:00:00Z' }],
+      reviewRecords: { mechanical: null, exemption: null },
+      updatedAt: '2026-10-14T01:00:00Z',
+    },
+  });
+});
+
+test('it shows no CI override once the PR has a new head', async () => {
+  const ctx = setupTest();
+  const head = ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678');
+  await ctx.answer(head, 'lgtm', { source: 'chat:kettle-1' });
+  await ctx.override(head, { source: 'chat:kettle-2', note: 'An intended infra change.', check: ['preview'] });
+
+  const shown = await ctx.status(ctx.headAt('b9c8d7e6f5a40312213f4e5d6c7b8a9087654321'));
+
+  expect(shown.data).toStrictEqual({
+    pr: {
+      repo: 'widgets',
+      pr: 7,
+      head: 'b9c8d7e6f5a40312213f4e5d6c7b8a9087654321',
+      headKnown: true,
+      gate: null,
+      gateHead: null,
+      gateAt: null,
+      gateStale: false,
+      answer: 'lgtm',
+      answerHead: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678',
+      answerSource: 'chat:kettle-1',
+      answerNote: null,
+      answerAt: '2026-10-14T01:00:00Z',
+      answerStale: true,
+      next: null,
+      nextAt: null,
+      override: null,
+      ciOverrides: [],
+      reviewRecords: { mechanical: null, exemption: null },
+      updatedAt: '2026-10-14T01:00:00Z',
+    },
+  });
+  expect(shown.text).not.toInclude('ci override');
+});
+
+test('it shows a standing CI override for a PR with no record', async () => {
+  const ctx = setupTest();
+  const head = ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678');
+  await ctx.override(head, { source: 'chat:kettle-2', note: 'An intended infra change.', check: ['preview'] });
+  ctx.db.query('DELETE FROM pr_status').run();
+
+  const shown = await ctx.status(head);
+
+  expect(shown.text).toInclude('ci override: preview at a1b2c3d via chat:kettle-2');
+  expect(shown.data).toStrictEqual({ pr: null, ciOverrides: [{ check: 'preview', head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', source: 'chat:kettle-2', note: 'An intended infra change.', at: '2026-10-14T01:00:00Z' }] });
+});
+
+test.each(['console:KET-60', 'call:KET-60'])('it refuses a CI check override from %s even when the picked option grants an override of this PR at this head, and records nothing', async (source) => {
+  const ctx = setupTest();
+  ctx.fileGrantCall('KET-60', { action: 'override', pr: 'zgeoff/widgets#7', head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678' });
+
+  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source, note: 'An intended infra change.', check: ['preview'] })).rejects.toMatchObject({ code: 'bad_args', message: `--source refused: ${source} cannot override a CI check: only the owner's own chat source may, so the owner names the check in the command; ask z-stu to record it` });
+
+  expect(ctx.db.query("SELECT COUNT(*) AS total FROM events WHERE action = 'pr-override'").get()).toStrictEqual({ total: 0 });
+});
+
+test('it refuses a CI check override from a call: source with a plain Yes, and records nothing', async () => {
+  const ctx = setupTest();
+  ctx.fileCall('KET-62', 'Override widgets#7 preview check?');
+  ctx.answerInConsole('KET-62');
+
+  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'call:KET-62', note: 'Ship it.', check: ['preview'] })).rejects.toMatchObject({ code: 'bad_args', message: expect.stringContaining('call:KET-62 cannot override a CI check') });
+
+  expect(ctx.db.query("SELECT COUNT(*) AS total FROM events WHERE action = 'pr-override'").get()).toStrictEqual({ total: 0 });
 });

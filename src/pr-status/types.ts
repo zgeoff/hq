@@ -1,3 +1,11 @@
+export interface CIOverrideView {
+  check: string;
+  head: string;
+  source: string;
+  note: string;
+  at: string;
+}
+
 export type PRAnswer = 'lgtm' | 'changes' | 'reject';
 
 // 'none': the gate passed because noslop does not review the PR (not listed, or a bot's PR).
@@ -25,6 +33,9 @@ export interface PRStatusView {
 
   // The owner's override of noslop's refusal at the head now, when one stands.
   override: { head: string; source: string; note: string; at: string } | null;
+
+  // The owner's overrides of named CI checks at the head now.
+  ciOverrides: CIOverrideView[];
 
   // z-review's records at the head now. Neither is an owner answer.
   reviewRecords: { mechanical: { files: string[]; lines: number } | null; exemption: { rule: string; note: string; files: string[] } | null };

@@ -729,7 +729,7 @@ test('it lets a PR of a repo off the list merge through hq review gate, with exi
 
   await expect(main(['review', 'gate', 'widgets', '7', '--json'], fake.run)).resolves.toBe(0);
 
-  expect(JSON.parse(lines[0] ?? '')).toMatchObject({ ok: true, mayMerge: true, reason: 'not a noslop repo: green CI is enough' });
+  expect(JSON.parse(lines[0] ?? '')).toMatchObject({ ok: true, mayMerge: true, reason: 'not a noslop repo: CI green at 0123456' });
 });
 
 test('it records gate none on the PR record through hq review gate for a PR of a repo off the list', async () => {

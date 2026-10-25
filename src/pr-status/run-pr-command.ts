@@ -5,6 +5,7 @@ import type { Database } from 'bun:sqlite';
 import type { Flags } from '../cli.ts';
 import type { Out } from '../commands.ts';
 import { HqError } from '../errors.ts';
+import { parseOneFlag } from '../parse-one-flag.ts';
 import type { PRStatusRow } from '../kdb.ts';
 import { getDeclaredSessions } from '../roles/get-declared-sessions.ts';
 import { roleName } from '../roles/role-name.ts';
@@ -30,12 +31,15 @@ import type { RoleProbe } from './read-role-session.ts';
 import { readPRHead } from './read-pr-head.ts';
 import { recordPRAnswer } from './record-pr-answer.ts';
 import { recordPRAcceptedRisk } from './record-pr-accepted-risk.ts';
+import { recordCICheckOverride } from './record-ci-check-override.ts';
+import { readHeadCIOverrides } from './read-head-ci-overrides.ts';
+import { formatCIOverrideLine } from './format-ci-override-line.ts';
 import { recordPROverride } from './record-pr-override.ts';
 import { recordPRNext } from './record-pr-next.ts';
 import { runPRExempt } from './run-pr-exempt.ts';
 import { runPRMechanical } from './run-pr-mechanical.ts';
 import { requireAnswerSource } from './require-answer-source.ts';
-import type { PRAnswer, PRStatusView } from './types.ts';
+import type { CIOverrideView, PRAnswer, PRStatusView } from './types.ts';
 import { updatePRHead } from './update-pr-head.ts';
 
 export interface PRCommandInput {
@@ -96,18 +100,23 @@ async function readUnrecordedStatus(input: PRCommandInput, ref: PRRef): Promise<
   const head = await readPRHead(input.run, ref.slug, ref.pr);
   const override = findStandingOverride(input, ref, head);
   const records = readStandingRecords(input, ref, head);
+  const ciOverrides = readStandingCIOverrides(input, ref, head);
   const shown = override === null ? null : { head: override.head, source: override.source, note: override.note, at: override.at };
   const recordsLine = formatReviewRecordsLine(records);
-  if (shown === null && recordsLine === null) {
+  if (shown === null && recordsLine === null && ciOverrides.length === 0) {
     return none;
   }
-  const lines = [none.text, shown === null ? null : formatOverrideLine(shown), recordsLine].filter((line): line is string => line !== null);
-  return { data: { pr: null, ...(shown === null ? {} : { override: shown }), ...(recordsLine === null ? {} : { reviewRecords: records }) }, text: lines.join('\n') };
+  const lines = [none.text, shown === null ? null : formatOverrideLine(shown), ...ciOverrides.map((ci) => formatCIOverrideLine(ci)), recordsLine].filter((line): line is string => line !== null);
+  return { data: { pr: null, ...(shown === null ? {} : { override: shown }), ...(ciOverrides.length === 0 ? {} : { ciOverrides }), ...(recordsLine === null ? {} : { reviewRecords: records }) }, text: lines.join('\n') };
 }
 
 // The override that stands at the head now; none when the head is unknown.
 function findStandingOverride(input: PRCommandInput, ref: PRRef, head: string | null): OwnerOverride | null {
   return head === null ? null : findOwnerOverride(input.db, ref.repo, ref.pr, head);
+}
+
+function readStandingCIOverrides(input: PRCommandInput, ref: PRRef, head: string | null): CIOverrideView[] {
+  return head === null ? [] : readHeadCIOverrides(input.db, ref.repo, ref.pr, head).map((override) => ({ check: override.check, head: override.head, source: override.source, note: override.note, at: override.at }));
 }
 
 // z-review's records that stand at the head; none when the head is unknown.
@@ -126,7 +135,7 @@ async function refreshStatus(input: PRCommandInput, ref: PRRef, row: PRStatusRow
   if (current !== null) {
     await updatePRHead(input.db, ref.repo, ref.pr, current);
   }
-  return buildOut(buildPRStatusView(row, current, findStandingOverride(input, ref, current), readStandingRecords(input, ref, current)));
+  return buildOut(buildPRStatusView(row, current, findStandingOverride(input, ref, current), { ciOverrides: readStandingCIOverrides(input, ref, current), reviewRecords: readStandingRecords(input, ref, current) }));
 }
 
 function buildOut(view: PRStatusView): Out {
@@ -173,15 +182,34 @@ async function readAnswerContext(input: PRCommandInput, ref: PRRef, head: string
 }
 
 async function runOverride(input: PRCommandInput, ref: PRRef): Promise<Out> {
+  const check = parseCheckFlag(input.flags.check);
+  const target = check === null ? 'the open findings' : `the ${check} check`;
   const head = await readPRHead(input.run, ref.slug, ref.pr);
-  const source = await requireOwnerSource(input, { ref, wanted: { action: 'override' }, head });
+  const source = await requireOwnerSource(input, { ref, wanted: check === null ? { action: 'override' } : { action: 'override', check }, head });
   const note = input.flags.note?.trim() ?? '';
   if (note === '') {
-    throw new HqError('bad_args', '--note is required: why the owner overrides the open findings at this head');
+    throw new HqError('bad_args', `--note is required: why the owner overrides ${target} at this head`);
   }
   const context = await readAnswerContext(input, ref, head);
+  if (check !== null) {
+    recordCICheckOverride(input.db, { repo: ref.repo, pr: ref.pr, head: context.head, source, note, actor: context.actor, check });
+    return { data: { ciOverride: { repo: ref.repo, pr: ref.pr, head: context.head, source, note, check } }, text: `Recorded the owner's override of the ${check} CI check for ${ref.repo}#${ref.pr} at ${context.head.slice(0, 7)} (${source}): ${note}` };
+  }
   recordPROverride(input.db, { repo: ref.repo, pr: ref.pr, head: context.head, source, note, actor: context.actor });
   return { data: { override: { repo: ref.repo, pr: ref.pr, head: context.head, source, note } }, text: `Recorded the owner's override of the open findings for ${ref.repo}#${ref.pr} at ${context.head.slice(0, 7)} (${source}): ${note}` };
+}
+
+// The one check name to override, or null when the flag is absent. The name must match a check
+// exactly, so a padded or empty one is refused rather than recorded to never match.
+function parseCheckFlag(values: readonly string[] | undefined): string | null {
+  const check = parseOneFlag(values, 'check');
+  if (check === undefined) {
+    return null;
+  }
+  if (check.trim() === '' || check !== check.trim()) {
+    throw new HqError('bad_args', '--check needs the exact name of one CI check, with no leading or trailing space');
+  }
+  return check;
 }
 
 async function requireOwnerSource(input: PRCommandInput, request: Omit<SourceRequest, 'source'>): Promise<string> {
@@ -244,7 +272,7 @@ function requireNextHolder(flags: Flags, session: string | undefined): string | 
 // The record after an answer, against the head that answer was just stored at.
 async function readOut(input: PRCommandInput, ref: PRRef, head: string): Promise<Out> {
   const row = await readWrittenRow(input, ref);
-  return buildOut(buildPRStatusView(row, head, findStandingOverride(input, ref, head), readStandingRecords(input, ref, head)));
+  return buildOut(buildPRStatusView(row, head, findStandingOverride(input, ref, head), { ciOverrides: readStandingCIOverrides(input, ref, head), reviewRecords: readStandingRecords(input, ref, head) }));
 }
 
 async function readWrittenRow(input: PRCommandInput, ref: PRRef): Promise<PRStatusRow> {

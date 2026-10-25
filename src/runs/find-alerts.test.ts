@@ -3,6 +3,7 @@ import { freshDb } from '../../test/helpers.ts';
 import { addPr } from './add-pr.ts';
 import { addRun } from './add-run.ts';
 import { findAlerts } from './find-alerts.ts';
+import { recordCICheckOverride } from '../pr-status/record-ci-check-override.ts';
 import { recordPROverride } from '../pr-status/record-pr-override.ts';
 import { setSession } from './set-session.ts';
 import { addUnblock } from '../unblock/add-unblock.ts';
@@ -250,5 +251,17 @@ test('it raises the quiet alert for an idle session past the quiet limit whose o
   expect(findAlerts(ctx.db, [{ id: session, name: 'kettle', alive: true, state: 'idle' }], activity, new Date('2026-10-21T03:00:00Z'))).toStrictEqual([
     { key: 'pr:kettle#56', fingerprint: 'final:abc1234', issue: 'GEO-9856', line: 'kettle#56 (GEO-9856) final at abc1234 for 120 min, no review [from marker:kettle]' },
     { key: `session:${session}`, fingerprint: 'quiet:idle', issue: 'GEO-9856', line: 'GEO-9856: session 98560000 quiet for 90 min' },
+  ]);
+});
+
+test('it raises a FINAL alert for a PR whose only override at its FINAL head is of a CI check', () => {
+  const ctx = setupTest();
+  addRun(ctx.db, { issue: 'GEO-9828', title: 'Invented kettle work', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
+  addPr(ctx.db, 'GEO-9828', 'kettle#28', 'kettle-bot');
+  ctx.db.query("UPDATE run_prs SET final_sha = 'abc1234', final_at = '2026-10-21T01:00:00Z', final_source = 'marker:kettle' WHERE ref = 'kettle#28'").run();
+  recordCICheckOverride(ctx.db, { repo: 'kettle', pr: 28, head: 'abc1234aaaabbbbccccddddeeeeffff00001111', source: 'chat:kettle-chat@2026-10-21T01:30:00Z', note: 'Invented: the preview is meant to be red.', actor: 'kettle-bot', check: 'preview' });
+
+  expect(findAlerts(ctx.db, [], new Map(), new Date('2026-10-21T03:00:00Z'))).toStrictEqual([
+    { key: 'pr:kettle#28', fingerprint: 'final:abc1234', issue: 'GEO-9828', line: 'kettle#28 (GEO-9828) final at abc1234 for 120 min, no review [from marker:kettle]' },
   ]);
 });

@@ -10,8 +10,9 @@ import { findCurrentOwnerAnswer } from './find-current-owner-answer.ts';
 import { hasPRName } from './has-pr-name.ts';
 import { isPlainYes } from './is-plain-yes.ts';
 
-// What the source must grant: an override of the open findings, or the risk of one finding.
-type OwnerAction = { action: 'override' } | { action: 'accept-risk'; finding: string };
+// What the source must grant: an override of the open findings, an override of one named CI check,
+// or the risk of one finding.
+type OwnerAction = { action: 'override'; check?: string } | { action: 'accept-risk'; finding: string };
 
 export interface SourceRequest {
   ref: PRRef;
@@ -27,6 +28,9 @@ export interface SourceRequest {
 export function findSourceRefusal(db: Database, request: SourceRequest, probe: OwnerProbe): string | null {
   const [kind = '', ...rest] = request.source.split(':');
   const id = rest.join(':');
+  if ((kind === 'call' || kind === 'console') && request.wanted.action === 'override' && request.wanted.check !== undefined) {
+    return `${request.source} cannot override a CI check: only the owner's own chat source may, so the owner names the check in the command`;
+  }
   if (kind === 'call' || kind === 'console') {
     return findCallRefusal(db, { ...request, id, needsGrant: kind === 'console' });
   }

@@ -63,7 +63,7 @@ test('it records gate none with no head for a PR whose repo is not on the noslop
   const ctx = setupTest(),
     fake = buildFakeRunner();
 
-  await expect(checkRecordedGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).resolves.toStrictEqual({ mayMerge: true, reason: 'not a noslop repo: green CI is enough', reviewed: false });
+  await expect(checkRecordedGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).resolves.toStrictEqual({ mayMerge: true, reason: 'not a noslop repo: CI green at 0123456', reviewed: false });
 
   expect(ctx.db.query('SELECT repo, pr, head, gate, gate_head FROM pr_status').all()).toStrictEqual([{ repo: 'widgets', pr: 7, head: null, gate: 'none', gate_head: null }]);
 });
@@ -73,7 +73,7 @@ test("it records gate none with no head for a bot's PR, which noslop never revie
     fake = buildFakeRunner({ author: '{"author":{"login":"renovate","is_bot":true}}' });
   setMeta(ctx.db, 'noslop', JSON.stringify({ repos: ['widgets'], sha: '0123456789abcdef0123456789abcdef01234567' }));
 
-  await expect(checkRecordedGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).resolves.toStrictEqual({ mayMerge: true, reason: 'bot PR: green CI is enough', reviewed: false });
+  await expect(checkRecordedGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).resolves.toStrictEqual({ mayMerge: true, reason: 'bot PR: CI green at 0123456', reviewed: false });
 
   expect(ctx.db.query('SELECT repo, pr, head, gate, gate_head FROM pr_status').all()).toStrictEqual([{ repo: 'widgets', pr: 7, head: null, gate: 'none', gate_head: null }]);
 });
@@ -94,7 +94,7 @@ test('it stores nothing for a PR of an owner other than zgeoff', async () => {
     fake = buildFakeRunner();
   setMeta(ctx.db, 'noslop', JSON.stringify({ repos: ['kettle-co/widgets'], sha: '0123456789abcdef0123456789abcdef01234567' }));
 
-  await expect(checkRecordedGate({ run: fake.run, db: ctx.db, rawRepo: 'kettle-co/widgets', pr: 7 })).resolves.toMatchObject({ mayMerge: true, reason: 'not a noslop repo: green CI is enough' });
+  await expect(checkRecordedGate({ run: fake.run, db: ctx.db, rawRepo: 'kettle-co/widgets', pr: 7 })).resolves.toMatchObject({ mayMerge: true, reason: 'not a noslop repo: CI green at 0123456' });
 
   expect(ctx.db.query('SELECT COUNT(*) AS n FROM pr_status').get()).toStrictEqual({ n: 0 });
 });
@@ -170,7 +170,7 @@ test("it records gate none for an unreviewed PR that changes an owner-held file 
   const fake = buildFakeRunner({ prFiles: { code: 0, stdout: 'skills/kettle/SKILL.md\n', stderr: '' } });
   recordPRAnswer(ctx.db, { repo: 'hq', pr: 7, answer: 'lgtm', head: FAKE_FULL_SHA, source: 'console:kettle-2', note: null, actor: 'z-kettle' });
 
-  await expect(checkRecordedGate({ run: fake.run, db: ctx.db, rawRepo: 'hq', pr: 7 })).resolves.toStrictEqual({ mayMerge: true, reason: 'not a noslop repo: green CI is enough', reviewed: false });
+  await expect(checkRecordedGate({ run: fake.run, db: ctx.db, rawRepo: 'hq', pr: 7 })).resolves.toStrictEqual({ mayMerge: true, reason: 'not a noslop repo: CI green at 0123456', reviewed: false });
 
   expect(ctx.db.query('SELECT gate, gate_head FROM pr_status').all()).toStrictEqual([{ gate: 'none', gate_head: null }]);
 });

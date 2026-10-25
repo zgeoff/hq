@@ -609,6 +609,22 @@ test('hq run check and state --check set live_check, and show it', async () => {
   expect((await hq('run', 'state', 'GEO-509', 'deploying', '--check', 'maybe')).code).not.toBe(0);
 });
 
+test('hq run state refuses --check given twice, and leaves the run as it was', async () => {
+  await hq('run', 'add', 'GEO-510', '--title', 'Invented kettle work', '--where', 'none');
+
+  const refused = await hq('run', 'state', 'GEO-510', 'deploying', '--check', 'owed', '--check', 'none');
+  const shown = await hq('run', 'show', 'GEO-510');
+
+  expect(refused.json.error).toStrictEqual({ code: 'bad_args', message: 'give --check once, not 2 times' });
+  expect(shown.json.run.state).toBe('working');
+});
+
+test('hq pr override refuses --check given twice', async () => {
+  const refused = await hq('pr', 'override', 'widgets', '7', '--check', 'preview', '--check', 'test', '--source', 'chat:kettle-12', '--note', 'Rebased.');
+
+  expect(refused.json.error).toStrictEqual({ code: 'bad_args', message: 'give --check once, not 2 times' });
+});
+
 test('hq run state refuses to move a run past its merge while a PR is open, and --force moves it', async () => {
   await hq('run', 'add', 'GEO-512', '--session', '512ab0c0-0000-4000-8000-00000000beef', '--title', 'Invented kettle stack', '--where', 'none');
   await hq('run', 'pr', 'GEO-512', 'vers#30');
