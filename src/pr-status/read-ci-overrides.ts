@@ -14,8 +14,6 @@ export interface CIOverride {
 
 const RowsSchema = z.array(z.object({ seq: z.number(), at: z.string(), data: z.string() }));
 
-const DataSchema = z.object({ head: z.string(), source: z.string(), note: z.string(), scope: z.string().optional(), check: z.string().optional() });
-
 // The PR's owner overrides of one named CI check, oldest first. One override event of any scope
 // that does not parse, or a ci-check one that names no check, voids them all, so a gap never lets
 // an older one stand.
@@ -39,6 +37,8 @@ export function readCIOverrides(db: Database, repo: string, pr: number): CIOverr
   }
   return overrides;
 }
+
+const DataSchema = z.object({ head: z.string(), source: z.string(), note: z.string(), scope: z.string().optional(), check: z.string().optional() });
 
 function parseData(text: string): z.infer<typeof DataSchema> | null {
   try {
