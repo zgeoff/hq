@@ -5,6 +5,7 @@ import type { Database } from 'bun:sqlite';
 import type { Flags } from '../cli.ts';
 import type { Out } from '../commands.ts';
 import { HqError } from '../errors.ts';
+import { parseOneFlag } from '../parse-one-flag.ts';
 import type { PRStatusRow } from '../kdb.ts';
 import { getDeclaredSessions } from '../roles/get-declared-sessions.ts';
 import { roleName } from '../roles/role-name.ts';
@@ -201,7 +202,8 @@ async function runOverride(input: PRCommandInput, ref: PRRef): Promise<Out> {
 
 // The one check name to override, or null when the flag is absent. The name must match a check
 // exactly, so a padded or empty one is refused rather than recorded to never match.
-function parseCheckFlag(check: string | undefined): string | null {
+function parseCheckFlag(values: readonly string[] | undefined): string | null {
+  const check = parseOneFlag(values, 'check');
   if (check === undefined) {
     return null;
   }

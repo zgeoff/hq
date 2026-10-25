@@ -910,7 +910,7 @@ test('it refuses a call: source for lgtm when the owner answered the call with s
 test('it records a CI check override at the head now, holding the head, source, note, scope and check', async () => {
   const ctx = setupTest();
 
-  const recorded = await ctx.override(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), { source: 'chat:kettle-12', note: 'An intended infra change.', check: 'preview' });
+  const recorded = await ctx.override(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), { source: 'chat:kettle-12', note: 'An intended infra change.', check: ['preview'] });
 
   expect(ctx.db.query("SELECT subject_id, actor, data FROM events WHERE action = 'pr-override'").all()).toStrictEqual([
     { subject_id: 'pr:widgets#7', actor: 'z-kettle', data: JSON.stringify({ head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', source: 'chat:kettle-12', note: 'An intended infra change.', scope: 'ci-check', check: 'preview' }) },
@@ -919,12 +919,13 @@ test('it records a CI check override at the head now, holding the head, source, 
 });
 
 test.each([
-  ['an empty --check', { source: 'chat:kettle-12', note: 'Rebased.', check: '' }],
-  ['a blank --check', { source: 'chat:kettle-12', note: 'Rebased.', check: '  ' }],
-  ['a padded --check', { source: 'chat:kettle-12', note: 'Rebased.', check: ' preview' }],
-  ['no --note', { source: 'chat:kettle-12', check: 'preview' }],
-  ['no --source', { note: 'Rebased.', check: 'preview' }],
-  ['a session --source', { source: 'session:z-kettle', note: 'Rebased.', check: 'preview' }],
+  ['an empty --check', { source: 'chat:kettle-12', note: 'Rebased.', check: [''] }],
+  ['a blank --check', { source: 'chat:kettle-12', note: 'Rebased.', check: ['  '] }],
+  ['a padded --check', { source: 'chat:kettle-12', note: 'Rebased.', check: [' preview'] }],
+  ['two --check values', { source: 'chat:kettle-12', note: 'Rebased.', check: ['preview', 'test'] }],
+  ['no --note', { source: 'chat:kettle-12', check: ['preview'] }],
+  ['no --source', { note: 'Rebased.', check: ['preview'] }],
+  ['a session --source', { source: 'session:z-kettle', note: 'Rebased.', check: ['preview'] }],
 ])('it refuses a CI check override with %s, and records nothing', async (_case, flags) => {
   const ctx = setupTest();
 
@@ -936,7 +937,7 @@ test.each([
 test('it refuses a CI check override from a caller that is not the owner session, and records nothing', async () => {
   const ctx = setupTest();
 
-  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'chat:kettle-12', note: 'Ship it.', check: 'preview' })).rejects.toMatchObject({ code: 'bad_args' });
+  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'chat:kettle-12', note: 'Ship it.', check: ['preview'] })).rejects.toMatchObject({ code: 'bad_args' });
 
   expect(ctx.db.query("SELECT COUNT(*) AS total FROM events WHERE action = 'pr-override'").get()).toStrictEqual({ total: 0 });
 });
@@ -944,7 +945,7 @@ test('it refuses a CI check override from a caller that is not the owner session
 test('it refuses a CI check override when gh cannot give the head, and records nothing', async () => {
   const ctx = setupTest();
 
-  await expect(ctx.override(ctx.ghDown(), { source: 'chat:kettle-12', note: 'Rebased.', check: 'preview' })).rejects.toMatchObject({ code: 'head_unreadable' });
+  await expect(ctx.override(ctx.ghDown(), { source: 'chat:kettle-12', note: 'Rebased.', check: ['preview'] })).rejects.toMatchObject({ code: 'head_unreadable' });
 
   expect(ctx.db.query("SELECT COUNT(*) AS total FROM events WHERE action = 'pr-override'").get()).toStrictEqual({ total: 0 });
 });
@@ -953,7 +954,7 @@ test('it shows a CI override at the head now, and not as the findings override',
   const ctx = setupTest();
   const head = ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678');
   await ctx.answer(head, 'lgtm', { source: 'chat:kettle-1' });
-  await ctx.override(head, { source: 'chat:kettle-2', note: 'An intended infra change.', check: 'preview' });
+  await ctx.override(head, { source: 'chat:kettle-2', note: 'An intended infra change.', check: ['preview'] });
 
   const shown = await ctx.status(head);
 
@@ -965,7 +966,7 @@ test('it shows no CI override once the PR has a new head', async () => {
   const ctx = setupTest();
   const head = ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678');
   await ctx.answer(head, 'lgtm', { source: 'chat:kettle-1' });
-  await ctx.override(head, { source: 'chat:kettle-2', note: 'An intended infra change.', check: 'preview' });
+  await ctx.override(head, { source: 'chat:kettle-2', note: 'An intended infra change.', check: ['preview'] });
 
   const shown = await ctx.status(ctx.headAt('b9c8d7e6f5a40312213f4e5d6c7b8a9087654321'));
 
@@ -976,7 +977,7 @@ test('it shows no CI override once the PR has a new head', async () => {
 test('it shows a standing CI override for a PR with no record', async () => {
   const ctx = setupTest();
   const head = ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678');
-  await ctx.override(head, { source: 'chat:kettle-2', note: 'An intended infra change.', check: 'preview' });
+  await ctx.override(head, { source: 'chat:kettle-2', note: 'An intended infra change.', check: ['preview'] });
   ctx.db.query('DELETE FROM pr_status').run();
 
   const shown = await ctx.status(head);
@@ -989,17 +990,17 @@ test.each(['console:KET-60', 'call:KET-60'])('it records a CI check override fro
   const ctx = setupTest();
   ctx.fileGrantCall('KET-60', { action: 'override', pr: 'zgeoff/widgets#7', head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', check: 'preview' });
 
-  await ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source, note: 'An intended infra change.', check: 'preview' });
+  await ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source, note: 'An intended infra change.', check: ['preview'] });
 
   expect(ctx.db.query("SELECT json_extract(data, '$.check') AS check_name FROM events WHERE action = 'pr-override'").all()).toStrictEqual([{ check_name: 'preview' }]);
 });
 
-test.each([
-  { mismatch: 'a findings override', grants: { action: 'override', pr: 'zgeoff/widgets#7', head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678' }, flags: { check: 'preview' }, why: 'override of zgeoff/widgets#7 at a1b2c3d, not override of zgeoff/widgets#7 check preview at a1b2c3d' },
-  { mismatch: 'another check', grants: { action: 'override', pr: 'zgeoff/widgets#7', head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', check: 'test' }, flags: { check: 'preview' }, why: 'override of zgeoff/widgets#7 check test at a1b2c3d, not override of zgeoff/widgets#7 check preview at a1b2c3d' },
-  { mismatch: 'a check named in another case', grants: { action: 'override', pr: 'zgeoff/widgets#7', head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', check: 'Preview' }, flags: { check: 'preview' }, why: 'override of zgeoff/widgets#7 check Preview at a1b2c3d, not override of zgeoff/widgets#7 check preview at a1b2c3d' },
+test.each<{ mismatch: string; grants: Record<string, string>; flags: Flags; why: string }>([
+  { mismatch: 'a findings override', grants: { action: 'override', pr: 'zgeoff/widgets#7', head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678' }, flags: { check: ['preview'] }, why: 'override of zgeoff/widgets#7 at a1b2c3d, not override of zgeoff/widgets#7 check preview at a1b2c3d' },
+  { mismatch: 'another check', grants: { action: 'override', pr: 'zgeoff/widgets#7', head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', check: 'test' }, flags: { check: ['preview'] }, why: 'override of zgeoff/widgets#7 check test at a1b2c3d, not override of zgeoff/widgets#7 check preview at a1b2c3d' },
+  { mismatch: 'a check named in another case', grants: { action: 'override', pr: 'zgeoff/widgets#7', head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', check: 'Preview' }, flags: { check: ['preview'] }, why: 'override of zgeoff/widgets#7 check Preview at a1b2c3d, not override of zgeoff/widgets#7 check preview at a1b2c3d' },
   { mismatch: 'a check, for the findings override', grants: { action: 'override', pr: 'zgeoff/widgets#7', head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', check: 'preview' }, flags: {}, why: 'override of zgeoff/widgets#7 check preview at a1b2c3d, not override of zgeoff/widgets#7 at a1b2c3d' },
-  { mismatch: 'another PR', grants: { action: 'override', pr: 'zgeoff/widgets#8', head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', check: 'preview' }, flags: { check: 'preview' }, why: 'override of zgeoff/widgets#8 check preview at a1b2c3d, not override of zgeoff/widgets#7 check preview at a1b2c3d' },
+  { mismatch: 'another PR', grants: { action: 'override', pr: 'zgeoff/widgets#8', head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', check: 'preview' }, flags: { check: ['preview'] }, why: 'override of zgeoff/widgets#8 check preview at a1b2c3d, not override of zgeoff/widgets#7 check preview at a1b2c3d' },
 ])('it refuses a console: source whose picked option grants $mismatch, and records nothing', async (row) => {
   const ctx = setupTest();
   ctx.fileGrantCall('KET-61', row.grants);
@@ -1014,7 +1015,7 @@ test('it refuses a CI check override from a call: source with a plain Yes, and r
   ctx.fileCall('KET-62', 'Override widgets#7 preview check?');
   ctx.answerInConsole('KET-62');
 
-  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'call:KET-62', note: 'Ship it.', check: 'preview' })).rejects.toMatchObject({ code: 'bad_args', message: expect.stringContaining('has no option that grants the override') });
+  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'call:KET-62', note: 'Ship it.', check: ['preview'] })).rejects.toMatchObject({ code: 'bad_args', message: expect.stringContaining('has no option that grants the override') });
 
   expect(ctx.db.query("SELECT COUNT(*) AS total FROM events WHERE action = 'pr-override'").get()).toStrictEqual({ total: 0 });
 });
@@ -1022,9 +1023,9 @@ test('it refuses a CI check override from a call: source with a plain Yes, and r
 test('it refuses a second CI check override from a grant that named the first check, and keeps only the first', async () => {
   const ctx = setupTest();
   ctx.fileGrantCall('KET-63', { action: 'override', pr: 'zgeoff/widgets#7', head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', check: 'preview' });
-  await ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'console:KET-63', note: 'An intended infra change.', check: 'preview' });
+  await ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'console:KET-63', note: 'An intended infra change.', check: ['preview'] });
 
-  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'console:KET-63', note: 'And the tests.', check: 'test' })).rejects.toMatchObject({ code: 'bad_args' });
+  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'console:KET-63', note: 'And the tests.', check: ['test'] })).rejects.toMatchObject({ code: 'bad_args' });
 
   expect(ctx.db.query("SELECT json_extract(data, '$.check') AS check_name FROM events WHERE action = 'pr-override'").all()).toStrictEqual([{ check_name: 'preview' }]);
 });

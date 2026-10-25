@@ -82,7 +82,8 @@ import { setLiveCheck } from './runs/set-live-check.ts';
 import { setSession } from './runs/set-session.ts';
 import { setState } from './runs/set-state.ts';
 import { sweepNow } from './runs/sweep-now.ts';
-import type { LiveCheck, RunView, WrapUp } from './runs/types.ts';
+import type { RunView, WrapUp } from './runs/types.ts';
+import { requireLiveCheck } from './runs/require-live-check.ts';
 import { unfinalPr } from './runs/unfinal-pr.ts';
 import { unmergePr } from './runs/unmerge-pr.ts';
 import { viewRun } from './runs/view-run.ts';
@@ -229,6 +230,7 @@ import { closeUnblock } from './unblock/close-unblock.ts';
 import { getUnblock } from './unblock/get-unblock.ts';
 import { isOverdue } from './unblock/is-overdue.ts';
 import { isRecheck } from './unblock/is-recheck.ts';
+import { parseOneFlag } from './parse-one-flag.ts';
 import { parseWatchFlags } from './unblock/parse-watch-flags.ts';
 import { listUnblocks } from './unblock/list-unblocks.ts';
 import { markPushed } from './unblock/mark-pushed.ts';
@@ -465,7 +467,7 @@ const OPTIONS = {
   tag: { type: 'string' },
   apply: { type: 'boolean' },
   file: { type: 'string' },
-  check: { type: 'string' },
+  check: { type: 'string', multiple: true },
   'ready-total': { type: 'string' },
   skipped: { type: 'string' },
   'budget-mb': { type: 'string' },
@@ -902,8 +904,12 @@ ${r.result === 'added' ? 'On the board.' : 'Already on the board.'}` };
       }
       const [issue, state] = [arg(0, 'issue'), arg(1, 'state')],
         actorName = await by(),
-        r = setState(db, issue, state, toExactOptional({ liveCheck: flags.check as LiveCheck | undefined, next: flags.next, waitsOn: parseWaitsOn(flags['waits-on']), note: flags.note ?? null, reopen: Boolean(flags.reopen), waitsOnGeoff: parseGeoffFlag(flags) }), actorName);
-      return { data: { run: r }, text: runLine(r) };
+        liveCheck = parseOneFlag(flags.check, 'check');
+      if (liveCheck !== undefined) {
+        requireLiveCheck(liveCheck);
+      }
+      const moved = setState(db, issue, state, toExactOptional({ liveCheck, next: flags.next, waitsOn: parseWaitsOn(flags['waits-on']), note: flags.note ?? null, reopen: Boolean(flags.reopen), waitsOnGeoff: parseGeoffFlag(flags) }), actorName);
+      return { data: { run: moved }, text: runLine(moved) };
     }
     case 'check': {
       const r = setLiveCheck(db, resolveRun(db, arg(0, 'issue')).issue, arg(1, 'owed or none'), await by());
