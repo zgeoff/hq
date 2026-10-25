@@ -4,6 +4,7 @@ import { chmodSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { HttpResponse, http } from 'msw';
 import rulesTable from '../lanes.json';
+import { slotUsage } from '../mocks/anthropic-handlers.ts';
 import { LINEAR_GRAPHQL_URL, linearIssues } from '../mocks/linear-handlers.ts';
 import { server } from '../mocks/node.ts';
 import { NOON_SYDNEY, at, fakeAtc, freshDb } from '../test/helpers.ts';
@@ -479,13 +480,10 @@ test('hq capacity --refresh-slots reads the four slots through op and prints the
   onTestFinished(overrideEnv('PATH', `${fresh.dir}/bin:${process.env['PATH']}`));
   writeFileSync(settings, JSON.stringify({ env: { OP_SERVICE_ACCOUNT_TOKEN: 'ops_kettle-profile-0001' } }));
   fresh.db.query('INSERT INTO usage_samples (at, account, five_hour, seven_day, five_hour_resets_at, seven_day_resets_at) VALUES (?, ?, ?, ?, ?, ?)').run('2026-10-14T00:55:00Z', 'abcdef012345', 5, 40, null, '2026-10-19T00:00:00Z');
-  const resets: Record<string, string> = {
-    'Bearer sk-ant-kettle-cli-1': '1792540800',
-    'Bearer sk-ant-kettle-cli-2': '1792368000',
-    'Bearer sk-ant-kettle-cli-3': '1792713600',
-    'Bearer sk-ant-kettle-cli-4': '1792800000',
-  };
-  server.use(http.post('https://api.anthropic.com/v1/messages', (info) => HttpResponse.json({}, { headers: { 'anthropic-ratelimit-unified-7d-utilization': '0.4', 'anthropic-ratelimit-unified-7d-reset': resets[info.request.headers.get('authorization') ?? ''] ?? '' } })));
+  slotUsage.set('Bearer sk-ant-kettle-cli-1', { seven: { utilization: 0.4, reset: 1_792_540_800 } });
+  slotUsage.set('Bearer sk-ant-kettle-cli-2', { seven: { utilization: 0.4, reset: 1_792_368_000 } });
+  slotUsage.set('Bearer sk-ant-kettle-cli-3', { seven: { utilization: 0.4, reset: 1_792_713_600 } });
+  slotUsage.set('Bearer sk-ant-kettle-cli-4', { seven: { utilization: 0.4, reset: 1_792_800_000 } });
   console.log = (line: string) => lines.push(line);
 
   await main(['capacity', '--refresh-slots']);
@@ -523,7 +521,9 @@ test('hq capacity --refresh-slots --json carries the refresh problems in the fle
   chmodSync(`${fresh.dir}/bin/op`, 0o755);
   onTestFinished(overrideEnv('PATH', `${fresh.dir}/bin:${process.env['PATH']}`));
   writeFileSync(settings, JSON.stringify({ env: { OP_SERVICE_ACCOUNT_TOKEN: 'ops_kettle-profile-0001' } }));
-  server.use(http.post('https://api.anthropic.com/v1/messages', () => HttpResponse.json({}, { headers: { 'anthropic-ratelimit-unified-7d-utilization': '0.4', 'anthropic-ratelimit-unified-7d-reset': '1792540800' } })));
+  slotUsage.set('Bearer sk-ant-kettle-cli-1', { seven: { utilization: 0.4, reset: 1_792_540_800 } });
+  slotUsage.set('Bearer sk-ant-kettle-cli-2', { seven: { utilization: 0.4, reset: 1_792_540_800 } });
+  slotUsage.set('Bearer sk-ant-kettle-cli-4', { seven: { utilization: 0.4, reset: 1_792_540_800 } });
   console.log = (line: string) => lines.push(line);
 
   await main(['capacity', '--refresh-slots', '--json']);

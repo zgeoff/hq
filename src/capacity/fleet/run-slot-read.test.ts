@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { HttpResponse, http } from 'msw';
+import { ANTHROPIC_MESSAGES_URL, slotUsage } from '../../../mocks/anthropic-handlers.ts';
 import { server } from '../../../mocks/node.ts';
 import { at, freshDb } from '../../../test/helpers.ts';
 import { addRun } from '../../runs/add-run.ts';
@@ -21,7 +22,7 @@ function setupTest() {
   return { db: fresh.db, path };
 }
 
-test('it reads four slots, stores one row each with the working lane count, and keeps a 403 and an op failure as rows', async () => {
+test('it reads four slots, stores one row each with the working lane count, and keeps a refused token and an op failure as rows', async () => {
   const ctx = setupTest();
   const answers: Record<string, RunResult> = {
     'op://claude-slots/claude-setup-token-1/credential': { code: 0, stdout: 'sk-ant-kettle-slot-1\n', stderr: '' },
@@ -30,28 +31,18 @@ test('it reads four slots, stores one row each with the working lane count, and 
     'op://claude-slots/claude-setup-token-4/credential': { code: 0, stdout: 'sk-ant-kettle-slot-4\n', stderr: '' },
   };
   const run = mock<Runner>((cmd) => Promise.resolve(answers[cmd[2] ?? ''] ?? { code: 1, stdout: '', stderr: 'invented: no answer' }));
-  const responses: Record<string, { status: number; headers: Record<string, string> }> = {
-    'Bearer sk-ant-kettle-slot-1': { status: 200, headers: { 'anthropic-ratelimit-unified-5h-utilization': '0.1', 'anthropic-ratelimit-unified-5h-reset': '1792000000', 'anthropic-ratelimit-unified-7d-utilization': '0.3', 'anthropic-ratelimit-unified-7d-reset': '1792400000' } },
-    'Bearer sk-ant-kettle-slot-2': { status: 403, headers: {} },
-    'Bearer sk-ant-kettle-slot-4': { status: 200, headers: { 'anthropic-ratelimit-unified-5h-utilization': '0.1', 'anthropic-ratelimit-unified-5h-reset': '1792000000', 'anthropic-ratelimit-unified-7d-utilization': '0.3', 'anthropic-ratelimit-unified-7d-reset': '1792400000' } },
-  };
 
   at('2026-10-14T01:00:00Z');
   writeFileSync(ctx.path, JSON.stringify({ env: { OP_SERVICE_ACCOUNT_TOKEN: 'ops_kettle-profile-0001' } }));
   addRun(ctx.db, { issue: 'GEO-9901', title: 'Descale the kettle', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
-  server.use(
-    http.post('https://api.anthropic.com/v1/messages', (info) => {
-      const response = responses[info.request.headers.get('authorization') ?? ''] ?? { status: 500, headers: {} };
-
-      return HttpResponse.json({}, response);
-    }),
-  );
-  const result = await runSlotRead(ctx.db, { run, httpClient: fetch, settings: { path: ctx.path, readFile: readOptionalFile } },new Date('2026-10-14T01:00:00Z'), new AbortController().signal);
+  slotUsage.set('Bearer sk-ant-kettle-slot-1', { five: { utilization: 0.1, reset: 1_792_000_000 }, seven: { utilization: 0.3, reset: 1_792_400_000 } });
+  slotUsage.set('Bearer sk-ant-kettle-slot-4', { five: { utilization: 0.1, reset: 1_792_000_000 }, seven: { utilization: 0.3, reset: 1_792_400_000 } });
+  const result = await runSlotRead(ctx.db, { run, httpClient: fetch, settings: { path: ctx.path, readFile: readOptionalFile } }, new Date('2026-10-14T01:00:00Z'), new AbortController().signal);
 
   expect(result).toMatchObject({ kind: 'read', problems: ['slot 3: op read failed (exit 1)'] });
   expect(ctx.db.query('SELECT at, slot, status, five_hour, seven_day, working_lanes FROM slot_usage ORDER BY slot').all()).toStrictEqual([
     { at: '2026-10-14T01:00:00Z', slot: 1, status: '200', five_hour: 10, seven_day: 30, working_lanes: 1 },
-    { at: '2026-10-14T01:00:00Z', slot: 2, status: '403', five_hour: null, seven_day: null, working_lanes: 1 },
+    { at: '2026-10-14T01:00:00Z', slot: 2, status: '401', five_hour: null, seven_day: null, working_lanes: 1 },
     { at: '2026-10-14T01:00:00Z', slot: 3, status: 'op-failed', five_hour: null, seven_day: null, working_lanes: 1 },
     { at: '2026-10-14T01:00:00Z', slot: 4, status: '200', five_hour: 10, seven_day: 30, working_lanes: 1 },
   ]);
@@ -61,7 +52,7 @@ test('it reads no slot and stores nothing when the slot reads are not set up', a
   const ctx = setupTest();
   const run = mock<Runner>(() => Promise.resolve({ code: 1, stdout: '', stderr: 'invented: must not run' }));
 
-  const result = await runSlotRead(ctx.db, { run, httpClient: fetch, settings: { path: ctx.path, readFile: readOptionalFile } },new Date('2026-10-14T01:00:00Z'), new AbortController().signal);
+  const result = await runSlotRead(ctx.db, { run, httpClient: fetch, settings: { path: ctx.path, readFile: readOptionalFile } }, new Date('2026-10-14T01:00:00Z'), new AbortController().signal);
 
   expect(result).toStrictEqual({ kind: 'not-set-up', reason: `no settings file at ${ctx.path}` });
   expect(ctx.db.query('SELECT COUNT(*) AS total FROM slot_usage').get()).toStrictEqual({ total: 0 });
@@ -78,8 +69,8 @@ test('it keeps every token out of the stored rows and the problems, even when th
   const run = mock<Runner>((cmd) => Promise.resolve(tokens[cmd[2] ?? ''] ?? { code: 1, stdout: '', stderr: 'invented: no such item' }));
 
   writeFileSync(ctx.path, JSON.stringify({ env: { OP_SERVICE_ACCOUNT_TOKEN: 'ops_kettle-profile-0001' } }));
-  server.use(http.post('https://api.anthropic.com/v1/messages', (info) => HttpResponse.json({ error: `bad credential ${info.request.headers.get('authorization')}` }, { status: 403 })));
-  const result = await runSlotRead(ctx.db, { run, httpClient: fetch, settings: { path: ctx.path, readFile: readOptionalFile } },new Date('2026-10-14T01:00:00Z'), new AbortController().signal);
+  server.use(http.post(ANTHROPIC_MESSAGES_URL, (info) => HttpResponse.json({ error: `bad credential ${info.request.headers.get('authorization')}` }, { status: 403 })));
+  const result = await runSlotRead(ctx.db, { run, httpClient: fetch, settings: { path: ctx.path, readFile: readOptionalFile } }, new Date('2026-10-14T01:00:00Z'), new AbortController().signal);
   const stored = JSON.stringify(ctx.db.query('SELECT * FROM slot_usage').all());
   const printed = JSON.stringify(result);
 

@@ -1,4 +1,5 @@
 import { afterAll, afterEach, beforeAll } from 'bun:test';
+import { slotUsage } from '../mocks/anthropic-handlers.ts';
 import { linearDocuments, linearIssues, linearWorkflowStates } from '../mocks/linear-handlers.ts';
 import { server } from '../mocks/node.ts';
 
@@ -19,6 +20,7 @@ afterEach(() => {
   linearIssues.length = 0;
   linearDocuments.length = 0;
   linearWorkflowStates.length = 0;
+  slotUsage.clear();
 });
 
 afterAll(() => {
