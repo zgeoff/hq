@@ -1056,6 +1056,19 @@ test.each<{ mismatch: string; grants: Record<string, string>; flags: Flags; why:
   expect(ctx.db.query("SELECT COUNT(*) AS total FROM events WHERE action = 'pr-override'").get()).toStrictEqual({ total: 0 });
 });
 
+test.each([
+  { source: 'call:KET-64', relayed: 'a findings override', grants: { action: 'override', pr: 'zgeoff/widgets#7', head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678' }, why: 'override of zgeoff/widgets#7 at a1b2c3d, not override of zgeoff/widgets#7 check preview at a1b2c3d' },
+  { source: 'call:KET-64', relayed: 'the check at another head', grants: { action: 'override', pr: 'zgeoff/widgets#7', head: 'e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1', check: 'preview' }, why: 'override of zgeoff/widgets#7 check preview at e1e1e1e, not override of zgeoff/widgets#7 check preview at a1b2c3d' },
+  { source: 'console:KET-64', relayed: 'the check at another head', grants: { action: 'override', pr: 'zgeoff/widgets#7', head: 'e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1', check: 'preview' }, why: 'override of zgeoff/widgets#7 check preview at e1e1e1e, not override of zgeoff/widgets#7 check preview at a1b2c3d' },
+])('it refuses a CI check override relayed from $source whose picked option grants $relayed, and records nothing', async (row) => {
+  const ctx = setupTest();
+  ctx.fileGrantCall('KET-64', row.grants);
+
+  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: row.source, note: 'Ship it.', check: ['preview'] })).rejects.toMatchObject({ code: 'bad_args', message: `--source refused: the option the owner picked in ${row.source} grants ${row.why}; ask z-stu to record it` });
+
+  expect(ctx.db.query("SELECT COUNT(*) AS total FROM events WHERE action = 'pr-override'").get()).toStrictEqual({ total: 0 });
+});
+
 test('it refuses a CI check override from a call: source with a plain Yes, and records nothing', async () => {
   const ctx = setupTest();
   ctx.fileCall('KET-62', 'Override widgets#7 preview check?');
