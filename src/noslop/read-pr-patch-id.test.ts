@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { realRunner } from '../runner/real-runner.ts';
 import { readPRPatchID } from './read-pr-patch-id.ts';
 
-// A repo whose main holds kettle.txt, with a git helper that fails loudly and a commit helper.
+// An empty git repo on main, with a git helper that fails loudly and a commit helper.
 async function setupTest() {
   const directory = mkdtempSync(join(tmpdir(), 'hq-patch-id-'));
   onTestFinished(() => rmSync(directory, { recursive: true, force: true }));
@@ -25,12 +25,12 @@ async function setupTest() {
     return await git('rev-parse', 'HEAD');
   };
   await git('init', '-q', '-b', 'main');
-  await commit({ 'kettle.txt': 'boil\n' }, 'start');
   return { directory, git, commit };
 }
 
 test('a PR rebased onto a moved base keeps its patch-id', async () => {
   const ctx = await setupTest();
+  await ctx.commit({ 'kettle.txt': 'boil\n' }, 'start');
   await ctx.git('checkout', '-q', '-b', 'pour');
   const first = await ctx.commit({ 'pour.txt': 'pour\n  slowly\n' }, 'pour');
   await ctx.git('checkout', '-q', 'main');
@@ -48,6 +48,7 @@ test('a PR rebased onto a moved base keeps its patch-id', async () => {
 
 test('a change of whitespace alone in the PR diff changes its patch-id', async () => {
   const ctx = await setupTest();
+  await ctx.commit({ 'kettle.txt': 'boil\n' }, 'start');
   await ctx.git('checkout', '-q', '-b', 'pour');
   const first = await ctx.commit({ 'pour.txt': 'pour\n  slowly\n' }, 'pour');
   const reindented = await ctx.commit({ 'pour.txt': 'pour\n    slowly\n' }, 'indent');
@@ -60,6 +61,7 @@ test('a change of whitespace alone in the PR diff changes its patch-id', async (
 
 test('an empty PR diff or a head git cannot find has no patch-id', async () => {
   const ctx = await setupTest();
+  await ctx.commit({ 'kettle.txt': 'boil\n' }, 'start');
 
   const empty = await readPRPatchID(realRunner, ctx.directory, 'main', 'main');
   const missing = await readPRPatchID(realRunner, ctx.directory, 'main', 'e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1');
