@@ -90,7 +90,7 @@ test('it passes open findings under an override at the head when noslop never re
   setMeta(ctx.db, 'noslop', JSON.stringify({ repos: ['widgets'], sha: '0123456789abcdef0123456789abcdef01234567' }));
   recordPROverride(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA, source: 'call:KET-2', note: 'Ship the kettle.', actor: 'z-kettle' });
 
-  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).resolves.toStrictEqual({ mayMerge: true, reason: "The owner's override at 0123456 (call:KET-2) stands for 1 open finding: aaaa", reviewed: true });
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).resolves.toStrictEqual({ mayMerge: true, reason: "The owner's override at 0123456 (call:KET-2) stands for 1 open finding: aaaa; CI green at 0123456", reviewed: true });
 });
 
 test("it passes under an override at the head when noslop's findings list is empty but its reviews recorded findings", async () => {
@@ -298,7 +298,7 @@ test("it passes an override at the head though noslop's check there failed", asy
   createListedReview(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA });
   recordPROverride(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA, source: 'call:KET-2', note: 'Ship the kettle.', actor: 'z-kettle' });
 
-  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).resolves.toStrictEqual({ mayMerge: true, reason: "The owner's override at 0123456 (call:KET-2) stands for 1 open finding: aaaa", reviewed: true });
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).resolves.toStrictEqual({ mayMerge: true, reason: "The owner's override at 0123456 (call:KET-2) stands for 1 open finding: aaaa; CI green at 0123456", reviewed: true });
 });
 
 test.each([
@@ -338,7 +338,7 @@ test('it lets a PR with no checks merge when GitHub says the head holds no workf
   const ctx = setupTest();
   const fake = buildFakeRunner({ prFacts: buildStubGateFacts({ head: FAKE_FULL_SHA, checks: [] }), workflows: { code: 1, stdout: '', stderr: 'gh: Not Found (HTTP 404)' } });
 
-  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).resolves.toStrictEqual({ mayMerge: true, reason: `not a noslop repo: green CI is enough; the repo runs no CI at ${FAKE_FULL_SHA.slice(0, 7)}`, reviewed: false });
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).resolves.toStrictEqual({ mayMerge: true, reason: `not a noslop repo: the repo runs no CI at ${FAKE_FULL_SHA.slice(0, 7)}`, reviewed: false });
   expect(fake.lines()).toContain(`gh api repos/zgeoff/widgets/contents/.github/workflows?ref=${FAKE_FULL_SHA} --silent`);
   expect(fake.lines()).toContain('gh api repos/zgeoff/widgets/contents/.github/workflows?ref=main --silent');
 });
@@ -431,7 +431,7 @@ test('it lets a PR of a repo off the noslop list merge on green CI alone', async
   const ctx = setupTest(),
     fake = buildFakeRunner();
 
-  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).resolves.toStrictEqual({ mayMerge: true, reason: 'not a noslop repo: green CI is enough', reviewed: false });
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).resolves.toStrictEqual({ mayMerge: true, reason: 'not a noslop repo: CI green at 0123456', reviewed: false });
 
   expect(fake.of('bun')).toStrictEqual([]);
 });
@@ -452,7 +452,7 @@ test.each([
     fake = buildFakeRunner({ author });
   setMeta(ctx.db, 'noslop', JSON.stringify({ repos: ['widgets'], sha: '0123456789abcdef0123456789abcdef01234567' }));
 
-  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).resolves.toStrictEqual({ mayMerge: true, reason: 'bot PR: green CI is enough', reviewed: false });
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).resolves.toStrictEqual({ mayMerge: true, reason: 'bot PR: CI green at 0123456', reviewed: false });
 
   expect(fake.of('bun')).toStrictEqual([]);
 });
@@ -503,7 +503,7 @@ test("it passes a PR in hq that changes a skill once the owner's console lgtm is
   const fake = buildFakeRunner({ prFiles: { code: 0, stdout: 'skills/kettle/SKILL.md\n', stderr: '' } });
   recordPRAnswer(ctx.db, { repo: 'hq', pr: 7, answer: 'lgtm', head: FAKE_FULL_SHA, source: 'console:kettle-2', note: null, actor: 'z-kettle' });
 
-  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'hq', pr: 7 })).resolves.toStrictEqual({ mayMerge: true, reason: 'not a noslop repo: green CI is enough', reviewed: false });
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'hq', pr: 7 })).resolves.toStrictEqual({ mayMerge: true, reason: 'not a noslop repo: CI green at 0123456', reviewed: false });
 });
 
 test('it holds a noslop-reviewed PR in hq to the same lgtm', async () => {
@@ -527,7 +527,7 @@ test('it lets a PR in hq that changes only source files merge with no lgtm', asy
   const ctx = setupTest();
   const fake = buildFakeRunner({ prFiles: { code: 0, stdout: 'src/kettle.ts\nsrc/kettle.test.ts\n', stderr: '' } });
 
-  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'hq', pr: 7 })).resolves.toStrictEqual({ mayMerge: true, reason: 'not a noslop repo: green CI is enough', reviewed: false });
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'hq', pr: 7 })).resolves.toStrictEqual({ mayMerge: true, reason: 'not a noslop repo: CI green at 0123456', reviewed: false });
 });
 
 test('it refuses a PR in hq that moves a skill out of skills/', async () => {
@@ -940,7 +940,7 @@ test('it passes the named red check at the pinned head and names the override in
 
   await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).resolves.toStrictEqual({
     mayMerge: true,
-    reason: 'noslop findings: none open; CI green at 0123456 with preview overridden by the owner (call:KET-2)',
+    reason: 'noslop findings: none open; CI green at 0123456 except preview, overridden by the owner (call:KET-2)',
     reviewed: true,
     overriddenChecks: ['preview'],
   });
@@ -953,7 +953,7 @@ test('it names the override on a repo off the noslop list', async () => {
 
   await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'gadgets', pr: 7 })).resolves.toStrictEqual({
     mayMerge: true,
-    reason: 'not a noslop repo: green CI is enough; CI check preview overridden by the owner (call:KET-2)',
+    reason: 'not a noslop repo: CI green at 0123456 except preview, overridden by the owner (call:KET-2)',
     reviewed: false,
     overriddenChecks: ['preview'],
   });
