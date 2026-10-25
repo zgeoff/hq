@@ -959,6 +959,20 @@ test('it names the override on a repo off the noslop list', async () => {
   });
 });
 
+test("it names the override on a bot's PR", async () => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ author: '{"author":{"login":"renovate","is_bot":true}}', prFacts: { code: 0, stdout: JSON.stringify({ headRefOid: FAKE_FULL_SHA, baseRefName: 'main', baseRefOid: FAKE_BASE_SHA, author: { login: 'renovate', is_bot: true }, statusCheckRollup: [{ __typename: 'CheckRun', name: 'preview', status: 'COMPLETED', conclusion: 'FAILURE' }] }), stderr: '' } });
+  setMeta(ctx.db, 'noslop', JSON.stringify({ repos: ['widgets'], sha: '0123456789abcdef0123456789abcdef01234567' }));
+  recordCICheckOverride(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA, source: 'call:KET-2', note: 'Intended infra change.', actor: 'z-kettle', check: 'preview' });
+
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).resolves.toStrictEqual({
+    mayMerge: true,
+    reason: 'bot PR: CI green at 0123456 except preview, overridden by the owner (call:KET-2)',
+    reviewed: false,
+    overriddenChecks: ['preview'],
+  });
+});
+
 test("it ignores the owner's CI override for a same-numbered PR in another owner's repo of the same name", async () => {
   const ctx = setupTest();
   const fake = buildFakeRunner({ prFacts: buildStubGateFacts({ head: FAKE_FULL_SHA, checks: [{ __typename: 'CheckRun', name: 'preview', status: 'COMPLETED', conclusion: 'FAILURE' }] }) });
