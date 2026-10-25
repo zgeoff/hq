@@ -10,6 +10,7 @@ import { collectAccountSeries } from './collect-account-series.ts';
 import { collectSlotReadings } from './collect-slot-readings.ts';
 import { findActiveSlot } from './find-active-slot.ts';
 import { findSafeCap } from './find-safe-cap.ts';
+import { isSameSevenReset } from './is-same-seven-reset.ts';
 import { makeLanesAt } from './make-lanes-at.ts';
 import { simulateFleet } from './simulate-fleet.ts';
 import type { SlotReadings } from './collect-slot-readings.ts';
@@ -56,7 +57,7 @@ export function buildFleetView(input: FleetViewInput): FleetView {
   if (profiles === null) {
     return { ...base, note: 'too few usage samples for a burn rate' };
   }
-  const slots = buildSimSlots(newest, active, latest);
+  const slots = buildSimSlots(newest, active, latest, input.samples);
   const simulate = (lanes: number) => {
     const scaled = lanes === input.working ? profiles : buildProfilesAt(lanes);
     if (scaled === null) {
@@ -112,17 +113,26 @@ function toPoints(samples: readonly UsageSample[], percent: 'five_hour' | 'seven
   return samples.map((sample) => ({ at: sample.at, percent: sample[percent], resetsAt: sample[resets] }));
 }
 
-function buildSimSlots(newest: readonly SlotRow[], active: number, latest: UsageSample): SimSlot[] {
+function buildSimSlots(newest: readonly SlotRow[], active: number, latest: UsageSample, samples: readonly UsageSample[]): SimSlot[] {
   const slots: SimSlot[] = [];
   for (const row of newest) {
-    const live = row.slot === active;
-    const seven = live ? latest.seven_day : row.seven;
-    const sevenResetsAt = live ? latest.seven_day_resets_at : row.sevenResetsAt;
+    const sample = row.slot === active ? latest : findNewerSample(row, samples);
+    const seven = sample === null ? row.seven : sample.seven_day;
+    const sevenResetsAt = sample === null ? row.sevenResetsAt : sample.seven_day_resets_at;
     if (seven === null || sevenResetsAt === null) {
       continue;
     }
-    const fiveResetsAt = live ? latest.five_hour_resets_at : row.fiveResetsAt;
-    slots.push({ slot: row.slot, five: (live ? latest.five_hour : row.five) ?? 0, fiveResetsAt: fiveResetsAt === null ? null : new Date(fiveResetsAt), seven, sevenResetsAt: new Date(sevenResetsAt) });
+    const fiveResetsAt = sample === null ? row.fiveResetsAt : sample.five_hour_resets_at;
+    slots.push({ slot: row.slot, five: (sample === null ? row.five : sample.five_hour) ?? 0, fiveResetsAt: fiveResetsAt === null ? null : new Date(fiveResetsAt), seven, sevenResetsAt: new Date(sevenResetsAt) });
   }
   return slots;
+}
+
+function findNewerSample(row: SlotRow, samples: readonly UsageSample[]): UsageSample | null {
+  const rowResetsAt = row.sevenResetsAt;
+  if (rowResetsAt === null) {
+    return null;
+  }
+  const matching = samples.filter((sample) => sample.seven_day_resets_at !== null && isSameSevenReset(sample.seven_day_resets_at, rowResetsAt) && Date.parse(sample.at) > Date.parse(row.at));
+  return matching.toSorted((left, right) => Date.parse(left.at) - Date.parse(right.at)).at(-1) ?? null;
 }

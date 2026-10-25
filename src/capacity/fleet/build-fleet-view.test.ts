@@ -98,6 +98,26 @@ test("it pools an earlier account's burn into the hour of the day and keeps the 
   expect(view.ratePerHour?.seven).toBeCloseTo(4, 6);
 });
 
+test('it simulates an inactive slot on its usage sample when that sample is newer than its slot read', () => {
+  const rows: SlotRow[] = [
+    { at: '2026-10-14T00:30:00Z', slot: 1, status: '200', five: 0, fiveResetsAt: null, seven: 80, sevenResetsAt: '2026-10-18T00:00:00Z', workingLanes: 2 },
+    { at: '2026-10-14T00:30:00Z', slot: 2, status: '200', five: 0, fiveResetsAt: null, seven: 40, sevenResetsAt: '2026-10-19T00:00:00Z', workingLanes: 2 },
+  ];
+  const samples = [
+    { at: '2026-10-14T01:00:00Z', account: 'kettle01', five_hour: 0, seven_day: 90, five_hour_resets_at: null, seven_day_resets_at: '2026-10-18T00:00:00Z' },
+    { at: '2026-10-14T01:30:00Z', account: 'kettle01', five_hour: 0, seven_day: 95, five_hour_resets_at: null, seven_day_resets_at: '2026-10-18T00:00:30Z' },
+    { at: '2026-10-14T02:00:00Z', account: 'teapot02', five_hour: 0, seven_day: 41, five_hour_resets_at: null, seven_day_resets_at: '2026-10-19T00:00:00Z' },
+    { at: '2026-10-14T02:30:00Z', account: 'teapot02', five_hour: 0, seven_day: 42, five_hour_resets_at: null, seven_day_resets_at: '2026-10-19T00:00:00Z' },
+    { at: '2026-10-14T03:00:00Z', account: 'teapot02', five_hour: 0, seven_day: 43, five_hour_resets_at: null, seven_day_resets_at: '2026-10-19T00:00:00Z' },
+  ];
+
+  const view = buildFleetView({ at: new Date('2026-10-14T03:00:00Z'), notSetUp: null, rows, samples, working: 2, cap: null });
+
+  expect(view.active).toBe(2);
+  expect(view.forecast?.switches).toStrictEqual([{ at: '2026-10-18T00:15:00Z', from: null, to: 1 }]);
+  expect(view.forecast?.pause?.end).toBe('2026-10-18T00:15:00Z');
+});
+
 test('it keeps a slot whose newest read failed in the simulation on its last good reading', () => {
   const rows: SlotRow[] = [
     { at: '2026-10-14T00:00:00Z', slot: 1, status: '200', five: 1, fiveResetsAt: null, seven: 10, sevenResetsAt: '2026-10-18T00:00:00Z', workingLanes: 2 },
