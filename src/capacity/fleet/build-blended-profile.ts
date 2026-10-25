@@ -12,9 +12,7 @@ export interface BlendedProfile {
 
 export function buildBlendedProfile(active: readonly BurnPoint[], history: readonly (readonly BurnPoint[])[], at: Date, scaleAt: (time: string) => number): BlendedProfile | null {
   const recentPoints = active.filter((point) => at.getTime() - Date.parse(point.at) <= RECENT_MS);
-  const slope = buildBurnRate(recentPoints).ratePerHour;
-  const newest = recentPoints.at(-1);
-  const recent = slope === null || newest === undefined ? null : slope * scaleAt(newest.at);
+  const recent = buildBurnRate(buildScaledPoints(recentPoints, scaleAt)).ratePerHour;
   const hourly = buildHourProfile(history, scaleAt);
   const near = buildFilledRates(hourly.map((rate) => blend(recent, rate)));
   const far = buildFilledRates(hourly.map((rate) => rate ?? recent));
@@ -27,6 +25,19 @@ export function buildBlendedProfile(active: readonly BurnPoint[], history: reado
       return rates[getSydneyParts(time).hour] ?? 0;
     },
   };
+}
+
+function buildScaledPoints(points: readonly BurnPoint[], scaleAt: (time: string) => number): BurnPoint[] {
+  const since = buildBurnRate(points).since;
+  const kept = points.filter((point) => point.percent !== null && since !== null && Date.parse(point.at) >= Date.parse(since));
+  let total = kept[0]?.percent ?? 0;
+  return kept.map((point, index) => {
+    const previous = kept[index - 1];
+    if (previous !== undefined) {
+      total += ((point.percent ?? 0) - (previous.percent ?? 0)) * scaleAt(previous.at);
+    }
+    return { at: point.at, percent: total, resetsAt: null };
+  });
 }
 
 function buildFilledRates(rates: readonly (number | null)[]): number[] | null {

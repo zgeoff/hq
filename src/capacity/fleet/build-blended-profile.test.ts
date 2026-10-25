@@ -2,6 +2,8 @@ import { expect, test } from 'bun:test';
 import { buildMockBurnDay } from '../../../test/build-mock-burn-day.ts';
 import type { BurnPoint } from '../build-burn-rate.ts';
 import { buildBlendedProfile } from './build-blended-profile.ts';
+import { buildLaneFactor } from './build-lane-factor.ts';
+import { makeLanesAt } from './make-lanes-at.ts';
 
 test('it blends a steep daytime slope with the mean of the hour of the day for the first 2 hours', () => {
   const active: BurnPoint[] = [
@@ -93,14 +95,18 @@ test('it takes the recent slope from the active points alone and the hourly mean
   expect(profile?.rateAt(new Date('2026-10-14T15:00:00Z'))).toBeCloseTo(6, 6);
 });
 
-test('it scales the recent slope by the factor for the newest recent point', () => {
+test('it scales each recent interval from the lanes in force for it when the lanes change at the newest point', () => {
   const active: BurnPoint[] = [
     { at: '2026-10-14T01:00:00Z', percent: 10, resetsAt: null },
     { at: '2026-10-14T01:30:00Z', percent: 11.5, resetsAt: null },
     { at: '2026-10-14T02:00:00Z', percent: 13, resetsAt: null },
   ];
+  const lanesAt = makeLanesAt([
+    { at: '2026-10-14T01:00:00Z', slot: 1, status: '200', five: 10, fiveResetsAt: null, seven: 20, sevenResetsAt: '2026-10-18T00:00:00Z', workingLanes: 2 },
+    { at: '2026-10-14T02:00:00Z', slot: 1, status: '200', five: 13, fiveResetsAt: null, seven: 21, sevenResetsAt: '2026-10-18T00:00:00Z', workingLanes: 4 },
+  ]);
 
-  const profile = buildBlendedProfile(active, [], new Date('2026-10-14T02:00:00Z'), (time) => (time === '2026-10-14T02:00:00Z' ? 5 / 3 : 1));
+  const profile = buildBlendedProfile(active, [], new Date('2026-10-14T02:00:00Z'), (time) => buildLaneFactor({ kind: 'fit', fit: { base: 1, perLane: 1 } }, lanesAt(time), 4));
 
   expect(profile?.rateAt(new Date('2026-10-14T02:00:00Z'))).toBeCloseTo(5, 6);
 });
