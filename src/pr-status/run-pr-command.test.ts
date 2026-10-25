@@ -959,7 +959,30 @@ test('it shows a CI override at the head now, and not as the findings override',
   const shown = await ctx.status(head);
 
   expect(shown.text).toInclude('ci override: preview at a1b2c3d via chat:kettle-2 (2026-10-14T01:00:00Z): An intended infra change.');
-  expect(shown.data).toMatchObject({ pr: { override: null, ciOverrides: [{ check: 'preview', head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', source: 'chat:kettle-2', note: 'An intended infra change.', at: '2026-10-14T01:00:00Z' }] } });
+  expect(shown.data).toStrictEqual({
+    pr: {
+      repo: 'widgets',
+      pr: 7,
+      head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678',
+      headKnown: true,
+      gate: null,
+      gateHead: null,
+      gateAt: null,
+      gateStale: false,
+      answer: 'lgtm',
+      answerHead: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678',
+      answerSource: 'chat:kettle-1',
+      answerNote: null,
+      answerAt: '2026-10-14T01:00:00Z',
+      answerStale: false,
+      next: null,
+      nextAt: null,
+      override: null,
+      ciOverrides: [{ check: 'preview', head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', source: 'chat:kettle-2', note: 'An intended infra change.', at: '2026-10-14T01:00:00Z' }],
+      reviewRecords: { mechanical: null, exemption: null },
+      updatedAt: '2026-10-14T01:00:00Z',
+    },
+  });
 });
 
 test('it shows no CI override once the PR has a new head', async () => {
@@ -970,7 +993,30 @@ test('it shows no CI override once the PR has a new head', async () => {
 
   const shown = await ctx.status(ctx.headAt('b9c8d7e6f5a40312213f4e5d6c7b8a9087654321'));
 
-  expect(shown.data).toMatchObject({ pr: { ciOverrides: [] } });
+  expect(shown.data).toStrictEqual({
+    pr: {
+      repo: 'widgets',
+      pr: 7,
+      head: 'b9c8d7e6f5a40312213f4e5d6c7b8a9087654321',
+      headKnown: true,
+      gate: null,
+      gateHead: null,
+      gateAt: null,
+      gateStale: false,
+      answer: 'lgtm',
+      answerHead: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678',
+      answerSource: 'chat:kettle-1',
+      answerNote: null,
+      answerAt: '2026-10-14T01:00:00Z',
+      answerStale: true,
+      next: null,
+      nextAt: null,
+      override: null,
+      ciOverrides: [],
+      reviewRecords: { mechanical: null, exemption: null },
+      updatedAt: '2026-10-14T01:00:00Z',
+    },
+  });
   expect(shown.text).not.toInclude('ci override');
 });
 
@@ -983,7 +1029,7 @@ test('it shows a standing CI override for a PR with no record', async () => {
   const shown = await ctx.status(head);
 
   expect(shown.text).toInclude('ci override: preview at a1b2c3d via chat:kettle-2');
-  expect(shown.data).toMatchObject({ pr: null, ciOverrides: [{ check: 'preview' }] });
+  expect(shown.data).toStrictEqual({ pr: null, ciOverrides: [{ check: 'preview', head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', source: 'chat:kettle-2', note: 'An intended infra change.', at: '2026-10-14T01:00:00Z' }] });
 });
 
 test.each(['console:KET-60', 'call:KET-60'])('it records a CI check override from %s when the picked option grants that check at this head', async (source) => {

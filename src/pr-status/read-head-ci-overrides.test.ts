@@ -1,7 +1,6 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { NOON_SYDNEY, at, freshDb } from '../../test/helpers.ts';
 import { logEvent } from '../log-event.ts';
-import { findOwnerOverride } from './find-owner-override.ts';
 import { readHeadCIOverrides } from './read-head-ci-overrides.ts';
 import { recordCICheckOverride } from './record-ci-check-override.ts';
 import { recordPROverride } from './record-pr-override.ts';
@@ -19,9 +18,9 @@ test('it reads the CI overrides recorded at the head, newest record of a check w
   recordCICheckOverride(ctx.db, { repo: 'widgets', pr: 7, head: 'b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2', source: 'chat:kettle-2', note: 'Second.', actor: 'z-kettle', check: 'preview' });
   recordCICheckOverride(ctx.db, { repo: 'widgets', pr: 7, head: 'b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2', source: 'chat:kettle-3', note: 'Lint.', actor: 'z-kettle', check: 'lint' });
 
-  expect(readHeadCIOverrides(ctx.db, 'widgets', 7, 'b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2')).toMatchObject([
-    { check: 'preview', source: 'chat:kettle-2', note: 'Second.' },
-    { check: 'lint', source: 'chat:kettle-3' },
+  expect(readHeadCIOverrides(ctx.db, 'widgets', 7, 'b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2')).toStrictEqual([
+    { seq: 2, at: '2026-10-14T01:00:00Z', head: 'b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2', source: 'chat:kettle-2', note: 'Second.', check: 'preview' },
+    { seq: 3, at: '2026-10-14T01:00:00Z', head: 'b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2', source: 'chat:kettle-3', note: 'Lint.', check: 'lint' },
   ]);
 });
 
@@ -55,11 +54,4 @@ test('it reads no CI override from a findings override', () => {
   recordPROverride(ctx.db, { repo: 'widgets', pr: 7, head: 'b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2', source: 'chat:kettle-1', note: 'Fine.', actor: 'z-kettle' });
 
   expect(readHeadCIOverrides(ctx.db, 'widgets', 7, 'b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2')).toStrictEqual([]);
-});
-
-test('it does not count a CI override as a findings override', () => {
-  const ctx = setupTest();
-  recordCICheckOverride(ctx.db, { repo: 'widgets', pr: 7, head: 'b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2', source: 'chat:kettle-1', note: 'Fine.', actor: 'z-kettle', check: 'preview' });
-
-  expect(findOwnerOverride(ctx.db, 'widgets', 7, 'b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2')).toBeNull();
 });
