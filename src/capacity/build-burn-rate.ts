@@ -1,3 +1,5 @@
+import { isBurnReset } from './is-burn-reset.ts';
+
 export interface BurnPoint {
   at: string;
   percent: number | null;
@@ -28,9 +30,6 @@ export function buildBurnRate(points: readonly BurnPoint[]): BurnRate {
   return { samples: kept.length, latest, ratePerHour: fitSlope(kept), since, reset };
 }
 
-const RESET_JUMP_MS = 60_000;
-const RESET_DROP_POINTS = 10;
-
 function getResetStart(read: readonly BurnPoint[]): number {
   let start = 0;
   for (let index = 1; index < read.length; index += 1) {
@@ -39,9 +38,7 @@ function getResetStart(read: readonly BurnPoint[]): number {
     if (previous === undefined || current === undefined) {
       continue;
     }
-    const fell = (previous.percent ?? 0) - (current.percent ?? 0) >= RESET_DROP_POINTS;
-    const moved = previous.resetsAt !== null && current.resetsAt !== null && Date.parse(current.resetsAt) - Date.parse(previous.resetsAt) > RESET_JUMP_MS;
-    if (fell || moved) {
+    if (isBurnReset(previous, current)) {
       start = index;
     }
   }

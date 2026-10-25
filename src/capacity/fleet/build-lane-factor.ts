@@ -1,0 +1,16 @@
+import { match } from 'ts-pattern';
+import type { LaneFit } from './build-lane-fit.ts';
+
+export type LaneModel = { kind: 'fit'; fit: LaneFit; current: number } | { kind: 'scale'; current: number };
+
+// What the burn at the current lane count is multiplied by to give the burn at `lanes`.
+export function buildLaneFactor(model: LaneModel, lanes: number): number {
+  return match(model)
+    .with({ kind: 'scale' }, (scale) => (scale.current > 0 ? lanes / scale.current : 1))
+    .with({ kind: 'fit' }, (fitted) => {
+      const now = fitted.fit.base + fitted.fit.perLane * fitted.current;
+      const wanted = fitted.fit.base + fitted.fit.perLane * lanes;
+      return now > 0 ? Math.max(0, wanted) / now : 1;
+    })
+    .exhaustive();
+}
