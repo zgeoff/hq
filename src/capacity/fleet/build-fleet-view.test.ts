@@ -118,6 +118,32 @@ test('it simulates an inactive slot on its usage sample when that sample is newe
   expect(view.forecast?.pause?.end).toBe('2026-10-18T00:15:00Z');
 });
 
+test('it starts the active slot from its slot read when that read is newer than the newest usage sample', () => {
+  const rows: SlotRow[] = [
+    { at: '2026-10-14T01:15:00Z', slot: 1, status: '200', five: 0, fiveResetsAt: null, seven: 96, sevenResetsAt: '2026-10-18T00:00:00Z', workingLanes: 2 },
+    { at: '2026-10-14T01:15:00Z', slot: 2, status: '200', five: 0, fiveResetsAt: null, seven: 10, sevenResetsAt: '2026-10-19T00:00:00Z', workingLanes: 2 },
+  ];
+  const samples = ['2026-10-13T23:30:00Z', '2026-10-14T00:00:00Z', '2026-10-14T00:30:00Z', '2026-10-14T01:00:00Z'].map((at, index) => ({ at, account: 'kettle01', five_hour: 0, seven_day: 78.5 + index * 0.5, five_hour_resets_at: null, seven_day_resets_at: '2026-10-18T00:00:00Z' }));
+
+  const view = buildFleetView({ at: new Date('2026-10-14T01:15:00Z'), notSetUp: null, rows, samples, working: 2, cap: null });
+
+  expect(view.active).toBe(1);
+  expect(view.forecast?.switches[0]).toStrictEqual({ at: '2026-10-14T01:15:00Z', from: 1, to: 2 });
+});
+
+test('it starts the active slot from the newest usage sample when that sample is newer than its slot read', () => {
+  const rows: SlotRow[] = [
+    { at: '2026-10-14T00:30:00Z', slot: 1, status: '200', five: 0, fiveResetsAt: null, seven: 96, sevenResetsAt: '2026-10-18T00:00:00Z', workingLanes: 2 },
+    { at: '2026-10-14T00:30:00Z', slot: 2, status: '200', five: 0, fiveResetsAt: null, seven: 10, sevenResetsAt: '2026-10-19T00:00:00Z', workingLanes: 2 },
+  ];
+  const samples = ['2026-10-13T23:30:00Z', '2026-10-14T00:00:00Z', '2026-10-14T00:30:00Z', '2026-10-14T01:00:00Z'].map((at, index) => ({ at, account: 'kettle01', five_hour: 0, seven_day: 78.5 + index * 0.5, five_hour_resets_at: null, seven_day_resets_at: '2026-10-18T00:00:00Z' }));
+
+  const view = buildFleetView({ at: new Date('2026-10-14T01:00:00Z'), notSetUp: null, rows, samples, working: 2, cap: null });
+
+  expect(view.active).toBe(1);
+  expect(view.forecast?.switches[0]).toStrictEqual({ at: '2026-10-14T16:00:00Z', from: 1, to: 2 });
+});
+
 test('it keeps a slot whose newest read failed in the simulation on its last good reading', () => {
   const rows: SlotRow[] = [
     { at: '2026-10-14T00:00:00Z', slot: 1, status: '200', five: 1, fiveResetsAt: null, seven: 10, sevenResetsAt: '2026-10-18T00:00:00Z', workingLanes: 2 },

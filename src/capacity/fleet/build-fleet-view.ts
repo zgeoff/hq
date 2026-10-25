@@ -116,7 +116,7 @@ function toPoints(samples: readonly UsageSample[], percent: 'five_hour' | 'seven
 function buildSimSlots(newest: readonly SlotRow[], active: number, latest: UsageSample, samples: readonly UsageSample[]): SimSlot[] {
   const slots: SimSlot[] = [];
   for (const row of newest) {
-    const sample = row.slot === active ? latest : findNewerSample(row, samples);
+    const sample = row.slot === active ? pickNewerThanRead(row, latest) : findNewerSample(row, samples);
     const seven = sample === null ? row.seven : sample.seven_day;
     const sevenResetsAt = sample === null ? row.sevenResetsAt : sample.seven_day_resets_at;
     if (seven === null || sevenResetsAt === null) {
@@ -126,6 +126,10 @@ function buildSimSlots(newest: readonly SlotRow[], active: number, latest: Usage
     slots.push({ slot: row.slot, five: (sample === null ? row.five : sample.five_hour) ?? 0, fiveResetsAt: fiveResetsAt === null ? null : new Date(fiveResetsAt), seven, sevenResetsAt: new Date(sevenResetsAt) });
   }
   return slots;
+}
+
+function pickNewerThanRead(row: SlotRow, sample: UsageSample): UsageSample | null {
+  return Date.parse(sample.at) > Date.parse(row.at) ? sample : null;
 }
 
 function findNewerSample(row: SlotRow, samples: readonly UsageSample[]): UsageSample | null {
