@@ -28,6 +28,9 @@ export interface SourceRequest {
 export function findSourceRefusal(db: Database, request: SourceRequest, probe: OwnerProbe): string | null {
   const [kind = '', ...rest] = request.source.split(':');
   const id = rest.join(':');
+  if ((kind === 'call' || kind === 'console') && request.wanted.action === 'override' && request.wanted.check !== undefined) {
+    return `${request.source} cannot override a CI check: only the owner's own chat source may, so the owner names the check in the command`;
+  }
   if (kind === 'call' || kind === 'console') {
     return findCallRefusal(db, { ...request, id, needsGrant: kind === 'console' });
   }
@@ -116,26 +119,19 @@ function findGrantRefusal(check: CallCheck, options: ItemOption[], answer: strin
 function isMatchingGrant(grant: ItemGrant, check: CallCheck): boolean {
   const finding = check.wanted.action === 'accept-risk' ? check.wanted.finding : undefined;
   const atHead = grant.head === undefined || grant.head === check.head;
-  return grant.action === check.wanted.action && grant.check === readWantedCheck(check.wanted) && grant.pr.toLowerCase() === `${check.ref.slug}#${check.ref.pr}`.toLowerCase() && grant.finding === finding && atHead;
-}
-
-function readWantedCheck(wanted: OwnerAction): string | undefined {
-  return wanted.action === 'override' ? wanted.check : undefined;
+  return grant.action === check.wanted.action && grant.pr.toLowerCase() === `${check.ref.slug}#${check.ref.pr}`.toLowerCase() && grant.finding === finding && atHead;
 }
 
 function formatGrant(grant: ItemGrant): string {
   const finding = grant.finding === undefined ? '' : ` finding ${grant.finding}`;
-  const checkName = grant.check === undefined ? '' : ` check ${grant.check}`;
   const head = grant.head === undefined ? '' : ` at ${grant.head.slice(0, 7)}`;
-  return `${grant.action} of ${grant.pr}${finding}${checkName}${head}`;
+  return `${grant.action} of ${grant.pr}${finding}${head}`;
 }
 
 function formatWanted(check: CallCheck, grant: ItemGrant): string {
   const finding = check.wanted.action === 'accept-risk' ? ` finding ${check.wanted.finding}` : '';
-  const wantedCheck = readWantedCheck(check.wanted);
-  const checkName = wantedCheck === undefined ? '' : ` check ${wantedCheck}`;
   const head = grant.head === undefined ? '' : ` at ${check.head === null ? 'a head gh could not read' : check.head.slice(0, 7)}`;
-  return `${check.wanted.action} of ${check.ref.slug}#${check.ref.pr}${finding}${checkName}${head}`;
+  return `${check.wanted.action} of ${check.ref.slug}#${check.ref.pr}${finding}${head}`;
 }
 
 function hasActionName(title: string, wanted: OwnerAction): boolean {
