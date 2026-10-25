@@ -126,8 +126,6 @@ function buildPRReport(rounds: RoundRecord[], earlier: RoundRecord[]): PRReport 
   };
 }
 
-// The ids of the ok reviews that only moved the base: a base-move run hq recorded, or a round from
-// before v45 at a new head whose PR diff equals the ok review before it.
 function collectBaseMoves(okReviews: RoundRecord[]): Set<number> {
   const moves = new Set<number>();
   okReviews.forEach((review, index) => {
