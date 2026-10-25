@@ -68,3 +68,9 @@ test('it gives pre-v45 reviews the patch-id of their PR diff, so the report find
   expect(buildNoslopReport(ctx.db)[0]).toMatchObject({ reviewsOk: 3, extraRounds: 1, baseMove: 1 });
   expect(refilled).toBe(0);
 });
+
+test('it refuses a --since that is not a time before it reads any round', async () => {
+  const ctx = await setupTest();
+
+  await expect(fillRoundPatchIDs({ run: realRunner, db: ctx.db, since: 'yesterday-ish' })).rejects.toThrow("--since must be an ISO time, got 'yesterday-ish'");
+});

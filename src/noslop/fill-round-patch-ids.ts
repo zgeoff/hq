@@ -2,6 +2,7 @@ import type { Database } from 'bun:sqlite';
 import { z } from 'zod';
 import { checkout } from '../review/checkout.ts';
 import type { Runner } from '../runner/types.ts';
+import { parseReportCutoff } from './parse-report-cutoff.ts';
 import { readPRPatchID } from './read-pr-patch-id.ts';
 
 export interface PatchFill {
@@ -17,7 +18,7 @@ const UnfilledSchema = z.array(z.object({ id: z.number(), repo: z.string(), head
 // Stores the PR diff's patch-id on each ok review from before v45. A diff git cannot read gets '',
 // never read again; a repo hq has no checkout of waits for a later report. Returns the ids found.
 export async function fillRoundPatchIDs(fill: PatchFill): Promise<number> {
-  const cutoff = fill.since === undefined ? '' : new Date(fill.since).toISOString();
+  const cutoff = parseReportCutoff(fill.since);
   const rows = UnfilledSchema.parse(
     fill.db
       .query(

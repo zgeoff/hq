@@ -1,7 +1,8 @@
 import type { Database } from 'bun:sqlite';
-import { HqError } from '../errors.ts';
+import { z } from 'zod';
 import type { StoredFinding } from './types.ts';
 import { countChurn } from './count-churn.ts';
+import { parseReportCutoff } from './parse-report-cutoff.ts';
 import type { ChurnReview } from './count-churn.ts';
 
 export interface PRReport {
@@ -38,37 +39,36 @@ export interface LateCount {
   of: number;
 }
 
+const RoundRecordSchema = z.object({
+  id: z.number(),
+  repo: z.string(),
+  pr: z.number(),
+  kind: z.enum(['review', 'check']),
+  started_at: z.string(),
+  ended_at: z.string(),
+  // oxlint-disable-next-line zgeoff/no-abbreviated-names -- the column is noslop_rounds' own
+  ms: z.number(),
+  ok: z.number(),
+  findings: z.string(),
+  conclusion: z.string().nullable(),
+  open: z.string(),
+  full: z.number().nullable(),
+  confirm: z.number(),
+  head: z.string().nullable(),
+  patch_id: z.string().nullable(),
+  base_move: z.number(),
+});
+
 // One report per PR that noslop has a round for since the time, in the order of their first round
 // since then. Churn also reads the PR's ok reviews from before the time, to tell what they raised.
 export function buildNoslopReport(db: Database, since?: string): PRReport[] {
-  if (since !== undefined && Number.isNaN(Date.parse(since))) {
-    throw new HqError('bad_args', `--since must be an ISO time, got '${since}'`);
-  }
-
-  // Rounds are stored in UTC: a cutoff with an offset compares right only once it is UTC too.
-  const cutoff = since === undefined ? '' : new Date(since).toISOString(),
-    rows = db.query('SELECT * FROM noslop_rounds WHERE (repo, pr) IN (SELECT repo, pr FROM noslop_rounds WHERE started_at >= ?) ORDER BY id').all(cutoff) as RoundRecord[];
+  const cutoff = parseReportCutoff(since);
+  const rows = z.array(RoundRecordSchema).parse(db.query('SELECT * FROM noslop_rounds WHERE (repo, pr) IN (SELECT repo, pr FROM noslop_rounds WHERE started_at >= ?) ORDER BY id').all(cutoff));
   return buildWindowReports(rows, cutoff);
 }
 
-interface RoundRecord {
-  id: number;
-  repo: string;
-  pr: number;
-  kind: 'review' | 'check';
-  started_at: string;
-  ended_at: string;
-  ms: number;
-  ok: number;
-  findings: string;
-  conclusion: string | null;
-  open: string;
-  full: number | null;
-  confirm: number;
-  head: string | null;
-  patch_id: string | null;
-  base_move: number;
-}
+
+type RoundRecord = z.output<typeof RoundRecordSchema>;
 
 function buildWindowReports(rows: RoundRecord[], cutoff: string): PRReport[] {
   const earlier = collectRoundsByPR(rows.filter((r) => r.started_at < cutoff));
