@@ -23,17 +23,20 @@ const GrantsFileSchema = z.array(z.object({ id: z.string(), label: z.string() })
 
 function parseGrantsFile(path: string, text: string): MainGrant[] {
   const session = path.slice('grants/'.length, -'.yaml'.length);
-  const parsed = GrantsFileSchema.safeParse(parseYAML(path, text));
-  if (!parsed.success) {
+  const entries = parseGrantEntries(text);
+  if (entries === null) {
     throw new HqError('bad_grants', `${path} at hq-private main is not a list of grants with an id and a label`);
   }
-  return parsed.data.map((grant) => ({ session, id: grant.id, label: grant.label, name: `${session}-${grant.id}` }));
+  return entries.map((grant) => ({ session, id: grant.id, label: grant.label, name: `${session}-${grant.id}` }));
 }
 
-function parseYAML(path: string, text: string): unknown {
+// The grants a grants file lists, or null when it is not YAML or not a list of grants with an id
+// and a label.
+export function parseGrantEntries(text: string): z.infer<typeof GrantsFileSchema> | null {
   try {
-    return Bun.YAML.parse(text);
+    const parsed = GrantsFileSchema.safeParse(Bun.YAML.parse(text));
+    return parsed.success ? parsed.data : null;
   } catch {
-    throw new HqError('bad_grants', `${path} at hq-private main is not YAML`);
+    return null;
   }
 }

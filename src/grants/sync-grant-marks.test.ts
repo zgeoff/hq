@@ -47,6 +47,17 @@ test('a grant removed and added again takes the time and PR of the later add', (
   expect(ctx.db.query("SELECT at, ref FROM marks WHERE grant_name = 'z-kettle-pour'").all()).toStrictEqual([{ at: '2026-10-12T09:00:00Z', ref: 'hq-private#14' }]);
 });
 
+test('a grant whose id is quoted takes the PR that added it, not a later change that only reformats the file', () => {
+  const ctx = setupTest();
+  ctx.tree.writeCommit({ 'grants/z-kettle.yaml': `${ctx.boil}- id: "pour"\n  label: "Pour"\n  outcome: allow\n` }, { subject: 'feat(grants): let z-kettle pour (#12)', at: '2026-10-10T09:00:00Z' });
+  ctx.tree.writeCommit({ 'grants/z-kettle.yaml': `# z-kettle's grants\n${ctx.boil}- id: 'pour'\n  label: Pour\n  outcome: allow\n` }, { subject: 'docs(grants): tidy the quotes (#13)', at: '2026-10-11T09:00:00Z' });
+  ctx.tree.git('fetch', '-q', 'origin');
+
+  syncGrantMarks(ctx.db, ctx.tree.dir, 'hq-watcher');
+
+  expect(ctx.db.query("SELECT at, ref FROM marks WHERE grant_name = 'z-kettle-pour'").all()).toStrictEqual([{ at: '2026-10-10T09:00:00Z', ref: 'hq-private#12' }]);
+});
+
 test('a grant whose add names no PR gets no mark, and the health check names it', () => {
   const ctx = setupTest();
   createGrantMark(ctx.db, { text: 'z-kettle may boil', ref: null, at: null, name: 'z-kettle-boil', actor: 'z-kettle' });
