@@ -66,6 +66,7 @@ test('it reads a call option that grants an override or an accepted risk', () =>
   const options: ItemOption[] = [
     { label: 'Override', effect: 'It merges past the findings.', grants: { action: 'override', pr: 'zgeoff/kettle#4', head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678' } },
     { label: 'Accept it', effect: 'It merges with the risk.', grants: { action: 'accept-risk', pr: 'zgeoff/kettle#4', finding: 'aaaa' } },
+    { label: 'Pass the check', effect: 'It merges past one red check.', grants: { action: 'override', pr: 'zgeoff/kettle#4', head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', check: 'preview' } },
   ];
 
   expect(parseItemInput('call', JSON.stringify({ title: 'Lid', question: 'Merge kettle#4?', options })).options).toStrictEqual(options);
@@ -77,6 +78,7 @@ test.each([
   ['a PR that is not owner/repo#number', 'call', { action: 'override', pr: 'kettle#4' }, 'must be <owner>/<repo>#<number>'],
   ['an action hq does not know', 'call', { action: 'merge', pr: 'zgeoff/kettle#4' }, 'options.0.grants.action'],
   ['a grant on a proposal option', 'proposal', { action: 'override', pr: 'zgeoff/kettle#4' }, 'only a call\'s option does'],
+  ['an accepted risk that names a CI check', 'call', { action: 'accept-risk', pr: 'zgeoff/kettle#4', finding: 'aaaa', check: 'preview' }, 'only an override grant names a CI check'],
   ['a grant head that is not a commit sha', 'call', { action: 'override', pr: 'zgeoff/kettle#4', head: 'a1b2c3d' }, 'must be a 40-character commit sha'],
 ] as const)('it refuses %s', (_case, kind, grants, why) => {
   const item = { title: 'Lid', question: 'Merge kettle#4?', diff: { now: 'Open.', would: 'Merged.' }, options: [{ label: 'Go', effect: 'It merges.', grants }, { label: 'Wait', effect: 'It waits.' }] };

@@ -26,6 +26,10 @@ function setupTest() {
       addAsk(fresh.db, { kind: 'call', id, title, question: 'Boil again?', body: 'Body', issues: [], forSession: null, actor: 'z-kettle' });
       openAsk(fresh.db, { id, force: true, actor: 'z-stu' });
     },
+    fileGrantCall: (id: string, grants: Record<string, string>) => {
+      applyAskItem(fresh.db, { kind: 'call', id, issues: [], forSession: null, actor: 'z-kettle' }, parseItemInput('call', JSON.stringify({ title: 'Merge widgets#7?', question: 'Merge past the red check?', options: [{ label: 'Go', effect: 'Merge it.', grants }, { label: 'Wait', effect: 'Fix it first.' }] })), 'Merge past the red check?');
+      recordConsoleAnswer(fresh.db, { id, option: 'Go', note: '', actor: 'owner' });
+    },
     answerInHq: (id: string) => answerAsk(fresh.db, { id, kind: 'call', answer: 'Yes', actor: 'z-stu' }),
     answerByHqCall: async (id: string, verdict: 'owner' | 'other', actor = 'z-stu') => await runCallAnswer(fresh.db, { id, kind: 'call', answer: 'Yes', actor }, () => Promise.resolve({ verdict })),
     answerInConsole: (id: string) => recordConsoleAnswer(fresh.db, { id, option: '', note: 'Yes', actor: 'owner' }),
@@ -979,4 +983,48 @@ test('it shows a standing CI override for a PR with no record', async () => {
 
   expect(shown.text).toInclude('ci override: preview at a1b2c3d via chat:kettle-2');
   expect(shown.data).toMatchObject({ pr: null, ciOverrides: [{ check: 'preview' }] });
+});
+
+test.each(['console:KET-60', 'call:KET-60'])('it records a CI check override from %s when the picked option grants that check at this head', async (source) => {
+  const ctx = setupTest();
+  ctx.fileGrantCall('KET-60', { action: 'override', pr: 'zgeoff/widgets#7', head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', check: 'preview' });
+
+  await ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source, note: 'An intended infra change.', check: 'preview' });
+
+  expect(ctx.db.query("SELECT json_extract(data, '$.check') AS check_name FROM events WHERE action = 'pr-override'").all()).toStrictEqual([{ check_name: 'preview' }]);
+});
+
+test.each([
+  { mismatch: 'a findings override', grants: { action: 'override', pr: 'zgeoff/widgets#7', head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678' }, flags: { check: 'preview' }, why: 'override of zgeoff/widgets#7 at a1b2c3d, not override of zgeoff/widgets#7 check preview at a1b2c3d' },
+  { mismatch: 'another check', grants: { action: 'override', pr: 'zgeoff/widgets#7', head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', check: 'test' }, flags: { check: 'preview' }, why: 'override of zgeoff/widgets#7 check test at a1b2c3d, not override of zgeoff/widgets#7 check preview at a1b2c3d' },
+  { mismatch: 'a check named in another case', grants: { action: 'override', pr: 'zgeoff/widgets#7', head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', check: 'Preview' }, flags: { check: 'preview' }, why: 'override of zgeoff/widgets#7 check Preview at a1b2c3d, not override of zgeoff/widgets#7 check preview at a1b2c3d' },
+  { mismatch: 'a check, for the findings override', grants: { action: 'override', pr: 'zgeoff/widgets#7', head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', check: 'preview' }, flags: {}, why: 'override of zgeoff/widgets#7 check preview at a1b2c3d, not override of zgeoff/widgets#7 at a1b2c3d' },
+  { mismatch: 'another PR', grants: { action: 'override', pr: 'zgeoff/widgets#8', head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', check: 'preview' }, flags: { check: 'preview' }, why: 'override of zgeoff/widgets#8 check preview at a1b2c3d, not override of zgeoff/widgets#7 check preview at a1b2c3d' },
+])('it refuses a console: source whose picked option grants $mismatch, and records nothing', async (row) => {
+  const ctx = setupTest();
+  ctx.fileGrantCall('KET-61', row.grants);
+
+  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'console:KET-61', note: 'Ship it.', ...row.flags })).rejects.toMatchObject({ code: 'bad_args', message: `--source refused: the option the owner picked in console:KET-61 grants ${row.why}; ask z-stu to record it` });
+
+  expect(ctx.db.query("SELECT COUNT(*) AS total FROM events WHERE action = 'pr-override'").get()).toStrictEqual({ total: 0 });
+});
+
+test('it refuses a CI check override from a call: source with a plain Yes, and records nothing', async () => {
+  const ctx = setupTest();
+  ctx.fileCall('KET-62', 'Override widgets#7 preview check?');
+  ctx.answerInConsole('KET-62');
+
+  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'call:KET-62', note: 'Ship it.', check: 'preview' })).rejects.toMatchObject({ code: 'bad_args', message: expect.stringContaining('has no option that grants the override') });
+
+  expect(ctx.db.query("SELECT COUNT(*) AS total FROM events WHERE action = 'pr-override'").get()).toStrictEqual({ total: 0 });
+});
+
+test('it refuses a second CI check override from a grant that named the first check, and keeps only the first', async () => {
+  const ctx = setupTest();
+  ctx.fileGrantCall('KET-63', { action: 'override', pr: 'zgeoff/widgets#7', head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', check: 'preview' });
+  await ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'console:KET-63', note: 'An intended infra change.', check: 'preview' });
+
+  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'console:KET-63', note: 'And the tests.', check: 'test' })).rejects.toMatchObject({ code: 'bad_args' });
+
+  expect(ctx.db.query("SELECT json_extract(data, '$.check') AS check_name FROM events WHERE action = 'pr-override'").all()).toStrictEqual([{ check_name: 'preview' }]);
 });

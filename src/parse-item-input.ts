@@ -38,7 +38,7 @@ function defineItemInputSchema() {
   const DetailSchema = z.strictObject({ heading: defineText(), text: defineText(), code: defineText().optional() }),
     DiffSchema = z.strictObject({ now: defineText(), would: defineText() }),
     LinkSchema = z.strictObject({ label: defineText(), url: z.url({ protocol: /^https?$/u }), subject: z.literal(true).optional() }),
-    GrantSchema = z.strictObject({ action: z.enum(['override', 'accept-risk']), pr: z.string().regex(/^[\w.-]+\/[\w.-]+#\d+$/u, 'must be <owner>/<repo>#<number>'), finding: defineText().optional(), head: z.string().regex(/^[0-9a-f]{40}$/u, 'must be a 40-character commit sha').optional() }),
+    GrantSchema = z.strictObject({ action: z.enum(['override', 'accept-risk']), pr: z.string().regex(/^[\w.-]+\/[\w.-]+#\d+$/u, 'must be <owner>/<repo>#<number>'), finding: defineText().optional(), check: defineText().optional(), head: z.string().regex(/^[0-9a-f]{40}$/u, 'must be a 40-character commit sha').optional() }),
     OptionSchema = z.strictObject({ label: defineText(), effect: defineText(), recommended: z.boolean().optional(), grants: GrantSchema.optional() }),
     UnblocksSchema = z.strictObject({ id: defineText(), title: defineText() });
   return z.strictObject({
@@ -81,7 +81,7 @@ function checkKind(kind: ItemKind, item: ItemInput): void {
 }
 
 // Only a call's option grants an action, and an accepted risk names its finding while an override
-// names none.
+// names none. Only an override names a CI check, and then it covers that check alone.
 function checkGrants(kind: ItemKind, item: ItemInput): void {
   for (const option of item.options ?? []) {
     if (option.grants === undefined) {
@@ -92,6 +92,9 @@ function checkGrants(kind: ItemKind, item: ItemInput): void {
     }
     if ((option.grants.action === 'accept-risk') !== (option.grants.finding !== undefined)) {
       throw new HqError('bad_args', `--item: option "${option.label}": an accept-risk grant names its finding, and an override grant names none`);
+    }
+    if (option.grants.action === 'accept-risk' && option.grants.check !== undefined) {
+      throw new HqError('bad_args', `--item: option "${option.label}": only an override grant names a CI check`);
     }
   }
 }

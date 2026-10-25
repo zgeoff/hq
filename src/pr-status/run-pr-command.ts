@@ -185,7 +185,7 @@ async function runOverride(input: PRCommandInput, ref: PRRef): Promise<Out> {
   const check = parseCheckFlag(input.flags.check);
   const target = check === null ? 'the open findings' : `the ${check} check`;
   const head = await readPRHead(input.run, ref.slug, ref.pr);
-  const source = await requireOwnerSource(input, { ref, wanted: { action: 'override' }, head });
+  const source = await requireOwnerSource(input, { ref, wanted: check === null ? { action: 'override' } : { action: 'override', check }, head });
   const note = input.flags.note?.trim() ?? '';
   if (note === '') {
     throw new HqError('bad_args', `--note is required: why the owner overrides ${target} at this head`);
