@@ -17,8 +17,6 @@ export interface PatchFill {
 
 const UnfilledSchema = z.array(z.object({ id: z.number(), repo: z.string(), head: z.string(), base: z.string() }));
 
-// Stores the PR diff's patch-id on each ok review from before v45. A diff git cannot read gets '',
-// never read again; a repo hq has no checkout of waits for a later report. Returns the ids found.
 export async function fillRoundPatchIDs(fill: PatchFill): Promise<number> {
   const cutoff = parseReportCutoff(fill.since);
   const rows = UnfilledSchema.parse(
