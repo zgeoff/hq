@@ -20,7 +20,7 @@ export function createStubOp(options: StubOpOptions): StubOp {
   const config = join(options.directory, 'op.json');
   mkdirSync(bin, { recursive: true });
   writeFileSync(config, JSON.stringify({ answers: options.answers }));
-  writeFileSync(join(bin, 'op'), `#!/bin/sh\nexec '${process.execPath}' '${resolve(import.meta.dir, 'run-stub-op.ts')}' '${config}' "$@"\n`);
+  writeFileSync(join(bin, 'op'), `#!/bin/sh\nexec '${process.execPath}' '${resolve(import.meta.dir, 'run-stub-op.ts')}' --config '${config}' "$@"\n`);
   chmodSync(join(bin, 'op'), 0o755);
   return { bin };
 }
