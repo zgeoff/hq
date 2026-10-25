@@ -28,10 +28,16 @@ export async function readSlotReading(io: Pick<FleetIO, 'run' | 'httpClient'>, o
       signal: AbortSignal.any([signal, AbortSignal.timeout(REQUEST_MS)]),
     });
     await response.body?.cancel();
-    return { reading: { ...empty, ...parseSlotHeaders(response.headers), status: String(response.status) }, problem: null };
+    const figures = parseSlotHeaders(response.headers);
+    return { reading: { ...empty, ...figures, status: String(response.status) }, problem: pickAnswerProblem(slot, response, Object.values(figures).some((figure) => figure !== null)) };
   } catch (error) {
     signal.throwIfAborted();
     const message = error instanceof Error ? error.message : String(error);
     return { reading: { ...empty, status: 'request-failed' }, problem: `slot ${slot}: ${redactSlotSecrets(message, [credential, opToken])}` };
   }
+}
+
+function pickAnswerProblem(slot: number, response: Response, hasUsage: boolean): string | null {
+  const failed = response.status >= 500 || (!response.ok && !hasUsage);
+  return failed ? `slot ${slot}: the messages API answered ${response.status}` : null;
 }

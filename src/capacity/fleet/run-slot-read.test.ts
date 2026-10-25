@@ -39,7 +39,7 @@ test('it reads four slots, stores one row each with the working lane count, and 
   slotUsage.set('Bearer sk-ant-kettle-slot-4', { five: { utilization: 0.1, reset: 1_792_000_000 }, seven: { utilization: 0.3, reset: 1_792_400_000 } });
   const result = await runSlotRead(ctx.db, { run, httpClient: fetch, settings: { path: ctx.path, readFile: readOptionalFile } }, new Date('2026-10-14T01:00:00Z'), new AbortController().signal);
 
-  expect(result).toMatchObject({ kind: 'read', problems: ['slot 3: op read failed (exit 1)'] });
+  expect(result).toMatchObject({ kind: 'read', problems: ['slot 2: the messages API answered 401', 'slot 3: op read failed (exit 1)'] });
   expect(ctx.db.query('SELECT at, slot, status, five_hour, seven_day, working_lanes FROM slot_usage ORDER BY slot').all()).toStrictEqual([
     { at: '2026-10-14T01:00:00Z', slot: 1, status: '200', five_hour: 10, seven_day: 30, working_lanes: 1 },
     { at: '2026-10-14T01:00:00Z', slot: 2, status: '401', five_hour: null, seven_day: null, working_lanes: 1 },
