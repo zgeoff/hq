@@ -96,8 +96,8 @@ hq 0.79.0: headquarters for the z- sessions. Every command takes --json.
   hq lanes cap <n> [--until <ISO time|Ddd HH:MM>] [--reason TEXT]
                                              set the cap; the owner may also raise or lift it, the delivery lead only set or lower it
   hq lanes cap off [--reason TEXT]            lift the cap
-  hq lanes skip <issue> --until <ISO time|GEO-n> --reason TEXT
-                                             leave one Ready issue out of the lanes' picks until the time passes or GEO-n is Done or Canceled
+  hq lanes skip <issue> --until <ISO time|GEO-n|pr:repo#n> --reason TEXT
+                                             leave one Ready issue out of the lanes' picks until the time passes, GEO-n is Done or Canceled, or the PR merges or closes
   hq lanes skip list                          each skip with its until and reason
   hq lanes skip drop <issue>                  end a skip now: the lanes may pick the issue from their next look
   hq focus [show] | clear                     the lanes' focus with each term's Ready and Backlog matches; clear goes back to all eligible work by priority
