@@ -497,6 +497,40 @@ test('hq capacity --refresh-slots reads the four slots through op and prints the
   expect(fresh.db.query('SELECT COUNT(*) AS total FROM slot_usage').get()).toStrictEqual({ total: 4 });
 });
 
+test('hq capacity --refresh-slots --json carries the refresh problems in the fleet block', async () => {
+  const fresh = freshDb();
+  const log = console.log;
+  const lines: string[] = [];
+  const settings = `${fresh.dir}/settings.local.json`;
+  onTestFinished(fresh.cleanup);
+  onTestFinished(overrideEnv('HQ_NOW', NOON_SYDNEY));
+  onTestFinished(overrideEnv('HQ_SLOTS_OP_SETTINGS', settings));
+  onTestFinished(() => (console.log = log));
+  mkdirSync(`${fresh.dir}/bin`);
+  writeFileSync(
+    `${fresh.dir}/bin/op`,
+    [
+      '#!/bin/sh',
+      'case "$2" in',
+      '  op://claude-slots/claude-setup-token-1/credential) echo sk-ant-kettle-cli-1 ;;',
+      '  op://claude-slots/claude-setup-token-2/credential) echo sk-ant-kettle-cli-2 ;;',
+      '  op://claude-slots/claude-setup-token-4/credential) echo sk-ant-kettle-cli-4 ;;',
+      '  *) echo "invented: no such item" >&2; exit 1 ;;',
+      'esac',
+      '',
+    ].join('\n'),
+  );
+  chmodSync(`${fresh.dir}/bin/op`, 0o755);
+  onTestFinished(overrideEnv('PATH', `${fresh.dir}/bin:${process.env['PATH']}`));
+  writeFileSync(settings, JSON.stringify({ env: { OP_SERVICE_ACCOUNT_TOKEN: 'ops_kettle-profile-0001' } }));
+  server.use(http.post('https://api.anthropic.com/v1/messages', () => HttpResponse.json({}, { headers: { 'anthropic-ratelimit-unified-7d-utilization': '0.4', 'anthropic-ratelimit-unified-7d-reset': '1792540800' } })));
+  console.log = (line: string) => lines.push(line);
+
+  await main(['capacity', '--refresh-slots', '--json']);
+
+  expect(JSON.parse(lines.join('\n')).fleet.problems).toStrictEqual(['slot 3: op read failed (exit 1)']);
+});
+
 test('hq lanes tick --refresh reads Ready from Linear inside the 10 min throttle, then ticks', async () => {
   const fresh = freshDb();
   const run = mock<Runner>(() => Promise.resolve<RunResult>({ code: 0, stdout: 'lin_api_INVENTEDkettleKEY0042\n', stderr: '' }));

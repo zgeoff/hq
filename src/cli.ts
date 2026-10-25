@@ -1093,7 +1093,7 @@ async function capacityCommand(db: Database, verb: string | undefined, args: str
       const pacing = await loadPacing(pacingPath());
       const hint = readCapacityHint(db, pacing.claudeLaunchPct ?? 95, now());
       const fleet = await readCapacityFleet(db, boundedRunner(realRunner, CALL_MS), now(), flags['refresh-slots'] === true);
-      return { data: { sample: reading, hint, settings: capacitySettings(db), open, fleet: fleet.view }, text: [...lines, ...formatCapacityHint(hint), ...formatFleetView(fleet.view), ...fleet.problems.map((problem) => `  ! ${problem}`)].join('\n') };
+      return { data: { sample: reading, hint, settings: capacitySettings(db), open, fleet: { ...fleet.view, problems: fleet.problems } }, text: [...lines, ...formatCapacityHint(hint), ...formatFleetView(fleet.view), ...fleet.problems.map((problem) => `  ! ${problem}`)].join('\n') };
     }
     case 'sample': {
       const r = await capacityTick(db, await actor(db, flags));
