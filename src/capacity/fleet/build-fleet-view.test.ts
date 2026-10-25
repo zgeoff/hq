@@ -181,6 +181,25 @@ test('it keeps the 7-day figure of the active slot read when the newer usage sam
   expect(view.forecast?.switches[0]).toStrictEqual({ at: '2026-10-14T01:00:00Z', from: 1, to: 2 });
 });
 
+test('it gives no rate and no forecast and says the samples are too few when only one usage sample matches', () => {
+  const rows: SlotRow[] = [{ at: '2026-10-14T00:50:00Z', slot: 1, status: '200', five: 4, fiveResetsAt: '2026-10-14T03:00:00Z', seven: 30, sevenResetsAt: '2026-10-18T00:00:00Z', workingLanes: 2 }];
+  const samples = [{ at: '2026-10-14T00:55:00Z', account: 'kettle01', five_hour: 5, seven_day: 31, five_hour_resets_at: '2026-10-14T03:00:00Z', seven_day_resets_at: '2026-10-18T00:00:00Z' }];
+
+  const view = buildFleetView({ at: new Date('2026-10-14T01:00:00Z'), notSetUp: null, rows, samples, working: 2, cap: null });
+
+  expect(view).toStrictEqual({
+    notSetUp: null,
+    limit: 95,
+    active: 1,
+    slots: [{ reading: 'known', slot: 1, active: true, status: '200', five: 4, fiveResetsAt: '2026-10-14T03:00:00Z', seven: 30, sevenResetsAt: '2026-10-18T00:00:00Z', readAt: '2026-10-14T00:50:00Z', readAgeMin: 10 }],
+    lanes: { working: 2, cap: null },
+    ratePerHour: null,
+    scaled: null,
+    forecast: null,
+    note: 'too few usage samples for a burn rate',
+  });
+});
+
 test('it keeps a slot whose newest read failed in the simulation on its last good reading', () => {
   const rows: SlotRow[] = [
     { at: '2026-10-14T00:00:00Z', slot: 1, status: '200', five: 1, fiveResetsAt: null, seven: 10, sevenResetsAt: '2026-10-18T00:00:00Z', workingLanes: 2 },
