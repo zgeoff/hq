@@ -1,14 +1,15 @@
 import { expect, test } from 'bun:test';
 import { buildMockBurnDay } from '../../../test/build-mock-burn-day.ts';
+import { buildMockSlotRow } from '../../../test/build-mock-slot-row.ts';
 import { buildFleetView } from './build-fleet-view.ts';
 import type { SlotRow } from './types.ts';
 
 test('it forecasts a pause, the slots that cannot be a target left out, and the highest cap that avoids it', () => {
   const rows: SlotRow[] = [
-    { at: '2026-10-14T00:30:00Z', slot: 1, status: '200', five: 20, fiveResetsAt: '2026-10-14T04:00:00Z', seven: 39, sevenResetsAt: '2026-10-18T00:00:00Z', workingLanes: 2 },
-    { at: '2026-10-14T00:30:00Z', slot: 2, status: '200', five: 0, fiveResetsAt: null, seven: 96, sevenResetsAt: '2026-10-18T12:00:00Z', workingLanes: 2 },
-    { at: '2026-10-14T00:30:00Z', slot: 3, status: '403', five: null, fiveResetsAt: null, seven: null, sevenResetsAt: null, workingLanes: 2 },
-    { at: '2026-10-14T00:30:00Z', slot: 4, status: '200', five: 0, fiveResetsAt: null, seven: 97, sevenResetsAt: '2026-10-18T06:00:00Z', workingLanes: 2 },
+    buildMockSlotRow({ five: 20, fiveResetsAt: '2026-10-14T04:00:00Z', seven: 39 }),
+    buildMockSlotRow({ slot: 2, seven: 96, sevenResetsAt: '2026-10-18T12:00:00Z' }),
+    buildMockSlotRow({ slot: 3, status: '403', five: null, seven: null, sevenResetsAt: null }),
+    buildMockSlotRow({ slot: 4, seven: 97, sevenResetsAt: '2026-10-18T06:00:00Z' }),
   ];
   const samples = ['2026-10-13T23:30:00Z', '2026-10-14T00:00:00Z', '2026-10-14T00:30:00Z', '2026-10-14T01:00:00Z'].map((at, index) => ({ at, account: 'abcdef012345', five_hour: 17 + index, seven_day: 38.5 + index * 0.5, five_hour_resets_at: '2026-10-14T04:00:00Z', seven_day_resets_at: '2026-10-18T00:00:00Z' }));
 
@@ -23,11 +24,11 @@ test('it forecasts a pause, the slots that cannot be a target left out, and the 
 
 test('it scales a burn measured at 2 lanes to 4 working lanes on the lane fit and finds the cap that avoids the pause at that rate', () => {
   const rows: SlotRow[] = [
-    { at: '2026-10-14T01:00:00Z', slot: 1, status: '200', five: 0, fiveResetsAt: null, seven: 10, sevenResetsAt: '2026-10-21T13:00:00Z', workingLanes: 0 },
-    { at: '2026-10-14T02:00:00Z', slot: 1, status: '200', five: 0, fiveResetsAt: null, seven: 11, sevenResetsAt: '2026-10-21T13:00:00Z', workingLanes: 2 },
-    { at: '2026-10-14T03:00:00Z', slot: 1, status: '200', five: 0, fiveResetsAt: null, seven: 14, sevenResetsAt: '2026-10-21T13:00:00Z', workingLanes: 4 },
-    { at: '2026-10-14T04:00:00Z', slot: 1, status: '200', five: 0, fiveResetsAt: null, seven: 19, sevenResetsAt: '2026-10-21T13:00:00Z', workingLanes: 2 },
-    { at: '2026-10-21T00:00:00Z', slot: 1, status: '200', five: 0, fiveResetsAt: null, seven: 40, sevenResetsAt: '2026-10-21T13:00:00Z', workingLanes: 2 },
+    buildMockSlotRow({ at: '2026-10-14T01:00:00Z', seven: 10, sevenResetsAt: '2026-10-21T13:00:00Z', workingLanes: 0 }),
+    buildMockSlotRow({ at: '2026-10-14T02:00:00Z', seven: 11, sevenResetsAt: '2026-10-21T13:00:00Z' }),
+    buildMockSlotRow({ at: '2026-10-14T03:00:00Z', seven: 14, sevenResetsAt: '2026-10-21T13:00:00Z', workingLanes: 4 }),
+    buildMockSlotRow({ at: '2026-10-14T04:00:00Z', seven: 19, sevenResetsAt: '2026-10-21T13:00:00Z' }),
+    buildMockSlotRow({ at: '2026-10-21T00:00:00Z', seven: 40, sevenResetsAt: '2026-10-21T13:00:00Z' }),
   ];
   const samples = [
     { at: '2026-10-14T01:00:00Z', account: 'kettle01', five_hour: 0, seven_day: 10, five_hour_resets_at: null, seven_day_resets_at: '2026-10-21T13:00:00Z' },
@@ -51,7 +52,7 @@ test('it scales a burn measured at 2 lanes to 4 working lanes on the lane fit an
 });
 
 test('it forecasts the pause on the night mean once a steep daytime slope is 2 hours old', () => {
-  const rows: SlotRow[] = [{ at: '2026-10-15T04:30:00Z', slot: 1, status: '200', five: 0, fiveResetsAt: null, seven: 44, sevenResetsAt: '2026-10-21T00:00:00Z', workingLanes: 2 }];
+  const rows: SlotRow[] = [buildMockSlotRow({ at: '2026-10-15T04:30:00Z', seven: 44, sevenResetsAt: '2026-10-21T00:00:00Z' })];
   const samples = [
     ...buildMockBurnDay().map((point) => ({ at: point.at, account: 'teapot02', five_hour: 0, seven_day: point.percent, five_hour_resets_at: null, seven_day_resets_at: '2026-10-19T00:00:00Z' })),
     { at: '2026-10-15T03:00:00Z', account: 'kettle01', five_hour: 0, seven_day: 32, five_hour_resets_at: null, seven_day_resets_at: '2026-10-21T00:00:00Z' },
@@ -68,8 +69,8 @@ test('it forecasts the pause on the night mean once a steep daytime slope is 2 h
 
 test('it forecasts no pause when the active slot never fills before a reset', () => {
   const rows: SlotRow[] = [
-    { at: '2026-10-14T00:30:00Z', slot: 1, status: '200', five: 1, fiveResetsAt: null, seven: 10, sevenResetsAt: '2026-10-18T00:00:00Z', workingLanes: 2 },
-    { at: '2026-10-14T00:30:00Z', slot: 2, status: '200', five: 0, fiveResetsAt: null, seven: 5, sevenResetsAt: '2026-10-19T00:00:00Z', workingLanes: 2 },
+    buildMockSlotRow({ five: 1, seven: 10 }),
+    buildMockSlotRow({ slot: 2, seven: 5, sevenResetsAt: '2026-10-19T00:00:00Z' }),
   ];
   const samples = ['2026-10-13T23:30:00Z', '2026-10-14T00:00:00Z', '2026-10-14T00:30:00Z', '2026-10-14T01:00:00Z'].map((at, index) => ({ at, account: 'abcdef012345', five_hour: 1, seven_day: 10 + index * 0.1, five_hour_resets_at: null, seven_day_resets_at: '2026-10-18T00:00:00Z' }));
 
@@ -80,8 +81,8 @@ test('it forecasts no pause when the active slot never fills before a reset', ()
 
 test("it pools an earlier account's burn into the hour of the day and keeps the 2 h slope on the active account", () => {
   const rows: SlotRow[] = [
-    { at: '2026-10-14T00:30:00Z', slot: 1, status: '200', five: 1, fiveResetsAt: null, seven: 11, sevenResetsAt: '2026-10-18T00:00:00Z', workingLanes: 2 },
-    { at: '2026-10-14T00:30:00Z', slot: 2, status: '200', five: 0, fiveResetsAt: null, seven: 70, sevenResetsAt: '2026-10-19T00:00:00Z', workingLanes: 2 },
+    buildMockSlotRow({ five: 1, seven: 11 }),
+    buildMockSlotRow({ slot: 2, seven: 70, sevenResetsAt: '2026-10-19T00:00:00Z' }),
   ];
   const samples = [
     { at: '2026-10-13T01:00:00Z', account: 'teapot02', five_hour: 1, seven_day: 50, five_hour_resets_at: null, seven_day_resets_at: '2026-10-19T00:00:00Z' },
@@ -100,8 +101,8 @@ test("it pools an earlier account's burn into the hour of the day and keeps the 
 
 test('it simulates an inactive slot on its usage sample when that sample is newer than its slot read', () => {
   const rows: SlotRow[] = [
-    { at: '2026-10-14T00:30:00Z', slot: 1, status: '200', five: 0, fiveResetsAt: null, seven: 80, sevenResetsAt: '2026-10-18T00:00:00Z', workingLanes: 2 },
-    { at: '2026-10-14T00:30:00Z', slot: 2, status: '200', five: 0, fiveResetsAt: null, seven: 40, sevenResetsAt: '2026-10-19T00:00:00Z', workingLanes: 2 },
+    buildMockSlotRow({ seven: 80 }),
+    buildMockSlotRow({ slot: 2, seven: 40, sevenResetsAt: '2026-10-19T00:00:00Z' }),
   ];
   const samples = [
     { at: '2026-10-14T01:00:00Z', account: 'kettle01', five_hour: 0, seven_day: 90, five_hour_resets_at: null, seven_day_resets_at: '2026-10-18T00:00:00Z' },
@@ -120,8 +121,8 @@ test('it simulates an inactive slot on its usage sample when that sample is newe
 
 test('it starts the active slot from its slot read when that read is newer than the newest usage sample', () => {
   const rows: SlotRow[] = [
-    { at: '2026-10-14T01:15:00Z', slot: 1, status: '200', five: 0, fiveResetsAt: null, seven: 96, sevenResetsAt: '2026-10-18T00:00:00Z', workingLanes: 2 },
-    { at: '2026-10-14T01:15:00Z', slot: 2, status: '200', five: 0, fiveResetsAt: null, seven: 10, sevenResetsAt: '2026-10-19T00:00:00Z', workingLanes: 2 },
+    buildMockSlotRow({ at: '2026-10-14T01:15:00Z', seven: 96 }),
+    buildMockSlotRow({ at: '2026-10-14T01:15:00Z', slot: 2, seven: 10, sevenResetsAt: '2026-10-19T00:00:00Z' }),
   ];
   const samples = ['2026-10-13T23:30:00Z', '2026-10-14T00:00:00Z', '2026-10-14T00:30:00Z', '2026-10-14T01:00:00Z'].map((at, index) => ({ at, account: 'kettle01', five_hour: 0, seven_day: 78.5 + index * 0.5, five_hour_resets_at: null, seven_day_resets_at: '2026-10-18T00:00:00Z' }));
 
@@ -133,8 +134,8 @@ test('it starts the active slot from its slot read when that read is newer than 
 
 test('it starts the active slot from the newest usage sample when that sample is newer than its slot read', () => {
   const rows: SlotRow[] = [
-    { at: '2026-10-14T00:30:00Z', slot: 1, status: '200', five: 0, fiveResetsAt: null, seven: 96, sevenResetsAt: '2026-10-18T00:00:00Z', workingLanes: 2 },
-    { at: '2026-10-14T00:30:00Z', slot: 2, status: '200', five: 0, fiveResetsAt: null, seven: 10, sevenResetsAt: '2026-10-19T00:00:00Z', workingLanes: 2 },
+    buildMockSlotRow({ seven: 96 }),
+    buildMockSlotRow({ slot: 2, seven: 10, sevenResetsAt: '2026-10-19T00:00:00Z' }),
   ];
   const samples = ['2026-10-13T23:30:00Z', '2026-10-14T00:00:00Z', '2026-10-14T00:30:00Z', '2026-10-14T01:00:00Z'].map((at, index) => ({ at, account: 'kettle01', five_hour: 0, seven_day: 78.5 + index * 0.5, five_hour_resets_at: null, seven_day_resets_at: '2026-10-18T00:00:00Z' }));
 
@@ -146,8 +147,8 @@ test('it starts the active slot from the newest usage sample when that sample is
 
 test('it keeps the 5-hour figure of a slot read when the newer usage sample has none', () => {
   const rows: SlotRow[] = [
-    { at: '2026-10-14T00:30:00Z', slot: 1, status: '200', five: 0, fiveResetsAt: null, seven: 93, sevenResetsAt: '2026-10-18T00:00:00Z', workingLanes: 2 },
-    { at: '2026-10-14T00:30:00Z', slot: 2, status: '200', five: 96, fiveResetsAt: '2026-10-14T04:00:00Z', seven: 40, sevenResetsAt: '2026-10-19T00:00:00Z', workingLanes: 2 },
+    buildMockSlotRow({ seven: 93 }),
+    buildMockSlotRow({ slot: 2, five: 96, fiveResetsAt: '2026-10-14T04:00:00Z', seven: 40, sevenResetsAt: '2026-10-19T00:00:00Z' }),
   ];
   const samples = [
     { at: '2026-10-13T23:30:00Z', account: 'kettle01', five_hour: 0, seven_day: 92.5, five_hour_resets_at: null, seven_day_resets_at: '2026-10-18T00:00:00Z' },
@@ -165,8 +166,8 @@ test('it keeps the 5-hour figure of a slot read when the newer usage sample has 
 
 test('it keeps the 7-day figure of the active slot read when the newer usage sample has none', () => {
   const rows: SlotRow[] = [
-    { at: '2026-10-14T00:30:00Z', slot: 1, status: '200', five: 0, fiveResetsAt: null, seven: 96, sevenResetsAt: '2026-10-18T00:00:00Z', workingLanes: 2 },
-    { at: '2026-10-14T00:30:00Z', slot: 2, status: '200', five: 0, fiveResetsAt: null, seven: 10, sevenResetsAt: '2026-10-19T00:00:00Z', workingLanes: 2 },
+    buildMockSlotRow({ seven: 96 }),
+    buildMockSlotRow({ slot: 2, seven: 10, sevenResetsAt: '2026-10-19T00:00:00Z' }),
   ];
   const samples = [
     { at: '2026-10-13T23:30:00Z', account: 'kettle01', five_hour: 0, seven_day: 94.5, five_hour_resets_at: null, seven_day_resets_at: '2026-10-18T00:00:00Z' },
@@ -183,8 +184,8 @@ test('it keeps the 7-day figure of the active slot read when the newer usage sam
 
 test('it keeps the 5-hour figure of an earlier newer sample when the newest sample has only a 7-day figure', () => {
   const rows: SlotRow[] = [
-    { at: '2026-10-14T00:20:00Z', slot: 1, status: '200', five: 0, fiveResetsAt: null, seven: 50, sevenResetsAt: '2026-10-18T00:00:00Z', workingLanes: 2 },
-    { at: '2026-10-14T00:20:00Z', slot: 2, status: '200', five: 0, fiveResetsAt: null, seven: 10, sevenResetsAt: '2026-10-19T00:00:00Z', workingLanes: 2 },
+    buildMockSlotRow({ at: '2026-10-14T00:20:00Z', seven: 50 }),
+    buildMockSlotRow({ at: '2026-10-14T00:20:00Z', slot: 2, seven: 10, sevenResetsAt: '2026-10-19T00:00:00Z' }),
   ];
   const samples = [
     { at: '2026-10-13T23:30:00Z', account: 'kettle01', five_hour: 90, seven_day: 49, five_hour_resets_at: '2026-10-14T03:00:00Z', seven_day_resets_at: '2026-10-18T00:00:00Z' },
@@ -201,8 +202,8 @@ test('it keeps the 5-hour figure of an earlier newer sample when the newest samp
 
 test('it keeps the slot read 5-hour reset still to come when the newest sample gives a 5-hour figure with no reset', () => {
   const rows: SlotRow[] = [
-    { at: '2026-10-14T00:20:00Z', slot: 1, status: '200', five: 20, fiveResetsAt: '2026-10-14T04:00:00Z', seven: 30, sevenResetsAt: '2026-10-18T00:00:00Z', workingLanes: 2 },
-    { at: '2026-10-14T00:20:00Z', slot: 2, status: '200', five: 0, fiveResetsAt: null, seven: 94.9, sevenResetsAt: '2026-10-19T00:00:00Z', workingLanes: 2 },
+    buildMockSlotRow({ at: '2026-10-14T00:20:00Z', five: 20, fiveResetsAt: '2026-10-14T04:00:00Z' }),
+    buildMockSlotRow({ at: '2026-10-14T00:20:00Z', slot: 2, seven: 94.9, sevenResetsAt: '2026-10-19T00:00:00Z' }),
   ];
   const samples = [
     { at: '2026-10-13T23:30:00Z', account: 'kettle01', five_hour: 90, seven_day: 29, five_hour_resets_at: null, seven_day_resets_at: '2026-10-18T00:00:00Z' },
@@ -217,7 +218,7 @@ test('it keeps the slot read 5-hour reset still to come when the newest sample g
 });
 
 test('it gives no rate and no forecast and says the samples are too few when only one usage sample matches', () => {
-  const rows: SlotRow[] = [{ at: '2026-10-14T00:50:00Z', slot: 1, status: '200', five: 4, fiveResetsAt: '2026-10-14T03:00:00Z', seven: 30, sevenResetsAt: '2026-10-18T00:00:00Z', workingLanes: 2 }];
+  const rows: SlotRow[] = [buildMockSlotRow({ at: '2026-10-14T00:50:00Z', five: 4, fiveResetsAt: '2026-10-14T03:00:00Z' })];
   const samples = [{ at: '2026-10-14T00:55:00Z', account: 'kettle01', five_hour: 5, seven_day: 31, five_hour_resets_at: '2026-10-14T03:00:00Z', seven_day_resets_at: '2026-10-18T00:00:00Z' }];
 
   const view = buildFleetView({ at: new Date('2026-10-14T01:00:00Z'), notSetUp: null, rows, samples, working: 2, cap: null });
@@ -237,10 +238,10 @@ test('it gives no rate and no forecast and says the samples are too few when onl
 
 test('it keeps a slot whose newest read failed in the simulation on its last good reading', () => {
   const rows: SlotRow[] = [
-    { at: '2026-10-14T00:00:00Z', slot: 1, status: '200', five: 1, fiveResetsAt: null, seven: 10, sevenResetsAt: '2026-10-18T00:00:00Z', workingLanes: 2 },
-    { at: '2026-10-14T00:00:00Z', slot: 2, status: '200', five: 0, fiveResetsAt: null, seven: 5, sevenResetsAt: '2026-10-19T00:00:00Z', workingLanes: 2 },
-    { at: '2026-10-14T00:30:00Z', slot: 1, status: '200', five: 1, fiveResetsAt: null, seven: 10, sevenResetsAt: '2026-10-18T00:00:00Z', workingLanes: 2 },
-    { at: '2026-10-14T00:30:00Z', slot: 2, status: 'request-failed', five: null, fiveResetsAt: null, seven: null, sevenResetsAt: null, workingLanes: 2 },
+    buildMockSlotRow({ at: '2026-10-14T00:00:00Z', five: 1, seven: 10 }),
+    buildMockSlotRow({ at: '2026-10-14T00:00:00Z', slot: 2, seven: 5, sevenResetsAt: '2026-10-19T00:00:00Z' }),
+    buildMockSlotRow({ five: 1, seven: 10 }),
+    buildMockSlotRow({ slot: 2, status: 'request-failed', five: null, seven: null, sevenResetsAt: null }),
   ];
   const samples = ['2026-10-13T23:30:00Z', '2026-10-14T00:00:00Z', '2026-10-14T00:30:00Z', '2026-10-14T01:00:00Z'].map((at, index) => ({ at, account: 'abcdef012345', five_hour: 1, seven_day: 10 + index * 0.1, five_hour_resets_at: null, seven_day_resets_at: '2026-10-18T00:00:00Z' }));
 
@@ -252,9 +253,9 @@ test('it keeps a slot whose newest read failed in the simulation on its last goo
 
 test('it lists a slot with no good reading in 6 hours as unknown and leaves it out of the simulation', () => {
   const rows: SlotRow[] = [
-    { at: '2026-10-13T18:00:00Z', slot: 2, status: '200', five: 0, fiveResetsAt: null, seven: 5, sevenResetsAt: '2026-10-19T00:00:00Z', workingLanes: 2 },
-    { at: '2026-10-14T00:30:00Z', slot: 1, status: '200', five: 1, fiveResetsAt: null, seven: 10, sevenResetsAt: '2026-10-18T00:00:00Z', workingLanes: 2 },
-    { at: '2026-10-14T00:30:00Z', slot: 2, status: '403', five: null, fiveResetsAt: null, seven: null, sevenResetsAt: null, workingLanes: 2 },
+    buildMockSlotRow({ at: '2026-10-13T18:00:00Z', slot: 2, seven: 5, sevenResetsAt: '2026-10-19T00:00:00Z' }),
+    buildMockSlotRow({ five: 1, seven: 10 }),
+    buildMockSlotRow({ slot: 2, status: '403', five: null, seven: null, sevenResetsAt: null }),
   ];
   const samples = ['2026-10-13T23:30:00Z', '2026-10-14T00:00:00Z', '2026-10-14T00:30:00Z', '2026-10-14T01:00:00Z'].map((at, index) => ({ at, account: 'abcdef012345', five_hour: 1, seven_day: 10 + index * 0.1, five_hour_resets_at: null, seven_day_resets_at: '2026-10-18T00:00:00Z' }));
 
@@ -265,7 +266,7 @@ test('it lists a slot with no good reading in 6 hours as unknown and leaves it o
 });
 
 test('it says the active slot is unknown when no slot has the sample reset', () => {
-  const rows: SlotRow[] = [{ at: '2026-10-14T00:30:00Z', slot: 1, status: '200', five: 1, fiveResetsAt: null, seven: 10, sevenResetsAt: '2026-10-18T00:00:00Z', workingLanes: 2 }];
+  const rows: SlotRow[] = [buildMockSlotRow({ five: 1, seven: 10 })];
   const samples = [{ at: '2026-10-14T01:00:00Z', account: 'abcdef012345', five_hour: 1, seven_day: 10, five_hour_resets_at: null, seven_day_resets_at: '2026-10-21T00:00:00Z' }];
 
   const view = buildFleetView({ at: new Date('2026-10-14T01:00:00Z'), notSetUp: null, rows, samples, working: 2, cap: null });
@@ -276,7 +277,7 @@ test('it says the active slot is unknown when no slot has the sample reset', () 
 });
 
 test('it says the slot reads are not set up, and still lists the slots it has stored', () => {
-  const rows: SlotRow[] = [{ at: '2026-10-14T00:30:00Z', slot: 1, status: '200', five: 1, fiveResetsAt: null, seven: 10, sevenResetsAt: '2026-10-18T00:00:00Z', workingLanes: 2 }];
+  const rows: SlotRow[] = [buildMockSlotRow({ five: 1, seven: 10 })];
 
   const view = buildFleetView({ at: new Date('2026-10-14T01:00:00Z'), notSetUp: 'no settings file at /invented/settings.json', rows, samples: [], working: 0, cap: null });
 
@@ -292,7 +293,7 @@ test('it points at --refresh-slots when no slot has been read', () => {
 });
 
 test('it says the newest usage sample is old rather than the active slot is unknown when the sample is stale', () => {
-  const rows: SlotRow[] = [{ at: '2026-10-14T00:30:00Z', slot: 1, status: '200', five: 1, fiveResetsAt: null, seven: 10, sevenResetsAt: '2026-10-18T00:00:00Z', workingLanes: 2 }];
+  const rows: SlotRow[] = [buildMockSlotRow({ five: 1, seven: 10 })];
   const samples = [{ at: '2026-10-14T00:00:00Z', account: 'abcdef012345', five_hour: 1, seven_day: 10, five_hour_resets_at: null, seven_day_resets_at: '2026-10-18T00:00:00Z' }];
 
   const view = buildFleetView({ at: new Date('2026-10-14T01:00:00Z'), notSetUp: null, rows, samples, working: 2, cap: null });
