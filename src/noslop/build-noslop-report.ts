@@ -132,7 +132,7 @@ function collectBaseMoves(okReviews: RoundRecord[]): Set<number> {
   const moves = new Set<number>();
   okReviews.forEach((review, index) => {
     const last = okReviews[index - 1];
-    if (review.base_move === 1 || (last !== undefined && isSameDiff(last, review))) {
+    if (review.base_move === 1 || (last !== undefined && review.full !== 1 && isSameDiff(last, review))) {
       moves.add(review.id);
     }
   });

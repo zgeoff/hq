@@ -235,6 +235,14 @@ test('a round from before v45 at a new head with the PR diff of the review befor
   expect(renderNoslopReport(buildNoslopReport(ctx.db))).toContain(', 0 main-merge, 1 base-move');
 });
 
+test('a --full review at a new head with the same PR diff is a round, not a base move', () => {
+  const ctx = setupTest();
+  ctx.addRound({ head: 'a1a1a1a', patchId: 'kettle-diff' });
+  ctx.addRound({ startedAt: '2026-10-18T02:00:00Z', head: 'b2b2b2b', patchId: 'kettle-diff', full: true });
+
+  expect(buildNoslopReport(ctx.db)[0]).toMatchObject({ extraRounds: 1, baseMove: 0 });
+});
+
 test('a round whose PR diff git could not read is never a base move', () => {
   const ctx = setupTest();
   ctx.addRound({ head: 'a1a1a1a', patchId: '' });
