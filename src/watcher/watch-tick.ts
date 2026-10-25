@@ -92,12 +92,20 @@ export async function watchTick(db: Database, d: WatchDeps): Promise<boolean> {
     }
     try {
       // Merged PR kinds: yesterday and today, at most every 30 min.
-      if (Date.now() - Date.parse(getMeta(db, 'kinds_synced_at') ?? '1970-01-01T00:00:00Z') > 30 * 60_000) {
+      if (now().getTime() - Date.parse(getMeta(db, 'kinds_synced_at') ?? '1970-01-01T00:00:00Z') > 30 * 60_000) {
         // Linear's side re-reads 2 days: a type set just after an issue closes still lands.
-        const k = await step('merged PR kinds', () => syncKinds(db, d.run, { from: new Date(Date.now() - LOOKBACK_DAYS * 86_400_000), maxDays: 3, env: cleanEnv() }));
+        const kinds = await step('merged PR kinds', () => syncKinds(db, d.run, { from: new Date(now().getTime() - LOOKBACK_DAYS * 86_400_000), maxDays: 3, env: cleanEnv() }));
         setMeta(db, 'kinds_synced_at', at());
-        if (!k.left) setMeta(db, 'kinds_ok_at', at()); // what the daily check-in trusts, with linear_synced_at
-        if (k.days.length) clearGhAuth(db); // syncKinds throws on a failed gh call: a fetched day means GitHub answered
+
+        // What the daily check-in trusts, with linear_synced_at.
+        if (!kinds.left) {
+          setMeta(db, 'kinds_ok_at', at());
+        }
+
+        // syncKinds throws on a failed gh call: a fetched day means GitHub answered.
+        if (kinds.days.length > 0) {
+          clearGhAuth(db);
+        }
         const linearAt = now();
         const linearFrom = new Date(linearAt.getTime() - 2 * 86_400_000);
         await step('Linear issue types', () => syncLinear(db, makeAuditedLinearCaller(db, d.run), linearFrom, linearAt));
@@ -105,7 +113,9 @@ export async function watchTick(db: Database, d: WatchDeps): Promise<boolean> {
         if (alerted.length > 0) {
           d.log(`${at()} goals: told triage about ${alerted.join(', ')}`);
         }
-        if (k.days.length > 2) d.log(`${at()} merged PR kinds: fetched ${k.days.join(', ')}`);
+        if (kinds.days.length > 2) {
+          d.log(`${at()} merged PR kinds: fetched ${kinds.days.join(', ')}`);
+        }
       }
     } catch (e) {
       noteGhAuth(db, msg(e));
@@ -114,8 +124,8 @@ export async function watchTick(db: Database, d: WatchDeps): Promise<boolean> {
     try {
       // Team-goals numbers: every day of the last LOOKBACK_DAYS not yet fetched (after a gap, the
       // weekly's two weeks fill again), at most every 30 min.
-      if (Date.now() - Date.parse(getMeta(db, 'goals_synced_at') ?? '1970-01-01T00:00:00Z') > 30 * 60_000) {
-        const goals = await step('team goals', (signal) => syncGoals(db, d.run, { from: new Date(Date.now() - LOOKBACK_DAYS * 86_400_000), maxRepoDays: 80, env: cleanEnv(), signal }));
+      if (now().getTime() - Date.parse(getMeta(db, 'goals_synced_at') ?? '1970-01-01T00:00:00Z') > 30 * 60_000) {
+        const goals = await step('team goals', (signal) => syncGoals(db, d.run, { from: new Date(now().getTime() - LOOKBACK_DAYS * 86_400_000), maxRepoDays: 80, env: cleanEnv(), signal }));
         const spendFailure = await step('Actions spend', () => refreshActionsSpend(db, d.run, now(), cleanEnv()));
         setMeta(db, 'goals_synced_at', at()); // the 30-min throttle: set even when a fetch failed
 
