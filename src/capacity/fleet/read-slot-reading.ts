@@ -1,7 +1,7 @@
-import { redact } from '../../redact/redact.ts';
 import type { Runner } from '../../runner/types.ts';
 import { parseSlotHeaders } from './parse-slot-headers.ts';
 import { readSlotCredential } from './read-slot-credential.ts';
+import { redactSlotSecrets } from './redact-slot-secrets.ts';
 import type { SlotReading } from './types.ts';
 
 export interface SlotReadResult {
@@ -31,6 +31,6 @@ export async function readSlotReading(run: Runner, opToken: string, slot: number
     return { reading: { ...empty, ...parseSlotHeaders(response.headers), status: String(response.status) }, problem: null };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    return { reading: { ...empty, status: 'request-failed' }, problem: `slot ${slot}: ${redact(message.replaceAll(credential, '[redacted]').replaceAll(opToken, '[redacted]'))}` };
+    return { reading: { ...empty, status: 'request-failed' }, problem: `slot ${slot}: ${redactSlotSecrets(message, [credential, opToken])}` };
   }
 }
