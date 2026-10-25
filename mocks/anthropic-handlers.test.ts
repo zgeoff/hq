@@ -28,10 +28,15 @@ test('it leaves out the headers of a window the record has no usage for', async 
   });
 });
 
-test('it refuses a token it holds no usage for with a 401 and no rate-limit headers', async () => {
+test.each([
+  ['no authorization header', {}],
+  ['a token it holds no usage for', { authorization: 'Bearer sk-ant-kettle-mock-other' }],
+  ['an empty bearer', { authorization: 'Bearer ' }],
+  ['the held token under a different scheme', { authorization: 'Basic sk-ant-kettle-mock-0001' }],
+])('it refuses %s with a 401 and no rate-limit headers', async (_label, headers: Record<string, string>) => {
   slotUsage.set('Bearer sk-ant-kettle-mock-0001', { seven: { utilization: 0.4, reset: 1_792_540_800 } });
 
-  const response = await fetch(ANTHROPIC_MESSAGES_URL, { method: 'POST', headers: { authorization: 'Bearer sk-ant-kettle-mock-other' }, body: '{}' });
+  const response = await fetch(ANTHROPIC_MESSAGES_URL, { method: 'POST', headers, body: '{}' });
   const body: unknown = await response.json();
 
   expect(response.status).toBe(401);
