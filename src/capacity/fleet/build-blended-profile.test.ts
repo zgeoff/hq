@@ -3,31 +3,77 @@ import { buildMockBurnDay } from '../../../test/build-mock-burn-day.ts';
 import type { BurnPoint } from '../build-burn-rate.ts';
 import { buildBlendedProfile } from './build-blended-profile.ts';
 
-test('it blends the slope of the last 2 hours with the mean of each hour of the day', () => {
-  const profile = buildBlendedProfile(buildMockBurnDay(), [buildMockBurnDay()], new Date('2026-10-14T12:30:00Z'));
+test('it blends a steep daytime slope with the mean of the hour of the day for the first 2 hours', () => {
+  const active: BurnPoint[] = [
+    { at: '2026-10-14T03:00:00Z', percent: 32, resetsAt: null },
+    { at: '2026-10-14T03:30:00Z', percent: 36, resetsAt: null },
+    { at: '2026-10-14T04:00:00Z', percent: 40, resetsAt: null },
+    { at: '2026-10-14T04:30:00Z', percent: 44, resetsAt: null },
+    { at: '2026-10-14T05:00:00Z', percent: 48, resetsAt: null },
+  ];
 
-  expect(profile?.[12]).toBeCloseTo(2.55, 6);
-  expect(profile?.[3]).toBeCloseTo(0.7, 6);
+  const profile = buildBlendedProfile(active, [buildMockBurnDay()], new Date('2026-10-14T05:00:00Z'));
+
+  expect(profile?.rateAt(new Date('2026-10-14T05:00:00Z'))).toBeCloseTo(6.2, 6);
+  expect(profile?.rateAt(new Date('2026-10-14T06:45:00Z'))).toBeCloseTo(6.2, 6);
+});
+
+test('it drops a steep daytime slope from 2 hours on and uses the low night mean of the hour alone', () => {
+  const active: BurnPoint[] = [
+    { at: '2026-10-14T03:00:00Z', percent: 32, resetsAt: null },
+    { at: '2026-10-14T03:30:00Z', percent: 36, resetsAt: null },
+    { at: '2026-10-14T04:00:00Z', percent: 40, resetsAt: null },
+    { at: '2026-10-14T04:30:00Z', percent: 44, resetsAt: null },
+    { at: '2026-10-14T05:00:00Z', percent: 48, resetsAt: null },
+  ];
+
+  const profile = buildBlendedProfile(active, [buildMockBurnDay()], new Date('2026-10-14T05:00:00Z'));
+
+  expect(profile?.rateAt(new Date('2026-10-14T07:00:00Z'))).toBeCloseTo(0.7, 6);
+  expect(profile?.rateAt(new Date('2026-10-14T16:00:00Z'))).toBeCloseTo(0.7, 6);
+  expect(profile?.rateAt(new Date('2026-10-15T01:00:00Z'))).toBeCloseTo(4.4, 6);
 });
 
 test('it uses the hourly mean alone when the last 2 hours have no points', () => {
   const profile = buildBlendedProfile(buildMockBurnDay(), [buildMockBurnDay()], new Date('2026-10-17T12:30:00Z'));
 
-  expect(profile?.[12]).toBeCloseTo(4.4, 6);
-  expect(profile?.[3]).toBeCloseTo(0.7, 6);
+  expect(profile?.rateAt(new Date('2026-10-17T12:30:00Z'))).toBeCloseTo(0.7, 6);
+  expect(profile?.rateAt(new Date('2026-10-18T01:00:00Z'))).toBeCloseTo(4.4, 6);
 });
 
-test('it uses the recent slope alone for an hour with no history', () => {
-  const points: BurnPoint[] = [
+test('it falls back to the recent slope for a later hour with no mean', () => {
+  const active: BurnPoint[] = [
     { at: '2026-10-14T01:00:00Z', percent: 10, resetsAt: null },
     { at: '2026-10-14T01:30:00Z', percent: 12, resetsAt: null },
     { at: '2026-10-14T02:00:00Z', percent: 14, resetsAt: null },
     { at: '2026-10-14T02:30:00Z', percent: 16, resetsAt: null },
   ];
+  const earlier: BurnPoint[] = [
+    { at: '2026-10-13T01:00:00Z', percent: 50, resetsAt: null },
+    { at: '2026-10-13T01:30:00Z', percent: 50.5, resetsAt: null },
+  ];
 
-  const profile = buildBlendedProfile(points, [points], new Date('2026-10-14T02:30:00Z'));
+  const profile = buildBlendedProfile(active, [earlier], new Date('2026-10-14T02:30:00Z'));
 
-  expect(profile?.[3]).toBeCloseTo(4, 6);
+  expect(profile?.rateAt(new Date('2026-10-14T16:00:00Z'))).toBeCloseTo(4, 6);
+  expect(profile?.rateAt(new Date('2026-10-15T01:00:00Z'))).toBeCloseTo(1, 6);
+});
+
+test('it uses the recent slope alone in the first 2 hours for an hour with no mean', () => {
+  const active: BurnPoint[] = [
+    { at: '2026-10-14T01:00:00Z', percent: 10, resetsAt: null },
+    { at: '2026-10-14T01:30:00Z', percent: 12, resetsAt: null },
+    { at: '2026-10-14T02:00:00Z', percent: 14, resetsAt: null },
+    { at: '2026-10-14T02:30:00Z', percent: 16, resetsAt: null },
+  ];
+  const earlier: BurnPoint[] = [
+    { at: '2026-10-13T01:00:00Z', percent: 50, resetsAt: null },
+    { at: '2026-10-13T01:30:00Z', percent: 50.5, resetsAt: null },
+  ];
+
+  const profile = buildBlendedProfile(active, [earlier], new Date('2026-10-14T02:30:00Z'));
+
+  expect(profile?.rateAt(new Date('2026-10-14T03:30:00Z'))).toBeCloseTo(4, 6);
 });
 
 test('it takes the recent slope from the active points alone and the hourly mean from every account', () => {
@@ -43,8 +89,8 @@ test('it takes the recent slope from the active points alone and the hourly mean
 
   const profile = buildBlendedProfile(active, [earlier, active], new Date('2026-10-14T02:00:00Z'));
 
-  expect(profile?.[2]).toBeCloseTo(4, 6);
-  expect(profile?.[12]).toBeCloseTo(2, 6);
+  expect(profile?.rateAt(new Date('2026-10-14T02:00:00Z'))).toBeCloseTo(2, 6);
+  expect(profile?.rateAt(new Date('2026-10-14T15:00:00Z'))).toBeCloseTo(6, 6);
 });
 
 test('it gives no profile when there are no points', () => {

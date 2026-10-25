@@ -1,4 +1,5 @@
 import { expect, test } from 'bun:test';
+import { buildMockBurnDay } from '../../../test/build-mock-burn-day.ts';
 import { buildFleetView } from './build-fleet-view.ts';
 import type { SlotRow } from './types.ts';
 
@@ -18,6 +19,22 @@ test('it forecasts a pause, the slots that cannot be a target left out, and the 
   expect(view.forecast?.pause).toStrictEqual({ start: '2026-10-16T08:00:00Z', end: '2026-10-18T00:00:00Z', hours: 40 });
   expect(view.forecast?.safeCap).toStrictEqual({ lanes: 1, endsAt: '2026-10-18T12:00:00Z' });
   expect(view.slots.map((slot) => slot.active)).toStrictEqual([true, false, false, false]);
+});
+
+test('it forecasts the pause on the night mean once a steep daytime slope is 2 hours old', () => {
+  const rows: SlotRow[] = [{ at: '2026-10-15T04:30:00Z', slot: 1, status: '200', five: 0, fiveResetsAt: null, seven: 44, sevenResetsAt: '2026-10-21T00:00:00Z', workingLanes: 2 }];
+  const samples = [
+    ...buildMockBurnDay().map((point) => ({ at: point.at, account: 'teapot02', five_hour: 0, seven_day: point.percent, five_hour_resets_at: null, seven_day_resets_at: '2026-10-19T00:00:00Z' })),
+    { at: '2026-10-15T03:00:00Z', account: 'kettle01', five_hour: 0, seven_day: 32, five_hour_resets_at: null, seven_day_resets_at: '2026-10-21T00:00:00Z' },
+    { at: '2026-10-15T03:30:00Z', account: 'kettle01', five_hour: 0, seven_day: 36, five_hour_resets_at: null, seven_day_resets_at: '2026-10-21T00:00:00Z' },
+    { at: '2026-10-15T04:00:00Z', account: 'kettle01', five_hour: 0, seven_day: 40, five_hour_resets_at: null, seven_day_resets_at: '2026-10-21T00:00:00Z' },
+    { at: '2026-10-15T04:30:00Z', account: 'kettle01', five_hour: 0, seven_day: 44, five_hour_resets_at: null, seven_day_resets_at: '2026-10-21T00:00:00Z' },
+    { at: '2026-10-15T05:00:00Z', account: 'kettle01', five_hour: 0, seven_day: 48, five_hour_resets_at: null, seven_day_resets_at: '2026-10-21T00:00:00Z' },
+  ];
+
+  const view = buildFleetView({ at: new Date('2026-10-15T05:00:00Z'), notSetUp: null, rows, samples, working: 2, cap: null });
+
+  expect(view.forecast?.pause).toStrictEqual({ start: '2026-10-16T02:45:00Z', end: '2026-10-21T00:00:00Z', hours: 117.25 });
 });
 
 test('it forecasts no pause when the active slot never fills before a reset', () => {

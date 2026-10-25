@@ -1,8 +1,8 @@
 import { match } from 'ts-pattern';
-import { getSydneyParts } from '../../clock/get-sydney-parts.ts';
 import type { BurnPoint } from '../build-burn-rate.ts';
 import type { UsageSample } from '../usage-sample.ts';
 import { buildBlendedProfile } from './build-blended-profile.ts';
+import type { BlendedProfile } from './build-blended-profile.ts';
 import { buildLaneFactor } from './build-lane-factor.ts';
 import { buildLaneModel } from './build-lane-model.ts';
 import { buildLanePoints } from './build-lane-points.ts';
@@ -58,7 +58,6 @@ export function buildFleetView(input: FleetViewInput): FleetView {
     input.working,
     input.at,
   );
-  const hour = getSydneyParts(input.at).hour;
   const slots = buildSimSlots(newest, active, latest);
   const simulate = (lanes: number) =>
     simulateFleet({
@@ -68,8 +67,7 @@ export function buildFleetView(input: FleetViewInput): FleetView {
       limit: FLEET_LIMIT,
       rateAt: (time) => {
         const factor = buildLaneFactor(model, lanes);
-        const sydneyHour = getSydneyParts(time).hour;
-        return { five: (profiles.five[sydneyHour] ?? 0) * factor, seven: (profiles.seven[sydneyHour] ?? 0) * factor };
+        return { five: profiles.five.rateAt(time) * factor, seven: profiles.seven.rateAt(time) * factor };
       },
     });
   if (!slots.some((slot) => slot.slot === active)) {
@@ -79,7 +77,7 @@ export function buildFleetView(input: FleetViewInput): FleetView {
   const safeCap = result.pause === null ? null : findSafeCap(Math.max(input.cap ?? 0, input.working), simulate);
   return {
     ...base,
-    ratePerHour: { five: profiles.five[hour] ?? 0, seven: profiles.seven[hour] ?? 0 },
+    ratePerHour: { five: profiles.five.rateAt(input.at), seven: profiles.seven.rateAt(input.at) },
     scaled: match(model)
       .with({ kind: 'scale' }, (scale) => scale.reason)
       .with({ kind: 'fit' }, () => null)
@@ -101,7 +99,7 @@ function buildReadAgeMin(row: SlotRow, at: Date): number {
 
 const WEEK_MS = 7 * 86_400_000;
 
-function buildProfiles(samples: readonly UsageSample[], account: string, at: Date): { five: number[]; seven: number[] } | null {
+function buildProfiles(samples: readonly UsageSample[], account: string, at: Date): { five: BlendedProfile; seven: BlendedProfile } | null {
   const week = samples.filter((sample) => at.getTime() - Date.parse(sample.at) <= WEEK_MS);
   const active = week.filter((sample) => sample.account === account);
   const series = collectAccountSeries(week);
