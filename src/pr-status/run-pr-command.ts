@@ -115,7 +115,6 @@ function findStandingOverride(input: PRCommandInput, ref: PRRef, head: string | 
   return head === null ? null : findOwnerOverride(input.db, ref.repo, ref.pr, head);
 }
 
-// The owner's CI overrides that stand at the head now; none when the head is unknown.
 function readStandingCIOverrides(input: PRCommandInput, ref: PRRef, head: string | null): CIOverrideView[] {
   return head === null ? [] : readHeadCIOverrides(input.db, ref.repo, ref.pr, head).map((override) => ({ check: override.check, head: override.head, source: override.source, note: override.note, at: override.at }));
 }

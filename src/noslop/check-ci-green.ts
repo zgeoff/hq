@@ -81,8 +81,6 @@ function isNoslopAppCheck(check: GateCheck): boolean {
     .exhaustive();
 }
 
-// A red check passes only on an exact name the owner overrode, and only when no other counted check
-// carries that name, so a same-named check in another workflow cannot ride the override.
 function isWaived(check: GateCheck, counted: readonly GateCheck[], overrides: readonly string[]): boolean {
   const name = pickName(check);
   return overrides.includes(name) && isRed(check) && counted.filter((other) => pickName(other) === name).length === 1;

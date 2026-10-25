@@ -1,4 +1,3 @@
-// The owner's override of one red CI check at a head.
 export interface CIOverrideView {
   check: string;
   head: string;

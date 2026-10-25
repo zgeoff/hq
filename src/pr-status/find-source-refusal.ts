@@ -119,7 +119,6 @@ function isMatchingGrant(grant: ItemGrant, check: CallCheck): boolean {
   return grant.action === check.wanted.action && grant.check === readWantedCheck(check.wanted) && grant.pr.toLowerCase() === `${check.ref.slug}#${check.ref.pr}`.toLowerCase() && grant.finding === finding && atHead;
 }
 
-// The CI check an override names; none for the findings override and for an accepted risk.
 function readWantedCheck(wanted: OwnerAction): string | undefined {
   return wanted.action === 'override' ? wanted.check : undefined;
 }

@@ -2,7 +2,6 @@ import type { PRStatusRow } from '../kdb.ts';
 import type { OwnerOverride } from './read-owner-overrides.ts';
 import type { CIOverrideView, PRStatusView } from './types.ts';
 
-// What stands at the head now besides the owner's findings override.
 export interface StandingRecords {
   ciOverrides: CIOverrideView[];
   reviewRecords: PRStatusView['reviewRecords'];

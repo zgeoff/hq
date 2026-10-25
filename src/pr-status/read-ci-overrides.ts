@@ -14,9 +14,6 @@ export interface CIOverride {
 
 const RowsSchema = z.array(z.object({ seq: z.number(), at: z.string(), data: z.string() }));
 
-// The PR's owner overrides of one named CI check, oldest first. One override event of any scope
-// that does not parse, or a ci-check one that names no check, voids them all, so a gap never lets
-// an older one stand.
 export function readCIOverrides(db: Database, repo: string, pr: number): CIOverride[] {
   const rows = RowsSchema.parse(db.query("SELECT seq, at, data FROM events WHERE subject = 'hq' AND subject_id = ? AND action = 'pr-override' ORDER BY seq").all(`pr:${repo}#${pr}`));
   const overrides: CIOverride[] = [];
