@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { config } from '../../config/config.ts';
 import { HqError } from '../../errors.ts';
+import { parseJSON } from '../../noslop/parse-json.ts';
 
 export type SlotOpToken = { kind: 'ready'; token: string } | { kind: 'not-set-up'; reason: string };
 
@@ -13,7 +14,7 @@ export async function readSlotOpToken(): Promise<SlotOpToken> {
     return { kind: 'not-set-up', reason: `no settings file at ${path}` };
   }
   const text = await file.text();
-  const raw = parseJSONText(text);
+  const raw = parseJSON(text);
   if (raw === undefined) {
     throw new HqError('bad_config', `the slot reads' settings file is not valid JSON: ${path}`);
   }
@@ -25,10 +26,3 @@ export async function readSlotOpToken(): Promise<SlotOpToken> {
   return { kind: 'ready', token };
 }
 
-function parseJSONText(text: string): unknown {
-  try {
-    return JSON.parse(text);
-  } catch {
-    return undefined;
-  }
-}
