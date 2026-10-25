@@ -75,6 +75,18 @@ test('it makes no request when 1Password gives no token', async () => {
   expect(requested).not.toHaveBeenCalled();
 });
 
+test('it leaves both the slot token and the profile token out of a request failure that names them', async () => {
+  const run = mock<Runner>(() => Promise.resolve({ code: 0, stdout: 'sk-ant-kettle-slot-0042\n', stderr: '' }));
+  const httpClient = Object.assign(
+    mock(() => Promise.reject(new Error('invented proxy dropped sk-ant-kettle-slot-0042 minted by ops_kettle-profile'))),
+    { preconnect: fetch.preconnect },
+  );
+
+  const result = await readSlotReading({ run, httpClient }, 'ops_kettle-profile', 1, new AbortController().signal);
+
+  expect(result).toStrictEqual({ reading: { slot: 1, status: 'request-failed', five: null, fiveResetsAt: null, seven: null, sevenResetsAt: null }, problem: 'slot 1: invented proxy dropped [redacted] minted by [redacted]' });
+});
+
 test('it reports a failed request without the token', async () => {
   const run = mock<Runner>(() => Promise.resolve({ code: 0, stdout: 'sk-ant-kettle-slot-0042\n', stderr: '' }));
 
