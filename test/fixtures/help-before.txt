@@ -41,7 +41,7 @@ hq 0.79.0: headquarters for the z- sessions. Every command takes --json.
 
   hq lanes [status|log] [--limit N]           watcher state, nudges and whether slots dropped
   hq lanes start [--interval SECONDS] | stop  install, enable and start the watcher unit (default every 300s); stop disables it
-  hq lanes tick                               one look now
+  hq lanes tick [--refresh]                   one look now; --refresh reads Ready from Linear first, past its 10 min throttle
   hq lanes promotable                         Backlog issues with every blocker Done and every section filled, not parked
   hq stats [--since 7d|36h|TIME] [--around MARK]   numbers someone acts on: waits on the owner, merge to live, idle capacity, flow
   hq answers [--since 7d|36h|TIME]   the owner's answers in the window: calls, proposals, console reviews and typed lines (--json for the weekly audit)
