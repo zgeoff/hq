@@ -959,6 +959,14 @@ test('it names the override on a repo off the noslop list', async () => {
   });
 });
 
+test("it ignores the owner's CI override for a same-numbered PR in another owner's repo of the same name", async () => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ prFacts: buildStubGateFacts({ head: FAKE_FULL_SHA, checks: [{ __typename: 'CheckRun', name: 'preview', status: 'COMPLETED', conclusion: 'FAILURE' }] }) });
+  recordCICheckOverride(ctx.db, { repo: 'gadgets', pr: 7, head: FAKE_FULL_SHA, source: 'call:KET-2', note: 'Intended infra change.', actor: 'z-kettle', check: 'preview' });
+
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'kettle-co/gadgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: 'CI is not green: preview (FAILURE)' });
+});
+
 test.each([
   ['a second red check', [{ __typename: 'CheckRun', name: 'preview', status: 'COMPLETED', conclusion: 'FAILURE' }, { __typename: 'CheckRun', name: 'test', status: 'COMPLETED', conclusion: 'FAILURE' }], 'CI is not green: test (FAILURE)'],
   ['a pending named check', [{ __typename: 'CheckRun', name: 'preview', status: 'IN_PROGRESS', conclusion: null }], 'CI is not green: preview (IN_PROGRESS)'],

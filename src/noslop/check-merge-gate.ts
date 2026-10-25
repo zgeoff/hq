@@ -6,6 +6,7 @@ import { readHeadLgtm } from '../pr-status/read-head-lgtm.ts';
 import { readHeadCIOverrides } from '../pr-status/read-head-ci-overrides.ts';
 import { findOwnerOverride } from '../pr-status/find-owner-override.ts';
 import { readPRHead } from '../pr-status/read-pr-head.ts';
+import { OWNER } from '../releases/owner.ts';
 import { assertPR } from './assert-pr.ts';
 import { buildSlug } from './build-slug.ts';
 import { checkCIGreen } from './check-ci-green.ts';
@@ -76,7 +77,9 @@ function readUnreviewedRoute(request: PRRequest, parsed: ParsedRepo, author: PRA
 }
 
 async function checkCI(request: PRRequest, parsed: ParsedRepo, facts: GateFacts): Promise<GateCI> {
-  const overrides = readHeadCIOverrides(request.db, parsed.repo, request.pr, facts.headRefOid);
+  // Overrides are keyed by repo name alone, and only the owner records them, so another owner's
+  // same-named repo never reads them.
+  const overrides = parsed.owner === OWNER ? readHeadCIOverrides(request.db, parsed.repo, request.pr, facts.headRefOid) : [];
   const verdict = checkCIGreen(facts.statusCheckRollup, overrides.map((override) => override.check));
   if (verdict.green) {
     const overridden = verdict.overridden ?? [];
