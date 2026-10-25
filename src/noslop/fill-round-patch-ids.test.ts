@@ -2,7 +2,6 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { overrideEnv } from '../config/override-env.ts';
 import { openDb } from '../db/open-db.ts';
 import { realRunner } from '../runner/real-runner.ts';
 import { buildNoslopReport } from './build-noslop-report.ts';
@@ -18,7 +17,6 @@ async function setupTest() {
     db.close();
     rmSync(base, { recursive: true, force: true });
   });
-  onTestFinished(overrideEnv('HQ_PROJECTS', join(base, 'projects')));
   mkdirSync(directory, { recursive: true });
   const git = async (...args: string[]): Promise<string> => {
     const result = await realRunner(['git', '-c', 'user.name=Kettle', '-c', 'user.email=kettle@example.com', '-c', 'commit.gpgsign=false', ...args], { cwd: directory });
@@ -38,6 +36,7 @@ async function setupTest() {
   await commit('kettle.txt', 'boil\n', 'start');
   return {
     db,
+    directory,
     git,
     commit,
     addReview: (startedAt: string, head: string, baseSha: string) =>
@@ -59,9 +58,9 @@ test('it gives pre-v45 reviews the patch-id of their PR diff, so the report find
   ctx.addReview('2026-10-18T02:00:00Z', rebased, movedBase);
   ctx.addReview('2026-10-18T03:00:00Z', 'e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1', movedBase);
 
-  const filled = await fillRoundPatchIDs({ run: realRunner, db: ctx.db });
+  const filled = await fillRoundPatchIDs({ run: realRunner, db: ctx.db, checkout: () => Promise.resolve(ctx.directory) });
   const stored = ctx.db.query('SELECT patch_id FROM noslop_rounds ORDER BY id').values().flat();
-  const refilled = await fillRoundPatchIDs({ run: realRunner, db: ctx.db });
+  const refilled = await fillRoundPatchIDs({ run: realRunner, db: ctx.db, checkout: () => Promise.resolve(ctx.directory) });
 
   expect(filled).toBe(2);
   expect(stored).toStrictEqual([expect.stringMatching(/^[0-9a-f]{40}$/u), stored[0], '']);
@@ -72,5 +71,16 @@ test('it gives pre-v45 reviews the patch-id of their PR diff, so the report find
 test('it refuses a --since that is not a time before it reads any round', async () => {
   const ctx = await setupTest();
 
-  await expect(fillRoundPatchIDs({ run: realRunner, db: ctx.db, since: 'yesterday-ish' })).rejects.toThrow("--since must be an ISO time, got 'yesterday-ish'");
+  await expect(fillRoundPatchIDs({ run: realRunner, db: ctx.db, since: 'yesterday-ish', checkout: () => Promise.resolve(ctx.directory) })).rejects.toThrow("--since must be an ISO time, got 'yesterday-ish'");
+});
+
+test('it leaves the patch-id unread for a repo hq has no checkout of, so a later report tries again', async () => {
+  const ctx = await setupTest();
+  const head = await ctx.git('rev-parse', 'main');
+  ctx.addReview('2026-10-18T01:00:00Z', head, head);
+
+  const filled = await fillRoundPatchIDs({ run: realRunner, db: ctx.db, checkout: () => Promise.reject(new Error('invented: no clone of widgets')) });
+
+  expect(filled).toBe(0);
+  expect(ctx.db.query('SELECT patch_id FROM noslop_rounds').all()).toStrictEqual([{ patch_id: null }]);
 });

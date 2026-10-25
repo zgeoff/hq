@@ -1,6 +1,5 @@
 import type { Database } from 'bun:sqlite';
 import { z } from 'zod';
-import { checkout } from '../review/checkout.ts';
 import type { Runner } from '../runner/types.ts';
 import { parseReportCutoff } from './parse-report-cutoff.ts';
 import { readPRPatchID } from './read-pr-patch-id.ts';
@@ -11,6 +10,9 @@ export interface PatchFill {
 
   // The report's window: only the PRs with a round since this time are filled. All PRs when absent.
   since?: string | undefined;
+
+  // The checkout of a zgeoff repo to read its diffs in; it throws when hq has none and cannot make one.
+  checkout: (repo: string) => Promise<string>;
 }
 
 const UnfilledSchema = z.array(z.object({ id: z.number(), repo: z.string(), head: z.string(), base: z.string() }));
@@ -29,7 +31,7 @@ export async function fillRoundPatchIDs(fill: PatchFill): Promise<number> {
   const directories = new Map<string, string | null>();
   let filled = 0;
   for (const row of rows) {
-    const directory = await readCheckout(fill.run, row.repo, directories);
+    const directory = await readCheckout(fill.checkout, row.repo, directories);
     if (directory === null) {
       continue;
     }
@@ -41,10 +43,10 @@ export async function fillRoundPatchIDs(fill: PatchFill): Promise<number> {
 }
 
 // One checkout per repo for the whole fill; null when hq cannot make one.
-async function readCheckout(run: Runner, repo: string, directories: Map<string, string | null>): Promise<string | null> {
+async function readCheckout(resolve: PatchFill['checkout'], repo: string, directories: Map<string, string | null>): Promise<string | null> {
   if (!directories.has(repo)) {
     try {
-      const directory = await checkout(run, `zgeoff/${repo}`, repo);
+      const directory = await resolve(repo);
       directories.set(repo, directory);
     } catch {
       directories.set(repo, null);
