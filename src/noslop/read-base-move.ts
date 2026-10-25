@@ -23,7 +23,7 @@ const LastReviewSchema = z.object({ head: z.string().nullable(), patch_id: z.str
 
 export async function readBaseMove(request: BaseMoveRequest): Promise<string | null> {
   const last = LastReviewSchema.parse(
-    request.db.query("SELECT head, patch_id FROM noslop_rounds WHERE repo = ? AND pr = ? AND kind = 'review' AND ok = 1 ORDER BY id DESC LIMIT 1").get(request.repo, request.pr) ?? null,
+    request.db.query("SELECT head, patch_id FROM noslop_rounds WHERE repo = ? AND pr = ? AND kind = 'review' AND ok = 1 AND confirm = 0 ORDER BY id DESC LIMIT 1").get(request.repo, request.pr) ?? null,
   );
   if (last === null || last.head === null || last.patch_id === null || last.patch_id === '') {
     return null;

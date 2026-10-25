@@ -616,6 +616,25 @@ test('a push back to a diff reviewed before the last review is a round: only the
   expect(reverted.outcome).toMatchObject({ fixesOnly: false, baseMove: null, round: 3 });
 });
 
+test('a head with the PR diff a --fixes-only run last saw is a round: only a full review is compared', async () => {
+  const ctx = setupTest();
+  ctx.listWidgets();
+  createRunPR(ctx.db);
+  const patchIds = { a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1: 'kettle-diff', b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2: 'kettle-diff-with-lid', c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3: 'kettle-diff-with-lid' };
+  await ctx.reviewAt('a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1', patchIds);
+  const fake = buildFakeRunner({
+    noslopReview: { code: 0, stdout: FAKE_REVIEW_JSON.replace('"head":"feat"', '"head":"b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2"'), stderr: '' },
+    prRefs: { code: 0, stdout: JSON.stringify({ headRefOid: 'b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2', baseRefName: 'main' }), stderr: '' },
+    patchIds,
+  });
+  await runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false, fixesOnly: true });
+
+  const rebased = await ctx.reviewAt('c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3', patchIds);
+
+  expect(rebased.fixesOnly).toBe(false);
+  expect(rebased.outcome).toMatchObject({ fixesOnly: false, baseMove: null, round: 2 });
+});
+
 test('--full runs a round though only the base moved', async () => {
   const ctx = setupTest();
   ctx.listWidgets();
