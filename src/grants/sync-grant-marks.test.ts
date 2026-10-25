@@ -58,6 +58,23 @@ test('a grant whose id is quoted takes the PR that added it, not a later change 
   expect(ctx.db.query("SELECT at, ref FROM marks WHERE grant_name = 'z-kettle-pour'").all()).toStrictEqual([{ at: '2026-10-10T09:00:00Z', ref: 'hq-private#12' }]);
 });
 
+test('a grant hq refuses to mark is reported, and the grants after it still get their marks', () => {
+  const ctx = setupTest();
+  createGrantMark(ctx.db, { text: 'z-kettle may boil', ref: null, at: null, name: 'z-kettle-boil', actor: 'z-kettle' });
+  ctx.tree.writeCommit(
+    { 'grants/z-kettle.yaml': `${ctx.boil}- id: pour-the-water-slowly-into-the-pot\n  label: "Pour slowly"\n  outcome: allow\n- id: pour\n  label: "Pour"\n  outcome: allow\n` },
+    { subject: 'feat(grants): let z-kettle pour (#12)', at: '2026-10-13T09:00:00Z' },
+  );
+  ctx.tree.git('fetch', '-q', 'origin');
+
+  const sync = syncGrantMarks(ctx.db, ctx.tree.dir, 'hq-watcher');
+
+  expect(sync.rejected.map((rejected) => [rejected.grant.name, rejected.reason])).toStrictEqual([
+    ['z-kettle-pour-the-water-slowly-into-the-pot', 'a grant name must be a slug of lowercase letters, digits and single hyphens, 40 characters at most'],
+  ]);
+  expect(sync.added.map((mark) => mark.grant_name)).toStrictEqual(['z-kettle-pour']);
+});
+
 test('a grant whose add names no PR gets no mark, and the health check names it', () => {
   const ctx = setupTest();
   createGrantMark(ctx.db, { text: 'z-kettle may boil', ref: null, at: null, name: 'z-kettle-boil', actor: 'z-kettle' });

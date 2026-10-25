@@ -78,8 +78,12 @@ export async function watchTick(db: Database, d: WatchDeps): Promise<boolean> {
     }
   }
   try {
-    for (const mark of runGrantMarksTick(db, d.me)?.added ?? []) {
+    const grants = runGrantMarksTick(db, d.me);
+    for (const mark of grants?.added ?? []) {
       d.log(`${at()} grant marks: added mark ${mark.id} for ${mark.grant_name} (${mark.ref})`);
+    }
+    for (const rejected of grants?.rejected ?? []) {
+      d.log(`${at()} grant marks: refused ${rejected.grant.name}: ${rejected.reason}`);
     }
   } catch (error) {
     d.log(`${at()} grant marks failed: ${msg(error)}`);
