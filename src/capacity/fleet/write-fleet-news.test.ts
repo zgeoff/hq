@@ -27,7 +27,7 @@ test('it adds nothing again while the pause time moves under 30 minutes and the 
   writeFleetNews(ctx.db, first);
 
   expect(writeFleetNews(ctx.db, moved)).toBe(false);
-  expect(ctx.db.query('SELECT COUNT(*) AS n FROM news').get()).toStrictEqual({ n: 1 });
+  expect(ctx.db.query('SELECT COUNT(*) AS total FROM news').get()).toStrictEqual({ total: 1 });
 });
 
 test('it adds a line again when the pause time moves by 30 minutes', () => {
@@ -38,7 +38,7 @@ test('it adds a line again when the pause time moves by 30 minutes', () => {
   writeFleetNews(ctx.db, first);
 
   expect(writeFleetNews(ctx.db, moved)).toBe(true);
-  expect(ctx.db.query('SELECT COUNT(*) AS n FROM news').get()).toStrictEqual({ n: 2 });
+  expect(ctx.db.query('SELECT COUNT(*) AS total FROM news').get()).toStrictEqual({ total: 2 });
 });
 
 test('it adds a line again when the safe cap changes', () => {

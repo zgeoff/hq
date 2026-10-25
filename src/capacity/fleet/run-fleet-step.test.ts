@@ -65,14 +65,13 @@ test('it reads the slots now when forced, whatever the age of the newest read', 
 
 test('it adds a news line for the forecast pause and leaks no token into it, the rows or the result', async () => {
   const ctx = setupTest();
-  const reset = (time: string) => String(Date.parse(time) / 1000);
   const figures: Record<string, { status: number; seven: string; reset: string }> = {
-    'Bearer sk-ant-kettle-slot-1': { status: 200, seven: '0.4', reset: reset('2026-10-18T00:00:00Z') },
-    'Bearer sk-ant-kettle-slot-2': { status: 200, seven: '0.96', reset: reset('2026-10-18T12:00:00Z') },
+    'Bearer sk-ant-kettle-slot-1': { status: 200, seven: '0.4', reset: String(Date.parse('2026-10-18T00:00:00Z') / 1000) },
+    'Bearer sk-ant-kettle-slot-2': { status: 200, seven: '0.96', reset: String(Date.parse('2026-10-18T12:00:00Z') / 1000) },
     'Bearer sk-ant-kettle-slot-3': { status: 403, seven: '', reset: '' },
-    'Bearer sk-ant-kettle-slot-4': { status: 200, seven: '0.97', reset: reset('2026-10-18T06:00:00Z') },
+    'Bearer sk-ant-kettle-slot-4': { status: 200, seven: '0.97', reset: String(Date.parse('2026-10-18T06:00:00Z') / 1000) },
   };
-  const run = mock<Runner>((cmd) => Promise.resolve({ code: 0, stdout: `sk-ant-kettle-slot-${cmd[2]?.match(/token-(\d)/u)?.[1]}\n`, stderr: '' }));
+  const run = mock<Runner>((cmd) => Promise.resolve({ code: 0, stdout: `sk-ant-kettle-slot-${cmd[2]?.match(/token-(?<slot>\d)/u)?.groups?.['slot']}\n`, stderr: '' }));
 
   server.use(
     http.post('https://api.anthropic.com/v1/messages', (info) => {

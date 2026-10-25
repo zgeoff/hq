@@ -16,13 +16,13 @@ function formatSlot(slot: FleetSlotView): string {
   return `slot ${slot.slot}${mark}: 5h ${formatWindow(slot.five, slot.fiveResetsAt)}, 7d ${formatWindow(slot.seven, slot.sevenResetsAt)}, ${age}`;
 }
 
+function formatAge(minutes: number): string {
+  return minutes >= 60 ? `${Math.floor(minutes / 60)} h ${minutes % 60} min` : `${minutes} min`;
+}
+
 function formatWindow(percent: number | null, resetsAt: string | null): string {
   const used = percent === null ? '?' : `${Math.round(percent)}%`;
   return resetsAt === null ? used : `${used} (resets ${formatResetTime(resetsAt)})`;
-}
-
-function formatAge(minutes: number): string {
-  return minutes >= 60 ? `${Math.floor(minutes / 60)} h ${minutes % 60} min` : `${minutes} min`;
 }
 
 function formatRate(rate: number): string {
@@ -33,10 +33,11 @@ function formatVerdict(view: FleetView): string {
   if (view.forecast === null) {
     return `fleet: no forecast, ${view.note ?? 'nothing to go on'}`;
   }
-  const { pause, safeCap, endsAt } = view.forecast;
+  const pause = view.forecast.pause;
   if (pause === null) {
-    return `fleet: no pause before ${formatResetTime(endsAt)}`;
+    return `fleet: no pause before ${formatResetTime(view.forecast.endsAt)}`;
   }
+  const safeCap = view.forecast.safeCap;
   const cap = safeCap === null ? 'no cap avoids it' : `a cap of ${safeCap.lanes} lasts until ${formatResetTime(safeCap.endsAt)}`;
   return `fleet: pauses ${formatResetTime(pause.start)} for ${pause.hours.toFixed(1)} h at the current rate; ${cap}`;
 }

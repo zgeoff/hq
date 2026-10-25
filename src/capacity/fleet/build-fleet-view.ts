@@ -13,8 +13,6 @@ import type { FleetSlotView, FleetView, SimSlot, SlotRow } from './types.ts';
 
 const FLEET_LIMIT = 95;
 
-const WEEK_MS = 7 * 86_400_000;
-
 export interface FleetViewInput {
   at: Date;
 
@@ -82,6 +80,12 @@ export function buildFleetView(input: FleetViewInput): FleetView {
   };
 }
 
+function buildSlotView(row: SlotRow, active: number | null, at: Date): FleetSlotView {
+  return { slot: row.slot, active: row.slot === active, status: row.status, five: row.five, fiveResetsAt: row.fiveResetsAt, seven: row.seven, sevenResetsAt: row.sevenResetsAt, readAt: row.at, readAgeMin: Math.max(0, Math.floor((at.getTime() - Date.parse(row.at)) / 60_000)) };
+}
+
+const WEEK_MS = 7 * 86_400_000;
+
 function buildProfiles(samples: readonly UsageSample[], at: Date): { five: number[]; seven: number[] } | null {
   const recent = samples.filter((sample) => at.getTime() - Date.parse(sample.at) <= WEEK_MS);
   const five = buildBlendedProfile(toPoints(recent, 'five_hour', 'five_hour_resets_at'), at);
@@ -91,10 +95,6 @@ function buildProfiles(samples: readonly UsageSample[], at: Date): { five: numbe
 
 function toPoints(samples: readonly UsageSample[], percent: 'five_hour' | 'seven_day', resets: 'five_hour_resets_at' | 'seven_day_resets_at'): BurnPoint[] {
   return samples.map((sample) => ({ at: sample.at, percent: sample[percent], resetsAt: sample[resets] }));
-}
-
-function buildSlotView(row: SlotRow, active: number | null, at: Date): FleetSlotView {
-  return { slot: row.slot, active: row.slot === active, status: row.status, five: row.five, fiveResetsAt: row.fiveResetsAt, seven: row.seven, sevenResetsAt: row.sevenResetsAt, readAt: row.at, readAgeMin: Math.max(0, Math.floor((at.getTime() - Date.parse(row.at)) / 60_000)) };
 }
 
 // A slot with no 7-day figures or reset is left out. The active slot takes the figures of the
