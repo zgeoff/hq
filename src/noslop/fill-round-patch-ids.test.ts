@@ -1,14 +1,15 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { createGitRepo } from '../../test/create-git-repo.ts';
 import { openDb } from '../db/open-db.ts';
 import { realRunner } from '../runner/real-runner.ts';
 import { buildNoslopReport } from './build-noslop-report.ts';
 import { fillRoundPatchIDs } from './fill-round-patch-ids.ts';
 
-// A database, and an empty git repo for widgets, with git and commit helpers and a helper that
-// stores a pre-v45 ok review with no patch-id.
+// A database, an empty git repo for widgets, and a helper that stores a pre-v45 ok review with no
+// patch-id.
 async function setupTest() {
   const base = mkdtempSync(join(tmpdir(), 'hq-fill-patch-'));
   const directory = join(base, 'projects', 'widgets');
@@ -17,26 +18,10 @@ async function setupTest() {
     db.close();
     rmSync(base, { recursive: true, force: true });
   });
-  mkdirSync(directory, { recursive: true });
-  const git = async (...args: string[]): Promise<string> => {
-    const result = await realRunner(['git', '-c', 'user.name=Kettle', '-c', 'user.email=kettle@example.com', '-c', 'commit.gpgsign=false', ...args], { cwd: directory });
-    if (result.code !== 0) {
-      throw new Error(`git ${args.join(' ')} failed: ${result.stderr}`);
-    }
-    return result.stdout.trim();
-  };
-  const commit = async (path: string, text: string, message: string): Promise<string> => {
-    writeFileSync(join(directory, path), text);
-    await git('add', '-A');
-    await git('commit', '-q', '-m', message);
-    return await git('rev-parse', 'HEAD');
-  };
-  await git('init', '-q', '-b', 'main');
+  const repo = await createGitRepo(directory);
   return {
     db,
-    directory,
-    git,
-    commit,
+    ...repo,
     addReview: (startedAt: string, head: string, baseSha: string) =>
       db.query("INSERT INTO noslop_rounds (repo, pr, kind, started_at, ended_at, ms, ok, head, base, findings, failed_calls, open, sha) VALUES ('widgets', 7, 'review', ?, ?, 1, 1, ?, ?, '[]', 0, '[]', 'x')").run(startedAt, startedAt, head, baseSha),
   };
@@ -44,11 +29,11 @@ async function setupTest() {
 
 test('it gives pre-v45 reviews the patch-id of their PR diff, so the report finds the rebase onto a moved base', async () => {
   const ctx = await setupTest();
-  const firstBase = await ctx.commit('kettle.txt', 'boil\n', 'start');
+  const firstBase = await ctx.commit({ 'kettle.txt': 'boil\n' }, 'start');
   await ctx.git('checkout', '-q', '-b', 'pour');
-  const first = await ctx.commit('pour.txt', 'pour\n', 'pour');
+  const first = await ctx.commit({ 'pour.txt': 'pour\n' }, 'pour');
   await ctx.git('checkout', '-q', 'main');
-  const movedBase = await ctx.commit('lid.txt', 'lid\n', 'main moves on');
+  const movedBase = await ctx.commit({ 'lid.txt': 'lid\n' }, 'main moves on');
   await ctx.git('checkout', '-q', 'pour');
   await ctx.git('rebase', '-q', 'main');
   const rebased = await ctx.git('rev-parse', 'HEAD');
@@ -74,7 +59,7 @@ test('it refuses a --since that is not a time before it reads any round', async 
 
 test('it leaves the patch-id unread for a repo hq has no checkout of, so a later report tries again', async () => {
   const ctx = await setupTest();
-  const head = await ctx.commit('kettle.txt', 'boil\n', 'start');
+  const head = await ctx.commit({ 'kettle.txt': 'boil\n' }, 'start');
   ctx.addReview('2026-10-18T01:00:00Z', head, head);
 
   const filled = await fillRoundPatchIDs({ run: realRunner, db: ctx.db, checkout: () => Promise.reject(new Error('invented: no clone of widgets')) });
