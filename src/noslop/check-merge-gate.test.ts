@@ -50,7 +50,7 @@ test("it blocks a fixed answer noslop has not read, when hq recorded a review at
   const fake = buildFakeRunner({ noslopFindings: buildStubFindings('fixed'), markerComments: { code: 0, stdout: `${JSON.stringify({ login: 'noslop-review[bot]', body: '<!-- noslop:summary {"head":"f00dfeedf00dfeedf00dfeedf00dfeedf00dfeed"} -->', updatedAt: '2026-10-14T01:00:00Z' })}\n`, stderr: '' } });
   createListedReview(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA });
 
-  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: 'noslop has not reviewed head 0123456 (its last review read f00dfee); run hq review widgets 7' });
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: 'noslop has not reviewed head 0123456 (its last review read f00dfee); not a base move it covers: hq has no base-move run recorded at 0123456; run hq review widgets 7' });
 });
 
 test('it blocks when a fix-checks-only run past the emergency cap checked no fix and left noslop on the older head', async () => {
@@ -60,7 +60,7 @@ test('it blocks when a fix-checks-only run past the emergency cap checked no fix
   setMeta(ctx.db, 'noslop', JSON.stringify({ repos: ['widgets'], sha: '0123456789abcdef0123456789abcdef01234567', caps: { widgets: 1 } }));
   ctx.db.query("INSERT INTO noslop_rounds (repo, pr, kind, started_at, ended_at, ms, ok, head, depth, special, findings, sha, confirm) VALUES ('widgets', 7, 'review', 'a', 'b', 1, 1, ?, 'standard', 'none', '[]', 'x', 1)").run(FAKE_FULL_SHA);
 
-  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: 'noslop has not reviewed head 0123456 (its last review read f00dfee); run hq review widgets 7' });
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: 'noslop has not reviewed head 0123456 (its last review read f00dfee); not a base move it covers: hq has no base-move run recorded at 0123456; run hq review widgets 7' });
 });
 
 test('it blocks when a hand-run fix-checks-only run read the new head and noslop is on the older head', async () => {
@@ -69,7 +69,7 @@ test('it blocks when a hand-run fix-checks-only run read the new head and noslop
   createListedReview(ctx.db, { repo: 'widgets', pr: 7, head: 'f00dfeedf00dfeedf00dfeedf00dfeedf00dfeed' });
   ctx.db.query("INSERT INTO noslop_rounds (repo, pr, kind, started_at, ended_at, ms, ok, head, depth, special, findings, sha, confirm) VALUES ('widgets', 7, 'review', 'a', 'b', 1, 1, ?, 'standard', 'none', '[]', 'x', 1)").run(FAKE_FULL_SHA);
 
-  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: 'noslop has not reviewed head 0123456 (its last review read f00dfee); run hq review widgets 7' });
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: 'noslop has not reviewed head 0123456 (its last review read f00dfee); not a base move it covers: hq has no base-move run recorded at 0123456; run hq review widgets 7' });
 });
 
 test.each([

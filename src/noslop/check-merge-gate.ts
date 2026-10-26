@@ -30,6 +30,8 @@ import { readOKReviews } from './read-ok-reviews.ts';
 import type { OKReviewRecord } from './read-ok-reviews.ts';
 import { readPRFiles } from './read-pr-files.ts';
 import { readSummaryHead } from './read-summary-head.ts';
+import { readBaseMoveCover } from './read-base-move-cover.ts';
+import { checkout } from '../review/checkout.ts';
 import { pickNoslopVerdict } from './pick-noslop-verdict.ts';
 import { pickOwnerHeldVerdict } from './pick-owner-held-verdict.ts';
 import { probeNoCI } from './probe-no-ci.ts';
@@ -137,7 +139,7 @@ function pickOverriddenChecks(used: readonly CIOverrideUse[]): Pick<GateOutcome,
 }
 
 async function checkNoslopGate(request: PRRequest, parsed: ParsedRepo, facts: GateFacts, ci: GateCI): Promise<GateOutcome> {
-  const noslopFacts = await readNoslopGateFacts(request, parsed, facts.headRefOid);
+  const noslopFacts = await readNoslopGateFacts(request, parsed, facts);
   return match(pickNoslopVerdict(noslopFacts, ci))
     .with({ pass: true }, (passed): GateOutcome => ({ mayMerge: true, reason: passed.reason, reviewed: true }))
     .with({ pass: false }, (blocked) => {
@@ -146,7 +148,8 @@ async function checkNoslopGate(request: PRRequest, parsed: ParsedRepo, facts: Ga
     .exhaustive();
 }
 
-async function readNoslopGateFacts(request: PRRequest, parsed: ParsedRepo, head: string): Promise<NoslopGateFacts> {
+async function readNoslopGateFacts(request: PRRequest, parsed: ParsedRepo, facts: GateFacts): Promise<NoslopGateFacts> {
+  const head = facts.headRefOid;
   const override = findOwnerOverride(request.db, parsed.repo, request.pr, head);
   if (override !== null) {
     const findings = await readFindings(request, parsed);
@@ -154,10 +157,11 @@ async function readNoslopGateFacts(request: PRRequest, parsed: ParsedRepo, head:
     return { overridden: true, head, override, findings, headNow };
   }
   const summary = await readSummaryHead(request.run, buildSlug(parsed), request.pr);
+  const baseMove = summary.found && summary.head !== head ? await readBaseMoveCover({ db: request.db, run: request.run, repo: parsed.repo, pr: request.pr, summaryHead: summary.head, head, baseNow: facts.baseRefOid, checkout: () => checkout(request.run, buildSlug(parsed), parsed.repo, request.repoDir) }) : null;
   const check = await readNoslopCheck(request.run, buildSlug(parsed), head);
   const findings = await readFindings(request, parsed);
   const headNow = await readPRHead(request.run, buildSlug(parsed), request.pr);
-  return { overridden: false, repo: parsed.repo, pr: request.pr, head, summary, check, recorded: countRecordedFindings(readOKReviews(request.db, parsed.repo, request.pr)), findings, headNow };
+  return { overridden: false, repo: parsed.repo, pr: request.pr, head, summary, baseMove, check, recorded: countRecordedFindings(readOKReviews(request.db, parsed.repo, request.pr)), findings, headNow };
 }
 
 async function readFindings(request: PRRequest, parsed: ParsedRepo): Promise<NoslopGateFacts['findings']> {
