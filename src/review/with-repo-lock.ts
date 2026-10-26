@@ -2,12 +2,10 @@ import { mkdirSync, rmSync, statSync, utimesSync } from 'node:fs';
 import { config } from '../config/config.ts';
 import { HqError } from '../errors.ts';
 
-// Same-repo reviews share one checkout: a lock per repo around the git steps that change it, so
-// parallel fetches don't race on its refs. The holder stamps the lock's mtime with the time it goes
-// stale, so a waiter takes over only a lock past its holder's own staleMs, whatever staleMs the waiter
-// was given. The margin covers the moment between mkdir and the stamp.
 const TAKEOVER_MARGIN_MS = 60_000;
 
+// Same-repo reviews share one checkout: a lock per repo around the git steps that change it, so
+// parallel fetches don't race on its refs.
 export async function withRepoLock<T>(dir: string, slug: string, fn: () => Promise<T>, staleMs = 600_000): Promise<T> {
   const lock = `${dir}/.lock-${slug.replace('/', '-')}`;
   const start = Date.now();
