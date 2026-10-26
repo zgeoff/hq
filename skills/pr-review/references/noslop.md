@@ -4,7 +4,7 @@ noslop reviews the PRs on every repo `hq noslop` lists, after the agent's own se
 
 ## The review
 
-Run `hq review <repo> <pr>`. noslop posts each finding as a review comment by `noslop-review[bot]` that holds `<!-- noslop:finding` and the finding's 16-hex id, or as an issue comment by the same bot when the finding has no line in the diff. Its `### noslop` summary comment lists every finding and its state. The gate reads those states, not the `noslop` check.
+Run `hq review <repo> <pr>`. noslop posts each finding as a review comment by `noslop-review[bot]` that holds `<!-- noslop:finding` and the finding's 16-hex id, or as an issue comment by the same bot when the finding has no line in the diff. When enough findings share a class, one comment holds them all and lists each one's anchor and id, and one reply in its thread answers every finding it holds. Its `### noslop` summary comment lists every finding and its state. The gate reads those states, not the `noslop` check.
 
 ## The answers
 
