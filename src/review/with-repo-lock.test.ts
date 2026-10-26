@@ -13,8 +13,6 @@ function setupTest() {
   return {
     directory,
     lock: join(directory, '.lock-zgeoff-widgets'),
-
-    // A waiter's work: it runs only if the waiter gets the lock.
     takeIt: () => Promise.resolve('took it'),
   };
 }
