@@ -56,6 +56,6 @@ export const SHAPES: Record<string, { command: string; keys: string[] }> = {
   },
   'review (noslop)': {
     command: 'hq review <repo> <pr> --json, on a PR that noslop reviews',
-    keys: ['ok', 'engine', 'repo', 'pr', 'head', 'base', 'sha', 'depth?', 'findings', 'notReviewed', 'round', 'fixesOnly', 'emergencyCap?', 'capNote?', 'fixChecks[]?.findingID', 'fixChecks[]?.fixed', 'fixChecks[]?.reason', 'fixChecks[]?.title', 'checks[].name', 'checks[].state', 'checksError', 'openThreads'],
+    keys: ['ok', 'engine', 'repo', 'pr', 'head', 'base', 'sha', 'depth?', 'findings', 'notReviewed', 'round', 'fixesOnly', 'emergencyCap?', 'capNote?', 'baseMove?', 'fixChecks[]?.findingID', 'fixChecks[]?.fixed', 'fixChecks[]?.reason', 'fixChecks[]?.title', 'checks[].name', 'checks[].state', 'checksError', 'openThreads'],
   },
 };

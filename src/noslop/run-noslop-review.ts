@@ -22,6 +22,8 @@ import { parseReviewRun } from './parse-review-run.ts';
 import type { FixCheck, NotReviewedFile, ReviewFinding, ReviewOutput } from './parse-review-run.ts';
 import { pickAction } from './pick-action.ts';
 import { probeStoredReview } from './probe-stored-review.ts';
+import type { BaseMove } from './pick-base-move.ts';
+import { readPRPatchID } from './read-pr-patch-id.ts';
 import { recordRound } from './record-round.ts';
 import type { RecordedFinding, RoundRow } from './record-round.ts';
 import { removeIssueFile } from './remove-issue-file.ts';
@@ -57,6 +59,10 @@ export interface NoslopReviewContext {
 
   // Fix checks only (`noslop review --fixes-only`), recorded as a review that is not a round.
   fixesOnly?: boolean | undefined;
+
+  // The head and PR diff a base move was found at. The run is recorded as a base move only when
+  // noslop ran on that head and the diff is still that one: a push in between makes it a plain fix check.
+  baseMove?: Pick<BaseMove, 'head' | 'patchId'> | undefined;
 
   // Reads the Linear issue the PR links, for noslop's intent lens. Without it no issue is attached.
   linear?: LinearCall | undefined;
@@ -235,8 +241,22 @@ async function findLate(ctx: NoslopReviewContext, ran: ReviewRan): Promise<Map<s
   }
 }
 
+// Never fails the review: a git fault leaves the round's patch-id null.
+async function readRoundPatchID(ctx: NoslopReviewContext, ran: ReviewRan): Promise<string | null> {
+  const output = ran.judged.value;
+  if (output === null || output.base === null || output.head === null) {
+    return null;
+  }
+  try {
+    return await readPRPatchID(ctx.run, ctx.dir, output.base, output.head);
+  } catch {
+    return null;
+  }
+}
+
 async function collectReviewRow(ctx: NoslopReviewContext, ran: ReviewRan): Promise<RoundRow> {
   const late = await findLate(ctx, ran);
+  const patchId = await readRoundPatchID(ctx, ran);
   return {
     repo: ctx.repo,
     pr: ctx.pr,
@@ -257,6 +277,8 @@ async function collectReviewRow(ctx: NoslopReviewContext, ran: ReviewRan): Promi
     sha: ran.sha,
     full: ctx.full === true,
     confirm: ctx.fixesOnly === true,
+    patchId,
+    baseMove: ctx.baseMove !== undefined && ran.judged.value?.head === ctx.baseMove.head && patchId === ctx.baseMove.patchId,
   };
 }
 

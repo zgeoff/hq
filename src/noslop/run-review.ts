@@ -19,6 +19,8 @@ import { writeReviewStarted } from '../runs/write-review-started.ts';
 import { writeReviewed } from '../runs/write-reviewed.ts';
 import { parseLowerRepo } from './parse-lower-repo.ts';
 import type { ParsedRepo } from './parse-lower-repo.ts';
+import { readBaseMove } from './read-base-move.ts';
+import type { BaseMove } from './pick-base-move.ts';
 import { readOKReviews } from './read-ok-reviews.ts';
 import { requirePinned } from './require-pinned.ts';
 import { resolveEngine } from './resolve-engine.ts';
@@ -61,6 +63,10 @@ export interface NoslopReviewOutcome extends NoslopReviewResult {
 
   // One line that says so when the cap did; null otherwise.
   capNote: string | null;
+
+  // The head of the last ok review when only the base moved since it, so this run was fix checks
+  // only and not a round; null otherwise.
+  baseMove: string | null;
   checks: ReviewResult['checks'];
   checksError: string | null;
   openThreads: number | null;
@@ -108,9 +114,17 @@ const ROUND_LOCK_STALE_MS = REVIEW_TIMEOUT_MS + 300_000;
 // lock that the git steps take inside, and it outlives the longest noslop run.
 async function runNoslopReviewWithCI(request: ReviewRequest, parsed: ParsedRepo, sha: string): Promise<NoslopReviewOutcome> {
   const folder = createScratchDir();
-  const ran = await withRepoLock(folder, `${buildSlug(parsed)}-pr${request.pr}`, () => runPlannedRound(planRound(request, parsed), parsed, sha, folder), ROUND_LOCK_STALE_MS);
+  const ran = await withRepoLock(
+    folder,
+    `${buildSlug(parsed)}-pr${request.pr}`,
+    async () => {
+      const plan = await planBaseMove(planRound(request, parsed), parsed, folder);
+      return await runPlannedRound(plan, parsed, sha, folder);
+    },
+    ROUND_LOCK_STALE_MS,
+  );
   const state = await readCIState(request.run, buildSlug(parsed), request.pr, request.watch);
-  return { ...ran.result, fixChecks: buildTitledFixChecks(ran.result.fixChecks, loadFindingTitles(request, parsed)), fixesOnly: ran.plan.fixesOnly, emergencyCap: ran.plan.emergencyCap, capNote: formatCapNote(ran.plan.emergencyCap, parsed), checks: state.checks, checksError: state.checksError, openThreads: state.openThreads, round: ran.plan.round };
+  return { ...ran.result, fixChecks: buildTitledFixChecks(ran.result.fixChecks, loadFindingTitles(request, parsed)), fixesOnly: ran.plan.fixesOnly, emergencyCap: ran.plan.emergencyCap, capNote: formatCapNote(ran.plan.emergencyCap, parsed), baseMove: ran.plan.baseMove?.reviewed ?? null, checks: state.checks, checksError: state.checksError, openThreads: state.openThreads, round: ran.plan.round };
 }
 
 function createScratchDir(): string {
@@ -119,11 +133,29 @@ function createScratchDir(): string {
   return scratch;
 }
 
+// A planned round whose PR diff equals the last ok review's, at a new head, runs as fix checks only:
+// only the base moved. --full always runs the round.
+async function planBaseMove(plan: RoundPlan, parsed: ParsedRepo, scratch: string): Promise<RoundPlan> {
+  if (plan.fixesOnly || plan.request.full === true) {
+    return plan;
+  }
+  const request = plan.request;
+  const directory = await checkout(request.run, buildSlug(parsed), parsed.repo, request.repoDir);
+  const move = await readBaseMove({ run: request.run, db: request.db, slug: buildSlug(parsed), repo: parsed.repo, pr: request.pr, directory, lock: (fn) => withRepoLock(scratch, buildSlug(parsed), fn) });
+  if (move === null) {
+    return plan;
+  }
+  return { ...plan, round: plan.round - 1, fixesOnly: true, baseMove: move };
+}
+
 interface RoundPlan {
   request: ReviewRequest;
   round: number;
   fixesOnly: boolean;
   emergencyCap: number | null;
+
+  // The base move found since the last full review; null when there was none.
+  baseMove: BaseMove | null;
 }
 
 interface RanRound {
@@ -157,18 +189,22 @@ async function createNoslopContext(plan: RoundPlan, parsed: ParsedRepo, sha: str
     lock: (fn) => withRepoLock(scratch, buildSlug(parsed), fn),
     full: request.full,
     fixesOnly: plan.fixesOnly,
+    baseMove: plan.baseMove ?? undefined,
     linear: makeAuditedLinearCaller(request.db, request.run),
   };
 }
 
-// A full review, or a fix-checks-only run the emergency cap forced, marks the head it ran on so the
-// sweep stops calling the head unreviewed; a hand-run --fixes-only marks nothing. Only a full review
-// counts as a round.
+// A full review, or a fix-checks-only run the emergency cap or a base move forced, marks the head it
+// ran on so the sweep stops calling the head unreviewed; a hand-run --fixes-only marks nothing. Only
+// a full review counts as a round. A base move marks only a run recorded as one, at the compared head.
 function writeRoundMark(plan: RoundPlan, parsed: ParsedRepo): void {
-  if (plan.fixesOnly && plan.emergencyCap === null) {
+  if (plan.fixesOnly && plan.emergencyCap === null && plan.baseMove === null) {
     return;
   }
   const found = findLastReviewRound(plan.request.db, parsed.repo, plan.request.pr);
+  if (plan.baseMove !== null && found?.base_move !== 1) {
+    return;
+  }
   if (found?.ok === 1 && found.head !== null && SHA.test(found.head)) {
     writeReviewed(plan.request.db, parsed.repo, plan.request.pr, { head: found.head, countsRound: !plan.fixesOnly });
   }
@@ -180,13 +216,14 @@ function planRound(request: ReviewRequest, parsed: ParsedRepo): RoundPlan {
   const started = readOKReviews(request.db, parsed.repo, request.pr).filter((okReview) => okReview.confirm === 0).length;
   const cap = findNoslopCap(loadNoslopSettings(request.db), parsed.owner, parsed.repo);
   if (request.fixesOnly === true) {
-    return { request, round: started, fixesOnly: true, emergencyCap: null };
+    return { request, round: started, fixesOnly: true, emergencyCap: null, baseMove: null };
   }
   if (cap !== null && started >= cap) {
-    return { request: { ...request, full: false }, round: started, fixesOnly: true, emergencyCap: cap };
+    return { request: { ...request, full: false }, round: started, fixesOnly: true, emergencyCap: cap, baseMove: null };
   }
-  return { request, round: started + 1, fixesOnly: false, emergencyCap: null };
+  return { request, round: started + 1, fixesOnly: false, emergencyCap: null, baseMove: null };
 }
+
 
 function buildTitledFixChecks(fixChecks: FixCheck[], titles: Map<string, string>): TitledFixCheck[] {
   return fixChecks.map((check) => ({ ...check, title: titles.get(check.findingID) ?? null }));

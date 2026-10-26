@@ -32,8 +32,8 @@ function formatSeconds(ms: number): string {
   return `${Math.round(ms / 1000)} s`;
 }
 
-function formatChurn(c: Churn): string {
-  const parts = [`${c.roundsWithNew} round${c.roundsWithNew === 1 ? '' : 's'} with a new finding`, `${c.repeatClass} repeat-class${formatUnknown(c.classUnknown)}`, `late ${c.late.n} of ${c.late.of}${formatUnknown(c.lateUnknown)}`, `${c.mainMerge} main-merge${formatUnknown(c.mergeUnknown)}`];
+function formatChurn(churn: Churn & { baseMove: number }): string {
+  const parts = [`${churn.roundsWithNew} round${churn.roundsWithNew === 1 ? '' : 's'} with a new finding`, `${churn.repeatClass} repeat-class${formatUnknown(churn.classUnknown)}`, `late ${churn.late.n} of ${churn.late.of}${formatUnknown(churn.lateUnknown)}`, `${churn.mainMerge} main-merge${formatUnknown(churn.mergeUnknown)}`, `${churn.baseMove} base-move`];
   return `  churn: ${parts.join(', ')}`;
 }
 

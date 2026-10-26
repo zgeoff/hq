@@ -191,7 +191,7 @@ test('it adds the void columns to grant_actions in v43 and keeps every row as it
   expect(db.query('PRAGMA user_version').get()).toStrictEqual({ user_version: 43 });
 });
 
-test('it adds slot_usage in v44, stores a row in it and makes v44 the newest schema', () => {
+test('it adds slot_usage in v44 and stores a row in it', () => {
   const base = mkdtempSync(join(tmpdir(), 'hq-migrate-v44-'));
   const db = new Database(join(base, 'hq.db'), { create: true, strict: true });
   const path = join(base, 'hq.db');
@@ -200,10 +200,9 @@ test('it adds slot_usage in v44, stores a row in it and makes v44 the newest sch
   db.exec('PRAGMA journal_mode = WAL;');
   migrate(db, path, false, MIGRATIONS.slice(0, 43));
 
-  expect(migrate(db, path, true)).not.toBeNull();
+  expect(migrate(db, path, true, MIGRATIONS.slice(0, 44))).not.toBeNull();
   db.query("INSERT INTO slot_usage (at, slot, status, five_hour, five_hour_resets_at, seven_day, seven_day_resets_at, working_lanes) VALUES ('2026-10-14T01:00:00Z', 2, '200', 12.5, '2026-10-14T05:00:00Z', 40, '2026-10-18T01:00:00Z', 3)").run();
   expect(db.query('SELECT slot, status, five_hour, seven_day, working_lanes FROM slot_usage').all()).toStrictEqual([{ slot: 2, status: '200', five_hour: 12.5, seven_day: 40, working_lanes: 3 }]);
-  expect(db.query('PRAGMA user_version').get()).toStrictEqual({ user_version: 44 });
 });
 
 test('it rejects a slot_usage row for a slot outside 1 to 4', () => {
@@ -216,4 +215,20 @@ test('it rejects a slot_usage row for a slot outside 1 to 4', () => {
   migrate(db, path, true);
 
   expect(() => db.query("INSERT INTO slot_usage (at, slot, status, working_lanes) VALUES ('2026-10-14T01:00:00Z', 5, '200', 0)").run()).toThrow(/CHECK constraint failed/u);
+});
+
+test('it adds patch_id and base_move to noslop_rounds in v45, keeps the earlier rows, and makes v45 the newest schema', () => {
+  const base = mkdtempSync(join(tmpdir(), 'hq-migrate-v45-'));
+  const db = new Database(join(base, 'hq.db'), { create: true, strict: true });
+  const path = join(base, 'hq.db');
+  onTestFinished(() => rmSync(base, { recursive: true, force: true }));
+  onTestFinished(() => db.close());
+  db.exec('PRAGMA journal_mode = WAL;');
+  migrate(db, path, false, MIGRATIONS.slice(0, 44));
+  db.query("INSERT INTO noslop_rounds (repo, pr, kind, started_at, ended_at, ms, ok, findings, failed_calls, open, sha) VALUES ('widgets', 7, 'review', '2026-10-14T01:00:00Z', '2026-10-14T01:05:00Z', 300000, 1, '[]', 0, '[]', 'aaaaaaa')").run();
+
+  expect(migrate(db, path, true)).not.toBeNull();
+  expect(db.query('SELECT repo, pr, patch_id, base_move FROM noslop_rounds').all()).toStrictEqual([{ repo: 'widgets', pr: 7, patch_id: null, base_move: 0 }]);
+  expect(() => db.query('UPDATE noslop_rounds SET base_move = 2').run()).toThrow(/CHECK constraint failed/u);
+  expect(db.query('PRAGMA user_version').get()).toStrictEqual({ user_version: 45 });
 });

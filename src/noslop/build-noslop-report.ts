@@ -1,7 +1,8 @@
 import type { Database } from 'bun:sqlite';
-import { HqError } from '../errors.ts';
+import { z } from 'zod';
 import type { StoredFinding } from './types.ts';
 import { countChurn } from './count-churn.ts';
+import { parseReportCutoff } from './parse-report-cutoff.ts';
 import type { ChurnReview } from './count-churn.ts';
 
 export interface PRReport {
@@ -27,6 +28,10 @@ export interface PRReport {
   lateUnknown: number;
   mainMerge: number;
   mergeUnknown: number;
+
+  // Reviews at a new head whose PR diff equals the last ok review's: only the base moved. They are
+  // not extra rounds.
+  baseMove: number;
 }
 
 export interface LateCount {
@@ -34,34 +39,36 @@ export interface LateCount {
   of: number;
 }
 
+const RoundRecordSchema = z.object({
+  id: z.number(),
+  repo: z.string(),
+  pr: z.number(),
+  kind: z.enum(['review', 'check']),
+  started_at: z.string(),
+  ended_at: z.string(),
+  // oxlint-disable-next-line zgeoff/no-abbreviated-names -- the column is noslop_rounds' own
+  ms: z.number(),
+  ok: z.number(),
+  findings: z.string(),
+  conclusion: z.string().nullable(),
+  open: z.string(),
+  full: z.number().nullable(),
+  confirm: z.number(),
+  head: z.string().nullable(),
+  patch_id: z.string().nullable(),
+  base_move: z.number(),
+});
+
 // One report per PR that noslop has a round for since the time, in the order of their first round
 // since then. Churn also reads the PR's ok reviews from before the time, to tell what they raised.
 export function buildNoslopReport(db: Database, since?: string): PRReport[] {
-  if (since !== undefined && Number.isNaN(Date.parse(since))) {
-    throw new HqError('bad_args', `--since must be an ISO time, got '${since}'`);
-  }
-
-  // Rounds are stored in UTC: a cutoff with an offset compares right only once it is UTC too.
-  const cutoff = since === undefined ? '' : new Date(since).toISOString(),
-    rows = db.query('SELECT * FROM noslop_rounds WHERE (repo, pr) IN (SELECT repo, pr FROM noslop_rounds WHERE started_at >= ?) ORDER BY id').all(cutoff) as RoundRecord[];
+  const cutoff = parseReportCutoff(since);
+  const rows = z.array(RoundRecordSchema).parse(db.query('SELECT * FROM noslop_rounds WHERE (repo, pr) IN (SELECT repo, pr FROM noslop_rounds WHERE started_at >= ?) ORDER BY id').all(cutoff));
   return buildWindowReports(rows, cutoff);
 }
 
-interface RoundRecord {
-  id: number;
-  repo: string;
-  pr: number;
-  kind: 'review' | 'check';
-  started_at: string;
-  ended_at: string;
-  ms: number;
-  ok: number;
-  findings: string;
-  conclusion: string | null;
-  open: string;
-  full: number | null;
-  confirm: number;
-}
+
+type RoundRecord = z.output<typeof RoundRecordSchema>;
 
 function buildWindowReports(rows: RoundRecord[], cutoff: string): PRReport[] {
   const earlier = collectRoundsByPR(rows.filter((r) => r.started_at < cutoff));
@@ -95,6 +102,7 @@ interface StoredOpen {
 // churn: they supply the finding ids seen and the classes cited before the window, and which review
 // came first. Every other field reads the rounds since the time.
 function buildPRReport(rounds: RoundRecord[], earlier: RoundRecord[]): PRReport {
+  const moves = collectBaseMoves([...splitRounds(earlier).okReviews, ...splitRounds(rounds).okReviews]);
   const parts = splitRounds(rounds),
     seen = collectFindings(parts.okReviews),
     tail = parts.checks.at(-1) ?? null,
@@ -104,8 +112,9 @@ function buildPRReport(rounds: RoundRecord[], earlier: RoundRecord[]): PRReport 
     reviewsOk: parts.okReviews.length,
     reviewsFailed: parts.reviews.length - parts.okReviews.length,
     fullReviews: parts.okReviews.filter((r) => r.full === 1).length,
-    extraRounds: Math.max(0, parts.okReviews.filter((r) => r.confirm !== 1).length - 1),
-    confirmReviews: parts.okReviews.filter((r) => r.confirm === 1).length,
+    extraRounds: Math.max(0, parts.okReviews.filter((review) => review.confirm !== 1 && !moves.has(review.id)).length - 1),
+    confirmReviews: parts.okReviews.filter((review) => review.confirm === 1 && !moves.has(review.id)).length,
+    baseMove: parts.okReviews.filter((review) => moves.has(review.id)).length,
     findings: seen.size,
     bySeverity: countSeverities(seen),
     latestCheck: tail?.conclusion ?? null,
@@ -115,6 +124,24 @@ function buildPRReport(rounds: RoundRecord[], earlier: RoundRecord[]): PRReport 
     reviewToPassMs: findSpan(parts),
     ...countChurn([...splitRounds(earlier).okReviews.map((r) => buildChurnReview(r, false)), ...parts.okReviews.map((r) => buildChurnReview(r, true))]),
   };
+}
+
+function collectBaseMoves(okReviews: RoundRecord[]): Set<number> {
+  const moves = new Set<number>();
+  let baseline: RoundRecord | undefined;
+  for (const review of okReviews) {
+    if (review.base_move === 1 || (baseline !== undefined && review.confirm === 0 && review.full !== 1 && isSameDiff(baseline, review))) {
+      moves.add(review.id);
+    }
+    if (review.confirm === 0) {
+      baseline = review;
+    }
+  }
+  return moves;
+}
+
+function isSameDiff(last: RoundRecord, review: RoundRecord): boolean {
+  return review.patch_id !== null && review.patch_id !== '' && review.patch_id === last.patch_id && review.head !== last.head;
 }
 
 function buildChurnReview(round: RoundRecord, counted: boolean): ChurnReview {

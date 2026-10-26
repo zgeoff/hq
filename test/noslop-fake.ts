@@ -57,6 +57,14 @@ export interface FakeScript {
   // line: one completed, successful run by the noslop App, newer than the default summary, when absent.
   noslopChecks?: RunResult;
 
+  // What `gh pr view --json headRefOid,baseRefName` answers; the fixed full sha on main when absent.
+  prRefs?: RunResult;
+
+  // The patch-id `git patch-id --verbatim` gives the PR diff at each head, by head. When it is set,
+  // `git diff --binary --full-index <base> <head>` prints a diff naming the head; when absent, git
+  // prints nothing, so no round has a patch-id.
+  patchIds?: Record<string, string>;
+
   // Run git for real, in the checkout the caller names, except `git remote get-url origin` and the
   // lines `git` answers: for a test on a real repo, with gh, op and noslop still faked.
   realGit?: boolean;
@@ -121,6 +129,9 @@ function pickBunAnswer(script: FakeScript, cmd: string[]): RunResult {
 
 // oxlint-disable-next-line zgeoff/module-order -- grandfathered: helpers sit above the factory
 function pickGhAnswer(script: FakeScript, line: string): RunResult | null {
+  if (line.endsWith('--json headRefOid,baseRefName')) {
+    return script.prRefs ?? buildResult(JSON.stringify({ headRefOid: FAKE_FULL_SHA, baseRefName: 'main' }));
+  }
   if (line.includes('--json headRefName,baseRefName')) {
     return buildResult(JSON.stringify({ headRefName: 'feat', baseRefName: 'main', body: script.prBody ?? '' }));
   }
@@ -167,8 +178,12 @@ function pickGhAnswer(script: FakeScript, line: string): RunResult | null {
 }
 
 // oxlint-disable-next-line zgeoff/module-order -- grandfathered: helpers sit above the factory
-function pickAnswer(script: FakeScript, cmd: string[]): RunResult {
+function pickAnswer(script: FakeScript, cmd: string[], opts: RunOpts | undefined): RunResult {
   const line = cmd.join(' ');
+  const patch = pickPatchAnswer(script, cmd, opts);
+  if (patch !== null) {
+    return patch;
+  }
   if (cmd[0] === 'op') {
     return pickOpAnswer(script);
   }
@@ -199,6 +214,24 @@ function expandSha(short: string): string {
   return FAKE_FULL_SHA.startsWith(short) ? FAKE_FULL_SHA : short.padEnd(40, '0');
 }
 
+// The PR diff of a head prints as one line naming it, so patch-id can tell which head it was given.
+function pickPatchAnswer(script: FakeScript, cmd: string[], opts: RunOpts | undefined): RunResult | null {
+  const patchIds = script.patchIds;
+  if (patchIds === undefined || cmd[0] !== 'git') {
+    return null;
+  }
+  if (cmd[1] === 'diff' && cmd[2] === '--binary') {
+    return buildResult(`diff of ${cmd.at(-1) ?? ''}\n`);
+  }
+  if (cmd[1] === 'patch-id') {
+    const head = (opts?.stdin ?? '').replace(/^diff of /u, '').trim();
+    const id = patchIds[head];
+    const printed = id === undefined ? '' : `${id} ${'0'.repeat(40)}\n`;
+    return buildResult(printed);
+  }
+  return null;
+}
+
 function isRealGit(script: FakeScript, cmd: string[]): boolean {
   const line = cmd.join(' ');
   return script.realGit === true && cmd[0] === 'git' && line !== 'git remote get-url origin';
@@ -208,7 +241,7 @@ export function buildFakeRunner(script: FakeScript = {}): FakeRunner {
   const calls: FakeCall[] = [],
     run: Runner = (cmd, opts) => {
       calls.push({ cmd, opts });
-      return isRealGit(script, cmd) ? realRunner(cmd, opts) : Promise.resolve(pickAnswer(script, cmd));
+      return isRealGit(script, cmd) ? realRunner(cmd, opts) : Promise.resolve(pickAnswer(script, cmd, opts));
     };
   return { run, calls, lines: () => calls.map((c) => c.cmd.join(' ')), of: (program) => calls.filter((c) => c.cmd[0] === program) };
 }

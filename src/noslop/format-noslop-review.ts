@@ -41,6 +41,9 @@ function formatFixesOnly(r: NoslopReviewOutcome): string {
 }
 
 function formatCapNote(outcome: NoslopReviewOutcome): string[] {
+  if (outcome.baseMove !== null) {
+    return [`fix checks only: only the base moved since the review at ${outcome.baseMove.slice(0, 7)} (the same PR diff); not a round`];
+  }
   if (outcome.capNote === null) {
     return [];
   }

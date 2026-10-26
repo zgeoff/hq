@@ -1,0 +1,56 @@
+import { expect, onTestFinished, test } from 'bun:test';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { createGitRepo } from '../../test/create-git-repo.ts';
+import { realRunner } from '../runner/real-runner.ts';
+import { readPRPatchID } from './read-pr-patch-id.ts';
+
+// An empty git repo on main.
+async function setupTest() {
+  const directory = mkdtempSync(join(tmpdir(), 'hq-patch-id-'));
+  onTestFinished(() => rmSync(directory, { recursive: true, force: true }));
+  return await createGitRepo(directory);
+}
+
+test('a PR rebased onto a moved base keeps its patch-id', async () => {
+  const ctx = await setupTest();
+  await ctx.commit({ 'kettle.txt': 'boil\n' }, 'start');
+  await ctx.git('checkout', '-q', '-b', 'pour');
+  const first = await ctx.commit({ 'pour.txt': 'pour\n  slowly\n' }, 'pour');
+  await ctx.git('checkout', '-q', 'main');
+  const movedBase = await ctx.commit({ 'lid.txt': 'lid\n' }, 'main moves on');
+  await ctx.git('checkout', '-q', 'pour');
+  await ctx.git('rebase', '-q', 'main');
+  const rebased = await ctx.git('rev-parse', 'HEAD');
+
+  const before = await readPRPatchID(realRunner, ctx.directory, 'main~1', first);
+  const after = await readPRPatchID(realRunner, ctx.directory, movedBase, rebased);
+
+  expect(before).toMatch(/^[0-9a-f]{40}$/u);
+  expect(after).toBe(before);
+});
+
+test('a change of whitespace alone in the PR diff changes its patch-id', async () => {
+  const ctx = await setupTest();
+  await ctx.commit({ 'kettle.txt': 'boil\n' }, 'start');
+  await ctx.git('checkout', '-q', '-b', 'pour');
+  const first = await ctx.commit({ 'pour.txt': 'pour\n  slowly\n' }, 'pour');
+  const reindented = await ctx.commit({ 'pour.txt': 'pour\n    slowly\n' }, 'indent');
+
+  const before = await readPRPatchID(realRunner, ctx.directory, 'main', first);
+  const after = await readPRPatchID(realRunner, ctx.directory, 'main', reindented);
+
+  expect(after).not.toBe(before);
+});
+
+test('an empty PR diff or a head git cannot find has no patch-id', async () => {
+  const ctx = await setupTest();
+  await ctx.commit({ 'kettle.txt': 'boil\n' }, 'start');
+
+  const empty = await readPRPatchID(realRunner, ctx.directory, 'main', 'main');
+  const missing = await readPRPatchID(realRunner, ctx.directory, 'main', 'e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1');
+
+  expect(empty).toBeNull();
+  expect(missing).toBeNull();
+});

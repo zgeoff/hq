@@ -43,6 +43,18 @@ function setupTest() {
     listWidgets: () => setMeta(db, 'noslop', JSON.stringify({ repos: ['widgets'], sha: PINNED })),
     setCap: (repo: string, cap: number) => setMeta(db, 'noslop', JSON.stringify({ repos: [repo], sha: PINNED, caps: { [repo]: cap } })),
     listUnpinned: () => setMeta(db, 'noslop', JSON.stringify({ repos: ['widgets'], sha: null })),
+
+    // A review of widgets#7 while GitHub gives the PR this head, noslop reviews it, and each head's
+    // PR diff has the patch-id given.
+    reviewAt: async (head: string, patchIds: Record<string, string>, full?: boolean) => {
+      const fake = buildFakeRunner({
+        noslopReview: { code: 0, stdout: FAKE_REVIEW_JSON.replace('"head":"feat"', `"head":"${head}"`), stderr: '' },
+        prRefs: { code: 0, stdout: JSON.stringify({ headRefOid: head, baseRefName: 'main' }), stderr: '' },
+        patchIds,
+      });
+      const outcome = await runReview({ run: fake.run, db, rawRepo: 'widgets', pr: 7, watch: false, full });
+      return { outcome, fixesOnly: fake.of('bun').some((call) => call.cmd.includes('--fixes-only')) };
+    },
   };
 }
 
@@ -560,4 +572,126 @@ test('it keeps counting a stored --confirm review as not a round', async () => {
   ctx.db.query("INSERT INTO noslop_rounds (repo, pr, kind, started_at, ended_at, ms, ok, depth, special, findings, sha, confirm) VALUES ('widgets', 7, 'review', 'a', 'b', 1, 1, 'standard', 'none', '[]', 'x', 1)").run();
 
   await expect(runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false })).resolves.toMatchObject({ round: 2 });
+});
+
+test('a push that only moves the base, with the same PR diff, runs fix checks only, is no round, and marks the new head reviewed', async () => {
+  const ctx = setupTest();
+  ctx.listWidgets();
+  createRunPR(ctx.db);
+  const patchIds = { a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1: 'kettle-diff', b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2: 'kettle-diff' };
+  await ctx.reviewAt('a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1', patchIds);
+
+  const moved = await ctx.reviewAt('b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2', patchIds);
+
+  expect(moved.fixesOnly).toBe(true);
+  expect(moved.outcome).toMatchObject({ fixesOnly: true, baseMove: 'a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1', round: 1 });
+  expect(ctx.db.query('SELECT head, patch_id, confirm, base_move FROM noslop_rounds ORDER BY id').all()).toStrictEqual([
+    { head: 'a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1', patch_id: 'kettle-diff', confirm: 0, base_move: 0 },
+    { head: 'b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2', patch_id: 'kettle-diff', confirm: 1, base_move: 1 },
+  ]);
+  expect(ctx.db.query("SELECT reviewed_sha, review_round FROM run_prs WHERE ref = 'widgets#7'").get()).toStrictEqual({ reviewed_sha: 'b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2', review_round: 1 });
+});
+
+test('a push that changes the PR diff is a round', async () => {
+  const ctx = setupTest();
+  ctx.listWidgets();
+  const patchIds = { a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1: 'kettle-diff', b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2: 'kettle-diff-with-lid' };
+  await ctx.reviewAt('a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1', patchIds);
+
+  const changed = await ctx.reviewAt('b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2', patchIds);
+
+  expect(changed.fixesOnly).toBe(false);
+  expect(changed.outcome).toMatchObject({ fixesOnly: false, baseMove: null, round: 2 });
+});
+
+test('a push back to a diff reviewed before the last review is a round: only the last ok review counts', async () => {
+  const ctx = setupTest();
+  ctx.listWidgets();
+  const patchIds = { a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1: 'kettle-diff', b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2: 'kettle-diff-with-lid', c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3: 'kettle-diff' };
+  await ctx.reviewAt('a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1', patchIds);
+  await ctx.reviewAt('b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2', patchIds);
+
+  const reverted = await ctx.reviewAt('c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3', patchIds);
+
+  expect(reverted.outcome).toMatchObject({ fixesOnly: false, baseMove: null, round: 3 });
+});
+
+test('a head with the PR diff a --fixes-only run last saw is a round: only a full review is compared', async () => {
+  const ctx = setupTest();
+  ctx.listWidgets();
+  createRunPR(ctx.db);
+  const patchIds = { a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1: 'kettle-diff', b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2: 'kettle-diff-with-lid', c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3: 'kettle-diff-with-lid' };
+  await ctx.reviewAt('a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1', patchIds);
+  const fake = buildFakeRunner({
+    noslopReview: { code: 0, stdout: FAKE_REVIEW_JSON.replace('"head":"feat"', '"head":"b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2"'), stderr: '' },
+    prRefs: { code: 0, stdout: JSON.stringify({ headRefOid: 'b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2', baseRefName: 'main' }), stderr: '' },
+    patchIds,
+  });
+  await runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false, fixesOnly: true });
+
+  const rebased = await ctx.reviewAt('c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3', patchIds);
+
+  expect(rebased.fixesOnly).toBe(false);
+  expect(rebased.outcome).toMatchObject({ fixesOnly: false, baseMove: null, round: 2 });
+});
+
+test('a head that moves between the compare and the run is not marked reviewed, and the next review is a round', async () => {
+  const ctx = setupTest();
+  ctx.listWidgets();
+  createRunPR(ctx.db);
+  const patchIds = { a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1: 'kettle-diff', b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2: 'kettle-diff', c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3: 'kettle-diff-with-lid' };
+  await ctx.reviewAt('a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1', patchIds);
+  const fake = buildFakeRunner({
+    noslopReview: { code: 0, stdout: FAKE_REVIEW_JSON.replace('"head":"feat"', '"head":"c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3"'), stderr: '' },
+    prRefs: { code: 0, stdout: JSON.stringify({ headRefOid: 'b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2', baseRefName: 'main' }), stderr: '' },
+    patchIds,
+  });
+
+  await runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false });
+  const next = await ctx.reviewAt('c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3', patchIds);
+
+  expect(ctx.db.query('SELECT head, confirm, base_move FROM noslop_rounds ORDER BY id').all()).toStrictEqual([
+    { head: 'a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1', confirm: 0, base_move: 0 },
+    { head: 'c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3', confirm: 1, base_move: 0 },
+    { head: 'c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3', confirm: 0, base_move: 0 },
+  ]);
+  expect(next.outcome).toMatchObject({ fixesOnly: false, baseMove: null, round: 2 });
+});
+
+test('a head that moves between the compare and the run leaves the reviewed mark at the last full review', async () => {
+  const ctx = setupTest();
+  ctx.listWidgets();
+  createRunPR(ctx.db);
+  const patchIds = { a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1: 'kettle-diff', b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2: 'kettle-diff', c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3: 'kettle-diff-with-lid' };
+  await ctx.reviewAt('a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1', patchIds);
+  const fake = buildFakeRunner({
+    noslopReview: { code: 0, stdout: FAKE_REVIEW_JSON.replace('"head":"feat"', '"head":"c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3"'), stderr: '' },
+    prRefs: { code: 0, stdout: JSON.stringify({ headRefOid: 'b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2', baseRefName: 'main' }), stderr: '' },
+    patchIds,
+  });
+
+  await runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false });
+
+  expect(ctx.db.query("SELECT reviewed_sha FROM run_prs WHERE ref = 'widgets#7'").get()).toStrictEqual({ reviewed_sha: 'a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1' });
+});
+
+test('--full runs a round though only the base moved', async () => {
+  const ctx = setupTest();
+  ctx.listWidgets();
+  const patchIds = { a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1: 'kettle-diff', b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2: 'kettle-diff' };
+  await ctx.reviewAt('a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1', patchIds);
+
+  const full = await ctx.reviewAt('b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2', patchIds, true);
+
+  expect(full.outcome).toMatchObject({ fixesOnly: false, baseMove: null, round: 2 });
+});
+
+test('a push to a head whose PR diff git cannot read is a round', async () => {
+  const ctx = setupTest();
+  ctx.listWidgets();
+  await ctx.reviewAt('a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1', { a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1: 'kettle-diff' });
+
+  const unread = await ctx.reviewAt('b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2', { a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1: 'kettle-diff' });
+
+  expect(unread.outcome).toMatchObject({ fixesOnly: false, baseMove: null, round: 2 });
 });

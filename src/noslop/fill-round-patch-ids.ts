@@ -1,0 +1,54 @@
+import type { Database } from 'bun:sqlite';
+import { z } from 'zod';
+import type { Runner } from '../runner/types.ts';
+import { parseReportCutoff } from './parse-report-cutoff.ts';
+import { readPRPatchID } from './read-pr-patch-id.ts';
+
+export interface PatchFill {
+  run: Runner;
+  db: Database;
+
+  // The report's window: only the PRs with a round since this time are filled. All PRs when absent.
+  since?: string | undefined;
+
+  // The checkout of a zgeoff repo to read its diffs in; it throws when hq has none and cannot make one.
+  checkout: (repo: string) => Promise<string>;
+}
+
+const UnfilledSchema = z.array(z.object({ id: z.number(), repo: z.string(), head: z.string(), base: z.string() }));
+
+export async function fillRoundPatchIDs(fill: PatchFill): Promise<number> {
+  const cutoff = parseReportCutoff(fill.since);
+  const rows = UnfilledSchema.parse(
+    fill.db
+      .query(
+        "SELECT id, repo, head, base FROM noslop_rounds WHERE kind = 'review' AND ok = 1 AND patch_id IS NULL AND head IS NOT NULL AND base IS NOT NULL AND (repo, pr) IN (SELECT repo, pr FROM noslop_rounds WHERE started_at >= ?) ORDER BY id",
+      )
+      .all(cutoff),
+  );
+  const directories = new Map<string, string | null>();
+  let filled = 0;
+  for (const row of rows) {
+    const directory = await readCheckout(fill.checkout, row.repo, directories);
+    if (directory === null) {
+      continue;
+    }
+    const patchID = await readPRPatchID(fill.run, directory, row.base, row.head);
+    fill.db.query('UPDATE noslop_rounds SET patch_id = ? WHERE id = ?').run(patchID ?? '', row.id);
+    filled += patchID === null ? 0 : 1;
+  }
+  return filled;
+}
+
+// One checkout per repo for the whole fill; null when hq cannot make one.
+async function readCheckout(resolve: PatchFill['checkout'], repo: string, directories: Map<string, string | null>): Promise<string | null> {
+  if (!directories.has(repo)) {
+    try {
+      const directory = await resolve(repo);
+      directories.set(repo, directory);
+    } catch {
+      directories.set(repo, null);
+    }
+  }
+  return directories.get(repo) ?? null;
+}
