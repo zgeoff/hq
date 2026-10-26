@@ -3,6 +3,7 @@
 import type { Ctx, Out } from './commands.ts';
 import { HqError } from './errors.ts';
 import { checkRecordedGate } from './pr-status/check-recorded-gate.ts';
+import { findReviewTimeoutRefusal } from './noslop/find-review-timeout-refusal.ts';
 import { runReview } from './noslop/run-review.ts';
 import { formatNoslopReview } from './noslop/format-noslop-review.ts';
 import type { PRRequest } from './noslop/types.ts';
@@ -51,9 +52,14 @@ function buildRequest(ctx: Ctx, rawRepo: string | undefined, rawPR: string | und
 }
 
 async function runReviewPR(ctx: Ctx): Promise<Out> {
+  const timeout = toTextFlag(ctx.flags.timeout);
+  const timeoutRefusal = findReviewTimeoutRefusal(timeout);
+  if (timeoutRefusal !== null) {
+    throw new HqError('bad_args', timeoutRefusal);
+  }
   const base = buildRequest(ctx, ctx.verb, ctx.rest[0]),
     effort = toTextFlag(ctx.flags.effort) as Effort | undefined,
-    result = await runReview({ ...base, watch: !ctx.flags['no-watch'], effort, full: ctx.flags.full === true, fixesOnly: ctx.flags['fixes-only'] === true, confirm: ctx.flags.confirm === true });
+    result = await runReview({ ...base, watch: !ctx.flags['no-watch'], effort, full: ctx.flags.full === true, fixesOnly: ctx.flags['fixes-only'] === true, timeout, confirm: ctx.flags.confirm === true });
   if ('engine' in result) {
     return { data: { ...result }, text: formatNoslopReview(result) };
   }

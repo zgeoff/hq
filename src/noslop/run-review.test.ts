@@ -110,6 +110,47 @@ test('it refuses --full for a PR on Codex, and runs nothing', async () => {
   expect(fake.of('bun')).toStrictEqual([]);
 });
 
+test('it gives the noslop run 15 minutes unless --timeout says otherwise', async () => {
+  const ctx = setupTest();
+  const plain = buildFakeRunner();
+  const longer = buildFakeRunner();
+  ctx.listWidgets();
+
+  await runReview({ run: plain.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false });
+  await runReview({ run: longer.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false, timeout: '40' });
+
+  expect(plain.of('bun')[0]?.opts?.timeoutMs).toBe(900_000);
+  expect(longer.of('bun')[0]?.opts?.timeoutMs).toBe(2_400_000);
+});
+
+test('hq review refuses a --timeout past the 60 minute cap, and runs nothing', async () => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
+  const errors: string[] = [];
+  const logger = spyOn(console, 'error').mockImplementation((line: string) => {
+    errors.push(line);
+  });
+  onTestFinished(() => logger.mockRestore());
+  onTestFinished(overrideEnv('HQ_DB', join(ctx.base, 'hq.db')));
+  onTestFinished(overrideEnv('HQ_NOTIFY', 'off'));
+  ctx.listWidgets();
+
+  await expect(main(['review', 'widgets', '7', '--no-watch', '--timeout', '61'], fake.run)).resolves.toBe(1);
+
+  expect(errors).toStrictEqual(['hq: --timeout takes whole minutes from 1 to 60, not "61"']);
+  expect(fake.calls).toStrictEqual([]);
+});
+
+test('it refuses --timeout for a PR on Codex, and runs nothing', async () => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
+
+  await expect(runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false, timeout: '30' })).rejects.toMatchObject({ code: 'bad_args' });
+
+  expect(fake.of('codex')).toStrictEqual([]);
+  expect(fake.of('bun')).toStrictEqual([]);
+});
+
 test('it reviews a listed repo\'s PR on noslop though a Codex review file of the PR exists', async () => {
   const ctx = setupTest();
   const fake = buildFakeRunner();
