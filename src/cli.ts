@@ -376,6 +376,7 @@ import { HELP } from './help.ts';
 import { readMoveRefusal } from './runs/read-move-refusal.ts';
 import { VERSION } from './version.ts';
 import { formatBrokerQuota, formatBrokerRecord } from './slots/format-broker.ts';
+import { pickClaudeReading } from './slots/pick-claude-reading.ts';
 import { readBrokerQuota } from './slots/read-broker-quota.ts';
 import { readBrokerSlot } from './slots/read-broker-slot.ts';
 import { writeBrokerSlot } from './slots/write-broker-slot.ts';
@@ -1125,7 +1126,7 @@ async function capacityCommand(db: Database, verb: string | undefined, args: str
     }
     case 'broker': {
       const broker = readBrokerQuota(db, now());
-      return { data: { broker }, text: formatBrokerQuota(broker) };
+      return { data: { broker, reading: pickClaudeReading(broker) }, text: formatBrokerQuota(broker) };
     }
     case 'set': {
       const key = need(args[0], 'setting name');

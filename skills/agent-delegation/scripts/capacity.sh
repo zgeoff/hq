@@ -70,13 +70,10 @@ claude_usage() {
 }
 
 # Claude on imp runs on the imp broker's slot, not this machine's login: hq reads that slot's quota
-# every 2 h. With no fresh read, a broker proof under 24 h old still means room (unknown: true).
+# every 2 h, and hq builds the reading. With no fresh read, a broker proof under 24 h old still
+# means room (unknown: true).
 broker_usage() {
-  hq capacity broker --json 2>/dev/null | jq -c '.broker
-    | (if .slot then {slot, proof, proofAgeHours} else {} end) as $proof
-    | if .state == "read" then $proof + {used, resetsAt, source: ("hq slot read of the imp broker slot \(.slot), \(.readAt)")}
-      elif .state == "unknown-proved" then $proof + {used: null, unknown: true, why, source: "hq capacity broker"}
-      else {error: ("imp broker quota unknown: " + (.why // "hq gave no broker state"))} end' 2>/dev/null \
+  hq capacity broker --json 2>/dev/null | jq -ce '.reading | objects' 2>/dev/null \
     || echo '{"error": "hq capacity broker failed"}'
 }
 
