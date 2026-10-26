@@ -22,19 +22,9 @@
     }
   },
   "routes": {
-    "S": [
-      "codex",
-      "claude"
-    ],
-    "M": [
-      "codex",
-      "claude"
-    ],
-    "L": [
-      "claude"
-    ],
-    "XL": [
-      "claude"
-    ]
+    "S": ["codex", "claude"],
+    "M": ["codex", "claude"],
+    "L": ["claude"],
+    "XL": ["claude"]
   }
 }
