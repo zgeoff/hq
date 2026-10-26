@@ -2,6 +2,7 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdirSync, mkdtempSync, rmSync, statSync, utimesSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { waitFor } from '../../test/wait-for.ts';
 import { overrideEnv } from '../config/override-env.ts';
 import { withRepoLock } from './with-repo-lock.ts';
 
@@ -15,13 +16,6 @@ function setupTest() {
 
     // A waiter's work: it runs only if the waiter gets the lock.
     takeIt: () => Promise.resolve('took it'),
-
-    // Polls the clock until it passes the given time, so a lock's age is past a waiter's 1 ms staleMs.
-    waitUntilPast: async (time: number) => {
-      while (Date.now() <= time) {
-        await Bun.sleep(1);
-      }
-    },
   };
 }
 
@@ -42,7 +36,8 @@ test('a waiter with a shorter staleMs leaves a live lock that its holder gave a 
     ctx.directory,
     'zgeoff/widgets',
     async () => {
-      await ctx.waitUntilPast(Date.now() + 5);
+      const past = Date.now() + 5;
+      await waitFor('the lock to age past the waiter\'s 1 ms staleMs', () => Date.now() > past, { pollMs: 1 });
       return await withRepoLock(ctx.directory, 'zgeoff/widgets', ctx.takeIt, 1).catch((error: unknown) => error);
     },
     2_400_000,
