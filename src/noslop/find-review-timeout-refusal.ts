@@ -1,4 +1,3 @@
-// The cap keeps a typo from holding a PR's round lock for hours.
 const MAX_MINUTES = 60;
 
 export function findReviewTimeoutRefusal(raw: string | undefined): string | null {
