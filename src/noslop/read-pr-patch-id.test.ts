@@ -1,31 +1,16 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { createGitRepo } from '../../test/create-git-repo.ts';
 import { realRunner } from '../runner/real-runner.ts';
 import { readPRPatchID } from './read-pr-patch-id.ts';
 
-// An empty git repo on main, with a git helper that fails loudly and a commit helper.
+// An empty git repo on main.
 async function setupTest() {
   const directory = mkdtempSync(join(tmpdir(), 'hq-patch-id-'));
   onTestFinished(() => rmSync(directory, { recursive: true, force: true }));
-  const git = async (...args: string[]): Promise<string> => {
-    const result = await realRunner(['git', '-c', 'user.name=Kettle', '-c', 'user.email=kettle@example.com', '-c', 'commit.gpgsign=false', ...args], { cwd: directory });
-    if (result.code !== 0) {
-      throw new Error(`git ${args.join(' ')} failed: ${result.stderr}`);
-    }
-    return result.stdout.trim();
-  };
-  const commit = async (files: Record<string, string>, message: string): Promise<string> => {
-    for (const [path, text] of Object.entries(files)) {
-      writeFileSync(join(directory, path), text);
-    }
-    await git('add', '-A');
-    await git('commit', '-q', '-m', message);
-    return await git('rev-parse', 'HEAD');
-  };
-  await git('init', '-q', '-b', 'main');
-  return { directory, git, commit };
+  return await createGitRepo(directory);
 }
 
 test('a PR rebased onto a moved base keeps its patch-id', async () => {
