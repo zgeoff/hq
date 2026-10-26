@@ -26,7 +26,7 @@ import { requirePinned } from './require-pinned.ts';
 import { resolveEngine } from './resolve-engine.ts';
 import { resolveNoslopDefaultStore } from './resolve-noslop-default-store.ts';
 import { resolveNoslopDir } from './resolve-noslop-dir.ts';
-import { REVIEW_TIMEOUT_MS } from './review-timeout-ms.ts';
+import { parseReviewTimeout } from './parse-review-timeout.ts';
 import { runNoslopReview } from './run-noslop-review.ts';
 import type { NoslopReviewContext, NoslopReviewResult } from './run-noslop-review.ts';
 import { loadNoslopSettings } from './load-noslop-settings.ts';
@@ -42,6 +42,9 @@ export interface ReviewRequest extends PRRequest {
 
   // A plain pass-through to `noslop review --fixes-only`: no basis check, no refusal, not a round, no reviewed mark.
   fixesOnly?: boolean | undefined;
+
+  // --timeout: the minutes one noslop run may take, as typed. Codex PRs refuse it.
+  timeout?: string | undefined;
 
   // The removed --confirm flag: still read, only so that it is refused with a pointer.
   confirm?: boolean | undefined;
@@ -89,7 +92,7 @@ export async function runReview(request: ReviewRequest): Promise<ReviewResult | 
   if (request.fixesOnly === true && request.full === true) {
     throw new HqError('bad_fixes_only', '--fixes-only and --full contradict: --fixes-only runs no lens over the diff, and --full asks for a review of the whole PR');
   }
-  return await runNoslopReviewWithCI(request, parsed, requirePinned(picked.sha));
+  return await runNoslopReviewWithCI(request, parsed, requirePinned(picked.sha), parseReviewTimeout(request.timeout));
 }
 
 function requireNoConfirm(request: ReviewRequest): void {
@@ -105,23 +108,26 @@ function requireCodexFlags(request: ReviewRequest, parsed: ParsedRepo): void {
   if (request.full === true) {
     throw new HqError('bad_args', `--full asks noslop for a full review, but ${parsed.repo}#${request.pr} is reviewed by Codex`);
   }
+  if (request.timeout !== undefined) {
+    throw new HqError('bad_args', `--timeout limits a noslop run, but ${parsed.repo}#${request.pr} is reviewed by Codex`);
+  }
 }
 
-const ROUND_LOCK_STALE_MS = REVIEW_TIMEOUT_MS + 300_000;
+const ROUND_LOCK_GRACE_MS = 300_000;
 
 // The cap check and the review run under one lock per PR, so two hq review calls on one PR cannot
 // both pass the cap: the second waits until the first has recorded its round. It is not the repo
-// lock that the git steps take inside, and it outlives the longest noslop run.
-async function runNoslopReviewWithCI(request: ReviewRequest, parsed: ParsedRepo, sha: string): Promise<NoslopReviewOutcome> {
+// lock that the git steps take inside, and it outlives this round's noslop run.
+async function runNoslopReviewWithCI(request: ReviewRequest, parsed: ParsedRepo, sha: string, timeoutMs: number): Promise<NoslopReviewOutcome> {
   const folder = createScratchDir();
   const ran = await withRepoLock(
     folder,
     `${buildSlug(parsed)}-pr${request.pr}`,
     async () => {
-      const plan = await planBaseMove(planRound(request, parsed), parsed, folder);
+      const plan = await planBaseMove(planRound(request, parsed, timeoutMs), parsed, folder);
       return await runPlannedRound(plan, parsed, sha, folder);
     },
-    ROUND_LOCK_STALE_MS,
+    timeoutMs + ROUND_LOCK_GRACE_MS,
   );
   const state = await readCIState(request.run, buildSlug(parsed), request.pr, request.watch);
   return { ...ran.result, fixChecks: buildTitledFixChecks(ran.result.fixChecks, loadFindingTitles(request, parsed)), fixesOnly: ran.plan.fixesOnly, emergencyCap: ran.plan.emergencyCap, capNote: formatCapNote(ran.plan.emergencyCap, parsed), baseMove: ran.plan.baseMove?.reviewed ?? null, checks: state.checks, checksError: state.checksError, openThreads: state.openThreads, round: ran.plan.round };
@@ -148,6 +154,20 @@ async function planBaseMove(plan: RoundPlan, parsed: ParsedRepo, scratch: string
   return { ...plan, round: plan.round - 1, fixesOnly: true, baseMove: move };
 }
 
+// A full review, unless the caller asked for fix checks only or the repo's emergency cap is spent:
+// past the cap, the review runs fix checks only and raises no new finding.
+function planRound(request: ReviewRequest, parsed: ParsedRepo, timeoutMs: number): RoundPlan {
+  const started = readOKReviews(request.db, parsed.repo, request.pr).filter((okReview) => okReview.confirm === 0).length;
+  const cap = findNoslopCap(loadNoslopSettings(request.db), parsed.owner, parsed.repo);
+  if (request.fixesOnly === true) {
+    return { request, round: started, fixesOnly: true, emergencyCap: null, baseMove: null, timeoutMs };
+  }
+  if (cap !== null && started >= cap) {
+    return { request: { ...request, full: false }, round: started, fixesOnly: true, emergencyCap: cap, baseMove: null, timeoutMs };
+  }
+  return { request, round: started + 1, fixesOnly: false, emergencyCap: null, baseMove: null, timeoutMs };
+}
+
 interface RoundPlan {
   request: ReviewRequest;
   round: number;
@@ -156,6 +176,9 @@ interface RoundPlan {
 
   // The base move found since the last full review; null when there was none.
   baseMove: BaseMove | null;
+
+  // How long the round's noslop run may take.
+  timeoutMs: number;
 }
 
 interface RanRound {
@@ -189,6 +212,7 @@ async function createNoslopContext(plan: RoundPlan, parsed: ParsedRepo, sha: str
     lock: (fn) => withRepoLock(scratch, buildSlug(parsed), fn),
     full: request.full,
     fixesOnly: plan.fixesOnly,
+    timeoutMs: plan.timeoutMs,
     baseMove: plan.baseMove ?? undefined,
     linear: makeAuditedLinearCaller(request.db, request.run),
   };
@@ -210,19 +234,6 @@ function writeRoundMark(plan: RoundPlan, parsed: ParsedRepo): void {
   }
 }
 
-// A full review, unless the caller asked for fix checks only or the repo's emergency cap is spent:
-// past the cap, the review runs fix checks only and raises no new finding.
-function planRound(request: ReviewRequest, parsed: ParsedRepo): RoundPlan {
-  const started = readOKReviews(request.db, parsed.repo, request.pr).filter((okReview) => okReview.confirm === 0).length;
-  const cap = findNoslopCap(loadNoslopSettings(request.db), parsed.owner, parsed.repo);
-  if (request.fixesOnly === true) {
-    return { request, round: started, fixesOnly: true, emergencyCap: null, baseMove: null };
-  }
-  if (cap !== null && started >= cap) {
-    return { request: { ...request, full: false }, round: started, fixesOnly: true, emergencyCap: cap, baseMove: null };
-  }
-  return { request, round: started + 1, fixesOnly: false, emergencyCap: null, baseMove: null };
-}
 
 
 function buildTitledFixChecks(fixChecks: FixCheck[], titles: Map<string, string>): TitledFixCheck[] {

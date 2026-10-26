@@ -53,7 +53,7 @@ function buildRequest(ctx: Ctx, rawRepo: string | undefined, rawPR: string | und
 async function runReviewPR(ctx: Ctx): Promise<Out> {
   const base = buildRequest(ctx, ctx.verb, ctx.rest[0]),
     effort = toTextFlag(ctx.flags.effort) as Effort | undefined,
-    result = await runReview({ ...base, watch: !ctx.flags['no-watch'], effort, full: ctx.flags.full === true, fixesOnly: ctx.flags['fixes-only'] === true, confirm: ctx.flags.confirm === true });
+    result = await runReview({ ...base, watch: !ctx.flags['no-watch'], effort, full: ctx.flags.full === true, fixesOnly: ctx.flags['fixes-only'] === true, timeout: toTextFlag(ctx.flags.timeout), confirm: ctx.flags.confirm === true });
   if ('engine' in result) {
     return { data: { ...result }, text: formatNoslopReview(result) };
   }

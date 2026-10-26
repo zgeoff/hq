@@ -426,6 +426,7 @@ const OPTIONS = {
   'no-watch': { type: 'boolean' },
   full: { type: 'boolean' },
   'fixes-only': { type: 'boolean' },
+  timeout: { type: 'string' },
   confirm: { type: 'boolean' },
   effort: { type: 'string' },
   require: { type: 'string' },

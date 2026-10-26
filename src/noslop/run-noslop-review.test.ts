@@ -57,6 +57,7 @@ function setupTest() {
       sha: 'abc1234abc1234abc1234abc1234abc1234abc12',
       store: join(base, 'store.sqlite'),
       lock: (fn) => fn(),
+      timeoutMs: 900_000,
     }),
   };
 }

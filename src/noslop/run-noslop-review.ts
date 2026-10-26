@@ -60,6 +60,9 @@ export interface NoslopReviewContext {
   // Fix checks only (`noslop review --fixes-only`), recorded as a review that is not a round.
   fixesOnly?: boolean | undefined;
 
+  // How long the noslop run may take before hq stops it and records no review.
+  timeoutMs: number;
+
   // The head and PR diff a base move was found at. The run is recorded as a base move only when
   // noslop ran on that head and the diff is still that one: a push in between makes it a plain fix check.
   baseMove?: Pick<BaseMove, 'head' | 'patchId'> | undefined;
@@ -193,11 +196,11 @@ async function runNoslopLocked(ctx: NoslopReviewContext, prep: ReviewPrep): Prom
     began = Date.now(),
     begun = iso(now()),
     command = buildNoslopCommand(ctx.clone, args),
-    proc = await boundedRunner(ctx.run, REVIEW_TIMEOUT_MS)(command, { cwd: prep.worktree, env: buildNoslopEnv(prep.secrets) }),
-    verdict = parseReviewRun(proc.code, proc.stdout, getTail(proc.stderr, prep.secrets), REVIEW_TIMEOUT_MS);
-  await Bun.write(prep.reviewFile, proc.stdout);
+    finished = await boundedRunner(ctx.run, ctx.timeoutMs)(command, { cwd: prep.worktree, env: buildNoslopEnv(prep.secrets) }),
+    verdict = parseReviewRun(finished.code, finished.stdout, getTail(finished.stderr, prep.secrets), ctx.timeoutMs);
+  await Bun.write(prep.reviewFile, finished.stdout);
   // oxlint-disable-next-line zgeoff/no-abbreviated-names -- grandfathered property of the recorded round
-  return { ...readPostFailedReview(ctx.store, proc.stdout, verdict), ms: Date.now() - began, startedAt: begun, sha: ctx.sha };
+  return { ...readPostFailedReview(ctx.store, finished.stdout, verdict), ms: Date.now() - began, startedAt: begun, sha: ctx.sha };
 }
 
 // noslop prints the review, then writes it to its store, then posts it to GitHub. A run that failed
