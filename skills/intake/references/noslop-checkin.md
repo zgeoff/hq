@@ -18,6 +18,7 @@ From `totals`, the churn:
 - `repeatClass`: findings that cite a rule an earlier finding on the same PR cited. The target is about 0. `classUnknown` counts rows too old to tell.
 - `late`: `{n, of}`, findings after round 1 on lines unchanged since round 1. `lateUnknown` counts the old rows.
 - `mainMerge`: findings on code the PR did not write. It should stay 0. `mergeUnknown` counts the old rows.
+- `baseMove`: pushes that only moved the PR onto a new base and left its own diff the same. They are not rounds. A high count means the stack was rebased often, not that review churned.
 
 Each PR entry carries the same churn fields, and the text output prints them as one `churn:` line per PR.
 
