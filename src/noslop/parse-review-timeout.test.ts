@@ -11,8 +11,6 @@ test('it reads --timeout as whole minutes, up to the 60 minute cap', () => {
   expect(parseReviewTimeout('60')).toBe(3_600_000);
 });
 
-test('it refuses a --timeout past the cap, below a minute, or not a whole number', () => {
-  for (const raw of ['61', '600', '0', '1.5', '-5', '', 'ten']) {
-    expect(() => parseReviewTimeout(raw)).toThrow(expect.objectContaining({ code: 'bad_args' }));
-  }
+test.each(['61', '600', '0', '1.5', '-5', '', 'ten'])('it refuses --timeout %p: past the cap, below a minute, or not a whole number', (raw) => {
+  expect(() => parseReviewTimeout(raw)).toThrow(expect.objectContaining({ code: 'bad_args' }));
 });
