@@ -713,6 +713,19 @@ test('hq slots broker: none yet, refuses a bad slot and a missing proof, records
   expect(quota.json.broker).toMatchObject({ state: 'unknown-proved', slot: 1, proof: 'req-1a2b' });
 });
 
+test("hq capacity broker reads the broker slot's fresh slot read from the database, not another slot's", async () => {
+  const store = db();
+  const insert = store.query('INSERT INTO slot_usage (at, slot, status, five_hour, five_hour_resets_at, seven_day, seven_day_resets_at, working_lanes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+  insert.run('2026-10-14T00:30:00Z', 1, '200', 0, '2026-10-14T04:00:00Z', 0, '2026-10-18T00:00:00Z', 2);
+  insert.run('2026-10-14T00:30:00Z', 3, '200', 99, '2026-10-14T04:00:00Z', 99, '2026-10-18T00:00:00Z', 2);
+  store.close();
+  await hq('slots', 'broker', '1', '--proof', 'req-5e6f');
+
+  const quota = await hq('capacity', 'broker');
+
+  expect(quota.json.broker).toMatchObject({ state: 'read', slot: 1, used: 0, readAt: '2026-10-14T00:30:00Z' });
+});
+
 // A v27 database at `file` with a call, a chat and a deleted proposal line typed, which refuses a
 // console source; returns its typed rows.
 function createV27TypedRows(file: string): unknown[] {
