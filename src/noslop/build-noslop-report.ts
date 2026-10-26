@@ -128,12 +128,15 @@ function buildPRReport(rounds: RoundRecord[], earlier: RoundRecord[]): PRReport 
 
 function collectBaseMoves(okReviews: RoundRecord[]): Set<number> {
   const moves = new Set<number>();
-  okReviews.forEach((review, index) => {
-    const last = okReviews[index - 1];
-    if (review.base_move === 1 || (last !== undefined && review.full !== 1 && isSameDiff(last, review))) {
+  let baseline: RoundRecord | undefined;
+  for (const review of okReviews) {
+    if (review.base_move === 1 || (baseline !== undefined && review.confirm === 0 && review.full !== 1 && isSameDiff(baseline, review))) {
       moves.add(review.id);
     }
-  });
+    if (review.confirm === 0) {
+      baseline = review;
+    }
+  }
   return moves;
 }
 
