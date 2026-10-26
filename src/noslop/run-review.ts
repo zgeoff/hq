@@ -26,7 +26,6 @@ import { requirePinned } from './require-pinned.ts';
 import { resolveEngine } from './resolve-engine.ts';
 import { resolveNoslopDefaultStore } from './resolve-noslop-default-store.ts';
 import { resolveNoslopDir } from './resolve-noslop-dir.ts';
-import { findReviewTimeoutRefusal } from './find-review-timeout-refusal.ts';
 import { parseReviewTimeout } from './parse-review-timeout.ts';
 import { runNoslopReview } from './run-noslop-review.ts';
 import type { NoslopReviewContext, NoslopReviewResult } from './run-noslop-review.ts';
@@ -89,10 +88,6 @@ export async function runReview(request: ReviewRequest): Promise<ReviewResult | 
   if (picked.engine === 'codex') {
     requireCodexFlags(request, parsed);
     return await review(request.run, request.rawRepo, request.pr, toExactOptional({ watch: request.watch, owner: request.owner, repoDir: request.repoDir, effort: request.effort }));
-  }
-  const timeoutRefusal = findReviewTimeoutRefusal(request.timeout);
-  if (timeoutRefusal !== null) {
-    throw new HqError('bad_args', timeoutRefusal);
   }
   if (request.fixesOnly === true && request.full === true) {
     throw new HqError('bad_fixes_only', '--fixes-only and --full contradict: --fixes-only runs no lens over the diff, and --full asks for a review of the whole PR');

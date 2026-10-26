@@ -123,13 +123,21 @@ test('it gives the noslop run 15 minutes unless --timeout says otherwise', async
   expect(longer.of('bun')[0]?.opts?.timeoutMs).toBe(2_400_000);
 });
 
-test('it refuses a --timeout past the 60 minute cap, and runs nothing', async () => {
+test('hq review refuses a --timeout past the 60 minute cap, and runs nothing', async () => {
   const ctx = setupTest();
   const fake = buildFakeRunner();
+  const errors: string[] = [];
+  const logger = spyOn(console, 'error').mockImplementation((line: string) => {
+    errors.push(line);
+  });
+  onTestFinished(() => logger.mockRestore());
+  onTestFinished(overrideEnv('HQ_DB', join(ctx.base, 'hq.db')));
+  onTestFinished(overrideEnv('HQ_NOTIFY', 'off'));
   ctx.listWidgets();
 
-  await expect(runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false, timeout: '61' })).rejects.toMatchObject({ code: 'bad_args' });
+  await expect(main(['review', 'widgets', '7', '--no-watch', '--timeout', '61'], fake.run)).resolves.toBe(1);
 
+  expect(errors).toStrictEqual(['hq: --timeout takes whole minutes from 1 to 60, not "61"']);
   expect(fake.calls).toStrictEqual([]);
 });
 
