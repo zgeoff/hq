@@ -29,7 +29,7 @@
         "@types/react": "19.3.0",
         "@types/react-dom": "19.3.0",
         "@zgeoff/oxlint-config": "0.7.0",
-        "@zgeoff/skill-gate": "0.2.8",
+        "@zgeoff/skill-gate": "0.2.9",
         "knip": "6.42.1",
         "msw": "2.15.0",
         "oxfmt": "^0.73.0",
@@ -462,7 +462,7 @@
 
     "@zgeoff/oxlint-config": ["@zgeoff/oxlint-config@0.7.0", "", { "dependencies": { "@stylistic/eslint-plugin": "5.10.0" }, "peerDependencies": { "oxlint": ">=1.78.0" } }, "sha512-ECHCzGCYnINclFxlkFxp1bJSw9RKnII/sj2YMKdJIJrQezgXp1vdcM3RuxgZqN3gJOpSKpEVrD4LD3oLSuyNgA=="],
 
-    "@zgeoff/skill-gate": ["@zgeoff/skill-gate@0.2.8", "", {}, "sha512-UYXUn4PkxbcRXo1aUOL3PtgaiHGzoKjOHBpeB4Kvj7bAAqsoTf5YZQ5bH6/5JPVyTo6TGElkYGRLDSQi9bScQQ=="],
+    "@zgeoff/skill-gate": ["@zgeoff/skill-gate@0.2.9", "", {}, "sha512-Ojjoj3Co5bmBqjpUwyoI5w6GuR/HUnCS3/b87cXAQOE0KPfbtbmaffJBhYTvH+u8+Ky190yxjMRneD+JiTssMg=="],
 
     "@zgeoff/std": ["@zgeoff/std@0.3.0", "", {}, "sha512-I9LBwkMr8uuNCAQ9/tIoObp09b8ixnNDp1f85T9Mm1Ox10nWbVrbiqoWkf+hATCt4iyYxvYIVXl4eUFLwZaU/g=="],
 
