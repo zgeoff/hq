@@ -1,0 +1,10 @@
+{
+  "ok": true,
+  "broker": {
+    "state": "unknown",
+    "slot": 1,
+    "proof": "req-4c1d",
+    "proofAgeHours": 30,
+    "why": "no slot read of the imp broker's slot 1 in the last 2.5 h, and its proof is 30 h old"
+  }
+}

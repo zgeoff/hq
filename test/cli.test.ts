@@ -694,6 +694,23 @@ test('hq capacity: no sample yet, set and reset a threshold, bad key, an empty l
   expect((await hq('capacity', 'log', '--hours', '6')).json.samples).toEqual([]);
 });
 
+test('hq slots broker: none yet, refuses a bad slot and a missing proof, records one, and hq capacity broker reads it', async () => {
+  const none = await hq('slots', 'broker');
+  const badSlot = await hq('slots', 'broker', '5', '--proof', 'req-1a2b');
+  const noProof = await hq('slots', 'broker', '1');
+  const blankProof = await hq('slots', 'broker', '1', '--proof', '  ');
+  const recorded = await hq('slots', 'broker', '1', '--proof', 'req-1a2b', '--note', 'after the account switch');
+  const shown = await hq('slots', 'broker');
+  const quota = await hq('capacity', 'broker');
+
+  expect(none.json.broker).toBeNull();
+  expect([badSlot.code, noProof.code, blankProof.code].every((code) => code !== 0)).toBe(true);
+  expect(recorded.code).toBe(0);
+  expect(recorded.json.broker).toMatchObject({ slot: 1, proof: 'req-1a2b', note: 'after the account switch' });
+  expect(shown.json.broker).toStrictEqual(recorded.json.broker);
+  expect(quota.json.broker).toMatchObject({ state: 'unknown-proved', slot: 1, proof: 'req-1a2b' });
+});
+
 // A v27 database at `file` with a call, a chat and a deleted proposal line typed, which refuses a
 // console source; returns its typed rows.
 function createV27TypedRows(file: string): unknown[] {

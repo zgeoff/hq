@@ -5,7 +5,7 @@
 # Usage: capacity.sh [--size S|M|L|XL | --design] [--design-open <n>] [--local-open <n>]
 #   --design-open  design sessions that wait on the owner now (default 0)
 #   --local-open   delivery sessions running on this host now (default 0)
-# Reads pacing.json beside this folder. Needs jq, curl and imp. Never prints a key.
+# Reads pacing.json beside this folder. Needs jq, curl, imp and hq. Never prints a key.
 set -euo pipefail
 
 here=$(cd "$(dirname "$0")" && pwd)
@@ -69,6 +69,17 @@ claude_usage() {
   echo "$out"
 }
 
+# Claude on imp runs on the imp broker's slot, not this machine's login: hq reads that slot's quota
+# every 2 h. With no fresh read, a broker proof under 24 h old still means room (unknown: true).
+broker_usage() {
+  hq capacity broker --json 2>/dev/null | jq -c '.broker
+    | (if .slot then {slot, proof, proofAgeHours} else {} end) as $proof
+    | if .state == "read" then $proof + {used, resetsAt, source: ("hq slot read of the imp broker slot \(.slot), \(.readAt)")}
+      elif .state == "unknown-proved" then $proof + {used: null, unknown: true, why, source: "hq capacity broker"}
+      else {error: ("imp broker quota unknown: " + .why)} end' 2>/dev/null \
+    || echo '{"error": "hq capacity broker failed"}'
+}
+
 codex_usage() {
   local file
   file=$(find ~/.codex/sessions -name '*.jsonl' -mtime -7 -printf '%T@ %p\n' 2>/dev/null \
@@ -96,7 +107,8 @@ read_json() {
 jq -n \
   --argjson pacing "$pacing" \
   --argjson imp "$(read_json imp_room)" \
-  --argjson claude "$(read_json claude_usage)" \
+  --argjson claude "$(read_json broker_usage)" \
+  --argjson local "$(read_json claude_usage)" \
   --argjson codex "$(read_json codex_usage)" \
   --arg size "$size" --argjson design "$design" --argjson open "$design_open" --argjson localOpen "$local_open" '
   {claude: $claude, codex: $codex} as $read
@@ -106,14 +118,23 @@ jq -n \
   | ($pacing.providers | with_entries(
       .key as $k | .value as $p | {key: $k, value: ($read[$k] + {
         threshold: $p.threshold, unattended: $p.unattended, target: $p.target,
-        room: (($read[$k].used // null) != null and $read[$k].used < $p.threshold)
-      })})) as $providers
+        room: ($read[$k].unknown == true or (($read[$k].used // null) != null and $read[$k].used < $p.threshold))
+      }
+      # The login on this machine, for the localFallback launches.
+      + if $k == "claude" then {local: ($local + {
+          room: (($local.used // null) != null and $local.used < $p.threshold)
+        })} else {} end)})) as $providers
   | {slots: $pacing.designSlots, open: $open, room: ($open < $pacing.designSlots)} as $designOut
-  # Where a provider launches now: its target, or this host when the imps are full and its
-  # localFallback cap has room, or null when neither has room.
-  | def place($p): $pacing.providers[$p] as $c
-      | if $c.target != "imp" or $impOut.room then $c.target
-        elif ($c.localFallback // 0) > $localOpen then "local" else null end;
+  # Where a provider launches now: its target while it has room there, or this host when the imps
+  # or the broker quota are full and its localFallback cap and this login have room, or null.
+  | def place($p): $pacing.providers[$p] as $c | $providers[$p] as $q
+      | if $q.room and ($c.target != "imp" or $impOut.room) then $c.target
+        elif $c.target == "imp" and ($c.localFallback // 0) > $localOpen and ($q.local // {room: false}).room then "local"
+        else null end;
+  # A launch on the imps with an unknown broker quota says why it still has room.
+  def note($p): if place($p) == "imp" and $providers[$p].unknown == true
+      then {reason: ("broker quota unknown, its proof " + $providers[$p].proof + " is " + ($providers[$p].proofAgeHours | tostring) + " h old")}
+      else {} end;
   {
       checkedAt: (now | todate),
       imp: $impOut,
@@ -123,14 +144,14 @@ jq -n \
     }
   | if $design then . + {launch: (
       if ($designOut.room | not) then {provider: null, reason: "every design slot is taken"}
-      elif (place("claude") == null) then {provider: null, reason: "no imp room"}
-      elif $providers.claude.room then {provider: "claude", agent: $pacing.providers.claude.agent, target: place("claude")}
+      elif place("claude") != null then {provider: "claude", agent: $pacing.providers.claude.agent, target: place("claude")} + note("claude")
+      elif $providers.claude.room then {provider: null, reason: "no imp room"}
       else {provider: null, reason: "Claude is at its quota threshold"} end)}
     elif $size != "" then . + {launch: (
       ($pacing.routes[$size] // error("unknown size " + $size)) as $route
-      | [$route[] | select($providers[.].unattended and $providers[.].room)] as $open
+      | [$route[] | select($providers[.].unattended and ($providers[.].room or ($providers[.].local // {room: false}).room))] as $open
       | [$open[] | select(place(.) != null)][0] as $pick
-      | if $pick then {size: $size, provider: $pick, agent: $pacing.providers[$pick].agent, target: place($pick)}
+      | if $pick then {size: $size, provider: $pick, agent: $pacing.providers[$pick].agent, target: place($pick)} + note($pick)
         elif ($open | length) > 0 then {size: $size, provider: null,
           reason: "no imp room"}
         else {size: $size, provider: null, reason: ("no provider on the " + $size + " route has room for unattended work")} end)}

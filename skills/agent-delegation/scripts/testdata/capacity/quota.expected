@@ -15,18 +15,27 @@
       "room": false
     },
     "claude": {
-      "used": 95,
-      "windows": {
-        "fiveHour": 95,
-        "sevenDay": 25
-      },
+      "slot": 1,
+      "proof": "req-4c1d",
+      "proofAgeHours": 5,
+      "used": 97,
       "resetsAt": "2026-10-16T04:00:00Z",
-      "source": "fixture cache",
-      "cached": true,
+      "source": "hq slot read of the imp broker slot 1, 2026-10-15T23:00:00Z",
       "threshold": 95,
       "unattended": true,
       "target": "imp",
-      "room": false
+      "room": false,
+      "local": {
+        "used": 95,
+        "windows": {
+          "fiveHour": 95,
+          "sevenDay": 25
+        },
+        "resetsAt": "2026-10-16T04:00:00Z",
+        "source": "fixture cache",
+        "cached": true,
+        "room": false
+      }
     }
   },
   "design": {

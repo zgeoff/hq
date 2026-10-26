@@ -33,10 +33,15 @@ slot while it waits on him.
   `launch.target` is `local` while fewer than that many delivery sessions run on this host.
 - Each provider's `used` is its fullest usage window, in percent. `room` is true while `used` is
   below `threshold`.
-- A provider with an `error` has no room. Claude's reading comes from an endpoint that reads only
-  the account logged in on this host, which the imps share; it rate-limits repeated calls, so the
-  script reuses a good reading for 2 minutes and marks it `cached`. Codex's reading comes from the
-  last local Codex session log.
+- A provider with an `error` has no room. For an imp launch, Claude's reading is the imp broker's
+  slot, from hq's slot reads (`hq capacity broker`). For a launch on this host, it is this host's
+  own login, read from the usage endpoint. That endpoint rate-limits repeated calls, so the script
+  reuses a good reading for 2 minutes and marks it `cached`. Codex's reading comes from the last
+  local Codex session log.
+- With no fresh read of the broker's slot, Claude's imp reading is `unknown`. It counts as room
+  while the last broker proof, `hq slots broker`, is under 24 h old, and `launch.reason` says so.
+  Otherwise it holds every imp launch. Record a proof with `hq slots broker <n> --proof <id>` after
+  you prove the broker's slot.
 - A provider with `unattended` false never gets a launch from the route, though its quota shows.
 
 When every provider on the route is over its threshold, or a readout fails, file it with
