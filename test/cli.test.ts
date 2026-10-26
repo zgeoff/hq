@@ -694,22 +694,44 @@ test('hq capacity: no sample yet, set and reset a threshold, bad key, an empty l
   expect((await hq('capacity', 'log', '--hours', '6')).json.samples).toEqual([]);
 });
 
-test('hq slots broker: none yet, refuses a bad slot and a missing proof, records one, and hq capacity broker reads it', async () => {
-  const none = await hq('slots', 'broker');
-  const badSlot = await hq('slots', 'broker', '5', '--proof', 'req-1a2b');
-  const noProof = await hq('slots', 'broker', '1');
-  const blankProof = await hq('slots', 'broker', '1', '--proof', '  ');
+test('hq slots broker shows no record before one is recorded', async () => {
+  const shown = await hq('slots', 'broker');
+
+  expect(shown.json.broker).toBeNull();
+});
+
+test('hq slots broker refuses a slot outside 1 to 4', async () => {
+  const refused = await hq('slots', 'broker', '5', '--proof', 'req-1a2b');
+
+  expect(refused.code).not.toBe(0);
+});
+
+test('hq slots broker refuses a slot with no --proof', async () => {
+  const refused = await hq('slots', 'broker', '1');
+
+  expect(refused.code).not.toBe(0);
+});
+
+test('hq slots broker refuses a blank --proof', async () => {
+  const refused = await hq('slots', 'broker', '1', '--proof', '  ');
+
+  expect(refused.code).not.toBe(0);
+});
+
+test('hq slots broker records a slot with its proof and note, and shows it after', async () => {
   const recorded = await hq('slots', 'broker', '1', '--proof', 'req-1a2b', '--note', 'after the account switch');
   const shown = await hq('slots', 'broker');
-  const quota = await hq('capacity', 'broker');
 
-  expect(none.json.broker).toBeNull();
-  expect(badSlot.code).not.toBe(0);
-  expect(noProof.code).not.toBe(0);
-  expect(blankProof.code).not.toBe(0);
   expect(recorded.code).toBe(0);
   expect(recorded.json.broker).toMatchObject({ slot: 1, proof: 'req-1a2b', note: 'after the account switch' });
   expect(shown.json.broker).toStrictEqual(recorded.json.broker);
+});
+
+test('hq capacity broker gives an unknown quota with room for a new proof and no slot read', async () => {
+  await hq('slots', 'broker', '1', '--proof', 'req-1a2b');
+
+  const quota = await hq('capacity', 'broker');
+
   expect(quota.json.broker).toMatchObject({ state: 'unknown-proved', slot: 1, proof: 'req-1a2b' });
 });
 

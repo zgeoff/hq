@@ -13,7 +13,14 @@ test('it marks an unknown quota with a young proof as unknown, with no used perc
   expect(reading).toStrictEqual({ slot: 1, proof: 'req-4c1d', proofAgeHours: 3, used: null, unknown: true, why: 'no slot read', source: 'hq capacity broker' });
 });
 
-test('it gives an error for an old proof and for no record', () => {
-  expect(pickClaudeReading({ state: 'unknown', slot: 2, proof: 'req-0002', proofAgeHours: 30, why: 'no slot read, and its proof is 30 h old' })).toStrictEqual({ error: 'imp broker quota unknown: no slot read, and its proof is 30 h old' });
-  expect(pickClaudeReading({ state: 'none', why: 'no imp broker slot recorded' })).toStrictEqual({ error: 'imp broker quota unknown: no imp broker slot recorded' });
+test('it gives an error for an unknown quota with an old proof', () => {
+  const reading = pickClaudeReading({ state: 'unknown', slot: 2, proof: 'req-0002', proofAgeHours: 30, why: 'no slot read, and its proof is 30 h old' });
+
+  expect(reading).toStrictEqual({ error: 'imp broker quota unknown: no slot read, and its proof is 30 h old' });
+});
+
+test('it gives an error when no broker slot is recorded', () => {
+  const reading = pickClaudeReading({ state: 'none', why: 'no imp broker slot recorded' });
+
+  expect(reading).toStrictEqual({ error: 'imp broker quota unknown: no imp broker slot recorded' });
 });
