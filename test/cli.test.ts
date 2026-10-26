@@ -694,6 +694,60 @@ test('hq capacity: no sample yet, set and reset a threshold, bad key, an empty l
   expect((await hq('capacity', 'log', '--hours', '6')).json.samples).toEqual([]);
 });
 
+test('hq slots broker shows no record before one is recorded', async () => {
+  const shown = await hq('slots', 'broker');
+
+  expect(shown.json.broker).toBeNull();
+});
+
+test('hq slots broker refuses a slot outside 1 to 4', async () => {
+  const refused = await hq('slots', 'broker', '5', '--proof', 'req-1a2b');
+
+  expect(refused.code).not.toBe(0);
+});
+
+test('hq slots broker refuses a slot with no --proof', async () => {
+  const refused = await hq('slots', 'broker', '1');
+
+  expect(refused.code).not.toBe(0);
+});
+
+test('hq slots broker refuses a blank --proof', async () => {
+  const refused = await hq('slots', 'broker', '1', '--proof', '  ');
+
+  expect(refused.code).not.toBe(0);
+});
+
+test('hq slots broker records a slot with its proof and note, and shows it after', async () => {
+  const recorded = await hq('slots', 'broker', '1', '--proof', 'req-1a2b', '--note', 'after the account switch');
+  const shown = await hq('slots', 'broker');
+
+  expect(recorded.code).toBe(0);
+  expect(recorded.json.broker).toMatchObject({ slot: 1, proof: 'req-1a2b', note: 'after the account switch' });
+  expect(shown.json.broker).toStrictEqual(recorded.json.broker);
+});
+
+test('hq capacity broker gives an unknown quota with room for a new proof and no slot read', async () => {
+  await hq('slots', 'broker', '1', '--proof', 'req-1a2b');
+
+  const quota = await hq('capacity', 'broker');
+
+  expect(quota.json.broker).toMatchObject({ state: 'unknown-proved', slot: 1, proof: 'req-1a2b' });
+});
+
+test("hq capacity broker reads the broker slot's fresh slot read from the database, not another slot's", async () => {
+  const store = db();
+  const insert = store.query('INSERT INTO slot_usage (at, slot, status, five_hour, five_hour_resets_at, seven_day, seven_day_resets_at, working_lanes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+  insert.run('2026-10-14T00:30:00Z', 1, '200', 0, '2026-10-14T04:00:00Z', 0, '2026-10-18T00:00:00Z', 2);
+  insert.run('2026-10-14T00:30:00Z', 3, '200', 99, '2026-10-14T04:00:00Z', 99, '2026-10-18T00:00:00Z', 2);
+  store.close();
+  await hq('slots', 'broker', '1', '--proof', 'req-5e6f');
+
+  const quota = await hq('capacity', 'broker');
+
+  expect(quota.json.broker).toMatchObject({ state: 'read', slot: 1, used: 0, readAt: '2026-10-14T00:30:00Z' });
+});
+
 // A v27 database at `file` with a call, a chat and a deleted proposal line typed, which refuses a
 // console source; returns its typed rows.
 function createV27TypedRows(file: string): unknown[] {

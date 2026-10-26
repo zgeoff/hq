@@ -36,6 +36,11 @@ cat > "$tmp/bin/imp" <<'SH'
 [ "$#" -eq 2 ] && [ "$1" = info ] && [ "$2" = --json ] || exit 1
 cat "$IMP_FIXTURE"
 SH
+cat > "$tmp/bin/hq" <<'SH'
+#!/bin/sh
+[ "$*" = "capacity broker --json" ] || exit 1
+cat "$HQ_FIXTURE"
+SH
 cat > "$tmp/bin/curl" <<'SH'
 #!/bin/sh
 # Only a case that sets ALLOW_CURL and CURL_FIXTURE may call curl; any other call fails the case.
@@ -61,13 +66,14 @@ per="$XDG_CACHE_HOME/z-capacity/claude-usage/$account.json"
 mkdir -p "$HOME/.codex/sessions" "$XDG_CACHE_HOME/z-capacity/claude-usage"
 fail=0
 
-check() { # case, imp fixture, Claude cache fixture, script arguments
-  name=$1 IMP_FIXTURE="$fixtures/$2"
-  cp "$fixtures/$3" "$per"
+check() { # case, imp fixture, hq broker fixture, this login's Claude cache fixture, script arguments
+  name=$1 IMP_FIXTURE="$fixtures/$2" HQ_FIXTURE="$fixtures/$3"
+  cp "$fixtures/$4" "$per"
+  cp "$fixtures/${PACING_FIXTURE:-pacing.json}" "$tmp/skill/pacing.json"
   # The stubbed epoch and this mtime match exactly, so the cache is always fresh.
   touch -d 2026-10-16T00:00:00Z "$per"
-  export IMP_FIXTURE
-  shift 3
+  export IMP_FIXTURE HQ_FIXTURE
+  shift 4
   : > "$FORBIDDEN_CALLS"
   if bash "$tmp/skill/scripts/capacity.sh" "$@" \
       > "$tmp/actual" 2> "$tmp/stderr"; then
@@ -85,11 +91,22 @@ check() { # case, imp fixture, Claude cache fixture, script arguments
   fi
 }
 
-check readout imp-room.json claude-room.json
-check size-imp imp-room.json claude-room.json --size M
-check size-local imp-full.json claude-room.json --size S --local-open 1
-check design-full imp-room.json claude-room.json --design --design-open 1
-check quota imp-room.json claude-full.json --size L
+check readout imp-room.json broker-room.json claude-room.json
+check size-imp imp-room.json broker-room.json claude-room.json --size M
+check size-local imp-full.json broker-room.json claude-room.json --size S --local-open 1
+check design-full imp-room.json broker-room.json claude-room.json --design --design-open 1
+check quota imp-room.json broker-full.json claude-full.json --size L
+# The imp route follows the broker's slot, never this machine's login.
+check broker-room-pc-full imp-room.json broker-empty.json claude-full.json --size L
+check broker-proved imp-room.json broker-proved.json claude-full.json --size L
+check broker-stale imp-room.json broker-stale.json claude-full.json --size L
+# A full broker slot falls back to this host when this login has room.
+check broker-full-local imp-room.json broker-full.json claude-room.json --size L
+# A Claude that targets this host reads its login, whatever the broker slot says.
+PACING_FIXTURE=pacing-claude-local.json
+check target-local imp-room.json broker-empty.json claude-full.json --size L
+unset PACING_FIXTURE
+cp "$fixtures/pacing.json" "$tmp/skill/pacing.json"
 
 # A fresh reading of another account is never reused: the active account, with no login here,
 # reads live and finds none.
@@ -98,8 +115,8 @@ other="$XDG_CACHE_HOME/z-capacity/claude-usage/$(printf '%s' potter@example.test
 cp "$fixtures/claude-room.json" "$other"
 cp "$fixtures/claude-room.json" "$XDG_CACHE_HOME/z-capacity/claude-usage.json"
 touch -d 2026-10-16T00:00:00Z "$other" "$XDG_CACHE_HOME/z-capacity/claude-usage.json"
-IMP_FIXTURE="$fixtures/imp-room.json" bash "$tmp/skill/scripts/capacity.sh" > "$tmp/actual" 2> "$tmp/stderr" || true
-if [ "$("$REAL_JQ" -r '.providers.claude.error // "cached"' "$tmp/actual")" = 'no Claude login on this machine' ]; then
+IMP_FIXTURE="$fixtures/imp-room.json" HQ_FIXTURE="$fixtures/broker-room.json" bash "$tmp/skill/scripts/capacity.sh" > "$tmp/actual" 2> "$tmp/stderr" || true
+if [ "$("$REAL_JQ" -r '.providers.claude.local.error // "cached"' "$tmp/actual")" = 'no Claude login on this machine' ]; then
   printf 'ok another account reading is not reused\n'
 else
   printf 'FAIL another account reading is not reused\n'; cat "$tmp/actual" "$tmp/stderr"; fail=1
@@ -110,7 +127,7 @@ rm -f "$other"
 rm -f "$XDG_CACHE_HOME/z-capacity/claude-usage.json"
 mkdir -p "$HOME/.claude"
 printf '%s\n' '{"claudeAiOauth": {"accessToken": "fixture-token"}}' > "$HOME/.claude/.credentials.json"
-IMP_FIXTURE="$fixtures/imp-room.json" CURL_FIXTURE="$fixtures/claude-live.json" ALLOW_CURL=1 \
+IMP_FIXTURE="$fixtures/imp-room.json" HQ_FIXTURE="$fixtures/broker-room.json" CURL_FIXTURE="$fixtures/claude-live.json" ALLOW_CURL=1 \
   bash "$tmp/skill/scripts/capacity.sh" > "$tmp/actual" 2> "$tmp/stderr" || true
 if [ -f "$per" ] && cmp -s "$per" "$XDG_CACHE_HOME/z-capacity/claude-usage.json" \
     && [ "$("$REAL_JQ" -r '"\(.account) \(.used)"' "$per")" = "$account 55" ] \

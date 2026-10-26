@@ -1,0 +1,20 @@
+{
+  "ok": true,
+  "broker": {
+    "state": "read",
+    "slot": 1,
+    "proof": "req-4c1d",
+    "proofAgeHours": 5,
+    "used": 40,
+    "resetsAt": "2026-10-16T04:00:00Z",
+    "readAt": "2026-10-15T23:00:00Z"
+  },
+  "reading": {
+    "slot": 1,
+    "proof": "req-4c1d",
+    "proofAgeHours": 5,
+    "used": 40,
+    "resetsAt": "2026-10-16T04:00:00Z",
+    "source": "hq slot read of the imp broker slot 1, 2026-10-15T23:00:00Z"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "ok": true,
+  "broker": {
+    "state": "unknown-proved",
+    "slot": 1,
+    "proof": "req-4c1d",
+    "proofAgeHours": 3,
+    "why": "no slot read of the imp broker's slot 1 in the last 2.5 h"
+  },
+  "reading": {
+    "slot": 1,
+    "proof": "req-4c1d",
+    "proofAgeHours": 3,
+    "used": null,
+    "unknown": true,
+    "why": "no slot read of the imp broker's slot 1 in the last 2.5 h",
+    "source": "hq capacity broker"
+  }
+}

@@ -69,6 +69,7 @@ hq 0.79.0: headquarters for the z- sessions. Every command takes --json.
   hq capacity [--refresh-slots]               the newest capacity sample (impd, cloud, Claude, CI, PC), thresholds, open alerts and the fleet forecast across the Claude slots; --refresh-slots reads the slots now
   hq capacity sample                          read capacity now, store it, send due alerts (the watcher does it every tick)
   hq capacity log [--hours 24]                stored samples, newest first
+  hq capacity broker                          the imp broker's Claude quota from its slot's newest read; unknown when no read is under 2.5 h old
   hq capacity set KEY VALUE | KEY --reset     set a threshold, or put it back to the default
   hq probe [status] [--days 7]               the Nix uptime probe: last sample and ready check, open outage or unready episode, downtime, outages and unready episodes in the window
   hq probe run                               one check of Nix's /health/live (the timer's command)
@@ -78,6 +79,7 @@ hq 0.79.0: headquarters for the z- sessions. Every command takes --json.
   hq backup restore --to DIR [--snapshot ID] [--remote]   restore into an empty directory (never over live state)
   hq backup timer install | remove           the hourly systemd user timer
   hq units scrub                             remove HQ_NOW and HQ_QUIET from the installed units and reload systemd
+  hq slots broker [N --proof ID [--note TEXT]]  the Claude slot (1-4) the imp broker runs on; N records it with the request or spawn id that proved it
   hq health [check]                          read-only checks on this PC: units, restart loops, disk, memory, atc, watcher
   hq health settings | set KEY [VALUE]       thresholds (no VALUE: back to the default)
   hq health tick                             one watcher step: tell z-stu about new problems, file news for cleared ones

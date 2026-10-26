@@ -375,6 +375,11 @@ import { HqError } from './errors.ts';
 import { HELP } from './help.ts';
 import { readMoveRefusal } from './runs/read-move-refusal.ts';
 import { VERSION } from './version.ts';
+import { formatBrokerQuota, formatBrokerRecord } from './slots/format-broker.ts';
+import { pickClaudeReading } from './slots/pick-claude-reading.ts';
+import { readBrokerQuota } from './slots/read-broker-quota.ts';
+import { readBrokerSlot } from './slots/read-broker-slot.ts';
+import { writeBrokerSlot } from './slots/write-broker-slot.ts';
 
 const OPTIONS = {
   json: { type: 'boolean' },
@@ -467,6 +472,7 @@ const OPTIONS = {
   hours: { type: 'string' },
   reset: { type: 'boolean' },
   'refresh-slots': { type: 'boolean' },
+  proof: { type: 'string' },
   around: { type: 'string' },
   kind: { type: 'string' },
   deadline: { type: 'string' },
@@ -1117,6 +1123,10 @@ async function capacityCommand(db: Database, verb: string | undefined, args: str
       const rows = await sampleLog(db, hours);
       const f = (x: number | null, div: number, d = 0) => (x === null ? '-' : (x / div).toFixed(d));
       return { data: { samples: rows }, text: rows.length ? rows.map((r) => `${r.at}  non-Nix ${f(r.nonnix_awake_mib, 1)} MiB  cloud ${f(r.cloud_avail_bytes, 2 ** 30, 1)} GiB  Claude 5h ${f(r.claude_five_hour, 1)}% 7d ${f(r.claude_seven_day, 1)}%  CI ${f(r.ci_minutes_today, 1)} min${Object.keys(r.errors).length ? `  ! ${Object.keys(r.errors).join(',')}` : ''}`).join('\n') : `No samples in the last ${hours} h.` };
+    }
+    case 'broker': {
+      const broker = readBrokerQuota(db, now());
+      return { data: { broker, reading: pickClaudeReading(broker) }, text: formatBrokerQuota(broker) };
     }
     case 'set': {
       const key = need(args[0], 'setting name');
@@ -2219,6 +2229,7 @@ const GROUPS: Record<string, (context: Ctx) => Promise<Out>> = {
   probe: (c) => probeCommand(c.db, c.verb, c.rest, c.flags),
   backup: (c) => backupCommand(c.db, c.verb, c.rest, c.flags),
   capacity: (c) => capacityCommand(c.db, c.verb, c.rest, c.flags),
+  slots: (context) => slotsCommand(context.db, context.verb, context.rest, context.flags),
   units: (context) => runUnitsCommand({ verb: context.verb, run: context.run, home: getHome(), env: cleanEnv() }),
   health: (c) => healthCommand(c.db, c.verb, c.rest, c.flags),
   news: (c) => newsCommand(c.db, c.verb, c.flags),
@@ -2293,6 +2304,19 @@ export async function main(argv: string[], runner: Runner = realRunner): Promise
     else console.error(`hq: ${err.message}`);
     return err.code === 'internal' ? 2 : 1;
   }
+}
+
+// `hq slots broker [<n> --proof T]`: the Claude slot the imp broker runs on.
+async function slotsCommand(db: Database, verb: string | undefined, args: string[], flags: Flags): Promise<Out> {
+  if (verb !== 'broker') {
+    throw new HqError('bad_args', `unknown command: hq slots ${verb ?? ''}`.trimEnd());
+  }
+  if (args[0] === undefined) {
+    const record = readBrokerSlot(db);
+    return { data: { broker: record }, text: record === null ? 'No imp broker slot recorded: hq slots broker <n> --proof <id>.' : formatBrokerRecord(record) };
+  }
+  const record = writeBrokerSlot(db, { slot: args[0], proof: flags.proof, note: flags.note, actor: await actor(db, flags), at: now() });
+  return { data: { broker: record }, text: formatBrokerRecord(record) };
 }
 
 function formatRefreshLine(refresh: { error: string | null } | null): string {

@@ -1,0 +1,30 @@
+{
+  "designSlots": 1,
+  "slots": {
+    "imp": 2,
+    "local": 2
+  },
+  "imp": {
+    "impMib": 2048
+  },
+  "providers": {
+    "codex": {
+      "agent": "codex",
+      "threshold": 80,
+      "unattended": false,
+      "target": "local"
+    },
+    "claude": {
+      "agent": "claude",
+      "threshold": 95,
+      "unattended": true,
+      "target": "local"
+    }
+  },
+  "routes": {
+    "S": ["codex", "claude"],
+    "M": ["codex", "claude"],
+    "L": ["claude"],
+    "XL": ["claude"]
+  }
+}
