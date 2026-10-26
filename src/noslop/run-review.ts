@@ -20,7 +20,7 @@ import { writeReviewed } from '../runs/write-reviewed.ts';
 import { parseLowerRepo } from './parse-lower-repo.ts';
 import type { ParsedRepo } from './parse-lower-repo.ts';
 import { readBaseMove } from './read-base-move.ts';
-import type { BaseMove } from './read-base-move.ts';
+import type { BaseMove } from './pick-base-move.ts';
 import { readOKReviews } from './read-ok-reviews.ts';
 import { requirePinned } from './require-pinned.ts';
 import { resolveEngine } from './resolve-engine.ts';

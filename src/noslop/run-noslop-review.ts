@@ -22,7 +22,7 @@ import { parseReviewRun } from './parse-review-run.ts';
 import type { FixCheck, NotReviewedFile, ReviewFinding, ReviewOutput } from './parse-review-run.ts';
 import { pickAction } from './pick-action.ts';
 import { probeStoredReview } from './probe-stored-review.ts';
-import type { BaseMove } from './read-base-move.ts';
+import type { BaseMove } from './pick-base-move.ts';
 import { readPRPatchID } from './read-pr-patch-id.ts';
 import { recordRound } from './record-round.ts';
 import type { RecordedFinding, RoundRow } from './record-round.ts';
