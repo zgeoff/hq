@@ -108,7 +108,8 @@ jq -n \
   --argjson local "$(read_json claude_usage)" \
   --argjson codex "$(read_json codex_usage)" \
   --arg size "$size" --argjson design "$design" --argjson open "$design_open" --argjson localOpen "$local_open" '
-  {claude: $claude, codex: $codex} as $read
+  # The broker slot reads Claude only for imp launches; a Claude that targets this host reads its login.
+  {claude: (if $pacing.providers.claude.target == "imp" then $claude else $local end), codex: $codex} as $read
   | ($imp | if .error then . + {room: false} else
       . + {freeMib: (.budgetMib - .committedMib)}
       | . + {room: (.freeMib >= $pacing.imp.impMib)} end) as $impOut
@@ -118,7 +119,7 @@ jq -n \
         room: ($read[$k].unknown == true or (($read[$k].used // null) != null and $read[$k].used < $p.threshold))
       }
       # The login on this machine, for the localFallback launches.
-      + if $k == "claude" then {local: ($local + {
+      + if $k == "claude" and $p.target == "imp" then {local: ($local + {
           room: (($local.used // null) != null and $local.used < $p.threshold)
         })} else {} end)})) as $providers
   | {slots: $pacing.designSlots, open: $open, room: ($open < $pacing.designSlots)} as $designOut

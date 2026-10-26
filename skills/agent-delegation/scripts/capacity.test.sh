@@ -69,6 +69,7 @@ fail=0
 check() { # case, imp fixture, hq broker fixture, this login's Claude cache fixture, script arguments
   name=$1 IMP_FIXTURE="$fixtures/$2" HQ_FIXTURE="$fixtures/$3"
   cp "$fixtures/$4" "$per"
+  cp "$fixtures/${PACING_FIXTURE:-pacing.json}" "$tmp/skill/pacing.json"
   # The stubbed epoch and this mtime match exactly, so the cache is always fresh.
   touch -d 2026-10-16T00:00:00Z "$per"
   export IMP_FIXTURE HQ_FIXTURE
@@ -101,6 +102,11 @@ check broker-proved imp-room.json broker-proved.json claude-full.json --size L
 check broker-stale imp-room.json broker-stale.json claude-full.json --size L
 # A full broker slot falls back to this host when this login has room.
 check broker-full-local imp-room.json broker-full.json claude-room.json --size L
+# A Claude that targets this host reads its login, whatever the broker slot says.
+PACING_FIXTURE=pacing-claude-local.json
+check target-local imp-room.json broker-empty.json claude-full.json --size L
+unset PACING_FIXTURE
+cp "$fixtures/pacing.json" "$tmp/skill/pacing.json"
 
 # A fresh reading of another account is never reused: the active account, with no login here,
 # reads live and finds none.
