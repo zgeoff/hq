@@ -1,10 +1,9 @@
 import { HqError } from '../errors.ts';
 import { REVIEW_TIMEOUT_MS } from './review-timeout-ms.ts';
 
+// The cap keeps a typo from holding a PR's round lock for hours.
 const MAX_MINUTES = 60;
 
-// `hq review --timeout <min>`: how long one noslop run may take, in ms. Unset, the default. The cap
-// keeps a typo from holding the PR's round lock for hours.
 export function parseReviewTimeout(raw: string | undefined): number {
   if (raw === undefined) {
     return REVIEW_TIMEOUT_MS;
