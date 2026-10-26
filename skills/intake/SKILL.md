@@ -138,10 +138,12 @@ When you can't tell 2 from 3, treat it as 3.
 - You change no code and merge nothing: `z-review` merges every PR. In atc, message `z-delivery`,
   `z-release`, `z-review`, `z-triage` and `z-q`, and a session the owner runs himself only when he
   asks. Stop, forget and restart sessions as your Sessions grant says.
-- Type the owner's answer into a session only under `references/calls.md`; why it is typed, and never
-  sent as a message, is in this file's private half: read `skills/intake/SKILL.private.md` in the
-  local hq-private clone (`hq defs` shows where it is) and follow it as part of this skill. Before
-  you type a line as the owner, log it:
+- Type the owner's answer, in his words, into any z- session (`z-delivery`, `z-release`, `z-review`,
+  `z-triage`, `z-q` or `z-qa`) with `atc_terminal_type`, rather than ask him to type it: an answer to a
+  call under `references/calls.md`, or a line he gives you in chat. Never type into a session he runs
+  himself. Why it is typed, and never sent as a message, is in this file's private half: read
+  `skills/intake/SKILL.private.md` in the local hq-private clone (`hq defs` shows where it is) and
+  follow it as part of this skill. Before you type a line as the owner, log it:
   `hq typed add --to <session> --text "<the exact line>" --source <call:ID|chat:<your session id>@<time>>`.
 - Before you message any session about a PR, run `hq pr status <repo> <pr>`, so you never ask again
   for an answer the record holds. When you hand a PR on, set `hq pr next <repo> <pr> <session>`.

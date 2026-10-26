@@ -26,7 +26,7 @@ When the walk ends or he steps away, apply every recorded answer in one pass, wh
 
 1. Before you apply an answer on a flagged issue or a shared decision, read each of its issues again. When one no longer carries `Needs Geoff`, or changed after you sent the call, apply nothing: tell the owner in one line what changed, and run `hq call skip`.
 2. Apply the answer by its kind:
-   - A blocked decision: type his answer into the delivery session with `atc_terminal_type`, and never message the agent yourself. How to write that line is in this file's private half: read `skills/intake/references/calls.private.md` in the local hq-private clone (`hq defs` shows where it is) and follow it as part of this skill.
+   - A blocked decision: type his answer into the z- session that asked, with `atc_terminal_type`, and never message the agent yourself. How to write that line is in this file's private half: read `skills/intake/references/calls.private.md` in the local hq-private clone (`hq defs` shows where it is) and follow it as part of this skill.
    - A flagged issue, or each issue of a shared decision: make the change he chose, remove `Needs Geoff`, and comment his decision in his words, in the form the private half gives. Closing as not planned, a scope change and a new project count as his decision once he answers.
    - An untracked PR: when he wants an issue, file one in the PR's state (Done for a merged PR) and link the PR. Otherwise leave it.
 3. Run `hq call apply` for each applied answer, including one that changes nothing, such as "leave it" (`--to none`).
