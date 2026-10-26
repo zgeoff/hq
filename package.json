@@ -48,7 +48,7 @@
     "@zgeoff/skill-gate": "0.2.8",
     "knip": "6.42.1",
     "msw": "2.15.0",
-    "oxfmt": "^0.72.0",
+    "oxfmt": "^0.73.0",
     "oxlint": "1.88.0",
     "tsrs": "0.18.0-ts7.1.0-dev.20260929",
     "typescript": "7.0.2"
