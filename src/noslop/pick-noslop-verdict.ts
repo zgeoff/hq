@@ -2,6 +2,7 @@ import { match } from 'ts-pattern';
 import type { OwnerOverride } from '../pr-status/read-owner-overrides.ts';
 import { formatCIClause } from './format-ci-clause.ts';
 import type { GateCI } from './format-ci-clause.ts';
+import type { BaseMoveCover } from './read-base-move-cover.ts';
 import type { NoslopCheck } from './read-noslop-check.ts';
 import type { SummaryHead } from './read-summary-head.ts';
 
@@ -9,12 +10,13 @@ type NoslopFindingsRead = { read: true; open: string[]; listed: number } | { rea
 
 export type NoslopGateFacts =
   | { overridden: true; head: string; override: OwnerOverride; findings: NoslopFindingsRead; headNow: string | null }
-  | { overridden: false; repo: string; pr: number; head: string; summary: SummaryHead; check: NoslopCheck; recorded: number; findings: NoslopFindingsRead; headNow: string | null };
+  | { overridden: false; repo: string; pr: number; head: string; summary: SummaryHead; baseMove: BaseMoveCover | null; check: NoslopCheck; recorded: number; findings: NoslopFindingsRead; headNow: string | null };
 
 export type NoslopVerdict = { pass: true; reason: string } | { pass: false; reason: string };
 
 // `summary` is the head noslop's own last review read, from its summary comment on GitHub; `check` is
-// noslop's own check run at the head; `recorded` counts the distinct findings the PR's reviews recorded in hq.
+// noslop's own check run at the head; `baseMove` says whether a base move lets the review at an older
+// summary head stand for this one (null when the heads match); `recorded` counts the distinct findings the PR's reviews recorded in hq.
 export function pickNoslopVerdict(facts: NoslopGateFacts, ci: GateCI): NoslopVerdict {
   if (facts.headNow !== facts.head) {
     return { pass: false, reason: `the PR's head moved from ${facts.head.slice(0, 7)} while the gate ran, so no pass: run the gate again` };
@@ -39,8 +41,9 @@ function pickReviewedVerdict(facts: Extract<NoslopGateFacts, { overridden: false
   if (!facts.summary.found) {
     return { pass: false, reason: `${facts.summary.reason}, so no pass: hq review ${facts.repo} ${facts.pr}` };
   }
-  if (facts.summary.head !== facts.head) {
-    return { pass: false, reason: `noslop has not reviewed head ${facts.head.slice(0, 7)} (its last review read ${facts.summary.head.slice(0, 7)}); run hq review ${facts.repo} ${facts.pr}` };
+  if (facts.summary.head !== facts.head && facts.baseMove?.covered !== true) {
+    const why = facts.baseMove?.covered === false ? `; not a base move it covers: ${facts.baseMove.why}` : '';
+    return { pass: false, reason: `noslop has not reviewed head ${facts.head.slice(0, 7)} (its last review read ${facts.summary.head.slice(0, 7)})${why}; run hq review ${facts.repo} ${facts.pr}` };
   }
   const check = pickCheckBlock(facts, facts.summary.updatedAt);
   if (check !== null) {
@@ -78,5 +81,6 @@ function pickFoundVerdict(facts: Extract<NoslopGateFacts, { overridden: false }>
   if (facts.recorded > 0 && found.listed === 0) {
     return { pass: false, reason: `noslop's findings list is empty, but its reviews of this PR recorded ${facts.recorded} finding${facts.recorded === 1 ? '' : 's'}, so no pass` };
   }
-  return { pass: true, reason: `noslop findings: none open; ${formatCIClause(facts.head.slice(0, 7), ci)}` };
+  const covers = facts.baseMove?.covered === true ? `noslop's review at ${facts.baseMove.reviewed.slice(0, 7)} covers ${facts.head.slice(0, 7)} (base move, same diff); ` : '';
+  return { pass: true, reason: `${covers}noslop findings: none open; ${formatCIClause(facts.head.slice(0, 7), ci)}` };
 }
