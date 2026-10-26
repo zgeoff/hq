@@ -16,9 +16,13 @@ test('it makes an empty repo on main, and a commit writes its files and gives th
 
   const head = await repo.commit({ 'kettle.txt': 'boil\n', 'lid.txt': 'on\n' }, 'start');
 
-  expect(head).toBe(await repo.git('rev-parse', 'main'));
-  expect(await repo.git('log', '-1', '--format=%an <%ae> %s')).toBe('Kettle <kettle@example.com> start');
-  expect(await repo.git('show', '--name-only', '--format=', 'HEAD')).toBe('kettle.txt\nlid.txt');
+  const mainHead = await repo.git('rev-parse', 'main');
+  const logLine = await repo.git('log', '-1', '--format=%an <%ae> %s');
+  const files = await repo.git('show', '--name-only', '--format=', 'HEAD');
+
+  expect(head).toBe(mainHead);
+  expect(logLine).toBe('Kettle <kettle@example.com> start');
+  expect(files).toBe('kettle.txt\nlid.txt');
   expect(readFileSync(join(ctx.directory, 'kettle.txt'), 'utf8')).toBe('boil\n');
 });
 
