@@ -704,7 +704,9 @@ test('hq slots broker: none yet, refuses a bad slot and a missing proof, records
   const quota = await hq('capacity', 'broker');
 
   expect(none.json.broker).toBeNull();
-  expect([badSlot.code, noProof.code, blankProof.code].every((code) => code !== 0)).toBe(true);
+  expect(badSlot.code).not.toBe(0);
+  expect(noProof.code).not.toBe(0);
+  expect(blankProof.code).not.toBe(0);
   expect(recorded.code).toBe(0);
   expect(recorded.json.broker).toMatchObject({ slot: 1, proof: 'req-1a2b', note: 'after the account switch' });
   expect(shown.json.broker).toStrictEqual(recorded.json.broker);

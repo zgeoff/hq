@@ -76,7 +76,7 @@ broker_usage() {
     | (if .slot then {slot, proof, proofAgeHours} else {} end) as $proof
     | if .state == "read" then $proof + {used, resetsAt, source: ("hq slot read of the imp broker slot \(.slot), \(.readAt)")}
       elif .state == "unknown-proved" then $proof + {used: null, unknown: true, why, source: "hq capacity broker"}
-      else {error: ("imp broker quota unknown: " + .why)} end' 2>/dev/null \
+      else {error: ("imp broker quota unknown: " + (.why // "hq gave no broker state"))} end' 2>/dev/null \
     || echo '{"error": "hq capacity broker failed"}'
 }
 
