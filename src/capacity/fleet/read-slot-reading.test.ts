@@ -46,9 +46,9 @@ test('it reports a 503 as a problem and keeps the usage headers it carries', asy
   const run = mock<Runner>(() => Promise.resolve({ code: 0, stdout: 'sk-ant-kettle-slot-0042\n', stderr: '' }));
 
   server.use(http.post(ANTHROPIC_MESSAGES_URL, () => HttpResponse.json({ type: 'error', error: { type: 'overloaded_error', message: 'Overloaded' } }, { status: 503, headers: { 'anthropic-ratelimit-unified-7d-utilization': '0.5', 'anthropic-ratelimit-unified-7d-reset': '1792400000' } })));
-  const result = await readSlotReading({ run, httpClient: fetch }, 'ops_kettle-profile', 4, new AbortController().signal);
+  const result = await readSlotReading({ run, httpClient: fetch }, 'ops_kettle-profile', 3, new AbortController().signal);
 
-  expect(result).toStrictEqual({ reading: { slot: 4, status: '503', five: null, fiveResetsAt: null, seven: 50, sevenResetsAt: '2026-10-19T08:53:20Z' }, problem: 'slot 4: the messages API answered 503' });
+  expect(result).toStrictEqual({ reading: { slot: 3, status: '503', five: null, fiveResetsAt: null, seven: 50, sevenResetsAt: '2026-10-19T08:53:20Z' }, problem: 'slot 3: the messages API answered 503' });
 });
 
 test('it keeps a 429 that carries usage headers as a reading with no problem', async () => {
@@ -69,9 +69,9 @@ test('it makes no request when 1Password gives no token', async () => {
       requested();
     }),
   );
-  const result = await readSlotReading({ run, httpClient: fetch }, 'ops_kettle-profile', 4, new AbortController().signal);
+  const result = await readSlotReading({ run, httpClient: fetch }, 'ops_kettle-profile', 3, new AbortController().signal);
 
-  expect(result).toStrictEqual({ reading: { slot: 4, status: 'op-failed', five: null, fiveResetsAt: null, seven: null, sevenResetsAt: null }, problem: 'slot 4: op read failed (exit 1)' });
+  expect(result).toStrictEqual({ reading: { slot: 3, status: 'op-failed', five: null, fiveResetsAt: null, seven: null, sevenResetsAt: null }, problem: 'slot 3: op read failed (exit 1)' });
   expect(requested).not.toHaveBeenCalled();
 });
 

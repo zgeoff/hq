@@ -454,7 +454,7 @@ test('hq capacity says the slot reads are not set up, in text and in --json', as
   expect(JSON.parse(lines[1] ?? '{}').fleet).toMatchObject({ notSetUp: expect.stringContaining('no settings file at '), active: null, slots: [], forecast: null, note: 'slot reads are not set up' });
 });
 
-test('hq capacity --refresh-slots reads the four slots through op and prints the fleet block without a token', async () => {
+test('hq capacity --refresh-slots reads the three slots through op and prints the fleet block without a token', async () => {
   const fresh = freshDb();
   const log = console.log;
   const lines: string[] = [];
@@ -469,7 +469,6 @@ test('hq capacity --refresh-slots reads the four slots through op and prints the
       'op://claude-slots/claude-setup-token-1/credential': 'sk-ant-kettle-cli-1',
       'op://claude-slots/claude-setup-token-2/credential': 'sk-ant-kettle-cli-2',
       'op://claude-slots/claude-setup-token-3/credential': 'sk-ant-kettle-cli-3',
-      'op://claude-slots/claude-setup-token-4/credential': 'sk-ant-kettle-cli-4',
     },
   });
   onTestFinished(overrideEnv('PATH', `${op.bin}:${process.env['PATH']}`));
@@ -478,7 +477,6 @@ test('hq capacity --refresh-slots reads the four slots through op and prints the
   slotUsage.set('Bearer sk-ant-kettle-cli-1', { seven: { utilization: 0.4, reset: 1_792_540_800 } });
   slotUsage.set('Bearer sk-ant-kettle-cli-2', { seven: { utilization: 0.4, reset: 1_792_368_000 } });
   slotUsage.set('Bearer sk-ant-kettle-cli-3', { seven: { utilization: 0.4, reset: 1_792_713_600 } });
-  slotUsage.set('Bearer sk-ant-kettle-cli-4', { seven: { utilization: 0.4, reset: 1_792_800_000 } });
   console.log = (line: string) => lines.push(line);
 
   await main(['capacity', '--refresh-slots']);
@@ -487,7 +485,7 @@ test('hq capacity --refresh-slots reads the four slots through op and prints the
   expect(text).toInclude('  slot 2 (active): 5h ?, 7d 40% (resets 19 Oct 00:00Z), read 0 min ago');
   expect(text).toInclude('  slot 1: 5h ?, 7d 40% (resets 21 Oct 00:00Z), read 0 min ago');
   expect(text).not.toInclude('sk-ant-kettle');
-  expect(fresh.db.query('SELECT COUNT(*) AS total FROM slot_usage').get()).toStrictEqual({ total: 4 });
+  expect(fresh.db.query('SELECT COUNT(*) AS total FROM slot_usage').get()).toStrictEqual({ total: 3 });
 });
 
 test('hq capacity --refresh-slots --json carries the refresh problems in the fleet block', async () => {
@@ -504,14 +502,12 @@ test('hq capacity --refresh-slots --json carries the refresh problems in the fle
     answers: {
       'op://claude-slots/claude-setup-token-1/credential': 'sk-ant-kettle-cli-1',
       'op://claude-slots/claude-setup-token-2/credential': 'sk-ant-kettle-cli-2',
-      'op://claude-slots/claude-setup-token-4/credential': 'sk-ant-kettle-cli-4',
     },
   });
   onTestFinished(overrideEnv('PATH', `${op.bin}:${process.env['PATH']}`));
   writeFileSync(settings, JSON.stringify({ env: { OP_SERVICE_ACCOUNT_TOKEN: 'ops_kettle-profile-0001' } }));
   slotUsage.set('Bearer sk-ant-kettle-cli-1', { seven: { utilization: 0.4, reset: 1_792_540_800 } });
   slotUsage.set('Bearer sk-ant-kettle-cli-2', { seven: { utilization: 0.4, reset: 1_792_540_800 } });
-  slotUsage.set('Bearer sk-ant-kettle-cli-4', { seven: { utilization: 0.4, reset: 1_792_540_800 } });
   console.log = (line: string) => lines.push(line);
 
   await main(['capacity', '--refresh-slots', '--json']);
@@ -533,7 +529,6 @@ test('hq capacity --refresh-slots prints no profile token when op and the slot r
     answers: {
       'op://claude-slots/claude-setup-token-2/credential': 'kettle-slot-credential-2',
       'op://claude-slots/claude-setup-token-3/credential': 'kettle-slot-credential-3',
-      'op://claude-slots/claude-setup-token-4/credential': 'kettle-slot-credential-4',
     },
     failures: { 'op://claude-slots/claude-setup-token-1/credential': '[ERROR] invented: the vault refused kettle-profile-credential' },
   });
@@ -553,7 +548,6 @@ test('hq capacity --refresh-slots prints no profile token when op and the slot r
     '  ! slot 1: op read failed (exit 1)',
     '  ! slot 2: invented proxy dropped a request minted by [redacted]',
     '  ! slot 3: invented proxy dropped a request minted by [redacted]',
-    '  ! slot 4: invented proxy dropped a request minted by [redacted]',
   ]);
   expect(lines.join('\n')).not.toInclude('kettle-profile-credential');
 });
@@ -572,14 +566,12 @@ test('hq capacity --refresh-slots --json carries neither a slot token nor the pr
     answers: {
       'op://claude-slots/claude-setup-token-2/credential': 'kettle-slot-credential-2',
       'op://claude-slots/claude-setup-token-3/credential': 'kettle-slot-credential-3',
-      'op://claude-slots/claude-setup-token-4/credential': 'kettle-slot-credential-4',
     },
     failures: { 'op://claude-slots/claude-setup-token-1/credential': '[ERROR] invented: kettle-slot-credential-1 is held back from kettle-profile-credential' },
   });
   const failures: Record<string, string> = {
     'Bearer kettle-slot-credential-2': 'invented proxy dropped kettle-slot-credential-2 minted by kettle-profile-credential',
     'Bearer kettle-slot-credential-3': 'invented proxy dropped kettle-slot-credential-3 minted by kettle-profile-credential',
-    'Bearer kettle-slot-credential-4': 'invented proxy dropped kettle-slot-credential-4 minted by kettle-profile-credential',
   };
   onTestFinished(overrideEnv('PATH', `${op.bin}:${process.env['PATH']}`));
   writeFileSync(settings, JSON.stringify({ env: { OP_SERVICE_ACCOUNT_TOKEN: 'kettle-profile-credential' } }));
@@ -598,7 +590,6 @@ test('hq capacity --refresh-slots --json carries neither a slot token nor the pr
     'slot 1: op read failed (exit 1)',
     'slot 2: invented proxy dropped [redacted] minted by [redacted]',
     'slot 3: invented proxy dropped [redacted] minted by [redacted]',
-    'slot 4: invented proxy dropped [redacted] minted by [redacted]',
   ]);
   expect(output).not.toInclude('kettle-slot-credential');
   expect(output).not.toInclude('kettle-profile-credential');
@@ -617,22 +608,17 @@ test('hq capacity --refresh-slots stores neither a slot token nor the profile to
     answers: {
       'op://claude-slots/claude-setup-token-2/credential': 'kettle-slot-credential-2',
       'op://claude-slots/claude-setup-token-3/credential': 'kettle-slot-credential-3',
-      'op://claude-slots/claude-setup-token-4/credential': 'kettle-slot-credential-4',
     },
     failures: { 'op://claude-slots/claude-setup-token-1/credential': '[ERROR] invented: kettle-slot-credential-1 is held back from kettle-profile-credential' },
   });
   const answers: Record<string, Response> = {
     'Bearer kettle-slot-credential-2': HttpResponse.json(
-      { type: 'error', error: { type: 'api_error', message: 'invented outage for kettle-slot-credential-2 minted by kettle-profile-credential' } },
-      { status: 500, headers: { 'x-invented-echo': 'kettle-slot-credential-2 kettle-profile-credential', 'anthropic-ratelimit-unified-7d-reset': 'kettle-slot-credential-2' } },
+      { type: 'error', error: { type: 'rate_limit_error', message: 'invented limit for kettle-slot-credential-2 minted by kettle-profile-credential' } },
+      { status: 429, headers: { 'x-invented-echo': 'kettle-slot-credential-2 kettle-profile-credential', 'anthropic-ratelimit-unified-7d-utilization': '1', 'anthropic-ratelimit-unified-7d-reset': 'kettle-profile-credential' } },
     ),
     'Bearer kettle-slot-credential-3': HttpResponse.json(
       { id: 'msg_invented0002', type: 'message', role: 'assistant', model: 'claude-haiku-4-5', content: [{ type: 'text', text: 'kettle-profile-credential' }], stop_reason: 'max_tokens', stop_sequence: null, usage: { input_tokens: 8, output_tokens: 1 } },
       { headers: { 'x-invented-echo': 'kettle-slot-credential-3 kettle-profile-credential', 'anthropic-ratelimit-unified-5h-utilization': 'kettle-profile-credential', 'anthropic-ratelimit-unified-5h-reset': 'kettle-slot-credential-3', 'anthropic-ratelimit-unified-7d-utilization': '0.4', 'anthropic-ratelimit-unified-7d-reset': '1792540800' } },
-    ),
-    'Bearer kettle-slot-credential-4': HttpResponse.json(
-      { type: 'error', error: { type: 'rate_limit_error', message: 'invented limit for kettle-slot-credential-4' } },
-      { status: 429, headers: { 'x-invented-echo': 'kettle-slot-credential-4 kettle-profile-credential', 'anthropic-ratelimit-unified-7d-utilization': '1', 'anthropic-ratelimit-unified-7d-reset': 'kettle-profile-credential' } },
     ),
   };
   onTestFinished(overrideEnv('PATH', `${op.bin}:${process.env['PATH']}`));
@@ -646,9 +632,8 @@ test('hq capacity --refresh-slots stores neither a slot token nor the profile to
   const stored = tables.map((table) => ({ table: table.name, rows: JSON.stringify(fresh.db.query(`SELECT * FROM "${table.name}"`).all()) }));
   expect(fresh.db.query('SELECT slot, status, five_hour, five_hour_resets_at, seven_day, seven_day_resets_at FROM slot_usage ORDER BY slot').all()).toStrictEqual([
     { slot: 1, status: 'op-failed', five_hour: null, five_hour_resets_at: null, seven_day: null, seven_day_resets_at: null },
-    { slot: 2, status: '500', five_hour: null, five_hour_resets_at: null, seven_day: null, seven_day_resets_at: null },
+    { slot: 2, status: '429', five_hour: null, five_hour_resets_at: null, seven_day: 100, seven_day_resets_at: null },
     { slot: 3, status: '200', five_hour: null, five_hour_resets_at: null, seven_day: 40, seven_day_resets_at: '2026-10-21T00:00:00Z' },
-    { slot: 4, status: '429', five_hour: null, five_hour_resets_at: null, seven_day: 100, seven_day_resets_at: null },
   ]);
   expect(stored.length).toBeGreaterThan(1);
   expect(stored.filter((table) => table.rows.includes('kettle-slot-credential') || table.rows.includes('kettle-profile-credential'))).toStrictEqual([]);

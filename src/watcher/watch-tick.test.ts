@@ -3,7 +3,7 @@ import { expect, mock, onTestFinished, test } from 'bun:test';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { HttpResponse, http } from 'msw';
 import { z } from 'zod';
-import { ANTHROPIC_MESSAGES_URL, slotUsage } from '../../mocks/anthropic-handlers.ts';
+import { ANTHROPIC_MESSAGES_URL } from '../../mocks/anthropic-handlers.ts';
 import { LINEAR_GRAPHQL_URL, linearDocuments, linearIssues } from '../../mocks/linear-handlers.ts';
 import { server } from '../../mocks/node.ts';
 import { buildFiledNode } from '../../test/build-filed-node.ts';
@@ -488,7 +488,6 @@ test('it logs no slot token and no profile token when op, a slot request and a s
     answers: {
       'op://claude-slots/claude-setup-token-2/credential': 'kettle-slot-credential-2',
       'op://claude-slots/claude-setup-token-3/credential': 'kettle-slot-credential-3',
-      'op://claude-slots/claude-setup-token-4/credential': 'kettle-slot-credential-4',
     },
     failures: { 'op://claude-slots/claude-setup-token-1/credential': '[ERROR] invented: kettle-slot-credential-1 is held back from kettle-profile-credential' },
   });
@@ -509,7 +508,6 @@ test('it logs no slot token and no profile token when op, a slot request and a s
     setMeta(ctx.db, key, '2026-10-15T20:00:00Z');
   }
   writeFileSync(settings, JSON.stringify({ env: { OP_SERVICE_ACCOUNT_TOKEN: 'kettle-profile-credential' } }));
-  slotUsage.set('Bearer kettle-slot-credential-4', { seven: { utilization: 0.4, reset: 1_792_540_800 } });
   server.use(http.post(ANTHROPIC_MESSAGES_URL, (info) => slotAnswers[info.request.headers.get('authorization') ?? '']?.()));
 
   await watchTick(ctx.db, {
