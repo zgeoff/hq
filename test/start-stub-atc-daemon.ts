@@ -44,7 +44,7 @@ type PeerRequest = Parameters<ServerPeerHandleRequestFn>[0];
 
 const CODEC = new StandardRPCCodec(new StandardRPCSerializer(new StandardRPCJsonSerializer()));
 
-// A stand-in for atc's protocol 11 daemon, so hq's tests never reach the live daemon.
+// A stand-in for atc's protocol 12 daemon, so hq's tests never reach the live daemon.
 export function startStubAtcDaemon(path: string, procedures: Record<string, StubProcedure>, options: StubAtcOptions = {}): StubAtcDaemon {
   const requests: StubAtcRequest[] = [],
     server = Bun.listen<Connection>({ unix: path, socket: buildHandlers(procedures, requests, options) });
@@ -52,7 +52,7 @@ export function startStubAtcDaemon(path: string, procedures: Record<string, Stub
 }
 
 function buildHandlers(procedures: Record<string, StubProcedure>, requests: StubAtcRequest[], options: StubAtcOptions): SocketHandler<Connection> {
-  const daemon: DaemonIdentity = { build: options.build ?? '7.1.0', protocol: options.protocol ?? 11, peerSession: options.peerSession ?? null, helloWithoutPeerSession: options.helloWithoutPeerSession ?? false };
+  const daemon: DaemonIdentity = { build: options.build ?? '7.4.0', protocol: options.protocol ?? 12, peerSession: options.peerSession ?? null, helloWithoutPeerSession: options.helloWithoutPeerSession ?? false };
   const router = buildRouter(procedures, requests, daemon);
   return {
     open(socket) {
@@ -107,7 +107,7 @@ function buildHelloResult(input: unknown, daemon: DaemonIdentity) {
       message: `${hello.client} speaks protocol v${hello.protocol ?? 'unknown'}, daemon ${daemon.build} speaks v${daemon.protocol}; restart the daemon so both run the same build`,
     });
   }
-  const result = { daemon: daemon.build, daemonID: 'd-invented', peerSession: daemon.peerSession, limits: { maxLine: 1_048_576, maxChunk: 65_536 }, idempotency: { completedRetentionMs: 86_400_000 }, lastUsedAgent: 'claude' };
+  const result = { daemon: daemon.build, daemonID: 'd-invented', peerSession: daemon.peerSession, limits: { maxLine: 1_048_576, maxChunk: 65_536 }, idempotency: { completedRetentionMs: 86_400_000 }, lastUsedAgent: 'claude', features: ['events.read.from-start'] };
   if (daemon.helloWithoutPeerSession) {
     const { peerSession: _omitted, ...older } = result;
     return older;
