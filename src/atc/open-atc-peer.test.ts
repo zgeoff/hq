@@ -12,13 +12,11 @@ function setupTest() {
 }
 
 test('it sends a hello first that names hq, protocol 12 and no auth', async () => {
-  const ctx = setupTest(),
-    daemon = startStubAtcDaemon(ctx.path, { 'session.list': () => ({ sessions: [] }) }),
-    peer = await openAtcPeer(ctx.path, 1000);
-  onTestFinished(() => {
-    peer.stop();
-    daemon.stop();
-  });
+  const ctx = setupTest();
+  const daemon = startStubAtcDaemon(ctx.path, { 'session.list': () => ({ sessions: [] }) });
+  onTestFinished(() => daemon.stop());
+  const peer = await openAtcPeer(ctx.path, 1000);
+  onTestFinished(() => peer.stop());
 
   await peer.send('session.list', {});
 
@@ -29,23 +27,19 @@ test('it sends a hello first that names hq, protocol 12 and no auth', async () =
 test('it reads the caller session from a protocol 12 hello that lists features', async () => {
   const ctx = setupTest();
   const daemon = startStubAtcDaemon(ctx.path, {}, { peerSession: 's-invented-caller' });
+  onTestFinished(() => daemon.stop());
   const peer = await openAtcPeer(ctx.path, 1000);
-  onTestFinished(() => {
-    peer.stop();
-    daemon.stop();
-  });
+  onTestFinished(() => peer.stop());
 
   expect(peer.peerSession).toBe('s-invented-caller');
 });
 
 test('it answers a request with the daemon answer object', async () => {
-  const ctx = setupTest(),
-    daemon = startStubAtcDaemon(ctx.path, { 'session.list': () => ({ sessions: [{ id: 's1-a' }] }) }),
-    peer = await openAtcPeer(ctx.path, 1000);
-  onTestFinished(() => {
-    peer.stop();
-    daemon.stop();
-  });
+  const ctx = setupTest();
+  const daemon = startStubAtcDaemon(ctx.path, { 'session.list': () => ({ sessions: [{ id: 's1-a' }] }) });
+  onTestFinished(() => daemon.stop());
+  const peer = await openAtcPeer(ctx.path, 1000);
+  onTestFinished(() => peer.stop());
 
   expect(peer.send('session.list', {})).resolves.toStrictEqual({ sessions: [{ id: 's1-a' }] });
 });
@@ -108,21 +102,20 @@ test('it gives up on a hello the daemon never answers', () => {
 });
 
 test('it gives up on a request the daemon never answers', async () => {
-  const ctx = setupTest(),
-    daemon = startStubAtcDaemon(ctx.path, { 'session.list': () => new Promise(() => {}) }),
-    peer = await openAtcPeer(ctx.path, 150);
-  onTestFinished(() => {
-    peer.stop();
-    daemon.stop();
-  });
+  const ctx = setupTest();
+  const daemon = startStubAtcDaemon(ctx.path, { 'session.list': () => new Promise(() => {}) });
+  onTestFinished(() => daemon.stop());
+  const peer = await openAtcPeer(ctx.path, 150);
+  onTestFinished(() => peer.stop());
 
   expect(peer.send('session.list', {})).rejects.toMatchObject({ code: 'atc_unreachable', message: 'atc did not answer session.list' });
 });
 
 test('it rejects a request once the daemon has gone', async () => {
-  const ctx = setupTest(),
-    daemon = startStubAtcDaemon(ctx.path, { 'session.list': () => ({ sessions: [] }) }),
-    peer = await openAtcPeer(ctx.path, 300);
+  const ctx = setupTest();
+  const daemon = startStubAtcDaemon(ctx.path, { 'session.list': () => ({ sessions: [] }) });
+  onTestFinished(() => daemon.stop());
+  const peer = await openAtcPeer(ctx.path, 300);
   onTestFinished(() => peer.stop());
 
   daemon.stop();
@@ -131,10 +124,10 @@ test('it rejects a request once the daemon has gone', async () => {
 });
 
 test('it rejects a request after the client is stopped', async () => {
-  const ctx = setupTest(),
-    daemon = startStubAtcDaemon(ctx.path, { 'session.list': () => ({ sessions: [] }) }),
-    peer = await openAtcPeer(ctx.path, 1000);
+  const ctx = setupTest();
+  const daemon = startStubAtcDaemon(ctx.path, { 'session.list': () => ({ sessions: [] }) });
   onTestFinished(() => daemon.stop());
+  const peer = await openAtcPeer(ctx.path, 1000);
 
   peer.stop();
 
