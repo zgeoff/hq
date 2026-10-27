@@ -11,41 +11,47 @@ function setupTest() {
   return { path: join(dir, 'atc.sock') };
 }
 
-test('it sends a hello first that names hq, protocol 11 and no auth', async () => {
-  const ctx = setupTest(),
-    daemon = startStubAtcDaemon(ctx.path, { 'session.list': () => ({ sessions: [] }) }),
-    peer = await openAtcPeer(ctx.path, 1000);
-  onTestFinished(() => {
-    peer.stop();
-    daemon.stop();
-  });
+test('it sends a hello first that names hq, protocol 12 and no auth', async () => {
+  const ctx = setupTest();
+  const daemon = startStubAtcDaemon(ctx.path, { 'session.list': () => ({ sessions: [] }) });
+  onTestFinished(() => daemon.stop());
+  const peer = await openAtcPeer(ctx.path, 1000);
+  onTestFinished(() => peer.stop());
 
   await peer.send('session.list', {});
 
   expect(daemon.requests.map((request) => request.method)).toStrictEqual(['daemon.hello', 'session.list']);
-  expect(daemon.requests[0]).toStrictEqual({ method: 'daemon.hello', input: { client: 'hq', protocol: 11, auth: { scheme: 'none' } } });
+  expect(daemon.requests[0]).toStrictEqual({ method: 'daemon.hello', input: { client: 'hq', protocol: 12, auth: { scheme: 'none' } } });
+});
+
+test('it reads the caller session from a protocol 12 hello that lists features', async () => {
+  const ctx = setupTest();
+  const daemon = startStubAtcDaemon(ctx.path, {}, { peerSession: 's-invented-caller' });
+  onTestFinished(() => daemon.stop());
+  const peer = await openAtcPeer(ctx.path, 1000);
+  onTestFinished(() => peer.stop());
+
+  expect(peer.peerSession).toBe('s-invented-caller');
 });
 
 test('it answers a request with the daemon answer object', async () => {
-  const ctx = setupTest(),
-    daemon = startStubAtcDaemon(ctx.path, { 'session.list': () => ({ sessions: [{ id: 's1-a' }] }) }),
-    peer = await openAtcPeer(ctx.path, 1000);
-  onTestFinished(() => {
-    peer.stop();
-    daemon.stop();
-  });
+  const ctx = setupTest();
+  const daemon = startStubAtcDaemon(ctx.path, { 'session.list': () => ({ sessions: [{ id: 's1-a' }] }) });
+  onTestFinished(() => daemon.stop());
+  const peer = await openAtcPeer(ctx.path, 1000);
+  onTestFinished(() => peer.stop());
 
   expect(peer.send('session.list', {})).resolves.toStrictEqual({ sessions: [{ id: 's1-a' }] });
 });
 
 test('it stops with both versions when the daemon refuses the hello as protocol_mismatch', () => {
   const ctx = setupTest(),
-    daemon = startStubAtcDaemon(ctx.path, {}, { build: '7.2.0', protocol: 12 });
+    daemon = startStubAtcDaemon(ctx.path, {}, { build: '7.1.0', protocol: 11 });
   onTestFinished(() => daemon.stop());
 
   expect(openAtcPeer(ctx.path, 1000)).rejects.toMatchObject({
     code: 'atc_protocol_mismatch',
-    message: 'atc 7.2.0 speaks protocol v12; hq speaks protocol v11. hq and atc install together: install the hq release that matches this atc.',
+    message: 'atc 7.1.0 speaks protocol v11; hq speaks protocol v12. hq and atc install together: install the hq release that matches this atc.',
   });
 });
 
@@ -63,7 +69,7 @@ test('it says the daemon speaks an older protocol when it closes the hello with 
 
   expect(openAtcPeer(ctx.path, 1000)).rejects.toMatchObject({
     code: 'atc_protocol_mismatch',
-    message: "the atc daemon speaks an older protocol than hq's v11 and closed the connection with no answer. hq and atc install together: install the hq release that matches this atc.",
+    message: "the atc daemon speaks an older protocol than hq's v12 and closed the connection with no answer. hq and atc install together: install the hq release that matches this atc.",
   });
 });
 
@@ -96,21 +102,20 @@ test('it gives up on a hello the daemon never answers', () => {
 });
 
 test('it gives up on a request the daemon never answers', async () => {
-  const ctx = setupTest(),
-    daemon = startStubAtcDaemon(ctx.path, { 'session.list': () => new Promise(() => {}) }),
-    peer = await openAtcPeer(ctx.path, 150);
-  onTestFinished(() => {
-    peer.stop();
-    daemon.stop();
-  });
+  const ctx = setupTest();
+  const daemon = startStubAtcDaemon(ctx.path, { 'session.list': () => new Promise(() => {}) });
+  onTestFinished(() => daemon.stop());
+  const peer = await openAtcPeer(ctx.path, 150);
+  onTestFinished(() => peer.stop());
 
   expect(peer.send('session.list', {})).rejects.toMatchObject({ code: 'atc_unreachable', message: 'atc did not answer session.list' });
 });
 
 test('it rejects a request once the daemon has gone', async () => {
-  const ctx = setupTest(),
-    daemon = startStubAtcDaemon(ctx.path, { 'session.list': () => ({ sessions: [] }) }),
-    peer = await openAtcPeer(ctx.path, 300);
+  const ctx = setupTest();
+  const daemon = startStubAtcDaemon(ctx.path, { 'session.list': () => ({ sessions: [] }) });
+  onTestFinished(() => daemon.stop());
+  const peer = await openAtcPeer(ctx.path, 300);
   onTestFinished(() => peer.stop());
 
   daemon.stop();
@@ -119,10 +124,10 @@ test('it rejects a request once the daemon has gone', async () => {
 });
 
 test('it rejects a request after the client is stopped', async () => {
-  const ctx = setupTest(),
-    daemon = startStubAtcDaemon(ctx.path, { 'session.list': () => ({ sessions: [] }) }),
-    peer = await openAtcPeer(ctx.path, 1000);
+  const ctx = setupTest();
+  const daemon = startStubAtcDaemon(ctx.path, { 'session.list': () => ({ sessions: [] }) });
   onTestFinished(() => daemon.stop());
+  const peer = await openAtcPeer(ctx.path, 1000);
 
   peer.stop();
 
