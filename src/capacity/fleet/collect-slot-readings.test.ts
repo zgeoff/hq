@@ -38,7 +38,7 @@ test('it counts a slot unknown when its last good reading is over 6 hours old, k
 });
 
 test('it counts a slot unknown when no read of it has figures', () => {
-  const readings = collectSlotReadings([{ at: '2026-10-14T02:00:00Z', slot: 4, status: 'op-failed', five: null, fiveResetsAt: null, seven: null, sevenResetsAt: null, workingLanes: 2 }], new Date('2026-10-14T03:00:00Z'));
+  const readings = collectSlotReadings([{ at: '2026-10-14T02:00:00Z', slot: 3, status: 'op-failed', five: null, fiveResetsAt: null, seven: null, sevenResetsAt: null, workingLanes: 2 }], new Date('2026-10-14T03:00:00Z'));
 
-  expect(readings.unknown.map((row) => row.slot)).toStrictEqual([4]);
+  expect(readings.unknown.map((row) => row.slot)).toStrictEqual([3]);
 });

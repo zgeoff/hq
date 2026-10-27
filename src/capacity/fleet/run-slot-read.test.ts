@@ -22,13 +22,12 @@ function setupTest() {
   return { db: fresh.db, path };
 }
 
-test('it reads four slots, stores one row each with the working lane count, and keeps a refused token and an op failure as rows', async () => {
+test('it reads three slots, stores one row each with the working lane count, and keeps a refused token and an op failure as rows', async () => {
   const ctx = setupTest();
   const answers: Record<string, RunResult> = {
     'op://claude-slots/claude-setup-token-1/credential': { code: 0, stdout: 'sk-ant-kettle-slot-1\n', stderr: '' },
     'op://claude-slots/claude-setup-token-2/credential': { code: 0, stdout: 'sk-ant-kettle-slot-2\n', stderr: '' },
     'op://claude-slots/claude-setup-token-3/credential': { code: 1, stdout: '', stderr: 'invented: item not found' },
-    'op://claude-slots/claude-setup-token-4/credential': { code: 0, stdout: 'sk-ant-kettle-slot-4\n', stderr: '' },
   };
   const run = mock<Runner>((cmd) => Promise.resolve(answers[cmd[2] ?? ''] ?? { code: 1, stdout: '', stderr: 'invented: no answer' }));
 
@@ -36,7 +35,6 @@ test('it reads four slots, stores one row each with the working lane count, and 
   writeFileSync(ctx.path, JSON.stringify({ env: { OP_SERVICE_ACCOUNT_TOKEN: 'ops_kettle-profile-0001' } }));
   addRun(ctx.db, { issue: 'GEO-9901', title: 'Descale the kettle', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
   slotUsage.set('Bearer sk-ant-kettle-slot-1', { five: { utilization: 0.1, reset: 1_792_000_000 }, seven: { utilization: 0.3, reset: 1_792_400_000 } });
-  slotUsage.set('Bearer sk-ant-kettle-slot-4', { five: { utilization: 0.1, reset: 1_792_000_000 }, seven: { utilization: 0.3, reset: 1_792_400_000 } });
   const result = await runSlotRead(ctx.db, { run, httpClient: fetch, settings: { path: ctx.path, readFile: readOptionalFile } }, new Date('2026-10-14T01:00:00Z'), new AbortController().signal);
 
   expect(result).toMatchObject({ kind: 'read', problems: ['slot 2: the messages API answered 401', 'slot 3: op read failed (exit 1)'] });
@@ -44,7 +42,6 @@ test('it reads four slots, stores one row each with the working lane count, and 
     { at: '2026-10-14T01:00:00Z', slot: 1, status: '200', five_hour: 10, seven_day: 30, working_lanes: 1 },
     { at: '2026-10-14T01:00:00Z', slot: 2, status: '401', five_hour: null, seven_day: null, working_lanes: 1 },
     { at: '2026-10-14T01:00:00Z', slot: 3, status: 'op-failed', five_hour: null, seven_day: null, working_lanes: 1 },
-    { at: '2026-10-14T01:00:00Z', slot: 4, status: '200', five_hour: 10, seven_day: 30, working_lanes: 1 },
   ]);
 });
 
@@ -64,7 +61,6 @@ test('it keeps every token out of the stored rows and the problems, even when th
     'op://claude-slots/claude-setup-token-1/credential': { code: 0, stdout: 'sk-ant-kettle-one-token-0042\n', stderr: '' },
     'op://claude-slots/claude-setup-token-2/credential': { code: 0, stdout: 'sk-ant-kettle-other-token-0042\n', stderr: '' },
     'op://claude-slots/claude-setup-token-3/credential': { code: 0, stdout: 'sk-ant-kettle-other-token-0042\n', stderr: '' },
-    'op://claude-slots/claude-setup-token-4/credential': { code: 0, stdout: 'sk-ant-kettle-other-token-0042\n', stderr: '' },
   };
   const run = mock<Runner>((cmd) => Promise.resolve(tokens[cmd[2] ?? ''] ?? { code: 1, stdout: '', stderr: 'invented: no such item' }));
 
