@@ -44,7 +44,6 @@ type PeerRequest = Parameters<ServerPeerHandleRequestFn>[0];
 
 const CODEC = new StandardRPCCodec(new StandardRPCSerializer(new StandardRPCJsonSerializer()));
 
-// A stand-in for atc's protocol 12 daemon, so hq's tests never reach the live daemon.
 export function startStubAtcDaemon(path: string, procedures: Record<string, StubProcedure>, options: StubAtcOptions = {}): StubAtcDaemon {
   const requests: StubAtcRequest[] = [],
     server = Bun.listen<Connection>({ unix: path, socket: buildHandlers(procedures, requests, options) });
