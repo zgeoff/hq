@@ -2,7 +2,7 @@
   "designSlots": 1,
   "slots": {
     "imp": 7,
-    "local": 6
+    "local": 1
   },
   "imp": {
     "impMib": 2048
@@ -19,7 +19,7 @@
       "threshold": 95,
       "unattended": true,
       "target": "imp",
-      "localFallback": 6
+      "localFallback": 1
     }
   },
   "routes": {
