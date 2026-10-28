@@ -52,8 +52,6 @@ export function findAlerts(db: Database, sessions: SessionInfo[], activity: Map<
       if (!s.alive) {
         continue;
       }
-
-      // A run that waits on the owner is quiet by design; only an exit is news.
       if (r.geoff_chat || r.waits_on_geoff) {
         continue;
       }
