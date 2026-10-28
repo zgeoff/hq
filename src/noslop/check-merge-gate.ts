@@ -70,7 +70,6 @@ function readUnreviewedRoute(request: PRRequest, parsed: ParsedRepo, author: PRA
     return 'not a noslop repo';
   }
 
-  // A bot PR skips noslop, unless someone ran a noslop review of it: then its findings gate it.
   if (isBotAuthor(author) && readOKReviews(request.db, parsed.repo, request.pr).length === 0) {
     return 'bot PR';
   }
