@@ -56,6 +56,11 @@ marks a merge whose paths are all tests `test-only`.
   name at once. After a manual `bun run ops:up -- --yes` in `~/projects/cloud`, run
   `bun run ops:deploy-prod -- <full commit of main's tip>` there, because every Deploy prod run
   holds on drift while the `deployed/prod` tag trails main, and hq can't move cloud runs on.
+- **After each pull in `~/projects/cloud`, run `bun install --frozen-lockfile`** before
+  `ops:preview` or `ops:up`. `ops.sh` installs nothing, and a stale provider makes the local
+  preview miss diffs that CI's guard sees.
+- **Read a guard hold before you dispatch Deploy prod with the revision it names.** That dispatch
+  approves the held plan, guarded resources included.
 - **Every other repo ships through its release PR,** in the next nightly batch.
 - hq moves the run to `merged` by itself once none of its PRs is open and no session of it is
   active. The issue stays In Review until its change is live and its live check passes.
