@@ -1,6 +1,6 @@
 ---
 name: pr-review
-description:
+description: >-
   How z-review reviews and merges every PR in the fleet's repos, and files the only follow-up issues
   a PR may leave. Load it when hq messages "Final: GEO-n (repo#n at <sha>)", when an agent answers
   a finding, when a session sends you a PR to merge, or before you file an issue from a PR.
