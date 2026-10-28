@@ -69,7 +69,8 @@ function readUnreviewedRoute(request: PRRequest, parsed: ParsedRepo, author: PRA
   if (!isNoslopListed(loadNoslopSettings(request.db), parsed.owner, parsed.repo)) {
     return 'not a noslop repo';
   }
-  if (isBotAuthor(author)) {
+
+  if (isBotAuthor(author) && readOKReviews(request.db, parsed.repo, request.pr).length === 0) {
     return 'bot PR';
   }
 

@@ -354,7 +354,7 @@ test('it shows a gate none plainly, as a PR noslop does not review', async () =>
         updatedAt: '2026-10-14T01:00:00Z',
       },
     },
-    text: ['widgets#7  head a1b2c3d', 'gate: none (noslop does not review this PR) (2026-10-14T01:00:00Z)', 'answer: none', 'next: nobody'].join('\n'),
+    text: ['widgets#7  head a1b2c3d', 'gate: none (noslop does not review this PR, or it is a bot PR with no noslop review) (2026-10-14T01:00:00Z)', 'answer: none', 'next: nobody'].join('\n'),
   });
 });
 
