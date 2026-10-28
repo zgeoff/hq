@@ -25,7 +25,7 @@ function formatGateLine(view: PRStatusView): string {
     return 'gate: not recorded';
   }
   if (view.gate === 'none') {
-    return `gate: none (noslop does not review this PR)${formatWhen(view.gateAt)}`;
+    return `gate: none (noslop does not review this PR, or it is a bot PR with no noslop review)${formatWhen(view.gateAt)}`;
   }
   return `gate: ${view.gate} ${formatAt(view.gateHead, view.gateStale)}${formatWhen(view.gateAt)}`;
 }

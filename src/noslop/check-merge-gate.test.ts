@@ -457,6 +457,22 @@ test.each([
   expect(fake.of('bun')).toStrictEqual([]);
 });
 
+test('it gates a bot PR on noslop when a noslop review of it is on record, and blocks its open finding', async () => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ author: '{"author":{"login":"app/repo-sync","is_bot":true}}', noslopFindings: buildStubFindings('open') });
+  createListedReview(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA });
+
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked' });
+});
+
+test('it passes a bot PR whose noslop review on record left no finding open, as reviewed', async () => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ author: '{"author":{"login":"app/repo-sync","is_bot":true}}', noslopFindings: buildStubFindings('fixed'), markerComments: { code: 0, stdout: `${JSON.stringify({ login: 'noslop-review[bot]', body: `<!-- noslop:summary {"head":"${FAKE_FULL_SHA}"} -->`, updatedAt: '2026-10-14T01:00:00Z' })}\n`, stderr: '' } });
+  createListedReview(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA });
+
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).resolves.toStrictEqual({ mayMerge: true, reason: 'noslop findings: none open; CI green at 0123456', reviewed: true });
+});
+
 test('it gates a listed repo\'s PR on noslop though a Codex review file of the PR exists', async () => {
   const ctx = setupTest(),
     fake = buildFakeRunner({ noslopFindings: buildStubFindings('open') });

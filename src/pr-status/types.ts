@@ -8,7 +8,7 @@ export interface CIOverrideView {
 
 export type PRAnswer = 'lgtm' | 'changes' | 'reject';
 
-// 'none': the gate passed because noslop does not review the PR (not listed, or a bot's PR).
+// 'none': the gate passed because noslop does not review the PR (not listed, or a bot's PR with no noslop review on record).
 export type PRGate = 'pass' | 'fail' | 'none';
 
 // A PR's record as the commands show it. A stale answer or gate was recorded at a head that is not
