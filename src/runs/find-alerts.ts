@@ -52,7 +52,9 @@ export function findAlerts(db: Database, sessions: SessionInfo[], activity: Map<
       if (!s.alive) {
         continue;
       }
-      if (r.geoff_chat) continue;
+      if (r.geoff_chat || r.waits_on_geoff) {
+        continue;
+      }
       if (!active.helper && probeHandedIn(db, r.prs)) {
         continue;
       }

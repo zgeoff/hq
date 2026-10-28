@@ -6,6 +6,7 @@ import { findAlerts } from './find-alerts.ts';
 import { recordCICheckOverride } from '../pr-status/record-ci-check-override.ts';
 import { recordPROverride } from '../pr-status/record-pr-override.ts';
 import { setSession } from './set-session.ts';
+import { setState } from './set-state.ts';
 import { addUnblock } from '../unblock/add-unblock.ts';
 import { closeUnblock } from '../unblock/close-unblock.ts';
 
@@ -252,6 +253,26 @@ test('it raises the quiet alert for an idle session past the quiet limit whose o
     { key: 'pr:kettle#56', fingerprint: 'final:abc1234', issue: 'GEO-9856', line: 'kettle#56 (GEO-9856) final at abc1234 for 120 min, no review [from marker:kettle]' },
     { key: `session:${session}`, fingerprint: 'quiet:idle', issue: 'GEO-9856', line: 'GEO-9856: session 98560000 quiet for 90 min' },
   ]);
+});
+
+test('it raises no quiet alert for an idle session past the quiet limit on a run that waits on Geoff', () => {
+  const ctx = setupTest();
+  const session = '98570000-0000-4000-8000-000000000001';
+  addRun(ctx.db, { issue: 'GEO-9857', title: 'Invented kettle work', place: 'imp', session, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
+  setState(ctx.db, 'GEO-9857', 'working', { next: 'Geoff picks a kettle colour.', waitsOnGeoff: true }, 'kettle-bot');
+
+  const activity = new Map([[session, Date.parse('2026-10-21T01:30:00Z')]]);
+
+  expect(findAlerts(ctx.db, [{ id: session, name: 'kettle', alive: true, state: 'idle' }], activity, new Date('2026-10-21T03:00:00Z'))).toStrictEqual([]);
+});
+
+test('it raises the exited alert for a session that ended on a run that waits on Geoff', () => {
+  const ctx = setupTest();
+  const session = '98580000-0000-4000-8000-000000000001';
+  addRun(ctx.db, { issue: 'GEO-9858', title: 'Invented kettle work', place: 'imp', session, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
+  setState(ctx.db, 'GEO-9858', 'working', { next: 'Geoff picks a kettle colour.', waitsOnGeoff: true }, 'kettle-bot');
+
+  expect(findAlerts(ctx.db, [], new Map(), new Date('2026-10-21T03:00:00Z')).map((alert) => alert.line)).toStrictEqual(['GEO-9858: session 98580000 has exited; check for its PR or final note']);
 });
 
 test('it raises a FINAL alert for a PR whose only override at its FINAL head is of a CI check', () => {
