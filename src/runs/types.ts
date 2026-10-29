@@ -34,6 +34,9 @@ export interface RunSession {
   added_at: string;
   ended_at: string | null;
   ended_by: 'sweep' | null;
+
+  // 1 for a session of the design pass the run turned from: an agent still awake there holds no delivery slot.
+  design_pass: 0 | 1;
 }
 
 export interface RunPr {

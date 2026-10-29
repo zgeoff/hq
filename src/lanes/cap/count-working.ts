@@ -24,7 +24,7 @@ export function countWorking(db: Database, at: Date, designRuns: readonly Design
   }
   const awake = new Set(reading.ids);
   const fleet = new Set(Object.values(fleetIds(db)));
-  const rows = rowsSchema.parse(db.query("SELECT DISTINCT s.issue AS issue, s.session_id AS session_id FROM run_sessions s JOIN runs r ON r.issue = s.issue WHERE r.state = 'working'").all());
+  const rows = rowsSchema.parse(db.query("SELECT DISTINCT s.issue AS issue, s.session_id AS session_id FROM run_sessions s JOIN runs r ON r.issue = s.issue WHERE r.state = 'working' AND s.design_pass = 0").all());
   const sessions = new Set(rows.filter((row) => awake.has(row.session_id) && !fleet.has(row.session_id) && !design.has(row.issue)).map((row) => row.session_id));
   return { count: sessions.size, from: 'sessions' };
 }

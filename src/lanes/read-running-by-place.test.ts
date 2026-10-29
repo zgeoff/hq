@@ -155,3 +155,16 @@ test('it leaves an agent design run on a non-Design issue out of the slot counts
 
   expect(readRunningByPlace(ctx.db)).toStrictEqual({ imp: 1, local: 0, issues: ['GEO-9932'], impIssues: ['GEO-9932'], localSource: null });
 });
+
+test('it counts one live session here for a build run while its design pass session stays awake here', () => {
+  const ctx = setupTest();
+  addRun(ctx.db, { issue: 'GEO-9932', title: 'Design the teapot lid', place: 'local', session: 'a0000033-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', design: 'agent', actor: 'z-delivery' });
+  setState(ctx.db, 'GEO-9932', 'done', { note: 'design settled' }, 'z-delivery');
+  addRun(ctx.db, { issue: 'GEO-9932', title: 'Build the teapot lid', place: 'local', session: 'a0000034-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Building.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
+  recordAwake(ctx.db, [
+    { id: 'a0000033-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'lid-design', alive: true, state: 'running', locator: { targetID: 'local' } },
+    { id: 'a0000034-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'lid-build', alive: true, state: 'running', locator: { targetID: 'local' } },
+  ]);
+
+  expect(readRunningByPlace(ctx.db)).toStrictEqual({ imp: 0, local: 1, issues: ['GEO-9932'], impIssues: [], localSource: null });
+});

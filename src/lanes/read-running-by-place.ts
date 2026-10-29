@@ -58,7 +58,7 @@ function readLiveLocal(db: Database, at: Date, design: ReadonlySet<string>): Liv
   }
   const awake = new Set(reading.ids);
   const here = new Set(reading.local);
-  const rows = sessionsSchema.parse(db.query('SELECT DISTINCT issue, session_id FROM run_sessions').all()).filter((row) => awake.has(row.session_id) && !design.has(row.issue));
+  const rows = sessionsSchema.parse(db.query('SELECT DISTINCT issue, session_id FROM run_sessions WHERE design_pass = 0').all()).filter((row) => awake.has(row.session_id) && !design.has(row.issue));
   const sessions = new Set(rows.filter((row) => here.has(row.session_id)).map((row) => row.session_id)).size;
   const elsewhere = new Set(rows.filter((row) => !here.has(row.session_id)).map((row) => row.issue));
   const hereOnly = new Set(rows.filter((row) => here.has(row.session_id) && !elsewhere.has(row.issue)).map((row) => row.issue));

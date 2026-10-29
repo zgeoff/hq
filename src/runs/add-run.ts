@@ -41,6 +41,7 @@ export function addRun(db: Database, input: AddRunInput): { run: RunView; result
           const oldSessions = sessionsSchema.parse(db.query('SELECT session_id FROM run_sessions WHERE issue = ? ORDER BY added_at').all(input.issue));
           db.query('UPDATE run_sessions SET active = 0, ended_at = COALESCE(ended_at, ?) WHERE issue = ? AND active = 1').run(t, input.issue);
           db.query('UPDATE run_prs SET design_pass = 1 WHERE issue = ?').run(input.issue);
+          db.query('UPDATE run_sessions SET design_pass = 1 WHERE issue = ?').run(input.issue);
           db.query(
             `UPDATE runs SET design_lane = NULL, state = 'working', closed_at = NULL, close_note = NULL, waits_on = NULL, waits_on_geoff = 0, live_check = NULL,
                title = ?, place = ?, next = ?, gate = ?, geoff_chat = ?, ready_since = ?, size = ?, size_lines = ?, lane = ?, created_at = ?, updated_at = ? WHERE issue = ?`,

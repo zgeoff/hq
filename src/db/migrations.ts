@@ -646,11 +646,12 @@ export const MIGRATIONS: string[] = [
   `ALTER TABLE noslop_rounds ADD COLUMN patch_id TEXT;
   ALTER TABLE noslop_rounds ADD COLUMN base_move INTEGER NOT NULL DEFAULT 0 CHECK (base_move IN (0, 1));`,
 
-  // v46: runs.design_lane: the design lane a run fills ('agent' or 'with-geoff'); NULL is a delivery
-  // run. slot_minutes takes the 'design' cause, the free agent design lanes' tally. run_prs.design_pass marks
-  // the PRs a run held before it turned from its design pass into the build run.
+  // v46: runs.design_lane: the design lane a run fills ('agent' or 'with-geoff'); NULL is a delivery run.
+  // slot_minutes takes the 'design' cause, the free agent design lanes' tally. The design_pass columns mark
+  // the PRs and sessions a run held before it turned from its design pass into the build run.
   `ALTER TABLE runs ADD COLUMN design_lane TEXT CHECK (design_lane IN ('agent', 'with-geoff'));
   ALTER TABLE run_prs ADD COLUMN design_pass INTEGER NOT NULL DEFAULT 0 CHECK (design_pass IN (0, 1));
+  ALTER TABLE run_sessions ADD COLUMN design_pass INTEGER NOT NULL DEFAULT 0 CHECK (design_pass IN (0, 1));
   CREATE TABLE slot_minutes_v46 (
     day     TEXT NOT NULL,
     cause   TEXT NOT NULL CHECK (cause IN ('delivery', 'triage', 'supply', 'design')),
