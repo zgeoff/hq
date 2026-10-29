@@ -20,7 +20,7 @@ export function dropCanceledRuns(db: Database, actor: string, githubAt: string |
           .query(
             `SELECT r.issue FROM runs r JOIN linear_issues l ON l.issue = r.issue
              WHERE r.state NOT IN ('done', 'dropped') AND l.state = 'canceled' AND l.closed_at < ?
-               AND NOT EXISTS (SELECT 1 FROM run_prs p WHERE p.issue = r.issue AND p.state IN ('open', 'merged'))
+               AND NOT EXISTS (SELECT 1 FROM run_prs p WHERE p.issue = r.issue AND p.state IN ('open', 'merged') AND p.design_pass = 0)
              ORDER BY r.issue`,
           )
           .all(githubAt),

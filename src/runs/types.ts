@@ -52,6 +52,9 @@ export interface RunPr {
   merge_sha: string | null;
   shipped_tag: string | null;
   shipped_at: string | null;
+
+  // 1 for a PR of the design pass the run turned from: it shows on the run but never moves the build run.
+  design_pass: 0 | 1;
   added_at: string;
   updated_at: string;
 }

@@ -825,7 +825,7 @@ function runLine(r: RunView): string {
   const sess = `${s ? `${s.session_id.slice(0, 8)} (${r.place})` : 'no session'}${helpers.length ? ` + helper ${helpers.join(', ')}` : ''}`;
   const prs = r.prs.length
     ? r.prs
-        .map((pr) => `${pr.ref} ${formatPRTag(pr)}`)
+        .map((pr) => `${pr.ref} ${formatPRTag(pr)}${pr.design_pass === 1 ? ' (design pass)' : ''}`)
         .join(', ')
     : 'none yet';
   const extra = [r.design_lane ? `design pass: ${r.design_lane}` : null, r.live_check ? `live check: ${r.live_check}` : null, r.gate ? `gate: ${r.gate}` : null, r.waits_on ? `waits on ${r.waits_on}` : null, r.geoff_chat ? 'the owner chats' : null].filter(Boolean).join('; ');

@@ -57,7 +57,7 @@ export async function shipRuns(db: Database, run: Runner, at: Date = now(), opts
   const states = new Map<string, PrState>();
   const candidates: { run: Run; refs: string[] }[] = [];
   for (const r of runs) {
-    const prs = prsOf(r.issue);
+    const prs = prsOf(r.issue).filter((pr) => pr.design_pass === 0);
     const merged = prs.filter((p) => p.state === 'merged');
     if (!merged.length || prs.some((p) => p.state === 'open')) continue;
     if (merged.some((p) => !(repoOf(p.ref) in SOURCES))) continue; // no release source: hq never moves it

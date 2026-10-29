@@ -19,6 +19,7 @@ import { recordGrantAction } from './grants/record-grant-action.ts';
 import { readReadySnapshot } from './lanes/read-ready-snapshot.ts';
 import { resetKey } from './linear/reset-key.ts';
 import type { RunResult, Runner } from './runner/types.ts';
+import { addPr } from './runs/add-pr.ts';
 import { addRun } from './runs/add-run.ts';
 import { setState } from './runs/set-state.ts';
 
@@ -185,6 +186,26 @@ test('it shows the design lanes apart from the delivery pool in hq lanes --json'
   const lanes = await hq('lanes');
 
   expect(JSON.parse(lanes.stdout)).toMatchObject({ plan: { pool: { impRunning: 0, localRunning: 0 }, design: { agent: { open: 1, slots: 1 }, withGeoff: { open: 2, slots: 1, asked: ['chat 29 Oct'] } } } });
+});
+
+test('it marks the design pass PRs in the hq run show text', async () => {
+  const fresh = freshDb();
+  const log = console.log;
+  const printed: string[] = [];
+  onTestFinished(fresh.cleanup);
+  onTestFinished(overrideEnv('HQ_NOW', NOON_SYDNEY));
+  console.log = (line: string) => void printed.push(line);
+  onTestFinished(() => (console.log = log));
+  at(NOON_SYDNEY);
+  addRun(fresh.db, { issue: 'GEO-9956', title: 'Design the kettle spout', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', design: 'agent', actor: 'z-delivery' });
+  addPr(fresh.db, 'GEO-9956', 'kettle#71', 'z-delivery');
+  setState(fresh.db, 'GEO-9956', 'done', { note: 'design settled' }, 'z-delivery');
+  addRun(fresh.db, { issue: 'GEO-9956', title: 'Build the kettle spout', place: 'imp', session: null, next: 'Building.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
+
+  const code = await main(['run', 'show', 'GEO-9956']);
+
+  expect(code).toBe(0);
+  expect(printed.join('\n')).toInclude('| kettle#71 open (design pass) |');
 });
 
 test('it keeps the design pass in hq run show after the build run starts', async () => {
