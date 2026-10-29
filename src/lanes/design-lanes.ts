@@ -10,6 +10,8 @@ interface DesignLaneView {
 
 // The 3 design lanes beside the delivery pool: 2 agent passes and the with-geoff pass, by default.
 export interface DesignLanes {
+  // pacing.json's error for the lane counts: the counts are the defaults and no lane names an issue.
+  countsError: string | null;
   agent: DesignLaneView;
   withGeoff: DesignLaneView & {
     // Where the owner asked for each open pass above the lane count; empty while the lane is not over.

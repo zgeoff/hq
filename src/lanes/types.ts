@@ -34,6 +34,9 @@ export interface Sample {
 
   // The design lane counts; absent: the defaults.
   design?: DesignSlots;
+
+  // pacing.json's error for those counts, which are then the defaults; absent or null: none.
+  designError?: string | null;
 }
 
 // A Ready issue the lanes leave out until a time passes, another issue is Done or Canceled, or a PR merges or closes.

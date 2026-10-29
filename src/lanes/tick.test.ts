@@ -582,3 +582,20 @@ test('it starts the design wait over when the ticket goes, so a later ticket get
 
   expect(readSlotMinutes(ctx.db, '2026-10-14').design).toBe(0);
 });
+
+test('it counts no design minutes while the design counts in pacing.json are unreadable', () => {
+  const ctx = setupTest();
+  const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 }, design: { agent: 2, withGeoff: 1 }, designError: 'pacing.json: agentDesignSlots is wrong' };
+  at('2026-10-14T01:00:00Z');
+  writeDesignBacklog(ctx.db, { at: new Date('2026-10-14T01:00:00Z'), agent: [buildReadyIssue('GEO-9906', { project: 'kettle roadmap', labels: ['needs-design'], type: 'Design', priority: 2 })], withGeoff: [] });
+  tick(ctx.db, sample, 'hq-lanes');
+  at('2026-10-14T01:30:00Z');
+  writeDesignBacklog(ctx.db, { at: new Date('2026-10-14T01:30:00Z'), agent: [buildReadyIssue('GEO-9906', { project: 'kettle roadmap', labels: ['needs-design'], type: 'Design', priority: 2 })], withGeoff: [] });
+  tick(ctx.db, sample, 'hq-lanes');
+
+  at('2026-10-14T02:00:00Z');
+  writeDesignBacklog(ctx.db, { at: new Date('2026-10-14T02:00:00Z'), agent: [buildReadyIssue('GEO-9906', { project: 'kettle roadmap', labels: ['needs-design'], type: 'Design', priority: 2 })], withGeoff: [] });
+  tick(ctx.db, sample, 'hq-lanes');
+
+  expect(readSlotMinutes(ctx.db, '2026-10-14').design).toBe(0);
+});

@@ -188,6 +188,30 @@ test('it shows the design lanes apart from the delivery pool in hq lanes --json'
   expect(JSON.parse(lanes.stdout)).toMatchObject({ plan: { pool: { impRunning: 0, localRunning: 0 }, design: { agent: { open: 1, slots: 1 }, withGeoff: { open: 2, slots: 1, asked: ['chat 29 Oct'] } } } });
 });
 
+test('it prints in hq lanes that the design counts are unreadable, with the defaults it uses', async () => {
+  const fresh = freshDb();
+  const log = console.log;
+  const printed: string[] = [];
+  onTestFinished(fresh.cleanup);
+  mkdirSync(`${fresh.dir}/bin`);
+  writeFileSync(`${fresh.dir}/bin/systemctl`, '#!/bin/sh\nexit 3\n');
+  chmodSync(`${fresh.dir}/bin/systemctl`, 0o755);
+  mkdirSync(`${fresh.dir}/skill/scripts`, { recursive: true });
+  writeFileSync(`${fresh.dir}/skill/scripts/capacity.sh`, `echo '${JSON.stringify({ imp: { freeMib: 0, room: false } })}'\n`);
+  writeFileSync(`${fresh.dir}/skill/pacing.json`, JSON.stringify({ slots: { imp: 2, local: 2 }, agentDesignSlots: 'two' }));
+  onTestFinished(overrideEnv('HQ_CAPACITY', `${fresh.dir}/skill/scripts/capacity.sh`));
+  onTestFinished(overrideEnv('HQ_NOW', NOON_SYDNEY));
+  onTestFinished(overrideEnv('HQ_NOTIFY', 'off'));
+  onTestFinished(overrideEnv('PATH', `${fresh.dir}/bin:${process.env['PATH']}`));
+  console.log = (line: string) => void printed.push(line);
+  onTestFinished(() => (console.log = log));
+
+  const code = await main(['lanes']);
+
+  expect(code).toBe(0);
+  expect(printed.join('\n')).toInclude('design: counts unreadable (pacing.json: pacing.json designSlots and agentDesignSlots: give each a whole number from 0 to 100), using agent 2, with-geoff 1');
+});
+
 test('it marks the design pass PRs in the hq run show text', async () => {
   const fresh = freshDb();
   const log = console.log;

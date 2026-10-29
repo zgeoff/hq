@@ -76,7 +76,7 @@ export function readSlotPlan(db: Database, sample: Sample, at: Date = now(), cap
   const snapshot = readReadySnapshot(db, at);
   const activeSkips = readLaneSkips(db).filter((skip) => isSkipActive(skip, at));
   const runs = runsSchema.parse(db.query('SELECT issue, state, design_lane FROM runs').all());
-  const design = readDesignLanes(db, { slots: sample.design ?? DEFAULT_DESIGN_SLOTS, snapshot, runs, designRuns, skipped: activeSkips.map((skip) => skip.issue), at });
+  const design = readDesignLanes(db, { slots: sample.design ?? DEFAULT_DESIGN_SLOTS, countsError: sample.designError ?? null, snapshot, runs, designRuns, skipped: activeSkips.map((skip) => skip.issue), at });
   if (snapshot === null) {
     return { pool, focus, plan: null, readyReadAt: null, eligible: null, design, skipped: [], cap };
   }
@@ -93,6 +93,7 @@ type RunRow = z.infer<typeof runsSchema>[number];
 
 interface DesignLanesLook {
   slots: DesignSlots;
+  countsError: string | null;
   snapshot: ReadySnapshot | null;
   runs: readonly RunRow[];
   designRuns: readonly DesignRun[];
@@ -116,6 +117,7 @@ function readDesignLanes(db: Database, look: DesignLanesLook): DesignLanes {
     agentQueue: waiting(backlog?.agent ?? []),
     withGeoffQueue: waiting([...(look.snapshot?.design ?? []), ...(backlog?.withGeoff ?? [])]),
     asked: readDesignAsked(db, look.designRuns),
+    countsError: look.countsError,
   });
 }
 

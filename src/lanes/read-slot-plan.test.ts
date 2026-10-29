@@ -264,7 +264,7 @@ test('it counts an agent design pass in the agent design lane', () => {
 
   const plan = readSlotPlan(ctx.db, ctx.sample, new Date('2026-10-15T20:00:00Z'));
 
-  expect(plan?.design).toStrictEqual({ agent: { open: 1, slots: 2, next: [] }, withGeoff: { open: 0, slots: 1, next: [], asked: [] } });
+  expect(plan?.design).toStrictEqual({ countsError: null, agent: { open: 1, slots: 2, next: [] }, withGeoff: { open: 0, slots: 1, next: [], asked: [] } });
 });
 
 test('it holds no delivery slot and no cap count for an agent design pass', () => {
@@ -366,7 +366,7 @@ test('it names a needs-design issue per free design lane in focus order, leaving
 
   const plan = readSlotPlan(ctx.db, ctx.sample, new Date('2026-10-15T20:00:00Z'));
 
-  expect(plan?.design).toStrictEqual({ agent: { open: 1, slots: 2, next: ['GEO-9822'] }, withGeoff: { open: 0, slots: 1, next: ['GEO-9825'], asked: [] } });
+  expect(plan?.design).toStrictEqual({ countsError: null, agent: { open: 1, slots: 2, next: ['GEO-9822'] }, withGeoff: { open: 0, slots: 1, next: ['GEO-9825'], asked: [] } });
 });
 
 test('it leaves out of the design queues an issue whose design pass is closed', () => {
@@ -379,7 +379,7 @@ test('it leaves out of the design queues an issue whose design pass is closed', 
 
   const plan = readSlotPlan(ctx.db, ctx.sample, new Date('2026-10-15T20:00:00Z'));
 
-  expect(plan?.design).toStrictEqual({ agent: { open: 0, slots: 2, next: [] }, withGeoff: { open: 0, slots: 1, next: [], asked: [] } });
+  expect(plan?.design).toStrictEqual({ countsError: null, agent: { open: 0, slots: 2, next: [] }, withGeoff: { open: 0, slots: 1, next: [], asked: [] } });
 });
 
 test('it names the design lanes and their next issues in the lanes nudge', () => {
@@ -417,5 +417,14 @@ test('it names no needs-design issue from a stale Backlog read', () => {
 
   const plan = readSlotPlan(ctx.db, ctx.sample, new Date('2026-10-15T20:00:00Z'));
 
-  expect(plan?.design).toStrictEqual({ agent: { open: 0, slots: 2, next: [] }, withGeoff: { open: 0, slots: 1, next: [], asked: [] } });
+  expect(plan?.design).toStrictEqual({ countsError: null, agent: { open: 0, slots: 2, next: [] }, withGeoff: { open: 0, slots: 1, next: [], asked: [] } });
+});
+
+test('it names no needs-design issue while the design counts in pacing.json are unreadable', () => {
+  const ctx = setupTest();
+  writeDesignBacklog(ctx.db, { at: new Date('2026-10-15T20:00:00Z'), agent: [buildReadyIssue('GEO-9843', { project: 'kettle roadmap', type: 'Design', priority: 2 })], withGeoff: [buildReadyIssue('GEO-9844', { project: 'kettle roadmap', type: 'Design', priority: 2 })] });
+
+  const plan = readSlotPlan(ctx.db, { ...ctx.sample, design: { agent: 2, withGeoff: 1 }, designError: 'pacing.json: agentDesignSlots is wrong' }, new Date('2026-10-15T20:00:00Z'));
+
+  expect(plan?.design).toStrictEqual({ countsError: 'pacing.json: agentDesignSlots is wrong', agent: { open: 0, slots: 2, next: [] }, withGeoff: { open: 0, slots: 1, next: [], asked: [] } });
 });

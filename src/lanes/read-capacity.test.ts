@@ -44,3 +44,12 @@ test('it reads a capacity.sh reading that still carries a design key', async () 
   expect(sample.cap?.imp).toStrictEqual({ freeMib: 4096, room: true });
   expect(sample.error).toBeNull();
 });
+
+test("it carries pacing.json's error for the design counts in the sample, with the lanes still read", async () => {
+  writeFileSync(setupTest(), JSON.stringify({ lanes: { imp: { cleanup: 2 }, local: {} }, agentDesignSlots: 'two' }));
+
+  const sample = await readCapacity(realRunner);
+
+  expect(sample.designError).toBe('pacing.json: pacing.json designSlots and agentDesignSlots: give each a whole number from 0 to 100');
+  expect(sample.lanes).toStrictEqual([{ name: 'cleanup', place: 'imp', size: 2 }]);
+});
