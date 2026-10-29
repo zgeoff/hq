@@ -35,29 +35,16 @@ function setupTest() {
   onTestFinished(fresh.cleanup);
   onTestFinished(overrideEnv('HQ_PROJECTS', `${fresh.dir}/projects`));
   onTestFinished(overrideEnv('HQ_REPOS', `${fresh.dir}/repos`));
-  const body = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'].map((word) => `${word}\n`).join('');
-  const edited = body.replace('five\n', 'fifty\n');
   const db = fresh.db;
-
-  // A repo whose PR changes line five of notes.txt and one more file, plus the owner's chat lgtm at that head.
-  const setupPR = async (repo = 'widgets') => {
-    const stub = await createStubRebaseRepo({ root: fresh.dir, repo, pr: 7, history: [{ 'notes.txt': body, 'other.txt': 'plain\n' }], change: { 'notes.txt': edited, 'extra.txt': 'extra\n' } });
-    recordPRAnswer(db, { repo, pr: 7, answer: 'lgtm', head: stub.oldHead, source: 'chat:kettle-1@ward', note: 'the kettle edit reads well', actor: 'z-kettle' });
-    return stub;
-  };
   const runRebased = async (call: Call) => {
     const repo = call.repo ?? 'widgets';
     const base = call.base ?? FAKE_BASE_SHA;
-    const fake = buildFakeRunner({ realGit: true, ...buildStubPRHead(call.head), prShas: { code: 0, stdout: JSON.stringify({ headRefOid: call.head, baseRefOid: base }), stderr: '' } });
+    const fake = buildFakeRunner({ realGit: true, origin: repo, ...buildStubPRHead(call.head), prShas: { code: 0, stdout: JSON.stringify({ headRefOid: call.head, baseRefOid: base }), stderr: '' } });
     const run: Runner = (cmd, opts) => {
       const line = cmd.join(' ');
       const answer = Object.entries(call.gh ?? {}).find(([piece]) => line.includes(piece))?.[1];
       if (answer !== undefined) {
         return Promise.resolve(answer);
-      }
-      if (line === 'git remote get-url origin') {
-        // The fake names zgeoff/widgets as every origin; this repo's is its own.
-        return Promise.resolve({ code: 0, stdout: `git@github.com:zgeoff/${repo}.git\n`, stderr: '' });
       }
       if (line === `git merge-base ${base} ${call.head}`) {
         call.during?.();
@@ -80,12 +67,13 @@ function setupTest() {
     const fake = buildFakeRunner({ realGit: true, ...buildStubPRHead(head) });
     return await runPRCommand({ run: fake.run, db, verb: 'status', rest: ['widgets', '7'], flags: {}, actor: () => Promise.resolve('z-review'), readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) });
   };
-  return { db, root: fresh.dir, body, edited, setupPR, runRebased, runStatus };
+  return { db, root: fresh.dir, runRebased, runStatus };
 }
 
 test('it carries the lgtm over a clean rebase onto a moved main, with the original source and note', async () => {
   const ctx = setupTest();
-  const stub = await ctx.setupPR();
+  const stub = await createStubRebaseRepo({ root: ctx.root, repo: 'widgets', pr: 7, history: [{ 'notes.txt': 'one\ntwo\nthree\nfour\nfive\nsix\n', 'other.txt': 'plain\n' }], change: { 'notes.txt': 'one\ntwo\nthree\nfour\nfifty\nsix\n', 'extra.txt': 'extra\n' } });
+  recordPRAnswer(ctx.db, { repo: 'widgets', pr: 7, answer: 'lgtm', head: stub.oldHead, source: 'chat:kettle-1@ward', note: 'the kettle edit reads well', actor: 'z-kettle' });
   await stub.moveMain({ 'other.txt': 'plain and moved\n' });
   const head = await stub.rebase();
 
@@ -101,7 +89,8 @@ test('it carries the lgtm over a clean rebase onto a moved main, with the origin
 
 test('it shows the carried lgtm in hq pr status with the source it carries, not stale', async () => {
   const ctx = setupTest();
-  const stub = await ctx.setupPR();
+  const stub = await createStubRebaseRepo({ root: ctx.root, repo: 'widgets', pr: 7, history: [{ 'notes.txt': 'one\ntwo\nthree\nfour\nfive\nsix\n', 'other.txt': 'plain\n' }], change: { 'notes.txt': 'one\ntwo\nthree\nfour\nfifty\nsix\n', 'extra.txt': 'extra\n' } });
+  recordPRAnswer(ctx.db, { repo: 'widgets', pr: 7, answer: 'lgtm', head: stub.oldHead, source: 'chat:kettle-1@ward', note: 'the kettle edit reads well', actor: 'z-kettle' });
   await stub.moveMain({ 'other.txt': 'plain and moved\n' });
   const head = await stub.rebase();
   await ctx.runRebased({ head, base: await stub.readMainHead(), from: stub.oldHead });
@@ -113,7 +102,8 @@ test('it shows the carried lgtm in hq pr status with the source it carries, not 
 
 test('it refuses a rebase that changes a content line, names the file and records nothing', async () => {
   const ctx = setupTest();
-  const stub = await ctx.setupPR();
+  const stub = await createStubRebaseRepo({ root: ctx.root, repo: 'widgets', pr: 7, history: [{ 'notes.txt': 'one\ntwo\nthree\nfour\nfive\nsix\n', 'other.txt': 'plain\n' }], change: { 'notes.txt': 'one\ntwo\nthree\nfour\nfifty\nsix\n', 'extra.txt': 'extra\n' } });
+  recordPRAnswer(ctx.db, { repo: 'widgets', pr: 7, answer: 'lgtm', head: stub.oldHead, source: 'chat:kettle-1@ward', note: 'the kettle edit reads well', actor: 'z-kettle' });
   await stub.moveMain({ 'other.txt': 'plain and moved\n' });
   const head = await stub.rebase({ 'extra.txt': 'extra, edited\n' });
 
@@ -125,8 +115,9 @@ test('it refuses a rebase that changes a content line, names the file and record
 
 test('it refuses a base move that changes a context line inside the hunk of the PR', async () => {
   const ctx = setupTest();
-  const stub = await ctx.setupPR();
-  await stub.moveMain({ 'notes.txt': ctx.body.replace('three\n', 'third\n') });
+  const stub = await createStubRebaseRepo({ root: ctx.root, repo: 'widgets', pr: 7, history: [{ 'notes.txt': 'one\ntwo\nthree\nfour\nfive\nsix\n', 'other.txt': 'plain\n' }], change: { 'notes.txt': 'one\ntwo\nthree\nfour\nfifty\nsix\n', 'extra.txt': 'extra\n' } });
+  recordPRAnswer(ctx.db, { repo: 'widgets', pr: 7, answer: 'lgtm', head: stub.oldHead, source: 'chat:kettle-1@ward', note: 'the kettle edit reads well', actor: 'z-kettle' });
+  await stub.moveMain({ 'notes.txt': 'one\ntwo\nthird\nfour\nfive\nsix\n' });
   const head = await stub.rebase();
 
   await expect(ctx.runRebased({ head, base: await stub.readMainHead(), from: stub.oldHead })).rejects.toMatchObject({ code: 'not_carried', message: expect.stringContaining('changed: notes.txt)') });
@@ -146,7 +137,7 @@ test('it lists the first ten changed files and counts the rest', async () => {
 
 test('it carries the lgtm over a squash of a two-commit PR into one commit of the same content', async () => {
   const ctx = setupTest();
-  const stub = await createStubRebaseRepo({ root: ctx.root, repo: 'widgets', pr: 7, history: [{ 'notes.txt': ctx.body, 'other.txt': 'plain\n' }], change: { 'notes.txt': ctx.edited }, followUp: { 'extra.txt': 'extra\n' } });
+  const stub = await createStubRebaseRepo({ root: ctx.root, repo: 'widgets', pr: 7, history: [{ 'notes.txt': 'one\ntwo\nthree\nfour\nfive\nsix\n', 'other.txt': 'plain\n' }], change: { 'notes.txt': 'one\ntwo\nthree\nfour\nfifty\nsix\n' }, followUp: { 'extra.txt': 'extra\n' } });
   recordPRAnswer(ctx.db, { repo: 'widgets', pr: 7, answer: 'lgtm', head: stub.oldHead, source: 'chat:kettle-1@ward', note: 'the kettle edit reads well', actor: 'z-kettle' });
   await stub.moveMain({ 'other.txt': 'plain and moved\n' });
   const head = await stub.squash();
@@ -158,7 +149,8 @@ test('it carries the lgtm over a squash of a two-commit PR into one commit of th
 
 test("it carries an lgtm a second time with the owner's own source and note, not the first carry's", async () => {
   const ctx = setupTest();
-  const stub = await ctx.setupPR();
+  const stub = await createStubRebaseRepo({ root: ctx.root, repo: 'widgets', pr: 7, history: [{ 'notes.txt': 'one\ntwo\nthree\nfour\nfive\nsix\n', 'other.txt': 'plain\n' }], change: { 'notes.txt': 'one\ntwo\nthree\nfour\nfifty\nsix\n', 'extra.txt': 'extra\n' } });
+  recordPRAnswer(ctx.db, { repo: 'widgets', pr: 7, answer: 'lgtm', head: stub.oldHead, source: 'chat:kettle-1@ward', note: 'the kettle edit reads well', actor: 'z-kettle' });
   await stub.moveMain({ 'other.txt': 'plain and moved\n' });
   const first = await stub.rebase();
   await ctx.runRebased({ head: first, base: await stub.readMainHead(), from: stub.oldHead });
@@ -175,7 +167,8 @@ test("it carries an lgtm a second time with the owner's own source and note, not
 
 test('it leaves no ref of its own in the checkout', async () => {
   const ctx = setupTest();
-  const stub = await ctx.setupPR();
+  const stub = await createStubRebaseRepo({ root: ctx.root, repo: 'widgets', pr: 7, history: [{ 'notes.txt': 'one\ntwo\nthree\nfour\nfive\nsix\n', 'other.txt': 'plain\n' }], change: { 'notes.txt': 'one\ntwo\nthree\nfour\nfifty\nsix\n', 'extra.txt': 'extra\n' } });
+  recordPRAnswer(ctx.db, { repo: 'widgets', pr: 7, answer: 'lgtm', head: stub.oldHead, source: 'chat:kettle-1@ward', note: 'the kettle edit reads well', actor: 'z-kettle' });
   await stub.moveMain({ 'other.txt': 'plain and moved\n' });
   const head = await stub.rebase();
   const refsBefore = await realRunner(['git', 'for-each-ref', '--format=%(refname)'], { cwd: stub.directory });
@@ -188,7 +181,8 @@ test('it leaves no ref of its own in the checkout', async () => {
 
 test('it refuses when a later changes at the old head took the lgtm back', async () => {
   const ctx = setupTest();
-  const stub = await ctx.setupPR();
+  const stub = await createStubRebaseRepo({ root: ctx.root, repo: 'widgets', pr: 7, history: [{ 'notes.txt': 'one\ntwo\nthree\nfour\nfive\nsix\n', 'other.txt': 'plain\n' }], change: { 'notes.txt': 'one\ntwo\nthree\nfour\nfifty\nsix\n', 'extra.txt': 'extra\n' } });
+  recordPRAnswer(ctx.db, { repo: 'widgets', pr: 7, answer: 'lgtm', head: stub.oldHead, source: 'chat:kettle-1@ward', note: 'the kettle edit reads well', actor: 'z-kettle' });
   recordPRAnswer(ctx.db, { repo: 'widgets', pr: 7, answer: 'changes', head: stub.oldHead, source: 'chat:kettle-1', note: 'rename the kettle', actor: 'z-kettle' });
   const head = await stub.rebase();
 
@@ -207,14 +201,16 @@ test('it refuses a head with no answer', async () => {
 
 test('it refuses when the head has not moved', async () => {
   const ctx = setupTest();
-  const stub = await ctx.setupPR();
+  const stub = await createStubRebaseRepo({ root: ctx.root, repo: 'widgets', pr: 7, history: [{ 'notes.txt': 'one\ntwo\nthree\nfour\nfive\nsix\n', 'other.txt': 'plain\n' }], change: { 'notes.txt': 'one\ntwo\nthree\nfour\nfifty\nsix\n', 'extra.txt': 'extra\n' } });
+  recordPRAnswer(ctx.db, { repo: 'widgets', pr: 7, answer: 'lgtm', head: stub.oldHead, source: 'chat:kettle-1@ward', note: 'the kettle edit reads well', actor: 'z-kettle' });
 
   await expect(ctx.runRebased({ head: stub.oldHead, from: stub.oldHead })).rejects.toMatchObject({ code: 'bad_args', message: expect.stringContaining('nothing to carry') });
 });
 
 test('it refuses an actor that is not z-review', async () => {
   const ctx = setupTest();
-  const stub = await ctx.setupPR();
+  const stub = await createStubRebaseRepo({ root: ctx.root, repo: 'widgets', pr: 7, history: [{ 'notes.txt': 'one\ntwo\nthree\nfour\nfive\nsix\n', 'other.txt': 'plain\n' }], change: { 'notes.txt': 'one\ntwo\nthree\nfour\nfifty\nsix\n', 'extra.txt': 'extra\n' } });
+  recordPRAnswer(ctx.db, { repo: 'widgets', pr: 7, answer: 'lgtm', head: stub.oldHead, source: 'chat:kettle-1@ward', note: 'the kettle edit reads well', actor: 'z-kettle' });
   await stub.moveMain({ 'other.txt': 'plain and moved\n' });
   const head = await stub.rebase();
 
@@ -225,7 +221,8 @@ test('it refuses an actor that is not z-review', async () => {
 
 test("it refuses a session that is not z-review's own", async () => {
   const ctx = setupTest();
-  const stub = await ctx.setupPR();
+  const stub = await createStubRebaseRepo({ root: ctx.root, repo: 'widgets', pr: 7, history: [{ 'notes.txt': 'one\ntwo\nthree\nfour\nfive\nsix\n', 'other.txt': 'plain\n' }], change: { 'notes.txt': 'one\ntwo\nthree\nfour\nfifty\nsix\n', 'extra.txt': 'extra\n' } });
+  recordPRAnswer(ctx.db, { repo: 'widgets', pr: 7, answer: 'lgtm', head: stub.oldHead, source: 'chat:kettle-1@ward', note: 'the kettle edit reads well', actor: 'z-kettle' });
   const head = await stub.rebase();
 
   await expect(ctx.runRebased({ head, from: stub.oldHead, probe: 'other' })).rejects.toMatchObject({ code: 'bad_args', message: expect.stringContaining("only z-review's own atc session") });
@@ -233,7 +230,8 @@ test("it refuses a session that is not z-review's own", async () => {
 
 test.each([undefined, 'xyz', 'abc12'])('it refuses --from %p', async (from) => {
   const ctx = setupTest();
-  const stub = await ctx.setupPR();
+  const stub = await createStubRebaseRepo({ root: ctx.root, repo: 'widgets', pr: 7, history: [{ 'notes.txt': 'one\ntwo\nthree\nfour\nfive\nsix\n', 'other.txt': 'plain\n' }], change: { 'notes.txt': 'one\ntwo\nthree\nfour\nfifty\nsix\n', 'extra.txt': 'extra\n' } });
+  recordPRAnswer(ctx.db, { repo: 'widgets', pr: 7, answer: 'lgtm', head: stub.oldHead, source: 'chat:kettle-1@ward', note: 'the kettle edit reads well', actor: 'z-kettle' });
   const head = await stub.rebase();
 
   await expect(ctx.runRebased({ head, from })).rejects.toMatchObject({ code: 'bad_args', message: expect.stringContaining('usage: hq pr rebased') });
@@ -241,7 +239,8 @@ test.each([undefined, 'xyz', 'abc12'])('it refuses --from %p', async (from) => {
 
 test('it refuses an old head that git cannot fetch', async () => {
   const ctx = setupTest();
-  const stub = await ctx.setupPR();
+  const stub = await createStubRebaseRepo({ root: ctx.root, repo: 'widgets', pr: 7, history: [{ 'notes.txt': 'one\ntwo\nthree\nfour\nfive\nsix\n', 'other.txt': 'plain\n' }], change: { 'notes.txt': 'one\ntwo\nthree\nfour\nfifty\nsix\n', 'extra.txt': 'extra\n' } });
+  recordPRAnswer(ctx.db, { repo: 'widgets', pr: 7, answer: 'lgtm', head: stub.oldHead, source: 'chat:kettle-1@ward', note: 'the kettle edit reads well', actor: 'z-kettle' });
   await stub.moveMain({ 'other.txt': 'plain and moved\n' });
   const head = await stub.rebase();
   recordPRAnswer(ctx.db, { repo: 'widgets', pr: 7, answer: 'lgtm', head: 'f00dfeedf00dfeedf00dfeedf00dfeedf00dfeed', source: 'chat:kettle-1', note: null, actor: 'z-kettle' });
@@ -253,7 +252,8 @@ test('it refuses an old head that git cannot fetch', async () => {
 
 test('it refuses a typed rebased: source on hq pr answer', async () => {
   const ctx = setupTest();
-  const stub = await ctx.setupPR();
+  const stub = await createStubRebaseRepo({ root: ctx.root, repo: 'widgets', pr: 7, history: [{ 'notes.txt': 'one\ntwo\nthree\nfour\nfive\nsix\n', 'other.txt': 'plain\n' }], change: { 'notes.txt': 'one\ntwo\nthree\nfour\nfifty\nsix\n', 'extra.txt': 'extra\n' } });
+  recordPRAnswer(ctx.db, { repo: 'widgets', pr: 7, answer: 'lgtm', head: stub.oldHead, source: 'chat:kettle-1@ward', note: 'the kettle edit reads well', actor: 'z-kettle' });
   const fake = buildFakeRunner({ realGit: true, ...buildStubPRHead(stub.oldHead) });
 
   await expect(runPRCommand({ run: fake.run, db: ctx.db, verb: 'answer', rest: ['widgets', '7', 'lgtm'], flags: { source: `rebased:${stub.oldHead}` }, actor: () => Promise.resolve('z-review'), readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) })).rejects.toMatchObject({ code: 'bad_args', message: expect.stringContaining('must be chat:<id>') });
@@ -261,7 +261,8 @@ test('it refuses a typed rebased: source on hq pr answer', async () => {
 
 test.each(['hq', 'hq-private'])('it works for %s, which has no instruction-file hold, on a PR with no instruction file', async (repo) => {
   const ctx = setupTest();
-  const stub = await ctx.setupPR(repo);
+  const stub = await createStubRebaseRepo({ root: ctx.root, repo, pr: 7, history: [{ 'notes.txt': 'one\ntwo\nthree\nfour\nfive\nsix\n', 'other.txt': 'plain\n' }], change: { 'notes.txt': 'one\ntwo\nthree\nfour\nfifty\nsix\n', 'extra.txt': 'extra\n' } });
+  recordPRAnswer(ctx.db, { repo, pr: 7, answer: 'lgtm', head: stub.oldHead, source: 'chat:kettle-1@ward', note: 'the kettle edit reads well', actor: 'z-kettle' });
   await stub.moveMain({ 'other.txt': 'plain and moved\n' });
   const head = await stub.rebase();
 
@@ -272,7 +273,8 @@ test.each(['hq', 'hq-private'])('it works for %s, which has no instruction-file 
 
 test('it refuses when the owner answered changes at the new head first', async () => {
   const ctx = setupTest();
-  const stub = await ctx.setupPR();
+  const stub = await createStubRebaseRepo({ root: ctx.root, repo: 'widgets', pr: 7, history: [{ 'notes.txt': 'one\ntwo\nthree\nfour\nfive\nsix\n', 'other.txt': 'plain\n' }], change: { 'notes.txt': 'one\ntwo\nthree\nfour\nfifty\nsix\n', 'extra.txt': 'extra\n' } });
+  recordPRAnswer(ctx.db, { repo: 'widgets', pr: 7, answer: 'lgtm', head: stub.oldHead, source: 'chat:kettle-1@ward', note: 'the kettle edit reads well', actor: 'z-kettle' });
   await stub.moveMain({ 'other.txt': 'plain and moved\n' });
   const head = await stub.rebase();
   recordPRAnswer(ctx.db, { repo: 'widgets', pr: 7, answer: 'changes', head, source: 'chat:kettle-1', note: 'rename the kettle', actor: 'z-kettle' });
@@ -285,7 +287,8 @@ test('it refuses when the owner answered changes at the new head first', async (
 
 test('it refuses when the owner answers changes at the old head during the git work', async () => {
   const ctx = setupTest();
-  const stub = await ctx.setupPR();
+  const stub = await createStubRebaseRepo({ root: ctx.root, repo: 'widgets', pr: 7, history: [{ 'notes.txt': 'one\ntwo\nthree\nfour\nfive\nsix\n', 'other.txt': 'plain\n' }], change: { 'notes.txt': 'one\ntwo\nthree\nfour\nfifty\nsix\n', 'extra.txt': 'extra\n' } });
+  recordPRAnswer(ctx.db, { repo: 'widgets', pr: 7, answer: 'lgtm', head: stub.oldHead, source: 'chat:kettle-1@ward', note: 'the kettle edit reads well', actor: 'z-kettle' });
   await stub.moveMain({ 'other.txt': 'plain and moved\n' });
   const head = await stub.rebase();
   const during = () => recordPRAnswer(ctx.db, { repo: 'widgets', pr: 7, answer: 'changes', head: stub.oldHead, source: 'chat:kettle-1', note: 'rename the kettle', actor: 'z-kettle' });
@@ -298,7 +301,8 @@ test('it refuses when the owner answers changes at the old head during the git w
 
 test('it refuses when the owner answers reject at the new head during the git work', async () => {
   const ctx = setupTest();
-  const stub = await ctx.setupPR();
+  const stub = await createStubRebaseRepo({ root: ctx.root, repo: 'widgets', pr: 7, history: [{ 'notes.txt': 'one\ntwo\nthree\nfour\nfive\nsix\n', 'other.txt': 'plain\n' }], change: { 'notes.txt': 'one\ntwo\nthree\nfour\nfifty\nsix\n', 'extra.txt': 'extra\n' } });
+  recordPRAnswer(ctx.db, { repo: 'widgets', pr: 7, answer: 'lgtm', head: stub.oldHead, source: 'chat:kettle-1@ward', note: 'the kettle edit reads well', actor: 'z-kettle' });
   await stub.moveMain({ 'other.txt': 'plain and moved\n' });
   const head = await stub.rebase();
   const during = () => recordPRAnswer(ctx.db, { repo: 'widgets', pr: 7, answer: 'reject', head, source: 'chat:kettle-1', note: 'no kettles', actor: 'z-kettle' });
@@ -310,7 +314,8 @@ test('it refuses when the owner answers reject at the new head during the git wo
 
 test('it refuses a --from prefix that fits two heads with answers', async () => {
   const ctx = setupTest();
-  const stub = await ctx.setupPR();
+  const stub = await createStubRebaseRepo({ root: ctx.root, repo: 'widgets', pr: 7, history: [{ 'notes.txt': 'one\ntwo\nthree\nfour\nfive\nsix\n', 'other.txt': 'plain\n' }], change: { 'notes.txt': 'one\ntwo\nthree\nfour\nfifty\nsix\n', 'extra.txt': 'extra\n' } });
+  recordPRAnswer(ctx.db, { repo: 'widgets', pr: 7, answer: 'lgtm', head: stub.oldHead, source: 'chat:kettle-1@ward', note: 'the kettle edit reads well', actor: 'z-kettle' });
   const head = await stub.rebase();
   for (const filler of ['1', '2']) {
     recordPRAnswer(ctx.db, { repo: 'widgets', pr: 7, answer: 'lgtm', head: `abc1234${filler.repeat(33)}`, source: 'chat:kettle-1', note: null, actor: 'z-kettle' });
@@ -321,7 +326,8 @@ test('it refuses a --from prefix that fits two heads with answers', async () => 
 
 test('it refuses when gh cannot read the head', async () => {
   const ctx = setupTest();
-  const stub = await ctx.setupPR();
+  const stub = await createStubRebaseRepo({ root: ctx.root, repo: 'widgets', pr: 7, history: [{ 'notes.txt': 'one\ntwo\nthree\nfour\nfive\nsix\n', 'other.txt': 'plain\n' }], change: { 'notes.txt': 'one\ntwo\nthree\nfour\nfifty\nsix\n', 'extra.txt': 'extra\n' } });
+  recordPRAnswer(ctx.db, { repo: 'widgets', pr: 7, answer: 'lgtm', head: stub.oldHead, source: 'chat:kettle-1@ward', note: 'the kettle edit reads well', actor: 'z-kettle' });
   await stub.moveMain({ 'other.txt': 'plain and moved\n' });
   const head = await stub.rebase();
 
@@ -332,7 +338,8 @@ test('it refuses when gh cannot read the head', async () => {
 
 test('it refuses when an answer record cannot be read', async () => {
   const ctx = setupTest();
-  const stub = await ctx.setupPR();
+  const stub = await createStubRebaseRepo({ root: ctx.root, repo: 'widgets', pr: 7, history: [{ 'notes.txt': 'one\ntwo\nthree\nfour\nfive\nsix\n', 'other.txt': 'plain\n' }], change: { 'notes.txt': 'one\ntwo\nthree\nfour\nfifty\nsix\n', 'extra.txt': 'extra\n' } });
+  recordPRAnswer(ctx.db, { repo: 'widgets', pr: 7, answer: 'lgtm', head: stub.oldHead, source: 'chat:kettle-1@ward', note: 'the kettle edit reads well', actor: 'z-kettle' });
   await stub.moveMain({ 'other.txt': 'plain and moved\n' });
   const head = await stub.rebase();
   logEvent(ctx.db, 'hq', 'pr:widgets#7', 'pr-answer', 'z-kettle', null, null, { answer: 'maybe' });
@@ -344,7 +351,8 @@ test('it refuses when an answer record cannot be read', async () => {
 
 test('it refuses when gh gives no base sha', async () => {
   const ctx = setupTest();
-  const stub = await ctx.setupPR();
+  const stub = await createStubRebaseRepo({ root: ctx.root, repo: 'widgets', pr: 7, history: [{ 'notes.txt': 'one\ntwo\nthree\nfour\nfive\nsix\n', 'other.txt': 'plain\n' }], change: { 'notes.txt': 'one\ntwo\nthree\nfour\nfifty\nsix\n', 'extra.txt': 'extra\n' } });
+  recordPRAnswer(ctx.db, { repo: 'widgets', pr: 7, answer: 'lgtm', head: stub.oldHead, source: 'chat:kettle-1@ward', note: 'the kettle edit reads well', actor: 'z-kettle' });
   await stub.moveMain({ 'other.txt': 'plain and moved\n' });
   const head = await stub.rebase();
 
@@ -355,7 +363,8 @@ test('it refuses when gh gives no base sha', async () => {
 
 test('it refuses when hq has no checkout of the repo', async () => {
   const ctx = setupTest();
-  const stub = await ctx.setupPR();
+  const stub = await createStubRebaseRepo({ root: ctx.root, repo: 'widgets', pr: 7, history: [{ 'notes.txt': 'one\ntwo\nthree\nfour\nfive\nsix\n', 'other.txt': 'plain\n' }], change: { 'notes.txt': 'one\ntwo\nthree\nfour\nfifty\nsix\n', 'extra.txt': 'extra\n' } });
+  recordPRAnswer(ctx.db, { repo: 'widgets', pr: 7, answer: 'lgtm', head: stub.oldHead, source: 'chat:kettle-1@ward', note: 'the kettle edit reads well', actor: 'z-kettle' });
   await stub.moveMain({ 'other.txt': 'plain and moved\n' });
   const head = await stub.rebase();
   recordPRAnswer(ctx.db, { repo: 'gadgets', pr: 7, answer: 'lgtm', head: stub.oldHead, source: 'chat:kettle-1', note: null, actor: 'z-kettle' });
@@ -367,8 +376,9 @@ test('it refuses when hq has no checkout of the repo', async () => {
 
 test('it says the diff at the new head is empty when its content is already on main', async () => {
   const ctx = setupTest();
-  const stub = await ctx.setupPR();
-  await stub.moveMain({ 'notes.txt': ctx.edited, 'extra.txt': 'extra\n' });
+  const stub = await createStubRebaseRepo({ root: ctx.root, repo: 'widgets', pr: 7, history: [{ 'notes.txt': 'one\ntwo\nthree\nfour\nfive\nsix\n', 'other.txt': 'plain\n' }], change: { 'notes.txt': 'one\ntwo\nthree\nfour\nfifty\nsix\n', 'extra.txt': 'extra\n' } });
+  recordPRAnswer(ctx.db, { repo: 'widgets', pr: 7, answer: 'lgtm', head: stub.oldHead, source: 'chat:kettle-1@ward', note: 'the kettle edit reads well', actor: 'z-kettle' });
+  await stub.moveMain({ 'notes.txt': 'one\ntwo\nthree\nfour\nfifty\nsix\n', 'extra.txt': 'extra\n' });
   const head = await stub.rebase();
 
   await expect(ctx.runRebased({ head, base: await stub.readMainHead(), from: stub.oldHead })).rejects.toMatchObject({ code: 'not_carried', message: `the diff at ${head.slice(0, 7)} is empty against the base of zgeoff/widgets#7, so the lgtm is not carried and nothing is recorded` });

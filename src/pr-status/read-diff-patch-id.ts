@@ -9,7 +9,8 @@ export async function readDiffPatchID(run: Runner, directory: string, base: stri
   if (id !== null) {
     return { kind: 'patch-id', id };
   }
-  return (await probeEmptyDiff(run, directory, base, head)) ? { kind: 'empty' } : { kind: 'unreadable' };
+  const empty = await probeEmptyDiff(run, directory, base, head);
+  return empty ? { kind: 'empty' } : { kind: 'unreadable' };
 }
 
 async function probeEmptyDiff(run: Runner, directory: string, base: string, head: string): Promise<boolean> {

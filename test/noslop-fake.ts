@@ -72,6 +72,9 @@ export interface FakeScript {
   // Run git for real, in the checkout the caller names, except `git remote get-url origin` and the
   // lines `git` answers: for a test on a real repo, with gh, op and noslop still faked.
   realGit?: boolean;
+
+  // The repo `git remote get-url origin` names under zgeoff; widgets when absent.
+  origin?: string;
 }
 
 export interface FakeRunner {
@@ -201,7 +204,7 @@ function pickAnswer(script: FakeScript, cmd: string[], opts: RunOpts | undefined
     return pickBunAnswer(script, cmd);
   }
   if (line === 'git remote get-url origin') {
-    return buildResult('git@github.com:zgeoff/widgets.git\n');
+    return buildResult(`git@github.com:zgeoff/${script.origin ?? 'widgets'}.git\n`);
   }
   if (line === 'git rev-parse HEAD' || line === 'git rev-parse FETCH_HEAD') {
     return buildResult(`${FAKE_FULL_SHA}\n`);

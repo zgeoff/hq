@@ -6,10 +6,10 @@ import { readMergeBase } from '../noslop/read-merge-base.ts';
 import { runMissingFetch } from '../noslop/run-missing-fetch.ts';
 import { checkout } from '../review/checkout.ts';
 import { buildCarriedNote } from './build-carried-note.ts';
-import { buildRebasedRefusal } from './build-rebased-refusal.ts';
 import { readDiffPatchID } from './read-diff-patch-id.ts';
 import { formatRebasedNews } from './format-rebased-news.ts';
 import { getAnswerHead } from './get-answer-head.ts';
+import { pickRebasedOutcome } from './pick-rebased-outcome.ts';
 import type { PRCommandInput } from './run-pr-command.ts';
 import type { PRRef } from './parse-pr-ref.ts';
 import { readHeadLgtm } from './read-head-lgtm.ts';
@@ -68,11 +68,13 @@ async function matchPatchIDs(input: PRCommandInput, ref: PRRef, heads: Heads): P
   }
   const oldPatchID = await readDiffPatchID(input.run, directory, heads.base, heads.oldHead);
   const newPatchID = await readDiffPatchID(input.run, directory, heads.base, heads.newHead);
-  if (oldPatchID.kind === 'patch-id' && newPatchID.kind === 'patch-id' && oldPatchID.id === newPatchID.id) {
-    return oldPatchID.id;
+  const differs = oldPatchID.kind === 'patch-id' && newPatchID.kind === 'patch-id' && oldPatchID.id !== newPatchID.id;
+  const changed = differs ? await compareFiles(input, directory, heads) : null;
+  const outcome = pickRebasedOutcome({ slug: ref.slug, pr: ref.pr, oldHead: heads.oldHead, newHead: heads.newHead, oldPatchID, newPatchID, changed });
+  if (outcome.kind === 'refuse') {
+    throw new HqError(outcome.code, outcome.message);
   }
-  const changed = oldPatchID.kind === 'patch-id' && newPatchID.kind === 'patch-id' ? await compareFiles(input, directory, heads) : null;
-  throw buildRebasedRefusal({ slug: ref.slug, pr: ref.pr, oldHead: heads.oldHead, newHead: heads.newHead, oldPatchID, newPatchID, changed });
+  return outcome.patchID;
 }
 
 async function compareFiles(input: PRCommandInput, directory: string, heads: Heads): Promise<string[] | null> {

@@ -18,7 +18,9 @@ test('it reads the patch-id of a PR diff that changes a file', async () => {
   await ctx.git('checkout', '-q', '-b', 'pour');
   const head = await ctx.commit({ 'kettle.txt': 'boil and pour\n' }, 'pour');
 
-  expect(await readDiffPatchID(realRunner, ctx.directory, 'main', head)).toStrictEqual({ kind: 'patch-id', id: expect.stringMatching(/^[0-9a-f]{40}$/u) });
+  const read = await readDiffPatchID(realRunner, ctx.directory, 'main', head);
+
+  expect(read).toStrictEqual({ kind: 'patch-id', id: expect.stringMatching(/^[0-9a-f]{40}$/u) });
 });
 
 test('it reads a PR diff whose content is already on the base as empty', async () => {
@@ -29,12 +31,16 @@ test('it reads a PR diff whose content is already on the base as empty', async (
   await ctx.git('checkout', '-q', 'main');
   await ctx.git('merge', '-q', '--ff-only', head);
 
-  expect(await readDiffPatchID(realRunner, ctx.directory, 'main', head)).toStrictEqual({ kind: 'empty' });
+  const read = await readDiffPatchID(realRunner, ctx.directory, 'main', head);
+
+  expect(read).toStrictEqual({ kind: 'empty' });
 });
 
 test('it reads a head git cannot find as unreadable', async () => {
   const ctx = await setupTest();
   await ctx.commit({ 'kettle.txt': 'boil\n' }, 'start');
 
-  expect(await readDiffPatchID(realRunner, ctx.directory, 'main', 'e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1')).toStrictEqual({ kind: 'unreadable' });
+  const read = await readDiffPatchID(realRunner, ctx.directory, 'main', 'e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1');
+
+  expect(read).toStrictEqual({ kind: 'unreadable' });
 });
