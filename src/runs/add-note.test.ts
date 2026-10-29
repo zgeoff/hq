@@ -20,7 +20,7 @@ function setupTest() {
   return { db: fresh.db, finalSha, notices };
 }
 
-test('it keeps the text of a note whose FINAL names no commit', async () => {
+test('it keeps the text of a note whose FINAL names no commit and sets no final mark', async () => {
   const ctx = setupTest();
   const head = `44238662${buildMockSha(2).slice(8)}`;
   const resolveFinal = makeFinalResolver(buildStubFinalGH({ commits: [head] }, []));
@@ -44,30 +44,7 @@ test('it keeps the text of a note whose FINAL names no commit', async () => {
     resolutions,
   });
 
-  expect(stored.text).toBe('FINAL kettle#714 4423866e all green');
-});
-
-test('it sets no final mark for a note whose FINAL names no commit', async () => {
-  const ctx = setupTest();
-  const head = `44238662${buildMockSha(2).slice(8)}`;
-  const resolveFinal = makeFinalResolver(buildStubFinalGH({ commits: [head] }, []));
-  addRun(ctx.db, {
-    issue: 'GEO-9731',
-    title: 'Invented kettle work',
-    place: 'local',
-    session: null,
-    next: 'Agent working.',
-    gate: null,
-    geoffChat: false,
-    actor: 'z-delivery',
-  });
-  addPr(ctx.db, 'GEO-9731', 'kettle#714', 'z-delivery');
-  const text = 'FINAL kettle#714 4423866e all green';
-  const resolutions = await resolveNoteFinals(ctx.db, resolveFinal, 'GEO-9731', text);
-
-  addNote(ctx.db, 'GEO-9731', text, { label: null, actor: 'z-delivery', resolutions });
-
-  expect(ctx.finalSha()).toBeNull();
+  expect({ text: stored.text, finalSha: ctx.finalSha() }).toStrictEqual({ text: 'FINAL kettle#714 4423866e all green', finalSha: null });
 });
 
 test('it tells the orchestrator both shas of a note whose FINAL names no commit', async () => {
