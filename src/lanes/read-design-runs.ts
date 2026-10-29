@@ -10,9 +10,6 @@ export interface DesignRun {
   issue: string;
   state: RunState;
   lane: DesignLane;
-
-  // The run's own design_lane; null for a run added before v46 that counts as with-geoff by its issue's type.
-  designLane: DesignLane | null;
 }
 
 const runsSchema = z.array(z.object({ issue: z.string(), state: z.enum(RUN_STATES), design_lane: z.enum(DESIGN_LANES).nullable() }));
@@ -28,6 +25,6 @@ export function readDesignRuns(db: Database): DesignRun[] {
   const built = new Set(movedSchema.parse(db.query("SELECT DISTINCT subject_id FROM events WHERE subject = 'run' AND action = 'design-to-build'").all()).map((row) => row.subject_id));
   return rows.flatMap((row): DesignRun[] => {
     const lane = row.design_lane ?? (designIssues.has(row.issue) && !built.has(row.issue) ? 'with-geoff' : null);
-    return lane === null ? [] : [{ issue: row.issue, state: row.state, lane, designLane: row.design_lane }];
+    return lane === null ? [] : [{ issue: row.issue, state: row.state, lane }];
   });
 }

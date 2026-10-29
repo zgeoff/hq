@@ -22,8 +22,8 @@ test('it reads a run with a design lane, and a run with none whose issue is Desi
   ctx.db.query('UPDATE runs SET design_lane = NULL WHERE issue = ?').run('GEO-9901');
 
   expect(readDesignRuns(ctx.db)).toStrictEqual([
-    { issue: 'GEO-9901', state: 'working', lane: 'with-geoff', designLane: null },
-    { issue: 'GEO-9902', state: 'working', lane: 'agent', designLane: 'agent' },
+    { issue: 'GEO-9901', state: 'working', lane: 'with-geoff' },
+    { issue: 'GEO-9902', state: 'working', lane: 'agent' },
   ]);
 });
 
