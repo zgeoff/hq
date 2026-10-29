@@ -253,3 +253,20 @@ test('the private-tree check joins the run when the probe supplies it, and is ab
     some = await runChecks({ ...probe(world()), privateTree: () => ({ key: 'private-tree', ok: false, line: 'hq-private: no checkout' }) }, HEALTH_DEFAULTS, {}, new Date(NOON_SYDNEY));
   expect([none.checks.some((c) => c.key === 'private-tree'), some.checks.find((c) => c.key === 'private-tree')]).toStrictEqual([false, { key: 'private-tree', ok: false, line: 'hq-private: no checkout' }]);
 });
+
+test('it marks the atc mcp check unknown when the probe read fails', async () => {
+  const result = await runChecks({ ...probe(world()), atcMcp: () => Promise.resolve('no atc on PATH'), sessionName: () => null }, HEALTH_DEFAULTS, {}, new Date(NOON_SYDNEY));
+
+  expect(result.checks.find((check) => check.key === 'atc-mcp')).toStrictEqual({ key: 'atc-mcp', ok: false, line: "can't read the atc mcp processes: no atc on PATH" });
+  expect(result.unknown).toContain('atc-mcp');
+});
+
+test('it joins a failing atc mcp check named by the fleet name when a process is older than the build', async () => {
+  const read = { processes: [{ pid: 3, sessionId: '1a2b3c4d-1111-2222-3333-444455556666', startedAtMs: 1000, exe: '/b/atc' }], binary: { path: '/b/atc', mtimeMs: 5000 } };
+
+  const result = await runChecks({ ...probe(world()), atcMcp: () => Promise.resolve(read), sessionName: () => 'z-kettle' }, HEALTH_DEFAULTS, {}, new Date(NOON_SYDNEY));
+
+  expect(result.checks.filter((check) => check.key.startsWith('atc-mcp'))).toStrictEqual([
+    { key: 'atc-mcp:1a2b3c4d-1111-2222-3333-444455556666', ok: false, line: 'atc mcp for z-kettle (session 1a2b3c4d) started before the atc build of 1970-01-01T00:00:05Z; restart the session for the new tool list' },
+  ]);
+});

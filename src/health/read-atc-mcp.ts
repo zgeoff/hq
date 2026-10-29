@@ -22,6 +22,9 @@ export function readAtcMcp(procRoot = '/proc', binaryPath: string | undefined = 
         continue;
       }
       const found = readProcess(join(procRoot, entry), Number(entry), btime);
+      if (typeof found === 'string') {
+        return found;
+      }
       if (found) {
         processes.push(found);
       }
@@ -36,7 +39,8 @@ export function readAtcMcp(procRoot = '/proc', binaryPath: string | undefined = 
 const TICK_MS = 10;
 const SCOPE = /atc-daemon-session-[0-9a-f]{8}-(?<id>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})-[0-9a-f]{8}\.scope/u;
 
-function readProcess(directory: string, pid: number, btime: number): AtcMcpProcess | null {
+// null: not an atc mcp process, or it exited mid-scan; a string: its start time can't be read.
+function readProcess(directory: string, pid: number, btime: number): AtcMcpProcess | string | null {
   try {
     const argv = readFileSync(join(directory, 'cmdline'), 'utf8').split('\0');
     if (basename(argv[0] ?? '') !== 'atc' || argv[1] !== 'mcp') {
@@ -49,7 +53,11 @@ function readProcess(directory: string, pid: number, btime: number): AtcMcpProce
     const exe = readlinkSync(join(directory, 'exe'));
     const cgroup = readFileSync(join(directory, 'cgroup'), 'utf8');
     const sessionId = SCOPE.exec(cgroup)?.groups?.['id'] ?? null;
-    return { pid, sessionId, startedAtMs: btime * 1000 + Number(fields[19]) * TICK_MS, exe };
+    const ticks = Number(fields[19]);
+    if (!Number.isFinite(ticks)) {
+      return `no start time in ${join(directory, 'stat')}`;
+    }
+    return { pid, sessionId, startedAtMs: btime * 1000 + ticks * TICK_MS, exe };
   } catch {
     // the process exited mid-scan
     return null;

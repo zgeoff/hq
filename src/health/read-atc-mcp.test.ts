@@ -111,3 +111,11 @@ test('it returns an error naming the path when the proc root is unreadable', () 
 
   expect(read).toContain(`ENOENT: no such file or directory, open '${join(missing, 'stat')}'`);
 });
+
+test('it returns an error naming the stat file when a process has no start time', () => {
+  const ctx = setupTest();
+  ctx.addProcess(55, { cmdline: 'atc\0mcp\0', cgroup: '', exe: '/x/atc' });
+  writeFileSync(join(ctx.procRoot, '55', 'stat'), '55 (atc) S 0');
+
+  expect(readAtcMcp(ctx.procRoot, ctx.binary)).toBe(`no start time in ${join(ctx.procRoot, '55', 'stat')}`);
+});

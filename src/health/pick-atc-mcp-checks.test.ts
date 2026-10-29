@@ -3,7 +3,7 @@ import { pickAtcMcpChecks } from './pick-atc-mcp-checks.ts';
 
 test('it fails a process that started before the atc build', () => {
   const read = {
-    processes: [{ pid: 7, sessionId: '1a2b3c4d-1111-2222-3333-444455556666', startedAtMs: 1_793_354_399_999, exe: '/bin/atc' }],
+    processes: [{ pid: 7, sessionId: '1a2b3c4d-1111-2222-3333-444455556666', startedAtMs: 1_793_354_399_000, exe: '/bin/atc' }],
     binary: { path: '/bin/atc', mtimeMs: 1_793_354_400_000 },
   };
 
@@ -19,8 +19,17 @@ test('it fails a process whose exe was deleted although it started after the bui
   };
 
   expect(pickAtcMcpChecks(read, () => null)).toStrictEqual([
-    { key: 'atc-mcp:1a2b3c4d-1111-2222-3333-444455556666', ok: false, line: 'atc mcp for session 1a2b3c4d started before the atc build of 2026-10-30T10:00:00Z; restart the session for the new tool list' },
+    { key: 'atc-mcp:1a2b3c4d-1111-2222-3333-444455556666', ok: false, line: 'atc mcp for session 1a2b3c4d runs a replaced atc binary; restart the session for the new tool list' },
   ]);
+});
+
+test('it passes a process that the btime rounding puts less than a second before the build', () => {
+  const read = {
+    processes: [{ pid: 7, sessionId: '1a2b3c4d-1111-2222-3333-444455556666', startedAtMs: 1_793_354_399_001, exe: '/bin/atc' }],
+    binary: { path: '/bin/atc', mtimeMs: 1_793_354_400_000 },
+  };
+
+  expect(pickAtcMcpChecks(read, () => null)).toStrictEqual([{ key: 'atc-mcp', ok: true, line: "atc mcp: every session's process runs the current atc build (1 processes)" }]);
 });
 
 test('it passes with one line and the count when every process is current', () => {
@@ -41,7 +50,7 @@ test('it fails with the read error when the read failed', () => {
 
 test('it names the session by its fleet name when one is declared', () => {
   const read = {
-    processes: [{ pid: 7, sessionId: '1a2b3c4d-1111-2222-3333-444455556666', startedAtMs: 1_793_354_399_999, exe: '/bin/atc' }],
+    processes: [{ pid: 7, sessionId: '1a2b3c4d-1111-2222-3333-444455556666', startedAtMs: 1_793_354_399_000, exe: '/bin/atc' }],
     binary: { path: '/bin/atc', mtimeMs: 1_793_354_400_000 },
   };
 
@@ -55,7 +64,7 @@ test('it names the session by its fleet name when one is declared', () => {
 });
 
 test('it keys a stale process without a session by its pid', () => {
-  const read = { processes: [{ pid: 4242, sessionId: null, startedAtMs: 1_793_354_399_999, exe: '/bin/atc' }], binary: { path: '/bin/atc', mtimeMs: 1_793_354_400_000 } };
+  const read = { processes: [{ pid: 4242, sessionId: null, startedAtMs: 1_793_354_399_000, exe: '/bin/atc' }], binary: { path: '/bin/atc', mtimeMs: 1_793_354_400_000 } };
 
   expect(pickAtcMcpChecks(read, () => null)).toStrictEqual([
     { key: 'atc-mcp:4242', ok: false, line: 'atc mcp (pid 4242) started before the atc build of 2026-10-30T10:00:00Z; restart the session for the new tool list' },
