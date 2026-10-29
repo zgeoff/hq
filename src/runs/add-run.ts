@@ -10,6 +10,7 @@ import { readDesignRuns } from '../lanes/read-design-runs.ts';
 import { removeLaneNudges } from '../lanes/remove-lane-nudges.ts';
 import { now } from '../clock/now.ts';
 import { HqError } from '../errors.ts';
+import { checkRun } from '../transitions/check-run.ts';
 import { CLOSED_RUN_STATES as CLOSED } from '../transitions/closed-run-states.ts';
 import { getRun } from './get-run.ts';
 import type { AddRunInput, RunView } from './types.ts';
@@ -33,7 +34,7 @@ export function addRun(db: Database, input: AddRunInput): { run: RunView; result
       const sizeFields = [input.size?.size ?? null, input.size?.lines ?? null] as const;
       const geoffChat = input.geoffChat ? 1 : 0;
       if (prev?.design_lane && !input.design) {
-        // The design pass is over and this run builds the issue: the row keeps its sessions, notes and PRs.
+        checkRun(input.issue, 'design-to-build', prev.state, 'working');
         const oldSessions = sessionsSchema.parse(db.query('SELECT session_id FROM run_sessions WHERE issue = ? ORDER BY added_at').all(input.issue));
         db.query('UPDATE run_sessions SET active = 0, ended_at = COALESCE(ended_at, ?) WHERE issue = ? AND active = 1').run(t, input.issue);
         db.query(
