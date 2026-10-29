@@ -38,13 +38,23 @@ async function openClient(): Promise<AtcClient> {
   return client;
 }
 
-test('a cursor in the keyed form of atc 5 resets once, then the next read keeps the notes', async () => {
-  const app = setupTest(),
-    client = await openClient(),
-    first = await ingestNotes(app.db, client, { run: buildStubFinalGH({ commits: [] }, []) }),
-    second = await ingestNotes(app.db, client, { run: buildStubFinalGH({ commits: [] }, []) });
+test('it resets a cursor in the keyed form of atc 5', async () => {
+  const app = setupTest();
+  const client = await openClient();
 
-  expect([first.reset, second]).toMatchObject([true, { reset: false, notes: 1 }]);
+  const first = await ingestNotes(app.db, client, { run: buildStubFinalGH({ commits: [] }, []) });
+
+  expect(first.reset).toBe(true);
+});
+
+test('it keeps the notes on the read after a keyed cursor resets, and resets no more', async () => {
+  const app = setupTest();
+  const client = await openClient();
+  await ingestNotes(app.db, client, { run: buildStubFinalGH({ commits: [] }, []) });
+
+  const second = await ingestNotes(app.db, client, { run: buildStubFinalGH({ commits: [] }, []) });
+
+  expect(second).toMatchObject({ reset: false, notes: 1 });
 });
 
 test('it reads the commits of a PR once for several FINAL notes on it', async () => {

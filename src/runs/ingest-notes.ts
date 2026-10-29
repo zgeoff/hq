@@ -135,7 +135,7 @@ function resolveFinals(db: Database, events: FeedEvent[], resolveFinal: (claims:
   return resolveFinal(claims);
 }
 
-// The same note read again after a feed reset has the same session, time and text.
+// A feed reset replays a note under a new cursor, so only its session, time and text find it again.
 function hasSameNote(db: Database, event: FeedEvent): boolean {
   return db.query(`SELECT 1 FROM run_notes WHERE session_id = ? AND at = ? AND text = ?`).get(event.session, toNoteTime(event), event.detail ?? null) !== null;
 }
