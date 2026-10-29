@@ -18,7 +18,9 @@
 # head equals it in the same way: the sync's retired-files commit, which deletes a renamed file's old
 # copy whatever its content. A Markdown file also matches its source once the
 # blocks that need a file the repo's entry does not deliver to it are dropped,
-# as the sync drops them. Prints "ok: ..." and
+# as the sync drops them. package.json, which no entry delivers, passes when
+# its only change sets scripts that a manifest entry declares, as the sync's
+# build writes them. Prints "ok: ..." and
 # exits 0, or the first reason it fails and exits 1. Needs gh, git and jq.
 #
 # SYNC_PR_TOOLS_REPO names the git source of the blobless clone of zgeoff/tools
@@ -208,11 +210,36 @@ renamed_removal() {
   return 1
 }
 
+# declared_scripts_change: package.json's only change from the PR base to the
+# head sets scripts that tools main's manifest declares, as the sync's build
+# writes them: each declared script at the head holds its declared value or its
+# value at the base, and nothing else in the file changed. Mirrors zgeoff/tools
+# scripts/repo-sync/collect-undelivered-paths.ts, but takes the scripts of every
+# entry, since the repo's own entry list is not known here.
+declared_scripts_change() {
+  raw_text "zgeoff/$repo" package.json "$base" >"$work/before.json" || return 1
+  raw_text "zgeoff/$repo" package.json "$head" >"$work/after.json" || return 1
+  jq -n -e --argjson declared "$(jq '[.[].scripts // {}] | add // {}' <<<"$manifest")" \
+    --slurpfile before "$work/before.json" --slurpfile after "$work/after.json" '
+    def scripts: if type == "object" then (.scripts // {}) else null end;
+    def kept: .scripts = (scripts | with_entries(select(.key as $k | $declared | has($k) | not)));
+    ($before[0] | scripts) as $b | ($after[0] | scripts) as $a |
+    ($before | length) == 1 and ($after | length) == 1 and
+    ($b | type) == "object" and ($a | type) == "object" and
+    all($declared | to_entries[]; $a[.key] == .value or $a[.key] == $b[.key]) and
+    ($before[0] | kept) == ($after[0] | kept)' >/dev/null 2>&1
+}
+
 count=0
 while IFS=$'\t' read -r path status; do
   case $status in
     added | modified)
       source=$(jq -r --arg t "$path" '[.[].files[] | select(.target == $t) | .source] | first // empty' <<<"$manifest")
+      if [ -z "$source" ] && [ "$path:$status" = package.json:modified ]; then
+        declared_scripts_change || fail "package.json changes more than the scripts the tools sync manifest declares"
+        count=$((count + 1))
+        continue
+      fi
       [ -n "$source" ] || fail "$path is not a target in the tools sync manifest"
       [ "$(blob "zgeoff/$repo" "$path" "$head")" != missing ] || fail "$path is missing at the PR head"
       matches "$path" "$head" "$source" || fail "$path matches $source at none of the last 30 tools main commits that changed it"
