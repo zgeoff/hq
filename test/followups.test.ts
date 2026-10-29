@@ -56,7 +56,7 @@ test('parses follow-ups and counts; leaving both off records nothing', () => {
   expect(parseFixed(undefined)).toBeNull();
   run('GEO-1');
   addPr(db, 'GEO-1', 'kettle#1', 'z-delivery');
-  finalPr(db, 'kettle#1', 'abc1234', 'z-delivery', { fixed: null, followups: null });
+  finalPr(db, 'kettle#1', { sha: 'abc1234', actor: 'z-delivery', tally: { fixed: null, followups: null } });
   expect(db.query('SELECT fixed_in_pr, tally_at FROM run_prs').get()).toEqual({ fixed_in_pr: null, tally_at: null });
   expect(db.query(`SELECT COUNT(*) AS n FROM events WHERE action = 'tally'`).get()).toEqual({ n: 0 });
 });
@@ -69,12 +69,14 @@ test('weekly counts around the rule: a hand-counted baseline before, PR tallies 
   at(day(3));
   run('GEO-1');
   addPr(db, 'GEO-1', 'kettle#1', 'z-delivery');
-  finalPr(db, 'kettle#1', 'abc1234', 'z-delivery', { fixed: 4, followups: ['GEO-200'] });
+  finalPr(db, 'kettle#1', { sha: 'abc1234', actor: 'z-delivery', tally: { fixed: 4, followups: ['GEO-200'] } });
   at(day(4));
   run('GEO-2');
   addPr(db, 'GEO-2', 'kettle#2', 'z-delivery');
-  finalPr(db, 'kettle#2', 'def5678', 'z-delivery', { fixed: 0, followups: null });
-  finalPr(db, 'kettle#2', 'def5678', 'z-delivery', { fixed: 2, followups: null }); // said again: replaces
+  finalPr(db, 'kettle#2', { sha: 'def5678', actor: 'z-delivery', tally: { fixed: 0, followups: null } });
+
+  // said again: replaces
+  finalPr(db, 'kettle#2', { sha: 'def5678', actor: 'z-delivery', tally: { fixed: 2, followups: null } });
   at(day(9));
   const s = reviewStats(db);
   expect(s.baseline).toEqual({ followupsPerWeek: 1.5, backfilled: 3, fixed: 'none' });

@@ -22,6 +22,8 @@ import type { RunResult, Runner } from './runner/types.ts';
 import { addPr } from './runs/add-pr.ts';
 import { addRun } from './runs/add-run.ts';
 import { setState } from './runs/set-state.ts';
+import { buildMockSha } from '../test/build-mock-sha.ts';
+import { buildStubFinalGH } from '../test/build-stub-final-gh.ts';
 
 // A database at noon Sydney, quiet notices and console, and a stand-in gh on PATH for
 // `hq goals sync`: no repos and no closed PRs, with `billing` as the billing usage call's commands.
@@ -1001,4 +1003,51 @@ test('hq lanes tick --refresh reports a failed Ready read, still ticks, and exit
 
   expect(code).toBe(0);
   expect(printed.join('\n')).toBe('Ready read from Linear failed: Linear answered 503: no data\n2 slot(s) free (0 MiB); free for 0 min, under 10');
+});
+
+test('hq run final refuses a sha that is no commit of the PR and records no FINAL', async () => {
+  const fresh = freshDb();
+  const printed: string[] = [];
+  const log = console.log;
+  onTestFinished(fresh.cleanup);
+  onTestFinished(overrideEnv('HQ_NOW', NOON_SYDNEY));
+  onTestFinished(overrideEnv('HQ_NOTIFY', 'off'));
+  onTestFinished(overrideEnv('HQ_AS', 'z-delivery'));
+  console.log = (line: string) => void printed.push(line);
+  onTestFinished(() => (console.log = log));
+  addRun(fresh.db, { issue: 'GEO-9731', title: 'Invented kettle work', place: 'local', session: null, next: 'Agent working.', gate: null, geoffChat: false, actor: 'z-delivery' });
+  addPr(fresh.db, 'GEO-9731', 'kettle#714', 'z-delivery');
+  const run = buildStubFinalGH({ commits: [`44238662${buildMockSha(2).slice(8)}`] }, []);
+
+  const code = await main(['run', 'final', 'kettle#714', '--sha', '4423866e', '--json'], run);
+
+  expect(code).toBe(1);
+  expect(JSON.parse(printed.join('\n'))).toStrictEqual({
+    ok: false,
+    error: { code: 'bad_args', message: 'the FINAL names 4423866e, which is no commit of zgeoff/kettle#714; its head is 44238662 - send the FINAL again at that sha' },
+  });
+  expect(fresh.db.query(`SELECT final_sha FROM run_prs WHERE ref = 'kettle#714'`).get()).toStrictEqual({ final_sha: null });
+});
+
+test('hq run note keeps a note whose FINAL is no commit of the PR, records no FINAL, and queues the refusal', async () => {
+  const fresh = freshDb();
+  const log = console.log;
+  onTestFinished(fresh.cleanup);
+  onTestFinished(overrideEnv('HQ_NOW', NOON_SYDNEY));
+  onTestFinished(overrideEnv('HQ_NOTIFY', 'off'));
+  onTestFinished(overrideEnv('HQ_AS', 'z-delivery'));
+  console.log = () => {};
+  onTestFinished(() => (console.log = log));
+  addRun(fresh.db, { issue: 'GEO-9731', title: 'Invented kettle work', place: 'local', session: null, next: 'Agent working.', gate: null, geoffChat: false, actor: 'z-delivery' });
+  addPr(fresh.db, 'GEO-9731', 'kettle#714', 'z-delivery');
+  const run = buildStubFinalGH({ commits: [`44238662${buildMockSha(2).slice(8)}`] }, []);
+
+  const code = await main(['run', 'note', 'GEO-9731', 'FINAL kettle#714 4423866e all green', '--json'], run);
+
+  expect(code).toBe(0);
+  expect(fresh.db.query(`SELECT text FROM run_notes WHERE issue = 'GEO-9731'`).all()).toStrictEqual([{ text: 'FINAL kettle#714 4423866e all green' }]);
+  expect(fresh.db.query(`SELECT final_sha FROM run_prs WHERE ref = 'kettle#714'`).get()).toStrictEqual({ final_sha: null });
+  expect(fresh.db.query(`SELECT target, text FROM outbox WHERE target != 'z-review'`).all()).toStrictEqual([
+    { target: 'z-delivery', text: 'GEO-9731: the FINAL names 4423866e, which is no commit of zgeoff/kettle#714; its head is 44238662 - send the FINAL again at that sha' },
+  ]);
 });

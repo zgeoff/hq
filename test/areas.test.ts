@@ -89,7 +89,7 @@ test('running counts by lane; a local run with no lane is flexible; a lane note 
   run('GEO-4', 'atc');
   setState(db, 'GEO-4', 'merged', {}, 'z-delivery'); // past the merge: no longer holds a slot
   addRun(db, { issue: 'GEO-5', title: 'Invented', place: 'none', session: null, next: 'x', gate: null, geoffChat: false, actor: 'z-delivery' }); // no agent
-  addNote(db, 'GEO-3', 'nixie-slice', 'lane', 'z-delivery');
+  addNote(db, 'GEO-3', 'nixie-slice', { label: 'lane', actor: 'z-delivery' });
   expect(runningByLane(db)).toEqual({ atc: 1, flexible: 1, 'nixie-slice': 1 });
   setRunLane(db, 'GEO-3', 'cloud', 'z-delivery');
   expect(runningByLane(db)).toEqual({ atc: 1, flexible: 1, cloud: 1 });

@@ -19,5 +19,5 @@ test('it marks the open PR of the build run final from a note that names no PR, 
   addRun(ctx.db, { issue: 'GEO-9951', title: 'Build the kettle spout', place: 'imp', session: null, next: 'Building.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
   addPr(ctx.db, 'GEO-9951', 'kettle#72', 'z-delivery');
 
-  expect(applyNoteSignals(ctx.db, 'GEO-9951', 'The spout work is final at 39f05fe', 'test')).toStrictEqual({ prs: [], final: 'kettle#72' });
+  expect(applyNoteSignals(ctx.db, 'GEO-9951', 'The spout work is final at 39f05fe', { source: 'test' })).toStrictEqual({ prs: [], final: 'kettle#72' });
 });

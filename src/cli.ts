@@ -68,6 +68,9 @@ import { checkMergedOnGitHub } from './runs/check-merged-on-github.ts';
 import { readMergedPR } from './runs/read-merged-pr.ts';
 import { closePr } from './runs/close-pr.ts';
 import { finalPr } from './runs/final-pr.ts';
+import { makeFinalResolver } from './runs/make-final-resolver.ts';
+import { resolveCliFinal } from './runs/resolve-cli-final.ts';
+import { resolveNoteFinals } from './runs/resolve-note-finals.ts';
 import { fullSessionId } from './runs/full-session-id.ts';
 import { getRun } from './runs/get-run.ts';
 import { ingestNotes } from './runs/ingest-notes.ts';
@@ -809,7 +812,7 @@ async function watchRuns(db: Database, me: string): Promise<void> {
   const c = await AtcClient.open();
   const wrapUpDeps = buildWrapUpDeps();
   try {
-    const ing = await ingestNotes(db, c);
+    const ing = await ingestNotes(db, c, { run: boundedRunner(realRunner, CALL_MS) });
     if (ing.notes > 0 || ing.routed > 0 || ing.reset || ing.bootstrapped) {
       console.log(`${iso(now())} notes: ${ing.notes} recorded${ing.routed ? `, ${ing.routed} routed to ${orchestratorName()}` : ''}${ing.finals.length > 0 ? `, final: ${ing.finals.join(', ')}` : ''}${ing.reset ? ', feed cursor reset' : ''}${ing.bootstrapped ? ', feed cursor started at the end' : ''}`);
     }
@@ -843,230 +846,6 @@ async function expandSession(raw: string): Promise<string> {
     }, raw);
   } finally {
     (client as AtcClient | null)?.close();
-  }
-}
-
-async function runCommand(db: Database, verb: string | undefined, args: string[], flags: Flags): Promise<Out> {
-  const by = () => actor(db, flags);
-  const arg = (i: number, what: string) => need(args[i], what);
-  const view = (issue: string) => viewRun(db, getRun(db, issue)!);
-  switch (verb) {
-    case 'add': {
-      // A second word was a session id once dropped without a word, so the run had no session and
-      // its notes, FINALs among them, never matched it.
-      if (args.length > 1) {
-        throw new HqError('bad_args', `hq run add takes one issue: pass the session as --session ${args[1]}`);
-      }
-      const where = (flags.where ?? 'imp') as 'local' | 'imp' | 'none';
-      if (!['local', 'imp', 'none'].includes(where)) throw new HqError('bad_args', '--where must be local, imp or none');
-      const pacing = await loadPacing(pacingPath());
-      const r = addRun(db, {
-        issue: arg(0, 'issue'),
-        title: need(flags.title, 'title'),
-        place: where,
-        session: flags.session ? await expandSession(flags.session) : null,
-        next: flags.next ?? 'Agent working.',
-        gate: flags.gate ?? null,
-        geoffChat: !!flags['geoff-chat'],
-        readySince: flags['ready-since'] ?? null,
-        size: parseSize(flags.size, flags.lines),
-        lane: flags.lane ? checkLane(await readLanes(), flags.lane) : null,
-        design: parseDesignFlag(flags.design),
-        asked: flags.asked ?? null,
-        designSlots: pacing.design,
-        designError: pacing.designError,
-        actor: await by(),
-      });
-      return { data: { result: r.result, run: r.run }, text: `${runLine(r.run)}
-${r.result === 'added' ? 'On the board.' : 'Already on the board.'}` };
-    }
-    case 'size': {
-      const issue = resolveRun(db, arg(0, 'issue')).issue;
-      const guess = parseSize(need(flags.size, 'size'), need(flags.lines, 'lines'))!;
-      setSize(db, issue, guess, await by());
-      return { data: { run: view(issue) }, text: `${issue}: ${guess.size}, about ${guess.lines.toLocaleString('en-AU')} lines` };
-    }
-    case 'session': {
-      if (flags.add && flags.remove) throw new HqError('bad_args', 'give --add or --remove, not both');
-      const raw = arg(1, 'session id');
-      const r = setSession(db, arg(0, 'issue'), flags.remove ? await expandSession(raw).catch(() => raw.toLowerCase()) : await expandSession(raw), await by(), flags.add ? 'add' : flags.remove ? 'remove' : 'main');
-      return { data: { run: r }, text: runLine(r) };
-    }
-    case 'lane': {
-      const a = laneArgs(args, flags.lane);
-      const issue = resolveRun(db, a.key).issue;
-      setRunLane(db, issue, checkLane(await readLanes(), a.lane), await by());
-      return { data: { run: view(issue) }, text: runLine(view(issue)) };
-    }
-    case 'reopen': {
-      // A done or dropped run that work started on again: back to working, sessions and PRs kept.
-      const prev = resolveRun(db, arg(0, 'issue'));
-      if (prev.state !== 'done' && prev.state !== 'dropped') throw new HqError('bad_state', `${prev.issue} is ${prev.state}, not done or dropped: nothing to reopen`);
-      const pacing = await loadPacing(pacingPath());
-      const reopenedBy = await by();
-      const reopened = reopenRun(db, { issue: prev.issue, next: flags.next ?? 'Reopened: agent working.', design: { slots: pacing.design, error: pacing.designError, asked: flags.asked ?? null }, actor: reopenedBy });
-      return { data: { run: reopened }, text: `${runLine(reopened)}\nReopened.` };
-    }
-    case 'state': {
-      const refusal = readMoveRefusal(db, arg(0, 'issue'), arg(1, 'state'), flags.force === true);
-      if (refusal !== null) {
-        throw new HqError('bad_state', refusal);
-      }
-      const [issue, state] = [arg(0, 'issue'), arg(1, 'state')],
-        actorName = await by(),
-        liveCheck = parseOneFlag(flags.check, 'check');
-      if (liveCheck !== undefined) {
-        requireLiveCheck(liveCheck);
-      }
-
-      // A reopen into another closed state takes no design lane, so only a move to an open state is checked.
-      const reopenPacing = flags.reopen === true && !CLOSED_RUN_STATES.some((closed) => closed === state) ? await loadPacing(pacingPath()) : null;
-      const moved = db.transaction(() => {
-        if (reopenPacing !== null) {
-          checkDesignReopen(db, issue, { slots: reopenPacing.design, error: reopenPacing.designError, asked: null });
-        }
-        return setState(db, issue, state, toExactOptional({ liveCheck, next: flags.next, waitsOn: parseWaitsOn(flags['waits-on']), note: flags.note ?? null, reopen: Boolean(flags.reopen), waitsOnGeoff: parseGeoffFlag(flags) }), actorName);
-      }).immediate();
-      return { data: { run: moved }, text: runLine(moved) };
-    }
-    case 'check': {
-      const r = setLiveCheck(db, resolveRun(db, arg(0, 'issue')).issue, arg(1, 'owed or none'), await by());
-      return { data: { run: r }, text: runLine(r) };
-    }
-    case 'ship': {
-      const r = await shipRuns(db, boundedRunner(realRunner, CALL_MS), now(), { dryRun: !!flags['dry-run'] });
-      const head = r.dryRun ? 'Would move' : 'Moved';
-      const text = [
-        r.moved.length ? `${head}:` : `${r.dryRun ? 'Would move' : 'Moved'} nothing.`,
-        ...r.moved.map((move) => `  ${move.issue} -> ${move.to}: ${move.prs.map((pr) => `${pr.ref} ${formatShippedAt(pr.tag)} (${pr.shipped_at})`).join(', ')}`),
-        `${r.shippedPrs} PR(s) ${r.dryRun ? 'found' : 'newly marked'} shipped; ${r.compares} compare call(s)${r.deferred ? `; ${r.deferred} PR(s) left for the next pass` : ''}.`,
-        ...r.held.map((issue) => `  left held: ${issue} was put in deploy-held after the release that holds its PRs`),
-        ...r.busy.map((left) => `  left: ${left.issue} has session ${left.session.slice(0, 8)} still active`),
-        ...r.errors.map((e) => `  error: ${e}`),
-      ].join('\n');
-      if (!r.dryRun) setMeta(db, CHECKED_AT, iso(now()));
-      return { data: { ...r }, text };
-    }
-    case 'done': {
-      const actorName = await by();
-      const closed = setState(db, arg(0, 'issue'), 'done', { note: flags.note ?? flags.reason ?? null }, actorName);
-      const wrapUp = await runDoneWrapUp(db, closed.issue, actorName);
-      return { data: { run: closed, wrapUp }, text: `${runLine(closed)}\n${formatWrapUp(wrapUp)}\nDone. Off the board.` };
-    }
-    case 'drop': {
-      const actorName = await by();
-      const dropped = setState(db, arg(0, 'issue'), 'dropped', { note: flags.note ?? flags.reason ?? null }, actorName);
-      return { data: { run: dropped }, text: `${runLine(dropped)}\nDropped.` };
-    }
-    case 'next':
-    case 'gate':
-    case 'title': {
-      const value = arg(1, verb);
-      const r = setField(db, arg(0, 'issue'), verb, verb === 'gate' && value === 'none' ? null : value, await by());
-      return { data: { run: r }, text: runLine(r) };
-    }
-    case 'place': {
-      const actorName = await by();
-      const placed = setPlace(db, { issue: arg(0, 'issue'), place: arg(1, 'place (imp, local or none)'), note: flags.note ?? null, actor: actorName });
-      if (!placed.ok) {
-        throw new HqError('bad_args', placed.refusal);
-      }
-      return { data: { run: placed.run }, text: `${runLine(placed.run)}\nNow ${placed.run.place}.` };
-    }
-    case 'geoff-chat': {
-      const r = setGeoffChat(db, arg(0, 'issue'), arg(1, 'on or off') === 'on', await by());
-      return { data: { run: r }, text: runLine(r) };
-    }
-    case 'pr': {
-      const p = addPr(db, arg(0, 'issue'), arg(1, 'pr (repo#n or URL)'), await by());
-      return { data: { pr: p }, text: runLine(view(p.issue)) };
-    }
-    case 'final': {
-      const p = finalPr(db, arg(0, 'pr'), need(flags.sha, 'sha'), await by(), { fixed: parseFixed(flags.fixed), followups: parseFollowups(flags.followups) });
-      return { data: { pr: p }, text: runLine(view(p.issue)) };
-    }
-    case 'unfinal': {
-      const p = unfinalPr(db, arg(0, 'pr'), await by(), flags.reason ?? null);
-      return { data: { pr: p }, text: runLine(view(p.issue)) };
-    }
-    case 'reviewing': {
-      const p = reviewStarted(db, arg(0, 'pr'), await by());
-      return { data: { pr: p }, text: runLine(view(p.issue)) };
-    }
-    case 'reviewed': {
-      const p = reviewedPr(db, arg(0, 'pr'), need(flags.sha, 'sha'), { recheck: !!flags.recheck, force: !!flags.force }, await by());
-      return { data: { pr: p }, text: `${runLine(view(p.issue))}
-Round ${p.review_round} recorded at ${p.reviewed_sha}.` };
-    }
-    case 'unmerge': {
-      const p = unmergePr(db, arg(0, 'pr'), await by(), flags.reason ?? null);
-      return { data: { pr: p }, text: runLine(view(p.issue)) };
-    }
-    case 'merged':
-    case 'closed': {
-      // The watcher may have marked it merged already: the call then succeeds and changes nothing.
-      const already = verb === 'merged' ? readMergedPR(db, arg(0, 'pr')) : null;
-      if (already) {
-        return { data: { pr: already }, text: runLine(view(already.issue)) };
-      }
-      if (verb === 'merged') await checkMergedOnGitHub(boundedRunner(realRunner, CALL_MS), arg(0, 'pr'));
-      const closed = closePr(db, arg(0, 'pr'), { to: verb, actor: await by() });
-      return { data: { pr: closed }, text: runLine(view(closed.issue)) };
-    }
-    case 'note': {
-      const n = addNote(db, arg(0, 'issue or session'), arg(1, 'text'), flags.label ?? null, await by());
-      return { data: { note: n }, text: runLine(view(n.issue)) };
-    }
-    case 'show': {
-      const shown = viewRun(db, resolveRun(db, arg(0, 'issue or session'), 'allow'));
-      const notes = notesFor(db, shown.issue, intFlag(flags.notes, 'notes') ?? 5);
-      const designPass = readDesignMoves(db, shown.issue);
-      const text = [runLine(shown), ...shown.sessions.map((session) => `  ${session.helper ? 'helper' : 'session'} ${session.session_id}${session.active ? ' (active)' : ` (ended ${session.ended_at})`}`), ...notes.map((note) => `  ${note.at} [${note.source}${note.label ? `/${note.label}` : ''}] ${note.text.replaceAll(/\s+/gu, ' ').slice(0, 200)}`)].join('\n');
-      return { data: { run: shown, notes, designPass }, text: [text, ...formatDesignMoves(designPass)].join('\n') };
-    }
-    case 'list':
-    case undefined: {
-      const rows = listRuns(db, !!flags.all);
-      const byLane = runningByLane(db);
-      const counts = Object.entries(byLane).map(([l, n]) => `${l || 'no lane'} ${n}`).join(', ');
-      const text = rows.length ? ['| Session | Issue | PR | Next |', '|---|---|---|---|', ...rows.map(runLine), '', `Running by lane: ${counts || 'none'}`].join('\n') : 'The board is clear.';
-      return { data: { runs: rows, runningByLane: byLane }, text };
-    }
-    case 'watchlist': {
-      const w = watchlist(db);
-      const body = w.map((x) => `${x.session_id} ${x.issue}`).join('\n');
-      if (flags.write) await Bun.write(flags.write, body ? `${body}\n` : '');
-      return { data: { sessions: w, written: flags.write ?? null }, text: body || '(no active sessions)' };
-    }
-    case 'sweep': {
-      const c = await AtcClient.open();
-      const wrapUpDeps = buildWrapUpDeps();
-      try {
-        const ing = await ingestNotes(db, c);
-        const sweeper = await by();
-        const sw = await sweepNow(db, c, boundedRunner(realRunner, CALL_MS), { actor: sweeper, wrapUpDeps: wrapUpDeps.deps, log: (line) => console.error(line) });
-        return {
-          data: { ingest: ing, alerts: sw.alerts, sent: sw.sent },
-          text: [`notes recorded: ${ing.notes}`, sw.alerts.length ? sw.alerts.map((a) => `- ${a.line}`).join('\n') : 'Nothing to flag.', sw.sent.length ? `(told ${orchestratorName()} about ${sw.sent.length})` : ''].filter(Boolean).join('\n'),
-        };
-      } finally {
-        wrapUpDeps.close();
-        c.close();
-      }
-    }
-    case 'tidy': {
-      const dryRun = flags['dry-run'] === true;
-      const options: WrapUpOptions = dryRun ? { dryRun } : { actor: await by() };
-      const tidyDeps = buildWrapUpDeps();
-      try {
-        const wrapped = await wrapUpMergedRuns(db, tidyDeps.deps, options);
-        return { data: { dryRun, runs: wrapped }, text: formatTidy(wrapped, dryRun) };
-      } finally {
-        tidyDeps.close();
-      }
-    }
-    default:
-      throw new HqError('bad_args', `unknown command: hq run ${verb}`);
   }
 }
 
@@ -2209,7 +1988,7 @@ const GROUPS: Record<string, (context: Ctx) => Promise<Out>> = {
   repair: (c) => repairCommand(c.verb, c.rest, c.flags),
   refs: (context) => refsCommand(context.verb, context.flags),
   refusals: (c) => refusalsCommand(c.db, c.verb, c.flags),
-  run: (c) => runCommand(c.db, c.verb, c.rest, c.flags),
+  run: runCommand,
   lanes: async (context) => {
     const out = await lanesCommand(context);
     return context.verb === undefined || context.verb === 'status' || context.verb === 'log' ? withStaleBuild(out, checkLanesBuild((path) => readFileSync(path, 'utf8'))) : out;
@@ -2285,7 +2064,7 @@ function idsFlag(raw: string): number[] {
   return parts.map(Number);
 }
 
-// The runner reaches hq review and hq noslop; a test passes a fake one.
+// The runner reaches every command that spawns a tool through it; a test passes a fake one.
 // oxlint-disable-next-line zgeoff/function-verb -- the entry point that the bin and every CLI test call
 export async function main(argv: string[], runner: Runner = realRunner): Promise<number> {
   const json = argv.includes('--json');
@@ -2320,6 +2099,240 @@ export async function main(argv: string[], runner: Runner = realRunner): Promise
     if (json) console.log(JSON.stringify({ ok: false, error: { code: err.code, message: err.message, ...(err.data ?? {}) } }, null, 2));
     else console.error(`hq: ${err.message}`);
     return err.code === 'internal' ? 2 : 1;
+  }
+}
+
+async function runCommand(context: Ctx): Promise<Out> {
+  const db = context.db;
+  const verb = context.verb;
+  const args = context.rest;
+  const flags = context.flags;
+  const run = context.run;
+  const by = () => actor(db, flags);
+  const arg = (i: number, what: string) => need(args[i], what);
+  const view = (issue: string) => viewRun(db, getRun(db, issue)!);
+  switch (verb) {
+    case 'add': {
+      // A second word was a session id once dropped without a word, so the run had no session and
+      // its notes, FINALs among them, never matched it.
+      if (args.length > 1) {
+        throw new HqError('bad_args', `hq run add takes one issue: pass the session as --session ${args[1]}`);
+      }
+      const where = (flags.where ?? 'imp') as 'local' | 'imp' | 'none';
+      if (!['local', 'imp', 'none'].includes(where)) throw new HqError('bad_args', '--where must be local, imp or none');
+      const pacing = await loadPacing(pacingPath());
+      const r = addRun(db, {
+        issue: arg(0, 'issue'),
+        title: need(flags.title, 'title'),
+        place: where,
+        session: flags.session ? await expandSession(flags.session) : null,
+        next: flags.next ?? 'Agent working.',
+        gate: flags.gate ?? null,
+        geoffChat: !!flags['geoff-chat'],
+        readySince: flags['ready-since'] ?? null,
+        size: parseSize(flags.size, flags.lines),
+        lane: flags.lane ? checkLane(await readLanes(), flags.lane) : null,
+        design: parseDesignFlag(flags.design),
+        asked: flags.asked ?? null,
+        designSlots: pacing.design,
+        designError: pacing.designError,
+        actor: await by(),
+      });
+      return { data: { result: r.result, run: r.run }, text: `${runLine(r.run)}
+${r.result === 'added' ? 'On the board.' : 'Already on the board.'}` };
+    }
+    case 'size': {
+      const issue = resolveRun(db, arg(0, 'issue')).issue;
+      const guess = parseSize(need(flags.size, 'size'), need(flags.lines, 'lines'))!;
+      setSize(db, issue, guess, await by());
+      return { data: { run: view(issue) }, text: `${issue}: ${guess.size}, about ${guess.lines.toLocaleString('en-AU')} lines` };
+    }
+    case 'session': {
+      if (flags.add && flags.remove) throw new HqError('bad_args', 'give --add or --remove, not both');
+      const raw = arg(1, 'session id');
+      const r = setSession(db, arg(0, 'issue'), flags.remove ? await expandSession(raw).catch(() => raw.toLowerCase()) : await expandSession(raw), await by(), flags.add ? 'add' : flags.remove ? 'remove' : 'main');
+      return { data: { run: r }, text: runLine(r) };
+    }
+    case 'lane': {
+      const a = laneArgs(args, flags.lane);
+      const issue = resolveRun(db, a.key).issue;
+      setRunLane(db, issue, checkLane(await readLanes(), a.lane), await by());
+      return { data: { run: view(issue) }, text: runLine(view(issue)) };
+    }
+    case 'reopen': {
+      // A done or dropped run that work started on again: back to working, sessions and PRs kept.
+      const prev = resolveRun(db, arg(0, 'issue'));
+      if (prev.state !== 'done' && prev.state !== 'dropped') throw new HqError('bad_state', `${prev.issue} is ${prev.state}, not done or dropped: nothing to reopen`);
+      const pacing = await loadPacing(pacingPath());
+      const reopenedBy = await by();
+      const reopened = reopenRun(db, { issue: prev.issue, next: flags.next ?? 'Reopened: agent working.', design: { slots: pacing.design, error: pacing.designError, asked: flags.asked ?? null }, actor: reopenedBy });
+      return { data: { run: reopened }, text: `${runLine(reopened)}\nReopened.` };
+    }
+    case 'state': {
+      const refusal = readMoveRefusal(db, arg(0, 'issue'), arg(1, 'state'), flags.force === true);
+      if (refusal !== null) {
+        throw new HqError('bad_state', refusal);
+      }
+      const [issue, state] = [arg(0, 'issue'), arg(1, 'state')],
+        actorName = await by(),
+        liveCheck = parseOneFlag(flags.check, 'check');
+      if (liveCheck !== undefined) {
+        requireLiveCheck(liveCheck);
+      }
+
+      // A reopen into another closed state takes no design lane, so only a move to an open state is checked.
+      const reopenPacing = flags.reopen === true && !CLOSED_RUN_STATES.some((closed) => closed === state) ? await loadPacing(pacingPath()) : null;
+      const moved = db.transaction(() => {
+        if (reopenPacing !== null) {
+          checkDesignReopen(db, issue, { slots: reopenPacing.design, error: reopenPacing.designError, asked: null });
+        }
+        return setState(db, issue, state, toExactOptional({ liveCheck, next: flags.next, waitsOn: parseWaitsOn(flags['waits-on']), note: flags.note ?? null, reopen: Boolean(flags.reopen), waitsOnGeoff: parseGeoffFlag(flags) }), actorName);
+      }).immediate();
+      return { data: { run: moved }, text: runLine(moved) };
+    }
+    case 'check': {
+      const r = setLiveCheck(db, resolveRun(db, arg(0, 'issue')).issue, arg(1, 'owed or none'), await by());
+      return { data: { run: r }, text: runLine(r) };
+    }
+    case 'ship': {
+      const r = await shipRuns(db, boundedRunner(realRunner, CALL_MS), now(), { dryRun: !!flags['dry-run'] });
+      const head = r.dryRun ? 'Would move' : 'Moved';
+      const text = [
+        r.moved.length ? `${head}:` : `${r.dryRun ? 'Would move' : 'Moved'} nothing.`,
+        ...r.moved.map((move) => `  ${move.issue} -> ${move.to}: ${move.prs.map((pr) => `${pr.ref} ${formatShippedAt(pr.tag)} (${pr.shipped_at})`).join(', ')}`),
+        `${r.shippedPrs} PR(s) ${r.dryRun ? 'found' : 'newly marked'} shipped; ${r.compares} compare call(s)${r.deferred ? `; ${r.deferred} PR(s) left for the next pass` : ''}.`,
+        ...r.held.map((issue) => `  left held: ${issue} was put in deploy-held after the release that holds its PRs`),
+        ...r.busy.map((left) => `  left: ${left.issue} has session ${left.session.slice(0, 8)} still active`),
+        ...r.errors.map((e) => `  error: ${e}`),
+      ].join('\n');
+      if (!r.dryRun) setMeta(db, CHECKED_AT, iso(now()));
+      return { data: { ...r }, text };
+    }
+    case 'done': {
+      const actorName = await by();
+      const closed = setState(db, arg(0, 'issue'), 'done', { note: flags.note ?? flags.reason ?? null }, actorName);
+      const wrapUp = await runDoneWrapUp(db, closed.issue, actorName);
+      return { data: { run: closed, wrapUp }, text: `${runLine(closed)}\n${formatWrapUp(wrapUp)}\nDone. Off the board.` };
+    }
+    case 'drop': {
+      const actorName = await by();
+      const dropped = setState(db, arg(0, 'issue'), 'dropped', { note: flags.note ?? flags.reason ?? null }, actorName);
+      return { data: { run: dropped }, text: `${runLine(dropped)}\nDropped.` };
+    }
+    case 'next':
+    case 'gate':
+    case 'title': {
+      const value = arg(1, verb);
+      const r = setField(db, arg(0, 'issue'), verb, verb === 'gate' && value === 'none' ? null : value, await by());
+      return { data: { run: r }, text: runLine(r) };
+    }
+    case 'place': {
+      const actorName = await by();
+      const placed = setPlace(db, { issue: arg(0, 'issue'), place: arg(1, 'place (imp, local or none)'), note: flags.note ?? null, actor: actorName });
+      if (!placed.ok) {
+        throw new HqError('bad_args', placed.refusal);
+      }
+      return { data: { run: placed.run }, text: `${runLine(placed.run)}\nNow ${placed.run.place}.` };
+    }
+    case 'geoff-chat': {
+      const r = setGeoffChat(db, arg(0, 'issue'), arg(1, 'on or off') === 'on', await by());
+      return { data: { run: r }, text: runLine(r) };
+    }
+    case 'pr': {
+      const p = addPr(db, arg(0, 'issue'), arg(1, 'pr (repo#n or URL)'), await by());
+      return { data: { pr: p }, text: runLine(view(p.issue)) };
+    }
+    case 'final': {
+      const sha = need(flags.sha, 'sha');
+      const resolution = await resolveCliFinal(makeFinalResolver(boundedRunner(run, CALL_MS)), arg(0, 'pr'), sha);
+      const finalizer = await by();
+      const finalized = finalPr(db, arg(0, 'pr'), { sha, actor: finalizer, tally: { fixed: parseFixed(flags.fixed), followups: parseFollowups(flags.followups) }, resolution });
+      return { data: { pr: finalized }, text: runLine(view(finalized.issue)) };
+    }
+    case 'unfinal': {
+      const p = unfinalPr(db, arg(0, 'pr'), await by(), flags.reason ?? null);
+      return { data: { pr: p }, text: runLine(view(p.issue)) };
+    }
+    case 'reviewing': {
+      const p = reviewStarted(db, arg(0, 'pr'), await by());
+      return { data: { pr: p }, text: runLine(view(p.issue)) };
+    }
+    case 'reviewed': {
+      const p = reviewedPr(db, arg(0, 'pr'), need(flags.sha, 'sha'), { recheck: !!flags.recheck, force: !!flags.force }, await by());
+      return { data: { pr: p }, text: `${runLine(view(p.issue))}
+Round ${p.review_round} recorded at ${p.reviewed_sha}.` };
+    }
+    case 'unmerge': {
+      const p = unmergePr(db, arg(0, 'pr'), await by(), flags.reason ?? null);
+      return { data: { pr: p }, text: runLine(view(p.issue)) };
+    }
+    case 'merged':
+    case 'closed': {
+      // The watcher may have marked it merged already: the call then succeeds and changes nothing.
+      const already = verb === 'merged' ? readMergedPR(db, arg(0, 'pr')) : null;
+      if (already) {
+        return { data: { pr: already }, text: runLine(view(already.issue)) };
+      }
+      if (verb === 'merged') await checkMergedOnGitHub(boundedRunner(realRunner, CALL_MS), arg(0, 'pr'));
+      const closed = closePr(db, arg(0, 'pr'), { to: verb, actor: await by() });
+      return { data: { pr: closed }, text: runLine(view(closed.issue)) };
+    }
+    case 'note': {
+      const resolutions = await resolveNoteFinals(db, makeFinalResolver(boundedRunner(run, CALL_MS)), arg(0, 'issue or session'), arg(1, 'text'));
+      const noter = await by();
+      const stored = addNote(db, arg(0, 'issue or session'), arg(1, 'text'), { label: flags.label ?? null, actor: noter, resolutions });
+      return { data: { note: stored }, text: runLine(view(stored.issue)) };
+    }
+    case 'show': {
+      const shown = viewRun(db, resolveRun(db, arg(0, 'issue or session'), 'allow'));
+      const notes = notesFor(db, shown.issue, intFlag(flags.notes, 'notes') ?? 5);
+      const designPass = readDesignMoves(db, shown.issue);
+      const text = [runLine(shown), ...shown.sessions.map((session) => `  ${session.helper ? 'helper' : 'session'} ${session.session_id}${session.active ? ' (active)' : ` (ended ${session.ended_at})`}`), ...notes.map((note) => `  ${note.at} [${note.source}${note.label ? `/${note.label}` : ''}] ${note.text.replaceAll(/\s+/gu, ' ').slice(0, 200)}`)].join('\n');
+      return { data: { run: shown, notes, designPass }, text: [text, ...formatDesignMoves(designPass)].join('\n') };
+    }
+    case 'list':
+    case undefined: {
+      const rows = listRuns(db, !!flags.all);
+      const byLane = runningByLane(db);
+      const counts = Object.entries(byLane).map(([l, n]) => `${l || 'no lane'} ${n}`).join(', ');
+      const text = rows.length ? ['| Session | Issue | PR | Next |', '|---|---|---|---|', ...rows.map(runLine), '', `Running by lane: ${counts || 'none'}`].join('\n') : 'The board is clear.';
+      return { data: { runs: rows, runningByLane: byLane }, text };
+    }
+    case 'watchlist': {
+      const w = watchlist(db);
+      const body = w.map((x) => `${x.session_id} ${x.issue}`).join('\n');
+      if (flags.write) await Bun.write(flags.write, body ? `${body}\n` : '');
+      return { data: { sessions: w, written: flags.write ?? null }, text: body || '(no active sessions)' };
+    }
+    case 'sweep': {
+      const c = await AtcClient.open();
+      const wrapUpDeps = buildWrapUpDeps();
+      try {
+        const ing = await ingestNotes(db, c, { run: boundedRunner(realRunner, CALL_MS) });
+        const sweeper = await by();
+        const sw = await sweepNow(db, c, boundedRunner(realRunner, CALL_MS), { actor: sweeper, wrapUpDeps: wrapUpDeps.deps, log: (line) => console.error(line) });
+        return {
+          data: { ingest: ing, alerts: sw.alerts, sent: sw.sent },
+          text: [`notes recorded: ${ing.notes}`, sw.alerts.length ? sw.alerts.map((a) => `- ${a.line}`).join('\n') : 'Nothing to flag.', sw.sent.length ? `(told ${orchestratorName()} about ${sw.sent.length})` : ''].filter(Boolean).join('\n'),
+        };
+      } finally {
+        wrapUpDeps.close();
+        c.close();
+      }
+    }
+    case 'tidy': {
+      const dryRun = flags['dry-run'] === true;
+      const options: WrapUpOptions = dryRun ? { dryRun } : { actor: await by() };
+      const tidyDeps = buildWrapUpDeps();
+      try {
+        const wrapped = await wrapUpMergedRuns(db, tidyDeps.deps, options);
+        return { data: { dryRun, runs: wrapped }, text: formatTidy(wrapped, dryRun) };
+      } finally {
+        tidyDeps.close();
+      }
+    }
+    default:
+      throw new HqError('bad_args', `unknown command: hq run ${verb}`);
   }
 }
 

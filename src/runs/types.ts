@@ -140,7 +140,41 @@ export interface FinalMark {
   source: string;
   actor: string;
   note: number | null;
+  resolution?: AcceptedFinal | null;
 }
+
+export type FinalResolution =
+  | { kind: 'full'; sha: string }
+  | { kind: 'refused'; reason: 'no-match'; head: string | null }
+  | { kind: 'refused'; reason: 'ambiguous'; shas: string[] }
+  | { kind: 'unresolved'; reason: string };
+
+export type AcceptedFinal = Extract<FinalResolution, { kind: 'full' | 'unresolved' }>;
+export type RefusedFinal = Extract<FinalResolution, { kind: 'refused' }>;
+
+export interface FinalClaim {
+  ref: string;
+  sha: string;
+}
+
+export interface IssueRefs {
+  all: ReadonlySet<string>;
+  open: ReadonlySet<string>;
+
+  // The open PRs a design pass did not leave behind.
+  deliveryOpen: readonly string[];
+}
+
+export interface FinalClaimFacts {
+  issue: string;
+  mark: { ref: string | null; sha: string; owner: string | null } | null;
+  phrase: { sha: string; mentioned: string[]; refs: IssueRefs } | null;
+}
+
+export type FinalResolutions = ReadonlyMap<string, FinalResolution>;
+
+export type CommitsRead = { kind: 'listed'; shas: string[] } | { kind: 'fault'; reason: string };
+export type CommitRead = { kind: 'found'; sha: string } | { kind: 'missing' } | { kind: 'fault'; reason: string };
 
 // What a check of an imp's workspace found: every commit on a remote branch and nothing
 // uncommitted, work that is not pushed, or no answer.

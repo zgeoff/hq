@@ -1,4 +1,5 @@
 import { expect, onTestFinished, test } from 'bun:test';
+import { buildStubFinalGH } from '../../test/build-stub-final-gh.ts';
 import { NOON_SYDNEY, fakeAtc, freshDb } from '../../test/helpers.ts';
 import { AtcClient } from '../atc/atc-client.ts';
 import { addRun } from './add-run.ts';
@@ -19,7 +20,7 @@ function setupTest() {
   const tick = async () => {
     const client = await AtcClient.open();
     try {
-      await ingestNotes(fresh.db, client);
+      await ingestNotes(fresh.db, client, { run: buildStubFinalGH({ commits: [] }, []) });
     } finally {
       client.close();
     }

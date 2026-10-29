@@ -160,7 +160,7 @@ describe('refusals through the real functions', () => {
     run();
     addPr(db, 'GEO-9100', 'hq#902', 'z-delivery');
     closePr(db, 'hq#902', { to: 'merged', actor: 'z-review' });
-    expect(() => finalPr(db, 'hq#902', 'abcdef1', 'z-delivery')).toThrow('hq#902 is merged');
+    expect(() => finalPr(db, 'hq#902', { sha: 'abcdef1', actor: 'z-delivery' })).toThrow('hq#902 is merged');
     expect(() => unfinalPr(db, 'hq#902', 'z-delivery', null)).toThrow('hq#902 is merged');
     expect(() => closePr(db, 'hq#902', { to: 'closed', actor: 'z-review' })).toThrow('hq#902 is merged');
   });

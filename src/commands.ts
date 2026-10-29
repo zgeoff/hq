@@ -19,7 +19,7 @@ export interface Ctx {
   rest: string[];
   flags: Flags;
 
-  // The runner hq review and hq noslop spawn their tools through: the real one, or the fake a test gives main().
+  // The runner a command spawns its tools through: the real one, or the fake a test gives main().
   run: Runner;
 }
 

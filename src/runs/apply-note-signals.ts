@@ -1,20 +1,36 @@
 import type { Database } from 'bun:sqlite';
 import { z } from 'zod';
+import { buildFinalKey } from './build-final-key.ts';
+import { collectMentionedPRs } from './collect-mentioned-prs.ts';
+import { FINAL_MARK } from './final-mark.ts';
+import { FINAL_PHRASE } from './final-phrase.ts';
 import { normalizePrRef } from './normalize-pr-ref.ts';
+import { parseMarkedRef } from './parse-marked-ref.ts';
+import { pickPhraseTarget } from './pick-phrase-target.ts';
 import { PR_IN_TEXT } from './pr-in-text.ts';
 import { scheduleFinalReview as markFinal } from './schedule-final-review.ts';
+import { sendFinalRefusal } from './send-final-refusal.ts';
+import { readIssueRefs } from './read-issue-refs.ts';
 import { registerRunPR as attachPr } from './register-run-pr.ts';
+import { requirePR } from './require-pr.ts';
+import { prAllows } from '../transitions/pr-allows.ts';
+import type { FinalResolutions } from './types.ts';
 
-export function applyNoteSignals(db: Database, issue: string, text: string, source: string, note: number | null = null, actor: string = source): { prs: string[]; final: string | null } {
-  // The fixed phrase briefs ask for: "FINAL <repo>#<n> <sha>". Also today's
-  // wording: "... is final (again) at <sha>" next to a PR reference.
-  // The callers read both patterns' groups by index. FINAL_PHRASE has no u: with i, u adds
-  // Unicode case folding, so "ſ" would match the s in "is".
-  // oxlint-disable-next-line prefer-named-capture-group
-  const FINAL_MARK = /^\s*FINAL\s+(\S+#\d+)\s+([0-9a-f]{7,40})\b/u,
-    // oxlint-disable-next-line prefer-named-capture-group, require-unicode-regexp
-    FINAL_PHRASE = /\bis final(?: again)? at ([0-9a-f]{7,40})\b/i,
-    found: string[] = [];
+interface SignalOptions {
+  source: string;
+  note?: number | null;
+  actor?: string;
+  resolutions?: FinalResolutions;
+}
+
+const NO_RESOLUTIONS: FinalResolutions = new Map();
+
+export function applyNoteSignals(db: Database, issue: string, text: string, options: SignalOptions): { prs: string[]; final: string | null } {
+  const source = options.source;
+  const actor = options.actor ?? source;
+  const note = options.note ?? null;
+  const resolutions = options.resolutions ?? NO_RESOLUTIONS;
+  const found: string[] = [];
   for (const m of text.matchAll(PR_IN_TEXT)) {
     // Only a PR the agent says it opened: a note that merely mentions another
     // PR ("rebased after nixie#149 merged") must not attach it.
@@ -35,12 +51,12 @@ export function applyNoteSignals(db: Database, issue: string, text: string, sour
   let final: string | null = null;
   const mark = FINAL_MARK.exec(text);
   if (mark) {
-    final = applyFinalMark(db, { issue, ref: mark[1] ?? '', sha: mark[2] ?? '', source: `marker:${source}`, actor, note });
+    final = applyFinalMark(db, { issue, ref: mark[1] ?? '', sha: mark[2] ?? '', source: `marker:${source}`, actor, note, resolutions });
   } else {
     const phrase = FINAL_PHRASE.exec(text);
     if (phrase) {
-      const target = pickPhraseTarget(mentionedPrs(text), readIssueRefs(db, issue));
-      if (target !== null && markFinal(db, { ref: target, sha: String(phrase[1]), source: `phrase:${source}`, actor, note })) {
+      const target = pickPhraseTarget(collectMentionedPRs(text), readIssueRefs(db, issue));
+      if (target !== null && markResolved(db, { issue, ref: target, sha: String(phrase[1]), source: `phrase:${source}`, actor, note, resolutions })) {
         final = target;
       }
     }
@@ -55,6 +71,7 @@ interface FinalMarkInput {
   source: string;
   actor: string;
   note: number | null;
+  resolutions: FinalResolutions;
 }
 
 const RunPrOwnerSchema = z.object({ issue: z.string() }).nullable();
@@ -71,53 +88,17 @@ function applyFinalMark(db: Database, input: FinalMarkInput): string | null {
   } else if (owner.issue !== input.issue) {
     return null;
   }
-  return markFinal(db, { ref, sha: input.sha, source: input.source, actor: input.actor, note: input.note }) ? ref : null;
+  return markResolved(db, { ...input, ref }) ? ref : null;
 }
 
-function parseMarkedRef(raw: string): string | null {
-  try {
-    return normalizePrRef(raw).ref;
-  } catch {
-    return null;
+function markResolved(db: Database, input: FinalMarkInput): boolean {
+  const resolution = input.resolutions.get(buildFinalKey(input.ref, input.sha)) ?? null;
+  if (resolution?.kind === 'refused') {
+    if (!prAllows('final', requirePR(db, input.ref).state)) {
+      return false;
+    }
+    sendFinalRefusal(db, { issue: input.issue, ref: input.ref, given: input.sha, refusal: resolution, actor: input.actor });
+    return false;
   }
-}
-
-interface IssueRefs {
-  all: ReadonlySet<string>;
-  open: ReadonlySet<string>;
-
-  // The open PRs a design pass did not leave behind.
-  deliveryOpen: readonly string[];
-}
-
-// The PR the phrase speaks of. A note that names any PR outside this row is ambiguous: mark nothing.
-// When the note names PRs, exactly one of them must be this row's open PR. Only a note that names
-// none falls back to the only open PR, a design pass's PR left out, since a build agent speaks of its own.
-function pickPhraseTarget(mentioned: readonly string[], refs: IssueRefs): string | null {
-  if (mentioned.some((ref) => !refs.all.has(ref))) {
-    return null;
-  }
-  if (mentioned.length > 0) {
-    const named = mentioned.filter((ref) => refs.open.has(ref));
-    return named.length === 1 ? (named[0] ?? null) : null;
-  }
-  return refs.deliveryOpen.length === 1 ? (refs.deliveryOpen[0] ?? null) : null;
-}
-
-function mentionedPrs(text: string): string[] {
-  const refs = new Set<string>();
-  for (const m of text.matchAll(PR_IN_TEXT)) {
-    try {
-      refs.add(normalizePrRef(m[0]).ref);
-    } catch {}
-  }
-  return [...refs];
-}
-
-const IssuePRsSchema = z.array(z.object({ ref: z.string(), state: z.string(), design_pass: z.number() }));
-
-function readIssueRefs(db: Database, issue: string): IssueRefs {
-  const rows = IssuePRsSchema.parse(db.query('SELECT ref, state, design_pass FROM run_prs WHERE issue = ? ORDER BY added_at').all(issue));
-  const open = rows.filter((row) => row.state === 'open');
-  return { all: new Set(rows.map((row) => row.ref)), open: new Set(open.map((row) => row.ref)), deliveryOpen: open.filter((row) => row.design_pass === 0).map((row) => row.ref) };
+  return markFinal(db, { ref: input.ref, sha: input.sha, source: input.source, actor: input.actor, note: input.note, resolution });
 }
