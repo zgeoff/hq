@@ -43,8 +43,7 @@ function setupTest() {
   const addLocalRun = (issue: string): void => {
     addRun(fresh.db, { issue, title: 'Descale the kettle', place: 'local', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: null, actor: 'z-delivery' });
   };
-
-return { db: fresh.db, readySeeds, sample, seedReady, addLocalRun };
+  return { db: fresh.db, readySeeds, sample, seedReady, addLocalRun };
 }
 
 test('a focus set changes what the next plan picks, and the running run keeps its slot', async () => {
