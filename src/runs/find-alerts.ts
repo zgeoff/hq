@@ -78,10 +78,12 @@ function formatRestackHint(ref: string): string {
 }
 
 // The run's active sessions, and with no active main session, the main one that ended last when the
-// sweep ended it: atc no longer listed it, so its work may be lost. One ended by hand is not watched.
+// sweep ended it: atc no longer listed it, so its work may be lost. One ended by hand is not watched,
+// nor one of the design pass the run turned from: the build run has its own.
 function findWatchedSessions(sessions: readonly RunSession[]): RunSession[] {
-  const active = sessions.filter((session) => session.active === 1),
-    [last] = sessions.filter((session) => session.helper === 0).toSorted((a, b) => (b.ended_at ?? '').localeCompare(a.ended_at ?? ''));
+  const own = sessions.filter((session) => session.design_pass === 0);
+  const active = own.filter((session) => session.active === 1);
+  const [last] = own.filter((session) => session.helper === 0).toSorted((left, right) => (right.ended_at ?? '').localeCompare(left.ended_at ?? ''));
   return active.some((session) => session.helper === 0) || last?.ended_by !== 'sweep' ? active : [...active, last];
 }
 

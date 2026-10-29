@@ -7,6 +7,7 @@ import { recordCICheckOverride } from '../pr-status/record-ci-check-override.ts'
 import { recordPROverride } from '../pr-status/record-pr-override.ts';
 import { setSession } from './set-session.ts';
 import { setState } from './set-state.ts';
+import { updateGoneRunSessions } from './update-gone-run-sessions.ts';
 import { addUnblock } from '../unblock/add-unblock.ts';
 import { closeUnblock } from '../unblock/close-unblock.ts';
 
@@ -301,4 +302,16 @@ test('it raises the exit alert for a build session that left no PR, though its d
   const alerts = findAlerts(ctx.db, [], new Map(), new Date('2026-10-21T03:00:00Z'));
 
   expect(alerts).toStrictEqual([{ key: 'session:a0000031-aaaa-4aaa-8aaa-aaaaaaaaaaaa', fingerprint: 'exited', issue: 'GEO-9831', line: 'GEO-9831: session a0000031 has exited; check for its PR or final note' }]);
+});
+
+test('it raises no exit alert for the design pass session the sweep ended, while the build run has no session yet', () => {
+  const ctx = setupTest();
+  at('2026-10-21T01:00:00Z');
+  addRun(ctx.db, { issue: 'GEO-9861', title: 'Design the kettle spout', place: 'imp', session: 'a0000061-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', design: 'agent', actor: 'kettle-bot' });
+  updateGoneRunSessions(ctx.db, [], 'hq-sweep', new Date('2026-10-21T01:30:00Z'));
+  at('2026-10-21T01:40:00Z');
+  setState(ctx.db, 'GEO-9861', 'done', { note: 'design settled' }, 'kettle-bot');
+  addRun(ctx.db, { issue: 'GEO-9861', title: 'Build the kettle spout', place: 'imp', session: null, next: 'Building.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
+
+  expect(findAlerts(ctx.db, [], new Map(), new Date('2026-10-21T02:00:00Z'))).toStrictEqual([]);
 });
