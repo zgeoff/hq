@@ -46,7 +46,10 @@ export interface FleetSession {
   name: string;
   alive: boolean;
   state?: string; // atc's running | needs_you | done | exited
-  lifecycle?: { desired?: string; harness?: string };
+  lifecycle?: { desired?: string; harness?: string; vm?: string | null | undefined } | null | undefined;
+
+  // the host the session runs on: local is this PC, anything else an imp
+  locator?: { targetID?: string | null | undefined } | null | undefined;
 
   // atc 4.15+: the folders the session was spawned with
   pluginDirs?: readonly string[] | null | undefined;

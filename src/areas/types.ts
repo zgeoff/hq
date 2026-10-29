@@ -29,7 +29,7 @@ export interface AwakeSession {
   name?: string;
   alive: boolean;
   locator?: { targetID?: string | null | undefined } | null | undefined;
-  lifecycle?: { desired?: string; vm?: string; harness?: string };
+  lifecycle?: { desired?: string | null | undefined; vm?: string | null | undefined; harness?: string | null | undefined } | null | undefined;
   state?: string;
 }
 
