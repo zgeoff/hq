@@ -27,8 +27,7 @@ function setupTest() {
     await readLinearReady(fresh.db, { call: makePagedCall(buildReadyPage(seeds, null)), run: buildStubGitHubFactsRunner({}), actor: 'hq-lanes', rules });
   };
   const queued = () => fresh.db.query("SELECT target, text FROM outbox WHERE text LIKE 'Lanes: % slot-minutes empty today%' ORDER BY id").all();
-
-return { db: fresh.db, seedReady, queued };
+  return { db: fresh.db, seedReady, queued };
 }
 
 test('it tags no cause and counts no minutes while Ready work has waited 10 minutes or less', async () => {
