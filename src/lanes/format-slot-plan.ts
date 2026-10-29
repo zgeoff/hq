@@ -1,4 +1,5 @@
 import { formatCapLine } from './cap/format-cap-line.ts';
+import { formatDesignLanes } from './format-design-lanes.ts';
 import { formatFocusLine } from '../focus/format-focus-line.ts';
 import type { SlotPlan } from './read-slot-plan.ts';
 
@@ -18,7 +19,7 @@ export function formatSlotPlan(slotPlan: SlotPlan, at: Date): string[] {
     `focus: ${slotPlan.focus === null ? 'none (all eligible work by priority)' : formatFocusLine(slotPlan.focus)}`,
     plan === null ? 'next: Ready unknown (no fresh read from Linear)' : `next: ${plan.picks.length === 0 ? 'nothing' : plan.picks.map((pick) => pick.issue).join(', ')} (${slotPlan.eligible ?? 0} eligible${formatReadyAge(slotPlan.readyReadAt, at)})`,
     ...(plan?.lent ?? []).map((lent) => `  lent: ${lent.slots} slot(s) reserved for ${lent.area}, nothing eligible`),
-    ...(slotPlan.design === null ? [] : [`design slot, when it is free: ${slotPlan.design}`]),
+    formatDesignLanes(slotPlan.design),
   ];
 }
 

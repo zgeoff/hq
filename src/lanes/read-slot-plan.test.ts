@@ -7,14 +7,19 @@ import { at, freshDb } from '../../test/helpers.ts';
 import { makeStateCall } from '../../test/make-state-call.ts';
 import { runFocusCommand } from '../focus/run-focus-command.ts';
 import { addRun } from '../runs/add-run.ts';
+import type { AddRunInput } from '../runs/types.ts';
 import { setMeta } from '../db/set-meta.ts';
+import { writeIssues } from '../linear/write-issues.ts';
 import { setState } from '../runs/set-state.ts';
+import { formatSlotNudge } from './format-slot-nudge.ts';
 import { formatSlotPlan } from './format-slot-plan.ts';
 import { parseLocalRoom } from './parse-local-room.ts';
 import { readLinearReady } from './read-linear-ready.ts';
 import { readSlotPlan } from './read-slot-plan.ts';
 import { tick } from './tick.ts';
+import type { ReadyIssue } from './types.ts';
 import { validateLaneRules } from './validate-lane-rules.ts';
+import { writeDesignBacklog } from './write-design-backlog.ts';
 import { writeLaneSkip } from './write-lane-skip.ts';
 
 // Three local slots and no imp ones, so impd's line plays no part. readySeeds: a kettle team's Ready
@@ -39,7 +44,22 @@ function setupTest() {
   const addLocalRun = (issue: string): void => {
     addRun(fresh.db, { issue, title: 'Descale the kettle', place: 'local', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: null, actor: 'z-delivery' });
   };
-  return { db: fresh.db, readySeeds, sample, seedReady, addLocalRun };
+
+  // A design ticket as a Ready or Backlog read holds it, with the 2 agent and 1 with-geoff design pass pacing.json gives by default.
+  const createdAt = '2026-10-01T00:00:00Z';
+  const buildTicket = (identifier: string, priority: number, type: ReadyIssue['type'] = 'Design'): ReadyIssue => ({ identifier, project: 'kettle roadmap', projectLabels: [], labels: ['atc'], type, priority, createdAt, parent: null });
+  const seedSnapshot = (eligible: ReadyIssue[], design: ReadyIssue[] = []): void => {
+    setMeta(fresh.db, 'lanes_ready_issues', JSON.stringify({ at: '2026-10-15T20:00:00Z', eligible, design }));
+  };
+  const addAnyRun = (issue: string, extra: Partial<AddRunInput> = {}) => addRun(fresh.db, { issue, title: 'Design the kettle spout', place: 'local', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: null, actor: 'z-delivery', ...extra });
+  const plan = () => {
+    const slotPlan = readSlotPlan(fresh.db, sample, new Date('2026-10-15T20:00:00Z'));
+    if (slotPlan === null) {
+      throw new Error('no slot plan');
+    }
+    return slotPlan;
+  };
+  return { db: fresh.db, readySeeds, sample, seedReady, addLocalRun, buildTicket, seedSnapshot, addAnyRun, plan };
 }
 
 test('a focus set changes what the next plan picks, and the running run keeps its slot', async () => {
@@ -251,4 +271,89 @@ test('a malformed stored cap limits nothing', async () => {
   const plan = readSlotPlan(ctx.db, ctx.sample);
 
   expect(plan?.pool.free).toBe(3);
+});
+
+test('a design pass fills a design lane and changes no delivery number, and hq lanes lists the 3 lanes', () => {
+  const ctx = setupTest();
+  ctx.addAnyRun('GEO-9801', { title: 'Descale the kettle' });
+  const before = ctx.plan();
+
+  ctx.addAnyRun('GEO-9802', { design: 'agent', session: 'a0000001-aaaa-4aaa-8aaa-aaaaaaaaaaaa' });
+  const after = ctx.plan();
+
+  expect(before.design).toStrictEqual({ agent: { open: 0, slots: 2, next: [] }, withGeoff: { open: 0, slots: 1, next: [], asked: [] } });
+  expect(after.design.agent.open).toBe(1);
+  expect([after.pool, after.cap.working]).toStrictEqual([before.pool, before.cap.working]);
+  expect(after.pool.localRunning).toBe(1);
+  expect(formatSlotPlan(after, new Date('2026-10-15T20:00:00Z')).at(-1)).toBe('design: agent 1/2, with-geoff 0/1');
+});
+
+test('a Design-type issue run with no --design flag fills the with-geoff lane and no delivery slot', () => {
+  const ctx = setupTest();
+  writeIssues(ctx.db, [{ issue: 'GEO-9803', type: 'Design', title: 'Design: a quieter kettle whistle', state: 'open', closed_at: null }]);
+
+  ctx.addAnyRun('GEO-9803', { geoffChat: true });
+
+  expect([ctx.plan().design.withGeoff.open, ctx.plan().pool.localRunning]).toStrictEqual([1, 0]);
+});
+
+test('a with-geoff pass started with --asked shows above the lane count in the lanes line', () => {
+  const ctx = setupTest();
+  ctx.addAnyRun('GEO-9804', { design: 'with-geoff' });
+  ctx.addAnyRun('GEO-9805', { design: 'with-geoff', asked: 'chat 29 Oct' });
+
+  expect(formatSlotPlan(ctx.plan(), new Date('2026-10-15T20:00:00Z')).at(-1)).toBe('design: agent 0/2, with-geoff 2/1 (asked: chat 29 Oct)');
+});
+
+test('a closed design run does not stop its issue being picked once Ready, and an open one does', () => {
+  const ctx = setupTest();
+  ctx.addAnyRun('GEO-9814', { design: 'agent' });
+  ctx.addAnyRun('GEO-9815', { design: 'agent' });
+  setState(ctx.db, 'GEO-9814', 'done', { note: 'design settled' }, 'z-delivery');
+  ctx.seedSnapshot([ctx.buildTicket('GEO-9814', 2, 'Feature'), ctx.buildTicket('GEO-9815', 2, 'Feature')]);
+
+  expect(ctx.plan().plan?.picks.map((pick) => pick.issue)).toStrictEqual(['GEO-9814']);
+});
+
+test('a built issue that is Design type still counts as a delivery run', () => {
+  const ctx = setupTest();
+  writeIssues(ctx.db, [{ issue: 'GEO-9812', type: 'Design', title: 'Design: a quieter kettle whistle', state: 'open', closed_at: null }]);
+  ctx.addAnyRun('GEO-9812');
+  setState(ctx.db, 'GEO-9812', 'done', { note: 'design settled' }, 'z-delivery');
+
+  ctx.addAnyRun('GEO-9812', { title: 'Build the whistle' });
+
+  expect([ctx.plan().pool.localRunning, ctx.plan().design.withGeoff.open]).toStrictEqual([1, 0]);
+});
+
+test('the needs-design queues name an issue per free lane in focus order, leave out an issue with an open run, and print in the lanes line and the nudge', () => {
+  const ctx = setupTest();
+  ctx.seedSnapshot([], [ctx.buildTicket('GEO-9824', 3)]);
+  writeDesignBacklog(ctx.db, {
+    at: new Date('2026-10-15T20:00:00Z'),
+    agent: [ctx.buildTicket('GEO-9821', 3), ctx.buildTicket('GEO-9822', 1), ctx.buildTicket('GEO-9823', 2)],
+    withGeoff: [ctx.buildTicket('GEO-9825', 1)],
+  });
+  ctx.addAnyRun('GEO-9823', { design: 'agent' });
+
+  const plan = ctx.plan();
+
+  expect(plan.design).toStrictEqual({ agent: { open: 1, slots: 2, next: ['GEO-9822'] }, withGeoff: { open: 0, slots: 1, next: ['GEO-9825'], asked: [] } });
+  expect(formatSlotPlan(plan, new Date('2026-10-15T20:00:00Z')).at(-1)).toBe('design: agent 1/2 (next GEO-9822), with-geoff 0/1 (next GEO-9825)');
+  expect(formatSlotNudge(plan, 12)).toInclude('design: agent 1/2 (next GEO-9822), with-geoff 0/1 (next GEO-9825).');
+});
+
+test('a full with-geoff lane still names the next issue, as waiting, from the Ready Design issues', () => {
+  const ctx = setupTest();
+  ctx.seedSnapshot([], [ctx.buildTicket('GEO-9831', 2)]);
+  ctx.addAnyRun('GEO-9832', { design: 'with-geoff' });
+
+  expect(formatSlotPlan(ctx.plan(), new Date('2026-10-15T20:00:00Z')).at(-1)).toBe('design: agent 0/2, with-geoff 1/1 (next GEO-9831, waiting)');
+});
+
+test('a stale Backlog read names no needs-design issue', () => {
+  const ctx = setupTest();
+  writeDesignBacklog(ctx.db, { at: new Date('2026-10-15T19:00:00Z'), agent: [ctx.buildTicket('GEO-9841', 2)], withGeoff: [ctx.buildTicket('GEO-9842', 2)] });
+
+  expect(ctx.plan().design).toStrictEqual({ agent: { open: 0, slots: 2, next: [] }, withGeoff: { open: 0, slots: 1, next: [], asked: [] } });
 });
