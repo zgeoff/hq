@@ -1015,11 +1015,11 @@ Round ${p.review_round} recorded at ${p.reviewed_sha}.` };
       return { data: { note: n }, text: runLine(view(n.issue)) };
     }
     case 'show': {
-      const r = viewRun(db, resolveRun(db, arg(0, 'issue or session')));
-      const notes = notesFor(db, r.issue, intFlag(flags.notes, 'notes') ?? 5);
-      const designPass = readDesignMoves(db, r.issue);
-      const text = [runLine(r), ...r.sessions.map((s) => `  ${s.helper ? 'helper' : 'session'} ${s.session_id}${s.active ? ' (active)' : ` (ended ${s.ended_at})`}`), ...notes.map((n) => `  ${n.at} [${n.source}${n.label ? `/${n.label}` : ''}] ${n.text.replace(/\s+/g, ' ').slice(0, 200)}`)].join('\n');
-      return { data: { run: r, notes, designPass }, text: [text, ...formatDesignMoves(designPass)].join('\n') };
+      const shown = viewRun(db, resolveRun(db, arg(0, 'issue or session'), 'allow'));
+      const notes = notesFor(db, shown.issue, intFlag(flags.notes, 'notes') ?? 5);
+      const designPass = readDesignMoves(db, shown.issue);
+      const text = [runLine(shown), ...shown.sessions.map((session) => `  ${session.helper ? 'helper' : 'session'} ${session.session_id}${session.active ? ' (active)' : ` (ended ${session.ended_at})`}`), ...notes.map((note) => `  ${note.at} [${note.source}${note.label ? `/${note.label}` : ''}] ${note.text.replaceAll(/\s+/gu, ' ').slice(0, 200)}`)].join('\n');
+      return { data: { run: shown, notes, designPass }, text: [text, ...formatDesignMoves(designPass)].join('\n') };
     }
     case 'list':
     case undefined: {

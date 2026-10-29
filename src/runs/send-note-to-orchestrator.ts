@@ -7,7 +7,7 @@ import type { FeedEvent } from './types.ts';
 
 const ROUTED_LABELS = new Set(['decision', 'blocked']);
 
-const RunIssueSchema = z.object({ issue: z.string() }).nullable();
+const RunIssueSchema = z.object({ issue: z.string(), design_pass: z.number() }).nullable();
 
 // Queue a decision or blocked note for the orchestrator, named by target, inside the caller's transaction.
 // An events row keyed on the session, the note's time and a hash of its label and text records each
@@ -21,8 +21,10 @@ export function sendNoteToOrchestrator(db: Database, event: FeedEvent, target: s
   if (db.query(`SELECT 1 FROM events WHERE subject = 'run' AND subject_id = ? AND action = 'note-routed'`).get(key)) {
     return false;
   }
-  const run = RunIssueSchema.parse(db.query('SELECT issue FROM run_sessions WHERE session_id = ? ORDER BY active DESC, added_at DESC LIMIT 1').get(event.session));
-  const issue = run?.issue ?? '(no run)';
+  const run = RunIssueSchema.parse(db.query('SELECT issue, design_pass FROM run_sessions WHERE session_id = ? ORDER BY active DESC, added_at DESC LIMIT 1').get(event.session));
+
+  // A late note from the design pass the run turned from still goes, named for the pass, not the build run.
+  const issue = run === null ? '(no run)' : `${run.issue}${run.design_pass === 1 ? "'s design pass" : ''}`;
   const session = event.name ?? event.session.slice(0, 8);
   const seq = logEvent(db, 'run', key, 'note-routed', 'hq', null, null, { issue: run?.issue ?? null, label: event.label });
   enqueue(db, seq, target, `${event.label} from ${issue} (${session}): ${event.detail}`);

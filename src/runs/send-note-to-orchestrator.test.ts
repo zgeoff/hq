@@ -5,6 +5,7 @@ import { addRun } from './add-run.ts';
 import { FROM_START } from './from-start.ts';
 import { ingestNotes } from './ingest-notes.ts';
 import { sendNoteToOrchestrator } from './send-note-to-orchestrator.ts';
+import { setState } from './set-state.ts';
 
 // A database, and a fake atc with an empty feed that knows the kettle session.
 function setupTest() {
@@ -88,4 +89,17 @@ test('a decision note goes to the target the caller names', () => {
   const sent = sendNoteToOrchestrator(app.db, { at: Date.parse(NOON_SYDNEY), session: app.kettle, name: 'kettle', kind: 'note', detail: 'buy a new kettle', label: 'decision', cursor: 'kettle-1' }, 'teapot-lead');
 
   expect([sent, app.outbox()]).toStrictEqual([true, [{ target: 'teapot-lead', text: 'decision from (no run) (kettle): buy a new kettle' }]]);
+});
+
+test('a blocked note from the design pass session names the design pass, not the build run', async () => {
+  const app = setupTest();
+  addRun(app.db, { issue: 'GEO-9833', title: 'Design the kettle spout', place: 'local', session: app.kettle, next: 'Agent working.', gate: null, geoffChat: false, design: 'agent', actor: 'z-delivery' });
+  setState(app.db, 'GEO-9833', 'done', { note: 'design settled' }, 'z-delivery');
+  addRun(app.db, { issue: 'GEO-9833', title: 'Build the kettle spout', place: 'local', session: null, next: 'Building.', gate: null, geoffChat: false, actor: 'z-delivery' });
+  app.db.query("INSERT INTO meta (key, value) VALUES ('atc_events_cursor', ?)").run(FROM_START);
+  app.feed.push({ at: Date.parse(NOON_SYDNEY), session: app.kettle, name: 'kettle', kind: 'note', detail: 'waiting on a spout sketch review', label: 'blocked' });
+
+  await app.tick();
+
+  expect(app.outbox()).toStrictEqual([{ target: 'z-delivery', text: "blocked from GEO-9833's design pass (kettle): waiting on a spout sketch review" }]);
 });
