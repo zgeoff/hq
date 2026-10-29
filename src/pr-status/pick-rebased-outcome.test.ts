@@ -14,11 +14,11 @@ test.each([
   expect(pickRebasedOutcome({ slug: 'zgeoff/widgets', pr: 7, oldHead: 'a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1', newHead: 'b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2', oldPatchID: { kind: 'patch-id', id: 'c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3' }, newPatchID: { kind: 'patch-id', id: 'd4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4' }, changed })).toStrictEqual({ kind: 'refuse', code: 'not_carried', message: `the diff of zgeoff/widgets#7 at b2b2b2b is not the one the owner approved at a1a1a1a (${reason}); the lgtm is not carried and needs the owner's answer at the new head` });
 });
 
-test.each<[string, DiffPatchID, DiffPatchID, 'git_unreadable' | 'not_carried', string]>([
-  ['an empty diff at the new head', { kind: 'patch-id', id: 'c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3' }, { kind: 'empty' }, 'not_carried', 'the diff at b2b2b2b is empty against the base of zgeoff/widgets#7, so the lgtm is not carried and nothing is recorded'],
-  ['empty diffs at both heads', { kind: 'empty' }, { kind: 'empty' }, 'not_carried', 'the diffs at a1a1a1a and b2b2b2b are empty against the base of zgeoff/widgets#7, so the lgtm is not carried and nothing is recorded'],
-  ['a diff git cannot read at the old head', { kind: 'unreadable' }, { kind: 'empty' }, 'git_unreadable', 'hq could not read the diff at a1a1a1a of zgeoff/widgets#7 in its checkout, so the lgtm is not carried and nothing is recorded'],
-  ['a diff git cannot read at the new head', { kind: 'patch-id', id: 'c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3' }, { kind: 'unreadable' }, 'git_unreadable', 'hq could not read the diff at b2b2b2b of zgeoff/widgets#7 in its checkout, so the lgtm is not carried and nothing is recorded'],
-])('it refuses %s', (_label, oldPatchID, newPatchID, code, message) => {
-  expect(pickRebasedOutcome({ slug: 'zgeoff/widgets', pr: 7, oldHead: 'a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1', newHead: 'b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2', oldPatchID, newPatchID, changed: null })).toStrictEqual({ kind: 'refuse', code, message });
+test.each<{ label: string; oldPatchID: DiffPatchID; newPatchID: DiffPatchID; code: 'git_unreadable' | 'not_carried'; message: string }>([
+  { label: 'an empty diff at the new head', oldPatchID: { kind: 'patch-id', id: 'c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3' }, newPatchID: { kind: 'empty' }, code: 'not_carried', message: 'the diff at b2b2b2b is empty against the base of zgeoff/widgets#7, so the lgtm is not carried and nothing is recorded' },
+  { label: 'empty diffs at both heads', oldPatchID: { kind: 'empty' }, newPatchID: { kind: 'empty' }, code: 'not_carried', message: 'the diffs at a1a1a1a and b2b2b2b are empty against the base of zgeoff/widgets#7, so the lgtm is not carried and nothing is recorded' },
+  { label: 'a diff git cannot read at the old head', oldPatchID: { kind: 'unreadable' }, newPatchID: { kind: 'empty' }, code: 'git_unreadable', message: 'hq could not read the diff at a1a1a1a of zgeoff/widgets#7 in its checkout, so the lgtm is not carried and nothing is recorded' },
+  { label: 'a diff git cannot read at the new head', oldPatchID: { kind: 'patch-id', id: 'c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3' }, newPatchID: { kind: 'unreadable' }, code: 'git_unreadable', message: 'hq could not read the diff at b2b2b2b of zgeoff/widgets#7 in its checkout, so the lgtm is not carried and nothing is recorded' },
+])('it refuses $label', (row) => {
+  expect(pickRebasedOutcome({ slug: 'zgeoff/widgets', pr: 7, oldHead: 'a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1', newHead: 'b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2', oldPatchID: row.oldPatchID, newPatchID: row.newPatchID, changed: null })).toStrictEqual({ kind: 'refuse', code: row.code, message: row.message });
 });
