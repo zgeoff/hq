@@ -244,6 +244,35 @@ test('it refuses hq run state --reopen on an agent pass while the agent lane is 
   expect(JSON.parse(printed.join(''))).toMatchObject({ ok: false, error: { code: 'design_full' } });
 });
 
+test('it moves a closed agent pass to another closed state with --reopen while the agent lane is full', async () => {
+  const fresh = freshDb();
+  const log = console.log;
+  const printed: string[] = [];
+  onTestFinished(fresh.cleanup);
+  mkdirSync(`${fresh.dir}/bin`);
+  writeFileSync(`${fresh.dir}/bin/systemctl`, '#!/bin/sh\nexit 3\n');
+  chmodSync(`${fresh.dir}/bin/systemctl`, 0o755);
+  mkdirSync(`${fresh.dir}/skill/scripts`, { recursive: true });
+  writeFileSync(`${fresh.dir}/skill/scripts/capacity.sh`, `echo '${JSON.stringify({ imp: { freeMib: 0, room: false } })}'\n`);
+  writeFileSync(`${fresh.dir}/skill/pacing.json`, JSON.stringify({ slots: { imp: 2, local: 2 }, designSlots: 1, agentDesignSlots: 1 }));
+  onTestFinished(overrideEnv('HQ_CAPACITY', `${fresh.dir}/skill/scripts/capacity.sh`));
+  onTestFinished(overrideEnv('HQ_NOW', NOON_SYDNEY));
+  onTestFinished(overrideEnv('HQ_NOTIFY', 'off'));
+  onTestFinished(overrideEnv('HQ_AS', 'z-delivery'));
+  onTestFinished(overrideEnv('PATH', `${fresh.dir}/bin:${process.env['PATH']}`));
+  console.log = (line: string) => void printed.push(line);
+  onTestFinished(() => (console.log = log));
+  at(NOON_SYDNEY);
+  addRun(fresh.db, { issue: 'GEO-9961', title: 'Design the kettle spout', place: 'local', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: null, design: 'agent', actor: 'z-delivery' });
+  setState(fresh.db, 'GEO-9961', 'done', { note: 'design settled' }, 'z-delivery');
+  addRun(fresh.db, { issue: 'GEO-9962', title: 'Design the kettle lid', place: 'local', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: null, design: 'agent', actor: 'z-delivery' });
+
+  const code = await main(['run', 'state', 'GEO-9961', 'dropped', '--reopen', '--note', 'design pass not needed', '--json']);
+
+  expect(code).toBe(0);
+  expect(JSON.parse(printed.join(''))).toMatchObject({ ok: true, run: { issue: 'GEO-9961', state: 'dropped' } });
+});
+
 test('it refuses hq run add --design agent above the agent count', async () => {
   const fresh = freshDb();
   const log = console.log;

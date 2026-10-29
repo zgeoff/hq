@@ -196,6 +196,7 @@ import { loadPacing } from './lanes/load-pacing.ts';
 import { parseDesignFlag } from './lanes/parse-design-flag.ts';
 import { formatDesignMoves } from './runs/format-design-moves.ts';
 import { checkDesignReopen, reopenRun } from './runs/reopen-run.ts';
+import { CLOSED_RUN_STATES } from './transitions/closed-run-states.ts';
 import { readDesignMoves } from './runs/read-design-moves.ts';
 import { pacingPath } from './lanes/pacing-path.ts';
 import { buildLanePlan } from './lanes/build-lane-plan.ts';
@@ -917,7 +918,9 @@ ${r.result === 'added' ? 'On the board.' : 'Already on the board.'}` };
       if (liveCheck !== undefined) {
         requireLiveCheck(liveCheck);
       }
-      const reopenPacing = flags.reopen === true ? await loadPacing(pacingPath()) : null;
+
+      // A reopen into another closed state takes no design lane, so only a move to an open state is checked.
+      const reopenPacing = flags.reopen === true && !CLOSED_RUN_STATES.some((closed) => closed === state) ? await loadPacing(pacingPath()) : null;
       const moved = db.transaction(() => {
         if (reopenPacing !== null) {
           checkDesignReopen(db, issue, { slots: reopenPacing.design, error: reopenPacing.designError, asked: null });
