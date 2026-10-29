@@ -193,6 +193,9 @@ import { loadImpRoom } from './lanes/load-imp-room.ts';
 import { LANES } from './lanes/lanes.ts';
 import { nudgeLog } from './lanes/nudge-log.ts';
 import { loadPacing } from './lanes/load-pacing.ts';
+import { parseDesignFlag } from './lanes/parse-design-flag.ts';
+import { formatDesignMoves } from './runs/format-design-moves.ts';
+import { readDesignMoves } from './runs/read-design-moves.ts';
 import { pacingPath } from './lanes/pacing-path.ts';
 import { buildLanePlan } from './lanes/build-lane-plan.ts';
 import { formatLanePlan } from './lanes/format-lane-plan.ts';
@@ -313,7 +316,7 @@ import { readPacingLanes } from './lanes/read-pacing-lanes.ts';
 import { runLinearReadyTick } from './run-linear-ready-tick.ts';
 import { STEP_MS } from './watcher/step-ms.ts';
 import { formatSlotCause } from './lanes/format-slot-cause.ts';
-import { readPromotableIssues } from './lanes/read-promotable-issues.ts';
+import { readBacklogIssues } from './lanes/read-backlog-issues.ts';
 import { readSlotCause } from './lanes/read-slot-cause.ts';
 import { readSlotMinutes } from './lanes/read-slot-minutes.ts';
 import rulesTable from '../lanes.json';
@@ -465,6 +468,8 @@ const OPTIONS = {
   'needs-geoff': { type: 'boolean' },
   snapshot: { type: 'string' },
   'ready-since': { type: 'string' },
+  design: { type: 'string' },
+  asked: { type: 'string' },
   size: { type: 'string' },
   lines: { type: 'string' },
   'waits-on-geoff': { type: 'boolean' },
@@ -823,7 +828,7 @@ function runLine(r: RunView): string {
         .map((pr) => `${pr.ref} ${formatPRTag(pr)}`)
         .join(', ')
     : 'none yet';
-  const extra = [r.live_check ? `live check: ${r.live_check}` : null, r.gate ? `gate: ${r.gate}` : null, r.waits_on ? `waits on ${r.waits_on}` : null, r.geoff_chat ? 'the owner chats' : null].filter(Boolean).join('; ');
+  const extra = [r.design_lane ? `design pass: ${r.design_lane}` : null, r.live_check ? `live check: ${r.live_check}` : null, r.gate ? `gate: ${r.gate}` : null, r.waits_on ? `waits on ${r.waits_on}` : null, r.geoff_chat ? 'the owner chats' : null].filter(Boolean).join('; ');
   return `| ${sess}${r.lane ? ` ${r.lane}` : ''} | ${r.issue} ${r.title} [${r.state}] | ${prs} | ${r.next}${extra ? ` (${extra})` : ''} |`;
 }
 
@@ -852,6 +857,7 @@ async function runCommand(db: Database, verb: string | undefined, args: string[]
       }
       const where = (flags.where ?? 'imp') as 'local' | 'imp' | 'none';
       if (!['local', 'imp', 'none'].includes(where)) throw new HqError('bad_args', '--where must be local, imp or none');
+      const pacing = await loadPacing(pacingPath());
       const r = addRun(db, {
         issue: arg(0, 'issue'),
         title: need(flags.title, 'title'),
@@ -863,6 +869,9 @@ async function runCommand(db: Database, verb: string | undefined, args: string[]
         readySince: flags['ready-since'] ?? null,
         size: parseSize(flags.size, flags.lines),
         lane: flags.lane ? checkLane(await readLanes(), flags.lane) : null,
+        design: parseDesignFlag(flags.design),
+        asked: flags.asked ?? null,
+        designSlots: pacing.design,
         actor: await by(),
       });
       return { data: { result: r.result, run: r.run }, text: `${runLine(r.run)}
@@ -998,8 +1007,9 @@ Round ${p.review_round} recorded at ${p.reviewed_sha}.` };
     case 'show': {
       const r = viewRun(db, resolveRun(db, arg(0, 'issue or session')));
       const notes = notesFor(db, r.issue, intFlag(flags.notes, 'notes') ?? 5);
+      const designPass = readDesignMoves(db, r.issue);
       const text = [runLine(r), ...r.sessions.map((s) => `  ${s.helper ? 'helper' : 'session'} ${s.session_id}${s.active ? ' (active)' : ` (ended ${s.ended_at})`}`), ...notes.map((n) => `  ${n.at} [${n.source}${n.label ? `/${n.label}` : ''}] ${n.text.replace(/\s+/g, ' ').slice(0, 200)}`)].join('\n');
-      return { data: { run: r, notes }, text };
+      return { data: { run: r, notes, designPass }, text: [text, ...formatDesignMoves(designPass)].join('\n') };
     }
     case 'list':
     case undefined: {
@@ -1884,8 +1894,8 @@ async function lanesCommand(context: Pick<Ctx, 'db' | 'verb' | 'rest' | 'flags' 
       return runLaneSkipCommand({ db, actor: await by(), at: now(), args });
     }
     case 'promotable': {
-      const backlog = await readPromotableIssues(makeAuditedLinearCaller(db, context.run), rulesTable.team);
-      const issues = backlog.map((issue) => ({ identifier: issue.identifier, title: issue.title }));
+      const backlog = await readBacklogIssues(makeAuditedLinearCaller(db, context.run), rulesTable.team);
+      const issues = backlog.promotable.map((issue) => ({ identifier: issue.identifier, title: issue.title }));
       return { data: { issues }, text: issues.length > 0 ? issues.map((issue) => `${issue.identifier}  ${issue.title}`).join('\n') : 'No Backlog issue is ready to promote.' };
     }
     case 'ready': {

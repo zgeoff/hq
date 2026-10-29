@@ -4,7 +4,7 @@ import { parkedRuns } from '../areas/parked-runs.ts';
 import { readFreshAwake } from '../areas/read-fresh-awake.ts';
 import { RUNNING } from '../areas/running.ts';
 import { now } from '../clock/now.ts';
-import { readDesignIssues } from './read-design-issues.ts';
+import { readDesignRuns } from './read-design-runs.ts';
 
 export interface RunningByPlace {
   imp: number;
@@ -24,7 +24,7 @@ const rowsSchema = z.array(z.object({ issue: z.string(), place: z.enum(['imp', '
 
 export function readRunningByPlace(db: Database, at: Date = now()): RunningByPlace {
   const parked = new Set(parkedRuns(db, at).map((run) => run.issue));
-  const design = readDesignIssues(db);
+  const design = new Set(readDesignRuns(db).map((run) => run.issue));
   const rows = rowsSchema.parse(db.query(`SELECT issue, place FROM runs WHERE place != 'none' AND state IN (${RUNNING.map(() => '?').join(', ')}) ORDER BY issue`).all(...RUNNING));
   const holding = rows.filter((row) => !parked.has(row.issue) && !design.has(row.issue));
   const live = readLiveLocal(db, at, design);

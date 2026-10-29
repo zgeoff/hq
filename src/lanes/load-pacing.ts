@@ -1,9 +1,11 @@
 import { z } from 'zod';
 import { parseLanes } from '../areas/parse-lanes.ts';
 import type { LaneConfig } from '../areas/types.ts';
+import { DEFAULT_DESIGN_SLOTS } from './default-design-slots.ts';
+import { parseDesignSlots } from './parse-design-slots.ts';
 import { parseLocalRoom } from './parse-local-room.ts';
 import { parsePacingSlots } from './parse-pacing-slots.ts';
-import type { PacingSlots } from './types.ts';
+import type { DesignSlots, PacingSlots } from './types.ts';
 
 export interface Pacing {
   impMib: number;
@@ -15,6 +17,9 @@ export interface Pacing {
 
   // Claude's launch limit, providers.claude.threshold, in percent; null when the file gives none.
   claudeLaunchPct: number | null;
+
+  // The design lane counts (designSlots, agentDesignSlots), their defaults when the file gives none.
+  design: DesignSlots;
   error: string | null;
 }
 
@@ -38,14 +43,15 @@ export async function loadPacing(path: string): Promise<Pacing> {
   const impMib = imp.success ? imp.data.imp.impMib : DEFAULT_IMP_MIB;
   const claude = claudeSchema.safeParse(file);
   const claudeLaunchPct = claude.success ? claude.data.providers.claude.threshold : null;
-  if (shape.lanes === undefined && shape.slots === undefined) {
-    return { impMib, lanes: null, slots: null, localRoom: null, claudeLaunchPct, error: null };
-  }
   try {
-    return { impMib, lanes: parseLanes(file), slots: parsePacingSlots(file), localRoom: parseLocalRoom(file), claudeLaunchPct, error: null };
+    const design = parseDesignSlots(file);
+    if (shape.lanes === undefined && shape.slots === undefined) {
+      return { impMib, lanes: null, slots: null, localRoom: null, claudeLaunchPct, design, error: null };
+    }
+    return { impMib, lanes: parseLanes(file), slots: parsePacingSlots(file), localRoom: parseLocalRoom(file), claudeLaunchPct, design, error: null };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    return { impMib, lanes: null, slots: null, localRoom: null, claudeLaunchPct, error: `pacing.json: ${message}` };
+    return { impMib, lanes: null, slots: null, localRoom: null, claudeLaunchPct, design: DEFAULT_DESIGN_SLOTS, error: `pacing.json: ${message}` };
   }
 }
 

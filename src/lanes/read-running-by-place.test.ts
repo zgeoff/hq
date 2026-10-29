@@ -140,3 +140,18 @@ test('it leaves a Design run filed imp out of the imp count', () => {
 
   expect(readRunningByPlace(ctx.db)).toStrictEqual({ imp: 0, local: 0, issues: [], impIssues: [], localSource: null });
 });
+
+test('it leaves an agent design run on a non-Design issue out of the slot counts, and counts a pre-v46 run on a Design issue as with-geoff', () => {
+  const ctx = setupTest();
+  writeIssues(ctx.db, [{ issue: 'GEO-9931', type: 'Design', title: 'Design: a teapot lid that stays on', state: 'open', closed_at: null }]);
+  addRun(ctx.db, { issue: 'GEO-9930', title: 'Design the kettle spout', place: 'imp', session: 'a0000030-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', design: 'agent', actor: 'z-delivery' });
+  addRun(ctx.db, { issue: 'GEO-9931', title: 'Design: a teapot lid that stays on', place: 'imp', session: null, next: 'The owner chats.', gate: null, geoffChat: true, lane: 'cloud', actor: 'z-delivery' });
+  ctx.db.query('UPDATE runs SET design_lane = NULL WHERE issue = ?').run('GEO-9931');
+  addRun(ctx.db, { issue: 'GEO-9932', title: 'Descale the kettle', place: 'imp', session: 'a0000032-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
+  recordAwake(ctx.db, [
+    { id: 'a0000030-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'spout-design', alive: true, state: 'running', locator: { targetID: 'local' } },
+    { id: 'a0000032-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, state: 'running', locator: { targetID: 'imp-kettle' } },
+  ]);
+
+  expect(readRunningByPlace(ctx.db)).toStrictEqual({ imp: 1, local: 0, issues: ['GEO-9932'], impIssues: ['GEO-9932'], localSource: null });
+});

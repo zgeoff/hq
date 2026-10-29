@@ -10,7 +10,7 @@ export async function readCapacity(run: Runner): Promise<Sample> {
   const pacing = await loadPacing(pacingPath()),
     ran = await run(['bash', LANES.capacityScript()]),
     read = parseCapacityRun(ran);
-  return { cap: read.cap, impMib: pacing.impMib, lanes: pacing.lanes, slots: pacing.slots, localRoom: pacing.localRoom, error: read.cap === null ? read.error : pacing.error };
+  return { cap: read.cap, impMib: pacing.impMib, lanes: pacing.lanes, slots: pacing.slots, localRoom: pacing.localRoom, design: pacing.design, error: read.cap === null ? read.error : pacing.error };
 }
 
 interface CapacityRead {

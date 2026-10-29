@@ -1,3 +1,5 @@
+import type { DesignLane } from '../lanes/design-lane.ts';
+import type { DesignSlots } from '../lanes/types.ts';
 import type { RunState } from '../transitions/run-states.ts';
 
 export interface Run {
@@ -14,6 +16,9 @@ export interface Run {
   size: 'S' | 'M' | 'L' | 'XL' | null;
   size_lines: number | null;
   lane: string | null;
+
+  // The design lane a design pass fills; NULL is a delivery run.
+  design_lane: DesignLane | null;
   live_check: 'owed' | 'none' | null; // after the release ships: NULL and 'owed' mean a live check is owed
   close_note: string | null;
   created_at: string;
@@ -78,6 +83,15 @@ export interface AddRunInput {
   readySince?: string | null; // when the issue became Ready in Linear, for cycle time
   size?: { size: 'S' | 'M' | 'L' | 'XL'; lines: number } | null; // triage's guess, from the ticket
   lane?: string | null; // a pacing.json lane, checked by the caller
+
+  // The design lane this run fills; left out, a Design-type issue fills with-geoff.
+  design?: DesignLane | null;
+
+  // Where the owner asked for a with-geoff pass above its lane count.
+  asked?: string | null;
+
+  // The lane counts from pacing.json; left out, the defaults.
+  designSlots?: DesignSlots;
   actor: string;
 }
 

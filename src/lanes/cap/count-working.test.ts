@@ -106,3 +106,16 @@ test('it counts the working runs when no atc reading exists', () => {
 
   expect(countWorking(ctx.db, new Date('2026-10-15T20:00:00Z'))).toStrictEqual({ count: 1, from: 'runs' });
 });
+
+test('it leaves out an agent design run on a non-Design issue, by its design lane', () => {
+  const ctx = setupTest();
+  at('2026-10-15T20:00:00Z');
+  addRun(ctx.db, { issue: 'GEO-9930', title: 'Design the kettle spout', place: 'imp', session: 'a0000030-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', design: 'agent', actor: 'z-delivery' });
+  addRun(ctx.db, { issue: 'GEO-9932', title: 'Descale the kettle', place: 'imp', session: 'a0000032-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
+  recordAwake(ctx.db, [
+    { id: 'a0000030-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'spout-design', alive: true, state: 'running', locator: { targetID: 'imp-spout' } },
+    { id: 'a0000032-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, state: 'running', locator: { targetID: 'imp-kettle' } },
+  ]);
+
+  expect(countWorking(ctx.db, new Date('2026-10-15T20:00:00Z'))).toStrictEqual({ count: 1, from: 'sessions' });
+});

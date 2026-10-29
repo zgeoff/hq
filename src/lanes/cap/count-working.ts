@@ -2,7 +2,7 @@ import type { Database } from 'bun:sqlite';
 import { z } from 'zod';
 import { readFreshAwake } from '../../areas/read-fresh-awake.ts';
 import { fleetIds } from '../../atc/fleet-ids.ts';
-import { readDesignIssues } from '../read-design-issues.ts';
+import { readDesignRuns } from '../read-design-runs.ts';
 
 export interface WorkingCount {
   count: number;
@@ -15,7 +15,7 @@ const runsSchema = z.array(z.object({ issue: z.string() }));
 const rowsSchema = z.array(z.object({ issue: z.string(), session_id: z.string() }));
 
 export function countWorking(db: Database, at: Date): WorkingCount {
-  const design = readDesignIssues(db);
+  const design = new Set(readDesignRuns(db).map((run) => run.issue));
   const reading = readFreshAwake(db, at);
   if (reading === null) {
     const runs = runsSchema.parse(db.query("SELECT issue FROM runs WHERE state = 'working'").all());
