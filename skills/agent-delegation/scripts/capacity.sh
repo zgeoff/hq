@@ -1,21 +1,19 @@
 #!/usr/bin/env bash
-# Reads the 3 delivery limits (imp room, provider quota, design slots) and prints one JSON
-# object. With --size or --design it adds a launch decision: the provider to launch on, or
-# why nothing can launch.
-# Usage: capacity.sh [--size S|M|L|XL | --design] [--design-open <n>] [--local-open <n>]
-#   --design-open  design sessions that wait on the owner now (default 0)
+# Reads the 2 delivery limits (imp room, provider quota) and prints one JSON object. With
+# --size or --design it adds a launch decision: the provider to launch on, or why nothing can
+# launch. hq counts the design lanes, so --design picks only the provider.
+# Usage: capacity.sh [--size S|M|L|XL | --design] [--local-open <n>]
 #   --local-open   delivery sessions running on this host now (default 0)
 # Reads pacing.json beside this folder. Needs jq, curl, imp and hq. Never prints a key.
 set -euo pipefail
 
 here=$(cd "$(dirname "$0")" && pwd)
 pacing=$(cat "$here/../pacing.json")
-size="" design=false design_open=0 local_open=0
+size="" design=false local_open=0
 while [ $# -gt 0 ]; do
   case $1 in
     --size) size=$2; shift 2 ;;
     --design) design=true; shift ;;
-    --design-open) design_open=$2; shift 2 ;;
     --local-open) local_open=$2; shift 2 ;;
     *) echo "capacity.sh: unknown option $1" >&2; exit 2 ;;
   esac
@@ -107,7 +105,7 @@ jq -n \
   --argjson claude "$(read_json broker_usage)" \
   --argjson local "$(read_json claude_usage)" \
   --argjson codex "$(read_json codex_usage)" \
-  --arg size "$size" --argjson design "$design" --argjson open "$design_open" --argjson localOpen "$local_open" '
+  --arg size "$size" --argjson design "$design" --argjson localOpen "$local_open" '
   # The broker slot reads Claude only for imp launches; a Claude that targets this host reads its login.
   {claude: (if $pacing.providers.claude.target == "imp" then $claude else $local end), codex: $codex} as $read
   | ($imp | if .error then . + {room: false} else
@@ -122,7 +120,6 @@ jq -n \
       + if $k == "claude" and $p.target == "imp" then {local: ($local + {
           room: (($local.used // null) != null and $local.used < $p.threshold)
         })} else {} end)})) as $providers
-  | {slots: $pacing.designSlots, open: $open, room: ($open < $pacing.designSlots)} as $designOut
   # Where a provider launches now: its target while it has room there, or this host when the imps
   # or the broker quota are full and its localFallback cap and this login have room, or null.
   | def place($p): $pacing.providers[$p] as $c | $providers[$p] as $q
@@ -137,12 +134,10 @@ jq -n \
       checkedAt: (now | todate),
       imp: $impOut,
       providers: $providers,
-      design: $designOut,
       slots: $pacing.slots
     }
   | if $design then . + {launch: (
-      if ($designOut.room | not) then {provider: null, reason: "every design slot is taken"}
-      elif place("claude") != null then {provider: "claude", agent: $pacing.providers.claude.agent, target: place("claude")} + note("claude")
+      if place("claude") != null then {provider: "claude", agent: $pacing.providers.claude.agent, target: place("claude")} + note("claude")
       elif $providers.claude.room then {provider: null, reason: "no imp room"}
       else {provider: null, reason: "Claude is at its quota threshold"} end)}
     elif $size != "" then . + {launch: (

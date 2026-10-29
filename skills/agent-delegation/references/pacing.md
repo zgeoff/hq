@@ -15,8 +15,8 @@ ad-hoc session. Take Ready issues in the order `hq focus show` prints.
    against its count and the next ticket for each lane. A full lane holds the launch.
 2. Count the delivery sessions running on this host now, from `hq lanes`.
 3. Run `scripts/capacity.sh --size <S|M|L|XL> --local-open <n>`. For a design pass, pass `--design`
-   in place of `--size`, with `--design-open 0`, since hq has checked the lane. Launch an
-   Investigation as an M.
+   in place of `--size`: the script picks only the provider, since the `design:` line holds the
+   design count. Launch an Investigation as an M.
 4. Read `launch`:
    - `provider` set: spawn with `agent` set to `launch.agent`, on the target `launch.target` names:
      `imp` for an imp target, `local` for this host.
