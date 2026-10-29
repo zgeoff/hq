@@ -12,7 +12,9 @@ test('it lists the PR commits, resolves a listed short sha, and records each cal
   const found = await run(['gh', 'api', 'repos/zgeoff/kettle/commits/abc1234', '--jq', '.sha']);
   const missing = await run(['gh', 'api', 'repos/zgeoff/kettle/commits/ffff000', '--jq', '.sha']);
 
-  expect([list.stdout, found.stdout, missing.stderr]).toStrictEqual([`${first}\n${second}\n`, `${second}\n`, 'gh: Not Found (HTTP 404)']);
+  expect(list.stdout).toBe(`${first}\n${second}\n`);
+  expect(found.stdout).toBe(`${second}\n`);
+  expect(missing.stderr).toBe('gh: Not Found (HTTP 404)');
   expect(calls).toHaveLength(3);
 });
 
@@ -23,5 +25,7 @@ test('it fails the reads it is told to fail and any call it does not know', asyn
   const lookup = await run(['gh', 'api', 'repos/zgeoff/kettle/commits/abc1234', '--jq', '.sha']);
   const unknown = await run(['gh', 'repo', 'list']);
 
-  expect([list.code, lookup.code, unknown.code]).toStrictEqual([1, 1, 1]);
+  expect(list.code).toBe(1);
+  expect(lookup.code).toBe(1);
+  expect(unknown.code).toBe(1);
 });
