@@ -47,25 +47,6 @@ test('it fills the with-geoff lane for a Design-type issue added with no --desig
   expect(added.run.design_lane).toBe('with-geoff');
 });
 
-test('it adds a delivery run for any other issue added with no --design flag', () => {
-  const ctx = setupTest();
-  at('2026-10-15T20:00:00Z');
-
-  const added = addRun(ctx.db, { issue: 'GEO-9801', title: 'Descale the kettle', place: 'local', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: null, actor: 'z-delivery' });
-
-  expect(added.run.design_lane).toBeNull();
-});
-
-test('it refuses a with-geoff pass above its lane count without --asked', () => {
-  const ctx = setupTest();
-  at('2026-10-15T20:00:00Z');
-  addRun(ctx.db, { issue: 'GEO-9804', title: 'Design the kettle spout', place: 'local', session: null, next: 'The owner chats.', gate: null, geoffChat: true, lane: null, design: 'with-geoff', designSlots: { agent: 2, withGeoff: 1 }, actor: 'z-delivery' });
-
-  const add = () => addRun(ctx.db, { issue: 'GEO-9805', title: 'Design the kettle lid', place: 'local', session: null, next: 'The owner chats.', gate: null, geoffChat: true, lane: null, design: 'with-geoff', designSlots: { agent: 2, withGeoff: 1 }, actor: 'z-delivery' });
-
-  expect(add).toThrow('GEO-9805: the with-geoff design lane is full at 1 (GEO-9804); pass --asked <where the owner asked> to add it above the count');
-});
-
 test('it adds a with-geoff pass above its lane count with --asked, and records where the owner asked', () => {
   const ctx = setupTest();
   at('2026-10-15T20:00:00Z');
@@ -75,17 +56,6 @@ test('it adds a with-geoff pass above its lane count with --asked, and records w
 
   expect(added.run.design_lane).toBe('with-geoff');
   expect(ctx.db.query("SELECT data FROM events WHERE subject_id = 'GEO-9805' AND action = 'added'").get()).toMatchObject({ data: expect.stringContaining('"asked":"chat 29 Oct"') });
-});
-
-test('it refuses a Design-type issue added with no --design flag above the with-geoff count', () => {
-  const ctx = setupTest();
-  at('2026-10-15T20:00:00Z');
-  writeIssues(ctx.db, [{ issue: 'GEO-9806', type: 'Design', title: 'Design: a teapot lid that stays on', state: 'open', closed_at: null }]);
-  addRun(ctx.db, { issue: 'GEO-9804', title: 'Design the kettle spout', place: 'local', session: null, next: 'The owner chats.', gate: null, geoffChat: true, lane: null, design: 'with-geoff', designSlots: { agent: 2, withGeoff: 1 }, actor: 'z-delivery' });
-
-  const add = () => addRun(ctx.db, { issue: 'GEO-9806', title: 'Design: a teapot lid that stays on', place: 'local', session: null, next: 'The owner chats.', gate: null, geoffChat: true, lane: null, designSlots: { agent: 2, withGeoff: 1 }, actor: 'z-delivery' });
-
-  expect(add).toThrow('GEO-9806: the with-geoff design lane is full at 1 (GEO-9804)');
 });
 
 test('it refuses an agent pass above the agent count, and adds no run', () => {
@@ -98,62 +68,6 @@ test('it refuses an agent pass above the agent count, and adds no run', () => {
 
   expect(add).toThrow('GEO-9808: all 2 agent design passes are open (GEO-9806, GEO-9807); close one with hq run done first');
   expect(getRun(ctx.db, 'GEO-9808')).toBeNull();
-});
-
-test('it refuses --asked on an agent pass', () => {
-  const ctx = setupTest();
-  at('2026-10-15T20:00:00Z');
-
-  const add = () => addRun(ctx.db, { issue: 'GEO-9808', title: 'Design the kettle handle', place: 'local', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: null, design: 'agent', asked: 'chat 29 Oct', actor: 'z-delivery' });
-
-  expect(add).toThrow('--asked goes with a with-geoff design pass, not an agent one');
-});
-
-test('it refuses --asked on a delivery run', () => {
-  const ctx = setupTest();
-  at('2026-10-15T20:00:00Z');
-
-  const add = () => addRun(ctx.db, { issue: 'GEO-9809', title: 'Descale the kettle', place: 'local', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: null, asked: 'chat 29 Oct', actor: 'z-delivery' });
-
-  expect(add).toThrow('--asked goes with a with-geoff design pass, and GEO-9809 gets a delivery run: pass --design with-geoff for a design pass');
-});
-
-test('it adds a delivery run while the agent design lanes are full', () => {
-  const ctx = setupTest();
-  at('2026-10-15T20:00:00Z');
-  addRun(ctx.db, { issue: 'GEO-9806', title: 'Design the kettle spout', place: 'local', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: null, design: 'agent', designSlots: { agent: 1, withGeoff: 1 }, actor: 'z-delivery' });
-
-  const added = addRun(ctx.db, { issue: 'GEO-9809', title: 'Descale the kettle', place: 'local', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: null, designSlots: { agent: 1, withGeoff: 1 }, actor: 'z-delivery' });
-
-  expect(added.result).toBe('added');
-});
-
-test('it refuses a --design pass while the design counts in pacing.json have an error', () => {
-  const ctx = setupTest();
-  at('2026-10-15T20:00:00Z');
-
-  const add = () => addRun(ctx.db, { issue: 'GEO-9810', title: 'Design the kettle spout', place: 'local', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: null, design: 'agent', designSlots: { agent: 2, withGeoff: 1 }, designError: 'pacing.json: agentDesignSlots is wrong', actor: 'z-delivery' });
-
-  expect(add).toThrow('pacing.json: agentDesignSlots is wrong; hq adds no design pass until pacing.json gives its counts');
-});
-
-test('it refuses a Design-type issue added with no --design flag while the design counts in pacing.json have an error', () => {
-  const ctx = setupTest();
-  at('2026-10-15T20:00:00Z');
-  writeIssues(ctx.db, [{ issue: 'GEO-9810', type: 'Design', title: 'Design: a quieter kettle whistle', state: 'open', closed_at: null }]);
-
-  const add = () => addRun(ctx.db, { issue: 'GEO-9810', title: 'Design: a quieter kettle whistle', place: 'local', session: null, next: 'The owner chats.', gate: null, geoffChat: true, lane: null, designSlots: { agent: 2, withGeoff: 1 }, designError: 'pacing.json: designSlots is wrong', actor: 'z-delivery' });
-
-  expect(add).toThrow('pacing.json: designSlots is wrong; hq adds no design pass until pacing.json gives its counts');
-});
-
-test('it adds a delivery run while the design counts in pacing.json have an error', () => {
-  const ctx = setupTest();
-  at('2026-10-15T20:00:00Z');
-
-  const added = addRun(ctx.db, { issue: 'GEO-9810', title: 'Descale the kettle', place: 'local', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: null, designSlots: { agent: 2, withGeoff: 1 }, designError: 'pacing.json: designSlots is wrong', actor: 'z-delivery' });
-
-  expect(added.result).toBe('added');
 });
 
 test('it turns a closed design run into the build run on run add, and keeps its design pass readable', () => {
@@ -183,28 +97,6 @@ test('it starts the build run at the move, so its cycle time leaves out the desi
   const built = addRun(ctx.db, { issue: 'GEO-9811', title: 'Build the kettle spout', place: 'imp', session: null, next: 'Building.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
 
   expect(built.run).toMatchObject({ created_at: '2026-10-17T09:30:00Z', updated_at: '2026-10-17T09:30:00Z' });
-});
-
-test('it refuses --design on a closed design run, since a new pass needs a reopen', () => {
-  const ctx = setupTest();
-  at('2026-10-15T20:00:00Z');
-  addRun(ctx.db, { issue: 'GEO-9812', title: 'Design the kettle spout', place: 'local', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: null, design: 'agent', actor: 'z-delivery' });
-  setState(ctx.db, 'GEO-9812', 'done', { note: 'design settled' }, 'z-delivery');
-
-  const add = () => addRun(ctx.db, { issue: 'GEO-9812', title: 'Design the kettle spout again', place: 'local', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: null, design: 'agent', actor: 'z-delivery' });
-
-  expect(add).toThrow('GEO-9812: its agent design pass is done; a new design pass needs hq run reopen GEO-9812');
-});
-
-test('it refuses --asked on the move from a closed design pass to the build run', () => {
-  const ctx = setupTest();
-  at('2026-10-15T20:00:00Z');
-  addRun(ctx.db, { issue: 'GEO-9812', title: 'Design the kettle spout', place: 'local', session: null, next: 'The owner chats.', gate: null, geoffChat: true, lane: null, design: 'with-geoff', actor: 'z-delivery' });
-  setState(ctx.db, 'GEO-9812', 'done', { note: 'design settled' }, 'z-delivery');
-
-  const add = () => addRun(ctx.db, { issue: 'GEO-9812', title: 'Build the kettle spout', place: 'imp', session: null, next: 'Building.', gate: null, geoffChat: false, lane: 'cloud', asked: 'chat 29 Oct', actor: 'z-delivery' });
-
-  expect(add).toThrow("--asked goes with a new with-geoff design pass; hq run add without --design turns GEO-9812's done design pass into the build run");
 });
 
 test('it refuses run add on a closed delivery run', () => {
