@@ -5,6 +5,7 @@ import { addPr } from './add-pr.ts';
 import { addRun } from './add-run.ts';
 import { closePr } from './close-pr.ts';
 import { dropCanceledRuns } from './drop-canceled-runs.ts';
+import { setState } from './set-state.ts';
 
 function setupTest() {
   const fresh = freshDb();
@@ -64,4 +65,18 @@ test('it waits for a GitHub pass that ran after the cancellation before it drops
   expect(dropCanceledRuns(ctx.db, 'hq-lanes', null)).toStrictEqual([]);
   expect(dropCanceledRuns(ctx.db, 'hq-lanes', '2026-10-21T01:00:00Z')).toStrictEqual([]);
   expect(dropCanceledRuns(ctx.db, 'hq-lanes', '2026-10-21T02:00:00Z')).toStrictEqual(['GEO-9871']);
+});
+
+test('it drops a canceled build run whose only merged PR is its design pass PR, after a GitHub read', () => {
+  const ctx = setupTest();
+  addRun(ctx.db, { issue: 'GEO-9848', title: 'Design the kettle spout', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', design: 'agent', actor: 'kettle-bot' });
+  addPr(ctx.db, 'GEO-9848', 'kettle#48', 'kettle-bot');
+  closePr(ctx.db, 'kettle#48', { to: 'merged', actor: 'kettle-bot' });
+  setState(ctx.db, 'GEO-9848', 'done', { note: 'design settled' }, 'kettle-bot');
+  addRun(ctx.db, { issue: 'GEO-9848', title: 'Build the kettle spout', place: 'imp', session: null, next: 'Building.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
+  writeIssues(ctx.db, [{ issue: 'GEO-9848', type: 'none', title: 'Build the kettle spout', state: 'canceled', closed_at: '2026-10-21T01:02:03Z' }]);
+
+  const dropped = dropCanceledRuns(ctx.db, 'hq-lanes', '2026-10-21T02:00:00Z');
+
+  expect(dropped).toStrictEqual(['GEO-9848']);
 });
