@@ -134,6 +134,13 @@ export interface FinalClaim {
   sha: string;
 }
 
+export interface FinalClaimFacts {
+  issue: string;
+  mark: { ref: string | null; sha: string; owner: string | null } | null;
+  phrase: { sha: string; mentioned: string[] } | null;
+  owned: { ref: string; state: string }[];
+}
+
 export type FinalResolutions = ReadonlyMap<string, FinalResolution>;
 
 export type CommitsRead = { kind: 'listed'; shas: string[] } | { kind: 'fault'; reason: string };

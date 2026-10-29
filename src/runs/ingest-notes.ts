@@ -7,10 +7,10 @@ import { setMeta } from '../db/set-meta.ts';
 import type { Runner } from '../runner/types.ts';
 import { applyNoteSignals } from './apply-note-signals.ts';
 import { cursorIndex } from './cursor-index.ts';
-import { collectFinalClaims } from './collect-final-claims.ts';
 import { findOpenSessionIssue } from './find-open-session-issue.ts';
 import { FROM_START } from './from-start.ts';
 import { makeFinalResolver } from './make-final-resolver.ts';
+import { readFinalClaims } from './read-final-claims.ts';
 import { orchestratorName } from '../wake/orchestrator-name.ts';
 import { sendNoteToOrchestrator } from './send-note-to-orchestrator.ts';
 import type { FeedEvent, FinalClaim, FinalResolutions, IngestResult } from './types.ts';
@@ -130,7 +130,7 @@ function resolveFinals(db: Database, events: FeedEvent[], resolveFinal: (claims:
       return [];
     }
     const issue = findOpenSessionIssue(db, event.session);
-    return issue === null ? [] : collectFinalClaims(db, issue, event.detail);
+    return issue === null ? [] : readFinalClaims(db, issue, event.detail);
   });
   return resolveFinal(claims);
 }

@@ -9,11 +9,13 @@ test('it picks the one commit of the PR whose sha starts with the given sha', ()
   expect(pickFinalResolution('44238662', { kind: 'listed', shas: [first, head] }, null)).toStrictEqual({ kind: 'full', sha: head });
 });
 
-test('it matches a given sha in upper case', () => {
-  const first = `1111111${buildMockSha(1).slice(7)}`;
+test.each([
+  ['an upper-case given sha against lower-case commits', 'ABCDEF1', `abcdef1${'0'.repeat(33)}`],
+  ['a lower-case given sha against upper-case commits', 'abcdef1', `ABCDEF1${'0'.repeat(33)}`],
+])('it matches %s and stores the sha in lower case', (_label, given, listed) => {
   const head = `44238662${buildMockSha(2).slice(8)}`;
 
-  expect(pickFinalResolution('1111111', { kind: 'listed', shas: [first.toUpperCase(), head] }, null)).toStrictEqual({ kind: 'full', sha: first });
+  expect(pickFinalResolution(given, { kind: 'listed', shas: [listed, head] }, null)).toStrictEqual({ kind: 'full', sha: `abcdef1${'0'.repeat(33)}` });
 });
 
 test('it refuses an ambiguous sha and lists every match', () => {
