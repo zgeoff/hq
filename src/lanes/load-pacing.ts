@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { parseLanes } from '../areas/parse-lanes.ts';
+import { toMessage } from '../runs/to-message.ts';
 import type { LaneConfig } from '../areas/types.ts';
 import { DEFAULT_DESIGN_SLOTS } from './default-design-slots.ts';
 import { parseDesignSlots } from './parse-design-slots.ts';
@@ -79,8 +80,4 @@ function parseDesignCounts(file: unknown): DesignCountsRead {
   } catch (error) {
     return { design: DEFAULT_DESIGN_SLOTS, error: `pacing.json: ${toMessage(error)}` };
   }
-}
-
-function toMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

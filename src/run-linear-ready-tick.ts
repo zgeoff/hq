@@ -11,6 +11,7 @@ import { readLinearReady } from './lanes/read-linear-ready.ts';
 import { countFocusMatches } from './focus/count-focus-matches.ts';
 import { readBacklogIssues } from './lanes/read-backlog-issues.ts';
 import { writeDesignBacklog } from './lanes/write-design-backlog.ts';
+import { toMessage } from './runs/to-message.ts';
 import { writePromotableFocus } from './lanes/write-promotable-focus.ts';
 import { validateLaneRules } from './lanes/validate-lane-rules.ts';
 import type { Runner } from './runner/types.ts';
@@ -62,7 +63,7 @@ export async function runLinearReadyTick(db: Database, deps: LinearReadyTickDeps
   const focus = readFocus(db);
   const backlog = await withDeadline(readBacklogIssues(cancellableCall, rulesTable.team), leftMs, 'Backlog promotable count', abandoned).then(
     (issues) => ({ issues, error: null }),
-    (error: unknown) => ({ issues: null, error: (error instanceof Error ? error.message : String(error)).slice(0, 300) }),
+    (error: unknown) => ({ issues: null, error: toMessage(error).slice(0, 300) }),
   );
   const count =
     backlog.issues === null
