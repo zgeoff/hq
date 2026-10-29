@@ -17,6 +17,6 @@ export function readDesignAsked(db: Database, designRuns: readonly DesignRun[]):
   if (open.size === 0) {
     return [];
   }
-  const events = eventsSchema.parse(db.query(`SELECT subject_id, data FROM events WHERE subject = 'run' AND action = 'added' AND subject_id IN (${[...open].map(() => '?').join(', ')}) ORDER BY seq`).all(...open));
+  const events = eventsSchema.parse(db.query(`SELECT subject_id, data FROM events WHERE subject = 'run' AND action IN ('added', 'design-asked') AND subject_id IN (${[...open].map(() => '?').join(', ')}) ORDER BY seq`).all(...open));
   return events.flatMap((event) => dataSchema.parse(JSON.parse(event.data)).asked ?? []);
 }

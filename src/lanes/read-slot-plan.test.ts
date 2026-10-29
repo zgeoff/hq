@@ -8,6 +8,7 @@ import { at, freshDb } from '../../test/helpers.ts';
 import { makeStateCall } from '../../test/make-state-call.ts';
 import { runFocusCommand } from '../focus/run-focus-command.ts';
 import { addRun } from '../runs/add-run.ts';
+import { reopenRun } from '../runs/reopen-run.ts';
 import { setMeta } from '../db/set-meta.ts';
 import { writeIssues } from '../linear/write-issues.ts';
 import { setState } from '../runs/set-state.ts';
@@ -441,4 +442,16 @@ test('it gives a free agent design lane the needs-design issue that matches the 
   const plan = readSlotPlan(ctx.db, ctx.sample, new Date('2026-10-15T20:00:00Z'));
 
   expect(plan?.design.agent.next).toStrictEqual(['GEO-9852']);
+});
+
+test('it lists where the owner asked for a with-geoff pass reopened above the lane count', () => {
+  const ctx = setupTest();
+  addRun(ctx.db, { issue: 'GEO-9874', title: 'Design the whistle', place: 'local', session: null, next: 'The owner chats.', gate: null, geoffChat: true, lane: null, design: 'with-geoff', actor: 'z-delivery' });
+  setState(ctx.db, 'GEO-9874', 'done', { note: 'design settled' }, 'z-delivery');
+  addRun(ctx.db, { issue: 'GEO-9875', title: 'Design the handle', place: 'local', session: null, next: 'The owner chats.', gate: null, geoffChat: true, lane: null, design: 'with-geoff', actor: 'z-delivery' });
+  reopenRun(ctx.db, { issue: 'GEO-9874', next: 'Reopened: the owner chats.', design: { error: null, asked: 'chat 30 Oct' }, actor: 'z-delivery' });
+
+  const plan = readSlotPlan(ctx.db, ctx.sample, new Date('2026-10-15T20:00:00Z'));
+
+  expect(plan?.design.withGeoff).toStrictEqual({ open: 2, slots: 1, next: [], asked: ['chat 30 Oct'] });
 });

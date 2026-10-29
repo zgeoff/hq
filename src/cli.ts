@@ -195,6 +195,7 @@ import { nudgeLog } from './lanes/nudge-log.ts';
 import { loadPacing } from './lanes/load-pacing.ts';
 import { parseDesignFlag } from './lanes/parse-design-flag.ts';
 import { formatDesignMoves } from './runs/format-design-moves.ts';
+import { checkDesignReopen, reopenRun } from './runs/reopen-run.ts';
 import { readDesignMoves } from './runs/read-design-moves.ts';
 import { pacingPath } from './lanes/pacing-path.ts';
 import { buildLanePlan } from './lanes/build-lane-plan.ts';
@@ -900,8 +901,10 @@ ${r.result === 'added' ? 'On the board.' : 'Already on the board.'}` };
       // A done or dropped run that work started on again: back to working, sessions and PRs kept.
       const prev = resolveRun(db, arg(0, 'issue'));
       if (prev.state !== 'done' && prev.state !== 'dropped') throw new HqError('bad_state', `${prev.issue} is ${prev.state}, not done or dropped: nothing to reopen`);
-      const r = setState(db, prev.issue, 'working', { next: flags.next ?? 'Reopened: agent working.', reopen: true }, await by());
-      return { data: { run: r }, text: `${runLine(r)}\nReopened.` };
+      const pacing = await loadPacing(pacingPath());
+      const reopenedBy = await by();
+      const reopened = reopenRun(db, { issue: prev.issue, next: flags.next ?? 'Reopened: agent working.', design: { slots: pacing.design, error: pacing.designError, asked: flags.asked ?? null }, actor: reopenedBy });
+      return { data: { run: reopened }, text: `${runLine(reopened)}\nReopened.` };
     }
     case 'state': {
       const refusal = readMoveRefusal(db, arg(0, 'issue'), arg(1, 'state'), flags.force === true);
@@ -914,7 +917,13 @@ ${r.result === 'added' ? 'On the board.' : 'Already on the board.'}` };
       if (liveCheck !== undefined) {
         requireLiveCheck(liveCheck);
       }
-      const moved = setState(db, issue, state, toExactOptional({ liveCheck, next: flags.next, waitsOn: parseWaitsOn(flags['waits-on']), note: flags.note ?? null, reopen: Boolean(flags.reopen), waitsOnGeoff: parseGeoffFlag(flags) }), actorName);
+      const reopenPacing = flags.reopen === true ? await loadPacing(pacingPath()) : null;
+      const moved = db.transaction(() => {
+        if (reopenPacing !== null) {
+          checkDesignReopen(db, issue, { slots: reopenPacing.design, error: reopenPacing.designError, asked: null });
+        }
+        return setState(db, issue, state, toExactOptional({ liveCheck, next: flags.next, waitsOn: parseWaitsOn(flags['waits-on']), note: flags.note ?? null, reopen: Boolean(flags.reopen), waitsOnGeoff: parseGeoffFlag(flags) }), actorName);
+      }).immediate();
       return { data: { run: moved }, text: runLine(moved) };
     }
     case 'check': {

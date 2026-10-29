@@ -3,10 +3,6 @@ import { match } from 'ts-pattern';
 import { z } from 'zod';
 import { logEvent } from '../log-event.ts';
 import { iso } from '../clock/iso.ts';
-import { countOpenDesignRuns } from '../lanes/count-open-design-runs.ts';
-import { DEFAULT_DESIGN_SLOTS } from '../lanes/default-design-slots.ts';
-import { readDesignIssues } from '../lanes/read-design-issues.ts';
-import { readDesignRuns } from '../lanes/read-design-runs.ts';
 import { removeLaneNudges } from '../lanes/remove-lane-nudges.ts';
 import { now } from '../clock/now.ts';
 import { HqError } from '../errors.ts';
@@ -14,8 +10,8 @@ import { checkRun } from '../transitions/check-run.ts';
 import { CLOSED_RUN_STATES as CLOSED } from '../transitions/closed-run-states.ts';
 import { getRun } from './get-run.ts';
 import { pickRunAdmission } from './pick-run-admission.ts';
-import type { RunAdmissionFacts } from './pick-run-admission.ts';
-import type { AddRunInput, Run, RunView } from './types.ts';
+import { readRunAdmissionFacts } from './read-run-admission-facts.ts';
+import type { AddRunInput, RunView } from './types.ts';
 import { updateRunSessions as attachSession } from './update-run-sessions.ts';
 import { viewRun } from './view-run.ts';
 
@@ -71,21 +67,4 @@ export function addRun(db: Database, input: AddRunInput): { run: RunView; result
       return { run: viewRun(db, getRun(db, input.issue)!), result: 'added' as const };
     })
     .immediate();
-}
-
-// The facts pickRunAdmission chooses from: the issue's type and the design runs open in each lane.
-function readRunAdmissionFacts(db: Database, input: AddRunInput, previous: Run | null): RunAdmissionFacts {
-  const designRuns = readDesignRuns(db);
-  const open = designRuns.filter((run) => !CLOSED.includes(run.state));
-  return {
-    issue: input.issue,
-    prior: previous === null ? null : { state: previous.state, designLane: previous.design_lane },
-    isDesignType: readDesignIssues(db).has(input.issue),
-    design: input.design ?? null,
-    asked: input.asked ?? null,
-    open: countOpenDesignRuns(designRuns),
-    openIssues: { agent: open.filter((run) => run.lane === 'agent').map((run) => run.issue), withGeoff: open.filter((run) => run.lane === 'with-geoff').map((run) => run.issue) },
-    slots: input.designSlots ?? DEFAULT_DESIGN_SLOTS,
-    designError: input.designError ?? null,
-  };
 }
