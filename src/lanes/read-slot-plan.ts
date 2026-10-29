@@ -6,9 +6,9 @@ import { now } from '../clock/now.ts';
 import { metaJson } from '../db/meta-json.ts';
 import { buildFocusPlan } from '../focus/build-focus-plan.ts';
 import { buildFocusQueue } from '../focus/build-focus-queue.ts';
-import { compareFocusIssues } from '../focus/compare-focus-issues.ts';
+import { sortByFocus } from '../focus/sort-by-focus.ts';
 import { readFocus } from '../focus/read-focus.ts';
-import type { Focus, FocusPlan } from '../focus/types.ts';
+import type { Focus, FocusPlan, FocusTerm } from '../focus/types.ts';
 import { buildCapView } from './cap/build-cap-view.ts';
 import type { CapView } from './cap/build-cap-view.ts';
 import { countWorking } from './cap/count-working.ts';
@@ -76,7 +76,7 @@ export function readSlotPlan(db: Database, sample: Sample, at: Date = now(), cap
   const snapshot = readReadySnapshot(db, at);
   const activeSkips = readLaneSkips(db).filter((skip) => isSkipActive(skip, at));
   const runs = runsSchema.parse(db.query('SELECT issue, state, design_lane FROM runs').all());
-  const design = readDesignLanes(db, { slots: sample.design ?? DEFAULT_DESIGN_SLOTS, countsError: sample.designError ?? null, snapshot, runs, designRuns, skipped: activeSkips.map((skip) => skip.issue), at });
+  const design = readDesignLanes(db, { slots: sample.design ?? DEFAULT_DESIGN_SLOTS, countsError: sample.designError ?? null, terms: focus?.terms ?? [], snapshot, runs, designRuns, skipped: activeSkips.map((skip) => skip.issue), at });
   if (snapshot === null) {
     return { pool, focus, plan: null, readyReadAt: null, eligible: null, design, skipped: [], cap };
   }
@@ -94,6 +94,7 @@ type RunRow = z.infer<typeof runsSchema>[number];
 interface DesignLanesLook {
   slots: DesignSlots;
   countsError: string | null;
+  terms: readonly FocusTerm[];
   snapshot: ReadySnapshot | null;
   runs: readonly RunRow[];
   designRuns: readonly DesignRun[];
@@ -102,14 +103,14 @@ interface DesignLanesLook {
 }
 
 // The design lanes: the open design runs against the lane counts, and for each lane the issues waiting
-// for it. An issue with a run of any kind, open or closed, or a lanes skip, waits for no lane: a closed
+// for it in focus order, as the delivery queue takes them. An issue with a run of any kind, open or closed, or a lanes skip, waits for no lane: a closed
 // design pass is not run again without a reopen.
 function readDesignLanes(db: Database, look: DesignLanesLook): DesignLanes {
   const leftOut = new Set([...look.runs.map((row) => row.issue), ...look.skipped]);
   const backlog = readDesignBacklog(db, look.at);
   const waiting = (issues: readonly ReadyIssue[]): string[] => {
     const seen = new Map(issues.filter((issue) => !leftOut.has(issue.identifier)).map((issue) => [issue.identifier, issue]));
-    return [...seen.values()].toSorted(compareFocusIssues).map((issue) => issue.identifier);
+    return sortByFocus([...seen.values()], look.terms).map((entry) => entry.issue.identifier);
   };
   return buildDesignLanes({
     slots: look.slots,

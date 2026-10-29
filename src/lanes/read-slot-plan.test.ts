@@ -427,3 +427,18 @@ test('it names no needs-design issue while the design counts in pacing.json are 
 
   expect(plan?.design).toStrictEqual({ countsError: 'pacing.json: agentDesignSlots is wrong', agent: { open: 0, slots: 2, next: [] }, withGeoff: { open: 0, slots: 1, next: [], asked: [] } });
 });
+
+test('it gives a free agent design lane the needs-design issue that matches the focus before a higher-priority one', async () => {
+  const ctx = setupTest();
+  await runFocusCommand({ db: ctx.db, call: makeStateCall([], []), actor: 'kettle-owner', at: new Date('2026-10-15T20:00:00Z'), verb: 'set', rest: ['maintenance'], reserves: [] });
+  writeDesignBacklog(ctx.db, {
+    at: new Date('2026-10-15T20:00:00Z'),
+    agent: [buildReadyIssue('GEO-9851', { project: 'kettle roadmap', type: 'Design', priority: 1 }), buildReadyIssue('GEO-9852', { project: 'kettle maintenance', projectLabels: ['maintenance'], type: 'Design', priority: 4 })],
+    withGeoff: [],
+  });
+  addRun(ctx.db, { issue: 'GEO-9853', title: 'Design the kettle spout', place: 'local', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: null, design: 'agent', actor: 'z-delivery' });
+
+  const plan = readSlotPlan(ctx.db, ctx.sample, new Date('2026-10-15T20:00:00Z'));
+
+  expect(plan?.design.agent.next).toStrictEqual(['GEO-9852']);
+});
