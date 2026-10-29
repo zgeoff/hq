@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { Runner } from '../runner/types.ts';
 import { pickBaseMoveCover } from './pick-base-move-cover.ts';
 import { readPRPatchID } from './read-pr-patch-id.ts';
+import { runMissingFetch } from './run-missing-fetch.ts';
 
 export type BaseMoveCover = { covered: true; reviewed: string } | { covered: false; why: string };
 
@@ -46,16 +47,4 @@ export async function readBaseMoveCover(request: CoverRequest): Promise<BaseMove
     return { covered: false, why: `git's patch-ids now do not match: ${request.head.slice(0, 7)} ${now ?? 'none'}, ${request.summaryHead.slice(0, 7)} ${reviewed ?? 'none'}, recorded ${stored.patchId}` };
   }
   return { covered: true, reviewed: request.summaryHead };
-}
-
-// Fetches from origin each commit the checkout lacks; false when one stays missing.
-async function runMissingFetch(run: Runner, directory: string, shas: readonly string[]): Promise<boolean> {
-  const unique = [...new Set(shas)];
-  const checks = await Promise.all(unique.map((sha) => run(['git', 'cat-file', '-e', `${sha}^{commit}`], { cwd: directory })));
-  const missing = unique.filter((_sha, index) => checks[index]?.code !== 0);
-  if (missing.length === 0) {
-    return true;
-  }
-  const fetched = await run(['git', 'fetch', '-q', 'origin', ...missing], { cwd: directory });
-  return fetched.code === 0;
 }

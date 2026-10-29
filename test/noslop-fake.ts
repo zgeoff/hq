@@ -60,6 +60,10 @@ export interface FakeScript {
   // What `gh pr view --json headRefOid,baseRefName` answers; the fixed full sha on main when absent.
   prRefs?: RunResult;
 
+  // What `gh pr view --json headRefOid,baseRefOid` answers; the fixed full sha on the fixed base sha
+  // when absent.
+  prShas?: RunResult;
+
   // The patch-id `git patch-id --verbatim` gives the PR diff at each head, by head. When it is set,
   // `git diff --binary --full-index <base> <head>` prints a diff naming the head; when absent, git
   // prints nothing, so no round has a patch-id.
@@ -68,6 +72,9 @@ export interface FakeScript {
   // Run git for real, in the checkout the caller names, except `git remote get-url origin` and the
   // lines `git` answers: for a test on a real repo, with gh, op and noslop still faked.
   realGit?: boolean;
+
+  // The repo `git remote get-url origin` names under zgeoff; widgets when absent.
+  origin?: string;
 }
 
 export interface FakeRunner {
@@ -129,6 +136,9 @@ function pickBunAnswer(script: FakeScript, cmd: string[]): RunResult {
 
 // oxlint-disable-next-line zgeoff/module-order -- grandfathered: helpers sit above the factory
 function pickGhAnswer(script: FakeScript, line: string): RunResult | null {
+  if (line.endsWith('--json headRefOid,baseRefOid')) {
+    return script.prShas ?? buildResult(JSON.stringify({ headRefOid: FAKE_FULL_SHA, baseRefOid: FAKE_BASE_SHA }));
+  }
   if (line.endsWith('--json headRefOid,baseRefName')) {
     return script.prRefs ?? buildResult(JSON.stringify({ headRefOid: FAKE_FULL_SHA, baseRefName: 'main' }));
   }
@@ -194,7 +204,7 @@ function pickAnswer(script: FakeScript, cmd: string[], opts: RunOpts | undefined
     return pickBunAnswer(script, cmd);
   }
   if (line === 'git remote get-url origin') {
-    return buildResult('git@github.com:zgeoff/widgets.git\n');
+    return buildResult(`git@github.com:zgeoff/${script.origin ?? 'widgets'}.git\n`);
   }
   if (line === 'git rev-parse HEAD' || line === 'git rev-parse FETCH_HEAD') {
     return buildResult(`${FAKE_FULL_SHA}\n`);

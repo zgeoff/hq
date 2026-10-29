@@ -5,6 +5,12 @@ import { logEvent } from '../log-event.ts';
 import type { PRAnswer } from './types.ts';
 import { upsertPRStatus } from './upsert-pr-status.ts';
 
+interface CarriedAnswer {
+  source: string;
+  note: string | null;
+  patchID: string;
+}
+
 export interface PRAnswerInput {
   repo: string;
   pr: number;
@@ -13,6 +19,9 @@ export interface PRAnswerInput {
   source: string;
   note: string | null;
   actor: string;
+
+  // Set only by `hq pr rebased`: whose words the answer carries from the old head.
+  carried?: CarriedAnswer;
 }
 
 // Stores the owner's answer at the head given and logs the write, in one transaction. The head is
@@ -28,6 +37,6 @@ export function recordPRAnswer(db: Database, input: PRAnswerInput): void {
       answer_note: input.note,
       answer_at: at,
     });
-    logEvent(db, 'hq', `pr:${input.repo}#${input.pr}`, 'pr-answer', input.actor, null, null, { answer: input.answer, head: input.head, source: input.source, note: input.note });
+    logEvent(db, 'hq', `pr:${input.repo}#${input.pr}`, 'pr-answer', input.actor, null, null, { answer: input.answer, head: input.head, source: input.source, note: input.note, ...(input.carried === undefined ? {} : { carried: input.carried }) });
   }).immediate();
 }

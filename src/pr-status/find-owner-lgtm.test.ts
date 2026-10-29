@@ -110,3 +110,19 @@ test('it reads only the answers of its own PR', async () => {
 
   expect(ctx.find()).toBeNull();
 });
+
+test('it finds a changes followed by an lgtm carried to the head by hq pr rebased', async () => {
+  const ctx = setupTest();
+  await ctx.answer('changes', REVIEWED);
+  await ctx.answer('lgtm', HEAD, `rebased:${OLDER}`);
+
+  expect(ctx.find()).toMatchObject({ lgtm: { answer: 'lgtm', head: HEAD, source: `rebased:${OLDER}` } });
+});
+
+test('it does not take a rebased: source as the owner answer to a changes', async () => {
+  const ctx = setupTest();
+  await ctx.answer('changes', REVIEWED, `rebased:${OLDER}`);
+  await ctx.answer('lgtm', HEAD);
+
+  expect(ctx.find()).toBeNull();
+});

@@ -1,6 +1,6 @@
-// `hq pr status|answer|override|accept-risk|mechanical|exempt|next`: the one record every session
-// reads before it messages another session about a PR. Only an override, an accepted risk and
-// z-review's two records change what the merge gate passes.
+// `hq pr status|answer|override|accept-risk|mechanical|rebased|exempt|next`: the one record every
+// session reads before it messages another session about a PR. Only an override, an accepted risk
+// and z-review's three records (mechanical, exempt and rebased) change what the merge gate passes.
 import type { Database } from 'bun:sqlite';
 import type { Flags } from '../cli.ts';
 import type { Out } from '../commands.ts';
@@ -38,6 +38,7 @@ import { recordPROverride } from './record-pr-override.ts';
 import { recordPRNext } from './record-pr-next.ts';
 import { runPRExempt } from './run-pr-exempt.ts';
 import { runPRMechanical } from './run-pr-mechanical.ts';
+import { runPRRebased } from './run-pr-rebased.ts';
 import { requireAnswerSource } from './require-answer-source.ts';
 import type { CIOverrideView, PRAnswer, PRStatusView } from './types.ts';
 import { updatePRHead } from './update-pr-head.ts';
@@ -73,13 +74,16 @@ export async function runPRCommand(input: PRCommandInput): Promise<Out> {
   if (input.verb === 'mechanical') {
     return await runPRMechanical(input, parsePRRef(rawRepo, rawPR));
   }
+  if (input.verb === 'rebased') {
+    return await runPRRebased(input, parsePRRef(rawRepo, rawPR));
+  }
   if (input.verb === 'exempt') {
     return await runPRExempt(input, parsePRRef(rawRepo, rawPR));
   }
   if (input.verb === 'next') {
     return await runNext(input, parsePRRef(rawRepo, rawPR), third);
   }
-  throw new HqError('bad_args', 'usage: hq pr status|answer|override|accept-risk|mechanical|exempt|next <repo> <pr>');
+  throw new HqError('bad_args', 'usage: hq pr status|answer|override|accept-risk|mechanical|rebased|exempt|next <repo> <pr>');
 }
 
 async function runStatus(input: PRCommandInput, ref: PRRef): Promise<Out> {

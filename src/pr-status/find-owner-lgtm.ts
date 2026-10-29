@@ -1,5 +1,6 @@
 import type { Database } from 'bun:sqlite';
 import { isAnswerSource } from './is-answer-source.ts';
+import { isOwnerLgtmSource } from './is-owner-lgtm-source.ts';
 import { readPRAnswers } from './read-pr-answers.ts';
 import type { OwnerAnswer } from './read-pr-answers.ts';
 
@@ -26,5 +27,5 @@ export function findOwnerLgtm(db: Database, repo: string, pr: number, ends: Answ
 }
 
 function isOwnerPair(changes: OwnerAnswer, lgtm: OwnerAnswer, head: string): boolean {
-  return changes.answer === 'changes' && lgtm.answer === 'lgtm' && lgtm.head === head && isAnswerSource(changes.source) && isAnswerSource(lgtm.source);
+  return changes.answer === 'changes' && lgtm.answer === 'lgtm' && lgtm.head === head && isAnswerSource(changes.source) && isOwnerLgtmSource(lgtm.source);
 }
