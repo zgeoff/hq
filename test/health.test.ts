@@ -267,7 +267,7 @@ test('it marks the atc mcp check unknown when the probe read fails', async () =>
 });
 
 test('it joins a failing atc mcp check named by the fleet name when a process is older than the build', async () => {
-  const read = { processes: [{ pid: 3, sessionId: '1a2b3c4d-1111-2222-3333-444455556666', startedAtMs: 1000, exe: '/b/atc' }], binary: { path: '/b/atc', mtimeMs: 5000 } };
+  const read = { processes: [{ pid: 3, sessionID: '1a2b3c4d-1111-2222-3333-444455556666', startedAtMs: 1000, exe: '/b/atc' }], binary: { path: '/b/atc', mtimeMs: 5000 } };
 
   const result = await runChecks({ ...probe(world()), atcMcp: () => Promise.resolve(read), sessionName: () => 'z-kettle' }, HEALTH_DEFAULTS, {}, new Date(NOON_SYDNEY));
 

@@ -8,7 +8,7 @@ const START_SLACK_MS = 1000;
 
 // Pure: one failing check per atc mcp process older than the installed atc build, else one passing check.
 // A read error is one failing check; the caller keeps the open atc-mcp problems open.
-export function pickAtcMcpChecks(read: AtcMcpRead, nameOf: (sessionId: string) => string | null): Check[] {
+export function pickAtcMcpChecks(read: AtcMcpRead, nameOf: (sessionID: string) => string | null): Check[] {
   if (typeof read === 'string') {
     return [{ key: 'atc-mcp', ok: false, line: `can't read the atc mcp processes: ${read}` }];
   }
@@ -25,11 +25,11 @@ export function pickAtcMcpChecks(read: AtcMcpRead, nameOf: (sessionId: string) =
   return stale.map((flagged) => {
     const candidate = flagged.candidate;
     const tail = `${flagged.why}; restart the session for the new tool list`;
-    if (candidate.sessionId === null) {
+    if (candidate.sessionID === null) {
       return { key: `atc-mcp:${candidate.pid}`, ok: false, line: `atc mcp (pid ${candidate.pid}) ${tail}` };
     }
-    const short = candidate.sessionId.slice(0, 8);
-    const name = nameOf(candidate.sessionId);
-    return { key: `atc-mcp:${candidate.sessionId}`, ok: false, line: `atc mcp for ${name === null ? `session ${short}` : `${name} (session ${short})`} ${tail}` };
+    const short = candidate.sessionID.slice(0, 8);
+    const name = nameOf(candidate.sessionID);
+    return { key: `atc-mcp:${candidate.sessionID}`, ok: false, line: `atc mcp for ${name === null ? `session ${short}` : `${name} (session ${short})`} ${tail}` };
   });
 }

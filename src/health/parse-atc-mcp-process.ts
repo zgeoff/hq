@@ -28,6 +28,6 @@ export function parseAtcMcpProcess(text: AtcMcpProcessText): AtcMcpProcess | 'no
   if (!Number.isFinite(ticks)) {
     return 'no start time';
   }
-  const sessionId = SCOPE.exec(text.cgroup)?.groups?.['id'] ?? null;
-  return { pid: text.pid, sessionId, startedAtMs: text.btime * 1000 + ticks * TICK_MS, exe: text.exe };
+  const sessionID = SCOPE.exec(text.cgroup)?.groups?.['id'] ?? null;
+  return { pid: text.pid, sessionID, startedAtMs: text.btime * 1000 + ticks * TICK_MS, exe: text.exe };
 }

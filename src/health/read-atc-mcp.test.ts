@@ -16,7 +16,7 @@ test('it reads an atc mcp process with its session, start time and exe, against 
   });
 
   expect(readAtcMcp(files)).toStrictEqual({
-    processes: [{ pid: 55, sessionId: '1a2b3c4d-1111-2222-3333-444455556666', startedAtMs: 1_002_500, exe: '/opt/kettle/atc (deleted)' }],
+    processes: [{ pid: 55, sessionID: '1a2b3c4d-1111-2222-3333-444455556666', startedAtMs: 1_002_500, exe: '/opt/kettle/atc (deleted)' }],
     binary: { path: '/opt/kettle/atc', mtimeMs: 1_700_000_123_000 },
   });
 });
@@ -56,7 +56,7 @@ test('it skips a process whose files vanished mid-scan and still reads the other
     links: { '/proc/58/exe': '/opt/kettle/atc' },
   });
 
-  expect(readAtcMcp(files)).toStrictEqual({ processes: [{ pid: 58, sessionId: null, startedAtMs: 1_001_000, exe: '/opt/kettle/atc' }], binary: { path: '/opt/kettle/atc', mtimeMs: 1_700_000_123_000 } });
+  expect(readAtcMcp(files)).toStrictEqual({ processes: [{ pid: 58, sessionID: null, startedAtMs: 1_001_000, exe: '/opt/kettle/atc' }], binary: { path: '/opt/kettle/atc', mtimeMs: 1_700_000_123_000 } });
 });
 
 test('it skips a process whose exe link reports it has exited', () => {

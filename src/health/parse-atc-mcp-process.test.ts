@@ -11,7 +11,7 @@ test('it builds the process record with its session, start time and exe', () => 
       cgroup: '0::/user.slice/atc-daemon-session-deadbeef-1a2b3c4d-1111-2222-3333-444455556666-cafef00d.scope\n',
       btime: 1000,
     }),
-  ).toStrictEqual({ pid: 55, sessionId: '1a2b3c4d-1111-2222-3333-444455556666', startedAtMs: 1_002_500, exe: '/home/kettle/.local/bin/atc (deleted)' });
+  ).toStrictEqual({ pid: 55, sessionID: '1a2b3c4d-1111-2222-3333-444455556666', startedAtMs: 1_002_500, exe: '/home/kettle/.local/bin/atc (deleted)' });
 });
 
 test('it counts the start time from the last paren when the command name holds spaces and parens', () => {
@@ -24,7 +24,7 @@ test('it counts the start time from the last paren when the command name holds s
       cgroup: '0::/user.slice/other.scope\n',
       btime: 1000,
     }),
-  ).toStrictEqual({ pid: 55, sessionId: null, startedAtMs: 1_002_500, exe: '/opt/kettle/atc' });
+  ).toStrictEqual({ pid: 55, sessionID: null, startedAtMs: 1_002_500, exe: '/opt/kettle/atc' });
 });
 
 test('it leaves the session null for a process outside an atc session scope', () => {
@@ -37,7 +37,7 @@ test('it leaves the session null for a process outside an atc session scope', ()
       cgroup: '0::/user.slice/user@1000.service/app.slice/tmux.scope\n',
       btime: 1000,
     }),
-  ).toStrictEqual({ pid: 58, sessionId: null, startedAtMs: 1_001_000, exe: '/opt/kettle/atc' });
+  ).toStrictEqual({ pid: 58, sessionID: null, startedAtMs: 1_001_000, exe: '/opt/kettle/atc' });
 });
 
 test('it returns null for a process that is not atc mcp', () => {

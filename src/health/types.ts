@@ -8,7 +8,7 @@ export interface Check {
 
 export interface AtcMcpProcess {
   pid: number;
-  sessionId: string | null;
+  sessionID: string | null;
   startedAtMs: number;
 
   // the exe link target; ends with ' (deleted)' once the file was replaced
@@ -35,7 +35,7 @@ export interface Probe {
   atcMcp?: () => Promise<AtcMcpRead>;
 
   // a declared fleet name for a session id
-  sessionName?: (sessionId: string) => string | null;
+  sessionName?: (sessionID: string) => string | null;
   home: string;
   backup?: () => { lastOk: string | null; lastError: string | null; everRan: boolean };
   morning?: (at: Date) => Check | null;
