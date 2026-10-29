@@ -1,6 +1,7 @@
 import type { Database } from 'bun:sqlite';
 import { logEvent } from '../log-event.ts';
 import { iso } from '../clock/iso.ts';
+import { removeLaneNudges } from '../lanes/remove-lane-nudges.ts';
 import { now } from '../clock/now.ts';
 import { HqError } from '../errors.ts';
 import { CLOSED_RUN_STATES as CLOSED } from '../transitions/closed-run-states.ts';
@@ -26,6 +27,9 @@ export function addRun(db: Database, input: AddRunInput): { run: RunView; result
       ).run(input.issue, input.title, input.place, input.next, input.gate, input.geoffChat ? 1 : 0, input.readySince ? iso(new Date(input.readySince)) : null, input.size?.size ?? null, input.size?.lines ?? null, input.lane ?? (input.place === 'local' ? 'flexible' : null), t, t);
       if (input.session) attachSession(db, input.issue, input.session);
       logEvent(db, 'run', input.issue, 'added', input.actor, null, 'working', { title: input.title, session: input.session, readySince: input.readySince ?? null, size: input.size ?? null });
+
+      // A queued lanes nudge was planned before this run held its slot, so it may name this issue; the next look plans again.
+      removeLaneNudges(db);
       return { run: viewRun(db, getRun(db, input.issue)!), result: 'added' as const };
     })
     .immediate();
