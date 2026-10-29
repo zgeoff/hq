@@ -65,7 +65,8 @@ The owner's instructions in chat take precedence over this skill.
    `atc_session_stop`, forget it once it exits, and relaunch shorter with a new `idempotencyKey`.
    When the spawn result is uncertain, look the session up before you try again.
 6. **Record it.** `hq run add <issue> --title T --session <id> --where imp|local` for an issue,
-   then comment the session name, target and checkout on the issue and move it to In Progress.
+   with `--design agent|with-geoff` for a design pass, then comment the session name, target and
+   checkout on the issue and move it to In Progress.
 
 For a design session, tell the owner its name so he can open it, pin it, and stay out of the
 conversation unless he asks you in.

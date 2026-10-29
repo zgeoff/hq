@@ -1,19 +1,22 @@
 # pacing
 
-A session launches only while imp capacity and provider quota both have room, and a design launch
-also needs a free design slot. `scripts/capacity.sh` reads them all and picks the provider, so one
-call stands in for several. [pacing.json](../pacing.json) holds the slot counts, the thresholds,
-the routes and the design slots.
+A session launches only while imp capacity and provider quota both have room, and a design pass
+also needs a free design lane. `scripts/capacity.sh` reads the imp room and the quotas and picks the
+provider, so one call stands in for several. hq counts the design lanes itself, from the open
+design runs. [pacing.json](../pacing.json) holds the slot counts, the thresholds, the routes and
+the design lane counts.
 
 Run `capacity.sh` before every launch: a Ready issue, a pitch launch, a relaunch, or a design or
 ad-hoc session. Take Ready issues in the order `hq focus show` prints.
 
 ## Before a launch
 
-1. Count the design sessions that wait on the owner now: those pinned for a design or an audit.
+1. For a design pass, read the `design:` line in `hq lanes`. It shows each lane's open passes
+   against its count and the next ticket for each lane. A full lane holds the launch.
 2. Count the delivery sessions running on this host now, from `hq lanes`.
-3. Run `scripts/capacity.sh --size <S|M|L|XL> --design-open <n> --local-open <n>`. For a design
-   session, pass `--design` in place of `--size`. Launch an Investigation as an M.
+3. Run `scripts/capacity.sh --size <S|M|L|XL> --local-open <n>`. For a design pass, pass `--design`
+   in place of `--size`, with `--design-open 0`, since hq has checked the lane. Launch an
+   Investigation as an M.
 4. Read `launch`:
    - `provider` set: spawn with `agent` set to `launch.agent`, on the target `launch.target` names:
      `imp` for an imp target, `local` for this host.
@@ -23,8 +26,16 @@ Work that reads the owner's personal data, such as his memories, the event log o
 conversations, runs on Claude only, because only Claude runs under his own account: launch it only
 when `launch.provider` is `claude`.
 
-A design session the owner asks for launches at once, whatever the slots, and counts as an open
-slot while it waits on him.
+There are two design lanes. An agent pass settles a `needs-design` ticket without the owner. A
+with-geoff pass works through a ticket with him: a Design-type issue, or a `needs-design` ticket
+labelled `with-geoff`. A with-geoff pass the owner asks for launches at once, whatever the count:
+record where he asked with `--asked`, and hq lets the run over the count. An agent lane has no such
+override.
+
+Record a design pass with `hq run add --design agent|with-geoff`; a Design-type issue with no flag
+goes in the with-geoff lane. When the pass ends, close its run with `hq run done`. The next
+`hq run add` on that issue turns the closed design run into the build run, and `hq run show` keeps
+the pass's sessions and notes.
 
 ## Reading the output
 
@@ -46,7 +57,7 @@ slot while it waits on him.
 
 When every provider on the route is over its threshold, or a readout fails, file it with
 `hq unblock add` with the soonest `resetsAt` or the `error`, once per hold, and close it with
-`hq unblock done` when the hold ends. Any other hold, such as no imp room or a full design slot, is
+`hq unblock done` when the hold ends. Any other hold, such as no imp room or a full design lane, is
 routine: say nothing.
 
 ## The settings
@@ -55,7 +66,9 @@ Change `pacing.json` only when the owner asks, and record his words in the PR. `
 checks it against [pacing.schema.json](../pacing.schema.json) in CI; add a new field to the schema
 in the same PR.
 
-- `designSlots`: how many design sessions may wait on the owner at a time.
+- `designSlots`: how many with-geoff design passes run at a time. It is a soft limit, since a pass
+  the owner asks for goes over it.
+- `agentDesignSlots`: how many agent design passes run at a time.
 - `slots.imp` and `slots.local`: how many delivery sessions run on the imps and on this host. The
   imps run at most 7, since impd's 16 GiB line for agents fits 8.
 - `providers.<name>.threshold`: the percent of either window at which launches on that provider

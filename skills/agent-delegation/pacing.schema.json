@@ -8,7 +8,15 @@
   "properties": {
     "designSlots": {
       "type": "integer",
-      "minimum": 0
+      "description": "How many design passes with the owner run at a time.",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "agentDesignSlots": {
+      "type": "integer",
+      "description": "How many design passes that need no owner run at a time. hq uses 2 when the key is absent.",
+      "minimum": 0,
+      "maximum": 100
     },
     "slots": {
       "type": "object",
