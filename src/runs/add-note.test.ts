@@ -44,7 +44,8 @@ test('it keeps the text of a note whose FINAL names no commit and sets no final 
     resolutions,
   });
 
-  expect({ text: stored.text, finalSha: ctx.finalSha() }).toStrictEqual({ text: 'FINAL kettle#714 4423866e all green', finalSha: null });
+  expect(stored.text).toBe('FINAL kettle#714 4423866e all green');
+  expect(ctx.finalSha()).toBeNull();
 });
 
 test('it tells the orchestrator both shas of a note whose FINAL names no commit', async () => {
