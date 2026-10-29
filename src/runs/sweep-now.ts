@@ -17,6 +17,7 @@ import { wrapUpMergedRuns } from './wrap-up-merged-runs.ts';
 export interface SweepOptions {
   actor: string;
   wrapUpDeps: WrapUpDeps;
+  log: (line: string) => void;
 }
 
 export async function sweepNow(db: Database, client: AtcClient, run: Runner, options: SweepOptions): Promise<{ alerts: Alert[]; sent: Alert[] }> {
@@ -35,17 +36,17 @@ export async function sweepNow(db: Database, client: AtcClient, run: Runner, opt
   if (Array.isArray(sessions)) {
     recordAwake(db, sessions, activity);
     updateGoneRunSessions(db, sessions, options.actor);
-    await wrapUpMergedRunsSafely(db, options.wrapUpDeps, options.actor);
+    await wrapUpMergedRunsSafely(db, options);
   }
   const alerts = await closeFlaggedPRs(db, run, findAlerts(db, sessions, activity, now()));
   const swept = sweep(db, alerts, options.actor);
   return { alerts, sent: swept.sent };
 }
 
-async function wrapUpMergedRunsSafely(db: Database, wrapUpDeps: WrapUpDeps, actor: string): Promise<void> {
+async function wrapUpMergedRunsSafely(db: Database, options: SweepOptions): Promise<void> {
   try {
-    await wrapUpMergedRuns(db, wrapUpDeps, { actor });
+    await wrapUpMergedRuns(db, options.wrapUpDeps, { actor: options.actor });
   } catch (error) {
-    console.error(`merged-run wrap-up failed: ${toMessage(error)}`);
+    options.log(`merged-run wrap-up failed: ${toMessage(error)}`);
   }
 }

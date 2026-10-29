@@ -1,6 +1,7 @@
 import { expect, mock, onTestFinished, test } from 'bun:test';
 import { buildStubFleetClient } from '../../test/build-stub-fleet-client.ts';
 import { freshDb } from '../../test/helpers.ts';
+import type { FleetClient, StaleOps } from '../fleet/types.ts';
 import { addPr } from './add-pr.ts';
 import { addRun } from './add-run.ts';
 import { closePr } from './close-pr.ts';
@@ -228,7 +229,7 @@ test('a run whose issue is not a Linear key still gets its news and event, and d
   expect(wrapped.map((entry) => entry.issue)).toStrictEqual(['GEO-9910', 'kettle-10']);
   expect(fleet.calls).toStrictEqual(['unpin 0000b001', 'kill 0000b001', 'unpin 0000b001', 'forget 0000b001']);
   expect(ctx.db.query('SELECT text, issue FROM news').all()).toStrictEqual([{ text: 'kettle-10 merged; wrap-up left kept 0000a001 (pinned in atc)', issue: null }]);
-  expect(ctx.db.query("SELECT subject_id FROM events WHERE action = 'merged-wrap-up' ORDER BY subject_id").all()).toStrictEqual([{ subject_id: 'GEO-9910' }, { subject_id: 'kettle-10' }]);
+  expect(ctx.db.query("SELECT subject_id FROM events WHERE action = 'merged-wrap-up-result' ORDER BY subject_id").all()).toStrictEqual([{ subject_id: 'GEO-9910' }, { subject_id: 'kettle-10' }]);
 });
 
 test('a run whose wrap-up throws is marked wrapped with the failure, and the next run is still wrapped', async () => {
@@ -253,6 +254,86 @@ test('a run whose wrap-up throws is marked wrapped with the failure, and the nex
   const wrapped = await wrapUpMergedRuns(ctx.db, { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')) }, { actor: 'sweep' });
 
   expect(wrapped.map((entry) => entry.wrapUp.failed.map((failed) => failed.id))).toStrictEqual([['GEO-9911'], []]);
-  expect(ctx.db.query("SELECT subject_id FROM events WHERE action = 'merged-wrap-up' ORDER BY subject_id").all()).toStrictEqual([{ subject_id: 'GEO-9911' }, { subject_id: 'GEO-9912' }]);
+  expect(ctx.db.query("SELECT subject_id FROM events WHERE action = 'merged-wrap-up-result' ORDER BY subject_id").all()).toStrictEqual([{ subject_id: 'GEO-9911' }, { subject_id: 'GEO-9912' }]);
   expect(ctx.db.query('SELECT text FROM news').all()).toStrictEqual([{ text: 'GEO-9911 merged; wrap-up left failed GEO-9911 (kettle refuses)' }]);
+});
+
+test('it records a news write that fails as the run failure, and still wraps up the next run', async () => {
+  const ctx = setupTest();
+  addRun(ctx.db, { issue: 'GEO-9916', title: 'Invented kettle descaler', place: 'local', session: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
+  addRun(ctx.db, { issue: 'GEO-9917', title: 'Invented teapot cosy', place: 'local', session: '0000b001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
+  for (const [issue, ref] of [['GEO-9916', 'kettle#16'], ['GEO-9917', 'teapot#17']] as const) {
+    addPr(ctx.db, issue, ref, 'z-delivery');
+    closePr(ctx.db, ref, { to: 'merged', actor: 'z-delivery' });
+    setState(ctx.db, issue, 'merged', {}, 'z-delivery');
+  }
+  ctx.db.exec("CREATE TRIGGER kettle_refuses_news BEFORE INSERT ON news WHEN NEW.issue = 'GEO-9916' BEGIN SELECT RAISE(ABORT, 'kettle refuses news'); END");
+  const fleet = buildStubFleetClient({
+    sessions: [
+      { id: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, pinned: true },
+      { id: '0000b001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'teapot-agent', alive: true, pinned: true },
+    ],
+  });
+
+  const wrapped = await wrapUpMergedRuns(ctx.db, { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')) }, { actor: 'sweep' });
+
+  expect(wrapped).toStrictEqual([
+    { issue: 'GEO-9916', wrapUp: { forgotten: [], destroyed: [], kept: [{ id: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', reason: 'pinned in atc' }], failed: [{ id: 'GEO-9916', reason: 'news: kettle refuses news' }] } },
+    { issue: 'GEO-9917', wrapUp: { forgotten: [], destroyed: [], kept: [{ id: '0000b001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', reason: 'pinned in atc' }], failed: [] } },
+  ]);
+  expect(ctx.db.query("SELECT subject_id, data FROM events WHERE action = 'merged-wrap-up-result' ORDER BY subject_id").all()).toStrictEqual([
+    { subject_id: 'GEO-9916', data: JSON.stringify(wrapped[0]?.wrapUp) },
+    { subject_id: 'GEO-9917', data: JSON.stringify(wrapped[1]?.wrapUp) },
+  ]);
+  expect(ctx.db.query('SELECT text FROM news').all()).toStrictEqual([{ text: 'GEO-9917 merged; wrap-up left kept 0000b001 (pinned in atc)' }]);
+});
+
+test('it wraps a run up in one pass only when a second pass starts before the first finishes', async () => {
+  const ctx = setupTest();
+  addRun(ctx.db, { issue: 'GEO-9918', title: 'Invented kettle descaler', place: 'local', session: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
+  addPr(ctx.db, 'GEO-9918', 'kettle#18', 'z-delivery');
+  closePr(ctx.db, 'kettle#18', { to: 'merged', actor: 'z-delivery' });
+  setState(ctx.db, 'GEO-9918', 'merged', {}, 'z-delivery');
+  const fleet = buildStubFleetClient({ sessions: [{ id: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, pinned: true }] });
+  const opened = Promise.withResolvers<FleetClient & StaleOps>();
+  const openClient = mock(() => opened.promise);
+  const deps = { openClient, readImpWork: () => Promise.reject(new Error('a local run checks no imp')) };
+
+  const first = wrapUpMergedRuns(ctx.db, deps, { actor: 'sweep' });
+  const second = wrapUpMergedRuns(ctx.db, deps, { actor: 'z-delivery' });
+  opened.resolve(fleet.client);
+  const passes = await Promise.all([first, second]);
+
+  expect(passes.map((pass) => pass.map((entry) => entry.issue))).toStrictEqual([['GEO-9918'], []]);
+  expect(openClient).toHaveBeenCalledOnce();
+  expect(ctx.db.query("SELECT COUNT(*) AS count FROM run_notes WHERE label = 'wrap-up'").get()).toStrictEqual({ count: 1 });
+  expect(ctx.db.query('SELECT COUNT(*) AS count FROM news').get()).toStrictEqual({ count: 1 });
+});
+
+test('it skips a run that another pass claimed after this pass listed it', async () => {
+  const ctx = setupTest();
+  addRun(ctx.db, { issue: 'GEO-9919', title: 'Invented kettle descaler', place: 'local', session: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
+  addRun(ctx.db, { issue: 'GEO-9920', title: 'Invented teapot cosy', place: 'local', session: '0000b001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
+  for (const [issue, ref] of [['GEO-9919', 'kettle#19'], ['GEO-9920', 'teapot#20']] as const) {
+    addPr(ctx.db, issue, ref, 'z-delivery');
+    closePr(ctx.db, ref, { to: 'merged', actor: 'z-delivery' });
+    setState(ctx.db, issue, 'merged', {}, 'z-delivery');
+  }
+  const fleet = buildStubFleetClient({
+    sessions: [
+      { id: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, pinned: true },
+      { id: '0000b001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'teapot-agent', alive: true, pinned: true },
+    ],
+  });
+  const opened = Promise.withResolvers<FleetClient & StaleOps>();
+  const deps = { openClient: () => opened.promise, readImpWork: () => Promise.reject(new Error('a local run checks no imp')) };
+
+  const first = wrapUpMergedRuns(ctx.db, deps, { actor: 'sweep' });
+  const second = wrapUpMergedRuns(ctx.db, deps, { actor: 'z-delivery' });
+  opened.resolve(fleet.client);
+  const passes = await Promise.all([first, second]);
+
+  expect(passes.map((pass) => pass.map((entry) => entry.issue))).toStrictEqual([['GEO-9919'], ['GEO-9920']]);
+  expect(ctx.db.query("SELECT issue FROM run_notes WHERE label = 'wrap-up' ORDER BY issue").all()).toStrictEqual([{ issue: 'GEO-9919' }, { issue: 'GEO-9920' }]);
+  expect(ctx.db.query('SELECT COUNT(*) AS count FROM news').get()).toStrictEqual({ count: 2 });
 });

@@ -1,4 +1,5 @@
 import type { Database } from 'bun:sqlite';
+import { match } from 'ts-pattern';
 import { z } from 'zod';
 import { HqError } from '../errors.ts';
 import type { FleetClient, FleetSession, StaleOps } from '../fleet/types.ts';
@@ -79,21 +80,23 @@ interface TreePass {
 
 async function wrapUpTree(pass: TreePass, root: FleetSession): Promise<void> {
   const decision = await planTree(pass, root);
-  if (decision.kind === 'keep') {
-    pass.wrapUp.kept.push(...decision.kept);
-    return;
-  }
-  if (pass.dryRun) {
-    pass.wrapUp.forgotten.push(...decision.children.map((child) => child.id), root.id);
-    if (decision.destroyImp) {
-      pass.wrapUp.destroyed.push(root.id);
-    }
-    return;
-  }
-  await forgetTree(pass, decision);
+  await match(decision)
+    .with({ kind: 'keep' }, (keep) => {
+      pass.wrapUp.kept.push(...keep.kept);
+      return Promise.resolve();
+    })
+    .with({ kind: 'forget' }, (forget) => (pass.dryRun ? Promise.resolve(reportForget(pass, forget)) : forgetTree(pass, forget)))
+    .exhaustive();
 }
 
-type TreeDecision = { kind: 'keep'; kept: KeptSession[] } | { kind: 'forget'; children: FleetSession[]; root: FleetSession; destroyImp: boolean };
+interface ForgetDecision {
+  kind: 'forget';
+  children: FleetSession[];
+  root: FleetSession;
+  destroyImp: boolean;
+}
+
+type TreeDecision = { kind: 'keep'; kept: KeptSession[] } | ForgetDecision;
 
 async function planTree(pass: TreePass, root: FleetSession): Promise<TreeDecision> {
   const children = collectChildren(pass.sessions, root.id);
@@ -112,6 +115,15 @@ async function planTree(pass: TreePass, root: FleetSession): Promise<TreeDecisio
   return { kind: 'forget', children, root, destroyImp: plan.destroyImp };
 }
 
+// The deepest sub-sessions come first, so each is forgotten before the session it lists under.
+function collectChildren(sessions: FleetSession[], parentID: string): FleetSession[] {
+  const found: FleetSession[] = [];
+  for (const child of sessions.filter((session) => session.parent === parentID)) {
+    found.push(...collectChildren(sessions, child.id), child);
+  }
+  return found;
+}
+
 function isOnImp(session: FleetSession, placedOnImp: boolean): boolean {
   const targetID = session.locator?.targetID;
   if (typeof targetID === 'string') {
@@ -124,7 +136,22 @@ function isOnImp(session: FleetSession, placedOnImp: boolean): boolean {
   return placedOnImp;
 }
 
-async function forgetTree(pass: TreePass, decision: Extract<TreeDecision, { kind: 'forget' }>): Promise<void> {
+async function readImpWorkSafely(deps: WrapUpDeps, session: FleetSession): Promise<ImpWork> {
+  try {
+    return await deps.readImpWork(session);
+  } catch (error) {
+    return { state: 'unknown', detail: toMessage(error) };
+  }
+}
+
+function reportForget(pass: TreePass, decision: ForgetDecision): void {
+  pass.wrapUp.forgotten.push(...decision.children.map((child) => child.id), decision.root.id);
+  if (decision.destroyImp) {
+    pass.wrapUp.destroyed.push(decision.root.id);
+  }
+}
+
+async function forgetTree(pass: TreePass, decision: ForgetDecision): Promise<void> {
   const children = decision.children;
   const root = decision.root;
 
@@ -153,23 +180,6 @@ async function forgetTree(pass: TreePass, decision: Extract<TreeDecision, { kind
     return;
   }
   await removeImpSession(pass, root.id);
-}
-
-// The deepest sub-sessions come first, so each is forgotten before the session it lists under.
-function collectChildren(sessions: FleetSession[], parentID: string): FleetSession[] {
-  const found: FleetSession[] = [];
-  for (const child of sessions.filter((session) => session.parent === parentID)) {
-    found.push(...collectChildren(sessions, child.id), child);
-  }
-  return found;
-}
-
-async function readImpWorkSafely(deps: WrapUpDeps, session: FleetSession): Promise<ImpWork> {
-  try {
-    return await deps.readImpWork(session);
-  } catch (error) {
-    return { state: 'unknown', detail: toMessage(error) };
-  }
 }
 
 // Forgets the live session, which stops it, and confirms the destroy of its imp when atc asks. A

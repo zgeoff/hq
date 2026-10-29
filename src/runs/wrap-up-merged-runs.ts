@@ -18,16 +18,16 @@ export interface MergedRunWrapUp {
 
 const issueRowSchema = z.object({ issue: z.string() });
 
-const QUALIFYING_RUNS = `
-  SELECT r.issue FROM runs r
-  WHERE r.state IN ('merged', 'live-check', 'deploy-held')
+const QUALIFIES = `
+  r.state IN ('merged', 'live-check', 'deploy-held')
     AND EXISTS (SELECT 1 FROM run_prs p WHERE p.issue = r.issue AND p.state = 'merged')
     AND NOT EXISTS (SELECT 1 FROM run_prs p WHERE p.issue = r.issue AND p.state NOT IN ('merged', 'closed'))
     AND NOT EXISTS (
       SELECT 1 FROM events w
       WHERE w.subject = 'run' AND w.subject_id = r.issue AND w.action = 'merged-wrap-up'
-        AND w.seq > COALESCE((SELECT MAX(m.seq) FROM events m WHERE m.subject = 'run' AND m.subject_id = r.issue AND m.action = 'state' AND m.to_state = 'merged'), 0))
-  ORDER BY r.issue`;
+        AND w.seq > COALESCE((SELECT MAX(m.seq) FROM events m WHERE m.subject = 'run' AND m.subject_id = r.issue AND m.action = 'state' AND m.to_state = 'merged'), 0))`;
+
+const QUALIFYING_RUNS = `SELECT r.issue FROM runs r WHERE ${QUALIFIES} ORDER BY r.issue`;
 
 export async function wrapUpMergedRuns(db: Database, deps: WrapUpDeps, options: WrapUpOptions): Promise<MergedRunWrapUp[]> {
   const issues = db
@@ -37,9 +37,11 @@ export async function wrapUpMergedRuns(db: Database, deps: WrapUpDeps, options: 
   const shared = shareClient(deps);
   const wrapped: MergedRunWrapUp[] = [];
   for (const issue of issues) {
-    const wrapUp = await wrapUpRunSafely(db, shared, issue, options);
-    wrapped.push({ issue, wrapUp });
-    if (options.dryRun !== true) {
+    if (options.dryRun === true) {
+      wrapped.push({ issue, wrapUp: await wrapUpRunSafely(db, shared, issue, options) });
+    } else if (claimMergedRun(db, issue, options.actor)) {
+      const wrapUp = await wrapUpRunSafely(db, shared, issue, options);
+      wrapped.push({ issue, wrapUp });
       recordMergedWrapUp(db, issue, wrapUp, options.actor);
     }
   }
@@ -73,8 +75,23 @@ async function wrapUpRunSafely(db: Database, deps: WrapUpDeps, issue: string, op
   }
 }
 
-// The news goes first and its failure joins the event, so the event is the last write and a run
-// that failed is still marked wrapped.
+const QUALIFYING_RUN = `SELECT r.issue FROM runs r WHERE r.issue = ? AND ${QUALIFIES}`;
+
+// Another pass, such as a watcher sweep beside hq run tidy, may have claimed the run since this
+// pass listed it, and its wrap-up is still running.
+function claimMergedRun(db: Database, issue: string, actor: string): boolean {
+  return db
+    .transaction(() => {
+      if (db.query(QUALIFYING_RUN).get(issue) === null) {
+        return false;
+      }
+      logEvent(db, 'run', issue, 'merged-wrap-up', actor, null, null);
+      return true;
+    })
+    .immediate();
+}
+
+// The news goes first so that its failure joins the result.
 function recordMergedWrapUp(db: Database, issue: string, wrapUp: WrapUp, actor: string): void {
   const text = buildMergedWrapUpNews(issue, wrapUp);
   if (text !== null) {
@@ -84,5 +101,5 @@ function recordMergedWrapUp(db: Database, issue: string, wrapUp: WrapUp, actor: 
       wrapUp.failed.push({ id: issue, reason: `news: ${toMessage(error)}` });
     }
   }
-  logEvent(db, 'run', issue, 'merged-wrap-up', actor, null, null, { ...wrapUp });
+  logEvent(db, 'run', issue, 'merged-wrap-up-result', actor, null, null, { ...wrapUp });
 }

@@ -323,6 +323,38 @@ test('done runs no imp check for a local session on an imp-place run', async () 
   expect(fleet.calls).toStrictEqual(['unpin 0000c002', 'kill 0000c002', 'unpin 0000c002', 'forget 0000c002']);
 });
 
+test('done checks the imp of a local-place run whose session names no host but runs a vm', async () => {
+  const ctx = setupTest();
+  addRun(ctx.db, { issue: 'GEO-9824', title: 'Invented kettle descaler', place: 'local', session: '0000c005-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
+  setState(ctx.db, 'GEO-9824', 'done', {}, 'z-delivery');
+  const fleet = buildStubFleetClient({
+    sessions: [{ id: '0000c005-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, cwd: '/workspace/kettle', lifecycle: { vm: 'running' } }],
+  });
+  const readImpWork = mock<(session: FleetSession) => Promise<ImpWork>>(() => Promise.resolve({ state: 'pushed' }));
+
+  const wrapUp = await runWrapUp(ctx.db, { openClient: () => Promise.resolve(fleet.client), readImpWork }, 'GEO-9824', { actor: 'z-delivery' });
+
+  expect(wrapUp).toStrictEqual({ forgotten: ['0000c005-aaaa-4aaa-8aaa-aaaaaaaaaaaa'], destroyed: [], kept: [], failed: [] });
+  expect(readImpWork).toHaveBeenCalledOnce();
+  expect(fleet.calls).toStrictEqual(['unpin 0000c005', 'forget-live 0000c005']);
+});
+
+test('done runs no imp check for an imp-place run whose session names no host and runs no vm', async () => {
+  const ctx = setupTest();
+  addRun(ctx.db, { issue: 'GEO-9825', title: 'Invented teapot cosy', place: 'imp', session: '0000c006-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
+  setState(ctx.db, 'GEO-9825', 'done', {}, 'z-delivery');
+  const fleet = buildStubFleetClient({
+    sessions: [{ id: '0000c006-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'teapot-agent', alive: true, cwd: '/workspace/teapot', lifecycle: { vm: 'none' } }],
+  });
+  const readImpWork = mock<(session: FleetSession) => Promise<ImpWork>>(() => Promise.resolve({ state: 'unpushed', detail: 'never read' }));
+
+  const wrapUp = await runWrapUp(ctx.db, { openClient: () => Promise.resolve(fleet.client), readImpWork }, 'GEO-9825', { actor: 'z-delivery' });
+
+  expect(wrapUp).toStrictEqual({ forgotten: ['0000c006-aaaa-4aaa-8aaa-aaaaaaaaaaaa'], destroyed: [], kept: [], failed: [] });
+  expect(readImpWork).not.toHaveBeenCalled();
+  expect(fleet.calls).toStrictEqual(['unpin 0000c006', 'kill 0000c006', 'unpin 0000c006', 'forget 0000c006']);
+});
+
 test('a dry run reports what it would forget and destroy, and calls no forget, unpin or kill and writes no row', async () => {
   const ctx = setupTest();
   addRun(ctx.db, { issue: 'GEO-9823', title: 'Invented kettle descaler', place: 'imp', session: '0000c003-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
