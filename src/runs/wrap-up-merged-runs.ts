@@ -20,8 +20,8 @@ const issueRowSchema = z.object({ issue: z.string() });
 
 const QUALIFIES = `
   r.state IN ('merged', 'live-check', 'deploy-held')
-    AND EXISTS (SELECT 1 FROM run_prs p WHERE p.issue = r.issue AND p.state = 'merged')
-    AND NOT EXISTS (SELECT 1 FROM run_prs p WHERE p.issue = r.issue AND p.state NOT IN ('merged', 'closed'))
+    AND EXISTS (SELECT 1 FROM run_prs p WHERE p.issue = r.issue AND p.state = 'merged' AND p.design_pass = 0)
+    AND NOT EXISTS (SELECT 1 FROM run_prs p WHERE p.issue = r.issue AND p.state NOT IN ('merged', 'closed') AND p.design_pass = 0)
     AND NOT EXISTS (
       SELECT 1 FROM events w
       WHERE w.subject = 'run' AND w.subject_id = r.issue AND w.action = 'merged-wrap-up'

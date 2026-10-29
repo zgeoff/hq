@@ -1,3 +1,5 @@
+import type { DesignLane } from '../lanes/design-lane.ts';
+import type { DesignSlots } from '../lanes/types.ts';
 import type { RunState } from '../transitions/run-states.ts';
 
 export interface Run {
@@ -14,6 +16,9 @@ export interface Run {
   size: 'S' | 'M' | 'L' | 'XL' | null;
   size_lines: number | null;
   lane: string | null;
+
+  // The design lane a design pass fills; NULL is a delivery run.
+  design_lane: DesignLane | null;
   live_check: 'owed' | 'none' | null; // after the release ships: NULL and 'owed' mean a live check is owed
   close_note: string | null;
   created_at: string;
@@ -29,6 +34,9 @@ export interface RunSession {
   added_at: string;
   ended_at: string | null;
   ended_by: 'sweep' | null;
+
+  // 1 for a session of the design pass the run turned from: an agent still awake there holds no delivery slot.
+  design_pass: 0 | 1;
 }
 
 export interface RunPr {
@@ -47,6 +55,9 @@ export interface RunPr {
   merge_sha: string | null;
   shipped_tag: string | null;
   shipped_at: string | null;
+
+  // 1 for a PR of the design pass the run turned from: it shows on the run but never moves the build run.
+  design_pass: 0 | 1;
   added_at: string;
   updated_at: string;
 }
@@ -78,6 +89,18 @@ export interface AddRunInput {
   readySince?: string | null; // when the issue became Ready in Linear, for cycle time
   size?: { size: 'S' | 'M' | 'L' | 'XL'; lines: number } | null; // triage's guess, from the ticket
   lane?: string | null; // a pacing.json lane, checked by the caller
+
+  // The design lane this run fills; left out, a Design-type issue fills with-geoff.
+  design?: DesignLane | null;
+
+  // Where the owner asked for a with-geoff pass above its lane count.
+  asked?: string | null;
+
+  // The lane counts from pacing.json; left out, the defaults.
+  designSlots?: DesignSlots;
+
+  // pacing.json's error for those counts; a design pass is refused while it is set.
+  designError?: string | null;
   actor: string;
 }
 
@@ -134,11 +157,18 @@ export interface FinalClaim {
   sha: string;
 }
 
+export interface IssueRefs {
+  all: ReadonlySet<string>;
+  open: ReadonlySet<string>;
+
+  // The open PRs a design pass did not leave behind.
+  deliveryOpen: readonly string[];
+}
+
 export interface FinalClaimFacts {
   issue: string;
   mark: { ref: string | null; sha: string; owner: string | null } | null;
-  phrase: { sha: string; mentioned: string[] } | null;
-  owned: { ref: string; state: string }[];
+  phrase: { sha: string; mentioned: string[]; refs: IssueRefs } | null;
 }
 
 export type FinalResolutions = ReadonlyMap<string, FinalResolution>;

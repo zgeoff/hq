@@ -3,7 +3,8 @@ import type { SlotMinutes } from './read-slot-minutes.ts';
 import type { SlotCause, SlotCauseUnknownReason } from './types.ts';
 
 export function formatSlotCause(slotCause: SlotCause, today: SlotMinutes, capHeld: boolean): string[] {
-  return [`cause: ${formatNow(slotCause, capHeld)}`, `empty slot-minutes today (Sydney): delivery ${Math.round(today.delivery)}, triage ${Math.round(today.triage)}, supply ${Math.round(today.supply)}`];
+  const designMinutes = today.design < 0.5 ? [] : [`empty agent design lane-minutes today (Sydney), apart from the slot-minutes: ${Math.round(today.design)}`];
+  return [`cause: ${formatNow(slotCause, capHeld)}`, `empty slot-minutes today (Sydney): delivery ${Math.round(today.delivery)}, triage ${Math.round(today.triage)}, supply ${Math.round(today.supply)}`, ...designMinutes];
 }
 
 function formatNow(slotCause: SlotCause, capHeld: boolean): string {

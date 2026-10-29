@@ -9,6 +9,7 @@ import { addRun } from './add-run.ts';
 import { FROM_START } from './from-start.ts';
 import { listRuns } from './list-runs.ts';
 import { ingestNotes } from './ingest-notes.ts';
+import { setState } from './set-state.ts';
 
 const KETTLE = '00000031-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 
@@ -164,4 +165,46 @@ test('it records a FINAL phrase for a PR an earlier note in the same page attach
       reason: 'not resolved in this pass',
     },
   ]);
+});
+
+test('it keeps a late note from the design pass session but marks no build PR final from it', async () => {
+  const fresh = freshDb();
+  const stub = fakeAtc(fresh.dir, [{ id: KETTLE, name: 'kettle', alive: true, state: 'running' }]);
+  onTestFinished(() => {
+    stub.stop();
+    fresh.cleanup();
+  });
+  addRun(fresh.db, { issue: 'GEO-9732', title: 'Design the kettle spout', place: 'local', session: KETTLE, next: 'Agent working.', gate: null, geoffChat: false, design: 'agent', actor: 'z-delivery' });
+  setState(fresh.db, 'GEO-9732', 'done', { note: 'design settled' }, 'z-delivery');
+  addRun(fresh.db, { issue: 'GEO-9732', title: 'Build the kettle spout', place: 'local', session: null, next: 'Building.', gate: null, geoffChat: false, actor: 'z-delivery' });
+  addPr(fresh.db, 'GEO-9732', 'kettle#32', 'z-delivery');
+  stub.feed.push({ at: new Date(NOON_SYDNEY).getTime(), session: KETTLE, name: 'kettle', kind: 'note', detail: 'the spout sketch is final at 39f05fe', label: 'progress' });
+  fresh.db.query("INSERT INTO meta (key, value) VALUES ('atc_events_cursor', ?)").run(FROM_START);
+  const client = await openClient();
+
+  const ingested = await ingestNotes(fresh.db, client, { run: buildStubFinalGH({ commits: [] }, []) });
+
+  expect([ingested.notes, ingested.finals]).toStrictEqual([1, []]);
+  expect(fresh.db.query("SELECT final_sha FROM run_prs WHERE ref = 'kettle#32'").get()).toStrictEqual({ final_sha: null });
+});
+
+test('it asks GitHub nothing about a FINAL in a late note from the design pass session', async () => {
+  const fresh = freshDb();
+  const stub = fakeAtc(fresh.dir, [{ id: KETTLE, name: 'kettle', alive: true, state: 'running' }]);
+  onTestFinished(() => {
+    stub.stop();
+    fresh.cleanup();
+  });
+  addRun(fresh.db, { issue: 'GEO-9732', title: 'Design the kettle spout', place: 'local', session: KETTLE, next: 'Agent working.', gate: null, geoffChat: false, design: 'agent', actor: 'z-delivery' });
+  setState(fresh.db, 'GEO-9732', 'done', { note: 'design settled' }, 'z-delivery');
+  addRun(fresh.db, { issue: 'GEO-9732', title: 'Build the kettle spout', place: 'local', session: null, next: 'Building.', gate: null, geoffChat: false, actor: 'z-delivery' });
+  addPr(fresh.db, 'GEO-9732', 'kettle#32', 'z-delivery');
+  stub.feed.push({ at: new Date(NOON_SYDNEY).getTime(), session: KETTLE, name: 'kettle', kind: 'note', detail: 'the spout sketch is final at 39f05fe', label: 'progress' });
+  fresh.db.query("INSERT INTO meta (key, value) VALUES ('atc_events_cursor', ?)").run(FROM_START);
+  const client = await openClient();
+  const calls: string[] = [];
+
+  await ingestNotes(fresh.db, client, { run: buildStubFinalGH({ commits: [`39f05fe${buildMockSha(3).slice(7)}`] }, calls) });
+
+  expect(calls).toStrictEqual([]);
 });

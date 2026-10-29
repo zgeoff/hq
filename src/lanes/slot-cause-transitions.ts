@@ -1,7 +1,7 @@
 import type { Row } from '../transitions/types.ts';
-import type { SlotCauseName } from './types.ts';
+import type { PoolCauseName } from './types.ts';
 
-export type SlotCauseState = SlotCauseName | 'unknown' | 'none';
+export type SlotCauseState = PoolCauseName | 'unknown' | 'none';
 
 const CAUSES = ['delivery', 'triage', 'supply', 'unknown'] as const satisfies readonly SlotCauseState[];
 

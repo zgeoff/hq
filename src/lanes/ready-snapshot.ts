@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { ISSUE_TYPES } from '../linear/issue-types.ts';
 
-const readyIssueSchema = z.object({
+export const readyIssueSchema = z.object({
   identifier: z.string(),
   project: z.string().nullable(),
   projectLabels: z.array(z.string()),

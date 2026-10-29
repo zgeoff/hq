@@ -1,9 +1,12 @@
 import { z } from 'zod';
 import { parseLanes } from '../areas/parse-lanes.ts';
+import { toMessage } from '../runs/to-message.ts';
 import type { LaneConfig } from '../areas/types.ts';
+import { DEFAULT_DESIGN_SLOTS } from './default-design-slots.ts';
+import { parseDesignSlots } from './parse-design-slots.ts';
 import { parseLocalRoom } from './parse-local-room.ts';
 import { parsePacingSlots } from './parse-pacing-slots.ts';
-import type { PacingSlots } from './types.ts';
+import type { DesignSlots, PacingSlots } from './types.ts';
 
 export interface Pacing {
   impMib: number;
@@ -15,6 +18,11 @@ export interface Pacing {
 
   // Claude's launch limit, providers.claude.threshold, in percent; null when the file gives none.
   claudeLaunchPct: number | null;
+
+  // The design lane counts (designSlots, agentDesignSlots), their defaults when the file gives none or
+  // gets one wrong; designError says which, apart from the lanes' error.
+  design: DesignSlots;
+  designError: string | null;
   error: string | null;
 }
 
@@ -38,14 +46,15 @@ export async function loadPacing(path: string): Promise<Pacing> {
   const impMib = imp.success ? imp.data.imp.impMib : DEFAULT_IMP_MIB;
   const claude = claudeSchema.safeParse(file);
   const claudeLaunchPct = claude.success ? claude.data.providers.claude.threshold : null;
-  if (shape.lanes === undefined && shape.slots === undefined) {
-    return { impMib, lanes: null, slots: null, localRoom: null, claudeLaunchPct, error: null };
-  }
+  const designRead = parseDesignCounts(file);
+  const design = { design: designRead.design, designError: designRead.error };
   try {
-    return { impMib, lanes: parseLanes(file), slots: parsePacingSlots(file), localRoom: parseLocalRoom(file), claudeLaunchPct, error: null };
+    if (shape.lanes === undefined && shape.slots === undefined) {
+      return { impMib, lanes: null, slots: null, localRoom: null, claudeLaunchPct, ...design, error: null };
+    }
+    return { impMib, lanes: parseLanes(file), slots: parsePacingSlots(file), localRoom: parseLocalRoom(file), claudeLaunchPct, ...design, error: null };
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return { impMib, lanes: null, slots: null, localRoom: null, claudeLaunchPct, error: `pacing.json: ${message}` };
+    return { impMib, lanes: null, slots: null, localRoom: null, claudeLaunchPct, ...design, error: `pacing.json: ${toMessage(error)}` };
   }
 }
 
@@ -55,5 +64,20 @@ async function readPacingJSON(path: string): Promise<unknown> {
     return raw;
   } catch {
     return null;
+  }
+}
+
+interface DesignCountsRead {
+  design: DesignSlots;
+  error: string | null;
+}
+
+// A design count pacing.json gets wrong gives the default counts and its own error, so the delivery lanes
+// and slots still load.
+function parseDesignCounts(file: unknown): DesignCountsRead {
+  try {
+    return { design: parseDesignSlots(file), error: null };
+  } catch (error) {
+    return { design: DEFAULT_DESIGN_SLOTS, error: `pacing.json: ${toMessage(error)}` };
   }
 }

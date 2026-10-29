@@ -337,3 +337,34 @@ test('it skips a run that another pass claimed after this pass listed it', async
   expect(ctx.db.query("SELECT issue FROM run_notes WHERE label = 'wrap-up' ORDER BY issue").all()).toStrictEqual([{ issue: 'GEO-9919' }, { issue: 'GEO-9920' }]);
   expect(ctx.db.query('SELECT COUNT(*) AS count FROM news').get()).toStrictEqual({ count: 2 });
 });
+
+test('it wraps up a merged build run whose design pass PR stays open', async () => {
+  const ctx = setupTest();
+  addRun(ctx.db, { issue: 'GEO-9921', title: 'Design the kettle lid', place: 'local', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', design: 'agent', actor: 'z-delivery' });
+  addPr(ctx.db, 'GEO-9921', 'kettle#21', 'z-delivery');
+  setState(ctx.db, 'GEO-9921', 'done', { note: 'design settled' }, 'z-delivery');
+  addRun(ctx.db, { issue: 'GEO-9921', title: 'Build the kettle lid', place: 'local', session: '0000a021-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Building.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
+  addPr(ctx.db, 'GEO-9921', 'kettle#22', 'z-delivery');
+  closePr(ctx.db, 'kettle#22', { to: 'merged', actor: 'z-delivery' });
+  setState(ctx.db, 'GEO-9921', 'merged', {}, 'z-delivery');
+  const fleet = buildStubFleetClient({ sessions: [{ id: '0000a021-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true }] });
+
+  const wrapped = await wrapUpMergedRuns(ctx.db, { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')) }, { actor: 'sweep' });
+
+  expect(wrapped).toStrictEqual([{ issue: 'GEO-9921', wrapUp: { forgotten: ['0000a021-aaaa-4aaa-8aaa-aaaaaaaaaaaa'], destroyed: [], kept: [], failed: [] } }]);
+});
+
+test('it skips a merged build run whose only merged PR is its design pass PR', async () => {
+  const ctx = setupTest();
+  addRun(ctx.db, { issue: 'GEO-9922', title: 'Design the kettle base', place: 'local', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', design: 'agent', actor: 'z-delivery' });
+  addPr(ctx.db, 'GEO-9922', 'kettle#23', 'z-delivery');
+  closePr(ctx.db, 'kettle#23', { to: 'merged', actor: 'z-delivery' });
+  setState(ctx.db, 'GEO-9922', 'done', { note: 'design settled' }, 'z-delivery');
+  addRun(ctx.db, { issue: 'GEO-9922', title: 'Build the kettle base', place: 'local', session: '0000a022-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Building.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
+  setState(ctx.db, 'GEO-9922', 'merged', {}, 'z-delivery');
+  const openClient = mock(() => Promise.reject(new Error('no atc expected')));
+
+  const wrapped = await wrapUpMergedRuns(ctx.db, { openClient, readImpWork: () => Promise.reject(new Error('no check expected')) }, { actor: 'sweep' });
+
+  expect(wrapped).toStrictEqual([]);
+});

@@ -1,3 +1,4 @@
+import { pickPhraseTarget } from './pick-phrase-target.ts';
 import type { FinalClaim, FinalClaimFacts } from './types.ts';
 
 export function pickFinalClaims(facts: FinalClaimFacts): FinalClaim[] {
@@ -10,6 +11,6 @@ export function pickFinalClaims(facts: FinalClaimFacts): FinalClaim[] {
   if (!phrase) {
     return [];
   }
-  const refs = phrase.mentioned.length > 0 ? phrase.mentioned.filter((ref) => facts.owned.some((pr) => pr.ref === ref)) : facts.owned.filter((pr) => pr.state === 'open').map((pr) => pr.ref);
-  return refs.map((ref) => ({ ref, sha: phrase.sha }));
+  const target = pickPhraseTarget(phrase.mentioned, phrase.refs);
+  return target === null ? [] : [{ ref: target, sha: phrase.sha }];
 }

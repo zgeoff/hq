@@ -78,3 +78,12 @@ test('it takes In and Out fields whose items sit on the lines below them', () =>
 
   expect(promotable).toBe(true);
 });
+
+test('it holds back a needs-design issue, since its design pass comes before triage can promote it', () => {
+  const description =
+    '## Outcome\n\nThe spout pours cleanly.\n\n## Context\n\n- Project: kitchen\n\n## Scope\n\nIn: the spout.\nOut: none stated.\n\n## Acceptance\n\n- [ ] The spout pours in a test (unit test)\n\n## Actions\n\nCode delivery\n';
+
+  const promotable = isIssuePromotable({ description, labels: ['Feature', 'needs-design'], blockerStates: [], moreRelations: false });
+
+  expect(promotable).toBe(false);
+});

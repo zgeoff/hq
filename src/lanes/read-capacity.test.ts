@@ -1,7 +1,7 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { overrideEnv } from '../config/override-env.ts';
 import { realRunner } from '../runner/real-runner.ts';
 import { readCapacity } from './read-capacity.ts';
@@ -33,4 +33,23 @@ test("the sample carries pacing.json's local room, an unattended imp provider's 
   writeFileSync(setupTest(), JSON.stringify({ slots: { imp: 4, local: 6 }, providers: { kettle: { unattended: true, target: 'imp', localFallback: 2 } } }));
   const sample = await readCapacity(realRunner);
   expect(sample.localRoom).toBe(2);
+});
+
+test('it reads a capacity.sh reading that still carries a design key', async () => {
+  const pacing = setupTest();
+  writeFileSync(join(dirname(pacing), 'scripts', 'capacity.sh'), `echo '${JSON.stringify({ imp: { freeMib: 4096, room: true }, design: { room: false } })}'\n`);
+
+  const sample = await readCapacity(realRunner);
+
+  expect(sample.cap?.imp).toStrictEqual({ freeMib: 4096, room: true });
+  expect(sample.error).toBeNull();
+});
+
+test("it carries pacing.json's error for the design counts in the sample, with the lanes still read", async () => {
+  writeFileSync(setupTest(), JSON.stringify({ lanes: { imp: { cleanup: 2 }, local: {} }, agentDesignSlots: 'two' }));
+
+  const sample = await readCapacity(realRunner);
+
+  expect(sample.designError).toBe('pacing.json: pacing.json designSlots and agentDesignSlots: give each a whole number from 0 to 100');
+  expect(sample.lanes).toStrictEqual([{ name: 'cleanup', place: 'imp', size: 2 }]);
 });

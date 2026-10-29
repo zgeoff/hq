@@ -13,6 +13,7 @@ import { enqueue } from '../outbox/enqueue.ts';
 import { orchestratorName } from '../wake/orchestrator-name.ts';
 import { endExpiredCap } from './cap/end-expired-cap.ts';
 import { readCappedImpRoom } from './cap/read-capped-imp-room.ts';
+import type { DesignCause } from './build-design-cause.ts';
 import { checkAllSkipped } from './check-all-skipped.ts';
 import { checkReadyStale } from './check-ready-stale.ts';
 import { eligibleNow } from './eligible-now.ts';
@@ -25,6 +26,7 @@ import { readSlotPlan } from './read-slot-plan.ts';
 import { removeLaneNudges } from './remove-lane-nudges.ts';
 import { sendSlotCauseAlert } from './send-slot-cause-alert.ts';
 import { slotsFrom } from './slots-from.ts';
+import { trackDesignCause } from './track-design-cause.ts';
 import { trackSlotCause } from './track-slot-cause.ts';
 import type { Sample, SlotCause, SlotCauseName, TickResult } from './types.ts';
 import { writeSlotMinutes } from './write-slot-minutes.ts';
@@ -55,7 +57,9 @@ export function tick(db: Database, sample: Sample, actor: string): TickResult {
 
       const slotCause = trackSlotCause(db, slotPlan, t);
       writeEmptySlotMinutes(db, { slotCause, previousAt: previous?.at ?? null, at: t });
-      sendSlotCauseAlerts(db, { free: slotCause.slots, at: t, actor });
+      const designCause = trackDesignCause(db, slotPlan, t);
+      writeDesignSlotMinutes(db, { designCause, previousAt: previous?.at ?? null, at: t });
+      sendSlotCauseAlerts(db, { free: slotCause.slots, designFree: designCause.slots, at: t, actor });
 
       // Follow up: did free slots drop after a nudge?
       const due = db.query('SELECT id, at FROM lanes_nudges WHERE slots_after IS NULL').all() as { id: number; at: string }[];
@@ -123,9 +127,9 @@ export function tick(db: Database, sample: Sample, actor: string): TickResult {
     .immediate();
 }
 
-// The slots worth filling: each pick, or every free slot while Ready is unknown. The design slot's
-// issue never counts: hq cannot see whether a Design session holds that slot, so it rides along in a
-// nudge the pool sends and starts none.
+// The slots worth filling: each pick, or every free slot while Ready is unknown. A design pick never
+// counts: a design pass holds no delivery slot, so the design lanes ride along in a nudge the pool
+// sends and start none.
 function countWanted(slotPlan: NonNullable<ReturnType<typeof readSlotPlan>>): number {
   if (slotPlan.plan === null) {
     return slotPlan.pool.free;
@@ -150,10 +154,29 @@ function writeEmptySlotMinutes(db: Database, look: EmptySlotLook): void {
   writeSlotMinutes(db, sydney(look.at).date, cause, minutes);
 }
 
-const SLOT_CAUSES: SlotCauseName[] = ['delivery', 'triage', 'supply'];
+// The idle agent design lane-minutes since the previous look (at most 30), on their own tally key: the
+// design cause is no part of the delivery pool's numbers.
+interface DesignMinutesLook {
+  designCause: DesignCause;
+  previousAt: string | null;
+  at: Date;
+}
+
+function writeDesignSlotMinutes(db: Database, look: DesignMinutesLook): void {
+  if (look.designCause.slots === 0 || look.previousAt === null) {
+    return;
+  }
+  const minutes = look.designCause.slots * Math.min(Math.max(0, look.at.getTime() - Date.parse(look.previousAt)) / 60_000, 30);
+  writeSlotMinutes(db, sydney(look.at).date, 'design', minutes);
+}
+
+const SLOT_CAUSES: SlotCauseName[] = ['delivery', 'triage', 'supply', 'design'];
 
 interface SlotAlertLook {
   free: number;
+
+  // The idle agent design lanes, the design cause's free slots.
+  designFree: number;
   at: Date;
   actor: string;
 }
@@ -164,7 +187,7 @@ function sendSlotCauseAlerts(db: Database, look: SlotAlertLook): void {
   const day = sydney(look.at).date;
   const totals = readSlotMinutes(db, day);
   for (const cause of SLOT_CAUSES) {
-    sendSlotCauseAlert(db, { day, cause, minutes: totals[cause], free: look.free, at: look.at, actor: look.actor });
+    sendSlotCauseAlert(db, { day, cause, minutes: totals[cause], free: cause === 'design' ? look.designFree : look.free, at: look.at, actor: look.actor });
   }
 }
 

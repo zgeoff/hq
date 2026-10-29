@@ -1,13 +1,15 @@
 import { z } from 'zod';
 import { HqError } from '../errors.ts';
 import type { LinearCall } from '../linear/types.ts';
+import { NEEDS_DESIGN_LABEL } from './needs-design-label.ts';
 import { isIssuePromotable } from './is-issue-promotable.ts';
 import { pickIssueType } from './pick-issue-type.ts';
-import type { PromotableIssue } from './types.ts';
+import type { PromotableIssue, ReadyIssue } from './types.ts';
 
 const MAX_PAGES = 20;
 const PAGE_SIZE = 50;
 const BACKLOG_STATE = 'Backlog';
+const WITH_GEOFF_LABEL = 'with-geoff';
 
 // inverseRelations holds the relations that point at the issue: a `blocks` one names its blocker.
 const QUERY = `query($after: String, $team: String!, $state: String!) {
@@ -59,10 +61,18 @@ const issuesSchema = z.object({ nodes: z.array(nodeSchema), pageInfo: pageInfoSc
 
 const pageSchema = z.object({ issues: issuesSchema });
 
-// Reads the team's Backlog page by page and keeps the issues isIssuePromotable passes, each with the
-// facts the focus matches on. Reads only; triage moves the issues.
-export async function readPromotableIssues(call: LinearCall, team: string): Promise<PromotableIssue[]> {
-  const promotable: PromotableIssue[] = [];
+export interface BacklogIssues {
+  promotable: PromotableIssue[];
+
+  // The needs-design issues by the design queue they wait in; none of them is promotable.
+  design: { agent: ReadyIssue[]; withGeoff: ReadyIssue[] };
+}
+
+// Reads the team's Backlog page by page and sorts it: the issues isIssuePromotable passes, each with the
+// facts the focus matches on, and the needs-design issues, queued for the with-geoff lane when they also
+// carry the with-geoff label and for the agent lanes otherwise. Reads only; triage moves the issues.
+export async function readBacklogIssues(call: LinearCall, team: string): Promise<BacklogIssues> {
+  const backlog: BacklogIssues = { promotable: [], design: { agent: [], withGeoff: [] } };
   let after: string | null = null;
   for (let page = 0; ; page++) {
     if (page === MAX_PAGES) {
@@ -81,21 +91,20 @@ export async function readPromotableIssues(call: LinearCall, team: string): Prom
         blockerStates: blockers.map((relation) => relation.issue.state.type),
         moreRelations: node.inverseRelations.pageInfo.hasNextPage,
       };
-      if (isIssuePromotable(issue)) {
-        promotable.push({
-          identifier: node.identifier,
-          title: node.title,
-          facts: {
-            identifier: node.identifier,
-            project: node.project?.name ?? null,
-            projectLabels: node.project?.labels.nodes.map((label) => label.name) ?? [],
-            labels: issue.labels,
-            type: pickIssueType(node.labels.nodes),
-            priority: node.priority,
-            createdAt: node.createdAt,
-            parent: node.parent?.identifier ?? null,
-          },
-        });
+      const facts = {
+        identifier: node.identifier,
+        project: node.project?.name ?? null,
+        projectLabels: node.project?.labels.nodes.map((label) => label.name) ?? [],
+        labels: issue.labels,
+        type: pickIssueType(node.labels.nodes),
+        priority: node.priority,
+        createdAt: node.createdAt,
+        parent: node.parent?.identifier ?? null,
+      };
+      if (issue.labels.includes(NEEDS_DESIGN_LABEL)) {
+        (issue.labels.includes(WITH_GEOFF_LABEL) ? backlog.design.withGeoff : backlog.design.agent).push(facts);
+      } else if (isIssuePromotable(issue)) {
+        backlog.promotable.push({ identifier: node.identifier, title: node.title, facts });
       }
     }
     if (!parsed.data.issues.pageInfo.hasNextPage) {
@@ -103,5 +112,5 @@ export async function readPromotableIssues(call: LinearCall, team: string): Prom
     }
     after = parsed.data.issues.pageInfo.endCursor;
   }
-  return promotable;
+  return backlog;
 }

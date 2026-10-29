@@ -4,7 +4,8 @@ import { parkedRuns } from '../areas/parked-runs.ts';
 import { readFreshAwake } from '../areas/read-fresh-awake.ts';
 import { RUNNING } from '../areas/running.ts';
 import { now } from '../clock/now.ts';
-import { readDesignIssues } from './read-design-issues.ts';
+import { readDesignRuns } from './read-design-runs.ts';
+import type { DesignRun } from './read-design-runs.ts';
 
 export interface RunningByPlace {
   imp: number;
@@ -22,9 +23,9 @@ export interface RunningByPlace {
 
 const rowsSchema = z.array(z.object({ issue: z.string(), place: z.enum(['imp', 'local']) }));
 
-export function readRunningByPlace(db: Database, at: Date = now()): RunningByPlace {
+export function readRunningByPlace(db: Database, at: Date = now(), designRuns: readonly DesignRun[] = readDesignRuns(db)): RunningByPlace {
   const parked = new Set(parkedRuns(db, at).map((run) => run.issue));
-  const design = readDesignIssues(db);
+  const design = new Set(designRuns.map((run) => run.issue));
   const rows = rowsSchema.parse(db.query(`SELECT issue, place FROM runs WHERE place != 'none' AND state IN (${RUNNING.map(() => '?').join(', ')}) ORDER BY issue`).all(...RUNNING));
   const holding = rows.filter((row) => !parked.has(row.issue) && !design.has(row.issue));
   const live = readLiveLocal(db, at, design);
@@ -57,7 +58,7 @@ function readLiveLocal(db: Database, at: Date, design: ReadonlySet<string>): Liv
   }
   const awake = new Set(reading.ids);
   const here = new Set(reading.local);
-  const rows = sessionsSchema.parse(db.query('SELECT DISTINCT issue, session_id FROM run_sessions').all()).filter((row) => awake.has(row.session_id) && !design.has(row.issue));
+  const rows = sessionsSchema.parse(db.query('SELECT DISTINCT issue, session_id FROM run_sessions WHERE design_pass = 0').all()).filter((row) => awake.has(row.session_id) && !design.has(row.issue));
   const sessions = new Set(rows.filter((row) => here.has(row.session_id)).map((row) => row.session_id)).size;
   const elsewhere = new Set(rows.filter((row) => !here.has(row.session_id)).map((row) => row.issue));
   const hereOnly = new Set(rows.filter((row) => here.has(row.session_id) && !elsewhere.has(row.issue)).map((row) => row.issue));

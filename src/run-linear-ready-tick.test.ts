@@ -9,6 +9,7 @@ import { buildMockLaneConfig } from '../test/build-mock-lane-config.ts';
 import { at, freshDb } from '../test/helpers.ts';
 import { getMeta } from './db/get-meta.ts';
 import { setMeta } from './db/set-meta.ts';
+import { readDesignBacklog } from './lanes/read-design-backlog.ts';
 import { readReadySnapshot } from './lanes/read-ready-snapshot.ts';
 import { runFocusCommand } from './focus/run-focus-command.ts';
 import { makeStateCall } from '../test/make-state-call.ts';
@@ -226,4 +227,22 @@ test('it records an unknown count when the Backlog read answers within a fresh d
 
   expect(read).toBe(true);
   expect(getMeta(ctx.db, 'lanes_promotable_focus')).toBe('{"at":"2026-10-15T20:00:00Z","count":null,"focus":"[]","error":"Backlog promotable count did not finish in 0 s"}');
+});
+
+test('it leaves a needs-design Backlog issue out of the promotable count and stores it in its design queue with the read time', async () => {
+  const ctx = setupTest();
+  const lanes = ['nixie-slice', 'nixie-maintenance', 'atc', 'imp', 'cloud', 'memory', 'flexible', 'cleanup', 'process'].map((name) => buildMockLaneConfig(name));
+  const call = makeBacklogCall([
+    { identifier: 'GEO-9901', project: 'kettle roadmap', type: 'Feature' },
+    { identifier: 'GEO-9902', project: 'kettle roadmap', type: 'Design', labels: ['needs-design'] },
+    { identifier: 'GEO-9903', project: 'kettle roadmap', type: 'Design', labels: ['needs-design', 'with-geoff'] },
+  ]);
+
+  await runLinearReadyTick(ctx.db, { call, run: buildStubGitHubFactsRunner({}), readLanes: () => Promise.resolve(lanes), actor: 'hq-lanes', deadlineMs: 2000 });
+
+  const stored = readDesignBacklog(ctx.db, new Date('2026-10-15T20:00:00Z'));
+  expect(getMeta(ctx.db, 'lanes_promotable_focus')).toBe('{"at":"2026-10-15T20:00:00Z","count":1,"focus":"[]","error":null}');
+  expect(stored?.at).toBe('2026-10-15T20:00:00Z');
+  expect(stored?.agent.map((issue) => issue.identifier)).toStrictEqual(['GEO-9902']);
+  expect(stored?.withGeoff.map((issue) => issue.identifier)).toStrictEqual(['GEO-9903']);
 });

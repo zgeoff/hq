@@ -7,7 +7,7 @@ import { setMeta } from '../db/set-meta.ts';
 import type { Runner } from '../runner/types.ts';
 import { applyNoteSignals } from './apply-note-signals.ts';
 import { cursorIndex } from './cursor-index.ts';
-import { findOpenSessionIssue } from './find-open-session-issue.ts';
+import { findOpenSession } from './find-open-session.ts';
 import { FROM_START } from './from-start.ts';
 import { makeFinalResolver } from './make-final-resolver.ts';
 import { readFinalClaims } from './read-final-claims.ts';
@@ -72,8 +72,8 @@ export async function ingestNotes(db: Database, client: AtcClient, opts: IngestO
         if (sendNoteToOrchestrator(db, e, orchestrator)) {
           result.routed++;
         }
-        const issue = findOpenSessionIssue(db, e.session);
-        if (issue === null) {
+        const row = findOpenSession(db, e.session);
+        if (row === null) {
           result.unmatched++;
           continue;
         }
@@ -83,12 +83,17 @@ export async function ingestNotes(db: Database, client: AtcClient, opts: IngestO
         }
         const ins = db
           .query(`INSERT INTO run_notes (issue, session_id, label, text, source, event_key, at) VALUES (?, ?, ?, ?, 'atc', ?, ?) ON CONFLICT (event_key) DO NOTHING`)
-          .run(issue, e.session, e.label ?? null, e.detail, `${epoch}:${e.cursor}`, noteAt);
+          .run(row.issue, e.session, e.label ?? null, e.detail, `${epoch}:${e.cursor}`, noteAt);
         if (ins.changes === 0) continue;
         result.notes++;
-        const sig = applyNoteSignals(db, issue, e.detail, { source: `atc:${e.session.slice(0, 8)}`, note: Number(ins.lastInsertRowid), actor: e.name ?? e.session.slice(0, 8), resolutions });
+
+        // A late note from the design pass the run turned from stays on the run, but marks nothing on the build.
+        if (row.design_pass === 1) {
+          continue;
+        }
+        const sig = applyNoteSignals(db, row.issue, e.detail, { source: `atc:${e.session.slice(0, 8)}`, note: Number(ins.lastInsertRowid), actor: e.name ?? e.session.slice(0, 8), resolutions });
         if (sig.final) result.finals.push(sig.final);
-        touch(db, issue);
+        touch(db, row.issue);
       }
       setMeta(db, CURSOR_KEY, r.cursor);
     }).immediate();
@@ -129,8 +134,8 @@ function resolveFinals(db: Database, events: FeedEvent[], resolveFinal: (claims:
     if (event.kind !== 'note' || !event.detail || hasSameNote(db, event)) {
       return [];
     }
-    const issue = findOpenSessionIssue(db, event.session);
-    return issue === null ? [] : readFinalClaims(db, issue, event.detail);
+    const row = findOpenSession(db, event.session);
+    return row === null || row.design_pass === 1 ? [] : readFinalClaims(db, row.issue, event.detail);
   });
   return resolveFinal(claims);
 }

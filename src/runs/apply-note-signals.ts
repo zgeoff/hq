@@ -6,9 +6,11 @@ import { FINAL_MARK } from './final-mark.ts';
 import { FINAL_PHRASE } from './final-phrase.ts';
 import { normalizePrRef } from './normalize-pr-ref.ts';
 import { parseMarkedRef } from './parse-marked-ref.ts';
+import { pickPhraseTarget } from './pick-phrase-target.ts';
 import { PR_IN_TEXT } from './pr-in-text.ts';
 import { scheduleFinalReview as markFinal } from './schedule-final-review.ts';
 import { sendFinalRefusal } from './send-final-refusal.ts';
+import { readIssueRefs } from './read-issue-refs.ts';
 import { registerRunPR as attachPr } from './register-run-pr.ts';
 import { requirePR } from './require-pr.ts';
 import { prAllows } from '../transitions/pr-allows.ts';
@@ -53,16 +55,8 @@ export function applyNoteSignals(db: Database, issue: string, text: string, opti
   } else {
     const phrase = FINAL_PHRASE.exec(text);
     if (phrase) {
-      // The PR the phrase speaks of: when the note names PRs, exactly one of them must
-      // be this row's open PR; only a note that names none falls back to the only open PR.
-      const open = (db.query(`SELECT ref FROM run_prs WHERE issue = ? AND state = 'open'`).all(issue) as { ref: string }[]).map((p) => p.ref);
-      // A note that names any PR outside this row is ambiguous: mark nothing.
-      const mentioned = collectMentionedPRs(text);
-      const ours = (db.query('SELECT ref FROM run_prs WHERE issue = ?').all(issue) as { ref: string }[]).map((p) => p.ref);
-      const foreign = mentioned.some((r) => !ours.includes(r));
-      const named = mentioned.filter((r) => open.includes(r));
-      const target = foreign ? undefined : mentioned.length ? (named.length === 1 ? named[0] : undefined) : open.length === 1 ? open[0] : undefined;
-      if (target && markResolved(db, { issue, ref: target, sha: String(phrase[1]), source: `phrase:${source}`, actor, note, resolutions })) {
+      const target = pickPhraseTarget(collectMentionedPRs(text), readIssueRefs(db, issue));
+      if (target !== null && markResolved(db, { issue, ref: target, sha: String(phrase[1]), source: `phrase:${source}`, actor, note, resolutions })) {
         final = target;
       }
     }
@@ -108,4 +102,3 @@ function markResolved(db: Database, input: FinalMarkInput): boolean {
   }
   return markFinal(db, { ref: input.ref, sha: input.sha, source: input.source, actor: input.actor, note: input.note, resolution });
 }
-
