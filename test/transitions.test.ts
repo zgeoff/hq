@@ -106,7 +106,7 @@ describe('the tables match the checks, pair by pair', () => {
     expect([...ASK_TRANSITIONS.opened.from].sort()).toEqual(['later', 'queued']);
     expect([...RUN_TRANSITIONS.state.from].sort()).toEqual(['blocked', 'deploy-held', 'deploying', 'live-check', 'merged', 'working']);
     expect([...RUN_TRANSITIONS.reopen.from].sort()).toEqual(['done', 'dropped']);
-    expect([...RUN_TRANSITIONS['design-to-build'].from].toSorted()).toEqual(['done', 'dropped']);
+    expect([...RUN_TRANSITIONS['design-to-build'].from].toSorted()).toStrictEqual(['done', 'dropped']);
     expect(RUN_TRANSITIONS['design-to-build'].to).toBe('working');
     expect(PR_TRANSITIONS.unmerge.from).toEqual(['merged']);
     expect(UNBLOCK_TRANSITIONS.reopened.from).toEqual(['done', 'dropped']);

@@ -9,6 +9,7 @@ import type { GhMerge, Oldest, Stats } from './types.ts';
 
 const MergedPRsSchema = z.array(z.object({ ref: z.string(), merged_at: z.string() }));
 const MergeDataSchema = z.object({ ref: z.string() });
+const RunsSchema = z.array(z.object({ issue: z.string(), state: z.string(), created_at: z.string(), closed_at: z.string().nullable(), ready_since: z.string().nullable() }));
 
 const mins = (a: string, b: string) => (Date.parse(b) - Date.parse(a)) / 60_000;
 const clip = (s: string, lo: string, hi: string) => (s < lo ? lo : s > hi ? hi : s);
@@ -34,7 +35,8 @@ export function computeStats(db: Database, opts: { from: string; to: string; gh:
   const ud = unb.filter((u) => u.state === 'done' && inWin(u.closed_at) && u.added_at >= cutoff()).map((u) => mins(u.added_at, u.closed_at!));
   const oldestUnblock = oldestOf(unb.filter((u) => u.state === 'open').map((u) => ({ id: u.id, t: u.added_at })));
 
-  const runs = db.query('SELECT issue, state, created_at, closed_at, ready_since FROM runs WHERE created_at >= ?').all(cutoff()) as { issue: string; state: string; created_at: string; closed_at: string | null; ready_since: string | null }[];
+  // A design pass is no delivery run, so its time is no part of these numbers.
+  const runs = RunsSchema.parse(db.query('SELECT issue, state, created_at, closed_at, ready_since FROM runs WHERE created_at >= ? AND design_lane IS NULL').all(cutoff()));
   const stateEvents = db.query(`SELECT subject_id AS issue, at, to_state, data FROM events WHERE subject = 'run' AND action = 'state' ORDER BY seq`).all() as { issue: string; at: string; to_state: string; data: string }[];
   const byIssue = new Map<string, typeof stateEvents>();
   for (const e of stateEvents) byIssue.set(e.issue, [...(byIssue.get(e.issue) ?? []), e]);
@@ -107,7 +109,11 @@ export function computeStats(db: Database, opts: { from: string; to: string; gh:
   for (const e of stateEvents) if (e.to_state === 'done' && e.at < to) doneAt.set(e.issue, e.at);
   for (const r of runs) {
     const done = doneAt.get(r.issue);
-    if (!done || !inWin(done)) continue;
+
+    // A build run that took over its design pass's row starts after the pass's done.
+    if (!done || !inWin(done) || done < r.created_at) {
+      continue;
+    }
     const last = merges.filter((m) => m.issue === r.issue && m.at <= done).at(-1);
     if (!last) continue;
     const m = mins(last.at, done);
@@ -165,7 +171,11 @@ export function computeStats(db: Database, opts: { from: string; to: string; gh:
   let fromReady = 0;
   for (const r of runs) {
     const done = doneAt.get(r.issue);
-    if (!done || !inWin(done)) continue;
+
+    // A build run that took over its design pass's row starts after the pass's done.
+    if (!done || !inWin(done) || done < r.created_at) {
+      continue;
+    }
     cycle.push(mins(r.ready_since ?? r.created_at, done));
     if (r.ready_since) fromReady++;
   }

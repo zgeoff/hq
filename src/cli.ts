@@ -872,6 +872,7 @@ async function runCommand(db: Database, verb: string | undefined, args: string[]
         design: parseDesignFlag(flags.design),
         asked: flags.asked ?? null,
         designSlots: pacing.design,
+        designError: pacing.designError,
         actor: await by(),
       });
       return { data: { result: r.result, run: r.run }, text: `${runLine(r.run)}

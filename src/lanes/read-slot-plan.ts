@@ -17,6 +17,7 @@ import { buildSlotPool } from './build-slot-pool.ts';
 import type { SlotPool } from './build-slot-pool.ts';
 import { buildDesignLanes } from './build-design-lanes.ts';
 import { countOpenDesignRuns } from './count-open-design-runs.ts';
+import { DESIGN_LANES } from './design-lane.ts';
 import { DEFAULT_DESIGN_SLOTS } from './default-design-slots.ts';
 import type { DesignLanes } from './design-lanes.ts';
 import { isSkipActive } from './is-skip-active.ts';
@@ -25,6 +26,7 @@ import { loadImpRoom } from './load-imp-room.ts';
 import { readDesignAsked } from './read-design-asked.ts';
 import { readDesignBacklog } from './read-design-backlog.ts';
 import { readDesignRuns } from './read-design-runs.ts';
+import type { DesignRun } from './read-design-runs.ts';
 import { readLaneSkips } from './read-lane-skips.ts';
 import { readReadySnapshot } from './read-ready-snapshot.ts';
 import { readRunningByPlace } from './read-running-by-place.ts';
@@ -54,27 +56,31 @@ export interface SlotPlan {
   cap: CapView;
 }
 
+const runsSchema = z.array(z.object({ issue: z.string(), state: z.enum(RUN_STATES), design_lane: z.enum(DESIGN_LANES).nullable() }));
+
 // The lanes' plan for this look: the pool's free slots, filled from the focus terms in order, then any
 // other eligible work. A focus change shows at the next look; running runs keep their slots.
 export function readSlotPlan(db: Database, sample: Sample, at: Date = now(), capAt: Date = at): SlotPlan | null {
   if (!sample.slots || !sample.cap) {
     return null;
   }
-  const running = readRunningByPlace(db, at);
+  const designRuns = readDesignRuns(db);
+  const running = readRunningByPlace(db, at, designRuns);
   const room = loadImpRoom(db, { budgetSlots: slotsFrom(sample.cap, sample.impMib).slots, impMib: sample.impMib }, at);
   const active = readActiveCap(db, capAt);
-  const working = countWorking(db, at);
+  const working = countWorking(db, at, designRuns);
   const capRoom = active === null ? null : Math.max(0, active.cap - working.count);
   const pool = buildSlotPool(sample.slots, running, { room, localRoom: sample.localRoom ?? null, capRoom });
   const cap = buildCapView(active, working, pool);
   const focus = readFocus(db);
   const snapshot = readReadySnapshot(db, at);
   const activeSkips = readLaneSkips(db).filter((skip) => isSkipActive(skip, at));
-  const design = readDesignLanes(db, { slots: sample.design ?? DEFAULT_DESIGN_SLOTS, snapshot, skipped: activeSkips.map((skip) => skip.issue), at });
+  const runs = runsSchema.parse(db.query('SELECT issue, state, design_lane FROM runs').all());
+  const design = readDesignLanes(db, { slots: sample.design ?? DEFAULT_DESIGN_SLOTS, snapshot, runs, designRuns, skipped: activeSkips.map((skip) => skip.issue), at });
   if (snapshot === null) {
     return { pool, focus, plan: null, readyReadAt: null, eligible: null, design, skipped: [], cap };
   }
-  const runIssues = readRunIssues(db);
+  const runIssues = collectRunIssues(runs);
   const leftOut = new Set([...runIssues, ...activeSkips.map((skip) => skip.issue)]);
   const queue = buildFocusQueue(snapshot.eligible, focus?.terms ?? [], leftOut);
   const plan = buildFocusPlan(queue, pool.free, focus?.reserves ?? [], readRunningByArea(db, running.issues));
@@ -83,20 +89,22 @@ export function readSlotPlan(db: Database, sample: Sample, at: Date = now(), cap
   return { pool, focus, plan, readyReadAt: snapshot.at, eligible: queue.length, design, skipped, cap };
 }
 
-const issuesSchema = z.array(z.object({ issue: z.string(), state: z.enum(RUN_STATES) }));
+type RunRow = z.infer<typeof runsSchema>[number];
 
 interface DesignLanesLook {
   slots: DesignSlots;
   snapshot: ReadySnapshot | null;
+  runs: readonly RunRow[];
+  designRuns: readonly DesignRun[];
   skipped: readonly string[];
   at: Date;
 }
 
 // The design lanes: the open design runs against the lane counts, and for each lane the issues waiting
-// for it. An issue with an open run, or a lanes skip, waits for no lane.
+// for it. An issue with a run of any kind, open or closed, or a lanes skip, waits for no lane: a closed
+// design pass is not run again without a reopen.
 function readDesignLanes(db: Database, look: DesignLanesLook): DesignLanes {
-  const rows = issuesSchema.parse(db.query('SELECT issue, state FROM runs').all());
-  const leftOut = new Set([...rows.filter((row) => !CLOSED_RUN_STATES.includes(row.state)).map((row) => row.issue), ...look.skipped]);
+  const leftOut = new Set([...look.runs.map((row) => row.issue), ...look.skipped]);
   const backlog = readDesignBacklog(db, look.at);
   const waiting = (issues: readonly ReadyIssue[]): string[] => {
     const seen = new Map(issues.filter((issue) => !leftOut.has(issue.identifier)).map((issue) => [issue.identifier, issue]));
@@ -104,20 +112,18 @@ function readDesignLanes(db: Database, look: DesignLanesLook): DesignLanes {
   };
   return buildDesignLanes({
     slots: look.slots,
-    open: countOpenDesignRuns(db),
+    open: countOpenDesignRuns(look.designRuns),
     agentQueue: waiting(backlog?.agent ?? []),
     withGeoffQueue: waiting([...(look.snapshot?.design ?? []), ...(backlog?.withGeoff ?? [])]),
-    asked: readDesignAsked(db),
+    asked: readDesignAsked(db, look.designRuns),
   });
 }
 
-// The issues with a run, whether or not it holds a slot now: the lanes never pick it again. A closed
-// run counts too, since the Ready read can still hold its issue and addRun refuses it until a reopen;
-// a closed design run does not, since its issue is next built once it is Ready.
-function readRunIssues(db: Database): Set<string> {
-  const rows = issuesSchema.parse(db.query('SELECT issue, state FROM runs').all());
-  const designPasses = new Set(readDesignRuns(db).filter((run) => CLOSED_RUN_STATES.includes(run.state)).map((run) => run.issue));
-  return new Set(rows.filter((row) => !designPasses.has(row.issue)).map((row) => row.issue));
+// The issues with a run, open or closed: the Ready read can still hold a closed run's issue, and addRun
+// refuses it until a reopen. A closed design_lane run does not count, since addRun turns it into the
+// build run; a pre-v46 Design-type run was the design outcome itself, so it does.
+function collectRunIssues(runs: readonly RunRow[]): Set<string> {
+  return new Set(runs.filter((row) => !(row.design_lane !== null && CLOSED_RUN_STATES.includes(row.state))).map((row) => row.issue));
 }
 
 const AREAS_SCHEMA = z.record(z.string(), z.array(z.string()));

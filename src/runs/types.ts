@@ -92,6 +92,9 @@ export interface AddRunInput {
 
   // The lane counts from pacing.json; left out, the defaults.
   designSlots?: DesignSlots;
+
+  // pacing.json's error for those counts; a design pass is refused while it is set.
+  designError?: string | null;
   actor: string;
 }
 

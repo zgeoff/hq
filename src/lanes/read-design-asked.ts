@@ -1,16 +1,16 @@
 import type { Database } from 'bun:sqlite';
 import { z } from 'zod';
 import { CLOSED_RUN_STATES } from '../transitions/closed-run-states.ts';
-import { readDesignRuns } from './read-design-runs.ts';
+import type { DesignRun } from './read-design-runs.ts';
 
 const eventsSchema = z.array(z.object({ subject_id: z.string(), data: z.string() }));
 
 const dataSchema = z.object({ asked: z.string().nullish() });
 
 // Where the owner asked for each open with-geoff pass added with --asked, in the order they were added.
-export function readDesignAsked(db: Database): string[] {
+export function readDesignAsked(db: Database, designRuns: readonly DesignRun[]): string[] {
   const open = new Set(
-    readDesignRuns(db)
+    designRuns
       .filter((run) => run.lane === 'with-geoff' && !CLOSED_RUN_STATES.includes(run.state))
       .map((run) => run.issue),
   );

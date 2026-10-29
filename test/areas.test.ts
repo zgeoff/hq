@@ -153,7 +153,7 @@ test('the watcher nudges with the picks after 10 min, and again only on a change
   expect(nudges[0]?.text).toContain('Take, in this order: GEO-22.');
 });
 
-test('a Design issue alone starts no nudge, though the plan names it for the with-geoff lane', () => {
+test('it starts no nudge for a Design issue alone, though the plan names it for the with-geoff lane', () => {
   setMeta(db, 'lanes_ready_issues', JSON.stringify({ at: T0, eligible: [], design: [buildReadyIssue('GEO-24', { type: 'Design' })] }));
   const withDesign = sample(16_384);
   tick(db, withDesign, 'hq-lanes');

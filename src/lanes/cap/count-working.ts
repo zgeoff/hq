@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { readFreshAwake } from '../../areas/read-fresh-awake.ts';
 import { fleetIds } from '../../atc/fleet-ids.ts';
 import { readDesignRuns } from '../read-design-runs.ts';
+import type { DesignRun } from '../read-design-runs.ts';
 
 export interface WorkingCount {
   count: number;
@@ -14,8 +15,8 @@ const runsSchema = z.array(z.object({ issue: z.string() }));
 
 const rowsSchema = z.array(z.object({ issue: z.string(), session_id: z.string() }));
 
-export function countWorking(db: Database, at: Date): WorkingCount {
-  const design = new Set(readDesignRuns(db).map((run) => run.issue));
+export function countWorking(db: Database, at: Date, designRuns: readonly DesignRun[] = readDesignRuns(db)): WorkingCount {
+  const design = new Set(designRuns.map((run) => run.issue));
   const reading = readFreshAwake(db, at);
   if (reading === null) {
     const runs = runsSchema.parse(db.query("SELECT issue FROM runs WHERE state = 'working'").all());

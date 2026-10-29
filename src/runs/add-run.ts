@@ -7,6 +7,7 @@ import { DEFAULT_DESIGN_SLOTS } from '../lanes/default-design-slots.ts';
 import type { DesignLane } from '../lanes/design-lane.ts';
 import { readDesignIssues } from '../lanes/read-design-issues.ts';
 import { readDesignRuns } from '../lanes/read-design-runs.ts';
+import type { DesignRun } from '../lanes/read-design-runs.ts';
 import { removeLaneNudges } from '../lanes/remove-lane-nudges.ts';
 import { now } from '../clock/now.ts';
 import { HqError } from '../errors.ts';
@@ -33,14 +34,20 @@ export function addRun(db: Database, input: AddRunInput): { run: RunView; result
       const ready = input.readySince ? iso(new Date(input.readySince)) : null;
       const sizeFields = [input.size?.size ?? null, input.size?.lines ?? null] as const;
       const geoffChat = input.geoffChat ? 1 : 0;
-      if (prev?.design_lane && !input.design) {
+      if (prev?.design_lane && input.design) {
+        throw new HqError('bad_state', `${input.issue}: its ${prev.design_lane} design pass is ${prev.state}; a new design pass needs hq run reopen ${input.issue}`);
+      }
+      if (prev?.design_lane && input.asked) {
+        throw new HqError('bad_args', `--asked goes with a new with-geoff design pass; hq run add without --design turns ${input.issue}'s ${prev.state} design pass into the build run`);
+      }
+      if (prev?.design_lane) {
         checkRun(input.issue, 'design-to-build', prev.state, 'working');
         const oldSessions = sessionsSchema.parse(db.query('SELECT session_id FROM run_sessions WHERE issue = ? ORDER BY added_at').all(input.issue));
         db.query('UPDATE run_sessions SET active = 0, ended_at = COALESCE(ended_at, ?) WHERE issue = ? AND active = 1').run(t, input.issue);
         db.query(
           `UPDATE runs SET design_lane = NULL, state = 'working', closed_at = NULL, close_note = NULL, waits_on = NULL, waits_on_geoff = 0, live_check = NULL,
-             title = ?, place = ?, next = ?, gate = ?, geoff_chat = ?, ready_since = ?, size = ?, size_lines = ?, lane = ?, updated_at = ? WHERE issue = ?`,
-        ).run(input.title, input.place, input.next, input.gate, geoffChat, ready, ...sizeFields, lane, t, input.issue);
+             title = ?, place = ?, next = ?, gate = ?, geoff_chat = ?, ready_since = ?, size = ?, size_lines = ?, lane = ?, created_at = ?, updated_at = ? WHERE issue = ?`,
+        ).run(input.title, input.place, input.next, input.gate, geoffChat, ready, ...sizeFields, lane, t, t, input.issue);
         if (input.session) {
           attachSession(db, input.issue, input.session);
         }
@@ -72,25 +79,32 @@ export function addRun(db: Database, input: AddRunInput): { run: RunView; result
 // owner asked for it somewhere.
 function readDesignLane(db: Database, input: AddRunInput): DesignLane | null {
   const lane = input.design ?? (readDesignIssues(db).has(input.issue) ? 'with-geoff' : null);
-  if (input.asked && lane !== 'with-geoff') {
-    throw new HqError('bad_args', '--asked goes with a with-geoff design pass');
+  if (input.asked && lane === null) {
+    throw new HqError('bad_args', `--asked goes with a with-geoff design pass, and ${input.issue} gets a delivery run: pass --design with-geoff for a design pass`);
+  }
+  if (input.asked && lane === 'agent') {
+    throw new HqError('bad_args', '--asked goes with a with-geoff design pass, not an agent one');
   }
   if (lane === null) {
     return null;
   }
+  if (input.designError) {
+    throw new HqError('no_lanes', `${input.designError}; hq adds no design pass until pacing.json gives its counts`);
+  }
   const slots = input.designSlots ?? DEFAULT_DESIGN_SLOTS;
-  const open = countOpenDesignRuns(db);
+  const designRuns = readDesignRuns(db);
+  const open = countOpenDesignRuns(designRuns);
   if (lane === 'agent' && open.agent >= slots.agent) {
-    throw new HqError('design_full', `${input.issue}: all ${slots.agent} agent design passes are open (${openIssues(db, 'agent')}); close one with hq run done first`, { lane, open: open.agent, slots: slots.agent });
+    throw new HqError('design_full', `${input.issue}: all ${slots.agent} agent design passes are open (${formatOpenIssues(designRuns, 'agent')}); close one with hq run done first`, { lane, open: open.agent, slots: slots.agent });
   }
   if (lane === 'with-geoff' && open.withGeoff >= slots.withGeoff && !input.asked) {
-    throw new HqError('design_full', `${input.issue}: the with-geoff design lane is full at ${slots.withGeoff} (${openIssues(db, 'with-geoff')}); pass --asked <where the owner asked> to add it above the count`, { lane, open: open.withGeoff, slots: slots.withGeoff });
+    throw new HqError('design_full', `${input.issue}: the with-geoff design lane is full at ${slots.withGeoff} (${formatOpenIssues(designRuns, 'with-geoff')}); pass --asked <where the owner asked> to add it above the count`, { lane, open: open.withGeoff, slots: slots.withGeoff });
   }
   return lane;
 }
 
-function openIssues(db: Database, lane: DesignLane): string {
-  return readDesignRuns(db)
+function formatOpenIssues(designRuns: readonly DesignRun[], lane: DesignLane): string {
+  return designRuns
     .filter((run) => run.lane === lane && !CLOSED.includes(run.state))
     .map((run) => run.issue)
     .join(', ') || 'none';

@@ -4,24 +4,18 @@ import { buildReadyPage, makePagedCall } from '../../test/build-ready-page.ts';
 import type { ReadyNodeSeed } from '../../test/build-ready-page.ts';
 import { buildStubGitHubFactsRunner } from '../../test/build-stub-github-facts-runner.ts';
 import { createCapacitySample } from '../../test/create-capacity-sample.ts';
+import { buildReadyIssue } from '../../test/build-ready-issue.ts';
 import { at, freshDb } from '../../test/helpers.ts';
 import { makeStateCall } from '../../test/make-state-call.ts';
-import { now } from '../clock/now.ts';
 import { setMeta } from '../db/set-meta.ts';
 import { runFocusCommand } from '../focus/run-focus-command.ts';
 import { addRun } from '../runs/add-run.ts';
-import type { ReadyIssue } from './types.ts';
 import { readLinearReady } from './read-linear-ready.ts';
 import { readSlotMinutes } from './read-slot-minutes.ts';
 import { tick } from './tick.ts';
 import { validateLaneRules } from './validate-lane-rules.ts';
 import { writeDesignBacklog } from './write-design-backlog.ts';
 import { writePromotableFocus } from './write-promotable-focus.ts';
-
-interface WaitingDesignTickets {
-  agent?: string[];
-  withGeoff?: string[];
-}
 
 // The ISO times are 12:00 Sydney on 14 Oct 2026 and the minutes after it. Each test's sample has three
 // local slots and no imp ones, so the pool holds three free slots while no run is open.
@@ -34,19 +28,7 @@ function setupTest() {
   };
   const queued = () => fresh.db.query("SELECT target, text FROM outbox WHERE text LIKE 'Lanes: % slot-minutes empty today%' ORDER BY id").all();
 
-  // A look at `time` with the Backlog read made then, naming `agent` and `withGeoff` as needs-design tickets waiting.
-  const designSample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 }, design: { agent: 2, withGeoff: 1 } };
-  const lookAtDesign = (time: string, waiting: WaitingDesignTickets) => {
-    at(time);
-    const createdAt = '2026-10-01T00:00:00Z';
-    const ticket = (identifier: string): ReadyIssue => ({ identifier, project: 'kettle roadmap', projectLabels: [], labels: ['needs-design'], type: 'Design', priority: 2, createdAt, parent: null });
-    writeDesignBacklog(fresh.db, { at: now(), agent: (waiting.agent ?? []).map((identifier) => ticket(identifier)), withGeoff: (waiting.withGeoff ?? []).map((identifier) => ticket(identifier)) });
-    return tick(fresh.db, designSample, 'hq-lanes');
-  };
-  const addAgentDesignRun = (issue: string): void => {
-    addRun(fresh.db, { issue, title: 'Design the kettle spout', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', design: 'agent', actor: 'z-delivery' });
-  };
-  return { db: fresh.db, seedReady, queued, lookAtDesign, addAgentDesignRun };
+return { db: fresh.db, seedReady, queued };
 }
 
 test('it tags no cause and counts no minutes while Ready work has waited 10 minutes or less', async () => {
@@ -474,50 +456,129 @@ test('it keeps a cap the wall clock has not reached while HQ_NOW pins a later ti
   expect(ctx.db.query("SELECT COUNT(*) AS total FROM outbox WHERE text LIKE 'Lanes cap%'").get()).toStrictEqual({ total: 0 });
 });
 
-test('the design cause fires for a free agent lane with a needs-design ticket waiting past the grace, and its minutes stay out of the delivery tally', () => {
+test('it counts no design minutes while a needs-design ticket has waited for a free agent lane 10 minutes or less', () => {
   const ctx = setupTest();
-  ctx.lookAtDesign('2026-10-14T01:00:00Z', { agent: ['GEO-9901'] });
-  ctx.lookAtDesign('2026-10-14T01:08:00Z', { agent: ['GEO-9901'] });
+  const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 }, design: { agent: 2, withGeoff: 1 } };
+  at('2026-10-14T01:00:00Z');
+  writeDesignBacklog(ctx.db, { at: new Date('2026-10-14T01:00:00Z'), agent: [buildReadyIssue('GEO-9901', { project: 'kettle roadmap', labels: ['needs-design'], type: 'Design', priority: 2 })], withGeoff: [] });
+  tick(ctx.db, sample, 'hq-lanes');
 
-  expect(readSlotMinutes(ctx.db, '2026-10-14')).toStrictEqual({ delivery: 0, triage: 0, supply: 0, design: 0 });
-
-  const late = ctx.lookAtDesign('2026-10-14T01:11:00Z', { agent: ['GEO-9901'] });
-
-  expect(readSlotMinutes(ctx.db, '2026-10-14')).toStrictEqual({ delivery: 0, triage: 0, supply: 0, design: 3 });
-  expect(late.slotCause.cause).toBe('unknown');
-});
-
-test('the design cause alerts z-delivery once its minutes reach 60', () => {
-  const ctx = setupTest();
-  ctx.addAgentDesignRun('GEO-9902');
-  for (const time of ['01:00', '01:11', '01:41', '02:11']) {
-    ctx.lookAtDesign(`2026-10-14T${time}:00Z`, { agent: ['GEO-9901'] });
-  }
-
-  expect(ctx.queued()).toStrictEqual([{ target: 'z-delivery', text: 'Lanes: 71 slot-minutes empty today with needs-design tickets waiting for an agent design lane (design). Free slots: 1.' }]);
-  expect(readSlotMinutes(ctx.db, '2026-10-14')).toStrictEqual({ delivery: 0, triage: 0, supply: 0, design: 71 });
-});
-
-test('the design cause stays quiet with no ticket waiting, with the agent lanes full, and for the with-geoff lane', () => {
-  const ctx = setupTest();
-  ctx.lookAtDesign('2026-10-14T01:00:00Z', {});
-  ctx.lookAtDesign('2026-10-14T01:30:00Z', {});
-  ctx.addAgentDesignRun('GEO-9902');
-  ctx.addAgentDesignRun('GEO-9903');
-  ctx.lookAtDesign('2026-10-14T02:00:00Z', { agent: ['GEO-9901'] });
-  ctx.lookAtDesign('2026-10-14T02:30:00Z', { agent: ['GEO-9901'] });
-  ctx.lookAtDesign('2026-10-14T03:00:00Z', { withGeoff: ['GEO-9904'] });
-  ctx.lookAtDesign('2026-10-14T03:30:00Z', { withGeoff: ['GEO-9904'] });
+  at('2026-10-14T01:08:00Z');
+  writeDesignBacklog(ctx.db, { at: new Date('2026-10-14T01:08:00Z'), agent: [buildReadyIssue('GEO-9901', { project: 'kettle roadmap', labels: ['needs-design'], type: 'Design', priority: 2 })], withGeoff: [] });
+  tick(ctx.db, sample, 'hq-lanes');
 
   expect(readSlotMinutes(ctx.db, '2026-10-14').design).toBe(0);
 });
 
-test('the design wait starts over when the ticket goes, so a later one gets its own grace', () => {
+test('it counts design minutes apart from the delivery tally once a needs-design ticket has waited for a free agent lane more than 10 minutes', () => {
   const ctx = setupTest();
-  ctx.lookAtDesign('2026-10-14T01:00:00Z', { agent: ['GEO-9901'] });
-  ctx.lookAtDesign('2026-10-14T01:20:00Z', {});
-  ctx.lookAtDesign('2026-10-14T01:25:00Z', { agent: ['GEO-9905'] });
-  ctx.lookAtDesign('2026-10-14T01:30:00Z', { agent: ['GEO-9905'] });
+  const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 }, design: { agent: 2, withGeoff: 1 } };
+  at('2026-10-14T01:00:00Z');
+  writeDesignBacklog(ctx.db, { at: new Date('2026-10-14T01:00:00Z'), agent: [buildReadyIssue('GEO-9901', { project: 'kettle roadmap', labels: ['needs-design'], type: 'Design', priority: 2 })], withGeoff: [] });
+  tick(ctx.db, sample, 'hq-lanes');
+  at('2026-10-14T01:08:00Z');
+  writeDesignBacklog(ctx.db, { at: new Date('2026-10-14T01:08:00Z'), agent: [buildReadyIssue('GEO-9901', { project: 'kettle roadmap', labels: ['needs-design'], type: 'Design', priority: 2 })], withGeoff: [] });
+  tick(ctx.db, sample, 'hq-lanes');
+
+  at('2026-10-14T01:11:00Z');
+  writeDesignBacklog(ctx.db, { at: new Date('2026-10-14T01:11:00Z'), agent: [buildReadyIssue('GEO-9901', { project: 'kettle roadmap', labels: ['needs-design'], type: 'Design', priority: 2 })], withGeoff: [] });
+  const result = tick(ctx.db, sample, 'hq-lanes');
+
+  expect(readSlotMinutes(ctx.db, '2026-10-14')).toStrictEqual({ delivery: 0, triage: 0, supply: 0, design: 3 });
+  expect(result.slotCause.cause).toBe('unknown');
+});
+
+test('it alerts z-delivery once the design minutes reach 60', () => {
+  const ctx = setupTest();
+  const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 }, design: { agent: 2, withGeoff: 1 } };
+  addRun(ctx.db, { issue: 'GEO-9902', title: 'Design the kettle spout', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', design: 'agent', actor: 'z-delivery' });
+  at('2026-10-14T01:00:00Z');
+  writeDesignBacklog(ctx.db, { at: new Date('2026-10-14T01:00:00Z'), agent: [buildReadyIssue('GEO-9901', { project: 'kettle roadmap', labels: ['needs-design'], type: 'Design', priority: 2 })], withGeoff: [] });
+  tick(ctx.db, sample, 'hq-lanes');
+  at('2026-10-14T01:11:00Z');
+  writeDesignBacklog(ctx.db, { at: new Date('2026-10-14T01:11:00Z'), agent: [buildReadyIssue('GEO-9901', { project: 'kettle roadmap', labels: ['needs-design'], type: 'Design', priority: 2 })], withGeoff: [] });
+  tick(ctx.db, sample, 'hq-lanes');
+  at('2026-10-14T01:41:00Z');
+  writeDesignBacklog(ctx.db, { at: new Date('2026-10-14T01:41:00Z'), agent: [buildReadyIssue('GEO-9901', { project: 'kettle roadmap', labels: ['needs-design'], type: 'Design', priority: 2 })], withGeoff: [] });
+  tick(ctx.db, sample, 'hq-lanes');
+
+  at('2026-10-14T02:11:00Z');
+  writeDesignBacklog(ctx.db, { at: new Date('2026-10-14T02:11:00Z'), agent: [buildReadyIssue('GEO-9901', { project: 'kettle roadmap', labels: ['needs-design'], type: 'Design', priority: 2 })], withGeoff: [] });
+  tick(ctx.db, sample, 'hq-lanes');
+
+  expect(ctx.queued()).toStrictEqual([{ target: 'z-delivery', text: 'Lanes: 71 slot-minutes empty today with needs-design tickets waiting for an agent design lane (design). Free slots: 1.' }]);
+  expect(readSlotMinutes(ctx.db, '2026-10-14').design).toBe(71);
+});
+
+test('it counts no design minutes while no needs-design ticket waits', () => {
+  const ctx = setupTest();
+  const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 }, design: { agent: 2, withGeoff: 1 } };
+  at('2026-10-14T01:00:00Z');
+  writeDesignBacklog(ctx.db, { at: new Date('2026-10-14T01:00:00Z'), agent: [], withGeoff: [] });
+  tick(ctx.db, sample, 'hq-lanes');
+  at('2026-10-14T01:30:00Z');
+  writeDesignBacklog(ctx.db, { at: new Date('2026-10-14T01:30:00Z'), agent: [], withGeoff: [] });
+  tick(ctx.db, sample, 'hq-lanes');
+
+  at('2026-10-14T02:00:00Z');
+  writeDesignBacklog(ctx.db, { at: new Date('2026-10-14T02:00:00Z'), agent: [], withGeoff: [] });
+  tick(ctx.db, sample, 'hq-lanes');
+
+  expect(readSlotMinutes(ctx.db, '2026-10-14').design).toBe(0);
+});
+
+test('it counts no design minutes while the agent design lanes are full', () => {
+  const ctx = setupTest();
+  const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 }, design: { agent: 2, withGeoff: 1 } };
+  addRun(ctx.db, { issue: 'GEO-9902', title: 'Design the kettle spout', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', design: 'agent', actor: 'z-delivery' });
+  addRun(ctx.db, { issue: 'GEO-9903', title: 'Design the kettle spout', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', design: 'agent', actor: 'z-delivery' });
+  at('2026-10-14T01:00:00Z');
+  writeDesignBacklog(ctx.db, { at: new Date('2026-10-14T01:00:00Z'), agent: [buildReadyIssue('GEO-9901', { project: 'kettle roadmap', labels: ['needs-design'], type: 'Design', priority: 2 })], withGeoff: [] });
+  tick(ctx.db, sample, 'hq-lanes');
+  at('2026-10-14T01:30:00Z');
+  writeDesignBacklog(ctx.db, { at: new Date('2026-10-14T01:30:00Z'), agent: [buildReadyIssue('GEO-9901', { project: 'kettle roadmap', labels: ['needs-design'], type: 'Design', priority: 2 })], withGeoff: [] });
+  tick(ctx.db, sample, 'hq-lanes');
+
+  at('2026-10-14T02:00:00Z');
+  writeDesignBacklog(ctx.db, { at: new Date('2026-10-14T02:00:00Z'), agent: [buildReadyIssue('GEO-9901', { project: 'kettle roadmap', labels: ['needs-design'], type: 'Design', priority: 2 })], withGeoff: [] });
+  tick(ctx.db, sample, 'hq-lanes');
+
+  expect(readSlotMinutes(ctx.db, '2026-10-14').design).toBe(0);
+});
+
+test('it counts no design minutes for a ticket waiting for the with-geoff lane', () => {
+  const ctx = setupTest();
+  const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 }, design: { agent: 2, withGeoff: 1 } };
+  at('2026-10-14T01:00:00Z');
+  writeDesignBacklog(ctx.db, { at: new Date('2026-10-14T01:00:00Z'), agent: [], withGeoff: [buildReadyIssue('GEO-9904', { project: 'kettle roadmap', labels: ['needs-design'], type: 'Design', priority: 2 })] });
+  tick(ctx.db, sample, 'hq-lanes');
+  at('2026-10-14T01:30:00Z');
+  writeDesignBacklog(ctx.db, { at: new Date('2026-10-14T01:30:00Z'), agent: [], withGeoff: [buildReadyIssue('GEO-9904', { project: 'kettle roadmap', labels: ['needs-design'], type: 'Design', priority: 2 })] });
+  tick(ctx.db, sample, 'hq-lanes');
+
+  at('2026-10-14T02:00:00Z');
+  writeDesignBacklog(ctx.db, { at: new Date('2026-10-14T02:00:00Z'), agent: [], withGeoff: [buildReadyIssue('GEO-9904', { project: 'kettle roadmap', labels: ['needs-design'], type: 'Design', priority: 2 })] });
+  tick(ctx.db, sample, 'hq-lanes');
+
+  expect(readSlotMinutes(ctx.db, '2026-10-14').design).toBe(0);
+});
+
+test('it starts the design wait over when the ticket goes, so a later ticket gets its own grace', () => {
+  const ctx = setupTest();
+  const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 }, design: { agent: 2, withGeoff: 1 } };
+  at('2026-10-14T01:00:00Z');
+  writeDesignBacklog(ctx.db, { at: new Date('2026-10-14T01:00:00Z'), agent: [buildReadyIssue('GEO-9901', { project: 'kettle roadmap', labels: ['needs-design'], type: 'Design', priority: 2 })], withGeoff: [] });
+  tick(ctx.db, sample, 'hq-lanes');
+  at('2026-10-14T01:20:00Z');
+  writeDesignBacklog(ctx.db, { at: new Date('2026-10-14T01:20:00Z'), agent: [], withGeoff: [] });
+  tick(ctx.db, sample, 'hq-lanes');
+  at('2026-10-14T01:25:00Z');
+  writeDesignBacklog(ctx.db, { at: new Date('2026-10-14T01:25:00Z'), agent: [buildReadyIssue('GEO-9905', { project: 'kettle roadmap', labels: ['needs-design'], type: 'Design', priority: 2 })], withGeoff: [] });
+  tick(ctx.db, sample, 'hq-lanes');
+
+  at('2026-10-14T01:30:00Z');
+  writeDesignBacklog(ctx.db, { at: new Date('2026-10-14T01:30:00Z'), agent: [buildReadyIssue('GEO-9905', { project: 'kettle roadmap', labels: ['needs-design'], type: 'Design', priority: 2 })], withGeoff: [] });
+  tick(ctx.db, sample, 'hq-lanes');
 
   expect(readSlotMinutes(ctx.db, '2026-10-14').design).toBe(0);
 });

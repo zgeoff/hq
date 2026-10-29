@@ -242,5 +242,7 @@ test('it leaves a needs-design Backlog issue out of the promotable count and sto
 
   const stored = readDesignBacklog(ctx.db, new Date('2026-10-15T20:00:00Z'));
   expect(getMeta(ctx.db, 'lanes_promotable_focus')).toBe('{"at":"2026-10-15T20:00:00Z","count":1,"focus":"[]","error":null}');
-  expect([stored?.at, stored?.agent.map((issue) => issue.identifier), stored?.withGeoff.map((issue) => issue.identifier)]).toStrictEqual(['2026-10-15T20:00:00Z', ['GEO-9902'], ['GEO-9903']]);
+  expect(stored?.at).toBe('2026-10-15T20:00:00Z');
+  expect(stored?.agent.map((issue) => issue.identifier)).toStrictEqual(['GEO-9902']);
+  expect(stored?.withGeoff.map((issue) => issue.identifier)).toStrictEqual(['GEO-9903']);
 });

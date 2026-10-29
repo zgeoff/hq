@@ -4,9 +4,6 @@ import type { LaneConfig } from '../areas/types.ts';
 export interface Capacity {
   imp?: { freeMib?: number; room?: boolean; error?: string };
   providers?: Record<string, { room?: boolean; unattended?: boolean; target?: string }>;
-
-  // capacity.sh's design slots. hq counts the open design runs itself and no longer reads this.
-  design?: { room?: boolean };
 }
 
 // How many design passes may run at once: the agent lanes (pacing.json agentDesignSlots) and the
