@@ -20,6 +20,10 @@ record goes into `hq news`:
 - **A mechanical edit:** `hq pr mechanical <repo> <pr>`. hq proves it from the diff and passes only a
   link or path target that moved to the same file, a version number, or a table re-padded with no
   cell changed. When hq refuses, the PR waits for him.
+- **A rebase that changes no content:** `hq pr rebased <repo> <pr> --from <old head>`, when his lgtm
+  is the newest owner answer at the old head. hq carries the lgtm to the new head only when git's
+  patch-id of the whole PR diff matches at both heads. When hq refuses, it names the changed files,
+  and the PR waits for him.
 - **An exception hq does not prove:** `hq pr exempt <repo> <pr> --rule <rule> --note <why>`, with
   one of these rules:
   - `formatting`: read the raw diff, and never rely on `git diff -w` showing nothing. Record it only
