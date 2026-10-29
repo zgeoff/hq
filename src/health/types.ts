@@ -6,10 +6,27 @@ export interface Check {
   line: string;
 }
 
+export interface AtcMcpProcess {
+  pid: number;
+  sessionId: string | null;
+  startedAtMs: number;
+
+  // the exe link target; ends with ' (deleted)' once the file was replaced
+  exe: string;
+}
+
+// The atc mcp processes plus the installed binary, or the error that stopped the read.
+export type AtcMcpRead = { processes: AtcMcpProcess[]; binary: { path: string; mtimeMs: number } } | string;
+
 export interface Probe {
   run: Runner;
   readFile: (path: string) => Promise<string>;
   atcAnswers: () => Promise<string | null>; // null when atc answers, else the error
+  // each session's atc mcp process, against the installed atc binary
+  atcMcp?: () => Promise<AtcMcpRead>;
+
+  // a declared fleet name for a session id
+  sessionName?: (sessionId: string) => string | null;
   home: string;
   backup?: () => { lastOk: string | null; lastError: string | null; everRan: boolean };
   morning?: (at: Date) => Check | null;
