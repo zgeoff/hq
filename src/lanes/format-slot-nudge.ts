@@ -1,7 +1,8 @@
+import { formatDesignLanes } from './format-design-lanes.ts';
 import type { SlotPlan } from './read-slot-plan.ts';
 
 // The nudge to z-delivery: the free slots and how long they waited, then the issues to take in order,
-// each with why (a focus term, a reserve), the reserves lent, and the design slot's issue.
+// each with why (a focus term, a reserve), the reserves lent, and the design lanes when one has an issue waiting.
 export function formatSlotNudge(slotPlan: SlotPlan, minutes: number): string {
   const free = `${slotPlan.pool.free} slot${slotPlan.pool.free === 1 ? '' : 's'} free for ${minutes} min (imp ${slotPlan.pool.impFree}, local ${slotPlan.pool.localFree}${slotPlan.pool.capHeld ? `; the cap of ${slotPlan.cap.cap} holds the rest` : ''})`;
   const tail = '(hq lanes shows the plan, hq focus the focus; capacity.sh still picks the provider and where it runs, and you write the briefs.)';
@@ -12,7 +13,7 @@ export function formatSlotNudge(slotPlan: SlotPlan, minutes: number): string {
   const parts = [
     ...(picks.length === 0 ? [] : [`${free}. Take, in this order: ${picks.join(', ')}.`]),
     ...slotPlan.plan.lent.map((lent) => `Reserved for ${lent.area} with nothing eligible, lent: ${lent.slots}.`),
-    ...(slotPlan.design === null ? [] : [`For the design slot, when it is free: ${slotPlan.design}.`]),
+    ...(hasDesignWork(slotPlan) ? [`${formatDesignLanes(slotPlan.design)}.`] : []),
   ];
   return `${parts.join(' ')} ${tail}`;
 }
@@ -23,4 +24,8 @@ function formatReason(slotPlan: SlotPlan, pick: NonNullable<SlotPlan['plan']>['p
   }
   const term = pick.term === null ? undefined : slotPlan.focus?.terms[pick.term];
   return term === undefined || pick.term === null ? '' : ` (focus ${pick.term + 1}: ${term.text})`;
+}
+
+function hasDesignWork(slotPlan: SlotPlan): boolean {
+  return slotPlan.design.agent.next.length > 0 || slotPlan.design.withGeoff.next.length > 0 || slotPlan.design.withGeoff.asked.length > 0;
 }

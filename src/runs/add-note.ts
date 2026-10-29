@@ -1,4 +1,5 @@
 import type { Database } from 'bun:sqlite';
+import { z } from 'zod';
 import { iso } from '../clock/iso.ts';
 import { now } from '../clock/now.ts';
 import { HqError } from '../errors.ts';
@@ -7,20 +8,29 @@ import { resolveRun } from './resolve-run.ts';
 import type { RunNote } from './types.ts';
 import { updateRunTime as touch } from './update-run-time.ts';
 
+const SessionRowSchema = z.object({ session_id: z.string(), design_pass: z.number() }).nullable();
+
 export function addNote(db: Database, key: string, text: string, label: string | null, actor: string): RunNote {
   if (!text.trim()) throw new HqError('bad_args', 'note text must not be empty');
   return db
     .transaction(() => {
-      const r = resolveRun(db, key);
-      const session = r.issue === key ? null : (db.query('SELECT session_id FROM run_sessions WHERE session_id = ? OR substr(session_id,1,8) = ?').get(key, key) as { session_id: string } | null)?.session_id ?? null;
-      const id = Number(
-        db.query(`INSERT INTO run_notes (issue, session_id, label, text, source, at) VALUES (?, ?, ?, ?, 'cli', ?)`).run(r.issue, session, label, text, iso(now())).lastInsertRowid,
-      );
-      applyNoteSignals(db, r.issue, text, `note:${actor}`, id, actor);
-      // Until the skill uses --lane: a "lane" note sets the run's lane.
-      const lane = text.trim().toLowerCase();
-      if (label === 'lane' && /^[a-z][a-z0-9-]{0,39}$/.test(lane)) db.query('UPDATE runs SET lane = ? WHERE issue = ?').run(lane, r.issue);
-      touch(db, r.issue);
+      const noted = resolveRun(db, key, 'allow');
+      const by = noted.issue === key ? null : SessionRowSchema.parse(db.query('SELECT session_id, design_pass FROM run_sessions WHERE session_id = ? OR substr(session_id,1,8) = ?').get(key, key));
+      const session = by?.session_id ?? null;
+      const inserted = db.query(`INSERT INTO run_notes (issue, session_id, label, text, source, at) VALUES (?, ?, ?, ?, 'cli', ?)`).run(noted.issue, session, label, text, iso(now()));
+      const id = Number(inserted.lastInsertRowid);
+
+      // A late note from the design pass the run turned from stays on the run, but changes nothing on the build.
+      if (by?.design_pass !== 1) {
+        applyNoteSignals(db, noted.issue, text, `note:${actor}`, id, actor);
+
+        // Until the skill uses --lane: a "lane" note sets the run's lane.
+        const lane = text.trim().toLowerCase();
+        if (label === 'lane' && /^[a-z][a-z0-9-]{0,39}$/u.test(lane)) {
+          db.query('UPDATE runs SET lane = ? WHERE issue = ?').run(lane, noted.issue);
+        }
+        touch(db, noted.issue);
+      }
       return db.query('SELECT * FROM run_notes WHERE id = ?').get(id) as RunNote;
     })
     .immediate();

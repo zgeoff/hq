@@ -8,7 +8,7 @@ import { overrideEnv } from '../config/override-env.ts';
 import { resetKey } from '../linear/reset-key.ts';
 import type { LinearCall } from '../linear/types.ts';
 import type { RunResult, Runner } from '../runner/types.ts';
-import { readPromotableIssues } from './read-promotable-issues.ts';
+import { readBacklogIssues } from './read-backlog-issues.ts';
 
 interface IssueSeed {
   identifier: string;
@@ -61,7 +61,8 @@ test('it lists the complete Backlog issue whose blockers are Done and leaves out
     { identifier: 'GEO-9802', title: 'pour the tea', description, blockerStates: ['completed', 'unstarted'] },
   ]);
 
-  const issues = await readPromotableIssues(call, 'GEO');
+  const backlog = await readBacklogIssues(call, 'GEO');
+  const issues = backlog.promotable;
 
   expect(issues).toStrictEqual([
     {
@@ -77,7 +78,7 @@ test('it rejects a Backlog answer with an unexpected shape', async () => {
   const answer = { issues: { nodes: [{ identifier: 'GEO-9809' }], pageInfo: { hasNextPage: false, endCursor: null } } };
   const call: LinearCall = () => Promise.resolve(answer);
 
-  const read = readPromotableIssues(call, 'GEO');
+  const read = readBacklogIssues(call, 'GEO');
 
   await expect(read).rejects.toMatchObject({ code: 'linear_failed', message: "Linear's Backlog answer has an unexpected shape: issues.nodes.0.title" });
 });
@@ -89,7 +90,7 @@ test('it stops after twenty Backlog pages that each name another page', async ()
     return Promise.resolve({ issues: { nodes: [], pageInfo: { hasNextPage: true, endCursor: `widget-${cursors.length}` } } });
   };
 
-  const read = readPromotableIssues(call, 'GEO');
+  const read = readBacklogIssues(call, 'GEO');
 
   await expect(read).rejects.toMatchObject({ code: 'linear_failed', message: 'more than 1000 Backlog issues; hq reads no further' });
   expect(cursors).toHaveLength(20);
@@ -107,7 +108,8 @@ test('it collects the promotable issues from every Backlog page, asking for each
     ],
   );
 
-  const issues = await readPromotableIssues(call, 'GEO');
+  const backlog = await readBacklogIssues(call, 'GEO');
+  const issues = backlog.promotable;
 
   expect(issues).toStrictEqual([
     {
@@ -161,4 +163,21 @@ test('hq lanes promotable --json prints the promotable Backlog issues of the lan
     { ok: true, issues: [{ identifier: 'GEO-9813', title: 'fit the whistle' }] },
     [{ query: expect.stringContaining('issues(first: 50,'), variables: { after: null, team: 'GEO', state: 'Backlog' } }],
   ]);
+});
+
+test('it leaves a needs-design issue out of the promotable ones and queues it by its with-geoff label', async () => {
+  const app = setupTest();
+  const description =
+    '## Outcome\n\nThe kettle has a design.\n\n## Context\n\n- Project: kitchen\n\n## Questions to settle\n\n- Which spout?\n\n## Acceptance\n\n- [ ] The design names a spout (review)\n\n## Actions\n\nDesign\n';
+  const call = app.answerWith([
+    { identifier: 'GEO-9821', title: 'design the spout', description, labels: ['needs-design'], typeLabel: 'Design', priority: 2 },
+    { identifier: 'GEO-9822', title: 'design the handle with the owner', description, labels: ['needs-design', 'with-geoff'], priority: 1 },
+    { identifier: 'GEO-9823', title: 'fit the lid', description, labels: ['atc'] },
+  ]);
+
+  const backlog = await readBacklogIssues(call, 'GEO');
+
+  expect(backlog.promotable.map((issue) => issue.identifier)).toStrictEqual(['GEO-9823']);
+  expect(backlog.design.agent.map((issue) => issue.identifier)).toStrictEqual(['GEO-9821']);
+  expect(backlog.design.withGeoff.map((issue) => issue.identifier)).toStrictEqual(['GEO-9822']);
 });

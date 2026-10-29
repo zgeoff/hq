@@ -1,8 +1,5 @@
+import { DELIVERY_GRACE_MINUTES } from './delivery-grace-minutes.ts';
 import type { SlotCause } from './types.ts';
-
-// Ready work that has waited this long beside a free slot is a delivery gap; before that, hq tags
-// nothing, since a launch takes a few minutes.
-const DELIVERY_GRACE_MINUTES = 10;
 
 export interface SlotCauseInput {
   free: number;

@@ -4,14 +4,17 @@ import { buildReadyPage, makePagedCall } from '../../test/build-ready-page.ts';
 import type { ReadyNodeSeed } from '../../test/build-ready-page.ts';
 import { buildStubGitHubFactsRunner } from '../../test/build-stub-github-facts-runner.ts';
 import { createCapacitySample } from '../../test/create-capacity-sample.ts';
+import { buildReadyIssue } from '../../test/build-ready-issue.ts';
 import { at, freshDb } from '../../test/helpers.ts';
 import { makeStateCall } from '../../test/make-state-call.ts';
 import { setMeta } from '../db/set-meta.ts';
 import { runFocusCommand } from '../focus/run-focus-command.ts';
+import { addRun } from '../runs/add-run.ts';
 import { readLinearReady } from './read-linear-ready.ts';
 import { readSlotMinutes } from './read-slot-minutes.ts';
 import { tick } from './tick.ts';
 import { validateLaneRules } from './validate-lane-rules.ts';
+import { writeDesignBacklog } from './write-design-backlog.ts';
 import { writePromotableFocus } from './write-promotable-focus.ts';
 
 // The ISO times are 12:00 Sydney on 14 Oct 2026 and the minutes after it. Each test's sample has three
@@ -38,7 +41,7 @@ test('it tags no cause and counts no minutes while Ready work has waited 10 minu
   const result = tick(ctx.db, sample, 'hq-lanes');
 
   expect(result.slotCause).toStrictEqual({ cause: null, slots: 3, since: '2026-10-14T01:00:00Z', readyAgeMinutes: 4, reason: null, waitingMinutes: 4, backlogError: null });
-  expect(readSlotMinutes(ctx.db, '2026-10-14')).toStrictEqual({ delivery: 0, triage: 0, supply: 0 });
+  expect(readSlotMinutes(ctx.db, '2026-10-14')).toStrictEqual({ delivery: 0, triage: 0, supply: 0, design: 0 });
 });
 
 test('it tags delivery once Ready work has waited more than 10 minutes, and counts free slots times the minutes since the last look', async () => {
@@ -54,7 +57,7 @@ test('it tags delivery once Ready work has waited more than 10 minutes, and coun
   const result = tick(ctx.db, sample, 'hq-lanes');
 
   expect(result.slotCause).toStrictEqual({ cause: 'delivery', slots: 3, since: '2026-10-14T01:11:00Z', readyAgeMinutes: 11, reason: null, waitingMinutes: null, backlogError: null });
-  expect(readSlotMinutes(ctx.db, '2026-10-14')).toStrictEqual({ delivery: 18, triage: 0, supply: 0 });
+  expect(readSlotMinutes(ctx.db, '2026-10-14')).toStrictEqual({ delivery: 18, triage: 0, supply: 0, design: 0 });
 });
 
 test('it counts at most 30 minutes for a gap between looks', async () => {
@@ -117,7 +120,7 @@ test('it tags triage when no Ready work waits and Backlog work asks for promotio
   const result = tick(ctx.db, sample, 'hq-lanes');
 
   expect(result.slotCause).toStrictEqual({ cause: 'triage', slots: 3, since: '2026-10-14T01:00:00Z', readyAgeMinutes: 5, reason: null, waitingMinutes: null, backlogError: null });
-  expect(readSlotMinutes(ctx.db, '2026-10-14')).toStrictEqual({ delivery: 0, triage: 15, supply: 0 });
+  expect(readSlotMinutes(ctx.db, '2026-10-14')).toStrictEqual({ delivery: 0, triage: 15, supply: 0, design: 0 });
 });
 
 test('it tags supply when no Ready work waits and no Backlog issue matches the focus', async () => {
@@ -132,7 +135,7 @@ test('it tags supply when no Ready work waits and no Backlog issue matches the f
   const result = tick(ctx.db, sample, 'hq-lanes');
 
   expect(result.slotCause.cause).toBe('supply');
-  expect(readSlotMinutes(ctx.db, '2026-10-14')).toStrictEqual({ delivery: 0, triage: 0, supply: 15 });
+  expect(readSlotMinutes(ctx.db, '2026-10-14')).toStrictEqual({ delivery: 0, triage: 0, supply: 15, design: 0 });
 });
 
 test('it tags unknown and counts nothing when the Backlog count is unknown', async () => {
@@ -149,7 +152,7 @@ test('it tags unknown and counts nothing when the Backlog count is unknown', asy
   expect(result.slotCause.cause).toBe('unknown');
   expect(result.slotCause.reason).toBe('backlog_unknown');
   expect(result.slotCause.readyAgeMinutes).toBe(5);
-  expect(readSlotMinutes(ctx.db, '2026-10-14')).toStrictEqual({ delivery: 0, triage: 0, supply: 0 });
+  expect(readSlotMinutes(ctx.db, '2026-10-14')).toStrictEqual({ delivery: 0, triage: 0, supply: 0, design: 0 });
 });
 
 test('it tags unknown and counts nothing when the focus has changed since the Backlog count', async () => {
@@ -165,7 +168,7 @@ test('it tags unknown and counts nothing when the focus has changed since the Ba
   const result = tick(ctx.db, sample, 'hq-lanes');
 
   expect(result.slotCause).toStrictEqual({ cause: 'unknown', slots: 3, since: '2026-10-14T01:05:00Z', readyAgeMinutes: 5, reason: 'backlog_focus_changed', waitingMinutes: null, backlogError: null });
-  expect(readSlotMinutes(ctx.db, '2026-10-14')).toStrictEqual({ delivery: 0, triage: 0, supply: 0 });
+  expect(readSlotMinutes(ctx.db, '2026-10-14')).toStrictEqual({ delivery: 0, triage: 0, supply: 0, design: 0 });
 });
 
 test('it tags unknown with the age of the Ready data and counts nothing when the Ready read is stale', async () => {
@@ -179,7 +182,7 @@ test('it tags unknown with the age of the Ready data and counts nothing when the
   const result = tick(ctx.db, sample, 'hq-lanes');
 
   expect(result.slotCause).toStrictEqual({ cause: 'unknown', slots: 3, since: '2026-10-14T01:42:00Z', readyAgeMinutes: 42, reason: 'ready_stale', waitingMinutes: null, backlogError: null });
-  expect(readSlotMinutes(ctx.db, '2026-10-14')).toStrictEqual({ delivery: 0, triage: 0, supply: 0 });
+  expect(readSlotMinutes(ctx.db, '2026-10-14')).toStrictEqual({ delivery: 0, triage: 0, supply: 0, design: 0 });
 });
 
 test('it tags no cause when no slot is free', async () => {
@@ -331,7 +334,7 @@ test('it counts no slot-minutes while the cap, not the pool, holds the free slot
 
   expect(result.slotCause).toStrictEqual({ cause: null, slots: 0, since: null, readyAgeMinutes: 20, reason: null, waitingMinutes: null, backlogError: null });
   expect(result.nudged).toBe(false);
-  expect(readSlotMinutes(ctx.db, '2026-10-14')).toStrictEqual({ delivery: 0, triage: 0, supply: 0 });
+  expect(readSlotMinutes(ctx.db, '2026-10-14')).toStrictEqual({ delivery: 0, triage: 0, supply: 0, design: 0 });
 });
 
 test('it offers the imp room as free slots when pacing has no lanes and no cap is set', () => {
@@ -450,4 +453,148 @@ test('it keeps a cap the wall clock has not reached while HQ_NOW pins a later ti
   expect(ctx.db.query("SELECT value FROM meta WHERE key = 'lanes_cap'").get()).toStrictEqual({ value: stored });
   expect(ctx.db.query("SELECT COUNT(*) AS total FROM events WHERE action = 'cap-ended'").get()).toStrictEqual({ total: 0 });
   expect(ctx.db.query("SELECT COUNT(*) AS total FROM outbox WHERE text LIKE 'Lanes cap%'").get()).toStrictEqual({ total: 0 });
+});
+
+test('it counts no design minutes while a needs-design ticket has waited for a free agent lane 10 minutes or less', () => {
+  const ctx = setupTest();
+  const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 }, design: { agent: 2, withGeoff: 1 } };
+  at('2026-10-14T01:00:00Z');
+  writeDesignBacklog(ctx.db, { at: new Date('2026-10-14T01:00:00Z'), agent: [buildReadyIssue('GEO-9901', { project: 'kettle roadmap', labels: ['needs-design'], type: 'Design', priority: 2 })], withGeoff: [] });
+  tick(ctx.db, sample, 'hq-lanes');
+
+  at('2026-10-14T01:08:00Z');
+  writeDesignBacklog(ctx.db, { at: new Date('2026-10-14T01:08:00Z'), agent: [buildReadyIssue('GEO-9901', { project: 'kettle roadmap', labels: ['needs-design'], type: 'Design', priority: 2 })], withGeoff: [] });
+  tick(ctx.db, sample, 'hq-lanes');
+
+  expect(readSlotMinutes(ctx.db, '2026-10-14').design).toBe(0);
+});
+
+test('it counts design minutes apart from the delivery tally once a needs-design ticket has waited for a free agent lane more than 10 minutes', () => {
+  const ctx = setupTest();
+  const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 }, design: { agent: 2, withGeoff: 1 } };
+  at('2026-10-14T01:00:00Z');
+  writeDesignBacklog(ctx.db, { at: new Date('2026-10-14T01:00:00Z'), agent: [buildReadyIssue('GEO-9901', { project: 'kettle roadmap', labels: ['needs-design'], type: 'Design', priority: 2 })], withGeoff: [] });
+  tick(ctx.db, sample, 'hq-lanes');
+  at('2026-10-14T01:08:00Z');
+  writeDesignBacklog(ctx.db, { at: new Date('2026-10-14T01:08:00Z'), agent: [buildReadyIssue('GEO-9901', { project: 'kettle roadmap', labels: ['needs-design'], type: 'Design', priority: 2 })], withGeoff: [] });
+  tick(ctx.db, sample, 'hq-lanes');
+
+  at('2026-10-14T01:11:00Z');
+  writeDesignBacklog(ctx.db, { at: new Date('2026-10-14T01:11:00Z'), agent: [buildReadyIssue('GEO-9901', { project: 'kettle roadmap', labels: ['needs-design'], type: 'Design', priority: 2 })], withGeoff: [] });
+  const result = tick(ctx.db, sample, 'hq-lanes');
+
+  expect(readSlotMinutes(ctx.db, '2026-10-14')).toStrictEqual({ delivery: 0, triage: 0, supply: 0, design: 3 });
+  expect(result.slotCause.cause).toBe('unknown');
+});
+
+test('it alerts z-delivery once the design minutes reach 60', () => {
+  const ctx = setupTest();
+  const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 }, design: { agent: 2, withGeoff: 1 } };
+  addRun(ctx.db, { issue: 'GEO-9902', title: 'Design the kettle spout', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', design: 'agent', actor: 'z-delivery' });
+  at('2026-10-14T01:00:00Z');
+  writeDesignBacklog(ctx.db, { at: new Date('2026-10-14T01:00:00Z'), agent: [buildReadyIssue('GEO-9901', { project: 'kettle roadmap', labels: ['needs-design'], type: 'Design', priority: 2 })], withGeoff: [] });
+  tick(ctx.db, sample, 'hq-lanes');
+  at('2026-10-14T01:11:00Z');
+  writeDesignBacklog(ctx.db, { at: new Date('2026-10-14T01:11:00Z'), agent: [buildReadyIssue('GEO-9901', { project: 'kettle roadmap', labels: ['needs-design'], type: 'Design', priority: 2 })], withGeoff: [] });
+  tick(ctx.db, sample, 'hq-lanes');
+  at('2026-10-14T01:41:00Z');
+  writeDesignBacklog(ctx.db, { at: new Date('2026-10-14T01:41:00Z'), agent: [buildReadyIssue('GEO-9901', { project: 'kettle roadmap', labels: ['needs-design'], type: 'Design', priority: 2 })], withGeoff: [] });
+  tick(ctx.db, sample, 'hq-lanes');
+
+  at('2026-10-14T02:11:00Z');
+  writeDesignBacklog(ctx.db, { at: new Date('2026-10-14T02:11:00Z'), agent: [buildReadyIssue('GEO-9901', { project: 'kettle roadmap', labels: ['needs-design'], type: 'Design', priority: 2 })], withGeoff: [] });
+  tick(ctx.db, sample, 'hq-lanes');
+
+  expect(ctx.queued()).toStrictEqual([{ target: 'z-delivery', text: 'Lanes: 71 slot-minutes empty today with needs-design tickets waiting for an agent design lane (design). Free slots: 1.' }]);
+  expect(readSlotMinutes(ctx.db, '2026-10-14').design).toBe(71);
+});
+
+test('it counts no design minutes while no needs-design ticket waits', () => {
+  const ctx = setupTest();
+  const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 }, design: { agent: 2, withGeoff: 1 } };
+  at('2026-10-14T01:00:00Z');
+  writeDesignBacklog(ctx.db, { at: new Date('2026-10-14T01:00:00Z'), agent: [], withGeoff: [] });
+  tick(ctx.db, sample, 'hq-lanes');
+  at('2026-10-14T01:30:00Z');
+  writeDesignBacklog(ctx.db, { at: new Date('2026-10-14T01:30:00Z'), agent: [], withGeoff: [] });
+  tick(ctx.db, sample, 'hq-lanes');
+
+  at('2026-10-14T02:00:00Z');
+  writeDesignBacklog(ctx.db, { at: new Date('2026-10-14T02:00:00Z'), agent: [], withGeoff: [] });
+  tick(ctx.db, sample, 'hq-lanes');
+
+  expect(readSlotMinutes(ctx.db, '2026-10-14').design).toBe(0);
+});
+
+test('it counts no design minutes while the agent design lanes are full', () => {
+  const ctx = setupTest();
+  const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 }, design: { agent: 2, withGeoff: 1 } };
+  addRun(ctx.db, { issue: 'GEO-9902', title: 'Design the kettle spout', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', design: 'agent', actor: 'z-delivery' });
+  addRun(ctx.db, { issue: 'GEO-9903', title: 'Design the kettle spout', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', design: 'agent', actor: 'z-delivery' });
+  at('2026-10-14T01:00:00Z');
+  writeDesignBacklog(ctx.db, { at: new Date('2026-10-14T01:00:00Z'), agent: [buildReadyIssue('GEO-9901', { project: 'kettle roadmap', labels: ['needs-design'], type: 'Design', priority: 2 })], withGeoff: [] });
+  tick(ctx.db, sample, 'hq-lanes');
+  at('2026-10-14T01:30:00Z');
+  writeDesignBacklog(ctx.db, { at: new Date('2026-10-14T01:30:00Z'), agent: [buildReadyIssue('GEO-9901', { project: 'kettle roadmap', labels: ['needs-design'], type: 'Design', priority: 2 })], withGeoff: [] });
+  tick(ctx.db, sample, 'hq-lanes');
+
+  at('2026-10-14T02:00:00Z');
+  writeDesignBacklog(ctx.db, { at: new Date('2026-10-14T02:00:00Z'), agent: [buildReadyIssue('GEO-9901', { project: 'kettle roadmap', labels: ['needs-design'], type: 'Design', priority: 2 })], withGeoff: [] });
+  tick(ctx.db, sample, 'hq-lanes');
+
+  expect(readSlotMinutes(ctx.db, '2026-10-14').design).toBe(0);
+});
+
+test('it counts no design minutes for a ticket waiting for the with-geoff lane', () => {
+  const ctx = setupTest();
+  const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 }, design: { agent: 2, withGeoff: 1 } };
+  at('2026-10-14T01:00:00Z');
+  writeDesignBacklog(ctx.db, { at: new Date('2026-10-14T01:00:00Z'), agent: [], withGeoff: [buildReadyIssue('GEO-9904', { project: 'kettle roadmap', labels: ['needs-design'], type: 'Design', priority: 2 })] });
+  tick(ctx.db, sample, 'hq-lanes');
+  at('2026-10-14T01:30:00Z');
+  writeDesignBacklog(ctx.db, { at: new Date('2026-10-14T01:30:00Z'), agent: [], withGeoff: [buildReadyIssue('GEO-9904', { project: 'kettle roadmap', labels: ['needs-design'], type: 'Design', priority: 2 })] });
+  tick(ctx.db, sample, 'hq-lanes');
+
+  at('2026-10-14T02:00:00Z');
+  writeDesignBacklog(ctx.db, { at: new Date('2026-10-14T02:00:00Z'), agent: [], withGeoff: [buildReadyIssue('GEO-9904', { project: 'kettle roadmap', labels: ['needs-design'], type: 'Design', priority: 2 })] });
+  tick(ctx.db, sample, 'hq-lanes');
+
+  expect(readSlotMinutes(ctx.db, '2026-10-14').design).toBe(0);
+});
+
+test('it starts the design wait over when the ticket goes, so a later ticket gets its own grace', () => {
+  const ctx = setupTest();
+  const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 }, design: { agent: 2, withGeoff: 1 } };
+  at('2026-10-14T01:00:00Z');
+  writeDesignBacklog(ctx.db, { at: new Date('2026-10-14T01:00:00Z'), agent: [buildReadyIssue('GEO-9901', { project: 'kettle roadmap', labels: ['needs-design'], type: 'Design', priority: 2 })], withGeoff: [] });
+  tick(ctx.db, sample, 'hq-lanes');
+  at('2026-10-14T01:20:00Z');
+  writeDesignBacklog(ctx.db, { at: new Date('2026-10-14T01:20:00Z'), agent: [], withGeoff: [] });
+  tick(ctx.db, sample, 'hq-lanes');
+  at('2026-10-14T01:25:00Z');
+  writeDesignBacklog(ctx.db, { at: new Date('2026-10-14T01:25:00Z'), agent: [buildReadyIssue('GEO-9905', { project: 'kettle roadmap', labels: ['needs-design'], type: 'Design', priority: 2 })], withGeoff: [] });
+  tick(ctx.db, sample, 'hq-lanes');
+
+  at('2026-10-14T01:30:00Z');
+  writeDesignBacklog(ctx.db, { at: new Date('2026-10-14T01:30:00Z'), agent: [buildReadyIssue('GEO-9905', { project: 'kettle roadmap', labels: ['needs-design'], type: 'Design', priority: 2 })], withGeoff: [] });
+  tick(ctx.db, sample, 'hq-lanes');
+
+  expect(readSlotMinutes(ctx.db, '2026-10-14').design).toBe(0);
+});
+
+test('it counts no design minutes while the design counts in pacing.json are unreadable', () => {
+  const ctx = setupTest();
+  const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 }, design: { agent: 2, withGeoff: 1 }, designError: 'pacing.json: agentDesignSlots is wrong' };
+  at('2026-10-14T01:00:00Z');
+  writeDesignBacklog(ctx.db, { at: new Date('2026-10-14T01:00:00Z'), agent: [buildReadyIssue('GEO-9906', { project: 'kettle roadmap', labels: ['needs-design'], type: 'Design', priority: 2 })], withGeoff: [] });
+  tick(ctx.db, sample, 'hq-lanes');
+  at('2026-10-14T01:30:00Z');
+  writeDesignBacklog(ctx.db, { at: new Date('2026-10-14T01:30:00Z'), agent: [buildReadyIssue('GEO-9906', { project: 'kettle roadmap', labels: ['needs-design'], type: 'Design', priority: 2 })], withGeoff: [] });
+  tick(ctx.db, sample, 'hq-lanes');
+
+  at('2026-10-14T02:00:00Z');
+  writeDesignBacklog(ctx.db, { at: new Date('2026-10-14T02:00:00Z'), agent: [buildReadyIssue('GEO-9906', { project: 'kettle roadmap', labels: ['needs-design'], type: 'Design', priority: 2 })], withGeoff: [] });
+  tick(ctx.db, sample, 'hq-lanes');
+
+  expect(readSlotMinutes(ctx.db, '2026-10-14').design).toBe(0);
 });

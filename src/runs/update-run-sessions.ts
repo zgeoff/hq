@@ -17,6 +17,6 @@ export function updateRunSessions(db: Database, issue: string, session: string, 
   }
   db.query(
     `INSERT INTO run_sessions (session_id, issue, active, helper, added_at) VALUES (?, ?, 1, ?, ?)
-     ON CONFLICT (session_id) DO UPDATE SET active = 1, helper = excluded.helper, ended_at = NULL, ended_by = NULL`,
+     ON CONFLICT (session_id) DO UPDATE SET active = 1, helper = excluded.helper, ended_at = NULL, ended_by = NULL, design_pass = 0`,
   ).run(session, issue, helper ? 1 : 0, t);
 }

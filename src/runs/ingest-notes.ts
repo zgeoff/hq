@@ -60,8 +60,8 @@ export async function ingestNotes(db: Database, client: AtcClient, opts: { maxPa
           result.routed++;
         }
         const row = db
-          .query(`SELECT s.issue FROM run_sessions s JOIN runs r ON r.issue = s.issue WHERE s.session_id = ? AND r.state NOT IN ('done','dropped')`)
-          .get(e.session) as { issue: string } | null;
+          .query(`SELECT s.issue, s.design_pass FROM run_sessions s JOIN runs r ON r.issue = s.issue WHERE s.session_id = ? AND r.state NOT IN ('done','dropped')`)
+          .get(e.session) as { issue: string; design_pass: number } | null;
         if (!row) {
           result.unmatched++;
           continue;
@@ -74,6 +74,11 @@ export async function ingestNotes(db: Database, client: AtcClient, opts: { maxPa
           .run(row.issue, e.session, e.label ?? null, e.detail, `${epoch}:${e.cursor}`, noteAt);
         if (ins.changes === 0) continue;
         result.notes++;
+
+        // A late note from the design pass the run turned from stays on the run, but marks nothing on the build.
+        if (row.design_pass === 1) {
+          continue;
+        }
         const sig = applyNoteSignals(db, row.issue, e.detail, `atc:${e.session.slice(0, 8)}`, Number(ins.lastInsertRowid), e.name ?? e.session.slice(0, 8));
         if (sig.final) result.finals.push(sig.final);
         touch(db, row.issue);

@@ -8,7 +8,10 @@ import { buildFocusKey } from './focus/build-focus-key.ts';
 import { readFocus } from './focus/read-focus.ts';
 import rulesTable from '../lanes.json';
 import { readLinearReady } from './lanes/read-linear-ready.ts';
-import { readPromotableFocusCount } from './lanes/read-promotable-focus-count.ts';
+import { countFocusMatches } from './focus/count-focus-matches.ts';
+import { readBacklogIssues } from './lanes/read-backlog-issues.ts';
+import { writeDesignBacklog } from './lanes/write-design-backlog.ts';
+import { toMessage } from './runs/to-message.ts';
 import { writePromotableFocus } from './lanes/write-promotable-focus.ts';
 import { validateLaneRules } from './lanes/validate-lane-rules.ts';
 import type { Runner } from './runner/types.ts';
@@ -58,10 +61,20 @@ export async function runLinearReadyTick(db: Database, deps: LinearReadyTickDeps
   setMeta(db, 'lanes_ready_linear_error', null);
   const leftMs = Math.max(0, deps.deadlineMs - (readClock() - startedAt));
   const focus = readFocus(db);
-  const backlog = await withDeadline(readPromotableFocusCount(cancellableCall, rulesTable.team, focus), leftMs, 'Backlog promotable count', abandoned).then(
-    (count) => ({ count, error: null }),
-    (error: unknown) => ({ count: null, error: (error instanceof Error ? error.message : String(error)).slice(0, 300) }),
+  const backlog = await withDeadline(readBacklogIssues(cancellableCall, rulesTable.team), leftMs, 'Backlog promotable count', abandoned).then(
+    (issues) => ({ issues, error: null }),
+    (error: unknown) => ({ issues: null, error: toMessage(error).slice(0, 300) }),
   );
-  writePromotableFocus(db, { ...backlog, focus: buildFocusKey(focus), at });
+  const count =
+    backlog.issues === null
+      ? null
+      : countFocusMatches(
+          backlog.issues.promotable.map((issue) => issue.facts),
+          focus,
+        );
+  writePromotableFocus(db, { count, error: backlog.error, focus: buildFocusKey(focus), at });
+  if (backlog.issues !== null) {
+    writeDesignBacklog(db, { ...backlog.issues.design, at });
+  }
   return true;
 }

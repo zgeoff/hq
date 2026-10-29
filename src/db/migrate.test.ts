@@ -227,8 +227,29 @@ test('it adds patch_id and base_move to noslop_rounds in v45, keeps the earlier 
   migrate(db, path, false, MIGRATIONS.slice(0, 44));
   db.query("INSERT INTO noslop_rounds (repo, pr, kind, started_at, ended_at, ms, ok, findings, failed_calls, open, sha) VALUES ('widgets', 7, 'review', '2026-10-14T01:00:00Z', '2026-10-14T01:05:00Z', 300000, 1, '[]', 0, '[]', 'aaaaaaa')").run();
 
-  expect(migrate(db, path, true)).not.toBeNull();
+  expect(migrate(db, path, true, MIGRATIONS.slice(0, 45))).not.toBeNull();
   expect(db.query('SELECT repo, pr, patch_id, base_move FROM noslop_rounds').all()).toStrictEqual([{ repo: 'widgets', pr: 7, patch_id: null, base_move: 0 }]);
   expect(() => db.query('UPDATE noslop_rounds SET base_move = 2').run()).toThrow(/CHECK constraint failed/u);
   expect(db.query('PRAGMA user_version').get()).toStrictEqual({ user_version: 45 });
+});
+
+test('it adds runs.design_lane and run_prs.design_pass in v46, keeps the earlier runs and PRs as delivery work, and lets slot_minutes take the design cause', () => {
+  const base = mkdtempSync(join(tmpdir(), 'hq-migrate-v46-'));
+  const db = new Database(join(base, 'hq.db'), { create: true, strict: true });
+  const path = join(base, 'hq.db');
+  onTestFinished(() => rmSync(base, { recursive: true, force: true }));
+  onTestFinished(() => db.close());
+  db.exec('PRAGMA journal_mode = WAL;');
+  migrate(db, path, false, MIGRATIONS.slice(0, 45));
+  db.query("INSERT INTO runs (issue, title, place, state, created_at, updated_at) VALUES ('GEO-9801', 'Descale the kettle', 'imp', 'working', '2026-10-14T01:00:00Z', '2026-10-14T01:00:00Z')").run();
+  db.query("INSERT INTO slot_minutes (day, cause, minutes) VALUES ('2026-10-14', 'triage', 7.5)").run();
+  db.query("INSERT INTO run_prs (ref, issue, state, added_at, updated_at) VALUES ('kettle#41', 'GEO-9801', 'open', '2026-10-14T01:00:00Z', '2026-10-14T01:00:00Z')").run();
+
+  expect(migrate(db, path, true)).not.toBeNull();
+  expect(db.query('SELECT ref, design_pass FROM run_prs').all()).toStrictEqual([{ ref: 'kettle#41', design_pass: 0 }]);
+  expect(db.query('SELECT issue, design_lane FROM runs').all()).toStrictEqual([{ issue: 'GEO-9801', design_lane: null }]);
+  expect(db.query('SELECT day, cause, minutes FROM slot_minutes').all()).toStrictEqual([{ day: '2026-10-14', cause: 'triage', minutes: 7.5 }]);
+  db.query("INSERT INTO slot_minutes (day, cause, minutes) VALUES ('2026-10-14', 'design', 3)").run();
+  expect(() => db.query("UPDATE runs SET design_lane = 'kettle'").run()).toThrow(/CHECK constraint failed/u);
+  expect(db.query('PRAGMA user_version').get()).toStrictEqual({ user_version: 46 });
 });

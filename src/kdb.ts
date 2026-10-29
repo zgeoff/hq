@@ -56,7 +56,7 @@ export interface ShippedCacheRow {
 
 interface SlotMinutesRow {
   day: string;
-  cause: 'delivery' | 'triage' | 'supply';
+  cause: 'delivery' | 'triage' | 'supply' | 'design';
   minutes: number;
 }
 

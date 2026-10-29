@@ -4,9 +4,13 @@ import type { LaneConfig } from '../areas/types.ts';
 export interface Capacity {
   imp?: { freeMib?: number; room?: boolean; error?: string };
   providers?: Record<string, { room?: boolean; unattended?: boolean; target?: string }>;
+}
 
-  // capacity.sh's design slots: room while fewer Design sessions wait on the owner than it allows.
-  design?: { room?: boolean };
+// How many design passes may run at once: the agent lanes (pacing.json agentDesignSlots) and the
+// with-geoff lane (pacing.json designSlots).
+export interface DesignSlots {
+  agent: number;
+  withGeoff: number;
 }
 
 // The slot caps by place the lanes' pool fills (pacing.json `slots`, or its lanes summed).
@@ -27,6 +31,12 @@ export interface Sample {
   // The local sessions an unattended provider may run on this host (pacing.json's localFallback);
   // absent or null when one targets local, so only the local cap counts.
   localRoom?: number | null;
+
+  // The design lane counts; absent: the defaults.
+  design?: DesignSlots;
+
+  // pacing.json's error for those counts, which are then the defaults; absent or null: none.
+  designError?: string | null;
 }
 
 // A Ready issue the lanes leave out until a time passes, another issue is Done or Canceled, or a PR merges or closes.
@@ -40,12 +50,16 @@ export interface LaneSkip {
   at: string;
 }
 
-export type SlotCauseName = 'delivery' | 'triage' | 'supply';
+// The causes of an empty delivery slot.
+export type PoolCauseName = 'delivery' | 'triage' | 'supply';
+
+// Every cause with slot-minutes: the pool's, and the free agent design lanes' own.
+export type SlotCauseName = PoolCauseName | 'design';
 
 export type SlotCauseUnknownReason = 'ready_never_read' | 'ready_stale' | 'backlog_unknown' | 'backlog_focus_changed' | 'backlog_stale';
 
 export interface SlotCause {
-  cause: SlotCauseName | 'unknown' | null;
+  cause: PoolCauseName | 'unknown' | null;
   slots: number;
   since: string | null;
   readyAgeMinutes: number | null;

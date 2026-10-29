@@ -23,6 +23,7 @@ const REASONS: Record<SlotCauseName, string> = {
   delivery: 'with Ready work waiting',
   triage: 'with no Ready work and Backlog issues waiting to be promoted',
   supply: 'with no Ready work and no Backlog issue to promote',
+  design: 'with needs-design tickets waiting for an agent design lane',
 };
 
 // Tells the session that owns a cause once per Sydney day when the cause's slot-minutes reach 60.
@@ -36,7 +37,7 @@ export function sendSlotCauseAlert(db: Database, alert: SlotCauseAlert): boolean
     return false;
   }
   const target = match(alert.cause)
-    .with('delivery', () => orchestratorName())
+    .with('delivery', 'design', () => orchestratorName())
     .with('triage', () => findRoleName('triage'))
     .with('supply', () => (isQuiet(alert.at) ? null : owner()))
     .exhaustive();

@@ -78,3 +78,16 @@ test('it leaves a run already past its merge alone', () => {
 
   expect(readMoveRefusal(ctx.db, 'GEO-9871', 'deploy-held', false)).toBeNull();
 });
+
+test('it names only the open PRs of the build run, not its design pass PR', () => {
+  const ctx = setupTest();
+  addRun(ctx.db, { issue: 'GEO-9872', title: 'Design the kettle lid', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: null, design: 'agent', actor: 'z-delivery' });
+  addPr(ctx.db, 'GEO-9872', 'kettle#13', 'z-delivery');
+  setState(ctx.db, 'GEO-9872', 'done', { note: 'design settled' }, 'z-delivery');
+  addRun(ctx.db, { issue: 'GEO-9872', title: 'Build the kettle lid', place: 'imp', session: null, next: 'Building.', gate: null, geoffChat: false, lane: null, actor: 'z-delivery' });
+  addPr(ctx.db, 'GEO-9872', 'kettle#14', 'z-delivery');
+
+  expect(readMoveRefusal(ctx.db, 'GEO-9872', 'deploy-held', false)).toBe(
+    'GEO-9872 still has open PR kettle#14, so its work is not finished: it moves to merged when its last PR merges and its session ends. Pass --force to move it to deploy-held now.',
+  );
+});

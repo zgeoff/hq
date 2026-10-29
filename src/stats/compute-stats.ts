@@ -9,6 +9,12 @@ import type { GhMerge, Oldest, Stats } from './types.ts';
 
 const MergedPRsSchema = z.array(z.object({ ref: z.string(), merged_at: z.string() }));
 const MergeDataSchema = z.object({ ref: z.string() });
+const RefsSchema = z.array(z.object({ ref: z.string() }));
+const RefDataSchema = z.object({ ref: z.string().optional() });
+const MergeEventsSchema = z.array(z.object({ issue: z.string(), action: z.string(), seq: z.number(), at: z.string(), data: z.string() }));
+const MovesSchema = z.array(z.object({ issue: z.string(), seq: z.number() }));
+const DoneEventsSchema = z.array(z.object({ issue: z.string(), seq: z.number(), at: z.string() }));
+const RunsSchema = z.array(z.object({ issue: z.string(), state: z.string(), created_at: z.string(), closed_at: z.string().nullable(), ready_since: z.string().nullable() }));
 
 const mins = (a: string, b: string) => (Date.parse(b) - Date.parse(a)) / 60_000;
 const clip = (s: string, lo: string, hi: string) => (s < lo ? lo : s > hi ? hi : s);
@@ -34,7 +40,8 @@ export function computeStats(db: Database, opts: { from: string; to: string; gh:
   const ud = unb.filter((u) => u.state === 'done' && inWin(u.closed_at) && u.added_at >= cutoff()).map((u) => mins(u.added_at, u.closed_at!));
   const oldestUnblock = oldestOf(unb.filter((u) => u.state === 'open').map((u) => ({ id: u.id, t: u.added_at })));
 
-  const runs = db.query('SELECT issue, state, created_at, closed_at, ready_since FROM runs WHERE created_at >= ?').all(cutoff()) as { issue: string; state: string; created_at: string; closed_at: string | null; ready_since: string | null }[];
+  // A design pass is no delivery run, so its time is no part of these numbers.
+  const runs = RunsSchema.parse(db.query('SELECT issue, state, created_at, closed_at, ready_since FROM runs WHERE created_at >= ? AND design_lane IS NULL').all(cutoff()));
   const stateEvents = db.query(`SELECT subject_id AS issue, at, to_state, data FROM events WHERE subject = 'run' AND action = 'state' ORDER BY seq`).all() as { issue: string; at: string; to_state: string; data: string }[];
   const byIssue = new Map<string, typeof stateEvents>();
   for (const e of stateEvents) byIssue.set(e.issue, [...(byIssue.get(e.issue) ?? []), e]);
@@ -87,16 +94,22 @@ export function computeStats(db: Database, opts: { from: string; to: string; gh:
   // A merge counts from when GitHub merged it, which hq can see minutes after the event it logs.
   const mergedPRs = MergedPRsSchema.parse(db.query(`SELECT ref, merged_at FROM run_prs WHERE state = 'merged' AND merged_at IS NOT NULL`).all());
   const mergedAt = new Map(mergedPRs.map((pr) => [pr.ref, pr.merged_at]));
-  const merges: { issue: string; at: string; data: string }[] = [];
-  for (const e of db.query(`SELECT subject_id AS issue, action, at, data FROM events WHERE subject = 'run' AND action IN ('merged', 'unmerged') ORDER BY seq`).all() as { issue: string; action: string; at: string; data: string }[]) {
-    if (e.action === 'merged') {
-      const merged = MergeDataSchema.parse(JSON.parse(e.data));
-      merges.push({ issue: e.issue, at: mergedAt.get(merged.ref) ?? e.at, data: e.data });
+  const designPassRefs = new Set(RefsSchema.parse(db.query('SELECT ref FROM run_prs WHERE design_pass = 1').all()).map((row) => row.ref));
+  const mergeEvents = MergeEventsSchema.parse(db.query(`SELECT subject_id AS issue, action, seq, at, data FROM events WHERE subject = 'run' AND action IN ('merged', 'unmerged') ORDER BY seq`).all());
+  const merges: { issue: string; seq: number; at: string; data: string }[] = [];
+  for (const event of mergeEvents) {
+    const ref = RefDataSchema.parse(JSON.parse(event.data)).ref;
+    if (event.action === 'merged') {
+      const merged = MergeDataSchema.parse(JSON.parse(event.data));
+      if (!designPassRefs.has(merged.ref)) {
+        merges.push({ issue: event.issue, seq: event.seq, at: mergedAt.get(merged.ref) ?? event.at, data: event.data });
+      }
       continue;
     }
-    const ref = (JSON.parse(e.data) as { ref?: string }).ref;
-    const i = merges.findLastIndex((m) => (JSON.parse(m.data) as { ref?: string }).ref === ref);
-    if (i >= 0) merges.splice(i, 1);
+    const index = merges.findLastIndex((merge) => RefDataSchema.parse(JSON.parse(merge.data)).ref === ref);
+    if (index !== -1) {
+      merges.splice(index, 1);
+    }
   }
   merges.sort((left, right) => left.at.localeCompare(right.at));
   const lastMerge = new Map<string, { at: string; repo: string }>();
@@ -104,11 +117,18 @@ export function computeStats(db: Database, opts: { from: string; to: string; gh:
   const perRepo: Record<string, number[]> = {};
   // The last completion before the window ends: a later reopen and close must not hide it.
   const doneAt = new Map<string, string>();
-  for (const e of stateEvents) if (e.to_state === 'done' && e.at < to) doneAt.set(e.issue, e.at);
+
+  // A build run that took over its design pass's row starts at the move: by event order, since the pass's
+  // done and the move can share a second.
+  const buildStarts = new Map(MovesSchema.parse(db.query("SELECT subject_id AS issue, MAX(seq) AS seq FROM events WHERE subject = 'run' AND action = 'design-to-build' GROUP BY subject_id").all()).map((move) => [move.issue, move.seq]));
+  const doneEvents = DoneEventsSchema.parse(db.query("SELECT subject_id AS issue, seq, at FROM events WHERE subject = 'run' AND action = 'state' AND to_state = 'done' AND at < ? ORDER BY seq").all(to));
+  for (const event of doneEvents.filter((doneEvent) => doneEvent.seq > (buildStarts.get(doneEvent.issue) ?? 0))) {
+    doneAt.set(event.issue, event.at);
+  }
   for (const r of runs) {
     const done = doneAt.get(r.issue);
     if (!done || !inWin(done)) continue;
-    const last = merges.filter((m) => m.issue === r.issue && m.at <= done).at(-1);
+    const last = merges.findLast((merge) => merge.issue === r.issue && merge.seq > (buildStarts.get(r.issue) ?? 0) && merge.at <= done);
     if (!last) continue;
     const m = mins(last.at, done);
     const repo = repoOf((JSON.parse(last.data) as { ref: string }).ref);

@@ -23,13 +23,13 @@ hq 0.79.0: headquarters for the z- sessions. Every command takes --json.
   hq repair advisor-400 <session> | --file T.jsonl [--apply]  mend a stopped Claude session that fails every turn with "unexpected tool_use_id found in advisor_tool_result blocks"; dry run unless --apply, backup first
                                              (checkout: --repo-dir, ~/projects/<repo>, else hq's own clone)
 
-  hq run add <issue> --title T [--session ID] [--where imp|local|none] [--next T] [--gate T] [--geoff-chat] [--ready-since TIME] [--size S|M|L|XL --lines N] [--lane LANE]
+  hq run add <issue> --title T [--session ID] [--where imp|local|none] [--next T] [--gate T] [--geoff-chat] [--ready-since TIME] [--size S|M|L|XL --lines N] [--lane LANE] [--design agent|with-geoff [--asked WHERE]]
   hq run size <issue> --size S|M|L|XL --lines N   triage's size guess (lines changed, tests included)
   hq run list [--all] | show <issue|session> [--notes N] | watchlist [--write FILE] | sweep
   hq run session <issue> <id> [--add|--remove] a relaunch (new main session), or a helper joins/leaves
   hq run lane <issue> (<lane> | --lane LANE)   set a run's delivery lane (pacing.json lanes)
   hq run place <issue> imp|local|none [--note T]  move an open run to where its session runs; the lanes count it there
-  hq run reopen <issue> [--next T]   a done or dropped run back to working
+  hq run reopen <issue> [--next T] [--asked WHERE]   a done or dropped run back to working
   hq run state <issue> <working|blocked|merged|deploying|deploy-held|live-check> [--next T] [--waits-on T|none] [--waits-on-geoff|--not-geoff] [--check owed|none] [--force]
   hq run check <issue> owed|none    whether a live check is owed once the release ships (unset counts as owed; none sends the run to done)
   hq run ship [--dry-run]            one release pass now: a run whose merged PRs all shipped in a release moves to live-check, or done when no check is owed (the watcher does it every 10 min)

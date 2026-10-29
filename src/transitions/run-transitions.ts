@@ -10,5 +10,6 @@ export const RUN_TRANSITIONS = {
   state: { from: OPEN_RUN_STATES, to: RUN_STATES },
   // a closed run needs --reopen, then goes to any state, closed ones included
   reopen: { from: CLOSED_RUN_STATES, to: RUN_STATES },
+  'design-to-build': { from: CLOSED_RUN_STATES, to: 'working' },
 } as const satisfies Record<string, Row<RunState>>;
 export type RunAction = keyof typeof RUN_TRANSITIONS;

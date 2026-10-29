@@ -39,16 +39,8 @@ export function applyNoteSignals(db: Database, issue: string, text: string, sour
   } else {
     const phrase = FINAL_PHRASE.exec(text);
     if (phrase) {
-      // The PR the phrase speaks of: when the note names PRs, exactly one of them must
-      // be this row's open PR; only a note that names none falls back to the only open PR.
-      const open = (db.query(`SELECT ref FROM run_prs WHERE issue = ? AND state = 'open'`).all(issue) as { ref: string }[]).map((p) => p.ref);
-      // A note that names any PR outside this row is ambiguous: mark nothing.
-      const mentioned = mentionedPrs(text);
-      const ours = (db.query('SELECT ref FROM run_prs WHERE issue = ?').all(issue) as { ref: string }[]).map((p) => p.ref);
-      const foreign = mentioned.some((r) => !ours.includes(r));
-      const named = mentioned.filter((r) => open.includes(r));
-      const target = foreign ? undefined : mentioned.length ? (named.length === 1 ? named[0] : undefined) : open.length === 1 ? open[0] : undefined;
-      if (target && markFinal(db, { ref: target, sha: String(phrase[1]), source: `phrase:${source}`, actor, note })) {
+      const target = pickPhraseTarget(mentionedPrs(text), readIssueRefs(db, issue));
+      if (target !== null && markFinal(db, { ref: target, sha: String(phrase[1]), source: `phrase:${source}`, actor, note })) {
         final = target;
       }
     }
@@ -90,6 +82,28 @@ function parseMarkedRef(raw: string): string | null {
   }
 }
 
+interface IssueRefs {
+  all: ReadonlySet<string>;
+  open: ReadonlySet<string>;
+
+  // The open PRs a design pass did not leave behind.
+  deliveryOpen: readonly string[];
+}
+
+// The PR the phrase speaks of. A note that names any PR outside this row is ambiguous: mark nothing.
+// When the note names PRs, exactly one of them must be this row's open PR. Only a note that names
+// none falls back to the only open PR, a design pass's PR left out, since a build agent speaks of its own.
+function pickPhraseTarget(mentioned: readonly string[], refs: IssueRefs): string | null {
+  if (mentioned.some((ref) => !refs.all.has(ref))) {
+    return null;
+  }
+  if (mentioned.length > 0) {
+    const named = mentioned.filter((ref) => refs.open.has(ref));
+    return named.length === 1 ? (named[0] ?? null) : null;
+  }
+  return refs.deliveryOpen.length === 1 ? (refs.deliveryOpen[0] ?? null) : null;
+}
+
 function mentionedPrs(text: string): string[] {
   const refs = new Set<string>();
   for (const m of text.matchAll(PR_IN_TEXT)) {
@@ -98,4 +112,12 @@ function mentionedPrs(text: string): string[] {
     } catch {}
   }
   return [...refs];
+}
+
+const IssuePRsSchema = z.array(z.object({ ref: z.string(), state: z.string(), design_pass: z.number() }));
+
+function readIssueRefs(db: Database, issue: string): IssueRefs {
+  const rows = IssuePRsSchema.parse(db.query('SELECT ref, state, design_pass FROM run_prs WHERE issue = ? ORDER BY added_at').all(issue));
+  const open = rows.filter((row) => row.state === 'open');
+  return { all: new Set(rows.map((row) => row.ref)), open: new Set(open.map((row) => row.ref)), deliveryOpen: open.filter((row) => row.design_pass === 0).map((row) => row.ref) };
 }

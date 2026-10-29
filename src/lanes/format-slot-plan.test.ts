@@ -19,7 +19,7 @@ test('hq lanes prints the local sessions against their cap, the focus and the pi
     },
     readyReadAt: '2026-10-15T20:00:00Z',
     eligible: 2,
-    design: 'GEO-9803',
+    design: { countsError: null, agent: { open: 0, slots: 2, next: ['GEO-9803'] }, withGeoff: { open: 1, slots: 1, next: ['GEO-9804'], asked: [] } },
     skipped: [],
     cap: { cap: null, until: null, reason: null, by: null, working: 0, limitedBy: null, workingFrom: 'sessions' },
   };
@@ -30,7 +30,7 @@ test('hq lanes prints the local sessions against their cap, the focus and the pi
     'focus: bug; reserve vers=1',
     'next: GEO-9801, GEO-9802 (2 eligible; Ready read 7 min ago)',
     '  lent: 1 slot(s) reserved for vers, nothing eligible',
-    'design slot, when it is free: GEO-9803',
+    'design: agent 0/2 (next GEO-9803), with-geoff 1/1 (next GEO-9804, waiting)',
   ]);
 });
 
@@ -49,13 +49,13 @@ test('the nudge names the free slots and each pick with its focus term', () => {
     },
     readyReadAt: '2026-10-15T20:00:00Z',
     eligible: 2,
-    design: 'GEO-9803',
+    design: { countsError: null, agent: { open: 0, slots: 2, next: ['GEO-9803'] }, withGeoff: { open: 1, slots: 1, next: ['GEO-9804'], asked: [] } },
     skipped: [],
     cap: { cap: null, until: null, reason: null, by: null, working: 0, limitedBy: null, workingFrom: 'sessions' },
   };
 
   expect(formatSlotNudge(slotPlan, 12)).toBe(
-    '3 slots free for 12 min (imp 2, local 1). Take, in this order: GEO-9801 (focus 1: bug), GEO-9802. Reserved for vers with nothing eligible, lent: 1. For the design slot, when it is free: GEO-9803. (hq lanes shows the plan, hq focus the focus; capacity.sh still picks the provider and where it runs, and you write the briefs.)',
+    '3 slots free for 12 min (imp 2, local 1). Take, in this order: GEO-9801 (focus 1: bug), GEO-9802. Reserved for vers with nothing eligible, lent: 1. design: agent 0/2 (next GEO-9803), with-geoff 1/1 (next GEO-9804, waiting). (hq lanes shows the plan, hq focus the focus; capacity.sh still picks the provider and where it runs, and you write the briefs.)',
   );
 });
 
@@ -66,7 +66,7 @@ test('hq lanes names the live sessions here when they set the local count', () =
     plan: null,
     readyReadAt: null,
     eligible: null,
-    design: null,
+    design: { countsError: null, agent: { open: 0, slots: 2, next: [] }, withGeoff: { open: 0, slots: 1, next: [], asked: [] } },
     skipped: [],
     cap: { cap: null, until: null, reason: null, by: null, working: 0, limitedBy: null, workingFrom: 'sessions' },
   };
@@ -81,7 +81,7 @@ test('hq lanes prints the cap line with its until, reason and working count', ()
     plan: null,
     readyReadAt: null,
     eligible: null,
-    design: null,
+    design: { countsError: null, agent: { open: 0, slots: 2, next: [] }, withGeoff: { open: 0, slots: 1, next: [], asked: [] } },
     skipped: [],
     cap: { cap: 7, until: '2026-10-18T21:00:00Z', reason: 'weekend pacing', by: 'z-stu', working: 6, limitedBy: 'cap', workingFrom: 'sessions' },
   };
@@ -96,7 +96,7 @@ test('hq lanes prints a cap with no until or reason, and says when the working c
     plan: null,
     readyReadAt: null,
     eligible: null,
-    design: null,
+    design: { countsError: null, agent: { open: 0, slots: 2, next: [] }, withGeoff: { open: 0, slots: 1, next: [], asked: [] } },
     skipped: [],
     cap: { cap: 7, until: null, reason: null, by: 'z-stu', working: 6, limitedBy: 'cap', workingFrom: 'runs' },
   };
@@ -111,7 +111,7 @@ test('the nudge says the cap holds the rest of the pool free slots', () => {
     plan: { picks: [{ issue: 'GEO-9801', term: null, reserve: null }], lent: [] },
     readyReadAt: '2026-10-15T20:00:00Z',
     eligible: 1,
-    design: null,
+    design: { countsError: null, agent: { open: 0, slots: 2, next: [] }, withGeoff: { open: 0, slots: 1, next: [], asked: [] } },
     skipped: [],
     cap: { cap: 7, until: null, reason: null, by: 'z-stu', working: 6, limitedBy: 'cap', workingFrom: 'sessions' },
   };
@@ -126,7 +126,7 @@ test('it says the Ready read was just now when it is under a minute old', () => 
     plan: { picks: [{ issue: 'GEO-9811', term: null, reserve: null }], lent: [] },
     readyReadAt: '2026-10-15T20:00:00Z',
     eligible: 1,
-    design: null,
+    design: { countsError: null, agent: { open: 0, slots: 2, next: [] }, withGeoff: { open: 0, slots: 1, next: [], asked: [] } },
     skipped: [],
     cap: { cap: null, until: null, reason: null, by: null, working: 0, limitedBy: null, workingFrom: 'sessions' },
   };
@@ -141,7 +141,7 @@ test('it gives the Ready read age in whole minutes when nothing is eligible', ()
     plan: { picks: [], lent: [] },
     readyReadAt: '2026-10-15T20:00:00Z',
     eligible: 0,
-    design: null,
+    design: { countsError: null, agent: { open: 0, slots: 2, next: [] }, withGeoff: { open: 0, slots: 1, next: [], asked: [] } },
     skipped: [],
     cap: { cap: null, until: null, reason: null, by: null, working: 0, limitedBy: null, workingFrom: 'sessions' },
   };
@@ -156,7 +156,7 @@ test('it says Ready is unknown when there is no fresh Ready read', () => {
     plan: null,
     readyReadAt: null,
     eligible: null,
-    design: null,
+    design: { countsError: null, agent: { open: 0, slots: 2, next: [] }, withGeoff: { open: 0, slots: 1, next: [], asked: [] } },
     skipped: [],
     cap: { cap: null, until: null, reason: null, by: null, working: 0, limitedBy: null, workingFrom: 'sessions' },
   };

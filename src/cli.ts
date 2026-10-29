@@ -193,6 +193,11 @@ import { loadImpRoom } from './lanes/load-imp-room.ts';
 import { LANES } from './lanes/lanes.ts';
 import { nudgeLog } from './lanes/nudge-log.ts';
 import { loadPacing } from './lanes/load-pacing.ts';
+import { parseDesignFlag } from './lanes/parse-design-flag.ts';
+import { formatDesignMoves } from './runs/format-design-moves.ts';
+import { checkDesignReopen, reopenRun } from './runs/reopen-run.ts';
+import { CLOSED_RUN_STATES } from './transitions/closed-run-states.ts';
+import { readDesignMoves } from './runs/read-design-moves.ts';
 import { pacingPath } from './lanes/pacing-path.ts';
 import { buildLanePlan } from './lanes/build-lane-plan.ts';
 import { formatLanePlan } from './lanes/format-lane-plan.ts';
@@ -313,7 +318,7 @@ import { readPacingLanes } from './lanes/read-pacing-lanes.ts';
 import { runLinearReadyTick } from './run-linear-ready-tick.ts';
 import { STEP_MS } from './watcher/step-ms.ts';
 import { formatSlotCause } from './lanes/format-slot-cause.ts';
-import { readPromotableIssues } from './lanes/read-promotable-issues.ts';
+import { readBacklogIssues } from './lanes/read-backlog-issues.ts';
 import { readSlotCause } from './lanes/read-slot-cause.ts';
 import { readSlotMinutes } from './lanes/read-slot-minutes.ts';
 import rulesTable from '../lanes.json';
@@ -465,6 +470,8 @@ const OPTIONS = {
   'needs-geoff': { type: 'boolean' },
   snapshot: { type: 'string' },
   'ready-since': { type: 'string' },
+  design: { type: 'string' },
+  asked: { type: 'string' },
   size: { type: 'string' },
   lines: { type: 'string' },
   'waits-on-geoff': { type: 'boolean' },
@@ -820,10 +827,10 @@ function runLine(r: RunView): string {
   const sess = `${s ? `${s.session_id.slice(0, 8)} (${r.place})` : 'no session'}${helpers.length ? ` + helper ${helpers.join(', ')}` : ''}`;
   const prs = r.prs.length
     ? r.prs
-        .map((pr) => `${pr.ref} ${formatPRTag(pr)}`)
+        .map((pr) => `${pr.ref} ${formatPRTag(pr)}${pr.design_pass === 1 ? ' (design pass)' : ''}`)
         .join(', ')
     : 'none yet';
-  const extra = [r.live_check ? `live check: ${r.live_check}` : null, r.gate ? `gate: ${r.gate}` : null, r.waits_on ? `waits on ${r.waits_on}` : null, r.geoff_chat ? 'the owner chats' : null].filter(Boolean).join('; ');
+  const extra = [r.design_lane ? `design pass: ${r.design_lane}` : null, r.live_check ? `live check: ${r.live_check}` : null, r.gate ? `gate: ${r.gate}` : null, r.waits_on ? `waits on ${r.waits_on}` : null, r.geoff_chat ? 'the owner chats' : null].filter(Boolean).join('; ');
   return `| ${sess}${r.lane ? ` ${r.lane}` : ''} | ${r.issue} ${r.title} [${r.state}] | ${prs} | ${r.next}${extra ? ` (${extra})` : ''} |`;
 }
 
@@ -852,6 +859,7 @@ async function runCommand(db: Database, verb: string | undefined, args: string[]
       }
       const where = (flags.where ?? 'imp') as 'local' | 'imp' | 'none';
       if (!['local', 'imp', 'none'].includes(where)) throw new HqError('bad_args', '--where must be local, imp or none');
+      const pacing = await loadPacing(pacingPath());
       const r = addRun(db, {
         issue: arg(0, 'issue'),
         title: need(flags.title, 'title'),
@@ -863,6 +871,10 @@ async function runCommand(db: Database, verb: string | undefined, args: string[]
         readySince: flags['ready-since'] ?? null,
         size: parseSize(flags.size, flags.lines),
         lane: flags.lane ? checkLane(await readLanes(), flags.lane) : null,
+        design: parseDesignFlag(flags.design),
+        asked: flags.asked ?? null,
+        designSlots: pacing.design,
+        designError: pacing.designError,
         actor: await by(),
       });
       return { data: { result: r.result, run: r.run }, text: `${runLine(r.run)}
@@ -890,8 +902,10 @@ ${r.result === 'added' ? 'On the board.' : 'Already on the board.'}` };
       // A done or dropped run that work started on again: back to working, sessions and PRs kept.
       const prev = resolveRun(db, arg(0, 'issue'));
       if (prev.state !== 'done' && prev.state !== 'dropped') throw new HqError('bad_state', `${prev.issue} is ${prev.state}, not done or dropped: nothing to reopen`);
-      const r = setState(db, prev.issue, 'working', { next: flags.next ?? 'Reopened: agent working.', reopen: true }, await by());
-      return { data: { run: r }, text: `${runLine(r)}\nReopened.` };
+      const pacing = await loadPacing(pacingPath());
+      const reopenedBy = await by();
+      const reopened = reopenRun(db, { issue: prev.issue, next: flags.next ?? 'Reopened: agent working.', design: { slots: pacing.design, error: pacing.designError, asked: flags.asked ?? null }, actor: reopenedBy });
+      return { data: { run: reopened }, text: `${runLine(reopened)}\nReopened.` };
     }
     case 'state': {
       const refusal = readMoveRefusal(db, arg(0, 'issue'), arg(1, 'state'), flags.force === true);
@@ -904,7 +918,15 @@ ${r.result === 'added' ? 'On the board.' : 'Already on the board.'}` };
       if (liveCheck !== undefined) {
         requireLiveCheck(liveCheck);
       }
-      const moved = setState(db, issue, state, toExactOptional({ liveCheck, next: flags.next, waitsOn: parseWaitsOn(flags['waits-on']), note: flags.note ?? null, reopen: Boolean(flags.reopen), waitsOnGeoff: parseGeoffFlag(flags) }), actorName);
+
+      // A reopen into another closed state takes no design lane, so only a move to an open state is checked.
+      const reopenPacing = flags.reopen === true && !CLOSED_RUN_STATES.some((closed) => closed === state) ? await loadPacing(pacingPath()) : null;
+      const moved = db.transaction(() => {
+        if (reopenPacing !== null) {
+          checkDesignReopen(db, issue, { slots: reopenPacing.design, error: reopenPacing.designError, asked: null });
+        }
+        return setState(db, issue, state, toExactOptional({ liveCheck, next: flags.next, waitsOn: parseWaitsOn(flags['waits-on']), note: flags.note ?? null, reopen: Boolean(flags.reopen), waitsOnGeoff: parseGeoffFlag(flags) }), actorName);
+      }).immediate();
       return { data: { run: moved }, text: runLine(moved) };
     }
     case 'check': {
@@ -996,10 +1018,11 @@ Round ${p.review_round} recorded at ${p.reviewed_sha}.` };
       return { data: { note: n }, text: runLine(view(n.issue)) };
     }
     case 'show': {
-      const r = viewRun(db, resolveRun(db, arg(0, 'issue or session')));
-      const notes = notesFor(db, r.issue, intFlag(flags.notes, 'notes') ?? 5);
-      const text = [runLine(r), ...r.sessions.map((s) => `  ${s.helper ? 'helper' : 'session'} ${s.session_id}${s.active ? ' (active)' : ` (ended ${s.ended_at})`}`), ...notes.map((n) => `  ${n.at} [${n.source}${n.label ? `/${n.label}` : ''}] ${n.text.replace(/\s+/g, ' ').slice(0, 200)}`)].join('\n');
-      return { data: { run: r, notes }, text };
+      const shown = viewRun(db, resolveRun(db, arg(0, 'issue or session'), 'allow'));
+      const notes = notesFor(db, shown.issue, intFlag(flags.notes, 'notes') ?? 5);
+      const designPass = readDesignMoves(db, shown.issue);
+      const text = [runLine(shown), ...shown.sessions.map((session) => `  ${session.helper ? 'helper' : 'session'} ${session.session_id}${session.active ? ' (active)' : ` (ended ${session.ended_at})`}`), ...notes.map((note) => `  ${note.at} [${note.source}${note.label ? `/${note.label}` : ''}] ${note.text.replaceAll(/\s+/gu, ' ').slice(0, 200)}`)].join('\n');
+      return { data: { run: shown, notes, designPass }, text: [text, ...formatDesignMoves(designPass)].join('\n') };
     }
     case 'list':
     case undefined: {
@@ -1884,8 +1907,8 @@ async function lanesCommand(context: Pick<Ctx, 'db' | 'verb' | 'rest' | 'flags' 
       return runLaneSkipCommand({ db, actor: await by(), at: now(), args });
     }
     case 'promotable': {
-      const backlog = await readPromotableIssues(makeAuditedLinearCaller(db, context.run), rulesTable.team);
-      const issues = backlog.map((issue) => ({ identifier: issue.identifier, title: issue.title }));
+      const backlog = await readBacklogIssues(makeAuditedLinearCaller(db, context.run), rulesTable.team);
+      const issues = backlog.promotable.map((issue) => ({ identifier: issue.identifier, title: issue.title }));
       return { data: { issues }, text: issues.length > 0 ? issues.map((issue) => `${issue.identifier}  ${issue.title}`).join('\n') : 'No Backlog issue is ready to promote.' };
     }
     case 'ready': {
