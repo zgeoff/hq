@@ -19,6 +19,8 @@ Every issue uses these sections in this order. The Linear templates prefill them
 
 For a nixie issue, never script Nix's replies or force a behaviour on her: no fixed line, required wording, forced closer, or rule that she must make an offer. State the outcome, and leave what she says to her. No Acceptance check tests her exact wording.
 
+For a vers issue on offline play, sync, the outbox or reconciliation, Context names each architecture doc that governs the behaviour, with `path:line`, and states the documented behaviour the fix keeps. Acceptance holds a check that this behaviour still holds, in an e2e test with the real network cut for both the page and its workers.
+
 A follow-up or split issue carries only what the owner approved. A new behaviour he didn't ask for, such as an offer Nix makes, goes to him as its own question, never as part of another question's answer.
 
 Title the issue with the outcome as a plain lowercase phrase ("pick clone destination automatically during spawn"). The type label carries the type, so leave prefixes like "Bug:" out of the title.
