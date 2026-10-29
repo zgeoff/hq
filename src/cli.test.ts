@@ -212,6 +212,23 @@ test('it prints in hq lanes that the design counts are unreadable, with the defa
   expect(printed.join('\n')).toInclude('design: counts unreadable (pacing.json: pacing.json designSlots and agentDesignSlots: give each a whole number from 0 to 100), using agent 2, with-geoff 1');
 });
 
+test('it names the design lane of an open design pass in the hq run show text', async () => {
+  const fresh = freshDb();
+  const log = console.log;
+  const printed: string[] = [];
+  onTestFinished(fresh.cleanup);
+  onTestFinished(overrideEnv('HQ_NOW', NOON_SYDNEY));
+  console.log = (line: string) => void printed.push(line);
+  onTestFinished(() => (console.log = log));
+  at(NOON_SYDNEY);
+  addRun(fresh.db, { issue: 'GEO-9957', title: 'Design the kettle spout', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', design: 'agent', actor: 'z-delivery' });
+
+  const code = await main(['run', 'show', 'GEO-9957']);
+
+  expect(code).toBe(0);
+  expect(printed.join('\n')).toInclude('| Agent working. (design pass: agent) |');
+});
+
 test('it marks the design pass PRs in the hq run show text', async () => {
   const fresh = freshDb();
   const log = console.log;

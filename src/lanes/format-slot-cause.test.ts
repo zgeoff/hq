@@ -60,3 +60,9 @@ test('it says the cap is reached when the cap holds the free slots back', () => 
 
   expect(lines[0]).toBe('cause: none (cap reached)');
 });
+
+test('it gives the empty agent design lane-minutes on a line of their own', () => {
+  const lines = formatSlotCause({ cause: 'delivery', slots: 2, since: '2026-10-14T01:11:00Z', readyAgeMinutes: 3, reason: null, waitingMinutes: null, backlogError: null }, { delivery: 12.4, triage: 0, supply: 3.6, design: 3 }, false);
+
+  expect(lines).toStrictEqual(['cause: delivery, 2 free slot(s) since 2026-10-14T01:11:00Z', 'empty slot-minutes today (Sydney): delivery 12, triage 0, supply 4', 'empty agent design lane-minutes today (Sydney), apart from the slot-minutes: 3']);
+});
