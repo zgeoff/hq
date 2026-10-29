@@ -172,3 +172,53 @@ test('a dry run calls no forget, unpin or destroy and writes no event, note or n
   expect(fleet.calls).toStrictEqual([]);
   expect(count()).toStrictEqual(before);
 });
+
+test('a run whose issue is not a Linear key still gets its news and event, and does not stop the next run', async () => {
+  const ctx = setupTest();
+  addRun(ctx.db, { issue: 'kettle-10', title: 'Invented kettle descaler', place: 'local', session: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
+  addRun(ctx.db, { issue: 'GEO-9910', title: 'Invented teapot cosy', place: 'local', session: '0000b001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
+  for (const [issue, ref] of [['kettle-10', 'kettle#10'], ['GEO-9910', 'teapot#10']] as const) {
+    addPr(ctx.db, issue, ref, 'z-delivery');
+    setState(ctx.db, issue, 'merged', {}, 'z-delivery');
+  }
+  ctx.db.query("UPDATE run_prs SET state = 'merged'").run();
+  const fleet = buildStubFleetClient({
+    sessions: [
+      { id: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, pinned: true },
+      { id: '0000b001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'teapot-agent', alive: true },
+    ],
+  });
+
+  const wrapped = await wrapUpMergedRuns(ctx.db, { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')) }, 'sweep');
+
+  expect(wrapped.map((entry) => entry.issue)).toStrictEqual(['GEO-9910', 'kettle-10']);
+  expect(fleet.calls).toStrictEqual(['unpin 0000b001', 'kill 0000b001', 'unpin 0000b001', 'forget 0000b001']);
+  expect(ctx.db.query('SELECT text, issue FROM news').all()).toStrictEqual([{ text: 'kettle-10 merged; wrap-up left kept 0000a001 (pinned in atc)', issue: null }]);
+  expect(ctx.db.query("SELECT subject_id FROM events WHERE action = 'merged-wrap-up' ORDER BY subject_id").all()).toStrictEqual([{ subject_id: 'GEO-9910' }, { subject_id: 'kettle-10' }]);
+});
+
+test('a run whose wrap-up throws is marked wrapped with the failure, and the next run is still wrapped', async () => {
+  const ctx = setupTest();
+  addRun(ctx.db, { issue: 'GEO-9911', title: 'Invented kettle descaler', place: 'local', session: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
+  addRun(ctx.db, { issue: 'GEO-9912', title: 'Invented teapot cosy', place: 'local', session: '0000b001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
+  for (const [issue, ref] of [['GEO-9911', 'kettle#11'], ['GEO-9912', 'teapot#12']] as const) {
+    addPr(ctx.db, issue, ref, 'z-delivery');
+    setState(ctx.db, issue, 'merged', {}, 'z-delivery');
+  }
+  ctx.db.query("UPDATE run_prs SET state = 'merged'").run();
+
+  // A run note that cannot be written makes the first run's wrap-up throw.
+  ctx.db.exec("CREATE TRIGGER kettle_refuses_note BEFORE INSERT ON run_notes WHEN NEW.issue = 'GEO-9911' BEGIN SELECT RAISE(ABORT, 'kettle refuses'); END");
+  const fleet = buildStubFleetClient({
+    sessions: [
+      { id: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true },
+      { id: '0000b001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'teapot-agent', alive: true },
+    ],
+  });
+
+  const wrapped = await wrapUpMergedRuns(ctx.db, { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')) }, 'sweep');
+
+  expect(wrapped.map((entry) => entry.wrapUp.failed.map((failed) => failed.id))).toStrictEqual([['GEO-9911'], []]);
+  expect(ctx.db.query("SELECT subject_id FROM events WHERE action = 'merged-wrap-up' ORDER BY subject_id").all()).toStrictEqual([{ subject_id: 'GEO-9911' }, { subject_id: 'GEO-9912' }]);
+  expect(ctx.db.query('SELECT text FROM news').all()).toStrictEqual([{ text: 'GEO-9911 merged; wrap-up left failed GEO-9911 (kettle refuses)' }]);
+});

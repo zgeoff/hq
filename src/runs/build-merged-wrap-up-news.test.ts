@@ -22,7 +22,7 @@ test('it truncates a long list under 400 characters and counts the sessions it l
   const text = buildMergedWrapUpNews('GEO-9901', { forgotten: [], destroyed: [], kept, failed: [] });
 
   expect(text?.length).toBeLessThanOrEqual(400);
-  expect(text).toMatch(/; and \d+ more$/);
+  expect(text).toMatch(/; and \d+ more$/u);
   expect(text).toStartWith('GEO-9901 merged; wrap-up left kept 0000b000 (');
 });
 

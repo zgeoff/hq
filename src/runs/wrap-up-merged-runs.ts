@@ -1,10 +1,11 @@
 import type { Database } from 'bun:sqlite';
 import { z } from 'zod';
+import { ISSUE } from '../followups/issue.ts';
 import { logEvent } from '../log-event.ts';
 import { addNews } from '../news/add-news.ts';
 import { buildMergedWrapUpNews } from './build-merged-wrap-up-news.ts';
 import { runWrapUp } from './run-wrap-up.ts';
-import type { WrapUpDeps } from './run-wrap-up.ts';
+import type { WrapUpDeps, WrapUpOptions } from './run-wrap-up.ts';
 import { SWEEP_ACTOR } from './sweep-actor.ts';
 import type { WrapUp } from './types.ts';
 
@@ -38,16 +39,38 @@ export async function wrapUpMergedRuns(db: Database, deps: WrapUpDeps, actor: st
     .map((row) => issueRowSchema.parse(row).issue);
   const wrapped: MergedRunWrapUp[] = [];
   for (const issue of issues) {
-    const wrapUp = await runWrapUp(db, deps, issue, { actor, dryRun });
+    const wrapUp = await wrapUpRunSafely(db, deps, issue, { actor, dryRun });
     wrapped.push({ issue, wrapUp });
-    if (dryRun) {
-      continue;
-    }
-    logEvent(db, 'run', issue, 'merged-wrap-up', actor, null, null, { ...wrapUp });
-    const text = buildMergedWrapUpNews(issue, wrapUp);
-    if (text !== null) {
-      addNews(db, { from: SWEEP_ACTOR, topic: 'report', text, issue, link: null, needsGeoff: false });
+    if (!dryRun) {
+      recordMergedWrapUp(db, issue, wrapUp, actor);
     }
   }
   return wrapped;
+}
+
+// One run's failure is that run's failed entry, so it never stops the runs after it.
+async function wrapUpRunSafely(db: Database, deps: WrapUpDeps, issue: string, options: WrapUpOptions): Promise<WrapUp> {
+  try {
+    return await runWrapUp(db, deps, issue, options);
+  } catch (error) {
+    return { forgotten: [], destroyed: [], kept: [], failed: [{ id: issue, reason: toMessage(error) }] };
+  }
+}
+
+function toMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+// The news goes first and its failure joins the event, so the event is the last write and a run
+// that failed is still marked wrapped. A run whose issue is not a Linear key files its news without one.
+function recordMergedWrapUp(db: Database, issue: string, wrapUp: WrapUp, actor: string): void {
+  const text = buildMergedWrapUpNews(issue, wrapUp);
+  if (text !== null) {
+    try {
+      addNews(db, { from: SWEEP_ACTOR, topic: 'report', text, issue: ISSUE.test(issue) ? issue : null, link: null, needsGeoff: false });
+    } catch (error) {
+      wrapUp.failed.push({ id: issue, reason: `news: ${toMessage(error)}` });
+    }
+  }
+  logEvent(db, 'run', issue, 'merged-wrap-up', actor, null, null, { ...wrapUp });
 }
