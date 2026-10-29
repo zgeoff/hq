@@ -6,6 +6,7 @@ import { buildStubFleetClient } from '../../test/build-stub-fleet-client.ts';
 import { fakeAtc, freshDb } from '../../test/helpers.ts';
 import { addPr } from './add-pr.ts';
 import { addRun } from './add-run.ts';
+import { closePr } from './close-pr.ts';
 import { setState } from './set-state.ts';
 import { sweepNow } from './sweep-now.ts';
 
@@ -39,7 +40,7 @@ test('it forgets the sessions of a merged run and logs the wrap-up once', async 
   onTestFinished(overrideEnv('HQ_NOW', '2026-10-21T03:00:00Z'));
   addRun(ctx.db, { issue: 'GEO-9852', title: 'Invented kettle work', place: 'local', session: '0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
   addPr(ctx.db, 'GEO-9852', 'kettle#52', 'kettle-bot');
-  ctx.db.query("UPDATE run_prs SET state = 'merged'").run();
+  closePr(ctx.db, 'kettle#52', { to: 'merged', actor: 'kettle-bot' });
   setState(ctx.db, 'GEO-9852', 'merged', {}, 'kettle-bot');
   const fleet = buildStubFleetClient({ sessions: [{ id: '0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true }] });
   const gh = buildStubGitHubFactsRunner({ views: {} });
@@ -60,7 +61,7 @@ test('it still sweeps for alerts when the wrap-up of merged runs throws', async 
 
   addRun(ctx.db, { issue: 'GEO-9854', title: 'Invented kettle work', place: 'local', session: '0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
   addPr(ctx.db, 'GEO-9854', 'kettle#54', 'kettle-bot');
-  ctx.db.query("UPDATE run_prs SET state = 'merged'").run();
+  closePr(ctx.db, 'kettle#54', { to: 'merged', actor: 'kettle-bot' });
   setState(ctx.db, 'GEO-9854', 'merged', {}, 'kettle-bot');
 
   // Logging the wrap-up fails after the sessions are forgotten, which is past the per-run guard.

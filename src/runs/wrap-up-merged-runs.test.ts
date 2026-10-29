@@ -3,6 +3,7 @@ import { buildStubFleetClient } from '../../test/build-stub-fleet-client.ts';
 import { freshDb } from '../../test/helpers.ts';
 import { addPr } from './add-pr.ts';
 import { addRun } from './add-run.ts';
+import { closePr } from './close-pr.ts';
 import { setSession } from './set-session.ts';
 import { setState } from './set-state.ts';
 import { wrapUpMergedRuns } from './wrap-up-merged-runs.ts';
@@ -18,8 +19,8 @@ test.each(['merged', 'live-check', 'deploy-held'])('it wraps up a %s run whose P
   addRun(ctx.db, { issue: 'GEO-9901', title: 'Invented kettle descaler', place: 'local', session: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
   addPr(ctx.db, 'GEO-9901', 'kettle#1', 'z-delivery');
   addPr(ctx.db, 'GEO-9901', 'kettle#2', 'z-delivery');
-  ctx.db.query("UPDATE run_prs SET state = 'merged' WHERE ref = 'kettle#1'").run();
-  ctx.db.query("UPDATE run_prs SET state = 'closed' WHERE ref = 'kettle#2'").run();
+  closePr(ctx.db, 'kettle#1', { to: 'merged', actor: 'z-delivery' });
+  closePr(ctx.db, 'kettle#2', { to: 'closed', actor: 'z-delivery' });
   setState(ctx.db, 'GEO-9901', state, {}, 'z-delivery');
   const fleet = buildStubFleetClient({ sessions: [{ id: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true }] });
 
@@ -34,7 +35,7 @@ test.each(['working', 'blocked', 'done'])('it skips a %s run', async (state) => 
   const ctx = setupTest();
   addRun(ctx.db, { issue: 'GEO-9902', title: 'Invented teapot cosy', place: 'local', session: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
   addPr(ctx.db, 'GEO-9902', 'teapot#1', 'z-delivery');
-  ctx.db.query("UPDATE run_prs SET state = 'merged'").run();
+  closePr(ctx.db, 'teapot#1', { to: 'merged', actor: 'z-delivery' });
   setState(ctx.db, 'GEO-9902', state, {}, 'z-delivery');
   const openClient = mock(() => Promise.reject(new Error('no atc expected')));
 
@@ -49,7 +50,7 @@ test('it skips a deploy-held run with an open PR, with no wrap-up note and no ne
   addRun(ctx.db, { issue: 'GEO-9903', title: 'Invented teapot cosy', place: 'local', session: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
   addPr(ctx.db, 'GEO-9903', 'teapot#1', 'z-delivery');
   addPr(ctx.db, 'GEO-9903', 'teapot#2', 'z-delivery');
-  ctx.db.query("UPDATE run_prs SET state = 'merged' WHERE ref = 'teapot#1'").run();
+  closePr(ctx.db, 'teapot#1', { to: 'merged', actor: 'z-delivery' });
   setState(ctx.db, 'GEO-9903', 'deploy-held', {}, 'z-delivery');
 
   const wrapped = await wrapUpMergedRuns(ctx.db, { openClient: () => Promise.reject(new Error('no atc expected')), readImpWork: () => Promise.reject(new Error('no check expected')) }, 'sweep');
@@ -63,7 +64,7 @@ test('it wraps a run up once across two passes', async () => {
   const ctx = setupTest();
   addRun(ctx.db, { issue: 'GEO-9904', title: 'Invented kettle descaler', place: 'local', session: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
   addPr(ctx.db, 'GEO-9904', 'kettle#1', 'z-delivery');
-  ctx.db.query("UPDATE run_prs SET state = 'merged'").run();
+  closePr(ctx.db, 'kettle#1', { to: 'merged', actor: 'z-delivery' });
   setState(ctx.db, 'GEO-9904', 'merged', {}, 'z-delivery');
   const fleet = buildStubFleetClient({ sessions: [{ id: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true }] });
   const deps = { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')) };
@@ -80,7 +81,7 @@ test('it wraps a run up again when it went back to working and merged again', as
   const ctx = setupTest();
   addRun(ctx.db, { issue: 'GEO-9905', title: 'Invented kettle descaler', place: 'local', session: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
   addPr(ctx.db, 'GEO-9905', 'kettle#1', 'z-delivery');
-  ctx.db.query("UPDATE run_prs SET state = 'merged'").run();
+  closePr(ctx.db, 'kettle#1', { to: 'merged', actor: 'z-delivery' });
   setState(ctx.db, 'GEO-9905', 'merged', {}, 'z-delivery');
   const fleet = buildStubFleetClient({ sessions: [{ id: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true }] });
   const deps = { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')) };
@@ -100,9 +101,9 @@ test('it adds one report news item naming each kept session, and none for a run 
   addRun(ctx.db, { issue: 'GEO-9907', title: 'Invented teapot cosy', place: 'local', session: '0000b001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
   for (const [issue, ref] of [['GEO-9906', 'kettle#1'], ['GEO-9907', 'teapot#1']] as const) {
     addPr(ctx.db, issue, ref, 'z-delivery');
+    closePr(ctx.db, ref, { to: 'merged', actor: 'z-delivery' });
     setState(ctx.db, issue, 'merged', {}, 'z-delivery');
   }
-  ctx.db.query("UPDATE run_prs SET state = 'merged'").run();
   const fleet = buildStubFleetClient({
     sessions: [
       { id: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, cwd: '/workspace/kettle' },
@@ -131,7 +132,7 @@ test('it forgets a session removed from the run by hand', async () => {
   setSession(ctx.db, 'GEO-9908', '0000a002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'z-delivery', 'add');
   setSession(ctx.db, 'GEO-9908', '0000a002', 'z-delivery', 'remove');
   addPr(ctx.db, 'GEO-9908', 'kettle#1', 'z-delivery');
-  ctx.db.query("UPDATE run_prs SET state = 'merged'").run();
+  closePr(ctx.db, 'kettle#1', { to: 'merged', actor: 'z-delivery' });
   setState(ctx.db, 'GEO-9908', 'merged', {}, 'z-delivery');
   const fleet = buildStubFleetClient({
     sessions: [
@@ -150,7 +151,7 @@ test('a dry run calls no forget, unpin or destroy and writes no event, note or n
   addRun(ctx.db, { issue: 'GEO-9909', title: 'Invented kettle descaler', place: 'imp', session: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
   setSession(ctx.db, 'GEO-9909', '0000a002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'z-delivery', 'add');
   addPr(ctx.db, 'GEO-9909', 'kettle#1', 'z-delivery');
-  ctx.db.query("UPDATE run_prs SET state = 'merged'").run();
+  closePr(ctx.db, 'kettle#1', { to: 'merged', actor: 'z-delivery' });
   setState(ctx.db, 'GEO-9909', 'merged', {}, 'z-delivery');
   const fleet = buildStubFleetClient({
     sessions: [
@@ -179,9 +180,9 @@ test('a run whose issue is not a Linear key still gets its news and event, and d
   addRun(ctx.db, { issue: 'GEO-9910', title: 'Invented teapot cosy', place: 'local', session: '0000b001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
   for (const [issue, ref] of [['kettle-10', 'kettle#10'], ['GEO-9910', 'teapot#10']] as const) {
     addPr(ctx.db, issue, ref, 'z-delivery');
+    closePr(ctx.db, ref, { to: 'merged', actor: 'z-delivery' });
     setState(ctx.db, issue, 'merged', {}, 'z-delivery');
   }
-  ctx.db.query("UPDATE run_prs SET state = 'merged'").run();
   const fleet = buildStubFleetClient({
     sessions: [
       { id: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, pinned: true },
@@ -203,9 +204,9 @@ test('a run whose wrap-up throws is marked wrapped with the failure, and the nex
   addRun(ctx.db, { issue: 'GEO-9912', title: 'Invented teapot cosy', place: 'local', session: '0000b001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
   for (const [issue, ref] of [['GEO-9911', 'kettle#11'], ['GEO-9912', 'teapot#12']] as const) {
     addPr(ctx.db, issue, ref, 'z-delivery');
+    closePr(ctx.db, ref, { to: 'merged', actor: 'z-delivery' });
     setState(ctx.db, issue, 'merged', {}, 'z-delivery');
   }
-  ctx.db.query("UPDATE run_prs SET state = 'merged'").run();
 
   // A run note that cannot be written makes the first run's wrap-up throw.
   ctx.db.exec("CREATE TRIGGER kettle_refuses_note BEFORE INSERT ON run_notes WHEN NEW.issue = 'GEO-9911' BEGIN SELECT RAISE(ABORT, 'kettle refuses'); END");
