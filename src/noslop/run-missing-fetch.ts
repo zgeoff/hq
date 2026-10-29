@@ -1,6 +1,5 @@
 import type { Runner } from '../runner/types.ts';
 
-// Fetches from origin each commit the checkout lacks; false when one stays missing.
 export async function runMissingFetch(run: Runner, directory: string, shas: readonly string[]): Promise<boolean> {
   const unique = [...new Set(shas)];
   const checks = await Promise.all(unique.map((sha) => run(['git', 'cat-file', '-e', `${sha}^{commit}`], { cwd: directory })));

@@ -3,7 +3,6 @@ import { dirname, join } from 'node:path';
 import { realRunner } from '../src/runner/real-runner.ts';
 import { createStubPRRepo } from './create-stub-pr-repo.ts';
 
-// A commit's files: a path to its text.
 type Files = Record<string, string>;
 
 interface StubRebaseRepoOptions {
@@ -12,6 +11,9 @@ interface StubRebaseRepoOptions {
   pr: number;
   history: Files[];
   change: Files;
+
+  // A second PR commit on top of `change`, so the PR holds two commits.
+  followUp?: Files;
 }
 
 interface StubRebaseRepo {
@@ -20,11 +22,13 @@ interface StubRebaseRepo {
   // The PR head before anything moves.
   oldHead: string;
 
+  readMainHead: () => Promise<string>;
+
   // One more commit on main, pushed.
   moveMain: (files: Files) => Promise<void>;
 
-  // Replays the PR commit on main as it is now, adds `edit` to that commit, and serves the result as
-  // the PR head. Gives the new head.
+  // Replays the PR commits on main as it is now, adds `edit` to the last of them, and serves the
+  // result as the PR head. Gives the new head.
   rebase: (edit?: Files) => Promise<string>;
 
   // Squashes the PR onto main as it is now into one commit, serves it as the PR head and gives it.
@@ -34,8 +38,8 @@ interface StubRebaseRepo {
   readServedHead: () => Promise<string>;
 }
 
-// A stub PR repo (see createStubPRRepo) whose PR head can then be rebased or squashed onto a main
-// that has moved, as a force push to the PR branch would.
+// A stub PR repo on disk, its origin a local bare repo, whose PR head can then be rebased or squashed
+// onto a main that has moved, as a force push to the PR branch would.
 export async function createStubRebaseRepo(options: StubRebaseRepoOptions): Promise<StubRebaseRepo> {
   const stub = await createStubPRRepo({ root: options.root, repo: options.repo, pr: options.pr, history: options.history, change: options.change });
   const git = (...args: string[]) => runGit(stub.directory, args);
@@ -44,9 +48,11 @@ export async function createStubRebaseRepo(options: StubRebaseRepoOptions): Prom
     await git('push', '-q', '--force', 'origin', `HEAD:refs/pull/${options.pr}/head`);
     return head;
   };
+  const oldHead = options.followUp === undefined ? stub.head : await addFollowUp(stub.directory, options.followUp, serve);
   return {
     directory: stub.directory,
-    oldHead: stub.head,
+    oldHead,
+    readMainHead: async () => await git('rev-parse', 'main'),
     moveMain: async (files) => {
       await git('checkout', '-q', 'main');
       writeFiles(stub.directory, files);
@@ -83,6 +89,16 @@ async function runGit(directory: string, args: string[]): Promise<string> {
     throw new Error(`git ${args.join(' ')} failed: ${result.stderr}`);
   }
   return result.stdout.trim();
+}
+
+async function addFollowUp(directory: string, files: Files, serve: () => Promise<string>): Promise<string> {
+  await runGit(directory, ['checkout', '-q', 'kettle-edit']);
+  writeFiles(directory, files);
+  await runGit(directory, ['add', '-A']);
+  await runGit(directory, ['commit', '-q', '-m', 'the PR follow-up']);
+  const head = await serve();
+  await runGit(directory, ['checkout', '-q', 'main']);
+  return head;
 }
 
 function writeFiles(directory: string, files: Files): void {

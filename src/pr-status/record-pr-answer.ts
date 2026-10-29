@@ -5,7 +5,7 @@ import { logEvent } from '../log-event.ts';
 import type { PRAnswer } from './types.ts';
 import { upsertPRStatus } from './upsert-pr-status.ts';
 
-export interface CarriedAnswer {
+interface CarriedAnswer {
   source: string;
   note: string | null;
   patchID: string;

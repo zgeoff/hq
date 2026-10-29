@@ -1,6 +1,6 @@
-// `hq pr status|answer|override|accept-risk|mechanical|rebased|exempt|next`: the one record every session
-// reads before it messages another session about a PR. Only an override, an accepted risk and
-// z-review's two records change what the merge gate passes.
+// `hq pr status|answer|override|accept-risk|mechanical|rebased|exempt|next`: the one record every
+// session reads before it messages another session about a PR. Only an override, an accepted risk
+// and z-review's three records (mechanical, exempt and rebased) change what the merge gate passes.
 import type { Database } from 'bun:sqlite';
 import type { Flags } from '../cli.ts';
 import type { Out } from '../commands.ts';

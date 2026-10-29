@@ -8,21 +8,22 @@ export interface CarriableLgtm {
   repo: string;
   pr: number;
   lgtm: OwnerAnswer;
+  oldHead: string;
   newHead: string;
 }
 
-// Run inside the write transaction: the fetch before it is slow, and the owner may have answered
+// Run inside the write transaction: the git work before it is slow, and the owner may have answered
 // meanwhile. A carried lgtm must never override a later word of the owner's.
 export function requireCarriableLgtm(db: Database, request: CarriableLgtm): void {
   const repo = request.repo;
   const pr = request.pr;
   const lgtm = request.lgtm;
+  const oldHead = request.oldHead;
   const newHead = request.newHead;
   const answers = readPRAnswers(db, repo, pr);
   if (answers === null) {
     throw new HqError('bad_args', `an answer record of ${repo}#${pr} cannot be read, so no lgtm is carried`);
   }
-  const oldHead = lgtm.head ?? '';
   if (readHeadLgtm(db, repo, pr, oldHead)?.seq !== lgtm.seq) {
     throw new HqError('bad_args', `the owner's lgtm at ${oldHead.slice(0, 7)} of ${repo}#${pr} is no longer the newest answer there, so it is not carried`);
   }

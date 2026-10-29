@@ -46,3 +46,30 @@ test('it serves a squash of the PR onto main as one commit', async () => {
   expect(served).toBe(head);
   expect(parents.stdout.trim().split(' ')).toHaveLength(2);
 });
+
+test('it serves a follow-up as a second PR commit, and a squash folds both into one', async () => {
+  const ctx = setupTest();
+  const repo = await createStubRebaseRepo({ root: ctx.root, repo: 'widgets', pr: 7, history: [{ 'a.txt': 'one\n' }], change: { 'b.txt': 'two\n' }, followUp: { 'c.txt': 'three\n' } });
+
+  const servedBefore = await repo.readServedHead();
+  const before = await realRunner(['git', 'rev-list', '--count', `main..${repo.oldHead}`], { cwd: repo.directory });
+  const head = await repo.squash();
+  const after = await realRunner(['git', 'rev-list', '--count', `main..${head}`], { cwd: repo.directory });
+  const files = await realRunner(['git', 'show', '--name-only', '--format=', head], { cwd: repo.directory });
+
+  expect(servedBefore).toBe(repo.oldHead);
+  expect(before.stdout.trim()).toBe('2');
+  expect(after.stdout.trim()).toBe('1');
+  expect(files.stdout.trim().split('\n')).toStrictEqual(['b.txt', 'c.txt']);
+});
+
+test('it reads the tip of main after main moves', async () => {
+  const ctx = setupTest();
+  const repo = await createStubRebaseRepo({ root: ctx.root, repo: 'widgets', pr: 7, history: [{ 'a.txt': 'one\n' }], change: { 'b.txt': 'two\n' } });
+  await repo.moveMain({ 'c.txt': 'three\n' });
+
+  const tip = await repo.readMainHead();
+
+  const pushed = await realRunner(['git', 'ls-remote', 'origin', 'refs/heads/main'], { cwd: repo.directory });
+  expect(tip).toBe(pushed.stdout.split('\t')[0] ?? '');
+});

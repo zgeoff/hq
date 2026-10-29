@@ -1,10 +1,6 @@
-export interface CarriedWords {
-  source: string;
-  note: string | null;
-}
+import type { OwnerWords } from './read-pr-answers.ts';
 
-// The note a carried lgtm stores: whose words it was, and the patch-id that matched at both heads.
-export function buildCarriedNote(from: CarriedWords, patchID: string): string {
-  const words = from.note === null ? from.source : `${from.source}: ${from.note}`;
-  return `from ${words}; patch-id ${patchID}`;
+export function buildCarriedNote(words: OwnerWords, patchID: string): string {
+  const said = words.note === null ? words.source : `${words.source}: ${words.note}`;
+  return `from ${said}; patch-id ${patchID}`;
 }
