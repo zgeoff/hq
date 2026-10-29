@@ -1,121 +1,138 @@
-import { expect, onTestFinished, test } from 'bun:test';
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { expect, test } from 'bun:test';
+import { buildStubAtcMcpFiles } from '../../test/build-stub-atc-mcp-files.ts';
 import { readAtcMcp } from './read-atc-mcp.ts';
 
-interface ProcessFiles {
-  cmdline: string;
-  ticks?: number;
-  cgroup?: string;
-  exe?: string;
-}
-
-// A fake /proc tree with btime 1000 and a fake atc binary; each test adds the processes it needs.
-function setupTest() {
-  const directory = mkdtempSync(join(tmpdir(), 'hq-atc-mcp-'));
-  onTestFinished(() => rmSync(directory, { recursive: true, force: true }));
-  const procRoot = join(directory, 'proc');
-  mkdirSync(procRoot);
-  writeFileSync(join(procRoot, 'stat'), 'cpu 1 2 3\nbtime 1000\n');
-  const binary = join(directory, 'atc');
-  writeFileSync(binary, '');
-
-  // field 22 (starttime) is the 20th after the ')' of comm, which holds a space on purpose
-  const addProcess = (pid: number, files: ProcessFiles) => {
-    const processDirectory = join(procRoot, String(pid));
-    mkdirSync(processDirectory);
-    writeFileSync(join(processDirectory, 'cmdline'), files.cmdline);
-    if (files.ticks !== undefined) {
-      writeFileSync(join(processDirectory, 'stat'), `${pid} (a tc) S ${Array.from({ length: 18 }, () => '0').join(' ')} ${files.ticks} 0 0`);
-    }
-    if (files.cgroup !== undefined) {
-      writeFileSync(join(processDirectory, 'cgroup'), files.cgroup);
-    }
-    if (files.exe !== undefined) {
-      symlinkSync(files.exe, join(processDirectory, 'exe'));
-    }
-  };
-
-  return { directory, procRoot, binary, addProcess };
-}
-
-test('it reads an atc mcp process with its session, start time and exe', () => {
-  const ctx = setupTest();
-  ctx.addProcess(55, {
-    cmdline: '/home/x/.local/bin/atc\0mcp\0',
-    ticks: 250,
-    cgroup: '0::/user.slice/atc-daemon-session-deadbeef-1a2b3c4d-1111-2222-3333-444455556666-cafef00d.scope\n',
-    exe: '/x/atc (deleted)',
+test('it reads an atc mcp process with its session, start time and exe, against the binary', () => {
+  const files = buildStubAtcMcpFiles({
+    atc: '/opt/kettle/atc',
+    mtimes: { '/opt/kettle/atc': 1_700_000_123_000 },
+    files: {
+      '/proc/stat': 'cpu  41 0 17 900\nbtime 1000\n',
+      '/proc/55/cmdline': '/opt/kettle/atc\0mcp\0',
+      '/proc/55/stat': '55 (atc) S 1 1 1 0 -1 4194304 0 0 0 0 0 0 0 0 20 0 1 0 250 3670016 448',
+      '/proc/55/cgroup': '0::/user.slice/atc-daemon-session-deadbeef-1a2b3c4d-1111-2222-3333-444455556666-cafef00d.scope\n',
+    },
+    links: { '/proc/55/exe': '/opt/kettle/atc (deleted)' },
   });
 
-  const read = readAtcMcp(ctx.procRoot, ctx.binary);
-
-  if (typeof read === 'string') {
-    throw new TypeError(read);
-  }
-  expect(read.processes).toStrictEqual([{ pid: 55, sessionId: '1a2b3c4d-1111-2222-3333-444455556666', startedAtMs: 1_002_500, exe: '/x/atc (deleted)' }]);
+  expect(readAtcMcp(files)).toStrictEqual({
+    processes: [{ pid: 55, sessionId: '1a2b3c4d-1111-2222-3333-444455556666', startedAtMs: 1_002_500, exe: '/opt/kettle/atc (deleted)' }],
+    binary: { path: '/opt/kettle/atc', mtimeMs: 1_700_000_123_000 },
+  });
 });
 
-test('it ignores a process that is not atc mcp', () => {
-  const ctx = setupTest();
-  ctx.addProcess(56, { cmdline: 'atc\0daemon\0' });
+test('it reads only the cmdline of a process that is not atc mcp', () => {
+  const files = buildStubAtcMcpFiles({
+    atc: '/opt/kettle/atc',
+    mtimes: { '/opt/kettle/atc': 1_700_000_123_000 },
+    files: { '/proc/stat': 'cpu  41 0 17 900\nbtime 1000\n', '/proc/1/cmdline': '/sbin/init\0' },
+    failures: { '/proc/1/stat': 'EACCES', '/proc/1/exe': 'EACCES', '/proc/1/cgroup': 'EACCES' },
+  });
 
-  const read = readAtcMcp(ctx.procRoot, ctx.binary);
-
-  if (typeof read === 'string') {
-    throw new TypeError(read);
-  }
-  expect(read.processes).toStrictEqual([]);
+  expect(readAtcMcp(files)).toStrictEqual({ processes: [], binary: { path: '/opt/kettle/atc', mtimeMs: 1_700_000_123_000 } });
 });
 
-test('it skips a process that vanishes mid-scan and still reads the others', () => {
-  const ctx = setupTest();
-  ctx.addProcess(57, { cmdline: 'atc\0mcp\0' });
-  ctx.addProcess(58, { cmdline: 'atc\0mcp\0', ticks: 100, cgroup: '0::/user.slice/other.scope\n', exe: '/x/atc' });
+test('it ignores a /proc entry that is not a pid', () => {
+  const files = buildStubAtcMcpFiles({
+    atc: '/opt/kettle/atc',
+    mtimes: { '/opt/kettle/atc': 1_700_000_123_000 },
+    files: { '/proc/stat': 'cpu  41 0 17 900\nbtime 1000\n', '/proc/self/cmdline': 'atc\0mcp\0' },
+  });
 
-  const read = readAtcMcp(ctx.procRoot, ctx.binary);
-
-  if (typeof read === 'string') {
-    throw new TypeError(read);
-  }
-  expect(read.processes).toStrictEqual([{ pid: 58, sessionId: null, startedAtMs: 1_001_000, exe: '/x/atc' }]);
+  expect(readAtcMcp(files)).toStrictEqual({ processes: [], binary: { path: '/opt/kettle/atc', mtimeMs: 1_700_000_123_000 } });
 });
 
-test('it reports the binary path and modification time', () => {
-  const ctx = setupTest();
-  utimesSync(ctx.binary, new Date(1_700_000_000_000), new Date(1_700_000_123_000));
+test('it skips a process whose files vanished mid-scan and still reads the others', () => {
+  const files = buildStubAtcMcpFiles({
+    atc: '/opt/kettle/atc',
+    mtimes: { '/opt/kettle/atc': 1_700_000_123_000 },
+    files: {
+      '/proc/stat': 'cpu  41 0 17 900\nbtime 1000\n',
+      '/proc/57/cmdline': 'atc\0mcp\0',
+      '/proc/58/cmdline': 'atc\0mcp\0',
+      '/proc/58/stat': '58 (atc) S 1 1 1 0 -1 4194304 0 0 0 0 0 0 0 0 20 0 1 0 100 3670016 448',
+      '/proc/58/cgroup': '0::/user.slice/other.scope\n',
+    },
+    links: { '/proc/58/exe': '/opt/kettle/atc' },
+  });
 
-  const read = readAtcMcp(ctx.procRoot, ctx.binary);
-
-  if (typeof read === 'string') {
-    throw new TypeError(read);
-  }
-  expect(read.binary).toStrictEqual({ path: ctx.binary, mtimeMs: 1_700_000_123_000 });
+  expect(readAtcMcp(files)).toStrictEqual({ processes: [{ pid: 58, sessionId: null, startedAtMs: 1_001_000, exe: '/opt/kettle/atc' }], binary: { path: '/opt/kettle/atc', mtimeMs: 1_700_000_123_000 } });
 });
 
-test('it returns an error naming the path when the binary is missing', () => {
-  const ctx = setupTest();
-  const missing = join(ctx.directory, 'nope');
+test('it skips a process whose exe link reports it has exited', () => {
+  const files = buildStubAtcMcpFiles({
+    atc: '/opt/kettle/atc',
+    mtimes: { '/opt/kettle/atc': 1_700_000_123_000 },
+    files: {
+      '/proc/stat': 'cpu  41 0 17 900\nbtime 1000\n',
+      '/proc/57/cmdline': 'atc\0mcp\0',
+      '/proc/57/stat': '57 (atc) Z 1 1 1 0 -1 4194304 0 0 0 0 0 0 0 0 20 0 1 0 100 0 0',
+      '/proc/57/cgroup': '0::/user.slice/other.scope\n',
+    },
+    failures: { '/proc/57/exe': 'ESRCH' },
+  });
 
-  const read = readAtcMcp(ctx.procRoot, missing);
-
-  expect(read).toContain(`ENOENT: no such file or directory, stat '${missing}'`);
+  expect(readAtcMcp(files)).toStrictEqual({ processes: [], binary: { path: '/opt/kettle/atc', mtimeMs: 1_700_000_123_000 } });
 });
 
-test('it returns an error naming the path when the proc root is unreadable', () => {
-  const ctx = setupTest();
-  const missing = join(ctx.directory, 'no-proc');
+test('it returns an error naming the pid and file when a live process refuses a read', () => {
+  const files = buildStubAtcMcpFiles({
+    atc: '/opt/kettle/atc',
+    mtimes: { '/opt/kettle/atc': 1_700_000_123_000 },
+    files: {
+      '/proc/stat': 'cpu  41 0 17 900\nbtime 1000\n',
+      '/proc/55/cmdline': 'atc\0mcp\0',
+      '/proc/55/stat': '55 (atc) S 1 1 1 0 -1 4194304 0 0 0 0 0 0 0 0 20 0 1 0 250 3670016 448',
+      '/proc/55/cgroup': '0::/user.slice/other.scope\n',
+    },
+    failures: { '/proc/55/exe': 'EACCES' },
+  });
 
-  const read = readAtcMcp(missing, ctx.binary);
+  expect(readAtcMcp(files)).toBe("pid 55: can't read /proc/55/exe: EACCES");
+});
 
-  expect(read).toContain(`ENOENT: no such file or directory, open '${join(missing, 'stat')}'`);
+test('it returns an error naming the pid and file when a process file fails with an i/o error', () => {
+  const files = buildStubAtcMcpFiles({
+    atc: '/opt/kettle/atc',
+    mtimes: { '/opt/kettle/atc': 1_700_000_123_000 },
+    files: { '/proc/stat': 'cpu  41 0 17 900\nbtime 1000\n' },
+    failures: { '/proc/55/cmdline': 'EIO' },
+  });
+
+  expect(readAtcMcp(files)).toBe("pid 55: can't read /proc/55/cmdline: EIO");
 });
 
 test('it returns an error naming the stat file when a process has no start time', () => {
-  const ctx = setupTest();
-  ctx.addProcess(55, { cmdline: 'atc\0mcp\0', cgroup: '', exe: '/x/atc' });
-  writeFileSync(join(ctx.procRoot, '55', 'stat'), '55 (atc) S 0');
+  const files = buildStubAtcMcpFiles({
+    atc: '/opt/kettle/atc',
+    mtimes: { '/opt/kettle/atc': 1_700_000_123_000 },
+    files: { '/proc/stat': 'cpu  41 0 17 900\nbtime 1000\n', '/proc/55/cmdline': 'atc\0mcp\0', '/proc/55/stat': '55 (atc) S 1', '/proc/55/cgroup': '' },
+    links: { '/proc/55/exe': '/opt/kettle/atc' },
+  });
 
-  expect(readAtcMcp(ctx.procRoot, ctx.binary)).toBe(`no start time in ${join(ctx.procRoot, '55', 'stat')}`);
+  expect(readAtcMcp(files)).toBe('no start time in /proc/55/stat');
+});
+
+test('it returns an error naming /proc/stat when it has no btime line', () => {
+  const files = buildStubAtcMcpFiles({ atc: '/opt/kettle/atc', mtimes: { '/opt/kettle/atc': 1_700_000_123_000 }, files: { '/proc/stat': 'cpu  41 0 17 900\nprocesses 812\n' } });
+
+  expect(readAtcMcp(files)).toBe('no btime in /proc/stat');
+});
+
+test('it returns an error when atc is not on PATH', () => {
+  const files = buildStubAtcMcpFiles({ atc: null, files: { '/proc/stat': 'cpu  41 0 17 900\nbtime 1000\n' } });
+
+  expect(readAtcMcp(files)).toBe('no atc on PATH');
+});
+
+test('it returns an error naming the path when the binary is missing', () => {
+  const files = buildStubAtcMcpFiles({ atc: '/opt/kettle/atc', files: { '/proc/stat': 'cpu  41 0 17 900\nbtime 1000\n' } });
+
+  expect(readAtcMcp(files)).toBe("ENOENT: no such file or directory, stat '/opt/kettle/atc'");
+});
+
+test('it returns an error naming /proc/stat when it cannot be read', () => {
+  const files = buildStubAtcMcpFiles({ atc: '/opt/kettle/atc', mtimes: { '/opt/kettle/atc': 1_700_000_123_000 }, failures: { '/proc/stat': 'EACCES' } });
+
+  expect(readAtcMcp(files)).toBe("EACCES: permission denied, open '/proc/stat'");
 });

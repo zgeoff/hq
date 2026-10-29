@@ -1,27 +1,30 @@
-import { readFileSync, readdirSync, readlinkSync, statSync } from 'node:fs';
-import { basename, join } from 'node:path';
-import type { AtcMcpProcess, AtcMcpRead } from './types.ts';
+import { join } from 'node:path';
+import { isAtcMcpCommand } from './is-atc-mcp-command.ts';
+import { parseAtcMcpProcess } from './parse-atc-mcp-process.ts';
+import { parseBtime } from './parse-btime.ts';
+import type { AtcMcpFiles, AtcMcpProcess, AtcMcpRead } from './types.ts';
 
-// Every `atc mcp` process under procRoot, plus the atc binary's modification time.
-// Start time is exact: /proc/<pid>/stat field 22 (ticks since boot) plus btime from /proc/stat.
-// A process that exits mid-scan is skipped; any other failure is returned as the error string.
-export function readAtcMcp(procRoot = '/proc', binaryPath: string | undefined = Bun.which('atc') ?? undefined): AtcMcpRead {
-  if (!binaryPath) {
+const PROC = '/proc';
+
+// Every `atc mcp` process, plus the atc binary's modification time, or the error that stopped the read.
+export function readAtcMcp(files: AtcMcpFiles): AtcMcpRead {
+  const binaryPath = files.whichAtc();
+  if (binaryPath === null) {
     return 'no atc on PATH';
   }
   try {
-    const binary = { path: binaryPath, mtimeMs: statSync(binaryPath).mtimeMs };
-    const statFile = join(procRoot, 'stat');
-    const btime = Number(/^btime (?<seconds>\d+)$/mu.exec(readFileSync(statFile, 'utf8'))?.groups?.['seconds']);
-    if (!Number.isFinite(btime)) {
-      return `no btime in ${statFile}`;
+    const binary = { path: binaryPath, mtimeMs: files.mtimeMs(binaryPath) };
+    const statPath = join(PROC, 'stat');
+    const btime = parseBtime(files.readFile(statPath));
+    if (btime === null) {
+      return `no btime in ${statPath}`;
     }
     const processes: AtcMcpProcess[] = [];
-    for (const entry of readdirSync(procRoot)) {
+    for (const entry of files.readdir(PROC)) {
       if (!/^\d+$/u.test(entry)) {
         continue;
       }
-      const found = readProcess(join(procRoot, entry), Number(entry), btime);
+      const found = readProcess(files, Number(entry), btime);
       if (typeof found === 'string') {
         return found;
       }
@@ -35,31 +38,39 @@ export function readAtcMcp(procRoot = '/proc', binaryPath: string | undefined = 
   }
 }
 
-// Linux counts start times in clock ticks of 1/100 s (USER_HZ is 100 on every Linux build we run on).
-const TICK_MS = 10;
-const SCOPE = /atc-daemon-session-[0-9a-f]{8}-(?<id>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})-[0-9a-f]{8}\.scope/u;
-
-// null: not an atc mcp process, or it exited mid-scan; a string: its start time can't be read.
-function readProcess(directory: string, pid: number, btime: number): AtcMcpProcess | string | null {
+// null: not an atc mcp process, or it exited mid-scan; a string: the error that stopped its read.
+function readProcess(files: AtcMcpFiles, pid: number, btime: number): AtcMcpProcess | string | null {
+  const directory = join(PROC, String(pid));
+  let path = join(directory, 'cmdline');
   try {
-    const argv = readFileSync(join(directory, 'cmdline'), 'utf8').split('\0');
-    if (basename(argv[0] ?? '') !== 'atc' || argv[1] !== 'mcp') {
+    const cmdline = files.readFile(path);
+
+    // another user's process refuses its exe link, so only an atc mcp process gets the other reads.
+    if (!isAtcMcpCommand(cmdline)) {
       return null;
     }
-    const stat = readFileSync(join(directory, 'stat'), 'utf8');
-
-    // comm (field 2) may hold spaces and parens, so count fields from the last ')'; field 3 is index 0.
-    const fields = stat.slice(stat.lastIndexOf(')') + 2).split(' ');
-    const exe = readlinkSync(join(directory, 'exe'));
-    const cgroup = readFileSync(join(directory, 'cgroup'), 'utf8');
-    const sessionId = SCOPE.exec(cgroup)?.groups?.['id'] ?? null;
-    const ticks = Number(fields[19]);
-    if (!Number.isFinite(ticks)) {
-      return `no start time in ${join(directory, 'stat')}`;
-    }
-    return { pid, sessionId, startedAtMs: btime * 1000 + ticks * TICK_MS, exe };
-  } catch {
-    // the process exited mid-scan
-    return null;
+    path = join(directory, 'stat');
+    const stat = files.readFile(path);
+    path = join(directory, 'exe');
+    const exe = files.readlink(path);
+    path = join(directory, 'cgroup');
+    const cgroup = files.readFile(path);
+    const parsed = parseAtcMcpProcess({ pid, cmdline, stat, exe, cgroup, btime });
+    return parsed === 'no start time' ? `no start time in ${join(directory, 'stat')}` : parsed;
+  } catch (error) {
+    return hasExited(error) ? null : `pid ${pid}: can't read ${path}: ${errorCode(error)}`;
   }
+}
+
+// ENOENT or ESRCH: the process exited between the directory listing and this read.
+function hasExited(error: unknown): boolean {
+  const code = errorCode(error);
+  return code === 'ENOENT' || code === 'ESRCH';
+}
+
+function errorCode(error: unknown): string {
+  if (error instanceof Error && 'code' in error && typeof error.code === 'string') {
+    return error.code;
+  }
+  return error instanceof Error ? error.message : String(error);
 }

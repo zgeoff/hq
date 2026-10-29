@@ -18,6 +18,15 @@ export interface AtcMcpProcess {
 // The atc mcp processes plus the installed binary, or the error that stopped the read.
 export type AtcMcpRead = { processes: AtcMcpProcess[]; binary: { path: string; mtimeMs: number } } | string;
 
+// The filesystem and PATH reads the atc mcp reader makes; each throws as node:fs does.
+export interface AtcMcpFiles {
+  readFile: (path: string) => string;
+  readdir: (path: string) => string[];
+  readlink: (path: string) => string;
+  mtimeMs: (path: string) => number;
+  whichAtc: () => string | null;
+}
+
 export interface Probe {
   run: Runner;
   readFile: (path: string) => Promise<string>;

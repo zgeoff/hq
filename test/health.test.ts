@@ -254,10 +254,15 @@ test('the private-tree check joins the run when the probe supplies it, and is ab
   expect([none.checks.some((c) => c.key === 'private-tree'), some.checks.find((c) => c.key === 'private-tree')]).toStrictEqual([false, { key: 'private-tree', ok: false, line: 'hq-private: no checkout' }]);
 });
 
-test('it marks the atc mcp check unknown when the probe read fails', async () => {
+test('it fails the atc mcp check with the read error when the probe read fails', async () => {
   const result = await runChecks({ ...probe(world()), atcMcp: () => Promise.resolve('no atc on PATH'), sessionName: () => null }, HEALTH_DEFAULTS, {}, new Date(NOON_SYDNEY));
 
   expect(result.checks.find((check) => check.key === 'atc-mcp')).toStrictEqual({ key: 'atc-mcp', ok: false, line: "can't read the atc mcp processes: no atc on PATH" });
+});
+
+test('it marks the atc mcp check unknown when the probe read fails', async () => {
+  const result = await runChecks({ ...probe(world()), atcMcp: () => Promise.resolve("pid 55: can't read /proc/55/exe: EACCES"), sessionName: () => null }, HEALTH_DEFAULTS, {}, new Date(NOON_SYDNEY));
+
   expect(result.unknown).toContain('atc-mcp');
 });
 
