@@ -1,5 +1,6 @@
 import type { Database } from 'bun:sqlite';
 import { z } from 'zod';
+import { ISSUE } from '../followups/issue.ts';
 import { FIELDS } from './fields.ts';
 import { toIssue } from './to-issue.ts';
 import type { LinearCall } from './types.ts';
@@ -17,11 +18,14 @@ const NODE = z.object({ identifier: z.string(), title: z.string(), completedAt: 
 const ANSWER = z.object({ issues: z.object({ nodes: z.array(NODE) }) });
 
 // Re-reads the issue of each open run, 50 to a query, so the sweep sees an issue Linear closed.
-// An issue Linear doesn't return keeps its last stored row.
+// An issue Linear doesn't return keeps its last stored row. A run key that is not a Linear
+// identifier, such as GEO-1-image, is never sent: Linear rejects the whole query for it.
 export async function syncRunIssues(db: Database, call: LinearCall): Promise<number> {
   const issues = OPEN_RUNS.parse(
     db.query(`SELECT issue FROM runs WHERE state NOT IN ('done', 'dropped') ORDER BY issue`).all(),
-  ).map((row) => row.issue);
+  )
+    .map((row) => row.issue)
+    .filter((issue) => ISSUE.test(issue));
   let read = 0;
   for (let start = 0; start < issues.length; start += 50) {
     const batch = issues.slice(start, start + 50);
