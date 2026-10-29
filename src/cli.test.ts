@@ -106,88 +106,6 @@ test('hq run place moves an imp run to local through the spawned CLI, and hq lan
   expect(JSON.parse(lanes.stdout)).toMatchObject({ plan: { pool: { impRunning: 0, localRunning: 1 } } });
 });
 
-test('it refuses hq run add --design agent above the agent count', async () => {
-  const fresh = freshDb();
-  onTestFinished(fresh.cleanup);
-  mkdirSync(`${fresh.dir}/bin`);
-  writeFileSync(`${fresh.dir}/bin/systemctl`, '#!/bin/sh\nexit 3\n');
-  chmodSync(`${fresh.dir}/bin/systemctl`, 0o755);
-  mkdirSync(`${fresh.dir}/skill/scripts`, { recursive: true });
-  writeFileSync(`${fresh.dir}/skill/scripts/capacity.sh`, `echo '${JSON.stringify({ imp: { freeMib: 0, room: false } })}'\n`);
-  writeFileSync(`${fresh.dir}/skill/pacing.json`, JSON.stringify({ slots: { imp: 2, local: 2 }, designSlots: 1, agentDesignSlots: 1 }));
-  const hq = async (...args: string[]): Promise<{ code: number; stdout: string; stderr: string }> => {
-    const child = Bun.spawn(['bun', join(import.meta.dir, 'cli.ts'), ...args, '--json'], {
-      stdout: 'pipe',
-      stderr: 'pipe',
-      env: { ...process.env, HOME: fresh.dir, HQ_DB: fresh.path, HQ_PROJECTS: `${fresh.dir}/projects`, HQ_CAPACITY: `${fresh.dir}/skill/scripts/capacity.sh`, HQ_NOTIFY: 'off', HQ_NOW: NOON_SYDNEY, HQ_AS: 'z-delivery', PATH: `${fresh.dir}/bin:${process.env['PATH']}` },
-    });
-    const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()]);
-    return { code, stdout, stderr };
-  };
-  at(NOON_SYDNEY);
-  addRun(fresh.db, { issue: 'GEO-9951', title: 'Design the kettle spout', place: 'local', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: null, design: 'agent', actor: 'z-delivery' });
-
-  const over = await hq('run', 'add', 'GEO-9952', '--title', 'Design the kettle lid', '--design', 'agent');
-
-  expect(over.code).toBe(1);
-  expect(over.stderr + over.stdout).toInclude('GEO-9952: all 1 agent design passes are open (GEO-9951)');
-});
-
-test('it adds a with-geoff pass above the count through hq run add --asked', async () => {
-  const fresh = freshDb();
-  onTestFinished(fresh.cleanup);
-  mkdirSync(`${fresh.dir}/bin`);
-  writeFileSync(`${fresh.dir}/bin/systemctl`, '#!/bin/sh\nexit 3\n');
-  chmodSync(`${fresh.dir}/bin/systemctl`, 0o755);
-  mkdirSync(`${fresh.dir}/skill/scripts`, { recursive: true });
-  writeFileSync(`${fresh.dir}/skill/scripts/capacity.sh`, `echo '${JSON.stringify({ imp: { freeMib: 0, room: false } })}'\n`);
-  writeFileSync(`${fresh.dir}/skill/pacing.json`, JSON.stringify({ slots: { imp: 2, local: 2 }, designSlots: 1, agentDesignSlots: 1 }));
-  const hq = async (...args: string[]): Promise<{ code: number; stdout: string; stderr: string }> => {
-    const child = Bun.spawn(['bun', join(import.meta.dir, 'cli.ts'), ...args, '--json'], {
-      stdout: 'pipe',
-      stderr: 'pipe',
-      env: { ...process.env, HOME: fresh.dir, HQ_DB: fresh.path, HQ_PROJECTS: `${fresh.dir}/projects`, HQ_CAPACITY: `${fresh.dir}/skill/scripts/capacity.sh`, HQ_NOTIFY: 'off', HQ_NOW: NOON_SYDNEY, HQ_AS: 'z-delivery', PATH: `${fresh.dir}/bin:${process.env['PATH']}` },
-    });
-    const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()]);
-    return { code, stdout, stderr };
-  };
-  at(NOON_SYDNEY);
-  addRun(fresh.db, { issue: 'GEO-9953', title: 'Design the whistle', place: 'local', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: null, design: 'with-geoff', actor: 'z-delivery' });
-
-  const asked = await hq('run', 'add', 'GEO-9954', '--title', 'Design the handle', '--design', 'with-geoff', '--asked', 'chat 29 Oct');
-
-  expect(asked.code).toBe(0);
-  expect(JSON.parse(asked.stdout)).toMatchObject({ run: { issue: 'GEO-9954', design_lane: 'with-geoff' } });
-});
-
-test('it shows the design lanes apart from the delivery pool in hq lanes --json', async () => {
-  const fresh = freshDb();
-  onTestFinished(fresh.cleanup);
-  mkdirSync(`${fresh.dir}/bin`);
-  writeFileSync(`${fresh.dir}/bin/systemctl`, '#!/bin/sh\nexit 3\n');
-  chmodSync(`${fresh.dir}/bin/systemctl`, 0o755);
-  mkdirSync(`${fresh.dir}/skill/scripts`, { recursive: true });
-  writeFileSync(`${fresh.dir}/skill/scripts/capacity.sh`, `echo '${JSON.stringify({ imp: { freeMib: 0, room: false } })}'\n`);
-  writeFileSync(`${fresh.dir}/skill/pacing.json`, JSON.stringify({ slots: { imp: 2, local: 2 }, designSlots: 1, agentDesignSlots: 1 }));
-  const hq = async (...args: string[]): Promise<{ code: number; stdout: string; stderr: string }> => {
-    const child = Bun.spawn(['bun', join(import.meta.dir, 'cli.ts'), ...args, '--json'], {
-      stdout: 'pipe',
-      stderr: 'pipe',
-      env: { ...process.env, HOME: fresh.dir, HQ_DB: fresh.path, HQ_PROJECTS: `${fresh.dir}/projects`, HQ_CAPACITY: `${fresh.dir}/skill/scripts/capacity.sh`, HQ_NOTIFY: 'off', HQ_NOW: NOON_SYDNEY, HQ_AS: 'z-delivery', PATH: `${fresh.dir}/bin:${process.env['PATH']}` },
-    });
-    const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()]);
-    return { code, stdout, stderr };
-  };
-  at(NOON_SYDNEY);
-  addRun(fresh.db, { issue: 'GEO-9951', title: 'Design the kettle spout', place: 'local', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: null, design: 'agent', actor: 'z-delivery' });
-  addRun(fresh.db, { issue: 'GEO-9953', title: 'Design the whistle', place: 'local', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: null, design: 'with-geoff', actor: 'z-delivery' });
-  addRun(fresh.db, { issue: 'GEO-9954', title: 'Design the handle', place: 'local', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: null, design: 'with-geoff', asked: 'chat 29 Oct', actor: 'z-delivery' });
-
-  const lanes = await hq('lanes');
-
-  expect(JSON.parse(lanes.stdout)).toMatchObject({ plan: { pool: { impRunning: 0, localRunning: 0 }, design: { agent: { open: 1, slots: 1 }, withGeoff: { open: 2, slots: 1, asked: ['chat 29 Oct'] } } } });
-});
-
 test('it prints in hq lanes that the design counts are unreadable, with the defaults it uses', async () => {
   const fresh = freshDb();
   const log = console.log;
@@ -249,8 +167,10 @@ test('it marks the design pass PRs in the hq run show text', async () => {
   expect(printed.join('\n')).toInclude('| kettle#71 open (design pass) |');
 });
 
-test('it keeps the design pass in hq run show after the build run starts', async () => {
+test('it refuses hq run add --design agent above the agent count', async () => {
   const fresh = freshDb();
+  const log = console.log;
+  const printed: string[] = [];
   onTestFinished(fresh.cleanup);
   mkdirSync(`${fresh.dir}/bin`);
   writeFileSync(`${fresh.dir}/bin/systemctl`, '#!/bin/sh\nexit 3\n');
@@ -258,23 +178,105 @@ test('it keeps the design pass in hq run show after the build run starts', async
   mkdirSync(`${fresh.dir}/skill/scripts`, { recursive: true });
   writeFileSync(`${fresh.dir}/skill/scripts/capacity.sh`, `echo '${JSON.stringify({ imp: { freeMib: 0, room: false } })}'\n`);
   writeFileSync(`${fresh.dir}/skill/pacing.json`, JSON.stringify({ slots: { imp: 2, local: 2 }, designSlots: 1, agentDesignSlots: 1 }));
-  const hq = async (...args: string[]): Promise<{ code: number; stdout: string; stderr: string }> => {
-    const child = Bun.spawn(['bun', join(import.meta.dir, 'cli.ts'), ...args, '--json'], {
-      stdout: 'pipe',
-      stderr: 'pipe',
-      env: { ...process.env, HOME: fresh.dir, HQ_DB: fresh.path, HQ_PROJECTS: `${fresh.dir}/projects`, HQ_CAPACITY: `${fresh.dir}/skill/scripts/capacity.sh`, HQ_NOTIFY: 'off', HQ_NOW: NOON_SYDNEY, HQ_AS: 'z-delivery', PATH: `${fresh.dir}/bin:${process.env['PATH']}` },
-    });
-    const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()]);
-    return { code, stdout, stderr };
-  };
+  onTestFinished(overrideEnv('HQ_CAPACITY', `${fresh.dir}/skill/scripts/capacity.sh`));
+  onTestFinished(overrideEnv('HQ_NOW', NOON_SYDNEY));
+  onTestFinished(overrideEnv('HQ_NOTIFY', 'off'));
+  onTestFinished(overrideEnv('HQ_AS', 'z-delivery'));
+  onTestFinished(overrideEnv('PATH', `${fresh.dir}/bin:${process.env['PATH']}`));
+  console.log = (line: string) => void printed.push(line);
+  onTestFinished(() => (console.log = log));
+  at(NOON_SYDNEY);
+  addRun(fresh.db, { issue: 'GEO-9951', title: 'Design the kettle spout', place: 'local', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: null, design: 'agent', actor: 'z-delivery' });
+
+  const code = await main(['run', 'add', 'GEO-9952', '--title', 'Design the kettle lid', '--design', 'agent', '--json']);
+
+  expect(code).toBe(1);
+  expect(JSON.parse(printed.join(''))).toMatchObject({ ok: false, error: { code: 'design_full', message: 'GEO-9952: all 1 agent design passes are open (GEO-9951); close one with hq run done first' } });
+});
+
+test('it adds a with-geoff pass above the count through hq run add --asked', async () => {
+  const fresh = freshDb();
+  const log = console.log;
+  const printed: string[] = [];
+  onTestFinished(fresh.cleanup);
+  mkdirSync(`${fresh.dir}/bin`);
+  writeFileSync(`${fresh.dir}/bin/systemctl`, '#!/bin/sh\nexit 3\n');
+  chmodSync(`${fresh.dir}/bin/systemctl`, 0o755);
+  mkdirSync(`${fresh.dir}/skill/scripts`, { recursive: true });
+  writeFileSync(`${fresh.dir}/skill/scripts/capacity.sh`, `echo '${JSON.stringify({ imp: { freeMib: 0, room: false } })}'\n`);
+  writeFileSync(`${fresh.dir}/skill/pacing.json`, JSON.stringify({ slots: { imp: 2, local: 2 }, designSlots: 1, agentDesignSlots: 1 }));
+  onTestFinished(overrideEnv('HQ_CAPACITY', `${fresh.dir}/skill/scripts/capacity.sh`));
+  onTestFinished(overrideEnv('HQ_NOW', NOON_SYDNEY));
+  onTestFinished(overrideEnv('HQ_NOTIFY', 'off'));
+  onTestFinished(overrideEnv('HQ_AS', 'z-delivery'));
+  onTestFinished(overrideEnv('PATH', `${fresh.dir}/bin:${process.env['PATH']}`));
+  console.log = (line: string) => void printed.push(line);
+  onTestFinished(() => (console.log = log));
+  at(NOON_SYDNEY);
+  addRun(fresh.db, { issue: 'GEO-9953', title: 'Design the whistle', place: 'local', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: null, design: 'with-geoff', actor: 'z-delivery' });
+
+  const code = await main(['run', 'add', 'GEO-9954', '--title', 'Design the handle', '--design', 'with-geoff', '--asked', 'chat 29 Oct', '--json']);
+
+  expect(code).toBe(0);
+  expect(JSON.parse(printed.join(''))).toMatchObject({ run: { issue: 'GEO-9954', design_lane: 'with-geoff' } });
+});
+
+test('it shows the design lanes apart from the delivery pool in hq lanes --json', async () => {
+  const fresh = freshDb();
+  const log = console.log;
+  const printed: string[] = [];
+  onTestFinished(fresh.cleanup);
+  mkdirSync(`${fresh.dir}/bin`);
+  writeFileSync(`${fresh.dir}/bin/systemctl`, '#!/bin/sh\nexit 3\n');
+  chmodSync(`${fresh.dir}/bin/systemctl`, 0o755);
+  mkdirSync(`${fresh.dir}/skill/scripts`, { recursive: true });
+  writeFileSync(`${fresh.dir}/skill/scripts/capacity.sh`, `echo '${JSON.stringify({ imp: { freeMib: 0, room: false } })}'\n`);
+  writeFileSync(`${fresh.dir}/skill/pacing.json`, JSON.stringify({ slots: { imp: 2, local: 2 }, designSlots: 1, agentDesignSlots: 1 }));
+  onTestFinished(overrideEnv('HQ_CAPACITY', `${fresh.dir}/skill/scripts/capacity.sh`));
+  onTestFinished(overrideEnv('HQ_NOW', NOON_SYDNEY));
+  onTestFinished(overrideEnv('HQ_NOTIFY', 'off'));
+  onTestFinished(overrideEnv('HQ_AS', 'z-delivery'));
+  onTestFinished(overrideEnv('PATH', `${fresh.dir}/bin:${process.env['PATH']}`));
+  console.log = (line: string) => void printed.push(line);
+  onTestFinished(() => (console.log = log));
+  at(NOON_SYDNEY);
+  addRun(fresh.db, { issue: 'GEO-9951', title: 'Design the kettle spout', place: 'local', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: null, design: 'agent', actor: 'z-delivery' });
+  addRun(fresh.db, { issue: 'GEO-9953', title: 'Design the whistle', place: 'local', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: null, design: 'with-geoff', actor: 'z-delivery' });
+  addRun(fresh.db, { issue: 'GEO-9954', title: 'Design the handle', place: 'local', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: null, design: 'with-geoff', asked: 'chat 29 Oct', actor: 'z-delivery' });
+
+  const code = await main(['lanes', '--json']);
+
+  expect(code).toBe(0);
+  expect(JSON.parse(printed.join(''))).toMatchObject({ plan: { pool: { impRunning: 0, localRunning: 0 }, design: { agent: { open: 1, slots: 1 }, withGeoff: { open: 2, slots: 1, asked: ['chat 29 Oct'] } } } });
+});
+
+test('it keeps the design pass in hq run show after the build run starts', async () => {
+  const fresh = freshDb();
+  const log = console.log;
+  const printed: string[] = [];
+  onTestFinished(fresh.cleanup);
+  mkdirSync(`${fresh.dir}/bin`);
+  writeFileSync(`${fresh.dir}/bin/systemctl`, '#!/bin/sh\nexit 3\n');
+  chmodSync(`${fresh.dir}/bin/systemctl`, 0o755);
+  mkdirSync(`${fresh.dir}/skill/scripts`, { recursive: true });
+  writeFileSync(`${fresh.dir}/skill/scripts/capacity.sh`, `echo '${JSON.stringify({ imp: { freeMib: 0, room: false } })}'\n`);
+  writeFileSync(`${fresh.dir}/skill/pacing.json`, JSON.stringify({ slots: { imp: 2, local: 2 }, designSlots: 1, agentDesignSlots: 1 }));
+  onTestFinished(overrideEnv('HQ_CAPACITY', `${fresh.dir}/skill/scripts/capacity.sh`));
+  onTestFinished(overrideEnv('HQ_NOW', NOON_SYDNEY));
+  onTestFinished(overrideEnv('HQ_NOTIFY', 'off'));
+  onTestFinished(overrideEnv('HQ_AS', 'z-delivery'));
+  onTestFinished(overrideEnv('PATH', `${fresh.dir}/bin:${process.env['PATH']}`));
+  console.log = (line: string) => void printed.push(line);
+  onTestFinished(() => (console.log = log));
   at(NOON_SYDNEY);
   addRun(fresh.db, { issue: 'GEO-9951', title: 'Design the kettle spout', place: 'local', session: 'a0000051-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: null, design: 'agent', actor: 'z-delivery' });
   setState(fresh.db, 'GEO-9951', 'dropped', { note: 'design settled elsewhere' }, 'z-delivery');
   addRun(fresh.db, { issue: 'GEO-9951', title: 'Build the kettle spout', place: 'local', session: 'a0000052-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: null, actor: 'z-delivery' });
 
-  const shown = await hq('run', 'show', 'GEO-9951');
+  const code = await main(['run', 'show', 'GEO-9951', '--json']);
 
-  expect(JSON.parse(shown.stdout)).toMatchObject({
+  expect(code).toBe(0);
+  expect(JSON.parse(printed.join(''))).toMatchObject({
     run: { issue: 'GEO-9951', design_lane: null, state: 'working', sessions: [{ session_id: 'a0000052-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }, { session_id: 'a0000051-aaaa-4aaa-8aaa-aaaaaaaaaaaa', active: 0 }] },
     designPass: [{ designLane: 'agent', designSessions: ['a0000051-aaaa-4aaa-8aaa-aaaaaaaaaaaa'] }],
   });
@@ -282,6 +284,8 @@ test('it keeps the design pass in hq run show after the build run starts', async
 
 test('it refuses hq run add --design while pacing.json gets a design count wrong', async () => {
   const fresh = freshDb();
+  const log = console.log;
+  const printed: string[] = [];
   onTestFinished(fresh.cleanup);
   mkdirSync(`${fresh.dir}/bin`);
   writeFileSync(`${fresh.dir}/bin/systemctl`, '#!/bin/sh\nexit 3\n');
@@ -289,20 +293,19 @@ test('it refuses hq run add --design while pacing.json gets a design count wrong
   mkdirSync(`${fresh.dir}/skill/scripts`, { recursive: true });
   writeFileSync(`${fresh.dir}/skill/scripts/capacity.sh`, `echo '${JSON.stringify({ imp: { freeMib: 0, room: false } })}'\n`);
   writeFileSync(`${fresh.dir}/skill/pacing.json`, JSON.stringify({ slots: { imp: 2, local: 2 }, agentDesignSlots: 'two' }));
-  const hq = async (...args: string[]): Promise<{ code: number; stdout: string; stderr: string }> => {
-    const child = Bun.spawn(['bun', join(import.meta.dir, 'cli.ts'), ...args, '--json'], {
-      stdout: 'pipe',
-      stderr: 'pipe',
-      env: { ...process.env, HOME: fresh.dir, HQ_DB: fresh.path, HQ_PROJECTS: `${fresh.dir}/projects`, HQ_CAPACITY: `${fresh.dir}/skill/scripts/capacity.sh`, HQ_NOTIFY: 'off', HQ_NOW: NOON_SYDNEY, HQ_AS: 'z-delivery', PATH: `${fresh.dir}/bin:${process.env['PATH']}` },
-    });
-    const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()]);
-    return { code, stdout, stderr };
-  };
+  onTestFinished(overrideEnv('HQ_CAPACITY', `${fresh.dir}/skill/scripts/capacity.sh`));
+  onTestFinished(overrideEnv('HQ_NOW', NOON_SYDNEY));
+  onTestFinished(overrideEnv('HQ_NOTIFY', 'off'));
+  onTestFinished(overrideEnv('HQ_AS', 'z-delivery'));
+  onTestFinished(overrideEnv('PATH', `${fresh.dir}/bin:${process.env['PATH']}`));
+  console.log = (line: string) => void printed.push(line);
+  onTestFinished(() => (console.log = log));
+  at(NOON_SYDNEY);
 
-  const refused = await hq('run', 'add', 'GEO-9955', '--title', 'Design the kettle spout', '--design', 'agent');
+  const code = await main(['run', 'add', 'GEO-9955', '--title', 'Design the kettle spout', '--design', 'agent', '--json']);
 
-  expect(refused.code).toBe(1);
-  expect(refused.stderr + refused.stdout).toInclude('pacing.json designSlots and agentDesignSlots: give each a whole number from 0 to 100; hq adds no design pass until pacing.json gives its counts');
+  expect(code).toBe(1);
+  expect(JSON.parse(printed.join(''))).toMatchObject({ ok: false, error: { code: 'no_lanes', message: 'pacing.json: pacing.json designSlots and agentDesignSlots: give each a whole number from 0 to 100; hq adds no design pass until pacing.json gives its counts' } });
 });
 
 test('hq unblock add files a watch with a deadline, and hq unblock list shows it overdue once the deadline passes', async () => {
