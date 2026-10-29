@@ -1,23 +1,11 @@
 import type { Database } from 'bun:sqlite';
-import { DEFAULT_DESIGN_SLOTS } from '../lanes/default-design-slots.ts';
-import { readDesignRuns } from '../lanes/read-design-runs.ts';
-import type { DesignSlots } from '../lanes/types.ts';
 import { HqError } from '../errors.ts';
 import { logEvent } from '../log-event.ts';
-import { pickRunAdmission } from './pick-run-admission.ts';
-import { readRunAdmissionFacts } from './read-run-admission-facts.ts';
-import { CLOSED_RUN_STATES as CLOSED } from '../transitions/closed-run-states.ts';
-import { getRun } from './get-run.ts';
+import { pickReopenAdmission } from './pick-reopen-admission.ts';
+import { readReopenAdmissionFacts } from './read-reopen-admission-facts.ts';
+import type { ReopenDesign } from './read-reopen-admission-facts.ts';
 import { setState } from './set-state.ts';
 import type { RunView } from './types.ts';
-
-// The design lane counts a reopened design pass is held to, and where the owner asked for a with-geoff
-// pass above its count; slots left out are the defaults.
-export interface ReopenDesign {
-  slots?: DesignSlots;
-  error: string | null;
-  asked: string | null;
-}
 
 export interface ReopenRunInput {
   issue: string;
@@ -44,20 +32,9 @@ export function reopenRun(db: Database, input: ReopenRunInput): RunView {
 // Refuses the reopen of a closed design pass above its lane count, and --asked on any other run; gives
 // the pass's design lane, or null for a delivery run or a run that is not closed.
 export function checkDesignReopen(db: Database, issue: string, design: ReopenDesign): string | null {
-  const closed = getRun(db, issue);
-  if (closed === null || !CLOSED.includes(closed.state)) {
-    return null;
-  }
-  const lane = readDesignRuns(db).find((run) => run.issue === issue)?.lane ?? null;
-  if (lane === null && design.asked !== null) {
-    throw new HqError('bad_args', `--asked goes with reopening a with-geoff design pass, and ${issue} is a delivery run`);
-  }
-  if (lane === null) {
-    return null;
-  }
-  const admission = pickRunAdmission(readRunAdmissionFacts(db, { issue, design: lane, asked: design.asked, designSlots: design.slots ?? DEFAULT_DESIGN_SLOTS, designError: design.error }, null));
+  const admission = pickReopenAdmission(readReopenAdmissionFacts(db, issue, design));
   if (admission.kind === 'refused') {
     throw new HqError(admission.code, admission.message, admission.data);
   }
-  return lane;
+  return admission.designLane;
 }
