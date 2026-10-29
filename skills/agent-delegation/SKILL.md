@@ -130,11 +130,11 @@ you pin one, tell the owner its name. Re-check the pin when the session's state 
 
 ## Ending a session
 
-- **A delivery run:** once every PR of the run is merged or closed, with at least one merged, the
-  sweep forgets the run's sessions and their children. It checks an imp for unpushed work before it
-  destroys it, and names each session it keeps in `hq news`. Leave the session running until then,
-  so the agent can answer review findings. `hq run done` ends the run once its live check passes or
-  no check is owed, and frees the slot.
+- **A delivery run:** once the run is in `merged`, `live-check` or `deploy-held`, and every PR of it
+  is merged or closed with at least one merged, the sweep forgets the run's sessions and their
+  children. It checks an imp for unpushed work before it destroys it, and names each session it
+  keeps in `hq news`. Leave the session running until then, so the agent can answer review findings.
+  `hq run done` ends the run once its live check passes or no check is owed, and frees the slot.
 - **A relaunch:** forget the old session with `atc_session_forget` and `stop: true` once the new
   one has picked up its brief. Use `atc_session_stop` instead when it holds unpushed work.
 - **A design or audit session:** keep it pinned and running until the owner has worked through its

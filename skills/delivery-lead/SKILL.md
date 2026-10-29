@@ -132,9 +132,10 @@ Message him directly only to tell him something, such as a hold, with a push not
 
 ## What is not yours
 
-- **Wrap-up.** Once every PR of a run is merged or closed, with at least one merged, the sweep
-  forgets the run's sessions, after it checks each imp for unpushed work. It names each session it
-  keeps in `hq news`. `hq run done` frees the slot after the live check.
+- **Wrap-up.** Once a run is in `merged`, `live-check` or `deploy-held`, and every PR of it is
+  merged or closed with at least one merged, the sweep forgets the run's sessions, after it checks
+  each imp for unpushed work. It names each session it keeps in `hq news`. `hq run done` frees the
+  slot after the live check.
 - **Releases, deploys and live checks.** `z-release` takes every merged PR to live.
 - **Merges.** `z-review` merges every PR.
 - **hq issues.** `z-q` builds hq.
