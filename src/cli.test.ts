@@ -167,6 +167,25 @@ test('it marks the design pass PRs in the hq run show text', async () => {
   expect(printed.join('\n')).toInclude('| kettle#71 open (design pass) |');
 });
 
+test('it prints the move from the design pass and its sessions in the hq run show text', async () => {
+  const fresh = freshDb();
+  const log = console.log;
+  const printed: string[] = [];
+  onTestFinished(fresh.cleanup);
+  onTestFinished(overrideEnv('HQ_NOW', NOON_SYDNEY));
+  console.log = (line: string) => void printed.push(line);
+  onTestFinished(() => (console.log = log));
+  at(NOON_SYDNEY);
+  addRun(fresh.db, { issue: 'GEO-9955', title: 'Design the kettle lid', place: 'imp', session: 'a0000055-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', design: 'agent', actor: 'z-delivery' });
+  setState(fresh.db, 'GEO-9955', 'done', { note: 'design settled' }, 'z-delivery');
+  addRun(fresh.db, { issue: 'GEO-9955', title: 'Build the kettle lid', place: 'imp', session: null, next: 'Building.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
+
+  const code = await main(['run', 'show', 'GEO-9955']);
+
+  expect(code).toBe(0);
+  expect(printed.join('\n')).toInclude(`  design pass (agent) became the build run ${NOON_SYDNEY}; its sessions: a0000055-aaaa-4aaa-8aaa-aaaaaaaaaaaa`);
+});
+
 test('it refuses hq run reopen on an agent pass while the agent lane is full', async () => {
   const fresh = freshDb();
   const log = console.log;
