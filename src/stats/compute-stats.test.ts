@@ -84,3 +84,21 @@ test('it times no merge to done from a design pass PR merged in the second its b
 
   expect(stats.live.mergeToDone.n).toBe(0);
 });
+
+test('it times no merge to done from a design pass PR merged after its build run started', () => {
+  const ctx = setupTest();
+  at('2026-10-16T01:00:00Z');
+  addRun(ctx.db, { issue: 'GEO-9866', title: 'Design the kettle handle', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', design: 'agent', actor: 'z-delivery' });
+  addPr(ctx.db, 'GEO-9866', 'kettle#82', 'z-delivery');
+  at('2026-10-16T02:00:00Z');
+  setState(ctx.db, 'GEO-9866', 'done', { note: 'design settled' }, 'z-delivery');
+  addRun(ctx.db, { issue: 'GEO-9866', title: 'Build the kettle handle', place: 'imp', session: null, next: 'Building.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
+  at('2026-10-16T02:30:00Z');
+  closePr(ctx.db, 'kettle#82', { to: 'merged', actor: 'z-review' });
+  at('2026-10-16T03:00:00Z');
+  setState(ctx.db, 'GEO-9866', 'done', { note: 'built with no PR' }, 'z-delivery');
+
+  const stats = computeStats(ctx.db, { from: '2026-10-16T00:00:00Z', to: '2026-10-16T04:00:00Z', gh: null });
+
+  expect(stats.live.mergeToDone.n).toBe(0);
+});
