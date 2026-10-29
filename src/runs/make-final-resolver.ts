@@ -6,8 +6,6 @@ import { readCommit } from './read-commit.ts';
 import { readPRCommits } from './read-pr-commits.ts';
 import type { CommitsRead, FinalClaim, FinalResolution, FinalResolutions } from './types.ts';
 
-// Settles FINAL claims against GitHub. A PR's commit list is read once and a claim is settled once,
-// however many claims name them; a failed read settles the claim as unresolved, never throws.
 export function makeFinalResolver(run: Runner): (claims: FinalClaim[]) => Promise<FinalResolutions> {
   const lists = new Map<string, Promise<CommitsRead>>();
   const settled = new Map<string, FinalResolution>();

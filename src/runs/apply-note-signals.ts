@@ -10,14 +10,14 @@ import { PR_IN_TEXT } from './pr-in-text.ts';
 import { scheduleFinalReview as markFinal } from './schedule-final-review.ts';
 import { sendFinalRefusal } from './send-final-refusal.ts';
 import { registerRunPR as attachPr } from './register-run-pr.ts';
+import { requirePR } from './require-pr.ts';
+import { prAllows } from '../transitions/pr-allows.ts';
 import type { FinalResolutions } from './types.ts';
 
 interface SignalOptions {
   source: string;
   note?: number | null;
   actor?: string;
-
-  // What GitHub said of each FINAL sha the note gives; a sha it lacks is recorded as given.
   resolutions?: FinalResolutions;
 }
 
@@ -97,10 +97,12 @@ function applyFinalMark(db: Database, input: FinalMarkInput): string | null {
   return markResolved(db, { ...input, ref }) ? ref : null;
 }
 
-// A refused sha leaves a notice for the orchestrator and no mark.
 function markResolved(db: Database, input: FinalMarkInput): boolean {
   const resolution = input.resolutions.get(buildFinalKey(input.ref, input.sha)) ?? null;
   if (resolution?.kind === 'refused') {
+    if (!prAllows('final', requirePR(db, input.ref).state)) {
+      return false;
+    }
     sendFinalRefusal(db, { issue: input.issue, ref: input.ref, given: input.sha, refusal: resolution, actor: input.actor });
     return false;
   }

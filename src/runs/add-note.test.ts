@@ -5,6 +5,7 @@ import { NOON_SYDNEY, at, freshDb } from '../../test/helpers.ts';
 import { addNote } from './add-note.ts';
 import { addPr } from './add-pr.ts';
 import { addRun } from './add-run.ts';
+import { closePr } from './close-pr.ts';
 import { listRuns } from './list-runs.ts';
 import { makeFinalResolver } from './make-final-resolver.ts';
 import { resolveNoteFinals } from './resolve-note-finals.ts';
@@ -191,4 +192,49 @@ test('it tells the orchestrator when a FINAL phrase names a sha that is no commi
       text: 'GEO-9731: the FINAL names 4423866e, which is no commit of zgeoff/kettle#714; its head is 44238662 - send the FINAL again at that sha',
     },
   ]);
+});
+
+test('it asks GitHub nothing about a FINAL phrase that names a PR of another run', async () => {
+  const ctx = setupTest();
+  const calls: string[] = [];
+  const resolveFinal = makeFinalResolver(buildStubFinalGH({ commits: [`44238662${buildMockSha(2).slice(8)}`] }, calls));
+  addRun(ctx.db, {
+    issue: 'GEO-9731',
+    title: 'Invented kettle work',
+    place: 'local',
+    session: null,
+    next: 'Agent working.',
+    gate: null,
+    geoffChat: false,
+    actor: 'z-delivery',
+  });
+  addPr(ctx.db, 'GEO-9731', 'kettle#714', 'z-delivery');
+
+  await resolveNoteFinals(ctx.db, resolveFinal, 'GEO-9731', 'toaster#88 is final at 44238662');
+
+  expect(calls).toStrictEqual([]);
+});
+
+test('it tells the orchestrator nothing of a FINAL that names no commit of a merged PR', async () => {
+  const ctx = setupTest();
+  const head = `44238662${buildMockSha(2).slice(8)}`;
+  const resolveFinal = makeFinalResolver(buildStubFinalGH({ commits: [head] }, []));
+  addRun(ctx.db, {
+    issue: 'GEO-9731',
+    title: 'Invented kettle work',
+    place: 'local',
+    session: null,
+    next: 'Agent working.',
+    gate: null,
+    geoffChat: false,
+    actor: 'z-delivery',
+  });
+  addPr(ctx.db, 'GEO-9731', 'kettle#714', 'z-delivery');
+  closePr(ctx.db, 'kettle#714', { to: 'merged', actor: 'z-review' });
+  const text = 'FINAL kettle#714 4423866e all green';
+  const resolutions = await resolveNoteFinals(ctx.db, resolveFinal, 'GEO-9731', text);
+
+  addNote(ctx.db, 'GEO-9731', text, { label: null, actor: 'z-delivery', resolutions });
+
+  expect(ctx.notices()).toStrictEqual([]);
 });

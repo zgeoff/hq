@@ -13,7 +13,6 @@ interface FinalRefusal {
   actor: string;
 }
 
-// Queue the refusal of a note's FINAL for the orchestrator, inside the caller's transaction.
 export function sendFinalRefusal(db: Database, input: FinalRefusal): void {
   const seq = logEvent(db, 'run', input.issue, 'final-refused', input.actor, null, null, { ref: input.ref, given: input.given, ...input.refusal });
   enqueue(db, seq, orchestratorName(), `${input.issue}: ${formatFinalRefusal(input.ref, input.given, input.refusal)}`);

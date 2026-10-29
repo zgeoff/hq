@@ -27,6 +27,7 @@ import { sweep } from '../src/runs/sweep.ts';
 import { unfinalPr } from '../src/runs/unfinal-pr.ts';
 import { unmergePr } from '../src/runs/unmerge-pr.ts';
 import { watchlist } from '../src/runs/watchlist.ts';
+import { buildStubFinalGH } from './build-stub-final-gh.ts';
 import { buildStubGitHubFactsRunner } from './build-stub-github-facts-runner.ts';
 import { type FakeAtc, NOON_SYDNEY, at, fakeAtc, freshDb } from './helpers.ts';
 
@@ -128,7 +129,7 @@ describe('note signals', () => {
     const ev = db.query(`SELECT subject_id, action, actor, from_state, to_state, data FROM events WHERE action = 'final'`).all() as { data: string }[];
     expect(ev).toHaveLength(1);
     expect(ev[0]).toMatchObject({ subject_id: 'GEO-9001', actor: 'z-delivery', from_state: null, to_state: 'abc1234' });
-    expect(JSON.parse(ev[0]!.data)).toEqual({ ref: 'widgets#12', sha: 'abc1234', source: 'marker:note:z-delivery', note: note.id });
+    expect(ev.map((event) => JSON.parse(event.data))).toStrictEqual([{ ref: 'widgets#12', sha: 'abc1234', source: 'marker:note:z-delivery', note: note.id, given: 'abc1234', resolved: false, reason: 'not resolved in this pass' }]);
     finalPr(db, 'widgets#12', { sha: 'def5678', actor: 'z-q' });
     const last = db.query(`SELECT from_state, to_state, data FROM events WHERE action = 'final' ORDER BY seq DESC LIMIT 1`).get() as { data: string };
     expect(last).toMatchObject({ from_state: 'abc1234', to_state: 'def5678' });
@@ -167,13 +168,15 @@ describe('reading the event feed', () => {
     add();
     const c = await AtcClient.open();
     try {
-      expect((await ingestNotes(db, c)).bootstrapped).toBe(true);
+      const boot = await ingestNotes(db, c, { run: buildStubFinalGH({ commits: 'fault' }, []) });
+      expect(boot.bootstrapped).toBe(true);
       atc.feed.push({ at: base + 1000, session: S1, name: 'kettle', kind: 'note', detail: 'FINAL widgets#12 abc1234', label: 'progress' });
       atc.feed.push({ at: base + 2000, session: 'cccccccc-0000', name: 'stranger', kind: 'note', detail: 'not ours', label: 'progress' });
       atc.feed.push({ at: base + 3000, session: S1, name: 'kettle', kind: 'turn-done', detail: null });
-      const r = await ingestNotes(db, c);
-      expect(r).toMatchObject({ read: 3, notes: 1, unmatched: 1, finals: ['widgets#12'] });
-      expect((await ingestNotes(db, c)).notes).toBe(0);
+      const ingested = await ingestNotes(db, c, { run: buildStubFinalGH({ commits: 'fault' }, []) });
+      expect(ingested).toMatchObject({ read: 3, notes: 1, unmatched: 1, finals: ['widgets#12'] });
+      const again = await ingestNotes(db, c, { run: buildStubFinalGH({ commits: 'fault' }, []) });
+      expect(again.notes).toBe(0);
     } finally {
       c.close();
     }
@@ -227,7 +230,8 @@ describe('reading the event feed', () => {
     db.query(`INSERT INTO meta (key, value) VALUES ('atc_events_cursor', 'not-a-cursor')`).run();
     const c = await AtcClient.open();
     try {
-      expect((await ingestNotes(db, c)).reset).toBe(true);
+      const resynced = await ingestNotes(db, c, { run: buildStubFinalGH({ commits: 'fault' }, []) });
+      expect(resynced.reset).toBe(true);
     } finally {
       c.close();
     }
@@ -241,9 +245,12 @@ describe('reading the event feed', () => {
     db.query(`INSERT INTO meta (key, value) VALUES ('atc_events_cursor', ?)`).run(past);
     const c = await AtcClient.open();
     try {
-      expect((await ingestNotes(db, c)).reset).toBe(false);
-      expect((await ingestNotes(db, c)).reset).toBe(false);
-      expect((await ingestNotes(db, c)).reset).toBe(true);
+      const first = await ingestNotes(db, c, { run: buildStubFinalGH({ commits: 'fault' }, []) });
+      expect(first.reset).toBe(false);
+      const second = await ingestNotes(db, c, { run: buildStubFinalGH({ commits: 'fault' }, []) });
+      expect(second.reset).toBe(false);
+      const third = await ingestNotes(db, c, { run: buildStubFinalGH({ commits: 'fault' }, []) });
+      expect(third.reset).toBe(true);
     } finally {
       c.close();
     }
@@ -435,15 +442,21 @@ describe('review fixes', () => {
     add();
     const c = await AtcClient.open();
     try {
-      await ingestNotes(db, c); // bootstrap at the end (empty)
+      // bootstrap at the end (empty)
+      await ingestNotes(db, c, { run: buildStubFinalGH({ commits: 'fault' }, []) });
       atc.feed.push({ at: base + 1000, session: S1, name: 'kettle', kind: 'note', detail: 'first note', label: 'progress' });
-      expect((await ingestNotes(db, c)).notes).toBe(1);
+      const kept = await ingestNotes(db, c, { run: buildStubFinalGH({ commits: 'fault' }, []) });
+      expect(kept.notes).toBe(1);
       // The daemon's log resets: the old note is replayed at index 0, then a new one.
       atc.feed.length = 0;
       atc.feed.push({ at: base + 1000, session: S1, name: 'kettle', kind: 'note', detail: 'first note', label: 'progress' });
       atc.feed.push({ at: base + 5000, session: S1, name: 'kettle', kind: 'note', detail: 'second note', label: 'progress' });
-      for (let i = 0; i < 3; i++) await ingestNotes(db, c); // three empty reads detect the reset
-      await ingestNotes(db, c);
+
+      // three empty reads detect the reset
+      await ingestNotes(db, c, { run: buildStubFinalGH({ commits: 'fault' }, []) });
+      await ingestNotes(db, c, { run: buildStubFinalGH({ commits: 'fault' }, []) });
+      await ingestNotes(db, c, { run: buildStubFinalGH({ commits: 'fault' }, []) });
+      await ingestNotes(db, c, { run: buildStubFinalGH({ commits: 'fault' }, []) });
     } finally {
       c.close();
     }
@@ -488,8 +501,9 @@ describe('re-check fixes', () => {
     db.query(`INSERT INTO meta (key, value) VALUES ('atc_events_cursor', 'not-a-cursor')`).run();
     const c = await AtcClient.open();
     try {
-      expect((await ingestNotes(db, c)).reset).toBe(true);
-      await ingestNotes(db, c);
+      const reset = await ingestNotes(db, c, { run: buildStubFinalGH({ commits: 'fault' }, []) });
+      expect(reset.reset).toBe(true);
+      await ingestNotes(db, c, { run: buildStubFinalGH({ commits: 'fault' }, []) });
     } finally {
       c.close();
     }
@@ -510,10 +524,11 @@ describe('re-check fixes', () => {
     add();
     const c = await AtcClient.open();
     try {
-      await ingestNotes(db, c);
+      await ingestNotes(db, c, { run: buildStubFinalGH({ commits: 'fault' }, []) });
       atc.feed.push({ at: base + 100, session: S1, name: 'kettle', kind: 'note', detail: 'tick', label: 'progress' });
       atc.feed.push({ at: base + 900, session: S1, name: 'kettle', kind: 'note', detail: 'tick', label: 'progress' });
-      expect((await ingestNotes(db, c)).notes).toBe(2);
+      const ticks = await ingestNotes(db, c, { run: buildStubFinalGH({ commits: 'fault' }, []) });
+      expect(ticks.notes).toBe(2);
     } finally {
       c.close();
     }

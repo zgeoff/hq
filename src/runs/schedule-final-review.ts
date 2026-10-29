@@ -33,10 +33,9 @@ export function scheduleFinalReview(db: Database, mark: FinalMark): boolean {
   return true;
 }
 
-// What the event keeps of how the sha was settled; nothing when GitHub was not asked.
 function describeResolution(given: string, resolution: AcceptedFinal | null): Record<string, unknown> {
   return match(resolution)
-    .with(null, () => ({}))
+    .with(null, () => ({ given, resolved: false, reason: 'not resolved in this pass' }))
     .with({ kind: 'full' }, () => ({ given, resolved: true }))
     .with({ kind: 'unresolved' }, (unresolved) => ({ given, resolved: false, reason: unresolved.reason }))
     .exhaustive();

@@ -6,7 +6,6 @@ import type { CommitRead } from './types.ts';
 // GitHub answers 404 for a sha it has no commit for, and 422 for one it cannot tell apart.
 const NOT_FOUND = /HTTP (?:404|422)/u;
 
-// The full sha GitHub resolves a short sha to in the PR's repo.
 export async function readCommit(run: Runner, ref: string, sha: string): Promise<CommitRead> {
   const [repo = ''] = ref.split('#');
   const result = await run(['gh', 'api', `repos/zgeoff/${repo}/commits/${sha}`, '--jq', '.sha'], { env: cleanEnv() }).catch(toRunFailure);

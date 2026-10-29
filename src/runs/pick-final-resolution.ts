@@ -4,8 +4,6 @@ import type { CommitRead, CommitsRead, FinalResolution } from './types.ts';
 // GitHub lists at most this many commits of a PR, so a list this long may not end at the head.
 const COMMITS_LIMIT = 250;
 
-// What a FINAL sha means for a PR, from the PR's commits and, when none matched there, the answer for
-// the sha alone (null when it was not asked).
 export function pickFinalResolution(given: string, commits: CommitsRead, lookup: CommitRead | null): FinalResolution {
   if (commits.kind === 'fault') {
     return { kind: 'unresolved', reason: commits.reason };

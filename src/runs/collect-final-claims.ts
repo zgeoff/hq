@@ -6,21 +6,27 @@ import { FINAL_PHRASE } from './final-phrase.ts';
 import { parseMarkedRef } from './parse-marked-ref.ts';
 import type { FinalClaim } from './types.ts';
 
-const OpenRefsSchema = z.array(z.object({ ref: z.string() }));
+const RefsSchema = z.array(z.object({ ref: z.string(), state: z.string() }));
 
-// The PR and sha pairs a note may mark final. A phrase's PR is only settled once the note's own PRs
-// are attached, so every PR it could mean is a claim; the sha is the same for each.
 export function collectFinalClaims(db: Database, issue: string, text: string): FinalClaim[] {
   const mark = FINAL_MARK.exec(text);
   if (mark) {
     const ref = parseMarkedRef(mark[1] ?? '');
-    return ref === null ? [] : [{ ref, sha: mark[2] ?? '' }];
+    return ref === null || isOwnedElsewhere(db, issue, ref) ? [] : [{ ref, sha: mark[2] ?? '' }];
   }
   const phrase = FINAL_PHRASE.exec(text);
   if (!phrase) {
     return [];
   }
+  const owned = RefsSchema.parse(db.query('SELECT ref, state FROM run_prs WHERE issue = ?').all(issue));
   const mentioned = collectMentionedPRs(text);
-  const refs = mentioned.length > 0 ? mentioned : OpenRefsSchema.parse(db.query(`SELECT ref FROM run_prs WHERE issue = ? AND state = 'open'`).all(issue)).map((pr) => pr.ref);
+  const refs = mentioned.length > 0 ? mentioned.filter((ref) => owned.some((pr) => pr.ref === ref)) : owned.filter((pr) => pr.state === 'open').map((pr) => pr.ref);
   return refs.map((ref) => ({ ref, sha: String(phrase[1]) }));
+}
+
+const OwnerSchema = z.object({ issue: z.string() }).nullable();
+
+function isOwnedElsewhere(db: Database, issue: string, ref: string): boolean {
+  const owner = OwnerSchema.parse(db.query('SELECT issue FROM run_prs WHERE ref = ?').get(ref));
+  return owner !== null && owner.issue !== issue;
 }

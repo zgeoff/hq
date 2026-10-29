@@ -2,30 +2,62 @@ import { expect, test } from 'bun:test';
 import { buildMockSha } from './build-mock-sha.ts';
 import { buildStubFinalGH } from './build-stub-final-gh.ts';
 
-test('it lists the PR commits, resolves a listed short sha, and records each call', async () => {
+test('it lists the commits of a PR one sha a line', async () => {
   const first = buildMockSha(1);
   const second = buildMockSha(2);
-  const calls: string[] = [];
-  const run = buildStubFinalGH({ commits: [first, second], lookups: { abc1234: second } }, calls);
+  const run = buildStubFinalGH({ commits: [first, second] }, []);
 
   const list = await run(['gh', 'api', 'repos/zgeoff/kettle/pulls/7/commits', '--paginate', '--jq', '.[].sha']);
-  const found = await run(['gh', 'api', 'repos/zgeoff/kettle/commits/abc1234', '--jq', '.sha']);
-  const missing = await run(['gh', 'api', 'repos/zgeoff/kettle/commits/ffff000', '--jq', '.sha']);
 
-  expect(list.stdout).toBe(`${first}\n${second}\n`);
-  expect(found.stdout).toBe(`${second}\n`);
-  expect(missing.stderr).toBe('gh: Not Found (HTTP 404)');
-  expect(calls).toHaveLength(3);
+  expect(list).toStrictEqual({ code: 0, stdout: `${first}\n${second}\n`, stderr: '' });
 });
 
-test('it fails the reads it is told to fail and any call it does not know', async () => {
-  const run = buildStubFinalGH({ commits: 'fault', lookupFault: true }, []);
+test('it resolves a short sha it lists to its full sha', async () => {
+  const full = buildMockSha(2);
+  const run = buildStubFinalGH({ commits: [], lookups: { abc1234: full } }, []);
+
+  const found = await run(['gh', 'api', 'repos/zgeoff/kettle/commits/abc1234', '--jq', '.sha']);
+
+  expect(found).toStrictEqual({ code: 0, stdout: `${full}\n`, stderr: '' });
+});
+
+test('it answers a short sha it does not list as GitHub answers a missing commit', async () => {
+  const run = buildStubFinalGH({ commits: [], lookups: {} }, []);
+
+  const missing = await run(['gh', 'api', 'repos/zgeoff/kettle/commits/ffff000', '--jq', '.sha']);
+
+  expect(missing).toStrictEqual({ code: 1, stdout: '', stderr: 'gh: Not Found (HTTP 404)' });
+});
+
+test('it records the line of each call', async () => {
+  const calls: string[] = [];
+  const run = buildStubFinalGH({ commits: [] }, calls);
+
+  await run(['gh', 'api', 'repos/zgeoff/kettle/commits/abc1234', '--jq', '.sha']);
+
+  expect(calls).toStrictEqual(['gh api repos/zgeoff/kettle/commits/abc1234 --jq .sha']);
+});
+
+test('it fails the commit list read when told to', async () => {
+  const run = buildStubFinalGH({ commits: 'fault' }, []);
 
   const list = await run(['gh', 'api', 'repos/zgeoff/kettle/pulls/7/commits', '--paginate', '--jq', '.[].sha']);
+
+  expect(list).toStrictEqual({ code: 1, stdout: '', stderr: 'gh: Bad Gateway (HTTP 502)' });
+});
+
+test('it fails the commit lookup when told to', async () => {
+  const run = buildStubFinalGH({ commits: [], lookupFault: true }, []);
+
   const lookup = await run(['gh', 'api', 'repos/zgeoff/kettle/commits/abc1234', '--jq', '.sha']);
+
+  expect(lookup).toStrictEqual({ code: 1, stdout: '', stderr: 'gh: Bad Gateway (HTTP 502)' });
+});
+
+test('it fails a call it does not know', async () => {
+  const run = buildStubFinalGH({ commits: [] }, []);
+
   const unknown = await run(['gh', 'repo', 'list']);
 
-  expect(list.code).toBe(1);
-  expect(lookup.code).toBe(1);
-  expect(unknown.code).toBe(1);
+  expect(unknown).toStrictEqual({ code: 1, stdout: '', stderr: 'invented: unknown call' });
 });

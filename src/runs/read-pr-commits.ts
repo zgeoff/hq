@@ -3,7 +3,6 @@ import { toRunFailure } from '../runner/to-run-failure.ts';
 import type { Runner } from '../runner/types.ts';
 import type { CommitsRead } from './types.ts';
 
-// Every commit sha of the PR, oldest first, in one paged read.
 export async function readPRCommits(run: Runner, ref: string): Promise<CommitsRead> {
   const [repo = '', number = ''] = ref.split('#');
   const result = await run(['gh', 'api', `repos/zgeoff/${repo}/pulls/${number}/commits`, '--paginate', '--jq', '.[].sha'], { env: cleanEnv() }).catch(toRunFailure);

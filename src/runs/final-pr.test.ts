@@ -320,9 +320,9 @@ test('it refuses a sha that is no hex sha', () => {
   expect(() => finalPr(ctx.db, 'kettle#714', { sha: 'nope', actor: 'z-q' })).toThrow('--sha must be a hex commit sha');
 });
 
-test('it reads GitHub not at all for a sha that is no hex sha', async () => {
+test('it asks GitHub nothing about a sha that is no hex sha', async () => {
   const calls: string[] = [];
-  const resolveFinal = makeFinalResolver(buildStubFinalGH({}, calls));
+  const resolveFinal = makeFinalResolver(buildStubFinalGH({ commits: [] }, calls));
 
   await resolveCliFinal(resolveFinal, 'kettle#714', 'nope');
 

@@ -16,15 +16,20 @@ import { sendNoteToOrchestrator } from './send-note-to-orchestrator.ts';
 import type { FeedEvent, FinalClaim, FinalResolutions, IngestResult } from './types.ts';
 import { updateRunTime as touch } from './update-run-time.ts';
 
+interface IngestOptions {
+  maxPages?: number;
+  run: Runner;
+}
+
 // Read atc's event feed from the stored cursor. A decision or blocked note goes
 // to the orchestrator. A note from a session on an open row becomes a run note; each page commits with its cursor, so a crash
 // re-reads at most one page and the event key keeps that idempotent.
-export async function ingestNotes(db: Database, client: AtcClient, opts: { maxPages?: number; run?: Runner } = {}): Promise<IngestResult> {
+export async function ingestNotes(db: Database, client: AtcClient, opts: IngestOptions): Promise<IngestResult> {
   const CURSOR_KEY = 'atc_events_cursor',
     result: IngestResult = { read: 0, notes: 0, routed: 0, finals: [], unmatched: 0, reset: false, bootstrapped: false };
   let cursor = getMeta(db, CURSOR_KEY);
   const maxPages = opts.maxPages ?? 50;
-  let resolveFinal: ReturnType<typeof makeFinalResolver> | undefined;
+  const resolveFinal = makeFinalResolver(opts.run);
   const orchestrator = orchestratorName();
 
   if (!cursor) {
@@ -57,10 +62,9 @@ export async function ingestNotes(db: Database, client: AtcClient, opts: { maxPa
       }
       throw e;
     }
-    if (opts.run !== undefined) {
-      resolveFinal ??= makeFinalResolver(opts.run);
-    }
-    const resolutions = await resolveFinals(db, r.events, resolveFinal ?? null);
+
+    // bun:sqlite runs a transaction synchronously, so GitHub is read before it opens.
+    const resolutions = await resolveFinals(db, r.events, resolveFinal);
     db.transaction(() => {
       for (const e of r.events) {
         result.read++;
@@ -73,9 +77,10 @@ export async function ingestNotes(db: Database, client: AtcClient, opts: { maxPa
           result.unmatched++;
           continue;
         }
-        const noteAt = new Date(e.at).toISOString(); // keep milliseconds: two notes in one second stay two
-        // The same note read again after a feed reset: same session, time and text.
-        if (db.query(`SELECT 1 FROM run_notes WHERE session_id = ? AND at = ? AND text = ?`).get(e.session, noteAt, e.detail)) continue;
+        const noteAt = toNoteTime(e);
+        if (hasSameNote(db, e)) {
+          continue;
+        }
         const ins = db
           .query(`INSERT INTO run_notes (issue, session_id, label, text, source, event_key, at) VALUES (?, ?, ?, ?, 'atc', ?, ?) ON CONFLICT (event_key) DO NOTHING`)
           .run(issue, e.session, e.label ?? null, e.detail, `${epoch}:${e.cursor}`, noteAt);
@@ -119,17 +124,23 @@ async function feedEnd(client: AtcClient): Promise<string> {
   return cursor!;
 }
 
-// What GitHub says of every FINAL sha the page's notes give, read before the page's transaction opens.
-function resolveFinals(db: Database, events: FeedEvent[], resolveFinal: ((claims: FinalClaim[]) => Promise<FinalResolutions>) | null): Promise<FinalResolutions> {
-  if (resolveFinal === null) {
-    return Promise.resolve(new Map());
-  }
+function resolveFinals(db: Database, events: FeedEvent[], resolveFinal: (claims: FinalClaim[]) => Promise<FinalResolutions>): Promise<FinalResolutions> {
   const claims = events.flatMap((event) => {
-    if (event.kind !== 'note' || !event.detail) {
+    if (event.kind !== 'note' || !event.detail || hasSameNote(db, event)) {
       return [];
     }
     const issue = findOpenSessionIssue(db, event.session);
     return issue === null ? [] : collectFinalClaims(db, issue, event.detail);
   });
   return resolveFinal(claims);
+}
+
+// The same note read again after a feed reset has the same session, time and text.
+function hasSameNote(db: Database, event: FeedEvent): boolean {
+  return db.query(`SELECT 1 FROM run_notes WHERE session_id = ? AND at = ? AND text = ?`).get(event.session, toNoteTime(event), event.detail ?? null) !== null;
+}
+
+// Milliseconds are kept: two notes in one second stay two.
+function toNoteTime(event: FeedEvent): string {
+  return new Date(event.at).toISOString();
 }
