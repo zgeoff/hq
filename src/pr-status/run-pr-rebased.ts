@@ -107,7 +107,7 @@ function carry(input: PRCommandInput, request: Carry): Out {
   const text = formatRebasedNews(request.actor, { repo: ref.repo, pr: ref.pr, oldHead: lgtm.head ?? '', newHead: request.newHead });
   input.db
     .transaction(() => {
-      requireCarriableLgtm(input.db, ref.repo, ref.pr, lgtm, request.newHead);
+      requireCarriableLgtm(input.db, { repo: ref.repo, pr: ref.pr, lgtm, newHead: request.newHead });
       recordPRAnswer(input.db, { repo: ref.repo, pr: ref.pr, answer: 'lgtm', head: request.newHead, source, note, actor: request.actor, carried });
       addNews(input.db, { from: request.actor, topic: 'merge', text, issue: null, link: null, needsGeoff: false });
     })

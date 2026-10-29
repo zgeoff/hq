@@ -4,11 +4,20 @@ import { readHeadLgtm } from './read-head-lgtm.ts';
 import { readPRAnswers } from './read-pr-answers.ts';
 import type { OwnerAnswer } from './read-pr-answers.ts';
 
-// Run inside the write transaction, on the answers as they are now: the fetch and patch-id work
-// before it is slow, and the owner may have answered meanwhile. Throws unless the owner's lgtm is
-// still the newest answer at the old head and no answer exists at the new head, so a carried lgtm
-// never overrides a later word of the owner's.
-export function requireCarriableLgtm(db: Database, repo: string, pr: number, lgtm: OwnerAnswer, newHead: string): void {
+export interface CarriableLgtm {
+  repo: string;
+  pr: number;
+  lgtm: OwnerAnswer;
+  newHead: string;
+}
+
+// Run inside the write transaction: the fetch before it is slow, and the owner may have answered
+// meanwhile. A carried lgtm must never override a later word of the owner's.
+export function requireCarriableLgtm(db: Database, request: CarriableLgtm): void {
+  const repo = request.repo;
+  const pr = request.pr;
+  const lgtm = request.lgtm;
+  const newHead = request.newHead;
   const answers = readPRAnswers(db, repo, pr);
   if (answers === null) {
     throw new HqError('bad_args', `an answer record of ${repo}#${pr} cannot be read, so no lgtm is carried`);
