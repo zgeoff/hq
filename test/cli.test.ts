@@ -15,7 +15,7 @@ import { overrideEnv } from '../src/config/override-env.ts';
 import { isHeatList } from '../mods/hq-band/hooks/is-heat-list.ts';
 import { isSegmentList } from '../mods/hq-band/hooks/is-segment-list.ts';
 import type { Band, Pane } from '../src/band/types.ts';
-import { NOON_SYDNEY, at, freshDb } from './helpers.ts';
+import { NOON_SYDNEY, at, fakeAtc, freshDb } from './helpers.ts';
 
 let dir: string;
 let path: string;
@@ -827,24 +827,49 @@ test('hq run ship prints a vers PR shipped at its merge as at merge', async () =
   }
 });
 
-test('hq run tidy --dry-run lists a merged run to tidy and changes nothing, and hq run tidy wraps it up once', async () => {
-  await hq('run', 'add', 'GEO-514', '--title', 'Invented kettle work', '--where', 'none');
+test('hq run tidy --dry-run says what it would do to a merged run and writes no row', async () => {
+  onTestFinished(overrideEnv('HQ_ATC_SOCKET', `${dir}/atc.sock`));
+  const atc = fakeAtc(dir, [
+    { id: '0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, state: 'done' },
+    { id: '0000d009-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'z-kettle', alive: true, state: 'done' },
+  ]);
+  onTestFinished(atc.stop);
+  await hq('run', 'add', 'GEO-514', '--session', '0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', '--title', 'Invented kettle work', '--where', 'none');
   await hq('run', 'pr', 'GEO-514', 'kettle#14');
   closePr(db(), 'kettle#14', { to: 'merged', actor: 'hq-github', facts: { mergedAt: '2026-10-20T03:04:05Z', mergeSha: null } });
-  await hq('run', 'state', 'GEO-514', 'merged');
+  await hq('run', 'state', 'GEO-514', 'merged', '--force');
+  onTestFinished(overrideEnv('HQ_AS', undefined));
+  onTestFinished(overrideEnv('ATC_SESSION_ID', '0000d009-aaaa-4aaa-8aaa-aaaaaaaaaaaa'));
+  const countRows = () => db().query('SELECT (SELECT COUNT(*) FROM events) AS events, (SELECT COUNT(*) FROM run_notes) AS notes, (SELECT COUNT(*) FROM news) AS news, (SELECT COUNT(*) FROM meta) AS meta').get();
+  const before = countRows();
   out = [];
 
-  const dry = await main(['run', 'tidy', '--dry-run']);
-  const dryText = out.join('\n');
-  out = [];
-  const real = await main(['run', 'tidy']);
-  const realText = out.join('\n');
-  out = [];
-  const repeat = await main(['run', 'tidy']);
+  const code = await main(['run', 'tidy', '--dry-run']);
 
-  expect([dry, dryText]).toStrictEqual([0, 'Would tidy (nothing changed):\n  GEO-514: Wrap-up: no session of the run is in atc.']);
-  expect([real, realText]).toStrictEqual([0, 'Tidied:\n  GEO-514: Wrap-up: no session of the run is in atc.']);
-  expect([repeat, out.join('\n')]).toStrictEqual([0, 'No merged run to tidy.']);
+  expect(code).toBe(0);
+  expect(out.join('\n')).toBe('Would tidy (nothing changed):\n  GEO-514: Wrap-up: would forget 0000d001.');
+  expect(countRows()).toStrictEqual(before);
+});
+
+test('hq run tidy wraps a merged run up, and finds nothing to tidy when it runs again', async () => {
+  onTestFinished(overrideEnv('HQ_ATC_SOCKET', `${dir}/atc.sock`));
+  const atc = fakeAtc(dir, [{ id: '0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, state: 'done' }]);
+  onTestFinished(atc.stop);
+  await hq('run', 'add', 'GEO-515', '--session', '0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', '--title', 'Invented kettle work', '--where', 'none');
+  await hq('run', 'pr', 'GEO-515', 'kettle#15');
+  closePr(db(), 'kettle#15', { to: 'merged', actor: 'hq-github', facts: { mergedAt: '2026-10-20T03:04:05Z', mergeSha: null } });
+  await hq('run', 'state', 'GEO-515', 'merged', '--force');
+  out = [];
+
+  const first = await main(['run', 'tidy']);
+  const firstText = out.join('\n');
+  out = [];
+  const again = await main(['run', 'tidy']);
+
+  expect(first).toBe(0);
+  expect(firstText).toBe('Tidied:\n  GEO-515: Wrap-up: forgot 0000d001.');
+  expect(again).toBe(0);
+  expect(out.join('\n')).toBe('No merged run to tidy.');
 });
 
 test('hq run ship lists a run whose helper is still active as left, and moves nothing', async () => {

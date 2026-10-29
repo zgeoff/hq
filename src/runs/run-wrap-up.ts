@@ -6,6 +6,7 @@ import { buildWrapUpPlan } from './build-wrap-up-plan.ts';
 import { forgetWrappedSession } from './forget-wrapped-session.ts';
 import { fullSessionId } from './full-session-id.ts';
 import { requireRun } from './require-run.ts';
+import { toMessage } from './to-message.ts';
 import type { ImpWork, KeptSession, WrapUp } from './types.ts';
 import { writeWrapUpNote } from './write-wrap-up-note.ts';
 
@@ -16,20 +17,13 @@ export interface WrapUpDeps {
   readImpWork: (session: FleetSession) => Promise<ImpWork>;
 }
 
-export interface WrapUpOptions {
-  actor: string;
-
-  // Decides and reports, and changes nothing in atc or the database.
-  dryRun?: boolean;
-}
+export type WrapUpOptions = { dryRun: true } | { dryRun?: false; actor: string };
 
 // Forgets each of the run's sessions and their sub-sessions, then notes what it did on the run. A
 // run the owner chats in keeps them all. An imp is destroyed only after its check finds all work
-// pushed; otherwise its session stays, sub-sessions and all. A dry run reports the same decisions
-// as what it would forget and destroy.
+// pushed; otherwise its session stays, sub-sessions and all.
 export async function runWrapUp(db: Database, deps: WrapUpDeps, issue: string, options: WrapUpOptions): Promise<WrapUp> {
   const run = requireRun(db, issue);
-  const dryRun = options.dryRun === true;
 
   // A session id is on one run only, so a session removed by hand is still this run's to forget.
   const rows = db.query('SELECT session_id FROM run_sessions WHERE issue = ? ORDER BY added_at, session_id').all(issue);
@@ -44,14 +38,14 @@ export async function runWrapUp(db: Database, deps: WrapUpDeps, issue: string, o
       const fullIDs = await resolveSessionIDs(ids, sessions, wrapUp);
       const roots = sessions.filter((session) => fullIDs.includes(session.id) && !fullIDs.includes(session.parent ?? ''));
       for (const root of roots) {
-        await wrapUpTree({ client, deps, sessions, wrapUp, placedOnImp: run.place === 'imp', dryRun }, root);
+        await wrapUpTree({ client, deps, sessions, wrapUp, placedOnImp: run.place === 'imp', dryRun: options.dryRun === true }, root);
       }
     } catch (error) {
       const reason = `atc: ${toMessage(error)}`;
       wrapUp.failed.push(...ids.map((id) => ({ id, reason })));
     }
   }
-  if (!dryRun) {
+  if (options.dryRun !== true) {
     writeWrapUpNote(db, issue, wrapUp, options.actor);
   }
   return wrapUp;
@@ -72,10 +66,6 @@ async function resolveSessionIDs(ids: string[], sessions: FleetSession[], wrapUp
     }
   }
   return fullIDs;
-}
-
-function toMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
 
 interface TreePass {
@@ -105,7 +95,6 @@ async function wrapUpTree(pass: TreePass, root: FleetSession): Promise<void> {
 
 type TreeDecision = { kind: 'keep'; kept: KeptSession[] } | { kind: 'forget'; children: FleetSession[]; root: FleetSession; destroyImp: boolean };
 
-// Decides what becomes of one session tree. Only the unpushed-work check reads anything.
 async function planTree(pass: TreePass, root: FleetSession): Promise<TreeDecision> {
   const children = collectChildren(pass.sessions, root.id);
   const tree = [...children, root];
@@ -123,8 +112,6 @@ async function planTree(pass: TreePass, root: FleetSession): Promise<TreeDecisio
   return { kind: 'forget', children, root, destroyImp: plan.destroyImp };
 }
 
-// atc says where a session runs: any host but this PC is an imp. The run's place decides only when
-// atc names no host.
 function isOnImp(session: FleetSession, placedOnImp: boolean): boolean {
   const targetID = session.locator?.targetID;
   if (typeof targetID === 'string') {

@@ -2,8 +2,6 @@ import type { KeptSession, WrapUp } from './types.ts';
 
 const NEWS_LIMIT = 400;
 
-// The one news line for a merged run's sessions the wrap-up left: each kept or failed one by its
-// first eight characters with its reason. Null when it left none.
 export function buildMergedWrapUpNews(issue: string, wrapUp: WrapUp): string | null {
   const items = [...wrapUp.kept.map((kept) => formatItem('kept', kept)), ...wrapUp.failed.map((failed) => formatItem('failed', failed))];
   if (items.length === 0) {

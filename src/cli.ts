@@ -31,7 +31,7 @@ import { readImpWork } from './runs/read-imp-work.ts';
 import { runWrapUp } from './runs/run-wrap-up.ts';
 import { wrapUpMergedRuns } from './runs/wrap-up-merged-runs.ts';
 import type { MergedRunWrapUp } from './runs/wrap-up-merged-runs.ts';
-import type { WrapUpDeps } from './runs/run-wrap-up.ts';
+import type { WrapUpDeps, WrapUpOptions } from './runs/run-wrap-up.ts';
 import { sessionListRequiredSchema } from './atc/session-list-required-schema.ts';
 import { fmtIdle } from './pins/fmt-idle.ts';
 import { listPins } from './pins/list-pins.ts';
@@ -1033,10 +1033,10 @@ Round ${p.review_round} recorded at ${p.reviewed_sha}.` };
     }
     case 'tidy': {
       const dryRun = flags['dry-run'] === true;
-      const tidier = await by();
+      const options: WrapUpOptions = dryRun ? { dryRun } : { actor: await by() };
       const tidyDeps = buildWrapUpDeps();
       try {
-        const wrapped = await wrapUpMergedRuns(db, tidyDeps.deps, tidier, { dryRun });
+        const wrapped = await wrapUpMergedRuns(db, tidyDeps.deps, options);
         return { data: { dryRun, runs: wrapped }, text: formatTidy(wrapped, dryRun) };
       } finally {
         tidyDeps.close();
@@ -2324,7 +2324,6 @@ function buildFleetIO(): FleetIO {
   return { run: boundedRunner(realRunner, CALL_MS), httpClient: fetch, settings: { path: config().HQ_SLOTS_OP_SETTINGS ?? `${getHome()}/projects/hq/.claude/settings.local.json`, readFile: readOptionalFile } };
 }
 
-// The atc connection opens only when a session needs it; close() ends every one opened.
 function buildWrapUpDeps(): { deps: WrapUpDeps; close: () => void } {
   const opened: AtcClient[] = [];
   const deps: WrapUpDeps = {
@@ -2362,7 +2361,8 @@ function formatTidy(wrapped: MergedRunWrapUp[], dryRun: boolean): string {
   if (wrapped.length === 0) {
     return 'No merged run to tidy.';
   }
-  const lines = wrapped.map((entry) => `${entry.issue}: ${formatWrapUp(entry.wrapUp)}`);
+  const tense = dryRun ? 'planned' : 'done';
+  const lines = wrapped.map((entry) => `${entry.issue}: ${formatWrapUp(entry.wrapUp, tense)}`);
   return [dryRun ? 'Would tidy (nothing changed):' : 'Tidied:', ...lines.map((line) => `  ${line}`)].join('\n');
 }
 

@@ -9,16 +9,17 @@ import { updateGoneRunSessions } from './update-gone-run-sessions.ts';
 import { findAlerts } from './find-alerts.ts';
 import type { WrapUpDeps } from './run-wrap-up.ts';
 import { sweep } from './sweep.ts';
+import { toMessage } from './to-message.ts';
 import type { Alert } from './types.ts';
 import { watchlist } from './watchlist.ts';
 import { wrapUpMergedRuns } from './wrap-up-merged-runs.ts';
 
-export interface SweepWho {
+export interface SweepOptions {
   actor: string;
   wrapUpDeps: WrapUpDeps;
 }
 
-export async function sweepNow(db: Database, client: AtcClient, run: Runner, who: SweepWho): Promise<{ alerts: Alert[]; sent: Alert[] }> {
+export async function sweepNow(db: Database, client: AtcClient, run: Runner, options: SweepOptions): Promise<{ alerts: Alert[]; sent: Alert[] }> {
   const sessions = await client.sessions();
   const activity = new Map<string, number | null>();
   for (const w of watchlist(db)) {
@@ -33,19 +34,18 @@ export async function sweepNow(db: Database, client: AtcClient, run: Runner, who
   // For the lanes: which runs are parked. Activity resets an idle session's clock.
   if (Array.isArray(sessions)) {
     recordAwake(db, sessions, activity);
-    updateGoneRunSessions(db, sessions, who.actor);
-    await wrapUpMergedRunsSafely(db, who.wrapUpDeps, who.actor);
+    updateGoneRunSessions(db, sessions, options.actor);
+    await wrapUpMergedRunsSafely(db, options.wrapUpDeps, options.actor);
   }
   const alerts = await closeFlaggedPRs(db, run, findAlerts(db, sessions, activity, now()));
-  const swept = sweep(db, alerts, who.actor);
+  const swept = sweep(db, alerts, options.actor);
   return { alerts, sent: swept.sent };
 }
 
-// The alert sweep goes on when the wrap-up of merged runs fails.
 async function wrapUpMergedRunsSafely(db: Database, wrapUpDeps: WrapUpDeps, actor: string): Promise<void> {
   try {
-    await wrapUpMergedRuns(db, wrapUpDeps, actor);
+    await wrapUpMergedRuns(db, wrapUpDeps, { actor });
   } catch (error) {
-    console.error(`merged-run wrap-up failed: ${error instanceof Error ? error.message : String(error)}`);
+    console.error(`merged-run wrap-up failed: ${toMessage(error)}`);
   }
 }

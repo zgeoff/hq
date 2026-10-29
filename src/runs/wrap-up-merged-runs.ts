@@ -1,5 +1,6 @@
 import type { Database } from 'bun:sqlite';
 import { z } from 'zod';
+import type { FleetClient, StaleOps } from '../fleet/types.ts';
 import { ISSUE } from '../followups/issue.ts';
 import { logEvent } from '../log-event.ts';
 import { addNews } from '../news/add-news.ts';
@@ -7,6 +8,7 @@ import { buildMergedWrapUpNews } from './build-merged-wrap-up-news.ts';
 import { runWrapUp } from './run-wrap-up.ts';
 import type { WrapUpDeps, WrapUpOptions } from './run-wrap-up.ts';
 import { SWEEP_ACTOR } from './sweep-actor.ts';
+import { toMessage } from './to-message.ts';
 import type { WrapUp } from './types.ts';
 
 export interface MergedRunWrapUp {
@@ -16,8 +18,6 @@ export interface MergedRunWrapUp {
 
 const issueRowSchema = z.object({ issue: z.string() });
 
-// A run is past merge when its state says so and every PR of it is settled, with one merged. It is
-// wrapped once per merge: a merged-wrap-up event after the run's latest move to merged marks it.
 const QUALIFYING_RUNS = `
   SELECT r.issue FROM runs r
   WHERE r.state IN ('merged', 'live-check', 'deploy-held')
@@ -29,26 +29,42 @@ const QUALIFYING_RUNS = `
         AND w.seq > COALESCE((SELECT MAX(m.seq) FROM events m WHERE m.subject = 'run' AND m.subject_id = r.issue AND m.action = 'state' AND m.to_state = 'merged'), 0))
   ORDER BY r.issue`;
 
-// Wraps up the sessions of each run past merge, once. The run's state stays as it is. A session the
-// wrap-up kept or failed on is named in one news item, and is not retried. A dry run only reports.
-export async function wrapUpMergedRuns(db: Database, deps: WrapUpDeps, actor: string, options: { dryRun?: boolean } = {}): Promise<MergedRunWrapUp[]> {
-  const dryRun = options.dryRun === true;
+export async function wrapUpMergedRuns(db: Database, deps: WrapUpDeps, options: WrapUpOptions): Promise<MergedRunWrapUp[]> {
   const issues = db
     .query(QUALIFYING_RUNS)
     .all()
     .map((row) => issueRowSchema.parse(row).issue);
+  const shared = shareClient(deps);
   const wrapped: MergedRunWrapUp[] = [];
   for (const issue of issues) {
-    const wrapUp = await wrapUpRunSafely(db, deps, issue, { actor, dryRun });
+    const wrapUp = await wrapUpRunSafely(db, shared, issue, options);
     wrapped.push({ issue, wrapUp });
-    if (!dryRun) {
-      recordMergedWrapUp(db, issue, wrapUp, actor);
+    if (options.dryRun !== true) {
+      recordMergedWrapUp(db, issue, wrapUp, options.actor);
     }
   }
   return wrapped;
 }
 
-// One run's failure is that run's failed entry, so it never stops the runs after it.
+// A list taken before an earlier run's forgets still holds this run's sessions: a session id is on
+// one run only.
+function shareClient(deps: WrapUpDeps): WrapUpDeps {
+  let opened: Promise<FleetClient & StaleOps> | null = null;
+  return {
+    openClient: () => {
+      opened ??= openListedClient(deps);
+      return opened;
+    },
+    readImpWork: deps.readImpWork,
+  };
+}
+
+async function openListedClient(deps: WrapUpDeps): Promise<FleetClient & StaleOps> {
+  const client = await deps.openClient();
+  const listed = await client.sessions();
+  return { ...client, sessions: () => Promise.resolve(listed) };
+}
+
 async function wrapUpRunSafely(db: Database, deps: WrapUpDeps, issue: string, options: WrapUpOptions): Promise<WrapUp> {
   try {
     return await runWrapUp(db, deps, issue, options);
@@ -57,12 +73,8 @@ async function wrapUpRunSafely(db: Database, deps: WrapUpDeps, issue: string, op
   }
 }
 
-function toMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
 // The news goes first and its failure joins the event, so the event is the last write and a run
-// that failed is still marked wrapped. A run whose issue is not a Linear key files its news without one.
+// that failed is still marked wrapped.
 function recordMergedWrapUp(db: Database, issue: string, wrapUp: WrapUp, actor: string): void {
   const text = buildMergedWrapUpNews(issue, wrapUp);
   if (text !== null) {

@@ -336,7 +336,7 @@ test('a dry run reports what it would forget and destroy, and calls no forget, u
   });
   const before = ctx.db.query('SELECT (SELECT COUNT(*) FROM events) AS events, (SELECT COUNT(*) FROM run_notes) AS notes').get();
 
-  const wrapUp = await runWrapUp(ctx.db, { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.resolve({ state: 'pushed' }) }, 'GEO-9823', { actor: 'z-delivery', dryRun: true });
+  const wrapUp = await runWrapUp(ctx.db, { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.resolve({ state: 'pushed' }) }, 'GEO-9823', { dryRun: true });
 
   expect(wrapUp).toStrictEqual({
     forgotten: ['0000c003-aaaa-4aaa-8aaa-aaaaaaaaaaaa', '0000c004-aaaa-4aaa-8aaa-aaaaaaaaaaaa'],
