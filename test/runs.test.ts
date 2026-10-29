@@ -193,9 +193,9 @@ describe('reading the event feed', () => {
     setSession(db, 'GEO-9003', BY_HAND, 'z-delivery', 'remove');
     atMin(6);
     try {
-      const afterSweep = await sweepNow(db, c, buildStubGitHubFactsRunner({}), 'z-delivery');
+      const afterSweep = await sweepNow(db, c, buildStubGitHubFactsRunner({}), { actor: 'z-delivery', wrapUpDeps: { openClient: () => Promise.reject(new Error('no wrap-up expected')), readImpWork: () => Promise.reject(new Error('no wrap-up expected')) }, log: () => {} });
       atMin(6 + SWEEP_MINUTES.repeatMinutes());
-      const repeatSweep = await sweepNow(db, c, buildStubGitHubFactsRunner({}), 'z-delivery');
+      const repeatSweep = await sweepNow(db, c, buildStubGitHubFactsRunner({}), { actor: 'z-delivery', wrapUpDeps: { openClient: () => Promise.reject(new Error('no wrap-up expected')), readImpWork: () => Promise.reject(new Error('no wrap-up expected')) }, log: () => {} });
       expect([afterSweep.sent.map((a) => a.key), repeatSweep.sent.map((a) => a.key), afterSweep.sent[0]?.line]).toEqual([
         [`session:${S1}`],
         [`session:${S1}`],

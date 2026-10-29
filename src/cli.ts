@@ -29,7 +29,9 @@ import { readStuckSaveChecks } from './fleet/read-stuck-save-checks.ts';
 import { formatWrapUp } from './runs/format-wrap-up.ts';
 import { readImpWork } from './runs/read-imp-work.ts';
 import { runWrapUp } from './runs/run-wrap-up.ts';
-import type { WrapUpDeps } from './runs/run-wrap-up.ts';
+import { wrapUpMergedRuns } from './runs/wrap-up-merged-runs.ts';
+import type { MergedRunWrapUp } from './runs/wrap-up-merged-runs.ts';
+import type { WrapUpDeps, WrapUpOptions } from './runs/run-wrap-up.ts';
 import { sessionListRequiredSchema } from './atc/session-list-required-schema.ts';
 import { fmtIdle } from './pins/fmt-idle.ts';
 import { listPins } from './pins/list-pins.ts';
@@ -798,14 +800,16 @@ async function unblockCommand(db: Database, verb: string, args: string[], flags:
 // One watcher tick for running work: read new notes from atc, then sweep.
 async function watchRuns(db: Database, me: string): Promise<void> {
   const c = await AtcClient.open();
+  const wrapUpDeps = buildWrapUpDeps();
   try {
     const ing = await ingestNotes(db, c);
     if (ing.notes > 0 || ing.routed > 0 || ing.reset || ing.bootstrapped) {
       console.log(`${iso(now())} notes: ${ing.notes} recorded${ing.routed ? `, ${ing.routed} routed to ${orchestratorName()}` : ''}${ing.finals.length > 0 ? `, final: ${ing.finals.join(', ')}` : ''}${ing.reset ? ', feed cursor reset' : ''}${ing.bootstrapped ? ', feed cursor started at the end' : ''}`);
     }
-    const sw = await sweepNow(db, c, boundedRunner(realRunner, CALL_MS), me);
+    const sw = await sweepNow(db, c, boundedRunner(realRunner, CALL_MS), { actor: me, wrapUpDeps: wrapUpDeps.deps, log: (line) => console.error(line) });
     if (sw.sent.length) console.log(`${iso(now())} sweep: told ${orchestratorName()} about ${sw.sent.map((a) => a.key).join(', ')}`);
   } finally {
+    wrapUpDeps.close();
     c.close();
   }
 }
@@ -832,30 +836,6 @@ async function expandSession(raw: string): Promise<string> {
     }, raw);
   } finally {
     (client as AtcClient | null)?.close();
-  }
-}
-
-// The atc connection opens only when a session needs it, and closes after.
-async function runDoneWrapUp(db: Database, issue: string, actorName: string): Promise<WrapUp> {
-  const opened: AtcClient[] = [];
-  const deps: WrapUpDeps = {
-    openClient: async () => {
-      const atc = await AtcClient.open();
-      opened.push(atc);
-      const fleetClient = makeFleetClient(atc);
-      if (!hasStaleOps(fleetClient)) {
-        throw new HqError('internal', 'the atc client lacks stop, unpin and forget');
-      }
-      return fleetClient;
-    },
-    readImpWork: (session) => readImpWork(realRunner, session.id, session.cwd),
-  };
-  try {
-    return await runWrapUp(db, deps, issue, actorName);
-  } finally {
-    for (const atc of opened) {
-      atc.close();
-    }
   }
 }
 
@@ -1037,16 +1017,29 @@ Round ${p.review_round} recorded at ${p.reviewed_sha}.` };
     }
     case 'sweep': {
       const c = await AtcClient.open();
+      const wrapUpDeps = buildWrapUpDeps();
       try {
         const ing = await ingestNotes(db, c);
         const sweeper = await by();
-        const sw = await sweepNow(db, c, boundedRunner(realRunner, CALL_MS), sweeper);
+        const sw = await sweepNow(db, c, boundedRunner(realRunner, CALL_MS), { actor: sweeper, wrapUpDeps: wrapUpDeps.deps, log: (line) => console.error(line) });
         return {
           data: { ingest: ing, alerts: sw.alerts, sent: sw.sent },
           text: [`notes recorded: ${ing.notes}`, sw.alerts.length ? sw.alerts.map((a) => `- ${a.line}`).join('\n') : 'Nothing to flag.', sw.sent.length ? `(told ${orchestratorName()} about ${sw.sent.length})` : ''].filter(Boolean).join('\n'),
         };
       } finally {
+        wrapUpDeps.close();
         c.close();
+      }
+    }
+    case 'tidy': {
+      const dryRun = flags['dry-run'] === true;
+      const options: WrapUpOptions = dryRun ? { dryRun } : { actor: await by() };
+      const tidyDeps = buildWrapUpDeps();
+      try {
+        const wrapped = await wrapUpMergedRuns(db, tidyDeps.deps, options);
+        return { data: { dryRun, runs: wrapped }, text: formatTidy(wrapped, dryRun) };
+      } finally {
+        tidyDeps.close();
       }
     }
     default:
@@ -2329,6 +2322,48 @@ function formatRefreshLine(refresh: { error: string | null } | null): string {
 
 function buildFleetIO(): FleetIO {
   return { run: boundedRunner(realRunner, CALL_MS), httpClient: fetch, settings: { path: config().HQ_SLOTS_OP_SETTINGS ?? `${getHome()}/projects/hq/.claude/settings.local.json`, readFile: readOptionalFile } };
+}
+
+function buildWrapUpDeps(): { deps: WrapUpDeps; close: () => void } {
+  const opened: AtcClient[] = [];
+  const deps: WrapUpDeps = {
+    openClient: async () => {
+      const atc = await AtcClient.open();
+      opened.push(atc);
+      const fleetClient = makeFleetClient(atc);
+      if (!hasStaleOps(fleetClient)) {
+        throw new HqError('internal', 'the atc client lacks stop, unpin and forget');
+      }
+      return fleetClient;
+    },
+    readImpWork: (session) => readImpWork(realRunner, session.id, session.cwd),
+  };
+  return {
+    deps,
+    close: () => {
+      for (const atc of opened) {
+        atc.close();
+      }
+    },
+  };
+}
+
+async function runDoneWrapUp(db: Database, issue: string, actorName: string): Promise<WrapUp> {
+  const wrapUpDeps = buildWrapUpDeps();
+  try {
+    return await runWrapUp(db, wrapUpDeps.deps, issue, { actor: actorName });
+  } finally {
+    wrapUpDeps.close();
+  }
+}
+
+function formatTidy(wrapped: MergedRunWrapUp[], dryRun: boolean): string {
+  if (wrapped.length === 0) {
+    return 'No merged run to tidy.';
+  }
+  const tense = dryRun ? 'planned' : 'done';
+  const lines = wrapped.map((entry) => `${entry.issue}: ${formatWrapUp(entry.wrapUp, tense)}`);
+  return [dryRun ? 'Would tidy (nothing changed):' : 'Tidied:', ...lines.map((line) => `  ${line}`)].join('\n');
 }
 
 if (import.meta.main) process.exit(await main(process.argv.slice(2)));

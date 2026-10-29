@@ -7,11 +7,20 @@ import type { Runner } from '../runner/types.ts';
 import { closeFlaggedPRs } from './close-flagged-prs.ts';
 import { updateGoneRunSessions } from './update-gone-run-sessions.ts';
 import { findAlerts } from './find-alerts.ts';
+import type { WrapUpDeps } from './run-wrap-up.ts';
 import { sweep } from './sweep.ts';
+import { toMessage } from './to-message.ts';
 import type { Alert } from './types.ts';
 import { watchlist } from './watchlist.ts';
+import { wrapUpMergedRuns } from './wrap-up-merged-runs.ts';
 
-export async function sweepNow(db: Database, client: AtcClient, run: Runner, actor: string): Promise<{ alerts: Alert[]; sent: Alert[] }> {
+export interface SweepOptions {
+  actor: string;
+  wrapUpDeps: WrapUpDeps;
+  log: (line: string) => void;
+}
+
+export async function sweepNow(db: Database, client: AtcClient, run: Runner, options: SweepOptions): Promise<{ alerts: Alert[]; sent: Alert[] }> {
   const sessions = await client.sessions();
   const activity = new Map<string, number | null>();
   for (const w of watchlist(db)) {
@@ -26,9 +35,18 @@ export async function sweepNow(db: Database, client: AtcClient, run: Runner, act
   // For the lanes: which runs are parked. Activity resets an idle session's clock.
   if (Array.isArray(sessions)) {
     recordAwake(db, sessions, activity);
-    updateGoneRunSessions(db, sessions, actor);
+    updateGoneRunSessions(db, sessions, options.actor);
+    await wrapUpMergedRunsSafely(db, options);
   }
   const alerts = await closeFlaggedPRs(db, run, findAlerts(db, sessions, activity, now()));
-  const { sent } = sweep(db, alerts, actor);
-  return { alerts, sent };
+  const swept = sweep(db, alerts, options.actor);
+  return { alerts, sent: swept.sent };
+}
+
+async function wrapUpMergedRunsSafely(db: Database, options: SweepOptions): Promise<void> {
+  try {
+    await wrapUpMergedRuns(db, options.wrapUpDeps, { actor: options.actor });
+  } catch (error) {
+    options.log(`merged-run wrap-up failed: ${toMessage(error)}`);
+  }
 }

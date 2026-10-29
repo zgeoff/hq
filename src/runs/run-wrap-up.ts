@@ -1,4 +1,5 @@
 import type { Database } from 'bun:sqlite';
+import { match } from 'ts-pattern';
 import { z } from 'zod';
 import { HqError } from '../errors.ts';
 import type { FleetClient, FleetSession, StaleOps } from '../fleet/types.ts';
@@ -6,7 +7,8 @@ import { buildWrapUpPlan } from './build-wrap-up-plan.ts';
 import { forgetWrappedSession } from './forget-wrapped-session.ts';
 import { fullSessionId } from './full-session-id.ts';
 import { requireRun } from './require-run.ts';
-import type { ImpWork, WrapUp } from './types.ts';
+import { toMessage } from './to-message.ts';
+import type { ImpWork, KeptSession, WrapUp } from './types.ts';
 import { writeWrapUpNote } from './write-wrap-up-note.ts';
 
 const sessionRowSchema = z.object({ session_id: z.string() });
@@ -16,24 +18,16 @@ export interface WrapUpDeps {
   readImpWork: (session: FleetSession) => Promise<ImpWork>;
 }
 
+export type WrapUpOptions = { dryRun: true } | { dryRun?: false; actor: string };
+
 // Forgets each of the run's sessions and their sub-sessions, then notes what it did on the run. A
 // run the owner chats in keeps them all. An imp is destroyed only after its check finds all work
 // pushed; otherwise its session stays, sub-sessions and all.
-export async function runWrapUp(db: Database, deps: WrapUpDeps, issue: string, actor: string): Promise<WrapUp> {
+export async function runWrapUp(db: Database, deps: WrapUpDeps, issue: string, options: WrapUpOptions): Promise<WrapUp> {
   const run = requireRun(db, issue);
 
-  // A session removed from the run by hand before it closed is no longer the run's to forget. Its
-  // end time alone cannot show that: a remove and the close can fall in the same second.
-  const rows = db
-    .query(
-      `SELECT session_id FROM run_sessions AS rs WHERE issue = ? AND (ended_at IS NULL OR ended_by = 'sweep' OR (ended_at = ? AND COALESCE((
-         SELECT json_extract(data, '$.mode') FROM events
-         WHERE subject = 'run' AND subject_id = rs.issue AND action = 'session'
-           AND (json_extract(data, '$.session') = rs.session_id
-             OR (length(json_extract(data, '$.session')) = 8 AND substr(rs.session_id, 1, 8) = json_extract(data, '$.session')))
-         ORDER BY seq DESC LIMIT 1), '') != 'remove')) ORDER BY added_at, session_id`,
-    )
-    .all(issue, run.closed_at);
+  // A session id is on one run only, so a session removed by hand is still this run's to forget.
+  const rows = db.query('SELECT session_id FROM run_sessions WHERE issue = ? ORDER BY added_at, session_id').all(issue);
   const ids = rows.map((row) => sessionRowSchema.parse(row).session_id);
   const wrapUp: WrapUp = { forgotten: [], destroyed: [], kept: [], failed: [] };
   if (run.geoff_chat === 1) {
@@ -45,14 +39,16 @@ export async function runWrapUp(db: Database, deps: WrapUpDeps, issue: string, a
       const fullIDs = await resolveSessionIDs(ids, sessions, wrapUp);
       const roots = sessions.filter((session) => fullIDs.includes(session.id) && !fullIDs.includes(session.parent ?? ''));
       for (const root of roots) {
-        await wrapUpTree({ client, deps, sessions, wrapUp, onImp: run.place === 'imp' }, root);
+        await wrapUpTree({ client, deps, sessions, wrapUp, placedOnImp: run.place === 'imp', dryRun: options.dryRun === true }, root);
       }
     } catch (error) {
       const reason = `atc: ${toMessage(error)}`;
       wrapUp.failed.push(...ids.map((id) => ({ id, reason })));
     }
   }
-  writeWrapUpNote(db, issue, wrapUp, actor);
+  if (options.dryRun !== true) {
+    writeWrapUpNote(db, issue, wrapUp, options.actor);
+  }
   return wrapUp;
 }
 
@@ -73,35 +69,91 @@ async function resolveSessionIDs(ids: string[], sessions: FleetSession[], wrapUp
   return fullIDs;
 }
 
-function toMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
 interface TreePass {
   client: FleetClient & StaleOps;
   deps: WrapUpDeps;
   sessions: FleetSession[];
   wrapUp: WrapUp;
-  onImp: boolean;
+  placedOnImp: boolean;
+  dryRun: boolean;
 }
 
 async function wrapUpTree(pass: TreePass, root: FleetSession): Promise<void> {
+  const decision = await planTree(pass, root);
+  await match(decision)
+    .with({ kind: 'keep' }, (keep) => {
+      pass.wrapUp.kept.push(...keep.kept);
+      return Promise.resolve();
+    })
+    .with({ kind: 'forget' }, (forget) => (pass.dryRun ? Promise.resolve(reportForget(pass, forget)) : forgetTree(pass, forget)))
+    .exhaustive();
+}
+
+interface ForgetDecision {
+  kind: 'forget';
+  children: FleetSession[];
+  root: FleetSession;
+  destroyImp: boolean;
+}
+
+type TreeDecision = { kind: 'keep'; kept: KeptSession[] } | ForgetDecision;
+
+async function planTree(pass: TreePass, root: FleetSession): Promise<TreeDecision> {
   const children = collectChildren(pass.sessions, root.id);
   const tree = [...children, root];
   if (tree.some((session) => session.pinned === true)) {
-    pass.wrapUp.kept.push(...tree.map((session) => ({ id: session.id, reason: 'pinned in atc' })));
-    return;
+    return { kind: 'keep', kept: tree.map((session) => ({ id: session.id, reason: 'pinned in atc' })) };
   }
   let work: ImpWork | null = null;
-  if (pass.onImp) {
+  if (isOnImp(root, pass.placedOnImp)) {
     work = await readImpWorkSafely(pass.deps, root);
   }
-  const childIDs = children.map((child) => child.id);
-  const plan = buildWrapUpPlan(root.id, childIDs, work);
+  const plan = buildWrapUpPlan(root.id, children.map((child) => child.id), work);
   if (plan.kind === 'keep') {
-    pass.wrapUp.kept.push(...plan.kept);
-    return;
+    return { kind: 'keep', kept: plan.kept };
   }
+  return { kind: 'forget', children, root, destroyImp: plan.destroyImp };
+}
+
+// The deepest sub-sessions come first, so each is forgotten before the session it lists under.
+function collectChildren(sessions: FleetSession[], parentID: string): FleetSession[] {
+  const found: FleetSession[] = [];
+  for (const child of sessions.filter((session) => session.parent === parentID)) {
+    found.push(...collectChildren(sessions, child.id), child);
+  }
+  return found;
+}
+
+function isOnImp(session: FleetSession, placedOnImp: boolean): boolean {
+  const targetID = session.locator?.targetID;
+  if (typeof targetID === 'string') {
+    return targetID !== 'local';
+  }
+  const vm = session.lifecycle?.vm;
+  if (typeof vm === 'string') {
+    return vm !== 'none';
+  }
+  return placedOnImp;
+}
+
+async function readImpWorkSafely(deps: WrapUpDeps, session: FleetSession): Promise<ImpWork> {
+  try {
+    return await deps.readImpWork(session);
+  } catch (error) {
+    return { state: 'unknown', detail: toMessage(error) };
+  }
+}
+
+function reportForget(pass: TreePass, decision: ForgetDecision): void {
+  pass.wrapUp.forgotten.push(...decision.children.map((child) => child.id), decision.root.id);
+  if (decision.destroyImp) {
+    pass.wrapUp.destroyed.push(decision.root.id);
+  }
+}
+
+async function forgetTree(pass: TreePass, decision: ForgetDecision): Promise<void> {
+  const children = decision.children;
+  const root = decision.root;
 
   // A sub-session takes its parent's pin, and atc refuses to forget one under a pinned parent.
   try {
@@ -118,7 +170,7 @@ async function wrapUpTree(pass: TreePass, root: FleetSession): Promise<void> {
       pass.wrapUp.failed.push({ id: child.id, reason: toMessage(error) });
     }
   }
-  if (!plan.destroyImp) {
+  if (!decision.destroyImp) {
     try {
       await forgetWrappedSession(pass.client, root.id);
       pass.wrapUp.forgotten.push(root.id);
@@ -128,23 +180,6 @@ async function wrapUpTree(pass: TreePass, root: FleetSession): Promise<void> {
     return;
   }
   await removeImpSession(pass, root.id);
-}
-
-// The deepest sub-sessions come first, so each is forgotten before the session it lists under.
-function collectChildren(sessions: FleetSession[], parentID: string): FleetSession[] {
-  const found: FleetSession[] = [];
-  for (const child of sessions.filter((session) => session.parent === parentID)) {
-    found.push(...collectChildren(sessions, child.id), child);
-  }
-  return found;
-}
-
-async function readImpWorkSafely(deps: WrapUpDeps, session: FleetSession): Promise<ImpWork> {
-  try {
-    return await deps.readImpWork(session);
-  } catch (error) {
-    return { state: 'unknown', detail: toMessage(error) };
-  }
 }
 
 // Forgets the live session, which stops it, and confirms the destroy of its imp when atc asks. A
