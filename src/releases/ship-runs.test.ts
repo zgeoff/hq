@@ -589,3 +589,23 @@ test('it reads a failed gates file once in a pass for two cloud PRs, records one
     { merge_sha: buildMockSha(52), shipped_tag: null, shipped_at: null },
   ]);
 });
+
+test('it ships a build run whose delivery PR is released while its design pass PR stays open', async () => {
+  const ctx = setupTest();
+  createMergedRun(ctx.db, 'GEO-79', ['tools#14']);
+  ctx.db.query("INSERT INTO run_prs (ref, issue, state, design_pass, added_at, updated_at) VALUES ('tools#13', 'GEO-79', 'open', 1, '2026-10-14T00:00:00Z', '2026-10-14T00:00:00Z')").run();
+  const run = buildStubSourceGH(
+    {
+      shas: { 'tools#14': buildMockSha(14) },
+      contains: { 'alpha@1.0.0': [buildMockSha(14)] },
+      releases: { tools: [buildMockRelease('alpha@1.0.0', '2026-10-15T00:00:00Z')] },
+      config: { tools: { packages: { 'packages/alpha': { component: 'alpha' } } } },
+      files: { 'tools#14': ['packages/alpha/src/a.ts'] },
+    },
+    ctx.calls,
+  );
+
+  const result = await shipRuns(ctx.db, run, ctx.now);
+
+  expect(result.moved).toStrictEqual([{ issue: 'GEO-79', to: 'live-check', prs: [{ ref: 'tools#14', tag: 'alpha@1.0.0', shipped_at: '2026-10-15T00:00:00Z' }] }]);
+});

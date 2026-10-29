@@ -54,10 +54,13 @@ export async function shipRuns(db: Database, run: Runner, at: Date = now(), opts
 
   const runs = db.query(`SELECT * FROM runs WHERE state IN ('merged','deploying','deploy-held') ORDER BY created_at`).all() as Run[];
   const prsOf = (issue: string) => db.query('SELECT * FROM run_prs WHERE issue = ? ORDER BY added_at').all(issue) as RunPr[];
+
+  // A design pass's PRs are no part of the build run's shipment.
+  const deliveryPRsOf = (issue: string) => prsOf(issue).filter((pr) => pr.design_pass === 0);
   const states = new Map<string, PrState>();
   const candidates: { run: Run; refs: string[] }[] = [];
   for (const r of runs) {
-    const prs = prsOf(r.issue).filter((pr) => pr.design_pass === 0);
+    const prs = deliveryPRsOf(r.issue);
     const merged = prs.filter((p) => p.state === 'merged');
     if (!merged.length || prs.some((p) => p.state === 'open')) continue;
     if (merged.some((p) => !(repoOf(p.ref) in SOURCES))) continue; // no release source: hq never moves it
@@ -225,7 +228,7 @@ export async function shipRuns(db: Database, run: Runner, at: Date = now(), opts
           if (now0.state === 'deploy-held' && isHeldPastShip(readHeldAt(db, c.run.issue), shippedAt)) {
             return null;
           }
-          const cur = prsOf(c.run.issue);
+          const cur = deliveryPRsOf(c.run.issue);
           if (cur.some((p) => p.state === 'open') || cur.filter((p) => p.state === 'merged').map((p) => p.ref).join() !== c.refs.join()) return null;
           // Decide the destination from the live_check read here, not the one read before GitHub was asked.
           const to = destination(now0.live_check);
