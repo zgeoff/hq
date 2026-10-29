@@ -120,3 +120,16 @@ test('the sweep\'s alert list carries the closed-issue alert', () => {
     },
   ]);
 });
+
+test('it gives the drop for a canceled build run whose only PRs are its design pass PRs', () => {
+  const ctx = setupTest();
+  addRun(ctx.db, { issue: 'GEO-9852', title: 'Design the kettle spout', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', design: 'agent', actor: 'kettle-bot' });
+  addPr(ctx.db, 'GEO-9852', 'kettle#52', 'kettle-bot');
+  addPr(ctx.db, 'GEO-9852', 'kettle#53', 'kettle-bot');
+  closePr(ctx.db, 'kettle#52', { to: 'merged', actor: 'kettle-bot' });
+  setState(ctx.db, 'GEO-9852', 'done', { note: 'design settled' }, 'kettle-bot');
+  addRun(ctx.db, { issue: 'GEO-9852', title: 'Build the kettle spout', place: 'imp', session: null, next: 'Building.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
+  ctx.closeInLinear('GEO-9852', 'canceled');
+
+  expect(readClosedIssueAlerts(ctx.db)).toStrictEqual([{ key: 'linear:GEO-9852', fingerprint: 'canceled:working', issue: 'GEO-9852', line: 'GEO-9852: Canceled in Linear while hq has it working; hq run drop GEO-9852' }]);
+});

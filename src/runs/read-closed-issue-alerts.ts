@@ -32,8 +32,10 @@ export function readClosedIssueAlerts(db: Database): Alert[] {
 }
 
 function pickAction(run: RunView, linear: 'completed' | 'canceled'): string | null {
-  const merged = run.prs.some((pr) => pr.state === 'merged');
-  if (run.prs.some((pr) => pr.state === 'open')) {
+  // A design pass's PRs are no part of the build run, as the drop and merge passes read them.
+  const delivery = run.prs.filter((pr) => pr.design_pass === 0);
+  const merged = delivery.some((pr) => pr.state === 'merged');
+  if (delivery.some((pr) => pr.state === 'open')) {
     return 'a PR is still open, so look before you close the run';
   }
 
