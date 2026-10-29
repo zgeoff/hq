@@ -64,3 +64,17 @@ test('it keeps the stored row of an issue Linear did not return, and asks 50 iss
   expect(asked).toStrictEqual([50, 1]);
   expect(ctx.db.query("SELECT state FROM linear_issues WHERE issue = 'GEO-9900'").get()).toStrictEqual({ state: 'canceled' });
 });
+
+test('it asks Linear only about run keys that are Linear identifiers', async () => {
+  const ctx = setupTest();
+  const asked: unknown[] = [];
+  ctx.addKettleRun('GEO-9864');
+  ctx.addKettleRun('GEO-9864-kettle');
+
+  await syncRunIssues(ctx.db, (_query, variables) => {
+    asked.push(variables['ids']);
+    return Promise.resolve({ issues: { nodes: [] } });
+  });
+
+  expect(asked).toStrictEqual([['GEO-9864']]);
+});
