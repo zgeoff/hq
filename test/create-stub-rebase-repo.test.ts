@@ -11,11 +11,6 @@ function setupTest() {
   return { root };
 }
 
-async function readServedHead(directory: string, pr: number): Promise<string> {
-  const result = await realRunner(['git', 'ls-remote', 'origin', `refs/pull/${pr}/head`], { cwd: directory });
-  return result.stdout.split('\t')[0] ?? '';
-}
-
 test('it serves a rebased head that holds main and the PR change', async () => {
   const ctx = setupTest();
   const repo = await createStubRebaseRepo({ root: ctx.root, repo: 'widgets', pr: 7, history: [{ 'a.txt': 'one\n' }], change: { 'b.txt': 'two\n' } });
@@ -24,7 +19,8 @@ test('it serves a rebased head that holds main and the PR change', async () => {
   const head = await repo.rebase();
 
   expect(head).not.toBe(repo.oldHead);
-  expect(await readServedHead(repo.directory, 7)).toBe(head);
+  const served = await repo.readServedHead();
+  expect(served).toBe(head);
   expect([readFileSync(join(repo.directory, 'b.txt'), 'utf8'), readFileSync(join(repo.directory, 'c.txt'), 'utf8')]).toStrictEqual(['two\n', 'three\n']);
 });
 
@@ -46,6 +42,7 @@ test('it serves a squash of the PR onto main as one commit', async () => {
   const head = await repo.squash();
 
   const parents = await realRunner(['git', 'rev-list', '--parents', '-n', '1', head], { cwd: repo.directory });
-  expect(await readServedHead(repo.directory, 7)).toBe(head);
+  const served = await repo.readServedHead();
+  expect(served).toBe(head);
   expect(parents.stdout.trim().split(' ')).toHaveLength(2);
 });

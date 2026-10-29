@@ -1,15 +1,15 @@
 import type { Out } from '../commands.ts';
 import { HqError } from '../errors.ts';
 import { addNews } from '../news/add-news.ts';
-import { findChangedDiffFiles } from '../noslop/find-changed-diff-files.ts';
+import { readChangedDiffFiles } from '../noslop/read-changed-diff-files.ts';
 import { readMergeBase } from '../noslop/read-merge-base.ts';
 import { readPRPatchID } from '../noslop/read-pr-patch-id.ts';
 import { runMissingFetch } from '../noslop/run-missing-fetch.ts';
 import { checkout } from '../review/checkout.ts';
 import { buildCarriedNote } from './build-carried-note.ts';
 import { buildRebasedRefusal } from './build-rebased-refusal.ts';
-import { findAnswerHead } from './find-answer-head.ts';
 import { formatRebasedNews } from './format-rebased-news.ts';
+import { getAnswerHead } from './get-answer-head.ts';
 import type { PRCommandInput } from './run-pr-command.ts';
 import type { PRRef } from './parse-pr-ref.ts';
 import { readHeadLgtm } from './read-head-lgtm.ts';
@@ -18,6 +18,7 @@ import type { OwnerAnswer } from './read-pr-answers.ts';
 import { readPRBase } from './read-pr-base.ts';
 import { readPRHead } from './read-pr-head.ts';
 import { recordPRAnswer } from './record-pr-answer.ts';
+import { requireCarriableLgtm } from './require-carriable-lgtm.ts';
 import { requireReviewer } from './require-reviewer.ts';
 
 const FROM = /^[0-9a-f]{7,40}$/iu;
@@ -27,7 +28,8 @@ const FROM = /^[0-9a-f]{7,40}$/iu;
 // The record keeps whose words the lgtm was. A different or unreadable diff records nothing.
 export async function runPRRebased(input: PRCommandInput, ref: PRRef): Promise<Out> {
   const actor = await input.actor();
-  requireReviewer(actor, await input.readReviewerSession());
+  const session = await input.readReviewerSession();
+  requireReviewer(actor, session);
   const prefix = input.flags.from?.trim() ?? '';
   if (!FROM.test(prefix)) {
     throw new HqError('bad_args', 'usage: hq pr rebased <repo> <pr> --from <old head>, with the old head a hex sha of 7 to 40 characters');
@@ -36,7 +38,7 @@ export async function runPRRebased(input: PRCommandInput, ref: PRRef): Promise<O
   if (answers === null) {
     throw new HqError('bad_args', `an answer record of ${ref.repo}#${ref.pr} cannot be read, so no lgtm is carried`);
   }
-  const oldHead = findAnswerHead(answers, prefix);
+  const oldHead = getAnswerHead(answers, prefix);
   const lgtm = readHeadLgtm(input.db, ref.repo, ref.pr, oldHead);
   if (lgtm === null) {
     throw new HqError('bad_args', `the owner's lgtm is not the newest answer at ${oldHead.slice(0, 7)} of ${ref.repo}#${ref.pr}, so there is none to carry`);
@@ -66,8 +68,8 @@ async function matchPatchIDs(input: PRCommandInput, ref: PRRef, heads: Heads): P
   }
   const baseRef = `refs/hq/base/${ref.pr}`;
   const fetched = await runMissingFetch(input.run, directory, [heads.oldHead, heads.newHead]);
-  const fetchedBase = fetched && (await input.run(['git', 'fetch', '-q', 'origin', `+${base}:${baseRef}`], { cwd: directory })).code === 0;
-  if (!fetchedBase) {
+  const baseFetch = fetched ? await input.run(['git', 'fetch', '-q', 'origin', `+${base}:${baseRef}`], { cwd: directory }) : null;
+  if (baseFetch?.code !== 0) {
     throw new HqError('git_unreadable', `git cannot fetch the heads and ${base} of ${ref.slug}#${ref.pr}, so the diffs are not compared and nothing is recorded`);
   }
   const oldPatchID = await readPRPatchID(input.run, directory, baseRef, heads.oldHead);
@@ -85,7 +87,7 @@ async function compareFiles(input: PRCommandInput, directory: string, baseRef: s
   if (oldBase === null || newBase === null) {
     return null;
   }
-  return await findChangedDiffFiles(input.run, directory, { from: oldBase, to: heads.oldHead }, { from: newBase, to: heads.newHead });
+  return await readChangedDiffFiles(input.run, directory, { from: oldBase, to: heads.oldHead }, { from: newBase, to: heads.newHead });
 }
 
 interface Carry {
@@ -97,14 +99,18 @@ interface Carry {
 }
 
 function carry(input: PRCommandInput, request: Carry): Out {
-  const { ref, lgtm, newHead, patchID } = request;
-  const source = `rebased:${lgtm.head}`,
-    carried = { source: lgtm.source, note: lgtm.note, patchID },
-    note = buildCarriedNote(lgtm, patchID),
-    text = formatRebasedNews(request.actor, { repo: ref.repo, pr: ref.pr, oldHead: lgtm.head ?? '', newHead });
-  input.db.transaction(() => {
-    recordPRAnswer(input.db, { repo: ref.repo, pr: ref.pr, answer: 'lgtm', head: newHead, source, note, actor: request.actor, carried });
-    addNews(input.db, { from: request.actor, topic: 'merge', text, issue: null, link: null, needsGeoff: false });
-  })();
-  return { data: { rebased: { repo: ref.repo, pr: ref.pr, from: lgtm.head, head: newHead, source, carried } }, text: `Recorded ${text}` };
+  const ref = request.ref;
+  const lgtm = request.lgtm;
+  const source = `rebased:${lgtm.head}`;
+  const carried = { source: lgtm.source, note: lgtm.note, patchID: request.patchID };
+  const note = buildCarriedNote(lgtm, request.patchID);
+  const text = formatRebasedNews(request.actor, { repo: ref.repo, pr: ref.pr, oldHead: lgtm.head ?? '', newHead: request.newHead });
+  input.db
+    .transaction(() => {
+      requireCarriableLgtm(input.db, ref.repo, ref.pr, lgtm, request.newHead);
+      recordPRAnswer(input.db, { repo: ref.repo, pr: ref.pr, answer: 'lgtm', head: request.newHead, source, note, actor: request.actor, carried });
+      addNews(input.db, { from: request.actor, topic: 'merge', text, issue: null, link: null, needsGeoff: false });
+    })
+    .immediate();
+  return { data: { rebased: { repo: ref.repo, pr: ref.pr, from: lgtm.head, head: request.newHead, source, carried } }, text: `Recorded ${text}` };
 }

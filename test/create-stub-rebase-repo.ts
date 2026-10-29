@@ -29,6 +29,9 @@ interface StubRebaseRepo {
 
   // Squashes the PR onto main as it is now into one commit, serves it as the PR head and gives it.
   squash: () => Promise<string>;
+
+  // The head origin serves for the PR now.
+  readServedHead: () => Promise<string>;
 }
 
 // A stub PR repo (see createStubPRRepo) whose PR head can then be rebased or squashed onto a main
@@ -60,6 +63,10 @@ export async function createStubRebaseRepo(options: StubRebaseRepoOptions): Prom
         await git('commit', '-q', '--amend', '--no-edit');
       }
       return await serve();
+    },
+    readServedHead: async () => {
+      const served = await git('ls-remote', 'origin', `refs/pull/${options.pr}/head`);
+      return served.split('\t')[0] ?? '';
     },
     squash: async () => {
       await git('checkout', '-q', '-B', 'kettle-squash', 'main');

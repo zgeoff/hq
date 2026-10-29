@@ -1,8 +1,9 @@
 import type { Runner } from '../runner/types.ts';
+import type { DiffEnd } from './diff-end.ts';
 
 // git's patch-id of one file's diff from `from` to `to`: '' when the file does not change, null when
 // git cannot read the diff.
-export async function readFilePatchID(run: Runner, directory: string, range: { from: string; to: string }, path: string): Promise<string | null> {
+export async function readFilePatchID(run: Runner, directory: string, range: DiffEnd, path: string): Promise<string | null> {
   const diff = await run(['git', '--literal-pathspecs', 'diff', '--binary', '--full-index', range.from, range.to, '--', path], { cwd: directory });
   if (diff.code !== 0) {
     return null;

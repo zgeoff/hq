@@ -3,7 +3,7 @@ import type { OwnerAnswer } from './read-pr-answers.ts';
 
 // The full sha of the one head the PR has an answer at that starts with `prefix`. Throws when none
 // does, or when the prefix fits more than one.
-export function findAnswerHead(answers: readonly OwnerAnswer[], prefix: string): string {
+export function getAnswerHead(answers: readonly OwnerAnswer[], prefix: string): string {
   const lower = prefix.toLowerCase();
   const heads = [...new Set(answers.flatMap((answer) => (answer.head?.startsWith(lower) === true ? [answer.head] : [])))];
   const [only] = heads;
