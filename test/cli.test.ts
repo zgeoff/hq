@@ -827,6 +827,26 @@ test('hq run ship prints a vers PR shipped at its merge as at merge', async () =
   }
 });
 
+test('hq run tidy --dry-run lists a merged run to tidy and changes nothing, and hq run tidy wraps it up once', async () => {
+  await hq('run', 'add', 'GEO-514', '--title', 'Invented kettle work', '--where', 'none');
+  await hq('run', 'pr', 'GEO-514', 'kettle#14');
+  closePr(db(), 'kettle#14', { to: 'merged', actor: 'hq-github', facts: { mergedAt: '2026-10-20T03:04:05Z', mergeSha: null } });
+  await hq('run', 'state', 'GEO-514', 'merged');
+  out = [];
+
+  const dry = await main(['run', 'tidy', '--dry-run']);
+  const dryText = out.join('\n');
+  out = [];
+  const real = await main(['run', 'tidy']);
+  const realText = out.join('\n');
+  out = [];
+  const repeat = await main(['run', 'tidy']);
+
+  expect([dry, dryText]).toStrictEqual([0, 'Would tidy (nothing changed):\n  GEO-514: Wrap-up: no session of the run is in atc.']);
+  expect([real, realText]).toStrictEqual([0, 'Tidied:\n  GEO-514: Wrap-up: no session of the run is in atc.']);
+  expect([repeat, out.join('\n')]).toStrictEqual([0, 'No merged run to tidy.']);
+});
+
 test('hq run ship lists a run whose helper is still active as left, and moves nothing', async () => {
   await hq('run', 'add', 'GEO-513', '--title', 'Invented kettle work', '--where', 'none');
   await hq('run', 'pr', 'GEO-513', 'vers#22');
