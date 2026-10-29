@@ -4,22 +4,27 @@ import { eventsCursorSchema } from '../atc/events-cursor-schema.ts';
 import { eventsReadSchema } from '../atc/events-read-schema.ts';
 import { getMeta } from '../db/get-meta.ts';
 import { setMeta } from '../db/set-meta.ts';
+import type { Runner } from '../runner/types.ts';
 import { applyNoteSignals } from './apply-note-signals.ts';
 import { cursorIndex } from './cursor-index.ts';
+import { collectFinalClaims } from './collect-final-claims.ts';
+import { findOpenSessionIssue } from './find-open-session-issue.ts';
 import { FROM_START } from './from-start.ts';
+import { makeFinalResolver } from './make-final-resolver.ts';
 import { orchestratorName } from '../wake/orchestrator-name.ts';
 import { sendNoteToOrchestrator } from './send-note-to-orchestrator.ts';
-import type { FeedEvent, IngestResult } from './types.ts';
+import type { FeedEvent, FinalClaim, FinalResolutions, IngestResult } from './types.ts';
 import { updateRunTime as touch } from './update-run-time.ts';
 
 // Read atc's event feed from the stored cursor. A decision or blocked note goes
 // to the orchestrator. A note from a session on an open row becomes a run note; each page commits with its cursor, so a crash
 // re-reads at most one page and the event key keeps that idempotent.
-export async function ingestNotes(db: Database, client: AtcClient, opts: { maxPages?: number } = {}): Promise<IngestResult> {
+export async function ingestNotes(db: Database, client: AtcClient, opts: { maxPages?: number; run?: Runner } = {}): Promise<IngestResult> {
   const CURSOR_KEY = 'atc_events_cursor',
     result: IngestResult = { read: 0, notes: 0, routed: 0, finals: [], unmatched: 0, reset: false, bootstrapped: false };
   let cursor = getMeta(db, CURSOR_KEY);
   const maxPages = opts.maxPages ?? 50;
+  let resolveFinal: ReturnType<typeof makeFinalResolver> | undefined;
   const orchestrator = orchestratorName();
 
   if (!cursor) {
@@ -52,6 +57,10 @@ export async function ingestNotes(db: Database, client: AtcClient, opts: { maxPa
       }
       throw e;
     }
+    if (opts.run !== undefined) {
+      resolveFinal ??= makeFinalResolver(opts.run);
+    }
+    const resolutions = await resolveFinals(db, r.events, resolveFinal ?? null);
     db.transaction(() => {
       for (const e of r.events) {
         result.read++;
@@ -59,10 +68,8 @@ export async function ingestNotes(db: Database, client: AtcClient, opts: { maxPa
         if (sendNoteToOrchestrator(db, e, orchestrator)) {
           result.routed++;
         }
-        const row = db
-          .query(`SELECT s.issue FROM run_sessions s JOIN runs r ON r.issue = s.issue WHERE s.session_id = ? AND r.state NOT IN ('done','dropped')`)
-          .get(e.session) as { issue: string } | null;
-        if (!row) {
+        const issue = findOpenSessionIssue(db, e.session);
+        if (issue === null) {
           result.unmatched++;
           continue;
         }
@@ -71,12 +78,12 @@ export async function ingestNotes(db: Database, client: AtcClient, opts: { maxPa
         if (db.query(`SELECT 1 FROM run_notes WHERE session_id = ? AND at = ? AND text = ?`).get(e.session, noteAt, e.detail)) continue;
         const ins = db
           .query(`INSERT INTO run_notes (issue, session_id, label, text, source, event_key, at) VALUES (?, ?, ?, ?, 'atc', ?, ?) ON CONFLICT (event_key) DO NOTHING`)
-          .run(row.issue, e.session, e.label ?? null, e.detail, `${epoch}:${e.cursor}`, noteAt);
+          .run(issue, e.session, e.label ?? null, e.detail, `${epoch}:${e.cursor}`, noteAt);
         if (ins.changes === 0) continue;
         result.notes++;
-        const sig = applyNoteSignals(db, row.issue, e.detail, `atc:${e.session.slice(0, 8)}`, Number(ins.lastInsertRowid), e.name ?? e.session.slice(0, 8));
+        const sig = applyNoteSignals(db, issue, e.detail, { source: `atc:${e.session.slice(0, 8)}`, note: Number(ins.lastInsertRowid), actor: e.name ?? e.session.slice(0, 8), resolutions });
         if (sig.final) result.finals.push(sig.final);
-        touch(db, row.issue);
+        touch(db, issue);
       }
       setMeta(db, CURSOR_KEY, r.cursor);
     }).immediate();
@@ -110,4 +117,19 @@ async function feedEnd(client: AtcClient): Promise<string> {
     if (!r.more) return cursor;
   }
   return cursor!;
+}
+
+// What GitHub says of every FINAL sha the page's notes give, read before the page's transaction opens.
+function resolveFinals(db: Database, events: FeedEvent[], resolveFinal: ((claims: FinalClaim[]) => Promise<FinalResolutions>) | null): Promise<FinalResolutions> {
+  if (resolveFinal === null) {
+    return Promise.resolve(new Map());
+  }
+  const claims = events.flatMap((event) => {
+    if (event.kind !== 'note' || !event.detail) {
+      return [];
+    }
+    const issue = findOpenSessionIssue(db, event.session);
+    return issue === null ? [] : collectFinalClaims(db, issue, event.detail);
+  });
+  return resolveFinal(claims);
 }

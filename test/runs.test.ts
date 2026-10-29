@@ -107,7 +107,7 @@ describe('reviews: one round plus one re-check', () => {
 describe('note signals', () => {
   test('the FINAL marker attaches the PR and marks it final', () => {
     add();
-    const sig = applyNoteSignals(db, 'GEO-9001', 'FINAL widgets#12 abc1234 all green', 'test');
+    const sig = applyNoteSignals(db, 'GEO-9001', 'FINAL widgets#12 abc1234 all green', { source: 'test' });
     expect(sig.final).toBe('widgets#12');
     expect(listRuns(db)[0]!.prs[0]).toMatchObject({ ref: 'widgets#12', final_sha: 'abc1234', final_source: 'marker:test' });
   });
@@ -115,21 +115,21 @@ describe('note signals', () => {
   test('a note whose final notice cannot be queued is not kept, so the same marker marks it final on a retry', () => {
     add();
     db.run("CREATE TEMP TRIGGER refuse_notice BEFORE INSERT ON outbox BEGIN SELECT RAISE(ABORT, 'invented: outbox refused'); END");
-    expect(() => addNote(db, 'GEO-9001', 'FINAL widgets#12 abc1234 all green', null, 'z-delivery')).toThrow('invented: outbox refused');
+    expect(() => addNote(db, 'GEO-9001', 'FINAL widgets#12 abc1234 all green', { label: null, actor: 'z-delivery' })).toThrow('invented: outbox refused');
     expect(db.query('SELECT COUNT(*) AS total FROM run_notes').get()).toStrictEqual({ total: 0 });
     db.run('DROP TRIGGER refuse_notice');
-    addNote(db, 'GEO-9001', 'FINAL widgets#12 abc1234 all green', null, 'z-delivery');
+    addNote(db, 'GEO-9001', 'FINAL widgets#12 abc1234 all green', { label: null, actor: 'z-delivery' });
     expect(db.query("SELECT topic FROM outbox WHERE topic = 'final:widgets#12'").all()).toStrictEqual([{ topic: 'final:widgets#12' }]);
   });
 
   test('a note that marks a PR final leaves an event with the note id and the sha', () => {
     add();
-    const note = addNote(db, 'GEO-9001', 'FINAL widgets#12 abc1234 all green', null, 'z-delivery');
+    const note = addNote(db, 'GEO-9001', 'FINAL widgets#12 abc1234 all green', { label: null, actor: 'z-delivery' });
     const ev = db.query(`SELECT subject_id, action, actor, from_state, to_state, data FROM events WHERE action = 'final'`).all() as { data: string }[];
     expect(ev).toHaveLength(1);
     expect(ev[0]).toMatchObject({ subject_id: 'GEO-9001', actor: 'z-delivery', from_state: null, to_state: 'abc1234' });
     expect(JSON.parse(ev[0]!.data)).toEqual({ ref: 'widgets#12', sha: 'abc1234', source: 'marker:note:z-delivery', note: note.id });
-    finalPr(db, 'widgets#12', 'def5678', 'z-q');
+    finalPr(db, 'widgets#12', { sha: 'def5678', actor: 'z-q' });
     const last = db.query(`SELECT from_state, to_state, data FROM events WHERE action = 'final' ORDER BY seq DESC LIMIT 1`).get() as { data: string };
     expect(last).toMatchObject({ from_state: 'abc1234', to_state: 'def5678' });
     expect(JSON.parse(last.data)).toMatchObject({ source: 'cli:z-q', note: null });
@@ -138,12 +138,12 @@ describe('note signals', () => {
   test("today's wording marks the row's only open PR final", () => {
     add();
     addPr(db, 'GEO-9001', 'widgets#12', 'z-delivery');
-    expect(applyNoteSignals(db, 'GEO-9001', 'PR #12 is final again at 39f05fe. CI green.', 'test').final).toBe('widgets#12');
+    expect(applyNoteSignals(db, 'GEO-9001', 'PR #12 is final again at 39f05fe. CI green.', { source: 'test' }).final).toBe('widgets#12');
   });
 
   test('an opened PR is attached; a merely mentioned one is not', () => {
     add();
-    applyNoteSignals(db, 'GEO-9001', 'Opened PR https://github.com/acme/widgets/pull/14 for GEO-9001. Rebased after gadgets#3 merged.', 'test');
+    applyNoteSignals(db, 'GEO-9001', 'Opened PR https://github.com/acme/widgets/pull/14 for GEO-9001. Rebased after gadgets#3 merged.', { source: 'test' });
     expect(listRuns(db)[0]!.prs.map((p) => p.ref)).toEqual(['widgets#14']);
   });
 
@@ -151,12 +151,12 @@ describe('note signals', () => {
     add();
     addPr(db, 'GEO-9001', 'widgets#12', 'z-delivery');
     addPr(db, 'GEO-9001', 'widgets#13', 'z-delivery');
-    expect(applyNoteSignals(db, 'GEO-9001', 'it is final at 39f05fe', 'test').final).toBeNull();
+    expect(applyNoteSignals(db, 'GEO-9001', 'it is final at 39f05fe', { source: 'test' }).final).toBeNull();
   });
 
   test('a cli note by session prefix lands on the row', () => {
     add();
-    expect(addNote(db, 'aaaaaaaa', 'checked the kettle', null, 'z-delivery').issue).toBe('GEO-9001');
+    expect(addNote(db, 'aaaaaaaa', 'checked the kettle', { label: null, actor: 'z-delivery' }).issue).toBe('GEO-9001');
   });
 });
 
@@ -256,7 +256,7 @@ describe('the sweep', () => {
   test('a final PR with no review for 30 min is flagged once, then after 30 more', () => {
     add();
     addPr(db, 'GEO-9001', 'widgets#12', 'z-delivery');
-    finalPr(db, 'widgets#12', 'abc1234', 'z-delivery');
+    finalPr(db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
     atMin(29);
     expect(findAlerts(db, alive(), new Map(), new Date(base + 29 * 60_000))).toEqual([]);
     atMin(31);
@@ -276,7 +276,7 @@ describe('the sweep', () => {
     add();
     addPr(db, 'GEO-9001', 'widgets#12', 'z-delivery');
     expect(() => unfinalPr(db, 'widgets#12', 'z-delivery', null)).toThrow('has no final mark');
-    finalPr(db, 'widgets#12', 'abc1234', 'z-delivery');
+    finalPr(db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
     atMin(31);
     expect(findAlerts(db, alive(), new Map(), new Date(base + 31 * 60_000))).toHaveLength(1);
     const p = unfinalPr(db, 'widgets#12', 'z-delivery', 'head moved; waits on a release');
@@ -286,7 +286,7 @@ describe('the sweep', () => {
     expect(ev.to_value).toBeNull();
     expect(JSON.parse(ev.data)).toMatchObject({ ref: 'widgets#12', reason: 'head moved; waits on a release' });
     expect(findAlerts(db, alive(), new Map(), new Date(base + 200 * 60_000))).toEqual([]);
-    finalPr(db, 'widgets#12', 'def5678', 'z-delivery');
+    finalPr(db, 'widgets#12', { sha: 'def5678', actor: 'z-delivery' });
     atMin(240);
     expect(findAlerts(db, alive(), new Map(), new Date(base + 240 * 60_000))[0]!.line).toContain('final at def5678');
     closePr(db, 'widgets#12', { to: 'merged', actor: 'z-delivery' });
@@ -296,11 +296,11 @@ describe('the sweep', () => {
   test('each new final sha tells z-review once; the same sha again tells nothing', () => {
     add();
     addPr(db, 'GEO-9001', 'widgets#12', 'z-delivery');
-    finalPr(db, 'widgets#12', 'abc1234', 'z-delivery');
-    finalPr(db, 'widgets#12', 'abc1234', 'z-delivery');
+    finalPr(db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
+    finalPr(db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
     expect(toReview()).toEqual([{ text: 'Final: GEO-9001 (widgets#12 at abc1234). Review it, then merge.', topic: 'final:widgets#12', status: 'pending' }]);
     // The head moved: the new final replaces the unsent older message.
-    applyNoteSignals(db, 'GEO-9001', 'FINAL widgets#12 def5678', 'atc:s1');
+    applyNoteSignals(db, 'GEO-9001', 'FINAL widgets#12 def5678', { source: 'atc:s1' });
     const m = toReview().filter((x) => x.status === 'pending');
     expect(m).toEqual([{ text: 'Final: GEO-9001 (widgets#12 at def5678). Review it, then merge.', topic: 'final:widgets#12', status: 'pending' }]);
   });
@@ -309,8 +309,8 @@ describe('the sweep', () => {
     add();
     addPr(db, 'GEO-9001', 'widgets#12', 'z-delivery');
     addPr(db, 'GEO-9001', 'widgets#13', 'z-delivery');
-    finalPr(db, 'widgets#12', 'abc1234', 'z-delivery');
-    finalPr(db, 'widgets#13', 'abc5678', 'z-delivery');
+    finalPr(db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
+    finalPr(db, 'widgets#13', { sha: 'abc5678', actor: 'z-delivery' });
     unfinalPr(db, 'widgets#12', 'z-delivery', null);
     expect(toReview().map((x) => x.topic)).toEqual(['final:widgets#13']);
     closePr(db, 'widgets#13', { to: 'merged', actor: 'z-review' });
@@ -331,7 +331,7 @@ describe('the sweep', () => {
   test('hq run unmerge puts a wrong merged mark back to open and logs it; final and review marks stay', () => {
     add();
     addPr(db, 'GEO-9001', 'widgets#12', 'z-delivery');
-    finalPr(db, 'widgets#12', 'abc1234', 'z-delivery');
+    finalPr(db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
     reviewedPr(db, 'widgets#12', 'abc1234', { recheck: false, force: false }, 'z-review');
     expect(() => unmergePr(db, 'widgets#12', 'z-review', null)).toThrow('is open, not merged');
     closePr(db, 'widgets#12', { to: 'merged', actor: 'z-review' });
@@ -340,7 +340,9 @@ describe('the sweep', () => {
     const ev = db.query(`SELECT from_state, to_state, data FROM events WHERE action = 'unmerged'`).get() as { from_state: string; to_state: string; data: string };
     expect(ev).toMatchObject({ from_state: 'merged', to_state: 'open' });
     expect(JSON.parse(ev.data)).toMatchObject({ ref: 'widgets#12', reason: 'merge failed on a conflict' });
-    finalPr(db, 'widgets#12', 'def5678', 'z-delivery'); // a final works again
+
+    // a final works again
+    finalPr(db, 'widgets#12', { sha: 'def5678', actor: 'z-delivery' });
   });
 
   test('unmerge drops the merge commit and the shipment of the wrong merge, and the event keeps them', () => {
@@ -355,7 +357,7 @@ describe('the sweep', () => {
   test('a review started recently, or a review of the final head, silences it', () => {
     add();
     addPr(db, 'GEO-9001', 'widgets#12', 'z-delivery');
-    finalPr(db, 'widgets#12', 'abc1234', 'z-delivery');
+    finalPr(db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
     atMin(31);
     reviewStarted(db, 'widgets#12', 'z-delivery');
     expect(findAlerts(db, alive(), new Map(), new Date(base + 40 * 60_000))).toEqual([]);
@@ -366,18 +368,18 @@ describe('the sweep', () => {
   test('a short final sha and a full reviewed sha of the same commit count as reviewed', () => {
     add();
     addPr(db, 'GEO-9001', 'widgets#12', 'z-delivery');
-    finalPr(db, 'widgets#12', 'abc1234', 'z-delivery');
+    finalPr(db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
     reviewedPr(db, 'widgets#12', 'abc1234def5678abc1234def5678abc1234def56', { recheck: false, force: false }, 'z-delivery');
     expect(findAlerts(db, alive(), new Map(), new Date(base + 31 * 60_000))).toEqual([]);
     // the marker read again (short) does not reset the final time
-    finalPr(db, 'widgets#12', 'abc1234def', 'z-delivery');
+    finalPr(db, 'widgets#12', { sha: 'abc1234def', actor: 'z-delivery' });
     expect(findAlerts(db, alive(), new Map(), new Date(base + 31 * 60_000))).toEqual([]);
   });
 
   test('a blocked run does not flag its unreviewed final PR', () => {
     add();
     addPr(db, 'GEO-9001', 'widgets#12', 'z-delivery');
-    finalPr(db, 'widgets#12', 'abc1234', 'z-delivery');
+    finalPr(db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
     setState(db, 'GEO-9001', 'blocked', { waitsOn: 'a gadgets release' }, 'z-delivery');
     expect(findAlerts(db, alive(), new Map(), new Date(base + 31 * 60_000))).toEqual([]);
     setState(db, 'GEO-9001', 'working', {}, 'z-delivery');
@@ -388,7 +390,7 @@ describe('the sweep', () => {
     add();
     addPr(db, 'GEO-9001', 'widgets#12', 'z-delivery');
     reviewedPr(db, 'widgets#12', 'abc1234', { recheck: false, force: false }, 'z-delivery');
-    finalPr(db, 'widgets#12', 'def5678', 'z-delivery');
+    finalPr(db, 'widgets#12', { sha: 'def5678', actor: 'z-delivery' });
     expect(findAlerts(db, alive(), new Map(), new Date(base + 31 * 60_000))[0]!.line).toContain('head moved since your review at abc1234');
   });
 
@@ -397,11 +399,13 @@ describe('the sweep', () => {
     const gone = [{ id: S1, name: 'kettle', alive: false, state: 'exited' }];
     addPr(db, 'GEO-9001', 'widgets#12', 'z-delivery');
     expect(findAlerts(db, gone, new Map(), new Date(base))[0]!.line).toContain('has exited'); // a PR, not yet final
-    finalPr(db, 'widgets#12', 'abc1234', 'z-delivery');
+    finalPr(db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
     expect(findAlerts(db, gone, new Map(), new Date(base))[0]!.line).toContain('has exited'); // final, not reviewed
     reviewedPr(db, 'widgets#12', 'abc1234', { recheck: false, force: false }, 'z-delivery');
     expect(findAlerts(db, gone, new Map(), new Date(base))).toEqual([]);
-    finalPr(db, 'widgets#12', 'def5678', 'z-delivery'); // the head moved after the review
+
+    // the head moved after the review
+    finalPr(db, 'widgets#12', { sha: 'def5678', actor: 'z-delivery' });
     expect(findAlerts(db, gone, new Map(), new Date(base)).map((a) => a.line).join('\n')).toContain('has exited');
   });
 
@@ -418,7 +422,7 @@ describe('the sweep', () => {
   test('merged PRs and closed rows are never flagged', () => {
     add();
     addPr(db, 'GEO-9001', 'widgets#12', 'z-delivery');
-    finalPr(db, 'widgets#12', 'abc1234', 'z-delivery');
+    finalPr(db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
     closePr(db, 'widgets#12', { to: 'merged', actor: 'z-delivery' });
     setState(db, 'GEO-9001', 'merged', { waitsOn: 'release' }, 'z-delivery');
     expect(findAlerts(db, alive('done'), new Map([[S1, 0]]), new Date(base + 500 * 60_000))).toEqual([]);
@@ -451,7 +455,7 @@ describe('review fixes', () => {
     add();
     add('GEO-9002', S2);
     addPr(db, 'GEO-9001', 'widgets#12', 'z-delivery');
-    finalPr(db, 'widgets#12', 'abc1234', 'z-delivery');
+    finalPr(db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
     const alive = [
       { id: S1, name: 'kettle', alive: true, state: 'running' },
       { id: S2, name: 'toaster', alive: true, state: 'running' },
@@ -471,7 +475,7 @@ describe('review fixes', () => {
   test("a note about another repo's PR never marks this row's PR final", () => {
     add();
     addPr(db, 'GEO-9001', 'widgets#12', 'z-delivery');
-    expect(applyNoteSignals(db, 'GEO-9001', 'gadgets#99 is final at abc1234', 'test').final).toBeNull();
+    expect(applyNoteSignals(db, 'GEO-9001', 'gadgets#99 is final at abc1234', { source: 'test' }).final).toBeNull();
     expect(listRuns(db)[0]!.prs[0]!.final_sha).toBeNull();
   });
 });
@@ -496,9 +500,9 @@ describe('re-check fixes', () => {
     add();
     addPr(db, 'GEO-9001', 'widgets#12', 'z-delivery');
     addPr(db, 'GEO-9001', 'widgets#13', 'z-delivery');
-    expect(applyNoteSignals(db, 'GEO-9001', 'Rebased widgets#12. gadgets#99 is final at abc1234', 'test').final).toBeNull();
+    expect(applyNoteSignals(db, 'GEO-9001', 'Rebased widgets#12. gadgets#99 is final at abc1234', { source: 'test' }).final).toBeNull();
     expect(listRuns(db)[0]!.prs.every((p) => p.final_sha === null)).toBe(true);
-    expect(applyNoteSignals(db, 'GEO-9001', 'widgets#13 is final at abc1234', 'test').final).toBe('widgets#13');
+    expect(applyNoteSignals(db, 'GEO-9001', 'widgets#13 is final at abc1234', { source: 'test' }).final).toBe('widgets#13');
   });
 
   test('two identical notes in the same second stay two', async () => {

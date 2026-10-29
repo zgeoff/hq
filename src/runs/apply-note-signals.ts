@@ -1,20 +1,34 @@
 import type { Database } from 'bun:sqlite';
 import { z } from 'zod';
+import { buildFinalKey } from './build-final-key.ts';
+import { collectMentionedPRs } from './collect-mentioned-prs.ts';
+import { FINAL_MARK } from './final-mark.ts';
+import { FINAL_PHRASE } from './final-phrase.ts';
 import { normalizePrRef } from './normalize-pr-ref.ts';
+import { parseMarkedRef } from './parse-marked-ref.ts';
 import { PR_IN_TEXT } from './pr-in-text.ts';
 import { scheduleFinalReview as markFinal } from './schedule-final-review.ts';
+import { sendFinalRefusal } from './send-final-refusal.ts';
 import { registerRunPR as attachPr } from './register-run-pr.ts';
+import type { FinalResolutions } from './types.ts';
 
-export function applyNoteSignals(db: Database, issue: string, text: string, source: string, note: number | null = null, actor: string = source): { prs: string[]; final: string | null } {
-  // The fixed phrase briefs ask for: "FINAL <repo>#<n> <sha>". Also today's
-  // wording: "... is final (again) at <sha>" next to a PR reference.
-  // The callers read both patterns' groups by index. FINAL_PHRASE has no u: with i, u adds
-  // Unicode case folding, so "ſ" would match the s in "is".
-  // oxlint-disable-next-line prefer-named-capture-group
-  const FINAL_MARK = /^\s*FINAL\s+(\S+#\d+)\s+([0-9a-f]{7,40})\b/u,
-    // oxlint-disable-next-line prefer-named-capture-group, require-unicode-regexp
-    FINAL_PHRASE = /\bis final(?: again)? at ([0-9a-f]{7,40})\b/i,
-    found: string[] = [];
+interface SignalOptions {
+  source: string;
+  note?: number | null;
+  actor?: string;
+
+  // What GitHub said of each FINAL sha the note gives; a sha it lacks is recorded as given.
+  resolutions?: FinalResolutions;
+}
+
+const NO_RESOLUTIONS: FinalResolutions = new Map();
+
+export function applyNoteSignals(db: Database, issue: string, text: string, options: SignalOptions): { prs: string[]; final: string | null } {
+  const source = options.source;
+  const actor = options.actor ?? source;
+  const note = options.note ?? null;
+  const resolutions = options.resolutions ?? NO_RESOLUTIONS;
+  const found: string[] = [];
   for (const m of text.matchAll(PR_IN_TEXT)) {
     // Only a PR the agent says it opened: a note that merely mentions another
     // PR ("rebased after nixie#149 merged") must not attach it.
@@ -35,7 +49,7 @@ export function applyNoteSignals(db: Database, issue: string, text: string, sour
   let final: string | null = null;
   const mark = FINAL_MARK.exec(text);
   if (mark) {
-    final = applyFinalMark(db, { issue, ref: mark[1] ?? '', sha: mark[2] ?? '', source: `marker:${source}`, actor, note });
+    final = applyFinalMark(db, { issue, ref: mark[1] ?? '', sha: mark[2] ?? '', source: `marker:${source}`, actor, note, resolutions });
   } else {
     const phrase = FINAL_PHRASE.exec(text);
     if (phrase) {
@@ -43,12 +57,12 @@ export function applyNoteSignals(db: Database, issue: string, text: string, sour
       // be this row's open PR; only a note that names none falls back to the only open PR.
       const open = (db.query(`SELECT ref FROM run_prs WHERE issue = ? AND state = 'open'`).all(issue) as { ref: string }[]).map((p) => p.ref);
       // A note that names any PR outside this row is ambiguous: mark nothing.
-      const mentioned = mentionedPrs(text);
+      const mentioned = collectMentionedPRs(text);
       const ours = (db.query('SELECT ref FROM run_prs WHERE issue = ?').all(issue) as { ref: string }[]).map((p) => p.ref);
       const foreign = mentioned.some((r) => !ours.includes(r));
       const named = mentioned.filter((r) => open.includes(r));
       const target = foreign ? undefined : mentioned.length ? (named.length === 1 ? named[0] : undefined) : open.length === 1 ? open[0] : undefined;
-      if (target && markFinal(db, { ref: target, sha: String(phrase[1]), source: `phrase:${source}`, actor, note })) {
+      if (target && markResolved(db, { issue, ref: target, sha: String(phrase[1]), source: `phrase:${source}`, actor, note, resolutions })) {
         final = target;
       }
     }
@@ -63,6 +77,7 @@ interface FinalMarkInput {
   source: string;
   actor: string;
   note: number | null;
+  resolutions: FinalResolutions;
 }
 
 const RunPrOwnerSchema = z.object({ issue: z.string() }).nullable();
@@ -79,23 +94,16 @@ function applyFinalMark(db: Database, input: FinalMarkInput): string | null {
   } else if (owner.issue !== input.issue) {
     return null;
   }
-  return markFinal(db, { ref, sha: input.sha, source: input.source, actor: input.actor, note: input.note }) ? ref : null;
+  return markResolved(db, { ...input, ref }) ? ref : null;
 }
 
-function parseMarkedRef(raw: string): string | null {
-  try {
-    return normalizePrRef(raw).ref;
-  } catch {
-    return null;
+// A refused sha leaves a notice for the orchestrator and no mark.
+function markResolved(db: Database, input: FinalMarkInput): boolean {
+  const resolution = input.resolutions.get(buildFinalKey(input.ref, input.sha)) ?? null;
+  if (resolution?.kind === 'refused') {
+    sendFinalRefusal(db, { issue: input.issue, ref: input.ref, given: input.sha, refusal: resolution, actor: input.actor });
+    return false;
   }
+  return markFinal(db, { ref: input.ref, sha: input.sha, source: input.source, actor: input.actor, note: input.note, resolution });
 }
 
-function mentionedPrs(text: string): string[] {
-  const refs = new Set<string>();
-  for (const m of text.matchAll(PR_IN_TEXT)) {
-    try {
-      refs.add(normalizePrRef(m[0]).ref);
-    } catch {}
-  }
-  return [...refs];
-}

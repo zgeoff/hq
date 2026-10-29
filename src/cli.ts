@@ -68,6 +68,9 @@ import { checkMergedOnGitHub } from './runs/check-merged-on-github.ts';
 import { readMergedPR } from './runs/read-merged-pr.ts';
 import { closePr } from './runs/close-pr.ts';
 import { finalPr } from './runs/final-pr.ts';
+import { makeFinalResolver } from './runs/make-final-resolver.ts';
+import { resolveCliFinal } from './runs/resolve-cli-final.ts';
+import { resolveNoteFinals } from './runs/resolve-note-finals.ts';
 import { fullSessionId } from './runs/full-session-id.ts';
 import { getRun } from './runs/get-run.ts';
 import { ingestNotes } from './runs/ingest-notes.ts';
@@ -802,7 +805,7 @@ async function watchRuns(db: Database, me: string): Promise<void> {
   const c = await AtcClient.open();
   const wrapUpDeps = buildWrapUpDeps();
   try {
-    const ing = await ingestNotes(db, c);
+    const ing = await ingestNotes(db, c, { run: boundedRunner(realRunner, CALL_MS) });
     if (ing.notes > 0 || ing.routed > 0 || ing.reset || ing.bootstrapped) {
       console.log(`${iso(now())} notes: ${ing.notes} recorded${ing.routed ? `, ${ing.routed} routed to ${orchestratorName()}` : ''}${ing.finals.length > 0 ? `, final: ${ing.finals.join(', ')}` : ''}${ing.reset ? ', feed cursor reset' : ''}${ing.bootstrapped ? ', feed cursor started at the end' : ''}`);
     }
@@ -960,8 +963,11 @@ ${r.result === 'added' ? 'On the board.' : 'Already on the board.'}` };
       return { data: { pr: p }, text: runLine(view(p.issue)) };
     }
     case 'final': {
-      const p = finalPr(db, arg(0, 'pr'), need(flags.sha, 'sha'), await by(), { fixed: parseFixed(flags.fixed), followups: parseFollowups(flags.followups) });
-      return { data: { pr: p }, text: runLine(view(p.issue)) };
+      const sha = need(flags.sha, 'sha');
+      const resolution = await resolveCliFinal(makeFinalResolver(boundedRunner(realRunner, CALL_MS)), arg(0, 'pr'), sha);
+      const finalizer = await by();
+      const finalized = finalPr(db, arg(0, 'pr'), { sha, actor: finalizer, tally: { fixed: parseFixed(flags.fixed), followups: parseFollowups(flags.followups) }, resolution });
+      return { data: { pr: finalized }, text: runLine(view(finalized.issue)) };
     }
     case 'unfinal': {
       const p = unfinalPr(db, arg(0, 'pr'), await by(), flags.reason ?? null);
@@ -992,8 +998,10 @@ Round ${p.review_round} recorded at ${p.reviewed_sha}.` };
       return { data: { pr: closed }, text: runLine(view(closed.issue)) };
     }
     case 'note': {
-      const n = addNote(db, arg(0, 'issue or session'), arg(1, 'text'), flags.label ?? null, await by());
-      return { data: { note: n }, text: runLine(view(n.issue)) };
+      const resolutions = await resolveNoteFinals(db, makeFinalResolver(boundedRunner(realRunner, CALL_MS)), arg(0, 'issue or session'), arg(1, 'text'));
+      const noter = await by();
+      const stored = addNote(db, arg(0, 'issue or session'), arg(1, 'text'), { label: flags.label ?? null, actor: noter, resolutions });
+      return { data: { note: stored }, text: runLine(view(stored.issue)) };
     }
     case 'show': {
       const r = viewRun(db, resolveRun(db, arg(0, 'issue or session')));
@@ -1019,7 +1027,7 @@ Round ${p.review_round} recorded at ${p.reviewed_sha}.` };
       const c = await AtcClient.open();
       const wrapUpDeps = buildWrapUpDeps();
       try {
-        const ing = await ingestNotes(db, c);
+        const ing = await ingestNotes(db, c, { run: boundedRunner(realRunner, CALL_MS) });
         const sweeper = await by();
         const sw = await sweepNow(db, c, boundedRunner(realRunner, CALL_MS), { actor: sweeper, wrapUpDeps: wrapUpDeps.deps, log: (line) => console.error(line) });
         return {

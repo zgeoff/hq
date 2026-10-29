@@ -4,10 +4,18 @@ import { now } from '../clock/now.ts';
 import { HqError } from '../errors.ts';
 import { applyNoteSignals } from './apply-note-signals.ts';
 import { resolveRun } from './resolve-run.ts';
-import type { RunNote } from './types.ts';
+import type { FinalResolutions, RunNote } from './types.ts';
 import { updateRunTime as touch } from './update-run-time.ts';
 
-export function addNote(db: Database, key: string, text: string, label: string | null, actor: string): RunNote {
+interface NoteInput {
+  label: string | null;
+  actor: string;
+  resolutions?: FinalResolutions;
+}
+
+export function addNote(db: Database, key: string, text: string, input: NoteInput): RunNote {
+  const actor = input.actor;
+  const label = input.label;
   if (!text.trim()) throw new HqError('bad_args', 'note text must not be empty');
   return db
     .transaction(() => {
@@ -16,7 +24,7 @@ export function addNote(db: Database, key: string, text: string, label: string |
       const id = Number(
         db.query(`INSERT INTO run_notes (issue, session_id, label, text, source, at) VALUES (?, ?, ?, ?, 'cli', ?)`).run(r.issue, session, label, text, iso(now())).lastInsertRowid,
       );
-      applyNoteSignals(db, r.issue, text, `note:${actor}`, id, actor);
+      applyNoteSignals(db, r.issue, text, { source: `note:${actor}`, note: id, actor, ...(input.resolutions && { resolutions: input.resolutions }) });
       // Until the skill uses --lane: a "lane" note sets the run's lane.
       const lane = text.trim().toLowerCase();
       if (label === 'lane' && /^[a-z][a-z0-9-]{0,39}$/.test(lane)) db.query('UPDATE runs SET lane = ? WHERE issue = ?').run(lane, r.issue);

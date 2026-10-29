@@ -117,7 +117,33 @@ export interface FinalMark {
   source: string;
   actor: string;
   note: number | null;
+
+  // How the given sha was settled; none when nothing was asked of GitHub.
+  resolution?: AcceptedFinal | null;
 }
+
+// A FINAL sha a PR's GitHub commits settle: its full sha, a refusal, or a lookup that failed.
+export type FinalResolution =
+  | { kind: 'full'; sha: string }
+  | { kind: 'refused'; reason: 'no-match'; head: string | null }
+  | { kind: 'refused'; reason: 'ambiguous'; shas: string[] }
+  | { kind: 'unresolved'; reason: string };
+
+export type AcceptedFinal = Extract<FinalResolution, { kind: 'full' | 'unresolved' }>;
+export type RefusedFinal = Extract<FinalResolution, { kind: 'refused' }>;
+
+// One FINAL sha a note or the cli gives for a PR.
+export interface FinalClaim {
+  ref: string;
+  sha: string;
+}
+
+// Every settled claim, keyed by buildFinalKey.
+export type FinalResolutions = ReadonlyMap<string, FinalResolution>;
+
+// What one read of GitHub answered: a PR's commits, or one commit by sha.
+export type CommitsRead = { kind: 'listed'; shas: string[] } | { kind: 'fault'; reason: string };
+export type CommitRead = { kind: 'found'; sha: string } | { kind: 'missing' } | { kind: 'fault'; reason: string };
 
 // What a check of an imp's workspace found: every commit on a remote branch and nothing
 // uncommitted, work that is not pushed, or no answer.
