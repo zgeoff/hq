@@ -661,4 +661,21 @@ export const MIGRATIONS: string[] = [
   INSERT INTO slot_minutes_v46 (day, cause, minutes) SELECT day, cause, minutes FROM slot_minutes;
   DROP TABLE slot_minutes;
   ALTER TABLE slot_minutes_v46 RENAME TO slot_minutes;`,
+
+  // v47: the umbrella issues a merged PR said it contributes to, one row per (repo, number, issue).
+  // outcome is NULL until hq decides: news (a news line asked for the box to be ticked), ticked,
+  // no_box, ambiguous, or gone (the merge is too old to post, or Linear no longer returns the issue).
+  `CREATE TABLE umbrella_boxes (
+    repo       TEXT NOT NULL,
+    number     INTEGER NOT NULL,
+    issue      TEXT NOT NULL,
+    merged_at  TEXT NOT NULL,
+    outcome    TEXT CHECK (outcome IN ('news', 'ticked', 'no_box', 'ambiguous', 'gone')),
+    decided_at TEXT,
+    PRIMARY KEY (repo, number, issue)
+  );
+  -- A merge up to 48 hours old still gets its box decided, but syncKinds never reads a cached day
+  -- again. Today is never cached, so forgetting the two newest cached days makes the next sync read
+  -- the rest of the window and record its boxes.
+  DELETE FROM merged_pr_days WHERE day IN (SELECT day FROM merged_pr_days ORDER BY day DESC LIMIT 2);`,
 ];

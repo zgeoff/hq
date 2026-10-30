@@ -37,6 +37,7 @@ export const REKEY_SPECS: Record<RekeyStore, RekeySpec[]> = {
     { table: 'noslop_rounds', column: 'repo', kind: 'name', key: null },
     { table: 'pr_status', column: 'repo', kind: 'name', key: ['pr'] },
     { table: 'goal_days', column: 'key', kind: 'name', key: ['kind', 'day'] },
+    { table: 'umbrella_boxes', column: 'repo', kind: 'name', key: ['number', 'issue'] },
     { table: 'run_prs', column: 'ref', kind: 'ref', key: [] },
     { table: 'run_prs', column: 'fixed_in_pr', kind: 'ref', key: null },
     { table: 'grant_actions', column: 'target', kind: 'ref', key: null },

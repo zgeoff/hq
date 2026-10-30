@@ -40,3 +40,14 @@ export interface Node {
 
 // Where a filed issue came from, as hq reads it from Linear.
 export type FiledSource = 'owner' | 'design' | 'agent' | 'live check' | 'bot';
+
+export type UmbrellaOutcome = 'news' | 'ticked' | 'no_box' | 'ambiguous' | 'gone';
+
+export interface UmbrellaBox {
+  repo: string;
+  number: number;
+  issue: string;
+  merged_at: string;
+  outcome: UmbrellaOutcome | null;
+  decided_at: string | null;
+}
