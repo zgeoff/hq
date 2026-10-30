@@ -124,10 +124,12 @@ awk -v decisions="$decisions" -v issue="$2" '
       infence = 1; start = nblk + 1; len = 0
       next
     }
-    if (match(line, /^#+[ \t]+/)) {
-      hashes = line; sub(/[ \t].*$/, "", hashes); level = length(hashes)
+    # A heading may sit up to 3 spaces in; 4 or more make an indented code line.
+    hline = line; sub(/^ ? ? ?/, "", hline)
+    if (match(hline, /^#+[ \t]+/)) {
+      hashes = hline; sub(/[ \t].*$/, "", hashes); level = length(hashes)
       if (level <= 6) {
-        text = line; sub(/^#+[ \t]+/, "", text); sub(/[ \t]+#*[ \t]*$/, "", text)
+        text = hline; sub(/^#+[ \t]+/, "", text); sub(/[ \t]+#*[ \t]*$/, "", text)
         text = clean(text); heading = text
         d = decision_of(text)
         if (d > 0 && index(decisions, "," d ",") > 0) {

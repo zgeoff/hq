@@ -1,0 +1,9 @@
+# Ferry rules
+
+  ## Decision 7: Tide tables
+
+```ts
+type Tide = "high" | "low";
+```
+
+    ## Decision 8: not a heading

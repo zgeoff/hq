@@ -8,7 +8,8 @@
 # character and a block with trailing spaces, dotted-* dotted sub-headings and a second heading
 # for the open decision, unclosed-* a fence left open at the end of the record, and indent-* a
 # ~~~ fence and an indented fence in the record against a block nested in a list item and a block
-# that lost its inner indentation in the issue, and escape-* a first line with backslashes and quotes.
+# that lost its inner indentation in the issue, escape-* a first line with backslashes and quotes, and spaced-* a heading 2 spaces in and a line 4
+# spaces in, which is no heading.
 # The fixtures are .txt files so the formatter leaves the trailing spaces in them.
 set -eu
 here=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
@@ -56,6 +57,10 @@ check missing-file 2 "" "check-sketches.sh: no such file: $fixtures/none.md$nl" 
 check no-files 2 "" "usage: check-sketches.sh [--decision <n>]... <record file> <issue file>$nl" "$rec"
 check decision-no-value 2 "" "usage: check-sketches.sh [--decision <n>]... <record file> <issue file>$nl" --decision
 check decision-trailing 2 "" "usage: check-sketches.sh [--decision <n>]... <record file> <issue file>$nl" --decision 1 --decision
+
+spaced='{"heading":"Decision 7: Tide tables","first":"type Tide = \"high\" | \"low\";","found":false}'
+check spaced-heading 1 "$spaced$nl" "" --decision 7 "$fixtures/spaced-record.txt" "$fixtures/blank-issue.txt"
+check four-space-line 2 "" "check-sketches.sh: no heading for decision 8$nl" --decision 8 "$fixtures/spaced-record.txt" "$fixtures/blank-issue.txt"
 
 # A first line with backslashes and quotes stays valid JSON and decodes to the same text, under
 # this host's awk and under a POSIX awk, which reads backslashes in a gsub replacement differently.
