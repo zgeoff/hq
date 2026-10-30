@@ -2,6 +2,7 @@ import type { Database } from 'bun:sqlite';
 import { iso } from '../clock/iso.ts';
 import { now } from '../clock/now.ts';
 import { setMeta } from '../db/set-meta.ts';
+import { decideUmbrellaBoxes } from '../linear/decide-umbrella-boxes.ts';
 import type { LinearCall } from '../linear/types.ts';
 import { syncClosed } from '../linear/sync-closed.ts';
 import { syncFiled } from '../linear/sync-filed.ts';
@@ -17,6 +18,7 @@ export async function syncLinear(db: Database, call: LinearCall, from: Date, at:
   try {
     closed = await syncClosed(db, call, from, at);
     typed = await syncPrIssues(db, call);
+    await decideUmbrellaBoxes(db, call, at);
     setMeta(db, 'linear_synced_at', iso(at));
     setMeta(db, 'linear_error', '');
   } catch (e) {
