@@ -281,8 +281,8 @@ test('it forgets the two newest cached merge days in v47, so the next sync recor
   db.query("INSERT INTO merged_pr_days (day, n, at) VALUES ('2026-10-17', 3, '2026-10-18T00:10:00Z'), ('2026-10-18', 2, '2026-10-19T00:10:00Z'), ('2026-10-19', 4, '2026-10-20T00:10:00Z'), ('2026-10-20', 1, '2026-10-21T00:10:00Z')").run();
 
   expect(migrate(db, path, true)).not.toBeNull();
-  expect(db.query('SELECT day, n FROM merged_pr_days ORDER BY day').all()).toStrictEqual([
-    { day: '2026-10-17', n: 3 },
-    { day: '2026-10-18', n: 2 },
+  expect(db.query('SELECT day, n AS prs FROM merged_pr_days ORDER BY day').all()).toStrictEqual([
+    { day: '2026-10-17', prs: 3 },
+    { day: '2026-10-18', prs: 2 },
   ]);
 });
