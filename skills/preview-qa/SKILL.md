@@ -55,7 +55,7 @@ vers has no PR previews, so you run a vers issue's live check on production at `
 
 1. **Use the runbook.** vers's [QA runbook](https://github.com/zgeoff/vers/blob/main/docs/runbooks/qa.md) holds every tool: accounts, the inbox, the debug Chrome over CDP and the debug hook. Run them in your own vers clone, never in the owner's checkout. Where to find the credentials and the database is in this file's private half.
 2. **Seed a fresh account per check**, named after its issue: `bun run qa:seed --user qa-geo-<n> --level <level> --yes`. Leave out `--runs`, because your grant doesn't cover it.
-3. **Reset it when the check ends**, pass or fail: `bun run qa:reset --user qa-geo-<n> --all --yes`. When `qa:seed` refuses because the account exists, an earlier check left it: reset it, then seed again.
+3. **Reset it when the check ends**, pass or fail: `bun run qa:reset --user qa-geo-<n> --all --yes`. When `qa:seed` refuses because the account exists, read your `qa.md`. If it lists no check in flight for that issue, an earlier check left the account: reset it, then seed again. If it lists one, finish that check first.
 4. **Keep credentials out of evidence.** Never record the seeded password, a two-factor secret, or a code or link from the inbox.
 5. **Cut the network only with a cut that holds** for the page and its workers. `qa:cdp offline` is not one: its cut ends when the command exits. When the runbook names no cut that holds, hand the offline item back as needs Geoff.
 
