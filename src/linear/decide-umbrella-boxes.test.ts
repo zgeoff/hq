@@ -117,3 +117,17 @@ test('it leaves the box undecided, with no news line and no event, when its even
   expect(ctx.newsLines()).toStrictEqual([]);
   expect(ctx.eventCount()).toBe(0);
 });
+
+test('it reads 51 issues from Linear in a query of 50 and a query of 1, and decides every box', async () => {
+  const ctx = setupTest();
+  const issues = Array.from({ length: 51 }, (_, index) => `GEO-${9100 + index}`);
+  for (const [index, issue] of issues.entries()) {
+    recordUmbrellaBox(ctx.db, { repo: 'vers', number: index + 1, issue, mergedAt: ctx.recent });
+  }
+  const linear = buildStubLinearDescriptions(Object.fromEntries(issues.map((issue) => [issue, '- [x] vers'])));
+
+  await decideUmbrellaBoxes(ctx.db, linear.call, ctx.at);
+
+  expect(linear.asked).toStrictEqual([issues.slice(0, 50), issues.slice(50)]);
+  expect(ctx.outcomes()).toStrictEqual(issues.map((issue, index) => `vers#${index + 1} ${issue} ticked`));
+});
