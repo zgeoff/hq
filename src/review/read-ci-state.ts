@@ -1,6 +1,7 @@
 import { toExactOptional } from '@zgeoff/std';
 import { z } from 'zod';
 import type { Runner } from '../runner/types.ts';
+import { pickCountedChecks } from './pick-counted-checks.ts';
 import type { CIState } from './types.ts';
 
 // The PR's CI checks (after waiting for them, when asked) and its count of unresolved review
@@ -9,7 +10,9 @@ export async function readCIState(run: Runner, slug: string, pr: number, watch: 
   return { ...(await readChecks(run, slug, pr, watch)), openThreads: await readOpenThreads(run, slug, pr) };
 }
 
-const Checks = z.array(z.object({ name: z.string(), state: z.string(), bucket: z.string().optional() }));
+const Checks = z.array(z.object({ name: z.string(), state: z.string(), bucket: z.string().optional(), workflow: z.string().optional(), link: z.string().optional(), startedAt: z.string().nullable().optional() }));
+
+const PASSING_BUCKETS = new Set(['pass', 'skipping']);
 
 // gh exits 1 with this on stderr, even with --json, for a PR that has no checks.
 const NO_CHECKS = /no checks reported/u;
@@ -18,13 +21,14 @@ async function readChecks(run: Runner, slug: string, pr: number, watch: boolean)
   if (watch) {
     await run(['gh', 'pr', 'checks', String(pr), '-R', slug, '--watch', '--interval', '30']);
   }
-  const out = await run(['gh', 'pr', 'checks', String(pr), '-R', slug, '--json', 'name,state,bucket']);
+  const out = await run(['gh', 'pr', 'checks', String(pr), '-R', slug, '--json', 'name,state,bucket,workflow,link,startedAt']);
   if (out.code !== 0 && NO_CHECKS.test(out.stderr)) {
     return { checks: [], checksError: null };
   }
   const parsed = Checks.safeParse(parseJSONText(out.stdout));
   if (parsed.success) {
-    return { checks: parsed.data.map((check) => toExactOptional(check)), checksError: null };
+    const counted = pickCountedChecks(parsed.data, (check) => ({ workflow: check.workflow ?? '', name: check.name, url: check.link, startedAt: check.startedAt, cancelled: check.bucket === 'cancel', passing: PASSING_BUCKETS.has(check.bucket ?? '') }));
+    return { checks: counted.map((check) => toExactOptional({ name: check.name, state: check.state, bucket: check.bucket })), checksError: null };
   }
   return { checks: [], checksError: `gh pr checks failed (${out.code}): ${(out.stderr || out.stdout).trim().slice(0, 300)}` };
 }

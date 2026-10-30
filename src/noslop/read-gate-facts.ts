@@ -7,7 +7,7 @@ import { CALL_MS } from '../watcher/call-ms.ts';
 import { parseJSON } from './parse-json.ts';
 
 const TimeSchema = z.string().nullable().optional();
-const CheckRunSchema = z.object({ __typename: z.literal('CheckRun'), name: z.string(), workflowName: z.string().optional(), status: z.string(), conclusion: z.string().nullable(), startedAt: TimeSchema, completedAt: TimeSchema });
+const CheckRunSchema = z.object({ __typename: z.literal('CheckRun'), name: z.string(), workflowName: z.string().optional(), detailsUrl: z.string().nullable().optional(), status: z.string(), conclusion: z.string().nullable(), startedAt: TimeSchema, completedAt: TimeSchema });
 const StatusContextSchema = z.object({ __typename: z.literal('StatusContext'), context: z.string(), state: z.string(), startedAt: TimeSchema });
 const FactsSchema = z.object({
     headRefOid: z.string().min(1),
