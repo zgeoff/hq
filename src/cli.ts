@@ -133,6 +133,8 @@ import { lastSample } from './probe/last-sample.ts';
 import { openOutage } from './probe/open-outage.ts';
 import { openUnready } from './probe/open-unready.ts';
 import { outagesIn } from './probe/outages-in.ts';
+import { buildNodeAtcMcpFiles } from './health/build-node-atc-mcp-files.ts';
+import { readAtcMcp } from './health/read-atc-mcp.ts';
 import { readLocalConfigCheck } from './health/read-local-config-check.ts';
 import { probeHealth } from './probe/probe-health.ts';
 import { probeOnce } from './probe/probe-once.ts';
@@ -867,6 +869,8 @@ function realProbe(db: Database): Probe {
         return String((e as Error).message ?? e);
       }
     },
+    atcMcp: () => Promise.resolve(readAtcMcp(buildNodeAtcMcpFiles())),
+    sessionName: (id) => findFleetName(db, id),
     home: process.env['HOME'] ?? '/',
     backup: () => {
       const l = lastBackup(db);

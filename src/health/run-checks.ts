@@ -6,6 +6,7 @@ import type { Runner } from '../runner/types.ts';
 import { COMMAND_TIMEOUT_MS } from './command-timeout-ms.ts';
 import type { HealthSettings } from './health-defaults.ts';
 import { out } from './out.ts';
+import { pickAtcMcpChecks } from './pick-atc-mcp-checks.ts';
 import type { Check, Probe, Samples } from './types.ts';
 
 const glob = (pattern: string) => new RegExp(`^${pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.')}$`);
@@ -153,6 +154,14 @@ export async function runChecks(p: Probe, s: HealthSettings, prev: Samples, at: 
 
   const atcErr = await p.atcAnswers();
   checks.push({ key: 'atc', ok: atcErr === null, line: atcErr === null ? 'atc daemon answers' : `atc daemon does not answer: ${atcErr}` });
+
+  if (p.atcMcp) {
+    const read = await p.atcMcp().catch((error: unknown) => (error instanceof Error ? error.message : String(error)));
+    checks.push(...pickAtcMcpChecks(read, p.sessionName ?? (() => null)));
+    if (typeof read === 'string') {
+      unknown.push('atc-mcp');
+    }
+  }
 
   let lanes = 'unknown';
   try {
