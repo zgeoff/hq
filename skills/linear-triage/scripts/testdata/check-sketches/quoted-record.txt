@@ -1,0 +1,15 @@
+# Harbour tests
+
+## 1. Seeding
+
+> The agreed shape:
+>
+> ```ts
+> function seedBerth(id: BerthId): Berth
+> ```
+
+## 2. Checks
+
+> > ```yaml
+> > checks: [tide, berth]
+> > ```
