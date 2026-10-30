@@ -122,36 +122,41 @@ test('it keeps the no-checks rule when an override names a check', () => {
   expect(checkCIGreen([], ['preview'])).toStrictEqual({ green: false, noChecks: true, reason: 'the head has no CI checks, so CI has not passed' });
 });
 
-function setupTest(): { cancelledRun: GateCheck[] } {
-  return {
-    cancelledRun: [
-  { __typename: 'CheckRun', name: 'lint', workflowName: 'PR', detailsUrl: 'https://github.com/acme/kettle/actions/runs/500/job/1', status: 'COMPLETED', conclusion: 'CANCELLED', startedAt: '2026-10-14T01:00:00Z', completedAt: '2026-10-14T01:00:01Z' },
-  { __typename: 'CheckRun', name: 'pr / test-matrix', workflowName: 'PR', detailsUrl: 'https://github.com/acme/kettle/actions/runs/500/job/2', status: 'COMPLETED', conclusion: 'CANCELLED', startedAt: '2026-10-14T01:00:00Z', completedAt: '2026-10-14T01:00:01Z' },
-    ],
-  };
-}
-
 test('it passes a cancelled run when a later run of the same workflow passed', () => {
-  const cancelledRun = setupTest().cancelledRun;
   expect(
     checkCIGreen([
-      ...cancelledRun,
+      { __typename: 'CheckRun', name: 'lint', workflowName: 'PR', detailsUrl: 'https://github.com/acme/kettle/actions/runs/500/job/1', status: 'COMPLETED', conclusion: 'CANCELLED', startedAt: '2026-10-14T01:00:00Z', completedAt: '2026-10-14T01:00:01Z' },
+      { __typename: 'CheckRun', name: 'pr / test-matrix', workflowName: 'PR', detailsUrl: 'https://github.com/acme/kettle/actions/runs/500/job/2', status: 'COMPLETED', conclusion: 'CANCELLED', startedAt: '2026-10-14T01:00:00Z', completedAt: '2026-10-14T01:00:01Z' },
       { __typename: 'CheckRun', name: 'lint', workflowName: 'PR', detailsUrl: 'https://github.com/acme/kettle/actions/runs/501/job/3', status: 'COMPLETED', conclusion: 'SUCCESS', startedAt: '2026-10-14T01:00:05Z', completedAt: '2026-10-14T01:04:00Z' },
     ], []),
   ).toStrictEqual({ green: true });
 });
 
 test('it blocks a cancelled run that no later run replaced', () => {
-  const cancelledRun = setupTest().cancelledRun;
-  expect(checkCIGreen(cancelledRun, [])).toStrictEqual({ green: false, reason: 'CI is not green: lint (CANCELLED), pr / test-matrix (CANCELLED)' });
+  expect(
+    checkCIGreen([
+      { __typename: 'CheckRun', name: 'lint', workflowName: 'PR', detailsUrl: 'https://github.com/acme/kettle/actions/runs/500/job/1', status: 'COMPLETED', conclusion: 'CANCELLED', startedAt: '2026-10-14T01:00:00Z', completedAt: '2026-10-14T01:00:01Z' },
+      { __typename: 'CheckRun', name: 'pr / test-matrix', workflowName: 'PR', detailsUrl: 'https://github.com/acme/kettle/actions/runs/500/job/2', status: 'COMPLETED', conclusion: 'CANCELLED', startedAt: '2026-10-14T01:00:00Z', completedAt: '2026-10-14T01:00:01Z' },
+    ], []),
+  ).toStrictEqual({ green: false, reason: 'CI is not green: lint (CANCELLED), pr / test-matrix (CANCELLED)' });
 });
 
 test('it blocks a cancelled run when the later run of the same workflow failed', () => {
-  const cancelledRun = setupTest().cancelledRun;
   expect(
     checkCIGreen([
-      ...cancelledRun,
+      { __typename: 'CheckRun', name: 'lint', workflowName: 'PR', detailsUrl: 'https://github.com/acme/kettle/actions/runs/500/job/1', status: 'COMPLETED', conclusion: 'CANCELLED', startedAt: '2026-10-14T01:00:00Z', completedAt: '2026-10-14T01:00:01Z' },
+      { __typename: 'CheckRun', name: 'pr / test-matrix', workflowName: 'PR', detailsUrl: 'https://github.com/acme/kettle/actions/runs/500/job/2', status: 'COMPLETED', conclusion: 'CANCELLED', startedAt: '2026-10-14T01:00:00Z', completedAt: '2026-10-14T01:00:01Z' },
       { __typename: 'CheckRun', name: 'lint', workflowName: 'PR', detailsUrl: 'https://github.com/acme/kettle/actions/runs/501/job/3', status: 'COMPLETED', conclusion: 'FAILURE', startedAt: '2026-10-14T01:00:05Z', completedAt: '2026-10-14T01:04:00Z' },
     ], []),
   ).toStrictEqual({ green: false, reason: 'CI is not green: lint (FAILURE), pr / test-matrix (CANCELLED)' });
+});
+
+test('it blocks a re-run of the cancelled run that is still running after the later run passed', () => {
+  expect(
+    checkCIGreen([
+      { __typename: 'CheckRun', name: 'pr / test-matrix', workflowName: 'PR', detailsUrl: 'https://github.com/acme/kettle/actions/runs/500/job/2', status: 'COMPLETED', conclusion: 'CANCELLED', startedAt: '2026-10-14T01:00:00Z', completedAt: '2026-10-14T01:00:01Z' },
+      { __typename: 'CheckRun', name: 'pr / test', workflowName: 'PR', detailsUrl: 'https://github.com/acme/kettle/actions/runs/501/job/3', status: 'COMPLETED', conclusion: 'SUCCESS', startedAt: '2026-10-14T01:00:05Z', completedAt: '2026-10-14T01:04:00Z' },
+      { __typename: 'CheckRun', name: 'pr / test-matrix', workflowName: 'PR', detailsUrl: 'https://github.com/acme/kettle/actions/runs/500/job/4', status: 'IN_PROGRESS', conclusion: null, startedAt: '2026-10-14T01:10:00Z', completedAt: null },
+    ], []),
+  ).toStrictEqual({ green: false, reason: 'CI is not green: pr / test-matrix (IN_PROGRESS)' });
 });
