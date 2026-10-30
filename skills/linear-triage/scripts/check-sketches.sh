@@ -19,7 +19,8 @@ decisions=","
 while [ $# -gt 0 ]; do
   case $1 in
     --decision)
-      n=${2:?$usage}
+      [ $# -ge 2 ] || { echo "$usage" >&2; exit 2; }
+      n=$2
       case $n in
         '' | *[!0-9]*)
           echo "check-sketches.sh: --decision wants a number, got '$n'" >&2

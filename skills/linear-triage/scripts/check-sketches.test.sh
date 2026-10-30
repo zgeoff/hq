@@ -49,5 +49,7 @@ check unknown-decision 2 "" "check-sketches.sh: no heading for decision 9$nl" --
 check bad-number 2 "" "check-sketches.sh: --decision wants a number, got 'x'$nl" --decision x "$rec" "$iss"
 check missing-file 2 "" "check-sketches.sh: no such file: $fixtures/none.md$nl" "$rec" "$fixtures/none.md"
 check no-files 2 "" "usage: check-sketches.sh [--decision <n>]... <record file> <issue file>$nl" "$rec"
+check decision-no-value 2 "" "usage: check-sketches.sh [--decision <n>]... <record file> <issue file>$nl" --decision
+check decision-trailing 2 "" "usage: check-sketches.sh [--decision <n>]... <record file> <issue file>$nl" --decision 1 --decision
 
 exit "$fail"
