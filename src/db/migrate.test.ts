@@ -269,3 +269,20 @@ test('it adds umbrella_boxes in v47 with no outcome until one is decided', () =>
   expect(() => db.query("UPDATE umbrella_boxes SET outcome = 'kettle'").run()).toThrow(/CHECK constraint failed/u);
   expect(db.query('PRAGMA user_version').get()).toStrictEqual({ user_version: 47 });
 });
+
+test('it forgets the two newest cached merge days in v47, so the next sync records their boxes', () => {
+  const base = mkdtempSync(join(tmpdir(), 'hq-migrate-v47-days-'));
+  const path = join(base, 'hq.db');
+  const db = new Database(path, { create: true, strict: true });
+  onTestFinished(() => rmSync(base, { recursive: true, force: true }));
+  onTestFinished(() => db.close());
+  db.exec('PRAGMA journal_mode = WAL;');
+  migrate(db, path, false, MIGRATIONS.slice(0, 46));
+  db.query("INSERT INTO merged_pr_days (day, n, at) VALUES ('2026-10-17', 3, '2026-10-18T00:10:00Z'), ('2026-10-18', 2, '2026-10-19T00:10:00Z'), ('2026-10-19', 4, '2026-10-20T00:10:00Z'), ('2026-10-20', 1, '2026-10-21T00:10:00Z')").run();
+
+  expect(migrate(db, path, true)).not.toBeNull();
+  expect(db.query('SELECT day, n FROM merged_pr_days ORDER BY day').all()).toStrictEqual([
+    { day: '2026-10-17', n: 3 },
+    { day: '2026-10-18', n: 2 },
+  ]);
+});

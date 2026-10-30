@@ -673,5 +673,9 @@ export const MIGRATIONS: string[] = [
     outcome    TEXT CHECK (outcome IN ('news', 'ticked', 'no_box', 'ambiguous', 'gone')),
     decided_at TEXT,
     PRIMARY KEY (repo, number, issue)
-  );`,
+  );
+  -- A merge up to 48 hours old still gets its box decided, but syncKinds never reads a cached day
+  -- again. Today is never cached, so forgetting the two newest cached days makes the next sync read
+  -- the rest of the window and record its boxes.
+  DELETE FROM merged_pr_days WHERE day IN (SELECT day FROM merged_pr_days ORDER BY day DESC LIMIT 2);`,
 ];
