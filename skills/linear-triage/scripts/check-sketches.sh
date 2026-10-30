@@ -42,9 +42,16 @@ done
 
 awk -v decisions="$decisions" -v issue="$2" '
   function clean(s) { sub(/\r$/, "", s); sub(/[ \t]+$/, "", s); return s }
-  function esc(s) {
-    gsub(/\\/, "\\\\", s); gsub(/"/, "\\\"", s); gsub(/\t/, "\\t", s)
-    return s
+  # A JSON string body, one character at a time: awks differ on backslashes in a gsub replacement.
+  function esc(s,    out, i, c) {
+    out = ""
+    for (i = 1; i <= length(s); i++) {
+      c = substr(s, i, 1)
+      if (c == "\\" || c == "\"") out = out "\\" c
+      else if (c == "\t") out = out "\\t"
+      else out = out c
+    }
+    return out
   }
   # The decision number a heading names, or 0. "7.1" names no decision.
   function decision_of(text,    t, n, rest) {

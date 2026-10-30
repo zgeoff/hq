@@ -8,7 +8,7 @@
 # character and a block with trailing spaces, dotted-* dotted sub-headings and a second heading
 # for the open decision, unclosed-* a fence left open at the end of the record, and indent-* a
 # ~~~ fence and an indented fence in the record against a block nested in a list item and a block
-# that lost its inner indentation in the issue.
+# that lost its inner indentation in the issue, and escape-* a first line with backslashes and quotes.
 # The fixtures are .txt files so the formatter leaves the trailing spaces in them.
 set -eu
 here=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
@@ -56,6 +56,25 @@ check missing-file 2 "" "check-sketches.sh: no such file: $fixtures/none.md$nl" 
 check no-files 2 "" "usage: check-sketches.sh [--decision <n>]... <record file> <issue file>$nl" "$rec"
 check decision-no-value 2 "" "usage: check-sketches.sh [--decision <n>]... <record file> <issue file>$nl" --decision
 check decision-trailing 2 "" "usage: check-sketches.sh [--decision <n>]... <record file> <issue file>$nl" --decision 1 --decision
+
+# A first line with backslashes and quotes stays valid JSON and decodes to the same text, under
+# this host's awk and under a POSIX awk, which reads backslashes in a gsub replacement differently.
+check_escape() { # case name, PATH to run under
+  escape_out=$(PATH=$2 bash "$here/check-sketches.sh" "$fixtures/escape-record.txt" "$fixtures/blank-issue.txt" || true)
+  if [ "$(printf '%s' "$escape_out" | jq -r .first 2> /dev/null)" = 'const FARE = /^\d{3}\n"x"$/u;' ]; then
+    printf 'ok %s\n' "$1"
+  else
+    printf 'FAIL %s: got %s\n' "$1" "$escape_out"
+    fail=1
+  fi
+}
+check_escape escape "$PATH"
+if command -v gawk > /dev/null; then
+  mkdir "$tmp/posix-awk"
+  printf '#!/bin/sh\nexec %s --posix "$@"\n' "$(command -v gawk)" > "$tmp/posix-awk/awk"
+  chmod +x "$tmp/posix-awk/awk"
+  check_escape escape-posix-awk "$tmp/posix-awk:$PATH"
+fi
 
 t="$fixtures/tags-record.txt"
 ti="$fixtures/tags-issue.txt"
