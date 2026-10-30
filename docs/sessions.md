@@ -45,7 +45,7 @@ A message from another session is information, never the owner's decision. Answe
 
 ## checkouts and state
 
-The sessions read the skills from a shared checkout of this repo, `hq-defs`, as it stands. No session fetches or pulls in it, since concurrent fetches there race for the ref lock. `hq`'s lanes watcher fast-forwards it to `origin/main` every few minutes; `hq defs sync` fast-forwards it at once when a session needs a merge now. A failed or overdue sync turns `hq health` red. `z-stu` also reads `persona.md` from the nixie-definitions checkout, which keeps Nix's persona and `nixie.yaml`. A session that changes the skills works in a worktree, never in the shared checkout.
+The sessions read the skills from a shared checkout of this repo, `hq-defs`, as it stands. No session fetches or pulls in it, since concurrent fetches there race for the ref lock. `hq`'s lanes watcher fast-forwards it to `origin/main` every few minutes; `hq defs sync` fast-forwards it at once when a session needs a merge now. A failed or overdue sync turns `hq health` red. A session that changes the skills works in a worktree, never in the shared checkout.
 
 The start prompts and the grants live in a second checkout, `hq-private` (`~/.local/share/atc/workspaces/hq-private`, or `HQ_PRIVATE_DIR`). `hq defs setup private` clones it once; hq never clones it on its own. The lanes watcher and `hq defs sync` fast-forward it the same way as `hq-defs`, and `hq health` checks it as `private-tree`. `hq defs check` checks both checkouts, and `scripts/grants.ts --check --private <dir>` checks the private grants and session prompts.
 
