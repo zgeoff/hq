@@ -218,9 +218,8 @@ async function createNoslopContext(plan: RoundPlan, parsed: ParsedRepo, sha: str
   };
 }
 
-// The mark stops the sweep calling the head unreviewed. A hand-run --fixes-only is the re-check the
-// owner's rules allow, so a passed one marks too. Only a full review counts as a round. A base move
-// marks only a run recorded as one, at the compared head.
+// The mark stops the sweep calling the head unreviewed. The owner's rules let a fixes-only re-check
+// stand as the review of a fix push.
 function writeRoundMark(plan: RoundPlan, parsed: ParsedRepo, fixChecks: readonly FixCheck[]): void {
   if (plan.fixesOnly && plan.emergencyCap === null && plan.baseMove === null && !isRecheckPassed(fixChecks)) {
     return;
