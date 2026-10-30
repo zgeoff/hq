@@ -1,0 +1,7 @@
+# Fare rules
+
+## 1. Fare codes
+
+```ts
+const FARE = /^\d{3}\n"x"$/u;
+```

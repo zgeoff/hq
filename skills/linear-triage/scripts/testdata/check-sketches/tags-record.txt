@@ -1,0 +1,13 @@
+Design notes for the lending desk.
+
+## 1. Fees
+
+```ts
+const feePerDay = 2
+```
+
+## 2. Limits
+
+```ts
+const maxLoans = 6
+```

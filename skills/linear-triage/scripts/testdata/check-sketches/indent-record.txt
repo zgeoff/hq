@@ -1,0 +1,15 @@
+Design notes for the lending desk.
+
+## 1. Renewals
+
+~~~yaml
+renew:
+  limit: 2
+~~~
+
+- A renewal can be refused:
+
+   ```ts
+   function renew(loan: LoanId): Loan
+     | Refused
+   ```

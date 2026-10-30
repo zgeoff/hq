@@ -1,0 +1,6 @@
+Design notes for the lending desk.
+
+## 1. Returns
+
+```sh
+scan --return

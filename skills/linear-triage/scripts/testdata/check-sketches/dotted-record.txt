@@ -1,0 +1,39 @@
+Design notes for the lending desk.
+
+## 1. Loans
+
+### 1.1 detail
+
+Loans last two weeks.
+
+### Notes
+
+```ts
+const loanDays = 14
+```
+
+## Decision 3: Holds
+
+### 3. Holds, in detail
+
+Holds expire after five days.
+
+### Expiry
+
+```ts
+const holdDays = 5
+```
+
+## 4. Fines
+
+```ts
+const finePerDay = 0
+```
+
+## Appendix
+
+### 1.1 Loan table
+
+```ts
+const loanTable: Loan[] = []
+```

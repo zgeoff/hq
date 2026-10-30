@@ -1,0 +1,9 @@
+From design https://example.test/lending, decisions 1, 2
+
+~~~typescript
+const feePerDay = 2
+~~~
+
+```ts
+const maxLoans = 6   
+```
