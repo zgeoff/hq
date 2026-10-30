@@ -57,7 +57,7 @@ import { formatItemLines } from './format-item-lines.ts';
 import { formatUnblockLater } from './format-unblock-later.ts';
 import { runItemCommand } from './run-item-command.ts';
 import { checkFleetBuild } from './roles/check-fleet-build.ts';
-import { existsSync, readFileSync, readdirSync, readlinkSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { checkLanesBuild } from './lanes/check-lanes-build.ts';
 import { rolesByName } from './roles/roles-by-name.ts';
 import { withStaleBuild } from './roles/with-stale-build.ts';
@@ -133,6 +133,7 @@ import { lastSample } from './probe/last-sample.ts';
 import { openOutage } from './probe/open-outage.ts';
 import { openUnready } from './probe/open-unready.ts';
 import { outagesIn } from './probe/outages-in.ts';
+import { buildNodeAtcMcpFiles } from './health/build-node-atc-mcp-files.ts';
 import { readAtcMcp } from './health/read-atc-mcp.ts';
 import { readLocalConfigCheck } from './health/read-local-config-check.ts';
 import { probeHealth } from './probe/probe-health.ts';
@@ -868,16 +869,7 @@ function realProbe(db: Database): Probe {
         return String((e as Error).message ?? e);
       }
     },
-    atcMcp: () =>
-      Promise.resolve(
-        readAtcMcp({
-          readFile: (path) => readFileSync(path, 'utf8'),
-          readdir: (path) => readdirSync(path),
-          readlink: (path) => readlinkSync(path),
-          mtimeMs: (path) => statSync(path).mtimeMs,
-          whichAtc: () => Bun.which('atc'),
-        }),
-      ),
+    atcMcp: () => Promise.resolve(readAtcMcp(buildNodeAtcMcpFiles())),
     sessionName: (id) => findFleetName(db, id),
     home: process.env['HOME'] ?? '/',
     backup: () => {

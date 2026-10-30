@@ -20,6 +20,8 @@ export type AtcMcpRead = { processes: AtcMcpProcess[]; binary: { path: string; m
 
 // The filesystem and PATH reads the atc mcp reader makes; each throws as node:fs does.
 export interface AtcMcpFiles {
+  // where proc is mounted: /proc on Linux
+  procRoot: string;
   readFile: (path: string) => string;
   readdir: (path: string) => string[];
   readlink: (path: string) => string;
