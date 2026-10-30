@@ -1,0 +1,34 @@
+Design session for the ferry scheduler.
+
+## Decisions
+
+### 1. Booking and cancelling
+
+Bookings go through one function.
+
+```ts
+function bookSeat(sailing: SailingId, rider: RiderId): Booking
+```
+
+Cancelling is configured like this.
+
+```yaml
+# a comment line, not a heading
+cancel:
+  window: 2h
+  refund: full
+```
+
+#### Refund rounding
+
+Rounded to the nearest cent.
+
+### 2. Sailing states
+
+```typescript
+type SailingState = "open" | "boarding" | "departed"
+```
+
+## Follow-ups
+
+One issue per decision.

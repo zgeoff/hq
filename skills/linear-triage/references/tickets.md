@@ -86,7 +86,7 @@ Write the Paid API limit as $5 in API money, or up to $50 when it runs on the ow
 
 ## saving an issue
 
-An issue filed from an agreed design record, such as a decision's follow-up, rollout or umbrella, starts its description with `From design <the record's link>`, so the inflow line counts it as planned. When you groom a Triage issue that a design session filed without it, add it.
+An issue filed from an agreed design record, such as a decision's follow-up, rollout or umbrella, starts its description with `From design <the record's link>, decisions <n>[, <n>]`, so the inflow line counts it as planned and the agent knows which decisions to read. For its scope, it carries what those decisions settled, word for word: every code block, decided name, value and example. The agent that takes it needs no other text. A later decision that changes the issue edits its description in place, and never adds a comment that amends it. When you groom a Triage issue that a design session filed without these, add them.
 
 Save each issue once. Save a description under about 3,000 characters whole. For a longer one, send a `patch` of `replace` or `replace_range` edits only, each anchored on text the issue holds now, so a retry that finds its anchor gone changes nothing; never `append`, `prepend` or `insert_*`, since a retry would add the text twice. Don't trust the save's reply. After the batch, list the issues updated since the pass's start once, and retry only a save that list shows didn't apply. A save that sets only fields (labels, project, priority, state, relations) needs no description: send just those fields. Grooming a Triage issue and completing an incomplete one save the same way.
 

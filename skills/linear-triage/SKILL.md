@@ -77,7 +77,10 @@ pass, so an issue that meets the criteria reaches Ready within one run, not the 
    priority, project and area label, and its relations; mark it Duplicate of an original you're
    sure of, after you copy any detail the original lacks; rewrite it to the ticket standard where
    the information exists, without changing its scope; then move it to Ready when it meets the
-   criteria, and to Backlog otherwise.
+   criteria, and to Backlog otherwise. For an issue that starts `From design`, export the record and
+   the issue to files, run `scripts/check-sketches.sh --decision <n> <record file> <issue file>` for
+   each decision it names, and copy in each block the script marks missing, as
+   [tickets.md](references/tickets.md) says.
 4. **Complete each incomplete issue.** Set the missing fields from what the issue says. List its
    sub-issues with `parentId` before you size it. Bring its sections to the standard where the
    issue already holds the information: add `Code delivery` as the Action for a Bug, Feature,

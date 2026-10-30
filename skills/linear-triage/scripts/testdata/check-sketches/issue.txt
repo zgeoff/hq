@@ -1,0 +1,13 @@
+From design https://example.test/record, decisions 1, 2
+
+Book with:
+
+```typescript
+function bookSeat(sailing: SailingId, rider: RiderId): Booking   
+```
+
+And the states:
+
+~~~ts
+type SailingState = "open" | "boarding" | "departed"
+~~~
