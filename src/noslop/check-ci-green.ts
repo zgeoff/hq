@@ -1,4 +1,6 @@
 import { match } from 'ts-pattern';
+import { pickCountedChecks } from '../review/pick-counted-checks.ts';
+import type { RunFacts } from '../review/pick-counted-checks.ts';
 import type { GateCheck } from './read-gate-facts.ts';
 
 export type CIVerdict = { green: true; overridden?: string[] } | { green: false; reason: string } | { green: false; noChecks: true; reason: string };
@@ -9,7 +11,7 @@ const NOSLOP_CHECK = 'noslop';
 // summary head and findings. The rollup names no app, but a GitHub Actions job carries its workflow's
 // name and an App check none. GitHub keeps a re-run in the rollup beside the run it replaced.
 export function checkCIGreen(checks: readonly GateCheck[], overrides: readonly string[]): CIVerdict {
-  const counted = pickNewestRuns(checks).filter((check) => !isNoslopAppCheck(check));
+  const counted = pickNewestRuns(pickCountedChecks(checks, describeRun)).filter((check) => !isNoslopAppCheck(check));
   if (counted.length === 0) {
     return { green: false, noChecks: true, reason: 'the head has no CI checks, so CI has not passed' };
   }
@@ -71,6 +73,13 @@ function isPassing(check: GateCheck): boolean {
   return match(check)
     .with({ __typename: 'CheckRun' }, (run) => run.status === 'COMPLETED' && run.conclusion !== null && PASSING.has(run.conclusion))
     .with({ __typename: 'StatusContext' }, (status) => status.state === 'SUCCESS')
+    .exhaustive();
+}
+
+function describeRun(check: GateCheck): RunFacts {
+  return match(check)
+    .with({ __typename: 'CheckRun' }, (run) => ({ workflow: run.workflowName ?? '', url: run.detailsUrl, cancelled: run.conclusion === 'CANCELLED', passing: isPassing(run) }))
+    .with({ __typename: 'StatusContext' }, () => ({ workflow: '', url: null, cancelled: false, passing: false }))
     .exhaustive();
 }
 
