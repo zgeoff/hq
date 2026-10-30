@@ -1,0 +1,15 @@
+From design https://example.test/lending, decision 1
+
+1. Renewals are configured like this:
+
+   ```yaml
+   renew:
+     limit: 2
+   ```
+
+2. And the function:
+
+```ts
+function renew(loan: LoanId): Loan
+| Refused
+```

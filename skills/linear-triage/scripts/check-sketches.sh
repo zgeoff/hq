@@ -4,12 +4,14 @@
 # first line) and `found` (true when the issue holds the block's lines in order).
 # Usage: check-sketches.sh [--decision <n>]... <record file> <issue file>
 # Both files are Markdown bodies. A block is fenced with ``` or ~~~ and any language tag. A
-# heading inside a fence is not a heading. With --decision, only the blocks under a heading for one
-# of those decisions are kept. A decision heading is "Decision <n>" or "<n>" followed by "." or
-# ":", for example "### 7. Tasks started on demand" or "## Decision 7: Tasks"; a block belongs to
-# the nearest such heading above it, with its sub-headings, until a heading of the same or a higher
-# level. A block counts as found when the issue holds its lines in order, ignoring trailing spaces
-# and the fence's language tag.
+# heading inside a fence is not a heading, and a fence still open at the end of the file ends there.
+# With --decision, only the blocks under a heading for one of those decisions are kept. A decision
+# heading is "Decision <n>" or "<n>" followed by "." or ":" and not by a digit, for example
+# "### 7. Tasks started on demand" or "## Decision 7: Tasks", but not "#### 7.1 Retries"; a block
+# belongs to the nearest such heading above it, with its sub-headings, until a heading of the same
+# or a higher level. Another heading for the decision already open keeps its level. A block counts
+# as found when the issue holds its lines in order, ignoring trailing spaces, the fence's language
+# tag and the indentation of the fence itself in either file.
 # Exit 0 when every kept block is found, 1 when any is missing, 2 on bad usage, a missing file or a
 # --decision that matches no heading. Needs awk.
 set -euo pipefail
@@ -44,15 +46,39 @@ awk -v decisions="$decisions" -v issue="$2" '
     gsub(/\\/, "\\\\", s); gsub(/"/, "\\\"", s); gsub(/\t/, "\\t", s)
     return s
   }
-  # The decision number a heading names, or 0.
-  function decision_of(text,    t, n) {
+  # The decision number a heading names, or 0. "7.1" names no decision.
+  function decision_of(text,    t, n, rest) {
     t = tolower(text)
     if (match(t, /^decision +[0-9]+/)) {
       n = substr(t, RSTART, RLENGTH); sub(/^decision +/, "", n)
-      if (substr(t, RSTART + RLENGTH, 1) !~ /[0-9]/) return n + 0
+      rest = substr(t, RSTART + RLENGTH)
+      if (rest !~ /^[0-9]/ && rest !~ /^[.:][0-9]/) return n + 0
     }
-    if (match(t, /^[0-9]+[.:]/)) return substr(t, 1, RLENGTH - 1) + 0
+    if (match(t, /^[0-9]+[.:]/) && substr(t, RLENGTH + 1, 1) !~ /[0-9]/) return substr(t, 1, RLENGTH - 1) + 0
     return 0
+  }
+  # Removes up to n leading spaces or tabs, without an interval expression, which some mawk builds lack.
+  function strip(s, n) {
+    while (n-- > 0 && (substr(s, 1, 1) == " " || substr(s, 1, 1) == "\t")) s = substr(s, 2)
+    return s
+  }
+  # Opens a fence when the line starts one, setting fchar, flen and findent; returns 1 if it did.
+  function opens(line,    s) {
+    if (!match(line, /^[ \t]*(```+|~~~+)/)) return 0
+    s = substr(line, RSTART, RLENGTH); findent = match(s, /[`~]/) - 1
+    s = substr(s, findent + 1)
+    fchar = substr(s, 1, 1); flen = length(s)
+    return 1
+  }
+  # 1 when the cleaned line closes the open fence.
+  function closes(t,    s) {
+    if (!match(t, /^[ \t]*(```+|~~~+)$/)) return 0
+    s = t; sub(/^[ \t]+/, "", s)
+    return substr(s, 1, 1) == fchar && length(s) >= flen
+  }
+  function keep() {
+    if (want && dnum == 0) return
+    nb++; bh[nb] = heading; bf[nb] = (len > 0 ? blk[start] : ""); bs[nb] = start; bl[nb] = len
   }
   function holds(first, len,    i, j, ok) {
     if (len == 0) return 1
@@ -64,32 +90,30 @@ awk -v decisions="$decisions" -v issue="$2" '
     return 0
   }
   BEGIN {
-    while ((getline line < issue) > 0) iss[++ni] = clean(line)
-    close(issue)
     want = decisions != ","
+    # Both files lose the same thing from a fenced line: up to the indentation of its fence, as
+    # CommonMark does, so a block nested in a list item matches. Stripping all leading whitespace
+    # instead would match a block whose indentation inside the fence differs.
+    while ((getline line < issue) > 0) {
+      t = clean(line)
+      if (infence) {
+        if (closes(t)) infence = 0
+        else t = strip(t, findent)
+      } else if (opens(line)) infence = 1
+      iss[++ni] = t
+    }
+    close(issue)
+    infence = 0
   }
   {
     line = $0
     if (infence) {
       t = clean(line)
-      if (match(t, /^[ \t]*(```+|~~~+)$/)) {
-        s = t; sub(/^[ \t]+/, "", s)
-        if (substr(s, 1, 1) == fchar && length(s) >= flen) {
-          infence = 0
-          if (!want || dnum > 0) {
-            nb++; bh[nb] = heading; bf[nb] = (len > 0 ? blk[start] : ""); bs[nb] = start; bl[nb] = len
-          }
-          next
-        }
-      }
-      sub("^[ \t]{0," indent "}", "", line)
-      blk[++nblk] = clean(line); len++
+      if (closes(t)) { infence = 0; keep(); next }
+      blk[++nblk] = strip(t, findent); len++
       next
     }
-    if (match(line, /^[ \t]*(```+|~~~+)/)) {
-      s = substr(line, RSTART, RLENGTH); indent = match(s, /[`~]/) - 1
-      sub(/^[ \t]+/, "", s)
-      fchar = substr(s, 1, 1); flen = length(s)
+    if (opens(line)) {
       infence = 1; start = nblk + 1; len = 0
       next
     }
@@ -100,12 +124,14 @@ awk -v decisions="$decisions" -v issue="$2" '
         text = clean(text); heading = text
         d = decision_of(text)
         if (d > 0 && index(decisions, "," d ",") > 0) {
-          dnum = d; dlevel = level; seen[d] = 1
+          if (d != dnum) { dnum = d; dlevel = level }
+          seen[d] = 1
         } else if (dnum > 0 && level <= dlevel) dnum = 0
       }
     }
   }
   END {
+    if (infence) keep()
     if (want) {
       m = split(decisions, ds, ",")
       for (k = 1; k <= m; k++) if (ds[k] != "" && !(ds[k] + 0 in seen)) {

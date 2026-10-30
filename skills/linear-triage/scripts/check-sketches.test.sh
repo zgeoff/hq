@@ -4,6 +4,11 @@
 # type under decision 2. The issue holds 2 of them, so the YAML block is missing. The issue's
 # signature has trailing spaces and its union type sits in a fence with another language tag and
 # another fence character, and both still count as found.
+# The other fixtures each hold one case: tags-* a block under another language tag and fence
+# character and a block with trailing spaces, dotted-* dotted sub-headings and a second heading
+# for the open decision, unclosed-* a fence left open at the end of the record, and indent-* a
+# ~~~ fence and an indented fence in the record against a block nested in a list item and a block
+# that lost its inner indentation in the issue.
 # The fixtures are .txt files so the formatter leaves the trailing spaces in them.
 set -eu
 here=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
@@ -51,5 +56,20 @@ check missing-file 2 "" "check-sketches.sh: no such file: $fixtures/none.md$nl" 
 check no-files 2 "" "usage: check-sketches.sh [--decision <n>]... <record file> <issue file>$nl" "$rec"
 check decision-no-value 2 "" "usage: check-sketches.sh [--decision <n>]... <record file> <issue file>$nl" --decision
 check decision-trailing 2 "" "usage: check-sketches.sh [--decision <n>]... <record file> <issue file>$nl" --decision 1 --decision
+
+t="$fixtures/tags-record.txt"
+ti="$fixtures/tags-issue.txt"
+check other-language-tag 0 '{"heading":"1. Fees","first":"const feePerDay = 2","found":true}'"$nl" "" --decision 1 "$t" "$ti"
+check trailing-spaces 0 '{"heading":"2. Limits","first":"const maxLoans = 6","found":true}'"$nl" "" --decision 2 "$t" "$ti"
+
+blank="$fixtures/blank-issue.txt"
+dotted="$fixtures/dotted-record.txt"
+check dotted-sub-heading 1 '{"heading":"Notes","first":"const loanDays = 14","found":false}'"$nl" "" --decision 1 "$dotted" "$blank"
+check same-decision-heading 1 '{"heading":"Expiry","first":"const holdDays = 5","found":false}'"$nl" "" --decision 3 "$dotted" "$blank"
+check unclosed-fence 1 '{"heading":"1. Returns","first":"scan --return","found":false}'"$nl" "" --decision 1 "$fixtures/unclosed-record.txt" "$blank"
+
+renew_yaml='{"heading":"1. Renewals","first":"renew:","found":true}'
+renew_ts='{"heading":"1. Renewals","first":"function renew(loan: LoanId): Loan","found":false}'
+check indented-fences 1 "$renew_yaml$nl$renew_ts$nl" "" "$fixtures/indent-record.txt" "$fixtures/indent-issue.txt"
 
 exit "$fail"
