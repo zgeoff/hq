@@ -99,12 +99,14 @@ test('it records nothing when Linear fails, so a later run decides the row', asy
     at,
   ).then(
     () => null,
-    (error: unknown) => (error instanceof Error ? error.message : String(error)),
+    (error: unknown) => error,
   );
   const between = ctx.outcomes();
   await decideUmbrellaBoxes(ctx.db, buildStubLinearDescriptions({ 'GEO-9001': '- [ ] vers' }).call, at);
 
-  expect({ failed, between, after: ctx.outcomes() }).toStrictEqual({ failed: 'invented outage', between: ['vers#3 GEO-9001 null'], after: ['vers#3 GEO-9001 news'] });
+  expect(failed).toStrictEqual(new Error('invented outage'));
+  expect(between).toStrictEqual(['vers#3 GEO-9001 null']);
+  expect(ctx.outcomes()).toStrictEqual(['vers#3 GEO-9001 news']);
 });
 
 test('it posts one news line and one event when two overlapping syncs read the same undecided row', async () => {
