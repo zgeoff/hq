@@ -7,6 +7,7 @@ import { main } from '../cli.ts';
 import { overrideEnv } from '../config/override-env.ts';
 import { openDb } from '../db/open-db.ts';
 import { setMeta } from '../db/set-meta.ts';
+import { listRuns } from '../runs/list-runs.ts';
 import { runReview } from './run-review.ts';
 
 const PINNED = '0123456789abcdef0123456789abcdef01234567';
@@ -500,7 +501,7 @@ test('it passes --fixes-only straight to noslop, with no review on record, and r
   expect(ctx.db.query('SELECT confirm, kind, ok FROM noslop_rounds ORDER BY id DESC LIMIT 1').get()).toStrictEqual({ confirm: 1, kind: 'review', ok: 1 });
 });
 
-test('it leaves the head a hand-run --fixes-only run ran on unmarked, and counts no round', async () => {
+test('it leaves the head a hand-run --fixes-only run that checked no fix ran on unmarked, and counts no round', async () => {
   const ctx = setupTest();
   const fake = buildFakeRunner({ noslopReview: { code: 0, stdout: FAKE_REVIEW_JSON.replace('"head":"feat"', `"head":"${FAKE_FULL_SHA}"`), stderr: '' } });
   ctx.listWidgets();
@@ -510,6 +511,34 @@ test('it leaves the head a hand-run --fixes-only run ran on unmarked, and counts
 
   expect(ctx.db.query("SELECT reviewed_sha, review_round FROM run_prs WHERE ref = 'widgets#7'").get()).toStrictEqual({ reviewed_sha: null, review_round: 0 });
   expect(ctx.db.query("SELECT COUNT(*) AS rounds FROM noslop_rounds WHERE confirm = 0").get()).toStrictEqual({ rounds: 0 });
+});
+
+test('it marks the head a hand-run --fixes-only run ran on reviewed when every fix check passed, and counts no round', async () => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ noslopReview: { code: 0, stdout: JSON.stringify({ version: 7, head: FAKE_FULL_SHA, base: 'main', depth: 'standard', findings: [], failedCalls: [], notReviewed: [], notReviewedByLens: [], fixChecks: [
+    { findingID: 'teapot0000000001', fixed: true, reason: 'the spout pours now' },
+    { findingID: 'teapot0000000002', fixed: true, reason: 'the lid fits now' },
+  ] }), stderr: '' } });
+  ctx.listWidgets();
+  createRunPR(ctx.db);
+
+  await runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false, fixesOnly: true });
+
+  expect(listRuns(ctx.db)[0]?.prs[0]).toMatchObject({ reviewed_sha: FAKE_FULL_SHA, review_round: 0 });
+});
+
+test('it leaves the head a hand-run --fixes-only run ran on unmarked when one fix check failed', async () => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ noslopReview: { code: 0, stdout: JSON.stringify({ version: 7, head: FAKE_FULL_SHA, base: 'main', depth: 'standard', findings: [], failedCalls: [], notReviewed: [], notReviewedByLens: [], fixChecks: [
+    { findingID: 'teapot0000000001', fixed: true, reason: 'the spout pours now' },
+    { findingID: 'teapot0000000002', fixed: false, reason: 'the lid still rattles' },
+  ] }), stderr: '' } });
+  ctx.listWidgets();
+  createRunPR(ctx.db);
+
+  await runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false, fixesOnly: true });
+
+  expect(listRuns(ctx.db)[0]?.prs[0]).toMatchObject({ reviewed_sha: null, review_round: 0 });
 });
 
 test('it marks the head a fix-checks-only run past the emergency cap ran on reviewed, without counting a round', async () => {

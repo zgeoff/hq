@@ -190,7 +190,7 @@ async function runPlannedRound(plan: RoundPlan, parsed: ParsedRepo, sha: string,
   writeReviewStarted(plan.request.db, parsed.repo, plan.request.pr);
   const built = await createNoslopContext(plan, parsed, sha, scratch);
   const result = await runNoslopReview(built);
-  writeRoundMark(plan, parsed);
+  writeRoundMark(plan, parsed, result.fixChecks);
   return { result, plan };
 }
 
@@ -218,11 +218,9 @@ async function createNoslopContext(plan: RoundPlan, parsed: ParsedRepo, sha: str
   };
 }
 
-// A full review, or a fix-checks-only run the emergency cap or a base move forced, marks the head it
-// ran on so the sweep stops calling the head unreviewed; a hand-run --fixes-only marks nothing. Only
-// a full review counts as a round. A base move marks only a run recorded as one, at the compared head.
-function writeRoundMark(plan: RoundPlan, parsed: ParsedRepo): void {
-  if (plan.fixesOnly && plan.emergencyCap === null && plan.baseMove === null) {
+// The owner's rules let a fixes-only re-check stand as the review of a fix push.
+function writeRoundMark(plan: RoundPlan, parsed: ParsedRepo, fixChecks: readonly FixCheck[]): void {
+  if (plan.fixesOnly && plan.emergencyCap === null && plan.baseMove === null && !isRecheckPassed(fixChecks)) {
     return;
   }
   const found = findLastReviewRound(plan.request.db, parsed.repo, plan.request.pr);
@@ -235,6 +233,9 @@ function writeRoundMark(plan: RoundPlan, parsed: ParsedRepo): void {
 }
 
 
+function isRecheckPassed(fixChecks: readonly FixCheck[]): boolean {
+  return fixChecks.length > 0 && fixChecks.every((check) => check.fixed);
+}
 
 function buildTitledFixChecks(fixChecks: FixCheck[], titles: Map<string, string>): TitledFixCheck[] {
   return fixChecks.map((check) => ({ ...check, title: titles.get(check.findingID) ?? null }));
