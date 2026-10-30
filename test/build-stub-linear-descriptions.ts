@@ -1,7 +1,5 @@
 import type { LinearCall } from '../src/linear/types.ts';
 
-// Linear's GraphQL over these issue descriptions: an id query gets a node for each id it names that
-// the map holds, and every other query an empty page. Each id query's id list goes to `asked`.
 export function buildStubLinearDescriptions(descriptions: Readonly<Record<string, string>>): { call: LinearCall; asked: unknown[] } {
   const asked: unknown[] = [];
   const call: LinearCall = (_query, variables) => {
