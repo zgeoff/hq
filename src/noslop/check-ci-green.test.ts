@@ -160,3 +160,24 @@ test('it blocks a re-run of the cancelled run that is still running after the la
     ], []),
   ).toStrictEqual({ green: false, reason: 'CI is not green: pr / test-matrix (IN_PROGRESS)' });
 });
+
+test('it passes a cancelled run whose failed summary job passed in the later run', () => {
+  expect(
+    checkCIGreen([
+      { __typename: 'CheckRun', name: 'pr / test-matrix', workflowName: 'PR', detailsUrl: 'https://github.com/acme/kettle/actions/runs/500/job/1', status: 'COMPLETED', conclusion: 'CANCELLED', startedAt: '2026-10-14T01:00:00Z', completedAt: '2026-10-14T01:00:01Z' },
+      { __typename: 'CheckRun', name: 'pr / checks', workflowName: 'PR', detailsUrl: 'https://github.com/acme/kettle/actions/runs/500/job/2', status: 'COMPLETED', conclusion: 'FAILURE', startedAt: '2026-10-14T01:00:02Z', completedAt: '2026-10-14T01:00:03Z' },
+      { __typename: 'CheckRun', name: 'pr / test', workflowName: 'PR', detailsUrl: 'https://github.com/acme/kettle/actions/runs/501/job/3', status: 'COMPLETED', conclusion: 'SUCCESS', startedAt: '2026-10-14T01:00:05Z', completedAt: '2026-10-14T01:04:00Z' },
+      { __typename: 'CheckRun', name: 'pr / checks', workflowName: 'PR', detailsUrl: 'https://github.com/acme/kettle/actions/runs/501/job/4', status: 'COMPLETED', conclusion: 'SUCCESS', startedAt: '2026-10-14T01:04:05Z', completedAt: '2026-10-14T01:04:10Z' },
+    ], []),
+  ).toStrictEqual({ green: true });
+});
+
+test('it blocks a failed check of a run that also holds a cancelled check, though a later run passed', () => {
+  expect(
+    checkCIGreen([
+      { __typename: 'CheckRun', name: 'pr / test-browser', workflowName: 'PR', detailsUrl: 'https://github.com/acme/kettle/actions/runs/500/job/1', status: 'COMPLETED', conclusion: 'FAILURE', startedAt: '2026-10-14T01:00:00Z', completedAt: '2026-10-14T01:02:00Z' },
+      { __typename: 'CheckRun', name: 'pr / test-e2e', workflowName: 'PR', detailsUrl: 'https://github.com/acme/kettle/actions/runs/500/job/2', status: 'COMPLETED', conclusion: 'CANCELLED', startedAt: '2026-10-14T01:00:00Z', completedAt: '2026-10-14T01:02:01Z' },
+      { __typename: 'CheckRun', name: 'pr / lint', workflowName: 'PR', detailsUrl: 'https://github.com/acme/kettle/actions/runs/501/job/3', status: 'COMPLETED', conclusion: 'SUCCESS', startedAt: '2026-10-14T01:03:00Z', completedAt: '2026-10-14T01:04:00Z' },
+    ], []),
+  ).toStrictEqual({ green: false, reason: 'CI is not green: pr / test-browser (FAILURE)' });
+});

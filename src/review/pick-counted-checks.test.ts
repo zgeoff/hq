@@ -33,16 +33,13 @@ test('it keeps a cancelled check that names no Actions run', () => {
   expect(pickCountedChecks(checks, describe)).toStrictEqual(checks);
 });
 
-test('it drops every check of a cancelled run, its failed summary job included, once a later run passed', () => {
+test('it drops only the cancelled check of a run that a later run replaced, and keeps its failed check', () => {
   const describe = setupTest().describe;
+  const failed = { workflow: 'PR', name: 'job-9', url: 'https://github.com/acme/kettle/actions/runs/700/job/2', startedAt: '2026-10-14T01:00:02Z', cancelled: false, passing: false };
   const later = { workflow: 'PR', name: 'job-7', url: 'https://github.com/acme/kettle/actions/runs/701/job/3', startedAt: '2026-10-14T01:00:05Z', cancelled: false, passing: true };
   expect(
-    pickCountedChecks([
-      { workflow: 'PR', name: 'job-8', url: 'https://github.com/acme/kettle/actions/runs/700/job/1', startedAt: '2026-10-14T01:00:00Z', cancelled: true, passing: false },
-      { workflow: 'PR', name: 'job-9', url: 'https://github.com/acme/kettle/actions/runs/700/job/2', startedAt: '2026-10-14T01:00:02Z', cancelled: false, passing: false },
-      later,
-    ], describe),
-  ).toStrictEqual([later]);
+    pickCountedChecks([{ workflow: 'PR', name: 'job-8', url: 'https://github.com/acme/kettle/actions/runs/700/job/1', startedAt: '2026-10-14T01:00:00Z', cancelled: true, passing: false }, failed, later], describe),
+  ).toStrictEqual([failed, later]);
 });
 
 test('it judges a later run by the newest attempt of each check, so a failed then passed re-run replaces the cancelled run', () => {
