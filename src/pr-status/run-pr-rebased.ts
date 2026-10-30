@@ -2,6 +2,7 @@ import type { Out } from '../commands.ts';
 import { HqError } from '../errors.ts';
 import { addNews } from '../news/add-news.ts';
 import { readChangedDiffFiles } from '../noslop/read-changed-diff-files.ts';
+import { readFilePatchID } from '../noslop/read-file-patch-id.ts';
 import { readMergeBase } from '../noslop/read-merge-base.ts';
 import { runMissingFetch } from '../noslop/run-missing-fetch.ts';
 import { checkout } from '../review/checkout.ts';
@@ -48,8 +49,8 @@ export async function runPRRebased(input: PRCommandInput, ref: PRRef): Promise<O
     throw new HqError('bad_args', `${ref.slug}#${ref.pr} is still at ${oldHead.slice(0, 7)}, so there is nothing to carry`);
   }
   const heads = { base: shas.base, oldHead, newHead };
-  const patchID = await matchPatchIDs(input, ref, heads);
-  return carry(input, { ref, actor, lgtm, oldHead, newHead, patchID });
+  const matched = await matchPatchIDs(input, ref, heads);
+  return carry(input, { ref, actor, lgtm, oldHead, newHead, patchID: matched.patchID, landed: matched.landed });
 }
 
 interface Heads {
@@ -58,7 +59,7 @@ interface Heads {
   newHead: string;
 }
 
-async function matchPatchIDs(input: PRCommandInput, ref: PRRef, heads: Heads): Promise<string> {
+async function matchPatchIDs(input: PRCommandInput, ref: PRRef, heads: Heads): Promise<{ patchID: string; landed: number }> {
   const directory = await checkout(input.run, ref.slug, ref.repo).catch(() => null);
   if (directory === null) {
     throw new HqError('git_unreadable', `hq could not get a checkout of ${ref.slug}, so the diffs are not compared and nothing is recorded`);
@@ -70,11 +71,12 @@ async function matchPatchIDs(input: PRCommandInput, ref: PRRef, heads: Heads): P
   const newPatchID = await readDiffPatchID(input.run, directory, heads.base, heads.newHead);
   const differs = oldPatchID.kind === 'patch-id' && newPatchID.kind === 'patch-id' && oldPatchID.id !== newPatchID.id;
   const changed = differs ? await compareFiles(input, directory, heads) : null;
-  const outcome = pickRebasedOutcome({ slug: ref.slug, pr: ref.pr, oldHead: heads.oldHead, newHead: heads.newHead, oldPatchID, newPatchID, changed });
+  const landed = changed === null ? [] : await readLandedFiles(input, directory, heads, changed);
+  const outcome = pickRebasedOutcome({ slug: ref.slug, pr: ref.pr, oldHead: heads.oldHead, newHead: heads.newHead, oldPatchID, newPatchID, changed, landed });
   if (outcome.kind === 'refuse') {
     throw new HqError(outcome.code, outcome.message);
   }
-  return outcome.patchID;
+  return { patchID: outcome.patchID, landed: outcome.landed };
 }
 
 async function compareFiles(input: PRCommandInput, directory: string, heads: Heads): Promise<string[] | null> {
@@ -86,6 +88,25 @@ async function compareFiles(input: PRCommandInput, directory: string, heads: Hea
   return await readChangedDiffFiles(input.run, directory, { from: oldBase, to: heads.oldHead }, { from: newBase, to: heads.newHead });
 }
 
+async function readLandedFiles(input: PRCommandInput, directory: string, heads: Heads, changed: readonly string[]): Promise<string[]> {
+  const newBase = await readMergeBase(input.run, directory, heads.base, heads.newHead);
+  if (newBase === null) {
+    return [];
+  }
+  const landed: string[] = [];
+  for (const path of changed) {
+    const untouched = (await readFilePatchID(input.run, directory, { from: newBase, to: heads.newHead }, path)) === '';
+    if (!untouched) {
+      continue;
+    }
+    const held = await input.run(['git', '--literal-pathspecs', 'diff', '--quiet', heads.base, heads.oldHead, '--', path], { cwd: directory });
+    if (held.code === 0) {
+      landed.push(path);
+    }
+  }
+  return landed;
+}
+
 interface Carry {
   ref: PRRef;
   actor: string;
@@ -93,6 +114,7 @@ interface Carry {
   oldHead: string;
   newHead: string;
   patchID: string;
+  landed: number;
 }
 
 function carry(input: PRCommandInput, request: Carry): Out {
@@ -102,7 +124,7 @@ function carry(input: PRCommandInput, request: Carry): Out {
   const words = lgtm.carried ?? { source: lgtm.source, note: lgtm.note };
   const carried = { ...words, patchID: request.patchID };
   const note = buildCarriedNote(words, request.patchID);
-  const text = formatRebasedNews(request.actor, { repo: ref.repo, pr: ref.pr, oldHead: request.oldHead, newHead: request.newHead });
+  const text = formatRebasedNews(request.actor, { repo: ref.repo, pr: ref.pr, oldHead: request.oldHead, newHead: request.newHead, landed: request.landed });
   input.db
     .transaction(() => {
       requireCarriableLgtm(input.db, { repo: ref.repo, pr: ref.pr, lgtm, oldHead: request.oldHead, newHead: request.newHead });
