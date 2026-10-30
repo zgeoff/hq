@@ -122,10 +122,8 @@ test('it carries the lgtm on a stacked PR once its parent merged, when only the 
 
   await ctx.runRebased({ head, base: await stub.readMainHead(), from: stub.oldHead });
 
-  expect({ carried: readHeadLgtm(ctx.db, 'widgets', 7, head), news: listNews(ctx.db, { all: true, limit: 10 }).map((item) => item.text) }).toMatchObject({
-    carried: { answer: 'lgtm', head, source: `rebased:${stub.oldHead}` },
-    news: [`z-review carried the owner's lgtm on widgets#7 from ${stub.oldHead.slice(0, 7)} to ${head.slice(0, 7)}: the diff matched once 1 file the base now holds as approved was left out`],
-  });
+  expect(readHeadLgtm(ctx.db, 'widgets', 7, head)).toMatchObject({ answer: 'lgtm', head, source: `rebased:${stub.oldHead}` });
+  expect(listNews(ctx.db, { all: true, limit: 10 }).map((item) => item.text)).toStrictEqual([`z-review carried the owner's lgtm on widgets#7 from ${stub.oldHead.slice(0, 7)} to ${head.slice(0, 7)}: the diff matched once 1 file the base now holds as approved was left out`]);
 });
 
 test('it refuses a stacked PR whose own file changed after its parent merged, and names only that file', async () => {
