@@ -7,6 +7,7 @@ import { main } from '../cli.ts';
 import { overrideEnv } from '../config/override-env.ts';
 import { openDb } from '../db/open-db.ts';
 import { setMeta } from '../db/set-meta.ts';
+import { listRuns } from '../runs/list-runs.ts';
 import { runReview } from './run-review.ts';
 
 const PINNED = '0123456789abcdef0123456789abcdef01234567';
@@ -523,7 +524,7 @@ test('it marks the head a hand-run --fixes-only run ran on reviewed when every f
 
   await runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false, fixesOnly: true });
 
-  expect(ctx.db.query("SELECT reviewed_sha, review_round FROM run_prs WHERE ref = 'widgets#7'").get()).toStrictEqual({ reviewed_sha: FAKE_FULL_SHA, review_round: 0 });
+  expect(listRuns(ctx.db)[0]?.prs[0]).toMatchObject({ reviewed_sha: FAKE_FULL_SHA, review_round: 0 });
 });
 
 test('it leaves the head a hand-run --fixes-only run ran on unmarked when one fix check failed', async () => {
@@ -537,7 +538,7 @@ test('it leaves the head a hand-run --fixes-only run ran on unmarked when one fi
 
   await runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false, fixesOnly: true });
 
-  expect(ctx.db.query("SELECT reviewed_sha, review_round FROM run_prs WHERE ref = 'widgets#7'").get()).toStrictEqual({ reviewed_sha: null, review_round: 0 });
+  expect(listRuns(ctx.db)[0]?.prs[0]).toMatchObject({ reviewed_sha: null, review_round: 0 });
 });
 
 test('it marks the head a fix-checks-only run past the emergency cap ran on reviewed, without counting a round', async () => {
