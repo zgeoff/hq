@@ -218,8 +218,7 @@ async function createNoslopContext(plan: RoundPlan, parsed: ParsedRepo, sha: str
   };
 }
 
-// The mark stops the sweep calling the head unreviewed. The owner's rules let a fixes-only re-check
-// stand as the review of a fix push.
+// The owner's rules let a fixes-only re-check stand as the review of a fix push.
 function writeRoundMark(plan: RoundPlan, parsed: ParsedRepo, fixChecks: readonly FixCheck[]): void {
   if (plan.fixesOnly && plan.emergencyCap === null && plan.baseMove === null && !isRecheckPassed(fixChecks)) {
     return;
