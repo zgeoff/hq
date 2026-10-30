@@ -27,7 +27,7 @@ async function readChecks(run: Runner, slug: string, pr: number, watch: boolean)
   }
   const parsed = Checks.safeParse(parseJSONText(out.stdout));
   if (parsed.success) {
-    const counted = pickCountedChecks(parsed.data, (check) => ({ workflow: check.workflow ?? '', url: check.link, startedAt: check.startedAt, cancelled: check.bucket === 'cancel', passing: PASSING_BUCKETS.has(check.bucket ?? '') }));
+    const counted = pickCountedChecks(parsed.data, (check) => ({ workflow: check.workflow ?? '', name: check.name, url: check.link, startedAt: check.startedAt, cancelled: check.bucket === 'cancel', passing: PASSING_BUCKETS.has(check.bucket ?? '') }));
     return { checks: counted.map((check) => toExactOptional({ name: check.name, state: check.state, bucket: check.bucket })), checksError: null };
   }
   return { checks: [], checksError: `gh pr checks failed (${out.code}): ${(out.stderr || out.stdout).trim().slice(0, 300)}` };

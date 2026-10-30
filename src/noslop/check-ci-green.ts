@@ -78,8 +78,8 @@ function isPassing(check: GateCheck): boolean {
 
 function describeRun(check: GateCheck): RunFacts {
   return match(check)
-    .with({ __typename: 'CheckRun' }, (run) => ({ workflow: run.workflowName ?? '', url: run.detailsUrl, startedAt: run.startedAt, cancelled: run.conclusion === 'CANCELLED', passing: isPassing(run) }))
-    .with({ __typename: 'StatusContext' }, () => ({ workflow: '', url: null, startedAt: null, cancelled: false, passing: false }))
+    .with({ __typename: 'CheckRun' }, (run) => ({ workflow: run.workflowName ?? '', name: run.name, url: run.detailsUrl, startedAt: run.startedAt, cancelled: run.conclusion === 'CANCELLED', passing: isPassing(run) }))
+    .with({ __typename: 'StatusContext' }, (status) => ({ workflow: '', name: status.context, url: null, startedAt: null, cancelled: false, passing: false }))
     .exhaustive();
 }
 
