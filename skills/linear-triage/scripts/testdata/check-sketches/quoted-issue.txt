@@ -1,0 +1,5 @@
+From design https://example.test/harbour, decisions 1, 2
+
+> ```yaml
+> checks: [tide, berth]
+> ```

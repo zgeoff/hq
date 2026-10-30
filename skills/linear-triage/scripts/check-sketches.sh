@@ -11,7 +11,8 @@
 # belongs to the nearest such heading above it, with its sub-headings, until a heading of the same
 # or a higher level. Another heading for the decision already open keeps its level. A block counts
 # as found when the issue holds its lines in order, ignoring trailing spaces, the fence's language
-# tag and the indentation of the fence itself in either file.
+# tag and the indentation of the fence itself in either file. Blockquote markers ("> ", nested too)
+# come off every line of both files first, so a quoted block counts like any other.
 # Exit 0 when every kept block is found, 1 when any is missing, 2 on bad usage, a missing file or a
 # --decision that matches no heading. Needs awk.
 set -euo pipefail
@@ -69,6 +70,16 @@ awk -v decisions="$decisions" -v issue="$2" '
     while (n-- > 0 && (substr(s, 1, 1) == " " || substr(s, 1, 1) == "\t")) s = substr(s, 2)
     return s
   }
+  # Removes the blockquote markers, nested ones too, so a fence inside a quote reads like any other:
+  # each marker is up to 3 spaces, a ">", and one optional space.
+  function unquote(s,    t) {
+    while (1) {
+      t = s; sub(/^ ? ? ?>/, "", t)
+      if (t == s) return s
+      if (substr(t, 1, 1) == " ") t = substr(t, 2)
+      s = t
+    }
+  }
   # Opens a fence when the line starts one, setting fchar, flen and findent; returns 1 if it did.
   function opens(line,    s) {
     if (!match(line, /^[ \t]*(```+|~~~+)/)) return 0
@@ -102,6 +113,7 @@ awk -v decisions="$decisions" -v issue="$2" '
     # CommonMark does, so a block nested in a list item matches. Stripping all leading whitespace
     # instead would match a block whose indentation inside the fence differs.
     while ((getline line < issue) > 0) {
+      line = unquote(line)
       t = clean(line)
       if (infence) {
         if (closes(t)) infence = 0
@@ -113,7 +125,7 @@ awk -v decisions="$decisions" -v issue="$2" '
     infence = 0
   }
   {
-    line = $0
+    line = unquote($0)
     if (infence) {
       t = clean(line)
       if (closes(t)) { infence = 0; keep(); next }
