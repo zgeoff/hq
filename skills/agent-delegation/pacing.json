@@ -1,5 +1,6 @@
 {
   "designSlots": 1,
+  "agentDesignSlots": 2,
   "slots": {
     "imp": 7,
     "local": 1

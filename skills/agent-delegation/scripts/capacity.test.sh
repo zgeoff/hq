@@ -94,7 +94,7 @@ check() { # case, imp fixture, hq broker fixture, this login's Claude cache fixt
 check readout imp-room.json broker-room.json claude-room.json
 check size-imp imp-room.json broker-room.json claude-room.json --size M
 check size-local imp-full.json broker-room.json claude-room.json --size S --local-open 1
-check design-full imp-room.json broker-room.json claude-room.json --design --design-open 1
+check design imp-room.json broker-room.json claude-room.json --design
 check quota imp-room.json broker-full.json claude-full.json --size L
 # The imp route follows the broker's slot, never this machine's login.
 check broker-room-pc-full imp-room.json broker-empty.json claude-full.json --size L

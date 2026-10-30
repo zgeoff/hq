@@ -38,17 +38,13 @@
       }
     }
   },
-  "design": {
-    "slots": 1,
-    "open": 1,
-    "room": false
-  },
   "slots": {
     "imp": 2,
     "local": 2
   },
   "launch": {
-    "provider": null,
-    "reason": "every design slot is taken"
+    "provider": "claude",
+    "agent": "claude",
+    "target": "imp"
   }
 }

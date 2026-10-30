@@ -39,11 +39,6 @@
       }
     }
   },
-  "design": {
-    "slots": 1,
-    "open": 0,
-    "room": true
-  },
   "slots": {
     "imp": 2,
     "local": 2
