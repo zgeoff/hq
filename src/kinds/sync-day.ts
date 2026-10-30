@@ -3,12 +3,12 @@ import type { Database } from 'bun:sqlite';
 import { iso } from '../clock/iso.ts';
 import { now } from '../clock/now.ts';
 import { HqError } from '../errors.ts';
+import { recordUmbrellaBox } from '../linear/record-umbrella-box.ts';
 import type { RunOpts, Runner } from '../runner/types.ts';
-import { recordUmbrellaBox } from '../linear/umbrella-boxes.ts';
 import { isInScope as inScope } from '../scope/is-in-scope.ts';
-import { contributedIssues } from './contributed-issues.ts';
 import { issueOf } from './issue-of.ts';
 import { kindOf } from './kind-of.ts';
+import { parseContributedIssues } from './parse-contributed-issues.ts';
 import { toUTCDay as utcDay } from './to-utc-day.ts';
 
 const CAP = 1000; // gh search's most results per query: a full day means rows are missing
@@ -40,8 +40,8 @@ export async function syncDay(db: Database, run: Runner, day: string, env?: RunO
       ON CONFLICT (repo, number) DO UPDATE SET merged_at = excluded.merged_at, title = excluded.title, kind = excluded.kind, issue = excluded.issue`);
     for (const pr of rows) {
       up.run(pr.repository.name, pr.number, pr.closedAt, pr.title, kindOf(pr.title), issueOf(pr.body));
-      for (const issue of contributedIssues(pr.body)) {
-        recordUmbrellaBox(db, pr.repository.name, pr.number, issue, pr.closedAt);
+      for (const issue of parseContributedIssues(pr.body)) {
+        recordUmbrellaBox(db, { repo: pr.repository.name, number: pr.number, issue, mergedAt: pr.closedAt });
       }
     }
     if (done) db.query('INSERT INTO merged_pr_days (day, n, at) VALUES (?, ?, ?) ON CONFLICT (day) DO UPDATE SET n = excluded.n, at = excluded.at').run(day, rows.length, iso(at));
