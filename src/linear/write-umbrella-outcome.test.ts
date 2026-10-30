@@ -17,7 +17,9 @@ test('it decides an undecided box', () => {
   const ctx = setupTest();
   recordUmbrellaBox(ctx.db, { repo: 'tools', number: 7, issue: 'GEO-9001', mergedAt: '2026-10-20T06:00:00Z' });
   const [box] = listUmbrellaBoxes(ctx.db);
-  if (box === undefined) throw new Error('the box was not recorded');
+  if (box === undefined) {
+    throw new Error('the box was not recorded');
+  }
 
   const written = writeUmbrellaOutcome(ctx.db, box, 'news');
 
@@ -29,7 +31,9 @@ test('it returns false and keeps the first outcome when another run decided the 
   const ctx = setupTest();
   recordUmbrellaBox(ctx.db, { repo: 'tools', number: 7, issue: 'GEO-9001', mergedAt: '2026-10-20T06:00:00Z' });
   const [box] = listUmbrellaBoxes(ctx.db);
-  if (box === undefined) throw new Error('the box was not recorded');
+  if (box === undefined) {
+    throw new Error('the box was not recorded');
+  }
   writeUmbrellaOutcome(ctx.db, box, 'ticked');
 
   const written = writeUmbrellaOutcome(ctx.db, box, 'news');
@@ -48,10 +52,14 @@ test.each<[UmbrellaOutcome, UmbrellaOutcome]>([
   const ctx = setupTest();
   recordUmbrellaBox(ctx.db, { repo: 'tools', number: 7, issue: 'GEO-9001', mergedAt: '2026-10-20T06:00:00Z' });
   const [box] = listUmbrellaBoxes(ctx.db);
-  if (box === undefined) throw new Error('the box was not recorded');
+  if (box === undefined) {
+    throw new Error('the box was not recorded');
+  }
   writeUmbrellaOutcome(ctx.db, box, decided);
   const [stored] = listUmbrellaBoxes(ctx.db);
-  if (stored === undefined) throw new Error('the box was not stored');
+  if (stored === undefined) {
+    throw new Error('the box was not stored');
+  }
 
   expect(() => writeUmbrellaOutcome(ctx.db, stored, next)).toThrow(expect.objectContaining({ code: 'bad_state', data: { state: decided } }));
   expect(ctx.db.query('SELECT outcome FROM umbrella_boxes').all()).toStrictEqual([{ outcome: decided }]);
