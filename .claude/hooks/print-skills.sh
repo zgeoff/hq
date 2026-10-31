@@ -1,7 +1,12 @@
 #!/bin/sh
 # SessionStart (compact) hook: prints a session's skills back into context after a compaction,
 # since compaction drops files the session read. Each session gets only its own:
-#   print-skills.sh
+#   print-skills.sh [slot]
+# Claude Code caps each hook call's output at 10,000 characters, so settings.json calls it once per
+# slot and each file gets a cap of its own: slot 1 to 5 prints the list's skill at that place, 6
+# prints the sixth skill and every one after it, and delegation, briefs and after print the
+# delivery role's agent-delegation SKILL.md, its briefs reference and the after-compaction file.
+# With no slot it prints them all in one call.
 # The session's skills come from hq's roles table, `hq fleet --json`: the declared session whose
 # last ensure recorded this atc session id, so a session atc renamed keeps its role. A session
 # hq hasn't recorded falls back to its atc name, which must be a declared name. Any other session,
@@ -39,10 +44,18 @@ skills=$(printf '%s' "$fleet" | jq -r --arg n "$name" \
 # A name hq doesn't declare prints nothing; a declared one with an empty list still gets its file.
 printf '%s' "$fleet" | jq -e --arg n "$name" 'any(.declared[]?; .name == $n)' >/dev/null 2>&1 || exit 0
 
+slot=${1:-all}
+case $slot in
+  all|1|2|3|4|5|6|delegation|briefs|after) ;;
+  *) exit 0 ;;
+esac
+wants() { [ "$slot" = all ] || [ "$slot" = "$1" ]; }
+
 used=0
 limit=9500
 reserve=200 # room kept for each item still to print
 left=$(( $(printf "%s\n" "$skills" | grep -c . || true) + 3 ))
+[ "$slot" = all ] || left=1
 say() { # say <line>: print it only while the total stays inside the cap
   size=$(printf '%s\n' "$1" | wc -c)
   [ $((used + size)) -le $limit ] || return 0
@@ -59,26 +72,32 @@ emit() { # emit <path relative to the project dir>
   say "$text"
 }
 
+place=0
 for skill in $skills; do
+  place=$((place + 1))
+  if [ "$slot" != all ]; then
+    { [ "$slot" = "$place" ] || { [ "$slot" = 6 ] && [ "$place" -gt 6 ]; }; } || continue
+  fi
   if [ -f "${CLAUDE_PROJECT_DIR:-.}/skills/$skill/SKILL.md" ]; then
     emit "skills/$skill/SKILL.md"
   else
     say "skipped $skill: no SKILL.md in this tree"
   fi
-  left=$((left - 1))
+  [ "$slot" != all ] || left=$((left - 1))
 done
 
 role=$(printf '%s\n' "$skills" | head -1)
 briefs=skills/delivery-lead/references/briefs.md
 delegation=skills/agent-delegation/SKILL.md
-if [ "$role" = delivery-lead ] && [ -f "${CLAUDE_PROJECT_DIR:-.}/$delegation" ]; then
-  left=3
+if wants delegation && [ "$role" = delivery-lead ] && [ -f "${CLAUDE_PROJECT_DIR:-.}/$delegation" ]; then
+  [ "$slot" != all ] || left=3
   emit "$delegation"
 fi
-if [ "$role" = delivery-lead ] && [ -f "${CLAUDE_PROJECT_DIR:-.}/$briefs" ]; then
-  left=2
+if wants briefs && [ "$role" = delivery-lead ] && [ -f "${CLAUDE_PROJECT_DIR:-.}/$briefs" ]; then
+  [ "$slot" != all ] || left=2
   emit "$briefs"
 fi
+wants after || exit 0
 left=1
 case $role in
   delivery-lead) after=delivery.md ;;
