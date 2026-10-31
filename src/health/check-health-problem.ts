@@ -1,13 +1,13 @@
-import { HqError } from '../errors.ts';
+import assert from 'node:assert';
 import type { HealthProblemAction, HealthProblemState } from './health-problem-transitions.ts';
 import { HEALTH_PROBLEM_TRANSITIONS } from './health-problem-transitions.ts';
 import type { OpenProblems } from './pick-health-moves.ts';
 
 export function checkHealthProblem(key: string, action: HealthProblemAction, from: HealthProblemState): void {
   const allowed: readonly HealthProblemState[] = HEALTH_PROBLEM_TRANSITIONS[action].from;
-  if (!allowed.includes(from)) {
-    throw new HqError('bad_state', `health problem ${key} is ${from}: ${action} needs ${allowed.join(' or ')}`, { state: from });
-  }
+
+  // pickHealthMoves derives both the action and the state, so a move the table lacks is a bug in hq
+  assert.ok(allowed.includes(from), `health problem ${key} is ${from}: ${action} needs ${allowed.join(' or ')}`);
 }
 
 export function readHealthProblemState(open: OpenProblems, key: string): HealthProblemState {
