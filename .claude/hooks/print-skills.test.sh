@@ -69,6 +69,11 @@ expect_order() { # expect_order <session id> <atc name> <marker>...: the markers
 # The shared skill with no SKILL.md gets one skipped line, and the rest still print.
 expect_order id-stu stu "body of intake" "body of owner-calls" "skipped tickets: no SKILL.md in this tree" "after stu"
 expect_order id-delivery down "body of delivery-lead" "skipped tickets: no SKILL.md in this tree" "body of fix-it-here" "after delivery"
+# Once the tree has delivery-lead's briefs reference, the delivery role gets it before its after-compaction file.
+mkdir -p "$project/skills/delivery-lead/references"
+echo "body of briefs" > "$project/skills/delivery-lead/references/briefs.md"
+expect_order id-delivery down "body of delivery-lead" "skipped tickets: no SKILL.md in this tree" "body of fix-it-here" "body of briefs" "after delivery"
+if run id-stu stu | grep -q "body of briefs"; then echo "FAIL: z-stu printed the briefs reference"; fail=1; else echo "ok: only the delivery role prints the briefs reference"; fi
 # A session hq hasn't recorded falls back to its atc name, which must be declared.
 expect_order id-new z-triage "body of linear-triage" "after triage"
 # An older hq gives only `skill`.
