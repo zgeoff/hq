@@ -32,7 +32,9 @@ export function readRunningByPlace(db: Database, at: Date = now(), designRuns: r
   const movedHere = holding.filter((row) => row.place === 'imp' && live?.hereOnly.has(row.issue) === true).length;
   const filedLocal = holding.filter((row) => row.place === 'local').length + movedHere;
   const impIssues = holding.filter((row) => row.place === 'imp' && live?.hereOnly.has(row.issue) !== true).map((row) => row.issue);
-  const imp = impIssues.length;
+
+  // Each awake session elsewhere holds an imp slot, so two launches on one issue hold two; a run with none awake holds one.
+  const imp = impIssues.reduce((total, issue) => total + Math.max(1, live?.elsewhere.get(issue) ?? 0), 0);
   const issues = holding.map((row) => row.issue);
   if (live === null || live.sessions <= filedLocal) {
     return { imp, local: filedLocal, issues, impIssues, localSource: null };
@@ -46,6 +48,9 @@ interface LiveLocal {
 
   // The runs whose awake sessions all run on this PC.
   hereOnly: Set<string>;
+
+  // How many awake sessions each run has on other hosts.
+  elsewhere: Map<string, number>;
 }
 
 const sessionsSchema = z.array(z.object({ issue: z.string(), session_id: z.string() }));
@@ -60,7 +65,10 @@ function readLiveLocal(db: Database, at: Date, design: ReadonlySet<string>): Liv
   const here = new Set(reading.local);
   const rows = sessionsSchema.parse(db.query('SELECT DISTINCT issue, session_id FROM run_sessions WHERE design_pass = 0').all()).filter((row) => awake.has(row.session_id) && !design.has(row.issue));
   const sessions = new Set(rows.filter((row) => here.has(row.session_id)).map((row) => row.session_id)).size;
-  const elsewhere = new Set(rows.filter((row) => !here.has(row.session_id)).map((row) => row.issue));
+  const elsewhere = new Map<string, number>();
+  for (const row of rows.filter((other) => !here.has(other.session_id))) {
+    elsewhere.set(row.issue, (elsewhere.get(row.issue) ?? 0) + 1);
+  }
   const hereOnly = new Set(rows.filter((row) => here.has(row.session_id) && !elsewhere.has(row.issue)).map((row) => row.issue));
-  return { sessions, hereOnly };
+  return { sessions, hereOnly, elsewhere };
 }
