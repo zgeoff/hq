@@ -528,3 +528,28 @@ test('it counts a free slot no eligible issue may fill as supply minutes, not em
   expect([first.slots, result.slots, result.slotCause.cause, result.slotCause.slots]).toStrictEqual([0, 0, 'supply', 1]);
   expect(readSlotMinutes(ctx.db, '2026-10-16')).toStrictEqual({ delivery: 0, triage: 0, supply: 10, design: 0 });
 });
+
+test('it names the place and its Types in the tick when the free slots fit no eligible issue, and sends no nudge', async () => {
+  const ctx = setupTest();
+  await ctx.seedReady([
+    { identifier: 'GEO-9851', project: 'kettle roadmap', type: 'Bug', labels: ['atc'], priority: 1 },
+    { identifier: 'GEO-9852', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 },
+  ]);
+  ctx.addImpRun('GEO-9852');
+  const sample = { ...ctx.sample, slots: { imp: 1, local: 1 }, placeTypes: { local: ['Design', 'Refactor', 'Investigation'] } };
+  tick(ctx.db, sample, 'hq-lanes');
+  at('2026-10-15T20:15:00Z');
+
+  const result = tick(ctx.db, sample, 'hq-lanes');
+
+  expect([result.nudged, result.why, ctx.db.query("SELECT text FROM outbox WHERE target = 'z-delivery'").all()]).toStrictEqual([false, '1 free slot(s) fit no eligible issue (local takes Design, Refactor, Investigation)', []]);
+});
+
+test('it keeps saying nothing is eligible in the tick under placeTypes when no issue is eligible at all', async () => {
+  const ctx = setupTest();
+  await ctx.seedReady([]);
+
+  const result = tick(ctx.db, { ...ctx.sample, placeTypes: { local: ['Investigation'] } }, 'hq-lanes');
+
+  expect(result.why).toBe('3 slot(s) free, nothing eligible');
+});

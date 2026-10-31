@@ -163,3 +163,18 @@ test('it says Ready is unknown when there is no fresh Ready read', () => {
 
   expect(formatSlotPlan(slotPlan, new Date('2026-10-15T20:12:40Z'))).toContain('next: Ready unknown (no fresh read from Linear)');
 });
+
+test('it leaves out of the nudge a free slot no eligible issue fits', () => {
+  const slotPlan: SlotPlan = {
+    pool: { impSize: 2, localSize: 1, impRunning: 1, localRunning: 0, impFree: 1, localFree: 1, free: 2, capHeld: false, held: null, localHeld: null, localSource: null },
+    focus: null,
+    plan: { picks: [{ issue: 'GEO-9881', term: null, reserve: null, place: 'imp' }], lent: [], unfit: { slots: 1, places: [{ place: 'local', types: ['Investigation'] }] } },
+    readyReadAt: '2026-10-15T20:00:00Z',
+    eligible: 1,
+    design: { countsError: null, agent: { open: 0, slots: 2, next: [] }, withGeoff: { open: 0, slots: 1, next: [], asked: [] } },
+    skipped: [],
+    cap: { cap: null, until: null, reason: null, by: null, working: 0, limitedBy: null, workingFrom: 'sessions' },
+  };
+
+  expect(formatSlotNudge(slotPlan, 12)).toBe('1 slot free for 12 min (imp 1). Take, in this order: GEO-9881. (hq lanes shows the plan, hq focus the focus; capacity.sh still picks the provider and where it runs, and you write the briefs.)');
+});

@@ -2,6 +2,7 @@ import { formatCapLine } from './cap/format-cap-line.ts';
 import { formatDesignLanes } from './format-design-lanes.ts';
 import { formatFocusLine } from '../focus/format-focus-line.ts';
 import type { PlaceUnfit } from '../focus/types.ts';
+import { formatPlaceUnfit } from './format-place-unfit.ts';
 import type { SlotPlan } from './read-slot-plan.ts';
 
 // hq lanes' view of the plan: the pool, the local sessions against their cap, the focus, and what the
@@ -37,5 +38,5 @@ function formatUnfitLine(unfit: PlaceUnfit | undefined): string[] {
   if (unfit === undefined || unfit.slots === 0) {
     return [];
   }
-  return [`  no fit: ${unfit.slots} free slot(s) fit no eligible issue (${unfit.places.map((entry) => `${entry.place} takes ${entry.types.join(', ')}`).join('; ')})`];
+  return [`  no fit: ${formatPlaceUnfit(unfit)}`];
 }

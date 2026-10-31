@@ -17,6 +17,7 @@ import type { DesignCause } from './build-design-cause.ts';
 import { checkAllSkipped } from './check-all-skipped.ts';
 import { checkReadyStale } from './check-ready-stale.ts';
 import { eligibleNow } from './eligible-now.ts';
+import { formatPlaceUnfit } from './format-place-unfit.ts';
 import { formatSlotNudge } from './format-slot-nudge.ts';
 import { getLanesHold } from './get-lanes-hold.ts';
 import { LANES } from './lanes.ts';
@@ -192,6 +193,10 @@ function sendSlotCauseAlerts(db: Database, look: SlotAlertLook): void {
 }
 
 function formatNoSlotWhy(slotPlan: ReturnType<typeof readSlotPlan>, capHeld: boolean): string {
+  const unfit = slotPlan?.plan?.unfit;
+  if (unfit !== undefined && unfit.slots > 0) {
+    return formatPlaceUnfit(unfit);
+  }
   if (slotPlan && slotPlan.pool.free > 0) {
     return `${slotPlan.pool.free} slot(s) free, nothing eligible`;
   }
