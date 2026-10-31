@@ -6,55 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/print-skill.sh delivery-lead skills/delivery-lead/SKILL.md"
-          },
-          {
-            "type": "command",
-            "command": "\"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/print-skill.sh delivery-lead skills/agent-delegation/SKILL.md"
-          },
-          {
-            "type": "command",
-            "command": "\"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/print-skill.sh release skills/release/SKILL.md"
-          },
-          {
-            "type": "command",
-            "command": "\"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/print-skill.sh linear-triage skills/linear-triage/SKILL.md"
-          },
-          {
-            "type": "command",
-            "command": "\"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/print-skill.sh intake skills/intake/SKILL.md"
-          },
-          {
-            "type": "command",
-            "command": "\"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/print-skill.sh preview-qa skills/preview-qa/SKILL.md"
-          },
-          {
-            "type": "command",
-            "command": "\"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/print-skill.sh pr-review skills/pr-review/SKILL.md"
-          },
-          {
-            "type": "command",
-            "command": "\"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/print-skill.sh delivery-lead .claude/hooks/after-compaction/delivery.md"
-          },
-          {
-            "type": "command",
-            "command": "\"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/print-skill.sh release .claude/hooks/after-compaction/release.md"
-          },
-          {
-            "type": "command",
-            "command": "\"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/print-skill.sh linear-triage .claude/hooks/after-compaction/triage.md"
-          },
-          {
-            "type": "command",
-            "command": "\"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/print-skill.sh intake .claude/hooks/after-compaction/stu.md"
-          },
-          {
-            "type": "command",
-            "command": "\"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/print-skill.sh preview-qa .claude/hooks/after-compaction/qa.md"
-          },
-          {
-            "type": "command",
-            "command": "\"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/print-skill.sh pr-review .claude/hooks/after-compaction/review.md"
+            "command": "\"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/print-skills.sh"
           }
         ]
       }
