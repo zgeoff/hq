@@ -1,36 +1,27 @@
 # nixie preview API
 
-How to drive a nixie preview where its `preview/README.md` doesn't cover a step. Where the README covers a step, follow the README, because it changes with the preview.
+A nixie preview runs in its own imp on the cloud host. nixie's `preview/README.md` and
+`docs/runbooks/preview-api-check.md`, read at the PR's head, say how to drive it. Each
+`conversation/send` uses one of the PR's 20 model turns.
 
-## Calls
+## Run a command in the preview
 
-The API is oRPC under `/rpc`. Every call is a `POST` with the header `x-nixie-client: <any name>`; without it the API answers 403. The body is `{"json": <input>}`, and the answer comes back as `{"json": ...}`.
+Runbook commands run in the preview's imp, from `/srv/preview/preview`.
 
-| Call                 | Input                                                                                                                         | Notes                                                                                                                                      |
-| -------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `sessions/enrol`     | `{clientActionID: <uuid>, code: <code>, deviceName, tokenDelivery: "bearer"}`                                                 | Signs in a test device. The code comes from `docker compose logs --no-log-prefix enrol`. Later calls send `Authorization: Bearer <token>`. |
-| `sessions/issueCode` | `{clientActionID: <uuid>}`                                                                                                    | Issues a code for a second device, which then enrols with it.                                                                              |
-| `conversation/send`  | `{clientMessageId: <uuid>, text, spans: [{start: 0, end: <UTF-16 length of text>, source: "typed"}], thread: "conversation"}` | Sends one turn. Each turn counts toward the 20-turn limit.                                                                                 |
-| `conversation/read`  | `{thread: "conversation", limit}`                                                                                             | Reads records: `owner_message`, `model.reply` (its `message.text`), `model.turn_ended` and `task.step_*`.                                  |
+1. Read the cloud host's ssh name. If it's unset, `hq health` reports the gap; send that to `z-q`
+   and stop.
 
-## The shell
+   ```sh
+   HQ_CLOUD_HOST=${HQ_CLOUD_HOST:-$(jq -r '.HQ_CLOUD_HOST // empty' "${HQ_LOCAL_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/hq/local.json}")}
+   : "${HQ_CLOUD_HOST:?HQ_CLOUD_HOST is not set: run hq health}"
+   ```
 
-Reach the preview's imp from this PC with:
+2. Run one runbook command:
 
-```sh
-HQ_CLOUD_HOST=${HQ_CLOUD_HOST:-$(jq -r '.HQ_CLOUD_HOST // empty' "${HQ_LOCAL_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/hq/local.json}")}
-: "${HQ_CLOUD_HOST:?HQ_CLOUD_HOST is not set: run hq health}"
-ssh root@"$HQ_CLOUD_HOST" "docker exec imp-host impz exec <preview imp> -- sh -c 'cd /srv/preview/preview && <command>'"
-```
+   ```sh
+   ssh root@"$HQ_CLOUD_HOST" "docker exec imp-host impz exec <preview imp> -- sh -c 'cd /srv/preview/preview && <command>'"
+   ```
 
-The cloud host's ssh name is `HQ_CLOUD_HOST` in hq's local settings file; `hq health` says when it is missing.
-
-Keep the double quotes around the whole remote command. ssh joins its arguments into one string for the cloud host's shell, so without them the single quotes are lost: `sh -c` runs only the first word, and an `&&` runs the rest on the cloud host instead of in the preview. The preview's compose project is in `/srv/preview/preview`.
-
-To reset the preview's data between checks and keep the enrolled devices, run this as the `<command>`:
-
-```sh
-docker compose exec -T nixie /app/preview/run-preview.sh reset --keep-sessions --yes
-```
-
-The reset exits the server, and compose's `restart: unless-stopped` starts it again. Wait for the health URL to answer before the next check.
+Keep the outer double quotes: without them ssh drops the single quotes, and everything after `&&`
+runs on the cloud host. A command with its own quotes, such as `curl` with a JSON body, breaks this.
+When one fails, file the gap in Triage; never work around it on the host.

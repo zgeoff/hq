@@ -1,4 +1,4 @@
-// The sections every issue fills before it leaves Backlog (skills/linear-triage/references/tickets.md).
+// The sections every issue fills before it leaves Backlog (skills/tickets/SKILL.md).
 // Design and Investigation issues ask questions where other issues set a scope.
 const REQUIRED: string[][] = [['outcome'], ['context'], ['scope', 'questions to settle', 'questions to answer'], ['acceptance'], ['actions']];
 

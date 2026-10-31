@@ -1,8 +1,24 @@
-# post-review list
+# Post-review list
 
-How `intake` sends the post-review list. Send it when the owner asks for the PRs to review, or for a post-merge review.
+The owner reviews PRs after they merge. Each list starts where the last ended, so no merge is
+missed; never pick a start time yourself. `~/.local/share/z-sessions/stu.md` keeps one line per
+list:
 
-1. Read the last "POST-REVIEW LIST given at" line in your saved state, and use its `<to>` time as `<from>`. If there's no such line, ask the owner where the list starts. Never pick a start time yourself.
-2. Take `<to>` as the UTC time you search, and list every PR merged after `<from>` and up to `<to>`, then every PR open at `<to>`. Leave out bot PRs.
-3. Write one line per PR on what it delivers, with its URL at the end of the line.
-4. After you send it, save the line "POST-REVIEW LIST given at <UTC time>, covering merges <from> to <to>".
+```text
+POST-REVIEW LIST given at <end time>, covering merges <start time> to <end time>
+```
+
+Times are ISO 8601 UTC to the minute, such as `2026-10-16T21:30Z`.
+
+1. Start: the end time on the last such line. With none, ask him where to start.
+2. End: now, in UTC, rounded down to the minute.
+3. Search, leaving out bot authors such as `app/renovate`:
+
+   ```bash
+   gh search prs --owner zgeoff --merged-at "<start time>..<end time>" --limit 200
+   gh search prs --owner zgeoff --state open --limit 200
+   ```
+
+4. Reply with "Merged" and "Open" headings, one line per PR on what it delivers, URL last. "none"
+   under an empty heading.
+5. Append this list's line to `stu.md`.

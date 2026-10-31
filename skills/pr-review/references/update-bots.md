@@ -1,39 +1,48 @@
-# update bots
+# Update bots
 
-Renovate PRs, repo-sync PRs, and the daily sweep.
+Renovate bumps dependencies, and the repo-sync App copies shared files from zgeoff/tools into each
+repo. Neither gets `hq review`: a repo-sync PR was already reviewed in zgeoff/tools.
 
-## Renovate
+## Renovate PRs
 
-Renovate merges its own patch, security, minor and weekly lock-file PRs on green CI, and every bump
-of the owner's own packages (`@zgeoff/*` and the tools sync ref), as the shared preset in
-zgeoff/tools sets it. Those get no review. Majors of anyone else's packages come in a weekly batch:
-take the batch in one sitting, each PR with the normal review.
+Renovate merges these itself on green CI: patch, security and minor updates, the weekly lock-file
+refresh, `@zgeoff/*` bumps, and bumps of the zgeoff/tools sync ref. Majors of other packages come in
+a weekly batch: review the batch in one sitting, each PR through `hq review`.
 
 ## Repo-sync PRs
 
-A repo-sync PR copies text already reviewed in zgeoff/tools, so it skips noslop and merges on green
-CI once every file it changes is a synced path, or a retired one it removes:
-`scripts/sync-pr.sh <repo> <pr>` prints `ok`. Don't run `hq review` on it.
+1. From this skill's folder, run `scripts/sync-pr.sh <repo> <pr>` (repo without `zgeoff/`). It
+   prints `ok: ...`, or `no` with the first failing reason.
+2. On `ok`, merge on green CI.
+3. If the reason is a local edit the repo keeps, compare the PR's diff with the upstream change it
+   copies:
+   - Merge it (your Repo sync grant covers this) when every line it removes or changes, upstream
+     also removes or changes, and every line only the repo's copy has survives.
+   - If it would lose a local edit, message `z-stu` the PR and the lines. `z-stu` decides.
+4. Any other reason: it waits for the owner's lgtm; file it with `hq unblock add` as holds.md says.
 
-When it prints `no` because the repo keeps a local edit, read the diff against the upstream change
-in zgeoff/tools. When every line it removes or changes is one the upstream change removes or
-changes, and each line only the repo's copy has stays, it merges under your Repo sync grant. When it
-would drop or overwrite a local edit, send it to `z-stu`, which decides. For any other `no`, it
-waits for the owner's lgtm, as the holds reference says.
+## The daily check of open Renovate PRs
 
-## The daily sweep
+Some PRs Renovate should have merged stay open, such as one whose CI went green late. Once a day,
+list them:
 
-Once a day, list every open update-bot PR across zgeoff with
-`gh search prs --owner zgeoff --state open --author app/renovate --limit 200`, since some PRs that
-Renovate merges itself stay open. For each one:
+```sh
+gh search prs --owner zgeoff --state open --author app/renovate --limit 200
+```
 
-- **One of those kinds, CI green:** squash-merge it, with no review. A zgeoff/cloud one that changes
-  `nixos/` or `packages/topology/` needs its NixOS check first.
-- **One of those kinds, CI red:** send it to `z-delivery`, which launches an agent to make it green;
-  merge it once CI is green.
-- **A major of anyone else's package:** leave it open for the weekly batch.
-- **A PR in an archived repo:** leave it. Unarchiving a repo is the owner's choice; ask him when it
-  can't wait.
+For each, the first that fits:
 
-Then post one line with the counts:
-`hq news add --topic merge --text "update-bot sweep: <n> merged, <n> sent to agents, <n> left for review"`.
+- **Archived repo:** leave it. For a security update, ask the owner through `z-stu` whether to
+  unarchive.
+- **A major of another package:** leave it for the weekly batch.
+- **CI running:** leave it for tomorrow.
+- **A kind Renovate merges, CI green:** for a zgeoff/cloud PR touching `nixos/` or
+  `packages/topology/`, run the NixOS check first. Then squash-merge it.
+- **A kind Renovate merges, CI red:** message `z-delivery` the PR to launch a fix, and merge once
+  green.
+
+Post the counts, with "left" as every PR left open:
+
+```sh
+hq news add --topic merge --text "Renovate daily check: <n> merged, <n> sent to agents, <n> left"
+```

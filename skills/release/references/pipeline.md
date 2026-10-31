@@ -1,29 +1,32 @@
-# pipeline
+# Bump PRs
 
-How zgeoff/cloud's `release-check` opens bump PRs, and how you take one that needs review.
+zgeoff/cloud pins each service's release (atc, imp, nixie, auto-mode) in
+`scripts/release/release-registry.ts`. A bump PR moves one pin to the newest release.
 
-## release-check
+A merged nixie bump deploys by itself, so back up any database it migrates before `z-review` merges
+it.
 
-zgeoff/cloud's `release-check` runs every 6 hours, once in the early Sydney morning. It opens a bump PR for each
-of atc, imp, nixie and auto-mode whose pin trails its newest release, and `release-bump-merge`
-merges the ones that need no review once their checks pass. A merged nixie bump deploys by itself
-through `deploy-prod`. An atc, imp or auto-mode bump still needs your host switch or image build:
-switch to a new agent image with `bun run ops:switch-agent-image -- <image>` in `~/projects/cloud`.
-tools has no bump job.
+## How they open and merge
 
-From 06:00 Sydney, check what the morning pipeline run landed. When it failed or missed something,
-fix it, and deploy by hand from 07:00, live and checked by 08:00.
+- `release-check` runs every 6 hours at :41 UTC (18:41 UTC is Sydney's early morning) and opens a
+  bump PR per service whose pin trails.
+- `release-bump-merge` merges each `auto-merge` bump once checks pass.
+- A nixie bump deploys through `deploy-prod`. An atc, imp or auto-mode bump is live only once you
+  roll it out under SKILL.md's Hard rules; for a new agent image, run
+  `bun run ops:switch-agent-image -- <image>` in `~/projects/cloud`.
 
-## Bump PRs
+From 06:00 Sydney, check the early-morning run and its PRs. A release is missed when a service's
+newest release is newer than its pin with no bump PR open. If the run failed or missed one, fix it
+or open the PR by hand, deploy by hand, and have it live and checked by 08:00.
 
-`release-check` labels a bump `needs-review` when it is a major update, a minor update to a 0.x
-release, or carries a flag such as `migrations` or `sandbox-images-changed`, and leaves it open.
+## A bump that needs review
 
-1. Send it to `z-review`: "Review the bump: cloud#<n>." `z-review` reviews it and merges it once
-   `hq review gate` exits 0, then tells you.
-2. Before the step that migrates state, such as impd's database, back that state up.
-3. Roll it out by the hard rules in `SKILL.md`, and record the PR and run links on the release's issue.
+`release-check` labels a bump `needs-review` for a major, a minor on 0.x, or a release labelled
+risky, such as `migrations` or `sandbox-images-changed`.
 
-Put it to the owner as a decision only when a finding needs his choice, or a migration deletes or
-rewrites existing data. A migration that only adds or fills in data needs no question: back up
-first, and ship it.
+1. Read the body and its migrations. One that deletes or rewrites data goes to `z-triage` as a
+   decision, with your recommendation; wait for the answer.
+2. Back up any database it migrates, as SKILL.md's Risky migrations says.
+3. Message `z-review`: "Review the bump: cloud#<n>." It tells you once merged.
+4. Roll it out. For nixie, watch the `deploy-prod` run go green.
+5. Comment the bump PR and deploy run on any Linear issue tracking the release.

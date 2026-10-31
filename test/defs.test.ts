@@ -40,8 +40,8 @@ afterEach(() => {
 
 // A ready hq checkout at the hq source's directory: every role prompt on main, and the lane files.
 function readyHq(files: Record<string, string> = {}) {
-  const all: Record<string, string> = { 'skills/agent-delegation/scripts/capacity.sh': '#!/bin/sh\n', 'skills/agent-delegation/pacing.json': '{}\n', ...files },
-    repo = createHqDefsRepo(`${dir}/build`, all);
+  const all: Record<string, string> = { 'skills/delivery-lead/scripts/capacity.sh': '#!/bin/sh\n', 'skills/delivery-lead/pacing.json': '{}\n', ...files };
+  const repo = createHqDefsRepo(`${dir}/build`, all);
 
   // createHqDefsRepo sets it; these tests go through the switch
   delete process.env['HQ_DEFINITIONS_DIR'];
@@ -178,7 +178,7 @@ test('the tree sync refuses a dirty tree, another branch, local commits and a wr
   expect(readTreeCheck(db, new Date())).toMatchObject({ ok: false, line: expect.stringContaining('never synced') });
   push({ 'skills/intake/SKILL.md': 'upstream\n' });
   const before = hqHead();
-  appendFileSync(`${DEFS_SOURCES.hq.dir()}/skills/agent-delegation/pacing.json`, ' ');
+  appendFileSync(`${DEFS_SOURCES.hq.dir()}/skills/delivery-lead/pacing.json`, ' ');
   expect(runTreeSyncTick(db, 'z-q')).toMatchObject({ ok: false, line: expect.stringContaining('dirty (1 changed file(s))') });
   expect(readTreeCheck(db, new Date())).toMatchObject({ ok: false, line: expect.stringContaining('dirty') });
   hqGit('checkout', '-q', '--', '.');
@@ -274,7 +274,7 @@ test('one setting moves the definitions checkout for the fleet, the lanes and th
     createReadyBoth();
     useSource(db, 'hq', 'test');
     const hqDir = DEFS_SOURCES.hq.dir();
-    expect(users()).toEqual({ fleet: [hqDir], capacity: `${hqDir}/skills/agent-delegation/scripts/capacity.sh`, prompts: hqDir });
+    expect(users()).toStrictEqual({ fleet: [hqDir], capacity: `${hqDir}/skills/delivery-lead/scripts/capacity.sh`, prompts: hqDir });
     // The env var wins over the file.
     process.env['HQ_DEFINITIONS_DIR'] = `${dir}/elsewhere`;
     expect(users()).toStrictEqual({ fleet: [`${dir}/elsewhere`], capacity: `${dir}/elsewhere/skills/delivery-lead/scripts/capacity.sh`, prompts: `${dir}/elsewhere` });

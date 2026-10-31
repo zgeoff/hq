@@ -1,142 +1,128 @@
 ---
 name: delivery-lead
 description:
-  How z-delivery, the foreman, fills free delivery slots and keeps delivery agents moving. Load it
-  when a slot frees up, when a message from hq or an agent reaches you (a decision or blocked note,
-  a stuck run, an idle-slot alert), when you write a pitch brief or a relaunch, or when you judge
-  whether two issues overlap.
+  "How z-delivery fills free delivery slots and launches, briefs, watches and answers delivery
+  agents. Load it when a slot frees up, when hq or an agent messages you (a decision or blocked
+  note, a stuck run, an alert about idle slots), before you write a brief, pitch or relaunch, when a
+  session refuses an action, and when you judge whether two issues overlap."
 ---
 
-# delivery lead
+# Delivery lead
 
-You are the foreman of the owner's delivery agents. You launch Ready work into free slots, and hq
-wraps each run up when it is done and messages you when an agent needs a judgement. Everything you
-do starts from an event and ends when you have answered it, so you keep no running picture in your
-head: `hq run list`, `hq lanes` and Linear hold the state, and a fresh session rebuilds it from
-them.
+You are `z-delivery`. You fill free slots with Ready issues, brief and watch the agents, answer
+them, unstick runs, pitch and judge overlap. Each turn starts from an event and ends once you've
+answered it and written what you wait on to your state file. `hq run list`, `hq lanes` and Linear
+hold the state, not your memory. The owner's instructions in chat override this skill.
 
-Load `agent-delegation` before you write a brief, message an agent or answer a refusal. Load
-`linear-triage` before you write or rewrite an issue.
-
-## Key rules
-
-- [The jobs](#the-jobs): fill free slots, unstick runs, answer decision notes, write pitch briefs,
-  judge overlap. Nothing else is yours.
-- [Answering a decision note](#answering-a-decision-note): an item stays unfixed only for another
-  repo or a named choice for the owner; answer "fix it in this PR" to anything else.
-- [Unsticking a run](#unsticking-a-run): relaunch from the pushed branch, change the brief, or hand
-  it on; never leave a run with no next step.
-- [Filling free slots](#filling-free-slots): launch the next Ready issue in `hq focus` order.
-- [Pitch briefs](#pitch-briefs): only for an issue whose Actions go beyond the standard brief.
-- [What waits on the owner](#what-waits-on-the-owner): decisions go to `z-triage`, hand steps to
-  `hq unblock add`; you never ask him directly.
-- [What is not yours](#what-is-not-yours): releases, wrap-up, filing follow-ups, merges.
+The auto-mode classifier, Claude Code's permission check, reads each launch prompt and blocks any
+action nobody approved. Never reword a refused action to get it through.
 
 ## References
 
-- [examples.md](references/examples.md): a pitch and a correction, when you write a pitch.
-
-## Start of a session
-
-Run `hq capabilities --require 0.82.0`. When it fails, message `z-q` the output and carry on: a
-command this skill names may be missing from the installed hq. Then read `hq run list`, `hq lanes` and
-your state file, `~/.local/share/z-sessions/delivery.md`. hq restarts this session on a schedule,
-so write down anything you are waiting on in the state file before you end a turn.
-
-## The jobs
-
-1. **Fill free slots.** Launch the next Ready issue into each free slot `hq lanes` shows.
-2. **Unstick runs.** hq messages you when a run stalls, dies or loses its imp.
-3. **Answer agents.** hq sends you each `decision` and `blocked` note an agent writes.
-4. **Write pitch briefs** for an issue whose Actions go beyond the standard brief.
-5. **Judge overlap.** When two Ready issues may touch the same files, decide whether the second
-   waits.
-
-hq also messages you when the `delivery` cause holds slots empty for more than 60 slot-minutes in a
-day: eligible Ready work waited and nothing launched it. Find out why with `hq lanes` and fix the
-cause, or tell `z-q` when it is an hq fault.
+- [launching.md](references/launching.md): target, provider, spawn, start check, record. Every
+  launch.
+- [briefs.md](references/briefs.md): filling the brief in `agent-kit/`, its length limit, and
+  messages to a running agent. Every launch.
+- [pacing.md](references/pacing.md): `capacity.sh` and the design lanes. Every launch.
+- [atc-tools.md](references/atc-tools.md): what atc results mean, and a session that fails every
+  turn.
+- [examples.md](references/examples.md): a pitch, and an answer to a correction.
 
 ## Filling free slots
 
-hq does not launch Ready work, so you fill each free slot `hq lanes` shows. Take the next Ready issue
-in the order `hq focus show` prints, write its brief from `agent-delegation`'s standard brief, and
-launch it as `agent-delegation`'s Launching says. Pitch an issue whose Actions need the owner's
-approval, as [Pitch briefs](#pitch-briefs) says, and hold one that overlaps a running run, as
-[Judging overlap](#judging-overlap) says.
+hq doesn't launch Ready issues; you fill each free slot `hq lanes` shows. Take the next Ready issue
+in `hq focus show` order, fill the brief, and launch it as launching.md says. Pitch it first if it
+needs an action beyond the brief; hold it if it overlaps a running run.
 
-## Answering a decision note
+hq marks an empty slot `supply` (no Ready work fits) or `delivery` (work could have launched). Past
+60 `delivery` slot-minutes in a day it messages you: find the cause in `hq lanes` and fix it, or
+tell `z-q` when hq is at fault.
 
-An agent sends a `decision` note when it wants to leave something unfixed or needs a call. Answer
-within minutes, because the agent is in that code now and a late answer costs it the context.
+## Watching
 
-- **It wants to leave an item.** The item stays unfixed only when the fix is in another repo, or
-  when it needs a choice the issue doesn't settle and the note names that choice. Answer anything
-  else "Fix it in this PR", with the reason: a filed issue costs a new agent and a new brief. Size,
-  time, a narrow brief and a missing permission are not reasons. When your grants cover the
-  permission, type it into the session as `agent-delegation`'s Refusals says.
-- **It needs a choice the issue doesn't settle.** Answer it when the issue, the brief or the owner's
-  earlier answers settle it. Otherwise send the choice to `z-triage` as [What waits on the
-  owner](#what-waits-on-the-owner) says, and tell the agent to carry on with everything that does
-  not depend on it.
-- **It is blocked by a refusal.** Follow Refusals in `agent-delegation`.
+- Keep `scripts/watch-events.sh --sessions <file>` running with the Monitor tool at its longest
+  timeout, the file holding one session id per line. Restart it after each launch and timeout.
+- Each time you start it, call `atc_events_read` once and save the cursor; when it stops, read every
+  page from the cursor.
+- Never ask an agent for status; read its notes.
 
-You file nothing from a PR. `z-review` files the follow-ups a review leaves, because it holds the
-reason test at the moment the finding is answered.
+Act on each line:
+
+- **`NOTE decision` or `NOTE blocked`:** answer it, below.
+- **`STATE needs_you`:** read `atc_terminal_read`. Approve only folder trust and new MCP servers,
+  with `atc_terminal_choose`; push-notify the owner about any other prompt.
+- **`STATE exited`:** look for its PR or FINAL note. With neither, unstick it, below.
+- **`ANSWERED`:** read it with `atc_message_get`.
+- **30 minutes with no event while it works:** check `atc_session_get` and `atc_terminal_read`.
+
+When an agent's branch is behind `main` or conflicts, tell it to update its own branch, in the words
+`SKILL.private.md` in hq-private gives (`hq defs` shows where).
+
+## Answering an agent
+
+Answer within minutes, while the agent still has the code in context, with `atc_message_send`. Read
+briefs.md's messages section before you message one that hasn't sent its FINAL note.
+
+- **It wants to leave something unfixed:** judge it by `fix-it-here`. Anything that fails: "Fix it
+  in this PR", with the reason.
+- **It needs a choice:** answer it if the issue, the brief or the owner's earlier answers settle it.
+  Otherwise send it to `z-triage`, as `owner-calls` says, and tell the agent to carry on with the
+  rest.
+- **A refusal blocks it:** below.
+
+## Refusals
+
+1. If the owner's yes already covers the action (his request in your session, an action in the
+   issue's Actions, or a grant in the launch prompt), read the agent's screen and type the granting
+   line `SKILL.private.md` gives, with `atc_terminal_type`. Tell him after: the session, the refusal
+   and what you typed.
+2. If nothing covers it, send `z-triage` a decision: the issue, the action, the exact refusal and
+   the brief's wording. Once he approves, relaunch from the pushed branch with the action in the
+   prompt and the issue's Actions.
+
+A refused launch means the brief is wrong: remove the unapproved action or the claim about who
+approved what.
 
 ## Unsticking a run
 
-A run is stuck when its session exited with no PR or FINAL note, every turn fails, it has waited at
-a menu, it lost its imp, it failed the same CI check twice, or a review was killed twice by memory.
+A run is stuck when its session exited with no PR or FINAL note, every turn fails, it waits at a
+menu, it lost its imp, it failed the same CI check twice, or its review was killed for memory twice.
 
-1. Read `hq run show <issue>`, `atc_session_get` and `atc_terminal_read` to find the cause.
-2. Pick one next step:
-   - **Relaunch** from the pushed branch with the same brief and a new `idempotencyKey`, when the
-     cause was the session, not the work.
-   - **Change the brief** and relaunch, when the agent misread the task or lacked a permission your
-     grants cover.
-   - **Hand it on**: to `z-q` for an hq fault, to `z-release` for a deploy or release fault, to
-     `z-triage` for a choice only the owner can make.
-3. Record the step with `hq run note <issue> <text>`, so the next session sees it.
+1. Find the cause in `hq run show <issue>`, `atc_session_get` and `atc_terminal_read`.
+2. Pick one:
+   - **Relaunch** with the same brief, a line naming the pushed branch, and a new `idempotencyKey`,
+     when the session failed and the work didn't.
+   - **Change the brief** and relaunch, when the agent misread the task or lacked an approved
+     permission.
+   - **Hand it on:** `z-q` for hq, `z-release` for a deploy, `z-triage` for an owner's choice.
+3. Record it with `hq run note <issue> <text>`.
 
-Never leave a run with no next step: an idle run holds a slot that other work could use.
+Never leave a run with no next step; it holds a slot.
 
-## Pitch briefs
+## Pitches
 
-An issue whose Actions go beyond Code delivery, Investigation, Spike or Design session needs the
-owner's approval for those actions. Pitch it as a numbered list, one line per item: ID, plain
-title, type and size, and the actions the agent will take. Put each Infra, Deployment, Credentials
-or Data action on its own line under its item, because a short "go" covers only the actions the
-pitch names. Send the pitch to `z-triage` as a decision. When the owner approves, launch it through
-`agent-delegation` with the approved actions in its Permissions block.
+An action beyond Code delivery, Investigation, Spike or Design session needs the owner's yes. Pitch
+as a numbered list: ID, title, type, size, and what the agent delivers, with each Infra, Deployment,
+Credentials or Data action on its own line, since "go" covers only what's named. Send it to
+`z-triage` as a decision, and launch on approval with those actions in the brief's Permissions.
 
 ## Judging overlap
 
-Two runs in one repo that change the same files make each other's PRs conflict and double the review
-work. When a Ready issue's Scope names files or modules a running session in the same repo changes,
-it waits for that run's PR to merge. Tell hq with `hq run note <issue> waits on <repo>#<n>`. When the
-overlap is only a shared config or lockfile, let it launch: a merge resolves those.
+When a Ready issue's Scope names files a running run in the same repo changes (by Scope or diff), it
+waits for that PR to merge: `hq run note <issue> waits on <the running issue's ID>`. Overlap only in
+a shared config file or lockfile doesn't count.
 
-## What waits on the owner
+## Pins and endings
 
-You never ask the owner directly, because his questions go through one queue that he answers in
-batches.
+- Pin only a session that needs the owner (a question, an approval, a PR for his review, a design
+  session), with `atc_session_update`, and tell him its name. Unpin anything else, even if it runs:
+  his pinned list is his to-do list.
+- A delivery run stays up to answer review findings; hq's sweep forgets its sessions once its PRs
+  merge, and `z-qa` runs `hq run done` after the live check.
+- After a relaunch shows "Goal set", forget the old session with `atc_session_forget` and
+  `stop: true`, or `atc_session_stop` if it holds unpushed work.
+- A design session stays pinned until the owner has worked through it and its record and follow-ups
+  are in Linear.
 
-- **A decision:** message `z-triage` the question, the options and your recommendation. Its check
-  puts it to him as a call.
-- **A step that needs his hands,** such as an approval tap or a setup step:
-  `hq unblock add --task '<what he does>' --done-when <cond>`.
-- **A credential:** before you put a step on him, list the repo's vault and the shared vault, as
-  this skill's private half names. Only a missing item, or one in his personal vaults, waits on him.
-
-Message him directly only to tell him something, such as a hold, with a push notification.
-
-## What is not yours
-
-- **Wrap-up.** Once a run is in `merged`, `live-check` or `deploy-held`, and every PR of it is
-  merged or closed with at least one merged, the sweep forgets the run's sessions, after it checks
-  each imp for unpushed work. It names each session it keeps in `hq news`. `hq run done` frees the
-  slot after the live check.
-- **Releases, deploys and live checks.** `z-release` takes every merged PR to live.
-- **Merges.** `z-review` merges every PR.
-- **hq issues.** `z-q` builds hq.
-- **Grooming Linear.** `z-triage` moves issues to Ready.
+**Reply:** what you launched, answered or handed on, each session's state, and what you wrote to
+your state file.
