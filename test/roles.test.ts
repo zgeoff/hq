@@ -376,7 +376,7 @@ test('hq fleet --json gives each session its skill and roles, plus the roles and
   expect(q.roles).toEqual(['developer']);
   const owner = j.declared.find((e: { name: string }) => e.name === roleName('owner'));
   expect(owner.skill).toBe('intake');
-  expect(owner.skills).toStrictEqual(['intake', 'owner-calls', 'tickets']);
+  expect(owner.skills).toStrictEqual(['intake', 'owner-calls', 'tickets', 'evidence']);
   for (const entry of j.declared) {
     expect(entry.skill).toBe(entry.skills[0] ?? null);
   }

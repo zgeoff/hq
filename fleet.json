@@ -2,7 +2,7 @@
   "sessions": [
     {
       "name": "z-stu",
-      "skills": ["intake", "owner-calls", "tickets"],
+      "skills": ["intake", "owner-calls", "tickets", "evidence"],
       "cwd": "defs",
       "model": "opus",
       "wake": true,
