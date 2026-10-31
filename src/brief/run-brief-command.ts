@@ -5,6 +5,7 @@ import { buildDeliveryBrief } from './build-delivery-brief.ts';
 import { REVIEW_LINES_PATH } from './build-review-pointer.ts';
 import { findFencedBlock } from './find-fenced-block.ts';
 import { pickBriefReads } from './pick-brief-reads.ts';
+import { pickIssueRepo } from './pick-issue-repo.ts';
 import { readBriefIssue } from './read-brief-issue.ts';
 import { readBriefTemplate } from './read-brief-template.ts';
 import { readPermissionTable } from './read-permission-table.ts';
@@ -24,7 +25,11 @@ export async function runBriefCommand(deps: BriefDeps, input: BriefInput): Promi
   }
   const issue = await readBriefIssue(deps.linear, input.issue);
   const sha = await readRefSHA(deps.run, input.ref);
-  const reads = pickBriefReads(issue, input, deps.noslop, sha);
+  const picked = pickIssueRepo(issue, input.repo);
+  if (picked.kind === 'refused') {
+    throw new HqError(picked.code, picked.message);
+  }
+  const reads = pickBriefReads(issue, { area: picked.area, others: picked.others, imp: input.imp }, deps.noslop, sha);
   const template = await readBriefTemplate(deps.run, sha, TEMPLATE_PATH);
   const permissionTable = readPermissionTable(deps.files, deps.privateDir);
   const playbookText = reads.playbook === null ? null : await readRefFile(deps.run, sha, reads.playbook.path);

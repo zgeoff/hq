@@ -3,9 +3,8 @@ import { isNoslopListed } from '../noslop/is-noslop-listed.ts';
 import type { NoslopSettings } from '../noslop/load-noslop-settings.ts';
 import { buildPlaybook } from './build-playbook.ts';
 import type { BriefArea } from './pick-brief-areas.ts';
-import { pickIssueRepo } from './pick-issue-repo.ts';
 import { pickIssueSize } from './pick-issue-size.ts';
-import type { BriefInput, BriefIssue, BriefPlaybook } from './types.ts';
+import type { BriefIssue, BriefPlaybook } from './types.ts';
 
 export interface BriefReads {
   repo: string;
@@ -20,20 +19,26 @@ export interface BriefReads {
   reviewLines: boolean;
 }
 
-// What a delivery brief needs read beyond the template and the permission table: the repo of the
-// area label, the Type's playbook, the stack line for an L or XL issue, the imp line with --imp,
+// The area the brief is for, its issue's other areas, and whether it runs on an imp.
+export interface BriefChoice {
+  area: BriefArea;
+  others: BriefArea[];
+  imp: boolean;
+}
+
+// What a delivery brief needs read beyond the template and the permission table: the picked area's
+// repo, the Type's playbook, the stack line for an L or XL issue, the imp line with --imp,
 // and the review lines for a repo noslop reviews.
-export function pickBriefReads(issue: BriefIssue, input: Pick<BriefInput, 'imp' | 'repo'>, noslop: NoslopSettings, sha: string): BriefReads {
-  const picked = pickIssueRepo(issue, input.repo);
-  const repo = picked.area.repo;
+export function pickBriefReads(issue: BriefIssue, choice: BriefChoice, noslop: NoslopSettings, sha: string): BriefReads {
+  const repo = choice.area.repo;
   const type = pickIssueType(issue.labels);
   const size = pickIssueSize(issue.labels);
   return {
     repo,
-    otherAreas: picked.others,
+    otherAreas: choice.others,
     playbook: type === 'none' ? null : buildPlaybook(type, sha),
     stack: size === 'L' || size === 'XL',
-    imp: input.imp,
+    imp: choice.imp,
     reviewLines: isNoslopListed(noslop, 'zgeoff', repo),
   };
 }

@@ -1,33 +1,35 @@
-import { HqError } from '../errors.ts';
+import { match } from 'ts-pattern';
 import type { BriefArea } from './pick-brief-areas.ts';
 import { pickBriefAreas } from './pick-brief-areas.ts';
 import type { BriefIssue } from './types.ts';
 
-export interface IssueRepo {
-  area: BriefArea;
+// The area the brief is for, and the issue's other areas, each its own launch; or why there is none.
+export type IssueRepo = { kind: 'picked'; area: BriefArea; others: BriefArea[] } | { kind: 'refused'; code: 'bad_args' | 'bad_state'; message: string };
 
-  // the issue's other areas, each its own launch
-  others: BriefArea[];
+// The one named with --repo, by its label or its repo, which must be one of the issue's areas, or
+// else the issue's one area. An issue with several needs --repo.
+export function pickIssueRepo(issue: BriefIssue, chosen: string | null = null): IssueRepo {
+  return match(pickBriefAreas(issue))
+    .with({ kind: 'unknown' }, (unknown): IssueRepo => ({
+      kind: 'refused',
+      code: 'bad_state',
+      message: `${issue.identifier} has the label ${unknown.label}, which names no repo hq knows: add it to AREA_REPOS in src/brief/area-repos.ts, or take it off the issue`,
+    }))
+    .with({ kind: 'known' }, (known) => pickKnownArea(issue.identifier, known.areas, chosen))
+    .exhaustive();
 }
 
-// The area the brief is for: the one named with --repo, by its label or its repo, which must be
-// one of the issue's areas, or else the issue's one area. An issue with several needs --repo.
-export function pickIssueRepo(issue: BriefIssue, chosen: string | null = null): IssueRepo {
-  const read = pickBriefAreas(issue);
-  if (read.kind === 'unknown') {
-    throw new HqError('bad_state', `${issue.identifier} has the label ${read.label}, which names no repo hq knows: add it to AREA_REPOS in src/brief/area-repos.ts, or take it off the issue`);
-  }
-  const areas = read.areas;
+function pickKnownArea(issue: string, areas: readonly BriefArea[], chosen: string | null): IssueRepo {
   const names = areas.map((area) => area.label).join(', ');
   const area = chosen === null ? areas[0] : areas.find((candidate) => candidate.label === chosen || candidate.repo === chosen);
   if (chosen !== null && area === undefined) {
-    throw new HqError('bad_args', `--repo ${chosen} is not one of ${issue.identifier}'s areas; it has ${names === '' ? 'none' : names}`);
+    return { kind: 'refused', code: 'bad_args', message: `--repo ${chosen} is not one of ${issue}'s areas; it has ${names === '' ? 'none' : names}` };
   }
   if (chosen === null && areas.length > 1) {
-    throw new HqError('bad_state', `${issue.identifier} has several areas (${names}): brief one at a time with --repo <area>`);
+    return { kind: 'refused', code: 'bad_state', message: `${issue} has several areas (${names}): brief one at a time with --repo <area>` };
   }
   if (area === undefined) {
-    throw new HqError('bad_state', `${issue.identifier} needs an area label to name its repo; it has none`);
+    return { kind: 'refused', code: 'bad_state', message: `${issue} needs an area label to name its repo; it has none` };
   }
-  return { area, others: areas.filter((other) => other.label !== area.label) };
+  return { kind: 'picked', area, others: areas.filter((other) => other.label !== area.label) };
 }
