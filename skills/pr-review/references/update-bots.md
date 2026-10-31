@@ -23,12 +23,16 @@ a weekly batch: review the batch in one sitting, each PR through `hq review`.
 
 ## The daily check of open Renovate PRs
 
-Some PRs Renovate should have merged stay open, such as one whose CI went green late. Once a day,
-list them:
+Some PRs Renovate should have merged stay open, such as one whose CI went green late. Run this
+check in your first turn after 07:00 Australia/Sydney each day. Save the date of the last check in
+your state file, so a new session can tell whether today's has run: when the saved date is not
+today, run it now. List them:
 
 ```sh
-gh search prs --owner zgeoff --state open --author app/renovate --limit 200
+gh search prs --owner zgeoff --state open --author app/zgeoff-renovate --limit 200
 ```
+
+Renovate runs as the `zgeoff-renovate` app, so `--author app/renovate` finds nothing.
 
 For each, the first that fits:
 
