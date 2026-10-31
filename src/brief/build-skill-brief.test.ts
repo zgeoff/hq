@@ -96,3 +96,16 @@ test('it refuses a brief over 4000 bytes with its byte count', () => {
     }),
   ).toThrow(expect.objectContaining({ code: 'too_long', message: 'the brief is 4046 bytes, over the 4000 limit', data: { bytes: 4046, cuts: [] } }));
 });
+
+test('it fills the repo --repo picks from a multi-area issue', () => {
+  const brief = buildSkillBrief({
+    issue: { identifier: 'GEO-9001', description: '', labels: [{ name: 'cloud' }, { name: 'imp' }] },
+    sha: 'c'.repeat(40),
+    kind: 'design',
+    template: 'Design the lid of {{repo}} for {{issue_id}}.',
+    skill: { name: 'tickets', path: 'skills/tickets/SKILL.md', command: 'gh api tickets' },
+    repo: 'imp',
+  });
+
+  expect(brief.text).toBe('Design the lid of zgeoff/imp for GEO-9001.\n\nFirst read the tickets skill: gh api tickets');
+});

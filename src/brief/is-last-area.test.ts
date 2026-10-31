@@ -11,9 +11,13 @@ test('it is not the last area when another area box is open or missing', () => {
 });
 
 test('it matches an area as a whole word, so teapot-tools does not tick teapot', () => {
-  expect(isLastArea('- [x] teapot-tools\n', ['teapot'])).toBe(false);
+  expect(isLastArea('## Scope\n\n- [x] teapot-tools\n', ['teapot'])).toBe(false);
 });
 
 test('it is the last area for an issue with one area, which has no other', () => {
   expect(isLastArea('', [])).toBe(true);
+});
+
+test('it reads ticked boxes only from the Scope section, so an Acceptance box does not count', () => {
+  expect(isLastArea('## Scope\n\n- [ ] teapot\n\n## Acceptance\n\n- [x] teapot is descaled\n', ['teapot'])).toBe(false);
 });
