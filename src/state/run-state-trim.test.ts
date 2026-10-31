@@ -2,7 +2,7 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { chmodSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { buildStubChangingReader } from '../../test/build-stub-changing-reader.ts';
+import { readChangingFile } from '../../test/read-changing-file.ts';
 import { runStateTrim } from './run-state-trim.ts';
 
 function setupTest() {
@@ -408,7 +408,7 @@ test('#runStateTrim a state file changed between the read and the replace is ref
       role: 'kettle',
       dryRun: false,
       at: new Date('2026-10-31T01:02:03Z'),
-      readText: buildStubChangingReader(join(ctx.directory, 'kettle.md'), replacement, 2),
+      readText: readChangingFile(join(ctx.directory, 'kettle.md'), replacement, 2),
     }),
   ).toThrow('changed while hq state trim ran, so it was not replaced');
 });
@@ -429,7 +429,7 @@ test('#runStateTrim a state file changed between the read and the replace keeps 
       role: 'kettle',
       dryRun: false,
       at: new Date('2026-10-31T01:02:03Z'),
-      readText: buildStubChangingReader(join(ctx.directory, 'kettle.md'), replacement, 2),
+      readText: readChangingFile(join(ctx.directory, 'kettle.md'), replacement, 2),
     }),
   ).toThrow();
   expect(readFileSync(join(ctx.directory, 'kettle.md'), 'utf8')).toBe(replacement);
@@ -451,7 +451,7 @@ test('#runStateTrim an aborted replace tells the user to rerun', () => {
       role: 'kettle',
       dryRun: false,
       at: new Date('2026-10-31T01:02:03Z'),
-      readText: buildStubChangingReader(join(ctx.directory, 'kettle.md'), replacement, 2),
+      readText: readChangingFile(join(ctx.directory, 'kettle.md'), replacement, 2),
     }),
   ).toThrow('Rerun hq state trim kettle');
 });
@@ -472,7 +472,7 @@ test('#runStateTrim an aborted replace leaves the backup in place', () => {
       role: 'kettle',
       dryRun: false,
       at: new Date('2026-10-31T01:02:03Z'),
-      readText: buildStubChangingReader(join(ctx.directory, 'kettle.md'), replacement, 2),
+      readText: readChangingFile(join(ctx.directory, 'kettle.md'), replacement, 2),
     }),
   ).toThrow();
   expect(readFileSync(join(ctx.directory, 'kettle.md.bak-20261031T010203Z'), 'utf8')).toBe(original);
@@ -494,7 +494,7 @@ test('#runStateTrim an aborted replace leaves the archive append in place', () =
       role: 'kettle',
       dryRun: false,
       at: new Date('2026-10-31T01:02:03Z'),
-      readText: buildStubChangingReader(join(ctx.directory, 'kettle.md'), replacement, 2),
+      readText: readChangingFile(join(ctx.directory, 'kettle.md'), replacement, 2),
     }),
   ).toThrow();
   expect(readFileSync(join(ctx.directory, 'kettle-archive-2026-10.md'), 'utf8')).toBe(`<!-- moved from kettle.md by hq state trim at 2026-10-31T01:02:03Z -->\n${entries.slice(0, 10).join('')}`);
@@ -516,7 +516,7 @@ test('#runStateTrim an aborted replace leaves no temp file behind', () => {
       role: 'kettle',
       dryRun: false,
       at: new Date('2026-10-31T01:02:03Z'),
-      readText: buildStubChangingReader(join(ctx.directory, 'kettle.md'), replacement, 2),
+      readText: readChangingFile(join(ctx.directory, 'kettle.md'), replacement, 2),
     }),
   ).toThrow();
   expect(readdirSync(ctx.directory).toSorted()).toStrictEqual(['kettle-archive-2026-10.md', 'kettle.md', 'kettle.md.bak-20261031T010203Z']);
