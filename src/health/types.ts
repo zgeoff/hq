@@ -36,6 +36,9 @@ export interface Probe {
   // each session's atc mcp process, against the installed atc binary
   atcMcp?: () => Promise<AtcMcpRead>;
 
+  // a failing check per role state file over its size limit, else one passing check
+  stateSizes?: () => Check[];
+
   // a declared fleet name for a session id
   sessionName?: (sessionID: string) => string | null;
   home: string;

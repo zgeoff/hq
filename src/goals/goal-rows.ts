@@ -3,11 +3,13 @@ import { now } from '../clock/now.ts';
 import { sydneyUtc } from '../morning/sydney-utc.ts';
 import { sydney } from '../morning/sydney.ts';
 import { readLog } from './read-log.ts';
+import { buildNodeLogFiles } from './build-node-log-files.ts';
+import { stateDir } from '../state/state-dir.ts';
 import { row } from './row.ts';
 import type { GoalRow } from './types.ts';
 
 export function goalRows(db: Database, days: number, at: Date = now()): { weeks: GoalRow[]; days: GoalRow[] } {
-  const log = readLog();
+  const log = readLog(stateDir(), buildNodeLogFiles());
   const s = sydney(at);
   const fmt = (t: number) => new Intl.DateTimeFormat('en-AU', { timeZone: 'Australia/Sydney', weekday: 'short', day: '2-digit', month: 'short' }).format(new Date(t)).replace(',', '');
   const dayRows: GoalRow[] = [];

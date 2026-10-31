@@ -1,4 +1,5 @@
-import { afterEach, beforeEach, expect, test } from 'bun:test';
+import { afterEach, beforeEach, expect, onTestFinished, test } from 'bun:test';
+import { overrideEnv } from '../config/override-env.ts';
 import type { Database } from 'bun:sqlite';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { classifyDeploy } from './classify-deploy.ts';
@@ -130,6 +131,7 @@ test('closed-unmerged PRs: stored once per past day; a bad row refuses the day',
 });
 
 test('the rows: Sydney days and weeks; deploys and log are n/a before their sources begin', async () => {
+  onTestFinished(overrideEnv('HQ_STATE_DIR', `${dir}/.local/share/z-sessions`));
   mkdirSync(`${dir}/.local/share/z-sessions`, { recursive: true });
   writeFileSync(`${dir}/.local/share/z-sessions/delivery.md`, '- 2026-10-14T01:00Z DEPLOY cloud\n- 01:30Z HOLD nixie\n');
   const runs = {

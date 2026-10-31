@@ -1,6 +1,7 @@
 import type { Database } from 'bun:sqlite';
-import { expect, mock, onTestFinished, test } from 'bun:test';
-import { chmodSync, mkdirSync, writeFileSync } from 'node:fs';
+import { expect, mock, onTestFinished, spyOn, test } from 'bun:test';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { HttpResponse, http } from 'msw';
 import { z } from 'zod';
@@ -22,6 +23,7 @@ import type { RunResult, Runner } from './runner/types.ts';
 import { addPr } from './runs/add-pr.ts';
 import { addRun } from './runs/add-run.ts';
 import { setState } from './runs/set-state.ts';
+import { getStateRoles } from './state/get-state-roles.ts';
 import { buildMockSha } from '../test/build-mock-sha.ts';
 import { buildStubFinalGH } from '../test/build-stub-final-gh.ts';
 
@@ -44,6 +46,44 @@ function setupTest(billing: string): Database {
   onTestFinished(() => (process.env['PATH'] = path0));
   return fresh.db;
 }
+
+test('it reports the plan for an oversized role file in hq state trim --dry-run', async () => {
+  setupTest('true');
+  const directory = mkdtempSync(join(tmpdir(), 'hq-state-cli-'));
+  onTestFinished(() => rmSync(directory, { recursive: true, force: true }));
+  onTestFinished(overrideEnv('HQ_STATE_DIR', directory));
+  const printed: string[] = [];
+  const spy = spyOn(console, 'log').mockImplementation((line: string) => void printed.push(line));
+  onTestFinished(() => spy.mockRestore());
+  const role = getStateRoles().find((name) => name !== 'delivery') ?? '';
+  writeFileSync(join(directory, `${role}.md`), `## Log\n${'09:10Z boiled the water\n'.repeat(1000)}09:11Z poured the tea\n`);
+
+  await main(['state', 'trim', role, '--dry-run']);
+
+  expect(printed).toStrictEqual([
+    [
+      `${role}.md: 24029 bytes before, 16373 bytes after, 319 entries moved`,
+      `archive: ${join(directory, `${role}-archive-2026-10.md`)}`,
+      `backup: ${join(directory, `${role}.md.bak-20261014T010000Z`)}`,
+      'dry run: nothing written',
+    ].join('\n'),
+  ]);
+});
+
+test('it changes no file in hq state trim --dry-run', async () => {
+  setupTest('true');
+  const directory = mkdtempSync(join(tmpdir(), 'hq-state-cli-'));
+  onTestFinished(() => rmSync(directory, { recursive: true, force: true }));
+  onTestFinished(overrideEnv('HQ_STATE_DIR', directory));
+  const role = getStateRoles().find((name) => name !== 'delivery') ?? '';
+  const original = `## Log\n${'09:10Z boiled the water\n'.repeat(1000)}09:11Z poured the tea\n`;
+  writeFileSync(join(directory, `${role}.md`), original);
+
+  await main(['state', 'trim', role, '--dry-run']);
+
+  expect(readdirSync(directory)).toStrictEqual([`${role}.md`]);
+  expect(readFileSync(join(directory, `${role}.md`), 'utf8')).toBe(original);
+});
 
 test("hq goals sync stores the month's Actions spend from GitHub billing", async () => {
   const db = setupTest(`echo '{"usageItems":[{"product":"actions","netAmount":12.5}]}'`);
