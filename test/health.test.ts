@@ -140,9 +140,11 @@ test('it asks the owning session of an oversized state file first, then z-stu on
 
   await tick(0);
   await tick(119);
+  const beforeDeadline = outbox().map((message) => message.target);
   await tick(120);
   await tick(180);
 
+  expect(beforeDeadline).toStrictEqual(['z-kettle']);
   expect(outbox()).toStrictEqual([
     { target: 'z-kettle', text: 'hq health: state file kettle.md is 20.0 KB, over its 16 KB limit. It is yours to fix: trim it. If it still fails in 2 hours, hq tells z-stu as Needs Geoff.' },
     {
