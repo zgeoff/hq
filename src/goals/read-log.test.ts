@@ -48,6 +48,31 @@ test('it still counts every entry after hq state trim moved the oldest out of de
   expect(readLog(ctx.directory).events).toHaveLength(40);
 });
 
+test('it dates every time-only entry by its day heading after hq state trim cut the day in two', () => {
+  const ctx = setupTest();
+  writeFileSync(
+    join(ctx.directory, 'delivery.md'),
+    `## Log\n### 2026-10-13\n${Array.from({ length: 40 }, (_unused, index) => {
+      const minutes = 22 * 60 + index * 10;
+      return `- ${String(Math.floor(minutes / 60) % 24).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}Z DEPLOY kettle ${'x'.repeat(500)}\n`;
+    }).join('')}`,
+  );
+  runStateTrim({
+    directory: ctx.directory,
+    roles: ['delivery'],
+    role: 'delivery',
+    actor: 'z-delivery',
+    dryRun: false,
+    at: new Date('2026-10-31T01:02:03Z'),
+    files: buildNodeStateFiles(),
+  });
+
+  expect(readLog(ctx.directory)).toStrictEqual({
+    events: Array.from({ length: 40 }, (_unused, index) => ({ kind: 'DEPLOY', at: new Date(Date.parse('2026-10-13T22:00:00Z') + index * 600_000).toISOString().replace('.000Z', 'Z') })),
+    from: '2026-10-13T22:00:00Z',
+  });
+});
+
 test('it still counts the old archive beside the monthly ones', () => {
   const ctx = setupTest();
   writeFileSync(join(ctx.directory, 'delivery-archive.md'), '- 2026-09-01T08:00Z DEPLOY kettle 0.0.9 live\n');

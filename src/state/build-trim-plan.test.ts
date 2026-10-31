@@ -109,6 +109,19 @@ test('#buildTrimPlan a log heading with words after it is the log section', () =
   });
 });
 
+test('#buildTrimPlan each side of the cut keeps the day its time-only entries take from the lines above', () => {
+  const text = '## Today 2026-10-13\n\n## Log\n- 22:00Z DEPLOY kettle\n### 2026-10-14\n- 01:00Z HOLD kettle\n- 02:00Z DEPLOY kettle\n';
+
+  expect(buildTrimPlan(text, 1)).toStrictEqual({
+    kind: 'plan',
+    kept: '## Today 2026-10-13\n\n## Log\n<!-- day context: 2026-10-14T01:00Z -->\n- 02:00Z DEPLOY kettle\n',
+    moved: '### 2026-10-13 (day context)\n- 22:00Z DEPLOY kettle\n### 2026-10-14\n- 01:00Z HOLD kettle\n',
+    entriesMoved: 3,
+    beforeBytes: 110,
+    afterBytes: 91,
+  });
+});
+
 test('#buildTrimPlan a file with no log heading has no log', () => {
   expect(buildTrimPlan('# kettle\n\n## Cursors\nspout: 4\n', 1)).toStrictEqual({
     kind: 'no-log',

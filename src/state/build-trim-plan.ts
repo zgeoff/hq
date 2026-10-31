@@ -1,3 +1,5 @@
+import { buildLogDayContext } from '../goals/build-log-day-context.ts';
+
 export type TrimPlan = { kind: 'no-log' } | { kind: 'plan'; kept: string; moved: string; entriesMoved: number; beforeBytes: number; afterBytes: number };
 
 // The "## Log" section runs to the next "## " line. A non-indented line starts an entry; an
@@ -30,12 +32,19 @@ export function buildTrimPlan(text: string, limitBytes: number): TrimPlan {
   }
   const firstMoved = entryStarts[0] ?? end;
   const firstKept = entryStarts[entriesMoved] ?? end;
+  const before = lines.slice(0, firstMoved).join('');
+  const moved = lines.slice(firstMoved, firstKept).join('');
+
+  // a "- HH:MMZ" entry takes its day from the lines above it, so each side of the cut gets the day it lost
+  const movedContext = buildLogDayContext(before);
+  const keptContext = buildLogDayContext(before + moved);
+  const keptPrefix = keptContext === movedContext ? '' : keptContext;
   return {
     kind: 'plan',
-    kept: lines.slice(0, firstMoved).join('') + lines.slice(firstKept).join(''),
-    moved: lines.slice(firstMoved, firstKept).join(''),
+    kept: before + keptPrefix + lines.slice(firstKept).join(''),
+    moved: movedContext + moved,
     entriesMoved,
     beforeBytes,
-    afterBytes,
+    afterBytes: afterBytes + Buffer.byteLength(keptPrefix),
   };
 }
