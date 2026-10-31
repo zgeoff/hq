@@ -2,6 +2,74 @@ import { expect, test } from 'bun:test';
 import { buildBriefParts } from '../../test/build-brief-parts.ts';
 import { fitBrief } from './fit-brief.ts';
 
+test('it fits one fixed brief', () => {
+  const fitted = fitBrief(
+    '/goal Ship {{repo}} {{issue_id}}{{goal_file}}\n\n{{issue}}\n\nPermissions:\n{{permissions}}\n\n{{stack}}\nFinish: "{{fixes}} {{issue_id}}". {{review_lines}}{{not_yours}}\n{{imp_line}}\n{{spout}}',
+    {
+      repo: 'kettle',
+      issueID: 'GEO-9001',
+      sections: [
+        { name: 'Outcome', text: '## Outcome\n\nA kettle that boils.' },
+        { name: 'Context', text: '## Context\n\nIt leaks at the lid.' },
+      ],
+      permissions: 'Work in kettle.',
+      stack: 'Build the kettle in layers.',
+      fixes: 'Fixes',
+      reviewLines: 'List findings on zgeoff/kettle.',
+      notYours: ' Leave the stove to me.',
+      impLine: 'This imp has a small kettle.',
+      goalFile: '. First read the bug playbook: gh api bug',
+    },
+    true,
+  );
+
+  expect(fitted).toMatchInlineSnapshot(`
+    {
+      "bytes": 321,
+      "cuts": [],
+      "prompt": 
+    "/goal Ship zgeoff/kettle GEO-9001. First read the bug playbook: gh api bug
+
+    ## Outcome
+
+    A kettle that boils.
+
+    ## Context
+
+    It leaks at the lid.
+
+    Permissions:
+    Work in kettle.
+
+    Build the kettle in layers.
+    Finish: "Fixes GEO-9001". List findings on zgeoff/kettle. Leave the stove to me.
+    This imp has a small kettle.
+    {{spout}}"
+    ,
+      "unknown": [
+        "spout",
+      ],
+    }
+  `);
+});
+
+test('it gives equal results for equal input', () => {
+  const parts = {
+    repo: 'kettle',
+    issueID: 'GEO-9001',
+    sections: [{ name: 'Scope', text: `## Scope\n\n${'In: the kettle. '.repeat(300)}` }],
+    permissions: 'Work in kettle.',
+    stack: '',
+    fixes: 'Fixes',
+    reviewLines: '',
+    notYours: '',
+    impLine: '',
+    goalFile: '. First read the bug playbook: gh api bug',
+  };
+
+  expect(fitBrief('/goal Ship {{repo}}{{goal_file}}\n\n{{issue}}', parts, true)).toStrictEqual(fitBrief('/goal Ship {{repo}}{{goal_file}}\n\n{{issue}}', parts, true));
+});
+
 test('it fills each placeholder in one pass, with the repo under its owner', () => {
   const parts = buildBriefParts({ sections: [{ name: 'Outcome', text: '## Outcome\n\nBoil {{repo}}.' }], stack: 'STACK', impLine: 'IMP' });
 
