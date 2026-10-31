@@ -7,37 +7,76 @@ import { logEvent } from '../log-event.ts';
 import { addNews } from '../news/add-news.ts';
 import { enqueue } from '../outbox/enqueue.ts';
 import { owner } from '../owner.ts';
+import { checkHealthProblem, readHealthProblemState } from './check-health-problem.ts';
 import { OPEN } from './open.ts';
+import type { HealthMove } from './pick-health-moves.ts';
+import { OWNER_FIX_MS, pickHealthMoves } from './pick-health-moves.ts';
+import { match } from 'ts-pattern';
 import type { Check, HealthTick, Samples } from './types.ts';
 
-// The watcher's step: record the samples, tell z-stu about new problems, file news for cleared ones.
+// The watcher's step: record the samples, decide each problem's move (pickHealthMoves), then write
+// the open problems, the events, the messages and the news those moves call for.
 export function applyHealth(db: Database, checks: Check[], samples: Samples, actor: string, unknown: string[] = []): HealthTick {
   return db
     .transaction((): HealthTick => {
       const at = iso(now());
       setMeta(db, 'health_samples', JSON.stringify(samples));
       const open = metaJson(db, 'health_open', OPEN, {});
-      const bad = checks.filter((c) => !c.ok);
-      const opened = bad.filter((c) => !open[c.key]);
-      const cleared: HealthTick['cleared'] = [];
-      for (const [key, o] of Object.entries(open)) {
-        if (!bad.some((c) => c.key === key) && !unknown.some((u) => key.startsWith(u))) {
-          cleared.push({ key, line: o.line, since: o.since });
-          delete open[key];
-        }
+      const moves = pickHealthMoves(open, checks, unknown, at);
+      for (const move of moves) {
+        checkHealthProblem(move.key, move.action, readHealthProblemState(open, move.key));
+        match(move)
+          .with({ action: 'reported' }, (reported) => {
+            open[reported.key] = { since: at, line: reported.line };
+          })
+          .with({ action: 'asked' }, (asked) => {
+            open[asked.key] = { since: at, line: asked.line, asked: asked.owner.session };
+          })
+          .with({ action: 'escalated' }, (escalated) => {
+            open[escalated.key] = { since: escalated.since, line: escalated.line, asked: escalated.asked, escalated: true };
+          })
+          .with({ action: 'cleared' }, (cleared) => {
+            delete open[cleared.key];
+          })
+          .exhaustive();
       }
-      for (const c of opened) open[c.key] = { since: at, line: c.line };
       setMeta(db, 'health_open', JSON.stringify(open));
-      if (opened.length) {
-        const seq = logEvent(db, 'hq', 'health', 'problem', actor, null, null, { opened: opened.map((c) => c.key) });
-        const text = `Needs Geoff (hq health, read-only): ${opened.length} new problem${opened.length > 1 ? 's' : ''} on the PC:\n${opened.map((c) => `- ${c.line}`).join('\n')}\nhq health shows every check. hq stopped or restarted nothing.`;
-        enqueue(db, seq, owner(), text);
-      }
-      for (const c of cleared) {
-        logEvent(db, 'hq', 'health', 'cleared', actor, null, null, { key: c.key });
-        addNews(db, { from: 'hq-health', topic: 'fix', text: `Cleared: ${c.line.replaceAll(/\s*[\r\n]+\s*/gu, ' ')} (open since ${c.since})`.slice(0, 400), issue: null, link: null, needsGeoff: false });
-      }
+      sendHealthMessages(db, moves, actor);
+      const opened = checks.filter((check) => moves.some((move) => move.key === check.key && (move.action === 'reported' || move.action === 'asked')));
+      const cleared = moves.flatMap((move) => (move.action === 'cleared' ? [{ key: move.key, line: move.line, since: move.since }] : []));
       return { checks, opened, cleared };
     })
     .immediate();
+}
+
+function sendHealthMessages(db: Database, moves: HealthMove[], actor: string): void {
+  const hours = OWNER_FIX_MS / 3_600_000;
+  const reported = moves.filter((move) => move.action === 'reported');
+  if (reported.length > 0) {
+    const seq = logEvent(db, 'hq', 'health', 'problem', actor, null, null, { opened: reported.map((move) => move.key) });
+    const text = `Needs Geoff (hq health, read-only): ${reported.length} new problem${reported.length > 1 ? 's' : ''} on the PC:\n${reported.map((move) => `- ${move.line}`).join('\n')}\nhq health shows every check. hq stopped or restarted nothing.`;
+    enqueue(db, seq, owner(), text);
+  }
+  for (const move of moves) {
+    if (move.action !== 'asked') {
+      continue;
+    }
+    const seq = logEvent(db, 'hq', 'health', 'problem', actor, null, null, { opened: [move.key], asked: move.owner.session });
+    const text = `hq health: ${move.line}. It is yours to fix: ${move.owner.ask}. If it still fails in ${hours} hours, hq tells ${owner()} as Needs Geoff.`;
+    enqueue(db, seq, move.owner.session, text);
+  }
+  const escalated = moves.flatMap((move) => (move.action === 'escalated' ? [move] : []));
+  if (escalated.length > 0) {
+    const seq = logEvent(db, 'hq', 'health', 'escalated', actor, null, null, { keys: escalated.map((move) => move.key) });
+    const lines = escalated.map((move) => `- ${move.line} (${move.asked} was asked at ${move.since})`);
+    const text = `Needs Geoff (hq health, read-only): ${escalated.length} problem${escalated.length > 1 ? 's' : ''} still open ${hours} hours after hq asked the owning session to fix ${escalated.length > 1 ? 'them' : 'it'}:\n${lines.join('\n')}\nhq health shows every check.`;
+    enqueue(db, seq, owner(), text);
+  }
+  for (const move of moves) {
+    if (move.action !== 'cleared') {
+      continue;
+    }
+    logEvent(db, 'hq', 'health', 'cleared', actor, null, null, { key: move.key });
+    addNews(db, { from: 'hq-health', topic: 'fix', text: `Cleared: ${move.line.replaceAll(/\s*[\r\n]+\s*/gu, ' ')} (open since ${move.since})`.slice(0, 400), issue: null, link: null, needsGeoff: false });
+  }
 }

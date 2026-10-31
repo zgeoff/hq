@@ -4,6 +4,14 @@ export interface Check {
   key: string; // stable per problem, e.g. failed:user:foo.service
   ok: boolean;
   line: string;
+
+  // the session whose job it is to fix the problem, and what to ask it; without one, the problem goes to the owner's session
+  owner?: CheckOwner;
+}
+
+export interface CheckOwner {
+  session: string;
+  ask: string;
 }
 
 export interface AtcMcpProcess {
