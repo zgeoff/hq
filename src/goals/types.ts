@@ -46,3 +46,10 @@ export interface GoalRow {
   merged: number;
   closedUnmerged: number;
 }
+
+// The filesystem operations the goals log reader makes, so a test can hand it a folder listing.
+export interface LogFiles {
+  listNames: (directory: string) => string[];
+  probeExists: (path: string) => boolean;
+  readText: (path: string) => string;
+}
