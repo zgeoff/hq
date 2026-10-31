@@ -2,7 +2,7 @@ import { join } from 'node:path';
 import { iso } from '../clock/iso.ts';
 import { HqError } from '../errors.ts';
 import { buildTrimPlan } from './build-trim-plan.ts';
-import { getStateLimit } from './get-state-limit.ts';
+import { getStateLimit, getStateTrimTarget } from './get-state-limit.ts';
 import type { StateFiles, TrimReport } from './types.ts';
 
 export interface StateTrimArgs {
@@ -15,7 +15,7 @@ export interface StateTrimArgs {
   files: StateFiles;
 }
 
-// Move the oldest "## Log" entries of <role>.md to this month's archive until the file fits its limit.
+// Move the oldest "## Log" entries of <role>.md to this month's archive until the file fits its trim target.
 // Order: backup, archive append, then an atomic replace; no backup, no write.
 export function runStateTrim(args: StateTrimArgs): TrimReport {
   const directory = args.directory;
@@ -36,7 +36,8 @@ export function runStateTrim(args: StateTrimArgs): TrimReport {
   }
   const text = files.readText(file);
   const limitBytes = getStateLimit(role);
-  const plan = buildTrimPlan(text, limitBytes);
+  const targetBytes = getStateTrimTarget(role);
+  const plan = buildTrimPlan(text, targetBytes);
   if (plan.kind === 'no-log') {
     throw new HqError('no_log_section', `${role}.md has no "## Log" section, so hq state trim cannot trim it; trim it by hand`);
   }
@@ -49,6 +50,7 @@ export function runStateTrim(args: StateTrimArgs): TrimReport {
     dryRun: args.dryRun,
     written: false,
     limitBytes,
+    targetBytes,
     beforeBytes: plan.beforeBytes,
     afterBytes: plan.afterBytes,
     entriesMoved: plan.entriesMoved,

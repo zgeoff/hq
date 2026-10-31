@@ -101,7 +101,7 @@ test('it never gives a later trimmed batch with no day the day of the batch befo
   });
 
   expect(readLog(ctx.directory, buildNodeLogFiles())).toStrictEqual({
-    events: Array.from({ length: 12 }, (_unused, index) => ({ kind: 'DEPLOY', at: `2026-10-13T09:${String(index).padStart(2, '0')}:00Z` })),
+    events: Array.from({ length: 19 }, (_unused, index) => ({ kind: 'DEPLOY', at: `2026-10-13T09:${String(index).padStart(2, '0')}:00Z` })),
     from: '2026-10-13T09:00:00Z',
   });
 });

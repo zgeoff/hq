@@ -65,7 +65,7 @@ test('it reports the plan for an oversized role file in hq state trim --dry-run'
 
   expect(printed).toStrictEqual([
     [
-      `${role}.md: 24029 bytes before, 16373 bytes after, 319 entries moved`,
+      `${role}.md: 24029 bytes before, 12269 bytes after, 490 entries moved`,
       `archive: ${join(directory, `${role}-archive-2026-10.md`)}`,
       `backup: ${join(directory, `${role}.md.bak-20261014T010000Z`)}`,
       'dry run: nothing written',

@@ -5,7 +5,7 @@ export function formatTrimReport(report: TrimReport): string {
   const name = `${report.role}.md`;
   const lines = [`${name}: ${report.beforeBytes} bytes before, ${report.afterBytes} bytes after, ${report.entriesMoved} entries moved`];
   if (report.entriesMoved === 0) {
-    const why = report.afterBytes > report.limitBytes ? 'only the newest log entry is left' : `already under the ${formatKilobytes(report.limitBytes)} limit`;
+    const why = report.afterBytes > report.targetBytes ? 'only the newest log entry is left' : `already under the ${formatKilobytes(report.targetBytes)} trim target`;
     lines.push(`nothing to move: ${why}`);
   } else {
     lines.push(`archive: ${report.archive}`, `backup: ${report.backup}`);

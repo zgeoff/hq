@@ -6,6 +6,9 @@ export interface TrimReport {
   // false when nothing moved or --dry-run
   written: boolean;
   limitBytes: number;
+
+  // the size hq state trim cuts to, below the limit
+  targetBytes: number;
   beforeBytes: number;
   afterBytes: number;
   entriesMoved: number;

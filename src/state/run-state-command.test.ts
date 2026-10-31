@@ -120,3 +120,39 @@ test('#runStateCommand a missing role is refused', () => {
     }),
   ).toThrow('give the role');
 });
+
+test('#runStateCommand a file under its trim target says so and names the target', () => {
+  const ctx = setupTest();
+  writeFileSync(join(ctx.directory, 'kettle.md'), '## Log\n09:10Z boiled the water\n09:11Z poured the tea\n');
+
+  const out = runStateCommand({
+    verb: 'trim',
+    rest: ['kettle'],
+    dryRun: false,
+    directory: ctx.directory,
+    roles: ['kettle'],
+    at: new Date('2026-10-31T01:02:03Z'),
+    actor: 'z-kettle',
+    files: buildNodeStateFiles(),
+  });
+
+  expect(out.text).toBe('kettle.md: 53 bytes before, 53 bytes after, 0 entries moved\nnothing to move: already under the 12.0 KB trim target');
+});
+
+test('#runStateCommand a file under its limit but over its trim target is trimmed', () => {
+  const ctx = setupTest();
+  writeFileSync(join(ctx.directory, 'kettle.md'), `## Log\n${'09:10Z boiled the water\n'.repeat(600)}09:11Z poured the tea\n`);
+
+  const out = runStateCommand({
+    verb: 'trim',
+    rest: ['kettle'],
+    dryRun: true,
+    directory: ctx.directory,
+    roles: ['kettle'],
+    at: new Date('2026-10-31T01:02:03Z'),
+    actor: 'z-kettle',
+    files: buildNodeStateFiles(),
+  });
+
+  expect(out.data).toMatchObject({ beforeBytes: 14_429, limitBytes: 16_384, targetBytes: 12_288, afterBytes: 12_269, entriesMoved: 90 });
+});
