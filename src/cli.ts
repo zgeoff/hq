@@ -319,6 +319,10 @@ import { syncKinds } from './kinds/sync-kinds.ts';
 import { syncLinear } from './kinds/sync-linear.ts';
 import { weeksBack } from './kinds/weeks-back.ts';
 import { makeAuditedLinearCaller } from './linear/make-audited-linear-caller.ts';
+import { makeLinearCaller } from './linear/make-linear-caller.ts';
+import { loadNoslopSettings } from './noslop/load-noslop-settings.ts';
+import { parseBriefFlags } from './brief/parse-brief-flags.ts';
+import { runBriefCommand } from './brief/run-brief-command.ts';
 import { readPacingLanes } from './lanes/read-pacing-lanes.ts';
 import { runLinearReadyTick } from './run-linear-ready-tick.ts';
 import { STEP_MS } from './watcher/step-ms.ts';
@@ -509,6 +513,9 @@ const OPTIONS = {
   out: { type: 'string' },
   reserve: { type: 'string', multiple: true },
   refresh: { type: 'boolean' },
+  imp: { type: 'boolean' },
+  'issue-by-link': { type: 'boolean' },
+  'goal-file': { type: 'string' },
 } as const;
 
 export type Flags = ReturnType<typeof parse>['values'];
@@ -2003,6 +2010,11 @@ const GROUPS: Record<string, (context: Ctx) => Promise<Out>> = {
   grant: (c) => runGrantCommand(c.db, c.verb, c.rest, c.flags),
   kinds: (c) => kindsCommand(c.db, c.verb, c.flags),
   linear: (context) => runLinearCommand({ call: makeAuditedLinearCaller(context.db, context.run), files: { statSync, readdirSync, writeFileSync, rmSync } }, context.flags),
+  brief: (context) =>
+    runBriefCommand(
+      { linear: makeLinearCaller(context.run), run: context.run, noslop: loadNoslopSettings(context.db), privateDir: PRIVATE_TREE.dir(), warn: (line) => console.error(line) },
+      parseBriefFlags(context.verb, context.flags),
+    ),
   goals: (c) => goalsCommand(c.db, c.verb, c.rest, c.flags),
   defs: (c) => defsCommand(c.db, c.verb, c.rest, c.flags),
   repo: async (c) => {
