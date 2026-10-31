@@ -39,7 +39,7 @@ export function buildDeliveryBrief(facts: DeliveryBriefFacts): DeliveryBrief {
   const issueSections = sections.filter((section) => ISSUE_SECTIONS.has(section.name.toLowerCase()));
   const actions = parseIssueActions(sections);
   const permissions = buildPermissions(actions, facts.permissionTable, facts.reads.repo);
-  const needsRelease = actions.some((action) => ['deploy', 'infra'].includes(action.toLowerCase()));
+  const needsRelease = permissions.names.some((action) => ['deploy', 'infra'].includes(action.toLowerCase()));
   const playbook = facts.playbookText === null ? null : facts.reads.playbook;
   const parts: BriefParts = {
     repo: facts.reads.repo,

@@ -114,6 +114,25 @@ test('it gives equal briefs for equal facts', () => {
   expect(buildDeliveryBrief(facts)).toStrictEqual(buildDeliveryBrief(facts));
 });
 
+test('it marks the PR line Contributes to for a Deploy action written with its detail after the name', () => {
+  const brief = buildDeliveryBrief({
+    input: { issue: 'GEO-9001', ref: 'main', imp: false, byLink: true, goalFile: null },
+    issue: { identifier: 'GEO-9001', description: '## Actions\n\nDeploy to the kettle stage\n', labels: [{ name: 'kettle' }] },
+    sha: 'b'.repeat(40),
+    reads: { repo: 'kettle', playbook: null, stack: false, imp: false, reviewLines: false },
+    template: '{{permissions}}\n"{{fixes}} {{issue_id}}"',
+    permissionTable: [
+      { action: 'Code delivery', phrase: 'Work in <repo>.' },
+      { action: 'Deploy', phrase: 'Deploy <repo> to the stage.' },
+    ],
+    playbookText: null,
+    stack: '',
+    impLine: '',
+  });
+
+  expect(brief.out.text).toBe('Work in kettle.\nDeploy kettle to the stage.\n"Contributes to GEO-9001"');
+});
+
 test('it warns and lists playbook in unfilled when the issue has no Type label', () => {
   const brief = buildDeliveryBrief({
     input: { issue: 'GEO-9001', ref: 'main', imp: false, byLink: true, goalFile: null },
