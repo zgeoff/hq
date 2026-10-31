@@ -9,12 +9,12 @@ test('it gives the body of the first text fence of the file at the commit', asyn
   await expect(readBriefTemplate(run, buildMockSha(5), 'agent-kit/kettle-brief.md')).resolves.toBe('Boil the water.');
 });
 
-test('it refuses a missing file with the file, the sha and the --ref hint', () => {
+test('it refuses a missing file with the file and the sha', () => {
   const run = buildStubBriefGH({ commits: { main: buildMockSha(5) }, files: {} }, []);
 
   expect(readBriefTemplate(run, buildMockSha(5), 'agent-kit/kettle-brief.md')).rejects.toMatchObject({
     code: 'not_found',
-    message: `agent-kit/kettle-brief.md is missing at ${buildMockSha(5)}; pass --ref refactor/fleet-skill-rebuild until the skill rebuild merges`,
+    message: `agent-kit/kettle-brief.md is missing at ${buildMockSha(5)}`,
   });
 });
 

@@ -36,7 +36,7 @@ export async function runBriefCommand(deps: BriefDeps, input: BriefInput): Promi
   const stack = reads.stack ? await readBlock(deps.run, sha, BRIEFS_PATH, 'The stack line:') : '';
   const impLine = reads.imp ? await readBlock(deps.run, sha, BRIEFS_PATH, 'The imp line:') : '';
   if (reads.reviewLines && (await readRefFile(deps.run, sha, REVIEW_LINES_PATH)) === null) {
-    throw new HqError('not_found', `${REVIEW_LINES_PATH} is missing at ${sha}; pass --ref refactor/fleet-skill-rebuild until the skill rebuild merges`);
+    throw new HqError('not_found', `${REVIEW_LINES_PATH} is missing at ${sha}`);
   }
   const brief = buildDeliveryBrief({ input, issue, sha, reads, template, permissionTable, playbookText, stack, impLine });
   for (const warning of brief.warnings) {
@@ -51,7 +51,7 @@ export async function runBriefCommand(deps: BriefDeps, input: BriefInput): Promi
 async function readBlock(run: Runner, sha: string, path: string, marker: string): Promise<string> {
   const text = await readRefFile(run, sha, path);
   if (text === null) {
-    throw new HqError('not_found', `${path} is missing at ${sha}; pass --ref refactor/fleet-skill-rebuild until the skill rebuild merges`);
+    throw new HqError('not_found', `${path} is missing at ${sha}`);
   }
   const block = findFencedBlock(text, marker);
   if (block === null) {

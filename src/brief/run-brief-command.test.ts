@@ -285,7 +285,7 @@ test('it refuses a prompt still over 4000 bytes after cut 3, with its byte count
   expect(existsSync(goalFile)).toBe(false);
 });
 
-test('it refuses with the --ref hint when brief.md is missing at the sha', () => {
+test('it refuses when brief.md is missing at the sha', () => {
   const ctx = setupTest();
   const stub = createStubBriefDeps(ctx.root, {
     issues: { 'GEO-9001': { description: buildKettleIssueText(), labels: [{ name: 'Bug', parent: 'Type' }, { name: 'cloud' }] } },
@@ -295,7 +295,7 @@ test('it refuses with the --ref hint when brief.md is missing at the sha', () =>
 
   const outcome = runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: null, repo: null });
 
-  expect(outcome).rejects.toMatchObject({ code: 'not_found', message: `agent-kit/brief.md is missing at ${stub.sha}; pass --ref refactor/fleet-skill-rebuild until the skill rebuild merges` });
+  expect(outcome).rejects.toMatchObject({ code: 'not_found', message: `agent-kit/brief.md is missing at ${stub.sha}` });
 });
 
 test('it never prints a section of the private file outside the permission table', async () => {
@@ -373,7 +373,7 @@ test('it refuses an L issue when briefs.md is missing at the sha, and writes no 
 
   const outcome = runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile, repo: null });
 
-  expect(outcome).rejects.toMatchObject({ code: 'not_found', message: `skills/delivery-lead/references/briefs.md is missing at ${stub.sha}; pass --ref refactor/fleet-skill-rebuild until the skill rebuild merges` });
+  expect(outcome).rejects.toMatchObject({ code: 'not_found', message: `skills/delivery-lead/references/briefs.md is missing at ${stub.sha}` });
   expect(existsSync(goalFile)).toBe(false);
 });
 
@@ -427,6 +427,6 @@ test('it refuses a repo noslop reviews when review-lines.md is missing at the sh
 
   const outcome = runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: null, repo: null });
 
-  expect(outcome).rejects.toMatchObject({ code: 'not_found', message: `agent-kit/review-lines.md is missing at ${stub.sha}; pass --ref refactor/fleet-skill-rebuild until the skill rebuild merges` });
+  expect(outcome).rejects.toMatchObject({ code: 'not_found', message: `agent-kit/review-lines.md is missing at ${stub.sha}` });
 });
 
