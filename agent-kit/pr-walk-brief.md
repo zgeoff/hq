@@ -13,7 +13,7 @@ You are a short-lived helper. z-stu, the session the owner talks to, started you
 
 ## Your material
 
-- The PR list: <the PR list from step 2, as a table or a file path>
+- The PR list: <the path of the file that holds the PR list from step 2>
 - Per PR: noslop's summaries (`gh pr view <n> -R zgeoff/<repo> --comments`), review threads (`gh api graphql`, `reviewThreads`), commits (`gh api repos/zgeoff/<repo>/pulls/<n>/commits`), and the code in `~/projects/<repo>`.
 - Earlier walk logs: <paths, or "none">
 - The rules in force, in your working directory: the delivery brief, `agent-kit/brief.md` (its `Finish line:` paragraph holds the review rules), the `fix-it-here` skill, and z-review's steps in `skills/pr-review/SKILL.md`. Judge a PR by the rules in force when it opened (`git log`), and say when a later rule would have stopped it.
