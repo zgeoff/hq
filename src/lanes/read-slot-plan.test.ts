@@ -9,6 +9,7 @@ import { makeStateCall } from '../../test/make-state-call.ts';
 import { runFocusCommand } from '../focus/run-focus-command.ts';
 import { addRun } from '../runs/add-run.ts';
 import { reopenRun } from '../runs/reopen-run.ts';
+import { unsent } from '../outbox/unsent.ts';
 import { setMeta } from '../db/set-meta.ts';
 import { writeIssues } from '../linear/write-issues.ts';
 import { setState } from '../runs/set-state.ts';
@@ -525,7 +526,10 @@ test('it counts a free slot no eligible issue may fill as supply minutes, not em
 
   const result = tick(ctx.db, sample, 'hq-lanes');
 
-  expect([first.slots, result.slots, result.slotCause.cause, result.slotCause.slots]).toStrictEqual([0, 0, 'supply', 1]);
+  expect(first.slots).toBe(0);
+  expect(result.slots).toBe(0);
+  expect(result.slotCause.cause).toBe('supply');
+  expect(result.slotCause.slots).toBe(1);
   expect(readSlotMinutes(ctx.db, '2026-10-16')).toStrictEqual({ delivery: 0, triage: 0, supply: 10, design: 0 });
 });
 
@@ -542,7 +546,9 @@ test('it names the place and its Types in the tick when the free slots fit no el
 
   const result = tick(ctx.db, sample, 'hq-lanes');
 
-  expect([result.nudged, result.why, ctx.db.query("SELECT text FROM outbox WHERE target = 'z-delivery'").all()]).toStrictEqual([false, '1 free slot(s) fit no eligible issue (local takes Design, Refactor, Investigation)', []]);
+  expect(result.nudged).toBe(false);
+  expect(result.why).toBe('1 free slot(s) fit no eligible issue (local takes Design, Refactor, Investigation)');
+  expect(unsent(ctx.db, false, undefined, 'target, text')).toStrictEqual([]);
 });
 
 test('it keeps saying nothing is eligible in the tick under placeTypes when no issue is eligible at all', async () => {
