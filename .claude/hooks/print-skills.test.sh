@@ -45,10 +45,10 @@ fail=0
 
 run() { # run <session id, or "unset"> <atc name, or "down">, with FAKE_HQ set by the caller
   case $1 in
-    unset) env -u ATC_SESSION_ID PATH="$bin:$PATH" CLAUDE_PROJECT_DIR="$project" sh "$hook" ;;
+    unset) env -u ATC_SESSION_ID PATH="$bin:$PATH" CLAUDE_PROJECT_DIR="$project" sh "$hook" ${SLOT:+"$SLOT"} ;;
     *) case $2 in
-         down) env -u FAKE_NAME ATC_ID="$1" ATC_SESSION_ID="$1" PATH="$bin:$PATH" CLAUDE_PROJECT_DIR="$project" sh "$hook" ;;
-         *) FAKE_NAME=$2 ATC_ID="$1" ATC_SESSION_ID="$1" PATH="$bin:$PATH" CLAUDE_PROJECT_DIR="$project" sh "$hook" ;;
+         down) env -u FAKE_NAME ATC_ID="$1" ATC_SESSION_ID="$1" PATH="$bin:$PATH" CLAUDE_PROJECT_DIR="$project" sh "$hook" ${SLOT:+"$SLOT"} ;;
+         *) FAKE_NAME=$2 ATC_ID="$1" ATC_SESSION_ID="$1" PATH="$bin:$PATH" CLAUDE_PROJECT_DIR="$project" sh "$hook" ${SLOT:+"$SLOT"} ;;
        esac ;;
   esac
 }
@@ -119,6 +119,42 @@ sed -i "s/{\"name\":\"z-triage\",\"skills\":\[\"linear-triage\"\]/{\"name\":\"z-
 total=$(run id-new z-triage | wc -c)
 if [ "$total" -lt 10000 ]; then echo "ok: forty long missing skills stay under the cap ($total)"; else echo "FAIL: output is $total characters"; fail=1; fi
 cp "$bin/hq.orig" "$bin/hq"
+# One call per slot: each slot prints only its own file, so each file gets the whole cap.
+SLOT=1; export SLOT
+expect_order id-stu stu "body of intake"
+if run id-stu stu | grep -q "owner-calls\|after stu"; then echo "FAIL: slot 1 printed more than its skill"; fail=1; else echo "ok: slot 1 prints only the role skill"; fi
+SLOT=3
+expect_order id-stu stu "skipped tickets: no SKILL.md in this tree"
+SLOT=after
+expect_order id-stu stu "after stu"
+SLOT=delegation
+expect_order id-delivery down "body of agent-delegation"
+if [ -n "$(run id-stu stu)" ]; then echo "FAIL: delegation slot printed for z-stu"; fail=1; else echo "ok: the delegation slot prints only for the delivery role"; fi
+SLOT=briefs
+expect_order id-delivery down "body of briefs"
+SLOT=5
+expect_none id-stu stu
+SLOT=kettle
+expect_none id-stu stu
+# An 8,600-character skill next to another prints whole in its own slot, where one shared call can't.
+awk 'BEGIN { for (i = 0; i < 270; i++) print "line " i " of a long kettle skill" }' > "$project/skills/intake/SKILL.md"
+cp "$project/skills/intake/SKILL.md" "$project/skills/owner-calls/SKILL.md"
+SLOT=2
+if run id-stu stu | grep -q "^line 269 of"; then echo "ok: a big second skill prints whole in its slot"; else echo "FAIL: the big second skill did not print whole"; fail=1; fi
+SLOT=1
+if run id-stu stu | grep -q "^line 269 of"; then echo "ok: a big role skill prints whole in its slot"; else echo "FAIL: the big role skill did not print whole"; fail=1; fi
+# Slot 6 with a sixth skill that fills the budget alone still names the seventh.
+awk 'BEGIN { for (i = 0; i < 296; i++) print "line " i " of a long kettle skill" }' > "$project/skills/intake/SKILL.md"
+sed -i 's/{"name":"z-triage","skills":\["linear-triage"\]/{"name":"z-triage","skills":["linear-triage","owner-calls","delivery-lead","fix-it-here","release","intake","kettle-seven"]/' "$bin/hq"
+SLOT=6
+if run id-new z-triage | grep -q "^skipped kettle-seven: no SKILL.md in this tree$"; then echo "ok: slot 6 keeps room for the seventh skill"; else echo "FAIL: slot 6 dropped the seventh skill"; fail=1; fi
+cp "$bin/hq.orig" "$bin/hq"
+unset SLOT
+echo "body of intake" > "$project/skills/intake/SKILL.md"
+echo "body of owner-calls" > "$project/skills/owner-calls/SKILL.md"
+# settings.json makes one compact call per slot, so no two files share a cap.
+slots=$(jq -r '.hooks.SessionStart[] | select(.matcher == "compact") | .hooks[].command | sub(".*print-skills.sh "; "")' "$(dirname "$hook")/../settings.json" | tr '\n' ' ')
+if [ "$slots" = "1 2 3 4 5 6 delegation briefs after " ]; then echo "ok: settings.json calls every slot once"; else echo "FAIL: settings.json slots are '$slots'"; fail=1; fi
 # hq down: no roles table, so nothing prints.
 FAKE_HQ=down
 export FAKE_HQ
