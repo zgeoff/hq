@@ -46,8 +46,9 @@ Record each answer at once and open the next; apply nothing until he's done. "La
 
 When he's done or steps away, apply every answer in one pass:
 
-1. For a call about an issue, re-read the issue first. If it lost `Needs Geoff` or changed since
-   you sent the call, apply nothing: tell him what changed, and `hq call skip`.
+1. For a flagged issue or a shared decision, re-read each issue first. If it lost `Needs Geoff` or
+   changed since you sent the call, apply nothing: tell him what changed, and `hq call skip`. A
+   blocked decision skips this step, since its issue may never have had the label.
 2. Apply by kind:
    - **Blocked decision:** type his answer into the asking session with `atc_terminal_type`, written
      as `skills/intake/references/calls.private.md` in hq-private says. Never message the agent.
