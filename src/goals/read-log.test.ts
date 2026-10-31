@@ -73,6 +73,38 @@ test('it dates every time-only entry by its day heading after hq state trim cut 
   });
 });
 
+test('it never gives a later trimmed batch with no day the day of the batch before it', () => {
+  const ctx = setupTest();
+  writeFileSync(
+    join(ctx.directory, 'delivery.md'),
+    `## Log\n${Array.from({ length: 40 }, (_unused, index) => `- 2026-10-13T09:${String(index).padStart(2, '0')}Z DEPLOY kettle ${'x'.repeat(500)}\n`).join('')}`,
+  );
+  runStateTrim({
+    directory: ctx.directory,
+    roles: ['delivery'],
+    role: 'delivery',
+    actor: 'z-delivery',
+    dryRun: false,
+    at: new Date('2026-10-20T01:02:03Z'),
+    files: buildNodeStateFiles(),
+  });
+  writeFileSync(join(ctx.directory, 'delivery.md'), `## Log\n${Array.from({ length: 40 }, (_unused, index) => `- 10:${String(index).padStart(2, '0')}Z HOLD kettle ${'x'.repeat(500)}\n`).join('')}`);
+  runStateTrim({
+    directory: ctx.directory,
+    roles: ['delivery'],
+    role: 'delivery',
+    actor: 'z-delivery',
+    dryRun: false,
+    at: new Date('2026-10-31T01:02:03Z'),
+    files: buildNodeStateFiles(),
+  });
+
+  expect(readLog(ctx.directory)).toStrictEqual({
+    events: Array.from({ length: 12 }, (_unused, index) => ({ kind: 'DEPLOY', at: `2026-10-13T09:${String(index).padStart(2, '0')}:00Z` })),
+    from: '2026-10-13T09:00:00Z',
+  });
+});
+
 test('it still counts the old archive beside the monthly ones', () => {
   const ctx = setupTest();
   writeFileSync(join(ctx.directory, 'delivery-archive.md'), '- 2026-09-01T08:00Z DEPLOY kettle 0.0.9 live\n');

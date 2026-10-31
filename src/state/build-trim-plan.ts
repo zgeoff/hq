@@ -1,4 +1,5 @@
-import { buildLogDayContext } from '../goals/build-log-day-context.ts';
+import { buildLogDay } from '../goals/build-log-day.ts';
+import { formatLogDayContext } from '../goals/format-log-day-context.ts';
 
 export type TrimPlan = { kind: 'no-log' } | { kind: 'plan'; kept: string; moved: string; entriesMoved: number; beforeBytes: number; afterBytes: number };
 
@@ -36,13 +37,14 @@ export function buildTrimPlan(text: string, limitBytes: number): TrimPlan {
   const moved = lines.slice(firstMoved, firstKept).join('');
 
   // a "- HH:MMZ" entry takes its day from the lines above it, so each side of the cut gets the day it lost
-  const movedContext = buildLogDayContext(before);
-  const keptContext = buildLogDayContext(before + moved);
-  const keptPrefix = keptContext === movedContext ? '' : keptContext;
+  const rest = lines.slice(firstKept).join('');
+  const movedDay = buildLogDay(before);
+  const keptDay = buildLogDay(before + moved);
+  const keptPrefix = keptDay.day === movedDay.day && keptDay.last === movedDay.last ? '' : formatLogDayContext(keptDay, rest);
   return {
     kind: 'plan',
-    kept: before + keptPrefix + lines.slice(firstKept).join(''),
-    moved: movedContext + moved,
+    kept: before + keptPrefix + rest,
+    moved: formatLogDayContext(movedDay, moved) + moved,
     entriesMoved,
     beforeBytes,
     afterBytes: afterBytes + Buffer.byteLength(keptPrefix),
