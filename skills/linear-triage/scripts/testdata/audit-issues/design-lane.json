@@ -83,5 +83,22 @@
     "createdAt": "2026-10-15T00:00:00Z",
     "updatedAt": "2026-10-15T00:00:00Z",
     "description": "## Outcome\n\nThe vents open on warm days.\n\n## ACTIONS\n\nAgent design pass\n"
+  },
+  {
+    "id": "GEO-9306",
+    "title": "Design: the trellis brief",
+    "url": "https://linear.example/issue/GEO-9306",
+    "status": "Ready",
+    "statusType": "unstarted",
+    "project": "Lantern Garden",
+    "priority": {
+      "value": 3,
+      "name": "Medium"
+    },
+    "labels": ["Design", "Garden"],
+    "parentId": null,
+    "createdAt": "2026-10-15T00:00:00Z",
+    "updatedAt": "2026-10-15T00:00:00Z",
+    "description": "## Context\n\nThe old trellis issue read:\n\n```md\n## Actions\n\nDesign session with Geoff\n```\n\n## Actions\n\nAgent design pass\n"
   }
 ]
