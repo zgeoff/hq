@@ -2,8 +2,6 @@ import { ROLE_NAMES } from '../roles/role-names.ts';
 import type { RolesTable } from '../roles/types.ts';
 import type { RoleSkills } from './types.ts';
 
-// Each role's session names and skills, in ROLE_NAMES order. A name that forwards to a holder
-// counts as that holder.
 export function buildRoleSkills(table: RolesTable): RoleSkills[] {
   return ROLE_NAMES.map((role) => {
     const holders = table.sessions.filter((session) => session.roles.includes(role));
