@@ -262,7 +262,7 @@ test('it applies cut 3 after cut 2, dropping the /goal line with its playbook po
   const out = await runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: null });
 
   expect(out.data['cuts']).toStrictEqual(['cut 1 unavailable', 'cut 2', 'cut 3']);
-  expect(out.text.startsWith('## Outcome')).toBe(true);
+  expect(out.text.startsWith('\n## Outcome')).toBe(true);
   expect(out.text).not.toContain('First read the bug playbook');
   expect(out.data['bytes']).toBeLessThanOrEqual(4000);
 });

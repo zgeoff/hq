@@ -41,6 +41,6 @@ test('it does not write to the db it reads', () => {
   readNoslopSettings(path);
 
   const db = new Database(path, { readonly: true });
-  expect(db.query('SELECT count(*) AS n FROM meta WHERE key = ?').get('noslop')).toStrictEqual({ n: 0 });
+  expect(db.query('SELECT count(*) AS total FROM meta WHERE key = ?').get('noslop')).toStrictEqual({ total: 0 });
   db.close();
 });

@@ -1,6 +1,6 @@
 import type { Database } from 'bun:sqlite';
 import { expect, mock, onTestFinished, test } from 'bun:test';
-import { chmodSync, mkdirSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { HttpResponse, http } from 'msw';
 import { z } from 'zod';
@@ -24,6 +24,7 @@ import { addRun } from './runs/add-run.ts';
 import { setState } from './runs/set-state.ts';
 import { buildMockSha } from '../test/build-mock-sha.ts';
 import { buildStubFinalGH } from '../test/build-stub-final-gh.ts';
+import { buildStubBriefGH } from '../test/build-stub-brief-gh.ts';
 
 // A database at noon Sydney, quiet notices and console, and a stand-in gh on PATH for
 // `hq goals sync`: no repos and no closed PRs, with `billing` as the billing usage call's commands.
@@ -1050,4 +1051,23 @@ test('hq run note keeps a note whose FINAL is no commit of the PR, records no FI
   expect(fresh.db.query(`SELECT target, text FROM outbox WHERE target != 'z-review'`).all()).toStrictEqual([
     { target: 'z-delivery', text: 'GEO-9731: the FINAL names 4423866e, which is no commit of zgeoff/kettle#714; its head is 44238662 - send the FINAL again at that sha' },
   ]);
+});
+
+test('it creates no hq db when hq brief runs and there is none', async () => {
+  const fresh = freshDb();
+  onTestFinished(fresh.cleanup);
+  const directory = join(fresh.dir, 'absent');
+  const log = console.log;
+  const error = console.error;
+  console.log = () => {};
+  console.error = () => {};
+  onTestFinished(() => {
+    console.log = log;
+    console.error = error;
+  });
+  onTestFinished(overrideEnv('HQ_DB', join(directory, 'hq.db')));
+
+  await main(['brief', 'GEO-9001', '--json'], buildStubBriefGH({ commits: {}, files: {} }, []));
+
+  expect(existsSync(directory)).toBe(false);
 });

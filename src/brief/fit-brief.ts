@@ -58,7 +58,5 @@ function isOver(prompt: string): boolean {
 }
 
 function dropGoalLine(prompt: string): string {
-  const lines = prompt.split('\n');
-  const dropped = lines[1] === '' ? 2 : 1;
-  return lines.slice(dropped).join('\n');
+  return prompt.split('\n').slice(1).join('\n');
 }

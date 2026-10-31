@@ -42,13 +42,13 @@ test('it drops Context and Agent notes as cut 2 when the issue is over the limit
   expect(fitted.prompt).not.toContain('Mind the lid.');
 });
 
-test('it applies cut 3, dropping the /goal line and the blank line under it, when cut 2 is not enough', () => {
+test('it applies cut 3, dropping only the /goal line and keeping the blank line under it, when cut 2 is not enough', () => {
   const parts = buildBriefParts({ sections: [{ name: 'Scope', text: `## Scope\n\n${'In: the kettle. '.repeat(300)}` }] });
 
   const fitted = fitBrief('/goal Ship {{repo}} {{issue_id}}{{goal_file}}\n\n{{issue}}\n\nPermissions:\n{{permissions}}\n\n{{stack}}\nFinish: "{{fixes}} {{issue_id}}". {{review_lines}} Done.{{not_yours}}\n{{imp_line}}\nEnd.', parts, true);
 
   expect(fitted.cuts).toStrictEqual(['cut 1 unavailable', 'cut 3']);
-  expect(fitted.prompt.startsWith('## Scope')).toBe(true);
+  expect(fitted.prompt.startsWith('\n## Scope')).toBe(true);
   expect(fitted.bytes).toBeGreaterThan(4000);
 });
 
@@ -58,7 +58,7 @@ test('it drops the whole /goal line, pointer included, as cut 3', () => {
   const fitted = fitBrief('/goal Ship {{repo}} {{issue_id}}{{goal_file}}\n\n{{issue}}\n\nPermissions:\n{{permissions}}\n\n{{stack}}\nFinish: "{{fixes}} {{issue_id}}". {{review_lines}} Done.{{not_yours}}\n{{imp_line}}\nEnd.', parts, true);
 
   expect(fitted.prompt).not.toContain('First read the bug playbook');
-  expect(fitted.prompt.startsWith('## Scope')).toBe(true);
+  expect(fitted.prompt.startsWith('\n## Scope')).toBe(true);
 });
 
 test('it applies cut 3 without noting cut 1 when the issue is already out of the prompt', () => {
@@ -73,4 +73,19 @@ test('it counts bytes, not characters', () => {
   const fitted = fitBrief('{{permissions}}', buildBriefParts({ permissions: 'é' }), true);
 
   expect(fitted.bytes).toBe(2);
+});
+
+test('it passes at exactly 4000 bytes after cut 3 and keeps the blank line that follows the /goal line', () => {
+  const fitted = fitBrief('/goal Ship\n\n{{permissions}}', buildBriefParts({ permissions: 'a'.repeat(3999) }), false);
+
+  expect(fitted.cuts).toStrictEqual(['cut 3']);
+  expect(fitted.bytes).toBe(4000);
+  expect(fitted.prompt).toBe(`\n${'a'.repeat(3999)}`);
+});
+
+test('it is still over the limit at 4001 bytes after cut 3, because the blank line is kept', () => {
+  const fitted = fitBrief('/goal Ship\n\n{{permissions}}', buildBriefParts({ permissions: 'a'.repeat(4000) }), false);
+
+  expect(fitted.cuts).toStrictEqual(['cut 3']);
+  expect(fitted.bytes).toBe(4001);
 });
