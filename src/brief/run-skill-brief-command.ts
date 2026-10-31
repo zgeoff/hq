@@ -31,18 +31,18 @@ export async function runSkillBriefCommand(deps: Pick<BriefDeps, 'linear' | 'run
     if ((await readRefFile(deps.run, sha, playbook.path)) === null) {
       throw new HqError('not_found', `${playbook.path} is missing at ${sha}`);
     }
-    const skill = await requireSkill(deps, input.kind, sha);
+    const skill = await readSkillPointer(deps, input.kind, sha);
     const extraActions = pickExtraDesignActions(issue);
     const permissionTable = extraActions.length > 0 ? readPermissionTable(deps.files, deps.privateDir) : [];
     return buildAgentDesignBrief({ issue, sha, template, skill, playbook, recordLine: readRecordLine(deps.files, deps.privateDir, issue.identifier), extraActions, permissionTable });
   }
   const template = await readBriefTemplate(deps.run, sha, `agent-kit/${input.kind}-brief.md`);
-  const skill = await requireSkill(deps, input.kind, sha);
+  const skill = await readSkillPointer(deps, input.kind, sha);
   const out = buildSkillBrief({ issue, sha, kind: input.kind, template, skill, repo: template.includes('{{repo}}') ? requireRepo(issue, input.repo) : null });
   return { ...out, data: { ...out.data, variant: variant === null ? null : variant.kind } };
 }
 
-async function requireSkill(deps: Pick<BriefDeps, 'run'>, kind: SkillBriefInput['kind'], sha: string): Promise<BriefSkill> {
+async function readSkillPointer(deps: Pick<BriefDeps, 'run'>, kind: SkillBriefInput['kind'], sha: string): Promise<BriefSkill> {
   const skill = buildSkillPointer(kind, sha);
   if ((await readRefFile(deps.run, sha, skill.path)) === null) {
     throw new HqError('not_found', `${skill.path} is missing at ${sha}`);
