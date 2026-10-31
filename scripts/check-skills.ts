@@ -1,4 +1,3 @@
-// CI: every `hq …` line in skills/ and agent-kit/ against hq --help (GEO-989). Exits 1 on any problem.
 import { join } from 'node:path';
 import { HELP } from '../src/help.ts';
 import { checkSkills } from '../src/skillcheck/check-skills.ts';

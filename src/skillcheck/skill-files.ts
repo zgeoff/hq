@@ -1,7 +1,6 @@
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
-// The agent kit's briefs and playbooks carry hq lines too, so they are checked with the skills.
 const DIRECTORIES = ['skills', 'agent-kit'];
 
 export function skillFiles(root: string): string[] {
