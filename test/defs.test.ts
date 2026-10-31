@@ -92,6 +92,15 @@ test('a switch needs a passing preflight; a failed one changes nothing', () => {
   expect(existsSync(requireEnv('HQ_DEFS_SOURCE_FILE'))).toBe(false);
 });
 
+test('it checks the lane files in delivery-lead once the rebuilt tree holds them', () => {
+  readyHq({ 'skills/delivery-lead/scripts/capacity.sh': '#!/bin/sh\n', 'skills/delivery-lead/pacing.json': '{}\n' });
+
+  expect(preflight('hq').filter((check) => check.line.includes('in the working tree'))).toStrictEqual([
+    { ok: true, line: 'skills/delivery-lead/scripts/capacity.sh present in the working tree' },
+    { ok: true, line: 'skills/delivery-lead/pacing.json present in the working tree' },
+  ]);
+});
+
 test('a ready checkout writes the switch file, and the event records it', () => {
   createReadyBoth();
   expect(preflight('hq').every((c) => c.ok)).toBe(true);
@@ -268,7 +277,7 @@ test('one setting moves the definitions checkout for the fleet, the lanes and th
     expect(users()).toEqual({ fleet: [hqDir], capacity: `${hqDir}/skills/agent-delegation/scripts/capacity.sh`, prompts: hqDir });
     // The env var wins over the file.
     process.env['HQ_DEFINITIONS_DIR'] = `${dir}/elsewhere`;
-    expect(users()).toEqual({ fleet: [`${dir}/elsewhere`], capacity: `${dir}/elsewhere/skills/agent-delegation/scripts/capacity.sh`, prompts: `${dir}/elsewhere` });
+    expect(users()).toStrictEqual({ fleet: [`${dir}/elsewhere`], capacity: `${dir}/elsewhere/skills/delivery-lead/scripts/capacity.sh`, prompts: `${dir}/elsewhere` });
   } finally {
     delete process.env['HQ_DEFINITIONS_DIR'];
     if (cap !== undefined) {

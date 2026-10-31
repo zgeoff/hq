@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 import { overrideEnv } from '../config/override-env.ts';
 import { declaredFleet } from '../fleet/declared-fleet.ts';
 import type { FleetEntry } from '../fleet/types.ts';
+import { readLaneSkillDir } from '../lanes/read-lane-skill-dir.ts';
 import type { DefsSource } from '../prompts/defs-sources.ts';
 import { DEFS_SOURCES } from '../prompts/defs-sources.ts';
 import { PRIVATE_TREE } from '../prompts/private-tree.ts';
@@ -12,8 +13,6 @@ import { checkGrants } from './check-grants.ts';
 import { originMatches } from './origin-matches.ts';
 import { readOrigin } from './read-origin.ts';
 import type { Check } from './types.ts';
-
-const LANE_FILES = ['skills/agent-delegation/scripts/capacity.sh', 'skills/agent-delegation/pacing.json'];
 
 // `spawn` starts the grants check; tests pass a fake to pin its command line.
 export function checkTrees(source: DefsSource, spawn: GrantsSpawn): Check[] {
@@ -29,12 +28,15 @@ function checkDefs(source: DefsSource): { ready: boolean; checks: Check[] } {
   return checkDefsOrigin(source, dir);
 }
 
+const LANE_FILES = ['scripts/capacity.sh', 'pacing.json'];
+
 function checkDefsOrigin(source: DefsSource, dir: string): { ready: boolean; checks: Check[] } {
   const origin = readOrigin(dir);
   if (!originMatches(origin, DEFS_SOURCES[source].repo)) {
     return { ready: false, checks: [{ ok: false, line: `${dir}'s origin is ${origin ?? 'not set'}, not ${DEFS_SOURCES[source].repo}` }] };
   }
-  return { ready: true, checks: LANE_FILES.map((file) => checkLaneFile(dir, file)) };
+  const skillDir = readLaneSkillDir(dir).slice(dir.length + 1);
+  return { ready: true, checks: LANE_FILES.map((file) => checkLaneFile(dir, `${skillDir}/${file}`)) };
 }
 
 function checkLaneFile(dir: string, file: string): Check {
