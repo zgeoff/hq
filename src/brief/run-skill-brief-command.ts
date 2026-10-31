@@ -18,5 +18,5 @@ export async function runSkillBriefCommand(deps: Pick<BriefDeps, 'linear' | 'run
   if ((await readRefFile(deps.run, sha, skill.path)) === null) {
     throw new HqError('not_found', `${skill.path} is missing at ${sha}; pass --ref refactor/fleet-skill-rebuild until the skill rebuild merges`);
   }
-  return buildSkillBrief({ issue, sha, kind: input.kind, template, skill });
+  return buildSkillBrief({ issue, sha, kind: input.kind, template, skill, repo: input.repo });
 }

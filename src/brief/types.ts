@@ -8,6 +8,9 @@ export interface BriefInput {
   imp: boolean;
   byLink: boolean;
   goalFile: string | null;
+
+  // the one area of a multi-area issue this brief is for, from --repo; null without it
+  repo: string | null;
 }
 
 // What hq brief reaches the outside through: Linear, gh, the noslop list read from the db, the
@@ -82,6 +85,7 @@ export interface SkillBriefInput {
   issue: string;
   ref: string;
   kind: SkillBriefKind;
+  repo: string | null;
 }
 
 export interface BriefSkill {

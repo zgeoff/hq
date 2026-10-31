@@ -2,11 +2,11 @@ import { expect, test } from 'bun:test';
 import { parseSkillBriefFlags } from './parse-skill-brief-flags.ts';
 
 test('it carries the issue, the ref and the kind', () => {
-  expect(parseSkillBriefFlags('GEO-9001', { ref: 'refactor/kettle-rebuild' }, 'design')).toStrictEqual({ issue: 'GEO-9001', ref: 'refactor/kettle-rebuild', kind: 'design' });
+  expect(parseSkillBriefFlags('GEO-9001', { ref: 'refactor/kettle-rebuild' }, 'design')).toStrictEqual({ issue: 'GEO-9001', ref: 'refactor/kettle-rebuild', kind: 'design', repo: null });
 });
 
 test('it takes main as the ref when none is given', () => {
-  expect(parseSkillBriefFlags('GEO-9001', {}, 'pr-walk')).toStrictEqual({ issue: 'GEO-9001', ref: 'main', kind: 'pr-walk' });
+  expect(parseSkillBriefFlags('GEO-9001', {}, 'pr-walk')).toStrictEqual({ issue: 'GEO-9001', ref: 'main', kind: 'pr-walk', repo: null });
 });
 
 test('it rejects --goal-file with design as a usage error naming the flag', () => {

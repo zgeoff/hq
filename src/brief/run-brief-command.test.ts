@@ -23,7 +23,7 @@ test('it fills the template for a Bug with Code delivery only, and gives the pro
   });
   const command = `gh api 'repos/zgeoff/hq/contents/agent-kit/playbooks/bug.md?ref=${stub.sha}' -H 'Accept: application/vnd.github.raw'`;
 
-  const out = await runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: null });
+  const out = await runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: null, repo: null });
 
   expect(out.text).toBe(
     `/goal A ready PR in zgeoff/cloud for GEO-9001. First read the bug playbook: ${command}\n\n## Outcome\n\nA kettle that boils.\n\n## Context\n\nIt leaks at the lid.\n\n## Scope\n\nIn: the lid.\nOut: none stated.\n\n## Acceptance\n\n- [ ] it boils\n\n## Agent notes\n\nMind the seal.\n\nPermissions:\nWork in cloud and open a PR.\n\n\nFinish line: a ready PR in zgeoff/cloud whose description holds "Fixes GEO-9001".\nBoil the water.  Leave the lid to me.\n\nSend a note when done.`,
@@ -49,7 +49,7 @@ test('it adds the stack line, from the files at the resolved sha, for a size L i
     rows: [['Code delivery', 'Work in <repo>.']],
   });
 
-  const out = await runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: null });
+  const out = await runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: null, repo: null });
 
   expect(out.text).toContain('Work in cloud.\n\nSTACK-LINE: build this in layers.\nFinish line:');
 });
@@ -61,7 +61,7 @@ test('it leaves the stack line out for a size M issue, and never reads briefs.md
     rows: [['Code delivery', 'Work in <repo>.']],
   });
 
-  const out = await runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: null });
+  const out = await runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: null, repo: null });
 
   expect(out.text).not.toContain('STACK-LINE');
   expect(stub.calls.some((call) => call.includes('briefs.md'))).toBe(false);
@@ -75,7 +75,7 @@ test('it points at the review lines pinned to the sha, with the repo named, for 
     noslop: ['Tools'],
   });
 
-  const out = await runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: null });
+  const out = await runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: null, repo: null });
 
   expect(out.text).toContain(
     `Boil the water. Before you write code, read noslop's rules, with <repo> as zgeoff/tools: gh api 'repos/zgeoff/hq/contents/agent-kit/review-lines.md?ref=${stub.sha}' -H 'Accept: application/vnd.github.raw' Leave the lid to me.`,
@@ -91,7 +91,7 @@ test('it leaves the review lines out for a repo noslop does not review, and neve
     noslop: ['tools'],
   });
 
-  const out = await runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: null });
+  const out = await runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: null, repo: null });
 
   expect(out.text).not.toContain('REVIEW-LINES');
   expect(stub.calls.some((call) => call.includes('review-lines.md'))).toBe(false);
@@ -104,7 +104,7 @@ test('it adds the imp line with --imp', async () => {
     rows: [['Code delivery', 'Work in <repo>.']],
   });
 
-  const out = await runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: true, byLink: false, goalFile: null });
+  const out = await runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: true, byLink: false, goalFile: null, repo: null });
 
   expect(out.text).toContain('Leave the lid to me.\nIMP-LINE: this imp has a small kettle.\nSend a note');
 });
@@ -116,7 +116,7 @@ test('it writes Contributes to and lists not_yours when the Actions include Depl
     rows: [['Code delivery', 'Work in <repo>.'], ['Deploy', 'Deploy to the kettle stage.']],
   });
 
-  const out = await runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: null });
+  const out = await runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: null, repo: null });
 
   expect(out.text).toContain('holds "Contributes to GEO-9001"');
   expect(out.text).toContain('Work in cloud.\nDeploy to the kettle stage.\n');
@@ -130,7 +130,7 @@ test('it writes Contributes to when the Actions include Infra', async () => {
     rows: [['Code delivery', 'Work in <repo>.'], ['Infra', 'Change the kettle stack.']],
   });
 
-  const out = await runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: null });
+  const out = await runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: null, repo: null });
 
   expect(out.text).toContain('holds "Contributes to GEO-9001"');
 });
@@ -142,7 +142,7 @@ test('it lists a phrase with a leftover slot, and an action with no wording, in 
     rows: [['Code delivery', 'Work in <repo>.'], ['Credentials', 'Read <vault> for <credential>.']],
   });
 
-  const out = await runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: null });
+  const out = await runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: null, repo: null });
 
   expect(out.text).toContain('Permissions:\nWork in cloud.\nRead <vault> for <credential>.\n');
   expect(out.data['unfilled']).toStrictEqual(['permissions:Credentials', 'permissions:Linear edits (no wording)']);
@@ -156,7 +156,7 @@ test('it pins the playbook pointer to the full sha of the ref and checks the fil
     refs: ['refactor/kettle-rebuild'],
   });
 
-  const out = await runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'refactor/kettle-rebuild', imp: false, byLink: false, goalFile: null });
+  const out = await runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'refactor/kettle-rebuild', imp: false, byLink: false, goalFile: null, repo: null });
 
   expect(out.text.split('\n')[0]).toBe(
     `/goal A ready PR in zgeoff/cloud for GEO-9001. First read the bug playbook: gh api 'repos/zgeoff/hq/contents/agent-kit/playbooks/bug.md?ref=${stub.sha}' -H 'Accept: application/vnd.github.raw'`,
@@ -172,7 +172,7 @@ test('it carries on with no playbook pointer, lists playbook and warns when the 
     rows: [['Code delivery', 'Work in <repo>.']],
   });
 
-  const out = await runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: null });
+  const out = await runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: null, repo: null });
 
   expect(out.text.split('\n')[0]).toBe('/goal A ready PR in zgeoff/cloud for GEO-9001');
   expect(out.data['playbook']).toBeNull();
@@ -187,7 +187,7 @@ test('it does the same for a Type whose playbook file is missing at the sha', as
     rows: [['Code delivery', 'Work in <repo>.']],
   });
 
-  const out = await runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: null });
+  const out = await runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: null, repo: null });
 
   expect(out.data['playbook']).toBeNull();
   expect(out.data['unfilled']).toStrictEqual(['playbook']);
@@ -201,7 +201,7 @@ test('it empties the issue and tells the agent to read it by link with --issue-b
     rows: [['Code delivery', 'Work in <repo>.']],
   });
 
-  const out = await runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: true, goalFile: null });
+  const out = await runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: true, goalFile: null, repo: null });
 
   expect(out.text.split('\n')[0]).toBe(
     `/goal A ready PR in zgeoff/cloud for GEO-9001. First read GEO-9001 with your own Linear access, then the bug playbook: gh api 'repos/zgeoff/hq/contents/agent-kit/playbooks/bug.md?ref=${stub.sha}' -H 'Accept: application/vnd.github.raw'`,
@@ -218,7 +218,7 @@ test('it writes the issue and playbook to the file and points to it with --goal-
   });
   const goalFile = join(ctx.root, 'goal.md');
 
-  const out = await runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile });
+  const out = await runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile, repo: null });
 
   expect(out.text.split('\n')[0]).toBe(`/goal A ready PR in zgeoff/cloud for GEO-9001. The full issue and its playbook are in ${goalFile}; read it first.`);
   expect(out.text).not.toContain('A kettle that boils.');
@@ -232,7 +232,7 @@ test('it refuses a --goal-file in a missing directory before it reads anything',
   const ctx = setupTest();
   const stub = createStubBriefDeps(ctx.root, { issues: {}, rows: [] });
 
-  const outcome = runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: join(ctx.root, 'gone/goal.md') });
+  const outcome = runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: join(ctx.root, 'gone/goal.md'), repo: null });
 
   expect(outcome).rejects.toMatchObject({ code: 'bad_args' });
   expect(stub.asked).toStrictEqual([]);
@@ -246,7 +246,7 @@ test('it drops Context and Agent notes as cut 2, and reports it, when the issue 
     rows: [['Code delivery', 'Work in <repo>.']],
   });
 
-  const out = await runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: null });
+  const out = await runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: null, repo: null });
 
   expect(out.data['cuts']).toStrictEqual(['cut 1 unavailable', 'cut 2']);
   expect(out.text).not.toContain('## Context');
@@ -262,7 +262,7 @@ test('it applies cut 3 after cut 2, keeping the playbook pointer as the first li
     rows: [['Code delivery', 'Work in <repo>.']],
   });
 
-  const out = await runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: null });
+  const out = await runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: null, repo: null });
 
   expect(out.data['cuts']).toStrictEqual(['cut 1 unavailable', 'cut 2', 'cut 3']);
   expect(out.text.startsWith(`First read the bug playbook: gh api 'repos/zgeoff/hq/contents/agent-kit/playbooks/bug.md?ref=${stub.sha}' -H 'Accept: application/vnd.github.raw'\n\n## Outcome`)).toBe(true);
@@ -279,7 +279,7 @@ test('it refuses a prompt still over 4000 bytes after cut 3, with its byte count
   });
   const goalFile = join(ctx.root, 'goal.md');
 
-  const outcome = runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile });
+  const outcome = runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile, repo: null });
 
   expect(outcome).rejects.toMatchObject({ code: 'too_long', message: expect.stringMatching(/^the brief is 7\d{3} bytes after every cut, over the 4000 limit$/u) });
   expect(existsSync(goalFile)).toBe(false);
@@ -293,7 +293,7 @@ test('it refuses with the --ref hint when brief.md is missing at the sha', () =>
     kit: buildStubBriefKit({ without: ['agent-kit/brief.md'] }),
   });
 
-  const outcome = runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: null });
+  const outcome = runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: null, repo: null });
 
   expect(outcome).rejects.toMatchObject({ code: 'not_found', message: `agent-kit/brief.md is missing at ${stub.sha}; pass --ref refactor/fleet-skill-rebuild until the skill rebuild merges` });
 });
@@ -305,7 +305,7 @@ test('it never prints a section of the private file outside the permission table
     rows: [['Code delivery', 'Work in <repo>.']],
   });
 
-  const out = await runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: true, byLink: false, goalFile: null });
+  const out = await runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: true, byLink: false, goalFile: null, repo: null });
 
   expect(JSON.stringify(out)).not.toContain(PRIVATE_MARKER);
   expect(JSON.stringify(out)).not.toContain('Opening text.');
@@ -319,8 +319,8 @@ test('it lists a missing Outcome, Scope or Acceptance section in unfilled, but n
     rows: [['Code delivery', 'Work in <repo>.']],
   });
 
-  const plain = await runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: null });
-  const byLink = await runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: true, goalFile: null });
+  const plain = await runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: null, repo: null });
+  const byLink = await runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: true, goalFile: null, repo: null });
 
   expect(plain.data['unfilled']).toStrictEqual(['issue:Scope', 'issue:Acceptance']);
   expect(byLink.data['unfilled']).toStrictEqual([]);
@@ -330,18 +330,18 @@ test('it refuses an issue with no area label, since none names a repo', () => {
   const ctx = setupTest();
   const stub = createStubBriefDeps(ctx.root, { issues: { 'GEO-9001': { description: buildKettleIssueText(), labels: [{ name: 'Bug', parent: 'Type' }] } }, rows: [] });
 
-  const outcome = runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: null });
+  const outcome = runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: null, repo: null });
 
-  expect(outcome).rejects.toMatchObject({ code: 'bad_state', message: 'GEO-9001 needs exactly one area label to name its repo; it has none' });
+  expect(outcome).rejects.toMatchObject({ code: 'bad_state', message: 'GEO-9001 needs an area label to name its repo; it has none' });
 });
 
 test('it refuses an issue with two area labels, since neither names the repo', () => {
   const ctx = setupTest();
   const stub = createStubBriefDeps(ctx.root, { issues: { 'GEO-9001': { description: buildKettleIssueText(), labels: [{ name: 'cloud' }, { name: 'imp' }] } }, rows: [] });
 
-  const outcome = runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: null });
+  const outcome = runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: null, repo: null });
 
-  expect(outcome).rejects.toMatchObject({ code: 'bad_state', message: 'GEO-9001 needs exactly one area label to name its repo; it has cloud, imp' });
+  expect(outcome).rejects.toMatchObject({ code: 'bad_state', message: 'GEO-9001 has several areas (cloud, imp): brief one at a time with --repo <area>' });
 });
 
 test('it rejects with the write failure when the goal file cannot be written', () => {
@@ -357,7 +357,7 @@ test('it rejects with the write failure when the goal file cannot be written', (
     },
   };
 
-  const outcome = runBriefCommand({ ...stub.deps, files }, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: join(ctx.root, 'goal.md') });
+  const outcome = runBriefCommand({ ...stub.deps, files }, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: join(ctx.root, 'goal.md'), repo: null });
 
   expect(outcome).rejects.toThrow('the kettle shelf is full');
 });
@@ -371,7 +371,7 @@ test('it refuses an L issue when briefs.md is missing at the sha, and writes no 
   });
   const goalFile = join(ctx.root, 'goal.md');
 
-  const outcome = runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile });
+  const outcome = runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile, repo: null });
 
   expect(outcome).rejects.toMatchObject({ code: 'not_found', message: `skills/delivery-lead/references/briefs.md is missing at ${stub.sha}; pass --ref refactor/fleet-skill-rebuild until the skill rebuild merges` });
   expect(existsSync(goalFile)).toBe(false);
@@ -385,7 +385,7 @@ test('it refuses an L issue when briefs.md has no stack line', () => {
     kit: { ...buildStubBriefKit(), 'skills/delivery-lead/references/briefs.md': '# Briefs\n\nThe imp line:\n\n```text\nIMP-LINE: this imp has a small kettle.\n```\n' },
   });
 
-  const outcome = runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: null });
+  const outcome = runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: null, repo: null });
 
   expect(outcome).rejects.toMatchObject({ code: 'not_found', message: `skills/delivery-lead/references/briefs.md at ${stub.sha} has no The stack line:` });
 });
@@ -398,7 +398,7 @@ test('it refuses an L issue when no text fence follows the stack line', () => {
     kit: { ...buildStubBriefKit(), 'skills/delivery-lead/references/briefs.md': '# Briefs\n\nThe stack line:\n\n    STACK-LINE: build this in layers.\n' },
   });
 
-  const outcome = runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: null });
+  const outcome = runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: null, repo: null });
 
   expect(outcome).rejects.toMatchObject({ code: 'not_found', message: `skills/delivery-lead/references/briefs.md at ${stub.sha} has no The stack line:` });
 });
@@ -411,7 +411,7 @@ test('it refuses --imp when briefs.md has no imp line', () => {
     kit: { ...buildStubBriefKit(), 'skills/delivery-lead/references/briefs.md': '# Briefs\n\nThe stack line:\n\n```text\nSTACK-LINE: build this in layers.\n```\n' },
   });
 
-  const outcome = runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: true, byLink: false, goalFile: null });
+  const outcome = runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: true, byLink: false, goalFile: null, repo: null });
 
   expect(outcome).rejects.toMatchObject({ code: 'not_found', message: `skills/delivery-lead/references/briefs.md at ${stub.sha} has no The imp line:` });
 });
@@ -425,7 +425,7 @@ test('it refuses a repo noslop reviews when review-lines.md is missing at the sh
     kit: buildStubBriefKit({ without: ['agent-kit/review-lines.md'] }),
   });
 
-  const outcome = runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: null });
+  const outcome = runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: null, repo: null });
 
   expect(outcome).rejects.toMatchObject({ code: 'not_found', message: `agent-kit/review-lines.md is missing at ${stub.sha}; pass --ref refactor/fleet-skill-rebuild until the skill rebuild merges` });
 });
