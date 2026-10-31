@@ -28,7 +28,8 @@ export function pickHealthMoves(open: OpenProblems, checks: Check[], unknown: st
   for (const check of bad) {
     const entry = open[check.key];
     if (entry === undefined) {
-      moves.push(check.owner === undefined ? { action: 'reported', key: check.key, line: check.line } : { action: 'asked', key: check.key, line: check.line, owner: check.owner });
+      const opened: HealthMove = check.owner === undefined ? { action: 'reported', key: check.key, line: check.line } : { action: 'asked', key: check.key, line: check.line, owner: check.owner };
+      moves.push(opened);
       continue;
     }
     if (entry.asked !== undefined && entry.escalated !== true && Date.parse(at) - Date.parse(entry.since) >= OWNER_FIX_MS) {
