@@ -167,7 +167,8 @@ test('it never tells z-stu about an oversized state file fixed inside 2 hours', 
   const cleared = await tick(30, fixed);
   await tick(150, fixed);
 
-  expect([outbox().map((message) => message.target), cleared.cleared.map((item) => item.key)]).toStrictEqual([['z-kettle'], ['state-size:kettle.md']]);
+  expect(outbox().map((message) => message.target)).toStrictEqual(['z-kettle']);
+  expect(cleared.cleared.map((item) => item.key)).toStrictEqual(['state-size:kettle.md']);
 });
 
 test('it does not escalate a state-file problem opened before owners existed', async () => {
