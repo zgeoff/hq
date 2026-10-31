@@ -15,7 +15,6 @@ export interface StateTrimArgs {
   files: StateFiles;
 }
 
-// Move the oldest "## Log" entries of <role>.md to this month's archive until the file fits its trim target.
 // Order: backup, archive append, then an atomic replace; no backup, no write.
 export function runStateTrim(args: StateTrimArgs): TrimReport {
   const directory = args.directory;
