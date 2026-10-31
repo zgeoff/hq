@@ -3,6 +3,9 @@ import type { SlotCause } from './types.ts';
 
 export interface SlotCauseInput {
   free: number;
+
+  // The free slots no eligible issue may fill under pacing.json's placeTypes; 0 without it.
+  unfit: number;
   eligible: number | null;
   eligibleSince: string | null;
   readyAt: string | null;
@@ -23,12 +26,16 @@ export function buildSlotCause(input: SlotCauseInput): SlotCause {
   if (input.eligible === null) {
     return { ...base, cause: 'unknown', reason: input.readyAt === null ? 'ready_never_read' : 'ready_stale', since: sinceOf('unknown') };
   }
+  if (input.eligible > 0 && input.unfit >= input.free) {
+    return { ...base, cause: 'supply', since: sinceOf('supply') };
+  }
   if (input.eligible > 0) {
+    const fillable = { ...base, slots: input.free - input.unfit };
     const waitingMs = input.eligibleSince === null ? 0 : input.at.getTime() - Date.parse(input.eligibleSince);
     if (waitingMs > DELIVERY_GRACE_MINUTES * 60_000) {
-      return { ...base, cause: 'delivery', since: sinceOf('delivery') };
+      return { ...fillable, cause: 'delivery', since: sinceOf('delivery') };
     }
-    return { ...base, cause: null, since: input.eligibleSince, waitingMinutes: Math.floor(waitingMs / 60_000) };
+    return { ...fillable, cause: null, since: input.eligibleSince, waitingMinutes: Math.floor(waitingMs / 60_000) };
   }
   const promotable = input.promotable;
   if (promotable === null || promotable.count === null) {

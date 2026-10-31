@@ -1769,7 +1769,7 @@ async function lanesCommand(context: Pick<Ctx, 'db' | 'verb' | 'rest' | 'flags' 
         ...nudges.map((n) => `  ${n.at} ${n.slots} free for ${n.free_minutes} min, eligible ${n.eligible ?? '?'} → after: ${n.slots_after ?? 'pending'}`),
       ];
       const slotCauses = { now: { cause: slotCause.cause, slots: slotCause.slots, since: slotCause.since, readyAgeMinutes: slotCause.readyAgeMinutes, reason: slotCause.reason, backlogError: slotCause.backlogError }, today: slotMinutesToday };
-      return { data: { watcher: unit.stdout.trim() || 'inactive', enabled, hold, plan: slotPlan, cap: capView, slotCauses, last, ready, idle24h: gap24, nudges }, text: lines.join('\n') };
+      return { data: { watcher: unit.stdout.trim() || 'inactive', enabled, hold, plan: slotPlan, placeTypes: sample.placeTypes ?? null, cap: capView, slotCauses, last, ready, idle24h: gap24, nudges }, text: lines.join('\n') };
     }
     default:
       throw new HqError('bad_args', `unknown command: hq lanes ${verb}`);

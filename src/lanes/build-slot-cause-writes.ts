@@ -28,7 +28,7 @@ function pickEligibleSince(stored: SlotCauseInput, capacityKnown: boolean): stri
   if (!capacityKnown) {
     return stored.eligibleSince;
   }
-  if (stored.free === 0 || stored.eligible === 0) {
+  if (stored.free === 0 || stored.eligible === 0 || stored.unfit >= stored.free) {
     return null;
   }
   if (stored.eligible !== null && stored.eligibleSince === null) {

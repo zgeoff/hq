@@ -18,6 +18,7 @@ export function readSlotCauseInput(db: Database, slotPlan: SlotPlan | null, at: 
   const snapshot = metaJson(db, READY_ISSUES_KEY, READY_SNAPSHOT, null);
   return {
     free: slotPlan?.pool.free ?? 0,
+    unfit: slotPlan?.plan?.unfit?.slots ?? 0,
     eligible: slotPlan?.eligible ?? null,
     eligibleSince: getMeta(db, ELIGIBLE_SINCE_KEY),
     readyAt: snapshot?.at ?? null,
