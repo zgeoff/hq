@@ -102,6 +102,13 @@ total=$(run id-new z-triage | wc -c)
 if [ "$total" -lt 10000 ]; then echo "ok: eight big skills stay under the cap ($total)"; else echo "FAIL: output is $total characters"; fail=1; fi
 if run id-new z-triage | grep -q '^after triage$'; then echo "ok: the after-compaction file still prints"; else echo "FAIL: no after-compaction file"; fail=1; fi
 cp "$bin/hq.orig" "$bin/hq"
+# Forty missing skills with long names, after a big skill: the skipped lines stay under the cap too.
+long=$(awk 'BEGIN { s = ""; for (i = 0; i < 22; i++) s = s "kettlepour"; print s }')
+names=$(awk -v l="$long" 'BEGIN { for (i = 1; i <= 40; i++) printf ",\"%s%d\"", l, i }')
+sed -i "s/{\"name\":\"z-triage\",\"skills\":\[\"linear-triage\"\]/{\"name\":\"z-triage\",\"skills\":[\"bigone\"$names]/" "$bin/hq"
+total=$(run id-new z-triage | wc -c)
+if [ "$total" -lt 10000 ]; then echo "ok: forty long missing skills stay under the cap ($total)"; else echo "FAIL: output is $total characters"; fail=1; fi
+cp "$bin/hq.orig" "$bin/hq"
 # hq down: no roles table, so nothing prints.
 FAKE_HQ=down
 export FAKE_HQ

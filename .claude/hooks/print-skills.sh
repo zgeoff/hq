@@ -13,7 +13,8 @@
 # Claude Code caps a hook's whole output at 10,000 characters and swaps longer output for a path it
 # doesn't ask Claude to read, so a file that would take the total past the budget prints an
 # instruction to read it instead. The budget keeps room for a read instruction (or skipped line)
-# for every item still to come, so the instructions never push the total past the cap.
+# for every item still to come, and a line that would still pass the cap is dropped, so the total
+# never passes it.
 set -eu
 
 [ -n "${ATC_SESSION_ID:-}" ] || exit 0
@@ -39,25 +40,27 @@ used=0
 limit=9500
 reserve=200 # room kept for each item still to print
 left=$(( $(printf "%s\n" "$skills" | grep -c . || true) + 1 ))
+say() { # say <line>: print it only while the total stays inside the cap
+  size=$(printf '%s\n' "$1" | wc -c)
+  [ $((used + size)) -le $limit ] || return 0
+  used=$((used + size))
+  printf '%s\n' "$1"
+}
 emit() { # emit <path relative to the project dir>
   body=$(sed -E 's/ {2,}/ /g; s/-{4,}/---/g' "${CLAUDE_PROJECT_DIR:-.}/$1")
   text=$(printf 'Context was compacted. This is %s, reloaded from disk. Follow it as written.\n\n%s\n' "$1" "$body")
   size=$(printf '%s\n' "$text" | wc -c)
   if [ $((used + size + reserve * (left - 1))) -gt $limit ]; then
     text="Context was compacted. Read $1 now, before your next action: it holds rules you must follow and is too long to print here."
-    size=$(printf '%s\n' "$text" | wc -c)
   fi
-  used=$((used + size))
-  printf '%s\n' "$text"
+  say "$text"
 }
 
 for skill in $skills; do
   if [ -f "${CLAUDE_PROJECT_DIR:-.}/skills/$skill/SKILL.md" ]; then
     emit "skills/$skill/SKILL.md"
   else
-    line="skipped $skill: no SKILL.md in this tree"
-    used=$((used + ${#line} + 1))
-    echo "$line"
+    say "skipped $skill: no SKILL.md in this tree"
   fi
   left=$((left - 1))
 done
