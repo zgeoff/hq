@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test';
 import { pickIssueRepo } from './pick-issue-repo.ts';
 
 test('it picks the area of the one area label, with its repo', () => {
-  expect(pickIssueRepo({ identifier: 'GEO-9001', description: '', labels: [{ name: 'Bug', parent: { name: 'Type' } }, { name: 'cloud' }] })).toStrictEqual({ label: 'cloud', repo: 'cloud' });
+  expect(pickIssueRepo({ identifier: 'GEO-9001', description: '', labels: [{ name: 'Bug', parent: { name: 'Type' } }, { name: 'cloud' }] })).toStrictEqual({ area: { label: 'cloud', repo: 'cloud' }, others: [] });
 });
 
 test('it refuses an issue with no area label', () => {
@@ -14,13 +14,19 @@ test('it refuses an issue with two areas and names --repo', () => {
 });
 
 test('it picks the area --repo names by its label', () => {
-  expect(pickIssueRepo({ identifier: 'GEO-9001', description: '', labels: [{ name: 'cloud' }, { name: 'imp' }] }, 'imp')).toStrictEqual({ label: 'imp', repo: 'impz' });
+  expect(pickIssueRepo({ identifier: 'GEO-9001', description: '', labels: [{ name: 'cloud' }, { name: 'imp' }] }, 'imp')).toStrictEqual({ area: { label: 'imp', repo: 'impz' }, others: [{ label: 'cloud', repo: 'cloud' }] });
 });
 
 test('it picks the area --repo names by its repo', () => {
-  expect(pickIssueRepo({ identifier: 'GEO-9001', description: '', labels: [{ name: 'cloud' }, { name: 'imp' }] }, 'impz')).toStrictEqual({ label: 'imp', repo: 'impz' });
+  expect(pickIssueRepo({ identifier: 'GEO-9001', description: '', labels: [{ name: 'cloud' }, { name: 'imp' }] }, 'impz')).toStrictEqual({ area: { label: 'imp', repo: 'impz' }, others: [{ label: 'cloud', repo: 'cloud' }] });
 });
 
 test('it refuses a --repo that is not one of the issue areas', () => {
   expect(() => pickIssueRepo({ identifier: 'GEO-9001', description: '', labels: [{ name: 'cloud' }, { name: 'imp' }] }, 'tools')).toThrow("--repo tools is not one of GEO-9001's areas; it has cloud, imp");
+});
+
+test('it refuses a label that names no repo hq knows, by name', () => {
+  expect(() => pickIssueRepo({ identifier: 'GEO-9001', description: '', labels: [{ name: 'cloud' }, { name: 'teapot' }] })).toThrow(
+    'GEO-9001 has the label teapot, which names no repo hq knows: add it to AREA_REPOS in src/brief/area-repos.ts, or take it off the issue',
+  );
 });
