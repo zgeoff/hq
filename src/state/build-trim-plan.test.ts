@@ -98,7 +98,20 @@ test('#buildTrimPlan a Log-notes section before the real log is left untouched',
   });
 });
 
-test('#buildTrimPlan a log heading with words after it is the log section', () => {
+test('#buildTrimPlan a Log notes section before the real log is left untouched', () => {
+  const text = '## Log notes\n09:00Z descaled the kettle\n## Log\n09:10Z boiled the water\n09:11Z poured the tea\n';
+
+  expect(buildTrimPlan(text, 1)).toStrictEqual({
+    kind: 'plan',
+    kept: '## Log notes\n09:00Z descaled the kettle\n## Log\n09:11Z poured the tea\n',
+    moved: '09:10Z boiled the water\n',
+    entriesMoved: 1,
+    beforeBytes: 93,
+    afterBytes: 69,
+  });
+});
+
+test('#buildTrimPlan a log heading with a note in brackets is the log section', () => {
   expect(buildTrimPlan('## Log (last 24 h)\n09:10Z boiled the water\n09:11Z poured the tea\n', 1)).toStrictEqual({
     kind: 'plan',
     kept: '## Log (last 24 h)\n09:11Z poured the tea\n',

@@ -8,7 +8,7 @@ export type TrimPlan = { kind: 'no-log' } | { kind: 'plan'; kept: string; moved:
 // indented or blank line belongs to the entry above. Oldest entries sit first and move first.
 export function buildTrimPlan(text: string, limitBytes: number): TrimPlan {
   const lines = text.split(/(?<=\n)/u);
-  const start = lines.findIndex((line) => /^## Log(?: |\r?\n|$)/u.test(line));
+  const start = lines.findIndex((line) => /^## Log(?: \([^)]*\))?\s*$/u.test(line));
   if (start === -1) {
     return { kind: 'no-log' };
   }
