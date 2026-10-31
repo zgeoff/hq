@@ -27,6 +27,13 @@ test('it passes a brief of exactly 4000 bytes', () => {
   expect(runBriefCheckCommand(buildNodeBriefFiles(), join(ctx.root, 'brief.txt'))).toStrictEqual({ data: { bytes: 4000, limit: 4000 }, text: 'ok: 4000 bytes' });
 });
 
+test('it passes a 4000-byte brief saved with one trailing newline, as hq brief > file writes it', () => {
+  const ctx = setupTest();
+  writeFileSync(join(ctx.root, 'brief.txt'), `${'k'.repeat(4000)}\n`);
+
+  expect(runBriefCheckCommand(buildNodeBriefFiles(), join(ctx.root, 'brief.txt'))).toStrictEqual({ data: { bytes: 4000, limit: 4000 }, text: 'ok: 4000 bytes' });
+});
+
 test('it refuses a brief of 4001 bytes with its byte count', () => {
   const ctx = setupTest();
   writeFileSync(join(ctx.root, 'brief.txt'), 'k'.repeat(4001));
