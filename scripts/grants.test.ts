@@ -753,6 +753,7 @@ test.each([
     '- a new greenhouse;\n- pruning the paper orchard;\n',
     ['-- a new greenhouse;', '+- pruning the paper orchard;'],
   ],
+  ['a line that is not a bullet', '- a new greenhouse;\n', '* a new greenhouse;\n', ['-* a new greenhouse;', '+- a new greenhouse;']],
   ['a wrong last-item punctuation', '- renaming the river.', '- renaming the river;', ['-- renaming the river;', '+- renaming the river.']],
 ])('it reports %s in an "Also his:" list and a write run regenerates it', (_label, from, to, lines) => {
   const ctx = setupTest();
@@ -807,7 +808,10 @@ test('it leaves a site with no "Also his:" line unchecked for the list', () => {
   }
 });
 
-test('it refuses an "Also his:" line that is neither a bullet nor a continuation', () => {
+test.each([
+  ['check', ['--check']],
+  ['write', []],
+])('it rejects a bullet after a blank line below the "Also his:" list in %s mode', (_label, args) => {
   const ctx = setupTest();
   for (const path of ['grants', 'skills', 'docs']) {
     cpSync(join(ctx.fixture, path), join(ctx.dir, path), { recursive: true });
@@ -815,15 +819,17 @@ test('it refuses an "Also his:" line that is neither a bullet nor a continuation
   {
     const path = join(ctx.dir, 'skills/intake/references/calls.md');
     const source = readFileSync(path, 'utf8');
-    expect(source).toContain('- a new greenhouse;\n');
-    writeFileSync(path, source.replace('- a new greenhouse;\n', '* a new greenhouse;\n'));
+    expect(source).toContain('- renaming the river.\n\n');
+    writeFileSync(path, source.replace('- renaming the river.\n\n', '- renaming the river.\n\n- a moonlit picnic.\n\n'));
     {
-      const result = ctx.run([]);
+      const edited = readFileSync(path, 'utf8');
+      const result = ctx.run(args);
       expect(result.exitCode).toBe(1);
       expect(result.stderr.toString()).toBe(
-        'grants: skills/intake/references/calls.md: the "Also his:" list holds "* a new greenhouse;", which is neither a "- " bullet nor a continuation indented 2 spaces\n',
+        'grants: skills/intake/references/calls.md: a "- " line follows the "Also his:" list after a blank line; keep every item in the list\n',
       );
-      expect(readFileSync(path, 'utf8')).toBe(source.replace('- a new greenhouse;\n', '* a new greenhouse;\n'));
+      expect(result.stdout.toString()).toBe('');
+      expect(readFileSync(path, 'utf8')).toBe(edited);
     }
   }
 });
