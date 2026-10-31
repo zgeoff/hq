@@ -3,6 +3,7 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { getMeta } from '../db/get-meta.ts';
 import { setMeta } from '../db/set-meta.ts';
 import { openDb } from '../db/open-db.ts';
 import { readNoslopSettings } from './read-noslop-settings.ts';
@@ -41,6 +42,6 @@ test('it does not write to the db it reads', () => {
   readNoslopSettings(path);
 
   const db = new Database(path, { readonly: true });
-  expect(db.query('SELECT count(*) AS total FROM meta WHERE key = ?').get('noslop')).toStrictEqual({ total: 0 });
-  db.close();
+  onTestFinished(() => db.close());
+  expect(getMeta(db, 'noslop')).toBeNull();
 });
