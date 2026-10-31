@@ -1,6 +1,8 @@
 import { formatCapLine } from './cap/format-cap-line.ts';
 import { formatDesignLanes } from './format-design-lanes.ts';
 import { formatFocusLine } from '../focus/format-focus-line.ts';
+import type { PlaceUnfit } from '../focus/types.ts';
+import { formatPlaceUnfit } from './format-place-unfit.ts';
 import type { SlotPlan } from './read-slot-plan.ts';
 
 // hq lanes' view of the plan: the pool, the local sessions against their cap, the focus, and what the
@@ -19,6 +21,7 @@ export function formatSlotPlan(slotPlan: SlotPlan, at: Date): string[] {
     `focus: ${slotPlan.focus === null ? 'none (all eligible work by priority)' : formatFocusLine(slotPlan.focus)}`,
     plan === null ? 'next: Ready unknown (no fresh read from Linear)' : `next: ${plan.picks.length === 0 ? 'nothing' : plan.picks.map((pick) => pick.issue).join(', ')} (${slotPlan.eligible ?? 0} eligible${formatReadyAge(slotPlan.readyReadAt, at)})`,
     ...(plan?.lent ?? []).map((lent) => `  lent: ${lent.slots} slot(s) reserved for ${lent.area}, nothing eligible`),
+    ...formatUnfitLine(plan?.unfit),
     formatDesignLanes(slotPlan.design),
   ];
 }
@@ -29,4 +32,11 @@ function formatReadyAge(readyReadAt: string | null, at: Date): string {
   }
   const minutes = Math.floor((at.getTime() - Date.parse(readyReadAt)) / 60_000);
   return minutes < 1 ? '; Ready read just now' : `; Ready read ${minutes} min ago`;
+}
+
+function formatUnfitLine(unfit: PlaceUnfit | undefined): string[] {
+  if (unfit === undefined || unfit.slots === 0) {
+    return [];
+  }
+  return [`  no fit: ${formatPlaceUnfit(unfit)}`];
 }

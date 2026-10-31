@@ -83,7 +83,8 @@ export function readSlotPlan(db: Database, sample: Sample, at: Date = now(), cap
   const runIssues = collectRunIssues(runs);
   const leftOut = new Set([...runIssues, ...activeSkips.map((skip) => skip.issue)]);
   const queue = buildFocusQueue(snapshot.eligible, focus?.terms ?? [], leftOut);
-  const plan = buildFocusPlan(queue, pool.free, focus?.reserves ?? [], readRunningByArea(db, running.issues));
+  const places = sample.placeTypes ? { free: { imp: pool.impFree, local: pool.localFree }, types: sample.placeTypes } : null;
+  const plan = buildFocusPlan(queue, { free: pool.free, places }, focus?.reserves ?? [], readRunningByArea(db, running.issues));
   const eligibleIssues = new Set(snapshot.eligible.map((issue) => issue.identifier));
   const skipped = activeSkips.filter((skip) => eligibleIssues.has(skip.issue) && !runIssues.has(skip.issue));
   return { pool, focus, plan, readyReadAt: snapshot.at, eligible: queue.length, design, skipped, cap };

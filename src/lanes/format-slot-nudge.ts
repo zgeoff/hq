@@ -1,10 +1,18 @@
 import { formatDesignLanes } from './format-design-lanes.ts';
 import type { SlotPlan } from './read-slot-plan.ts';
 
-// The nudge to z-delivery: the free slots and how long they waited, then the issues to take in order,
+const PLACE_FREE = [
+  { place: 'imp', key: 'impFree' },
+  { place: 'local', key: 'localFree' },
+] as const;
+
+// The nudge to z-delivery, leaving out a free slot no eligible issue fits: the free slots and how long they waited, then the issues to take in order,
 // each with why (a focus term, a reserve), the reserves lent, and the design lanes when one has an issue waiting.
 export function formatSlotNudge(slotPlan: SlotPlan, minutes: number): string {
-  const free = `${slotPlan.pool.free} slot${slotPlan.pool.free === 1 ? '' : 's'} free for ${minutes} min (imp ${slotPlan.pool.impFree}, local ${slotPlan.pool.localFree}${slotPlan.pool.capHeld ? `; the cap of ${slotPlan.cap.cap} holds the rest` : ''})`;
+  const unfit = slotPlan.plan?.unfit ?? { slots: 0, places: [] };
+  const fitFree = slotPlan.pool.free - unfit.slots;
+  const byPlace = PLACE_FREE.filter((entry) => !unfit.places.some((place) => place.place === entry.place)).map((entry) => `${entry.place} ${slotPlan.pool[entry.key]}`);
+  const free = `${fitFree} slot${fitFree === 1 ? '' : 's'} free for ${minutes} min (${byPlace.join(', ')}${slotPlan.pool.capHeld ? `; the cap of ${slotPlan.cap.cap} holds the rest` : ''})`;
   const tail = '(hq lanes shows the plan, hq focus the focus; capacity.sh still picks the provider and where it runs, and you write the briefs.)';
   if (slotPlan.plan === null) {
     return `${free}, Ready unknown: hq has no fresh Ready read from Linear, so it names no issues. Fill by priority, and report Ready by hand with hq lanes ready --lane name=n,... while the read fails. ${tail}`;

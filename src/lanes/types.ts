@@ -19,6 +19,10 @@ export interface PacingSlots {
   local: number;
 }
 
+// The Type names each listed place may take (pacing.json `placeTypes`), matched case-insensitively; a
+// place not listed takes any Type.
+export type PlaceTypes = Partial<Record<keyof PacingSlots, string[]>>;
+
 export interface Sample {
   cap: Capacity | null;
   impMib: number;
@@ -34,6 +38,9 @@ export interface Sample {
 
   // The design lane counts; absent: the defaults.
   design?: DesignSlots;
+
+  // The Type names each place takes; absent or null: every place takes any Type.
+  placeTypes?: PlaceTypes | null;
 
   // pacing.json's error for those counts, which are then the defaults; absent or null: none.
   designError?: string | null;
