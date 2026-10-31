@@ -7,8 +7,8 @@ step 3 and say so in the PR.
 
 1. Do the maintenance. Fix what you meet along the way. Before you remove code you don't understand,
    use the `why` skill. When it shows the code is still needed, keep it, and say why in the PR.
-2. Run the repo's test command. Fix each test that fails only on your branch. When a test also fails
-   on the base branch, it was broken before you came: say so in the PR, and leave it.
+2. Run the repo's test command and fix each test that fails. When a test also fails on the base
+   branch, fix it too, and say in the PR that it failed before your change.
 3. Find the features your change can reach: each one whose code you changed, and for a dependency or
    config bump, each one that uses what you bumped. Drive each with `bun verify` on the base branch,
    from a second worktree, and on yours. Compare the outputs, ignoring values that change on every

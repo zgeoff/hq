@@ -41,7 +41,7 @@ the skill gate refuses an edit under `skills/` until you have.
 
 - **Name the rule that failed.** The PR description says which existing rule should have covered the
   failure, and why it didn't. Fix that rule rather than add a near-duplicate beside it.
-- **Prefer a check to a sentence.** When a tool or script can enforce a rule, build that and delete
+- **Build a check, not a sentence.** When a tool or script can enforce a rule, build it and delete
   the prose.
 - **Keep must-hold rules in `SKILL.md`,** at the step where they apply. A reference holds how-to
   detail, and `SKILL.md`'s References list names the task that needs each one.
