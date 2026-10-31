@@ -126,6 +126,9 @@ function renderDiff(file: string, before: string, after: string): string {
 
 interface StillAsk {
   afters: Map<string, string>;
+
+  // The owner's other calls, which a site may list as bullets under "Also his:" after the sentence.
+  also: string[] | undefined;
   dataFile: string;
 
   // The sites marked `tree: private`, which hq-private holds and hq's public check skips.
@@ -134,7 +137,7 @@ interface StillAsk {
   textByVoice: Record<Voice, string>;
 }
 
-function buildStillAsk(dataFile: string, entries: unknown[], items: Item[]): StillAsk {
+function buildStillAsk(dataFile: string, entries: unknown[], items: Item[], also: string[] | undefined): StillAsk {
   const afters = new Map<string, string>(),
     getNotes = (voice: Voice) => items.map((item) => (voice === 'first' ? (item.note_first ?? item.note) : item.note)),
     privateSites = new Set<string>(),
@@ -176,17 +179,38 @@ function buildStillAsk(dataFile: string, entries: unknown[], items: Item[]): Sti
       );
     }
   }
-  return { afters, dataFile, privateSites, sites, textByVoice };
+  return { afters, also, dataFile, privateSites, sites, textByVoice };
 }
 
 function readStillAsk(tree: Tree): StillAsk {
   const dataFile = 'grants/still-ask.yaml',
-    model = parseObject(Bun.YAML.parse(read(tree, dataFile)), ['items', 'sites'], dataFile),
+    model = parseObject(Bun.YAML.parse(read(tree, dataFile)), ['items', 'also', 'sites'], dataFile),
     stillAsk = parseEntries(model.items, 'ask', `${dataFile}.items`) as Item[];
   if (!Array.isArray(model.sites) || model.sites.length === 0) {
     throw new Error(`${dataFile}: expected sites`);
   }
-  return buildStillAsk(dataFile, model.sites, stillAsk);
+  const also = model.also === undefined ? undefined : parseAlso(model.also, `${dataFile}.also`);
+  return buildStillAsk(dataFile, model.sites, stillAsk, also);
+}
+
+// Each item is stored bare: the check adds the bullet and the closing ";" or ".".
+function parseAlso(value: unknown, where: string): string[] {
+  if (!Array.isArray(value) || value.length === 0) {
+    throw new Error(`${where}: expected a nonempty list`);
+  }
+  const seen = new Set<string>();
+  return value.map((entry, index) => {
+    const at = `${where}[${index}]`;
+    const text = parseText(entry, at);
+    if (text !== text.trim() || /^- |[;.]$/u.test(text)) {
+      throw new Error(`${at}: give the item without its "- " bullet, closing ";" or ".", or surrounding spaces`);
+    }
+    if (seen.has(text)) {
+      throw new Error(`${at}: duplicate item ${JSON.stringify(text)}`);
+    }
+    seen.add(text);
+    return text;
+  });
 }
 
 // Check the source sites before grant replacement can conceal a missing or extra span.
@@ -199,6 +223,7 @@ function normalizeSite(file: string, body: string, data: StillAsk): string {
       `${file}: expected ${voice ? 'one still-ask span' : 'no security change outside the listed sites'}; found ${spans.length} spans and ${mentions} security change mentions`,
     );
   }
+  let next = body;
   for (const span of spans) {
     const tail = /^[^.)]*[.)]/u.exec(body.slice(span.index + span[0].length))?.[0] ?? '';
 
@@ -209,10 +234,64 @@ function normalizeSite(file: string, body: string, data: StillAsk): string {
         `${file}: the still-ask list is followed by ${JSON.stringify(tail)}, not ${JSON.stringify(data.afters.get(file))} as grants/still-ask.yaml pins`,
       );
     }
+    if (data.also) {
+      next = renderAlso(file, body, span.index + span[0].length + tail.length, data.also);
+    }
   }
   return voice
-    ? body.replaceAll(/deleting or rewriting\b[^\n]*?\bsecurity change\b/gu, () => data.textByVoice[voice])
-    : body;
+    ? next.replaceAll(/deleting or rewriting\b[^\n]*?\bsecurity change\b/gu, () => data.textByVoice[voice])
+    : next;
+}
+
+const ALSO_HEAD = '\n\nAlso his:\n\n';
+const ALSO_WIDTH = 100;
+
+// A site opts in by following the still-ask sentence with "Also his:"; its bullet list, up to the
+// next blank line, must then hold `also` in order. A list that matches once its wrapped lines are
+// joined is left as written; any other list is replaced with `also`, wrapped at 100 columns.
+function renderAlso(file: string, body: string, at: number, also: string[]): string {
+  if (!body.startsWith(ALSO_HEAD, at)) {
+    return body;
+  }
+  const start = at + ALSO_HEAD.length;
+  const blank = body.indexOf('\n\n', start);
+  const end = blank === -1 ? body.length - (body.endsWith('\n') ? 1 : 0) : blank;
+  const expected = also.map((item, index) => `${item}${index === also.length - 1 ? '.' : ';'}`);
+  const found = parseAlsoList(file, body.slice(start, end));
+  if (found.length === expected.length && found.every((item, index) => item === expected[index])) {
+    return body;
+  }
+  return body.slice(0, start) + expected.map((item) => renderBullet(item)).join('\n') + body.slice(end);
+}
+
+function parseAlsoList(file: string, block: string): string[] {
+  const items: string[] = [];
+  for (const line of block === '' ? [] : block.split('\n')) {
+    if (line.startsWith('- ')) {
+      items.push(line.slice(2));
+    } else if (/^ {2}\S/u.test(line) && items.length > 0) {
+      items.push(`${items.pop() ?? ''} ${line.slice(2)}`);
+    } else {
+      throw new Error(
+        `${file}: the "Also his:" list holds ${JSON.stringify(line)}, which is neither a "- " bullet nor a continuation indented 2 spaces`,
+      );
+    }
+  }
+  return items;
+}
+
+function renderBullet(item: string): string {
+  const lines: string[] = [];
+  let line = '-';
+  for (const word of item.split(' ')) {
+    if (line.length > 2 && line.length + 1 + word.length > ALSO_WIDTH) {
+      lines.push(line);
+      line = ' ';
+    }
+    line = `${line} ${word}`;
+  }
+  lines.push(line);
+  return lines.join('\n');
 }
 
 interface SessionContext {

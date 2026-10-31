@@ -22,6 +22,11 @@ items:
   - id: security-change
     outcome: ask
     note: "a High or Urgent security change"
+also:
+  - "pruning the paper orchard"
+  - "a new greenhouse"
+  - "a lantern beyond the ones the night watch already carries: Brass that dents, Glass that cracks, Oil, Wicks, or Paper over its limit"
+  - "renaming the river"
 sites:
   - file: skills/linear-triage/SKILL.md
     voice: third
