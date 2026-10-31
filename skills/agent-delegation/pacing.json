@@ -3,7 +3,7 @@
   "agentDesignSlots": 2,
   "slots": {
     "imp": 7,
-    "local": 1
+    "local": 3
   },
   "imp": {
     "impMib": 2048
