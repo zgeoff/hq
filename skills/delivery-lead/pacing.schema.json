@@ -72,6 +72,20 @@
           "$ref": "#/$defs/route"
         }
       }
+    },
+    "placeTypes": {
+      "type": "object",
+      "description": "The issue Types each place takes; a place with no list takes every Type.",
+      "minProperties": 1,
+      "additionalProperties": false,
+      "properties": {
+        "imp": {
+          "$ref": "#/$defs/placeTypeList"
+        },
+        "local": {
+          "$ref": "#/$defs/placeTypeList"
+        }
+      }
     }
   },
   "$defs": {
@@ -106,6 +120,14 @@
       "minItems": 1,
       "items": {
         "type": "string"
+      }
+    },
+    "placeTypeList": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "enum": ["Bug", "Feature", "Improvement", "Chore", "Design", "Investigation"]
       }
     }
   }

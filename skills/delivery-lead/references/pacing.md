@@ -63,6 +63,9 @@ Change `pacing.json` only when the owner asks, quoting him in the PR. CI checks 
 - `agentDesignSlots`: agent design sessions at once.
 - `slots.imp`, `slots.local`: delivery sessions on the imps, and on this host. Keep `slots.imp` at 7
   or fewer: the imps' host has 16 GiB for 8 imps of 2 GiB.
+- `placeTypes.<place>`: the issue Types a slot there takes, so `hq lanes` fills it with no other
+  Type. A place with no list takes every Type. An imp agent gets only its repo's skills, so local
+  takes the Investigation issues.
 - `providers.<name>`: `threshold` (percent at which launches stop), `unattended` (may launch with no
   person in it), `localFallback` (local sessions when the imps are full), `target` (`imp` or
   `local`; Codex runs `local`, where its login lives).
