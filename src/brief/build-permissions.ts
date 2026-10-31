@@ -7,15 +7,27 @@ const SLOT = /<[^<>\n]+>/u;
 // and each action once, with the repo in place of `<repo>`. A phrase that still holds another slot, or an action with no row,
 // goes into `unfilled` for the launcher.
 export function buildPermissions(actions: readonly string[], rows: readonly PermissionRow[], repo: string): { names: string[]; lines: string[]; unfilled: string[] } {
-  const wanted: string[] = [CODE_DELIVERY];
+  const names = pickPermissionNames([CODE_DELIVERY, ...actions], rows);
+  return { names, ...buildPermissionLines(names, rows, repo) };
+}
+
+// Each action once, as the table spells it, in the order given.
+export function pickPermissionNames(actions: readonly string[], rows: readonly PermissionRow[]): string[] {
+  const wanted: string[] = [];
   for (const action of actions.map((name) => pickRowName(rows, name))) {
     if (!wanted.some((name) => name.toLowerCase() === action.toLowerCase())) {
       wanted.push(action);
     }
   }
+  return wanted;
+}
+
+// The permission line of each named action, with the repo in place of `<repo>`. A phrase that still
+// holds another slot, or an action with no row, goes into `unfilled` for the launcher.
+export function buildPermissionLines(names: readonly string[], rows: readonly PermissionRow[], repo: string): { lines: string[]; unfilled: string[] } {
   const lines: string[] = [];
   const unfilled: string[] = [];
-  for (const action of wanted) {
+  for (const action of names) {
     const row = rows.find((candidate) => candidate.action.toLowerCase() === action.toLowerCase());
     if (row === undefined) {
       unfilled.push(`permissions:${action} (no wording)`);
@@ -27,7 +39,7 @@ export function buildPermissions(actions: readonly string[], rows: readonly Perm
       unfilled.push(`permissions:${row.action}`);
     }
   }
-  return { names: wanted, lines, unfilled };
+  return { lines, unfilled };
 }
 
 // An Actions line may add its detail after the name with no comma or colon, as in "Code delivery in
