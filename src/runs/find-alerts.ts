@@ -35,6 +35,7 @@ export function findAlerts(db: Database, sessions: SessionInfo[], activity: Map<
       });
     }
     if (r.state !== 'working') continue;
+    const mainActive = r.sessions.some((session) => session.design_pass === 0 && session.active === 1 && session.helper === 0);
     for (const active of findWatchedSessions(r.sessions)) {
       const who = `${active.helper ? 'helper ' : ''}session ${active.session_id.slice(0, 8)}`;
       const s = byId.get(active.session_id);
@@ -55,7 +56,9 @@ export function findAlerts(db: Database, sessions: SessionInfo[], activity: Map<
       if (r.geoff_chat || r.waits_on_geoff) {
         continue;
       }
-      if (!active.helper && probeHandedIn(db, r.prs)) {
+
+      // With no main session active, a helper carries the run, so its handed-in work silences it too.
+      if ((!active.helper || !mainActive) && probeHandedIn(db, r.prs)) {
         continue;
       }
       const last = activity.get(active.session_id) ?? null;
