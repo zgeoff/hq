@@ -163,6 +163,14 @@ export async function runChecks(p: Probe, s: HealthSettings, prev: Samples, at: 
     }
   }
 
+  if (p.stateSizes) {
+    const sizes = p.stateSizes();
+    checks.push(...sizes);
+    if (sizes.some((check) => check.key === 'state-size' && !check.ok)) {
+      unknown.push('state-size');
+    }
+  }
+
   let lanes = 'unknown';
   try {
     const r = await Promise.race([p.run(['systemctl', '--user', 'is-active', 'hq-lanes']), Bun.sleep(COMMAND_TIMEOUT_MS).then(() => null)]);

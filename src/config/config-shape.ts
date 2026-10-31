@@ -60,6 +60,7 @@ export const CONFIG_SHAPE = {
   HQ_DEFINITIONS_DIR: path(),
   HQ_PRIVATE_DIR: path(),
   HQ_DEFS_SOURCE_FILE: path(),
+  HQ_STATE_DIR: path(),
   HQ_NOW: text(),
   HQ_ORCHESTRATOR: text(),
   HQ_OWNER: text(),

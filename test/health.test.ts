@@ -275,3 +275,17 @@ test('it joins a failing atc mcp check named by the fleet name when a process is
     { key: 'atc-mcp:1a2b3c4d-1111-2222-3333-444455556666', ok: false, line: 'atc mcp for z-kettle (session 1a2b3c4d) started before the atc build of 1970-01-01T00:00:05Z; restart the session for the new tool list' },
   ]);
 });
+
+test('it joins the state size checks to the run and keeps their open problems open when the folder cannot be read', async () => {
+  const unreadable = [{ key: 'state-size', ok: false, line: "can't read the state files (/gone: ENOENT)" }];
+  const result = await runChecks({ ...probe(world()), stateSizes: () => unreadable }, HEALTH_DEFAULTS, {}, new Date(NOON_SYDNEY));
+
+  expect([result.checks.some((check) => check.key === 'state-size'), result.unknown]).toStrictEqual([true, ['state-size']]);
+});
+
+test('it reports an oversized state file as a problem but not unknown', async () => {
+  const over = [{ key: 'state-size:kettle.md', ok: false, line: 'state file kettle.md is 20.0 KB, over its 16 KB limit' }];
+  const result = await runChecks({ ...probe(world()), stateSizes: () => over }, HEALTH_DEFAULTS, {}, new Date(NOON_SYDNEY));
+
+  expect([result.checks.filter((check) => !check.ok).map((check) => check.key), result.unknown]).toStrictEqual([['state-size:kettle.md'], []]);
+});
