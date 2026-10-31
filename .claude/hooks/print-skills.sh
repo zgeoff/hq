@@ -4,8 +4,8 @@
 #   print-skills.sh [slot]
 # Claude Code caps each hook call's output at 10,000 characters, so settings.json calls it once per
 # slot and each file gets a cap of its own: slot 1 to 5 prints the list's skill at that place, 6
-# prints the sixth skill and every one after it, and delegation, briefs and after print the
-# delivery role's agent-delegation SKILL.md, its briefs reference and the after-compaction file.
+# prints the sixth skill and every one after it, and briefs and after print the delivery role's
+# briefs reference and the after-compaction file.
 # With no slot it prints them all in one call.
 # The session's skills come from hq's roles table, `hq fleet --json`: the declared session whose
 # last ensure recorded this atc session id, so a session atc renamed keeps its role. A session
@@ -15,9 +15,8 @@
 # this tree gets one "skipped" line (the shared skills only exist on some branches). Then it prints
 # the role's after-compaction file, found by the first skill, the role skill.
 # A session with no skills prints only its after-compaction file, found by its name (z-q gets q.md).
-# The delivery role also gets agent-delegation's SKILL.md and delivery-lead's briefs reference,
-# each when this tree has it: the first holds its launch and watch rules until the skill rebuild
-# folds them into delivery-lead, and every launch it writes follows the second.
+# The delivery role also gets delivery-lead's briefs reference when this tree has it, since every
+# launch it writes follows it.
 # Claude Code caps a hook's whole output at 10,000 characters and swaps longer output for a path it
 # doesn't ask Claude to read, so a file that would take the total past the budget prints an
 # instruction to read it instead. The budget keeps room for a read instruction (or skipped line)
@@ -46,7 +45,7 @@ printf '%s' "$fleet" | jq -e --arg n "$name" 'any(.declared[]?; .name == $n)' >/
 
 slot=${1:-all}
 case $slot in
-  all|1|2|3|4|5|6|delegation|briefs|after) ;;
+  all|1|2|3|4|5|6|briefs|after) ;;
   *) exit 0 ;;
 esac
 wants() { [ "$slot" = all ] || [ "$slot" = "$1" ]; }
@@ -54,7 +53,7 @@ wants() { [ "$slot" = all ] || [ "$slot" = "$1" ]; }
 used=0
 limit=9500
 reserve=200 # room kept for each item still to print
-left=$(( $(printf "%s\n" "$skills" | grep -c . || true) + 3 ))
+left=$(( $(printf "%s\n" "$skills" | grep -c . || true) + 2 ))
 [ "$slot" = all ] || left=1
 # Slot 6 can print several skills, so it keeps room for each one after the sixth.
 [ "$slot" != 6 ] || left=$(( $(printf "%s\n" "$skills" | grep -c . || true) - 5 ))
@@ -90,11 +89,6 @@ done
 
 role=$(printf '%s\n' "$skills" | head -1)
 briefs=skills/delivery-lead/references/briefs.md
-delegation=skills/agent-delegation/SKILL.md
-if wants delegation && [ "$role" = delivery-lead ] && [ -f "${CLAUDE_PROJECT_DIR:-.}/$delegation" ]; then
-  [ "$slot" != all ] || left=3
-  emit "$delegation"
-fi
 if wants briefs && [ "$role" = delivery-lead ] && [ -f "${CLAUDE_PROJECT_DIR:-.}/$briefs" ]; then
   [ "$slot" != all ] || left=2
   emit "$briefs"
