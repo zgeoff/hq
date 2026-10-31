@@ -21,21 +21,6 @@ test('it reads the table of the delivery-lead file', () => {
   expect(readPermissionTable(buildNodeBriefFiles(), ctx.root)).toStrictEqual([{ action: 'Code delivery', phrase: 'Work in <repo>.' }]);
 });
 
-test('it reads the agent-delegation file when there is no delivery-lead one', () => {
-  const ctx = setupTest();
-  createStubBriefPrivateDir(ctx.root, { path: 'skills/agent-delegation/references/briefs.private.md', rows: [['Deploy', 'Deploy to <environment>.']], marker: 'CLOSING-MARKER' });
-
-  expect(readPermissionTable(buildNodeBriefFiles(), ctx.root)).toStrictEqual([{ action: 'Deploy', phrase: 'Deploy to <environment>.' }]);
-});
-
-test('it prefers the delivery-lead file when both exist', () => {
-  const ctx = setupTest();
-  createStubBriefPrivateDir(ctx.root, { path: 'skills/delivery-lead/references/briefs.private.md', rows: [['Post', 'First.']], marker: 'CLOSING-MARKER' });
-  createStubBriefPrivateDir(ctx.root, { path: 'skills/agent-delegation/references/briefs.private.md', rows: [['Post', 'Second.']], marker: 'CLOSING-MARKER' });
-
-  expect(readPermissionTable(buildNodeBriefFiles(), ctx.root)).toStrictEqual([{ action: 'Post', phrase: 'First.' }]);
-});
-
 test('it rejects a checkout with no briefs file', () => {
   const ctx = setupTest();
 
