@@ -1,5 +1,5 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { buildStubFindings } from '../../test/build-stub-findings.ts';
@@ -891,6 +891,23 @@ test('it holds .claude/settings.json in hq, as its CODEOWNERS lists /.claude/', 
   const fake = buildFakeRunner({ prFiles: { code: 0, stdout: '.claude/settings.json\n', stderr: '' }, contents: { [`.github/CODEOWNERS?ref=${FAKE_BASE_SHA}`]: { code: 0, stdout: JSON.stringify({ type: 'file', encoding: 'base64', content: codeowners }), stderr: '' } } });
 
   await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'hq', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: expect.stringContaining('owner-held files (.claude/settings.json)') });
+});
+
+test("it holds an agent-kit file in hq through the repo's own CODEOWNERS", async () => {
+  const ctx = setupTest();
+  const codeowners = readFileSync(join(import.meta.dir, '..', '..', '.github', 'CODEOWNERS')).toString('base64');
+  const fake = buildFakeRunner({ prFiles: { code: 0, stdout: 'agent-kit/brief.md\n', stderr: '' }, contents: { [`.github/CODEOWNERS?ref=${FAKE_BASE_SHA}`]: { code: 0, stdout: JSON.stringify({ type: 'file', encoding: 'base64', content: codeowners }), stderr: '' } } });
+
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'hq', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: expect.stringContaining('owner-held files (agent-kit/brief.md)') });
+});
+
+test("it passes an agent-kit change in hq once the owner's lgtm is recorded at its head", async () => {
+  const ctx = setupTest();
+  const codeowners = readFileSync(join(import.meta.dir, '..', '..', '.github', 'CODEOWNERS')).toString('base64');
+  const fake = buildFakeRunner({ prFiles: { code: 0, stdout: 'agent-kit/brief.md\n', stderr: '' }, contents: { [`.github/CODEOWNERS?ref=${FAKE_BASE_SHA}`]: { code: 0, stdout: JSON.stringify({ type: 'file', encoding: 'base64', content: codeowners }), stderr: '' } } });
+  recordPRAnswer(ctx.db, { repo: 'hq', pr: 7, answer: 'lgtm', head: FAKE_FULL_SHA, source: 'chat:kettle-6', note: null, actor: 'z-kettle' });
+
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'hq', pr: 7 })).resolves.toMatchObject({ mayMerge: true });
 });
 
 test('it lets a PR in hq that changes only src/x.ts merge with no lgtm, as CODEOWNERS leaves it to z-q', async () => {

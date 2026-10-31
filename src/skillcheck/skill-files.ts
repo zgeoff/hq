@@ -1,10 +1,14 @@
-import { readdirSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
+const DIRECTORIES = ['skills', 'agent-kit'];
+
 export function skillFiles(root: string): string[] {
-  return readdirSync(join(root, 'skills'), { recursive: true })
-    .map(String)
-    .filter((f) => f.endsWith('.md'))
-    .sort()
-    .map((f) => join('skills', f));
+  return DIRECTORIES.filter((directory) => existsSync(join(root, directory))).flatMap((directory) =>
+    readdirSync(join(root, directory), { recursive: true })
+      .map(String)
+      .filter((file) => file.endsWith('.md'))
+      .toSorted()
+      .map((file) => join(directory, file)),
+  );
 }
