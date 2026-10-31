@@ -11,8 +11,9 @@
 # the role's after-compaction file, found by the first skill, the role skill.
 # A session with no skills prints only its after-compaction file, found by its name (z-q gets q.md).
 # Claude Code caps a hook's whole output at 10,000 characters and swaps longer output for a path it
-# doesn't ask Claude to read, so a file that would take the total past the cap prints an
-# instruction to read it instead.
+# doesn't ask Claude to read, so a file that would take the total past the budget prints an
+# instruction to read it instead. The budget keeps room for a read instruction (or skipped line)
+# for every item still to come, so the instructions never push the total past the cap.
 set -eu
 
 [ -n "${ATC_SESSION_ID:-}" ] || exit 0
@@ -35,11 +36,14 @@ skills=$(printf '%s' "$fleet" | jq -r --arg n "$name" \
 printf '%s' "$fleet" | jq -e --arg n "$name" 'any(.declared[]?; .name == $n)' >/dev/null 2>&1 || exit 0
 
 used=0
+limit=9500
+reserve=200 # room kept for each item still to print
+left=$(( $(printf "%s\n" "$skills" | grep -c . || true) + 1 ))
 emit() { # emit <path relative to the project dir>
   body=$(sed -E 's/ {2,}/ /g; s/-{4,}/---/g' "${CLAUDE_PROJECT_DIR:-.}/$1")
   text=$(printf 'Context was compacted. This is %s, reloaded from disk. Follow it as written.\n\n%s\n' "$1" "$body")
   size=$(printf '%s\n' "$text" | wc -c)
-  if [ $((used + size)) -gt 9000 ]; then
+  if [ $((used + size + reserve * (left - 1))) -gt $limit ]; then
     text="Context was compacted. Read $1 now, before your next action: it holds rules you must follow and is too long to print here."
     size=$(printf '%s\n' "$text" | wc -c)
   fi
@@ -55,8 +59,10 @@ for skill in $skills; do
     used=$((used + ${#line} + 1))
     echo "$line"
   fi
+  left=$((left - 1))
 done
 
+left=1
 case $(printf '%s\n' "$skills" | head -1) in
   delivery-lead) after=delivery.md ;;
   release) after=release.md ;;

@@ -92,6 +92,16 @@ if run id-new z-triage | grep -q "^line 0 of"; then echo "ok: the first big skil
 if [ "$total" -lt 10000 ]; then echo "ok: two big skills stay under the cap ($total)"; else echo "FAIL: output is $total characters"; fail=1; fi
 if run id-new z-triage | grep -q '^Context was compacted. Read skills/bigtwo/SKILL.md now'; then echo "ok: the second big skill prints a read instruction"; else echo "FAIL: no read instruction for bigtwo"; fail=1; fi
 cp "$bin/hq.orig" "$bin/hq"
+# Eight big skills: the read instructions for the later ones still fit under the cap, with the after-compaction file.
+for n in 1 2 3 4 5 6 7 8; do
+  mkdir -p "$project/skills/kettle$n"
+  cp "$project/skills/bigone/SKILL.md" "$project/skills/kettle$n/SKILL.md"
+done
+sed -i 's/{"name":"z-triage","skills":\["linear-triage"\]/{"name":"z-triage","skills":["linear-triage","kettle1","kettle2","kettle3","kettle4","kettle5","kettle6","kettle7","kettle8"]/' "$bin/hq"
+total=$(run id-new z-triage | wc -c)
+if [ "$total" -lt 10000 ]; then echo "ok: eight big skills stay under the cap ($total)"; else echo "FAIL: output is $total characters"; fail=1; fi
+if run id-new z-triage | grep -q '^after triage$'; then echo "ok: the after-compaction file still prints"; else echo "FAIL: no after-compaction file"; fail=1; fi
+cp "$bin/hq.orig" "$bin/hq"
 # hq down: no roles table, so nothing prints.
 FAKE_HQ=down
 export FAKE_HQ
