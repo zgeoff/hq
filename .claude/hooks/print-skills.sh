@@ -56,6 +56,8 @@ limit=9500
 reserve=200 # room kept for each item still to print
 left=$(( $(printf "%s\n" "$skills" | grep -c . || true) + 3 ))
 [ "$slot" = all ] || left=1
+# Slot 6 can print several skills, so it keeps room for each one after the sixth.
+[ "$slot" != 6 ] || left=$(( $(printf "%s\n" "$skills" | grep -c . || true) - 5 ))
 say() { # say <line>: print it only while the total stays inside the cap
   size=$(printf '%s\n' "$1" | wc -c)
   [ $((used + size)) -le $limit ] || return 0
@@ -83,7 +85,7 @@ for skill in $skills; do
   else
     say "skipped $skill: no SKILL.md in this tree"
   fi
-  [ "$slot" != all ] || left=$((left - 1))
+  case $slot in all|6) left=$((left - 1)) ;; esac
 done
 
 role=$(printf '%s\n' "$skills" | head -1)

@@ -143,6 +143,12 @@ SLOT=2
 if run id-stu stu | grep -q "^line 269 of"; then echo "ok: a big second skill prints whole in its slot"; else echo "FAIL: the big second skill did not print whole"; fail=1; fi
 SLOT=1
 if run id-stu stu | grep -q "^line 269 of"; then echo "ok: a big role skill prints whole in its slot"; else echo "FAIL: the big role skill did not print whole"; fail=1; fi
+# Slot 6 with a sixth skill that fills the budget alone still names the seventh.
+awk 'BEGIN { for (i = 0; i < 296; i++) print "line " i " of a long kettle skill" }' > "$project/skills/intake/SKILL.md"
+sed -i 's/{"name":"z-triage","skills":\["linear-triage"\]/{"name":"z-triage","skills":["linear-triage","owner-calls","delivery-lead","fix-it-here","release","intake","kettle-seven"]/' "$bin/hq"
+SLOT=6
+if run id-new z-triage | grep -q "^skipped kettle-seven: no SKILL.md in this tree$"; then echo "ok: slot 6 keeps room for the seventh skill"; else echo "FAIL: slot 6 dropped the seventh skill"; fail=1; fi
+cp "$bin/hq.orig" "$bin/hq"
 unset SLOT
 echo "body of intake" > "$project/skills/intake/SKILL.md"
 echo "body of owner-calls" > "$project/skills/owner-calls/SKILL.md"
