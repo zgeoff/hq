@@ -5,5 +5,5 @@ test("z-q's start prompt is read from hq-private's main, like the skill sessions
   const fleet = loadDeclaredFleet();
 
   expect(fleet.find((entry) => entry.name === 'z-q')?.prompt).toBe('main:prompts/z-q.md');
-  expect(fleet.filter((entry) => entry.skill !== null).every((entry) => entry.prompt.startsWith('main:skills/'))).toBe(true);
+  expect(fleet.filter((entry) => (entry.skills?.length ?? 0) > 0).every((entry) => entry.prompt.startsWith('main:skills/'))).toBe(true);
 });

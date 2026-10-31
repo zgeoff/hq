@@ -2,7 +2,7 @@
   "sessions": [
     {
       "name": "z-stu",
-      "skill": "intake",
+      "skills": ["intake", "owner-calls", "tickets"],
       "cwd": "defs",
       "model": "opus",
       "wake": true,
@@ -12,7 +12,7 @@
     },
     {
       "name": "z-delivery",
-      "skill": "delivery-lead",
+      "skills": ["delivery-lead", "tickets", "fix-it-here", "owner-calls"],
       "cwd": "defs",
       "model": "opus",
       "wake": false,
@@ -21,7 +21,7 @@
     },
     {
       "name": "z-release",
-      "skill": "release",
+      "skills": ["release", "owner-calls", "evidence", "tickets"],
       "cwd": "defs",
       "model": "opus",
       "wake": true,
@@ -30,7 +30,7 @@
     },
     {
       "name": "z-triage",
-      "skill": "linear-triage",
+      "skills": ["linear-triage", "tickets", "owner-calls", "fix-it-here", "evidence"],
       "cwd": "defs",
       "model": "opus",
       "wake": true,
@@ -38,7 +38,7 @@
     },
     {
       "name": "z-qa",
-      "skill": "preview-qa",
+      "skills": ["preview-qa", "evidence", "owner-calls"],
       "cwd": "defs",
       "model": "opus",
       "wake": true,
@@ -47,7 +47,7 @@
     },
     {
       "name": "z-review",
-      "skill": "pr-review",
+      "skills": ["pr-review", "fix-it-here", "owner-calls", "evidence"],
       "cwd": "defs",
       "model": "sonnet",
       "wake": true,
@@ -56,7 +56,7 @@
     },
     {
       "name": "z-q",
-      "skill": null,
+      "skills": [],
       "cwd": "hq",
       "model": "opus",
       "wake": true,

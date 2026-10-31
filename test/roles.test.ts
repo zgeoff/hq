@@ -7,6 +7,7 @@ import { overrideEnv } from '../src/config/override-env.ts';
 import { checkFleetBuild } from '../src/roles/check-fleet-build.ts';
 import { getDeclaredForwards as declaredForwards } from '../src/roles/get-declared-forwards.ts';
 import { getDeclaredSessions as declaredSessions } from '../src/roles/get-declared-sessions.ts';
+import { findRoleSkill } from '../src/roles/find-role-skill.ts';
 import { roleName } from '../src/roles/role-name.ts';
 import { rolesByName } from '../src/roles/roles-by-name.ts';
 import { ROLES } from '../src/roles/roles.ts';
@@ -16,11 +17,17 @@ import { forwardOf } from '../src/outbox/forward-of.ts';
 import { setForward } from '../src/outbox/set-forward.ts';
 import { NOON_SYDNEY, at, freshDb } from './helpers.ts';
 
-const one = (name: string, roles: string[], extra: Record<string, unknown> = {}) => ({ name, skill: 'kettle', cwd: 'defs', model: 'opus', wake: true, roles, ...extra });
-const valid = () => ({
-  sessions: [one('z-aa', ['owner']), one('z-bb', ['orchestrator']), one('z-cc', ['reviewer']), one('z-dd', ['qa', 'triage'])],
-  forwards: { 'z-old': 'z-dd' },
-});
+function setupTest() {
+  const ctx = {
+    one: (name: string, roles: string[], extra: Record<string, unknown> = {}) => ({ name, skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles, ...extra }),
+    valid: () => ({
+      sessions: [ctx.one('z-aa', ['owner']), ctx.one('z-bb', ['orchestrator']), ctx.one('z-cc', ['reviewer']), ctx.one('z-dd', ['qa', 'triage'])],
+      forwards: { 'z-old': 'z-dd' },
+    }),
+  };
+
+  return ctx;
+}
 
 test('the table loads and each single role resolves to one declared session', () => {
   expect(ROLES.sessions.length).toBeGreaterThan(5);
@@ -31,72 +38,105 @@ test('the table loads and each single role resolves to one declared session', ()
 });
 
 test('a valid object passes', () => {
-  expect(validateRoles(valid()).sessions).toHaveLength(4);
+  const ctx = setupTest();
+  expect(validateRoles(ctx.valid()).sessions).toHaveLength(4);
 });
 
 test('pluginDirs: a list of absolute or ~/ folders passes; anything else is refused by name', () => {
-  const ok = valid();
-  ok.sessions[0] = one('z-aa', ['owner'], { pluginDirs: ['~/plugins/band', '/opt/plugins/pane'] });
+  const ctx = setupTest();
+  const ok = ctx.valid();
+  ok.sessions[0] = ctx.one('z-aa', ['owner'], { pluginDirs: ['~/plugins/band', '/opt/plugins/pane'] });
   expect(validateRoles(ok).sessions[0]).toMatchObject({ pluginDirs: ['~/plugins/band', '/opt/plugins/pane'] });
-  expect(validateRoles(valid()).sessions[0]).not.toHaveProperty('pluginDirs');
+  expect(validateRoles(ctx.valid()).sessions[0]).not.toHaveProperty('pluginDirs');
   for (const bad of [[], ['plugins/band'], ['~/plugins/../band'], 'band', [7]]) {
-    const t = valid();
-    t.sessions[0] = one('z-aa', ['owner'], { pluginDirs: bad });
-    expect(() => validateRoles(t)).toThrow('sessions[0].pluginDirs');
+    const table = ctx.valid();
+    table.sessions[0] = ctx.one('z-aa', ['owner'], { pluginDirs: bad });
+    expect(() => validateRoles(table)).toThrow('sessions[0].pluginDirs');
   }
 });
 
 test('the validator rejects a bad file and names the field', () => {
-  const dup = valid();
-  dup.sessions.push(one('z-aa', []));
+  const ctx = setupTest();
+  const dup = ctx.valid();
+  dup.sessions.push(ctx.one('z-aa', []));
   expect(() => validateRoles(dup)).toThrow('sessions[4].name');
 
-  const unknown = valid();
+  const unknown = ctx.valid();
   unknown.sessions[0]!.roles = ['owner', 'boss'];
   expect(() => validateRoles(unknown)).toThrow('unknown role');
 
-  const two = valid();
+  const two = ctx.valid();
   two.sessions[1]!.roles = ['orchestrator', 'owner'];
   expect(() => validateRoles(two)).toThrow('roles.owner');
 
-  const none = valid();
+  const none = ctx.valid();
   none.sessions[2]!.roles = [];
   expect(() => validateRoles(none)).toThrow('roles.reviewer');
 
-  const fwd = valid();
+  const fwd = ctx.valid();
   fwd.forwards = { 'z-old': 'z-nobody' };
   expect(() => validateRoles(fwd)).toThrow('forwards.z-old');
 
-  const name = valid();
+  const name = ctx.valid();
   name.sessions[0]!.name = 'Z-Aa';
   expect(() => validateRoles(name)).toThrow('sessions[0].name');
 
-  const cwd = valid();
+  const cwd = ctx.valid();
   (cwd.sessions[0] as Record<string, unknown>)['cwd'] = 'elsewhere';
   expect(() => validateRoles(cwd)).toThrow('sessions[0].cwd');
 
-  const skill = valid();
-  (skill.sessions[0] as Record<string, unknown>)['skill'] = null;
+  const skill = ctx.valid();
+  skill.sessions[0] = ctx.one('z-aa', ['owner'], { skills: [] });
   expect(() => validateRoles(skill)).toThrow('sessions[0].prompt');
 });
 
+test.each([[['Kettle']], [['kettle', 'kettle']], [['kettle', 7]], ['kettle'], [null], [undefined]])('it refuses skills %j by name', (skills) => {
+  const ctx = setupTest();
+  const table = ctx.valid();
+  table.sessions[0] = ctx.one('z-aa', ['owner'], { skills });
+
+  expect(() => validateRoles(table)).toThrow('sessions[0].skills');
+});
+
+test('it refuses a prompt beside a non-empty skills list', () => {
+  const ctx = setupTest();
+  const table = ctx.valid();
+  table.sessions[0] = ctx.one('z-aa', ['owner'], { prompt: 'main:prompts/kettle.md' });
+
+  expect(() => validateRoles(table)).toThrow('sessions[0].prompt');
+});
+
+test('it keeps skills that have no directory, and the role skill is the first one', () => {
+  const ctx = setupTest();
+  const table = ctx.valid();
+  table.sessions[0] = ctx.one('z-aa', ['owner'], { skills: ['kettle', 'teapot-shared'] });
+  const [session] = validateRoles(table).sessions;
+
+  expect(session).toMatchObject({ skills: ['kettle', 'teapot-shared'] });
+  expect(session && findRoleSkill(session)).toBe('kettle');
+  expect(findRoleSkill({ skills: [] })).toBeNull();
+});
+
 test.each(['kettle-prompt.md', 'main:prompts/kettle.md'])('prompt %s passes for a session with no skill', (prompt) => {
-  const table = valid();
-  table.sessions[0] = one('z-aa', ['owner'], { skill: null, prompt });
+  const ctx = setupTest();
+  const table = ctx.valid();
+  table.sessions[0] = ctx.one('z-aa', ['owner'], { skills: [], prompt });
 
   expect(validateRoles(table).sessions[0]).toMatchObject({ prompt });
 });
 
 test.each(['prompts/kettle.md', 'main:', 'main:../kettle.md', 'main:prompts/../kettle.md', 'main:/etc/kettle.md'])('prompt %s is refused by name', (prompt) => {
-  const table = valid();
-  table.sessions[0] = one('z-aa', ['owner'], { skill: null, prompt });
+  const ctx = setupTest();
+  const table = ctx.valid();
+  table.sessions[0] = ctx.one('z-aa', ['owner'], { skills: [], prompt });
 
   expect(() => validateRoles(table)).toThrow('sessions[0].prompt');
 });
 
 test('the validator takes a release session, and the release role lists its holders', () => {
-  const withRelease = valid();
-  withRelease.sessions.push(one('z-ee', ['release']));
+  const ctx = setupTest();
+  const withRelease = ctx.valid();
+  withRelease.sessions.push(ctx.one('z-ee', ['release']));
 
   expect(validateRoles(withRelease).sessions.map((session) => session.roles)).toStrictEqual([['owner'], ['orchestrator'], ['reviewer'], ['qa', 'triage'], ['release']]);
   expect(Array.isArray(rolesByName().release)).toBe(true);
@@ -195,9 +235,14 @@ test('hq fleet --json gives each session its skill and roles, plus the roles and
   const j = JSON.parse(out.join('\n'));
   const q = j.declared.find((e: { name: string }) => e.name === 'z-q');
   expect(q.skill).toBeNull();
+  expect(q.skills).toStrictEqual([]);
   expect(q.roles).toEqual(['developer']);
   const owner = j.declared.find((e: { name: string }) => e.name === roleName('owner'));
   expect(owner.skill).toBe('intake');
+  expect(owner.skills).toStrictEqual(['intake', 'owner-calls', 'tickets']);
+  for (const entry of j.declared) {
+    expect(entry.skill).toBe(entry.skills[0] ?? null);
+  }
   expect(owner.roles).toEqual(['owner']);
   expect(owner.cwd).toBeTruthy();
   expect(j.roles).toEqual(rolesByName());
@@ -205,8 +250,10 @@ test('hq fleet --json gives each session its skill and roles, plus the roles and
   expect(j.roles.developer).toEqual(['z-q']);
   expect(j.forwards['z-refine']).toBe(declaredForwards()['z-refine']);
 
-  // The compact hook (.claude/hooks/print-skill.sh) reads these: change it with them.
-  for (const e of j.declared) expect(Object.keys(e)).toEqual(expect.arrayContaining(['name', 'skill']));
+  // The compact hook (.claude/hooks/print-skills.sh) reads these: change it with them.
+  for (const entry of j.declared) {
+    expect(Object.keys(entry)).toStrictEqual(expect.arrayContaining(['name', 'skills', 'skill']));
+  }
   expect('last' in j).toBe(true);
 });
 });

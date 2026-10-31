@@ -5,7 +5,7 @@
 export const SHAPES: Record<string, { command: string; keys: string[] }> = {
   fleet: {
     command: 'hq fleet --json',
-    keys: ['ok', 'timer', 'declared[].name', 'declared[].skill', 'declared[].roles', 'declared[].cwd', 'declared[].promptCheck?.state', 'declared[].promptCheck?.since', 'declared[].promptCheck?.hint', 'declared[].promptCheck?.reason', 'retired', 'roles', 'forwards', 'last?.at', 'last?.steps[].name', 'last?.steps[].id?'],
+    keys: ['ok', 'timer', 'declared[].name', 'declared[].skills', 'declared[].skill', 'declared[].roles', 'declared[].cwd', 'declared[].promptCheck?.state', 'declared[].promptCheck?.since', 'declared[].promptCheck?.hint', 'declared[].promptCheck?.reason', 'retired', 'roles', 'forwards', 'last?.at', 'last?.steps[].name', 'last?.steps[].id?'],
   },
   status: {
     command: 'hq status --json',
