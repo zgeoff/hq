@@ -9,8 +9,10 @@
 # It prints skills/<skill>/SKILL.md for each declared skill in order; a skill with no SKILL.md in
 # this tree gets one "skipped" line (the shared skills only exist on some branches). Then it prints
 # the role's after-compaction file, found by the first skill, the role skill.
-# Claude Code caps hook output at 10,000 characters and swaps longer output for a path it doesn't
-# ask Claude to read, so an oversized file prints an instruction to read it instead.
+# A session with no skills prints only its after-compaction file, found by its name (z-q gets q.md).
+# Claude Code caps a hook's whole output at 10,000 characters and swaps longer output for a path it
+# doesn't ask Claude to read, so a file that would take the total past the cap prints an
+# instruction to read it instead.
 set -eu
 
 [ -n "${ATC_SESSION_ID:-}" ] || exit 0
@@ -29,22 +31,29 @@ fi
 # An older hq gives only `skill`, the role skill, so fall back to it.
 skills=$(printf '%s' "$fleet" | jq -r --arg n "$name" \
   '[.declared[]? | select(.name == $n) | (.skills // [.skill // empty])[]] | .[]' 2>/dev/null) || exit 0
-[ -n "$skills" ] || exit 0
+# A name hq doesn't declare prints nothing; a declared one with an empty list still gets its file.
+printf '%s' "$fleet" | jq -e --arg n "$name" 'any(.declared[]?; .name == $n)' >/dev/null 2>&1 || exit 0
 
+used=0
 emit() { # emit <path relative to the project dir>
   body=$(sed -E 's/ {2,}/ /g; s/-{4,}/---/g' "${CLAUDE_PROJECT_DIR:-.}/$1")
-  if [ "$(printf '%s' "$body" | wc -c)" -gt 9700 ]; then
-    echo "Context was compacted. Read $1 now, before your next action: it holds rules you must follow and is too long to print here."
-  else
-    printf 'Context was compacted. This is %s, reloaded from disk. Follow it as written.\n\n%s\n' "$1" "$body"
+  text=$(printf 'Context was compacted. This is %s, reloaded from disk. Follow it as written.\n\n%s\n' "$1" "$body")
+  size=$(printf '%s\n' "$text" | wc -c)
+  if [ $((used + size)) -gt 9000 ]; then
+    text="Context was compacted. Read $1 now, before your next action: it holds rules you must follow and is too long to print here."
+    size=$(printf '%s\n' "$text" | wc -c)
   fi
+  used=$((used + size))
+  printf '%s\n' "$text"
 }
 
 for skill in $skills; do
   if [ -f "${CLAUDE_PROJECT_DIR:-.}/skills/$skill/SKILL.md" ]; then
     emit "skills/$skill/SKILL.md"
   else
-    echo "skipped $skill: no SKILL.md in this tree"
+    line="skipped $skill: no SKILL.md in this tree"
+    used=$((used + ${#line} + 1))
+    echo "$line"
   fi
 done
 
@@ -55,6 +64,7 @@ case $(printf '%s\n' "$skills" | head -1) in
   intake) after=stu.md ;;
   preview-qa) after=qa.md ;;
   pr-review) after=review.md ;;
+  '') after=${name#z-}.md ;;
   *) after= ;;
 esac
-[ -z "$after" ] || emit ".claude/hooks/after-compaction/$after"
+[ -z "$after" ] || [ ! -f "${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/after-compaction/$after" ] || emit ".claude/hooks/after-compaction/$after"

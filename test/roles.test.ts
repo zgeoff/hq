@@ -17,18 +17,6 @@ import { forwardOf } from '../src/outbox/forward-of.ts';
 import { setForward } from '../src/outbox/set-forward.ts';
 import { NOON_SYDNEY, at, freshDb } from './helpers.ts';
 
-function setupTest() {
-  const ctx = {
-    one: (name: string, roles: string[], extra: Record<string, unknown> = {}) => ({ name, skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles, ...extra }),
-    valid: () => ({
-      sessions: [ctx.one('z-aa', ['owner']), ctx.one('z-bb', ['orchestrator']), ctx.one('z-cc', ['reviewer']), ctx.one('z-dd', ['qa', 'triage'])],
-      forwards: { 'z-old': 'z-dd' },
-    }),
-  };
-
-  return ctx;
-}
-
 test('the table loads and each single role resolves to one declared session', () => {
   expect(ROLES.sessions.length).toBeGreaterThan(5);
   const names = declaredSessions().map((s) => s.name);
@@ -38,78 +26,208 @@ test('the table loads and each single role resolves to one declared session', ()
 });
 
 test('a valid object passes', () => {
-  const ctx = setupTest();
-  expect(validateRoles(ctx.valid()).sessions).toHaveLength(4);
+  const table = {
+    sessions: [
+      { name: 'z-aa', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['owner'] },
+      { name: 'z-bb', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['orchestrator'] },
+      { name: 'z-cc', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['reviewer'] },
+      { name: 'z-dd', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['qa', 'triage'] },
+    ],
+    forwards: { 'z-old': 'z-dd' },
+  };
+
+  expect(validateRoles(table).sessions).toHaveLength(4);
 });
 
-test('pluginDirs: a list of absolute or ~/ folders passes; anything else is refused by name', () => {
-  const ctx = setupTest();
-  const ok = ctx.valid();
-  ok.sessions[0] = ctx.one('z-aa', ['owner'], { pluginDirs: ['~/plugins/band', '/opt/plugins/pane'] });
-  expect(validateRoles(ok).sessions[0]).toMatchObject({ pluginDirs: ['~/plugins/band', '/opt/plugins/pane'] });
-  expect(validateRoles(ctx.valid()).sessions[0]).not.toHaveProperty('pluginDirs');
-  for (const bad of [[], ['plugins/band'], ['~/plugins/../band'], 'band', [7]]) {
-    const table = ctx.valid();
-    table.sessions[0] = ctx.one('z-aa', ['owner'], { pluginDirs: bad });
-    expect(() => validateRoles(table)).toThrow('sessions[0].pluginDirs');
-  }
+test('it passes pluginDirs that are absolute or ~/ folders', () => {
+  const withDirs = {
+    sessions: [
+      { name: 'z-aa', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['owner'], pluginDirs: ['~/plugins/band', '/opt/plugins/pane'] },
+      { name: 'z-bb', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['orchestrator'] },
+      { name: 'z-cc', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['reviewer'] },
+      { name: 'z-dd', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['qa', 'triage'] },
+    ],
+    forwards: { 'z-old': 'z-dd' },
+  };
+  const without = {
+    sessions: [
+      { name: 'z-aa', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['owner'] },
+      { name: 'z-bb', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['orchestrator'] },
+      { name: 'z-cc', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['reviewer'] },
+      { name: 'z-dd', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['qa', 'triage'] },
+    ],
+    forwards: { 'z-old': 'z-dd' },
+  };
+
+  expect(validateRoles(withDirs).sessions[0]).toMatchObject({ pluginDirs: ['~/plugins/band', '/opt/plugins/pane'] });
+  expect(validateRoles(without).sessions[0]).not.toHaveProperty('pluginDirs');
 });
 
-test('the validator rejects a bad file and names the field', () => {
-  const ctx = setupTest();
-  const dup = ctx.valid();
-  dup.sessions.push(ctx.one('z-aa', []));
-  expect(() => validateRoles(dup)).toThrow('sessions[4].name');
+test.each([[[]], [['plugins/band']], [['~/plugins/../band']], ['band'], [[7]]])('it refuses pluginDirs %j by name', (pluginDirs) => {
+  const table = {
+    sessions: [
+      { name: 'z-aa', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['owner'], pluginDirs },
+      { name: 'z-bb', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['orchestrator'] },
+      { name: 'z-cc', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['reviewer'] },
+      { name: 'z-dd', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['qa', 'triage'] },
+    ],
+    forwards: { 'z-old': 'z-dd' },
+  };
 
-  const unknown = ctx.valid();
-  unknown.sessions[0]!.roles = ['owner', 'boss'];
-  expect(() => validateRoles(unknown)).toThrow('unknown role');
+  expect(() => validateRoles(table)).toThrow('sessions[0].pluginDirs');
+});
 
-  const two = ctx.valid();
-  two.sessions[1]!.roles = ['orchestrator', 'owner'];
-  expect(() => validateRoles(two)).toThrow('roles.owner');
+test('it refuses a repeated session name by name', () => {
+  const table = {
+    sessions: [
+      { name: 'z-aa', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['owner'] },
+      { name: 'z-bb', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['orchestrator'] },
+      { name: 'z-cc', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['reviewer'] },
+      { name: 'z-dd', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['qa', 'triage'] },
+      { name: 'z-aa', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: [] },
+    ],
+    forwards: { 'z-old': 'z-dd' },
+  };
 
-  const none = ctx.valid();
-  none.sessions[2]!.roles = [];
-  expect(() => validateRoles(none)).toThrow('roles.reviewer');
+  expect(() => validateRoles(table)).toThrow('sessions[4].name');
+});
 
-  const fwd = ctx.valid();
-  fwd.forwards = { 'z-old': 'z-nobody' };
-  expect(() => validateRoles(fwd)).toThrow('forwards.z-old');
+test('it refuses an unknown role', () => {
+  const table = {
+    sessions: [
+      { name: 'z-aa', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['owner', 'boss'] },
+      { name: 'z-bb', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['orchestrator'] },
+      { name: 'z-cc', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['reviewer'] },
+      { name: 'z-dd', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['qa', 'triage'] },
+    ],
+    forwards: { 'z-old': 'z-dd' },
+  };
 
-  const name = ctx.valid();
-  name.sessions[0]!.name = 'Z-Aa';
-  expect(() => validateRoles(name)).toThrow('sessions[0].name');
+  expect(() => validateRoles(table)).toThrow('unknown role');
+});
 
-  const cwd = ctx.valid();
-  (cwd.sessions[0] as Record<string, unknown>)['cwd'] = 'elsewhere';
-  expect(() => validateRoles(cwd)).toThrow('sessions[0].cwd');
+test('it refuses two holders of the owner role', () => {
+  const table = {
+    sessions: [
+      { name: 'z-aa', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['owner'] },
+      { name: 'z-bb', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['orchestrator', 'owner'] },
+      { name: 'z-cc', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['reviewer'] },
+      { name: 'z-dd', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['qa', 'triage'] },
+    ],
+    forwards: { 'z-old': 'z-dd' },
+  };
 
-  const skill = ctx.valid();
-  skill.sessions[0] = ctx.one('z-aa', ['owner'], { skills: [] });
-  expect(() => validateRoles(skill)).toThrow('sessions[0].prompt');
+  expect(() => validateRoles(table)).toThrow('roles.owner');
+});
+
+test('it refuses a missing reviewer', () => {
+  const table = {
+    sessions: [
+      { name: 'z-aa', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['owner'] },
+      { name: 'z-bb', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['orchestrator'] },
+      { name: 'z-cc', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: [] },
+      { name: 'z-dd', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['qa', 'triage'] },
+    ],
+    forwards: { 'z-old': 'z-dd' },
+  };
+
+  expect(() => validateRoles(table)).toThrow('roles.reviewer');
+});
+
+test('it refuses a forward to an undeclared session', () => {
+  const table = {
+    sessions: [
+      { name: 'z-aa', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['owner'] },
+      { name: 'z-bb', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['orchestrator'] },
+      { name: 'z-cc', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['reviewer'] },
+      { name: 'z-dd', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['qa', 'triage'] },
+    ],
+    forwards: { 'z-old': 'z-nobody' },
+  };
+
+  expect(() => validateRoles(table)).toThrow('forwards.z-old');
+});
+
+test('it refuses an upper-case session name', () => {
+  const table = {
+    sessions: [
+      { name: 'Z-Aa', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['owner'] },
+      { name: 'z-bb', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['orchestrator'] },
+      { name: 'z-cc', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['reviewer'] },
+      { name: 'z-dd', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['qa', 'triage'] },
+    ],
+    forwards: { 'z-old': 'z-dd' },
+  };
+
+  expect(() => validateRoles(table)).toThrow('sessions[0].name');
+});
+
+test('it refuses a cwd outside defs', () => {
+  const table = {
+    sessions: [
+      { name: 'z-aa', skills: ['kettle'], cwd: 'elsewhere', model: 'opus', wake: true, roles: ['owner'] },
+      { name: 'z-bb', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['orchestrator'] },
+      { name: 'z-cc', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['reviewer'] },
+      { name: 'z-dd', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['qa', 'triage'] },
+    ],
+    forwards: { 'z-old': 'z-dd' },
+  };
+
+  expect(() => validateRoles(table)).toThrow('sessions[0].cwd');
+});
+
+test('it refuses an empty skills list without a prompt', () => {
+  const table = {
+    sessions: [
+      { name: 'z-aa', skills: [], cwd: 'defs', model: 'opus', wake: true, roles: ['owner'] },
+      { name: 'z-bb', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['orchestrator'] },
+      { name: 'z-cc', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['reviewer'] },
+      { name: 'z-dd', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['qa', 'triage'] },
+    ],
+    forwards: { 'z-old': 'z-dd' },
+  };
+
+  expect(() => validateRoles(table)).toThrow('sessions[0].prompt');
 });
 
 test.each([[['Kettle']], [['kettle', 'kettle']], [['kettle', 7]], ['kettle'], [null], [undefined]])('it refuses skills %j by name', (skills) => {
-  const ctx = setupTest();
-  const table = ctx.valid();
-  table.sessions[0] = ctx.one('z-aa', ['owner'], { skills });
+  const table = {
+    sessions: [
+      { name: 'z-aa', skills, cwd: 'defs', model: 'opus', wake: true, roles: ['owner'] },
+      { name: 'z-bb', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['orchestrator'] },
+      { name: 'z-cc', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['reviewer'] },
+      { name: 'z-dd', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['qa', 'triage'] },
+    ],
+    forwards: { 'z-old': 'z-dd' },
+  };
 
   expect(() => validateRoles(table)).toThrow('sessions[0].skills');
 });
 
 test('it refuses a prompt beside a non-empty skills list', () => {
-  const ctx = setupTest();
-  const table = ctx.valid();
-  table.sessions[0] = ctx.one('z-aa', ['owner'], { prompt: 'main:prompts/kettle.md' });
+  const table = {
+    sessions: [
+      { name: 'z-aa', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['owner'], prompt: 'main:prompts/kettle.md' },
+      { name: 'z-bb', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['orchestrator'] },
+      { name: 'z-cc', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['reviewer'] },
+      { name: 'z-dd', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['qa', 'triage'] },
+    ],
+    forwards: { 'z-old': 'z-dd' },
+  };
 
   expect(() => validateRoles(table)).toThrow('sessions[0].prompt');
 });
 
 test('it keeps skills that have no directory, and the role skill is the first one', () => {
-  const ctx = setupTest();
-  const table = ctx.valid();
-  table.sessions[0] = ctx.one('z-aa', ['owner'], { skills: ['kettle', 'teapot-shared'] });
+  const table = {
+    sessions: [
+      { name: 'z-aa', skills: ['kettle', 'teapot-shared'], cwd: 'defs', model: 'opus', wake: true, roles: ['owner'] },
+      { name: 'z-bb', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['orchestrator'] },
+      { name: 'z-cc', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['reviewer'] },
+      { name: 'z-dd', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['qa', 'triage'] },
+    ],
+    forwards: { 'z-old': 'z-dd' },
+  };
   const [session] = validateRoles(table).sessions;
 
   expect(session).toMatchObject({ skills: ['kettle', 'teapot-shared'] });
@@ -118,27 +236,46 @@ test('it keeps skills that have no directory, and the role skill is the first on
 });
 
 test.each(['kettle-prompt.md', 'main:prompts/kettle.md'])('prompt %s passes for a session with no skill', (prompt) => {
-  const ctx = setupTest();
-  const table = ctx.valid();
-  table.sessions[0] = ctx.one('z-aa', ['owner'], { skills: [], prompt });
+  const table = {
+    sessions: [
+      { name: 'z-aa', skills: [], cwd: 'defs', model: 'opus', wake: true, roles: ['owner'], prompt },
+      { name: 'z-bb', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['orchestrator'] },
+      { name: 'z-cc', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['reviewer'] },
+      { name: 'z-dd', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['qa', 'triage'] },
+    ],
+    forwards: { 'z-old': 'z-dd' },
+  };
 
   expect(validateRoles(table).sessions[0]).toMatchObject({ prompt });
 });
 
 test.each(['prompts/kettle.md', 'main:', 'main:../kettle.md', 'main:prompts/../kettle.md', 'main:/etc/kettle.md'])('prompt %s is refused by name', (prompt) => {
-  const ctx = setupTest();
-  const table = ctx.valid();
-  table.sessions[0] = ctx.one('z-aa', ['owner'], { skills: [], prompt });
+  const table = {
+    sessions: [
+      { name: 'z-aa', skills: [], cwd: 'defs', model: 'opus', wake: true, roles: ['owner'], prompt },
+      { name: 'z-bb', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['orchestrator'] },
+      { name: 'z-cc', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['reviewer'] },
+      { name: 'z-dd', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['qa', 'triage'] },
+    ],
+    forwards: { 'z-old': 'z-dd' },
+  };
 
   expect(() => validateRoles(table)).toThrow('sessions[0].prompt');
 });
 
 test('the validator takes a release session, and the release role lists its holders', () => {
-  const ctx = setupTest();
-  const withRelease = ctx.valid();
-  withRelease.sessions.push(ctx.one('z-ee', ['release']));
+  const table = {
+    sessions: [
+      { name: 'z-aa', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['owner'] },
+      { name: 'z-bb', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['orchestrator'] },
+      { name: 'z-cc', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['reviewer'] },
+      { name: 'z-dd', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['qa', 'triage'] },
+      { name: 'z-ee', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['release'] },
+    ],
+    forwards: { 'z-old': 'z-dd' },
+  };
 
-  expect(validateRoles(withRelease).sessions.map((session) => session.roles)).toStrictEqual([['owner'], ['orchestrator'], ['reviewer'], ['qa', 'triage'], ['release']]);
+  expect(validateRoles(table).sessions.map((session) => session.roles)).toStrictEqual([['owner'], ['orchestrator'], ['reviewer'], ['qa', 'triage'], ['release']]);
   expect(Array.isArray(rolesByName().release)).toBe(true);
 });
 

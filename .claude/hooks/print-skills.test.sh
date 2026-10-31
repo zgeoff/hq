@@ -1,7 +1,8 @@
 #!/bin/sh
 # Runs print-skills.sh against a stand-in `hq fleet --json`, a stand-in `atc` that reports a given
 # session name, and a temp project tree of invented skills. Checks that a session's skills print in
-# order, that a missing SKILL.md gets one "skipped" line, and that only a declared session prints.
+# order, that a missing SKILL.md gets one "skipped" line, and that an empty list prints only its after-compaction file, that the whole output stays under the
+# hook cap, and that only a declared session prints.
 # Usage: sh .claude/hooks/print-skills.test.sh (from the repo root). Needs jq.
 set -eu
 hook="$(cd "$(dirname "$0")" && pwd)/print-skills.sh"
@@ -39,6 +40,7 @@ echo "after stu" > "$project/.claude/hooks/after-compaction/stu.md"
 echo "after release" > "$project/.claude/hooks/after-compaction/release.md"
 echo "after delivery" > "$project/.claude/hooks/after-compaction/delivery.md"
 echo "after triage" > "$project/.claude/hooks/after-compaction/triage.md"
+echo "after q" > "$project/.claude/hooks/after-compaction/q.md"
 fail=0
 
 run() { # run <session id, or "unset"> <atc name, or "down">, with FAKE_HQ set by the caller
@@ -71,12 +73,25 @@ expect_order id-delivery down "body of delivery-lead" "skipped tickets: no SKILL
 expect_order id-new z-triage "body of linear-triage" "after triage"
 # An older hq gives only `skill`.
 expect_order id-new z-old "body of release" "after release"
-# An empty list prints nothing, and so does an unknown or missing session.
-for name in z-q "" z-delivery-old helper-1 stu; do
+# An empty list prints only the session's after-compaction file.
+expect_order id-new z-q "after q"
+# An unknown or missing session prints nothing.
+for name in "" z-delivery-old helper-1 stu; do
   expect_none id-new "$name"
 done
 expect_none id-new down
 expect_none unset z-delivery
+# Output past the cap: two skills that fit alone are too big together, so the second becomes a read instruction.
+mkdir -p "$project/skills/bigone" "$project/skills/bigtwo"
+awk 'BEGIN { for (i = 0; i < 170; i++) print "line " i " of a long kettle skill" }' > "$project/skills/bigone/SKILL.md"
+cp "$project/skills/bigone/SKILL.md" "$project/skills/bigtwo/SKILL.md"
+cp "$bin/hq" "$bin/hq.orig"
+sed -i 's/{"name":"z-triage","skills":\["linear-triage"\]/{"name":"z-triage","skills":["bigone","bigtwo","linear-triage"]/' "$bin/hq"
+total=$(run id-new z-triage | wc -c)
+if run id-new z-triage | grep -q "^line 0 of"; then echo "ok: the first big skill prints in full"; else echo "FAIL: bigone did not print"; fail=1; fi
+if [ "$total" -lt 10000 ]; then echo "ok: two big skills stay under the cap ($total)"; else echo "FAIL: output is $total characters"; fail=1; fi
+if run id-new z-triage | grep -q '^Context was compacted. Read skills/bigtwo/SKILL.md now'; then echo "ok: the second big skill prints a read instruction"; else echo "FAIL: no read instruction for bigtwo"; fail=1; fi
+cp "$bin/hq.orig" "$bin/hq"
 # hq down: no roles table, so nothing prints.
 FAKE_HQ=down
 export FAKE_HQ
