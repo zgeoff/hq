@@ -7,6 +7,10 @@ test('#parseRecordLine joins the section into one line and puts the issue in pla
   expect(parseRecordLine(markdown, 'GEO-9001')).toBe('You should file the kettle record on GEO-9001, and its follow-ups in Triage.');
 });
 
-test('#parseRecordLine returns null when the heading is missing or empty', () => {
-  expect([parseRecordLine('# design brief\n\n## other\n\nText.\n', 'GEO-9001'), parseRecordLine('## Design brief (the record line)\n\n## next\n', 'GEO-9001')]).toStrictEqual([null, null]);
+test('#parseRecordLine returns null when the heading is missing', () => {
+  expect(parseRecordLine('# design brief\n\n## other\n\nText.\n', 'GEO-9001')).toBeNull();
+});
+
+test('#parseRecordLine returns null when the section under the heading is empty', () => {
+  expect(parseRecordLine('## Design brief (the record line)\n\n## next\n', 'GEO-9001')).toBeNull();
 });
