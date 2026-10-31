@@ -21,3 +21,8 @@ test('it is the last area for an issue with one area, which has no other', () =>
 test('it reads ticked boxes only from the Scope section, so an Acceptance box does not count', () => {
   expect(isLastArea('## Scope\n\n- [ ] teapot\n\n## Acceptance\n\n- [x] teapot is descaled\n', ['teapot'])).toBe(false);
 });
+
+test('it counts an area only as the first word of a ticked box, not a mention in another area box', () => {
+  expect(isLastArea('## Scope\n\n- [x] cloud: drop the imp dependency\n- [ ] imp: update the worker\n', ['imp'])).toBe(false);
+  expect(isLastArea('## Scope\n\n- [x] cloud#745\n', ['cloud'])).toBe(true);
+});
