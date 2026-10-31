@@ -19,6 +19,10 @@ process.env['REVIEW_DIR'] = join(tmpdir(), 'hq-tests-no-review-dir');
 // HQ_SLOTS_OP_SETTINGS at it.
 process.env['HQ_SLOTS_OP_SETTINGS'] = join(tmpdir(), 'hq-tests-no-slots-settings', 'settings.local.json');
 
+// No test reads the sessions' real state files, which the goals report reads too: this directory
+// never exists. A test that needs state files makes them in a temp dir and points HQ_STATE_DIR at it.
+process.env['HQ_STATE_DIR'] = join(tmpdir(), 'hq-tests-no-state-dir');
+
 // A run from an agent's shell inherits its atc session id, and `hq call answer` then asks the real
 // atc whether that session is the owner's. A test that needs a session id sets its own.
 delete process.env['ATC_SESSION_ID'];
