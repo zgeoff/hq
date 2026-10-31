@@ -3,9 +3,11 @@
 Run `hq brief <issue>` for every launch that delivers code: a Ready issue, a relaunch or a pitch. It
 fills [agent-kit/brief.md](../../../agent-kit/brief.md) from the issue, the playbook of its Type, the
 private permission wording and the two blocks below, and prints the prompt. Add `--imp` on an imp,
-`--issue-by-link` when the agent can reach Linear, and `--goal-file <path>` on a relaunch. A design
-pass takes `--kind design`, and a PR walk `--kind pr-walk`. An Improvement gets the feature playbook,
-since no Improvement playbook exists.
+`--issue-by-link` when the agent can reach Linear, and `--goal-file <path>` on a relaunch. An
+Improvement gets the feature playbook, since no Improvement playbook exists.
+
+A design pass takes `--kind design`, and a PR walk `--kind pr-walk`. Those add only the skill
+pointer: fill each angle-bracket slot as the template file says, since `unfilled` doesn't list them.
 
 The session refuses a `/goal` line over 4,000 characters. `hq brief` cuts the brief to fit, as
 [fit-brief.ts](../../../src/brief/fit-brief.ts) orders the cuts, and refuses with the count when it
@@ -24,6 +26,8 @@ granting wording is in `skills/delivery-lead/references/briefs.private.md` in hq
   issue.
 - **`playbook`:** the issue has no Type label, or its Type has no playbook. Ask `z-triage` to label
   it, or launch without one.
+
+hq writes `Contributes to` only when the issue's Actions list Deploy or Infra. When an Acceptance item needs a release, deploy or live check that no Action names, change `Fixes` to `Contributes to`, and end the review paragraph, where `{{not_yours}}` sits in the template, with ` <step> is not yours; it runs after the merge.` Then the merge doesn't close the issue early.
 
 The stack line:
 
