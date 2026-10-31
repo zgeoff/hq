@@ -340,3 +340,21 @@ test('it refuses an issue with two area labels, since neither names the repo', (
 
   expect(outcome).rejects.toMatchObject({ code: 'bad_state', message: 'GEO-9001 needs exactly one area label to name its repo; it has cloud, imp' });
 });
+
+test('it rejects with the write failure when the goal file cannot be written', () => {
+  const ctx = setupTest();
+  const stub = createStubBriefDeps(ctx.root, {
+    issues: { 'GEO-9001': { description: buildKettleIssueText(), labels: [{ name: 'Bug', parent: 'Type' }, { name: 'cloud' }] } },
+    rows: [['Code delivery', 'Work in <repo>.']],
+  });
+  const files = {
+    ...stub.deps.files,
+    writeText: () => {
+      throw new Error('the kettle shelf is full');
+    },
+  };
+
+  const outcome = runBriefCommand({ ...stub.deps, files }, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: join(ctx.root, 'goal.md') });
+
+  expect(outcome).rejects.toThrow('the kettle shelf is full');
+});

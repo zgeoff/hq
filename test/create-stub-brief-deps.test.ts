@@ -20,7 +20,7 @@ test('it wires the private checkout, the noslop list and the sha, and a warning 
   const stub = createStubBriefDeps(ctx.root, { issues: {}, rows: [['Code delivery', 'Work in <repo>.']], noslop: ['tools'] });
   stub.deps.warn('kettle warning');
 
-  expect(readPermissionTable(stub.deps.privateDir)).toStrictEqual([{ action: 'Code delivery', phrase: 'Work in <repo>.' }]);
+  expect(readPermissionTable(stub.deps.files, stub.deps.privateDir)).toStrictEqual([{ action: 'Code delivery', phrase: 'Work in <repo>.' }]);
   expect(stub.deps.noslop).toStrictEqual({ repos: ['tools'], sha: null, caps: {} });
   expect(stub.sha).toBe(buildMockSha(2748));
   expect(stub.warnings).toStrictEqual(['kettle warning']);

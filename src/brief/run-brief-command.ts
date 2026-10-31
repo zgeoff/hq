@@ -2,6 +2,7 @@ import type { Out } from '../commands.ts';
 import { HqError } from '../errors.ts';
 import { pickIssueType } from '../lanes/pick-issue-type.ts';
 import { isNoslopListed } from '../noslop/is-noslop-listed.ts';
+import { buildGoalFileText } from './build-goal-file-text.ts';
 import { buildGoalPointer } from './build-goal-pointer.ts';
 import { buildPermissions } from './build-permissions.ts';
 import { buildPlaybook } from './build-playbook.ts';
@@ -18,7 +19,6 @@ import { readRefFile } from './read-ref-file.ts';
 import { readRefSHA } from './read-ref-sha.ts';
 import { requireGoalFileTarget } from './require-goal-file-target.ts';
 import type { BriefDeps, BriefInput, BriefIssue, BriefParts, BriefPlaybook } from './types.ts';
-import { writeGoalFile } from './write-goal-file.ts';
 
 const ISSUE_SECTIONS = new Set(['outcome', 'context', 'scope', 'acceptance', 'agent notes']);
 const REQUIRED_SECTIONS = ['Outcome', 'Scope', 'Acceptance'];
@@ -30,7 +30,7 @@ const TEMPLATE_PATH = 'agent-kit/brief.md';
 // the private wording, and writes nothing but the --goal-file file.
 export async function runBriefCommand(deps: BriefDeps, input: BriefInput): Promise<Out> {
   if (input.goalFile !== null) {
-    requireGoalFileTarget(input.goalFile);
+    requireGoalFileTarget(deps.files, input.goalFile);
   }
   const issue = await readBriefIssue(deps.linear, input.issue);
   const repo = pickIssueRepo(issue);
@@ -39,7 +39,7 @@ export async function runBriefCommand(deps: BriefDeps, input: BriefInput): Promi
   const sections = parseIssueSections(issue.description);
   const issueSections = sections.filter((section) => ISSUE_SECTIONS.has(section.name.toLowerCase()));
   const actions = parseIssueActions(sections);
-  const permissions = buildPermissions(actions, readPermissionTable(deps.privateDir), repo);
+  const permissions = buildPermissions(actions, readPermissionTable(deps.files, deps.privateDir), repo);
   const unfilled = [...permissions.unfilled];
   const needsRelease = actions.some((action) => ['deploy', 'infra'].includes(action.toLowerCase()));
   if (needsRelease) {
@@ -76,7 +76,7 @@ export async function runBriefCommand(deps: BriefDeps, input: BriefInput): Promi
   }
   unfilled.push(...fitted.unknown.map((name) => `placeholder:${name}`));
   if (input.goalFile !== null) {
-    writeGoalFile(input.goalFile, issue.identifier, issueSections, playbook.text);
+    deps.files.writeText(input.goalFile, buildGoalFileText(issue.identifier, issueSections, playbook.text));
   }
   return {
     data: { issue: issue.identifier, repo: `zgeoff/${repo}`, ref: sha, prompt: fitted.prompt, bytes: fitted.bytes, cuts: fitted.cuts, playbook: playbook.found, goalFile: input.goalFile, unfilled },

@@ -1,3 +1,4 @@
+import { buildNodeBriefFiles } from '../src/brief/build-node-brief-files.ts';
 import type { BriefDeps } from '../src/brief/types.ts';
 import { buildMockSha } from './build-mock-sha.ts';
 import { buildStubBriefGH } from './build-stub-brief-gh.ts';
@@ -37,6 +38,6 @@ export function createStubBriefDeps(root: string, scenario: StubBriefScenario) {
   createStubBriefPrivateDir(root, { path: 'skills/delivery-lead/references/briefs.private.md', rows: scenario.rows, marker: PRIVATE_MARKER });
   const commits = Object.fromEntries((scenario.refs ?? ['main']).map((ref) => [ref, sha]));
   const run = buildStubBriefGH({ commits, files: scenario.kit ?? buildStubBriefKit() }, calls);
-  const deps: BriefDeps = { linear: linear.call, run, noslop: { repos: scenario.noslop ?? [], sha: null, caps: {} }, privateDir: root, warn: (line) => warnings.push(line) };
+  const deps: BriefDeps = { linear: linear.call, run, noslop: { repos: scenario.noslop ?? [], sha: null, caps: {} }, privateDir: root, files: buildNodeBriefFiles(), warn: (line) => warnings.push(line) };
   return { deps, calls, warnings, asked: linear.asked, sha };
 }

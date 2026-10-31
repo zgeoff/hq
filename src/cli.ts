@@ -327,6 +327,7 @@ import { weeksBack } from './kinds/weeks-back.ts';
 import { makeAuditedLinearCaller } from './linear/make-audited-linear-caller.ts';
 import { makeLinearCaller } from './linear/make-linear-caller.ts';
 import { readNoslopSettings } from './brief/read-noslop-settings.ts';
+import { buildNodeBriefFiles } from './brief/build-node-brief-files.ts';
 import { dbPath } from './db/db-path.ts';
 import { parseBriefFlags } from './brief/parse-brief-flags.ts';
 import { parseBriefKind } from './brief/parse-brief-kind.ts';
@@ -2136,7 +2137,8 @@ export async function main(argv: string[], runner: Runner = realRunner): Promise
 function runBrief(runner: Runner, verb: string | undefined, flags: Flags): Promise<Out> {
   return match(parseBriefKind(flags))
     .with('delivery', () => {
-      const deps = { linear: makeLinearCaller(runner), run: runner, noslop: readNoslopSettings(dbPath()), privateDir: PRIVATE_TREE.dir(), warn: (line: string) => console.error(line) };
+      const files = buildNodeBriefFiles();
+      const deps = { linear: makeLinearCaller(runner), run: runner, noslop: readNoslopSettings(files, dbPath()), privateDir: PRIVATE_TREE.dir(), files, warn: (line: string) => console.error(line) };
       return runBriefCommand(deps, parseBriefFlags(verb, flags));
     })
     .with('design', 'pr-walk', (kind) => runSkillBriefCommand({ linear: makeLinearCaller(runner), run: runner }, parseSkillBriefFlags(verb, flags, kind)))
