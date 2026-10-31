@@ -1,4 +1,4 @@
-import { appendFileSync, constants, copyFileSync, existsSync, renameSync, statSync, writeFileSync } from 'node:fs';
+import { appendFileSync, constants, copyFileSync, existsSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { iso } from '../clock/iso.ts';
 import { HqError } from '../errors.ts';
@@ -52,20 +52,24 @@ export function runStateTrim(args: StateTrimArgs): TrimReport {
     return report;
   }
 
+  // the archive and the temp file take the state file's mode, so a private state file never lands in a wider one
+  const mode = statSync(file).mode & 0o777;
   copyFileSync(file, backup, constants.COPYFILE_EXCL);
   const marker = `<!-- moved from ${role}.md by hq state trim at ${iso(args.at)} -->\n`;
   const existing = existsSync(archive) ? args.readText(archive) : '';
-  appendFileSync(archive, (existing === '' || existing.endsWith('\n') ? '' : '\n') + marker + plan.moved);
+  appendFileSync(archive, (existing === '' || existing.endsWith('\n') ? '' : '\n') + marker + plan.moved, { mode });
 
-  // another writer may have touched the file since the read; the rename would drop its change
+  const temp = join(directory, `${role}.md.tmp-${process.pid}`);
+  writeFileSync(temp, plan.kept, { mode });
+
+  // another writer may have touched the file since the read; the rename would drop its change, so this check sits right before the rename
   if (args.readText(file) !== text) {
+    rmSync(temp, { force: true });
     throw new HqError(
       'state_file_changed',
       `${role}.md changed while hq state trim ran, so it was not replaced. The moved entries are already appended to ${archive}, so a rerun repeats them there. The backup is ${backup}. Rerun hq state trim ${role}.`,
     );
   }
-  const temp = join(directory, `${role}.md.tmp-${process.pid}`);
-  writeFileSync(temp, plan.kept, { mode: statSync(file).mode & 0o777 });
   renameSync(temp, file);
   return { ...report, written: true };
 }

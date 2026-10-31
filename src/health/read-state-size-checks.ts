@@ -1,4 +1,4 @@
-import { readdirSync, statSync } from 'node:fs';
+import { accessSync, constants, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { formatKilobytes } from '../state/format-kilobytes.ts';
 import { getStateLimit } from '../state/get-state-limit.ts';
@@ -23,6 +23,8 @@ export function readStateSizeChecks(directory: string, roles: string[]): Check[]
     }
     let size: number;
     try {
+      // statSync reads only metadata, so a file that cannot be opened for reading needs its own check
+      accessSync(join(directory, file), constants.R_OK);
       size = statSync(join(directory, file)).size;
     } catch (error) {
       return [unreadable(`${join(directory, file)}: ${errorCode(error)}`)];
