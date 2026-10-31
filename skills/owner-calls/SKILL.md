@@ -44,8 +44,9 @@ propose changing something he approved, read its history and say what he decided
 
 hq records his answers: `hq call answer`, `hq pr answer`, `hq pr override`, `hq pr accept-risk`, and
 each line typed into a session with `hq typed add`. Gates and sessions read only those records, so
-never pass an answer on by message. Only `z-stu` records them, from the sources its private files
-name.
+never pass an answer on by message. Only `z-stu` records his answers, from the sources its private
+files name. Each other session records its own acts, such as a rebase, a mechanical edit or a grant
+he gave it in chat.
 
 - A grant he gives in chat holds for that session's life: log it with `hq grant act` and tell
   `z-stu`.
