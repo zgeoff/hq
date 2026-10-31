@@ -11,15 +11,23 @@ export interface RebasedReads {
 
   // Null when git could not compare the files one by one, or was not asked to.
   changed: string[] | null;
+
+  // The changed files the new diff no longer touches because the base now holds them as the old
+  // head had them, as a stacked parent's files once the parent merges.
+  landed: readonly string[];
 }
 
-export type RebasedOutcome = { kind: 'carry'; patchID: string } | { kind: 'refuse'; code: 'git_unreadable' | 'not_carried'; message: string };
+export type RebasedOutcome = { kind: 'carry'; patchID: string; landed: number } | { kind: 'refuse'; code: 'git_unreadable' | 'not_carried'; message: string };
 
 export function pickRebasedOutcome(reads: RebasedReads): RebasedOutcome {
   const oldPatchID = reads.oldPatchID;
   const newPatchID = reads.newPatchID;
   if (oldPatchID.kind === 'patch-id' && newPatchID.kind === 'patch-id' && oldPatchID.id === newPatchID.id) {
-    return { kind: 'carry', patchID: oldPatchID.id };
+    return { kind: 'carry', patchID: oldPatchID.id, landed: 0 };
+  }
+  const changed = reads.changed?.filter((path) => !reads.landed.includes(path)) ?? null;
+  if (newPatchID.kind === 'patch-id' && reads.landed.length > 0 && changed?.length === 0) {
+    return { kind: 'carry', patchID: newPatchID.id, landed: reads.landed.length };
   }
   const where = `${reads.slug}#${reads.pr}`;
   const diffs = [
@@ -35,7 +43,7 @@ export function pickRebasedOutcome(reads: RebasedReads): RebasedOutcome {
     const diff = empty.length === 1 ? `the diff at ${empty.join('')} is empty` : `the diffs at ${empty.join(' and ')} are empty`;
     return { kind: 'refuse', code: 'not_carried', message: `${diff} against the base of ${where}, so the lgtm is not carried and nothing is recorded` };
   }
-  return { kind: 'refuse', code: 'not_carried', message: `the diff of ${where} at ${reads.newHead.slice(0, 7)} is not the one the owner approved at ${reads.oldHead.slice(0, 7)} (${formatDifference(reads.changed)}); the lgtm is not carried and needs the owner's answer at the new head` };
+  return { kind: 'refuse', code: 'not_carried', message: `the diff of ${where} at ${reads.newHead.slice(0, 7)} is not the one the owner approved at ${reads.oldHead.slice(0, 7)} (${formatDifference(changed)}); the lgtm is not carried and needs the owner's answer at the new head` };
 }
 
 function formatDifference(changed: string[] | null): string {

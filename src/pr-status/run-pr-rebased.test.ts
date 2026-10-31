@@ -113,6 +113,44 @@ test('it refuses a rebase that changes a content line, names the file and record
   expect(listNews(ctx.db, { all: true, limit: 10 })).toStrictEqual([]);
 });
 
+test('it carries the lgtm on a stacked PR once its parent merged, when only the parent files left the diff', async () => {
+  const ctx = setupTest();
+  const stub = await createStubRebaseRepo({ root: ctx.root, repo: 'widgets', pr: 7, history: [{ 'base.txt': 'plain\n' }], change: { 'lid.txt': 'lid from the parent\n' }, followUp: { 'spout.txt': 'spout from this PR\n' } });
+  recordPRAnswer(ctx.db, { repo: 'widgets', pr: 7, answer: 'lgtm', head: stub.oldHead, source: 'chat:kettle-1', note: null, actor: 'z-kettle' });
+  await stub.moveMain({ 'lid.txt': 'lid from the parent\n' });
+  const head = await stub.rebase();
+
+  await ctx.runRebased({ head, base: await stub.readMainHead(), from: stub.oldHead });
+
+  expect(readHeadLgtm(ctx.db, 'widgets', 7, head)).toMatchObject({ answer: 'lgtm', head, source: `rebased:${stub.oldHead}` });
+  expect(listNews(ctx.db, { all: true, limit: 10 }).map((item) => item.text)).toStrictEqual([`z-review carried the owner's lgtm on widgets#7 from ${stub.oldHead.slice(0, 7)} to ${head.slice(0, 7)}: the diff matched once 1 file the base now holds as approved was left out`]);
+});
+
+test('it refuses a stacked PR whose own file changed after its parent merged, and names only that file', async () => {
+  const ctx = setupTest();
+  const stub = await createStubRebaseRepo({ root: ctx.root, repo: 'widgets', pr: 7, history: [{ 'base.txt': 'plain\n' }], change: { 'lid.txt': 'lid from the parent\n' }, followUp: { 'spout.txt': 'spout from this PR\n' } });
+  recordPRAnswer(ctx.db, { repo: 'widgets', pr: 7, answer: 'lgtm', head: stub.oldHead, source: 'chat:kettle-1', note: null, actor: 'z-kettle' });
+  await stub.moveMain({ 'lid.txt': 'lid from the parent\n' });
+  const head = await stub.rebase({ 'spout.txt': 'spout, edited\n' });
+
+  await expect(ctx.runRebased({ head, base: await stub.readMainHead(), from: stub.oldHead })).rejects.toMatchObject({ code: 'not_carried', message: expect.stringContaining('(changed: spout.txt)') });
+
+  expect(readHeadLgtm(ctx.db, 'widgets', 7, head)).toBeNull();
+});
+
+test('it refuses a stacked PR when the base holds a parent file with other content than the approved head', async () => {
+  const ctx = setupTest();
+  const stub = await createStubRebaseRepo({ root: ctx.root, repo: 'widgets', pr: 7, history: [{ 'base.txt': 'plain\n' }], change: { 'lid.txt': 'lid from the parent\n' }, followUp: { 'spout.txt': 'spout from this PR\n' } });
+  recordPRAnswer(ctx.db, { repo: 'widgets', pr: 7, answer: 'lgtm', head: stub.oldHead, source: 'chat:kettle-1', note: null, actor: 'z-kettle' });
+  await stub.moveMain({ 'lid.txt': 'lid from the parent\n' });
+  await stub.moveMain({ 'lid.txt': 'lid, edited on main\n' });
+  const head = await stub.rebase();
+
+  await expect(ctx.runRebased({ head, base: await stub.readMainHead(), from: stub.oldHead })).rejects.toMatchObject({ code: 'not_carried', message: expect.stringContaining('(changed: lid.txt)') });
+
+  expect(readHeadLgtm(ctx.db, 'widgets', 7, head)).toBeNull();
+});
+
 test('it refuses a base move that changes a context line inside the hunk of the PR', async () => {
   const ctx = setupTest();
   const stub = await createStubRebaseRepo({ root: ctx.root, repo: 'widgets', pr: 7, history: [{ 'notes.txt': 'one\ntwo\nthree\nfour\nfive\nsix\n', 'other.txt': 'plain\n' }], change: { 'notes.txt': 'one\ntwo\nthree\nfour\nfifty\nsix\n', 'extra.txt': 'extra\n' } });
