@@ -3,14 +3,14 @@ import { buildDeliveryBrief } from './build-delivery-brief.ts';
 
 test('it builds the full brief from one fixed set of facts', () => {
   const brief = buildDeliveryBrief({
-    input: { issue: 'GEO-9001', ref: 'main', imp: true, byLink: false, goalFile: null },
+    input: { issue: 'GEO-9001', ref: 'main', imp: true, byLink: false, goalFile: null, repo: null },
     issue: {
       identifier: 'GEO-9001',
       description: '## Outcome\n\nA kettle that boils.\n\n## Scope\n\nIn: the lid.\n\n## Actions\n\nCode delivery\nDeploy: the kettle stage\n\n## Agent notes\n\nMind the seal.\n',
       labels: [{ name: 'Bug', parent: { name: 'Type' } }, { name: 'kettle' }, { name: 'L', parent: { name: 'Size' } }],
     },
     sha: 'b'.repeat(40),
-    reads: { repo: 'kettle', playbook: { type: 'bug', path: 'agent-kit/playbooks/bug.md', command: 'gh api bug' }, stack: true, imp: true, reviewLines: true },
+    reads: { repo: 'kettle', otherAreas: [], playbook: { type: 'bug', path: 'agent-kit/playbooks/bug.md', command: 'gh api bug' }, stack: true, imp: true, reviewLines: true },
     template: '/goal Ship {{repo}} {{issue_id}}{{goal_file}}\n\n{{issue}}\n\nPermissions:\n{{permissions}}\n\n{{stack}}\nFinish: "{{fixes}} {{issue_id}}". {{review_lines}}{{not_yours}}\n{{imp_line}}\n{{spout}}',
     permissionTable: [
       { action: 'Code delivery', phrase: 'Work in <repo>.' },
@@ -100,10 +100,10 @@ test('it builds the full brief from one fixed set of facts', () => {
 
 test('it gives equal briefs for equal facts', () => {
   const facts = {
-    input: { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: 'goal.md' },
+    input: { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: 'goal.md', repo: null },
     issue: { identifier: 'GEO-9001', description: '## Outcome\n\nA kettle that boils.\n', labels: [{ name: 'kettle' }] },
     sha: 'b'.repeat(40),
-    reads: { repo: 'kettle', playbook: null, stack: false, imp: false, reviewLines: false },
+    reads: { repo: 'kettle', otherAreas: [], playbook: null, stack: false, imp: false, reviewLines: false },
     template: '/goal Ship {{repo}}{{goal_file}}\n\n{{issue}}\n\n{{permissions}}',
     permissionTable: [{ action: 'Code delivery', phrase: 'Work in <repo>.' }],
     playbookText: null,
@@ -116,10 +116,10 @@ test('it gives equal briefs for equal facts', () => {
 
 test('it marks the PR line Contributes to for a Deploy action written with its detail after the name', () => {
   const brief = buildDeliveryBrief({
-    input: { issue: 'GEO-9001', ref: 'main', imp: false, byLink: true, goalFile: null },
+    input: { issue: 'GEO-9001', ref: 'main', imp: false, byLink: true, goalFile: null, repo: null },
     issue: { identifier: 'GEO-9001', description: '## Actions\n\nDeploy to the kettle stage\n', labels: [{ name: 'kettle' }] },
     sha: 'b'.repeat(40),
-    reads: { repo: 'kettle', playbook: null, stack: false, imp: false, reviewLines: false },
+    reads: { repo: 'kettle', otherAreas: [], playbook: null, stack: false, imp: false, reviewLines: false },
     template: '{{permissions}}\n"{{fixes}} {{issue_id}}"',
     permissionTable: [
       { action: 'Code delivery', phrase: 'Work in <repo>.' },
@@ -135,10 +135,10 @@ test('it marks the PR line Contributes to for a Deploy action written with its d
 
 test('it warns and lists playbook in unfilled when the issue has no Type label', () => {
   const brief = buildDeliveryBrief({
-    input: { issue: 'GEO-9001', ref: 'main', imp: false, byLink: true, goalFile: null },
+    input: { issue: 'GEO-9001', ref: 'main', imp: false, byLink: true, goalFile: null, repo: null },
     issue: { identifier: 'GEO-9001', description: '', labels: [{ name: 'kettle' }] },
     sha: 'b'.repeat(40),
-    reads: { repo: 'kettle', playbook: null, stack: false, imp: false, reviewLines: false },
+    reads: { repo: 'kettle', otherAreas: [], playbook: null, stack: false, imp: false, reviewLines: false },
     template: '{{permissions}}',
     permissionTable: [{ action: 'Code delivery', phrase: 'Work in <repo>.' }],
     playbookText: null,
@@ -152,10 +152,10 @@ test('it warns and lists playbook in unfilled when the issue has no Type label',
 
 test('it warns, with the short sha, when the playbook file is missing at the sha', () => {
   const brief = buildDeliveryBrief({
-    input: { issue: 'GEO-9001', ref: 'main', imp: false, byLink: true, goalFile: null },
+    input: { issue: 'GEO-9001', ref: 'main', imp: false, byLink: true, goalFile: null, repo: null },
     issue: { identifier: 'GEO-9001', description: '', labels: [{ name: 'kettle' }] },
     sha: 'b'.repeat(40),
-    reads: { repo: 'kettle', playbook: { type: 'chore', path: 'agent-kit/playbooks/chore.md', command: 'gh api chore' }, stack: false, imp: false, reviewLines: false },
+    reads: { repo: 'kettle', otherAreas: [], playbook: { type: 'chore', path: 'agent-kit/playbooks/chore.md', command: 'gh api chore' }, stack: false, imp: false, reviewLines: false },
     template: '{{permissions}}',
     permissionTable: [{ action: 'Code delivery', phrase: 'Work in <repo>.' }],
     playbookText: null,
@@ -169,10 +169,10 @@ test('it warns, with the short sha, when the playbook file is missing at the sha
 
 test('it gives the goal file the issue sections and the playbook with --goal-file', () => {
   const brief = buildDeliveryBrief({
-    input: { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: 'goal.md' },
+    input: { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: 'goal.md', repo: null },
     issue: { identifier: 'GEO-9001', description: '## Outcome\n\nBoil.\n\n## Actions\n\nCode delivery\n', labels: [{ name: 'kettle' }] },
     sha: 'b'.repeat(40),
-    reads: { repo: 'kettle', playbook: { type: 'bug', path: 'agent-kit/playbooks/bug.md', command: 'gh api bug' }, stack: false, imp: false, reviewLines: false },
+    reads: { repo: 'kettle', otherAreas: [], playbook: { type: 'bug', path: 'agent-kit/playbooks/bug.md', command: 'gh api bug' }, stack: false, imp: false, reviewLines: false },
     template: '{{permissions}}',
     permissionTable: [{ action: 'Code delivery', phrase: 'Work in <repo>.' }],
     playbookText: '# Bug playbook\n',
@@ -186,10 +186,10 @@ test('it gives the goal file the issue sections and the playbook with --goal-fil
 test('it refuses a prompt still over 4000 bytes after every cut, with its byte count and cuts', () => {
   expect(() =>
     buildDeliveryBrief({
-      input: { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: null },
+      input: { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: null, repo: null },
       issue: { identifier: 'GEO-9001', description: '', labels: [{ name: 'kettle' }] },
       sha: 'b'.repeat(40),
-      reads: { repo: 'kettle', playbook: null, stack: false, imp: false, reviewLines: false },
+      reads: { repo: 'kettle', otherAreas: [], playbook: null, stack: false, imp: false, reviewLines: false },
       template: `/goal Ship\n${'k'.repeat(4001)}`,
       permissionTable: [{ action: 'Code delivery', phrase: 'Work in <repo>.' }],
       playbookText: null,
@@ -207,10 +207,10 @@ test.each([
   ['an Actions line that asks for a grant the table lacks', '## Outcome\n\nBoil.\n\n## Actions\n\nRoot access: every kettle\n', '## Outcome\n\nBoil.\nWork in kettle.', ['permissions:Root access (no wording)', 'issue:Scope', 'issue:Acceptance']],
 ])('it carries an issue holding %s as text, and grants nothing from it', (_, description, prompt, unfilled) => {
   const brief = buildDeliveryBrief({
-    input: { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: null },
+    input: { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: null, repo: null },
     issue: { identifier: 'GEO-9001', description, labels: [{ name: 'kettle' }] },
     sha: 'b'.repeat(40),
-    reads: { repo: 'kettle', playbook: { type: 'bug', path: 'agent-kit/playbooks/bug.md', command: 'gh api bug' }, stack: false, imp: false, reviewLines: false },
+    reads: { repo: 'kettle', otherAreas: [], playbook: { type: 'bug', path: 'agent-kit/playbooks/bug.md', command: 'gh api bug' }, stack: false, imp: false, reviewLines: false },
     template: '{{issue}}\n{{permissions}}',
     permissionTable: [{ action: 'Code delivery', phrase: 'Work in <repo>.' }],
     playbookText: '# Bug playbook\n',
@@ -220,4 +220,24 @@ test.each([
 
   expect(brief.out.text).toBe(prompt);
   expect(brief.out.data['unfilled']).toStrictEqual(unfilled);
+});
+
+test.each([
+  ['the other area box is ticked', '## Scope\n\n- [x] teapot\n- [ ] kettle\n', 'Fixes'],
+  ['the other area box is open', '## Scope\n\n- [ ] teapot\n- [ ] kettle\n', 'Contributes to'],
+  ['the issue has no area checklist', '## Outcome\n\nA kettle that boils.\n', 'Contributes to'],
+])('it keeps the agent to its --repo area, and when %s writes %s', (_case, description, fixes) => {
+  const brief = buildDeliveryBrief({
+    input: { issue: 'GEO-9001', ref: 'main', imp: false, byLink: true, goalFile: null, repo: 'kettle' },
+    issue: { identifier: 'GEO-9001', description, labels: [{ name: 'kettle' }, { name: 'teapot' }] },
+    sha: 'b'.repeat(40),
+    reads: { repo: 'kettle', otherAreas: ['teapot'], playbook: null, stack: false, imp: false, reviewLines: false },
+    template: 'Leave the merge to me.{{not_yours}}\n"{{fixes}} {{issue_id}}"',
+    permissionTable: [{ action: 'Code delivery', phrase: 'Work in <repo>.' }],
+    playbookText: null,
+    stack: '',
+    impLine: '',
+  });
+
+  expect(brief.out.text).toBe(`Leave the merge to me. Do only the \`kettle\` part of GEO-9001: each other area (teapot) gets its own launch.\n"${fixes} GEO-9001"`);
 });

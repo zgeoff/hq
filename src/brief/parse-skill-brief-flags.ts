@@ -11,5 +11,5 @@ export function parseSkillBriefFlags(issue: string | undefined, flags: Flags, ki
     throw new HqError('bad_args', `--${flag} does not apply to --kind ${kind}`);
   }
   const input = parseBriefFlags(issue, flags);
-  return { issue: input.issue, ref: input.ref, kind };
+  return { issue: input.issue, ref: input.ref, kind, repo: input.repo };
 }

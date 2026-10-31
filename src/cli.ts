@@ -526,6 +526,7 @@ const OPTIONS = {
   reserve: { type: 'string', multiple: true },
   refresh: { type: 'boolean' },
   imp: { type: 'boolean' },
+  repo: { type: 'string' },
   'issue-by-link': { type: 'boolean' },
   'goal-file': { type: 'string' },
 } as const;

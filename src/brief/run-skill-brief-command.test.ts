@@ -25,7 +25,7 @@ test('it prints the design template, filled, then the tickets skill pointer at t
   });
   const command = `gh api 'repos/zgeoff/hq/contents/skills/tickets/SKILL.md?ref=${stub.sha}' -H 'Accept: application/vnd.github.raw'`;
 
-  const out = await runSkillBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'refactor/kettle-rebuild', kind: 'design' });
+  const out = await runSkillBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'refactor/kettle-rebuild', kind: 'design', repo: null });
 
   expect(out.text).toBe(`Run a design session with me for GEO-9001 in zgeoff/cloud: a kettle that pours.\n\nSettle the spout first.\n\nFirst read the tickets skill: ${command}`);
   expect(out.data).toStrictEqual({
@@ -58,7 +58,7 @@ test('it prints the PR-walk template, then the fix-it-here skill pointer at the 
   });
   const command = `gh api 'repos/zgeoff/hq/contents/skills/fix-it-here/SKILL.md?ref=${stub.sha}' -H 'Accept: application/vnd.github.raw'`;
 
-  const out = await runSkillBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', kind: 'pr-walk' });
+  const out = await runSkillBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', kind: 'pr-walk', repo: null });
 
   expect(out.text).toBe(`# Brief: going through the kettle PRs with the owner\n\nFind out why each lid PR took rework.\n\nFirst read the fix-it-here skill: ${command}`);
   expect(out.data['kind']).toBe('pr-walk');
@@ -74,7 +74,7 @@ test('it prints a brief whose template names no repo for an issue with no area l
     kit: buildStubSkillBriefKit(),
   });
 
-  const out = await runSkillBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', kind: 'pr-walk' });
+  const out = await runSkillBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', kind: 'pr-walk', repo: null });
 
   expect(out.data['repo']).toBeNull();
   expect(out.text.startsWith('# Brief: going through the kettle PRs with the owner\n')).toBe(true);
@@ -88,9 +88,9 @@ test('it refuses a brief whose template names the repo when the issue has no are
     kit: buildStubSkillBriefKit(),
   });
 
-  const outcome = runSkillBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', kind: 'design' });
+  const outcome = runSkillBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', kind: 'design', repo: null });
 
-  expect(outcome).rejects.toMatchObject({ code: 'bad_state', message: 'GEO-9001 needs exactly one area label to name its repo; it has none' });
+  expect(outcome).rejects.toMatchObject({ code: 'bad_state', message: 'GEO-9001 needs an area label to name its repo; it has none' });
 });
 
 test('it refuses when the skill file is missing at the sha', () => {
@@ -101,7 +101,7 @@ test('it refuses when the skill file is missing at the sha', () => {
     kit: buildStubSkillBriefKit({ without: ['skills/tickets/SKILL.md'] }),
   });
 
-  const outcome = runSkillBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', kind: 'design' });
+  const outcome = runSkillBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', kind: 'design', repo: null });
 
   expect(outcome).rejects.toMatchObject({ code: 'not_found', message: `skills/tickets/SKILL.md is missing at ${stub.sha}; pass --ref refactor/fleet-skill-rebuild until the skill rebuild merges` });
 });
@@ -114,7 +114,7 @@ test('it refuses with the --ref hint when the template is missing at the sha', (
     kit: buildStubSkillBriefKit({ without: ['agent-kit/pr-walk-brief.md'] }),
   });
 
-  const outcome = runSkillBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', kind: 'pr-walk' });
+  const outcome = runSkillBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', kind: 'pr-walk', repo: null });
 
   expect(outcome).rejects.toMatchObject({ code: 'not_found', message: `agent-kit/pr-walk-brief.md is missing at ${stub.sha}; pass --ref refactor/fleet-skill-rebuild until the skill rebuild merges` });
 });
@@ -127,7 +127,7 @@ test('it lists a placeholder hq has no value for in unfilled and leaves it in th
     kit: { ...buildStubSkillBriefKit(), 'agent-kit/design-brief.md': '```text\nPour {{issue_id}} through the {{spout}}.\n```\n' },
   });
 
-  const out = await runSkillBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', kind: 'design' });
+  const out = await runSkillBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', kind: 'design', repo: null });
 
   expect(out.text.split('\n')[0]).toBe('Pour GEO-9001 through the {{spout}}.');
   expect(out.data['unfilled']).toStrictEqual(['placeholder:spout']);
@@ -141,7 +141,7 @@ test('it refuses a brief over 4000 bytes with its byte count, and cuts nothing',
     kit: { ...buildStubSkillBriefKit(), 'agent-kit/pr-walk-brief.md': `\`\`\`text\n${'Descale the kettle. '.repeat(200)}\n\`\`\`\n` },
   });
 
-  const outcome = runSkillBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', kind: 'pr-walk' });
+  const outcome = runSkillBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', kind: 'pr-walk', repo: null });
 
   expect(outcome).rejects.toMatchObject({ code: 'too_long', message: 'the brief is 4182 bytes, over the 4000 limit', data: { bytes: 4182, cuts: [] } });
 });

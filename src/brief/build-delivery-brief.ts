@@ -5,6 +5,7 @@ import { buildGoalPointer } from './build-goal-pointer.ts';
 import { buildPermissions } from './build-permissions.ts';
 import { buildReviewPointer } from './build-review-pointer.ts';
 import { BRIEF_LIMIT_BYTES, fitBrief } from './fit-brief.ts';
+import { isLastArea } from './is-last-area.ts';
 import { parseIssueActions } from './parse-issue-actions.ts';
 import { parseIssueSections } from './parse-issue-sections.ts';
 import type { BriefReads } from './pick-brief-reads.ts';
@@ -47,9 +48,9 @@ export function buildDeliveryBrief(facts: DeliveryBriefFacts): DeliveryBrief {
     sections: issueSections,
     permissions: permissions.lines.join('\n'),
     stack: facts.stack,
-    fixes: needsRelease ? 'Contributes to' : 'Fixes',
+    fixes: needsRelease || !isLastArea(facts.issue.description, facts.reads.otherAreas) ? 'Contributes to' : 'Fixes',
     reviewLines: facts.reads.reviewLines ? buildReviewPointer(`zgeoff/${facts.reads.repo}`, facts.sha) : '',
-    notYours: '',
+    notYours: buildAreaLine(facts.issue.identifier, facts.reads.repo, facts.reads.otherAreas),
     impLine: facts.impLine,
     goalFile: buildGoalPointer({ issue: facts.issue.identifier, playbook, byLink: facts.input.byLink, goalFile: facts.input.goalFile }),
   };
@@ -75,6 +76,11 @@ export function buildDeliveryBrief(facts: DeliveryBriefFacts): DeliveryBrief {
 }
 
 const REQUIRED_SECTIONS = ['Outcome', 'Scope', 'Acceptance'];
+
+// With --repo on a multi-area issue: keep the agent to its own area, since each other gets a launch.
+function buildAreaLine(issue: string, repo: string, otherAreas: readonly string[]): string {
+  return otherAreas.length === 0 ? '' : ` Do only the \`${repo}\` part of ${issue}: each other area (${otherAreas.join(', ')}) gets its own launch.`;
+}
 
 function collectMissingSections(sections: readonly IssueSection[]): string[] {
   return REQUIRED_SECTIONS.filter((name) => !sections.some((section) => section.name.toLowerCase() === name.toLowerCase())).map((name) => `issue:${name}`);
