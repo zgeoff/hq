@@ -122,6 +122,19 @@ test('#buildTrimPlan each side of the cut keeps the day its time-only entries ta
   });
 });
 
+test('#buildTrimPlan entries keep moving until the file fits with the day line it adds back', () => {
+  const text = '## Log\n### 2026-10-13\n- 09:00Z DEPLOY kettle\n- 09:05Z HOLD kettle\n- 09:10Z DEPLOY kettle\n';
+
+  expect(buildTrimPlan(text, 79)).toStrictEqual({
+    kind: 'plan',
+    kept: '## Log\n<!-- day context: 2026-10-13T09:05Z -->\n- 09:10Z DEPLOY kettle\n',
+    moved: '<!-- day context: none -->\n### 2026-10-13\n- 09:00Z DEPLOY kettle\n- 09:05Z HOLD kettle\n',
+    entriesMoved: 3,
+    beforeBytes: 89,
+    afterBytes: 70,
+  });
+});
+
 test('#buildTrimPlan a file with no log heading has no log', () => {
   expect(buildTrimPlan('# kettle\n\n## Cursors\nspout: 4\n', 1)).toStrictEqual({
     kind: 'no-log',
