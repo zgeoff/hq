@@ -183,7 +183,7 @@ test('it carries on with no playbook pointer, lists playbook and warns when the 
 test('it does the same for a Type whose playbook file is missing at the sha', async () => {
   const ctx = setupTest();
   const stub = createStubBriefDeps(ctx.root, {
-    issues: { 'GEO-9001': { description: buildKettleIssueText(), labels: [{ name: 'Improvement', parent: 'Type' }, { name: 'cloud' }] } },
+    issues: { 'GEO-9001': { description: buildKettleIssueText(), labels: [{ name: 'Chore', parent: 'Type' }, { name: 'cloud' }] } },
     rows: [['Code delivery', 'Work in <repo>.']],
   });
 
@@ -191,7 +191,7 @@ test('it does the same for a Type whose playbook file is missing at the sha', as
 
   expect(out.data['playbook']).toBeNull();
   expect(out.data['unfilled']).toStrictEqual(['playbook']);
-  expect(stub.warnings).toStrictEqual(['hq brief: no agent-kit/playbooks/improvement.md at 0000000, so the brief carries no playbook pointer']);
+  expect(stub.warnings).toStrictEqual(['hq brief: no agent-kit/playbooks/chore.md at 0000000, so the brief carries no playbook pointer']);
 });
 
 test('it empties the issue and tells the agent to read it by link with --issue-by-link', async () => {
