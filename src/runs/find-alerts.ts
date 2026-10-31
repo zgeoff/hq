@@ -56,8 +56,6 @@ export function findAlerts(db: Database, sessions: SessionInfo[], activity: Map<
       if (r.geoff_chat || r.waits_on_geoff) {
         continue;
       }
-
-      // With no main session active, a helper carries the run, so its handed-in work silences it too.
       if ((!active.helper || !mainActive) && probeHandedIn(db, r.prs)) {
         continue;
       }
