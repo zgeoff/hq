@@ -26,3 +26,7 @@ test('it counts an area only as the first word of a ticked box, not a mention in
   expect(isLastArea('## Scope\n\n- [x] cloud: drop the imp dependency\n- [ ] imp: update the worker\n', ['imp'])).toBe(false);
   expect(isLastArea('## Scope\n\n- [x] cloud#745\n', ['cloud'])).toBe(true);
 });
+
+test('it skips a ticked box inside a code fence in Scope', () => {
+  expect(isLastArea('## Scope\n\n```md\n- [x] teapot\n```\n- [ ] teapot\n', ['teapot'])).toBe(false);
+});
