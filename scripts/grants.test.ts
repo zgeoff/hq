@@ -772,14 +772,30 @@ test.each([
       const written = ctx.run([]);
       expect(checked.exitCode).toBe(1);
       expect(checked.stdout.toString()).toContain(`--- a/${file}\n+++ b/${file}\n@@ `);
-      for (const line of lines) {
-        expect(checked.stdout.toString()).toContain(`\n${line}\n`);
-      }
+      expect(lines.filter((line) => !checked.stdout.toString().includes(`\n${line}\n`))).toStrictEqual([]);
       expect(checked.stderr.toString()).toBe('');
       expect(written.exitCode).toBe(0);
       expect(written.stdout.toString()).toBe('grants: wrote 1 files (11 generated files)\n');
       expect(readFileSync(path, 'utf8')).toBe(source);
       expect(ctx.run().exitCode).toBe(0);
+    }
+  }
+});
+
+test('it ends an "Also his:" list at a line of spaces, so a write run keeps the paragraph after it', () => {
+  const ctx = setupTest();
+  for (const path of ['grants', 'skills', 'docs']) {
+    cpSync(join(ctx.fixture, path), join(ctx.dir, path), { recursive: true });
+  }
+  {
+    const path = join(ctx.dir, 'skills/intake/references/calls.md');
+    const source = readFileSync(path, 'utf8');
+    expect(source).toContain('- renaming the river.\n\nAnything else');
+    writeFileSync(path, source.replace('- renaming the river.\n\n', '- renaming the river;\n  \n'));
+    {
+      const written = ctx.run([]);
+      expect(written.exitCode).toBe(0);
+      expect(readFileSync(path, 'utf8')).toBe(source.replace('- renaming the river.\n\n', '- renaming the river.\n  \n'));
     }
   }
 });

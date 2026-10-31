@@ -254,8 +254,9 @@ function renderAlso(file: string, body: string, at: number, also: string[]): str
     return body;
   }
   const start = at + ALSO_HEAD.length;
-  const blank = body.indexOf('\n\n', start);
-  const end = blank === -1 ? body.length - (body.endsWith('\n') ? 1 : 0) : blank;
+  // A line that holds only spaces or tabs ends the list as an empty line does.
+  const blank = /\n[ \t]*\n/u.exec(body.slice(start));
+  const end = blank === null ? body.length - (body.endsWith('\n') ? 1 : 0) : start + blank.index;
   const expected = also.map((item, index) => `- ${item}${index === also.length - 1 ? '.' : ';'}`);
   const found = parseAlsoList(body.slice(start, end));
 
