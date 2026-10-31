@@ -2,6 +2,8 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { buildNodeStateFiles } from '../state/build-node-state-files.ts';
+import { runStateTrim } from '../state/run-state-trim.ts';
 import { readLog } from './read-log.ts';
 
 function setupTest() {
@@ -25,6 +27,25 @@ test('it counts an entry that hq state trim moved into a monthly archive', () =>
     ],
     from: '2026-10-13T22:30:00Z',
   });
+});
+
+test('it still counts every entry after hq state trim moved the oldest out of delivery.md', () => {
+  const ctx = setupTest();
+  writeFileSync(
+    join(ctx.directory, 'delivery.md'),
+    `## Log\n${Array.from({ length: 40 }, (_unused, index) => `- 2026-10-13T09:${String(index).padStart(2, '0')}Z DEPLOY kettle ${'x'.repeat(500)}\n`).join('')}`,
+  );
+  runStateTrim({
+    directory: ctx.directory,
+    roles: ['delivery'],
+    role: 'delivery',
+    actor: 'z-delivery',
+    dryRun: false,
+    at: new Date('2026-10-31T01:02:03Z'),
+    files: buildNodeStateFiles(),
+  });
+
+  expect(readLog(ctx.directory).events).toHaveLength(40);
 });
 
 test('it still counts the old archive beside the monthly ones', () => {
