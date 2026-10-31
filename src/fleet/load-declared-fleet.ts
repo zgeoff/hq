@@ -1,6 +1,7 @@
 import { DEFS } from '../prompts/defs.ts';
 import { rolePrompt } from '../prompts/role-prompt.ts';
 import { getDeclaredSessions as declaredSessions } from '../roles/get-declared-sessions.ts';
+import { findRoleSkill } from '../roles/find-role-skill.ts';
 import type { DeclaredSession } from '../roles/types.ts';
 import { getHome as HOME, getHome } from './get-home.ts';
 import type { FleetEntry } from './types.ts';
@@ -11,8 +12,9 @@ export function loadDeclaredFleet(): FleetEntry[] {
 }
 
 function getPromptSource(session: DeclaredSession): string {
-  if (session.skill !== null) {
-    return rolePrompt(session.skill);
+  const roleSkill = findRoleSkill(session);
+  if (roleSkill !== null) {
+    return rolePrompt(roleSkill);
   }
   if (session.prompt?.startsWith('main:')) {
     return session.prompt;
@@ -27,7 +29,10 @@ function buildFleetEntry(s: DeclaredSession): FleetEntry {
     model: s.model,
     prompt: getPromptSource(s),
     wake: s.wake,
-    skill: s.skill,
+    skills: s.skills,
+
+    // a compatibility alias for readers of the older shape; read `skills`
+    skill: findRoleSkill(s),
     roles: s.roles,
   };
   if (s.remoteControl) {

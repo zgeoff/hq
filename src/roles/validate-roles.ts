@@ -29,8 +29,9 @@ export function validateRoles(raw: unknown): RolesTable {
       return bad(`${at}.name`, `${s['name']} is declared twice`);
     }
     names.add(s['name']);
-    if (s['skill'] !== null && (typeof s['skill'] !== 'string' || !SLUG.test(s['skill']))) {
-      return bad(`${at}.skill`, 'must be a skill slug or null');
+    const skills = s['skills'];
+    if (!isSkillList(skills)) {
+      return bad(`${at}.skills`, 'must be a list of distinct skill slugs, the role skill first');
     }
     if (s['cwd'] !== 'defs' && s['cwd'] !== 'hq') {
       return bad(`${at}.cwd`, 'must be defs or hq');
@@ -44,7 +45,8 @@ export function validateRoles(raw: unknown): RolesTable {
     if (s['remoteControl'] !== undefined && typeof s['remoteControl'] !== 'boolean') {
       return bad(`${at}.remoteControl`, 'must be true or false');
     }
-    if (s['pluginDirs'] !== undefined && !isPluginDirs(s['pluginDirs'])) {
+    const pluginDirs = s['pluginDirs'];
+    if (pluginDirs !== undefined && !isPluginDirs(pluginDirs)) {
       return bad(`${at}.pluginDirs`, 'must be a non-empty list of folders, each absolute or starting with ~/, without a .. segment');
     }
     if (s['prompt'] !== undefined && !isPromptSource(s['prompt'])) {
@@ -53,16 +55,16 @@ export function validateRoles(raw: unknown): RolesTable {
     if (s['note'] !== undefined && typeof s['note'] !== 'string') {
       return bad(`${at}.note`, 'must be text');
     }
-    if (s['skill'] === null && s['prompt'] === undefined) {
-      return bad(`${at}.prompt`, 'is required when skill is null');
+    if (skills.length === 0 && s['prompt'] === undefined) {
+      return bad(`${at}.prompt`, 'is required when skills is empty');
     }
-    if (s['skill'] !== null && s['prompt'] !== undefined) {
-      return bad(`${at}.prompt`, 'is only for a session with no skill');
+    if (skills.length > 0 && s['prompt'] !== undefined) {
+      return bad(`${at}.prompt`, 'is only for a session with no skills');
     }
     if (!Array.isArray(s['roles'])) {
       return bad(`${at}.roles`, 'must be a list');
     }
-    sessions.push({ name: s['name'], skill: s['skill'], cwd: s['cwd'], model: s['model'], wake: s['wake'], ...(s['remoteControl'] === undefined ? {} : { remoteControl: s['remoteControl'] }), ...(s['pluginDirs'] === undefined ? {} : { pluginDirs: s['pluginDirs'] as string[] }), ...(s['prompt'] === undefined ? {} : { prompt: s['prompt'] }), ...(s['note'] === undefined ? {} : { note: s['note'] }), roles: parseRoles(at, s['roles']) });
+    sessions.push({ name: s['name'], skills, cwd: s['cwd'], model: s['model'], wake: s['wake'], ...(s['remoteControl'] === undefined ? {} : { remoteControl: s['remoteControl'] }), ...(pluginDirs === undefined ? {} : { pluginDirs }), ...(s['prompt'] === undefined ? {} : { prompt: s['prompt'] }), ...(s['note'] === undefined ? {} : { note: s['note'] }), roles: parseRoles(at, s['roles']) });
   });
   for (const role of SINGLE) {
     const holders = sessions.filter((s) => s.roles.includes(role)).map((s) => s.name);
@@ -83,6 +85,14 @@ export function validateRoles(raw: unknown): RolesTable {
   return { sessions, forwards };
 }
 
+function isSkillList(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === 'string' && SLUG.test(item)) && new Set(value).size === value.length;
+}
+
+function isPluginDirs(value: unknown): value is string[] {
+  return Array.isArray(value) && value.length > 0 && value.every((directory) => typeof directory === 'string' && (directory.startsWith('/') || directory.startsWith('~/')) && !directory.split('/').includes('..'));
+}
+
 // atc's spawn refuses any other form, so a bad list fails here, not at the spawn.
 // A file name under ~/.local/share/z-sessions, or a path that hq reads from hq-private's origin/main.
 function isPromptSource(value: unknown): value is string {
@@ -94,10 +104,6 @@ function isPromptSource(value: unknown): value is string {
   }
   const rel = value.slice('main:'.length);
   return /^[A-Za-z0-9._-][A-Za-z0-9._/-]*$/u.test(rel) && !rel.split('/').includes('..');
-}
-
-function isPluginDirs(v: unknown): boolean {
-  return Array.isArray(v) && v.length > 0 && v.every((d) => typeof d === 'string' && (d.startsWith('/') || d.startsWith('~/')) && !d.split('/').includes('..'));
 }
 
 function parseRoles(at: string, list: unknown[]): Role[] {

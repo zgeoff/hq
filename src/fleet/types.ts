@@ -9,7 +9,11 @@ export interface FleetEntry {
   model: string;
   prompt: string; // main:<path> (read from origin/main) or an absolute path outside any repo
   wake: boolean; // keep it on hq's wake list
-  skill?: string | null; // the role skill in the definitions repo; null for a session with a prompt file of its own
+  // the session's skills, the role skill first; empty for a session with a prompt file of its own
+  skills?: readonly string[];
+
+  // The role skill (skills[0]), null when skills is empty: a compatibility alias for readers of the older shape.
+  skill?: string | null;
 
   // read by name, so a role fleet.json adds before ROLE_NAMES knows it still counts
   roles?: readonly string[];
