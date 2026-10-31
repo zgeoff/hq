@@ -1,15 +1,17 @@
 import { collectFencedLines } from './collect-fenced-lines.ts';
 import type { PermissionRow } from './types.ts';
 
-const HEADING = '## permission phrasing';
+// The private half names the section after the public placeholder it fills; older clones keep the
+// short name.
+const HEADINGS = new Set(['## permission phrasing', '## placeholders (`{{permissions}}`: the permission phrasing)']);
 const SEPARATOR = /^:?-+:?$/u;
 
-// The `| Action | Phrase in the brief |` rows under the `## permission phrasing` heading, and no
+// The `| Action | Phrase in the brief |` rows under the permission phrasing heading, and no
 // other part of the text: the section ends at the next heading of its level or a higher one. A
 // heading or a row inside a code fence is text.
 export function parsePermissionTable(markdown: string): PermissionRow[] {
   const lines = collectUnfencedLines(markdown.split('\n'));
-  const start = lines.findIndex((line) => line.trim().toLowerCase() === HEADING);
+  const start = lines.findIndex((line) => HEADINGS.has(line.trim().toLowerCase()));
   if (start === -1) {
     return [];
   }

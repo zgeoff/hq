@@ -36,3 +36,9 @@ test('it reads neither a heading nor a row inside a code fence', () => {
     { action: 'Deploy', phrase: 'Deploy to <environment>.' },
   ]);
 });
+
+test('it reads the rows under the heading named after the permissions placeholder', () => {
+  const rows = parsePermissionTable(['## Placeholders (`{{permissions}}`: the permission phrasing)', '', '| Action | Phrase in the brief |', '| - | - |', '| Code delivery | Work in <repo>. |', '', '## Placeholders (`{{permissions}}`: the permission phrasing, the Child session row)', '', '| Stray | SENTINEL-IN-THE-CHILD-SECTION |'].join('\n'));
+
+  expect(rows).toStrictEqual([{ action: 'Code delivery', phrase: 'Work in <repo>.' }]);
+});
