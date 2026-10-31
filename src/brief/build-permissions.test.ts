@@ -46,3 +46,22 @@ test('it lists an action given twice once', () => {
     { action: 'Post', phrase: 'Post to the kettle forum.' },
   ], 'kettle').lines).toHaveLength(2);
 });
+
+test('it names an action by the row that opens its line as whole words, the longest such row first', () => {
+  const result = buildPermissions(['Code delivery in zgeoff/kettle (the spout folder)', 'Paid API for the steam model'], [
+    { action: 'Code delivery', phrase: 'Work in <repo> and open a PR.' },
+    { action: 'Paid', phrase: 'Pay for the kettle.' },
+    { action: 'Paid API', phrase: 'Call the steam model.' },
+  ], 'kettle');
+
+  expect(result).toStrictEqual({ lines: ['Work in kettle and open a PR.', 'Call the steam model.'], unfilled: [] });
+});
+
+test('it does not take a row whose name only starts a longer word of the line', () => {
+  const result = buildPermissions(['Postage for the kettle'], [
+    { action: 'Code delivery', phrase: 'Work in <repo>.' },
+    { action: 'Post', phrase: 'Post to the kettle forum.' },
+  ], 'kettle');
+
+  expect(result).toStrictEqual({ lines: ['Work in kettle.'], unfilled: ['permissions:Postage for the kettle (no wording)'] });
+});

@@ -8,7 +8,7 @@ const SLOT = /<[^<>\n]+>/u;
 // goes into `unfilled` for the launcher.
 export function buildPermissions(actions: readonly string[], rows: readonly PermissionRow[], repo: string): { lines: string[]; unfilled: string[] } {
   const wanted: string[] = [CODE_DELIVERY];
-  for (const action of actions) {
+  for (const action of actions.map((name) => pickRowName(rows, name))) {
     if (!wanted.some((name) => name.toLowerCase() === action.toLowerCase())) {
       wanted.push(action);
     }
@@ -28,4 +28,15 @@ export function buildPermissions(actions: readonly string[], rows: readonly Perm
     }
   }
   return { lines, unfilled };
+}
+
+// An Actions line may add its detail after the name with no comma or colon, as in "Code delivery in
+// zgeoff/kettle", so a row whose name opens the line as whole words names it; the longest such row wins.
+function pickRowName(rows: readonly PermissionRow[], action: string): string {
+  const name = action.toLowerCase();
+  if (rows.some((row) => row.action.toLowerCase() === name)) {
+    return action;
+  }
+  const opening = rows.filter((row) => name.startsWith(`${row.action.toLowerCase()} `)).toSorted((left, right) => right.action.length - left.action.length);
+  return opening[0]?.action ?? action;
 }
