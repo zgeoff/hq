@@ -52,13 +52,12 @@ test('it applies cut 3, dropping only the /goal line and keeping the blank line 
   expect(fitted.bytes).toBeGreaterThan(4000);
 });
 
-test('it drops the whole /goal line, pointer included, as cut 3', () => {
+test('it keeps the pointer as a line of its own, with the blank line under it, when cut 3 drops the /goal line', () => {
   const parts = buildBriefParts({ goalFile: '. First read the bug playbook: gh api x', sections: [{ name: 'Scope', text: `## Scope\n\n${'In: the kettle. '.repeat(300)}` }] });
 
   const fitted = fitBrief('/goal Ship {{repo}} {{issue_id}}{{goal_file}}\n\n{{issue}}\n\nPermissions:\n{{permissions}}\n\n{{stack}}\nFinish: "{{fixes}} {{issue_id}}". {{review_lines}} Done.{{not_yours}}\n{{imp_line}}\nEnd.', parts, true);
 
-  expect(fitted.prompt).not.toContain('First read the bug playbook');
-  expect(fitted.prompt.startsWith('\n## Scope')).toBe(true);
+  expect(fitted.prompt.startsWith('First read the bug playbook: gh api x\n\n## Scope')).toBe(true);
 });
 
 test('it applies cut 3 without noting cut 1 when the issue is already out of the prompt', () => {

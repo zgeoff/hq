@@ -252,7 +252,7 @@ test('it drops Context and Agent notes as cut 2, and reports it, when the issue 
   expect(out.data['bytes']).toBeLessThanOrEqual(4000);
 });
 
-test('it applies cut 3 after cut 2, dropping the /goal line with its playbook pointer, when the issue is still too long', async () => {
+test('it applies cut 3 after cut 2, keeping the playbook pointer as the first line, when the issue is still too long', async () => {
   const ctx = setupTest();
   const stub = createStubBriefDeps(ctx.root, {
     issues: { 'GEO-9001': { description: buildKettleIssueText({ scope: 'In: the lid. '.repeat(273) }), labels: [{ name: 'Bug', parent: 'Type' }, { name: 'cloud' }] } },
@@ -262,8 +262,7 @@ test('it applies cut 3 after cut 2, dropping the /goal line with its playbook po
   const out = await runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: null });
 
   expect(out.data['cuts']).toStrictEqual(['cut 1 unavailable', 'cut 2', 'cut 3']);
-  expect(out.text.startsWith('\n## Outcome')).toBe(true);
-  expect(out.text).not.toContain('First read the bug playbook');
+  expect(out.text.startsWith(`First read the bug playbook: gh api 'repos/zgeoff/hq/contents/agent-kit/playbooks/bug.md?ref=${stub.sha}' -H 'Accept: application/vnd.github.raw'\n\n## Outcome`)).toBe(true);
   expect(out.data['bytes']).toBeLessThanOrEqual(4000);
 });
 

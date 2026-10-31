@@ -22,7 +22,7 @@ export function fitBrief(template: string, parts: BriefParts, issueInPrompt: boo
     }
   }
   if (isOver(prompt)) {
-    prompt = dropGoalLine(prompt);
+    prompt = dropGoalLine(prompt, parts.goalFile);
     cuts.push('cut 3');
   }
   return { prompt, bytes: Buffer.byteLength(prompt), cuts, unknown: fillPlaceholders(template, buildValues(parts, sections)).unknown };
@@ -49,6 +49,9 @@ function isOver(prompt: string): boolean {
   return Buffer.byteLength(prompt) > BRIEF_LIMIT_BYTES;
 }
 
-function dropGoalLine(prompt: string): string {
-  return prompt.split('\n').slice(1).join('\n');
+// briefs.md's cut 3 drops the /goal line, but the pointer to the issue and playbook has no other
+// place in the prompt, so it takes that line's place.
+function dropGoalLine(prompt: string, pointer: string): string {
+  const rest = prompt.split('\n').slice(1);
+  return (pointer === '' ? rest : [pointer.replace(/^\. /u, ''), ...rest]).join('\n');
 }
