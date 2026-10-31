@@ -32,8 +32,6 @@ export function readRunningByPlace(db: Database, at: Date = now(), designRuns: r
   const movedHere = holding.filter((row) => row.place === 'imp' && live?.hereOnly.has(row.issue) === true).length;
   const filedLocal = holding.filter((row) => row.place === 'local').length + movedHere;
   const impIssues = holding.filter((row) => row.place === 'imp' && live?.hereOnly.has(row.issue) !== true).map((row) => row.issue);
-
-  // Each awake session elsewhere holds an imp slot, so two launches on one issue hold two; a run with none awake holds one.
   const imp = impIssues.reduce((total, issue) => total + Math.max(1, live?.elsewhere.get(issue) ?? 0), 0);
   const issues = holding.map((row) => row.issue);
   if (live === null || live.sessions <= filedLocal) {
@@ -48,8 +46,6 @@ interface LiveLocal {
 
   // The runs whose awake sessions all run on this PC.
   hereOnly: Set<string>;
-
-  // How many awake sessions each run has on other hosts.
   elsewhere: Map<string, number>;
 }
 
