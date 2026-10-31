@@ -43,7 +43,10 @@ export async function runBriefCommand(deps: BriefDeps, input: BriefInput): Promi
 
 async function readBlock(run: Runner, sha: string, path: string, marker: string | null): Promise<string> {
   const text = await readRefFile(run, sha, path);
-  const block = text === null ? null : findFencedBlock(text, marker);
+  if (text === null) {
+    throw new HqError('not_found', `${path} is missing at ${sha}; pass --ref refactor/fleet-skill-rebuild until the skill rebuild merges`);
+  }
+  const block = findFencedBlock(text, marker);
   if (block === null) {
     throw new HqError('not_found', `${path} at ${sha} has no ${marker ?? 'text fence'}`);
   }

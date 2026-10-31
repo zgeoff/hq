@@ -358,3 +358,85 @@ test('it rejects with the write failure when the goal file cannot be written', (
 
   expect(outcome).rejects.toThrow('the kettle shelf is full');
 });
+
+test('it refuses an L issue when briefs.md is missing at the sha, and writes no goal file', () => {
+  const ctx = setupTest();
+  const stub = createStubBriefDeps(ctx.root, {
+    issues: { 'GEO-9001': { description: buildKettleIssueText(), labels: [{ name: 'Bug', parent: 'Type' }, { name: 'cloud' }, { name: 'L', parent: 'Size' }] } },
+    rows: [['Code delivery', 'Work in <repo>.']],
+    kit: buildStubBriefKit({ without: ['skills/delivery-lead/references/briefs.md'] }),
+  });
+  const goalFile = join(ctx.root, 'goal.md');
+
+  const outcome = runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile });
+
+  expect(outcome).rejects.toMatchObject({ code: 'not_found', message: `skills/delivery-lead/references/briefs.md is missing at ${stub.sha}; pass --ref refactor/fleet-skill-rebuild until the skill rebuild merges` });
+  expect(existsSync(goalFile)).toBe(false);
+});
+
+test('it refuses an L issue when briefs.md has no stack line', () => {
+  const ctx = setupTest();
+  const stub = createStubBriefDeps(ctx.root, {
+    issues: { 'GEO-9001': { description: buildKettleIssueText(), labels: [{ name: 'Bug', parent: 'Type' }, { name: 'cloud' }, { name: 'L', parent: 'Size' }] } },
+    rows: [['Code delivery', 'Work in <repo>.']],
+    kit: { ...buildStubBriefKit(), 'skills/delivery-lead/references/briefs.md': '# Briefs\n\nThe imp line:\n\n```text\nIMP-LINE: this imp has a small kettle.\n```\n' },
+  });
+
+  const outcome = runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: null });
+
+  expect(outcome).rejects.toMatchObject({ code: 'not_found', message: `skills/delivery-lead/references/briefs.md at ${stub.sha} has no The stack line:` });
+});
+
+test('it refuses an L issue when no text fence follows the stack line', () => {
+  const ctx = setupTest();
+  const stub = createStubBriefDeps(ctx.root, {
+    issues: { 'GEO-9001': { description: buildKettleIssueText(), labels: [{ name: 'Bug', parent: 'Type' }, { name: 'cloud' }, { name: 'L', parent: 'Size' }] } },
+    rows: [['Code delivery', 'Work in <repo>.']],
+    kit: { ...buildStubBriefKit(), 'skills/delivery-lead/references/briefs.md': '# Briefs\n\nThe stack line:\n\n    STACK-LINE: build this in layers.\n' },
+  });
+
+  const outcome = runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: null });
+
+  expect(outcome).rejects.toMatchObject({ code: 'not_found', message: `skills/delivery-lead/references/briefs.md at ${stub.sha} has no The stack line:` });
+});
+
+test('it refuses --imp when briefs.md has no imp line', () => {
+  const ctx = setupTest();
+  const stub = createStubBriefDeps(ctx.root, {
+    issues: { 'GEO-9001': { description: buildKettleIssueText(), labels: [{ name: 'Bug', parent: 'Type' }, { name: 'cloud' }] } },
+    rows: [['Code delivery', 'Work in <repo>.']],
+    kit: { ...buildStubBriefKit(), 'skills/delivery-lead/references/briefs.md': '# Briefs\n\nThe stack line:\n\n```text\nSTACK-LINE: build this in layers.\n```\n' },
+  });
+
+  const outcome = runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: true, byLink: false, goalFile: null });
+
+  expect(outcome).rejects.toMatchObject({ code: 'not_found', message: `skills/delivery-lead/references/briefs.md at ${stub.sha} has no The imp line:` });
+});
+
+test('it refuses a repo noslop reviews when review-lines.md is missing at the sha', () => {
+  const ctx = setupTest();
+  const stub = createStubBriefDeps(ctx.root, {
+    issues: { 'GEO-9001': { description: buildKettleIssueText(), labels: [{ name: 'Bug', parent: 'Type' }, { name: 'tools' }] } },
+    rows: [['Code delivery', 'Work in <repo>.']],
+    noslop: ['tools'],
+    kit: buildStubBriefKit({ without: ['agent-kit/review-lines.md'] }),
+  });
+
+  const outcome = runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: null });
+
+  expect(outcome).rejects.toMatchObject({ code: 'not_found', message: `agent-kit/review-lines.md is missing at ${stub.sha}; pass --ref refactor/fleet-skill-rebuild until the skill rebuild merges` });
+});
+
+test('it refuses a repo noslop reviews when review-lines.md has no text fence', () => {
+  const ctx = setupTest();
+  const stub = createStubBriefDeps(ctx.root, {
+    issues: { 'GEO-9001': { description: buildKettleIssueText(), labels: [{ name: 'Bug', parent: 'Type' }, { name: 'tools' }] } },
+    rows: [['Code delivery', 'Work in <repo>.']],
+    noslop: ['tools'],
+    kit: { ...buildStubBriefKit(), 'agent-kit/review-lines.md': '# kettle review\n\nPut this block in the brief.\n\n```md\nREVIEW-LINES: not a text fence.\n```\n' },
+  });
+
+  const outcome = runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: null });
+
+  expect(outcome).rejects.toMatchObject({ code: 'not_found', message: `agent-kit/review-lines.md at ${stub.sha} has no text fence` });
+});
