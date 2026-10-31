@@ -93,3 +93,22 @@ test('it fills a reserved slot only with an issue of its area that a free place 
 
   expect(plan).toStrictEqual({ picks: [{ issue: 'GEO-9868', term: null, reserve: null, place: 'local' }], lent: [{ area: 'nixie', slots: 1 }], unfit: { slots: 0, places: [] } });
 });
+
+test('it moves an earlier issue to its other place when a later issue fits only the place it holds', () => {
+  const queue = buildFocusQueue([buildReadyIssue('GEO-9869', { type: 'Investigation' }), buildReadyIssue('GEO-9870', { type: 'Bug' })], [], new Set());
+
+  const plan = buildFocusPlan(queue, { free: 2, places: { free: { imp: 1, local: 1 }, types: { imp: ['Bug', 'Investigation'], local: ['Investigation'] } } }, [], {});
+
+  expect(plan.picks).toStrictEqual([
+    { issue: 'GEO-9869', term: null, reserve: null, place: 'local' },
+    { issue: 'GEO-9870', term: null, reserve: null, place: 'imp' },
+  ]);
+});
+
+test('it never drops an earlier issue for a later one when both want the one free slot', () => {
+  const queue = buildFocusQueue([buildReadyIssue('GEO-9871', { type: 'Investigation' }), buildReadyIssue('GEO-9872', { type: 'Bug' })], [], new Set());
+
+  const plan = buildFocusPlan(queue, { free: 1, places: { free: { imp: 1, local: 0 }, types: { imp: ['Bug', 'Investigation'], local: ['Investigation'] } } }, [], {});
+
+  expect(plan.picks).toStrictEqual([{ issue: 'GEO-9871', term: null, reserve: null, place: 'imp' }]);
+});

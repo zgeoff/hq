@@ -520,12 +520,11 @@ test('it counts a free slot no eligible issue may fill as supply minutes, not em
   ]);
   ctx.addImpRun('GEO-9842');
   const sample = { ...ctx.sample, slots: { imp: 1, local: 1 }, placeTypes: { local: ['Design', 'Refactor', 'Investigation'] } };
-  tick(ctx.db, sample, 'hq-lanes');
+  const first = tick(ctx.db, sample, 'hq-lanes');
   at('2026-10-15T20:10:00Z');
 
   const result = tick(ctx.db, sample, 'hq-lanes');
 
-  expect([result.slots, result.slotCause.cause, result.slotCause.slots]).toStrictEqual([0, 'supply', 1]);
-  expect(ctx.db.query('SELECT slots FROM lanes_samples ORDER BY seq').all()).toStrictEqual([{ slots: 0 }, { slots: 0 }]);
+  expect([first.slots, result.slots, result.slotCause.cause, result.slotCause.slots]).toStrictEqual([0, 0, 'supply', 1]);
   expect(readSlotMinutes(ctx.db, '2026-10-16')).toStrictEqual({ delivery: 0, triage: 0, supply: 10, design: 0 });
 });

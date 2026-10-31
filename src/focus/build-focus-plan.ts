@@ -10,19 +10,12 @@ export function buildFocusPlan(queue: readonly FocusEntry[], slots: FocusSlots, 
   const picks: FocusPick[] = [];
   const lent: FocusPlan['lent'] = [];
   const taken = new Set<string>();
-  const room = slots.places === null ? null : { free: { ...slots.places.free }, types: slots.places.types };
+  const seating = slots.places === null ? null : makeSeatIssue(slots.places);
   const tryTake = (entry: FocusEntry, reserve: string | null): boolean => {
-    const pick = { issue: entry.issue.identifier, term: entry.term, reserve };
-    if (room === null) {
-      picks.push(pick);
-    } else {
-      const place = pickPlace(room, entry.issue.type);
-      if (place === null) {
-        return false;
-      }
-      room.free[place] -= 1;
-      picks.push({ ...pick, place });
+    if (seating !== null && !seating.trySeat(entry.issue.identifier, entry.issue.type)) {
+      return false;
     }
+    picks.push({ issue: entry.issue.identifier, term: entry.term, reserve });
     taken.add(entry.issue.identifier);
     return true;
   };
@@ -50,18 +43,67 @@ export function buildFocusPlan(queue: readonly FocusEntry[], slots: FocusSlots, 
       tryTake(entry, null);
     }
   }
-  return slots.places === null ? { picks, lent } : { picks, lent, unfit: buildPlaceUnfit(queue, slots.free, slots.places) };
+  if (seating === null || slots.places === null) {
+    return { picks, lent };
+  }
+  return { picks: picks.map((pick) => ({ issue: pick.issue, term: pick.term, reserve: pick.reserve, place: seating.getPlace(pick.issue) })), lent, unfit: buildPlaceUnfit(queue, slots.free, slots.places) };
 }
 
 type Place = keyof PacingSlots;
 
 const PLACES: readonly Place[] = ['imp', 'local'];
 
-// A listed place first, so an issue that fits both leaves the unlisted slot for an issue that fits
-// only there.
-function pickPlace(room: PlaceRoom, issueType: string): Place | null {
-  const open = PLACES.filter((place) => room.free[place] > 0 && isTypeTakenAt(room.types, place, issueType));
-  return open.find((place) => room.types[place] !== undefined) ?? open[0] ?? null;
+interface SeatIssue {
+  trySeat: (issue: string, issueType: string) => boolean;
+  getPlace: (issue: string) => Place;
+}
+
+// Seats each issue in turn at a place that takes its Type, a listed place first. When every such place
+// is full, an augmenting path moves seated issues to their other places to make room, so the plan
+// fills as many slots as it can and never unseats an earlier issue for a later one.
+function makeSeatIssue(places: PlaceRoom): SeatIssue {
+  const room = { ...places.free };
+  const seated = new Map<string, { place: Place; issueType: string }>();
+  const fitting = (issueType: string): Place[] => {
+    const fits = PLACES.filter((place) => isTypeTakenAt(places.types, place, issueType));
+    return [...fits.filter((place) => places.types[place] !== undefined), ...fits.filter((place) => places.types[place] === undefined)];
+  };
+  const moveTo = (issue: string, issueType: string, place: Place): void => {
+    const from = seated.get(issue)?.place;
+    if (from !== undefined) {
+      room[from] += 1;
+    }
+    room[place] -= 1;
+    seated.set(issue, { place, issueType });
+  };
+  const trySeatAway = (issue: string, issueType: string, away: Place | null, visited: Set<Place>): boolean => {
+    const fits = fitting(issueType).filter((place) => place !== away);
+    const open = fits.find((place) => room[place] > 0);
+    if (open !== undefined) {
+      moveTo(issue, issueType, open);
+      return true;
+    }
+    for (const place of fits.filter((entry) => !visited.has(entry))) {
+      visited.add(place);
+      for (const [other, seat] of seated) {
+        if (seat.place === place && other !== issue && trySeatAway(other, seat.issueType, place, visited)) {
+          moveTo(issue, issueType, place);
+          return true;
+        }
+      }
+    }
+    return false;
+  };
+  return {
+    trySeat: (issue, issueType) => trySeatAway(issue, issueType, null, new Set()),
+    getPlace: (issue) => {
+      const seat = seated.get(issue);
+      if (seat === undefined) {
+        throw new Error(`no place seated for ${issue}`);
+      }
+      return seat.place;
+    },
+  };
 }
 
 // An issue with no Type label fits only a place with no list.

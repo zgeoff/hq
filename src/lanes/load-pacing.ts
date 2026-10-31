@@ -56,7 +56,11 @@ export async function loadPacing(path: string): Promise<Pacing> {
     if (shape.lanes === undefined && shape.slots === undefined) {
       return { impMib, lanes: null, slots: null, placeTypes: null, localRoom: null, claudeLaunchPct, ...design, error: null };
     }
-    return { impMib, lanes: parseLanes(file), slots: parsePacingSlots(file), placeTypes: parsePlaceTypes(file), localRoom: parseLocalRoom(file), claudeLaunchPct, ...design, error: null };
+    const placeRead = parsePlaceTypes(file);
+    if (placeRead.error !== null) {
+      return { impMib, lanes: null, slots: null, placeTypes: null, localRoom: null, claudeLaunchPct, ...design, error: `pacing.json: ${placeRead.error}` };
+    }
+    return { impMib, lanes: parseLanes(file), slots: parsePacingSlots(file), placeTypes: placeRead.placeTypes, localRoom: parseLocalRoom(file), claudeLaunchPct, ...design, error: null };
   } catch (error) {
     return { impMib, lanes: null, slots: null, placeTypes: null, localRoom: null, claudeLaunchPct, ...design, error: `pacing.json: ${toMessage(error)}` };
   }
