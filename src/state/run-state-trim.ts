@@ -1,18 +1,18 @@
-import { appendFileSync, constants, copyFileSync, existsSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { iso } from '../clock/iso.ts';
 import { HqError } from '../errors.ts';
 import { buildTrimPlan } from './build-trim-plan.ts';
 import { getStateLimit } from './get-state-limit.ts';
-import type { TrimReport } from './types.ts';
+import type { StateFiles, TrimReport } from './types.ts';
 
 export interface StateTrimArgs {
   directory: string;
   roles: string[];
   role: string;
+  actor: string;
   dryRun: boolean;
   at: Date;
-  readText: (path: string) => string;
+  files: StateFiles;
 }
 
 // Move the oldest "## Log" entries of <role>.md to this month's archive until the file fits its limit.
@@ -20,14 +20,21 @@ export interface StateTrimArgs {
 export function runStateTrim(args: StateTrimArgs): TrimReport {
   const directory = args.directory;
   const role = args.role;
+  const files = args.files;
   if (!args.roles.includes(role)) {
     throw new HqError('unknown_role', `${role} is not a fleet role (${args.roles.join(', ')}), so it has no state file to trim`);
   }
+  const owner = `z-${role}`;
+
+  // only the owning session writes its state file, and it is blocked while it runs this command, so no write can land between the read and the rename
+  if (!args.dryRun && args.actor !== owner) {
+    throw new HqError('not_owner', `only ${owner} may trim ${role}.md, not ${args.actor}; anyone may run hq state trim ${role} --dry-run`);
+  }
   const file = join(directory, `${role}.md`);
-  if (!existsSync(file)) {
+  if (!files.probeExists(file)) {
     throw new HqError('no_state_file', `${file} does not exist`);
   }
-  const text = args.readText(file);
+  const text = files.readText(file);
   const limitBytes = getStateLimit(role);
   const plan = buildTrimPlan(text, limitBytes);
   if (plan.kind === 'no-log') {
@@ -53,23 +60,27 @@ export function runStateTrim(args: StateTrimArgs): TrimReport {
   }
 
   // the archive and the temp file take the state file's mode, so a private state file never lands in a wider one
-  const mode = statSync(file).mode & 0o777;
-  copyFileSync(file, backup, constants.COPYFILE_EXCL);
+  const mode = files.readMode(file);
+  files.copyNew(file, backup);
   const marker = `<!-- moved from ${role}.md by hq state trim at ${iso(args.at)} -->\n`;
-  const existing = existsSync(archive) ? args.readText(archive) : '';
-  appendFileSync(archive, (existing === '' || existing.endsWith('\n') ? '' : '\n') + marker + plan.moved, { mode });
+  const archiveExists = files.probeExists(archive);
+  if (archiveExists && (files.readMode(archive) & ~mode) !== 0) {
+    files.changeMode(archive, mode);
+  }
+  const existing = archiveExists ? files.readText(archive) : '';
+  files.appendText(archive, (existing === '' || existing.endsWith('\n') ? '' : '\n') + marker + plan.moved, mode);
 
   const temp = join(directory, `${role}.md.tmp-${process.pid}`);
-  writeFileSync(temp, plan.kept, { mode });
+  files.writeText(temp, plan.kept, mode);
 
-  // another writer may have touched the file since the read; the rename would drop its change, so this check sits right before the rename
-  if (args.readText(file) !== text) {
-    rmSync(temp, { force: true });
+  // a write that ignores the session block would be dropped by the rename, so this check sits right before it
+  if (files.readText(file) !== text) {
+    files.removeFile(temp);
     throw new HqError(
       'state_file_changed',
       `${role}.md changed while hq state trim ran, so it was not replaced. The moved entries are already appended to ${archive}, so a rerun repeats them there. The backup is ${backup}. Rerun hq state trim ${role}.`,
     );
   }
-  renameSync(temp, file);
+  files.renameFile(temp, file);
   return { ...report, written: true };
 }

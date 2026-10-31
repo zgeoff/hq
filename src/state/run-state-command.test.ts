@@ -1,7 +1,8 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { buildNodeStateFiles } from './build-node-state-files.ts';
 import { runStateCommand } from './run-state-command.ts';
 
 function setupTest() {
@@ -21,7 +22,8 @@ test('#runStateCommand trim reports in text and in data', () => {
     directory: ctx.directory,
     roles: ['kettle'],
     at: new Date('2026-10-31T01:02:03Z'),
-    readText: (path) => readFileSync(path, 'utf8'),
+    actor: 'z-kettle',
+    files: buildNodeStateFiles(),
   });
 
   expect(out.data).toMatchObject({
@@ -42,7 +44,8 @@ test('#runStateCommand the text names the sizes, the archive and the backup', ()
     directory: ctx.directory,
     roles: ['kettle'],
     at: new Date('2026-10-31T01:02:03Z'),
-    readText: (path) => readFileSync(path, 'utf8'),
+    actor: 'z-kettle',
+    files: buildNodeStateFiles(),
   });
 
   expect(out.text).toContain(`archive: ${join(ctx.directory, 'kettle-archive-2026-10.md')}\nbackup: ${join(ctx.directory, 'kettle.md.bak-20261031T010203Z')}`);
@@ -59,7 +62,8 @@ test('#runStateCommand a dry run says so', () => {
     directory: ctx.directory,
     roles: ['kettle'],
     at: new Date('2026-10-31T01:02:03Z'),
-    readText: (path) => readFileSync(path, 'utf8'),
+    actor: 'z-kettle',
+    files: buildNodeStateFiles(),
   });
 
   expect(out.text).toEndWith('dry run: nothing written');
@@ -76,7 +80,8 @@ test('it says plainly how far over the limit the file stays after the log', () =
     directory: ctx.directory,
     roles: ['kettle'],
     at: new Date('2026-10-31T01:02:03Z'),
-    readText: (path) => readFileSync(path, 'utf8'),
+    actor: 'z-kettle',
+    files: buildNodeStateFiles(),
   });
 
   expect(out.text).toMatch(/still \d+\.\d KB over the limit after the log; trim the other sections by hand/u);
@@ -93,7 +98,8 @@ test('#runStateCommand an unknown verb is refused', () => {
       directory: ctx.directory,
       roles: ['kettle'],
       at: new Date('2026-10-31T01:02:03Z'),
-      readText: (path) => readFileSync(path, 'utf8'),
+      actor: 'z-kettle',
+      files: buildNodeStateFiles(),
     }),
   ).toThrow('unknown command: hq state shrink');
 });
@@ -109,7 +115,8 @@ test('#runStateCommand a missing role is refused', () => {
       directory: ctx.directory,
       roles: ['kettle'],
       at: new Date('2026-10-31T01:02:03Z'),
-      readText: (path) => readFileSync(path, 'utf8'),
+      actor: 'z-kettle',
+      files: buildNodeStateFiles(),
     }),
   ).toThrow('give the role');
 });

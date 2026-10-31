@@ -3,6 +3,7 @@ import { chmodSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, wr
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { readChangingFile } from '../../test/read-changing-file.ts';
+import { buildNodeStateFiles } from './build-node-state-files.ts';
 import { runStateTrim } from './run-state-trim.ts';
 
 function setupTest() {
@@ -23,9 +24,10 @@ test('it moves the oldest entries until the file is under its limit', () => {
     directory: ctx.directory,
     roles: ['kettle', 'delivery'],
     role: 'kettle',
+    actor: 'z-kettle',
     dryRun: false,
     at: new Date('2026-10-31T01:02:03Z'),
-    readText: (path: string) => readFileSync(path, 'utf8'),
+    files: buildNodeStateFiles(),
   });
 
   const text = readFileSync(join(ctx.directory, 'kettle.md'), 'utf8');
@@ -44,9 +46,10 @@ test('it keeps the header and the other sections byte for byte', () => {
     directory: ctx.directory,
     roles: ['kettle', 'delivery'],
     role: 'kettle',
+    actor: 'z-kettle',
     dryRun: false,
     at: new Date('2026-10-31T01:02:03Z'),
-    readText: (path: string) => readFileSync(path, 'utf8'),
+    files: buildNodeStateFiles(),
   });
 
   const text = readFileSync(join(ctx.directory, 'kettle.md'), 'utf8');
@@ -66,9 +69,10 @@ test('it keeps the newest entries and moves only a leading run of the oldest', (
     directory: ctx.directory,
     roles: ['kettle', 'delivery'],
     role: 'kettle',
+    actor: 'z-kettle',
     dryRun: false,
     at: new Date('2026-10-31T01:02:03Z'),
-    readText: (path: string) => readFileSync(path, 'utf8'),
+    files: buildNodeStateFiles(),
   });
 
   expect(readFileSync(join(ctx.directory, 'kettle.md'), 'utf8')).toBe(`${head}## Log\n${entries.slice(10).join('')}${tail}`);
@@ -86,9 +90,10 @@ test('it appends the moved entries to the monthly archive after a marker line', 
     directory: ctx.directory,
     roles: ['kettle', 'delivery'],
     role: 'kettle',
+    actor: 'z-kettle',
     dryRun: false,
     at: new Date('2026-10-31T01:02:03Z'),
-    readText: (path: string) => readFileSync(path, 'utf8'),
+    files: buildNodeStateFiles(),
   });
 
   expect(readFileSync(join(ctx.directory, 'kettle-archive-2026-10.md'), 'utf8')).toBe(`<!-- moved from kettle.md by hq state trim at 2026-10-31T01:02:03Z -->\n${entries.slice(0, 10).join('')}`);
@@ -107,9 +112,10 @@ test('it adds a second batch to an archive that exists', () => {
     directory: ctx.directory,
     roles: ['kettle', 'delivery'],
     role: 'kettle',
+    actor: 'z-kettle',
     dryRun: false,
     at: new Date('2026-10-31T01:02:03Z'),
-    readText: (path: string) => readFileSync(path, 'utf8'),
+    files: buildNodeStateFiles(),
   });
 
   expect(readFileSync(join(ctx.directory, 'kettle-archive-2026-10.md'), 'utf8')).toStartWith('an older batch without a newline\n<!-- moved from kettle.md');
@@ -127,9 +133,10 @@ test('it copies the state file to a timestamped backup before it changes it', ()
     directory: ctx.directory,
     roles: ['kettle', 'delivery'],
     role: 'kettle',
+    actor: 'z-kettle',
     dryRun: false,
     at: new Date('2026-10-31T01:02:03Z'),
-    readText: (path: string) => readFileSync(path, 'utf8'),
+    files: buildNodeStateFiles(),
   });
 
   expect(readFileSync(join(ctx.directory, 'kettle.md.bak-20261031T010203Z'), 'utf8')).toBe(original);
@@ -147,9 +154,10 @@ test('it reports the sizes, the entries moved, the archive and the backup', () =
     directory: ctx.directory,
     roles: ['kettle', 'delivery'],
     role: 'kettle',
+    actor: 'z-kettle',
     dryRun: false,
     at: new Date('2026-10-31T01:02:03Z'),
-    readText: (path: string) => readFileSync(path, 'utf8'),
+    files: buildNodeStateFiles(),
   });
 
   expect(report).toStrictEqual({
@@ -180,9 +188,10 @@ test('it never touches the older delivery and release archives', () => {
     directory: ctx.directory,
     roles: ['kettle', 'delivery'],
     role: 'kettle',
+    actor: 'z-kettle',
     dryRun: false,
     at: new Date('2026-10-31T01:02:03Z'),
-    readText: (path: string) => readFileSync(path, 'utf8'),
+    files: buildNodeStateFiles(),
   });
 
   expect([readFileSync(join(ctx.directory, 'delivery-archive.md'), 'utf8'), readFileSync(join(ctx.directory, 'release-archive.md'), 'utf8')]).toStrictEqual([
@@ -203,9 +212,10 @@ test('#runStateTrim a dry run reports the plan and says nothing was written', ()
     directory: ctx.directory,
     roles: ['kettle', 'delivery'],
     role: 'kettle',
+    actor: 'z-kettle',
     dryRun: true,
     at: new Date('2026-10-31T01:02:03Z'),
-    readText: (path: string) => readFileSync(path, 'utf8'),
+    files: buildNodeStateFiles(),
   });
 
   expect(report).toStrictEqual({
@@ -230,7 +240,15 @@ test('#runStateTrim a dry run leaves the state file as it was', () => {
   const original = `${head}## Log\n${entries.join('')}${tail}`;
   writeFileSync(join(ctx.directory, 'kettle.md'), original);
 
-  runStateTrim({ directory: ctx.directory, roles: ['kettle', 'delivery'], role: 'kettle', dryRun: true, at: new Date('2026-10-31T01:02:03Z'), readText: (path: string) => readFileSync(path, 'utf8') });
+  runStateTrim({
+    directory: ctx.directory,
+    roles: ['kettle', 'delivery'],
+    role: 'kettle',
+    actor: 'z-kettle',
+    dryRun: true,
+    at: new Date('2026-10-31T01:02:03Z'),
+    files: buildNodeStateFiles(),
+  });
 
   expect(readFileSync(join(ctx.directory, 'kettle.md'), 'utf8')).toBe(original);
 });
@@ -243,7 +261,15 @@ test('#runStateTrim a dry run leaves the folder as it was', () => {
   const original = `${head}## Log\n${entries.join('')}${tail}`;
   writeFileSync(join(ctx.directory, 'kettle.md'), original);
 
-  runStateTrim({ directory: ctx.directory, roles: ['kettle', 'delivery'], role: 'kettle', dryRun: true, at: new Date('2026-10-31T01:02:03Z'), readText: (path: string) => readFileSync(path, 'utf8') });
+  runStateTrim({
+    directory: ctx.directory,
+    roles: ['kettle', 'delivery'],
+    role: 'kettle',
+    actor: 'z-kettle',
+    dryRun: true,
+    at: new Date('2026-10-31T01:02:03Z'),
+    files: buildNodeStateFiles(),
+  });
 
   expect(readdirSync(ctx.directory)).toStrictEqual(['kettle.md']);
 });
@@ -256,9 +282,10 @@ test('#runStateTrim a file already under its limit is left alone, with no backup
     directory: ctx.directory,
     roles: ['kettle', 'delivery'],
     role: 'kettle',
+    actor: 'z-kettle',
     dryRun: false,
     at: new Date('2026-10-31T01:02:03Z'),
-    readText: (path: string) => readFileSync(path, 'utf8'),
+    files: buildNodeStateFiles(),
   });
 
   expect(readdirSync(ctx.directory)).toStrictEqual(['kettle.md']);
@@ -272,9 +299,10 @@ test('it keeps the newest entry when the other sections alone leave the file ove
     directory: ctx.directory,
     roles: ['kettle', 'delivery'],
     role: 'kettle',
+    actor: 'z-kettle',
     dryRun: false,
     at: new Date('2026-10-31T01:02:03Z'),
-    readText: (path: string) => readFileSync(path, 'utf8'),
+    files: buildNodeStateFiles(),
   });
 
   expect(readFileSync(join(ctx.directory, 'kettle.md'), 'utf8')).toEndWith('## Log\n09:11Z poured the tea\n');
@@ -288,9 +316,10 @@ test('it reports how far over the limit the file stays', () => {
     directory: ctx.directory,
     roles: ['kettle', 'delivery'],
     role: 'kettle',
+    actor: 'z-kettle',
     dryRun: false,
     at: new Date('2026-10-31T01:02:03Z'),
-    readText: (path: string) => readFileSync(path, 'utf8'),
+    files: buildNodeStateFiles(),
   });
 
   expect([report.afterBytes, report.limitBytes]).toStrictEqual([24_029, 16_384]);
@@ -307,9 +336,10 @@ test('#runStateTrim delivery trims to 15 KB', () => {
     directory: ctx.directory,
     roles: ['kettle', 'delivery'],
     role: 'delivery',
+    actor: 'z-delivery',
     dryRun: false,
     at: new Date('2026-10-31T01:02:03Z'),
-    readText: (path: string) => readFileSync(path, 'utf8'),
+    files: buildNodeStateFiles(),
   });
 
   expect([report.limitBytes, report.entriesMoved, report.afterBytes]).toStrictEqual([15_360, 12, 15_211]);
@@ -324,9 +354,10 @@ test('#runStateTrim a file with no log section is refused in a real run', () => 
       directory: ctx.directory,
       roles: ['kettle', 'delivery'],
       role: 'kettle',
+      actor: 'z-kettle',
       dryRun: false,
       at: new Date('2026-10-31T01:02:03Z'),
-      readText: (path: string) => readFileSync(path, 'utf8'),
+      files: buildNodeStateFiles(),
     }),
   ).toThrow('kettle.md has no "## Log" section, so hq state trim cannot trim it; trim it by hand');
 });
@@ -340,9 +371,10 @@ test('#runStateTrim a file with no log section is refused in a dry run', () => {
       directory: ctx.directory,
       roles: ['kettle', 'delivery'],
       role: 'kettle',
+      actor: 'z-kettle',
       dryRun: true,
       at: new Date('2026-10-31T01:02:03Z'),
-      readText: (path: string) => readFileSync(path, 'utf8'),
+      files: buildNodeStateFiles(),
     }),
   ).toThrow('kettle.md has no "## Log" section, so hq state trim cannot trim it; trim it by hand');
 });
@@ -356,9 +388,10 @@ test('#runStateTrim a refused file gets no backup', () => {
       directory: ctx.directory,
       roles: ['kettle', 'delivery'],
       role: 'kettle',
+      actor: 'z-kettle',
       dryRun: false,
       at: new Date('2026-10-31T01:02:03Z'),
-      readText: (path: string) => readFileSync(path, 'utf8'),
+      files: buildNodeStateFiles(),
     }),
   ).toThrow();
   expect(readdirSync(ctx.directory)).toStrictEqual(['kettle.md']);
@@ -371,9 +404,10 @@ test('#runStateTrim a role outside the fleet is refused', () => {
       directory: ctx.directory,
       roles: ['kettle', 'delivery'],
       role: 'teapot',
+      actor: 'z-teapot',
       dryRun: false,
       at: new Date('2026-10-31T01:02:03Z'),
-      readText: (path: string) => readFileSync(path, 'utf8'),
+      files: buildNodeStateFiles(),
     }),
   ).toThrow('teapot is not a fleet role');
 });
@@ -385,9 +419,10 @@ test('#runStateTrim a role with no state file is refused', () => {
       directory: ctx.directory,
       roles: ['kettle', 'delivery'],
       role: 'delivery',
+      actor: 'z-delivery',
       dryRun: false,
       at: new Date('2026-10-31T01:02:03Z'),
-      readText: (path: string) => readFileSync(path, 'utf8'),
+      files: buildNodeStateFiles(),
     }),
   ).toThrow('delivery.md does not exist');
 });
@@ -406,9 +441,10 @@ test('#runStateTrim a state file changed between the read and the replace is ref
       directory: ctx.directory,
       roles: ['kettle', 'delivery'],
       role: 'kettle',
+      actor: 'z-kettle',
       dryRun: false,
       at: new Date('2026-10-31T01:02:03Z'),
-      readText: readChangingFile(join(ctx.directory, 'kettle.md'), replacement, 2),
+      files: { ...buildNodeStateFiles(), readText: readChangingFile(join(ctx.directory, 'kettle.md'), replacement, 2) },
     }),
   ).toThrow('changed while hq state trim ran, so it was not replaced');
 });
@@ -427,9 +463,10 @@ test('#runStateTrim a state file changed between the read and the replace keeps 
       directory: ctx.directory,
       roles: ['kettle', 'delivery'],
       role: 'kettle',
+      actor: 'z-kettle',
       dryRun: false,
       at: new Date('2026-10-31T01:02:03Z'),
-      readText: readChangingFile(join(ctx.directory, 'kettle.md'), replacement, 2),
+      files: { ...buildNodeStateFiles(), readText: readChangingFile(join(ctx.directory, 'kettle.md'), replacement, 2) },
     }),
   ).toThrow();
   expect(readFileSync(join(ctx.directory, 'kettle.md'), 'utf8')).toBe(replacement);
@@ -449,9 +486,10 @@ test('#runStateTrim an aborted replace tells the user to rerun', () => {
       directory: ctx.directory,
       roles: ['kettle', 'delivery'],
       role: 'kettle',
+      actor: 'z-kettle',
       dryRun: false,
       at: new Date('2026-10-31T01:02:03Z'),
-      readText: readChangingFile(join(ctx.directory, 'kettle.md'), replacement, 2),
+      files: { ...buildNodeStateFiles(), readText: readChangingFile(join(ctx.directory, 'kettle.md'), replacement, 2) },
     }),
   ).toThrow('Rerun hq state trim kettle');
 });
@@ -470,9 +508,10 @@ test('#runStateTrim an aborted replace leaves the backup in place', () => {
       directory: ctx.directory,
       roles: ['kettle', 'delivery'],
       role: 'kettle',
+      actor: 'z-kettle',
       dryRun: false,
       at: new Date('2026-10-31T01:02:03Z'),
-      readText: readChangingFile(join(ctx.directory, 'kettle.md'), replacement, 2),
+      files: { ...buildNodeStateFiles(), readText: readChangingFile(join(ctx.directory, 'kettle.md'), replacement, 2) },
     }),
   ).toThrow();
   expect(readFileSync(join(ctx.directory, 'kettle.md.bak-20261031T010203Z'), 'utf8')).toBe(original);
@@ -492,9 +531,10 @@ test('#runStateTrim an aborted replace leaves the archive append in place', () =
       directory: ctx.directory,
       roles: ['kettle', 'delivery'],
       role: 'kettle',
+      actor: 'z-kettle',
       dryRun: false,
       at: new Date('2026-10-31T01:02:03Z'),
-      readText: readChangingFile(join(ctx.directory, 'kettle.md'), replacement, 2),
+      files: { ...buildNodeStateFiles(), readText: readChangingFile(join(ctx.directory, 'kettle.md'), replacement, 2) },
     }),
   ).toThrow();
   expect(readFileSync(join(ctx.directory, 'kettle-archive-2026-10.md'), 'utf8')).toBe(`<!-- moved from kettle.md by hq state trim at 2026-10-31T01:02:03Z -->\n${entries.slice(0, 10).join('')}`);
@@ -514,9 +554,10 @@ test('#runStateTrim an aborted replace leaves no temp file behind', () => {
       directory: ctx.directory,
       roles: ['kettle', 'delivery'],
       role: 'kettle',
+      actor: 'z-kettle',
       dryRun: false,
       at: new Date('2026-10-31T01:02:03Z'),
-      readText: readChangingFile(join(ctx.directory, 'kettle.md'), replacement, 2),
+      files: { ...buildNodeStateFiles(), readText: readChangingFile(join(ctx.directory, 'kettle.md'), replacement, 2) },
     }),
   ).toThrow();
   expect(readdirSync(ctx.directory).toSorted()).toStrictEqual(['kettle-archive-2026-10.md', 'kettle.md', 'kettle.md.bak-20261031T010203Z']);
@@ -537,9 +578,10 @@ test('it creates the archive with the mode of a private state file', () => {
     directory: ctx.directory,
     roles: ['kettle', 'delivery'],
     role: 'kettle',
+    actor: 'z-kettle',
     dryRun: false,
     at: new Date('2026-10-31T01:02:03Z'),
-    readText: (path: string) => readFileSync(path, 'utf8'),
+    files: buildNodeStateFiles(),
   });
 
   expect(statSync(join(ctx.directory, 'kettle-archive-2026-10.md')).mode & 0o777).toBe(0o600);
@@ -560,9 +602,10 @@ test('it replaces a private state file with the same mode', () => {
     directory: ctx.directory,
     roles: ['kettle', 'delivery'],
     role: 'kettle',
+    actor: 'z-kettle',
     dryRun: false,
     at: new Date('2026-10-31T01:02:03Z'),
-    readText: (path: string) => readFileSync(path, 'utf8'),
+    files: buildNodeStateFiles(),
   });
 
   expect(statSync(join(ctx.directory, 'kettle.md')).mode & 0o777).toBe(0o600);
@@ -583,10 +626,150 @@ test('it gives the backup the mode of a private state file', () => {
     directory: ctx.directory,
     roles: ['kettle', 'delivery'],
     role: 'kettle',
+    actor: 'z-kettle',
     dryRun: false,
     at: new Date('2026-10-31T01:02:03Z'),
-    readText: (path: string) => readFileSync(path, 'utf8'),
+    files: buildNodeStateFiles(),
   });
 
   expect(statSync(join(ctx.directory, 'kettle.md.bak-20261031T010203Z')).mode & 0o777).toBe(0o600);
+});
+
+test('it narrows an existing wider archive to the mode of a private state file', () => {
+  const ctx = setupTest();
+  const head = '# kettle\n\n## Cursors\nspout: 4\n\n';
+  const entries = Array.from({ length: 40 }, (_unused, index) => `09:${String(index).padStart(2, '0')}Z boiled the water ${'x'.repeat(500)}\n  and then waited\n`);
+  const tail = '\n## Holds\nlid: stuck\n';
+  writeFileSync(join(ctx.directory, 'kettle.md'), `${head}## Log\n${entries.join('')}${tail}`);
+  chmodSync(join(ctx.directory, 'kettle.md'), 0o600);
+  writeFileSync(join(ctx.directory, 'kettle-archive-2026-10.md'), '08:00Z filled the kettle\n');
+  chmodSync(join(ctx.directory, 'kettle-archive-2026-10.md'), 0o644);
+
+  runStateTrim({
+    directory: ctx.directory,
+    roles: ['kettle', 'delivery'],
+    role: 'kettle',
+    actor: 'z-kettle',
+    dryRun: false,
+    at: new Date('2026-10-31T01:02:03Z'),
+    files: buildNodeStateFiles(),
+  });
+
+  expect(statSync(join(ctx.directory, 'kettle-archive-2026-10.md')).mode & 0o777).toBe(0o600);
+});
+
+test('it leaves an existing archive that is already narrower than the state file as it is', () => {
+  const ctx = setupTest();
+  const head = '# kettle\n\n## Cursors\nspout: 4\n\n';
+  const entries = Array.from({ length: 40 }, (_unused, index) => `09:${String(index).padStart(2, '0')}Z boiled the water ${'x'.repeat(500)}\n  and then waited\n`);
+  const tail = '\n## Holds\nlid: stuck\n';
+  writeFileSync(join(ctx.directory, 'kettle.md'), `${head}## Log\n${entries.join('')}${tail}`);
+  chmodSync(join(ctx.directory, 'kettle.md'), 0o644);
+  writeFileSync(join(ctx.directory, 'kettle-archive-2026-10.md'), '08:00Z filled the kettle\n');
+  chmodSync(join(ctx.directory, 'kettle-archive-2026-10.md'), 0o600);
+
+  runStateTrim({
+    directory: ctx.directory,
+    roles: ['kettle', 'delivery'],
+    role: 'kettle',
+    actor: 'z-kettle',
+    dryRun: false,
+    at: new Date('2026-10-31T01:02:03Z'),
+    files: buildNodeStateFiles(),
+  });
+
+  expect(statSync(join(ctx.directory, 'kettle-archive-2026-10.md')).mode & 0o777).toBe(0o600);
+});
+
+test('#runStateTrim a real trim by a session other than the role owner is refused', () => {
+  const ctx = setupTest();
+  writeFileSync(join(ctx.directory, 'kettle.md'), `## Log\n${'09:10Z boiled the water\n'.repeat(1000)}09:11Z poured the tea\n`);
+
+  expect(() =>
+    runStateTrim({
+      directory: ctx.directory,
+      roles: ['kettle', 'delivery'],
+      role: 'kettle',
+      actor: 'z-delivery',
+      dryRun: false,
+      at: new Date('2026-10-31T01:02:03Z'),
+      files: buildNodeStateFiles(),
+    }),
+  ).toThrow('only z-kettle may trim kettle.md, not z-delivery; anyone may run hq state trim kettle --dry-run');
+});
+
+test('#runStateTrim a refused trim by another session writes nothing', () => {
+  const ctx = setupTest();
+  writeFileSync(join(ctx.directory, 'kettle.md'), `## Log\n${'09:10Z boiled the water\n'.repeat(1000)}09:11Z poured the tea\n`);
+
+  expect(() =>
+    runStateTrim({
+      directory: ctx.directory,
+      roles: ['kettle', 'delivery'],
+      role: 'kettle',
+      actor: 'z-delivery',
+      dryRun: false,
+      at: new Date('2026-10-31T01:02:03Z'),
+      files: buildNodeStateFiles(),
+    }),
+  ).toThrow();
+  expect(readdirSync(ctx.directory)).toStrictEqual(['kettle.md']);
+});
+
+test('#runStateTrim the role owner session may run a real trim', () => {
+  const ctx = setupTest();
+  writeFileSync(join(ctx.directory, 'kettle.md'), `## Log\n${'09:10Z boiled the water\n'.repeat(1000)}09:11Z poured the tea\n`);
+
+  const report = runStateTrim({
+    directory: ctx.directory,
+    roles: ['kettle', 'delivery'],
+    role: 'kettle',
+    actor: 'z-kettle',
+    dryRun: false,
+    at: new Date('2026-10-31T01:02:03Z'),
+    files: buildNodeStateFiles(),
+  });
+
+  expect(report.written).toBe(true);
+});
+
+test('#runStateTrim any session may run a dry run of another role', () => {
+  const ctx = setupTest();
+  writeFileSync(join(ctx.directory, 'kettle.md'), `## Log\n${'09:10Z boiled the water\n'.repeat(1000)}09:11Z poured the tea\n`);
+
+  const report = runStateTrim({
+    directory: ctx.directory,
+    roles: ['kettle', 'delivery'],
+    role: 'kettle',
+    actor: 'z-delivery',
+    dryRun: true,
+    at: new Date('2026-10-31T01:02:03Z'),
+    files: buildNodeStateFiles(),
+  });
+
+  expect(report.entriesMoved).toBe(319);
+});
+
+test('#runStateTrim a failed archive append leaves the state file as it was', () => {
+  const ctx = setupTest();
+  const original = `## Log\n${'09:10Z boiled the water\n'.repeat(1000)}09:11Z poured the tea\n`;
+  writeFileSync(join(ctx.directory, 'kettle.md'), original);
+
+  expect(() =>
+    runStateTrim({
+      directory: ctx.directory,
+      roles: ['kettle', 'delivery'],
+      role: 'kettle',
+      actor: 'z-kettle',
+      dryRun: false,
+      at: new Date('2026-10-31T01:02:03Z'),
+      files: {
+        ...buildNodeStateFiles(),
+        appendText: () => {
+          throw new Error('ENOSPC: no space left on device');
+        },
+      },
+    }),
+  ).toThrow('ENOSPC');
+  expect(readFileSync(join(ctx.directory, 'kettle.md'), 'utf8')).toBe(original);
 });

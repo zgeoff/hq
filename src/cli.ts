@@ -25,6 +25,7 @@ import { readStateSizeChecks } from './health/read-state-size-checks.ts';
 import { getStateRoles } from './state/get-state-roles.ts';
 import { stateDir } from './state/state-dir.ts';
 import { runStateCommand } from './state/run-state-command.ts';
+import { buildNodeStateFiles } from './state/build-node-state-files.ts';
 import { fleetIds } from './atc/fleet-ids.ts';
 import { sessionGetSchema } from './atc/session-get-schema.ts';
 import { makeFleetClient } from './fleet/make-fleet-client.ts';
@@ -2037,7 +2038,7 @@ const GROUPS: Record<string, (context: Ctx) => Promise<Out>> = {
   slots: (context) => slotsCommand(context.db, context.verb, context.rest, context.flags),
   units: (context) => runUnitsCommand({ verb: context.verb, run: context.run, home: getHome(), env: cleanEnv() }),
   health: (c) => healthCommand(c.db, c.verb, c.rest, c.flags),
-  state: (context) => Promise.resolve(runStateCommand({ verb: context.verb, rest: context.rest, dryRun: context.flags['dry-run'] === true, directory: stateDir(), roles: getStateRoles(), at: now(), readText: (path) => readFileSync(path, 'utf8') })),
+  state: async (context) => runStateCommand({ verb: context.verb, rest: context.rest, dryRun: context.flags['dry-run'] === true, directory: stateDir(), roles: getStateRoles(), actor: await actor(context.db, context.flags), at: now(), files: buildNodeStateFiles() }),
   news: (c) => newsCommand(c.db, c.verb, c.flags),
   outbox: (c) => outboxCommand(c.db, c.verb, c.rest, c.flags),
   ask: (c) => askCommand(c.db, c.noun as Kind, need(c.verb, 'command'), c.rest, c.flags),
