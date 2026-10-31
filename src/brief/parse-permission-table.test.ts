@@ -27,3 +27,12 @@ test('it stops at the next heading of the same level', () => {
 
   expect(rows).toStrictEqual([{ action: 'Code delivery', phrase: 'Work in <repo>.' }]);
 });
+
+test('it reads neither a heading nor a row inside a code fence', () => {
+  const rows = parsePermissionTable(['## permission phrasing', '', '| Code delivery | Work in <repo>. |', '', '```md', '## example', '| Stray | SENTINEL-IN-A-FENCE |', '```', '', '| Deploy | Deploy to <environment>. |'].join('\n'));
+
+  expect(rows).toStrictEqual([
+    { action: 'Code delivery', phrase: 'Work in <repo>.' },
+    { action: 'Deploy', phrase: 'Deploy to <environment>.' },
+  ]);
+});

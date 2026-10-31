@@ -1,7 +1,7 @@
+import { collectFencedLines } from './collect-fenced-lines.ts';
 import type { IssueSection } from './types.ts';
 
 const HEADING = /^(?<hashes>#{1,6})\s+(?<name>.+?)\s*$/u;
-const FENCE = /^\s*(?:```|~~~)/u;
 
 // The headed sections of an issue description, in order. A section runs to the next heading of the
 // same or a higher level, so one that holds a lower heading holds its text too, and the lower
@@ -9,12 +9,9 @@ const FENCE = /^\s*(?:```|~~~)/u;
 export function parseIssueSections(description: string): IssueSection[] {
   const lines = description.split('\n');
   const starts: { index: number; level: number; name: string }[] = [];
-  let fenced = false;
+  const fenced = collectFencedLines(lines);
   for (const [index, line] of lines.entries()) {
-    if (FENCE.test(line)) {
-      fenced = !fenced;
-    }
-    const heading = fenced ? null : HEADING.exec(line)?.groups;
+    const heading = fenced[index] === true ? null : HEADING.exec(line)?.groups;
     if (heading) {
       starts.push({ index, level: heading['hashes']?.length ?? 1, name: heading['name'] ?? '' });
     }

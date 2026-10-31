@@ -29,3 +29,21 @@ test('it reads a heading line inside a code fence as text', () => {
 test('it gives no section for text with no heading', () => {
   expect(parseIssueSections('Just a kettle.')).toStrictEqual([]);
 });
+
+test('it keeps a heading of a three-backtick example inside a four-backtick fence as text', () => {
+  const sections = parseIssueSections('## Scope\n\n````md\n```md\n## Example heading\n```\n````\n\nIn: the lid.\n\n## Acceptance\n\n- [ ] boils\n');
+
+  expect(sections).toStrictEqual([
+    { name: 'Scope', text: '## Scope\n\n````md\n```md\n## Example heading\n```\n````\n\nIn: the lid.' },
+    { name: 'Acceptance', text: '## Acceptance\n\n- [ ] boils' },
+  ]);
+});
+
+test.each([
+  ['a tilde fence closed by backticks', '~~~\n## Lid\n```\n## Spout\n~~~'],
+  ['a backtick fence closed by a shorter run', '````\n## Lid\n```\n## Spout\n````'],
+  ['a closing line with an info string', '```\n## Lid\n```md\n## Spout\n```'],
+  ['a fence indented by up to three spaces', '   ```\n## Lid\n  ```'],
+])('it reads no heading inside %s', (_, fenced) => {
+  expect(parseIssueSections(`## Scope\n\n${fenced}\n\n## Acceptance\n\nBoils.`).map((section) => section.name)).toStrictEqual(['Scope', 'Acceptance']);
+});

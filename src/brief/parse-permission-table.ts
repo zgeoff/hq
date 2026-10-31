@@ -1,12 +1,14 @@
+import { collectFencedLines } from './collect-fenced-lines.ts';
 import type { PermissionRow } from './types.ts';
 
 const HEADING = '## permission phrasing';
 const SEPARATOR = /^:?-+:?$/u;
 
 // The `| Action | Phrase in the brief |` rows under the `## permission phrasing` heading, and no
-// other part of the text: the section ends at the next heading of its level or a higher one.
+// other part of the text: the section ends at the next heading of its level or a higher one. A
+// heading or a row inside a code fence is text.
 export function parsePermissionTable(markdown: string): PermissionRow[] {
-  const lines = markdown.split('\n');
+  const lines = collectUnfencedLines(markdown.split('\n'));
   const start = lines.findIndex((line) => line.trim().toLowerCase() === HEADING);
   if (start === -1) {
     return [];
@@ -22,6 +24,11 @@ export function parsePermissionTable(markdown: string): PermissionRow[] {
     }
   }
   return rows;
+}
+
+function collectUnfencedLines(lines: readonly string[]): string[] {
+  const fenced = collectFencedLines(lines);
+  return lines.filter((_, index) => fenced[index] !== true);
 }
 
 function splitRow(row: string): string[] {
