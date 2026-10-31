@@ -256,26 +256,26 @@ function renderAlso(file: string, body: string, at: number, also: string[]): str
   const start = at + ALSO_HEAD.length;
   const blank = body.indexOf('\n\n', start);
   const end = blank === -1 ? body.length - (body.endsWith('\n') ? 1 : 0) : blank;
-  const expected = also.map((item, index) => `${item}${index === also.length - 1 ? '.' : ';'}`);
+  const expected = also.map((item, index) => `- ${item}${index === also.length - 1 ? '.' : ';'}`);
   const found = parseAlsoList(body.slice(start, end));
 
   // A bullet after a blank line would escape the list and the check; refuse it.
-  if (/^\n{2,}- /u.test(body.slice(end))) {
+  if (/^\n(?:[ \t]*\n)+[ \t]*- /u.test(body.slice(end))) {
     throw new Error(`${file}: a "- " line follows the "Also his:" list after a blank line; keep every item in the list`);
   }
   if (found.length === expected.length && found.every((item, index) => item === expected[index])) {
     return body;
   }
-  return body.slice(0, start) + expected.map((item) => renderBullet(item)).join('\n') + body.slice(end);
+  return body.slice(0, start) + expected.map((item) => renderBullet(item.slice(2))).join('\n') + body.slice(end);
 }
 
-// A line that is neither a bullet nor a continuation is kept whole as an item, so it fails the
-// comparison and a write run replaces it.
+// Each item keeps its "- " marker. A line that is neither a bullet nor a continuation is kept
+// whole as an item, so it fails the comparison and a write run replaces it.
 function parseAlsoList(block: string): string[] {
   const items: string[] = [];
   for (const line of block === '' ? [] : block.split('\n')) {
     if (line.startsWith('- ')) {
-      items.push(line.slice(2));
+      items.push(line);
     } else if (/^ {2}\S/u.test(line) && items.length > 0) {
       items.push(`${items.pop() ?? ''} ${line.slice(2)}`);
     } else {
