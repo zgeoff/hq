@@ -3,6 +3,7 @@ import { HqError } from '../errors.ts';
 import { buildGoalFileText } from './build-goal-file-text.ts';
 import { buildGoalPointer } from './build-goal-pointer.ts';
 import { buildPermissions } from './build-permissions.ts';
+import { buildReviewPointer } from './build-review-pointer.ts';
 import { BRIEF_LIMIT_BYTES, fitBrief } from './fit-brief.ts';
 import { parseIssueActions } from './parse-issue-actions.ts';
 import { parseIssueSections } from './parse-issue-sections.ts';
@@ -23,7 +24,6 @@ export interface DeliveryBriefFacts {
   playbookText: string | null;
   stack: string;
   impLine: string;
-  reviewBlock: string;
 }
 
 export interface DeliveryBrief {
@@ -39,7 +39,7 @@ export function buildDeliveryBrief(facts: DeliveryBriefFacts): DeliveryBrief {
   const issueSections = sections.filter((section) => ISSUE_SECTIONS.has(section.name.toLowerCase()));
   const actions = parseIssueActions(sections);
   const permissions = buildPermissions(actions, facts.permissionTable, facts.reads.repo);
-  const needsRelease = actions.some((action) => ['deploy', 'infra'].includes(action.toLowerCase()));
+  const needsRelease = permissions.names.some((action) => ['deploy', 'infra'].includes(action.toLowerCase()));
   const playbook = facts.playbookText === null ? null : facts.reads.playbook;
   const parts: BriefParts = {
     repo: facts.reads.repo,
@@ -48,7 +48,7 @@ export function buildDeliveryBrief(facts: DeliveryBriefFacts): DeliveryBrief {
     permissions: permissions.lines.join('\n'),
     stack: facts.stack,
     fixes: needsRelease ? 'Contributes to' : 'Fixes',
-    reviewLines: facts.reviewBlock.replaceAll('<repo>', facts.reads.repo),
+    reviewLines: facts.reads.reviewLines ? buildReviewPointer(`zgeoff/${facts.reads.repo}`, facts.sha) : '',
     notYours: '',
     impLine: facts.impLine,
     goalFile: buildGoalPointer({ issue: facts.issue.identifier, playbook, byLink: facts.input.byLink, goalFile: facts.input.goalFile }),

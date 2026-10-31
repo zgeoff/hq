@@ -2,6 +2,7 @@ import type { Out } from '../commands.ts';
 import { HqError } from '../errors.ts';
 import type { Runner } from '../runner/types.ts';
 import { buildDeliveryBrief } from './build-delivery-brief.ts';
+import { REVIEW_LINES_PATH } from './build-review-pointer.ts';
 import { findFencedBlock } from './find-fenced-block.ts';
 import { pickBriefReads } from './pick-brief-reads.ts';
 import { readBriefIssue } from './read-brief-issue.ts';
@@ -13,7 +14,6 @@ import { requireGoalFileTarget } from './require-goal-file-target.ts';
 import type { BriefDeps, BriefInput } from './types.ts';
 
 const BRIEFS_PATH = 'skills/delivery-lead/references/briefs.md';
-const REVIEW_LINES_PATH = 'agent-kit/review-lines.md';
 const TEMPLATE_PATH = 'agent-kit/brief.md';
 
 // Fills the delivery launch brief for one Linear issue and prints it. It reads Linear, GitHub and
@@ -30,8 +30,10 @@ export async function runBriefCommand(deps: BriefDeps, input: BriefInput): Promi
   const playbookText = reads.playbook === null ? null : await readRefFile(deps.run, sha, reads.playbook.path);
   const stack = reads.stack ? await readBlock(deps.run, sha, BRIEFS_PATH, 'The stack line:') : '';
   const impLine = reads.imp ? await readBlock(deps.run, sha, BRIEFS_PATH, 'The imp line:') : '';
-  const reviewBlock = reads.reviewLines ? await readBlock(deps.run, sha, REVIEW_LINES_PATH, null) : '';
-  const brief = buildDeliveryBrief({ input, issue, sha, reads, template, permissionTable, playbookText, stack, impLine, reviewBlock });
+  if (reads.reviewLines && (await readRefFile(deps.run, sha, REVIEW_LINES_PATH)) === null) {
+    throw new HqError('not_found', `${REVIEW_LINES_PATH} is missing at ${sha}; pass --ref refactor/fleet-skill-rebuild until the skill rebuild merges`);
+  }
+  const brief = buildDeliveryBrief({ input, issue, sha, reads, template, permissionTable, playbookText, stack, impLine });
   for (const warning of brief.warnings) {
     deps.warn(warning);
   }
@@ -41,14 +43,14 @@ export async function runBriefCommand(deps: BriefDeps, input: BriefInput): Promi
   return brief.out;
 }
 
-async function readBlock(run: Runner, sha: string, path: string, marker: string | null): Promise<string> {
+async function readBlock(run: Runner, sha: string, path: string, marker: string): Promise<string> {
   const text = await readRefFile(run, sha, path);
   if (text === null) {
     throw new HqError('not_found', `${path} is missing at ${sha}; pass --ref refactor/fleet-skill-rebuild until the skill rebuild merges`);
   }
   const block = findFencedBlock(text, marker);
   if (block === null) {
-    throw new HqError('not_found', `${path} at ${sha} has no ${marker ?? 'text fence'}`);
+    throw new HqError('not_found', `${path} at ${sha} has no ${marker}`);
   }
   return block;
 }
