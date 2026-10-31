@@ -1111,3 +1111,19 @@ test('it creates no hq db when hq brief runs and there is none', async () => {
 
   expect(existsSync(directory)).toBe(false);
 });
+
+test('it routes hq brief check to the measure of a finished brief, and opens no hq db', async () => {
+  const fresh = freshDb();
+  onTestFinished(fresh.cleanup);
+  const printed: string[] = [];
+  const spy = spyOn(console, 'log').mockImplementation((line: string) => void printed.push(line));
+  onTestFinished(() => spy.mockRestore());
+  onTestFinished(overrideEnv('HQ_DB', join(fresh.dir, 'absent', 'hq.db')));
+  writeFileSync(join(fresh.dir, 'brief.txt'), '/goal A kettle that boils.');
+
+  const code = await main(['brief', 'check', join(fresh.dir, 'brief.txt')], buildStubBriefGH({ commits: {}, files: {} }, []));
+
+  expect(code).toBe(0);
+  expect(printed).toStrictEqual(['ok: 26 bytes']);
+  expect(existsSync(join(fresh.dir, 'absent'))).toBe(false);
+});

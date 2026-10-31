@@ -332,6 +332,7 @@ import { dbPath } from './db/db-path.ts';
 import { parseBriefFlags } from './brief/parse-brief-flags.ts';
 import { parseBriefKind } from './brief/parse-brief-kind.ts';
 import { parseSkillBriefFlags } from './brief/parse-skill-brief-flags.ts';
+import { runBriefCheckCommand } from './brief/run-brief-check-command.ts';
 import { runBriefCommand } from './brief/run-brief-command.ts';
 import { runSkillBriefCommand } from './brief/run-skill-brief-command.ts';
 import { readPacingLanes } from './lanes/read-pacing-lanes.ts';
@@ -2022,7 +2023,7 @@ const GROUPS: Record<string, (context: Ctx) => Promise<Out>> = {
   grant: (c) => runGrantCommand(c.db, c.verb, c.rest, c.flags),
   kinds: (c) => kindsCommand(c.db, c.verb, c.flags),
   linear: (context) => runLinearCommand({ call: makeAuditedLinearCaller(context.db, context.run), files: { statSync, readdirSync, writeFileSync, rmSync } }, context.flags),
-  brief: (context) => runBrief(context.run, context.verb, context.flags),
+  brief: (context) => runBrief(context.run, context.verb, context.rest, context.flags),
   goals: (c) => goalsCommand(c.db, c.verb, c.rest, c.flags),
   defs: (c) => defsCommand(c.db, c.verb, c.rest, c.flags),
   repo: async (c) => {
@@ -2079,7 +2080,7 @@ async function runArgv(argv: string[], runner: Runner): Promise<{ out: Out; db: 
 
   // hq brief is read-only toward the hq db too: openDb would create an absent db and migrate an older one.
   if (noun === 'brief') {
-    return { out: await runBrief(runner, verb, flags), db: null };
+    return { out: await runBrief(runner, verb, rest, flags), db: null };
   }
   const db = openDb();
   const command = lookup(noun, verb);
@@ -2134,7 +2135,10 @@ export async function main(argv: string[], runner: Runner = realRunner): Promise
 
 // The delivery kind reads the db only for noslop's repo list, read-only, so no db is created or
 // migrated.
-function runBrief(runner: Runner, verb: string | undefined, flags: Flags): Promise<Out> {
+function runBrief(runner: Runner, verb: string | undefined, rest: readonly string[], flags: Flags): Promise<Out> {
+  if (verb === 'check') {
+    return Promise.resolve(runBriefCheckCommand(buildNodeBriefFiles(), rest[0]));
+  }
   return match(parseBriefKind(flags))
     .with('delivery', () => {
       const files = buildNodeBriefFiles();
