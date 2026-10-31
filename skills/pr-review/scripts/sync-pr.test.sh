@@ -166,6 +166,10 @@ caller 'uses: zgeoff/tools/.github/workflows/bun-checks.yml@sync-v15' 'uses: zge
 expect "a workflow caller pinned to a sync tag passes" 0 "ok: 1 files"
 
 set_case
+caller 'uses: zgeoff/tools/.github/workflows/bun-checks.yml@3f9c2e1a7b0d4c6e8f1a2b3c4d5e6f7a8b9c0d1e # main' 'uses: zgeoff/tools/.github/workflows/bun-checks.yml@main'
+expect "a workflow caller pinned to a tools commit passes" 0 "ok: 1 files"
+
+set_case
 caller 'uses: zgeoff/tools/.github/workflows/bun-checks.yml@sync-v15' 'uses: zgeoff/tools/.github/workflows/other.yml@main'
 expect "a workflow caller with another workflow fails" 1 "no: .github/workflows/pr.yml matches"
 

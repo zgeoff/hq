@@ -9,11 +9,11 @@
 # in zgeoff/tools' sync/manifest.json whose content at the PR head equals its
 # source at one of the last 30 tools main commits that changed that source, so
 # a sync PR that tools main has moved past still passes. The sync pins each
-# workflow caller's zgeoff/tools ref to the release tag, so a file whose blob
+# workflow caller's zgeoff/tools ref to the commit it syncs, so a file whose blob
 # differs is compared again with its `uses: zgeoff/tools/...@<ref>` refs
-# (main or sync-vN) made equal. A removed file passes only when tools main no
-# longer syncs it and either its copy at the PR base equals, in the same way, a
-# source that an earlier tools manifest delivered to its path, or the source
+# (main, sync-vN, or a commit with its `# main` comment) made equal. A removed
+# file passes only when tools main no longer syncs it and either its copy at
+# the PR base equals, in the same way, a source that an earlier tools manifest delivered to its path, or the source
 # moved to one that the same entry still delivers and whose target at the PR
 # head equals it in the same way: the sync's retired-files commit, which deletes a renamed file's old
 # copy whatever its content. A Markdown file also matches its source once the
@@ -72,10 +72,11 @@ raw_text() {
 }
 
 # text <owner/repo> <path> <ref>: the file's content, with each zgeoff/tools
-# workflow ref (main or sync-vN) on a uses: line replaced by @REF.
+# workflow ref (main, sync-vN, or a commit with its `# main` comment) on a uses:
+# line replaced by @REF.
 text() {
   raw_text "$1" "$2" "$3" |
-    sed -E 's#(uses:[[:space:]]*zgeoff/tools/[^@[:space:]]+)@(main|sync-v[0-9]+)#\1@REF#'
+    sed -E 's#(uses:[[:space:]]*zgeoff/tools/[^@[:space:]]+)@(main|sync-v[0-9]+|[0-9a-f]{40}( \# main)?)#\1@REF#'
 }
 
 # excluded_targets <path>: the targets of the manifest entry that delivers path
