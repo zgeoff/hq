@@ -7,3 +7,7 @@ const LIMIT_BYTES_BY_ROLE: Record<string, number> = {
 export function getStateLimit(role: string): number {
   return LIMIT_BYTES_BY_ROLE[role] ?? DEFAULT_LIMIT_BYTES;
 }
+
+export function getStateTrimTarget(role: string): number {
+  return Math.floor((getStateLimit(role) * 3) / 4);
+}

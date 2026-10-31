@@ -12,7 +12,7 @@ function setupTest() {
   return { directory };
 }
 
-test('it moves the oldest entries until the file is under its limit', () => {
+test('it moves the oldest entries until the file is under its trim target, three quarters of the limit', () => {
   const ctx = setupTest();
   const head = '# kettle\n\n## Cursors\nspout: 4\n\n';
   const entries = Array.from({ length: 40 }, (_unused, index) => `09:${String(index).padStart(2, '0')}Z boiled the water ${'x'.repeat(500)}\n  and then waited\n`);
@@ -31,7 +31,7 @@ test('it moves the oldest entries until the file is under its limit', () => {
   });
 
   const text = readFileSync(join(ctx.directory, 'kettle.md'), 'utf8');
-  expect(Buffer.byteLength(text)).toBe(16_349);
+  expect(Buffer.byteLength(text)).toBe(12_005);
 });
 
 test('it keeps the header and the other sections byte for byte', () => {
@@ -75,7 +75,7 @@ test('it keeps the newest entries and moves only a leading run of the oldest', (
     files: buildNodeStateFiles(),
   });
 
-  expect(readFileSync(join(ctx.directory, 'kettle.md'), 'utf8')).toBe(`${head}## Log\n${entries.slice(10).join('')}${tail}`);
+  expect(readFileSync(join(ctx.directory, 'kettle.md'), 'utf8')).toBe(`${head}## Log\n${entries.slice(18).join('')}${tail}`);
 });
 
 test('it appends the moved entries to the monthly archive after a marker line', () => {
@@ -96,7 +96,7 @@ test('it appends the moved entries to the monthly archive after a marker line', 
     files: buildNodeStateFiles(),
   });
 
-  expect(readFileSync(join(ctx.directory, 'kettle-archive-2026-10.md'), 'utf8')).toBe(`<!-- moved from kettle.md by hq state trim at 2026-10-31T01:02:03Z -->\n${entries.slice(0, 10).join('')}`);
+  expect(readFileSync(join(ctx.directory, 'kettle-archive-2026-10.md'), 'utf8')).toBe(`<!-- moved from kettle.md by hq state trim at 2026-10-31T01:02:03Z -->\n${entries.slice(0, 18).join('')}`);
 });
 
 test('it adds a second batch to an archive that exists', () => {
@@ -166,9 +166,10 @@ test('it reports the sizes, the entries moved, the archive and the backup', () =
     dryRun: false,
     written: true,
     limitBytes: 16_384,
+    targetBytes: 12_288,
     beforeBytes: Buffer.byteLength(original),
-    afterBytes: 16_349,
-    entriesMoved: 10,
+    afterBytes: 12_005,
+    entriesMoved: 18,
     archive: join(ctx.directory, 'kettle-archive-2026-10.md'),
     backup: join(ctx.directory, 'kettle.md.bak-20261031T010203Z'),
   });
@@ -224,9 +225,10 @@ test('#runStateTrim a dry run reports the plan and says nothing was written', ()
     dryRun: true,
     written: false,
     limitBytes: 16_384,
+    targetBytes: 12_288,
     beforeBytes: Buffer.byteLength(original),
-    afterBytes: 16_349,
-    entriesMoved: 10,
+    afterBytes: 12_005,
+    entriesMoved: 18,
     archive: join(ctx.directory, 'kettle-archive-2026-10.md'),
     backup: join(ctx.directory, 'kettle.md.bak-20261031T010203Z'),
   });
@@ -325,7 +327,7 @@ test('it reports how far over the limit the file stays', () => {
   expect([report.afterBytes, report.limitBytes]).toStrictEqual([24_029, 16_384]);
 });
 
-test('#runStateTrim delivery trims to 15 KB', () => {
+test('#runStateTrim delivery trims to three quarters of its 15 KB limit', () => {
   const ctx = setupTest();
   writeFileSync(
     join(ctx.directory, 'delivery.md'),
@@ -342,7 +344,7 @@ test('#runStateTrim delivery trims to 15 KB', () => {
     files: buildNodeStateFiles(),
   });
 
-  expect([report.limitBytes, report.entriesMoved, report.afterBytes]).toStrictEqual([15_360, 12, 15_211]);
+  expect([report.limitBytes, report.targetBytes, report.entriesMoved, report.afterBytes]).toStrictEqual([15_360, 11_520, 19, 11_410]);
 });
 
 test('#runStateTrim a file with no log section is refused in a real run', () => {
@@ -537,7 +539,7 @@ test('#runStateTrim an aborted replace leaves the archive append in place', () =
       files: { ...buildNodeStateFiles(), readText: readChangingFile(join(ctx.directory, 'kettle.md'), replacement, 2) },
     }),
   ).toThrow();
-  expect(readFileSync(join(ctx.directory, 'kettle-archive-2026-10.md'), 'utf8')).toBe(`<!-- moved from kettle.md by hq state trim at 2026-10-31T01:02:03Z -->\n${entries.slice(0, 10).join('')}`);
+  expect(readFileSync(join(ctx.directory, 'kettle-archive-2026-10.md'), 'utf8')).toBe(`<!-- moved from kettle.md by hq state trim at 2026-10-31T01:02:03Z -->\n${entries.slice(0, 18).join('')}`);
 });
 
 test('#runStateTrim an aborted replace leaves no temp file behind', () => {
@@ -747,7 +749,7 @@ test('#runStateTrim any session may run a dry run of another role', () => {
     files: buildNodeStateFiles(),
   });
 
-  expect(report.entriesMoved).toBe(319);
+  expect(report.entriesMoved).toBe(490);
 });
 
 test('#runStateTrim a backup already at the target path stops the trim before anything changes', () => {

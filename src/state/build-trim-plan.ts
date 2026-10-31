@@ -6,7 +6,7 @@ export type TrimPlan = { kind: 'no-log' } | { kind: 'plan'; kept: string; moved:
 
 // The "## Log" section runs to the next "## " line. A non-indented line starts an entry; an
 // indented or blank line belongs to the entry above. Oldest entries sit first and move first.
-export function buildTrimPlan(text: string, limitBytes: number): TrimPlan {
+export function buildTrimPlan(text: string, targetBytes: number): TrimPlan {
   const lines = text.split(/(?<=\n)/u);
   const start = lines.findIndex((line) => /^## Log(?: \([^)]*\))?\s*$/u.test(line));
   if (start === -1) {
@@ -32,7 +32,7 @@ export function buildTrimPlan(text: string, limitBytes: number): TrimPlan {
   let keptPrefix = '';
   let afterBytes = beforeBytes;
   let entriesMoved = 0;
-  while (afterBytes > limitBytes && entriesMoved < entryStarts.length - 1) {
+  while (afterBytes > targetBytes && entriesMoved < entryStarts.length - 1) {
     const from = entryStarts[entriesMoved] ?? end;
     const to = entryStarts[entriesMoved + 1] ?? end;
     for (const line of lines.slice(from, to)) {

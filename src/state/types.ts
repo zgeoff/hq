@@ -6,6 +6,7 @@ export interface TrimReport {
   // false when nothing moved or --dry-run
   written: boolean;
   limitBytes: number;
+  targetBytes: number;
   beforeBytes: number;
   afterBytes: number;
   entriesMoved: number;
