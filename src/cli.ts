@@ -320,7 +320,8 @@ import { syncLinear } from './kinds/sync-linear.ts';
 import { weeksBack } from './kinds/weeks-back.ts';
 import { makeAuditedLinearCaller } from './linear/make-audited-linear-caller.ts';
 import { makeLinearCaller } from './linear/make-linear-caller.ts';
-import { loadNoslopSettings } from './noslop/load-noslop-settings.ts';
+import { readNoslopSettings } from './brief/read-noslop-settings.ts';
+import { dbPath } from './db/db-path.ts';
 import { parseBriefFlags } from './brief/parse-brief-flags.ts';
 import { runBriefCommand } from './brief/run-brief-command.ts';
 import { readPacingLanes } from './lanes/read-pacing-lanes.ts';
@@ -2010,11 +2011,7 @@ const GROUPS: Record<string, (context: Ctx) => Promise<Out>> = {
   grant: (c) => runGrantCommand(c.db, c.verb, c.rest, c.flags),
   kinds: (c) => kindsCommand(c.db, c.verb, c.flags),
   linear: (context) => runLinearCommand({ call: makeAuditedLinearCaller(context.db, context.run), files: { statSync, readdirSync, writeFileSync, rmSync } }, context.flags),
-  brief: (context) =>
-    runBriefCommand(
-      { linear: makeLinearCaller(context.run), run: context.run, noslop: loadNoslopSettings(context.db), privateDir: PRIVATE_TREE.dir(), warn: (line) => console.error(line) },
-      parseBriefFlags(context.verb, context.flags),
-    ),
+  brief: (context) => runBrief(context.run, context.verb, context.flags),
   goals: (c) => goalsCommand(c.db, c.verb, c.rest, c.flags),
   defs: (c) => defsCommand(c.db, c.verb, c.rest, c.flags),
   repo: async (c) => {
@@ -2067,6 +2064,11 @@ async function runArgv(argv: string[], runner: Runner): Promise<{ out: Out; db: 
   if (noun === 'capabilities') return { out: capabilities(VERSION, SCHEMA_VERSION, flags.require), db: null };
   // A bad setting stops the command here, naming it, instead of turning into NaN deep inside one.
   config();
+
+  // hq brief is read-only toward the hq db too: openDb would create an absent db and migrate an older one.
+  if (noun === 'brief') {
+    return { out: await runBrief(runner, verb, flags), db: null };
+  }
   const db = openDb();
   const command = lookup(noun, verb);
   if (!command) throw new HqError('bad_args', `unknown command: ${noun}. Try hq help`);
@@ -2116,6 +2118,12 @@ export async function main(argv: string[], runner: Runner = realRunner): Promise
     else console.error(`hq: ${err.message}`);
     return err.code === 'internal' ? 2 : 1;
   }
+}
+
+// Reads the db only for noslop's repo list, read-only, so no db is created or migrated.
+function runBrief(runner: Runner, verb: string | undefined, flags: Flags): Promise<Out> {
+  const deps = { linear: makeLinearCaller(runner), run: runner, noslop: readNoslopSettings(dbPath()), privateDir: PRIVATE_TREE.dir(), warn: (line: string) => console.error(line) };
+  return runBriefCommand(deps, parseBriefFlags(verb, flags));
 }
 
 async function runCommand(context: Ctx): Promise<Out> {

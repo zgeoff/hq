@@ -22,7 +22,7 @@ export function fitBrief(template: string, parts: BriefParts, issueInPrompt: boo
     }
   }
   if (isOver(prompt)) {
-    prompt = dropGoalLine(prompt, parts.goalFile);
+    prompt = dropGoalLine(prompt);
     cuts.push('cut 3');
   }
   const names = [...template.matchAll(PLACEHOLDER)].map((match) => match.groups?.['name'] ?? '');
@@ -57,13 +57,8 @@ function isOver(prompt: string): boolean {
   return Buffer.byteLength(prompt) > BRIEF_LIMIT_BYTES;
 }
 
-// The pointer to the issue and playbook lives on the /goal line, so it stays as a line of its own
-// when that line goes.
-function dropGoalLine(prompt: string, pointer: string): string {
+function dropGoalLine(prompt: string): string {
   const lines = prompt.split('\n');
-  if (pointer !== '') {
-    return [pointer.replace(/^\. /u, ''), ...lines.slice(1)].join('\n');
-  }
   const dropped = lines[1] === '' ? 2 : 1;
   return lines.slice(dropped).join('\n');
 }
