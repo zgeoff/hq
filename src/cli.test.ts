@@ -18,6 +18,7 @@ import { loadActionsSpend } from './goals/load-actions-spend.ts';
 import { createGrantMark } from './grants/create-grant-mark.ts';
 import { recordGrantAction } from './grants/record-grant-action.ts';
 import { readReadySnapshot } from './lanes/read-ready-snapshot.ts';
+import { READY_ISSUES_KEY } from './lanes/ready-issues-key.ts';
 import { resetKey } from './linear/reset-key.ts';
 import type { RunResult, Runner } from './runner/types.ts';
 import { addPr } from './runs/add-pr.ts';
@@ -25,6 +26,7 @@ import { addRun } from './runs/add-run.ts';
 import { setState } from './runs/set-state.ts';
 import { getStateRoles } from './state/get-state-roles.ts';
 import { buildMockSha } from '../test/build-mock-sha.ts';
+import { buildReadyIssue } from '../test/build-ready-issue.ts';
 import { buildStubFinalGH } from '../test/build-stub-final-gh.ts';
 import { buildStubBriefGH } from '../test/build-stub-brief-gh.ts';
 
@@ -396,7 +398,34 @@ test('it shows the design lanes apart from the delivery pool in hq lanes --json'
   const code = await main(['lanes', '--json']);
 
   expect(code).toBe(0);
-  expect(JSON.parse(printed.join(''))).toMatchObject({ plan: { pool: { impRunning: 0, localRunning: 0 }, design: { agent: { open: 1, slots: 1 }, withGeoff: { open: 2, slots: 1, asked: ['chat 29 Oct'] } } } });
+  expect(JSON.parse(printed.join(''))).toMatchObject({ plan: { pool: { impRunning: 0, localRunning: 0 }, design: { agent: { open: 1, slots: 1 }, withGeoff: { open: 2, slots: 1, asked: ['chat 29 Oct'] } } }, placeTypes: null });
+});
+
+test('it shows the parsed placeTypes and the place of each next issue in hq lanes --json', async () => {
+  const fresh = freshDb();
+  const log = console.log;
+  const printed: string[] = [];
+  onTestFinished(fresh.cleanup);
+  mkdirSync(`${fresh.dir}/bin`);
+  writeFileSync(`${fresh.dir}/bin/systemctl`, '#!/bin/sh\nexit 3\n');
+  chmodSync(`${fresh.dir}/bin/systemctl`, 0o755);
+  mkdirSync(`${fresh.dir}/skill/scripts`, { recursive: true });
+  writeFileSync(`${fresh.dir}/skill/scripts/capacity.sh`, `echo '${JSON.stringify({ imp: { freeMib: 0, room: false } })}'\n`);
+  writeFileSync(`${fresh.dir}/skill/pacing.json`, JSON.stringify({ slots: { imp: 0, local: 1 }, placeTypes: { local: ['investigation'] } }));
+  onTestFinished(overrideEnv('HQ_CAPACITY', `${fresh.dir}/skill/scripts/capacity.sh`));
+  onTestFinished(overrideEnv('HQ_NOW', NOON_SYDNEY));
+  onTestFinished(overrideEnv('HQ_NOTIFY', 'off'));
+  onTestFinished(overrideEnv('HQ_AS', 'z-delivery'));
+  onTestFinished(overrideEnv('PATH', `${fresh.dir}/bin:${process.env['PATH']}`));
+  console.log = (line: string) => void printed.push(line);
+  onTestFinished(() => (console.log = log));
+  at(NOON_SYDNEY);
+  setMeta(fresh.db, READY_ISSUES_KEY, JSON.stringify({ at: NOON_SYDNEY, eligible: [buildReadyIssue('GEO-9871', { type: 'Bug' }), buildReadyIssue('GEO-9872', { type: 'Investigation' })], design: [] }));
+
+  const code = await main(['lanes', '--json']);
+
+  expect(code).toBe(0);
+  expect(JSON.parse(printed.join(''))).toMatchObject({ placeTypes: { local: ['investigation'] }, plan: { plan: { picks: [{ issue: 'GEO-9872', term: null, reserve: null, place: 'local' }] } } });
 });
 
 test('it keeps the design pass in hq run show after the build run starts', async () => {

@@ -5,6 +5,7 @@ test('it keeps the Ready-waiting clock and the stored cause when the capacity re
   const writes = buildSlotCauseWrites(
     {
       free: 0,
+      unfit: 0,
       eligible: null,
       eligibleSince: '2026-10-14T00:55:00Z',
       readyAt: '2026-10-14T00:58:00Z',
@@ -24,6 +25,7 @@ test('it clears the Ready-waiting clock and ends the stored cause when no slot i
   const writes = buildSlotCauseWrites(
     {
       free: 0,
+      unfit: 0,
       eligible: 2,
       eligibleSince: '2026-10-14T00:55:00Z',
       readyAt: '2026-10-14T00:58:00Z',
@@ -43,6 +45,7 @@ test('it clears the Ready-waiting clock when no Ready issue is eligible', () => 
   const writes = buildSlotCauseWrites(
     {
       free: 2,
+      unfit: 0,
       eligible: 0,
       eligibleSince: '2026-10-14T00:55:00Z',
       readyAt: '2026-10-14T00:58:00Z',
@@ -62,6 +65,7 @@ test('it starts the Ready-waiting clock at the look when eligible Ready work fir
   const writes = buildSlotCauseWrites(
     {
       free: 2,
+      unfit: 0,
       eligible: 1,
       eligibleSince: null,
       readyAt: '2026-10-14T00:58:00Z',
@@ -81,6 +85,7 @@ test('it begins a cause at the look when none was stored', () => {
   const writes = buildSlotCauseWrites(
     {
       free: 2,
+      unfit: 0,
       eligible: 0,
       eligibleSince: null,
       readyAt: '2026-10-14T00:58:00Z',
@@ -100,6 +105,7 @@ test('it changes the stored cause at the look when the look finds another', () =
   const writes = buildSlotCauseWrites(
     {
       free: 2,
+      unfit: 0,
       eligible: 0,
       eligibleSince: null,
       readyAt: '2026-10-14T00:58:00Z',
@@ -119,6 +125,7 @@ test('it writes no move and keeps the stored start when the look finds the store
   const writes = buildSlotCauseWrites(
     {
       free: 2,
+      unfit: 0,
       eligible: 0,
       eligibleSince: null,
       readyAt: '2026-10-14T00:58:00Z',
@@ -138,6 +145,7 @@ test('it ends the stored cause when eligible Ready work is still inside its grac
   const writes = buildSlotCauseWrites(
     {
       free: 2,
+      unfit: 0,
       eligible: 1,
       eligibleSince: '2026-10-14T00:55:00Z',
       readyAt: '2026-10-14T00:58:00Z',
@@ -157,6 +165,7 @@ test('it writes no move when no cause holds and none was stored', () => {
   const writes = buildSlotCauseWrites(
     {
       free: 0,
+      unfit: 0,
       eligible: 2,
       eligibleSince: null,
       readyAt: '2026-10-14T00:58:00Z',
@@ -170,4 +179,24 @@ test('it writes no move when no cause holds and none was stored', () => {
   );
 
   expect(writes.move).toBeNull();
+});
+
+test('it clears the Ready-waiting clock while no eligible issue fits a free slot, so a fitting issue later gets the grace', () => {
+  const writes = buildSlotCauseWrites(
+    {
+      free: 1,
+      unfit: 1,
+      eligible: 2,
+      eligibleSince: '2026-10-14T00:20:00Z',
+      readyAt: '2026-10-14T00:58:00Z',
+      promotable: null,
+      focus: '[]',
+      causeSince: null,
+      freshMinutes: 30,
+      at: new Date('2026-10-14T01:00:00Z'),
+    },
+    true,
+  );
+
+  expect(writes).toStrictEqual({ eligibleSince: null, move: { action: 'cause-began', to: 'supply' }, slotCause: { cause: 'supply', slots: 1, since: '2026-10-14T01:00:00Z', readyAgeMinutes: 2, reason: null, waitingMinutes: null, backlogError: null } });
 });

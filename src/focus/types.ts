@@ -1,4 +1,4 @@
-import type { ReadyIssue } from '../lanes/types.ts';
+import type { PacingSlots, PlaceTypes, ReadyIssue } from '../lanes/types.ts';
 
 type FocusClass = 'maintenance' | 'roadmap';
 type FocusType = 'bug' | 'feature' | 'chore' | 'improvement' | 'investigation';
@@ -39,11 +39,32 @@ export interface FocusEntry {
   term: number | null;
 }
 
-// One free slot's issue. reserve names the area whose reserved slot it fills.
+// One free slot's issue. reserve names the area whose reserved slot it fills; place, the place whose
+// slot it fills, set only under pacing.json's placeTypes.
 export interface FocusPick {
   issue: string;
   term: number | null;
   reserve: string | null;
+  place?: keyof PacingSlots;
+}
+
+// The free slots by place, and the Type names each listed place takes.
+export interface PlaceRoom {
+  free: PacingSlots;
+  types: PlaceTypes;
+}
+
+// The free slots a plan fills: the pool's free count and, under pacing.json's placeTypes, the free
+// slots by place.
+export interface FocusSlots {
+  free: number;
+  places: PlaceRoom | null;
+}
+
+// The free slots no eligible issue fits, and the places they sit in with the Type names each takes.
+export interface PlaceUnfit {
+  slots: number;
+  places: { place: keyof PacingSlots; types: string[] }[];
 }
 
 export interface FocusPlan {
@@ -51,4 +72,7 @@ export interface FocusPlan {
 
   // Reserved slots with nothing eligible in their area, given to other work.
   lent: { area: string; slots: number }[];
+
+  // Set only under pacing.json's placeTypes.
+  unfit?: PlaceUnfit;
 }

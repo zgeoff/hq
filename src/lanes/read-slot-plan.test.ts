@@ -16,6 +16,7 @@ import { formatSlotNudge } from './format-slot-nudge.ts';
 import { formatSlotPlan } from './format-slot-plan.ts';
 import { parseLocalRoom } from './parse-local-room.ts';
 import { readLinearReady } from './read-linear-ready.ts';
+import { readSlotMinutes } from './read-slot-minutes.ts';
 import { readSlotPlan } from './read-slot-plan.ts';
 import { tick } from './tick.ts';
 import { validateLaneRules } from './validate-lane-rules.ts';
@@ -44,7 +45,10 @@ function setupTest() {
   const addLocalRun = (issue: string): void => {
     addRun(fresh.db, { issue, title: 'Descale the kettle', place: 'local', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: null, actor: 'z-delivery' });
   };
-  return { db: fresh.db, readySeeds, sample, seedReady, addLocalRun };
+  const addImpRun = (issue: string): void => {
+    addRun(fresh.db, { issue, title: 'Polish the kettle', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: null, actor: 'z-delivery' });
+  };
+  return { db: fresh.db, readySeeds, sample, seedReady, addLocalRun, addImpRun };
 }
 
 test('a focus set changes what the next plan picks, and the running run keeps its slot', async () => {
@@ -454,4 +458,74 @@ test('it lists where the owner asked for a with-geoff pass reopened above the la
   const plan = readSlotPlan(ctx.db, ctx.sample, new Date('2026-10-15T20:00:00Z'));
 
   expect(plan?.design.withGeoff).toStrictEqual({ open: 2, slots: 1, next: [], asked: ['chat 30 Oct'] });
+});
+
+test('it plans, prints and ticks the same with placeTypes null as with no placeTypes key', async () => {
+  const ctx = setupTest();
+  await ctx.seedReady(ctx.readySeeds);
+  ctx.addLocalRun('GEO-9805');
+
+  const withoutKey = readSlotPlan(ctx.db, ctx.sample);
+  const withNull = readSlotPlan(ctx.db, { ...ctx.sample, placeTypes: null });
+  if (withoutKey === null || withNull === null) {
+    throw new Error('no slot plan');
+  }
+
+  expect(withNull).toStrictEqual(withoutKey);
+  expect(formatSlotPlan(withNull, new Date('2026-10-15T20:00:00Z'))).toStrictEqual([
+    'slots (running/size, free now): imp 0/0, 0 free; local 1/3, 2 free',
+    'local: 1 of 3 delivery sessions on this host',
+    'focus: none (all eligible work by priority)',
+    'next: GEO-9801, GEO-9804 (4 eligible; Ready read just now)',
+    'design: agent 0/2, with-geoff 0/1',
+  ]);
+});
+
+test('it passes over a Bug for the free local slot and picks the next issue whose Type local takes', async () => {
+  const ctx = setupTest();
+  await ctx.seedReady([
+    { identifier: 'GEO-9821', project: 'kettle roadmap', type: 'Bug', labels: ['atc'], priority: 1 },
+    { identifier: 'GEO-9822', project: 'kettle roadmap', type: 'Investigation', labels: ['atc'], priority: 2 },
+    { identifier: 'GEO-9823', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 },
+  ]);
+  ctx.addImpRun('GEO-9823');
+
+  const plan = readSlotPlan(ctx.db, { ...ctx.sample, slots: { imp: 1, local: 1 }, placeTypes: { local: ['Design', 'Refactor', 'Investigation'] } });
+
+  expect([plan?.pool.impFree, plan?.pool.localFree, plan?.plan?.picks]).toStrictEqual([0, 1, [{ issue: 'GEO-9822', term: null, reserve: null, place: 'local' }]]);
+});
+
+test('it picks no issue when only Bugs are eligible and only a local slot is free, and says so in one line', async () => {
+  const ctx = setupTest();
+  await ctx.seedReady([
+    { identifier: 'GEO-9831', project: 'kettle roadmap', type: 'Bug', labels: ['atc'], priority: 1 },
+    { identifier: 'GEO-9832', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 },
+  ]);
+  ctx.addImpRun('GEO-9832');
+
+  const plan = readSlotPlan(ctx.db, { ...ctx.sample, slots: { imp: 1, local: 1 }, placeTypes: { local: ['Design', 'Refactor', 'Investigation'] } });
+  if (plan === null) {
+    throw new Error('no slot plan');
+  }
+
+  expect(plan.plan).toStrictEqual({ picks: [], lent: [], unfit: { slots: 1, places: [{ place: 'local', types: ['Design', 'Refactor', 'Investigation'] }] } });
+  expect(formatSlotPlan(plan, new Date('2026-10-15T20:00:00Z')).slice(3, 5)).toStrictEqual(['next: nothing (1 eligible; Ready read just now)', '  no fit: 1 free slot(s) fit no eligible issue (local takes Design, Refactor, Investigation)']);
+});
+
+test('it counts a free slot no eligible issue may fill as supply minutes, not empty delivery minutes or idle slot-minutes', async () => {
+  const ctx = setupTest();
+  await ctx.seedReady([
+    { identifier: 'GEO-9841', project: 'kettle roadmap', type: 'Bug', labels: ['atc'], priority: 1 },
+    { identifier: 'GEO-9842', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 },
+  ]);
+  ctx.addImpRun('GEO-9842');
+  const sample = { ...ctx.sample, slots: { imp: 1, local: 1 }, placeTypes: { local: ['Design', 'Refactor', 'Investigation'] } };
+  tick(ctx.db, sample, 'hq-lanes');
+  at('2026-10-15T20:10:00Z');
+
+  const result = tick(ctx.db, sample, 'hq-lanes');
+
+  expect([result.slots, result.slotCause.cause, result.slotCause.slots]).toStrictEqual([0, 'supply', 1]);
+  expect(ctx.db.query('SELECT slots FROM lanes_samples ORDER BY seq').all()).toStrictEqual([{ slots: 0 }, { slots: 0 }]);
+  expect(readSlotMinutes(ctx.db, '2026-10-16')).toStrictEqual({ delivery: 0, triage: 0, supply: 10, design: 0 });
 });

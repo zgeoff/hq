@@ -6,12 +6,16 @@ import { DEFAULT_DESIGN_SLOTS } from './default-design-slots.ts';
 import { parseDesignSlots } from './parse-design-slots.ts';
 import { parseLocalRoom } from './parse-local-room.ts';
 import { parsePacingSlots } from './parse-pacing-slots.ts';
-import type { DesignSlots, PacingSlots } from './types.ts';
+import { parsePlaceTypes } from './parse-place-types.ts';
+import type { DesignSlots, PacingSlots, PlaceTypes } from './types.ts';
 
 export interface Pacing {
   impMib: number;
   lanes: LaneConfig[] | null;
   slots: PacingSlots | null;
+
+  // The Type names each place takes; null when the file gives none, so every place takes any Type.
+  placeTypes: PlaceTypes | null;
 
   // The local sessions unattended providers may run on this host; null: no cap but the local slots.
   localRoom: number | null;
@@ -34,7 +38,7 @@ const claudeProviderSchema = z.object({ threshold: z.number() });
 
 const claudeSchema = z.object({ providers: z.object({ claude: claudeProviderSchema }) });
 
-// pacing.json's imp size, lanes, slot caps and local room. A file hq can't read, or one with neither lanes nor
+// pacing.json's imp size, lanes, slot caps, place types and local room. A file hq can't read, or one with neither lanes nor
 // slots, gives one pool of imp slots. Lanes or slots it refuses give an error, so the watcher nudges
 // nothing on a config it can't read.
 export async function loadPacing(path: string): Promise<Pacing> {
@@ -50,11 +54,11 @@ export async function loadPacing(path: string): Promise<Pacing> {
   const design = { design: designRead.design, designError: designRead.error };
   try {
     if (shape.lanes === undefined && shape.slots === undefined) {
-      return { impMib, lanes: null, slots: null, localRoom: null, claudeLaunchPct, ...design, error: null };
+      return { impMib, lanes: null, slots: null, placeTypes: null, localRoom: null, claudeLaunchPct, ...design, error: null };
     }
-    return { impMib, lanes: parseLanes(file), slots: parsePacingSlots(file), localRoom: parseLocalRoom(file), claudeLaunchPct, ...design, error: null };
+    return { impMib, lanes: parseLanes(file), slots: parsePacingSlots(file), placeTypes: parsePlaceTypes(file), localRoom: parseLocalRoom(file), claudeLaunchPct, ...design, error: null };
   } catch (error) {
-    return { impMib, lanes: null, slots: null, localRoom: null, claudeLaunchPct, ...design, error: `pacing.json: ${toMessage(error)}` };
+    return { impMib, lanes: null, slots: null, placeTypes: null, localRoom: null, claudeLaunchPct, ...design, error: `pacing.json: ${toMessage(error)}` };
   }
 }
 
