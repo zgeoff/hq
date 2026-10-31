@@ -1,65 +1,62 @@
-# holds
+# Holds
 
-What holds a merge besides the gate, and how the owner's answer is recorded.
+Two holds stop a merge: the owner's lgtm, which `hq review gate` enforces from hq's records, and a
+preview check, which you enforce. Each record is tied to one head commit, and a push voids it. Never
+pass an lgtm on by message.
 
 ## The owner's lgtm
 
-The owner reviews skill and instruction changes himself, because they decide how every agent
-behaves. A PR waits for his lgtm when it changes a repo's `AGENTS.md` or its skills, and in zgeoff/hq
-and zgeoff/hq-private when it changes `skills/`, [fleet.json](../../../fleet.json), `grants/` or the session docs. A skill
-is its `SKILL.md`, its references and the scripts it runs. `hq review gate` refuses such a PR in hq
-and hq-private until his lgtm is on record at its head.
+A PR is held when it changes:
 
-`hq review gate` holds such a PR in every other zgeoff repo too, except zgeoff/nixie-definitions,
-until a record at its head clears it. A test file or test data in a skill's folder is not held, and
-neither is a PR a bot opened.
+- a repo's `AGENTS.md`;
+- a skill: its `SKILL.md`, references or scripts;
+- in zgeoff/hq and zgeoff/hq-private, also [fleet.json](../../../fleet.json), `grants/` or the
+  session docs in `docs/`.
 
-Clear these yourself with a record at the PR's head. A push after it voids the record, and each
-record goes into `hq news`:
+Not held: test files or data in a skill folder; a bot's PR (except repo-sync, which needs its
+record); anything in zgeoff/nixie-definitions.
 
-- **A mechanical edit:** `hq pr mechanical <repo> <pr>`. hq proves it from the diff and passes only a
-  link or path target that moved to the same file, a version number, or a table re-padded with no
-  cell changed. When hq refuses, the PR waits for him.
-- **A rebase that changes no content:** `hq pr rebased <repo> <pr> --from <old head>`, when his lgtm
-  is the newest owner answer at the old head. hq carries the lgtm to the new head only when git's
-  patch-id of the whole PR diff matches at both heads. When hq refuses, it names the changed files,
-  and the PR waits for him.
-- **An exception hq does not prove:** `hq pr exempt <repo> <pr> --rule <rule> --note <why>`, with
-  one of these rules:
-  - `formatting`: read the raw diff, and never rely on `git diff -w` showing nothing. Record it only
-    when no line inside a code block, a command, or YAML or JSON changes, whitespace included. A
-    prose re-wrap and blank lines between paragraphs count; any other whitespace change waits for
-    him.
-  - `rename`: `scripts/rename-pr.sh <repo> <pr>` prints `ok`.
-  - `repo-sync`: a repo-sync PR, as the update-bots reference says.
-  - `ci-design-sync`: the skill change only rolls the shared ci-design skill out to a repo or syncs
-    it. A new rule inside ci-design itself, in zgeoff/tools, waits for him.
+In zgeoff/hq and zgeoff/hq-private only his lgtm clears it. Elsewhere, one of these records you make
+also clears it, at the PR's head. If hq refuses the record, the PR waits for him.
 
-In zgeoff/hq and zgeoff/hq-private, neither record counts: those PRs wait for his lgtm.
+- **Mechanical edit:** `hq pr mechanical <repo> <pr>`. hq passes only a moved link or path, a
+  version number, or a re-padded table.
+- **Content-free rebase:** `hq pr rebased <repo> <pr> --from <old head>`, when his lgtm is the
+  newest answer at the old head. hq carries it over only if the PR's patch-id matches.
+- **Exception:** `hq pr exempt <repo> <pr> --rule <rule> --note <why>`, with one of:
+  - `formatting`: no change inside a code block, or to any command, YAML or JSON line, whitespace
+    included. Read the raw diff: `git diff -w` hides code-block whitespace.
+  - `rename`: only renames, and `scripts/rename-pr.sh <repo> <pr>` prints `ok`.
+  - `repo-sync`: a PR the repo-sync workflow opened.
+  - `ci-design-sync`: only rolls out or syncs the shared ci-design skill. A new ci-design rule waits
+    for him.
 
-File each PR that waits with `hq unblock add --task '<lgtm repo#n: what it changes>' --done-when pr:<repo>#<n>`.
-Send any decision it needs to `z-triage` by message.
+File each PR waiting on him with
+`hq unblock add --task '<lgtm repo#n: what it changes>' --done-when pr:<repo>#<n>`. A question
+beyond the lgtm goes to `z-triage` as a call.
 
-## The owner's answer
+## His answer
 
-`z-stu` records the owner's answer with `hq pr answer <repo> <pr> lgtm|changes|reject --source <source>`,
-with his words and their source, as this file's private half says: read
-`skills/pr-review/references/holds.private.md` in the local hq-private clone (`hq defs` shows where
-it is) and follow it as part of this skill. Read it with `hq pr status <repo> <pr>`. No session
-relays an lgtm by message, because the gate reads only the record.
+`z-stu` records it with `hq pr answer`; read it with `hq pr status <repo> <pr>`.
 
-- **lgtm:** merge on the gate.
+- **lgtm:** merge once the gate passes.
 - **changes:** send his note to the agent as a finding.
-- **later:** leave it waiting.
-- **reject:** close the PR with `gh pr close <n> -R zgeoff/<repo> --comment "Closed: rejected in review."`,
-  and send his note to `z-delivery`, which drops or replans the issue.
+- **none yet, or "later":** the PR waits.
+- **reject:** `gh pr close <n> -R zgeoff/<repo> --comment "Closed: rejected in review."`, and send
+  his note to `z-delivery`.
+
+If an answer's source looks wrong, `skills/pr-review/references/holds.private.md` in hq-private
+(`hq defs` shows where) says which sources count.
 
 ## A preview check
 
-A PR with a preview comment gets its live acceptance items checked on the preview before the merge,
-since the preview ends when the PR closes. Once the PR is final and its preview comment names its
-head commit, message `z-qa` the issue, the PR, the head commit and those items. Merge after `z-qa`'s
-evidence comment for that head is on the issue. A failed item is a finding: send it to the agent. An
-item that needs the owner goes to `hq unblock add --done-when issue:GEO-n` and doesn't hold the
-merge. When no `z-qa` session runs, or the PR has no preview comment, the live check waits for the
-release.
+Some repos deploy each PR to a preview and comment its URL. `z-qa` checks the issue's live
+Acceptance items there before the merge, since the preview ends when the PR closes.
+
+1. Wait for the FINAL note and a preview comment naming the PR's head.
+2. Message `z-qa` the issue, PR, head and live items.
+3. Merge once `z-qa`'s evidence comment for that head is on the issue and the gate passes.
+
+A failed item is a finding for the agent. An item that needs the owner goes on his list with
+`hq unblock add --task '<what he checks>' --done-when issue:GEO-<n>`, and doesn't hold the merge.
+With no `z-qa` session, or no preview comment, skip this; `z-qa` checks after release.

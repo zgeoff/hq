@@ -1,25 +1,45 @@
-# stacks
+# Stacks
 
-How `pr-review` merges a stack.
+A stack is a chain of PRs, each built on the one below. GitHub refuses `gh pr merge` on a layer, so
+one `gh stack merge` on the top PR squash-merges every open layer, bottom up, all or nothing.
 
-A stack merges in one call, never layer by layer: `gh pr merge` refuses a PR in a stack. Merge it only once every layer has cleared review with its head checked, every review thread on every layer has its answer, and `hq review gate` exits 0 for each layer, since the call merges every open layer below the top PR. A layer that `SKILL.md` holds for the owner's lgtm, such as one that changes a repo's `AGENTS.md` or its skills, still needs it; the stack merge itself needs no other yes from him. Use the `gh-stack` skill's merge, never a raw `merge-async` API call, which the classifier refuses as a CI bypass.
+`gh stack` has no `-R` flag and acts on the current folder's repo, and your Bash starts in a
+zgeoff/hq checkout. Start each `gh stack` command with `cd <checkout of the stack's repo> &&`. The
+classifier refuses a merge line with a pipe or any other command, and a raw `merge-async` call, so
+run step 3 exactly as written.
 
-Your shell returns to `hq-defs` after each Bash call, so a `cd` on its own never lasts, and `gh stack` takes no `-R` flag: run bare from `hq-defs`, it would act on `hq`'s PR of that number. So start each `gh stack` command with `cd <checkout of the repo> &&`, in a checkout with the top PR's branch checked out. First check that the stack holds exactly the layers you reviewed:
+## Before the merge
 
-```sh
-cd <checkout of the repo> && gh stack view --short
-```
+Every layer: reviewed at its current head, every thread answered, `hq review gate <repo> <pr>` exits
+0, and the owner's lgtm on record where SKILL.md's holds need it.
 
-Then read the top PR's full head SHA into a variable, whole from GitHub, never pieced together from a short SHA or a copied fragment, and print it:
+## Merge it
 
-```sh
-top_sha=$(gh pr view <top PR> -R <owner>/<repo> --json headRefOid --jq .headRefOid) && echo "$top_sha"
-```
+1. In a checkout with the top PR's branch, such as a worktree under `~/projects/<repo>/.worktrees/`,
+   check the layers are the ones you reviewed:
 
-Check that it is the SHA you reviewed. When it differs, the head moved after your review: review again first, since `gh stack merge` takes no head SHA. Then run exactly this line, with nothing else on it: no pipe, no `echo`, no other command:
+   ```sh
+   cd <checkout of the stack's repo> && gh stack view --short
+   ```
 
-```sh
-cd <checkout of the repo> && gh stack merge <top PR> --yes --squash
-```
+   Review any layer you haven't; ask the agent about any that's missing.
 
-Check the result with `gh pr view <top PR> -R <owner>/<repo> --json state` in a separate call. The merge is all or nothing: GitHub squash-merges each layer in order, or merges none and reports why; act on the reason it prints. Then check each layer as After the merge in `SKILL.md` says, and hand on every layer's merge in one message.
+2. `gh stack merge` takes no SHA, so check the top head is still the one you reviewed, using the
+   full SHA from GitHub:
+
+   ```sh
+   gh pr view <top PR> -R zgeoff/<repo> --json headRefOid --jq .headRefOid
+   ```
+
+3. Merge, on a line of its own:
+
+   ```sh
+   cd <checkout of the stack's repo> && gh stack merge <top PR> --yes --squash
+   ```
+
+   On failure it prints why; act on that.
+
+4. In a separate call, expect `"state": "MERGED"` from
+   `gh pr view <top PR> -R zgeoff/<repo> --json state`.
+5. Do SKILL.md's After the merge for each layer, and send one message listing each layer's merge
+   SHA.

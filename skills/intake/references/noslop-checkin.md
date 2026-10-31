@@ -1,36 +1,35 @@
 # noslop check-in
 
-How `intake` runs the daily noslop check-in.
+Once a day, post one news line on how noslop's reviews went: review churn, and any `accepted-risk`
+answer the owner never gave. Only he may accept a finding's risk.
 
-A daily session cron job in your session runs it at 18:07 Sydney time. When `CronList` shows none, create it, and save its creation time in your state file; a recurring job expires after 7 days, so replace it once it is 6 days old.
+Your state file keeps two marks: `noslop cron=` and `noslop since=`, both UTC as
+`YYYY-MM-DDTHH:MM:SSZ`, since GitHub's `created_at` is UTC.
 
-Read the `noslop since=` mark in your state file, note the time now, and run `hq noslop report --since <the mark> --json`. With no mark yet, use 24 hours ago. Write the time you noted as the new mark only after the `hq news add` below succeeds, so a failed run or a restart loses no window.
+1. **Keep the cron alive:** a recurring job expires silently after 7 days. If `CronList` has no job
+   naming the noslop check-in, or `noslop cron=` is 6 days old, delete it and create a daily one at
+   18:07 Sydney. Write `noslop cron=<UTC time>`.
+2. Read `noslop since=` (none yet: 24 hours ago), and note the time now.
+3. Run `hq noslop report --since <the mark> --json`.
+4. From each PR in `reports`, add up `reviewsOk` and `reviewsFailed`, `findings` by severity from
+   `bySeverity`, and findings `answered` against the length of `openIDs`.
+5. From `totals`, copy the churn, each with its unknown count where it has one: `prs`,
+   `roundsWithNew`, `repeatClass` (`classUnknown`), `late` as `{n, of}` (`lateUnknown`), `mainMerge`
+   (`mergeUnknown`), and `baseMove`.
+6. Count `accepted-risk` answers since the mark that cite none of his words.
+   `skills/intake/references/noslop-checkin.private.md` in hq-private (`hq defs` shows where) says
+   which sources count. Without it, write "not checked" and tell `z-q`. Per PR (`ref` is
+   `<repo>#<n>`):
 
-From each PR entry in `reports`, sum:
+   ```sh
+   gh api repos/zgeoff/<repo>/pulls/<n>/comments --paginate --jq '.[] | select(.created_at >= "<the mark>") | select(.body | startswith("accepted-risk")) | .body'
+   gh api repos/zgeoff/<repo>/issues/<n>/comments --paginate --jq '.[] | select(.created_at >= "<the mark>") | select(.body | test("^[0-9a-f]{16} accepted-risk")) | .body'
+   ```
 
-- Reviews: `reviewsOk`, and `reviewsFailed`, the reviews that failed.
-- Findings: `findings`, split by `bySeverity`, and by outcome: `answered`, and `openIDs`, the findings still open.
-
-From `totals`, the churn:
-
-- `prs`: PRs reviewed in the window.
-- `roundsWithNew`: rounds that raised a new finding.
-- `repeatClass`: findings that cite a rule an earlier finding on the same PR cited. The target is about 0. `classUnknown` counts rows too old to tell.
-- `late`: `{n, of}`, findings after round 1 on lines unchanged since round 1. `lateUnknown` counts the old rows.
-- `mainMerge`: findings on code the PR did not write. It should stay 0. `mergeUnknown` counts the old rows.
-- `baseMove`: pushes that only moved the PR onto a new base and left its own diff the same. They are not rounds. A high count means the stack was rebased often, not that review churned.
-
-Each PR entry carries the same churn fields, and the text output prints them as one `churn:` line per PR.
-
-Then count the `accepted-risk` answers without the owner's words. Each PR entry's `ref` reads `<repo>#<n>`. For each, list the answers given since the mark, in finding threads and as issue comments that start with a finding's id:
-
-```sh
-gh api repos/zgeoff/<repo>/pulls/<n>/comments --paginate --jq '.[] | select(.created_at >= "<the mark, UTC>") | select(.body | startswith("accepted-risk")) | .body'
-gh api repos/zgeoff/<repo>/issues/<n>/comments --paginate --jq '.[] | select(.created_at >= "<the mark, UTC>") | select(.body | test("^[0-9a-f]{16} accepted-risk")) | .body'
-```
-
-Give the mark as `YYYY-MM-DDTHH:MM:SSZ` in UTC, since GitHub's `created_at` is UTC. Count each answer that cites none of the sources that show the owner's words. Which sources those are is in this file's private half: read `skills/intake/references/noslop-checkin.private.md` in the local hq-private clone (`hq defs` shows where it is) and follow it as part of this skill.
-
-Flag each PR with `mainMerge` above 0, each PR with a failed review, and each PR with `repeatClass` above 0 that opened after 2026-10-19T05:00Z, when the delivery brief gained its rule to fix a whole class of finding in one push. Read a PR's `createdAt` with `gh pr view <n> -R zgeoff/<repo> --json createdAt`.
-
-Post one `hq news add --topic report` line that holds the reviews and failed reviews, the findings by severity and by outcome, the churn totals, the count of `accepted-risk` answers without the owner's words, and the flagged PRs. For each PR with such an answer, also add it to the owner's list with `hq unblock add --task "<repo>#<n>: accepted-risk answer cites no word of the owner's"`.
+7. Flag each PR with `mainMerge` above 0, a failed review, or `repeatClass` above 0.
+8. Post it, even for an empty window: `hq news add --topic report --text "<the line>"`, with the
+   counts, findings, churn with unknowns, the `accepted-risk` count and the flagged PRs.
+9. For each uncited `accepted-risk`:
+   `hq unblock add --task "<repo>#<n>: accepted-risk answer cites no word of the owner's"`.
+10. Only now, write the time from step 2 as the new `noslop since=`, so a failed run loses no
+    window.

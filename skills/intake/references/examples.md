@@ -1,37 +1,36 @@
-# examples
+# Examples: starting work and a side request
 
-How `intake` opens a working session and files a side request. The scene is invented, a kettle-timer app with KET-n issues, to show the intended behaviour.
+Two invented replies, for a kettle-timer app with KET-n issues. Copy the shape, not the words.
 
-## opening a session
+## Starting work
 
-The owner: "let's pick the kettle timer back up."
-
-Before replying, read the kettle-timer project, its open issues, and all of Triage. Then:
+He says: "let's pick the kettle timer back up, I still want it to tell me when the water's ready
+without me watching it." You read the project, its issues, and all 12 Triage issues first.
 
 ```text
-Kettle timer: you want a timer that says when the water is ready without you watching the kettle.
+Kettle timer: you want it to tell you when the water's ready, without you watching it.
 
-I've read the project and all 12 Triage items (10 are kettle timer). The work falls into three threads:
-- Alert model: the redesign (KET-40) plus the alert findings (late chimes, a second alert after you already poured, alerts on the wrong device).
-- Boil-time tests: the two reports show tuning the default times alone won't get there; KET-31 covers rethinking how boil time is measured.
-- Small fixes: KET-35 (boil-time rounding) is independent and ready.
+I've read the project and all 12 Triage issues (10 are kettle timer). The work falls into three threads:
+- Alerts: the redesign (KET-40) plus the three alert bugs (late chimes, a second alert after you poured, alerts on the wrong device).
+- Boil-time measurement: the two boil-time reports show that tuning the default times won't fix it. KET-31 covers measuring boil time a new way.
+- Small fixes: KET-35 (boil-time rounding) stands alone and is Ready.
 
-Proposed working set:
-- Ready to launch: KET-35.
-- Design session with you: KET-40, then KET-31.
-- Parked until the redesign lands: the default-time tuning issues.
+What I'd do with each:
+- Launch now: KET-35.
+- Give to an agent's design session: KET-40, then KET-31.
+- Park until the redesign lands: the default-time tuning issues.
 
-One question: should the measurement rethink wait for the redesign, or run alongside it?
+One question: should KET-31 wait for the redesign, or run beside it?
 ```
 
-What makes this work: the goal is in the owner's words, Triage was read before any recommendation, the design questions are left for the design session, and there's one question only the owner can answer.
+The first line repeats his goal. The design questions go to a design session, so the one question is
+something only he can answer.
 
-## a side request mid-session
+## A side request mid-session
 
-The owner: "also, the timer doesn't show on the lock screen."
-
-File it straight away, link it to related work, and keep going in one short reply:
+He says: "also, the timer doesn't show on the lock screen." File it to Triage at once, confirm in
+one line, and carry on:
 
 ```text
-Filed KET-52: show the running timer on the lock screen (Triage, linked to the notification work). Separate from KET-51's chime-volume issue so neither gets lost.
+Filed KET-52: show the running timer on the lock screen (Triage, related to KET-40, the alert redesign).
 ```

@@ -69,15 +69,10 @@ expect_order() { # expect_order <session id> <atc name> <marker>...: the markers
 # The shared skill with no SKILL.md gets one skipped line, and the rest still print.
 expect_order id-stu stu "body of intake" "body of owner-calls" "skipped tickets: no SKILL.md in this tree" "after stu"
 expect_order id-delivery down "body of delivery-lead" "skipped tickets: no SKILL.md in this tree" "body of fix-it-here" "after delivery"
-# While the tree still has agent-delegation, the delivery role gets its SKILL.md after its own skills.
-mkdir -p "$project/skills/agent-delegation"
-echo "body of agent-delegation" > "$project/skills/agent-delegation/SKILL.md"
-expect_order id-delivery down "body of delivery-lead" "skipped tickets: no SKILL.md in this tree" "body of fix-it-here" "body of agent-delegation" "after delivery"
-if run id-stu stu | grep -q "body of agent-delegation"; then echo "FAIL: z-stu printed agent-delegation"; fail=1; else echo "ok: only the delivery role prints agent-delegation"; fi
 # Once the tree has delivery-lead's briefs reference, the delivery role gets it before its after-compaction file.
 mkdir -p "$project/skills/delivery-lead/references"
 echo "body of briefs" > "$project/skills/delivery-lead/references/briefs.md"
-expect_order id-delivery down "body of delivery-lead" "skipped tickets: no SKILL.md in this tree" "body of fix-it-here" "body of agent-delegation" "body of briefs" "after delivery"
+expect_order id-delivery down "body of delivery-lead" "skipped tickets: no SKILL.md in this tree" "body of fix-it-here" "body of briefs" "after delivery"
 if run id-stu stu | grep -q "body of briefs"; then echo "FAIL: z-stu printed the briefs reference"; fail=1; else echo "ok: only the delivery role prints the briefs reference"; fi
 # A session hq hasn't recorded falls back to its atc name, which must be declared.
 expect_order id-new z-triage "body of linear-triage" "after triage"
@@ -127,9 +122,6 @@ SLOT=3
 expect_order id-stu stu "skipped tickets: no SKILL.md in this tree"
 SLOT=after
 expect_order id-stu stu "after stu"
-SLOT=delegation
-expect_order id-delivery down "body of agent-delegation"
-if [ -n "$(run id-stu stu)" ]; then echo "FAIL: delegation slot printed for z-stu"; fail=1; else echo "ok: the delegation slot prints only for the delivery role"; fi
 SLOT=briefs
 expect_order id-delivery down "body of briefs"
 SLOT=5
@@ -154,7 +146,7 @@ echo "body of intake" > "$project/skills/intake/SKILL.md"
 echo "body of owner-calls" > "$project/skills/owner-calls/SKILL.md"
 # settings.json makes one compact call per slot, so no two files share a cap.
 slots=$(jq -r '.hooks.SessionStart[] | select(.matcher == "compact") | .hooks[].command | sub(".*print-skills.sh "; "")' "$(dirname "$hook")/../settings.json" | tr '\n' ' ')
-if [ "$slots" = "1 2 3 4 5 6 delegation briefs after " ]; then echo "ok: settings.json calls every slot once"; else echo "FAIL: settings.json slots are '$slots'"; fail=1; fi
+if [ "$slots" = "1 2 3 4 5 6 briefs after " ]; then echo "ok: settings.json calls every slot once"; else echo "FAIL: settings.json slots are '$slots'"; fail=1; fi
 # hq down: no roles table, so nothing prints.
 FAKE_HQ=down
 export FAKE_HQ

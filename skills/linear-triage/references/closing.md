@@ -1,37 +1,72 @@
-# closing, freeing and promoting issues
+# Closing, freeing and promoting issues
 
-Step 5 of a pass: close each issue whose work is done or no longer worth doing, free the issues its close unblocks, and promote each Backlog issue that meets the Ready criteria.
+Step 5 of a pass: close what is done or no longer worth doing, free what each close unblocks, and
+promote what meets the [Ready criteria](../SKILL.md#ready). To flag, follow
+[Flagging](../SKILL.md#flagging).
 
-## completion
+Contents: [Completion](#completion) · [Stalled In Progress issues](#stalled-in-progress-issues) ·
+[Obsolete Backlog issues](#obsolete-backlog-issues) ·
+[What a closed blocker frees](#what-a-closed-blocker-frees) ·
+[Promoting Backlog issues](#promoting-backlog-issues)
 
-Check for completion each stale candidate, each issue you read in this pass, each In Review issue, and each In Progress issue whose every PR merged more than 24 hours ago, however recently it moved. An umbrella issue is complete only when every repo's box in its checklist is ticked.
+## Completion
 
-- **Done at merge.** Close an issue as Done when a merged PR shows each acceptance item met and the change needs no deploy or live check, or when the condition the issue's own text sets for closing has happened. Comment the evidence: the PR, or the issue that met it.
-- **A deploy or live check may be due.** Leave the issue to `z-release` and `z-qa` until every PR on it merged more than 24 hours ago. Then run `scripts/release-deployed.sh <repo>#<n>…` with the last PR in each repo the issue touched, and close it only when each PR shows `deployed: true` and every acceptance item has its evidence. Comment each PR, release and pinned version from the script's output. Otherwise comment once which items remain and who owns each, and leave it.
-- **Partial evidence.** When the evidence covers only part of the acceptance, or another issue only probably covers it, flag it with your recommendation.
-- **An unreproduced one-off.** One that step 7 left in Backlog turns stale after 14 days with nothing new: close it as not reproduced, with a comment, and don't flag it.
+Check:
 
-Judge only the written acceptance. An extra the PR adds beyond it, such as a test the acceptance never asked for, is no reason to flag. A preview check is evidence for an acceptance item, never that the change is live.
+- each issue in step 2's `stale` list;
+- each issue you read this pass;
+- each In Review issue;
+- each In Progress issue whose PRs all merged more than 24 hours ago.
 
-What counts as live differs by repo, and `release-deployed.sh` holds each rule. Two cases have no production pin: a merge in zgeoff/tools or zgeoff/noslop is live once a published release of each package it changes contains it, and an hq merge is live once the hq installed on this host was built from a commit that contains it. The script shows `deployed: null` for an hq built from source or from a dirty tree.
+Judge by the `evidence` skill. Take the first case that fits:
 
-An In Progress issue is stale when neither its agent nor its PR moved in 3 days. Find the agent with `atc_sessions_list`, whose session names carry the issue ID, and the PR with `gh search prs GEO-<n> --owner zgeoff`. Give a stale one `Needs Geoff` and the comment "Stale: nothing has moved since <date>. Recommend <keep, relaunch, or close>, because <reason>."
+- **Done at merge:** a merged PR meets every Acceptance item and needs no deploy or live check, or
+  the issue's own closing condition has happened. Close as Done, commenting the PR or the condition.
+- **A deploy or live check may be due:** wait 24 hours after the last merge, while `z-release` ships
+  and `z-qa` checks. Then run `scripts/release-deployed.sh <repo>#<n>…` with the latest merged PR in
+  each repo. Close only when each shows `deployed: true` and every item has evidence, and comment
+  the PRs, releases and versions it prints. Otherwise comment, once, which items remain and who owns
+  each. `deployed: null` means not deployed.
+- **Partial evidence,** or another issue may cover it without proof: flag it.
+- **An unreproduced one-off** left in Backlog, after 14 days with no new comment or PR: close as
+  Canceled, "Not reproduced". Don't flag it.
 
-## obsolete Backlog issues
+## Stalled In Progress issues
 
-On a full pass, check each Backlog issue in the audit's `stale` list, the ones filed 14 days ago or more, for whether its work is still worth doing. Leave out vers feature work, which only the owner decides. Close an issue as Canceled, or as Duplicate of the issue that covered it, when you find one of these, and comment the evidence:
+No movement on the agent or the PR in 3 days. Find the session with `atc_sessions_list` (its name
+has the issue ID) and the PR with `gh search prs GEO-<n> --owner zgeoff`. Flag it: "Stalled: nothing
+has moved since <date>. Recommend <keep, relaunch, or close>, because <reason>."
 
-- **Overtaken:** a decision record or a merged change made it moot. Name the record or the PR.
-- **Gone:** the code or files it names no longer exist. Name the paths and the commit that removed them.
-- **Covered:** a closed issue did its work. Name that issue.
-- **Reversed:** a later decision reversed its premise. Link the decision.
+## Obsolete Backlog issues
 
-When the evidence covers only part of an issue, or you are unsure, close nothing. Add the issue to the obsolescence list in `~/.local/share/z-sessions/triage.md`, with the evidence you found and your recommendation. On the first full pass of each week, flag every issue on that list with the same question, word for word: "Are these Backlog issues still worth doing?" The check then puts them to the owner as one call. Empty the list once you have flagged them.
+On a full pass, check each stale Backlog issue, except vers feature work. Close it with the evidence
+when one of these holds:
 
-## what a closed or merged blocker frees
+| Finding   | What happened                                     | Close as                | Evidence             |
+| --------- | ------------------------------------------------- | ----------------------- | -------------------- |
+| Overtaken | A decision record or a merged change made it moot | Canceled                | The record or the PR |
+| Gone      | The code or files it names no longer exist        | Canceled                | The paths and commit |
+| Covered   | A closed issue did its work                       | Duplicate of that issue | That issue           |
+| Reversed  | A later decision reversed its premise             | Canceled                | The decision         |
 
-For each issue in this pass's list that is Done, each you closed in this pass, and each whose every PR has merged, get it with its relations and read the issues it blocks. Free nothing from a Done issue you didn't close until its acceptance shows evidence: a merged PR that says `Fixes GEO-<n>`, a completion comment, or a Design's or Investigation's record. When it shows none, reopen it to its last state and comment why.
+When the evidence is partial or you're unsure, close nothing. Add the issue, the evidence and your
+recommendation to the possibly-obsolete list in `~/.local/share/z-sessions/triage.md`. On the week's
+first full pass, flag every issue on the list with this exact comment, so the check asks them as one
+question: "Are these Backlog issues still worth doing?" Put the evidence in `notes.json`, not the
+comment. Then empty the list.
 
-## promoting Backlog issues
+## What a closed blocker frees
 
-Check against the Ready criteria, blockers aside, each Backlog issue in this pass's list or freed by a closed or merged blocker, and on a full pass every Backlog issue. Move each one that meets them to Ready, with a comment that names the blocker that closed or whose PRs merged, or the criteria it meets. When one fails only on a missing section whose information it holds, write the section as step 4 says, then move it.
+Take as blockers: each Done issue in this pass's pages, each issue you closed, and each issue whose
+PRs all merged. Read the issues each one blocks.
+
+Free nothing from a Done issue you didn't close until it shows evidence: a merged PR with
+`Fixes GEO-<n>`, a completion comment, or a Design or Investigation record. With none, reopen it to
+its previous state and comment why.
+
+## Promoting Backlog issues
+
+Check each Backlog issue in this pass's pages, each one freed above, and on a full pass every
+Backlog issue. Move each that meets the criteria to Ready, with a comment naming the blocker that
+closed or the criteria it meets. When only a section is missing and the issue's text holds what it
+needs, write it first, as step 4 does.

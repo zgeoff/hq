@@ -1,0 +1,23 @@
+# noslop brief
+
+noslop is the review bot on every repo `hq noslop` lists. `z-review` starts it after the agent's
+FINAL note; the agent never runs it. It reads answers by exact format, so any other wording leaves a
+finding open.
+
+For such a repo, `{{review_lines}}` holds one pinned `gh api` line that sends the agent here, and
+names the repo for `<repo>`, owner included, such as `zgeoff/kettle`. The agent reads the block
+below, with `<n>` as its PR number. The block is too long to go in the brief itself. For any other
+repo, `{{review_lines}}` is empty.
+
+```text
+noslop checks the rules in these sections of the shared skills, so read them before you write code and check your diff against them in your self-review: code-style's Function names, Types, Structure, Errors and logs, and Comments; testing's Principles and Boundaries; and docs-writing's "Describe the system as it is now" and "Give each doc one job, and each fact one doc that owns it" rules, and the Procedures and Formatting rules under Shape the doc. After your FINAL note, noslop posts each finding on the PR as a review comment by `noslop-review[bot]` that holds `<!-- noslop:finding`. `<n>` is your PR's number. List them with `gh api repos/<repo>/pulls/<n>/comments --paginate --jq '.[] | select(.user.login == "noslop-review[bot]" and .in_reply_to_id == null and (.body | contains("<!-- noslop:finding"))) | {id, path, line, body}'`. Answer every finding in its own thread with `gh api repos/<repo>/pulls/<n>/comments/<comment id>/replies -f body='<answer>'`.
+
+One comment can hold several findings, each with its file position and its 16-hex id. When your reply's first line is a bare answer, such as `fixed 1a2b3c4`, noslop gives that answer to every finding in the comment. To answer them apart, such as when one of them is wrong, start the reply with one line per finding: its id, a space, and its answer, such as `7d3f1a2b9c4e5f60 fixed 1a2b3c4` and `c58e2b7a1f0d4936 not-a-defect <reason>`. noslop leaves open a finding whose id has no line. When any line holds an id with no answer after it, noslop takes the whole reply as no answer.
+
+Each answer holds only `fixed <sha>` or `not-a-defect <reason>`, with nothing after the sha. Put any explanation or quote below a blank line after the answers, or noslop ignores the answer. Never quote the text `<!-- noslop:` in a reply: hq and noslop take any comment that holds it for noslop's own, so they skip the reply, and the finding stays open. Put each finding's fix in a single commit: squash its commits locally before you push. Push the fix before you answer `fixed <its sha>`. noslop then checks the fix at the PR's head, and the answer counts once that check confirms it. A finding noslop reports again stays open. Each push gets a review of only the code it changed, so a late commit can bring a new finding: answer it like the others. A rebase or a merge of `main` is fine: noslop reviews only the files whose diff against `main` changed since its last review. A finding with no line in the diff is an issue comment by the same bot: answer it with `gh api repos/<repo>/issues/<n>/comments -f body='<its 16-hex id> <answer>'`. When that issue comment holds several findings, a single `<id> <answer>` line answers all of them. To answer them apart, write one `<id> <answer>` line for each finding. Answer a finding `not-a-defect` only when it is wrong. When the finding quotes a skill rule, a `not-a-defect` answer needs a quote below the blank line that shows the rule doesn't apply. Quote the shared rule's own wording. Or quote a line of this repo's `project-` skill for that area, when the shared skill allows a project skill to hold that line. Each shared skill says what its project skill may do: code-style and testing let it only add, such as a project verb or a stricter rule, and docs-writing lets it win where the two disagree. Without such a quote, fix it.
+
+A finding you leave unfixed, because the fix belongs in another repo or needs a choice the issue doesn't settle, goes in your final report, as the finish line says. Send your FINAL note again, and leave the finding unanswered. In a comment that holds several findings, leave its line out of the reply. Never answer `accepted-risk`: only I make that call. When every finding has its answer: after a fix push, send your FINAL note again; with no new commit, say so in your answer to the message that told you about the findings.
+```
+
+The first paragraph names the skill sections noslop cites. When noslop cites a new section, or a
+cited section is renamed, change it here in the same release.

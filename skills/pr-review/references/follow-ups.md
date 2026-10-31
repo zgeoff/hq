@@ -1,32 +1,28 @@
-# follow-ups
+# Follow-ups
 
-You are the only session that files an issue from a PR. Filing sits here, at the moment a finding is
-answered, because that is where the reason is still checkable against the diff. Load this file
-before every Linear `save_issue` call: the skill gate refuses the call until you have.
+A follow-up is a Linear issue for a finding a PR leaves unfixed. Only you file them, when the agent
+answers with its reason, so you can check the reason against the diff and the issue. A hook refuses
+`save_issue` until this file is loaded.
 
-## The reason test
+## A reason that fails
 
-An item a PR leaves unfixed holds one of two reasons, and nothing else:
+Judge the agent's reason by `fix-it-here`. When it fails, reply in the finding's thread (step 3's
+command) with its file and line, in 1 to 3 sentences, telling the agent to fix it here. Leave the
+thread open.
 
-1. **Another repo:** the file the fix changes is in a different repo from the PR. Check the path
-   the agent names against the PR's repo.
-2. **A choice the issue doesn't settle:** the agent names the choice, such as a change to a public
-   interface, a schema, a config format, or behaviour that users or other sessions rely on.
+## File the follow-up
 
-Size, time, a round limit, another push, a restack, a narrow brief and a missing permission are not
-reasons. A doc change that only records behaviour the issue or a linked decision already settles is
-not one either: it belongs in this PR. Send each item that fails back to the agent to fix in this
-PR, in 1 to 3 plain sentences with its file and line, and keep its finding open.
+1. Take the issue's sections from the agent's answer: Outcome, Context (file, line, evidence), Scope
+   and Acceptance, in its words. If one is missing, ask in the thread and wait.
+2. `save_issue` in team GEO, state Triage, titled from the Outcome. The description starts
+   `From <repo>#<pr number>` (repo without `zgeoff/`), then the four sections.
+3. Reply in the thread, with the first comment's id from
+   `gh api repos/zgeoff/<repo>/pulls/<pr number>/comments --paginate`:
 
-## Filing
+   ```bash
+   gh api repos/zgeoff/<repo>/pulls/<pr number>/comments/<the thread's first comment id>/replies -f body='deferred GEO-<issue number>'
+   ```
 
-For each item that holds:
-
-1. File it in Triage in team GEO. Its description's first line is `From <repo>#<n>`, then the
-   agent's text: Outcome, Context with the file, line and evidence, Scope and Acceptance. Use the
-   agent's words, because the agent saw the code and you only checked the reason.
-2. Record it: `hq followup add GEO-<n> --from <repo>#<n>`. The daily check counts any issue that
-   points at a PR without this record as a bad filing.
-3. Reply in the finding's thread: `deferred GEO-<n>`, with
-   `gh api repos/zgeoff/<repo>/pulls/<n>/comments/<comment id>/replies -f body='deferred GEO-<n>'`.
-4. For reason 2, message `z-triage` the choice, so its check puts it to the owner.
+4. `hq followup add GEO-<issue number> --from <repo>#<pr number>`. hq alerts `z-triage` about any
+   issue that names a PR without this record.
+5. For reason 2, message `z-triage` the issue ID and the choice, to queue as a call.

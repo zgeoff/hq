@@ -5,6 +5,9 @@
     "imp": 7,
     "local": 3
   },
+  "placeTypes": {
+    "local": ["Investigation"]
+  },
   "imp": {
     "impMib": 2048
   },

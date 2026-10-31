@@ -26,7 +26,7 @@ export function buildPrompt(who: string): string {
 // A test home with no checkout in it. Each tree is made on demand, cloned from a local origin.
 export function createTreeFixture() {
   const base = freshDb(),
-    laneFiles = { 'skills/agent-delegation/scripts/capacity.sh': '#!/bin/sh\n', 'skills/agent-delegation/pacing.json': '{}\n' };
+    laneFiles = { 'skills/delivery-lead/scripts/capacity.sh': '#!/bin/sh\n', 'skills/delivery-lead/pacing.json': '{}\n' };
   onTestFinished(base.cleanup);
   onTestFinished(createHomeOverride(base.dir));
   onTestFinished(overrideEnv('HQ_PRIVATE_DIR', `${base.dir}/.local/share/atc/workspaces/hq-private`));
