@@ -274,3 +274,16 @@ test('it refuses an agent design brief when the private design brief has an empt
 
   expect(outcome).rejects.toMatchObject({ code: 'bad_state', message: `${join(ctx.root, 'skills/delivery-lead/references/design-brief.private.md')} has no record line` });
 });
+
+test('it refuses an agent design brief when the design playbook is missing at the sha', () => {
+  const ctx = setupTest();
+  const stub = createStubBriefDeps(ctx.root, {
+    issues: { 'GEO-9001': { description: buildKettleIssueText({ actions: 'Agent design pass' }), labels: [] } },
+    rows: [],
+    kit: buildStubSkillBriefKit({ without: ['agent-kit/playbooks/design.md'] }),
+  });
+
+  const outcome = runSkillBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', kind: 'design', repo: null });
+
+  expect(outcome).rejects.toMatchObject({ code: 'not_found', message: `agent-kit/playbooks/design.md is missing at ${stub.sha}` });
+});
