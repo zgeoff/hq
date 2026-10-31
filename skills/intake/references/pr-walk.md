@@ -16,8 +16,9 @@ Never edit this file to add a fault the helper found: file it as an issue.
    takes the file's path, never the list, so it stays under the launch limit.
 3. Take the record line and the agreed-change form from
    `skills/intake/references/pr-walk.private.md` in hq-private (`hq defs` shows where).
-4. Fill the brief in [agent-kit/pr-walk-brief.md](../../../agent-kit/pr-walk-brief.md): the PR list's path, earlier walk logs, both private
-   texts and your session id. The helper fills only `<n>` and `<repo>`.
+4. Run `hq brief <any issue> --kind pr-walk` for [agent-kit/pr-walk-brief.md](../../../agent-kit/pr-walk-brief.md) with its skill pointer, then
+   fill its slots: the PR list's path, earlier walk logs, both private texts and your session id.
+   The helper fills only `<n>` and `<repo>`. Check the result with `hq brief check <file>`.
 5. Launch it in the hq-defs checkout as [agent-kit/helpers.md](../../../agent-kit/helpers.md) says, and wait for its message.
 6. File each item he wants in GEO Triage. Then file one more Triage issue updating this file's fault
    list: new faults, and faults a new rule now covers, named by what the rule says.

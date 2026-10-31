@@ -9,9 +9,8 @@ Every launch: a Ready issue, a pitch, a relaunch, a design session or an ad-hoc 
 2. **Provider:** run `scripts/capacity.sh` as pacing.md says, and launch on what it picks, or hold.
    When it returns `launch.target: local`, launch here. An ad-hoc session uses the CLI the owner
    names, or Claude. Use Opus where offered.
-3. **Prompt:** from its template, with the issue pasted in, since the agent may not reach Linear.
-   Write as the owner, "I" to "you": the classifier reads "the owner" as someone else's claim. Write
-   each approved action in the wording `briefs.private.md` gives, details word for word.
+3. **Prompt:** run `hq brief <issue>`, as briefs.md says. When you add to it, write as the owner, "I"
+   to "you": the classifier reads "the owner" as someone else's claim.
 4. **Launch** with `atc_session_spawn`: `detached: true`, a name that says the outcome ("geo-92
    probability-sum validation"), and an `idempotencyKey` such as `geo-92-launch-1`.
 5. **Check it started** 20 seconds later: `atc_session_get` shows it working, and for a `/goal`

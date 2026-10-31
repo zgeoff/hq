@@ -31,7 +31,7 @@ action nobody approved. Never reword a refused action to get it through.
 ## Filling free slots
 
 hq doesn't launch Ready issues; you fill each free slot `hq lanes` shows. Take the next Ready issue
-in `hq focus show` order, fill the brief, and launch it as launching.md says. Pitch it first if it
+in `hq focus show` order, run `hq brief`, and launch it as launching.md says. Pitch it first if it
 needs an action beyond the brief; hold it if it overlaps a running run.
 
 hq marks an empty slot `supply` (no Ready work fits) or `delivery` (work could have launched). Past

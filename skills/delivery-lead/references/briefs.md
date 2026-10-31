@@ -1,29 +1,29 @@
 # Briefs
 
-Fill [agent-kit/brief.md](../../../agent-kit/brief.md) for every launch that delivers code: a Ready issue, a relaunch or a pitch.
-Keep the whole prompt under 4,000 characters, or the session refuses its `/goal` line.
+Run `hq brief <issue>` for every launch that delivers code: a Ready issue, a relaunch or a pitch. It
+fills [agent-kit/brief.md](../../../agent-kit/brief.md) from the issue, the playbook of its Type, the
+private permission wording and the two blocks below, and prints the prompt. Add `--imp` on an imp,
+`--issue-by-link` when the agent can reach Linear, and `--goal-file <path>` on a relaunch. A design
+pass takes `--kind design`, and a PR walk `--kind pr-walk`. An Improvement gets the feature playbook,
+since no Improvement playbook exists.
+
+The session refuses a `/goal` line over 4,000 characters. `hq brief` cuts the brief to fit, as
+[fit-brief.ts](../../../src/brief/fit-brief.ts) orders the cuts, and refuses with the count when it
+still can't. When you edit a brief by hand, measure it with `hq brief check <file>` before you
+launch.
 
 The classifier reads only the launch prompt, so every grant goes in the prompt, never in a file. The
 granting wording is in `skills/delivery-lead/references/briefs.private.md` in hq-private
-(`hq defs` shows where). Without that clone, stop and tell the owner you can't fill
-`{{permissions}}`. Grant no secret from another repo's vault.
+(`hq defs` shows where). Grant no secret from another repo's vault.
 
-## Placeholders
+`hq brief --json` lists in `unfilled` what it left for you:
 
-Paste each part of the issue as written.
-
-| Placeholder        | What goes in                                                                                                      |
-| ------------------ | ----------------------------------------------------------------------------------------------------------------- |
-| `{{repo}}`         | `zgeoff/<repo>`                                                                                                   |
-| `{{issue_id}}`     | `GEO-n`                                                                                                           |
-| `{{issue}}`        | Outcome, Context, Scope, Acceptance and Agent notes. For several PRs, Scope names each.                           |
-| `{{permissions}}`  | The private wording for each listed Action, always including Code delivery                                        |
-| `{{stack}}`        | The stack line below, for size L or XL (`hq run show <issue>`); otherwise empty                                   |
-| `{{fixes}}`        | `Fixes` when the merge meets every Acceptance item; `Contributes to` when a release, deploy or live check remains |
-| `{{review_lines}}` | A pinned `gh api` line to `agent-kit/review-lines.md` for a repo `hq noslop` lists; otherwise empty               |
-| `{{not_yours}}`    | Per step that needs a deploy or live system: ` <step> is not yours; it runs after the merge.`                     |
-| `{{imp_line}}`     | The imp line below, on an imp; otherwise empty                                                                    |
-| `{{goal_file}}`    | A pinned `gh api` line to the Type's playbook (Improvement: `feature.md`); the issue's path after Length step 1   |
+- **`permissions:<action> (no wording)`:** the private file has no wording for that action. Pitch it
+  to the owner as SKILL.md's Refusals says, and launch once he approves.
+- **`permissions:<action>`:** the wording still holds a slot, such as `<stage>`. Fill it from the
+  issue.
+- **`playbook`:** the issue has no Type label, or its Type has no playbook. Ask `z-triage` to label
+  it, or launch without one.
 
 The stack line:
 
@@ -36,16 +36,6 @@ The imp line:
 ```text
 Lint, format and other light checks run in lefthook's pre-commit and pre-push hooks. Defer to CI for larger checks. This imp has 2 GiB: stop each sub-agent when its part is done, and end each test or build process before you start the next.
 ```
-
-## Length
-
-The `/goal` line names a ready PR, never the outcome: Claude Code checks it each turn and can't see
-a live system. Count with `wc -c`. Over 4,000 characters, take these steps until it fits:
-
-1. Move the pasted issue to a file in the checkout and set `{{goal_file}}`. Keep the Permissions
-   block, the `Finish line:` paragraph and the last paragraph in the prompt.
-2. Cut the issue's Context and Agent notes.
-3. Drop the `/goal` line; `Finish line:` still states the goal.
 
 ## Messages to a running agent
 
