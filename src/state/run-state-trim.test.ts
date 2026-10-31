@@ -750,6 +750,29 @@ test('#runStateTrim any session may run a dry run of another role', () => {
   expect(report.entriesMoved).toBe(319);
 });
 
+test('#runStateTrim a backup already at the target path stops the trim before anything changes', () => {
+  const ctx = setupTest();
+  const original = `## Log\n${'09:10Z boiled the water\n'.repeat(1000)}09:11Z poured the tea\n`;
+  writeFileSync(join(ctx.directory, 'kettle.md'), original);
+  writeFileSync(join(ctx.directory, 'kettle-archive-2026-10.md'), '08:00Z filled the kettle\n');
+  writeFileSync(join(ctx.directory, 'kettle.md.bak-20261031T010203Z'), '# an older backup\n');
+
+  expect(() =>
+    runStateTrim({
+      directory: ctx.directory,
+      roles: ['kettle', 'delivery'],
+      role: 'kettle',
+      actor: 'z-kettle',
+      dryRun: false,
+      at: new Date('2026-10-31T01:02:03Z'),
+      files: buildNodeStateFiles(),
+    }),
+  ).toThrow('EEXIST');
+  expect(readFileSync(join(ctx.directory, 'kettle.md'), 'utf8')).toBe(original);
+  expect(readFileSync(join(ctx.directory, 'kettle-archive-2026-10.md'), 'utf8')).toBe('08:00Z filled the kettle\n');
+  expect(readFileSync(join(ctx.directory, 'kettle.md.bak-20261031T010203Z'), 'utf8')).toBe('# an older backup\n');
+});
+
 test('#runStateTrim a failed archive append leaves the state file as it was', () => {
   const ctx = setupTest();
   const original = `## Log\n${'09:10Z boiled the water\n'.repeat(1000)}09:11Z poured the tea\n`;
