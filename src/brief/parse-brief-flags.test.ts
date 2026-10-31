@@ -31,5 +31,5 @@ test('it rejects --issue-by-link with --goal-file', () => {
 
 test('it carries --repo, and rejects one that is not an area label', () => {
   expect(parseBriefFlags('GEO-9001', { repo: 'cloud' }).repo).toBe('cloud');
-  expect(() => parseBriefFlags('GEO-9001', { repo: 'zgeoff/cloud' })).toThrow('--repo must be an area label such as cloud: zgeoff/cloud');
+  expect(() => parseBriefFlags('GEO-9001', { repo: 'zgeoff/cloud' })).toThrow('--repo must be an area label or repo such as cloud: zgeoff/cloud');
 });

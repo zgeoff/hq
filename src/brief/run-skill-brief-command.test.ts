@@ -93,6 +93,19 @@ test('it refuses a brief whose template names the repo when the issue has no are
   expect(outcome).rejects.toMatchObject({ code: 'bad_state', message: 'GEO-9001 needs an area label to name its repo; it has none' });
 });
 
+test('it fills the repo that --repo picks from a multi-area issue', async () => {
+  const ctx = setupTest();
+  const stub = createStubBriefDeps(ctx.root, {
+    issues: { 'GEO-9001': { description: buildKettleIssueText(), labels: [{ name: 'Design', parent: 'Type' }, { name: 'cloud' }, { name: 'imp' }] } },
+    rows: [],
+    kit: buildStubSkillBriefKit(),
+  });
+
+  const out = await runSkillBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', kind: 'design', repo: 'imp' });
+
+  expect(out.text).toStartWith('Run a design session with me for GEO-9001 in zgeoff/impz:');
+});
+
 test('it refuses when the skill file is missing at the sha', () => {
   const ctx = setupTest();
   const stub = createStubBriefDeps(ctx.root, {

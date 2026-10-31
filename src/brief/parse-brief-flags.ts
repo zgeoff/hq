@@ -7,7 +7,7 @@ const ISSUE_ID = /^[A-Z][A-Z0-9]*-\d+$/u;
 // A git ref: branch, tag or sha characters only, so it fits the gh api path it goes into.
 const REF = /^[\w][\w./-]*$/u;
 
-// An area label, as getIssueAreas names it.
+// An area label or its repo name, as AREA_REPOS holds them.
 const AREA = /^[a-z0-9][a-z0-9-]*$/u;
 
 export function parseBriefFlags(issue: string | undefined, flags: Flags): BriefInput {
@@ -23,7 +23,7 @@ export function parseBriefFlags(issue: string | undefined, flags: Flags): BriefI
   }
   const repo = flags.repo ?? null;
   if (repo !== null && !AREA.test(repo)) {
-    throw new HqError('bad_args', `--repo must be an area label such as cloud: ${repo}`);
+    throw new HqError('bad_args', `--repo must be an area label or repo such as cloud: ${repo}`);
   }
   const imp = flags.imp === true;
   const goalFile = flags['goal-file'] ?? null;

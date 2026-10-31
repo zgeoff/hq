@@ -2,11 +2,12 @@ import type { Out } from '../commands.ts';
 import { HqError } from '../errors.ts';
 import { buildSkillBrief } from './build-skill-brief.ts';
 import { buildSkillPointer } from './build-skill-pointer.ts';
+import { pickIssueRepo } from './pick-issue-repo.ts';
 import { readBriefIssue } from './read-brief-issue.ts';
 import { readBriefTemplate } from './read-brief-template.ts';
 import { readRefFile } from './read-ref-file.ts';
 import { readRefSHA } from './read-ref-sha.ts';
-import type { BriefDeps, SkillBriefInput } from './types.ts';
+import type { BriefDeps, BriefIssue, SkillBriefInput } from './types.ts';
 
 // Fills the design or PR-walk brief for one Linear issue and prints it, with a pointer to the hq
 // skill its agent reads first. It reads Linear and GitHub, and writes nothing.
@@ -18,5 +19,14 @@ export async function runSkillBriefCommand(deps: Pick<BriefDeps, 'linear' | 'run
   if ((await readRefFile(deps.run, sha, skill.path)) === null) {
     throw new HqError('not_found', `${skill.path} is missing at ${sha}; pass --ref refactor/fleet-skill-rebuild until the skill rebuild merges`);
   }
-  return buildSkillBrief({ issue, sha, kind: input.kind, template, skill, repo: input.repo });
+  return buildSkillBrief({ issue, sha, kind: input.kind, template, skill, repo: template.includes('{{repo}}') ? requireRepo(issue, input.repo) : null });
+}
+
+// A design or PR-walk issue often has no area label, so its repo is needed only when the template names it.
+function requireRepo(issue: BriefIssue, chosen: string | null): string {
+  const picked = pickIssueRepo(issue, chosen);
+  if (picked.kind === 'refused') {
+    throw new HqError(picked.code, picked.message);
+  }
+  return `zgeoff/${picked.area.repo}`;
 }
