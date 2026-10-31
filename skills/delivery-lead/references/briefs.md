@@ -23,7 +23,7 @@ Paste each part of the issue as written.
 | `{{review_lines}}` | A pinned `gh api` line to `agent-kit/review-lines.md` for a repo `hq noslop` lists; otherwise empty               |
 | `{{not_yours}}`    | Per step that needs a deploy or live system: ` <step> is not yours; it runs after the merge.`                     |
 | `{{imp_line}}`     | The imp line below, on an imp; otherwise empty                                                                    |
-| `{{goal_file}}`    | `. The full issue is in <path>; read it first.` when Length step 1 moved it; otherwise empty                      |
+| `{{goal_file}}`    | A pinned `gh api` line to the Type's playbook (Improvement: `feature.md`); the issue's path after Length step 1   |
 
 The stack line:
 
