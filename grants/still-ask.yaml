@@ -22,6 +22,13 @@ items:
   - id: security-change
     outcome: ask
     note: "a High or Urgent security change"
+# The owner's other calls, which a site that follows the still-ask sentence with "Also his:" lists as bullets in this order.
+also:
+  - "closing an issue whose work is still worth doing, or as not planned"
+  - "a new project"
+  - "an Action beyond Code delivery, Investigation, Spike or Design session: Data that deletes or rewrites, Deploy, Infra, Credentials, Posting, or Paid API over its limit"
+  - "accepting a finding's risk, or merging a PR its gate blocks"
+  - "product direction, and a cost only he can accept"
 sites:
   - file: skills/linear-triage/SKILL.md
     voice: third

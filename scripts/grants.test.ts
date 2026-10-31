@@ -724,3 +724,164 @@ test('it rejects a site tree other than private', () => {
     expect(result.stderr.toString()).toBe('grants: skills/intake/references/session-prompt.md: tree must be private, or left out for a site hq holds\n');
   }
 });
+
+test('it passes an "Also his:" list that matches once its wrapped lines are joined', () => {
+  const ctx = setupTest();
+  for (const path of ['grants', 'skills', 'docs']) {
+    cpSync(join(ctx.fixture, path), join(ctx.dir, path), { recursive: true });
+  }
+  {
+    const path = join(ctx.dir, 'skills/intake/references/calls.md');
+    const source = readFileSync(path, 'utf8');
+    expect(source).toContain('Glass that cracks,\n  Oil, Wicks');
+    writeFileSync(path, source.replace('Glass that cracks,\n  Oil, Wicks', 'Glass\n  that cracks, Oil, Wicks'));
+    {
+      const result = ctx.run();
+      expect(result.stdout.toString()).toBe('grants: 11 files match\n');
+      expect(result.stderr.toString()).toBe('');
+      expect(result.exitCode).toBe(0);
+    }
+  }
+});
+
+test.each([
+  ['a missing item', '- a new greenhouse;\n', '', ['+- a new greenhouse;']],
+  ['an extra item', '- a new greenhouse;\n', '- a new greenhouse;\n- a moonlit picnic;\n', ['-- a moonlit picnic;']],
+  [
+    'a reordered list',
+    '- pruning the paper orchard;\n- a new greenhouse;\n',
+    '- a new greenhouse;\n- pruning the paper orchard;\n',
+    ['-- a new greenhouse;', '+- pruning the paper orchard;'],
+  ],
+  ['a line that is not a bullet', '- a new greenhouse;\n', '* a new greenhouse;\n', ['-* a new greenhouse;', '+- a new greenhouse;']],
+  ['an item with no bullet', '- a new greenhouse;\n', 'a new greenhouse;\n', ['-a new greenhouse;', '+- a new greenhouse;']],
+  ['a wrong last-item punctuation', '- renaming the river.', '- renaming the river;', ['-- renaming the river;', '+- renaming the river.']],
+])('it reports %s in an "Also his:" list and a write run regenerates it', (_label, from, to, lines) => {
+  const ctx = setupTest();
+  for (const path of ['grants', 'skills', 'docs']) {
+    cpSync(join(ctx.fixture, path), join(ctx.dir, path), { recursive: true });
+  }
+  {
+    const file = 'skills/intake/references/calls.md';
+    const path = join(ctx.dir, file);
+    const source = readFileSync(path, 'utf8');
+    expect(source).toContain(from);
+    writeFileSync(path, source.replace(from, to));
+    {
+      const checked = ctx.run();
+      const written = ctx.run([]);
+      expect(checked.exitCode).toBe(1);
+      expect(checked.stdout.toString()).toContain(`--- a/${file}\n+++ b/${file}\n@@ `);
+      expect(lines.filter((line) => !checked.stdout.toString().includes(`\n${line}\n`))).toStrictEqual([]);
+      expect(checked.stderr.toString()).toBe('');
+      expect(written.exitCode).toBe(0);
+      expect(written.stdout.toString()).toBe('grants: wrote 1 files (11 generated files)\n');
+      expect(readFileSync(path, 'utf8')).toBe(source);
+      expect(ctx.run().exitCode).toBe(0);
+    }
+  }
+});
+
+test('it ends an "Also his:" list at a line of spaces, so a write run keeps the paragraph after it', () => {
+  const ctx = setupTest();
+  for (const path of ['grants', 'skills', 'docs']) {
+    cpSync(join(ctx.fixture, path), join(ctx.dir, path), { recursive: true });
+  }
+  {
+    const path = join(ctx.dir, 'skills/intake/references/calls.md');
+    const source = readFileSync(path, 'utf8');
+    expect(source).toContain('- renaming the river.\n\nAnything else');
+    writeFileSync(path, source.replace('- renaming the river.\n\n', '- renaming the river;\n  \n'));
+    {
+      const written = ctx.run([]);
+      expect(written.exitCode).toBe(0);
+      expect(readFileSync(path, 'utf8')).toBe(source.replace('- renaming the river.\n\n', '- renaming the river.\n  \n'));
+    }
+  }
+});
+
+test('it leaves a site with no "Also his:" line unchecked for the list', () => {
+  const ctx = setupTest();
+  for (const path of ['grants', 'skills', 'docs']) {
+    cpSync(join(ctx.fixture, path), join(ctx.dir, path), { recursive: true });
+  }
+  {
+    const path = join(ctx.dir, 'skills/intake/references/calls.md');
+    const source = readFileSync(path, 'utf8');
+    const start = source.indexOf('\n\nAlso his:');
+    const end = source.indexOf('\n\nAnything else');
+    expect(start).toBeGreaterThan(0);
+    expect(end).toBeGreaterThan(start);
+    writeFileSync(path, source.slice(0, start) + source.slice(end));
+    {
+      const stripped = readFileSync(path, 'utf8');
+      const checked = ctx.run();
+      const written = ctx.run([]);
+      expect(checked.stdout.toString()).toBe('grants: 11 files match\n');
+      expect(checked.exitCode).toBe(0);
+      expect(written.stdout.toString()).toBe('grants: wrote 0 files (11 generated files)\n');
+      expect(readFileSync(path, 'utf8')).toBe(stripped);
+    }
+  }
+});
+
+test.each([
+  ['check', ['--check'], '\n\n'],
+  ['write', [], '\n\n'],
+  ['check', ['--check'], '\n  \n'],
+])('it rejects a bullet after a blank line below the "Also his:" list in %s mode (%j)', (_label, args, gap) => {
+  const ctx = setupTest();
+  for (const path of ['grants', 'skills', 'docs']) {
+    cpSync(join(ctx.fixture, path), join(ctx.dir, path), { recursive: true });
+  }
+  {
+    const path = join(ctx.dir, 'skills/intake/references/calls.md');
+    const source = readFileSync(path, 'utf8');
+    expect(source).toContain('- renaming the river.\n\n');
+    writeFileSync(path, source.replace('- renaming the river.\n\n', `- renaming the river.\n${gap}- a moonlit picnic.\n\n`));
+    {
+      const edited = readFileSync(path, 'utf8');
+      const result = ctx.run(args);
+      expect(result.exitCode).toBe(1);
+      expect(result.stderr.toString()).toBe(
+        'grants: skills/intake/references/calls.md: a "- " line follows the "Also his:" list after a blank line; keep every item in the list\n',
+      );
+      expect(result.stdout.toString()).toBe('');
+      expect(readFileSync(path, 'utf8')).toBe(edited);
+    }
+  }
+});
+
+test.each([
+  ['an empty list', 'also: []\n', 'grants: grants/still-ask.yaml.also: expected a nonempty list\n'],
+  [
+    'a duplicate item',
+    'also:\n  - "a new greenhouse"\n  - "a new greenhouse"\n',
+    'grants: grants/still-ask.yaml.also[1]: duplicate item "a new greenhouse"\n',
+  ],
+  ['an empty item', 'also:\n  - ""\n', 'grants: grants/still-ask.yaml.also[0]: expected one nonempty line\n'],
+  [
+    'an item with its closing punctuation',
+    'also:\n  - "a new greenhouse;"\n',
+    'grants: grants/still-ask.yaml.also[0]: give the item without its "- " bullet, closing ";" or ".", or surrounding spaces\n',
+  ],
+])('it rejects %s in the also list', (_label, also, message) => {
+  const ctx = setupTest();
+  for (const path of ['grants', 'skills', 'docs']) {
+    cpSync(join(ctx.fixture, path), join(ctx.dir, path), { recursive: true });
+  }
+  {
+    const path = join(ctx.dir, 'grants/still-ask.yaml');
+    const source = readFileSync(path, 'utf8');
+    const start = source.indexOf('also:\n');
+    const end = source.indexOf('sites:\n');
+    expect(start).toBeGreaterThan(0);
+    writeFileSync(path, source.slice(0, start) + also + source.slice(end));
+    {
+      const result = ctx.run();
+      expect(result.exitCode).toBe(1);
+      expect(result.stderr.toString()).toBe(message);
+      expect(result.stdout.toString()).toBe('');
+    }
+  }
+});
