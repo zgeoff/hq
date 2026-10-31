@@ -254,6 +254,7 @@ function renderAlso(file: string, body: string, at: number, also: string[]): str
     return body;
   }
   const start = at + ALSO_HEAD.length;
+
   // A line that holds only spaces or tabs ends the list as an empty line does.
   const blank = /\n[ \t]*\n/u.exec(body.slice(start));
   const end = blank === null ? body.length - (body.endsWith('\n') ? 1 : 0) : start + blank.index;
