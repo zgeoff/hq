@@ -19,7 +19,6 @@ test('it builds the full brief from one fixed set of facts', () => {
     playbookText: '# Bug playbook\n\nReproduce the leak first.\n',
     stack: 'Build the kettle in layers.',
     impLine: 'This imp has a small kettle.',
-    reviewBlock: 'List findings on zgeoff/<repo>.',
   });
 
   expect(brief).toMatchInlineSnapshot(`
@@ -27,7 +26,7 @@ test('it builds the full brief from one fixed set of facts', () => {
       "goalFile": null,
       "out": {
         "data": {
-          "bytes": 355,
+          "bytes": 542,
           "cuts": [],
           "goalFile": null,
           "issue": "GEO-9001",
@@ -56,7 +55,7 @@ test('it builds the full brief from one fixed set of facts', () => {
     Deploy kettle to <stage>.
 
     Build the kettle in layers.
-    Finish: "Contributes to GEO-9001". List findings on zgeoff/kettle.
+    Finish: "Contributes to GEO-9001". Before you write code, read noslop's rules, with <repo> as zgeoff/kettle: gh api 'repos/zgeoff/hq/contents/agent-kit/review-lines.md?ref=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' -H 'Accept: application/vnd.github.raw'
     This imp has a small kettle.
     {{spout}}"
     ,
@@ -89,7 +88,7 @@ test('it builds the full brief from one fixed set of facts', () => {
     Deploy kettle to <stage>.
 
     Build the kettle in layers.
-    Finish: "Contributes to GEO-9001". List findings on zgeoff/kettle.
+    Finish: "Contributes to GEO-9001". Before you write code, read noslop's rules, with <repo> as zgeoff/kettle: gh api 'repos/zgeoff/hq/contents/agent-kit/review-lines.md?ref=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' -H 'Accept: application/vnd.github.raw'
     This imp has a small kettle.
     {{spout}}"
     ,
@@ -110,7 +109,6 @@ test('it gives equal briefs for equal facts', () => {
     playbookText: null,
     stack: '',
     impLine: '',
-    reviewBlock: '',
   };
 
   expect(buildDeliveryBrief(facts)).toStrictEqual(buildDeliveryBrief(facts));
@@ -127,7 +125,6 @@ test('it warns and lists playbook in unfilled when the issue has no Type label',
     playbookText: null,
     stack: '',
     impLine: '',
-    reviewBlock: '',
   });
 
   expect(brief.warnings).toStrictEqual(['hq brief: GEO-9001 has no Type label, so the brief carries no playbook pointer']);
@@ -145,7 +142,6 @@ test('it warns, with the short sha, when the playbook file is missing at the sha
     playbookText: null,
     stack: '',
     impLine: '',
-    reviewBlock: '',
   });
 
   expect(brief.warnings).toStrictEqual(['hq brief: no agent-kit/playbooks/chore.md at bbbbbbb, so the brief carries no playbook pointer']);
@@ -163,7 +159,6 @@ test('it gives the goal file the issue sections and the playbook with --goal-fil
     playbookText: '# Bug playbook\n',
     stack: '',
     impLine: '',
-    reviewBlock: '',
   });
 
   expect(brief.goalFile).toStrictEqual({ path: 'goal.md', text: '# GEO-9001\n\n## Outcome\n\nBoil.\n\n---\n\n# Bug playbook\n' });
@@ -181,8 +176,7 @@ test('it refuses a prompt still over 4000 bytes after every cut, with its byte c
       playbookText: null,
       stack: '',
       impLine: '',
-      reviewBlock: '',
-    }),
+      }),
   ).toThrow(expect.objectContaining({ code: 'too_long', message: 'the brief is 4001 bytes after every cut, over the 4000 limit', data: { bytes: 4001, cuts: ['cut 1 unavailable', 'cut 3'] } }));
 });
 
@@ -203,7 +197,6 @@ test.each([
     playbookText: '# Bug playbook\n',
     stack: '',
     impLine: '',
-    reviewBlock: '',
   });
 
   expect(brief.out.text).toBe(prompt);

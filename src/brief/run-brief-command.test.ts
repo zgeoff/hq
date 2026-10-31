@@ -67,7 +67,7 @@ test('it leaves the stack line out for a size M issue, and never reads briefs.md
   expect(stub.calls.some((call) => call.includes('briefs.md'))).toBe(false);
 });
 
-test('it adds the review lines, with the repo filled in and <n> left, for a repo noslop reviews', async () => {
+test('it points at the review lines pinned to the sha, with the repo named, for a repo noslop reviews', async () => {
   const ctx = setupTest();
   const stub = createStubBriefDeps(ctx.root, {
     issues: { 'GEO-9001': { description: buildKettleIssueText(), labels: [{ name: 'Bug', parent: 'Type' }, { name: 'tools' }] } },
@@ -77,7 +77,10 @@ test('it adds the review lines, with the repo filled in and <n> left, for a repo
 
   const out = await runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: null });
 
-  expect(out.text).toContain('Boil the water. REVIEW-LINES: list findings with gh api repos/zgeoff/tools/pulls/<n>/comments. Leave the lid to me.');
+  expect(out.text).toContain(
+    `Boil the water. Before you write code, read noslop's rules, with <repo> as zgeoff/tools: gh api 'repos/zgeoff/hq/contents/agent-kit/review-lines.md?ref=${stub.sha}' -H 'Accept: application/vnd.github.raw' Leave the lid to me.`,
+  );
+  expect(out.text).not.toContain('REVIEW-LINES');
 });
 
 test('it leaves the review lines out for a repo noslop does not review, and never reads review-lines.md', async () => {
@@ -427,16 +430,3 @@ test('it refuses a repo noslop reviews when review-lines.md is missing at the sh
   expect(outcome).rejects.toMatchObject({ code: 'not_found', message: `agent-kit/review-lines.md is missing at ${stub.sha}; pass --ref refactor/fleet-skill-rebuild until the skill rebuild merges` });
 });
 
-test('it refuses a repo noslop reviews when review-lines.md has no text fence', () => {
-  const ctx = setupTest();
-  const stub = createStubBriefDeps(ctx.root, {
-    issues: { 'GEO-9001': { description: buildKettleIssueText(), labels: [{ name: 'Bug', parent: 'Type' }, { name: 'tools' }] } },
-    rows: [['Code delivery', 'Work in <repo>.']],
-    noslop: ['tools'],
-    kit: { ...buildStubBriefKit(), 'agent-kit/review-lines.md': '# kettle review\n\nPut this block in the brief.\n\n```md\nREVIEW-LINES: not a text fence.\n```\n' },
-  });
-
-  const outcome = runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: null });
-
-  expect(outcome).rejects.toMatchObject({ code: 'not_found', message: `agent-kit/review-lines.md at ${stub.sha} has no text fence` });
-});
