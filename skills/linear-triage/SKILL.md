@@ -34,8 +34,8 @@ since your last pass, on every other scheduled run.
    Light pass: `--state Triage` into one folder, then every open state with
    `--updated-since <your last "TRIAGE PASS at" time>` into another. If hq fails, fetch with the
    Linear connector, save every page, and say so in the pass line.
-2. **Audit.** `scripts/audit-issues.sh <page files>` prints JSON: `triage`, `incomplete`, `stale`
-   and `counts`.
+2. **Audit.** `scripts/audit-issues.sh <page files>` prints JSON: `triage`, `incomplete`, `stale`,
+   `designLane` and `counts`.
 3. **Groom each Triage issue,** in one update where you can: type, size, priority, project, area
    label and relations. Mark a duplicate only when you're sure, after copying any detail the
    original lacks. Rewrite it into the `tickets` sections without changing its scope. Then Ready if
@@ -44,7 +44,9 @@ since your last pass, on every other scheduled run.
    and copy in each block it marks missing.
 4. **Complete each incomplete issue** from what it already says. List its sub-issues with `parentId`
    before you size it. A Bug, Feature, Improvement or Chore with no Action gets `Code delivery`. A
-   blocker its text names becomes a relation.
+   blocker its text names becomes a relation. For each `designLane` issue, whose `with-geoff` label
+   and Actions line disagree, fix the one that is wrong only when its comments or history record
+   the owner's choice; otherwise flag it, asking whether he joins the design.
 5. **Close, free and promote,** as closing.md says; on a full pass, also the obsolete Backlog
    issues. Then run `hq lanes promotable` and move each issue it lists that the Ready criteria
    allow, with a comment naming the blocker that closed or the criteria it meets.

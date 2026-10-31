@@ -1,0 +1,58 @@
+[
+  {
+    "id": "GEO-9301",
+    "title": "Design: the lantern schedule",
+    "url": "https://linear.example/issue/GEO-9301",
+    "status": "Ready",
+    "statusType": "unstarted",
+    "project": "Lantern Garden",
+    "priority": { "value": 3, "name": "Medium" },
+    "labels": ["Design", "Garden", "with-geoff"],
+    "parentId": null,
+    "createdAt": "2026-10-15T00:00:00Z",
+    "updatedAt": "2026-10-15T00:00:00Z",
+    "description": "## Outcome\n\nLanterns light at dusk.\n\n## Actions\n\nAgent design pass, then the decision record.\n"
+  },
+  {
+    "id": "GEO-9302",
+    "title": "Design: the seed swap",
+    "url": "https://linear.example/issue/GEO-9302",
+    "status": "Ready",
+    "statusType": "unstarted",
+    "project": "Lantern Garden",
+    "priority": { "value": 3, "name": "Medium" },
+    "labels": ["Design", "Garden"],
+    "parentId": null,
+    "createdAt": "2026-10-15T00:00:00Z",
+    "updatedAt": "2026-10-15T00:00:00Z",
+    "description": "## Outcome\n\nSeeds change hands.\n\n## Actions\n\n- `Design session with Geoff`, then the decision record as a Linear document\n\n## Agent notes\n\nNone.\n"
+  },
+  {
+    "id": "GEO-9303",
+    "title": "Design: the pond pump",
+    "url": "https://linear.example/issue/GEO-9303",
+    "status": "Ready",
+    "statusType": "unstarted",
+    "project": "Lantern Garden",
+    "priority": { "value": 3, "name": "Medium" },
+    "labels": ["Design", "Garden", "with-geoff"],
+    "parentId": null,
+    "createdAt": "2026-10-15T00:00:00Z",
+    "updatedAt": "2026-10-15T00:00:00Z",
+    "description": "## Outcome\n\nThe pond stays clear.\n\n## Actions\n\nDesign session with the owner, then the decision record as a Linear document.\n"
+  },
+  {
+    "id": "GEO-9304",
+    "title": "Design: the compost rota",
+    "url": "https://linear.example/issue/GEO-9304",
+    "status": "Ready",
+    "statusType": "unstarted",
+    "project": "Lantern Garden",
+    "priority": { "value": 3, "name": "Medium" },
+    "labels": ["Design", "Garden", "parked"],
+    "parentId": null,
+    "createdAt": "2026-10-15T00:00:00Z",
+    "updatedAt": "2026-10-15T00:00:00Z",
+    "description": "## Actions\n\nAgent design pass, not with Geoff: the owner settled the rota.\n"
+  }
+]

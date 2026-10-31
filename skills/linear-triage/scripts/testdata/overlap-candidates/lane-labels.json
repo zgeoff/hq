@@ -1,0 +1,24 @@
+[
+  {
+    "id": "GEO-960",
+    "title": "Design the lantern timer schedule",
+    "url": "https://linear.example/issue/GEO-960",
+    "status": "Ready",
+    "statusType": "unstarted",
+    "project": "Lantern Garden",
+    "labels": ["Design", "with-geoff", "parked"],
+    "parentId": null,
+    "updatedAt": "2026-10-15T00:00:00Z"
+  },
+  {
+    "id": "GEO-961",
+    "title": "Design the lantern timer schedules",
+    "url": "https://linear.example/issue/GEO-961",
+    "status": "Ready",
+    "statusType": "unstarted",
+    "project": "Orchard Walk",
+    "labels": ["Design", "with-geoff", "parked"],
+    "parentId": null,
+    "updatedAt": "2026-10-15T00:00:00Z"
+  }
+]

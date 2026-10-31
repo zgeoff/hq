@@ -9,9 +9,11 @@
     "missingSize": 0,
     "missingArea": 0,
     "stale": 0,
-    "needsGeoff": 0
+    "needsGeoff": 0,
+    "designLane": 0
   },
   "triage": [],
   "incomplete": [],
-  "stale": []
+  "stale": [],
+  "designLane": []
 }

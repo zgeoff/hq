@@ -1,0 +1,58 @@
+{
+  "checkedAt": "2026-10-16T00:00:00Z",
+  "open": 4,
+  "counts": {
+    "inTriage": 0,
+    "missingProject": 0,
+    "missingType": 0,
+    "missingPriority": 0,
+    "missingSize": 0,
+    "missingArea": 0,
+    "stale": 0,
+    "needsGeoff": 0,
+    "designLane": 2
+  },
+  "triage": [],
+  "incomplete": [],
+  "stale": [],
+  "designLane": [
+    {
+      "id": "GEO-9301",
+      "title": "Design: the lantern schedule",
+      "url": "https://linear.example/issue/GEO-9301",
+      "status": "Ready",
+      "project": "Lantern Garden",
+      "type": "Design",
+      "size": null,
+      "areas": [
+        "Garden"
+      ],
+      "priority": 3,
+      "idleDays": 1,
+      "ageDays": 1,
+      "needsGeoff": false,
+      "designLane": "with-geoff label but its Actions line asks for an agent design pass",
+      "missing": [],
+      "stale": false
+    },
+    {
+      "id": "GEO-9302",
+      "title": "Design: the seed swap",
+      "url": "https://linear.example/issue/GEO-9302",
+      "status": "Ready",
+      "project": "Lantern Garden",
+      "type": "Design",
+      "size": null,
+      "areas": [
+        "Garden"
+      ],
+      "priority": 3,
+      "idleDays": 1,
+      "ageDays": 1,
+      "needsGeoff": false,
+      "designLane": "no with-geoff label but its Actions line asks for a session with the owner",
+      "missing": [],
+      "stale": false
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 #!/bin/sh
-# Golden outputs for missing fields, size exemptions, stale boundaries, and the quality and enabler labels,
-# which are not areas.
+# Golden outputs for missing fields, size exemptions, stale boundaries, the quality and enabler labels,
+# which are not areas, and design issues whose with-geoff label and Actions line disagree.
 # --now fixes staleness; the script's initial date read is overridden by that flag.
 set -eu
 here=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
@@ -33,4 +33,5 @@ check mixed "$fixtures/mixed.json" "$fixtures/children-envelope.json" "$fixtures
 check healthy "$fixtures/healthy.json"
 check boundaries "$fixtures/boundaries.json"
 check quality "$fixtures/quality.json"
+check design-lane "$fixtures/design-lane.json"
 exit "$fail"
