@@ -4,8 +4,9 @@ noslop is the review bot on every repo `hq noslop` lists. `z-review` starts it a
 FINAL note; the agent never runs it. It reads answers by exact format, so any other wording leaves a
 finding open.
 
-For such a repo, put this block in `{{review_lines}}` without the fences, with `<repo>` filled in
-and `<n>` left for the agent. For any other repo, leave it empty.
+For such a repo, `{{review_lines}}` holds one pinned `gh api` line that sends the agent here, and
+names the repo for `<repo>`. The agent reads the block below, with `<n>` as its PR number. The block
+is too long to go in the brief itself. For any other repo, `{{review_lines}}` is empty.
 
 ```text
 noslop checks the rules in these sections of the shared skills, so read them before you write code and check your diff against them in your self-review: code-style's Function names, Types, Structure, Errors and logs, and Comments; testing's Principles and Boundaries; and docs-writing's "Describe the system as it is now" and "Give each doc one job, and each fact one doc that owns it" rules, and the Procedures and Formatting rules under Shape the doc. After your FINAL note, noslop posts each finding on the PR as a review comment by `noslop-review[bot]` that holds `<!-- noslop:finding`. `<n>` is your PR's number. List them with `gh api repos/zgeoff/<repo>/pulls/<n>/comments --paginate --jq '.[] | select(.user.login == "noslop-review[bot]" and .in_reply_to_id == null and (.body | contains("<!-- noslop:finding"))) | {id, path, line, body}'`. Answer every finding in its own thread with `gh api repos/zgeoff/<repo>/pulls/<n>/comments/<comment id>/replies -f body='<answer>'`.

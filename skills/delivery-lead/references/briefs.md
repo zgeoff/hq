@@ -20,7 +20,7 @@ Paste each part of the issue as written.
 | `{{permissions}}`  | The private wording for each listed Action, always including Code delivery                                        |
 | `{{stack}}`        | The stack line below, for size L or XL (`hq run show <issue>`); otherwise empty                                   |
 | `{{fixes}}`        | `Fixes` when the merge meets every Acceptance item; `Contributes to` when a release, deploy or live check remains |
-| `{{review_lines}}` | The block in `agent-kit/review-lines.md` for a repo `hq noslop` lists; otherwise empty                            |
+| `{{review_lines}}` | A pinned `gh api` line to `agent-kit/review-lines.md` for a repo `hq noslop` lists; otherwise empty               |
 | `{{not_yours}}`    | Per step that needs a deploy or live system: ` <step> is not yours; it runs after the merge.`                     |
 | `{{imp_line}}`     | The imp line below, on an imp; otherwise empty                                                                    |
 | `{{goal_file}}`    | `. The full issue is in <path>; read it first.` when Length step 1 moved it; otherwise empty                      |
