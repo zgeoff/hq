@@ -27,3 +27,7 @@ test('it refuses a label that names no repo hq knows, by name', () => {
 test('it refuses an area that has no repo of its own', () => {
   expect(() => pickBriefAreas({ identifier: 'GEO-9001', description: '', labels: [{ name: 'frankie' }] })).toThrow('GEO-9001 has the label frankie, which names no repo hq knows');
 });
+
+test('it refuses a label named like an Object property, such as constructor', () => {
+  expect(() => pickBriefAreas({ identifier: 'GEO-9001', description: '', labels: [{ name: 'constructor' }] })).toThrow('GEO-9001 has the label constructor, which names no repo hq knows');
+});
