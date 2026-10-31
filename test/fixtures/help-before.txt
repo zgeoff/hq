@@ -84,6 +84,7 @@ hq 0.79.0: headquarters for the z- sessions. Every command takes --json.
   hq health [check]                          read-only checks on this PC: units, restart loops, disk, memory, atc, watcher
   hq health settings | set KEY [VALUE]       thresholds (no VALUE: back to the default)
   hq health tick                             one watcher step: tell z-stu about new problems, file news for cleared ones
+  hq state trim <role> [--dry-run]            move the oldest '## Log' entries of a role's state file to this month's archive until it is under its size limit; --dry-run only reports
   hq news [--all] [--limit N]                unread items for the owner, grouped by topic
   hq news add --topic merge|release|deploy|fix|report|other --text T [--from S] [--issue GEO-n] [--link URL] [--tag SLUG] [--needs-geoff]
                                              file one line; only --needs-geoff messages z-stu
