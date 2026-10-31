@@ -11,6 +11,10 @@ test('it carries each flag it is given', () => {
   expect(input).toStrictEqual({ issue: 'GEO-9001', ref: 'refactor/kettle-rebuild', imp: true, byLink: false, goalFile: '/tmp/kettle-goal.md' });
 });
 
+test('it sends the issue by link with --imp and no --goal-file', () => {
+  expect(parseBriefFlags('GEO-9001', { imp: true })).toStrictEqual({ issue: 'GEO-9001', ref: 'main', imp: true, byLink: true, goalFile: null });
+});
+
 test('it rejects a missing issue and one that is not a Linear ID', () => {
   expect(() => parseBriefFlags(undefined, {})).toThrow('hq brief <issue> needs a Linear issue ID such as GEO-123');
   expect(() => parseBriefFlags('kettle', {})).toThrow('hq brief <issue> needs a Linear issue ID such as GEO-123');
