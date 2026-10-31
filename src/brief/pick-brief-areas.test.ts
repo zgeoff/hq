@@ -24,6 +24,20 @@ test('it reads pepys and osrs as areas beside cloud, and leaves out quality, Typ
   });
 });
 
+test('it maps noslop, wringer, dotfiles and nixie-definitions to their own repos', () => {
+  const labels = [{ name: 'noslop' }, { name: 'wringer' }, { name: 'dotfiles' }, { name: 'nixie-definitions' }];
+
+  expect(pickBriefAreas({ identifier: 'GEO-9001', description: '', labels })).toStrictEqual({
+    kind: 'known',
+    areas: [
+      { label: 'dotfiles', repo: 'dotfiles' },
+      { label: 'nixie-definitions', repo: 'nixie-definitions' },
+      { label: 'noslop', repo: 'noslop' },
+      { label: 'wringer', repo: 'wringer' },
+    ],
+  });
+});
+
 test('it returns a label that names no repo hq knows as unknown', () => {
   expect(pickBriefAreas({ identifier: 'GEO-9001', description: '', labels: [{ name: 'cloud' }, { name: 'teapot' }] })).toStrictEqual({ kind: 'unknown', label: 'teapot' });
 });
