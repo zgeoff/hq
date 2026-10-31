@@ -2,6 +2,7 @@
 // hq: the z- sessions' headquarters. Typed state, named transitions, atc nudges.
 import { Database } from 'bun:sqlite';
 import { parseArgs } from 'node:util';
+import { match } from 'ts-pattern';
 import { addAsk } from './asks/add-ask.ts';
 import { answerAsk } from './asks/answer-ask.ts';
 import { applyAsk } from './asks/apply-ask.ts';
@@ -323,7 +324,10 @@ import { makeLinearCaller } from './linear/make-linear-caller.ts';
 import { readNoslopSettings } from './brief/read-noslop-settings.ts';
 import { dbPath } from './db/db-path.ts';
 import { parseBriefFlags } from './brief/parse-brief-flags.ts';
+import { parseBriefKind } from './brief/parse-brief-kind.ts';
+import { parseSkillBriefFlags } from './brief/parse-skill-brief-flags.ts';
 import { runBriefCommand } from './brief/run-brief-command.ts';
+import { runSkillBriefCommand } from './brief/run-skill-brief-command.ts';
 import { readPacingLanes } from './lanes/read-pacing-lanes.ts';
 import { runLinearReadyTick } from './run-linear-ready-tick.ts';
 import { STEP_MS } from './watcher/step-ms.ts';
@@ -2120,10 +2124,16 @@ export async function main(argv: string[], runner: Runner = realRunner): Promise
   }
 }
 
-// Reads the db only for noslop's repo list, read-only, so no db is created or migrated.
+// The delivery kind reads the db only for noslop's repo list, read-only, so no db is created or
+// migrated.
 function runBrief(runner: Runner, verb: string | undefined, flags: Flags): Promise<Out> {
-  const deps = { linear: makeLinearCaller(runner), run: runner, noslop: readNoslopSettings(dbPath()), privateDir: PRIVATE_TREE.dir(), warn: (line: string) => console.error(line) };
-  return runBriefCommand(deps, parseBriefFlags(verb, flags));
+  return match(parseBriefKind(flags))
+    .with('delivery', () => {
+      const deps = { linear: makeLinearCaller(runner), run: runner, noslop: readNoslopSettings(dbPath()), privateDir: PRIVATE_TREE.dir(), warn: (line: string) => console.error(line) };
+      return runBriefCommand(deps, parseBriefFlags(verb, flags));
+    })
+    .with('design', 'pr-walk', (kind) => runSkillBriefCommand({ linear: makeLinearCaller(runner), run: runner }, parseSkillBriefFlags(verb, flags, kind)))
+    .exhaustive();
 }
 
 async function runCommand(context: Ctx): Promise<Out> {

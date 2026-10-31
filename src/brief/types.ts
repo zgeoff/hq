@@ -61,3 +61,19 @@ export interface BriefParts {
   impLine: string;
   goalFile: string;
 }
+
+export type SkillBriefKind = 'design' | 'pr-walk';
+
+export type BriefKind = 'delivery' | SkillBriefKind;
+
+export interface SkillBriefInput {
+  issue: string;
+  ref: string;
+  kind: SkillBriefKind;
+}
+
+export interface BriefSkill {
+  name: string;
+  path: string;
+  command: string;
+}

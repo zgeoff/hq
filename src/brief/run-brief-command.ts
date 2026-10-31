@@ -1,7 +1,6 @@
 import type { Out } from '../commands.ts';
 import { HqError } from '../errors.ts';
 import { pickIssueType } from '../lanes/pick-issue-type.ts';
-import { getIssueAreas } from '../focus/get-issue-areas.ts';
 import { isNoslopListed } from '../noslop/is-noslop-listed.ts';
 import { buildGoalPointer } from './build-goal-pointer.ts';
 import { buildPermissions } from './build-permissions.ts';
@@ -10,8 +9,10 @@ import { BRIEF_LIMIT_BYTES, fitBrief } from './fit-brief.ts';
 import { findFencedBlock } from './find-fenced-block.ts';
 import { parseIssueActions } from './parse-issue-actions.ts';
 import { parseIssueSections } from './parse-issue-sections.ts';
+import { pickIssueRepo } from './pick-issue-repo.ts';
 import { pickIssueSize } from './pick-issue-size.ts';
 import { readBriefIssue } from './read-brief-issue.ts';
+import { readBriefTemplate } from './read-brief-template.ts';
 import { readPermissionTable } from './read-permission-table.ts';
 import { readRefFile } from './read-ref-file.ts';
 import { readRefSHA } from './read-ref-sha.ts';
@@ -23,6 +24,7 @@ const ISSUE_SECTIONS = new Set(['outcome', 'context', 'scope', 'acceptance', 'ag
 const REQUIRED_SECTIONS = ['Outcome', 'Scope', 'Acceptance'];
 const BRIEFS_PATH = 'skills/delivery-lead/references/briefs.md';
 const REVIEW_LINES_PATH = 'agent-kit/review-lines.md';
+const TEMPLATE_PATH = 'agent-kit/brief.md';
 
 // Fills the delivery launch brief for one Linear issue and prints it. It reads Linear, GitHub and
 // the private wording, and writes nothing but the --goal-file file.
@@ -31,13 +33,9 @@ export async function runBriefCommand(deps: BriefDeps, input: BriefInput): Promi
     requireGoalFileTarget(input.goalFile);
   }
   const issue = await readBriefIssue(deps.linear, input.issue);
-  const areas = getIssueAreas(issue.labels.map((label) => label.name));
-  const [repo] = areas;
-  if (areas.length !== 1 || repo === undefined) {
-    throw new HqError('bad_state', `${issue.identifier} needs exactly one area label to name its repo; it has ${areas.length === 0 ? 'none' : areas.join(', ')}`);
-  }
+  const repo = pickIssueRepo(issue);
   const sha = await readRefSHA(deps.run, input.ref);
-  const template = await readTemplate(deps, sha);
+  const template = await readBriefTemplate(deps.run, sha, TEMPLATE_PATH);
   const sections = parseIssueSections(issue.description);
   const issueSections = sections.filter((section) => ISSUE_SECTIONS.has(section.name.toLowerCase()));
   const actions = parseIssueActions(sections);
@@ -84,20 +82,6 @@ export async function runBriefCommand(deps: BriefDeps, input: BriefInput): Promi
     data: { issue: issue.identifier, repo: `zgeoff/${repo}`, ref: sha, prompt: fitted.prompt, bytes: fitted.bytes, cuts: fitted.cuts, playbook: playbook.found, goalFile: input.goalFile, unfilled },
     text: fitted.prompt,
   };
-}
-
-const TEMPLATE_PATH = 'agent-kit/brief.md';
-
-async function readTemplate(deps: BriefDeps, sha: string): Promise<string> {
-  const text = await readRefFile(deps.run, sha, TEMPLATE_PATH);
-  if (text === null) {
-    throw new HqError('not_found', `${TEMPLATE_PATH} is missing at ${sha}; pass --ref refactor/fleet-skill-rebuild until the skill rebuild merges`);
-  }
-  const template = findFencedBlock(text, null);
-  if (template === null) {
-    throw new HqError('bad_state', `${TEMPLATE_PATH} at ${sha} has no text fence holding the prompt`);
-  }
-  return template;
 }
 
 interface PlaybookRead {

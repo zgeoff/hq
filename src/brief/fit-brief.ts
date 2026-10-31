@@ -1,7 +1,7 @@
+import { fillPlaceholders } from './fill-placeholders.ts';
 import type { BriefParts, IssueSection } from './types.ts';
 
 const CUT_2_SECTIONS = new Set(['context', 'agent notes']);
-const PLACEHOLDER = /\{\{(?<name>\w+)\}\}/gu;
 
 // Fills the template and cuts it to the limit in the order of briefs.md's Length section: cut 1
 // moves the issue out (so unavailable when it is in the prompt), cut 2 drops the issue's Context
@@ -9,7 +9,7 @@ const PLACEHOLDER = /\{\{(?<name>\w+)\}\}/gu;
 export function fitBrief(template: string, parts: BriefParts, issueInPrompt: boolean): { prompt: string; bytes: number; cuts: string[]; unknown: string[] } {
   const cuts: string[] = [];
   let sections: IssueSection[] = issueInPrompt ? parts.sections : [];
-  let prompt = fillTemplate(template, parts, sections);
+  let prompt = fillPlaceholders(template, buildValues(parts, sections)).text;
   if (isOver(prompt) && issueInPrompt) {
     cuts.push('cut 1 unavailable');
   }
@@ -17,7 +17,7 @@ export function fitBrief(template: string, parts: BriefParts, issueInPrompt: boo
     const kept = sections.filter((section) => !CUT_2_SECTIONS.has(section.name.toLowerCase()));
     if (kept.length !== sections.length) {
       sections = kept;
-      prompt = fillTemplate(template, parts, sections);
+      prompt = fillPlaceholders(template, buildValues(parts, sections)).text;
       cuts.push('cut 2');
     }
   }
@@ -25,15 +25,7 @@ export function fitBrief(template: string, parts: BriefParts, issueInPrompt: boo
     prompt = dropGoalLine(prompt);
     cuts.push('cut 3');
   }
-  const names = [...template.matchAll(PLACEHOLDER)].map((match) => match.groups?.['name'] ?? '');
-  const known = Object.keys(buildValues(parts, sections));
-  return { prompt, bytes: Buffer.byteLength(prompt), cuts, unknown: [...new Set(names.filter((name) => !known.includes(name)))] };
-}
-
-// Placeholders are filled in one pass, so text that holds `{{x}}` is never filled again.
-function fillTemplate(template: string, parts: BriefParts, sections: readonly IssueSection[]): string {
-  const values = buildValues(parts, sections);
-  return template.replaceAll(PLACEHOLDER, (whole, name: string) => values[name] ?? whole);
+  return { prompt, bytes: Buffer.byteLength(prompt), cuts, unknown: fillPlaceholders(template, buildValues(parts, sections)).unknown };
 }
 
 function buildValues(parts: BriefParts, sections: readonly IssueSection[]): Record<string, string> {
