@@ -8,6 +8,7 @@ import { BRIEF_LIMIT_BYTES, fitBrief } from './fit-brief.ts';
 import { isLastArea } from './is-last-area.ts';
 import { parseIssueActions } from './parse-issue-actions.ts';
 import { parseIssueSections } from './parse-issue-sections.ts';
+import type { BriefArea } from './pick-brief-areas.ts';
 import type { BriefReads } from './pick-brief-reads.ts';
 import type { BriefInput, BriefIssue, BriefParts, IssueSection, PermissionRow } from './types.ts';
 
@@ -78,8 +79,8 @@ export function buildDeliveryBrief(facts: DeliveryBriefFacts): DeliveryBrief {
 const REQUIRED_SECTIONS = ['Outcome', 'Scope', 'Acceptance'];
 
 // With --repo on a multi-area issue: keep the agent to its own area, since each other gets a launch.
-function buildAreaLine(issue: string, repo: string, otherAreas: readonly string[]): string {
-  return otherAreas.length === 0 ? '' : ` Do only the \`${repo}\` part of ${issue}: each other area (${otherAreas.join(', ')}) gets its own launch.`;
+function buildAreaLine(issue: string, repo: string, otherAreas: readonly BriefArea[]): string {
+  return otherAreas.length === 0 ? '' : ` Do only the \`${repo}\` part of ${issue}: each other area (${otherAreas.map((area) => area.label).join(', ')}) gets its own launch.`;
 }
 
 function collectMissingSections(sections: readonly IssueSection[]): string[] {

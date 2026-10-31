@@ -231,7 +231,7 @@ test.each([
     input: { issue: 'GEO-9001', ref: 'main', imp: false, byLink: true, goalFile: null, repo: 'kettle' },
     issue: { identifier: 'GEO-9001', description, labels: [{ name: 'kettle' }, { name: 'teapot' }] },
     sha: 'b'.repeat(40),
-    reads: { repo: 'kettle', otherAreas: ['teapot'], playbook: null, stack: false, imp: false, reviewLines: false },
+    reads: { repo: 'kettle', otherAreas: [{ label: 'teapot', repo: 'teapot' }], playbook: null, stack: false, imp: false, reviewLines: false },
     template: 'Leave the merge to me.{{not_yours}}\n"{{fixes}} {{issue_id}}"',
     permissionTable: [{ action: 'Code delivery', phrase: 'Work in <repo>.' }],
     playbookText: null,

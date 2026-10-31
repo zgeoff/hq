@@ -53,5 +53,5 @@ test('it names the other areas when --repo picks one area of several', () => {
   const issue = { identifier: 'GEO-9001', description: '', labels: [{ name: 'cloud' }, { name: 'imp' }, { name: 'tools' }] };
   const reads = pickBriefReads(issue, { imp: false, repo: 'imp' }, { repos: [], sha: null, caps: {} }, 'a'.repeat(40));
 
-  expect([reads.repo, reads.otherAreas]).toStrictEqual(['imp', ['cloud', 'tools']]);
+  expect([reads.repo, reads.otherAreas]).toStrictEqual(['impz', [{ label: 'cloud', repo: 'cloud' }, { label: 'tools', repo: 'tools' }]]);
 });

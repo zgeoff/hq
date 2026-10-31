@@ -18,7 +18,7 @@ export interface SkillBriefFacts {
 // brief over the limit is refused, since it has nothing to cut.
 export function buildSkillBrief(facts: SkillBriefFacts): Out {
   // a design or PR-walk issue often has no area label, so its repo is needed only when the template names it
-  const repo = facts.template.includes('{{repo}}') ? `zgeoff/${pickIssueRepo(facts.issue, facts.repo)}` : null;
+  const repo = facts.template.includes('{{repo}}') ? `zgeoff/${pickIssueRepo(facts.issue, facts.repo).repo}` : null;
   const values = repo === null ? { issue_id: facts.issue.identifier } : { repo, issue_id: facts.issue.identifier };
   const filled = fillPlaceholders(facts.template, values);
   const prompt = `${filled.text}\n\nFirst read the ${facts.skill.name} skill: ${facts.skill.command}`;

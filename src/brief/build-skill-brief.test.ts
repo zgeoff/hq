@@ -107,5 +107,5 @@ test('it fills the repo --repo picks from a multi-area issue', () => {
     repo: 'imp',
   });
 
-  expect(brief.text).toBe('Design the lid of zgeoff/imp for GEO-9001.\n\nFirst read the tickets skill: gh api tickets');
+  expect(brief.text).toBe('Design the lid of zgeoff/impz for GEO-9001.\n\nFirst read the tickets skill: gh api tickets');
 });
