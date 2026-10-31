@@ -20,7 +20,7 @@
       "threshold": 95,
       "unattended": true,
       "target": "imp",
-      "localFallback": 1
+      "localFallback": 3
     }
   },
   "routes": {
