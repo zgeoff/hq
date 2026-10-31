@@ -32,42 +32,81 @@ test('#buildTrimPlan an indented line and the blank line after it move with thei
   const text = '## Log\n09:10Z boiled the water\n09:11Z poured the tea\n  with a splash of milk\n\n09:12Z washed the cup\n';
   const limit = Buffer.byteLength(text) - Buffer.byteLength('09:10Z boiled the water\n09:11Z poured the tea\n  with a splash of milk\n\n');
 
-  expect(buildTrimPlan(text, limit)).toMatchObject({
+  expect(buildTrimPlan(text, limit)).toStrictEqual({
+    kind: 'plan',
     kept: '## Log\n09:12Z washed the cup\n',
     moved: '09:10Z boiled the water\n09:11Z poured the tea\n  with a splash of milk\n\n',
     entriesMoved: 2,
+    beforeBytes: 100,
+    afterBytes: 29,
   });
 });
 
 test('#buildTrimPlan the newest entry stays even when the file is still over the limit', () => {
   const text = '# kettle\n\n## Log\n09:10Z boiled the water\n09:11Z poured the tea\n09:12Z washed the cup\n\n## Holds\nlid: stuck\n';
 
-  expect(buildTrimPlan(text, 1)).toMatchObject({
+  expect(buildTrimPlan(text, 1)).toStrictEqual({
+    kind: 'plan',
     kept: '# kettle\n\n## Log\n09:12Z washed the cup\n\n## Holds\nlid: stuck\n',
+    moved: '09:10Z boiled the water\n09:11Z poured the tea\n',
     entriesMoved: 2,
+    beforeBytes: 106,
+    afterBytes: 60,
   });
 });
 
 test('#buildTrimPlan the heading line stays and lines before the first entry are never moved', () => {
   const text = '## Log\n\n  a note under the heading\n09:10Z boiled the water\n09:11Z poured the tea\n';
 
-  expect(buildTrimPlan(text, 1)).toMatchObject({
+  expect(buildTrimPlan(text, 1)).toStrictEqual({
+    kind: 'plan',
     kept: '## Log\n\n  a note under the heading\n09:11Z poured the tea\n',
     moved: '09:10Z boiled the water\n',
+    entriesMoved: 1,
+    beforeBytes: 81,
+    afterBytes: 57,
   });
 });
 
 test('#buildTrimPlan the log section ends at the next heading, so entries after it are never moved', () => {
   const text = '## Log\n09:10Z boiled the water\n09:11Z poured the tea\n## Holds\nlid: stuck\nlid: loose\n';
 
-  expect(buildTrimPlan(text, 1)).toMatchObject({
+  expect(buildTrimPlan(text, 1)).toStrictEqual({
+    kind: 'plan',
     kept: '## Log\n09:11Z poured the tea\n## Holds\nlid: stuck\nlid: loose\n',
+    moved: '09:10Z boiled the water\n',
     entriesMoved: 1,
+    beforeBytes: 84,
+    afterBytes: 60,
   });
 });
 
 test('#buildTrimPlan a heading that only starts with Log is not the log section', () => {
   expect(buildTrimPlan('## Logbook\n09:10Z boiled the water\n', 1)).toStrictEqual({ kind: 'no-log' });
+});
+
+test('#buildTrimPlan a Log-notes section before the real log is left untouched', () => {
+  const text = '## Log-notes\n09:00Z descaled the kettle\n09:01Z dried the kettle\n## Log\n09:10Z boiled the water\n09:11Z poured the tea\n';
+
+  expect(buildTrimPlan(text, 1)).toStrictEqual({
+    kind: 'plan',
+    kept: '## Log-notes\n09:00Z descaled the kettle\n09:01Z dried the kettle\n## Log\n09:11Z poured the tea\n',
+    moved: '09:10Z boiled the water\n',
+    entriesMoved: 1,
+    beforeBytes: 117,
+    afterBytes: 93,
+  });
+});
+
+test('#buildTrimPlan a log heading with words after it is the log section', () => {
+  expect(buildTrimPlan('## Log (last 24 h)\n09:10Z boiled the water\n09:11Z poured the tea\n', 1)).toStrictEqual({
+    kind: 'plan',
+    kept: '## Log (last 24 h)\n09:11Z poured the tea\n',
+    moved: '09:10Z boiled the water\n',
+    entriesMoved: 1,
+    beforeBytes: 65,
+    afterBytes: 41,
+  });
 });
 
 test('#buildTrimPlan a file with no log heading has no log', () => {
@@ -77,5 +116,12 @@ test('#buildTrimPlan a file with no log heading has no log', () => {
 });
 
 test('#buildTrimPlan a log whose last line has no newline keeps it', () => {
-  expect(buildTrimPlan('## Log\n09:10Z boiled the water\n09:11Z poured the tea', 1)).toMatchObject({ kept: '## Log\n09:11Z poured the tea' });
+  expect(buildTrimPlan('## Log\n09:10Z boiled the water\n09:11Z poured the tea', 1)).toStrictEqual({
+    kind: 'plan',
+    kept: '## Log\n09:11Z poured the tea',
+    moved: '09:10Z boiled the water\n',
+    entriesMoved: 1,
+    beforeBytes: 52,
+    afterBytes: 28,
+  });
 });
