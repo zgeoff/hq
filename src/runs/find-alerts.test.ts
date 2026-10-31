@@ -214,7 +214,7 @@ test('it raises the prompt-wait alert for a session waiting past the quiet limit
   ]);
 });
 
-test('it raises the prompt-wait alert for a helper waiting past the quiet limit whose run PR is final and reviewed at its head', () => {
+test('it raises no prompt-wait alert for a helper that carries the run, with no main session active, once its run PR is final and reviewed at its head', () => {
   const ctx = setupTest();
   const helper = '98540000-0000-4000-8000-000000000001';
   addRun(ctx.db, { issue: 'GEO-9854', title: 'Invented kettle work', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
@@ -224,8 +224,29 @@ test('it raises the prompt-wait alert for a helper waiting past the quiet limit 
 
   const activity = new Map([[helper, Date.parse('2026-10-21T01:30:00Z')]]);
 
-  expect(findAlerts(ctx.db, [{ id: helper, name: 'kettle helper', alive: true, state: 'needs_you' }], activity, new Date('2026-10-21T03:00:00Z'))).toStrictEqual([
-    { key: `session:${helper}`, fingerprint: 'quiet:needs_you', issue: 'GEO-9854', line: 'GEO-9854: helper session 98540000 waits on a prompt for 90 min' },
+  expect(findAlerts(ctx.db, [{ id: helper, name: 'kettle helper', alive: true, state: 'needs_you' }], activity, new Date('2026-10-21T03:00:00Z'))).toStrictEqual([]);
+});
+
+test('it raises the prompt-wait alert for a helper beside an active main session, although the run PR is final and reviewed at its head', () => {
+  const ctx = setupTest();
+  const main = '98570000-0000-4000-8000-000000000001';
+  const helper = '98570000-0000-4000-8000-000000000002';
+  addRun(ctx.db, { issue: 'GEO-9857', title: 'Invented kettle work', place: 'imp', session: main, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
+  setSession(ctx.db, 'GEO-9857', helper, 'kettle-bot', 'add');
+  addPr(ctx.db, 'GEO-9857', 'kettle#57', 'kettle-bot');
+  ctx.db.query("UPDATE run_prs SET final_sha = 'abc1234', final_at = '2026-10-21T01:00:00Z', final_source = 'marker:kettle', review_started_at = '2026-10-21T01:10:00Z', reviewed_sha = 'abc1234', review_round = 1, reviewed_at = '2026-10-21T01:20:00Z' WHERE ref = 'kettle#57'").run();
+  const sessions = [
+    { id: main, name: 'kettle', alive: true, state: 'running' },
+    { id: helper, name: 'kettle helper', alive: true, state: 'needs_you' },
+  ];
+
+  const activity = new Map([
+    [main, Date.parse('2026-10-21T02:55:00Z')],
+    [helper, Date.parse('2026-10-21T01:30:00Z')],
+  ]);
+
+  expect(findAlerts(ctx.db, sessions, activity, new Date('2026-10-21T03:00:00Z'))).toStrictEqual([
+    { key: `session:${helper}`, fingerprint: 'quiet:needs_you', issue: 'GEO-9857', line: 'GEO-9857: helper session 98570000 waits on a prompt for 90 min' },
   ]);
 });
 
