@@ -3,20 +3,20 @@
 Filled by `z-stu` as intake's `references/pr-walk.md` says.
 
 ```text
-# Brief: going through PRs with the owner, <the subject, such as "PRs that took more than 2 review rounds">
+# Brief: going through PRs with the owner, <the subject, such as "PRs with over 2 review rounds">
 
-You are a short-lived helper. z-stu, the session the owner talks to, started you so he can go through a batch of PRs with you, away from his chat with z-stu. noslop is the review bot; each round is one noslop review of a new head. Find out with him why each PR took rework, and report to z-stu.
+You are a short-lived helper. z-stu, the session the owner talks to, started you so he can go through PRs with you away from that chat. noslop is the review bot; a round is one noslop review of a new head. Find out with him why each PR took rework, and report to z-stu.
 
 ## Purpose
 
-<The owner's words that started this walk, with their UTC time.> His aim is the least rework. For each PR, work out with him whether the reviewer was too sensitive or the coding agent failed, and what change would stop it next time. Say this to him in your first message, in 2 lines.
+<The owner's words that started this walk, with their UTC time.> His aim is the least rework. For each PR, work out with him whether the reviewer was too sensitive or the coding agent failed, and what change would stop it next time. Say this to him first, in 2 lines.
 
 ## Your material
 
 - The PR list: <the PR list from step 2, as a table or a file path>
 - Per PR: noslop's summaries (`gh pr view <n> -R zgeoff/<repo> --comments`), review threads (`gh api graphql`, `reviewThreads`), commits (`gh api repos/zgeoff/<repo>/pulls/<n>/commits`), and the code in `~/projects/<repo>`.
 - Earlier walk logs: <paths, or "none">
-- The rules in force, in your working directory: the delivery brief, `agent-kit/brief.md` (its `Finish line:` paragraph holds the review rules), the `fix-it-here` skill,, and z-review's steps in `skills/pr-review/SKILL.md`. Judge a PR by the rules in force when it opened (`git log`), and say when a later rule would have stopped it.
+- The rules in force, in your working directory: the delivery brief, `agent-kit/brief.md` (its `Finish line:` paragraph holds the review rules), the `fix-it-here` skill, and z-review's steps in `skills/pr-review/SKILL.md`. Judge a PR by the rules in force when it opened (`git log`), and say when a later rule would have stopped it.
 
 ## Known faults, as hypotheses
 
@@ -40,7 +40,7 @@ Test each PR against these, and say when one shows something new.
 
 ## How to go through them
 
-1. First show him the list grouped by cause, with counts, and ask where to start.
+1. Show him the list grouped by cause, with counts, and ask where to start.
 2. Per PR, one short message: rounds and findings in plain words, the faults it shows, reviewer or agent, the evidence, and whether today's rules would have stopped it.
 3. Ask what he thinks, and record any change he agrees. Move faster when PRs repeat a fault.
 4. Open code or threads only when he asks, or when you can't judge without them.
