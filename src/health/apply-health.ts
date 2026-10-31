@@ -7,6 +7,7 @@ import { logEvent } from '../log-event.ts';
 import { addNews } from '../news/add-news.ts';
 import { enqueue } from '../outbox/enqueue.ts';
 import { owner } from '../owner.ts';
+import { checkHealthProblem, readHealthProblemState } from './check-health-problem.ts';
 import { OPEN } from './open.ts';
 import type { HealthMove } from './pick-health-moves.ts';
 import { OWNER_FIX_MS, pickHealthMoves } from './pick-health-moves.ts';
@@ -23,6 +24,7 @@ export function applyHealth(db: Database, checks: Check[], samples: Samples, act
       const open = metaJson(db, 'health_open', OPEN, {});
       const moves = pickHealthMoves(open, checks, unknown, at);
       for (const move of moves) {
+        checkHealthProblem(move.key, move.action, readHealthProblemState(open, move.key));
         match(move)
           .with({ action: 'reported' }, (reported) => {
             open[reported.key] = { since: at, line: reported.line };
