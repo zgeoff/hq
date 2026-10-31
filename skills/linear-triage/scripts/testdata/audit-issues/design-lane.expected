@@ -1,6 +1,6 @@
 {
   "checkedAt": "2026-10-16T00:00:00Z",
-  "open": 4,
+  "open": 5,
   "counts": {
     "inTriage": 0,
     "missingProject": 0,
@@ -10,7 +10,7 @@
     "missingArea": 0,
     "stale": 0,
     "needsGeoff": 0,
-    "designLane": 2
+    "designLane": 3
   },
   "triage": [],
   "incomplete": [],
@@ -51,6 +51,25 @@
       "ageDays": 1,
       "needsGeoff": false,
       "designLane": "no with-geoff label but its Actions line asks for a session with the owner",
+      "missing": [],
+      "stale": false
+    },
+    {
+      "id": "GEO-9305",
+      "title": "Design: the greenhouse vents",
+      "url": "https://linear.example/issue/GEO-9305",
+      "status": "Ready",
+      "project": "Lantern Garden",
+      "type": "Design",
+      "size": null,
+      "areas": [
+        "Garden"
+      ],
+      "priority": 3,
+      "idleDays": 1,
+      "ageDays": 1,
+      "needsGeoff": false,
+      "designLane": "with-geoff label but its Actions line asks for an agent design pass",
       "missing": [],
       "stale": false
     }

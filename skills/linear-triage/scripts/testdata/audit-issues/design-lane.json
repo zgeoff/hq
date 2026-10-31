@@ -6,7 +6,10 @@
     "status": "Ready",
     "statusType": "unstarted",
     "project": "Lantern Garden",
-    "priority": { "value": 3, "name": "Medium" },
+    "priority": {
+      "value": 3,
+      "name": "Medium"
+    },
     "labels": ["Design", "Garden", "with-geoff"],
     "parentId": null,
     "createdAt": "2026-10-15T00:00:00Z",
@@ -20,7 +23,10 @@
     "status": "Ready",
     "statusType": "unstarted",
     "project": "Lantern Garden",
-    "priority": { "value": 3, "name": "Medium" },
+    "priority": {
+      "value": 3,
+      "name": "Medium"
+    },
     "labels": ["Design", "Garden"],
     "parentId": null,
     "createdAt": "2026-10-15T00:00:00Z",
@@ -34,7 +40,10 @@
     "status": "Ready",
     "statusType": "unstarted",
     "project": "Lantern Garden",
-    "priority": { "value": 3, "name": "Medium" },
+    "priority": {
+      "value": 3,
+      "name": "Medium"
+    },
     "labels": ["Design", "Garden", "with-geoff"],
     "parentId": null,
     "createdAt": "2026-10-15T00:00:00Z",
@@ -48,11 +57,31 @@
     "status": "Ready",
     "statusType": "unstarted",
     "project": "Lantern Garden",
-    "priority": { "value": 3, "name": "Medium" },
+    "priority": {
+      "value": 3,
+      "name": "Medium"
+    },
     "labels": ["Design", "Garden", "parked"],
     "parentId": null,
     "createdAt": "2026-10-15T00:00:00Z",
     "updatedAt": "2026-10-15T00:00:00Z",
     "description": "## Actions\n\nAgent design pass, not with Geoff: the owner settled the rota.\n"
+  },
+  {
+    "id": "GEO-9305",
+    "title": "Design: the greenhouse vents",
+    "url": "https://linear.example/issue/GEO-9305",
+    "status": "Ready",
+    "statusType": "unstarted",
+    "project": "Lantern Garden",
+    "priority": {
+      "value": 3,
+      "name": "Medium"
+    },
+    "labels": ["Design", "Garden", "with-geoff"],
+    "parentId": null,
+    "createdAt": "2026-10-15T00:00:00Z",
+    "updatedAt": "2026-10-15T00:00:00Z",
+    "description": "## Outcome\n\nThe vents open on warm days.\n\n## ACTIONS\n\nAgent design pass\n"
   }
 ]

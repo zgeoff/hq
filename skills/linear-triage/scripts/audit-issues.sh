@@ -7,7 +7,7 @@
 # A parent (an issue another fetched issue names as its parentId) needs no size.
 # An area label is any label outside the Type and Size groups, other than Needs Geoff, quality, enabler,
 # process, with-geoff and parked.
-# A design issue (type Design, or the needs-design label) disagrees when it has with-geoff and an
+# A design issue (type Design, or the needs-design label) disagrees, under an Actions heading in any case, when it has with-geoff and an
 # action named "Agent design pass", or lacks with-geoff and has an action naming a session "with the
 # owner" or "with Geoff". An action's name is its Actions line up to the first comma or colon, as hq
 # brief reads it, which refuses the same two cases. An issue with no description is not checked.
@@ -40,7 +40,7 @@ jq -s --arg now "$now" '
   # first comma or colon.
   def actions:
     (.description // "") | split("\n")
-    | (map(test("^#{1,6} +[Aa]ctions *$")) | index(true)) as $start
+    | (map(test("^#{1,6} +actions *$"; "i")) | index(true)) as $start
     | if $start == null then [] else
         .[$start + 1:] | (map(test("^#{1,6} ")) | index(true)) as $end
         | (if $end == null then . else .[:$end] end)
