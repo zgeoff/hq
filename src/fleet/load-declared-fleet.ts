@@ -31,7 +31,7 @@ function buildFleetEntry(s: DeclaredSession): FleetEntry {
     wake: s.wake,
     skills: s.skills,
 
-    // the alias goes in the next release; read `skills`
+    // a compatibility alias for readers of the older shape; read `skills`
     skill: findRoleSkill(s),
     roles: s.roles,
   };

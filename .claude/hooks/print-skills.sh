@@ -10,8 +10,9 @@
 # this tree gets one "skipped" line (the shared skills only exist on some branches). Then it prints
 # the role's after-compaction file, found by the first skill, the role skill.
 # A session with no skills prints only its after-compaction file, found by its name (z-q gets q.md).
-# The delivery role also gets delivery-lead's briefs reference, when this tree has it, since every
-# launch it writes follows that file.
+# The delivery role also gets agent-delegation's SKILL.md and delivery-lead's briefs reference,
+# each when this tree has it: the first holds its launch and watch rules until the skill rebuild
+# folds them into delivery-lead, and every launch it writes follows the second.
 # Claude Code caps a hook's whole output at 10,000 characters and swaps longer output for a path it
 # doesn't ask Claude to read, so a file that would take the total past the budget prints an
 # instruction to read it instead. The budget keeps room for a read instruction (or skipped line)
@@ -41,7 +42,7 @@ printf '%s' "$fleet" | jq -e --arg n "$name" 'any(.declared[]?; .name == $n)' >/
 used=0
 limit=9500
 reserve=200 # room kept for each item still to print
-left=$(( $(printf "%s\n" "$skills" | grep -c . || true) + 2 ))
+left=$(( $(printf "%s\n" "$skills" | grep -c . || true) + 3 ))
 say() { # say <line>: print it only while the total stays inside the cap
   size=$(printf '%s\n' "$1" | wc -c)
   [ $((used + size)) -le $limit ] || return 0
@@ -69,6 +70,11 @@ done
 
 role=$(printf '%s\n' "$skills" | head -1)
 briefs=skills/delivery-lead/references/briefs.md
+delegation=skills/agent-delegation/SKILL.md
+if [ "$role" = delivery-lead ] && [ -f "${CLAUDE_PROJECT_DIR:-.}/$delegation" ]; then
+  left=3
+  emit "$delegation"
+fi
 if [ "$role" = delivery-lead ] && [ -f "${CLAUDE_PROJECT_DIR:-.}/$briefs" ]; then
   left=2
   emit "$briefs"
