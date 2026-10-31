@@ -87,8 +87,8 @@ What counts as done for each type is in the `evidence` skill.
   box on merge. A vers part that is feature work stays its own Backlog issue, related to the
   umbrella.
 - Grooming one repo's part of a shared change: search for the same change in other repos, make the
-  oldest the umbrella with a box per repo, and mark the others Duplicate. Step 6 finds the ones past
-  Triage.
+  oldest the umbrella with a box per repo, and mark the others Duplicate. `linear-triage`'s pass
+  finds the ones past Triage.
 - A refactor, migration or architecture project ends with a cleanup Chore, blocked by every other
   open issue in the project. File one if it's missing. Its Scope lists each temporary piece the move
   added:
@@ -137,7 +137,7 @@ higher limit.
 ## Saving an issue
 
 - An issue filed from a design record starts with `From design <link>, decisions <n>[, <n>]`, so
-  `scripts/inflow.sh` counts it as planned. Its Scope carries what those decisions settled, word for
+  `linear-triage/scripts/inflow.sh` counts it as planned. Its Scope carries what those decisions settled, word for
   word: every code block, name, value and example. A later decision edits the description, never
   adds an amending comment. Add the line when you groom a design-filed issue that lacks it.
 - Save each issue in one `save_issue` call. Under about 3,000 characters, send the description

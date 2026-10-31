@@ -1,11 +1,11 @@
 # Design
 
 Settle the design questions the ticket lists, and write the decisions down so the agent that later
-builds it needs no design of its own. When the ticket has the `with-geoff` label, Geoff joins this
+builds it needs no design of its own. When the ticket has the `with-geoff` label, the owner joins this
 session and makes each decision. Otherwise you make the decisions yourself, and put on the ticket
 only the questions that need him, as step 3 says.
 
-The `tickets` skill defines a ticket's Design block, its Acceptance section and the design triggers.
+The `tickets` skill defines a Design issue's `## Questions to settle`, its Acceptance and its Action.
 
 1. Learn the system. Read the repo's `docs/vision.md` when it exists, then the architecture docs,
    then the code and the history the questions touch. Use the `how` skill for how the system works,
@@ -24,7 +24,7 @@ The `tickets` skill defines a ticket's Design block, its Acceptance section and 
      premise, research it again as in step 1, and bring the question back.
    - **Without it:** pick the option your evidence supports, and record the options you rejected and
      why. For a decision that can't be undone, get a review of your pick from another model family
-     through the `second-opinion` skill first. When a question needs Geoff, such as product
+     through the `second-opinion` skill first. When a question needs the owner, such as product
      direction or a cost only he can accept, write it on the ticket with your recommendation, add
      the `Needs Geoff` label, and settle the questions it doesn't block. When that question blocks
      all the others, skip to step 7, and send the ticket's link in place of a record.
