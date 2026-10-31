@@ -9,7 +9,8 @@
     "missingSize": 0,
     "missingArea": 0,
     "stale": 3,
-    "needsGeoff": 0
+    "needsGeoff": 0,
+    "designLane": 0
   },
   "triage": [],
   "incomplete": [],
@@ -29,6 +30,7 @@
       "idleDays": 1,
       "ageDays": 14,
       "needsGeoff": false,
+      "designLane": null,
       "missing": [],
       "stale": true
     },
@@ -47,6 +49,7 @@
       "idleDays": 14,
       "ageDays": 14,
       "needsGeoff": false,
+      "designLane": null,
       "missing": [],
       "stale": true
     },
@@ -65,8 +68,10 @@
       "idleDays": 3,
       "ageDays": 3,
       "needsGeoff": false,
+      "designLane": null,
       "missing": [],
       "stale": true
     }
-  ]
+  ],
+  "designLane": []
 }

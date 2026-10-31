@@ -57,6 +57,10 @@ check linked --threshold 0.6 --relations "$fixtures/relations.json" "$fixtures/f
 # A relations file that doesn't exist yet links nothing.
 check frames --threshold 0.6 --relations "$tmp/missing.json" "$fixtures/frames.json"
 
+# GEO-960/961 sit in different projects and share only the with-geoff and parked labels, which
+# name no area, so they don't pair.
+check lane-labels --threshold 0.6 "$fixtures/lane-labels.json"
+
 # Links, ids and the issue list's truncation note are no shared terms, at the default threshold:
 # GEO-960/961 share only those and don't pair, and GEO-962/963 share a file path and do.
 check noise "$fixtures/noise.json"

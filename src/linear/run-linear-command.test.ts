@@ -458,7 +458,7 @@ test('it runs each triage script to exit 0 over every issue on the pages hq line
   expect(overlap.exitCode).toBe(0);
   const auditOut = z.object({ open: z.number(), counts: z.record(z.string(), z.number()) }).parse(JSON.parse(audit.stdout.toString()));
   expect(auditOut.open).toBe(120);
-  expect(auditOut.counts).toStrictEqual({ inTriage: 0, missingProject: 0, missingType: 0, missingPriority: 0, missingSize: 0, missingArea: 0, stale: 0, needsGeoff: 0 });
+  expect(auditOut.counts).toStrictEqual({ inTriage: 0, missingProject: 0, missingType: 0, missingPriority: 0, missingSize: 0, missingArea: 0, stale: 0, needsGeoff: 0, designLane: 0 });
   expect(JSON.parse(inflow.stdout.toString())).toStrictEqual({ since: '2026-10-01T00:00:00Z', until: '2026-10-22T00:00:00Z', filed: 123, planned: 0, reactive: 123, closed: 3, flag: true, fromPR: [] });
   expect(overlap.stdout.toString()).toBe('GEO-3\tGEO-110\t1\tgasket, hinge, lid, replace, teapot\n');
   expect(overlap.stderr.toString()).toBe('1 pair(s) above the threshold\n');

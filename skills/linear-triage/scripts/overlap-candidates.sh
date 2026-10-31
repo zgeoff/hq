@@ -2,7 +2,7 @@
 # Pairs open issues that may duplicate, overlap or conflict with each other, from saved pages of
 # Linear issues, and prints the strongest pairs for the model to read in full.
 # Open means Backlog, Ready, In Progress or In Review. Two issues pair when they share a project,
-# or an area label (any label outside the Type and Size groups, other than Needs Geoff, quality, enabler and process).
+# or an area label (any label outside the Type and Size groups, other than Needs Geoff, quality, enabler, process, with-geoff and parked).
 # The score is the share of title words they have in common, out of the shorter title, after stop
 # words and a leading "<repo or area>:" prefix are dropped, plus 0.2 for each file path or backticked
 # command that both descriptions (or titles) name, at most 0.6. Links, URLs, issue ids and the
@@ -86,7 +86,7 @@ jq -rs --rawfile judged "$judged" --argjson links "$links" --argjson threshold "
     "per", "out", "all", "one", "via", "use", "add", "make", "new", "are", "can", "has", "have", "but",
     "to", "of", "in", "on", "at", "by", "an", "is", "it", "be", "as", "or", "if", "no", "so", "up", "do"];
   def unclassified: ["Bug", "Feature", "Improvement", "Chore", "Design", "Investigation",
-    "S", "M", "L", "XL", "Needs Geoff", "quality", "enabler", "process"];
+    "S", "M", "L", "XL", "Needs Geoff", "quality", "enabler", "process", "with-geoff", "parked"];
   def labelNames: (.labels // []) | map(if type == "object" then .name else . end);
   def projectName: .project | if type == "object" then .name else . end;
   def num: ltrimstr("GEO-") | tonumber;
