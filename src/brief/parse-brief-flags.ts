@@ -18,5 +18,10 @@ export function parseBriefFlags(issue: string | undefined, flags: Flags): BriefI
   if (flags['issue-by-link'] === true && flags['goal-file'] !== undefined) {
     throw new HqError('bad_args', 'give --issue-by-link or --goal-file, not both');
   }
-  return { issue, ref, imp: flags.imp === true, byLink: flags['issue-by-link'] === true, goalFile: flags['goal-file'] ?? null };
+  const imp = flags.imp === true;
+  const goalFile = flags['goal-file'] ?? null;
+
+  // An imp agent reads Linear itself, and the issue body pushes an imp brief past the limit.
+  const byLink = flags['issue-by-link'] === true || (imp && goalFile === null);
+  return { issue, ref, imp, byLink, goalFile };
 }
