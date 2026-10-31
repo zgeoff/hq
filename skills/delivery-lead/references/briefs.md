@@ -4,7 +4,7 @@ Fill [agent-kit/brief.md](../../../agent-kit/brief.md) for every launch that del
 Keep the whole prompt under 4,000 characters, or the session refuses its `/goal` line.
 
 The classifier reads only the launch prompt, so every grant goes in the prompt, never in a file. The
-granting wording is in `skills/agent-delegation/references/briefs.private.md` in hq-private
+granting wording is in `skills/delivery-lead/references/briefs.private.md` in hq-private
 (`hq defs` shows where). Without that clone, stop and tell the owner you can't fill
 `{{permissions}}`. Grant no secret from another repo's vault.
 

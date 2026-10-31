@@ -4,7 +4,7 @@ The launch prompt for a design session with the owner: an issue labelled `with-g
 Design or with `needs-design`. Without `with-geoff`, the session runs without him from
 `agent-kit/playbooks/design.md`. The prompt speaks as the owner.
 
-- Paste the record line from `skills/agent-delegation/references/design-brief.private.md` in
+- Paste the record line from `skills/delivery-lead/references/design-brief.private.md` in
   hq-private (`hq defs status` shows where) word for word, and follow the rest of that file.
 - Paste the issue's Outcome, Context, Questions to settle and Acceptance as written.
 - When the design changes how Nix behaves or what she remembers, keep the Nix sentence; otherwise

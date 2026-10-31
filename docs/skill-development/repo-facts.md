@@ -9,7 +9,7 @@ The owner shares excerpts from the sessions' transcripts, or a session reports a
 - `docs/skill-development/delivery-design.md` and `roles-design.md` in zgeoff/hq-private record the decisions and their reasons. Change a decision there when the skills change it.
 - A rule's decision ID, such as `(decision D-cleanup-first)`, names its record in hq-private's `delivery-design.md` or `roles-design.md`, on the line `ID: D-cleanup-first.`; the owner's words for it live there, never in this repo.
 - `docs/skill-development/evaluation.md` in zgeoff/hq-private lists the behavioural checks. Record each transcript result there, with the change it led to.
-- Refusals the owner passes on go into `docs/skill-development/refusals.md` in zgeoff/hq-private, and their fixes go into the permission phrasing in hq-private's `skills/agent-delegation/references/briefs.private.md`.
+- Refusals the owner passes on go into `docs/skill-development/refusals.md` in zgeoff/hq-private, and their fixes go into the permission phrasing in hq-private's `skills/delivery-lead/references/briefs.private.md`.
 
 Facts about the setup that the skills depend on:
 

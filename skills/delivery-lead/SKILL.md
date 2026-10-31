@@ -56,7 +56,7 @@ Act on each line:
 - **30 minutes with no event while it works:** check `atc_session_get` and `atc_terminal_read`.
 
 When an agent's branch is behind `main` or conflicts, tell it to update its own branch, in the words
-`skills/agent-delegation/SKILL.private.md` in hq-private gives (`hq defs` shows where).
+`skills/delivery-lead/SKILL.private.md` in hq-private gives (`hq defs` shows where).
 
 ## Answering an agent
 
