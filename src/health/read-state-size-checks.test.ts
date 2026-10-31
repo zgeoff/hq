@@ -22,6 +22,7 @@ test('#readStateSizeChecks a file over the default limit fails, naming the file,
       key: 'state-size:kettle.md',
       ok: false,
       line: 'state file kettle.md is 20.0 KB, over its 16 KB limit',
+      owner: { session: 'z-kettle', ask: 'trim it with `hq state trim kettle`, or move old entries to your archive, then check that `hq health` is clear' },
     },
   ]);
 });

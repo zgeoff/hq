@@ -2,6 +2,7 @@ import { accessSync, constants, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { formatKilobytes } from '../state/format-kilobytes.ts';
 import { getStateLimit } from '../state/get-state-limit.ts';
+import { getStateOwner } from '../state/get-state-owner.ts';
 import type { Check } from './types.ts';
 
 // One failing check per role state file over its limit, else one passing check. Only <role>.md for
@@ -32,7 +33,12 @@ export function readStateSizeChecks(directory: string, roles: string[]): Check[]
     seen++;
     const limit = getStateLimit(role);
     if (size > limit) {
-      over.push({ key: `state-size:${file}`, ok: false, line: `state file ${file} is ${formatKilobytes(size)}, over its ${limit / 1024} KB limit` });
+      over.push({
+        key: `state-size:${file}`,
+        ok: false,
+        line: `state file ${file} is ${formatKilobytes(size)}, over its ${limit / 1024} KB limit`,
+        owner: { session: getStateOwner(role), ask: `trim it with \`hq state trim ${role}\`, or move old entries to your archive, then check that \`hq health\` is clear` },
+      });
     }
   }
   if (over.length > 0) {

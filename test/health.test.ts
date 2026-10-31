@@ -130,6 +130,54 @@ test('a failed read neither clears open problems nor drops restart samples', asy
   expect(texts.at(-1)).toContain('kettle.service is restart-looping'); // the 100 sample survived the failed read
 });
 
+test('it asks the owning session of an oversized state file first, then z-stu once after 2 hours', async () => {
+  const over = [{ key: 'state-size:kettle.md', ok: false, line: 'state file kettle.md is 20.0 KB, over its 16 KB limit', owner: { session: 'z-kettle', ask: 'trim it' } }];
+  const tick = async (minute: number) => {
+    at(new Date(Date.parse(NOON_SYDNEY) + minute * 60_000).toISOString());
+    const result = await runChecks({ ...probe(world()), stateSizes: () => over }, healthSettings(db), {}, new Date(Date.parse(NOON_SYDNEY) + minute * 60_000));
+    return applyHealth(db, result.checks, result.samples, 'hq-lanes', result.unknown);
+  };
+
+  await tick(0);
+  await tick(119);
+  await tick(120);
+  await tick(180);
+
+  expect(outbox()).toStrictEqual([
+    { target: 'z-kettle', text: 'hq health: state file kettle.md is 20.0 KB, over its 16 KB limit. It is yours to fix: trim it. If it still fails in 2 hours, hq tells z-stu as Needs Geoff.' },
+    {
+      target: 'z-stu',
+      text: 'Needs Geoff (hq health, read-only): 1 problem still open 2 hours after hq asked the owning session to fix it:\n- state file kettle.md is 20.0 KB, over its 16 KB limit (z-kettle was asked at 2026-10-14T01:00:00Z)\nhq health shows every check.',
+    },
+  ]);
+});
+
+test('it never tells z-stu about an oversized state file fixed inside 2 hours', async () => {
+  const over = [{ key: 'state-size:kettle.md', ok: false, line: 'state file kettle.md is 20.0 KB, over its 16 KB limit', owner: { session: 'z-kettle', ask: 'trim it' } }];
+  const fixed = [{ key: 'state-size', ok: true, line: 'state files: all 1 under their limits' }];
+  const tick = async (minute: number, sizes: typeof over | typeof fixed) => {
+    at(new Date(Date.parse(NOON_SYDNEY) + minute * 60_000).toISOString());
+    const result = await runChecks({ ...probe(world()), stateSizes: () => sizes }, healthSettings(db), {}, new Date(Date.parse(NOON_SYDNEY) + minute * 60_000));
+    return applyHealth(db, result.checks, result.samples, 'hq-lanes', result.unknown);
+  };
+
+  await tick(0, over);
+  const cleared = await tick(30, fixed);
+  await tick(150, fixed);
+
+  expect([outbox().map((message) => message.target), cleared.cleared.map((item) => item.key)]).toStrictEqual([['z-kettle'], ['state-size:kettle.md']]);
+});
+
+test('it does not escalate a state-file problem opened before owners existed', async () => {
+  db.query("INSERT INTO meta (key, value) VALUES ('health_open', ?)").run(JSON.stringify({ 'state-size:kettle.md': { since: '2026-10-13T20:00:00.000Z', line: 'state file kettle.md is 20.0 KB, over its 16 KB limit' } }));
+  const over = [{ key: 'state-size:kettle.md', ok: false, line: 'state file kettle.md is 20.0 KB, over its 16 KB limit', owner: { session: 'z-kettle', ask: 'trim it' } }];
+
+  const result = await runChecks({ ...probe(world()), stateSizes: () => over }, healthSettings(db), {}, new Date(NOON_SYDNEY));
+  applyHealth(db, result.checks, result.samples, 'hq-lanes', result.unknown);
+
+  expect(outbox()).toStrictEqual([]);
+});
+
 test('it reports a failed memory-pressure read as a problem', async () => {
   const healthy = probe(world());
   const unreadable: Probe = { ...healthy, readFile: (path) => (path.endsWith('pressure/memory') ? Promise.reject(new Error('invented read failure')) : healthy.readFile(path)) };

@@ -10,7 +10,11 @@ import { owner } from '../owner.ts';
 import { OPEN } from './open.ts';
 import type { Check, HealthTick, Samples } from './types.ts';
 
-// The watcher's step: record the samples, tell z-stu about new problems, file news for cleared ones.
+// How long the session that owns a problem has to fix it before hq tells the owner's session.
+export const OWNER_FIX_MS = 2 * 60 * 60 * 1000;
+
+// The watcher's step: record the samples, ask each problem's owner to fix it, tell z-stu about new
+// problems no session owns and about owned ones still open after OWNER_FIX_MS, file news for cleared ones.
 export function applyHealth(db: Database, checks: Check[], samples: Samples, actor: string, unknown: string[] = []): HealthTick {
   return db
     .transaction((): HealthTick => {
@@ -26,13 +30,40 @@ export function applyHealth(db: Database, checks: Check[], samples: Samples, act
           delete open[key];
         }
       }
-      for (const c of opened) open[c.key] = { since: at, line: c.line };
-      setMeta(db, 'health_open', JSON.stringify(open));
-      if (opened.length) {
-        const seq = logEvent(db, 'hq', 'health', 'problem', actor, null, null, { opened: opened.map((c) => c.key) });
-        const text = `Needs Geoff (hq health, read-only): ${opened.length} new problem${opened.length > 1 ? 's' : ''} on the PC:\n${opened.map((c) => `- ${c.line}`).join('\n')}\nhq health shows every check. hq stopped or restarted nothing.`;
+      const unowned = opened.filter((check) => check.owner === undefined);
+      for (const check of opened) {
+        open[check.key] = check.owner === undefined ? { since: at, line: check.line } : { since: at, line: check.line, asked: check.owner.session };
+      }
+      if (unowned.length > 0) {
+        const seq = logEvent(db, 'hq', 'health', 'problem', actor, null, null, { opened: unowned.map((check) => check.key) });
+        const text = `Needs Geoff (hq health, read-only): ${unowned.length} new problem${unowned.length > 1 ? 's' : ''} on the PC:\n${unowned.map((check) => `- ${check.line}`).join('\n')}\nhq health shows every check. hq stopped or restarted nothing.`;
         enqueue(db, seq, owner(), text);
       }
+      for (const check of opened) {
+        if (check.owner === undefined) {
+          continue;
+        }
+        const seq = logEvent(db, 'hq', 'health', 'problem', actor, null, null, { opened: [check.key], asked: check.owner.session });
+        const text = `hq health: ${check.line}. It is yours to fix: ${check.owner.ask}. If it still fails in ${OWNER_FIX_MS / 3_600_000} hours, hq tells ${owner()} as Needs Geoff.`;
+        enqueue(db, seq, check.owner.session, text);
+      }
+      const overdue = bad.flatMap((check) => {
+        const entry = open[check.key];
+        if (entry?.asked === undefined || entry.escalated === true || Date.parse(at) - Date.parse(entry.since) < OWNER_FIX_MS) {
+          return [];
+        }
+        return [{ key: check.key, line: check.line, asked: entry.asked, entry }];
+      });
+      if (overdue.length > 0) {
+        const seq = logEvent(db, 'hq', 'health', 'escalated', actor, null, null, { keys: overdue.map((item) => item.key) });
+        const lines = overdue.map((item) => `- ${item.line} (${item.asked} was asked at ${item.entry.since})`);
+        const text = `Needs Geoff (hq health, read-only): ${overdue.length} problem${overdue.length > 1 ? 's' : ''} still open ${OWNER_FIX_MS / 3_600_000} hours after hq asked the owning session to fix ${overdue.length > 1 ? 'them' : 'it'}:\n${lines.join('\n')}\nhq health shows every check.`;
+        enqueue(db, seq, owner(), text);
+        for (const item of overdue) {
+          open[item.key] = { ...item.entry, escalated: true };
+        }
+      }
+      setMeta(db, 'health_open', JSON.stringify(open));
       for (const c of cleared) {
         logEvent(db, 'hq', 'health', 'cleared', actor, null, null, { key: c.key });
         addNews(db, { from: 'hq-health', topic: 'fix', text: `Cleared: ${c.line.replaceAll(/\s*[\r\n]+\s*/gu, ' ')} (open since ${c.since})`.slice(0, 400), issue: null, link: null, needsGeoff: false });
