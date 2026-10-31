@@ -16,5 +16,5 @@ export const AREA_REPOS: ReadonlyMap<string, string | null> = new Map([
   ['wringer', 'wringer'],
 ]);
 
-// Labels outside the Type and Size groups that name no area (linear-triage's audit-issues.sh).
-export const NOT_AREA_LABELS: ReadonlySet<string> = new Set(['needs geoff', 'quality', 'enabler', 'process']);
+// Labels outside the Type and Size groups that name no area (linear-triage's audit-issues.sh, plus the design-lane and parking labels).
+export const NOT_AREA_LABELS: ReadonlySet<string> = new Set(['needs geoff', 'quality', 'enabler', 'process', 'with-geoff', 'parked']);

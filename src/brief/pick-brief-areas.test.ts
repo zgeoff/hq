@@ -38,6 +38,12 @@ test('it maps noslop, wringer, dotfiles and nixie-definitions to their own repos
   });
 });
 
+test('it leaves out the with-geoff and parked labels', () => {
+  const labels = [{ name: 'with-geoff' }, { name: 'parked' }, { name: 'vers' }];
+
+  expect(pickBriefAreas({ identifier: 'GEO-9001', description: '', labels })).toStrictEqual({ kind: 'known', areas: [{ label: 'vers', repo: 'vers' }] });
+});
+
 test('it returns a label that names no repo hq knows as unknown', () => {
   expect(pickBriefAreas({ identifier: 'GEO-9001', description: '', labels: [{ name: 'cloud' }, { name: 'teapot' }] })).toStrictEqual({ kind: 'unknown', label: 'teapot' });
 });
