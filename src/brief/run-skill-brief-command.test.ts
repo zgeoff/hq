@@ -66,6 +66,33 @@ test('it prints the PR-walk template, then the fix-it-here skill pointer at the 
   expect(out.data['unfilled']).toStrictEqual([]);
 });
 
+test('it prints a brief whose template names no repo for an issue with no area label', async () => {
+  const ctx = setupTest();
+  const stub = createStubBriefDeps(ctx.root, {
+    issues: { 'GEO-9001': { description: buildKettleIssueText(), labels: [] } },
+    rows: [],
+    kit: buildStubSkillBriefKit(),
+  });
+
+  const out = await runSkillBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', kind: 'pr-walk' });
+
+  expect(out.data['repo']).toBeNull();
+  expect(out.text.startsWith('# Brief: going through the kettle PRs with the owner\n')).toBe(true);
+});
+
+test('it refuses a brief whose template names the repo when the issue has no area label', () => {
+  const ctx = setupTest();
+  const stub = createStubBriefDeps(ctx.root, {
+    issues: { 'GEO-9001': { description: buildKettleIssueText(), labels: [{ name: 'Design', parent: 'Type' }] } },
+    rows: [],
+    kit: buildStubSkillBriefKit(),
+  });
+
+  const outcome = runSkillBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', kind: 'design' });
+
+  expect(outcome).rejects.toMatchObject({ code: 'bad_state', message: 'GEO-9001 needs exactly one area label to name its repo; it has none' });
+});
+
 test('it refuses when the skill file is missing at the sha', () => {
   const ctx = setupTest();
   const stub = createStubBriefDeps(ctx.root, {
