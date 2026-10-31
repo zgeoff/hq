@@ -1,0 +1,91 @@
+import type { Out } from '../commands.ts';
+import { HqError } from '../errors.ts';
+import { buildGoalFileText } from './build-goal-file-text.ts';
+import { buildGoalPointer } from './build-goal-pointer.ts';
+import { buildPermissions } from './build-permissions.ts';
+import { BRIEF_LIMIT_BYTES, fitBrief } from './fit-brief.ts';
+import { parseIssueActions } from './parse-issue-actions.ts';
+import { parseIssueSections } from './parse-issue-sections.ts';
+import type { BriefReads } from './pick-brief-reads.ts';
+import type { BriefInput, BriefIssue, BriefParts, IssueSection, PermissionRow } from './types.ts';
+
+const ISSUE_SECTIONS = new Set(['outcome', 'context', 'scope', 'acceptance', 'agent notes']);
+
+export interface DeliveryBriefFacts {
+  input: BriefInput;
+  issue: BriefIssue;
+  sha: string;
+  reads: BriefReads;
+  template: string;
+  permissionTable: readonly PermissionRow[];
+
+  // the playbook's text at the sha; null when there is no playbook to read or no file at its path
+  playbookText: string | null;
+  stack: string;
+  impLine: string;
+  reviewBlock: string;
+}
+
+export interface DeliveryBrief {
+  out: Out;
+  warnings: string[];
+  goalFile: { path: string; text: string } | null;
+}
+
+// The delivery brief from what hq read: the filled and fitted prompt, the warnings to print, and
+// the --goal-file file to write. A prompt still over the limit after every cut is refused.
+export function buildDeliveryBrief(facts: DeliveryBriefFacts): DeliveryBrief {
+  const sections = parseIssueSections(facts.issue.description);
+  const issueSections = sections.filter((section) => ISSUE_SECTIONS.has(section.name.toLowerCase()));
+  const actions = parseIssueActions(sections);
+  const permissions = buildPermissions(actions, facts.permissionTable, facts.reads.repo);
+  const needsRelease = actions.some((action) => ['deploy', 'infra'].includes(action.toLowerCase()));
+  const playbook = facts.playbookText === null ? null : facts.reads.playbook;
+  const parts: BriefParts = {
+    repo: facts.reads.repo,
+    issueID: facts.issue.identifier,
+    sections: issueSections,
+    permissions: permissions.lines.join('\n'),
+    stack: facts.stack,
+    fixes: needsRelease ? 'Contributes to' : 'Fixes',
+    reviewLines: facts.reviewBlock.replaceAll('<repo>', facts.reads.repo),
+    notYours: '',
+    impLine: facts.impLine,
+    goalFile: buildGoalPointer({ issue: facts.issue.identifier, playbook, byLink: facts.input.byLink, goalFile: facts.input.goalFile }),
+  };
+  const fitted = fitBrief(facts.template, parts, !facts.input.byLink && facts.input.goalFile === null);
+  if (fitted.bytes > BRIEF_LIMIT_BYTES) {
+    throw new HqError('too_long', `the brief is ${fitted.bytes} bytes after every cut, over the ${BRIEF_LIMIT_BYTES} limit`, { bytes: fitted.bytes, cuts: fitted.cuts });
+  }
+  const unfilled = [
+    ...permissions.unfilled,
+    ...(needsRelease ? ['not_yours'] : []),
+    ...(playbook === null ? ['playbook'] : []),
+    ...(facts.input.byLink ? [] : collectMissingSections(issueSections)),
+    ...fitted.unknown.map((name) => `placeholder:${name}`),
+  ];
+  return {
+    out: {
+      data: { issue: facts.issue.identifier, repo: `zgeoff/${facts.reads.repo}`, ref: facts.sha, prompt: fitted.prompt, bytes: fitted.bytes, cuts: fitted.cuts, playbook, goalFile: facts.input.goalFile, unfilled },
+      text: fitted.prompt,
+    },
+    warnings: buildPlaybookWarnings(facts),
+    goalFile: facts.input.goalFile === null ? null : { path: facts.input.goalFile, text: buildGoalFileText(facts.issue.identifier, issueSections, facts.playbookText) },
+  };
+}
+
+const REQUIRED_SECTIONS = ['Outcome', 'Scope', 'Acceptance'];
+
+function collectMissingSections(sections: readonly IssueSection[]): string[] {
+  return REQUIRED_SECTIONS.filter((name) => !sections.some((section) => section.name.toLowerCase() === name.toLowerCase())).map((name) => `issue:${name}`);
+}
+
+function buildPlaybookWarnings(facts: DeliveryBriefFacts): string[] {
+  if (facts.reads.playbook === null) {
+    return [`hq brief: ${facts.issue.identifier} has no Type label, so the brief carries no playbook pointer`];
+  }
+  if (facts.playbookText === null) {
+    return [`hq brief: no ${facts.reads.playbook.path} at ${facts.sha.slice(0, 7)}, so the brief carries no playbook pointer`];
+  }
+  return [];
+}

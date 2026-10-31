@@ -2,6 +2,7 @@
 // hq: the z- sessions' headquarters. Typed state, named transitions, atc nudges.
 import { Database } from 'bun:sqlite';
 import { parseArgs } from 'node:util';
+import { match } from 'ts-pattern';
 import { addAsk } from './asks/add-ask.ts';
 import { answerAsk } from './asks/answer-ask.ts';
 import { applyAsk } from './asks/apply-ask.ts';
@@ -324,6 +325,16 @@ import { syncKinds } from './kinds/sync-kinds.ts';
 import { syncLinear } from './kinds/sync-linear.ts';
 import { weeksBack } from './kinds/weeks-back.ts';
 import { makeAuditedLinearCaller } from './linear/make-audited-linear-caller.ts';
+import { makeLinearCaller } from './linear/make-linear-caller.ts';
+import { readNoslopSettings } from './brief/read-noslop-settings.ts';
+import { buildNodeBriefFiles } from './brief/build-node-brief-files.ts';
+import { dbPath } from './db/db-path.ts';
+import { parseBriefFlags } from './brief/parse-brief-flags.ts';
+import { parseBriefKind } from './brief/parse-brief-kind.ts';
+import { parseSkillBriefFlags } from './brief/parse-skill-brief-flags.ts';
+import { runBriefCheckCommand } from './brief/run-brief-check-command.ts';
+import { runBriefCommand } from './brief/run-brief-command.ts';
+import { runSkillBriefCommand } from './brief/run-skill-brief-command.ts';
 import { readPacingLanes } from './lanes/read-pacing-lanes.ts';
 import { runLinearReadyTick } from './run-linear-ready-tick.ts';
 import { STEP_MS } from './watcher/step-ms.ts';
@@ -514,6 +525,9 @@ const OPTIONS = {
   out: { type: 'string' },
   reserve: { type: 'string', multiple: true },
   refresh: { type: 'boolean' },
+  imp: { type: 'boolean' },
+  'issue-by-link': { type: 'boolean' },
+  'goal-file': { type: 'string' },
 } as const;
 
 export type Flags = ReturnType<typeof parse>['values'];
@@ -2009,6 +2023,7 @@ const GROUPS: Record<string, (context: Ctx) => Promise<Out>> = {
   grant: (c) => runGrantCommand(c.db, c.verb, c.rest, c.flags),
   kinds: (c) => kindsCommand(c.db, c.verb, c.flags),
   linear: (context) => runLinearCommand({ call: makeAuditedLinearCaller(context.db, context.run), files: { statSync, readdirSync, writeFileSync, rmSync } }, context.flags),
+  brief: (context) => runBrief(context.run, context.verb, context.rest, context.flags),
   goals: (c) => goalsCommand(c.db, c.verb, c.rest, c.flags),
   defs: (c) => defsCommand(c.db, c.verb, c.rest, c.flags),
   repo: async (c) => {
@@ -2062,6 +2077,11 @@ async function runArgv(argv: string[], runner: Runner): Promise<{ out: Out; db: 
   if (noun === 'capabilities') return { out: capabilities(VERSION, SCHEMA_VERSION, flags.require), db: null };
   // A bad setting stops the command here, naming it, instead of turning into NaN deep inside one.
   config();
+
+  // hq brief is read-only toward the hq db too: openDb would create an absent db and migrate an older one.
+  if (noun === 'brief') {
+    return { out: await runBrief(runner, verb, rest, flags), db: null };
+  }
   const db = openDb();
   const command = lookup(noun, verb);
   if (!command) throw new HqError('bad_args', `unknown command: ${noun}. Try hq help`);
@@ -2111,6 +2131,22 @@ export async function main(argv: string[], runner: Runner = realRunner): Promise
     else console.error(`hq: ${err.message}`);
     return err.code === 'internal' ? 2 : 1;
   }
+}
+
+// The delivery kind reads the db only for noslop's repo list, read-only, so no db is created or
+// migrated.
+function runBrief(runner: Runner, verb: string | undefined, rest: readonly string[], flags: Flags): Promise<Out> {
+  if (verb === 'check') {
+    return Promise.resolve(runBriefCheckCommand(buildNodeBriefFiles(), rest[0]));
+  }
+  return match(parseBriefKind(flags))
+    .with('delivery', () => {
+      const files = buildNodeBriefFiles();
+      const deps = { linear: makeLinearCaller(runner), run: runner, noslop: readNoslopSettings(files, dbPath()), privateDir: PRIVATE_TREE.dir(), files, warn: (line: string) => console.error(line) };
+      return runBriefCommand(deps, parseBriefFlags(verb, flags));
+    })
+    .with('design', 'pr-walk', (kind) => runSkillBriefCommand({ linear: makeLinearCaller(runner), run: runner }, parseSkillBriefFlags(verb, flags, kind)))
+    .exhaustive();
 }
 
 async function runCommand(context: Ctx): Promise<Out> {
