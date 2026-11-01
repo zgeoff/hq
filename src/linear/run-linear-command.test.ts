@@ -492,3 +492,10 @@ test('it refuses hq linear areas with no --team', async () => {
 
   await expect(runLinearCommand(ctx.deps, 'areas', {})).rejects.toMatchObject({ code: 'bad_args', message: 'hq linear areas needs --team' });
 });
+
+test('it refuses a Linear labels answer that lacks a field', async () => {
+  const ctx = setupTest();
+  server.use(http.post(LINEAR_GRAPHQL_URL, () => HttpResponse.json({ data: { issueLabels: { nodes: [{ name: 'kettle' }], pageInfo: { hasNextPage: false, endCursor: null } } } })));
+
+  await expect(runLinearCommand(ctx.deps, 'areas', { team: 'KET' })).rejects.toMatchObject({ code: 'linear_failed', message: "Linear's issue labels answer has an unexpected shape: issueLabels.nodes.0.isGroup" });
+});
