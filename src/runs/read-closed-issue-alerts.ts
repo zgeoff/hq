@@ -48,6 +48,12 @@ function pickAction(run: RunView, linear: 'completed' | 'canceled'): string | nu
   if (!merged) {
     return `done with no merged PR: hq run done ${run.issue} or hq run drop ${run.issue}`;
   }
+
+  // A run blocked on the owner stays open past its merge on purpose, such as for a follow-up PR a
+  // live session holds until he answers, so setting it merged would drop that session from the sweep.
+  if (run.state === 'blocked' && run.waits_on_geoff === 1) {
+    return null;
+  }
   if (run.state === 'working' || run.state === 'blocked') {
     return `its PRs merged: hq run state ${run.issue} merged, and the release pass closes it once they ship`;
   }

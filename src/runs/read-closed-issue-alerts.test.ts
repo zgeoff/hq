@@ -49,6 +49,35 @@ test('it raises nothing for a merged or live-check run on its way to live, owed 
   expect(readClosedIssueAlerts(ctx.db)).toStrictEqual([]);
 });
 
+test('it raises nothing for a merged run blocked on the owner, since he decides when it closes', () => {
+  const ctx = setupTest();
+  ctx.addKettleRun('GEO-9815');
+  addPr(ctx.db, 'GEO-9815', 'kettle#15', 'kettle-bot');
+  closePr(ctx.db, 'kettle#15', { to: 'merged', actor: 'kettle-bot' });
+  setState(ctx.db, 'GEO-9815', 'blocked', { waitsOn: 'the owner picks a kettle colour', waitsOnGeoff: true }, 'kettle-bot');
+  ctx.closeInLinear('GEO-9815', 'completed');
+
+  expect(readClosedIssueAlerts(ctx.db)).toStrictEqual([]);
+});
+
+test('it tells a working run whose PR merged to set merged, unlike one blocked on the owner', () => {
+  const ctx = setupTest();
+  ctx.addKettleRun('GEO-9816');
+  addPr(ctx.db, 'GEO-9816', 'kettle#16', 'kettle-bot');
+  closePr(ctx.db, 'kettle#16', { to: 'merged', actor: 'kettle-bot' });
+  setState(ctx.db, 'GEO-9816', 'working', {}, 'kettle-bot');
+  ctx.closeInLinear('GEO-9816', 'completed');
+
+  expect(readClosedIssueAlerts(ctx.db)).toStrictEqual([
+    {
+      key: 'linear:GEO-9816',
+      fingerprint: 'completed:working',
+      issue: 'GEO-9816',
+      line: 'GEO-9816: Done in Linear while hq has it working; its PRs merged: hq run state GEO-9816 merged, and the release pass closes it once they ship',
+    },
+  ]);
+});
+
 test('it tells done from dropped for each closed issue by what the run still owes', () => {
   const ctx = setupTest();
   ctx.addKettleRun('GEO-9821');
