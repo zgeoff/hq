@@ -33,15 +33,8 @@ export interface LinearWorkflowStateRecord {
 // The workflow states each team holds; test/msw-preload.ts empties it after each test.
 export const linearWorkflowStates: LinearWorkflowStateRecord[] = [];
 
-export interface LinearLabelRecord {
-  team: string | null;
-  name: string;
-  isGroup: boolean;
-  parent: string | null;
-}
-
 // The labels each team holds, and the shared ones with a null team; test/msw-preload.ts empties it after each test.
-export const linearLabels: LinearLabelRecord[] = [];
+export const linearLabels: { team: string | null; name: string; isGroup: boolean; parent: string | null }[] = [];
 
 // The documents Linear holds; test/msw-preload.ts empties it after each test.
 export const linearDocuments: LinearDocumentRecord[] = [];
@@ -50,7 +43,8 @@ async function readLinearAnswer(info: LinearRequest): Promise<Response> {
   const body: unknown = await info.request.json().catch(() => null);
   const variables = typeof body === 'object' && body !== null && 'variables' in body && typeof body.variables === 'object' && body.variables !== null ? body.variables : {};
   if ('filter' in variables && readQuery(body).includes('issueLabels')) {
-    return HttpResponse.json({ data: buildLabelsAnswer(variables.filter, 'after' in variables ? variables.after : null) });
+    const after = 'after' in variables ? variables.after : null;
+    return HttpResponse.json({ data: buildLabelsAnswer(variables.filter, after) });
   }
   if ('filter' in variables) {
     return HttpResponse.json({ data: buildIssuesPageAnswer(variables, readQuery(body)) });
@@ -76,6 +70,31 @@ async function readLinearAnswer(info: LinearRequest): Promise<Response> {
   }
   return HttpResponse.json({ data: { viewer: { id: 'kettle-bot' } } });
 }
+
+function readQuery(body: unknown): string {
+  return typeof body === 'object' && body !== null && 'query' in body && typeof body.query === 'string' ? body.query : '';
+}
+
+const teamKeySchema = z.object({ key: z.object({ eq: z.string() }) });
+
+const teamKeyClauseSchema = z.object({ team: teamKeySchema });
+
+const sharedClauseSchema = z.object({ team: z.object({ null: z.literal(true) }) });
+
+const labelFilterSchema = z.object({ or: z.array(z.union([teamKeyClauseSchema, sharedClauseSchema])) });
+
+function buildLabelsAnswer(rawFilter: unknown, rawAfter: unknown): unknown {
+  const clauses = labelFilterSchema.parse(rawFilter).or;
+  const keys = new Set(clauses.flatMap((clause) => ('key' in clause.team ? [clause.team.key.eq] : [])));
+  const shared = clauses.some((clause) => 'null' in clause.team);
+  const matched = linearLabels.filter((label) => (label.team === null ? shared : keys.has(label.team)));
+  const start = typeof rawAfter === 'string' ? Number(rawAfter) : 0;
+  const nodes = matched.slice(start, start + LABEL_PAGE).map((label) => ({ name: label.name, isGroup: label.isGroup, parent: label.parent === null ? null : { name: label.parent } }));
+  const next = start + LABEL_PAGE;
+  return { issueLabels: { nodes, pageInfo: { hasNextPage: next < matched.length, endCursor: next < matched.length ? String(next) : null } } };
+}
+
+const LABEL_PAGE = 2;
 
 const keyFilterSchema = z.object({ eq: z.string() });
 
@@ -152,10 +171,6 @@ function buildIssuePageNode(issue: LinearIssueRecord) {
   };
 }
 
-function readQuery(body: unknown): string {
-  return typeof body === 'object' && body !== null && 'query' in body && typeof body.query === 'string' ? body.query : '';
-}
-
 // The issues Linear holds; test/msw-preload.ts empties it after each test.
 export const linearIssues: LinearIssueRecord[] = [];
 
@@ -188,18 +203,3 @@ function buildIssuesAnswer(ids: unknown) {
     }));
   return { issues: { nodes } };
 }
-
-const labelFilterSchema = z.object({ or: z.array(z.union([z.object({ team: z.object({ key: keyFilterSchema }) }), z.object({ team: z.object({ null: z.literal(true) }) })])) });
-
-function buildLabelsAnswer(rawFilter: unknown, rawAfter: unknown): unknown {
-  const clauses = labelFilterSchema.parse(rawFilter).or;
-  const keys = new Set(clauses.flatMap((clause) => ('key' in clause.team ? [clause.team.key.eq] : [])));
-  const shared = clauses.some((clause) => 'null' in clause.team);
-  const matched = linearLabels.filter((label) => (label.team === null ? shared : keys.has(label.team)));
-  const start = typeof rawAfter === 'string' ? Number(rawAfter) : 0;
-  const nodes = matched.slice(start, start + LABEL_PAGE).map((label) => ({ name: label.name, isGroup: label.isGroup, parent: label.parent === null ? null : { name: label.parent } }));
-  const next = start + LABEL_PAGE;
-  return { issueLabels: { nodes, pageInfo: { hasNextPage: next < matched.length, endCursor: next < matched.length ? String(next) : null } } };
-}
-
-const LABEL_PAGE = 2;

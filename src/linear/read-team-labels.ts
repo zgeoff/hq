@@ -9,9 +9,13 @@ const QUERY = `query($filter: IssueLabelFilter!, $after: String) {
   }
 }`;
 
-const labelSchema = z.object({ name: z.string(), isGroup: z.boolean(), parent: z.object({ name: z.string() }).nullable() });
+const parentSchema = z.object({ name: z.string() }).nullable();
 
-const answerSchema = z.object({ issueLabels: z.object({ nodes: z.array(labelSchema), pageInfo: z.object({ hasNextPage: z.boolean(), endCursor: z.string().nullable() }) }) });
+const labelSchema = z.object({ name: z.string(), isGroup: z.boolean(), parent: parentSchema });
+
+const pageInfoSchema = z.object({ hasNextPage: z.boolean(), endCursor: z.string().nullable() });
+
+const answerSchema = z.object({ issueLabels: z.object({ nodes: z.array(labelSchema), pageInfo: pageInfoSchema }) });
 
 export type TeamLabel = z.output<typeof labelSchema>;
 
