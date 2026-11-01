@@ -26,5 +26,5 @@ test('it refuses a --repo that is not one of the issue areas', () => {
 });
 
 test('it refuses a label that names no repo hq knows, by name', () => {
-  expect(pickIssueRepo({ identifier: 'GEO-9001', description: '', labels: [{ name: 'cloud' }, { name: 'teapot' }] })).toStrictEqual({ kind: 'refused', code: 'bad_state', message: 'GEO-9001 has the label teapot, which names no repo hq knows: add it to AREA_REPOS in src/brief/area-repos.ts, or take it off the issue' });
+  expect(pickIssueRepo({ identifier: 'GEO-9001', description: '', labels: [{ name: 'cloud' }, { name: 'teapot' }] })).toStrictEqual({ kind: 'refused', code: 'bad_state', message: 'GEO-9001 has the label teapot, which names no repo hq knows: add it to FOCUS_AREAS in src/focus/focus-areas.ts and its repo to src/brief/area-repos.ts, or take it off the issue' });
 });

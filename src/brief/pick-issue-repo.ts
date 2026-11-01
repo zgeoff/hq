@@ -13,7 +13,7 @@ export function pickIssueRepo(issue: BriefIssue, chosen: string | null = null): 
     .with({ kind: 'unknown' }, (unknown): IssueRepo => ({
       kind: 'refused',
       code: 'bad_state',
-      message: `${issue.identifier} has the label ${unknown.label}, which names no repo hq knows: add it to AREA_REPOS in src/brief/area-repos.ts, or take it off the issue`,
+      message: `${issue.identifier} has the label ${unknown.label}, which names no repo hq knows: add it to FOCUS_AREAS in src/focus/focus-areas.ts and its repo to src/brief/area-repos.ts, or take it off the issue`,
     }))
     .with({ kind: 'known' }, (known) => pickKnownArea(issue.identifier, known.areas, chosen))
     .exhaustive();

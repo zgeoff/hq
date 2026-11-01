@@ -2023,7 +2023,7 @@ const GROUPS: Record<string, (context: Ctx) => Promise<Out>> = {
   answers: (c) => Promise.resolve(runAnswersCommand(c.db, c.flags)),
   grant: (c) => runGrantCommand(c.db, c.verb, c.rest, c.flags),
   kinds: (c) => kindsCommand(c.db, c.verb, c.flags),
-  linear: (context) => runLinearCommand({ call: makeAuditedLinearCaller(context.db, context.run), files: { statSync, readdirSync, writeFileSync, rmSync } }, context.flags),
+  linear: (context) => runLinearCommand({ call: makeAuditedLinearCaller(context.db, context.run), files: { statSync, readdirSync, writeFileSync, rmSync } }, context.verb, context.flags),
   brief: (context) => runBrief(context.run, context.verb, context.rest, context.flags),
   goals: (c) => goalsCommand(c.db, c.verb, c.rest, c.flags),
   defs: (c) => defsCommand(c.db, c.verb, c.rest, c.flags),

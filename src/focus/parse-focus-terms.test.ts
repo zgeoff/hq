@@ -22,6 +22,19 @@ test('it splits terms by comma and filters by colon', () => {
   ]);
 });
 
+test('it reads each area hq knows, the noslop and nixie-definitions labels included', () => {
+  expect(parseFocusTerms('noslop, nixie-definitions:bug')).toStrictEqual([
+    { text: 'noslop', filters: [{ kind: 'area', value: 'noslop' }] },
+    {
+      text: 'nixie-definitions:bug',
+      filters: [
+        { kind: 'area', value: 'nixie-definitions' },
+        { kind: 'type', value: 'bug' },
+      ],
+    },
+  ]);
+});
+
 test('it refuses an empty term', () => {
   expect(() => parseFocusTerms('bug,,chore')).toThrow('focus: an empty term in "bug,,chore"');
 });
