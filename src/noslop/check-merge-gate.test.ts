@@ -753,6 +753,21 @@ test('it passes a PR in a zgeoff repo whose only held change is a moved link, on
   await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).resolves.toMatchObject({ mayMerge: true });
 });
 
+test("it asks no proof of a skill PR with z-review's mechanical record at its head", async () => {
+  const ctx = setupTest();
+  const stub = await createStubPRRepo({
+    root: ctx.base,
+    repo: 'widgets',
+    pr: 7,
+    history: [{ 'skills/kettle/SKILL.md': 'See [care](../../docs/old.md).\n', 'docs/old.md': 'Descale monthly.\n' }],
+    change: { 'skills/kettle/SKILL.md': 'See [care](../../docs/new.md).\n', 'docs/old.md': null, 'docs/new.md': 'Descale monthly.\n' },
+  });
+  const fake = buildFakeRunner({ realGit: true, prFiles: { code: 0, stdout: `skills/kettle/SKILL.md\ndocs/old.md\ndocs/new.md\n`, stderr: '' }, ...buildStubPRHead(stub.head, undefined, 'Move the care link.') });
+  recordPRMechanical(ctx.db, { repo: 'widgets', pr: 7, head: stub.head, files: ['skills/kettle/SKILL.md'], lines: 1, actor: 'z-review' });
+
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).resolves.toMatchObject({ mayMerge: true });
+});
+
 test('it blocks a PR whose moved link points at a file with other content, record or not', async () => {
   const ctx = setupTest();
   const stub = await createStubPRRepo({
