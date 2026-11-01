@@ -499,6 +499,15 @@ test('it refuses a skill PR without the proof in any zgeoff repo, a non-noslop o
   await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: expect.stringContaining('changes skill text (.claude/skills/kettle/references/pour.md)') });
 });
 
+test('it reads the PR body in the same GitHub read as the head and checks', async () => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ prBody: FAKE_PROOF_BODY });
+
+  await checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 });
+
+  expect(fake.lines().filter((line) => line.includes('--json headRefOid,author'))).toStrictEqual(['gh pr view 7 -R zgeoff/widgets --json headRefOid,author,statusCheckRollup,baseRefName,baseRefOid,body']);
+});
+
 test('it reads the changed files once when the description lacks the proof and no skill text changed', async () => {
   const ctx = setupTest();
   const fake = buildFakeRunner({});
