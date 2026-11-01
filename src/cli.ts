@@ -2143,7 +2143,7 @@ function runBrief(runner: Runner, verb: string | undefined, rest: readonly strin
   return match(parseBriefKind(flags))
     .with('delivery', () => {
       const files = buildNodeBriefFiles();
-      const deps = { linear: makeLinearCaller(runner), run: runner, noslop: readNoslopSettings(files, dbPath()), privateDir: PRIVATE_TREE.dir(), files, warn: (line: string) => console.error(line) };
+      const deps = { linear: makeLinearCaller(runner), run: runner, noslop: readNoslopSettings(files, dbPath()), privateDir: PRIVATE_TREE.dir(), briefsDir: `${stateDir()}/briefs`, files, warn: (line: string) => console.error(line) };
       return runBriefCommand(deps, parseBriefFlags(verb, flags));
     })
     .with('design', 'pr-walk', (kind) => runSkillBriefCommand({ linear: makeLinearCaller(runner), run: runner, files: buildNodeBriefFiles(), privateDir: PRIVATE_TREE.dir() }, parseSkillBriefFlags(verb, flags, kind)))

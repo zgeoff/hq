@@ -20,6 +20,9 @@ export interface BriefDeps {
   run: Runner;
   noslop: NoslopSettings;
   privateDir: string;
+
+  // the folder cut 1 writes a moved issue's goal file into
+  briefsDir: string;
   files: BriefFiles;
   warn: (line: string) => void;
 }
@@ -33,6 +36,7 @@ export interface BriefFiles {
   readLinkKind: (path: string) => EntryKind;
   readText: (path: string) => string;
   writeText: (path: string, text: string) => void;
+  makeDir: (path: string) => void;
 }
 
 export interface IssueLabel {
