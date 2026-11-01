@@ -11,9 +11,6 @@ import type { PRRequest } from './types.ts';
 
 export type ReadFiles = () => Promise<string[]>;
 
-// A PR that changes a skill's text carries its proof in the body: the chex output, the cold-read
-// findings with their answers, and the deslop changes. Cheap facts first, so the changed files are
-// read only for a body that lacks a section.
 export async function checkSkillProof(request: PRRequest, parsed: ParsedRepo, facts: GateFacts, readFiles: ReadFiles): Promise<void> {
   if (parsed.owner !== OWNER || isBotAuthor(facts.author)) {
     return;
