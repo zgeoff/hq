@@ -18,7 +18,8 @@ leaves.
 - [noslop.md](references/noslop.md): noslop reviews, answers, the cap and `hq review gate`.
 - [follow-ups.md](references/follow-ups.md): filing a follow-up, and replying to a reason that
   fails.
-- [holds.md](references/holds.md): the owner's lgtm hold, preview checks, and his answers.
+- [holds.md](references/holds.md): the skill proof, the owner's lgtm hold, preview checks, and his
+  answers.
 - [update-bots.md](references/update-bots.md): Renovate and repo-sync PRs.
 - [stacks.md](references/stacks.md): merging a stack.
 
@@ -36,7 +37,8 @@ flight in `~/.local/share/z-sessions/review.md`, and delete it after the merge.
    `hq health` shows memory passing, run it once more; killed again, tell `z-delivery` it's stuck.
 3. **Get every finding answered,** as below.
 4. **Move the issue to In Review,** commenting the PR and your review.
-5. **Wait for any hold,** as below.
+5. **Run `hq review gate`, then wait for any hold,** as below. The gate names a missing skill proof
+   before the owner's hold.
 6. **Merge,** as below.
 
 ## Answering findings
@@ -52,6 +54,9 @@ follow-ups.md says.
 
 ## What holds a merge
 
+- **The skill proof** on a PR that changes a skill's `SKILL.md` or references: the gate blocks
+  until the description shows the chex output, the cold read and the deslop changes. holds.md has
+  the headings, when to run the gate and what clears it.
 - **The owner's lgtm** on a PR that changes an `AGENTS.md`, a skill, or some hq and hq-private
   files. holds.md has the list and what clears it without him.
 - **A preview check** on a PR with a preview comment (holds.md).
