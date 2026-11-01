@@ -1,5 +1,5 @@
 import type { Stats } from 'node:fs';
-import { lstatSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { lstatSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import type { BriefFiles, EntryKind } from './types.ts';
 
 export function buildNodeBriefFiles(): BriefFiles {
@@ -8,6 +8,9 @@ export function buildNodeBriefFiles(): BriefFiles {
     readLinkKind: (path) => toEntryKind(lstatSync(path, { throwIfNoEntry: false })),
     readText: (path) => readFileSync(path, 'utf8'),
     writeText: (path, text) => writeFileSync(path, text),
+    makeDir: (path) => {
+      mkdirSync(path, { recursive: true });
+    },
   };
 }
 

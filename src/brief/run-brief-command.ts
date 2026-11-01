@@ -1,3 +1,4 @@
+import { join } from 'node:path';
 import type { Out } from '../commands.ts';
 import { HqError } from '../errors.ts';
 import type { Runner } from '../runner/types.ts';
@@ -18,7 +19,8 @@ const BRIEFS_PATH = 'skills/delivery-lead/references/briefs.md';
 const TEMPLATE_PATH = 'agent-kit/brief.md';
 
 // Fills the delivery launch brief for one Linear issue and prints it. It reads Linear, GitHub and
-// the private wording, and writes nothing but the --goal-file file.
+// the private wording, and writes nothing but the goal file: the --goal-file file, or the one in
+// the briefs folder when cut 1 moves the issue out of the prompt.
 export async function runBriefCommand(deps: BriefDeps, input: BriefInput): Promise<Out> {
   if (input.goalFile !== null) {
     requireGoalFileTarget(deps.files, input.goalFile);
@@ -38,9 +40,14 @@ export async function runBriefCommand(deps: BriefDeps, input: BriefInput): Promi
   if (reads.reviewLines && (await readRefFile(deps.run, sha, REVIEW_LINES_PATH)) === null) {
     throw new HqError('not_found', `${REVIEW_LINES_PATH} is missing at ${sha}`);
   }
-  const brief = buildDeliveryBrief({ input, issue, sha, reads, template, permissionTable, playbookText, stack, impLine });
+  const movedGoalFile = join(deps.briefsDir, `${issue.identifier}.md`);
+  const brief = buildDeliveryBrief({ input, issue, sha, reads, template, permissionTable, playbookText, stack, impLine, movedGoalFile });
   for (const warning of brief.warnings) {
     deps.warn(warning);
+  }
+  if (brief.goalFile?.path === movedGoalFile) {
+    deps.files.makeDir(deps.briefsDir);
+    requireGoalFileTarget(deps.files, movedGoalFile);
   }
   if (brief.goalFile !== null) {
     deps.files.writeText(brief.goalFile.path, brief.goalFile.text);

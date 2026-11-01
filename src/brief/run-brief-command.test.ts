@@ -239,37 +239,41 @@ test('it refuses a --goal-file in a missing directory before it reads anything',
   expect(stub.calls).toStrictEqual([]);
 });
 
-test('it drops Context and Agent notes as cut 2, and reports it, when the issue pushes the prompt over 4000 bytes', async () => {
+test('it moves the issue into the briefs folder as cut 1, and points the /goal line at that file, when the issue pushes a local prompt over 4000 bytes', async () => {
   const ctx = setupTest();
   const stub = createStubBriefDeps(ctx.root, {
     issues: { 'GEO-9001': { description: buildKettleIssueText({ context: 'It leaks at the lid. '.repeat(200) }), labels: [{ name: 'Bug', parent: 'Type' }, { name: 'cloud' }] } },
     rows: [['Code delivery', 'Work in <repo>.']],
   });
+  const moved = join(ctx.root, 'briefs', 'GEO-9001.md');
 
   const out = await runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: null, repo: null });
 
-  expect(out.data['cuts']).toStrictEqual(['cut 1 unavailable', 'cut 2']);
-  expect(out.text).not.toContain('## Context');
-  expect(out.text).not.toContain('## Agent notes');
-  expect(out.text).toContain('## Acceptance');
+  expect(out.data['cuts']).toStrictEqual(['cut 1']);
+  expect(out.data['goalFile']).toBe(moved);
+  expect(out.text).toStartWith(`/goal A ready PR in zgeoff/cloud for GEO-9001. The full issue and its playbook are in ${moved}; read it first.\n`);
+  expect(out.text).not.toContain('## Outcome');
   expect(out.data['bytes']).toBeLessThanOrEqual(4000);
+  expect(readFileSync(moved, 'utf8')).toContain('## Context\n\nIt leaks at the lid. It leaks');
+  expect(readFileSync(moved, 'utf8')).toContain('## Acceptance\n\n- [ ] it boils');
 });
 
-test('it applies cut 3 after cut 2, keeping the playbook pointer as the first line, when the issue is still too long', async () => {
+test('it refuses a local prompt still over 4000 bytes after cut 1 and cut 2, and writes no briefs file', () => {
   const ctx = setupTest();
+  const template = buildStubBriefKit()['agent-kit/brief.md'] ?? '';
   const stub = createStubBriefDeps(ctx.root, {
-    issues: { 'GEO-9001': { description: buildKettleIssueText({ scope: 'In: the lid. '.repeat(273) }), labels: [{ name: 'Bug', parent: 'Type' }, { name: 'cloud' }] } },
+    issues: { 'GEO-9001': { description: buildKettleIssueText(), labels: [{ name: 'Bug', parent: 'Type' }, { name: 'cloud' }] } },
     rows: [['Code delivery', 'Work in <repo>.']],
+    kit: { ...buildStubBriefKit(), 'agent-kit/brief.md': template.replace('Send a note when done.', 'Send a note when done. '.repeat(300)) },
   });
 
-  const out = await runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: null, repo: null });
+  const outcome = runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: null, repo: null });
 
-  expect(out.data['cuts']).toStrictEqual(['cut 1 unavailable', 'cut 2', 'cut 3']);
-  expect(out.text.startsWith(`First read the bug playbook: gh api 'repos/zgeoff/hq/contents/agent-kit/playbooks/bug.md?ref=${stub.sha}' -H 'Accept: application/vnd.github.raw'\n\n## Outcome`)).toBe(true);
-  expect(out.data['bytes']).toBeLessThanOrEqual(4000);
+  expect(outcome).rejects.toMatchObject({ code: 'too_long', data: { cuts: ['cut 1', 'cut 2'] } });
+  expect(existsSync(join(ctx.root, 'briefs'))).toBe(false);
 });
 
-test('it refuses a prompt still over 4000 bytes after cut 3, with its byte count, and writes no goal file', () => {
+test('it refuses a prompt still over 4000 bytes after cut 2, with its byte count, and writes no goal file', () => {
   const ctx = setupTest();
   const template = buildStubBriefKit()['agent-kit/brief.md'] ?? '';
   const stub = createStubBriefDeps(ctx.root, {

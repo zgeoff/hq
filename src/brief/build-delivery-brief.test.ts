@@ -19,6 +19,7 @@ test('it builds the full brief from one fixed set of facts', () => {
     playbookText: '# Bug playbook\n\nReproduce the leak first.\n',
     stack: 'Build the kettle in layers.',
     impLine: 'This imp has a small kettle.',
+    movedGoalFile: 'briefs/GEO-9001.md',
   });
 
   expect(brief).toMatchInlineSnapshot(`
@@ -109,6 +110,7 @@ test('it gives equal briefs for equal facts', () => {
     playbookText: null,
     stack: '',
     impLine: '',
+    movedGoalFile: 'briefs/GEO-9001.md',
   };
 
   expect(buildDeliveryBrief(facts)).toStrictEqual(buildDeliveryBrief(facts));
@@ -128,6 +130,7 @@ test('it marks the PR line Contributes to for a Deploy action written with its d
     playbookText: null,
     stack: '',
     impLine: '',
+    movedGoalFile: 'briefs/GEO-9001.md',
   });
 
   expect(brief.out.text).toBe('Work in kettle.\nDeploy kettle to the stage.\n"Contributes to GEO-9001"');
@@ -144,6 +147,7 @@ test('it warns and lists playbook in unfilled when the issue has no Type label',
     playbookText: null,
     stack: '',
     impLine: '',
+    movedGoalFile: 'briefs/GEO-9001.md',
   });
 
   expect(brief.warnings).toStrictEqual(['hq brief: GEO-9001 has no Type label, so the brief carries no playbook pointer']);
@@ -161,6 +165,7 @@ test('it warns, with the short sha, when the playbook file is missing at the sha
     playbookText: null,
     stack: '',
     impLine: '',
+    movedGoalFile: 'briefs/GEO-9001.md',
   });
 
   expect(brief.warnings).toStrictEqual(['hq brief: no agent-kit/playbooks/chore.md at bbbbbbb, so the brief carries no playbook pointer']);
@@ -178,9 +183,32 @@ test('it gives the goal file the issue sections and the playbook with --goal-fil
     playbookText: '# Bug playbook\n',
     stack: '',
     impLine: '',
+    movedGoalFile: 'briefs/GEO-9001.md',
   });
 
   expect(brief.goalFile).toStrictEqual({ path: 'goal.md', text: '# GEO-9001\n\n## Outcome\n\nBoil.\n\n---\n\n# Bug playbook\n' });
+});
+
+test('it moves the issue of a local brief to the briefs file when the issue keeps the prompt over the limit', () => {
+  const brief = buildDeliveryBrief({
+    input: { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: null, repo: null },
+    issue: { identifier: 'GEO-9001', description: `## Outcome\n\nBoil.\n\n## Scope\n\n${'In: the lid. '.repeat(40)}\n\n## Acceptance\n\n- [ ] It boils.\n\n## Actions\n\nCode delivery\n`, labels: [{ name: 'kettle' }] },
+    sha: 'b'.repeat(40),
+    reads: { repo: 'kettle', otherAreas: [], playbook: { type: 'bug', path: 'agent-kit/playbooks/bug.md', command: 'gh api bug' }, stack: false, imp: false, reviewLines: false },
+    template: `/goal Ship {{repo}} {{issue_id}}{{goal_file}}\n\n{{issue}}\n\nPermissions:\n{{permissions}}\n\n${'Keep the kettle clean. '.repeat(150)}`,
+    permissionTable: [{ action: 'Code delivery', phrase: 'Work in <repo>.' }],
+    playbookText: '# Bug playbook\n',
+    stack: '',
+    impLine: '',
+    movedGoalFile: 'briefs/GEO-9001.md',
+  });
+
+  expect(brief.out.data['cuts']).toStrictEqual(['cut 1']);
+  expect(brief.out.data['goalFile']).toBe('briefs/GEO-9001.md');
+  expect(brief.out.data['bytes']).toBeLessThan(4000);
+  expect(brief.out.text).toStartWith('/goal Ship zgeoff/kettle GEO-9001. The full issue and its playbook are in briefs/GEO-9001.md; read it first.\n');
+  expect(brief.out.text).not.toContain('In: the lid.');
+  expect(brief.goalFile).toStrictEqual({ path: 'briefs/GEO-9001.md', text: `# GEO-9001\n\n## Outcome\n\nBoil.\n\n## Scope\n\n${'In: the lid. '.repeat(40).trim()}\n\n## Acceptance\n\n- [ ] It boils.\n\n---\n\n# Bug playbook\n` });
 });
 
 test('it refuses a prompt still over 4000 bytes after every cut, with its byte count and cuts', () => {
@@ -195,8 +223,9 @@ test('it refuses a prompt still over 4000 bytes after every cut, with its byte c
       playbookText: null,
       stack: '',
       impLine: '',
+      movedGoalFile: 'briefs/GEO-9001.md',
       }),
-  ).toThrow(expect.objectContaining({ code: 'too_long', message: 'the brief is 4001 bytes after every cut, over the 4000 limit', data: { bytes: 4001, cuts: ['cut 1 unavailable', 'cut 3'] } }));
+  ).toThrow(expect.objectContaining({ code: 'too_long', message: 'the brief is 4001 bytes after every cut, over the 4000 limit', data: { bytes: 4001, cuts: ['cut 2'] } }));
 });
 
 test.each([
@@ -216,6 +245,7 @@ test.each([
     playbookText: '# Bug playbook\n',
     stack: '',
     impLine: '',
+    movedGoalFile: 'briefs/GEO-9001.md',
   });
 
   expect(brief.out.text).toBe(prompt);
@@ -237,6 +267,7 @@ test.each([
     playbookText: null,
     stack: '',
     impLine: '',
+    movedGoalFile: 'briefs/GEO-9001.md',
   });
 
   expect(brief.out.text).toBe(`Leave the merge to me. Do only the \`kettle\` part of GEO-9001: each other area (teapot) gets its own launch.\n"${fixes} GEO-9001"`);

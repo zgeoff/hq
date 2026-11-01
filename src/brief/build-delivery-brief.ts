@@ -26,6 +26,9 @@ export interface DeliveryBriefFacts {
   playbookText: string | null;
   stack: string;
   impLine: string;
+
+  // where cut 1 writes the issue when a brief that carries it in the prompt is over the limit
+  movedGoalFile: string;
 }
 
 export interface DeliveryBrief {
@@ -35,7 +38,8 @@ export interface DeliveryBrief {
 }
 
 // The delivery brief from what hq read: the filled and fitted prompt, the warnings to print, and
-// the --goal-file file to write. A prompt still over the limit after every cut is refused.
+// the goal file to write, at --goal-file or where cut 1 moved the issue. A prompt still over the
+// limit after every cut is refused.
 export function buildDeliveryBrief(facts: DeliveryBriefFacts): DeliveryBrief {
   const sections = parseIssueSections(facts.issue.description);
   const issueSections = sections.filter((section) => ISSUE_SECTIONS.has(section.name.toLowerCase()));
@@ -55,7 +59,10 @@ export function buildDeliveryBrief(facts: DeliveryBriefFacts): DeliveryBrief {
     impLine: facts.impLine,
     goalFile: buildGoalPointer({ issue: facts.issue.identifier, playbook, byLink: facts.input.byLink, goalFile: facts.input.goalFile }),
   };
-  const fitted = fitBrief(facts.template, parts, !facts.input.byLink && facts.input.goalFile === null);
+  const issueInPrompt = !facts.input.byLink && facts.input.goalFile === null;
+  const movedPointer = issueInPrompt ? buildGoalPointer({ issue: facts.issue.identifier, playbook, byLink: false, goalFile: facts.movedGoalFile }) : null;
+  const fitted = fitBrief(facts.template, parts, movedPointer);
+  const goalFile = fitted.movedIssue ? facts.movedGoalFile : facts.input.goalFile;
   if (fitted.bytes > BRIEF_LIMIT_BYTES) {
     throw new HqError('too_long', `the brief is ${fitted.bytes} bytes after every cut, over the ${BRIEF_LIMIT_BYTES} limit`, { bytes: fitted.bytes, cuts: fitted.cuts });
   }
@@ -68,11 +75,11 @@ export function buildDeliveryBrief(facts: DeliveryBriefFacts): DeliveryBrief {
   ];
   return {
     out: {
-      data: { issue: facts.issue.identifier, repo: `zgeoff/${facts.reads.repo}`, ref: facts.sha, prompt: fitted.prompt, bytes: fitted.bytes, cuts: fitted.cuts, playbook, goalFile: facts.input.goalFile, unfilled },
+      data: { issue: facts.issue.identifier, repo: `zgeoff/${facts.reads.repo}`, ref: facts.sha, prompt: fitted.prompt, bytes: fitted.bytes, cuts: fitted.cuts, playbook, goalFile, unfilled },
       text: fitted.prompt,
     },
     warnings: buildPlaybookWarnings(facts),
-    goalFile: facts.input.goalFile === null ? null : { path: facts.input.goalFile, text: buildGoalFileText(facts.issue.identifier, issueSections, facts.playbookText) },
+    goalFile: goalFile === null ? null : { path: goalFile, text: buildGoalFileText(facts.issue.identifier, issueSections, facts.playbookText) },
   };
 }
 

@@ -48,6 +48,6 @@ export function createStubBriefDeps(root: string, scenario: StubBriefScenario) {
   }
   const commits = Object.fromEntries((scenario.refs ?? ['main']).map((ref) => [ref, sha]));
   const run = buildStubBriefGH({ commits, files: scenario.kit ?? buildStubBriefKit() }, calls);
-  const deps: BriefDeps = { linear: linear.call, run, noslop: { repos: scenario.noslop ?? [], sha: null, caps: {} }, privateDir: root, files: buildNodeBriefFiles(), warn: (line) => warnings.push(line) };
+  const deps: BriefDeps = { linear: linear.call, run, noslop: { repos: scenario.noslop ?? [], sha: null, caps: {} }, privateDir: root, briefsDir: join(root, 'briefs'), files: buildNodeBriefFiles(), warn: (line) => warnings.push(line) };
   return { deps, calls, warnings, asked: linear.asked, sha };
 }
