@@ -49,6 +49,17 @@ test('it raises nothing for a merged or live-check run on its way to live, owed 
   expect(readClosedIssueAlerts(ctx.db)).toStrictEqual([]);
 });
 
+test('it raises nothing for a merged run blocked on the owner, since he decides when it closes', () => {
+  const ctx = setupTest();
+  ctx.addKettleRun('GEO-9815');
+  addPr(ctx.db, 'GEO-9815', 'kettle#15', 'kettle-bot');
+  closePr(ctx.db, 'kettle#15', { to: 'merged', actor: 'kettle-bot' });
+  setState(ctx.db, 'GEO-9815', 'blocked', { waitsOn: 'the owner picks a kettle colour', waitsOnGeoff: true }, 'kettle-bot');
+  ctx.closeInLinear('GEO-9815', 'completed');
+
+  expect(readClosedIssueAlerts(ctx.db)).toStrictEqual([]);
+});
+
 test('it tells done from dropped for each closed issue by what the run still owes', () => {
   const ctx = setupTest();
   ctx.addKettleRun('GEO-9821');
