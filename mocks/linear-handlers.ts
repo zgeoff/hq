@@ -10,7 +10,8 @@ export const LINEAR_GRAPHQL_URL = 'https://api.linear.app/graphql';
 // variables is the Ready query, answered in one page from the issues in that team and state. An
 // `ids` query answers the issues whose identifier, or a previous one, is among the ids. A `filter`
 // query answers one page, of its `first` size, of the issues that match its team key, state names and updatedAt
-// bound, and a `teamKey` query the workflow states of that team. A `slugID`
+// bound, and a `teamKey` query the workflow states of that team, or its labels and the shared ones
+// when it asks for issueLabels. A `slugID`
 // query answers the documents with that slug ID, and an `id` query that document.
 export const linearHandlers = [http.post(LINEAR_GRAPHQL_URL, (info) => readLinearAnswer(info))];
 
@@ -32,6 +33,16 @@ export interface LinearWorkflowStateRecord {
 // The workflow states each team holds; test/msw-preload.ts empties it after each test.
 export const linearWorkflowStates: LinearWorkflowStateRecord[] = [];
 
+export interface LinearLabelRecord {
+  team: string | null;
+  name: string;
+  isGroup: boolean;
+  parent: string | null;
+}
+
+// The labels each team holds, and the shared ones with a null team; test/msw-preload.ts empties it after each test.
+export const linearLabels: LinearLabelRecord[] = [];
+
 // The documents Linear holds; test/msw-preload.ts empties it after each test.
 export const linearDocuments: LinearDocumentRecord[] = [];
 
@@ -39,8 +50,11 @@ async function readLinearAnswer(info: LinearRequest): Promise<Response> {
   const body: unknown = await info.request.json().catch(() => null);
   const variables = typeof body === 'object' && body !== null && 'variables' in body && typeof body.variables === 'object' && body.variables !== null ? body.variables : {};
   if ('filter' in variables) {
-    const query = typeof body === 'object' && body !== null && 'query' in body && typeof body.query === 'string' ? body.query : '';
-    return HttpResponse.json({ data: buildIssuesPageAnswer(variables, query) });
+    return HttpResponse.json({ data: buildIssuesPageAnswer(variables, readQuery(body)) });
+  }
+  if ('teamKey' in variables && readQuery(body).includes('issueLabels')) {
+    const nodes = linearLabels.filter((label) => label.team === null || label.team === variables.teamKey).map((label) => ({ name: label.name, isGroup: label.isGroup, parent: label.parent === null ? null : { name: label.parent } }));
+    return HttpResponse.json({ data: { issueLabels: { nodes } } });
   }
   if ('teamKey' in variables) {
     return HttpResponse.json({ data: { workflowStates: { nodes: linearWorkflowStates.filter((state) => state.team === variables.teamKey).map((state) => ({ name: state.name })) } } });
@@ -137,6 +151,10 @@ function buildIssuePageNode(issue: LinearIssueRecord) {
     canceledAt: issue.canceledAt ?? null,
     description: issue.description ?? null,
   };
+}
+
+function readQuery(body: unknown): string {
+  return typeof body === 'object' && body !== null && 'query' in body && typeof body.query === 'string' ? body.query : '';
 }
 
 // The issues Linear holds; test/msw-preload.ts empties it after each test.
