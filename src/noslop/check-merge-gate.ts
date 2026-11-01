@@ -14,6 +14,8 @@ import { formatCIClause } from './format-ci-clause.ts';
 import type { CIOverrideUse, GateCI } from './format-ci-clause.ts';
 import { collectOpenFindingIDs } from './collect-open-finding-ids.ts';
 import { checkInstructionHold } from './check-instruction-hold.ts';
+import { checkSkillProof } from './check-skill-proof.ts';
+import type { ReadFiles } from './check-skill-proof.ts';
 import { findInstructionHeldTest } from './find-instruction-held-test.ts';
 import { isBotAuthor } from './is-bot-author.ts';
 import type { PRAuthor } from './is-bot-author.ts';
@@ -57,7 +59,11 @@ export async function checkMergeGate(request: PRRequest, onHead?: OnGateHead): P
     onHead?.(facts.headRefOid);
   }
   const ci = await checkCI(request, parsed, facts);
-  await checkOwnerHeld(request, parsed, facts);
+  const readFiles = readFilesOnce(request, parsed);
+
+  // Before the owner's hold, so his lgtm never lands on a description that still has to change.
+  await checkSkillProof(request, parsed, facts, readFiles);
+  await checkOwnerHeld(request, parsed, facts, readFiles);
   if (unreviewed !== null) {
     return { mayMerge: true, reason: `${unreviewed}: ${formatCIClause(facts.headRefOid.slice(0, 7), ci)}`, reviewed: false, ...pickOverriddenChecks(ci.used) };
   }
@@ -104,13 +110,18 @@ async function checkCI(request: PRRequest, parsed: ParsedRepo, facts: GateFacts)
   return { noCI: true, used: [] };
 }
 
+function readFilesOnce(request: PRRequest, parsed: ParsedRepo): ReadFiles {
+  let files: Promise<string[]> | null = null;
+  return () => (files ??= readPRFiles(request.run, buildSlug(parsed), request.pr));
+}
+
 function buildBlock(parsed: ParsedRepo, pr: number, reason: string): HqError {
   return new HqError('merge_blocked', reason, { repo: parsed.repo, pr });
 }
 
 // On every route: a change to an owner-held path needs the owner's own lgtm at the head, and a change
 // to a repo instruction file needs it unless hq clears that hold.
-async function checkOwnerHeld(request: PRRequest, parsed: ParsedRepo, facts: GateFacts): Promise<void> {
+async function checkOwnerHeld(request: PRRequest, parsed: ParsedRepo, facts: GateFacts, readFiles: ReadFiles): Promise<void> {
   const ownerHeld = await readOwnerHeldTest(request.run, parsed, facts.baseRefOid);
   const instructionHeld = findInstructionHeldTest(parsed);
   if (ownerHeld === null && instructionHeld === null) {
@@ -119,7 +130,7 @@ async function checkOwnerHeld(request: PRRequest, parsed: ParsedRepo, facts: Gat
   const isHeld = ownerHeld ?? (() => false);
   const isInstruction = instructionHeld ?? (() => false);
   const head = facts.headRefOid;
-  const files = await readPRFiles(request.run, buildSlug(parsed), request.pr);
+  const files = await readFiles();
   const lgtm = readHeadLgtm(request.db, parsed.repo, request.pr, head) !== null;
   const instruction = files.filter((file) => isInstruction(file));
   if (ownerHeld === null && instruction.length === 0) {

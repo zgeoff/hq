@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { buildStubFindings } from '../../test/build-stub-findings.ts';
 import { buildStubGateFacts } from '../../test/build-stub-gate-facts.ts';
 import { createListedReview } from '../../test/create-listed-review.ts';
-import { FAKE_FULL_SHA, FAKE_TOKEN, buildFakeRunner } from '../../test/noslop-fake.ts';
+import { FAKE_FULL_SHA, FAKE_PROOF_BODY, FAKE_TOKEN, buildFakeRunner } from '../../test/noslop-fake.ts';
 import { overrideEnv } from '../config/override-env.ts';
 import { openDb } from '../db/open-db.ts';
 import { setMeta } from '../db/set-meta.ts';
@@ -148,7 +148,7 @@ test('it keeps the last seen head when a gate none follows a recorded head', asy
 
 test('it records a fail at the head it read when a reviewed PR changes an owner-held file without the lgtm', async () => {
   const ctx = setupTest();
-  const fake = buildFakeRunner({ prFiles: { code: 0, stdout: 'skills/kettle/SKILL.md\n', stderr: '' } });
+  const fake = buildFakeRunner({ prBody: FAKE_PROOF_BODY, prFiles: { code: 0, stdout: 'skills/kettle/SKILL.md\n', stderr: '' } });
   createListedReview(ctx.db, { repo: 'hq', pr: 7, head: FAKE_FULL_SHA });
 
   await expect(checkRecordedGate({ run: fake.run, db: ctx.db, rawRepo: 'hq', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: expect.stringContaining("needs the owner's lgtm at 0123456") });
@@ -167,7 +167,7 @@ test('it records no gate when an unreviewed PR changes an owner-held file withou
 
 test("it records gate none for an unreviewed PR that changes an owner-held file under the owner's lgtm", async () => {
   const ctx = setupTest();
-  const fake = buildFakeRunner({ prFiles: { code: 0, stdout: 'skills/kettle/SKILL.md\n', stderr: '' } });
+  const fake = buildFakeRunner({ prBody: FAKE_PROOF_BODY, prFiles: { code: 0, stdout: 'skills/kettle/SKILL.md\n', stderr: '' } });
   recordPRAnswer(ctx.db, { repo: 'hq', pr: 7, answer: 'lgtm', head: FAKE_FULL_SHA, source: 'console:kettle-2', note: null, actor: 'z-kettle' });
 
   await expect(checkRecordedGate({ run: fake.run, db: ctx.db, rawRepo: 'hq', pr: 7 })).resolves.toStrictEqual({ mayMerge: true, reason: 'not a noslop repo: CI green at 0123456', reviewed: false });
