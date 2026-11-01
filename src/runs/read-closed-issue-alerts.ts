@@ -8,7 +8,6 @@ const LINEAR_STATE = z.object({ state: z.enum(['completed', 'canceled', 'open'])
 // Open runs whose Linear issue is closed, with what to do. A 'Fixes' merge closes the issue before
 // the release, deploy and live check, so a merged run still on its way to live raises nothing: the
 // release pass closes it once its PRs ship, and the live check's recipient closes a live-check run.
-// A merged run blocked on the owner raises nothing either: he decides when it closes.
 export function readClosedIssueAlerts(db: Database): Alert[] {
   const alerts: Alert[] = [];
   for (const run of listRuns(db)) {
