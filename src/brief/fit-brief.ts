@@ -6,14 +6,9 @@ interface FittedBrief {
   bytes: number;
   cuts: string[];
   unknown: string[];
-
-  // whether cut 1 moved the issue out of the prompt, so the caller writes its goal file
   movedIssue: boolean;
 }
 
-// Fills the template and cuts it to the limit: cut 1 moves the issue out of the prompt into a goal
-// file, and cut 2 drops the /goal line. `movedPointer` is the /goal line's pointer to that file,
-// null when the issue is already out of the prompt. `unknown` names the unfilled placeholders.
 export function fitBrief(template: string, parts: BriefParts, movedPointer: string | null): FittedBrief {
   const cuts: string[] = [];
   let fitted = parts;
