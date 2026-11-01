@@ -477,9 +477,9 @@ test("it passes hq linear areas when each of the team's and the shared area labe
   await expect(runLinearCommand(ctx.deps, 'areas', { team: 'KET' })).resolves.toStrictEqual({ data: { team: 'KET', unmapped: [] }, text: 'every area label in KET names a repo hq knows' });
 });
 
-test('it refuses hq linear areas, naming each area label hq does not know', async () => {
+test('it refuses hq linear areas, naming each area label hq does not know, a shared one on a later page included', async () => {
   const ctx = setupTest();
-  linearLabels.push({ team: 'KET', name: 'kettle', isGroup: false, parent: null }, { team: null, name: 'Teapot', isGroup: false, parent: null }, { team: 'KET', name: 'atc', isGroup: false, parent: null });
+  linearLabels.push({ team: 'KET', name: 'atc', isGroup: false, parent: null }, { team: 'KET', name: 'kettle', isGroup: false, parent: null }, { team: 'POT', name: 'mug', isGroup: false, parent: null }, { team: null, name: 'Teapot', isGroup: false, parent: null });
 
   await expect(runLinearCommand(ctx.deps, 'areas', { team: 'KET' })).rejects.toMatchObject({
     code: 'bad_state',

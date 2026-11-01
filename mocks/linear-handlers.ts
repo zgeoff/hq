@@ -10,8 +10,8 @@ export const LINEAR_GRAPHQL_URL = 'https://api.linear.app/graphql';
 // variables is the Ready query, answered in one page from the issues in that team and state. An
 // `ids` query answers the issues whose identifier, or a previous one, is among the ids. A `filter`
 // query answers one page, of its `first` size, of the issues that match its team key, state names and updatedAt
-// bound, and a `teamKey` query the workflow states of that team, or its labels and the shared ones
-// when it asks for issueLabels. A `slugID`
+// bound, and a `teamKey` query the workflow states of that team. An issueLabels query answers the
+// labels its filter's team key and null-team clauses match, two to a page. A `slugID`
 // query answers the documents with that slug ID, and an `id` query that document.
 export const linearHandlers = [http.post(LINEAR_GRAPHQL_URL, (info) => readLinearAnswer(info))];
 
@@ -49,12 +49,11 @@ export const linearDocuments: LinearDocumentRecord[] = [];
 async function readLinearAnswer(info: LinearRequest): Promise<Response> {
   const body: unknown = await info.request.json().catch(() => null);
   const variables = typeof body === 'object' && body !== null && 'variables' in body && typeof body.variables === 'object' && body.variables !== null ? body.variables : {};
+  if ('filter' in variables && readQuery(body).includes('issueLabels')) {
+    return HttpResponse.json({ data: buildLabelsAnswer(variables.filter, 'after' in variables ? variables.after : null) });
+  }
   if ('filter' in variables) {
     return HttpResponse.json({ data: buildIssuesPageAnswer(variables, readQuery(body)) });
-  }
-  if ('teamKey' in variables && readQuery(body).includes('issueLabels')) {
-    const nodes = linearLabels.filter((label) => label.team === null || label.team === variables.teamKey).map((label) => ({ name: label.name, isGroup: label.isGroup, parent: label.parent === null ? null : { name: label.parent } }));
-    return HttpResponse.json({ data: { issueLabels: { nodes } } });
   }
   if ('teamKey' in variables) {
     return HttpResponse.json({ data: { workflowStates: { nodes: linearWorkflowStates.filter((state) => state.team === variables.teamKey).map((state) => ({ name: state.name })) } } });
@@ -189,3 +188,18 @@ function buildIssuesAnswer(ids: unknown) {
     }));
   return { issues: { nodes } };
 }
+
+const labelFilterSchema = z.object({ or: z.array(z.union([z.object({ team: z.object({ key: keyFilterSchema }) }), z.object({ team: z.object({ null: z.literal(true) }) })])) });
+
+function buildLabelsAnswer(rawFilter: unknown, rawAfter: unknown): unknown {
+  const clauses = labelFilterSchema.parse(rawFilter).or;
+  const keys = new Set(clauses.flatMap((clause) => ('key' in clause.team ? [clause.team.key.eq] : [])));
+  const shared = clauses.some((clause) => 'null' in clause.team);
+  const matched = linearLabels.filter((label) => (label.team === null ? shared : keys.has(label.team)));
+  const start = typeof rawAfter === 'string' ? Number(rawAfter) : 0;
+  const nodes = matched.slice(start, start + LABEL_PAGE).map((label) => ({ name: label.name, isGroup: label.isGroup, parent: label.parent === null ? null : { name: label.parent } }));
+  const next = start + LABEL_PAGE;
+  return { issueLabels: { nodes, pageInfo: { hasNextPage: next < matched.length, endCursor: next < matched.length ? String(next) : null } } };
+}
+
+const LABEL_PAGE = 2;
