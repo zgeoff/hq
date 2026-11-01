@@ -91,7 +91,6 @@ export interface FakeRunner {
 export const FAKE_FULL_SHA = '0123456789abcdef0123456789abcdef01234567';
 export const FAKE_BASE_SHA = 'ba5eba5eba5eba5eba5eba5eba5eba5eba5eba5e';
 
-// A skill PR's description that carries every proof section the merge gate looks for.
 export const FAKE_PROOF_BODY = ['Teach the kettle skill to pour.', '## Skill checks', 'chex skill: 0 problems', '## Cold read', 'No findings.', '## Deslop', 'none'].join('\n');
 const NOT_FOUND: RunResult = { code: 1, stdout: '', stderr: 'gh: Not Found (HTTP 404)' };
 
