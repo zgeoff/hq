@@ -29,6 +29,12 @@ test('it ignores a heading inside a code fence', () => {
   expect(collectMissingProof(body)).toStrictEqual(['Cold read']);
 });
 
+test('it closes a fence only on the same marker, at least as long as the opening one', () => {
+  const body = ['## Skill checks', 'chex: 0 problems', '````md', '```', '## Cold read', 'No findings.', '```', '~~~', '## Deslop', 'none', '````'].join('\n');
+
+  expect(collectMissingProof(body)).toStrictEqual(['Cold read', 'Deslop']);
+});
+
 test('it names every section for an empty body', () => {
   expect(collectMissingProof('')).toStrictEqual(['Skill checks', 'Cold read', 'Deslop']);
 });
