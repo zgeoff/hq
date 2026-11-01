@@ -110,7 +110,6 @@ async function checkCI(request: PRRequest, parsed: ParsedRepo, facts: GateFacts)
   return { noCI: true, used: [] };
 }
 
-// The proof check and the owner's hold share one read of the changed files, made only when one needs it.
 function readFilesOnce(request: PRRequest, parsed: ParsedRepo): ReadFiles {
   let files: Promise<string[]> | null = null;
   return () => (files ??= readPRFiles(request.run, buildSlug(parsed), request.pr));
