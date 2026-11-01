@@ -32,7 +32,7 @@ hq writes `Contributes to` only when the issue's Actions list Deploy or Infra. W
 The stack line:
 
 ```text
-Build this as a stack with the gh-stack skill, one reviewable layer per PR. Sync it with `gh stack sync`, never a rebase of one layer. Review each layer as the finish line says, with `--base <its parent branch>`. Fix a kind of defect in the layers above in the same push.
+Build this as a stack with the gh-stack skill, one reviewable layer per PR. Sync it with `gh stack sync`, never a rebase of one layer. Review each layer as the finish line says, with `--base <its parent branch>`. When you fix a defect in one layer, fix the same kind of defect in the layers above it in the same push.
 ```
 
 The imp line:
