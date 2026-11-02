@@ -36,10 +36,6 @@ export interface StoreMigrationInput {
   requireIdle?: (() => Promise<void>) | undefined;
 }
 
-const MIGRATION_QUERY = ['store', 'query', 'findings-by-pr', '--repo', 'hq-pin-guard/none', '--pr', '1', '--json'];
-const QUERY_TIMEOUT_MS = 300_000;
-const SHORT_SHA_CHARS = 7;
-
 export async function runStoreMigration(input: StoreMigrationInput): Promise<StoreMigration> {
   const none: StoreMigration = { store: input.store, hasStore: existsSync(input.store), names: [], backup: null, tables: [] };
   if (!none.hasStore) {
@@ -56,6 +52,8 @@ async function runNewMigrations(input: StoreMigrationInput, none: StoreMigration
   }
   return await applyMigrations(input, { ...none, names });
 }
+
+const SHORT_SHA_CHARS = 7;
 
 async function applyMigrations(input: StoreMigrationInput, pending: StoreMigration): Promise<StoreMigration> {
   const backup = createStoreBackup(input.store, input.sha.slice(0, SHORT_SHA_CHARS), iso(now()).replaceAll(/[-:]/gu, ''));
@@ -78,6 +76,9 @@ async function requireIdleAfterBackup(input: StoreMigrationInput, backup: string
     throw error;
   }
 }
+
+const MIGRATION_QUERY = ['store', 'query', 'findings-by-pr', '--repo', 'hq-pin-guard/none', '--pr', '1', '--json'];
+const QUERY_TIMEOUT_MS = 300_000;
 
 async function runMigrationQuery(run: Runner, clone: string): Promise<void> {
   const cwd = mkdtempSync(join(tmpdir(), 'hq-noslop-migrate-'));

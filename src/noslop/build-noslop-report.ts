@@ -87,18 +87,14 @@ function buildKey(row: RoundRecord | undefined): string {
   return `${row?.repo}#${row?.pr}`;
 }
 
-interface StoredOpen {
-  id: string;
-  title: string;
-  reason: string;
-}
+const StoredOpenSchema = z.array(z.object({ id: z.string() }));
 
 function buildPRReport(rounds: RoundRecord[], earlier: RoundRecord[]): PRReport {
   const moves = collectBaseMoves([...splitRounds(earlier).okReviews, ...splitRounds(rounds).okReviews]);
   const parts = splitRounds(rounds);
   const seen = collectFindings(parts.okReviews);
   const tail = parts.checks.at(-1) ?? null;
-  const unresolved = tail === null ? [] : (JSON.parse(tail.open) as StoredOpen[]);
+  const unresolved = tail === null ? [] : StoredOpenSchema.parse(JSON.parse(tail.open));
   return {
     ref: `${rounds[0]?.repo}#${rounds[0]?.pr}`,
     reviewsOk: parts.okReviews.length,
@@ -175,7 +171,7 @@ function countSeverities(findings: Map<string, StoredFinding>): Record<string, n
 
 function findSpan(parts: RoundParts): number | null {
   const [first] = parts.okReviews;
-  const pass = parts.checks.find((c) => c.conclusion === 'success');
+  const pass = parts.checks.find((check) => check.conclusion === 'success');
   if (first === undefined || pass === undefined) {
     return null;
   }

@@ -29,9 +29,9 @@ export function setTarget(db: Database, key: string, op: string, value: string |
   return db
     .transaction(() => {
       const before = goalTargets(db).targets[k];
-      const o = loadStoredTargets(db);
-      o[k] = next;
-      setMeta(db, 'goal_targets', JSON.stringify(o));
+      const stored = loadStoredTargets(db);
+      stored[k] = next;
+      setMeta(db, 'goal_targets', JSON.stringify(stored));
       logEvent(db, 'hq', 'goals', 'target', actor, formatTarget(before), formatTarget(next), { key: k });
       return next;
     })

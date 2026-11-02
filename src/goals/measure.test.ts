@@ -1,6 +1,6 @@
-import { afterEach, beforeEach, expect, test } from 'bun:test';
-import type { Database } from 'bun:sqlite';
+import { expect, onTestFinished, test } from 'bun:test';
 import { at, fetchedDays, freshDb } from '../../test/helpers.ts';
+import { overrideEnv } from '../config/override-env.ts';
 import { addPr } from '../runs/add-pr.ts';
 import { addRun } from '../runs/add-run.ts';
 import { reviewedPr } from '../runs/reviewed-pr.ts';
@@ -8,333 +8,388 @@ import { DEFAULT_TARGETS } from './default-targets.ts';
 import { measure } from './measure.ts';
 import { verdict } from './verdict.ts';
 
-let cleanup: () => void;
-let db: Database;
-let dir: string;
-const home = process.env['HOME'];
-const xdg = process.env['XDG_CACHE_HOME'];
-
-const FROM = new Date('2026-10-15T13:00:00Z');
-const TO = new Date('2026-10-16T13:00:00Z');
-const NOW = new Date('2026-10-16T07:00:00Z');
-const m = () => measure(db, FROM, TO, NOW);
-
-beforeEach(() => {
-  ({ db, dir, cleanup } = freshDb());
-  process.env['HOME'] = dir;
+function setupTest() {
+  const base = freshDb();
+  const db = base.db;
+  const savedCacheHome = process.env['XDG_CACHE_HOME'];
+  onTestFinished(base.cleanup);
+  onTestFinished(overrideEnv('HOME', base.dir));
   delete process.env['XDG_CACHE_HOME'];
-  at(NOW.toISOString());
+  onTestFinished(() => {
+    if (savedCacheHome === undefined) {
+      delete process.env['XDG_CACHE_HOME'];
+    } else {
+      process.env['XDG_CACHE_HOME'] = savedCacheHome;
+    }
+  });
+  at('2026-10-16T07:00:00.000Z');
   fetchedDays(db);
-});
-afterEach(() => {
-  process.env['HOME'] = home;
-  if (xdg === undefined) {
-    delete process.env['XDG_CACHE_HOME'];
-  } else {
-    process.env['XDG_CACHE_HOME'] = xdg;
-  }
-  cleanup();
-});
+  const seedCIRun = (id: number, over: Partial<{ repo: string; path: string; status: string; conclusion: string | null; minutes: number }> = {}) => {
+    const run = { repo: 'atc', path: '.github/workflows/ci.yml', status: 'completed', conclusion: 'success', minutes: 10, ...over };
+    const start = '2026-10-16T02:00:00Z';
+    db.query('INSERT INTO ci_runs (id, repo, path, event, status, conclusion, attempt, created_at, started_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?)').run(id, run.repo, run.path, 'push', run.status, run.conclusion, start, start, new Date(Date.parse(start) + run.minutes * 60_000).toISOString().replace('.000', ''));
+  };
 
-const pr = (n: number, issue: string | null, mergedAt = '2026-10-16T03:00:00Z') => db.query(`INSERT INTO merged_prs (repo, number, merged_at, title, kind, issue) VALUES ('atc', ?, ?, 'x: y', 'other', ?)`).run(n, mergedAt, issue);
-const issue = (id: string, type: string) => db.query(`INSERT INTO linear_issues (issue, type, title, state, closed_at, fetched_at) VALUES (?, ?, 't', 'completed', NULL, '2026-10-16T00:00:00Z')`).run(id, type);
-const ci = (id: number, over: Partial<{ repo: string; path: string; status: string; conclusion: string | null; minutes: number }> = {}) => {
-  const o = { repo: 'atc', path: '.github/workflows/ci.yml', status: 'completed', conclusion: 'success', minutes: 10, ...over };
-  const start = '2026-10-16T02:00:00Z';
-  db.query('INSERT INTO ci_runs (id, repo, path, event, status, conclusion, attempt, created_at, started_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?)').run(id, o.repo, o.path, 'push', o.status, o.conclusion, start, start, new Date(Date.parse(start) + o.minutes * 60_000).toISOString().replace('.000', ''));
-};
+  return {
+    db,
+    readMeasures: () => measure(db, new Date('2026-10-15T13:00:00Z'), new Date('2026-10-16T13:00:00Z'), new Date('2026-10-16T07:00:00Z')),
+    seedPR: (number: number, issue: string | null, mergedAt = '2026-10-16T03:00:00Z') => db.query(`INSERT INTO merged_prs (repo, number, merged_at, title, kind, issue) VALUES ('atc', ?, ?, 'x: y', 'other', ?)`).run(number, mergedAt, issue),
+    seedIssue: (id: string, type: string) => db.query(`INSERT INTO linear_issues (issue, type, title, state, closed_at, fetched_at) VALUES (?, ?, 't', 'completed', NULL, '2026-10-16T00:00:00Z')`).run(id, type),
+    seedCIRun,
+    seedDeployRun: (id: number, outcome: string | null, over: Partial<{ conclusion: string | null; status: string }> = {}) => {
+      seedCIRun(id, { repo: 'cloud', path: '.github/workflows/deploy-prod.yml', ...over });
+      if (outcome) {
+        db.query(`INSERT INTO deploy_runs (run_id, outcome, attempt, fetched_at) VALUES (?, ?, 1, '2026-10-16T05:00:00Z')`).run(id, outcome);
+      }
+    },
+    seedOutage: (down: number, detectAfter = 1) => {
+      const startMs = Date.parse('2026-10-16T01:00:00Z');
+      const formatMinute = (min: number) => new Date(startMs + min * 60_000).toISOString().replace('.000', '');
+      for (let minute = -10; minute < down + 10; minute++) {
+        const isDown = minute >= 0 && minute < down;
+        const targetOk = isDown ? 0 : 1;
+        const controlOk = isDown ? 1 : null;
+        db.query('INSERT INTO probe_samples (at, target_ok, control_ok) VALUES (?, ?, ?)').run(formatMinute(minute), targetOk, controlOk);
+      }
+      db.query('INSERT INTO outages (started_at, detected_at, ended_at) VALUES (?, ?, ?)').run(formatMinute(0), formatMinute(detectAfter), formatMinute(down));
+    },
+    seedExactOutage: (downSec: number, detectSec: number) => {
+      const startMs = Date.parse('2026-10-16T01:00:00Z');
+      const formatSecond = (sec: number) => new Date(startMs + sec * 1000).toISOString().replace('.000', '');
+      for (let second = -300; second <= downSec + 300; second += 30) {
+        const isDown = second >= 0 && second < downSec;
+        const targetOk = isDown ? 0 : 1;
+        const controlOk = isDown ? 1 : null;
+        db.query('INSERT INTO probe_samples (at, target_ok, control_ok) VALUES (?, ?, ?)').run(formatSecond(second), targetOk, controlOk);
+      }
+      db.query('INSERT INTO outages (started_at, detected_at, ended_at) VALUES (?, ?, ?)').run(formatSecond(0), formatSecond(detectSec), formatSecond(downSec));
+    },
+  };
+}
 
 test('bugs and features share one denominator: merged PRs with a typed Linear issue', () => {
-  issue('GEO-1', 'Bug');
-  issue('GEO-2', 'Feature');
-  issue('GEO-3', 'Improvement');
-  issue('GEO-4', 'Chore');
-  pr(1, 'GEO-1');
-  pr(2, 'GEO-2');
-  pr(3, 'GEO-3');
-  pr(4, 'GEO-4');
-  pr(5, null);
-  pr(6, 'GEO-404');
-  pr(7, 'GEO-1', '2026-10-10T03:00:00Z');
-  const r = m();
-  expect(r.bugs).toMatchObject({ value: 25, denominator: 4, shown: '25%' });
-  expect(r.bugs.detail).toBe('1 Bug of 4 merged PRs with a typed Linear issue');
-  expect(r.features).toMatchObject({ value: 50, denominator: 4 });
-  expect(verdict(DEFAULT_TARGETS.bugs, r.bugs)).toBe('red');
-  expect(verdict(DEFAULT_TARGETS.features, r.features)).toBe('red');
+  const ctx = setupTest();
+  ctx.seedIssue('GEO-1', 'Bug');
+  ctx.seedIssue('GEO-2', 'Feature');
+  ctx.seedIssue('GEO-3', 'Improvement');
+  ctx.seedIssue('GEO-4', 'Chore');
+  ctx.seedPR(1, 'GEO-1');
+  ctx.seedPR(2, 'GEO-2');
+  ctx.seedPR(3, 'GEO-3');
+  ctx.seedPR(4, 'GEO-4');
+  ctx.seedPR(5, null);
+  ctx.seedPR(6, 'GEO-404');
+  ctx.seedPR(7, 'GEO-1', '2026-10-10T03:00:00Z');
+  const result = ctx.readMeasures();
+  expect(result.bugs).toMatchObject({ value: 25, denominator: 4, shown: '25%' });
+  expect(result.bugs.detail).toBe('1 Bug of 4 merged PRs with a typed Linear issue');
+  expect(result.features).toMatchObject({ value: 50, denominator: 4 });
+  expect(verdict(DEFAULT_TARGETS.bugs, result.bugs)).toBe('red');
+  expect(verdict(DEFAULT_TARGETS.features, result.features)).toBe('red');
 });
 
 test('a window with no typed PRs has no data, and no data is never green', () => {
-  const r = m();
+  const ctx = setupTest();
+  const result = ctx.readMeasures();
   for (const k of ['bugs', 'features', 'deploys', 'downtime', 'ciwaste', 'mustfix'] as const) {
-    expect(r[k]).toMatchObject({ value: null, denominator: 0, shown: 'no data' });
-    expect(r[k].detail).toContain('no data');
-    expect(verdict(DEFAULT_TARGETS[k], r[k])).toBe('none');
+    expect(result[k]).toMatchObject({ value: null, denominator: 0, shown: 'no data' });
+    expect(result[k].detail).toContain('no data');
+    expect(verdict(DEFAULT_TARGETS[k], result[k])).toBe('none');
   }
 });
 
 test('green at the edge of a target: bugs under 20, features at 60', () => {
-  for (let i = 1; i <= 5; i++) issue(`GEO-${i}`, i === 1 ? 'Bug' : i <= 4 ? 'Feature' : 'Improvement');
-  for (let i = 1; i <= 5; i++) pr(i, `GEO-${i}`);
-  const measures = m();
+  const ctx = setupTest();
+  for (const [offset, type] of ['Bug', 'Feature', 'Feature', 'Feature', 'Improvement'].entries()) {
+    ctx.seedIssue(`GEO-${offset + 1}`, type);
+  }
+  for (let index = 1; index <= 5; index++) {
+    ctx.seedPR(index, `GEO-${index}`);
+  }
+  const measures = ctx.readMeasures();
   expect(verdict(DEFAULT_TARGETS.bugs, measures.bugs)).toBe('red');
   expect(verdict(DEFAULT_TARGETS.features, measures.features)).toBe('green');
   expect(verdict({ op: '<=', value: 20 }, measures.bugs)).toBe('green');
 });
 
-const DEP = { repo: 'cloud', path: '.github/workflows/deploy-prod.yml' };
-const deployRun = (id: number, outcome: string | null, over: Partial<{ conclusion: string | null; status: string }> = {}) => {
-  ci(id, { ...DEP, ...over });
-  if (outcome) db.query(`INSERT INTO deploy_runs (run_id, outcome, attempt, fetched_at) VALUES (?, ?, 1, '2026-10-16T05:00:00Z')`).run(id, outcome);
-};
-
 test('deploy-prod rate counts applies only; holds and no-applies are shown apart', () => {
+  const ctx = setupTest();
   let id = 100;
-  for (let i = 0; i < 39; i++) deployRun(id++, 'applied_ok');
-  for (let i = 0; i < 20; i++) deployRun(id++, 'applied_failed', { conclusion: 'failure' });
-  for (let i = 0; i < 5; i++) deployRun(id++, 'cancelled', { conclusion: 'cancelled' });
-  for (let i = 0; i < 11; i++) deployRun(id++, 'held', { conclusion: 'failure' });
-  for (let i = 0; i < 6; i++) deployRun(id++, 'no_apply');
-  ci(1, { repo: 'cloud', path: '.github/workflows/ci.yml', conclusion: 'failure' });
-  const r = m().deploys;
-  expect(r).toMatchObject({ value: 61, denominator: 64, unit: 'applies', shown: '61%' });
-  expect(r.detail).toBe('61% (39/64 applies), 11 held, 6 no-apply');
-  expect(verdict(DEFAULT_TARGETS.deploys, r)).toBe('red');
+  for (let index = 0; index < 39; index++) {
+    ctx.seedDeployRun(id++, 'applied_ok');
+  }
+  for (let index = 0; index < 20; index++) {
+    ctx.seedDeployRun(id++, 'applied_failed', { conclusion: 'failure' });
+  }
+  for (let index = 0; index < 5; index++) {
+    ctx.seedDeployRun(id++, 'cancelled', { conclusion: 'cancelled' });
+  }
+  for (let index = 0; index < 11; index++) {
+    ctx.seedDeployRun(id++, 'held', { conclusion: 'failure' });
+  }
+  for (let index = 0; index < 6; index++) {
+    ctx.seedDeployRun(id++, 'no_apply');
+  }
+  ctx.seedCIRun(1, { repo: 'cloud', path: '.github/workflows/ci.yml', conclusion: 'failure' });
+  const result = ctx.readMeasures().deploys;
+  expect(result).toMatchObject({ value: 61, denominator: 64, unit: 'applies', shown: '61%' });
+  expect(result.detail).toBe('61% (39/64 applies), 11 held, 6 no-apply');
+  expect(verdict(DEFAULT_TARGETS.deploys, result)).toBe('red');
 });
 
 test('deploy-prod rate: 9 of 10 applies with holds is 90%, and unclassified runs are named', () => {
+  const ctx = setupTest();
   let id = 100;
-  for (let i = 0; i < 9; i++) deployRun(id++, 'applied_ok');
-  deployRun(id++, 'applied_failed', { conclusion: 'failure' });
-  for (let i = 0; i < 11; i++) deployRun(id++, 'held', { conclusion: 'failure' });
-  expect(m().deploys.detail).toBe('90% (9/10 applies), 11 held');
-  deployRun(id++, null, { conclusion: 'success' });
-  deployRun(id++, null, { status: 'in_progress', conclusion: null });
-  const r = m().deploys;
-  expect(r).toMatchObject({ value: 90, denominator: 10 });
-  expect(r.detail).toBe('90% (9/10 applies), 11 held, 1 not yet classified');
+  for (let index = 0; index < 9; index++) {
+    ctx.seedDeployRun(id++, 'applied_ok');
+  }
+  ctx.seedDeployRun(id++, 'applied_failed', { conclusion: 'failure' });
+  for (let index = 0; index < 11; index++) {
+    ctx.seedDeployRun(id++, 'held', { conclusion: 'failure' });
+  }
+  expect(ctx.readMeasures().deploys.detail).toBe('90% (9/10 applies), 11 held');
+  ctx.seedDeployRun(id++, null, { conclusion: 'success' });
+  ctx.seedDeployRun(id++, null, { status: 'in_progress', conclusion: null });
+  const result = ctx.readMeasures().deploys;
+  expect(result).toMatchObject({ value: 90, denominator: 10 });
+  expect(result.detail).toBe('90% (9/10 applies), 11 held, 1 not yet classified');
 });
 
 test('deploy-prod with a run not yet classified keeps its value but gets no colour', () => {
-  for (let i = 0; i < 10; i++) deployRun(100 + i, 'applied_ok');
-  expect(verdict(DEFAULT_TARGETS.deploys, m().deploys)).toBe('green');
-  deployRun(200, null, { conclusion: 'success' });
-  const r = m().deploys;
-  expect(r).toMatchObject({ value: 100, unclassified: 1 });
-  expect(verdict(DEFAULT_TARGETS.deploys, r)).toBe('none');
+  const ctx = setupTest();
+  for (let index = 0; index < 10; index++) {
+    ctx.seedDeployRun(100 + index, 'applied_ok');
+  }
+  expect(verdict(DEFAULT_TARGETS.deploys, ctx.readMeasures().deploys)).toBe('green');
+  ctx.seedDeployRun(200, null, { conclusion: 'success' });
+  const result = ctx.readMeasures().deploys;
+  expect(result).toMatchObject({ value: 100, unclassified: 1 });
+  expect(verdict(DEFAULT_TARGETS.deploys, result)).toBe('none');
 });
 
 test('it names an unknown deploy outcome and withholds the colour while one remains', () => {
+  const ctx = setupTest();
   for (let index = 0; index < 9; index++) {
-    deployRun(100 + index, 'applied_ok');
+    ctx.seedDeployRun(100 + index, 'applied_ok');
   }
-  deployRun(200, 'unknown', { conclusion: 'success' });
+  ctx.seedDeployRun(200, 'unknown', { conclusion: 'success' });
 
-  const result = measure(db, FROM, TO, NOW).deploys;
+  const result = ctx.readMeasures().deploys;
 
   expect(result).toMatchObject({ value: 100, unknown: 1, detail: '100% (9/9 applies), 1 unknown outcome' });
   expect(verdict(DEFAULT_TARGETS.deploys, result)).toBe('none');
 });
 
 test('deploy-prod with no applies has no data, still naming holds', () => {
-  deployRun(1, 'held', { conclusion: 'failure' });
-  deployRun(2, 'no_apply');
-  const r = m().deploys;
-  expect(r).toMatchObject({ value: null, denominator: 0, shown: 'no data' });
-  expect(r.detail).toBe('no data: no applies in the window, 1 held, 1 no-apply');
-  expect(verdict(DEFAULT_TARGETS.deploys, r)).toBe('none');
+  const ctx = setupTest();
+  ctx.seedDeployRun(1, 'held', { conclusion: 'failure' });
+  ctx.seedDeployRun(2, 'no_apply');
+  const result = ctx.readMeasures().deploys;
+  expect(result).toMatchObject({ value: null, denominator: 0, shown: 'no data' });
+  expect(result.detail).toBe('no data: no applies in the window, 1 held, 1 no-apply');
+  expect(verdict(DEFAULT_TARGETS.deploys, result)).toBe('none');
 });
 
 test('ci waste is the minutes in failed or cancelled runs over all minutes', () => {
-  ci(1, { minutes: 80 });
-  ci(2, { minutes: 10, conclusion: 'failure' });
-  ci(3, { minutes: 10, conclusion: 'cancelled' });
-  ci(4, { minutes: 50, status: 'in_progress', conclusion: null });
-  const r = m().ciwaste;
-  expect(r).toMatchObject({ value: 20, denominator: 100 });
-  expect(r.detail).toBe('20 of 100 CI minutes were in failed or cancelled runs');
-  expect(verdict(DEFAULT_TARGETS.ciwaste, r)).toBe('red');
-  expect(verdict({ op: '<=', value: 20 }, r)).toBe('green');
+  const ctx = setupTest();
+  ctx.seedCIRun(1, { minutes: 80 });
+  ctx.seedCIRun(2, { minutes: 10, conclusion: 'failure' });
+  ctx.seedCIRun(3, { minutes: 10, conclusion: 'cancelled' });
+  ctx.seedCIRun(4, { minutes: 50, status: 'in_progress', conclusion: null });
+  const result = ctx.readMeasures().ciwaste;
+  expect(result).toMatchObject({ value: 20, denominator: 100 });
+  expect(result.detail).toBe('20 of 100 CI minutes were in failed or cancelled runs');
+  expect(verdict(DEFAULT_TARGETS.ciwaste, result)).toBe('red');
+  expect(verdict({ op: '<=', value: 20 }, result)).toBe('green');
 });
 
 test('a past day not fetched leaves the measure incomplete, with no colour; today never counts', () => {
-  ci(1, { minutes: 100 });
-  expect(verdict(DEFAULT_TARGETS.ciwaste, m().ciwaste)).toBe('green');
-  db.query(`DELETE FROM goal_days WHERE day = '2026-10-15'`).run();
-  const r = m();
-  expect(r.ciwaste).toMatchObject({ value: 0, missing: 1 });
-  expect(r.ciwaste.detail).toContain('1 day(s) not fetched yet, so no colour');
-  expect(verdict(DEFAULT_TARGETS.ciwaste, r.ciwaste)).toBe('none');
-  expect(r.deploys.missing).toBe(1);
-  db.query(`DELETE FROM merged_pr_days WHERE day = '2026-10-16'`).run();
-  expect(m().bugs.missing).toBeUndefined();
-  db.query(`DELETE FROM merged_pr_days WHERE day = '2026-10-15'`).run();
-  issue('GEO-1', 'Feature');
-  pr(1, 'GEO-1');
-  expect(m().features).toMatchObject({ value: 100, missing: 1 });
-  expect(verdict(DEFAULT_TARGETS.features, m().features)).toBe('none');
+  const ctx = setupTest();
+  ctx.seedCIRun(1, { minutes: 100 });
+  expect(verdict(DEFAULT_TARGETS.ciwaste, ctx.readMeasures().ciwaste)).toBe('green');
+  ctx.db.query(`DELETE FROM goal_days WHERE day = '2026-10-15'`).run();
+  const result = ctx.readMeasures();
+  expect(result.ciwaste).toMatchObject({ value: 0, missing: 1 });
+  expect(result.ciwaste.detail).toContain('1 day(s) not fetched yet, so no colour');
+  expect(verdict(DEFAULT_TARGETS.ciwaste, result.ciwaste)).toBe('none');
+  expect(result.deploys.missing).toBe(1);
+  ctx.db.query(`DELETE FROM merged_pr_days WHERE day = '2026-10-16'`).run();
+  expect(ctx.readMeasures().bugs.missing).toBeUndefined();
+  ctx.db.query(`DELETE FROM merged_pr_days WHERE day = '2026-10-15'`).run();
+  ctx.seedIssue('GEO-1', 'Feature');
+  ctx.seedPR(1, 'GEO-1');
+  expect(ctx.readMeasures().features).toMatchObject({ value: 100, missing: 1 });
+  expect(verdict(DEFAULT_TARGETS.features, ctx.readMeasures().features)).toBe('none');
 });
 
 test('must-fix is first reviews that needed a recheck, of the reviewed runs', () => {
+  const ctx = setupTest();
   const run = (issueId: string, p: string, recheck: boolean) => {
-    addRun(db, { issue: issueId, title: 'Invented', place: 'imp', session: null, next: 'x', gate: null, geoffChat: false, actor: 'z-delivery' });
-    addPr(db, issueId, p, 'z-delivery');
-    reviewedPr(db, p, 'abc1234', { recheck: false, force: false }, 'z-delivery');
-    if (recheck) reviewedPr(db, p, 'abc1234', { recheck: true, force: false }, 'z-delivery');
+    addRun(ctx.db, { issue: issueId, title: 'Invented', place: 'imp', session: null, next: 'x', gate: null, geoffChat: false, actor: 'z-delivery' });
+    addPr(ctx.db, issueId, p, 'z-delivery');
+    reviewedPr(ctx.db, p, 'abc1234', { recheck: false, force: false }, 'z-delivery');
+    if (recheck) {
+      reviewedPr(ctx.db, p, 'abc1234', { recheck: true, force: false }, 'z-delivery');
+    }
   };
   at('2026-10-16T06:00:00Z');
   run('GEO-1', 'widgets#1', true);
   run('GEO-2', 'widgets#2', false);
   run('GEO-3', 'widgets#3', false);
   run('GEO-4', 'widgets#4', false);
-  at(NOW.toISOString());
-  const r = m().mustfix;
-  expect(r).toMatchObject({ value: 25, denominator: 4 });
-  expect(r.detail).toBe('1 of 4 reviewed runs had a must-fix at the first review');
-  expect(verdict(DEFAULT_TARGETS.mustfix, r)).toBe('red');
+  at('2026-10-16T07:00:00.000Z');
+  const result = ctx.readMeasures().mustfix;
+  expect(result).toMatchObject({ value: 25, denominator: 4 });
+  expect(result.detail).toBe('1 of 4 reviewed runs had a must-fix at the first review');
+  expect(verdict(DEFAULT_TARGETS.mustfix, result)).toBe('red');
 });
 
-function outage(down: number, detectAfter = 1) {
-  const t0 = Date.parse('2026-10-16T01:00:00Z');
-  const z = (min: number) => new Date(t0 + min * 60_000).toISOString().replace('.000', '');
-  for (let i = -10; i < down + 10; i++) {
-    const isDown = i >= 0 && i < down;
-    db.query('INSERT INTO probe_samples (at, target_ok, control_ok) VALUES (?, ?, ?)').run(z(i), isDown ? 0 : 1, isDown ? 1 : null);
-  }
-  db.query('INSERT INTO outages (started_at, detected_at, ended_at) VALUES (?, ?, ?)').run(z(0), z(detectAfter), z(down));
-}
-
 test('downtime is green under 15 min and red at 15', () => {
-  outage(14);
-  expect(verdict(DEFAULT_TARGETS.downtime, m().downtime)).toBe('green');
-  expect(m().downtime).toMatchObject({ value: 14, shown: '14 min' });
+  const ctx = setupTest();
+  ctx.seedOutage(14);
+  expect(verdict(DEFAULT_TARGETS.downtime, ctx.readMeasures().downtime)).toBe('green');
+  expect(ctx.readMeasures().downtime).toMatchObject({ value: 14, shown: '14 min' });
 });
 
 test('downtime is red at 15 minutes', () => {
-  outage(15);
-  expect(m().downtime.value).toBe(15);
-  expect(verdict(DEFAULT_TARGETS.downtime, m().downtime)).toBe('red');
+  const ctx = setupTest();
+  ctx.seedOutage(15);
+  expect(ctx.readMeasures().downtime.value).toBe(15);
+  expect(verdict(DEFAULT_TARGETS.downtime, ctx.readMeasures().downtime)).toBe('red');
 });
 
 test('an outage caught after 6 minutes is red even when it was short', () => {
-  outage(8, 6);
-  const r = m().downtime;
-  expect(r.value).toBe(8);
-  expect(r.longest).toBe(6);
-  expect(verdict(DEFAULT_TARGETS.downtime, r)).toBe('red');
-  expect(r.detail).toContain('slowest caught in 6 min');
+  const ctx = setupTest();
+  ctx.seedOutage(8, 6);
+  const result = ctx.readMeasures().downtime;
+  expect(result.value).toBe(8);
+  expect(result.longest).toBe(6);
+  expect(verdict(DEFAULT_TARGETS.downtime, result)).toBe('red');
+  expect(result.detail).toContain('slowest caught in 6 min');
 });
 
 test('samples and no outage: zero minutes, green', () => {
-  db.query('INSERT INTO probe_samples (at, target_ok, control_ok) VALUES (?, 1, NULL)').run('2026-10-16T02:00:00Z');
-  expect(m().downtime).toMatchObject({ value: 0, denominator: 1 });
-  expect(verdict(DEFAULT_TARGETS.downtime, m().downtime)).toBe('green');
+  const ctx = setupTest();
+  ctx.db.query('INSERT INTO probe_samples (at, target_ok, control_ok) VALUES (?, 1, NULL)').run('2026-10-16T02:00:00Z');
+  expect(ctx.readMeasures().downtime).toMatchObject({ value: 0, denominator: 1 });
+  expect(verdict(DEFAULT_TARGETS.downtime, ctx.readMeasures().downtime)).toBe('green');
 });
 
 test('a window the probe saw only blind has no data, never green', () => {
-  for (const t of ['2026-10-16T02:00:00Z', '2026-10-16T02:01:00Z', '2026-10-16T02:02:00Z']) db.query('INSERT INTO probe_samples (at, target_ok, control_ok) VALUES (?, 0, 0)').run(t);
-  const r = m().downtime;
-  expect(r).toMatchObject({ value: null, shown: 'no data', detail: 'no data: the probe saw the window only blind (the PC offline)' });
-  expect(verdict(DEFAULT_TARGETS.downtime, r)).not.toBe('green');
+  const ctx = setupTest();
+  for (const sampleAt of ['2026-10-16T02:00:00Z', '2026-10-16T02:01:00Z', '2026-10-16T02:02:00Z']) {
+    ctx.db.query('INSERT INTO probe_samples (at, target_ok, control_ok) VALUES (?, 0, 0)').run(sampleAt);
+  }
+  const result = ctx.readMeasures().downtime;
+  expect(result).toMatchObject({ value: null, shown: 'no data', detail: 'no data: the probe saw the window only blind (the PC offline)' });
+  expect(verdict(DEFAULT_TARGETS.downtime, result)).not.toBe('green');
 });
 
 test('cost reports the latest readings and the window peak', () => {
+  const ctx = setupTest();
   for (const [t, five, seven] of [['2026-10-16T01:00:00Z', 10, 40], ['2026-10-16T03:00:00Z', 30, 71], ['2026-10-16T05:00:00Z', 20, 55]] as const) {
-    db.query('INSERT INTO usage_samples (at, account, five_hour, seven_day) VALUES (?, ?, ?, ?)').run(t, 'active', five, seven);
+    ctx.db.query('INSERT INTO usage_samples (at, account, five_hour, seven_day) VALUES (?, ?, ?, ?)').run(t, 'active', five, seven);
   }
-  ci(1, { minutes: 90 });
-  const r = m().cost;
-  expect(r).toMatchObject({ value: 71, denominator: 3 });
-  expect(r.detail).toBe('Claude 7-day 55% and 5-hour 20% used at last reading (active account only), 7-day peak 71%; CI 90 min');
+  ctx.seedCIRun(1, { minutes: 90 });
+  const result = ctx.readMeasures().cost;
+  expect(result).toMatchObject({ value: 71, denominator: 3 });
+  expect(result.detail).toBe('Claude 7-day 55% and 5-hour 20% used at last reading (active account only), 7-day peak 71%; CI 90 min');
 });
 
 test('targets are judged on the unrounded share: 10 of 51 is under 20, 59.6% is under 60', () => {
-  issue('GEO-1', 'Bug');
-  issue('GEO-2', 'Feature');
-  for (let i = 1; i <= 10; i++) pr(i, 'GEO-1');
-  for (let i = 11; i <= 51; i++) pr(i, 'GEO-2');
-  const r = m();
-  expect(r.bugs).toMatchObject({ value: 20, shown: '20%' });
-  expect(verdict(DEFAULT_TARGETS.bugs, r.bugs)).toBe('green');
-  expect(verdict({ op: '>=', value: 80 }, r.features)).toBe('green');
-  expect(verdict({ op: '>', value: 80.4 }, r.features)).toBe('red');
+  const ctx = setupTest();
+  ctx.seedIssue('GEO-1', 'Bug');
+  ctx.seedIssue('GEO-2', 'Feature');
+  for (let index = 1; index <= 10; index++) {
+    ctx.seedPR(index, 'GEO-1');
+  }
+  for (let index = 11; index <= 51; index++) {
+    ctx.seedPR(index, 'GEO-2');
+  }
+  const result = ctx.readMeasures();
+  expect(result.bugs).toMatchObject({ value: 20, shown: '20%' });
+  expect(verdict(DEFAULT_TARGETS.bugs, result.bugs)).toBe('green');
+  expect(verdict({ op: '>=', value: 80 }, result.features)).toBe('green');
+  expect(verdict({ op: '>', value: 80.4 }, result.features)).toBe('red');
 });
 
 test('a 59.6% feature share does not pass the 60% target', () => {
-  issue('GEO-1', 'Feature');
-  issue('GEO-2', 'Bug');
-  for (let i = 1; i <= 149; i++) pr(i, 'GEO-1');
-  for (let i = 150; i <= 250; i++) pr(i, 'GEO-2');
-  const r = m();
-  expect(r.features).toMatchObject({ value: 60, shown: '60%' });
-  expect(verdict(DEFAULT_TARGETS.features, r.features)).toBe('red');
+  const ctx = setupTest();
+  ctx.seedIssue('GEO-1', 'Feature');
+  ctx.seedIssue('GEO-2', 'Bug');
+  for (let index = 1; index <= 149; index++) {
+    ctx.seedPR(index, 'GEO-1');
+  }
+  for (let index = 150; index <= 250; index++) {
+    ctx.seedPR(index, 'GEO-2');
+  }
+  const result = ctx.readMeasures();
+  expect(result.features).toMatchObject({ value: 60, shown: '60%' });
+  expect(verdict(DEFAULT_TARGETS.features, result.features)).toBe('red');
 });
 
 test('ci waste is judged on raw durations: 100s ok plus 20s failed is 16.7%, not 0%', () => {
-  ci(1, { minutes: 100 / 60 });
-  ci(2, { conclusion: 'failure', minutes: 20 / 60 });
-  const r = m().ciwaste;
-  expect(r.exact).toBeCloseTo(16.67, 1);
-  expect(verdict({ op: '<=', value: 10 }, r)).toBe('red');
+  const ctx = setupTest();
+  ctx.seedCIRun(1, { minutes: 100 / 60 });
+  ctx.seedCIRun(2, { conclusion: 'failure', minutes: 20 / 60 });
+  const result = ctx.readMeasures().ciwaste;
+  expect(result.exact).toBeCloseTo(16.67, 1);
+  expect(verdict({ op: '<=', value: 10 }, result)).toBe('red');
 });
 
 test('untyped Linear issues (type none) stay out of the typed denominator', () => {
-  issue('GEO-1', 'none');
-  pr(1, 'GEO-1');
-  expect(m().bugs).toMatchObject({ value: null, denominator: 0 });
-  issue('GEO-2', 'Bug');
-  issue('GEO-3', 'Feature');
-  pr(2, 'GEO-2');
-  pr(3, 'GEO-3');
-  expect(m().bugs).toMatchObject({ value: 50, denominator: 2 });
+  const ctx = setupTest();
+  ctx.seedIssue('GEO-1', 'none');
+  ctx.seedPR(1, 'GEO-1');
+  expect(ctx.readMeasures().bugs).toMatchObject({ value: null, denominator: 0 });
+  ctx.seedIssue('GEO-2', 'Bug');
+  ctx.seedIssue('GEO-3', 'Feature');
+  ctx.seedPR(2, 'GEO-2');
+  ctx.seedPR(3, 'GEO-3');
+  expect(ctx.readMeasures().bugs).toMatchObject({ value: 50, denominator: 2 });
 });
 
 test('a usage reading stored at the report second counts', () => {
-  db.query('INSERT INTO usage_samples (at, account, five_hour, seven_day) VALUES (?, ?, ?, ?)').run('2026-10-16T01:00:00Z', 'active', 10, 40);
-  db.query('INSERT INTO usage_samples (at, account, five_hour, seven_day) VALUES (?, ?, ?, ?)').run('2026-10-16T07:00:00Z', 'active', 20, 90);
-  expect(m().cost).toMatchObject({ value: 90, denominator: 2 });
+  const ctx = setupTest();
+  ctx.db.query('INSERT INTO usage_samples (at, account, five_hour, seven_day) VALUES (?, ?, ?, ?)').run('2026-10-16T01:00:00Z', 'active', 10, 40);
+  ctx.db.query('INSERT INTO usage_samples (at, account, five_hour, seven_day) VALUES (?, ?, ?, ?)').run('2026-10-16T07:00:00Z', 'active', 20, 90);
+  expect(ctx.readMeasures().cost).toMatchObject({ value: 90, denominator: 2 });
 });
 
 test('cost targets compare the unrounded peak: 79.9 passes under 80', () => {
-  db.query('INSERT INTO usage_samples (at, account, five_hour, seven_day) VALUES (?, ?, ?, ?)').run('2026-10-16T01:00:00Z', 'active', 10, 79.9);
-  const r = m().cost;
-  expect(r).toMatchObject({ value: 80, shown: '80%' });
-  expect(verdict({ op: '<', value: 80 }, r)).toBe('green');
+  const ctx = setupTest();
+  ctx.db.query('INSERT INTO usage_samples (at, account, five_hour, seven_day) VALUES (?, ?, ?, ?)').run('2026-10-16T01:00:00Z', 'active', 10, 79.9);
+  const result = ctx.readMeasures().cost;
+  expect(result).toMatchObject({ value: 80, shown: '80%' });
+  expect(verdict({ op: '<', value: 80 }, result)).toBe('green');
 });
 
-function exactOutage(downSec: number, detectSec: number) {
-  const t0 = Date.parse('2026-10-16T01:00:00Z');
-  const z = (sec: number) => new Date(t0 + sec * 1000).toISOString().replace('.000', '');
-  for (let s = -300; s <= downSec + 300; s += 30) {
-    const isDown = s >= 0 && s < downSec;
-    db.query('INSERT INTO probe_samples (at, target_ok, control_ok) VALUES (?, ?, ?)').run(z(s), isDown ? 0 : 1, isDown ? 1 : null);
-  }
-  db.query('INSERT INTO outages (started_at, detected_at, ended_at) VALUES (?, ?, ?)').run(z(0), z(detectSec), z(downSec));
-}
-
 test('a detection of 5 min 1 s is red, though it shows as 5 min', () => {
-  exactOutage(120, 301);
-  const r = m().downtime;
-  expect(r.longest).toBe(5);
-  expect(r.longestExact).toBeCloseTo(301 / 60, 5);
-  expect(verdict(DEFAULT_TARGETS.downtime, r)).toBe('red');
+  const ctx = setupTest();
+  ctx.seedExactOutage(120, 301);
+  const result = ctx.readMeasures().downtime;
+  expect(result.longest).toBe(5);
+  expect(result.longestExact).toBeCloseTo(301 / 60, 5);
+  expect(verdict(DEFAULT_TARGETS.downtime, result)).toBe('red');
 });
 
 test('a detection of exactly 5 min is green', () => {
-  exactOutage(120, 300);
-  expect(verdict(DEFAULT_TARGETS.downtime, m().downtime)).toBe('green');
+  const ctx = setupTest();
+  ctx.seedExactOutage(120, 300);
+  expect(verdict(DEFAULT_TARGETS.downtime, ctx.readMeasures().downtime)).toBe('green');
 });
 
 test('14 min 59 s down is green, though it shows as 15 min; 15 min 0 s is red', () => {
-  exactOutage(14 * 60 + 59, 60);
-  let r = m().downtime;
-  expect(r.shown).toBe('15 min');
-  expect(r.exact).toBeCloseTo(899 / 60, 5);
-  expect(verdict(DEFAULT_TARGETS.downtime, r)).toBe('green');
-  db.query('DELETE FROM probe_samples').run();
-  db.query('DELETE FROM outages').run();
-  exactOutage(15 * 60, 60);
-  r = m().downtime;
-  expect(r.shown).toBe('15 min');
-  expect(verdict(DEFAULT_TARGETS.downtime, r)).toBe('red');
+  const ctx = setupTest();
+  ctx.seedExactOutage(14 * 60 + 59, 60);
+  let result = ctx.readMeasures().downtime;
+  expect(result.shown).toBe('15 min');
+  expect(result.exact).toBeCloseTo(899 / 60, 5);
+  expect(verdict(DEFAULT_TARGETS.downtime, result)).toBe('green');
+  ctx.db.query('DELETE FROM probe_samples').run();
+  ctx.db.query('DELETE FROM outages').run();
+  ctx.seedExactOutage(15 * 60, 60);
+  result = ctx.readMeasures().downtime;
+  expect(result.shown).toBe('15 min');
+  expect(verdict(DEFAULT_TARGETS.downtime, result)).toBe('red');
 });

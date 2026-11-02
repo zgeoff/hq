@@ -103,7 +103,7 @@ async function ensureOnce(db: Database, client: FleetClient, opts: { dryRun: boo
   const GRACE_MIN = 10;
   const INTENDED_MAX_MIN = 60;
   const UNLISTED_GRACE_MIN = 30;
-  const t = now();
+  const startedAt = now();
   const fleet = opts.fleet ?? declaredFleet(db);
   const hurry = new Set(opts.now ?? []);
   const unknown = [...hurry].filter((n) => !fleet.some((e) => e.name === n));
@@ -145,12 +145,13 @@ async function ensureOnce(db: Database, client: FleetClient, opts: { dryRun: boo
       steps.push({ name: e.name, action: 'ok', detail: `${renamed.id.slice(0, 8)}, now named ${renamed.name}; hq spawns none`, id: renamed.id });
       continue;
     }
-    missing[e.name] ??= iso(t);
-    const gone = (t.getTime() - Date.parse(missing[e.name]!)) / 60_000;
+    const missingSince = missing[e.name] ?? iso(startedAt);
+    missing[e.name] = missingSince;
+    const gone = (startedAt.getTime() - Date.parse(missingSince)) / 60_000;
     const intended = [...mine, ...all.filter((s) => s.name === e.name)].some((s) => s.lifecycle?.desired !== undefined && s.lifecycle.desired !== 'stop');
     const unlisted = ids.length > 0 && mine.length === 0;
     const grace = unlisted ? UNLISTED_GRACE_MIN : GRACE_MIN;
-    const recentRestart = restartAt !== null && t.getTime() - restartAt < GRACE_MIN * 60_000;
+    const recentRestart = restartAt !== null && startedAt.getTime() - restartAt < GRACE_MIN * 60_000;
     const stillIntended = intended && gone < INTENDED_MAX_MIN;
     if (!hurry.has(e.name) && (gone < grace || stillIntended || recentRestart)) {
       const why = stillIntended
@@ -193,7 +194,7 @@ async function ensureOnce(db: Database, client: FleetClient, opts: { dryRun: boo
       known[e.name] = id;
       const step: EnsureStep = { name: e.name, action: 'spawned', detail: `${id.slice(0, 8)} after ${Math.floor(gone)} min without a live session${hurry.has(e.name) ? ' (--now)' : ''}${pinFailure ? `; the pin failed (${pinFailure}), so the next check pins it again` : ''}`, id };
       if (e.remoteControl) {
-        setPending(db, e.name, { id, since: iso(t) });
+        setPending(db, e.name, { id, since: iso(startedAt) });
         helpers.push({ name: e.name, step });
       }
       steps.push(step);
@@ -221,16 +222,19 @@ async function ensureOnce(db: Database, client: FleetClient, opts: { dryRun: boo
       setMeta(db, FLEET_UNPINNED, JSON.stringify(unpinned));
     }
     setMeta(db, 'fleet_ids', JSON.stringify(known));
-    setMeta(db, 'fleet_last', JSON.stringify({ at: iso(t), dryRun: opts.dryRun, steps }));
+    setMeta(db, 'fleet_last', JSON.stringify({ at: iso(startedAt), dryRun: opts.dryRun, steps }));
     const told = steps.filter((step) => !rcReported.has(step) && (step.action === 'spawned' || step.action === 'failed' || step.action === 'duplicates' || step.action === 'remote control'));
     if (!opts.dryRun && told.length) {
       const seq = logEvent(db, 'hq', 'fleet', 'ensured', opts.actor, null, null, { steps: told });
       const text = `hq fleet: ${told.map(sayStep).join('; ')}.`;
       for (const u of told.filter((x) => x.urgent)) enqueue(db, logEvent(db, 'hq', 'fleet', 'urgent', opts.actor, null, null, { step: u }), owner(), `hq fleet: ${sayStep(u)}.`);
-      if (isQuiet(t)) setMeta(db, 'fleet_held', JSON.stringify([...metaJson(db, 'fleet_held', HELD, []), { seq, text }]));
-      else enqueue(db, seq, owner(), text);
+      if (isQuiet(startedAt)) {
+        setMeta(db, 'fleet_held', JSON.stringify([...metaJson(db, 'fleet_held', HELD, []), { seq, text }]));
+      } else {
+        enqueue(db, seq, owner(), text);
+      }
     }
-    if (!opts.dryRun && !isQuiet(t)) {
+    if (!opts.dryRun && !isQuiet(startedAt)) {
       const held = metaJson(db, 'fleet_held', HELD, []);
       for (const h of held) enqueue(db, h.seq, owner(), `${h.text} (held over quiet hours)`);
       setMeta(db, 'fleet_held', null);

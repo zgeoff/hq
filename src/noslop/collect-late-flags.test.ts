@@ -39,6 +39,9 @@ function setupTest() {
   });
 
   return {
+    gitOk: { code: 0, stderr: '' },
+    newFinding: { id: 'bbbb', lens: 'correctness', severity: 'high', title: 'Kettle never boils', anchor: { path: 'src/kettle.ts', startLine: 10, endLine: 12 } },
+    oldFinding: { id: 'aaaa', lens: 'style', severity: 'low', title: 'Lid is loose' },
     calls,
     addReview: (head: string, findings: RecordedFinding[]) =>
       recordRound(db, { repo: 'widgets', pr: 7, kind: 'review', startedAt: '2026-10-18T01:00:00Z', endedAt: '2026-10-18T01:01:00Z', ms: 1, ok: true, head, base: 'main', depth: null, findings, failedCalls: 0, conclusion: null, open: [], error: null, sha: 'abc1234' }),
@@ -49,15 +52,11 @@ function setupTest() {
   };
 }
 
-const CAT_OK = { code: 0, stderr: '' };
-const NEW = { id: 'bbbb', lens: 'correctness', severity: 'high', title: 'Kettle never boils', anchor: { path: 'src/kettle.ts', startLine: 10, endLine: 12 } };
-const OLD = { id: 'aaaa', lens: 'style', severity: 'low', title: 'Lid is loose' };
-
 test('it flags a new finding late when the first-to-latest diff leaves its lines alone', async () => {
   const ctx = setupTest();
-  ctx.addReview('h1', [OLD]);
+  ctx.addReview('h1', [ctx.oldFinding]);
 
-  await expect(ctx.collect({ commit: CAT_OK, cat: CAT_OK, diff: { code: 0, stdout: '@@ -1,2 +1,3 @@\n+x\n@@ -30 +31 @@\n' } }, [OLD, NEW], 'h2')).resolves.toStrictEqual({ aaaa: null, bbbb: true });
+  await expect(ctx.collect({ commit: ctx.gitOk, cat: ctx.gitOk, diff: { code: 0, stdout: '@@ -1,2 +1,3 @@\n+x\n@@ -30 +31 @@\n' } }, [ctx.oldFinding, ctx.newFinding], 'h2')).resolves.toStrictEqual({ aaaa: null, bbbb: true });
   expect(ctx.calls).toStrictEqual([
     ['git', 'cat-file', '-e', 'h1^{commit}'],
     ['git', 'cat-file', '-e', 'h1:src/kettle.ts'],
@@ -67,59 +66,59 @@ test('it flags a new finding late when the first-to-latest diff leaves its lines
 
 test('it flags a new finding not late when a hunk overlaps its lines', async () => {
   const ctx = setupTest();
-  ctx.addReview('h1', [OLD]);
+  ctx.addReview('h1', [ctx.oldFinding]);
 
-  await expect(ctx.collect({ commit: CAT_OK, cat: CAT_OK, diff: { code: 0, stdout: '@@ -9,0 +11,2 @@\n' } }, [NEW], 'h2')).resolves.toStrictEqual({ bbbb: false });
+  await expect(ctx.collect({ commit: ctx.gitOk, cat: ctx.gitOk, diff: { code: 0, stdout: '@@ -9,0 +11,2 @@\n' } }, [ctx.newFinding], 'h2')).resolves.toStrictEqual({ bbbb: false });
 });
 
 test('it treats a pure deletion at a line inside the anchor as touching it', async () => {
   const ctx = setupTest();
-  ctx.addReview('h1', [OLD]);
+  ctx.addReview('h1', [ctx.oldFinding]);
 
-  await expect(ctx.collect({ commit: CAT_OK, cat: CAT_OK, diff: { code: 0, stdout: '@@ -11,3 +11,0 @@\n' } }, [NEW], 'h2')).resolves.toStrictEqual({ bbbb: false });
+  await expect(ctx.collect({ commit: ctx.gitOk, cat: ctx.gitOk, diff: { code: 0, stdout: '@@ -11,3 +11,0 @@\n' } }, [ctx.newFinding], 'h2')).resolves.toStrictEqual({ bbbb: false });
 });
 
 test('it flags a finding in a file that is new since the first head as not late', async () => {
   const ctx = setupTest();
-  ctx.addReview('h1', [OLD]);
+  ctx.addReview('h1', [ctx.oldFinding]);
 
-  await expect(ctx.collect({ commit: CAT_OK, cat: { code: 128, stderr: "fatal: path 'src/kettle.ts' does not exist in 'h1'" }, diff: { code: 0, stdout: '' } }, [NEW], 'h2')).resolves.toStrictEqual({ bbbb: false });
+  await expect(ctx.collect({ commit: ctx.gitOk, cat: { code: 128, stderr: "fatal: path 'src/kettle.ts' does not exist in 'h1'" }, diff: { code: 0, stdout: '' } }, [ctx.newFinding], 'h2')).resolves.toStrictEqual({ bbbb: false });
 });
 
 test('it leaves the flag null when git diff fails', async () => {
   const ctx = setupTest();
-  ctx.addReview('h1', [OLD]);
+  ctx.addReview('h1', [ctx.oldFinding]);
 
-  await expect(ctx.collect({ commit: CAT_OK, cat: CAT_OK, diff: { code: 128, stdout: '' } }, [NEW], 'h2')).resolves.toStrictEqual({ bbbb: null });
+  await expect(ctx.collect({ commit: ctx.gitOk, cat: ctx.gitOk, diff: { code: 128, stdout: '' } }, [ctx.newFinding], 'h2')).resolves.toStrictEqual({ bbbb: null });
 });
 
 test('it leaves the flag null when the first head is not in the clone', async () => {
   const ctx = setupTest();
-  ctx.addReview('h1', [OLD]);
+  ctx.addReview('h1', [ctx.oldFinding]);
 
-  await expect(ctx.collect({ commit: { code: 128, stderr: 'fatal: Not a valid object name 1111111111111111111111111111111111111111^{commit}' }, cat: CAT_OK, diff: { code: 0, stdout: '' } }, [NEW], 'h2')).resolves.toStrictEqual({ bbbb: null });
+  await expect(ctx.collect({ commit: { code: 128, stderr: 'fatal: Not a valid object name 1111111111111111111111111111111111111111^{commit}' }, cat: ctx.gitOk, diff: { code: 0, stdout: '' } }, [ctx.newFinding], 'h2')).resolves.toStrictEqual({ bbbb: null });
   expect(ctx.calls).toHaveLength(1);
 });
 
 test('it leaves every flag null on the first ok review and runs no git', async () => {
   const ctx = setupTest();
 
-  await expect(ctx.collect({ commit: CAT_OK, cat: CAT_OK, diff: { code: 0, stdout: '' } }, [NEW], 'h1')).resolves.toStrictEqual({ bbbb: null });
+  await expect(ctx.collect({ commit: ctx.gitOk, cat: ctx.gitOk, diff: { code: 0, stdout: '' } }, [ctx.newFinding], 'h1')).resolves.toStrictEqual({ bbbb: null });
   expect(ctx.calls).toStrictEqual([]);
 });
 
 test('it leaves a finding seen before and a finding without an anchor null', async () => {
   const ctx = setupTest();
-  ctx.addReview('h1', [OLD]);
+  ctx.addReview('h1', [ctx.oldFinding]);
 
-  await expect(ctx.collect({ commit: CAT_OK, cat: CAT_OK, diff: { code: 0, stdout: '' } }, [{ ...OLD, anchor: { path: 'a.ts', startLine: 1, endLine: 1 } }, { id: 'cccc', lens: 'style', severity: 'low', title: 'No anchor' }], 'h2')).resolves.toStrictEqual({ aaaa: null, cccc: null });
+  await expect(ctx.collect({ commit: ctx.gitOk, cat: ctx.gitOk, diff: { code: 0, stdout: '' } }, [{ ...ctx.oldFinding, anchor: { path: 'a.ts', startLine: 1, endLine: 1 } }, { id: 'cccc', lens: 'style', severity: 'low', title: 'No anchor' }], 'h2')).resolves.toStrictEqual({ aaaa: null, cccc: null });
   expect(ctx.calls).toStrictEqual([]);
 });
 
 test('it runs one commit check, one cat-file and one diff for findings that share a path', async () => {
   const ctx = setupTest();
-  ctx.addReview('h1', [OLD]);
+  ctx.addReview('h1', [ctx.oldFinding]);
 
-  await expect(ctx.collect({ commit: CAT_OK, cat: CAT_OK, diff: { code: 0, stdout: '' } }, [NEW, { ...NEW, id: 'dddd', anchor: { path: 'src/kettle.ts', startLine: 50, endLine: 51 } }], 'h2')).resolves.toStrictEqual({ bbbb: true, dddd: true });
+  await expect(ctx.collect({ commit: ctx.gitOk, cat: ctx.gitOk, diff: { code: 0, stdout: '' } }, [ctx.newFinding, { ...ctx.newFinding, id: 'dddd', anchor: { path: 'src/kettle.ts', startLine: 50, endLine: 51 } }], 'h2')).resolves.toStrictEqual({ bbbb: true, dddd: true });
   expect(ctx.calls).toHaveLength(3);
 });

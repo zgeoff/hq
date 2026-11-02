@@ -24,10 +24,7 @@ export async function loadNoslopSecrets(run: Runner, recordRead: () => void = ()
   };
 }
 
-const AUTH_FAILURE = /auth|sign.?in|token|unauthori[sz]ed|forbidden|401|403/iu;
-const OpFields = z.array(z.object({ label: z.string(), value: z.string().optional() }));
 const OpSettings = z.object({ env: z.object({ OP_SERVICE_ACCOUNT_TOKEN: z.string().min(1) }) });
-const RATE_LIMITED = /too many requests|rate.?limit/iu;
 
 async function readOpToken(): Promise<string> {
   const path = resolveSettingsPath();
@@ -56,6 +53,8 @@ async function readJSONFile(path: string): Promise<unknown> {
   }
 }
 
+const OpFields = z.array(z.object({ label: z.string(), value: z.string().optional() }));
+
 async function readSecretFields(run: Runner, token: string, recordRead: () => void): Promise<z.infer<typeof OpFields>> {
   const settings = { item: readLocalSetting('HQ_NOSLOP_OP_ITEM'), vault: readLocalSetting('HQ_NOSLOP_OP_VAULT') };
   const toolResult = await run(['op', 'item', 'get', settings.item, '--vault', settings.vault, '--fields', 'label=app-id,label=installation-id,label=private-key', '--reveal', '--format', 'json'], { env: cleanEnv({ OP_SERVICE_ACCOUNT_TOKEN: token }) });
@@ -73,6 +72,9 @@ function parseSecretFields(stdout: string): z.infer<typeof OpFields> {
   }
   return parsed.data;
 }
+
+const AUTH_FAILURE = /auth|sign.?in|token|unauthori[sz]ed|forbidden|401|403/iu;
+const RATE_LIMITED = /too many requests|rate.?limit/iu;
 
 function pickFailureReason(stderr: string): string {
   if (RATE_LIMITED.test(stderr)) {

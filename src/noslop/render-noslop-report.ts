@@ -16,7 +16,7 @@ function formatPRReport(r: PRReport): string {
   const full = r.fullReviews > 0 ? `, ${r.fullReviews} full` : '';
   const open = r.openIDs.length > 0 ? `, open: ${r.openIDs.join(', ')}` : '';
   const plural = r.extraRounds === 1 ? '' : 's';
-  const severities = Object.entries(r.bySeverity).map(([severity, n]) => `${n} ${severity}`).join(', ');
+  const severities = Object.entries(r.bySeverity).map(([severity, count]) => `${count} ${severity}`).join(', ');
   const span = r.reviewToPassMs === null ? '' : `; first review to first passing check: ${formatSeconds(r.reviewToPassMs)}`;
   return [
     r.ref,

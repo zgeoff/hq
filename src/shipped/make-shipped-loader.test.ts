@@ -70,7 +70,7 @@ test('a failed read is not kept: the next request tries again', async () => {
   const mended = buildStubDeliveryRunner({ days: ctx.days, rendered: ctx.rendered });
   const outcome = await ctx.makeLoader(first.run)('week').then(
     () => null,
-    (error: unknown) => (error as Error).message,
+    (error: Error) => error.message,
   );
   const recovered = await ctx.makeLoader(mended.run)('week');
 

@@ -111,9 +111,9 @@ test('g s typed in the page\'s note box types text and switches nothing', async 
 
 // One call on the Needs you tab, so the page shows its note box.
 async function createKettleCall(): Promise<void> {
-  const dir = mkdtempSync(join(tmpdir(), 'hq-tabs-'));
-  const file = join(dir, 'kettle.json');
-  onTestFinished(() => rmSync(dir, { recursive: true, force: true }));
+  const directory = mkdtempSync(join(tmpdir(), 'hq-tabs-'));
+  const file = join(directory, 'kettle.json');
+  onTestFinished(() => rmSync(directory, { recursive: true, force: true }));
   onTestFinished(overrideEnv('HQ_NOTIFY', 'off'));
   onTestFinished(overrideEnv('HQ_AS', 'kettle-bot'));
   writeFileSync(file, JSON.stringify({ title: 'Mint the kettle tokens', question: 'Mint the kettle tokens tonight?', options: [{ label: 'Yes, mint them', effect: 'The kettle starts at 07:00.', recommended: true }, { label: 'Not yet', effect: 'The kettle waits a day.' }], stuView: 'Minting now keeps the morning boil on time.', details: [] }));

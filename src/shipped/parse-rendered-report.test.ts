@@ -7,7 +7,7 @@ const FIXTURES = join(import.meta.dir, '../../skills/delivery-report/scripts/tes
 
 test.each(['daily.json.expected', 'weekly.json.expected'])('the skill\'s own %s reads whole', (file) => {
   const body = readFileSync(join(FIXTURES, file), 'utf8');
-  const raw = JSON.parse(body) as { groups: { rows: { prs: unknown[] }[] }[] };
+  const raw: { groups: { rows: { prs: unknown[] }[] }[] } = JSON.parse(body);
   const read = parseRenderedReport(body);
   expect(collectPRs(read.groups)).toStrictEqual(collectPRs(raw.groups));
 });

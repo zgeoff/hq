@@ -78,10 +78,10 @@ test('a week is read a day at a time and merged into what merged-prs.sh weekly p
 });
 
 test('a week with more than 1,000 merged PRs gives every one, because no search spans the week', async () => {
-  const capped = Array.from({ length: 1000 }, (_unused, n) => buildMergedPR({ number: n, issue: null }));
+  const capped = Array.from({ length: 1000 }, (_unused, index) => buildMergedPR({ number: index, issue: null }));
   const ctx = setupTest();
   const dates = ['2026-10-12', '2026-10-13', '2026-10-14', '2026-10-15'];
-  const perDay = dates.map((date, index) => Array.from({ length: 350 }, (_unused, n) => buildMergedPR({ number: index * 1000 + n, day: date, mergedAt: `${date}T01:00:00Z`, issue: null })));
+  const perDay = dates.map((date, index) => Array.from({ length: 350 }, (_unused, offset) => buildMergedPR({ number: index * 1000 + offset, day: date, mergedAt: `${date}T01:00:00Z`, issue: null })));
   const stub = buildStubDeliveryRunner({
     days: Object.fromEntries(dates.map((date, index) => [date, buildMergedDayOutput(date, perDay[index] ?? [])])),
     weekly: buildMergedDayOutput('2026-10-12', capped, 1400),

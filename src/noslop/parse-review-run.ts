@@ -7,7 +7,6 @@ import type { Judged } from './types.ts';
 
 const AnchorSchema = z.object({ path: z.string(), startLine: z.number(), endLine: z.number() });
 const FixCheckSchema = z.object({ findingID: z.string(), fixed: z.boolean(), reason: z.string() });
-const NOSLOP_OUTPUT_VERSIONS: readonly number[] = [4, 5, 6, 7];
 const NotReviewedSchema = z.object({ path: z.string(), reason: z.string() });
 const ReviewFindingSchema = z.object({
   id: z.string(),
@@ -20,21 +19,6 @@ const ReviewFindingSchema = z.object({
   anchor: AnchorSchema.optional(),
   writtenByChange: z.boolean().optional(),
 });
-const ReviewOutputSchema = z.object({
-  version: z.number(),
-  head: z.unknown(),
-  base: z.unknown(),
-  depth: z.unknown(),
-
-  special: z.unknown().optional(),
-  findings: z.array(ReviewFindingSchema),
-  failedCalls: z.array(z.unknown()),
-
-  notReviewed: z.array(NotReviewedSchema).optional(),
-
-  fixChecks: z.array(FixCheckSchema).optional(),
-});
-const VersionSchema = z.object({ version: z.number() });
 
 export type ReviewFinding = z.output<typeof ReviewFindingSchema>;
 
@@ -67,6 +51,9 @@ export function parseReviewRun(code: number, stdout: string, stderr: string, tim
   return parseReviewOutput(raw);
 }
 
+const NOSLOP_OUTPUT_VERSIONS: readonly number[] = [4, 5, 6, 7];
+const VersionSchema = z.object({ version: z.number() });
+
 function parseReviewOutput(raw: unknown): Judged<ReviewOutput> {
   const version = VersionSchema.safeParse(raw);
   if (!version.success) {
@@ -81,6 +68,21 @@ function parseReviewOutput(raw: unknown): Judged<ReviewOutput> {
 function formatVersions(versions: readonly number[]): string {
   return `${versions.slice(0, -1).join(', ')} and ${versions.at(-1) ?? ''}`;
 }
+
+const ReviewOutputSchema = z.object({
+  version: z.number(),
+  head: z.unknown(),
+  base: z.unknown(),
+  depth: z.unknown(),
+
+  special: z.unknown().optional(),
+  findings: z.array(ReviewFindingSchema),
+  failedCalls: z.array(z.unknown()),
+
+  notReviewed: z.array(NotReviewedSchema).optional(),
+
+  fixChecks: z.array(FixCheckSchema).optional(),
+});
 
 function parseReviewShape(raw: unknown, version: number): Judged<ReviewOutput> {
   const NOT_REVIEWED_SINCE = 6;

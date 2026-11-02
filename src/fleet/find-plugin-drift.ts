@@ -20,8 +20,8 @@ export function findPluginDrift(entries: FleetEntry[], live: FleetSession[], kno
 }
 
 function findLiveSession(name: string, live: FleetSession[], known: Record<string, string>): FleetSession | undefined {
-  const byName = live.filter((s) => s.alive && s.name === name);
-  const recorded = Object.hasOwn(known, name) ? live.find((s) => s.id === known[name] && s.alive) : undefined;
+  const byName = live.filter((session) => session.alive && session.name === name);
+  const recorded = Object.hasOwn(known, name) ? live.find((session) => session.id === known[name] && session.alive) : undefined;
   return recorded ?? (byName.length === 1 ? byName[0] : undefined);
 }
 

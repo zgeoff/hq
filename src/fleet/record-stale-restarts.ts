@@ -16,7 +16,7 @@ export function recordStaleRestarts(db: Database, restarted: RestartedSession[],
   }
   const refresh = metaJson(db, 'fleet_refresh', refreshSchema, {});
   for (const r of restarted) {
-    const step = steps?.find((s) => s.name === r.name);
+    const step = steps?.find((entry) => entry.name === r.name);
     const why = step ? `${step.action}: ${step.detail}` : 'ensure did not finish';
     if (step?.action === 'spawned') {
       addNews(db, { from: actor, topic: 'other', text: `${r.name} restarted from main; ${formatNewsReason(r)}`, issue: null, link: null, needsGeoff: false });

@@ -1,4 +1,5 @@
 import type { Database } from 'bun:sqlite';
+import assert from 'node:assert';
 import { logEvent } from '../log-event.ts';
 import { owner } from '../owner.ts';
 import { isQuiet } from '../clock/is-quiet.ts';
@@ -24,40 +25,58 @@ export async function checkRcMarker(db: Database, check: RcCheck): Promise<RcEva
   const RC_TYPING_MS = 2 * 60_000;
   const client = check.client;
   const name = check.name;
-  const o = check;
-  const p = rcPending(db)[name];
+  const pending = rcPending(db)[name];
   const rc = check.rc;
-  if (!p) return { kind: 'none' };
-  const t = now();
-  const end = (action: EnsureStep['action'], text: string, data: Record<string, unknown>) => rcFinish(db, name, p, action, text, data, o.actor);
-  const newer = o.known[name];
-  if (newer && newer !== p.id) return o.replaced === 'quiet' ? { kind: 'none' } : end('remote control', `was replaced by ${newer.slice(0, 8)} before hq typed; hq typed nothing.`, { result: 'replaced' });
-  const all = await client.sessions();
-  if (!Array.isArray(all)) return { kind: 'wait' };
-  const s = all.find((x) => x.id === p.id);
-  if (!s?.alive) return end('failed', 'is gone; hq typed nothing.', { result: 'gone' });
-  const st = rc.state(p.id);
-  if (p.typedAt) {
-    if (t.getTime() - Date.parse(p.typedAt) < RC_TYPING_MS) return { kind: 'wait' };
-    return end(st.state === 'on' ? 'remote control' : 'failed', `hq did not type (already marked as typed); Remote Control is ${st.state}.`, { result: 'marked', rc: st });
+  if (!pending) {
+    return { kind: 'none' };
   }
-  if (st.state === 'on') return end('remote control', 'Remote Control was already on; hq typed nothing.', { result: 'already on', rc: st });
-  const age = (t.getTime() - Date.parse(p.since)) / 60_000;
-  const done = s.state === 'done';
-  if (!done || age < RC_SETTLE_MIN) {
-    if (age >= RC_MAX_MIN && !done) return end('failed', `did not finish its start turn in ${RC_MAX_MIN} min (atc shows ${s.state ?? 'no state'}); hq typed nothing. Type /remote-control in the session yourself.`, { result: 'timed out', state: s.state });
+  const t = now();
+  const end = (action: EnsureStep['action'], text: string, data: Record<string, unknown>) => rcFinish(db, name, pending, action, text, data, check.actor);
+  const newer = check.known[name];
+  if (newer && newer !== pending.id) {
+    return check.replaced === 'quiet' ? { kind: 'none' } : end('remote control', `was replaced by ${newer.slice(0, 8)} before hq typed; hq typed nothing.`, { result: 'replaced' });
+  }
+  const all = await client.sessions();
+  if (!Array.isArray(all)) {
     return { kind: 'wait' };
   }
-  if (st.state === 'unknown') return end('failed', `hq can't tell whether Remote Control is on (${st.why}); hq typed nothing. Type /remote-control in the session yourself.`, { result: 'unknown', rc: st });
-  if (!claimTyping(db, name, p.id, t)) return { kind: 'wait' };
+  const session = all.find((x) => x.id === pending.id);
+  if (!session?.alive) {
+    return end('failed', 'is gone; hq typed nothing.', { result: 'gone' });
+  }
+  const st = rc.state(pending.id);
+  if (pending.typedAt) {
+    if (t.getTime() - Date.parse(pending.typedAt) < RC_TYPING_MS) {
+      return { kind: 'wait' };
+    }
+    return end(st.state === 'on' ? 'remote control' : 'failed', `hq did not type (already marked as typed); Remote Control is ${st.state}.`, { result: 'marked', rc: st });
+  }
+  if (st.state === 'on') {
+    return end('remote control', 'Remote Control was already on; hq typed nothing.', { result: 'already on', rc: st });
+  }
+  const age = (t.getTime() - Date.parse(pending.since)) / 60_000;
+  const done = session.state === 'done';
+  if (!done || age < RC_SETTLE_MIN) {
+    if (age >= RC_MAX_MIN && !done) {
+      return end('failed', `did not finish its start turn in ${RC_MAX_MIN} min (atc shows ${session.state ?? 'no state'}); hq typed nothing. Type /remote-control in the session yourself.`, { result: 'timed out', state: session.state });
+    }
+    return { kind: 'wait' };
+  }
+  if (st.state === 'unknown') {
+    return end('failed', `hq can't tell whether Remote Control is on (${st.why}); hq typed nothing. Type /remote-control in the session yourself.`, { result: 'unknown', rc: st });
+  }
+  if (!claimTyping(db, name, pending.id, t)) {
+    return { kind: 'wait' };
+  }
   const mine = iso(t);
-  const endMine = (action: EnsureStep['action'], text: string, data: Record<string, unknown>, alarm?: string) => rcFinish(db, name, p, action, text, data, o.actor, mine, alarm);
+  const endMine = (action: EnsureStep['action'], text: string, data: Record<string, unknown>, alarm?: string) => rcFinish(db, name, pending, action, text, data, check.actor, mine, alarm);
   try {
-    await client.submit!(p.id, `/remote-control ${name}`);
+    assert.ok(client.submit);
+    await client.submit(pending.id, `/remote-control ${name}`);
   } catch (err) {
     const code = (err as { code?: string }).code ?? '';
     if (RC_RETRY.has(code)) {
-      releaseTyping(db, name, p.id);
+      releaseTyping(db, name, pending.id);
       return { kind: 'wait' };
     }
     return endMine('failed', `typing into the session failed (${String((err as Error).message ?? err)}); check the session and type /remote-control yourself if it is off.`, { result: 'type failed', code });
@@ -66,13 +85,15 @@ export async function checkRcMarker(db: Database, check: RcCheck): Promise<RcEva
   let last: RcState = st;
   for (let i = 0; i < RC_CONFIRM_POLLS; i++) {
     await sleep(2_000);
-    last = rc.state(p.id);
+    last = rc.state(pending.id);
     if (last.state === 'on') break;
   }
-  if (last.state === 'on') return endMine('remote control', `typed /remote-control ${name}; Remote Control is on.`, { result: 'on', rc: last });
+  if (last.state === 'on') {
+    return endMine('remote control', `typed /remote-control ${name}; Remote Control is on.`, { result: 'on', rc: last });
+  }
 
   // z-stu: told at once, since the typing may have turned off a Remote Control the owner had turned on.
-  return endMine('failed', `typed /remote-control ${name}, but no Remote Control record showed within 30 s (${last.why}).`, { result: 'not on', rc: last }, `Remote Control may be off in ${name}: typed, no record (${p.id.slice(0, 8)}). Ask the owner to check.`);
+  return endMine('failed', `typed /remote-control ${name}, but no Remote Control record showed within 30 s (${last.why}).`, { result: 'not on', rc: last }, `Remote Control may be off in ${name}: typed, no record (${pending.id.slice(0, 8)}). Ask the owner to check.`);
 }
 
 function releaseTyping(db: Database, name: string, id: string): void {

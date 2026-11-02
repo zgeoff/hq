@@ -23,7 +23,7 @@ export function countChurn(reviews: ChurnReview[]): Churn {
   const seen = new Set<string>();
   reviews.forEach((review, index) => {
     const findings = review.findings;
-    const fresh = findings.filter((f, at) => !seen.has(f.id) && findings.findIndex((g) => g.id === f.id) === at);
+    const fresh = findings.filter((finding, at) => !seen.has(finding.id) && findings.findIndex((other) => other.id === finding.id) === at);
     if (review.counted) {
       countReview(churn, fresh, index > 0, cited);
     }

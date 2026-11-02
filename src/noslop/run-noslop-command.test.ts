@@ -47,7 +47,19 @@ function setupTest() {
   mkdirSync(join(base, 'data', 'noslop'), { recursive: true });
   onTestFinished(overrideEnv('REVIEW_DIR', join(base, 'reviews')));
 
-  return { base, db, readBackups: () => readdirSync(join(base, 'data', 'noslop')).filter((name) => name.startsWith('store.sqlite.bak-')), store: join(base, 'data', 'noslop', 'store.sqlite') };
+  const heldMigrations = ['0001-the-store', '0002-dispositions-by-repo', '0003-calls-without-chunks', '0004-calls-with-cache-counts', '0005-reviews-without-step-up', '0006-dropped-findings'];
+
+  return {
+    base,
+    db,
+    addDispositionsMigration: "INSERT INTO kysely_migration (name, timestamp) VALUES ('0007-dispositions-by-pull-request', '2026-10-20T00:00:00.000Z')",
+    busyPgrep: { code: 0, stdout: '4242 bun /x/apps/cli/src/cli.ts review\n', stderr: '' },
+    fullSHA: '0123456789abcdef0123456789abcdef01234567',
+    heldMigrations,
+    newMigrations: [...heldMigrations, '0007-dispositions-by-pull-request'],
+    readBackups: () => readdirSync(join(base, 'data', 'noslop')).filter((name) => name.startsWith('store.sqlite.bak-')),
+    store: join(base, 'data', 'noslop', 'store.sqlite'),
+  };
 }
 
 test('it shows noslop off everywhere, with no pin, until someone turns it on', async () => {
@@ -228,7 +240,7 @@ test('it keeps a repo turned on while the install runs', async () => {
 
 test('it keeps a repo turned on and a repo turned off while the store migration runs', async () => {
   const ctx = setupTest();
-  const fake = buildFakeRunner({ storeQuery: buildStubStoreQuery(ctx.store, [ADD_0007]) });
+  const fake = buildFakeRunner({ runStoreQuery: buildStubStoreQuery(ctx.store, [ctx.addDispositionsMigration]) });
   const paths = buildPinPaths(ctx.base);
   const run: Runner = (cmd, opts) => {
     if (cmd.includes('query')) {
@@ -238,12 +250,12 @@ test('it keeps a repo turned on and a repo turned off while the store migration 
     return fake.run(cmd, opts);
   };
   updateNoslopRepos(ctx.db, 'on', ['atc']);
-  createStubNoslopStore(ctx.store, { migrations: HELD_NAMES, tables: { dispositions: 3, reviews: 2 } });
-  createStubNoslopClone(paths.folder, NEW_NAMES);
+  createStubNoslopStore(ctx.store, { migrations: ctx.heldMigrations, tables: { dispositions: 3, reviews: 2 } });
+  createStubNoslopClone(paths.folder, ctx.newMigrations);
 
   await runNoslopCommand({ run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) });
 
-  expect(loadNoslopSettings(ctx.db)).toStrictEqual({ repos: ['widgets'], sha: FULL_SHA, caps: {} });
+  expect(loadNoslopSettings(ctx.db)).toStrictEqual({ repos: ['widgets'], sha: ctx.fullSHA, caps: {} });
 });
 
 test('it refuses a pin while another pin\'s process still runs, however old its lock is', async () => {
@@ -298,12 +310,6 @@ test('it keeps the old pin when the checkout fails', async () => {
   expect(loadNoslopSettings(ctx.db).sha).toBe('0123456789abcdef0123456789abcdef01234567');
 });
 
-const ADD_0007 = "INSERT INTO kysely_migration (name, timestamp) VALUES ('0007-dispositions-by-pull-request', '2026-10-20T00:00:00.000Z')";
-const BUSY = { code: 0, stdout: '4242 bun /x/apps/cli/src/cli.ts review\n', stderr: '' };
-const FULL_SHA = '0123456789abcdef0123456789abcdef01234567';
-const HELD_NAMES = ['0001-the-store', '0002-dispositions-by-repo', '0003-calls-without-chunks', '0004-calls-with-cache-counts', '0005-reviews-without-step-up', '0006-dropped-findings'];
-const NEW_NAMES = [...HELD_NAMES, '0007-dispositions-by-pull-request'];
-
 test('it refuses a pin while a noslop CLI runs, names it, and checks nothing out', async () => {
   const ctx = setupTest();
   const fake = buildFakeRunner({ pgrep: { code: 0, stdout: '4242 bun --config=/x/bunfig.toml /x/apps/cli/src/cli.ts review --pr 354\n', stderr: '' } });
@@ -323,7 +329,7 @@ test('it leaves hq itself out of the processes it names', async () => {
 
   await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) });
 
-  expect(loadNoslopSettings(ctx.db).sha).toBe(FULL_SHA);
+  expect(loadNoslopSettings(ctx.db).sha).toBe(ctx.fullSHA);
 });
 
 test.each([[2], [127]])('it refuses a pin when pgrep fails with exit %d', async (code) => {
@@ -358,7 +364,7 @@ test('it pins when a live review removes its worktree between the scan and the r
 
   await runNoslopCommand({ run: buildFakeRunner().run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) });
 
-  expect(loadNoslopSettings(ctx.db).sha).toBe(FULL_SHA);
+  expect(loadNoslopSettings(ctx.db).sha).toBe(ctx.fullSHA);
 });
 
 test('it ignores a review folder whose process is gone', async () => {
@@ -369,7 +375,7 @@ test('it ignores a review folder whose process is gone', async () => {
 
   await runNoslopCommand({ run: buildFakeRunner().run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) });
 
-  expect(loadNoslopSettings(ctx.db).sha).toBe(FULL_SHA);
+  expect(loadNoslopSettings(ctx.db).sha).toBe(ctx.fullSHA);
 });
 
 test('it refuses --force with no reason as bad_args, and runs nothing', async () => {
@@ -383,16 +389,16 @@ test('it refuses --force with no reason as bad_args, and runs nothing', async ()
 
 test('it goes on with --force and a reason while noslop runs, still backs up and counts, and records the reason', async () => {
   const ctx = setupTest();
-  const fake = buildFakeRunner({ pgrep: { code: 0, stdout: '4242 bun /x/apps/cli/src/cli.ts review\n', stderr: '' }, storeQuery: buildStubStoreQuery(ctx.store, [ADD_0007]) });
+  const fake = buildFakeRunner({ pgrep: { code: 0, stdout: '4242 bun /x/apps/cli/src/cli.ts review\n', stderr: '' }, runStoreQuery: buildStubStoreQuery(ctx.store, [ctx.addDispositionsMigration]) });
   const paths = buildPinPaths(ctx.base);
-  createStubNoslopStore(ctx.store, { migrations: HELD_NAMES, tables: { dispositions: 3 } });
-  createStubNoslopClone(paths.folder, NEW_NAMES);
+  createStubNoslopStore(ctx.store, { migrations: ctx.heldMigrations, tables: { dispositions: 3 } });
+  createStubNoslopClone(paths.folder, ctx.newMigrations);
 
   await expect(runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456', 'invented', 'reason'], force: true, since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) })).resolves.toMatchObject({
     text: expect.stringContaining('dispositions 3 → 3'),
   });
 
-  expect(loadNoslopSettings(ctx.db).sha).toBe(FULL_SHA);
+  expect(loadNoslopSettings(ctx.db).sha).toBe(ctx.fullSHA);
   expect(ctx.readBackups()).toHaveLength(1);
   expect(ctx.db.query("SELECT json_extract(data, '$.force') AS force, json_extract(data, '$.counts.dispositions.after') AS after FROM events WHERE action = 'pinned'").all()).toStrictEqual([{ force: 'invented reason', after: 3 }]);
 });
@@ -401,22 +407,22 @@ test('it pins with no store migration, no backup and no store query when the sto
   const ctx = setupTest();
   const fake = buildFakeRunner();
   const paths = buildPinPaths(ctx.base);
-  createStubNoslopStore(ctx.store, { migrations: NEW_NAMES, tables: { dispositions: 2 } });
-  createStubNoslopClone(paths.folder, NEW_NAMES);
+  createStubNoslopStore(ctx.store, { migrations: ctx.newMigrations, tables: { dispositions: 2 } });
+  createStubNoslopClone(paths.folder, ctx.newMigrations);
 
-  await expect(runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) })).resolves.toMatchObject({ text: `repos: none (noslop is off everywhere)\nemergency review cap: off everywhere (hq noslop cap <repo> <n>)\npinned: ${FULL_SHA}\nclone: ${paths.folder}\nno store migration` });
+  await expect(runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) })).resolves.toMatchObject({ text: `repos: none (noslop is off everywhere)\nemergency review cap: off everywhere (hq noslop cap <repo> <n>)\npinned: ${ctx.fullSHA}\nclone: ${paths.folder}\nno store migration` });
 
   expect(ctx.readBackups()).toStrictEqual([]);
   expect(fake.of('bun')).toStrictEqual([]);
-  expect(loadNoslopSettings(ctx.db).sha).toBe(FULL_SHA);
+  expect(loadNoslopSettings(ctx.db).sha).toBe(ctx.fullSHA);
 });
 
 test('it backs up the store, counts every table and pins when a migration is new', async () => {
   const ctx = setupTest();
-  const fake = buildFakeRunner({ storeQuery: buildStubStoreQuery(ctx.store, [ADD_0007]) });
+  const fake = buildFakeRunner({ runStoreQuery: buildStubStoreQuery(ctx.store, [ctx.addDispositionsMigration]) });
   const paths = buildPinPaths(ctx.base);
-  createStubNoslopStore(ctx.store, { migrations: HELD_NAMES, tables: { dispositions: 3, reviews: 2 } });
-  createStubNoslopClone(paths.folder, NEW_NAMES);
+  createStubNoslopStore(ctx.store, { migrations: ctx.heldMigrations, tables: { dispositions: 3, reviews: 2 } });
+  createStubNoslopClone(paths.folder, ctx.newMigrations);
 
   await expect(runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) })).resolves.toMatchObject({
     text: expect.stringMatching(/\nstore migration: 0007-dispositions-by-pull-request; backup \S+\.bak-0123456-\d{8}T\d{6}Z; dispositions 3 → 3, kysely_migration 6 → 7, reviews 2 → 2$/u),
@@ -424,7 +430,7 @@ test('it backs up the store, counts every table and pins when a migration is new
 
   expect(ctx.readBackups()).toStrictEqual([expect.stringMatching(/^store\.sqlite\.bak-0123456-\d{8}T\d{6}Z$/u)]);
   expect(fake.of('bun').map((call) => call.cmd.slice(2))).toStrictEqual([[`${paths.folder}/apps/cli/src/cli.ts`, 'store', 'query', 'findings-by-pr', '--repo', 'hq-pin-guard/none', '--pr', '1', '--json']]);
-  expect(loadNoslopSettings(ctx.db).sha).toBe(FULL_SHA);
+  expect(loadNoslopSettings(ctx.db).sha).toBe(ctx.fullSHA);
   expect(ctx.db.query("SELECT json_extract(data, '$.migrations') AS migrations FROM events WHERE action = 'pinned'").all()).toStrictEqual([{ migrations: '["0007-dispositions-by-pull-request"]' }]);
 });
 
@@ -443,11 +449,11 @@ test('it refuses a pin when HQ_NOSLOP_STORE names a store noslop does not open, 
 
 test('it migrates the store noslop opens, when HQ_NOSLOP_STORE names that same file', async () => {
   const ctx = setupTest();
-  const fake = buildFakeRunner({ storeQuery: buildStubStoreQuery(ctx.store, [ADD_0007]) });
+  const fake = buildFakeRunner({ runStoreQuery: buildStubStoreQuery(ctx.store, [ctx.addDispositionsMigration]) });
   const paths = buildPinPaths(ctx.base);
   onTestFinished(overrideEnv('HQ_NOSLOP_STORE', ctx.store));
-  createStubNoslopStore(ctx.store, { migrations: HELD_NAMES, tables: { dispositions: 3 } });
-  createStubNoslopClone(paths.folder, NEW_NAMES);
+  createStubNoslopStore(ctx.store, { migrations: ctx.heldMigrations, tables: { dispositions: 3 } });
+  createStubNoslopClone(paths.folder, ctx.newMigrations);
 
   await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) });
 
@@ -460,11 +466,11 @@ test('it refuses a pin when noslop starts during the install, removes the backup
       { code: 0, stdout: '4242 bun /x/apps/cli/src/cli.ts review\n', stderr: '' },
     ];
   const ctx = setupTest();
-  const fake = buildFakeRunner({ storeQuery: buildStubStoreQuery(ctx.store, [ADD_0007]) });
+  const fake = buildFakeRunner({ runStoreQuery: buildStubStoreQuery(ctx.store, [ctx.addDispositionsMigration]) });
   const paths = buildPinPaths(ctx.base);
-  const run: Runner = (cmd, opts) => (cmd[0] === 'pgrep' ? Promise.resolve(answers.shift() ?? BUSY) : fake.run(cmd, opts));
-  createStubNoslopStore(ctx.store, { migrations: HELD_NAMES, tables: { dispositions: 3 } });
-  createStubNoslopClone(paths.folder, NEW_NAMES);
+  const run: Runner = (cmd, opts) => (cmd[0] === 'pgrep' ? Promise.resolve(answers.shift() ?? ctx.busyPgrep) : fake.run(cmd, opts));
+  createStubNoslopStore(ctx.store, { migrations: ctx.heldMigrations, tables: { dispositions: 3 } });
+  createStubNoslopClone(paths.folder, ctx.newMigrations);
 
   await expect(runNoslopCommand({ run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) })).rejects.toMatchObject({ code: 'noslop_busy', message: expect.stringContaining('4242') });
 
@@ -475,10 +481,10 @@ test('it refuses a pin when noslop starts during the install, removes the backup
 
 test('it runs the store query from an empty folder, not from a repo', async () => {
   const ctx = setupTest();
-  const fake = buildFakeRunner({ storeQuery: buildStubStoreQuery(ctx.store, [ADD_0007]) });
+  const fake = buildFakeRunner({ runStoreQuery: buildStubStoreQuery(ctx.store, [ctx.addDispositionsMigration]) });
   const paths = buildPinPaths(ctx.base);
-  createStubNoslopStore(ctx.store, { migrations: HELD_NAMES, tables: { dispositions: 1 } });
-  createStubNoslopClone(paths.folder, NEW_NAMES);
+  createStubNoslopStore(ctx.store, { migrations: ctx.heldMigrations, tables: { dispositions: 1 } });
+  createStubNoslopClone(paths.folder, ctx.newMigrations);
 
   await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) });
 
@@ -489,10 +495,10 @@ test('it runs the store query from an empty folder, not from a repo', async () =
 
 test('it refuses and keeps the old pin when a table loses rows in the migration, naming the backup', async () => {
   const ctx = setupTest();
-  const fake = buildFakeRunner({ storeQuery: buildStubStoreQuery(ctx.store, [ADD_0007, 'DELETE FROM dispositions WHERE id > 1']) });
+  const fake = buildFakeRunner({ runStoreQuery: buildStubStoreQuery(ctx.store, [ctx.addDispositionsMigration, 'DELETE FROM dispositions WHERE id > 1']) });
   const paths = buildPinPaths(ctx.base);
-  createStubNoslopStore(ctx.store, { migrations: HELD_NAMES, tables: { dispositions: 3 } });
-  createStubNoslopClone(paths.folder, NEW_NAMES);
+  createStubNoslopStore(ctx.store, { migrations: ctx.heldMigrations, tables: { dispositions: 3 } });
+  createStubNoslopClone(paths.folder, ctx.newMigrations);
 
   await expect(runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) })).rejects.toMatchObject({
     code: 'store_migration_failed',
@@ -506,10 +512,10 @@ test('it refuses and keeps the old pin when a table loses rows in the migration,
 test('it refuses the next pin after a migration lost rows, naming the backup, while the store is not restored', async () => {
   const ctx = setupTest();
   const failures: unknown[] = [];
-  const fake = buildFakeRunner({ storeQuery: buildStubStoreQuery(ctx.store, [ADD_0007, 'DELETE FROM dispositions WHERE id > 1']) });
+  const fake = buildFakeRunner({ runStoreQuery: buildStubStoreQuery(ctx.store, [ctx.addDispositionsMigration, 'DELETE FROM dispositions WHERE id > 1']) });
   const paths = buildPinPaths(ctx.base);
-  createStubNoslopStore(ctx.store, { migrations: HELD_NAMES, tables: { dispositions: 3 } });
-  createStubNoslopClone(paths.folder, NEW_NAMES);
+  createStubNoslopStore(ctx.store, { migrations: ctx.heldMigrations, tables: { dispositions: 3 } });
+  createStubNoslopClone(paths.folder, ctx.newMigrations);
   await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) }).catch((error: unknown) => failures.push(error));
 
   await expect(runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) })).rejects.toMatchObject({
@@ -529,10 +535,10 @@ test('it pins again once the store is restored from the backup, migrating it ane
   const ctx = setupTest();
   const failures: unknown[] = [];
   const paths = buildPinPaths(ctx.base);
-  const restored = buildFakeRunner({ storeQuery: buildStubStoreQuery(ctx.store, [ADD_0007]) });
-  createStubNoslopStore(ctx.store, { migrations: HELD_NAMES, tables: { dispositions: 3 } });
-  createStubNoslopClone(paths.folder, NEW_NAMES);
-  await runNoslopCommand({ run: buildFakeRunner({ storeQuery: buildStubStoreQuery(ctx.store, [ADD_0007, 'DELETE FROM dispositions WHERE id > 1']) }).run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) }).catch((error: unknown) => failures.push(error));
+  const restored = buildFakeRunner({ runStoreQuery: buildStubStoreQuery(ctx.store, [ctx.addDispositionsMigration]) });
+  createStubNoslopStore(ctx.store, { migrations: ctx.heldMigrations, tables: { dispositions: 3 } });
+  createStubNoslopClone(paths.folder, ctx.newMigrations);
+  await runNoslopCommand({ run: buildFakeRunner({ runStoreQuery: buildStubStoreQuery(ctx.store, [ctx.addDispositionsMigration, 'DELETE FROM dispositions WHERE id > 1']) }).run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) }).catch((error: unknown) => failures.push(error));
   renameSync(join(ctx.base, 'data', 'noslop', ctx.readBackups()[0] ?? 'none'), ctx.store);
 
   await expect(runNoslopCommand({ run: restored.run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) })).resolves.toMatchObject({
@@ -541,7 +547,7 @@ test('it pins again once the store is restored from the backup, migrating it ane
 
   expect(failures).toMatchObject([{ code: 'store_migration_failed' }]);
   expect(restored.of('bun')).toHaveLength(1);
-  expect(loadNoslopSettings(ctx.db).sha).toBe(FULL_SHA);
+  expect(loadNoslopSettings(ctx.db).sha).toBe(ctx.fullSHA);
   expect(ctx.db.query("SELECT json_extract(data, '$.counts.dispositions.after') AS after FROM events WHERE action = 'pinned'").all()).toStrictEqual([{ after: 3 }]);
   expect(ctx.db.query("SELECT value FROM meta WHERE key = 'noslop_store_migration_failed'").all()).toStrictEqual([]);
 });
@@ -549,10 +555,10 @@ test('it pins again once the store is restored from the backup, migrating it ane
 test('it refuses the pin after a failed migration even with --force', async () => {
   const ctx = setupTest();
   const failures: unknown[] = [];
-  const fake = buildFakeRunner({ storeQuery: buildStubStoreQuery(ctx.store, [ADD_0007, 'DELETE FROM dispositions WHERE id > 1']) });
+  const fake = buildFakeRunner({ runStoreQuery: buildStubStoreQuery(ctx.store, [ctx.addDispositionsMigration, 'DELETE FROM dispositions WHERE id > 1']) });
   const paths = buildPinPaths(ctx.base);
-  createStubNoslopStore(ctx.store, { migrations: HELD_NAMES, tables: { dispositions: 3 } });
-  createStubNoslopClone(paths.folder, NEW_NAMES);
+  createStubNoslopStore(ctx.store, { migrations: ctx.heldMigrations, tables: { dispositions: 3 } });
+  createStubNoslopClone(paths.folder, ctx.newMigrations);
   await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) }).catch((error: unknown) => failures.push(error));
 
   await expect(runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456', 'invented', 'reason'], force: true, since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) })).rejects.toMatchObject({
@@ -566,10 +572,10 @@ test('it refuses the pin after a failed migration even with --force', async () =
 
 test('it refuses and keeps the old pin when a migration name is missing after the run', async () => {
   const ctx = setupTest();
-  const fake = buildFakeRunner({ storeQuery: buildStubStoreQuery(ctx.store, []) });
+  const fake = buildFakeRunner({ runStoreQuery: buildStubStoreQuery(ctx.store, []) });
   const paths = buildPinPaths(ctx.base);
-  createStubNoslopStore(ctx.store, { migrations: HELD_NAMES, tables: { dispositions: 3 } });
-  createStubNoslopClone(paths.folder, NEW_NAMES);
+  createStubNoslopStore(ctx.store, { migrations: ctx.heldMigrations, tables: { dispositions: 3 } });
+  createStubNoslopClone(paths.folder, ctx.newMigrations);
 
   await expect(runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) })).rejects.toMatchObject({
     code: 'store_migration_failed',
@@ -581,10 +587,10 @@ test('it refuses and keeps the old pin when a migration name is missing after th
 
 test('it refuses when the store query fails', async () => {
   const ctx = setupTest();
-  const fake = buildFakeRunner({ storeQuery: () => ({ code: 1, stdout: '', stderr: 'no such column' }) });
+  const fake = buildFakeRunner({ runStoreQuery: () => ({ code: 1, stdout: '', stderr: 'no such column' }) });
   const paths = buildPinPaths(ctx.base);
-  createStubNoslopStore(ctx.store, { migrations: HELD_NAMES, tables: { dispositions: 3 } });
-  createStubNoslopClone(paths.folder, NEW_NAMES);
+  createStubNoslopStore(ctx.store, { migrations: ctx.heldMigrations, tables: { dispositions: 3 } });
+  createStubNoslopClone(paths.folder, ctx.newMigrations);
 
   await expect(runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) })).rejects.toMatchObject({
     code: 'store_migration_failed',
@@ -597,7 +603,7 @@ test('it refuses when the store query fails', async () => {
 test('it refuses when the migration names of the new noslop cannot be read', async () => {
   const ctx = setupTest();
   const paths = buildPinPaths(ctx.base);
-  createStubNoslopStore(ctx.store, { migrations: HELD_NAMES, tables: { dispositions: 3 } });
+  createStubNoslopStore(ctx.store, { migrations: ctx.heldMigrations, tables: { dispositions: 3 } });
   createStubNoslopClone(paths.folder, []);
 
   await expect(runNoslopCommand({ run: buildFakeRunner().run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) })).rejects.toMatchObject({ code: 'store_unreadable' });
@@ -609,7 +615,7 @@ test('it refuses when the migration names of the new noslop cannot be read', asy
 test('it refuses when the store holds no migration table', async () => {
   const ctx = setupTest();
   const paths = buildPinPaths(ctx.base);
-  createStubNoslopClone(paths.folder, NEW_NAMES);
+  createStubNoslopClone(paths.folder, ctx.newMigrations);
   createStubNoslopStore(ctx.store, { migrations: [], tables: { dispositions: 1 } });
   buildStubStoreQuery(ctx.store, ['DROP TABLE kysely_migration'])();
 
@@ -621,14 +627,14 @@ test('it refuses when the store holds no migration table', async () => {
 test('it pins with no backup when there is no store file', async () => {
   const ctx = setupTest();
   const paths = buildPinPaths(ctx.base);
-  createStubNoslopClone(paths.folder, NEW_NAMES);
+  createStubNoslopClone(paths.folder, ctx.newMigrations);
 
   await expect(runNoslopCommand({ run: buildFakeRunner().run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) })).resolves.toMatchObject({
-    text: `repos: none (noslop is off everywhere)\nemergency review cap: off everywhere (hq noslop cap <repo> <n>)\npinned: ${FULL_SHA}\nclone: ${paths.folder}\nno store migration (no store at ${ctx.store})`,
+    text: `repos: none (noslop is off everywhere)\nemergency review cap: off everywhere (hq noslop cap <repo> <n>)\npinned: ${ctx.fullSHA}\nclone: ${paths.folder}\nno store migration (no store at ${ctx.store})`,
   });
 
   expect(existsSync(ctx.store)).toBe(false);
-  expect(loadNoslopSettings(ctx.db).sha).toBe(FULL_SHA);
+  expect(loadNoslopSettings(ctx.db).sha).toBe(ctx.fullSHA);
 });
 
 test('it reports the rounds as data and text', async () => {
@@ -695,7 +701,7 @@ test('it pins through hq noslop pin --force on the cli while noslop runs, and re
 
   await expect(main(['noslop', 'pin', '0123456', '--force', 'invented', 'reason', '--json'], fake.run)).resolves.toBe(0);
 
-  expect(JSON.parse(lines[0] ?? '')).toMatchObject({ ok: true, sha: FULL_SHA });
+  expect(JSON.parse(lines[0] ?? '')).toMatchObject({ ok: true, sha: ctx.fullSHA });
   expect(db.query("SELECT json_extract(data, '$.force') AS force FROM events WHERE action = 'pinned'").all()).toStrictEqual([{ force: 'invented reason' }]);
 });
 

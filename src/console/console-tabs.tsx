@@ -14,7 +14,7 @@ interface ConsoleTabsProps {
 
 // The console's tabs, each with its jump key, and the keys that move between them on every tab.
 export function ConsoleTabs(props: ConsoleTabsProps) {
-  const appRouter = useRouter({ warn: false }) as ReturnType<typeof useRouter> | undefined;
+  const appRouter: ReturnType<typeof useRouter> | undefined = useRouter({ warn: false });
   const go = props.onGo ?? ((path: string) => openPath(appRouter, path));
   const pendingSince = useRef<number | null>(null);
 

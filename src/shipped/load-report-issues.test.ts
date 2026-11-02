@@ -62,7 +62,7 @@ test('a Canceled issue is not asked for again', async () => {
 });
 
 test('only the issues not kept are asked for, 100 to a query', async () => {
-  const all = Array.from({ length: 251 }, (_unused, n) => buildIssue({ id: `GEO-${9000 + n}`, status: n === 0 ? 'Done' : 'In Review', statusType: n === 0 ? 'completed' : 'started' }));
+  const all = Array.from({ length: 251 }, (_unused, index) => buildIssue({ id: `GEO-${9000 + index}`, status: index === 0 ? 'Done' : 'In Review', statusType: index === 0 ? 'completed' : 'started' }));
   const asked: unknown[] = [];
   const ctx = setupTest();
   const fakeLinear = makeLinearFake(all, [], asked);
