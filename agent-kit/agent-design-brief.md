@@ -29,5 +29,5 @@ Before your final report, check the follow-ups:
 3. For each follow-up, and each decision it covers, run `bash <scratch>/check-sketches.sh --decision <decision number> <record file> <issue file>`. The decision number is the one in the record's heading for it, such as "Decision 7".
 4. Copy each code block the script marks `"found": false` into that issue's description, and run it again.
 
-Finish line: when every follow-up passes, send z-stu and z-delivery one message each through your ATC message tool, with the record's link and the follow-ups' IDs, then a final report with the same links. Send an ATC `decision` note when you need a call, and a `blocked` note with the exact text when an action is refused. When done, remove your scratch folder.
+Finish line: when every follow-up passes, send an ATC `progress` note that starts `DESIGN DONE <record link> <follow-up IDs>`, then a final report with the same links. z-delivery relays the note to z-stu. Send an ATC `decision` note when you need a call, and a `blocked` note with the exact text when an action is refused. When done, remove your scratch folder.
 ```
