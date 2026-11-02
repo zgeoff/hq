@@ -1,7 +1,10 @@
 # Update bots
 
-Renovate bumps dependencies, and the repo-sync App copies shared files from zgeoff/tools into each
-repo. Neither gets `hq review`: a repo-sync PR was already reviewed in zgeoff/tools.
+Renovate bumps dependencies, and the repo-sync App copies shared files from zgeoff/tools and
+zgeoff/skills into each repo. Skip `hq review` for a PR from either bot. A repo-sync PR copies files
+that their source repo reviewed.
+
+Send a Renovate major of a package outside `@zgeoff/*` through `hq review`.
 
 ## Renovate PRs
 

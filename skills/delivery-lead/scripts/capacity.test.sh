@@ -61,6 +61,9 @@ HOME="$tmp/home"
 XDG_CACHE_HOME="$tmp/cache"
 FORBIDDEN_CALLS="$tmp/forbidden-calls"
 export PATH HOME XDG_CACHE_HOME FORBIDDEN_CALLS
+# capacity.sh reads the Claude login from CLAUDE_CONFIG_DIR before HOME, so a session that sets it
+# would hand the test its real login.
+unset CLAUDE_CONFIG_DIR
 account=$(printf '%s' gardener@example.test | sha256sum | cut -c1-12)
 per="$XDG_CACHE_HOME/z-capacity/claude-usage/$account.json"
 mkdir -p "$HOME/.codex/sessions" "$XDG_CACHE_HOME/z-capacity/claude-usage"
