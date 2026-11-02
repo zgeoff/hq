@@ -16,11 +16,11 @@ import { readHeadMechanical } from './read-head-mechanical.ts';
 import { findOwnerOverride } from './find-owner-override.ts';
 import type { OwnerOverride } from './read-owner-overrides.ts';
 import { readAnswerSourceRefusal } from './read-answer-source-refusal.ts';
-import { findSourceRefusal } from './find-source-refusal.ts';
-import type { SourceRequest } from './find-source-refusal.ts';
 import { findPRStatus } from './find-pr-status.ts';
 import { formatOverrideLine } from './format-override-line.ts';
 import { formatReviewRecordsLine } from './format-review-records-line.ts';
+import { formatAcceptedRiskLine } from './format-accepted-risk-line.ts';
+import { readAcceptedRiskViews } from './read-accepted-risk-views.ts';
 import { formatPRStatus } from './format-pr-status.ts';
 import { hasPROverride } from './has-pr-override.ts';
 import { hasReviewerRecord } from './has-reviewer-record.ts';
@@ -30,7 +30,8 @@ import type { OwnerProbe } from './read-owner-session.ts';
 import type { RoleProbe } from './read-role-session.ts';
 import { readPRHead } from './read-pr-head.ts';
 import { recordPRAnswer } from './record-pr-answer.ts';
-import { recordPRAcceptedRisk } from './record-pr-accepted-risk.ts';
+import { requireOwnerSource } from './require-owner-source.ts';
+import { runAcceptRisk } from './run-accept-risk.ts';
 import { recordCICheckOverride } from './record-ci-check-override.ts';
 import { readHeadCIOverrides } from './read-head-ci-overrides.ts';
 import { formatCIOverrideLine } from './format-ci-override-line.ts';
@@ -98,7 +99,8 @@ async function runStatus(input: PRCommandInput, ref: PRRef): Promise<Out> {
 // needs to see; gh is read only when one was ever recorded.
 async function readUnrecordedStatus(input: PRCommandInput, ref: PRRef): Promise<Out> {
   const none: Out = { data: { pr: null }, text: `No record for ${ref.repo}#${ref.pr}.` };
-  if (!hasPROverride(input.db, ref.repo, ref.pr) && !hasReviewerRecord(input.db, ref.repo, ref.pr)) {
+  const risks = await readAcceptedRiskViews(input.run, input.db, ref);
+  if (!hasPROverride(input.db, ref.repo, ref.pr) && !hasReviewerRecord(input.db, ref.repo, ref.pr) && risks.length === 0) {
     return none;
   }
   const head = await readPRHead(input.run, ref.slug, ref.pr);
@@ -107,11 +109,11 @@ async function readUnrecordedStatus(input: PRCommandInput, ref: PRRef): Promise<
   const ciOverrides = readStandingCIOverrides(input, ref, head);
   const shown = override === null ? null : { head: override.head, source: override.source, note: override.note, at: override.at };
   const recordsLine = formatReviewRecordsLine(records);
-  if (shown === null && recordsLine === null && ciOverrides.length === 0) {
+  if (shown === null && recordsLine === null && ciOverrides.length === 0 && risks.length === 0) {
     return none;
   }
-  const lines = [none.text, shown === null ? null : formatOverrideLine(shown), ...ciOverrides.map((ci) => formatCIOverrideLine(ci)), recordsLine].filter((line): line is string => line !== null);
-  return { data: { pr: null, ...(shown === null ? {} : { override: shown }), ...(ciOverrides.length === 0 ? {} : { ciOverrides }), ...(recordsLine === null ? {} : { reviewRecords: records }) }, text: lines.join('\n') };
+  const lines = [none.text, shown === null ? null : formatOverrideLine(shown), ...ciOverrides.map((ci) => formatCIOverrideLine(ci)), recordsLine, ...risks.map((risk) => formatAcceptedRiskLine(risk))].filter((line): line is string => line !== null);
+  return { data: { pr: null, ...(shown === null ? {} : { override: shown }), ...(ciOverrides.length === 0 ? {} : { ciOverrides }), ...(recordsLine === null ? {} : { reviewRecords: records }), ...(risks.length === 0 ? {} : { acceptedRisks: risks }) }, text: lines.join('\n') };
 }
 
 // The override that stands at the head now; none when the head is unknown.
@@ -139,7 +141,7 @@ async function refreshStatus(input: PRCommandInput, ref: PRRef, row: PRStatusRow
   if (current !== null) {
     await updatePRHead(input.db, ref.repo, ref.pr, current);
   }
-  return buildOut(buildPRStatusView(row, current, findStandingOverride(input, ref, current), { ciOverrides: readStandingCIOverrides(input, ref, current), reviewRecords: readStandingRecords(input, ref, current) }));
+  return buildOut(buildPRStatusView(row, current, findStandingOverride(input, ref, current), { ciOverrides: readStandingCIOverrides(input, ref, current), reviewRecords: readStandingRecords(input, ref, current), acceptedRisks: await readAcceptedRiskViews(input.run, input.db, ref) }));
 }
 
 function buildOut(view: PRStatusView): Out {
@@ -216,30 +218,6 @@ function parseCheckFlag(values: readonly string[] | undefined): string | null {
   return check;
 }
 
-async function requireOwnerSource(input: PRCommandInput, request: Omit<SourceRequest, 'source'>): Promise<string> {
-  const source = requireAnswerSource(input.flags.source);
-  const probe: OwnerProbe = source.startsWith('chat:') ? await input.readOwnerSession() : { verdict: 'other' };
-  const refusal = findSourceRefusal(input.db, { ...request, source }, probe);
-  if (refusal !== null) {
-    throw new HqError('bad_args', `--source refused: ${refusal}; ask ${roleName('owner')} to record it`);
-  }
-  return source;
-}
-
-async function runAcceptRisk(input: PRCommandInput, ref: PRRef, finding: string | undefined): Promise<Out> {
-  if (finding === undefined || finding.trim() === '') {
-    throw new HqError('bad_args', 'usage: hq pr accept-risk <repo> <pr> <finding-id> --source S --note T');
-  }
-  const head = await readPRHead(input.run, ref.slug, ref.pr);
-  const source = await requireOwnerSource(input, { ref, wanted: { action: 'accept-risk', finding }, head });
-  const note = input.flags.note?.trim() ?? '';
-  if (note === '') {
-    throw new HqError('bad_args', '--note is required: why the owner accepts this risk');
-  }
-  recordPRAcceptedRisk(input.db, { repo: ref.repo, pr: ref.pr, finding, source, note, actor: await input.actor() });
-  return { data: { acceptedRisk: { repo: ref.repo, pr: ref.pr, finding, source, note } }, text: `Recorded the owner's acceptance of the risk of finding ${finding} for ${ref.repo}#${ref.pr} (${source}): ${note}` };
-}
-
 async function runNext(input: PRCommandInput, ref: PRRef, session: string | undefined): Promise<Out> {
   const actor = await input.actor(),
     holder = requireNextHolder(input.flags, session);
@@ -276,7 +254,7 @@ function requireNextHolder(flags: Flags, session: string | undefined): string | 
 // The record after an answer, against the head that answer was just stored at.
 async function readOut(input: PRCommandInput, ref: PRRef, head: string): Promise<Out> {
   const row = await readWrittenRow(input, ref);
-  return buildOut(buildPRStatusView(row, head, findStandingOverride(input, ref, head), { ciOverrides: readStandingCIOverrides(input, ref, head), reviewRecords: readStandingRecords(input, ref, head) }));
+  return buildOut(buildPRStatusView(row, head, findStandingOverride(input, ref, head), { ciOverrides: readStandingCIOverrides(input, ref, head), reviewRecords: readStandingRecords(input, ref, head), acceptedRisks: await readAcceptedRiskViews(input.run, input.db, ref) }));
 }
 
 async function readWrittenRow(input: PRCommandInput, ref: PRRef): Promise<PRStatusRow> {

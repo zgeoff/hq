@@ -1,3 +1,4 @@
+import { formatAcceptedRiskLine } from './format-accepted-risk-line.ts';
 import { formatCIOverrideLine } from './format-ci-override-line.ts';
 import { formatOverrideLine } from './format-override-line.ts';
 import { formatReviewRecordsLine } from './format-review-records-line.ts';
@@ -16,6 +17,7 @@ export function formatPRStatus(view: PRStatusView): string {
   if (records !== null) {
     lines.push(records);
   }
+  lines.push(...view.acceptedRisks.map((risk) => formatAcceptedRiskLine(risk)));
   if (!view.headKnown) {
     lines.push('The PR head could not be read, so stale is unknown.');
   }

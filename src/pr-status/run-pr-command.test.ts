@@ -6,6 +6,8 @@ import { openAsk } from '../asks/open-ask.ts';
 import { logEvent } from '../log-event.ts';
 import { parseItemInput } from '../parse-item-input.ts';
 import { recordConsoleAnswer } from '../record-console-answer.ts';
+import { buildBotComment, buildCommentLines } from '../../test/build-stub-pr-comments.ts';
+import { createStubNoslopEnv } from '../../test/create-stub-noslop-env.ts';
 import { buildFakeRunner } from '../../test/noslop-fake.ts';
 import { NOON_SYDNEY, at, freshDb } from '../../test/helpers.ts';
 import type { Flags } from '../cli.ts';
@@ -16,6 +18,7 @@ function setupTest() {
   const fresh = freshDb();
   at(NOON_SYDNEY);
   onTestFinished(fresh.cleanup);
+  createStubNoslopEnv(fresh.db);
   return {
     db: fresh.db,
     fileCall: (id: string, title: string) => {
@@ -33,7 +36,7 @@ function setupTest() {
     answerInHq: (id: string) => answerAsk(fresh.db, { id, kind: 'call', answer: 'Yes', actor: 'z-stu' }),
     answerByHqCall: async (id: string, verdict: 'owner' | 'other', actor = 'z-stu') => await runCallAnswer(fresh.db, { id, kind: 'call', answer: 'Yes', actor }, () => Promise.resolve({ verdict })),
     answerInConsole: (id: string) => recordConsoleAnswer(fresh.db, { id, option: '', note: 'Yes', actor: 'owner' }),
-    headAt: (head: string) => buildFakeRunner({ prHead: { code: 0, stdout: JSON.stringify({ headRefOid: head }), stderr: '' } }),
+    headAt: (head: string) => buildFakeRunner({ prHead: { code: 0, stdout: JSON.stringify({ headRefOid: head }), stderr: '' }, reviewComments: buildCommentLines(buildBotComment(501, 'Kettle never boils (aaaa)')) }),
     ghDown: () => buildFakeRunner({ prHead: { code: 1, stdout: '', stderr: 'gh: could not resolve to a PullRequest' } }),
     actor: () => Promise.resolve('z-kettle'),
     override: async (fake: ReturnType<typeof buildFakeRunner>, flags: Flags) => await runPRCommand({ run: fake.run, db: fresh.db, verb: 'override', rest: ['widgets', '7'], flags, actor: () => Promise.resolve('z-kettle'), readOwnerSession: () => Promise.resolve({ verdict: 'owner' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) }),
@@ -70,6 +73,7 @@ test('it shows a changes answer at the head it was given, with its source and no
         override: null,
         ciOverrides: [],
         reviewRecords: { mechanical: null, exemption: null },
+        acceptedRisks: [],
         updatedAt: '2026-10-14T01:00:00Z',
       },
     },
@@ -103,6 +107,7 @@ test.each(['lgtm', 'changes'])('it marks an older %s answer stale at the head it
         override: null,
         ciOverrides: [],
         reviewRecords: { mechanical: null, exemption: null },
+        acceptedRisks: [],
         updatedAt: '2026-10-14T01:00:00Z',
       },
     },
@@ -191,6 +196,7 @@ test('it prints the stored record and says stale is unknown when gh cannot give 
         override: null,
         ciOverrides: [],
         reviewRecords: { mechanical: null, exemption: null },
+        acceptedRisks: [],
         updatedAt: '2026-10-14T01:00:00Z',
       },
     },
@@ -264,6 +270,7 @@ test('it sets who holds the next step, and shows the record against the head gh 
         override: null,
         ciOverrides: [],
         reviewRecords: { mechanical: null, exemption: null },
+        acceptedRisks: [],
         updatedAt: '2026-10-14T01:00:00Z',
       },
     },
@@ -351,6 +358,7 @@ test('it shows a gate none plainly, as a PR noslop does not review', async () =>
         override: null,
         ciOverrides: [],
         reviewRecords: { mechanical: null, exemption: null },
+        acceptedRisks: [],
         updatedAt: '2026-10-14T01:00:00Z',
       },
     },
@@ -384,6 +392,7 @@ test("it marks a gate recorded at an older head stale once the PR has a new head
         override: null,
         ciOverrides: [],
         reviewRecords: { mechanical: null, exemption: null },
+        acceptedRisks: [],
         updatedAt: '2026-10-14T01:00:00Z',
       },
     },
@@ -417,6 +426,7 @@ test("it shows a gate recorded at the PR's head now as not stale", async () => {
         override: null,
         ciOverrides: [],
         reviewRecords: { mechanical: null, exemption: null },
+        acceptedRisks: [],
         updatedAt: '2026-10-14T01:00:00Z',
       },
     },
@@ -971,6 +981,7 @@ test('it shows a CI override at the head now, and not as the findings override',
       override: null,
       ciOverrides: [{ check: 'preview', head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', source: 'chat:kettle-2', note: 'An intended infra change.', at: '2026-10-14T01:00:00Z' }],
       reviewRecords: { mechanical: null, exemption: null },
+      acceptedRisks: [],
       updatedAt: '2026-10-14T01:00:00Z',
     },
   });
@@ -1005,6 +1016,7 @@ test('it shows no CI override once the PR has a new head', async () => {
       override: null,
       ciOverrides: [],
       reviewRecords: { mechanical: null, exemption: null },
+      acceptedRisks: [],
       updatedAt: '2026-10-14T01:00:00Z',
     },
   });
