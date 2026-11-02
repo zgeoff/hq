@@ -96,9 +96,9 @@ async function readFleetView(
   client: FleetClient & StaleOps,
   fleet: FleetEntry[],
 ): Promise<{ sessions: Record<string, FleetSession>; drift: Record<string, PromptDrift> }> {
-  const all = await client.sessions(),
-    known = fleetIds(db),
-    sessions: Record<string, FleetSession> = {};
+  const all = await client.sessions();
+  const known = fleetIds(db);
+  const sessions: Record<string, FleetSession> = {};
   if (!Array.isArray(all)) {
     throw new HqError('atc_bad_answer', 'atc returned no session list; no stale restart');
   }
@@ -298,8 +298,8 @@ async function readMessageLookup(pass: StalePass, turn: StaleTurn, asked: Entry)
 }
 
 function buildSkip(entry: Entry, t: Date): Entry {
-  const skips = entry.skips + 1,
-    wait = Math.min(STALE_LIMITS.backoffMs * 2 ** (skips - 1), STALE_LIMITS.backoffMaxMs);
+  const skips = entry.skips + 1;
+  const wait = Math.min(STALE_LIMITS.backoffMs * 2 ** (skips - 1), STALE_LIMITS.backoffMaxMs);
   return {
     sessionId: entry.sessionId,
     phase: 'idle',

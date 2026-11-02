@@ -15,11 +15,6 @@ import { logEvent } from '../log-event.ts';
 import { resetFetchCache } from '../prompts/reset-fetch-cache.ts';
 import { FOUR_AM_SYDNEY, NOON_SYDNEY, at, createDefsRepo, fakeAtc, freshDb } from '../../test/helpers.ts';
 
-const KETTLE = 'skills/kettle/references/session-prompt.md',
-  NEW_PROMPT = 'You are Kettle. Boil water when asked.',
-  OLD_PROMPT = 'You are Kettle. Boil water slowly.',
-  URN = 'skills/urn/references/session-prompt.md';
-
 interface RosterSession {
   id: string;
   name: string;
@@ -30,13 +25,17 @@ interface RosterSession {
 
 function setupTest(config: { sessions?: RosterSession[]; cwd?: string } = {}) {
   resetFetchCache();
-  const base = freshDb(),
-    kettle: FleetEntry = { name: 'z-kettle', cwd: config.cwd ?? `${base.dir}/work`, model: 'opus', prompt: `main:${KETTLE}`, wake: false },
-    roster = (config.sessions ?? [{ id: 'id-kettle', name: 'z-kettle', state: 'done' }]).map((s) => Object.assign(s, { alive: true, pinned: true })),
-    server = fakeAtc(base.dir, roster),
-    steward: FleetEntry = { name: 'z-stu', cwd: `${base.dir}/work`, model: 'opus', prompt: `main:${KETTLE}`, wake: false, roles: ['owner'] },
-    urn: FleetEntry = { name: 'z-urn', cwd: `${base.dir}/work`, model: 'opus', prompt: `main:${URN}`, wake: false };
-  createDefsRepo(base.dir, { [KETTLE]: `\`\`\`text\n${NEW_PROMPT}\n\`\`\`\n`, [URN]: '```text\nYou are Urn. Keep the water hot.\n```\n' });
+  const kettlePromptPath = 'skills/kettle/references/session-prompt.md';
+  const newPrompt = 'You are Kettle. Boil water when asked.';
+  const oldPrompt = 'You are Kettle. Boil water slowly.';
+  const urnPromptPath = 'skills/urn/references/session-prompt.md';
+  const base = freshDb();
+  const kettle: FleetEntry = { name: 'z-kettle', cwd: config.cwd ?? `${base.dir}/work`, model: 'opus', prompt: `main:${kettlePromptPath}`, wake: false };
+  const roster = (config.sessions ?? [{ id: 'id-kettle', name: 'z-kettle', state: 'done' }]).map((session) => Object.assign(session, { alive: true, pinned: true }));
+  const server = fakeAtc(base.dir, roster);
+  const steward: FleetEntry = { name: 'z-stu', cwd: `${base.dir}/work`, model: 'opus', prompt: `main:${kettlePromptPath}`, wake: false, roles: ['owner'] };
+  const urn: FleetEntry = { name: 'z-urn', cwd: `${base.dir}/work`, model: 'opus', prompt: `main:${urnPromptPath}`, wake: false };
+  createDefsRepo(base.dir, { [kettlePromptPath]: `\`\`\`text\n${newPrompt}\n\`\`\`\n`, [urnPromptPath]: '```text\nYou are Urn. Keep the water hot.\n```\n' });
   onTestFinished(base.cleanup);
   onTestFinished(server.stop);
   onTestFinished(overrideEnv('HQ_ATC_STATE', `${base.dir}/atc-state`));
@@ -47,7 +46,7 @@ function setupTest(config: { sessions?: RosterSession[]; cwd?: string } = {}) {
   mkdirSync(`${base.dir}/projects/-work`, { recursive: true });
   writeFileSync(`${base.dir}/claude.json`, JSON.stringify({ projects: { [`${base.dir}/work`]: { hasTrustDialogAccepted: true } } }));
   for (const session of roster) {
-    const prompt = session.name === 'z-urn' ? 'You are Urn. Keep the water cold.' : OLD_PROMPT;
+    const prompt = session.name === 'z-urn' ? 'You are Urn. Keep the water cold.' : oldPrompt;
     server.prompts.set(session.id, prompt);
   }
 
@@ -59,6 +58,8 @@ function setupTest(config: { sessions?: RosterSession[]; cwd?: string } = {}) {
     steward,
     delivery: { ...kettle, name: 'z-delivery', roles: ['orchestrator'] } satisfies FleetEntry,
     release: { ...kettle, name: 'z-ship', roles: ['release'] } satisfies FleetEntry,
+    newPrompt,
+    oldPrompt,
     deliveryAgent: '0000aaaa-1111-4222-8333-444455556666',
 
     writeTranscript(agentSessionID: string, compactions: number) {
@@ -86,7 +87,7 @@ function setupTest(config: { sessions?: RosterSession[]; cwd?: string } = {}) {
     },
     setId(id: string, next: string) {
       Object.assign(roster.find((s) => s.id === id) ?? {}, { id: next });
-      server.prompts.set(next, OLD_PROMPT);
+      server.prompts.set(next, oldPrompt);
     },
     setRefresh: (value: unknown) => setMeta(base.db, 'fleet_refresh', JSON.stringify(value)),
     staleSince: () => staleSinceSchema.parse(JSON.parse(getMeta(base.db, 'fleet_stale_since') ?? '{}')),
@@ -115,9 +116,9 @@ test('it restarts a session whose prompt has been stale for two hours, once, aft
   expect(ctx.atc.calls[0]?.input).toStrictEqual({ session: 'id-kettle', stopOnly: true });
   expect(ctx.atc.calls[1]?.input).toStrictEqual({ session: 'id-kettle', pinned: false });
   expect(ctx.atc.calls[2]?.input).toStrictEqual({ session: 'id-kettle', refusePinned: true });
-  expect(ctx.atc.calls[3]?.input).toMatchObject({ name: 'z-kettle', prompt: NEW_PROMPT });
+  expect(ctx.atc.calls[3]?.input).toMatchObject({ name: 'z-kettle', prompt: ctx.newPrompt });
   expect(ctx.atc.calls[4]?.input).toStrictEqual({ session: 'spawned-1', pinned: true });
-  expect(ctx.atc.prompts.get('spawned-1')).toBe(NEW_PROMPT);
+  expect(ctx.atc.prompts.get('spawned-1')).toBe(ctx.newPrompt);
   expect(ctx.refresh()).toStrictEqual({});
   expect(ctx.staleSince()).toStrictEqual({});
 });
@@ -195,8 +196,8 @@ test('it does not ask a session with an unsent message waiting for it', async ()
 });
 
 test('it skips with a longer backoff each time a message stays delivered, up to four hours', async () => {
-  const ctx = setupTest(),
-    retries: (string | undefined)[] = [];
+  const ctx = setupTest();
+  const retries: (string | undefined)[] = [];
 
   for (const minutes of [0, 121, 132, 192, 203, 323, 334, 574, 585]) {
     await ctx.tick(minutes, [ctx.kettle]);
@@ -212,8 +213,8 @@ test('it skips with a longer backoff each time a message stays delivered, up to 
 });
 
 test('it tells the owner once after six skips and still does not restart', async () => {
-  const ctx = setupTest(),
-    quiet = overrideEnv('HQ_QUIET', '0-0');
+  const ctx = setupTest();
+  const quiet = overrideEnv('HQ_QUIET', '0-0');
   onTestFinished(quiet);
 
   for (const minutes of [0, 121, 132, 192, 203, 323, 334, 574, 585, 825, 836, 1076, 1087, 1327, 1338]) {
@@ -248,9 +249,9 @@ test('it never asks or restarts at 04:00 Sydney', async () => {
 });
 
 test('it holds a restart that a session said saved for before 03:00 Sydney until quiet hours end', async () => {
-  const ctx = setupTest(),
-    quietCalls: string[] = [],
-    quietPhases: (string | undefined)[] = [];
+  const ctx = setupTest();
+  const quietCalls: string[] = [];
+  const quietPhases: (string | undefined)[] = [];
 
   await ctx.tick(760, [ctx.kettle]);
   await ctx.tick(881, [ctx.kettle]);
@@ -501,8 +502,8 @@ test('it records when atc last answered the read of an asked save request, and k
 });
 
 test('it waits, then restarts, when the activity of the saved answer itself is recent', async () => {
-  const answeredAt = Date.parse(NOON_SYDNEY) + 125 * 60_000,
-    ctx = setupTest();
+  const answeredAt = Date.parse(NOON_SYDNEY) + 125 * 60_000;
+  const ctx = setupTest();
 
   await ctx.tick(0, [ctx.kettle]);
   await ctx.tick(121, [ctx.kettle]);
@@ -520,8 +521,8 @@ test('it waits, then restarts, when the activity of the saved answer itself is r
 });
 
 test('it skips the round when the session is still busy ten minutes after it said saved', async () => {
-  const answeredAt = Date.parse(NOON_SYDNEY) + 125 * 60_000,
-    ctx = setupTest();
+  const answeredAt = Date.parse(NOON_SYDNEY) + 125 * 60_000;
+  const ctx = setupTest();
 
   await ctx.tick(0, [ctx.kettle]);
   await ctx.tick(121, [ctx.kettle]);
@@ -561,9 +562,9 @@ test('it starts a fresh two-hour wait when a prompt reads current and then stale
   const ctx = setupTest();
 
   await ctx.tick(0, [ctx.kettle]);
-  ctx.atc.prompts.set('id-kettle', NEW_PROMPT);
+  ctx.atc.prompts.set('id-kettle', ctx.newPrompt);
   await ctx.tick(30, [ctx.kettle]);
-  ctx.atc.prompts.set('id-kettle', OLD_PROMPT);
+  ctx.atc.prompts.set('id-kettle', ctx.oldPrompt);
   await ctx.tick(35, [ctx.kettle]);
   await ctx.tick(125, [ctx.kettle]);
 
@@ -597,7 +598,7 @@ test('it never restarts a session whose prompt hq-private cannot supply', async 
 
 test('it restarts an orchestrator session six hours after its start, through the save request', async () => {
   const ctx = setupTest({ sessions: [{ id: 'id-delivery', name: 'z-delivery', state: 'done', createdAt: Date.parse(NOON_SYDNEY) - 6 * 3_600_000 }] });
-  ctx.atc.prompts.set('id-delivery', NEW_PROMPT);
+  ctx.atc.prompts.set('id-delivery', ctx.newPrompt);
 
   await ctx.tick(0, [ctx.delivery]);
   ctx.atc.messages.set('m-1', { status: 'answered', answer: 'saved' });
@@ -619,7 +620,7 @@ test('it restarts an orchestrator session six hours after its start, through the
 
 test('it restarts an orchestrator session one hour old after three compactions since its start', async () => {
   const ctx = setupTest({ sessions: [{ id: 'id-delivery', name: 'z-delivery', state: 'done', createdAt: Date.parse(NOON_SYDNEY) - 1 * 3_600_000, agentSessionID: '0000aaaa-1111-4222-8333-444455556666' }] });
-  ctx.atc.prompts.set('id-delivery', NEW_PROMPT);
+  ctx.atc.prompts.set('id-delivery', ctx.newPrompt);
   ctx.writeTranscript(ctx.deliveryAgent, 3);
 
   await ctx.tick(0, [ctx.delivery]);
@@ -633,7 +634,7 @@ test('it restarts an orchestrator session one hour old after three compactions s
 
 test('it leaves an orchestrator session alone at five hours and two compactions', async () => {
   const ctx = setupTest({ sessions: [{ id: 'id-delivery', name: 'z-delivery', state: 'done', createdAt: Date.parse(NOON_SYDNEY) - 5 * 3_600_000, agentSessionID: '0000aaaa-1111-4222-8333-444455556666' }] });
-  ctx.atc.prompts.set('id-delivery', NEW_PROMPT);
+  ctx.atc.prompts.set('id-delivery', ctx.newPrompt);
   ctx.writeTranscript(ctx.deliveryAgent, 2);
 
   await ctx.tick(0, [ctx.delivery]);
@@ -645,7 +646,7 @@ test('it leaves an orchestrator session alone at five hours and two compactions'
 
 test('it keeps the recorded start when atc reports a newer createdAt for the same session', async () => {
   const ctx = setupTest({ sessions: [{ id: 'id-delivery', name: 'z-delivery', state: 'done', createdAt: Date.parse(NOON_SYDNEY) - 1 * 3_600_000 }] });
-  ctx.atc.prompts.set('id-delivery', NEW_PROMPT);
+  ctx.atc.prompts.set('id-delivery', ctx.newPrompt);
 
   await ctx.tick(0, [ctx.delivery]);
   ctx.setCreatedAt('id-delivery', Date.parse(NOON_SYDNEY) + 4 * 3_600_000);
@@ -656,7 +657,7 @@ test('it keeps the recorded start when atc reports a newer createdAt for the sam
 
 test('it restarts a release session on the same schedule', async () => {
   const ctx = setupTest({ sessions: [{ id: 'id-ship', name: 'z-ship', state: 'done', createdAt: Date.parse(NOON_SYDNEY) - 6 * 3_600_000 }] });
-  ctx.atc.prompts.set('id-ship', NEW_PROMPT);
+  ctx.atc.prompts.set('id-ship', ctx.newPrompt);
 
   await ctx.tick(0, [ctx.release]);
   ctx.atc.messages.set('m-1', { status: 'answered', answer: 'saved' });
@@ -674,8 +675,8 @@ test('it never schedules a restart for a session of another role, or of none', a
       { id: 'id-dev', name: 'z-dev', state: 'done', createdAt: Date.parse(NOON_SYDNEY) - 7 * 3_600_000 },
     ],
   });
-  ctx.atc.prompts.set('id-kettle', NEW_PROMPT);
-  ctx.atc.prompts.set('id-dev', NEW_PROMPT);
+  ctx.atc.prompts.set('id-kettle', ctx.newPrompt);
+  ctx.atc.prompts.set('id-dev', ctx.newPrompt);
   ctx.writeTranscript(ctx.deliveryAgent, 4);
 
   await ctx.tick(0, [ctx.kettle, { ...ctx.kettle, name: 'z-dev', roles: ['developer'] }]);
@@ -686,7 +687,7 @@ test('it never schedules a restart for a session of another role, or of none', a
 
 test('it does not restart the new session again while it is younger than the limits', async () => {
   const ctx = setupTest({ sessions: [{ id: 'id-delivery', name: 'z-delivery', state: 'done', createdAt: Date.parse(NOON_SYDNEY) - 6 * 3_600_000, agentSessionID: '0000aaaa-1111-4222-8333-444455556666' }] });
-  ctx.atc.prompts.set('id-delivery', NEW_PROMPT);
+  ctx.atc.prompts.set('id-delivery', ctx.newPrompt);
   ctx.writeTranscript(ctx.deliveryAgent, 3);
 
   await ctx.tick(0, [ctx.delivery]);
@@ -703,7 +704,7 @@ test('it does not restart the new session again while it is younger than the lim
 
 test('it asks again six hours after the new session started', async () => {
   const ctx = setupTest({ sessions: [{ id: 'id-delivery', name: 'z-delivery', state: 'done', createdAt: Date.parse(NOON_SYDNEY) - 6 * 3_600_000 }] });
-  ctx.atc.prompts.set('id-delivery', NEW_PROMPT);
+  ctx.atc.prompts.set('id-delivery', ctx.newPrompt);
 
   await ctx.tick(0, [ctx.delivery]);
   ctx.atc.messages.set('m-1', { status: 'answered', answer: 'saved' });
@@ -716,7 +717,7 @@ test('it asks again six hours after the new session started', async () => {
 
 test('it keeps a deferred scheduled restart waiting out its backoff though the prompt reads current', async () => {
   const ctx = setupTest({ sessions: [{ id: 'id-delivery', name: 'z-delivery', state: 'done', createdAt: Date.parse(NOON_SYDNEY) - 6 * 3_600_000 }] });
-  ctx.atc.prompts.set('id-delivery', NEW_PROMPT);
+  ctx.atc.prompts.set('id-delivery', ctx.newPrompt);
 
   await ctx.tick(0, [ctx.delivery]);
   ctx.atc.messages.set('m-1', { status: 'answered', answer: 'busy' });
@@ -729,7 +730,7 @@ test('it keeps a deferred scheduled restart waiting out its backoff though the p
 
 test.each(['running', 'needs_you'])('it never asks a %s session that is due a scheduled restart', async (state) => {
   const ctx = setupTest({ sessions: [{ id: 'id-delivery', name: 'z-delivery', state, createdAt: Date.parse(NOON_SYDNEY) - 7 * 3_600_000 }] });
-  ctx.atc.prompts.set('id-delivery', NEW_PROMPT);
+  ctx.atc.prompts.set('id-delivery', ctx.newPrompt);
 
   await ctx.tick(0, [ctx.delivery]);
   await ctx.tick(5, [ctx.delivery]);

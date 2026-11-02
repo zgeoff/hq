@@ -12,7 +12,7 @@ export interface FakeScript {
   noslopReview?: RunResult;
   noslopHelp?: RunResult;
 
-  storeQuery?: () => RunResult;
+  runStoreQuery?: () => RunResult;
 
   pgrep?: RunResult;
   author?: string;
@@ -108,7 +108,7 @@ function pickBunAnswer(script: FakeScript, cmd: string[]): RunResult {
     return script.noslopCheck ?? buildResult(JSON.stringify({ conclusion: 'success', title: 'No findings need attention.', summary: '', open: [] }));
   }
   if (cmd[3] === 'store') {
-    return script.storeQuery?.() ?? buildResult('[]');
+    return script.runStoreQuery?.() ?? buildResult('[]');
   }
   if (cmd[4] === '--help') {
     return script.noslopHelp ?? buildResult('  --pr <pr>   Review a pull request\n');

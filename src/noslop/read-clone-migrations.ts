@@ -4,8 +4,8 @@ import { HqError } from '../errors.ts';
 const NAME_SHAPE = /^[ \t]*'(?<name>\d{4}-[a-z0-9-]+)':/gmu;
 
 export function readCloneMigrations(clone: string): string[] {
-  const file = `${clone}/adapters/sqlite/src/load-store.ts`,
-    names = [...readText(file).matchAll(NAME_SHAPE)].map((match) => match.groups?.['name'] ?? '');
+  const file = `${clone}/adapters/sqlite/src/load-store.ts`;
+  const names = [...readText(file).matchAll(NAME_SHAPE)].map((match) => match.groups?.['name'] ?? '');
   if (names.length === 0) {
     throw new HqError('store_unreadable', `hq cannot read the store migrations the new noslop applies: ${file} names none`);
   }

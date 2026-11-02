@@ -18,12 +18,13 @@ export interface ChurnReview {
 }
 
 export function countChurn(reviews: ChurnReview[]): Churn {
-  const churn: Churn = { roundsWithNew: 0, repeatClass: 0, classUnknown: 0, late: { n: 0, of: 0 }, lateUnknown: 0, mainMerge: 0, mergeUnknown: 0 },
-    cited = new Map<string, Set<string>>(),
-    seen = new Set<string>();
+  // oxlint-disable-next-line id-length -- late.n is a key of hq noslop's JSON report
+  const churn: Churn = { roundsWithNew: 0, repeatClass: 0, classUnknown: 0, late: { n: 0, of: 0 }, lateUnknown: 0, mainMerge: 0, mergeUnknown: 0 };
+  const cited = new Map<string, Set<string>>();
+  const seen = new Set<string>();
   reviews.forEach((review, index) => {
-    const findings = review.findings,
-      fresh = findings.filter((f, at) => !seen.has(f.id) && findings.findIndex((g) => g.id === f.id) === at);
+    const findings = review.findings;
+    const fresh = findings.filter((finding, at) => !seen.has(finding.id) && findings.findIndex((other) => other.id === finding.id) === at);
     if (review.counted) {
       countReview(churn, fresh, index > 0, cited);
     }

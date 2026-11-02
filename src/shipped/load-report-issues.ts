@@ -19,11 +19,11 @@ interface IssueNode {
 }
 
 export async function loadReportIssues(call: LinearCall, db: Database, ids: readonly string[], at: Date): Promise<ReportIssue[]> {
-  const BATCH = 100,
-    cached = await findCacheEntries(db, 'issue', ids, at),
-    fetched: ReportIssue[] = [],
-    hits = collectValidHits(cached),
-    wanted = ids.filter((id) => !hits.has(id));
+  const BATCH = 100;
+  const cached = await findCacheEntries(db, 'issue', ids, at);
+  const fetched: ReportIssue[] = [];
+  const hits = collectValidHits(cached);
+  const wanted = ids.filter((id) => !hits.has(id));
   for (let i = 0; i < wanted.length; i += BATCH) {
     const data = (await call(QUERY, { ids: wanted.slice(i, i + BATCH) })) as { issues: { nodes: IssueNode[] } };
     fetched.push(...data.issues.nodes.map((node) => toReportIssue(node)));

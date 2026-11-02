@@ -13,8 +13,8 @@ import { runReview } from './run-review.ts';
 const PINNED = '0123456789abcdef0123456789abcdef01234567';
 
 function setupTest() {
-  const base = mkdtempSync(join(tmpdir(), 'hq-review-noslop-')),
-    db = openDb(join(base, 'hq.db'));
+  const base = mkdtempSync(join(tmpdir(), 'hq-review-noslop-'));
+  const db = openDb(join(base, 'hq.db'));
 
   onTestFinished(() => {
     db.close();
@@ -58,9 +58,9 @@ function setupTest() {
 }
 
 test('it reviews a repo off the noslop list with Codex, as before', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner(),
-    result = await runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false });
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
+  const result = await runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false });
 
   expect(result).toMatchObject({ codexCode: 0, head: 'feat', base: 'main' });
   expect(fake.of('codex').map((c) => c.cmd[1])).toStrictEqual(['review']);
@@ -69,8 +69,8 @@ test('it reviews a repo off the noslop list with Codex, as before', async () => 
 });
 
 test('it reviews a listed repo with noslop, then reads its CI checks and open threads', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner();
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
   ctx.listWidgets();
 
   await expect(runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: true })).resolves.toMatchObject({
@@ -90,8 +90,8 @@ test('it reviews a listed repo with noslop, then reads its CI checks and open th
 });
 
 test('it passes --full to a noslop review of a listed repo', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner();
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
   ctx.listWidgets();
 
   await runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false, full: true });
@@ -100,8 +100,8 @@ test('it passes --full to a noslop review of a listed repo', async () => {
 });
 
 test('it refuses --full for a PR on Codex, and runs nothing', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner();
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
 
   await expect(runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false, full: true })).rejects.toMatchObject({ code: 'bad_args' });
 
@@ -174,8 +174,8 @@ test('it reviews a listed repo\'s PR on noslop though a Codex review file of the
 });
 
 test('it reviews a listed repo\'s PR on noslop though a run already gave it a Codex round', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner();
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
   ctx.listWidgets();
   ctx.db.exec('PRAGMA foreign_keys = OFF');
   ctx.db.query("INSERT INTO run_prs (ref, issue, state, review_round, added_at, updated_at) VALUES ('widgets#7', 'GEO-1', 'open', 1, '2026-10-18T00:00:00Z', '2026-10-18T00:00:00Z')").run();
@@ -186,8 +186,8 @@ test('it reviews a listed repo\'s PR on noslop though a run already gave it a Co
 });
 
 test('it keeps a PR on noslop once noslop has reviewed it, even with a Codex file beside it', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner();
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
   ctx.listWidgets();
   ctx.db.query("INSERT INTO noslop_rounds (repo, pr, kind, started_at, ended_at, ms, ok, sha) VALUES ('widgets', 7, 'review', '2026-10-18T00:00:00Z', '2026-10-18T00:01:00Z', 60000, 1, 'abc1234')").run();
   writeFileSync(join(ctx.base, 'widgets7-review.md'), 'No findings.\n');
@@ -198,8 +198,8 @@ test('it keeps a PR on noslop once noslop has reviewed it, even with a Codex fil
 });
 
 test('it refuses a listed repo that has no pinned commit, and runs nothing', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner();
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
   ctx.listUnpinned();
 
   await expect(runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false })).rejects.toMatchObject({
@@ -211,8 +211,8 @@ test('it refuses a listed repo that has no pinned commit, and runs nothing', asy
 });
 
 test('it never falls back to Codex when noslop gives no review', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner({ noslopReview: { code: 1, stdout: '', stderr: 'boom' } });
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ noslopReview: { code: 1, stdout: '', stderr: 'boom' } });
   ctx.listWidgets();
 
   await expect(runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false })).rejects.toMatchObject({ code: 'noslop_failed' });
@@ -226,8 +226,8 @@ function createRunPR(db: ReturnType<typeof openDb>): void {
 }
 
 test('it marks the PR on its run reviewed at the head the round read, with no session writing it', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner({ noslopReview: { code: 0, stdout: FAKE_REVIEW_JSON.replace('"head":"feat"', `"head":"${FAKE_FULL_SHA}"`), stderr: '' } });
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ noslopReview: { code: 0, stdout: FAKE_REVIEW_JSON.replace('"head":"feat"', `"head":"${FAKE_FULL_SHA}"`), stderr: '' } });
   ctx.listWidgets();
   createRunPR(ctx.db);
 
@@ -237,8 +237,8 @@ test('it marks the PR on its run reviewed at the head the round read, with no se
 });
 
 test('it marks the review started but not reviewed when noslop gives no review', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner({ noslopReview: { code: 1, stdout: '', stderr: 'boom' } });
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ noslopReview: { code: 1, stdout: '', stderr: 'boom' } });
   ctx.listWidgets();
   createRunPR(ctx.db);
 
@@ -254,8 +254,8 @@ test('it rejects a PR number that is not positive', async () => {
 });
 
 test('it runs a noslop review while a pin holds the clone lock', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner();
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
   ctx.listWidgets();
   mkdirSync(join(ctx.base, '.lock-zgeoff-noslop-clone'));
 
@@ -265,8 +265,8 @@ test('it runs a noslop review while a pin holds the clone lock', async () => {
 });
 
 test('it runs a first review of a noslop PR and records its special as none', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner();
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
   ctx.listWidgets();
 
   await expect(runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false })).resolves.toMatchObject({ round: 1, fixesOnly: false, emergencyCap: null, capNote: null });
@@ -275,8 +275,8 @@ test('it runs a first review of a noslop PR and records its special as none', as
 });
 
 test('it records the special route noslop gave the review', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner({ noslopReview: { code: 0, stdout: JSON.stringify({ ...JSON.parse(FAKE_REVIEW_JSON), special: 'docs-only' }), stderr: '' } });
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ noslopReview: { code: 0, stdout: JSON.stringify({ ...JSON.parse(FAKE_REVIEW_JSON), special: 'docs-only' }), stderr: '' } });
   ctx.listWidgets();
 
   await runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false });
@@ -285,8 +285,8 @@ test('it records the special route noslop gave the review', async () => {
 });
 
 test('it runs a full review however many reviews the PR has had, while no cap is set', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner();
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
   ctx.listWidgets();
   ctx.addRound('review', 1, 'light', 'docs-only');
   ctx.addRound('review', 1, 'light', 'docs-only');
@@ -298,8 +298,8 @@ test('it runs a full review however many reviews the PR has had, while no cap is
 });
 
 test('it does not count a failed review or a check as a round', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner();
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
   ctx.listWidgets();
   ctx.addRound('review', 1, 'standard', 'none');
   ctx.addRound('review', 0, null, null);
@@ -309,8 +309,8 @@ test('it does not count a failed review or a check as a round', async () => {
 });
 
 test('it does not cap a PR on Codex however many rounds it has', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner();
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
   ctx.addRound('review', 1, 'light', 'docs-only');
   ctx.addRound('review', 1, 'light', 'docs-only');
 
@@ -318,8 +318,8 @@ test('it does not cap a PR on Codex however many rounds it has', async () => {
 });
 
 test('it keeps --full on a later review', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner();
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
   ctx.listWidgets();
   ctx.addRound('review', 1, 'standard', 'none');
 
@@ -329,8 +329,8 @@ test('it keeps --full on a later review', async () => {
 });
 
 test('it takes the PR\'s lock for the review, and runs nothing while another review holds it', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner();
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
   ctx.listWidgets();
   onTestFinished(overrideEnv('HQ_REVIEW_LOCK_WAIT_MS', '0'));
   mkdirSync(join(ctx.base, '.lock-zgeoff-widgets-pr7'));
@@ -341,8 +341,8 @@ test('it takes the PR\'s lock for the review, and runs nothing while another rev
 });
 
 test('it runs a full review while the emergency cap is not reached', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner();
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
   ctx.setCap('widgets', 1);
 
   await expect(runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false })).resolves.toMatchObject({ round: 1, fixesOnly: false, emergencyCap: null });
@@ -351,8 +351,8 @@ test('it runs a full review while the emergency cap is not reached', async () =>
 });
 
 test('it runs the second review as fix checks only, and says so, when the emergency cap is 1', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner();
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
   ctx.setCap('widgets', 1);
   await runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false });
 
@@ -372,8 +372,8 @@ test('it applies an emergency cap stored under the repo name in another case, as
 });
 
 test('it runs the second review in full when the emergency cap is off', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner();
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
   ctx.listWidgets();
   await runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false });
 
@@ -383,8 +383,8 @@ test('it runs the second review in full when the emergency cap is off', async ()
 });
 
 test('it counts only the full reviews against the emergency cap, not fix checks or failed reviews', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner();
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
   ctx.setCap('widgets', 2);
   ctx.addRound('review', 1, 'standard', 'none');
   ctx.addRound('review', 0, null, null);
@@ -395,8 +395,8 @@ test('it counts only the full reviews against the emergency cap, not fix checks 
 });
 
 test('it counts the emergency cap per PR', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner();
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
   ctx.setCap('widgets', 1);
   ctx.addRound('review', 1, 'standard', 'none');
 
@@ -404,8 +404,8 @@ test('it counts the emergency cap per PR', async () => {
 });
 
 test('it drops --full past the emergency cap', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner();
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
   ctx.setCap('widgets', 1);
   ctx.addRound('review', 1, 'standard', 'none');
 
@@ -415,8 +415,8 @@ test('it drops --full past the emergency cap', async () => {
 });
 
 test('it lets only one of two reviews started together on one PR take the last full review before the cap', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner();
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
   ctx.setCap('widgets', 1);
 
   const settled = await Promise.all([runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false }), runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false })]);
@@ -426,12 +426,12 @@ test('it lets only one of two reviews started together on one PR take the last f
 });
 
 test('it prints the cap note first in the text of hq review past the cap', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner(),
-    lines: string[] = [],
-    logger = spyOn(console, 'log').mockImplementation((line: string) => {
-      lines.push(line);
-    });
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
+  const lines: string[] = [];
+  const logger = spyOn(console, 'log').mockImplementation((line: string) => {
+    lines.push(line);
+  });
   onTestFinished(() => logger.mockRestore());
   onTestFinished(overrideEnv('HQ_DB', join(ctx.base, 'hq.db')));
   onTestFinished(overrideEnv('HQ_NOTIFY', 'off'));
@@ -444,12 +444,12 @@ test('it prints the cap note first in the text of hq review past the cap', async
 });
 
 test('it forwards the cap note and fixesOnly in the JSON of hq review past the cap', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner(),
-    lines: string[] = [],
-    logger = spyOn(console, 'log').mockImplementation((line: string) => {
-      lines.push(line);
-    });
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
+  const lines: string[] = [];
+  const logger = spyOn(console, 'log').mockImplementation((line: string) => {
+    lines.push(line);
+  });
   onTestFinished(() => logger.mockRestore());
   onTestFinished(overrideEnv('HQ_DB', join(ctx.base, 'hq.db')));
   onTestFinished(overrideEnv('HQ_NOTIFY', 'off'));
@@ -462,21 +462,21 @@ test('it forwards the cap note and fixesOnly in the JSON of hq review past the c
 });
 
 test('it passes --fixes-only straight to noslop, with no review on record, and records a run that is not a round', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner({ noslopReview: { code: 0, stdout: JSON.stringify({
-        version: 7,
-        head: 'feat',
-        base: 'main',
-        depth: 'standard',
-        findings: [],
-        failedCalls: [],
-        notReviewed: [],
-        notReviewedByLens: [],
-        fixChecks: [
-          { findingID: 'kettle0000000001', fixed: true, reason: 'the kettle boils now' },
-          { findingID: 'kettle0000000002', fixed: false, reason: 'the lid still leaks' },
-        ],
-      }), stderr: '' } });
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ noslopReview: { code: 0, stdout: JSON.stringify({
+      version: 7,
+      head: 'feat',
+      base: 'main',
+      depth: 'standard',
+      findings: [],
+      failedCalls: [],
+      notReviewed: [],
+      notReviewedByLens: [],
+      fixChecks: [
+        { findingID: 'kettle0000000001', fixed: true, reason: 'the kettle boils now' },
+        { findingID: 'kettle0000000002', fixed: false, reason: 'the lid still leaks' },
+      ],
+    }), stderr: '' } });
   ctx.listWidgets();
   ctx.addReview('[{"id":"kettle0000000001","lens":"correctness","severity":"high","title":"Kettle never boils"}]');
   createRunPR(ctx.db);
@@ -573,18 +573,18 @@ test('it passes --fixes-only to noslop when the PR has no review at all, past an
 });
 
 test('it forwards --fixes-only from hq review to noslop, and prints the fix checks as JSON', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner({ noslopReview: { code: 0, stdout: JSON.stringify({
-        version: 7,
-        head: 'feat',
-        base: 'main',
-        depth: 'standard',
-        findings: [],
-        failedCalls: [],
-        notReviewed: [],
-        notReviewedByLens: [],
-        fixChecks: [{ findingID: 'kettle0000000001', fixed: true, reason: 'the kettle boils now' }],
-      }), stderr: '' } });
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ noslopReview: { code: 0, stdout: JSON.stringify({
+      version: 7,
+      head: 'feat',
+      base: 'main',
+      depth: 'standard',
+      findings: [],
+      failedCalls: [],
+      notReviewed: [],
+      notReviewedByLens: [],
+      fixChecks: [{ findingID: 'kettle0000000001', fixed: true, reason: 'the kettle boils now' }],
+    }), stderr: '' } });
   const lines: string[] = [];
   const logger = spyOn(console, 'log').mockImplementation((line: string) => {
     lines.push(line);
@@ -602,8 +602,8 @@ test('it forwards --fixes-only from hq review to noslop, and prints the fix chec
 });
 
 test('it refuses --fixes-only with --full, and runs nothing', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner();
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
   ctx.listWidgets();
 
   await expect(runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false, fixesOnly: true, full: true })).rejects.toMatchObject({ code: 'bad_fixes_only', message: '--fixes-only and --full contradict: --fixes-only runs no lens over the diff, and --full asks for a review of the whole PR' });
@@ -612,8 +612,8 @@ test('it refuses --fixes-only with --full, and runs nothing', async () => {
 });
 
 test('it refuses --fixes-only on a PR reviewed by Codex, and runs nothing', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner();
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
 
   await expect(runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false, fixesOnly: true })).rejects.toMatchObject({ code: 'bad_fixes_only', message: "--fixes-only checks a noslop PR's fixes, but widgets#7 is reviewed by Codex" });
 
@@ -621,9 +621,9 @@ test('it refuses --fixes-only on a PR reviewed by Codex, and runs nothing', asyn
 });
 
 test('it refuses --confirm with a pointer to --fixes-only, on a noslop PR and a Codex PR, and runs nothing', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner(),
-    message = '--confirm was removed in 0.62.0: run hq review <repo> <pr> --fixes-only';
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
+  const message = '--confirm was removed in 0.62.0: run hq review <repo> <pr> --fixes-only';
 
   await expect(runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false, confirm: true })).rejects.toMatchObject({ code: 'bad_confirm', message });
   ctx.listWidgets();
@@ -633,8 +633,8 @@ test('it refuses --confirm with a pointer to --fixes-only, on a noslop PR and a 
 });
 
 test('it keeps counting a stored --confirm review as not a round', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner();
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
   ctx.listWidgets();
   ctx.addReview('[]');
   ctx.db.query("INSERT INTO noslop_rounds (repo, pr, kind, started_at, ended_at, ms, ok, depth, special, findings, sha, confirm) VALUES ('widgets', 7, 'review', 'a', 'b', 1, 1, 'standard', 'none', '[]', 'x', 1)").run();

@@ -10,8 +10,8 @@ import type { Check } from './types.ts';
 const FETCH_RECORD = z.object({ at: z.string(), error: z.string().nullable() }).nullable();
 
 export function readFetchCheck(db: Database): Check & { key: string } {
-  const last = metaJson(db, 'defs_fetch_check', FETCH_RECORD, null),
-    record = last && Date.now() - Date.parse(last.at) <= 3_600_000 ? last : writeFetchRecord(db);
+  const last = metaJson(db, 'defs_fetch_check', FETCH_RECORD, null);
+  const record = last && Date.now() - Date.parse(last.at) <= 3_600_000 ? last : writeFetchRecord(db);
   return {
     key: 'defs-fetch',
     ok: !record.error,

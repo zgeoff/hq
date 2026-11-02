@@ -12,8 +12,8 @@ const lastAt = z.object({ at: z.string().nullable() });
 const LAST_ROW = z.object({ account: z.string(), five_hour: z.number().nullable(), seven_day: z.number().nullable(), five_hour_resets_at: z.string().nullable(), seven_day_resets_at: z.string().nullable() }).nullable();
 
 export function sampleUsage(db: Database, at: Date = now()): boolean {
-  const f = getUsageCache(),
-    insert = db.query('INSERT OR IGNORE INTO usage_samples (at, account, five_hour, seven_day, five_hour_resets_at, seven_day_resets_at) VALUES (?, ?, ?, ?, ?, ?)');
+  const cachePath = getUsageCache();
+  const insert = db.query('INSERT OR IGNORE INTO usage_samples (at, account, five_hour, seven_day, five_hour_resets_at, seven_day_resets_at) VALUES (?, ?, ?, ?, ?, ?)');
   let files: string[] = [];
   try {
     files = readdirSync(getUsageDir()).filter((name) => name.endsWith('.json'));
@@ -37,15 +37,19 @@ export function sampleUsage(db: Database, at: Date = now()): boolean {
     }
     return stored;
   }
-  if (!existsSync(f)) return false;
-  const r = readings(f);
-  if (!r) return false;
-  const account = typeof r.account === 'string' && ACCOUNT_KEY.test(r.account) ? r.account : 'active';
-  const last = LAST_ROW.parse(db.query('SELECT account, five_hour, seven_day, five_hour_resets_at, seven_day_resets_at FROM usage_samples ORDER BY at DESC LIMIT 1').get());
-  if (isSameReading(last, { ...r, account })) {
+  if (!existsSync(cachePath)) {
     return false;
   }
-  return insert.run(iso(at), account, r.five, r.seven, r.fiveResetsAt, r.sevenResetsAt).changes > 0;
+  const cached = readings(cachePath);
+  if (!cached) {
+    return false;
+  }
+  const account = typeof cached.account === 'string' && ACCOUNT_KEY.test(cached.account) ? cached.account : 'active';
+  const last = LAST_ROW.parse(db.query('SELECT account, five_hour, seven_day, five_hour_resets_at, seven_day_resets_at FROM usage_samples ORDER BY at DESC LIMIT 1').get());
+  if (isSameReading(last, { ...cached, account })) {
+    return false;
+  }
+  return insert.run(iso(at), account, cached.five, cached.seven, cached.fiveResetsAt, cached.sevenResetsAt).changes > 0;
 }
 
 interface WindowResets {

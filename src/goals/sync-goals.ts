@@ -19,10 +19,10 @@ interface SyncGoalsOptions {
 }
 
 export async function syncGoals(db: Database, run: Runner, opts: SyncGoalsOptions, at: Date = now()): Promise<{ days: number; runs: number; closed: number; left: number; deployRuns: number; deployLeft: number; errors: string[] }> {
-  const all = buildUTCDays(opts.from, at),
-    errors: string[] = [],
-    names = await loadRepos(run, opts.env),
-    want = names.flatMap((repo) => all.filter((d) => !isDayDone(db, 'ci', repo, d)).map((d) => [repo, d] as const)).toSorted((a, b) => b[1].localeCompare(a[1]));
+  const all = buildUTCDays(opts.from, at);
+  const errors: string[] = [];
+  const names = await loadRepos(run, opts.env);
+  const want = names.flatMap((repo) => all.filter((day) => !isDayDone(db, 'ci', repo, day)).map((day) => [repo, day] as const)).toSorted((first, second) => second[1].localeCompare(first[1]));
   let runs = 0;
   let closed = 0;
   let days = 0;

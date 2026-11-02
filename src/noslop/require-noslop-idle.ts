@@ -8,8 +8,8 @@ import type { OpenRound } from './read-open-rounds.ts';
 
 // A pin that migrates the store under a running review can lose that review's record.
 export async function requireNoslopIdle(run: Runner): Promise<void> {
-  const processes = await readNoslopProcesses(run),
-    rounds = readOpenRounds(reviewDir());
+  const processes = await readNoslopProcesses(run);
+  const rounds = readOpenRounds(reviewDir());
   if (processes.length === 0 && rounds.length === 0) {
     return;
   }

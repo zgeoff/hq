@@ -68,8 +68,8 @@ export async function runNoslopCommand(args: NoslopArgs): Promise<Out> {
 }
 
 function updateRepoList(args: NoslopArgs, change: 'on' | 'off'): Out {
-  const before = loadNoslopSettings(args.db),
-    next = updateNoslopRepos(args.db, change, args.rest);
+  const before = loadNoslopSettings(args.db);
+  const next = updateNoslopRepos(args.db, change, args.rest);
   logEvent(args.db, 'hq', 'noslop', change, args.actor, before.repos.join(','), next.repos.join(','), { repos: args.rest });
   return renderSettings(args.db);
 }
@@ -84,8 +84,8 @@ function resolveRunDir(settings: NoslopSettings): string {
 }
 
 function formatSettings(settings: NoslopSettings): string {
-  const clone = resolveRunDir(settings),
-    repos = settings.repos.length > 0 ? settings.repos.join(', ') : 'none (noslop is off everywhere)';
+  const clone = resolveRunDir(settings);
+  const repos = settings.repos.length > 0 ? settings.repos.join(', ') : 'none (noslop is off everywhere)';
   return [
     `repos: ${repos}`,
     `emergency review cap: ${formatCaps(settings)}`,
@@ -128,10 +128,10 @@ async function requireOwnerSession(args: NoslopArgs): Promise<void> {
 }
 
 async function updatePin(args: NoslopArgs): Promise<Out> {
-  const commit = requireSha(args.rest),
-    force = requireForce(args),
-    migration = await withCloneLock(() => updatePinLocked(args, commit, force)),
-    shown = renderSettings(args.db);
+  const commit = requireSha(args.rest);
+  const force = requireForce(args);
+  const migration = await withCloneLock(() => updatePinLocked(args, commit, force));
+  const shown = renderSettings(args.db);
   return { data: { ...shown.data, storeMigration: migration }, text: `${shown.text}\n${formatStoreMigration(migration)}` };
 }
 
@@ -153,19 +153,18 @@ interface PinPlan {
 }
 
 async function updatePinStored(args: NoslopArgs, plan: PinPlan): Promise<StoreMigration> {
-  const pinned = await updateNoslopClone(args.run, resolveNoslopDir(), plan.commit),
-    requireIdle = plan.force === undefined ? () => requireNoslopIdle(args.run) : undefined,
-    stored = await runStoreMigration({ run: args.run, store: plan.store, clone: pinned.clone, sha: pinned.sha, requireIdle }).catch((error: unknown) => {
-      writeMigrationFailure(args.db, pinned.sha, error);
-      throw error;
-    }),
-
-    // `hq noslop on` and `off` take no clone lock, so the list is read in the same transaction as the write.
-    before = args.db.transaction(() => {
-      const settings = loadNoslopSettings(args.db);
-      writeNoslopSettings(args.db, { ...settings, sha: pinned.sha });
-      return settings;
-    }).immediate();
+  const pinned = await updateNoslopClone(args.run, resolveNoslopDir(), plan.commit);
+  const requireIdle = plan.force === undefined ? () => requireNoslopIdle(args.run) : undefined;
+  const stored = await runStoreMigration({ run: args.run, store: plan.store, clone: pinned.clone, sha: pinned.sha, requireIdle }).catch((error: unknown) => {
+    writeMigrationFailure(args.db, pinned.sha, error);
+    throw error;
+  });
+  // `hq noslop on` and `off` take no clone lock, so the list is read in the same transaction as the write.
+  const before = args.db.transaction(() => {
+    const settings = loadNoslopSettings(args.db);
+    writeNoslopSettings(args.db, { ...settings, sha: pinned.sha });
+    return settings;
+  }).immediate();
   logEvent(args.db, 'hq', 'noslop', 'pinned', args.actor, before.sha, pinned.sha, buildPinData(stored, plan.force));
   return stored;
 }
@@ -173,16 +172,16 @@ async function updatePinStored(args: NoslopArgs, plan: PinPlan): Promise<StoreMi
 // noslop never reads HQ_NOSLOP_STORE, so a migration it runs lands in its own store. A different
 // path in the setting would have hq guard one file while noslop migrates another.
 function requireNoslopStore(): string {
-  const own = resolveNoslopDefaultStore(process.env),
-    setting = config(process.env).HQ_NOSLOP_STORE;
+  const own = resolveNoslopDefaultStore(process.env);
+  const setting = config(process.env).HQ_NOSLOP_STORE;
   if (setting !== undefined && setting !== own) {
     throw new HqError('bad_args', `HQ_NOSLOP_STORE is ${setting}, but noslop opens ${own} and ignores that setting. Unset HQ_NOSLOP_STORE to pin.`);
   }
   return own;
 }
 
-const FAILED_KEY = 'noslop_store_migration_failed',
-  FailedMigration = z.object({ sha: z.string(), names: z.array(z.string()), backup: z.string(), at: z.string() });
+const FAILED_KEY = 'noslop_store_migration_failed';
+const FailedMigration = z.object({ sha: z.string(), names: z.array(z.string()), backup: z.string(), at: z.string() });
 
 // A failed migration leaves the store holding its names, so the next pin would see nothing new to
 // migrate and record the pin over the lost rows. The marker keeps every pin refused until the store
@@ -223,8 +222,8 @@ function writeMigrationFailure(db: Database, sha: string, error: unknown): void 
 }
 
 function buildPinData(migration: StoreMigration, force: string | undefined): Record<string, unknown> {
-  const counts = Object.fromEntries(migration.tables.map((count) => [count.table, { before: count.before, after: count.after }])),
-    moved = migration.backup === null ? {} : { migrations: migration.names, backup: migration.backup, counts };
+  const counts = Object.fromEntries(migration.tables.map((count) => [count.table, { before: count.before, after: count.after }]));
+  const moved = migration.backup === null ? {} : { migrations: migration.names, backup: migration.backup, counts };
   return force === undefined ? moved : { ...moved, force };
 }
 

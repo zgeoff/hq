@@ -15,8 +15,8 @@ export interface NoslopSecrets {
 // One `op item get` per round for all three fields, by item and vault ID: 1Password counts a lookup
 // by name as 3 requests and one by ID as 1, and every hq call is a new process.
 export async function loadNoslopSecrets(run: Runner, recordRead: () => void = () => {}): Promise<NoslopSecrets> {
-  const token = await readOpToken(),
-    values = await readSecretFields(run, token, recordRead);
+  const token = await readOpToken();
+  const values = await readSecretFields(run, token, recordRead);
   return {
     appID: pickSecret(values, 'app-id'),
     installationID: pickSecret(values, 'installation-id'),
@@ -24,17 +24,13 @@ export async function loadNoslopSecrets(run: Runner, recordRead: () => void = ()
   };
 }
 
-const AUTH_FAILURE = /auth|sign.?in|token|unauthori[sz]ed|forbidden|401|403/iu,
-
-  OpFields = z.array(z.object({ label: z.string(), value: z.string().optional() })),
-  OpSettings = z.object({ env: z.object({ OP_SERVICE_ACCOUNT_TOKEN: z.string().min(1) }) }),
-  RATE_LIMITED = /too many requests|rate.?limit/iu;
+const OpSettings = z.object({ env: z.object({ OP_SERVICE_ACCOUNT_TOKEN: z.string().min(1) }) });
 
 async function readOpToken(): Promise<string> {
-  const path = resolveSettingsPath(),
-    raw = await readJSONFile(path),
-    remint = `re-mint with op-mint noslop (token read from ${path})`,
-    settings = OpSettings.safeParse(raw);
+  const path = resolveSettingsPath();
+  const raw = await readJSONFile(path);
+  const remint = `re-mint with op-mint noslop (token read from ${path})`;
+  const settings = OpSettings.safeParse(raw);
   if (raw === undefined) {
     throw new HqError('bad_config', `noslop's 1Password token is unreadable: ${remint}`);
   }
@@ -57,9 +53,11 @@ async function readJSONFile(path: string): Promise<unknown> {
   }
 }
 
+const OpFields = z.array(z.object({ label: z.string(), value: z.string().optional() }));
+
 async function readSecretFields(run: Runner, token: string, recordRead: () => void): Promise<z.infer<typeof OpFields>> {
-  const settings = { item: readLocalSetting('HQ_NOSLOP_OP_ITEM'), vault: readLocalSetting('HQ_NOSLOP_OP_VAULT') },
-    toolResult = await run(['op', 'item', 'get', settings.item, '--vault', settings.vault, '--fields', 'label=app-id,label=installation-id,label=private-key', '--reveal', '--format', 'json'], { env: cleanEnv({ OP_SERVICE_ACCOUNT_TOKEN: token }) });
+  const settings = { item: readLocalSetting('HQ_NOSLOP_OP_ITEM'), vault: readLocalSetting('HQ_NOSLOP_OP_VAULT') };
+  const toolResult = await run(['op', 'item', 'get', settings.item, '--vault', settings.vault, '--fields', 'label=app-id,label=installation-id,label=private-key', '--reveal', '--format', 'json'], { env: cleanEnv({ OP_SERVICE_ACCOUNT_TOKEN: token }) });
   recordRead();
   if (toolResult.code !== 0) {
     throw new HqError('bad_config', `1Password gave no app secrets for noslop (exit ${toolResult.code})${pickFailureReason(toolResult.stderr)}`);
@@ -74,6 +72,9 @@ function parseSecretFields(stdout: string): z.infer<typeof OpFields> {
   }
   return parsed.data;
 }
+
+const AUTH_FAILURE = /auth|sign.?in|token|unauthori[sz]ed|forbidden|401|403/iu;
+const RATE_LIMITED = /too many requests|rate.?limit/iu;
 
 function pickFailureReason(stderr: string): string {
   if (RATE_LIMITED.test(stderr)) {

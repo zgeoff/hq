@@ -14,44 +14,38 @@ import { mergedPRsOutputSchema } from './merged-prs-output-schema.ts';
 import { parseRenderedReport } from './parse-rendered-report.ts';
 import type { ProjectIssue, ReportIssue } from './types.ts';
 
-const FIXTURES = join(import.meta.dir, '../../skills/delivery-report/scripts/testdata/render-report'),
-  FIXTURE_PR = z.looseObject({ repo: z.string(), number: z.number(), title: z.string(), url: z.string(), day: z.string(), issue: z.string().nullable() }),
-  FIXTURE_ROW = z.looseObject({ issue: z.string(), prs: z.array(FIXTURE_PR) }),
-  RENDER_INPUT = z.looseObject({ start: z.string(), totals: z.looseObject({ prs: z.number() }), byIssue: z.array(FIXTURE_ROW), prs: z.array(FIXTURE_PR) }),
-  SCRIPTS = join(import.meta.dir, '../../skills/delivery-report/scripts');
-
 function setupTest() {
   const fresh = freshDb();
   onTestFinished(fresh.cleanup);
-  return { db: fresh.db };
+  return { db: fresh.db, scripts: join(import.meta.dir, '../../skills/delivery-report/scripts') };
 }
 
 test('a day: merged-prs.sh, the Linear issues and render-report.sh --json give the golden report', async () => {
-  const asked: unknown[] = [],
-    ctx = setupTest(),
-    merged = mergedPRsOutputSchema.parse(JSON.parse(readScriptOutput('daily-prs.json'))),
-    ran: string[][] = [],
-    report = await loadShippedReport({ db: ctx.db, run: makeScriptRunner('daily-prs.json', ran), call: loadLinearFake([], asked), scripts: SCRIPTS }, 'today', new Date('2026-10-15T02:00:00Z'));
+  const asked: unknown[] = [];
+  const ctx = setupTest();
+  const merged = mergedPRsOutputSchema.parse(JSON.parse(readScriptOutput('daily-prs.json')));
+  const ran: string[][] = [];
+  const report = await loadShippedReport({ db: ctx.db, run: makeScriptRunner('daily-prs.json', ran), call: loadLinearFake([], asked), scripts: ctx.scripts }, 'today', new Date('2026-10-15T02:00:00Z'));
   expect(report.report).toStrictEqual(parseRenderedReport(readFixture('daily.json.expected')));
   expect([report.period, report.at]).toStrictEqual(['today', '2026-10-15T02:00:00Z']);
-  expect(ran[0]).toStrictEqual([join(SCRIPTS, 'merged-prs.sh'), 'daily', '2026-10-15']);
+  expect(ran[0]).toStrictEqual([join(ctx.scripts, 'merged-prs.sh'), 'daily', '2026-10-15']);
   expect(asked[0]).toStrictEqual({ ids: merged.byIssue.map((entry) => entry.issue) });
 });
 
 test('a week up to Thursday, read a day at a time, renders its days and totals', async () => {
-  const ctx = setupTest(),
-    day14 = buildMergedPR({ number: 9401, url: 'https://github.com/zgeoff/lantern-demo/pull/9401', repo: 'lantern-demo', issue: 'GEO-9401', mergedAt: '2026-10-14T01:00:00Z', day: '2026-10-14', added: 100, removed: 20 }),
-    day15 = buildMergedPR({ number: 9402, url: 'https://github.com/zgeoff/lantern-demo/pull/9402', repo: 'lantern-demo', issue: 'GEO-9402', mergedAt: '2026-10-15T01:00:00Z', day: '2026-10-15', added: 30, removed: 5 }),
-    fake = buildStubDeliveryRunner({
-      days: {
-        '2026-10-12': buildMergedDayOutput('2026-10-12', []),
-        '2026-10-13': buildMergedDayOutput('2026-10-13', []),
-        '2026-10-14': buildMergedDayOutput('2026-10-14', [day14]),
-        '2026-10-15': buildMergedDayOutput('2026-10-15', [day15]),
-      },
-      otherwise: realRunner,
-    }),
-    report = await loadShippedReport({ db: ctx.db, run: fake.run, call: loadLinearFake([], []), scripts: SCRIPTS }, 'week', new Date('2026-10-15T02:00:00Z'));
+  const ctx = setupTest();
+  const day14 = buildMergedPR({ number: 9401, url: 'https://github.com/zgeoff/lantern-demo/pull/9401', repo: 'lantern-demo', issue: 'GEO-9401', mergedAt: '2026-10-14T01:00:00Z', day: '2026-10-14', added: 100, removed: 20 });
+  const day15 = buildMergedPR({ number: 9402, url: 'https://github.com/zgeoff/lantern-demo/pull/9402', repo: 'lantern-demo', issue: 'GEO-9402', mergedAt: '2026-10-15T01:00:00Z', day: '2026-10-15', added: 30, removed: 5 });
+  const fake = buildStubDeliveryRunner({
+    days: {
+      '2026-10-12': buildMergedDayOutput('2026-10-12', []),
+      '2026-10-13': buildMergedDayOutput('2026-10-13', []),
+      '2026-10-14': buildMergedDayOutput('2026-10-14', [day14]),
+      '2026-10-15': buildMergedDayOutput('2026-10-15', [day15]),
+    },
+    otherwise: realRunner,
+  });
+  const report = await loadShippedReport({ db: ctx.db, run: fake.run, call: loadLinearFake([], []), scripts: ctx.scripts }, 'week', new Date('2026-10-15T02:00:00Z'));
   expect(report.report.kind).toBe('weekly');
   expect(report.report.dateLabel).toBe('Monday 12 October');
   expect(report.report.totals).toStrictEqual({ prs: 2, repos: 1, issues: 2, added: 130, removed: 25, closed: 1 });
@@ -62,23 +56,23 @@ test('a week up to Thursday, read a day at a time, renders its days and totals',
 });
 
 test('a week read a day at a time renders in full, with each project\'s burndown', async () => {
-  const ctx = setupTest(),
-    fake = buildStubDeliveryRunner({
-      days: {
-        '2026-10-12': buildMergedDayOutput('2026-10-12', []),
-        '2026-10-13': buildMergedDayOutput('2026-10-13', [
-          buildMergedPR({ number: 9501, url: 'https://github.com/zgeoff/lantern-demo/pull/9501', repo: 'lantern-demo', issue: 'GEO-9401', mergedAt: '2026-10-13T01:00:00Z', day: '2026-10-13', added: 100, removed: 20 }),
-        ]),
-        '2026-10-14': buildMergedDayOutput('2026-10-14', [
-          buildMergedPR({ number: 9502, url: 'https://github.com/zgeoff/lantern-demo/pull/9502', repo: 'lantern-demo', issue: 'GEO-9402', mergedAt: '2026-10-14T01:00:00Z', day: '2026-10-14', added: 30, removed: 5 }),
-          buildMergedPR({ number: 9503, url: 'https://github.com/zgeoff/lantern-demo/pull/9503', repo: 'lantern-demo', issue: 'GEO-9403', mergedAt: '2026-10-14T02:00:00Z', day: '2026-10-14', added: 8, removed: 1 }),
-        ]),
-        '2026-10-15': buildMergedDayOutput('2026-10-15', []),
-      },
-      otherwise: realRunner,
-    }),
-    fixtures = ['project-array.json', 'project-object.json'].flatMap((file) => readIssues<ProjectIssue>(file)),
-    report = await loadShippedReport({ db: ctx.db, run: fake.run, call: loadLinearFake(fixtures, []), scripts: SCRIPTS }, 'week', new Date('2026-10-15T02:00:00Z'));
+  const ctx = setupTest();
+  const fake = buildStubDeliveryRunner({
+    days: {
+      '2026-10-12': buildMergedDayOutput('2026-10-12', []),
+      '2026-10-13': buildMergedDayOutput('2026-10-13', [
+        buildMergedPR({ number: 9501, url: 'https://github.com/zgeoff/lantern-demo/pull/9501', repo: 'lantern-demo', issue: 'GEO-9401', mergedAt: '2026-10-13T01:00:00Z', day: '2026-10-13', added: 100, removed: 20 }),
+      ]),
+      '2026-10-14': buildMergedDayOutput('2026-10-14', [
+        buildMergedPR({ number: 9502, url: 'https://github.com/zgeoff/lantern-demo/pull/9502', repo: 'lantern-demo', issue: 'GEO-9402', mergedAt: '2026-10-14T01:00:00Z', day: '2026-10-14', added: 30, removed: 5 }),
+        buildMergedPR({ number: 9503, url: 'https://github.com/zgeoff/lantern-demo/pull/9503', repo: 'lantern-demo', issue: 'GEO-9403', mergedAt: '2026-10-14T02:00:00Z', day: '2026-10-14', added: 8, removed: 1 }),
+      ]),
+      '2026-10-15': buildMergedDayOutput('2026-10-15', []),
+    },
+    otherwise: realRunner,
+  });
+  const fixtures = ['project-array.json', 'project-object.json'].flatMap((file) => readIssues<ProjectIssue>(file));
+  const report = await loadShippedReport({ db: ctx.db, run: fake.run, call: loadLinearFake(fixtures, []), scripts: ctx.scripts }, 'week', new Date('2026-10-15T02:00:00Z'));
 
   expect(report.report).toMatchInlineSnapshot(`
     {
@@ -195,31 +189,32 @@ test('a week read a day at a time renders in full, with each project\'s burndown
 });
 
 test('a week whose Monday GitHub capped at 1,000 of 1,200 PRs keeps the fetch-gap warning, with the week\'s sums', async () => {
-  const ctx = setupTest(),
-    fake = buildStubDeliveryRunner({
-      days: {
-        '2026-10-12': buildMergedDayOutput(
-          '2026-10-12',
-          Array.from({ length: 1000 }, (_unused, n) => buildMergedPR({ number: n, day: '2026-10-12', mergedAt: '2026-10-12T01:00:00Z', issue: null })),
-          1200,
-        ),
-        '2026-10-13': buildMergedDayOutput(
-          '2026-10-13',
-          Array.from({ length: 10 }, (_unused, n) => buildMergedPR({ number: 2000 + n, day: '2026-10-13', mergedAt: '2026-10-13T01:00:00Z', issue: null })),
-        ),
-        '2026-10-14': buildMergedDayOutput('2026-10-14', []),
-        '2026-10-15': buildMergedDayOutput('2026-10-15', []),
-      },
-      otherwise: realRunner,
-    }),
-    report = await loadShippedReport({ db: ctx.db, run: fake.run, call: loadLinearFake([], []), scripts: SCRIPTS }, 'week', new Date('2026-10-15T02:00:00Z'));
+  const ctx = setupTest();
+  const fake = buildStubDeliveryRunner({
+    days: {
+      '2026-10-12': buildMergedDayOutput(
+        '2026-10-12',
+        Array.from({ length: 1000 }, (_unused, n) => buildMergedPR({ number: n, day: '2026-10-12', mergedAt: '2026-10-12T01:00:00Z', issue: null })),
+        1200,
+      ),
+      '2026-10-13': buildMergedDayOutput(
+        '2026-10-13',
+        Array.from({ length: 10 }, (_unused, n) => buildMergedPR({ number: 2000 + n, day: '2026-10-13', mergedAt: '2026-10-13T01:00:00Z', issue: null })),
+      ),
+      '2026-10-14': buildMergedDayOutput('2026-10-14', []),
+      '2026-10-15': buildMergedDayOutput('2026-10-15', []),
+    },
+    otherwise: realRunner,
+  });
+  const report = await loadShippedReport({ db: ctx.db, run: fake.run, call: loadLinearFake([], []), scripts: ctx.scripts }, 'week', new Date('2026-10-15T02:00:00Z'));
 
   expect(report.report.fetchGap).toStrictEqual({ searchCount: 1210, fetched: 1010 });
 });
 
 test('a day carries each project\'s burndown beside its heading when Linear gives the projects\' issues', async () => {
-  const fixtures = ['project-array.json', 'project-object.json'].flatMap((file) => readIssues<ProjectIssue>(file)),
-    report = await loadShippedReport({ db: setupTest().db, run: makeScriptRunner('daily-prs.json', []), call: loadLinearFake(fixtures, []), scripts: SCRIPTS }, 'today', new Date('2026-10-15T02:00:00Z'));
+  const ctx = setupTest();
+  const fixtures = ['project-array.json', 'project-object.json'].flatMap((file) => readIssues<ProjectIssue>(file));
+  const report = await loadShippedReport({ db: ctx.db, run: makeScriptRunner('daily-prs.json', []), call: loadLinearFake(fixtures, []), scripts: ctx.scripts }, 'today', new Date('2026-10-15T02:00:00Z'));
   expect(report.report.groups.slice(0, 2).map((group) => [group.project, group.burndown])).toStrictEqual([
     ['Lantern Garden', { total: 3, done: 1, triage: 1 }],
     ['Paper Orchard', { total: 2, done: 1, triage: 0 }],
@@ -227,7 +222,8 @@ test('a day carries each project\'s burndown beside its heading when Linear give
 });
 
 test('a script that fails says which and why, in one line', async () => {
-  await expect(loadShippedReport({ db: setupTest().db, run: runFailingScript, call: loadLinearFake([], []), scripts: SCRIPTS }, 'today', new Date())).rejects.toThrow('merged-prs.sh exited 1: gh: not logged in');
+  const ctx = setupTest();
+  await expect(loadShippedReport({ db: ctx.db, run: runFailingScript, call: loadLinearFake([], []), scripts: ctx.scripts }, 'today', new Date())).rejects.toThrow('merged-prs.sh exited 1: gh: not logged in');
 });
 
 function makeScriptRunner(prsFile: string, ran: string[][]): Runner {
@@ -241,7 +237,8 @@ function makeScriptRunner(prsFile: string, ran: string[][]): Runner {
 }
 
 test('merged-prs.sh output in another shape is refused, naming the fields', async () => {
-  await expect(loadShippedReport({ db: setupTest().db, run: runOddShapeScript, call: loadLinearFake([], []), scripts: SCRIPTS }, 'today', new Date())).rejects.toThrow(/^merged-prs\.sh printed an unexpected shape: .*byIssue\.0\.issue/u);
+  const ctx = setupTest();
+  await expect(loadShippedReport({ db: ctx.db, run: runOddShapeScript, call: loadLinearFake([], []), scripts: ctx.scripts }, 'today', new Date())).rejects.toThrow(/^merged-prs\.sh printed an unexpected shape: .*byIssue\.0\.issue/u);
 });
 
 function runOddShapeScript(): Promise<RunResult> {
@@ -254,7 +251,10 @@ function runFailingScript(): Promise<RunResult> {
 
 // The fields the fixture leaves out, which render-report.sh does not read for a day, are filled in.
 function readScriptOutput(file: string): string {
-  const fixture = RENDER_INPUT.parse(JSON.parse(readFixture(file)));
+  const fixturePR = z.looseObject({ repo: z.string(), number: z.number(), title: z.string(), url: z.string(), day: z.string(), issue: z.string().nullable() });
+  const fixtureRow = z.looseObject({ issue: z.string(), prs: z.array(fixturePR) });
+  const renderInput = z.looseObject({ start: z.string(), totals: z.looseObject({ prs: z.number() }), byIssue: z.array(fixtureRow), prs: z.array(fixturePR) });
+  const fixture = renderInput.parse(JSON.parse(readFixture(file)));
   return JSON.stringify({
     ...fixture,
     end: `${fixture.start.slice(0, 10)}T23:59:59Z`,
@@ -267,7 +267,7 @@ function readScriptOutput(file: string): string {
 }
 
 function readFixture(file: string): string {
-  return readFileSync(join(FIXTURES, file), 'utf8');
+  return readFileSync(join(import.meta.dir, '../../skills/delivery-report/scripts/testdata/render-report', file), 'utf8');
 }
 
 function readIssues<T>(file: string): T[] {

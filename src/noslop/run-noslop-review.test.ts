@@ -28,8 +28,8 @@ function buildLockThatTimesOut(): NoslopReviewContext['lock'] {
 }
 
 function setupTest() {
-  const base = mkdtempSync(join(tmpdir(), 'hq-noslop-run-')),
-    db = openDb(join(base, 'hq.db'));
+  const base = mkdtempSync(join(tmpdir(), 'hq-noslop-run-'));
+  const db = openDb(join(base, 'hq.db'));
 
   onTestFinished(() => {
     db.close();
@@ -62,9 +62,9 @@ function setupTest() {
 }
 
 test('it asks noslop for a full review only when told to', async () => {
-  const ctx = setupTest(),
-    full = buildFakeRunner(),
-    partial = buildFakeRunner();
+  const ctx = setupTest();
+  const full = buildFakeRunner();
+  const partial = buildFakeRunner();
 
   await runNoslopReview(ctx.reviewContext(partial.run));
   await runNoslopReview({ ...ctx.reviewContext(full.run), full: true });
@@ -75,17 +75,17 @@ test('it asks noslop for a full review only when told to', async () => {
 });
 
 test('it hands noslop the linked Linear issue in a file, then removes the file', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner({ prBody: 'Fixes GEO-12', noslopHelp: { code: 0, stdout: '  --issue-file <path>\n', stderr: '' } }),
-    file = `${ctx.base}/widgets+7-issue-${process.pid}.md`,
-    runAndRead: Runner = async (cmd, opts) => {
-      const at = cmd.indexOf('--issue-file');
-      if (at > 0) {
-        seen.push(readFileSync(cmd[at + 1] ?? '', 'utf8'));
-      }
-      return await fake.run(cmd, opts);
-    },
-    seen: string[] = [];
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ prBody: 'Fixes GEO-12', noslopHelp: { code: 0, stdout: '  --issue-file <path>\n', stderr: '' } });
+  const file = `${ctx.base}/widgets+7-issue-${process.pid}.md`;
+  const runAndRead: Runner = async (cmd, opts) => {
+    const at = cmd.indexOf('--issue-file');
+    if (at > 0) {
+      seen.push(readFileSync(cmd[at + 1] ?? '', 'utf8'));
+    }
+    return await fake.run(cmd, opts);
+  };
+  const seen: string[] = [];
 
   await expect(runNoslopReview({ ...ctx.reviewContext(runAndRead), linear: readKettleIssue })).resolves.toMatchObject({ issue: { issue: 'GEO-12', attached: true, why: 'attached' } });
 
@@ -95,10 +95,10 @@ test('it hands noslop the linked Linear issue in a file, then removes the file',
 });
 
 test('it removes the issue file even when the worktree cleanup cannot take the lock', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner({ prBody: 'Fixes GEO-12', noslopHelp: { code: 0, stdout: '  --issue-file <path>\n', stderr: '' } }),
-    file = `${ctx.base}/widgets+7-issue-${process.pid}.md`,
-    review = { ...ctx.reviewContext(fake.run), linear: readKettleIssue, lock: buildLockThatTimesOut() };
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ prBody: 'Fixes GEO-12', noslopHelp: { code: 0, stdout: '  --issue-file <path>\n', stderr: '' } });
+  const file = `${ctx.base}/widgets+7-issue-${process.pid}.md`;
+  const review = { ...ctx.reviewContext(fake.run), linear: readKettleIssue, lock: buildLockThatTimesOut() };
 
   await runNoslopReview(review);
 
@@ -117,18 +117,18 @@ test('it records a review that ran and logs the cleanup error when the worktree 
 });
 
 test('it reviews without an issue file when the PR links none', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner(),
-    result = await runNoslopReview({ ...ctx.reviewContext(fake.run), linear: readKettleIssue });
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
+  const result = await runNoslopReview({ ...ctx.reviewContext(fake.run), linear: readKettleIssue });
 
   expect(fake.of('bun').at(-1)?.cmd).not.toContain('--issue-file');
   expect(result.issue).toStrictEqual({ issue: null, attached: false, why: 'the PR body links no GEO issue' });
 });
 
 test('it records the review with its findings and returns them', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner(),
-    result = await runNoslopReview(ctx.reviewContext(fake.run));
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
+  const result = await runNoslopReview(ctx.reviewContext(fake.run));
 
   expect(result.findings).toStrictEqual([{ id: '00112233445566aa', lens: 'correctness', severity: 'high', title: 'Kettle never boils' }]);
   expect(ctx.db.query('SELECT repo, pr, kind, ok, depth, failed_calls, error, sha, findings FROM noslop_rounds').get()).toStrictEqual({
@@ -145,8 +145,8 @@ test('it records the review with its findings and returns them', async () => {
 });
 
 test('it runs noslop from the pinned clone with its own bunfig, in the worktree of the base', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner();
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
 
   await runNoslopReview(ctx.reviewContext(fake.run));
 
@@ -168,8 +168,8 @@ test('it runs noslop from the pinned clone with its own bunfig, in the worktree 
 });
 
 test('it fetches the PR head and removes the worktree after the review', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner();
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
 
   await runNoslopReview(ctx.reviewContext(fake.run));
 
@@ -180,8 +180,8 @@ test('it fetches the PR head and removes the worktree after the review', async (
 });
 
 test('it gives the credentials to the noslop child only, and the 1Password token to the op children only', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner();
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
 
   await runNoslopReview(ctx.reviewContext(fake.run));
 
@@ -196,10 +196,10 @@ test('it gives the credentials to the noslop child only, and the 1Password token
 });
 
 test('it keeps every credential out of the returned data, the event log and the stored rounds', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner(),
-    result = await runNoslopReview(ctx.reviewContext(fake.run)),
-    stored = JSON.stringify([ctx.db.query('SELECT * FROM events').all(), ctx.db.query('SELECT * FROM noslop_rounds').all(), result]);
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
+  const result = await runNoslopReview(ctx.reviewContext(fake.run));
+  const stored = JSON.stringify([ctx.db.query('SELECT * FROM events').all(), ctx.db.query('SELECT * FROM noslop_rounds').all(), result]);
 
   for (const secret of [...Object.values(FAKE_SECRETS), FAKE_TOKEN]) {
     expect(stored).not.toContain(secret);
@@ -216,8 +216,8 @@ test.each([
   ['a version 6 output has no notReviewed list', { code: 0, stdout: JSON.stringify({ ...JSON.parse(FAKE_REVIEW_JSON), version: 6, dropped: [] }), stderr: '' }, 'output version 6 has no notReviewed list'],
   ['a noslop call failed', { code: 0, stdout: JSON.stringify({ ...JSON.parse(FAKE_REVIEW_JSON), failedCalls: [{ lens: 'security' }] }), stderr: '' }, '1 noslop call(s) failed'],
 ])('it throws noslop_failed and records no review when %s', async (_name, noslopReview, why) => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner({ noslopReview });
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ noslopReview });
 
   await expect(runNoslopReview(ctx.reviewContext(fake.run))).rejects.toMatchObject({
     code: 'noslop_failed',
@@ -230,38 +230,38 @@ test.each([
 });
 
 test('it reads a version 5 review, which adds the dropped findings', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner({ noslopReview: { code: 0, stdout: JSON.stringify({ ...JSON.parse(FAKE_REVIEW_JSON), version: 5, dropped: [{ lens: 'style', reason: 'no quote', title: 'Lid is loose' }] }), stderr: '' } }),
-    result = await runNoslopReview(ctx.reviewContext(fake.run));
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ noslopReview: { code: 0, stdout: JSON.stringify({ ...JSON.parse(FAKE_REVIEW_JSON), version: 5, dropped: [{ lens: 'style', reason: 'no quote', title: 'Lid is loose' }] }), stderr: '' } });
+  const result = await runNoslopReview(ctx.reviewContext(fake.run));
 
   expect(result.findings).toStrictEqual([{ id: '00112233445566aa', lens: 'correctness', severity: 'high', title: 'Kettle never boils' }]);
   expect(ctx.db.query('SELECT ok, error FROM noslop_rounds').get()).toStrictEqual({ ok: 1, error: null });
 });
 
 test('it reads a version 6 review, which lists the files no call read, and keeps them on the result', async () => {
-  const ctx = setupTest(),
-    left = [
-      { path: 'data/kettle-readings.json', reason: 'data' },
-      { path: 'src/teapot-lid.ts', reason: 'too-large' },
-    ],
-    noslop = buildFakeRunner({ noslopReview: { code: 0, stdout: JSON.stringify({ ...JSON.parse(FAKE_REVIEW_JSON), version: 6, dropped: [], notReviewed: left }), stderr: '' } }).run,
-    result = await runNoslopReview(ctx.reviewContext(noslop));
+  const ctx = setupTest();
+  const left = [
+    { path: 'data/kettle-readings.json', reason: 'data' },
+    { path: 'src/teapot-lid.ts', reason: 'too-large' },
+  ];
+  const noslop = buildFakeRunner({ noslopReview: { code: 0, stdout: JSON.stringify({ ...JSON.parse(FAKE_REVIEW_JSON), version: 6, dropped: [], notReviewed: left }), stderr: '' } }).run;
+  const result = await runNoslopReview(ctx.reviewContext(noslop));
 
   expect([result.findings.map((f) => f.id), result.notReviewed]).toStrictEqual([['00112233445566aa'], left]);
   expect(ctx.db.query('SELECT ok, error FROM noslop_rounds').get()).toStrictEqual({ ok: 1, error: null });
 });
 
 test('a version 4 or 5 review has no files left out', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner({ noslopReview: { code: 0, stdout: JSON.stringify({ ...JSON.parse(FAKE_REVIEW_JSON), version: 5, dropped: [] }), stderr: '' } }),
-    result = await runNoslopReview(ctx.reviewContext(fake.run));
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ noslopReview: { code: 0, stdout: JSON.stringify({ ...JSON.parse(FAKE_REVIEW_JSON), version: 5, dropped: [] }), stderr: '' } });
+  const result = await runNoslopReview(ctx.reviewContext(fake.run));
 
   expect(result.notReviewed).toStrictEqual([]);
 });
 
 test('it counts the failed calls in the stored round', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner({ noslopReview: { code: 0, stdout: JSON.stringify({ ...JSON.parse(FAKE_REVIEW_JSON), failedCalls: [1, 2] }), stderr: '' } });
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ noslopReview: { code: 0, stdout: JSON.stringify({ ...JSON.parse(FAKE_REVIEW_JSON), failedCalls: [1, 2] }), stderr: '' } });
 
   await expect(runNoslopReview(ctx.reviewContext(fake.run))).rejects.toMatchObject({ code: 'noslop_failed' });
 
@@ -327,8 +327,8 @@ test('it records no review when noslop exits 1 with output that is no review, ev
 });
 
 test('it blanks a credential that noslop echoes in its error output', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner({ noslopReview: { code: 1, stdout: '', stderr: `bad key ${FAKE_SECRETS['private-key']} and app ${FAKE_SECRETS['app-id']}` } });
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ noslopReview: { code: 1, stdout: '', stderr: `bad key ${FAKE_SECRETS['private-key']} and app ${FAKE_SECRETS['app-id']}` } });
 
   await expect(runNoslopReview(ctx.reviewContext(fake.run))).rejects.toMatchObject({
     message: expect.stringMatching(/^(?!.*(?:badger-secret-key|app-4711)).*\[redacted\]/su),
@@ -338,8 +338,8 @@ test('it blanks a credential that noslop echoes in its error output', async () =
 });
 
 test('it names the empty field when 1Password gives an empty installation id', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner({ secrets: { ...FAKE_SECRETS, 'installation-id': '' } });
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ secrets: { ...FAKE_SECRETS, 'installation-id': '' } });
 
   await expect(runNoslopReview(ctx.reviewContext(fake.run))).rejects.toMatchObject({
     code: 'bad_config',
@@ -351,16 +351,16 @@ test('it names the empty field when 1Password gives an empty installation id', a
 });
 
 test('a review records its one 1Password read for the weekly audit', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner();
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
   await runNoslopReview(ctx.reviewContext(fake.run));
 
   expect(ctx.db.query("SELECT actor, data FROM events WHERE subject = 'hq' AND subject_id = 'op' AND action = 'read'").all()).toStrictEqual([{ actor: 'noslop', data: '{"consumer":"noslop","requests":1}' }]);
 });
 
 test('a review whose 1Password read is refused still records the read', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner({ opAnswer: { code: 1, stdout: '', stderr: 'vault not found' } });
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ opAnswer: { code: 1, stdout: '', stderr: 'vault not found' } });
 
   await expect(runNoslopReview(ctx.reviewContext(fake.run))).rejects.toMatchObject({ code: 'bad_config' });
   expect(ctx.db.query("SELECT actor, data FROM events WHERE subject = 'hq' AND subject_id = 'op' AND action = 'read'").all()).toStrictEqual([{ actor: 'noslop', data: '{"consumer":"noslop","requests":1}' }]);
@@ -380,9 +380,9 @@ function readLateFlags(db: Database): (boolean | null | undefined)[] {
 }
 
 test('it records late on a new finding of a later review and leaves it null on the first', async () => {
-  const ctx = setupTest(),
-    first = buildFakeRunner({ noslopReview: { code: 0, stdout: buildAnchoredReview('aaaa', 'h1'), stderr: '' } }),
-    second = buildFakeRunner({ noslopReview: { code: 0, stdout: buildAnchoredReview('bbbb', 'h2'), stderr: '' } });
+  const ctx = setupTest();
+  const first = buildFakeRunner({ noslopReview: { code: 0, stdout: buildAnchoredReview('aaaa', 'h1'), stderr: '' } });
+  const second = buildFakeRunner({ noslopReview: { code: 0, stdout: buildAnchoredReview('bbbb', 'h2'), stderr: '' } });
 
   await runNoslopReview(ctx.reviewContext(first.run));
   await runNoslopReview(ctx.reviewContext(second.run));
@@ -392,8 +392,8 @@ test('it records late on a new finding of a later review and leaves it null on t
 });
 
 test('it still records the review when the late check cannot run git', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner({ noslopReview: { code: 0, stdout: buildAnchoredReview('bbbb', 'h2'), stderr: '' } });
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ noslopReview: { code: 0, stdout: buildAnchoredReview('bbbb', 'h2'), stderr: '' } });
   ctx.db.query("INSERT INTO noslop_rounds (repo, pr, kind, started_at, ended_at, ms, ok, head, findings, sha) VALUES ('widgets', 7, 'review', 'a', 'b', 1, 1, 'h1', '[]', 'x')").run();
 
   await runNoslopReview(ctx.reviewContext(makeGitlessRunner(fake.run)));

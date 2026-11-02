@@ -91,8 +91,8 @@ function formatClosed(closed: RenderedReport['closed']): string {
 }
 
 function formatGroupCounts(group: ReportGroup): string {
-  const counts = `(${formatCount(group.issues, 'issue')}, ${formatCount(group.prs, 'PR')})`,
-    done = group.burndown;
+  const counts = `(${formatCount(group.issues, 'issue')}, ${formatCount(group.prs, 'PR')})`;
+  const done = group.burndown;
   if (done === null) {
     return counts;
   }

@@ -11,8 +11,8 @@ import type { ShippedPeriod, ShippedSources } from './types.ts';
 import { upsertCacheEntries } from './upsert-cache-entries.ts';
 
 export async function loadMergedPRs(sources: ShippedSources, period: ShippedPeriod, at: Date): Promise<string> {
-  const bodies = await readDays(sources, planMergedDays(period, at), at),
-    [only] = bodies;
+  const bodies = await readDays(sources, planMergedDays(period, at), at);
+  const [only] = bodies;
   if (period !== 'week' && only !== undefined) {
     return only;
   }
@@ -20,13 +20,13 @@ export async function loadMergedPRs(sources: ShippedSources, period: ShippedPeri
 }
 
 async function readDays(sources: ShippedSources, calendar: MergedDaysPlan, at: Date): Promise<string[]> {
-  const bodies: string[] = [],
-    kept = await findCacheEntries(
-      sources.db,
-      'merged-day',
-      calendar.days.filter((day) => day < calendar.today),
-      at,
-    );
+  const bodies: string[] = [];
+  const kept = await findCacheEntries(
+    sources.db,
+    'merged-day',
+    calendar.days.filter((day) => day < calendar.today),
+    at,
+  );
   for (const day of calendar.days) {
     const hit = kept.get(day);
     if (hit !== undefined && findValidBody(hit, mergedPRsOutputSchema) !== undefined) {

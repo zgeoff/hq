@@ -10,8 +10,8 @@ const FIXTURES = join(import.meta.dir, '../../skills/delivery-report/scripts/tes
 
 // A page and the report body's component, before anything is drawn.
 async function setupTest() {
-  const lib = await setupPageDOM('http://127.0.0.1:4317/shipped'),
-    module = await import('./shipped-report-body.tsx');
+  const lib = await setupPageDOM('http://127.0.0.1:4317/shipped');
+  const module = await import('./shipped-report-body.tsx');
   return { lib, ShippedReportBody: module.ShippedReportBody };
 }
 
@@ -31,8 +31,8 @@ function collectRowParts(page: HTMLElement): string[][] {
 }
 
 test('a day draws its title, each project as a group of two-line rows, No issue, and the notes', async () => {
-  const app = await setupTest(),
-    page = renderReport(app, loadFixture('daily'));
+  const app = await setupTest();
+  const page = renderReport(app, loadFixture('daily'));
   expect(page.querySelector('h1')?.textContent).toBe('Thursday 15 October: 7 PRs across 2 repos, covering 5 issues, 2 closed.');
   expect(Array.from(page.querySelectorAll('h2'), (heading) => heading.textContent)).toStrictEqual(['Lantern Garden (2 issues, 3 PRs)', 'Paper Orchard (1 issue, 1 PR)', 'No project (1 issue, 1 PR)', 'No issue (1 PR)']);
   expect(collectRowParts(page)).toStrictEqual([
@@ -46,8 +46,8 @@ test('a day draws its title, each project as a group of two-line rows, No issue,
 });
 
 test('a week draws its days, its burndowns, Still open and the fetch gap', async () => {
-  const app = await setupTest(),
-    page = renderReport(app, loadFixture('weekly'));
+  const app = await setupTest();
+  const page = renderReport(app, loadFixture('weekly'));
   expect([page.querySelector('h1')?.textContent, page.querySelector('.hq-shipped-days li')?.textContent]).toStrictEqual(['Week of Monday 12 October: 6 PRs across 2 repos, covering 4 issues, 2 closed. +2,345 −1,234.', 'Thursday 15 October: 2 PRs, 2 issues']);
   expect(Array.from(page.querySelectorAll('h2'), (heading) => heading.textContent)).toStrictEqual(['Lantern Garden (2 issues, 3 PRs) · 1 of 3 done, 1 in Triage', 'Paper Orchard (1 issue, 1 PR) · 1 of 2 done', 'Still open', 'No issue (1 PR)']);
   expect(page.textContent).toContain('Lantern Garden: 1 issue, most PRs on GEO-9402 Add the dusk path');
@@ -55,12 +55,12 @@ test('a week draws its days, its burndowns, Still open and the fetch gap', async
 });
 
 test('Still open separates the issues it names with commas', async () => {
-  const app = await setupTest(),
-    listed = [
-      { issue: 'GEO-9701', title: 'Fit the long spout', url: 'https://linear.example/issue/GEO-9701' },
-      { issue: 'GEO-9702', title: 'Descale the boiler', url: 'https://linear.example/issue/GEO-9702' },
-    ],
-    page = renderReport(app, buildRenderedReport({ stillOpen: [{ project: 'Kettle Works', issues: 2, top: listed }] }));
+  const app = await setupTest();
+  const listed = [
+    { issue: 'GEO-9701', title: 'Fit the long spout', url: 'https://linear.example/issue/GEO-9701' },
+    { issue: 'GEO-9702', title: 'Descale the boiler', url: 'https://linear.example/issue/GEO-9702' },
+  ];
+  const page = renderReport(app, buildRenderedReport({ stillOpen: [{ project: 'Kettle Works', issues: 2, top: listed }] }));
   expect(page.querySelector('.hq-shipped-days li')?.textContent).toBe('Kettle Works: 2 issues, most PRs on GEO-9701 Fit the long spout, GEO-9702 Descale the boiler');
 });
 
@@ -68,11 +68,11 @@ test('Still open separates the issues it names with commas', async () => {
 // the marker column has a fixed width, so the chips start at one x on every row. happy-dom has no
 // layout, so the test checks that structure; the screenshots show it drawn.
 test('each PR is a chip naming its repo and number and linking to the PR, six of them in one wrapping list under the title', async () => {
-  const app = await setupTest(),
-    chipPRs = Array.from({ length: 6 }, (_unused, index) => ({ repo: 'kettle', number: 50 + index, url: `https://github.com/zgeoff/kettle/pull/${50 + index}` })),
-    group = buildKettleGroup([buildKettleRow({ prs: chipPRs }), buildKettleRow({ issue: 'GEO-9602' })]),
-    page = renderReport(app, buildRenderedReport({ groups: [group] })),
-    rowChips = [...page.querySelectorAll('ul.hq-shipped-chips')];
+  const app = await setupTest();
+  const chipPRs = Array.from({ length: 6 }, (_unused, index) => ({ repo: 'kettle', number: 50 + index, url: `https://github.com/zgeoff/kettle/pull/${50 + index}` }));
+  const group = buildKettleGroup([buildKettleRow({ prs: chipPRs }), buildKettleRow({ issue: 'GEO-9602' })]);
+  const page = renderReport(app, buildRenderedReport({ groups: [group] }));
+  const rowChips = [...page.querySelectorAll('ul.hq-shipped-chips')];
   expect(rowChips.map((list) => Array.from(list.querySelectorAll('a'), (chip) => [chip.textContent, chip.getAttribute('href'), chip.getAttribute('target')]))).toStrictEqual([
     chipPRs.map((pr) => [`kettle#${pr.number}`, pr.url, '_blank']),
     [['kettle#41', 'https://github.com/zgeoff/kettle/pull/41', '_blank']],
@@ -82,11 +82,11 @@ test('each PR is a chip naming its repo and number and linking to the PR, six of
 });
 
 test('a long title keeps to one line and shows whole on hover', async () => {
-  const app = await setupTest(),
-    fullTitle = 'Fit the long spout and the short spout and the spare spout and the lid that holds them all',
-    group = buildKettleGroup([buildKettleRow({ title: fullTitle })]),
-    page = renderReport(app, buildRenderedReport({ groups: [group] })),
-    title = page.querySelector('a.hq-shipped-title');
+  const app = await setupTest();
+  const fullTitle = 'Fit the long spout and the short spout and the spare spout and the lid that holds them all';
+  const group = buildKettleGroup([buildKettleRow({ title: fullTitle })]);
+  const page = renderReport(app, buildRenderedReport({ groups: [group] }));
+  const title = page.querySelector('a.hq-shipped-title');
   expect([title?.getAttribute('title'), title?.className]).toStrictEqual([`GEO-9601 ${fullTitle}`, 'hq-shipped-title']);
 });
 
@@ -99,7 +99,7 @@ function buildKettleRow(over: Partial<ReportRow>): ReportRow {
 }
 
 test('an empty day says nothing merged under its title', async () => {
-  const app = await setupTest(),
-    page = renderReport(app, buildRenderedReport({ totals: { prs: 0, repos: 0, issues: 0, added: 0, removed: 0, closed: 0 }, closed: [], groups: [], noIssue: [] }));
+  const app = await setupTest();
+  const page = renderReport(app, buildRenderedReport({ totals: { prs: 0, repos: 0, issues: 0, added: 0, removed: 0, closed: 0 }, closed: [], groups: [], noIssue: [] }));
   expect(Array.from(page.querySelector('article')?.children ?? [], (part) => part.textContent)).toStrictEqual(['Thursday 15 October: 0 PRs across 0 repos, covering 0 issues, 0 closed.', 'Nothing merged in this period.', 'Closed: none.']);
 });

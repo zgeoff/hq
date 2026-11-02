@@ -26,10 +26,10 @@ const KETTLE_CALL = {
 };
 
 async function setupTest() {
-  const fresh = freshDb(),
-    signedIn = createSignedInAuth(),
-    server = createConsoleServer({ db: fresh.db, auth: signedIn.auth, port: 0, actor: 'console', run: () => Promise.resolve({ code: 1, stdout: '', stderr: 'no gh in this test' }), assets: new Map(), notify: () => Promise.resolve(true), loadShipped: () => Promise.reject(new Error('no report in this test')) }),
-    spy = spyOn(console, 'log').mockImplementation(() => {});
+  const fresh = freshDb();
+  const signedIn = createSignedInAuth();
+  const server = createConsoleServer({ db: fresh.db, auth: signedIn.auth, port: 0, actor: 'console', run: () => Promise.resolve({ code: 1, stdout: '', stderr: 'no gh in this test' }), assets: new Map(), notify: () => Promise.resolve(true), loadShipped: () => Promise.reject(new Error('no report in this test')) });
+  const spy = spyOn(console, 'log').mockImplementation(() => {});
   at(NOON_SYDNEY);
   onTestFinished(fresh.cleanup);
   onTestFinished(() => spy.mockRestore());
@@ -47,11 +47,11 @@ async function setupTest() {
 }
 
 test('the owner answers by click, key and note, Ask Stu copies its prompt, a review takes review words, and a to-do put off comes back when due', async () => {
-  const app = await setupTest(),
-    lib = app.library,
-    queryClient = new QueryClient(),
-    view = await import('./needs-you-view.tsx'),
-    write = spyOn(navigator.clipboard, 'writeText');
+  const app = await setupTest();
+  const lib = app.library;
+  const queryClient = new QueryClient();
+  const view = await import('./needs-you-view.tsx');
+  const write = spyOn(navigator.clipboard, 'writeText');
   createUnblockItems(app.db, { 'review-4': { task: 'Review kettle#4 and say lgtm', links: [{ label: 'kettle#4', url: 'https://github.com/kettle-co/kettle/pull/4', subject: true }] } });
   lib.render(
     <ConsoleAPIContext value={lib.api}>

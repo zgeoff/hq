@@ -10,8 +10,8 @@ import { SCHEMA_VERSION } from '../db/schema-version.ts';
 import { recordRound } from './record-round.ts';
 
 function setupTest() {
-  const base = mkdtempSync(join(tmpdir(), 'hq-noslop-')),
-    db = openDb(join(base, 'hq.db'));
+  const base = mkdtempSync(join(tmpdir(), 'hq-noslop-'));
+  const db = openDb(join(base, 'hq.db'));
 
   onTestFinished(() => {
     db.close();
@@ -30,9 +30,9 @@ test('it creates the noslop rounds table on a fresh database', () => {
 });
 
 test('it upgrades a v23 database to v24 after taking a backup, keeping its rows', () => {
-  const ctx = setupTest(),
-    path = join(ctx.base, 'old.db'),
-    stored = new Database(path, { create: true, strict: true });
+  const ctx = setupTest();
+  const path = join(ctx.base, 'old.db');
+  const stored = new Database(path, { create: true, strict: true });
   onTestFinished(() => stored.close());
   migrate(stored, path, false, MIGRATIONS.slice(0, 23));
   stored.query("INSERT INTO meta (key, value) VALUES ('keep', 'me')").run();
@@ -45,9 +45,9 @@ test('it upgrades a v23 database to v24 after taking a backup, keeping its rows'
 });
 
 test('it upgrades a v24 database to v25 after taking a backup, leaving full NULL on the rounds it had', () => {
-  const ctx = setupTest(),
-    path = join(ctx.base, 'old.db'),
-    stored = new Database(path, { create: true, strict: true });
+  const ctx = setupTest();
+  const path = join(ctx.base, 'old.db');
+  const stored = new Database(path, { create: true, strict: true });
   onTestFinished(() => stored.close());
   migrate(stored, path, false, MIGRATIONS.slice(0, 24));
   stored.query("INSERT INTO noslop_rounds (repo, pr, kind, started_at, ended_at, ms, ok, sha) VALUES ('widgets', 7, 'review', 'a', 'b', 1, 1, 'x')").run();
@@ -67,9 +67,9 @@ test('it refuses a round with a kind or an ok flag the table does not allow', ()
 });
 
 test('it upgrades a v32 database to v33 after taking a backup, leaving special and redesign NULL on the rounds it had', () => {
-  const ctx = setupTest(),
-    path = join(ctx.base, 'old.db'),
-    stored = new Database(path, { create: true, strict: true });
+  const ctx = setupTest();
+  const path = join(ctx.base, 'old.db');
+  const stored = new Database(path, { create: true, strict: true });
   onTestFinished(() => stored.close());
   migrate(stored, path, false, MIGRATIONS.slice(0, 32));
   stored.query("INSERT INTO noslop_rounds (repo, pr, kind, started_at, ended_at, ms, ok, sha) VALUES ('widgets', 7, 'review', 'a', 'b', 1, 1, 'x')").run();

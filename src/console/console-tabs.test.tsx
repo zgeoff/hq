@@ -15,25 +15,25 @@ import { createConsoleAPI } from './console-api.ts';
 import { ConsoleAPIContext } from './console-api-context.ts';
 
 async function setupTest() {
-  const lib = await setupPageDOM('http://127.0.0.1:4317/'),
-    tabs = await import('./console-tabs.tsx');
+  const lib = await setupPageDOM('http://127.0.0.1:4317/');
+  const tabs = await import('./console-tabs.tsx');
   return { lib, ConsoleTabs: tabs.ConsoleTabs };
 }
 
 // The console's own router over a memory history, on a console server with no items and a report.
 async function setupAppTest() {
-  const fresh = freshDb(),
-    signedIn = createSignedInAuth(),
-    server = createConsoleServer({
-      db: fresh.db,
-      auth: signedIn.auth,
-      port: 0,
-      actor: 'console', run: () => Promise.resolve({ code: 1, stdout: '', stderr: 'no gh in this test' }),
-      assets: new Map(),
-      notify: () => Promise.resolve(true),
-      loadShipped: (period) => Promise.resolve({ period, report: buildRenderedReport({ dateLabel: 'The kettle report' }), at: '2026-10-15T02:00:00Z' }),
-    }),
-    spy = spyOn(console, 'log').mockImplementation(() => {});
+  const fresh = freshDb();
+  const signedIn = createSignedInAuth();
+  const server = createConsoleServer({
+    db: fresh.db,
+    auth: signedIn.auth,
+    port: 0,
+    actor: 'console', run: () => Promise.resolve({ code: 1, stdout: '', stderr: 'no gh in this test' }),
+    assets: new Map(),
+    notify: () => Promise.resolve(true),
+    loadShipped: (period) => Promise.resolve({ period, report: buildRenderedReport({ dateLabel: 'The kettle report' }), at: '2026-10-15T02:00:00Z' }),
+  });
+  const spy = spyOn(console, 'log').mockImplementation(() => {});
   onTestFinished(fresh.cleanup);
   onTestFinished(() => spy.mockRestore());
   onTestFinished(() => server.stop(true));
@@ -42,11 +42,11 @@ async function setupAppTest() {
 }
 
 test('g s from Needs you opens Shipped, g n returns, and ] and [ step between the pages', async () => {
-  const lib = await setupAppTest(),
-    page = lib.within(document.body),
-    routes = await import('./create-console-app-router.tsx'),
-    seen: string[] = [],
-    tabRouter = routes.createConsoleAppRouter(createMemoryHistory({ initialEntries: ['/'] }));
+  const lib = await setupAppTest();
+  const page = lib.within(document.body);
+  const routes = await import('./create-console-app-router.tsx');
+  const seen: string[] = [];
+  const tabRouter = routes.createConsoleAppRouter(createMemoryHistory({ initialEntries: ['/'] }));
   lib.render(
     <ConsoleAPIContext value={lib.api}>
       <QueryClientProvider client={new QueryClient()}>
@@ -73,11 +73,11 @@ test('g s from Needs you opens Shipped, g n returns, and ] and [ step between th
 });
 
 test('g s typed in the page\'s note box types text and switches nothing', async () => {
-  const lib = await setupAppTest(),
-    page = lib.within(document.body),
-    routes = await import('./create-console-app-router.tsx'),
-    tabRouter = routes.createConsoleAppRouter(createMemoryHistory({ initialEntries: ['/'] })),
-    moves: string[] = [];
+  const lib = await setupAppTest();
+  const page = lib.within(document.body);
+  const routes = await import('./create-console-app-router.tsx');
+  const tabRouter = routes.createConsoleAppRouter(createMemoryHistory({ initialEntries: ['/'] }));
+  const moves: string[] = [];
   onTestFinished(tabRouter.history.subscribe((move) => moves.push(move.location.pathname)));
   await createKettleCall();
   lib.render(
@@ -111,9 +111,9 @@ test('g s typed in the page\'s note box types text and switches nothing', async 
 
 // One call on the Needs you tab, so the page shows its note box.
 async function createKettleCall(): Promise<void> {
-  const dir = mkdtempSync(join(tmpdir(), 'hq-tabs-')),
-    file = join(dir, 'kettle.json');
-  onTestFinished(() => rmSync(dir, { recursive: true, force: true }));
+  const directory = mkdtempSync(join(tmpdir(), 'hq-tabs-'));
+  const file = join(directory, 'kettle.json');
+  onTestFinished(() => rmSync(directory, { recursive: true, force: true }));
   onTestFinished(overrideEnv('HQ_NOTIFY', 'off'));
   onTestFinished(overrideEnv('HQ_AS', 'kettle-bot'));
   writeFileSync(file, JSON.stringify({ title: 'Mint the kettle tokens', question: 'Mint the kettle tokens tonight?', options: [{ label: 'Yes, mint them', effect: 'The kettle starts at 07:00.', recommended: true }, { label: 'Not yet', effect: 'The kettle waits a day.' }], stuView: 'Minting now keeps the morning boil on time.', details: [] }));
@@ -121,9 +121,9 @@ async function createKettleCall(): Promise<void> {
 }
 
 test('each tab shows its jump key in the header', async () => {
-  const app = await setupTest(),
-    drawn = app.lib.render(<app.ConsoleTabs current="shipped" onGo={() => {}} />),
-    links = drawn.getAllByRole('link');
+  const app = await setupTest();
+  const drawn = app.lib.render(<app.ConsoleTabs current="shipped" onGo={() => {}} />);
+  const links = drawn.getAllByRole('link');
   expect(links.map((link) => [link.textContent, link.getAttribute('aria-keyshortcuts'), link.getAttribute('aria-current')])).toStrictEqual([
     ['Needs you g n', 'g n', null],
     ['Shipped g s', 'g s', 'page'],

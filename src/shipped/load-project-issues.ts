@@ -14,11 +14,11 @@ interface IssuePage {
 }
 
 export async function loadProjectIssues(call: LinearCall, db: Database, projects: readonly string[], at: Date): Promise<ProjectIssue[]> {
-  const issues: ProjectIssue[] = [],
-    kept = await findCacheEntries(db, 'project', projects, at);
+  const issues: ProjectIssue[] = [];
+  const kept = await findCacheEntries(db, 'project', projects, at);
   for (const project of projects) {
-    const body = kept.get(project),
-      hit = body === undefined ? undefined : findValidBody(body, projectIssuesSchema);
+    const body = kept.get(project);
+    const hit = body === undefined ? undefined : findValidBody(body, projectIssuesSchema);
     if (hit === undefined) {
       const fetched = await loadOneProject(call, project);
       await upsertCacheEntries(db, [{ kind: 'project', key: project, body: JSON.stringify(fetched), fetched_at: iso(at), expires_at: buildOpenExpiry(at) }]);
@@ -34,8 +34,8 @@ const QUERY = `query($after: String, $name: String!) { issues(first: 250, after:
   nodes { identifier state { type } project { name } } pageInfo { hasNextPage endCursor } } }`;
 
 async function loadOneProject(call: LinearCall, project: string): Promise<ProjectIssue[]> {
-  const MAX_PAGES = 20,
-    issues: ProjectIssue[] = [];
+  const MAX_PAGES = 20;
+  const issues: ProjectIssue[] = [];
   let after: string | null = null;
   for (let page = 0; page < MAX_PAGES; page++) {
     const data = (await call(QUERY, { after, name: project })) as IssuePage;

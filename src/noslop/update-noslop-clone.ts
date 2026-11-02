@@ -44,8 +44,8 @@ async function createRunDir(run: Runner, base: string, full: string): Promise<Pi
   return { sha: full, clone };
 }
 
-const INSTALL_TIMEOUT_MS = 600_000,
-  TAIL_CHARS = 300;
+const INSTALL_TIMEOUT_MS = 600_000;
+const TAIL_CHARS = 300;
 
 async function runNoslopInstall(run: Runner, clone: string): Promise<void> {
   const install = await boundedRunner(run, INSTALL_TIMEOUT_MS)(['bun', 'install', '--frozen-lockfile', '--ignore-scripts'], { cwd: clone });

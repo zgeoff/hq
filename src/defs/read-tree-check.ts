@@ -17,8 +17,7 @@ interface TreeNames {
 const NAMES: Record<TreeName, TreeNames> = {
     hq: { key: 'defs-tree', label: 'hq-defs' },
     private: { key: 'private-tree', label: 'hq-private' },
-  },
-  TREE_STALE_MS = 30 * 60_000;
+  };
 
 export function readTreeCheck(db: Database, at: Date, tree: TreeName = 'hq'): TreeHealth | null {
   const dir = TREES[tree].dir();
@@ -48,6 +47,8 @@ function buildTreeHealth(tree: TreeName, at: Date, record: TreeSync | null): Tre
   }
   return buildAgedHealth(tree, record, at.getTime() - Date.parse(record.at));
 }
+
+const TREE_STALE_MS = 30 * 60_000;
 
 function buildAgedHealth(tree: TreeName, record: TreeSync, age: number): TreeHealth {
   const names = NAMES[tree];

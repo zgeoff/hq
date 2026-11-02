@@ -4,9 +4,9 @@ import { createTreeFixture } from '../../test/create-tree-fixture.ts';
 import { runAllTreeSyncs } from './run-all-tree-syncs.ts';
 
 test('it syncs both trees in one call, and a refused tree does not stop the other', () => {
-  const ctx = createTreeFixture(),
-    hq = ctx.createHq(),
-    tree = ctx.createPrivate();
+  const ctx = createTreeFixture();
+  const hq = ctx.createHq();
+  const tree = ctx.createPrivate();
   hq.writeCommit({ 'skills/intake/SKILL.md': 'hq change\n' });
   tree.writeCommit({ 'skills/intake/SKILL.md': 'private change\n' });
   tree.git('remote', 'set-url', 'origin', 'git@github.com:zgeoff/hq.git');

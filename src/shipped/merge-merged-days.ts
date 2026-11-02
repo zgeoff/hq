@@ -4,13 +4,13 @@ import type { MergedPRsOutput } from './merged-prs-output-schema.ts';
 const DATE_LENGTH = 10;
 
 export function mergeMergedDays(days: readonly MergedPRsOutput[]): MergedPRsOutput {
-  const monday = days[0]?.start.slice(0, DATE_LENGTH) ?? '',
-    prs = sortBy(
-      days.flatMap((day) => day.prs),
-      (pr) => `${pr.repo}\0${pr.mergedAt}`,
-    ),
-    sunday = buildSunday(monday),
-    withIssue = prs.filter((pr) => pr.issue !== null);
+  const monday = days[0]?.start.slice(0, DATE_LENGTH) ?? '';
+  const prs = sortBy(
+    days.flatMap((day) => day.prs),
+    (pr) => `${pr.repo}\0${pr.mergedAt}`,
+  );
+  const sunday = buildSunday(monday);
+  const withIssue = prs.filter((pr) => pr.issue !== null);
   return {
     kind: 'weekly',
     start: days[0]?.start ?? `${monday}T00:00:00${buildOffset(monday)}`,
@@ -53,8 +53,8 @@ function buildSum<T>(items: readonly T[], valueOf: (item: T) => number): number 
 
 function sortBy<T>(items: readonly T[], keyOf: (item: T) => number | string): T[] {
   return items.toSorted((a, b) => {
-    const left = keyOf(a),
-      right = keyOf(b);
+    const left = keyOf(a);
+    const right = keyOf(b);
     if (left === right) {
       return 0;
     }
@@ -66,8 +66,8 @@ function sortBy<T>(items: readonly T[], keyOf: (item: T) => number | string): T[
 function splitByKey<T>(items: readonly T[], keyOf: (item: T) => string): T[][] {
   const groups = new Map<string, T[]>();
   for (const item of items) {
-    const label = keyOf(item),
-      members = groups.get(label);
+    const label = keyOf(item);
+    const members = groups.get(label);
     if (members === undefined) {
       groups.set(label, [item]);
     } else {
@@ -78,8 +78,8 @@ function splitByKey<T>(items: readonly T[], keyOf: (item: T) => string): T[][] {
 }
 
 function buildOffset(day: string): string {
-  const noon = buildNoon(day),
-    parts = new Intl.DateTimeFormat('en-US', { timeZone: TZ, timeZoneName: 'longOffset' }).formatToParts(noon);
+  const noon = buildNoon(day);
+  const parts = new Intl.DateTimeFormat('en-US', { timeZone: TZ, timeZoneName: 'longOffset' }).formatToParts(noon);
   return (parts.find((part) => part.type === 'timeZoneName')?.value ?? 'GMT+00:00').replace('GMT', '') || '+00:00';
 }
 
@@ -89,8 +89,8 @@ function buildNoon(day: string): Date {
 }
 
 function buildSunday(monday: string): string {
-  const WEEK_LAST = 6,
-    noon = buildNoon(monday);
+  const WEEK_LAST = 6;
+  const noon = buildNoon(monday);
   noon.setUTCDate(noon.getUTCDate() + WEEK_LAST);
   return noon.toISOString().slice(0, DATE_LENGTH);
 }

@@ -10,8 +10,8 @@ interface UsageItem {
 // GitHub billing uses the UTC calendar month. netAmount is the amount GitHub bills after the included
 // minutes and discounts; grossAmount also counts the free allowance, which costs nothing.
 export async function readActionsSpend(run: Runner, at: Date, env?: RunOpts['env']): Promise<number> {
-  const path = `users/zgeoff/settings/billing/usage?year=${at.getUTCFullYear()}&month=${at.getUTCMonth() + 1}`,
-    raw = await readGhJSON(run, ['api', path], env, 'GitHub billing usage');
+  const path = `users/zgeoff/settings/billing/usage?year=${at.getUTCFullYear()}&month=${at.getUTCMonth() + 1}`;
+  const raw = await readGhJSON(run, ['api', path], env, 'GitHub billing usage');
   if (!hasUsageItems(raw)) {
     throw new HqError('command_failed', 'GitHub billing usage: no usageItems list');
   }

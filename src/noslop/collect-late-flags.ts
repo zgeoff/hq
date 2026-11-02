@@ -19,20 +19,17 @@ interface PriorReview {
   findings: string;
 }
 
-const HUNK_HEADER = /^@@ -\d+(?:,\d+)? \+(?<start>\d+)(?:,(?<length>\d+))? @@/u,
-  MISSING_PATH = /does not exist|exists on disk, but not in/u;
-
 export async function collectLateFlags(input: LateInput): Promise<Map<string, boolean | null>> {
-  const flags = new Map<string, boolean | null>(input.findings.map((f) => [f.id, null])),
-    prior = readPriorReviews(input);
+  const flags = new Map<string, boolean | null>(input.findings.map((finding) => [finding.id, null]));
+  const prior = readPriorReviews(input);
   await updateLateFlags(input, flags, prior);
   return flags;
 }
 
 async function updateLateFlags(input: LateInput, flags: Map<string, boolean | null>, prior: PriorReview[]): Promise<void> {
-  const first = prior[0]?.head ?? null,
-    fresh = pickFreshFindings(input, prior),
-    paths = [...new Set(fresh.map((f) => f.anchor?.path ?? ''))];
+  const first = prior[0]?.head ?? null;
+  const fresh = pickFreshFindings(input, prior);
+  const paths = [...new Set(fresh.map((finding) => finding.anchor?.path ?? ''))];
   if (first === null || input.head === null || fresh.length === 0) {
     return;
   }
@@ -80,6 +77,8 @@ async function readHunks(input: LateInput, first: string, head: string, path: st
   }
 }
 
+const MISSING_PATH = /does not exist|exists on disk, but not in/u;
+
 async function readFileHunks(input: LateInput, first: string, head: string, path: string): Promise<Hunks> {
   const exists = await input.run(['git', 'cat-file', '-e', `${first}:${path}`], { cwd: input.dir });
   if (exists.code !== 0) {
@@ -93,13 +92,15 @@ async function readDiffHunks(input: LateInput, first: string, head: string, path
   return diff.code === 0 ? parseHunks(diff.stdout) : null;
 }
 
+const HUNK_HEADER = /^@@ -\d+(?:,\d+)? \+(?<start>\d+)(?:,(?<length>\d+))? @@/u;
+
 function parseHunks(diff: string): Span[] {
   const spans: Span[] = [];
   for (const line of diff.split('\n')) {
     const groups = HUNK_HEADER.exec(line)?.groups;
     if (groups !== undefined) {
-      const length = groups['length'] === undefined ? 1 : Number(groups['length']),
-        start = Number(groups['start']);
+      const length = groups['length'] === undefined ? 1 : Number(groups['length']);
+      const start = Number(groups['start']);
       spans.push({ start, end: length === 0 ? start : start + length - 1 });
     }
   }
@@ -113,7 +114,7 @@ function buildLateFlag(hunks: Hunks, finding: ReviewFinding): boolean | null {
   if (hunks === 'new') {
     return false;
   }
-  const end = finding.anchor.endLine,
-    start = finding.anchor.startLine;
+  const end = finding.anchor.endLine;
+  const start = finding.anchor.startLine;
   return !hunks.some((h) => h.start <= end && h.end >= start);
 }

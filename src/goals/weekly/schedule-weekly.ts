@@ -16,10 +16,10 @@ interface RunRequest {
 }
 
 export function scheduleWeekly(db: Database, run: RunRequest): JobRun {
-  const actor = run.actor,
-    at = run.at,
-    detail = run.detail,
-    key = run.key;
+  const actor = run.actor;
+  const at = run.at;
+  const detail = run.detail;
+  const key = run.key;
   const text = weeklyText(db, at); // before the run row: the flags are those since the previous weekly
   const seq = logEvent(db, 'hq', `job:${JOB}`, 'ran', actor, null, null, { key, detail });
   enqueue(db, seq, owner(), text, `job:${JOB}:${key}`); // a topic per week: one week never supersedes another

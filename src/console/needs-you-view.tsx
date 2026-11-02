@@ -39,83 +39,83 @@ interface NeedsYouViewProps {
 // reads the list again every minute, so a new or newly due item shows without a reload.
 export function NeedsYouView(props: NeedsYouViewProps) {
   const refreshMs = props.refreshMs ?? 60_000;
-  const [answered, setAnswered] = useState<Answered[]>([]),
-    [offset, setOffset] = useState(0),
-    [notes, setNotes] = useState<ReadonlyMap<string, string>>(new Map()),
-    [copied, setCopied] = useState(false),
-    [help, setHelp] = useState(false),
-    [toast, setToast] = useState<Toast | null>(null),
-    emitToast = (next: Toast) => {
-      setToast(next);
-      globalThis.setTimeout(() => setToast((t) => (t === next ? null : t)), 2400);
+  const [answered, setAnswered] = useState<Answered[]>([]);
+  const [offset, setOffset] = useState(0);
+  const [notes, setNotes] = useState<ReadonlyMap<string, string>>(new Map());
+  const [copied, setCopied] = useState(false);
+  const [help, setHelp] = useState(false);
+  const [toast, setToast] = useState<Toast | null>(null);
+  const emitToast = (next: Toast) => {
+    setToast(next);
+    globalThis.setTimeout(() => setToast((t) => (t === next ? null : t)), 2400);
+  };
+  const consoleAPI = useConsoleAPI();
+  const list = useQuery(consoleAPI.items.list.queryOptions({ refetchInterval: refreshMs }));
+  const noteRef = useRef<HTMLTextAreaElement | null>(null);
+  const pending = buildRotation(
+    (list.data ?? []).filter((i) => !answered.some((a) => a.id === i.id && a.at > list.dataUpdatedAt)),
+    offset,
+  );
+  const queryClient = useQueryClient();
+  const send = useMutation({
+    mutationFn: async (choice: Choice) => await sendChoice(consoleAPI, choice),
+    onSuccess: (told, choice) => {
+      setAnswered((a) => [...a, { id: choice.item.id, at: Date.now() }]);
+      setNotes((n) => new Map(n).set(choice.item.id, ''));
+      setCopied(false);
+      setOffset(0);
+      const next: Toast = told ? { text: `Sent to Stu: ${formatShown(choice)}`, tone: 'plain' } : { text: `Recorded: ${formatShown(choice)}. The message to Stu failed; hq retries it.`, tone: 'warn' };
+      emitToast(next);
+      void queryClient.invalidateQueries({ queryKey: consoleAPI.items.list.key() });
     },
-    consoleAPI = useConsoleAPI(),
-    list = useQuery(consoleAPI.items.list.queryOptions({ refetchInterval: refreshMs })),
-    noteRef = useRef<HTMLTextAreaElement | null>(null),
-    pending = buildRotation(
-      (list.data ?? []).filter((i) => !answered.some((a) => a.id === i.id && a.at > list.dataUpdatedAt)),
-      offset,
-    ),
-    queryClient = useQueryClient(),
-    send = useMutation({
-      mutationFn: async (choice: Choice) => await sendChoice(consoleAPI, choice),
-      onSuccess: (told, choice) => {
-        setAnswered((a) => [...a, { id: choice.item.id, at: Date.now() }]);
-        setNotes((n) => new Map(n).set(choice.item.id, ''));
-        setCopied(false);
-        setOffset(0);
-        const next: Toast = told ? { text: `Sent to Stu: ${formatShown(choice)}`, tone: 'plain' } : { text: `Recorded: ${formatShown(choice)}. The message to Stu failed; hq retries it.`, tone: 'warn' };
-        emitToast(next);
-        void queryClient.invalidateQueries({ queryKey: consoleAPI.items.list.key() });
-      },
-      onError: (error) => emitToast({ text: `Not recorded: ${error.message}`, tone: 'warn' }),
-    }),
-    top = pending[0] ?? null,
-    topNote = top === null ? '' : (notes.get(top.id) ?? ''),
-    tryPick = (label: string) => {
-      if (top === null || send.isPending) {
-        return;
-      }
-      if (top.kind === 'review' && label === 'Changes' && topNote.trim() === '') {
-        emitToast({ text: 'Changes needs a note: say what to change.', tone: 'plain' });
-        noteRef.current?.focus();
-        return;
-      }
-      send.mutate({ item: top, label, note: topNote });
-    },
-    trySendNote = () => {
-      if (top === null || topNote.trim() === '') {
-        return;
-      }
-      if (top.kind === 'todo') {
-        emitToast({ text: 'A to-do takes Done, Later or Skip; the note goes with it.', tone: 'plain' });
-        return;
-      }
-      if (top.kind === 'review') {
-        emitToast({ text: 'A review takes lgtm, Changes, Later or Reject; the note goes with it.', tone: 'plain' });
-        return;
-      }
-      tryPick('');
-    },
-    writeStuPrompt = async () => {
-      if (top === null) {
-        return;
-      }
-      const prompt = formatAskStu(top);
-      try {
-        await navigator.clipboard.writeText(prompt);
-      } catch {
-        emitToast({ text: `Could not copy. Paste this to Stu: ${prompt}`, tone: 'warn' });
-        return;
-      }
-      setCopied(true);
-      globalThis.setTimeout(() => setCopied(false), 2400);
-    },
-    writeTopNote = (text: string) => {
-      if (top !== null) {
-        setNotes((n) => new Map(n).set(top.id, text));
-      }
-    };
+    onError: (error) => emitToast({ text: `Not recorded: ${error.message}`, tone: 'warn' }),
+  });
+  const top = pending[0] ?? null;
+  const topNote = top === null ? '' : (notes.get(top.id) ?? '');
+  const tryPick = (label: string) => {
+    if (top === null || send.isPending) {
+      return;
+    }
+    if (top.kind === 'review' && label === 'Changes' && topNote.trim() === '') {
+      emitToast({ text: 'Changes needs a note: say what to change.', tone: 'plain' });
+      noteRef.current?.focus();
+      return;
+    }
+    send.mutate({ item: top, label, note: topNote });
+  };
+  const trySendNote = () => {
+    if (top === null || topNote.trim() === '') {
+      return;
+    }
+    if (top.kind === 'todo') {
+      emitToast({ text: 'A to-do takes Done, Later or Skip; the note goes with it.', tone: 'plain' });
+      return;
+    }
+    if (top.kind === 'review') {
+      emitToast({ text: 'A review takes lgtm, Changes, Later or Reject; the note goes with it.', tone: 'plain' });
+      return;
+    }
+    tryPick('');
+  };
+  const writeStuPrompt = async () => {
+    if (top === null) {
+      return;
+    }
+    const prompt = formatAskStu(top);
+    try {
+      await navigator.clipboard.writeText(prompt);
+    } catch {
+      emitToast({ text: `Could not copy. Paste this to Stu: ${prompt}`, tone: 'warn' });
+      return;
+    }
+    setCopied(true);
+    globalThis.setTimeout(() => setCopied(false), 2400);
+  };
+  const writeTopNote = (text: string) => {
+    if (top !== null) {
+      setNotes((n) => new Map(n).set(top.id, text));
+    }
+  };
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -178,14 +178,14 @@ const NEEDS_YOU_KEYS = [
     { key: 'i / Esc', what: 'Into the note / back out' },
     { key: 'Enter', what: 'In the note: send it' },
     { key: 'j / k', what: 'Next / previous item' },
-  ],
-  REVIEW_ANSWERS: Record<string, 'lgtm' | 'changes' | 'later' | 'reject'> = { lgtm: 'lgtm', Changes: 'changes', Later: 'later', Reject: 'reject' },
-  TODO_MARKS: Record<string, 'done' | 'later' | 'skip'> = { Done: 'done', Later: 'later', Skip: 'skip' };
+  ];
+const REVIEW_ANSWERS: Record<string, 'lgtm' | 'changes' | 'later' | 'reject'> = { lgtm: 'lgtm', Changes: 'changes', Later: 'later', Reject: 'reject' };
+const TODO_MARKS: Record<string, 'done' | 'later' | 'skip'> = { Done: 'done', Later: 'later', Skip: 'skip' };
 
 // Whether the owner session got the message; the answer is recorded either way.
 async function sendChoice(consoleAPI: ConsoleAPI, choice: Choice): Promise<boolean> {
-  const mark = TODO_MARKS[choice.label],
-    review = REVIEW_ANSWERS[choice.label];
+  const mark = TODO_MARKS[choice.label];
+  const review = REVIEW_ANSWERS[choice.label];
   if (choice.item.kind === 'review' && review !== undefined) {
     const reviewed = await consoleAPI.unblock.review.call({ id: choice.item.id, review, note: choice.note });
     return reviewed.told;

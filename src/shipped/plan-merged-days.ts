@@ -19,9 +19,9 @@ export function planMergedDays(period: ShippedPeriod, at: Date): MergedDaysPlan 
 const SYDNEY_DATE = new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' });
 
 function buildWeekDays(today: string): string[] {
-  const SINCE_MONDAY = 6,
-    WEEK = 7,
-    monday = buildShiftedDay(today, -((toUTCDate(today).getUTCDay() + SINCE_MONDAY) % WEEK));
+  const SINCE_MONDAY = 6;
+  const WEEK = 7;
+  const monday = buildShiftedDay(today, -((toUTCDate(today).getUTCDay() + SINCE_MONDAY) % WEEK));
   return Array.from({ length: WEEK }, (_unused, offset) => buildShiftedDay(monday, offset)).filter((day) => day <= today);
 }
 

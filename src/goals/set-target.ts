@@ -28,10 +28,10 @@ export function setTarget(db: Database, key: string, op: string, value: string |
   } else if (value !== undefined) throw new HqError('bad_args', 'none takes no value');
   return db
     .transaction(() => {
-      const before = goalTargets(db).targets[k],
-        o = loadStoredTargets(db);
-      o[k] = next;
-      setMeta(db, 'goal_targets', JSON.stringify(o));
+      const before = goalTargets(db).targets[k];
+      const stored = loadStoredTargets(db);
+      stored[k] = next;
+      setMeta(db, 'goal_targets', JSON.stringify(stored));
       logEvent(db, 'hq', 'goals', 'target', actor, formatTarget(before), formatTarget(next), { key: k });
       return next;
     })
