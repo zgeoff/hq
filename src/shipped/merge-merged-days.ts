@@ -51,7 +51,6 @@ function buildSum<T>(items: readonly T[], valueOf: (item: T) => number): number 
   return items.reduce((total, item) => total + valueOf(item), 0);
 }
 
-// A stable sort, like jq's sort_by.
 function sortBy<T>(items: readonly T[], keyOf: (item: T) => number | string): T[] {
   return items.toSorted((a, b) => {
     const left = keyOf(a),
