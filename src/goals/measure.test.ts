@@ -55,9 +55,9 @@ test('bugs and features share one denominator: merged PRs with a typed Linear is
   pr(6, 'GEO-404');
   pr(7, 'GEO-1', '2026-10-10T03:00:00Z');
   const r = m();
-  expect(r.bugs).toMatchObject({ value: 25, n: 4, shown: '25%' });
+  expect(r.bugs).toMatchObject({ value: 25, denominator: 4, shown: '25%' });
   expect(r.bugs.detail).toBe('1 Bug of 4 merged PRs with a typed Linear issue');
-  expect(r.features).toMatchObject({ value: 50, n: 4 });
+  expect(r.features).toMatchObject({ value: 50, denominator: 4 });
   expect(verdict(DEFAULT_TARGETS.bugs, r.bugs)).toBe('red');
   expect(verdict(DEFAULT_TARGETS.features, r.features)).toBe('red');
 });
@@ -65,7 +65,7 @@ test('bugs and features share one denominator: merged PRs with a typed Linear is
 test('a window with no typed PRs has no data, and no data is never green', () => {
   const r = m();
   for (const k of ['bugs', 'features', 'deploys', 'downtime', 'ciwaste', 'mustfix'] as const) {
-    expect(r[k]).toMatchObject({ value: null, n: 0, shown: 'no data' });
+    expect(r[k]).toMatchObject({ value: null, denominator: 0, shown: 'no data' });
     expect(r[k].detail).toContain('no data');
     expect(verdict(DEFAULT_TARGETS[k], r[k])).toBe('none');
   }
@@ -95,7 +95,7 @@ test('deploy-prod rate counts applies only; holds and no-applies are shown apart
   for (let i = 0; i < 6; i++) deployRun(id++, 'no_apply');
   ci(1, { repo: 'cloud', path: '.github/workflows/ci.yml', conclusion: 'failure' });
   const r = m().deploys;
-  expect(r).toMatchObject({ value: 61, n: 64, unit: 'applies', shown: '61%' });
+  expect(r).toMatchObject({ value: 61, denominator: 64, unit: 'applies', shown: '61%' });
   expect(r.detail).toBe('61% (39/64 applies), 11 held, 6 no-apply');
   expect(verdict(DEFAULT_TARGETS.deploys, r)).toBe('red');
 });
@@ -109,7 +109,7 @@ test('deploy-prod rate: 9 of 10 applies with holds is 90%, and unclassified runs
   deployRun(id++, null, { conclusion: 'success' });
   deployRun(id++, null, { status: 'in_progress', conclusion: null });
   const r = m().deploys;
-  expect(r).toMatchObject({ value: 90, n: 10 });
+  expect(r).toMatchObject({ value: 90, denominator: 10 });
   expect(r.detail).toBe('90% (9/10 applies), 11 held, 1 not yet classified');
 });
 
@@ -138,7 +138,7 @@ test('deploy-prod with no applies has no data, still naming holds', () => {
   deployRun(1, 'held', { conclusion: 'failure' });
   deployRun(2, 'no_apply');
   const r = m().deploys;
-  expect(r).toMatchObject({ value: null, n: 0, shown: 'no data' });
+  expect(r).toMatchObject({ value: null, denominator: 0, shown: 'no data' });
   expect(r.detail).toBe('no data: no applies in the window, 1 held, 1 no-apply');
   expect(verdict(DEFAULT_TARGETS.deploys, r)).toBe('none');
 });
@@ -149,7 +149,7 @@ test('ci waste is the minutes in failed or cancelled runs over all minutes', () 
   ci(3, { minutes: 10, conclusion: 'cancelled' });
   ci(4, { minutes: 50, status: 'in_progress', conclusion: null });
   const r = m().ciwaste;
-  expect(r).toMatchObject({ value: 20, n: 100 });
+  expect(r).toMatchObject({ value: 20, denominator: 100 });
   expect(r.detail).toBe('20 of 100 CI minutes were in failed or cancelled runs');
   expect(verdict(DEFAULT_TARGETS.ciwaste, r)).toBe('red');
   expect(verdict({ op: '<=', value: 20 }, r)).toBe('green');
@@ -187,7 +187,7 @@ test('must-fix is first reviews that needed a recheck, of the reviewed runs', ()
   run('GEO-4', 'widgets#4', false);
   at(NOW.toISOString());
   const r = m().mustfix;
-  expect(r).toMatchObject({ value: 25, n: 4 });
+  expect(r).toMatchObject({ value: 25, denominator: 4 });
   expect(r.detail).toBe('1 of 4 reviewed runs had a must-fix at the first review');
   expect(verdict(DEFAULT_TARGETS.mustfix, r)).toBe('red');
 });
@@ -225,7 +225,7 @@ test('an outage caught after 6 minutes is red even when it was short', () => {
 
 test('samples and no outage: zero minutes, green', () => {
   db.query('INSERT INTO probe_samples (at, target_ok, control_ok) VALUES (?, 1, NULL)').run('2026-10-16T02:00:00Z');
-  expect(m().downtime).toMatchObject({ value: 0, n: 1 });
+  expect(m().downtime).toMatchObject({ value: 0, denominator: 1 });
   expect(verdict(DEFAULT_TARGETS.downtime, m().downtime)).toBe('green');
 });
 
@@ -242,7 +242,7 @@ test('cost reports the latest readings and the window peak', () => {
   }
   ci(1, { minutes: 90 });
   const r = m().cost;
-  expect(r).toMatchObject({ value: 71, n: 3 });
+  expect(r).toMatchObject({ value: 71, denominator: 3 });
   expect(r.detail).toBe('Claude 7-day 55% and 5-hour 20% used at last reading (active account only), 7-day peak 71%; CI 90 min');
 });
 
@@ -279,18 +279,18 @@ test('ci waste is judged on raw durations: 100s ok plus 20s failed is 16.7%, not
 test('untyped Linear issues (type none) stay out of the typed denominator', () => {
   issue('GEO-1', 'none');
   pr(1, 'GEO-1');
-  expect(m().bugs).toMatchObject({ value: null, n: 0 });
+  expect(m().bugs).toMatchObject({ value: null, denominator: 0 });
   issue('GEO-2', 'Bug');
   issue('GEO-3', 'Feature');
   pr(2, 'GEO-2');
   pr(3, 'GEO-3');
-  expect(m().bugs).toMatchObject({ value: 50, n: 2 });
+  expect(m().bugs).toMatchObject({ value: 50, denominator: 2 });
 });
 
 test('a usage reading stored at the report second counts', () => {
   db.query('INSERT INTO usage_samples (at, account, five_hour, seven_day) VALUES (?, ?, ?, ?)').run('2026-10-16T01:00:00Z', 'active', 10, 40);
   db.query('INSERT INTO usage_samples (at, account, five_hour, seven_day) VALUES (?, ?, ?, ?)').run('2026-10-16T07:00:00Z', 'active', 20, 90);
-  expect(m().cost).toMatchObject({ value: 90, n: 2 });
+  expect(m().cost).toMatchObject({ value: 90, denominator: 2 });
 });
 
 test('cost targets compare the unrounded peak: 79.9 passes under 80', () => {

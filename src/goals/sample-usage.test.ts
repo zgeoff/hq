@@ -84,7 +84,7 @@ test('switching account A to B and back to A with unchanged figures stores A aga
   expect(sampleUsage(db, new Date('2026-10-16T03:00:00Z'))).toBe(true);
   expect(sampleUsage(db, new Date('2026-10-16T04:00:00Z'))).toBe(false);
   expect(rows()).toHaveLength(3);
-  expect(measure(db, FROM, TO, NOW).cost).toMatchObject({ value: 40, n: 2 });
+  expect(measure(db, FROM, TO, NOW).cost).toMatchObject({ value: 40, denominator: 2 });
 });
 
 function accountFile(name: string, body: unknown, mtime: string) {
