@@ -952,7 +952,7 @@ test('hq pr override and accept-risk refuse a chat source named by --by and HQ_A
   });
 
   const override = await hq('pr', 'override', 'widgets', '7', '--source', 'chat:kettle-1', '--by', 'z-stu', '--note', 'Teapot is fine.');
-  const acceptRisk = await hq('pr', 'accept-risk', 'widgets', '7', 'KET-1-f1', '--source', 'chat:kettle-1', '--by', 'z-stu', '--note', 'Teapot is fine.');
+  const acceptRisk = await hq('pr', 'accept-risk', 'widgets', '7', 'f1f1f1f1f1f1f1f1', '--source', 'chat:kettle-1', '--by', 'z-stu', '--note', 'Teapot is fine.');
 
   expect([override.code === 0, override.json.error.code, override.json.error.message.endsWith('; ask z-stu to record it')]).toStrictEqual([false, 'bad_args', true]);
   expect([acceptRisk.code === 0, acceptRisk.json.error.code, acceptRisk.json.error.message.endsWith('; ask z-stu to record it')]).toStrictEqual([false, 'bad_args', true]);
