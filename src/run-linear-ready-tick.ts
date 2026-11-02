@@ -10,6 +10,7 @@ import rulesTable from '../lanes.json';
 import { readLinearReady } from './lanes/read-linear-ready.ts';
 import { collectFocusMatches } from './focus/collect-focus-matches.ts';
 import { countFocusMatches } from './focus/count-focus-matches.ts';
+import { readDoneOpenIssues } from './lanes/read-done-open-issues.ts';
 import { readBacklogIssues } from './lanes/read-backlog-issues.ts';
 import { writeDesignBacklog } from './lanes/write-design-backlog.ts';
 import { toMessage } from './runs/to-message.ts';
@@ -63,7 +64,7 @@ export async function runLinearReadyTick(db: Database, deps: LinearReadyTickDeps
   setMeta(db, 'lanes_ready_linear_error', null);
   const leftMs = Math.max(0, deps.deadlineMs - (readClock() - startedAt));
   const focus = readFocus(db);
-  const backlog = await withDeadline(readBacklogIssues(cancellableCall, rulesTable.team), leftMs, 'Backlog promotable count', abandoned).then(
+  const backlog = await withDeadline(readBacklogIssues(cancellableCall, rulesTable.team, readDoneOpenIssues(db)), leftMs, 'Backlog promotable count', abandoned).then(
     (issues) => ({ issues, error: null }),
     (error: unknown) => ({ issues: null, error: toMessage(error).slice(0, 300) }),
   );

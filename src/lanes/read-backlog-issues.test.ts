@@ -19,6 +19,7 @@ interface IssueSeed {
   project?: string;
   priority?: number;
   blockerStates?: string[];
+  blockers?: { identifier: string; state: string }[];
 }
 
 // A fake Linear that answers the Backlog query with the given pages of issues, one per call in
@@ -37,7 +38,7 @@ function setupTest() {
         parent: null,
         labels: { nodes: [...(seed.labels ?? []).map((name) => ({ name })), ...(seed.typeLabel === undefined ? [] : [{ name: seed.typeLabel, parent: { name: 'Type' } }])] },
         inverseRelations: {
-          nodes: (seed.blockerStates ?? []).map((type, blocker) => ({ type: 'blocks', issue: { identifier: `GEO-97${blocker}`, state: { type } } })),
+          nodes: (seed.blockers ?? (seed.blockerStates ?? []).map((type, blocker) => ({ identifier: `GEO-97${blocker}`, state: type }))).map((blocker) => ({ type: 'blocks', issue: { identifier: blocker.identifier, state: { type: blocker.state } } })),
           pageInfo: { hasNextPage: false },
         },
       }));
@@ -61,7 +62,7 @@ test('it lists the complete Backlog issue whose blockers are Done and leaves out
     { identifier: 'GEO-9802', title: 'pour the tea', description, blockerStates: ['completed', 'unstarted'] },
   ]);
 
-  const backlog = await readBacklogIssues(call, 'GEO');
+  const backlog = await readBacklogIssues(call, 'GEO', new Map());
   const issues = backlog.promotable;
 
   expect(issues).toStrictEqual([
@@ -78,7 +79,7 @@ test('it rejects a Backlog answer with an unexpected shape', async () => {
   const answer = { issues: { nodes: [{ identifier: 'GEO-9809' }], pageInfo: { hasNextPage: false, endCursor: null } } };
   const call: LinearCall = () => Promise.resolve(answer);
 
-  const read = readBacklogIssues(call, 'GEO');
+  const read = readBacklogIssues(call, 'GEO', new Map());
 
   await expect(read).rejects.toMatchObject({ code: 'linear_failed', message: "Linear's Backlog answer has an unexpected shape: issues.nodes.0.title" });
 });
@@ -90,7 +91,7 @@ test('it stops after twenty Backlog pages that each name another page', async ()
     return Promise.resolve({ issues: { nodes: [], pageInfo: { hasNextPage: true, endCursor: `widget-${cursors.length}` } } });
   };
 
-  const read = readBacklogIssues(call, 'GEO');
+  const read = readBacklogIssues(call, 'GEO', new Map());
 
   await expect(read).rejects.toMatchObject({ code: 'linear_failed', message: 'more than 1000 Backlog issues; hq reads no further' });
   expect(cursors).toHaveLength(20);
@@ -108,7 +109,7 @@ test('it collects the promotable issues from every Backlog page, asking for each
     ],
   );
 
-  const backlog = await readBacklogIssues(call, 'GEO');
+  const backlog = await readBacklogIssues(call, 'GEO', new Map());
   const issues = backlog.promotable;
 
   expect(issues).toStrictEqual([
@@ -129,7 +130,7 @@ test('it collects the promotable issues from every Backlog page, asking for each
   ]);
 });
 
-test('hq lanes promotable --json prints the promotable Backlog issues of the lanes team', async () => {
+test('hq lanes promotable --json prints the promotable Backlog issues of the lanes team, and the ones a done-but-open blocker holds', async () => {
   const fresh = freshDb();
   const run = mock<Runner>(() => Promise.resolve<RunResult>({ code: 0, stdout: 'lin_api_INVENTEDkettleKEY0042\n', stderr: '' }));
   const log = console.log;
@@ -147,7 +148,20 @@ test('hq lanes promotable --json prints the promotable Backlog issues of the lan
   const nodes = [
     { identifier: 'GEO-9813', title: 'fit the whistle', description, priority: 0, createdAt: '2026-10-01T00:00:00Z', project: null, parent: null, labels: { nodes: [] }, inverseRelations: relations },
     { identifier: 'GEO-9814', title: 'paint the whistle', description, priority: 0, createdAt: '2026-10-01T00:00:00Z', project: null, parent: null, labels: { nodes: [{ name: 'parked' }] }, inverseRelations: relations },
+    {
+      identifier: 'GEO-9815',
+      title: 'polish the whistle',
+      description,
+      priority: 0,
+      createdAt: '2026-10-01T00:00:00Z',
+      project: null,
+      parent: null,
+      labels: { nodes: [] },
+      inverseRelations: { nodes: [{ type: 'blocks', issue: { identifier: 'GEO-9871', state: { type: 'started' } } }], pageInfo: { hasNextPage: false } },
+    },
   ];
+  fresh.db.run("INSERT INTO linear_started (issue, started_at, fetched_at) VALUES ('GEO-9871', '2026-10-10T01:00:00Z', '2026-10-16T01:00:00Z')");
+  fresh.db.run("INSERT INTO linear_started_prs (issue, ref, status, merged_at) VALUES ('GEO-9871', 'kettle#9', 'merged', '2026-10-13T01:00:00Z')");
   server.use(
     http.post(LINEAR_GRAPHQL_URL, async (info) => {
       const body: unknown = await info.request.json();
@@ -160,7 +174,7 @@ test('hq lanes promotable --json prints the promotable Backlog issues of the lan
 
   expect([code, JSON.parse(printed.join('')), asked]).toStrictEqual([
     0,
-    { ok: true, issues: [{ identifier: 'GEO-9813', title: 'fit the whistle' }] },
+    { ok: true, issues: [{ identifier: 'GEO-9813', title: 'fit the whistle' }], held: [{ identifier: 'GEO-9815', title: 'polish the whistle', blockers: [{ identifier: 'GEO-9871', lastMergedAt: '2026-10-13T01:00:00Z' }] }] },
     [{ query: expect.stringContaining('issues(first: 50,'), variables: { after: null, team: 'GEO', state: 'Backlog' } }],
   ]);
 });
@@ -175,9 +189,28 @@ test('it leaves a needs-design issue out of the promotable ones and queues it by
     { identifier: 'GEO-9823', title: 'fit the lid', description, labels: ['atc'] },
   ]);
 
-  const backlog = await readBacklogIssues(call, 'GEO');
+  const backlog = await readBacklogIssues(call, 'GEO', new Map());
 
   expect(backlog.promotable.map((issue) => issue.identifier)).toStrictEqual(['GEO-9823']);
   expect(backlog.design.agent.map((issue) => issue.identifier)).toStrictEqual(['GEO-9821']);
   expect(backlog.design.withGeoff.map((issue) => issue.identifier)).toStrictEqual(['GEO-9822']);
+});
+
+test('it holds an issue blocked only by a done-but-open issue, and not one with a stalled blocker, nor a completed one', async () => {
+  const app = setupTest();
+  const description =
+    '## Outcome\n\nThe kettle boils.\n\n## Context\n\n- Project: kitchen\n\n## Scope\n\nIn: the element.\nOut: none stated.\n\n## Acceptance\n\n- [ ] The kettle boils in a test (unit test)\n\n## Actions\n\nCode delivery\n';
+  const call = app.answerWith([
+    { identifier: 'GEO-9831', title: 'boil the kettle', description, blockers: [{ identifier: 'GEO-9871', state: 'started' }, { identifier: 'GEO-9870', state: 'completed' }] },
+    { identifier: 'GEO-9832', title: 'pour the tea', description, blockers: [{ identifier: 'GEO-9872', state: 'started' }] },
+    { identifier: 'GEO-9833', title: 'fill the cup', description, blockers: [{ identifier: 'GEO-9870', state: 'completed' }] },
+    { identifier: 'GEO-9834', title: 'serve the tea', description, blockers: [{ identifier: 'GEO-9871', state: 'started' }, { identifier: 'GEO-9872', state: 'started' }] },
+  ]);
+
+  const backlog = await readBacklogIssues(call, 'GEO', new Map([['GEO-9871', '2026-10-13T01:00:00Z']]));
+
+  expect({ promotable: backlog.promotable.map((issue) => issue.identifier), held: backlog.held }).toStrictEqual({
+    promotable: ['GEO-9833'],
+    held: [{ identifier: 'GEO-9831', title: 'boil the kettle', blockers: [{ identifier: 'GEO-9871', lastMergedAt: '2026-10-13T01:00:00Z' }] }],
+  });
 });

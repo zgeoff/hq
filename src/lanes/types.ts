@@ -149,6 +149,13 @@ export interface PromotableIssue {
   facts: ReadyIssue;
 }
 
+// A Backlog issue that would be promotable, but for blockers In Progress whose every PR merged.
+export interface HeldIssue {
+  identifier: string;
+  title: string;
+  blockers: { identifier: string; lastMergedAt: string }[];
+}
+
 // A Backlog issue as the promotion check sees it: the state type of each issue that blocks it, and
 // whether Linear holds more relations than the one page hq read.
 export interface BacklogIssue {

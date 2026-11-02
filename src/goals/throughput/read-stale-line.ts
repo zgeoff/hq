@@ -1,6 +1,7 @@
 import type { Database } from 'bun:sqlite';
 import { match } from 'ts-pattern';
 import { z } from 'zod';
+import { readStartedPrs } from '../../linear/read-started-prs.ts';
 import { findUnreadLine } from './find-unread-line.ts';
 import { formatItemList } from './format-item-list.ts';
 import { pickStaleKind } from './pick-stale-kind.ts';
@@ -35,7 +36,6 @@ interface StaleItem {
 }
 
 const startedRowSchema = z.object({ issue: z.string(), started_at: z.string() });
-const prRowSchema = z.object({ issue: z.string(), ref: z.string(), status: z.string(), merged_at: z.string().nullable() });
 
 function readUnrunItems(db: Database): StaleItem[] {
   const rows = db
@@ -46,13 +46,12 @@ function readUnrunItems(db: Database): StaleItem[] {
        ORDER BY s.issue`,
     )
     .all();
-  const prRows = z.array(prRowSchema).parse(db.query('SELECT issue, ref, status, merged_at FROM linear_started_prs ORDER BY issue, ref').all());
+  const prs = readStartedPrs(db);
   return z
     .array(startedRowSchema)
     .parse(rows)
     .flatMap((row) => {
-      const prs = prRows.filter((pr) => pr.issue === row.issue).map((pr) => ({ ref: pr.ref, status: pr.status, mergedAt: pr.merged_at }));
-      return buildUnrunItem(row.issue, row.started_at, pickStaleKind(row.started_at, prs));
+      return buildUnrunItem(row.issue, row.started_at, pickStaleKind(row.started_at, prs.get(row.issue) ?? []));
     });
 }
 
