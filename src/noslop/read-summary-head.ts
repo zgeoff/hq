@@ -6,12 +6,10 @@ export type SummaryHead = { found: true; head: string; updatedAt: string } | { f
 
 const MARKER_START = '<!-- noslop:summary ';
 
-// The login of the noslop App that posts the summary comment. It must match the App's slug: under
-// another login no comment counts, so every PR reads as one noslop never reviewed.
+// It must match the App's slug: under another login no comment counts, so every PR reads as one
+// noslop never reviewed.
 const NOSLOP_LOGIN = 'noslop-review[bot]';
 
-// The head noslop's own last review read, taken the way noslop finds it: from the newest issue comment
-// the noslop App posted that opens a summary marker.
 export async function readSummaryHead(run: Runner, slug: string, pr: number): Promise<SummaryHead> {
   const path = `repos/${slug}/issues/${pr}/comments`;
   const result = await run(['gh', 'api', path, '--paginate', '--jq', '.[] | {login: .user.login, body, updatedAt: .updated_at}']);

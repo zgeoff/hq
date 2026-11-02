@@ -8,8 +8,6 @@ import { SKIP_TRANSITIONS } from './skip-transitions.ts';
 import type { SkipAction, SkipState } from './skip-transitions.ts';
 import type { LaneSkip } from './types.ts';
 
-// The one write to the stored skips: checks the move against the table, stores the skips after it in
-// issue order, and logs it. The caller holds the transaction.
 export function writeSkipMove(db: Database, action: SkipAction, skip: LaneSkip, actor: string): void {
   const skips = readLaneSkips(db);
   const others = skips.filter((stored) => stored.issue !== skip.issue);

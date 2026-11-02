@@ -8,8 +8,8 @@ import { CALL_MS } from '../watcher/call-ms.ts';
 
 const FILES_LIMIT = 3000;
 
-// Every path the PR changes, a renamed file's old path too, read page by page. GitHub lists at most
-// 3000 files, so a list that long may hide one; the read then fails, as any failed read does.
+// GitHub lists at most 3000 files, so a list that long may hide one; the read then fails, as any
+// failed read does.
 export async function readPRFiles(run: Runner, slug: string, pr: number): Promise<string[]> {
   const result = await boundedRunner(run, CALL_MS)(['gh', 'api', '--paginate', `repos/${slug}/pulls/${pr}/files?per_page=100`, '--jq', '.[] | [.filename, .previous_filename // empty] | @tsv']).catch(toRunFailure);
   if (result.code !== 0) {

@@ -24,9 +24,6 @@ interface LowWaterAlert {
   actor: string;
 }
 
-// Tells z-triage once per low-water episode that eligible Ready work is running out while Backlog issues
-// wait to be promoted. pickLowWaterMoves decides; this reads its inputs and writes what it picked.
-// Returns whether it sent.
 export function sendLowWaterAlert(db: Database, alert: LowWaterAlert): boolean {
   const since = getMeta(db, LOW_WATER_SINCE_KEY);
   const target = findRoleName('triage');

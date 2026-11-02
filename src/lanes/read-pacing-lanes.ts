@@ -5,8 +5,6 @@ import { readPacingFile } from './read-pacing-file.ts';
 
 const fileSchema = z.object({ lanes: z.unknown(), slots: z.unknown() }).partial();
 
-// pacing.json's named lanes to check lanes.json against, or null when it gives only `slots`: the lane
-// rules then stand on their own.
 export async function readPacingLanes(): Promise<LaneConfig[] | null> {
   const raw = await readPacingFile();
   const file = fileSchema.safeParse(raw);

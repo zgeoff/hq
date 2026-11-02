@@ -4,8 +4,8 @@ import { loadNoslopSettings } from './load-noslop-settings.ts';
 import type { NoslopSettings } from './load-noslop-settings.ts';
 import { writeNoslopSettings } from './write-noslop-settings.ts';
 
-// Adds or removes repos; repeating a change changes nothing. The read and the write share one
-// immediate transaction, so a list change or pin by another hq process in between is never lost.
+// The read and the write share one immediate transaction, so a list change or pin by another hq
+// process in between is never lost.
 export function updateNoslopRepos(db: Database, change: 'on' | 'off', names: string[]): NoslopSettings {
   assertRepoNames(change, names);
   return db

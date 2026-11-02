@@ -9,8 +9,6 @@ export interface ResolvedEngine {
   sha: string | null;
 }
 
-// The engine for a repo's PRs, from the noslop list in hq.db: no review file or earlier round
-// moves a listed repo's PR to Codex.
 export function resolveEngine(db: Database, owner: string, repo: string): ResolvedEngine {
   const settings = loadNoslopSettings(db);
   return {

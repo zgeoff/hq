@@ -28,7 +28,6 @@ export function checkAllSkipped(db: Database, slotPlan: SlotPlan, actor: string)
     return false;
   }
   if (getLanesHold(db)) {
-    // An alert the hold drops unsent is owed again once the hold ends.
     if (removeAllSkippedAlerts(db) > 0) {
       setMeta(db, TOLD, null);
     }

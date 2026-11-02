@@ -4,7 +4,6 @@ import { at, freshDb } from '../../test/helpers.ts';
 import { holdLanes } from './hold-lanes.ts';
 import { tick } from './tick.ts';
 
-// Each look has three free slots, so the mark is 3.
 function setupTest() {
   const fresh = freshDb();
   onTestFinished(fresh.cleanup);

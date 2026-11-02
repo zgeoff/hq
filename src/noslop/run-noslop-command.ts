@@ -79,7 +79,6 @@ function renderSettings(db: Database): Out {
   return { data: { repos: settings.repos, caps: settings.caps, sha: settings.sha, clone: resolveRunDir(settings) }, text: formatSettings(settings) };
 }
 
-// The folder noslop runs from: the pinned commit's own, or the base clone before any pin.
 function resolveRunDir(settings: NoslopSettings): string {
   return settings.sha === null ? resolveNoslopDir() : buildRunDir(resolveNoslopDir(), settings.sha);
 }
@@ -95,7 +94,6 @@ function formatSettings(settings: NoslopSettings): string {
   ].join('\n');
 }
 
-// The cap of each listed repo, or off; a repo with a cap that is not listed shows too.
 function formatCaps(settings: NoslopSettings): string {
   const names = [...new Set([...settings.repos.map((name) => name.toLowerCase()), ...Object.keys(settings.caps)])].toSorted();
   if (names.length === 0) {
@@ -137,9 +135,8 @@ async function updatePin(args: NoslopArgs): Promise<Out> {
   return { data: { ...shown.data, storeMigration: migration }, text: `${shown.text}\n${formatStoreMigration(migration)}` };
 }
 
-// The lock covers the idle check, checkout, install, the store migration and the meta write, so the
-// recorded pin is the commit checked out and the store it migrated. Reviews take no lock, so the
-// idle check runs again after the install, right before the migration query.
+// Reviews take no lock, so the idle check runs again after the install, right before the migration
+// query.
 async function updatePinLocked(args: NoslopArgs, commit: string, force: string | undefined): Promise<StoreMigration> {
   const store = requireNoslopStore();
   requireStoreRestored(args.db, store);

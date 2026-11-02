@@ -12,7 +12,6 @@ export interface NoslopTotals {
   baseMove: number;
 }
 
-// The churn figures summed across PRs.
 export function buildNoslopTotals(reports: PRReport[]): NoslopTotals {
   const buildSum = (pick: (r: PRReport) => number): number => reports.reduce((total, r) => total + pick(r), 0);
   return {

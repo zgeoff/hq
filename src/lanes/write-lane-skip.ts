@@ -15,8 +15,6 @@ export interface SkipChange {
   at: Date;
 }
 
-// Sets one issue's skip, in place of any it had, and logs it. The caller reads the clock and passes
-// the set time; an until before it is refused.
 export function writeLaneSkip(db: Database, change: SkipChange): LaneSkip {
   if (!ISSUE.test(change.issue)) {
     throw new HqError('bad_args', `hq lanes skip takes an issue like GEO-123, not "${change.issue.slice(0, 60)}"`);

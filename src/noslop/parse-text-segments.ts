@@ -2,7 +2,6 @@ import type { Segment } from './segment.ts';
 
 const VERSION_IN_TEXT = /(?<![\w./-])(?:v\d+\.\d+(?:\.\d+)?|\d+\.\d+\.\d+)(?:-(?:alpha|beta|rc)(?:\.\d+)*)?(?![\w-]|\.\d)/gu;
 
-// Text only, with its version tokens set apart.
 export function parseTextSegments(text: string): Segment[] {
   const segments: Segment[] = [];
   let last = 0;

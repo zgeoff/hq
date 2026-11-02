@@ -9,7 +9,6 @@ function setupTest() {
   onTestFinished(fresh.cleanup);
   const look = createLanesLook(fresh.db);
 
-  // One look at `time` with `eligible` Ready issues and 2 promotable ones, both read at that time.
   const lookAt = async (time: string, eligible: number): Promise<void> => {
     at(time);
     await look.ready(eligible);

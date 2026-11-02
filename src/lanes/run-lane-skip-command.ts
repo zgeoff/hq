@@ -19,8 +19,6 @@ interface SkipOut {
   text: string;
 }
 
-// hq lanes skip <issue>|list|drop. A skip leaves one Ready issue out of the lanes' picks until its
-// time passes, or until its until issue is Done or Canceled or its until PR merges or closes, and the Ready summary lists it as skipped.
 export function runLaneSkipCommand(deps: LaneSkipCommandDeps): SkipOut {
   return match(deps.args)
     .with({ kind: 'list' }, () => {

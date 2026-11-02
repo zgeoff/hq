@@ -10,14 +10,8 @@ import type { DesignRun } from './read-design-runs.ts';
 export interface RunningByPlace {
   imp: number;
   local: number;
-
-  // The running issues that hold a slot, parked ones left out.
   issues: string[];
-
-  // Those of them that hold an imp slot.
   impIssues: string[];
-
-  // Why local is more than the runs here hold, or null when those runs set it.
   localSource: string | null;
 }
 
@@ -43,15 +37,13 @@ export function readRunningByPlace(db: Database, at: Date = now(), designRuns: r
 
 interface LiveLocal {
   sessions: number;
-
-  // The runs whose awake sessions all run on this PC.
   hereOnly: Set<string>;
   elsewhere: Map<string, number>;
 }
 
 const sessionsSchema = z.array(z.object({ issue: z.string(), session_id: z.string() }));
 
-// Null with no fresh reading, or one from before the sweep recorded the local sessions.
+// Null for a reading from before the sweep recorded the local sessions.
 function readLiveLocal(db: Database, at: Date, design: ReadonlySet<string>): LiveLocal | null {
   const reading = readFreshAwake(db, at);
   if (reading?.local === undefined) {

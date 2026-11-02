@@ -34,8 +34,6 @@ const pageSchema = z.object({ issues: z.object({ nodes: z.array(nodeSchema), pag
 
 export type ReadyPageAnswer = z.input<typeof pageSchema>;
 
-// Every issue of the team in one workflow state, page by page. A failure on any page throws, so a
-// caller never acts on part of the list.
 export async function readTeamIssues(call: LinearCall, team: string, state: string): Promise<ReadyIssue[]> {
   const issues: ReadyIssue[] = [];
   let after: string | null = null;

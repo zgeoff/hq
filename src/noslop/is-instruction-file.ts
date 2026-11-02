@@ -1,5 +1,3 @@
-// A repo's instruction file: AGENTS.md at any depth, or a file under .claude/skills/ or skills/,
-// except a test file or test data.
 export function isInstructionFile(path: string): boolean {
   if (/(?:^|\/)AGENTS\.md$/u.test(path)) {
     return true;

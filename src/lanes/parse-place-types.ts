@@ -12,8 +12,6 @@ export interface PlaceTypesRead {
   error: string | null;
 }
 
-// pacing.json's `placeTypes: { imp?: [...], local?: [...] }`: the Type names each listed place takes;
-// null when the file gives none. A place, list or name it cannot read gives null and the error.
 export function parsePlaceTypes(raw: unknown): PlaceTypesRead {
   const file = fileSchema.safeParse(raw);
   const given = file.success ? file.data.placeTypes : undefined;

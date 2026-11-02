@@ -16,9 +16,7 @@ const runsSchema = z.array(z.object({ issue: z.string(), state: z.enum(RUN_STATE
 
 const movedSchema = z.array(z.object({ subject_id: z.string() }));
 
-// Every run that is a design pass, open or closed: one with a design_lane, and a run added before v46
-// (no design_lane) whose issue is type Design, which counts as with-geoff. A run that turned into the
-// build run after its design pass is a delivery run, whatever its issue's type.
+// A run added before v46 has no design_lane; one whose issue is type Design counts as with-geoff.
 export function readDesignRuns(db: Database): DesignRun[] {
   const rows = runsSchema.parse(db.query('SELECT issue, state, design_lane FROM runs').all());
   const designIssues = readDesignIssues(db);

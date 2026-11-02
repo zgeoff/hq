@@ -6,7 +6,6 @@ import { overrideEnv } from '../config/override-env.ts';
 import { realRunner } from '../runner/real-runner.ts';
 import { readCapacity } from './read-capacity.ts';
 
-// A skill folder whose capacity.sh prints room for imps; returns where its pacing.json goes.
 function setupTest(): string {
   const dir = mkdtempSync(join(tmpdir(), 'hq-capacity-')),
     script = join(dir, 'scripts', 'capacity.sh');

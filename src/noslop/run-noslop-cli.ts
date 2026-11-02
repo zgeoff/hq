@@ -17,12 +17,9 @@ import type { PRRequest } from './types.ts';
 export interface NoslopCliRun {
   finished: RunResult;
 
-  // The end of stderr with the App's secrets cut out.
   tail: string;
 }
 
-// One noslop command for a PR, run from the pinned clone with the App's credentials, in a checkout
-// of the PR's repo. The caller reads the exit code and the output.
 export async function runNoslopCli(request: PRRequest, parsed: ParsedRepo, args: string[], timeoutMs: number): Promise<NoslopCliRun> {
   const sha = requirePinned(loadNoslopSettings(request.db).sha);
   const slug = buildSlug(parsed);

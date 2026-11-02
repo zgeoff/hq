@@ -1,6 +1,4 @@
-// Whether a CODEOWNERS pattern covers a repo path. A leading or inner slash anchors the pattern at
-// the root, a pattern with none matches that name at any depth, and a match covers everything below,
-// except that a single `*` in the last segment matches at that depth only, as GitHub's `docs/*` does.
+// A single `*` in the last segment matches at that depth only, as GitHub's `docs/*` does.
 export function isCodeownersMatch(pattern: string, path: string): boolean {
   const dirOnly = pattern.endsWith('/');
   const body = pattern.replace(/^\//u, '').replace(/\/$/u, '');

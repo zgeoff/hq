@@ -4,8 +4,6 @@ import type { SlotCause } from './types.ts';
 
 export interface SlotCauseInput {
   free: number;
-
-  // The free slots no eligible issue may fill under pacing.json's placeTypes; 0 without it.
   unfit: number;
   eligible: number | null;
   eligibleSince: string | null;

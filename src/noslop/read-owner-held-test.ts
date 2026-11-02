@@ -8,8 +8,6 @@ import type { ParsedRepo } from './parse-lower-repo.ts';
 import { parseOwnerPatterns } from './parse-owner-patterns.ts';
 import { readCodeowners } from './read-codeowners.ts';
 
-// Which paths need the owner's lgtm: the owner section of the repo's CODEOWNERS at the PR's base,
-// else the code rule when the repo has no CODEOWNERS. Null for a repo with none held.
 export async function readOwnerHeldTest(run: Runner, parsed: ParsedRepo, base: string): Promise<((path: string) => boolean) | null> {
   if (parsed.owner !== OWNER) {
     return null;

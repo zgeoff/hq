@@ -15,7 +15,6 @@ const AnchorSchema = z.object({ path: z.string(), startLine: z.number(), endLine
     severity: z.string(),
     title: z.string(),
 
-    // From noslop's later versions: the criterion and taste rule cited, where it anchors, and whether the PR wrote the line.
     criterion: z.string().optional(),
     rule: z.string().optional(),
     anchor: AnchorSchema.optional(),
@@ -27,15 +26,12 @@ const AnchorSchema = z.object({ path: z.string(), startLine: z.number(), endLine
     base: z.unknown(),
     depth: z.unknown(),
 
-    // From a later noslop: the special route it gave the PR; null or absent for an ordinary PR.
     special: z.unknown().optional(),
     findings: z.array(ReviewFindingSchema),
     failedCalls: z.array(z.unknown()),
 
-    // From version 6, the changed files no call read: data files, and files too large for a call.
     notReviewed: z.array(NotReviewedSchema).optional(),
 
-    // From version 7, on a fixes-only run only: noslop's verdict on each fix it checked.
     fixChecks: z.array(FixCheckSchema).optional(),
   }),
   VersionSchema = z.object({ version: z.number() });
@@ -51,18 +47,14 @@ export interface ReviewOutput {
   base: string | null;
   depth: string | null;
 
-  // Noslop's special route; null for an ordinary PR.
   special: string | null;
   findings: ReviewFinding[];
 
-  // Empty before version 6, which first reports them.
   notReviewed: NotReviewedFile[];
 
-  // Empty unless the run was a fixes-only run.
   fixChecks: FixCheck[];
 }
 
-// What a finished `noslop review --json` run was: a review, or the reason it was not one.
 export function parseReviewRun(code: number, stdout: string, stderr: string, timeoutMs: number): Judged<ReviewOutput> {
   const fault = findRunFault(code, stderr, timeoutMs),
     raw = parseJSON(stdout);

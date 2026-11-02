@@ -1,5 +1,3 @@
-// hq lanes: watch delivery capacity and nudge z-delivery when agent slots sit
-// free while Ready work waits. hq names the issues the focus picks; z-delivery launches them.
 import type { Database } from 'bun:sqlite';
 import { z } from 'zod';
 import { iso } from '../clock/iso.ts';
@@ -34,8 +32,6 @@ import { trackSlotCause } from './track-slot-cause.ts';
 import type { Sample, SlotCause, SlotCauseName, TickResult } from './types.ts';
 import { writeSlotMinutes } from './write-slot-minutes.ts';
 
-// One look: record the sample, follow up old nudges, nudge if the gap is long
-// enough and the state changed or the repeat time passed.
 export function tick(db: Database, sample: Sample, actor: string): TickResult {
   return db
     .transaction((): TickResult => {
@@ -46,8 +42,6 @@ export function tick(db: Database, sample: Sample, actor: string): TickResult {
       const slotPlan = readSlotPlan(db, sample, t, capAt);
       const { freeMib, slots: impSlots } = sample.cap ? slotsFrom(sample.cap, sample.impMib) : { freeMib: null, slots: 0 };
 
-      // With lanes: the slots worth filling now, the issues the plan picks (every free slot while Ready
-      // is unknown). Else one pool of imp slots, under impd's non-Nix line as the lanes are.
       const look = slotPlan ? { slots: countWanted(slotPlan), capHeld: slotPlan.pool.capHeld } : readCappedImpRoom(db, { budgetSlots: impSlots, impMib: sample.impMib }, t, capAt);
       const slots = look.slots;
       const eligible = slotPlan?.eligible ?? eligibleNow(db).count;
@@ -71,7 +65,6 @@ export function tick(db: Database, sample: Sample, actor: string): TickResult {
         sendStalledTriageAlert(db, { slotCause, held, at: t, actor });
       }
 
-      // Follow up: did free slots drop after a nudge?
       const due = db.query('SELECT id, at FROM lanes_nudges WHERE slots_after IS NULL').all() as { id: number; at: string }[];
       for (const n of due) {
         if (t.getTime() - new Date(n.at).getTime() >= LANES.followMinutes() * 60_000 && sample.cap) {
@@ -137,9 +130,6 @@ export function tick(db: Database, sample: Sample, actor: string): TickResult {
     .immediate();
 }
 
-// The slots worth filling: each pick, or every free slot while Ready is unknown. A design pick never
-// counts: a design pass holds no delivery slot, so the design lanes ride along in a nudge the pool
-// sends and start none.
 function countWanted(slotPlan: NonNullable<ReturnType<typeof readSlotPlan>>): number {
   if (slotPlan.plan === null) {
     return slotPlan.pool.free;
@@ -153,8 +143,6 @@ interface EmptySlotLook {
   at: Date;
 }
 
-// Adds the slot-minutes since the previous look (at most 30) to the look's cause on its Sydney day;
-// no cause, or an unknown one, adds nothing.
 function writeEmptySlotMinutes(db: Database, look: EmptySlotLook): void {
   const cause = look.slotCause.cause;
   if (cause === null || cause === 'unknown' || look.previousAt === null) {
@@ -164,8 +152,6 @@ function writeEmptySlotMinutes(db: Database, look: EmptySlotLook): void {
   writeSlotMinutes(db, sydney(look.at).date, cause, minutes);
 }
 
-// The idle agent design lane-minutes since the previous look (at most 30), on their own tally key: the
-// design cause is no part of the delivery pool's numbers.
 interface DesignMinutesLook {
   designCause: DesignCause;
   previousAt: string | null;
@@ -184,8 +170,6 @@ const SLOT_CAUSES: SlotCauseName[] = ['delivery', 'triage', 'supply', 'design'];
 
 interface SlotAlertLook {
   free: number;
-
-  // The idle agent design lanes, the design cause's free slots.
   designFree: number;
   at: Date;
   actor: string;

@@ -14,9 +14,6 @@ export type NoslopGateFacts =
 
 export type NoslopVerdict = { pass: true; reason: string } | { pass: false; reason: string };
 
-// `summary` is the head noslop's own last review read, from its summary comment on GitHub; `check` is
-// noslop's own check run at the head; `baseMove` says whether a base move lets the review at an older
-// summary head stand for this one (null when the heads match); `recorded` counts the distinct findings the PR's reviews recorded in hq.
 export function pickNoslopVerdict(facts: NoslopGateFacts, ci: GateCI): NoslopVerdict {
   if (facts.headNow !== facts.head) {
     return { pass: false, reason: `the PR's head moved from ${facts.head.slice(0, 7)} while the gate ran, so no pass: run the gate again` };

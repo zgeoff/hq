@@ -9,8 +9,6 @@ const countSchema = z.number().int().min(0).max(MAX_SLOTS);
 
 const fileSchema = z.object({ designSlots: countSchema.optional(), agentDesignSlots: countSchema.optional() });
 
-// The design lane counts: pacing.json's designSlots for the with-geoff lane and agentDesignSlots for the
-// agent lanes. A key it lacks gives its default; one that is not a whole number from 0 to 100 throws.
 export function parseDesignSlots(raw: unknown): DesignSlots {
   const parsed = fileSchema.safeParse(raw ?? {});
   if (!parsed.success) {

@@ -24,8 +24,6 @@ import { validateLaneRules } from './validate-lane-rules.ts';
 import { writeDesignBacklog } from './write-design-backlog.ts';
 import { writeLaneSkip } from './write-lane-skip.ts';
 
-// Three local slots and no imp ones, so impd's line plays no part. readySeeds: a kettle team's Ready
-// issues; GEO-9805 runs in one local slot already.
 function setupTest() {
   const fresh = freshDb();
   onTestFinished(fresh.cleanup);

@@ -1,7 +1,6 @@
 import { HqError } from '../errors.ts';
 import { pacingPath } from './pacing-path.ts';
 
-// pacing.json as parsed JSON; a file hq cannot read or parse throws.
 export async function readPacingFile(): Promise<unknown> {
   try {
     const raw: unknown = await Bun.file(pacingPath()).json();

@@ -1,5 +1,4 @@
 interface DiffHunk {
-  // The head line of the first added line.
   start: number;
   removed: string[];
   added: string[];
@@ -20,8 +19,6 @@ const HEADER_REFUSALS: [prefix: string, reason: string][] = [
 
 const HUNK_HEADER = /^@@ -\d+(?:,\d+)? \+(?<start>\d+)(?:,\d+)? @@/u;
 
-// A single file's `git diff --unified=0` text as hunks of removed and added lines, or the reason it
-// cannot be read as text edits.
 export function parseFileDiff(diff: string): FileDiff {
   const hunks: DiffHunk[] = [];
   let open: DiffHunk | null = null;

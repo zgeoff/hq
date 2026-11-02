@@ -37,29 +37,16 @@ import type { DesignSlots, LaneSkip, ReadyIssue, Sample } from './types.ts';
 export interface SlotPlan {
   pool: SlotPool;
   focus: Focus | null;
-
-  // What the free slots take, in order; null while the Ready read is unknown or stale.
   plan: FocusPlan | null;
-
-  // When the Ready read the plan comes from was stored; null with the plan.
   readyReadAt: string | null;
-
-  // Every eligible issue not on the board; null while unknown.
   eligible: number | null;
-
-  // The 3 design lanes beside the pool: the open design runs, the lane counts, and the issues each lane
-  // takes next. A design run holds no delivery slot, so none of this moves the pool or the cap.
   design: DesignLanes;
-
   skipped: LaneSkip[];
-
   cap: CapView;
 }
 
 const runsSchema = z.array(z.object({ issue: z.string(), state: z.enum(RUN_STATES), design_lane: z.enum(DESIGN_LANES).nullable() }));
 
-// The lanes' plan for this look: the pool's free slots, filled from the focus terms in order, then any
-// other eligible work. A focus change shows at the next look; running runs keep their slots.
 export function readSlotPlan(db: Database, sample: Sample, at: Date = now(), capAt: Date = at): SlotPlan | null {
   if (!sample.slots || !sample.cap) {
     return null;
@@ -103,9 +90,6 @@ interface DesignLanesLook {
   at: Date;
 }
 
-// The design lanes: the open design runs against the lane counts, and for each lane the issues waiting
-// for it in focus order, as the delivery queue takes them. An issue with a run of any kind, open or closed, or a lanes skip, waits for no lane: a closed
-// design pass is not run again without a reopen.
 function readDesignLanes(db: Database, look: DesignLanesLook): DesignLanes {
   const leftOut = new Set([...look.runs.map((row) => row.issue), ...look.skipped]);
   const backlog = readDesignBacklog(db, look.at);
@@ -123,9 +107,9 @@ function readDesignLanes(db: Database, look: DesignLanesLook): DesignLanes {
   });
 }
 
-// The issues with a run, open or closed: the Ready read can still hold a closed run's issue, and addRun
-// refuses it until a reopen. A closed design_lane run does not count, since addRun turns it into the
-// build run; a pre-v46 Design-type run was the design outcome itself, so it does.
+// The Ready read can still hold a closed run's issue, refused until a reopen. A closed design_lane
+// run turns into the build run, so it does not count; a pre-v46 Design-type run was the design
+// outcome itself, so it does.
 function collectRunIssues(runs: readonly RunRow[]): Set<string> {
   return new Set(runs.filter((row) => !(row.design_lane !== null && CLOSED_RUN_STATES.includes(row.state))).map((row) => row.issue));
 }

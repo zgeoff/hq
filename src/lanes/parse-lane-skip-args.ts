@@ -5,8 +5,6 @@ import { LANE_SKIP_USAGE } from './lane-skip-usage.ts';
 
 export type LaneSkipArgs = { kind: 'list' } | { kind: 'drop'; issue: string } | { kind: 'set'; issue: string; until: string; reason: string };
 
-// hq lanes skip's words after the verb, with its --until and --reason flags, as one command. Anything
-// else is bad_args with the usage.
 export function parseLaneSkipArgs(rest: readonly string[], until: string | undefined, reason: string | undefined): LaneSkipArgs {
   return match(rest)
     .returnType<LaneSkipArgs>()

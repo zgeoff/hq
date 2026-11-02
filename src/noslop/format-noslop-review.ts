@@ -2,7 +2,6 @@ import { formatChecks } from '../review/format-checks.ts';
 import { formatNotReviewed } from './format-not-reviewed.ts';
 import type { NoslopReviewOutcome, TitledFixCheck } from './run-review.ts';
 
-// `hq review`'s text for a noslop review: engine, issue, findings, the files no call read, then CI.
 export function formatNoslopReview(r: NoslopReviewOutcome): string {
   if (r.fixesOnly) {
     return formatFixesOnly(r);
@@ -27,7 +26,6 @@ function formatPostFailed(review: NoslopReviewOutcome): string[] {
   return [`== not posted: noslop stored this review but did not post it to GitHub (${review.postFailed}). Run noslop post ${review.reviewFile} to finish the post.`];
 }
 
-// A fix-checks-only run raises no finding, so its text is the verdict on each fix and the check after.
 function formatFixesOnly(r: NoslopReviewOutcome): string {
   return [
     ...formatCapNote(r),

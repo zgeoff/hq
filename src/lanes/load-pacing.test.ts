@@ -4,14 +4,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { loadPacing } from './load-pacing.ts';
 
-// A pacing.json path in a folder of its own, gone when the test ends; no file is written.
 function setupTest(): string {
   const dir = mkdtempSync(join(tmpdir(), 'hq-pacing-'));
   onTestFinished(() => rmSync(dir, { recursive: true, force: true }));
   return join(dir, 'pacing.json');
 }
 
-// Writes `pacing` to `path` and returns the path.
 function writePacing(path: string, pacing: unknown): string {
   writeFileSync(path, JSON.stringify(pacing));
   return path;

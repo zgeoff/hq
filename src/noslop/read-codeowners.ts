@@ -11,8 +11,7 @@ const MISSING_PATH = /\bNot Found \(HTTP 404\)/u;
 const BASE64 = /^[A-Za-z0-9+/=\s]*$/u;
 const FileSchema = z.object({ type: z.literal('file'), encoding: z.literal('base64'), content: z.string().regex(BASE64) });
 
-// The CODEOWNERS text at the PR's base commit, or null when the repo has none there. The base, not
-// the head, so a PR cannot loosen the rule it is judged by. Any other failure blocks the merge.
+// The base, not the head, so a PR cannot loosen the rule it is judged by.
 export async function readCodeowners(run: Runner, slug: string, base: string): Promise<string | null> {
   const bounded = boundedRunner(run, CALL_MS);
   for (const path of PATHS) {

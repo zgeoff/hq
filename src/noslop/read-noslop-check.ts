@@ -14,8 +14,8 @@ const CheckRunSchema = z.object({ id: z.number(), name: z.string(), app: z.strin
 
 type CheckRun = z.output<typeof CheckRunSchema>;
 
-// noslop's own check run at one commit. The newest run wins by id, since GitHub numbers runs in the
-// order it creates them, and a re-run can start in the same second as the run it replaces.
+// The newest run wins by id, since GitHub numbers runs in the order it creates them, and a re-run can
+// start in the same second as the run it replaces.
 export async function readNoslopCheck(run: Runner, slug: string, sha: string): Promise<NoslopCheck> {
   const path = `repos/${slug}/commits/${sha}/check-runs?check_name=${NOSLOP_CHECK}&filter=all&per_page=100`;
   const result = await run(['gh', 'api', path, '--paginate', '--jq', '.check_runs[] | {id, name, app: .app.slug, status, conclusion, title: .output.title, completedAt: .completed_at}']);

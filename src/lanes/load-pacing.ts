@@ -13,18 +13,9 @@ export interface Pacing {
   impMib: number;
   lanes: LaneConfig[] | null;
   slots: PacingSlots | null;
-
-  // The Type names each place takes; null when the file gives none, so every place takes any Type.
   placeTypes: PlaceTypes | null;
-
-  // The local sessions unattended providers may run on this host; null: no cap but the local slots.
   localRoom: number | null;
-
-  // Claude's launch limit, providers.claude.threshold, in percent; null when the file gives none.
   claudeLaunchPct: number | null;
-
-  // The design lane counts (designSlots, agentDesignSlots), their defaults when the file gives none or
-  // gets one wrong; designError says which, apart from the lanes' error.
   design: DesignSlots;
   designError: string | null;
   error: string | null;
@@ -38,9 +29,6 @@ const claudeProviderSchema = z.object({ threshold: z.number() });
 
 const claudeSchema = z.object({ providers: z.object({ claude: claudeProviderSchema }) });
 
-// pacing.json's imp size, lanes, slot caps, place types and local room. A file hq can't read, or one with neither lanes nor
-// slots, gives one pool of imp slots. Lanes or slots it refuses give an error, so the watcher nudges
-// nothing on a config it can't read.
 export async function loadPacing(path: string): Promise<Pacing> {
   const DEFAULT_IMP_MIB = 2048;
   const file = await readPacingJSON(path);
@@ -80,8 +68,6 @@ interface DesignCountsRead {
   error: string | null;
 }
 
-// A design count pacing.json gets wrong gives the default counts and its own error, so the delivery lanes
-// and slots still load.
 function parseDesignCounts(file: unknown): DesignCountsRead {
   try {
     return { design: parseDesignSlots(file), error: null };

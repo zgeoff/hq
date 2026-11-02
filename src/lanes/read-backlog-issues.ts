@@ -64,19 +64,10 @@ const pageSchema = z.object({ issues: issuesSchema });
 
 export interface BacklogIssues {
   promotable: PromotableIssue[];
-
-  // The issues only a done-but-open blocker holds back: none counts as promotable.
   held: HeldIssue[];
-
-  // The needs-design issues by the design queue they wait in; none of them is promotable.
   design: { agent: ReadyIssue[]; withGeoff: ReadyIssue[] };
 }
 
-// Reads the team's Backlog page by page and sorts it: the issues isIssuePromotable passes, each with the
-// facts the focus matches on, and the needs-design issues, queued for the with-geoff lane when they also
-// carry the with-geoff label and for the agent lanes otherwise. doneOpen holds the In Progress issues whose
-// every PR merged, with their last merge: an issue blocked only by those is held, with the reason, not
-// promotable. Reads only; triage moves the issues.
 export async function readBacklogIssues(call: LinearCall, team: string, doneOpen: ReadonlyMap<string, string>): Promise<BacklogIssues> {
   const backlog: BacklogIssues = { promotable: [], held: [], design: { agent: [], withGeoff: [] } };
   let after: string | null = null;

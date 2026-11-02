@@ -7,9 +7,6 @@ export interface ClassifiedReady {
   skipped: Skipped[];
 }
 
-// Every Ready issue to one lane, or to skipped with a reason. First match wins: the exclusions, the
-// skips set with hq lanes skip, the lanes in lanes.json's order, then the fallback. counts holds every
-// lane in the rules, zeros included.
 export function classifyReady(issues: ReadyIssue[], rules: LaneRules, skips: readonly LaneSkip[]): ClassifiedReady {
   const entries = Object.entries(rules.lanes);
   const ordered = entries.filter(([, rule]) => !rule.fallback);

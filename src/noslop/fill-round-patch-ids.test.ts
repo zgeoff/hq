@@ -8,8 +8,6 @@ import { realRunner } from '../runner/real-runner.ts';
 import { buildNoslopReport } from './build-noslop-report.ts';
 import { fillRoundPatchIDs } from './fill-round-patch-ids.ts';
 
-// A database, an empty git repo for widgets, and a helper that stores a pre-v45 ok review with no
-// patch-id.
 async function setupTest() {
   const base = mkdtempSync(join(tmpdir(), 'hq-fill-patch-'));
   const directory = join(base, 'projects', 'widgets');

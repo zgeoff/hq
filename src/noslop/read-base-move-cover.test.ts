@@ -10,8 +10,6 @@ import { readBaseMoveCover } from './read-base-move-cover.ts';
 import type { CoverRequest } from './read-base-move-cover.ts';
 import { readPRPatchID } from './read-pr-patch-id.ts';
 
-// An empty hq database and an empty git repo, with a way to record a review of widgets#7 and to
-// build the gate's request for it.
 async function setupTest() {
   const base = mkdtempSync(join(tmpdir(), 'hq-base-move-cover-'));
   const db = openDb(join(base, 'hq.db'));

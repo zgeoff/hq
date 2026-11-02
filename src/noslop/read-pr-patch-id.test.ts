@@ -6,7 +6,6 @@ import { createGitRepo } from '../../test/create-git-repo.ts';
 import { realRunner } from '../runner/real-runner.ts';
 import { readPRPatchID } from './read-pr-patch-id.ts';
 
-// An empty git repo on main.
 async function setupTest() {
   const directory = mkdtempSync(join(tmpdir(), 'hq-patch-id-'));
   onTestFinished(() => rmSync(directory, { recursive: true, force: true }));

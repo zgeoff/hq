@@ -5,8 +5,6 @@ import type { PacingSlots } from './types.ts';
 
 const fileSchema = z.object({ slots: z.unknown() }).partial();
 
-// The slot caps the lanes' pool fills: pacing.json's `slots` when present, else the old per-lane counts
-// summed by place. Either shape it cannot read throws.
 export function parsePacingSlots(raw: unknown): PacingSlots {
   const file = fileSchema.safeParse(raw);
   const given = file.success ? file.data.slots : undefined;

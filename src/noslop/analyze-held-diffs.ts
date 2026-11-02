@@ -4,9 +4,6 @@ import type { HeldDiff, MoveClaim } from './types.ts';
 
 export type HeldAnalysis = { ok: true; claims: MoveClaim[]; lines: number } | { ok: false; reason: string };
 
-// Whether every held file's diff is a run of one-line replacements that differ only in a way a
-// line may differ mechanically. It names the first file and line that is not. The targets that
-// moved come back as claims to prove against git.
 export function analyzeHeldDiffs(files: HeldDiff[]): HeldAnalysis {
   const claims: MoveClaim[] = [];
   let lines = 0;

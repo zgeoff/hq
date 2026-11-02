@@ -2,8 +2,6 @@ import { Database } from 'bun:sqlite';
 import { rmSync } from 'node:fs';
 import { HqError } from '../errors.ts';
 
-// A copy of the store beside it, made with SQLite's own backup and checked with integrity_check.
-// A copy that is not ok is removed and refused.
 export function createStoreBackup(store: string, shortSha: string, stamp: string): string {
   const backup = `${store}.bak-${shortSha}-${stamp}`;
   try {
