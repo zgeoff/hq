@@ -54,10 +54,12 @@ test('wait on the owner: call queue → answer → apply, and run time waiting o
   setState(db, 'GEO-2', 'blocked', { waitsOn: 'a release', waitsOnGeoff: true }, 'z-delivery');
   at('2026-10-16T03:45:00Z');
   const stats = computeStats(db, { from: '2026-10-16T01:00:00Z', to: '2026-10-16T03:45:00Z', gh: null });
-  expect(stats.geoff.queueToAnswer).toMatchObject({ n: 1, medianMin: 65 });
-  expect(stats.geoff.answerToApply).toMatchObject({ n: 1, medianMin: 10 });
+  expect(stats.geoff.queueToAnswer).toMatchObject({ medianMin: 65 });
+  expect(stats.geoff.queueToAnswer.n).toBe(1);
+  expect(stats.geoff.answerToApply).toMatchObject({ medianMin: 10 });
+  expect(stats.geoff.answerToApply.n).toBe(1);
   expect(stats.geoff.runGeoffWait.n).toBe(2);
-  expect(stats.geoff.oldestRunWait).toEqual({ id: 'GEO-2', ageMin: 30 });
+  expect(stats.geoff.oldestRunWait).toStrictEqual({ id: 'GEO-2', ageMin: 30 });
   expect(stats.geoff.runWaitExactShare).toBe(0.33);
   expect(statsText(stats)).toContain('67% matched by the word "Geoff" or "the owner"');
 });
@@ -105,9 +107,10 @@ test('merged to live, the backlog by repo, review rework and cycle time', () => 
   setState(db, 'GEO-2', 'deploy-held', {}, 'z-delivery');
   at('2026-10-16T04:30:00Z');
   const stats = computeStats(db, { from: '2026-10-16T01:00:00Z', to: '2026-10-16T04:30:00Z', gh: null });
-  expect(stats.live.mergeToDone).toMatchObject({ n: 1, medianMin: 120 });
-  expect(stats.live.byRepo['widgets']).toMatchObject({ n: 1 });
-  expect(stats.live.backlog).toEqual({ total: 1, byRepo: { gadgets: 1 }, oldest: { id: 'GEO-2', ageMin: 60 } });
+  expect(stats.live.mergeToDone).toMatchObject({ medianMin: 120 });
+  expect(stats.live.mergeToDone.n).toBe(1);
+  expect(stats.live.byRepo['widgets']?.n).toBe(1);
+  expect(stats.live.backlog).toStrictEqual({ total: 1, byRepo: { gadgets: 1 }, oldest: { id: 'GEO-2', ageMin: 60 } });
   expect(stats.flow).toMatchObject({ reviewed: 2, rechecked: 1, reworkShare: 0.5, cycleFromReady: 1 });
   expect(stats.flow.cycle.medianMin).toBe(270);
   expect(stats.flow.mergesSource).toBe('hq');
@@ -158,7 +161,7 @@ test('idle capacity counts only while Ready work waited; a stale count is flagge
   sample(30, 0, 4);
   db.query("INSERT INTO lanes_nudges (at, slots, free_minutes, eligible, event_seq, slots_after) VALUES (?, 2, 10, 3, 1, 0), (?, 2, 10, 3, 1, 2), (?, 1, 10, null, 1, NULL)").run('2026-10-16T01:01:00Z', '2026-10-16T01:11:00Z', '2026-10-16T01:21:00Z');
   const stats = computeStats(db, { from: '2026-10-16T01:00:00Z', to: '2026-10-16T01:40:00Z', gh: null });
-  expect(stats.idle).toEqual({ slotMinutesWhileReady: 20, slotMinutesUnknown: 10, staleShare: 0.25, samples: 4, nudges: 3, nudgesConverted: 1, nudgesPending: 1 });
+  expect(stats.idle).toStrictEqual({ slotMinutesWhileReady: 20, slotMinutesUnknown: 10, staleShare: 0.25, samples: 4, nudges: 3, nudgesConverted: 1, nudgesPending: 1 });
   expect(statsText(stats)).toContain('READY COUNT STALE in 25% of 4 samples: no fresh per-lane Ready report');
 });
 
