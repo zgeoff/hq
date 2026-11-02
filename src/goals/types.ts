@@ -4,29 +4,28 @@ import type { Op } from './ops.ts';
 export interface Target {
   op: Op;
   value: number;
-  until?: string; // a deadline date, YYYY-MM-DD
-  detectMax?: number; // downtime only: each outage caught within this many minutes
+  until?: string;
+  detectMax?: number;
 }
 export type Targets = Record<GoalKey, Target | null>;
 
 export interface Measure {
-  value: number | null; // percent rounded to whole numbers, for display; minutes for downtime; null with no data
-  exact?: number; // the unrounded percent: targets are compared against this, never the rounded value
-  n: number; // the denominator
-  unit: string; // what n counts
-  shown: string; // value as text: "20%", "3 min", "no data"
+  value: number | null;
+  exact?: number;
+  denominator: number;
+  unit: string;
+  shown: string;
   detail: string;
-  longest?: number; // downtime only: the slowest detection of an outage, minutes (rounded, for display)
-  longestExact?: number; // downtime only: the same unrounded: the detection limit is judged on it
-  outages?: number; // downtime only
-  blind?: number; // downtime only: minutes the probe could not see
-  ci?: number; // cost only: CI minutes in the window
-  unclassified?: number; // deploys only: completed runs not yet read from GitHub; the value is partial, never judged
+  longest?: number;
+  longestExact?: number;
+  outages?: number;
+  blind?: number;
+  ci?: number;
+  unclassified?: number;
 
-  // deploys only: classified runs whose outcome hq could not read; the value is partial, never judged
   unknown?: number;
-  extra?: string; // deploys only: what the rate leaves out (holds, no-apply runs, unclassified), for the reports
-  missing?: number; // past days in the window whose data hq has not fetched: the value is incomplete, never judged
+  extra?: string;
+  missing?: number;
 }
 export type Measures = Record<GoalKey, Measure>;
 export type Verdict = 'green' | 'red' | 'none';
@@ -39,15 +38,13 @@ export interface GoalRow {
   to: string;
   partial: boolean;
 
-  // null: before the workflow existed; the applied_* to unclassified fields come from deploy_runs
   deploys: { runs: number; ok: number; failed: number; cancelled: number; running: number; applied_ok: number; applied_failed: number; applied_cancelled: number; held: number; no_apply: number; unknown: number; unclassified: number } | null;
-  log: { deploy: number; hold: number } | null; // null: before the log starts
-  ci: { runs: number; failed: number; cancelled: number; reruns: number; minutes: number; wasteMinutes: number; rawMinutes: number; rawWasteMinutes: number; missing: number }; // raw: unrounded, for target checks
+  log: { deploy: number; hold: number } | null;
+  ci: { runs: number; failed: number; cancelled: number; reruns: number; minutes: number; wasteMinutes: number; rawMinutes: number; rawWasteMinutes: number; missing: number };
   merged: number;
   closedUnmerged: number;
 }
 
-// The filesystem operations the goals log reader makes, so a test can hand it a folder listing.
 export interface LogFiles {
   listNames: (directory: string) => string[];
   probeExists: (path: string) => boolean;

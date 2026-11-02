@@ -14,8 +14,6 @@ export interface OwnerOverride {
 
 const OverrideRowsSchema = z.array(z.object({ seq: z.number(), at: z.string(), data: z.string() }));
 
-// The PR's overrides of open findings from an owner's answer, oldest first. One override event that
-// does not parse voids them all, so a gap never lets an older one stand.
 export function readOwnerOverrides(db: Database, repo: string, pr: number): OwnerOverride[] {
   const rows = OverrideRowsSchema.parse(db.query("SELECT seq, at, data FROM events WHERE subject = 'hq' AND subject_id = ? AND action = 'pr-override' ORDER BY seq").all(`pr:${repo}#${pr}`));
   const overrides = rows.map((row) => parseOverride(row));

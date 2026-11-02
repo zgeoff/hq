@@ -5,9 +5,6 @@ import { iso } from '../clock/iso.ts';
 import { now } from '../clock/now.ts';
 import { updateMergedRun } from './update-merged-run.ts';
 
-// Ends every active run session atc no longer lists, past one sweep (5 min) of grace, and marks it
-// ended by the sweep: findAlerts keeps raising a working run's exit alert from that mark. A run
-// whose work is merged moves to merged once its last session ends.
 export function updateGoneRunSessions(db: Database, sessions: readonly AwakeSession[], actor: string, at: Date = now()): number {
   const GONE_GRACE_MS = 5 * 60_000,
     active = db.query('SELECT session_id, issue, added_at FROM run_sessions WHERE active = 1').all() as { session_id: string; issue: string; added_at: string }[],

@@ -30,7 +30,6 @@ function pickPassResult(outcome: GateOutcome, head: string | null): PRGateResult
   return head === null ? null : { gate: 'pass', head };
 }
 
-// Whether the result was recorded.
 async function tryRecord(request: PRRequest, result: PRGateResult | null): Promise<boolean> {
   if (result === null) {
     return false;

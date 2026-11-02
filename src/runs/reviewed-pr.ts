@@ -9,7 +9,6 @@ import { SHA } from './sha.ts';
 import type { RunPr } from './types.ts';
 import { updateRunTime as touch } from './update-run-time.ts';
 
-// One review round plus one re-check per PR, as the owner's rules say. A third needs --force.
 export function reviewedPr(db: Database, raw: string, sha: string, opts: { recheck: boolean; force: boolean }, actor: string): RunPr {
   if (!SHA.test(sha)) throw new HqError('bad_args', '--sha must be the head sha you reviewed');
   return db

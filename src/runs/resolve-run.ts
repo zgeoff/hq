@@ -6,8 +6,6 @@ import type { Run } from './types.ts';
 
 const MatchesSchema = z.array(z.object({ issue: z.string(), design_pass: z.number() }));
 
-// A row by issue, or by one of its sessions (full id or 8-character prefix). A session of the design
-// pass the run turned from changes nothing on the build run, so only a reader passes 'allow' for one.
 export function resolveRun(db: Database, key: string, designPass: 'allow' | 'refuse' = 'refuse'): Run {
   const byIssue = getRun(db, key);
   if (byIssue) return byIssue;

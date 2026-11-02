@@ -9,11 +9,8 @@ export interface RebasedReads {
   oldPatchID: DiffPatchID;
   newPatchID: DiffPatchID;
 
-  // Null when git could not compare the files one by one, or was not asked to.
   changed: string[] | null;
 
-  // The changed files the new diff no longer touches because the base now holds them as the old
-  // head had them, as a stacked parent's files once the parent merges.
   landed: readonly string[];
 }
 

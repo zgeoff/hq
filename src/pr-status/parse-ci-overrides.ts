@@ -17,8 +17,6 @@ export interface OverrideEventRow {
   data: string;
 }
 
-// One override row hq cannot read voids every CI override of the PR, so a gap never lets an older
-// one stand.
 export function parseCIOverrides(rows: readonly OverrideEventRow[]): CIOverride[] {
   const overrides: CIOverride[] = [];
   for (const row of rows) {

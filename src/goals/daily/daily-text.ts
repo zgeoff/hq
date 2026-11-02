@@ -1,6 +1,3 @@
-// The daily goals check-in (goals rhythm): at 18:00 Sydney the watcher tells z-stu where each of
-// the 7 goals stands, today and for the week so far. One job_runs row per Sydney date, as the
-// morning reports do (morning.ts), so a missed day shows in hq health.
 import type { Database } from 'bun:sqlite';
 import { readySummary } from '../../areas/ready-summary.ts';
 import { loadCapacityLine as capacityLine } from '../../capacity/load-capacity-line.ts';
@@ -44,8 +41,7 @@ export function dailyText(db: Database, at: Date = now()): string {
       return formatFittedLine(`- ${GOAL_NAMES[k]}: ${goal.text}; ${w.detail}`, `; target ${target} ${mark[goal.verdict]}`);
     }
     const v = mark[verdict(targets[k], w)];
-    const part = (m: Measure) => `${m.shown} (${num(m.n)} ${m.unit}${m.missing ? `, ${m.missing} day(s) not fetched` : ''})${m.extra ?? ''}`;
-    return formatFittedLine(`- ${GOAL_NAMES[k]}: today ${part(t)}, week so far ${part(w)}`, `; target ${target} ${v}`);
+    return formatFittedLine(`- ${GOAL_NAMES[k]}: today ${formatMeasurePart(t)}, week so far ${formatMeasurePart(w)}`, `; target ${target} ${v}`);
   };
   const throughput = (read: ThroughputLine) => formatFittedLine(`- ${read.name}: ${read.detail}`, `; target ${read.target} ${mark[read.verdict]}`);
   const ready = readySummary(db, LANES.readyFreshMinutes());
@@ -67,7 +63,6 @@ function incidents(db: Database, from: Date, at: Date): string {
   return lines.slice(0, 3).join('; ') + (lines.length > 3 ? `; ${lines.length - 3} more` : '');
 }
 
-// A long line gives up its middle, never the target and colour at the end.
 function formatFittedLine(head: string, tail: string): string {
   const room = MAX_LINE - tail.length;
   return `${head.length > room ? `${head.slice(0, room - 1)}…` : head}${tail}`;
@@ -76,3 +71,8 @@ function formatFittedLine(head: string, tail: string): string {
 const cap = (l: string) => (l.length > MAX_LINE ? `${l.slice(0, MAX_LINE - 1)}…` : l);
 const num = (x: number) => x.toLocaleString('en-AU');
 const hhmm = (t: string) => new Intl.DateTimeFormat('en-AU', { timeZone: TZ, hourCycle: 'h23', hour: '2-digit', minute: '2-digit' }).format(new Date(t));
+
+function formatMeasurePart(goal: Measure): string {
+  const missing = goal.missing ? `, ${goal.missing} day(s) not fetched` : '';
+  return `${goal.shown} (${num(goal.denominator)} ${goal.unit}${missing})${goal.extra ?? ''}`;
+}

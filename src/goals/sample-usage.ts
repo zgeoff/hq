@@ -11,12 +11,6 @@ const lastAt = z.object({ at: z.string().nullable() });
 
 const LAST_ROW = z.object({ account: z.string(), five_hour: z.number().nullable(), seven_day: z.number().nullable(), five_hour_resets_at: z.string().nullable(), seven_day_resets_at: z.string().nullable() }).nullable();
 
-// One usage_samples row per account whose claude-usage/<account>.json is newer than that account's
-// last row (at = the file's mtime). A file counts only when its account is 12 hex characters and
-// equals the file's base name; others are skipped without a word. With no such folder or no
-// .json in it, the old single file is read as before: one row when it differs from the last row
-// stored, or names another account than it does (A, then B, then A again with the same figures is
-// 3 rows). A missing or unreadable file, or one with no percentages, is skipped without a word.
 export function sampleUsage(db: Database, at: Date = now()): boolean {
   const f = getUsageCache(),
     insert = db.query('INSERT OR IGNORE INTO usage_samples (at, account, five_hour, seven_day, five_hour_resets_at, seven_day_resets_at) VALUES (?, ?, ?, ?, ?, ?)');
@@ -33,7 +27,6 @@ export function sampleUsage(db: Database, at: Date = now()): boolean {
         continue;
       }
 
-      // Outside the file read's catch: a failed query or insert reaches the caller.
       const last = lastAt.parse(db.query('SELECT MAX(at) AS at FROM usage_samples WHERE account = ?').get(key));
       if (last.at !== null && reading.when <= last.at) {
         continue;
@@ -60,8 +53,6 @@ interface WindowResets {
   sevenResetsAt: string | null;
 }
 
-// One account's file: its percentages and its mtime, or null when the file is unreadable, holds no
-// usable percentage, or names another account than its base name.
 function readAccountFile(file: string, key: string): (WindowResets & { five: number | null; seven: number | null; when: string }) | null {
   const reading = ACCOUNT_KEY.test(key) ? readings(file) : null;
   if (!reading || reading.account !== key) {
@@ -78,8 +69,6 @@ const WINDOW_PAIR = z.object({ fiveHour: z.unknown(), sevenDay: z.unknown() }).p
 
 const CACHE_FILE = z.object({ account: z.unknown(), windows: WINDOW_PAIR, resets: WINDOW_PAIR }).partial();
 
-// The two percentages of a cache file and each window's reset time, or null when it holds no usable
-// percentage. A reset that is not an ISO time is left out.
 function readings(file: string): (WindowResets & { account: unknown; five: number | null; seven: number | null }) | null {
   try {
     const parsed = CACHE_FILE.safeParse(JSON.parse(readFileSync(file, 'utf8')));
@@ -104,7 +93,6 @@ function readResetTime(value: unknown): string | null {
   return parsed.success ? iso(new Date(parsed.data)) : null;
 }
 
-// The single cache file read again with nothing new: the same account, percentages and resets.
 function isSameReading(last: z.output<typeof LAST_ROW>, reading: WindowResets & { account: string; five: number | null; seven: number | null }): boolean {
   return last !== null && last.account === reading.account && last.five_hour === reading.five && last.seven_day === reading.seven && last.five_hour_resets_at === reading.fiveResetsAt && last.seven_day_resets_at === reading.sevenResetsAt;
 }

@@ -1,6 +1,5 @@
 import type { Measure, Target, Verdict } from './types.ts';
 
-// green or red against a target; none without a target or without data.
 export function verdict(target: Target | null, m: Measure): Verdict {
   if (!target || m.value === null || m.missing || m.unclassified || m.unknown) {
     return 'none';

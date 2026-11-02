@@ -5,7 +5,6 @@ import { resolveRun } from './resolve-run.ts';
 const UNFINISHED_STATES = new Set(['working', 'blocked']);
 const PAST_MERGE_STATES = new Set(['merged', 'deploying', 'deploy-held', 'live-check']);
 
-// Why a working or blocked run may not move past its merge yet, or null when it may. --force skips it.
 export function readMoveRefusal(db: Database, issue: string, state: string, force: boolean): string | null {
   const run = resolveRun(db, issue);
   if (force || !UNFINISHED_STATES.has(run.state) || !PAST_MERGE_STATES.has(state)) {

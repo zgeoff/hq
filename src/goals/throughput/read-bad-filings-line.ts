@@ -7,7 +7,6 @@ import type { ThroughputLine } from './types.ts';
 
 const NAME = 'Bad filings';
 
-// Issues filed today that point at a PR, but that z-review did not record as a follow-up. Target 0.
 export function readBadFilingsLine(db: Database, from: Date, at: Date): ThroughputLine {
   const unread = findUnreadLine(db, NAME, '0');
   if (unread !== null) {

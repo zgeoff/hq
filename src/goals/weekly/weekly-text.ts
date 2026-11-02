@@ -1,6 +1,3 @@
-// The weekly goals review (goals rhythm): Monday 17:00 Sydney the watcher tells z-stu where each of
-// the 7 goals stood over the last complete week and the week before, with the usage per account and
-// the flags kept during the week. One job_runs row per Monday, as the daily check-in has per day.
 import type { Database } from 'bun:sqlite';
 import { accountLabels } from '../../accounts/account-labels.ts';
 import { accountName } from '../../accounts/account-name.ts';
@@ -60,34 +57,32 @@ export function weeklyText(db: Database, at: Date = now()): string {
 const num = (x: number) => x.toLocaleString('en-AU');
 const fmt = (t: Date | string, o: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat('en-AU', { timeZone: TZ, hourCycle: 'h23', ...o }).format(new Date(t));
 
-// Sydney midnight of the Monday `weeks` weeks before the one in `monday`.
 const weeksBefore = (monday: Date, weeks: number) => {
   const s = sydney(monday);
   return sydneyUtc(s.y, s.mo, s.d - 7 * weeks);
 };
-
-// ---------- the cost row ----------
 
 interface AccountWeek {
   account: string;
   peak: number | null;
   five: number | null;
   seven: number | null;
-  n: number; // readings in the week
+  readings: number;
 }
 
-// Per account: the week's peak seven-day use, and the latest reading in the week.
 function accountWeeks(db: Database, from: Date, to: Date): AccountWeek[] {
   const [f, t] = [iso(from), iso(to)];
   const rows = db.query('SELECT at, account, five_hour, seven_day FROM usage_samples WHERE at >= ? AND at < ? ORDER BY account, at').all(f, t) as { at: string; account: string; five_hour: number | null; seven_day: number | null }[];
   const out = new Map<string, AccountWeek>();
-  for (const r of rows) {
-    const w = out.get(r.account) ?? { account: r.account, peak: null, five: null, seven: null, n: 0 };
-    w.n++;
-    if (r.seven_day !== null && (w.peak === null || r.seven_day > w.peak)) w.peak = r.seven_day;
-    w.five = r.five_hour;
-    w.seven = r.seven_day;
-    out.set(r.account, w);
+  for (const row of rows) {
+    const week = out.get(row.account) ?? { account: row.account, peak: null, five: null, seven: null, readings: 0 };
+    week.readings++;
+    if (row.seven_day !== null && (week.peak === null || row.seven_day > week.peak)) {
+      week.peak = row.seven_day;
+    }
+    week.five = row.five_hour;
+    week.seven = row.seven_day;
+    out.set(row.account, week);
   }
   return [...out.values()];
 }
@@ -101,24 +96,25 @@ function costCell(db: Database, from: Date, to: Date, m: Measure, labels: Record
   // Legacy 'active' readings stay in a mixed week: dropping them could hide a breach.
   if (weeks.length === 1 && weeks[0]!.account === 'active') {
     const a = weeks[0]!;
-    return `active account only: 7-day peak ${pc(a.peak)}, latest 5-hour ${pc(a.five)} and 7-day ${pc(a.seven)} (${num(a.n)} readings)${ci}`;
+    return `active account only: 7-day peak ${pc(a.peak)}, latest 5-hour ${pc(a.five)} and 7-day ${pc(a.seven)} (${num(a.readings)} readings)${ci}`;
   }
-  return `${weeks.map((w) => `${accountName(labels, w.account)}: 7-day peak ${pc(w.peak)}, latest 5-hour ${pc(w.five)} and 7-day ${pc(w.seven)} (${num(w.n)} readings)`).join('; ')}${ci}`;
+  return `${weeks.map((week) => `${accountName(labels, week.account)}: 7-day peak ${pc(week.peak)}, latest 5-hour ${pc(week.five)} and 7-day ${pc(week.seven)} (${num(week.readings)} readings)`).join('; ')}${ci}`;
 }
-
-// ---------- the message ----------
 
 const cell = (k: GoalKey, m: Measure): string => {
   const gap = m.missing ? `, ${m.missing} day(s) not fetched` : '';
   const extra = m.extra ?? '';
-  if (m.value === null) return `no data (${num(m.n)} ${m.unit}${gap})${extra}`;
-  if (k === 'downtime') return `${m.shown} down, ${m.outages ?? 0} outage(s), slowest caught in ${m.longest ?? 0} min, ${m.blind ?? 0} min blind (${num(m.n)} ${m.unit})`;
-  return `${m.shown} of ${num(m.n)} ${m.unit}${gap}${extra}`;
+  if (m.value === null) {
+    return `no data (${num(m.denominator)} ${m.unit}${gap})${extra}`;
+  }
+  if (k === 'downtime') {
+    return `${m.shown} down, ${m.outages ?? 0} outage(s), slowest caught in ${m.longest ?? 0} min, ${m.blind ?? 0} min blind (${num(m.denominator)} ${m.unit})`;
+  }
+  return `${m.shown} of ${num(m.denominator)} ${m.unit}${gap}${extra}`;
 };
 
 const flat = (t: string) => t.replace(/\s+/g, ' ').trim().slice(0, 240);
 
-// The last weekly run that sent, else 7 days back.
 function flagsSince(db: Database, at: Date): string {
   const last = db.query(`SELECT at FROM job_runs WHERE job = ? AND result = 'queued' ORDER BY at DESC LIMIT 1`).get(JOB) as { at: string } | null;
   return last?.at ?? iso(new Date(at.getTime() - 7 * 86_400_000));

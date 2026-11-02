@@ -13,8 +13,6 @@ export interface PlannedAttach {
   url: string;
 }
 
-// Which open PRs go to which open run: a PR in scope that no run holds goes to the open run its body
-// names with a "Fixes" or "Contributes to" line. Two different open runs named attach it to neither.
 export function planAttachments(prs: OpenPR[], attached: ReadonlySet<string>, openRuns: ReadonlySet<string>): { attach: PlannedAttach[]; errors: string[] } {
   const attach: PlannedAttach[] = [];
   const errors: string[] = [];

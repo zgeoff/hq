@@ -50,7 +50,6 @@ test('every change logs an event with the old and the new target', () => {
   ]);
 });
 
-// Input the command must refuse: [key, op, value, why].
 const HOSTILE: [string, string, string | undefined, string][] = [
   ['moon', '<', '5', 'unknown goal'],
   ['', '<', '5', 'unknown goal'],

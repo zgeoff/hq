@@ -1,9 +1,8 @@
 import { match } from 'ts-pattern';
 import type { ImpWork, WrapUpPlan } from './types.ts';
 
-// Decides what the wrap-up does with one session and its sub-sessions. A local session's work
-// (null) needs no check. An imp goes only when its check found all work pushed; otherwise the
-// session stays with its sub-sessions, since they live in the same imp.
+// An imp goes only when its check found all work pushed; otherwise the session stays with its
+// sub-sessions, since they live in the same imp.
 export function buildWrapUpPlan(rootID: string, childIDs: string[], work: ImpWork | null): WrapUpPlan {
   return match(work)
     .with(null, (): WrapUpPlan => ({ kind: 'forget', destroyImp: false }))

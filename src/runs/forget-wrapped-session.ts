@@ -1,7 +1,6 @@
 import type { FleetClient, StaleOps } from '../fleet/types.ts';
 
-// Stops a run's session, unpins it, then forgets it. A failure leaves it unpinned: in this fleet a
-// pin means the session needs the owner, and a failed wrap-up is the orchestrator's to finish. A
+// A failure leaves the session unpinned: in this fleet a pin means the session needs the owner. A
 // confirmToken answer is a failure, since this forget never destroys the session's host.
 export async function forgetWrappedSession(client: FleetClient & StaleOps, id: string): Promise<void> {
   await client.kill(id);

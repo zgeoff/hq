@@ -13,9 +13,6 @@ export interface ReviewHold {
   files: string[];
 }
 
-// What a z-review record needs: the head now and the repo instruction files the PR changes. It
-// refuses any other actor, a repo with no instruction hold (hq and hq-private keep the owner's
-// lgtm alone) and a PR with no such file.
 export async function readReviewHold(run: Runner, ref: PRRef, actor: string, probe: RoleProbe): Promise<ReviewHold> {
   requireReviewer(actor, probe);
   const isInstruction = findInstructionHeldTest(parseLowerRepo(ref.slug, undefined));

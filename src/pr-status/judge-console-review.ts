@@ -7,8 +7,6 @@ export interface ConsoleReviewEvidence {
   storedAtHead: boolean;
 }
 
-// A console: source is the owner's answer on this PR only as the owner's console review of this PR,
-// with this answer, that the console stored at the head gh gives now. null evidence: no such review.
 export function judgeConsoleReview(request: AnswerSourceRequest, evidence: ConsoleReviewEvidence | null): string | null {
   if (evidence === null) {
     return `${request.source} names no owner review in the console`;

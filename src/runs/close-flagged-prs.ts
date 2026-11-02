@@ -6,8 +6,6 @@ import { readGitHubPR } from './read-github-pr.ts';
 import { SWEEP_ACTOR } from './sweep-actor.ts';
 import type { Alert } from './types.ts';
 
-// Before the sweep flags a run PR, it asks GitHub: one closed there without a merge is marked
-// closed and drops its alert. A merged PR, or one gh can't read, keeps its alert.
 export async function closeFlaggedPRs(db: Database, run: Runner, alerts: Alert[]): Promise<Alert[]> {
   const kept = await Promise.all(alerts.map((alert) => closeOne(db, run, alert)));
   return alerts.filter((_, index) => kept[index]);

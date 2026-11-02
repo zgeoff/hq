@@ -8,7 +8,6 @@ export interface StandingRecords {
   acceptedRisks: AcceptedRiskView[];
 }
 
-// The record with its stale flags, against the PR's head now (null when it could not be read).
 export function buildPRStatusView(row: PRStatusRow, current: string | null, override: OwnerOverride | null, standing: StandingRecords): PRStatusView {
   return {
     repo: row.repo,

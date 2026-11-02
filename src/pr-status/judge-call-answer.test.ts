@@ -1,7 +1,6 @@
 import { expect, test } from 'bun:test';
 import { judgeCallAnswer } from './judge-call-answer.ts';
 
-// An lgtm on widgets#7 at a1b2c3d from call:KET-50.
 function setupTest() {
   return { request: { ref: { repo: 'widgets', pr: 7, slug: 'zgeoff/widgets' }, answer: 'lgtm', source: 'call:KET-50', head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678' } as const };
 }

@@ -16,7 +16,6 @@ import type { PRCommandInput } from './run-pr-command.ts';
 const USAGE = 'usage: hq pr accept-risk <repo> <pr> <finding-id> --source S --note T';
 const FINDING_ID = /^[0-9a-f]{16}$/u;
 
-// One run of the command: the hq record it acts on, and whether an earlier run wrote it.
 interface Accepting {
   input: PRCommandInput;
   ref: PRRef;
@@ -24,9 +23,6 @@ interface Accepting {
   alreadyRecorded: boolean;
 }
 
-// `hq pr accept-risk`: records the owner's acceptance in hq, posts the disposition reply noslop reads,
-// and has noslop set its check from it. The merge gate needs the record and noslop's accepted-risk
-// state both, so a run that stops between the halves leaves the gate shut and a rerun finishes it.
 export async function runAcceptRisk(input: PRCommandInput, ref: PRRef, finding: string | undefined): Promise<Out> {
   if (finding === undefined || finding.trim() === '') {
     throw new HqError('bad_args', USAGE);
@@ -110,9 +106,8 @@ async function setCheck(accepting: Accepting, reply: PostedReply): Promise<Noslo
   }
 }
 
-// A check that fails over other findings is not this command's error. One that still lists the
-// accepted finding as open means noslop did not take the reply (for example the author lacks admin
-// permission, or noslop has not read the reply yet), so the command fails and says why.
+// A check that still lists the accepted finding as open means noslop did not take the reply (for
+// example the author lacks admin permission, or noslop has not read the reply yet).
 function rejectOwnOpenFinding(accepting: Accepting, reply: PostedReply, check: NoslopCheckOutcome): void {
   const own = check.open.find((finding) => finding.id === accepting.record.finding);
   if (check.conclusion === 'success' || own === undefined) {

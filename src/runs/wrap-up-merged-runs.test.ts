@@ -242,7 +242,6 @@ test('a run whose wrap-up throws is marked wrapped with the failure, and the nex
     setState(ctx.db, issue, 'merged', {}, 'z-delivery');
   }
 
-  // A run note that cannot be written makes the first run's wrap-up throw.
   ctx.db.exec("CREATE TRIGGER kettle_refuses_note BEFORE INSERT ON run_notes WHEN NEW.issue = 'GEO-9911' BEGIN SELECT RAISE(ABORT, 'kettle refuses'); END");
   const fleet = buildStubFleetClient({
     sessions: [

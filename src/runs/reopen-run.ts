@@ -14,8 +14,6 @@ export interface ReopenRunInput {
   actor: string;
 }
 
-// A done or dropped run back to working. A design pass takes a design lane again, so it meets the lane
-// counts as hq run add does, and where the owner asked for it above them goes in a design-asked event.
 export function reopenRun(db: Database, input: ReopenRunInput): RunView {
   return db
     .transaction(() => {
@@ -29,8 +27,6 @@ export function reopenRun(db: Database, input: ReopenRunInput): RunView {
     .immediate();
 }
 
-// Refuses the reopen of a closed design pass above its lane count, and --asked on any other run; gives
-// the pass's design lane, or null for a delivery run or a run that is not closed.
 export function checkDesignReopen(db: Database, issue: string, design: ReopenDesign): string | null {
   const admission = pickReopenAdmission(readReopenAdmissionFacts(db, issue, design));
   if (admission.kind === 'refused') {

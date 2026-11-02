@@ -3,8 +3,8 @@ import type { Runner } from '../runner/types.ts';
 import { cleanEnv } from '../runner/clean-env.ts';
 import { normalizePrRef } from './normalize-pr-ref.ts';
 
-// `hq run merged` asks GitHub first (z-review, 2026-10-17): a `gh pr merge` that failed on a
-// conflict once left a PR open on GitHub but merged in hq, and nothing could undo it.
+// A `gh pr merge` that failed on a conflict once left a PR open on GitHub but merged in hq, and
+// nothing could undo it.
 export async function checkMergedOnGitHub(run: Runner, raw: string): Promise<void> {
   const { ref } = normalizePrRef(raw);
   const [repo, n] = ref.split('#') as [string, string];

@@ -13,8 +13,6 @@ export interface DesignMove {
   designSessions: string[];
 }
 
-// The times a run turned from its design pass into the build run, oldest first, each with the design
-// lane and the sessions that held the pass.
 export function readDesignMoves(db: Database, issue: string): DesignMove[] {
   const rows = movesSchema.parse(db.query("SELECT at, data FROM events WHERE subject = 'run' AND subject_id = ? AND action = 'design-to-build' ORDER BY seq").all(issue));
   return rows.map((row) => {

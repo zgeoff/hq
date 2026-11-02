@@ -16,8 +16,6 @@ export interface PostedReply {
   text: string;
 }
 
-// A reply that could not be posted. Carries the exact text and where it goes, so the caller can
-// print both for someone to post by hand.
 export class ReplyFailureError extends HqError {
   readonly text: string;
   readonly where: string;
@@ -30,9 +28,6 @@ export class ReplyFailureError extends HqError {
   }
 }
 
-// Posts the owner's accepted-risk reply as the login gh runs under, where pickThreadTarget or
-// pickIssueTarget puts it: in the finding's thread on the diff, else as an issue comment. A reply
-// that already stands is not posted again.
 export async function postAcceptRiskReply(run: Runner, ref: PRRef, input: AcceptRiskReplyInput): Promise<PostedReply> {
   const text = buildAcceptRiskReply(input, 'thread');
   const issueText = buildAcceptRiskReply(input, 'issue');

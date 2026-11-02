@@ -5,9 +5,8 @@ import type { Alert, RunView } from './types.ts';
 
 const LINEAR_STATE = z.object({ state: z.enum(['completed', 'canceled', 'open']) }).nullable();
 
-// Open runs whose Linear issue is closed, with what to do. A 'Fixes' merge closes the issue before
-// the release, deploy and live check, so a merged run still on its way to live raises nothing: the
-// release pass closes it once its PRs ship, and the live check's recipient closes a live-check run.
+// A 'Fixes' merge closes the issue before the release, deploy and live check, so a merged run still
+// on its way to live raises nothing.
 export function readClosedIssueAlerts(db: Database): Alert[] {
   const alerts: Alert[] = [];
   for (const run of listRuns(db)) {
@@ -32,7 +31,6 @@ export function readClosedIssueAlerts(db: Database): Alert[] {
 }
 
 function pickAction(run: RunView, linear: 'completed' | 'canceled'): string | null {
-  // A design pass's PRs are no part of the build run, as the drop and merge passes read them.
   const delivery = run.prs.filter((pr) => pr.design_pass === 0);
   const merged = delivery.some((pr) => pr.state === 'merged');
   if (delivery.some((pr) => pr.state === 'open')) {

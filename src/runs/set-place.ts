@@ -18,9 +18,6 @@ export type PlaceResult = { ok: true; run: RunView } | { ok: false; refusal: str
 
 const placeSchema = z.enum(['imp', 'local', 'none']);
 
-// Moves an open run to another place and logs the move with its note; the lanes count it there from
-// their next look. A bad place, or one equal to the run's own, comes back as a refusal, so a slip
-// never logs a move; a missing or closed run still throws, as every run setter does.
 export function setPlace(db: Database, change: PlaceChange): PlaceResult {
   const issue = change.issue;
   const parsed = placeSchema.safeParse(change.place);

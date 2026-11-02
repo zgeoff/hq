@@ -5,13 +5,9 @@ const DAY = 86_400_000;
 export interface LogDay {
   day: string | null;
 
-  // the time of the last dated line, in ms; null after a heading or before any dated line
   last: number | null;
 }
 
-// A heading with a date sets the day, and hq state trim's no-day context line clears it. A full time
-// on a line sets the day and the time. "- HH:MMZ" takes the day of the last dated line or heading,
-// and a time well before the last one rolls to the next day.
 export function stepLogDay(state: LogDay, line: string): LogDay {
   if (line.startsWith('<!-- day context: none -->')) {
     return { day: null, last: null };

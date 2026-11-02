@@ -11,9 +11,6 @@ import type { ThroughputAlert, ThroughputLine } from './types.ts';
 const NAME = 'Stale';
 const DAY_MS = 86_400_000;
 
-// In Progress issues with no open run, no session and no open or draft PR, and open runs whose issue is
-// closed. A done-open issue (every PR merged) ages from its last merge and goes to triage; a stalled one
-// ages from its start and goes to the orchestrator. Target 0 older than 24 hours; only those alert.
 export function readStaleLine(db: Database, _from: Date, at: Date): ThroughputLine {
   const unread = findUnreadLine(db, NAME, '0 older than 24h');
   if (unread !== null) {

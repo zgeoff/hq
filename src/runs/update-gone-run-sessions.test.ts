@@ -4,7 +4,6 @@ import { addRun } from './add-run.ts';
 import { setState } from './set-state.ts';
 import { updateGoneRunSessions } from './update-gone-run-sessions.ts';
 
-// A database at 01:00Z; each test adds its own runs.
 function setupTest() {
   const fresh = freshDb();
   onTestFinished(fresh.cleanup);

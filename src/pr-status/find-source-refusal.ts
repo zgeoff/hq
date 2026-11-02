@@ -10,8 +10,6 @@ import { findCurrentOwnerAnswer } from './find-current-owner-answer.ts';
 import { hasPRName } from './has-pr-name.ts';
 import { isPlainYes } from './is-plain-yes.ts';
 
-// What the source must grant: an override of the open findings, an override of one named CI check,
-// or the risk of one finding.
 type OwnerAction = { action: 'override'; check?: string } | { action: 'accept-risk'; finding: string };
 
 export interface SourceRequest {
@@ -19,12 +17,10 @@ export interface SourceRequest {
   wanted: OwnerAction;
   source: string;
 
-  // The PR's head as gh gives it now; null when gh could not read it.
   head: string | null;
 }
 
-// chat: has no record to check, so only the owner's own session may give it. A console: or call:
-// source is the owner's answer to a call; a review answer in the console grants neither action.
+// chat: has no record to check, so only the owner's own session may give it.
 export function findSourceRefusal(db: Database, request: SourceRequest, probe: OwnerProbe): string | null {
   const [kind = '', ...rest] = request.source.split(':');
   const id = rest.join(':');
@@ -40,8 +36,6 @@ export function findSourceRefusal(db: Database, request: SourceRequest, probe: O
 interface CallCheck extends SourceRequest {
   id: string;
 
-  // A console: source counts only through a grant; a call: source on a call with no grants keeps
-  // the plain-Yes rule, for accept-risk only.
   needsGrant: boolean;
 }
 
@@ -50,7 +44,7 @@ const CallRowSchema = z.object({ title: z.string() });
 const AnswerDataSchema = z.object({ answer: z.string(), title: z.string().optional() });
 
 // --by and HQ_AS are the caller's own words, so only a console answer or an `hq call answer` that
-// atc placed in z-stu's session (marked ownerSession) is the owner's.
+// atc placed in z-stu's session is the owner's.
 function findCallRefusal(db: Database, check: CallCheck): string | null {
   const call = CallRowSchema.nullable().parse(db.query("SELECT title FROM asks WHERE id = ? AND kind = 'call'").get(check.id));
   if (call === null) {
@@ -89,8 +83,7 @@ function findCallRefusal(db: Database, check: CallCheck): string | null {
 
 const OverrideHeadsSchema = z.array(z.object({ head: z.string() }));
 
-// Only overrides since the owner's current answer: a new answer is a new approval. call:<id> and
-// console:<id> name the same answer, so an override under either form counts.
+// call:<id> and console:<id> name the same answer, so an override under either form counts.
 function findOverrideAtOtherHead(db: Database, check: CallCheck, answerSeq: number): string | null {
   const rows = OverrideHeadsSchema.parse(
     db

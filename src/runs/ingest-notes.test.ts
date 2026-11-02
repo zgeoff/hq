@@ -13,8 +13,6 @@ import { setState } from './set-state.ts';
 
 const KETTLE = '00000031-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 
-// One open run on KETTLE, a fake atc whose feed holds one note from it, and a stored cursor in the
-// keyed form of atc 5.
 function setupTest() {
   const fresh = freshDb(),
     stub = fakeAtc(fresh.dir, [{ id: KETTLE, name: 'kettle', alive: true, state: 'running' }]);

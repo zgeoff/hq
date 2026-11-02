@@ -5,12 +5,9 @@ import { isPlainYes } from './is-plain-yes.ts';
 export interface CallEvidence {
   title: string;
 
-  // The owner's answer to the call's current round; null when there is none.
   answer: string | null;
 }
 
-// A call: source is the owner's answer on this PR only when the owner answered a call that names the
-// PR; lgtm needs a plain Yes. null evidence: no such call.
 export function judgeCallAnswer(request: AnswerSourceRequest, evidence: CallEvidence | null): string | null {
   if (evidence === null) {
     return `${request.source} is not a call in hq`;

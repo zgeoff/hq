@@ -32,7 +32,6 @@ export async function sweepNow(db: Database, client: AtcClient, run: Runner, opt
     }
   }
 
-  // For the lanes: which runs are parked. Activity resets an idle session's clock.
   if (Array.isArray(sessions)) {
     recordAwake(db, sessions, activity);
     updateGoneRunSessions(db, sessions, options.actor);

@@ -9,7 +9,6 @@ const NAME = 'Issues';
 const countSchema = z.object({ count: z.number() });
 const SOURCES: readonly IssueSource[] = ['owner', 'design', 'agent', 'review', 'live check', 'bot'];
 
-// Issues filed against issues closed (completed or canceled), with no target.
 export function readIssuesLine(db: Database, from: Date, at: Date): ThroughputLine {
   const unread = findUnreadLine(db, NAME, 'none');
   if (unread !== null) {

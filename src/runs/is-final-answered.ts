@@ -3,9 +3,8 @@ import type { RunPr } from './types.ts';
 
 export type FinalMarks = Pick<RunPr, 'final_sha' | 'final_at' | 'review_started_at' | 'reviewed_sha' | 'reviewed_at'>;
 
-// hq keeps no commit order, so time decides when the shas differ. A review round reads the head
-// it starts at: a finished round that started after the FINAL read that head or a newer one. The
-// marks keep whole seconds, so a review in the FINAL's own second may have come first: it counts not.
+// hq keeps no commit order, so time decides when the shas differ. The marks keep whole seconds, so
+// a review in the FINAL's own second may have come first: it counts not.
 export function isFinalAnswered(pr: FinalMarks): boolean {
   if (sameSha(pr.reviewed_sha, pr.final_sha)) {
     return true;

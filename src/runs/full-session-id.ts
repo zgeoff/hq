@@ -1,7 +1,7 @@
 import { HqError } from '../errors.ts';
 
-// The sweep and the note feed match sessions by full id, so a short id is expanded
-// through atc before it is stored. A full id needs no atc.
+// The sweep and the note feed match sessions by full id, so a short id is expanded before it is
+// stored.
 export async function fullSessionId(sessions: () => Promise<{ id: string }[]>, raw: string): Promise<string> {
   const FULL_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   if (FULL_ID.test(raw)) return raw.toLowerCase();

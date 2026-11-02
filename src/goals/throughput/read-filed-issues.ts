@@ -10,8 +10,6 @@ const filedRowSchema = z.object({
   recorded: z.number(),
 });
 
-// The issues filed in [from, at); one z-review recorded as a follow-up is a review one, whatever
-// Linear shows.
 export function readFiledIssues(db: Database, from: Date, at: Date): FiledIssue[] {
   const rows = db
     .query(

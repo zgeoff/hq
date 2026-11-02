@@ -9,7 +9,6 @@ import { NAME } from './name.ts';
 import { toUTCDay } from './to-utc-day.ts';
 import { upsertGoalDay } from './upsert-goal-day.ts';
 
-// PRs closed without merging on one UTC day, all zgeoff repos (the search API: 30 a minute).
 export async function syncClosedDay(db: Database, run: Runner, day: string, env?: RunOpts['env'], at: Date = now()): Promise<number> {
   const q = `org:zgeoff is:pr is:closed is:unmerged closed:${day}T00:00:00Z..${day}T23:59:59Z`,
     raw = await readGhJSON(run, ['api', '-X', 'GET', 'search/issues', '-f', `q=${q}`, '-f', 'per_page=100', '--paginate', '--slurp'], env, `closed PRs on ${day}`);

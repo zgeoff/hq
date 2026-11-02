@@ -8,12 +8,8 @@ import { DEPLOY } from './deploy.ts';
 import { DEPLOY_BATCH } from './deploy-batch.ts';
 import { readGhJSON } from './read-gh-json.ts';
 
-// Classifies completed deploy-prod runs with no deploy_runs row for their current attempt (a re-run is classified again), at most `cap` a call:
-// runs inside the window first, so old runs that keep failing can't take every slot, then the older ones, each oldest first.
-// The jobs come from that attempt, so a re-run GitHub made since hq cached the run can't stand in for it.
-// A run GitHub no longer has (404) is stored as unknown; any other failure gets no row and is tried
-// again next sync. Only runs created since `from` hold back the check-in (`left`, `errors`): an
-// older run that keeps failing goes to `oldErrors`.
+// The jobs come from the run's current attempt, so a re-run GitHub made since hq cached the run can't
+// stand in for it.
 export async function syncDeploys(db: Database, run: Runner, env?: RunOpts['env'], at: Date = now(), cap = DEPLOY_BATCH, from: Date = new Date(0)): Promise<{ fetched: number; left: number; errors: string[]; oldErrors: string[] }> {
   const since = iso(from);
   const todo = db.query(`SELECT c.id AS id, c.conclusion AS conclusion, c.attempt AS attempt, c.created_at AS created_at FROM ci_runs c LEFT JOIN deploy_runs d ON d.run_id = c.id WHERE c.repo = ? AND c.path = ? AND c.status = 'completed' AND (d.run_id IS NULL OR d.attempt != c.attempt) ORDER BY (c.created_at >= ?) DESC, c.created_at ASC, c.id ASC`).all(DEPLOY.repo, DEPLOY.path, since) as { id: number; conclusion: string | null; attempt: number; created_at: string }[];
@@ -40,6 +36,6 @@ export async function syncDeploys(db: Database, run: Runner, env?: RunOpts['env'
     }
   };
   await Promise.all(Array.from({ length: 4 }, worker));
-  const left = todo.slice(cap).filter((r) => r.created_at >= since).length; // window runs come first, so these wait only on other window runs
+  const left = todo.slice(cap).filter((pending) => pending.created_at >= since).length;
   return { fetched, left, errors, oldErrors };
 }

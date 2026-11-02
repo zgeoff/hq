@@ -4,10 +4,10 @@ interface SydneyTime {
 }
 
 interface ClockTime {
-  h: number;
-  m: number;
+  hour: number;
+  minute: number;
 }
 
 export function isPast(s: SydneyTime, t: ClockTime): boolean {
-  return s.h > t.h || (s.h === t.h && s.mi >= t.m);
+  return s.h > t.hour || (s.h === t.hour && s.mi >= t.minute);
 }
