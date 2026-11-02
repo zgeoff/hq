@@ -11,7 +11,9 @@ export function markPushed(db: Database, upto: number, actor: string): { cursor:
   return db
     .transaction(() => {
       const prev = pushedSeq(db);
-      if (upto <= prev) return { cursor: prev, covered: 0 }; // already pushed: nothing to move
+      if (upto <= prev) {
+        return { cursor: prev, covered: 0 };
+      }
       const max = (db.query('SELECT MAX(added_seq) AS m FROM unblocks').get() as { m: number | null }).m ?? 0;
       if (upto > max) throw new HqError('bad_args', `--upto ${upto} is past the newest item (${max})`);
       const covered = newSincePush(db).filter((u) => u.added_seq <= upto).length;

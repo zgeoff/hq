@@ -10,9 +10,6 @@ export interface ScheduleDeps {
   transcripts: TranscriptReader;
 }
 
-// The scheduled restarts due now, by name, each with why. Records the starts of the scheduled
-// sessions, and reads a transcript through `transcripts` only when the age alone does not make its
-// session due.
 export async function readScheduledRestarts(deps: ScheduleDeps, fleet: FleetEntry[], sessions: Record<string, FleetSession>, nowMs: number): Promise<Record<string, string>> {
   const live = collectScheduledSessions(fleet, sessions);
   const starts = recordSessionStarts(deps.db, live);
@@ -40,8 +37,7 @@ async function readDueReason(transcripts: TranscriptReader, entry: FleetEntry, s
   return pickScheduledReason(ageMs, compactions);
 }
 
-// The compactions since the session started: its transcript starts with it, so every boundary
-// counts. 0 when the transcript cannot be read.
+// The session's transcript starts with it, so every boundary counts.
 async function readCompactions(transcripts: TranscriptReader, entry: FleetEntry, session: FleetSession): Promise<number> {
   let count = 0;
   try {

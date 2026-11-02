@@ -22,8 +22,6 @@ const filedNodeSchema = z.object({
 const pageInfoSchema = z.object({ hasNextPage: z.boolean(), endCursor: z.string().nullable() });
 const filedPageSchema = z.object({ issues: z.object({ nodes: z.array(filedNodeSchema), pageInfo: pageInfoSchema }) });
 
-// Every issue created in [from, to), stored with its source and the PR it points at; the
-// description itself stays in Linear.
 export async function syncFiled(db: Database, call: LinearCall, from: Date, to: Date = now()): Promise<number> {
   const query = `query($after: String, $from: DateTimeOrDuration!, $to: DateTimeOrDuration!) {
     issues(first: 100, after: $after, includeArchived: true, filter: { createdAt: { gte: $from, lt: $to } }) {

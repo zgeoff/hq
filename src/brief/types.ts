@@ -9,28 +9,22 @@ export interface BriefInput {
   byLink: boolean;
   goalFile: string | null;
 
-  // the one area of a multi-area issue this brief is for, from --repo; null without it
   repo: string | null;
 }
 
-// What hq brief reaches the outside through: Linear, gh, the noslop list read from the db, the
-// hq-private checkout, the filesystem, and where a warning goes (stderr).
 export interface BriefDeps {
   linear: LinearCall;
   run: Runner;
   noslop: NoslopSettings;
   privateDir: string;
 
-  // the folder cut 1 writes a moved issue's goal file into
   briefsDir: string;
   files: BriefFiles;
   warn: (line: string) => void;
 }
 
-// What is at a path: `readKind` follows a link to what it names, `readLinkKind` reports the link.
 export type EntryKind = 'file' | 'directory' | 'link' | 'other' | 'missing';
 
-// Every filesystem operation hq brief makes, so a test can put a failure at any of them.
 export interface BriefFiles {
   readKind: (path: string) => EntryKind;
   readLinkKind: (path: string) => EntryKind;
@@ -50,7 +44,6 @@ export interface BriefIssue {
   labels: IssueLabel[];
 }
 
-// One heading of an issue description with the text under it, the heading line kept.
 export interface IssueSection {
   name: string;
   text: string;
@@ -67,7 +60,6 @@ export interface BriefPlaybook {
   command: string;
 }
 
-// The pieces {{placeholders}} take, and whether the issue's sections are in the prompt at all.
 export interface BriefParts {
   repo: string;
   issueID: string;

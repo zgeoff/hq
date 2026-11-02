@@ -2,8 +2,7 @@ import { dirname } from 'node:path';
 import { HqError } from '../errors.ts';
 import type { BriefFiles } from './types.ts';
 
-// Refuses a --goal-file path whose directory is missing, or which names something that is not a
-// regular file (a directory, or a link, which hq would write through).
+// A link is refused, since hq would write through it.
 export function requireGoalFileTarget(files: BriefFiles, path: string): void {
   const directory = dirname(path);
   if (files.readKind(directory) !== 'directory') {

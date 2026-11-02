@@ -4,7 +4,6 @@ const ISSUE_FIELDS = ['id', 'title', 'url', 'status', 'statusType', 'project', '
 
 export type IssueField = (typeof ISSUE_FIELDS)[number];
 
-// The fields a `--fields` list names, in the connector's order; no list names all of them.
 export function parseIssueFields(raw: string | undefined): IssueField[] {
   if (raw === undefined) {
     return [...ISSUE_FIELDS];

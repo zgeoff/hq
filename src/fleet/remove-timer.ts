@@ -9,8 +9,6 @@ interface TimerRemoval {
   env?: Record<string, string | undefined>;
 }
 
-// Turn a user timer off, then delete its unit files. A failed disable stops before the files go, so
-// the reported state stays true; a timer that is not installed is already off.
 export async function removeTimer(run: Runner, removal: TimerRemoval): Promise<void> {
   const disabled = await run(['systemctl', '--user', 'disable', '--now', `${removal.unit}.timer`], toExactOptional({ env: removal.env }));
   if (disabled.code !== 0 && !/does not exist|not loaded/u.test(disabled.stderr)) {

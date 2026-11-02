@@ -11,9 +11,6 @@ import { getUnblock } from './get-unblock.ts';
 import { mergeDoneWhen } from './merge-done-when.ts';
 import type { DoneWhen, UnblockInput, UnblockItem, UnblockWarning } from './types.ts';
 
-// Add, or refresh an open item with the same id. A refresh keeps its added time
-// and its place in the push cursor; a closed id comes back as a new item.
-// A new or reopened item warns about closed items for the same issues; it is still added.
 export function addUnblock(
   db: Database,
   input: UnblockInput,

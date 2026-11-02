@@ -15,7 +15,6 @@ export interface ReviewResult {
   allowDeny: { code: number | null; answer: string; skipped: string | null };
   checks: { name: string; state: string; bucket?: string }[];
 
-  // Why the checks could not be read, which leaves checks empty; null when they were read.
   checksError: string | null;
   openThreads: number | null;
   install: { ran: boolean; ok: boolean; detail: string };

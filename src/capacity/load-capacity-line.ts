@@ -4,8 +4,6 @@ import { capacitySettings } from './capacity-settings.ts';
 import { formatGiB as gib } from './format-gib.ts';
 import { formatNumber as n0 } from './format-number.ts';
 
-// For the daily check-in: the newest sample, if it is no more than RECENT_MIN minutes old (the
-// daily line trusts a sample no older than this).
 export function loadCapacityLine(db: Database, at: Date): string {
   const RECENT_MIN = 15,
     r = db.query('SELECT * FROM capacity_samples ORDER BY at DESC LIMIT 1').get() as CapacitySampleRow | null;

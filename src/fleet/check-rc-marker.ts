@@ -18,10 +18,7 @@ import { RC_SETTLE_MIN } from './rc-settle-min.ts';
 import type { EnsureStep, RcCheck, RcEval, RcPending } from './types.ts';
 import { updateRcPending as setPending } from './update-rc-pending.ts';
 
-// One look at one marker. Never loops; the helper and the 5-minute ensure both call it.
 export async function checkRcMarker(db: Database, check: RcCheck): Promise<RcEval> {
-  // RC_TYPING_MS: a marker typed this recently belongs to the actor that typed it. RC_RETRY: mid-turn
-  // refusals, where nothing went in, so a later look tries again. RC_CONFIRM_POLLS: one look every 2 s.
   const RC_CONFIRM_POLLS = 15,
     RC_RETRY = new Set(['atc_too_slow', 'atc_permission_pending']),
     RC_TYPING_MS = 2 * 60_000,
@@ -41,7 +38,6 @@ export async function checkRcMarker(db: Database, check: RcCheck): Promise<RcEva
   if (!s?.alive) return end('failed', 'is gone; hq typed nothing.', { result: 'gone' });
   const st = rc.state(p.id);
   if (p.typedAt) {
-    // Another actor is typing and confirming right now: leave it. An older mark with no report is a crash or a hand edit.
     if (t.getTime() - Date.parse(p.typedAt) < RC_TYPING_MS) return { kind: 'wait' };
     return end(st.state === 'on' ? 'remote control' : 'failed', `hq did not type (already marked as typed); Remote Control is ${st.state}.`, { result: 'marked', rc: st });
   }
@@ -49,12 +45,10 @@ export async function checkRcMarker(db: Database, check: RcCheck): Promise<RcEva
   const age = (t.getTime() - Date.parse(p.since)) / 60_000;
   const done = s.state === 'done';
   if (!done || age < RC_SETTLE_MIN) {
-    // A turn that has ended is judged even past the limit: the limit is for one that never ends.
     if (age >= RC_MAX_MIN && !done) return end('failed', `did not finish its start turn in ${RC_MAX_MIN} min (atc shows ${s.state ?? 'no state'}); hq typed nothing. Type /remote-control in the session yourself.`, { result: 'timed out', state: s.state });
     return { kind: 'wait' };
   }
   if (st.state === 'unknown') return end('failed', `hq can't tell whether Remote Control is on (${st.why}); hq typed nothing. Type /remote-control in the session yourself.`, { result: 'unknown', rc: st });
-  // Off, the session is idle: type once.
   if (!claimTyping(db, name, p.id, t)) return { kind: 'wait' };
   const mine = iso(t);
   const endMine = (action: EnsureStep['action'], text: string, data: Record<string, unknown>, alarm?: string) => rcFinish(db, name, p, action, text, data, o.actor, mine, alarm);
@@ -63,7 +57,7 @@ export async function checkRcMarker(db: Database, check: RcCheck): Promise<RcEva
   } catch (err) {
     const code = (err as { code?: string }).code ?? '';
     if (RC_RETRY.has(code)) {
-      releaseTyping(db, name, p.id); // nothing went in: a later look tries again
+      releaseTyping(db, name, p.id);
       return { kind: 'wait' };
     }
     return endMine('failed', `typing into the session failed (${String((err as Error).message ?? err)}); check the session and type /remote-control yourself if it is off.`, { result: 'type failed', code });
@@ -91,9 +85,8 @@ function releaseTyping(db: Database, name: string, id: string): void {
   }).immediate();
 }
 
-// Ends a marker: removes it, logs one event, and queues its report in the same transaction, so a
-// process that stops after the removal cannot lose the report. Null when the marker is gone or
-// belongs to another spawn.
+// The removal, the event and the report share one transaction, so a process that stops after the
+// removal cannot lose the report.
 function rcFinish(db: Database, name: string, p: RcPending, action: EnsureStep['action'], text: string, data: Record<string, unknown>, actor: string, claim: string | undefined = p.typedAt, alarm?: string): RcEval {
   const sid = p.id.slice(0, 8);
   return db
@@ -111,7 +104,6 @@ function rcFinish(db: Database, name: string, p: RcPending, action: EnsureStep['
     .immediate();
 }
 
-// Quiet hours hold the report, as they hold ensure's; an urgent one goes out at once.
 function deliverStep(db: Database, seq: number, step: EnsureStep): void {
   const text = `hq fleet: ${formatStep(step)}.`;
   if (isQuiet(now()) && !step.urgent) {

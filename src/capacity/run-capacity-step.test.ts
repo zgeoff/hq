@@ -6,8 +6,6 @@ import { overrideEnv } from '../config/override-env.ts';
 import { runCapacityStep } from './run-capacity-step.ts';
 import type { CapacityProbe } from './types.ts';
 
-// A database, the pacing.json path, no 1Password token, and a probe whose every source fails, so
-// only the lane plan decides an alert.
 function setupTest() {
   const fresh = freshDb(),
     probe: CapacityProbe = {
@@ -23,7 +21,6 @@ function setupTest() {
   return { db: fresh.db, pacing: join(fresh.dir, 'pacing.json'), probe };
 }
 
-// The hold rule needs 2 samples in a row: these are 5 minutes apart at noon Sydney.
 test.each([
   ['it opens lanes:plan for imp lanes whose 9 slots of 2048 MiB cross impd\'s line', { imp: { impMib: 2048 }, lanes: { imp: { kettle: 6, teapot: 3 }, local: { flexible: 1 } } }, ['lanes:plan']],
   ['it opens nothing for imp lanes whose 7 slots fit under the line', { imp: { impMib: 2048 }, lanes: { imp: { kettle: 4, teapot: 3 }, local: { flexible: 5 } } }, []],

@@ -3,7 +3,6 @@ import { overrideEnv } from '../config/override-env.ts';
 import { readCloud } from './read-cloud.ts';
 import type { CapacityProbe } from './types.ts';
 
-// A probe whose metrics page reports 2 GiB available of 8 GiB, recording each URL it fetches.
 function setupTest() {
   const readText = mock<CapacityProbe['readText']>(() => Promise.resolve('node_memory_MemAvailable_bytes 2147483648\nnode_memory_MemTotal_bytes 8589934592\n'));
   const probe: CapacityProbe = { run: () => Promise.resolve({ code: 1, stdout: '', stderr: '' }), readText, readFile: () => Promise.resolve(''), readMs: 100 };

@@ -1,6 +1,5 @@
 import type { ReviewResult } from './types.ts';
 
-// `hq review`'s CI and open-thread lines, for either engine.
 export function formatChecks(result: Pick<ReviewResult, 'checks' | 'checksError' | 'openThreads'>): string[] {
   const threads = `== open threads: ${result.openThreads ?? 'unknown'}`;
   if (result.checksError !== null) {

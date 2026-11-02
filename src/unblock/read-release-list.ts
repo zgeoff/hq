@@ -10,8 +10,6 @@ export interface PublishedRelease {
 
 const rowsSchema = z.array(z.object({ tag_name: z.string(), draft: z.boolean(), prerelease: z.boolean(), published_at: z.string().nullable() }));
 
-// The newest 30 GitHub releases of owner/repo that are published, drafts and prereleases left out.
-// A failed or malformed answer throws.
 export async function readReleaseList(run: Runner, repo: string): Promise<PublishedRelease[]> {
   const out = await runGH(run, ['api', `repos/${repo}/releases?per_page=30`, '--jq', '[.[] | {tag_name, draft, prerelease, published_at}]'], `releases of ${repo}`);
   let raw: unknown;

@@ -1,4 +1,3 @@
-// What a changed line names, for each class on the must-fix list (risk-paths.ts).
 export const RISK_WORDS: [RegExp, string][] = [
   [/\b(auth\w*|authn|authz|login|logout|sign[_-]?in|session[_-]?token|jwt|api[_-]?key|private[_-]?key|secrets?|credentials?|password|bearer|oauth|access[_-]?token|OP_SERVICE_ACCOUNT_TOKEN)\b/i, 'auth or secrets'],
   [/\b(stripe|payment|billing|invoice|refund|charge)\b/i, 'money'],

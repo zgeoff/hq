@@ -6,7 +6,6 @@ import type { LinearCall } from './types.ts';
 const PAGE_SIZE = 100;
 const MAX_PAGES = 200;
 
-// A GraphQL filter on the issues of one team, in the given states, updated at or after a time.
 export interface IssuesFilter {
   team: { key: { eq: string } };
   state: { name: { in: string[] } };
@@ -46,7 +45,6 @@ const rawNodeSchema = z.object({
   description: z.string().nullable(),
 });
 
-// The connector's shape of an issue: project {name}, priority {value, name}, labels [{name}].
 const nodeSchema = rawNodeSchema.transform((node) => ({
   id: node.identifier,
   title: node.title,

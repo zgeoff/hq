@@ -5,14 +5,11 @@ interface ClaudeUse {
   usedPct: number;
   warnPct: number;
 
-  // pacing.json's providers.claude.threshold: launches stop there, not at the warning.
   launchPct: number | null;
   resetsAt: string | null;
   account: string | null;
 }
 
-// One Claude usage alert line, worded as the early warning it is, with the launch limit and the
-// window's reset beside it.
 export function formatClaudeLine(use: ClaudeUse): string {
   const notes = [...(use.launchPct === null ? [] : [`launch limit ${use.launchPct}%`]), ...(use.resetsAt === null ? [] : [`resets ${formatResetTime(use.resetsAt)}`])];
   const limit = notes.length === 0 ? '' : ` (${notes.join('; ')})`;

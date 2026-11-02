@@ -13,8 +13,6 @@ function setupTest() {
   onTestFinished(overrideEnv('HQ_REPOS', join(base, 'repos')));
   const clones: string[] = [];
 
-  // A stand-in gh: a clone into a folder that exists fails, as gh's does, and a clone writes its
-  // files only after a pause, so a reader that runs early sees a folder with no kettle.txt.
   const run: Runner = async (cmd) => {
     if (cmd[0] === 'gh' && cmd[1] === 'repo' && cmd[2] === 'clone') {
       const target = cmd[4] ?? '';

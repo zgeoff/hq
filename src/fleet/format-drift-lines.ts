@@ -1,7 +1,5 @@
 import type { PluginDrift, PromptDrift } from './types.ts';
 
-// The text lines `hq fleet` adds: one per stale session (hint under it), one per unknown, one per
-// session whose plugin folders differ from fleet.json's.
 export function formatDriftLines(drift: Record<string, PromptDrift>, plugins: Record<string, PluginDrift> = {}): string[] {
   const lines: string[] = [];
   for (const [name, d] of Object.entries(drift)) {

@@ -1,5 +1,3 @@
-// hq review <repo> <pr>: a Codex review of the PR head against its base, in a
-// throwaway worktree, then CI checks and the count of open review threads.
 import { appendFileSync, mkdirSync, rmSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { z } from 'zod';

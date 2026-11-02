@@ -3,7 +3,6 @@ import type { Priority } from './priorities.ts';
 import { PRIORITIES } from './priorities.ts';
 import type { Unblocked } from './types.ts';
 
-// "GEO-778:urgent" -> { issue, priority }. The caller knows the priority; hq never guesses it.
 export function parseUnblocks(raw: string): Unblocked[] {
   return raw
     .split(',')

@@ -9,25 +9,19 @@ export interface CapacityProbe {
   run: Runner;
   readText: (url: string, timeoutMs: number) => Promise<string>;
   readFile(path: string): Promise<string>;
-  readMs?: number; // the deadline of each read (default 15 s)
+  readMs?: number;
 
-  // The imp lanes' plan from pacing.json, checked against impd's lines with each reading; left
-  // out, no lanes were read.
   plan?: LanePlan | null;
 
-  // Claude's launch limit from pacing.json, named in the Claude usage alerts; left out, none was read.
   claudeLaunchPct?: number | null;
 }
 
-// One reading to check, with the imp lanes' plan; null when no pacing.json lanes were read.
 export interface CapacityInput {
   reading: Reading;
   plan: LanePlan | null;
   claudeLaunchPct?: number | null;
 }
 
-// What a rule reads from pacing.json: the imp lanes' plan (null when no lanes were read) and Claude's
-// launch limit (null when none was read).
 interface RuleContext {
   plan: LanePlan | null;
   claudeLaunchPct: number | null;
@@ -35,7 +29,6 @@ interface RuleContext {
 
 export type Errors = Record<string, string>;
 
-// The 1Password account's requests today and its daily limit; refused when any limit is spent.
 export interface OnePasswordUse {
   used: number | null;
   limit: number | null;
@@ -54,17 +47,16 @@ export interface Impd {
 
 export interface Rule {
   key: string;
-  label: string; // for the back-under message
+  label: string;
   limit: (s: CapacitySettings) => string;
   urgent?: boolean;
 
-  // true: breached; false: fine; null: no reading.
   breached: (reading: Reading, settings: CapacitySettings, ctx: RuleContext) => boolean | null;
   line: (reading: Reading, settings: CapacitySettings, names: Record<string, string>, ctx: RuleContext) => string;
 }
 
 export interface CapacityTick {
-  opened: string[]; // keys that opened this tick
-  cleared: string[]; // keys that cleared this tick
-  told: { opened: string[]; cleared: string[] }; // what the messages sent this tick carried
+  opened: string[];
+  cleared: string[];
+  told: { opened: string[]; cleared: string[] };
 }

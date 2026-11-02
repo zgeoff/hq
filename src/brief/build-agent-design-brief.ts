@@ -20,18 +20,14 @@ export interface AgentDesignBriefFacts {
   playbook: BriefPlaybook;
   recordLine: string;
 
-  // the issue's actions beyond the design pass (pickExtraDesignActions), and the table that words them
   extraActions: readonly string[];
   permissionTable: readonly PermissionRow[];
 }
 
-// The issue's actions beyond the design pass itself, whose permissions the template already states.
 export function pickExtraDesignActions(issue: BriefIssue): string[] {
   return parseIssueActions(parseIssueSections(issue.description)).filter((action) => !OWN_ACTIONS.some((own) => action.toLowerCase().startsWith(own)));
 }
 
-// The agent design brief from what hq read: the template filled, then the skill pointer. A brief
-// over the limit is refused, since it has nothing to cut.
 export function buildAgentDesignBrief(facts: AgentDesignBriefFacts): Out {
   const permissions = buildPermissionLines(pickPermissionNames(facts.extraActions, facts.permissionTable), facts.permissionTable, '<repo>');
   const values = {

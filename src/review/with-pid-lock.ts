@@ -5,9 +5,8 @@ import { isStaleTakeover } from './is-stale-takeover.ts';
 
 const LOCK_POLL_MS = 250;
 
-// A lock held for as long as its process lives: a lock whose process is gone is taken over, and no
-// age limit applies, since one would hand a lock to the next caller while a slow holder still runs.
-// A held lock is waited on for up to waitMs, then refused; `what` names the holder in the refusal.
+// The lock has no age limit, since one would hand the lock to the next caller while a slow holder
+// still runs.
 export async function withPidLock<T>(lock: string, what: string, fn: () => Promise<T>, waitMs = 0): Promise<T> {
   const start = Date.now();
   while (!tryCreateLock(lock)) {
@@ -50,9 +49,8 @@ function tryCreateLock(lock: string): boolean {
   return false;
 }
 
-// Takeovers run one at a time under their own lock, and each checks the holder again inside it:
-// two callers that both saw a dead holder would otherwise each remove the lock, the second one
-// removing the lock the first had just installed. False when another takeover is under way.
+// Each takeover checks the holder again under its own lock: two callers that both saw a dead holder
+// would otherwise each remove the lock, the second one removing the lock the first had just installed.
 function removeDeadLock(lock: string): boolean {
   const takeover = `${lock}.takeover`;
   try {

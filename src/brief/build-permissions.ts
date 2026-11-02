@@ -3,15 +3,11 @@ import type { PermissionRow } from './types.ts';
 const CODE_DELIVERY = 'Code delivery';
 const SLOT = /<[^<>\n]+>/u;
 
-// The issue's action names as the table spells them, and their permission lines, Code delivery first
-// and each action once, with the repo in place of `<repo>`. A phrase that still holds another slot, or an action with no row,
-// goes into `unfilled` for the launcher.
 export function buildPermissions(actions: readonly string[], rows: readonly PermissionRow[], repo: string): { names: string[]; lines: string[]; unfilled: string[] } {
   const names = pickPermissionNames([CODE_DELIVERY, ...actions], rows);
   return { names, ...buildPermissionLines(names, rows, repo) };
 }
 
-// Each action once, as the table spells it, in the order given.
 export function pickPermissionNames(actions: readonly string[], rows: readonly PermissionRow[]): string[] {
   const wanted: string[] = [];
   for (const action of actions.map((name) => pickRowName(rows, name))) {
@@ -22,8 +18,6 @@ export function pickPermissionNames(actions: readonly string[], rows: readonly P
   return wanted;
 }
 
-// The permission line of each named action, with the repo in place of `<repo>`. A phrase that still
-// holds another slot, or an action with no row, goes into `unfilled` for the launcher.
 export function buildPermissionLines(names: readonly string[], rows: readonly PermissionRow[], repo: string): { lines: string[]; unfilled: string[] } {
   const lines: string[] = [];
   const unfilled: string[] = [];

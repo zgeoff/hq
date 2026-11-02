@@ -4,7 +4,6 @@ import type { Runner } from '../runner/types.ts';
 import { cleanEnv } from '../runner/clean-env.ts';
 import type { ConditionVerdict } from './types.ts';
 
-// GitHub's word for a PR: merged or closed settles it.
 export async function readPRVerdict(run: Runner, pr: PRRef): Promise<ConditionVerdict> {
   const name = `${pr.owner}/${pr.repo}#${pr.number}`;
   const result = await run(['gh', 'pr', 'view', String(pr.number), '-R', `${pr.owner}/${pr.repo}`, '--json', 'state'], { env: cleanEnv() });

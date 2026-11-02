@@ -8,10 +8,8 @@ export interface LinearIssue {
   closed_at: string | null;
 }
 
-// A Linear GraphQL call; tests pass a fake.
 export type LinearCall = (query: string, variables: Record<string, unknown>) => Promise<unknown>;
 
-// The filesystem calls hq linear issues makes on its --out directory; the CLI passes node:fs.
 export interface IssueFiles {
   statSync: (path: string) => { isDirectory: () => boolean };
   readdirSync: (path: string) => string[];
@@ -24,7 +22,6 @@ interface ForceRemove {
   force: true;
 }
 
-// What hq linear issues reaches Linear and the filesystem through.
 export interface LinearCommandDeps {
   call: LinearCall;
   files: IssueFiles;
@@ -38,7 +35,6 @@ export interface Node {
   labels: { nodes: { name: string; parent: { name: string } | null }[] };
 }
 
-// Where a filed issue came from, as hq reads it from Linear.
 export type FiledSource = 'owner' | 'design' | 'agent' | 'live check' | 'bot';
 
 export type UmbrellaOutcome = 'news' | 'ticked' | 'no_box' | 'ambiguous' | 'gone';

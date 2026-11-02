@@ -7,8 +7,6 @@ interface PointerFacts {
   goalFile: string | null;
 }
 
-// What {{goal_file}} holds: the sentence on the /goal line that sends the agent to the issue and
-// its playbook, or nothing when there is nothing to send it to.
 export function buildGoalPointer(facts: PointerFacts): string {
   if (facts.goalFile !== null) {
     return facts.playbook === null ? `. The full issue is in ${facts.goalFile}; read it first.` : `. The full issue and its playbook are in ${facts.goalFile}; read it first.`;

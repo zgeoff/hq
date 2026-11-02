@@ -12,8 +12,7 @@ export function buildUnitSettings(unit: string, env: Record<string, string | und
     .join('');
 }
 
-// One Environment= line, quoted; % is a systemd specifier, so it is doubled. A setting that holds a
-// quote, a backslash or a newline is refused rather than escaped.
+// % is a systemd specifier, so it is doubled.
 function buildEnvironmentLine(unit: string, name: string, value: string | undefined): string[] {
   if (!value) {
     return [];

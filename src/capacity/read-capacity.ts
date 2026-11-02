@@ -10,7 +10,6 @@ import { readOnePassword } from './read-one-password.ts';
 import { readPC as readPc } from './read-pc.ts';
 import type { CapacityProbe, Errors, Impd, Reading } from './types.ts';
 
-// Read every source. A source that fails stores NULLs and an errors entry; none fails the others.
 export async function readCapacity(db: Database, probe: CapacityProbe, at: Date = now()): Promise<Reading> {
   const errors: Errors = {},
     [impd, cloud, pc, op] = await Promise.all([

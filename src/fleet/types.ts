@@ -7,40 +7,36 @@ export interface FleetEntry {
   name: string;
   cwd: string;
   model: string;
-  prompt: string; // main:<path> (read from origin/main) or an absolute path outside any repo
-  wake: boolean; // keep it on hq's wake list
-  // the session's skills, the role skill first; empty for a session with a prompt file of its own
+  prompt: string;
+  wake: boolean;
   skills?: readonly string[];
 
-  // The role skill (skills[0]), null when skills is empty: a compatibility alias for readers of the older shape.
+  // The role skill, a compatibility alias for readers of the older shape.
   skill?: string | null;
 
-  // read by name, so a role fleet.json adds before ROLE_NAMES knows it still counts
+  // Roles are read by name, so a role that fleet.json adds before hq knows the role still counts.
   roles?: readonly string[];
 
-  // Claude Code plugin folders passed to atc's spawn; atc gives each as --plugin-dir
   pluginDirs?: string[];
-  remoteControl?: boolean; // after a spawn, type `/remote-control <name>` once the start turn ends (GEO-1102)
+  remoteControl?: boolean;
 }
 
 export interface PromptDrift {
   state: 'current' | 'stale' | 'unknown';
-  since: string | null; // stale: the latest commit on origin/main that touched the prompt, or the file's mtime
-  hint: string | null; // stale: the first differing line
-  reason: string | null; // unknown: why
+  since: string | null;
+  hint: string | null;
+  reason: string | null;
 }
 
-// A live session's plugin folders against fleet.json's, when they differ.
 export interface PluginDrift {
   declared: string[];
   running: string[];
 }
 
 export interface DriftClient {
-  prompt(id: string): Promise<string | undefined>; // atc's session.get `prompt`
+  prompt: (id: string) => Promise<string | undefined>;
 }
 
-// Reads a session's compaction count from its Claude Code transcript, in its cwd or the entry's.
 export interface TranscriptReader {
   lines: (session: FleetSession, fallbackCwd: string) => AsyncIterable<string>;
 }
@@ -49,32 +45,24 @@ export interface FleetSession {
   id: string;
   name: string;
   alive: boolean;
-  state?: string; // atc's running | needs_you | done | exited
+  state?: string;
   lifecycle?: { desired?: string; harness?: string; vm?: string | null | undefined } | null | undefined;
 
-  // the host the session runs on: local is this PC, anything else an imp
   locator?: { targetID?: string | null | undefined } | null | undefined;
 
-  // atc 4.15+: the folders the session was spawned with
   pluginDirs?: readonly string[] | null | undefined;
 
-  // the owner's mark: run wrap-up keeps a pinned session
   pinned?: boolean | null | undefined;
 
-  // the session this one is a sub-session of, and its working directory inside its host
   parent?: string | null | undefined;
   cwd?: string | null | undefined;
 
-  // when atc made the session, in ms, and Claude's own session id, which names its transcript
   createdAt?: number | null | undefined;
   agentSessionID?: string | null | undefined;
 }
 
-// Why hq restarts a session: its prompt is stale (the commit it first read stale at, and the
-// latest change), or a scheduled restart is due.
 export type RestartCause = { kind: 'stale'; commit: string; latest: StaleCommit } | { kind: 'scheduled'; why: string };
 
-// What hq fleet asks atc's session.spawn for.
 export interface SpawnRequest {
   cwd: string;
   name: string;
@@ -85,15 +73,13 @@ export interface SpawnRequest {
   pluginDirs?: string[];
 }
 
-// atc's session.forget: forgotten, or refused. A confirmToken answer means the forget destroys the
-// session's host, and atc wants a second call that carries the token.
+// A confirmToken answer means the forget destroys the session's host, and atc wants a second call
+// that carries the token.
 interface ForgetResult {
   forgotten: boolean;
   confirmToken?: string | undefined;
 }
 
-// What the stale restart reads and does beyond ensure: a session's prompt and last activity, a
-// sent message's outcome, and the stop, unpin and forget.
 export interface StaleOps {
   details: (id: string) => Promise<{ prompt: string | null; lastActivityAt: number }>;
   message: (id: string) => Promise<MessageGet>;
@@ -110,7 +96,9 @@ export interface FleetClient extends Partial<StaleOps> {
   sessions(): Promise<FleetSession[]>;
   spawn: (p: SpawnRequest) => Promise<{ id: string }>;
   pin(id: string): Promise<void>;
-  submit?(id: string, text: string): Promise<void>; // types a line and submits it; atc refuses one mid-turn
+
+  // atc refuses a line mid-turn.
+  submit?: (id: string, text: string) => Promise<void>;
 }
 
 export interface EnsureStep {
@@ -119,15 +107,12 @@ export interface EnsureStep {
   detail: string;
   id?: string | undefined;
 
-  // the whole line z-stu is told, when it isn't `<name> <action>: <detail>`
   message?: string | undefined;
 
   // told at once, quiet hours or not (Remote Control may have been turned off)
   urgent?: boolean | undefined;
 }
 
-// What the Remote Control steps need from outside: the state probe (reads /proc and Claude
-// Code's config), a runner for systemd-run, and hq's own command line. Tests inject all three.
 export interface RcDeps {
   state(sessionId: string): RcState;
   run: Runner;

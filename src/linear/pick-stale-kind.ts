@@ -1,5 +1,3 @@
-// What an In Progress issue with no open run and no active session is stuck on. since is when it began
-// to wait: the last merge for done-open (the start when Linear gave no merge time), the start for stalled.
 export type StaleKind = { kind: 'done-open'; since: string; ref: string; mergedAt: string | null } | { kind: 'stalled'; since: string } | { kind: 'live' };
 
 export function pickStaleKind(startedAt: string, prs: readonly { ref: string; status: string; mergedAt: string | null }[]): StaleKind {

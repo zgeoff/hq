@@ -17,9 +17,8 @@ const NODE = z.object({ identifier: z.string(), title: z.string(), completedAt: 
 
 const ANSWER = z.object({ issues: z.object({ nodes: z.array(NODE) }) });
 
-// Re-reads the issue of each open run, 50 to a query, so the sweep sees an issue Linear closed.
-// An issue Linear doesn't return keeps its last stored row. A run key that is not a Linear
-// identifier, such as GEO-1-image, is never sent: Linear rejects the whole query for it.
+// A run key that is not a Linear identifier, such as GEO-1-image, is never sent: Linear rejects the
+// whole query for it.
 export async function syncRunIssues(db: Database, call: LinearCall): Promise<number> {
   const issues = OPEN_RUNS.parse(
     db.query(`SELECT issue FROM runs WHERE state NOT IN ('done', 'dropped') ORDER BY issue`).all(),

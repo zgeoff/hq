@@ -3,7 +3,6 @@ export interface StaleCommit {
   subject: string;
 }
 
-// A drift `since` is `<hash> <subject>` for a prompt on main, or a file's mtime for a local one.
 export function parseStaleCommit(since: string | null): StaleCommit {
   if (since === null) {
     return { commit: 'unknown', subject: 'no commit found' };

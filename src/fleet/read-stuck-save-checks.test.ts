@@ -17,9 +17,6 @@ interface DeclaredSession {
   livePrompt: string;
 }
 
-// Wires the fake atc, a temp work tree and the env the fleet tick reads. Each test declares its own
-// session: a live prompt that differs from main's makes the tick ask it to save 121 minutes after
-// NOON_SYDNEY. `tick` runs the 5-minute timer and the watcher's flush.
 function setupTest() {
   resetFetchCache();
   const base = freshDb();

@@ -9,26 +9,20 @@ import type { BriefIssue, BriefPlaybook } from './types.ts';
 export interface BriefReads {
   repo: string;
 
-  // the issue's other areas when --repo picked one of several; each gets its own launch
   otherAreas: BriefArea[];
 
-  // the playbook of the issue's Type, to check at the sha; null when the issue has no Type label
   playbook: BriefPlaybook | null;
   stack: boolean;
   imp: boolean;
   reviewLines: boolean;
 }
 
-// The area the brief is for, its issue's other areas, and whether it runs on an imp.
 export interface BriefChoice {
   area: BriefArea;
   others: BriefArea[];
   imp: boolean;
 }
 
-// What a delivery brief needs read beyond the template and the permission table: the picked area's
-// repo, the Type's playbook, the stack line for an L or XL issue, the imp line with --imp,
-// and the review lines for a repo noslop reviews.
 export function pickBriefReads(issue: BriefIssue, choice: BriefChoice, noslop: NoslopSettings, sha: string): BriefReads {
   const repo = choice.area.repo;
   const type = pickIssueType(issue.labels);

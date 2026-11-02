@@ -1,4 +1,4 @@
-// One value of a Prometheus text page; the number may be in exponent form (1.5e+10).
+// A Prometheus text page number may be in exponent form (1.5e+10).
 export function promValue(text: string, name: string): number | null {
   for (const l of text.split('\n')) {
     if (!l.startsWith(name)) continue;

@@ -5,7 +5,6 @@ import { toIssue } from './to-issue.ts';
 import type { LinearCall, LinearIssue, Node } from './types.ts';
 import { writeIssues as store } from './write-issues.ts';
 
-// The issues merged PRs name that hq has no type for yet; up to `max`, 50 to a query.
 export async function syncPrIssues(db: Database, call: LinearCall, max = 200): Promise<number> {
   const want = (db.query(`SELECT DISTINCT p.issue FROM merged_prs p LEFT JOIN linear_issues l ON l.issue = p.issue WHERE p.issue IS NOT NULL AND l.issue IS NULL AND p.repo IN ${IN_SQL} LIMIT ?`).all(max) as { issue: string }[]).map((r) => r.issue);
   let n = 0;

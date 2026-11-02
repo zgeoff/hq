@@ -3,7 +3,6 @@ import type { Runner } from '../runner/types.ts';
 import { findFencedBlock } from './find-fenced-block.ts';
 import { readRefFile } from './read-ref-file.ts';
 
-// The prompt in the first text fence of a brief template of zgeoff/hq at the commit.
 export async function readBriefTemplate(run: Runner, sha: string, path: string): Promise<string> {
   const text = await readRefFile(run, sha, path);
   if (text === null) {

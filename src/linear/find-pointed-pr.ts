@@ -1,5 +1,4 @@
-// A PR attachment as Linear gives it: the URL, and when the PR opened (metadata.createdAt, the PR's own
-// open time, not when Linear attached it), or null when Linear gave none.
+// metadata.createdAt is the PR's own open time, not when Linear attached it.
 export interface PRAttachment {
   url: string;
   openedAt: string | null;

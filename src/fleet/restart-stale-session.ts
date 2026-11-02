@@ -1,9 +1,7 @@
 import { HqError } from '../errors.ts';
 import type { FleetClient, StaleOps } from './types.ts';
 
-// Stops the session, unpins it, then forgets it. A forget that fails pins the session again, so
-// it is never left unpinned and unforgotten. A confirmToken answer is a failure: this forget never
-// destroys the session's host.
+// A confirmToken answer is a failure: this forget never destroys the session's host.
 export async function restartStaleSession(client: FleetClient & StaleOps, id: string): Promise<void> {
   await client.kill(id);
   await client.unpin(id);
