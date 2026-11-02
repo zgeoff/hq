@@ -25,7 +25,9 @@ import { nudgeText } from './nudge-text.ts';
 import { readSlotMinutes } from './read-slot-minutes.ts';
 import { readSlotPlan } from './read-slot-plan.ts';
 import { removeLaneNudges } from './remove-lane-nudges.ts';
+import { sendLowWaterAlert } from './send-low-water-alert.ts';
 import { sendSlotCauseAlert } from './send-slot-cause-alert.ts';
+import { sendStalledTriageAlert } from './send-stalled-triage-alert.ts';
 import { slotsFrom } from './slots-from.ts';
 import { trackDesignCause } from './track-design-cause.ts';
 import { trackSlotCause } from './track-slot-cause.ts';
@@ -61,6 +63,13 @@ export function tick(db: Database, sample: Sample, actor: string): TickResult {
       const designCause = trackDesignCause(db, slotPlan, t);
       writeDesignSlotMinutes(db, { designCause, previousAt: previous?.at ?? null, at: t });
       sendSlotCauseAlerts(db, { free: slotCause.slots, designFree: designCause.slots, at: t, actor });
+      if (!sample.error) {
+        const held = getLanesHold(db) !== null;
+        if (slotPlan?.eligible != null) {
+          sendLowWaterAlert(db, { eligible: slotPlan.eligible, free: slotPlan.pool.free, held, at: t, actor });
+        }
+        sendStalledTriageAlert(db, { slotCause, held, at: t, actor });
+      }
 
       // Follow up: did free slots drop after a nudge?
       const due = db.query('SELECT id, at FROM lanes_nudges WHERE slots_after IS NULL').all() as { id: number; at: string }[];
