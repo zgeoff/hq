@@ -4,7 +4,6 @@ import { parseAtcMcpProcess } from './parse-atc-mcp-process.ts';
 import { parseBtime } from './parse-btime.ts';
 import type { AtcMcpFiles, AtcMcpProcess, AtcMcpRead } from './types.ts';
 
-// Every `atc mcp` process, plus the atc binary's modification time, or the error that stopped the read.
 export function readAtcMcp(files: AtcMcpFiles): AtcMcpRead {
   const binaryPath = files.whichAtc();
   if (binaryPath === null) {
@@ -36,7 +35,6 @@ export function readAtcMcp(files: AtcMcpFiles): AtcMcpRead {
   }
 }
 
-// null: not an atc mcp process, or it exited mid-scan; a string: the error that stopped its read.
 function readProcess(files: AtcMcpFiles, pid: number, btime: number): AtcMcpProcess | string | null {
   const directory = join(files.procRoot, String(pid));
   let path = join(directory, 'cmdline');

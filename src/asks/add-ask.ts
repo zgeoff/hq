@@ -14,8 +14,6 @@ import { requireAsk } from './require-ask.ts';
 import { sendNoticeIfOther as notifyIfOther } from './send-notice-if-other.ts';
 import type { AddInput, AddResult, Ask } from './types.ts';
 
-// "call ready" and "proposal: ...". Idempotent: the same id and question never
-// reach the owner twice. A changed question on a settled id starts a new round.
 export function addAsk(db: Database, input: AddInput): AddResult {
   if (!/^[a-z0-9][a-z0-9._-]*$/i.test(input.id)) throw new HqError('bad_args', `id "${input.id}" must be a slug: letters, digits, . _ -`);
   for (const f of ['title', 'question', 'body'] as const) {
@@ -66,15 +64,12 @@ export function addAsk(db: Database, input: AddInput): AddResult {
         return { ask: getAsk(db, prev.id)!, result: 'reasked' };
       }
       if (prev.state === 'closed' && prev.answer !== null) {
-        // The owner answered it before it closed: the same question never goes back to them.
         updateIssuesOnly(db, prev, input, t);
         return { ask: getAsk(db, prev.id)!, result: 'noop', note: 'answered, then closed: not sent again' };
       }
       if ((ASK_TRANSITIONS.requeued.from as readonly AskState[]).includes(prev.state)) {
         checkAsk(prev.id, 'requeued', prev.state);
         updateText(db, prev, input, t);
-        // A skipped answer was not applied because the issue changed: the re-prepared
-        // call is a new round. The old answer stays in the event log.
         const newRound = prev.answer !== null;
         db.query(
           `UPDATE asks SET state='queued', close_reason=NULL, opened_at=NULL, queued_at=?, updated_at=?
@@ -89,7 +84,6 @@ export function addAsk(db: Database, input: AddInput): AddResult {
         markTold(db, prev.id, input.actor);
         return { ask: getAsk(db, prev.id)!, result: 'requeued' };
       }
-      // queued or later: refresh the text in place, keep its place in line.
       updateText(db, prev, input, t);
       return { ask: getAsk(db, prev.id)!, result: changed(prev, input) ? 'updated' : 'noop' };
     })
@@ -112,7 +106,7 @@ function changed(prev: Ask, input: AddInput): boolean {
 }
 
 // New text drops the structured fields, which describe the old text: the console shows an item's
-// fields over its body. A caller that files fields writes them again after this.
+// fields over its body.
 function updateText(db: Database, prev: Ask, input: AddInput, t: string): void {
   if (!changed(prev, input)) return;
   const newText = prev.title !== input.title || prev.question !== input.question || prev.body !== input.body;
@@ -137,15 +131,11 @@ function updateIssuesOnly(db: Database, prev: Ask, input: AddInput, t: string): 
   logEvent(db, 'ask', prev.id, 'updated', input.actor, prev.state, prev.state, readRoundFacts(db, prev.id));
 }
 
-// What an answer is about, kept with each change so an answer from an earlier round is read
-// against the title, issues and session it was given to.
 function readRoundFacts(db: Database, id: string): { title: string; issues: string[]; forSession: string | null } {
   const ask = requireAsk(db, id);
   return { title: ask.title, issues: ask.issues, forSession: ask.for_session };
 }
 
-// The owner knows about an item it filed itself, or one it heard about while
-// the item could open: the reminder below then has nothing to add.
 function markTold(db: Database, id: string, actor: string): void {
   if (actor === owner() || !isQuiet(now())) setMeta(db, `told:${id}`, now().toISOString());
 }

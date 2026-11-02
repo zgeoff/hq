@@ -9,8 +9,6 @@ import type { Check } from './types.ts';
 
 const FETCH_RECORD = z.object({ at: z.string(), error: z.string().nullable() }).nullable();
 
-// For hq health: can hq fetch hq-private's main? A broken GitHub credential shows here before a
-// restart needs the start prompts, so the fetch runs at most hourly.
 export function readFetchCheck(db: Database): Check & { key: string } {
   const last = metaJson(db, 'defs_fetch_check', FETCH_RECORD, null),
     record = last && Date.now() - Date.parse(last.at) <= 3_600_000 ? last : writeFetchRecord(db);

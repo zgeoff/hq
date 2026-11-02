@@ -3,8 +3,7 @@ import { findString as str } from './find-string.ts';
 import { parseJSONLine as jsonLine } from './parse-json-line.ts';
 import type { Obj, Tool } from './types.ts';
 
-// The tool_use blocks of an assistant line, keyed by tool_use id, and by `a:<record uuid>` when
-// the record holds one block (for sourceToolAssistantUUID).
+// A record that holds one block is also keyed by `a:<record uuid>`, for sourceToolAssistantUUID.
 export function collectToolUses(line: string): [string, Tool][] {
   const rec = jsonLine(line);
   return buildUsePairs(rec, findUses(rec));
@@ -28,7 +27,6 @@ function buildUsePairs(rec: Obj | null, uses: Obj[]): [string, Tool][] {
   return out;
 }
 
-// Bash: the command; a file tool: its path; any other tool shows nothing.
 function pickInput(tool: string, input: Obj | undefined): unknown {
   if (tool === 'Bash') {
     return input?.['command'];

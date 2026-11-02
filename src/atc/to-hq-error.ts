@@ -3,8 +3,6 @@ import { HqError } from '../errors.ts';
 import { ATC_ERROR_CODES } from './error-codes.ts';
 import { mismatch } from './mismatch.ts';
 
-// The HqError for a failed peer call: a daemon refusal keeps its code (atc_<code>), an unknown
-// code decodes as internal and keeps the message, and anything else is internal too.
 export function toHqError(error: unknown): HqError {
   if (error instanceof HqError) {
     return error;

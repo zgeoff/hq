@@ -86,7 +86,6 @@ function readBackupNames(dbFile: string): string[] {
   return readdirSync(dirname(dbFile)).filter((name) => name.includes('.bak-'));
 }
 
-// The archived row is finding f1 on pull request 1, source s, at 2026-10-01T00:00:00Z.
 function writeStoreDisposition(path: string, pullRequest: number, source: string): void {
   const store = new Database(path);
   store.query("INSERT INTO dispositions (repo, finding_id, kind, value, author, author_is_owner, source, at, pull_request) VALUES ('zgeoff/hq', 'f1', 'fixed', 'x', 'a', 1, ?, '2026-10-01T00:00:00Z', ?)").run(source, pullRequest);

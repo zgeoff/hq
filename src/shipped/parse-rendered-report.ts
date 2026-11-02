@@ -2,8 +2,6 @@ import { z } from 'zod';
 import { HqError } from '../errors.ts';
 import type { RenderedReport } from './types.ts';
 
-// The part of render-report.sh --json the tab draws; a change to it fails here, by name. Each
-// shape is named so the ones it holds come first.
 const BURNDOWN = z.object({ total: z.number(), done: z.number(), triage: z.number() }),
   CLOSED = z.object({ type: z.string().nullable(), count: z.number() }),
   DAY = z.object({ date: z.string(), label: z.string(), prs: z.number(), issues: z.number() }),
@@ -37,7 +35,6 @@ const BURNDOWN = z.object({ total: z.number(), done: z.number(), triage: z.numbe
     fetchGap: GAP.nullable(),
   }) satisfies z.ZodType<RenderedReport>;
 
-// render-report.sh --json's output, checked; a shape hq doesn't know names the fields that differ.
 export function parseRenderedReport(json: string): RenderedReport {
   const checked = WHOLE_REPORT.safeParse(JSON.parse(json));
   if (!checked.success) {

@@ -8,8 +8,6 @@ export interface FocusCount {
   backlog: number;
 }
 
-// Each term's matches on its own, among issues the lanes could take: a later term counts an issue an
-// earlier term matched too. Design-type issues take the design slot, so they count for no term.
 export function buildFocusCounts(terms: readonly FocusTerm[], ready: readonly ReadyIssue[], backlog: readonly ReadyIssue[]): FocusCount[] {
   return terms.map((term) => ({ term: term.text, ready: countMatches(ready, term), backlog: countMatches(backlog, term) }));
 }

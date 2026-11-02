@@ -2,8 +2,6 @@ import type { Database } from 'bun:sqlite';
 import { logEvent } from '../log-event.ts';
 import { addNews } from '../news/add-news.ts';
 
-// Clears the focus, logs it and posts it to hq news; false when none was set, and then nothing is
-// logged or posted.
 export function removeFocus(db: Database, actor: string): boolean {
   return db
     .transaction(() => {

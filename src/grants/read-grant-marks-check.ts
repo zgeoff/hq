@@ -4,8 +4,6 @@ import type { Check } from '../health/types.ts';
 import { readMainGrants } from './read-main-grants.ts';
 import { listUnmarkedGrants } from './sync-grant-marks.ts';
 
-// For hq health: every grant on hq-private's main has a named mark, so `hq grant act` finds it.
-// Null with no clone: the hq-private tree check reports that.
 export function readGrantMarksCheck(db: Database, directory: string): Check | null {
   if (!existsSync(`${directory}/.git`)) {
     return null;

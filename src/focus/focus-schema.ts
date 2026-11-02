@@ -9,8 +9,8 @@ const filterSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('priority'), value: z.enum(['urgent', 'high+', 'medium+']) }),
 ]);
 
-// The focus row's JSON columns, as hq focus set writes them. An area is any string here: one dropped
-// from FOCUS_AREAS since then matches nothing, and its reserve lends, rather than failing every tick.
+// An area is any string here: a stored area later dropped from the known areas matches nothing,
+// and its reserve lends, rather than failing every tick.
 export const FOCUS_SCHEMA = {
   terms: z.array(z.object({ text: z.string(), filters: z.array(filterSchema) })),
   reserves: z.array(z.object({ area: z.string(), slots: z.number().int().positive() })),

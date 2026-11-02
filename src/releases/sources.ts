@@ -1,6 +1,5 @@
 import type { Source } from './types.ts';
 
-// The only repos hq knows releases for. Anything else (dotfiles, evals) has none.
 export const SOURCES: Record<string, Source> = {
   nixie: { kind: 'releases', tag: /^v\d/ },
   impz: { kind: 'releases', tag: /^v\d/ },
@@ -10,7 +9,6 @@ export const SOURCES: Record<string, Source> = {
   // A change to the host's NixOS build reaches prod only through a host switch, which moves deployed/host.
   cloud: { kind: 'ref', ref: 'deployed/prod', gated: { gate: 'nixos', ref: 'deployed/host' } },
 
-  // Release-please monorepos: a PR ships once each package it changes has a published release holding it.
   tools: { kind: 'packages' },
   noslop: { kind: 'packages' },
 

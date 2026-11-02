@@ -5,8 +5,6 @@ import { READY_DETAIL } from './ready-detail.ts';
 import { readReadyByLane } from './read-ready-by-lane.ts';
 import type { ReadySummary, Skipped } from './types.ts';
 
-// The Ready check: how many Ready issues z-delivery saw, how many lanes can take, how many it
-// skipped with a reason. Null unless the detail is fresh and carries a total.
 export function readySummary(db: Database, freshMinutes: number): ReadySummary | null {
   const detail = metaJson(db, 'lanes_ready_detail', READY_DETAIL, null);
   const eligible = Object.values(readReadyByLane(db, freshMinutes)).reduce((sum, lane) => sum + (lane.n ?? 0), 0);

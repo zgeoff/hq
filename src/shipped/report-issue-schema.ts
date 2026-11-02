@@ -1,6 +1,5 @@
 import { z } from 'zod';
 
-// A Linear issue as render-report.sh reads it, and as the Shipped tab keeps it.
 export const reportIssueSchema = z.object({
   id: z.string(),
   title: z.string(),

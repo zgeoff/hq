@@ -21,7 +21,6 @@ export interface FocusCommandDeps {
   call: LinearCall;
   actor: string;
 
-  // When a set happens; the stored focus carries it.
   at: Date;
   verb: string | undefined;
   rest: readonly string[];
@@ -33,9 +32,6 @@ interface FocusOut {
   text: string;
 }
 
-// hq focus show|set|clear. set checks every term and reserve before it writes, and refuses the whole
-// command on any it does not know. set and show count each term's Ready and Backlog matches in Linear;
-// a failed read leaves the counts out and says why, and never undoes a set.
 export function runFocusCommand(deps: FocusCommandDeps): Promise<FocusOut> {
   return match(deps.verb ?? 'show')
     .with('show', async () => {

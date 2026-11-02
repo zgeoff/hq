@@ -4,7 +4,6 @@ import { addMark } from '../marks/add-mark.ts';
 import type { GrantMarkInput } from './types.ts';
 import { updateMarkGrantName } from './update-mark-grant-name.ts';
 
-// `hq mark add --kind grant --grant NAME`: the grant mark and its name land together, or neither does.
 export function createGrantMark(db: Database, input: GrantMarkInput): Mark {
   return db
     .transaction((): Mark => {

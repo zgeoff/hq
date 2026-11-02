@@ -1,4 +1,4 @@
-// The error codes atc 5.0.0 defines. A code outside this list decodes as internal.
+// The error codes atc 5.0.0 defines.
 export const ATC_ERROR_CODES: ReadonlySet<string> = new Set([
   'protocol_mismatch',
   'unauthorized',

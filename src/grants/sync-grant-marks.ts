@@ -11,17 +11,12 @@ interface RejectedGrant {
   reason: string;
 }
 
-// The grant marks one pass added, the grants whose add names no PR, and the grants hq refused to
-// mark, with why.
 export interface GrantMarkSync {
   added: Mark[];
   unmarked: MainGrant[];
   rejected: RejectedGrant[];
 }
 
-// Gives each grant on hq-private's main its named mark, at the time and PR of the add in force. A
-// name a mark carries already is left alone; a grant whose add names no PR stays unmarked. One
-// refused grant never stops the rest.
 export function syncGrantMarks(db: Database, directory: string, actor: string): GrantMarkSync {
   const sync: GrantMarkSync = { added: [], unmarked: [], rejected: [] };
   for (const grant of listUnmarkedGrants(db, readMainGrants(directory))) {

@@ -6,7 +6,6 @@ import type { RekeySpec, RepoNames } from './rekey-specs.ts';
 export interface RekeyCount {
   column: string;
 
-  // Rows holding the name being left, and rows already holding the name being taken.
   from: number;
   table: string;
   to: number;
@@ -22,8 +21,6 @@ function readCount(db: Database, spec: RekeySpec, where: string, params: string[
   return CountSchema.parse(row).total;
 }
 
-// How many rows of each re-keyed column hold each name, and for a meta row how many keys of its
-// object. A column the database lacks is a fault of this list, never skipped.
 export function readRekeyCounts(db: Database, specs: RekeySpec[], names: RepoNames): RekeyCount[] {
   return specs.map((spec) => {
     const column = spec.metaKey === undefined ? `"${spec.column}"` : 'entry."key"';

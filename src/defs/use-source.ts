@@ -1,5 +1,3 @@
-// hq defs: which repo the fleet's skills and start prompts come from. A switch only goes through
-// when the target is ready.
 import type { Database } from 'bun:sqlite';
 import { mkdirSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
@@ -12,8 +10,6 @@ import { rawDefsSource } from '../prompts/raw-defs-source.ts';
 import { preflight } from './preflight.ts';
 import type { Check } from './types.ts';
 
-// Write the switch atomically, and only after the target passes its preflight.
-// A switch file with a bad value is repaired the same way: the bad value is recorded as the from.
 export function useSource(db: Database, source: DefsSource, actor: string): { from: string; to: DefsSource; checks: Check[] } {
   const raw = rawDefsSource();
   const from = raw === null ? 'none' : raw.slice(0, 40);

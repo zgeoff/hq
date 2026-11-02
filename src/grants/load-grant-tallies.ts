@@ -5,8 +5,6 @@ import type { GrantAction, GrantActionRow, GrantTally, GrantWindow, VoidedGrantA
 
 const MARK = z.object({ id: z.number(), grant_name: z.string(), text: z.string(), ref: z.string().nullable() });
 
-// Every named grant, by name, with the actions taken under it in the window. A grant with none is
-// listed too: an unused grant is the plainest one for the owner to pull back.
 export function loadGrantTallies(db: Database, window: GrantWindow): GrantTally[] {
   const actionsOf = db.query('SELECT * FROM grant_actions WHERE grant_name = ? AND at >= ? AND at < ? ORDER BY id');
   const marks = z.array(MARK).parse(db.query('SELECT id, grant_name, text, ref FROM marks WHERE grant_name IS NOT NULL ORDER BY grant_name').all());

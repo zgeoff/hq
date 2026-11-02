@@ -5,8 +5,6 @@ import type { TreeName } from '../prompts/trees.ts';
 import { TREES } from '../prompts/trees.ts';
 import type { Runner } from '../runner/types.ts';
 
-// A clone of the tree's repo, if there is none yet. hq-defs' working tree is where the fleet
-// sessions run; start prompts are read from hq-private's origin/main.
 export async function setupCheckout(run: Runner, tree: TreeName): Promise<{ dir: string; made: boolean }> {
   const dir = TREES[tree].dir();
   if (existsSync(`${dir}/.git`)) {

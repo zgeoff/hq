@@ -3,10 +3,6 @@ import { now } from '../clock/now.ts';
 import { readFreshAwake } from './read-fresh-awake.ts';
 import type { AwakeReading } from './read-fresh-awake.ts';
 
-// A blocked run whose sessions are all asleep, gone, or idle 15 min holds no agent, whatever it
-// waits on (z-stu, 0.44.0): its slot is free until a session wakes or the state moves, and the lane
-// may run over its size meanwhile. A working run whose sessions are all gone holds none either
-// (z-stu, 0.54.16); asleep counts as present. With no fresh reading of atc, every run counts.
 export function parkedRuns(db: Database, at: Date = now()): { issue: string; lane: string }[] {
   const reading = readFreshAwake(db, at);
   return reading === null ? [] : [...findIdleBlockedRuns(db, reading, at), ...findGoneRuns(db, reading, at)].toSorted((a, b) => a.issue.localeCompare(b.issue));
@@ -25,12 +21,10 @@ function hasBusySession(rows: readonly { session_id: string }[], awake: Readonly
   return rows.some((row) => isBusy(row.session_id, awake, idle, at));
 }
 
-// An awake session idle this long holds no agent (z-stu, 0.37.0).
 function getIdleParkMs(): number {
   return 15 * 60_000;
 }
 
-// A session holds its run's slot while awake, unless it has sat idle for getIdleParkMs().
 function isBusy(id: string, awake: ReadonlySet<string>, idle: Readonly<Record<string, string>>, at: Date): boolean {
   const since = idle[id];
   if (!awake.has(id)) {
@@ -44,8 +38,8 @@ interface SessionRow {
   added_at: string;
 }
 
-// Working runs that have sessions, none of them present, the newest added over one sweep (5 min)
-// ago: atc can take a moment to list a session after its spawn.
+// The newest session is added over one sweep (5 min) ago before a run counts as gone: atc can take
+// a moment to list a session after its spawn.
 function findGoneRuns(db: Database, reading: AwakeReading, at: Date): { issue: string; lane: string }[] {
   const GONE_GRACE_MS = 5 * 60_000,
     present = new Set(reading.present),

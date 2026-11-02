@@ -4,7 +4,6 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { readLocalConfigCheck } from './read-local-config-check.ts';
 
-// A temporary folder for the local file; each test writes its own file there.
 function setupTest() {
   const dir = mkdtempSync(join(tmpdir(), 'hq-local-check-'));
   onTestFinished(() => rmSync(dir, { recursive: true, force: true }));

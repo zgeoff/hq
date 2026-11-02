@@ -1,6 +1,5 @@
 import type { LoginGate } from './read-login-gate.ts';
 
-// What `hq console` prints on start: a login link only when the gate allows one.
 export function buildStartLine(gate: LoginGate, port: number, mintLink: () => string): string {
   if (gate.ok) {
     return `hq console: open ${mintLink()}  (one use; Ctrl-C stops it)`;

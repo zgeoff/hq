@@ -13,7 +13,6 @@ import { originMatches } from './origin-matches.ts';
 import { readOrigin } from './read-origin.ts';
 import type { Check } from './types.ts';
 
-// `spawn` starts the grants check; tests pass a fake to pin its command line.
 export function checkTrees(source: DefsSource, spawn: GrantsSpawn): Check[] {
   const defs = checkDefs(source);
   return defs.ready ? [...defs.checks, ...checkPrivate(DEFS_SOURCES[source].dir(), spawn)] : defs.checks;

@@ -2,12 +2,11 @@ import type { Build } from '../build/read-build.ts';
 import type { Runner } from '../runner/types.ts';
 import type { Gate } from './parse-gate.ts';
 
-// A ref source with `gated` holds a PR that changes a path of that gate only once `gated.ref` holds it too.
 export type Source = { kind: 'releases'; tag: RegExp } | { kind: 'ref'; ref: string; gated?: { gate: string; ref: string } } | { kind: 'packages' } | { kind: 'build' } | { kind: 'merge' };
 
 export interface Release {
   tag: string;
-  at: string | null; // published_at; null for a moving tag
+  at: string | null;
 }
 
 export interface ShipMove {
@@ -19,13 +18,11 @@ export interface ShipMove {
 export interface ShipResult {
   dryRun: boolean;
   moved: ShipMove[];
-  shippedPrs: number; // PRs newly found in a release (stored unless a dry run)
+  shippedPrs: number;
   compares: number;
-  deferred: number; // PRs left for the next pass by the compare cap
-  // Deploy-held runs left alone: held after the releases that hold their PRs.
+  deferred: number;
   held: string[];
 
-  // Runs left alone while a session on them, a helper's included, is still active.
   busy: { issue: string; session: string }[];
   errors: string[];
 }

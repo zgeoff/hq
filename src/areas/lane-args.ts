@@ -1,7 +1,7 @@
 import { HqError } from '../errors.ts';
 
-// hq run lane: the issue and the lane as two words, or the lane as --lane. A single quoted
-// "GEO-12 cloud" arrives as one word, so split it; an issue or a session id has no space.
+// A single quoted "GEO-12 cloud" arrives as one word, so split it; an issue or a session id has
+// no space.
 export function laneArgs(args: string[], flag: string | undefined): { key: string; lane: string } {
   const words = args.length === 1 ? args[0]!.trim().split(/\s+/) : args;
   const [key, pos, ...extra] = words;

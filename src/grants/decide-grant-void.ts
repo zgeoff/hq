@@ -15,8 +15,6 @@ type GrantVoidDecision =
   | { ok: false; code: 'not_found' | 'not_allowed'; message: string; state: null }
   | { ok: false; code: 'bad_state'; message: string; state: GrantActState };
 
-// Only the caller's session as atc found it counts. The act's own actor may void it when the caller
-// is the session hq fleet recorded for that actor, and so may the owner's recorded session.
 export function decideGrantVoid(input: GrantVoidInput): GrantVoidDecision {
   const action = input.action;
   if (action === null) {

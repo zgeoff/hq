@@ -6,7 +6,6 @@ import { at, freshDb } from '../../test/helpers.ts';
 import type { Runner } from '../runner/types.ts';
 import { makeShippedLoader } from './make-shipped-loader.ts';
 
-// The clock reads 13:00 on Thursday 15 Oct 2026 in Sydney.
 function setupTest() {
   const days = {
       '2026-10-12': buildMergedDayOutput('2026-10-12', []),

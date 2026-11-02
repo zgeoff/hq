@@ -2,7 +2,6 @@ import type { Database } from 'bun:sqlite';
 import { kdb } from '../kdb.ts';
 import type { ShippedCacheRow } from '../kdb.ts';
 
-// Keeps these entries, replacing any held under the same kind and key.
 export async function upsertCacheEntries(db: Database, entries: readonly ShippedCacheRow[]): Promise<void> {
   if (entries.length === 0) {
     return;

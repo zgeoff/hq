@@ -1,6 +1,5 @@
 import { HqError } from '../errors.ts';
 
-// "14d", "14" or 14: whole days.
 export function parseDays(v: string | undefined, flag: string, dflt: number): number {
   if (v === undefined) return dflt;
   const m = /^(\d+)d?$/.exec(v);

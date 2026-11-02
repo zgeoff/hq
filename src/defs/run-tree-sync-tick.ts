@@ -17,8 +17,6 @@ interface SyncWho {
   tree: TreeName;
 }
 
-// The watcher's step, and `hq defs sync`: sync one tree, remember the result for hq health, log a
-// move. hq-defs then gets its dependencies when they are missing or stale.
 export function runTreeSyncTick(db: Database, actor: string, tree: TreeName = 'hq', install: Install = runBunInstall): TreeSync | null {
   const synced = runTreeSync(tree);
   if (!synced) {
@@ -30,7 +28,6 @@ export function runTreeSyncTick(db: Database, actor: string, tree: TreeName = 'h
 }
 
 function writeSyncResult(db: Database, who: SyncWho, synced: TreeSync): TreeSync {
-  // A ref lock twice in a row (two ticks, each with a retry) is no longer a passing race.
   const result = readRepeatedLock(db, who.tree, synced) ? { ...synced, ok: false, line: `${synced.line}; the same on the tick before` } : synced;
   setMeta(db, TREE_META[who.tree], JSON.stringify(result));
   if (result.reattached) {

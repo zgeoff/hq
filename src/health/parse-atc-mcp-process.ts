@@ -16,7 +16,6 @@ interface AtcMcpProcessText {
 const TICK_MS = 10;
 const SCOPE = /atc-daemon-session-[0-9a-f]{8}-(?<id>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})-[0-9a-f]{8}\.scope/u;
 
-// null: not an atc mcp process; 'no start time': the stat text has no field 22.
 export function parseAtcMcpProcess(text: AtcMcpProcessText): AtcMcpProcess | 'no start time' | null {
   if (!isAtcMcpCommand(text.cmdline)) {
     return null;

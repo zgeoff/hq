@@ -5,8 +5,6 @@ import { HqError } from '../errors.ts';
 import { logEvent } from '../log-event.ts';
 import type { GrantAction, GrantActionInput } from './types.ts';
 
-// Appends one action a session took under a named standing grant. A name no grant mark carries is
-// refused, with the names that exist, so a typo never files an action under no grant.
 export function recordGrantAction(db: Database, input: GrantActionInput): GrantAction {
   const note = input.note === null || input.note.trim() === '' ? null : input.note.trim(),
     target = input.target.trim();

@@ -1,8 +1,6 @@
 import { z } from 'zod';
 
-// What merged-prs.sh prints, daily or weekly: a week has the same shape as a day. Every field is
-// required, since render-report.sh or the week's merge reads each one. fetched counts every PR
-// GitHub sent, and searchCount every PR it found.
+// Every field is required, since render-report.sh or the week's merge reads each one.
 export const mergedPRsOutputSchema = z.object({
   kind: z.enum(['daily', 'weekly']),
   start: z.string(),

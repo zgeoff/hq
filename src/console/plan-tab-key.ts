@@ -7,7 +7,6 @@ export interface TabKeyInput {
   modified: boolean;
   current: ConsoleTab;
 
-  // When `g` was pressed, if it still waits for its second key; and the time now, in ms.
   pendingSince: number | null;
   now: number;
 }
@@ -18,9 +17,6 @@ export interface TabKeyPlan {
   consumed: boolean;
 }
 
-// The keys that move between tabs on every tab: `g` then a tab's key jumps to it, `[` and `]` step.
-// A `g` waits 1.5 s for its second key; any other key ends the wait and acts as it would alone.
-// None fires in a text box or with a modifier, and a key they don't use passes on to the tab.
 export function planTabKey(input: TabKeyInput): TabKeyPlan {
   const PENDING_MS = 1500,
     pending = input.pendingSince !== null && input.now - input.pendingSince <= PENDING_MS,
@@ -39,7 +35,6 @@ export function planTabKey(input: TabKeyInput): TabKeyPlan {
 
 const STEPS: Record<string, number> = { '[': -1, ']': 1 };
 
-// The path `step` tabs on from the current one, wrapping round; none for a step of 0.
 function findStep(current: ConsoleTab, step: number): string | null {
   if (step === 0) {
     return null;

@@ -3,8 +3,7 @@ import type { ReadyIssue } from '../lanes/types.ts';
 import { getIssueAreas } from './get-issue-areas.ts';
 import type { FocusFilter, FocusTerm } from './types.ts';
 
-// An issue matches a term when it matches every filter in it. Maintenance is an issue in a project
-// labelled maintenance, or a Bug; everything else is roadmap. Linear's priority 0 is none, never urgent.
+// Linear's priority 0 is none, never urgent.
 export function isFocusMatch(issue: ReadyIssue, term: FocusTerm): boolean {
   return term.filters.every((filter) => isFilterMatch(issue, filter));
 }

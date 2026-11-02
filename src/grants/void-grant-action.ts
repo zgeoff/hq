@@ -18,8 +18,6 @@ interface GrantVoidDeps {
   clock: () => Date;
 }
 
-// Takes back an action logged in error. The row stays, marked with when, by whom and why, and drops
-// out of the grant's tally.
 export async function voidGrantAction(deps: GrantVoidDeps): Promise<GrantActionRow> {
   const caller = await readGrantVoidCaller(deps.probe);
   return deps.db.transaction(() => writeVoid(deps, caller)).immediate();

@@ -1,7 +1,3 @@
-// Release-aware runs: a run whose merged PRs have all shipped in a release moves on by itself,
-// to live-check (a check is owed) or to done (live_check is 'none'). Releases come from a fixed
-// table of repos; a repo with no source is never moved by hq. One pass is `shipRuns`; the watcher
-// runs it every 10 minutes and `hq run ship` runs it by hand.
 import type { Database } from 'bun:sqlite';
 import { match } from 'ts-pattern';
 import { iso } from '../clock/iso.ts';
@@ -46,7 +42,6 @@ import { readHeldAt } from './read-held-at.ts';
 import { readActiveSession } from '../runs/read-active-session.ts';
 import type { PrState, Release, ShipMove, ShipResult, Source } from './types.ts';
 
-// One pass. A dry run reads from GitHub but writes nothing.
 export async function shipRuns(db: Database, run: Runner, at: Date = now(), opts: { dryRun?: boolean; readBuild?: () => Build } = {}): Promise<ShipResult> {
   const dryRun = !!opts.dryRun;
   const res: ShipResult = { dryRun, moved: [], shippedPrs: 0, compares: 0, deferred: 0, held: [], busy: [], errors: [] };
@@ -55,7 +50,6 @@ export async function shipRuns(db: Database, run: Runner, at: Date = now(), opts
   const runs = db.query(`SELECT * FROM runs WHERE state IN ('merged','deploying','deploy-held') ORDER BY created_at`).all() as Run[];
   const prsOf = (issue: string) => db.query('SELECT * FROM run_prs WHERE issue = ? ORDER BY added_at').all(issue) as RunPr[];
 
-  // A design pass's PRs are no part of the build run's shipment.
   const deliveryPRsOf = (issue: string) => prsOf(issue).filter((pr) => pr.design_pass === 0);
   const states = new Map<string, PrState>();
   const candidates: { run: Run; refs: string[] }[] = [];
@@ -63,7 +57,9 @@ export async function shipRuns(db: Database, run: Runner, at: Date = now(), opts
     const prs = deliveryPRsOf(r.issue);
     const merged = prs.filter((p) => p.state === 'merged');
     if (!merged.length || prs.some((p) => p.state === 'open')) continue;
-    if (merged.some((p) => !(repoOf(p.ref) in SOURCES))) continue; // no release source: hq never moves it
+    if (merged.some((pr) => !(repoOf(pr.ref) in SOURCES))) {
+      continue;
+    }
     for (const pr of merged) {
       states.set(pr.ref, { ref: pr.ref, repo: repoOf(pr.ref), sha: pr.merge_sha, tag: pr.shipped_tag, at: pr.shipped_at, mergedAt: pr.merged_at });
     }
@@ -110,8 +106,8 @@ export async function shipRuns(db: Database, run: Runner, at: Date = now(), opts
     }
   };
 
-  // A release tag or a build commit never moves, so its answer holds across passes: a scan the
-  // compare cap cut off resumes instead of starting over. A moving ref is asked again each pass.
+  // A release tag or a build commit never moves, so its answer holds across passes. A moving ref is
+  // asked again each pass.
   const compared = new Map(Object.entries(metaJson(db, COMPARED, COMPARED_ROWS, {})));
   const contains = async (repo: string, sha: string, tag: string): Promise<boolean | 'cap'> => {
     const key = `${repo}:${sha}:${tag}`;
@@ -295,8 +291,6 @@ async function readMovingTag(run: Runner, repo: string, ref: string, at: Date): 
   return [{ tag: ref, at: iso(at) }];
 }
 
-// One message per recipient per pass. Live-check runs go to HQ_LIVECHECK_TO (z-qa alone since 0.33.1,
-// unless set); runs closed with no check owed go to z-delivery only.
 function tellShipped(db: Database, moved: ShipMove[]): void {
   const live = moved.filter((m) => m.to === 'live-check');
   const done = moved.filter((m) => m.to === 'done');

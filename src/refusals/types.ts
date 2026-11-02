@@ -3,12 +3,12 @@ import type { BY } from './by.ts';
 
 export interface ScanOptions {
   dir?: string;
-  windowDays?: number; // first sight of a file older than this skips its history
-  budgetBytes?: number; // every byte read is charged; checked between lines
-  maxLineBytes?: number; // a longer line is passed over
-  sliceBytes?: number; // bytes per read (tests)
-  deadlineMs?: number; // stop reading after this long; what is left resumes next scan
-  sessions?: () => Promise<SessionInfo[]>; // atc's list; a failure scans with no session names
+  windowDays?: number;
+  budgetBytes?: number;
+  maxLineBytes?: number;
+  sliceBytes?: number;
+  deadlineMs?: number;
+  sessions?: () => Promise<SessionInfo[]>;
 }
 
 export interface ScanResult {
@@ -38,7 +38,7 @@ export type Obj = Record<string, any>;
 
 export interface Tool {
   name: string;
-  input: string | null; // inputOf's output: already cut and masked; raw input is never kept
+  input: string | null;
 }
 
 export interface RefusalRow {

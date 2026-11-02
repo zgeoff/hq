@@ -3,8 +3,6 @@ import { HqError } from '../errors.ts';
 import { PRIVATE_TREE } from './private-tree.ts';
 import { runMainFetch } from './run-main-fetch.ts';
 
-// A file as it stands on origin/main of hq-private, after a fetch, never from the working tree.
-// There is no fallback to another checkout: a missing file, clone or fetch is a refusal.
 export function readPrivateMain(rel: string, quick: boolean): string {
   const dir = PRIVATE_TREE.dir();
   if (!existsSync(`${dir}/.git`)) {

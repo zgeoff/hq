@@ -14,8 +14,6 @@ import { OWNER_FIX_MS, pickHealthMoves } from './pick-health-moves.ts';
 import { match } from 'ts-pattern';
 import type { Check, HealthTick, Samples } from './types.ts';
 
-// The watcher's step: record the samples, decide each problem's move (pickHealthMoves), then write
-// the open problems, the events, the messages and the news those moves call for.
 export function applyHealth(db: Database, checks: Check[], samples: Samples, actor: string, unknown: string[] = []): HealthTick {
   return db
     .transaction((): HealthTick => {

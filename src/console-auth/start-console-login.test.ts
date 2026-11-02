@@ -8,8 +8,6 @@ import { askConsoleLogin } from './ask-console-login.ts';
 import { createConsoleAuth } from './create-console-auth.ts';
 import { startConsoleLogin } from './start-console-login.ts';
 
-// A real console server and its login wiring, started from a terminal that is `isTTY` and outside
-// every atc session.
 async function setupTest(isTTY: boolean) {
   const directory = mkdtempSync(join(tmpdir(), 'hq-console-login-'));
   onTestFinished(() => rmSync(directory, { recursive: true, force: true }));

@@ -13,8 +13,6 @@ interface IssuePage {
   issues: { nodes: { identifier: string; state: { type: string }; project: { name: string } | null }[]; pageInfo: { hasNextPage: boolean; endCursor: string | null } };
 }
 
-// Every issue in each named project, with its state type, for the projects' burndowns. A project's
-// issues are kept 5 minutes, and read again sooner when what is kept does not fit the schema.
 export async function loadProjectIssues(call: LinearCall, db: Database, projects: readonly string[], at: Date): Promise<ProjectIssue[]> {
   const issues: ProjectIssue[] = [],
     kept = await findCacheEntries(db, 'project', projects, at);

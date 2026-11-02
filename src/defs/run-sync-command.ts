@@ -5,8 +5,6 @@ import { runAllTreeSyncs } from './run-all-tree-syncs.ts';
 
 type TreeResult = ReturnType<typeof runAllTreeSyncs>[number];
 
-// `hq defs sync`: fast-forward both checkouts. A tree with no checkout is reported, not failed
-// (hq health is what goes red); a refused or failed sync fails the command.
 export function runSyncCommand(db: Database, actor: string): { data: Record<string, unknown>; text: string } {
   const results = runAllTreeSyncs(db, actor);
   checkSynced(results);

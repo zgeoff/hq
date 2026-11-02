@@ -1,13 +1,4 @@
-// The refusal log (z-stu, 2026-10-16): every auto-mode refusal in the fleet's Claude Code
-// transcripts, kept without anyone remembering to. A refusal is a record whose structured field
-// toolDenialKind is "automode-blocked"; hq never matches text to find one. Read-only on the
-// transcripts, and nothing secret is stored: the tool input is cut to the command or path, and
-// input and reason are masked (redact.ts) before they are capped.
-//
-// The projects dir is ~8 GB, so a scan is bounded: a byte offset per file, only new bytes read, a
-// byte budget per scan (most recently modified first), and files older than the backfill window
-// skipped on first sight. Each file streams line by line; a refusal's tool comes from the
-// tool_use ids seen before it, kept per file across scans. Local transcripts only.
+// The projects dir is ~8 GB, so a scan is bounded.
 import type { Database } from 'bun:sqlite';
 import { closeSync, openSync, readSync } from 'node:fs';
 import { sep } from 'node:path';
@@ -30,8 +21,6 @@ export async function scanRefusals(db: Database, o: ScanOptions = {}): Promise<S
     who = await whoBySession(o.sessions),
     [dir, window, scannedAt] = [o.dir ?? getProjectsDir(), (o.windowDays ?? BACKFILL_DAYS) * 86_400_000, iso(now())];
   const maxLine = o.maxLineBytes ?? MAX_LINE;
-  // Checked between reads. A file's first line is read to its end (at most maxLine), so a scan
-  // overspends by a read plus one line at most, and every file it starts moves forward.
   let budget = o.budgetBytes ?? BUDGET_BYTES;
   const t0 = performance.now();
   const late = () => performance.now() - t0 >= (o.deadlineMs ?? DEADLINE_MS);
@@ -51,7 +40,7 @@ export async function scanRefusals(db: Database, o: ScanOptions = {}): Promise<S
     const mtime = iso(new Date(f.mtimeMs));
     const prev = known.get(f.path);
     if (!prev && now().getTime() - f.mtimeMs > window) {
-      save.run(f.path, f.size, f.size, mtime, '[]'); // first sight of an old file: its history is skipped
+      save.run(f.path, f.size, f.size, mtime, '[]');
       continue;
     }
     const shrank = !!prev && f.size < prev.offset;
@@ -72,8 +61,6 @@ export async function scanRefusals(db: Database, o: ScanOptions = {}): Promise<S
       continue;
     }
     const found: Found[] = [];
-    // A whole line. A scan that resumed mid-line (after an oversized one) gets a fragment here,
-    // which fails to parse and is skipped.
     // The two checks are independent: a tool_use whose input quotes the refusal mark is still a
     // tool_use that a later refusal names.
     const line = (b: Buffer) => {
@@ -91,8 +78,6 @@ export async function scanRefusals(db: Database, o: ScanOptions = {}): Promise<S
     const from = offset;
     try {
       while (pos < f.size) {
-        // Out of budget: stop once this file has moved on (the carried part line is read again
-        // next scan). Until then the line begun is read on, so every file started moves forward.
         if ((budget <= 0 || late()) && (offset > from || carryLen === 0)) {
           left = true;
           break;
@@ -127,7 +112,6 @@ export async function scanRefusals(db: Database, o: ScanOptions = {}): Promise<S
     } finally {
       closeSync(fd);
     }
-    // A partial last line (carry) waits for its newline: offset stays at its start.
     if (left) r.files_left++;
     r.files_read++;
     db.transaction(() => {
@@ -152,8 +136,7 @@ function readAt(fd: number, start: number, len: number): Buffer {
   return buf.subarray(0, got);
 }
 
-// A tool_use map entry ages out after this many newer ones: a tool_result follows its tool_use
-// within a few records, parallel calls included.
+// A tool_result follows its tool_use within a few records, parallel calls included.
 const TOOLS_KEPT = 128;
 
 const remember = (tools: Map<string, Tool>, [k, v]: [string, Tool]) => {

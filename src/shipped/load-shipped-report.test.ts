@@ -230,7 +230,6 @@ test('a script that fails says which and why, in one line', async () => {
   await expect(loadShippedReport({ db: setupTest().db, run: runFailingScript, call: loadLinearFake([], []), scripts: SCRIPTS }, 'today', new Date())).rejects.toThrow('merged-prs.sh exited 1: gh: not logged in');
 });
 
-// merged-prs.sh prints the fixture, as it would print GitHub's answer; render-report.sh runs.
 function makeScriptRunner(prsFile: string, ran: string[][]): Runner {
   return async (cmd, opts) => {
     ran.push(cmd.slice(1));
@@ -253,8 +252,7 @@ function runFailingScript(): Promise<RunResult> {
   return Promise.resolve({ code: 1, stdout: '', stderr: 'gh: not logged in\nrun gh auth login' });
 }
 
-// A render-report.sh fixture as merged-prs.sh prints it: the fields the fixture leaves out, which
-// render-report.sh does not read for a day, are filled in, and fetched is every PR listed.
+// The fields the fixture leaves out, which render-report.sh does not read for a day, are filled in.
 function readScriptOutput(file: string): string {
   const fixture = RENDER_INPUT.parse(JSON.parse(readFixture(file)));
   return JSON.stringify({
@@ -277,7 +275,6 @@ function readIssues<T>(file: string): T[] {
   return Array.isArray(parsed) ? parsed : parsed.issues;
 }
 
-// Linear over the report fixtures' issues, read from their files.
 function loadLinearFake(projectIssues: readonly ProjectIssue[], asked: unknown[]): LinearCall {
   return makeLinearFake([...readIssues<ReportIssue>('issues-array.json'), ...readIssues<ReportIssue>('issues-object.json')], projectIssues, asked);
 }

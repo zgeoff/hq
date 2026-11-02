@@ -1,7 +1,6 @@
 import { z } from 'zod';
 
-// atc's message.get: a sent message's outcome. unanswered is final; delivered stays so for a
-// session that never answers.
+// In atc's message.get, unanswered is final; delivered stays so for a session that never answers.
 export const messageGetSchema = z.looseObject({
   message: z.string(),
   session: z.string(),

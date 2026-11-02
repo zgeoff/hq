@@ -6,8 +6,7 @@ import { freshDb } from '../../test/helpers.ts';
 import type { RekeySpec } from './rekey-specs.ts';
 import { REKEY_SPECS } from './rekey-specs.ts';
 
-// Columns that look like they could name a repo and are outside the agreed list. linear_started_prs.ref is
-// outside it because every Linear read replaces the table.
+// linear_started_prs.ref is outside the agreed list because every Linear read replaces the table.
 const CANDIDATE = /\.(?:repo|ref|link|url|target|from_ref|source_ref|fixed_in_pr)$/u,
   OUTSIDE_LIST = new Set(['followups.from_ref', 'linear_started_prs.ref', 'outbox.target', 'run_prs.url', 'typed.source_ref']);
 
@@ -32,7 +31,6 @@ function readColumns(db: Database, table: string): string[] {
     .map((column) => column.name);
 }
 
-// Every unique key of the table made of plain columns: its primary key and its unique indexes.
 function readUniqueKeys(db: Database, table: string): string[][] {
   const indexes = db
       .query<{ name: string; unique: number }, []>(`PRAGMA index_list("${table}")`)
@@ -93,7 +91,7 @@ test("the unique keys of noslop's store columns are the ones the list says", () 
   expect(readUniqueKeys(ctx.store, 'escapes')).toStrictEqual([['escape_id']]);
 
   // dispositions_key reads the pull request as COALESCE(pull_request, 0), which index_info reports
-  // as an unnamed column, so the list names it in zeroIfNull.
+  // as an unnamed column.
   expect(readUniqueKeys(ctx.store, 'dispositions')).toStrictEqual([['repo', '', 'finding_id', 'source', 'at']]);
 });
 

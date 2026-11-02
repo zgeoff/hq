@@ -6,8 +6,6 @@ export interface ConsoleAuth {
   hasSession: (value: string | null) => boolean;
 }
 
-// Held in this process's memory only: never in hq.db, a file, a log or an event. A login token is
-// good for one exchange, and a new one replaces the last.
 export function createConsoleAuth(): ConsoleAuth {
   let login: string | null = null;
   const sessions: string[] = [];

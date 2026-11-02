@@ -7,8 +7,6 @@ const RoundEventSchema = z.object({ action: z.string(), data: z.string() }).null
 
 const ItemDataSchema = z.object({ item: z.string() });
 
-// The options an ask showed at an event: its last `item` event before it, unless a re-ask or a
-// text change cleared the item after that.
 export function readRoundOptions(db: Database, id: string, beforeSeq: number): ItemOption[] {
   const row = RoundEventSchema.parse(
     db

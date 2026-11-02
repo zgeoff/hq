@@ -13,8 +13,6 @@ export interface LoginPage {
 }
 
 // A login link carries its one-time token after #t=, which the browser never sends to a server.
-// The page swaps it for a session, keeps the session in this tab, and takes the token off the URL.
-// A swap that cannot reach the console, or a browser that blocks storage, is a failure, not a throw.
 export async function runLoginExchange(page: LoginPage): Promise<LoginOutcome> {
   try {
     return await swapToken(page);

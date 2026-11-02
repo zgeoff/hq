@@ -2,7 +2,6 @@ import { HqError } from '../errors.ts';
 import { checkLane } from './check-lane.ts';
 import type { LaneConfig } from './types.ts';
 
-// --lane nixie-slice=3,atc=0: every name a configured lane, every count a whole number.
 export function parseReady(lanes: LaneConfig[], raw: string): Record<string, number> {
   const out: Record<string, number> = {};
   for (const part of raw.split(',').map((x) => x.trim()).filter(Boolean)) {
