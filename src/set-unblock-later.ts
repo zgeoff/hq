@@ -8,8 +8,6 @@ import { HqError } from './errors.ts';
 import type { UnblockItem } from './unblock/types.ts';
 import { getUnblock } from './unblock/get-unblock.ts';
 
-// `hq unblock later`: hides an open item from the console until the time, the next 07:00 Sydney by
-// default, as `hq call later` does. It stays open, so every list still shows it.
 export function setUnblockLater(db: Database, id: string, until: string | null, actor: string): UnblockItem {
   return db
     .transaction(() => {

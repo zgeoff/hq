@@ -13,7 +13,6 @@ export interface StuViewInput {
   actor: string;
 }
 
-// `hq call|proposal stu <id> --view`: the owner's one or two sentences, shown first in the details.
 export function setStuView(db: Database, input: StuViewInput): Ask {
   if (input.view.trim() === '') {
     throw new HqError('bad_args', '--view must not be empty');

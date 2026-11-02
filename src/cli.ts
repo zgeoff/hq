@@ -1,5 +1,4 @@
 #!/usr/bin/env bun
-// hq: the z- sessions' headquarters. Typed state, named transitions, atc nudges.
 import { Database } from 'bun:sqlite';
 import { parseArgs } from 'node:util';
 import { match } from 'ts-pattern';
@@ -618,12 +617,10 @@ async function actor(db: Database, flags: Flags): Promise<string> {
       c.close();
     }
   } catch (e) {
-    if ((e as HqError).code === 'atc_protocol_mismatch') throw e; // never hidden behind a fallback
+    if ((e as HqError).code === 'atc_protocol_mismatch') throw e;
     return sid;
   }
 }
-
-// ---------- text rendering ----------
 
 const STATE_MARK: Record<AskState, string> = {
   queued: '·',
@@ -673,8 +670,6 @@ function flushNote(f: (FlushResult & { pending?: number }) | null): string {
   if (f.failed) parts.push(`${f.failed} failed, kept in the outbox: ${f.errors.join('; ')}`);
   return parts.length ? `\n(${parts.join('; ')})` : '';
 }
-
-// ---------- commands ----------
 
 async function askCommand(db: Database, kind: Kind, verb: string, args: string[], flags: Flags): Promise<Out> {
   const id = args[0];
@@ -831,7 +826,6 @@ async function unblockCommand(db: Database, verb: string, args: string[], flags:
   }
 }
 
-// One watcher tick for running work: read new notes from atc, then sweep.
 async function watchRuns(db: Database, me: string): Promise<void> {
   const c = await AtcClient.open();
   const wrapUpDeps = buildWrapUpDeps();
@@ -917,8 +911,6 @@ function realProbe(db: Database): Probe {
   };
 }
 
-// What the capacity watch reads from: impz and df under a deadline, the tailnet metrics page, /proc.
-// The watcher's capacity step; also `hq capacity sample`.
 async function capacityTick(db: Database, actor: string) {
   const r = await runCapacityStep(db, buildCapacityProbe(), pacingPath(), actor);
   return { ...r, opened: r.tick.opened, cleared: r.tick.cleared };
@@ -963,7 +955,6 @@ async function capacityCommand(db: Database, verb: string | undefined, args: str
   }
 }
 
-// The watcher's health step; also `hq health tick`.
 async function healthTick(db: Database, actor: string) {
   const { checks, samples, unknown } = await runChecks(realProbe(db), healthSettings(db), healthSamples(db), now());
   return applyHealth(db, checks, samples, actor, unknown);
@@ -973,7 +964,6 @@ async function healthCommand(db: Database, verb: string | undefined, args: strin
   switch (verb) {
     case undefined:
     case 'check': {
-      // On demand: read only. The watcher keeps the samples and sends the alerts.
       const { checks } = await runChecks(realProbe(db), healthSettings(db), healthSamples(db), now());
       const open = openProblems(db);
       const bad = checks.filter((c) => !c.ok);
@@ -996,7 +986,6 @@ async function healthCommand(db: Database, verb: string | undefined, args: strin
   }
 }
 
-// "7d", "36h", or a time.
 function sinceArg(raw: string | undefined, to: Date): string {
   const v = raw ?? '7d';
   const m = /^(\d+)([dh])$/.exec(v);
@@ -1008,7 +997,6 @@ function sinceArg(raw: string | undefined, to: Date): string {
 
 const GH_CACHE = z.object({ day: z.string(), at: z.string(), merges: z.array(z.object({ repo: z.string(), mergedAt: z.string() })) });
 
-// Every merged zgeoff PR since `from`, from GitHub; cached 30 min. null when gh fails.
 async function ghMerges(db: Database, from: string, run: Runner = realRunner): Promise<GhMerge[] | null> {
   const day = from.slice(0, 10);
   const c = metaJson(db, 'stats_gh_cache', GH_CACHE.nullable(), null);
@@ -1037,13 +1025,12 @@ async function kindsCommand(db: Database, verb: string | undefined, flags: Flags
       return { data: { weeks: w, linear: linearState(db) }, text: kindText(w, linearState(db)).join('\n') };
     }
     case 'sync': {
-      // The backfill: every day in the window not yet fetched, one gh search a day.
       const kinds = await syncKinds(db, realRunner, { from: weeksBack(weeks), maxDays: weeks * 7 + 2, env: cleanEnv() }),
         linear = await syncLinear(db, makeAuditedLinearCaller(db, realRunner), weeksBack(weeks)).catch((error: unknown) => ({ error: String((error as Error).message ?? error) })),
         said = 'error' in linear ? `Linear failed: ${linear.error}` : `Linear: ${linear.closed} closed issue(s), ${linear.typed} PR issue(s) typed.`,
         w = kindWeeks(db, weeks);
 
-      // As the watcher does: the daily check-in trusts kinds_ok_at.
+      // The daily check-in trusts kinds_ok_at.
       if (!kinds.left) {
         setMeta(db, 'kinds_ok_at', new Date().toISOString());
       }
@@ -1064,7 +1051,6 @@ async function goalsCommand(db: Database, verb: string | undefined, rest: string
       return { data: { ...g }, text: goalsText(g, true).join('\n') };
     }
     case 'sync': {
-      // The backfill: every repo's runs for each UTC day not yet fetched, and closed PRs.
       const r = await syncGoals(db, boundedRunner(realRunner, CALL_MS), { from: new Date(Date.now() - (days + 1) * 86_400_000), env: cleanEnv() }),
         spendFailure = await refreshActionsSpend(db, boundedRunner(realRunner, CALL_MS), now(), cleanEnv());
       if (!r.errors.length && !r.deployLeft) setMeta(db, 'goals_ok_at', new Date().toISOString());
@@ -1129,7 +1115,6 @@ async function goalsCommand(db: Database, verb: string | undefined, rest: string
   }
 }
 
-// The window's answers for the weekly audit, which reads them with --json.
 function runAnswersCommand(db: Database, flags: Flags): Out {
   const at = now(),
     window = { from: sinceArg(flags.since, at), to: iso(at) },
@@ -1155,7 +1140,6 @@ async function statsCommand(db: Database, flags: Flags): Promise<Out> {
   const sizes = facts ? sizeStats(merged, facts) : null;
   const marks = listMarks(db, s.window.from);
   const reviews = reviewStats(db, t);
-  // Up to 3 days not fetched yet; the watcher and hq kinds sync keep the rest.
   await syncKinds(db, realRunner, { from: weeksBack(KIND_WEEKS, t), maxDays: 3, env: cleanEnv() }, t).catch(() => null);
   const kinds = kindWeeks(db, KIND_WEEKS, t);
   const goals = goalRows(db, 14, t);
@@ -1163,7 +1147,6 @@ async function statsCommand(db: Database, flags: Flags): Promise<Out> {
   return mergeAnswerWeeks({ data: { stats: s, sizes, reviews, kinds, goals: goals.weeks, marks }, text }, countAnswerWeeks(db, 4, t));
 }
 
-// The target as atc knows it now; the line is still recorded when atc can't say.
 async function resolveTarget(raw: string): Promise<{ id: string | null; name: string | null }> {
   let client: AtcClient | null = null;
   try {
@@ -1185,7 +1168,7 @@ async function typedCommand(db: Database, verb: string | undefined, flags: Flags
     case 'add': {
       const to = need(flags.to, 'to');
       const source = parseSource(db, need(flags.source, 'source'));
-      if (source.kind === 'chat') source.ref = await expandSession(source.ref).catch(() => source.ref); // the full id when atc knows it
+      if (source.kind === 'chat') source.ref = await expandSession(source.ref).catch(() => source.ref);
       const text = await readText(flags.text, flags['text-file'], 'text');
       const target = await resolveTarget(to);
       const t = addTyped(db, { to, toId: target.id, toName: target.name, text, source, actor: await actor(db, flags) });
@@ -1309,7 +1292,6 @@ async function markCommand(db: Database, verb: string | undefined, args: string[
   }
 }
 
-// `hq mark add --kind grant --grant NAME`: a standing grant's mark, named.
 async function runGrantMarkAdd(db: Database, flags: Flags): Promise<Out> {
   if (flags.kind !== 'grant') {
     throw new HqError('bad_args', '--grant names a standing grant: give it with --kind grant');
@@ -1319,14 +1301,12 @@ async function runGrantMarkAdd(db: Database, flags: Flags): Promise<Out> {
   return { data: { mark: m }, text: `Mark ${m.id} at ${m.at}: ${m.text} (grant ${m.grant_name})` };
 }
 
-// `hq mark grant ID NAME`: names a grant mark recorded before names.
 async function runMarkGrant(db: Database, args: string[], flags: Flags): Promise<Out> {
   const by = await actor(db, flags),
     m = updateMarkGrantName(db, { id: intFlag(need(args[0], 'mark id'), 'id') ?? 0, name: need(args[1], 'grant name'), actor: by });
   return { data: { mark: m }, text: `Mark ${m.id} is grant ${m.grant_name}: ${m.text}` };
 }
 
-// `hq grant act` from a session acting under a standing grant; `hq grant void` takes one back; `hq grant actions` for the weekly report.
 async function runGrantCommand(db: Database, verb: string | undefined, args: string[], flags: Flags): Promise<Out> {
   if (verb === 'act') {
     const by = await actor(db, flags),
@@ -1346,7 +1326,6 @@ async function runGrantCommand(db: Database, verb: string | undefined, args: str
   return { data: { window, grants: windowTallies }, text: windowTallies.length > 0 ? windowTallies.map((t) => formatGrantLine(t)).join('\n') : 'No named grants (name one with hq mark grant ID NAME).' };
 }
 
-// The watcher's weekly line: Monday from 08:00 Sydney, once.
 async function weeklyStats(db: Database, actor: string, run: Runner = realRunner): Promise<boolean> {
   const t = now();
   const parts = new Intl.DateTimeFormat('en-AU', { timeZone: 'Australia/Sydney', weekday: 'short', hour: '2-digit', hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(t);
@@ -1383,7 +1362,7 @@ const rcDeps = (): RcDeps => ({ state: (id) => rcState(id), run: realRunner, sel
 async function fleetCommand(db: Database, verb: string | undefined, args: string[], flags: Flags): Promise<Out> {
   switch (verb) {
     case 'ensure': {
-      // Before atc: a stuck watcher is told even when atc is the thing that's down (GEO-1015).
+      // Before atc: a stuck watcher is told even when atc is the thing that's down.
       const watcher = flags['dry-run'] ? null : watcherAlert(db, await actor(db, flags));
       if (!flags['dry-run']) {
         await sendStaleWatcherAlerts(db);
@@ -1397,8 +1376,8 @@ async function fleetCommand(db: Database, verb: string | undefined, args: string
         try {
           steps = await ensureFleet(db, client, toExactOptional({ dryRun: Boolean(flags['dry-run']), actor: await actor(db, flags), now: hurry, rc: rcDeps() }));
         } catch (e) {
-          // Another run holds the lease: it is doing this run's work, so this one is a skip, not a
-          // failure (the hq-fleet timer unit must not go red over it). A --now says so plainly.
+          // Another run holds the lease and is doing this run's work, so this one is a skip, not a
+          // failure: the hq-fleet timer unit must not go red over it.
           if (e instanceof HqError && e.code === 'busy' && !hurry) return { data: { skipped: e.message, watcher }, text: `Skipped: ${e.message}` };
           throw e;
         }
@@ -1409,10 +1388,8 @@ async function fleetCommand(db: Database, verb: string | undefined, args: string
       }
     }
     case 'rc': {
-      // The helper `ensure` starts after a spawn; also fine to run by hand.
       const name = need(args[0], 'name');
-      // The helper waits up to 30 min, through an atc restart: a lost connection is opened again at
-      // the next call. The call that failed is never retried, since a timed-out submit may have typed.
+      // The call that failed is never retried, since a timed-out submit may have typed.
       let c: AtcClient | null = await AtcClient.open();
       const live = async <T,>(f: (x: FleetClient) => Promise<T>): Promise<T> => {
         c ??= await AtcClient.open();
@@ -1454,8 +1431,8 @@ async function fleetCommand(db: Database, verb: string | undefined, args: string
       const last = loadFleetLast(db);
       const timer = (await realRunner(['systemctl', '--user', 'is-active', `${FLEET_UNIT}.timer`], { env: cleanEnv() })).stdout.trim() || 'inactive';
       const declared = declaredFleet(db);
-      // Read-only: atc down means no check, not a failed status. --json skips it unless --prompts
-      // asks: the compaction hook reads `hq fleet --json` under a 5 s limit.
+      // --json skips the check unless --prompts asks: the compaction hook reads `hq fleet --json`
+      // under a 5 s limit.
       let drift: Record<string, PromptDrift> = {},
         plugins: Record<string, PluginDrift> = {};
       let c: AtcClient | null = null;
@@ -1478,8 +1455,6 @@ async function fleetCommand(db: Database, verb: string | undefined, args: string
         ...formatDriftLines(drift, plugins),
       ];
 
-      // `prompt` stays the source string; the check sits beside it as `promptCheck`, and a plugin
-      // folder mismatch as `pluginCheck`.
       return { data: { timer, declared: declared.map((e) => buildFleetChecks(e, drift[e.name], plugins[e.name])), retired: retiredNames(db), roles: rolesByName(retiredNames(db)), forwards: forwards(db), last }, text: lines.join('\n') };
     }
     case 'timer': {
@@ -1873,7 +1848,6 @@ function fmtCounts(c: Record<string, number>): string {
   return parts.length ? parts.join(', ') : 'none';
 }
 
-// The inline commands, one function each, so the registry can hand every row a handler.
 async function restartCommand(db: Database, flags: Flags): Promise<Out> {
   if (flags.here) {
     const r = await restartHere(db, realRunner, await actor(db, flags), !!flags.force);
@@ -1981,7 +1955,6 @@ async function outboxCommand(db: Database, verb: string | undefined, rest: strin
   return { data: { outbox: rows }, text: rows.length ? rows.map((r) => `${r.id} [${r.status}] → ${r.target}: ${r.text}${r.last_error ? `\n   last error: ${r.last_error}` : ''}`).join('\n') : 'Outbox empty.' };
 }
 
-// Each command group's entry point, keyed by the `group` a registry row names (src/commands.ts).
 const GROUPS: Record<string, (context: Ctx) => Promise<Out>> = {
   status: async (c) => status(c.db),
   open: (c) => openCommand(c.db, c.verb, c.flags),
@@ -2077,12 +2050,13 @@ async function runArgv(argv: string[], runner: Runner): Promise<{ out: Out; db: 
   if (noun === 'version') {
     return { out: renderVersion(VERSION, SCHEMA_VERSION, readBuild()), db: null };
   }
-  // Like help and version, capabilities never opens the db: a session runs it before anything else.
+  // capabilities never opens the db: a session runs it before anything else.
   if (noun === 'capabilities') return { out: capabilities(VERSION, SCHEMA_VERSION, flags.require), db: null };
   // A bad setting stops the command here, naming it, instead of turning into NaN deep inside one.
   config();
 
-  // hq brief is read-only toward the hq db too: openDb would create an absent db and migrate an older one.
+  // hq brief is read-only toward the hq db: opening the db would create an absent db and migrate an
+  // older one.
   if (noun === 'brief') {
     return { out: await runBrief(runner, verb, rest, flags), db: null };
   }
@@ -2092,14 +2066,12 @@ async function runArgv(argv: string[], runner: Runner): Promise<{ out: Out; db: 
   return { out: await command.handler({ db, noun, verb, rest, flags, run: runner }), db };
 }
 
-// `hq outbox flush --ids 1,2`: the detached unit sends only the rows of the command that started it.
 function idsFlag(raw: string): number[] {
   const parts = raw.split(',');
   if (!parts.every((p) => /^[1-9]\d{0,15}$/.test(p))) throw new HqError('bad_args', '--ids must be outbox ids, like 3,4');
   return parts.map(Number);
 }
 
-// The runner reaches every command that spawns a tool through it; a test passes a fake one.
 // oxlint-disable-next-line zgeoff/function-verb -- the entry point that the bin and every CLI test call
 export async function main(argv: string[], runner: Runner = realRunner): Promise<number> {
   const json = argv.includes('--json');
@@ -2110,8 +2082,6 @@ export async function main(argv: string[], runner: Runner = realRunner): Promise
     let flushed: FlushResult | null = null;
     let detached: DetachResult | null = null;
     if (ran.db) {
-      // A command sends only the rows it queued; one that queued nothing sends nothing.
-      // Only `hq outbox flush` (and the watcher) sends what other commands left pending.
       const { positionals: [noun, verb], values } = parse(argv);
       const flushCmd = noun === 'outbox' && verb === 'flush';
       const mine = takeQueued();
@@ -2137,8 +2107,6 @@ export async function main(argv: string[], runner: Runner = realRunner): Promise
   }
 }
 
-// The delivery kind reads the db only for noslop's repo list, read-only, so no db is created or
-// migrated.
 function runBrief(runner: Runner, verb: string | undefined, rest: readonly string[], flags: Flags): Promise<Out> {
   if (verb === 'check') {
     return Promise.resolve(runBriefCheckCommand(buildNodeBriefFiles(), rest[0]));
@@ -2164,8 +2132,6 @@ async function runCommand(context: Ctx): Promise<Out> {
   const view = (issue: string) => viewRun(db, getRun(db, issue)!);
   switch (verb) {
     case 'add': {
-      // A second word was a session id once dropped without a word, so the run had no session and
-      // its notes, FINALs among them, never matched it.
       if (args.length > 1) {
         throw new HqError('bad_args', `hq run add takes one issue: pass the session as --session ${args[1]}`);
       }
@@ -2191,7 +2157,6 @@ async function runCommand(context: Ctx): Promise<Out> {
         actor: await by(),
       });
 
-      // A run already on the board keeps its sessions, so a --session here would vanish without a word.
       const ignored = r.result === 'noop' && session && !r.run.sessions.some((row) => row.active === 1 && row.session_id === session)
         ? { session, next: `hq run session ${r.run.issue} ${session} --add` }
         : undefined;
@@ -2218,7 +2183,6 @@ async function runCommand(context: Ctx): Promise<Out> {
       return { data: { run: view(issue) }, text: runLine(view(issue)) };
     }
     case 'reopen': {
-      // A done or dropped run that work started on again: back to working, sessions and PRs kept.
       const prev = resolveRun(db, arg(0, 'issue'));
       if (prev.state !== 'done' && prev.state !== 'dropped') throw new HqError('bad_state', `${prev.issue} is ${prev.state}, not done or dropped: nothing to reopen`);
       const pacing = await loadPacing(pacingPath());
@@ -2238,7 +2202,6 @@ async function runCommand(context: Ctx): Promise<Out> {
         requireLiveCheck(liveCheck);
       }
 
-      // A reopen into another closed state takes no design lane, so only a move to an open state is checked.
       const reopenPacing = flags.reopen === true && !CLOSED_RUN_STATES.some((closed) => closed === state) ? await loadPacing(pacingPath()) : null;
       const moved = db.transaction(() => {
         if (reopenPacing !== null) {
@@ -2394,7 +2357,6 @@ Round ${p.review_round} recorded at ${p.reviewed_sha}.` };
   }
 }
 
-// `hq slots broker [<n> --proof T]`: the Claude slot the imp broker runs on.
 async function slotsCommand(db: Database, verb: string | undefined, args: string[], flags: Flags): Promise<Out> {
   if (verb !== 'broker') {
     throw new HqError('bad_args', `unknown command: hq slots ${verb ?? ''}`.trimEnd());

@@ -38,7 +38,6 @@ beforeEach(() => {
   at(NOON_SYDNEY);
   process.env['HQ_ATC_STATE'] = dir;
   process.env['XDG_STATE_HOME'] = `${dir}/state`;
-  // Every prompt path inside the test dir: a wake must never write the real one.
   process.env['HQ_DEFINITIONS_DIR'] = `${dir}/defs`;
   resetFetchCache();
   mkdirSync(`${dir}/restarts`, { recursive: true });
@@ -107,7 +106,6 @@ test('a dry run sends nothing', async () => {
   expect(atc.sent).toHaveLength(0);
 });
 
-// A fake runner that records commands and plays scripted exit codes.
 function fakeRunner(codes: Record<string, number> = {}): { run: Runner; calls: { cmd: string[]; opts?: RunOpts }[] } {
   const calls: { cmd: string[]; opts?: RunOpts }[] = [];
   const run: Runner = async (cmd, opts) => {
@@ -118,7 +116,7 @@ function fakeRunner(codes: Record<string, number> = {}): { run: Runner; calls: {
 }
 
 test('restart refuses 23:00-08:00 Sydney unless forced', async () => {
-  expect(restartQuiet(new Date('2026-10-14T13:00:00Z'))).toBe(true); // 00:00 Sydney
+  expect(restartQuiet(new Date('2026-10-14T13:00:00Z'))).toBe(true);
   expect(restartQuiet(new Date(NOON_SYDNEY))).toBe(false);
   at('2026-10-14T13:00:00Z');
   const { run, calls } = fakeRunner();
@@ -227,7 +225,6 @@ test('a bad restore wait falls back to 180 s; the wake keeps the report read aft
   const { run } = fakeRunner({ 'atc daemon restart': 1 });
   const p = restartHere(db, run, 'z-q', false);
 
-  // The wait line is logged once the report after the restart is read; only then is it rewritten.
   await waitFor('the restore wait to start', async () => {
     const log = await Bun.file(`${dir}/r.log`).text().catch(() => '');
     return log.includes('waiting up to 180s');

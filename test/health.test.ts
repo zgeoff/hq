@@ -22,10 +22,10 @@ beforeEach(() => {
 afterEach(() => cleanup());
 
 interface World {
-  broken?: boolean; // every systemctl and df call fails
+  broken?: boolean;
   failedUser: string[];
   failedSystem: string[];
-  restarts: Record<string, number>; // user services
+  restarts: Record<string, number>;
   availBytes: number;
   tmpAvailBytes?: number;
   memSome60: number;
@@ -79,9 +79,9 @@ test('a new problem tells z-stu once, in one message per tick; clearing files ne
   expect(m.text).toContain('2 new problems');
   expect(m.text).toContain('user unit teapot.service has failed');
   expect(m.text).toContain('disk /: 2.0 GiB free');
-  expect(m.text).not.toContain('run-r123'); // ignored by default
+  expect(m.text).not.toContain('run-r123');
   await step(world({ failedUser: ['teapot.service'], availBytes: 2 * 2 ** 30 }), 5);
-  expect(outbox()).toHaveLength(1); // nothing new
+  expect(outbox()).toHaveLength(1);
   await step(world(), 10);
   expect(outbox()).toHaveLength(1);
   expect(listNews(db, { all: false, limit: 10 }).map((n) => n.text)).toEqual([
@@ -96,7 +96,7 @@ test('a restart loop trips on restarts gained inside the window, and clears when
   expect(outbox()).toHaveLength(0);
   const r = await step(world({ restarts: { 'kettle.service': 106 } }), 10);
   expect(r.opened.map((c) => c.line)).toEqual(['user unit kettle.service is restart-looping: 6 restarts in 30 min (NRestarts 106)']);
-  const r2 = await step(world({ restarts: { 'kettle.service': 106 } }), 36); // the 100 sample left the window
+  const r2 = await step(world({ restarts: { 'kettle.service': 106 } }), 36);
   expect(r2.cleared.map((c) => c.key)).toEqual(['restart-loop:user:kettle.service']);
 });
 
@@ -126,8 +126,8 @@ test('a failed read neither clears open problems nor drops restart samples', asy
   expect(r.opened.map((check) => check.key).toSorted()).toEqual(['disk', 'restarts:system', 'restarts:user', 'systemd:system', 'systemd:user']);
   await step(world({ failedUser: ['teapot.service'], availBytes: 2 * 2 ** 30, restarts: { 'kettle.service': 106 } }), 10);
   const texts = outbox().map((m) => m.text);
-  expect(texts.filter((t) => t.includes('teapot.service'))).toHaveLength(1); // no second alert
-  expect(texts.at(-1)).toContain('kettle.service is restart-looping'); // the 100 sample survived the failed read
+  expect(texts.filter((t) => t.includes('teapot.service'))).toHaveLength(1);
+  expect(texts.at(-1)).toContain('kettle.service is restart-looping');
 });
 
 test('it asks the owning session of an oversized state file first, then z-stu once after 2 hours', async () => {
@@ -217,7 +217,6 @@ test('a command that hangs counts as a failed read', async () => {
   expect(COMMAND_TIMEOUT_MS).toBeLessThanOrEqual(20_000);
   const started = Date.now();
   const orig = setTimeout;
-  // Speed the timer: run the check with a short timeout through a patched clock.
   (globalThis as { setTimeout: unknown }).setTimeout = ((fn: () => void, _ms: number) => orig(fn, 10)) as typeof setTimeout;
   try {
     const { unknown } = await runChecks(hang, healthSettings(db), {}, new Date(NOON_SYDNEY));

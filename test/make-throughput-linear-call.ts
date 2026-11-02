@@ -7,8 +7,6 @@ interface StartedSeed {
   attachments?: readonly unknown[];
 }
 
-// Linear as hq's sync reads it, in one page each: these filed issues, these In Progress ones, and
-// an empty answer to every other query.
 export function makeThroughputLinearCall(filed: readonly FiledNode[], started: readonly StartedSeed[] = []): LinearCall {
   return (query) => {
     if (query.includes('createdAt: {')) {

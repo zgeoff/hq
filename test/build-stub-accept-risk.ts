@@ -13,11 +13,9 @@ export interface AcceptRiskScenario {
   threadURL: string;
   replyURL: string;
 
-  // The PR's one noslop thread on the diff, opened for finding aaaaaaaaaaaaaaaa.
   thread: FakeScript;
 }
 
-// The owner accepts finding aaaaaaaaaaaaaaaa on zgeoff/widgets#7 as hq event 1, from chat:kettle-12.
 export function buildAcceptRiskScenario(): AcceptRiskScenario {
   const note = 'The lid is cosmetic.';
   const trailer = 'Recorded in hq as event 1 (source chat:kettle-12) by hq pr accept-risk.';
@@ -32,8 +30,6 @@ export function buildAcceptRiskScenario(): AcceptRiskScenario {
   };
 }
 
-// A noslop that answers from what the run did: the finding reads accepted-risk only after an
-// accepted-risk reply was posted, and the check passes only after `noslop check` ran on that reply.
 export function buildReplyDrivenNoslop(thread: FakeScript): { run: Runner } {
   const failing = { code: 0, stdout: `${JSON.stringify({ id: 9001, name: 'noslop', app: 'noslop-review', status: 'completed', conclusion: 'failure', title: '1 finding holds no valid disposition', completedAt: '2026-10-14T01:00:05Z' })}\n`, stderr: '' };
   const before = buildFakeRunner({ ...thread, noslopFindings: buildStubFindings('open'), noslopChecks: failing });

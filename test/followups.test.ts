@@ -27,7 +27,6 @@ afterEach(() => cleanup());
 
 const run = (issue: string) => addRun(db, { issue, title: 'Invented kettle work', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, actor: 'z-delivery' });
 
-// Inputs the new checks must refuse.
 const HOSTILE_FOLLOWUPS: [string, string][] = [
   ['GEO-1,teapot', '"TEAPOT" isn\'t one'],
   ['GEO-1;GEO-2', "isn't one"],
@@ -75,7 +74,6 @@ test('weekly counts around the rule: a hand-counted baseline before, PR tallies 
   addPr(db, 'GEO-2', 'kettle#2', 'z-delivery');
   finalPr(db, 'kettle#2', { sha: 'def5678', actor: 'z-delivery', tally: { fixed: 0, followups: null } });
 
-  // said again: replaces
   finalPr(db, 'kettle#2', { sha: 'def5678', actor: 'z-delivery', tally: { fixed: 2, followups: null } });
   at(day(9));
   const s = reviewStats(db);

@@ -5,10 +5,8 @@ import { join } from 'node:path';
 import { buildResticTemplateKey } from './build-restic-template-key.ts';
 import { writeCheapResticKey } from './write-cheap-restic-key.ts';
 
-// Every restic repo the tests make shares this password, so one pair of templates serves them all.
 export const RESTIC_TEST_PASSWORD = 'invented-kettle-password';
 
-// An empty `local` and `remote` repo, built once per restic version and builder source, under a lock.
 // A calibrated key costs about 0.75 s per restic call, so each key is rewritten cheap. The remote is
 // initialised with hq's flags for a new remote, so `restic copy` between copies of the two works.
 export function createResticTemplates(): string {

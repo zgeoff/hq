@@ -5,8 +5,6 @@ export interface StubNoslopStore {
   tables: Record<string, number>;
 }
 
-// A store file in noslop's shape: a kysely_migration table holding the applied names and invented
-// tables holding the given number of rows each.
 export function createStubNoslopStore(path: string, store: StubNoslopStore): void {
   const db = new Database(path, { create: true });
   db.run('CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT NOT NULL)');

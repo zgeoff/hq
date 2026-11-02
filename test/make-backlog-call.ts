@@ -8,9 +8,6 @@ interface BacklogSeed {
   labels?: string[];
 }
 
-// A Linear call that answers the Ready query with no issues and the Backlog query with the given
-// issues, each complete and unblocked. With 'outage' the Backlog query fails as an outage does, and
-// with 'silent' it never answers.
 export function makeBacklogCall(issues: BacklogSeed[] | 'outage' | 'silent'): LinearCall {
   const description =
     '## Outcome\n\nThe kettle whistles.\n\n## Context\n\n- Project: kitchen\n\n## Scope\n\nIn: the whistle.\nOut: none stated.\n\n## Acceptance\n\n- [ ] The kettle whistles in a test (unit test)\n\n## Actions\n\nCode delivery\n';

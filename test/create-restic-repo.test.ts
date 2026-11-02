@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { z } from 'zod';
 import { createResticRepo } from './create-restic-repo.ts';
 
-// Skipped on a machine without restic, never in CI, which installs it.
+// Never skipped in CI, which installs restic.
 const canRunRestic = process.env['CI'] !== undefined || Bun.which('restic') !== null;
 
 function setupTest() {

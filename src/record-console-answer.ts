@@ -18,9 +18,6 @@ export interface ConsoleAnswerInput {
   actor: string;
 }
 
-// Records the owner's console answer in one write transaction: opened then answered, as the CLI does,
-// or answered unopened while another item is open with the owner. The owner session gets one message,
-// `console answer: <kind> <id>: <answer>`, through the outbox.
 export function recordConsoleAnswer(db: Database, input: ConsoleAnswerInput): Ask {
   return db
     .transaction((): Ask => {
@@ -52,7 +49,6 @@ function requireAsk(db: Database, id: string): Ask {
   return a;
 }
 
-// An option must be one the item offers; a free-text item offers none, so it takes a note only.
 function checkOption(a: Ask, option: string): string {
   const labels = (a.item?.options ?? []).map((o) => o.label);
   if (option !== '' && !labels.includes(option)) {

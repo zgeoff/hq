@@ -1,5 +1,3 @@
-// Writes the console's structured fields onto a call or proposal, wrapping addAsk in the same
-// transaction.
 import type { Database } from 'bun:sqlite';
 import type { AddInput, AddResult, Ask } from './asks/types.ts';
 import { addAsk } from './asks/add-ask.ts';
@@ -13,9 +11,6 @@ import { splitItemExtras } from './split-item-extras.ts';
 
 export type AskItemInput = Omit<AddInput, 'title' | 'question' | 'body'>;
 
-// `hq call|proposal add --item`: adds or updates the ask as addAsk does, then stores its fields. A
-// note from addAsk (open with the owner, already settled) means its text was left as it was, so its
-// fields are too.
 export function applyAskItem(db: Database, input: AskItemInput, item: ItemInput, body: string): AddResult {
   return db
     .transaction((): AddResult => {

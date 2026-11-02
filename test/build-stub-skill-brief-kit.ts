@@ -1,6 +1,3 @@
-// The files the design (both variants) and PR-walk briefs read from zgeoff/hq at a commit, with invented text in
-// the real shape: each template's prompt in a text fence under a heading, and the two skills each
-// brief points to. `without` leaves paths out.
 export function buildStubSkillBriefKit(options: { without?: string[] } = {}): Record<string, string> {
   const files: Record<string, string> = {
     'agent-kit/design-brief.md': [

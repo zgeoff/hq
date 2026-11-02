@@ -38,10 +38,8 @@ beforeEach(() => {
   ({ db, dir, cleanup } = freshDb());
   at(NOON_SYDNEY);
 
-  // no restart record
   process.env['HQ_ATC_STATE'] = `${dir}/atc-state`;
   mkdirSync(`${dir}/work`, { recursive: true });
-  // Claude Code trusts the test folder, as it trusts the fleet's checkouts.
   process.env['HQ_CLAUDE_JSON'] = `${dir}/claude.json`;
   writeFileSync(process.env['HQ_CLAUDE_JSON'], JSON.stringify({ projects: { [`${dir}/work`]: { hasTrustDialogAccepted: true } } }));
   resetFetchCache();
@@ -99,7 +97,7 @@ test('a live session is left alone; a missing one waits out the grace, then spaw
   expect((await ensureFleet(db, client, { dryRun: true, actor: 'hq-fleet', fleet }))[0]!.action).toBe('waiting');
   atMin(10);
   expect((await ensureFleet(db, client, { dryRun: true, actor: 'hq-fleet', fleet }))[0]).toMatchObject({ action: 'would spawn' });
-  expect(spawns).toHaveLength(0); // dry run spawns nothing
+  expect(spawns).toHaveLength(0);
   steps = await ensureFleet(db, client, { dryRun: false, actor: 'hq-fleet', fleet });
   expect(steps[0]).toMatchObject({ name: 'z-kettle', action: 'spawned' });
   expect(spawns).toEqual([{ cwd: `${dir}/work`, name: 'z-kettle', prompt: 'You are Kettle. Boil water when asked.', model: 'opus', agent: 'claude', idempotencyKey: 'hq-fleet-z-kettle-2026-10-14T01:00:00Z' }]);
@@ -108,7 +106,7 @@ test('a live session is left alone; a missing one waits out the grace, then spaw
   expect(outbox()).toEqual([{ target: 'z-stu', text: expect.stringContaining('hq fleet: z-kettle spawned') }]);
   atMin(15);
   await ensureFleet(db, client, { dryRun: false, actor: 'hq-fleet', fleet });
-  expect(spawns).toHaveLength(1); // never a second
+  expect(spawns).toHaveLength(1);
 });
 
 test('it reports a failed pin after a spawn, and pins the live session on the next check', async () => {
@@ -176,7 +174,7 @@ test('duplicates are reported, never stopped; a restoring session is waited for'
   atMin(100);
   expect((await ensureFleet(db, client, { dryRun: false, actor: 'hq-fleet', fleet }))[1]!.detail).toContain('atc still means to run it');
   expect(spawns).toHaveLength(0);
-  atMin(125); // 65 min without a live teapot: a dead session marked 'run' no longer blocks it
+  atMin(125);
   expect((await ensureFleet(db, client, { dryRun: false, actor: 'hq-fleet', fleet }))[1]!.action).toBe('spawned');
 });
 
@@ -184,7 +182,7 @@ test('a recent daemon restart holds spawns; quiet hours hold only the message', 
   mkdirSync(`${dir}/atc-state/restarts`, { recursive: true });
   writeFileSync(`${dir}/atc-state/restarts/last.json`, '{}');
   const { client, spawns } = fake([]);
-  at(new Date().toISOString()); // the record was just written
+  at(new Date().toISOString());
   await ensureFleet(db, client, { dryRun: false, actor: 'hq-fleet', fleet });
   at(new Date(Date.now() + 11 * 60_000).toISOString());
   const steps = await ensureFleet(db, client, { dryRun: false, actor: 'hq-fleet', fleet: fleet.slice(0, 1) });
@@ -194,13 +192,13 @@ test('a recent daemon restart holds spawns; quiet hours hold only the message', 
 
 test('quiet hours: the spawn happens, the message waits for morning', async () => {
   const { client, spawns } = fake([]);
-  at('2026-10-14T16:00:00Z'); // 03:00 Sydney
+  at('2026-10-14T16:00:00Z');
   await ensureFleet(db, client, { dryRun: false, actor: 'hq-fleet', fleet: fleet.slice(1) });
   at('2026-10-14T16:20:00Z');
   await ensureFleet(db, client, { dryRun: false, actor: 'hq-fleet', fleet: fleet.slice(1) });
   expect(spawns).toHaveLength(1);
   expect(outbox()).toHaveLength(0);
-  at('2026-10-14T20:30:00Z'); // 07:30 Sydney
+  at('2026-10-14T20:30:00Z');
   await ensureFleet(db, client, { dryRun: false, actor: 'hq-fleet', fleet: fleet.slice(1) });
   expect(outbox()).toEqual([{ target: 'z-stu', text: expect.stringContaining('(held over quiet hours)') }]);
 });
@@ -256,7 +254,7 @@ test('remove retires a declared name: ensure skips it and its wake entry goes; r
   expect(declaredFleet(db).map((entry) => entry.name)).not.toContain('z-release');
   expect(wakeList(db)).toHaveLength(0);
   expect(retireName(db, 'z-release', 'z-stu', true).changed).toBe(false);
-  expect(() => retireName(db, 'z-refine', 'z-stu', true)).toThrow('not a declared fleet name'); // dropped in the merge
+  expect(() => retireName(db, 'z-refine', 'z-stu', true)).toThrow('not a declared fleet name');
   expect(retireName(db, 'z-release', 'z-stu', false).changed).toBe(true);
   expect(declaredFleet(db).map((entry) => entry.name)).toContain('z-release');
   expect(declaredFleet(db).map((entry) => entry.name)).toEqual(['z-stu', 'z-delivery', 'z-release', 'z-triage', 'z-qa', 'z-review', 'z-q']);
@@ -273,14 +271,12 @@ test('a role prompt comes from origin/main: a working-tree edit is ignored, a me
   expect(() => readPrompt(`${hqPrivate}/${KETTLE}`)).toThrow('inside a git work tree');
   symlinkSync(`${hqPrivate}/${KETTLE}`, `${dir}/linked-prompt.md`);
   expect(() => readPrompt(`${dir}/linked-prompt.md`)).toThrow('inside a git work tree');
-  // A git error is a refusal too: here git rejects the checkout's owner.
   process.env['GIT_TEST_ASSUME_DIFFERENT_OWNER'] = '1';
   try {
     expect(() => readPrompt(`${hqPrivate}/${KETTLE}`)).toThrow('git could not tell');
   } finally {
     delete process.env['GIT_TEST_ASSUME_DIFFERENT_OWNER'];
   }
-  // A clone whose refspec skips main still gets the newest main.
   Bun.spawnSync(['git', '-C', hqPrivate, 'config', 'remote.origin.fetch', '+refs/heads/other:refs/remotes/origin/other']);
   push({ [KETTLE]: '```text\nYou are Kettle. Boil water three times.\n```\n' });
   resetFetchCache();
@@ -308,7 +304,7 @@ test('folder trust: the folder or a trusted parent; anything else is untrusted',
   put({ [dir]: { hasTrustDialogAccepted: true } });
   expect(checkFolderTrust(`${dir}/work`)).toEqual({ trusted: true, by: dir });
   expect(checkFolderTrust(`${dir}/work/../work`)).toEqual({ trusted: true, by: dir });
-  put({ [`${dir}/work/deeper`]: { hasTrustDialogAccepted: true } }); // a child doesn't cover its parent
+  put({ [`${dir}/work/deeper`]: { hasTrustDialogAccepted: true } });
   expect(checkFolderTrust(`${dir}/work`).trusted).toBe(false);
   put({ [`${dir}/work`]: { hasTrustDialogAccepted: 'true' } });
   expect(checkFolderTrust(`${dir}/work`).trusted).toBe(false);
@@ -342,14 +338,13 @@ test('the trust file follows CLAUDE_CONFIG_DIR, and HQ_CLAUDE_JSON overrides bot
 });
 
 test('--now spawns a forgotten session at once, for the named session only', async () => {
-  // z-kettle's known id was forgotten (not in atc's list): normally a 30 min wait. z-teapot is also gone.
   const { client, spawns } = fake([]);
   wakeAdd(db, { id: 'id-kettle-forgotten', name: 'z-kettle' }, null, 'z-q');
   const steps = await ensureFleet(db, client, { dryRun: false, actor: 'z-stu', fleet, now: ['z-kettle'] });
   expect(steps.map((s) => s.action)).toEqual(['spawned', 'waiting']);
   expect(steps[0]!.detail).toContain('(--now)');
   expect(spawns.map((s) => s.name)).toEqual(['z-kettle']);
-  expect(wakeList(db).map((w) => w.name)).toEqual(['z-kettle']); // the forgotten id is replaced
+  expect(wakeList(db).map((w) => w.name)).toEqual(['z-kettle']);
 });
 
 test('--now never spawns a second session: a live one by name or by known id stays the only one', async () => {
@@ -388,11 +383,10 @@ test('fleet ensure runs one at a time: an overlapping run is refused and spawns 
   const a = ensureFleet(db, client, { dryRun: false, actor: 'z-stu', fleet: one, now: ['z-kettle'] });
   await inSpawn.promise;
   await expect(ensureFleet(db, client, { dryRun: false, actor: 'hq-fleet', fleet: one, now: ['z-kettle'] })).rejects.toThrow('another hq fleet ensure is running (z-stu)');
-  expect((await ensureFleet(db, client, { dryRun: true, actor: 'z-q', fleet: one }))[0]).toBeDefined(); // a dry run needs no lease
+  expect((await ensureFleet(db, client, { dryRun: true, actor: 'z-q', fleet: one }))[0]).toBeDefined();
   release();
   await a;
   expect(spawned).toHaveLength(1);
-  // The lease is gone once a run ends, even one that threw.
   const boom: FleetClient = { ...client, sessions: async () => { throw new Error('invented outage'); } };
   await expect(ensureFleet(db, boom, { dryRun: false, actor: 'z-stu', fleet: one })).rejects.toThrow('invented outage');
   await ensureFleet(db, client, { dryRun: false, actor: 'z-stu', fleet: one });
@@ -412,13 +406,10 @@ test('claimMissing keeps the first stored start', () => {
   expect(claimMissing(db, 'z-teapot', '2026-10-15T01:05:00Z')).toBe('2026-10-15T01:05:00Z');
 });
 
-// ---------- Remote Control after a spawn (GEO-1102 v2) ----------
-
 const ON: RcState = { state: 'on', why: 'invented' };
 const OFF: RcState = { state: 'off', why: 'invented' };
 const UNKNOWN: RcState = { state: 'unknown', why: 'invented: no process found' };
 
-// A fake atc client with submit, and fake Remote Control sources: the state per call, the runner, the sleeps.
 function rcFake(sessions: FleetSession[], states: RcState[] = [OFF]) {
   const f = fake(sessions);
   const typed: [string, string][] = [];
@@ -430,10 +421,9 @@ function rcFake(sessions: FleetSession[], states: RcState[] = [OFF]) {
   const submit: FleetClient['submit'] = async (id, text) => {
     if (refuse) throw new HqError(refuse, 'invented refusal');
     typed.push([id, text]);
-    looked = Math.max(looked, 1); // after typing, the sequence moves on to its next state
+    looked = Math.max(looked, 1);
   };
   const rc: RcDeps = {
-    // The first entry answers until something is typed; then each look takes the next one.
     state: () => (typed.length ? states[Math.min(looked++, states.length - 1)]! : states[0]!),
     run: async (cmd): Promise<RunResult> => (cmds.push(cmd), { code: helperCode, stdout: '', stderr: helperCode ? 'invented systemd failure' : '' }),
     self: ['hq-self'],
@@ -468,10 +458,9 @@ test('a spawn marks the session and starts the helper unit through the runner', 
   expect(cmd.some((a) => /^--unit=hq-rc-z-kettle-\d+$/.test(a))).toBe(true);
   expect(cmd.slice(-4)).toEqual(['hq-self', 'fleet', 'rc', 'z-kettle']);
 
-  // the helper reads the same config file
   expect(cmd).toContain(`--setenv=HQ_CLAUDE_JSON=${resolve(getClaudeJson())}`);
-  expect(JSON.parse(getMeta(db, 'fleet_ids')!)).toEqual({ 'z-kettle': id }); // stored before the helper looks
-  expect(f.typed).toEqual([]); // the spawning run never types
+  expect(JSON.parse(getMeta(db, 'fleet_ids')!)).toEqual({ 'z-kettle': id });
+  expect(f.typed).toEqual([]);
 });
 
 test('a helper that will not start is reported, and the 5-minute check still types', async () => {
@@ -508,7 +497,7 @@ test('off and done: types once, then reports on when the bridge shows', async ()
   atMin(5);
   const steps = await ensure(f);
   expect(f.typed).toEqual([['id-k', '/remote-control z-kettle']]);
-  expect(f.sleeps).toEqual([2_000, 2_000]); // looked every 2 s until it showed
+  expect(f.sleeps).toEqual([2_000, 2_000]);
   expect(steps.at(-1)).toMatchObject({ name: 'z-kettle', action: 'remote control', detail: 'id-k: typed /remote-control z-kettle; Remote Control is on.' });
   expect(told().at(-1)).toBe('hq fleet: z-kettle id-k: typed /remote-control z-kettle; Remote Control is on.');
   expect(pending()).toEqual({});
@@ -523,7 +512,6 @@ test('typed but never on: reports it honestly after 30 s of looks', async () => 
   atMin(5);
   const steps = await ensure(f);
   expect(f.sleeps).toHaveLength(15);
-  // z-stu (16 Oct): told at once, in its words, since the typing may have turned it off.
   expect(steps.at(-1)).toMatchObject({ action: 'failed', urgent: true, message: 'Remote Control may be off in z-kettle: typed, no record (id-k). Ask the owner to check.' });
   expect(told()).toContain('hq fleet: Remote Control may be off in z-kettle: typed, no record (id-k). Ask the owner to check.');
 });
@@ -576,7 +564,7 @@ test('off and running waits; once done and settled it types', async () => {
   mark();
   atMin(1);
   sessions[0]!.state = 'done';
-  await ensure(f); // done, but under RC_SETTLE_MIN old
+  await ensure(f);
   expect(f.typed).toEqual([]);
   atMin(5);
   sessions[0]!.state = 'needs_you';
@@ -618,9 +606,8 @@ test('a stale tick cannot discard the result of a helper that claimed the marker
   const stale: FleetClient = { ...f.client, sessions: async () => (waitsOnAtc.resolve(), await gate, f.client.sessions()) };
   const tick = ensureFleet(db, stale, { dryRun: false, actor: 'hq-fleet', fleet: rcFleet(), rc: f.rc });
 
-  // The tick has read the marker (no typedAt) and waits on atc.
   await waitsOnAtc.promise;
-  const step = await rcWatch(db, f.client, f.rc, 'z-kettle', 'hq-fleet'); // the helper claims, types, finishes
+  const step = await rcWatch(db, f.client, f.rc, 'z-kettle', 'hq-fleet');
   expect(step).toMatchObject({ action: 'remote control' });
   release();
   const steps = await tick;
@@ -634,7 +621,6 @@ test('the helper and the 5-minute check on one marker type once between them', a
   const f = rcFake(sessions, [OFF, ON]);
   mark();
   atMin(5);
-  // The helper is mid-typing when the tick looks: its submit holds until the tick has run.
   let release!: () => void;
   const gate = new Promise<void>((r) => (release = r));
   const inSubmit = Promise.withResolvers<void>();
@@ -645,13 +631,12 @@ test('the helper and the 5-minute check on one marker type once between them', a
   const slow: FleetClient = { ...f.client, submit: async (id, text) => (inSubmit.resolve(), await gate, submit(id, text)) };
   const helper = rcWatch(db, slow, f.rc, 'z-kettle', 'hq-fleet');
   await inSubmit.promise;
-  const tick = await ensure(f); // typedAt is set and recent: leaves it
+  const tick = await ensure(f);
   expect(tick.filter((x) => x.action === 'failed' || x.action === 'remote control')).toEqual([]);
   release();
   const step = await helper;
   expect(f.typed).toEqual([['id-k', '/remote-control z-kettle']]);
   expect(step).toMatchObject({ action: 'remote control' });
-  // Two claims on the same marker: only the first wins.
   mark();
   expect(claimTyping(db, 'z-kettle', 'id-k', at2())).toBe(true);
   expect(claimTyping(db, 'z-kettle', 'id-k', at2())).toBe(false);
@@ -673,7 +658,7 @@ test('the helper loops until the session is done, then types and tells z-stu thr
   expect(f.typed).toEqual([['id-k', '/remote-control z-kettle']]);
   expect(step).toMatchObject({ action: 'remote control' });
   expect(told().at(-1)).toBe('hq fleet: z-kettle id-k: typed /remote-control z-kettle; Remote Control is on.');
-  expect(await rcWatch(db, f.client, f.rc, 'z-kettle', 'hq-fleet')).toBeNull(); // no marker: quiet
+  expect(await rcWatch(db, f.client, f.rc, 'z-kettle', 'hq-fleet')).toBeNull();
 });
 
 test('it queues the Remote Control report in the transaction that removes the marker', async () => {
@@ -706,7 +691,7 @@ test('the helper exits quietly when the marker is replaced by a newer spawn', as
   expect(await rcWatch(db, f.client, f.rc, 'z-kettle', 'hq-fleet')).toBeNull();
   expect(f.typed).toEqual([]);
   expect(told()).toEqual([]);
-  expect(pending()['z-kettle']).toBeDefined(); // the 5-minute check reports it
+  expect(pending()['z-kettle']).toBeDefined();
 });
 
 test('a mid-turn refusal retries; a gone session, a stuck turn or a hard refusal ends it once', async () => {
@@ -716,7 +701,7 @@ test('a mid-turn refusal retries; a gone session, a stuck turn or a hard refusal
   atMin(5);
   f.refuse('atc_too_slow');
   await ensure(f);
-  expect(pending()['z-kettle']).toEqual({ id: 'id-k', since: NOON_SYDNEY }); // no typedAt: nothing went in
+  expect(pending()['z-kettle']).toEqual({ id: 'id-k', since: NOON_SYDNEY });
   f.refuse('atc_permission_pending');
   await ensure(f);
   expect(pending()['z-kettle'].typedAt).toBeUndefined();
@@ -729,7 +714,7 @@ test('a mid-turn refusal retries; a gone session, a stuck turn or a hard refusal
   atMin(30);
   expect((await ensure(f)).at(-1)).toMatchObject({ action: 'failed', detail: expect.stringContaining('did not finish its start turn in 30 min (atc shows needs_you)') });
   mark();
-  sessions[0]!.state = 'done'; // its turn ended at minute 26; the next look, at 30, still types
+  sessions[0]!.state = 'done';
   expect((await ensure(f)).at(-1)).toMatchObject({ action: 'remote control' });
   expect(f.typed).toEqual([['id-k', '/remote-control z-kettle']]);
   f.typed.length = 0;

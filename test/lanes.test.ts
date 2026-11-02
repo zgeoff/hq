@@ -32,7 +32,6 @@ beforeEach(() => {
   ({ db, cleanup } = freshDb());
   at(NOON_SYDNEY);
 
-  // An impd reading every 5 min under raised lines, so the budget, not the line, sets the slots.
   setCapacitySetting(db, 'nonnixMaxMib', '65536', 'z-delivery');
   setCapacitySetting(db, 'nonnixMaxVcpus', '1000', 'z-delivery');
   for (let m = -5; m <= 105; m += 5) {
@@ -59,7 +58,7 @@ test('nudges once slots stay free past 10 minutes, then not again while nothing 
   atMin(15);
   expect(tick(db, sample(16384), 'hq-lanes').why).toContain('nothing changed');
   atMin(40);
-  expect(tick(db, sample(16384), 'hq-lanes').nudged).toBe(true); // 30 min passed
+  expect(tick(db, sample(16384), 'hq-lanes').nudged).toBe(true);
   expect(nudgeLog(db, 5)).toHaveLength(2);
 });
 
@@ -80,14 +79,14 @@ test('full lanes reset the clock; a reported count informs but never suppresses'
   reportReady(db, 0, 'z-delivery');
   atMin(30);
   const r = tick(db, sample(4096), 'hq-lanes');
-  expect(r.nudged).toBe(true); // a reported 0 never suppresses a nudge
+  expect(r.nudged).toBe(true);
   expect(msgs()[0]!.text).toContain('0 eligible Ready issues');
   reportReady(db, 6, 'z-delivery');
   atMin(31);
-  expect(tick(db, sample(4096), 'hq-lanes').nudged).toBe(true); // count changed
+  expect(tick(db, sample(4096), 'hq-lanes').nudged).toBe(true);
   expect(msgs()[0]!.text).toContain('6 eligible Ready issues');
   atMin(62);
-  expect(tick(db, sample(4096), 'hq-lanes').eligible).toBeNull(); // stale after 30 min
+  expect(tick(db, sample(4096), 'hq-lanes').eligible).toBeNull();
 });
 
 test('a failed reading neither nudges nor resets the clock', () => {
@@ -103,7 +102,7 @@ test('the log shows whether free slots dropped after a nudge, and the idle gap',
   atMin(10);
   tick(db, sample(16384), 'hq-lanes');
   atMin(15);
-  tick(db, sample(4096), 'hq-lanes'); // follow-up not due yet (10 min)
+  tick(db, sample(4096), 'hq-lanes');
   expect(nudgeLog(db, 5)[0]!.slots_after).toBeNull();
   atMin(21);
   tick(db, sample(2048), 'hq-lanes');
@@ -134,7 +133,7 @@ test('a backlog of unsent nudges is cut to the newest, and to none once lanes ar
   atMin(10);
   tick(db, sample(16384), 'hq-lanes');
   atMin(41);
-  tick(db, sample(16384), 'hq-lanes'); // 30 min on: a second nudge supersedes the unsent first
+  tick(db, sample(16384), 'hq-lanes');
   expect(msgs()).toHaveLength(1);
   atMin(13);
   tick(db, sample(0), 'hq-lanes');
@@ -145,7 +144,7 @@ test('a hold pauses nudges, drops an unsent one, and ends by itself', () => {
   tick(db, sample(16384), 'hq-lanes');
   atMin(10);
   expect(tick(db, sample(16384), 'hq-lanes').nudged).toBe(true);
-  expect(msgs()).toHaveLength(1); // unsent
+  expect(msgs()).toHaveLength(1);
   holdLanes(db, 60, 'host switch', 'z-delivery');
   expect(msgs()).toHaveLength(0);
   atMin(45);
@@ -153,7 +152,7 @@ test('a hold pauses nudges, drops an unsent one, and ends by itself', () => {
   expect(nudgeLog(db, 5)).toHaveLength(1);
   atMin(71);
   expect(getLanesHold(db)).toBeNull();
-  expect(tick(db, sample(16384), 'hq-lanes').nudged).toBe(true); // the free time kept counting
+  expect(tick(db, sample(16384), 'hq-lanes').nudged).toBe(true);
 });
 
 test('it drops an unsent nudge at the forwarded orchestrator when the lanes are held', () => {
@@ -202,7 +201,6 @@ test('a Ready report over 2 h old with a free slot alerts z-stu once per stale s
   tick(db, sample(16_384), 'hq-lanes');
   expect(msgs().filter((m) => m.target === 'z-stu')).toHaveLength(1);
 
-  // The impd readings end at 105 min; one more keeps the imp slots free at 126.
   createCapacitySample(db, { at: new Date(Date.parse(NOON_SYDNEY) + 125 * 60_000).toISOString().replace('.000Z', 'Z'), nonnixAwakeMib: 0 });
   atMin(126);
   tick(db, sample(16_384), 'hq-lanes');
@@ -236,7 +234,6 @@ test('quiet hours hold the stale alert until the first look after them', () => {
   at(FOUR_AM_SYDNEY);
   expect(checkReadyStale(db, new Date(FOUR_AM_SYDNEY), 3, 'hq-lanes')).toBe(false);
 
-  // Noon the next day in Sydney: quiet hours are over.
   const noon = new Date(Date.parse(FOUR_AM_SYDNEY) + 8 * 60 * 60_000);
   expect(checkReadyStale(db, noon, 3, 'hq-lanes')).toBe(true);
   expect(msgs()).toEqual([{ target: 'z-stu', text: expect.stringContaining('3 slot(s) free') }]);

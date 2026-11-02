@@ -3,7 +3,6 @@ import { Database as SqliteDatabase } from 'bun:sqlite';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 
-// noslop's store as its migrations leave it, for the four tables a re-key touches.
 const AT = '2026-10-01T00:00:00Z',
   STORE_DDL = `
   CREATE TABLE reviews (
@@ -38,8 +37,6 @@ export function createStoreTables(path: string): void {
   store.close();
 }
 
-// One row in each re-keyed column of hq.db that names `repo`, with keys that start at `offset`, so
-// two repos never share a key; and rows that only look like the repo, which a re-key must leave.
 export function createHistoryRows(db: Database, repo: string, offset: number): void {
   db.query('INSERT INTO ci_runs (id, repo, path, event, status, attempt, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run(offset + 1, repo, 'ci.yml', 'push', 'completed', 1, AT, AT);
   db.query('INSERT INTO closed_prs (repo, number, closed_at) VALUES (?, ?, ?)').run(repo, offset + 1, AT);
@@ -54,7 +51,6 @@ export function createHistoryRows(db: Database, repo: string, offset: number): v
   db.query("INSERT INTO news (from_name, topic, text, link, added_at) VALUES ('z-stu', 'merge', ?, ?, ?)").run(`merged a change to hq itself, ${repo}`, `https://github.com/zgeoff/${repo}/pull/${offset + 9}`, AT);
 }
 
-// Rows that look like a repo called hq and are not it, in the same columns.
 export function createLookalikeRows(db: Database): void {
   db.query('INSERT INTO ci_runs (id, repo, path, event, status, attempt, created_at, updated_at) VALUES (900, ?, ?, ?, ?, ?, ?, ?)').run('hq-tools', 'ci.yml', 'push', 'completed', 1, AT, AT);
   db.query("INSERT INTO grant_actions (grant_name, target, actor, at) VALUES ('kettle', 'hq#abc', 'z-qa', ?)").run(AT);
@@ -64,7 +60,6 @@ export function createLookalikeRows(db: Database): void {
   db.query("INSERT INTO events (subject, subject_id, action, actor, at, data) VALUES ('hq', 'hq', 'noted', 'hq', ?, '{\"note\":\"hq\"}')").run(AT);
 }
 
-// The same for noslop's store, with finding ids that start at `offset`.
 export function createStoreRows(path: string, repo: string, offset: number): void {
   const finding = `f${offset + 1}`,
     review = `r${offset + 1}`,

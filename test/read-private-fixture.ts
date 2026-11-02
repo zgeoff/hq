@@ -1,8 +1,6 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-// The still-ask list is invented, and so is every file the grants check reads, so the fixture
-// never depends on the text hq or hq-private hold. The script is the repo's own.
 const ROLE_SKILLS = [
   "delivery-lead",
   "intake",
@@ -45,9 +43,6 @@ interface PrivateFixture {
   privateFiles: Record<string, string>;
 }
 
-// What a full `hq defs check` needs of each tree. hq-defs holds the grants script, the still-ask
-// list and one public site. hq-private holds the six start prompts (the qa one with a Grants block),
-// its grant file and a doc site.
 export function readPrivateFixture(): PrivateFixture {
   const privateFiles = Object.fromEntries(
     ROLE_SKILLS.map((skill) => [

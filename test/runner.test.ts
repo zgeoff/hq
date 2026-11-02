@@ -71,7 +71,6 @@ test('the deadline reaches the whole process group, a TERM-ignoring child includ
   const child = Number(readFileSync(f, 'utf8').trim());
   expect(child).toBeGreaterThan(1);
 
-  // The KILL that follows the TERM ends the child well inside the 30 s it would sleep.
   await waitFor('the TERM-ignoring child to be gone', () => !alive(child));
 });
 
@@ -91,6 +90,5 @@ test('a one-shot process that times out still kills the TERM-ignoring child befo
   await p.exited;
   const child = Number(readFileSync(f, 'utf8').trim());
 
-  // The KILL went out before the process exited; the wait covers only the child's reaping.
   await waitFor('the TERM-ignoring child to be gone', () => !alive(child));
 });

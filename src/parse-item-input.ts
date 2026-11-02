@@ -1,6 +1,3 @@
-// The structured fields of a call, proposal or unblock item, as the console shows them (console
-// brief, `Item`). `hq call|proposal|unblock add --item` takes them, validated here; every text is kept
-// verbatim. An item filed as free text has none and shows its body instead.
 import { z } from 'zod';
 import { HqError } from './errors.ts';
 import { parsePRURL } from './parse-pr-url.ts';
@@ -10,8 +7,6 @@ export type ItemOption = NonNullable<ItemInput['options']>[number];
 export type ItemGrant = NonNullable<ItemOption['grants']>;
 export type ItemDetail = ItemInput['details'][number];
 
-// The part stored in the row's `item` column: everything but the title, question and Stu's view,
-// which have columns of their own.
 export type ItemExtras = Omit<ItemInput, 'title' | 'question' | 'stuView'>;
 
 export type ItemKind = 'call' | 'proposal' | 'unblock';
@@ -33,7 +28,6 @@ export function parseItemInput(kind: ItemKind, raw: string): ItemInput {
 
 const TITLE_MAX = 80;
 
-// What `--item` carries. Title and question also fill the row's own columns.
 function defineItemInputSchema() {
   const DetailSchema = z.strictObject({ heading: defineText(), text: defineText(), code: defineText().optional() }),
     DiffSchema = z.strictObject({ now: defineText(), would: defineText() }),
@@ -55,7 +49,6 @@ function defineItemInputSchema() {
   });
 }
 
-// Text is stored as given, spaces and all; it only has to hold something.
 function defineText() {
   return z.string().regex(/\S/u, 'must not be blank');
 }
@@ -64,8 +57,6 @@ function formatIssues(error: z.ZodError): string {
   return error.issues.map((i) => `${i.path.join('.') || '(top)'}: ${i.message}`).join('; ');
 }
 
-// A call needs 2 to 4 options and a proposal its diff too; an unblock item has the fixed Done, Later
-// and Skip, so it takes none.
 function checkKind(kind: ItemKind, item: ItemInput): void {
   if (kind === 'unblock' && item.options !== undefined) {
     throw new HqError('bad_args', '--item: an unblock item takes no options; it has Done, Later and Skip');
@@ -80,8 +71,6 @@ function checkKind(kind: ItemKind, item: ItemInput): void {
   checkSubject(kind, item);
 }
 
-// Only a call's option grants an action, and an accepted risk names its finding while an override
-// names none.
 function checkGrants(kind: ItemKind, item: ItemInput): void {
   for (const option of item.options ?? []) {
     if (option.grants === undefined) {
@@ -96,8 +85,6 @@ function checkGrants(kind: ItemKind, item: ItemInput): void {
   }
 }
 
-// A subject link marks the PR an unblock item is about (a review, lgtm or merge ask): the watcher
-// drops the item once that PR merges or closes. A link given only as context carries no mark.
 function checkSubject(kind: ItemKind, item: ItemInput): void {
   const subjects = item.links.filter((l) => l.subject === true);
   if (subjects.length > 0 && kind !== 'unblock') {

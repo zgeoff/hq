@@ -5,8 +5,7 @@ const DESCRIPTIONS: Record<string, string> = {
   EIO: 'i/o error',
 };
 
-// A real filesystem cannot raise ESRCH or EIO on demand, so this wraps real files and throws the given
-// errno code, with the code and message node:fs gives, for each listed path; every other read passes through.
+// A real filesystem cannot raise ESRCH or EIO on demand.
 export function buildStubFailingAtcMcpFiles(files: AtcMcpFiles, failures: Record<string, string>): AtcMcpFiles {
   const failFor = (syscall: string, path: string) => {
     const code = failures[path];

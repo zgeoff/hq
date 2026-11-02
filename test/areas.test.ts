@@ -52,7 +52,6 @@ beforeEach(() => {
   ({ db, cleanup } = freshDb());
   atMin(0);
 
-  // An impd reading every 5 min under raised lines, so the budget, not the line, sets the slots.
   setCapacitySetting(db, 'nonnixMaxMib', '65536', 'z-delivery');
   setCapacitySetting(db, 'nonnixMaxVcpus', '1000', 'z-delivery');
   for (let m = -5; m <= 185; m += 5) {
@@ -68,7 +67,6 @@ test('reads the lanes from pacing.json, and refuses a bad config', () => {
   }
 });
 
-// Lane names and Ready reports the commands must refuse.
 const HOSTILE_LANES = ['NIXIE-SLICE', 'nixie', 'flexible; DROP TABLE runs', '', 'atc ', '../atc'];
 test.each(HOSTILE_LANES)('--lane refuses %p', (raw) => expect(() => checkLane(LANES, raw)).toThrow('--lane must be one of'));
 const HOSTILE_READY: [string, string][] = [
@@ -87,8 +85,8 @@ test('running counts by lane; a local run with no lane is flexible; a lane note 
   run('GEO-2', null, 'local');
   run('GEO-3', null);
   run('GEO-4', 'atc');
-  setState(db, 'GEO-4', 'merged', {}, 'z-delivery'); // past the merge: no longer holds a slot
-  addRun(db, { issue: 'GEO-5', title: 'Invented', place: 'none', session: null, next: 'x', gate: null, geoffChat: false, actor: 'z-delivery' }); // no agent
+  setState(db, 'GEO-4', 'merged', {}, 'z-delivery');
+  addRun(db, { issue: 'GEO-5', title: 'Invented', place: 'none', session: null, next: 'x', gate: null, geoffChat: false, actor: 'z-delivery' });
   addNote(db, 'GEO-3', 'nixie-slice', { label: 'lane', actor: 'z-delivery' });
   expect(runningByLane(db)).toEqual({ atc: 1, flexible: 1, 'nixie-slice': 1 });
   setRunLane(db, 'GEO-3', 'cloud', 'z-delivery');
@@ -146,7 +144,6 @@ test('the watcher nudges with the picks after 10 min, and again only on a change
   run('GEO-21', 'nixie-slice');
   atMin(16);
 
-  // A launch took GEO-21, so the picks changed; the newer nudge replaced the unsent one.
   expect(tick(db, sample(16_384), 'hq-lanes').nudged).toBe(true);
   const nudges = msgs().filter((message) => message.text.includes('Take, in this order'));
   expect(nudges).toHaveLength(1);
@@ -221,9 +218,8 @@ test('a blocked run with no session awake is parked, whatever it waits on: its s
   withSession('GEO-3', '0000000c-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
   setState(db, 'GEO-1', 'blocked', { waitsOnGeoff: true }, 'z-delivery');
 
-  // Blocked, but not on the owner.
   setState(db, 'GEO-2', 'blocked', { waitsOn: 'a release' }, 'z-delivery');
-  expect(parkedRuns(db)).toEqual([]); // no atc reading yet: every run counts
+  expect(parkedRuns(db)).toEqual([]);
   expect(runningByLane(db)).toEqual({ atc: 3 });
   const asleep = { id: '0000000a-aaaa-4aaa-8aaa-aaaaaaaaaaaa', alive: true, lifecycle: { vm: 'asleep' } };
   recordAwake(db, [asleep, { id: '0000000b-aaaa-4aaa-8aaa-aaaaaaaaaaaa', alive: false }, { id: '0000000c-aaaa-4aaa-8aaa-aaaaaaaaaaaa', alive: true }]);
@@ -232,22 +228,20 @@ test('a blocked run with no session awake is parked, whatever it waits on: its s
     { issue: 'GEO-2', lane: 'atc' },
   ]);
   expect(runningByLane(db)).toEqual({ atc: 1 });
-  recordAwake(db, [{ ...asleep, lifecycle: {} }]); // its session woke: it counts again
+  recordAwake(db, [{ ...asleep, lifecycle: {} }]);
   expect(runningByLane(db)).toEqual({ atc: 2 });
   recordAwake(db, [{ id: '0000000a-aaaa-4aaa-8aaa-aaaaaaaaaaaa', alive: true, lifecycle: { harness: 'suspended' } }]);
   expect(runningByLane(db)).toEqual({ atc: 1 });
-  atMin(16); // the reading is over 15 min old: every run counts
+  atMin(16);
   expect(runningByLane(db)).toEqual({ atc: 3 });
 
-  // GEO-2's session is gone
   recordAwake(db, [asleep, { id: '0000000c-aaaa-4aaa-8aaa-aaaaaaaaaaaa', alive: true }]);
 
-  // The owner answered.
   setState(db, 'GEO-1', 'working', {}, 'z-delivery');
   expect(parkedRuns(db)).toEqual([{ issue: 'GEO-2', lane: 'atc' }]);
   setState(db, 'GEO-1', 'blocked', { waitsOnGeoff: true }, 'z-delivery');
   expect(runningByLane(db)).toEqual({ atc: 1 });
-  atMin(-1); // a reading from the future proves nothing
+  atMin(-1);
   expect(runningByLane(db)).toEqual({ atc: 3 });
 });
 
@@ -261,13 +255,11 @@ test('the sample records the eligible issues the Ready read holds, the hand coun
   tick(db, sample(16384), 'hq-lanes');
   expect(eligible()).toStrictEqual({ eligible: 2, slots: 2 });
 
-  // No Ready read and no hand report: unknown, and every free slot counts.
   db.query("DELETE FROM meta WHERE key = 'lanes_ready_issues'").run();
   atMin(2);
   tick(db, sample(16384), 'hq-lanes');
   expect(eligible()).toStrictEqual({ eligible: null, slots: 10 });
 
-  // A hand report stands in while the read is missing.
   reportReady(db, 5, 'z-delivery');
   atMin(3);
   tick(db, sample(16384), 'hq-lanes');
@@ -303,7 +295,6 @@ test('the Ready detail is stored with the report, shown while fresh, and flags w
   expect(dailyText(db, new Date(Date.parse(T0)))).toContain('Ready: 5 total, 3 eligible');
   atMin(31);
   expect(readySummary(db, 30)).toBeNull();
-  // A later report without the detail clears it; a total alone shows too many skips as zero.
   atMin(32);
   reportLaneReady(db, parseReady(LANES, 'atc=1'), 'z-delivery');
   expect(readySummary(db, 30)).toBeNull();
@@ -323,7 +314,6 @@ test('a working run whose sessions atc no longer lists holds no slot, after one 
   recordAwake(db, [{ id: '0000000f-aaaa-4aaa-8aaa-aaaaaaaaaaaa', alive: true, lifecycle: { vm: 'asleep' } }]);
   expect([parkedRuns(db), runningByLane(db)]).toEqual([[{ issue: 'GEO-7', lane: 'flexible' }], { flexible: 1 }]);
 
-  // the reading is over 15 min old: a gone session frees nothing
   atMin(22);
   expect(runningByLane(db)).toEqual({ flexible: 2 });
 });

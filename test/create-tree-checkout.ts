@@ -3,7 +3,6 @@ import { dirname, join } from 'node:path';
 import type { TreeName } from '../src/prompts/trees.ts';
 import { TREES } from '../src/prompts/trees.ts';
 
-// The subject and time of a commit to origin; each defaults when left out.
 interface CommitShape {
   subject?: string;
   at?: string;
@@ -16,8 +15,6 @@ interface TreeCheckout {
   writeCommit: (files: Record<string, string>, commit?: CommitShape) => void;
 }
 
-// A checkout of one tree at its directory, cloned from a local origin under `root`. Its remote
-// reads as the one gh sets; insteadOf sends the fetch to the local origin.
 export function createTreeCheckout(root: string, tree: TreeName, files: Record<string, string>): TreeCheckout {
   const dir = TREES[tree].dir(),
     origin = join(root, `${tree}-origin`),
@@ -45,7 +42,6 @@ interface DatedPlace {
   at?: string | undefined;
 }
 
-// A place given with `at` makes a commit there carry that time as both its author and commit time.
 function runGit(place: string | DatedPlace, ...args: string[]): string {
   const dated: DatedPlace = typeof place === 'string' ? { cwd: place } : place;
   const env = dated.at === undefined ? process.env : { ...process.env, GIT_AUTHOR_DATE: dated.at, GIT_COMMITTER_DATE: dated.at };

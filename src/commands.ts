@@ -1,6 +1,3 @@
-// The command registry: one row per hq command. `run()` in cli.ts dispatches through it and
-// `HELP` is rendered from it, so a command's usage, summary and read-only flag live in one place.
-// The table is data except `handler`, so `hq capabilities --json` can print it.
 import type { Database } from 'bun:sqlite';
 import type { Flags } from './cli.ts';
 import { GROUP_HANDLERS } from './group-handlers.ts';
@@ -11,7 +8,6 @@ export interface Out {
   text: string;
 }
 
-// What a handler gets. `db` is opened by `run()` before dispatch; help and version never open it.
 export interface Ctx {
   db: Database;
   noun: string;
@@ -19,14 +15,9 @@ export interface Ctx {
   rest: string[];
   flags: Flags;
 
-  // The runner a command spawns its tools through: the real one, or the fake a test gives main().
   run: Runner;
 }
 
-// How a row appears in `hq help`, where that differs from the row itself. Every field is optional:
-// a missing one is the row's own. `summary: null` prints no summary; an array is a summary over
-// several lines; `pad` is the spaces between usage and summary (default: pad to column 46, at
-// least 2); `below` puts the summary on the lines under the usage.
 export interface HelpEntry {
   usage?: string;
   summary?: string | readonly string[] | null;
@@ -35,16 +26,14 @@ export interface HelpEntry {
 }
 
 interface Spec {
-  group: string; // which command group in cli.ts handles it (see GROUPS there)
-  nouns: readonly string[]; // `call|proposal` is one row with two nouns
-  verbs: readonly string[] | null; // null: any verb, and no verb
-  bare: boolean; // also the row for the noun with no verb
+  group: string;
+  nouns: readonly string[];
+  verbs: readonly string[] | null;
+  bare: boolean;
   usage: string;
   summary: string;
-  section: string; // the block of `hq help` it is printed in
-  readOnly: boolean; // never writes the db and never sends anything, whatever its flags
-  // undefined: one line from usage and summary. false: not a line of its own (another row's line
-  // covers it, or it is internal). One or more entries: the lines it prints.
+  section: string;
+  readOnly: boolean;
   help?: false | HelpEntry | readonly HelpEntry[];
 }
 

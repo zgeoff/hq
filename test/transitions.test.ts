@@ -187,7 +187,6 @@ function buildKettleInput(task: string): UnblockInput {
 }
 
 describe('no state write skips the table', () => {
-  // Recursive: GEO-1288 moved the writers into area folders, and the table into src/transitions/.
   test('every source file that writes a state column imports the table', () => {
     const src = join(import.meta.dir, '..', 'src'),
       write = /UPDATE (?:asks|runs|run_prs|unblocks) SET [^`'"]*\bstate\s*=/u;

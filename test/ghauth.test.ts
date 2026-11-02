@@ -63,7 +63,6 @@ test('the install build reads no .env or bunfig.toml from the working directory'
   expect(sh).toContain('--no-compile-autoload-bunfig');
 });
 
-// Committed hostile inputs for the token filter: each must be dropped, so gh falls back to its login.
 const NOT_TOKENS = ['$(gh auth token)', '`gh auth token`', '${GH_TOKEN}', '', ' ', 'gho_', 'gho_short', `gho_${'k'.repeat(36)} `, `gho_${'k'.repeat(30)};rm`, 'ghx_' + 'k'.repeat(36), 'github_pat_', 'Bearer gho_' + 'k'.repeat(36), "'gho_" + 'k'.repeat(36) + "'"];
 
 test('every hostile token value in the table is dropped from both variables', () => {

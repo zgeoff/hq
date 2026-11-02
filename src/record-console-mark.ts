@@ -18,9 +18,6 @@ export interface ConsoleMarkInput {
   actor: string;
 }
 
-// Done and Skip close the item as `hq unblock done` and `hq unblock drop` do, the note as its close
-// note; Later puts it off to the next morning. The owner session gets one message in the same
-// write transaction.
 export function recordConsoleMark(db: Database, input: ConsoleMarkInput): UnblockItem {
   return db
     .transaction((): UnblockItem => {

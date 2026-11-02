@@ -23,10 +23,6 @@ import { withDeadline } from './watcher/with-deadline.ts';
 
 const READ_AT = 'lanes_ready_linear_at';
 
-// At most every 10 min, read Ready per lane from Linear by lanes.json's rules. The throttle is set
-// before the read, so a failed or late pass waits its 10 min too; the failure is kept in meta for
-// the stale alert, and a page that answers after the deadline writes nothing. False when not due;
-// refresh reads now whatever the throttle says, and restarts it.
 interface LinearReadyTickDeps {
   call: LinearCall;
   run: Runner;

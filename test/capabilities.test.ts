@@ -134,14 +134,10 @@ test('capabilities does not open the db; a command that does would', async () =>
   expect((await hq('capabilities')).code).toBe(0);
   expect((await hq('version')).code).toBe(0);
   expect(existsSync(join(dir, 'missing'))).toBe(false);
-  // The control: a command that opens the db creates it there.
   expect((await hq('status')).code).toBe(0);
   expect(existsSync(gone)).toBe(true);
 });
 
-// Each listed key must be in the real output: `a.b` a nested key, `a[].b` the key on every element
-// of the array `a`. A required `a[]` must not be empty, so each test seeds a row; an optional `a[]?`
-// may be absent, null or empty.
 function missing(value: unknown, path: string): string | null {
   const [head, ...tail] = path.split('.');
   const rest = tail.join('.');
@@ -188,15 +184,14 @@ test('shape: fleet', async () => {
 });
 
 test('shape: fleet shows promptCheck for a declared session that is live in atc, and says so in the text', async () => {
-  const atc = fakeAtc(dir); // z-stu is live; the fake gives no prompt, so the check is unknown
+  const atc = fakeAtc(dir);
   try {
-    // --json skips the check (the compaction hook reads it under a 5 s limit) unless --prompts asks.
     expect(((await hq('fleet')).json as { declared: { promptCheck?: object }[] }).declared.every((e) => e.promptCheck === undefined)).toBe(true);
     const json = (await hq('fleet', '--prompts')).json as { declared: { name: string; prompt: string; promptCheck?: object }[] };
     const stu = json.declared.find((e) => e.name === 'z-stu')!;
     expect(typeof stu.prompt).toBe('string');
     expect(stu.promptCheck).toEqual({ state: 'unknown', since: null, hint: null, reason: expect.stringContaining('no prompt') });
-    expect(json.declared.some((e) => e.promptCheck === undefined)).toBe(true); // not live: no check
+    expect(json.declared.some((e) => e.promptCheck === undefined)).toBe(true);
     checkShape('fleet', json);
     out = [];
     expect(await main(['fleet'])).toBe(0);
@@ -211,7 +206,6 @@ interface FleetPluginJson {
   declared: { name: string; pluginCheck?: object }[];
 }
 
-// The fake lists z-stu with no plugin folders, as atc before 4.15 spawned it.
 test("shape: fleet --prompts gives pluginCheck for a live session whose plugin folders differ from fleet.json's", async () => {
   const atc = fakeAtc(dir);
   try {
@@ -263,8 +257,7 @@ test('shape: call list and proposal list', async () => {
   checkShape('proposal list', (await hq('proposal', 'list')).json);
 });
 
-// `hq review` takes no runner (it uses the real gh and codex, so it needs the network), so this runs
-// review() with fakes. The command's data is `{ ...result }` plus `ok`, so the keys are the same.
+// `hq review` takes no runner and uses the real gh and codex, so it needs the network.
 test('shape: review', async () => {
   process.env['REVIEW_DIR'] = join(dir, 'reviews');
   process.env['HQ_PROJECTS'] = join(dir, 'projects');
@@ -294,8 +287,7 @@ test('shape: review', async () => {
   }
 });
 
-// `hq pr` reads the head with the real gh, so a record is written and read with runPRCommand and
-// a fake runner. The command's data is `{ pr }` plus `ok`, so the keys are the same.
+// `hq pr` reads the head with the real gh.
 test('it gives every pr status shape key, in the answer output and the status output of a PR with a record', async () => {
   const fake = buildFakeRunner({ prHead: { code: 0, stdout: JSON.stringify({ headRefOid: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678' }), stderr: '' } }),
     recorded = await runPRCommand({ run: fake.run, db, verb: 'answer', rest: ['widgets', '7', 'lgtm'], flags: { source: 'chat:kettle-12' }, actor: () => Promise.resolve('z-kettle'), readOwnerSession: () => Promise.resolve({ verdict: 'owner' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) }),
@@ -312,8 +304,6 @@ test('it gives the pr status shape for a PR with no record', async () => {
   checkShape('pr status', shown.json);
 });
 
-// A noslop PR's review is runReview() with the fake noslop runner: a --fixes-only run, so fixChecks
-// is not empty and the keys under it are checked. The command's data is `{ ...result }` plus `ok`.
 test('shape: review (noslop)', async () => {
   writeFileSync(join(dir, 'settings.json'), JSON.stringify({ env: { OP_SERVICE_ACCOUNT_TOKEN: FAKE_TOKEN } }));
   process.env['HQ_NOSLOP_OP_SETTINGS'] = join(dir, 'settings.json');

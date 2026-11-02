@@ -5,10 +5,8 @@ type ForgetAnswer = Awaited<ReturnType<StaleOps['forget']>>;
 export interface StubFleetAnswers {
   sessions: FleetSession[];
 
-  // per session id, what its forget calls answer in turn; a forget past the list forgets the session
   forgets?: Record<string, ForgetAnswer[]>;
 
-  // session ids whose kill atc does not answer
   killFailures?: string[];
 }
 
@@ -17,8 +15,6 @@ export interface StubFleetClient {
   calls: string[];
 }
 
-// An atc fleet client that lists the given sessions and answers the wrap-up's session operations.
-// It spawns and reads nothing.
 export function buildStubFleetClient(answers: StubFleetAnswers): StubFleetClient {
   const calls: string[] = [];
   const forgets = new Map(Object.entries(answers.forgets ?? {}).map(([id, list]) => [id, [...list]]));

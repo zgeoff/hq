@@ -21,8 +21,8 @@ import { at, freshDb } from './helpers.ts';
 
 let db: Database;
 let cleanup: () => void;
-const T0 = '2026-10-16T01:00:00Z'; // after the cutoff
-const until = (m: number) => new Date(Date.parse(T0) + m * 60_000).toISOString().replace(/\.\d{3}Z$/, 'Z'); // hq's own time format
+const T0 = '2026-10-16T01:00:00Z';
+const until = (m: number) => new Date(Date.parse(T0) + m * 60_000).toISOString().replace(/\.\d{3}Z$/, 'Z');
 const atMin = (m: number) => at(until(m));
 
 beforeEach(() => {
@@ -50,18 +50,18 @@ test('wait on the owner: call queue → answer → apply, and run time waiting o
   applyAsk(db, 'kettle-colour', 'call', 'linear:GEO-1', 'done', 'z-stu');
 
   run('GEO-1');
-  setState(db, 'GEO-1', 'blocked', { waitsOn: "Geoff's yes" }, 'z-delivery'); // by the word, at 75
+  setState(db, 'GEO-1', 'blocked', { waitsOn: "Geoff's yes" }, 'z-delivery');
   atMin(135);
-  setState(db, 'GEO-1', 'working', { waitsOn: null }, 'z-delivery'); // 60 min
+  setState(db, 'GEO-1', 'working', { waitsOn: null }, 'z-delivery');
   run('GEO-2');
-  setState(db, 'GEO-2', 'blocked', { waitsOn: 'a release', waitsOnGeoff: true }, 'z-delivery'); // exact, at 135
+  setState(db, 'GEO-2', 'blocked', { waitsOn: 'a release', waitsOnGeoff: true }, 'z-delivery');
   atMin(165);
   const s = computeStats(db, { from: T0, to: until(165), gh: null });
   expect(s.geoff.queueToAnswer).toMatchObject({ n: 1, medianMin: 65 });
   expect(s.geoff.answerToApply).toMatchObject({ n: 1, medianMin: 10 });
   expect(s.geoff.runGeoffWait.n).toBe(2);
   expect(s.geoff.oldestRunWait).toEqual({ id: 'GEO-2', ageMin: 30 });
-  expect(s.geoff.runWaitExactShare).toBe(0.33); // 30 of 90 minutes set exactly
+  expect(s.geoff.runWaitExactShare).toBe(0.33);
   expect(statsText(s)).toContain('67% matched by the word "Geoff" or "the owner"');
 });
 
@@ -112,7 +112,7 @@ test('merged to live, the backlog by repo, review rework and cycle time', () => 
   expect(s.live.byRepo['widgets']).toMatchObject({ n: 1 });
   expect(s.live.backlog).toEqual({ total: 1, byRepo: { gadgets: 1 }, oldest: { id: 'GEO-2', ageMin: 60 } });
   expect(s.flow).toMatchObject({ reviewed: 2, rechecked: 1, reworkShare: 0.5, cycleFromReady: 1 });
-  expect(s.flow.cycle.medianMin).toBe(270); // from 23:00Z Ready to 03:30Z done
+  expect(s.flow.cycle.medianMin).toBe(270);
   expect(s.flow.mergesSource).toBe('hq');
   expect(headline(s)).toContain('merge→live 2.0h (n=1), 1 waiting');
 });
@@ -155,9 +155,9 @@ test('it takes the latest GitHub merge time as the last merge, whatever order hq
 
 test('idle capacity counts only while Ready work waited; a stale count is flagged; nudges convert', () => {
   const sample = (m: number, slots: number, eligible: number | null) => db.query('INSERT INTO lanes_samples (at, free_mib, slots, eligible) VALUES (?, 0, ?, ?)').run(until(m), slots, eligible);
-  sample(0, 2, 3); // 2 slots × 10 min while ready
-  sample(10, 2, 0); // nothing ready: not counted
-  sample(20, 1, null); // unknown: 1 × 10
+  sample(0, 2, 3);
+  sample(10, 2, 0);
+  sample(20, 1, null);
   sample(30, 0, 4);
   db.query("INSERT INTO lanes_nudges (at, slots, free_minutes, eligible, event_seq, slots_after) VALUES (?, 2, 10, 3, 1, 0), (?, 2, 10, 3, 1, 2), (?, 1, 10, null, 1, NULL)").run(until(1), until(11), until(21));
   const s = computeStats(db, { from: T0, to: until(40), gh: null });

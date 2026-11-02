@@ -1,5 +1,3 @@
-// A fake Runner for the noslop tests: answers 1Password, git, gh and the noslop CLI the way the real
-// ones do, records every call, and never starts a process. All data here is invented.
 import { realRunner } from '../src/runner/real-runner.ts';
 import type { RunOpts, RunResult, Runner } from '../src/runner/types.ts';
 
@@ -8,85 +6,53 @@ interface FakeCall {
   opts: RunOpts | undefined;
 }
 
-// secrets are the fields `op item get` prints as JSON; opAnswer, when set, is that call's whole result. author is the JSON that `gh pr view --json author` prints.
 export interface FakeScript {
   secrets?: Record<string, string>;
   opAnswer?: RunResult;
   noslopReview?: RunResult;
   noslopHelp?: RunResult;
 
-  // What `noslop store query` answers, called on each run; an empty success when absent.
   storeQuery?: () => RunResult;
 
-  // What `pgrep -af` answers for noslop CLI processes; exit 1, none, when absent.
   pgrep?: RunResult;
   author?: string;
   prBody?: string;
 
-  // What `gh pr view --json headRefOid` answers; the fixed full sha when absent.
   prHead?: RunResult;
 
-  // What `gh pr view --json headRefOid,author,statusCheckRollup,baseRefName` answers: one passing CI check
-  // on the fixed head, with the author and body above, when absent.
   prFacts?: RunResult;
 
-  // What `gh api …/contents/.github/workflows?ref=<ref>` answers at the head, and at the base branch
-  // `main` (the head's answer when baseWorkflows is absent): the folder is there when both are absent.
   workflows?: RunResult;
   baseWorkflows?: RunResult;
 
-  // What `gh api …/contents/<path>?ref=<ref>` answers for a CODEOWNERS path, keyed `<path>?ref=<ref>`;
-  // a 404 for any key it lacks.
   contents?: Record<string, RunResult>;
 
-  // What `gh api repos/<slug>/commits/<sha> --silent` answers: the commit is readable when absent.
   baseCommit?: RunResult;
 
-  // What `gh api --paginate …/pulls/<pr>/files` prints: a path a line, with a renamed file's old
-  // path after a tab. One source file when absent.
   prFiles?: RunResult;
 
-  // What `noslop findings --json` answers; no findings when absent.
   noslopFindings?: RunResult;
 
-  // What `noslop check --json` answers: a passing check when absent.
   noslopCheck?: RunResult;
 
-  // What the read of the PR's review comments (the threads on the diff) prints, one compact JSON object
-  // a line with id, replyTo, login, type, body and url; none when absent.
   reviewComments?: RunResult;
 
-  // What the same read of the PR's issue comments prints; none when absent.
   issueComments?: RunResult;
 
-  // What a `gh api -X POST` of a reply or comment answers: the comment's URL when absent.
   ghPost?: RunResult;
 
-  // What the read of the PR's issue comments for noslop's summary marker prints, one compact JSON
-  // object a line: one summary comment by the noslop App at the fixed full sha when absent.
   markerComments?: RunResult;
 
-  // What the read of the check runs named `noslop` at a commit prints, one compact JSON object a
-  // line: one completed, successful run by the noslop App, newer than the default summary, when absent.
   noslopChecks?: RunResult;
 
-  // What `gh pr view --json headRefOid,baseRefName` answers; the fixed full sha on main when absent.
   prRefs?: RunResult;
 
-  // What `gh pr view --json headRefOid,baseRefOid` answers; the fixed full sha on the fixed base sha
-  // when absent.
   prShas?: RunResult;
 
-  // The patch-id `git patch-id --verbatim` gives the PR diff at each head, by head. When it is set,
-  // `git diff --binary --full-index <base> <head>` prints a diff naming the head; when absent, git
-  // prints nothing, so no round has a patch-id.
   patchIds?: Record<string, string>;
 
-  // Run git for real, in the checkout the caller names, except `git remote get-url origin` and the
-  // lines `git` answers: for a test on a real repo, with gh, op and noslop still faked.
   realGit?: boolean;
 
-  // The repo `git remote get-url origin` names under zgeoff; widgets when absent.
   origin?: string;
 }
 
@@ -94,10 +60,8 @@ export interface FakeRunner {
   run: Runner;
   calls: FakeCall[];
 
-  // Every call as one line, in order.
   lines: () => string[];
 
-  // The calls of one program (op, bun, git, gh).
   of: (program: string) => FakeCall[];
 }
 
@@ -234,7 +198,6 @@ function pickAnswer(script: FakeScript, cmd: string[], opts: RunOpts | undefined
     return buildResult(`${FAKE_FULL_SHA}\n`);
   }
   if (cmd[1] === 'rev-list' && cmd[2] === '--parents') {
-    // A commit the fake knows no parents of, so a non-merge.
     return buildResult(`${cmd[5] ?? ''}\n`);
   }
   if (cmd[1] === 'rev-parse' && cmd[2] === '--verify') {
@@ -243,12 +206,10 @@ function pickAnswer(script: FakeScript, cmd: string[], opts: RunOpts | undefined
   return pickGhAnswer(script, line) ?? buildResult('');
 }
 
-// The full sha a short one names: the fixed full sha when it is a prefix of it, else the short one padded.
 function expandSha(short: string): string {
   return FAKE_FULL_SHA.startsWith(short) ? FAKE_FULL_SHA : short.padEnd(40, '0');
 }
 
-// The PR diff of a head prints as one line naming it, so patch-id can tell which head it was given.
 function pickPatchAnswer(script: FakeScript, cmd: string[], opts: RunOpts | undefined): RunResult | null {
   const patchIds = script.patchIds;
   if (patchIds === undefined || cmd[0] !== 'git') {

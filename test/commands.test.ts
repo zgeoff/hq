@@ -63,7 +63,6 @@ test('every row names a group that exists and has the fields a capabilities list
   }
 });
 
-// Each noun's group function in cli.ts, and the verbs its source switches on.
 const FUNCTIONS: Record<string, string> = {
   call: 'askCommand',
   proposal: 'askCommand',

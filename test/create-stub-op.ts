@@ -4,7 +4,6 @@ import { join, resolve } from 'node:path';
 interface StubOpOptions {
   directory: string;
 
-  // What `op read <reference>` prints, by op:// reference; any other reference fails.
   answers: Record<string, string>;
 
   // op's own errors can echo what it was given.
@@ -12,12 +11,9 @@ interface StubOpOptions {
 }
 
 interface StubOp {
-  // A directory to put first on PATH; it holds only `op`.
   bin: string;
 }
 
-// Writes an `op` that answers `op read` from a table, so a test can run code that reads 1Password
-// without reaching the real op or a real token.
 export function createStubOp(options: StubOpOptions): StubOp {
   const bin = join(options.directory, 'bin');
   const config = join(options.directory, 'op.json');

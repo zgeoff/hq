@@ -42,7 +42,6 @@ const base = new Date(NOON_SYDNEY).getTime();
 const atMin = (m: number) => at(new Date(base + m * 60_000).toISOString());
 const add = (issue = 'GEO-9001', session: string | null = S1) =>
   addRun(db, { issue, title: 'Teach the kettle to whistle', place: 'imp', session, next: 'Agent working.', gate: null, geoffChat: false, actor: 'z-delivery' });
-// The sweep's messages; z-review's final messages have their own test.
 const outbox = () => db.query(`SELECT target, text FROM outbox WHERE target != 'z-review'`).all() as { target: string; text: string }[];
 const toReview = () => db.query(`SELECT text, topic, status FROM outbox WHERE target = 'z-review' ORDER BY id`).all() as { text: string; topic: string; status: string }[];
 
@@ -276,7 +275,7 @@ describe('the sweep', () => {
     atMin(62);
     a = findAlerts(db, alive(), new Map(), new Date(base + 62 * 60_000));
     expect(sweep(db, a, 'hq-lanes').sent).toHaveLength(1);
-    expect(outbox()).toHaveLength(1); // the unsent first one was superseded
+    expect(outbox()).toHaveLength(1);
   });
 
   test('hq run unfinal clears a stale final: the sweep stops, a new final starts it again', () => {
@@ -306,7 +305,6 @@ describe('the sweep', () => {
     finalPr(db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
     finalPr(db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
     expect(toReview()).toEqual([{ text: 'Final: GEO-9001 (widgets#12 at abc1234). Review it, then merge.', topic: 'final:widgets#12', status: 'pending' }]);
-    // The head moved: the new final replaces the unsent older message.
     applyNoteSignals(db, 'GEO-9001', 'FINAL widgets#12 def5678', { source: 'atc:s1' });
     const m = toReview().filter((x) => x.status === 'pending');
     expect(m).toEqual([{ text: 'Final: GEO-9001 (widgets#12 at def5678). Review it, then merge.', topic: 'final:widgets#12', status: 'pending' }]);
@@ -348,7 +346,6 @@ describe('the sweep', () => {
     expect(ev).toMatchObject({ from_state: 'merged', to_state: 'open' });
     expect(JSON.parse(ev.data)).toMatchObject({ ref: 'widgets#12', reason: 'merge failed on a conflict' });
 
-    // a final works again
     finalPr(db, 'widgets#12', { sha: 'def5678', actor: 'z-delivery' });
   });
 
@@ -378,7 +375,6 @@ describe('the sweep', () => {
     finalPr(db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
     reviewedPr(db, 'widgets#12', 'abc1234def5678abc1234def5678abc1234def56', { recheck: false, force: false }, 'z-delivery');
     expect(findAlerts(db, alive(), new Map(), new Date(base + 31 * 60_000))).toEqual([]);
-    // the marker read again (short) does not reset the final time
     finalPr(db, 'widgets#12', { sha: 'abc1234def', actor: 'z-delivery' });
     expect(findAlerts(db, alive(), new Map(), new Date(base + 31 * 60_000))).toEqual([]);
   });
@@ -405,13 +401,12 @@ describe('the sweep', () => {
     add();
     const gone = [{ id: S1, name: 'kettle', alive: false, state: 'exited' }];
     addPr(db, 'GEO-9001', 'widgets#12', 'z-delivery');
-    expect(findAlerts(db, gone, new Map(), new Date(base))[0]!.line).toContain('has exited'); // a PR, not yet final
+    expect(findAlerts(db, gone, new Map(), new Date(base))[0]!.line).toContain('has exited');
     finalPr(db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
-    expect(findAlerts(db, gone, new Map(), new Date(base))[0]!.line).toContain('has exited'); // final, not reviewed
+    expect(findAlerts(db, gone, new Map(), new Date(base))[0]!.line).toContain('has exited');
     reviewedPr(db, 'widgets#12', 'abc1234', { recheck: false, force: false }, 'z-delivery');
     expect(findAlerts(db, gone, new Map(), new Date(base))).toEqual([]);
 
-    // the head moved after the review
     finalPr(db, 'widgets#12', { sha: 'def5678', actor: 'z-delivery' });
     expect(findAlerts(db, gone, new Map(), new Date(base)).map((a) => a.line).join('\n')).toContain('has exited');
   });
@@ -442,17 +437,14 @@ describe('review fixes', () => {
     add();
     const c = await AtcClient.open();
     try {
-      // bootstrap at the end (empty)
       await ingestNotes(db, c, { run: buildStubFinalGH({ commits: 'fault' }, []) });
       atc.feed.push({ at: base + 1000, session: S1, name: 'kettle', kind: 'note', detail: 'first note', label: 'progress' });
       const kept = await ingestNotes(db, c, { run: buildStubFinalGH({ commits: 'fault' }, []) });
       expect(kept.notes).toBe(1);
-      // The daemon's log resets: the old note is replayed at index 0, then a new one.
       atc.feed.length = 0;
       atc.feed.push({ at: base + 1000, session: S1, name: 'kettle', kind: 'note', detail: 'first note', label: 'progress' });
       atc.feed.push({ at: base + 5000, session: S1, name: 'kettle', kind: 'note', detail: 'second note', label: 'progress' });
 
-      // three empty reads detect the reset
       await ingestNotes(db, c, { run: buildStubFinalGH({ commits: 'fault' }, []) });
       await ingestNotes(db, c, { run: buildStubFinalGH({ commits: 'fault' }, []) });
       await ingestNotes(db, c, { run: buildStubFinalGH({ commits: 'fault' }, []) });
@@ -474,7 +466,7 @@ describe('review fixes', () => {
       { id: S2, name: 'toaster', alive: true, state: 'running' },
     ];
     atMin(31);
-    sweep(db, findAlerts(db, alive, new Map(), new Date(base + 31 * 60_000)), 'hq-lanes'); // A queued, never delivered
+    sweep(db, findAlerts(db, alive, new Map(), new Date(base + 31 * 60_000)), 'hq-lanes');
     atMin(36);
     const gone = [alive[0]!, { ...alive[1]!, alive: false, state: 'exited' }];
     const r = sweep(db, findAlerts(db, gone, new Map(), new Date(base + 36 * 60_000)), 'hq-lanes');

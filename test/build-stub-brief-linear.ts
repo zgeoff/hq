@@ -5,9 +5,6 @@ export interface StubBriefIssue {
   labels: { name: string; parent?: string }[];
 }
 
-// A fake Linear for hq brief: the issue named by the `identifier` variable, with its description
-// and labels as Linear gives them, and null for an issue it does not hold. Each id asked goes into
-// `asked`.
 export function buildStubBriefLinear(issues: Readonly<Record<string, StubBriefIssue>>): { call: LinearCall; asked: string[] } {
   const asked: string[] = [];
   const call: LinearCall = (_query, variables) => {

@@ -290,8 +290,6 @@ test('a declared forward needs no meta row, and a meta row wins', () => {
   }
 });
 
-// Recursive, as GEO-1288 moves code into area folders; tests beside their modules are skipped, as
-// they were in test/.
 test('no session-name literal sits in src/ outside roles.ts', () => {
   const hits: string[] = [];
   for (const f of readdirSync(`${import.meta.dir}/../src`, { recursive: true, encoding: 'utf8' }).filter((n) => n.endsWith('.ts') && !n.endsWith('.test.ts') && n !== 'roles.ts')) {

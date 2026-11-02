@@ -1,9 +1,8 @@
 import { GlobalRegistrator } from '@happy-dom/global-registrator';
 import { onTestFinished } from 'bun:test';
 
-// A page test's DOM at `url`, gone when the test ends, with Testing Library to drive it. Bun keeps
-// its own fetch and microtasks: React DOM keeps the queueMicrotask it first loads with, and a closed
-// happy-dom window's never fire, which would stall every page test after the first.
+// Bun keeps its own fetch and microtasks: React DOM keeps the queueMicrotask it first loads with, and a
+// closed happy-dom window's never fire, which would stall every page test after the first.
 export async function setupPageDOM(url: string) {
   const kept = {
     fetch: globalThis.fetch,

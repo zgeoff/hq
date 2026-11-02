@@ -26,7 +26,6 @@ export interface ConditionsResult {
   dropped: string[];
   errors: string[];
 
-  // The items whose deadline passed in this pass, their sessions told.
   overdue: string[];
 }
 

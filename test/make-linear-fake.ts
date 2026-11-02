@@ -1,9 +1,6 @@
 import type { LinearCall } from '../src/linear/types.ts';
 import type { ProjectIssue, ReportIssue } from '../src/shipped/types.ts';
 
-// Linear's GraphQL as the Shipped tab queries it, over these issues: an id query gets each issue it
-// names once, in Linear's node shape, and a project query that project's issues in one page. Each
-// call's variables go to `asked`.
 export function makeLinearFake(issues: readonly ReportIssue[], projectIssues: readonly ProjectIssue[], asked: unknown[] = []): LinearCall {
   return (_query, variables) => {
     asked.push(variables);

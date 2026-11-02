@@ -18,7 +18,7 @@ const NOW = Date.parse('2026-10-16T10:00:00Z');
 const HOUR = 3_600_000;
 const entry = (pid: unknown, createdAt = NOW - HOUR, start = '9001') => ({ pid, createdAt, titleSha: 'invented', procStart: start, usedAt: createdAt + 1 });
 const alive = (_pid: number): boolean => true;
-const started = (_pid: number): string | null => '9001'; // the live process's start time, as /proc gives it
+const started = (_pid: number): string | null => '9001';
 const live = { pid: 4242 };
 const BOOT = NOW - 10 * HOUR;
 const many = (n: number) => Object.fromEntries(Array.from({ length: n }, (_, i) => [`cse_${i}`, entry(100 + i)]));
@@ -54,7 +54,7 @@ test.each([
 test('both answers need the live start time: unreadable means unknown', () => {
   expect(rcFromConfig(config({ cse_a: entry(4242) }), live, alive, () => null, NOW, BOOT).state).toBe('unknown');
   expect(rcFromConfig(config({ cse_a: entry(1) }), live, alive, () => null, NOW, BOOT).state).toBe('unknown');
-  expect(rcFromConfig(config({ cse_a: entry(4242) }), live, alive, started, NOW, null).state).toBe('unknown'); // boot time unreadable
+  expect(rcFromConfig(config({ cse_a: entry(4242) }), live, alive, started, NOW, null).state).toBe('unknown');
 });
 
 test('bootTime reads btime from a stat file', () => {
@@ -81,7 +81,7 @@ test('the session pid comes from the process whose --add-dir is the session dire
   expect(pidFromCmdlines('00000000-0000-0000-0000-000000000000', procs)).toMatchObject({ why: expect.stringContaining('no process') });
   expect(pidFromCmdlines(SID, [...procs, claude(SID, 13)])).toMatchObject({ why: expect.stringContaining('2 processes') });
   expect(pidFromCmdlines(SID, [{ pid: 14, args: ['claude', `--add-dir=/state/atc/sessions/${SID}`] }])).toEqual({ pid: 14 });
-  expect(pidFromCmdlines(SID, [{ pid: 15, args: ['claude', '--add-dir', `/state/atc/sessions/${SID}x/scratch`] }])).toMatchObject({ why: expect.any(String) }); // a longer id is another session
+  expect(pidFromCmdlines(SID, [{ pid: 15, args: ['claude', '--add-dir', `/state/atc/sessions/${SID}x/scratch`] }])).toMatchObject({ why: expect.any(String) });
 });
 
 let dir: string;
@@ -112,7 +112,7 @@ test('rcState reads the config named by HQ_CLAUDE_JSON and leaves the file as it
   const src = { findPid: () => live, alive, start: started, now: () => NOW, boot: () => BOOT };
   expect(rcState(SID, src).state).toBe('on');
   writeFileSync(file, config({ cse_a: entry(7) }));
-  expect(rcState(SID, src).state).toBe('off'); // another process's record, written today
+  expect(rcState(SID, src).state).toBe('off');
   rmSync(file);
   expect(rcState(SID, src).state).toBe('unknown');
   writeFileSync(file, text);
@@ -130,7 +130,6 @@ test('no code in src writes, renames, locks or opens for writing the Claude Code
   const checked: string[] = [];
   for (const f of files) {
     const text = readFileSync(join(import.meta.dir, '..', 'src', f), 'utf8');
-    // A file that mentions the config path and also writes anywhere is checked line by line.
     if (!mentions.test(text)) continue;
     checked.push(f);
     text.split('\n').forEach((line, i) => {

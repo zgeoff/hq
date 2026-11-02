@@ -8,7 +8,6 @@ import { repairedText } from '../src/repair/repaired-text.ts';
 import { transcriptPath } from '../src/repair/transcript-path.ts';
 import { fakeAtc, type FakeAtc } from './helpers.ts';
 
-// Invented records in the shape Claude writes: an advisor call split by a message that arrived mid-turn.
 const U = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const SID = '11111111-2222-4333-8444-555555555555';
 const base = { isSidechain: false, sessionId: SID, cwd: '/work/widgets', timestamp: '2026-10-17T00:00:00.000Z' };
@@ -55,13 +54,12 @@ test('re-links the advisor result to its use and moves the interloper after the 
   expect(parentOf(fixed, A3)).toBe(A2);
   expect(parentOf(fixed, I1)).toBe(T1);
   expect(parentOf(fixed, AT1)).toBe(I1);
-  // Only the three changed lines differ; the rest stay byte for byte.
   const a = text.split('\n');
   const b = fixed.split('\n');
   expect(b.length).toBe(a.length);
   expect(a.filter((l, i) => l !== b[i]).length).toBe(3);
   expect(checkRepaired(fixed)).toMatchObject({ ok: true, leaf: A6, promptLeaf: A6 });
-  expect(planRepair(fixed).changes).toEqual([]); // a second run finds nothing
+  expect(planRepair(fixed).changes).toEqual([]);
 });
 
 test('two interlopers move together, in their order', () => {
@@ -82,11 +80,10 @@ test('a turn with no tool use: the interloper goes after the turn\'s last record
 
 test('a healthy transcript, and a split off the live branch, are left alone', () => {
   const healthy = broken();
-  (healthy[4] as { parentUuid: string }).parentUuid = A2; // result on its use
-  (healthy[3] as { parentUuid: string }).parentUuid = T1; // note after the turn
+  (healthy[4] as { parentUuid: string }).parentUuid = A2;
+  (healthy[3] as { parentUuid: string }).parentUuid = T1;
   (healthy[8] as { parentUuid: string }).parentUuid = I1;
   expect(planRepair(lines(healthy)).changes).toEqual([]);
-  // A later branch from R leaves the split behind.
   const forked = [...broken().slice(0, -1), user(U(20), R, 'Start again.'), asst(U(21), U(20), 'msg_9', [{ type: 'text', text: 'Fresh start.' }])];
   const plan = planRepair(lines(forked));
   expect(plan.changes).toEqual([]);
@@ -95,7 +92,6 @@ test('a healthy transcript, and a split off the live branch, are left alone', ()
 
 test('refuses a shape it does not know, and a line that is not JSON', () => {
   const recs = broken();
-  // The record between use and result is the turn's own tool_result: not an interloper.
   recs[3] = user(I1, A2, [{ type: 'tool_result', tool_use_id: 'toolu_0', content: 'x' }]);
   expect(() => planRepair(lines(recs))).toThrow('belongs to the turn');
   expect(() => planRepair(`${lines(broken())}{not json\n`)).toThrow('is not JSON');
@@ -196,7 +192,6 @@ test('review follow-ups: a dangling parent, a long run of interlopers, and a tur
   (dangling[1] as { parentUuid: string }).parentUuid = U(77);
   expect(() => planRepair(lines(dangling))).toThrow(`names a parent ${U(77)} that is not in the transcript`);
 
-  // 25 notes between the use and its result: all move, in order.
   const recs = broken();
   const notes = Array.from({ length: 25 }, (_, k) => user(U(100 + k), k ? U(99 + k) : A2, [{ type: 'text', text: `Note ${k}.` }], { isMeta: true }));
   recs.splice(3, 1, ...notes);
@@ -207,7 +202,6 @@ test('review follow-ups: a dangling parent, a long run of interlopers, and a tur
   expect([parentOf(fixed, A3), parentOf(fixed, U(100)), parentOf(fixed, AT1)]).toEqual([A2, T1, U(124)]);
   checkRepaired(fixed);
 
-  // Nothing after the turn: the moved note would leave the live branch, so hq refuses.
   const tail = broken().slice(0, 8);
   expect(() => planRepair(lines(tail))).toThrow('ends the transcript');
 });

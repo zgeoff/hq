@@ -98,10 +98,10 @@ test('an item added after the list was read stays new after the push', () => {
   addUnblock(db, item({ id: 'a' }));
   const seen = newSincePush(db);
   const upto = uptoFor(seen, db);
-  addUnblock(db, item({ id: 'b' })); // another session, between read and push
+  addUnblock(db, item({ id: 'b' }));
   expect(markPushed(db, upto, 'z-stu').covered).toBe(1);
   expect(newSincePush(db).map((u) => u.id)).toEqual(['b']);
-  expect(markPushed(db, upto, 'z-stu').covered).toBe(0); // a repeat push is a no-op
+  expect(markPushed(db, upto, 'z-stu').covered).toBe(0);
 });
 
 test('a re-add without --rank keeps the rank z-stu set', () => {

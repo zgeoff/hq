@@ -152,7 +152,6 @@ test('slow session.get replies run together and are cut off at the budget as unk
   const started = Date.now();
   const drift = await promptDrift(slow, many, sessions, {}, 300);
 
-  // Seven 60 ms calls in parallel, one cut off at 0.3 s, each kept in declared order.
   expect(Date.now() - started).toBeLessThan(600);
   expect(Object.values(drift).filter((entry) => entry.state === 'current').length).toBe(6);
   expect(drift['z-potg']).toEqual({ state: 'unknown', since: null, hint: null, reason: 'atc session.get took over 300 ms' });
@@ -168,7 +167,6 @@ test('a hint on a long line starts a little before the first character that diff
 });
 
 test("plugin folders: a live session whose folders differ from its entry's is reported, a match or a missing session is not", () => {
-  // z-kettle was spawned before atc took plugin folders; z-cosy has no live session.
   const entries: FleetEntry[] = [
       { name: 'z-kettle', cwd: `${dir}/work`, model: 'opus', prompt: `main:${KETTLE}`, wake: true, pluginDirs: ['~/plugins/kettle-band'] },
       { name: 'z-teapot', cwd: `${dir}/work`, model: 'opus', prompt: `${dir}/teapot-prompt.md`, wake: false },

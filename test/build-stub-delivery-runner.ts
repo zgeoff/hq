@@ -12,9 +12,6 @@ export interface StubDeliveryRunner {
   merged: string[][];
 }
 
-// A runner for the delivery-report scripts. merged-prs.sh `daily <date>` prints that date's text from
-// `days` and `weekly` prints `weekly`; a missing one fails like gh offline. Any other command goes to
-// `otherwise`, else prints `rendered`. `merged` collects each merged-prs.sh call's arguments.
 export function buildStubDeliveryRunner(answers: StubDeliveryAnswers): StubDeliveryRunner {
   const merged: string[][] = [],
     run: Runner = (cmd, opts) => {

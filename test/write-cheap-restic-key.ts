@@ -16,9 +16,8 @@ const CHEAP_PARAMETERS: ScryptParameters = { cost: 128, blockSize: 1, paralleliz
 // a key file names the scrypt parameters N, r and p
 const KeyFileSchema = z.looseObject({ 'N': z.number(), 'r': z.number(), 'p': z.number(), salt: z.string(), data: z.string() });
 
-// Rewrites the one key of the restic repo at `repo` to hold the same master key under the cheap
-// parameters, in restic's key format: scrypt derives 64 bytes, an AES-256 key and a Poly1305-AES key,
-// and the data is the IV, the AES-CTR ciphertext of the master key, and the Poly1305-AES tag.
+// restic's key format: scrypt derives 64 bytes, an AES-256 key and a Poly1305-AES key, and the data
+// is the IV, the AES-CTR ciphertext of the master key, and the Poly1305-AES tag.
 export function writeCheapResticKey(repo: string, password: string): void {
   const keys = join(repo, 'keys');
   const [name] = readdirSync(keys);

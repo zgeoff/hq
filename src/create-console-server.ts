@@ -23,8 +23,6 @@ export interface ConsoleServerInput {
   auth: ConsoleAuth;
 }
 
-// Serves the page and its API on 127.0.0.1 only. Every request, page files included, passes the
-// Host and Origin check first; `/rpc` goes to the oRPC router, any other path to the page's files.
 // No response may load in another site's frame, so a decoy page cannot steer the owner's clicks.
 const SIGN_IN = 'hq console: sign in first: open the login link on the terminal where hq console runs (hq console login prints a new one there)\n';
 
@@ -72,7 +70,6 @@ async function readExchange(auth: ConsoleAuth, req: Request): Promise<Response> 
   return Response.json(reply, { headers: { 'cache-control': 'no-store' } });
 }
 
-// The Shipped tab's path loads the same page, whose router shows the tab.
 function buildAssetResponse(assets: ConsoleAssets, req: Request): Response {
   const asked = new URL(req.url).pathname,
     page = asked === '/shipped' ? '/' : asked,
