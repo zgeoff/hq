@@ -1,4 +1,5 @@
 import { DELIVERY_GRACE_MINUTES } from './delivery-grace-minutes.ts';
+import { pickPromotableFreshness } from './pick-promotable-freshness.ts';
 import type { SlotCause } from './types.ts';
 
 export interface SlotCauseInput {
@@ -41,11 +42,9 @@ export function buildSlotCause(input: SlotCauseInput): SlotCause {
   if (promotable === null || promotable.count === null) {
     return { ...base, cause: 'unknown', reason: 'backlog_unknown', since: sinceOf('unknown'), backlogError: promotable?.error ?? null };
   }
-  if (promotable.focus !== input.focus) {
-    return { ...base, cause: 'unknown', reason: 'backlog_focus_changed', since: sinceOf('unknown') };
-  }
-  if (input.at.getTime() - Date.parse(promotable.at) > input.freshMinutes * 60_000) {
-    return { ...base, cause: 'unknown', reason: 'backlog_stale', since: sinceOf('unknown') };
+  const freshness = pickPromotableFreshness({ promotable, focus: input.focus, freshMinutes: input.freshMinutes, at: input.at });
+  if (freshness !== 'fresh') {
+    return { ...base, cause: 'unknown', reason: freshness === 'focus_changed' ? 'backlog_focus_changed' : 'backlog_stale', since: sinceOf('unknown') };
   }
   const cause = promotable.count > 0 ? 'triage' : 'supply';
   return { ...base, cause, since: sinceOf(cause) };

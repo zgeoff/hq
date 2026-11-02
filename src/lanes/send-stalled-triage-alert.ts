@@ -1,11 +1,11 @@
 import type { Database } from 'bun:sqlite';
 import { z } from 'zod';
+import { getMeta } from '../db/get-meta.ts';
 import { logEvent } from '../log-event.ts';
 import { sydney } from '../morning/sydney.ts';
 import { enqueue } from '../outbox/enqueue.ts';
 import { owner } from '../owner.ts';
-import { LOW_WATER_SINCE_KEY } from './send-low-water-alert.ts';
-import { getMeta } from '../db/get-meta.ts';
+import { LOW_WATER_SINCE_KEY } from './low-water-since-key.ts';
 import type { SlotCause } from './types.ts';
 
 const STALLED_MINUTES = 30;

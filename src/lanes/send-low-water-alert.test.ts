@@ -43,7 +43,7 @@ test('it sends again when eligible work returns to the mark and then drops under
 
   // An unsent message on the topic gives way to the newer one, so the two sends show in the events.
   expect(ctx.db.query("SELECT subject_id FROM events WHERE subject_id LIKE 'low-water:%' ORDER BY seq").all()).toStrictEqual([{ subject_id: 'low-water:2026-10-14T01:00:00Z' }, { subject_id: 'low-water:2026-10-14T01:10:00Z' }]);
-  expect(ctx.look.lowWater()).toHaveLength(1);
+  expect(ctx.db.query("SELECT outbox.target, outbox.text, events.subject_id FROM outbox JOIN events ON events.seq = outbox.event_seq WHERE outbox.topic = 'lanes-low-water'").all()).toStrictEqual([{ target: 'z-triage', text: ctx.lowWaterText, subject_id: 'low-water:2026-10-14T01:10:00Z' }]);
 });
 
 test('it sends nothing when the promotable count is 0', async () => {

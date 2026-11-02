@@ -9,12 +9,11 @@ import { logEvent } from '../log-event.ts';
 import { enqueue } from '../outbox/enqueue.ts';
 import { findRoleName } from '../roles/find-role-name.ts';
 import { LANES } from './lanes.ts';
+import { LOW_WATER_SINCE_KEY } from './low-water-since-key.ts';
 import { pickLowWater } from './pick-low-water.ts';
 import { PROMOTABLE_FOCUS } from './promotable-focus.ts';
 import { PROMOTABLE_FOCUS_KEY } from './promotable-focus-key.ts';
 import { PROMOTABLE_TOP, PROMOTABLE_TOP_KEY } from './promotable-top.ts';
-
-export const LOW_WATER_SINCE_KEY = 'lanes_low_water_since';
 
 interface LowWaterAlert {
   eligible: number;
