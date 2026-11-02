@@ -1,7 +1,10 @@
 import type { Database } from 'bun:sqlite';
+import { match } from 'ts-pattern';
 import { z } from 'zod';
 import { findUnreadLine } from './find-unread-line.ts';
 import { formatItemList } from './format-item-list.ts';
+import { pickStaleKind } from './pick-stale-kind.ts';
+import type { StaleKind } from './pick-stale-kind.ts';
 import type { ThroughputAlert, ThroughputLine } from './types.ts';
 
 const NAME = 'Stale';
@@ -32,6 +35,7 @@ interface StaleItem {
 }
 
 const startedRowSchema = z.object({ issue: z.string(), started_at: z.string() });
+const prRowSchema = z.object({ issue: z.string(), ref: z.string(), status: z.string(), merged_at: z.string().nullable() });
 
 function readUnrunItems(db: Database): StaleItem[] {
   const rows = db
@@ -42,17 +46,42 @@ function readUnrunItems(db: Database): StaleItem[] {
        ORDER BY s.issue`,
     )
     .all();
+  const prRows = z.array(prRowSchema).parse(db.query('SELECT issue, ref, status, merged_at FROM linear_started_prs ORDER BY issue, ref').all());
   return z
     .array(startedRowSchema)
     .parse(rows)
-    .map((row) => ({
-      since: row.started_at,
-      summary: `${row.issue} In Progress, no run`,
-      alert: {
-        key: `stale:in-progress:${row.issue}`,
-        text: `Stale: ${row.issue} has been In Progress in Linear since ${row.started_at} with no hq run and no session. Start its run, or move it out of In Progress.`,
+    .flatMap((row) => {
+      const prs = prRows.filter((pr) => pr.issue === row.issue).map((pr) => ({ ref: pr.ref, status: pr.status, mergedAt: pr.merged_at }));
+      return buildUnrunItem(row.issue, row.started_at, pickStaleKind(row.started_at, prs));
+    });
+}
+
+function buildUnrunItem(issue: string, startedAt: string, stale: StaleKind): StaleItem[] {
+  return match(stale)
+    .with({ kind: 'live' }, () => [])
+    .with({ kind: 'done-open' }, ({ since, ref }) => [
+      {
+        since,
+        summary: `${issue} In Progress, every PR merged`,
+        alert: {
+          key: `stale:done-open:${issue}`,
+          text: `Stale: ${issue} is In Progress, but every PR merged (last ${ref} at ${since}). Close it, or name the live check or owner step that holds it.`,
+          role: 'triage' as const,
+        },
       },
-    }));
+    ])
+    .with({ kind: 'stalled' }, ({ since }) => [
+      {
+        since,
+        summary: `${issue} In Progress, no run, no open PR`,
+        alert: {
+          key: `stale:stalled:${issue}`,
+          text: `Stale: ${issue} has been In Progress since ${startedAt} with no hq run, no session and no open PR. Relaunch its run, or move it out of In Progress.`,
+          role: 'orchestrator' as const,
+        },
+      },
+    ])
+    .exhaustive();
 }
 
 const closedRowSchema = z.object({ issue: z.string(), state: z.enum(['completed', 'canceled']), closed_at: z.string() });
