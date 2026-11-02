@@ -41,10 +41,10 @@ interface SessionRow {
 // The newest session is added over one sweep (5 min) ago before a run counts as gone: atc can take
 // a moment to list a session after its spawn.
 function findGoneRuns(db: Database, reading: AwakeReading, at: Date): { issue: string; lane: string }[] {
-  const GONE_GRACE_MS = 5 * 60_000,
-    present = new Set(reading.present),
-    sessionsOf = db.query('SELECT session_id, added_at FROM run_sessions WHERE issue = ? AND design_pass = 0'),
-    working = db.query(`SELECT issue, COALESCE(lane, '') AS lane FROM runs WHERE place != 'none' AND state = 'working' ORDER BY issue`).all() as { issue: string; lane: string }[];
+  const GONE_GRACE_MS = 5 * 60_000;
+  const present = new Set(reading.present);
+  const sessionsOf = db.query('SELECT session_id, added_at FROM run_sessions WHERE issue = ? AND design_pass = 0');
+  const working = db.query(`SELECT issue, COALESCE(lane, '') AS lane FROM runs WHERE place != 'none' AND state = 'working' ORDER BY issue`).all() as { issue: string; lane: string }[];
   if (reading.present === undefined) {
     return [];
   }

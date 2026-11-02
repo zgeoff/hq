@@ -28,17 +28,17 @@ export function addUnblock(
         const kind = input.kind ?? prev.kind;
         const deadline = input.deadline === undefined ? prev.deadline : input.deadline;
         const toldAt = deadline === prev.deadline ? prev.overdue_told_at : null;
-        const clear = input.fromItem === true ? '' : ', title=NULL, item=NULL',
-          same =
-            prev.task === input.task &&
-            prev.minutes === input.minutes &&
-            JSON.stringify(prev.unblocks) === fields[2] &&
-            prev.rank === rank &&
-            doneWhen.length === prev.done_when.length &&
-            JSON.stringify(prev.notify) === fields[4] &&
-            prev.kind === kind &&
-            prev.deadline === deadline &&
-            (input.fromItem === true || (prev.title === null && prev.item === null));
+        const clear = input.fromItem === true ? '' : ', title=NULL, item=NULL';
+        const same =
+          prev.task === input.task &&
+          prev.minutes === input.minutes &&
+          JSON.stringify(prev.unblocks) === fields[2] &&
+          prev.rank === rank &&
+          doneWhen.length === prev.done_when.length &&
+          JSON.stringify(prev.notify) === fields[4] &&
+          prev.kind === kind &&
+          prev.deadline === deadline &&
+          (input.fromItem === true || (prev.title === null && prev.item === null));
         if (same) return { item: prev, result: 'noop' as const, warnings: [] };
         checkUnblock(prev.id, 'updated', prev.state);
         db.query(`UPDATE unblocks SET task=?, minutes=?, unblocks=?, rank=?, notify=?, done_when=?, kind=?, deadline=?, overdue_told_at=?${clear}, updated_at=? WHERE id=?`).run(...fields, toColumn(doneWhen), kind, deadline, toldAt, t, prev.id);

@@ -5,9 +5,9 @@ import { findOwnerLgtm } from './find-owner-lgtm.ts';
 import { recordPRAnswer } from './record-pr-answer.ts';
 import type { PRAnswer } from './types.ts';
 
-const HEAD = 'b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2',
-  OLDER = 'e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1',
-  REVIEWED = 'a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1';
+const HEAD = 'b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2';
+const OLDER = 'e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1';
+const REVIEWED = 'a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1';
 
 function setupTest() {
   const fresh = freshDb();

@@ -16,17 +16,17 @@ interface TreeCheckout {
 }
 
 export function createTreeCheckout(root: string, tree: TreeName, files: Record<string, string>): TreeCheckout {
-  const dir = TREES[tree].dir(),
-    origin = join(root, `${tree}-origin`),
-    remote = `git@github.com:${TREES[tree].repo}.git`,
-    writeCommit = (next: Record<string, string>, commit: CommitShape = {}) => {
-      for (const [path, text] of Object.entries(next)) {
-        mkdirSync(dirname(join(origin, path)), { recursive: true });
-        writeFileSync(join(origin, path), text);
-      }
-      runGit(origin, 'add', '-A');
-      runGit({ cwd: origin, at: commit.at }, 'commit', '-q', '-m', commit.subject ?? 'invented change');
-    };
+  const dir = TREES[tree].dir();
+  const origin = join(root, `${tree}-origin`);
+  const remote = `git@github.com:${TREES[tree].repo}.git`;
+  const writeCommit = (next: Record<string, string>, commit: CommitShape = {}) => {
+    for (const [path, text] of Object.entries(next)) {
+      mkdirSync(dirname(join(origin, path)), { recursive: true });
+      writeFileSync(join(origin, path), text);
+    }
+    runGit(origin, 'add', '-A');
+    runGit({ cwd: origin, at: commit.at }, 'commit', '-q', '-m', commit.subject ?? 'invented change');
+  };
   mkdirSync(origin, { recursive: true });
   runGit(origin, 'init', '-q', '-b', 'main');
   writeCommit(files);

@@ -7,8 +7,8 @@ import { realRunner } from '../runner/real-runner.ts';
 import { readCapacity } from './read-capacity.ts';
 
 function setupTest(): string {
-  const dir = mkdtempSync(join(tmpdir(), 'hq-capacity-')),
-    script = join(dir, 'scripts', 'capacity.sh');
+  const dir = mkdtempSync(join(tmpdir(), 'hq-capacity-'));
+  const script = join(dir, 'scripts', 'capacity.sh');
   mkdirSync(join(dir, 'scripts'));
   writeFileSync(script, `echo '${JSON.stringify({ imp: { freeMib: 8192, room: true } })}'\n`);
   onTestFinished(() => rmSync(dir, { recursive: true, force: true }));

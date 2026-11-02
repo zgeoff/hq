@@ -10,8 +10,8 @@ import { updateGoneRunSessions } from './update-gone-run-sessions.ts';
 const SESSION = '00000031-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 
 function setupTest() {
-  const fresh = freshDb(),
-    readState = () => (fresh.db.query("SELECT state FROM runs WHERE issue = 'GEO-9721'").get() as { state: string }).state;
+  const fresh = freshDb();
+  const readState = () => (fresh.db.query("SELECT state FROM runs WHERE issue = 'GEO-9721'").get() as { state: string }).state;
   onTestFinished(fresh.cleanup);
   addRun(fresh.db, { issue: 'GEO-9721', title: 'Invented kettle work', place: 'imp', session: SESSION, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
   addPr(fresh.db, 'GEO-9721', 'kettle#51', 'z-delivery');
@@ -27,35 +27,35 @@ function setupTest() {
 }
 
 test('the PR merges, then its session is removed: the run moves to merged at the removal', () => {
-  const app = setupTest(),
-    atMerge = app.step(() => closePr(app.db, 'kettle#51', { to: 'merged', actor: 'z-review' })),
-    atRemove = app.step(() => setSession(app.db, 'GEO-9721', SESSION, 'z-delivery', 'remove'));
+  const app = setupTest();
+  const atMerge = app.step(() => closePr(app.db, 'kettle#51', { to: 'merged', actor: 'z-review' }));
+  const atRemove = app.step(() => setSession(app.db, 'GEO-9721', SESSION, 'z-delivery', 'remove'));
   expect([atMerge, atRemove]).toEqual(['working', 'merged']);
 });
 
 test('the session is removed, then the PR merges: the run moves to merged at the merge', () => {
-  const app = setupTest(),
-    atRemove = app.step(() => setSession(app.db, 'GEO-9721', SESSION, 'z-delivery', 'remove')),
-    atZMerge = app.step(() => closePr(app.db, 'kettle#51', { to: 'merged', actor: 'z-review' }));
+  const app = setupTest();
+  const atRemove = app.step(() => setSession(app.db, 'GEO-9721', SESSION, 'z-delivery', 'remove'));
+  const atZMerge = app.step(() => closePr(app.db, 'kettle#51', { to: 'merged', actor: 'z-review' }));
   expect([atRemove, atZMerge]).toEqual(['working', 'merged']);
 });
 
 test('the PR merges, then the sweep ends the gone session: the run moves to merged', () => {
-  const LATER = new Date(Date.now() + 10 * 60_000),
-    app = setupTest(),
-    atMerge = app.step(() => closePr(app.db, 'kettle#51', { to: 'merged', actor: 'z-review' })),
-    atSweep = app.step(() => updateGoneRunSessions(app.db, [], 'z-delivery', LATER));
+  const LATER = new Date(Date.now() + 10 * 60_000);
+  const app = setupTest();
+  const atMerge = app.step(() => closePr(app.db, 'kettle#51', { to: 'merged', actor: 'z-review' }));
+  const atSweep = app.step(() => updateGoneRunSessions(app.db, [], 'z-delivery', LATER));
   expect([atMerge, atSweep]).toEqual(['working', 'merged']);
 });
 
 test('a run stays as it is with a PR still open, with only a closed PR, or in another state', () => {
-  const app = setupTest(),
-    atOpen = app.step(() => {
-      addPr(app.db, 'GEO-9721', 'kettle#52', 'z-delivery');
-      closePr(app.db, 'kettle#51', { to: 'merged', actor: 'z-review' });
-      setSession(app.db, 'GEO-9721', SESSION, 'z-delivery', 'remove');
-    }),
-    atPRClosed = app.step(() => closePr(app.db, 'kettle#52', { to: 'closed', actor: 'z-delivery' }));
+  const app = setupTest();
+  const atOpen = app.step(() => {
+    addPr(app.db, 'GEO-9721', 'kettle#52', 'z-delivery');
+    closePr(app.db, 'kettle#51', { to: 'merged', actor: 'z-review' });
+    setSession(app.db, 'GEO-9721', SESSION, 'z-delivery', 'remove');
+  });
+  const atPRClosed = app.step(() => closePr(app.db, 'kettle#52', { to: 'closed', actor: 'z-delivery' }));
   addRun(app.db, { issue: 'GEO-9722', title: 'Invented teapot work', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
   addPr(app.db, 'GEO-9722', 'teapot#8', 'z-delivery');
   closePr(app.db, 'teapot#8', { to: 'closed', actor: 'z-delivery' });

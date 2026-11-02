@@ -5,8 +5,8 @@ import { formatGiB as gib } from './format-gib.ts';
 import { formatNumber as n0 } from './format-number.ts';
 
 export function loadCapacityLine(db: Database, at: Date): string {
-  const RECENT_MIN = 15,
-    r = db.query('SELECT * FROM capacity_samples ORDER BY at DESC LIMIT 1').get() as CapacitySampleRow | null;
+  const RECENT_MIN = 15;
+  const r = db.query('SELECT * FROM capacity_samples ORDER BY at DESC LIMIT 1').get() as CapacitySampleRow | null;
   if (!r || !(at.getTime() - Date.parse(r.at) <= RECENT_MIN * 60_000)) return 'Capacity: no recent reading';
   const s = capacitySettings(db);
   const none = 'no reading';

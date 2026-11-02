@@ -7,9 +7,9 @@ import { migrate } from './migrate.ts';
 import { MIGRATIONS } from './migrations.ts';
 
 async function setupTest() {
-  const dir = mkdtempSync(join(tmpdir(), 'hq-migrate-')),
-    paths = [0, 1, 2, 3].map((round) => join(dir, `hq-${round}.db`)),
-    script = join(dir, 'child.ts');
+  const dir = mkdtempSync(join(tmpdir(), 'hq-migrate-'));
+  const paths = [0, 1, 2, 3].map((round) => join(dir, `hq-${round}.db`));
+  const script = join(dir, 'child.ts');
   onTestFinished(() => rmSync(dir, { recursive: true, force: true }));
   await Bun.write(script, `import { openDb } from ${JSON.stringify(join(import.meta.dir, 'open-db.ts'))};\nconsole.log(openDb(process.argv[2]).query('PRAGMA user_version').get().user_version);\n`);
   return { paths, script };
@@ -19,26 +19,26 @@ test.each([
   ['5 versions behind', true, 4],
   ['not yet created', false, 0],
 ])('4 migrators started at once against one database %s all finish at the newest schema, 4 times over', async (_case, isBehind, seeded) => {
-  const app = await setupTest(),
-    behind = app.paths.filter(() => isBehind).map((path) => {
-      const db = new Database(path, { create: true, strict: true });
-      db.exec('PRAGMA journal_mode = WAL;');
-      migrate(db, path, false, MIGRATIONS.slice(0, -5));
-      db.close();
-      return path;
-    }),
-    children = app.paths.flatMap((path) => [0, 1, 2, 3].map(() => Bun.spawn(['bun', app.script, path], { stdout: 'pipe', stderr: 'pipe' }))),
-    codes = await Promise.all(children.map(async (child) => await child.exited)),
-    stderrs = await Promise.all(children.map(async (child) => await new Response(child.stderr).text().then((text) => text.trim()))),
-    versions = await Promise.all(children.map(async (child) => await new Response(child.stdout).text().then((text) => text.trim())));
+  const app = await setupTest();
+  const behind = app.paths.filter(() => isBehind).map((path) => {
+    const db = new Database(path, { create: true, strict: true });
+    db.exec('PRAGMA journal_mode = WAL;');
+    migrate(db, path, false, MIGRATIONS.slice(0, -5));
+    db.close();
+    return path;
+  });
+  const children = app.paths.flatMap((path) => [0, 1, 2, 3].map(() => Bun.spawn(['bun', app.script, path], { stdout: 'pipe', stderr: 'pipe' })));
+  const codes = await Promise.all(children.map(async (child) => await child.exited));
+  const stderrs = await Promise.all(children.map(async (child) => await new Response(child.stderr).text().then((text) => text.trim())));
+  const versions = await Promise.all(children.map(async (child) => await new Response(child.stdout).text().then((text) => text.trim())));
 
   expect({ seeded: behind.length, codes, stderrs, versions }).toStrictEqual({ seeded, codes: children.map(() => 0), stderrs: children.map(() => ''), versions: children.map(() => String(MIGRATIONS.length)) });
 });
 
 test('v35 adds the pr_status table and keeps the rows already in the database', () => {
-  const base = mkdtempSync(join(tmpdir(), 'hq-migrate-v35-')),
-    db = new Database(join(base, 'hq.db'), { create: true, strict: true }),
-    path = join(base, 'hq.db');
+  const base = mkdtempSync(join(tmpdir(), 'hq-migrate-v35-'));
+  const db = new Database(join(base, 'hq.db'), { create: true, strict: true });
+  const path = join(base, 'hq.db');
   onTestFinished(() => rmSync(base, { recursive: true, force: true }));
   onTestFinished(() => db.close());
   db.exec('PRAGMA journal_mode = WAL;');
@@ -53,9 +53,9 @@ test('v35 adds the pr_status table and keeps the rows already in the database', 
 });
 
 test('v36 adds the shipped_cache table and keeps the rows already in the database', () => {
-  const base = mkdtempSync(join(tmpdir(), 'hq-migrate-v36-')),
-    db = new Database(join(base, 'hq.db'), { create: true, strict: true }),
-    path = join(base, 'hq.db');
+  const base = mkdtempSync(join(tmpdir(), 'hq-migrate-v36-'));
+  const db = new Database(join(base, 'hq.db'), { create: true, strict: true });
+  const path = join(base, 'hq.db');
   onTestFinished(() => rmSync(base, { recursive: true, force: true }));
   onTestFinished(() => db.close());
   db.exec('PRAGMA journal_mode = WAL;');

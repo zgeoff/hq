@@ -10,8 +10,8 @@ import { openDb } from './open-db.ts';
 import { MIGRATIONS } from './migrations.ts';
 
 function setupTest(): Database {
-  const scratch = mkdtempSync(join(tmpdir(), 'hq-live-upgrade-')),
-    store = new Database(join(scratch, 'hq.db'), { create: true, strict: true });
+  const scratch = mkdtempSync(join(tmpdir(), 'hq-live-upgrade-'));
+  const store = new Database(join(scratch, 'hq.db'), { create: true, strict: true });
   onTestFinished(() => {
     store.close();
     rmSync(scratch, { recursive: true, force: true });
@@ -36,8 +36,8 @@ test('an installed hq, or a source run on a copy, passes the same database', () 
 });
 
 test('openDb refuses to upgrade an older database in a source run with HQ_LIVE=1 and no HQ_DB', () => {
-  const db = setupTest(),
-    path = db.filename;
+  const db = setupTest();
+  const path = db.filename;
   onTestFinished(overrideEnv('HQ_LIVE', '1'));
   onTestFinished(overrideEnv('HQ_DB', undefined));
   db.close();

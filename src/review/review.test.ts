@@ -337,23 +337,23 @@ test('every hostile input in the tables gets high effort, or runs the allow-or-d
 });
 
 function buildLockedFake(fail: string | null = null): ReturnType<typeof fake> {
-  const inner = fake(fail),
-    runLocked: Runner = async (cmd, opts) => {
-      const result = await inner.run(cmd, opts);
-      if (cmd.slice(0, 3).join(' ') === 'git worktree add') {
-        mkdirSync(String(cmd[5]), { recursive: true });
-        await Bun.write(`${String(cmd[5])}/bun.lock`, '{}');
-      }
-      return result;
-    };
+  const inner = fake(fail);
+  const runLocked: Runner = async (cmd, opts) => {
+    const result = await inner.run(cmd, opts);
+    if (cmd.slice(0, 3).join(' ') === 'git worktree add') {
+      mkdirSync(String(cmd[5]), { recursive: true });
+      await Bun.write(`${String(cmd[5])}/bun.lock`, '{}');
+    }
+    return result;
+  };
   return { calls: inner.calls, run: runLocked };
 }
 
 test('a repo with bun.lock gets a frozen install without scripts in the worktree, before Codex runs', async () => {
-  const fakeRun = buildLockedFake(),
-    result = await review(fakeRun.run, 'widgets', 7, { watch: false }),
-    texts = fakeRun.calls.map((c) => c.cmd.join(' ')),
-    where = texts.indexOf('bun install --frozen-lockfile --ignore-scripts');
+  const fakeRun = buildLockedFake();
+  const result = await review(fakeRun.run, 'widgets', 7, { watch: false });
+  const texts = fakeRun.calls.map((c) => c.cmd.join(' '));
+  const where = texts.indexOf('bun install --frozen-lockfile --ignore-scripts');
   expect(where).toBeGreaterThan(texts.findIndex((l) => l.startsWith('git worktree add')));
   expect(where).toBeLessThan(texts.findIndex((l) => l.startsWith('codex review')));
   expect(fakeRun.calls[where]?.opts?.cwd).toBe(`${dir}/zgeoff/widgets/7`);
@@ -361,16 +361,16 @@ test('a repo with bun.lock gets a frozen install without scripts in the worktree
 });
 
 test('a failed install is reported, the review still runs, and the review file says it is static', async () => {
-  const result = await review(buildLockedFake('bun install').run, 'widgets', 7, { watch: false }),
-    text = await Bun.file(result.reviewFile).text();
+  const result = await review(buildLockedFake('bun install').run, 'widgets', 7, { watch: false });
+  const text = await Bun.file(result.reviewFile).text();
   expect(result.install.ok).toBe(false);
   expect(result.install.detail).toContain('bun install failed (1): boom');
   expect(text).toContain('FAILED: bun install failed');
 });
 
 test('a repo without bun.lock gets no install', async () => {
-  const fakeRun = fake(),
-    result = await review(fakeRun.run, 'widgets', 7, { watch: false });
+  const fakeRun = fake();
+  const result = await review(fakeRun.run, 'widgets', 7, { watch: false });
   expect(fakeRun.calls.some((c) => c.cmd[0] === 'bun')).toBe(false);
   expect(result.install).toEqual({ detail: 'no bun.lock', ok: true, ran: false });
 });

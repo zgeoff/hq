@@ -4,8 +4,8 @@ import { HqError } from '../errors.ts';
 import { getLocalSettingsPath } from './get-local-settings-path.ts';
 import { LOCAL_KEYS } from './local-keys.ts';
 
-const FlatStrings = z.record(z.string(), z.string()),
-  cache = new Map<string, { mtimeMs: number; values: Record<string, string> }>();
+const FlatStrings = z.record(z.string(), z.string());
+const cache = new Map<string, { mtimeMs: number; values: Record<string, string> }>();
 
 export function readLocalSettings(env: Record<string, string | undefined> = process.env): Record<string, string> {
   const path = getLocalSettingsPath(env);

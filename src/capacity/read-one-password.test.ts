@@ -9,22 +9,22 @@ import { readingText } from './reading-text.ts';
 import { sampleCapacity } from './sample-capacity.ts';
 import type { CapacityProbe } from './types.ts';
 
-const FOUR_AM_SYDNEY_PLUS_5 = new Date(Date.parse(FOUR_AM_SYDNEY) + 300_000),
-  NOON_SYDNEY_PLUS_5 = new Date(Date.parse(NOON_SYDNEY) + 300_000),
-  SETTINGS = `${process.env['HOME'] ?? ''}/.claude/settings.json`;
+const FOUR_AM_SYDNEY_PLUS_5 = new Date(Date.parse(FOUR_AM_SYDNEY) + 300_000);
+const NOON_SYDNEY_PLUS_5 = new Date(Date.parse(NOON_SYDNEY) + 300_000);
+const SETTINGS = `${process.env['HOME'] ?? ''}/.claude/settings.json`;
 
 function setupTest() {
-  const answers = new Map<string, RunResult>(),
-    files = new Map<string, string>(),
-    fresh = freshDb(),
-    run = mock<Runner>((cmd) => Promise.resolve(answers.get(cmd[0] ?? '') ?? { code: 1, stdout: '', stderr: '' })),
-    saved = process.env['OP_SERVICE_ACCOUNT_TOKEN'],
-    stub: CapacityProbe = {
-      run,
-      readText: () => Promise.reject(new Error('no cloud here')),
-      readFile: (path) => Promise.resolve(files.get(path) ?? ''),
-      readMs: 100,
-    };
+  const answers = new Map<string, RunResult>();
+  const files = new Map<string, string>();
+  const fresh = freshDb();
+  const run = mock<Runner>((cmd) => Promise.resolve(answers.get(cmd[0] ?? '') ?? { code: 1, stdout: '', stderr: '' }));
+  const saved = process.env['OP_SERVICE_ACCOUNT_TOKEN'];
+  const stub: CapacityProbe = {
+    run,
+    readText: () => Promise.reject(new Error('no cloud here')),
+    readFile: (path) => Promise.resolve(files.get(path) ?? ''),
+    readMs: 100,
+  };
   onTestFinished(fresh.cleanup);
   delete process.env['OP_SERVICE_ACCOUNT_TOKEN'];
   onTestFinished(() => {

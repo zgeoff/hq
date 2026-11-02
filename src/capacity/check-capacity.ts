@@ -18,11 +18,11 @@ import type { CapacityInput, CapacityTick } from './types.ts';
 export function checkCapacity(db: Database, input: CapacityInput, actor: string, at: Date = now()): CapacityTick {
   return db
     .transaction((): CapacityTick => {
-      const COUNTS = z.record(z.string(), z.object({ bad: z.number(), good: z.number() })),
-        HELD = z.array(z.object({ key: z.string(), label: z.string(), limit: z.string(), since: z.string(), until: z.string() })),
-        TAIL = 'hq capacity shows every reading. hq changed nothing.',
-        r = input.reading,
-        s = capacitySettings(db);
+      const COUNTS = z.record(z.string(), z.object({ bad: z.number(), good: z.number() }));
+      const HELD = z.array(z.object({ key: z.string(), label: z.string(), limit: z.string(), since: z.string(), until: z.string() }));
+      const TAIL = 'hq capacity shows every reading. hq changed nothing.';
+      const r = input.reading;
+      const s = capacitySettings(db);
       const ruleContext = { plan: input.plan, claudeLaunchPct: input.claudeLaunchPct ?? null };
       const hold = Math.max(1, Math.floor(s.holdSamples));
       const names = accountLabels(db);

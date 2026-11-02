@@ -43,8 +43,8 @@ function formatAnswerLine(view: PRStatusView): string {
     const carried = view.answerNote === null ? '' : ` (${view.answerNote})`;
     return `answer: ${view.answer} ${at} via ${formatAnswerSource(view.answerSource)}${carried}${when}`;
   }
-  const note = view.answerNote === null ? '' : `: ${view.answerNote}`,
-    source = view.answerSource === null ? '' : ` via ${view.answerSource}`;
+  const note = view.answerNote === null ? '' : `: ${view.answerNote}`;
+  const source = view.answerSource === null ? '' : ` via ${view.answerSource}`;
   return `answer: ${view.answer} ${at}${source}${when}${note}`;
 }
 

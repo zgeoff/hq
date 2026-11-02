@@ -20,8 +20,8 @@ export function updateMarkGrantName(db: Database, naming: GrantNaming): Mark {
 }
 
 function requireNameableMark(db: Database, naming: GrantNaming): Mark {
-  const mark = getMark(db, naming.id),
-    owner = db.query('SELECT id FROM marks WHERE grant_name = ?').get(naming.name) as { id: number } | null;
+  const mark = getMark(db, naming.id);
+  const owner = db.query('SELECT id FROM marks WHERE grant_name = ?').get(naming.name) as { id: number } | null;
   if (mark === null) {
     throw new HqError('not_found', `no mark ${naming.id}`);
   }

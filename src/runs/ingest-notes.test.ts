@@ -14,8 +14,8 @@ import { setState } from './set-state.ts';
 const KETTLE = '00000031-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 
 function setupTest() {
-  const fresh = freshDb(),
-    stub = fakeAtc(fresh.dir, [{ id: KETTLE, name: 'kettle', alive: true, state: 'running' }]);
+  const fresh = freshDb();
+  const stub = fakeAtc(fresh.dir, [{ id: KETTLE, name: 'kettle', alive: true, state: 'running' }]);
   onTestFinished(() => {
     stub.stop();
     fresh.cleanup();

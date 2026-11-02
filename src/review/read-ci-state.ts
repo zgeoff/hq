@@ -45,7 +45,7 @@ function buildThreadQuery(slug: string, pr: number): string {
 }
 
 async function readOpenThreads(run: Runner, slug: string, pr: number): Promise<number | null> {
-  const query = buildThreadQuery(slug, pr),
-    threads = await run(['gh', 'api', 'graphql', '-f', `query=${query}`, '--jq', '[.data.repository.pullRequest.reviewThreads.nodes[]|select(.isResolved|not)]|length']);
+  const query = buildThreadQuery(slug, pr);
+  const threads = await run(['gh', 'api', 'graphql', '-f', `query=${query}`, '--jq', '[.data.repository.pullRequest.reviewThreads.nodes[]|select(.isResolved|not)]|length']);
   return threads.code === 0 && /^\d+$/u.test(threads.stdout.trim()) ? Number(threads.stdout.trim()) : null;
 }

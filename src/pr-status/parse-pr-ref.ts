@@ -16,8 +16,8 @@ export function parsePRRef(rawRepo: string | undefined, rawPR: string | undefine
   if (rawRepo === undefined || rawRepo.trim() === '' || rawPR === undefined || !/^\d+$/u.test(rawPR)) {
     throw new HqError('bad_args', 'usage: <repo> <pr>, with the PR a whole number');
   }
-  const parsed = parseLowerRepo(rawRepo, undefined),
-    pr = Number(rawPR);
+  const parsed = parseLowerRepo(rawRepo, undefined);
+  const pr = Number(rawPR);
   assertPR(pr);
   if (parsed.owner !== OWNER) {
     throw new HqError('bad_args', `hq pr keeps records for ${OWNER}'s PRs only, not ${parsed.owner}/${parsed.repo}; give the bare repo name or ${OWNER}/<repo>`);

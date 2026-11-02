@@ -17,9 +17,9 @@ import { readTranscriptList as listTranscripts } from './read-transcript-list.ts
 import type { Found, ScanOptions, ScanResult, Tool } from './types.ts';
 
 export async function scanRefusals(db: Database, o: ScanOptions = {}): Promise<ScanResult> {
-  const SLICE = 8 * 1024 * 1024,
-    who = await whoBySession(o.sessions),
-    [dir, window, scannedAt] = [o.dir ?? getProjectsDir(), (o.windowDays ?? BACKFILL_DAYS) * 86_400_000, iso(now())];
+  const SLICE = 8 * 1024 * 1024;
+  const who = await whoBySession(o.sessions);
+  const [dir, window, scannedAt] = [o.dir ?? getProjectsDir(), (o.windowDays ?? BACKFILL_DAYS) * 86_400_000, iso(now())];
   const maxLine = o.maxLineBytes ?? MAX_LINE;
   let budget = o.budgetBytes ?? BUDGET_BYTES;
   const t0 = performance.now();

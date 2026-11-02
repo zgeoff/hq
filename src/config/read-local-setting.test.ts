@@ -6,8 +6,8 @@ import { readLocalSetting } from './read-local-setting.ts';
 import { readLocalSettings } from './read-local-settings.ts';
 
 function setupTest() {
-  const dir = mkdtempSync(join(tmpdir(), 'hq-local-config-')),
-    file = join(dir, 'local.json');
+  const dir = mkdtempSync(join(tmpdir(), 'hq-local-config-'));
+  const file = join(dir, 'local.json');
   onTestFinished(() => rmSync(dir, { recursive: true, force: true }));
   return { dir, file };
 }

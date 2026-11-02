@@ -11,19 +11,19 @@ import { readPC as readPc } from './read-pc.ts';
 import type { CapacityProbe, Errors, Impd, Reading } from './types.ts';
 
 export async function readCapacity(db: Database, probe: CapacityProbe, at: Date = now()): Promise<Reading> {
-  const errors: Errors = {},
-    [impd, cloud, pc, op] = await Promise.all([
-    readImpd(probe).catch((e) => ({ impd: { budgetMib: null, usedMib: null, committedMib: null, nonnixAwakeMib: null, nixAwakeMib: null } as Impd, error: msg(e) })),
-    readCloud(probe).catch((e) => {
-      errors['cloud'] = msg(e);
-      return null;
-    }),
-    readPc(probe),
-    readOnePassword(probe).catch((error: unknown) => {
-      errors['op'] = msg(error);
-      return null;
-    }),
-  ]);
+  const errors: Errors = {};
+  const [impd, cloud, pc, op] = await Promise.all([
+  readImpd(probe).catch((e) => ({ impd: { budgetMib: null, usedMib: null, committedMib: null, nonnixAwakeMib: null, nixAwakeMib: null } as Impd, error: msg(e) })),
+  readCloud(probe).catch((e) => {
+    errors['cloud'] = msg(e);
+    return null;
+  }),
+  readPc(probe),
+  readOnePassword(probe).catch((error: unknown) => {
+    errors['op'] = msg(error);
+    return null;
+  }),
+]);
   if (impd.error) {
     errors['impd'] = impd.error;
   }

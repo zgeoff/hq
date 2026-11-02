@@ -23,8 +23,8 @@ function runBusy(): Promise<RunResult> {
 }
 
 function setupTest() {
-  const base = freshDb(),
-    store = `${base.dir}/xdg/noslop/store.sqlite`;
+  const base = freshDb();
+  const store = `${base.dir}/xdg/noslop/store.sqlite`;
   onTestFinished(base.cleanup);
   createStoreTables(store);
   return {
@@ -273,8 +273,8 @@ test('it changes nothing, writes no backup, and prints the counts on a dry run',
   ctx.createHistoryRows('hq', 0);
   ctx.createStoreRows('hq', 0);
   {
-    const before = readAllRows(ctx),
-      result = await ctx.archive('hq', 'hq-archive', { dryRun: true, run: runBusy });
+    const before = readAllRows(ctx);
+    const result = await ctx.archive('hq', 'hq-archive', { dryRun: true, run: runBusy });
     expect(readAllRows(ctx)).toStrictEqual(before);
     expect(result).toMatchObject({ dryRun: true, backups: [] });
     expect(result.before[0]?.counts.find((count) => count.table === 'merged_prs')).toStrictEqual({ table: 'merged_prs', column: 'repo', from: 1, to: 0 });
@@ -304,11 +304,11 @@ test('it reports a partial re-key that names the backups when the store refuses 
     store.close();
   }
   {
-    const before = readStoreRows(ctx.store),
-      failure = await ctx.archive('hq', 'hq-archive').then(
-        () => null,
-        (error: unknown) => error,
-      );
+    const before = readStoreRows(ctx.store);
+    const failure = await ctx.archive('hq', 'hq-archive').then(
+      () => null,
+      (error: unknown) => error,
+    );
     {
       const backups = [...readBackupNames(ctx.path).map((name) => `${ctx.dir}/${name}`), ...readBackupNames(ctx.store).map((name) => `${dirname(ctx.store)}/${name}`)];
       expect(backups).toStrictEqual([expect.stringMatching(/\/hq\.db\.bak-archive-/u), expect.stringMatching(/\/store\.sqlite\.bak-archive-/u)]);

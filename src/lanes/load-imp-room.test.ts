@@ -13,8 +13,8 @@ function setupTest(): Database {
 }
 
 test('the tightest of the budget, the memory line and the vCPU line sets the slots, and is named', () => {
-  const db = createCapacitySample(setupTest(), { at: '2026-10-16T00:55:00Z', nonnixAwakeMib: 8192, nonnixAwakeVcpus: 4 }),
-    line = { awakeMib: 8192, maxMib: 16_384, awakeVcpus: 4, maxVcpus: 16 };
+  const db = createCapacitySample(setupTest(), { at: '2026-10-16T00:55:00Z', nonnixAwakeMib: 8192, nonnixAwakeVcpus: 4 });
+  const line = { awakeMib: 8192, maxMib: 16_384, awakeVcpus: 4, maxVcpus: 16 };
   expect([loadImpRoom(db, { budgetSlots: 2, impMib: 2048 }), loadImpRoom(db, { budgetSlots: 6, impMib: 2048 })]).toStrictEqual([
     { slots: 2, heldBy: 'imp budget or provider quota', line },
     { slots: 4, heldBy: 'impd at line', line },
@@ -33,8 +33,8 @@ test('one more imp takes some vCPUs: 0 is refused, so the vCPU line is always ch
 });
 
 test('both lines are the capacity watch\'s settings, their overrides included', () => {
-  const db = createCapacitySample(setupTest(), { at: '2026-10-16T00:55:00Z', nonnixAwakeMib: 16_384, nonnixAwakeVcpus: 16 }),
-    size = { budgetSlots: 4, impMib: 2048 };
+  const db = createCapacitySample(setupTest(), { at: '2026-10-16T00:55:00Z', nonnixAwakeMib: 16_384, nonnixAwakeVcpus: 16 });
+  const size = { budgetSlots: 4, impMib: 2048 };
   expect(loadImpRoom(db, size).slots).toBe(0);
   setCapacitySetting(db, 'nonnixMaxMib', '20480', 'kettle-bot');
   expect(loadImpRoom(db, size)).toMatchObject({ slots: 0, heldBy: 'impd at vCPU line' });
@@ -43,9 +43,9 @@ test('both lines are the capacity watch\'s settings, their overrides included', 
 });
 
 test('no sample, one with no memory or vCPU reading, or one over 15 min old holds every slot, and a later one is not read yet', () => {
-  const db = setupTest(),
-    held = { slots: 0, heldBy: 'no fresh impd reading', line: null },
-    size = { budgetSlots: 4, impMib: 2048 };
+  const db = setupTest();
+  const held = { slots: 0, heldBy: 'no fresh impd reading', line: null };
+  const size = { budgetSlots: 4, impMib: 2048 };
   expect(loadImpRoom(db, size)).toStrictEqual(held);
   createCapacitySample(db, { at: '2026-10-16T00:55:00Z', nonnixAwakeMib: null });
   expect(loadImpRoom(db, size)).toStrictEqual(held);

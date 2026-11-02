@@ -21,8 +21,8 @@ function setupTest(): Database {
 }
 
 test('the window lists ask answers, console reviews and typed lines, oldest first, each with its source', () => {
-  const db = setupTest(),
-    item = parseItemInput('call', JSON.stringify({ title: 'Descale the kettle', question: 'Descale it now?', options: [{ label: 'Descale it', effect: 'It gets descaled.', recommended: true }, { label: 'Leave it', effect: 'Nothing changes.' }] }));
+  const db = setupTest();
+  const item = parseItemInput('call', JSON.stringify({ title: 'Descale the kettle', question: 'Descale it now?', options: [{ label: 'Descale it', effect: 'It gets descaled.', recommended: true }, { label: 'Leave it', effect: 'Nothing changes.' }] }));
   applyAskItem(db, { kind: 'call', id: 'kettle-descale', issues: ['GEO-9001'], forSession: 'kettle-bot', actor: 'kettle-bot' }, item, 'Descale it now?');
   at('2026-10-14T01:01:00Z');
   recordConsoleAnswer(db, { id: 'kettle-descale', option: 'Descale it', note: 'Use the citric acid.', actor: 'console' });
@@ -42,15 +42,15 @@ test('the window lists ask answers, console reviews and typed lines, oldest firs
 const CRACKED_OPTIONS = [
     { label: 'The red one', effect: 'Red.', recommended: true },
     { label: 'A new one', effect: 'Buy one.' },
-  ],
-  TEAPOT_OPTIONS = [
-    { label: 'The blue one', effect: 'Blue.' },
-    { label: 'The red one', effect: 'Red.' },
   ];
+const TEAPOT_OPTIONS = [
+  { label: 'The blue one', effect: 'Blue.' },
+  { label: 'The red one', effect: 'Red.' },
+];
 
 test('a re-asked call lists each round\'s answer once, read against that round\'s options, and an answer outside the window is left out', () => {
-  const db = setupTest(),
-    item = parseItemInput('call', JSON.stringify({ title: 'Pick a teapot', question: 'Which teapot?', options: TEAPOT_OPTIONS }));
+  const db = setupTest();
+  const item = parseItemInput('call', JSON.stringify({ title: 'Pick a teapot', question: 'Which teapot?', options: TEAPOT_OPTIONS }));
   applyAskItem(db, { kind: 'call', id: 'teapot-pick', issues: [], forSession: null, actor: 'kettle-bot' }, item, 'Which teapot?');
   openAsk(db, { id: 'teapot-pick', force: true, actor: 'kettle-bot' });
   answerAsk(db, { id: 'teapot-pick', kind: 'call', answer: 'The blue one', actor: 'teapot-bot' });
@@ -173,11 +173,11 @@ test('it lists a review answer from before its facts were kept with no title or 
 });
 
 test('hq answers --json lists the last 7 days by default, and --since sets the window', async () => {
-  const db = createTwoTypedLines(setupTest()),
-    log = spyOn(console, 'log').mockImplementation((line: string) => printed.push(line)),
-    printed: string[] = [],
-    runDefault = await main(['answers', '--json']),
-    runSince = await main(['answers', '--since', '10d', '--json']);
+  const db = createTwoTypedLines(setupTest());
+  const log = spyOn(console, 'log').mockImplementation((line: string) => printed.push(line));
+  const printed: string[] = [];
+  const runDefault = await main(['answers', '--json']);
+  const runSince = await main(['answers', '--since', '10d', '--json']);
   onTestFinished(() => log.mockRestore());
   expect([db.query('SELECT COUNT(*) AS n FROM typed').get(), runDefault, runSince]).toStrictEqual([{ n: 2 }, 0, 0]);
   expect(printed.map((p) => JSON.parse(p) as { window: { from: string }; answers: { words: string }[] }).map((j) => [j.window.from, j.answers.map((a) => a.words)])).toStrictEqual([

@@ -6,11 +6,11 @@ import { now } from '../clock/now.ts';
 import { updateMergedRun } from './update-merged-run.ts';
 
 export function updateGoneRunSessions(db: Database, sessions: readonly AwakeSession[], actor: string, at: Date = now()): number {
-  const GONE_GRACE_MS = 5 * 60_000,
-    active = db.query('SELECT session_id, issue, added_at FROM run_sessions WHERE active = 1').all() as { session_id: string; issue: string; added_at: string }[],
-    end = db.query("UPDATE run_sessions SET active = 0, ended_at = COALESCE(ended_at, ?), ended_by = 'sweep' WHERE session_id = ? AND active = 1"),
-    present = new Set(sessions.filter((session) => isPresentSession(session)).map((session) => session.id)),
-    stale = active.filter((row) => !present.has(row.session_id) && at.getTime() - Date.parse(row.added_at) > GONE_GRACE_MS);
+  const GONE_GRACE_MS = 5 * 60_000;
+  const active = db.query('SELECT session_id, issue, added_at FROM run_sessions WHERE active = 1').all() as { session_id: string; issue: string; added_at: string }[];
+  const end = db.query("UPDATE run_sessions SET active = 0, ended_at = COALESCE(ended_at, ?), ended_by = 'sweep' WHERE session_id = ? AND active = 1");
+  const present = new Set(sessions.filter((session) => isPresentSession(session)).map((session) => session.id));
+  const stale = active.filter((row) => !present.has(row.session_id) && at.getTime() - Date.parse(row.added_at) > GONE_GRACE_MS);
   db.transaction(() => {
     for (const row of stale) {
       end.run(iso(at), row.session_id);

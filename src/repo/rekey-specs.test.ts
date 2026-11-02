@@ -7,12 +7,12 @@ import type { RekeySpec } from './rekey-specs.ts';
 import { REKEY_SPECS } from './rekey-specs.ts';
 
 // linear_started_prs.ref is outside the agreed list because every Linear read replaces the table.
-const CANDIDATE = /\.(?:repo|ref|link|url|target|from_ref|source_ref|fixed_in_pr)$/u,
-  OUTSIDE_LIST = new Set(['followups.from_ref', 'linear_started_prs.ref', 'outbox.target', 'run_prs.url', 'typed.source_ref']);
+const CANDIDATE = /\.(?:repo|ref|link|url|target|from_ref|source_ref|fixed_in_pr)$/u;
+const OUTSIDE_LIST = new Set(['followups.from_ref', 'linear_started_prs.ref', 'outbox.target', 'run_prs.url', 'typed.source_ref']);
 
 function setupTest() {
-  const base = freshDb(),
-    storePath = `${base.dir}/store.sqlite`;
+  const base = freshDb();
+  const storePath = `${base.dir}/store.sqlite`;
   onTestFinished(base.cleanup);
   createStoreTables(storePath);
   return { hq: base.db, store: openStore(storePath) };
@@ -41,13 +41,13 @@ function readUniqueKeys(db: Database, table: string): string[][] {
           .query<{ name: string | null }, []>(`PRAGMA index_info("${index.name}")`)
           .all()
           .map((column) => column.name ?? ''),
-      ),
-    primary = db
-      .query<{ name: string; pk: number }, []>(`PRAGMA table_info("${table}")`)
-      .all()
-      .filter((column) => column.pk > 0)
-      .toSorted((left, right) => left.pk - right.pk)
-      .map((column) => column.name);
+      );
+  const primary = db
+    .query<{ name: string; pk: number }, []>(`PRAGMA table_info("${table}")`)
+    .all()
+    .filter((column) => column.pk > 0)
+    .toSorted((left, right) => left.pk - right.pk)
+    .map((column) => column.name);
   return [...new Map([primary, ...indexes].filter((key) => key.length > 0).map((key) => [key.join(','), key])).values()];
 }
 
@@ -79,8 +79,8 @@ test.each(REKEY_SPECS.noslop.map((spec) => [`${spec.table}.${spec.column}`, spec
 });
 
 test.each(REKEY_SPECS.hq.map((spec) => [`${spec.table}.${spec.column}`, spec] as const))('the unique key of hq.db column %s is the one the list says', (_name, spec: RekeySpec) => {
-  const ctx = setupTest(),
-    holding = readUniqueKeys(ctx.hq, spec.table).filter((key) => key.includes(spec.column));
+  const ctx = setupTest();
+  const holding = readUniqueKeys(ctx.hq, spec.table).filter((key) => key.includes(spec.column));
   expect(holding.map((key) => key.toSorted())).toStrictEqual(readExpectedKeys(spec));
 });
 
@@ -96,7 +96,7 @@ test("the unique keys of noslop's store columns are the ones the list says", () 
 });
 
 test('every hq.db column that could name a repo is in the list or outside it on purpose', () => {
-  const ctx = setupTest(),
-    listed = new Set(REKEY_SPECS.hq.map((spec) => `${spec.table}.${spec.column}`));
+  const ctx = setupTest();
+  const listed = new Set(REKEY_SPECS.hq.map((spec) => `${spec.table}.${spec.column}`));
   expect(readCandidates(ctx.hq).filter((column) => !listed.has(column) && !OUTSIDE_LIST.has(column))).toStrictEqual([]);
 });

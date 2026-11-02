@@ -28,10 +28,10 @@ const PRRefs = z.object({ headRefName: z.string(), headRefOid: z.string(), baseR
 
 export async function review(run: Runner, rawRepo: string, pr: number, opts: { watch: boolean; owner?: string; repoDir?: string; effort?: Effort }): Promise<ReviewResult> {
   if (opts.effort !== undefined && opts.effort !== REVIEW_EFFORT && opts.effort !== RISK_EFFORT) throw new HqError('bad_args', `--effort must be ${REVIEW_EFFORT} or ${RISK_EFFORT}`);
-  const answerFile = buildReviewPath(rawRepo, opts.owner, pr, '-allow-deny.md'),
-    reviewFile = buildReviewPath(rawRepo, opts.owner, pr, '-review.md'),
-    tmp = buildReviewPath(rawRepo, opts.owner, pr, '-tmp'),
-    wt = buildReviewPath(rawRepo, opts.owner, pr, '');
+  const answerFile = buildReviewPath(rawRepo, opts.owner, pr, '-allow-deny.md');
+  const reviewFile = buildReviewPath(rawRepo, opts.owner, pr, '-review.md');
+  const tmp = buildReviewPath(rawRepo, opts.owner, pr, '-tmp');
+  const wt = buildReviewPath(rawRepo, opts.owner, pr, '');
   const { owner, repo } = parseRepo(rawRepo, opts.owner ?? 'zgeoff');
   if (!Number.isInteger(pr) || pr <= 0) throw new HqError('bad_args', 'pr must be a positive number');
   const slug = `${owner}/${repo}`;
@@ -55,11 +55,11 @@ export async function review(run: Runner, rawRepo: string, pr: number, opts: { w
         throw new HqError('head_moved', `refs/pull/${pr}/head is ${fetched}, but the PR head is ${refs.headRefOid}; try again`);
       }
     });
-    let allowDenyCode: number | null = null,
-      codexCode: number,
-      gate: { run: boolean; reason: string },
-      install: ReviewResult['install'] = { ran: false, ok: true, detail: 'no install' },
-      tier: ReviewResult['effort'];
+    let allowDenyCode: number | null = null;
+    let codexCode: number;
+    let gate: { run: boolean; reason: string };
+    let install: ReviewResult['install'] = { ran: false, ok: true, detail: 'no install' };
+    let tier: ReviewResult['effort'];
     rmSync(wt, { recursive: true, force: true });
     await withRepoLock(S, slug, async () => {
       await run(['git', 'worktree', 'prune'], { cwd: dir });

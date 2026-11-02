@@ -16,9 +16,9 @@ export async function readOnePassword(probe: CapacityProbe): Promise<OnePassword
   return buildUse(Limits.parse(parseJSON(ran.stdout)));
 }
 
-const Limits = z.array(z.object({ type: z.string(), used: z.number(), limit: z.number(), remaining: z.number() })),
-  RATE_LIMITED = /too many requests|rate.?limit/iu,
-  Settings = z.object({ env: z.object({ OP_SERVICE_ACCOUNT_TOKEN: z.string().min(1) }) });
+const Limits = z.array(z.object({ type: z.string(), used: z.number(), limit: z.number(), remaining: z.number() }));
+const RATE_LIMITED = /too many requests|rate.?limit/iu;
+const Settings = z.object({ env: z.object({ OP_SERVICE_ACCOUNT_TOKEN: z.string().min(1) }) });
 
 async function runRatelimit(probe: CapacityProbe): Promise<RunResult> {
   const token = await loadServiceAccountToken(probe);

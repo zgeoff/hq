@@ -52,8 +52,8 @@ export interface PRCommandInput {
   readReviewerSession: () => Promise<RoleProbe>;
 }
 
-const ANSWERS = new Set(['lgtm', 'changes', 'reject']),
-  NEXT_USAGE = 'usage: hq pr next <repo> <pr> <session> | --clear';
+const ANSWERS = new Set(['lgtm', 'changes', 'reject']);
+const NEXT_USAGE = 'usage: hq pr next <repo> <pr> <session> | --clear';
 
 export async function runPRCommand(input: PRCommandInput): Promise<Out> {
   const [rawRepo, rawPR, third] = input.rest;
@@ -147,11 +147,11 @@ interface AnswerArgs {
 }
 
 async function runAnswer(input: PRCommandInput, ref: PRRef, rawAnswer: string | undefined): Promise<Out> {
-  const args = parseAnswerArgs(input.flags, rawAnswer),
-    head = await readPRHead(input.run, ref.slug, ref.pr),
-    context = await readAnswerContext(input, ref, head),
-    probe: OwnerProbe = args.source.startsWith('chat:') ? await input.readOwnerSession() : { verdict: 'other' },
-    refusal = readAnswerSourceRefusal(input.db, { ref, answer: args.answer, source: args.source, head: context.head }, probe);
+  const args = parseAnswerArgs(input.flags, rawAnswer);
+  const head = await readPRHead(input.run, ref.slug, ref.pr);
+  const context = await readAnswerContext(input, ref, head);
+  const probe: OwnerProbe = args.source.startsWith('chat:') ? await input.readOwnerSession() : { verdict: 'other' };
+  const refusal = readAnswerSourceRefusal(input.db, { ref, answer: args.answer, source: args.source, head: context.head }, probe);
   if (refusal !== null) {
     throw new HqError('bad_args', `--source refused: ${refusal}; ask ${roleName('owner')} to record it`);
   }
@@ -160,8 +160,8 @@ async function runAnswer(input: PRCommandInput, ref: PRRef, rawAnswer: string | 
 }
 
 function parseAnswerArgs(flags: Flags, rawAnswer: string | undefined): AnswerArgs {
-  const note = flags.note?.trim() ?? '',
-    source = requireAnswerSource(flags.source);
+  const note = flags.note?.trim() ?? '';
+  const source = requireAnswerSource(flags.source);
   if (rawAnswer === undefined || !ANSWERS.has(rawAnswer)) {
     throw new HqError('bad_args', 'the answer must be lgtm, changes or reject');
   }
@@ -211,8 +211,8 @@ function parseCheckFlag(values: readonly string[] | undefined): string | null {
 }
 
 async function runNext(input: PRCommandInput, ref: PRRef, session: string | undefined): Promise<Out> {
-  const actor = await input.actor(),
-    holder = requireNextHolder(input.flags, session);
+  const actor = await input.actor();
+  const holder = requireNextHolder(input.flags, session);
   await recordPRNext(input.db, ref, holder, actor);
   return await refreshWrittenStatus(input, ref);
 }
@@ -223,8 +223,8 @@ async function refreshWrittenStatus(input: PRCommandInput, ref: PRRef): Promise<
 }
 
 function requireNextHolder(flags: Flags, session: string | undefined): string | null {
-  const clear = flags.clear === true,
-    names = getDeclaredSessions().map((s) => s.name);
+  const clear = flags.clear === true;
+  const names = getDeclaredSessions().map((s) => s.name);
   if (clear && session !== undefined) {
     throw new HqError('bad_args', `give a session or --clear, not both; ${NEXT_USAGE}`);
   }

@@ -10,24 +10,24 @@ interface SocketWriter {
 // socket.write drops what it does not accept, so a short write parks the rest here until the
 // socket drains.
 export function buildOutboundQueue(socket: SocketWriter): OutboundQueue {
-  const chunks: Uint8Array[] = [],
-    drain = (): void => {
-      for (let head = chunks.at(0); head !== undefined; head = chunks.at(0)) {
-        const wrote = Math.max(socket.write(head), 0);
-        if (wrote < head.length) {
-          chunks[0] = head.subarray(wrote);
-          return;
-        }
-        chunks.shift();
+  const chunks: Uint8Array[] = [];
+  const drain = (): void => {
+    for (let head = chunks.at(0); head !== undefined; head = chunks.at(0)) {
+      const wrote = Math.max(socket.write(head), 0);
+      if (wrote < head.length) {
+        chunks[0] = head.subarray(wrote);
+        return;
       }
-    },
-    encoder = new TextEncoder(),
-    send = (text: string): void => {
-      chunks.push(encoder.encode(text));
-      if (chunks.length === 1) {
-        drain();
-      }
-    };
+      chunks.shift();
+    }
+  };
+  const encoder = new TextEncoder();
+  const send = (text: string): void => {
+    chunks.push(encoder.encode(text));
+    if (chunks.length === 1) {
+      drain();
+    }
+  };
 
   return { send, drain };
 }

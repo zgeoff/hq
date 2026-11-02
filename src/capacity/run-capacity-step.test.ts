@@ -7,14 +7,14 @@ import { runCapacityStep } from './run-capacity-step.ts';
 import type { CapacityProbe } from './types.ts';
 
 function setupTest() {
-  const fresh = freshDb(),
-    probe: CapacityProbe = {
-      run: () => Promise.resolve({ code: 1, stdout: '', stderr: 'invented: no such source' }),
-      readText: () => Promise.reject(new Error('no cloud here')),
-      readFile: () => Promise.resolve(''),
-      readMs: 100,
-    },
-    saved = process.env['OP_SERVICE_ACCOUNT_TOKEN'];
+  const fresh = freshDb();
+  const probe: CapacityProbe = {
+    run: () => Promise.resolve({ code: 1, stdout: '', stderr: 'invented: no such source' }),
+    readText: () => Promise.reject(new Error('no cloud here')),
+    readFile: () => Promise.resolve(''),
+    readMs: 100,
+  };
+  const saved = process.env['OP_SERVICE_ACCOUNT_TOKEN'];
   onTestFinished(fresh.cleanup);
   delete process.env['OP_SERVICE_ACCOUNT_TOKEN'];
   onTestFinished(() => saved !== undefined && (process.env['OP_SERVICE_ACCOUNT_TOKEN'] = saved));

@@ -5,9 +5,9 @@ import { pacingPath } from './pacing-path.ts';
 import type { Capacity, Sample } from './types.ts';
 
 export async function readCapacity(run: Runner): Promise<Sample> {
-  const pacing = await loadPacing(pacingPath()),
-    ran = await run(['bash', LANES.capacityScript()]),
-    read = parseCapacityRun(ran);
+  const pacing = await loadPacing(pacingPath());
+  const ran = await run(['bash', LANES.capacityScript()]);
+  const read = parseCapacityRun(ran);
   return { cap: read.cap, impMib: pacing.impMib, lanes: pacing.lanes, slots: pacing.slots, placeTypes: pacing.placeTypes, localRoom: pacing.localRoom, design: pacing.design, designError: pacing.designError, error: read.cap === null ? read.error : pacing.error };
 }
 

@@ -14,8 +14,8 @@ import { uptoFor } from './upto-for.ts';
 
 // Sydney is on AEDT (UTC+11) in October: 12:00 Sydney is 01:00Z, 04:00 is 17:00Z of the day before.
 function setupTest() {
-  const area = mkdtempSync(join(tmpdir(), 'hq-unblock-changed-')),
-    db = openDb(join(area, 'hq.db'));
+  const area = mkdtempSync(join(tmpdir(), 'hq-unblock-changed-'));
+  const db = openDb(join(area, 'hq.db'));
   onTestFinished(() => {
     db.close();
     rmSync(area, { recursive: true, force: true });

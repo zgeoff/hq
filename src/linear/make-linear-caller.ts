@@ -13,8 +13,8 @@ export function makeLinearCaller(run: Runner, doFetch: typeof fetch = fetch, rec
     if (process.env['BUN_CONFIG_VERBOSE_FETCH']) {
       throw new HqError('linear_failed', 'BUN_CONFIG_VERBOSE_FETCH is set; hq will not send the Linear key while fetch is traced');
     }
-    const API = 'https://api.linear.app/graphql',
-      k = await readKey(run, recordRead);
+    const API = 'https://api.linear.app/graphql';
+    const k = await readKey(run, recordRead);
     let res: Response;
     try {
       res = await doFetch(API, { method: 'POST', headers: { 'content-type': 'application/json', authorization: k }, body: JSON.stringify({ query, variables }), signal: AbortSignal.timeout(30_000) });
@@ -34,8 +34,8 @@ export function makeLinearCaller(run: Runner, doFetch: typeof fetch = fetch, rec
 }
 
 async function readKey(run: Runner, recordRead: () => void): Promise<string> {
-  const ITEM = readLocalSetting('HQ_LINEAR_OP_REF'),
-    KEY_TTL_MS = 12 * 3_600_000;
+  const ITEM = readLocalSetting('HQ_LINEAR_OP_REF');
+  const KEY_TTL_MS = 12 * 3_600_000;
   if (KEY_CACHE.value && KEY_CACHE.ref === ITEM && now().getTime() < KEY_CACHE.expiresAt) {
     return KEY_CACHE.value;
   }

@@ -17,9 +17,9 @@ test.each([
   ['an hour later reuses the key', '2026-10-19T01:00:00Z', 1],
   ['12 hours later reads 1Password again, though Linear answered 200 throughout', '2026-10-19T12:00:00Z', 2],
 ])('one caller held %s', async (_case, later, count) => {
-  const app = setupTest(),
-    counter = mock(() => {}),
-    linear = makeLinearCaller(app.run, fetch, counter);
+  const app = setupTest();
+  const counter = mock(() => {});
+  const linear = makeLinearCaller(app.run, fetch, counter);
   onTestFinished(overrideEnv('HQ_NOW', '2026-10-19T00:00:00Z'));
   await linear('q', {});
   onTestFinished(overrideEnv('HQ_NOW', later));
@@ -29,8 +29,8 @@ test.each([
 });
 
 test('a changed Linear item reference reads 1Password again', async () => {
-  const app = setupTest(),
-    linear = makeLinearCaller(app.run, fetch, mock(() => {}));
+  const app = setupTest();
+  const linear = makeLinearCaller(app.run, fetch, mock(() => {}));
   onTestFinished(overrideEnv('HQ_NOW', '2026-10-19T00:00:00Z'));
   onTestFinished(overrideEnv('HQ_LINEAR_OP_REF', 'op://kettle/teapot-key/credential'));
   await linear('q', {});

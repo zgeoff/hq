@@ -18,9 +18,9 @@ function findUses(rec: Obj | null): Obj[] {
 }
 
 function buildUsePairs(rec: Obj | null, uses: Obj[]): [string, Tool][] {
-  const out: [string, Tool][] = uses.map((b) => [b['id'] as string, { name: b['name'] as string, input: inputOf(b['name'] as string, b['input'] as Obj | undefined) }]),
-    uuid = str(rec?.['uuid']),
-    [first] = out;
+  const out: [string, Tool][] = uses.map((b) => [b['id'] as string, { name: b['name'] as string, input: inputOf(b['name'] as string, b['input'] as Obj | undefined) }]);
+  const uuid = str(rec?.['uuid']);
+  const [first] = out;
   if (uses.length === 1 && uuid && first !== undefined) {
     out.push([`a:${uuid}`, first[1]]);
   }

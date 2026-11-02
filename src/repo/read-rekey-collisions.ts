@@ -21,10 +21,10 @@ function readSpecCollisions(db: Database, spec: RekeySpec, names: RepoNames): st
   if (spec.key === null) {
     return [];
   }
-  const columns = [`n."${spec.column}" AS value`, ...spec.key.map((name) => `n."${name}" AS "${name}"`)].join(', '),
-    keyJoin = spec.key.map((name) => ` AND ${readKeyColumn(spec, 'n', name)} = ${readKeyColumn(spec, 'm', name)}`).join(''),
-    rekey = buildRekeySql(spec, `m."${spec.column}"`, names),
-    select = `SELECT ${columns} FROM "${spec.table}" AS m JOIN "${spec.table}" AS n ON n."${spec.column}" = ${rekey.newValue}${keyJoin} WHERE ${rekey.fromWhere}`;
+  const columns = [`n."${spec.column}" AS value`, ...spec.key.map((name) => `n."${name}" AS "${name}"`)].join(', ');
+  const keyJoin = spec.key.map((name) => ` AND ${readKeyColumn(spec, 'n', name)} = ${readKeyColumn(spec, 'm', name)}`).join('');
+  const rekey = buildRekeySql(spec, `m."${spec.column}"`, names);
+  const select = `SELECT ${columns} FROM "${spec.table}" AS m JOIN "${spec.table}" AS n ON n."${spec.column}" = ${rekey.newValue}${keyJoin} WHERE ${rekey.fromWhere}`;
   return db
     .query<KeyRow, string[]>(select)
     .all(...rekey.newParams, ...rekey.fromParams)

@@ -6,8 +6,8 @@ import { readPrompt } from './read-prompt.ts';
 import { resetFetchCache } from './reset-fetch-cache.ts';
 
 test('it reads a start prompt from origin/main of hq-private after a fetch, never from the working tree', () => {
-  const ctx = createTreeFixture(),
-    tree = ctx.createPrivate();
+  const ctx = createTreeFixture();
+  const tree = ctx.createPrivate();
   writeFileSync(`${tree.dir}/${INTAKE}`, buildPrompt('unmerged edit'));
   expect(readPrompt(`main:${INTAKE}`)).toBe('You are an invented intake.');
   tree.writeCommit({ [INTAKE]: buildPrompt('intake two') });
@@ -16,8 +16,8 @@ test('it reads a start prompt from origin/main of hq-private after a fetch, neve
 });
 
 test('it refuses a prompt hq-private lacks, even when hq-defs holds it, and names hq-private and the path', () => {
-  const ctx = createTreeFixture(),
-    path = 'skills/only-in-defs/references/session-prompt.md';
+  const ctx = createTreeFixture();
+  const path = 'skills/only-in-defs/references/session-prompt.md';
   ctx.createHq({ [path]: buildPrompt('only in defs') });
   ctx.createPrivate();
   expect(() => readPrompt(`main:${path}`)).toThrow(`can't read ${path} from origin/main in ${PRIVATE_TREE.dir()}`);
@@ -31,8 +31,8 @@ test('it refuses every prompt when hq-private is not cloned, even with hq-defs i
 });
 
 test('it refuses a prompt when the fetch of hq-private fails, and uses no old fetch', () => {
-  const ctx = createTreeFixture(),
-    tree = ctx.createPrivate();
+  const ctx = createTreeFixture();
+  const tree = ctx.createPrivate();
   tree.git('config', '--unset-all', `url.${tree.origin}.insteadOf`);
   tree.git('remote', 'set-url', 'origin', `${ctx.dir}/no-such-origin`);
   expect(() => readPrompt(`main:${INTAKE}`)).toThrow(`can't fetch main in ${PRIVATE_TREE.dir()} to read ${INTAKE}`);

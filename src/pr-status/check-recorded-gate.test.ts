@@ -13,8 +13,8 @@ import { checkRecordedGate } from './check-recorded-gate.ts';
 import { recordPRAnswer } from './record-pr-answer.ts';
 
 function setupTest() {
-  const base = mkdtempSync(join(tmpdir(), 'hq-pr-gate-')),
-    db = openDb(join(base, 'hq.db'));
+  const base = mkdtempSync(join(tmpdir(), 'hq-pr-gate-'));
+  const db = openDb(join(base, 'hq.db'));
 
   onTestFinished(() => {
     db.close();
@@ -30,8 +30,8 @@ function setupTest() {
 }
 
 test('it records a passing gate with the head it read, and returns the gate outcome unchanged', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner();
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
   createListedReview(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA });
 
   await expect(checkRecordedGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).resolves.toStrictEqual({ mayMerge: true, reason: `noslop findings: none open; CI green at ${FAKE_FULL_SHA.slice(0, 7)}`, reviewed: true });
@@ -40,8 +40,8 @@ test('it records a passing gate with the head it read, and returns the gate outc
 });
 
 test('it records a blocked gate as a fail and still throws the same merge_blocked error', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner({ noslopFindings: buildStubFindings('open') });
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ noslopFindings: buildStubFindings('open') });
   createListedReview(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA });
 
   await expect(checkRecordedGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: '1 noslop finding is open: aaaaaaaaaaaaaaaa' });
@@ -50,8 +50,8 @@ test('it records a blocked gate as a fail and still throws the same merge_blocke
 });
 
 test('it records a gate that red CI blocks as a fail at the head it read', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner({ prFacts: buildStubGateFacts({ head: FAKE_FULL_SHA, checks: [{ __typename: 'CheckRun', name: 'test', status: 'COMPLETED', conclusion: 'FAILURE' }] }) });
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ prFacts: buildStubGateFacts({ head: FAKE_FULL_SHA, checks: [{ __typename: 'CheckRun', name: 'test', status: 'COMPLETED', conclusion: 'FAILURE' }] }) });
   createListedReview(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA });
 
   await expect(checkRecordedGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked' });
@@ -60,8 +60,8 @@ test('it records a gate that red CI blocks as a fail at the head it read', async
 });
 
 test('it records gate none with no head for a PR whose repo is not on the noslop list', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner();
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
 
   await expect(checkRecordedGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).resolves.toStrictEqual({ mayMerge: true, reason: 'not a noslop repo: CI green at 0123456', reviewed: false });
 
@@ -69,8 +69,8 @@ test('it records gate none with no head for a PR whose repo is not on the noslop
 });
 
 test("it records gate none with no head for a bot's PR, which noslop never reviews", async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner({ author: '{"author":{"login":"renovate","is_bot":true}}' });
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ author: '{"author":{"login":"renovate","is_bot":true}}' });
   setMeta(ctx.db, 'noslop', JSON.stringify({ repos: ['widgets'], sha: '0123456789abcdef0123456789abcdef01234567' }));
 
   await expect(checkRecordedGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).resolves.toStrictEqual({ mayMerge: true, reason: 'bot PR: CI green at 0123456', reviewed: false });
@@ -79,8 +79,8 @@ test("it records gate none with no head for a bot's PR, which noslop never revie
 });
 
 test('it records a noslop gate, not gate none, for a listed repo\'s PR that has a Codex review file', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner();
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
   setMeta(ctx.db, 'noslop', JSON.stringify({ repos: ['widgets'], sha: '0123456789abcdef0123456789abcdef01234567' }));
   writeFileSync(join(ctx.base, 'widgets7-review.md'), 'No findings.\n');
 
@@ -90,8 +90,8 @@ test('it records a noslop gate, not gate none, for a listed repo\'s PR that has 
 });
 
 test('it stores nothing for a PR of an owner other than zgeoff', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner();
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
   setMeta(ctx.db, 'noslop', JSON.stringify({ repos: ['kettle-co/widgets'], sha: '0123456789abcdef0123456789abcdef01234567' }));
 
   await expect(checkRecordedGate({ run: fake.run, db: ctx.db, rawRepo: 'kettle-co/widgets', pr: 7 })).resolves.toMatchObject({ mayMerge: true, reason: 'not a noslop repo: CI green at 0123456' });
@@ -100,9 +100,9 @@ test('it stores nothing for a PR of an owner other than zgeoff', async () => {
 });
 
 test('it leaves the gate passing when the record cannot be written', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner(),
-    stderr = spyOn(console, 'error').mockImplementation(() => {});
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
+  const stderr = spyOn(console, 'error').mockImplementation(() => {});
   onTestFinished(() => stderr.mockRestore());
   createListedReview(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA });
   ctx.db.exec('DROP TABLE pr_status');
@@ -111,9 +111,9 @@ test('it leaves the gate passing when the record cannot be written', async () =>
 });
 
 test('it warns on stderr when the record cannot be written', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner(),
-    stderr = spyOn(console, 'error').mockImplementation(() => {});
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
+  const stderr = spyOn(console, 'error').mockImplementation(() => {});
   onTestFinished(() => stderr.mockRestore());
   createListedReview(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA });
   ctx.db.exec('DROP TABLE pr_status');
@@ -124,9 +124,9 @@ test('it warns on stderr when the record cannot be written', async () => {
 });
 
 test('it throws the same merge_blocked error when a blocked gate cannot be recorded', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner({ noslopFindings: buildStubFindings('open') }),
-    stderr = spyOn(console, 'error').mockImplementation(() => {});
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ noslopFindings: buildStubFindings('open') });
+  const stderr = spyOn(console, 'error').mockImplementation(() => {});
   onTestFinished(() => stderr.mockRestore());
   createListedReview(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA });
   ctx.db.exec('DROP TABLE pr_status');
@@ -135,8 +135,8 @@ test('it throws the same merge_blocked error when a blocked gate cannot be recor
 });
 
 test('it keeps the last seen head when a gate none follows a recorded head', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner();
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
   createListedReview(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA });
   await checkRecordedGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 });
   setMeta(ctx.db, 'noslop', JSON.stringify({ repos: [], sha: '0123456789abcdef0123456789abcdef01234567' }));
