@@ -35,8 +35,8 @@ test('it names the rate limit and how to see it when 1Password rate-limits the r
 
 test('it reads all three fields in one op call', async () => {
   setupTest();
-  const fake = buildFakeRunner(),
-    secrets = await loadNoslopSecrets(fake.run);
+  const fake = buildFakeRunner();
+  const secrets = await loadNoslopSecrets(fake.run);
 
   expect([fake.of('op').length, secrets]).toStrictEqual([1, { appID: 'app-4711', installationID: 'inst-8842', privateKey: '-----BEGIN KEY-----\nbadger-secret-key\n-----END KEY-----' }]);
 });
@@ -73,8 +73,8 @@ test.each([
   ['a refused read', { code: 1, stdout: '', stderr: 'vault not found' }],
 ])('it counts the read for the weekly audit even on %s', async (_case, opAnswer) => {
   setupTest();
-  const counter = mock(() => {}),
-    fake = buildFakeRunner({ opAnswer });
+  const counter = mock(() => {});
+  const fake = buildFakeRunner({ opAnswer });
 
   await expect(loadNoslopSecrets(fake.run, counter)).rejects.toMatchObject({ code: 'bad_config' });
   expect(counter).toHaveBeenCalledTimes(1);

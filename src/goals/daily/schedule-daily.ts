@@ -16,10 +16,10 @@ interface RunRequest {
 }
 
 export function scheduleDaily(db: Database, run: RunRequest): JobRun {
-  const actor = run.actor,
-    at = run.at,
-    date = run.key,
-    detail = run.detail;
+  const actor = run.actor;
+  const at = run.at;
+  const date = run.key;
+  const detail = run.detail;
   const seq = logEvent(db, 'hq', `job:${JOB}`, 'ran', actor, null, null, { key: date, detail });
   enqueue(db, seq, owner(), dailyText(db, at), `job:${JOB}:${date}`); // a topic per day: one day never supersedes another
   db.query('INSERT INTO job_runs (job, key, at, result, detail, outbox_key) VALUES (?, ?, ?, ?, ?, ?)').run(JOB, date, iso(at), 'queued', detail, `hq-ev${seq}-${owner()}`);

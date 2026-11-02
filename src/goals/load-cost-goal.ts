@@ -7,8 +7,8 @@ import { verdict } from './verdict.ts';
 // The spend and the pro-rated target are rounded to whole cents once and compared as integers, so a
 // float sum such as 0.1 + 0.2 meets a budget of 0.30.
 export function loadCostGoal(db: Database, target: Target | null, at: Date): { text: string; verdict: Verdict } {
-  const budget = toCents(buildActionsBudget(target?.value ?? 0, at)),
-    dollars = loadActionsSpend(db, at);
+  const budget = toCents(buildActionsBudget(target?.value ?? 0, at));
+  const dollars = loadActionsSpend(db, at);
   if (dollars === null) {
     return { text: 'Actions spend unknown', verdict: 'none' };
   }

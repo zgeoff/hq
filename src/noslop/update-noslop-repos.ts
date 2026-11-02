@@ -18,8 +18,8 @@ export function updateNoslopRepos(db: Database, change: 'on' | 'off', names: str
     .immediate();
 }
 
-const BARE_REPO = /^[A-Za-z0-9._-]+$/u,
-  NOSLOP_OWNER = 'zgeoff';
+const BARE_REPO = /^[A-Za-z0-9._-]+$/u;
+const NOSLOP_OWNER = 'zgeoff';
 
 function assertRepoNames(change: 'on' | 'off', names: string[]): void {
   if (names.length === 0) {

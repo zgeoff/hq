@@ -9,8 +9,8 @@ export function findPluginDrift(entries: FleetEntry[], live: FleetSession[], kno
   for (const e of entries) {
     const session = findLiveSession(e.name, live, known);
     if (session) {
-      const declared = e.pluginDirs ?? [],
-        running = [...(session.pluginDirs ?? [])];
+      const declared = e.pluginDirs ?? [];
+      const running = [...(session.pluginDirs ?? [])];
       if (declared.map((d) => expandHome(d)).join('\n') !== running.map((d) => expandHome(d)).join('\n')) {
         out[e.name] = { declared, running };
       }
@@ -20,8 +20,8 @@ export function findPluginDrift(entries: FleetEntry[], live: FleetSession[], kno
 }
 
 function findLiveSession(name: string, live: FleetSession[], known: Record<string, string>): FleetSession | undefined {
-  const byName = live.filter((s) => s.alive && s.name === name),
-    recorded = Object.hasOwn(known, name) ? live.find((s) => s.id === known[name] && s.alive) : undefined;
+  const byName = live.filter((s) => s.alive && s.name === name);
+  const recorded = Object.hasOwn(known, name) ? live.find((s) => s.id === known[name] && s.alive) : undefined;
   return recorded ?? (byName.length === 1 ? byName[0] : undefined);
 }
 

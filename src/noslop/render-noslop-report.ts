@@ -11,13 +11,13 @@ export function renderNoslopReport(reports: PRReport[]): string {
 }
 
 function formatPRReport(r: PRReport): string {
-  const answered = r.answered === null ? '' : `, ${r.answered} answered`,
-    confirm = r.confirmReviews > 0 ? `, ${r.confirmReviews} --confirm` : '',
-    full = r.fullReviews > 0 ? `, ${r.fullReviews} full` : '',
-    open = r.openIDs.length > 0 ? `, open: ${r.openIDs.join(', ')}` : '',
-    plural = r.extraRounds === 1 ? '' : 's',
-    severities = Object.entries(r.bySeverity).map(([severity, n]) => `${n} ${severity}`).join(', '),
-    span = r.reviewToPassMs === null ? '' : `; first review to first passing check: ${formatSeconds(r.reviewToPassMs)}`;
+  const answered = r.answered === null ? '' : `, ${r.answered} answered`;
+  const confirm = r.confirmReviews > 0 ? `, ${r.confirmReviews} --confirm` : '';
+  const full = r.fullReviews > 0 ? `, ${r.fullReviews} full` : '';
+  const open = r.openIDs.length > 0 ? `, open: ${r.openIDs.join(', ')}` : '';
+  const plural = r.extraRounds === 1 ? '' : 's';
+  const severities = Object.entries(r.bySeverity).map(([severity, n]) => `${n} ${severity}`).join(', ');
+  const span = r.reviewToPassMs === null ? '' : `; first review to first passing check: ${formatSeconds(r.reviewToPassMs)}`;
   return [
     r.ref,
     `  reviews: ${r.reviewsOk} ok, ${r.reviewsFailed} failed (${r.extraRounds} extra round${plural}${full}${confirm})`,

@@ -10,21 +10,21 @@ import { createConsoleServer } from '../create-console-server.ts';
 import type { ShippedPeriod } from '../shipped/types.ts';
 
 async function setupTest(asked: ShippedPeriod[]) {
-  const fresh = freshDb(),
-    signedIn = createSignedInAuth(),
-    server = createConsoleServer({
-      db: fresh.db,
-      auth: signedIn.auth,
-      port: 0,
-      actor: 'console', run: () => Promise.resolve({ code: 1, stdout: '', stderr: 'no gh in this test' }),
-      assets: new Map(),
-      notify: () => Promise.resolve(true),
-      loadShipped: (period) => {
-        asked.push(period);
-        return Promise.resolve({ period, report: buildRenderedReport({ dateLabel: `The kettle report for ${period}` }), at: '2026-10-15T02:00:00Z' });
-      },
-    }),
-    spy = spyOn(console, 'log').mockImplementation(() => {});
+  const fresh = freshDb();
+  const signedIn = createSignedInAuth();
+  const server = createConsoleServer({
+    db: fresh.db,
+    auth: signedIn.auth,
+    port: 0,
+    actor: 'console', run: () => Promise.resolve({ code: 1, stdout: '', stderr: 'no gh in this test' }),
+    assets: new Map(),
+    notify: () => Promise.resolve(true),
+    loadShipped: (period) => {
+      asked.push(period);
+      return Promise.resolve({ period, report: buildRenderedReport({ dateLabel: `The kettle report for ${period}` }), at: '2026-10-15T02:00:00Z' });
+    },
+  });
+  const spy = spyOn(console, 'log').mockImplementation(() => {});
   onTestFinished(fresh.cleanup);
   onTestFinished(() => spy.mockRestore());
   onTestFinished(() => server.stop(true));
@@ -33,10 +33,10 @@ async function setupTest(asked: ShippedPeriod[]) {
 }
 
 test('Shipped opens on today; a click on Yesterday and the w key each read and show their period', async () => {
-  const asked: ShippedPeriod[] = [],
-    lib = await setupTest(asked),
-    page = lib.within(document.body),
-    view = await import('./shipped-view.tsx');
+  const asked: ShippedPeriod[] = [];
+  const lib = await setupTest(asked);
+  const page = lib.within(document.body);
+  const view = await import('./shipped-view.tsx');
   lib.render(
     <ConsoleAPIContext value={lib.api}>
     <QueryClientProvider client={new QueryClient()}>
@@ -55,9 +55,9 @@ test('Shipped opens on today; a click on Yesterday and the w key each read and s
 });
 
 test('an open page reads its report again on its own, so a new day shows without a click', async () => {
-  const asked: ShippedPeriod[] = [],
-    lib = await setupTest(asked),
-    view = await import('./shipped-view.tsx');
+  const asked: ShippedPeriod[] = [];
+  const lib = await setupTest(asked);
+  const view = await import('./shipped-view.tsx');
 
   // Query took this process for a server when it loaded, before the page's DOM, and a server
   // schedules no refresh; the browser page is a client.
@@ -75,9 +75,9 @@ test('an open page reads its report again on its own, so a new day shows without
 });
 
 test('? lists the Shipped keys and the keys every tab shares, and Esc closes the list', async () => {
-  const lib = await setupTest([]),
-    page = lib.within(document.body),
-    view = await import('./shipped-view.tsx');
+  const lib = await setupTest([]);
+  const page = lib.within(document.body);
+  const view = await import('./shipped-view.tsx');
   lib.render(
     <ConsoleAPIContext value={lib.api}>
     <QueryClientProvider client={new QueryClient()}>

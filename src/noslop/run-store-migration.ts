@@ -36,9 +36,9 @@ export interface StoreMigrationInput {
   requireIdle?: (() => Promise<void>) | undefined;
 }
 
-const MIGRATION_QUERY = ['store', 'query', 'findings-by-pr', '--repo', 'hq-pin-guard/none', '--pr', '1', '--json'],
-  QUERY_TIMEOUT_MS = 300_000,
-  SHORT_SHA_CHARS = 7;
+const MIGRATION_QUERY = ['store', 'query', 'findings-by-pr', '--repo', 'hq-pin-guard/none', '--pr', '1', '--json'];
+const QUERY_TIMEOUT_MS = 300_000;
+const SHORT_SHA_CHARS = 7;
 
 export async function runStoreMigration(input: StoreMigrationInput): Promise<StoreMigration> {
   const none: StoreMigration = { store: input.store, hasStore: existsSync(input.store), names: [], backup: null, tables: [] };
@@ -49,8 +49,8 @@ export async function runStoreMigration(input: StoreMigrationInput): Promise<Sto
 }
 
 async function runNewMigrations(input: StoreMigrationInput, none: StoreMigration): Promise<StoreMigration> {
-  const held = new Set(readStoreMigrations(input.store)),
-    names = readCloneMigrations(input.clone).filter((name) => !held.has(name));
+  const held = new Set(readStoreMigrations(input.store));
+  const names = readCloneMigrations(input.clone).filter((name) => !held.has(name));
   if (names.length === 0) {
     return none;
   }
@@ -92,8 +92,8 @@ async function runMigrationQuery(run: Runner, clone: string): Promise<void> {
 }
 
 function checkMigrated(store: string, names: string[], before: Record<string, number>): TableCount[] {
-  const after = countStoreRows(store),
-    problem = pickMigrationProblem(names, readStoreMigrations(store), before, after);
+  const after = countStoreRows(store);
+  const problem = pickMigrationProblem(names, readStoreMigrations(store), before, after);
   if (problem !== null) {
     throw new HqError('store_migration_failed', problem);
   }
@@ -101,7 +101,7 @@ function checkMigrated(store: string, names: string[], before: Record<string, nu
 }
 
 function buildTableCounts(before: Record<string, number>, after: Record<string, number>): TableCount[] {
-  const added = Object.keys(after).filter((table) => !(table in before)),
-    tables = [...Object.keys(before), ...added];
+  const added = Object.keys(after).filter((table) => !(table in before));
+  const tables = [...Object.keys(before), ...added];
   return tables.map((table) => ({ table, before: before[table] ?? 0, after: after[table] ?? 0 }));
 }

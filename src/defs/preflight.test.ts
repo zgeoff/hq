@@ -38,8 +38,8 @@ test("it fails when hq-private's origin is another repo", () => {
 });
 
 test('it fails on a drifted private prompt, with the output of the grants script', () => {
-  const checkouts = createTreeFixture().createBoth(),
-    promptFile = `${checkouts.private.dir}/skills/preview-qa/references/session-prompt.md`;
+  const checkouts = createTreeFixture().createBoth();
+  const promptFile = `${checkouts.private.dir}/skills/preview-qa/references/session-prompt.md`;
   writeFileSync(promptFile, readFileSync(promptFile, 'utf8').replace('- Water: pour the water.', '- Water: pour every drop.'));
   {
     const failed = preflight('hq').filter((check) => !check.ok);

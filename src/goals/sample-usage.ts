@@ -12,8 +12,8 @@ const lastAt = z.object({ at: z.string().nullable() });
 const LAST_ROW = z.object({ account: z.string(), five_hour: z.number().nullable(), seven_day: z.number().nullable(), five_hour_resets_at: z.string().nullable(), seven_day_resets_at: z.string().nullable() }).nullable();
 
 export function sampleUsage(db: Database, at: Date = now()): boolean {
-  const f = getUsageCache(),
-    insert = db.query('INSERT OR IGNORE INTO usage_samples (at, account, five_hour, seven_day, five_hour_resets_at, seven_day_resets_at) VALUES (?, ?, ?, ?, ?, ?)');
+  const f = getUsageCache();
+  const insert = db.query('INSERT OR IGNORE INTO usage_samples (at, account, five_hour, seven_day, five_hour_resets_at, seven_day_resets_at) VALUES (?, ?, ?, ?, ?, ?)');
   let files: string[] = [];
   try {
     files = readdirSync(getUsageDir()).filter((name) => name.endsWith('.json'));

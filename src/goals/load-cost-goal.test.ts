@@ -53,8 +53,8 @@ test('it gives the spend no colour when the review cleared the target', async ()
 });
 
 test('it compares in whole cents, so 0.1 and 0.2 meet a budget of exactly 0.30', async () => {
-  const db = setupTest(),
-    lastDay = new Date('2026-10-31T07:00:00Z');
+  const db = setupTest();
+  const lastDay = new Date('2026-10-31T07:00:00Z');
   await refreshActionsSpend(db, () => Promise.resolve({ code: 0, stdout: JSON.stringify({ usageItems: [{ product: 'actions', netAmount: 0.1 }, { product: 'actions', netAmount: 0.2 }] }), stderr: '' }), lastDay);
 
   expect(loadCostGoal(db, { op: '<=', value: 0.3 }, lastDay)).toStrictEqual({ text: 'Actions $0.30 of $0.30 budget to date', verdict: 'green' });

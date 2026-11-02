@@ -14,10 +14,10 @@ test('a week across the October daylight saving change starts at the old offset 
 });
 
 test('PRs sort by repo then merge time, and issues with equal PR counts stay in issue order', () => {
-  const early = buildMergedPR({ number: 2, repo: 'kettle', issue: 'GEO-9801', mergedAt: '2026-10-13T01:00:00Z' }),
-    late = buildMergedPR({ number: 3, repo: 'kettle', issue: 'GEO-9802', mergedAt: '2026-10-13T05:00:00Z' }),
-    other = buildMergedPR({ number: 1, repo: 'brewer', issue: 'GEO-9803', mergedAt: '2026-10-14T01:00:00Z' }),
-    week = mergeMergedDays([buildDay('2026-10-12T00:00:00+11:00', { prs: [late] }), buildDay('2026-10-13T00:00:00+11:00', { prs: [other, early] })]);
+  const early = buildMergedPR({ number: 2, repo: 'kettle', issue: 'GEO-9801', mergedAt: '2026-10-13T01:00:00Z' });
+  const late = buildMergedPR({ number: 3, repo: 'kettle', issue: 'GEO-9802', mergedAt: '2026-10-13T05:00:00Z' });
+  const other = buildMergedPR({ number: 1, repo: 'brewer', issue: 'GEO-9803', mergedAt: '2026-10-14T01:00:00Z' });
+  const week = mergeMergedDays([buildDay('2026-10-12T00:00:00+11:00', { prs: [late] }), buildDay('2026-10-13T00:00:00+11:00', { prs: [other, early] })]);
 
   expect(week.prs.map((pr) => pr.number)).toStrictEqual([1, 2, 3]);
   expect(week.byIssue.map((entry) => entry.issue)).toStrictEqual(['GEO-9801', 'GEO-9802', 'GEO-9803']);

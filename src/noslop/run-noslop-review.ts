@@ -81,9 +81,9 @@ export interface NoslopReviewResult {
 }
 
 export async function runNoslopReview(ctx: NoslopReviewContext): Promise<NoslopReviewResult> {
-  const prep = await createReviewPrep(ctx),
-    ran = await runNoslopProcess(ctx, prep),
-    row = await collectReviewRow(ctx, ran);
+  const prep = await createReviewPrep(ctx);
+  const ran = await runNoslopProcess(ctx, prep);
+  const row = await collectReviewRow(ctx, ran);
   recordRound(ctx.db, row);
   // oxlint-disable-next-line zgeoff/no-abbreviated-names -- grandfathered key of the review event
   logEvent(ctx.db, 'hq', `noslop:${ctx.repo}#${ctx.pr}`, pickAction('review', row.ok), 'hq', null, null, { ms: ran.ms, findings: row.findings.length, sha: ran.sha, issue: prep.issueFile.note, postFailed: ran.postFailed });
@@ -114,10 +114,10 @@ interface ReviewPrep {
 // Credentials first, so a missing one stops the review before any worktree exists. The worktree name
 // is unique per process: a second review of the same PR never removes this one's worktree.
 async function createReviewPrep(ctx: NoslopReviewContext): Promise<ReviewPrep> {
-  const refs = await readPRRefs(ctx),
-    reviewFile = `${ctx.scratch}/${buildRoundStem(ctx.repo, ctx.pr)}-noslop.json`,
-    secrets = await loadNoslopSecrets(ctx.run, () => recordOpRead(ctx.db, 'noslop', 1)),
-    worktree = `${ctx.scratch}/${buildRoundStem(ctx.repo, ctx.pr)}-noslop-${process.pid}`;
+  const refs = await readPRRefs(ctx);
+  const reviewFile = `${ctx.scratch}/${buildRoundStem(ctx.repo, ctx.pr)}-noslop.json`;
+  const secrets = await loadNoslopSecrets(ctx.run, () => recordOpRead(ctx.db, 'noslop', 1));
+  const worktree = `${ctx.scratch}/${buildRoundStem(ctx.repo, ctx.pr)}-noslop-${process.pid}`;
   rmSync(worktree, { recursive: true, force: true });
   rmSync(reviewFile, { force: true });
   await createWorktree(ctx, worktree, refs.baseRefName);
@@ -172,12 +172,12 @@ async function runNoslopProcess(ctx: NoslopReviewContext, prep: ReviewPrep): Pro
 }
 
 async function runNoslopLocked(ctx: NoslopReviewContext, prep: ReviewPrep): Promise<Omit<ReviewRan, 'cleanupError'>> {
-  const args = buildReviewArgs(ctx, prep),
-    began = Date.now(),
-    begun = iso(now()),
-    command = buildNoslopCommand(ctx.clone, args),
-    finished = await boundedRunner(ctx.run, ctx.timeoutMs)(command, { cwd: prep.worktree, env: buildNoslopEnv(prep.secrets) }),
-    verdict = parseReviewRun(finished.code, finished.stdout, getTail(finished.stderr, prep.secrets), ctx.timeoutMs);
+  const args = buildReviewArgs(ctx, prep);
+  const began = Date.now();
+  const begun = iso(now());
+  const command = buildNoslopCommand(ctx.clone, args);
+  const finished = await boundedRunner(ctx.run, ctx.timeoutMs)(command, { cwd: prep.worktree, env: buildNoslopEnv(prep.secrets) });
+  const verdict = parseReviewRun(finished.code, finished.stdout, getTail(finished.stderr, prep.secrets), ctx.timeoutMs);
   await Bun.write(prep.reviewFile, finished.stdout);
   // oxlint-disable-next-line zgeoff/no-abbreviated-names -- grandfathered property of the recorded round
   return { ...readPostFailedReview(ctx.store, finished.stdout, verdict), ms: Date.now() - began, startedAt: begun, sha: ctx.sha };
@@ -197,9 +197,9 @@ function readPostFailedReview(store: string, stdout: string, verdict: Judged<Rev
 }
 
 function buildReviewArgs(ctx: NoslopReviewContext, prep: ReviewPrep): string[] {
-  const fixesOnly = ctx.fixesOnly === true ? ['--fixes-only'] : [],
-    full = ctx.full === true ? ['--full'] : [],
-    issue = buildIssueArgs(prep.issueFile);
+  const fixesOnly = ctx.fixesOnly === true ? ['--fixes-only'] : [];
+  const full = ctx.full === true ? ['--full'] : [];
+  const issue = buildIssueArgs(prep.issueFile);
   return ['review', '--pr', String(ctx.pr), '--repo', ctx.slug, '--report', 'sqlite,github', '--json', ...full, ...fixesOnly, ...issue];
 }
 

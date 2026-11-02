@@ -212,8 +212,8 @@ test('it takes no new repo-day once the sync is aborted', async () => {
 });
 
 test('loadRepos() keeps only the repos in scope, and the list matches repo-facts.md', async () => {
-  const doc = await Bun.file(`${import.meta.dir}/../../docs/skill-development/repo-facts.md`).text(),
-    scoped = await loadRepos(() => Promise.resolve({ code: 0, stdout: JSON.stringify([{ name: 'atc', isArchived: false }, { name: 'decree', isArchived: false }, { name: 'brand-new', isArchived: false }]), stderr: '' }));
+  const doc = await Bun.file(`${import.meta.dir}/../../docs/skill-development/repo-facts.md`).text();
+  const scoped = await loadRepos(() => Promise.resolve({ code: 0, stdout: JSON.stringify([{ name: 'atc', isArchived: false }, { name: 'decree', isArchived: false }, { name: 'brand-new', isArchived: false }]), stderr: '' }));
   expect(scoped).toEqual(['atc']);
   const section = doc.split('## repos in scope')[1]!.split('\n## ')[0]!;
   const inList = section.split(/^In:\s*$/m)[1]!.split(/^(?!- |\s*$)/m)[0]!;

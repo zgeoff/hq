@@ -19,14 +19,14 @@ import type { EnsureStep, RcCheck, RcEval, RcPending } from './types.ts';
 import { updateRcPending as setPending } from './update-rc-pending.ts';
 
 export async function checkRcMarker(db: Database, check: RcCheck): Promise<RcEval> {
-  const RC_CONFIRM_POLLS = 15,
-    RC_RETRY = new Set(['atc_too_slow', 'atc_permission_pending']),
-    RC_TYPING_MS = 2 * 60_000,
-    client = check.client,
-    name = check.name,
-    o = check,
-    p = rcPending(db)[name],
-    rc = check.rc;
+  const RC_CONFIRM_POLLS = 15;
+  const RC_RETRY = new Set(['atc_too_slow', 'atc_permission_pending']);
+  const RC_TYPING_MS = 2 * 60_000;
+  const client = check.client;
+  const name = check.name;
+  const o = check;
+  const p = rcPending(db)[name];
+  const rc = check.rc;
   if (!p) return { kind: 'none' };
   const t = now();
   const end = (action: EnsureStep['action'], text: string, data: Record<string, unknown>) => rcFinish(db, name, p, action, text, data, o.actor);

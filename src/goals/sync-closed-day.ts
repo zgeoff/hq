@@ -10,8 +10,8 @@ import { toUTCDay } from './to-utc-day.ts';
 import { upsertGoalDay } from './upsert-goal-day.ts';
 
 export async function syncClosedDay(db: Database, run: Runner, day: string, env?: RunOpts['env'], at: Date = now()): Promise<number> {
-  const q = `org:zgeoff is:pr is:closed is:unmerged closed:${day}T00:00:00Z..${day}T23:59:59Z`,
-    raw = await readGhJSON(run, ['api', '-X', 'GET', 'search/issues', '-f', `q=${q}`, '-f', 'per_page=100', '--paginate', '--slurp'], env, `closed PRs on ${day}`);
+  const q = `org:zgeoff is:pr is:closed is:unmerged closed:${day}T00:00:00Z..${day}T23:59:59Z`;
+  const raw = await readGhJSON(run, ['api', '-X', 'GET', 'search/issues', '-f', `q=${q}`, '-f', 'per_page=100', '--paginate', '--slurp'], env, `closed PRs on ${day}`);
   if (!Array.isArray(raw)) throw new HqError('command_failed', `closed PRs on ${day}: not a page list`);
   const items: { repo: string; number: number; closed_at: string }[] = [];
   for (const page of raw as { total_count?: unknown; items?: unknown; incomplete_results?: unknown }[]) {

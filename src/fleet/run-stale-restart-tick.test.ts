@@ -15,10 +15,10 @@ import { logEvent } from '../log-event.ts';
 import { resetFetchCache } from '../prompts/reset-fetch-cache.ts';
 import { FOUR_AM_SYDNEY, NOON_SYDNEY, at, createDefsRepo, fakeAtc, freshDb } from '../../test/helpers.ts';
 
-const KETTLE = 'skills/kettle/references/session-prompt.md',
-  NEW_PROMPT = 'You are Kettle. Boil water when asked.',
-  OLD_PROMPT = 'You are Kettle. Boil water slowly.',
-  URN = 'skills/urn/references/session-prompt.md';
+const KETTLE = 'skills/kettle/references/session-prompt.md';
+const NEW_PROMPT = 'You are Kettle. Boil water when asked.';
+const OLD_PROMPT = 'You are Kettle. Boil water slowly.';
+const URN = 'skills/urn/references/session-prompt.md';
 
 interface RosterSession {
   id: string;
@@ -30,12 +30,12 @@ interface RosterSession {
 
 function setupTest(config: { sessions?: RosterSession[]; cwd?: string } = {}) {
   resetFetchCache();
-  const base = freshDb(),
-    kettle: FleetEntry = { name: 'z-kettle', cwd: config.cwd ?? `${base.dir}/work`, model: 'opus', prompt: `main:${KETTLE}`, wake: false },
-    roster = (config.sessions ?? [{ id: 'id-kettle', name: 'z-kettle', state: 'done' }]).map((s) => Object.assign(s, { alive: true, pinned: true })),
-    server = fakeAtc(base.dir, roster),
-    steward: FleetEntry = { name: 'z-stu', cwd: `${base.dir}/work`, model: 'opus', prompt: `main:${KETTLE}`, wake: false, roles: ['owner'] },
-    urn: FleetEntry = { name: 'z-urn', cwd: `${base.dir}/work`, model: 'opus', prompt: `main:${URN}`, wake: false };
+  const base = freshDb();
+  const kettle: FleetEntry = { name: 'z-kettle', cwd: config.cwd ?? `${base.dir}/work`, model: 'opus', prompt: `main:${KETTLE}`, wake: false };
+  const roster = (config.sessions ?? [{ id: 'id-kettle', name: 'z-kettle', state: 'done' }]).map((s) => Object.assign(s, { alive: true, pinned: true }));
+  const server = fakeAtc(base.dir, roster);
+  const steward: FleetEntry = { name: 'z-stu', cwd: `${base.dir}/work`, model: 'opus', prompt: `main:${KETTLE}`, wake: false, roles: ['owner'] };
+  const urn: FleetEntry = { name: 'z-urn', cwd: `${base.dir}/work`, model: 'opus', prompt: `main:${URN}`, wake: false };
   createDefsRepo(base.dir, { [KETTLE]: `\`\`\`text\n${NEW_PROMPT}\n\`\`\`\n`, [URN]: '```text\nYou are Urn. Keep the water hot.\n```\n' });
   onTestFinished(base.cleanup);
   onTestFinished(server.stop);
@@ -195,8 +195,8 @@ test('it does not ask a session with an unsent message waiting for it', async ()
 });
 
 test('it skips with a longer backoff each time a message stays delivered, up to four hours', async () => {
-  const ctx = setupTest(),
-    retries: (string | undefined)[] = [];
+  const ctx = setupTest();
+  const retries: (string | undefined)[] = [];
 
   for (const minutes of [0, 121, 132, 192, 203, 323, 334, 574, 585]) {
     await ctx.tick(minutes, [ctx.kettle]);
@@ -212,8 +212,8 @@ test('it skips with a longer backoff each time a message stays delivered, up to 
 });
 
 test('it tells the owner once after six skips and still does not restart', async () => {
-  const ctx = setupTest(),
-    quiet = overrideEnv('HQ_QUIET', '0-0');
+  const ctx = setupTest();
+  const quiet = overrideEnv('HQ_QUIET', '0-0');
   onTestFinished(quiet);
 
   for (const minutes of [0, 121, 132, 192, 203, 323, 334, 574, 585, 825, 836, 1076, 1087, 1327, 1338]) {
@@ -248,9 +248,9 @@ test('it never asks or restarts at 04:00 Sydney', async () => {
 });
 
 test('it holds a restart that a session said saved for before 03:00 Sydney until quiet hours end', async () => {
-  const ctx = setupTest(),
-    quietCalls: string[] = [],
-    quietPhases: (string | undefined)[] = [];
+  const ctx = setupTest();
+  const quietCalls: string[] = [];
+  const quietPhases: (string | undefined)[] = [];
 
   await ctx.tick(760, [ctx.kettle]);
   await ctx.tick(881, [ctx.kettle]);
@@ -501,8 +501,8 @@ test('it records when atc last answered the read of an asked save request, and k
 });
 
 test('it waits, then restarts, when the activity of the saved answer itself is recent', async () => {
-  const answeredAt = Date.parse(NOON_SYDNEY) + 125 * 60_000,
-    ctx = setupTest();
+  const answeredAt = Date.parse(NOON_SYDNEY) + 125 * 60_000;
+  const ctx = setupTest();
 
   await ctx.tick(0, [ctx.kettle]);
   await ctx.tick(121, [ctx.kettle]);
@@ -520,8 +520,8 @@ test('it waits, then restarts, when the activity of the saved answer itself is r
 });
 
 test('it skips the round when the session is still busy ten minutes after it said saved', async () => {
-  const answeredAt = Date.parse(NOON_SYDNEY) + 125 * 60_000,
-    ctx = setupTest();
+  const answeredAt = Date.parse(NOON_SYDNEY) + 125 * 60_000;
+  const ctx = setupTest();
 
   await ctx.tick(0, [ctx.kettle]);
   await ctx.tick(121, [ctx.kettle]);

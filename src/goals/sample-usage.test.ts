@@ -7,13 +7,15 @@ import { getUsageDir } from './get-usage-dir.ts';
 import { measure } from './measure.ts';
 import { sampleUsage } from './sample-usage.ts';
 
-let cleanup: () => void, db: Database, dir: string;
+let cleanup: () => void;
+let db: Database;
+let dir: string;
 
-const FROM = new Date('2026-10-15T13:00:00Z'),
-  NOW = new Date('2026-10-16T07:00:00Z'),
-  TO = new Date('2026-10-16T13:00:00Z'),
-  home = process.env['HOME'],
-  xdg = process.env['XDG_CACHE_HOME'];
+const FROM = new Date('2026-10-15T13:00:00Z');
+const NOW = new Date('2026-10-16T07:00:00Z');
+const TO = new Date('2026-10-16T13:00:00Z');
+const home = process.env['HOME'];
+const xdg = process.env['XDG_CACHE_HOME'];
 
 beforeEach(() => {
   ({ db, dir, cleanup } = freshDb());

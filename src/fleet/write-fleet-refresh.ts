@@ -8,8 +8,8 @@ import type { RefreshMap, RefreshPhase } from './refresh-schema.ts';
 import { REFRESH_TRANSITIONS } from './refresh-transitions.ts';
 
 export function writeFleetRefresh(db: Database, refresh: RefreshMap): void {
-  const stored = metaJson(db, 'fleet_refresh', refreshSchema, {}),
-    text = Object.keys(refresh).length > 0 ? JSON.stringify(refresh) : null;
+  const stored = metaJson(db, 'fleet_refresh', refreshSchema, {});
+  const text = Object.keys(refresh).length > 0 ? JSON.stringify(refresh) : null;
   for (const name of new Set([...Object.keys(stored), ...Object.keys(refresh)])) {
     checkRefreshMove(name, stored[name], refresh[name]);
   }
@@ -22,8 +22,8 @@ function checkRefreshMove(name: string, from: RefreshEntry | undefined, to: Refr
   if (isDeepStrictEqual(toPhaseFields(from), toPhaseFields(to))) {
     return;
   }
-  const fromPhase = toMovePhase(from, to?.sessionId),
-    toPhase = to?.phase ?? 'none';
+  const fromPhase = toMovePhase(from, to?.sessionId);
+  const toPhase = to?.phase ?? 'none';
   if (!REFRESH_TRANSITIONS[fromPhase].includes(toPhase)) {
     throw new HqError('bad_refresh_move', `fleet_refresh: ${name} cannot move from ${fromPhase} to ${toPhase}`);
   }

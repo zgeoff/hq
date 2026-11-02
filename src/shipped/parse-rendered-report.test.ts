@@ -6,9 +6,9 @@ import { parseRenderedReport } from './parse-rendered-report.ts';
 const FIXTURES = join(import.meta.dir, '../../skills/delivery-report/scripts/testdata/render-report');
 
 test.each(['daily.json.expected', 'weekly.json.expected'])('the skill\'s own %s reads whole', (file) => {
-  const body = readFileSync(join(FIXTURES, file), 'utf8'),
-    raw = JSON.parse(body) as { groups: { rows: { prs: unknown[] }[] }[] },
-    read = parseRenderedReport(body);
+  const body = readFileSync(join(FIXTURES, file), 'utf8');
+  const raw = JSON.parse(body) as { groups: { rows: { prs: unknown[] }[] }[] };
+  const read = parseRenderedReport(body);
   expect(collectPRs(read.groups)).toStrictEqual(collectPRs(raw.groups));
 });
 

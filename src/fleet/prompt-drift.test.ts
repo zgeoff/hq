@@ -10,9 +10,9 @@ const KETTLE = 'skills/kettle/references/session-prompt.md';
 
 function setupTest() {
   resetFetchCache();
-  const base = freshDb(),
-    client: DriftClient = { prompt: () => Promise.resolve('You are Kettle.') },
-    entry: FleetEntry = { name: 'z-kettle', cwd: base.dir, model: 'opus', prompt: `main:${KETTLE}`, wake: false };
+  const base = freshDb();
+  const client: DriftClient = { prompt: () => Promise.resolve('You are Kettle.') };
+  const entry: FleetEntry = { name: 'z-kettle', cwd: base.dir, model: 'opus', prompt: `main:${KETTLE}`, wake: false };
   onTestFinished(base.cleanup);
   return { client, dir: base.dir, entry, createDefsRepo: (files: Record<string, string>) => createDefsRepo(base.dir, files) };
 }
@@ -38,10 +38,10 @@ test('it reports unknown, never stale, when hq-private is not a checkout', async
 });
 
 test('it reads every session within the budget when the fetch of hq-private is slower than the budget', async () => {
-  const ctx = setupTest(),
-    entries = ['z-kettle', 'z-teapot', 'z-mug'].map((name): FleetEntry => ({ name, cwd: ctx.entry.cwd, model: ctx.entry.model, prompt: ctx.entry.prompt, wake: false })),
-    repo = ctx.createDefsRepo({ [KETTLE]: '```text\nYou are Kettle.\n```\n' }),
-    slow: DriftClient = { prompt: () => readAfterExit('You are Kettle.') };
+  const ctx = setupTest();
+  const entries = ['z-kettle', 'z-teapot', 'z-mug'].map((name): FleetEntry => ({ name, cwd: ctx.entry.cwd, model: ctx.entry.model, prompt: ctx.entry.prompt, wake: false }));
+  const repo = ctx.createDefsRepo({ [KETTLE]: '```text\nYou are Kettle.\n```\n' });
+  const slow: DriftClient = { prompt: () => readAfterExit('You are Kettle.') };
   Bun.spawnSync(['git', '-C', repo.private, 'config', 'remote.origin.uploadpack', 'sleep 1; git-upload-pack']);
   {
     const result = await promptDrift(slow, entries, entries.map((e) => ({ id: `id-${e.name}`, name: e.name, alive: true })), {}, 500);

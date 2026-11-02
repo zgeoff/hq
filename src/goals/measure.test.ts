@@ -8,9 +8,11 @@ import { DEFAULT_TARGETS } from './default-targets.ts';
 import { measure } from './measure.ts';
 import { verdict } from './verdict.ts';
 
-let cleanup: () => void, db: Database, dir: string;
-const home = process.env['HOME'],
-  xdg = process.env['XDG_CACHE_HOME'];
+let cleanup: () => void;
+let db: Database;
+let dir: string;
+const home = process.env['HOME'];
+const xdg = process.env['XDG_CACHE_HOME'];
 
 const FROM = new Date('2026-10-15T13:00:00Z');
 const TO = new Date('2026-10-16T13:00:00Z');

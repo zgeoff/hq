@@ -26,8 +26,8 @@ function buildUsage(items: unknown[]): RunResult {
 const OCT_16 = new Date('2026-10-16T07:00:00Z');
 
 test('it reads the month of the UTC date from the user billing usage endpoint', async () => {
-  const calls: string[][] = [],
-    db = setupTest();
+  const calls: string[][] = [];
+  const db = setupTest();
 
   await refreshActionsSpend(db, makeGh(buildUsage([]), calls), OCT_16);
 
@@ -35,13 +35,13 @@ test('it reads the month of the UTC date from the user billing usage endpoint', 
 });
 
 test('it sums the net amount of the actions product only, in any case', async () => {
-  const db = setupTest(),
-    failure = await refreshActionsSpend(db, makeGh(buildUsage([
-      { date: '2026-10-02T00:00:00Z', product: 'actions', sku: 'actions_linux', quantity: 300, unitType: 'Minutes', pricePerUnit: 0.008, grossAmount: 2.4, discountAmount: 0.4, netAmount: 2, repositoryName: 'zgeoff/kettle' },
-      { date: '2026-10-03T00:00:00Z', product: 'Actions', sku: 'actions_storage', quantity: 1, unitType: 'GigabyteHours', pricePerUnit: 0.25, grossAmount: 0.5, discountAmount: 0, netAmount: 0.5, repositoryName: 'zgeoff/teapot' },
-      { date: '2026-10-03T00:00:00Z', product: 'packages', sku: 'packages_storage', quantity: 2, unitType: 'GigabyteHours', pricePerUnit: 0.25, grossAmount: 9, discountAmount: 0, netAmount: 9, repositoryName: 'zgeoff/kettle' },
-      { date: '2026-10-04T00:00:00Z', product: 'copilot', sku: 'copilot_premium_request', quantity: 10, unitType: 'Requests', pricePerUnit: 0.04, grossAmount: 7, discountAmount: 0, netAmount: 7, repositoryName: '' },
-    ])), OCT_16);
+  const db = setupTest();
+  const failure = await refreshActionsSpend(db, makeGh(buildUsage([
+    { date: '2026-10-02T00:00:00Z', product: 'actions', sku: 'actions_linux', quantity: 300, unitType: 'Minutes', pricePerUnit: 0.008, grossAmount: 2.4, discountAmount: 0.4, netAmount: 2, repositoryName: 'zgeoff/kettle' },
+    { date: '2026-10-03T00:00:00Z', product: 'Actions', sku: 'actions_storage', quantity: 1, unitType: 'GigabyteHours', pricePerUnit: 0.25, grossAmount: 0.5, discountAmount: 0, netAmount: 0.5, repositoryName: 'zgeoff/teapot' },
+    { date: '2026-10-03T00:00:00Z', product: 'packages', sku: 'packages_storage', quantity: 2, unitType: 'GigabyteHours', pricePerUnit: 0.25, grossAmount: 9, discountAmount: 0, netAmount: 9, repositoryName: 'zgeoff/kettle' },
+    { date: '2026-10-04T00:00:00Z', product: 'copilot', sku: 'copilot_premium_request', quantity: 10, unitType: 'Requests', pricePerUnit: 0.04, grossAmount: 7, discountAmount: 0, netAmount: 7, repositoryName: '' },
+  ])), OCT_16);
 
   expect(failure).toBeNull();
   expect(loadActionsSpend(db, OCT_16)).toBe(2.5);
@@ -56,9 +56,9 @@ test('it reads an empty usage list as no spend', async () => {
 });
 
 test('it leaves the spend unknown when gh exits non-zero, even after a good reading', async () => {
-  const db = setupTest(),
-    earlier = await refreshActionsSpend(db, makeGh(buildUsage([{ product: 'actions', netAmount: 4 }])), new Date('2026-10-16T06:30:00Z')),
-    failure = await refreshActionsSpend(db, makeGh({ code: 1, stdout: '', stderr: 'gh: Resource not accessible by personal access token (HTTP 403)' }), OCT_16);
+  const db = setupTest();
+  const earlier = await refreshActionsSpend(db, makeGh(buildUsage([{ product: 'actions', netAmount: 4 }])), new Date('2026-10-16T06:30:00Z'));
+  const failure = await refreshActionsSpend(db, makeGh({ code: 1, stdout: '', stderr: 'gh: Resource not accessible by personal access token (HTTP 403)' }), OCT_16);
 
   expect(earlier).toBeNull();
   expect(failure).toBe('GitHub billing usage failed (1): gh: Resource not accessible by personal access token (HTTP 403)');
@@ -66,24 +66,24 @@ test('it leaves the spend unknown when gh exits non-zero, even after a good read
 });
 
 test('it leaves the spend unknown when the JSON has no usageItems', async () => {
-  const db = setupTest(),
-    failure = await refreshActionsSpend(db, makeGh({ code: 0, stdout: JSON.stringify({ total: 4 }), stderr: '' }), OCT_16);
+  const db = setupTest();
+  const failure = await refreshActionsSpend(db, makeGh({ code: 0, stdout: JSON.stringify({ total: 4 }), stderr: '' }), OCT_16);
 
   expect(failure).toBe('GitHub billing usage: no usageItems list');
   expect(loadActionsSpend(db, OCT_16)).toBeNull();
 });
 
 test('it leaves the spend unknown when gh prints no JSON', async () => {
-  const db = setupTest(),
-    failure = await refreshActionsSpend(db, makeGh({ code: 0, stdout: 'not json', stderr: '' }), OCT_16);
+  const db = setupTest();
+  const failure = await refreshActionsSpend(db, makeGh({ code: 0, stdout: 'not json', stderr: '' }), OCT_16);
 
   expect(failure).toBe('GitHub billing usage returned no JSON');
   expect(loadActionsSpend(db, OCT_16)).toBeNull();
 });
 
 test('it leaves the spend unknown when an item has no numeric netAmount', async () => {
-  const db = setupTest(),
-    failure = await refreshActionsSpend(db, makeGh(buildUsage([{ product: 'actions', netAmount: 1 }, { product: 'actions', grossAmount: 3, netAmount: '3' }])), OCT_16);
+  const db = setupTest();
+  const failure = await refreshActionsSpend(db, makeGh(buildUsage([{ product: 'actions', netAmount: 1 }, { product: 'actions', grossAmount: 3, netAmount: '3' }])), OCT_16);
 
   expect(failure).toBe('GitHub billing usage: an item without a product or a netAmount');
   expect(loadActionsSpend(db, OCT_16)).toBeNull();

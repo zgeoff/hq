@@ -16,18 +16,18 @@ function readBlockedStorage(): Storage {
 }
 
 test('a picked theme comes back on the next page, as a tab change loads one', () => {
-  const kept = buildStorage(),
-    picked = buildRoot(),
-    reloaded = buildRoot();
+  const kept = buildStorage();
+  const picked = buildRoot();
+  const reloaded = buildRoot();
   writeTheme(picked, () => kept, 'dark');
   restoreTheme(reloaded, () => kept);
   expect([picked.dataset['theme'], reloaded.dataset['theme']]).toStrictEqual(['dark', 'dark']);
 });
 
 test('with no theme kept, or storage that refuses, the page follows the system theme and still shows a pick', () => {
-  const blocked = buildRoot(),
-    fresh = buildRoot(),
-    picked = buildRoot();
+  const blocked = buildRoot();
+  const fresh = buildRoot();
+  const picked = buildRoot();
   restoreTheme(fresh, () => buildStorage());
   restoreTheme(blocked, readBlockedStorage);
   writeTheme(picked, readBlockedStorage, 'light');

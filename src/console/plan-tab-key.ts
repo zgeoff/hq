@@ -18,9 +18,9 @@ export interface TabKeyPlan {
 }
 
 export function planTabKey(input: TabKeyInput): TabKeyPlan {
-  const PENDING_MS = 1500,
-    pending = input.pendingSince !== null && input.now - input.pendingSince <= PENDING_MS,
-    target = pending ? CONSOLE_TAB_LIST.find((entry) => entry.key === input.key) : undefined;
+  const PENDING_MS = 1500;
+  const pending = input.pendingSince !== null && input.now - input.pendingSince <= PENDING_MS;
+  const target = pending ? CONSOLE_TAB_LIST.find((entry) => entry.key === input.key) : undefined;
   if (input.inText || input.modified) {
     return { pendingSince: null, go: null, consumed: false };
   }
@@ -39,7 +39,7 @@ function findStep(current: ConsoleTab, step: number): string | null {
   if (step === 0) {
     return null;
   }
-  const at = CONSOLE_TAB_LIST.findIndex((entry) => entry.tab === current),
-    count = CONSOLE_TAB_LIST.length;
+  const at = CONSOLE_TAB_LIST.findIndex((entry) => entry.tab === current);
+  const count = CONSOLE_TAB_LIST.length;
   return CONSOLE_TAB_LIST[(((at + step) % count) + count) % count]?.path ?? null;
 }

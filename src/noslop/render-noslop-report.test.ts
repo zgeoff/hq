@@ -9,8 +9,8 @@ import type { RoundRow } from './record-round.ts';
 import { renderNoslopReport } from './render-noslop-report.ts';
 
 function setupTest() {
-  const base = mkdtempSync(join(tmpdir(), 'hq-noslop-report-')),
-    db = openDb(join(base, 'hq.db'));
+  const base = mkdtempSync(join(tmpdir(), 'hq-noslop-report-'));
+  const db = openDb(join(base, 'hq.db'));
 
   onTestFinished(() => {
     db.close();
@@ -42,8 +42,8 @@ function setupTest() {
   };
 }
 
-const FIND_A = { id: 'aaaaaaaaaaaaaaaa', lens: 'correctness', severity: 'high', title: 'Kettle never boils' },
-  FIND_B = { id: 'bbbbbbbbbbbbbbbb', lens: 'style', severity: 'low', title: 'Lid is loose' };
+const FIND_A = { id: 'aaaaaaaaaaaaaaaa', lens: 'correctness', severity: 'high', title: 'Kettle never boils' };
+const FIND_B = { id: 'bbbbbbbbbbbbbbbb', lens: 'style', severity: 'low', title: 'Lid is loose' };
 
 test('it prints one block per PR', () => {
   const ctx = setupTest();

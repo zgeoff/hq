@@ -15,9 +15,9 @@ function setupTest() {
 }
 
 test('it pins a commit in its own folder: fetch, resolve the full sha, add a worktree, install without scripts', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner(),
-    folder = `${ctx.base}-0123456789abcdef0123456789abcdef01234567`;
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
+  const folder = `${ctx.base}-0123456789abcdef0123456789abcdef01234567`;
   onTestFinished(() => rmSync(folder, { recursive: true, force: true }));
   const result = await updateNoslopClone(fake.run, ctx.base, '0123456');
 
@@ -33,9 +33,9 @@ test('it pins a commit in its own folder: fetch, resolve the full sha, add a wor
 });
 
 test('it reuses a commit folder that is already installed', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner(),
-    folder = `${ctx.base}-0123456789abcdef0123456789abcdef01234567`;
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
+  const folder = `${ctx.base}-0123456789abcdef0123456789abcdef01234567`;
   mkdirSync(`${folder}/node_modules`, { recursive: true });
   onTestFinished(() => rmSync(folder, { recursive: true, force: true }));
   writeFileSync(`${folder}/node_modules/.hq-install-complete`, '');
@@ -66,16 +66,16 @@ test('it installs again in a commit folder whose install stopped before it compl
 });
 
 test('it removes the commit folder when the install fails', async () => {
-  const ctx = setupTest(),
-    folder = `${ctx.base}-${'abc1234'.padEnd(40, '0')}`,
-    lines: string[] = [],
-    run: Runner = (cmd) => {
-      lines.push(cmd.join(' '));
-      if (cmd[0] === 'bun') {
-        return Promise.resolve({ code: 1, stdout: '', stderr: 'lockfile out of date' });
-      }
-      return Promise.resolve({ code: 0, stdout: `${'abc1234'.padEnd(40, '0')}\n`, stderr: '' });
-    };
+  const ctx = setupTest();
+  const folder = `${ctx.base}-${'abc1234'.padEnd(40, '0')}`;
+  const lines: string[] = [];
+  const run: Runner = (cmd) => {
+    lines.push(cmd.join(' '));
+    if (cmd[0] === 'bun') {
+      return Promise.resolve({ code: 1, stdout: '', stderr: 'lockfile out of date' });
+    }
+    return Promise.resolve({ code: 0, stdout: `${'abc1234'.padEnd(40, '0')}\n`, stderr: '' });
+  };
 
   await expect(updateNoslopClone(run, ctx.base, 'abc1234')).rejects.toMatchObject({ code: 'command_failed' });
 
@@ -83,8 +83,8 @@ test('it removes the commit folder when the install fails', async () => {
 });
 
 test('it clones noslop on first use before it pins', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner();
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
 
   await updateNoslopClone(fake.run, join(ctx.base, 'cache', 'zgeoff', 'noslop'), 'abc1234');
 

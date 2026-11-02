@@ -2,8 +2,8 @@ import { expect, test } from 'bun:test';
 import { planMergedDays } from './plan-merged-days.ts';
 
 test('today and yesterday are Sydney calendar dates, across midnight UTC and a daylight saving change', () => {
-  const morning = new Date('2026-10-14T21:30:00Z'),
-    shifted = new Date('2026-10-04T13:30:00Z');
+  const morning = new Date('2026-10-14T21:30:00Z');
+  const shifted = new Date('2026-10-04T13:30:00Z');
   expect([planMergedDays('today', morning), planMergedDays('yesterday', morning)]).toStrictEqual([
     { today: '2026-10-15', days: ['2026-10-15'] },
     { today: '2026-10-15', days: ['2026-10-14'] },

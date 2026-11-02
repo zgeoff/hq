@@ -4,8 +4,8 @@ import { checkTrees } from './check-trees.ts';
 import { spawnGrants } from './spawn-grants.ts';
 
 test('it starts the grants check with bun, not the running binary, from the hq-defs checkout', () => {
-  const calls: { argv: string[]; cwd: string }[] = [],
-    trees = createTreeFixture().createBoth();
+  const calls: { argv: string[]; cwd: string }[] = [];
+  const trees = createTreeFixture().createBoth();
   checkTrees('hq', (argv, cwd) => {
     calls.push({ argv, cwd });
     return spawnGrants(argv, cwd);

@@ -18,11 +18,11 @@ interface ShippedViewProps {
 // switch the period. hq keeps each report 5 minutes, and an open page reads again every 5, so a
 // new Sydney day shows within 5 minutes of midnight.
 export function ShippedView(props: ShippedViewProps) {
-  const refreshMs = props.refreshMs ?? 5 * 60_000,
-    [period, setPeriod] = useState<ShippedPeriod>('today'),
-    [help, setHelp] = useState(false),
-    consoleAPI = useConsoleAPI(),
-    report = useQuery(consoleAPI.shipped.report.queryOptions({ input: { period }, staleTime: refreshMs, refetchInterval: refreshMs }));
+  const refreshMs = props.refreshMs ?? 5 * 60_000;
+  const [period, setPeriod] = useState<ShippedPeriod>('today');
+  const [help, setHelp] = useState(false);
+  const consoleAPI = useConsoleAPI();
+  const report = useQuery(consoleAPI.shipped.report.queryOptions({ input: { period }, staleTime: refreshMs, refetchInterval: refreshMs }));
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -68,8 +68,8 @@ const PERIODS: { period: ShippedPeriod; label: string; key: string }[] = [
   { period: 'today', label: 'Today', key: 't' },
   { period: 'yesterday', label: 'Yesterday', key: 'y' },
   { period: 'week', label: 'This week', key: 'w' },
-],
-  SHIPPED_KEYS = [
-    { key: 't / y / w', what: 'Today / yesterday / this week' },
-    { key: 'Esc', what: 'Close this list' },
-  ];
+];
+const SHIPPED_KEYS = [
+  { key: 't / y / w', what: 'Today / yesterday / this week' },
+  { key: 'Esc', what: 'Close this list' },
+];

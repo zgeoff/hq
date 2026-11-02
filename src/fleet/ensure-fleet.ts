@@ -74,8 +74,8 @@ async function tryStaleRestart(db: Database, client: FleetClient, opts: StaleRes
   }
 }
 
-const LEASE = 'fleet_ensure_lease',
-  LEASE_MS = 5 * 60_000;
+const LEASE = 'fleet_ensure_lease';
+const LEASE_MS = 5 * 60_000;
 
 function takeLease(db: Database, actor: string): string {
   return db
@@ -100,10 +100,10 @@ const FLEET_UNPINNED = 'fleet_unpinned';
 async function ensureOnce(db: Database, client: FleetClient, opts: { dryRun: boolean; actor: string; fleet?: FleetEntry[]; now?: string[]; rc?: RcDeps }): Promise<EnsureStep[]> {
   // A missing name waits before a spawn (a restore after a daemon restart keeps its id); a z- session
   // doesn't sleep for an hour, so a session atc still means to run is taken as dead after that.
-  const GRACE_MIN = 10,
-    INTENDED_MAX_MIN = 60,
-    UNLISTED_GRACE_MIN = 30,
-    t = now();
+  const GRACE_MIN = 10;
+  const INTENDED_MAX_MIN = 60;
+  const UNLISTED_GRACE_MIN = 30;
+  const t = now();
   const fleet = opts.fleet ?? declaredFleet(db);
   const hurry = new Set(opts.now ?? []);
   const unknown = [...hurry].filter((n) => !fleet.some((e) => e.name === n));
@@ -289,8 +289,8 @@ async function pinSession(client: FleetClient, id: string): Promise<string | nul
 // Plugin folders go only when the entry declares them, so an atc before 4.15 still spawns every
 // other session.
 async function createFleetSession(client: FleetClient, e: FleetEntry, prompt: string, idempotencyKey: string): Promise<string> {
-  const request: SpawnRequest = { cwd: e.cwd, name: e.name, prompt, model: e.model, agent: 'claude', idempotencyKey, ...(e.pluginDirs ? { pluginDirs: e.pluginDirs } : {}) },
-    spawned = await client.spawn(request);
+  const request: SpawnRequest = { cwd: e.cwd, name: e.name, prompt, model: e.model, agent: 'claude', idempotencyKey, ...(e.pluginDirs ? { pluginDirs: e.pluginDirs } : {}) };
+  const spawned = await client.spawn(request);
   return spawned.id;
 }
 

@@ -4,8 +4,8 @@ import { kdb } from '../kdb.ts';
 import type { ShippedCacheRow } from '../kdb.ts';
 
 export async function findCacheEntries(db: Database, kind: ShippedCacheRow['kind'], keys: readonly string[], at: Date): Promise<Map<string, string>> {
-  const CHUNK = 500,
-    found = new Map<string, string>();
+  const CHUNK = 500;
+  const found = new Map<string, string>();
   for (let i = 0; i < keys.length; i += CHUNK) {
     const rows = await kdb(db)
       .selectFrom('shipped_cache')

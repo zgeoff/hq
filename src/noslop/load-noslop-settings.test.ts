@@ -7,8 +7,8 @@ import { setMeta } from '../db/set-meta.ts';
 import { loadNoslopSettings } from './load-noslop-settings.ts';
 
 function setupTest() {
-  const base = mkdtempSync(join(tmpdir(), 'hq-noslop-')),
-    db = openDb(join(base, 'hq.db'));
+  const base = mkdtempSync(join(tmpdir(), 'hq-noslop-'));
+  const db = openDb(join(base, 'hq.db'));
 
   onTestFinished(() => {
     db.close();

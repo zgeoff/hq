@@ -35,10 +35,10 @@ function buildLinear(issue: { identifier: string; title: string; description: st
 }
 
 test('it writes the issue file when the PR links an issue and noslop takes the flag', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner({ noslopHelp: HELP_WITH_FLAG }),
-    linear = buildLinear({ identifier: 'GEO-12', title: 'Mend the kettle', description: null }),
-    made = await createIssueFile({ run: fake.run, linear: linear.call, clone: '/noslop', cwd: ctx.base, body: 'Fixes GEO-12', path: ctx.path });
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ noslopHelp: HELP_WITH_FLAG });
+  const linear = buildLinear({ identifier: 'GEO-12', title: 'Mend the kettle', description: null });
+  const made = await createIssueFile({ run: fake.run, linear: linear.call, clone: '/noslop', cwd: ctx.base, body: 'Fixes GEO-12', path: ctx.path });
 
   expect(made).toStrictEqual({ path: ctx.path, note: { issue: 'GEO-12', attached: true, why: 'attached' } });
   expect(readFileSync(ctx.path, 'utf8')).toBe('# GEO-12: Mend the kettle\n\n\n');
@@ -46,10 +46,10 @@ test('it writes the issue file when the PR links an issue and noslop takes the f
 });
 
 test('it attaches nothing, and never asks Linear, when the pinned noslop lacks the flag', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner(),
-    linear = buildLinear(null),
-    made = await createIssueFile({ run: fake.run, linear: linear.call, clone: '/noslop', cwd: ctx.base, body: 'Fixes GEO-12', path: ctx.path });
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
+  const linear = buildLinear(null);
+  const made = await createIssueFile({ run: fake.run, linear: linear.call, clone: '/noslop', cwd: ctx.base, body: 'Fixes GEO-12', path: ctx.path });
 
   expect(made).toStrictEqual({ path: null, note: { issue: 'GEO-12', attached: false, why: 'the pinned noslop has no --issue-file' } });
   expect(linear.asked).toStrictEqual([]);
@@ -57,9 +57,9 @@ test('it attaches nothing, and never asks Linear, when the pinned noslop lacks t
 });
 
 test('it asks noslop for its help once per clone', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner({ noslopHelp: HELP_WITH_FLAG }),
-    linear = buildLinear({ identifier: 'GEO-12', title: 'Kettle', description: 'Boil.' });
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ noslopHelp: HELP_WITH_FLAG });
+  const linear = buildLinear({ identifier: 'GEO-12', title: 'Kettle', description: 'Boil.' });
 
   await createIssueFile({ run: fake.run, linear: linear.call, clone: '/noslop', cwd: ctx.base, body: 'Fixes GEO-12', path: ctx.path });
   await createIssueFile({ run: fake.run, linear: linear.call, clone: '/noslop', cwd: ctx.base, body: 'Fixes GEO-12', path: ctx.path });
@@ -68,8 +68,8 @@ test('it asks noslop for its help once per clone', async () => {
 });
 
 test('it attaches nothing, and never throws, when Linear fails or has no such issue', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner({ noslopHelp: HELP_WITH_FLAG });
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ noslopHelp: HELP_WITH_FLAG });
 
   await expect(createIssueFile({ run: fake.run, linear: readFailingLinear, clone: '/noslop', cwd: ctx.base, body: 'Fixes GEO-12', path: ctx.path })).resolves.toStrictEqual({ path: null, note: { issue: 'GEO-12', attached: false, why: 'could not read it from Linear: Linear answered 500: [key] rejected' } });
   await expect(createIssueFile({ run: fake.run, linear: buildLinear(null).call, clone: '/noslop', cwd: ctx.base, body: 'Fixes GEO-99', path: ctx.path })).resolves.toStrictEqual({ path: null, note: { issue: 'GEO-99', attached: false, why: 'could not read it from Linear: Linear has no issue GEO-99' } });
@@ -77,16 +77,16 @@ test('it attaches nothing, and never throws, when Linear fails or has no such is
 });
 
 test('it attaches nothing, and never throws, when the noslop help cannot run', async () => {
-  const ctx = setupTest(),
-    made = await createIssueFile({ run: () => Promise.reject(new Error('spawn bun ENOENT')), linear: buildLinear(null).call, clone: '/noslop', cwd: ctx.base, body: 'Fixes GEO-12', path: ctx.path });
+  const ctx = setupTest();
+  const made = await createIssueFile({ run: () => Promise.reject(new Error('spawn bun ENOENT')), linear: buildLinear(null).call, clone: '/noslop', cwd: ctx.base, body: 'Fixes GEO-12', path: ctx.path });
 
   expect(made).toStrictEqual({ path: null, note: { issue: 'GEO-12', attached: false, why: 'could not ask noslop for its flags: spawn bun ENOENT' } });
 });
 
 test('it attaches nothing, and never throws, when it can neither write nor remove the issue file', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner({ noslopHelp: HELP_WITH_FLAG }),
-    folder = join(ctx.base, 'folder');
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ noslopHelp: HELP_WITH_FLAG });
+  const folder = join(ctx.base, 'folder');
   mkdirSync(folder);
 
   await expect(createIssueFile({ run: fake.run, linear: buildLinear({ identifier: 'GEO-12', title: 'Kettle', description: 'Boil.' }).call, clone: '/noslop', cwd: ctx.base, body: 'Fixes GEO-12', path: folder })).resolves.toMatchObject({
@@ -96,9 +96,9 @@ test('it attaches nothing, and never throws, when it can neither write nor remov
 });
 
 test('it attaches nothing when the PR body links no GEO issue', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner({ noslopHelp: HELP_WITH_FLAG }),
-    made = await createIssueFile({ run: fake.run, linear: buildLinear(null).call, clone: '/noslop', cwd: ctx.base, body: 'Tidy the lid.', path: ctx.path });
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ noslopHelp: HELP_WITH_FLAG });
+  const made = await createIssueFile({ run: fake.run, linear: buildLinear(null).call, clone: '/noslop', cwd: ctx.base, body: 'Tidy the lid.', path: ctx.path });
 
   expect(made.note).toStrictEqual({ issue: null, attached: false, why: 'the PR body links no GEO issue' });
   expect(fake.of('bun')).toStrictEqual([]);

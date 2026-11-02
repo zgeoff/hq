@@ -34,8 +34,8 @@ function createDataHomeOverride(value: string): () => void {
 }
 
 function setupTest() {
-  const base = mkdtempSync(join(tmpdir(), 'hq-noslop-command-')),
-    db = openDb(join(base, 'hq.db'));
+  const base = mkdtempSync(join(tmpdir(), 'hq-noslop-command-'));
+  const db = openDb(join(base, 'hq.db'));
 
   onTestFinished(() => {
     db.close();
@@ -51,8 +51,8 @@ function setupTest() {
 }
 
 test('it shows noslop off everywhere, with no pin, until someone turns it on', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner();
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
 
   await expect(runNoslopCommand({ run: fake.run, db: ctx.db, verb: undefined, rest: [], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) })).resolves.toStrictEqual({
     data: { repos: [], caps: {}, sha: null, clone: `${ctx.base}/repos/zgeoff/noslop` },
@@ -61,8 +61,8 @@ test('it shows noslop off everywhere, with no pin, until someone turns it on', a
 });
 
 test('it turns repos on and off, sorted, and the second identical call changes nothing', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner();
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
 
   await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'on', rest: ['tools', 'atc'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) });
   await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'on', rest: ['tools', 'atc'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) });
@@ -169,8 +169,8 @@ test.each([
   ['a sha that is not hex', ['not-a-sha']],
   ['an option', ['--force']],
 ])('it refuses to pin %s and runs nothing', async (_label, rest) => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner();
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
 
   await expect(runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest, since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) })).rejects.toMatchObject({ code: 'bad_args' });
 
@@ -179,9 +179,9 @@ test.each([
 });
 
 test('it pins hq\'s own clone and records the full sha, keeping the list', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner(),
-    paths = buildPinPaths(ctx.base);
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
+  const paths = buildPinPaths(ctx.base);
   updateNoslopRepos(ctx.db, 'on', ['atc']);
 
   await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) });
@@ -212,14 +212,14 @@ test('it keeps a configured emergency cap when it pins', async () => {
 });
 
 test('it keeps a repo turned on while the install runs', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner(),
-    run: Runner = (cmd, opts) => {
-      if (cmd[0] === 'bun') {
-        updateNoslopRepos(ctx.db, 'on', ['widgets']);
-      }
-      return fake.run(cmd, opts);
-    };
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
+  const run: Runner = (cmd, opts) => {
+    if (cmd[0] === 'bun') {
+      updateNoslopRepos(ctx.db, 'on', ['widgets']);
+    }
+    return fake.run(cmd, opts);
+  };
 
   await runNoslopCommand({ run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) });
 
@@ -262,22 +262,22 @@ test('it refuses a pin while another pin\'s process still runs, however old its 
 });
 
 test('it runs two overlapping pins one after the other', async () => {
-  const ctx = setupTest(),
-    events: string[] = [],
-    fake = buildFakeRunner(),
-    gate = Promise.withResolvers<void>(),
-    atGate = Promise.withResolvers<void>(),
-    run: Runner = async (cmd, opts) => {
-      if (cmd[0] === 'git' && cmd[1] === 'worktree' && cmd[2] === 'add') {
-        events.push(`add ${cmd.at(-1)?.slice(0, 7)}`);
-      }
-      if (cmd[0] === 'bun' && events.length === 1) {
-        atGate.resolve();
-        await gate.promise;
-      }
-      return await fake.run(cmd, opts);
-    },
-    started = ['aaaaaaa', 'bbbbbbb'].map((sha) => runNoslopCommand({ run, db: ctx.db, verb: 'pin', rest: [sha], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) }));
+  const ctx = setupTest();
+  const events: string[] = [];
+  const fake = buildFakeRunner();
+  const gate = Promise.withResolvers<void>();
+  const atGate = Promise.withResolvers<void>();
+  const run: Runner = async (cmd, opts) => {
+    if (cmd[0] === 'git' && cmd[1] === 'worktree' && cmd[2] === 'add') {
+      events.push(`add ${cmd.at(-1)?.slice(0, 7)}`);
+    }
+    if (cmd[0] === 'bun' && events.length === 1) {
+      atGate.resolve();
+      await gate.promise;
+    }
+    return await fake.run(cmd, opts);
+  };
+  const started = ['aaaaaaa', 'bbbbbbb'].map((sha) => runNoslopCommand({ run, db: ctx.db, verb: 'pin', rest: [sha], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) }));
 
   await atGate.promise;
   events.push('released');
@@ -288,8 +288,8 @@ test('it runs two overlapping pins one after the other', async () => {
 });
 
 test('it keeps the old pin when the checkout fails', async () => {
-  const ctx = setupTest(),
-    runner = buildFakeRunner();
+  const ctx = setupTest();
+  const runner = buildFakeRunner();
   updateNoslopRepos(ctx.db, 'on', ['atc']);
   await runNoslopCommand({ run: runner.run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) });
 
@@ -298,15 +298,15 @@ test('it keeps the old pin when the checkout fails', async () => {
   expect(loadNoslopSettings(ctx.db).sha).toBe('0123456789abcdef0123456789abcdef01234567');
 });
 
-const ADD_0007 = "INSERT INTO kysely_migration (name, timestamp) VALUES ('0007-dispositions-by-pull-request', '2026-10-20T00:00:00.000Z')",
-  BUSY = { code: 0, stdout: '4242 bun /x/apps/cli/src/cli.ts review\n', stderr: '' },
-  FULL_SHA = '0123456789abcdef0123456789abcdef01234567',
-  HELD_NAMES = ['0001-the-store', '0002-dispositions-by-repo', '0003-calls-without-chunks', '0004-calls-with-cache-counts', '0005-reviews-without-step-up', '0006-dropped-findings'],
-  NEW_NAMES = [...HELD_NAMES, '0007-dispositions-by-pull-request'];
+const ADD_0007 = "INSERT INTO kysely_migration (name, timestamp) VALUES ('0007-dispositions-by-pull-request', '2026-10-20T00:00:00.000Z')";
+const BUSY = { code: 0, stdout: '4242 bun /x/apps/cli/src/cli.ts review\n', stderr: '' };
+const FULL_SHA = '0123456789abcdef0123456789abcdef01234567';
+const HELD_NAMES = ['0001-the-store', '0002-dispositions-by-repo', '0003-calls-without-chunks', '0004-calls-with-cache-counts', '0005-reviews-without-step-up', '0006-dropped-findings'];
+const NEW_NAMES = [...HELD_NAMES, '0007-dispositions-by-pull-request'];
 
 test('it refuses a pin while a noslop CLI runs, names it, and checks nothing out', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner({ pgrep: { code: 0, stdout: '4242 bun --config=/x/bunfig.toml /x/apps/cli/src/cli.ts review --pr 354\n', stderr: '' } });
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ pgrep: { code: 0, stdout: '4242 bun --config=/x/bunfig.toml /x/apps/cli/src/cli.ts review --pr 354\n', stderr: '' } });
 
   await expect(runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) })).rejects.toMatchObject({
     code: 'noslop_busy',
@@ -318,8 +318,8 @@ test('it refuses a pin while a noslop CLI runs, names it, and checks nothing out
 });
 
 test('it leaves hq itself out of the processes it names', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner({ pgrep: { code: 0, stdout: `${process.pid} bun /x/apps/cli/src/cli.ts\n`, stderr: '' } });
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ pgrep: { code: 0, stdout: `${process.pid} bun /x/apps/cli/src/cli.ts\n`, stderr: '' } });
 
   await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) });
 
@@ -327,8 +327,8 @@ test('it leaves hq itself out of the processes it names', async () => {
 });
 
 test.each([[2], [127]])('it refuses a pin when pgrep fails with exit %d', async (code) => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner({ pgrep: { code, stdout: '', stderr: 'pgrep: invalid' } });
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ pgrep: { code, stdout: '', stderr: 'pgrep: invalid' } });
 
   await expect(runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) })).rejects.toMatchObject({ code: 'noslop_busy', message: expect.stringContaining('hq cannot tell') });
 
@@ -336,8 +336,8 @@ test.each([[2], [127]])('it refuses a pin when pgrep fails with exit %d', async 
 });
 
 test('it refuses a pin while a review round is open, and names the PR', async () => {
-  const ctx = setupTest(),
-    sleeper = Bun.spawn(['sleep', '30']);
+  const ctx = setupTest();
+  const sleeper = Bun.spawn(['sleep', '30']);
   onTestFinished(() => sleeper.kill());
   mkdirSync(join(ctx.base, 'reviews', `hq+354-noslop-${sleeper.pid}`), { recursive: true });
 
@@ -362,8 +362,8 @@ test('it pins when a live review removes its worktree between the scan and the r
 });
 
 test('it ignores a review folder whose process is gone', async () => {
-  const ctx = setupTest(),
-    gone = Bun.spawn(['true']);
+  const ctx = setupTest();
+  const gone = Bun.spawn(['true']);
   await gone.exited;
   mkdirSync(join(ctx.base, 'reviews', `hq+354-noslop-${gone.pid}`), { recursive: true });
 
@@ -373,8 +373,8 @@ test('it ignores a review folder whose process is gone', async () => {
 });
 
 test('it refuses --force with no reason as bad_args, and runs nothing', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner();
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
 
   await expect(runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456'], force: true, since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) })).rejects.toMatchObject({ code: 'bad_args' });
 
@@ -382,9 +382,9 @@ test('it refuses --force with no reason as bad_args, and runs nothing', async ()
 });
 
 test('it goes on with --force and a reason while noslop runs, still backs up and counts, and records the reason', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner({ pgrep: { code: 0, stdout: '4242 bun /x/apps/cli/src/cli.ts review\n', stderr: '' }, storeQuery: buildStubStoreQuery(ctx.store, [ADD_0007]) }),
-    paths = buildPinPaths(ctx.base);
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ pgrep: { code: 0, stdout: '4242 bun /x/apps/cli/src/cli.ts review\n', stderr: '' }, storeQuery: buildStubStoreQuery(ctx.store, [ADD_0007]) });
+  const paths = buildPinPaths(ctx.base);
   createStubNoslopStore(ctx.store, { migrations: HELD_NAMES, tables: { dispositions: 3 } });
   createStubNoslopClone(paths.folder, NEW_NAMES);
 
@@ -398,9 +398,9 @@ test('it goes on with --force and a reason while noslop runs, still backs up and
 });
 
 test('it pins with no store migration, no backup and no store query when the store holds every migration', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner(),
-    paths = buildPinPaths(ctx.base);
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
+  const paths = buildPinPaths(ctx.base);
   createStubNoslopStore(ctx.store, { migrations: NEW_NAMES, tables: { dispositions: 2 } });
   createStubNoslopClone(paths.folder, NEW_NAMES);
 
@@ -412,9 +412,9 @@ test('it pins with no store migration, no backup and no store query when the sto
 });
 
 test('it backs up the store, counts every table and pins when a migration is new', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner({ storeQuery: buildStubStoreQuery(ctx.store, [ADD_0007]) }),
-    paths = buildPinPaths(ctx.base);
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ storeQuery: buildStubStoreQuery(ctx.store, [ADD_0007]) });
+  const paths = buildPinPaths(ctx.base);
   createStubNoslopStore(ctx.store, { migrations: HELD_NAMES, tables: { dispositions: 3, reviews: 2 } });
   createStubNoslopClone(paths.folder, NEW_NAMES);
 
@@ -429,8 +429,8 @@ test('it backs up the store, counts every table and pins when a migration is new
 });
 
 test('it refuses a pin when HQ_NOSLOP_STORE names a store noslop does not open, and runs nothing', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner();
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
   onTestFinished(overrideEnv('HQ_NOSLOP_STORE', join(ctx.base, 'other-store.sqlite')));
 
   await expect(runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) })).rejects.toMatchObject({
@@ -442,9 +442,9 @@ test('it refuses a pin when HQ_NOSLOP_STORE names a store noslop does not open, 
 });
 
 test('it migrates the store noslop opens, when HQ_NOSLOP_STORE names that same file', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner({ storeQuery: buildStubStoreQuery(ctx.store, [ADD_0007]) }),
-    paths = buildPinPaths(ctx.base);
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ storeQuery: buildStubStoreQuery(ctx.store, [ADD_0007]) });
+  const paths = buildPinPaths(ctx.base);
   onTestFinished(overrideEnv('HQ_NOSLOP_STORE', ctx.store));
   createStubNoslopStore(ctx.store, { migrations: HELD_NAMES, tables: { dispositions: 3 } });
   createStubNoslopClone(paths.folder, NEW_NAMES);
@@ -458,11 +458,11 @@ test('it refuses a pin when noslop starts during the install, removes the backup
   const answers = [
       { code: 1, stdout: '', stderr: '' },
       { code: 0, stdout: '4242 bun /x/apps/cli/src/cli.ts review\n', stderr: '' },
-    ],
-    ctx = setupTest(),
-    fake = buildFakeRunner({ storeQuery: buildStubStoreQuery(ctx.store, [ADD_0007]) }),
-    paths = buildPinPaths(ctx.base),
-    run: Runner = (cmd, opts) => (cmd[0] === 'pgrep' ? Promise.resolve(answers.shift() ?? BUSY) : fake.run(cmd, opts));
+    ];
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ storeQuery: buildStubStoreQuery(ctx.store, [ADD_0007]) });
+  const paths = buildPinPaths(ctx.base);
+  const run: Runner = (cmd, opts) => (cmd[0] === 'pgrep' ? Promise.resolve(answers.shift() ?? BUSY) : fake.run(cmd, opts));
   createStubNoslopStore(ctx.store, { migrations: HELD_NAMES, tables: { dispositions: 3 } });
   createStubNoslopClone(paths.folder, NEW_NAMES);
 
@@ -474,9 +474,9 @@ test('it refuses a pin when noslop starts during the install, removes the backup
 });
 
 test('it runs the store query from an empty folder, not from a repo', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner({ storeQuery: buildStubStoreQuery(ctx.store, [ADD_0007]) }),
-    paths = buildPinPaths(ctx.base);
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ storeQuery: buildStubStoreQuery(ctx.store, [ADD_0007]) });
+  const paths = buildPinPaths(ctx.base);
   createStubNoslopStore(ctx.store, { migrations: HELD_NAMES, tables: { dispositions: 1 } });
   createStubNoslopClone(paths.folder, NEW_NAMES);
 
@@ -488,9 +488,9 @@ test('it runs the store query from an empty folder, not from a repo', async () =
 });
 
 test('it refuses and keeps the old pin when a table loses rows in the migration, naming the backup', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner({ storeQuery: buildStubStoreQuery(ctx.store, [ADD_0007, 'DELETE FROM dispositions WHERE id > 1']) }),
-    paths = buildPinPaths(ctx.base);
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ storeQuery: buildStubStoreQuery(ctx.store, [ADD_0007, 'DELETE FROM dispositions WHERE id > 1']) });
+  const paths = buildPinPaths(ctx.base);
   createStubNoslopStore(ctx.store, { migrations: HELD_NAMES, tables: { dispositions: 3 } });
   createStubNoslopClone(paths.folder, NEW_NAMES);
 
@@ -504,10 +504,10 @@ test('it refuses and keeps the old pin when a table loses rows in the migration,
 });
 
 test('it refuses the next pin after a migration lost rows, naming the backup, while the store is not restored', async () => {
-  const ctx = setupTest(),
-    failures: unknown[] = [],
-    fake = buildFakeRunner({ storeQuery: buildStubStoreQuery(ctx.store, [ADD_0007, 'DELETE FROM dispositions WHERE id > 1']) }),
-    paths = buildPinPaths(ctx.base);
+  const ctx = setupTest();
+  const failures: unknown[] = [];
+  const fake = buildFakeRunner({ storeQuery: buildStubStoreQuery(ctx.store, [ADD_0007, 'DELETE FROM dispositions WHERE id > 1']) });
+  const paths = buildPinPaths(ctx.base);
   createStubNoslopStore(ctx.store, { migrations: HELD_NAMES, tables: { dispositions: 3 } });
   createStubNoslopClone(paths.folder, NEW_NAMES);
   await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) }).catch((error: unknown) => failures.push(error));
@@ -526,10 +526,10 @@ test('it refuses the next pin after a migration lost rows, naming the backup, wh
 });
 
 test('it pins again once the store is restored from the backup, migrating it anew', async () => {
-  const ctx = setupTest(),
-    failures: unknown[] = [],
-    paths = buildPinPaths(ctx.base),
-    restored = buildFakeRunner({ storeQuery: buildStubStoreQuery(ctx.store, [ADD_0007]) });
+  const ctx = setupTest();
+  const failures: unknown[] = [];
+  const paths = buildPinPaths(ctx.base);
+  const restored = buildFakeRunner({ storeQuery: buildStubStoreQuery(ctx.store, [ADD_0007]) });
   createStubNoslopStore(ctx.store, { migrations: HELD_NAMES, tables: { dispositions: 3 } });
   createStubNoslopClone(paths.folder, NEW_NAMES);
   await runNoslopCommand({ run: buildFakeRunner({ storeQuery: buildStubStoreQuery(ctx.store, [ADD_0007, 'DELETE FROM dispositions WHERE id > 1']) }).run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) }).catch((error: unknown) => failures.push(error));
@@ -547,10 +547,10 @@ test('it pins again once the store is restored from the backup, migrating it ane
 });
 
 test('it refuses the pin after a failed migration even with --force', async () => {
-  const ctx = setupTest(),
-    failures: unknown[] = [],
-    fake = buildFakeRunner({ storeQuery: buildStubStoreQuery(ctx.store, [ADD_0007, 'DELETE FROM dispositions WHERE id > 1']) }),
-    paths = buildPinPaths(ctx.base);
+  const ctx = setupTest();
+  const failures: unknown[] = [];
+  const fake = buildFakeRunner({ storeQuery: buildStubStoreQuery(ctx.store, [ADD_0007, 'DELETE FROM dispositions WHERE id > 1']) });
+  const paths = buildPinPaths(ctx.base);
   createStubNoslopStore(ctx.store, { migrations: HELD_NAMES, tables: { dispositions: 3 } });
   createStubNoslopClone(paths.folder, NEW_NAMES);
   await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) }).catch((error: unknown) => failures.push(error));
@@ -565,9 +565,9 @@ test('it refuses the pin after a failed migration even with --force', async () =
 });
 
 test('it refuses and keeps the old pin when a migration name is missing after the run', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner({ storeQuery: buildStubStoreQuery(ctx.store, []) }),
-    paths = buildPinPaths(ctx.base);
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ storeQuery: buildStubStoreQuery(ctx.store, []) });
+  const paths = buildPinPaths(ctx.base);
   createStubNoslopStore(ctx.store, { migrations: HELD_NAMES, tables: { dispositions: 3 } });
   createStubNoslopClone(paths.folder, NEW_NAMES);
 
@@ -580,9 +580,9 @@ test('it refuses and keeps the old pin when a migration name is missing after th
 });
 
 test('it refuses when the store query fails', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner({ storeQuery: () => ({ code: 1, stdout: '', stderr: 'no such column' }) }),
-    paths = buildPinPaths(ctx.base);
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ storeQuery: () => ({ code: 1, stdout: '', stderr: 'no such column' }) });
+  const paths = buildPinPaths(ctx.base);
   createStubNoslopStore(ctx.store, { migrations: HELD_NAMES, tables: { dispositions: 3 } });
   createStubNoslopClone(paths.folder, NEW_NAMES);
 
@@ -595,8 +595,8 @@ test('it refuses when the store query fails', async () => {
 });
 
 test('it refuses when the migration names of the new noslop cannot be read', async () => {
-  const ctx = setupTest(),
-    paths = buildPinPaths(ctx.base);
+  const ctx = setupTest();
+  const paths = buildPinPaths(ctx.base);
   createStubNoslopStore(ctx.store, { migrations: HELD_NAMES, tables: { dispositions: 3 } });
   createStubNoslopClone(paths.folder, []);
 
@@ -607,8 +607,8 @@ test('it refuses when the migration names of the new noslop cannot be read', asy
 });
 
 test('it refuses when the store holds no migration table', async () => {
-  const ctx = setupTest(),
-    paths = buildPinPaths(ctx.base);
+  const ctx = setupTest();
+  const paths = buildPinPaths(ctx.base);
   createStubNoslopClone(paths.folder, NEW_NAMES);
   createStubNoslopStore(ctx.store, { migrations: [], tables: { dispositions: 1 } });
   buildStubStoreQuery(ctx.store, ['DROP TABLE kysely_migration'])();
@@ -619,8 +619,8 @@ test('it refuses when the store holds no migration table', async () => {
 });
 
 test('it pins with no backup when there is no store file', async () => {
-  const ctx = setupTest(),
-    paths = buildPinPaths(ctx.base);
+  const ctx = setupTest();
+  const paths = buildPinPaths(ctx.base);
   createStubNoslopClone(paths.folder, NEW_NAMES);
 
   await expect(runNoslopCommand({ run: buildFakeRunner().run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) })).resolves.toMatchObject({
@@ -665,11 +665,11 @@ test('it refuses a verb it does not know', async () => {
 });
 
 test('it answers hq noslop on and hq noslop through the cli, as JSON', async () => {
-  const ctx = setupTest(),
-    lines: string[] = [],
-    logger = spyOn(console, 'log').mockImplementation((line: string) => {
-      lines.push(line);
-    });
+  const ctx = setupTest();
+  const lines: string[] = [];
+  const logger = spyOn(console, 'log').mockImplementation((line: string) => {
+    lines.push(line);
+  });
   onTestFinished(() => logger.mockRestore());
   onTestFinished(overrideEnv('HQ_DB', join(ctx.base, 'cli.db')));
   onTestFinished(overrideEnv('HQ_NOTIFY', 'off'));
@@ -681,13 +681,13 @@ test('it answers hq noslop on and hq noslop through the cli, as JSON', async () 
 });
 
 test('it pins through hq noslop pin --force on the cli while noslop runs, and records the reason', async () => {
-  const ctx = setupTest(),
-    db = new Database(join(ctx.base, 'cli.db'), { create: true }),
-    fake = buildFakeRunner({ pgrep: { code: 0, stdout: '4242 bun /x/apps/cli/src/cli.ts review --pr 7\n', stderr: '' } }),
-    lines: string[] = [],
-    logger = spyOn(console, 'log').mockImplementation((line: string) => {
-      lines.push(line);
-    });
+  const ctx = setupTest();
+  const db = new Database(join(ctx.base, 'cli.db'), { create: true });
+  const fake = buildFakeRunner({ pgrep: { code: 0, stdout: '4242 bun /x/apps/cli/src/cli.ts review --pr 7\n', stderr: '' } });
+  const lines: string[] = [];
+  const logger = spyOn(console, 'log').mockImplementation((line: string) => {
+    lines.push(line);
+  });
   onTestFinished(() => db.close());
   onTestFinished(() => logger.mockRestore());
   onTestFinished(overrideEnv('HQ_DB', join(ctx.base, 'cli.db')));
@@ -700,12 +700,12 @@ test('it pins through hq noslop pin --force on the cli while noslop runs, and re
 });
 
 test('it refuses hq noslop pin --force with no reason on the cli as bad_args', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner(),
-    lines: string[] = [],
-    logger = spyOn(console, 'log').mockImplementation((line: string) => {
-      lines.push(line);
-    });
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
+  const lines: string[] = [];
+  const logger = spyOn(console, 'log').mockImplementation((line: string) => {
+    lines.push(line);
+  });
   onTestFinished(() => logger.mockRestore());
   onTestFinished(overrideEnv('HQ_DB', join(ctx.base, 'cli.db')));
   onTestFinished(overrideEnv('HQ_NOTIFY', 'off'));
@@ -717,12 +717,12 @@ test('it refuses hq noslop pin --force with no reason on the cli as bad_args', a
 });
 
 test('it lets a PR of a repo off the list merge through hq review gate, with exit 0', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner(),
-    lines: string[] = [],
-    logger = spyOn(console, 'log').mockImplementation((line: string) => {
-      lines.push(line);
-    });
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
+  const lines: string[] = [];
+  const logger = spyOn(console, 'log').mockImplementation((line: string) => {
+    lines.push(line);
+  });
   onTestFinished(() => logger.mockRestore());
   onTestFinished(overrideEnv('HQ_DB', join(ctx.base, 'cli.db')));
   onTestFinished(overrideEnv('HQ_NOTIFY', 'off'));
@@ -733,10 +733,10 @@ test('it lets a PR of a repo off the list merge through hq review gate, with exi
 });
 
 test('it records gate none on the PR record through hq review gate for a PR of a repo off the list', async () => {
-  const ctx = setupTest(),
-    fake = buildFakeRunner(),
-    db = new Database(join(ctx.base, 'cli.db'), { create: true }),
-    logger = spyOn(console, 'log').mockImplementation(() => {});
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
+  const db = new Database(join(ctx.base, 'cli.db'), { create: true });
+  const logger = spyOn(console, 'log').mockImplementation(() => {});
   onTestFinished(() => db.close());
   onTestFinished(() => logger.mockRestore());
   onTestFinished(overrideEnv('HQ_DB', join(ctx.base, 'cli.db')));
@@ -748,11 +748,11 @@ test('it records gate none on the PR record through hq review gate for a PR of a
 });
 
 test('it parses --full on hq review and refuses it for a PR on Codex', async () => {
-  const ctx = setupTest(),
-    lines: string[] = [],
-    logger = spyOn(console, 'log').mockImplementation((line: string) => {
-      lines.push(line);
-    });
+  const ctx = setupTest();
+  const lines: string[] = [];
+  const logger = spyOn(console, 'log').mockImplementation((line: string) => {
+    lines.push(line);
+  });
   onTestFinished(() => logger.mockRestore());
   onTestFinished(overrideEnv('HQ_DB', join(ctx.base, 'cli.db')));
   onTestFinished(overrideEnv('HQ_NOTIFY', 'off'));

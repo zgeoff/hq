@@ -7,7 +7,8 @@ import { GOAL_KEYS } from './goal-keys.ts';
 import { goalTargets } from './goal-targets.ts';
 import { targetLine } from './target-line.ts';
 
-let cleanup: () => void, db: Database;
+let cleanup: () => void;
+let db: Database;
 beforeEach(() => {
   ({ db, cleanup } = freshDb());
   at('2026-10-16T01:00:00Z');

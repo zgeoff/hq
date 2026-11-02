@@ -9,8 +9,8 @@ import type { StaleSinceMap } from './stale-since-schema.ts';
 import type { PromptDrift } from './types.ts';
 
 export function recordStaleSince(db: Database, drift: Record<string, PromptDrift>, live: Record<string, string>): StaleSinceMap {
-  const current = metaJson(db, 'fleet_stale_since', staleSinceSchema, {}),
-    next = buildNextStaleSince(current, drift, live);
+  const current = metaJson(db, 'fleet_stale_since', staleSinceSchema, {});
+  const next = buildNextStaleSince(current, drift, live);
   if (JSON.stringify(next) !== JSON.stringify(current)) {
     setMeta(db, 'fleet_stale_since', JSON.stringify(next));
   }

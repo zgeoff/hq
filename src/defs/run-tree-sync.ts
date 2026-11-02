@@ -33,9 +33,9 @@ export function runTreeSync(tree: TreeName = 'hq'): TreeSync | null {
 }
 
 function runCheckoutSync(dir: string, repo: string): TreeSync {
-  const at = new Date().toISOString(),
-    git = makeGit(dir),
-    origin = readOrigin(dir);
+  const at = new Date().toISOString();
+  const git = makeGit(dir);
+  const origin = readOrigin(dir);
   if (!originMatches(origin, repo)) {
     return buildRefusal({ at, dir, git }, `origin is ${origin ?? 'not set'}, not ${repo}`);
   }
@@ -46,11 +46,11 @@ function runCheckoutSync(dir: string, repo: string): TreeSync {
 // drops its lock fd before the command runs, so the lock dies with flock.
 function makeGit(dir: string): Git {
   return (...args) => {
-    const gitMs = config().HQ_SYNC_GIT_TIMEOUT_MS,
-      result = Bun.spawnSync(buildLockedGit(dir, gitMs, args), {
-        env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
-        timeout: LOCK_WAIT_S * 1000 + gitMs + 10_000,
-      });
+    const gitMs = config().HQ_SYNC_GIT_TIMEOUT_MS;
+    const result = Bun.spawnSync(buildLockedGit(dir, gitMs, args), {
+      env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
+      timeout: LOCK_WAIT_S * 1000 + gitMs + 10_000,
+    });
     return { code: result.exitCode, err: result.stderr.toString().trim(), out: result.stdout.toString().trim() };
   };
 }
@@ -139,8 +139,8 @@ function readSha(git: Git, ref: string): string | null {
 }
 
 function runFastForward(checkout: Checkout): TreeSync {
-  const head = readSha(checkout.git, 'HEAD'),
-    main = readSha(checkout.git, 'origin/main');
+  const head = readSha(checkout.git, 'HEAD');
+  const main = readSha(checkout.git, 'origin/main');
   if (!head || !main) {
     return buildRefusal(checkout, `can't resolve ${head ? 'origin/main' : 'HEAD'}`);
   }

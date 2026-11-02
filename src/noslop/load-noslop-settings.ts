@@ -9,8 +9,8 @@ export interface NoslopSettings {
   caps: Record<string, number>;
 }
 
-const NOSLOP_KEY = 'noslop',
-  NoslopMeta = z.object({ repos: z.array(z.string()), sha: z.string().nullable(), caps: z.record(z.string(), z.number().int().positive()).default({}) });
+const NOSLOP_KEY = 'noslop';
+const NoslopMeta = z.object({ repos: z.array(z.string()), sha: z.string().nullable(), caps: z.record(z.string(), z.number().int().positive()).default({}) });
 
 export function loadNoslopSettings(db: Database): NoslopSettings {
   return metaJson(db, NOSLOP_KEY, NoslopMeta, { repos: [], sha: null, caps: {} });

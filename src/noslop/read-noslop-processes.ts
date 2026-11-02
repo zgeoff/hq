@@ -7,14 +7,14 @@ export interface NoslopProcess {
   command: string;
 }
 
-const COMMAND_CHARS = 100,
-  LINE_SHAPE = /^(?<pid>\d+)\s+(?<command>.*)$/u,
-  PGREP_NONE = 1;
+const COMMAND_CHARS = 100;
+const LINE_SHAPE = /^(?<pid>\d+)\s+(?<command>.*)$/u;
+const PGREP_NONE = 1;
 
 // Exit 1 of pgrep is none; any other failure refuses, because hq cannot then tell whether noslop runs.
 export async function readNoslopProcesses(run: Runner): Promise<NoslopProcess[]> {
-  const pattern = `${buildEscapedPattern(repoCache())}/zgeoff/noslop[^ ]*/apps/cli/src/cli\\.ts`,
-    result = await run(['pgrep', '-af', '--', pattern]);
+  const pattern = `${buildEscapedPattern(repoCache())}/zgeoff/noslop[^ ]*/apps/cli/src/cli\\.ts`;
+  const result = await run(['pgrep', '-af', '--', pattern]);
   if (result.code === PGREP_NONE) {
     return [];
   }

@@ -1,8 +1,8 @@
 import { FAILED } from './failed.ts';
 import type { DeployOutcome } from './types.ts';
 
-const APPLY_STEP = 'Apply',
-  HOLD_STEP = 'Hold for a manual dispatch';
+const APPLY_STEP = 'Apply';
+const HOLD_STEP = 'Hold for a manual dispatch';
 
 export function classifyDeploy(jobs: unknown, runConclusion: string | null): { outcome: DeployOutcome; apply_conclusion: string | null; failed_step: string | null } | null {
   const j = jobs as { total_count?: unknown; jobs?: unknown } | null;

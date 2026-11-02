@@ -29,9 +29,9 @@ function makeGitRunner(calls: string[][], answers: GitAnswers): Runner {
 }
 
 function setupTest() {
-  const base = mkdtempSync(join(tmpdir(), 'hq-noslop-late-')),
-    calls: string[][] = [],
-    db = openDb(join(base, 'hq.db'));
+  const base = mkdtempSync(join(tmpdir(), 'hq-noslop-late-'));
+  const calls: string[][] = [];
+  const db = openDb(join(base, 'hq.db'));
 
   onTestFinished(() => {
     db.close();
@@ -49,9 +49,9 @@ function setupTest() {
   };
 }
 
-const CAT_OK = { code: 0, stderr: '' },
-  NEW = { id: 'bbbb', lens: 'correctness', severity: 'high', title: 'Kettle never boils', anchor: { path: 'src/kettle.ts', startLine: 10, endLine: 12 } },
-  OLD = { id: 'aaaa', lens: 'style', severity: 'low', title: 'Lid is loose' };
+const CAT_OK = { code: 0, stderr: '' };
+const NEW = { id: 'bbbb', lens: 'correctness', severity: 'high', title: 'Kettle never boils', anchor: { path: 'src/kettle.ts', startLine: 10, endLine: 12 } };
+const OLD = { id: 'aaaa', lens: 'style', severity: 'low', title: 'Lid is loose' };
 
 test('it flags a new finding late when the first-to-latest diff leaves its lines alone', async () => {
   const ctx = setupTest();

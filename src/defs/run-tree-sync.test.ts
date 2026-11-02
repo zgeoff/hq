@@ -9,8 +9,8 @@ import { runTreeSync } from './run-tree-sync.ts';
 type Checkout = ReturnType<typeof createTreeCheckout>;
 
 test('it fast-forwards hq-private, records it under its own key, and logs the tree', () => {
-  const ctx = createTreeFixture(),
-    tree = ctx.createPrivate();
+  const ctx = createTreeFixture();
+  const tree = ctx.createPrivate();
   expect(runTreeSync('private')).toMatchObject({ ok: true, changed: false, line: expect.stringContaining('is on origin/main') });
   tree.writeCommit({ [INTAKE]: buildPrompt('intake two') });
   expect(runTreeSyncTick(ctx.db, 'hq-lanes', 'private')).toMatchObject({ ok: true, changed: true, line: expect.stringContaining('fast-forwarded') });
@@ -32,8 +32,8 @@ test.each([
   ['a local commit', (tree: Checkout) => tree.git('commit', '-q', '--allow-empty', '-m', 'local'), 'has commits origin/main'],
   ["hq's own origin", (tree: Checkout) => tree.git('remote', 'set-url', 'origin', 'git@github.com:zgeoff/hq.git'), 'not zgeoff/hq-private'],
 ])('it refuses to fast-forward hq-private with %s, and leaves its files as they were', (_name, spoil, why) => {
-  const ctx = createTreeFixture(),
-    tree = ctx.createPrivate();
+  const ctx = createTreeFixture();
+  const tree = ctx.createPrivate();
   tree.writeCommit({ 'skills/intake/SKILL.md': 'upstream\n' });
   spoil(tree);
   expect(runTreeSync('private')).toMatchObject({ ok: false, changed: false, line: expect.stringContaining(why) });
@@ -41,8 +41,8 @@ test.each([
 });
 
 test('it retries a ref lock in hq-private, and goes red on the second tick in a row, under its own key', () => {
-  const ctx = createTreeFixture(),
-    tree = ctx.createPrivate();
+  const ctx = createTreeFixture();
+  const tree = ctx.createPrivate();
   tree.writeCommit({ 'skills/intake/SKILL.md': 'upstream\n' });
   writeFileSync(`${tree.dir}/.git/refs/remotes/origin/main.lock`, '');
   expect(runTreeSyncTick(ctx.db, 'hq-lanes', 'private')).toMatchObject({ ok: true, transient: true });

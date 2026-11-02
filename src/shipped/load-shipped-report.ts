@@ -13,12 +13,12 @@ import type { ProjectIssue, ReportIssue, ShippedPeriod, ShippedReport, ShippedSo
 export async function loadShippedReport(sources: ShippedSources, period: ShippedPeriod, at: Date): Promise<ShippedReport> {
   const dir = mkdtempSync(join(tmpdir(), 'hq-shipped-'));
   try {
-    const listed = await loadMergedPRs(sources, period, at),
-      merged = parseMergedPRs(listed),
-      named = await loadReportIssues(sources.call, sources.db, merged.byIssue.map((entry) => entry.issue), at),
-      projects = await loadProjectIssues(sources.call, sources.db, [...new Set(named.flatMap((issue) => (issue.project === null ? [] : [issue.project])))], at),
-      stored = writeReportInputs(dir, listed, named, projects),
-      text = await runDeliveryScript(sources, 'render-report.sh', ['--json', stored.prs, stored.issues, '--projects', stored.projects]);
+    const listed = await loadMergedPRs(sources, period, at);
+    const merged = parseMergedPRs(listed);
+    const named = await loadReportIssues(sources.call, sources.db, merged.byIssue.map((entry) => entry.issue), at);
+    const projects = await loadProjectIssues(sources.call, sources.db, [...new Set(named.flatMap((issue) => (issue.project === null ? [] : [issue.project])))], at);
+    const stored = writeReportInputs(dir, listed, named, projects);
+    const text = await runDeliveryScript(sources, 'render-report.sh', ['--json', stored.prs, stored.issues, '--projects', stored.projects]);
     return { period, report: parseRenderedReport(text), at: iso(at) };
   } finally {
     rmSync(dir, { recursive: true, force: true });

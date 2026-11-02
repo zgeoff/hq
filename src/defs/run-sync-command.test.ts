@@ -3,8 +3,8 @@ import { createTreeFixture } from '../../test/create-tree-fixture.ts';
 import { runSyncCommand } from './run-sync-command.ts';
 
 test('it fails with the refused tree named when one tree cannot be fast-forwarded', () => {
-  const ctx = createTreeFixture(),
-    tree = ctx.createPrivate();
+  const ctx = createTreeFixture();
+  const tree = ctx.createPrivate();
   ctx.createHq();
   tree.git('remote', 'set-url', 'origin', 'git@github.com:zgeoff/hq.git');
   expect(() => runSyncCommand(ctx.db, 'z-q')).toThrow(

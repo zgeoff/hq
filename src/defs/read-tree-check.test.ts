@@ -16,8 +16,8 @@ test('it turns the private-tree health check red with no checkout, and says how 
 });
 
 test('it holds hq-private to the same 30-minute rule as hq-defs, and prefixes its lines', () => {
-  const ctx = createTreeFixture(),
-    later = new Date(Date.now() + 31 * 60_000);
+  const ctx = createTreeFixture();
+  const later = new Date(Date.now() + 31 * 60_000);
   ctx.createPrivate();
   expect(readTreeCheck(ctx.db, new Date(), 'private')).toStrictEqual({
     key: 'private-tree',
