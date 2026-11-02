@@ -1,15 +1,20 @@
-import type { PRStatusRow } from '../kdb.ts';
-import type { OwnerOverride } from './read-owner-overrides.ts';
-import type { AcceptedRiskView, CIOverrideView, PRStatusView } from './types.ts';
+import type { PRStatusRow } from "../kdb.ts";
+import type { OwnerOverride } from "./read-owner-overrides.ts";
+import type { AcceptedRiskView, CIOverrideView, PRStatusView } from "./types.ts";
 
 export interface StandingRecords {
   ciOverrides: CIOverrideView[];
-  reviewRecords: PRStatusView['reviewRecords'];
+  reviewRecords: PRStatusView["reviewRecords"];
   acceptedRisks: AcceptedRiskView[];
 }
 
 // The record with its stale flags, against the PR's head now (null when it could not be read).
-export function buildPRStatusView(row: PRStatusRow, current: string | null, override: OwnerOverride | null, standing: StandingRecords): PRStatusView {
+export function buildPRStatusView(
+  row: PRStatusRow,
+  current: string | null,
+  override: OwnerOverride | null,
+  standing: StandingRecords,
+): PRStatusView {
   return {
     repo: row.repo,
     pr: row.pr,
@@ -27,7 +32,10 @@ export function buildPRStatusView(row: PRStatusRow, current: string | null, over
     answerStale: isStale(row.answer_head, current),
     next: row.next,
     nextAt: row.next_at,
-    override: override === null ? null : { head: override.head, source: override.source, note: override.note, at: override.at },
+    override:
+      override === null
+        ? null
+        : { head: override.head, source: override.source, note: override.note, at: override.at },
     ciOverrides: standing.ciOverrides,
     reviewRecords: standing.reviewRecords,
     acceptedRisks: standing.acceptedRisks,

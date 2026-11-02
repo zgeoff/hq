@@ -1,9 +1,9 @@
-import type { Database } from 'bun:sqlite';
-import { iso } from '../clock/iso.ts';
-import { now } from '../clock/now.ts';
-import { logEvent } from '../log-event.ts';
-import type { PRAnswer } from './types.ts';
-import { upsertPRStatus } from './upsert-pr-status.ts';
+import type { Database } from "bun:sqlite";
+import { iso } from "../clock/iso.ts";
+import { now } from "../clock/now.ts";
+import { logEvent } from "../log-event.ts";
+import type { PRAnswer } from "./types.ts";
+import { upsertPRStatus } from "./upsert-pr-status.ts";
 
 interface CarriedAnswer {
   source: string;
@@ -37,6 +37,12 @@ export function recordPRAnswer(db: Database, input: PRAnswerInput): void {
       answer_note: input.note,
       answer_at: at,
     });
-    logEvent(db, 'hq', `pr:${input.repo}#${input.pr}`, 'pr-answer', input.actor, null, null, { answer: input.answer, head: input.head, source: input.source, note: input.note, ...(input.carried === undefined ? {} : { carried: input.carried }) });
+    logEvent(db, "hq", `pr:${input.repo}#${input.pr}`, "pr-answer", input.actor, null, null, {
+      answer: input.answer,
+      head: input.head,
+      source: input.source,
+      note: input.note,
+      ...(input.carried === undefined ? {} : { carried: input.carried }),
+    });
   }).immediate();
 }

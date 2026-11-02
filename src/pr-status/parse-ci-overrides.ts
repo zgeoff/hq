@@ -1,6 +1,6 @@
-import { z } from 'zod';
-import { CI_CHECK_SCOPE } from './ci-check-scope.ts';
-import { isAnswerSource } from './is-answer-source.ts';
+import { z } from "zod";
+import { CI_CHECK_SCOPE } from "./ci-check-scope.ts";
+import { isAnswerSource } from "./is-answer-source.ts";
 
 export interface CIOverride {
   seq: number;
@@ -29,17 +29,30 @@ export function parseCIOverrides(rows: readonly OverrideEventRow[]): CIOverride[
     if (data.scope !== CI_CHECK_SCOPE) {
       continue;
     }
-    if (data.check === undefined || data.check === '') {
+    if (data.check === undefined || data.check === "") {
       return [];
     }
     if (isAnswerSource(data.source)) {
-      overrides.push({ seq: row.seq, at: row.at, head: data.head, source: data.source, note: data.note, check: data.check });
+      overrides.push({
+        seq: row.seq,
+        at: row.at,
+        head: data.head,
+        source: data.source,
+        note: data.note,
+        check: data.check,
+      });
     }
   }
   return overrides;
 }
 
-const DataSchema = z.object({ head: z.string(), source: z.string(), note: z.string(), scope: z.string().optional(), check: z.string().optional() });
+const DataSchema = z.object({
+  head: z.string(),
+  source: z.string(),
+  note: z.string(),
+  scope: z.string().optional(),
+  check: z.string().optional(),
+});
 
 function parseData(text: string): z.infer<typeof DataSchema> | null {
   try {

@@ -1,5 +1,5 @@
-import type { Database } from 'bun:sqlite';
-import { logEvent } from '../log-event.ts';
+import type { Database } from "bun:sqlite";
+import { logEvent } from "../log-event.ts";
 
 export interface PRAcceptedRiskInput {
   repo: string;
@@ -12,5 +12,14 @@ export interface PRAcceptedRiskInput {
 
 // The event's seq, which is the record's id.
 export function recordPRAcceptedRisk(db: Database, input: PRAcceptedRiskInput): number {
-  return logEvent(db, 'hq', `pr:${input.repo}#${input.pr}`, 'pr-accepted-risk', input.actor, null, null, { finding: input.finding, source: input.source, note: input.note });
+  return logEvent(
+    db,
+    "hq",
+    `pr:${input.repo}#${input.pr}`,
+    "pr-accepted-risk",
+    input.actor,
+    null,
+    null,
+    { finding: input.finding, source: input.source, note: input.note },
+  );
 }

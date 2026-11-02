@@ -1,5 +1,5 @@
-import { parsePRURL } from '../parse-pr-url.ts';
-import type { AnswerSourceRequest } from './read-answer-source-refusal.ts';
+import { parsePRURL } from "../parse-pr-url.ts";
+import type { AnswerSourceRequest } from "./read-answer-source-refusal.ts";
 
 export interface ConsoleReviewEvidence {
   review: string;
@@ -9,12 +9,19 @@ export interface ConsoleReviewEvidence {
 
 // A console: source is the owner's answer on this PR only as the owner's console review of this PR,
 // with this answer, that the console stored at the head gh gives now. null evidence: no such review.
-export function judgeConsoleReview(request: AnswerSourceRequest, evidence: ConsoleReviewEvidence | null): string | null {
+export function judgeConsoleReview(
+  request: AnswerSourceRequest,
+  evidence: ConsoleReviewEvidence | null,
+): string | null {
   if (evidence === null) {
     return `${request.source} names no owner review in the console`;
   }
-  const named = parsePRURL(evidence.prURL ?? '');
-  if (named === null || `${named.owner}/${named.repo}`.toLowerCase() !== request.ref.slug.toLowerCase() || named.number !== request.ref.pr) {
+  const named = parsePRURL(evidence.prURL ?? "");
+  if (
+    named === null ||
+    `${named.owner}/${named.repo}`.toLowerCase() !== request.ref.slug.toLowerCase() ||
+    named.number !== request.ref.pr
+  ) {
     return `${request.source} is not the owner's console review of ${request.ref.slug}#${request.ref.pr}`;
   }
   if (evidence.review !== request.answer) {

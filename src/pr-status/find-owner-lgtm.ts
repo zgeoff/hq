@@ -1,8 +1,8 @@
-import type { Database } from 'bun:sqlite';
-import { isAnswerSource } from './is-answer-source.ts';
-import { isOwnerLgtmSource } from './is-owner-lgtm-source.ts';
-import { readPRAnswers } from './read-pr-answers.ts';
-import type { OwnerAnswer } from './read-pr-answers.ts';
+import type { Database } from "bun:sqlite";
+import { isAnswerSource } from "./is-answer-source.ts";
+import { isOwnerLgtmSource } from "./is-owner-lgtm-source.ts";
+import { readPRAnswers } from "./read-pr-answers.ts";
+import type { OwnerAnswer } from "./read-pr-answers.ts";
 
 export interface OwnerLgtm {
   changes: OwnerAnswer;
@@ -16,7 +16,12 @@ export interface AnswerEnds {
 }
 
 // The owner's `changes` at the reviewed head and `lgtm` at the head now, from the pr-answer events.
-export function findOwnerLgtm(db: Database, repo: string, pr: number, ends: AnswerEnds): OwnerLgtm | null {
+export function findOwnerLgtm(
+  db: Database,
+  repo: string,
+  pr: number,
+  ends: AnswerEnds,
+): OwnerLgtm | null {
   const answers = readPRAnswers(db, repo, pr);
   const changes = answers?.findLast((answer) => answer.head === ends.reviewed) ?? null;
   const lgtm = answers?.at(-1) ?? null;
@@ -27,5 +32,11 @@ export function findOwnerLgtm(db: Database, repo: string, pr: number, ends: Answ
 }
 
 function isOwnerPair(changes: OwnerAnswer, lgtm: OwnerAnswer, head: string): boolean {
-  return changes.answer === 'changes' && lgtm.answer === 'lgtm' && lgtm.head === head && isAnswerSource(changes.source) && isOwnerLgtmSource(lgtm.source);
+  return (
+    changes.answer === "changes" &&
+    lgtm.answer === "lgtm" &&
+    lgtm.head === head &&
+    isAnswerSource(changes.source) &&
+    isOwnerLgtmSource(lgtm.source)
+  );
 }

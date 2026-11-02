@@ -1,6 +1,6 @@
-import type { Database } from 'bun:sqlite';
-import { z } from 'zod';
-import { isAnswerSource } from './is-answer-source.ts';
+import type { Database } from "bun:sqlite";
+import { z } from "zod";
+import { isAnswerSource } from "./is-answer-source.ts";
 
 const RowsSchema = z.array(z.object({ seq: z.number(), data: z.string() }));
 
@@ -14,13 +14,28 @@ export interface AcceptedRiskRecord {
 
 // The PR's valid records, one per finding: the first stands, and a later one for the same finding
 // repeats it.
-export function readAcceptedRiskRecords(db: Database, repo: string, pr: number): AcceptedRiskRecord[] {
-  const rows = RowsSchema.parse(db.query("SELECT seq, data FROM events WHERE subject = 'hq' AND subject_id = ? AND action = 'pr-accepted-risk' ORDER BY seq").all(`pr:${repo}#${pr}`));
+export function readAcceptedRiskRecords(
+  db: Database,
+  repo: string,
+  pr: number,
+): AcceptedRiskRecord[] {
+  const rows = RowsSchema.parse(
+    db
+      .query(
+        "SELECT seq, data FROM events WHERE subject = 'hq' AND subject_id = ? AND action = 'pr-accepted-risk' ORDER BY seq",
+      )
+      .all(`pr:${repo}#${pr}`),
+  );
   const records = new Map<string, AcceptedRiskRecord>();
   for (const row of rows) {
     const risk = parseRisk(row.data);
     if (risk !== null && isAnswerSource(risk.source) && !records.has(risk.finding)) {
-      records.set(risk.finding, { event: row.seq, finding: risk.finding, source: risk.source, note: risk.note ?? '' });
+      records.set(risk.finding, {
+        event: row.seq,
+        finding: risk.finding,
+        source: risk.source,
+        note: risk.note ?? "",
+      });
     }
   }
   return [...records.values()];
@@ -32,7 +47,11 @@ export function findAcceptedRisks(db: Database, repo: string, pr: number): Set<s
   return new Set(readAcceptedRiskRecords(db, repo, pr).map((record) => record.finding));
 }
 
-const RiskSchema = z.object({ finding: z.string(), source: z.string(), note: z.string().optional() });
+const RiskSchema = z.object({
+  finding: z.string(),
+  source: z.string(),
+  note: z.string().optional(),
+});
 
 function parseRisk(data: string): z.output<typeof RiskSchema> | null {
   try {

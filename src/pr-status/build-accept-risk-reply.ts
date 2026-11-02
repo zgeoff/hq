@@ -5,9 +5,16 @@ export interface AcceptRiskReplyInput {
   source: string;
 }
 
-// The disposition line names its finding, so it answers that finding only: noslop shares a folded
-// comment's replies among every finding folded into it, and a bare `accepted-risk` line would answer
-// them all. The trailer is a second line, which also keeps a single-line comment from answering all.
-export function buildAcceptRiskReply(input: AcceptRiskReplyInput): string {
-  return `${input.finding} accepted-risk ${input.note}\n\nRecorded in hq as event ${input.event} (source ${input.source}) by hq pr accept-risk.`;
+export type AcceptRiskReplyForm = "thread" | "issue";
+
+// An issue comment needs two id-led lines: with one, noslop gives the whole text to every finding
+// folded into the comment, and each reads it as accepted-risk.
+export function buildAcceptRiskReply(
+  input: AcceptRiskReplyInput,
+  form: AcceptRiskReplyForm,
+): string {
+  const line = `${input.finding} accepted-risk ${input.note}`;
+  const trailer = `Recorded in hq as event ${input.event} (source ${input.source}) by hq pr accept-risk.`;
+  const answers = form === "issue" ? [line, line] : [line];
+  return `${answers.join("\n")}\n\n${trailer}`;
 }
