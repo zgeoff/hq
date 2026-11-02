@@ -57,7 +57,9 @@ export async function shipRuns(db: Database, run: Runner, at: Date = now(), opts
     const prs = deliveryPRsOf(r.issue);
     const merged = prs.filter((p) => p.state === 'merged');
     if (!merged.length || prs.some((p) => p.state === 'open')) continue;
-    if (merged.some((p) => !(repoOf(p.ref) in SOURCES))) continue;
+    if (merged.some((pr) => !(repoOf(pr.ref) in SOURCES))) {
+      continue;
+    }
     for (const pr of merged) {
       states.set(pr.ref, { ref: pr.ref, repo: repoOf(pr.ref), sha: pr.merge_sha, tag: pr.shipped_tag, at: pr.shipped_at, mergedAt: pr.merged_at });
     }
