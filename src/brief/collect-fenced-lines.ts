@@ -2,7 +2,6 @@ import { isClosingFence } from './is-closing-fence.ts';
 import type { FenceLine } from './parse-fence-line.ts';
 import { parseFenceLine } from './parse-fence-line.ts';
 
-// A fence that never closes runs to the end of the text.
 export function collectFencedLines(lines: readonly string[]): boolean[] {
   let opening: FenceLine | null = null;
   return lines.map((line) => {
