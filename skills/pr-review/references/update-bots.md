@@ -4,7 +4,7 @@ Renovate bumps dependencies, and the repo-sync App copies shared files from zgeo
 zgeoff/skills into each repo. Skip `hq review` for a PR from either bot. A repo-sync PR copies files
 that their source repo reviewed.
 
-Send a Renovate major of another package through `hq review`.
+Send a Renovate major of a package outside `@zgeoff/*` through `hq review`.
 
 ## Renovate PRs
 
