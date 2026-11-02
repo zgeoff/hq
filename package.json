@@ -18,7 +18,9 @@
     "lint:changed": "bun scripts/lint-changed.ts",
     "grants": "bun scripts/grants.ts",
     "check:grants": "bun scripts/grants.ts --check",
-    "check:skill-writing": "sh scripts/check-skill-writing.sh"
+    "check:skill-writing": "sh scripts/check-skill-writing.sh",
+    "ci:install-tool": "bun scripts/check/install-tool.ts",
+    "ci:test-scope": "bun scripts/check/read-test-scope.ts"
   },
   "dependencies": {
     "@orpc/client": "1.16.1",

@@ -19,6 +19,7 @@
     "mocks",
     "scripts/lint-changed.ts",
     "scripts/lint-changed.test.ts",
+    "scripts/check",
     "skills/pr-review/scripts/rename-decls.ts"
   ]
 }
