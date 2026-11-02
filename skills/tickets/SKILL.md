@@ -21,15 +21,17 @@ may not be able to open Linear. Put every fact it needs in the issue.
 
 In this order; the Linear templates prefill them.
 
-| Section     | What goes in it                                                                                             |
-| ----------- | ----------------------------------------------------------------------------------------------------------- |
-| Outcome     | What becomes possible, and for whom, in 1–3 sentences. A bug: what should happen, and what happens instead. |
-| Context     | Links and facts: project, related issues, prior PRs, eval reports, decisions, reproduction steps.           |
-| Scope       | `In:` and `Out:` lines. `Out:` only what the issue already excludes, or `Out: none stated.`                 |
-| Acceptance  | Checkboxes, each a check plus its evidence: a test, an eval run, a screenshot, a demo.                      |
-| Actions     | What the agent may do, from [Actions](#actions).                                                            |
-| Agent notes | Optional: repo, branch, commands, pitfalls.                                                                 |
+| Section     | What goes in it                                                                                                                   |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Outcome     | What becomes possible, and for whom, in 1–3 sentences. A bug: what should happen, and what happens instead.                       |
+| Context     | Links and facts: project, related issues, prior PRs, eval reports, decisions, reproduction steps.                                 |
+| Scope       | `In:` and `Out:` lines. `Out:` only what the issue already excludes, or `Out: none stated.`                                       |
+| Acceptance  | Checkboxes, each a check plus the evidence the builder shows in its PR: a test, an eval run, a demo, a screenshot or a recording. |
+| Actions     | What the agent may do, from [Actions](#actions).                                                                                  |
+| Agent notes | Optional: repo, branch, commands, pitfalls.                                                                                       |
 
+- For a change someone can see, name a screenshot or a recording as its evidence. The builder adds it
+  to its PR with the `pr-evidence` skill.
 - A Design issue replaces Scope with `## Questions to settle`; an Investigation with
   `## Questions to answer`.
 - Title: the outcome as a plain lowercase phrase, with no type prefix: "pick clone destination
