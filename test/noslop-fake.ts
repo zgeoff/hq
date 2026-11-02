@@ -49,6 +49,19 @@ export interface FakeScript {
   // What `noslop findings --json` answers; no findings when absent.
   noslopFindings?: RunResult;
 
+  // What `noslop check --json` answers: a passing check when absent.
+  noslopCheck?: RunResult;
+
+  // What the read of the PR's review comments (the threads on the diff) prints, one compact JSON object
+  // a line with id, replyTo, login, type, body and url; none when absent.
+  reviewComments?: RunResult;
+
+  // What the same read of the PR's issue comments prints; none when absent.
+  issueComments?: RunResult;
+
+  // What a `gh api -X POST` of a reply or comment answers: the comment's URL when absent.
+  ghPost?: RunResult;
+
   // What the read of the PR's issue comments for noslop's summary marker prints, one compact JSON
   // object a line: one summary comment by the noslop App at the fixed full sha when absent.
   markerComments?: RunResult;
@@ -127,6 +140,9 @@ function pickBunAnswer(script: FakeScript, cmd: string[]): RunResult {
   if (cmd[3] === 'findings') {
     return script.noslopFindings ?? buildResult(JSON.stringify({ findings: [] }));
   }
+  if (cmd[3] === 'check') {
+    return script.noslopCheck ?? buildResult(JSON.stringify({ conclusion: 'success', title: 'No findings need attention.', summary: '', open: [] }));
+  }
   if (cmd[3] === 'store') {
     return script.storeQuery?.() ?? buildResult('[]');
   }
@@ -173,6 +189,12 @@ function pickGhAnswer(script: FakeScript, line: string): RunResult | null {
   }
   if (line.startsWith('gh api --paginate repos/') && line.includes('/files?')) {
     return script.prFiles ?? buildResult('src/kettle.ts\n');
+  }
+  if (line.startsWith('gh api -X POST repos/')) {
+    return script.ghPost ?? buildResult('https://github.com/zgeoff/widgets/pull/7#discussion_r9000\n');
+  }
+  if (line.startsWith('gh api repos/') && line.includes('/comments --paginate') && line.includes('.user.type')) {
+    return (line.includes('/pulls/') ? script.reviewComments : script.issueComments) ?? buildResult('');
   }
   if (line.startsWith('gh api repos/') && line.includes('/issues/') && line.includes('/comments --paginate') && line.includes('user.login')) {
     return script.markerComments ?? buildResult(`${JSON.stringify({ login: 'noslop-review[bot]', body: `<!-- noslop:summary {"head":"${FAKE_FULL_SHA}","reviews":1} -->`, updatedAt: '2026-10-14T01:00:00Z' })}\n`);
