@@ -34,6 +34,19 @@ test('it stores each In Progress issue with its PR attachments and replaces them
   });
 });
 
+test('it asks Linear for the In Progress state by name, so an In Review issue is never read as started', async () => {
+  const ctx = setupTest();
+  const filters: (string | undefined)[] = [];
+  const call = (query: string) => {
+    filters.push(/filter: (?<filter>.*)\) \{/u.exec(query)?.groups?.['filter']);
+    return Promise.resolve({ issues: { nodes: [], pageInfo: { hasNextPage: false, endCursor: null } } });
+  };
+
+  await syncStarted(ctx.db, call, new Date('2026-10-16T07:00:00Z'));
+
+  expect(filters).toStrictEqual(['{ state: { name: { eq: "In Progress" } } }']);
+});
+
 test('it asks for 50 issues a page, follows the cursor, and stores all 40 pages', async () => {
   const ctx = setupTest();
   const asked: { first: string | undefined; after: unknown }[] = [];

@@ -15,7 +15,7 @@ const PAGE_SIZE = 50;
 const MAX_PAGES = 40;
 
 const STARTED_QUERY = `query($after: String) {
-  issues(first: ${PAGE_SIZE}, after: $after, filter: { state: { type: { eq: "started" } } }) {
+  issues(first: ${PAGE_SIZE}, after: $after, filter: { state: { name: { eq: "In Progress" } } }) {
     nodes { identifier startedAt updatedAt attachments(first: 20) { nodes { url sourceType metadata } pageInfo { hasNextPage endCursor } } }
     pageInfo { hasNextPage endCursor } } }`;
 

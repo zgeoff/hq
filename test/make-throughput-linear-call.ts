@@ -14,7 +14,7 @@ export function makeThroughputLinearCall(filed: readonly FiledNode[], started: r
     if (query.includes('createdAt: {')) {
       return Promise.resolve(buildPage(filed));
     }
-    if (query.includes('"started"')) {
+    if (query.includes('"In Progress"')) {
       return Promise.resolve(buildPage(started.map((issue) => buildStartedNode(issue))));
     }
     return Promise.resolve(buildPage([]));
