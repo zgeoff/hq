@@ -25,6 +25,11 @@ trap 'rm -rf "$work"' EXIT
 # from zgeoff/demo, whatever the case of the name. A file read is parsed as an
 # HTTP client does: a fragment never reaches the server, the path is percent-decoded,
 # and a read with no ref gets the default branch, whose blob is default-<repo>.
+# The skill-s entry copies its file from zgeoff/skills, at the commit SKILLS_PIN
+# that tools main's sync/skills-pin.json names, and the manifest at old1 also
+# delivered .claude/skills/s/retired.md and .claude/skills/s/old.md from there;
+# skill-s still delivers the second as .claude/skills/s/new.md. Each commit a
+# workflow pins is on tools main, except FORK_PIN, which only a fork holds.
 cat >"$work/gh" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -41,10 +46,15 @@ case $args in
   "pr view"*)
     printf '{"state":"%s","author":{"login":"%s"},"headRefName":"%s","headRefOid":"head1","baseRefOid":"base1"}\n' "$STATE" "$AUTHOR" "$BRANCH" ;;
   "api repos/zgeoff/tools/commits/main"*) echo main1 ;;
+  "api repos/zgeoff/tools/contents/sync/skills-pin.json?ref=main1"*)
+    [ -z "${PIN_FAIL:-}" ] || { echo "HTTP 502" >&2; exit 1; }
+    printf '{"commit":"%s"}' "$SKILLS_PIN" | base64 ;;
+  "api repos/zgeoff/tools/compare/$FORK_PIN...main1"*) echo diverged ;;
+  "api repos/zgeoff/tools/compare/"*"...main1"*) echo ahead ;;
   "api repos/zgeoff/tools/contents/sync/manifest.json?ref=old1"*)
-    printf '[{"name":"skill-y","files":[{"source":"sync/skills/y/SKILL.md","target":".claude/skills/y/SKILL.md"}]},{"name":"skill-n","files":[{"source":"sync/skills/old/SKILL.md","target":".claude/skills/old/SKILL.md"},{"source":"sync/skills/lone/SKILL.md","target":".claude/skills/lone/SKILL.md"}]}]' | base64 ;;
+    printf '[{"name":"skill-s","files":[{"repo":"zgeoff/skills","source":"skills/s/retired.md","target":".claude/skills/s/retired.md"},{"repo":"zgeoff/skills","source":"skills/s/old.md","target":".claude/skills/s/old.md"}]},{"name":"skill-y","files":[{"source":"sync/skills/y/SKILL.md","target":".claude/skills/y/SKILL.md"}]},{"name":"skill-n","files":[{"source":"sync/skills/old/SKILL.md","target":".claude/skills/old/SKILL.md"},{"source":"sync/skills/lone/SKILL.md","target":".claude/skills/lone/SKILL.md"}]}]' | base64 ;;
   "api repos/zgeoff/tools/contents/sync/manifest.json"*)
-    printf '[{"name":"skill-x","files":[{"source":"sync/skills/x/SKILL.md","target":".claude/skills/x/SKILL.md"}]},{"name":"callers","files":[{"source":"sync/workflow-callers/pr.yml","target":".github/workflows/pr.yml"}]},{"name":"skill-odd","files":[{"source":"sync/skills/odd/odd #1?%%41.md","target":".claude/skills/odd/odd #1?%%41.md"}]},{"name":"skill-blk","files":[{"source":"sync/skills/blk/SKILL.md","target":".claude/skills/blk/SKILL.md"},{"source":"sync/skills/blk/references/rust.md","target":".claude/skills/blk/references/rust.md","except":["ZGeoff/Demo"]},{"source":"sync/skills/blk/references/kotlin.md","target":".claude/skills/blk/references/kotlin.md","except":["zgeoff/other"]}]},{"name":"skill-n","files":[{"source":"sync/skills/new/SKILL.md","target":".claude/skills/new/SKILL.md"}]},{"name":"baseline","files":[],"scripts":{"check:tea":"bun scripts/tea.ts","check:toast":"bun scripts/toast.ts"}}]' | base64 ;;
+    printf '[{"name":"skill-x","files":[{"source":"sync/skills/x/SKILL.md","target":".claude/skills/x/SKILL.md"}]},{"name":"callers","files":[{"source":"sync/workflow-callers/pr.yml","target":".github/workflows/pr.yml"}]},{"name":"skill-odd","files":[{"source":"sync/skills/odd/odd #1?%%41.md","target":".claude/skills/odd/odd #1?%%41.md"}]},{"name":"skill-blk","files":[{"source":"sync/skills/blk/SKILL.md","target":".claude/skills/blk/SKILL.md"},{"source":"sync/skills/blk/references/rust.md","target":".claude/skills/blk/references/rust.md","except":["ZGeoff/Demo"]},{"source":"sync/skills/blk/references/kotlin.md","target":".claude/skills/blk/references/kotlin.md","except":["zgeoff/other"]}]},{"name":"skill-n","files":[{"source":"sync/skills/new/SKILL.md","target":".claude/skills/new/SKILL.md"}]},{"name":"skill-s","files":[{"repo":"zgeoff/skills","source":"skills/s/SKILL.md","target":".claude/skills/s/SKILL.md"},{"repo":"zgeoff/skills","source":"skills/s/new.md","target":".claude/skills/s/new.md"}]},{"name":"baseline","files":[],"scripts":{"check:tea":"bun scripts/tea.ts","check:toast":"bun scripts/toast.ts"}}]' | base64 ;;
   *"--jq .content"*)
     [ -z "${TEXT_FAIL:-}" ] || { echo "HTTP 502" >&2; exit 1; }
     case $args in
@@ -54,6 +64,9 @@ case $args in
       *) printf 'older\n' | base64 ;;
     esac ;;
   "api repos/zgeoff/tools/commits?"*) printf 'main1\nold1\n' ;;
+  "api repos/zgeoff/skills/commits?sha=$SKILLS_PIN&"*) printf '%s\nold1\n' "$SKILLS_PIN" ;;
+  "api repos/zgeoff/skills/contents/"*"?ref=$SKILLS_PIN"*) echo "${SOURCE_BLOBS%% *}" ;;
+  "api repos/zgeoff/skills/contents/"*"?ref=old1"*) echo "${SOURCE_BLOBS##* }" ;;
   "api repos/zgeoff/tools/contents/sync/"*"?ref=main1"*) echo "${SOURCE_BLOBS%% *}" ;;
   "api repos/zgeoff/tools/contents/sync/"*"?ref=old1"*) echo "${SOURCE_BLOBS##* }" ;;
   "api repos/zgeoff/demo/contents/"*"ref=base1"*) echo "$BASE_BLOB" ;;
@@ -84,6 +97,22 @@ git -C "$tools_repo" rm -q sync/skills/lone/SKILL.md
 git -C "$tools_repo" commit -q -m "refactor: move the skill"
 export SYNC_PR_TOOLS_REPO="file://$tools_repo"
 
+# The zgeoff/skills history: skill-s's source moved from skills/s/old.md to
+# skills/s/new.md.
+skills_repo="$work/skills-fixture"
+git init -q "$skills_repo"
+git -C "$skills_repo" config user.email test@example.com
+git -C "$skills_repo" config user.name test
+git -C "$skills_repo" config uploadpack.allowFilter true
+mkdir -p "$skills_repo/skills/s"
+printf '# Part\n\nA body long enough for git to see the same file after a move.\n' >"$skills_repo/skills/s/old.md"
+git -C "$skills_repo" add -A
+git -C "$skills_repo" commit -q -m "feat: add the skill"
+git -C "$skills_repo" mv skills/s/old.md skills/s/new.md
+git -C "$skills_repo" commit -q -m "refactor: move the part"
+export SYNC_PR_SKILLS_REPO="file://$skills_repo"
+export FORK_PIN=fedcba9876543210fedcba9876543210fedcba98
+
 failures=0
 # expect <name> <exit code> <output prefix>, with the case's variables exported.
 expect() {
@@ -100,14 +129,16 @@ expect() {
 set_case() {
   export STATE=OPEN AUTHOR=app/zgeoff-sync-bot BRANCH=repo-sync/zgeoff-tools
   export FILES='.claude/skills/x/SKILL.md\tmodified' HEAD_BLOB=b1 BASE_BLOB=b1 SOURCE_BLOBS='b1 b0'
-  export HEAD_TEXT=ours SOURCE_TEXT=theirs
+  export HEAD_TEXT=ours SOURCE_TEXT=theirs SKILLS_PIN=0123456789abcdef0123456789abcdef01234567
   unset BASE_TEXT
 }
 
-# caller <head ref line> <source ref line>: a workflow caller whose blob differs.
+# caller <head ref line> <source ref line>: a workflow caller whose blob differs,
+# and whose base held an older job.
 caller() {
   export FILES='.github/workflows/pr.yml\tmodified' HEAD_BLOB=pinned
   export HEAD_TEXT="jobs:\\n  checks:\\n    $1" SOURCE_TEXT="jobs:\\n  checks:\\n    $2"
+  export BASE_TEXT="jobs:\\n  checks:\\n    uses: zgeoff/tools/.github/workflows/old-checks.yml@main"
 }
 
 set_case
@@ -191,6 +222,75 @@ unset FILES_FAIL
 set_case
 export FILES='.claude/skills/odd/odd #1?%41.md\tmodified'
 expect "a synced file whose name holds #, ? and % is read at its own path and ref" 0 "ok: 1 files"
+
+# own <path> <base ref> <head ref>: a workflow the repo wrote itself, whose
+# blob differs and whose call to a zgeoff/tools workflow names each ref.
+own() {
+  export FILES="$1\\tmodified" HEAD_BLOB=pinned SOURCE_TEXT=unrelated
+  export BASE_TEXT="on: push\\njobs:\\n  checks:\\n    uses: zgeoff/tools/.github/workflows/bun-checks.yml@$2"
+  export HEAD_TEXT="on: push\\njobs:\\n  checks:\\n    uses: zgeoff/tools/.github/workflows/bun-checks.yml@$3"
+}
+old_pin='1111111111111111111111111111111111111111 # main'
+new_pin='2222222222222222222222222222222222222222 # main'
+
+set_case
+own .github/workflows/main.yml "$old_pin" "$new_pin"
+expect "a workflow the manifest does not deliver passes when the sync only moved its tools pin" 0 "ok: 1 files"
+
+set_case
+own .github/workflows/pr.yml "$old_pin" "$new_pin"
+expect "a repo's own workflow at a target path passes when the sync only moved its tools pin" 0 "ok: 1 files"
+
+set_case
+own .github/workflows/main.yml "$old_pin" "$new_pin"
+export HEAD_TEXT="$HEAD_TEXT\\n  extra:\\n    runs-on: ubuntu-latest"
+expect "a workflow the manifest does not deliver fails when it changes more than its tools pin" 1 "no: .github/workflows/main.yml is not a target"
+
+set_case
+own .github/workflows/main.yml "$old_pin" "$FORK_PIN # main"
+expect "a workflow pinned to a tools commit that only a fork holds fails" 1 "no: .github/workflows/main.yml pins zgeoff/tools at $FORK_PIN, which is not on tools main (diverged)"
+
+set_case
+caller "uses: zgeoff/tools/.github/workflows/bun-checks.yml@$FORK_PIN # main" 'uses: zgeoff/tools/.github/workflows/bun-checks.yml@main'
+expect "a workflow caller pinned to a tools commit that only a fork holds fails" 1 "no: .github/workflows/pr.yml pins zgeoff/tools at $FORK_PIN"
+
+set_case
+own .github/workflows/main.yml "$old_pin" "$new_pin"
+export FILES='.github/workflows/main.yml\tadded'
+expect "an added workflow the manifest does not deliver fails" 1 "no: .github/workflows/main.yml is not a target"
+
+set_case
+export FILES='.claude/skills/s/SKILL.md\tmodified'
+expect "a file from zgeoff/skills equal to its source at the skills pin passes" 0 "ok: 1 files equal their sources on tools main (head main1) and zgeoff/skills (pin 0123456)"
+
+set_case
+export FILES='.claude/skills/s/SKILL.md\tmodified' SOURCE_BLOBS='b2 b1'
+expect "a file from zgeoff/skills equal to an older version of its source passes" 0 "ok: 1 files"
+
+set_case
+export FILES='.claude/skills/s/SKILL.md\tmodified' HEAD_BLOB=edited
+expect "a file from zgeoff/skills edited after the sync fails" 1 "no: .claude/skills/s/SKILL.md matches zgeoff/skills skills/s/SKILL.md at none"
+
+set_case
+export FILES='.claude/skills/s/SKILL.md\tmodified' SKILLS_PIN=main
+expect "a skills pin that names no commit fails" 1 "no: tools main's sync/skills-pin.json pins no zgeoff/skills commit"
+
+set_case
+export FILES='.claude/skills/s/SKILL.md\tmodified' PIN_FAIL=1
+expect "a skills pin that cannot be read fails with its reason" 1 "no: tools main's sync/skills-pin.json could not be read: HTTP 502"
+unset PIN_FAIL
+
+set_case
+export FILES='.claude/skills/s/retired.md\tremoved' BASE_BLOB=b0
+expect "a removed copy of a retired zgeoff/skills file passes" 0 "ok: 1 files"
+
+set_case
+export FILES='.claude/skills/s/old.md\tremoved' BASE_BLOB=edited HEAD_BLOB=b1
+expect "a removed file whose zgeoff/skills source was renamed passes with an edited old copy" 0 "ok: 1 files"
+
+set_case
+export FILES='.claude/skills/s/old.md\tremoved' BASE_BLOB=edited HEAD_BLOB=b1
+SYNC_PR_SKILLS_REPO="file://$work/no-such-repo" expect "a failed clone of the skills history fails with its reason" 1 "no: skills could not be cloned from file://"
 
 # block <head text> <source text>: .claude/skills/blk/SKILL.md, whose blob differs, with the
 # text of the PR head and of tools main.
