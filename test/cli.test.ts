@@ -582,6 +582,20 @@ test('hq run add refuses a session id given as a second word, and stores the run
   expect((stored.json.run.sessions as RunSessionRow[]).map((x) => x.session_id)).toEqual(['9701ab0c-0000-4000-8000-00000000beef']);
 });
 
+test('#run add names hq run session --add for a --session it ignores on a run already on the board', async () => {
+  await hq('run', 'add', 'GEO-9702', '--session', '9702ab0c-0000-4000-8000-00000000aaaa', '--title', 'Invented kettle work', '--where', 'none');
+  const helper = await hq('run', 'add', 'GEO-9702', '--session', '9702ab0c-0000-4000-8000-00000000bbbb', '--title', 'Invented kettle work', '--where', 'none');
+  const same = await hq('run', 'add', 'GEO-9702', '--session', '9702ab0c-0000-4000-8000-00000000aaaa', '--title', 'Invented kettle work', '--where', 'none');
+  expect(helper.code).toBe(0);
+  expect(helper.json).toMatchObject({
+    result: 'noop',
+    ignored: { session: '9702ab0c-0000-4000-8000-00000000bbbb', next: 'hq run session GEO-9702 9702ab0c-0000-4000-8000-00000000bbbb --add' },
+    run: { sessions: [{ session_id: '9702ab0c-0000-4000-8000-00000000aaaa' }] },
+  });
+  expect(same.json.result).toBe('noop');
+  expect(same.json.ignored).toBeUndefined();
+});
+
 test('v20 adds live_check to runs and the merge and release columns to run_prs', () => {
   const p = `${dir}/v19.db`;
   const v19 = new Database(p, { create: true });

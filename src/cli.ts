@@ -2169,11 +2169,12 @@ async function runCommand(context: Ctx): Promise<Out> {
       const where = (flags.where ?? 'imp') as 'local' | 'imp' | 'none';
       if (!['local', 'imp', 'none'].includes(where)) throw new HqError('bad_args', '--where must be local, imp or none');
       const pacing = await loadPacing(pacingPath());
+      const session = flags.session ? await expandSession(flags.session) : null;
       const r = addRun(db, {
         issue: arg(0, 'issue'),
         title: need(flags.title, 'title'),
         place: where,
-        session: flags.session ? await expandSession(flags.session) : null,
+        session,
         next: flags.next ?? 'Agent working.',
         gate: flags.gate ?? null,
         geoffChat: !!flags['geoff-chat'],
@@ -2186,8 +2187,14 @@ async function runCommand(context: Ctx): Promise<Out> {
         designError: pacing.designError,
         actor: await by(),
       });
-      return { data: { result: r.result, run: r.run }, text: `${runLine(r.run)}
-${r.result === 'added' ? 'On the board.' : 'Already on the board.'}` };
+
+      // A run already on the board keeps its sessions, so a --session here would vanish without a word.
+      const ignored = r.result === 'noop' && session && !r.run.sessions.some((row) => row.active === 1 && row.session_id === session)
+        ? { session, next: `hq run session ${r.run.issue} ${session} --add` }
+        : undefined;
+      const said = r.result === 'added' ? 'On the board.' : 'Already on the board.';
+      const hint = ignored ? `\nIgnored --session ${session}: to add it to the run, use ${ignored.next}` : '';
+      return { data: { result: r.result, run: r.run, ignored }, text: `${runLine(r.run)}\n${said}${hint}` };
     }
     case 'size': {
       const issue = resolveRun(db, arg(0, 'issue')).issue;
