@@ -678,4 +678,15 @@ export const MIGRATIONS: string[] = [
   -- again. Today is never cached, so forgetting the two newest cached days makes the next sync read
   -- the rest of the window and record its boxes.
   DELETE FROM merged_pr_days WHERE day IN (SELECT day FROM merged_pr_days ORDER BY day DESC LIMIT 2);`,
+
+  // v48: the GitHub PRs Linear attaches to each In Progress issue, replaced with linear_started on every
+  // read. ref is repo#number, as run_prs refs are; status is open, draft, merged or closed; merged_at is
+  // NULL until the PR merged.
+  `CREATE TABLE linear_started_prs (
+    issue     TEXT NOT NULL,
+    ref       TEXT NOT NULL,
+    status    TEXT NOT NULL,
+    merged_at TEXT,
+    PRIMARY KEY (issue, ref)
+  );`,
 ];

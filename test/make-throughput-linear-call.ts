@@ -4,6 +4,7 @@ import type { FiledNode } from './build-filed-node.ts';
 interface StartedSeed {
   identifier: string;
   startedAt: string;
+  attachments?: readonly unknown[];
 }
 
 // Linear as hq's sync reads it, in one page each: these filed issues, these In Progress ones, and
@@ -14,7 +15,7 @@ export function makeThroughputLinearCall(filed: readonly FiledNode[], started: r
       return Promise.resolve(buildPage(filed));
     }
     if (query.includes('"started"')) {
-      return Promise.resolve(buildPage(started.map((issue) => ({ ...issue, updatedAt: issue.startedAt }))));
+      return Promise.resolve(buildPage(started.map(({ attachments, ...issue }) => ({ ...issue, updatedAt: issue.startedAt, ...(attachments === undefined ? {} : { attachments: { nodes: attachments } }) }))));
     }
     return Promise.resolve(buildPage([]));
   };
