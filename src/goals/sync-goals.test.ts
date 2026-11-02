@@ -23,7 +23,7 @@ const home = process.env['HOME'];
 beforeEach(() => {
   ({ db, dir, cleanup } = freshDb());
   process.env['HOME'] = dir;
-  at('2026-10-16T02:00:00Z'); // Friday 13:00 Sydney
+  at('2026-10-16T02:00:00Z');
 });
 afterEach(() => {
   process.env['HOME'] = home;
@@ -43,7 +43,6 @@ const run = (over: Partial<Record<string, unknown>> = {}) => ({
   ...over,
 });
 
-// gh api for runs: each repo/day answers the given runs.
 function gh(runs: Record<string, ReturnType<typeof run>[]>, closed: Record<string, { number: number; closed_at: string; repo: string }[]> = {}, repos = ['atc', 'cloud']): Runner {
   return async (cmd) => {
     if (cmd[1] === 'repo') return { code: 0, stdout: JSON.stringify(repos.map((name) => ({ name, isArchived: false })).concat([{ name: 'old', isArchived: true }])), stderr: '' };
@@ -79,7 +78,7 @@ test.each([
   [{ id: 0 }],
   [{ id: 'x' }],
   [{ run_attempt: 0 }],
-  [{ created_at: '2026-10-13T23:00:00Z' }], // another day
+  [{ created_at: '2026-10-13T23:00:00Z' }],
   [{ created_at: 'soon' }],
   [{ updated_at: '0' }],
   [{ conclusion: 7 }],
@@ -135,14 +134,13 @@ test('the rows: Sydney days and weeks; deploys and log are n/a before their sour
   mkdirSync(`${dir}/.local/share/z-sessions`, { recursive: true });
   writeFileSync(`${dir}/.local/share/z-sessions/delivery.md`, '- 2026-10-14T01:00Z DEPLOY cloud\n- 01:30Z HOLD nixie\n');
   const runs = {
-    // Wed 14 Oct Sydney is 13 Oct 13:00Z to 14 Oct 13:00Z.
-    'atc/2026-10-13': [run({ id: 1, created_at: '2026-10-13T12:00:00Z', run_started_at: '2026-10-13T12:00:00Z', updated_at: '2026-10-13T12:20:00Z' })], // Tue 13 Oct 23:00 Sydney
+    'atc/2026-10-13': [run({ id: 1, created_at: '2026-10-13T12:00:00Z', run_started_at: '2026-10-13T12:00:00Z', updated_at: '2026-10-13T12:20:00Z' })],
     'atc/2026-10-14': [run({ id: 2, conclusion: 'cancelled' }), run({ id: 3, conclusion: 'failure', run_attempt: 3 })],
     'cloud/2026-10-14': [run({ id: 4, path: DEPLOY.path }), run({ id: 5, path: DEPLOY.path, conclusion: 'failure' })],
   };
   const r = await syncGoals(db, gh(runs, { '2026-10-14': [{ repo: 'atc', number: 8, closed_at: '2026-10-14T04:00:00Z' }] }), { from: new Date('2026-10-12T00:00:00Z') });
   expect(r.errors).toEqual([]);
-  expect(r.runs).toBe(5); // four workers, one total
+  expect(r.runs).toBe(5);
   db.query(`INSERT INTO merged_prs (repo, number, merged_at, title, kind, issue) VALUES ('atc', 1, '2026-10-14T02:00:00Z', 'fix: x', 'fix', NULL)`).run();
   const g = goalRows(db, 4);
   const [tue, wed, thu, fri] = g.days;
@@ -158,7 +156,6 @@ test('the rows: Sydney days and weeks; deploys and log are n/a before their sour
 test('stored rows of a repo now out of scope stay in the database but count nowhere', async () => {
   const runs = { 'atc/2026-10-14': [run({ id: 2 })] };
   await syncGoals(db, gh(runs, { '2026-10-14': [] }), { from: new Date('2026-10-12T00:00:00Z') });
-  // Rows from before the repo went out: a run, a merge, a closed PR, and CI fetched for one day only.
   db.query(`INSERT INTO ci_runs (id, repo, path, event, status, conclusion, attempt, created_at, started_at, updated_at) VALUES (99, 'teapots', 'ci.yml', 'push', 'completed', 'failure', 1, '2026-10-14T01:00:00Z', '2026-10-14T01:00:00Z', '2026-10-14T01:30:00Z')`).run();
   db.query(`INSERT INTO merged_prs (repo, number, merged_at, title, kind, issue) VALUES ('teapots', 3, '2026-10-14T02:00:00Z', 'fix: y', 'fix', NULL)`).run();
   db.query(`INSERT INTO closed_prs (repo, number, closed_at) VALUES ('teapots', 4, '2026-10-14T03:00:00Z')`).run();
@@ -172,9 +169,9 @@ test('a capped sync fetches the newest repo-days first and counts the rest as le
   const r = await syncGoals(db, gh({}, {}), { from: new Date('2026-10-12T00:00:00Z'), maxRepoDays: 3 });
   expect(r.days).toBe(3);
   expect(r.errors).toEqual([]);
-  expect(r.left).toBe(2 * 5 - 3); // atc and cloud, 12 to 16 Oct (today is fetched every call): 10 repo-days, 3 fetched
+  expect(r.left).toBe(2 * 5 - 3);
   const got = db.query(`SELECT day FROM goal_days WHERE kind = 'ci' ORDER BY day`).all() as { day: string }[];
-  expect(got.every((x) => x.day === '2026-10-15')).toBe(true); // the newest past day; today is never marked done
+  expect(got.every((x) => x.day === '2026-10-15')).toBe(true);
   const again = await syncGoals(db, gh({}, {}), { from: new Date('2026-10-12T00:00:00Z') });
   expect(again.left).toBe(0);
 });
@@ -219,7 +216,6 @@ test('loadRepos() keeps only the repos in scope, and the list matches repo-facts
     scoped = await loadRepos(() => Promise.resolve({ code: 0, stdout: JSON.stringify([{ name: 'atc', isArchived: false }, { name: 'decree', isArchived: false }, { name: 'brand-new', isArchived: false }]), stderr: '' }));
   expect(scoped).toEqual(['atc']);
   const section = doc.split('## repos in scope')[1]!.split('\n## ')[0]!;
-  // The bullets under "In:", up to the next line that is not a bullet or blank.
   const inList = section.split(/^In:\s*$/m)[1]!.split(/^(?!- |\s*$)/m)[0]!;
   const listed = [...inList.matchAll(/^- `zgeoff\/([A-Za-z0-9_.-]+)`\s*$/gm)].map((m) => m[1]);
   expect(listed.length).toBeGreaterThan(0);
@@ -232,8 +228,6 @@ test('closed-unmerged PRs in a repo not in scope are not stored', async () => {
   expect(db.query('SELECT repo FROM closed_prs').all()).toEqual([{ repo: 'atc' }]);
 });
 
-// ---------- deploy-prod outcomes ----------
-
 const job = (name: string, conclusion: string | null, steps: { name: string; conclusion: string }[] = []) => ({ name, conclusion, steps });
 const jobsOf = (...jobs: ReturnType<typeof job>[]) => ({ total_count: jobs.length, jobs });
 const HOLD = 'Hold for a manual dispatch';
@@ -243,23 +237,25 @@ test('classify a deploy-prod run from its jobs', () => {
   expect(one(jobsOf(job('decide', 'success'), job('apply', 'skipped'), job('alert', 'skipped')))).toMatchObject({ outcome: 'no_apply', apply_conclusion: 'skipped' });
   expect(one(jobsOf(job('decide', 'success')))).toMatchObject({ outcome: 'no_apply', apply_conclusion: null });
   expect(one(jobsOf(job('decide', 'success'), job('apply', 'success', [{ name: 'Apply', conclusion: 'success' }])))).toMatchObject({ outcome: 'applied_ok' });
-  expect(one(jobsOf(job('decide', 'success'), job('apply', 'success', [{ name: 'Decide again', conclusion: 'success' }, { name: 'Apply', conclusion: 'skipped' }])))).toMatchObject({ outcome: 'no_apply', apply_conclusion: 'success' }); // the queued decision found nothing left
+  const decideAgain = jobsOf(job('decide', 'success'), job('apply', 'success', [{ name: 'Decide again', conclusion: 'success' }, { name: 'Apply', conclusion: 'skipped' }]));
+  expect(one(decideAgain)).toMatchObject({ outcome: 'no_apply', apply_conclusion: 'success' });
   expect(one(jobsOf(job('apply', 'failure', [{ name: 'Set up', conclusion: 'success' }, { name: HOLD, conclusion: 'failure' }])), 'failure')).toEqual({ outcome: 'held', apply_conclusion: 'failure', failed_step: HOLD });
   expect(one(jobsOf(job('apply', 'failure', [{ name: 'Terraform apply', conclusion: 'failure' }])), 'failure')).toEqual({ outcome: 'applied_failed', apply_conclusion: 'failure', failed_step: 'Terraform apply' });
-  expect(one(jobsOf(job('apply', 'failure', [{ name: `${HOLD} again`, conclusion: 'failure' }])), 'failure')).toMatchObject({ outcome: 'applied_failed' }); // the name must match exactly
+  const holdAgain = jobsOf(job('apply', 'failure', [{ name: `${HOLD} again`, conclusion: 'failure' }]));
+  expect(one(holdAgain, 'failure')).toMatchObject({ outcome: 'applied_failed' });
   expect(one(jobsOf(job('apply', 'timed_out')), 'failure')).toMatchObject({ outcome: 'applied_failed', failed_step: null });
   expect(one(jobsOf(job('apply', 'cancelled')), 'cancelled')).toMatchObject({ outcome: 'cancelled' });
   expect(one(jobsOf(job('decide', 'cancelled'), job('apply', 'skipped')), 'cancelled')).toMatchObject({ outcome: 'cancelled' });
   expect(one(jobsOf(job('apply', 'neutral')))).toMatchObject({ outcome: 'unknown' });
   expect(one(null)).toBeNull();
   expect(one({ jobs: 'x' })).toBeNull();
-  expect(one({ total_count: 150, jobs: [job('decide', 'success')] })).toBeNull(); // more jobs than one page
-  expect(one(jobsOf(job('apply', null)))).toBeNull(); // finished run, unfinished apply
+  expect(one({ total_count: 150, jobs: [job('decide', 'success')] })).toBeNull();
+  const noConclusion = jobsOf(job('apply', null));
+  expect(one(noConclusion)).toBeNull();
 });
 
 const depRun = (id: number, over: Partial<Record<string, unknown>> = {}) => run({ id, path: DEPLOY.path, created_at: `2026-10-14T0${id % 10}:00:00Z`, ...over });
 
-// A runner that answers jobs calls from a table and records the run ids it was asked about.
 function jobsGh(answers: Record<number, unknown>, asked: number[] = []): Runner {
   return async (cmd) => {
     const m = /repos\/zgeoff\/cloud\/actions\/runs\/(\d+)\/attempts\/(\d+)\/jobs\?per_page=100$/.exec(cmd.find((c) => c.startsWith('repos/')) ?? '');
@@ -294,23 +290,22 @@ test('syncDeploys stores one outcome per completed run and skips one still runni
     { run_id: 7001, outcome: 'no_apply', apply_conclusion: 'skipped', failed_step: null },
     { run_id: 7002, outcome: 'held', apply_conclusion: 'failure', failed_step: HOLD },
   ]);
-  // Nothing is fetched twice.
   asked.length = 0;
   await syncDeploys(db, jobsGh(answers, asked));
-  expect(asked).toEqual([]);
+  expect(asked).toStrictEqual([]);
 });
 
 test('syncDeploys takes at most 60 a call, oldest first, and counts what is left', async () => {
   const answers: Record<number, unknown> = {};
   for (let i = 0; i < 65; i++) {
     const id = 8000 + i;
-    storeRun(id, { created: new Date(Date.parse('2026-10-14T00:00:00Z') + (64 - i) * 60_000).toISOString().replace('.000', '') }); // a higher id is older
+    storeRun(id, { created: new Date(Date.parse('2026-10-14T00:00:00Z') + (64 - i) * 60_000).toISOString().replace('.000', '') });
     answers[id] = jobsOf(job('apply', 'success'));
   }
   const first = await syncDeploys(db, jobsGh(answers));
   expect(first).toMatchObject({ fetched: 60, left: 5 });
   const stored = (db.query('SELECT run_id FROM deploy_runs').all() as { run_id: number }[]).map((x) => x.run_id);
-  expect(stored).not.toContain(8000); // the newest five wait
+  expect(stored).not.toContain(8000);
   expect(stored).not.toContain(8004);
   expect(stored).toContain(8005);
   expect(stored).toContain(8064);
@@ -322,7 +317,7 @@ test('an unreadable jobs answer leaves no row and an error, and the next sync tr
   storeRun(9001);
   storeRun(9002);
   storeRun(9003);
-  const answers = { 9001: jobsOf(job('apply', 'success')), 9002: { total_count: 'x' } }; // 9003: gh fails
+  const answers = { 9001: jobsOf(job('apply', 'success')), 9002: { total_count: 'x' } };
   const r = await syncDeploys(db, jobsGh(answers));
   expect(r.fetched).toBe(1);
   expect(r.errors).toHaveLength(2);
@@ -336,7 +331,7 @@ test('an unreadable jobs answer leaves no row and an error, and the next sync tr
 test('syncGoals classifies the deploy-prod runs it stored, and reports the errors', async () => {
   const runs = { 'cloud/2026-10-14': [depRun(4), depRun(5, { conclusion: 'failure' })] };
   const base = gh(runs);
-  const answers = { 4: jobsOf(job('apply', 'success')) }; // 5: unreadable
+  const answers = { 4: jobsOf(job('apply', 'success')) };
   const jobs = jobsGh(answers);
   const both: Runner = (cmd, o) => (cmd.some((c) => c.includes('/jobs?')) ? jobs(cmd, o) : base(cmd, o));
   const r = await syncGoals(db, both, { from: new Date('2026-10-12T00:00:00Z') });
@@ -353,11 +348,10 @@ test('a re-run with a new attempt is classified again; a stored row for an older
   const first = { 9501: jobsOf(job('apply', 'failure', [{ name: 'Apply', conclusion: 'failure' }])) };
   await syncDeploys(db, jobsGh(first));
   expect(db.query('SELECT outcome, attempt FROM deploy_runs').all()).toEqual([{ outcome: 'applied_failed', attempt: 1 }]);
-  // The same day, the run is re-run: attempt 2 is running, then succeeds.
   db.query(`UPDATE ci_runs SET attempt = 2, status = 'in_progress', conclusion = NULL WHERE id = 9501`).run();
   const asked: number[] = [];
   expect(await syncDeploys(db, jobsGh({}, asked))).toMatchObject({ fetched: 0, errors: [] });
-  expect(asked).toEqual([]); // not completed: not fetched
+  expect(asked).toStrictEqual([]);
   expect(goalRows(db, 4).days.find((d) => d.deploys?.runs === 1)!.deploys).toMatchObject({ applied_failed: 0, unclassified: 0, running: 1 });
   db.query(`UPDATE ci_runs SET status = 'completed', conclusion = 'success' WHERE id = 9501`).run();
   expect(goalRows(db, 4).days.find((d) => d.deploys?.runs === 1)!.deploys).toMatchObject({ applied_failed: 0, unclassified: 1 });
@@ -379,7 +373,7 @@ test('syncDeploys asks for the attempt hq stored, so a later re-run cannot stand
 });
 
 test('a run GitHub no longer has is stored as unknown; an older run that keeps failing does not hold the check-in', async () => {
-  storeRun(9701, { created: '2026-10-01T00:00:00Z' }); // before the window
+  storeRun(9701, { created: '2026-10-01T00:00:00Z' });
   storeRun(9702, { created: '2026-10-14T00:00:00Z' });
   storeRun(9703, { created: '2026-10-14T00:00:01Z' });
   const r = await syncDeploys(db, jobsGh({ 9702: 404, 9703: jobsOf(job('apply', 'success')) }), undefined, undefined, 60, new Date('2026-10-10T00:00:00Z'));
@@ -393,7 +387,9 @@ test('a run GitHub no longer has is stored as unknown; an older run that keeps f
 });
 
 test('old runs that keep failing cannot take every slot: runs inside the window go first', async () => {
-  for (let i = 0; i < 61; i++) storeRun(9800 + i, { created: `2026-10-01T00:${String(i % 60).padStart(2, '0')}:00Z` }); // before the window; no answer: they fail
+  for (let index = 0; index < 61; index++) {
+    storeRun(9800 + index, { created: `2026-10-01T00:${String(index % 60).padStart(2, '0')}:00Z` });
+  }
   storeRun(9900, { created: '2026-10-14T00:00:00Z' });
   const asked: number[] = [];
   const r = await syncDeploys(db, jobsGh({ 9900: jobsOf(job('apply', 'success')) }, asked), undefined, undefined, 60, new Date('2026-10-10T00:00:00Z'));

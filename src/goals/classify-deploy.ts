@@ -4,10 +4,6 @@ import type { DeployOutcome } from './types.ts';
 const APPLY_STEP = 'Apply',
   HOLD_STEP = 'Hold for a manual dispatch';
 
-// The outcome of one completed run from its jobs answer, or null when the answer can't be read.
-// The workflow has jobs decide, apply and alert: apply skipped (or absent) means nothing to apply;
-// apply failing on the step named HOLD_STEP is a hold, not a failure; apply succeeding with its
-// APPLY_STEP skipped found nothing to apply.
 export function classifyDeploy(jobs: unknown, runConclusion: string | null): { outcome: DeployOutcome; apply_conclusion: string | null; failed_step: string | null } | null {
   const j = jobs as { total_count?: unknown; jobs?: unknown } | null;
   if (!j || typeof j !== 'object' || !Array.isArray(j.jobs)) return null;
@@ -17,7 +13,9 @@ export function classifyDeploy(jobs: unknown, runConclusion: string | null): { o
   const apply = list.find((x) => x.name === 'apply');
   if (apply && apply.conclusion !== null && typeof apply.conclusion !== 'string') return null;
   const c = apply ? (apply.conclusion as string | null) : null;
-  if (apply && c === null) return null; // a finished run whose apply job has no conclusion
+  if (apply && c === null) {
+    return null;
+  }
   if (runConclusion === 'cancelled' || c === 'cancelled') return { outcome: 'cancelled', apply_conclusion: c, failed_step: null };
   if (!apply || c === 'skipped') return { outcome: 'no_apply', apply_conclusion: c, failed_step: null };
   if (c === 'success') {

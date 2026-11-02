@@ -12,7 +12,6 @@ let cleanup: () => void, db: Database, dir: string;
 const home = process.env['HOME'],
   xdg = process.env['XDG_CACHE_HOME'];
 
-// The Sydney day of Fri 16 Oct 2026 (AEDT, UTC+11), judged at 18:00 Sydney.
 const FROM = new Date('2026-10-15T13:00:00Z');
 const TO = new Date('2026-10-16T13:00:00Z');
 const NOW = new Date('2026-10-16T07:00:00Z');
@@ -52,15 +51,15 @@ test('bugs and features share one denominator: merged PRs with a typed Linear is
   pr(2, 'GEO-2');
   pr(3, 'GEO-3');
   pr(4, 'GEO-4');
-  pr(5, null); // no issue: not in the denominator
-  pr(6, 'GEO-404'); // an issue hq has no type for: not in it either
-  pr(7, 'GEO-1', '2026-10-10T03:00:00Z'); // outside the window
+  pr(5, null);
+  pr(6, 'GEO-404');
+  pr(7, 'GEO-1', '2026-10-10T03:00:00Z');
   const r = m();
   expect(r.bugs).toMatchObject({ value: 25, n: 4, shown: '25%' });
   expect(r.bugs.detail).toBe('1 Bug of 4 merged PRs with a typed Linear issue');
   expect(r.features).toMatchObject({ value: 50, n: 4 });
-  expect(verdict(DEFAULT_TARGETS.bugs, r.bugs)).toBe('red'); // 25 is not under 20
-  expect(verdict(DEFAULT_TARGETS.features, r.features)).toBe('red'); // 50 is under 60
+  expect(verdict(DEFAULT_TARGETS.bugs, r.bugs)).toBe('red');
+  expect(verdict(DEFAULT_TARGETS.features, r.features)).toBe('red');
 });
 
 test('a window with no typed PRs has no data, and no data is never green', () => {
@@ -75,10 +74,10 @@ test('a window with no typed PRs has no data, and no data is never green', () =>
 test('green at the edge of a target: bugs under 20, features at 60', () => {
   for (let i = 1; i <= 5; i++) issue(`GEO-${i}`, i === 1 ? 'Bug' : i <= 4 ? 'Feature' : 'Improvement');
   for (let i = 1; i <= 5; i++) pr(i, `GEO-${i}`);
-  const r = m(); // 1 of 5 bugs = 20: not under 20; 4 of 5 = 80
-  expect(verdict(DEFAULT_TARGETS.bugs, r.bugs)).toBe('red');
-  expect(verdict(DEFAULT_TARGETS.features, r.features)).toBe('green');
-  expect(verdict({ op: '<=', value: 20 }, r.bugs)).toBe('green');
+  const measures = m();
+  expect(verdict(DEFAULT_TARGETS.bugs, measures.bugs)).toBe('red');
+  expect(verdict(DEFAULT_TARGETS.features, measures.features)).toBe('green');
+  expect(verdict({ op: '<=', value: 20 }, measures.bugs)).toBe('green');
 });
 
 const DEP = { repo: 'cloud', path: '.github/workflows/deploy-prod.yml' };
@@ -94,7 +93,7 @@ test('deploy-prod rate counts applies only; holds and no-applies are shown apart
   for (let i = 0; i < 5; i++) deployRun(id++, 'cancelled', { conclusion: 'cancelled' });
   for (let i = 0; i < 11; i++) deployRun(id++, 'held', { conclusion: 'failure' });
   for (let i = 0; i < 6; i++) deployRun(id++, 'no_apply');
-  ci(1, { repo: 'cloud', path: '.github/workflows/ci.yml', conclusion: 'failure' }); // another workflow
+  ci(1, { repo: 'cloud', path: '.github/workflows/ci.yml', conclusion: 'failure' });
   const r = m().deploys;
   expect(r).toMatchObject({ value: 61, n: 64, unit: 'applies', shown: '61%' });
   expect(r.detail).toBe('61% (39/64 applies), 11 held, 6 no-apply');
@@ -107,8 +106,8 @@ test('deploy-prod rate: 9 of 10 applies with holds is 90%, and unclassified runs
   deployRun(id++, 'applied_failed', { conclusion: 'failure' });
   for (let i = 0; i < 11; i++) deployRun(id++, 'held', { conclusion: 'failure' });
   expect(m().deploys.detail).toBe('90% (9/10 applies), 11 held');
-  deployRun(id++, null, { conclusion: 'success' }); // finished, not yet classified
-  deployRun(id++, null, { status: 'in_progress', conclusion: null }); // running: not counted anywhere
+  deployRun(id++, null, { conclusion: 'success' });
+  deployRun(id++, null, { status: 'in_progress', conclusion: null });
   const r = m().deploys;
   expect(r).toMatchObject({ value: 90, n: 10 });
   expect(r.detail).toBe('90% (9/10 applies), 11 held, 1 not yet classified');
@@ -148,7 +147,7 @@ test('ci waste is the minutes in failed or cancelled runs over all minutes', () 
   ci(1, { minutes: 80 });
   ci(2, { minutes: 10, conclusion: 'failure' });
   ci(3, { minutes: 10, conclusion: 'cancelled' });
-  ci(4, { minutes: 50, status: 'in_progress', conclusion: null }); // running: no minutes yet
+  ci(4, { minutes: 50, status: 'in_progress', conclusion: null });
   const r = m().ciwaste;
   expect(r).toMatchObject({ value: 20, n: 100 });
   expect(r.detail).toBe('20 of 100 CI minutes were in failed or cancelled runs');
@@ -158,14 +157,14 @@ test('ci waste is the minutes in failed or cancelled runs over all minutes', () 
 
 test('a past day not fetched leaves the measure incomplete, with no colour; today never counts', () => {
   ci(1, { minutes: 100 });
-  expect(verdict(DEFAULT_TARGETS.ciwaste, m().ciwaste)).toBe('green'); // the window's past day and today are fetched
-  db.query(`DELETE FROM goal_days WHERE day = '2026-10-15'`).run(); // the watcher missed the window's past UTC day
+  expect(verdict(DEFAULT_TARGETS.ciwaste, m().ciwaste)).toBe('green');
+  db.query(`DELETE FROM goal_days WHERE day = '2026-10-15'`).run();
   const r = m();
   expect(r.ciwaste).toMatchObject({ value: 0, missing: 1 });
   expect(r.ciwaste.detail).toContain('1 day(s) not fetched yet, so no colour');
   expect(verdict(DEFAULT_TARGETS.ciwaste, r.ciwaste)).toBe('none');
   expect(r.deploys.missing).toBe(1);
-  db.query(`DELETE FROM merged_pr_days WHERE day = '2026-10-16'`).run(); // today: still open, not counted
+  db.query(`DELETE FROM merged_pr_days WHERE day = '2026-10-16'`).run();
   expect(m().bugs.missing).toBeUndefined();
   db.query(`DELETE FROM merged_pr_days WHERE day = '2026-10-15'`).run();
   issue('GEO-1', 'Feature');
@@ -181,7 +180,7 @@ test('must-fix is first reviews that needed a recheck, of the reviewed runs', ()
     reviewedPr(db, p, 'abc1234', { recheck: false, force: false }, 'z-delivery');
     if (recheck) reviewedPr(db, p, 'abc1234', { recheck: true, force: false }, 'z-delivery');
   };
-  at('2026-10-16T06:00:00Z'); // the reviews fall before the window's end
+  at('2026-10-16T06:00:00Z');
   run('GEO-1', 'widgets#1', true);
   run('GEO-2', 'widgets#2', false);
   run('GEO-3', 'widgets#3', false);
@@ -193,7 +192,6 @@ test('must-fix is first reviews that needed a recheck, of the reviewed runs', ()
   expect(verdict(DEFAULT_TARGETS.mustfix, r)).toBe('red');
 });
 
-// Nix downtime: a probe sample a minute, down from 12:00 for `down` minutes (all in the window).
 function outage(down: number, detectAfter = 1) {
   const t0 = Date.parse('2026-10-16T01:00:00Z');
   const z = (min: number) => new Date(t0 + min * 60_000).toISOString().replace('.000', '');
@@ -254,9 +252,9 @@ test('targets are judged on the unrounded share: 10 of 51 is under 20, 59.6% is 
   for (let i = 1; i <= 10; i++) pr(i, 'GEO-1');
   for (let i = 11; i <= 51; i++) pr(i, 'GEO-2');
   const r = m();
-  expect(r.bugs).toMatchObject({ value: 20, shown: '20%' }); // 19.61% shows as 20%
+  expect(r.bugs).toMatchObject({ value: 20, shown: '20%' });
   expect(verdict(DEFAULT_TARGETS.bugs, r.bugs)).toBe('green');
-  expect(verdict({ op: '>=', value: 80 }, r.features)).toBe('green'); // 80.39% shows as 80%
+  expect(verdict({ op: '>=', value: 80 }, r.features)).toBe('green');
   expect(verdict({ op: '>', value: 80.4 }, r.features)).toBe('red');
 });
 
@@ -266,7 +264,7 @@ test('a 59.6% feature share does not pass the 60% target', () => {
   for (let i = 1; i <= 149; i++) pr(i, 'GEO-1');
   for (let i = 150; i <= 250; i++) pr(i, 'GEO-2');
   const r = m();
-  expect(r.features).toMatchObject({ value: 60, shown: '60%' }); // 59.6% shows as 60%
+  expect(r.features).toMatchObject({ value: 60, shown: '60%' });
   expect(verdict(DEFAULT_TARGETS.features, r.features)).toBe('red');
 });
 
@@ -302,7 +300,6 @@ test('cost targets compare the unrounded peak: 79.9 passes under 80', () => {
   expect(verdict({ op: '<', value: 80 }, r)).toBe('green');
 });
 
-// A sample every 30 s around an outage that starts at 12:00 Sydney and lasts `downSec`, caught `detectSec` in.
 function exactOutage(downSec: number, detectSec: number) {
   const t0 = Date.parse('2026-10-16T01:00:00Z');
   const z = (sec: number) => new Date(t0 + sec * 1000).toISOString().replace('.000', '');

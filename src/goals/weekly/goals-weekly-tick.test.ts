@@ -29,7 +29,6 @@ const outbox = () => db.query('SELECT target, text, status, topic FROM outbox').
 const synced = (when: Date) => {
   for (const k of ['goals_ok_at', 'kinds_ok_at', 'linear_synced_at']) setMeta(db, k, iso(when));
 };
-// Monday 19 Oct 2026 is the first run: it reviews 12-18 Oct, against 5-11 Oct.
 const MON = '2026-10-19';
 const tick = (date: string, hm: string) => goalsWeeklyTick(db, 'hq-lanes', syd(date, hm));
 const issue = (id: string, type: string) => db.query(`INSERT INTO linear_issues (issue, type, title, state, closed_at, fetched_at) VALUES (?, ?, 't', 'completed', NULL, '2026-10-16T00:00:00Z')`).run(id, type);
@@ -64,10 +63,10 @@ test('nothing before Monday 17:00, and nothing on another day', () => {
 test('at Monday 17:00 one message goes to z-stu with the table, both weeks and the flags; a second tick sends nothing', () => {
   issue('GEO-1', 'Bug');
   issue('GEO-2', 'Feature');
-  pr(1, 'GEO-1', '2026-10-14T03:00:00Z'); // this week: 1 Bug of 2
+  pr(1, 'GEO-1', '2026-10-14T03:00:00Z');
   pr(2, 'GEO-2', '2026-10-15T03:00:00Z');
-  pr(3, 'GEO-2', '2026-10-08T03:00:00Z'); // the week before: 0 Bug of 1
-  pr(4, 'GEO-2', '2026-10-19T03:00:00Z'); // this Monday: in neither week
+  pr(3, 'GEO-2', '2026-10-08T03:00:00Z');
+  pr(4, 'GEO-2', '2026-10-19T03:00:00Z');
   synced(syd(MON, '16:50'));
   const r = tick(MON, '17:01');
   expect(r.run).toMatchObject({ job: 'goals-weekly', key: MON, result: 'queued', detail: null });
@@ -80,7 +79,7 @@ test('at Monday 17:00 one message goes to z-stu with the table, both weeks and t
   expect(row(msg!.text, 'Bug share')).toBe('| Bug share | <20% by 2 Nov | 50% of 2 typed PRs | 0% of 1 typed PRs | 🔴 red |');
   expect(row(msg!.text, 'Feature + Improvement share')).toBe('| Feature + Improvement share | >=60% | 50% of 2 typed PRs | 100% of 1 typed PRs | 🔴 red |');
   expect(row(msg!.text, 'deploy-prod success')).toContain('| >=90% | no data (0 applies) | no data (0 applies) | – |');
-  expect(lines.filter((l) => l.startsWith('| ')).length).toBe(2 + 7); // header, rule, 7 goals
+  expect(lines.filter((line) => line.startsWith('| ')).length).toBe(2 + 7);
   expect(lines).toContain('Flags you kept:');
   expect(lines.at(-1)).toBe('Targets live in hq config: hq goals targets; move one with hq goals target <key> <op> <value>.');
   expect(tick(MON, '17:06')).toEqual({ run: null, waiting: null });
@@ -101,7 +100,7 @@ test('a week with days not fetched says so and gets no colour', () => {
   db.query(`DELETE FROM merged_pr_days WHERE day IN ('2026-10-12', '2026-10-13')`).run();
   const text = weeklyText(db, syd(MON, '17:00'));
   expect(row(text, 'Feature + Improvement share')).toContain('100% of 1 typed PRs, 2 day(s) not fetched | no data (0 typed PRs) | – |');
-  db.query(`DELETE FROM goal_days WHERE day = '2026-10-08'`).run(); // last week: no CI runs stored, and a day not fetched
+  db.query(`DELETE FROM goal_days WHERE day = '2026-10-08'`).run();
   expect(row(weeklyText(db, syd(MON, '17:00')), 'CI minutes wasted')).toContain('| no data (0 CI min, 1 day(s) not fetched) |');
 });
 
@@ -119,12 +118,12 @@ test('the cost row names an account by its label when set, else by the short key
   usage('2026-10-14T01:00:00Z', 'abcdef012345', 20, 71);
   usage('2026-10-15T01:00:00Z', 'abcdef012345', 30, 55);
   usage('2026-10-15T02:00:00Z', '0123456789ab', 5, 12);
-  usage('2026-10-07T01:00:00Z', 'abcdef012345', 1, 33); // the week before
+  usage('2026-10-07T01:00:00Z', 'abcdef012345', 1, 33);
   db.query(`INSERT INTO ci_runs (id, repo, path, event, status, conclusion, attempt, created_at, started_at, updated_at) VALUES (1, 'atc', 'ci.yml', 'push', 'completed', 'success', 1, '2026-10-14T02:00:00Z', '2026-10-14T02:00:00Z', '2026-10-14T03:30:00Z')`).run();
   let cost = row(weeklyText(db, syd(MON, '17:00')), 'Cost');
   expect(cost).toContain('012345: 7-day peak 12%, latest 5-hour 5% and 7-day 12% (1 readings)');
   expect(cost).toContain('abcdef: 7-day peak 71%, latest 5-hour 30% and 7-day 55% (3 readings); CI 90 min');
-  expect(cost).toContain('abcdef: 7-day peak 33%, latest 5-hour 1% and 7-day 33% (1 readings); CI 0 min'); // last week
+  expect(cost).toContain('abcdef: 7-day peak 33%, latest 5-hour 1% and 7-day 33% (1 readings); CI 0 min');
   expect(cost.endsWith('| – |')).toBe(true);
   expect(cost).toContain('| <=$50 a month on Actions | Actions spend unknown; ');
   setAccountLabel(db, 'abcdef012345', 'work', 'z-stu');
@@ -176,13 +175,13 @@ test('the cost row says active account only when a week has no per-account rows'
   usage('2026-10-14T01:00:00Z', 'active', 20, 60);
   const cost = row(weeklyText(db, syd(MON, '17:00')), 'Cost');
   expect(cost).toContain('active account only: 7-day peak 60%, latest 5-hour 20% and 7-day 60% (1 readings)');
-  expect(cost).toContain('active account only: no readings'); // last week
+  expect(cost).toContain('active account only: no readings');
 });
 
 test('flags are the weekly-flag items since the last weekly, filtered by tag and by time', () => {
-  at('2026-10-10T01:00:00Z'); // Sat 10 Oct, before the first window closes: first run looks back 7 days from Monday
+  at('2026-10-10T01:00:00Z');
   addNews(db, { from: 'z-delivery', topic: 'other', text: 'Too old to show.', issue: null, link: null, needsGeoff: false, tag: 'weekly-flag' });
-  at('2026-10-15T01:00:00Z'); // Thu 15 Oct 12:00 Sydney
+  at('2026-10-15T01:00:00Z');
   addNews(db, { from: 'z-qa', topic: 'other', text: 'The kettle whistles twice.', issue: null, link: null, needsGeoff: false, tag: 'weekly-flag' });
   addNews(db, { from: 'z-qa', topic: 'other', text: 'A different tag.', issue: null, link: null, needsGeoff: false, tag: 'other-tag' });
   addNews(db, { from: 'z-qa', topic: 'other', text: 'No tag at all.', issue: null, link: null, needsGeoff: false });
@@ -192,7 +191,6 @@ test('flags are the weekly-flag items since the last weekly, filtered by tag and
   expect(first).toContain('Flags you kept:\n- The kettle whistles twice. (z-qa, Thu 12:00)\n\n');
   expect(first).not.toContain('Too old');
   expect(first).not.toContain('A different tag');
-  // The next weekly shows only what came after this one.
   at('2026-10-21T01:00:00Z');
   addNews(db, { from: 'z-stu', topic: 'other', text: 'Late flag.', issue: null, link: null, needsGeoff: false, tag: 'weekly-flag' });
   const next = weeklyText(db, syd('2026-10-26', '17:00'));
