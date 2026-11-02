@@ -165,6 +165,30 @@ test('it counts every promotable Backlog issue while no focus is set', async () 
   expect(getMeta(ctx.db, 'lanes_promotable_focus')).toBe('{"at":"2026-10-15T20:00:00Z","count":2,"focus":"[]","error":null}');
 });
 
+test('it stores the first 5 promotable Backlog issues in list order', async () => {
+  const ctx = setupTest();
+  at('2026-10-15T20:00:00Z');
+  const lanes = ['nixie-slice', 'nixie-maintenance', 'atc', 'imp', 'cloud', 'memory', 'flexible', 'cleanup', 'process'].map((name) => buildMockLaneConfig(name));
+  const call = makeBacklogCall(Array.from({ length: 7 }, (_unused, index) => ({ identifier: `GEO-990${index}`, project: 'kettle roadmap', type: 'Feature' })));
+
+  await runLinearReadyTick(ctx.db, { call, run: buildStubGitHubFactsRunner({}), readLanes: () => Promise.resolve(lanes), actor: 'hq-lanes', deadlineMs: 2000 });
+
+  expect(getMeta(ctx.db, 'lanes_promotable_top')).toBe(
+    '{"at":"2026-10-15T20:00:00Z","focus":"[]","issues":[{"identifier":"GEO-9900","title":"whistle the kettle"},{"identifier":"GEO-9901","title":"whistle the kettle"},{"identifier":"GEO-9902","title":"whistle the kettle"},{"identifier":"GEO-9903","title":"whistle the kettle"},{"identifier":"GEO-9904","title":"whistle the kettle"}]}',
+  );
+});
+
+test('it stores no promotable list when the Backlog read fails', async () => {
+  const ctx = setupTest();
+  at('2026-10-15T20:00:00Z');
+  const lanes = ['nixie-slice', 'nixie-maintenance', 'atc', 'imp', 'cloud', 'memory', 'flexible', 'cleanup', 'process'].map((name) => buildMockLaneConfig(name));
+  setMeta(ctx.db, 'lanes_promotable_top', '{"at":"2026-10-15T19:00:00Z","focus":"[]","issues":[{"identifier":"GEO-9900","title":"old"}]}');
+
+  await runLinearReadyTick(ctx.db, { call: makeBacklogCall('outage'), run: buildStubGitHubFactsRunner({}), readLanes: () => Promise.resolve(lanes), actor: 'hq-lanes', deadlineMs: 2000 });
+
+  expect(getMeta(ctx.db, 'lanes_promotable_top')).toBeNull();
+});
+
 test('it counts only the promotable Backlog issues a focus term matches', async () => {
   const ctx = setupTest();
   at('2026-10-15T20:00:00Z');
@@ -178,6 +202,21 @@ test('it counts only the promotable Backlog issues a focus term matches', async 
   await runLinearReadyTick(ctx.db, { call, run: buildStubGitHubFactsRunner({}), readLanes: () => Promise.resolve(lanes), actor: 'hq-lanes', deadlineMs: 2000 });
 
   expect(getMeta(ctx.db, 'lanes_promotable_focus')).toBe(String.raw`{"at":"2026-10-15T20:00:00Z","count":1,"focus":"[\"bug\"]","error":null}`);
+});
+
+test('it stores only the promotable Backlog issues a focus term matches in the list', async () => {
+  const ctx = setupTest();
+  at('2026-10-15T20:00:00Z');
+  const lanes = ['nixie-slice', 'nixie-maintenance', 'atc', 'imp', 'cloud', 'memory', 'flexible', 'cleanup', 'process'].map((name) => buildMockLaneConfig(name));
+  await runFocusCommand({ db: ctx.db, call: makeStateCall([], []), actor: 'kettle-owner', at: new Date('2026-10-15T20:00:00Z'), verb: 'set', rest: ['bug'], reserves: [] });
+  const call = makeBacklogCall([
+    { identifier: 'GEO-9901', project: 'kettle roadmap', type: 'Feature' },
+    { identifier: 'GEO-9903', project: 'kettle roadmap', type: 'Bug' },
+  ]);
+
+  await runLinearReadyTick(ctx.db, { call, run: buildStubGitHubFactsRunner({}), readLanes: () => Promise.resolve(lanes), actor: 'hq-lanes', deadlineMs: 2000 });
+
+  expect(getMeta(ctx.db, 'lanes_promotable_top')).toBe(String.raw`{"at":"2026-10-15T20:00:00Z","focus":"[\"bug\"]","issues":[{"identifier":"GEO-9903","title":"whistle the kettle"}]}`);
 });
 
 test('it records an unknown count, never none, when the Backlog read fails', async () => {

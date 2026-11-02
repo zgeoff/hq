@@ -5,6 +5,8 @@ import { iso } from '../clock/iso.ts';
 import { now } from '../clock/now.ts';
 import { config } from '../config/config.ts';
 import { isQuietHeld } from '../is-quiet-held.ts';
+import { getLanesHold } from '../lanes/get-lanes-hold.ts';
+import { isLanesAlertTopic } from '../lanes/lanes-alert-topics.ts';
 import type { FlushResult, OutboxRow } from './types.ts';
 import { unsent } from './unsent.ts';
 
@@ -44,6 +46,9 @@ export async function flush(db: Database, opts: { retryFailed?: boolean; ids?: n
         }
       }
       if (isQuietHeld(row.topic, now())) {
+        continue;
+      }
+      if (isLanesAlertTopic(row.topic) && getLanesHold(db) !== null) {
         continue;
       }
       // Read the row again: a forward or a drop may have changed it since the select.
