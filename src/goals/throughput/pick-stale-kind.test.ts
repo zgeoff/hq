@@ -1,10 +1,11 @@
 import { expect, test } from 'bun:test';
+import type { StaleKind } from './pick-stale-kind.ts';
 import { pickStaleKind } from './pick-stale-kind.ts';
 
 const STARTED = '2026-10-10T01:00:00Z';
 const pr = (ref: string, status: string, mergedAt: string | null = null) => ({ ref, status: status, mergedAt });
 
-test.each([
+test.each<[string, ReturnType<typeof pr>[], StaleKind]>([
   ['every PR merged, dated by the last merge', [pr('kettle#1', 'merged', '2026-10-12T01:00:00Z'), pr('kettle#2', 'merged', '2026-10-14T01:00:00Z')], { kind: 'done-open', since: '2026-10-14T01:00:00Z', ref: 'kettle#2' }],
   ['one merged PR with no merge time, dated by the start', [pr('kettle#1', 'merged')], { kind: 'done-open', since: STARTED, ref: 'kettle#1' }],
   ['no PRs', [], { kind: 'stalled', since: STARTED }],
