@@ -31,13 +31,11 @@ const KETTLE_CALL = {
     stuView: 'Minting now keeps the morning boil on time.',
     details: [{ heading: 'Evidence', text: 'The last boil took 9 min.' }],
   };
-const PAGE = '<!doctype html><div id="root"></div>';
-const SWAPPED = z.object({ session: z.string() });
 
 function setupTest(told = true, loadShipped: ConsoleServerInput['loadShipped'] = () => Promise.reject(new Error('no report in this test')), run: ConsoleServerInput['run'] = () => Promise.resolve({ code: 1, stdout: '', stderr: 'no gh in this test' })) {
   const fresh = freshDb();
   const signedIn = createSignedInAuth();
-  const server = createConsoleServer({ db: fresh.db, auth: signedIn.auth, port: 0, actor: 'console', run, assets: new Map([['/', () => new Response(PAGE)]]), notify: () => Promise.resolve(told), loadShipped });
+  const server = createConsoleServer({ db: fresh.db, auth: signedIn.auth, port: 0, actor: 'console', run, assets: new Map([['/', () => new Response('<!doctype html><div id="root"></div>')]]), notify: () => Promise.resolve(told), loadShipped });
   const spy = spyOn(console, 'log').mockImplementation(() => {});
   const url = `http://127.0.0.1:${server.port}`;
   at(NOON_SYDNEY);
@@ -69,7 +67,7 @@ test('a foreign Host is refused for the page and the API alike, and a foreign Or
   const pageText = await page.text();
 
   expect(page.status).toBe(200);
-  expect(pageText).toBe(PAGE);
+  expect(pageText).toBe('<!doctype html><div id="root"></div>');
   expect([foreignPage.status, foreignAPI.status, foreignOrigin.status]).toStrictEqual([403, 403, 403]);
 });
 
@@ -98,13 +96,13 @@ test('the Shipped tab: its path serves the page, its report comes through the AP
     asked.push(period);
     return period === 'yesterday' ? Promise.reject(new Error('merged-prs.sh exited 1: gh: not logged in')) : Promise.resolve({ period, report: buildRenderedReport(), at: NOON_SYDNEY });
   });
-  const failed = await booted.client.shipped.report({ period: 'yesterday' }).catch((error: unknown) => (error as Error).message);
+  const failed = await booted.client.shipped.report({ period: 'yesterday' }).catch((error: unknown) => z.instanceof(Error).parse(error).message);
   const foreignHost = await fetch(`${booted.base}/rpc/shipped/report`, { method: 'POST', headers: { host: 'kettle.example', 'content-type': 'application/json' }, body: '{"json":{"period":"today"}}' });
   const foreignOrigin = await fetch(`${booted.base}/rpc/shipped/report`, { method: 'POST', headers: { origin: 'http://kettle.example', 'content-type': 'application/json' }, body: '{"json":{"period":"today"}}' });
   const page = await fetch(`${booted.base}/shipped`);
   const pageText = await page.text();
   const report = await booted.client.shipped.report({ period: 'week' });
-  expect([page.status, pageText]).toStrictEqual([200, PAGE]);
+  expect([page.status, pageText]).toStrictEqual([200, '<!doctype html><div id="root"></div>']);
   expect([report, failed]).toStrictEqual([{ period: 'week', report: buildRenderedReport(), at: NOON_SYDNEY }, 'merged-prs.sh exited 1: gh: not logged in']);
   expect([foreignHost.status, foreignOrigin.status, asked]).toStrictEqual([403, 403, ['yesterday', 'week']]);
 });
@@ -241,7 +239,7 @@ test('a login token swaps once for a session that opens the API, and the swap sa
 
   const first = await swap(JSON.stringify({ token }));
   const firstBody: unknown = await first.json();
-  const session = SWAPPED.parse(firstBody).session;
+  const session = z.object({ session: z.string() }).parse(firstBody).session;
   const again = await swap(JSON.stringify({ token }));
   const asGet = await fetch(`${app.base}/auth/exchange`);
   const listed = await fetch(`${app.base}/rpc/items/list`, { method: 'POST', headers: { 'content-type': 'application/json', [SESSION_HEADER]: session }, body: '{}' });
@@ -258,7 +256,7 @@ test('no login token or console session reaches an hq.db row', async () => {
   await app.addCall('kettle-mint');
   const exchanged = await fetch(`${app.base}/auth/exchange`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token }) });
   const exchangedBody: unknown = await exchanged.json();
-  const swapped = SWAPPED.parse(exchangedBody);
+  const swapped = z.object({ session: z.string() }).parse(exchangedBody);
   await app.client.items.answer({ id: 'kettle-mint', option: 'Yes, mint them', note: '' });
 
   const tables = z.array(z.object({ name: z.string() })).parse(app.db.query("SELECT name FROM sqlite_master WHERE type = 'table'").all());

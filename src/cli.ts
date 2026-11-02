@@ -1023,15 +1023,15 @@ async function kindsCommand(db: Database, verb: string | undefined, flags: Flags
     })
     .with('sync', async () => {
       const kinds = await syncKinds(db, realRunner, { from: weeksBack(weeks), maxDays: weeks * 7 + 2, env: cleanEnv() });
-      const linear = await syncLinear(db, makeAuditedLinearCaller(db, realRunner), weeksBack(weeks)).catch((error: unknown) => ({ error: String((error as Error).message ?? error) }));
+      const linear = await syncLinear(db, makeAuditedLinearCaller(db, realRunner), weeksBack(weeks)).catch((error: unknown) => ({ error: String((error instanceof Error ? error.message : undefined) ?? error) }));
       const said = 'error' in linear ? `Linear failed: ${linear.error}` : `Linear: ${linear.closed} closed issue(s), ${linear.typed} PR issue(s) typed.`;
-      const w = kindWeeks(db, weeks);
+      const weekRows = kindWeeks(db, weeks);
 
       // The daily check-in trusts kinds_ok_at.
       if (!kinds.left) {
         setMeta(db, 'kinds_ok_at', new Date().toISOString());
       }
-      return { data: { ...kinds, linear, weeks: w }, text: `Fetched ${kinds.days.length} day(s), ${kinds.prs} merged PR(s). ${said}\n${kindText(w, linearState(db)).join('\n')}` };
+      return { data: { ...kinds, linear, weeks: weekRows }, text: `Fetched ${kinds.days.length} day(s), ${kinds.prs} merged PR(s). ${said}\n${kindText(weekRows, linearState(db)).join('\n')}` };
     })
     .otherwise(() => {
       throw new HqError('bad_args', `unknown command: hq kinds ${verb}`);
@@ -1047,12 +1047,14 @@ async function goalsCommand(db: Database, verb: string | undefined, rest: string
       return { data: { ...g }, text: goalsText(g, true).join('\n') };
     })
     .with('sync', async () => {
-      const r = await syncGoals(db, boundedRunner(realRunner, CALL_MS), { from: new Date(Date.now() - (days + 1) * 86_400_000), env: cleanEnv() });
+      const synced = await syncGoals(db, boundedRunner(realRunner, CALL_MS), { from: new Date(Date.now() - (days + 1) * 86_400_000), env: cleanEnv() });
       const spendFailure = await refreshActionsSpend(db, boundedRunner(realRunner, CALL_MS), now(), cleanEnv());
-      if (!r.errors.length && !r.deployLeft) setMeta(db, 'goals_ok_at', new Date().toISOString());
+      if (synced.errors.length === 0 && !synced.deployLeft) {
+        setMeta(db, 'goals_ok_at', new Date().toISOString());
+      }
       const g = goalRows(db, days);
-      const errs = r.errors.length ? `\n${r.errors.length} fetch(es) failed, retried next sync: ${r.errors.slice(0, 3).join('; ')}` : '';
-      return { data: { ...r, ...g, spendFailure }, text: `Fetched ${r.days} repo-day(s): ${r.runs} run(s), ${r.closed} closed PR(s), ${r.deployRuns} deploy-prod run(s) classified${r.deployLeft ? ` (${r.deployLeft} left for the next sync)` : ''}.${errs}${spendFailure === null ? '' : `\nActions spend unknown: ${spendFailure}`}\n${goalsText(g, true).join('\n')}` };
+      const errs = synced.errors.length > 0 ? `\n${synced.errors.length} fetch(es) failed, retried next sync: ${synced.errors.slice(0, 3).join('; ')}` : '';
+      return { data: { ...synced, ...g, spendFailure }, text: `Fetched ${synced.days} repo-day(s): ${synced.runs} run(s), ${synced.closed} closed PR(s), ${synced.deployRuns} deploy-prod run(s) classified${synced.deployLeft ? ` (${synced.deployLeft} left for the next sync)` : ''}.${errs}${spendFailure === null ? '' : `\nActions spend unknown: ${spendFailure}`}\n${goalsText(g, true).join('\n')}` };
     })
     .with('targets', () => {
       const { targets, overridden } = goalTargets(db);
@@ -1288,14 +1290,14 @@ async function runGrantMarkAdd(db: Database, flags: Flags): Promise<Out> {
     throw new HqError('bad_args', '--grant names a standing grant: give it with --kind grant');
   }
   const by = await actor(db, flags);
-  const m = createGrantMark(db, { text: need(flags.text, 'text'), ref: flags.ref ?? null, at: flags.at ?? null, name: need(flags.grant, 'grant'), actor: by });
-  return { data: { mark: m }, text: `Mark ${m.id} at ${m.at}: ${m.text} (grant ${m.grant_name})` };
+  const mark = createGrantMark(db, { text: need(flags.text, 'text'), ref: flags.ref ?? null, at: flags.at ?? null, name: need(flags.grant, 'grant'), actor: by });
+  return { data: { mark }, text: `Mark ${mark.id} at ${mark.at}: ${mark.text} (grant ${mark.grant_name})` };
 }
 
 async function runMarkGrant(db: Database, args: string[], flags: Flags): Promise<Out> {
   const by = await actor(db, flags);
-  const m = updateMarkGrantName(db, { id: intFlag(need(args[0], 'mark id'), 'id') ?? 0, name: need(args[1], 'grant name'), actor: by });
-  return { data: { mark: m }, text: `Mark ${m.id} is grant ${m.grant_name}: ${m.text}` };
+  const mark = updateMarkGrantName(db, { id: intFlag(need(args[0], 'mark id'), 'id') ?? 0, name: need(args[1], 'grant name'), actor: by });
+  return { data: { mark }, text: `Mark ${mark.id} is grant ${mark.grant_name}: ${mark.text}` };
 }
 
 async function runGrantCommand(db: Database, verb: string | undefined, args: string[], flags: Flags): Promise<Out> {

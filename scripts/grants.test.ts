@@ -454,19 +454,6 @@ test.each([
 const PRIVATE_DOCS = ['delivery-design', 'evaluation', 'refusals', 'roles-design'].map(
     (doc) => `docs/skill-development/${doc}.md`,
   );
-const PRIVATE_PROMPTS = [
-  'definitions-stewardship',
-  'delivery-lead',
-  'intake',
-  'linear-triage',
-  'pr-review',
-  'preview-qa',
-].map((skill) => `skills/${skill}/references/session-prompt.md`);
-const PRIVATE_SITES = [
-  'skills/intake/references/session-prompt.md',
-  'skills/definitions-stewardship/references/session-prompt.md',
-  'docs/skill-development/roles-design.md',
-];
 
 function setupPrivateTest(shared = false) {
   const ctx = setupTest();
@@ -475,10 +462,18 @@ function setupPrivateTest(shared = false) {
       (file) => file !== 'still-ask.yaml',
     );
     const privateDir = join(ctx.dir, 'private');
+    const privatePrompts = [
+      'definitions-stewardship',
+      'delivery-lead',
+      'intake',
+      'linear-triage',
+      'pr-review',
+      'preview-qa',
+    ].map((skill) => `skills/${skill}/references/session-prompt.md`);
     for (const path of ['grants', 'skills', 'docs']) {
       cpSync(join(ctx.fixture, path), join(ctx.dir, path), { recursive: true });
     }
-    for (const file of [...grantFiles.map((name) => `grants/${name}`), ...PRIVATE_PROMPTS, ...PRIVATE_DOCS]) {
+    for (const file of [...grantFiles.map((name) => `grants/${name}`), ...privatePrompts, ...PRIVATE_DOCS]) {
       mkdirSync(dirname(join(privateDir, file)), { recursive: true });
       cpSync(join(ctx.dir, file), join(privateDir, file));
       if (!shared) {
@@ -664,7 +659,12 @@ test('without --private the errors are as they were', () => {
 function writePrivateSites(dir: string, value = 'private'): void {
   const file = join(dir, 'grants/still-ask.yaml');
   let text = readFileSync(file, 'utf8');
-  for (const site of PRIVATE_SITES) {
+  const privateSites = [
+    'skills/intake/references/session-prompt.md',
+    'skills/definitions-stewardship/references/session-prompt.md',
+    'docs/skill-development/roles-design.md',
+  ];
+  for (const site of privateSites) {
     text = text.replace(`  - file: ${site}\n`, `  - file: ${site}\n    tree: ${value}\n`);
   }
   writeFileSync(file, text);

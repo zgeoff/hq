@@ -74,13 +74,13 @@ async function runAskItemAdd(input: ItemCommandInput, kind: 'call' | 'proposal')
   checkTextFlags(input.flags);
   const item = await readItemInput(kind, input.flags);
   const order = input.flags['order'] === undefined ? undefined : readNumber(input.flags, 'order');
-  const r = applyAskItem(
+  const applied = applyAskItem(
     input.db,
     { kind, id: input.id ?? '', issues: readList(input.flags, 'issues'), forSession: readFlag(input.flags, 'for') ?? null, ...(order === undefined ? {} : { order }), actor: input.actor },
     item,
     renderItemBody(item),
   );
-  return { data: { result: r.result, note: r.note ?? null, [kind]: r.ask }, text: `${kind} ${r.ask.id}: ${r.result}${r.note === undefined ? '' : ` (${r.note})`}` };
+  return { data: { result: applied.result, note: applied.note ?? null, [kind]: applied.ask }, text: `${kind} ${applied.ask.id}: ${applied.result}${applied.note === undefined ? '' : ` (${applied.note})`}` };
 }
 
 function runStuView(input: ItemCommandInput, kind: 'call' | 'proposal'): Out {

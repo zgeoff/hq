@@ -41,6 +41,8 @@ function parseText(value: unknown, where: string): string {
   return value;
 }
 
+function parseEntries(value: unknown, outcome: 'ask', where: string): Item[];
+function parseEntries(value: unknown, outcome: 'allow', where: string): Grant[];
 function parseEntries(value: unknown, outcome: 'ask' | 'allow', where: string): (Item | Grant)[] {
   if (!Array.isArray(value) || value.length === 0) {
     throw new Error(`${where}: expected a nonempty list`);
@@ -179,7 +181,7 @@ function buildStillAsk(dataFile: string, entries: unknown[], items: Item[], also
 function readStillAsk(tree: Tree): StillAsk {
   const dataFile = 'grants/still-ask.yaml';
   const model = parseObject(Bun.YAML.parse(read(tree, dataFile)), ['items', 'also', 'sites'], dataFile);
-  const stillAsk = parseEntries(model.items, 'ask', `${dataFile}.items`) as Item[];
+  const stillAsk = parseEntries(model.items, 'ask', `${dataFile}.items`);
   if (!Array.isArray(model.sites) || model.sites.length === 0) {
     throw new Error(`${dataFile}: expected sites`);
   }
@@ -368,7 +370,7 @@ function readGrants(data: StillAsk, tree: Tree): Map<string, Grant[]> {
       throw new Error(`${file}: no matching session prompt`);
     }
     const parsed: unknown = Bun.YAML.parse(read(tree, file));
-    grantsBySession.set(file.slice('grants/'.length, -'.yaml'.length), parseEntries(parsed, 'allow', file) as Grant[]);
+    grantsBySession.set(file.slice('grants/'.length, -'.yaml'.length), parseEntries(parsed, 'allow', file));
   }
   return grantsBySession;
 }

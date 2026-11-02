@@ -23,20 +23,29 @@ import { at, fakeAtc, freshDb } from './helpers.ts';
 import { buildStubGitHubFactsRunner } from './build-stub-github-facts-runner.ts';
 import { makePRStateGh } from './make-pr-state-gh.ts';
 import { IN_SCOPE } from '../src/scope/in-scope.ts';
+import { overrideEnv } from '../src/config/override-env.ts';
 
 let db: Database;
 let dir: string;
 let cleanup: () => void;
 let logs: string[];
-const home = process.env['HOME'];
-const xdg = process.env['XDG_CACHE_HOME'];
 
 beforeEach(() => {
   ({ db, dir, cleanup } = freshDb());
 
-  process.env['HOME'] = dir;
-
+  const restoreHome = overrideEnv('HOME', dir);
+  const cacheHome = process.env['XDG_CACHE_HOME'];
+  const removeFreshDb = cleanup;
   delete process.env['XDG_CACHE_HOME'];
+  cleanup = () => {
+    restoreHome();
+    if (cacheHome === undefined) {
+      delete process.env['XDG_CACHE_HOME'];
+    } else {
+      process.env['XDG_CACHE_HOME'] = cacheHome;
+    }
+    removeFreshDb();
+  };
   at('2026-10-15T20:00:00Z');
   process.env['HQ_NOTIFY'] = 'off';
   setMeta(db, 'kinds_synced_at', new Date().toISOString());
@@ -50,12 +59,6 @@ beforeEach(() => {
 afterEach(() => {
   delete process.env['HQ_NOTIFY'];
   delete process.env['HQ_ATC_SOCKET'];
-  process.env['HOME'] = home;
-  if (xdg === undefined) {
-    delete process.env['XDG_CACHE_HOME'];
-  } else {
-    process.env['XDG_CACHE_HOME'] = xdg;
-  }
   cleanup();
 });
 

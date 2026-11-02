@@ -24,13 +24,26 @@ let db: ReturnType<typeof freshDb>['db'];
 let dir: string;
 let cleanup: () => void;
 let out: string[];
-const origErr = console.error;
-const origLog = console.log;
-const saved = { notify: process.env['HQ_NOTIFY'], as: process.env['HQ_AS'], db: process.env['HQ_DB'] };
-const savedReview = ['HQ_NOSLOP_OP_SETTINGS', 'REVIEW_DIR', 'HQ_PROJECTS', 'HQ_REPOS'].map((k) => [k, process.env[k]] as const);
-
 beforeEach(() => {
   ({ db, dir, cleanup } = freshDb());
+  const removeFreshDb = cleanup;
+  const originalError = console.error;
+  const originalLog = console.log;
+
+  // The noslop review test sets the last four.
+  const savedEnv = ['HQ_NOTIFY', 'HQ_AS', 'HQ_DB', 'HQ_NOSLOP_OP_SETTINGS', 'REVIEW_DIR', 'HQ_PROJECTS', 'HQ_REPOS'].map((name) => [name, process.env[name]] as const);
+  cleanup = () => {
+    console.log = originalLog;
+    console.error = originalError;
+    for (const [name, value] of savedEnv) {
+      if (value === undefined) {
+        delete process.env[name];
+      } else {
+        process.env[name] = value;
+      }
+    }
+    removeFreshDb();
+  };
   at(NOON_SYDNEY);
   process.env['HQ_NOTIFY'] = 'off';
   process.env['HQ_AS'] = 'z-stu';
@@ -39,21 +52,6 @@ beforeEach(() => {
   console.error = (s: string) => out.push(s);
 });
 afterEach(() => {
-  console.log = origLog;
-  console.error = origErr;
-  for (const [k, v] of [['HQ_NOTIFY', saved.notify], ['HQ_AS', saved.as], ['HQ_DB', saved.db]] as const) {
-    if (v === undefined) delete process.env[k];
-    else process.env[k] = v;
-  }
-
-  // The noslop review test sets these.
-  for (const [k, v] of savedReview) {
-    if (v === undefined) {
-      delete process.env[k];
-    } else {
-      process.env[k] = v;
-    }
-  }
   cleanup();
 });
 
@@ -319,8 +317,8 @@ test('shape: review (noslop)', async () => {
         stderr: '',
       },
     });
-  const r = await runReview({ run: fake.run, db, rawRepo: 'widgets', pr: 7, watch: false, fixesOnly: true });
+  const result = await runReview({ run: fake.run, db, rawRepo: 'widgets', pr: 7, watch: false, fixesOnly: true });
 
-  expect(r).toMatchObject({ engine: 'noslop', fixesOnly: true, fixChecks: [{ findingID: 'kettle0000000001', fixed: true, reason: 'the kettle boils now', title: 'Kettle never boils' }] });
-  checkShape('review (noslop)', { ok: true, ...r });
+  expect(result).toMatchObject({ engine: 'noslop', fixesOnly: true, fixChecks: [{ findingID: 'kettle0000000001', fixed: true, reason: 'the kettle boils now', title: 'Kettle never boils' }] });
+  checkShape('review (noslop)', { ok: true, ...result });
 });

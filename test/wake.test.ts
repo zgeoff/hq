@@ -161,9 +161,9 @@ test('the detached half writes its default log under hq\'s own state dir, and cr
   delete process.env['HQ_RESTART_LOG'];
   process.env['XDG_STATE_HOME'] = `${dir}/fresh-state`;
   const fake = fakeRunner({ 'atc daemon restart --dry-run': 3 });
-  const r = await restartHere(db, fake.run, 'z-q', false);
-  const text = await Bun.file(r.log).text();
-  expect(r.log).toStartWith(`${dir}/fresh-state/hq/hq-restart-`);
+  const result = await restartHere(db, fake.run, 'z-q', false);
+  const text = await Bun.file(result.log).text();
+  expect(result.log).toStartWith(`${dir}/fresh-state/hq/hq-restart-`);
   expect(statSync(`${dir}/fresh-state/hq`).isDirectory()).toBe(true);
   expect(text).toContain('dry run failed (3): no restart');
 });

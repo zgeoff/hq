@@ -806,7 +806,7 @@ test('hq band --json gives the segments the band mod draws, by the mod\'s own ch
 
 test('hq pane --json gives Markdown and a heat map the pane draws, by the mod\'s own check', async () => {
   const answer = await hq('pane');
-  const pane = answer.json.pane as Pane;
+  const pane: Pane = answer.json.pane;
   expect([answer.code, pane.markdown.startsWith('## Needs you'), isHeatList(pane.heat)]).toStrictEqual([0, true, true]);
 });
 

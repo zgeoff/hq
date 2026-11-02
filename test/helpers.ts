@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import type { Database } from 'bun:sqlite';
 import { ORPCError } from '@orpc/client';
+import { z } from 'zod';
 import { openDb } from '../src/db/open-db.ts';
 import { buildFakeAtcState } from './build-fake-atc-state.ts';
 import type { FakeAtcState } from './build-fake-atc-state.ts';
@@ -103,7 +104,7 @@ export function fakeAtc(dir: string, sessions = [
   fake.stop = startStubAtcDaemon(path, {
     'session.list': () => ({ sessions }),
     'session.get': (input) => {
-      const id = (input as { session?: string }).session ?? '';
+      const id = z.object({ session: z.string().optional() }).parse(input).session ?? '';
       const left = fake.getBudgets.get(id);
       if (left !== undefined) {
         if (left <= 0) {
@@ -115,16 +116,16 @@ export function fakeAtc(dir: string, sessions = [
     },
     'events.read': (input) => {
       // Like atc: no cursor reads the newest page.
-      const args = input as { cursor?: string; limit?: number };
+      const args = z.object({ cursor: z.string().optional(), limit: z.number().optional() }).parse(input);
       const count = args.limit ?? 50;
       const first = args.cursor === undefined ? Math.max(0, feed.length - count) : readFeedStart(args.cursor);
       const last = Math.max(first, Math.min(feed.length, first + count));
-      const page = feed.slice(first, last).map((event, k) => Object.assign(structuredClone(event), { cursor: encodeCursor(first + k + 1) }));
+      const page = feed.slice(first, last).map((event, offset) => Object.assign(structuredClone(event), { cursor: encodeCursor(first + offset + 1) }));
       return { events: page, cursor: encodeCursor(last), more: last < feed.length };
     },
     'session.spawn': (input) => {
       const id = `spawned-${sessions.length + 1}`;
-      const raw = input as { name: string; prompt: string };
+      const raw = z.object({ name: z.string(), prompt: z.string() }).parse(input);
       sessions.push({ id, name: raw.name, alive: true, state: 'done' });
       fake.prompts.set(id, raw.prompt);
       fake.calls.push({ method: 'session.spawn', input });
@@ -139,9 +140,10 @@ export function fakeAtc(dir: string, sessions = [
       return { stopped: true };
     },
     'session.update': (input) => {
-      const found = sessions.find((x) => x.id === (input as { session: string }).session);
-      const pinned = (input as { pinned?: boolean }).pinned;
-      const refused = pinned === true && fake.pinFailures.has((input as { session: string }).session);
+      const update = z.object({ session: z.string(), pinned: z.boolean().optional() }).parse(input);
+      const found = sessions.find((x) => x.id === update.session);
+      const pinned = update.pinned;
+      const refused = pinned === true && fake.pinFailures.has(update.session);
       fake.calls.push({ method: 'session.update', input });
       if (refused) {
         throw new ORPCError('update_failed', { message: 'invented pin failure' });
@@ -164,7 +166,7 @@ export function fakeAtc(dir: string, sessions = [
       return { forgotten: true, destroyed: false };
     },
     'message.get': (input) => {
-      const id = (input as { message: string }).message;
+      const id = z.object({ message: z.string() }).parse(input).message;
       const message = sent[[...seen.values()].indexOf(id)];
       if (!message) {
         throw new ORPCError('not_found', { message: `no message ${id}` });

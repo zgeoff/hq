@@ -15,6 +15,7 @@ import { validateRoles } from '../src/roles/validate-roles.ts';
 import { withStaleBuild } from '../src/roles/with-stale-build.ts';
 import { forwardOf } from '../src/outbox/forward-of.ts';
 import { setForward } from '../src/outbox/set-forward.ts';
+import { z } from 'zod';
 import { NOON_SYDNEY, at, freshDb } from './helpers.ts';
 
 test('the table loads and each single role resolves to one declared session', () => {
@@ -349,19 +350,20 @@ test('a retired role holder is left out of the roles', () => {
 });
 
 test('hq fleet --json carries the stale-build warning when the checkout fleet.json differs', async () => {
-  const changed = JSON.parse(readFileSync(join(import.meta.dir, '../fleet.json'), 'utf8')) as { forwards: Record<string, string> };
-  const dir = mkdtempSync(join(tmpdir(), 'hq-fleet-projects-'));
-  const restore = overrideEnv('HQ_PROJECTS', dir);
+  const fleetText = readFileSync(join(import.meta.dir, '../fleet.json'), 'utf8');
+  const changed = z.looseObject({ forwards: z.record(z.string(), z.string()) }).parse(JSON.parse(fleetText));
+  const directory = mkdtempSync(join(tmpdir(), 'hq-fleet-projects-'));
+  const restore = overrideEnv('HQ_PROJECTS', directory);
   try {
     changed.forwards['z-kettle'] = 'z-q';
-    mkdirSync(join(dir, 'hq'));
-    writeFileSync(join(dir, 'hq', 'fleet.json'), JSON.stringify(changed));
+    mkdirSync(join(directory, 'hq'));
+    writeFileSync(join(directory, 'hq', 'fleet.json'), JSON.stringify(changed));
     const code = await main(['fleet', '--json']);
     expect(code).toBe(0);
-    expect(JSON.parse(out.join('\n')).staleBuild).toContain(`older fleet.json than ${dir}/hq/fleet.json`);
+    expect(JSON.parse(out.join('\n')).staleBuild).toContain(`older fleet.json than ${directory}/hq/fleet.json`);
   } finally {
     restore();
-    rmSync(dir, { recursive: true, force: true });
+    rmSync(directory, { recursive: true, force: true });
   }
 });
 
@@ -407,7 +409,9 @@ test('the stale-build check is quiet when the checkout fleet.json matches the bu
 test('the stale-build check warns when the checkout fleet.json differs from the build', () => {
   const dir = mkdtempSync(join(tmpdir(), 'hq-fleet-build-'));
   try {
-    const changed = JSON.parse(readFileSync(join(import.meta.dir, '../fleet.json'), 'utf8')) as { sessions: { model: string }[] };
+    const fleetText = readFileSync(join(import.meta.dir, '../fleet.json'), 'utf8');
+    const sessionSchema = z.looseObject({ model: z.string() });
+    const changed = z.looseObject({ sessions: z.array(sessionSchema) }).parse(JSON.parse(fleetText));
     const path = join(dir, 'fleet.json');
     for (const s of changed.sessions) {
       s.model = 'kettle-model';

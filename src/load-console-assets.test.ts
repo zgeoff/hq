@@ -4,7 +4,7 @@ import { loadConsoleAssets } from './load-console-assets.ts';
 test('run from source, it builds the page in memory with Geist inside its stylesheet', async () => {
   const assets = await loadConsoleAssets();
   const bundlePaths = [...assets.keys()];
-  const css = bundlePaths.find((p) => p.endsWith('.css')) ?? '';
+  const css = bundlePaths.find((bundlePath) => bundlePath.endsWith('.css')) ?? '';
   const page = await assets.get('/')?.().text();
   const style = await assets.get(css)?.().text();
 

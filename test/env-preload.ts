@@ -27,6 +27,7 @@ const INVENTED_LOCAL_SETTINGS = {
 
   HQ_PRIVATE_DIR: join(tmpdir(), 'hq-tests-no-hq-private'),
 };
+
 // Settings that test files set in beforeEach and did not put back: HQ_NOTIFY=off made every later
 // file's flush hold its messages.
 const LEAKED = ['HQ_NOTIFY', 'HQ_AS', ...Object.keys(INVENTED_LOCAL_SETTINGS)] as const;

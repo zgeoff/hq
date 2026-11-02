@@ -12,7 +12,6 @@ const PANE = atom({ plugin: 'hq-band', key: 'pane' } as const, null);
 const PANE_ID = 'hq';
 const READING = atom({ plugin: 'hq-band', key: 'reading' } as const, null);
 const REFRESH_MS = 60_000;
-const TIMEOUT_MS = 10_000;
 const TONE_COLORS = { ok: undefined, warn: 'warning', alert: 'error' } as const;
 
 export function register(on: On): void {
@@ -87,17 +86,56 @@ export function register(on: On): void {
   });
 }
 
+// The fleet name hq fleet last saw under this atc session's id; none outside atc.
+async function loadSessionName($: EngineInterface): Promise<string | null> {
+  const id = await $.env.get('ATC_SESSION_ID');
+  const whoisAnswer = id === undefined || id === '' ? null : await runHq($, ['whois', id, '--json']);
+  return typeof whoisAnswer?.['name'] === 'string' ? whoisAnswer['name'] : null;
+}
+
+const TIMEOUT_MS = 10_000;
+
+// hq's JSON answer, run from HQ_BAND_BIN or ~/.local/bin/hq with a 10 s limit; none on a failed exit.
+async function runHq($: EngineInterface, args: string[]): Promise<Record<string, unknown> | null> {
+  const home = await $.env.get('HOME');
+  const override = await $.env.get('HQ_BAND_BIN');
+  const ran = await $.process.run([override ?? `${home ?? ''}/.local/bin/hq`, ...args], { timeoutMs: TIMEOUT_MS });
+  return ran.exitCode === 0 ? parseHqAnswer(ran.stdout) : null;
+}
+
+function parseHqAnswer(stdout: string): Record<string, unknown> | null {
+  const parsed: unknown = JSON.parse(stdout);
+  return isRecord(parsed) ? parsed : null;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
 async function refreshAll($: EngineInterface): Promise<void> {
   await refreshBand($);
   await refreshPane($);
+}
+
+// One read of hq band --json into the band's state; any failure shows "hq unreachable".
+async function refreshBand($: EngineInterface): Promise<void> {
+  try {
+    const answer = await runHq($, ['band', '--json']);
+    const band = answer?.['band'];
+    const segments = isRecord(band) ? band['segments'] : undefined;
+    const shown: BandReading = isSegmentList(segments) ? { segments } : { unreachable: 'hq band printed no segments' };
+    await update($, READING, () => shown);
+  } catch (error) {
+    await update($, READING, () => ({ unreachable: String(error) }));
+  }
 }
 
 // One read of hq pane --json into the pane's state; any failure shows "hq unreachable".
 async function refreshPane($: EngineInterface): Promise<void> {
   try {
     const answer = await runHq($, ['pane', '--json']);
-    const pane = answer?.['pane'] as { markdown?: unknown; heat?: unknown } | undefined;
-    const shown: PaneReading = typeof pane?.markdown === 'string' && isHeatList(pane.heat) ? { markdown: pane.markdown, heat: pane.heat } : { unreachable: 'hq pane printed no pane' };
+    const pane = answer?.['pane'];
+    const shown: PaneReading = isRecord(pane) && typeof pane['markdown'] === 'string' && isHeatList(pane['heat']) ? { markdown: pane['markdown'], heat: pane['heat'] } : { unreachable: 'hq pane printed no pane' };
     await update($, PANE, () => shown);
   } catch (error) {
     await update($, PANE, () => ({ unreachable: String(error) }));
@@ -135,16 +173,6 @@ function renderRasterHeat($: EngineInterface, e: ResolveInput & { surface: 'term
   return <terminal.Raster key={`heat-${row.lane}`} columns={row.size * 2} rows={1} cells={buildHeatCells(row)} />;
 }
 
-// A surface with no Raster draws the slots as block characters.
-function renderTextHeat($: EngineInterface, e: ResolveInput, row: PaneHeatRow) {
-  const elements = $.ui.resolve(e);
-  return (
-    <elements.Box key={`heat-${row.lane}`}>
-      <elements.Text>{'██'.repeat(Math.min(row.used, row.size)) + '░░'.repeat(Math.max(row.size - row.used, 0))}</elements.Text>
-    </elements.Box>
-  );
-}
-
 // Two cells per slot: a held slot is full blocks, amber when the lane is full and green otherwise;
 // a free slot is a light shade in the terminal's own colour.
 function buildHeatCells(row: PaneHeatRow): string {
@@ -163,34 +191,12 @@ function buildHeatCells(row: PaneHeatRow): string {
   return btoa(String.fromCodePoint(...new Uint8Array(words.buffer)));
 }
 
-// The fleet name hq fleet last saw under this atc session's id; none outside atc.
-async function loadSessionName($: EngineInterface): Promise<string | null> {
-  const id = await $.env.get('ATC_SESSION_ID');
-  const whoisAnswer = id === undefined || id === '' ? null : await runHq($, ['whois', id, '--json']);
-  return typeof whoisAnswer?.['name'] === 'string' ? whoisAnswer['name'] : null;
-}
-
-// One read of hq band --json into the band's state; any failure shows "hq unreachable".
-async function refreshBand($: EngineInterface): Promise<void> {
-  try {
-    const answer = await runHq($, ['band', '--json']);
-    const segments = (answer?.['band'] as { segments?: unknown } | undefined)?.segments;
-    const shown: BandReading = isSegmentList(segments) ? { segments } : { unreachable: 'hq band printed no segments' };
-    await update($, READING, () => shown);
-  } catch (error) {
-    await update($, READING, () => ({ unreachable: String(error) }));
-  }
-}
-
-// hq's JSON answer, run from HQ_BAND_BIN or ~/.local/bin/hq with a 10 s limit; none on a failed exit.
-async function runHq($: EngineInterface, args: string[]): Promise<Record<string, unknown> | null> {
-  const home = await $.env.get('HOME');
-  const override = await $.env.get('HQ_BAND_BIN');
-  const ran = await $.process.run([override ?? `${home ?? ''}/.local/bin/hq`, ...args], { timeoutMs: TIMEOUT_MS });
-  return ran.exitCode === 0 ? parseHqAnswer(ran.stdout) : null;
-}
-
-function parseHqAnswer(stdout: string): Record<string, unknown> | null {
-  const parsed: unknown = JSON.parse(stdout);
-  return typeof parsed === 'object' && parsed !== null ? (parsed as Record<string, unknown>) : null;
+// A surface with no Raster draws the slots as block characters.
+function renderTextHeat($: EngineInterface, e: ResolveInput, row: PaneHeatRow) {
+  const elements = $.ui.resolve(e);
+  return (
+    <elements.Box key={`heat-${row.lane}`}>
+      <elements.Text>{'██'.repeat(Math.min(row.used, row.size)) + '░░'.repeat(Math.max(row.size - row.used, 0))}</elements.Text>
+    </elements.Box>
+  );
 }

@@ -188,16 +188,16 @@ function buildKettleInput(task: string): UnblockInput {
 
 describe('no state write skips the table', () => {
   test('every source file that writes a state column imports the table', () => {
-    const src = join(import.meta.dir, '..', 'src');
+    const sourceDirectory = join(import.meta.dir, '..', 'src');
     const write = /UPDATE (?:asks|runs|run_prs|unblocks) SET [^`'"]*\bstate\s*=/u;
     const offenders: string[] = [];
     let seen = 0;
-    for (const f of readdirSync(src, { recursive: true, encoding: 'utf8' }).filter((n) => n.endsWith('.ts'))) {
-      const text = readFileSync(join(src, f), 'utf8');
+    for (const file of readdirSync(sourceDirectory, { recursive: true, encoding: 'utf8' }).filter((name) => name.endsWith('.ts'))) {
+      const text = readFileSync(join(sourceDirectory, file), 'utf8');
       if (!write.test(text)) continue;
       seen++;
-      if (!f.startsWith('transitions/') && !/from '(?:\.\.?\/)+(?:transitions\/[a-z-]+|check-unblock)\.ts'/u.test(text)) {
-        offenders.push(f);
+      if (!file.startsWith('transitions/') && !/from '(?:\.\.?\/)+(?:transitions\/[a-z-]+|check-unblock)\.ts'/u.test(text)) {
+        offenders.push(file);
       }
     }
     expect(seen).toBeGreaterThan(0);

@@ -16,7 +16,7 @@ test('the stand-in answers a known PR state, fails an unknown PR, and records ea
 
 test('the stand-in hands any other command to its fallback', async () => {
   const gh = makePRStateGh({ states: {}, fallback: () => Promise.resolve({ code: 0, stdout: 'invented capacity', stderr: '' }) });
-  const r = await gh(['capacity.sh']);
+  const result = await gh(['capacity.sh']);
 
-  expect(r.stdout).toBe('invented capacity');
+  expect(result.stdout).toBe('invented capacity');
 });

@@ -23,8 +23,6 @@ const KETTLE_CALL = {
     stuView: 'Minting now keeps the morning boil on time.',
     details: [{ heading: 'Evidence', text: 'The last boil took 9 min.', code: 'kettle boil --dry-run' }],
   };
-const KETTLE_PROPOSAL = { ...KETTLE_CALL, title: 'Boil earlier', question: 'Boil at 06:00 from now on?', diff: { now: 'The kettle boils at `07:00`.', would: 'The kettle boils at `06:00`.' } };
-const LID_TODO = { title: 'Fit the lid', question: 'Fit the new lid on the kettle', time: 'about 2 min', unblocks: [{ id: 'GEO-7', title: 'Steam test' }] };
 
 function setupTest() {
   const fresh = freshDb();
@@ -76,10 +74,11 @@ test('hq call add --item stores every field and shows them in the console, verba
 
 test('hq proposal add --item stores the diff and shows it in the console, verbatim', async () => {
   const app = setupTest();
-  const code = await main(['proposal', 'add', 'boil-early', '--item', app.writeItem('proposal.json', KETTLE_PROPOSAL), '--json']);
+  const proposal = { ...KETTLE_CALL, title: 'Boil earlier', question: 'Boil at 06:00 from now on?', diff: { now: 'The kettle boils at `07:00`.', would: 'The kettle boils at `06:00`.' } };
+  const code = await main(['proposal', 'add', 'boil-early', '--item', app.writeItem('proposal.json', proposal), '--json']);
 
   expect(code).toBe(0);
-  expect(loadConsoleItems(app.db)).toMatchObject([{ id: 'boil-early', kind: 'proposal', diff: KETTLE_PROPOSAL.diff, options: KETTLE_PROPOSAL.options }]);
+  expect(loadConsoleItems(app.db)).toMatchObject([{ id: 'boil-early', kind: 'proposal', diff: proposal.diff, options: proposal.options }]);
 });
 
 test('hq call add --item - reads the item from stdin', async () => {
@@ -155,7 +154,7 @@ test('hq call stu sets Stu view on an item filed as free text', async () => {
 
 test('hq unblock add --item makes a to-do with Done, Later and Skip', async () => {
   const app = setupTest();
-  const code = await main(['unblock', 'add', '--id', 'lid', '--item', app.writeItem('todo.json', LID_TODO), '--unblocks', 'GEO-7:high', '--json']);
+  const code = await main(['unblock', 'add', '--id', 'lid', '--item', app.writeItem('todo.json', { title: 'Fit the lid', question: 'Fit the new lid on the kettle', time: 'about 2 min', unblocks: [{ id: 'GEO-7', title: 'Steam test' }] }), '--unblocks', 'GEO-7:high', '--json']);
 
   expect(code).toBe(0);
   expect(getUnblock(app.db, 'lid')).toMatchObject({ title: 'Fit the lid', task: 'Fit the new lid on the kettle', state: 'open' });
@@ -167,7 +166,7 @@ test('hq unblock add --item makes a to-do with Done, Later and Skip', async () =
 test('hq unblock add --item keeps --kind watch and --deadline, so the watch stays off the console', async () => {
   const app = setupTest();
 
-  const code = await main(['unblock', 'add', '--id', 'lid-watch', '--item', app.writeItem('watch.json', LID_TODO), '--kind', 'watch', '--deadline', '2026-10-20T00:00:00Z', '--json']);
+  const code = await main(['unblock', 'add', '--id', 'lid-watch', '--item', app.writeItem('watch.json', { title: 'Fit the lid', question: 'Fit the new lid on the kettle', time: 'about 2 min', unblocks: [{ id: 'GEO-7', title: 'Steam test' }] }), '--kind', 'watch', '--deadline', '2026-10-20T00:00:00Z', '--json']);
 
   expect(code).toBe(0);
   expect(getUnblock(app.db, 'lid-watch')).toMatchObject({ kind: 'watch', deadline: '2026-10-20T00:00:00Z' });
@@ -195,7 +194,7 @@ test('an unblock item filed as a task shows its minutes and the issues it unbloc
 
 test('it keeps each --done-when of hq unblock add --item, and the console lists them as a detail', async () => {
   const app = setupTest();
-  const item = app.writeItem('todo.json', LID_TODO);
+  const item = app.writeItem('todo.json', { title: 'Fit the lid', question: 'Fit the new lid on the kettle', time: 'about 2 min', unblocks: [{ id: 'GEO-7', title: 'Steam test' }] });
   const code = await main(['unblock', 'add', '--id', 'lid', '--item', item, '--done-when', 'issue:KET-7', '--done-when', 'pr:kettle-co/kettle#4', '--json']);
 
   expect(code).toBe(0);
@@ -208,7 +207,7 @@ test('it keeps each --done-when of hq unblock add --item, and the console lists 
 
 test('hq unblock later hides the item from the console until it is due', async () => {
   const app = setupTest();
-  await main(['unblock', 'add', '--id', 'lid', '--item', app.writeItem('todo.json', LID_TODO), '--json']);
+  await main(['unblock', 'add', '--id', 'lid', '--item', app.writeItem('todo.json', { title: 'Fit the lid', question: 'Fit the new lid on the kettle', time: 'about 2 min', unblocks: [{ id: 'GEO-7', title: 'Steam test' }] }), '--json']);
 
   await expect(main(['unblock', 'later', 'lid', '--until', '+4h', '--json'])).resolves.toBe(0);
   expect(loadConsoleItems(app.db)).toStrictEqual([]);
@@ -219,7 +218,7 @@ test('hq unblock later hides the item from the console until it is due', async (
 
 test('an unblock item dropped while put off comes back to the console when it is added again', async () => {
   const app = setupTest();
-  const todo = app.writeItem('todo.json', LID_TODO);
+  const todo = app.writeItem('todo.json', { title: 'Fit the lid', question: 'Fit the new lid on the kettle', time: 'about 2 min', unblocks: [{ id: 'GEO-7', title: 'Steam test' }] });
   await main(['unblock', 'add', '--id', 'lid', '--item', todo, '--json']);
   await main(['unblock', 'later', 'lid', '--until', '+4h', '--json']);
   await main(['unblock', 'drop', 'lid', '--json']);
@@ -235,7 +234,7 @@ test('the console lists calls in send order, then to-dos, and leaves out a call 
   await main(['call', 'add', 'first', '--item', app.writeItem('b.json', KETTLE_CALL), '--order', '1', '--json']);
   await main(['call', 'add', 'shelved', '--item', app.writeItem('c.json', KETTLE_CALL), '--json']);
   await main(['call', 'later', 'shelved', '--until', '+4h', '--json']);
-  await main(['unblock', 'add', '--id', 'lid', '--item', app.writeItem('todo.json', LID_TODO), '--json']);
+  await main(['unblock', 'add', '--id', 'lid', '--item', app.writeItem('todo.json', { title: 'Fit the lid', question: 'Fit the new lid on the kettle', time: 'about 2 min', unblocks: [{ id: 'GEO-7', title: 'Steam test' }] }), '--json']);
 
   expect(loadConsoleItems(app.db).map((i) => i.id)).toStrictEqual(['first', 'second', 'lid']);
 });
