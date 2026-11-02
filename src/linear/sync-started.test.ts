@@ -40,7 +40,7 @@ test('it asks for 50 issues a page, follows the cursor, and stores all 40 pages'
   const call = (query: string, variables: Record<string, unknown>) => {
     asked.push({ first: /issues\(first: (?<first>\d+)/u.exec(query)?.groups?.['first'], after: variables['after'] });
     const page = asked.length - 1;
-    const nodes = Array.from({ length: 50 }, (_unused, k) => ({ identifier: `GEO-${10_000 + page * 50 + k}`, startedAt: '2026-10-14T07:00:00Z', updatedAt: '2026-10-14T07:00:00Z' }));
+    const nodes = Array.from({ length: 50 }, (_unused, index) => ({ identifier: `GEO-${10_000 + page * 50 + index}`, startedAt: '2026-10-14T07:00:00Z', updatedAt: '2026-10-14T07:00:00Z' }));
     return Promise.resolve({ issues: { nodes, pageInfo: { hasNextPage: page < 39, endCursor: `cursor-${page}` } } });
   };
 
@@ -57,12 +57,15 @@ test('it asks for 50 issues a page, follows the cursor, and stores all 40 pages'
 test('it refuses a 41st page and keeps the last read as it was', async () => {
   const ctx = setupTest();
   await syncStarted(ctx.db, makeThroughputLinearCall([], [{ identifier: 'GEO-9809', startedAt: '2026-10-14T07:00:00Z', attachments: [buildGithubAttachment(49, 'open')] }]), new Date('2026-10-15T07:00:00Z'));
+  let pages = 0;
   const call = (_query: string, variables: Record<string, unknown>) => {
+    pages += 1;
     const node = { identifier: `GEO-${String(variables['after'] ?? 'first')}`, startedAt: '2026-10-14T07:00:00Z', updatedAt: '2026-10-14T07:00:00Z' };
     return Promise.resolve({ issues: { nodes: [node], pageInfo: { hasNextPage: true, endCursor: 'more' } } });
   };
 
   await expect(syncStarted(ctx.db, call, new Date('2026-10-16T07:00:00Z'))).rejects.toMatchObject({ code: 'linear_failed', message: 'more than 2000 issues In Progress; not recorded' });
+  expect(pages).toBe(40);
   expect({ started: ctx.db.query('SELECT issue FROM linear_started').all(), prs: ctx.readPrs() }).toStrictEqual({
     started: [{ issue: 'GEO-9809' }],
     prs: [{ issue: 'GEO-9809', ref: 'kettle#49', status: 'open', merged_at: null }],
@@ -71,7 +74,7 @@ test('it refuses a 41st page and keeps the last read as it was', async () => {
 
 test('it reads every attachment page, so an open PR after 20 merged ones keeps the issue live', async () => {
   const ctx = setupTest();
-  const merged = Array.from({ length: 20 }, (_unused, k) => buildGithubAttachment(k + 1, 'merged', '2026-10-15T01:00:00Z'));
+  const merged = Array.from({ length: 20 }, (_unused, index) => buildGithubAttachment(index + 1, 'merged', '2026-10-15T01:00:00Z'));
   const call = (query: string, variables: Record<string, unknown>) => {
     if (query.includes('issue(id:')) {
       return Promise.resolve({ issue: { attachments: { nodes: [buildGithubAttachment(21, 'open')], pageInfo: { hasNextPage: false, endCursor: null } } } });
