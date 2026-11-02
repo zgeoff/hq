@@ -47,6 +47,7 @@ function setupTest() {
 test('it prints one block per PR', () => {
   const ctx = setupTest();
   ctx.addRound({ findings: [ctx.boilFinding, ctx.lidFinding] });
+  // oxlint-disable-next-line zgeoff/no-abbreviated-names -- ms is the stored noslop_rounds column
   ctx.addRound({ kind: 'check', conclusion: 'failure', ms: 4000, open: [{ id: ctx.boilFinding.id, title: ctx.boilFinding.title, reason: 'no reply' }] });
 
   expect(renderNoslopReport(buildNoslopReport(ctx.db))).toBe(

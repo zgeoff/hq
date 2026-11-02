@@ -56,7 +56,9 @@ test('it reports no rounds as nothing to report', () => {
 test('it adds two review rounds and a passing check into one PR report', () => {
   const ctx = setupTest();
   ctx.addRound({ findings: [ctx.boilFinding, ctx.lidFinding] });
+  // oxlint-disable-next-line zgeoff/no-abbreviated-names -- ms is the stored noslop_rounds column
   ctx.addRound({ startedAt: '2026-10-18T02:00:00Z', endedAt: '2026-10-18T02:02:00Z', ms: 120_000, findings: [ctx.lidFinding, ctx.cordFinding] });
+  // oxlint-disable-next-line zgeoff/no-abbreviated-names -- ms is the stored noslop_rounds column
   ctx.addRound({ kind: 'check', startedAt: '2026-10-18T02:10:00Z', endedAt: '2026-10-18T02:10:05Z', ms: 5000, conclusion: 'failure', open: [{ id: ctx.cordFinding.id, title: ctx.cordFinding.title, reason: 'no reply' }] });
   ctx.addRound({ kind: 'check', startedAt: '2026-10-18T03:00:00Z', endedAt: '2026-10-18T03:00:04Z', ms: 4000, conclusion: 'success' });
 

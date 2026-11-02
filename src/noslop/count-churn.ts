@@ -18,6 +18,7 @@ export interface ChurnReview {
 }
 
 export function countChurn(reviews: ChurnReview[]): Churn {
+  // oxlint-disable-next-line id-length -- late.n is a key of hq noslop's JSON report
   const churn: Churn = { roundsWithNew: 0, repeatClass: 0, classUnknown: 0, late: { n: 0, of: 0 }, lateUnknown: 0, mainMerge: 0, mergeUnknown: 0 };
   const cited = new Map<string, Set<string>>();
   const seen = new Set<string>();
