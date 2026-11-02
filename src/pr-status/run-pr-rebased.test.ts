@@ -39,16 +39,7 @@ function setupTest() {
   const runRebased = async (call: Call) => {
     const repo = call.repo ?? 'widgets';
     const base = call.base ?? FAKE_BASE_SHA;
-    const fake = buildFakeRunner({
-      realGit: true,
-      origin: repo,
-      ...buildStubPRHead(call.head),
-      prShas: {
-        code: 0,
-        stdout: JSON.stringify({ headRefOid: call.head, baseRefOid: base }),
-        stderr: '',
-      },
-    });
+    const fake = buildFakeRunner({ realGit: true, origin: repo, ...buildStubPRHead(call.head), prShas: { code: 0, stdout: JSON.stringify({ headRefOid: call.head, baseRefOid: base }), stderr: '' } });
     const run: Runner = (cmd, opts) => {
       const line = cmd.join(' ');
       const answer = Object.entries(call.gh ?? {}).find(([piece]) => line.includes(piece))?.[1];
@@ -86,11 +77,7 @@ test('it carries the lgtm over a clean rebase onto a moved main, with the origin
   await stub.moveMain({ 'other.txt': 'plain and moved\n' });
   const head = await stub.rebase();
 
-  const out = await ctx.runRebased({
-    head,
-    base: await stub.readMainHead(),
-    from: stub.oldHead.slice(0, 9),
-  });
+  const out = await ctx.runRebased({ head, base: await stub.readMainHead(), from: stub.oldHead.slice(0, 9) });
 
   const carried = readHeadLgtm(ctx.db, 'widgets', 7, head);
   expect(carried).toMatchObject({ answer: 'lgtm', head, source: `rebased:${stub.oldHead}` });
@@ -195,9 +182,7 @@ test('it carries the lgtm over a squash of a two-commit PR into one commit of th
 
   await ctx.runRebased({ head, base: await stub.readMainHead(), from: stub.oldHead });
 
-  expect(readHeadLgtm(ctx.db, 'widgets', 7, head)).toMatchObject({
-    source: `rebased:${stub.oldHead}`,
-  });
+  expect(readHeadLgtm(ctx.db, 'widgets', 7, head)).toMatchObject({ source: `rebased:${stub.oldHead}` });
 });
 
 test("it carries an lgtm a second time with the owner's own source and note, not the first carry's", async () => {
@@ -224,15 +209,11 @@ test('it leaves no ref of its own in the checkout', async () => {
   recordPRAnswer(ctx.db, { repo: 'widgets', pr: 7, answer: 'lgtm', head: stub.oldHead, source: 'chat:kettle-1@ward', note: 'the kettle edit reads well', actor: 'z-kettle' });
   await stub.moveMain({ 'other.txt': 'plain and moved\n' });
   const head = await stub.rebase();
-  const refsBefore = await realRunner(['git', 'for-each-ref', '--format=%(refname)'], {
-    cwd: stub.directory,
-  });
+  const refsBefore = await realRunner(['git', 'for-each-ref', '--format=%(refname)'], { cwd: stub.directory });
 
   await ctx.runRebased({ head, base: await stub.readMainHead(), from: stub.oldHead });
 
-  const refsAfter = await realRunner(['git', 'for-each-ref', '--format=%(refname)'], {
-    cwd: stub.directory,
-  });
+  const refsAfter = await realRunner(['git', 'for-each-ref', '--format=%(refname)'], { cwd: stub.directory });
   expect(refsAfter.stdout).toBe(refsBefore.stdout);
 });
 
@@ -313,21 +294,7 @@ test('it refuses a typed rebased: source on hq pr answer', async () => {
   recordPRAnswer(ctx.db, { repo: 'widgets', pr: 7, answer: 'lgtm', head: stub.oldHead, source: 'chat:kettle-1@ward', note: 'the kettle edit reads well', actor: 'z-kettle' });
   const fake = buildFakeRunner({ realGit: true, ...buildStubPRHead(stub.oldHead) });
 
-  await expect(
-    runPRCommand({
-      run: fake.run,
-      db: ctx.db,
-      verb: 'answer',
-      rest: ['widgets', '7', 'lgtm'],
-      flags: { source: `rebased:${stub.oldHead}` },
-      actor: () => Promise.resolve('z-review'),
-      readOwnerSession: () => Promise.resolve({ verdict: 'other' }),
-      readReviewerSession: () => Promise.resolve({ verdict: 'match' }),
-    }),
-  ).rejects.toMatchObject({
-    code: 'bad_args',
-    message: expect.stringContaining('must be chat:<id>'),
-  });
+  await expect(runPRCommand({ run: fake.run, db: ctx.db, verb: 'answer', rest: ['widgets', '7', 'lgtm'], flags: { source: `rebased:${stub.oldHead}` }, actor: () => Promise.resolve('z-review'), readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) })).rejects.toMatchObject({ code: 'bad_args', message: expect.stringContaining('must be chat:<id>') });
 });
 
 test.each(['hq', 'hq-private'])('it works for %s, which has no instruction-file hold, on a PR with no instruction file', async (repo) => {
@@ -339,11 +306,8 @@ test.each(['hq', 'hq-private'])('it works for %s, which has no instruction-file 
 
   await ctx.runRebased({ repo, head, base: await stub.readMainHead(), from: stub.oldHead });
 
-    expect(readHeadLgtm(ctx.db, repo, 7, head)).toMatchObject({
-      source: `rebased:${stub.oldHead}`,
-    });
-  },
-);
+  expect(readHeadLgtm(ctx.db, repo, 7, head)).toMatchObject({ source: `rebased:${stub.oldHead}` });
+});
 
 test('it refuses when the owner answered changes at the new head first', async () => {
   const ctx = setupTest();
@@ -367,12 +331,7 @@ test('it refuses when the owner answers changes at the old head during the git w
   const head = await stub.rebase();
   const during = () => recordPRAnswer(ctx.db, { repo: 'widgets', pr: 7, answer: 'changes', head: stub.oldHead, source: 'chat:kettle-1', note: 'rename the kettle', actor: 'z-kettle' });
 
-  await expect(
-    ctx.runRebased({ head, base: await stub.readMainHead(), from: stub.oldHead, during }),
-  ).rejects.toMatchObject({
-    code: 'bad_args',
-    message: expect.stringContaining('no longer the newest answer'),
-  });
+  await expect(ctx.runRebased({ head, base: await stub.readMainHead(), from: stub.oldHead, during })).rejects.toMatchObject({ code: 'bad_args', message: expect.stringContaining('no longer the newest answer') });
 
   expect(readHeadLgtm(ctx.db, 'widgets', 7, head)).toBeNull();
   expect(listNews(ctx.db, { all: true, limit: 10 })).toStrictEqual([]);
@@ -386,12 +345,7 @@ test('it refuses when the owner answers reject at the new head during the git wo
   const head = await stub.rebase();
   const during = () => recordPRAnswer(ctx.db, { repo: 'widgets', pr: 7, answer: 'reject', head, source: 'chat:kettle-1', note: 'no kettles', actor: 'z-kettle' });
 
-  await expect(
-    ctx.runRebased({ head, base: await stub.readMainHead(), from: stub.oldHead, during }),
-  ).rejects.toMatchObject({
-    code: 'bad_args',
-    message: expect.stringContaining('already answered reject at'),
-  });
+  await expect(ctx.runRebased({ head, base: await stub.readMainHead(), from: stub.oldHead, during })).rejects.toMatchObject({ code: 'bad_args', message: expect.stringContaining('already answered reject at') });
 
   expect(readHeadLgtm(ctx.db, 'widgets', 7, head)).toBeNull();
 });
@@ -415,13 +369,7 @@ test('it refuses when gh cannot read the head', async () => {
   await stub.moveMain({ 'other.txt': 'plain and moved\n' });
   const head = await stub.rebase();
 
-  await expect(
-    ctx.runRebased({
-      head,
-      from: stub.oldHead,
-      gh: { headRefOid: { code: 1, stdout: '', stderr: 'no route' } },
-    }),
-  ).rejects.toMatchObject({ code: 'head_unreadable' });
+  await expect(ctx.runRebased({ head, from: stub.oldHead, gh: { 'headRefOid': { code: 1, stdout: '', stderr: 'no route' } } })).rejects.toMatchObject({ code: 'head_unreadable' });
 
   expect(readHeadLgtm(ctx.db, 'widgets', 7, head)).toBeNull();
 });
@@ -446,22 +394,7 @@ test('it refuses when gh gives no base sha', async () => {
   await stub.moveMain({ 'other.txt': 'plain and moved\n' });
   const head = await stub.rebase();
 
-  await expect(
-    ctx.runRebased({
-      head,
-      from: stub.oldHead,
-      gh: {
-        'headRefOid,baseRefOid': {
-          code: 0,
-          stdout: JSON.stringify({ headRefOid: head }),
-          stderr: '',
-        },
-      },
-    }),
-  ).rejects.toMatchObject({
-    code: 'head_unreadable',
-    message: expect.stringContaining("could not read zgeoff/widgets#7's head and base with gh"),
-  });
+  await expect(ctx.runRebased({ head, from: stub.oldHead, gh: { 'headRefOid,baseRefOid': { code: 0, stdout: JSON.stringify({ headRefOid: head }), stderr: '' } } })).rejects.toMatchObject({ code: 'head_unreadable', message: expect.stringContaining("could not read zgeoff/widgets#7's head and base with gh") });
 
   expect(readHeadLgtm(ctx.db, 'widgets', 7, head)).toBeNull();
 });
@@ -481,26 +414,9 @@ test('it refuses when hq has no checkout of the repo', async () => {
 
 test('it says the diff at the new head is empty when its content is already on main', async () => {
   const ctx = setupTest();
-  const stub = await createStubRebaseRepo({
-    root: ctx.root,
-    repo: 'widgets',
-    pr: 7,
-    history: [{ 'notes.txt': 'one\ntwo\nthree\nfour\nfive\nsix\n', 'other.txt': 'plain\n' }],
-    change: { 'notes.txt': 'one\ntwo\nthree\nfour\nfifty\nsix\n', 'extra.txt': 'extra\n' },
-  });
-  recordPRAnswer(ctx.db, {
-    repo: 'widgets',
-    pr: 7,
-    answer: 'lgtm',
-    head: stub.oldHead,
-    source: 'chat:kettle-1@ward',
-    note: 'the kettle edit reads well',
-    actor: 'z-kettle',
-  });
-  await stub.moveMain({
-    'notes.txt': 'one\ntwo\nthree\nfour\nfifty\nsix\n',
-    'extra.txt': 'extra\n',
-  });
+  const stub = await createStubRebaseRepo({ root: ctx.root, repo: 'widgets', pr: 7, history: [{ 'notes.txt': 'one\ntwo\nthree\nfour\nfive\nsix\n', 'other.txt': 'plain\n' }], change: { 'notes.txt': 'one\ntwo\nthree\nfour\nfifty\nsix\n', 'extra.txt': 'extra\n' } });
+  recordPRAnswer(ctx.db, { repo: 'widgets', pr: 7, answer: 'lgtm', head: stub.oldHead, source: 'chat:kettle-1@ward', note: 'the kettle edit reads well', actor: 'z-kettle' });
+  await stub.moveMain({ 'notes.txt': 'one\ntwo\nthree\nfour\nfifty\nsix\n', 'extra.txt': 'extra\n' });
   const head = await stub.rebase();
 
   await expect(ctx.runRebased({ head, base: await stub.readMainHead(), from: stub.oldHead })).rejects.toMatchObject({ code: 'not_carried', message: `the diff at ${head.slice(0, 7)} is empty against the base of zgeoff/widgets#7, so the lgtm is not carried and nothing is recorded` });

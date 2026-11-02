@@ -3,22 +3,7 @@ import { pickRebasedOutcome } from './pick-rebased-outcome.ts';
 import type { DiffPatchID } from './read-diff-patch-id.ts';
 
 test('it carries when both diffs have the same patch-id', () => {
-  expect(
-    pickRebasedOutcome({
-      slug: 'zgeoff/widgets',
-      pr: 7,
-      oldHead: 'a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1',
-      newHead: 'b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2',
-      oldPatchID: { kind: 'patch-id', id: 'c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3' },
-      newPatchID: { kind: 'patch-id', id: 'c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3' },
-      changed: null,
-      landed: [],
-    }),
-  ).toStrictEqual({
-    kind: 'carry',
-    patchID: 'c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3',
-    landed: 0,
-  });
+  expect(pickRebasedOutcome({ slug: 'zgeoff/widgets', pr: 7, oldHead: 'a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1', newHead: 'b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2', oldPatchID: { kind: 'patch-id', id: 'c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3' }, newPatchID: { kind: 'patch-id', id: 'c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3' }, changed: null, landed: [] })).toStrictEqual({ kind: 'carry', patchID: 'c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3', landed: 0 });
 });
 
 test.each([

@@ -39,7 +39,8 @@ export async function postAcceptRiskReply(run: Runner, ref: PRRef, input: Accept
   const generalWhere = `the finding's thread or the issue comments of ${ref.slug}#${ref.pr}`;
   const reviewPath = `repos/${ref.slug}/pulls/${ref.pr}/comments`;
   const issuePath = `repos/${ref.slug}/issues/${ref.pr}/comments`;
-  const review = await readOrFail(run, reviewPath, text, generalWhere);
+  const eitherText = `On the finding's thread:\n\n${text}\n\nOr, for a finding outside the diff, as an issue comment:\n\n${issueText}`;
+  const review = await readOrFail(run, reviewPath, eitherText, generalWhere);
   const thread = findFindingComment(review, input.finding);
   if (thread !== undefined) {
     const standing = review.find((comment) => comment.replyTo === thread.id && isOwner(comment) && comment.body.startsWith(standingLine));
@@ -67,9 +68,11 @@ async function readOrFail(run: Runner, path: string, text: string, where: string
   }
 }
 
-// A top-level comment of the noslop App that holds the finding's id.
+// A top-level comment of the noslop App whose marker names the finding's id. The match is on the
+// marker's `"id":"<id>"`, never the id anywhere in the body, so a reply lands in no other thread.
 function findFindingComment(comments: readonly PRComment[], finding: string): PRComment | undefined {
-  return comments.find((comment) => (comment.replyTo ?? null) === null && comment.type === 'Bot' && comment.body.includes(finding));
+  const marker = `"id":"${finding}"`;
+  return comments.find((comment) => (comment.replyTo ?? null) === null && comment.type === 'Bot' && comment.body.includes('<!-- noslop:') && comment.body.includes(marker));
 }
 
 function isOwner(comment: PRComment): boolean {

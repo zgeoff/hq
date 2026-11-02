@@ -50,15 +50,7 @@ export async function runPRRebased(input: PRCommandInput, ref: PRRef): Promise<O
   }
   const heads = { base: shas.base, oldHead, newHead };
   const matched = await matchPatchIDs(input, ref, heads);
-  return carry(input, {
-    ref,
-    actor,
-    lgtm,
-    oldHead,
-    newHead,
-    patchID: matched.patchID,
-    landed: matched.landed,
-  });
+  return carry(input, { ref, actor, lgtm, oldHead, newHead, patchID: matched.patchID, landed: matched.landed });
 }
 
 interface Heads {
@@ -135,44 +127,10 @@ function carry(input: PRCommandInput, request: Carry): Out {
   const text = formatRebasedNews(request.actor, { repo: ref.repo, pr: ref.pr, oldHead: request.oldHead, newHead: request.newHead, landed: request.landed });
   input.db
     .transaction(() => {
-      requireCarriableLgtm(input.db, {
-        repo: ref.repo,
-        pr: ref.pr,
-        lgtm,
-        oldHead: request.oldHead,
-        newHead: request.newHead,
-      });
-      recordPRAnswer(input.db, {
-        repo: ref.repo,
-        pr: ref.pr,
-        answer: 'lgtm',
-        head: request.newHead,
-        source,
-        note,
-        actor: request.actor,
-        carried,
-      });
-      addNews(input.db, {
-        from: request.actor,
-        topic: 'merge',
-        text,
-        issue: null,
-        link: null,
-        needsGeoff: false,
-      });
+      requireCarriableLgtm(input.db, { repo: ref.repo, pr: ref.pr, lgtm, oldHead: request.oldHead, newHead: request.newHead });
+      recordPRAnswer(input.db, { repo: ref.repo, pr: ref.pr, answer: 'lgtm', head: request.newHead, source, note, actor: request.actor, carried });
+      addNews(input.db, { from: request.actor, topic: 'merge', text, issue: null, link: null, needsGeoff: false });
     })
     .immediate();
-  return {
-    data: {
-      rebased: {
-        repo: ref.repo,
-        pr: ref.pr,
-        from: request.oldHead,
-        head: request.newHead,
-        source,
-        carried,
-      },
-    },
-    text: `Recorded ${text}`,
-  };
+  return { data: { rebased: { repo: ref.repo, pr: ref.pr, from: request.oldHead, head: request.newHead, source, carried } }, text: `Recorded ${text}` };
 }

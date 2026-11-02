@@ -116,9 +116,7 @@ test('it finds a changes followed by an lgtm carried to the head by hq pr rebase
   await ctx.answer('changes', REVIEWED);
   await ctx.answer('lgtm', HEAD, `rebased:${OLDER}`);
 
-  expect(ctx.find()).toMatchObject({
-    lgtm: { answer: 'lgtm', head: HEAD, source: `rebased:${OLDER}` },
-  });
+  expect(ctx.find()).toMatchObject({ lgtm: { answer: 'lgtm', head: HEAD, source: `rebased:${OLDER}` } });
 });
 
 test('it does not take a rebased: source as the owner answer to a changes', async () => {

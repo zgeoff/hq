@@ -14,6 +14,7 @@ import { requireOwnerSource } from './require-owner-source.ts';
 import type { PRCommandInput } from './run-pr-command.ts';
 
 const USAGE = 'usage: hq pr accept-risk <repo> <pr> <finding-id> --source S --note T';
+const FINDING_ID = /^[0-9a-f]{16}$/u;
 
 // One run of the command: the hq record it acts on, and whether an earlier run wrote it.
 interface Accepting {
@@ -29,6 +30,9 @@ interface Accepting {
 export async function runAcceptRisk(input: PRCommandInput, ref: PRRef, finding: string | undefined): Promise<Out> {
   if (finding === undefined || finding.trim() === '') {
     throw new HqError('bad_args', USAGE);
+  }
+  if (!FINDING_ID.test(finding)) {
+    throw new HqError('bad_args', `finding id "${finding}" must be noslop's 16 lowercase hex characters, as its comment shows them`);
   }
   const head = await readPRHead(input.run, ref.slug, ref.pr);
   const source = await requireOwnerSource(input, {

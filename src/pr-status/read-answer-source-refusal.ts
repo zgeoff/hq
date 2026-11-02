@@ -34,10 +34,7 @@ export function readAnswerSourceRefusal(db: Database, request: AnswerSourceReque
 
 const ReviewRowSchema = z.object({ seq: z.number(), data: z.string() });
 
-const ReviewDataSchema = z.object({
-  review: z.string(),
-  facts: z.object({ ref: z.string().nullable() }).optional(),
-});
+const ReviewDataSchema = z.object({ review: z.string(), facts: z.object({ ref: z.string().nullable() }).optional() });
 
 // The owner's latest console review under this id, and whether the console stored it on this PR at
 // the head gh gives now.

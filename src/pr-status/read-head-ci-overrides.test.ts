@@ -45,34 +45,10 @@ test.each([
 });
 
 test.each([
-  [
-    'names no check',
-    {
-      head: 'b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2',
-      source: 'chat:kettle-2',
-      note: 'Bad.',
-      scope: 'ci-check',
-    },
-  ],
-  [
-    'names an empty check',
-    {
-      head: 'b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2',
-      source: 'chat:kettle-2',
-      note: 'Bad.',
-      scope: 'ci-check',
-      check: '',
-    },
-  ],
+  ['names no check', { head: 'b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2', source: 'chat:kettle-2', note: 'Bad.', scope: 'ci-check' }],
+  ['names an empty check', { head: 'b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2', source: 'chat:kettle-2', note: 'Bad.', scope: 'ci-check', check: '' }],
   ['has no head', { source: 'chat:kettle-2', note: 'Bad.', scope: 'ci-check', check: 'preview' }],
-  [
-    'is a findings override with no note',
-    {
-      head: 'b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2',
-      source: 'chat:kettle-2',
-      scope: 'open-findings',
-    },
-  ],
+  ['is a findings override with no note', { head: 'b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2', source: 'chat:kettle-2', scope: 'open-findings' }],
 ])('it reads no CI override once an override event %s', (_label, data) => {
   const ctx = setupTest();
   recordCICheckOverride(ctx.db, { repo: 'widgets', pr: 7, head: 'b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2', source: 'chat:kettle-1', note: 'Fine.', actor: 'z-kettle', check: 'preview' });

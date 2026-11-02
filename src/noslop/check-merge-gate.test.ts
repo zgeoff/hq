@@ -92,14 +92,14 @@ test('it passes open findings under an override at the head when noslop never re
   setMeta(ctx.db, 'noslop', JSON.stringify({ repos: ['widgets'], sha: '0123456789abcdef0123456789abcdef01234567' }));
   recordPROverride(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA, source: 'call:KET-2', note: 'Ship the kettle.', actor: 'z-kettle' });
 
-  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).resolves.toStrictEqual({ mayMerge: true, reason: "The owner's override at 0123456 (call:KET-2) stands for 1 open finding: aaaa; CI green at 0123456", reviewed: true });
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).resolves.toStrictEqual({ mayMerge: true, reason: "The owner's override at 0123456 (call:KET-2) stands for 1 open finding: aaaaaaaaaaaaaaaa; CI green at 0123456", reviewed: true });
 });
 
 test("it passes under an override at the head when noslop's findings list is empty but its reviews recorded findings", async () => {
   const ctx = setupTest();
   const fake = buildFakeRunner();
   setMeta(ctx.db, 'noslop', JSON.stringify({ repos: ['widgets'], sha: '0123456789abcdef0123456789abcdef01234567' }));
-  ctx.db.query("INSERT INTO noslop_rounds (repo, pr, kind, started_at, ended_at, ms, ok, head, depth, special, findings, sha, confirm) VALUES ('widgets', 7, 'review', 'a', 'b', 1, 1, ?, 'standard', 'none', ?, 'x', 0)").run(FAKE_FULL_SHA, '[{"id":"aaaa","lens":"correctness","severity":"high","title":"Kettle never boils"}]');
+  ctx.db.query("INSERT INTO noslop_rounds (repo, pr, kind, started_at, ended_at, ms, ok, head, depth, special, findings, sha, confirm) VALUES ('widgets', 7, 'review', 'a', 'b', 1, 1, ?, 'standard', 'none', ?, 'x', 0)").run(FAKE_FULL_SHA, '[{"id":"aaaaaaaaaaaaaaaa","lens":"correctness","severity":"high","title":"Kettle never boils"}]');
   recordPROverride(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA, source: 'call:KET-2', note: 'Ship the kettle.', actor: 'z-kettle' });
 
   await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).resolves.toStrictEqual({ mayMerge: true, reason: "The owner's override at 0123456 (call:KET-2) stands; CI green at 0123456", reviewed: true });
@@ -118,7 +118,7 @@ test("it blocks when noslop's findings list is empty but the full review at the 
   const ctx = setupTest();
   const fake = buildFakeRunner();
   setMeta(ctx.db, 'noslop', JSON.stringify({ repos: ['widgets'], sha: '0123456789abcdef0123456789abcdef01234567' }));
-  ctx.db.query("INSERT INTO noslop_rounds (repo, pr, kind, started_at, ended_at, ms, ok, head, depth, special, findings, sha, confirm) VALUES ('widgets', 7, 'review', 'a', 'b', 1, 1, ?, 'standard', 'none', ?, 'x', 0)").run(FAKE_FULL_SHA, '[{"id":"aaaa","lens":"correctness","severity":"high","title":"Kettle never boils"},{"id":"bbbb","lens":"tests","severity":"P2","title":"Lid untested"}]');
+  ctx.db.query("INSERT INTO noslop_rounds (repo, pr, kind, started_at, ended_at, ms, ok, head, depth, special, findings, sha, confirm) VALUES ('widgets', 7, 'review', 'a', 'b', 1, 1, ?, 'standard', 'none', ?, 'x', 0)").run(FAKE_FULL_SHA, '[{"id":"aaaaaaaaaaaaaaaa","lens":"correctness","severity":"high","title":"Kettle never boils"},{"id":"bbbb","lens":"tests","severity":"P2","title":"Lid untested"}]');
 
   await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: "noslop's findings list is empty, but its reviews of this PR recorded 2 findings, so no pass" });
 });
@@ -127,7 +127,7 @@ test("it blocks when noslop's findings list is empty but an older round recorded
   const ctx = setupTest();
   const fake = buildFakeRunner();
   setMeta(ctx.db, 'noslop', JSON.stringify({ repos: ['widgets'], sha: '0123456789abcdef0123456789abcdef01234567' }));
-  ctx.db.query("INSERT INTO noslop_rounds (repo, pr, kind, started_at, ended_at, ms, ok, head, depth, special, findings, sha, confirm) VALUES ('widgets', 7, 'review', 'a', 'b', 1, 1, 'f00dfeedf00dfeedf00dfeedf00dfeedf00dfeed', 'standard', 'none', ?, 'x', 0)").run('[{"id":"aaaa","lens":"correctness","severity":"P1","title":"Kettle never boils"},{"id":"bbbb","lens":"tests","severity":"P2","title":"Lid untested"},{"id":"cccc","lens":"intent","severity":"P2","title":"Spout points inward"}]');
+  ctx.db.query("INSERT INTO noslop_rounds (repo, pr, kind, started_at, ended_at, ms, ok, head, depth, special, findings, sha, confirm) VALUES ('widgets', 7, 'review', 'a', 'b', 1, 1, 'f00dfeedf00dfeedf00dfeedf00dfeedf00dfeed', 'standard', 'none', ?, 'x', 0)").run('[{"id":"aaaaaaaaaaaaaaaa","lens":"correctness","severity":"P1","title":"Kettle never boils"},{"id":"bbbb","lens":"tests","severity":"P2","title":"Lid untested"},{"id":"cccc","lens":"intent","severity":"P2","title":"Spout points inward"}]');
   ctx.db.query("INSERT INTO noslop_rounds (repo, pr, kind, started_at, ended_at, ms, ok, head, depth, special, findings, sha, confirm) VALUES ('widgets', 7, 'review', 'a', 'b', 1, 1, ?, 'standard', 'none', '[]', 'x', 0)").run(FAKE_FULL_SHA);
 
   await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: "noslop's findings list is empty, but its reviews of this PR recorded 3 findings, so no pass" });
@@ -149,7 +149,7 @@ test('it blocks a PR with an open finding, naming it', async () => {
     fake = buildFakeRunner({ noslopFindings: buildStubFindings('open') });
   createListedReview(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA });
 
-  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: '1 noslop finding is open: aaaa' });
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: '1 noslop finding is open: aaaaaaaaaaaaaaaa' });
 });
 
 test.each(['fixed', 'not-a-defect', 'deferred'])('it passes a finding in state %s', async (state) => {
@@ -165,14 +165,14 @@ test('it keeps an accepted-risk finding open when the reply is by zgeoff but hq 
     fake = buildFakeRunner({ noslopFindings: buildStubFindings('accepted-risk') });
   createListedReview(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA });
 
-  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: '1 noslop finding is open: aaaa' });
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: '1 noslop finding is open: aaaaaaaaaaaaaaaa' });
 });
 
 test('it passes an accepted-risk finding the owner accepted in hq', async () => {
   const ctx = setupTest(),
     fake = buildFakeRunner({ noslopFindings: buildStubFindings('accepted-risk') });
   createListedReview(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA });
-  recordPRAcceptedRisk(ctx.db, { repo: 'widgets', pr: 7, finding: 'aaaa', source: 'call:KET-1', note: 'The lid is cosmetic.', actor: 'z-kettle' });
+  recordPRAcceptedRisk(ctx.db, { repo: 'widgets', pr: 7, finding: 'aaaaaaaaaaaaaaaa', source: 'call:KET-1', note: 'The lid is cosmetic.', actor: 'z-kettle' });
 
   await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).resolves.toMatchObject({ mayMerge: true });
 });
@@ -181,7 +181,7 @@ test('it ignores a record of accepted risk whose source is not an owner source',
   const ctx = setupTest(),
     fake = buildFakeRunner({ noslopFindings: buildStubFindings('accepted-risk') });
   createListedReview(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA });
-  logEvent(ctx.db, 'hq', 'pr:widgets#7', 'pr-accepted-risk', 'z-kettle', null, null, { finding: 'aaaa', source: 'session:z-teapot', note: 'Fine.' });
+  logEvent(ctx.db, 'hq', 'pr:widgets#7', 'pr-accepted-risk', 'z-kettle', null, null, { finding: 'aaaaaaaaaaaaaaaa', source: 'session:z-teapot', note: 'Fine.' });
 
   await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked' });
 });
@@ -192,7 +192,7 @@ test('it passes open findings under an override at the head it read', async () =
   createListedReview(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA });
   recordPROverride(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA, source: 'call:KET-2', note: 'Ship the kettle.', actor: 'z-kettle' });
 
-  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).resolves.toMatchObject({ mayMerge: true, reason: expect.stringContaining("The owner's override at 0123456 (call:KET-2) stands for 1 open finding: aaaa") });
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).resolves.toMatchObject({ mayMerge: true, reason: expect.stringContaining("The owner's override at 0123456 (call:KET-2) stands for 1 open finding: aaaaaaaaaaaaaaaa") });
 });
 
 test('it blocks open findings under an override logged before 0.80.0 at the head it read', async () => {
@@ -201,7 +201,7 @@ test('it blocks open findings under an override logged before 0.80.0 at the head
   createListedReview(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA });
   logEvent(ctx.db, 'hq', 'pr:widgets#7', 'pr-override', 'z-kettle', null, null, { head: FAKE_FULL_SHA, source: 'call:KET-2', note: 'Ship the kettle.' });
 
-  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: '1 noslop finding is open: aaaa' });
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: '1 noslop finding is open: aaaaaaaaaaaaaaaa' });
 });
 
 test('it blocks open findings once the PR has a new head after the override', async () => {
@@ -210,7 +210,7 @@ test('it blocks open findings once the PR has a new head after the override', as
   createListedReview(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA });
   recordPROverride(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA, source: 'call:KET-2', note: 'Ship the kettle.', actor: 'z-kettle' });
 
-  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: '1 noslop finding is open: aaaa' });
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: '1 noslop finding is open: aaaaaaaaaaaaaaaa' });
 });
 
 test('it refuses an override whose source is a session', async () => {
@@ -219,7 +219,7 @@ test('it refuses an override whose source is a session', async () => {
   createListedReview(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA });
   recordPROverride(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA, source: 'session:z-teapot', note: 'Trust me.', actor: 'z-teapot' });
 
-  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: '1 noslop finding is open: aaaa' });
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: '1 noslop finding is open: aaaaaaaaaaaaaaaa' });
 });
 
 test("it leaves a failing noslop check in the CI rollup to the noslop route, which reads noslop's own run by app", async () => {
@@ -300,7 +300,7 @@ test("it passes an override at the head though noslop's check there failed", asy
   createListedReview(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA });
   recordPROverride(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA, source: 'call:KET-2', note: 'Ship the kettle.', actor: 'z-kettle' });
 
-  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).resolves.toStrictEqual({ mayMerge: true, reason: "The owner's override at 0123456 (call:KET-2) stands for 1 open finding: aaaa; CI green at 0123456", reviewed: true });
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).resolves.toStrictEqual({ mayMerge: true, reason: "The owner's override at 0123456 (call:KET-2) stands for 1 open finding: aaaaaaaaaaaaaaaa; CI green at 0123456", reviewed: true });
 });
 
 test.each([
@@ -415,7 +415,7 @@ test('it reads the findings of a noslop that exits 0 with a warning that holds t
 
 test('it blocks a PR whose findings output does not fit', async () => {
   const ctx = setupTest(),
-    fake = buildFakeRunner({ noslopFindings: { code: 0, stdout: '{"findings":[{"id":"aaaa","state":"mystery"}]}', stderr: '' } });
+    fake = buildFakeRunner({ noslopFindings: { code: 0, stdout: '{"findings":[{"id":"aaaaaaaaaaaaaaaa","state":"mystery"}]}', stderr: '' } });
   createListedReview(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA });
 
   await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: expect.stringContaining('no pass') });
@@ -1161,5 +1161,5 @@ test('it does not let a CI override pass an open finding', async () => {
   createListedReview(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA });
   recordCICheckOverride(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA, source: 'call:KET-2', note: 'Intended infra change.', actor: 'z-kettle', check: 'test' });
 
-  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: '1 noslop finding is open: aaaa' });
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: '1 noslop finding is open: aaaaaaaaaaaaaaaa' });
 });

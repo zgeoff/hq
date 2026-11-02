@@ -26,35 +26,10 @@ export async function runPRMechanical(input: PRCommandInput, ref: PRRef): Promis
   }
   const text = formatMechanicalNews(ref, hold.head, proof.files, proof.lines);
   input.db.transaction(() => {
-    recordPRMechanical(input.db, {
-      repo: ref.repo,
-      pr: ref.pr,
-      head: hold.head,
-      files: proof.files,
-      lines: proof.lines,
-      actor,
-    });
-    addNews(input.db, {
-      from: actor,
-      topic: 'merge',
-      text,
-      issue: null,
-      link: null,
-      needsGeoff: false,
-    });
+    recordPRMechanical(input.db, { repo: ref.repo, pr: ref.pr, head: hold.head, files: proof.files, lines: proof.lines, actor });
+    addNews(input.db, { from: actor, topic: 'merge', text, issue: null, link: null, needsGeoff: false });
   })();
-  return {
-    data: {
-      mechanical: {
-        repo: ref.repo,
-        pr: ref.pr,
-        head: hold.head,
-        files: proof.files,
-        lines: proof.lines,
-      },
-    },
-    text: `Recorded ${text}`,
-  };
+  return { data: { mechanical: { repo: ref.repo, pr: ref.pr, head: hold.head, files: proof.files, lines: proof.lines } }, text: `Recorded ${text}` };
 }
 
 const NEWS_LIMIT = 400;

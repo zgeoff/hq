@@ -24,10 +24,7 @@ test("it matches a caller whose kernel-found session is the role's recorded sess
 
   const probe = await readRoleSession(ctx.db, { openClient: () => Promise.resolve(ctx.client('kettle-1')) }, 'reviewer');
 
-  expect({ probe, closed: ctx.closed }).toStrictEqual({
-    probe: { verdict: 'match' },
-    closed: ['closed'],
-  });
+  expect({ probe, closed: ctx.closed }).toStrictEqual({ probe: { verdict: 'match' }, closed: ['closed'] });
 });
 
 test('it refuses a caller whose kernel-found session is another session, whatever ATC_SESSION_ID says', async () => {

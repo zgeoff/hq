@@ -10,9 +10,11 @@ interface StubComment {
   url: string;
 }
 
-// The noslop App's top-level comment, such as a finding's thread opener.
-export function buildBotComment(id: number, body: string): StubComment {
-  return { id, replyTo: null, login: 'noslop-review[bot]', type: 'Bot', body, url: `https://github.com/zgeoff/widgets/pull/7#discussion_r${id}` };
+// The noslop App's top-level comment, such as a finding's thread opener: its text, then one noslop
+// finding marker for each finding it holds, as noslop writes them.
+export function buildBotComment(id: number, text: string, findings: readonly string[]): StubComment {
+  const markers = findings.map((finding) => `<!-- noslop:finding {"id":"${finding}","severity":"P2"} -->`);
+  return { id, replyTo: null, login: 'noslop-review[bot]', type: 'Bot', body: [text, ...markers].join('\n\n'), url: `https://github.com/zgeoff/widgets/pull/7#discussion_r${id}` };
 }
 
 // A comment by the owner's login, a reply in a thread when replyTo names its opener.

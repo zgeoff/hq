@@ -63,10 +63,7 @@ test('it shows the record in hq pr status for a fresh PR with no other record', 
   const status = await runPRCommand({ run: fake.run, db: ctx.db, verb: 'status', rest: ['widgets', '7'], flags: {}, actor: () => Promise.resolve('z-review'), readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) });
 
   expect(status).toStrictEqual({
-    data: {
-      pr: null,
-      reviewRecords: { mechanical: { files: ['AGENTS.md'], lines: 1 }, exemption: null },
-    },
+    data: { pr: null, acceptedRisks: [], reviewRecords: { mechanical: { files: ['AGENTS.md'], lines: 1 }, exemption: null } },
     text: 'No record for widgets#7.\nz-review: mechanical edits proved by hq (1 lines in AGENTS.md)',
   });
 });
@@ -86,12 +83,8 @@ test('it counts three long held paths in a news line that fits, and records them
   const out = await runPRCommand({ run: fake.run, db: ctx.db, verb: 'mechanical', rest: ['widgets', '7'], flags: {}, actor: () => Promise.resolve('z-review'), readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) });
 
   expect(paths.map((path) => path.length)).toStrictEqual([120, 120, 120]);
-  expect(out.data).toStrictEqual({
-    mechanical: { repo: 'widgets', pr: 7, head: stub.head, files: paths, lines: 3 },
-  });
-  expect(listNews(ctx.db, { all: true, limit: 10 }).map((item) => item.text)).toStrictEqual([
-    `z-review approved mechanical skill edits on widgets#7 at ${stub.head.slice(0, 7)}: 3 held files, all listed by hq pr status widgets 7 (3 lines)`,
-  ]);
+  expect(out.data).toStrictEqual({ mechanical: { repo: 'widgets', pr: 7, head: stub.head, files: paths, lines: 3 } });
+  expect(listNews(ctx.db, { all: true, limit: 10 }).map((item) => item.text)).toStrictEqual([`z-review approved mechanical skill edits on widgets#7 at ${stub.head.slice(0, 7)}: 3 held files, all listed by hq pr status widgets 7 (3 lines)`]);
 });
 
 test('it refuses an edit hq does not prove, names the line, and records nothing', async () => {
@@ -109,21 +102,7 @@ test('it refuses any actor but z-review', async () => {
   const ctx = setupTest();
   const fake = buildFakeRunner({ prFiles: { code: 0, stdout: 'AGENTS.md\n', stderr: '' } });
 
-  await expect(
-    runPRCommand({
-      run: fake.run,
-      db: ctx.db,
-      verb: 'mechanical',
-      rest: ['widgets', '7'],
-      flags: {},
-      actor: () => Promise.resolve('z-kettle'),
-      readOwnerSession: () => Promise.resolve({ verdict: 'other' }),
-      readReviewerSession: () => Promise.resolve({ verdict: 'match' }),
-    }),
-  ).rejects.toMatchObject({
-    code: 'bad_args',
-    message: 'only z-review records this, not z-kettle',
-  });
+  await expect(runPRCommand({ run: fake.run, db: ctx.db, verb: 'mechanical', rest: ['widgets', '7'], flags: {}, actor: () => Promise.resolve('z-kettle'), readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) })).rejects.toMatchObject({ code: 'bad_args', message: 'only z-review records this, not z-kettle' });
 });
 
 test('it refuses a session that is not z-review even when the actor says z-review, and records nothing', async () => {
@@ -137,25 +116,9 @@ test('it refuses a session that is not z-review even when the actor says z-revie
 
 test.each(['hq', 'hq-private'])('it refuses a PR in %s, whose held paths need the owner\'s lgtm', async (repo) => {
   const ctx = setupTest();
-  const fake = buildFakeRunner({
-    prFiles: { code: 0, stdout: 'skills/kettle/SKILL.md\n', stderr: '' },
-  });
+  const fake = buildFakeRunner({ prFiles: { code: 0, stdout: 'skills/kettle/SKILL.md\n', stderr: '' } });
 
-  await expect(
-    runPRCommand({
-      run: fake.run,
-      db: ctx.db,
-      verb: 'mechanical',
-      rest: [repo, '7'],
-      flags: {},
-      actor: () => Promise.resolve('z-review'),
-      readOwnerSession: () => Promise.resolve({ verdict: 'other' }),
-      readReviewerSession: () => Promise.resolve({ verdict: 'match' }),
-    }),
-  ).rejects.toMatchObject({
-    code: 'bad_args',
-    message: expect.stringContaining("need the owner's lgtm"),
-  });
+  await expect(runPRCommand({ run: fake.run, db: ctx.db, verb: 'mechanical', rest: [repo, '7'], flags: {}, actor: () => Promise.resolve('z-review'), readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) })).rejects.toMatchObject({ code: 'bad_args', message: expect.stringContaining('need the owner\'s lgtm') });
 });
 
 test('it refuses a PR that changes no instruction file', async () => {
@@ -177,21 +140,7 @@ test('it refuses to record when hq cannot read the diff at the head', async () =
   await createStubPRRepo({ root: ctx.root, repo: 'widgets', pr: 7, history: [{ 'AGENTS.md': 'Needs bun 1.3.4.\n' }], change: { 'AGENTS.md': 'Needs bun 1.4.0.\n' } });
   const fake = buildFakeRunner({ realGit: true, prFiles: { code: 0, stdout: 'AGENTS.md\n', stderr: '' }, ...buildStubPRHead('f00dfeedf00dfeedf00dfeedf00dfeedf00dfeed') });
 
-  await expect(
-    runPRCommand({
-      run: fake.run,
-      db: ctx.db,
-      verb: 'mechanical',
-      rest: ['widgets', '7'],
-      flags: {},
-      actor: () => Promise.resolve('z-review'),
-      readOwnerSession: () => Promise.resolve({ verdict: 'other' }),
-      readReviewerSession: () => Promise.resolve({ verdict: 'match' }),
-    }),
-  ).rejects.toMatchObject({
-    code: 'git_unreadable',
-    message: expect.stringContaining('could not read the diff'),
-  });
+  await expect(runPRCommand({ run: fake.run, db: ctx.db, verb: 'mechanical', rest: ['widgets', '7'], flags: {}, actor: () => Promise.resolve('z-review'), readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) })).rejects.toMatchObject({ code: 'git_unreadable', message: expect.stringContaining('could not read the diff') });
 
   expect(listNews(ctx.db, { all: true, limit: 10 })).toStrictEqual([]);
 });

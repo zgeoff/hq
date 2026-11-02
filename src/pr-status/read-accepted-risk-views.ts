@@ -8,14 +8,17 @@ import type { AcceptedRiskRecord } from './find-accepted-risks.ts';
 import type { PRRef } from './parse-pr-ref.ts';
 import type { AcceptedRiskView } from './types.ts';
 
+const NOT_READ = 'not read by this command: hq pr status reads it';
+
 // The PR's accepted risks with the state noslop gives each finding. noslop is read only when the PR
-// holds a record, and a failed read never fails the caller: each risk then shows no state and why.
-export async function readAcceptedRiskViews(run: Runner, db: Database, ref: PRRef): Promise<AcceptedRiskView[]> {
+// holds a record and the caller asks (only `hq pr status`: a noslop read checks out the repo and
+// reads 1Password), and a failed read never fails the caller: each risk then shows no state and why.
+export async function readAcceptedRiskViews(run: Runner, db: Database, ref: PRRef, readNoslop: boolean): Promise<AcceptedRiskView[]> {
   const records = readAcceptedRiskRecords(db, ref.repo, ref.pr);
   if (records.length === 0) {
     return [];
   }
-  const read = await readFindings(run, db, ref);
+  const read = readNoslop ? await readFindings(run, db, ref) : NOT_READ;
   return records.map((record) => buildView(record, read));
 }
 

@@ -44,7 +44,7 @@ test('it records a blocked gate as a fail and still throws the same merge_blocke
     fake = buildFakeRunner({ noslopFindings: buildStubFindings('open') });
   createListedReview(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA });
 
-  await expect(checkRecordedGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: '1 noslop finding is open: aaaa' });
+  await expect(checkRecordedGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: '1 noslop finding is open: aaaaaaaaaaaaaaaa' });
 
   expect(ctx.db.query('SELECT gate, gate_head FROM pr_status').all()).toStrictEqual([{ gate: 'fail', gate_head: FAKE_FULL_SHA }]);
 });
@@ -92,14 +92,7 @@ test('it records a noslop gate, not gate none, for a listed repo\'s PR that has 
 test('it stores nothing for a PR of an owner other than zgeoff', async () => {
   const ctx = setupTest(),
     fake = buildFakeRunner();
-  setMeta(
-    ctx.db,
-    'noslop',
-    JSON.stringify({
-      repos: ['kettle-co/widgets'],
-      sha: '0123456789abcdef0123456789abcdef01234567',
-    }),
-  );
+  setMeta(ctx.db, 'noslop', JSON.stringify({ repos: ['kettle-co/widgets'], sha: '0123456789abcdef0123456789abcdef01234567' }));
 
   await expect(checkRecordedGate({ run: fake.run, db: ctx.db, rawRepo: 'kettle-co/widgets', pr: 7 })).resolves.toMatchObject({ mayMerge: true, reason: 'not a noslop repo: CI green at 0123456' });
 
@@ -138,7 +131,7 @@ test('it throws the same merge_blocked error when a blocked gate cannot be recor
   createListedReview(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA });
   ctx.db.exec('DROP TABLE pr_status');
 
-  await expect(checkRecordedGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: '1 noslop finding is open: aaaa' });
+  await expect(checkRecordedGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: '1 noslop finding is open: aaaaaaaaaaaaaaaa' });
 });
 
 test('it keeps the last seen head when a gate none follows a recorded head', async () => {
@@ -165,9 +158,7 @@ test('it records a fail at the head it read when a reviewed PR changes an owner-
 
 test('it records no gate when an unreviewed PR changes an owner-held file without the lgtm', async () => {
   const ctx = setupTest();
-  const fake = buildFakeRunner({
-    prFiles: { code: 0, stdout: 'skills/kettle/SKILL.md\n', stderr: '' },
-  });
+  const fake = buildFakeRunner({ prFiles: { code: 0, stdout: 'skills/kettle/SKILL.md\n', stderr: '' } });
 
   await expect(checkRecordedGate({ run: fake.run, db: ctx.db, rawRepo: 'hq', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked' });
 
