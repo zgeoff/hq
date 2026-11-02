@@ -9,8 +9,8 @@ import { getMondayKey } from './get-monday-key.ts';
 import { getRun } from './get-run.ts';
 import { scheduleWeekly } from './schedule-weekly.ts';
 
-const DUE = { h: 17, m: 0 },
-  LATE = { h: 17, m: 30 };
+const DUE = { hour: 17, minute: 0 };
+const LATE = { hour: 17, minute: 30 };
 
 export function goalsWeeklyTick(db: Database, actor: string, at: Date = now()): { run: JobRun | null; waiting: string | null } {
   const s = sydney(at);

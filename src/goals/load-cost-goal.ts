@@ -21,7 +21,7 @@ function buildKnownCostGoal(spend: number, budget: number, target: Target | null
   }
   return {
     text: `Actions ${formatCents(spend)} of ${formatCents(budget)} budget to date`,
-    verdict: verdict({ op: target.op, value: budget }, { value: spend, n: 1, unit: 'cents', shown: formatCents(spend), detail: '' }),
+    verdict: verdict({ op: target.op, value: budget }, { value: spend, denominator: 1, unit: 'cents', shown: formatCents(spend), detail: '' }),
   };
 }
 

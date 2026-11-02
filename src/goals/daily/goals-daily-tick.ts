@@ -8,8 +8,8 @@ import { stale } from '../stale.ts';
 import { getRun } from './get-run.ts';
 import { scheduleDaily } from './schedule-daily.ts';
 
-const DUE = { h: 18, m: 0 },
-  LATE = { h: 18, m: 30 };
+const DUE = { hour: 18, minute: 0 };
+const LATE = { hour: 18, minute: 30 };
 
 export function goalsDailyTick(db: Database, actor: string, at: Date = now()): { run: JobRun | null; waiting: string | null } {
   const s = sydney(at);

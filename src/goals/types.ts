@@ -12,7 +12,7 @@ export type Targets = Record<GoalKey, Target | null>;
 export interface Measure {
   value: number | null;
   exact?: number;
-  n: number;
+  denominator: number;
   unit: string;
   shown: string;
   detail: string;

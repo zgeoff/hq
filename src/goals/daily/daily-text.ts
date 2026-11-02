@@ -41,8 +41,7 @@ export function dailyText(db: Database, at: Date = now()): string {
       return formatFittedLine(`- ${GOAL_NAMES[k]}: ${goal.text}; ${w.detail}`, `; target ${target} ${mark[goal.verdict]}`);
     }
     const v = mark[verdict(targets[k], w)];
-    const part = (m: Measure) => `${m.shown} (${num(m.n)} ${m.unit}${m.missing ? `, ${m.missing} day(s) not fetched` : ''})${m.extra ?? ''}`;
-    return formatFittedLine(`- ${GOAL_NAMES[k]}: today ${part(t)}, week so far ${part(w)}`, `; target ${target} ${v}`);
+    return formatFittedLine(`- ${GOAL_NAMES[k]}: today ${formatMeasurePart(t)}, week so far ${formatMeasurePart(w)}`, `; target ${target} ${v}`);
   };
   const throughput = (read: ThroughputLine) => formatFittedLine(`- ${read.name}: ${read.detail}`, `; target ${read.target} ${mark[read.verdict]}`);
   const ready = readySummary(db, LANES.readyFreshMinutes());
@@ -72,3 +71,8 @@ function formatFittedLine(head: string, tail: string): string {
 const cap = (l: string) => (l.length > MAX_LINE ? `${l.slice(0, MAX_LINE - 1)}…` : l);
 const num = (x: number) => x.toLocaleString('en-AU');
 const hhmm = (t: string) => new Intl.DateTimeFormat('en-AU', { timeZone: TZ, hourCycle: 'h23', hour: '2-digit', minute: '2-digit' }).format(new Date(t));
+
+function formatMeasurePart(goal: Measure): string {
+  const missing = goal.missing ? `, ${goal.missing} day(s) not fetched` : '';
+  return `${goal.shown} (${num(goal.denominator)} ${goal.unit}${missing})${goal.extra ?? ''}`;
+}

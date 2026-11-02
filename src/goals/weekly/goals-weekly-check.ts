@@ -7,7 +7,7 @@ import { getMondayKey } from './get-monday-key.ts';
 import { getRun } from './get-run.ts';
 import { JOB } from './job.ts';
 
-const LATE = { h: 17, m: 30 };
+const LATE = { hour: 17, minute: 30 };
 
 export function goalsWeeklyCheck(db: Database, at: Date): { key: string; ok: boolean; line: string } | null {
   const s = sydney(at);

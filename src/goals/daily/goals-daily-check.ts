@@ -7,7 +7,7 @@ import { isPast } from '../is-past.ts';
 import { getRun } from './get-run.ts';
 import { JOB } from './job.ts';
 
-const LATE = { h: 18, m: 30 };
+const LATE = { hour: 18, minute: 30 };
 
 export function goalsDailyCheck(db: Database, at: Date): { key: string; ok: boolean; line: string } | null {
   const s = sydney(at);

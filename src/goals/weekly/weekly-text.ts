@@ -104,9 +104,13 @@ function costCell(db: Database, from: Date, to: Date, m: Measure, labels: Record
 const cell = (k: GoalKey, m: Measure): string => {
   const gap = m.missing ? `, ${m.missing} day(s) not fetched` : '';
   const extra = m.extra ?? '';
-  if (m.value === null) return `no data (${num(m.n)} ${m.unit}${gap})${extra}`;
-  if (k === 'downtime') return `${m.shown} down, ${m.outages ?? 0} outage(s), slowest caught in ${m.longest ?? 0} min, ${m.blind ?? 0} min blind (${num(m.n)} ${m.unit})`;
-  return `${m.shown} of ${num(m.n)} ${m.unit}${gap}${extra}`;
+  if (m.value === null) {
+    return `no data (${num(m.denominator)} ${m.unit}${gap})${extra}`;
+  }
+  if (k === 'downtime') {
+    return `${m.shown} down, ${m.outages ?? 0} outage(s), slowest caught in ${m.longest ?? 0} min, ${m.blind ?? 0} min blind (${num(m.denominator)} ${m.unit})`;
+  }
+  return `${m.shown} of ${num(m.denominator)} ${m.unit}${gap}${extra}`;
 };
 
 const flat = (t: string) => t.replace(/\s+/g, ' ').trim().slice(0, 240);

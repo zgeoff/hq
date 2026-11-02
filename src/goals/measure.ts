@@ -30,8 +30,8 @@ export function measure(db: Database, from: Date, to: Date, at: Date = now()): M
   const dt = downtime(db, from, new Date(t));
   const seen = dt.samples > 0 && dt.blindMs < Date.parse(t) - from.getTime();
   const downtimeM: Measure = seen
-    ? { value: dt.downMinutes, exact: dt.downMs / 60_000, n: dt.samples, unit: 'samples', longest: dt.longestDetectMinutes, longestExact: dt.longestDetectMs / 60_000, outages: dt.outages, blind: dt.blindMinutes, shown: `${dt.downMinutes} min`, detail: `${dt.downMinutes} min down in ${dt.outages} outage(s), slowest caught in ${dt.longestDetectMinutes} min, ${dt.blindMinutes} min not seen by the probe` }
-    : { value: null, n: 0, unit: 'samples', shown: 'no data', detail: dt.samples ? 'no data: the probe saw the window only blind (the PC offline)' : 'no data: the Nix probe has no samples in the window' };
+    ? { value: dt.downMinutes, exact: dt.downMs / 60_000, denominator: dt.samples, unit: 'samples', longest: dt.longestDetectMinutes, longestExact: dt.longestDetectMs / 60_000, outages: dt.outages, blind: dt.blindMinutes, shown: `${dt.downMinutes} min`, detail: `${dt.downMinutes} min down in ${dt.outages} outage(s), slowest caught in ${dt.longestDetectMinutes} min, ${dt.blindMinutes} min not seen by the probe` }
+    : { value: null, denominator: 0, unit: 'samples', shown: 'no data', detail: dt.samples ? 'no data: the probe saw the window only blind (the PC offline)' : 'no data: the Nix probe has no samples in the window' };
 
   const s = computeStats(db, { from: f, to: t, gh: null }).flow;
   const mustfix = share(pct(s.rechecked, s.reviewed), s.reviewed, 'reviewed runs', `${s.rechecked} of ${s.reviewed} reviewed runs had a must-fix at the first review`);
@@ -45,7 +45,7 @@ export function measure(db: Database, from: Date, to: Date, at: Date = now()): M
   const cost: Measure = {
     value: peak,
     ...(exactPeak === undefined ? {} : { exact: exactPeak }),
-    n: inWin.n,
+    denominator: inWin.n,
     ci: g.ci.minutes,
     unit: 'readings',
     shown: peak === null ? 'no data' : `${peak}%`,
@@ -99,5 +99,5 @@ const utcDay = (t: number) => iso(new Date(t)).slice(0, 10);
 const pct = (a: number, b: number) => (b ? (100 * a) / b : null);
 const share = (exact: number | null, n: number, unit: string, detail: string): Measure => {
   const value = exact === null ? null : Math.round(exact);
-  return { value, ...(exact === null ? {} : { exact }), n, unit, shown: value === null ? 'no data' : `${value}%`, detail: value === null ? `no data: no ${unit} in the window` : detail };
+  return { value, ...(exact === null ? {} : { exact }), denominator: n, unit, shown: value === null ? 'no data' : `${value}%`, detail: value === null ? `no data: no ${unit} in the window` : detail };
 };
