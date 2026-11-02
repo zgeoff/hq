@@ -23,10 +23,10 @@ export function runWeeklyAuditTick(db: Database, actor: string, at: Date = now()
       if (readRun(db, week.key) !== null) {
         return null;
       }
-      const detail = at >= week.late ? 'late' : null,
-        late = detail !== null,
-        seq = logEvent(db, 'hq', `job:${JOB}`, 'ran', actor, null, null, { key: week.key, late }),
-        target = roleName('owner');
+      const detail = at >= week.late ? 'late' : null;
+      const late = detail !== null;
+      const seq = logEvent(db, 'hq', `job:${JOB}`, 'ran', actor, null, null, { key: week.key, late });
+      const target = roleName('owner');
       enqueue(db, seq, target, `${formatAuditText(week, late)}\n\n${loadOpWeek(db, week.from)}`, `job:${JOB}:${week.key}`);
       db.query('INSERT INTO job_runs (job, key, at, result, detail, outbox_key) VALUES (?, ?, ?, ?, ?, ?)').run(JOB, week.key, iso(at), 'queued', detail, `hq-ev${seq}-${target}`);
       return readRun(db, week.key);

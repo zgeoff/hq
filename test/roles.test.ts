@@ -303,8 +303,8 @@ describe('hq fleet --json and forwards', () => {
 let cleanup: () => void;
 let db: ReturnType<typeof freshDb>['db'];
 let out: string[];
-const origLog = console.log,
-  saved = { notify: process.env['HQ_NOTIFY'], as: process.env['HQ_AS'] };
+const origLog = console.log;
+const saved = { notify: process.env['HQ_NOTIFY'], as: process.env['HQ_AS'] };
 beforeEach(() => {
   ({ cleanup, db } = freshDb());
   at(NOON_SYDNEY);
@@ -349,9 +349,9 @@ test('a retired role holder is left out of the roles', () => {
 });
 
 test('hq fleet --json carries the stale-build warning when the checkout fleet.json differs', async () => {
-  const changed = JSON.parse(readFileSync(join(import.meta.dir, '../fleet.json'), 'utf8')) as { forwards: Record<string, string> },
-    dir = mkdtempSync(join(tmpdir(), 'hq-fleet-projects-')),
-    restore = overrideEnv('HQ_PROJECTS', dir);
+  const changed = JSON.parse(readFileSync(join(import.meta.dir, '../fleet.json'), 'utf8')) as { forwards: Record<string, string> };
+  const dir = mkdtempSync(join(tmpdir(), 'hq-fleet-projects-'));
+  const restore = overrideEnv('HQ_PROJECTS', dir);
   try {
     changed.forwards['z-kettle'] = 'z-q';
     mkdirSync(join(dir, 'hq'));
@@ -407,8 +407,8 @@ test('the stale-build check is quiet when the checkout fleet.json matches the bu
 test('the stale-build check warns when the checkout fleet.json differs from the build', () => {
   const dir = mkdtempSync(join(tmpdir(), 'hq-fleet-build-'));
   try {
-    const changed = JSON.parse(readFileSync(join(import.meta.dir, '../fleet.json'), 'utf8')) as { sessions: { model: string }[] },
-      path = join(dir, 'fleet.json');
+    const changed = JSON.parse(readFileSync(join(import.meta.dir, '../fleet.json'), 'utf8')) as { sessions: { model: string }[] };
+    const path = join(dir, 'fleet.json');
     for (const s of changed.sessions) {
       s.model = 'kettle-model';
     }

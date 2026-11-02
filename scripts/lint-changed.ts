@@ -15,9 +15,9 @@ interface ChangeSet {
   readonly whole: ReadonlySet<string>;
 }
 
-const FILE = /^\+\+\+ b\/(?<path>.+)$/u,
-  HUNK = /^@@ -\d+(?:,\d+)? \+(?<start>\d+)(?:,(?<count>\d+))? @@/u,
-  MOVED_RUN = 3;
+const FILE = /^\+\+\+ b\/(?<path>.+)$/u;
+const HUNK = /^@@ -\d+(?:,\d+)? \+(?<start>\d+)(?:,(?<count>\d+))? @@/u;
+const MOVED_RUN = 3;
 
 interface AddedRow {
   readonly file: string;
@@ -37,8 +37,8 @@ interface ParseState {
 
 
 function recordHunk(state: ParseState, groups: Readonly<Record<string, string | undefined>>): void {
-  const end = Number(groups['start']) + Number(groups['count'] ?? '1'),
-    set = state.lines.get(state.current) ?? new Set<number>();
+  const end = Number(groups['start']) + Number(groups['count'] ?? '1');
+  const set = state.lines.get(state.current) ?? new Set<number>();
   state.next = Number(groups['start']);
   for (let line = Number(groups['start']); line < end; line += 1) {
     set.add(line);
@@ -54,8 +54,8 @@ function recordRow(state: ParseState, row: string): void {
   if (recordContent(state, row)) {
     return;
   }
-  const file = FILE.exec(row)?.groups?.['path'],
-    hunk = HUNK.exec(row)?.groups;
+  const file = FILE.exec(row)?.groups?.['path'];
+  const hunk = HUNK.exec(row)?.groups;
   if (row === '+++ /dev/null') {
     state.current = '';
     return;
@@ -95,15 +95,15 @@ export function parseChanges(diff: string): ChangeSet {
 }
 
 export function isChanged(diagnostic: Diagnostic, changes: ChangeSet): boolean {
-  const moved = changes.moved.get(diagnostic.filename),
-    set = changes.lines.get(diagnostic.filename),
-    whole = changes.whole.has(diagnostic.filename);
+  const moved = changes.moved.get(diagnostic.filename);
+  const set = changes.lines.get(diagnostic.filename);
+  const whole = changes.whole.has(diagnostic.filename);
   return diagnostic.labels.some((label) => moved?.has(label.span.line) !== true && (whole || set?.has(label.span.line) === true));
 }
 
 function findMovedLines(rows: readonly AddedRow[], removed: ReadonlyMap<string, number>): Map<string, Set<number>> {
-  const left = new Map(removed),
-    moved = new Map<string, Set<number>>();
+  const left = new Map(removed);
+  const moved = new Map<string, Set<number>>();
   let run: AddedRow[] = [];
   for (const row of rows) {
     if (isRunBroken(run.at(-1), row, left)) {
@@ -167,8 +167,8 @@ function runMain(base: string): number {
     console.log(`lint:changed: the merge base with ${base} holds no package.json, so this branch imports the tree and changes no linted line`);
     return 0;
   }
-  const changes = parseChanges(readDiff(base)),
-    files = [...new Set([...changes.lines.keys(), ...changes.whole])];
+  const changes = parseChanges(readDiff(base));
+  const files = [...new Set([...changes.lines.keys(), ...changes.whole])];
   if (files.length === 0) {
     console.log(`lint:changed: no TypeScript changes against ${base}`);
     return 0;

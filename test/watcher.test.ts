@@ -28,8 +28,8 @@ let db: Database;
 let dir: string;
 let cleanup: () => void;
 let logs: string[];
-const home = process.env['HOME'],
-  xdg = process.env['XDG_CACHE_HOME'];
+const home = process.env['HOME'];
+const xdg = process.env['XDG_CACHE_HOME'];
 
 beforeEach(() => {
   ({ db, dir, cleanup } = freshDb());
@@ -84,8 +84,8 @@ test('a tick queues the morning call ready and the unblock list changed for the 
   addAsk(db, { kind: 'call', id: 'geo-1-paint', title: 'Paint the shed', question: 'Green or grey?', body: 'Green or grey? Recommendation: green.', issues: ['GEO-1'], forSession: 'z-delivery', actor: 'z-refine' });
   addUnblock(db, { id: 'kettle', task: 'Try the new kettle', minutes: null, unblocks: [], notify: [], actor: 'kettle-triage' });
 
-  const done = await watchTick(db, deps()),
-    sent = db.query("SELECT target, text, topic FROM outbox WHERE topic IN ('call-ready-morning', 'unblock-changed') ORDER BY topic").all();
+  const done = await watchTick(db, deps());
+  const sent = db.query("SELECT target, text, topic FROM outbox WHERE topic IN ('call-ready-morning', 'unblock-changed') ORDER BY topic").all();
 
   expect(done).toBe(true);
   expect(sent).toStrictEqual([

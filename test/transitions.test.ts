@@ -188,8 +188,8 @@ function buildKettleInput(task: string): UnblockInput {
 
 describe('no state write skips the table', () => {
   test('every source file that writes a state column imports the table', () => {
-    const src = join(import.meta.dir, '..', 'src'),
-      write = /UPDATE (?:asks|runs|run_prs|unblocks) SET [^`'"]*\bstate\s*=/u;
+    const src = join(import.meta.dir, '..', 'src');
+    const write = /UPDATE (?:asks|runs|run_prs|unblocks) SET [^`'"]*\bstate\s*=/u;
     const offenders: string[] = [];
     let seen = 0;
     for (const f of readdirSync(src, { recursive: true, encoding: 'utf8' }).filter((n) => n.endsWith('.ts'))) {

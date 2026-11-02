@@ -171,11 +171,11 @@ test("plugin folders: a live session whose folders differ from its entry's is re
       { name: 'z-kettle', cwd: `${dir}/work`, model: 'opus', prompt: `main:${KETTLE}`, wake: true, pluginDirs: ['~/plugins/kettle-band'] },
       { name: 'z-teapot', cwd: `${dir}/work`, model: 'opus', prompt: `${dir}/teapot-prompt.md`, wake: false },
       { name: 'z-cosy', cwd: `${dir}/work`, model: 'opus', prompt: `${dir}/teapot-prompt.md`, wake: false, pluginDirs: ['~/plugins/cosy'] },
-    ],
-    found = findPluginDrift(entries, [
-      { id: 'id-kettle', name: 'z-kettle', alive: true },
-      { id: 'id-teapot', name: 'z-teapot', alive: true, pluginDirs: ['~/plugins/stray'] },
-    ]);
+    ];
+  const found = findPluginDrift(entries, [
+    { id: 'id-kettle', name: 'z-kettle', alive: true },
+    { id: 'id-teapot', name: 'z-teapot', alive: true, pluginDirs: ['~/plugins/stray'] },
+  ]);
   expect(found).toEqual({
     'z-kettle': { declared: ['~/plugins/kettle-band'], running: [] },
     'z-teapot': { declared: [], running: ['~/plugins/stray'] },
@@ -193,26 +193,26 @@ test("plugin folders: a live session whose folders differ from its entry's is re
 });
 
 test('plugin folders: the recorded id wins over a second live session of the name; two by name and no record give no verdict', () => {
-  const entries: FleetEntry[] = [{ name: 'z-kettle', cwd: `${dir}/work`, model: 'opus', prompt: `main:${KETTLE}`, wake: true, pluginDirs: ['~/plugins/kettle-band'] }],
-    sessions: FleetSession[] = [
-      { id: 'id-old', name: 'z-kettle', alive: true },
-      { id: 'id-new', name: 'z-kettle', alive: true, pluginDirs: ['~/plugins/kettle-band'] },
-    ];
+  const entries: FleetEntry[] = [{ name: 'z-kettle', cwd: `${dir}/work`, model: 'opus', prompt: `main:${KETTLE}`, wake: true, pluginDirs: ['~/plugins/kettle-band'] }];
+  const sessions: FleetSession[] = [
+    { id: 'id-old', name: 'z-kettle', alive: true },
+    { id: 'id-new', name: 'z-kettle', alive: true, pluginDirs: ['~/plugins/kettle-band'] },
+  ];
   expect(findPluginDrift(entries, sessions, { 'z-kettle': 'id-new' })).toEqual({});
   expect(findPluginDrift(entries, sessions, { 'z-kettle': 'id-old' })).toEqual({ 'z-kettle': { declared: ['~/plugins/kettle-band'], running: [] } });
   expect(findPluginDrift(entries, sessions)).toEqual({});
 });
 
 test("atc's session list keeps a session's plugin folders and drops a malformed list", () => {
-  const bad = sessionListRequiredSchema.parse({ sessions: [{ id: 'a', name: 'z-kettle', alive: true, state: 'running', pluginDirs: 'nope' }] }),
-    good = sessionListRequiredSchema.parse({ sessions: [{ id: 'a', name: 'z-kettle', alive: true, state: 'running', pluginDirs: ['~/p'] }] });
+  const bad = sessionListRequiredSchema.parse({ sessions: [{ id: 'a', name: 'z-kettle', alive: true, state: 'running', pluginDirs: 'nope' }] });
+  const good = sessionListRequiredSchema.parse({ sessions: [{ id: 'a', name: 'z-kettle', alive: true, state: 'running', pluginDirs: ['~/p'] }] });
   expect(good.sessions).toEqual([expect.objectContaining({ pluginDirs: ['~/p'] })]);
   expect(bad.sessions).toEqual([expect.objectContaining({ pluginDirs: undefined })]);
 });
 
 test('plugin folders: a ~/ folder matches the expanded, resolved path atc lists, under HOME only', () => {
-  const entries: FleetEntry[] = [{ name: 'z-kettle', cwd: `${dir}/work`, model: 'opus', prompt: `main:${KETTLE}`, wake: true, pluginDirs: ['~/plugins/kettle-band'] }],
-    home = requireEnv('HOME');
+  const entries: FleetEntry[] = [{ name: 'z-kettle', cwd: `${dir}/work`, model: 'opus', prompt: `main:${KETTLE}`, wake: true, pluginDirs: ['~/plugins/kettle-band'] }];
+  const home = requireEnv('HOME');
   expect(findPluginDrift(entries, [{ id: 'id-kettle', name: 'z-kettle', alive: true, pluginDirs: [`${home}/plugins/kettle-band`] }])).toEqual({});
   expect(findPluginDrift(entries, [{ id: 'id-kettle', name: 'z-kettle', alive: true, pluginDirs: [`${home}/plugins/./kettle-band/`] }])).toEqual({});
   expect(findPluginDrift(entries, [{ id: 'id-kettle', name: 'z-kettle', alive: true, pluginDirs: ['/elsewhere/plugins/kettle-band'] }])).toEqual({

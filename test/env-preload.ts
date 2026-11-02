@@ -26,12 +26,11 @@ const INVENTED_LOCAL_SETTINGS = {
   HQ_CLOUD_HOST: 'teapot-host',
 
   HQ_PRIVATE_DIR: join(tmpdir(), 'hq-tests-no-hq-private'),
-},
-
-  // Settings that test files set in beforeEach and did not put back: HQ_NOTIFY=off made every later
-  // file's flush hold its messages.
-  LEAKED = ['HQ_NOTIFY', 'HQ_AS', ...Object.keys(INVENTED_LOCAL_SETTINGS)] as const,
-  SAVED = Object.fromEntries(LEAKED.map((name) => [name, { ...process.env, ...INVENTED_LOCAL_SETTINGS }[name]]));
+};
+// Settings that test files set in beforeEach and did not put back: HQ_NOTIFY=off made every later
+// file's flush hold its messages.
+const LEAKED = ['HQ_NOTIFY', 'HQ_AS', ...Object.keys(INVENTED_LOCAL_SETTINGS)] as const;
+const SAVED = Object.fromEntries(LEAKED.map((name) => [name, { ...process.env, ...INVENTED_LOCAL_SETTINGS }[name]]));
 
 Object.assign(process.env, INVENTED_LOCAL_SETTINGS);
 

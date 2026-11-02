@@ -160,9 +160,9 @@ test('the detached half: a failed dry run stops before the restart', async () =>
 test('the detached half writes its default log under hq\'s own state dir, and creates the dir', async () => {
   delete process.env['HQ_RESTART_LOG'];
   process.env['XDG_STATE_HOME'] = `${dir}/fresh-state`;
-  const fake = fakeRunner({ 'atc daemon restart --dry-run': 3 }),
-    r = await restartHere(db, fake.run, 'z-q', false),
-    text = await Bun.file(r.log).text();
+  const fake = fakeRunner({ 'atc daemon restart --dry-run': 3 });
+  const r = await restartHere(db, fake.run, 'z-q', false);
+  const text = await Bun.file(r.log).text();
   expect(r.log).toStartWith(`${dir}/fresh-state/hq/hq-restart-`);
   expect(statSync(`${dir}/fresh-state/hq`).isDirectory()).toBe(true);
   expect(text).toContain('dry run failed (3): no restart');
@@ -240,16 +240,16 @@ test('a bad restore wait falls back to 180 s; the wake keeps the report read aft
 test('the default restart log is under hq\'s own state dir, and the dir is created', async () => {
   process.env['HOME'] = dir;
   delete process.env['XDG_STATE_HOME'];
-  const runner = fakeRunner(),
-    started = await launchDetached(runner.run, { force: true });
+  const runner = fakeRunner();
+  const started = await launchDetached(runner.run, { force: true });
   expect(started.log).toStartWith(`${dir}/.local/state/hq/hq-restart-`);
   expect(statSync(`${dir}/.local/state/hq`).isDirectory()).toBe(true);
 });
 
 test('XDG_STATE_HOME moves the restart log, and the dir is created', async () => {
   process.env['XDG_STATE_HOME'] = `${dir}/xdg-state`;
-  const runner = fakeRunner(),
-    started = await launchDetached(runner.run, { force: true });
+  const runner = fakeRunner();
+  const started = await launchDetached(runner.run, { force: true });
   expect(started.log).toStartWith(`${dir}/xdg-state/hq/hq-restart-`);
   expect(statSync(`${dir}/xdg-state/hq`).isDirectory()).toBe(true);
 });

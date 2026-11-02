@@ -33,8 +33,8 @@ function toTextFlag(value: string | boolean | undefined): string | undefined {
 }
 
 function formatCodexReview(r: ReviewResult): string {
-  const allowDeny = r.allowDeny.skipped ? [`== allow-or-deny pass skipped: ${r.allowDeny.skipped}`] : [`== allow-or-deny (codex exit ${r.allowDeny.code})`, r.allowDeny.answer],
-    install = r.install.ok ? r.install.detail : `FAILED, so the review is static: ${r.install.detail}`;
+  const allowDeny = r.allowDeny.skipped ? [`== allow-or-deny pass skipped: ${r.allowDeny.skipped}`] : [`== allow-or-deny (codex exit ${r.allowDeny.code})`, r.allowDeny.answer];
+  const install = r.install.ok ? r.install.detail : `FAILED, so the review is static: ${r.install.detail}`;
   return [
     `== effort: ${r.effort.effort} (${r.effort.reason})`,
     `== install: ${install}`,
@@ -55,9 +55,9 @@ async function runReviewPR(ctx: Ctx): Promise<Out> {
   if (timeoutRefusal !== null) {
     throw new HqError('bad_args', timeoutRefusal);
   }
-  const base = buildRequest(ctx, ctx.verb, ctx.rest[0]),
-    effort = toTextFlag(ctx.flags.effort) as Effort | undefined,
-    result = await runReview({ ...base, watch: !ctx.flags['no-watch'], effort, full: ctx.flags.full === true, fixesOnly: ctx.flags['fixes-only'] === true, timeout, confirm: ctx.flags.confirm === true });
+  const base = buildRequest(ctx, ctx.verb, ctx.rest[0]);
+  const effort = toTextFlag(ctx.flags.effort) as Effort | undefined;
+  const result = await runReview({ ...base, watch: !ctx.flags['no-watch'], effort, full: ctx.flags.full === true, fixesOnly: ctx.flags['fixes-only'] === true, timeout, confirm: ctx.flags.confirm === true });
   if ('engine' in result) {
     return { data: { ...result }, text: formatNoslopReview(result) };
   }

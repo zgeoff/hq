@@ -43,22 +43,22 @@ export async function runItemCommand(input: ItemCommandInput): Promise<Out> {
 
 async function runUnblockItemAdd(input: ItemCommandInput): Promise<Out> {
   checkTextFlags(input.flags);
-  const item = await readItemInput('unblock', input.flags),
-    rank = input.flags['rank'] === undefined ? undefined : readNumber(input.flags, 'rank'),
-    result = applyUnblockItem(
-      input.db,
-      {
-        id: readFlag(input.flags, 'id') ?? null,
-        minutes: readNumber(input.flags, 'minutes'),
-        unblocks: parseUnblocks(readFlag(input.flags, 'unblocks') ?? ''),
-        notify: readList(input.flags, 'notify'),
-        doneWhen: readDoneWhen(input.flags),
-        ...parseWatchFlags(readFlag(input.flags, 'kind'), readFlag(input.flags, 'deadline')),
-        ...(rank === undefined ? {} : { rank }),
-        actor: input.actor,
-      },
-      item,
-    );
+  const item = await readItemInput('unblock', input.flags);
+  const rank = input.flags['rank'] === undefined ? undefined : readNumber(input.flags, 'rank');
+  const result = applyUnblockItem(
+    input.db,
+    {
+      id: readFlag(input.flags, 'id') ?? null,
+      minutes: readNumber(input.flags, 'minutes'),
+      unblocks: parseUnblocks(readFlag(input.flags, 'unblocks') ?? ''),
+      notify: readList(input.flags, 'notify'),
+      doneWhen: readDoneWhen(input.flags),
+      ...parseWatchFlags(readFlag(input.flags, 'kind'), readFlag(input.flags, 'deadline')),
+      ...(rank === undefined ? {} : { rank }),
+      actor: input.actor,
+    },
+    item,
+  );
   return { data: { result: result.result, item: result.item, warnings: result.warnings }, text: `unblock ${result.item.id}: ${result.result}` };
 }
 
@@ -72,14 +72,14 @@ function runUnblockLater(input: ItemCommandInput): Out {
 
 async function runAskItemAdd(input: ItemCommandInput, kind: 'call' | 'proposal'): Promise<Out> {
   checkTextFlags(input.flags);
-  const item = await readItemInput(kind, input.flags),
-    order = input.flags['order'] === undefined ? undefined : readNumber(input.flags, 'order'),
-    r = applyAskItem(
-      input.db,
-      { kind, id: input.id ?? '', issues: readList(input.flags, 'issues'), forSession: readFlag(input.flags, 'for') ?? null, ...(order === undefined ? {} : { order }), actor: input.actor },
-      item,
-      renderItemBody(item),
-    );
+  const item = await readItemInput(kind, input.flags);
+  const order = input.flags['order'] === undefined ? undefined : readNumber(input.flags, 'order');
+  const r = applyAskItem(
+    input.db,
+    { kind, id: input.id ?? '', issues: readList(input.flags, 'issues'), forSession: readFlag(input.flags, 'for') ?? null, ...(order === undefined ? {} : { order }), actor: input.actor },
+    item,
+    renderItemBody(item),
+  );
   return { data: { result: r.result, note: r.note ?? null, [kind]: r.ask }, text: `${kind} ${r.ask.id}: ${r.result}${r.note === undefined ? '' : ` (${r.note})`}` };
 }
 

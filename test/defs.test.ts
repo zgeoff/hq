@@ -225,9 +225,9 @@ test('a hung fetch is stopped and releases the sync lock (GEO-1147)', () => {
   hqGit('config', 'protocol.ext.allow', 'always');
   hqGit('config', `url.ext::sh -c sleep% 31337.insteadOf`, 'git@github.com:zgeoff/hq.git');
   hqGit('config', '--unset-all', `url.${dir}/build/origin.insteadOf`);
-  const began = Date.now(),
-    lock = `${DEFS_SOURCES.hq.dir()}/.git/hq-sync.lock`,
-    s = runTreeSync();
+  const began = Date.now();
+  const lock = `${DEFS_SOURCES.hq.dir()}/.git/hq-sync.lock`;
+  const s = runTreeSync();
   expect(s).toMatchObject({ ok: false, line: expect.stringContaining('git fetch failed (124)') });
   expect(Date.now() - began).toBeLessThan(8000);
   expect(Bun.spawnSync(['flock', '-n', lock, 'true']).exitCode).toBe(0);

@@ -183,10 +183,10 @@ describe('reading the event feed', () => {
   });
 
   test('a sweep ends every gone session, and a working run\'s exit alert repeats from the sweep\'s mark; a session removed by hand raises none', async () => {
-    const BY_HAND = 'dddddddd-4444-4444-8444-444444444444',
-      HANDOFF = 'eeeeeeee-5555-4555-8555-555555555555',
-      atcFake = fakeAtc(dir, []),
-      c = await AtcClient.open();
+    const BY_HAND = 'dddddddd-4444-4444-8444-444444444444';
+    const HANDOFF = 'eeeeeeee-5555-4555-8555-555555555555';
+    const atcFake = fakeAtc(dir, []);
+    const c = await AtcClient.open();
     atc = atcFake;
     add();
     add('GEO-9002', S2);

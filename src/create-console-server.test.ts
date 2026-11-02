@@ -30,16 +30,16 @@ const KETTLE_CALL = {
     ],
     stuView: 'Minting now keeps the morning boil on time.',
     details: [{ heading: 'Evidence', text: 'The last boil took 9 min.' }],
-  },
-  PAGE = '<!doctype html><div id="root"></div>',
-  SWAPPED = z.object({ session: z.string() });
+  };
+const PAGE = '<!doctype html><div id="root"></div>';
+const SWAPPED = z.object({ session: z.string() });
 
 function setupTest(told = true, loadShipped: ConsoleServerInput['loadShipped'] = () => Promise.reject(new Error('no report in this test')), run: ConsoleServerInput['run'] = () => Promise.resolve({ code: 1, stdout: '', stderr: 'no gh in this test' })) {
-  const fresh = freshDb(),
-    signedIn = createSignedInAuth(),
-    server = createConsoleServer({ db: fresh.db, auth: signedIn.auth, port: 0, actor: 'console', run, assets: new Map([['/', () => new Response(PAGE)]]), notify: () => Promise.resolve(told), loadShipped }),
-    spy = spyOn(console, 'log').mockImplementation(() => {}),
-    url = `http://127.0.0.1:${server.port}`;
+  const fresh = freshDb();
+  const signedIn = createSignedInAuth();
+  const server = createConsoleServer({ db: fresh.db, auth: signedIn.auth, port: 0, actor: 'console', run, assets: new Map([['/', () => new Response(PAGE)]]), notify: () => Promise.resolve(told), loadShipped });
+  const spy = spyOn(console, 'log').mockImplementation(() => {});
+  const url = `http://127.0.0.1:${server.port}`;
   at(NOON_SYDNEY);
   onTestFinished(fresh.cleanup);
   onTestFinished(() => spy.mockRestore());
@@ -61,12 +61,12 @@ function setupTest(told = true, loadShipped: ConsoleServerInput['loadShipped'] =
 }
 
 test('a foreign Host is refused for the page and the API alike, and a foreign Origin for the API', async () => {
-  const app = setupTest(),
-    foreignAPI = await fetch(`${app.base}/rpc/items/list`, { method: 'POST', headers: { host: 'kettle.example', 'content-type': 'application/json' }, body: '{}' }),
-    foreignOrigin = await fetch(`${app.base}/rpc/items/list`, { method: 'POST', headers: { origin: 'http://kettle.example', 'content-type': 'application/json' }, body: '{}' }),
-    foreignPage = await fetch(`${app.base}/`, { headers: { host: 'kettle.example' } }),
-    page = await fetch(`${app.base}/`),
-    pageText = await page.text();
+  const app = setupTest();
+  const foreignAPI = await fetch(`${app.base}/rpc/items/list`, { method: 'POST', headers: { host: 'kettle.example', 'content-type': 'application/json' }, body: '{}' });
+  const foreignOrigin = await fetch(`${app.base}/rpc/items/list`, { method: 'POST', headers: { origin: 'http://kettle.example', 'content-type': 'application/json' }, body: '{}' });
+  const foreignPage = await fetch(`${app.base}/`, { headers: { host: 'kettle.example' } });
+  const page = await fetch(`${app.base}/`);
+  const pageText = await page.text();
 
   expect(page.status).toBe(200);
   expect(pageText).toBe(PAGE);
@@ -85,35 +85,35 @@ test.each([
   ['POST', '/rpc/items/answer', { origin: 'https://kettle.example' }],
   ['POST', '/rpc/unblock/mark', { origin: 'http://localhost:1' }],
 ])('a hostile request is refused before it reaches hq: %s %s %o', async (method, path, headers) => {
-  const app = setupTest(),
-    response = await fetch(`${app.base}${path}`, { method, headers: { 'content-type': 'application/json', ...headers }, ...(method === 'POST' ? { body: '{"json":{"id":"kettle-mint","option":"","note":"x","mark":"done"}}' } : {}) });
+  const app = setupTest();
+  const response = await fetch(`${app.base}${path}`, { method, headers: { 'content-type': 'application/json', ...headers }, ...(method === 'POST' ? { body: '{"json":{"id":"kettle-mint","option":"","note":"x","mark":"done"}}' } : {}) });
 
   expect(response.status).toBe(403);
   expect(app.db.query('SELECT COUNT(*) AS n FROM events').get()).toStrictEqual({ n: 0 });
 });
 
 test('the Shipped tab: its path serves the page, its report comes through the API, and a foreign Host or Origin is refused', async () => {
-  const asked: ShippedPeriod[] = [],
-    booted = setupTest(true, (period) => {
-      asked.push(period);
-      return period === 'yesterday' ? Promise.reject(new Error('merged-prs.sh exited 1: gh: not logged in')) : Promise.resolve({ period, report: buildRenderedReport(), at: NOON_SYDNEY });
-    }),
-    failed = await booted.client.shipped.report({ period: 'yesterday' }).catch((error: unknown) => (error as Error).message),
-    foreignHost = await fetch(`${booted.base}/rpc/shipped/report`, { method: 'POST', headers: { host: 'kettle.example', 'content-type': 'application/json' }, body: '{"json":{"period":"today"}}' }),
-    foreignOrigin = await fetch(`${booted.base}/rpc/shipped/report`, { method: 'POST', headers: { origin: 'http://kettle.example', 'content-type': 'application/json' }, body: '{"json":{"period":"today"}}' }),
-    page = await fetch(`${booted.base}/shipped`),
-    pageText = await page.text(),
-    report = await booted.client.shipped.report({ period: 'week' });
+  const asked: ShippedPeriod[] = [];
+  const booted = setupTest(true, (period) => {
+    asked.push(period);
+    return period === 'yesterday' ? Promise.reject(new Error('merged-prs.sh exited 1: gh: not logged in')) : Promise.resolve({ period, report: buildRenderedReport(), at: NOON_SYDNEY });
+  });
+  const failed = await booted.client.shipped.report({ period: 'yesterday' }).catch((error: unknown) => (error as Error).message);
+  const foreignHost = await fetch(`${booted.base}/rpc/shipped/report`, { method: 'POST', headers: { host: 'kettle.example', 'content-type': 'application/json' }, body: '{"json":{"period":"today"}}' });
+  const foreignOrigin = await fetch(`${booted.base}/rpc/shipped/report`, { method: 'POST', headers: { origin: 'http://kettle.example', 'content-type': 'application/json' }, body: '{"json":{"period":"today"}}' });
+  const page = await fetch(`${booted.base}/shipped`);
+  const pageText = await page.text();
+  const report = await booted.client.shipped.report({ period: 'week' });
   expect([page.status, pageText]).toStrictEqual([200, PAGE]);
   expect([report, failed]).toStrictEqual([{ period: 'week', report: buildRenderedReport(), at: NOON_SYDNEY }, 'merged-prs.sh exited 1: gh: not logged in']);
   expect([foreignHost.status, foreignOrigin.status, asked]).toStrictEqual([403, 403, ['yesterday', 'week']]);
 });
 
 test('no response may load in another site\'s frame', async () => {
-  const app = setupTest(),
-    page = await fetch(`${app.base}/`),
-    refused = await fetch(`${app.base}/`, { headers: { host: 'kettle.example' } }),
-    rpc = await fetch(`${app.base}/rpc/items/list`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
+  const app = setupTest();
+  const page = await fetch(`${app.base}/`);
+  const refused = await fetch(`${app.base}/`, { headers: { host: 'kettle.example' } });
+  const rpc = await fetch(`${app.base}/rpc/items/list`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
 
   for (const response of [page, rpc, refused]) {
     expect(response.headers.get('x-frame-options')).toBe('DENY');

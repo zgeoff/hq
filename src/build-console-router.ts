@@ -28,15 +28,15 @@ export function buildConsoleRouter() {
     items: {
       list: base.handler((args) => loadConsoleItems(args.context.db)),
       answer: base.input(z.object({ id: z.string(), option: z.string(), note: z.string() })).handler(async (args) => {
-        const ask = recordConsoleAnswer(args.context.db, { ...args.input, actor: args.context.actor }),
-          told = await args.context.notify();
+        const ask = recordConsoleAnswer(args.context.db, { ...args.input, actor: args.context.actor });
+        const told = await args.context.notify();
         return { id: ask.id, answer: ask.answer, told };
       }),
     },
     unblock: {
       mark: base.input(z.object({ id: z.string(), mark: z.enum(['done', 'later', 'skip']), note: z.string() })).handler(async (args) => {
-        const item = recordConsoleMark(args.context.db, { ...args.input, actor: args.context.actor }),
-          told = await args.context.notify();
+        const item = recordConsoleMark(args.context.db, { ...args.input, actor: args.context.actor });
+        const told = await args.context.notify();
         return { id: item.id, state: item.state, told };
       }),
       review: base.input(z.object({ id: z.string(), review: z.enum(['lgtm', 'changes', 'later', 'reject']), note: z.string() })).handler(async (args) => {

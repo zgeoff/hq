@@ -601,8 +601,8 @@ function openOwnerProbeClient(): Promise<AtcClient> {
 
 async function actor(db: Database, flags: Flags): Promise<string> {
   if (flags.by) return flags.by;
-  const as = config().HQ_AS,
-    sid = process.env['ATC_SESSION_ID'];
+  const as = config().HQ_AS;
+  const sid = process.env['ATC_SESSION_ID'];
   if (as) return as;
   if (!sid) return 'unknown';
   const cached = getMeta(db, `session_name:${sid}`);
@@ -743,8 +743,8 @@ async function askCommand(db: Database, kind: Kind, verb: string, args: string[]
       return { data: { [kind]: a, ...(h ? { history: h } : {}) }, text: askFull(a) + htext };
     })
     .with('list', () => {
-      const asked = pickAskStates(flags.state),
-        rows = listAsks(db, toExactOptional({ kind, states: asked }));
+      const asked = pickAskStates(flags.state);
+      const rows = listAsks(db, toExactOptional({ kind, states: asked }));
       return { data: { [`${kind}s`]: rows }, text: rows.length ? rows.map(askLine).join('\n') : `No ${kind}s here.` };
     })
     .otherwise(() => {
@@ -1022,10 +1022,10 @@ async function kindsCommand(db: Database, verb: string | undefined, flags: Flags
       return { data: { weeks: w, linear: linearState(db) }, text: kindText(w, linearState(db)).join('\n') };
     })
     .with('sync', async () => {
-      const kinds = await syncKinds(db, realRunner, { from: weeksBack(weeks), maxDays: weeks * 7 + 2, env: cleanEnv() }),
-        linear = await syncLinear(db, makeAuditedLinearCaller(db, realRunner), weeksBack(weeks)).catch((error: unknown) => ({ error: String((error as Error).message ?? error) })),
-        said = 'error' in linear ? `Linear failed: ${linear.error}` : `Linear: ${linear.closed} closed issue(s), ${linear.typed} PR issue(s) typed.`,
-        w = kindWeeks(db, weeks);
+      const kinds = await syncKinds(db, realRunner, { from: weeksBack(weeks), maxDays: weeks * 7 + 2, env: cleanEnv() });
+      const linear = await syncLinear(db, makeAuditedLinearCaller(db, realRunner), weeksBack(weeks)).catch((error: unknown) => ({ error: String((error as Error).message ?? error) }));
+      const said = 'error' in linear ? `Linear failed: ${linear.error}` : `Linear: ${linear.closed} closed issue(s), ${linear.typed} PR issue(s) typed.`;
+      const w = kindWeeks(db, weeks);
 
       // The daily check-in trusts kinds_ok_at.
       if (!kinds.left) {
@@ -1047,8 +1047,8 @@ async function goalsCommand(db: Database, verb: string | undefined, rest: string
       return { data: { ...g }, text: goalsText(g, true).join('\n') };
     })
     .with('sync', async () => {
-      const r = await syncGoals(db, boundedRunner(realRunner, CALL_MS), { from: new Date(Date.now() - (days + 1) * 86_400_000), env: cleanEnv() }),
-        spendFailure = await refreshActionsSpend(db, boundedRunner(realRunner, CALL_MS), now(), cleanEnv());
+      const r = await syncGoals(db, boundedRunner(realRunner, CALL_MS), { from: new Date(Date.now() - (days + 1) * 86_400_000), env: cleanEnv() });
+      const spendFailure = await refreshActionsSpend(db, boundedRunner(realRunner, CALL_MS), now(), cleanEnv());
       if (!r.errors.length && !r.deployLeft) setMeta(db, 'goals_ok_at', new Date().toISOString());
       const g = goalRows(db, days);
       const errs = r.errors.length ? `\n${r.errors.length} fetch(es) failed, retried next sync: ${r.errors.slice(0, 3).join('; ')}` : '';
@@ -1112,9 +1112,9 @@ async function goalsCommand(db: Database, verb: string | undefined, rest: string
 }
 
 function runAnswersCommand(db: Database, flags: Flags): Out {
-  const at = now(),
-    window = { from: sinceArg(flags.since, at), to: iso(at) },
-    windowAnswers = loadAnswers(db, window);
+  const at = now();
+  const window = { from: sinceArg(flags.since, at), to: iso(at) };
+  const windowAnswers = loadAnswers(db, window);
   return { data: { window, answers: windowAnswers }, text: windowAnswers.length > 0 ? windowAnswers.map((a) => formatAnswerLine(a)).join('\n') : `No answers since ${window.from}.` };
 }
 
@@ -1287,21 +1287,21 @@ async function runGrantMarkAdd(db: Database, flags: Flags): Promise<Out> {
   if (flags.kind !== 'grant') {
     throw new HqError('bad_args', '--grant names a standing grant: give it with --kind grant');
   }
-  const by = await actor(db, flags),
-    m = createGrantMark(db, { text: need(flags.text, 'text'), ref: flags.ref ?? null, at: flags.at ?? null, name: need(flags.grant, 'grant'), actor: by });
+  const by = await actor(db, flags);
+  const m = createGrantMark(db, { text: need(flags.text, 'text'), ref: flags.ref ?? null, at: flags.at ?? null, name: need(flags.grant, 'grant'), actor: by });
   return { data: { mark: m }, text: `Mark ${m.id} at ${m.at}: ${m.text} (grant ${m.grant_name})` };
 }
 
 async function runMarkGrant(db: Database, args: string[], flags: Flags): Promise<Out> {
-  const by = await actor(db, flags),
-    m = updateMarkGrantName(db, { id: intFlag(need(args[0], 'mark id'), 'id') ?? 0, name: need(args[1], 'grant name'), actor: by });
+  const by = await actor(db, flags);
+  const m = updateMarkGrantName(db, { id: intFlag(need(args[0], 'mark id'), 'id') ?? 0, name: need(args[1], 'grant name'), actor: by });
   return { data: { mark: m }, text: `Mark ${m.id} is grant ${m.grant_name}: ${m.text}` };
 }
 
 async function runGrantCommand(db: Database, verb: string | undefined, args: string[], flags: Flags): Promise<Out> {
   if (verb === 'act') {
-    const by = await actor(db, flags),
-      recorded = recordGrantAction(db, { grant: need(args[0], 'grant name'), target: need(flags.target, 'target'), note: flags.note ?? null, actor: by });
+    const by = await actor(db, flags);
+    const recorded = recordGrantAction(db, { grant: need(args[0], 'grant name'), target: need(flags.target, 'target'), note: flags.note ?? null, actor: by });
     return { data: { action: recorded }, text: `Recorded ${recorded.id} under ${recorded.grant_name}: ${recorded.target}` };
   }
   if (verb === 'void') {
@@ -1311,9 +1311,9 @@ async function runGrantCommand(db: Database, verb: string | undefined, args: str
   if (verb !== 'actions' && verb !== undefined) {
     throw new HqError('bad_args', `unknown command: hq grant ${verb}`);
   }
-  const at = now(),
-    window = { from: sinceArg(flags.since, at), to: iso(at) },
-    windowTallies = loadGrantTallies(db, window);
+  const at = now();
+  const window = { from: sinceArg(flags.since, at), to: iso(at) };
+  const windowTallies = loadGrantTallies(db, window);
   return { data: { window, grants: windowTallies }, text: windowTallies.length > 0 ? windowTallies.map((t) => formatGrantLine(t)).join('\n') : 'No named grants (name one with hq mark grant ID NAME).' };
 }
 
@@ -1424,8 +1424,8 @@ async function fleetCommand(db: Database, verb: string | undefined, args: string
 
       // --json skips the check unless --prompts asks: the compaction hook reads `hq fleet --json`
       // under a 5 s limit.
-      let drift: Record<string, PromptDrift> = {},
-        plugins: Record<string, PluginDrift> = {};
+      let drift: Record<string, PromptDrift> = {};
+      let plugins: Record<string, PluginDrift> = {};
       let c: AtcClient | null = null;
       if (!flags.json || flags.prompts) try {
         c = await AtcClient.open();
@@ -1956,8 +1956,8 @@ const GROUPS: Record<string, (context: Ctx) => Promise<Out>> = {
     return { data: { pane }, text: pane.markdown };
   },
   whois: (c) => {
-    const id = need(c.verb, 'session-id'),
-      name = findFleetName(c.db, id);
+    const id = need(c.verb, 'session-id');
+    const name = findFleetName(c.db, id);
     return Promise.resolve({ data: { session: id, name }, text: name ?? `${id} is no declared fleet session` });
   },
   console: async (command) => {
@@ -2182,9 +2182,9 @@ async function runCommand(context: Ctx): Promise<Out> {
       if (refusal !== null) {
         throw new HqError('bad_state', refusal);
       }
-      const [issue, state] = [arg(0, 'issue'), arg(1, 'state')],
-        actorName = await by(),
-        liveCheck = parseOneFlag(flags.check, 'check');
+      const [issue, state] = [arg(0, 'issue'), arg(1, 'state')];
+      const actorName = await by();
+      const liveCheck = parseOneFlag(flags.check, 'check');
       if (liveCheck !== undefined) {
         requireLiveCheck(liveCheck);
       }

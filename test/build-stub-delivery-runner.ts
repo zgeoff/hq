@@ -13,17 +13,17 @@ export interface StubDeliveryRunner {
 }
 
 export function buildStubDeliveryRunner(answers: StubDeliveryAnswers): StubDeliveryRunner {
-  const merged: string[][] = [],
-    run: Runner = (cmd, opts) => {
-      if (cmd[1]?.endsWith('merged-prs.sh') !== true) {
-        const fallback = answers.otherwise ?? (() => Promise.resolve({ code: 0, stdout: answers.rendered ?? '{}', stderr: '' }));
-        return fallback(cmd, opts);
-      }
-      const args = cmd.slice(2),
-        text = args[0] === 'weekly' ? answers.weekly : answers.days[args[1] ?? ''];
-      merged.push(args);
-      return Promise.resolve(buildMergedAnswer(text));
-    };
+  const merged: string[][] = [];
+  const run: Runner = (cmd, opts) => {
+    if (cmd[1]?.endsWith('merged-prs.sh') !== true) {
+      const fallback = answers.otherwise ?? (() => Promise.resolve({ code: 0, stdout: answers.rendered ?? '{}', stderr: '' }));
+      return fallback(cmd, opts);
+    }
+    const args = cmd.slice(2);
+    const text = args[0] === 'weekly' ? answers.weekly : answers.days[args[1] ?? ''];
+    merged.push(args);
+    return Promise.resolve(buildMergedAnswer(text));
+  };
   return { run, merged };
 }
 

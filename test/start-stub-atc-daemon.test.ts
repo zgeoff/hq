@@ -12,17 +12,17 @@ function setupTest() {
 }
 
 test('it refuses a hello on another protocol with the mismatch text atc writes', async () => {
-  const ctx = setupTest(),
-    daemon = startStubAtcDaemon(ctx.path, {}, { build: '7.1.0', protocol: 11 }),
-    lines = Promise.withResolvers<unknown>(),
-    socket = await Bun.connect({
-      unix: ctx.path,
-      socket: {
-        data(_socket, chunk) {
-          lines.resolve(JSON.parse(new TextDecoder().decode(chunk)));
-        },
+  const ctx = setupTest();
+  const daemon = startStubAtcDaemon(ctx.path, {}, { build: '7.1.0', protocol: 11 });
+  const lines = Promise.withResolvers<unknown>();
+  const socket = await Bun.connect({
+    unix: ctx.path,
+    socket: {
+      data(_socket, chunk) {
+        lines.resolve(JSON.parse(new TextDecoder().decode(chunk)));
       },
-    });
+    },
+  });
   onTestFinished(() => {
     socket.end();
     daemon.stop();

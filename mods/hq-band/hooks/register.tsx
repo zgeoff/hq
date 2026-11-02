@@ -6,14 +6,14 @@ import { isSegmentList } from './is-segment-list';
 
 // The band is z-stu's alone. In any other session, or when hq can't say whose session this is,
 // both hooks pass straight through: no timer, no process after the first, nothing drawn.
-const LIVE = atom({ plugin: 'hq-band', key: 'live' } as const, false),
-  OWNER = 'z-stu',
-  PANE = atom({ plugin: 'hq-band', key: 'pane' } as const, null),
-  PANE_ID = 'hq',
-  READING = atom({ plugin: 'hq-band', key: 'reading' } as const, null),
-  REFRESH_MS = 60_000,
-  TIMEOUT_MS = 10_000,
-  TONE_COLORS = { ok: undefined, warn: 'warning', alert: 'error' } as const;
+const LIVE = atom({ plugin: 'hq-band', key: 'live' } as const, false);
+const OWNER = 'z-stu';
+const PANE = atom({ plugin: 'hq-band', key: 'pane' } as const, null);
+const PANE_ID = 'hq';
+const READING = atom({ plugin: 'hq-band', key: 'reading' } as const, null);
+const REFRESH_MS = 60_000;
+const TIMEOUT_MS = 10_000;
+const TONE_COLORS = { ok: undefined, warn: 'warning', alert: 'error' } as const;
 
 export function register(on: On): void {
   on('session.start', async ($, e, next) => {
@@ -47,9 +47,9 @@ export function register(on: On): void {
   });
 
   on('ui.render', { component: 'Pane', requestId: PANE_ID }, async ($, e, next) => {
-    const elements = $.ui.resolve(e),
-      isLive = await read($, LIVE),
-      shown = isLive ? await read($, PANE) : null;
+    const elements = $.ui.resolve(e);
+    const isLive = await read($, LIVE);
+    const shown = isLive ? await read($, PANE) : null;
     if (shown === null) {
       return next(e);
     }
@@ -57,9 +57,9 @@ export function register(on: On): void {
   });
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
-    const elements = $.ui.resolve(e),
-      isLive = await read($, LIVE),
-      shown = isLive && !e.props.hasSurvey ? await read($, READING) : null;
+    const elements = $.ui.resolve(e);
+    const isLive = await read($, LIVE);
+    const shown = isLive && !e.props.hasSurvey ? await read($, READING) : null;
     if (shown === null) {
       return next(e);
     }
@@ -95,9 +95,9 @@ async function refreshAll($: EngineInterface): Promise<void> {
 // One read of hq pane --json into the pane's state; any failure shows "hq unreachable".
 async function refreshPane($: EngineInterface): Promise<void> {
   try {
-    const answer = await runHq($, ['pane', '--json']),
-      pane = answer?.['pane'] as { markdown?: unknown; heat?: unknown } | undefined,
-      shown: PaneReading = typeof pane?.markdown === 'string' && isHeatList(pane.heat) ? { markdown: pane.markdown, heat: pane.heat } : { unreachable: 'hq pane printed no pane' };
+    const answer = await runHq($, ['pane', '--json']);
+    const pane = answer?.['pane'] as { markdown?: unknown; heat?: unknown } | undefined;
+    const shown: PaneReading = typeof pane?.markdown === 'string' && isHeatList(pane.heat) ? { markdown: pane.markdown, heat: pane.heat } : { unreachable: 'hq pane printed no pane' };
     await update($, PANE, () => shown);
   } catch (error) {
     await update($, PANE, () => ({ unreachable: String(error) }));
@@ -106,8 +106,8 @@ async function refreshPane($: EngineInterface): Promise<void> {
 
 // The heat map, a row per lane with its name, then hq's Markdown.
 function renderPaneDetail($: EngineInterface, e: ResolveInput, shown: PaneDetail) {
-  const elements = $.ui.resolve(e),
-    width = Math.max(...shown.heat.map((row) => row.lane.length), 4);
+  const elements = $.ui.resolve(e);
+  const width = Math.max(...shown.heat.map((row) => row.lane.length), 4);
   return (
     <elements.Box flexDirection="column" key="pane">
       {shown.heat.map((row) => (
@@ -148,34 +148,34 @@ function renderTextHeat($: EngineInterface, e: ResolveInput, row: PaneHeatRow) {
 // Two cells per slot: a held slot is full blocks, amber when the lane is full and green otherwise;
 // a free slot is a light shade in the terminal's own colour.
 function buildHeatCells(row: PaneHeatRow): string {
-  const DEFAULT = 0x01_00_00_00,
-    FREE = 0x25_91,
-    FULL_COLOR = 0xd2_99_22,
-    HELD = 0x25_88,
-    OPEN_COLOR = 0x3f_b9_50,
-    held = row.used >= row.size ? FULL_COLOR : OPEN_COLOR,
-    words = Uint32Array.from({ length: row.size * 6 }, (_unused, index) => {
-      const cell = Math.floor(index / 6),
-        isHeld = cell < row.used,
-        part = index % 3;
-      return [isHeld ? HELD : FREE, isHeld ? held : DEFAULT, DEFAULT][part] ?? DEFAULT;
-    });
+  const DEFAULT = 0x01_00_00_00;
+  const FREE = 0x25_91;
+  const FULL_COLOR = 0xd2_99_22;
+  const HELD = 0x25_88;
+  const OPEN_COLOR = 0x3f_b9_50;
+  const held = row.used >= row.size ? FULL_COLOR : OPEN_COLOR;
+  const words = Uint32Array.from({ length: row.size * 6 }, (_unused, index) => {
+    const cell = Math.floor(index / 6);
+    const isHeld = cell < row.used;
+    const part = index % 3;
+    return [isHeld ? HELD : FREE, isHeld ? held : DEFAULT, DEFAULT][part] ?? DEFAULT;
+  });
   return btoa(String.fromCodePoint(...new Uint8Array(words.buffer)));
 }
 
 // The fleet name hq fleet last saw under this atc session's id; none outside atc.
 async function loadSessionName($: EngineInterface): Promise<string | null> {
-  const id = await $.env.get('ATC_SESSION_ID'),
-    whoisAnswer = id === undefined || id === '' ? null : await runHq($, ['whois', id, '--json']);
+  const id = await $.env.get('ATC_SESSION_ID');
+  const whoisAnswer = id === undefined || id === '' ? null : await runHq($, ['whois', id, '--json']);
   return typeof whoisAnswer?.['name'] === 'string' ? whoisAnswer['name'] : null;
 }
 
 // One read of hq band --json into the band's state; any failure shows "hq unreachable".
 async function refreshBand($: EngineInterface): Promise<void> {
   try {
-    const answer = await runHq($, ['band', '--json']),
-      segments = (answer?.['band'] as { segments?: unknown } | undefined)?.segments,
-      shown: BandReading = isSegmentList(segments) ? { segments } : { unreachable: 'hq band printed no segments' };
+    const answer = await runHq($, ['band', '--json']);
+    const segments = (answer?.['band'] as { segments?: unknown } | undefined)?.segments;
+    const shown: BandReading = isSegmentList(segments) ? { segments } : { unreachable: 'hq band printed no segments' };
     await update($, READING, () => shown);
   } catch (error) {
     await update($, READING, () => ({ unreachable: String(error) }));
@@ -184,9 +184,9 @@ async function refreshBand($: EngineInterface): Promise<void> {
 
 // hq's JSON answer, run from HQ_BAND_BIN or ~/.local/bin/hq with a 10 s limit; none on a failed exit.
 async function runHq($: EngineInterface, args: string[]): Promise<Record<string, unknown> | null> {
-  const home = await $.env.get('HOME'),
-    override = await $.env.get('HQ_BAND_BIN'),
-    ran = await $.process.run([override ?? `${home ?? ''}/.local/bin/hq`, ...args], { timeoutMs: TIMEOUT_MS });
+  const home = await $.env.get('HOME');
+  const override = await $.env.get('HQ_BAND_BIN');
+  const ran = await $.process.run([override ?? `${home ?? ''}/.local/bin/hq`, ...args], { timeoutMs: TIMEOUT_MS });
   return ran.exitCode === 0 ? parseHqAnswer(ran.stdout) : null;
 }
 

@@ -24,10 +24,10 @@ let db: ReturnType<typeof freshDb>['db'];
 let dir: string;
 let cleanup: () => void;
 let out: string[];
-const origErr = console.error,
-  origLog = console.log,
-  saved = { notify: process.env['HQ_NOTIFY'], as: process.env['HQ_AS'], db: process.env['HQ_DB'] },
-  savedReview = ['HQ_NOSLOP_OP_SETTINGS', 'REVIEW_DIR', 'HQ_PROJECTS', 'HQ_REPOS'].map((k) => [k, process.env[k]] as const);
+const origErr = console.error;
+const origLog = console.log;
+const saved = { notify: process.env['HQ_NOTIFY'], as: process.env['HQ_AS'], db: process.env['HQ_DB'] };
+const savedReview = ['HQ_NOSLOP_OP_SETTINGS', 'REVIEW_DIR', 'HQ_PROJECTS', 'HQ_REPOS'].map((k) => [k, process.env[k]] as const);
 
 beforeEach(() => {
   ({ db, dir, cleanup } = freshDb());
@@ -289,9 +289,9 @@ test('shape: review', async () => {
 
 // `hq pr` reads the head with the real gh.
 test('it gives every pr status shape key, in the answer output and the status output of a PR with a record', async () => {
-  const fake = buildFakeRunner({ prHead: { code: 0, stdout: JSON.stringify({ headRefOid: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678' }), stderr: '' } }),
-    recorded = await runPRCommand({ run: fake.run, db, verb: 'answer', rest: ['widgets', '7', 'lgtm'], flags: { source: 'chat:kettle-12' }, actor: () => Promise.resolve('z-kettle'), readOwnerSession: () => Promise.resolve({ verdict: 'owner' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) }),
-    status = await runPRCommand({ run: fake.run, db, verb: 'status', rest: ['widgets', '7'], flags: {}, actor: () => Promise.resolve('z-kettle'), readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) });
+  const fake = buildFakeRunner({ prHead: { code: 0, stdout: JSON.stringify({ headRefOid: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678' }), stderr: '' } });
+  const recorded = await runPRCommand({ run: fake.run, db, verb: 'answer', rest: ['widgets', '7', 'lgtm'], flags: { source: 'chat:kettle-12' }, actor: () => Promise.resolve('z-kettle'), readOwnerSession: () => Promise.resolve({ verdict: 'owner' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) });
+  const status = await runPRCommand({ run: fake.run, db, verb: 'status', rest: ['widgets', '7'], flags: {}, actor: () => Promise.resolve('z-kettle'), readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) });
 
   checkShape('pr status', { ok: true, ...recorded.data });
   checkShape('pr status', { ok: true, ...status.data });
@@ -318,8 +318,8 @@ test('shape: review (noslop)', async () => {
         stdout: JSON.stringify({ version: 7, head: 'feat', base: 'main', depth: 'standard', findings: [], failedCalls: [], notReviewed: [], notReviewedByLens: [], fixChecks: [{ findingID: 'kettle0000000001', fixed: true, reason: 'the kettle boils now' }] }),
         stderr: '',
       },
-    }),
-    r = await runReview({ run: fake.run, db, rawRepo: 'widgets', pr: 7, watch: false, fixesOnly: true });
+    });
+  const r = await runReview({ run: fake.run, db, rawRepo: 'widgets', pr: 7, watch: false, fixesOnly: true });
 
   expect(r).toMatchObject({ engine: 'noslop', fixesOnly: true, fixChecks: [{ findingID: 'kettle0000000001', fixed: true, reason: 'the kettle boils now', title: 'Kettle never boils' }] });
   checkShape('review (noslop)', { ok: true, ...r });

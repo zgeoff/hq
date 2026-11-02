@@ -32,10 +32,10 @@ function recordMarkMessage(db: Database, input: ConsoleMarkInput, note: string |
   if (current !== null && findSubjectLink(current) !== null) {
     throw new HqError('bad_args', `${input.id} is a review: it takes lgtm, Changes, Later or Reject`);
   }
-  const item = applyMark(db, input, note),
-    label = MARK_LABELS[input.mark],
-    seq = logEvent(db, 'unblock', item.id, 'console-mark', input.actor, null, null, { mark: input.mark, note }),
-    text = note === null ? label : `${label} | ${note}`;
+  const item = applyMark(db, input, note);
+  const label = MARK_LABELS[input.mark];
+  const seq = logEvent(db, 'unblock', item.id, 'console-mark', input.actor, null, null, { mark: input.mark, note });
+  const text = note === null ? label : `${label} | ${note}`;
   enqueue(db, seq, roleName('owner'), `console answer: todo ${item.id}: ${text}`);
   return item;
 }

@@ -4,9 +4,9 @@ import { createUnblockItems } from './create-unblock-items.ts';
 import { freshDb } from './helpers.ts';
 
 test('it files open items, with the console fields only when links are given', () => {
-  const env = freshDb(),
-    links = [{ label: 'kettle#4', url: 'https://github.com/kettle-co/kettle/pull/4', subject: true as const }],
-    seeded = createUnblockItems(env.db, { linked: { task: 'Review kettle#4', links }, plain: { task: 'Run the steam test' } });
+  const env = freshDb();
+  const links = [{ label: 'kettle#4', url: 'https://github.com/kettle-co/kettle/pull/4', subject: true as const }];
+  const seeded = createUnblockItems(env.db, { linked: { task: 'Review kettle#4', links }, plain: { task: 'Run the steam test' } });
   onTestFinished(env.cleanup);
 
   expect(getUnblock(seeded, 'linked')).toMatchObject({ state: 'open', task: 'Review kettle#4', notify: ['kettle-session'], added_by: 'kettle-triage' });

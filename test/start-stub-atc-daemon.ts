@@ -45,8 +45,8 @@ type PeerRequest = Parameters<ServerPeerHandleRequestFn>[0];
 const CODEC = new StandardRPCCodec(new StandardRPCSerializer(new StandardRPCJsonSerializer()));
 
 export function startStubAtcDaemon(path: string, procedures: Record<string, StubProcedure>, options: StubAtcOptions = {}): StubAtcDaemon {
-  const requests: StubAtcRequest[] = [],
-    server = Bun.listen<Connection>({ unix: path, socket: buildHandlers(procedures, requests, options) });
+  const requests: StubAtcRequest[] = [];
+  const server = Bun.listen<Connection>({ unix: path, socket: buildHandlers(procedures, requests, options) });
   return { path, requests, stop: () => server.stop(true) };
 }
 
@@ -61,8 +61,8 @@ function buildHandlers(procedures: Record<string, StubProcedure>, requests: Stub
       socket.data = { decoder: new TextDecoder(), pending: '', peer };
     },
     data(socket, chunk) {
-      const conn = socket.data,
-        lines = `${conn.pending}${conn.decoder.decode(chunk, { stream: true })}`.split('\n');
+      const conn = socket.data;
+      const lines = `${conn.pending}${conn.decoder.decode(chunk, { stream: true })}`.split('\n');
       conn.pending = lines.pop() ?? '';
       for (const line of lines) {
         if (line.trim()) {
@@ -82,8 +82,8 @@ async function runPeerRequest(request: PeerRequest, router: ReturnType<typeof bu
 }
 
 function buildRouter(procedures: Record<string, StubProcedure>, requests: StubAtcRequest[], daemon: DaemonIdentity) {
-  const all: Record<string, StubProcedure> = { ...procedures, 'daemon.hello': (input) => buildHelloResult(input, daemon) },
-    router: Record<string, Record<string, ReturnType<typeof buildProcedure>>> = {};
+  const all: Record<string, StubProcedure> = { ...procedures, 'daemon.hello': (input) => buildHelloResult(input, daemon) };
+  const router: Record<string, Record<string, ReturnType<typeof buildProcedure>>> = {};
   for (const [method, run] of Object.entries(all)) {
     const [noun = '', verb = ''] = method.split('.');
     router[noun] ??= {};

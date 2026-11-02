@@ -2,18 +2,18 @@ import { expect, test } from 'bun:test';
 import type { ProjectIssue, ReportIssue } from '../src/shipped/types.ts';
 import { makeLinearFake } from './make-linear-fake.ts';
 
-const KETTLE: ReportIssue = { id: 'GEO-9601', title: 'Descale the kettle', url: 'https://linear.example/issue/GEO-9601', status: 'Done', statusType: 'completed', project: 'Kettle', priority: { value: 2, name: 'High' } as unknown as number, labels: ['Chore'] },
-  PROJECT: ProjectIssue[] = [
-    { id: 'GEO-9601', statusType: 'completed', project: 'Kettle' },
-    { id: 'GEO-9603', statusType: 'triage', project: 'Kettle' },
-    { id: 'GEO-9604', statusType: 'started', project: 'Teapot' },
-  ],
-  TEAPOT: ReportIssue = { id: 'GEO-9602', title: 'Hinge the teapot lid', url: 'https://linear.example/issue/GEO-9602', status: 'Todo', statusType: 'unstarted', project: null, priority: 0, labels: [] };
+const KETTLE: ReportIssue = { id: 'GEO-9601', title: 'Descale the kettle', url: 'https://linear.example/issue/GEO-9601', status: 'Done', statusType: 'completed', project: 'Kettle', priority: { value: 2, name: 'High' } as unknown as number, labels: ['Chore'] };
+const PROJECT: ProjectIssue[] = [
+  { id: 'GEO-9601', statusType: 'completed', project: 'Kettle' },
+  { id: 'GEO-9603', statusType: 'triage', project: 'Kettle' },
+  { id: 'GEO-9604', statusType: 'started', project: 'Teapot' },
+];
+const TEAPOT: ReportIssue = { id: 'GEO-9602', title: 'Hinge the teapot lid', url: 'https://linear.example/issue/GEO-9602', status: 'Todo', statusType: 'unstarted', project: null, priority: 0, labels: [] };
 
 test('an id query answers each named issue once, in Linear\'s node shape, and leaves an unknown id out', async () => {
-  const asked: unknown[] = [],
-    call = makeLinearFake([KETTLE, TEAPOT, KETTLE], PROJECT, asked),
-    reply = await call('query', { ids: ['GEO-9601', 'GEO-9699', 'GEO-9602'] });
+  const asked: unknown[] = [];
+  const call = makeLinearFake([KETTLE, TEAPOT, KETTLE], PROJECT, asked);
+  const reply = await call('query', { ids: ['GEO-9601', 'GEO-9699', 'GEO-9602'] });
   expect(reply).toStrictEqual({
     issues: {
       nodes: [

@@ -18,8 +18,8 @@ export function buildMergedPR(over: Partial<MergedPR> = {}): MergedPR {
 }
 
 export function buildMergedDayOutput(day: string, prs: readonly MergedPR[], searchCount = prs.length): string {
-  const issues = [...new Set(prs.flatMap((pr) => (pr.issue === null ? [] : [pr.issue])))].toSorted(),
-    repos = [...new Set(prs.map((pr) => pr.repo))].toSorted();
+  const issues = [...new Set(prs.flatMap((pr) => (pr.issue === null ? [] : [pr.issue])))].toSorted();
+  const repos = [...new Set(prs.map((pr) => pr.repo))].toSorted();
   return JSON.stringify({
     kind: 'daily',
     start: `${day}T00:00:00+11:00`,

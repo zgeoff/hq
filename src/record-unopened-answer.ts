@@ -12,8 +12,8 @@ import { checkAsk } from './transitions/check-ask.ts';
 export function recordUnopenedAnswer(db: Database, id: string, answer: string, actor: string): Ask {
   return db
     .transaction((): Ask => {
-      const at = iso(now()),
-        before = requireAsk(db, id);
+      const at = iso(now());
+      const before = requireAsk(db, id);
       checkAsk(before.id, 'answered-unopened', before.state);
       db.query(`UPDATE asks SET state = 'answered', answer = ?, answered_at = ?, opened_at = ?, due_at = NULL, updated_at = ? WHERE id = ?`).run(answer, at, at, at, before.id);
       return recordFilerNotice(db, before, answer, actor);
@@ -30,8 +30,8 @@ function requireAsk(db: Database, id: string): Ask {
 }
 
 function recordFilerNotice(db: Database, before: Ask, answer: string, actor: string): Ask {
-  const after = requireAsk(db, before.id),
-    seq = logEvent(db, 'ask', before.id, 'answered-unopened', actor, before.state, 'answered', { answer });
+  const after = requireAsk(db, before.id);
+  const seq = logEvent(db, 'ask', before.id, 'answered-unopened', actor, before.state, 'answered', { answer });
   if (after.filed_by !== null && after.filed_by !== actor) {
     enqueue(db, seq, after.filed_by, `FYI ${after.kind} ${after.id} answered by the owner: "${answer}". This note carries no grant: ${owner()} applies the answer.`);
   }

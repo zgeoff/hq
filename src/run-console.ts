@@ -16,12 +16,12 @@ import { CALL_MS } from './watcher/call-ms.ts';
 const DEFAULT_PORT = 4317;
 
 export async function runConsole(db: Database, port: number | null, gateDeps: LoginGateDeps): Promise<never> {
-  const assets = await loadConsoleAssets(),
-    auth = createConsoleAuth(),
-    // oxlint-disable-next-line new-cap -- DEFS is the definitions folder's accessor, called as every module calls it
-    loadShipped = makeShippedLoader({ db, run: realRunner, call: makeAuditedLinearCaller(db, realRunner), scripts: `${DEFS()}/skills/delivery-report/scripts` }),
-    server = createConsoleServer({ db, port: port ?? DEFAULT_PORT, actor: 'console', run: boundedRunner(realRunner, CALL_MS), assets, notify: () => sendConsoleMessages(db), loadShipped, auth }),
-    controlPath = controlSocketPath();
+  const assets = await loadConsoleAssets();
+  const auth = createConsoleAuth();
+  // oxlint-disable-next-line new-cap -- DEFS is the definitions folder's accessor, called as every module calls it
+  const loadShipped = makeShippedLoader({ db, run: realRunner, call: makeAuditedLinearCaller(db, realRunner), scripts: `${DEFS()}/skills/delivery-report/scripts` });
+  const server = createConsoleServer({ db, port: port ?? DEFAULT_PORT, actor: 'console', run: boundedRunner(realRunner, CALL_MS), assets, notify: () => sendConsoleMessages(db), loadShipped, auth });
+  const controlPath = controlSocketPath();
   await startConsoleLogin({ port: server.port ?? DEFAULT_PORT, auth, gateDeps, controlPath, print: (line) => console.log(line) });
   return await new Promise<never>(() => {});
 }

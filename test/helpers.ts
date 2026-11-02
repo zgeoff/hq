@@ -103,8 +103,8 @@ export function fakeAtc(dir: string, sessions = [
   fake.stop = startStubAtcDaemon(path, {
     'session.list': () => ({ sessions }),
     'session.get': (input) => {
-      const id = (input as { session?: string }).session ?? '',
-        left = fake.getBudgets.get(id);
+      const id = (input as { session?: string }).session ?? '';
+      const left = fake.getBudgets.get(id);
       if (left !== undefined) {
         if (left <= 0) {
           throw new ORPCError('internal', { message: 'invented session.get failure' });
@@ -115,16 +115,16 @@ export function fakeAtc(dir: string, sessions = [
     },
     'events.read': (input) => {
       // Like atc: no cursor reads the newest page.
-      const args = input as { cursor?: string; limit?: number },
-        count = args.limit ?? 50,
-        first = args.cursor === undefined ? Math.max(0, feed.length - count) : readFeedStart(args.cursor),
-        last = Math.max(first, Math.min(feed.length, first + count)),
-        page = feed.slice(first, last).map((event, k) => Object.assign(structuredClone(event), { cursor: encodeCursor(first + k + 1) }));
+      const args = input as { cursor?: string; limit?: number };
+      const count = args.limit ?? 50;
+      const first = args.cursor === undefined ? Math.max(0, feed.length - count) : readFeedStart(args.cursor);
+      const last = Math.max(first, Math.min(feed.length, first + count));
+      const page = feed.slice(first, last).map((event, k) => Object.assign(structuredClone(event), { cursor: encodeCursor(first + k + 1) }));
       return { events: page, cursor: encodeCursor(last), more: last < feed.length };
     },
     'session.spawn': (input) => {
-      const id = `spawned-${sessions.length + 1}`,
-        raw = input as { name: string; prompt: string };
+      const id = `spawned-${sessions.length + 1}`;
+      const raw = input as { name: string; prompt: string };
       sessions.push({ id, name: raw.name, alive: true, state: 'done' });
       fake.prompts.set(id, raw.prompt);
       fake.calls.push({ method: 'session.spawn', input });
@@ -139,9 +139,9 @@ export function fakeAtc(dir: string, sessions = [
       return { stopped: true };
     },
     'session.update': (input) => {
-      const found = sessions.find((x) => x.id === (input as { session: string }).session),
-        pinned = (input as { pinned?: boolean }).pinned,
-        refused = pinned === true && fake.pinFailures.has((input as { session: string }).session);
+      const found = sessions.find((x) => x.id === (input as { session: string }).session);
+      const pinned = (input as { pinned?: boolean }).pinned;
+      const refused = pinned === true && fake.pinFailures.has((input as { session: string }).session);
       fake.calls.push({ method: 'session.update', input });
       if (refused) {
         throw new ORPCError('update_failed', { message: 'invented pin failure' });
@@ -164,8 +164,8 @@ export function fakeAtc(dir: string, sessions = [
       return { forgotten: true, destroyed: false };
     },
     'message.get': (input) => {
-      const id = (input as { message: string }).message,
-        message = sent[[...seen.values()].indexOf(id)];
+      const id = (input as { message: string }).message;
+      const message = sent[[...seen.values()].indexOf(id)];
       if (!message) {
         throw new ORPCError('not_found', { message: `no message ${id}` });
       }
@@ -237,8 +237,8 @@ export function createHqDefsRepo(dir: string, files: Record<string, string>): { 
 }
 
 export function createDefsRepo(dir: string, files: Record<string, string>): { defs: string; private: string; push: (files: Record<string, string>) => void } {
-  const hq = createHqDefsRepo(dir, { 'README.md': 'invented skills tree\n' }),
-    hqPrivate = createOriginClone(dir, 'private-origin', 'private', files);
+  const hq = createHqDefsRepo(dir, { 'README.md': 'invented skills tree\n' });
+  const hqPrivate = createOriginClone(dir, 'private-origin', 'private', files);
   process.env['HQ_PRIVATE_DIR'] = hqPrivate.dir;
   return { defs: hq.defs, private: hqPrivate.dir, push: hqPrivate.push };
 }

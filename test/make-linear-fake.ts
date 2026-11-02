@@ -5,8 +5,8 @@ export function makeLinearFake(issues: readonly ReportIssue[], projectIssues: re
   return (_query, variables) => {
     asked.push(variables);
     if ('ids' in variables) {
-      const ids = variables['ids'] as string[],
-        named = ids.flatMap((id) => issues.find((issue) => issue.id === id) ?? []);
+      const ids = variables['ids'] as string[];
+      const named = ids.flatMap((id) => issues.find((issue) => issue.id === id) ?? []);
       return Promise.resolve({ issues: { nodes: named.map((issue) => toIssueNode(issue)) } });
     }
     const nodes = projectIssues.filter((issue) => issue.project === variables['name']).map((issue) => ({ identifier: issue.id, state: { type: issue.statusType }, project: { name: issue.project } }));

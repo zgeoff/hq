@@ -10,9 +10,9 @@ export interface PRStateGh {
 
 export function makePRStateGh(gh: PRStateGh): Runner {
   return (cmd, opts) => {
-    const line = cmd.join(' '),
-      m = /^gh pr view (?<n>\d+) -R (?<repo>\S+) --json state$/u.exec(line),
-      state = m?.groups ? gh.states[`${m.groups['repo']}#${m.groups['n']}`] : undefined;
+    const line = cmd.join(' ');
+    const m = /^gh pr view (?<n>\d+) -R (?<repo>\S+) --json state$/u.exec(line);
+    const state = m?.groups ? gh.states[`${m.groups['repo']}#${m.groups['n']}`] : undefined;
     gh.calls?.push(line);
     if (!m?.groups) {
       return gh.fallback ? gh.fallback(cmd, opts) : Promise.resolve({ code: 1, stdout: '', stderr: `invented: unexpected ${line}` });

@@ -312,9 +312,9 @@ test('migrating from v1 backs up first and runs each later step', () => {
 });
 
 test('v28 keeps every typed row and id, and then takes a console source', () => {
-  const file = `${dir}/v27.db`,
-    rows = createV27TypedRows(file),
-    upgraded = openDb(file);
+  const file = `${dir}/v27.db`;
+  const rows = createV27TypedRows(file);
+  const upgraded = openDb(file);
   expect(upgraded.query('SELECT * FROM typed ORDER BY id').all()).toStrictEqual(rows);
   upgraded.query(`INSERT INTO typed (to_session, text, source_kind, source_ref, typed_by, at) VALUES ('z-invented', 'Descale it.', 'console', 'descale-kettle', 'z-stu', '2026-10-15T01:00:00Z')`).run();
   expect(upgraded.query('SELECT id, source_kind FROM typed ORDER BY id').all()).toStrictEqual([
@@ -573,9 +573,9 @@ interface RunSessionRow {
 }
 
 test('hq run add refuses a session id given as a second word, and stores the run only with --session', async () => {
-  const refused = await hq('run', 'add', 'GEO-9701', '9701ab0c-0000-4000-8000-00000000beef', '--title', 'Invented kettle work', '--where', 'none'),
-    remaining = await hq('run', 'list'),
-    stored = await hq('run', 'add', 'GEO-9701', '--session', '9701ab0c-0000-4000-8000-00000000beef', '--title', 'Invented kettle work', '--where', 'none');
+  const refused = await hq('run', 'add', 'GEO-9701', '9701ab0c-0000-4000-8000-00000000beef', '--title', 'Invented kettle work', '--where', 'none');
+  const remaining = await hq('run', 'list');
+  const stored = await hq('run', 'add', 'GEO-9701', '--session', '9701ab0c-0000-4000-8000-00000000beef', '--title', 'Invented kettle work', '--where', 'none');
   expect([refused.code, refused.json.error.message]).toEqual([1, 'hq run add takes one issue: pass the session as --session 9701ab0c-0000-4000-8000-00000000beef']);
   expect(remaining.json.runs).toEqual([]);
   expect((stored.json.run.sessions as RunSessionRow[]).map((x) => x.session_id)).toEqual(['9701ab0c-0000-4000-8000-00000000beef']);
@@ -791,8 +791,8 @@ function createV27TypedRows(file: string): unknown[] {
 
 test('hq whois names the fleet session hq fleet saw under an id, and null for any other id', async () => {
   setMeta(db(), 'fleet_ids', JSON.stringify({ 'z-stu': 'id-stu' }));
-  const stu = await hq('whois', 'id-stu'),
-    teapot = await hq('whois', 'id-teapot');
+  const stu = await hq('whois', 'id-stu');
+  const teapot = await hq('whois', 'id-teapot');
   expect([stu.json, teapot.json]).toStrictEqual([
     { ok: true, session: 'id-stu', name: 'z-stu' },
     { ok: true, session: 'id-teapot', name: null },
@@ -805,8 +805,8 @@ test('hq band --json gives the segments the band mod draws, by the mod\'s own ch
 });
 
 test('hq pane --json gives Markdown and a heat map the pane draws, by the mod\'s own check', async () => {
-  const answer = await hq('pane'),
-    pane = answer.json.pane as Pane;
+  const answer = await hq('pane');
+  const pane = answer.json.pane as Pane;
   expect([answer.code, pane.markdown.startsWith('## Needs you'), isHeatList(pane.heat)]).toStrictEqual([0, true, true]);
 });
 

@@ -27,12 +27,12 @@ import { FOUR_AM_SYDNEY, NOON_SYDNEY, at, createDefsRepo, freshDb, requireEnv } 
 import { readPrompt } from '../src/prompts/read-prompt.ts';
 import { resetFetchCache } from '../src/prompts/reset-fetch-cache.ts';
 
-let cleanup: () => void,
-  db: Database,
-  dir: string,
-  fleet: FleetEntry[],
-  hqPrivate: string,
-  push: (files: Record<string, string>) => void;
+let cleanup: () => void;
+let db: Database;
+let dir: string;
+let fleet: FleetEntry[];
+let hqPrivate: string;
+let push: (files: Record<string, string>) => void;
 const KETTLE = 'skills/kettle/references/session-prompt.md';
 
 beforeEach(() => {
@@ -739,11 +739,11 @@ test('a marker whose session was replaced by a newer spawn is closed by the 5-mi
 });
 
 test("an entry's plugin folders go to atc's spawn; an entry without them sends none", async () => {
-  const f = fake([]),
-    withBand: FleetEntry[] = [
-      { name: 'z-kettle', cwd: `${dir}/work`, model: 'opus', prompt: `main:${KETTLE}`, wake: true, pluginDirs: ['~/plugins/kettle-band'] },
-      { name: 'z-teapot', cwd: `${dir}/work`, model: 'opus', prompt: `${dir}/teapot-prompt.md`, wake: false },
-    ];
+  const f = fake([]);
+  const withBand: FleetEntry[] = [
+    { name: 'z-kettle', cwd: `${dir}/work`, model: 'opus', prompt: `main:${KETTLE}`, wake: true, pluginDirs: ['~/plugins/kettle-band'] },
+    { name: 'z-teapot', cwd: `${dir}/work`, model: 'opus', prompt: `${dir}/teapot-prompt.md`, wake: false },
+  ];
   await ensureFleet(db, f.client, { dryRun: false, actor: 'hq-fleet', fleet: withBand, now: ['z-kettle', 'z-teapot'] });
   expect(f.spawns).toEqual([
     { cwd: `${dir}/work`, name: 'z-kettle', prompt: 'You are Kettle. Boil water when asked.', model: 'opus', agent: 'claude', idempotencyKey: expect.any(String), pluginDirs: ['~/plugins/kettle-band'] },

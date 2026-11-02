@@ -86,9 +86,9 @@ test.each([
 });
 
 test('an unblock item may mark one GitHub PR link as its subject', () => {
-  const context = { label: 'Runbook', url: 'https://example.com/kettle' },
-    pr = { label: 'kettle#4', url: 'https://github.com/kettle-co/kettle/pull/4', subject: true as const },
-    todo = { title: 'Review kettle#4', question: 'Review kettle#4 and say lgtm', links: [pr, context] };
+  const context = { label: 'Runbook', url: 'https://example.com/kettle' };
+  const pr = { label: 'kettle#4', url: 'https://github.com/kettle-co/kettle/pull/4', subject: true as const };
+  const todo = { title: 'Review kettle#4', question: 'Review kettle#4 and say lgtm', links: [pr, context] };
 
   expect(parseItemInput('unblock', JSON.stringify(todo)).links).toStrictEqual([pr, context]);
   expect(() => parseItemInput('unblock', JSON.stringify({ ...todo, links: [pr, { ...pr, label: 'again' }] }))).toThrow('one subject link at most');

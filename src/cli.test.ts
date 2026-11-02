@@ -31,10 +31,10 @@ import { buildStubFinalGH } from '../test/build-stub-final-gh.ts';
 import { buildStubBriefGH } from '../test/build-stub-brief-gh.ts';
 
 function setupTest(billing: string): Database {
-  const fresh = freshDb(),
-    log = console.log,
-    path0 = process.env['PATH'],
-    stubBin = `${fresh.dir}/bin`;
+  const fresh = freshDb();
+  const log = console.log;
+  const path0 = process.env['PATH'];
+  const stubBin = `${fresh.dir}/bin`;
   onTestFinished(fresh.cleanup);
   onTestFinished(overrideEnv('HQ_NOW', NOON_SYDNEY));
   onTestFinished(overrideEnv('HQ_NOTIFY', 'off'));
