@@ -12,6 +12,8 @@ import { countFocusMatches } from './focus/count-focus-matches.ts';
 import { readBacklogIssues } from './lanes/read-backlog-issues.ts';
 import { writeDesignBacklog } from './lanes/write-design-backlog.ts';
 import { toMessage } from './runs/to-message.ts';
+import { collectFocusMatches } from './focus/collect-focus-matches.ts';
+import { writePromotableTop } from './lanes/write-promotable-top.ts';
 import { writePromotableFocus } from './lanes/write-promotable-focus.ts';
 import { validateLaneRules } from './lanes/validate-lane-rules.ts';
 import type { Runner } from './runner/types.ts';
@@ -73,6 +75,7 @@ export async function runLinearReadyTick(db: Database, deps: LinearReadyTickDeps
           focus,
         );
   writePromotableFocus(db, { count, error: backlog.error, focus: buildFocusKey(focus), at });
+  writePromotableTop(db, { issues: backlog.issues === null ? null : collectFocusMatches(backlog.issues.promotable, focus), focus: buildFocusKey(focus), at });
   if (backlog.issues !== null) {
     writeDesignBacklog(db, { ...backlog.issues.design, at });
   }
