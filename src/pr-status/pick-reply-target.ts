@@ -39,7 +39,7 @@ function findFindingComment(comments: readonly PRComment[], finding: string): PR
 // The owner's comment that stands as an accepted risk: noslop counts a finding's latest disposition,
 // so an acceptance stands only when the owner's latest valid answer to the finding is one.
 function findStandingAcceptance(comments: readonly PRComment[], finding: string, form: 'thread' | 'issue'): PRComment | null {
-  const answered = comments.filter((comment) => isOwner(comment)).map((comment) => ({ comment, kind: readDispositionKind(comment.body, finding, form) }));
+  const answered = comments.filter((comment) => isOwner(comment)).map((comment) => ({ comment, kind: parseDispositionKind(comment.body, finding, form) }));
   const latest = answered.findLast((entry) => entry.kind !== null);
   return latest?.kind === 'accepted-risk' ? latest.comment : null;
 }
@@ -47,17 +47,17 @@ function findStandingAcceptance(comments: readonly PRComment[], finding: string,
 // The disposition kind a comment gives the finding, as noslop reads it: the last id-led line naming
 // the finding, or in a thread with no id-led line, the first line. Null when it gives none, such as
 // `accepted-risk` with no reason.
-function readDispositionKind(body: string, finding: string, form: 'thread' | 'issue'): string | null {
+function parseDispositionKind(body: string, finding: string, form: 'thread' | 'issue'): string | null {
   const lines = body.split('\n').map((line) => line.trim());
   const idLines = lines.map((line) => ID_LINE.exec(line)?.groups).filter((groups) => groups !== undefined);
   if (idLines.length > 0) {
     const own = idLines.findLast((groups) => groups['id'] === finding);
-    return own === undefined ? null : readKind(own['answer'] ?? '');
+    return own === undefined ? null : parseKind(own['answer'] ?? '');
   }
-  return form === 'thread' ? readKind(lines.find((line) => line !== '') ?? '') : null;
+  return form === 'thread' ? parseKind(lines.find((line) => line !== '') ?? '') : null;
 }
 
-function readKind(answer: string): string | null {
+function parseKind(answer: string): string | null {
   if (answer === 'fixed') {
     return 'fixed';
   }
