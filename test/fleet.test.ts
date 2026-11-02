@@ -774,7 +774,9 @@ test('a mid-turn refusal retries; a gone session, a stuck turn or a hard refusal
   expect(ctx.pending()['z-kettle']).toStrictEqual({ id: 'id-k', since: NOON_SYDNEY });
   f.refuse('atc_permission_pending');
   await ctx.ensure(f);
-  expect(ctx.pending()['z-kettle']?.typedAt).toBeUndefined();
+  const marker = ctx.pending()['z-kettle'];
+  assert.ok(marker);
+  expect(marker.typedAt).toBeUndefined();
   f.refuse('atc_session_dead');
   const dead = await ctx.ensure(f);
   expect(dead.at(-1)).toMatchObject({ action: 'failed', detail: expect.stringContaining('typing into the session failed') });
