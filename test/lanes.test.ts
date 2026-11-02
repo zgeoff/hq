@@ -111,6 +111,14 @@ test('the log shows whether free slots dropped after a nudge, and the idle gap',
   expect(idleSlotMinutes(db, 24).slotMinutes).toBe(8 * 10 + 8 * 5 + 2 * 6);
 });
 
+test('it counts the idle gap between two samples as 30 minutes at most', () => {
+  tick(db, sample(16_384), 'hq-lanes');
+  atMin(60);
+  tick(db, sample(16_384), 'hq-lanes');
+
+  expect(idleSlotMinutes(db, 24).slotMinutes).toBe(8 * 30);
+});
+
 test('unsent nudges never pile up: only the newest stays in the outbox', () => {
   tick(db, sample(16384), 'hq-lanes');
   for (const m of [10, 40, 70, 100]) {
