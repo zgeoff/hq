@@ -4,6 +4,7 @@ import { iso } from '../clock/iso.ts';
 import { now } from '../clock/now.ts';
 import { dropTopic } from '../outbox/drop-topic.ts';
 import { checkPr } from '../transitions/check-pr.ts';
+import { clearOwnerWait } from './clear-owner-wait.ts';
 import { normalizePrRef } from './normalize-pr-ref.ts';
 import { requirePR as mustPr } from './require-pr.ts';
 import { REVIEWER } from './reviewer.ts';
@@ -36,6 +37,9 @@ export function closePr(db: Database, raw: string, close: PrClose): RunPr {
       touch(db, pr.issue);
       logEvent(db, 'run', pr.issue, close.to, close.actor, 'open', close.to, { ref });
       dropTopic(db, REVIEWER, `final:${ref}`); // merged or closed: an unsent final notice is moot
+      if (close.to === 'merged') {
+        clearOwnerWait(db, pr.issue, ref, close.actor);
+      }
       updateMergedRun(db, pr.issue, close.actor);
       return mustPr(db, ref);
     })
