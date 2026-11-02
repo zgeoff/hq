@@ -5,6 +5,7 @@ import { getRun } from './get-run.ts';
 import { pickOwnerWaitClear } from './pick-owner-wait-clear.ts';
 
 const openSchema = z.object({ open: z.number() });
+const designSchema = z.object({ design_pass: z.number() }).nullable();
 
 // Clears the owner wait of the run a PR just merged on, when pickOwnerWaitClear says the merge ended
 // it, and logs which rule did. Reads the PR table as it stands, so call it after the PR is marked merged.
@@ -14,7 +15,8 @@ export function clearOwnerWait(db: Database, issue: string, mergedRef: string, a
     return;
   }
   const count = openSchema.parse(db.query(`SELECT COUNT(*) AS open FROM run_prs WHERE issue = ? AND state = 'open' AND design_pass = 0`).get(issue));
-  const rule = pickOwnerWaitClear({ waitsOnGeoff: run.waits_on_geoff === 1, waitsOn: run.waits_on }, mergedRef, count.open);
+  const merged = designSchema.parse(db.query('SELECT design_pass FROM run_prs WHERE ref = ?').get(mergedRef));
+  const rule = pickOwnerWaitClear({ waitsOnGeoff: run.waits_on_geoff === 1, waitsOn: run.waits_on }, { ref: mergedRef, designPass: merged?.design_pass === 1 }, count.open);
   if (rule === null) {
     return;
   }

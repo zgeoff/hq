@@ -13,13 +13,13 @@ function setupTest() {
 test('it dates a done-but-open issue by its last merge', () => {
   const app = setupTest();
 
-  expect(app.classify([app.pr('kettle#1', 'merged', '2026-10-12T01:00:00Z'), app.pr('kettle#2', 'merged', '2026-10-14T01:00:00Z')])).toStrictEqual({ kind: 'done-open', since: '2026-10-14T01:00:00Z', ref: 'kettle#2' });
+  expect(app.classify([app.pr('kettle#1', 'merged', '2026-10-12T01:00:00Z'), app.pr('kettle#2', 'merged', '2026-10-14T01:00:00Z')])).toStrictEqual({ kind: 'done-open', since: '2026-10-14T01:00:00Z', ref: 'kettle#2', mergedAt: '2026-10-14T01:00:00Z' });
 });
 
 test('it dates a done-but-open issue by its start when the merge time is unknown', () => {
   const app = setupTest();
 
-  expect(app.classify([app.pr('kettle#1', 'merged')])).toStrictEqual({ kind: 'done-open', since: app.started, ref: 'kettle#1' });
+  expect(app.classify([app.pr('kettle#1', 'merged')])).toStrictEqual({ kind: 'done-open', since: app.started, ref: 'kettle#1', mergedAt: null });
 });
 
 test('it calls an issue with no PRs, or only closed ones, stalled since its start', () => {
@@ -47,7 +47,7 @@ test('it ignores a PR of unknown status', () => {
   const app = setupTest();
 
   expect([app.classify([app.pr('kettle#1', 'merged', '2026-10-12T01:00:00Z'), app.pr('kettle#2', 'mystery')]), app.classify([app.pr('kettle#3', 'mystery')])]).toStrictEqual([
-    { kind: 'done-open', since: '2026-10-12T01:00:00Z', ref: 'kettle#1' },
+    { kind: 'done-open', since: '2026-10-12T01:00:00Z', ref: 'kettle#1', mergedAt: '2026-10-12T01:00:00Z' },
     { kind: 'stalled', since: app.started },
   ]);
 });

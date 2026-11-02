@@ -1,6 +1,6 @@
 // What an In Progress issue with no open run and no active session is stuck on. since is when it began
-// to wait: the last merge for done-open, the start for stalled.
-export type StaleKind = { kind: 'done-open'; since: string; ref: string } | { kind: 'stalled'; since: string } | { kind: 'live' };
+// to wait: the last merge for done-open (the start when Linear gave no merge time), the start for stalled.
+export type StaleKind = { kind: 'done-open'; since: string; ref: string; mergedAt: string | null } | { kind: 'stalled'; since: string } | { kind: 'live' };
 
 // Done-open: it has PRs and every one merged, so the work is in and only the close is missing. Live: a
 // PR is still open or draft. Stalled: no PRs, or only closed ones beside any merged. A PR whose status
@@ -12,7 +12,7 @@ export function pickStaleKind(startedAt: string, prs: readonly { ref: string; st
   }
   if (known.length > 0 && known.every((pr) => pr.status === 'merged')) {
     const last = known.reduce((latest, pr) => ((pr.mergedAt ?? startedAt) > (latest.mergedAt ?? startedAt) ? pr : latest));
-    return { kind: 'done-open', since: last.mergedAt ?? startedAt, ref: last.ref };
+    return { kind: 'done-open', since: last.mergedAt ?? startedAt, ref: last.ref, mergedAt: last.mergedAt };
   }
   return { kind: 'stalled', since: startedAt };
 }

@@ -1,18 +1,19 @@
 import type { Database } from 'bun:sqlite';
 import { match } from 'ts-pattern';
 import { z } from 'zod';
+import { pickStaleKind } from '../../linear/pick-stale-kind.ts';
+import type { StaleKind } from '../../linear/pick-stale-kind.ts';
 import { readStartedPrs } from '../../linear/read-started-prs.ts';
 import { findUnreadLine } from './find-unread-line.ts';
 import { formatItemList } from './format-item-list.ts';
-import { pickStaleKind } from './pick-stale-kind.ts';
-import type { StaleKind } from './pick-stale-kind.ts';
 import type { ThroughputAlert, ThroughputLine } from './types.ts';
 
 const NAME = 'Stale';
 const DAY_MS = 86_400_000;
 
-// In Progress issues with no open run and no session, and open runs whose issue is closed. Target 0
-// older than 24 hours; only those alert.
+// In Progress issues with no open run, no session and no open or draft PR, and open runs whose issue is
+// closed. A done-open issue (every PR merged) ages from its last merge and goes to triage; a stalled one
+// ages from its start and goes to the orchestrator. Target 0 older than 24 hours; only those alert.
 export function readStaleLine(db: Database, _from: Date, at: Date): ThroughputLine {
   const unread = findUnreadLine(db, NAME, '0 older than 24h');
   if (unread !== null) {
@@ -62,7 +63,7 @@ function buildUnrunItem(issue: string, startedAt: string, stale: StaleKind): Sta
         summary: `${issue} In Progress, every PR merged`,
         alert: {
           key: `stale:done-open:${issue}`,
-          text: `Stale: ${issue} is In Progress, but every PR merged (last ${done.ref} at ${done.since}). Close it, or name the live check or owner step that holds it.`,
+          text: `Stale: ${issue} is In Progress, but every PR merged (last ${done.ref}, ${done.mergedAt === null ? 'merge time unknown' : `at ${done.mergedAt}`}). Close it, or name the live check or owner step that holds it.`,
           role: 'triage' as const,
         },
       },

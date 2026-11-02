@@ -1,6 +1,6 @@
 import type { Database } from 'bun:sqlite';
 import { z } from 'zod';
-import { pickStaleKind } from '../goals/throughput/pick-stale-kind.ts';
+import { pickStaleKind } from '../linear/pick-stale-kind.ts';
 import { readStartedPrs } from '../linear/read-started-prs.ts';
 
 const startedSchema = z.object({ issue: z.string(), started_at: z.string() });
