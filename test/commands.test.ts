@@ -91,8 +91,12 @@ function verbsOf(fn: string): { verbs: string[]; bare: boolean } {
   expect(start, fn).toBeGreaterThanOrEqual(0);
   const end = cliSource.indexOf('\n}\n', start);
   const body = cliSource.slice(start, end);
-  const verbs = [...body.matchAll(/(?:case|verb ===|verb !==) '([^']+)'/g)].map((m) => m[1]!);
-  return { verbs: [...new Set(verbs)], bare: /case undefined:/.test(body) || fn === 'outboxCommand' };
+  const compared = [...body.matchAll(/(?:verb ===|verb !==) '(?<verb>[^']+)'/gu)].map((found) => found.groups?.['verb'] ?? '');
+  const labelLists = [...body.matchAll(/\.with\((?<labels>(?:undefined|'[^']+')(?:, (?:undefined|'[^']+'))*), /gu)].map((found) => found.groups?.['labels'] ?? '');
+  const matched = labelLists.flatMap((labels) => [...labels.matchAll(/'(?<verb>[^']+)'/gu)].map((label) => label.groups?.['verb'] ?? ''));
+  const verbs = [...compared, ...matched];
+  const bare = labelLists.some((labels) => labels.split(', ').includes('undefined'));
+  return { verbs: [...new Set(verbs)], bare: bare || fn === 'outboxCommand' };
 }
 
 test('every verb a group function handles has a row, or a catch-all row covers it', () => {

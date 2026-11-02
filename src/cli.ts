@@ -677,12 +677,12 @@ async function askCommand(db: Database, kind: Kind, verb: string, args: string[]
   const id = args[0];
   const by = () => actor(db, flags);
   const needId = () => need(id, 'id (first argument)');
-  switch (verb) {
-    case 'stu': {
+  return match(verb)
+    .with('stu', async () => {
       const who = await by();
       return await runItemCommand({ db, noun: kind, verb: 'stu', id, flags, actor: who });
-    }
-    case 'add': {
+    })
+    .with('add', async () => {
       if (flags.item !== undefined) {
         const who = await by();
         return await runItemCommand({ db, noun: kind, verb: 'add', id: needId(), flags, actor: who });
@@ -706,60 +706,60 @@ async function askCommand(db: Database, kind: Kind, verb: string, args: string[]
         noop: 'Nothing to do.',
       }[r.result];
       return { data: { result: r.result, note: r.note ?? null, [kind]: r.ask }, text: `${askLine(r.ask)}\n${words}${r.note ? ` ${r.note}` : ''}` };
-    }
-    case 'open': {
+    })
+    .with('open', async () => {
       const a = openAsk(db, toExactOptional({ kind, id, force: Boolean(flags.force), actor: await by() }));
       return { data: { [kind]: a }, text: `Opened. The owner has the floor.\n\n${askFull(a)}` };
-    }
-    case 'answer': {
+    })
+    .with('answer', async () => {
       const askID = needId();
       const text = await readText(flags.answer, flags['answer-file'], 'answer');
       const who = await by();
       const input = { id: askID, kind, answer: text, actor: who };
       const answered = kind === 'call' ? await runCallAnswer(db, input, () => readOwnerSession(db, readOwnerProbeDeps())) : answerAsk(db, input);
       return { data: { [kind]: answered }, text: `${askLine(answered)}\nAnswer saved word for word. Apply it, then: hq ${kind} apply ${answered.id} --to ...` };
-    }
-    case 'apply': {
+    })
+    .with('apply', async () => {
       const a = applyAsk(db, needId(), kind, need(flags.to, 'to'), flags.note ?? null, await by());
       return { data: { [kind]: a }, text: `${askLine(a)}\nApplied. The floor is free.` };
-    }
-    case 'later': {
+    })
+    .with('later', async () => {
       const a = laterAsk(db, needId(), kind, flags.until ?? null, await by());
       return { data: { [kind]: a }, text: `${askLine(a)}\nShelved until ${a.due_at}.` };
-    }
-    case 'skip': {
+    })
+    .with('skip', async () => {
       const a = skipAsk(db, needId(), kind, flags.reason ?? null, await by());
       return { data: { [kind]: a }, text: `${askLine(a)}\nSkipped. It returns when its filer adds it again.` };
-    }
-    case 'close': {
+    })
+    .with('close', async () => {
       const a = closeAsk(db, needId(), kind, need(flags.reason, 'reason'), await by());
       return { data: { [kind]: a }, text: `${askLine(a)}\nClosed: it no longer needs the owner.` };
-    }
-    case 'show': {
+    })
+    .with('show', () => {
       const a = getAsk(db, needId());
       if (!a || a.kind !== kind) throw new HqError('not_found', `no ${kind} with id ${id}`);
       const h = flags.history ? history(db, 'ask', a.id) : undefined;
       const htext = h ? `\n\nhistory:\n${(h as { at: string; action: string; actor: string }[]).map((e) => `  ${e.at} ${e.action} by ${e.actor}`).join('\n')}` : '';
       return { data: { [kind]: a, ...(h ? { history: h } : {}) }, text: askFull(a) + htext };
-    }
-    case 'list': {
+    })
+    .with('list', () => {
       const asked = pickAskStates(flags.state),
         rows = listAsks(db, toExactOptional({ kind, states: asked }));
       return { data: { [`${kind}s`]: rows }, text: rows.length ? rows.map(askLine).join('\n') : `No ${kind}s here.` };
-    }
-    default:
+    })
+    .otherwise(() => {
       throw new HqError('bad_args', `unknown command: hq ${kind} ${verb}`);
-  }
+    });
 }
 
 async function unblockCommand(db: Database, verb: string, args: string[], flags: Flags): Promise<Out> {
   const by = () => actor(db, flags);
-  switch (verb) {
-    case 'later': {
+  return match(verb)
+    .with('later', async () => {
       const who = await by();
       return await runItemCommand({ db, noun: 'unblock', verb: 'later', id: args[0], flags, actor: who });
-    }
-    case 'add': {
+    })
+    .with('add', async () => {
       if (flags.item !== undefined) {
         const who = await by();
         return await runItemCommand({ db, noun: 'unblock', verb: 'add', id: undefined, flags, actor: who });
@@ -779,13 +779,13 @@ async function unblockCommand(db: Database, verb: string, args: string[], flags:
         (w) => `warning: ${w.issue} was already on the list as ${w.id} (${w.state}${w.closed_at ? ` ${w.closed_at.slice(0, 10)}` : ''}): ${w.task}`,
       );
       return { data: { result: r.result, item: r.item, warnings: r.warnings }, text: [unblockLine(r.item), r.result, ...warn].join('\n') };
-    }
-    case 'list': {
+    })
+    .with('list', () => {
       const state = (flags.state ?? 'open') as 'open' | 'done' | 'dropped' | 'all';
       const items = listUnblocks(db, state);
       return { data: { items: items.map((item) => ({ ...item, recheck: isRecheck(item, now()), overdue: isOverdue(item, now()) })) }, text: items.length > 0 ? items.map((item) => unblockLine(item)).join('\n') : 'Nothing needs the owner\'s hands. Remarkable.' };
-    }
-    case 'new': {
+    })
+    .with('new', () => {
       const items = newSincePush(db);
       return {
         data: { cursor: pushedSeq(db), upto: uptoFor(items, db), items },
@@ -793,22 +793,21 @@ async function unblockCommand(db: Database, verb: string, args: string[], flags:
           ? `${items.length} new since the last push:\n${items.map(unblockLine).join('\n')}\nAfter you push them: hq unblock pushed --upto ${uptoFor(items, db)}`
           : 'Nothing new since the last push.',
       };
-    }
-    case 'pushed': {
+    })
+    .with('pushed', async () => {
       const r = markPushed(db, intFlag(need(flags.upto, 'upto (from hq unblock new)'), 'upto')!, await by());
       return { data: r, text: `Cursor moved: ${r.covered} item${r.covered === 1 ? '' : 's'} marked as pushed.` };
-    }
-    case 'done':
-    case 'drop': {
+    })
+    .with('done', 'drop', async () => {
       const u = closeUnblock(db, need(args[0], 'id (first argument)'), verb === 'done' ? 'done' : 'dropped', flags.note ?? null, await by());
       return { data: { item: u }, text: `${unblockLine(u)}\n${verb === 'done' ? 'Done. Nice work.' : 'Dropped.'}` };
-    }
-    case 'rank': {
+    })
+    .with('rank', async () => {
       const raw = need(args[1], 'rank (second argument: N or none)');
       const u = rankUnblock(db, need(args[0], 'id (first argument)'), intFlag(raw, 'rank'), await by());
       return { data: { item: u }, text: unblockLine(u) };
-    }
-    case 'done-when': {
+    })
+    .with('done-when', async () => {
       const conditions = args.slice(1).map((raw) => parseDoneWhen(raw));
       if (conditions.length === 0) {
         throw new HqError('bad_args', 'hq unblock done-when <id> <issue:GEO-1|pr:repo#1|doc:ID|release:repo|date:ISO>...');
@@ -816,16 +815,16 @@ async function unblockCommand(db: Database, verb: string, args: string[], flags:
       const who = await by();
       const item = addDoneWhen(db, need(args[0], 'id (first argument)'), conditions, who);
       return { data: { item }, text: unblockLine(item) };
-    }
-    case 'show': {
+    })
+    .with('show', () => {
       const u = getUnblock(db, need(args[0], 'id (first argument)'));
       if (!u) throw new HqError('not_found', `no unblock item ${args[0]}`);
       const h = flags.history ? history(db, 'unblock', u.id) : undefined;
       return { data: { item: { ...u, recheck: isRecheck(u, now()), overdue: isOverdue(u, now()) }, ...(h ? { history: h } : {}) }, text: unblockLine(u) };
-    }
-    default:
+    })
+    .otherwise(() => {
       throw new HqError('bad_args', `unknown command: hq unblock ${verb}`);
-  }
+    });
 }
 
 async function watchRuns(db: Database, me: string): Promise<void> {
@@ -919,9 +918,8 @@ async function capacityTick(db: Database, actor: string) {
 }
 
 async function capacityCommand(db: Database, verb: string | undefined, args: string[], flags: Flags): Promise<Out> {
-  switch (verb) {
-    case undefined:
-    case 'show': {
+  return match(verb)
+    .with(undefined, 'show', async () => {
       const reading = await latestSample(db);
       const open = openAlerts(db);
       const lines = [reading ? readingText(reading) : 'No sample yet: hq capacity sample reads one now.', 'Thresholds:', ...thresholdLines(db, reading).map((l) => `  ${l}`), Object.keys(open).length ? 'Open alerts:' : 'No open alerts.', ...Object.values(open).map((o) => `  ${o.line} (since ${o.since}${o.told ? '' : ', not yet told'})`)];
@@ -929,32 +927,32 @@ async function capacityCommand(db: Database, verb: string | undefined, args: str
       const hint = readCapacityHint(db, pacing.claudeLaunchPct ?? 95, now());
       const fleet = await readCapacityFleet(db, buildFleetIO(), now(), flags['refresh-slots'] === true);
       return { data: { sample: reading, hint, settings: capacitySettings(db), open, fleet: { ...fleet.view, problems: fleet.problems } }, text: [...lines, ...formatCapacityHint(hint), ...formatFleetView(fleet.view), ...fleet.problems.map((problem) => `  ! ${problem}`)].join('\n') };
-    }
-    case 'sample': {
+    })
+    .with('sample', async () => {
       const r = await capacityTick(db, await actor(db, flags));
       return { data: { sample: r.reading, opened: r.tick.opened, cleared: r.tick.cleared, told: r.tick.told }, text: `${readingText(r.reading)}\n${r.tick.opened.length} opened, ${r.tick.cleared.length} cleared.` };
-    }
-    case 'log': {
+    })
+    .with('log', async () => {
       const hours = flags.hours === undefined ? 24 : intFlag(flags.hours, 'hours');
       if (hours === null || hours < 1 || hours > 24 * 30) throw new HqError('bad_args', '--hours must be a whole number from 1 to 720');
       const rows = await sampleLog(db, hours);
       const f = (x: number | null, div: number, d = 0) => (x === null ? '-' : (x / div).toFixed(d));
       return { data: { samples: rows }, text: rows.length ? rows.map((r) => `${r.at}  non-Nix ${f(r.nonnix_awake_mib, 1)} MiB  cloud ${f(r.cloud_avail_bytes, 2 ** 30, 1)} GiB  Claude 5h ${f(r.claude_five_hour, 1)}% 7d ${f(r.claude_seven_day, 1)}%  CI ${f(r.ci_minutes_today, 1)} min${Object.keys(r.errors).length ? `  ! ${Object.keys(r.errors).join(',')}` : ''}`).join('\n') : `No samples in the last ${hours} h.` };
-    }
-    case 'broker': {
+    })
+    .with('broker', () => {
       const broker = readBrokerQuota(db, now());
       return { data: { broker, reading: pickClaudeReading(broker) }, text: formatBrokerQuota(broker) };
-    }
-    case 'set': {
+    })
+    .with('set', async () => {
       const key = need(args[0], 'setting name');
       if (flags.reset && args[1] !== undefined) throw new HqError('bad_args', 'give a VALUE or --reset, not both');
       if (!flags.reset && args[1] === undefined) throw new HqError('bad_args', 'give a VALUE, or --reset for the default');
       const settings = setCapacitySetting(db, key, flags.reset ? null : args[1]!, await actor(db, flags));
       return { data: { settings }, text: `${key} = ${settings[key as keyof typeof settings]}${flags.reset ? ' (default)' : ''}` };
-    }
-    default:
+    })
+    .otherwise(() => {
       throw new HqError('bad_args', `unknown command: hq capacity ${verb}`);
-  }
+    });
 }
 
 async function healthTick(db: Database, actor: string) {
@@ -963,29 +961,27 @@ async function healthTick(db: Database, actor: string) {
 }
 
 async function healthCommand(db: Database, verb: string | undefined, args: string[], flags: Flags): Promise<Out> {
-  switch (verb) {
-    case undefined:
-    case 'check': {
+  return match(verb)
+    .with(undefined, 'check', async () => {
       const { checks } = await runChecks(realProbe(db), healthSettings(db), healthSamples(db), now());
       const open = openProblems(db);
       const bad = checks.filter((c) => !c.ok);
       const lines = [bad.length ? `${bad.length} problem(s):` : 'All checks pass.', ...bad.map((c) => `  ✗ ${c.line}${open[c.key] ? ` (told ${open[c.key]!.since})` : ''}`), ...checks.filter((c) => c.ok).map((c) => `  ✓ ${c.line}`)];
       return { data: { healthy: bad.length === 0, checks, open }, text: lines.join('\n') };
-    }
-    case 'tick': {
+    })
+    .with('tick', async () => {
       const r = await healthTick(db, await actor(db, flags));
       return { data: { ...r }, text: `${r.checks.filter((c) => !c.ok).length} problem(s); ${r.opened.length} new (told ${owner()}); ${r.cleared.length} cleared.` };
-    }
-    case 'settings':
-      return { data: { settings: healthSettings(db) }, text: Object.entries(healthSettings(db)).map(([k, v]) => `${k} = ${v}`).join('\n') };
-    case 'set': {
+    })
+    .with('settings', () => ({ data: { settings: healthSettings(db) }, text: Object.entries(healthSettings(db)).map(([name, value]) => `${name} = ${value}`).join('\n') }))
+    .with('set', async () => {
       const key = need(args[0], 'setting name');
       const settings = setHealthSetting(db, key, args[1] ?? null, await actor(db, flags));
       return { data: { settings }, text: `${key} = ${settings[key as keyof typeof settings]}${args[1] === undefined ? ' (default)' : ''}` };
-    }
-    default:
+    })
+    .otherwise(() => {
       throw new HqError('bad_args', `unknown command: hq health ${verb}`);
-  }
+    });
 }
 
 function sinceArg(raw: string | undefined, to: Date): string {
@@ -1020,13 +1016,12 @@ const KIND_WEEKS = 8;
 async function kindsCommand(db: Database, verb: string | undefined, flags: Flags): Promise<Out> {
   const weeks = intFlag(flags.weeks, 'weeks') ?? KIND_WEEKS;
   if (weeks < 1 || weeks > 104) throw new HqError('bad_args', '--weeks must be 1 to 104');
-  switch (verb) {
-    case undefined:
-    case 'list': {
+  return match(verb)
+    .with(undefined, 'list', () => {
       const w = kindWeeks(db, weeks);
       return { data: { weeks: w, linear: linearState(db) }, text: kindText(w, linearState(db)).join('\n') };
-    }
-    case 'sync': {
+    })
+    .with('sync', async () => {
       const kinds = await syncKinds(db, realRunner, { from: weeksBack(weeks), maxDays: weeks * 7 + 2, env: cleanEnv() }),
         linear = await syncLinear(db, makeAuditedLinearCaller(db, realRunner), weeksBack(weeks)).catch((error: unknown) => ({ error: String((error as Error).message ?? error) })),
         said = 'error' in linear ? `Linear failed: ${linear.error}` : `Linear: ${linear.closed} closed issue(s), ${linear.typed} PR issue(s) typed.`,
@@ -1037,42 +1032,41 @@ async function kindsCommand(db: Database, verb: string | undefined, flags: Flags
         setMeta(db, 'kinds_ok_at', new Date().toISOString());
       }
       return { data: { ...kinds, linear, weeks: w }, text: `Fetched ${kinds.days.length} day(s), ${kinds.prs} merged PR(s). ${said}\n${kindText(w, linearState(db)).join('\n')}` };
-    }
-    default:
+    })
+    .otherwise(() => {
       throw new HqError('bad_args', `unknown command: hq kinds ${verb}`);
-  }
+    });
 }
 
 async function goalsCommand(db: Database, verb: string | undefined, rest: string[], flags: Flags): Promise<Out> {
   const days = intFlag(flags.days, 'days') ?? 14;
   if (days < 1 || days > 120) throw new HqError('bad_args', '--days must be 1 to 120');
-  switch (verb) {
-    case undefined:
-    case 'list': {
+  return match(verb)
+    .with(undefined, 'list', () => {
       const g = goalRows(db, days);
       return { data: { ...g }, text: goalsText(g, true).join('\n') };
-    }
-    case 'sync': {
+    })
+    .with('sync', async () => {
       const r = await syncGoals(db, boundedRunner(realRunner, CALL_MS), { from: new Date(Date.now() - (days + 1) * 86_400_000), env: cleanEnv() }),
         spendFailure = await refreshActionsSpend(db, boundedRunner(realRunner, CALL_MS), now(), cleanEnv());
       if (!r.errors.length && !r.deployLeft) setMeta(db, 'goals_ok_at', new Date().toISOString());
       const g = goalRows(db, days);
       const errs = r.errors.length ? `\n${r.errors.length} fetch(es) failed, retried next sync: ${r.errors.slice(0, 3).join('; ')}` : '';
       return { data: { ...r, ...g, spendFailure }, text: `Fetched ${r.days} repo-day(s): ${r.runs} run(s), ${r.closed} closed PR(s), ${r.deployRuns} deploy-prod run(s) classified${r.deployLeft ? ` (${r.deployLeft} left for the next sync)` : ''}.${errs}${spendFailure === null ? '' : `\nActions spend unknown: ${spendFailure}`}\n${goalsText(g, true).join('\n')}` };
-    }
-    case 'targets': {
+    })
+    .with('targets', () => {
       const { targets, overridden } = goalTargets(db);
       return {
         data: { targets, overridden },
         text: GOAL_KEYS.map((k) => `${k.padEnd(9)} ${targetLine(k, targets[k]).padEnd(46)} ${overridden.includes(k) ? 'set by the review' : 'default'}`).join('\n'),
       };
-    }
-    case 'target': {
+    })
+    .with('target', async () => {
       const key = need(rest[0], 'goal');
       const t = setTarget(db, key, need(rest[1], 'operator or none'), rest[2], await actor(db, flags));
       return { data: { key, target: t }, text: `Target for ${key}: ${targetLine(key as (typeof GOAL_KEYS)[number], t)}` };
-    }
-    case 'daily': {
+    })
+    .with('daily', async () => {
       const a = await actor(db, flags);
       if (rest[0] === 'skip') {
         const r = skipDaily(db, rest[1] ?? flags.date ?? sydney(now()).date, need(flags.reason, 'reason'), a);
@@ -1086,8 +1080,8 @@ async function goalsCommand(db: Database, verb: string | undefined, rest: string
       }
       const r = sendDaily(db, a);
       return { data: { run: r }, text: `Told ${owner()}: goals check-in (${r.key})` };
-    }
-    case 'weekly': {
+    })
+    .with('weekly', async () => {
       const a = await actor(db, flags);
       if (rest[0] === 'skip') {
         const r = skipWeekly(db, rest[1] ?? flags.date ?? sydney(mondayOf(now())).date, need(flags.reason, 'reason'), a);
@@ -1102,8 +1096,8 @@ async function goalsCommand(db: Database, verb: string | undefined, rest: string
       }
       const r = sendWeekly(db, a);
       return { data: { run: r }, text: `Told ${owner()}: goals weekly (${r.key})` };
-    }
-    case 'account': {
+    })
+    .with('account', async () => {
       if (rest.length === 0) {
         const labels = accountLabels(db);
         return { data: { labels }, text: Object.keys(labels).length ? Object.entries(labels).map(([k, v]) => `${k} ${v}`).join('\n') : 'No account has a name yet: hq goals account <key> <name>' };
@@ -1111,10 +1105,10 @@ async function goalsCommand(db: Database, verb: string | undefined, rest: string
       const key = need(rest[0], 'account key');
       const name = setAccountLabel(db, key, need(rest[1], 'name or none'), await actor(db, flags));
       return { data: { key, name }, text: name ? `Account ${key} is named ${name}` : `Account ${key} has no name` };
-    }
-    default:
+    })
+    .otherwise(() => {
       throw new HqError('bad_args', `unknown command: hq goals ${verb}`);
-  }
+    });
 }
 
 function runAnswersCommand(db: Database, flags: Flags): Out {
@@ -1166,8 +1160,8 @@ async function resolveTarget(raw: string): Promise<{ id: string | null; name: st
 
 async function typedCommand(db: Database, verb: string | undefined, flags: Flags): Promise<Out> {
   const line = (t: Typed) => `${t.id} ${t.at} → ${t.to_name ?? t.to_session}${t.to_id ? ` (${t.to_id.slice(0, 8)})` : ' (not resolved)'} by ${t.typed_by}, from ${typedSource(t)}\n    ${t.text.replaceAll('\n', '\n    ')}`;
-  switch (verb) {
-    case 'add': {
+  return match(verb)
+    .with('add', async () => {
       const to = need(flags.to, 'to');
       const source = parseSource(db, need(flags.source, 'source'));
       if (source.kind === 'chat') {
@@ -1177,123 +1171,116 @@ async function typedCommand(db: Database, verb: string | undefined, flags: Flags
       const target = await resolveTarget(to);
       const t = addTyped(db, { to, toId: target.id, toName: target.name, text, source, actor: await actor(db, flags) });
       return { data: { typed: t }, text: `Logged ${t.id}: ${t.to_name ?? t.to_session}${t.to_id ? '' : ' (atc could not resolve it; kept as given)'}, from ${typedSource(t)}` };
-    }
-    case 'list':
-    case undefined: {
+    })
+    .with('list', undefined, () => {
       const ts = listTyped(db, { session: flags.session ?? null, limit: flags.limit ? intFlag(flags.limit, 'limit')! : 50 });
       return { data: { typed: ts }, text: ts.length ? ts.map(line).join('\n') : 'No typed lines.' };
-    }
-    default:
+    })
+    .otherwise(() => {
       throw new HqError('bad_args', `unknown command: hq typed ${verb}`);
-  }
+    });
 }
 
 async function defsCommand(db: Database, verb: string | undefined, args: string[], flags: Flags): Promise<Out> {
   const lines = (cs: { ok: boolean; line: string }[]) => cs.map((c) => `  ${c.ok ? '✓' : '✗'} ${c.line}`).join('\n');
-  switch (verb) {
-    case 'status':
-    case undefined: {
+  return match(verb)
+    .with('status', undefined, async () => {
       const src = defsSource();
       const dir = DEFS();
       const head = (await realRunner(['git', '-C', dir, 'rev-parse', '--short', 'origin/main'], { env: cleanEnv() })).stdout.trim() || '?';
       const override = config().HQ_DEFINITIONS_DIR ? ' (HQ_DEFINITIONS_DIR overrides it)' : '';
       return { data: { source: src, dir, originMain: head, sources: Object.fromEntries(Object.entries(DEFS_SOURCES).map(([k, v]) => [k, v.dir()])) }, text: `definitions: ${src}${override}\ncheckout: ${dir} (origin/main ${head})\nswitch file: ${defsSourceFile()}` };
-    }
-    case 'setup': {
+    })
+    .with('setup', async () => {
       const r = await setupCheckout(realRunner, parseTree(need(args[0], 'tree (hq or private)')));
       return { data: r, text: r.made ? `Cloned into ${r.dir}.` : `${r.dir} is already a checkout.` };
-    }
-    case 'check': {
+    })
+    .with('check', () => {
       const source = parseDefsSource(args[0] ?? defsSource());
       const cs = preflight(source);
       const bad = cs.filter((c) => !c.ok).length;
       return { data: { source, ready: bad === 0, checks: cs }, text: `${source}: ${bad ? `${bad} problem(s)` : 'ready'}\n${lines(cs)}` };
-    }
-    case 'sync': {
+    })
+    .with('sync', async () => {
       const who = await actor(db, flags);
       return runSyncCommand(db, who);
-    }
-    case 'use': {
+    })
+    .with('use', async () => {
       const r = useSource(db, parseDefsSource(need(args[0], 'source (hq)')), await actor(db, flags));
       return { data: r, text: `Definitions: ${r.from} → ${r.to}.\n${lines(r.checks)}\nRunning sessions keep their directory until they restart; the next fleet spawn, wake and lanes tick use ${r.to}.` };
-    }
-    default:
+    })
+    .otherwise(() => {
       throw new HqError('bad_args', `unknown command: hq defs ${verb}`);
-  }
+    });
 }
 
 async function morningCommand(db: Database, verb: string | undefined, flags: Flags): Promise<Out> {
-  switch (verb) {
-    case 'skip': {
+  return match(verb)
+    .with('skip', async () => {
       const r = skipMorning(db, flags.date ?? sydney(now()).date, need(flags.reason, 'reason'), await actor(db, flags));
       return { data: { run: r }, text: `Morning reports for ${r.key}: skipped (${r.detail})` };
-    }
-    case 'tick': {
+    })
+    .with('tick', async () => {
       const r = morningTick(db, await actor(db, flags));
       return { data: { run: r }, text: r ? `Told ${owner()}: morning reports due (${r.key})` : 'Nothing to do: not yet 08:15 Sydney, or today already ran.' };
-    }
-    case 'status':
-    case undefined: {
+    })
+    .with('status', undefined, () => {
       const rs = recentRuns(db);
       const w = windows(now());
       return {
         data: { runs: rs, next: w },
         text: [`Morning reports, 08:15 Sydney daily. Today's text would be:`, morningText(w, false).replace(/^/gm, '  '), '', ...(rs.length ? rs.map((r) => `${r.key} ${r.result} at ${r.at}${r.detail ? ` (${r.detail})` : ''}${r.result === 'queued' ? `, ${r.sent ?? 'not in the outbox'}` : ''}`) : ['No runs yet.'])].join('\n'),
       };
-    }
-    default:
+    })
+    .otherwise(() => {
       throw new HqError('bad_args', `unknown command: hq morning ${verb}`);
-  }
+    });
 }
 
 async function followupCommand(db: Database, verb: string | undefined, args: string[], flags: Flags): Promise<Out> {
-  switch (verb) {
-    case 'add': {
+  return match(verb)
+    .with('add', async () => {
       const by = await actor(db, flags);
       const followup = flags.backfill ? addBackfill(db, { issue: need(args[0], 'issue'), fromRef: flags.from ?? null, at: need(flags.at, 'at'), actor: by }) : addFollowup(db, { issue: need(args[0], 'issue'), fromRef: need(flags.from, 'from'), actor: by });
       return { data: { followup }, text: `Counted ${followup.issue} (${followup.source}), filed ${followup.filed_at}${followup.from_ref ? ` from ${followup.from_ref}` : ''}` };
-    }
-    case 'drop': {
+    })
+    .with('drop', async () => {
       const issue = need(args[0], 'issue');
       if (!dropFollowup(db, issue, await actor(db, flags))) throw new HqError('not_found', `${issue} is not counted`);
       return { data: { dropped: issue }, text: `Dropped ${issue}` };
-    }
-    case 'list':
-    case undefined: {
+    })
+    .with('list', undefined, () => {
       const fs = listFollowups(db);
       return { data: { followups: fs }, text: fs.length ? fs.map((f) => `${f.filed_at} ${f.issue} ${f.source}${f.from_ref ? ` from ${f.from_ref}` : ''}`).join('\n') : 'No follow-ups counted.' };
-    }
-    default:
+    })
+    .otherwise(() => {
       throw new HqError('bad_args', `unknown command: hq followup ${verb}`);
-  }
+    });
 }
 
 async function markCommand(db: Database, verb: string | undefined, args: string[], flags: Flags): Promise<Out> {
-  switch (verb) {
-    case 'add': {
+  return match(verb)
+    .with('add', async () => {
       if (flags.grant !== undefined) {
         return runGrantMarkAdd(db, flags);
       }
       const m = addMark(db, { kind: need(flags.kind, 'kind'), text: need(flags.text, 'text'), ref: flags.ref ?? null, at: flags.at ?? null, actor: await actor(db, flags) });
       return { data: { mark: m }, text: `Mark ${m.id} at ${m.at}: ${m.text}` };
-    }
-    case 'grant': {
-      return runMarkGrant(db, args, flags);
-    }
-    case 'drop': {
+    })
+    .with('grant', () => runMarkGrant(db, args, flags))
+    .with('drop', async () => {
       const id = intFlag(need(args[0] ?? flags.id, 'mark id'), 'id')!;
       const m = dropMark(db, id, await actor(db, flags));
       if (!m) throw new HqError('not_found', `no mark ${id}`);
       return { data: { dropped: m }, text: `Dropped mark ${id}: ${m.text}` };
-    }
-    case 'list':
-    case undefined: {
+    })
+    .with('list', undefined, () => {
       const ms = listMarks(db, flags.since ? sinceArg(flags.since, now()) : null);
       return { data: { marks: ms }, text: ms.length > 0 ? ms.map((m) => `${m.id} ${m.at} [${m.kind}${m.grant_name === null ? '' : ` ${m.grant_name}`}] ${m.text}${m.ref ? ` ${m.ref}` : ''} (by ${m.added_by})`).join('\n') : 'No marks.' };
-    }
-    default:
+    })
+    .otherwise(() => {
       throw new HqError('bad_args', `unknown command: hq mark ${verb}`);
-  }
+    });
 }
 
 async function runGrantMarkAdd(db: Database, flags: Flags): Promise<Out> {
@@ -1364,8 +1351,8 @@ async function installTimer(unit: string, u: { service: string; timer: string })
 const rcDeps = (): RcDeps => ({ state: (id) => rcState(id), run: realRunner, self: selfCommand() });
 
 async function fleetCommand(db: Database, verb: string | undefined, args: string[], flags: Flags): Promise<Out> {
-  switch (verb) {
-    case 'ensure': {
+  return match(verb)
+    .with('ensure', async () => {
       // Before atc: a stuck watcher is told even when atc is the thing that's down.
       const watcher = flags['dry-run'] ? null : watcherAlert(db, await actor(db, flags));
       if (!flags['dry-run']) {
@@ -1390,8 +1377,8 @@ async function fleetCommand(db: Database, verb: string | undefined, args: string
       } finally {
         c.close();
       }
-    }
-    case 'rc': {
+    })
+    .with('rc', async () => {
       const name = need(args[0], 'name');
 
       // The call that failed is never retried, since a timed-out submit may have typed.
@@ -1420,9 +1407,8 @@ async function fleetCommand(db: Database, verb: string | undefined, args: string
       } finally {
         c?.close();
       }
-    }
-    case 'remove':
-    case 'restore': {
+    })
+    .with('remove', 'restore', async () => {
       const name = need(args[0], 'name');
       const r = retireName(db, name, await actor(db, flags), verb === 'remove');
       const text =
@@ -1430,9 +1416,8 @@ async function fleetCommand(db: Database, verb: string | undefined, args: string
           ? `${name} ${r.changed ? 'is retired' : 'was already retired'}: ensure never spawns it.${r.wakeRemoved ? ` Removed ${r.wakeRemoved} wake-list entr${r.wakeRemoved === 1 ? 'y' : 'ies'}.` : ''} hq stopped nothing; stop its session yourself.`
           : `${name} ${r.changed ? 'is declared again' : 'was not retired'}: ensure spawns it after 10 min without a live session.`;
       return { data: { name, ...r, retired: retiredNames(db) }, text };
-    }
-    case 'status':
-    case undefined: {
+    })
+    .with('status', undefined, async () => {
       const last = loadFleetLast(db);
       const timer = (await realRunner(['systemctl', '--user', 'is-active', `${FLEET_UNIT}.timer`], { env: cleanEnv() })).stdout.trim() || 'inactive';
       const declared = declaredFleet(db);
@@ -1462,8 +1447,8 @@ async function fleetCommand(db: Database, verb: string | undefined, args: string
       ];
 
       return { data: { timer, declared: declared.map((e) => buildFleetChecks(e, drift[e.name], plugins[e.name])), retired: retiredNames(db), roles: rolesByName(retiredNames(db)), forwards: forwards(db), last }, text: lines.join('\n') };
-    }
-    case 'timer': {
+    })
+    .with('timer', async () => {
       if (args[0] === 'install') {
         await installTimer(FLEET_UNIT, fleetTimerUnits(selfCommand().join(' '), process.env));
         return { data: { unit: `${FLEET_UNIT}.timer` }, text: `Fleet check every 5 min (${FLEET_UNIT}.timer).` };
@@ -1473,21 +1458,20 @@ async function fleetCommand(db: Database, verb: string | undefined, args: string
         return { data: { removed: true }, text: 'Fleet timer off.' };
       }
       throw new HqError('bad_args', 'hq fleet timer install|remove');
-    }
-    default:
+    })
+    .otherwise(() => {
       throw new HqError('bad_args', `unknown command: hq fleet ${verb}`);
-  }
+    });
 }
 
 async function probeCommand(db: Database, verb: string | undefined, args: string[], flags: Flags): Promise<Out> {
-  switch (verb) {
-    case 'run': {
+  return match(verb)
+    .with('run', async () => {
       const r = await probeOnce(db, realFetcher, await actor(db, flags));
       const extra = `${r.opened !== undefined ? `; outage ${r.opened} opened` : ''}${r.closed !== undefined ? `; outage ${r.closed} closed` : ''}${r.unreadyOpened !== undefined ? `; unready ${r.unreadyOpened} opened` : ''}${r.unreadyClosed !== undefined ? `; unready ${r.unreadyClosed} closed` : ''}`;
       return { data: { ...r }, text: `${r.state} (${r.ms} ms)${extra}` };
-    }
-    case 'status':
-    case undefined: {
+    })
+    .with('status', undefined, async () => {
       const days = intFlag(flags.days, 'days') ?? 7;
       if (days < 1 || days > 60) throw new HqError('bad_args', '--days must be 1 to 60');
       const to = now();
@@ -1512,8 +1496,8 @@ async function probeCommand(db: Database, verb: string | undefined, args: string
         ...unready.map((o) => `  #${o.id} ${o.started_at} to ${o.ended_at ?? 'now'} (detected ${o.detected_at})`),
       ];
       return { data: { timer, last, lastReady: lastReadyRow, open, openUnready: openUnreadyRow, downtime: d, outages, unready }, text: lines.join('\n') };
-    }
-    case 'timer': {
+    })
+    .with('timer', async () => {
       if (args[0] === 'install') {
         await installTimer(PROBE_UNIT, buildProbeTimerUnits(selfCommand().join(' '), process.env));
         return { data: { unit: `${PROBE_UNIT}.timer` }, text: `Nix probe every minute (${PROBE_UNIT}.timer).` };
@@ -1523,22 +1507,21 @@ async function probeCommand(db: Database, verb: string | undefined, args: string
         return { data: { removed: true }, text: 'Probe timer off.' };
       }
       throw new HqError('bad_args', 'hq probe timer install|remove');
-    }
-    default:
+    })
+    .otherwise(() => {
       throw new HqError('bad_args', `unknown command: hq probe ${verb}`);
-  }
+    });
 }
 
 async function backupCommand(db: Database, verb: string | undefined, args: string[], flags: Flags): Promise<Out> {
   const run: Runner = (cmd, opts) => realRunner(cmd, { ...opts, env: opts?.env ?? cleanEnv() });
-  switch (verb) {
-    case 'run': {
+  return match(verb)
+    .with('run', async () => {
       const r = await runBackup(db, run, await actor(db, flags));
       if (!r.ok) throw new HqError('backup_failed', `backup failed after ${r.seconds}s: ${r.error}`);
       return { data: { backup: r }, text: `Snapshot ${r.snapshot} in ${r.seconds}s; remote: ${r.remote}.` };
-    }
-    case 'status':
-    case undefined: {
+    })
+    .with('status', undefined, async () => {
       const { last, lastOk, test } = lastBackup(db);
       let remote: string;
       try {
@@ -1560,17 +1543,17 @@ async function backupCommand(db: Database, verb: string | undefined, args: strin
         `restore test: ${test ? `${test['at']} ${test['ok'] ? 'ok' : `FAILED: ${test['error']}`} (${test['files']} files, hq.db ${test['dbCheck']})` : 'never'}`,
       ];
       return { data: { timer, last, lastOk, remote, snapshots: snaps.length, test }, text: lines.join('\n') };
-    }
-    case 'restore': {
+    })
+    .with('restore', async () => {
       const r = await restore(run, need(flags.to, 'to'), { snapshot: flags.snapshot ?? 'latest', remote: !!flags.remote });
       return { data: { ...r }, text: `Restored into ${r.to}.${r.db ? ` hq.db is at ${r.db}.` : ''} Nothing live was touched.` };
-    }
-    case 'test': {
+    })
+    .with('test', async () => {
       const r = await restoreTest(db, run, { remote: !!flags.remote, scratch: backupPaths().state }, await actor(db, flags));
       if (!r.ok) throw new HqError('restore_test_failed', `restore test failed: ${r.error ?? r.dbCheck}`);
       return { data: { ...r }, text: `Restore test passed: ${r.files} files, hq.db ${r.dbCheck}.` };
-    }
-    case 'timer': {
+    })
+    .with('timer', async () => {
       const dir = `${process.env['HOME']}/.config/systemd/user`;
       if (args[0] === 'install') {
         const p = ensurePassword();
@@ -1588,15 +1571,15 @@ async function backupCommand(db: Database, verb: string | undefined, args: strin
         return { data: { removed: true }, text: 'Hourly timer off. The snapshots stay.' };
       }
       throw new HqError('bad_args', 'hq backup timer install|remove');
-    }
-    default:
+    })
+    .otherwise(() => {
       throw new HqError('bad_args', `unknown command: hq backup ${verb}`);
-  }
+    });
 }
 
 async function newsCommand(db: Database, verb: string | undefined, flags: Flags): Promise<Out> {
-  switch (verb) {
-    case 'add': {
+  return match(verb)
+    .with('add', async () => {
       const n = addNews(db, {
         from: flags.from ?? (await actor(db, flags)),
         topic: need(flags.topic, 'topic'),
@@ -1607,21 +1590,20 @@ async function newsCommand(db: Database, verb: string | undefined, flags: Flags)
         tag: flags.tag ?? null,
       });
       return { data: { news: n }, text: `News ${n.id} filed under ${n.topic}${n.tag ? ` (tag ${n.tag})` : ''}${n.needs_geoff ? `; ${owner()} is told now` : ''}.` };
-    }
-    case 'read': {
+    })
+    .with('read', async () => {
       const n = readNews(db, intFlag(need(flags.upto, 'upto'), 'upto')!, await actor(db, flags));
       return { data: { read: n }, text: n ? `Marked ${n} item(s) read.` : 'Nothing unread up to there.' };
-    }
-    case undefined:
-    case 'list': {
+    })
+    .with(undefined, 'list', () => {
       const all = !!flags.all;
       const items = listNews(db, { all, limit: intFlag(flags.limit, 'limit') ?? 200 });
       const more = all ? 0 : unreadCount(db) - items.length;
       return { data: { news: items, moreUnread: more }, text: digest(items, { all, more }) };
-    }
-    default:
+    })
+    .otherwise(() => {
       throw new HqError('bad_args', `unknown command: hq news ${verb}`);
-  }
+    });
 }
 
 async function lanesCommand(context: Pick<Ctx, 'db' | 'verb' | 'rest' | 'flags' | 'run'>): Promise<Out> {
@@ -1629,8 +1611,8 @@ async function lanesCommand(context: Pick<Ctx, 'db' | 'verb' | 'rest' | 'flags' 
   const verb = context.verb;
   const flags = context.flags;
   const by = () => actor(db, flags);
-  switch (verb) {
-    case 'tick': {
+  return match(verb)
+    .with('tick', async () => {
       const me = await by();
       const run = boundedRunner(context.run, CALL_MS);
       const refresh =
@@ -1643,8 +1625,8 @@ async function lanesCommand(context: Pick<Ctx, 'db' | 'verb' | 'rest' | 'flags' 
       const capacity = await readCapacity(realRunner);
       const look = tick(db, capacity, me);
       return { data: { ...look, ...(refresh === null ? {} : { refresh }) }, text: `${formatRefreshLine(refresh)}${look.slots} slot(s) free${look.freeMib === null ? '' : ` (${look.freeMib} MiB)`}; ${look.nudged ? `nudged ${orchestratorName()}` : look.why}` };
-    }
-    case 'watch': {
+    })
+    .with('watch', async () => {
       const interval = (intFlag(flags.interval, 'interval') ?? 300) * 1000;
       const me = await by();
       try {
@@ -1665,41 +1647,41 @@ async function lanesCommand(context: Pick<Ctx, 'db' | 'verb' | 'rest' | 'flags' 
         },
       };
       return watchLoop(db, { me, run: boundedRunner(realRunner, CALL_MS), log: (line) => console.log(line), steps }, interval);
-    }
-    case 'start': {
+    })
+    .with('start', async () => {
       const r = await installLanes(realRunner, { home: getHome(), exec: selfCommand(), interval: intFlag(flags.interval, 'interval'), processEnv: process.env, env: cleanEnv() });
       return {
         data: { unit: LANES_UNIT, path: r.path, interval: r.interval, replacedTransient: r.replacedTransient },
         text: `Lanes watcher on duty as ${LANES_UNIT}, every ${r.interval}s; it restarts after a crash and starts at login.${r.replacedTransient ? ' Replaced the old transient unit.' : ''} Logs: journalctl --user -u ${LANES_UNIT}`,
       };
-    }
-    case 'stop': {
+    })
+    .with('stop', async () => {
       await stopLanes(realRunner, cleanEnv());
       return { data: { unit: LANES_UNIT, stopped: true }, text: 'Lanes watcher stood down; it stays off after a reboot until hq lanes start.' };
-    }
-    case 'hold': {
+    })
+    .with('hold', async () => {
       const h = holdLanes(db, intFlag(need(flags.minutes, 'minutes'), 'minutes')!, need(flags.reason, 'reason'), await by());
       return { data: { hold: h }, text: `Slot nudges held until ${h.until}: ${h.reason}. They resume by themselves; hq lanes release ends it sooner.` };
-    }
-    case 'release': {
+    })
+    .with('release', async () => {
       const had = releaseLanes(db, await by());
       return { data: { released: had }, text: had ? 'Slot nudges resume from the next look.' : 'No lanes hold to release.' };
-    }
-    case 'cap': {
+    })
+    .with('cap', () => {
       const args = parseLanesCapArgs(context.rest, flags.until, flags.reason);
       return runLanesCapCommand({ db, at: readCapClock(args), args, probe: readOwnerProbeDeps() });
-    }
-    case 'skip': {
+    })
+    .with('skip', async () => {
       const args = parseLaneSkipArgs(context.rest, flags.until, flags.reason);
       return runLaneSkipCommand({ db, actor: await by(), at: now(), args });
-    }
-    case 'promotable': {
+    })
+    .with('promotable', async () => {
       const backlog = await readBacklogIssues(makeAuditedLinearCaller(db, context.run), rulesTable.team, readDoneOpenIssues(db));
       const issues = backlog.promotable.map((issue) => ({ identifier: issue.identifier, title: issue.title }));
       const head = issues.length > 0 ? issues.map((issue) => `${issue.identifier}  ${issue.title}`) : ['No Backlog issue is ready to promote.'];
       return { data: { issues, held: backlog.held }, text: [...head, ...backlog.held.map(formatHeldIssue)].join('\n') };
-    }
-    case 'ready': {
+    })
+    .with('ready', async () => {
       if (flags.lane) {
         const counts = parseReady(await readLanes(), flags.lane);
         const total = flags['ready-total'] === undefined ? null : parseReadyTotal(flags['ready-total']);
@@ -1712,10 +1694,8 @@ async function lanesCommand(context: Pick<Ctx, 'db' | 'verb' | 'rest' | 'flags' 
       const n = intFlag(need(flags.count, 'count (or --lane name=n,...)'), 'count')!;
       reportReady(db, n, await by());
       return { data: { count: n }, text: `Noted: ${n} eligible Ready issue(s) in total; per lane, use --lane name=n,...` };
-    }
-    case 'status':
-    case 'log':
-    case undefined: {
+    })
+    .with('status', 'log', undefined, async () => {
       const unit = await realRunner(['systemctl', '--user', 'is-active', LANES_UNIT], { env: cleanEnv() });
       const enabled = (await realRunner(['systemctl', '--user', 'is-enabled', LANES_UNIT], { env: cleanEnv() })).stdout.trim() || 'not installed';
       const last = db.query('SELECT * FROM lanes_samples ORDER BY seq DESC LIMIT 1').get();
@@ -1755,10 +1735,10 @@ async function lanesCommand(context: Pick<Ctx, 'db' | 'verb' | 'rest' | 'flags' 
       ];
       const slotCauses = { now: { cause: slotCause.cause, slots: slotCause.slots, since: slotCause.since, readyAgeMinutes: slotCause.readyAgeMinutes, reason: slotCause.reason, backlogError: slotCause.backlogError }, today: slotMinutesToday };
       return { data: { watcher: unit.stdout.trim() || 'inactive', enabled, hold, plan: slotPlan, placeTypes: sample.placeTypes ?? null, cap: capView, slotCauses, last, ready, idle24h: gap24, nudges }, text: lines.join('\n') };
-    }
-    default:
+    })
+    .otherwise(() => {
       throw new HqError('bad_args', `unknown command: hq lanes ${verb}`);
-  }
+    });
 }
 
 async function wakeCommand(db: Database, verb: string | undefined, args: string[], flags: Flags): Promise<Out> {
@@ -1771,8 +1751,8 @@ async function wakeCommand(db: Database, verb: string | undefined, args: string[
       c.close();
     }
   };
-  switch (verb) {
-    case undefined: {
+  return match(verb)
+    .with(undefined, async () => {
       const r = await runWake(db, { dryRun: !!flags['dry-run'], waitMs: (intFlag(flags.wait, 'wait') ?? 0) * 1000, actor: await by() });
       const lines = [
         `${r.dryRun ? 'Would wake' : 'Woke'} after restart ${r.runID}:`,
@@ -1780,29 +1760,29 @@ async function wakeCommand(db: Database, verb: string | undefined, args: string[
         ...r.skipped.map((s) => `  - ${s.name}: ${s.why}`),
       ];
       return { data: { ...r }, text: lines.join('\n') };
-    }
-    case 'list': {
+    })
+    .with('list', () => {
       const rows = wakeList(db);
       return { data: { sessions: rows }, text: rows.length ? rows.map((r) => `${r.session_id} ${r.name}${r.note ? ` · ${r.note}` : ''}`).join('\n') : 'Wake list empty.' };
-    }
-    case 'add': {
+    })
+    .with('add', async () => {
       const s = await resolveSession(need(args[0], 'session (id or live name)'));
       const r = wakeAdd(db, s, flags.note ?? null, await by());
       return { data: r, text: `${r.result}: ${s.name} (${s.id})` };
-    }
-    case 'remove': {
+    })
+    .with('remove', async () => {
       const e = wakeRemove(db, need(args[0], 'session (id or name)'), await by());
       return { data: { removed: e }, text: `removed: ${e.name} (${e.session_id})` };
-    }
-    case 'import': {
+    })
+    .with('import', async () => {
       const file = need(args[0], 'file (wake-sessions.txt format)');
       const actorName = await by();
       const results = parseWakeFile(await Bun.file(file).text()).map((s) => ({ ...wakeAdd(db, s, null, actorName) }));
       return { data: { results }, text: results.map((r) => `${r.result}: ${r.entry.name}`).join('\n') };
-    }
-    default:
+    })
+    .otherwise(() => {
       throw new HqError('bad_args', `unknown command: hq wake ${verb}`);
-  }
+    });
 }
 
 function status(db: Database): Out {
@@ -2137,8 +2117,8 @@ async function runCommand(context: Ctx): Promise<Out> {
   const by = () => actor(db, flags);
   const arg = (i: number, what: string) => need(args[i], what);
   const view = (issue: string) => viewRun(db, getRun(db, issue)!);
-  switch (verb) {
-    case 'add': {
+  return match(verb)
+    .with('add', async () => {
       if (args.length > 1) {
         throw new HqError('bad_args', `hq run add takes one issue: pass the session as --session ${args[1]}`);
       }
@@ -2170,34 +2150,34 @@ async function runCommand(context: Ctx): Promise<Out> {
       const said = r.result === 'added' ? 'On the board.' : 'Already on the board.';
       const hint = ignored ? `\nIgnored --session ${session}: to add it to the run, use ${ignored.next}` : '';
       return { data: { result: r.result, run: r.run, ignored }, text: `${runLine(r.run)}\n${said}${hint}` };
-    }
-    case 'size': {
+    })
+    .with('size', async () => {
       const issue = resolveRun(db, arg(0, 'issue')).issue;
       const guess = parseSize(need(flags.size, 'size'), need(flags.lines, 'lines'))!;
       setSize(db, issue, guess, await by());
       return { data: { run: view(issue) }, text: `${issue}: ${guess.size}, about ${guess.lines.toLocaleString('en-AU')} lines` };
-    }
-    case 'session': {
+    })
+    .with('session', async () => {
       if (flags.add && flags.remove) throw new HqError('bad_args', 'give --add or --remove, not both');
       const raw = arg(1, 'session id');
       const r = setSession(db, arg(0, 'issue'), flags.remove ? await expandSession(raw).catch(() => raw.toLowerCase()) : await expandSession(raw), await by(), flags.add ? 'add' : flags.remove ? 'remove' : 'main');
       return { data: { run: r }, text: runLine(r) };
-    }
-    case 'lane': {
+    })
+    .with('lane', async () => {
       const a = laneArgs(args, flags.lane);
       const issue = resolveRun(db, a.key).issue;
       setRunLane(db, issue, checkLane(await readLanes(), a.lane), await by());
       return { data: { run: view(issue) }, text: runLine(view(issue)) };
-    }
-    case 'reopen': {
+    })
+    .with('reopen', async () => {
       const prev = resolveRun(db, arg(0, 'issue'));
       if (prev.state !== 'done' && prev.state !== 'dropped') throw new HqError('bad_state', `${prev.issue} is ${prev.state}, not done or dropped: nothing to reopen`);
       const pacing = await loadPacing(pacingPath());
       const reopenedBy = await by();
       const reopened = reopenRun(db, { issue: prev.issue, next: flags.next ?? 'Reopened: agent working.', design: { slots: pacing.design, error: pacing.designError, asked: flags.asked ?? null }, actor: reopenedBy });
       return { data: { run: reopened }, text: `${runLine(reopened)}\nReopened.` };
-    }
-    case 'state': {
+    })
+    .with('state', async () => {
       const refusal = readMoveRefusal(db, arg(0, 'issue'), arg(1, 'state'), flags.force === true);
       if (refusal !== null) {
         throw new HqError('bad_state', refusal);
@@ -2217,12 +2197,12 @@ async function runCommand(context: Ctx): Promise<Out> {
         return setState(db, issue, state, toExactOptional({ liveCheck, next: flags.next, waitsOn: parseWaitsOn(flags['waits-on']), note: flags.note ?? null, reopen: Boolean(flags.reopen), waitsOnGeoff: parseGeoffFlag(flags) }), actorName);
       }).immediate();
       return { data: { run: moved }, text: runLine(moved) };
-    }
-    case 'check': {
+    })
+    .with('check', async () => {
       const r = setLiveCheck(db, resolveRun(db, arg(0, 'issue')).issue, arg(1, 'owed or none'), await by());
       return { data: { run: r }, text: runLine(r) };
-    }
-    case 'ship': {
+    })
+    .with('ship', async () => {
       const r = await shipRuns(db, boundedRunner(realRunner, CALL_MS), now(), { dryRun: !!flags['dry-run'] });
       const head = r.dryRun ? 'Would move' : 'Moved';
       const text = [
@@ -2235,104 +2215,104 @@ async function runCommand(context: Ctx): Promise<Out> {
       ].join('\n');
       if (!r.dryRun) setMeta(db, CHECKED_AT, iso(now()));
       return { data: { ...r }, text };
-    }
-    case 'done': {
+    })
+    .with('done', async () => {
       const actorName = await by();
       const closed = setState(db, arg(0, 'issue'), 'done', { note: flags.note ?? flags.reason ?? null }, actorName);
       const wrapUp = await runDoneWrapUp(db, closed.issue, actorName);
       return { data: { run: closed, wrapUp }, text: `${runLine(closed)}\n${formatWrapUp(wrapUp)}\nDone. Off the board.` };
-    }
-    case 'drop': {
+    })
+    .with('drop', async () => {
       const actorName = await by();
       const dropped = setState(db, arg(0, 'issue'), 'dropped', { note: flags.note ?? flags.reason ?? null }, actorName);
       return { data: { run: dropped }, text: `${runLine(dropped)}\nDropped.` };
-    }
-    case 'next':
-    case 'gate':
-    case 'title': {
-      const value = arg(1, verb);
-      const r = setField(db, arg(0, 'issue'), verb, verb === 'gate' && value === 'none' ? null : value, await by());
-      return { data: { run: r }, text: runLine(r) };
-    }
-    case 'place': {
+    })
+    .with('next', 'gate', 'title', async (field) => {
+      const value = arg(1, field);
+      const stored = field === 'gate' && value === 'none' ? null : value;
+      const actorName = await by();
+      const updated = setField(db, arg(0, 'issue'), field, stored, actorName);
+      return { data: { run: updated }, text: runLine(updated) };
+    })
+    .with('place', async () => {
       const actorName = await by();
       const placed = setPlace(db, { issue: arg(0, 'issue'), place: arg(1, 'place (imp, local or none)'), note: flags.note ?? null, actor: actorName });
       if (!placed.ok) {
         throw new HqError('bad_args', placed.refusal);
       }
       return { data: { run: placed.run }, text: `${runLine(placed.run)}\nNow ${placed.run.place}.` };
-    }
-    case 'geoff-chat': {
+    })
+    .with('geoff-chat', async () => {
       const r = setGeoffChat(db, arg(0, 'issue'), arg(1, 'on or off') === 'on', await by());
       return { data: { run: r }, text: runLine(r) };
-    }
-    case 'pr': {
+    })
+    .with('pr', async () => {
       const p = addPr(db, arg(0, 'issue'), arg(1, 'pr (repo#n or URL)'), await by());
       return { data: { pr: p }, text: runLine(view(p.issue)) };
-    }
-    case 'final': {
+    })
+    .with('final', async () => {
       const sha = need(flags.sha, 'sha');
       const resolution = await resolveCliFinal(makeFinalResolver(boundedRunner(run, CALL_MS)), arg(0, 'pr'), sha);
       const finalizer = await by();
       const finalized = finalPr(db, arg(0, 'pr'), { sha, actor: finalizer, tally: { fixed: parseFixed(flags.fixed), followups: parseFollowups(flags.followups) }, resolution });
       return { data: { pr: finalized }, text: runLine(view(finalized.issue)) };
-    }
-    case 'unfinal': {
+    })
+    .with('unfinal', async () => {
       const p = unfinalPr(db, arg(0, 'pr'), await by(), flags.reason ?? null);
       return { data: { pr: p }, text: runLine(view(p.issue)) };
-    }
-    case 'reviewing': {
+    })
+    .with('reviewing', async () => {
       const p = reviewStarted(db, arg(0, 'pr'), await by());
       return { data: { pr: p }, text: runLine(view(p.issue)) };
-    }
-    case 'reviewed': {
+    })
+    .with('reviewed', async () => {
       const p = reviewedPr(db, arg(0, 'pr'), need(flags.sha, 'sha'), { recheck: !!flags.recheck, force: !!flags.force }, await by());
       return { data: { pr: p }, text: `${runLine(view(p.issue))}
 Round ${p.review_round} recorded at ${p.reviewed_sha}.` };
-    }
-    case 'unmerge': {
+    })
+    .with('unmerge', async () => {
       const p = unmergePr(db, arg(0, 'pr'), await by(), flags.reason ?? null);
       return { data: { pr: p }, text: runLine(view(p.issue)) };
-    }
-    case 'merged':
-    case 'closed': {
+    })
+    .with('merged', 'closed', async (to) => {
       // The watcher may have marked it merged already: the call then succeeds and changes nothing.
-      const already = verb === 'merged' ? readMergedPR(db, arg(0, 'pr')) : null;
+      const already = to === 'merged' ? readMergedPR(db, arg(0, 'pr')) : null;
       if (already) {
         return { data: { pr: already }, text: runLine(view(already.issue)) };
       }
-      if (verb === 'merged') await checkMergedOnGitHub(boundedRunner(realRunner, CALL_MS), arg(0, 'pr'));
-      const closed = closePr(db, arg(0, 'pr'), { to: verb, actor: await by() });
+      if (to === 'merged') {
+        await checkMergedOnGitHub(boundedRunner(realRunner, CALL_MS), arg(0, 'pr'));
+      }
+      const closed = closePr(db, arg(0, 'pr'), { to, actor: await by() });
       return { data: { pr: closed }, text: runLine(view(closed.issue)) };
-    }
-    case 'note': {
+    })
+    .with('note', async () => {
       const resolutions = await resolveNoteFinals(db, makeFinalResolver(boundedRunner(run, CALL_MS)), arg(0, 'issue or session'), arg(1, 'text'));
       const noter = await by();
       const stored = addNote(db, arg(0, 'issue or session'), arg(1, 'text'), { label: flags.label ?? null, actor: noter, resolutions });
       return { data: { note: stored }, text: runLine(view(stored.issue)) };
-    }
-    case 'show': {
+    })
+    .with('show', () => {
       const shown = viewRun(db, resolveRun(db, arg(0, 'issue or session'), 'allow'));
       const notes = notesFor(db, shown.issue, intFlag(flags.notes, 'notes') ?? 5);
       const designPass = readDesignMoves(db, shown.issue);
       const text = [runLine(shown), ...shown.sessions.map((session) => `  ${session.helper ? 'helper' : 'session'} ${session.session_id}${session.active ? ' (active)' : ` (ended ${session.ended_at})`}`), ...notes.map((note) => `  ${note.at} [${note.source}${note.label ? `/${note.label}` : ''}] ${note.text.replaceAll(/\s+/gu, ' ').slice(0, 200)}`)].join('\n');
       return { data: { run: shown, notes, designPass }, text: [text, ...formatDesignMoves(designPass)].join('\n') };
-    }
-    case 'list':
-    case undefined: {
+    })
+    .with('list', undefined, () => {
       const rows = listRuns(db, !!flags.all);
       const byLane = runningByLane(db);
       const counts = Object.entries(byLane).map(([l, n]) => `${l || 'no lane'} ${n}`).join(', ');
       const text = rows.length ? ['| Session | Issue | PR | Next |', '|---|---|---|---|', ...rows.map(runLine), '', `Running by lane: ${counts || 'none'}`].join('\n') : 'The board is clear.';
       return { data: { runs: rows, runningByLane: byLane }, text };
-    }
-    case 'watchlist': {
+    })
+    .with('watchlist', async () => {
       const w = watchlist(db);
       const body = w.map((x) => `${x.session_id} ${x.issue}`).join('\n');
       if (flags.write) await Bun.write(flags.write, body ? `${body}\n` : '');
       return { data: { sessions: w, written: flags.write ?? null }, text: body || '(no active sessions)' };
-    }
-    case 'sweep': {
+    })
+    .with('sweep', async () => {
       const c = await AtcClient.open();
       const wrapUpDeps = buildWrapUpDeps();
       try {
@@ -2347,8 +2327,8 @@ Round ${p.review_round} recorded at ${p.reviewed_sha}.` };
         wrapUpDeps.close();
         c.close();
       }
-    }
-    case 'tidy': {
+    })
+    .with('tidy', async () => {
       const dryRun = flags['dry-run'] === true;
       const options: WrapUpOptions = dryRun ? { dryRun } : { actor: await by() };
       const tidyDeps = buildWrapUpDeps();
@@ -2358,10 +2338,10 @@ Round ${p.review_round} recorded at ${p.reviewed_sha}.` };
       } finally {
         tidyDeps.close();
       }
-    }
-    default:
+    })
+    .otherwise(() => {
       throw new HqError('bad_args', `unknown command: hq run ${verb}`);
-  }
+    });
 }
 
 async function slotsCommand(db: Database, verb: string | undefined, args: string[], flags: Flags): Promise<Out> {

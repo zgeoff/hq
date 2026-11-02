@@ -1,3 +1,4 @@
+import { match } from 'ts-pattern';
 import type { SessionInfo } from '../atc/session-schema.ts';
 import { atcStateDir } from './atc-state-dir.ts';
 import type { RestartRecord, WakePlan, WakeReason } from './types.ts';
@@ -30,13 +31,20 @@ export function planWake(last: RestartRecord, sessions: SessionInfo[], listed: {
 const LOOP_CHECK = " If you run a /loop, check CronList; when its jobs are gone, re-arm it from your start prompt's /loop line.";
 
 function wakeText(reason: WakeReason, last: RestartRecord): string {
-  switch (reason) {
-    case 'orchestrator': {
-      return `The atc daemon restarted (run ${last.runID}, code ${last.code}, restored ${last.restored}/${last.total}) and ended your event watch. Read your start prompt as it stands on main and your state file again, re-arm the event watch, and carry on. Check the restart log in ${atcStateDir()}/restarts/${last.runID}.log.`;
-    }
-    case 'background':
-      return 'The atc daemon restarted and ended your background tasks, such as CI waits. Your work is intact. Check the state you were waiting on, start your waits again, and carry on under your launch prompt.' + LOOP_CHECK;
-    case 'interrupted':
-      return 'The atc daemon restarted and cut off your last turn. Your work is intact. Carry on from where you stopped, under your launch prompt.' + LOOP_CHECK;
-  }
+  return match(reason)
+    .with(
+      'orchestrator',
+      () =>
+        `The atc daemon restarted (run ${last.runID}, code ${last.code}, restored ${last.restored}/${last.total}) and ended your event watch. Read your start prompt as it stands on main and your state file again, re-arm the event watch, and carry on. Check the restart log in ${atcStateDir()}/restarts/${last.runID}.log.`,
+    )
+    .with(
+      'background',
+      () =>
+        `The atc daemon restarted and ended your background tasks, such as CI waits. Your work is intact. Check the state you were waiting on, start your waits again, and carry on under your launch prompt.${LOOP_CHECK}`,
+    )
+    .with(
+      'interrupted',
+      () => `The atc daemon restarted and cut off your last turn. Your work is intact. Carry on from where you stopped, under your launch prompt.${LOOP_CHECK}`,
+    )
+    .exhaustive();
 }
