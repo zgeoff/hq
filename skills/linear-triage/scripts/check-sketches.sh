@@ -136,8 +136,10 @@ awk -v decisions="$decisions" -v issue="$2" '
       infence = 1; start = nblk + 1; len = 0
       next
     }
-    # A heading may sit up to 3 spaces in; 4 or more make an indented code line.
-    hline = line; sub(/^ ? ? ?/, "", hline)
+    # A heading may sit up to 3 spaces in; 4 or more make an indented code line. A loop, since
+    # mawk 1.3.4 takes only one space for /^ ? ? ?/.
+    hline = line
+    for (lead = 0; lead < 3 && substr(hline, 1, 1) == " "; lead++) hline = substr(hline, 2)
     if (match(hline, /^#+[ \t]+/)) {
       hashes = hline; sub(/[ \t].*$/, "", hashes); level = length(hashes)
       if (level <= 6) {
