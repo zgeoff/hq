@@ -178,7 +178,7 @@ matches() {
     case $path in
       .github/workflows/*)
         [ -n "$ours_text" ] || ours_text=$(text "zgeoff/$repo" "$path" "$ref") || fail "$path could not be read at $ref"
-        theirs_text=$(text zgeoff/tools "$source" "$commit") || fail "$source could not be read at tools commit $commit"
+        theirs_text=$(text "$from" "$source" "$commit") || fail "$source could not be read at $from commit $commit"
         [ "$theirs_text" != "$ours_text" ] || return 0
         ;;
       *.md)
@@ -189,7 +189,7 @@ matches() {
         # With nothing excluded the sync drops nothing, so the blob check was the whole test.
         [ -n "$withheld" ] || continue
         [ -s "$work/ours.md" ] || raw_text "zgeoff/$repo" "$path" "$ref" >"$work/ours.md" || fail "$path could not be read at $ref"
-        raw_text zgeoff/tools "$source" "$commit" >"$work/theirs.md" || fail "$source could not be read at tools commit $commit"
+        raw_text "$from" "$source" "$commit" >"$work/theirs.md" || fail "$source could not be read at $from commit $commit"
         drop_blocks "$(dirname "$path")" "$withheld" <"$work/theirs.md" >"$work/dropped.md" || continue
         ! cmp -s "$work/dropped.md" "$work/ours.md" || return 0
         ;;

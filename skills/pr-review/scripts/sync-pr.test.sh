@@ -28,7 +28,8 @@ trap 'rm -rf "$work"' EXIT
 # The skill-s entry copies its file from zgeoff/skills, at the commit SKILLS_PIN
 # that tools main's sync/skills-pin.json names, and the manifest at old1 also
 # delivered .claude/skills/s/retired.md and .claude/skills/s/old.md from there;
-# skill-s still delivers the second as .claude/skills/s/new.md. Each commit a
+# skill-s still delivers the second as .claude/skills/s/new.md, and withholds
+# references/rust.md from zgeoff/demo. Each commit a
 # workflow pins is on tools main, except FORK_PIN, which only a fork holds.
 cat >"$work/gh" <<'EOF'
 #!/usr/bin/env bash
@@ -54,13 +55,13 @@ case $args in
   "api repos/zgeoff/tools/contents/sync/manifest.json?ref=old1"*)
     printf '[{"name":"skill-s","files":[{"repo":"zgeoff/skills","source":"skills/s/retired.md","target":".claude/skills/s/retired.md"},{"repo":"zgeoff/skills","source":"skills/s/old.md","target":".claude/skills/s/old.md"}]},{"name":"skill-y","files":[{"source":"sync/skills/y/SKILL.md","target":".claude/skills/y/SKILL.md"}]},{"name":"skill-n","files":[{"source":"sync/skills/old/SKILL.md","target":".claude/skills/old/SKILL.md"},{"source":"sync/skills/lone/SKILL.md","target":".claude/skills/lone/SKILL.md"}]}]' | base64 ;;
   "api repos/zgeoff/tools/contents/sync/manifest.json"*)
-    printf '[{"name":"skill-x","files":[{"source":"sync/skills/x/SKILL.md","target":".claude/skills/x/SKILL.md"}]},{"name":"callers","files":[{"source":"sync/workflow-callers/pr.yml","target":".github/workflows/pr.yml"}]},{"name":"skill-odd","files":[{"source":"sync/skills/odd/odd #1?%%41.md","target":".claude/skills/odd/odd #1?%%41.md"}]},{"name":"skill-blk","files":[{"source":"sync/skills/blk/SKILL.md","target":".claude/skills/blk/SKILL.md"},{"source":"sync/skills/blk/references/rust.md","target":".claude/skills/blk/references/rust.md","except":["ZGeoff/Demo"]},{"source":"sync/skills/blk/references/kotlin.md","target":".claude/skills/blk/references/kotlin.md","except":["zgeoff/other"]}]},{"name":"skill-n","files":[{"source":"sync/skills/new/SKILL.md","target":".claude/skills/new/SKILL.md"}]},{"name":"skill-s","files":[{"repo":"zgeoff/skills","source":"skills/s/SKILL.md","target":".claude/skills/s/SKILL.md"},{"repo":"zgeoff/skills","source":"skills/s/new.md","target":".claude/skills/s/new.md"}]},{"name":"baseline","files":[],"scripts":{"check:tea":"bun scripts/tea.ts","check:toast":"bun scripts/toast.ts"}}]' | base64 ;;
+    printf '[{"name":"skill-x","files":[{"source":"sync/skills/x/SKILL.md","target":".claude/skills/x/SKILL.md"}]},{"name":"callers","files":[{"source":"sync/workflow-callers/pr.yml","target":".github/workflows/pr.yml"}]},{"name":"skill-odd","files":[{"source":"sync/skills/odd/odd #1?%%41.md","target":".claude/skills/odd/odd #1?%%41.md"}]},{"name":"skill-blk","files":[{"source":"sync/skills/blk/SKILL.md","target":".claude/skills/blk/SKILL.md"},{"source":"sync/skills/blk/references/rust.md","target":".claude/skills/blk/references/rust.md","except":["ZGeoff/Demo"]},{"source":"sync/skills/blk/references/kotlin.md","target":".claude/skills/blk/references/kotlin.md","except":["zgeoff/other"]}]},{"name":"skill-n","files":[{"source":"sync/skills/new/SKILL.md","target":".claude/skills/new/SKILL.md"}]},{"name":"skill-s","files":[{"repo":"zgeoff/skills","source":"skills/s/SKILL.md","target":".claude/skills/s/SKILL.md"},{"repo":"zgeoff/skills","source":"skills/s/new.md","target":".claude/skills/s/new.md"},{"repo":"zgeoff/skills","source":"skills/s/references/rust.md","target":".claude/skills/s/references/rust.md","except":["zgeoff/demo"]}]},{"name":"baseline","files":[],"scripts":{"check:tea":"bun scripts/tea.ts","check:toast":"bun scripts/toast.ts"}}]' | base64 ;;
   *"--jq .content"*)
     [ -z "${TEXT_FAIL:-}" ] || { echo "HTTP 502" >&2; exit 1; }
     case $args in
       *"repos/zgeoff/demo/"*"ref=base1"*) printf '%b\n' "${BASE_TEXT:-$HEAD_TEXT}" | base64 ;;
       *"repos/zgeoff/demo/"*) printf '%b\n' "$HEAD_TEXT" | base64 ;;
-      *"ref=main1"*) printf '%b\n' "$SOURCE_TEXT" | base64 ;;
+      *"ref=main1"* | *"repos/zgeoff/skills/"*"ref=$SKILLS_PIN"*) printf '%b\n' "$SOURCE_TEXT" | base64 ;;
       *) printf 'older\n' | base64 ;;
     esac ;;
   "api repos/zgeoff/tools/commits?"*) printf 'main1\nold1\n' ;;
@@ -318,6 +319,11 @@ set_case
 block "# Demo\\n\\n$kotlin$http" "# Demo\\n\\n$rust$kotlin$http"
 export SOURCE_BLOBS='b2 b1'
 expect "a dropped block is compared with every source version, not only the newest" 0 "ok: 1 files"
+
+set_case
+block "# Demo\\n\\n$http" "# Demo\\n\\n$rust$http"
+export FILES='.claude/skills/s/SKILL.md\tmodified'
+expect "a Markdown file from zgeoff/skills equals its source once the block for a withheld file is dropped" 0 "ok: 1 files"
 
 set_case
 block "# Demo\\n\\n${kotlin//Kotlin, read/Kotlin, see}$http" "# Demo\\n\\n$rust$kotlin$http"
