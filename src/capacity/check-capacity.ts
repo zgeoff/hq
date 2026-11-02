@@ -15,10 +15,6 @@ import { openAlerts } from './open-alerts.ts';
 import { RULES } from './rules.ts';
 import type { CapacityInput, CapacityTick } from './types.ts';
 
-// Evaluate one stored reading against the thresholds and send what is due. The hold rule: a breach
-// (or a recovery) must last holdSamples samples in a row; a sample with no reading counts for neither.
-// Quiet hours hold every message but an impd open; held opens go out once, if still open, with the
-// held clears of alerts that were told.
 export function checkCapacity(db: Database, input: CapacityInput, actor: string, at: Date = now()): CapacityTick {
   return db
     .transaction((): CapacityTick => {
@@ -52,7 +48,6 @@ export function checkCapacity(db: Database, input: CapacityInput, actor: string,
         if (breach && !current && count.bad >= hold) {
           open[rule.key] = { since: stamp, line: rule.line(r, s, names, ruleContext), told: false };
           opened.push(rule.key);
-          // A recovery still held for an earlier run of this alert is stale now it is open again.
           held = held.filter((h) => h.key !== rule.key);
         } else if (breach && current) {
           current.line = rule.line(r, s, names, ruleContext);
@@ -60,7 +55,6 @@ export function checkCapacity(db: Database, input: CapacityInput, actor: string,
           const o = current;
           delete open[rule.key];
           cleared.push(rule.key);
-          // An alert nobody was told about needs no all-clear.
           if (o.told) {
             held.push({ key: rule.key, label: rule.label, limit: rule.limit(s), since: o.since, until: stamp });
           }
@@ -69,18 +63,15 @@ export function checkCapacity(db: Database, input: CapacityInput, actor: string,
 
       const quiet = isQuiet(at);
       const rule = (k: string) => RULES.find((x) => x.key === k)!;
-      // Opens due now: every untold open alert, or in quiet hours only the urgent ones.
       const dueOpen = Object.entries(open).filter(([k, o]) => !o.told && (!quiet || rule(k).urgent)).map(([k]) => k);
       const targets = [...new Set([owner(), orchestratorName()])];
-      // Clears due now: the held ones, when it is not quiet. (A quiet clear stays held, urgent or not.)
       const dueClear = quiet ? [] : held.splice(0, held.length);
       const stillOpen = (skip: string[]) => {
         const rest = Object.entries(open).filter(([k, o]) => o.told && !skip.includes(k));
         return rest.length ? `\nStill open:\n${rest.map(([, o]) => `- ${o.line} (since ${o.since})`).join('\n')}` : '';
       };
       // No outbox topic: a notice is never replaced or dropped, so "told" means queued, and the
-      // outbox sends in order. After an atc outage the notices arrive late but complete; the hold
-      // rule and one message per tick keep their number small.
+      // outbox sends in order.
       const send = (kind: string, text: string, detail: Record<string, unknown>) => {
         const seq = logEvent(db, 'hq', 'capacity', kind, actor, null, null, detail);
         for (const t of targets) enqueue(db, seq, t, text);

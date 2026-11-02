@@ -1,7 +1,3 @@
-// hq fleet: the z- sessions that should exist. `hq fleet ensure` spawns each one atc has
-// no live session for, with its approved start prompt, pins it, puts it on the wake list,
-// and tells z-stu. It never spawns a second one. The only session it stops is one whose start
-// prompt is stale, at a quiet moment, after the session says it saved its state.
 import type { Database } from 'bun:sqlite';
 import { existsSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -40,11 +36,9 @@ import type { RestartedSession } from './run-stale-restart-tick.ts';
 import type { EnsureStep, FleetClient, FleetEntry, RcDeps, SpawnRequest } from './types.ts';
 import { updateRcPending as setPending } from './update-rc-pending.ts';
 
-// now: names to spawn without the waits (a deliberate re-home). The live-session checks still
-// apply, so it can never make a second session.
 export async function ensureFleet(db: Database, client: FleetClient, opts: { dryRun: boolean; actor: string; fleet?: FleetEntry[]; now?: string[]; rc?: RcDeps }): Promise<EnsureStep[]> {
   // One ensure at a time: two that overlap could each read "missing" and spawn (a --now beside
-  // the timer). A dry run spawns nothing and takes no lease.
+  // the timer).
   if (opts.dryRun) return ensureOnce(db, client, opts);
   const lease = takeLease(db, opts.actor);
   try {
@@ -68,7 +62,6 @@ interface StaleRestartOptions {
   fleet?: FleetEntry[];
 }
 
-// A failed stale-restart pass is logged and never holds up the spawns.
 async function tryStaleRestart(db: Database, client: FleetClient, opts: StaleRestartOptions): Promise<RestartedSession[]> {
   if (!hasStaleOps(client)) {
     return [];
@@ -81,7 +74,6 @@ async function tryStaleRestart(db: Database, client: FleetClient, opts: StaleRes
   }
 }
 
-// A crashed run's lease ends by itself after LEASE_MS.
 const LEASE = 'fleet_ensure_lease',
   LEASE_MS = 5 * 60_000;
 
@@ -106,9 +98,8 @@ function dropLease(db: Database, token: string): void {
 const FLEET_UNPINNED = 'fleet_unpinned';
 
 async function ensureOnce(db: Database, client: FleetClient, opts: { dryRun: boolean; actor: string; fleet?: FleetEntry[]; now?: string[]; rc?: RcDeps }): Promise<EnsureStep[]> {
-  // A missing name waits GRACE_MIN before a spawn (a restore after a daemon restart keeps its id);
-  // a known id atc doesn't list waits UNLISTED_GRACE_MIN; a z- session doesn't sleep for an hour,
-  // so past INTENDED_MAX_MIN a session atc still means to run is taken as dead.
+  // A missing name waits before a spawn (a restore after a daemon restart keeps its id); a z- session
+  // doesn't sleep for an hour, so a session atc still means to run is taken as dead after that.
   const GRACE_MIN = 10,
     INTENDED_MAX_MIN = 60,
     UNLISTED_GRACE_MIN = 30,
@@ -120,10 +111,8 @@ async function ensureOnce(db: Database, client: FleetClient, opts: { dryRun: boo
   const all = await client.sessions();
   if (!Array.isArray(all)) throw new HqError('atc_bad_answer', 'atc returned no session list; spawning nothing');
   const missing = metaJson(db, 'fleet_missing_since', strMap, {});
-  // The ids hq knows for each name: the last seen live, and the wake list's.
   const known = metaJson(db, 'fleet_ids', strMap, {});
 
-  // A spawned session whose pin failed: the live path pins it again until a pin holds.
   const unpinned = metaJson(db, FLEET_UNPINNED, strMap, {});
   const knownIds = (name: string) => [...new Set([known[name], ...wakeList(db).filter((w) => w.name === name).map((w) => w.session_id)].filter((x): x is string => !!x))];
   // atc writes this record when a restart ends; the restore runs around then.
@@ -189,8 +178,6 @@ async function ensureOnce(db: Database, client: FleetClient, opts: { dryRun: boo
     }
     try {
       // One key per gap: a retry or an overlapping run replays the first spawn, never a second.
-      // The gap's start is claimed in a write transaction before the spawn, so two runs that
-      // overlap (a --now and the timer, or two --now) read the same one and share the key.
       missing[e.name] = claimMissing(db, e.name, missing[e.name]!);
       const id = await createFleetSession(client, e, prompt, `hq-fleet-${e.name}-${missing[e.name]}`);
       const pinFailure = await pinSession(client, id);
@@ -239,7 +226,6 @@ async function ensureOnce(db: Database, client: FleetClient, opts: { dryRun: boo
     if (!opts.dryRun && told.length) {
       const seq = logEvent(db, 'hq', 'fleet', 'ensured', opts.actor, null, null, { steps: told });
       const text = `hq fleet: ${told.map(sayStep).join('; ')}.`;
-      // Quiet hours hold the message, not the respawn. An urgent step also goes out at once, alone.
       for (const u of told.filter((x) => x.urgent)) enqueue(db, logEvent(db, 'hq', 'fleet', 'urgent', opts.actor, null, null, { step: u }), owner(), `hq fleet: ${sayStep(u)}.`);
       if (isQuiet(t)) setMeta(db, 'fleet_held', JSON.stringify([...metaJson(db, 'fleet_held', HELD, []), { seq, text }]));
       else enqueue(db, seq, owner(), text);
@@ -253,7 +239,6 @@ async function ensureOnce(db: Database, client: FleetClient, opts: { dryRun: boo
   return steps;
 }
 
-// The 5-minute ensure's look at every marker: the fallback when the helper did not start or died.
 async function remoteControlTick(db: Database, client: FleetClient, rc: RcDeps | undefined, known: Record<string, string>, actor: string): Promise<EnsureStep[]> {
   const steps: EnsureStep[] = [];
   if (!rc || !client.submit) return steps;
@@ -264,7 +249,6 @@ async function remoteControlTick(db: Database, client: FleetClient, rc: RcDeps |
   return steps;
 }
 
-// Starts the helper unit right after a spawn. Returns an error text, or null.
 async function startHelper(rc: RcDeps, name: string): Promise<string | null> {
   const unit = `hq-rc-${name}-${Math.floor(Date.now() / 1000)}`;
   const path = `${HOME()}/.local/bin:${HOME()}/.bun/bin:/usr/local/bin:/usr/bin:/bin`;
@@ -281,7 +265,6 @@ async function startHelper(rc: RcDeps, name: string): Promise<string | null> {
   }
 }
 
-// Pins the live session when its spawn's pin failed. Returns the failure, or null when it is pinned.
 async function retryPin(client: FleetClient, unpinned: Record<string, string>, name: string, id: string): Promise<string | null> {
   if (unpinned[name] !== id) {
     delete unpinned[name];
@@ -303,8 +286,8 @@ async function pinSession(client: FleetClient, id: string): Promise<string | nul
   }
 }
 
-// Spawns the entry through atc and gives the new session's id. Plugin folders go only when the
-// entry declares them, so an atc before 4.15 still spawns every other session.
+// Plugin folders go only when the entry declares them, so an atc before 4.15 still spawns every
+// other session.
 async function createFleetSession(client: FleetClient, e: FleetEntry, prompt: string, idempotencyKey: string): Promise<string> {
   const request: SpawnRequest = { cwd: e.cwd, name: e.name, prompt, model: e.model, agent: 'claude', idempotencyKey, ...(e.pluginDirs ? { pluginDirs: e.pluginDirs } : {}) },
     spawned = await client.spawn(request);

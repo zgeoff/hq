@@ -29,7 +29,6 @@ afterEach(() => {
   delete process.env['CODEX_HOME'];
 });
 
-// The diff the fake checkout holds: by default a small gate change, so both passes run at medium.
 let diffPaths = 'src/gate.ts';
 let diffText = '+++ b/src/gate.ts\n+  if (!known.has(kettle)) return deny(kettle);\n';
 beforeEach(() => {
@@ -174,7 +173,7 @@ test('the default review folder is on disk, not in /tmp', () => {
 });
 
 test('the sentence is added to the developer instructions in the Codex config, or stands alone when there are none', async () => {
-  expect(await codexInstructions()).toBe(NO_TMP); // no config file
+  expect(await codexInstructions()).toBe(NO_TMP);
   mkdirSync(`${dir}/codex`);
   await Bun.write(`${dir}/codex/config.toml`, 'model = "m"\n');
   expect(await codexInstructions()).toBe(NO_TMP);
@@ -198,7 +197,7 @@ test('both passes run at the review effort; the review pass may write Bun\'s ins
   for (const c of [rev!, ex!]) expect(c.cmd).toContain(`model_reasoning_effort=${REVIEW_EFFORT}`);
   expect(REVIEW_EFFORT).toBe('medium');
   expect(rev!.cmd).toContain(`sandbox_workspace_write.writable_roots=${JSON.stringify([bunCacheDir()])}`);
-  expect(ex!.cmd.slice(0, 4)).toEqual(['codex', 'exec', '-s', 'read-only']); // the allow-or-deny pass stays read-only
+  expect(ex!.cmd.slice(0, 4)).toEqual(['codex', 'exec', '-s', 'read-only']);
 });
 
 test('a Codex usage limit or an interrupted review fails loudly: no review is never a pass', async () => {
@@ -241,13 +240,11 @@ test('the repo lock lets one holder in at a time, and takes over a stale lock', 
     order.push(`${tag} out`);
   });
 
-  // b finds the lock taken before its call returns, so it waits on it while a holds the gate.
   const holders = [hold('a'), hold('b')];
   order.push('released');
   gate.resolve();
   await Promise.all(holders);
   expect(order).toEqual(['a in', 'released', 'a out', 'b in', 'b out']);
-  // A lock left by a dead review, older than 10 minutes, is taken over.
   const { mkdirSync: mk, utimesSync } = await import('node:fs');
   mk(`${dir}/.lock-zgeoff-widgets`);
   const old = new Date(Date.now() - 11 * 60_000);
@@ -267,7 +264,6 @@ test('effort by risk: high for auth, secrets, money, migrations, deletion or inf
     [['.github/workflows/ci.yml'], '+x\n', 'infra permissions: path .github/workflows/ci.yml'],
   ];
   for (const [paths, diff, reason] of cases) expect(riskTier(paths, diff)).toEqual({ effort: RISK_EFFORT, reason });
-  // A file header that names a risky word is not a changed line.
   expect(riskTier(['src/kettle.ts'], '--- a/src/kettle.ts\n+++ b/src/kettle.ts\n context DELETE FROM\n+const spout = 3;\n').effort).toBe(REVIEW_EFFORT);
 });
 
@@ -308,8 +304,6 @@ test('a risky diff runs both passes at high; --effort overrides the tier and say
   await expect(review(run, 'widgets', 7, { watch: false, effort: 'low' as never })).rejects.toThrow('--effort must be medium or high');
 });
 
-// Committed tables of hostile inputs (every allow-or-deny check has one). Each must get high effort, or must run the
-// allow-or-deny pass: a diff that tries to slip past the tiering by its file name or its spelling.
 const MUST_BE_HIGH: [string, string][] = [
   ['src/atc.ts', "+  auth: { scheme: 'none' },"],
   ['src/kettle.ts', '+const authorization = req.headers.get(x);'],
@@ -336,7 +330,6 @@ test('every hostile input in the tables gets high effort, or runs the allow-or-d
   for (const [path, line] of MUST_RUN_GATE) expect([path, line, allowDenyNeeded([path], `${line}\n`).run]).toEqual([path, line, true]);
 });
 
-// The fake checkout, with a bun.lock in the worktree once it is added.
 function buildLockedFake(fail: string | null = null): ReturnType<typeof fake> {
   const inner = fake(fail),
     runLocked: Runner = async (cmd, opts) => {

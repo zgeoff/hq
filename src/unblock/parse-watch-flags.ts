@@ -12,7 +12,6 @@ const kindSchema = z.enum(['owner', 'watch']);
 
 const ISO_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})$/u;
 
-// hq unblock add's --kind and --deadline; each left out is left out, so a refresh keeps the stored one.
 export function parseWatchFlags(kind: string | undefined, deadline: string | undefined): WatchFields {
   const fields: WatchFields = {};
   if (kind !== undefined) {

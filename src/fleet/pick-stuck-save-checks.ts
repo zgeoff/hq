@@ -9,9 +9,6 @@ export interface UnreadAnswer {
 
 const STUCK_MS = 60 * 60_000;
 
-// A save request is stuck when no read of its answer has worked for over an hour, counted from the
-// ask or from the last read atc answered, and a read failed since then: the restart then waits on
-// an answer hq cannot see.
 export function pickStuckSaveChecks(refresh: RefreshMap, unread: readonly UnreadAnswer[], at: Date): Check[] {
   const stuck = Object.entries(refresh).flatMap(([name, entry]) => {
     const askedAt = entry.askedAt;

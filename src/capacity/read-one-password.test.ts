@@ -9,13 +9,10 @@ import { readingText } from './reading-text.ts';
 import { sampleCapacity } from './sample-capacity.ts';
 import type { CapacityProbe } from './types.ts';
 
-// Each alert holds for 2 samples; the second comes 5 minutes after the first.
 const FOUR_AM_SYDNEY_PLUS_5 = new Date(Date.parse(FOUR_AM_SYDNEY) + 300_000),
   NOON_SYDNEY_PLUS_5 = new Date(Date.parse(NOON_SYDNEY) + 300_000),
   SETTINGS = `${process.env['HOME'] ?? ''}/.claude/settings.json`;
 
-// A database, no 1Password token in the environment, and a probe that answers each command from
-// `answers` by its program and each file from `files` by its path, recording every run.
 function setupTest() {
   const answers = new Map<string, RunResult>(),
     files = new Map<string, string>(),

@@ -61,14 +61,12 @@ function setupTest(config: { sessions?: RosterSession[]; cwd?: string } = {}) {
     release: { ...kettle, name: 'z-ship', roles: ['release'] } satisfies FleetEntry,
     deliveryAgent: '0000aaaa-1111-4222-8333-444455556666',
 
-    // A Claude Code transcript with a user turn and `compactions` compact boundaries.
     writeTranscript(agentSessionID: string, compactions: number) {
       const user = JSON.stringify({ type: 'user', message: { role: 'user', content: 'boil the kettle' }, timestamp: NOON_SYDNEY });
       const boundary = JSON.stringify({ type: 'system', subtype: 'compact_boundary', content: 'Conversation compacted', timestamp: NOON_SYDNEY, compactMetadata: { trigger: 'auto' } });
       writeFileSync(`${base.dir}/projects/-work/${agentSessionID}.jsonl`, `${[user, ...Array.from({ length: compactions }, () => boundary)].join('\n')}\n`);
     },
 
-    // The 5-minute timer at a time, then the watcher's flush.
     async tickAt(time: string, fleet: FleetEntry[]) {
       at(time);
       const peer = await AtcClient.open();

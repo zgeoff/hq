@@ -7,7 +7,6 @@ const ISSUE_ID = /^[A-Z][A-Z0-9]*-\d+$/u;
 // A git ref: branch, tag or sha characters only, so it fits the gh api path it goes into.
 const REF = /^[\w][\w./-]*$/u;
 
-// An area label or its repo name, as AREA_REPOS holds them.
 const AREA = /^[a-z0-9][a-z0-9-]*$/u;
 
 export function parseBriefFlags(issue: string | undefined, flags: Flags): BriefInput {

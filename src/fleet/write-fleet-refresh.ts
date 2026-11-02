@@ -7,7 +7,6 @@ import { refreshSchema } from './refresh-schema.ts';
 import type { RefreshMap, RefreshPhase } from './refresh-schema.ts';
 import { REFRESH_TRANSITIONS } from './refresh-transitions.ts';
 
-// Saves meta fleet_refresh; an empty map removes the key.
 export function writeFleetRefresh(db: Database, refresh: RefreshMap): void {
   const stored = metaJson(db, 'fleet_refresh', refreshSchema, {}),
     text = Object.keys(refresh).length > 0 ? JSON.stringify(refresh) : null;
@@ -19,7 +18,6 @@ export function writeFleetRefresh(db: Database, refresh: RefreshMap): void {
 
 type RefreshEntry = RefreshMap[string];
 
-// A new answer read time changes no phase, so it is no move.
 function checkRefreshMove(name: string, from: RefreshEntry | undefined, to: RefreshEntry | undefined): void {
   if (isDeepStrictEqual(toPhaseFields(from), toPhaseFields(to))) {
     return;

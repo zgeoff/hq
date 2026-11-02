@@ -12,7 +12,6 @@ export interface ClaudeUse {
   at: string;
 }
 
-// The newest usage_samples row (src/goals/sample-usage.ts stores them); older than 30 min is no reading.
 export function readClaude(db: Database, at: Date): ClaudeUse {
   const CLAUDE_MAX_AGE_MIN = 30;
   const row = ROW.parse(db.query('SELECT at, account, five_hour, seven_day, five_hour_resets_at, seven_day_resets_at FROM usage_samples ORDER BY at DESC LIMIT 1').get());

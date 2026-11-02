@@ -6,8 +6,7 @@ export interface FenceLine {
   info: string;
 }
 
-// A code fence line as CommonMark reads one: up to three spaces, a run of three or more backticks
-// or tildes, then the info string. A backtick run whose info string holds a backtick is no fence.
+// As CommonMark reads one, a backtick run whose info string holds a backtick is no fence.
 export function parseFenceLine(line: string): FenceLine | null {
   const groups = FENCE_LINE.exec(line)?.groups;
   const run = groups?.['run'];

@@ -5,14 +5,6 @@ import { runMainFetch } from '../prompts/run-main-fetch.ts';
 import { DRIFT_BUDGET_MS } from './drift-budget-ms.ts';
 import type { DriftClient, FleetEntry, FleetSession, PromptDrift } from './types.ts';
 
-// atc revives a session with the prompt it was first spawned with, so a prompt change on main never
-// reaches a running session. `hq fleet` compares each live session's atc prompt with the one hq
-// would spawn it with now. Read-only: it restarts and messages nothing.
-// For each declared entry with a live atc session (its recorded id, else the one live session of
-// that name), whether the session's prompt is the one hq would spawn it with now. An entry with no
-// live session is left out: it is spawned fresh. `unknown` never says stale.
-// The whole check finishes within budgetMs: the session.get calls run together, and one still out
-// at the deadline reads `unknown`.
 export async function promptDrift(client: DriftClient, entries: FleetEntry[], live: FleetSession[], known: Record<string, string> = {}, budgetMs = DRIFT_BUDGET_MS): Promise<Record<string, PromptDrift>> {
   const out: Record<string, PromptDrift> = {};
   const unknown = (reason: string): PromptDrift => ({ state: 'unknown', since: null, hint: null, reason });
@@ -55,7 +47,7 @@ export async function promptDrift(client: DriftClient, entries: FleetEntry[], li
     }
     let wanted: string;
     try {
-      wanted = readPrompt(e.prompt, true); // quick fetch of origin/main, at most once a minute per process
+      wanted = readPrompt(e.prompt, true);
     } catch (err) {
       out[e.name] = unknown(`can't read the prompt hq would spawn with: ${String((err as Error).message ?? err).slice(0, 160)}`);
       return;
@@ -70,7 +62,6 @@ export async function promptDrift(client: DriftClient, entries: FleetEntry[], li
 const normalize = (t: string) => t.split('\n').map((l) => l.trimEnd()).join('\n').trim();
 const cut = (l: string) => (l.length > 80 ? l.slice(0, 80) : l);
 
-// The first line where the two texts differ, as `main: <line> vs session: <line>`.
 function firstDifference(main: string, session: string): string {
   const a = main.split('\n');
   const b = session.split('\n');
@@ -78,8 +69,6 @@ function firstDifference(main: string, session: string): string {
     if (a[i] === b[i]) continue;
     const x = a[i] ?? '';
     const y = b[i] ?? '';
-    // Show each side from a little before the first character that differs, so a long shared start
-    // doesn't hide the change.
     let c = 0;
     while (c < x.length && c < y.length && x[c] === y[c]) c++;
     const from = Math.max(0, c - 20);

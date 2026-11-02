@@ -4,8 +4,6 @@ import type { Runner } from '../runner/types.ts';
 import { pickCountedChecks } from './pick-counted-checks.ts';
 import type { CIState } from './types.ts';
 
-// The PR's CI checks (after waiting for them, when asked) and its count of unresolved review
-// threads: the part of a review that is the same whichever reviewer ran.
 export async function readCIState(run: Runner, slug: string, pr: number, watch: boolean): Promise<CIState> {
   return { ...(await readChecks(run, slug, pr, watch)), openThreads: await readOpenThreads(run, slug, pr) };
 }

@@ -1,8 +1,7 @@
 import { match } from 'ts-pattern';
 import type { BriefSkill, SkillBriefKind } from './types.ts';
 
-// The hq skill a kind's agent reads first, and the pinned command that prints it, since an agent
-// outside zgeoff/hq has no copy of hq's skills.
+// A pinned command, since an agent outside zgeoff/hq has no copy of hq's skills.
 export function buildSkillPointer(kind: SkillBriefKind, sha: string): BriefSkill {
   const name = match(kind)
     .with('design', () => 'tickets')

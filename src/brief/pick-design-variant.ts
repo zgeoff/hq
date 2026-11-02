@@ -9,9 +9,6 @@ export type DesignVariant = { kind: 'with-geoff' } | { kind: 'agent' } | { kind:
 const AGENT_ACTION = /^agent design pass\b/iu;
 const OWNER_ACTION = /\bwith (?:the owner|geoff)\b/iu;
 
-// The design brief an issue takes: with-geoff when it has the `with-geoff` label, since the owner
-// joins only then (the tickets skill's Actions table), else the agent pass. An issue whose label and
-// Actions line disagree is refused, since either brief would send it to the wrong lane.
 export function pickDesignVariant(issue: BriefIssue): DesignVariant {
   const withGeoff = issue.labels.some((label) => label.name.toLowerCase() === 'with-geoff');
   const actions = parseIssueActions(parseIssueSections(issue.description));

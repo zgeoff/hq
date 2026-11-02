@@ -19,8 +19,7 @@ const STARTED_QUERY = `query($after: String) {
     nodes { identifier startedAt updatedAt attachments(first: 20) { nodes { url sourceType metadata } pageInfo { hasNextPage endCursor } } }
     pageInfo { hasNextPage endCursor } } }`;
 
-// The issues In Progress at `at`, in place of the last read's. Linear's page size keeps the query under
-// its complexity limit, so 40 pages of 50 hold the same 2,000 issues the old 8 pages of 250 did.
+// Linear's page size keeps the query under its complexity limit, so 40 pages of 50 hold 2,000 issues.
 export async function syncStarted(db: Database, call: LinearCall, at: Date): Promise<number> {
   const started: { issue: string; startedAt: string; prs: StartedPr[] }[] = [];
   let after: string | null = null;

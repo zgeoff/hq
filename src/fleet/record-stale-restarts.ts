@@ -10,9 +10,6 @@ import { writeFleetRefresh } from './write-fleet-refresh.ts';
 import type { RestartedSession } from './run-stale-restart-tick.ts';
 import type { EnsureStep } from './types.ts';
 
-// Closes each restart once ensure has run: a spawn is news and clears the entry; any other
-// outcome tells z-stu at once, and fleet_missing_since lets a later ensure spawn the session.
-// `steps` is null when ensure itself threw.
 export function recordStaleRestarts(db: Database, restarted: RestartedSession[], steps: EnsureStep[] | null, actor: string): void {
   if (restarted.length === 0) {
     return;

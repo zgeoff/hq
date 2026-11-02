@@ -11,8 +11,6 @@ export interface AskedReading {
   nowMs: number;
 }
 
-// A session that said saved has just been active, so a busy quiet point after `saved` waits, and
-// skips only once the save timeout has passed since the answer.
 export function pickAskedOutcome(reading: AskedReading): AskedOutcome {
   return match<AskedAnswer, AskedOutcome>(reading.answer)
     .with({ kind: 'busy' }, { kind: 'unanswered' }, () => 'skip')

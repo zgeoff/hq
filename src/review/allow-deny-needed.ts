@@ -1,6 +1,5 @@
 import { collectChangedLines } from './collect-changed-lines.ts';
 
-// The allow-or-deny pass runs only when the diff adds or changes an allow-or-deny check (INTERIM, as above). When unsure (no diff to read), it runs.
 export function allowDenyNeeded(paths: string[] | null, diff: string | null): { run: boolean; reason: string } {
   // No u flag: with i, it folds Unicode case and widens \b, so a Kelvin sign before allow would stop matching.
   // oxlint-disable-next-line require-unicode-regexp

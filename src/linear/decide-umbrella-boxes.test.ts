@@ -131,7 +131,6 @@ test('it leaves the box undecided, with no news line and no event, when its even
   const mergedAt = '2026-10-20T06:00:00Z';
   recordUmbrellaBox(ctx.db, { repo: 'tools', number: 7, issue: 'GEO-9001', mergedAt });
 
-  // Setup only: makes the umbrella event's insert fail after the outcome and the news line are written.
   ctx.db.exec("CREATE TRIGGER refuse_umbrella_event BEFORE INSERT ON events WHEN NEW.action = 'umbrella-box' BEGIN SELECT RAISE(ABORT, 'invented refusal'); END;");
 
   await expect(decideUmbrellaBoxes(ctx.db, buildStubLinearDescriptions({ 'GEO-9001': '- [ ] tools' }).call, at)).rejects.toThrow('invented refusal');

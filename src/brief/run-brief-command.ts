@@ -18,9 +18,6 @@ import type { BriefDeps, BriefInput } from './types.ts';
 const BRIEFS_PATH = 'skills/delivery-lead/references/briefs.md';
 const TEMPLATE_PATH = 'agent-kit/brief.md';
 
-// Fills the delivery launch brief for one Linear issue and prints it. It reads Linear, GitHub and
-// the private wording, and writes nothing but the goal file: the --goal-file file, or the one in
-// the briefs folder when cut 1 moves the issue out of the prompt.
 export async function runBriefCommand(deps: BriefDeps, input: BriefInput): Promise<Out> {
   if (input.goalFile !== null) {
     requireGoalFileTarget(deps.files, input.goalFile);

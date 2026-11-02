@@ -10,8 +10,7 @@ function setupTest() {
   return { db: fresh.db };
 }
 
-// A reading with every source empty, so only the lane plan decides; the hold rule needs 2 samples
-// in a row, at noon Sydney so nothing waits for quiet hours to end.
+// The readings are at noon Sydney, so nothing waits for quiet hours to end.
 test('an imp lane plan over impd\'s line opens the lanes:plan alert after 2 samples, and a plan that fits clears it after 2 more', () => {
   const ctx = setupTest(),
     fits = { slots: 7, mib: 14_336, vcpus: 14, maxMib: 16_384, maxVcpus: 16, overMib: false, overVcpus: false },

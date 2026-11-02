@@ -3,11 +3,8 @@ import type { BriefArea } from './pick-brief-areas.ts';
 import { pickBriefAreas } from './pick-brief-areas.ts';
 import type { BriefIssue } from './types.ts';
 
-// The area the brief is for, and the issue's other areas, each its own launch; or why there is none.
 export type IssueRepo = { kind: 'picked'; area: BriefArea; others: BriefArea[] } | { kind: 'refused'; code: 'bad_args' | 'bad_state'; message: string };
 
-// The one named with --repo, by its label or its repo, which must be one of the issue's areas, or
-// else the issue's one area. An issue with several needs --repo.
 export function pickIssueRepo(issue: BriefIssue, chosen: string | null = null): IssueRepo {
   return match(pickBriefAreas(issue))
     .with({ kind: 'unknown' }, (unknown): IssueRepo => ({

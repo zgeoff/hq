@@ -11,12 +11,9 @@ export interface SkillBriefFacts {
   template: string;
   skill: BriefSkill;
 
-  // the zgeoff repo the template names, resolved by the command; null when it names none
   repo: string | null;
 }
 
-// The design or PR-walk brief from what hq read: the template filled, then the skill pointer. A
-// brief over the limit is refused, since it has nothing to cut.
 export function buildSkillBrief(facts: SkillBriefFacts): Out {
   const values = facts.repo === null ? { issue_id: facts.issue.identifier } : { repo: facts.repo, issue_id: facts.issue.identifier };
   const filled = fillPlaceholders(facts.template, values);

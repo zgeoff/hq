@@ -14,10 +14,6 @@ import { readRefFile } from './read-ref-file.ts';
 import { readRefSHA } from './read-ref-sha.ts';
 import type { BriefDeps, BriefIssue, BriefSkill, SkillBriefInput } from './types.ts';
 
-// Fills the design or PR-walk brief for one Linear issue and prints it, with a pointer to the hq
-// skill its agent reads first. A design issue without the `with-geoff` label takes the agent
-// variant, which also reads the record line and the permission table from hq-private. It reads
-// Linear, GitHub and hq-private, and writes nothing.
 export async function runSkillBriefCommand(deps: Pick<BriefDeps, 'linear' | 'run' | 'files' | 'privateDir'>, input: SkillBriefInput): Promise<Out> {
   const issue = await readBriefIssue(deps.linear, input.issue);
   const sha = await readRefSHA(deps.run, input.ref);

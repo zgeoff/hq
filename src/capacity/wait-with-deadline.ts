@@ -1,4 +1,3 @@
-// A read that hangs fails its source, never the tick.
 export async function waitWithDeadline<T>(p: Promise<T>, ms: number): Promise<T> {
   let t: ReturnType<typeof setTimeout> | undefined;
   try {

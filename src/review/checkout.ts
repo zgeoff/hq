@@ -7,8 +7,6 @@ import { repoCache } from './repo-cache.ts';
 import { runCommand } from './run-command.ts';
 import { withPidLock } from './with-pid-lock.ts';
 
-// A checkout to make the worktree from: --repo-dir, else ~/projects/<repo> when its
-// origin is the repo, else hq's own clone (made on first use).
 export async function checkout(run: Runner, slug: string, repo: string, repoDir?: string): Promise<string> {
   if (repoDir) {
     if (!existsSync(repoDir)) throw new HqError('bad_args', `--repo-dir ${repoDir} does not exist`);

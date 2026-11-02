@@ -4,9 +4,7 @@ import { getReadMS as readMs } from './get-read-ms.ts';
 import type { RunResult } from '../runner/types.ts';
 import type { CapacityProbe, OnePasswordUse } from './types.ts';
 
-// The 1Password account's requests today against its daily limit, from `op service-account
-// ratelimit`, which costs no request. Refused when 1Password rate-limits this read or any limit has
-// nothing left. Read with the global profile's token, as hq's Linear key is.
+// `op service-account ratelimit` costs no request.
 export async function readOnePassword(probe: CapacityProbe): Promise<OnePasswordUse> {
   const ran = await runRatelimit(probe);
   if (ran.code !== 0) {
@@ -36,7 +34,7 @@ async function loadServiceAccountToken(probe: CapacityProbe): Promise<string> {
 }
 
 function parseSettingsToken(text: string): string {
-  // parseJSON, not JSON.parse: a parse error quotes the text, and this text holds the token.
+  // Not JSON.parse: its parse error quotes the text, and this text holds the token.
   const parsed = Settings.safeParse(parseJSON(text));
   if (!parsed.success) {
     throw new Error('no 1Password service-account token in ~/.claude/settings.json: op-mint global');

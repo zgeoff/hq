@@ -22,12 +22,10 @@ export interface DeliveryBriefFacts {
   template: string;
   permissionTable: readonly PermissionRow[];
 
-  // the playbook's text at the sha; null when there is no playbook to read or no file at its path
   playbookText: string | null;
   stack: string;
   impLine: string;
 
-  // where cut 1 writes the issue when a brief that carries it in the prompt is over the limit
   movedGoalFile: string;
 }
 
@@ -37,9 +35,6 @@ export interface DeliveryBrief {
   goalFile: { path: string; text: string } | null;
 }
 
-// The delivery brief from what hq read: the filled and fitted prompt, the warnings to print, and
-// the goal file to write, at --goal-file or where cut 1 moved the issue. A prompt still over the
-// limit after every cut is refused.
 export function buildDeliveryBrief(facts: DeliveryBriefFacts): DeliveryBrief {
   const sections = parseIssueSections(facts.issue.description);
   const issueSections = sections.filter((section) => ISSUE_SECTIONS.has(section.name.toLowerCase()));
@@ -85,7 +80,6 @@ export function buildDeliveryBrief(facts: DeliveryBriefFacts): DeliveryBrief {
 
 const REQUIRED_SECTIONS = ['Outcome', 'Scope', 'Acceptance'];
 
-// With --repo on a multi-area issue: keep the agent to its own area, since each other gets a launch.
 function buildAreaLine(issue: string, repo: string, otherAreas: readonly BriefArea[]): string {
   return otherAreas.length === 0 ? '' : ` Do only the \`${repo}\` part of ${issue}: each other area (${otherAreas.map((area) => area.label).join(', ')}) gets its own launch.`;
 }

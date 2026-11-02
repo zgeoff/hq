@@ -15,7 +15,6 @@ export function fitBrief(template: string, parts: BriefParts, movedPointer: stri
   let sections: IssueSection[] = movedPointer === null ? [] : parts.sections;
   let prompt = fillPlaceholders(template, buildValues(fitted, sections)).text;
 
-  // An issue with no sections has nothing to move, and the pointer would only add bytes.
   if (isOver(prompt) && movedPointer !== null && sections.length > 0) {
     fitted = { ...parts, goalFile: movedPointer };
     sections = [];
@@ -50,8 +49,8 @@ function isOver(prompt: string): boolean {
   return Buffer.byteLength(prompt) > BRIEF_LIMIT_BYTES;
 }
 
-// Cut 2 drops the /goal line, but the pointer to the issue and playbook has no other place in the
-// prompt, so it takes that line's place.
+// The pointer to the issue and playbook has no other place in the prompt, so it takes the /goal
+// line's place.
 function dropGoalLine(prompt: string, pointer: string): string {
   const rest = prompt.split('\n').slice(1);
   return (pointer === '' ? rest : [pointer.replace(/^\. /u, ''), ...rest]).join('\n');

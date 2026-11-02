@@ -3,8 +3,6 @@ import { formatError as msg } from './format-error.ts';
 import { getReadMS as readMs } from './get-read-ms.ts';
 import type { CapacityProbe, Impd } from './types.ts';
 
-// impz info and impz ls: the daemon's RAM budget, and the memory of the imps awake now, split into
-// the Nix imps (named nixie-*) and the rest. Decision 16's lanes can reuse this later.
 export async function readImpd(probe: CapacityProbe): Promise<{ impd: Impd; error: string | null }> {
   const impd: Impd = { budgetMib: null, usedMib: null, committedMib: null, nonnixAwakeMib: null, nonnixAwakeVcpus: null, nixAwakeMib: null };
   const errors: string[] = [];
@@ -44,8 +42,7 @@ export async function readImpd(probe: CapacityProbe): Promise<{ impd: Impd; erro
 
 const num = (x: unknown): number | null => (typeof x === 'number' && Number.isFinite(x) ? Math.round(x) : null);
 
-// The vCPUs of the awake non-Nix imps, for the lanes' vCPU line. An awake imp that reports none
-// makes the count unknown, which holds every lane slot, rather than a count too low.
+// An awake imp that reports no vCPUs makes the count unknown, rather than a count too low.
 function countNonnixVcpus(imps: readonly { name?: unknown; state?: unknown; vcpus?: unknown }[]): number | null {
   let total = 0;
   for (const i of imps) {

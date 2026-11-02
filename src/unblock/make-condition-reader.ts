@@ -13,12 +13,9 @@ interface ConditionReaderDeps {
   run: Runner;
   issues: Map<string, ConditionVerdict>;
 
-  // When this pass reads: a date condition is settled once this reaches it.
   at: Date;
 }
 
-// The item a condition belongs to, as far as its verdict depends on it: a release settles only when
-// published after the item was added.
 interface ConditionOwner {
   added_at: string;
 }

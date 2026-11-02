@@ -6,8 +6,8 @@ import { CALL_MS } from '../watcher/call-ms.ts';
 
 const MISSING_PATH = /\bNot Found \(HTTP 404\)/u;
 
-// A file of zgeoff/hq at a commit, or null when the commit has no such file. Any other failure
-// throws, so a flaky read is never taken for a missing file.
+// Null only when the commit has no such file. Any other failure throws, so a flaky read is never
+// taken for a missing file.
 export async function readRefFile(run: Runner, sha: string, path: string): Promise<string | null> {
   const result = await boundedRunner(run, CALL_MS)(['gh', 'api', `repos/zgeoff/hq/contents/${path}?ref=${sha}`, '-H', 'Accept: application/vnd.github.raw']).catch(toRunFailure);
   if (result.code === 0) {

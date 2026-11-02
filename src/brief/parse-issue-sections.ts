@@ -3,9 +3,6 @@ import type { IssueSection } from './types.ts';
 
 const HEADING = /^(?<hashes>#{1,6})\s+(?<name>.+?)\s*$/u;
 
-// The headed sections of an issue description, in order. A section runs to the next heading of the
-// same or a higher level, so one that holds a lower heading holds its text too, and the lower
-// heading is a section of its own. A heading inside a code fence is text.
 export function parseIssueSections(description: string): IssueSection[] {
   const lines = description.split('\n');
   const starts: { index: number; level: number; name: string }[] = [];

@@ -1,6 +1,3 @@
-// A read-only Linear client for the issue-type stats and noslop's linked issue (key chosen 2026-10-16):
-// 1Password's item named by HQ_LINEAR_OP_REF, read at run time with the global profile's service-account token
-// and kept in memory only: never in hq.db, a file, a log or an error.
 import { readFileSync } from 'node:fs';
 import { now } from '../clock/now.ts';
 import { readLocalSetting } from '../config/read-local-setting.ts';
@@ -10,7 +7,6 @@ import { KEY_CACHE } from './key-cache.ts';
 import { redact } from './redact.ts';
 import type { LinearCall } from './types.ts';
 
-// `recordRead` runs after each real 1Password read of the key, not a cached one.
 export function makeLinearCaller(run: Runner, doFetch: typeof fetch = fetch, recordRead: () => void = () => {}): LinearCall {
   return async (query, variables) => {
     // Bun's fetch trace prints request headers, the key among them, to stderr.

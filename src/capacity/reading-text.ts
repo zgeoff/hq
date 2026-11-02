@@ -2,7 +2,6 @@ import { formatGiB as gib } from './format-gib.ts';
 import { formatNumber as n0 } from './format-number.ts';
 import type { Reading } from './types.ts';
 
-// The plain reading, for `hq capacity` and `hq capacity sample`.
 export function readingText(r: Reading): string {
   const none = 'no reading';
   const mib = (x: number | null) => (x === null ? none : `${n0(x)} MiB`);

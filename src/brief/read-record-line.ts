@@ -5,8 +5,7 @@ import type { BriefFiles } from './types.ts';
 
 const WHERE = 'skills/delivery-lead/references/design-brief.private.md';
 
-// The record line of the private design brief in the hq-private checkout, for the issue. Nothing
-// else in that file is read out of this function, and an error names the file, never its text.
+// An error names the private design brief file, never its text.
 export function readRecordLine(files: BriefFiles, privateDir: string, issueID: string): string {
   const found = join(privateDir, WHERE);
   if (files.readKind(found) !== 'file') {

@@ -17,7 +17,6 @@ export function readStuckSaveChecks(db: Database, at: Date): Check[] {
 const UNREAD_ROWS = z.array(z.object({ at: z.string(), data: z.string() }));
 const UNREAD_DATA = z.object({ sessionId: z.string(), error: z.string() });
 
-// An event whose data does not hold a session and an error is left out.
 function readUnreadAnswers(db: Database, since: string): UnreadAnswer[] {
   const rows = UNREAD_ROWS.parse(db.query("SELECT at, data FROM events WHERE subject = 'hq' AND subject_id = 'fleet' AND action = 'stale-answer-unread' AND at >= ? ORDER BY seq").all(since));
   return rows.flatMap((row) => {

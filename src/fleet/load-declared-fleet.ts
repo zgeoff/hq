@@ -6,7 +6,6 @@ import type { DeclaredSession } from '../roles/types.ts';
 import { getHome as HOME, getHome } from './get-home.ts';
 import type { FleetEntry } from './types.ts';
 
-// The declared sessions, built from the roles table (fleet.json).
 export function loadDeclaredFleet(): FleetEntry[] {
   return declaredSessions().map((s) => buildFleetEntry(s));
 }

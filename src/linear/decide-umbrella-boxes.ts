@@ -10,7 +10,7 @@ import { writeUmbrellaOutcome } from './write-umbrella-outcome.ts';
 // An older merge is not posted: the first run after install must not flood news with old merges.
 const FRESH_MS = 48 * 3_600_000;
 
-// hq only reads Linear: z-review ticks the box. Returns the news lines posted.
+// hq only reads Linear: z-review ticks the box.
 export async function decideUmbrellaBoxes(db: Database, call: LinearCall, at: Date = now()): Promise<number> {
   const cutoff = at.getTime() - FRESH_MS;
   const undecided = listUmbrellaBoxes(db, 'undecided');
@@ -98,7 +98,6 @@ function pickDecision(box: UmbrellaBox, description: string): Decision {
   return { outcome: 'news', reason: `the ${box.repo} box in ${box.issue} is unticked` };
 }
 
-// The tick mark of each checklist line that starts with the repo's name, not a longer name.
 function collectMarks(description: string, repo: string): string[] {
   const escaped = repo.replaceAll(/[.*+?^${}()|[\]\\]/gu, String.raw`\$&`);
   const pattern = new RegExp(String.raw`^\s*[-*]\s+\[(?<mark> |x|X)\]\s+${escaped}\b(?![-\w])`, 'u');

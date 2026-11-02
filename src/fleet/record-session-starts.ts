@@ -7,9 +7,7 @@ import { sessionStartsSchema } from './session-starts-schema.ts';
 import type { SessionStartsMap } from './session-starts-schema.ts';
 import type { FleetSession } from './types.ts';
 
-// Keeps meta fleet_session_starts for the named live sessions. A session id is written once, at
-// atc's createdAt (or now, when atc gives none), so an atc restore that resets createdAt does not
-// move it. A name whose session id changes starts again; a name not given is dropped.
+// A session id is written once, so an atc restore that resets createdAt does not move it.
 export function recordSessionStarts(db: Database, live: Record<string, FleetSession>): SessionStartsMap {
   const current = metaJson(db, 'fleet_session_starts', sessionStartsSchema, {});
   const next: SessionStartsMap = {};

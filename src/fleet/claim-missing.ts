@@ -3,7 +3,6 @@ import { metaJson } from '../db/meta-json.ts';
 import { setMeta } from '../db/set-meta.ts';
 import { strMap } from '../db/str-map.ts';
 
-// The stored start of a name's gap, or `mine` if none is stored yet; written before it returns.
 export function claimMissing(db: Database, name: string, mine: string): string {
   return db
     .transaction(() => {

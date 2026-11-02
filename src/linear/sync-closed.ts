@@ -7,7 +7,6 @@ import { toIssue } from './to-issue.ts';
 import type { LinearCall, Node } from './types.ts';
 import { writeIssues as store } from './write-issues.ts';
 
-// Every issue completed or canceled in [from, to), stored with its type.
 export async function syncClosed(db: Database, call: LinearCall, from: Date, to: Date = now()): Promise<number> {
   const q = `query($after: String, $from: DateTimeOrDuration!, $to: DateTimeOrDuration!) {
     issues(first: 250, after: $after, includeArchived: true, filter: { or: [{ completedAt: { gte: $from, lt: $to } }, { canceledAt: { gte: $from, lt: $to } }] }) {

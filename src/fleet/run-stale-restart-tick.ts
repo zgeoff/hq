@@ -56,8 +56,6 @@ interface StalePass {
   acted: boolean;
 }
 
-// A session the pass may act on, and why: its prompt has read stale for over two hours, or a
-// scheduled restart is due. A session already asked keeps the cause it was asked for.
 interface StaleTurn {
   entry: FleetEntry;
   session: FleetSession;
@@ -65,10 +63,6 @@ interface StaleTurn {
   held: Entry | undefined;
 }
 
-// One pass of the stale restart, a state machine per declared session kept in meta fleet_refresh.
-// Stale for over two hours, or due a scheduled restart, a session is asked to save at a quiet
-// moment; on `saved` it is stopped, unpinned and forgotten, and ensure spawns it from main. One
-// ask or restart per pass.
 export async function runStaleRestartTick(db: Database, client: FleetClient & StaleOps, opts: StaleTickOptions): Promise<RestartedSession[]> {
   const pass = await readStalePass(db, client, opts);
   removeSettledEntries(pass);
@@ -126,9 +120,6 @@ function toLiveIDs(sessions: Record<string, FleetSession>): Record<string, strin
   return Object.fromEntries(Object.entries(sessions).map(([name, session]) => [name, session.id]));
 }
 
-// A restart an earlier pass left unfinished is a skip when its session is still there, and gone
-// when it is not. An entry for another session id, or a stale-prompt entry whose prompt is now
-// current, is dropped. A scheduled entry stays until the session id changes.
 function removeSettledEntries(pass: StalePass): void {
   for (const [name, entry] of Object.entries(pass.refresh)) {
     const current = pass.sessions[name];
@@ -193,7 +184,6 @@ function findCause(pass: StalePass, name: string, session: FleetSession, held: E
   return scheduled === undefined ? null : { kind: 'scheduled', why: scheduled };
 }
 
-// The stale-prompt cause, when the session reads stale and hq has seen it stale since `sinceMs`.
 function findStaleCause(pass: StalePass, name: string, session: FleetSession): { cause: RestartCause; sinceMs: number } | null {
   const reading = pass.drift[name];
   const since = pass.stale[name];
@@ -251,8 +241,6 @@ async function runAskedStep(pass: StalePass, turn: StaleTurn, asked: Entry): Pro
   await runRestart(pass, turn, asked);
 }
 
-// A stale-prompt restart is logged as stale-restarted with its commit, a scheduled one as
-// scheduled-restarted with its reason.
 async function runRestart(pass: StalePass, turn: StaleTurn, asked: Entry): Promise<void> {
   const restart = match(turn.cause)
     .with({ kind: 'stale' }, (stale) => ({ action: 'stale-restarted', detail: { commit: stale.commit } }))
@@ -322,7 +310,6 @@ function buildSkip(entry: Entry, t: Date): Entry {
   };
 }
 
-// After enough deferrals z-stu is told once; hq never restarts the session unasked.
 function recordSkip(pass: StalePass, name: string, entry: Entry, cause: RestartCause): void {
   const skipped = buildSkip(entry, pass.time);
   pass.refresh[name] = skipped;

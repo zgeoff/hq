@@ -139,8 +139,6 @@ function buildSimSlots(newest: readonly SlotRow[], context: SimSlotContext): Sim
   return slots;
 }
 
-// A slot's samples newer than its read, oldest first: the active slot's by its account, another's by
-// its 7-day reset. Each window then takes the newest sample that holds a figure for it.
 function collectNewerSamples(row: SlotRow, account: string | null, samples: readonly UsageSample[]): UsageSample[] {
   const rowResetsAt = row.sevenResetsAt;
   const newer = samples.filter((sample) => Date.parse(sample.at) > Date.parse(row.at));

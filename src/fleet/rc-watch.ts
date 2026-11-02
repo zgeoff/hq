@@ -8,8 +8,6 @@ import { loadRcPending as rcPending } from './load-rc-pending.ts';
 import { RC_MAX_MIN } from './rc-max-min.ts';
 import type { EnsureStep, FleetClient, RcDeps, RcEval } from './types.ts';
 
-// `hq fleet rc NAME`: the helper. Looks every poll until the marker ends. Gives up quietly past the
-// limit (the 5-minute ensure still covers it), and when the marker is gone or replaced.
 export async function rcWatch(db: Database, client: FleetClient, rc: RcDeps, name: string, actor: string): Promise<EnsureStep | null> {
   const first = rcPending(db)[name];
   if (!first || !client.submit) return null;

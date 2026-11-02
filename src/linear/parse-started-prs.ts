@@ -2,7 +2,6 @@ import { z } from 'zod';
 
 export type StartedPrStatus = 'open' | 'draft' | 'merged' | 'closed';
 
-// A GitHub PR Linear attaches to an issue, as hq keeps it: ref is repo#number, the way run_prs refs are.
 export interface StartedPr {
   ref: string;
   status: StartedPrStatus;

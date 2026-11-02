@@ -13,9 +13,6 @@ const REPEAT_MS = 60 * 60_000,
   TOLD_AT = 'unblock_changed_told_at',
   TOLD_SEQ = 'unblock_changed_told_seq';
 
-// z-triage's "unblock list changed" nudge, from the watcher: outside quiet hours, tell the owner
-// when `hq unblock new` lists items. At once for a seq above the one last told, then every 60 min
-// while items stay unpushed. A push that moves the cursor past them ends it.
 export function runUnblockChangedTick(db: Database, actor: string, at: Date = now()): boolean {
   if (isQuiet(at)) {
     return false;

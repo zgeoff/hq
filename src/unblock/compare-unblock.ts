@@ -1,8 +1,6 @@
 import { PRIORITIES } from './priorities.ts';
 import type { UnblockItem } from './types.ts';
 
-// Explicit ranks first (lowest first). Then Urgent/High work unblocked, then
-// the most work unblocked, then the fewest minutes, then the oldest.
 export function compareUnblock(a: UnblockItem, b: UnblockItem): number {
   if (a.rank !== null || b.rank !== null) {
     if (a.rank === null) return 1;
