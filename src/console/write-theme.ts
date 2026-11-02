@@ -5,6 +5,5 @@ export function writeTheme(root: HTMLElement, readStorage: () => Storage, theme:
   try {
     readStorage().setItem(THEME_KEY, theme);
   } catch {
-    // Storage that refuses keeps the theme for this page only.
   }
 }
