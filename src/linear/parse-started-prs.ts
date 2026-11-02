@@ -17,8 +17,6 @@ const metadataSchema = z.object({
   repoName: z.string().nullish(),
 });
 
-// The PRs among an issue's attachments. An attachment that is not GitHub's, or has no usable status or
-// no PR number, is left out: hq cannot tell what it says about the work.
 export function parseStartedPrs(attachments: readonly unknown[]): StartedPr[] {
   const prs = new Map<string, StartedPr>();
   for (const raw of attachments) {

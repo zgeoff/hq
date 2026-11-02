@@ -7,8 +7,6 @@ import { pickOwnerWaitClear } from './pick-owner-wait-clear.ts';
 const openSchema = z.object({ open: z.number() });
 const designSchema = z.object({ design_pass: z.number() }).nullable();
 
-// Clears the owner wait of the run a PR just merged on, when pickOwnerWaitClear says the merge ended
-// it, and logs which rule did. Reads the PR table as it stands, so call it after the PR is marked merged.
 export function clearOwnerWait(db: Database, issue: string, mergedRef: string, actor: string): void {
   const run = getRun(db, issue);
   if (run === null) {

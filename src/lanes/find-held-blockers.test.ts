@@ -1,37 +1,40 @@
 import { expect, test } from 'bun:test';
+import { buildKettleIssueText } from '../../test/build-kettle-issue-text.ts';
 import { findHeldBlockers } from './find-held-blockers.ts';
 
-function setupTest() {
-  const description =
-    '## Outcome\n\nThe kettle boils.\n\n## Context\n\n- Project: kitchen\n\n## Scope\n\nIn: the element.\nOut: none stated.\n\n## Acceptance\n\n- [ ] The kettle boils in a test (unit test)\n\n## Actions\n\nCode delivery\n';
-  return {
-    issue: { description, labels: ['Feature'], blockerStates: [], moreRelations: false },
-    doneOpen: new Map([['GEO-9871', '2026-10-13T01:00:00Z']]),
-    started: [{ identifier: 'GEO-9871', state: 'started' }],
-  };
-}
-
 test('it names the done-but-open blockers that alone hold an otherwise promotable issue', () => {
-  const app = setupTest();
+  const issue = { description: buildKettleIssueText(), labels: ['Feature'], blockerStates: [], moreRelations: false };
+  const blockers = [
+    { identifier: 'GEO-9870', state: 'completed' },
+    { identifier: 'GEO-9871', state: 'started' },
+  ];
 
-  expect(findHeldBlockers(app.issue, [{ identifier: 'GEO-9870', state: 'completed' }, ...app.started], app.doneOpen)).toStrictEqual([{ identifier: 'GEO-9871', lastMergedAt: '2026-10-13T01:00:00Z' }]);
+  expect(findHeldBlockers(issue, blockers, new Map([['GEO-9871', '2026-10-13T01:00:00Z']]))).toStrictEqual([{ identifier: 'GEO-9871', lastMergedAt: '2026-10-13T01:00:00Z' }]);
 });
 
 test('it gives no held blockers when every blocker is completed', () => {
-  const app = setupTest();
+  const issue = { description: buildKettleIssueText(), labels: ['Feature'], blockerStates: [], moreRelations: false };
 
-  expect(findHeldBlockers(app.issue, [{ identifier: 'GEO-9870', state: 'completed' }], app.doneOpen)).toBeNull();
+  expect(findHeldBlockers(issue, [{ identifier: 'GEO-9870', state: 'completed' }], new Map([['GEO-9871', '2026-10-13T01:00:00Z']]))).toBeNull();
 });
 
 test('it gives no held blockers when another blocker is not done', () => {
-  const app = setupTest();
+  const issue = { description: buildKettleIssueText(), labels: ['Feature'], blockerStates: [], moreRelations: false };
+  const blockers = [
+    { identifier: 'GEO-9871', state: 'started' },
+    { identifier: 'GEO-9872', state: 'started' },
+  ];
 
-  expect(findHeldBlockers(app.issue, [...app.started, { identifier: 'GEO-9872', state: 'started' }], app.doneOpen)).toBeNull();
+  expect(findHeldBlockers(issue, blockers, new Map([['GEO-9871', '2026-10-13T01:00:00Z']]))).toBeNull();
 });
 
-test('it gives no held blockers when the issue is parked, needs design, has unread relations or lacks sections', () => {
-  const app = setupTest();
-  const reasons = [{ labels: ['parked'] }, { labels: ['needs-design'] }, { moreRelations: true }, { description: '## Outcome\n\nTBD\n' }];
+test.each([
+  { name: 'is parked', labels: ['parked'], moreRelations: false, description: buildKettleIssueText() },
+  { name: 'needs design', labels: ['needs-design'], moreRelations: false, description: buildKettleIssueText() },
+  { name: 'has unread relations', labels: ['Feature'], moreRelations: true, description: buildKettleIssueText() },
+  { name: 'lacks sections', labels: ['Feature'], moreRelations: false, description: '## Outcome\n\nTBD\n' },
+])('it gives no held blockers when the issue $name', (row) => {
+  const issue = { description: row.description, labels: [...row.labels], blockerStates: [], moreRelations: row.moreRelations };
 
-  expect(reasons.map((reason) => findHeldBlockers({ ...app.issue, ...reason }, app.started, app.doneOpen))).toStrictEqual([null, null, null, null]);
+  expect(findHeldBlockers(issue, [{ identifier: 'GEO-9871', state: 'started' }], new Map([['GEO-9871', '2026-10-13T01:00:00Z']]))).toBeNull();
 });

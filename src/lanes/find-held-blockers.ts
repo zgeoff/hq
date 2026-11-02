@@ -6,9 +6,6 @@ export interface HeldBlocker {
   lastMergedAt: string;
 }
 
-// The blockers that alone hold back an otherwise promotable Backlog issue: each is In Progress with every
-// PR merged (a key of doneOpen, valued with its last merge). Null when the issue is promotable already, or
-// fails for another reason, or has a blocker that is neither completed nor done-but-open.
 export function findHeldBlockers(issue: BacklogIssue, blockers: readonly { identifier: string; state: string }[], doneOpen: ReadonlyMap<string, string>): HeldBlocker[] | null {
   const waiting = blockers.filter((blocker) => blocker.state !== 'completed');
   const held = waiting.flatMap((blocker) => {
