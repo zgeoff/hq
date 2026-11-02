@@ -1,5 +1,6 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { buildFiledNode } from '../../../test/build-filed-node.ts';
+import { buildGithubAttachment } from '../../../test/build-github-attachment.ts';
 import { freshDb } from '../../../test/helpers.ts';
 import { makeThroughputLinearCall } from '../../../test/make-throughput-linear-call.ts';
 import { main } from '../../cli.ts';
@@ -122,7 +123,7 @@ test('the issues line splits filings by source', async () => {
   expect(ctx.findLine('Issues')).toBe('- Issues: today 7 filed (owner 1, design 1, agent 1, review 0, live check 2, bot 2), 0 closed; target none –');
 });
 
-test('an In Progress issue with no run and no PR, or an open run on a closed issue, is stale after 24 hours, and its owner hears once each', async () => {
+test('it alerts on an In Progress issue with no run and no PR, or an open run on a closed issue, after 24 hours, and its owner hears once each', async () => {
   const ctx = setupTest();
   const run = (issue: string) => addRun(ctx.db, { issue, title: 'Invented kettle work', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, actor: 'z-delivery' });
   run('GEO-9803');
@@ -218,16 +219,15 @@ test('an In Progress issue with an active session and no open run is not stale',
   });
 });
 
-test('an In Progress issue whose PRs all merged is stale 24 hours after the last merge and goes to triage, and one stalled with only closed PRs goes to the orchestrator, once each', async () => {
+test('it sends a done-but-open issue to triage 24 hours after its last merge and a stalled one to the orchestrator, once each', async () => {
   const ctx = setupTest();
-  const pr = (number: number, status: string, mergedAt: string | null) => ({ url: `https://github.com/zgeoff/kettle/pull/${number}`, sourceType: 'github', metadata: { status, mergedAt, number, repoName: 'kettle' } });
   const started = [
-    { identifier: 'GEO-9801', startedAt: '2026-10-10T07:00:00Z', attachments: [pr(1, 'merged', '2026-10-13T07:00:00Z'), pr(2, 'merged', '2026-10-14T07:00:00Z')] },
-    { identifier: 'GEO-9802', startedAt: '2026-10-10T07:00:00Z', attachments: [pr(3, 'merged', '2026-10-16T01:00:00Z')] },
-    { identifier: 'GEO-9803', startedAt: '2026-10-14T07:00:00Z', attachments: [pr(4, 'closed', null)] },
-    { identifier: 'GEO-9804', startedAt: '2026-10-16T01:00:00Z', attachments: [pr(5, 'closed', null)] },
-    { identifier: 'GEO-9805', startedAt: '2026-10-10T07:00:00Z', attachments: [pr(6, 'merged', '2026-10-12T07:00:00Z'), pr(7, 'open', null)] },
-    { identifier: 'GEO-9806', startedAt: '2026-10-10T07:00:00Z', attachments: [pr(8, 'draft', null)] },
+    { identifier: 'GEO-9801', startedAt: '2026-10-10T07:00:00Z', attachments: [buildGithubAttachment(1, 'merged', '2026-10-13T07:00:00Z'), buildGithubAttachment(2, 'merged', '2026-10-14T07:00:00Z')] },
+    { identifier: 'GEO-9802', startedAt: '2026-10-10T07:00:00Z', attachments: [buildGithubAttachment(3, 'merged', '2026-10-16T01:00:00Z')] },
+    { identifier: 'GEO-9803', startedAt: '2026-10-14T07:00:00Z', attachments: [buildGithubAttachment(4, 'closed')] },
+    { identifier: 'GEO-9804', startedAt: '2026-10-16T01:00:00Z', attachments: [buildGithubAttachment(5, 'closed')] },
+    { identifier: 'GEO-9805', startedAt: '2026-10-10T07:00:00Z', attachments: [buildGithubAttachment(6, 'merged', '2026-10-12T07:00:00Z'), buildGithubAttachment(7, 'open')] },
+    { identifier: 'GEO-9806', startedAt: '2026-10-10T07:00:00Z', attachments: [buildGithubAttachment(8, 'draft')] },
   ];
   await syncLinear(ctx.db, makeThroughputLinearCall([], started), new Date('2026-10-14T00:00:00Z'), new Date(ctx.now));
 

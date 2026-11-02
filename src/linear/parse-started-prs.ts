@@ -39,6 +39,6 @@ function pickRef(repoName: string | null | undefined, number: number | null | un
   if (repoName && number) {
     return `${repoName.split('/').at(-1)}#${number}`;
   }
-  const match = /github\.com\/[\w.-]+\/([\w.-]+)\/pull\/(\d+)/u.exec(url ?? '');
-  return match === null ? null : `${match[1]}#${match[2]}`;
+  const match = /github\.com\/[\w.-]+\/(?<repo>[\w.-]+)\/pull\/(?<number>\d+)/u.exec(url ?? '');
+  return match?.groups === undefined ? null : `${match.groups['repo']}#${match.groups['number']}`;
 }

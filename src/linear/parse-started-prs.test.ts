@@ -1,14 +1,9 @@
 import { expect, test } from 'bun:test';
+import { buildGithubAttachment } from '../../test/build-github-attachment.ts';
 import { parseStartedPrs } from './parse-started-prs.ts';
 
-const github = (metadata: unknown, url = 'https://github.com/zgeoff/kettle/pull/41') => ({ url, sourceType: 'github', metadata });
-
 test('it reads the ref, status and merge time of GitHub attachments', () => {
-  const prs = parseStartedPrs([
-    github({ status: 'merged', mergedAt: '2026-10-14T01:00:00Z', number: 41, repoName: 'kettle', repoLogin: 'zgeoff' }),
-    github({ status: 'open', mergedAt: null, number: 42, repoName: 'kettle' }),
-    github({ status: 'draft', number: 43, repoName: 'teapot' }),
-  ]);
+  const prs = parseStartedPrs([buildGithubAttachment(41, 'merged', '2026-10-14T01:00:00Z'), buildGithubAttachment(42, 'open'), { ...buildGithubAttachment(43, 'draft'), metadata: { status: 'draft', number: 43, repoName: 'teapot' } }]);
 
   expect(prs).toStrictEqual([
     { ref: 'kettle#41', status: 'merged', mergedAt: '2026-10-14T01:00:00Z' },
@@ -18,12 +13,13 @@ test('it reads the ref, status and merge time of GitHub attachments', () => {
 });
 
 test('it leaves out attachments that are not GitHub, have no usable status, or name no PR', () => {
+  const github = buildGithubAttachment(44, 'merged');
   const prs = parseStartedPrs([
     { url: 'https://example.com/x', sourceType: 'slack', metadata: { status: 'merged' } },
-    github({ number: 44, repoName: 'kettle' }),
-    github({ status: 'weird', number: 45, repoName: 'kettle' }),
-    github(null),
-    github({ status: 'closed' }, 'https://example.com/none'),
+    { ...github, metadata: { number: 44, repoName: 'kettle' } },
+    { ...github, metadata: { status: 'weird', number: 45, repoName: 'kettle' } },
+    { ...github, metadata: null },
+    { url: 'https://example.com/none', sourceType: 'github', metadata: { status: 'closed' } },
     'not an attachment',
   ]);
 
@@ -31,5 +27,7 @@ test('it leaves out attachments that are not GitHub, have no usable status, or n
 });
 
 test('it takes the ref from the URL when the metadata lacks the repo or number', () => {
-  expect(parseStartedPrs([github({ status: 'closed' })])).toStrictEqual([{ ref: 'kettle#41', status: 'closed', mergedAt: null }]);
+  const attachment = { ...buildGithubAttachment(41, 'closed'), metadata: { status: 'closed' } };
+
+  expect(parseStartedPrs([attachment])).toStrictEqual([{ ref: 'kettle#41', status: 'closed', mergedAt: null }]);
 });

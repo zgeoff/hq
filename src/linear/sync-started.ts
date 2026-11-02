@@ -6,7 +6,8 @@ import { parseStartedPrs } from './parse-started-prs.ts';
 import type { StartedPr } from './parse-started-prs.ts';
 import type { LinearCall } from './types.ts';
 
-const startedNodeSchema = z.object({ identifier: z.string(), startedAt: z.string().nullable(), updatedAt: z.string(), attachments: z.object({ nodes: z.array(z.unknown()) }).nullish() });
+const attachmentsSchema = z.object({ nodes: z.array(z.unknown()) });
+const startedNodeSchema = z.object({ identifier: z.string(), startedAt: z.string().nullable(), updatedAt: z.string(), attachments: attachmentsSchema.nullish() });
 const pageInfoSchema = z.object({ hasNextPage: z.boolean(), endCursor: z.string().nullable() });
 const startedPageSchema = z.object({ issues: z.object({ nodes: z.array(startedNodeSchema), pageInfo: pageInfoSchema }) });
 
@@ -20,9 +21,11 @@ export async function syncStarted(db: Database, call: LinearCall, at: Date): Pro
   for (let page = 0; page < 40; page++) {
     const answer = await call(query, { after });
     const issues = startedPageSchema.parse(answer).issues;
-
-    // An issue moved straight into a started state without Linear stamping startedAt is aged from its last update.
-    started.push(...issues.nodes.map((node) => ({ issue: node.identifier, startedAt: iso(new Date(node.startedAt ?? node.updatedAt)), prs: parseStartedPrs(node.attachments?.nodes ?? []) })));
+    for (const node of issues.nodes) {
+      // An issue moved straight into a started state without Linear stamping startedAt is aged from its last update.
+      const startedAt = iso(new Date(node.startedAt ?? node.updatedAt));
+      started.push({ issue: node.identifier, startedAt, prs: parseStartedPrs(node.attachments?.nodes ?? []) });
+    }
     if (!issues.pageInfo.hasNextPage) {
       writeStarted(db, started, at);
       return started.length;

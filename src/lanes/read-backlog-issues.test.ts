@@ -130,7 +130,7 @@ test('it collects the promotable issues from every Backlog page, asking for each
   ]);
 });
 
-test('hq lanes promotable --json prints the promotable Backlog issues of the lanes team, and the ones a done-but-open blocker holds', async () => {
+test('it prints, for hq lanes promotable --json, the promotable Backlog issues of the lanes team, and the ones a done-but-open blocker holds', async () => {
   const fresh = freshDb();
   const run = mock<Runner>(() => Promise.resolve<RunResult>({ code: 0, stdout: 'lin_api_INVENTEDkettleKEY0042\n', stderr: '' }));
   const log = console.log;

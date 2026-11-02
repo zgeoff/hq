@@ -15,7 +15,7 @@ export function makeThroughputLinearCall(filed: readonly FiledNode[], started: r
       return Promise.resolve(buildPage(filed));
     }
     if (query.includes('"started"')) {
-      return Promise.resolve(buildPage(started.map(({ attachments, ...issue }) => ({ ...issue, updatedAt: issue.startedAt, ...(attachments === undefined ? {} : { attachments: { nodes: attachments } }) }))));
+      return Promise.resolve(buildPage(started.map((issue) => buildStartedNode(issue))));
     }
     return Promise.resolve(buildPage([]));
   };
@@ -23,4 +23,9 @@ export function makeThroughputLinearCall(filed: readonly FiledNode[], started: r
 
 function buildPage(nodes: readonly unknown[]) {
   return { issues: { nodes, pageInfo: { hasNextPage: false, endCursor: null } } };
+}
+
+function buildStartedNode(issue: StartedSeed) {
+  const node = { identifier: issue.identifier, startedAt: issue.startedAt, updatedAt: issue.startedAt };
+  return issue.attachments === undefined ? node : { ...node, attachments: { nodes: issue.attachments } };
 }

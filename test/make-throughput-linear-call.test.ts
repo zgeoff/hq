@@ -17,7 +17,9 @@ test('it nests an In Progress issue\'s attachments under attachments.nodes, and 
   const attachment = { url: 'https://github.com/zgeoff/kettle/pull/41', sourceType: 'github', metadata: { status: 'open' } };
   const call = makeThroughputLinearCall([], [{ identifier: 'GEO-9802', startedAt: '2026-10-14T07:00:00Z', attachments: [attachment] }]);
 
-  expect(await call('issues(filter: { state: { type: { eq: "started" } } })', {})).toStrictEqual({
+  const answer = await call('issues(filter: { state: { type: { eq: "started" } } })', {});
+
+  expect(answer).toStrictEqual({
     issues: { nodes: [{ identifier: 'GEO-9802', startedAt: '2026-10-14T07:00:00Z', updatedAt: '2026-10-14T07:00:00Z', attachments: { nodes: [attachment] } }], pageInfo: { hasNextPage: false, endCursor: null } },
   });
 });

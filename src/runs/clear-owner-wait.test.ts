@@ -1,4 +1,5 @@
 import { expect, onTestFinished, test } from 'bun:test';
+import { z } from 'zod';
 import { freshDb } from '../../test/helpers.ts';
 import { overrideEnv } from '../config/override-env.ts';
 import { addPr } from './add-pr.ts';
@@ -19,11 +20,11 @@ function setupTest(waitsOn: string) {
     db: fresh.db,
     merge: (ref: string) => closePr(fresh.db, ref, { to: 'merged', actor: 'z-review' }),
     readWait: () => fresh.db.query("SELECT waits_on, waits_on_geoff FROM runs WHERE issue = 'GEO-9731'").get(),
-    readEvents: () => (fresh.db.query("SELECT actor, data FROM events WHERE action = 'owner-wait-cleared'").all() as { actor: string; data: string }[]).map((row) => ({ actor: row.actor, data: JSON.parse(row.data) as unknown })),
+    readEvents: () => z.array(z.object({ actor: z.string(), data: z.string() })).parse(fresh.db.query("SELECT actor, data FROM events WHERE action = 'owner-wait-cleared'").all()).map((row) => ({ actor: row.actor, data: z.unknown().parse(JSON.parse(row.data)) })),
   };
 }
 
-test('merging the PR the owner wait names clears the wait and logs the PR and the named rule', () => {
+test('it clears the wait on merging the PR it names, and logs the PR and the named rule', () => {
   const app = setupTest('owner to merge kettle#61');
 
   app.merge('kettle#61');
@@ -34,7 +35,7 @@ test('merging the PR the owner wait names clears the wait and logs the PR and th
   });
 });
 
-test('merging the last open PR clears an owner wait that names none of them', () => {
+test('it clears a wait that names no PR on merging the last open PR', () => {
   const app = setupTest('owner to check the kettle');
 
   app.merge('kettle#61');
@@ -48,7 +49,7 @@ test('merging the last open PR clears an owner wait that names none of them', ()
   });
 });
 
-test('merging a PR the wait does not name keeps the wait while another PR is open', () => {
+test('it keeps a wait on merging a PR it does not name while another PR is open', () => {
   const app = setupTest('owner to merge kettle#62');
 
   app.merge('kettle#61');

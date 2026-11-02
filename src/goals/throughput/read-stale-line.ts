@@ -50,28 +50,26 @@ function readUnrunItems(db: Database): StaleItem[] {
   return z
     .array(startedRowSchema)
     .parse(rows)
-    .flatMap((row) => {
-      return buildUnrunItem(row.issue, row.started_at, pickStaleKind(row.started_at, prs.get(row.issue) ?? []));
-    });
+    .flatMap((row) => buildUnrunItem(row.issue, row.started_at, pickStaleKind(row.started_at, prs.get(row.issue) ?? [])));
 }
 
 function buildUnrunItem(issue: string, startedAt: string, stale: StaleKind): StaleItem[] {
   return match(stale)
     .with({ kind: 'live' }, () => [])
-    .with({ kind: 'done-open' }, ({ since, ref }) => [
+    .with({ kind: 'done-open' }, (done) => [
       {
-        since,
+        since: done.since,
         summary: `${issue} In Progress, every PR merged`,
         alert: {
           key: `stale:done-open:${issue}`,
-          text: `Stale: ${issue} is In Progress, but every PR merged (last ${ref} at ${since}). Close it, or name the live check or owner step that holds it.`,
+          text: `Stale: ${issue} is In Progress, but every PR merged (last ${done.ref} at ${done.since}). Close it, or name the live check or owner step that holds it.`,
           role: 'triage' as const,
         },
       },
     ])
-    .with({ kind: 'stalled' }, ({ since }) => [
+    .with({ kind: 'stalled' }, (stalled) => [
       {
-        since,
+        since: stalled.since,
         summary: `${issue} In Progress, no run, no open PR`,
         alert: {
           key: `stale:stalled:${issue}`,
