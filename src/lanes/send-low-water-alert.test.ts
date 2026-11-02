@@ -113,6 +113,23 @@ test('it sends nothing while a lanes hold is active', async () => {
   expect(ctx.look.lowWater()).toStrictEqual([]);
 });
 
+test('it keeps the episode a lanes hold started and sends its message once the hold ends', async () => {
+  const ctx = setupTest();
+  at('2026-10-14T01:00:00Z');
+  holdLanes(ctx.db, 10, 'host switch', 'kettle-owner');
+  await ctx.look.ready(1);
+  ctx.look.promotable(2, '2026-10-14T01:00:00Z');
+  tick(ctx.db, ctx.look.sample, 'hq-lanes');
+  const held = ctx.look.lowWater();
+  at('2026-10-14T01:15:00Z');
+  ctx.look.promotable(2, '2026-10-14T01:15:00Z');
+
+  tick(ctx.db, ctx.look.sample, 'hq-lanes');
+
+  expect(held).toStrictEqual([]);
+  expect(ctx.db.query("SELECT outbox.target, outbox.text, events.subject_id FROM outbox JOIN events ON events.seq = outbox.event_seq WHERE outbox.topic = 'lanes-low-water'").all()).toStrictEqual([{ target: 'z-triage', text: ctx.lowWaterText, subject_id: 'low-water:2026-10-14T01:00:00Z' }]);
+});
+
 test('it sends nothing while the look has a sample error', async () => {
   const ctx = setupTest();
   at('2026-10-14T01:00:00Z');

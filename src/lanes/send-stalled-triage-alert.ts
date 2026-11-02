@@ -2,14 +2,14 @@ import type { Database } from 'bun:sqlite';
 import { z } from 'zod';
 import { getMeta } from '../db/get-meta.ts';
 import { logEvent } from '../log-event.ts';
-import { sydney } from '../morning/sydney.ts';
 import { enqueue } from '../outbox/enqueue.ts';
 import { owner } from '../owner.ts';
+import { STALLED_TRIAGE_TOPIC } from './lanes-alert-topics.ts';
 import { LOW_WATER_SINCE_KEY } from './low-water-since-key.ts';
+import { pickStalledTriage } from './pick-stalled-triage.ts';
 import type { SlotCause } from './types.ts';
 
-const STALLED_MINUTES = 30;
-const SENT_AT = z.object({ at: z.string() }).nullable();
+const SENT_AT = z.object({ sent_at: z.string() }).nullable();
 
 interface StalledTriageAlert {
   slotCause: SlotCause;
@@ -18,29 +18,35 @@ interface StalledTriageAlert {
   actor: string;
 }
 
-// Tells the owner once per triage cause episode when free slots have waited 30 minutes for promotion, with
-// the time z-triage got the low-water message if the current low-water episode sent one. Quiet hours stop
-// nothing: the owner's session holds any push itself. A lanes hold stops it. Returns whether it sent.
+// Tells the owner when triage has left free slots empty for 30 minutes. pickStalledTriage decides; this
+// reads its inputs and queues what it picked. Returns whether it sent.
 export function sendStalledTriageAlert(db: Database, alert: StalledTriageAlert): boolean {
   const since = alert.slotCause.since;
-  const slots = alert.slotCause.slots;
-  if (alert.held || alert.slotCause.cause !== 'triage' || slots < 1 || since === null) {
-    return false;
-  }
-  const minutes = Math.floor((alert.at.getTime() - Date.parse(since)) / 60_000);
-  if (minutes < STALLED_MINUTES) {
-    return false;
-  }
-  const subjectID = `slot-cause-stalled:triage:${since}`;
-  if (db.query(`SELECT 1 FROM events WHERE subject = 'hq' AND subject_id = ? AND action = 'alerted'`).get(subjectID)) {
-    return false;
-  }
   const lowWaterSince = getMeta(db, LOW_WATER_SINCE_KEY);
-  const sent = lowWaterSince === null ? null : SENT_AT.parse(db.query(`SELECT at FROM events WHERE subject = 'hq' AND subject_id = ? AND action = 'alerted'`).get(`low-water:${lowWaterSince}`));
-  const when = sent === null ? null : sydney(new Date(sent.at));
-  const told = when === null ? '' : ` z-triage got the low-water message at ${String(when.h).padStart(2, '0')}:${String(when.mi).padStart(2, '0')}.`;
+  const message = pickStalledTriage({
+    slotCause: alert.slotCause,
+    held: alert.held,
+    at: alert.at,
+    alerted: since !== null && probeAlerted(db, `slot-cause-stalled:triage:${since}`),
+    toldAt: lowWaterSince === null ? null : readDeliveredAt(db, `low-water:${lowWaterSince}`),
+  });
+  if (message === null) {
+    return false;
+  }
   const target = owner();
-  const seq = logEvent(db, 'hq', subjectID, 'alerted', alert.actor, null, null, { to: target, slots, minutes });
-  enqueue(db, seq, target, `Lanes: ${slots} slots empty for ${minutes} min with Backlog issues to promote (triage).${told}`, subjectID);
+  const seq = logEvent(db, 'hq', message.subjectID, 'alerted', alert.actor, null, null, { to: target, slots: alert.slotCause.slots, minutes: message.minutes });
+  enqueue(db, seq, target, message.text, STALLED_TRIAGE_TOPIC);
   return true;
+}
+
+function probeAlerted(db: Database, subjectID: string): boolean {
+  return db.query(`SELECT 1 FROM events WHERE subject = 'hq' AND subject_id = ? AND action = 'alerted'`).get(subjectID) !== null;
+}
+
+// When the alert's message reached its session: the sent_at of its outbox row, or null while it waits.
+function readDeliveredAt(db: Database, subjectID: string): string | null {
+  const row = SENT_AT.parse(
+    db.query(`SELECT outbox.sent_at FROM outbox JOIN events ON events.seq = outbox.event_seq WHERE events.subject = 'hq' AND events.subject_id = ? AND events.action = 'alerted' AND outbox.status = 'sent' AND outbox.sent_at IS NOT NULL ORDER BY outbox.sent_at LIMIT 1`).get(subjectID),
+  );
+  return row?.sent_at ?? null;
 }
