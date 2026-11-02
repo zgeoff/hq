@@ -255,6 +255,22 @@ set_case
 caller "uses: zgeoff/tools/.github/workflows/bun-checks.yml@$FORK_PIN # main" 'uses: zgeoff/tools/.github/workflows/bun-checks.yml@main'
 expect "a workflow caller pinned to a tools commit that only a fork holds fails" 1 "no: .github/workflows/pr.yml pins zgeoff/tools at $FORK_PIN"
 
+# step <base ref> <head ref>: a workflow the repo wrote itself, whose only change
+# moves the ref of a step that uses a zgeoff/tools action, which the sync never pins.
+step() {
+  export FILES='.github/workflows/main.yml\tmodified' HEAD_BLOB=pinned SOURCE_TEXT=unrelated
+  export BASE_TEXT="on: push\\njobs:\\n  checks:\\n    steps:\\n      - uses: zgeoff/tools/actions/setup@$1"
+  export HEAD_TEXT="on: push\\njobs:\\n  checks:\\n    steps:\\n      - uses: zgeoff/tools/actions/setup@$2"
+}
+
+set_case
+step "$old_pin" "$FORK_PIN # main"
+expect "a workflow that repoints a tools action at a commit only a fork holds fails" 1 "no: .github/workflows/main.yml pins zgeoff/tools at $FORK_PIN, which is not on tools main (diverged)"
+
+set_case
+step "$old_pin" "$new_pin"
+expect "a workflow that repoints a tools action at a commit on tools main fails, since the sync pins only workflow calls" 1 "no: .github/workflows/main.yml is not a target"
+
 set_case
 own .github/workflows/main.yml "$old_pin" "$new_pin"
 export FILES='.github/workflows/main.yml\tadded'

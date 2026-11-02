@@ -12,12 +12,13 @@
 # read from tools main, or in the repo its entry's `repo` names: zgeoff/skills,
 # read from the commit that tools main's sync/skills-pin.json pins. The sync
 # pins each zgeoff/tools workflow call to the commit it syncs, so a file whose blob
-# differs is compared again with its `uses: zgeoff/tools/...@<ref>` refs
-# (main, sync-vN, or a commit with its `# main` comment) made equal. The sync
+# differs is compared again with its `uses: zgeoff/tools/.github/workflows/...@<ref>`
+# refs (main, sync-vN, or a commit with its `# main` comment) made equal; a ref
+# to any other zgeoff/tools path, such as an action, stays as written. The sync
 # also pins those calls in the repo's own workflows, so a workflow file whose
-# only change is such a ref passes, target or not. Each commit a changed
-# workflow pins must be on tools main, since a ref can also name a commit that
-# only a fork holds. A removed
+# only change is such a ref passes, target or not. Each commit that a changed
+# workflow pins on any zgeoff/tools path must be on tools main, since a ref can
+# also name a commit that only a fork holds. A removed
 # file passes only when tools main no longer syncs it and either its copy at
 # the PR base equals, in the same way, a source that an earlier tools manifest delivered to its path, or the source
 # moved, in the same repo, to one that the same entry still delivers and whose target at the PR
@@ -82,10 +83,13 @@ raw_text() {
 
 # text <owner/repo> <path> <ref>: the file's content, with each zgeoff/tools
 # workflow ref (main, sync-vN, or a commit with its `# main` comment) on a uses:
-# line replaced by @REF.
+# line replaced by @REF. Only a call to a workflow under .github/workflows/
+# counts, as only those the sync pins (zgeoff/tools
+# scripts/repo-sync/build-tools-pin.ts), so a moved ref to an action or any
+# other path stays a change.
 text() {
   raw_text "$1" "$2" "$3" |
-    sed -E 's#(uses:[[:space:]]*zgeoff/tools/[^@[:space:]]+)@(main|sync-v[0-9]+|[0-9a-f]{40}( \# main)?)#\1@REF#'
+    sed -E 's#(uses:[[:space:]]*zgeoff/tools/\.github/workflows/[^@[:space:]]+)@(main|sync-v[0-9]+|[0-9a-f]{40}( \# main)?)#\1@REF#'
 }
 
 # excluded_targets <path>: the targets of the manifest entry that delivers path
@@ -248,16 +252,16 @@ renamed_removal() {
   return 1
 }
 
-# tools_pins_on_main <path>: each zgeoff/tools commit that a workflow call in
-# the file pins at the PR head is on tools main. A call can name a commit that
-# only a fork of zgeoff/tools holds, and GitHub runs it as if zgeoff/tools held
-# it. Each commit is checked once.
+# tools_pins_on_main <path>: each zgeoff/tools commit that the file pins at the
+# PR head, on a workflow, an action or any other path, is on tools main. A ref
+# can name a commit that only a fork of zgeoff/tools holds, and GitHub runs it
+# as if zgeoff/tools held it. Each commit is checked once.
 declare -A on_main=()
 tools_pins_on_main() {
   local path=$1 content pins pin status
   content=$(raw_text "zgeoff/$repo" "$path" "$head") || fail "$path could not be read at $head"
-  # grep exits 1 on a file with no pinned call, which is no failure.
-  pins=$(grep -oE 'zgeoff/tools/\.github/workflows/[^@[:space:]]+@[0-9a-f]{40}' <<<"$content" | sed 's/.*@//' | sort -u) || true
+  # grep exits 1 on a file with no pinned ref, which is no failure.
+  pins=$(grep -oE 'zgeoff/tools/[^@[:space:]]+@[0-9a-f]{40}' <<<"$content" | sed 's/.*@//' | sort -u) || true
   while IFS= read -r pin; do
     [ -n "$pin" ] && [ -z "${on_main[$pin]:-}" ] || continue
     status=$(gh api "repos/zgeoff/tools/compare/$pin...$tools_main" --jq .status 2>/dev/null) || status=unknown
