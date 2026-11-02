@@ -260,3 +260,13 @@ test('a round whose PR diff git could not read is never a base move', () => {
 
   expect(buildNoslopReport(ctx.db)[0]).toMatchObject({ extraRounds: 1, baseMove: 0 });
 });
+
+test('it throws on a check round whose stored open findings are corrupt', () => {
+  const ctx = setupTest();
+  ctx.addRound({ findings: [ctx.boilFinding] });
+  ctx.addRound({ kind: 'check', conclusion: 'success' });
+  // recordRound's types cannot write a corrupt row, so the test corrupts the stored one
+  ctx.db.run(`UPDATE noslop_rounds SET open = '[{"id":42}]' WHERE kind = 'check'`);
+
+  expect(() => buildNoslopReport(ctx.db)).toThrow('expected string, received number');
+});
