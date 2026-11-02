@@ -63,7 +63,7 @@ test('it shows the record in hq pr status for a fresh PR with no other record', 
   const status = await runPRCommand({ run: fake.run, db: ctx.db, verb: 'status', rest: ['widgets', '7'], flags: {}, actor: () => Promise.resolve('z-review'), readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) });
 
   expect(status).toStrictEqual({
-    data: { pr: null, reviewRecords: { mechanical: { files: ['AGENTS.md'], lines: 1 }, exemption: null } },
+    data: { pr: null, acceptedRisks: [], reviewRecords: { mechanical: { files: ['AGENTS.md'], lines: 1 }, exemption: null } },
     text: 'No record for widgets#7.\nz-review: mechanical edits proved by hq (1 lines in AGENTS.md)',
   });
 });

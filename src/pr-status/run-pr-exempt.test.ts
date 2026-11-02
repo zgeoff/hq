@@ -64,7 +64,7 @@ test('it shows the exemption in hq pr status for a fresh PR with no other record
   const status = await runPRCommand({ run: fake.run, db: ctx.db, verb: 'status', rest: ['widgets', '7'], flags: {}, actor: () => Promise.resolve('z-review'), readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) });
 
   expect(status).toStrictEqual({
-    data: { pr: null, reviewRecords: { mechanical: null, exemption: { rule: 'formatting', note: 'Only blank lines moved.', files: ['skills/kettle/SKILL.md'] } } },
+    data: { pr: null, acceptedRisks: [], reviewRecords: { mechanical: null, exemption: { rule: 'formatting', note: 'Only blank lines moved.', files: ['skills/kettle/SKILL.md'] } } },
     text: 'No record for widgets#7.\nz-review: exempt under the formatting rule, not proved by hq: Only blank lines moved. (held files: skills/kettle/SKILL.md)',
   });
 });

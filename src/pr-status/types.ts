@@ -6,6 +6,18 @@ export interface CIOverrideView {
   at: string;
 }
 
+// An accepted risk hq holds for the PR, with the state noslop gives that finding. The gate passes the
+// finding only when noslop reads it as accepted-risk; noslopState is null when noslop could not be
+// read, and noslopError says why.
+export interface AcceptedRiskView {
+  finding: string;
+  source: string;
+  note: string;
+  event: number;
+  noslopState: string | null;
+  noslopError?: string;
+}
+
 export type PRAnswer = 'lgtm' | 'changes' | 'reject';
 
 export type PRGate = 'pass' | 'fail' | 'none';
@@ -38,6 +50,9 @@ export interface PRStatusView {
 
   // z-review's records at the head now. Neither is an owner answer.
   reviewRecords: { mechanical: { files: string[]; lines: number } | null; exemption: { rule: string; note: string; files: string[] } | null };
+
+  // The owner's accepted risks recorded for the PR, one per finding.
+  acceptedRisks: AcceptedRiskView[];
   updatedAt: string;
 }
 

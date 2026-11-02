@@ -1,10 +1,11 @@
 import type { PRStatusRow } from '../kdb.ts';
 import type { OwnerOverride } from './read-owner-overrides.ts';
-import type { CIOverrideView, PRStatusView } from './types.ts';
+import type { AcceptedRiskView, CIOverrideView, PRStatusView } from './types.ts';
 
 export interface StandingRecords {
   ciOverrides: CIOverrideView[];
   reviewRecords: PRStatusView['reviewRecords'];
+  acceptedRisks: AcceptedRiskView[];
 }
 
 // The record with its stale flags, against the PR's head now (null when it could not be read).
@@ -29,6 +30,7 @@ export function buildPRStatusView(row: PRStatusRow, current: string | null, over
     override: override === null ? null : { head: override.head, source: override.source, note: override.note, at: override.at },
     ciOverrides: standing.ciOverrides,
     reviewRecords: standing.reviewRecords,
+    acceptedRisks: standing.acceptedRisks,
     updatedAt: row.updated_at,
   };
 }
