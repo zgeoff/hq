@@ -185,3 +185,16 @@ function createTwoTypedLines(db: Database): Database {
   at(NOON_SYDNEY);
   return db;
 }
+
+test('it throws on a stored ask answer whose text is not a string', () => {
+  const db = setupTest();
+  const item = parseItemInput('call', JSON.stringify({ title: 'Descale the kettle', question: 'Descale it now?', options: [{ label: 'Descale it', effect: 'It gets descaled.' }, { label: 'Leave it', effect: 'Nothing changes.' }] }));
+  applyAskItem(db, { kind: 'call', id: 'kettle-descale', issues: [], forSession: null, actor: 'kettle-bot' }, item, 'Descale it now?');
+  at('2026-10-14T01:01:00Z');
+  recordConsoleAnswer(db, { id: 'kettle-descale', option: 'Descale it', note: '', actor: 'console' });
+
+  // the answer writers cannot store a non-string answer, so the test corrupts the stored event
+  db.run(`UPDATE events SET data = '{"answer":42}' WHERE subject = 'ask' AND action = 'answered'`);
+
+  expect(() => loadAnswers(db, { from: NOON_SYDNEY, to: '2026-10-14T02:00:00Z' })).toThrow('expected string, received number');
+});
