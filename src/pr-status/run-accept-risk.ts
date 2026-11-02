@@ -45,6 +45,7 @@ export async function runAcceptRisk(input: PRCommandInput, ref: PRRef, finding: 
   const accepting: Accepting = { input, ref, record, alreadyRecorded: standing !== undefined };
   const reply = await postReply(accepting);
   const check = await setCheck(accepting, reply);
+  rejectOwnOpenFinding(accepting, reply, check);
   return buildOut(accepting, reply, check);
 }
 
@@ -70,10 +71,22 @@ async function setCheck(accepting: Accepting, reply: PostedReply): Promise<Noslo
   } catch (error) {
     if (error instanceof HqError) {
       const posted = reply.reply === 'posted' ? 'posted' : 'already posted';
-      throw new HqError('check_failed', `The reply is ${posted} (${reply.url}), but noslop's check was not set: ${error.message}. The record stands (hq event ${accepting.record.event}), and the merge gate stays shut until noslop's check is set. Rerun hq pr accept-risk: it posts nothing again and sets the check.`, { acceptedRisk: { ...describeRun(accepting), reply: reply.reply, replyURL: reply.url, replyText: buildAcceptRiskReply('inline', accepting.record) } });
+      throw new HqError('check_failed', `The reply is ${posted} (${reply.url}), but noslop's check was not set: ${error.message}. The record stands (hq event ${accepting.record.event}), and the merge gate stays shut until noslop's check is set. Rerun hq pr accept-risk: it posts nothing again and sets the check.`, { acceptedRisk: { ...describeRun(accepting), reply: reply.reply, replyURL: reply.url, replyText: buildAcceptRiskReply(accepting.record) } });
     }
     throw error;
   }
+}
+
+// A check that fails over other findings is not this command's error. One that still lists the
+// accepted finding as open means noslop did not take the reply (for example the author lacks admin
+// permission, or noslop has not read the reply yet), so the command fails and says why.
+function rejectOwnOpenFinding(accepting: Accepting, reply: PostedReply, check: NoslopCheckOutcome): void {
+  const own = check.open.find((finding) => finding.id === accepting.record.finding);
+  if (check.conclusion === 'success' || own === undefined) {
+    return;
+  }
+  const posted = reply.reply === 'posted' ? 'posted' : 'already posted';
+  throw new HqError('check_failed', `The reply is ${posted} (${reply.url}), but noslop's check still lists finding ${own.id} as open: ${own.reason}. The record stands (hq event ${accepting.record.event}), and the merge gate stays shut until noslop reads the reply as accepted-risk. Rerun hq pr accept-risk once the cause is fixed.`, { acceptedRisk: { ...describeRun(accepting), reply: reply.reply, replyURL: reply.url, check } });
 }
 
 function buildOut(accepting: Accepting, reply: PostedReply, check: NoslopCheckOutcome): Out {
@@ -90,5 +103,6 @@ function formatCheck(check: NoslopCheckOutcome): string {
   if (check.conclusion === 'success') {
     return `noslop check: pass (${check.title})`;
   }
-  return `noslop check: still failing (${check.title}); first problem: ${check.problem ?? 'none named'}. Other findings or checks are open, so the merge gate may stay shut until they clear; this is not an error of accept-risk.`;
+  const others = check.open.length > 0 ? `open findings: ${check.open.map((finding) => finding.id).join(', ')}` : 'no open finding named';
+  return `noslop check: still failing (${check.title}); first problem: ${check.problem ?? 'none named'}; ${others}. Other findings or checks are open, so the merge gate may stay shut until they clear; this is not an error of accept-risk.`;
 }

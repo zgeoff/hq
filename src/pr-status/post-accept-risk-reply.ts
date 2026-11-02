@@ -32,29 +32,29 @@ export class ReplyFailureError extends HqError {
 // finding's thread on the diff, else (a finding outside the diff) as an issue comment on the PR. A
 // reply that already stands is not posted again.
 export async function postAcceptRiskReply(run: Runner, ref: PRRef, input: AcceptRiskReplyInput): Promise<PostedReply> {
-  const inline = buildAcceptRiskReply('inline', input);
-  const issue = buildAcceptRiskReply('issue', input);
+  const text = buildAcceptRiskReply(input);
+  const standingLine = `${input.finding} accepted-risk`;
   const generalWhere = `the finding's thread or the issue comments of ${ref.slug}#${ref.pr}`;
   const reviewPath = `repos/${ref.slug}/pulls/${ref.pr}/comments`;
   const issuePath = `repos/${ref.slug}/issues/${ref.pr}/comments`;
-  const review = await readOrFail(run, reviewPath, inline, generalWhere);
+  const review = await readOrFail(run, reviewPath, text, generalWhere);
   const thread = findFindingComment(review, input.finding);
   if (thread !== undefined) {
-    const standing = review.find((comment) => comment.replyTo === thread.id && isOwner(comment) && comment.body.split('\n')[0]?.startsWith('accepted-risk') === true);
+    const standing = review.find((comment) => comment.replyTo === thread.id && isOwner(comment) && comment.body.startsWith(standingLine));
     if (standing !== undefined) {
       return { reply: 'already-posted', url: standing.url };
     }
-    return await post(run, `${reviewPath}/${thread.id}/replies`, inline, `the thread of the finding's comment ${thread.url}`);
+    return await post(run, `${reviewPath}/${thread.id}/replies`, text, `the thread of the finding's comment ${thread.url}`);
   }
-  const general = await readOrFail(run, issuePath, issue, generalWhere);
+  const general = await readOrFail(run, issuePath, text, generalWhere);
   if (findFindingComment(general, input.finding) === undefined) {
     throw new HqError('not_found', `no noslop comment holds finding ${input.finding} on ${ref.slug}#${ref.pr}, in a thread on the diff or among the PR's issue comments, so there is nowhere to post the reply; the record stands, and a rerun posts it once the finding's comment exists`);
   }
-  const standing = general.find((comment) => isOwner(comment) && comment.body.startsWith(`${input.finding} accepted-risk`));
+  const standing = general.find((comment) => isOwner(comment) && comment.body.startsWith(standingLine));
   if (standing !== undefined) {
     return { reply: 'already-posted', url: standing.url };
   }
-  return await post(run, issuePath, issue, `the issue comments of ${ref.slug}#${ref.pr}`);
+  return await post(run, issuePath, text, `the issue comments of ${ref.slug}#${ref.pr}`);
 }
 
 async function readOrFail(run: Runner, path: string, text: string, where: string): Promise<PRComment[]> {

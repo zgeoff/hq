@@ -39,8 +39,8 @@ test('it records the risk, replies in the finding thread and sets noslop check',
 
   const out = await ctx.accept(fake);
 
-  expect(ctx.posts(fake)).toStrictEqual([['gh', 'api', '-X', 'POST', 'repos/zgeoff/widgets/pulls/7/comments/501/replies', '-f', `body=accepted-risk ${ctx.note}\n\n${ctx.trailer}`, '--jq', '.html_url']]);
-  expect(out.data).toStrictEqual({ acceptedRisk: { repo: 'widgets', pr: 7, finding: 'aaaa', source: 'chat:kettle-12', note: ctx.note, alreadyRecorded: false, event: 1, reply: 'posted', replyURL: ctx.replyURL, check: { conclusion: 'success', title: 'No findings need attention.', problem: null } } });
+  expect(ctx.posts(fake)).toStrictEqual([['gh', 'api', '-X', 'POST', 'repos/zgeoff/widgets/pulls/7/comments/501/replies', '-f', `body=aaaa accepted-risk ${ctx.note}\n\n${ctx.trailer}`, '--jq', '.html_url']]);
+  expect(out.data).toStrictEqual({ acceptedRisk: { repo: 'widgets', pr: 7, finding: 'aaaa', source: 'chat:kettle-12', note: ctx.note, alreadyRecorded: false, event: 1, reply: 'posted', replyURL: ctx.replyURL, check: { conclusion: 'success', title: 'No findings need attention.', problem: null, open: [] } } });
   expect(out.text).toStrictEqual([`Recorded the owner's acceptance of the risk of finding aaaa for widgets#7 as hq event 1 (chat:kettle-12): ${ctx.note}`, `Reply: posted at ${ctx.replyURL}`, 'noslop check: pass (No findings need attention.)'].join('\n'));
   expect(fake.lines().filter((line) => line.includes(' check --pr '))).toStrictEqual([expect.stringContaining('check --pr 7 --repo zgeoff/widgets --json')]);
 });
@@ -75,7 +75,7 @@ test('it ignores a human comment that mentions the finding id', async () => {
 test('it adds no second record and no second reply on a rerun, and says the record already stood', async () => {
   const ctx = setupTest();
   await ctx.accept(ctx.fake());
-  const rerun = ctx.fake({ reviewComments: buildCommentLines(buildBotComment(501, 'Kettle never boils (aaaa)'), buildOwnerComment(502, 501, `accepted-risk ${ctx.note}\n\n${ctx.trailer}`)) });
+  const rerun = ctx.fake({ reviewComments: buildCommentLines(buildBotComment(501, 'Kettle never boils (aaaa)'), buildOwnerComment(502, 501, `aaaa accepted-risk ${ctx.note}\n\n${ctx.trailer}`)) });
 
   const out = await ctx.accept(rerun, { source: 'chat:kettle-12', note: 'Another note.' });
 
@@ -114,9 +114,9 @@ test('it keeps the record, exits with the reply text and where it goes, and leav
   const failure = await ctx.accept(fake).catch((error: unknown) => error);
 
   const message = failure instanceof Error ? failure.message : '';
-  expect(failure).toMatchObject({ code: 'reply_failed', data: { acceptedRisk: { event: 1, reply: 'not-posted', replyText: `accepted-risk ${ctx.note}\n\n${ctx.trailer}` } } });
+  expect(failure).toMatchObject({ code: 'reply_failed', data: { acceptedRisk: { event: 1, reply: 'not-posted', replyText: `aaaa accepted-risk ${ctx.note}\n\n${ctx.trailer}` } } });
   expect(message).toContain(`the thread of the finding's comment ${ctx.threadURL}`);
-  expect(message).toContain(`accepted-risk ${ctx.note}\n\n${ctx.trailer}`);
+  expect(message).toContain(`aaaa accepted-risk ${ctx.note}\n\n${ctx.trailer}`);
   expect(message).toContain("the merge gate stays shut until both the reply and noslop's check exist");
   expect(ctx.events()).toStrictEqual([{ seq: 1 }]);
   expect(fake.lines().filter((line) => line.includes(' check --pr '))).toStrictEqual([]);
@@ -138,8 +138,32 @@ test('it exits 0 and names the first problem when the check still fails over oth
 
   const out = await ctx.accept(fake);
 
-  expect(out.data).toMatchObject({ acceptedRisk: { check: { conclusion: 'failure', title: '1 finding needs attention', problem: 'bbbb: no reply yet' } } });
-  expect(out.text.split('\n')[2]).toStrictEqual('noslop check: still failing (1 finding needs attention); first problem: bbbb: no reply yet. Other findings or checks are open, so the merge gate may stay shut until they clear; this is not an error of accept-risk.');
+  expect(out.data).toMatchObject({ acceptedRisk: { check: { conclusion: 'failure', title: '1 finding needs attention', problem: 'bbbb: no reply yet', open: [{ id: 'bbbb', reason: 'no reply yet' }] } } });
+  expect(out.text.split('\n')[2]).toStrictEqual('noslop check: still failing (1 finding needs attention); first problem: bbbb: no reply yet; open findings: bbbb. Other findings or checks are open, so the merge gate may stay shut until they clear; this is not an error of accept-risk.');
+});
+
+test('it fails, keeping the record, when the check still lists the accepted finding as open', async () => {
+  const ctx = setupTest();
+  const failing = JSON.stringify({ conclusion: 'failure', title: '1 finding needs attention', summary: '', open: [{ id: 'aaaa', title: 'Kettle never boils', reason: 'author lacks admin permission' }] });
+  const fake = ctx.fake({ noslopCheck: { code: 0, stdout: failing, stderr: '' } });
+
+  await expect(ctx.accept(fake)).rejects.toMatchObject({ code: 'check_failed', message: expect.stringContaining('still lists finding aaaa as open: author lacks admin permission'), data: { acceptedRisk: { event: 1, reply: 'posted' } } });
+
+  expect(ctx.events()).toStrictEqual([{ seq: 1 }]);
+});
+
+test('it answers only its own finding in a comment that folds two findings, and posts again for the second', async () => {
+  const ctx = setupTest();
+  const folded = buildBotComment(501, 'Two problems (aaaa) (bbbb)');
+  const first = ctx.fake({ reviewComments: buildCommentLines(folded) });
+  await ctx.accept(first);
+  const second = ctx.fake({ reviewComments: buildCommentLines(folded, buildOwnerComment(502, 501, `aaaa accepted-risk ${ctx.note}\n\n${ctx.trailer}`)) });
+
+  const out = await ctx.command(second, 'accept-risk', ['widgets', '7', 'bbbb'], { source: 'chat:kettle-12', note: 'The spout is cosmetic.' });
+
+  expect(ctx.posts(first)).toStrictEqual([['gh', 'api', '-X', 'POST', 'repos/zgeoff/widgets/pulls/7/comments/501/replies', '-f', `body=aaaa accepted-risk ${ctx.note}\n\n${ctx.trailer}`, '--jq', '.html_url']]);
+  expect(ctx.posts(second)).toStrictEqual([['gh', 'api', '-X', 'POST', 'repos/zgeoff/widgets/pulls/7/comments/501/replies', '-f', expect.stringContaining('bbbb accepted-risk The spout is cosmetic.\n\n'), '--jq', '.html_url']]);
+  expect(out.data).toMatchObject({ acceptedRisk: { finding: 'bbbb', reply: 'posted' } });
 });
 
 test('it refuses a note with a newline and records nothing', async () => {

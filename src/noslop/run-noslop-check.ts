@@ -16,11 +16,13 @@ const ConclusionSchema = z.enum(['success', 'failure']);
 const OutcomeSchema = z.object({ conclusion: ConclusionSchema, title: z.string(), summary: z.string().optional(), open: z.array(OpenSchema).optional() });
 
 // What noslop's check set on the PR's head: the conclusion, its title, and the first problem it names
-// (an open finding with its reason, else the first line of its summary) when it failed.
+// (an open finding with its reason, else the first line of its summary) when it failed, and every
+// finding it lists as open.
 export interface NoslopCheckOutcome {
   conclusion: 'success' | 'failure';
   title: string;
   problem: string | null;
+  open: { id: string; reason: string }[];
 }
 
 // Sets noslop's check run again from the replies on the PR, with no review and no model call. noslop
@@ -39,7 +41,7 @@ export async function runNoslopCheck(request: PRRequest, parsed: ParsedRepo): Pr
   if (!answer.success) {
     throw new NoslopCheckError(`noslop did not set its check (output does not fit at ${formatIssue(answer.error)})`, 'bad check output');
   }
-  return { conclusion: answer.data.conclusion, title: answer.data.title, problem: pickProblem(answer.data) };
+  return { conclusion: answer.data.conclusion, title: answer.data.title, problem: pickProblem(answer.data), open: (answer.data.open ?? []).map((finding) => ({ id: finding.id, reason: finding.reason })) };
 }
 
 function pickProblem(outcome: z.output<typeof OutcomeSchema>): string | null {

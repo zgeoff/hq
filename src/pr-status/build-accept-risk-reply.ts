@@ -5,11 +5,9 @@ export interface AcceptRiskReplyInput {
   source: string;
 }
 
-type ReplyForm = 'inline' | 'issue';
-
-// The disposition noslop reads is the first line only. An issue comment names its finding first,
-// because it sits outside the finding's thread.
-export function buildAcceptRiskReply(form: ReplyForm, input: AcceptRiskReplyInput): string {
-  const disposition = form === 'inline' ? `accepted-risk ${input.note}` : `${input.finding} accepted-risk ${input.note}`;
-  return `${disposition}\n\nRecorded in hq as event ${input.event} (source ${input.source}) by hq pr accept-risk.`;
+// The disposition line names its finding, so it answers that finding only: noslop shares a folded
+// comment's replies among every finding folded into it, and a bare `accepted-risk` line would answer
+// them all. The trailer is a second line, which also keeps a single-line comment from answering all.
+export function buildAcceptRiskReply(input: AcceptRiskReplyInput): string {
+  return `${input.finding} accepted-risk ${input.note}\n\nRecorded in hq as event ${input.event} (source ${input.source}) by hq pr accept-risk.`;
 }
