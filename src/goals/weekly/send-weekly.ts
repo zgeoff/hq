@@ -9,7 +9,6 @@ import { getMondayKey } from './get-monday-key.ts';
 import { getRun } from './get-run.ts';
 import { scheduleWeekly } from './schedule-weekly.ts';
 
-// hq goals weekly: send this week's review now (any day), once per Monday.
 export function sendWeekly(db: Database, actor: string, at: Date = now()): JobRun {
   const key = getMondayKey(at);
   return db

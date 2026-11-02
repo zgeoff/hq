@@ -1,9 +1,7 @@
 import type { Database } from 'bun:sqlite';
 import { setState } from './set-state.ts';
 
-// Moves a working run to merged once its work is in: a PR merged, none open, and no active session
-// left. The PR's merge and its session's end come in either order, so each calls this. A design pass's
-// PRs are not the build run's work.
+// The PR's merge and its session's end come in either order, so each calls this.
 export function updateMergedRun(db: Database, issue: string, actor: string): boolean {
   const run = db
     .query(

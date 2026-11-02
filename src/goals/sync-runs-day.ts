@@ -20,9 +20,8 @@ interface Run {
   updated_at: string;
 }
 
-// One repo's workflow runs created on one UTC day, stored. A bad row refuses the day. The API lists
-// at most 1000 runs per query, so a busier window is split in half, down to one hour (nixie ran
-// 1,277 on 2026-10-16); an hour with 1000+ runs refuses the day.
+// The API lists at most 1000 runs per query, so a busier window is split in half, down to one hour
+// (nixie ran 1,277 on 2026-10-16).
 const HOUR = 3_600_000;
 export async function syncRunsDay(db: Database, run: Runner, repo: string, day: string, env?: RunOpts['env'], at: Date = now()): Promise<number> {
   if (!NAME.test(repo) || /^\.+$/.test(repo)) throw new HqError('bad_args', `bad repo name ${repo}`);
@@ -55,14 +54,12 @@ export async function syncRunsDay(db: Database, run: Runner, repo: string, day: 
     const up = db.query(`INSERT INTO ci_runs (id, repo, path, event, status, conclusion, attempt, created_at, started_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT (id) DO UPDATE SET status = excluded.status, conclusion = excluded.conclusion, attempt = excluded.attempt, started_at = excluded.started_at, updated_at = excluded.updated_at`);
     for (const r of rows.values()) up.run(r.id, repo, r.path, r.event, r.status, r.conclusion, r.run_attempt, r.created_at, r.run_started_at, r.updated_at);
-    // A past day is done once every run in it has finished; one still running is fetched again.
     if (toUTCDay(at.getTime()) > day && [...rows.values()].every((r) => r.status === 'completed')) {
       upsertGoalDay(db, { kind: 'ci', key: repo, day, n: rows.size, at });
     }
   }).immediate();
   return rows.size;
 }
-
 
 function goodRun(x: Partial<Run>, day: string): x is Run {
   return (

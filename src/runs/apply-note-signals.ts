@@ -42,7 +42,6 @@ export function applyNoteSignals(db: Database, issue: string, text: string, opti
     } catch {
       continue;
     }
-    // "#254" with no repo is too loose; only refs with a repo, or URLs.
     const owner = db.query('SELECT issue FROM run_prs WHERE ref = ?').get(parsed.ref) as { issue: string } | null;
     if (owner && owner.issue !== issue) continue;
     attachPr(db, issue, m[0]);
@@ -76,7 +75,6 @@ interface FinalMarkInput {
 
 const RunPrOwnerSchema = z.object({ issue: z.string() }).nullable();
 
-// Only a marker whose ref does not parse is passed over; a failed write aborts the note.
 function applyFinalMark(db: Database, input: FinalMarkInput): string | null {
   const ref = parseMarkedRef(input.ref);
   if (ref === null) {

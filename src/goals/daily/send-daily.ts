@@ -9,7 +9,6 @@ import { stale } from '../stale.ts';
 import { getRun } from './get-run.ts';
 import { scheduleDaily } from './schedule-daily.ts';
 
-// hq goals daily: send today's check-in now (any time of day), once per day.
 export function sendDaily(db: Database, actor: string, at: Date = now()): JobRun {
   const s = sydney(at);
   return db

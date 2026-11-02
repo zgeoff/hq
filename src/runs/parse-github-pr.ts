@@ -12,8 +12,6 @@ const ANSWER = z.object({
   mergeCommit: z.object({ oid: z.string() }).nullish(),
 });
 
-// What one `gh pr view --json state,mergedAt,mergeCommit` answer says about a run PR, or the reason
-// hq can't tell.
 export function parseGitHubPR(ref: string, view: RunResult): GitHubPr | { error: string } {
   if (view.code !== 0) {
     return { error: `${ref}: can't read it (gh exit ${view.code}): ${(view.stderr || view.stdout).trim().slice(0, 200)}` };

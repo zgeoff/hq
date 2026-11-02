@@ -62,7 +62,6 @@ test('it still sweeps for alerts when the wrap-up of merged runs throws', async 
   closePr(ctx.db, 'kettle#54', { to: 'merged', actor: 'kettle-bot' });
   setState(ctx.db, 'GEO-9854', 'merged', {}, 'kettle-bot');
 
-  // Logging the wrap-up fails after the sessions are forgotten, which is past the per-run guard.
   ctx.db.exec("CREATE TRIGGER kettle_refuses_wrap_up BEFORE INSERT ON events WHEN NEW.action = 'merged-wrap-up-result' BEGIN SELECT RAISE(ABORT, 'kettle refuses'); END");
   addRun(ctx.db, { issue: 'GEO-9853', title: 'Invented teapot work', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
   addPr(ctx.db, 'GEO-9853', 'kettle#53', 'kettle-bot');

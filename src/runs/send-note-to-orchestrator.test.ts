@@ -8,7 +8,6 @@ import { ingestNotes } from './ingest-notes.ts';
 import { sendNoteToOrchestrator } from './send-note-to-orchestrator.ts';
 import { setState } from './set-state.ts';
 
-// A database, and a fake atc with an empty feed that knows the kettle session.
 function setupTest() {
   const kettle = '00000032-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
   const fresh = freshDb();

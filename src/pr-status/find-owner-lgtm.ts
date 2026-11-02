@@ -9,13 +9,11 @@ export interface OwnerLgtm {
   lgtm: OwnerAnswer;
 }
 
-// The reviewed head the commits since start from, and the PR's head now.
 export interface AnswerEnds {
   reviewed: string;
   head: string;
 }
 
-// The owner's `changes` at the reviewed head and `lgtm` at the head now, from the pr-answer events.
 export function findOwnerLgtm(db: Database, repo: string, pr: number, ends: AnswerEnds): OwnerLgtm | null {
   const answers = readPRAnswers(db, repo, pr);
   const changes = answers?.findLast((answer) => answer.head === ends.reviewed) ?? null;

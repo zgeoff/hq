@@ -12,8 +12,6 @@ import { addRun } from '../../runs/add-run.ts';
 import { dailyText } from '../daily/daily-text.ts';
 import { sendThroughputAlerts } from './send-throughput-alerts.ts';
 
-// A database at 18:00 on Fri 16 Oct in Sydney (07:00Z; the Sydney day began at 13:00Z on 15 Oct),
-// with HOME in its folder.
 function setupTest() {
   const fresh = freshDb();
   const home = process.env['HOME'];

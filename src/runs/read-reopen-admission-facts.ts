@@ -7,16 +7,12 @@ import { getRun } from './get-run.ts';
 import type { ReopenAdmissionFacts } from './pick-reopen-admission.ts';
 import { readRunAdmissionFacts } from './read-run-admission-facts.ts';
 
-// The design lane counts a reopened design pass is held to, and where the owner asked for a with-geoff
-// pass above its count; slots left out are the defaults.
 export interface ReopenDesign {
   slots?: DesignSlots;
   error: string | null;
   asked: string | null;
 }
 
-// The facts pickReopenAdmission chooses from: whether the run is closed, its pass's design lane, and the
-// design runs open in each lane.
 export function readReopenAdmissionFacts(db: Database, issue: string, design: ReopenDesign): ReopenAdmissionFacts {
   const run = getRun(db, issue);
   const lanes = readRunAdmissionFacts(db, { issue, design: null, asked: design.asked, designSlots: design.slots ?? DEFAULT_DESIGN_SLOTS, designError: design.error }, null);

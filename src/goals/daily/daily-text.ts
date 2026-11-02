@@ -1,6 +1,3 @@
-// The daily goals check-in (goals rhythm): at 18:00 Sydney the watcher tells z-stu where each of
-// the 7 goals stands, today and for the week so far. One job_runs row per Sydney date, as the
-// morning reports do (morning.ts), so a missed day shows in hq health.
 import type { Database } from 'bun:sqlite';
 import { readySummary } from '../../areas/ready-summary.ts';
 import { loadCapacityLine as capacityLine } from '../../capacity/load-capacity-line.ts';
@@ -67,7 +64,6 @@ function incidents(db: Database, from: Date, at: Date): string {
   return lines.slice(0, 3).join('; ') + (lines.length > 3 ? `; ${lines.length - 3} more` : '');
 }
 
-// A long line gives up its middle, never the target and colour at the end.
 function formatFittedLine(head: string, tail: string): string {
   const room = MAX_LINE - tail.length;
   return `${head.length > room ? `${head.slice(0, room - 1)}…` : head}${tail}`;

@@ -24,7 +24,6 @@ export interface AttachResult {
   // the errors otherwise.
   skipped: number;
 
-  // Every repo's merged search answered in full, so no merged PR since mergedSince was missed.
   mergedSearched: boolean;
 }
 
@@ -64,7 +63,6 @@ interface RepoSearch {
   errors: string[];
   skipped: number;
 
-  // The search answered and fit under its limit.
   complete: boolean;
 }
 
@@ -115,7 +113,6 @@ function readOpenRuns(db: Database): Set<string> {
   return new Set(runs.filter((run) => !CLOSED_RUN_STATES.some((closed) => closed === run.state)).map((run) => run.issue));
 }
 
-// null when attached, else why not.
 function tryAttach(db: Database, issue: string, url: string): string | null {
   try {
     addPr(db, issue, url, GITHUB_ACTOR);

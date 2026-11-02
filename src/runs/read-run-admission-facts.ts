@@ -9,7 +9,6 @@ import type { AddRunInput, Run } from './types.ts';
 
 type AdmissionInput = Pick<AddRunInput, 'issue' | 'design' | 'asked' | 'designSlots' | 'designError'>;
 
-// The facts pickRunAdmission chooses from: the issue's type and the design runs open in each lane.
 export function readRunAdmissionFacts(db: Database, input: AdmissionInput, previous: Run | null): RunAdmissionFacts {
   const designRuns = readDesignRuns(db);
   const open = designRuns.filter((run) => !CLOSED.includes(run.state));

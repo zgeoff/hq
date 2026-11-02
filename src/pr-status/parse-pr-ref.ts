@@ -10,8 +10,8 @@ export interface PRRef {
   slug: string;
 }
 
-// `<repo> <pr>` from the command line. A bare repo is zgeoff's, and only zgeoff's PRs have a record:
-// it keys on the repo name alone, so another owner's repo of the same name would share it.
+// Only zgeoff's PRs have a record: the record keys on the repo name alone, so another owner's repo of
+// the same name would share it.
 export function parsePRRef(rawRepo: string | undefined, rawPR: string | undefined): PRRef {
   if (rawRepo === undefined || rawRepo.trim() === '' || rawPR === undefined || !/^\d+$/u.test(rawPR)) {
     throw new HqError('bad_args', 'usage: <repo> <pr>, with the PR a whole number');

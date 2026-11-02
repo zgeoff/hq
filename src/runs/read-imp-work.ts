@@ -4,9 +4,7 @@ import type { ImpWork } from './types.ts';
 
 const impListSchema = z.array(z.looseObject({ name: z.string() }));
 
-// Lists each worktree's uncommitted changes, the stash count, then the commits no remote branch holds
-// from any branch or worktree HEAD, detached or not. Any line out means unpushed work. A failed git
-// call exits nonzero: none runs inside a pipe, whose status would be the last command's.
+// A failed git call exits nonzero: none runs inside a pipe, whose status would be the last command's.
 const CHECK_SCRIPT = [
   'set -eu',
   'cd "$1"',

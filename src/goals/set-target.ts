@@ -13,7 +13,6 @@ import type { Target } from './types.ts';
 
 const VALUE = /^\d{1,6}(?:\.\d{1,3})?$/u;
 
-// hq goals target <key> <op> <value> | hq goals target <key> none
 export function setTarget(db: Database, key: string, op: string, value: string | undefined, actor: string): Target | null {
   if (!(GOAL_KEYS as readonly string[]).includes(key)) throw new HqError('bad_args', `unknown goal ${JSON.stringify(key).slice(0, 40)}: one of ${GOAL_KEYS.join(', ')}`);
   const k = key as GoalKey;
@@ -24,8 +23,6 @@ export function setTarget(db: Database, key: string, op: string, value: string |
     if (value === undefined || !VALUE.test(value) || Number(value) > range.max) {
       throw new HqError('bad_args', `the value must be a number from 0 to ${range.max} (${range.unit})`);
     }
-    // Only the value and the operator move: a deadline or a detection limit stays.
-    // A cleared target has none to keep: they come back from the code default.
     const cur = goalTargets(db).targets[k] ?? DEFAULT_TARGETS[k];
     next = { op: op as Op, value: Number(value), ...(cur?.until ? { until: cur.until } : {}), ...(cur?.detectMax !== undefined ? { detectMax: cur.detectMax } : {}) };
   } else if (value !== undefined) throw new HqError('bad_args', 'none takes no value');

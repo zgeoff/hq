@@ -21,9 +21,6 @@ interface IngestOptions {
   run: Runner;
 }
 
-// Read atc's event feed from the stored cursor. A decision or blocked note goes
-// to the orchestrator. A note from a session on an open row becomes a run note; each page commits with its cursor, so a crash
-// re-reads at most one page and the event key keeps that idempotent.
 export async function ingestNotes(db: Database, client: AtcClient, opts: IngestOptions): Promise<IngestResult> {
   const CURSOR_KEY = 'atc_events_cursor',
     result: IngestResult = { read: 0, notes: 0, routed: 0, finals: [], unmatched: 0, reset: false, bootstrapped: false };
@@ -33,7 +30,6 @@ export async function ingestNotes(db: Database, client: AtcClient, opts: IngestO
   const orchestrator = orchestratorName();
 
   if (!cursor) {
-    // First run: skip the history, start at the end of the feed.
     cursor = await feedEnd(client);
     setMeta(db, CURSOR_KEY, cursor);
     result.bootstrapped = true;
@@ -42,7 +38,6 @@ export async function ingestNotes(db: Database, client: AtcClient, opts: IngestO
 
   // Cursor values repeat after a feed reset, so event keys carry an epoch.
   let epoch = Number(getMeta(db, 'atc_events_epoch') ?? '0');
-  // After a reset, read the new feed from its start; content dedupe skips notes already kept.
   const restart = () => {
     epoch++;
     setMeta(db, 'atc_events_epoch', String(epoch));
@@ -87,7 +82,6 @@ export async function ingestNotes(db: Database, client: AtcClient, opts: IngestO
         if (ins.changes === 0) continue;
         result.notes++;
 
-        // A late note from the design pass the run turned from stays on the run, but marks nothing on the build.
         if (row.design_pass === 1) {
           continue;
         }
@@ -118,7 +112,6 @@ export async function ingestNotes(db: Database, client: AtcClient, opts: IngestO
   return result;
 }
 
-// The cursor at the end of the feed, found by paging from the oldest event.
 async function feedEnd(client: AtcClient): Promise<string> {
   let cursor: string | undefined;
   for (let i = 0; i < 1000; i++) {

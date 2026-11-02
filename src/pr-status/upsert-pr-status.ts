@@ -9,9 +9,8 @@ export type PRStatusFields = Partial<Omit<PRStatusRow, 'repo' | 'pr' | 'updated_
 
 const BindingsSchema = z.array(z.union([z.string(), z.number(), z.null()]));
 
-// Writes the given fields of a PR's record, creating the record when there is none. Fields not
-// given keep their value. Kysely's execute waits on its own connection lock before it runs, so the
-// write runs here, at once, and a caller's bun:sqlite transaction holds it.
+// Kysely's execute waits on its own connection lock before it runs, so the write runs here, at once,
+// and a caller's bun:sqlite transaction holds it.
 export function upsertPRStatus(db: Database, repo: string, pr: number, fields: PRStatusFields): void {
   const blank: Omit<PRStatusRow, 'repo' | 'pr' | 'updated_at'> = {
       head: null,

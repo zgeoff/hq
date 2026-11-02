@@ -9,7 +9,6 @@ import { updateGoneRunSessions } from './update-gone-run-sessions.ts';
 
 const SESSION = '00000031-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 
-// A working run, GEO-9721, with one session and its PR kettle#51 open.
 function setupTest() {
   const fresh = freshDb(),
     readState = () => (fresh.db.query("SELECT state FROM runs WHERE issue = 'GEO-9721'").get() as { state: string }).state;
@@ -20,7 +19,6 @@ function setupTest() {
     db: fresh.db,
     readState,
 
-    // Runs one step of the scenario and gives the run's state after it.
     step: (fn: () => unknown) => {
       fn();
       return readState();

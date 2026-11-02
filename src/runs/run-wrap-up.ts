@@ -20,9 +20,6 @@ export interface WrapUpDeps {
 
 export type WrapUpOptions = { dryRun: true } | { dryRun?: false; actor: string };
 
-// Forgets each of the run's sessions and their sub-sessions, then notes what it did on the run. A
-// run the owner chats in keeps them all. An imp is destroyed only after its check finds all work
-// pushed; otherwise its session stays, sub-sessions and all.
 export async function runWrapUp(db: Database, deps: WrapUpDeps, issue: string, options: WrapUpOptions): Promise<WrapUp> {
   const run = requireRun(db, issue);
 
@@ -52,8 +49,6 @@ export async function runWrapUp(db: Database, deps: WrapUpDeps, issue: string, o
   return wrapUp;
 }
 
-// A run may hold a short session id, so each is matched to the one atc session it starts. A
-// session atc no longer lists is gone already; a prefix that several sessions start is not guessed.
 async function resolveSessionIDs(ids: string[], sessions: FleetSession[], wrapUp: WrapUp): Promise<string[]> {
   const fullIDs: string[] = [];
   for (const id of ids) {
@@ -115,7 +110,6 @@ async function planTree(pass: TreePass, root: FleetSession): Promise<TreeDecisio
   return { kind: 'forget', children, root, destroyImp: plan.destroyImp };
 }
 
-// The deepest sub-sessions come first, so each is forgotten before the session it lists under.
 function collectChildren(sessions: FleetSession[], parentID: string): FleetSession[] {
   const found: FleetSession[] = [];
   for (const child of sessions.filter((session) => session.parent === parentID)) {
@@ -182,9 +176,8 @@ async function forgetTree(pass: TreePass, decision: ForgetDecision): Promise<voi
   await removeImpSession(pass, root.id);
 }
 
-// Forgets the live session, which stops it, and confirms the destroy of its imp when atc asks. A
-// separate stop first would suspend a cloud imp, which outlasts the atc call.
-// A failure leaves it unpinned: a pin means the session needs the owner, and this is not that.
+// A separate stop before forgetting the live session would suspend a cloud imp, which outlasts the
+// atc call.
 async function removeImpSession(pass: TreePass, id: string): Promise<void> {
   try {
     const first = await pass.client.forgetLive(id);

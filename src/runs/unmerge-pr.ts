@@ -8,8 +8,7 @@ import { requirePR as mustPr } from './require-pr.ts';
 import type { RunPr } from './types.ts';
 import { updateRunTime as touch } from './update-run-time.ts';
 
-// A wrong merged mark back to open, like unfinal for a final mark. The final and review marks stay;
-// the merge commit and its shipment go with the merge, so a later merge is checked for release again.
+// The merge commit and its shipment go with the merge, so a later merge is checked for release again.
 export function unmergePr(db: Database, raw: string, actor: string, reason: string | null): RunPr {
   return db
     .transaction(() => {

@@ -1,6 +1,5 @@
 import type { Database } from 'bun:sqlite';
 
-// Sessions to watch: each open row's active session.
 export function watchlist(db: Database): { session_id: string; issue: string }[] {
   return db
     .query(

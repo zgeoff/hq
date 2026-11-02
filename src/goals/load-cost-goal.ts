@@ -4,9 +4,8 @@ import { loadActionsSpend } from './load-actions-spend.ts';
 import type { Target, Verdict } from './types.ts';
 import { verdict } from './verdict.ts';
 
-// The cost goal's spend text and colour: the month's Actions spend so far against the monthly
-// target pro-rated to the days elapsed, both rounded to whole cents once and compared as
-// integers, so a float sum such as 0.1 + 0.2 meets a budget of 0.30. An unknown spend gets no colour.
+// The spend and the pro-rated target are rounded to whole cents once and compared as integers, so a
+// float sum such as 0.1 + 0.2 meets a budget of 0.30.
 export function loadCostGoal(db: Database, target: Target | null, at: Date): { text: string; verdict: Verdict } {
   const budget = toCents(buildActionsBudget(target?.value ?? 0, at)),
     dollars = loadActionsSpend(db, at);

@@ -10,7 +10,6 @@ export interface PRAcceptedRiskInput {
   actor: string;
 }
 
-// The event's seq, which is the record's id.
 export function recordPRAcceptedRisk(db: Database, input: PRAcceptedRiskInput): number {
   return logEvent(db, 'hq', `pr:${input.repo}#${input.pr}`, 'pr-accepted-risk', input.actor, null, null, { finding: input.finding, source: input.source, note: input.note });
 }

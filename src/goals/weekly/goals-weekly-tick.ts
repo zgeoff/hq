@@ -9,12 +9,9 @@ import { getMondayKey } from './get-monday-key.ts';
 import { getRun } from './get-run.ts';
 import { scheduleWeekly } from './schedule-weekly.ts';
 
-// hq health flags a Monday with no run after LATE.
 const DUE = { h: 17, m: 0 },
   LATE = { h: 17, m: 30 };
 
-// The watcher's step: once per Monday, from 17:00, and only on goals data synced within FRESH_MIN
-// minutes; with older data it waits for the next tick (the goals step runs first).
 export function goalsWeeklyTick(db: Database, actor: string, at: Date = now()): { run: JobRun | null; waiting: string | null } {
   const s = sydney(at);
   if (getMondayKey(at) !== s.date || !isPast(s, DUE)) {

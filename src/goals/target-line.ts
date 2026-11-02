@@ -1,7 +1,6 @@
 import type { GoalKey } from './goal-keys.ts';
 import type { Target } from './types.ts';
 
-// "<20% by 2 Nov", "<15 min a week, each outage caught within 5 min", "<=$50 a month on Actions"
 export function targetLine(key: GoalKey, t: Target | null): string {
   if (!t) return 'none yet';
   if (key === 'cost') {

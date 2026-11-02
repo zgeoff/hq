@@ -40,8 +40,7 @@ export function findAlerts(db: Database, sessions: SessionInfo[], activity: Map<
       const who = `${active.helper ? 'helper ' : ''}session ${active.session_id.slice(0, 8)}`;
       const s = byId.get(active.session_id);
       if (!s || !isPresentSession(s)) {
-        // Its work is handed in: a PR final and reviewed at its head. A session put to sleep
-        // until its merge window is not lost work (z-delivery, GEO-957).
+        // A session put to sleep until its merge window is not lost work.
         if (!active.helper && probeHandedIn(db, r.prs)) {
           continue;
         }
@@ -78,9 +77,7 @@ function formatRestackHint(ref: string): string {
   return ` (a restack? a passed hq review ${repo} ${pr} records the new head)`;
 }
 
-// The run's active sessions, and with no active main session, the main one that ended last when the
-// sweep ended it: atc no longer listed it, so its work may be lost. One ended by hand is not watched,
-// nor one of the design pass the run turned from: the build run has its own.
+// A main session the sweep ended stays watched: atc no longer listed it, so its work may be lost.
 function findWatchedSessions(sessions: readonly RunSession[]): RunSession[] {
   const own = sessions.filter((session) => session.design_pass === 0);
   const active = own.filter((session) => session.active === 1);
@@ -88,8 +85,6 @@ function findWatchedSessions(sessions: readonly RunSession[]): RunSession[] {
   return active.some((session) => session.helper === 0) || last?.ended_by !== 'sweep' ? active : [...active, last];
 }
 
-// A helper, or a session the sweep ended, is dismissed with --remove; for a main session atc
-// still lists, the run is checked for its PR instead.
 function formatExitHint(issue: string, session: RunSession): string {
   return session.helper || session.ended_by === 'sweep' ? `wrap it up, or hq run session ${issue} ${session.session_id.slice(0, 8)} --remove` : 'check for its PR or final note';
 }

@@ -6,7 +6,6 @@ import { formatAnswerSource } from './format-answer-source.ts';
 import { isRebasedSource } from './is-rebased-source.ts';
 import type { PRStatusView } from './types.ts';
 
-// The record in words. A stale line says `stale at <short head>`, the head it was recorded at.
 export function formatPRStatus(view: PRStatusView): string {
   const lines = [`${view.repo}#${view.pr}  ${formatHead(view)}`, formatGateLine(view), formatAnswerLine(view), formatNextLine(view)];
   if (view.override !== null) {

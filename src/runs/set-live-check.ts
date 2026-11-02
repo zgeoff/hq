@@ -8,7 +8,6 @@ import { requireOpenRun as mustOpenRun } from './require-open-run.ts';
 import type { RunView } from './types.ts';
 import { viewRun } from './view-run.ts';
 
-// Whether a live check is owed once the release ships. Unset counts as owed.
 export function setLiveCheck(db: Database, issue: string, value: string, actor: string): RunView {
   checkLiveCheck(value);
   return db

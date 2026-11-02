@@ -9,8 +9,6 @@ import { countMinutesSince as mins } from './count-minutes-since.ts';
 import { SWEEP_MINUTES as SWEEP } from './sweep-minutes.ts';
 import type { Alert } from './types.ts';
 
-// Send what is new, or unchanged for 30 minutes, as one message. Clears
-// the record of alerts that went away, so a recurrence is news again.
 export function sweep(db: Database, alerts: Alert[], actor: string): { sent: Alert[]; held: number } {
   return db
     .transaction(() => {
@@ -22,7 +20,6 @@ export function sweep(db: Database, alerts: Alert[], actor: string): { sent: Ale
       const due = alerts.filter((a) => {
         const prev = db.query('SELECT fingerprint, sent_at, event_seq FROM run_alerts WHERE key = ?').get(a.key) as { fingerprint: string; sent_at: string; event_seq: number | null } | null;
         if (!prev || prev.fingerprint !== a.fingerprint || mins(prev.sent_at, t) >= SWEEP.repeatMinutes()) return true;
-        // Not yet delivered (pending, failed, or superseded): it rides along in the next message.
         const delivered = prev.event_seq !== null && db.query(`SELECT 1 FROM outbox WHERE event_seq = ? AND status = 'sent'`).get(prev.event_seq);
         return !delivered;
       });
@@ -41,8 +38,7 @@ export function sweep(db: Database, alerts: Alert[], actor: string): { sent: Ale
     .immediate();
 }
 
-// New, changed, or 30 minutes on: worth a message by itself. An undelivered
-// alert alone waits for the outbox retry instead of re-queueing every tick.
+// An undelivered alert alone waits for the outbox retry instead of re-queueing every tick.
 function isNews(db: Database, a: Alert, t: Date): boolean {
   const prev = db.query('SELECT fingerprint, sent_at FROM run_alerts WHERE key = ?').get(a.key) as { fingerprint: string; sent_at: string } | null;
   return !prev || prev.fingerprint !== a.fingerprint || mins(prev.sent_at, t) >= SWEEP.repeatMinutes();

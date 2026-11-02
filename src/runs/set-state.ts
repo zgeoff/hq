@@ -13,8 +13,6 @@ import { requireRun as mustRun } from './require-run.ts';
 import type { LiveCheck, RunView } from './types.ts';
 import { viewRun } from './view-run.ts';
 
-// waitsOnGeoff marks the wait as the owner's, exactly; left out, it stays as it was, and a new
-// waits-on text clears it unless given again.
 export function setState(db: Database, issue: string, state: string, opts: { next?: string; waitsOn?: string | null; waitsOnGeoff?: boolean; note?: string | null; reopen?: boolean; liveCheck?: LiveCheck }, actor: string): RunView {
   if (opts.liveCheck !== undefined) checkLiveCheck(opts.liveCheck);
   if (!RUN_STATES.includes(state as RunState)) throw new HqError('bad_args', `state must be one of ${RUN_STATES.join(', ')}`);

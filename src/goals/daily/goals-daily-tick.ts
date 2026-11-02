@@ -8,12 +8,9 @@ import { stale } from '../stale.ts';
 import { getRun } from './get-run.ts';
 import { scheduleDaily } from './schedule-daily.ts';
 
-// hq health flags a day with no run after LATE.
 const DUE = { h: 18, m: 0 },
   LATE = { h: 18, m: 30 };
 
-// The watcher's step: once per Sydney day, from 18:00, and only on goals data synced within
-// FRESH_MIN minutes; with older data it waits for the next tick (the goals step runs first).
 export function goalsDailyTick(db: Database, actor: string, at: Date = now()): { run: JobRun | null; waiting: string | null } {
   const s = sydney(at);
   if (!isPast(s, DUE)) {

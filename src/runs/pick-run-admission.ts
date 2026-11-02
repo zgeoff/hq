@@ -6,14 +6,12 @@ import type { RunState } from '../transitions/run-states.ts';
 export interface RunAdmissionFacts {
   issue: string;
 
-  // The closed run the issue already has, if any; an open one never reaches this choice.
   prior: { state: RunState; designLane: DesignLane | null } | null;
   isDesignType: boolean;
   design: DesignLane | null;
   asked: string | null;
   open: OpenDesignRuns;
 
-  // The issues of the open design passes in each lane, for the refusal text.
   openIssues: { agent: string[]; withGeoff: string[] };
   slots: DesignSlots;
   designError: string | null;
@@ -21,8 +19,6 @@ export interface RunAdmissionFacts {
 
 export type RunAdmission = { kind: 'add'; designLane: DesignLane | null } | { kind: 'move'; designLane: DesignLane; from: RunState } | { kind: 'refused'; code: string; message: string; data?: Record<string, unknown> };
 
-// The design lane is the --design flag, else with-geoff for a Design-type issue. A pass above its lane
-// count is refused: an agent pass always, a with-geoff pass unless the owner asked for it somewhere.
 export function pickRunAdmission(facts: RunAdmissionFacts): RunAdmission {
   const issue = facts.issue;
   const prior = facts.prior;

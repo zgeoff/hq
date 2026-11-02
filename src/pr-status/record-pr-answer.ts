@@ -20,12 +20,9 @@ export interface PRAnswerInput {
   note: string | null;
   actor: string;
 
-  // Set only by `hq pr rebased`: whose words the answer carries from the old head.
   carried?: CarriedAnswer;
 }
 
-// Stores the owner's answer at the head given and logs the write, in one transaction. The head is
-// null only when it could not be read; the record then shows `head unknown`.
 export function recordPRAnswer(db: Database, input: PRAnswerInput): void {
   const at = iso(now());
   db.transaction(() => {

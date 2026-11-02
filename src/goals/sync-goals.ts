@@ -1,6 +1,3 @@
-// Team-goals numbers per Sydney day and week. GitHub is the source for CI runs (cloud's
-// deploy-prod among them) and PRs closed unmerged; z-delivery's log gives DEPLOY and HOLD lines;
-// merged PRs come from merged_prs (kinds.ts). A past UTC day is fetched once.
 import type { Database } from 'bun:sqlite';
 import { now } from '../clock/now.ts';
 import { config } from '../config/config.ts';
@@ -21,7 +18,6 @@ interface SyncGoalsOptions {
   signal?: AbortSignal;
 }
 
-// Every UTC day from `from` to today not yet done, for every repo and for closed PRs.
 export async function syncGoals(db: Database, run: Runner, opts: SyncGoalsOptions, at: Date = now()): Promise<{ days: number; runs: number; closed: number; left: number; deployRuns: number; deployLeft: number; errors: string[] }> {
   const all = buildUTCDays(opts.from, at),
     errors: string[] = [],
@@ -31,11 +27,9 @@ export async function syncGoals(db: Database, run: Runner, opts: SyncGoalsOption
   let closed = 0;
   let days = 0;
   // Four repo-days at a time: the watcher's step has 120 s for about 80 of them.
-  // Newest days first, at most maxRepoDays a call: after a long gap the rest come on later calls.
   const todo = want.slice(0, opts.maxRepoDays ?? want.length);
   const left = want.length - todo.length;
   const worker = async () => {
-    // An aborted sync takes no new job: a step given up on stops instead of running on.
     for (let job = todo.shift(); job && !opts.signal?.aborted; job = todo.shift()) {
       try {
         const n = await syncRunsDay(db, run, job[0], job[1], opts.env, at); // not runs += await: the workers would lose counts

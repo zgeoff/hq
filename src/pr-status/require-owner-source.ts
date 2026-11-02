@@ -6,7 +6,6 @@ import { requireAnswerSource } from './require-answer-source.ts';
 import type { OwnerProbe } from './read-owner-session.ts';
 import type { PRCommandInput } from './run-pr-command.ts';
 
-// The --source of an owner action, once it proves the owner gave the answer; refused otherwise.
 export async function requireOwnerSource(input: PRCommandInput, request: Omit<SourceRequest, 'source'>): Promise<string> {
   const source = requireAnswerSource(input.flags.source);
   const probe: OwnerProbe = source.startsWith('chat:') ? await input.readOwnerSession() : { verdict: 'other' };

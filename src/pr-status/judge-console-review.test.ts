@@ -2,7 +2,6 @@ import { expect, test } from 'bun:test';
 import { judgeConsoleReview } from './judge-console-review.ts';
 import type { ConsoleReviewEvidence } from './judge-console-review.ts';
 
-// An lgtm on widgets#7 at a1b2c3d from console:review-9, and the review evidence that backs it.
 function setupTest() {
   return {
     request: { ref: { repo: 'widgets', pr: 7, slug: 'zgeoff/widgets' }, answer: 'lgtm', source: 'console:review-9', head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678' } as const,

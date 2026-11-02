@@ -14,14 +14,11 @@ export interface OwnerAnswer {
   source: string;
   note: string | null;
 
-  // The owner's own source and note, on an lgtm `hq pr rebased` carried from another head.
   carried: OwnerWords | null;
 }
 
 const AnswerRowSchema = z.object({ seq: z.number(), at: z.string(), data: z.string() });
 
-// The PR's pr-answer events, oldest first; null when any event does not parse, so a gap never lets
-// an older answer stand.
 export function readPRAnswers(db: Database, repo: string, pr: number): OwnerAnswer[] | null {
   const rows = z.array(AnswerRowSchema).parse(db.query("SELECT seq, at, data FROM events WHERE subject = 'hq' AND subject_id = ? AND action = 'pr-answer' ORDER BY seq").all(`pr:${repo}#${pr}`));
   const answers = rows.map((row) => parseAnswer(row));

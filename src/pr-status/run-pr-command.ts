@@ -1,6 +1,3 @@
-// `hq pr status|answer|override|accept-risk|mechanical|rebased|exempt|next`: the one record every
-// session reads before it messages another session about a PR. Only an override, an accepted risk
-// and z-review's three records (mechanical, exempt and rebased) change what the merge gate passes.
 import type { Database } from 'bun:sqlite';
 import type { Flags } from '../cli.ts';
 import type { Out } from '../commands.ts';
@@ -95,8 +92,6 @@ async function runStatus(input: PRCommandInput, ref: PRRef): Promise<Out> {
   return await refreshStatus(input, ref, row, true);
 }
 
-// A PR with no record may still hold the owner's override or z-review's records, which the reviewer
-// needs to see; gh is read only when one was ever recorded.
 async function readUnrecordedStatus(input: PRCommandInput, ref: PRRef): Promise<Out> {
   const none: Out = { data: { pr: null, acceptedRisks: [] }, text: `No record for ${ref.repo}#${ref.pr}.` };
   const risks = await readAcceptedRiskViews(input.run, input.db, ref, true);
@@ -116,7 +111,6 @@ async function readUnrecordedStatus(input: PRCommandInput, ref: PRRef): Promise<
   return { data: { pr: null, ...(shown === null ? {} : { override: shown }), ...(ciOverrides.length === 0 ? {} : { ciOverrides }), ...(recordsLine === null ? {} : { reviewRecords: records }), acceptedRisks: risks }, text: lines.join('\n') };
 }
 
-// The override that stands at the head now; none when the head is unknown.
 function findStandingOverride(input: PRCommandInput, ref: PRRef, head: string | null): OwnerOverride | null {
   return head === null ? null : findOwnerOverride(input.db, ref.repo, ref.pr, head);
 }
@@ -125,7 +119,6 @@ function readStandingCIOverrides(input: PRCommandInput, ref: PRRef, head: string
   return head === null ? [] : readHeadCIOverrides(input.db, ref.repo, ref.pr, head).map((override) => ({ check: override.check, head: override.head, source: override.source, note: override.note, at: override.at }));
 }
 
-// z-review's records that stand at the head; none when the head is unknown.
 function readStandingRecords(input: PRCommandInput, ref: PRRef, head: string | null): PRStatusView['reviewRecords'] {
   if (head === null) {
     return { mechanical: null, exemption: null };
@@ -135,7 +128,6 @@ function readStandingRecords(input: PRCommandInput, ref: PRRef, head: string | n
   return { mechanical: mechanical === null ? null : { files: mechanical.files, lines: mechanical.lines }, exemption: exemption === null ? null : { rule: exemption.rule, note: exemption.note, files: exemption.files } };
 }
 
-// The record against the head gh gives now; that head is also stored as the one hq last saw.
 async function refreshStatus(input: PRCommandInput, ref: PRRef, row: PRStatusRow, readNoslop: boolean): Promise<Out> {
   const current = await readPRHead(input.run, ref.slug, ref.pr);
   if (current !== null) {
@@ -205,8 +197,8 @@ async function runOverride(input: PRCommandInput, ref: PRRef): Promise<Out> {
   return { data: { override: { repo: ref.repo, pr: ref.pr, head: context.head, source, note } }, text: `Recorded the owner's override of the open findings for ${ref.repo}#${ref.pr} at ${context.head.slice(0, 7)} (${source}): ${note}` };
 }
 
-// The one check name to override, or null when the flag is absent. The name must match a check
-// exactly, so a padded or empty one is refused rather than recorded to never match.
+// The check name must match a check exactly, so a padded or empty one is refused rather than
+// recorded to never match.
 function parseCheckFlag(values: readonly string[] | undefined): string | null {
   const check = parseOneFlag(values, 'check');
   if (check === undefined) {
@@ -225,14 +217,11 @@ async function runNext(input: PRCommandInput, ref: PRRef, session: string | unde
   return await refreshWrittenStatus(input, ref);
 }
 
-// The record just written, against the head gh gives now, as `hq pr status` shows it.
 async function refreshWrittenStatus(input: PRCommandInput, ref: PRRef): Promise<Out> {
   const row = await readWrittenRow(input, ref);
   return await refreshStatus(input, ref, row, false);
 }
 
-// The session that holds the next step, or null for --clear. Exactly one of the two is given, and
-// the session is a declared one.
 function requireNextHolder(flags: Flags, session: string | undefined): string | null {
   const clear = flags.clear === true,
     names = getDeclaredSessions().map((s) => s.name);
@@ -251,7 +240,6 @@ function requireNextHolder(flags: Flags, session: string | undefined): string | 
   return session;
 }
 
-// The record after an answer, against the head that answer was just stored at.
 async function readOut(input: PRCommandInput, ref: PRRef, head: string): Promise<Out> {
   const row = await readWrittenRow(input, ref);
   return buildOut(buildPRStatusView(row, head, findStandingOverride(input, ref, head), { ciOverrides: readStandingCIOverrides(input, ref, head), reviewRecords: readStandingRecords(input, ref, head), acceptedRisks: await readAcceptedRiskViews(input.run, input.db, ref, false) }));

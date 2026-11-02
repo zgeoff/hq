@@ -15,17 +15,14 @@ import { runPRCommand } from './run-pr-command.ts';
 interface Call {
   head: string;
 
-  // The base branch's tip GitHub names; a sha no checkout holds when absent.
   base?: string;
   repo?: string;
   from?: string | undefined;
   actor?: string;
   probe?: 'match' | 'other';
 
-  // Runs when hq reads the new head's merge base, as the owner answering during the slow git work.
   during?: () => void;
 
-  // Replaces what a gh call answers, keyed by a piece of its command line.
   gh?: Record<string, RunResult>;
 }
 

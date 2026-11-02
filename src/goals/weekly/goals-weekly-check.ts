@@ -7,9 +7,8 @@ import { getMondayKey } from './get-monday-key.ts';
 import { getRun } from './get-run.ts';
 import { JOB } from './job.ts';
 
-const LATE = { h: 17, m: 30 }; // hq health flags a Monday with no run after this
+const LATE = { h: 17, m: 30 };
 
-// For hq health: after 17:30 on a Monday, that Monday needs a run, and a queued message must not have failed.
 export function goalsWeeklyCheck(db: Database, at: Date): { key: string; ok: boolean; line: string } | null {
   const s = sydney(at);
   if (getMondayKey(at) !== s.date || !isPast(s, LATE)) {
@@ -25,7 +24,6 @@ export function goalsWeeklyCheck(db: Database, at: Date): { key: string; ok: boo
   return { key: `job:${JOB}`, ok: true, line: `goals weekly: ${r.result} today at ${r.at}` };
 }
 
-// A day with no run because GitHub refused hq's calls names that cause.
 const cause = (db: Database): string => {
   const c = ghAuthCause(db);
   return c ? `; cause: ${c}` : '';

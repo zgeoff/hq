@@ -9,7 +9,6 @@ import { sampleUsage } from './sample-usage.ts';
 
 let cleanup: () => void, db: Database, dir: string;
 
-// The Sydney day of Fri 16 Oct 2026 (AEDT, UTC+11), judged at 18:00 Sydney.
 const FROM = new Date('2026-10-15T13:00:00Z'),
   NOW = new Date('2026-10-16T07:00:00Z'),
   TO = new Date('2026-10-16T13:00:00Z'),
@@ -83,7 +82,7 @@ test('switching account A to B and back to A with unchanged figures stores A aga
   expect(sampleUsage(db, new Date('2026-10-16T02:00:00Z'))).toBe(true);
   cache({ account: 'aaaaaaaaaaaa', windows: w });
   expect(sampleUsage(db, new Date('2026-10-16T03:00:00Z'))).toBe(true);
-  expect(sampleUsage(db, new Date('2026-10-16T04:00:00Z'))).toBe(false); // same account, same figures
+  expect(sampleUsage(db, new Date('2026-10-16T04:00:00Z'))).toBe(false);
   expect(rows()).toHaveLength(3);
   expect(measure(db, FROM, TO, NOW).cost).toMatchObject({ value: 40, n: 2 });
 });
@@ -107,17 +106,17 @@ test('two account files give two rows, stamped with the file mtime; an unchanged
   ]);
   expect(sampleUsage(db, new Date('2026-10-16T05:05:00Z'))).toBe(false);
   expect(rows()).toHaveLength(2);
-  accountFile(A, { account: A, windows: { fiveHour: 10, sevenDay: 40 } }, '2026-10-16T03:00:00Z'); // a newer reading, even with the same figures
+  accountFile(A, { account: A, windows: { fiveHour: 10, sevenDay: 40 } }, '2026-10-16T03:00:00Z');
   expect(sampleUsage(db, new Date('2026-10-16T05:10:00Z'))).toBe(true);
   expect(rows()).toHaveLength(3);
 });
 
 test('a file with a bad name, a bad account, a mismatched account or no figures is skipped without a word', () => {
-  accountFile(A, { account: B, windows: { fiveHour: 1, sevenDay: 2 } }, '2026-10-16T01:00:00Z'); // names another account
+  accountFile(A, { account: B, windows: { fiveHour: 1, sevenDay: 2 } }, '2026-10-16T01:00:00Z');
   accountFile('ABCDEFABCDEF', { account: 'ABCDEFABCDEF', windows: { fiveHour: 1, sevenDay: 2 } }, '2026-10-16T01:00:00Z');
   accountFile('geoff@example.com', { account: 'geoff@example.com', windows: { fiveHour: 1, sevenDay: 2 } }, '2026-10-16T01:00:00Z');
   accountFile('short', { account: 'short', windows: { fiveHour: 1, sevenDay: 2 } }, '2026-10-16T01:00:00Z');
-  accountFile(B, { windows: { fiveHour: 1, sevenDay: 2 } }, '2026-10-16T01:00:00Z'); // names none
+  accountFile(B, { windows: { fiveHour: 1, sevenDay: 2 } }, '2026-10-16T01:00:00Z');
   accountFile('cccccccccccc', '{not json', '2026-10-16T01:00:00Z');
   accountFile('dddddddddddd', { account: 'dddddddddddd', windows: { fiveHour: 'lots' } }, '2026-10-16T01:00:00Z');
   expect(sampleUsage(db, new Date('2026-10-16T05:00:00Z'))).toBe(false);

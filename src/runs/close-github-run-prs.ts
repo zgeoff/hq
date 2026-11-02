@@ -6,11 +6,8 @@ import { closePr } from './close-pr.ts';
 import { GITHUB_ACTOR } from './github-actor.ts';
 import { readGitHubPR } from './read-github-pr.ts';
 
-
 const OPEN_REFS = z.array(z.object({ ref: z.string() }));
 
-// Closes each open PR of an open run as GitHub reports it: merged with GitHub's time and merge
-// commit, or closed. A failed read leaves the PR alone and reports it.
 export async function closeGitHubRunPRs(db: Database, run: Runner): Promise<{ closed: string[]; errors: string[] }> {
   const placeholders = CLOSED_RUN_STATES.map(() => '?').join(', ');
   const rows = db.query(`SELECT p.ref FROM run_prs p JOIN runs r ON r.issue = p.issue WHERE p.state = 'open' AND r.state NOT IN (${placeholders}) ORDER BY p.added_at`).all(...CLOSED_RUN_STATES);

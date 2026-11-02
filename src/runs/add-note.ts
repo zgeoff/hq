@@ -26,11 +26,9 @@ export function addNote(db: Database, key: string, text: string, input: NoteInpu
       const inserted = db.query(`INSERT INTO run_notes (issue, session_id, label, text, source, at) VALUES (?, ?, ?, ?, 'cli', ?)`).run(noted.issue, session, label, text, iso(now()));
       const id = Number(inserted.lastInsertRowid);
 
-      // A late note from the design pass the run turned from stays on the run, but changes nothing on the build.
       if (by?.design_pass !== 1) {
         applyNoteSignals(db, noted.issue, text, { source: `note:${actor}`, note: id, actor, ...(input.resolutions && { resolutions: input.resolutions }) });
 
-        // Until the skill uses --lane: a "lane" note sets the run's lane.
         const lane = text.trim().toLowerCase();
         if (label === 'lane' && /^[a-z][a-z0-9-]{0,39}$/u.test(lane)) {
           db.query('UPDATE runs SET lane = ? WHERE issue = ?').run(lane, noted.issue);

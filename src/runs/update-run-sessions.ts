@@ -8,10 +8,8 @@ export function updateRunSessions(db: Database, issue: string, session: string, 
   const other = db.query('SELECT issue FROM run_sessions WHERE session_id = ?').get(session) as { issue: string } | null;
   if (other && other.issue !== issue) throw new HqError('session_taken', `session ${session} is on ${other.issue}`);
   const t = iso(now());
-  // --add on the active main session keeps it main: never demote by accident.
   const cur = db.query('SELECT active, helper FROM run_sessions WHERE session_id = ?').get(session) as { active: number; helper: number } | null;
   if (helper && cur?.active === 1 && cur.helper === 0) return;
-  // A new main session replaces the old main one; helpers stay.
   if (!helper) {
     db.query('UPDATE run_sessions SET active = 0, ended_at = COALESCE(ended_at, ?) WHERE issue = ? AND active = 1 AND helper = 0 AND session_id != ?').run(t, issue, session);
   }

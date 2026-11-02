@@ -5,7 +5,6 @@ import { join } from 'node:path';
 import { buildStubImpRunner } from '../../test/build-stub-imp-runner.ts';
 import { readImpWork } from './read-imp-work.ts';
 
-// A temp directory, and git run in it under an invented identity.
 function setupTest() {
   const directory = mkdtempSync(join(tmpdir(), 'hq-imp-work-'));
   onTestFinished(() => rmSync(directory, { recursive: true, force: true }));
