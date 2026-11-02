@@ -65,7 +65,7 @@ export function tick(db: Database, sample: Sample, actor: string): TickResult {
       sendSlotCauseAlerts(db, { free: slotCause.slots, designFree: designCause.slots, at: t, actor });
       if (!sample.error) {
         const held = getLanesHold(db) !== null;
-        if (slotPlan?.eligible != null) {
+        if (slotPlan !== null && slotPlan.eligible !== null) {
           sendLowWaterAlert(db, { eligible: slotPlan.eligible, free: slotPlan.pool.free, held, at: t, actor });
         }
         sendStalledTriageAlert(db, { slotCause, held, at: t, actor });

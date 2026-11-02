@@ -1,7 +1,7 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { freshDb } from '../../test/helpers.ts';
 import { getMeta } from '../db/get-meta.ts';
-import { PROMOTABLE_TOP_KEY } from './promotable-top.ts';
+import { PROMOTABLE_TOP, PROMOTABLE_TOP_KEY } from './promotable-top.ts';
 import { writePromotableTop } from './write-promotable-top.ts';
 
 function setupTest() {
@@ -12,11 +12,11 @@ function setupTest() {
 
 test('it keeps the first 5 issues in list order with the time and focus', () => {
   const ctx = setupTest();
-  const issues = Array.from({ length: 7 }, (_, i) => ({ identifier: `GEO-970${i}`, title: `fix part ${i}` }));
+  const issues = Array.from({ length: 7 }, (_unused, index) => ({ identifier: `GEO-970${index}`, title: `fix part ${index}` }));
 
   writePromotableTop(ctx.db, { issues, focus: '[]', at: new Date('2026-10-14T01:00:00Z') });
 
-  expect(JSON.parse(getMeta(ctx.db, PROMOTABLE_TOP_KEY)!)).toStrictEqual({ at: '2026-10-14T01:00:00Z', focus: '[]', issues: issues.slice(0, 5) });
+  expect(PROMOTABLE_TOP.parse(JSON.parse(getMeta(ctx.db, PROMOTABLE_TOP_KEY) ?? 'null'))).toStrictEqual({ at: '2026-10-14T01:00:00Z', focus: '[]', issues: issues.slice(0, 5) });
 });
 
 test('it removes the stored list when the read failed', () => {

@@ -22,6 +22,9 @@ export function pickLowWater(look: LowWaterLook): { mark: number; phase: LowWate
     return { mark, phase: 'above' };
   }
   const promotable = look.promotable;
-  const fresh = promotable !== null && promotable.count !== null && promotable.focus === look.focus && look.at.getTime() - Date.parse(promotable.at) <= look.freshMinutes * 60_000;
-  return { mark, phase: fresh && promotable.count! > 0 ? 'low' : 'unclear' };
+  if (promotable === null || promotable.count === null || promotable.count === 0) {
+    return { mark, phase: 'unclear' };
+  }
+  const fresh = promotable.focus === look.focus && look.at.getTime() - Date.parse(promotable.at) <= look.freshMinutes * 60_000;
+  return { mark, phase: fresh ? 'low' : 'unclear' };
 }
