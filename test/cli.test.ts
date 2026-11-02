@@ -596,6 +596,19 @@ test('#run add names hq run session --add for a --session it ignores on a run al
   expect(same.json.ignored).toBeUndefined();
 });
 
+test('#run add prints the hq run session --add line in text output only for a session it ignores', async () => {
+  await hq('run', 'add', 'GEO-9703', '--session', '9703ab0c-0000-4000-8000-00000000aaaa', '--title', 'Invented kettle work', '--where', 'none');
+  out = [];
+  await main(['run', 'add', 'GEO-9703', '--session', '9703ab0c-0000-4000-8000-00000000bbbb', '--title', 'Invented kettle work', '--where', 'none']);
+  const ignoredText = out.join('\n');
+  out = [];
+  await main(['run', 'add', 'GEO-9703', '--session', '9703ab0c-0000-4000-8000-00000000aaaa', '--title', 'Invented kettle work', '--where', 'none']);
+  const sameText = out.join('\n');
+  expect(ignoredText).toContain('Already on the board.\nIgnored --session 9703ab0c-0000-4000-8000-00000000bbbb: to add it to the run, use hq run session GEO-9703 9703ab0c-0000-4000-8000-00000000bbbb --add');
+  expect(sameText).toContain('Already on the board.');
+  expect(sameText).not.toContain('Ignored --session');
+});
+
 test('v20 adds live_check to runs and the merge and release columns to run_prs', () => {
   const p = `${dir}/v19.db`;
   const v19 = new Database(p, { create: true });
