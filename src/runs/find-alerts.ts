@@ -64,7 +64,7 @@ export function findAlerts(db: Database, sessions: SessionInfo[], activity: Map<
           key: `session:${active.session_id}`,
           fingerprint: `quiet:${s.state}`,
           issue: r.issue,
-          line: `${r.issue}: ${who} ${s.state === 'needs_you' ? 'waits on a prompt' : 'quiet'} for ${Math.floor((at.getTime() - last) / 60_000)} min`,
+          line: `${r.issue}: ${who} ${s.state === 'needs_you' ? 'waits on a prompt' : 'quiet'} for ${Math.floor((at.getTime() - last) / 60_000)} min${s.state === 'needs_you' ? '' : `; if it waits only on the owner, hq run state ${r.issue} working --waits-on-geoff`}`,
         });
       }
     }

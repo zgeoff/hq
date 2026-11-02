@@ -273,7 +273,7 @@ test('it raises the quiet alert for an idle session past the quiet limit whose o
 
   expect(findAlerts(ctx.db, [{ id: session, name: 'kettle', alive: true, state: 'idle' }], activity, new Date('2026-10-21T03:00:00Z'))).toStrictEqual([
     { key: 'pr:kettle#56', fingerprint: 'final:abc1234', issue: 'GEO-9856', line: 'kettle#56 (GEO-9856) final at abc1234 for 120 min, no review [from marker:kettle]' },
-    { key: `session:${session}`, fingerprint: 'quiet:idle', issue: 'GEO-9856', line: 'GEO-9856: session 98560000 quiet for 90 min' },
+    { key: `session:${session}`, fingerprint: 'quiet:idle', issue: 'GEO-9856', line: 'GEO-9856: session 98560000 quiet for 90 min; if it waits only on the owner, hq run state GEO-9856 working --waits-on-geoff' },
   ]);
 });
 

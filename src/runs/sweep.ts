@@ -6,6 +6,7 @@ import { dropTopic } from '../outbox/drop-topic.ts';
 import { enqueue } from '../outbox/enqueue.ts';
 import { orchestratorName } from '../wake/orchestrator-name.ts';
 import { countMinutesSince as mins } from './count-minutes-since.ts';
+import { formatSweepText } from './format-sweep-text.ts';
 import { SWEEP_MINUTES as SWEEP } from './sweep-minutes.ts';
 import type { Alert } from './types.ts';
 
@@ -25,7 +26,7 @@ export function sweep(db: Database, alerts: Alert[], actor: string): { sent: Ale
       });
       if (alerts.length === 0) dropTopic(db, orchestratorName(), 'run-sweep');
       if (due.length === 0 || due.every((a) => !isNews(db, a, t))) return { sent: [], held: alerts.length };
-      const text = `hq run sweep: ${due.length} to look at.\n${due.map((a) => `- ${a.line}`).join('\n')}\nRecord a review with hq run reviewed <pr> --sha <head>.`;
+      const text = formatSweepText(due);
       const seq = logEvent(db, 'run', 'sweep', 'alerted', actor, null, null, { alerts: due.map((a) => a.key) });
       enqueue(db, seq, orchestratorName(), text, 'run-sweep');
       for (const a of due) {
