@@ -47,9 +47,16 @@ export async function runAcceptRisk(input: PRCommandInput, ref: PRRef, finding: 
   if (/[\r\n]/u.test(note)) {
     throw new HqError('bad_args', '--note must be one line: noslop reads the first line of the reply as the disposition');
   }
-  const standing = readAcceptedRiskRecords(input.db, ref.repo, ref.pr).find((record) => record.finding === finding);
-  const record = standing ?? { event: recordPRAcceptedRisk(input.db, { repo: ref.repo, pr: ref.pr, finding, source, note, actor: await input.actor() }), finding, source, note };
-  const accepting: Accepting = { input, ref, record, alreadyRecorded: standing !== undefined };
+  const actor = await input.actor();
+
+  // One immediate transaction reads and writes, so two runs at once leave one record.
+  const kept = input.db
+    .transaction(() => {
+      const standing = readAcceptedRiskRecords(input.db, ref.repo, ref.pr).find((record) => record.finding === finding);
+      return standing === undefined ? { record: { event: recordPRAcceptedRisk(input.db, { repo: ref.repo, pr: ref.pr, finding, source, note, actor }), finding, source, note }, alreadyRecorded: false } : { record: standing, alreadyRecorded: true };
+    })
+    .immediate();
+  const accepting: Accepting = { input, ref, ...kept };
   const reply = await postReply(accepting);
   const check = await setCheck(accepting, reply);
   rejectOwnOpenFinding(accepting, reply, check);
