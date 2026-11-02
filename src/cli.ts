@@ -339,7 +339,9 @@ import { readPacingLanes } from './lanes/read-pacing-lanes.ts';
 import { runLinearReadyTick } from './run-linear-ready-tick.ts';
 import { STEP_MS } from './watcher/step-ms.ts';
 import { formatSlotCause } from './lanes/format-slot-cause.ts';
+import { formatHeldIssue } from './lanes/format-held-issue.ts';
 import { readBacklogIssues } from './lanes/read-backlog-issues.ts';
+import { readDoneOpenIssues } from './lanes/read-done-open-issues.ts';
 import { readSlotCause } from './lanes/read-slot-cause.ts';
 import { readSlotMinutes } from './lanes/read-slot-minutes.ts';
 import rulesTable from '../lanes.json';
@@ -1711,9 +1713,10 @@ async function lanesCommand(context: Pick<Ctx, 'db' | 'verb' | 'rest' | 'flags' 
       return runLaneSkipCommand({ db, actor: await by(), at: now(), args });
     }
     case 'promotable': {
-      const backlog = await readBacklogIssues(makeAuditedLinearCaller(db, context.run), rulesTable.team);
+      const backlog = await readBacklogIssues(makeAuditedLinearCaller(db, context.run), rulesTable.team, readDoneOpenIssues(db));
       const issues = backlog.promotable.map((issue) => ({ identifier: issue.identifier, title: issue.title }));
-      return { data: { issues }, text: issues.length > 0 ? issues.map((issue) => `${issue.identifier}  ${issue.title}`).join('\n') : 'No Backlog issue is ready to promote.' };
+      const head = issues.length > 0 ? issues.map((issue) => `${issue.identifier}  ${issue.title}`) : ['No Backlog issue is ready to promote.'];
+      return { data: { issues, held: backlog.held }, text: [...head, ...backlog.held.map(formatHeldIssue)].join('\n') };
     }
     case 'ready': {
       if (flags.lane) {

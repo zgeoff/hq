@@ -6,9 +6,10 @@ import { freshDb } from '../../test/helpers.ts';
 import type { RekeySpec } from './rekey-specs.ts';
 import { REKEY_SPECS } from './rekey-specs.ts';
 
-// Columns that look like they could name a repo and are outside the agreed list.
+// Columns that look like they could name a repo and are outside the agreed list. linear_started_prs.ref is
+// outside it because every Linear read replaces the table.
 const CANDIDATE = /\.(?:repo|ref|link|url|target|from_ref|source_ref|fixed_in_pr)$/u,
-  OUTSIDE_LIST = new Set(['followups.from_ref', 'outbox.target', 'run_prs.url', 'typed.source_ref']);
+  OUTSIDE_LIST = new Set(['followups.from_ref', 'linear_started_prs.ref', 'outbox.target', 'run_prs.url', 'typed.source_ref']);
 
 function setupTest() {
   const base = freshDb(),

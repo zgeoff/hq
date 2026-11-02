@@ -1,10 +1,13 @@
 import type { Database } from 'bun:sqlite';
+import type { Role } from '../../roles/role-names.ts';
 import type { Verdict } from '../types.ts';
 
-// One message to z-triage about one item, sent once: the key names the item.
+// One message about one item, sent once: the key names the item. It goes to the session holding the
+// role, triage when none is named.
 export interface ThroughputAlert {
   key: string;
   text: string;
+  role?: Role;
 }
 
 export interface ThroughputLine {

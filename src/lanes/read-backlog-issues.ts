@@ -2,9 +2,10 @@ import { z } from 'zod';
 import { HqError } from '../errors.ts';
 import type { LinearCall } from '../linear/types.ts';
 import { NEEDS_DESIGN_LABEL } from './needs-design-label.ts';
+import { findHeldBlockers } from './find-held-blockers.ts';
 import { isIssuePromotable } from './is-issue-promotable.ts';
 import { pickIssueType } from './pick-issue-type.ts';
-import type { PromotableIssue, ReadyIssue } from './types.ts';
+import type { HeldIssue, PromotableIssue, ReadyIssue } from './types.ts';
 
 const MAX_PAGES = 20;
 const PAGE_SIZE = 50;
@@ -64,15 +65,20 @@ const pageSchema = z.object({ issues: issuesSchema });
 export interface BacklogIssues {
   promotable: PromotableIssue[];
 
+  // The issues only a done-but-open blocker holds back: none counts as promotable.
+  held: HeldIssue[];
+
   // The needs-design issues by the design queue they wait in; none of them is promotable.
   design: { agent: ReadyIssue[]; withGeoff: ReadyIssue[] };
 }
 
 // Reads the team's Backlog page by page and sorts it: the issues isIssuePromotable passes, each with the
 // facts the focus matches on, and the needs-design issues, queued for the with-geoff lane when they also
-// carry the with-geoff label and for the agent lanes otherwise. Reads only; triage moves the issues.
-export async function readBacklogIssues(call: LinearCall, team: string): Promise<BacklogIssues> {
-  const backlog: BacklogIssues = { promotable: [], design: { agent: [], withGeoff: [] } };
+// carry the with-geoff label and for the agent lanes otherwise. doneOpen holds the In Progress issues whose
+// every PR merged, with their last merge: an issue blocked only by those is held, with the reason, not
+// promotable. Reads only; triage moves the issues.
+export async function readBacklogIssues(call: LinearCall, team: string, doneOpen: ReadonlyMap<string, string>): Promise<BacklogIssues> {
+  const backlog: BacklogIssues = { promotable: [], held: [], design: { agent: [], withGeoff: [] } };
   let after: string | null = null;
   for (let page = 0; ; page++) {
     if (page === MAX_PAGES) {
@@ -105,6 +111,15 @@ export async function readBacklogIssues(call: LinearCall, team: string): Promise
         (issue.labels.includes(WITH_GEOFF_LABEL) ? backlog.design.withGeoff : backlog.design.agent).push(facts);
       } else if (isIssuePromotable(issue)) {
         backlog.promotable.push({ identifier: node.identifier, title: node.title, facts });
+      } else {
+        const held = findHeldBlockers(
+          issue,
+          blockers.map((relation) => ({ identifier: relation.issue.identifier, state: relation.issue.state.type })),
+          doneOpen,
+        );
+        if (held !== null) {
+          backlog.held.push({ identifier: node.identifier, title: node.title, blockers: held });
+        }
       }
     }
     if (!parsed.data.issues.pageInfo.hasNextPage) {

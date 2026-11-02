@@ -1,5 +1,6 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { buildFiledNode } from '../../../test/build-filed-node.ts';
+import { buildGithubAttachment } from '../../../test/build-github-attachment.ts';
 import { freshDb } from '../../../test/helpers.ts';
 import { makeThroughputLinearCall } from '../../../test/make-throughput-linear-call.ts';
 import { main } from '../../cli.ts';
@@ -122,7 +123,7 @@ test('the issues line splits filings by source', async () => {
   expect(ctx.findLine('Issues')).toBe('- Issues: today 7 filed (owner 1, design 1, agent 1, review 0, live check 2, bot 2), 0 closed; target none –');
 });
 
-test('an In Progress issue with no run, or an open run on a closed issue, is stale after 24 hours, and triage hears once each', async () => {
+test('it alerts on an In Progress issue with no run and no PR, or an open run on a closed issue, after 24 hours, and its owner hears once each', async () => {
   const ctx = setupTest();
   const run = (issue: string) => addRun(ctx.db, { issue, title: 'Invented kettle work', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, actor: 'z-delivery' });
   run('GEO-9803');
@@ -142,12 +143,12 @@ test('an In Progress issue with no run, or an open run on a closed issue, is sta
   const second = sendThroughputAlerts(ctx.db, 'hq-lanes', new Date('2026-10-14T00:00:00Z'), new Date(ctx.now));
 
   expect({ first, second, line: ctx.findLine('Stale') }).toStrictEqual({
-    first: ['stale:in-progress:GEO-9801', 'stale:open-run:GEO-9804'],
+    first: ['stale:stalled:GEO-9801', 'stale:open-run:GEO-9804'],
     second: [],
-    line: '- Stale: 2 older than 24h (GEO-9801 In Progress, no run, GEO-9804 run open, issue completed), 4 in all; target 0 older than 24h 🔴 red',
+    line: '- Stale: 2 older than 24h (GEO-9801 In Progress, no run, no open PR, GEO-9804 run open, issue completed), 4 in all; target 0 older than 24h 🔴 red',
   });
   expect(ctx.readOutbox()).toStrictEqual([
-    { target: 'z-triage', text: 'Stale: GEO-9801 has been In Progress in Linear since 2026-10-14T07:00:00Z with no hq run and no session. Start its run, or move it out of In Progress.' },
+    { target: 'z-delivery', text: 'Stale: GEO-9801 has been In Progress since 2026-10-14T07:00:00Z with no hq run, no session and no open PR. Relaunch its run, or move it out of In Progress.' },
     { target: 'z-triage', text: "Stale: GEO-9804's hq run is still open, but Linear marked the issue completed at 2026-10-14T07:00:00Z. Close the run, or reopen the issue." },
   ]);
 });
@@ -216,4 +217,42 @@ test('an In Progress issue with an active session and no open run is not stale',
     sent: [],
     line: '- Stale: 0 older than 24h, 0 in all; target 0 older than 24h 🟢 green',
   });
+});
+
+test('it says the merge time is unknown when Linear gives none, and ages the issue from its start', async () => {
+  const ctx = setupTest();
+  const started = [{ identifier: 'GEO-9811', startedAt: '2026-10-10T07:00:00Z', attachments: [buildGithubAttachment(9, 'merged')] }];
+  await syncLinear(ctx.db, makeThroughputLinearCall([], started), new Date('2026-10-14T00:00:00Z'), new Date(ctx.now));
+
+  sendThroughputAlerts(ctx.db, 'hq-lanes', new Date('2026-10-14T00:00:00Z'), new Date(ctx.now));
+
+  expect(ctx.readOutbox()).toStrictEqual([
+    { target: 'z-triage', text: 'Stale: GEO-9811 is In Progress, but every PR merged (last kettle#9, merge time unknown). Close it, or name the live check or owner step that holds it.' },
+  ]);
+});
+
+test('it sends a done-but-open issue to triage 24 hours after its last merge and a stalled one to the orchestrator, once each', async () => {
+  const ctx = setupTest();
+  const started = [
+    { identifier: 'GEO-9801', startedAt: '2026-10-10T07:00:00Z', attachments: [buildGithubAttachment(1, 'merged', '2026-10-13T07:00:00Z'), buildGithubAttachment(2, 'merged', '2026-10-14T07:00:00Z')] },
+    { identifier: 'GEO-9802', startedAt: '2026-10-10T07:00:00Z', attachments: [buildGithubAttachment(3, 'merged', '2026-10-16T01:00:00Z')] },
+    { identifier: 'GEO-9803', startedAt: '2026-10-14T07:00:00Z', attachments: [buildGithubAttachment(4, 'closed')] },
+    { identifier: 'GEO-9804', startedAt: '2026-10-16T01:00:00Z', attachments: [buildGithubAttachment(5, 'closed')] },
+    { identifier: 'GEO-9805', startedAt: '2026-10-10T07:00:00Z', attachments: [buildGithubAttachment(6, 'merged', '2026-10-12T07:00:00Z'), buildGithubAttachment(7, 'open')] },
+    { identifier: 'GEO-9806', startedAt: '2026-10-10T07:00:00Z', attachments: [buildGithubAttachment(8, 'draft')] },
+  ];
+  await syncLinear(ctx.db, makeThroughputLinearCall([], started), new Date('2026-10-14T00:00:00Z'), new Date(ctx.now));
+
+  const first = sendThroughputAlerts(ctx.db, 'hq-lanes', new Date('2026-10-14T00:00:00Z'), new Date(ctx.now));
+  const second = sendThroughputAlerts(ctx.db, 'hq-lanes', new Date('2026-10-14T00:00:00Z'), new Date(ctx.now));
+
+  expect({ first, second, line: ctx.findLine('Stale') }).toStrictEqual({
+    first: ['stale:done-open:GEO-9801', 'stale:stalled:GEO-9803'],
+    second: [],
+    line: '- Stale: 2 older than 24h (GEO-9801 In Progress, every PR merged, GEO-9803 In Progress, no run, no open PR), 4 in all; target 0 older than 24h 🔴 red',
+  });
+  expect(ctx.readOutbox()).toStrictEqual([
+    { target: 'z-triage', text: 'Stale: GEO-9801 is In Progress, but every PR merged (last kettle#2, at 2026-10-14T07:00:00Z). Close it, or name the live check or owner step that holds it.' },
+    { target: 'z-delivery', text: 'Stale: GEO-9803 has been In Progress since 2026-10-14T07:00:00Z with no hq run, no session and no open PR. Relaunch its run, or move it out of In Progress.' },
+  ]);
 });
