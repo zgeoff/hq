@@ -27,8 +27,8 @@ test('it is unclear when the promotable count is missing, null, zero, stale or f
   const ctx = setupTest();
   const phases = [
     pickLowWater({ ...ctx.base, promotable: null }),
-    pickLowWater({ ...ctx.base, promotable: { ...ctx.ctx.base.promotable, count: null } }),
-    pickLowWater({ ...ctx.base, promotable: { ...ctx.ctx.base.promotable, count: 0 } }),
+    pickLowWater({ ...ctx.base, promotable: { ...ctx.base.promotable, count: null } }),
+    pickLowWater({ ...ctx.base, promotable: { ...ctx.base.promotable, count: 0 } }),
     pickLowWater({ ...ctx.base, at: new Date('2026-10-14T01:31:00Z') }),
     pickLowWater({ ...ctx.base, focus: '["bug"]' }),
   ].map((pick) => pick.phase);
