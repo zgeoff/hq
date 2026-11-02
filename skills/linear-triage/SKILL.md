@@ -35,7 +35,12 @@ since your last pass, on every other scheduled run.
    `--updated-since <your last "TRIAGE PASS at" time>` into another. If hq fails, fetch with the
    Linear connector, save every page, and say so in the pass line.
 2. **Audit.** `scripts/audit-issues.sh <page files>` prints JSON: `triage`, `incomplete`, `stale`,
-   `designLane` and `counts`.
+   `designLane` and `counts`. On a full pass, also run `hq linear areas --team GEO`, and expect
+   `every area label in GEO names a repo hq knows`. A failure with
+   `GEO has area labels hq does not know:` lists the labels with no repo in hq. hq won't brief an
+   issue with one of them for an agent. Message `z-q`, who keeps hq, each listed label that
+   `triage.md` doesn't hold yet, and add it there. Any other failure counts as hq failing. Keep
+   grooming with these labels, and go on with the pass.
 3. **Groom each Triage issue,** in one update where you can: type, size, priority, project, area
    label and relations. Mark a duplicate only when you're sure, after copying any detail the
    original lacks. Rewrite it into the `tickets` sections without changing its scope. Then Ready if
