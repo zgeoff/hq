@@ -5,14 +5,21 @@ on:
   push:
     branches: [main]
 
+# A new push to a PR cancels the PR's older run. Main groups by commit, so no merge drops a main run.
+concurrency:
+  group: checks-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: true
+
 jobs:
   check:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
         with:
-          # lint:changed diffs against the base branch's merge base
+          # lint:changed diffs against the base branch's merge base, and gitleaks reads every commit
           fetch-depth: 0
+          filter: ""
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile --ignore-scripts
       - run: bun run fmt:check
@@ -28,27 +35,21 @@ jobs:
       - run: bun run check:skill-writing
       # GEO-1046: each generated copy of grants/ matches its data
       - run: bun run check:grants
-      # GEO-983: shellcheck and the shell tests of the skill scripts. shellcheck is pinned to the
-      # version used locally: the runner's older one reports findings 0.11.0 does not.
-      - name: shellcheck 0.11.0
-        run: |
-          curl -sSfLO https://github.com/koalaman/shellcheck/releases/download/v0.11.0/shellcheck-v0.11.0.linux.x86_64.tar.xz
-          echo "8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198  shellcheck-v0.11.0.linux.x86_64.tar.xz" | sha256sum -c -
-          tar -xJf shellcheck-v0.11.0.linux.x86_64.tar.xz
-          echo "$PWD/shellcheck-v0.11.0" >> "$GITHUB_PATH"
-      - run: shellcheck --version && bun run test:scripts
-      # GEO-1546: no secret in any commit. Pinned like shellcheck; .gitleaks.toml allows the tests' invented values.
-      - name: gitleaks 8.30.1
-        run: |
-          curl -sSfLO https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz
-          echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  gitleaks_8.30.1_linux_x64.tar.gz" | sha256sum -c -
-          tar -xzf gitleaks_8.30.1_linux_x64.tar.gz gitleaks
-          ./gitleaks git . --redact --no-banner
-      # restic is a per-run fixture of the backup tests, pinned to the version hq backs up with.
-      - name: restic 0.17.3
-        run: |
-          curl -sSfLO https://github.com/restic/restic/releases/download/v0.17.3/restic_0.17.3_linux_amd64.bz2
-          echo "5097faeda6aa13167aae6e36efdba636637f8741fed89bbf015678334632d4d3  restic_0.17.3_linux_amd64.bz2" | sha256sum -c -
-          mkdir -p "$RUNNER_TEMP/restic" && bunzip2 -c restic_0.17.3_linux_amd64.bz2 > "$RUNNER_TEMP/restic/restic" && chmod +x "$RUNNER_TEMP/restic/restic"
-          echo "$RUNNER_TEMP/restic" >> "$GITHUB_PATH"
-      - run: restic version && sqlite3 --version && bun test
+      # A PR that changes only docs or data skips the test steps below; a push to main runs them all.
+      - id: scope
+        run: bun run --silent ci:test-scope
+        env:
+          TEST_BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || '' }}
+      # GEO-983: shellcheck and the shell tests of the skill scripts
+      - run: bun run --silent ci:install-tool shellcheck
+        if: steps.scope.outputs.tests != 'skip'
+      - run: bun run test:scripts
+        if: steps.scope.outputs.tests != 'skip'
+      # GEO-1546: no secret in any commit. .gitleaks.toml allows the tests' invented values.
+      - run: bun run --silent ci:install-tool gitleaks
+      - run: gitleaks git . --redact --no-banner
+      # restic is a per-run fixture of the backup tests
+      - run: bun run --silent ci:install-tool restic
+        if: steps.scope.outputs.tests != 'skip'
+      - run: bun test
+        if: steps.scope.outputs.tests != 'skip'
