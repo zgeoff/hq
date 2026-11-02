@@ -1,7 +1,5 @@
-# Repo-sync copies from zgeoff/tools (.github/workflows/repo-sync.yml); each sync overwrites them.
-.claude/skills/docs-writing/
-.claude/skills/testing/
-.claude/skills/code-style/
+# repo-sync delivers .claude/skills/ verbatim, in its sources' format (.github/workflows/repo-sync.yml).
+.claude/skills/
 
 # A verbatim copy of zgeoff/tools socket.yml, which uses single quotes.
 socket.yml
