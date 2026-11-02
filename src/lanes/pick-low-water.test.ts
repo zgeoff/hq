@@ -6,31 +6,31 @@ function setupTest() {
 }
 
 test('it sets the mark to 3 when fewer slots are free', () => {
-  const { base } = setupTest();
+  const ctx = setupTest();
 
-  expect(pickLowWater(base)).toStrictEqual({ mark: 3, phase: 'low' });
+  expect(pickLowWater(ctx.base)).toStrictEqual({ mark: 3, phase: 'low' });
 });
 
 test('it sets the mark to the free slots when more than 3 are free', () => {
-  const { base } = setupTest();
+  const ctx = setupTest();
 
-  expect(pickLowWater({ ...base, free: 5, eligible: 4 })).toStrictEqual({ mark: 5, phase: 'low' });
+  expect(pickLowWater({ ...ctx.base, free: 5, eligible: 4 })).toStrictEqual({ mark: 5, phase: 'low' });
 });
 
 test('it ends the episode when eligible work reaches the mark', () => {
-  const { base } = setupTest();
+  const ctx = setupTest();
 
-  expect(pickLowWater({ ...base, eligible: 3 })).toStrictEqual({ mark: 3, phase: 'above' });
+  expect(pickLowWater({ ...ctx.base, eligible: 3 })).toStrictEqual({ mark: 3, phase: 'above' });
 });
 
 test('it is unclear when the promotable count is missing, null, zero, stale or for another focus', () => {
-  const { base } = setupTest();
+  const ctx = setupTest();
   const phases = [
-    pickLowWater({ ...base, promotable: null }),
-    pickLowWater({ ...base, promotable: { ...base.promotable, count: null } }),
-    pickLowWater({ ...base, promotable: { ...base.promotable, count: 0 } }),
-    pickLowWater({ ...base, at: new Date('2026-10-14T01:31:00Z') }),
-    pickLowWater({ ...base, focus: '["bug"]' }),
+    pickLowWater({ ...ctx.base, promotable: null }),
+    pickLowWater({ ...ctx.base, promotable: { ...ctx.ctx.base.promotable, count: null } }),
+    pickLowWater({ ...ctx.base, promotable: { ...ctx.ctx.base.promotable, count: 0 } }),
+    pickLowWater({ ...ctx.base, at: new Date('2026-10-14T01:31:00Z') }),
+    pickLowWater({ ...ctx.base, focus: '["bug"]' }),
   ].map((pick) => pick.phase);
 
   expect(phases).toStrictEqual(['unclear', 'unclear', 'unclear', 'unclear', 'unclear']);

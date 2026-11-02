@@ -16,7 +16,9 @@ test('it keeps the first 5 issues in list order with the time and focus', () => 
 
   writePromotableTop(ctx.db, { issues, focus: '[]', at: new Date('2026-10-14T01:00:00Z') });
 
-  expect(PROMOTABLE_TOP.parse(JSON.parse(getMeta(ctx.db, PROMOTABLE_TOP_KEY) ?? 'null'))).toStrictEqual({ at: '2026-10-14T01:00:00Z', focus: '[]', issues: issues.slice(0, 5) });
+  const stored = PROMOTABLE_TOP.parse(JSON.parse(getMeta(ctx.db, PROMOTABLE_TOP_KEY) ?? 'null'));
+
+  expect(stored).toStrictEqual({ at: '2026-10-14T01:00:00Z', focus: '[]', issues: issues.slice(0, 5) });
 });
 
 test('it removes the stored list when the read failed', () => {
