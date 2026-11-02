@@ -1,13 +1,13 @@
-import type { Out } from "../commands.ts";
-import { HqError } from "../errors.ts";
-import { roleName } from "../roles/role-name.ts";
-import { addNews } from "../news/add-news.ts";
-import { EXEMPT_RULES } from "./exempt-rules.ts";
-import { formatHeldFiles } from "./format-held-files.ts";
-import type { PRCommandInput } from "./run-pr-command.ts";
-import type { PRRef } from "./parse-pr-ref.ts";
-import { readReviewHold } from "./read-review-hold.ts";
-import { recordPRExemption } from "./record-pr-exemption.ts";
+import type { Out } from '../commands.ts';
+import { HqError } from '../errors.ts';
+import { roleName } from '../roles/role-name.ts';
+import { addNews } from '../news/add-news.ts';
+import { EXEMPT_RULES } from './exempt-rules.ts';
+import { formatHeldFiles } from './format-held-files.ts';
+import type { PRCommandInput } from './run-pr-command.ts';
+import type { PRRef } from './parse-pr-ref.ts';
+import { readReviewHold } from './read-review-hold.ts';
+import { recordPRExemption } from './record-pr-exemption.ts';
 
 const NEWS_LIMIT = 400;
 
@@ -15,21 +15,15 @@ const NEWS_LIMIT = 400;
 // at this head. hq proves none of the rules, and the news line says so.
 export async function runPRExempt(input: PRCommandInput, ref: PRRef): Promise<Out> {
   const rule = EXEMPT_RULES.find((candidate) => candidate === input.flags.rule);
-  const note = (input.flags.note ?? "").replaceAll(/\s+/gu, " ").trim();
-  if (rule === undefined || note === "") {
-    throw new HqError(
-      "bad_args",
-      `usage: hq pr exempt <repo> <pr> --rule ${EXEMPT_RULES.join("|")} --note <why the rule covers the PR>`,
-    );
+  const note = (input.flags.note ?? '').replaceAll(/\s+/gu, ' ').trim();
+  if (rule === undefined || note === '') {
+    throw new HqError('bad_args', `usage: hq pr exempt <repo> <pr> --rule ${EXEMPT_RULES.join('|')} --note <why the rule covers the PR>`);
   }
   const actor = await input.actor();
   const probe = await input.readReviewerSession();
   const hold = await readReviewHold(input.run, ref, actor, probe);
-  const reviewer = roleName("reviewer");
-  const caveat =
-    rule === "repo-sync"
-      ? `${reviewer}'s call, not proved by hq; hq did not check the files against the sync source`
-      : `${reviewer}'s call, not proved by hq`;
+  const reviewer = roleName('reviewer');
+  const caveat = rule === 'repo-sync' ? `${reviewer}'s call, not proved by hq; hq did not check the files against the sync source` : `${reviewer}'s call, not proved by hq`;
   const lead = `${reviewer} exempted ${ref.repo}#${ref.pr} at ${hold.head.slice(0, 7)} from the instruction-file hold under the ${rule} rule (${caveat}): ${listFiles(rule, hold.files, ref)}`;
   const text = `${lead}. Note: ${note}`.slice(0, NEWS_LIMIT);
   input.db.transaction(() => {
@@ -44,7 +38,7 @@ export async function runPRExempt(input: PRCommandInput, ref: PRRef): Promise<Ou
     });
     addNews(input.db, {
       from: actor,
-      topic: "merge",
+      topic: 'merge',
       text,
       issue: null,
       link: null,
@@ -66,11 +60,9 @@ const FILE_LIST_LIMIT = 150;
 // list cannot fit one news line, the line counts them and points to `hq pr status`, which lists
 // all of them.
 function listFiles(rule: string, files: string[], ref: PRRef): string {
-  if (rule !== "repo-sync") {
+  if (rule !== 'repo-sync') {
     return formatHeldFiles(files);
   }
-  const all = files.join(", ");
-  return all.length <= FILE_LIST_LIMIT
-    ? all
-    : `${files.length} held files, all listed by hq pr status ${ref.repo} ${ref.pr}`;
+  const all = files.join(', ');
+  return all.length <= FILE_LIST_LIMIT ? all : `${files.length} held files, all listed by hq pr status ${ref.repo} ${ref.pr}`;
 }

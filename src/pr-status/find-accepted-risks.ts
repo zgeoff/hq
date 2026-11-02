@@ -1,6 +1,6 @@
-import type { Database } from "bun:sqlite";
-import { z } from "zod";
-import { isAnswerSource } from "./is-answer-source.ts";
+import type { Database } from 'bun:sqlite';
+import { z } from 'zod';
+import { isAnswerSource } from './is-answer-source.ts';
 
 const RowsSchema = z.array(z.object({ seq: z.number(), data: z.string() }));
 
@@ -14,18 +14,8 @@ export interface AcceptedRiskRecord {
 
 // The PR's valid records, one per finding: the first stands, and a later one for the same finding
 // repeats it.
-export function readAcceptedRiskRecords(
-  db: Database,
-  repo: string,
-  pr: number,
-): AcceptedRiskRecord[] {
-  const rows = RowsSchema.parse(
-    db
-      .query(
-        "SELECT seq, data FROM events WHERE subject = 'hq' AND subject_id = ? AND action = 'pr-accepted-risk' ORDER BY seq",
-      )
-      .all(`pr:${repo}#${pr}`),
-  );
+export function readAcceptedRiskRecords(db: Database, repo: string, pr: number): AcceptedRiskRecord[] {
+  const rows = RowsSchema.parse(db.query("SELECT seq, data FROM events WHERE subject = 'hq' AND subject_id = ? AND action = 'pr-accepted-risk' ORDER BY seq").all(`pr:${repo}#${pr}`));
   const records = new Map<string, AcceptedRiskRecord>();
   for (const row of rows) {
     const risk = parseRisk(row.data);
@@ -34,7 +24,7 @@ export function readAcceptedRiskRecords(
         event: row.seq,
         finding: risk.finding,
         source: risk.source,
-        note: risk.note ?? "",
+        note: risk.note ?? '',
       });
     }
   }

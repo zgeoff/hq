@@ -18,9 +18,9 @@ export interface AcceptedRiskView {
   noslopError?: string;
 }
 
-export type PRAnswer = "lgtm" | "changes" | "reject";
+export type PRAnswer = 'lgtm' | 'changes' | 'reject';
 
-export type PRGate = "pass" | "fail" | "none";
+export type PRGate = 'pass' | 'fail' | 'none';
 
 // A PR's record as the commands show it. A stale answer or gate was recorded at a head that is not
 // the PR's head now; stale stays false when either head is unknown.
@@ -49,10 +49,7 @@ export interface PRStatusView {
   ciOverrides: CIOverrideView[];
 
   // z-review's records at the head now. Neither is an owner answer.
-  reviewRecords: {
-    mechanical: { files: string[]; lines: number } | null;
-    exemption: { rule: string; note: string; files: string[] } | null;
-  };
+  reviewRecords: { mechanical: { files: string[]; lines: number } | null; exemption: { rule: string; note: string; files: string[] } | null };
 
   // The owner's accepted risks recorded for the PR, one per finding.
   acceptedRisks: AcceptedRiskView[];

@@ -1,1 +1,1 @@
-export const CI_CHECK_SCOPE = "ci-check";
+export const CI_CHECK_SCOPE = 'ci-check';

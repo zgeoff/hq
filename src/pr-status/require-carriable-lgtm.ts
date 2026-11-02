@@ -1,8 +1,8 @@
-import type { Database } from "bun:sqlite";
-import { HqError } from "../errors.ts";
-import { readHeadLgtm } from "./read-head-lgtm.ts";
-import { readPRAnswers } from "./read-pr-answers.ts";
-import type { OwnerAnswer } from "./read-pr-answers.ts";
+import type { Database } from 'bun:sqlite';
+import { HqError } from '../errors.ts';
+import { readHeadLgtm } from './read-head-lgtm.ts';
+import { readPRAnswers } from './read-pr-answers.ts';
+import type { OwnerAnswer } from './read-pr-answers.ts';
 
 export interface CarriableLgtm {
   repo: string;
@@ -22,22 +22,13 @@ export function requireCarriableLgtm(db: Database, request: CarriableLgtm): void
   const newHead = request.newHead;
   const answers = readPRAnswers(db, repo, pr);
   if (answers === null) {
-    throw new HqError(
-      "bad_args",
-      `an answer record of ${repo}#${pr} cannot be read, so no lgtm is carried`,
-    );
+    throw new HqError('bad_args', `an answer record of ${repo}#${pr} cannot be read, so no lgtm is carried`);
   }
   if (readHeadLgtm(db, repo, pr, oldHead)?.seq !== lgtm.seq) {
-    throw new HqError(
-      "bad_args",
-      `the owner's lgtm at ${oldHead.slice(0, 7)} of ${repo}#${pr} is no longer the newest answer there, so it is not carried`,
-    );
+    throw new HqError('bad_args', `the owner's lgtm at ${oldHead.slice(0, 7)} of ${repo}#${pr} is no longer the newest answer there, so it is not carried`);
   }
   const atNew = answers.find((answer) => answer.head === newHead);
   if (atNew !== undefined) {
-    throw new HqError(
-      "bad_args",
-      `the owner already answered ${atNew.answer} at ${newHead.slice(0, 7)} of ${repo}#${pr}, so the lgtm is not carried over it`,
-    );
+    throw new HqError('bad_args', `the owner already answered ${atNew.answer} at ${newHead.slice(0, 7)} of ${repo}#${pr}, so the lgtm is not carried over it`);
   }
 }

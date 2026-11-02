@@ -1,6 +1,6 @@
-import type { Database } from "bun:sqlite";
-import { logEvent } from "../log-event.ts";
-import { OVERRIDE_SCOPE } from "./override-scope.ts";
+import type { Database } from 'bun:sqlite';
+import { logEvent } from '../log-event.ts';
+import { OVERRIDE_SCOPE } from './override-scope.ts';
 
 export interface PROverrideInput {
   repo: string;
@@ -12,10 +12,5 @@ export interface PROverrideInput {
 }
 
 export function recordPROverride(db: Database, input: PROverrideInput): void {
-  logEvent(db, "hq", `pr:${input.repo}#${input.pr}`, "pr-override", input.actor, null, null, {
-    head: input.head,
-    source: input.source,
-    note: input.note,
-    scope: OVERRIDE_SCOPE,
-  });
+  logEvent(db, 'hq', `pr:${input.repo}#${input.pr}`, 'pr-override', input.actor, null, null, { head: input.head, source: input.source, note: input.note, scope: OVERRIDE_SCOPE });
 }
