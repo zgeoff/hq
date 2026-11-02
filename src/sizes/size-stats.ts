@@ -1,5 +1,3 @@
-// Run sizes: triage's guess ("L, about 3,000 lines", tests included) against the lines its merged
-// PRs changed, so the bands move on evidence. Also how many runs shipped as a stack.
 import { THIN } from '../stats/thin.ts';
 import { bandOf } from './band-of.ts';
 import { SIZES } from './sizes.ts';

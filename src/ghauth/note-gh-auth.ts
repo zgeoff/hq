@@ -1,6 +1,5 @@
-// GitHub auth failures in the watcher's gh calls (2026-10-17: a bad GITHUB_TOKEN made every call
-// 401 for a day, and hq health said only "no run today"). The last one is kept in meta, so the
-// checks that depend on GitHub data can name the cause.
+// The last GitHub auth failure is kept in meta (a bad GITHUB_TOKEN once made every call 401
+// for a day, and hq health said only "no run today").
 import type { Database } from 'bun:sqlite';
 import { iso } from '../clock/iso.ts';
 import { now } from '../clock/now.ts';

@@ -7,8 +7,6 @@ import { overrideEnv } from '../config/override-env.ts';
 import { readReferenceCounts } from './read-reference-counts.ts';
 import { readUnopenedReferences } from './read-unopened-references.ts';
 
-// A temp definitions tree for linear-triage references (fleet.json gives that skill to the triage
-// role), and a temp projects dir of invented transcripts written relative to HQ_NOW.
 function setupTest() {
   const fresh = freshDb();
   const now = '2026-10-17T00:00:00Z';

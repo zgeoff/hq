@@ -1,14 +1,11 @@
 import { z } from 'zod';
 
-// An integer of milliseconds or minutes. 0 is allowed: a test sets a wait to 0, and a threshold of 0 means "at once".
+// 0 is allowed: a test sets a wait to 0, and a threshold of 0 means "at once".
 const count = (dflt: number) => z.coerce.number().int().nonnegative().default(dflt);
-// A wait that falls back to its default when the value is unusable (not a number, negative); the
-// caller clamps the top end. A bad value here has never been an error.
 const lenientWait = (dflt: number) => z.coerce.number().nonnegative().finite().catch(dflt).default(dflt);
 const text = () => z.string().optional();
 
 export const CONFIG_SHAPE = {
-  // Minutes and milliseconds.
   HQ_REVIEW_LOCK_WAIT_MS: count(300_000),
   HQ_LANES_FREE_MIN: count(10),
   HQ_LANES_REPEAT_MIN: count(30),
@@ -27,16 +24,13 @@ export const CONFIG_SHAPE = {
   HQ_RC_POLL_MS: lenientWait(15_000),
   HQ_SEND_WAIT_MS: lenientWait(15_000),
   HQ_RESTORE_WAIT_MS: lenientWait(180_000),
-  // Quiet hours, "03-07": start and end hour in Sydney.
   HQ_QUIET: z
     .string()
     .regex(/^\d{1,2}-\d{1,2}$/)
     .default('03-07'),
   HQ_STATS_CUTOFF: z.string().default('2026-10-14T20:00:00Z'),
-  // Anything but "off" leaves notifications on; anything but "1" is not a live run.
   HQ_NOTIFY: text(),
   HQ_LIVE: text(),
-  // Paths and names. Each default is built where it is used.
   REVIEW_DIR: path(),
   HQ_REPOS: path(),
   HQ_PROJECTS: path(),
@@ -76,7 +70,6 @@ export const CONFIG_SHAPE = {
   HQ_RESTART_LOG: path(),
 };
 
-// A setting that names a file or directory, or a colon-separated list of them.
 function path() {
   return text().describe('path');
 }

@@ -1,6 +1,4 @@
-// hq stats: numbers someone acts on. Each section names who acts and what they would change;
-// a number from fewer than THIN samples says so. Rows from before CUTOFF (the bulk import)
-// are left out: their times mark the import, not the work.
+// Rows from before the bulk import are left out: their times mark the import, not the work.
 import type { Database } from 'bun:sqlite';
 import { z } from 'zod';
 import { dist } from './dist.ts';
@@ -25,7 +23,6 @@ export function computeStats(db: Database, opts: { from: string; to: string; gh:
   const to = opts.to;
   const inWin = (t: string | null) => !!t && t >= from && t < to;
 
-  // ---- wait on the owner
   const asks = db.query('SELECT id, state, queued_at, answered_at, applied_at FROM asks').all() as { id: string; state: string; queued_at: string; answered_at: string | null; applied_at: string | null }[];
   const qa = asks.filter((a) => inWin(a.answered_at) && a.queued_at >= cutoff() && a.answered_at! >= a.queued_at).map((a) => mins(a.queued_at, a.answered_at!));
   const ap = asks.filter((a) => inWin(a.applied_at) && a.answered_at && a.answered_at >= cutoff()).map((a) => mins(a.answered_at!, a.applied_at!));
@@ -40,7 +37,6 @@ export function computeStats(db: Database, opts: { from: string; to: string; gh:
   const ud = unb.filter((u) => u.state === 'done' && inWin(u.closed_at) && u.added_at >= cutoff()).map((u) => mins(u.added_at, u.closed_at!));
   const oldestUnblock = oldestOf(unb.filter((u) => u.state === 'open').map((u) => ({ id: u.id, t: u.added_at })));
 
-  // A design pass is no delivery run, so its time is no part of these numbers.
   const runs = RunsSchema.parse(db.query('SELECT issue, state, created_at, closed_at, ready_since FROM runs WHERE created_at >= ? AND design_lane IS NULL').all(cutoff()));
   const stateEvents = db.query(`SELECT subject_id AS issue, at, to_state, data FROM events WHERE subject = 'run' AND action = 'state' ORDER BY seq`).all() as { issue: string; at: string; to_state: string; data: string }[];
   const byIssue = new Map<string, typeof stateEvents>();
@@ -89,8 +85,6 @@ export function computeStats(db: Database, opts: { from: string; to: string; gh:
     if (total > 0) waitTotals.push(total);
   }
 
-  // ---- merged to live
-  // A merge that `hq run unmerge` took back did not happen: its later 'unmerged' event cancels it.
   // A merge counts from when GitHub merged it, which hq can see minutes after the event it logs.
   const mergedPRs = MergedPRsSchema.parse(db.query(`SELECT ref, merged_at FROM run_prs WHERE state = 'merged' AND merged_at IS NOT NULL`).all());
   const mergedAt = new Map(mergedPRs.map((pr) => [pr.ref, pr.merged_at]));
@@ -149,7 +143,6 @@ export function computeStats(db: Database, opts: { from: string; to: string; gh:
     }
   }
 
-  // ---- idle capacity while work is ready
   const samples = db.query('SELECT at, slots, eligible, error FROM lanes_samples WHERE at >= ? AND at < ? ORDER BY seq').all(from, to) as { at: string; slots: number; eligible: number | null; error: string | null }[];
   let ready = 0;
   let unknown = 0;
@@ -165,7 +158,6 @@ export function computeStats(db: Database, opts: { from: string; to: string; gh:
   }
   const nudges = db.query('SELECT slots, slots_after FROM lanes_nudges WHERE at >= ? AND at < ?').all(from, to) as { slots: number; slots_after: number | null }[];
 
-  // ---- flow
   const days = Math.max(1 / 24, (Date.parse(to) - Date.parse(from)) / 86_400_000);
   const mergesPerDay: Record<string, number> = {};
   let source: 'github' | 'hq' = 'hq';

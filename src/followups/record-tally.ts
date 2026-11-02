@@ -3,8 +3,6 @@ import { iso } from '../clock/iso.ts';
 import { now } from '../clock/now.ts';
 import { logEvent } from '../log-event.ts';
 
-// At a PR's final: how many review findings it fixed itself, and the follow-up issues filed
-// from its review. Called inside finalPr's transaction. Saying it again replaces the count.
 export function recordTally(db: Database, ref: string, issue: string, tally: { fixed: number | null; followups: string[] | null }, actor: string): void {
   const t = iso(now());
   if (tally.fixed !== null) db.query('UPDATE run_prs SET fixed_in_pr = ?, tally_at = ? WHERE ref = ?').run(tally.fixed, t, ref);

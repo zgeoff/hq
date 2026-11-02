@@ -17,7 +17,6 @@ function setupTest() {
   return {
     directory,
 
-    // Writes the files and commits them on the current branch.
     commit: (files: Record<string, string>): void => {
       for (const [path, text] of Object.entries(files)) {
         writeFileSync(join(directory, path), text);

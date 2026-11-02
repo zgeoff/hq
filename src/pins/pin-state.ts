@@ -1,5 +1,3 @@
-// Every pinned atc session, longest idle first, so z-delivery can sweep them
-// in one command and wrap up the ones that no longer need the owner.
 import type { PinRaw, PinState } from './types.ts';
 
 export function pinState(s: PinRaw): PinState {

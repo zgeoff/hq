@@ -1,6 +1,6 @@
 export interface JobRun {
   job: string;
-  key: string; // the Sydney date, YYYY-MM-DD
+  key: string;
   at: string;
   result: 'queued' | 'skipped';
   detail: string | null;

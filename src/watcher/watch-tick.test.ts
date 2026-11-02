@@ -34,8 +34,6 @@ import { realRunner } from '../runner/real-runner.ts';
 import type { RunResult, Runner } from '../runner/types.ts';
 import { watchTick } from './watch-tick.ts';
 
-// A database, a home with no live checkout or usage cache, quiet notices, a clean Linear key cache,
-// and a 1Password token.
 function setupTest() {
   const fresh = freshDb(),
     xdg = process.env['XDG_CACHE_HOME'];
@@ -52,8 +50,6 @@ function setupTest() {
   return { db: fresh.db, directory: fresh.dir };
 }
 
-// At 07:00 Sydney, with the goals sync fresh and the kinds sync last run 10 hours earlier, so only
-// the kinds sync and its Linear side are due. GitHub finds no merged PRs and Linear no closed issues.
 test('a due kinds sync reads the Linear key from 1Password once and records that read for the weekly audit', async () => {
   const answers: Record<string, RunResult> = {
       bash: { code: 0, stdout: JSON.stringify({ imp: { freeMib: 0, room: false }, providers: { claude: { room: false, unattended: true, target: 'imp' } } }), stderr: '' },
@@ -77,8 +73,6 @@ test('a due kinds sync reads the Linear key from 1Password once and records that
   ).resolves.toStrictEqual({ keyReads: [['op', 'read', 'op://kettle/teapot-key/credential']], events: [{ actor: 'linear', data: '{"consumer":"linear","requests":3}' }] });
 });
 
-// At 18:00 Sydney with the kinds sync last run 10 hours earlier, so the kinds sync and its Linear
-// side are due. Linear holds one issue filed today that points at a PR with no follow-up record.
 test('a due Linear sync tells triage about a bad filing once across two passes', async () => {
   const answers: Record<string, RunResult> = {
     bash: { code: 0, stdout: JSON.stringify({ imp: { freeMib: 0, room: false }, providers: { claude: { room: false, unattended: true, target: 'imp' } } }), stderr: '' },
@@ -117,8 +111,6 @@ test('a due Linear sync tells triage about a bad filing once across two passes',
   });
 });
 
-// At 18:00 Sydney with the kinds sync fresh and the goals sync never run, so the goals sync is due.
-// gh answers the billing usage call with `billing` and every other call with an empty list.
 function makeGoalsRunner(billing: RunResult): Runner {
   return (cmd) => {
     if (cmd[0] === 'gh' && cmd.some((arg) => arg.includes('settings/billing/usage'))) {
@@ -154,9 +146,6 @@ test("the watcher's goals sync replaces an earlier good Actions spend with unkno
   expect(loadActionsSpend(ctx.db, new Date('2026-10-16T07:00:00Z'))).toBeNull();
 });
 
-// At 20:00 UTC with every other sync fresh, so only the Ready pass is due. pacing.json gives only slot
-// caps, so the lane rules stand on their own. Linear holds three
-// Ready issues and one in Todo.
 test('a due Ready pass writes the counts before the lanes tick, and the logged eligible shows them', async () => {
   const ctx = setupTest();
   mkdirSync(`${ctx.directory}/scripts`, { recursive: true });
@@ -200,8 +189,6 @@ test('a due Ready pass writes the counts before the lanes tick, and the logged e
   expect(metaJson(ctx.db, PROMOTABLE_FOCUS_KEY, PROMOTABLE_FOCUS, null)).toStrictEqual({ at: '2026-10-15T20:00:00Z', count: 0, focus: '[]', error: null });
 });
 
-// At 20:00 UTC with every other sync fresh. The open item waits on an issue, whose Linear read
-// fails with a 500, and on a PR that GitHub reports merged.
 test('it closes an item whose PR merged as done in a due unblock pass, and logs it and the failed issue read by item', async () => {
   const ctx = setupTest();
   const logs: string[] = [];
@@ -236,8 +223,6 @@ test('it closes an item whose PR merged as done in a due unblock pass, and logs 
   expect(ctx.db.query("SELECT actor, data FROM events WHERE subject = 'hq' AND subject_id = 'op' AND action = 'read'").all()).toStrictEqual([{ actor: 'linear', data: '{"consumer":"linear","requests":3}' }]);
 });
 
-// At 20:00 UTC with every other sync fresh. Linear holds the issue as Done and the decision record
-// as decided, and answers both over HTTP.
 test('it closes the items whose Linear issue is Done and whose document is decided in a due unblock pass', async () => {
   const ctx = setupTest();
   const logs: string[] = [];
@@ -259,7 +244,6 @@ test('it closes the items whose Linear issue is Done and whose document is decid
   expect(logs.filter((line) => line.includes('unblock conditions'))).toStrictEqual(['2026-10-15T20:00:00Z unblock conditions: closed steam-test, descale-plan as done']);
 });
 
-// At 20:00 UTC with every other sync fresh: a watch whose deadline passed at 19:00 waits on nothing hq reads.
 test('it logs the items a due unblock pass found overdue', async () => {
   const ctx = setupTest();
   const logs: string[] = [];
@@ -309,8 +293,6 @@ test('a goals sync the deadline gave up on is not started again until it stops',
   expect({ whileHeld, after: repoLists.length, skipped: logs.some((line) => line.endsWith('team goals failed: team goals from an earlier pass is still running')) }).toStrictEqual({ whileHeld: 1, after: 2, skipped: true });
 });
 
-// At 20:00 UTC with every other sync fresh and the GitHub pass due, where gh finds no PRs. Linear
-// holds the run's issue as canceled at 19:00, and the run has no PR.
 test('a due run-issue pass drops a run whose issue Linear canceled, tells z-delivery, and waits 10 minutes before the next read', async () => {
   const ctx = setupTest();
   const logs: string[] = [];
@@ -348,8 +330,6 @@ test('a due run-issue pass drops a run whose issue Linear canceled, tells z-deli
   expect(runIssueReads).toStrictEqual(['2026-10-15T20:00:00Z']);
 });
 
-// At 20:00 UTC with every other sync fresh and the GitHub pass due, where every gh call fails.
-// Linear holds the run's issue as canceled at 19:00.
 test('a run-issue pass drops nothing when this tick\'s GitHub pass did not read every PR', async () => {
   const ctx = setupTest();
   const capacity = JSON.stringify({ imp: { freeMib: 0, room: false }, providers: { claude: { room: false, unattended: true, target: 'imp' } } });

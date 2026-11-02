@@ -4,7 +4,6 @@ import { lastSample } from './last-sample.ts';
 import { OPEN_AFTER } from './open-after.ts';
 import { openOutage } from './open-outage.ts';
 
-// For hq health: red while an outage is open, or when the probe has stopped.
 export function probeHealth(db: Database, at: Date): { key: string; ok: boolean; line: string } {
   const last = lastSample(db);
   if (!last) return { key: 'nix-probe', ok: true, line: 'nix probe: no samples yet (hq probe timer install starts it)' };

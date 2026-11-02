@@ -14,5 +14,5 @@ export interface Pin {
   name: string;
   state: PinState;
   lastActivityAt: string | null;
-  idleMs: number | null; // null while working
+  idleMs: number | null;
 }

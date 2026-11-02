@@ -5,12 +5,9 @@ import { dropTopic } from './drop-topic.ts';
 import { forwardOf } from './forward-of.ts';
 import { queued } from './queued.ts';
 
-// Queue a message inside the caller's transaction. The key makes every
-// retry, here and at atc, the same message: nobody hears it twice.
-// With a topic, the new message supersedes any unsent one on the same target
-// and topic: after an atc outage only the newest goes out, never a burst.
-// The new row's id is kept for this process: the command that queued it sends
-// it, and only it (see takeQueued). The watcher and `hq outbox flush` send the rest.
+// The key makes every retry, here and at atc, the same message: nobody hears it twice. With a
+// topic, the new message supersedes any unsent one on the same target and topic: after an atc
+// outage only the newest goes out, never a burst.
 export function enqueue(db: Database, eventSeq: number, rawTarget: string, text: string, topic: string | null = null): void {
   const target = forwardOf(db, rawTarget);
   if (topic) dropTopic(db, target, topic);

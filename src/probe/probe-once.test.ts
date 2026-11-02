@@ -57,7 +57,7 @@ test('samples are up, down or blind, and the control is fetched only when the ta
   expect(urls).toEqual(['https://target.invalid/live', 'https://target.invalid/ready']);
   urls.length = 0;
   expect((await step(1, DOWN)).state).toBe('down');
-  expect(urls).toEqual(['https://target.invalid/live', 'https://control.invalid/ok']); // ready is not fetched while live fails
+  expect(urls).toEqual(['https://target.invalid/live', 'https://control.invalid/ok']);
   expect((await step(2, BLIND)).state).toBe('blind');
   expect(db.query('SELECT at, target_ok, control_ok, ready_ok FROM probe_samples ORDER BY at').all()).toEqual([
     { at: minute(0), target_ok: 1, control_ok: null, ready_ok: 1 },
@@ -74,7 +74,6 @@ test('two downs open one outage dated from the first; a third queues nothing mor
   expect(r.opened).toBe(1);
   expect(outages()).toEqual([{ id: 1, started_at: minute(1), detected_at: minute(2), ended_at: null, alert_seq: expect.any(Number), recover_seq: null, kind: 'down' }]);
 
-  // z-stu decides whether to wake the owner; z-delivery starts the fix (GEO-1104)
   expect(outbox().map((o) => o.target)).toEqual(['z-stu', 'z-delivery']);
   expect(outbox()[0]).toMatchObject({ topic: 'nix-outage', status: 'pending' });
   expect(outbox()[1]!.text).toBe(outbox()[0]!.text);
@@ -105,11 +104,10 @@ test('an up sample resets the run', async () => {
 });
 
 test('an up closes the outage and queues one recovery message', async () => {
-  for (let m = 0; m <= 5; m++) await step(m, DOWN); // a check every minute, as the timer runs
+  for (let m = 0; m <= 5; m++) await step(m, DOWN);
   const r = await step(6, UP);
   expect(r.closed).toBe(1);
   expect(outages()[0]!.ended_at).toBe(minute(6));
-  // the unsent outage alert and the recovery share a topic: only the newest is kept
   expect(outbox().map((o) => [o.target, o.text])).toEqual([
     ['z-stu', 'Nix is back: down 6 min (12:00–12:06 Sydney).'],
     ['z-delivery', 'Nix is back: down 6 min (12:00–12:06 Sydney).'],
@@ -130,7 +128,7 @@ test('the probe sends nothing itself: the alert is queued for the command that r
   await step(0, DOWN);
   await step(1, DOWN);
   expect(outbox().map((o) => o.status)).toEqual(['pending', 'pending']);
-  const ids = takeQueued(); // what main() sends through send() as `hq probe run` ends
+  const ids = takeQueued();
   expect(ids).toHaveLength(2);
   expect(db.query(`SELECT DISTINCT topic FROM outbox WHERE id IN (${ids.join(',')})`).all()).toEqual([{ topic: 'nix-outage' }]);
 });
@@ -151,19 +149,19 @@ test('samples older than the keep window are pruned', async () => {
 test('downtime clips outages to the window, counts an open one to the end, and reports detection delay and blind time', async () => {
   for (let m = 0; m <= 4; m++) await step(m, UP);
   await step(5, DOWN);
-  await step(6, DOWN); // outage 1 opens at minute 5, detected at 6
+  await step(6, DOWN);
   for (let m = 7; m <= 10; m++) await step(m, DOWN);
-  await step(11, UP); // closes at 11
+  await step(11, UP);
   for (let m = 12; m <= 14; m++) await step(m, UP);
   await step(15, DOWN);
-  await step(16, DOWN); // outage 2 opens at 15, still open
+  await step(16, DOWN);
   for (let m = 17; m <= 19; m++) await step(m, DOWN);
   const d = downtime(db, new Date(T0 + 8 * 60_000), new Date(T0 + 20 * 60_000));
   expect(d.outages).toBe(2);
-  expect(d.downMinutes).toBe(3 + 5); // 8-11 clipped, then 15-20 open
+  expect(d.downMinutes).toBe(3 + 5);
   expect(d.longestDetectMinutes).toBe(1);
-  expect(d.samples).toBe(12); // minutes 8-19
-  expect(d.blindMinutes).toBe(0); // a sample every minute covers the whole window
+  expect(d.samples).toBe(12);
+  expect(d.blindMinutes).toBe(0);
 });
 
 test('blind minutes inside an outage are not counted as downtime', async () => {
@@ -173,7 +171,7 @@ test('blind minutes inside an outage are not counted as downtime', async () => {
   await step(60, UP);
   const d = downtime(db, new Date(T0), new Date(T0 + 60 * 60_000));
   expect(d.outages).toBe(1);
-  expect(d.downMinutes).toBe(3); // down samples at 0 and 1 cover 0-3
+  expect(d.downMinutes).toBe(3);
   expect(d.blindMinutes).toBe(57);
 });
 
@@ -191,7 +189,6 @@ test('a 10 minute gap and blind samples both count as blind minutes', async () =
   await step(11, BLIND);
   await step(12, UP);
   const d = downtime(db, new Date(T0), new Date(T0 + 12 * 60_000));
-  // 0-2 and 10-11 covered, 11 is blind but 10 covers to 12; 12 itself covers nothing in the window
   expect(d.blindMinutes).toBe(8);
   expect(d.outages).toBe(0);
 });
@@ -224,7 +221,6 @@ test('the recovery message counts blind minutes as blind, as downtime() does', a
   expect(d.downMinutes).toBeLessThan(5);
 });
 
-// Unready: Nix answers live but not ready (GEO-1142).
 const UNREADY = { target: true, control: true, ready: false };
 const kinds = () => db.query('SELECT id, kind, started_at, detected_at, ended_at FROM outages ORDER BY id').all() as { id: number; kind: string; started_at: string; detected_at: string; ended_at: string | null }[];
 
@@ -238,10 +234,10 @@ test('ready failing for 2 minutes alerts nobody; at 3 minutes one alert goes to 
   await step(0, UP);
   await step(1, UNREADY);
   await step(2, UNREADY);
-  await step(3, UNREADY); // failing since minute 1: 2 minutes
+  await step(3, UNREADY);
   expect(kinds()).toEqual([]);
   expect(outbox()).toEqual([]);
-  const r = await step(4, UNREADY); // 3 minutes
+  const r = await step(4, UNREADY);
   expect(r.unreadyOpened).toBe(1);
   expect(kinds()).toEqual([{ id: 1, kind: 'unready', started_at: minute(1), detected_at: minute(4), ended_at: null }]);
   expect(outbox().map((o) => o.target)).toEqual(['z-stu', 'z-delivery']);
@@ -254,11 +250,11 @@ test('ready failing for 2 minutes alerts nobody; at 3 minutes one alert goes to 
   expect(outbox()).toHaveLength(2);
   expect(kinds()).toHaveLength(1);
   expect(openUnready(db)?.id).toBe(1);
-  expect(probeHealth(db, new Date(T0 + 7 * 60_000)).line).toContain('Nix up'); // hq health stays about live and down
+  expect(probeHealth(db, new Date(T0 + 7 * 60_000)).line).toContain('Nix up');
 });
 
 test('the unready alert is not held over quiet hours', async () => {
-  const night = Date.parse('2026-10-16T14:00:00Z'); // 01:00 Sydney
+  const night = Date.parse('2026-10-16T14:00:00Z');
   const go = async (m: number, w: { target: boolean; control: boolean; ready?: boolean }) => {
     at(iso(new Date(night + m * 60_000)));
     return probeOnce(db, fake(w), 'hq-probe');
@@ -268,7 +264,7 @@ test('the unready alert is not held over quiet hours', async () => {
 });
 
 test('the first ready sample closes the unready outage and says how long', async () => {
-  for (let m = 0; m <= 4; m++) await step(m, UNREADY); // opens at 3
+  for (let m = 0; m <= 4; m++) await step(m, UNREADY);
   const r = await step(5, UP);
   expect(r.unreadyClosed).toBe(1);
   expect(kinds()[0]!.ended_at).toBe(minute(5));
@@ -284,9 +280,9 @@ test('the first ready sample closes the unready outage and says how long', async
 test('a live failure during an unready outage does not close it, and coming back unready continues it', async () => {
   for (let m = 0; m <= 3; m++) await step(m, UNREADY);
   await step(4, DOWN);
-  await step(5, DOWN); // a down outage opens beside the unready one
+  await step(5, DOWN);
   expect(kinds().map((k) => [k.kind, k.ended_at])).toEqual([['unready', null], ['down', null]]);
-  const r = await step(6, UNREADY); // live is back, ready is not: the down outage closes, the unready one goes on
+  const r = await step(6, UNREADY);
   expect(r.closed).toBe(2);
   expect(r.unreadyClosed).toBeUndefined();
   expect(kinds().map((k) => [k.kind, k.ended_at === null])).toEqual([['unready', true], ['down', false]]);
@@ -303,7 +299,7 @@ test('a down and an unready outage are open together, and downtime counts only t
   expect(kinds().map((k) => k.kind)).toEqual(['unready', 'down']);
   const d = downtime(db, new Date(T0), new Date(T0 + 10 * 60_000));
   expect(d.outages).toBe(1);
-  expect(d.downMinutes).toBe(6); // down samples at 4-9 cover 4-10; the unready minutes 0-3 are not downtime
+  expect(d.downMinutes).toBe(6);
   expect(unreadyIn(db, new Date(T0), new Date(T0 + 10 * 60_000))).toHaveLength(1);
 });
 
@@ -311,15 +307,15 @@ test('down and blind samples are skipped by the unready run, and an up one befor
   await step(0, UNREADY);
   await step(1, DOWN);
   await step(2, BLIND);
-  await step(3, UNREADY); // the run is minutes 0 and 3: 3 minutes old at 3
+  await step(3, UNREADY);
   expect(kinds().map((k) => [k.kind, k.started_at])).toEqual([['unready', minute(0)]]);
   db.query('DELETE FROM outages').run();
   db.query('DELETE FROM probe_samples').run();
-  db.query('INSERT INTO probe_samples (at, target_ok, control_ok, ready_ok) VALUES (?, 1, NULL, NULL)').run(minute(0)); // from before v19
+  db.query('INSERT INTO probe_samples (at, target_ok, control_ok, ready_ok) VALUES (?, 1, NULL, NULL)').run(minute(0));
   await step(1, UNREADY);
   await step(2, UNREADY);
   await step(3, UNREADY);
-  expect(kinds()).toEqual([]); // the run starts at minute 1, only 2 minutes old
+  expect(kinds()).toEqual([]);
   await step(4, UNREADY);
   expect(kinds().map((k) => k.started_at)).toEqual([minute(1)]);
 });

@@ -1,10 +1,6 @@
-// hq repair advisor-400 <session>: mend a Claude transcript that fails every turn with
-// "unexpected tool_use_id found in advisor_tool_result blocks" (z-stu, 2026-10-17; root cause GEO-1169).
-// A record written mid-turn (such as an atc-bridge message) can land between an advisor
-// server_tool_use and its advisor_tool_result in the parentUuid chain. Claude then sends the
-// result in a later message than its use, and the API refuses every turn. The repair re-links the
-// result to its use and moves the interloper after the turn's last record, so it stays in context.
-// Only parentUuid fields change; every other line stays byte for byte. Dry run unless --apply.
+// A record written mid-turn can land between an advisor server_tool_use and its
+// advisor_tool_result in the parentUuid chain. Claude then sends the result in a later message
+// than its use, and the API refuses every turn.
 import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { AtcClient } from '../atc/atc-client.ts';
@@ -60,8 +56,6 @@ interface WireSession {
   locator?: { targetID?: string };
 }
 
-// The session's transcript, after checking that it is stopped and on this machine. With --file,
-// no live atc session may hold that transcript.
 async function locate(target: string | undefined, file: string | undefined): Promise<{ file: string; session: string | null }> {
   let atc: AtcClient;
   try {

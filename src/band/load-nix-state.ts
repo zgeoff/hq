@@ -4,8 +4,6 @@ import { openOutage } from '../probe/open-outage.ts';
 
 export type NixState = { kind: 'down'; since: string } | { kind: 'unknown'; reason: string } | { kind: 'up' };
 
-// Nix as the band and the pane show it: down while an outage is open; unknown when the probe has
-// no sample in 5 minutes, or its newest was blind (the target and the control both failed); else up.
 export function loadNixState(db: Database, at: Date): NixState {
   const STALE_MS = 5 * 60_000,
     last = lastSample(db),

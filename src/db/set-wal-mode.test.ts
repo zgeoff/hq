@@ -6,7 +6,6 @@ import { join } from 'node:path';
 import { buildStubClock } from '../../test/build-stub-clock.ts';
 import { setWALMode } from './set-wal-mode.ts';
 
-// A new database file and two connections to it: the one under test and a holder for its write lock.
 function setupTest() {
   const stack = new DisposableStack();
   onTestFinished(() => stack.dispose());

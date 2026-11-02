@@ -1,4 +1,3 @@
-// A Sydney wall-clock reading, and a target time of day.
 interface SydneyNow {
   h: number;
   mi: number;

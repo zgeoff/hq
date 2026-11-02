@@ -1,5 +1,3 @@
-// hq news: one-line items for the owner, read as a digest. Adding one sends
-// nothing, unless it needs the owner, which tells z-stu at once.
 import { ok } from 'node:assert/strict';
 import type { Database } from 'bun:sqlite';
 import { iso } from '../clock/iso.ts';
@@ -33,7 +31,6 @@ export function addNews(db: Database, input: AddNewsInput): NewsItem {
           .run(input.from.trim(), input.topic, text, input.issue, input.link, input.needsGeoff ? 1 : 0, t, input.tag ?? null).lastInsertRowid,
       );
       const seq = logEvent(db, 'hq', `news:${id}`, 'news-added', input.from.trim(), null, null, { topic: input.topic, needsGeoff: input.needsGeoff, tag: input.tag ?? null });
-      // z-stu filing its own item needs no message to itself.
       const news = getNews(db, id);
       ok(news, `news ${id} is missing inside the transaction that inserted it`);
       if (input.needsGeoff && input.from.trim() !== owner()) {

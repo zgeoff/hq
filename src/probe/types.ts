@@ -12,7 +12,6 @@ export interface ProbeResult {
   state: ProbeState;
   opened?: number;
   closed?: number;
-  // The ready check: absent when live failed and ready was not fetched.
   ready?: boolean;
   unreadyOpened?: number;
   unreadyClosed?: number;
@@ -37,7 +36,6 @@ export interface Downtime {
   outages: number;
   longestDetectMinutes: number;
   blindMinutes: number;
-  // The same figures unrounded, in milliseconds: targets are judged on these, the minutes are for display.
   downMs: number;
   longestDetectMs: number;
   blindMs: number;

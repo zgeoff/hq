@@ -4,7 +4,6 @@ import { cleanEnv } from './clean-env.ts';
 import { TIMED_OUT } from './timed-out.ts';
 import type { RunResult, Runner } from './types.ts';
 
-// With stdoutFile, stdout and stderr both append to that file through one descriptor.
 export const realRunner: Runner = async (cmd, opts = {}) => {
   const fd = opts.stdoutFile ? openSync(opts.stdoutFile, 'a') : null;
   // A timed command runs in its own session (setsid), so the deadline reaches its whole process

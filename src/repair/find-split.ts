@@ -22,7 +22,7 @@ export function findSplit(byUuid: Map<string, Rec>, recs: Rec[], path: Rec[], of
         between.unshift(p);
         p = p.obj.parentUuid ? byUuid.get(p.obj.parentUuid) : undefined;
       }
-      if (p?.obj.uuid !== use.obj.uuid) continue; // the result does not descend from its use: not this fault
+      if (p?.obj.uuid !== use.obj.uuid) continue;
       if (!onPath.has(r.obj.uuid)) {
         offBranch.add(r.obj.uuid);
         continue;
@@ -34,7 +34,6 @@ export function findSplit(byUuid: Map<string, Rec>, recs: Rec[], path: Rec[], of
           throw new HqError('unknown_shape', `record ${x.obj.uuid} (line ${x.line + 1}) sits between advisor use ${use.obj.uuid} and its result but belongs to the turn; hq repairs only an interloper from outside the turn`);
         }
       }
-      // The turn: the result, then the same message's records and the tool_results for its tool_uses.
       const toolUses = new Set<string>();
       let i = onPath.get(r.obj.uuid)!;
       for (;;) {

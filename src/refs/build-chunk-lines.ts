@@ -1,9 +1,6 @@
 import { REFERENCE_MARK } from './reference-mark.ts';
 import type { ChunkCarry } from './types.ts';
 
-// The whole lines one chunk completes, and the carry for the next chunk. The line the carry
-// completes always comes out; the chunk's own whole lines come out only when one holds a
-// references path. A line longer than `maxLine` is passed over.
 export function buildChunkLines(carry: ChunkCarry, chunk: Buffer, maxLine: number): { lines: Buffer[]; carry: ChunkCarry } {
   const first = chunk.indexOf(0x0a);
   if (first === -1) {

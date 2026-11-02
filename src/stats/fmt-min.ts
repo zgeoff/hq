@@ -1,5 +1,3 @@
-// ---- text
-
 export function fmtMin(m: number | null): string {
   if (m === null) return '–';
   if (m < 90) return `${Math.round(m)}m`;

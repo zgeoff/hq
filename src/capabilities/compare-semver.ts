@@ -1,7 +1,6 @@
 import { HqError } from '../errors.ts';
 import { parseSemver } from './parse-semver.ts';
 
-// Negative: a is older than b.
 export function compareSemver(a: string, b: string): number {
   const x = parseSemver(a),
     y = parseSemver(b);

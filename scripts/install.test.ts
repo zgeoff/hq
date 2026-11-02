@@ -5,8 +5,6 @@ import { dirname, join, resolve } from 'node:path';
 import { z } from 'zod';
 import { createStubSystemctl } from '../test/create-stub-systemctl.ts';
 
-// Each build runs in a clone of this checkout, so a test can dirty or drop the tree without
-// touching the checkout itself.
 function setupTest() {
   const directory = mkdtempSync(join(tmpdir(), 'hq-install-'));
   const repo = resolve(import.meta.dir, '..');

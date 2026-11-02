@@ -1,6 +1,6 @@
 export interface RcState {
   state: 'on' | 'off' | 'unknown';
-  why: string; // what the answer rests on, or what stopped it
+  why: string;
 }
 
 export type PidFind = { pid: number } | { why: string };

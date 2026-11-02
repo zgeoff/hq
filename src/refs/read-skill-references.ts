@@ -1,7 +1,6 @@
 import { readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
-// The reference files a skill owns, as `<skill>/references/<file>`, sorted. No folder: none.
 export function readSkillReferences(definitionsDirectory: string, skill: string): string[] {
   const folder = join(definitionsDirectory, 'skills', skill, 'references');
   let names: string[];

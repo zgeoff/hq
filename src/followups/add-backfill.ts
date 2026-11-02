@@ -6,8 +6,6 @@ import { logEvent } from '../log-event.ts';
 import { ISSUE } from './issue.ts';
 import type { Followup } from './types.ts';
 
-// The baseline, counted by hand from Linear: an issue whose description names the PR review it
-// came from, at the time Linear says it was created.
 export function addBackfill(db: Database, input: { issue: string; fromRef: string | null; at: string; actor: string }): Followup {
   const issue = input.issue.toUpperCase();
   if (!ISSUE.test(issue)) throw new HqError('bad_args', `"${input.issue}" is not an issue id such as GEO-12`);

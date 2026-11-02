@@ -1,7 +1,3 @@
-// Lints only the lines a branch changes against its base: hq takes the shared rules unchanged, and
-// its older code comes into line as it is touched. A new file is linted whole, except for code the
-// branch only moved: a run of 3 or more added lines, each matching a line the branch deletes. A
-// branch onto a base with no package.json imports the tree into an empty repo, and lints nothing.
 import { spawnSync } from 'node:child_process';
 import { probeImportBase } from './probe-import-base.ts';
 import { readDiff } from './read-diff.ts';
@@ -76,8 +72,6 @@ function recordRow(state: ParseState, row: string): void {
   }
 }
 
-// A content row of a hunk: an added line keeps its new-file number, a deleted line only its text. A
-// deleted file has no new name, so its rows only give deleted lines.
 function recordContent(state: ParseState, row: string): boolean {
   if (row.startsWith('+') && !row.startsWith('+++ ') && state.current !== '') {
     state.addedRows.push({ file: state.current, line: state.next, text: row.slice(1).trim() });
@@ -107,8 +101,6 @@ export function isChanged(diagnostic: Diagnostic, changes: ChangeSet): boolean {
   return diagnostic.labels.some((label) => moved?.has(label.span.line) !== true && (whole || set?.has(label.span.line) === true));
 }
 
-// Each deleted line vouches for one added line with the same text. Only a run of MOVED_RUN or more
-// vouched lines in a row counts as moved, so a lone `return null;` that happens to match stays linted.
 function findMovedLines(rows: readonly AddedRow[], removed: ReadonlyMap<string, number>): Map<string, Set<number>> {
   const left = new Map(removed),
     moved = new Map<string, Set<number>>();
@@ -132,7 +124,6 @@ function isRunBroken(previous: AddedRow | undefined, row: AddedRow, left: Readon
   return previous !== undefined && (previous.file !== row.file || previous.line + 1 !== row.line || (left.get(row.text) ?? 0) === 0);
 }
 
-// A run too short to count gives its deleted lines back, so a real move later in the diff can use them.
 function recordRun(moved: Map<string, Set<number>>, left: Map<string, number>, run: readonly AddedRow[]): void {
   if (run.length < MOVED_RUN) {
     for (const row of run) {

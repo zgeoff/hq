@@ -11,7 +11,6 @@ function setupTest() {
   runGit(dir, ['init', '--quiet', '--initial-branch=main']);
   return {
     directory: dir,
-    // Commits kettle.ts as `before`, then deletes it and stages `after`: the diff lint:changed reads.
     splitKettle: (before: string, after: Record<string, string>): ReturnType<typeof parseChanges> => {
       writeFileSync(join(dir, 'kettle.ts'), before);
       runGit(dir, ['add', '-A']);

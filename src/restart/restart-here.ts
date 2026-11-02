@@ -1,6 +1,5 @@
-// Restart the atc daemon, then wake the sessions. The restart ends every
-// session's process, so `hq restart` hands itself to systemd and returns; the
-// detached copy (`--here`) does the work and writes a log.
+// The atc daemon restart ends every session's process, so `hq restart` hands itself to systemd
+// and returns; the detached copy (`--here`) does the work.
 import { toExactOptional } from '@zgeoff/std';
 import type { Database } from 'bun:sqlite';
 import { iso } from '../clock/iso.ts';
@@ -24,8 +23,6 @@ const restoreWaitMs = () => {
   return Number.isFinite(n) && n >= 0 ? Math.min(n, 600_000) : 180_000;
 };
 
-// The detached half. It logs each step; a failed dry run stops before the restart.
-// The launcher already checked quiet hours and passes --force; a direct run checks here.
 export async function restartHere(db: Database, run: Runner, actor: string, force: boolean): Promise<RestartResult> {
   guardQuiet(force);
   const log = config().HQ_RESTART_LOG ?? logPath(iso(now()).replace(/[-:]/g, ''));

@@ -17,14 +17,12 @@ export interface Stats {
     answerToApply: Dist;
     unblockAddedToDone: Dist;
 
-    // Per run, total minutes waiting on the owner in the window.
     runGeoffWait: Dist;
     oldestQueued: Oldest | null;
     oldestUnapplied: Oldest | null;
     oldestUnblock: Oldest | null;
     oldestRunWait: Oldest | null;
 
-    // Share of owner-wait minutes set with --waits-on-geoff, not by text.
     runWaitExactShare: number | null;
   };
   live: {
@@ -49,7 +47,7 @@ export interface Stats {
     rechecked: number;
     reworkShare: number | null;
     cycle: Dist;
-    cycleFromReady: number; // how many of cycle.n start at ready_since (the rest at launch)
+    cycleFromReady: number;
   };
 }
 

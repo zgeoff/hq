@@ -126,7 +126,7 @@ test('a long cost line gives up its middle and keeps the target and colour', asy
 
 test('incidents today list the outages opened today, with minutes', () => {
   db.query('INSERT INTO outages (started_at, detected_at, ended_at) VALUES (?, ?, ?)').run('2026-10-16T03:00:00Z', '2026-10-16T03:01:00Z', '2026-10-16T03:05:00Z');
-  db.query('INSERT INTO outages (started_at, detected_at, ended_at) VALUES (?, ?, ?)').run('2026-10-15T03:00:00Z', '2026-10-15T03:01:00Z', '2026-10-15T03:20:00Z'); // yesterday
+  db.query('INSERT INTO outages (started_at, detected_at, ended_at) VALUES (?, ?, ?)').run('2026-10-15T03:00:00Z', '2026-10-15T03:01:00Z', '2026-10-15T03:20:00Z');
   for (let i = 0; i < 5; i++) db.query('INSERT INTO probe_samples (at, target_ok, control_ok) VALUES (?, 0, 1)').run(iso(new Date(Date.parse('2026-10-16T03:00:00Z') + i * 60_000)));
   const last = dailyText(db, syd('2026-10-16', '18:00')).split('\n').at(-1);
   expect(last).toBe('Incidents today: Nix outage 14:00–14:05 Sydney, 5 min');
@@ -141,7 +141,7 @@ test('incidents today list an unready episode beside the outages, one line each'
 });
 
 test('stale goals data makes it wait, and it sends once the data is fresh', () => {
-  synced(syd('2026-10-16', '16:00')); // 2 hours old at 18:00
+  synced(syd('2026-10-16', '16:00'));
   expect(tick('2026-10-16', '18:00')).toEqual({ run: null, waiting: 'goals data 120 min old' });
   expect(outbox()).toEqual([]);
   expect(db.query('SELECT COUNT(*) AS n FROM job_runs').get()).toEqual({ n: 0 });
@@ -164,7 +164,7 @@ test('a day after 18:30 is sent late and marked so', () => {
 test('hq goals daily sends now, once; a dry run sends nothing and writes no job row', () => {
   synced(syd('2026-10-16', '10:00'));
   const t = syd('2026-10-16', '10:10');
-  dailyText(db, t); // the dry run is this text and no write
+  dailyText(db, t);
   expect(outbox()).toEqual([]);
   expect(db.query('SELECT COUNT(*) AS n FROM job_runs').get()).toEqual({ n: 0 });
   expect(sendDaily(db, 'z-stu', t)).toMatchObject({ result: 'queued', detail: 'manual' });
@@ -215,9 +215,9 @@ test('health is red for a day whose data stayed stale', () => {
 });
 
 test('only a sync without failed fetches counts as fresh: goals_synced_at alone does not', () => {
-  setMeta(db, 'goals_synced_at', iso(syd('2026-10-16', '17:55'))); // the watcher stamps this even on failed fetches
+  setMeta(db, 'goals_synced_at', iso(syd('2026-10-16', '17:55')));
   expect(tick('2026-10-16', '18:00').waiting).toBe('goals data never synced');
-  synced(syd('2026-10-16', '17:55')); // a clean sync, from the watcher or hq goals sync
+  synced(syd('2026-10-16', '17:55'));
   expect(tick('2026-10-16', '18:00').run).not.toBeNull();
 });
 
@@ -248,5 +248,5 @@ test('the deploy-prod line names holds, no-apply runs and runs not yet classifie
   add(5, null);
   const l = line(dailyText(db, syd('2026-10-16', '18:00')));
   expect(l).toContain('today 100% (1 applies), 2 held, 1 no-apply, 1 not yet classified,');
-  expect(l).toMatch(/; target >=90% –$/); // no colour while a run is unclassified, and the long line keeps it
+  expect(l).toMatch(/; target >=90% –$/);
 });

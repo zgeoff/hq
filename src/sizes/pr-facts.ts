@@ -16,10 +16,8 @@ interface Gql {
   timelineItems: { nodes: { previousRefName?: string }[] };
 }
 
-// One GraphQL query per 25 PRs, then one for the base branches that aren't the default: a base
-// counts as a stack only when another PR's head was that branch (a release branch is not).
-// A merged PR doesn't change, so its facts are cached for good. null when GitHub can't be read;
-// a PR GitHub doesn't know is left out.
+// A base counts as a stack only when another PR's head was that branch (a release branch is not).
+// A merged PR doesn't change, so its facts are cached for good.
 export async function prFacts(db: Database, run: Runner, prs: { ref: string; url: string | null }[], env?: RunOpts['env']): Promise<Record<string, PrFacts> | null> {
   const cache = metaJson(db, 'stats_pr_facts_v2', z.record(z.string(), z.object({ lines: z.number(), stacked: z.boolean() })), {});
   const todo = [...new Map(prs.filter((p) => !cache[p.ref]).map((p) => [p.ref, p])).values()];
@@ -55,7 +53,7 @@ export async function prFacts(db: Database, run: Runner, prs: { ref: string; url
   const key = (p: { ref: string; url: string | null }, b: string) => `${ownerOf(p)}/${p.ref.split('#')[0]}:${b}`;
   const branches = [...new Map(found.flatMap((f) => f.bases.map((b) => [key(f.p, b), { owner: ownerOf(f.p), repo: f.p.ref.split('#')[0]!, b }]))).entries()];
   const fromPr = new Set<string>();
-  const unknown = new Set<string>(); // a lookup GitHub didn't answer: those PRs stay uncached
+  const unknown = new Set<string>();
   for (let i = 0; i < branches.length; i += 25) {
     const chunk = branches.slice(i, i + 25);
     const data = await ask(chunk.map(([, x], k) => `b${k}: repository(owner: "${x.owner}", name: "${x.repo}") { pullRequests(headRefName: ${JSON.stringify(x.b)}, first: 1) { totalCount } }`));

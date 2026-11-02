@@ -27,7 +27,7 @@ export function parseHelp(help: string, verbsOf?: (top: string) => readonly stri
       if (toks[0] === 'hq') {
         top = alts(toks[1] ?? '');
         rest = toks.slice(2);
-      } else rest = toks; // "… | show <issue>": the verb of the same top
+      } else rest = toks;
       if (!top.length) continue;
       const head = rest[0] ?? '';
       let verbs: (string | null)[];
@@ -38,7 +38,6 @@ export function parseHelp(help: string, verbsOf?: (top: string) => readonly stri
       } else {
         verbs = [null];
       }
-      // A positional: <x>, or [x] that is not a flag or a verb list.
       const args = optionalVerb ? rest.slice(1) : rest;
       const positional = args.some((token) => /^<[^>]+>$/u.test(token) || /^\[[a-z][a-z ]*\]$/u.test(token));
       for (const t of top) for (const v of verbs) {
@@ -58,7 +57,6 @@ function isVerbList(tops: string[], words: string[], verbsOf: ((top: string) => 
   });
 }
 
-// Split on " | " outside brackets and parentheses.
 function topLevel(s: string): string[] {
   const out: string[] = [];
   let depth = 0;

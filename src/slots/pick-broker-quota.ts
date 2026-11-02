@@ -17,11 +17,8 @@ const HOUR_MS = 3_600_000;
 // The slot reads run every 2 h; a read older than one interval and a margin says nothing now.
 const READ_FRESH_MS = 2.5 * HOUR_MS;
 
-// A broker proof keeps an unread slot usable this long.
 const PROOF_ROOM_MS = 24 * HOUR_MS;
 
-// The imp broker's Claude quota: its slot's newest good read when fresh, else unknown, which still
-// has room while the broker's proof is under 24 h old.
 export function pickBrokerQuota(record: BrokerRecord | null, rows: readonly SlotRow[], at: Date): BrokerQuota {
   if (record === null) {
     return { state: 'none', why: 'no imp broker slot recorded: hq slots broker <n> --proof <id>' };
@@ -40,7 +37,6 @@ export function pickBrokerQuota(record: BrokerRecord | null, rows: readonly Slot
   return { state: 'unknown', ...proof, why: `${why}, and its proof is ${Math.floor(proofMs / HOUR_MS)} h old` };
 }
 
-// The fuller of the two windows, and when it resets.
 function pickFullestWindow(row: SlotRow): { used: number; resetsAt: string | null } | null {
   if (row.five === null && row.seven === null) {
     return null;

@@ -9,17 +9,15 @@ export interface Followup {
   added_at: string;
 }
 
-// ---------- the stats section ----------
-
 export interface WeekRow {
-  week: number; // -2, -1 before the rule's mark; 1, 2, ... after
+  week: number;
   from: string;
   to: string;
-  partialDays: number | null; // the current week, so far
+  partialDays: number | null;
   followups: number;
   followupsBackfilled: number;
-  fixed: number; // findings fixed in their own PR
-  tallied: number; // PRs that reported a count
+  fixed: number;
+  tallied: number;
 }
 
 export interface ReviewStats {

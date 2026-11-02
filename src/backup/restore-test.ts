@@ -9,7 +9,6 @@ import { logEvent } from '../log-event.ts';
 import type { Runner } from '../runner/types.ts';
 import { restore } from './restore.ts';
 
-// Restore the newest snapshot into a scratch directory and check what came back.
 export async function restoreTest(db: Database, run: Runner, opts: { remote: boolean; scratch: string }, actor: string): Promise<{ ok: boolean; files: number; dbCheck: string; error: string | null }> {
   const dir = join(opts.scratch, `hq-restore-test-${Date.now()}`);
   let result = { ok: false, files: 0, dbCheck: 'not run', error: null as string | null };

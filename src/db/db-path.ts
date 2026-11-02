@@ -1,7 +1,5 @@
 import { config } from '../config/config.ts';
 
-// A run from source (bun src/cli.ts) never touches the live database by
-// accident: it needs HQ_DB, or HQ_LIVE=1 to mean the live one on purpose.
 export function dbPath(): string {
   const named = config().HQ_DB;
   if (named) return named;

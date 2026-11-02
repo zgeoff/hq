@@ -3,30 +3,27 @@ import type { GrantMarkSync } from '../grants/sync-grant-marks.ts';
 import type { Runner } from '../runner/types.ts';
 
 interface WatchSteps {
-  runs(): Promise<void>; // atc notes and the sweep
-  weekly(): Promise<boolean>; // the Monday stats line
+  runs(): Promise<void>;
+  weekly(): Promise<boolean>;
   health(): Promise<{ opened: unknown[]; cleared: unknown[] }>;
-  refusals?(): Promise<number>; // scan the transcripts; the refusals added
+  refusals?(): Promise<number>;
   slots?: (signal: AbortSignal) => Promise<{ read: SlotReadRun | null; news: boolean }>;
-  capacity?(): Promise<{ opened: unknown[]; cleared: unknown[] }>; // sample capacity, alert on thresholds
+  capacity?(): Promise<{ opened: unknown[]; cleared: unknown[] }>;
 
-  // Mark the grants on hq-private's main that have none; null with no clone.
   grantMarks?: () => GrantMarkSync | null;
 }
 
 export interface WatchDeps {
   me: string;
-  run: Runner; // bounded: every call has a deadline
+  run: Runner;
   steps: WatchSteps;
   log(line: string): void;
   stepMs?: number;
 }
 
-// ---------- the outside check ----------
-
 export interface WatcherState {
   lastTick: string | null;
-  since: string | null; // the last tick, else when the loop started
+  since: string | null;
   stale: boolean;
   minutes: number | null;
 }

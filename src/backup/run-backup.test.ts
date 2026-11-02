@@ -14,7 +14,6 @@ import { realRunner } from '../runner/real-runner.ts';
 import { createResticRepo } from '../../test/create-restic-repo.ts';
 import { freshDb, requireEnv } from '../../test/helpers.ts';
 
-// Real restic against temp repos. Skipped on a machine without restic, never in CI, which installs it.
 const canRunRestic = process.env['CI'] !== undefined || (Bun.which('restic') !== null && Bun.which('sqlite3') !== null);
 
 let db: Database;
@@ -50,7 +49,7 @@ test.skipIf(!canRunRestic)('backs up hq.db online plus the dirs, restores them, 
   expect(r.ok).toBe(true);
   expect(r.remote).toBe('not configured');
   expect(statSync(requireEnv('HQ_BACKUP_PASSWORD_FILE')).mode & 0o777).toBe(0o600);
-  expect(existsSync(`${dir}/backup/staging`)).toBe(false); // staging is cleaned up
+  expect(existsSync(`${dir}/backup/staging`)).toBe(false);
 
   const out = `${dir}/restored`;
   const back = await restore(realRunner, out, { snapshot: 'latest', remote: false });

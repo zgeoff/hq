@@ -1,5 +1,3 @@
-// One answer the owner gave, as `hq answers` lists it: a call or proposal answered, a review answered
-// in the console, or a line typed into a session as the owner.
 export interface Answer {
   source: 'ask' | 'review' | 'typed';
   id: string;

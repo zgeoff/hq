@@ -2,7 +2,6 @@ import { existsSync, readFileSync } from 'node:fs';
 import { HqError } from '../errors.ts';
 import { backupPaths } from './backup-paths.ts';
 
-// KEY=VALUE lines; values never printed.
 export function readRemoteEnv(): Record<string, string> | null {
   const path = backupPaths().remoteEnv;
   if (!existsSync(path)) return null;

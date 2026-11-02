@@ -2,7 +2,6 @@ import type { Database } from 'bun:sqlite';
 import { createDBBackup } from './create-db-backup.ts';
 import { MIGRATIONS } from './migrations.ts';
 
-// hq.db holds live state: copy it before any schema change.
 export function migrate(db: Database, path: string, existed: boolean, migrations = MIGRATIONS): string | null {
   const target = migrations.length;
   const current = (db.query('PRAGMA user_version').get() as { user_version: number }).user_version;

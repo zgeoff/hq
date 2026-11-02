@@ -3,7 +3,6 @@ import { iso } from '../clock/iso.ts';
 import { outagesIn } from './outages-in.ts';
 import type { Downtime } from './types.ts';
 
-// A gap between samples above GAP_MIN minutes is blind time.
 const GAP_MIN = 2;
 
 export function downtime(db: Database, from: Date, to: Date): Downtime {
@@ -25,7 +24,6 @@ export function downtime(db: Database, from: Date, to: Date): Downtime {
   return { from: iso(from), to: iso(to), samples: total, downMinutes: round(downMs / 60_000), outages: rows.length, longestDetectMinutes: round(longestMs / 60_000), blindMinutes: round(blindMs / 60_000), downMs, longestDetectMs: longestMs, blindMs };
 }
 
-// Milliseconds of [f, e] covered by a non-blind sample, each covering up to GAP_MIN minutes after it.
 function coveredMs(db: Database, f: number, e: number): number {
   const sample = db.query('SELECT at FROM probe_samples WHERE at >= ? AND at <= ? AND NOT (target_ok = 0 AND control_ok = 0) ORDER BY at').all(iso(new Date(f - GAP_MIN * 60_000)), iso(new Date(e))) as { at: string }[];
   let covered = 0;

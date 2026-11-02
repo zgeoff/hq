@@ -3,8 +3,7 @@ import table from '../../fleet.json';
 import { config } from '../config/config.ts';
 
 // The installed hq carries the fleet.json it was built with. When the checkout's copy differs, a
-// merged fleet change has not been installed, and spawns still use the old one. Null when they match
-// or the checkout has no readable copy.
+// merged fleet change has not been installed, and spawns still use the old one.
 export function checkFleetBuild(path = `${config().HQ_PROJECTS ?? `${process.env['HOME']}/projects`}/hq/fleet.json`): string | null {
   let source: unknown;
   try {

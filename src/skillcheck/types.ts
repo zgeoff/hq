@@ -1,8 +1,8 @@
 export interface Form {
   top: string;
-  verb: string | null; // null: the form takes no verb (hq status, hq news [--all])
+  verb: string | null;
   flags: Set<string>;
-  positional: boolean; // takes a value that is not a flag (<id>, [id]): an unknown word may be one
+  positional: boolean;
 }
 
 export interface Use {

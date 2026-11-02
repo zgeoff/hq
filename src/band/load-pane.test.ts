@@ -11,7 +11,6 @@ import { loadPane } from './load-pane.ts';
 const AT = new Date('2026-10-15T01:00:00Z'),
   CONSOLE = 'http://127.0.0.1:4317/';
 
-// A database and the pacing.json hq reads; nothing is stored or written yet.
 function setupTest() {
   const fresh = freshDb(),
     spy = spyOn(console, 'log').mockImplementation(() => {});
@@ -25,8 +24,6 @@ function setupTest() {
   return { db: fresh.db, pacing: join(fresh.dir, 'pacing.json') };
 }
 
-// A 3-slot cleanup lane and a 1-slot flexible lane, one working run in cleanup, and an outage of
-// 10 minutes this Sydney morning that has ended.
 async function writeFleet(app: ReturnType<typeof setupTest>): Promise<Database> {
   writeFileSync(app.pacing, JSON.stringify({ imp: { impMib: 2048 }, lanes: { imp: { cleanup: 3 }, local: { flexible: 1 } } }));
   const added = await main(['run', 'add', 'GEO-9601', '--title', 'Fit the long spout', '--where', 'imp', '--json']),
@@ -35,8 +32,6 @@ async function writeFleet(app: ReturnType<typeof setupTest>): Promise<Database> 
   return app.db;
 }
 
-// One PR in review since 11:30 Sydney, one reviewed, and two merged this Sydney day for one issue
-// in two repos.
 function writePRs(db: Database): Database {
   const pr = db.query("INSERT INTO run_prs (ref, issue, url, state, review_started_at, reviewed_at, merged_at, added_at, updated_at) VALUES (?, 'GEO-9601', ?, ?, ?, ?, ?, '2026-10-14T00:00:00Z', '2026-10-15T00:00:00Z')");
   pr.run('kettle#41', null, 'open', '2026-10-15T00:30:00Z', null, null);
@@ -46,8 +41,6 @@ function writePRs(db: Database): Database {
   return db;
 }
 
-// No session is awake at AT, so blocked GEO-9602 shows parked and holds no slot; a probe sample
-// 2 minutes old keeps Nix up.
 test('the pane lists what needs the owner with its links, then Nix, lanes, reviews, shipped today and news, as Markdown', async () => {
   const app = setupTest(),
     fleet = await writeFleet(app),
@@ -151,14 +144,12 @@ test('a pacing.json hq refuses says why under Lanes, and draws no heat map', asy
   expect([shown.heat, shown.markdown.split('\n\n')[2]]).toStrictEqual([[], "## Lanes\nhq can't read the lanes: pacing.json: pacing.json lanes: bad lane imp.Bad Teapot"]);
 });
 
-// Closes every outage and adds one probe sample whose target and control both gave `ok`.
 function writeProbeSample(db: Database, at: string, ok: number): Database {
   db.query('DELETE FROM outages').run();
   db.query('INSERT INTO probe_samples (at, target_ok, control_ok) VALUES (?, ?, ?)').run(at, ok, ok);
   return db;
 }
 
-// An outage that opened at 11:50 Sydney and is still open, no probe samples, and no lanes.
 function writeOpenOutage(app: ReturnType<typeof setupTest>): Database {
   writeFileSync(app.pacing, JSON.stringify({ imp: { impMib: 2048 } }));
   app.db.query("INSERT INTO outages (started_at, detected_at, kind) VALUES (?, ?, 'down')").run('2026-10-15T00:50:00Z', '2026-10-15T00:53:00Z');

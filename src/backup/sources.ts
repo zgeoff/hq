@@ -4,8 +4,6 @@ import { config } from '../config/config.ts';
 import { dbPath } from '../db/db-path.ts';
 import { getHome as HOME } from './get-home.ts';
 
-// What goes in: the staged hq.db, the rest of z-sessions, and the transcripts of the
-// sessions hq serves (the frankie-main and hq-defs workspaces, and hq's own).
 export function sources(): { db: string; dirs: string[]; exclude: string[] } {
   const db = config().HQ_BACKUP_DB ?? dbPath();
   const dirs = config().HQ_BACKUP_DIRS;

@@ -1,6 +1,3 @@
-// hq backup: an hourly, encrypted restic snapshot of hq's state and the z- sessions'
-// transcripts, kept locally and copied off this PC when a remote is configured.
-// hq.db goes in through sqlite's online backup, never as a raw file copy.
 import { Database } from 'bun:sqlite';
 import { existsSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
@@ -60,10 +57,9 @@ export async function runBackup(db: Database, run: Runner, actor: string): Promi
     const remote = readRemoteEnv();
     if (remote) {
       try {
-        const extra = remote; // RESTIC_REPOSITORY travels in the environment, never in argv
+        const extra = remote;
         await ensureRepo(run, [], extra, ['--from-repo', localRepo(), '--from-password-file', backupPaths().password, '--copy-chunker-params']);
         await restic(run, ['copy', '--from-repo', localRepo(), '--from-password-file', backupPaths().password, '--tag', 'hq'], extra);
-        // Check the copy landed: the newest local snapshot's time must be on the remote too.
         const newest = (snaps: Snapshot[]) => snaps.map((x) => x.time).sort().at(-1);
         const want = newest(JSON.parse(await restic(run, ['-r', localRepo(), 'snapshots', '--json', '--tag', 'hq'])) as Snapshot[]);
         const got = JSON.parse(await restic(run, ['snapshots', '--json', '--tag', 'hq'], extra)) as Snapshot[];
@@ -95,9 +91,9 @@ export async function runBackup(db: Database, run: Runner, actor: string): Promi
 
 const HolderSchema = z.object({ pid: z.number() }).nullable();
 
-// One staging dir, so runs take turns. The holder's pid sits in a database of its own, so reading
-// it, finding its run gone and writing this run's pid is one write transaction: two runs can never
-// both take a dead holder's place, and no file is ever removed on a guess.
+// The holder's pid sits in a database of its own, so reading it, finding its run gone and writing
+// this run's pid is one write transaction: two runs can never both take a dead holder's place, and
+// no file is ever removed on a guess.
 function createStagingLock(): Database {
   const lock = new Database(join(backupPaths().state, 'staging-lock.sqlite'), { create: true });
   lock.run('PRAGMA busy_timeout = 5000');
@@ -138,7 +134,6 @@ async function ensureRepo(run: Runner, repoArgs: string[], extra: Record<string,
   return true;
 }
 
-// Remote values (a repository URL can carry a key) never reach an error, a log or an event.
 function redact(text: string, extra: Record<string, string>): string {
   let out = text;
   for (const v of Object.values(extra)) if (v.length >= 4) out = out.split(v).join('***');

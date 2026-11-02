@@ -186,7 +186,6 @@ test('hq answers --json lists the last 7 days by default, and --since sets the w
   ]);
 });
 
-// One typed line 8 days before noon on 14 Oct and one a day before, then the clock back at noon.
 function createTwoTypedLines(db: Database): Database {
   at('2026-10-06T01:00:00Z');
   addTyped(db, { to: 'kettle-bot', toId: null, toName: null, text: 'Old news.', source: { kind: 'chat', ref: 'kettle-bot', at: '2026-10-06T00:59:00Z' }, actor: 'teapot-bot' });

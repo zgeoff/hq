@@ -1,6 +1,3 @@
-// The lanes watcher runs as a real systemd user unit, so it comes back after a
-// crash or a reboot. `hq lanes start` writes the unit file, enables it and
-// restarts it; scripts/install.sh calls `hq lanes start`, so both give the same unit.
 import { toExactOptional } from '@zgeoff/std';
 import { HqError } from '../errors.ts';
 import type { Runner } from '../runner/types.ts';
@@ -14,9 +11,8 @@ import { runSystemctl as systemctl } from './run-systemctl.ts';
 import type { InstallResult } from './types.ts';
 import { unitPath } from './unit-path.ts';
 
-// Write the unit, enable it, and (re)start it on the new file and code. A watcher
-// that hq <= 0.16 started with systemd-run is a transient unit of the same name,
-// which shadows the file: stop it first, and systemd drops it (it ran with --collect).
+// A transient unit of the same name from systemd-run shadows the file: stop it first, and systemd
+// drops it (it ran with --collect).
 export async function installLanes(
   run: Runner,
   o: { home: string; exec: string[]; interval: number | null; processEnv: Record<string, string | undefined>; env?: Record<string, string | undefined> },

@@ -3,7 +3,6 @@ import { bandOf } from './band-of.ts';
 import type { Size } from './bands.ts';
 import { SIZES } from './sizes.ts';
 
-// Both flags or neither; the line guess must sit inside its band.
 export function parseSize(size: string | undefined, lines: string | undefined): { size: Size; lines: number } | null {
   if (size === undefined && lines === undefined) return null;
   if (size === undefined || lines === undefined) throw new HqError('bad_args', '--size and --lines go together, such as --size L --lines 3000');

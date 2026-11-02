@@ -1,7 +1,3 @@
-// Every HQ_* setting (and REVIEW_DIR) hq reads, in one schema. config() parses the environment on
-// each call, so a test that changes a variable between cases sees the change. A bad value throws
-// bad_config naming the variable. Settings with a default that depends on HOME or on another
-// setting stay optional here; the code that needs one applies its own fallback.
 import { z } from 'zod';
 import { CLOCK_OVERRIDES } from '../clock/clock-overrides.ts';
 import { isSourceRun } from '../clock/is-source-run.ts';
@@ -11,11 +7,8 @@ import { CONFIG_SHAPE } from './config-shape.ts';
 const schema = z.object(CONFIG_SHAPE);
 export type HqConfig = z.infer<typeof schema>;
 
-// HOME, NODE_ENV, ATC_SESSION_ID, OP_SERVICE_ACCOUNT_TOKEN and PATH are read straight from the
-// environment, but a test overrides them by name too.
 export type ConfigName = keyof typeof CONFIG_SHAPE | 'HOME' | 'NODE_ENV' | 'ATC_SESSION_ID' | 'OP_SERVICE_ACCOUNT_TOKEN' | 'PATH';
 
-// What each setting must be, for the message.
 const RULES: Partial<Record<ConfigName, string>> = {
   HQ_QUIET: 'two hours like 03-07',
 };
@@ -28,7 +21,6 @@ export function config(env: Record<string, string | undefined> = process.env): H
     input[key] = env[key];
   }
 
-  // The installed hq reads the real clock and the default quiet window, whatever the caller set.
   if (!isSourceRun()) {
     for (const name of CLOCK_OVERRIDES) {
       input[name] = undefined;

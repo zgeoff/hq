@@ -2,8 +2,6 @@ import type { SessionInfo } from '../atc/session-schema.ts';
 import { atcStateDir } from './atc-state-dir.ts';
 import type { RestartRecord, WakePlan, WakeReason } from './types.ts';
 
-// Pure: who gets which message. Keys match the old wake.ts, so running both
-// for one restart still sends each session one message.
 export function planWake(last: RestartRecord, sessions: SessionInfo[], listed: { id: string; name: string }[], orchestrator: string): WakePlan {
   const plan: WakePlan = { runID: last.runID, messages: [], skipped: [] };
   const byId = new Map(sessions.map((s) => [s.id, s]));

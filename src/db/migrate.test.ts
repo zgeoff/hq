@@ -6,8 +6,6 @@ import { join } from 'node:path';
 import { migrate } from './migrate.ts';
 import { MIGRATIONS } from './migrations.ts';
 
-// A scratch folder with a child script that opens and migrates the database it is given, the way an
-// hq command does after an install, and 4 database paths in it.
 async function setupTest() {
   const dir = mkdtempSync(join(tmpdir(), 'hq-migrate-')),
     paths = [0, 1, 2, 3].map((round) => join(dir, `hq-${round}.db`)),

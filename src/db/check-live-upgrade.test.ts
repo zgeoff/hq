@@ -9,7 +9,6 @@ import { migrate } from './migrate.ts';
 import { openDb } from './open-db.ts';
 import { MIGRATIONS } from './migrations.ts';
 
-// A database one schema behind this hq, in a scratch folder.
 function setupTest(): Database {
   const scratch = mkdtempSync(join(tmpdir(), 'hq-live-upgrade-')),
     store = new Database(join(scratch, 'hq.db'), { create: true, strict: true });

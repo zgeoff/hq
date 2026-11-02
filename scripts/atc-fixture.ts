@@ -1,6 +1,3 @@
-// Records what the running atc daemon sends, for test/fixtures/atc.json (GEO-1018): an events.read
-// cursor. Run it after an atc upgrade, against a daemon you may talk to:
-//   bun scripts/atc-fixture.ts > test/fixtures/atc.json
 import { AtcClient } from '../src/atc/atc-client.ts';
 import { eventsCursorSchema } from '../src/atc/events-cursor-schema.ts';
 import { socketPath } from '../src/atc/socket-path.ts';
