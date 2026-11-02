@@ -8,7 +8,6 @@ import { setMeta } from '../db/set-meta.ts';
 import { overrideEnv } from '../config/override-env.ts';
 import { loadBand } from './load-band.ts';
 
-// A database and the pacing.json hq reads; nothing is stored or written yet.
 function setupTest() {
   const fresh = freshDb(),
     spy = spyOn(console, 'log').mockImplementation(() => {});
@@ -21,8 +20,6 @@ function setupTest() {
   return { db: fresh.db, pacing: join(fresh.dir, 'pacing.json') };
 }
 
-// A 3-slot imp lane and a 1-slot local lane, a fresh probe sample, impd well under its lines, CI
-// that passed 1 hour before, and one working run in the cleanup lane.
 test('all clear: nothing needs the owner, Nix is up, impd has room, CI passed, and each segment is plain', async () => {
   const ctx = setupTest();
   writeFileSync(ctx.pacing, JSON.stringify({ imp: { impMib: 2048 }, lanes: { imp: { cleanup: 3 }, local: { flexible: 1 } } }));
@@ -94,8 +91,6 @@ test('a fresh probe sample that was blind, the target and the control both faili
   await expect(loadBand(ctx.db, ctx.pacing, new Date('2026-10-15T01:00:00Z')).then((band) => band.segments[1])).resolves.toStrictEqual({ key: 'nix', text: 'Nix ?', tone: 'warn' });
 });
 
-// One run with four PRs: under review now, reviewed since, closed mid-review, and a review left
-// open two days. Only the first is in flight.
 test('reviews counts open PRs whose review started in the last 24 hours and has not finished', async () => {
   const ctx = setupTest();
   ctx.db.query("INSERT INTO runs (issue, title, place, state, created_at, updated_at) VALUES ('GEO-9601', 'Fit the long spout', 'imp', 'working', '2026-10-13T00:00:00Z', '2026-10-15T00:00:00Z')").run();
@@ -193,7 +188,6 @@ test('CI stored over 2 hours ago is unknown in amber', async () => {
   await expect(loadBand(ctx.db, ctx.pacing, new Date('2026-10-15T03:00:00Z')).then((band) => band.segments[3])).resolves.toStrictEqual({ key: 'ci', text: 'CI ?', tone: 'warn' });
 });
 
-// A pacing.json with a lane name hq refuses.
 test('a pacing.json hq cannot read shows lanes unknown, not a failure', async () => {
   const ctx = setupTest();
   writeFileSync(ctx.pacing, JSON.stringify({ lanes: { imp: { 'Bad Teapot': 3 }, local: {} } }));

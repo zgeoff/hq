@@ -1,6 +1,3 @@
-// After an atc daemon restart, message every session the restart cut off, every
-// live session on the wake list (its background waits died with the daemon),
-// and the orchestrator, whose event watch died too.
 import { toExactOptional } from '@zgeoff/std';
 import type { Database } from 'bun:sqlite';
 import { logEvent } from '../log-event.ts';

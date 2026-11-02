@@ -3,8 +3,6 @@ import type { z } from 'zod';
 import { HqError } from '../errors.ts';
 import { getMeta } from './get-meta.ts';
 
-// A meta value that holds JSON, checked against its schema. A missing key gives the fallback; a
-// value that is not JSON, or does not fit the schema, is bad_meta naming the key.
 export function metaJson<S extends z.ZodType>(db: Database, key: string, schema: S, fallback: z.output<S>): z.output<S> {
   const raw = getMeta(db, key);
   if (raw === null) return fallback;

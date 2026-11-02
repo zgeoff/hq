@@ -4,8 +4,8 @@ import { setMeta } from '../db/set-meta.ts';
 import { addMark } from './add-mark.ts';
 import type { Mark } from './mark-kinds.ts';
 
-// The watcher marks each new hq version the first time it runs. The check, the mark and the
-// checkpoint commit together, so a stop between them or a second watcher never marks it twice.
+// The check, the mark and the checkpoint commit together, so a stop between them or a second
+// watcher never marks an hq version twice.
 export function markVersion(db: Database, version: string, actor: string): Mark | null {
   return db
     .transaction((): Mark | null => {

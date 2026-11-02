@@ -6,13 +6,8 @@ import type { PidFind, RcState } from './types.ts';
 
 const DAY_MS = 86_400_000;
 
-// The pure part: the config file's text (null when it could not be read), the session's pid, and
-// the live process's start time (field 22 of /proc/<pid>/stat; null when unreadable).
-// 'off' needs proof that records are being written (z-stu, option A): the list exists, holds fewer
-// than RC_CAP records, none for this process, and another process wrote one in the last day.
 export function rcFromConfig(text: string | null, found: PidFind, alive: (pid: number) => boolean = pidAlive, start: (pid: number) => string | null = procStart, at: number = Date.now(), boot: number | null = bootTime()): RcState {
   if ('why' in found) return { state: 'unknown', why: found.why };
-  // Both answers need the live process: alive, with a start time to compare.
   if (!alive(found.pid)) return { state: 'unknown', why: `process ${found.pid} is not alive` };
   const live = start(found.pid);
   if (live === null) return { state: 'unknown', why: `process ${found.pid}'s start time can't be read` };
@@ -25,7 +20,6 @@ export function rcFromConfig(text: string | null, found: PidFind, alive: (pid: n
   }
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { state: 'unknown', why: 'the Claude Code config file has an unexpected shape' };
 
-  // From here raw is the config's bridge record list.
   raw = (raw as Record<string, unknown>)['replBridgePlaceholders'];
   if (raw === undefined) {
     return { state: 'unknown', why: 'the config has no bridge record list, so no proof that records are written' };

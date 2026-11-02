@@ -4,7 +4,6 @@ import { now } from '../clock/now.ts';
 import { HqError } from '../errors.ts';
 import type { Source } from './types.ts';
 
-// call:<id> | proposal:<id> | console:<id> | chat:<session>@<time>. Anything else is refused.
 export function parseSource(db: Database, raw: string): Source {
   const consoleAnswer = /^console:(?<id>[A-Za-z0-9._-]+)$/u.exec(raw);
   if (consoleAnswer?.groups?.['id'] !== undefined) {
@@ -28,7 +27,6 @@ export function parseSource(db: Database, raw: string): Source {
   throw new HqError('bad_args', '--source must be call:<id>, proposal:<id>, console:<id> or chat:<typing session id>@<time of the owner\'s message>');
 }
 
-// A console answer's id: a call, proposal or unblock item the owner answered on the console page.
 function requireConsoleSource(db: Database, id: string): Source {
   if (db.query('SELECT 1 FROM asks WHERE id = ? UNION ALL SELECT 1 FROM unblocks WHERE id = ?').get(id, id) === null) {
     throw new HqError('not_found', `no call, proposal or unblock item ${id} in hq`);

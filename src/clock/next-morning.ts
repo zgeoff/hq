@@ -13,8 +13,7 @@ export function nextMorning(d: Date): Date {
   return sydneyToUtc(tomorrow.getUTCFullYear(), tomorrow.getUTCMonth() + 1, tomorrow.getUTCDate(), end);
 }
 
-// The UTC instant of a Sydney wall-clock time. DST-safe: correct the guess by
-// the offset Sydney actually has at that instant, twice.
+// DST-safe: correct the guess by the offset Sydney actually has at that instant, twice.
 function sydneyToUtc(year: number, month: number, day: number, hour: number): Date {
   let guess = Date.UTC(year, month - 1, day, hour);
   for (let i = 0; i < 2; i++) {

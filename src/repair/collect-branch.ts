@@ -1,7 +1,6 @@
 import { HqError } from '../errors.ts';
 import type { Rec } from './types.ts';
 
-// The live branch ends at the last main-chain record in the file; the branch is its ancestors.
 export function collectBranch(byUuid: Map<string, Rec>, recs: Rec[]): Rec[] {
   const last = [...recs].reverse().find((r) => !r.obj.isSidechain);
   if (!last) return [];

@@ -3,7 +3,6 @@ import { findSplit } from './find-split.ts';
 import { parseTranscript as parse } from './parse-transcript.ts';
 import type { Change, Rec, RepairPlan, Split } from './types.ts';
 
-// Plans the repair over parsed records, changing parentUuids in place, one split at a time.
 export function planRepair(text: string): RepairPlan & { recs: Rec[]; lineText: string[] } {
   const { lines, recs } = parse(text);
   const byUuid = new Map(recs.map((r) => [r.obj.uuid, r]));

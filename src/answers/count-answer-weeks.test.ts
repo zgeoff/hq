@@ -25,7 +25,6 @@ function createAnsweredCall(db: Database, id: string, answer: string): void {
 test('each Sydney week counts its call answers and console reviews, not typed lines, newest first', () => {
   const db = setupTest();
 
-  // Wednesday the week before, then Wednesday 14 Oct.
   at('2026-10-07T01:00:00Z');
   createAnsweredCall(db, 'kettle-1', 'yes');
   at(NOON_SYDNEY);

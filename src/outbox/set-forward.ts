@@ -5,7 +5,6 @@ import { forwardOf } from './forward-of.ts';
 import { forwards } from './forwards.ts';
 import { loadForwards as metaForwards } from './load-forwards.ts';
 
-// Set (or with to = null, clear) a forward, and move the unsent messages already queued for `from`.
 export function setForward(db: Database, from: string, to: string | null): { moved: number; merged: number } {
   return db
     .transaction(() => {
@@ -16,7 +15,7 @@ export function setForward(db: Database, from: string, to: string | null): { mov
         if (!(from in stored) && from in declaredForwards()) throw new HqError('bad_args', `${from}'s forward is declared in fleet.json; change it there`);
         delete stored[from];
         // Removing a stored override brings back a declared forward, which can close a loop with
-        // the stored ones (Codex, on hq#108).
+        // the stored ones.
         const after = { ...declaredForwards(), ...stored };
         if (after[from]) {
           const seen = new Set<string>([from]);
@@ -44,7 +43,7 @@ export function setForward(db: Database, from: string, to: string | null): { mov
         for (const r of rows) {
           const key = `hq-ev${r.event_seq}-${dest}`;
           if (db.query('SELECT 1 FROM outbox WHERE idem_key = ?').get(key)) {
-            db.query('DELETE FROM outbox WHERE id = ?').run(r.id); // the same event already reaches dest
+            db.query('DELETE FROM outbox WHERE id = ?').run(r.id);
             merged++;
           } else {
             db.query(`UPDATE outbox SET target = ?, idem_key = ?, status = 'pending', last_error = NULL WHERE id = ?`).run(dest, key, r.id);

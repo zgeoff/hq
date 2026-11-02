@@ -3,7 +3,6 @@ export interface TrimReport {
   file: string;
   dryRun: boolean;
 
-  // false when nothing moved or --dry-run
   written: boolean;
   limitBytes: number;
   targetBytes: number;
@@ -14,7 +13,6 @@ export interface TrimReport {
   backup: string;
 }
 
-// Every filesystem operation hq state trim makes, so a test can inject a failure at any step.
 export interface StateFiles {
   readText: (path: string) => string;
   probeExists: (path: string) => boolean;

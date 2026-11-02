@@ -9,7 +9,6 @@ import { watcherState } from './watcher-state.ts';
 
 const ALERTED = 'watcher_stale_alerted';
 
-// From `hq fleet ensure` (its own timer): tell z-stu once per stale spell, and once when it ends.
 export function watcherAlert(db: Database, actor: string, at: Date = now()): 'alerted' | 'recovered' | null {
   const s = watcherState(db, at);
   return db

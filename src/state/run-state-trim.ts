@@ -15,7 +15,6 @@ export interface StateTrimArgs {
   files: StateFiles;
 }
 
-// Order: backup, archive append, then an atomic replace; no backup, no write.
 export function runStateTrim(args: StateTrimArgs): TrimReport {
   const directory = args.directory;
   const role = args.role;

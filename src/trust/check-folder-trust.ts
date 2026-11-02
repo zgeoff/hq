@@ -1,7 +1,6 @@
-// Claude Code's folder trust (z-stu, 2026-10-16): a session spawned in a folder nobody trusted
-// stops at the trust dialog and hangs silently. Trust lives in ~/.claude.json under
-// projects[<path>].hasTrustDialogAccepted; a trusted parent folder covers its children. hq only
-// reads it: trusting a folder stays a human's answer.
+// A Claude Code session spawned in a folder nobody trusted stops at the trust dialog and hangs
+// silently. Trust lives in ~/.claude.json under projects[<path>].hasTrustDialogAccepted; a trusted
+// parent folder covers its children.
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { getClaudeJson } from './get-claude-json.ts';

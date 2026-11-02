@@ -12,7 +12,6 @@ interface FollowupInput {
   actor: string;
 }
 
-// A follow-up z-review files from a PR's review, recorded when it is filed.
 export function addFollowup(db: Database, input: FollowupInput): Followup {
   const issue = input.issue.toUpperCase();
   if (!ISSUE.test(issue)) {

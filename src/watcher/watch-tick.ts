@@ -43,12 +43,10 @@ import { STEP_MS } from './step-ms.ts';
 import type { WatchDeps } from './types.ts';
 import { withDeadline } from './with-deadline.ts';
 
-// The goals data looks back this far: the weekly's two weeks plus today.
 const LOOKBACK_DAYS = 15;
 
 const msg = (e: unknown) => String((e as Error).message ?? e);
 
-// One pass. True when the tick completed: the lanes reading, the sweep and the send all ran.
 export async function watchTick(db: Database, d: WatchDeps): Promise<boolean> {
   const ms = d.stepMs ?? STEP_MS;
   const unsettled = readUnsettled(d);
@@ -103,18 +101,15 @@ export async function watchTick(db: Database, d: WatchDeps): Promise<boolean> {
       d.log(`${at()} weekly stats failed: ${msg(e)}`);
     }
     try {
-      // Merged PR kinds: yesterday and today, at most every 30 min.
       if (now().getTime() - Date.parse(getMeta(db, 'kinds_synced_at') ?? '1970-01-01T00:00:00Z') > 30 * 60_000) {
         // Linear's side re-reads 2 days: a type set just after an issue closes still lands.
         const kinds = await step('merged PR kinds', () => syncKinds(db, d.run, { from: new Date(now().getTime() - LOOKBACK_DAYS * 86_400_000), maxDays: 3, env: cleanEnv() }));
         setMeta(db, 'kinds_synced_at', at());
 
-        // What the daily check-in trusts, with linear_synced_at.
         if (!kinds.left) {
           setMeta(db, 'kinds_ok_at', at());
         }
 
-        // syncKinds throws on a failed gh call: a fetched day means GitHub answered.
         if (kinds.days.length > 0) {
           clearGhAuth(db);
         }
@@ -134,14 +129,11 @@ export async function watchTick(db: Database, d: WatchDeps): Promise<boolean> {
       d.log(`${at()} merged PR kinds failed: ${msg(e)}`);
     }
     try {
-      // Team-goals numbers: every day of the last LOOKBACK_DAYS not yet fetched (after a gap, the
-      // weekly's two weeks fill again), at most every 30 min.
       if (now().getTime() - Date.parse(getMeta(db, 'goals_synced_at') ?? '1970-01-01T00:00:00Z') > 30 * 60_000) {
         const goals = await step('team goals', (signal) => syncGoals(db, d.run, { from: new Date(now().getTime() - LOOKBACK_DAYS * 86_400_000), maxRepoDays: 80, env: cleanEnv(), signal }));
         const spendFailure = await step('Actions spend', () => refreshActionsSpend(db, d.run, now(), cleanEnv()));
-        setMeta(db, 'goals_synced_at', at()); // the 30-min throttle: set even when a fetch failed
+        setMeta(db, 'goals_synced_at', at());
 
-        // What the daily check-in trusts: repo-days and deploy-prod runs the caps left are not yet counted.
         if (goals.errors.length === 0 && goals.left === 0 && goals.deployLeft === 0) {
           setMeta(db, 'goals_ok_at', at());
         }
@@ -163,10 +155,9 @@ export async function watchTick(db: Database, d: WatchDeps): Promise<boolean> {
       d.log(`${at()} team goals failed: ${msg(e)}`);
     }
     try {
-      // Runs whose merged PRs have all shipped in a release move on, at most every 10 min.
       if (dueForShipPass(db)) {
         const s = await step('releases', () => shipRuns(db, d.run, now()));
-        setMeta(db, CHECKED_AT, at()); // the throttle: set even when a fetch failed
+        setMeta(db, CHECKED_AT, at());
         if (s.moved.length) d.log(`${at()} releases: moved ${s.moved.map((m) => `${m.issue} to ${m.to}`).join(', ')}`);
         if (s.errors.length) d.log(`${at()} releases: ${s.errors.length} problem(s): ${s.errors.slice(0, 2).join('; ')}`);
       }
@@ -208,7 +199,6 @@ export async function watchTick(db: Database, d: WatchDeps): Promise<boolean> {
         d.log(`${at()} run PRs: attached ${facts.attached.join(', ')}`);
       }
 
-      // One line per problem, every one of them: each names the PR that needs a look.
       for (const problem of facts?.errors ?? []) {
         d.log(`${at()} run PRs: ${problem}`);
       }
@@ -217,11 +207,7 @@ export async function watchTick(db: Database, d: WatchDeps): Promise<boolean> {
       d.log(`${at()} run PRs failed: ${msg(error)}`);
     }
     try {
-      // The Linear state of each open run's issue, at most every 10 min: the sweep alerts on a
-      // closed issue. A run whose issue was canceled with no open or merged PR drops only after a
-      // clean GitHub pass in this same tick has attached every new PR.
       if (now().getTime() - Date.parse(getMeta(db, 'run_issues_checked_at') ?? '1970-01-01T00:00:00Z') > 10 * 60_000) {
-        // The throttle: set even when the read fails.
         setMeta(db, 'run_issues_checked_at', at());
         await step('run issues in Linear', () => syncRunIssues(db, makeAuditedLinearCaller(db, d.run)));
         const dropped = dropCanceledRuns(db, d.me, cleanGitHubAt);
@@ -332,8 +318,8 @@ export async function watchTick(db: Database, d: WatchDeps): Promise<boolean> {
   }
 }
 
-// The steps each watcher has started and not yet seen settle. A step the deadline gave up on stays
-// here until its work stops, so a later pass never runs a second copy beside it.
+// A step the deadline gave up on stays here until its work stops, so a later pass never runs a
+// second copy beside it.
 const UNSETTLED = new WeakMap<WatchDeps, Set<string>>();
 
 function readUnsettled(deps: WatchDeps): Set<string> {
@@ -345,12 +331,10 @@ function readUnsettled(deps: WatchDeps): Set<string> {
   return names;
 }
 
-// The step's own caller reports its failure; this only waits for the work to stop.
 async function forgetWhenSettled(work: Promise<unknown>, forget: () => void): Promise<void> {
   try {
     await work;
   } catch {
-    // reported by the caller of withDeadline
   } finally {
     forget();
   }

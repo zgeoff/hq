@@ -5,8 +5,6 @@ import { logEvent } from '../log-event.ts';
 import { getMark } from './get-mark.ts';
 import type { Mark } from './mark-kinds.ts';
 
-// Remove a mistaken mark. The event keeps what it said. A named grant with actions stays, so its
-// actions keep their grant.
 export function dropMark(db: Database, id: number, actor: string): Mark | null {
   return db
     .transaction(() => {

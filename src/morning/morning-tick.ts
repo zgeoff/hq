@@ -1,5 +1,3 @@
-// Morning reports, ready by 08:30 Sydney each day: at 08:15 the watcher tells z-stu the reports are due, with yesterday's and this morning's windows. Each run
-// is a job_runs row, so a missed morning shows in hq health.
 import type { Database } from 'bun:sqlite';
 import { iso } from '../clock/iso.ts';
 import { now } from '../clock/now.ts';
@@ -17,8 +15,7 @@ import { windows } from './windows.ts';
 
 const DUE = { h: 8, m: 15 };
 
-// The watcher's step: once per Sydney day, from 08:15. Check and queue in one write transaction,
-// so two watchers can't both send it.
+// Check and queue in one write transaction, so two watchers can't both send the morning reports.
 export function morningTick(db: Database, actor: string, at: Date = now()): JobRun | null {
   const s = sydney(at);
   if (!past(s, DUE)) return null;

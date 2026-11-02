@@ -1,5 +1,3 @@
-// `hq capabilities`: what this hq can do, as data. A session checks it at start: `--require X.Y.Z`
-// fails when the installed hq is older than the version the session needs. It never opens the db.
 import type { Out } from '../commands.ts';
 import { COMMANDS } from '../commands.ts';
 import { HqError } from '../errors.ts';

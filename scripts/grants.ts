@@ -4,8 +4,6 @@ import { parseArgs } from 'node:util';
 
 const root = resolve(import.meta.dir, '..');
 
-// A checkout the script reads and writes. `name` is set only with --private, so every error and
-// diff says which of the two trees a file came from; without it the output is as it always was.
 interface Tree {
   name: string | null;
   root: string;
@@ -95,7 +93,6 @@ function formatList(notes: string[]): string {
   return `${notes.slice(0, -1).join(', ')}, and ${notes.at(-1)}`;
 }
 
-// A single hunk with common context also covers multiple edits in the same file.
 function renderDiff(file: string, before: string, after: string): string {
   const newLines = after.split('\n'),
     oldLines = before.split('\n');
@@ -127,11 +124,9 @@ function renderDiff(file: string, before: string, after: string): string {
 interface StillAsk {
   afters: Map<string, string>;
 
-  // The owner's other calls, which a site may list as bullets under "Also his:" after the sentence.
   also: string[] | undefined;
   dataFile: string;
 
-  // The sites marked `tree: private`, which hq-private holds and hq's public check skips.
   privateSites: Set<string>;
   sites: Map<string, Voice>;
   textByVoice: Record<Voice, string>;
@@ -163,7 +158,6 @@ function buildStillAsk(dataFile: string, entries: unknown[], items: Item[], also
     afters.set(site, parseText(row.after, 'site.after'));
   }
 
-  // The span regex below needs unique boundary phrases to keep writes idempotent.
   for (const voice of ['first', 'third'] as const) {
     if (!textByVoice[voice].startsWith('deleting or rewriting') || !textByVoice[voice].endsWith('security change')) {
       throw new Error(
@@ -193,7 +187,6 @@ function readStillAsk(tree: Tree): StillAsk {
   return buildStillAsk(dataFile, model.sites, stillAsk, also);
 }
 
-// Each item is stored bare: the check adds the bullet and the closing ";" or ".".
 function parseAlso(value: unknown, where: string): string[] {
   if (!Array.isArray(value) || value.length === 0) {
     throw new Error(`${where}: expected a nonempty list`);
@@ -213,7 +206,6 @@ function parseAlso(value: unknown, where: string): string[] {
   });
 }
 
-// Check the source sites before grant replacement can conceal a missing or extra span.
 function normalizeSite(file: string, body: string, data: StillAsk): string {
   const mentions = [...body.matchAll(/security change/gu)].length,
     spans = [...body.matchAll(/deleting or rewriting\b[^\n]*?\bsecurity change\b/gu)],
@@ -227,8 +219,6 @@ function normalizeSite(file: string, body: string, data: StillAsk): string {
   for (const span of spans) {
     const tail = /^[^.)]*[.)]/u.exec(body.slice(span.index + span[0].length))?.[0] ?? '';
 
-    // The text after the list, up to its sentence end, is pinned too, so a qualifier added
-    // after the last item can't narrow one copy unseen.
     if (tail !== data.afters.get(file)) {
       throw new Error(
         `${file}: the still-ask list is followed by ${JSON.stringify(tail)}, not ${JSON.stringify(data.afters.get(file))} as grants/still-ask.yaml pins`,
@@ -246,22 +236,17 @@ function normalizeSite(file: string, body: string, data: StillAsk): string {
 const ALSO_HEAD = '\n\nAlso his:\n\n';
 const ALSO_WIDTH = 100;
 
-// A site opts in by following the still-ask sentence with "Also his:"; its bullet list, up to the
-// next blank line, must then hold `also` in order. A list that matches once its wrapped lines are
-// joined is left as written; any other list is replaced with `also`, wrapped at 100 columns.
 function renderAlso(file: string, body: string, at: number, also: string[]): string {
   if (!body.startsWith(ALSO_HEAD, at)) {
     return body;
   }
   const start = at + ALSO_HEAD.length;
 
-  // A line that holds only spaces or tabs ends the list as an empty line does.
   const blank = /\n[ \t]*\n/u.exec(body.slice(start));
   const end = blank === null ? body.length - (body.endsWith('\n') ? 1 : 0) : start + blank.index;
   const expected = also.map((item, index) => `- ${item}${index === also.length - 1 ? '.' : ';'}`);
   const found = parseAlsoList(body.slice(start, end));
 
-  // A bullet after a blank line would escape the list and the check; refuse it.
   if (/^\n(?:[ \t]*\n)+[ \t]*- /u.test(body.slice(end))) {
     throw new Error(`${file}: a "- " line follows the "Also his:" list after a blank line; keep every item in the list`);
   }
@@ -271,8 +256,6 @@ function renderAlso(file: string, body: string, at: number, also: string[]): str
   return body.slice(0, start) + expected.map((item) => renderBullet(item.slice(2))).join('\n') + body.slice(end);
 }
 
-// Each item keeps its "- " marker. A line that is neither a bullet nor a continuation is kept
-// whole as an item, so it fails the comparison and a write run replaces it.
 function parseAlsoList(block: string): string[] {
   const items: string[] = [];
   for (const line of block === '' ? [] : block.split('\n')) {
@@ -326,7 +309,6 @@ function renderSessionGrants(file: string, body: string, block: RegExpExecArray,
       updatedBlock = block[0].replace(span[0], () => rendered),
       updatedBody = body.slice(0, block.index) + updatedBlock + body.slice(block.index + block[0].length);
 
-    // A bullet after a blank line would escape the block and the check; refuse it.
     if (/^- /mu.test(rest)) {
       throw new Error(
         `${file}: a "- " line follows the Grants block after a blank line; keep every grant in the block`,
@@ -402,7 +384,6 @@ function formatFile(tree: Tree, file: string): string {
   return tree.name === null ? file : `${tree.name}:${file}`;
 }
 
-// Name the tree in an error, so a failure in a two-tree run says where the file lives.
 function withTree<T>(tree: Tree, run: () => T): T {
   try {
     return run();
@@ -459,8 +440,6 @@ function buildTrees(privateDir: string | undefined): Trees {
   return { all: [hq, prompts], hq, prompts };
 }
 
-// The listed sites still pass through hq's copies, so an empty or wrong private dir would pass the
-// check with nothing in it checked.
 function requirePrivateFiles(tree: Tree): void {
   const grants = collectFiles(tree, 'grants').filter((file) => file.endsWith('.yaml') && file !== 'grants/still-ask.yaml'),
     prompts = [...new Bun.Glob('skills/*/references/session-prompt.md').scanSync({ cwd: tree.root, onlyFiles: true })];
@@ -480,7 +459,6 @@ function readHeld(tree: Tree): Held {
   return { originals: new Map(files.map((file) => [file, read(tree, file)])), tree };
 }
 
-// Every tree is checked for the still-ask span, and a listed site is regenerated in each tree that holds it.
 function collectSites(held: Held[], data: StillAsk): Generated[] {
   const generated: Generated[] = [];
   for (const entry of held) {
@@ -494,7 +472,6 @@ function collectSites(held: Held[], data: StillAsk): Generated[] {
   return generated;
 }
 
-// Only the tree that holds the session prompts gets Grants blocks.
 function renderSessions(entry: Held, context: RenderContext, generated: Generated[]): void {
   for (const [file, body] of entry.originals) {
     const next = withTree(entry.tree, () => renderSession(file, body, context));
@@ -521,8 +498,6 @@ function runTrees(trees: Trees, check: boolean): number {
   return writeGenerated(renderTrees(trees, held, { data, grantsBySession, sessions }), check);
 }
 
-// A private site must be in hq-private, and hq's public check skips it when hq no longer holds it;
-// any other site must be in a tree the run reads.
 function requireSite(file: string, trees: Trees, held: Held[], data: StillAsk): void {
   const isPrivate = data.privateSites.has(file);
   if (isPrivate && trees.all.length > 1 && !held.some((entry) => entry.tree === trees.prompts && entry.originals.has(file))) {
@@ -549,9 +524,6 @@ function renderTrees(trees: Trees, held: Held[], context: RenderContext): Genera
   return generated;
 }
 
-// Without --private, hq is the one tree and holds the grants and the session prompts. With it, the
-// grants and session prompts come from the private tree; the still-ask list stays in hq, and each
-// listed site is processed in every tree that holds it.
 function runMain(): number {
   const args = parseArgs({
     options: { check: { type: 'boolean' }, private: { type: 'string' } },

@@ -3,7 +3,6 @@ import { existsSync } from 'node:fs';
 import { iso } from '../clock/iso.ts';
 import { now } from '../clock/now.ts';
 
-// A copy of hq.db beside it, named for what is about to change it: `<path>.bak-<label>-<time>-<pid>`.
 export function createDBBackup(db: Database, path: string, label: string): string {
   const stamp = iso(now()).replaceAll(/[-:]/gu, '');
   let backup = `${path}.bak-${label}-${stamp}-${process.pid}`;

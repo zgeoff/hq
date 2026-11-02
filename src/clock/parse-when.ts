@@ -1,6 +1,5 @@
 import { HqError } from '../errors.ts';
 
-// Accepts an ISO time, or +30m / +4h / +2d from now.
 export function parseWhen(raw: string, from: Date): Date {
   const rel = /^\+(\d+)([mhd])$/.exec(raw);
   if (rel) {

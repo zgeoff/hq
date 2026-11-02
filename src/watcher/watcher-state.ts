@@ -9,7 +9,9 @@ import type { WatcherState } from './types.ts';
 export function watcherState(db: Database, at: Date = now()): WatcherState {
   const lastTick = getMeta(db, LAST_TICK);
   const since = lastTick ?? getMeta(db, STARTED);
-  if (since === null) return { lastTick, since: null, stale: false, minutes: null }; // never ran: health shows the unit
+  if (since === null) {
+    return { lastTick, since: null, stale: false, minutes: null };
+  }
   const t = Date.parse(since);
   // A time hq can't read, or one in the future, proves nothing: stale until a tick writes a good one.
   if (!/^\d{4}-\d{2}-\d{2}T/.test(since) || !Number.isFinite(t) || t > at.getTime() + 5 * 60_000) return { lastTick, since, stale: true, minutes: null };

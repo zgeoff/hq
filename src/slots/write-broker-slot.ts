@@ -14,7 +14,6 @@ export interface BrokerChange {
   at: Date;
 }
 
-// `hq slots broker <n> --proof T`: the imp broker's slot, with the check that proved it.
 export function writeBrokerSlot(db: Database, change: BrokerChange): BrokerRecord {
   const slot = Number(change.slot);
   if (!/^[1-4]$/u.test(change.slot)) {

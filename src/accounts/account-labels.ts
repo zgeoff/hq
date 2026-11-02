@@ -1,5 +1,3 @@
-// Names for the Claude accounts in usage_samples (goals rhythm). The key is an opaque hash of the
-// login, never an email; the weekly review shows the name set here, else the first 6 characters.
 import type { Database } from 'bun:sqlite';
 import { getMeta } from '../db/get-meta.ts';
 import { ACCOUNT_KEY } from '../goals/account-key.ts';

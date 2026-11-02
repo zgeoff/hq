@@ -1,7 +1,6 @@
 import { expect, test } from 'bun:test';
 import { buildChunkLines } from './build-chunk-lines.ts';
 
-// `decode` runs one chunk against a carry of `parts` and gives back strings to compare.
 function setupTest() {
   return {
     decode: (parts: string[], chunk: string, maxLine: number, skipping = false) => {

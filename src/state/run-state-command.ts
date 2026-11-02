@@ -8,7 +8,6 @@ interface StateCommandArgs extends Omit<StateTrimArgs, 'role'> {
   rest: string[];
 }
 
-// hq state trim <role> [--dry-run]
 export function runStateCommand(args: StateCommandArgs): { data: Record<string, unknown>; text: string } {
   if (args.verb !== 'trim') {
     throw new HqError('bad_args', `unknown command: hq state ${args.verb ?? ''}. Try hq state trim <role> [--dry-run]`);

@@ -12,8 +12,6 @@ function setupTest() {
     return {
       dir,
 
-      // An invented fleet laid out as hq's tree, so no test reads the grants, prompts or docs that
-      // hq itself holds, which can move to hq-private.
       fixture: join(repo, 'scripts/fixtures/grants'),
       run: (args: string[] = ['--check']) =>
         Bun.spawnSync([process.execPath, join(dir, 'scripts/grants.ts'), ...args], {
@@ -470,9 +468,6 @@ const PRIVATE_DOCS = ['delivery-design', 'evaluation', 'refusals', 'roles-design
     'docs/skill-development/roles-design.md',
   ];
 
-// A public root and a private dir split as the two repos are: the private dir holds the grants, the
-// six session prompts and four docs; hq keeps still-ask.yaml and the rest. `shared` leaves the
-// private files in the public root too, as before the move.
 function setupPrivateTest(shared = false) {
   const ctx = setupTest();
   {
@@ -666,7 +661,6 @@ test('without --private the errors are as they were', () => {
   );
 });
 
-// Marks the still-ask sites that only hq-private holds once hq drops its copies.
 function writePrivateSites(dir: string, value = 'private'): void {
   const file = join(dir, 'grants/still-ask.yaml');
   let text = readFileSync(file, 'utf8');

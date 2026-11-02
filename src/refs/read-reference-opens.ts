@@ -1,6 +1,3 @@
-// An open is a Read whose file_path ends in skills/<skill>/references/<file>, or a Bash command
-// that names such a path (cat, sed, head). Files modified before the window are skipped unread;
-// only a line holding a tool_use and a references path is parsed.
 import { match } from 'ts-pattern';
 import { z } from 'zod';
 import { MAX_LINE } from '../refusals/max-line.ts';
@@ -10,11 +7,9 @@ import { buildChunkLines } from './build-chunk-lines.ts';
 import { REFERENCE_MARK } from './reference-mark.ts';
 import type { ChunkCarry } from './types.ts';
 
-// Claude session id -> the references it opened, as `<skill>/references/<file>`.
 export async function readReferenceOpens(directory: string, since: Date, until: Date): Promise<Map<string, Set<string>>> {
   const opens = new Map<string, Set<string>>();
   for (const file of readTranscriptList(directory)) {
-    // The list is newest first: every file after this one is older too.
     if (file.mtimeMs < since.getTime()) {
       break;
     }
@@ -25,7 +20,6 @@ export async function readReferenceOpens(directory: string, since: Date, until: 
   return opens;
 }
 
-// A line that spans chunks is carried; the reader passes on what each chunk completes.
 async function readFileOpens(path: string, onLine: (line: Buffer) => void): Promise<void> {
   let carry: ChunkCarry = { parts: [], length: 0, skipping: false };
   try {
@@ -50,7 +44,6 @@ async function readFileOpens(path: string, onLine: (line: Buffer) => void): Prom
 
 const USE_MARK = Buffer.from('"tool_use"');
 
-// What an open needs of a record; any other shape is not an open.
 const contentSchema = z.array(z.unknown());
 const messageSchema = z.looseObject({ content: contentSchema });
 const recordSchema = z.looseObject({ sessionId: z.string(), timestamp: z.string(), message: messageSchema });

@@ -11,9 +11,6 @@ import { readSkillReferences } from './read-skill-references.ts';
 import type { SessionInfo } from '../atc/session-schema.ts';
 import type { ReferenceCount, ReferenceOptions } from './types.ts';
 
-// hq refs: each role's skill references and how many of the role's sessions opened each in the
-// last `days` days. A transcript maps to a role through atc's list (Claude session id -> atc name):
-// a session atc no longer lists, or one restarted since, counts for no role. atc down throws.
 export async function readReferenceCounts(options: ReferenceOptions): Promise<ReferenceCount[]> {
   const until = now();
   const since = new Date(until.getTime() - options.days * 86_400_000);

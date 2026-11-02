@@ -10,7 +10,6 @@ export function check(forms: Form[], uses: Use[]): Problem[] {
       continue;
     }
     const verbs = new Set(ofTop.map((f) => f.verb).filter((v): v is string => v !== null));
-    // A word after the top is a verb when the top has verbs; with none, it is a positional.
     let match = ofTop.filter((f) => f.verb === u.verb);
     if (u.verb !== null && !verbs.has(u.verb)) {
       if (verbs.size && !ofTop.some((f) => f.verb === null && f.positional)) {

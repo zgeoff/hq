@@ -4,9 +4,7 @@ import { sydneyUtc } from '../morning/sydney-utc.ts';
 import { sydney } from '../morning/sydney.ts';
 import { TZ } from '../morning/tz.ts';
 
-// The weekly audit's 1Password lines, one per Sydney day from `from`: the account's highest reading
-// in the capacity samples, hq's own reads by consumer from the op read events, and the rest as
-// "other". 1Password's day resets on its own clock, not Sydney's, so "other" is approximate.
+// 1Password's day resets on its own clock, not Sydney's, so the "other" reads are approximate.
 export function loadOpWeek(db: Database, from: Date): string {
   const day0 = sydney(from),
     lines = Array.from({ length: 7 }, (_, i) => loadOpDay(db, sydneyUtc(day0.y, day0.mo, day0.d + i), sydneyUtc(day0.y, day0.mo, day0.d + i + 1)));

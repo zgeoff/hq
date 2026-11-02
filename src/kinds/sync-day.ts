@@ -21,7 +21,6 @@ interface GhPr {
   repository: { name: string };
 }
 
-// One UTC day of merges, stored. A past day is recorded as done and never fetched again.
 export async function syncDay(db: Database, run: Runner, day: string, env?: RunOpts['env'], at: Date = now()): Promise<number> {
   const r = await run(['gh', 'search', 'prs', '--owner', 'zgeoff', '--merged', '--merged-at', `${day}T00:00:00Z..${day}T23:59:59Z`, '--json', 'repository,number,title,body,closedAt', '--limit', String(CAP)], toExactOptional({ env }));
   if (r.code !== 0) throw new HqError('command_failed', `gh search prs for ${day} failed (${r.code}): ${(r.stderr || r.stdout).trim().slice(0, 200)}`);
@@ -29,7 +28,6 @@ export async function syncDay(db: Database, run: Runner, day: string, env?: RunO
   if (!Array.isArray(raw)) throw new HqError('command_failed', `gh search prs for ${day} did not return a list`);
   const all = raw as GhPr[];
   if (all.length >= CAP) throw new HqError('too_many', `${day} has ${CAP}+ merged PRs, more than one search returns; not recorded`);
-  // A merge time is an ISO instant inside the day asked for; a repo name is GitHub's.
   const inDay = (t: unknown) => typeof t === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/.test(t) && t.slice(0, 10) === day;
   const bad = all.find((p) => !Number.isSafeInteger(p?.number) || p.number < 1 || typeof p.title !== 'string' || !inDay(p.closedAt) || typeof p.repository?.name !== 'string' || !/^[A-Za-z0-9_.-]{1,100}$/.test(p.repository.name) || /^\.+$/.test(p.repository.name));
   if (bad) throw new HqError('command_failed', `gh search prs for ${day} returned a row hq can't read; not recorded`);

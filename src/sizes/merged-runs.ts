@@ -2,9 +2,6 @@ import type { Database } from 'bun:sqlite';
 import { getCutoff as cutoff } from '../stats/get-cutoff.ts';
 import type { SizedRun } from './types.ts';
 
-// Finished runs (past the merge, no PR still open) whose last PR merge falls in the window,
-// with their merged PRs: a run half merged would compare the whole guess with part of the work.
-// A design pass PR is no part of the build its run turned into.
 export function mergedRuns(db: Database, from: string, to: string): SizedRun[] {
   const lo = from < cutoff() ? cutoff() : from;
   const rows = db

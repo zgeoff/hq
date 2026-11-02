@@ -7,7 +7,6 @@ import { readOutboxStatus } from './read-outbox-status.ts';
 import { sydney } from './sydney.ts';
 import { TARGET } from './target.ts';
 
-// For hq health: after 08:45 Sydney, today needs a run, and a queued message must not have failed.
 export function morningCheck(db: Database, at: Date): { key: string; ok: boolean; line: string } | null {
   const s = sydney(at);
   if (!past(s, LATE)) return null;

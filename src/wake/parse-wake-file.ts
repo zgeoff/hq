@@ -1,4 +1,3 @@
-// The old wake-sessions.txt format: "<session id> <name>" per line, # comments.
 export function parseWakeFile(text: string): { id: string; name: string }[] {
   return text
     .split('\n')

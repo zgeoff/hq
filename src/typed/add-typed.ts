@@ -1,6 +1,3 @@
-// Typed lines: each line a session types into another session as the owner (today z-stu, through
-// atc_terminal_type), with where the owner said it. An audit trail the owner reads when something
-// looks off.
 import type { Database } from 'bun:sqlite';
 import { iso } from '../clock/iso.ts';
 import { now } from '../clock/now.ts';

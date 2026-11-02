@@ -2,7 +2,6 @@ import { fmtMin } from './fmt-min.ts';
 import { formatPct as pct } from './format-pct.ts';
 import type { Dist, Stats } from './types.ts';
 
-// Before/after a mark: the headline numbers side by side.
 export function compareText(mark: { id: number; at: string; text: string }, before: Stats, after: Stats): string {
   const row = (name: string, b: string, a: string) => `  ${name.padEnd(34)} ${b.padEnd(16)} ${a}`;
   const dd = (x: Dist) => `${fmtMin(x.medianMin)} (n=${x.n})`;

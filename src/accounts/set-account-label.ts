@@ -7,7 +7,6 @@ import { accountLabels } from './account-labels.ts';
 import { ACCOUNT_NAME_RE } from './account-name-re.ts';
 import { NAME_MAX } from './name-max.ts';
 
-// hq goals account <key> <name> | hq goals account <key> none
 export function setAccountLabel(db: Database, key: string, name: string, actor: string): string | null {
   if (!ACCOUNT_KEY.test(key)) throw new HqError('bad_args', 'the account key must be 12 lowercase hex characters, as hq goals shows it');
   const clear = name === 'none';

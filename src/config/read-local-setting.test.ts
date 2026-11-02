@@ -5,7 +5,6 @@ import { join } from 'node:path';
 import { readLocalSetting } from './read-local-setting.ts';
 import { readLocalSettings } from './read-local-settings.ts';
 
-// A temporary folder for the local file; each test writes its own file there.
 function setupTest() {
   const dir = mkdtempSync(join(tmpdir(), 'hq-local-config-')),
     file = join(dir, 'local.json');

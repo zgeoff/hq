@@ -1,5 +1,3 @@
-// Change marks: when the system changed (a skills PR, a grant, an hq release), so stats can
-// show a number before and after.
 import type { Database } from 'bun:sqlite';
 import { iso } from '../clock/iso.ts';
 import { now } from '../clock/now.ts';

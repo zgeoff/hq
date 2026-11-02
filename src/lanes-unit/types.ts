@@ -1,7 +1,7 @@
 export interface LanesUnitOpts {
-  exec: string[]; // the command that runs this hq
-  interval: number; // seconds between looks
-  env: Record<string, string>; // HQ_AS, PATH and hq's own HQ_ settings
+  exec: string[];
+  interval: number;
+  env: Record<string, string>;
 }
 
 export interface InstallResult {

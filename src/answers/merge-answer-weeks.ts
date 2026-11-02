@@ -2,8 +2,6 @@ import type { Out } from '../commands.ts';
 import { sydney } from '../morning/sydney.ts';
 import type { AnswerWeek } from './types.ts';
 
-// `hq stats` with the owner's yes/no count per Sydney week: in its data, and as a section right after
-// "Wait on the owner", the second block of the text.
 export function mergeAnswerWeeks(stats: Out, weeks: readonly AnswerWeek[]): Out {
   const blocks = stats.text.split('\n\n');
   return { data: { ...stats.data, answerWeeks: weeks }, text: [...blocks.slice(0, 2), formatAnswerWeeks(weeks).join('\n'), ...blocks.slice(2)].join('\n\n') };

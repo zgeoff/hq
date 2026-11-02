@@ -16,8 +16,8 @@ test('log events: a full time, or HH:MMZ on the last dated day; a time far behin
   expect(logEvents([text])).toEqual([
     { kind: 'DEPLOY', at: '2026-10-13T22:30:00Z' },
     { kind: 'HOLD', at: '2026-10-13T23:10:00Z' },
-    { kind: 'DEPLOY', at: '2026-10-14T01:20:00Z' }, // 01:20 after 23:10: the next UTC day
-    { kind: 'HOLD', at: '2026-10-15T03:00:00Z' }, // a line with no time takes the last line's
+    { kind: 'DEPLOY', at: '2026-10-14T01:20:00Z' },
+    { kind: 'HOLD', at: '2026-10-15T03:00:00Z' },
     { kind: 'HOLD', at: '2026-10-15T04:00:00Z' },
   ]);
 });

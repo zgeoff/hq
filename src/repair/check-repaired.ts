@@ -3,8 +3,6 @@ import { collectBranch as branch } from './collect-branch.ts';
 import { findSplit } from './find-split.ts';
 import { parseTranscript as parse } from './parse-transcript.ts';
 
-// After a repair: every line parses, every parent exists, the chain has no loop and no split, and
-// the last last-prompt leaf sits on the live branch.
 export function checkRepaired(text: string): { ok: true; leaf: string | null; promptLeaf: string | null } {
   const { recs } = parse(text);
   const byUuid = new Map(recs.map((r) => [r.obj.uuid, r]));

@@ -16,8 +16,6 @@ import { match } from 'ts-pattern';
 import { loadNixState } from './load-nix-state.ts';
 import type { Band, BandSegment } from './types.ts';
 
-// The band's line from what hq already stores; it runs no probe, script or network call, so a
-// read every minute costs a few queries. Each segment says how it is drawn.
 export async function loadBand(db: Database, pacingFile: string, at: Date = now()): Promise<Band> {
   const segments = [buildNeedsSegment(db), buildNixSegment(db, at), await loadLanesSegment(db, pacingFile, at), buildCISegment(db, at), buildReviewsSegment(db, at)];
   return { at: iso(at), segments, line: segments.map((segment) => segment.text).join(' · ') };
@@ -36,9 +34,6 @@ function buildNixSegment(db: Database, at: Date): BandSegment {
     .exhaustive();
 }
 
-// The runs that hold a slot against the slot caps, then impd's non-Nix use against its lines. Amber
-// when the runs of either place exceed its cap, when one more imp would cross either impd line, when no impd reading
-// is 15 minutes fresh, or when the imp cap, all full, would cross one ("plan 18/16 GiB").
 async function loadLanesSegment(db: Database, pacingFile: string, at: Date): Promise<BandSegment> {
   const pacing = await loadPacing(pacingFile);
   return pacing.slots === null ? { key: 'lanes', text: 'lanes ?', tone: 'warn' } : loadLanesFromConfig(db, at, pacing.slots, pacing.impMib);
@@ -89,8 +84,6 @@ function buildImpdLine(awakeMib: number, awakeVcpus: number, settings: CapacityS
   return { text: `impd ${gib}, ${vcpus}`, near };
 }
 
-// Each workflow's newest finished push run of the last 24 hours; red when any of those failed.
-// Unknown when the goals sync has stored no run in 2 hours.
 function buildCISegment(db: Database, at: Date): BandSegment {
   const DAY_MS = 86_400_000,
     STALE_MS = 2 * 3_600_000,
@@ -109,7 +102,6 @@ function buildCISegment(db: Database, at: Date): BandSegment {
   return failed.n === 0 ? { key: 'ci', text: 'CI green', tone: 'ok' } : { key: 'ci', text: `CI ${failed.n} red`, tone: 'alert' };
 }
 
-// Open PRs whose review started in the last 24 hours and has not finished.
 function buildReviewsSegment(db: Database, at: Date): BandSegment {
   const DAY_MS = 86_400_000,
     cutoff = iso(new Date(at.getTime() - DAY_MS)),

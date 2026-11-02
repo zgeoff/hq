@@ -1,5 +1,3 @@
-// hq's send (GEO-1021, from cli.ts): the rows a command queued, inline or through a detached
-// unit when the command runs inside an atc session.
 import { toExactOptional } from '@zgeoff/std';
 import type { Database } from 'bun:sqlite';
 import { config } from '../config/config.ts';
@@ -14,7 +12,6 @@ import { hqSetenv } from '../runner/hq-setenv.ts';
 import { awaitDetached } from './await-detached.ts';
 import { sendWaitMs } from './send-wait-ms.ts';
 
-// `scope` is the ids of the rows this command queued, or 'all' for `hq outbox flush`.
 export async function send(
   db: Database,
   scope: number[] | 'all',

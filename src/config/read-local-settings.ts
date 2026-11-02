@@ -16,7 +16,6 @@ function loadIfPresent(path: string, mtimeMs: number | null): Record<string, str
   return mtimeMs === null ? {} : load(path, mtimeMs);
 }
 
-// Null for a file that is not there; any other failure to stat it is a bad_config naming the cause.
 function readModifiedTime(path: string): number | null {
   try {
     return statSync(path).mtimeMs;

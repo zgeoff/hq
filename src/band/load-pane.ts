@@ -20,9 +20,7 @@ import { match } from 'ts-pattern';
 import { loadNixState } from './load-nix-state.ts';
 import type { Pane, PaneHeatRow } from './types.ts';
 
-// The /hq pane's detail behind the band, from what hq already stores: what needs the owner with its
-// links, Nix today, what holds each lane, reviews in flight, what merged today, and the newest
-// news. Links are Markdown, so the terminal makes them clickable.
+// Links are Markdown, so the terminal makes them clickable.
 export async function loadPane(db: Database, pacingFile: string, consoleURL: string, at: Date = now()): Promise<Pane> {
   const config = await loadPacing(pacingFile),
     held = collectHeldIssues(db, at),
@@ -54,8 +52,6 @@ function loadNixSection(db: Database, at: Date): string {
   return `## Nix\n${state} · ${today.downMinutes} min down today`;
 }
 
-// Each lane's slots and the runs that hold them; a parked run holds no slot and says so. A plan
-// over impd's line comes first, in bold, as the band shows it in amber.
 function renderLanesSection(lanes: readonly LaneConfig[], held: Map<string, HeldIssue[]>, error: string | null, overage: string | null): string {
   if (error !== null) {
     return `## Lanes\nhq can't read the lanes: ${error}`;
@@ -68,8 +64,7 @@ function renderLanesSection(lanes: readonly LaneConfig[], held: Map<string, Held
   return ['## Lanes', ...(overage === null ? [] : [`**The imp lanes, all full, cross impd's line: ${overage}**`]), ...(rows.length === 0 ? ['No lanes in pacing.json.'] : rows)].join('\n');
 }
 
-// The lane's true use, as the band counts it; bold when the runs exceed its size, since Markdown
-// has no amber.
+// Bold when the runs exceed the lane's size, since Markdown has no amber.
 function formatLaneCount(used: number, size: number): string {
   return used > size ? `**${used}/${size}**` : `${used}/${size}`;
 }
@@ -84,7 +79,6 @@ function loadReviewsSection(db: Database, at: Date): string {
   return [`## Reviews in flight (${rows.length})`, ...(rows.length === 0 ? ['None.'] : shownRows)].join('\n');
 }
 
-// PRs hq saw merge since Sydney midnight.
 function loadShippedSection(db: Database, consoleURL: string, at: Date): string {
   const batch = db.query('SELECT ref, issue FROM run_prs WHERE merged_at >= ?').all(iso(getSydneyMidnight(at))) as { ref: string; issue: string }[],
     issues = new Set(batch.map((pr) => pr.issue)).size,
@@ -92,7 +86,6 @@ function loadShippedSection(db: Database, consoleURL: string, at: Date): string 
   return `## Shipped today\n${formatCount(batch.length, 'PR')} in ${formatCount(repos, 'repo')}, for ${formatCount(issues, 'issue')} · [Shipped tab](${consoleURL}shipped)`;
 }
 
-// The newest news lines, read or not, newest first.
 function loadNewsSection(db: Database): string {
   const LIMIT = 5,
     items = db.query('SELECT * FROM news ORDER BY id DESC LIMIT ?').all(LIMIT) as NewsItem[];
@@ -104,7 +97,6 @@ interface HeldIssue {
   parked: boolean;
 }
 
-// The running runs of each lane, a parked one marked.
 function collectHeldIssues(db: Database, at: Date): Map<string, HeldIssue[]> {
   const byLane = new Map<string, HeldIssue[]>(),
     parked = new Set(parkedRuns(db, at).map((run) => run.issue)),
@@ -120,7 +112,6 @@ function buildHeatRow(lane: LaneConfig, held: Map<string, HeldIssue[]>): PaneHea
   return { lane: lane.name, size: lane.size, used };
 }
 
-// A run PR's ref is repo#n in zgeoff's account, as hq run pr records it.
 function buildPRURL(ref: string): string {
   const [repo, number] = ref.split('#');
   return `https://github.com/zgeoff/${repo}/pull/${number}`;

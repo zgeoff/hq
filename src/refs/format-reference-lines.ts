@@ -1,6 +1,5 @@
 import type { ReferenceCount } from './types.ts';
 
-// One block per role that owns references: the role, then `<count>  <reference>`, zeros first.
 export function formatReferenceLines(counts: ReferenceCount[], days: number): string {
   const roles = [...new Set(counts.map((item) => item.role))];
   if (roles.length === 0) {

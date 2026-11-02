@@ -1,5 +1,3 @@
-// The Nix uptime probe: one check a minute of Nix's /health/live, and of /health/ready while live
-// answers, from this PC. Live failing is down; live fine but ready failing for UNREADY_AFTER_MIN is unready.
 // A failure only counts as Nix being down when a known-up control URL answers; when both fail,
 // the PC's own network, DNS or sleep is the cause, and the sample is blind.
 import type { Database } from 'bun:sqlite';
@@ -23,7 +21,6 @@ export async function probeOnce(db: Database, fetcher: Fetcher, actor: string): 
   const t = await fetcher(readLocalSetting('HQ_PROBE_TARGET'));
   const c = t.ok ? null : await fetcher(control());
   const state: ProbeState = t.ok ? 'up' : c?.ok ? 'down' : 'blind';
-  // Ready is asked only while live answers; a failing live check is the down logic's.
   let r: Awaited<ReturnType<Fetcher>> | null = null;
   if (t.ok) {
     r = await fetcher(readLocalSetting('HQ_PROBE_READY'));
@@ -40,7 +37,8 @@ export async function probeOnce(db: Database, fetcher: Fetcher, actor: string): 
     if (state === 'up' && open) {
       const seq = logEvent(db, 'hq', 'probe', 'recovered', actor, null, null, { outage: open.id, started_at: open.started_at, ended_at: at });
       db.query('UPDATE outages SET ended_at = ?, recover_seq = ? WHERE id = ?').run(at, seq, open.id);
-      // The same count as downtime(): minutes the PC could not see are blind, not down.
+
+      // Minutes the PC could not see are blind, not down.
       const d = downtime(db, new Date(open.started_at), new Date(at));
       const blind = d.blindMinutes ? `; hq could not see ${d.blindMinutes} min of it (the PC was offline)` : '';
       tell(db, seq, `Nix is back: down ${d.downMinutes} min (${formatClock(open.started_at)}–${formatClock(at)} Sydney${blind}).`);
@@ -64,7 +62,6 @@ export async function probeOnce(db: Database, fetcher: Fetcher, actor: string): 
       tell(db, seq, `Nix is ready again: unready ${mins} min (${formatClock(unready.started_at)}–${formatClock(at)} Sydney).`, 'nix-unready');
       unreadyClosed = unready.id;
     } else if (r && !r.ok && !unready) {
-      // Minutes of failing ready checks, with live fine, that open an unready outage.
       const UNREADY_AFTER_MIN = 3,
         run = unreadyRun(db);
       const startedAt = run[run.length - 1];
@@ -79,18 +76,15 @@ export async function probeOnce(db: Database, fetcher: Fetcher, actor: string): 
     const cutoff = iso(new Date(now().getTime() - KEEP_DAYS * 86_400_000));
     db.query('DELETE FROM probe_samples WHERE at < ?').run(cutoff);
   }).immediate();
-  // Outage alerts are not held over quiet hours (no isQuiet check): an outage is what the probe
-  // exists to catch within 5 min. `hq probe run` sends the rows it queued as it ends, through the
-  // same send as every command (main), which reports a failed send; not at the watcher's next tick.
+
+  // Outage alerts are not held over quiet hours: an outage is what the probe exists to catch
+  // within 5 min.
   return { state, ...(opened !== undefined ? { opened } : {}), ...(closed !== undefined ? { closed } : {}), ...(r ? { ready: r.ok } : {}), ...(unreadyOpened !== undefined ? { unreadyOpened } : {}), ...(unreadyClosed !== undefined ? { unreadyClosed } : {}), ms: t.ms };
 }
 
-// The control URL, overridable in config; the live and ready URLs come from the local settings.
 const CONTROL = 'https://api.github.com/zen';
 const control = () => config().HQ_PROBE_CONTROL ?? CONTROL;
 
-// Samples in the current unready run, newest first. Down and blind samples (target_ok = 0) belong to
-// the down logic and are skipped; a ready one, or one from before v19 (ready_ok NULL), ends the run.
 function unreadyRun(db: Database): string[] {
   const rows = db.query('SELECT at, target_ok, ready_ok FROM probe_samples WHERE target_ok = 1 ORDER BY at DESC LIMIT 200').all() as { at: string; target_ok: number; ready_ok: number | null }[];
   const run: string[] = [];
@@ -101,7 +95,6 @@ function unreadyRun(db: Database): string[] {
   return run;
 }
 
-// Samples that count toward a run of downs, newest first: blind ones are filtered out before the limit, an up one ends the run.
 function downRun(db: Database): string[] {
   const rows = db.query(`SELECT at, target_ok, control_ok FROM probe_samples WHERE NOT (target_ok = 0 AND control_ok = 0) ORDER BY at DESC LIMIT 50`).all() as { at: string; target_ok: number; control_ok: number | null }[];
   const run: string[] = [];
@@ -112,7 +105,6 @@ function downRun(db: Database): string[] {
   return run;
 }
 
-// z-stu decides whether to wake the owner; z-delivery starts the fix (GEO-1104). Both hear at once.
 // Each kind has its own topic: a newer message replaces an unsent one of the same topic, so a
 // "ready again" must never replace an unsent "Nix is back" or "Nix is down".
 function tell(db: Database, seq: number, text: string, topic: 'nix-outage' | 'nix-unready' = 'nix-outage'): void {

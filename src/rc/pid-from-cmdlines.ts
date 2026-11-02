@@ -1,8 +1,8 @@
 import type { PidFind } from './types.ts';
 
-// The claude process of a session: atc starts it with `--add-dir <state>/atc/sessions/<id>/...`.
-// Only an argument that follows --add-dir counts, so a shell or an editor that merely mentions
-// the path does not. Exactly one process must match.
+// atc starts a session's claude process with `--add-dir <state>/atc/sessions/<id>/...`. Only an
+// argument that follows --add-dir counts, so a shell or an editor that merely mentions the path
+// does not.
 export function pidFromCmdlines(sessionId: string, procs: { pid: number; args: string[] }[]): PidFind {
   const dir = `/atc/sessions/${sessionId}`;
   const isDir = (a: string) => a.endsWith(dir) || a.includes(`${dir}/`);

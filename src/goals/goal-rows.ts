@@ -18,7 +18,7 @@ export function goalRows(db: Database, days: number, at: Date = now()): { weeks:
     const hi = sydneyUtc(s.y, s.mo, s.d - i + 1).getTime();
     dayRows.push(row(db, fmt(lo), lo, hi, at, log));
   }
-  const dow = (new Date(Date.UTC(s.y, s.mo - 1, s.d)).getUTCDay() + 6) % 7; // 0 = Monday
+  const dow = (new Date(Date.UTC(s.y, s.mo - 1, s.d)).getUTCDay() + 6) % 7;
   const weekRows: GoalRow[] = [];
   for (const k of [1, 0]) {
     const lo = sydneyUtc(s.y, s.mo, s.d - dow - 7 * k).getTime();

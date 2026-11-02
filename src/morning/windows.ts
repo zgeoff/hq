@@ -6,7 +6,7 @@ import { TZ } from './tz.ts';
 export function windows(at: Date): Windows {
   const s = sydney(at);
   const midnight = sydneyUtc(s.y, s.mo, s.d);
-  const yStart = sydney(new Date(midnight.getTime() - 12 * 3_600_000)); // a time on the previous Sydney day
+  const yStart = sydney(new Date(midnight.getTime() - 12 * 3_600_000));
   const day = (x: Date) => new Intl.DateTimeFormat('en-AU', { timeZone: TZ, weekday: 'short', day: 'numeric', month: 'short' }).format(x);
   const from = sydneyUtc(yStart.y, yStart.mo, yStart.d);
   return {

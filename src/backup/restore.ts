@@ -14,7 +14,6 @@ interface RestoreOptions {
 const SnapshotSchema = z.looseObject({ paths: z.array(z.string()) });
 const SnapshotsSchema = z.array(SnapshotSchema);
 
-// Restore one snapshot into an empty or new directory. Never writes over live state.
 // restic restores each file under its path when backed up, so hq.db is found from the snapshot's
 // own paths: a snapshot taken under another HOME or backup dir staged it somewhere else.
 export async function restore(run: Runner, to: string, opts: RestoreOptions): Promise<{ to: string; db: string | null }> {
@@ -29,8 +28,6 @@ export async function restore(run: Runner, to: string, opts: RestoreOptions): Pr
   }
 }
 
-// Beside the directory, not in it, so the restore lands in a directory that holds only the snapshot.
-// Held from the emptiness check to the end, so a second restore to the same place cannot mix in.
 function createRestoreLock(to: string): string {
   const lock = `${resolve(to)}.restore-lock`;
   mkdirSync(dirname(lock), { recursive: true });

@@ -1,4 +1,3 @@
-// Every Linear issue a PR body says it contributes to, in order, once each.
 export function parseContributedIssues(body: string | null | undefined): string[] {
   if (!body) {
     return [];

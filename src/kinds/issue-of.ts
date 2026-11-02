@@ -1,4 +1,3 @@
-// The Linear issue a PR body names: Fixes first, then Contributes to, then Related to.
 export function issueOf(body: string | null | undefined): string | null {
   if (!body) return null;
   for (const rel of ['Fixes', 'Contributes to', 'Related to']) {
