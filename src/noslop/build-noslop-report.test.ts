@@ -265,6 +265,7 @@ test('it throws on a check round whose stored open findings are corrupt', () => 
   const ctx = setupTest();
   ctx.addRound({ findings: [ctx.boilFinding] });
   ctx.addRound({ kind: 'check', conclusion: 'success' });
+
   // recordRound's types cannot write a corrupt row, so the test corrupts the stored one
   ctx.db.run(`UPDATE noslop_rounds SET open = '[{"id":42}]' WHERE kind = 'check'`);
 
