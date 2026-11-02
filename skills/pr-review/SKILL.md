@@ -85,7 +85,12 @@ as stacks.md says.
 
 Once `gh pr view <n> -R zgeoff/<repo> --json state,mergeCommit` shows `MERGED`:
 
-1. For `Contributes to` an umbrella issue, tick this repo's box in its Scope.
+1. When the PR body has `Contributes to` an umbrella issue, tick this repo's box in the issue's
+   Scope. An umbrella issue has a Scope checklist with a box per repo, as the
+   [tickets](../tickets/SKILL.md) skill writes it. When you tick the last open box, close the issue:
+   - If it owes no live check under [Once live](../evidence/SKILL.md#once-live), move it to Done.
+     If `hq run show <issue>` finds its delivery run, also run `hq run done <issue>`.
+   - If it owes one, move it to In Review, and leave its delivery run at `live-check` for `z-qa`.
 2. Message `z-release` "merged, ready to release: <repo>#<n> <merge sha> (GEO-n)", plus `test-only`
    when every path is a test. A PR another session sent: tell that session instead.
 3. Post it to `hq news` if the owner would notice.
