@@ -16,8 +16,8 @@ test('seeded capacity samples read back as the watch reads its newest one, a lat
       { at: '2026-10-16T01:00:00Z', nonnixAwakeMib: 8192 },
       { at: '2026-10-16T01:05:00Z', nonnixAwakeMib: 14_336 },
       { at: '2026-10-16T01:05:00Z', nonnixAwakeMib: 16_384 },
-    ),
-    newest = await latestSample(db);
+    );
+  const newest = await latestSample(db);
   expect(newest).toMatchObject({ at: '2026-10-16T01:05:00Z', nonnix_awake_mib: 16_384, impd_budget_mib: null, errors: {} });
   expect(db.query('SELECT COUNT(*) AS n FROM capacity_samples').get()).toStrictEqual({ n: 2 });
 });

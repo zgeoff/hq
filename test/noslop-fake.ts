@@ -233,10 +233,10 @@ function isRealGit(script: FakeScript, cmd: string[]): boolean {
 }
 
 export function buildFakeRunner(script: FakeScript = {}): FakeRunner {
-  const calls: FakeCall[] = [],
-    run: Runner = (cmd, opts) => {
-      calls.push({ cmd, opts });
-      return isRealGit(script, cmd) ? realRunner(cmd, opts) : Promise.resolve(pickAnswer(script, cmd, opts));
-    };
+  const calls: FakeCall[] = [];
+  const run: Runner = (cmd, opts) => {
+    calls.push({ cmd, opts });
+    return isRealGit(script, cmd) ? realRunner(cmd, opts) : Promise.resolve(pickAnswer(script, cmd, opts));
+  };
   return { run, calls, lines: () => calls.map((c) => c.cmd.join(' ')), of: (program) => calls.filter((c) => c.cmd[0] === program) };
 }

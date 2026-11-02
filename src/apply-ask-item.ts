@@ -14,9 +14,9 @@ export type AskItemInput = Omit<AddInput, 'title' | 'question' | 'body'>;
 export function applyAskItem(db: Database, input: AskItemInput, item: ItemInput, body: string): AddResult {
   return db
     .transaction((): AddResult => {
-      const added = addAsk(db, { ...input, title: item.title, question: item.question, body }),
-        extras = JSON.stringify(splitItemExtras(item)),
-        stuView = item.stuView ?? added.ask.stu_view;
+      const added = addAsk(db, { ...input, title: item.title, question: item.question, body });
+      const extras = JSON.stringify(splitItemExtras(item));
+      const stuView = item.stuView ?? added.ask.stu_view;
       if (added.note !== undefined) {
         return added;
       }

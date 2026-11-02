@@ -21,8 +21,8 @@ export interface ConsoleAnswerInput {
 export function recordConsoleAnswer(db: Database, input: ConsoleAnswerInput): Ask {
   return db
     .transaction((): Ask => {
-      const before = requireAsk(db, input.id),
-        text = formatConsoleAnswer(checkOption(before, input.option), input.note);
+      const before = requireAsk(db, input.id);
+      const text = formatConsoleAnswer(checkOption(before, input.option), input.note);
       if (before.state === 'open') {
         return recordAnswerMessage(db, answerAsk(db, { id: before.id, kind: before.kind, answer: text, actor: input.actor }), text, input.actor);
       }

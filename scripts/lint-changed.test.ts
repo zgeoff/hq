@@ -16,40 +16,6 @@ const DIFF = [
   '+++ b/src/teapot.ts',
   '@@ -0,0 +1,2 @@',
   '+export const spout = 1;',
-].join('\n'),
-  MOVE_DIFF = [
-  'diff --git a/src/kettle.ts b/src/kettle.ts',
-  '--- a/src/kettle.ts',
-  '+++ b/src/kettle.ts',
-  '@@ -20,5 +19,0 @@',
-  '-function boilWater(litres) {',
-  '-  const minutes = litres * 3;',
-  '-  return minutes;',
-  '-}',
-  '-const spoutAngle = 40;',
-  '@@ -60,3 +55,0 @@',
-  '-export function pourTea(cups) {',
-  '-  if (cups > 4) return null;',
-  '-  return cups * 250;',
-  'diff --git a/src/kettle/boil-water.ts b/src/kettle/boil-water.ts',
-  'new file mode 100644',
-  '--- /dev/null',
-  '+++ b/src/kettle/boil-water.ts',
-  '@@ -0,0 +1,6 @@',
-  '+// Boils the water.',
-  '+function boilWater(litres) {',
-  '+  const minutes = litres * 3;',
-  '+  return minutes;',
-  '+}',
-  '+const spoutAngle = 45;',
-  'diff --git a/src/teapot.ts b/src/teapot.ts',
-  '--- a/src/teapot.ts',
-  '+++ b/src/teapot.ts',
-  '@@ -8,0 +9,4 @@',
-  '+export function pourTea(cups) {',
-  '+  if (cups > 6) return null;',
-  '+  return cups * 250;',
-  '+}',
 ].join('\n');
 
 function buildDiagnostic(filename: string, line: number): Parameters<typeof isChanged>[0] {
@@ -94,7 +60,41 @@ describe('isChanged', () => {
 
 
 describe('moved lines', () => {
-  const changes = parseChanges(MOVE_DIFF);
+  const moveDiff = [
+    'diff --git a/src/kettle.ts b/src/kettle.ts',
+    '--- a/src/kettle.ts',
+    '+++ b/src/kettle.ts',
+    '@@ -20,5 +19,0 @@',
+    '-function boilWater(litres) {',
+    '-  const minutes = litres * 3;',
+    '-  return minutes;',
+    '-}',
+    '-const spoutAngle = 40;',
+    '@@ -60,3 +55,0 @@',
+    '-export function pourTea(cups) {',
+    '-  if (cups > 4) return null;',
+    '-  return cups * 250;',
+    'diff --git a/src/kettle/boil-water.ts b/src/kettle/boil-water.ts',
+    'new file mode 100644',
+    '--- /dev/null',
+    '+++ b/src/kettle/boil-water.ts',
+    '@@ -0,0 +1,6 @@',
+    '+// Boils the water.',
+    '+function boilWater(litres) {',
+    '+  const minutes = litres * 3;',
+    '+  return minutes;',
+    '+}',
+    '+const spoutAngle = 45;',
+    'diff --git a/src/teapot.ts b/src/teapot.ts',
+    '--- a/src/teapot.ts',
+    '+++ b/src/teapot.ts',
+    '@@ -8,0 +9,4 @@',
+    '+export function pourTea(cups) {',
+    '+  if (cups > 6) return null;',
+    '+  return cups * 250;',
+    '+}',
+  ].join('\n');
+  const changes = parseChanges(moveDiff);
 
   test('a block moved into a new file is not linted, though the file is new', () => {
     for (const line of [2, 3, 4, 5]) {
@@ -112,7 +112,7 @@ describe('moved lines', () => {
   });
 
   test('a block moved between existing files, unedited, is not linted', () => {
-    const moved = parseChanges(MOVE_DIFF.replace("'+  if (cups > 6) return null;'", '').replace('+  if (cups > 6) return null;', '+  if (cups > 4) return null;'));
+    const moved = parseChanges(moveDiff.replace("'+  if (cups > 6) return null;'", '').replace('+  if (cups > 6) return null;', '+  if (cups > 4) return null;'));
 
     expect([9, 10, 11].map((line) => isChanged(buildDiagnostic('src/teapot.ts', line), moved))).toStrictEqual([false, false, false]);
     expect(isChanged(buildDiagnostic('src/teapot.ts', 12), moved)).toBe(true);

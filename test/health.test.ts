@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test';
 import { toExactOptional } from '@zgeoff/std';
 import type { Database } from 'bun:sqlite';
+import assert from 'node:assert';
 import { applyHealth } from '../src/health/apply-health.ts';
 import { HEALTH_DEFAULTS } from '../src/health/health-defaults.ts';
 import { healthSettings } from '../src/health/health-settings.ts';
@@ -228,15 +229,17 @@ test('a command that hangs counts as a failed read', async () => {
 });
 
 test('a stale or failing backup is a problem once hq backup has run', async () => {
-  const p = probe(world()),
-    run = async (b: Probe['backup']) => {
-      const result = await runChecks(toExactOptional({ ...p, backup: b }), healthSettings(db), {}, t);
-      return result.checks.find((c) => c.key === 'backup');
-    },
-    t = new Date(NOON_SYDNEY);
+  const probed = probe(world());
+  const run = async (backup: Probe['backup']) => {
+    const result = await runChecks(toExactOptional({ ...probed, backup }), healthSettings(db), {}, now);
+    return result.checks.find((check) => check.key === 'backup');
+  };
+  const now = new Date(NOON_SYDNEY);
   expect(await run(() => ({ lastOk: null, lastError: null, everRan: false }))).toBeUndefined();
-  expect((await run(() => ({ lastOk: new Date(t.getTime() - 3_600_000).toISOString(), lastError: null, everRan: true })))!.ok).toBe(true);
-  const stale = await run(() => ({ lastOk: new Date(t.getTime() - 4 * 3_600_000).toISOString(), lastError: 'restic copy failed', everRan: true }));
+  const fresh = await run(() => ({ lastOk: new Date(now.getTime() - 3_600_000).toISOString(), lastError: null, everRan: true }));
+  assert.ok(fresh);
+  expect(fresh.ok).toBe(true);
+  const stale = await run(() => ({ lastOk: new Date(now.getTime() - 4 * 3_600_000).toISOString(), lastError: 'restic copy failed', everRan: true }));
   expect(stale).toMatchObject({ ok: false, line: 'hq backup: no good backup in 4.0 h; last error: restic copy failed' });
 });
 
@@ -261,8 +264,8 @@ test('the nix probe check is red when stale or while an outage is open, and quie
 });
 
 test('the local settings check joins the run when the probe supplies it, and is absent otherwise', async () => {
-  const none = await runChecks(probe(world()), HEALTH_DEFAULTS, {}, new Date(NOON_SYDNEY)),
-    some = await runChecks({ ...probe(world()), localConfig: () => ({ key: 'local-config', ok: false, line: 'local settings: HQ_PROBE_READY not set' }) }, HEALTH_DEFAULTS, {}, new Date(NOON_SYDNEY));
+  const none = await runChecks(probe(world()), HEALTH_DEFAULTS, {}, new Date(NOON_SYDNEY));
+  const some = await runChecks({ ...probe(world()), localConfig: () => ({ key: 'local-config', ok: false, line: 'local settings: HQ_PROBE_READY not set' }) }, HEALTH_DEFAULTS, {}, new Date(NOON_SYDNEY));
   expect([none.checks.some((c) => c.key === 'local-config'), some.checks.find((c) => c.key === 'local-config')]).toStrictEqual([false, { key: 'local-config', ok: false, line: 'local settings: HQ_PROBE_READY not set' }]);
 });
 
@@ -299,8 +302,8 @@ test('it reports a stuck save request check that cannot read its state as a prob
 });
 
 test('the private-tree check joins the run when the probe supplies it, and is absent otherwise', async () => {
-  const none = await runChecks(probe(world()), HEALTH_DEFAULTS, {}, new Date(NOON_SYDNEY)),
-    some = await runChecks({ ...probe(world()), privateTree: () => ({ key: 'private-tree', ok: false, line: 'hq-private: no checkout' }) }, HEALTH_DEFAULTS, {}, new Date(NOON_SYDNEY));
+  const none = await runChecks(probe(world()), HEALTH_DEFAULTS, {}, new Date(NOON_SYDNEY));
+  const some = await runChecks({ ...probe(world()), privateTree: () => ({ key: 'private-tree', ok: false, line: 'hq-private: no checkout' }) }, HEALTH_DEFAULTS, {}, new Date(NOON_SYDNEY));
   expect([none.checks.some((c) => c.key === 'private-tree'), some.checks.find((c) => c.key === 'private-tree')]).toStrictEqual([false, { key: 'private-tree', ok: false, line: 'hq-private: no checkout' }]);
 });
 

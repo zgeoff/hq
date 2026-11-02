@@ -135,8 +135,8 @@ test('an atc answer missing a required field is bad_atc_answer naming the method
 });
 
 test('a live client turns a bad session.list into bad_atc_answer', async () => {
-  const base = mkdtempSync(`${tmpdir()}/hq-cfg-`),
-    daemon = startStubAtcDaemon(`${base}/atc.sock`, { 'session.list': () => ({ sessions: [{ id: 'id-a' }] }) });
+  const base = mkdtempSync(`${tmpdir()}/hq-cfg-`);
+  const daemon = startStubAtcDaemon(`${base}/atc.sock`, { 'session.list': () => ({ sessions: [{ id: 'id-a' }] }) });
   try {
     const c = await AtcClient.open(daemon.path);
     await expect(c.sessions()).rejects.toMatchObject({ code: 'bad_atc_answer', message: expect.stringContaining('session.list') });

@@ -3,31 +3,31 @@ import { Database as SqliteDatabase } from 'bun:sqlite';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 
-const AT = '2026-10-01T00:00:00Z',
-  STORE_DDL = `
-  CREATE TABLE reviews (
-    review_id TEXT PRIMARY KEY, repo TEXT NOT NULL, pull_request INTEGER, base TEXT NOT NULL, head TEXT NOT NULL,
-    title TEXT, depth TEXT NOT NULL, special TEXT, risk_classes TEXT NOT NULL, lenses TEXT NOT NULL,
-    config_hash TEXT NOT NULL, started_at TEXT NOT NULL, ended_at TEXT NOT NULL
-  );
-  CREATE TABLE findings (
-    review_id TEXT NOT NULL REFERENCES reviews (review_id) ON DELETE CASCADE, finding_id TEXT NOT NULL,
-    lens TEXT NOT NULL, call_id TEXT, title TEXT NOT NULL, body TEXT NOT NULL, path TEXT NOT NULL,
-    start_line INTEGER NOT NULL, end_line INTEGER NOT NULL, second_location TEXT, severity TEXT NOT NULL,
-    criterion TEXT NOT NULL, rule TEXT, verdict TEXT NOT NULL, unverified_fact TEXT,
-    written_by_change INTEGER NOT NULL, risk_class TEXT, fix TEXT, depth TEXT NOT NULL, model TEXT,
-    effort TEXT, comment_url TEXT,
-    CONSTRAINT findings_pk PRIMARY KEY (review_id, finding_id)
-  );
-  CREATE TABLE dispositions (
-    repo TEXT NOT NULL, finding_id TEXT NOT NULL, kind TEXT NOT NULL, value TEXT NOT NULL, author TEXT NOT NULL,
-    author_is_owner INTEGER NOT NULL, source TEXT NOT NULL, at TEXT NOT NULL, pull_request INTEGER
-  );
-  CREATE UNIQUE INDEX dispositions_key ON dispositions (repo, COALESCE(pull_request, 0), finding_id, source, at);
-  CREATE TABLE escapes (
-    escape_id TEXT PRIMARY KEY, repo TEXT NOT NULL, issue TEXT NOT NULL, head TEXT NOT NULL, lens TEXT,
-    defect TEXT NOT NULL, path TEXT, start_line INTEGER, end_line INTEGER, recorded_at TEXT NOT NULL
-  );
+const AT = '2026-10-01T00:00:00Z';
+const STORE_DDL = `
+CREATE TABLE reviews (
+  review_id TEXT PRIMARY KEY, repo TEXT NOT NULL, pull_request INTEGER, base TEXT NOT NULL, head TEXT NOT NULL,
+  title TEXT, depth TEXT NOT NULL, special TEXT, risk_classes TEXT NOT NULL, lenses TEXT NOT NULL,
+  config_hash TEXT NOT NULL, started_at TEXT NOT NULL, ended_at TEXT NOT NULL
+);
+CREATE TABLE findings (
+  review_id TEXT NOT NULL REFERENCES reviews (review_id) ON DELETE CASCADE, finding_id TEXT NOT NULL,
+  lens TEXT NOT NULL, call_id TEXT, title TEXT NOT NULL, body TEXT NOT NULL, path TEXT NOT NULL,
+  start_line INTEGER NOT NULL, end_line INTEGER NOT NULL, second_location TEXT, severity TEXT NOT NULL,
+  criterion TEXT NOT NULL, rule TEXT, verdict TEXT NOT NULL, unverified_fact TEXT,
+  written_by_change INTEGER NOT NULL, risk_class TEXT, fix TEXT, depth TEXT NOT NULL, model TEXT,
+  effort TEXT, comment_url TEXT,
+  CONSTRAINT findings_pk PRIMARY KEY (review_id, finding_id)
+);
+CREATE TABLE dispositions (
+  repo TEXT NOT NULL, finding_id TEXT NOT NULL, kind TEXT NOT NULL, value TEXT NOT NULL, author TEXT NOT NULL,
+  author_is_owner INTEGER NOT NULL, source TEXT NOT NULL, at TEXT NOT NULL, pull_request INTEGER
+);
+CREATE UNIQUE INDEX dispositions_key ON dispositions (repo, COALESCE(pull_request, 0), finding_id, source, at);
+CREATE TABLE escapes (
+  escape_id TEXT PRIMARY KEY, repo TEXT NOT NULL, issue TEXT NOT NULL, head TEXT NOT NULL, lens TEXT,
+  defect TEXT NOT NULL, path TEXT, start_line INTEGER, end_line INTEGER, recorded_at TEXT NOT NULL
+);
 `;
 
 export function createStoreTables(path: string): void {
@@ -61,10 +61,10 @@ export function createLookalikeRows(db: Database): void {
 }
 
 export function createStoreRows(path: string, repo: string, offset: number): void {
-  const finding = `f${offset + 1}`,
-    review = `r${offset + 1}`,
-    slug = `zgeoff/${repo}`,
-    store = new SqliteDatabase(path);
+  const finding = `f${offset + 1}`;
+  const review = `r${offset + 1}`;
+  const slug = `zgeoff/${repo}`;
+  const store = new SqliteDatabase(path);
   store.query("INSERT INTO reviews (review_id, repo, pull_request, base, head, depth, risk_classes, lenses, config_hash, started_at, ended_at) VALUES (?, ?, 1, 'b', 'h', 'high', '[]', '[]', 'c', ?, ?)").run(review, slug, AT, AT);
   store
     .query("INSERT INTO findings (review_id, finding_id, lens, title, body, path, start_line, end_line, severity, criterion, verdict, written_by_change, depth, comment_url) VALUES (?, ?, 'design', 't', 'b', 'p', 1, 2, 'P2', 'c', 'v', 0, 'high', ?)")

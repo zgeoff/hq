@@ -35,17 +35,17 @@ function runGit(dir: string, args: string[]): void {
 
 // kettle.ts is split 3 ways, so no new file is alike enough for git to call it a rename: it shows as deleted.
 test('a file deleted and split into new ones, read from git, counts as moved', () => {
-  const app = setupTest(),
-    parts = {
-      boil: ['export function boilWater(litres: number): number {', '  const minutes = litres * 3;', '  return minutes;', '}', ''].join('\n'),
-      pour: ['export function pourTea(cups: number): number {', '  const millilitres = cups * 250;', '  return millilitres;', '}', ''].join('\n'),
-      warm: ['export function warmPot(seconds: number): number {', '  const degrees = seconds / 4;', '  return degrees;', '}', ''].join('\n'),
-    },
-    split = app.splitKettle(`${parts.boil}\n${parts.pour}\n${parts.warm}`, {
-      'kettle/boil-water.ts': `// Boils the water.\n${parts.boil}`,
-      'kettle/pour-tea.ts': parts.pour,
-      'kettle/warm-pot.ts': parts.warm,
-    });
+  const app = setupTest();
+  const parts = {
+    boil: ['export function boilWater(litres: number): number {', '  const minutes = litres * 3;', '  return minutes;', '}', ''].join('\n'),
+    pour: ['export function pourTea(cups: number): number {', '  const millilitres = cups * 250;', '  return millilitres;', '}', ''].join('\n'),
+    warm: ['export function warmPot(seconds: number): number {', '  const degrees = seconds / 4;', '  return degrees;', '}', ''].join('\n'),
+  };
+  const split = app.splitKettle(`${parts.boil}\n${parts.pour}\n${parts.warm}`, {
+    'kettle/boil-water.ts': `// Boils the water.\n${parts.boil}`,
+    'kettle/pour-tea.ts': parts.pour,
+    'kettle/warm-pot.ts': parts.warm,
+  });
 
   expect([2, 3, 4, 5].map((line) => checkLine(split, line))).toStrictEqual([false, false, false, false]);
   expect(checkLine(split, 1)).toBe(true);

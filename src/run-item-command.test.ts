@@ -22,16 +22,14 @@ const KETTLE_CALL = {
     ],
     stuView: 'Minting now keeps the morning boil on time.',
     details: [{ heading: 'Evidence', text: 'The last boil took 9 min.', code: 'kettle boil --dry-run' }],
-  },
-  KETTLE_PROPOSAL = { ...KETTLE_CALL, title: 'Boil earlier', question: 'Boil at 06:00 from now on?', diff: { now: 'The kettle boils at `07:00`.', would: 'The kettle boils at `06:00`.' } },
-  LID_TODO = { title: 'Fit the lid', question: 'Fit the new lid on the kettle', time: 'about 2 min', unblocks: [{ id: 'GEO-7', title: 'Steam test' }] };
+  };
 
 function setupTest() {
-  const fresh = freshDb(),
-    lines: string[] = [],
-    spy = spyOn(console, 'log').mockImplementation((line: string) => {
-      lines.push(line);
-    });
+  const fresh = freshDb();
+  const lines: string[] = [];
+  const spy = spyOn(console, 'log').mockImplementation((line: string) => {
+    lines.push(line);
+  });
   at(NOON_SYDNEY);
   onTestFinished(fresh.cleanup);
   onTestFinished(() => spy.mockRestore());
@@ -50,8 +48,8 @@ function setupTest() {
 }
 
 test('hq call add --item stores every field and shows them in the console, verbatim', async () => {
-  const app = setupTest(),
-    code = await main(['call', 'add', 'kettle-mint', '--item', app.writeItem('call.json', KETTLE_CALL), '--issues', 'GEO-12', '--json']);
+  const app = setupTest();
+  const code = await main(['call', 'add', 'kettle-mint', '--item', app.writeItem('call.json', KETTLE_CALL), '--issues', 'GEO-12', '--json']);
 
   expect(code).toBe(0);
   expect(getAsk(app.db, 'kettle-mint')).toMatchObject({ title: KETTLE_CALL.title, question: KETTLE_CALL.question, stu_view: KETTLE_CALL.stuView, issues: ['GEO-12'], state: 'queued' });
@@ -75,41 +73,42 @@ test('hq call add --item stores every field and shows them in the console, verba
 });
 
 test('hq proposal add --item stores the diff and shows it in the console, verbatim', async () => {
-  const app = setupTest(),
-    code = await main(['proposal', 'add', 'boil-early', '--item', app.writeItem('proposal.json', KETTLE_PROPOSAL), '--json']);
+  const app = setupTest();
+  const proposal = { ...KETTLE_CALL, title: 'Boil earlier', question: 'Boil at 06:00 from now on?', diff: { now: 'The kettle boils at `07:00`.', would: 'The kettle boils at `06:00`.' } };
+  const code = await main(['proposal', 'add', 'boil-early', '--item', app.writeItem('proposal.json', proposal), '--json']);
 
   expect(code).toBe(0);
-  expect(loadConsoleItems(app.db)).toMatchObject([{ id: 'boil-early', kind: 'proposal', diff: KETTLE_PROPOSAL.diff, options: KETTLE_PROPOSAL.options }]);
+  expect(loadConsoleItems(app.db)).toMatchObject([{ id: 'boil-early', kind: 'proposal', diff: proposal.diff, options: proposal.options }]);
 });
 
 test('hq call add --item - reads the item from stdin', async () => {
-  const app = setupTest(),
-    child = Bun.spawn(['bun', join(import.meta.dir, 'cli.ts'), 'call', 'add', 'kettle-pipe', '--item', '-', '--json'], {
-      stdin: new Blob([JSON.stringify(KETTLE_CALL)]),
-      stdout: 'pipe',
-      stderr: 'pipe',
-      env: { ...process.env, HQ_DB: app.path, HQ_NOTIFY: 'off', HQ_AS: roleName('owner'), HQ_NOW: NOON_SYDNEY },
-    }),
-    code = await child.exited;
+  const app = setupTest();
+  const child = Bun.spawn(['bun', join(import.meta.dir, 'cli.ts'), 'call', 'add', 'kettle-pipe', '--item', '-', '--json'], {
+    stdin: new Blob([JSON.stringify(KETTLE_CALL)]),
+    stdout: 'pipe',
+    stderr: 'pipe',
+    env: { ...process.env, HQ_DB: app.path, HQ_NOTIFY: 'off', HQ_AS: roleName('owner'), HQ_NOW: NOON_SYDNEY },
+  });
+  const code = await child.exited;
 
   expect(code).toBe(0);
   expect(getAsk(app.db, 'kettle-pipe')).toMatchObject({ title: KETTLE_CALL.title, stu_view: KETTLE_CALL.stuView });
 });
 
 test('a call filed as free text shows its body as one details section and no options', async () => {
-  const app = setupTest(),
-    code = await main(['call', 'add', 'kettle-old', '--title', 'Old kettle', '--question', 'Keep the old kettle?', '--body', 'It leaks a little.\nIt still boils.', '--json']);
+  const app = setupTest();
+  const code = await main(['call', 'add', 'kettle-old', '--title', 'Old kettle', '--question', 'Keep the old kettle?', '--body', 'It leaks a little.\nIt still boils.', '--json']);
 
   expect(code).toBe(0);
   expect(loadConsoleItems(app.db)).toMatchObject([{ id: 'kettle-old', options: [], stuView: null, details: [{ heading: 'Details', text: 'It leaks a little.\nIt still boils.' }] }]);
 });
 
 test('hq call add --item refuses the free-text flags beside it, and a bad item', async () => {
-  const app = setupTest(),
-    bad = app.writeItem('bad.json', { ...KETTLE_CALL, options: [] }),
-    good = app.writeItem('call.json', KETTLE_CALL),
-    refusedFlags = await main(['call', 'add', 'k1', '--item', good, '--title', 'Twice', '--json']),
-    refusedItem = await main(['call', 'add', 'k2', '--item', bad, '--json']);
+  const app = setupTest();
+  const bad = app.writeItem('bad.json', { ...KETTLE_CALL, options: [] });
+  const good = app.writeItem('call.json', KETTLE_CALL);
+  const refusedFlags = await main(['call', 'add', 'k1', '--item', good, '--title', 'Twice', '--json']);
+  const refusedItem = await main(['call', 'add', 'k2', '--item', bad, '--json']);
 
   expect([refusedFlags, refusedItem]).not.toContain(0);
   expect(app.lines.map((l) => JSON.parse(l).error.code)).toStrictEqual(['bad_args', 'bad_args']);
@@ -118,9 +117,9 @@ test('hq call add --item refuses the free-text flags beside it, and a bad item',
 });
 
 test('a re-add of a queued call with the same question updates its fields in place', async () => {
-  const app = setupTest(),
-    changed = app.writeItem('changed.json', { ...KETTLE_CALL, stuView: 'Boil it later instead.' }),
-    first = app.writeItem('call.json', KETTLE_CALL);
+  const app = setupTest();
+  const changed = app.writeItem('changed.json', { ...KETTLE_CALL, stuView: 'Boil it later instead.' });
+  const first = app.writeItem('call.json', KETTLE_CALL);
   await main(['call', 'add', 'kettle-mint', '--item', first, '--json']);
   await main(['call', 'add', 'kettle-mint', '--item', changed, '--json']);
 
@@ -129,10 +128,10 @@ test('a re-add of a queued call with the same question updates its fields in pla
 });
 
 test('a re-add leaves the fields of a call that is open with the owner, or already answered, as they were', async () => {
-  const app = setupTest(),
-    first = app.writeItem('call.json', KETTLE_CALL),
-    newQuestion = app.writeItem('new.json', { ...KETTLE_CALL, question: 'Mint half the tokens?', stuView: 'Half is enough.' }),
-    sameQuestion = app.writeItem('same.json', { ...KETTLE_CALL, stuView: 'Changed my mind.', details: [] });
+  const app = setupTest();
+  const first = app.writeItem('call.json', KETTLE_CALL);
+  const newQuestion = app.writeItem('new.json', { ...KETTLE_CALL, question: 'Mint half the tokens?', stuView: 'Half is enough.' });
+  const sameQuestion = app.writeItem('same.json', { ...KETTLE_CALL, stuView: 'Changed my mind.', details: [] });
   await main(['call', 'add', 'kettle-mint', '--item', first, '--json']);
   await main(['call', 'open', 'kettle-mint', '--json']);
   await main(['call', 'add', 'kettle-mint', '--item', newQuestion, '--json']);
@@ -154,8 +153,8 @@ test('hq call stu sets Stu view on an item filed as free text', async () => {
 });
 
 test('hq unblock add --item makes a to-do with Done, Later and Skip', async () => {
-  const app = setupTest(),
-    code = await main(['unblock', 'add', '--id', 'lid', '--item', app.writeItem('todo.json', LID_TODO), '--unblocks', 'GEO-7:high', '--json']);
+  const app = setupTest();
+  const code = await main(['unblock', 'add', '--id', 'lid', '--item', app.writeItem('todo.json', { title: 'Fit the lid', question: 'Fit the new lid on the kettle', time: 'about 2 min', unblocks: [{ id: 'GEO-7', title: 'Steam test' }] }), '--unblocks', 'GEO-7:high', '--json']);
 
   expect(code).toBe(0);
   expect(getUnblock(app.db, 'lid')).toMatchObject({ title: 'Fit the lid', task: 'Fit the new lid on the kettle', state: 'open' });
@@ -167,7 +166,7 @@ test('hq unblock add --item makes a to-do with Done, Later and Skip', async () =
 test('hq unblock add --item keeps --kind watch and --deadline, so the watch stays off the console', async () => {
   const app = setupTest();
 
-  const code = await main(['unblock', 'add', '--id', 'lid-watch', '--item', app.writeItem('watch.json', LID_TODO), '--kind', 'watch', '--deadline', '2026-10-20T00:00:00Z', '--json']);
+  const code = await main(['unblock', 'add', '--id', 'lid-watch', '--item', app.writeItem('watch.json', { title: 'Fit the lid', question: 'Fit the new lid on the kettle', time: 'about 2 min', unblocks: [{ id: 'GEO-7', title: 'Steam test' }] }), '--kind', 'watch', '--deadline', '2026-10-20T00:00:00Z', '--json']);
 
   expect(code).toBe(0);
   expect(getUnblock(app.db, 'lid-watch')).toMatchObject({ kind: 'watch', deadline: '2026-10-20T00:00:00Z' });
@@ -175,11 +174,11 @@ test('hq unblock add --item keeps --kind watch and --deadline, so the watch stay
 });
 
 test('an unchanged hq unblock add --item is a no-op that keeps its subject link', async () => {
-  const app = setupTest(),
-    body = { title: 'Review kettle#4', question: 'Review kettle#4 and say lgtm', links: [{ label: 'kettle#4', url: 'https://github.com/kettle-co/kettle/pull/4', subject: true }] },
-    doc = app.writeItem('review.json', body),
-    first = await main(['unblock', 'add', '--id', 'review-4', '--item', doc, '--json']),
-    second = await main(['unblock', 'add', '--id', 'review-4', '--item', doc, '--json']);
+  const app = setupTest();
+  const body = { title: 'Review kettle#4', question: 'Review kettle#4 and say lgtm', links: [{ label: 'kettle#4', url: 'https://github.com/kettle-co/kettle/pull/4', subject: true }] };
+  const doc = app.writeItem('review.json', body);
+  const first = await main(['unblock', 'add', '--id', 'review-4', '--item', doc, '--json']);
+  const second = await main(['unblock', 'add', '--id', 'review-4', '--item', doc, '--json']);
 
   expect([first, second]).toStrictEqual([0, 0]);
   expect(app.lines.map((l) => JSON.parse(l).result)).toStrictEqual(['added', 'noop']);
@@ -195,7 +194,7 @@ test('an unblock item filed as a task shows its minutes and the issues it unbloc
 
 test('it keeps each --done-when of hq unblock add --item, and the console lists them as a detail', async () => {
   const app = setupTest();
-  const item = app.writeItem('todo.json', LID_TODO);
+  const item = app.writeItem('todo.json', { title: 'Fit the lid', question: 'Fit the new lid on the kettle', time: 'about 2 min', unblocks: [{ id: 'GEO-7', title: 'Steam test' }] });
   const code = await main(['unblock', 'add', '--id', 'lid', '--item', item, '--done-when', 'issue:KET-7', '--done-when', 'pr:kettle-co/kettle#4', '--json']);
 
   expect(code).toBe(0);
@@ -208,7 +207,7 @@ test('it keeps each --done-when of hq unblock add --item, and the console lists 
 
 test('hq unblock later hides the item from the console until it is due', async () => {
   const app = setupTest();
-  await main(['unblock', 'add', '--id', 'lid', '--item', app.writeItem('todo.json', LID_TODO), '--json']);
+  await main(['unblock', 'add', '--id', 'lid', '--item', app.writeItem('todo.json', { title: 'Fit the lid', question: 'Fit the new lid on the kettle', time: 'about 2 min', unblocks: [{ id: 'GEO-7', title: 'Steam test' }] }), '--json']);
 
   await expect(main(['unblock', 'later', 'lid', '--until', '+4h', '--json'])).resolves.toBe(0);
   expect(loadConsoleItems(app.db)).toStrictEqual([]);
@@ -218,8 +217,8 @@ test('hq unblock later hides the item from the console until it is due', async (
 });
 
 test('an unblock item dropped while put off comes back to the console when it is added again', async () => {
-  const app = setupTest(),
-    todo = app.writeItem('todo.json', LID_TODO);
+  const app = setupTest();
+  const todo = app.writeItem('todo.json', { title: 'Fit the lid', question: 'Fit the new lid on the kettle', time: 'about 2 min', unblocks: [{ id: 'GEO-7', title: 'Steam test' }] });
   await main(['unblock', 'add', '--id', 'lid', '--item', todo, '--json']);
   await main(['unblock', 'later', 'lid', '--until', '+4h', '--json']);
   await main(['unblock', 'drop', 'lid', '--json']);
@@ -235,15 +234,15 @@ test('the console lists calls in send order, then to-dos, and leaves out a call 
   await main(['call', 'add', 'first', '--item', app.writeItem('b.json', KETTLE_CALL), '--order', '1', '--json']);
   await main(['call', 'add', 'shelved', '--item', app.writeItem('c.json', KETTLE_CALL), '--json']);
   await main(['call', 'later', 'shelved', '--until', '+4h', '--json']);
-  await main(['unblock', 'add', '--id', 'lid', '--item', app.writeItem('todo.json', LID_TODO), '--json']);
+  await main(['unblock', 'add', '--id', 'lid', '--item', app.writeItem('todo.json', { title: 'Fit the lid', question: 'Fit the new lid on the kettle', time: 'about 2 min', unblocks: [{ id: 'GEO-7', title: 'Steam test' }] }), '--json']);
 
   expect(loadConsoleItems(app.db).map((i) => i.id)).toStrictEqual(['first', 'second', 'lid']);
 });
 
 test('migration v26 adds the item columns after a backup, keeping the rows it had', () => {
-  const base = mkdtempSync(join(tmpdir(), 'hq-item-migration-')),
-    path = join(base, 'old.db'),
-    stored = new Database(path, { create: true, strict: true });
+  const base = mkdtempSync(join(tmpdir(), 'hq-item-migration-'));
+  const path = join(base, 'old.db');
+  const stored = new Database(path, { create: true, strict: true });
   onTestFinished(() => {
     stored.close();
     rmSync(base, { recursive: true, force: true });

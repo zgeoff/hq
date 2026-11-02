@@ -59,8 +59,8 @@ function loadDueTodos(db: Database, t: string): UnblockItem[] {
 }
 
 function buildUnblockItem(u: UnblockItem): ConsoleItem {
-  const asReview = findSubjectLink(u) !== null,
-    base = { id: u.id, kind: asReview ? ('review' as const) : ('todo' as const), title: u.title ?? formatTitle(u.task), question: u.task, options: asReview ? buildReviewOptions() : buildTodoOptions(), stuView: null };
+  const asReview = findSubjectLink(u) !== null;
+  const base = { id: u.id, kind: asReview ? ('review' as const) : ('todo' as const), title: u.title ?? formatTitle(u.task), question: u.task, options: asReview ? buildReviewOptions() : buildTodoOptions(), stuView: null };
   const fields = buildUnblockFields(u, parseStoredExtras(u.item));
   const doneWhen = u.done_when.length > 0 ? [{ heading: 'Done when', text: formatDoneWhen(u.done_when, '\n') }] : [];
   return { ...base, ...fields, details: [...fields.details, ...doneWhen] };
@@ -84,8 +84,8 @@ function buildReviewOptions(): ConsoleOption[] {
 }
 
 function formatTitle(text: string): string {
-  const cut = 80,
-    line = text.split('\n', 1)[0] ?? '';
+  const cut = 80;
+  const line = text.split('\n', 1)[0] ?? '';
   return line.length <= cut ? line : `${line.slice(0, cut - 1)}…`;
 }
 

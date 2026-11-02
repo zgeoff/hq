@@ -16,15 +16,15 @@ interface KettleStatusProps {
 }
 
 async function loadStatus(url: string, show: (status: string) => void): Promise<void> {
-  const response = await fetch(url),
-    status = await response.text();
+  const response = await fetch(url);
+  const status = await response.text();
   show(status);
 }
 
 // The same check twice: the second page in this process must still fetch and re-render.
 test.each(['first', 'second'])('the %s page in a process fetches and re-renders after an await', async () => {
-  const kettle = Bun.serve({ port: 0, fetch: () => new Response('ready') }),
-    lib = await setupPageDOM(`http://127.0.0.1:${kettle.port}/`);
+  const kettle = Bun.serve({ port: 0, routes: { '/*': () => new Response('ready') } });
+  const lib = await setupPageDOM(`http://127.0.0.1:${kettle.port}/`);
   try {
     lib.render(<KettleStatus url={`http://127.0.0.1:${kettle.port}/status`} />);
     const shown = await lib.within(document.body).findByText('ready');

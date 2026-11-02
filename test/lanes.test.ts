@@ -222,8 +222,8 @@ test('a fresh Ready report, full lanes, a failed reading or no report at all sen
 
 test('the stale alert is due once the report is past 2 h, not at the next whole minute', () => {
   reportReady(db, 4, 'z-delivery');
-  const atTwoHours = new Date(Date.parse(NOON_SYDNEY) + 120 * 60_000),
-    justOver = new Date(Date.parse(NOON_SYDNEY) + 120 * 60_000 + 30_000);
+  const atTwoHours = new Date(Date.parse(NOON_SYDNEY) + 120 * 60_000);
+  const justOver = new Date(Date.parse(NOON_SYDNEY) + 120 * 60_000 + 30_000);
   expect(checkReadyStale(db, atTwoHours, 3, 'hq-lanes')).toBe(false);
   expect(checkReadyStale(db, justOver, 3, 'hq-lanes')).toBe(true);
 });

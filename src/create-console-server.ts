@@ -27,8 +27,8 @@ export interface ConsoleServerInput {
 const SIGN_IN = 'hq console: sign in first: open the login link on the terminal where hq console runs (hq console login prints a new one there)\n';
 
 export function createConsoleServer(input: ConsoleServerInput): Server<undefined> {
-  const context = { db: input.db, actor: input.actor, run: input.run, notify: input.notify, loadShipped: input.loadShipped },
-    handler = new RPCHandler(buildConsoleRouter());
+  const context = { db: input.db, actor: input.actor, run: input.run, notify: input.notify, loadShipped: input.loadShipped };
+  const handler = new RPCHandler(buildConsoleRouter());
   return Bun.serve({
     hostname: '127.0.0.1',
     port: input.port,
@@ -71,9 +71,9 @@ async function readExchange(auth: ConsoleAuth, req: Request): Promise<Response> 
 }
 
 function buildAssetResponse(assets: ConsoleAssets, req: Request): Response {
-  const asked = new URL(req.url).pathname,
-    page = asked === '/shipped' ? '/' : asked,
-    served = assets.get(page);
+  const asked = new URL(req.url).pathname;
+  const page = asked === '/shipped' ? '/' : asked;
+  const served = assets.get(page);
   if (served === undefined) {
     return new Response('not found\n', { status: 404 });
   }

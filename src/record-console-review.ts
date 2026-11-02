@@ -22,9 +22,9 @@ export interface ConsoleReviewInput {
 export function recordConsoleReview(db: Database, input: ConsoleReviewInput): UnblockItem {
   return db
     .transaction((): UnblockItem => {
-      const answer = formatReviewAnswer(requireReviewInput(db, input)),
-        item = applyReview(db, input, answer),
-        seq = logEvent(db, 'unblock', item.id, 'console-review', input.actor, null, null, { review: input.review, note: input.note.trim() === '' ? null : input.note, facts: buildReviewFacts(item) });
+      const answer = formatReviewAnswer(requireReviewInput(db, input));
+      const item = applyReview(db, input, answer);
+      const seq = logEvent(db, 'unblock', item.id, 'console-review', input.actor, null, null, { review: input.review, note: input.note.trim() === '' ? null : input.note, facts: buildReviewFacts(item) });
       enqueue(db, seq, roleName('owner'), `console answer: review ${item.id}: ${answer}`);
       return item;
     })

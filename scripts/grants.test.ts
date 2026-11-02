@@ -42,16 +42,16 @@ test('it repairs a hand edit to a generated grant and leaves check mode read-onl
     cpSync(join(ctx.fixture, path), join(ctx.dir, path), { recursive: true });
   }
   {
-    const file = 'skills/preview-qa/references/session-prompt.md',
-      path = join(ctx.dir, file),
-      source = readFileSync(path, 'utf8');
+    const file = 'skills/preview-qa/references/session-prompt.md';
+    const path = join(ctx.dir, file);
+    const source = readFileSync(path, 'utf8');
     expect(source).toContain('- GitHub: read zgeoff PRs and their comments.');
     writeFileSync(path, source.replace('- GitHub: read zgeoff PRs and their comments.', '- GitHub: read every repo.'));
     {
-      const checked = ctx.run(),
-        checkedSource = readFileSync(path, 'utf8'),
-        written = ctx.run([]),
-        writtenSource = readFileSync(path, 'utf8');
+      const checked = ctx.run();
+      const checkedSource = readFileSync(path, 'utf8');
+      const written = ctx.run([]);
+      const writtenSource = readFileSync(path, 'utf8');
       expect(checked.exitCode).toBe(1);
       expect(checked.stdout.toString()).toContain(`--- a/${file}\n+++ b/${file}\n@@ `);
       expect(checked.stdout.toString()).toContain('-- GitHub: read every repo.');
@@ -70,13 +70,13 @@ test('it restores a legacy still-ask list from the placeholder in a grant note',
     cpSync(join(ctx.fixture, path), join(ctx.dir, path), { recursive: true });
   }
   {
-    const path = join(ctx.dir, 'skills/definitions-stewardship/references/session-prompt.md'),
-      source = readFileSync(path, 'utf8');
+    const path = join(ctx.dir, 'skills/definitions-stewardship/references/session-prompt.md');
+    const source = readFileSync(path, 'utf8');
     expect(source).toContain("my data, anything that touches Nix's memory");
     writeFileSync(path, source.replace("my data, anything that touches Nix's memory", "my data, Nix's memory"));
     {
-      const checked = ctx.run(),
-        written = ctx.run([]);
+      const checked = ctx.run();
+      const written = ctx.run([]);
       expect(checked.exitCode).toBe(1);
       expect(written.exitCode).toBe(0);
       expect(readFileSync(path, 'utf8')).toBe(source);
@@ -107,8 +107,8 @@ test.each([
     cpSync(join(ctx.fixture, path), join(ctx.dir, path), { recursive: true });
   }
   {
-    const path = join(ctx.dir, 'skills/intake/references/session-prompt.md'),
-      source = readFileSync(path, 'utf8');
+    const path = join(ctx.dir, 'skills/intake/references/session-prompt.md');
+    const source = readFileSync(path, 'utf8');
     expect(source).toMatch(/deleting or rewriting[^\n]*?security change/u);
     writeFileSync(path, source.replace(/deleting or rewriting[^\n]*?security change/u, replacement));
     {
@@ -125,8 +125,8 @@ test('it reports a diff for a hand edit inside a still-ask list', () => {
     cpSync(join(ctx.fixture, path), join(ctx.dir, path), { recursive: true });
   }
   {
-    const path = join(ctx.dir, 'skills/linear-triage/SKILL.md'),
-      source = readFileSync(path, 'utf8');
+    const path = join(ctx.dir, 'skills/linear-triage/SKILL.md');
+    const source = readFileSync(path, 'utf8');
     expect(source).toContain('credentials, scope and naming');
     writeFileSync(path, source.replace('credentials, scope and naming', 'credentials, another item, scope and naming'));
     {
@@ -144,8 +144,8 @@ test('it rejects a grant file whose prompt has no Grants block', () => {
     cpSync(join(ctx.fixture, path), join(ctx.dir, path), { recursive: true });
   }
   {
-    const path = join(ctx.dir, 'skills/preview-qa/references/session-prompt.md'),
-      source = readFileSync(path, 'utf8');
+    const path = join(ctx.dir, 'skills/preview-qa/references/session-prompt.md');
+    const source = readFileSync(path, 'utf8');
     expect(source).toContain('\nGrants:\n');
     writeFileSync(path, source.replace('\nGrants:\n', '\nAllowed:\n'));
     {
@@ -163,12 +163,12 @@ test('it refuses a prompt with no grant file, in both modes, before any write', 
   }
   rmSync(join(ctx.dir, 'grants/z-qa.yaml'));
   {
-    const path = join(ctx.dir, 'skills/preview-qa/references/session-prompt.md'),
-      source = readFileSync(path, 'utf8');
+    const path = join(ctx.dir, 'skills/preview-qa/references/session-prompt.md');
+    const source = readFileSync(path, 'utf8');
     {
-      const checked = ctx.run(),
-        message = 'grants: skills/preview-qa/references/session-prompt.md: no grants/z-qa.yaml for this prompt\'s Grants block\n',
-        written = ctx.run([]);
+      const checked = ctx.run();
+      const message = 'grants: skills/preview-qa/references/session-prompt.md: no grants/z-qa.yaml for this prompt\'s Grants block\n';
+      const written = ctx.run([]);
       expect(checked.exitCode).toBe(1);
       expect(checked.stderr.toString()).toBe(message);
       expect(written.exitCode).toBe(1);
@@ -184,8 +184,8 @@ test('it carries a first-person wording change without the words "my data"', () 
     cpSync(join(ctx.fixture, path), join(ctx.dir, path), { recursive: true });
   }
   {
-    const path = join(ctx.dir, 'grants/still-ask.yaml'),
-      source = readFileSync(path, 'utf8');
+    const path = join(ctx.dir, 'grants/still-ask.yaml');
+    const source = readFileSync(path, 'utf8');
     expect(source).toContain('note_first: "deleting or rewriting my data"');
     writeFileSync(
       path,
@@ -208,8 +208,8 @@ test('it rejects a match field in grant data', () => {
     cpSync(join(ctx.fixture, path), join(ctx.dir, path), { recursive: true });
   }
   {
-    const path = join(ctx.dir, 'grants/z-qa.yaml'),
-      source = readFileSync(path, 'utf8');
+    const path = join(ctx.dir, 'grants/z-qa.yaml');
+    const source = readFileSync(path, 'utf8');
     expect(source).toContain('  outcome: allow');
     writeFileSync(path, source.replace('  outcome: allow', '  outcome: allow\n  tools: ["*"]'));
     {
@@ -226,13 +226,13 @@ test('it updates all seven still-ask sites, including both Grants blocks, from t
     cpSync(join(ctx.fixture, path), join(ctx.dir, path), { recursive: true });
   }
   {
-    const path = join(ctx.dir, 'grants/still-ask.yaml'),
-      source = readFileSync(path, 'utf8');
+    const path = join(ctx.dir, 'grants/still-ask.yaml');
+    const source = readFileSync(path, 'utf8');
     expect(source).toContain('note: "a priority"');
     writeFileSync(path, source.replace('note: "a priority"', 'note: "a changed priority"'));
     {
-      const checked = ctx.run(),
-        written = ctx.run([]);
+      const checked = ctx.run();
+      const written = ctx.run([]);
       expect(checked.exitCode).toBe(1);
       expect(checked.stdout.toString().match(/^--- a\//gmu)).toHaveLength(7);
       expect(written.exitCode).toBe(0);
@@ -251,8 +251,8 @@ test('it rejects a still-ask list that no longer ends with "security change"', (
     cpSync(join(ctx.fixture, path), join(ctx.dir, path), { recursive: true });
   }
   {
-    const path = join(ctx.dir, 'grants/still-ask.yaml'),
-      source = readFileSync(path, 'utf8');
+    const path = join(ctx.dir, 'grants/still-ask.yaml');
+    const source = readFileSync(path, 'utf8');
     expect(source).toContain('a High or Urgent security change"');
     writeFileSync(path, source.replace('a High or Urgent security change"', 'a High or Urgent security change that affects production"'));
     {
@@ -272,8 +272,8 @@ test.each([
     cpSync(join(ctx.fixture, path), join(ctx.dir, path), { recursive: true });
   }
   {
-    const path = join(ctx.dir, 'skills/delivery-lead/references/session-prompt.md'),
-      source = readFileSync(path, 'utf8');
+    const path = join(ctx.dir, 'skills/delivery-lead/references/session-prompt.md');
+    const source = readFileSync(path, 'utf8');
     expect(source).toContain('\n- Release: ');
     writeFileSync(path, source.replace('\n- Release: ', '\n\n- Release: '));
     {
@@ -331,11 +331,11 @@ test('it generates an invented fleet and passes the next check', () => {
     ].join('\n'),
   );
   {
-    const checked = ctx.run(),
-      written = ctx.run([]);
+    const checked = ctx.run();
+    const written = ctx.run([]);
     {
-      const prompt = readFileSync(join(ctx.dir, 'skills/garden/references/session-prompt.md'), 'utf8'),
-        rechecked = ctx.run();
+      const prompt = readFileSync(join(ctx.dir, 'skills/garden/references/session-prompt.md'), 'utf8');
+      const rechecked = ctx.run();
       expect(checked.exitCode).toBe(1);
       expect(written.exitCode).toBe(0);
       expect(prompt).toContain('- Water: water the paper orchard each morning.\n');
@@ -356,8 +356,8 @@ test.each([
     cpSync(join(ctx.fixture, path), join(ctx.dir, path), { recursive: true });
   }
   {
-    const path = join(ctx.dir, 'skills/delivery-lead/references/releases.md'),
-      source = readFileSync(path, 'utf8');
+    const path = join(ctx.dir, 'skills/delivery-lead/references/releases.md');
+    const source = readFileSync(path, 'utf8');
     expect(source).toContain('security change.');
     writeFileSync(path, source.replace('security change.', 'security change that deletes production data.'));
     {
@@ -372,8 +372,8 @@ test.each([
   ['unknown flag', ['--chek'], "Unknown option '--chek'"],
   ['positional argument', ['check'], 'Unexpected argument'],
 ])('it rejects an %s before it can write files', (_label, args, message) => {
-  const ctx = setupTest(),
-    result = ctx.run(args);
+  const ctx = setupTest();
+  const result = ctx.run(args);
   expect(result.exitCode).toBe(1);
   expect(result.stderr.toString()).toContain(message);
   expect(result.stdout.toString()).toBe('');
@@ -405,8 +405,8 @@ test.each([
     cpSync(join(ctx.fixture, path), join(ctx.dir, path), { recursive: true });
   }
   {
-    const path = join(ctx.dir, 'grants/z-stu.yaml'),
-      source = readFileSync(path, 'utf8');
+    const path = join(ctx.dir, 'grants/z-stu.yaml');
+    const source = readFileSync(path, 'utf8');
     expect(source).toContain('{still-ask}');
     writeFileSync(path, source.replace('{still-ask}', 'deleting or rewriting my data, or a security change'));
     {
@@ -431,10 +431,10 @@ test.each([
   {
     const generated = [...new Bun.Glob('**/*').scanSync({ cwd: ctx.dir, onlyFiles: true })].filter((file) =>
         /^(?:skills|docs)\//u.test(file),
-      ),
-      originals = generated.map((file) => readFileSync(join(ctx.dir, file))),
-      path = join(ctx.dir, 'grants/still-ask.yaml'),
-      source = readFileSync(path, 'utf8');
+      );
+    const originals = generated.map((file) => readFileSync(join(ctx.dir, file)));
+    const path = join(ctx.dir, 'grants/still-ask.yaml');
+    const source = readFileSync(path, 'utf8');
     expect(source).toContain('  - id: priority\n');
     writeFileSync(
       path,
@@ -453,20 +453,7 @@ test.each([
 
 const PRIVATE_DOCS = ['delivery-design', 'evaluation', 'refusals', 'roles-design'].map(
     (doc) => `docs/skill-development/${doc}.md`,
-  ),
-  PRIVATE_PROMPTS = [
-    'definitions-stewardship',
-    'delivery-lead',
-    'intake',
-    'linear-triage',
-    'pr-review',
-    'preview-qa',
-  ].map((skill) => `skills/${skill}/references/session-prompt.md`),
-  PRIVATE_SITES = [
-    'skills/intake/references/session-prompt.md',
-    'skills/definitions-stewardship/references/session-prompt.md',
-    'docs/skill-development/roles-design.md',
-  ];
+  );
 
 function setupPrivateTest(shared = false) {
   const ctx = setupTest();
@@ -475,10 +462,18 @@ function setupPrivateTest(shared = false) {
       (file) => file !== 'still-ask.yaml',
     );
     const privateDir = join(ctx.dir, 'private');
+    const privatePrompts = [
+      'definitions-stewardship',
+      'delivery-lead',
+      'intake',
+      'linear-triage',
+      'pr-review',
+      'preview-qa',
+    ].map((skill) => `skills/${skill}/references/session-prompt.md`);
     for (const path of ['grants', 'skills', 'docs']) {
       cpSync(join(ctx.fixture, path), join(ctx.dir, path), { recursive: true });
     }
-    for (const file of [...grantFiles.map((name) => `grants/${name}`), ...PRIVATE_PROMPTS, ...PRIVATE_DOCS]) {
+    for (const file of [...grantFiles.map((name) => `grants/${name}`), ...privatePrompts, ...PRIVATE_DOCS]) {
       mkdirSync(dirname(join(privateDir, file)), { recursive: true });
       cpSync(join(ctx.dir, file), join(privateDir, file));
       if (!shared) {
@@ -509,9 +504,9 @@ test('with --private it still passes while hq holds the same copies', () => {
 test('with --private it fails on a drifted private prompt, names the tree, and writes the repair without --check', () => {
   const ctx = setupPrivateTest();
   {
-    const file = 'skills/preview-qa/references/session-prompt.md',
-      path = join(ctx.privateDir, file),
-      source = readFileSync(path, 'utf8');
+    const file = 'skills/preview-qa/references/session-prompt.md';
+    const path = join(ctx.privateDir, file);
+    const source = readFileSync(path, 'utf8');
     writeFileSync(path, source.replace('- GitHub: read zgeoff PRs and their comments.', '- GitHub: read every repo.'));
     {
       const checked = ctx.runPrivate();
@@ -529,8 +524,8 @@ test('with --private it fails on a drifted private prompt, names the tree, and w
 test('with --private it repairs a still-ask list in a private doc from the list in hq', () => {
   const ctx = setupPrivateTest();
   {
-    const path = join(ctx.privateDir, 'docs/skill-development/roles-design.md'),
-      source = readFileSync(path, 'utf8');
+    const path = join(ctx.privateDir, 'docs/skill-development/roles-design.md');
+    const source = readFileSync(path, 'utf8');
     writeFileSync(path, source.replace("Nix's memory or identity", 'Nix'));
     expect(ctx.runPrivate().exitCode).toBe(1);
     expect(ctx.runPrivate([]).exitCode).toBe(0);
@@ -613,8 +608,8 @@ test('with --private a missing directory is refused', () => {
 });
 
 test('with --private an empty private dir is refused, though hq still holds every listed site', () => {
-  const ctx = setupPrivateTest(true),
-    empty = join(ctx.dir, 'empty');
+  const ctx = setupPrivateTest(true);
+  const empty = join(ctx.dir, 'empty');
   mkdirSync(empty);
   {
     const result = ctx.run(['--check', '--private', empty]);
@@ -664,7 +659,12 @@ test('without --private the errors are as they were', () => {
 function writePrivateSites(dir: string, value = 'private'): void {
   const file = join(dir, 'grants/still-ask.yaml');
   let text = readFileSync(file, 'utf8');
-  for (const site of PRIVATE_SITES) {
+  const privateSites = [
+    'skills/intake/references/session-prompt.md',
+    'skills/definitions-stewardship/references/session-prompt.md',
+    'docs/skill-development/roles-design.md',
+  ];
+  for (const site of privateSites) {
     text = text.replace(`  - file: ${site}\n`, `  - file: ${site}\n    tree: ${value}\n`);
   }
   writeFileSync(file, text);

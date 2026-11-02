@@ -99,8 +99,8 @@ test('impd: the awake non-Nix imps\' vCPUs are counted, Nix and sleeping ones le
       { name: 'kettle-1', state: 'running', memoryMib: 2048, vcpus: 2 },
       { name: 'kettle-2', state: 'running', memoryMib: 2048, vcpus: 4 },
       { name: 'kettle-3', state: 'sleeping', memoryMib: 2048 },
-    ])),
-    unknown = await readImpd(buildImpzProbe([{ name: 'kettle-1', state: 'running', memoryMib: 2048 }]));
+    ]));
+  const unknown = await readImpd(buildImpzProbe([{ name: 'kettle-1', state: 'running', memoryMib: 2048 }]));
   expect([counted.impd.nonnixAwakeVcpus, counted.impd.nonnixAwakeMib, unknown.impd.nonnixAwakeVcpus, unknown.impd.nonnixAwakeMib]).toStrictEqual([6, 4096, null, 2048]);
 });
 

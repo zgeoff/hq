@@ -183,10 +183,10 @@ describe('reading the event feed', () => {
   });
 
   test('a sweep ends every gone session, and a working run\'s exit alert repeats from the sweep\'s mark; a session removed by hand raises none', async () => {
-    const BY_HAND = 'dddddddd-4444-4444-8444-444444444444',
-      HANDOFF = 'eeeeeeee-5555-4555-8555-555555555555',
-      atcFake = fakeAtc(dir, []),
-      c = await AtcClient.open();
+    const BY_HAND = 'dddddddd-4444-4444-8444-444444444444';
+    const HANDOFF = 'eeeeeeee-5555-4555-8555-555555555555';
+    const atcFake = fakeAtc(dir, []);
+    const client = await AtcClient.open();
     atc = atcFake;
     add();
     add('GEO-9002', S2);
@@ -195,16 +195,16 @@ describe('reading the event feed', () => {
     setSession(db, 'GEO-9003', BY_HAND, 'z-delivery', 'remove');
     atMin(6);
     try {
-      const afterSweep = await sweepNow(db, c, buildStubGitHubFactsRunner({}), { actor: 'z-delivery', wrapUpDeps: { openClient: () => Promise.reject(new Error('no wrap-up expected')), readImpWork: () => Promise.reject(new Error('no wrap-up expected')) }, log: () => {} });
+      const afterSweep = await sweepNow(db, client, buildStubGitHubFactsRunner({}), { actor: 'z-delivery', wrapUpDeps: { openClient: () => Promise.reject(new Error('no wrap-up expected')), readImpWork: () => Promise.reject(new Error('no wrap-up expected')) }, log: () => {} });
       atMin(6 + SWEEP_MINUTES.repeatMinutes());
-      const repeatSweep = await sweepNow(db, c, buildStubGitHubFactsRunner({}), { actor: 'z-delivery', wrapUpDeps: { openClient: () => Promise.reject(new Error('no wrap-up expected')), readImpWork: () => Promise.reject(new Error('no wrap-up expected')) }, log: () => {} });
+      const repeatSweep = await sweepNow(db, client, buildStubGitHubFactsRunner({}), { actor: 'z-delivery', wrapUpDeps: { openClient: () => Promise.reject(new Error('no wrap-up expected')), readImpWork: () => Promise.reject(new Error('no wrap-up expected')) }, log: () => {} });
       expect([afterSweep.sent.map((a) => a.key), repeatSweep.sent.map((a) => a.key), afterSweep.sent[0]?.line]).toEqual([
         [`session:${S1}`],
         [`session:${S1}`],
         'GEO-9001: session aaaaaaaa has exited; wrap it up, or hq run session GEO-9001 aaaaaaaa --remove',
       ]);
     } finally {
-      c.close();
+      client.close();
     }
     expect(db.query('SELECT session_id, active, ended_by FROM run_sessions ORDER BY session_id').all()).toEqual([
       { session_id: S1, active: 0, ended_by: 'sweep' },

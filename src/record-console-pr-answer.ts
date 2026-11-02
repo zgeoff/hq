@@ -26,8 +26,8 @@ export async function recordConsolePRAnswer(db: Database, run: Runner, item: Unb
     return false;
   }
   try {
-    const head = await readPRHead(run, `${ref.owner}/${ref.repo}`, ref.number),
-      note = input.note.trim();
+    const head = await readPRHead(run, `${ref.owner}/${ref.repo}`, ref.number);
+    const note = input.note.trim();
     await recordPRAnswer(db, { repo: ref.repo.toLowerCase(), pr: ref.number, answer: input.review, head, source: `console:${item.id}`, note: note === '' ? null : note, actor: input.actor });
     return true;
   } catch (error) {

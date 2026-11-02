@@ -12,8 +12,8 @@ export async function loadConsoleAssets(): Promise<ConsoleAssets> {
 }
 
 async function runConsoleBuild(): Promise<ConsoleAssets> {
-  const index = join(import.meta.dir, 'console', 'index.html'),
-    result = await Bun.build({ entrypoints: [index], minify: true });
+  const index = join(import.meta.dir, 'console', 'index.html');
+  const result = await Bun.build({ entrypoints: [index], minify: true });
   if (!result.success) {
     throw new AggregateError(result.logs, 'the console page did not build');
   }

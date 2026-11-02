@@ -238,8 +238,8 @@ test('the key is cut from an op failure and a stored title, and a traced fetch i
   forgetKey();
   process.env['OP_SERVICE_ACCOUNT_TOKEN'] = 'invented-token';
   try {
-    const caller = makeLinearCaller(() => Promise.resolve({ code: 1, stdout: KEY, stderr: `[ERROR] ${KEY} could not be read` })),
-      err = await caller('q', {}).catch((error: unknown) => error);
+    const caller = makeLinearCaller(() => Promise.resolve({ code: 1, stdout: KEY, stderr: `[ERROR] ${KEY} could not be read` }));
+    const err = await caller('q', {}).catch((error: unknown) => error);
     expect(String((err as Error).message)).not.toContain(KEY);
     process.env['BUN_CONFIG_VERBOSE_FETCH'] = 'curl';
     const ok: Runner = async () => ({ code: 0, stdout: KEY, stderr: '' });

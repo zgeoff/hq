@@ -17,9 +17,9 @@ function setupTest() {
 }
 
 test('it tells the owner once, from Monday 09:00 Sydney, with the last 7 days as the window', () => {
-  const ctx = setupTest(),
-    read = ctx.db.query("INSERT INTO events (subject, subject_id, action, actor, at, data) VALUES ('hq', 'op', 'read', ?, ?, ?)"),
-    sample = ctx.db.query('INSERT INTO capacity_samples (at, op_account_used, op_account_limit, op_refused) VALUES (?, ?, 1000, 0)');
+  const ctx = setupTest();
+  const read = ctx.db.query("INSERT INTO events (subject, subject_id, action, actor, at, data) VALUES ('hq', 'op', 'read', ?, ?, ?)");
+  const sample = ctx.db.query('INSERT INTO capacity_samples (at, op_account_used, op_account_limit, op_refused) VALUES (?, ?, 1000, 0)');
   sample.run('2026-10-11T23:00:00Z', 640);
   sample.run('2026-10-12T12:00:00Z', 812);
   sample.run('2026-10-13T13:30:00Z', 90);
@@ -63,8 +63,8 @@ test('it sends only on the Monday: a first run later in the week sends nothing',
 });
 
 test('it holds the message in the quiet hours', () => {
-  const ctx = setupTest(),
-    restore = overrideEnv('HQ_QUIET', '09-11');
+  const ctx = setupTest();
+  const restore = overrideEnv('HQ_QUIET', '09-11');
 
   expect(runWeeklyAuditTick(ctx.db, 'hq', sydneyUtc(2026, 10, 19, 10, 0))).toBeNull();
   restore();
@@ -86,8 +86,8 @@ test('a first tick after 09:30 marks the message late', () => {
 });
 
 test('the outbox holds an unsent audit message through the quiet hours and sends it after them', async () => {
-  const app = setupTest(),
-    atc = fakeAtc(app.dir);
+  const app = setupTest();
+  const atc = fakeAtc(app.dir);
   onTestFinished(() => atc.stop());
   onTestFinished(overrideEnv('HQ_NOTIFY', undefined));
   runWeeklyAuditTick(app.db, 'hq', sydneyUtc(2026, 10, 19, 9, 0));

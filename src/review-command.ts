@@ -6,6 +6,8 @@ import { runReview } from './noslop/run-review.ts';
 import { formatNoslopReview } from './noslop/format-noslop-review.ts';
 import type { PRRequest } from './noslop/types.ts';
 import { formatChecks } from './review/format-checks.ts';
+import { REVIEW_EFFORT } from './review/review-effort.ts';
+import { RISK_EFFORT } from './review/risk-effort.ts';
 import type { Effort, ReviewResult } from './review/types.ts';
 
 function readPR(raw: string | undefined): number {
@@ -33,8 +35,8 @@ function toTextFlag(value: string | boolean | undefined): string | undefined {
 }
 
 function formatCodexReview(r: ReviewResult): string {
-  const allowDeny = r.allowDeny.skipped ? [`== allow-or-deny pass skipped: ${r.allowDeny.skipped}`] : [`== allow-or-deny (codex exit ${r.allowDeny.code})`, r.allowDeny.answer],
-    install = r.install.ok ? r.install.detail : `FAILED, so the review is static: ${r.install.detail}`;
+  const allowDeny = r.allowDeny.skipped ? [`== allow-or-deny pass skipped: ${r.allowDeny.skipped}`] : [`== allow-or-deny (codex exit ${r.allowDeny.code})`, r.allowDeny.answer];
+  const install = r.install.ok ? r.install.detail : `FAILED, so the review is static: ${r.install.detail}`;
   return [
     `== effort: ${r.effort.effort} (${r.effort.reason})`,
     `== install: ${install}`,
@@ -55,9 +57,9 @@ async function runReviewPR(ctx: Ctx): Promise<Out> {
   if (timeoutRefusal !== null) {
     throw new HqError('bad_args', timeoutRefusal);
   }
-  const base = buildRequest(ctx, ctx.verb, ctx.rest[0]),
-    effort = toTextFlag(ctx.flags.effort) as Effort | undefined,
-    result = await runReview({ ...base, watch: !ctx.flags['no-watch'], effort, full: ctx.flags.full === true, fixesOnly: ctx.flags['fixes-only'] === true, timeout, confirm: ctx.flags.confirm === true });
+  const base = buildRequest(ctx, ctx.verb, ctx.rest[0]);
+  const effort = parseEffort(toTextFlag(ctx.flags.effort));
+  const result = await runReview({ ...base, watch: !ctx.flags['no-watch'], effort, full: ctx.flags.full === true, fixesOnly: ctx.flags['fixes-only'] === true, timeout, confirm: ctx.flags.confirm === true });
   if ('engine' in result) {
     return { data: { ...result }, text: formatNoslopReview(result) };
   }
@@ -74,4 +76,11 @@ export async function runReviewCommand(ctx: Ctx): Promise<Out> {
     return await runGatePR(ctx);
   }
   return await runReviewPR(ctx);
+}
+
+function parseEffort(value: string | undefined): Effort | undefined {
+  if (value === undefined || value === REVIEW_EFFORT || value === RISK_EFFORT) {
+    return value;
+  }
+  throw new HqError('bad_args', `--effort must be ${REVIEW_EFFORT} or ${RISK_EFFORT}`);
 }

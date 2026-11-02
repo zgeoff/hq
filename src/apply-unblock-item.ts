@@ -12,8 +12,8 @@ import { getUnblock } from './unblock/get-unblock.ts';
 export function applyUnblockItem(db: Database, input: Omit<UnblockInput, 'task'>, item: ItemInput): ReturnType<typeof addUnblock> {
   return db
     .transaction(() => {
-      const added = addUnblock(db, { ...input, fromItem: true, task: item.question }),
-        extras = JSON.stringify(splitItemExtras(item));
+      const added = addUnblock(db, { ...input, fromItem: true, task: item.question });
+      const extras = JSON.stringify(splitItemExtras(item));
       if (added.item.title === item.title && added.item.item === extras) {
         return added;
       }

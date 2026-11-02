@@ -7,11 +7,11 @@ import { roleName } from './roles/role-name.ts';
 import { sendConsoleMessages } from './send-console-messages.ts';
 
 function setupTest() {
-  const fresh = freshDb(),
-    lines: string[] = [],
-    spy = spyOn(console, 'log').mockImplementation((line: string) => {
-      lines.push(line);
-    });
+  const fresh = freshDb();
+  const lines: string[] = [];
+  const spy = spyOn(console, 'log').mockImplementation((line: string) => {
+    lines.push(line);
+  });
   at(NOON_SYDNEY);
   onTestFinished(fresh.cleanup);
   onTestFinished(() => spy.mockRestore());
@@ -30,8 +30,8 @@ function setupTest() {
 }
 
 test('a failed send says so, is logged, and stays in the outbox for a retry', async () => {
-  const app = setupTest(),
-    told = await sendConsoleMessages(app.db);
+  const app = setupTest();
+  const told = await sendConsoleMessages(app.db);
 
   expect(told).toBe(false);
   expect(app.readStatus()).toStrictEqual(['failed']);
@@ -39,9 +39,9 @@ test('a failed send says so, is logged, and stays in the outbox for a retry', as
 });
 
 test('a message the owner session gets says so', async () => {
-  const app = setupTest(),
-    atc = app.startAtc(),
-    told = await sendConsoleMessages(app.db);
+  const app = setupTest();
+  const atc = app.startAtc();
+  const told = await sendConsoleMessages(app.db);
 
   expect(told).toBe(true);
   expect(atc.sent.map((m) => m.text)).toStrictEqual(['console answer: call kettle-mint: Yes, mint them']);

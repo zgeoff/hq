@@ -41,16 +41,18 @@ function parseText(value: unknown, where: string): string {
   return value;
 }
 
+function parseEntries(value: unknown, outcome: 'ask', where: string): Item[];
+function parseEntries(value: unknown, outcome: 'allow', where: string): Grant[];
 function parseEntries(value: unknown, outcome: 'ask' | 'allow', where: string): (Item | Grant)[] {
   if (!Array.isArray(value) || value.length === 0) {
     throw new Error(`${where}: expected a nonempty list`);
   }
   const ids = new Set<string>();
   return value.map((entry, i) => {
-    const at = `${where}[${i}]`,
-      fields = outcome === 'ask' ? ['id', 'outcome', 'note', 'note_first'] : ['id', 'label', 'outcome', 'note'],
-      row = parseObject(entry, fields, at),
-      slug = parseText(row.id, `${at}.id`);
+    const at = `${where}[${i}]`;
+    const fields = outcome === 'ask' ? ['id', 'outcome', 'note', 'note_first'] : ['id', 'label', 'outcome', 'note'];
+    const row = parseObject(entry, fields, at);
+    const slug = parseText(row.id, `${at}.id`);
     if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(slug) || ids.has(slug)) {
       throw new Error(`${at}: id must be a unique slug`);
     }
@@ -94,11 +96,11 @@ function formatList(notes: string[]): string {
 }
 
 function renderDiff(file: string, before: string, after: string): string {
-  const newLines = after.split('\n'),
-    oldLines = before.split('\n');
-  let endNew = newLines.length,
-    endOld = oldLines.length,
-    start = 0;
+  const newLines = after.split('\n');
+  const oldLines = before.split('\n');
+  let endNew = newLines.length;
+  let endOld = oldLines.length;
+  let start = 0;
   while (start < oldLines.length && start < newLines.length && oldLines[start] === newLines[start]) {
     start++;
   }
@@ -107,8 +109,8 @@ function renderDiff(file: string, before: string, after: string): string {
     endNew--;
   }
   {
-    const context = Math.min(3, oldLines.length - endOld),
-      from = Math.max(0, start - 3);
+    const context = Math.min(3, oldLines.length - endOld);
+    const from = Math.max(0, start - 3);
     return [
       `--- a/${file}`,
       `+++ b/${file}`,
@@ -133,15 +135,15 @@ interface StillAsk {
 }
 
 function buildStillAsk(dataFile: string, entries: unknown[], items: Item[], also: string[] | undefined): StillAsk {
-  const afters = new Map<string, string>(),
-    getNotes = (voice: Voice) => items.map((item) => (voice === 'first' ? (item.note_first ?? item.note) : item.note)),
-    privateSites = new Set<string>(),
-    sites = new Map<string, Voice>(),
-    textByVoice = { first: formatList(getNotes('first')), third: formatList(getNotes('third')) };
+  const afters = new Map<string, string>();
+  const getNotes = (voice: Voice) => items.map((item) => (voice === 'first' ? (item.note_first ?? item.note) : item.note));
+  const privateSites = new Set<string>();
+  const sites = new Map<string, Voice>();
+  const textByVoice = { first: formatList(getNotes('first')), third: formatList(getNotes('third')) };
   for (const entry of entries) {
-    const row = parseObject(entry, ['file', 'voice', 'after', 'tree'], `${dataFile}.sites`),
-      site = parseText(row.file, 'site.file'),
-      voice = site.endsWith('/references/session-prompt.md') ? 'first' : 'third';
+    const row = parseObject(entry, ['file', 'voice', 'after', 'tree'], `${dataFile}.sites`);
+    const site = parseText(row.file, 'site.file');
+    const voice = site.endsWith('/references/session-prompt.md') ? 'first' : 'third';
     if (!/^(?:skills|docs)\//u.test(site) || site.split('/').includes('..') || sites.has(site)) {
       throw new Error(`invalid or duplicate site: ${site}`);
     }
@@ -177,9 +179,9 @@ function buildStillAsk(dataFile: string, entries: unknown[], items: Item[], also
 }
 
 function readStillAsk(tree: Tree): StillAsk {
-  const dataFile = 'grants/still-ask.yaml',
-    model = parseObject(Bun.YAML.parse(read(tree, dataFile)), ['items', 'also', 'sites'], dataFile),
-    stillAsk = parseEntries(model.items, 'ask', `${dataFile}.items`) as Item[];
+  const dataFile = 'grants/still-ask.yaml';
+  const model = parseObject(Bun.YAML.parse(read(tree, dataFile)), ['items', 'also', 'sites'], dataFile);
+  const stillAsk = parseEntries(model.items, 'ask', `${dataFile}.items`);
   if (!Array.isArray(model.sites) || model.sites.length === 0) {
     throw new Error(`${dataFile}: expected sites`);
   }
@@ -207,9 +209,9 @@ function parseAlso(value: unknown, where: string): string[] {
 }
 
 function normalizeSite(file: string, body: string, data: StillAsk): string {
-  const mentions = [...body.matchAll(/security change/gu)].length,
-    spans = [...body.matchAll(/deleting or rewriting\b[^\n]*?\bsecurity change\b/gu)],
-    voice = data.sites.get(file);
+  const mentions = [...body.matchAll(/security change/gu)].length;
+  const spans = [...body.matchAll(/deleting or rewriting\b[^\n]*?\bsecurity change\b/gu)];
+  const voice = data.sites.get(file);
   if (mentions !== spans.length || spans.length !== (voice ? 1 : 0)) {
     throw new Error(
       `${file}: expected ${voice ? 'one still-ask span' : 'no security change outside the listed sites'}; found ${spans.length} spans and ${mentions} security change mentions`,
@@ -290,9 +292,9 @@ interface SessionContext {
 }
 
 function renderSessionGrants(file: string, body: string, block: RegExpExecArray, context: SessionContext): string {
-  const content = block.groups?.['content'] ?? '',
-    matches = [...content.matchAll(/^Grants:\n[\s\S]*?\n\n/gmu)],
-    [span] = matches;
+  const content = block.groups?.['content'] ?? '';
+  const matches = [...content.matchAll(/^Grants:\n[\s\S]*?\n\n/gmu)];
+  const [span] = matches;
   if (matches.length !== 1 || !span) {
     throw new Error(`${file}: expected one Grants block ending with a blank line`);
   }
@@ -303,11 +305,11 @@ function renderSessionGrants(file: string, body: string, block: RegExpExecArray,
           () => context.data.textByVoice[context.data.sites.get(file) ?? 'first'],
         );
         return `- ${grant.label}: ${note}`;
-      }),
-      rendered = `Grants:\n${notes.join('\n')}\n\n`,
-      rest = content.slice(span.index + span[0].length),
-      updatedBlock = block[0].replace(span[0], () => rendered),
-      updatedBody = body.slice(0, block.index) + updatedBlock + body.slice(block.index + block[0].length);
+      });
+    const rendered = `Grants:\n${notes.join('\n')}\n\n`;
+    const rest = content.slice(span.index + span[0].length);
+    const updatedBlock = block[0].replace(span[0], () => rendered);
+    const updatedBody = body.slice(0, block.index) + updatedBlock + body.slice(block.index + block[0].length);
 
     if (/^- /mu.test(rest)) {
       throw new Error(
@@ -328,9 +330,9 @@ function renderSession(file: string, body: string, context: RenderContext): stri
   if (!/^skills\/[^/]+\/references\/session-prompt\.md$/u.test(file)) {
     return undefined;
   }
-  const blocks = [...body.matchAll(/^```text\n(?<content>[\s\S]*?)^```[ \t]*$/gmu)],
-    session = /The start prompt for `(?<name>z-[a-z0-9-]+)`/u.exec(body)?.groups?.['name'],
-    withGrants = blocks.filter((block) => /^Grants:$/mu.test(block.groups?.['content'] ?? ''));
+  const blocks = [...body.matchAll(/^```text\n(?<content>[\s\S]*?)^```[ \t]*$/gmu)];
+  const session = /The start prompt for `(?<name>z-[a-z0-9-]+)`/u.exec(body)?.groups?.['name'];
+  const withGrants = blocks.filter((block) => /^Grants:$/mu.test(block.groups?.['content'] ?? ''));
   if (withGrants.length === 0) {
     return undefined;
   }
@@ -368,7 +370,7 @@ function readGrants(data: StillAsk, tree: Tree): Map<string, Grant[]> {
       throw new Error(`${file}: no matching session prompt`);
     }
     const parsed: unknown = Bun.YAML.parse(read(tree, file));
-    grantsBySession.set(file.slice('grants/'.length, -'.yaml'.length), parseEntries(parsed, 'allow', file) as Grant[]);
+    grantsBySession.set(file.slice('grants/'.length, -'.yaml'.length), parseEntries(parsed, 'allow', file));
   }
   return grantsBySession;
 }
@@ -431,8 +433,8 @@ function buildTrees(privateDir: string | undefined): Trees {
     const only: Tree = { name: null, root };
     return { all: [only], hq: only, prompts: only };
   }
-  const hq: Tree = { name: 'hq', root },
-    prompts: Tree = { name: 'hq-private', root: resolve(privateDir) };
+  const hq: Tree = { name: 'hq', root };
+  const prompts: Tree = { name: 'hq-private', root: resolve(privateDir) };
   if (!existsSync(prompts.root)) {
     throw new Error(`--private ${prompts.root}: no such directory`);
   }
@@ -441,8 +443,8 @@ function buildTrees(privateDir: string | undefined): Trees {
 }
 
 function requirePrivateFiles(tree: Tree): void {
-  const grants = collectFiles(tree, 'grants').filter((file) => file.endsWith('.yaml') && file !== 'grants/still-ask.yaml'),
-    prompts = [...new Bun.Glob('skills/*/references/session-prompt.md').scanSync({ cwd: tree.root, onlyFiles: true })];
+  const grants = collectFiles(tree, 'grants').filter((file) => file.endsWith('.yaml') && file !== 'grants/still-ask.yaml');
+  const prompts = [...new Bun.Glob('skills/*/references/session-prompt.md').scanSync({ cwd: tree.root, onlyFiles: true })];
   {
     const missing = [
       ...(grants.length === 0 ? ['grants (grants/<session>.yaml)'] : []),
@@ -476,8 +478,8 @@ function renderSessions(entry: Held, context: RenderContext, generated: Generate
   for (const [file, body] of entry.originals) {
     const next = withTree(entry.tree, () => renderSession(file, body, context));
     if (next !== undefined) {
-      const existing = generated.find((item) => item.tree === entry.tree && item.file === file),
-        final = withTree(entry.tree, () => normalizeSite(file, next, context.data));
+      const existing = generated.find((item) => item.tree === entry.tree && item.file === file);
+      const final = withTree(entry.tree, () => normalizeSite(file, next, context.data));
       if (existing) {
         existing.next = final;
       } else {
@@ -488,10 +490,10 @@ function renderSessions(entry: Held, context: RenderContext, generated: Generate
 }
 
 function runTrees(trees: Trees, check: boolean): number {
-  const data = readStillAsk(trees.hq),
-    grantsBySession = withTree(trees.prompts, () => readGrants(data, trees.prompts)),
-    held = trees.all.map((tree) => readHeld(tree)),
-    sessions = new Set<string>();
+  const data = readStillAsk(trees.hq);
+  const grantsBySession = withTree(trees.prompts, () => readGrants(data, trees.prompts));
+  const held = trees.all.map((tree) => readHeld(tree));
+  const sessions = new Set<string>();
   for (const file of data.sites.keys()) {
     requireSite(file, trees, held, data);
   }
@@ -509,8 +511,8 @@ function requireSite(file: string, trees: Trees, held: Held[], data: StillAsk): 
 }
 
 function renderTrees(trees: Trees, held: Held[], context: RenderContext): Generated[] {
-  const generated = collectSites(held, context.data),
-    prompts = held.find((entry) => entry.tree === trees.prompts);
+  const generated = collectSites(held, context.data);
+  const prompts = held.find((entry) => entry.tree === trees.prompts);
   if (prompts) {
     renderSessions(prompts, context, generated);
   }

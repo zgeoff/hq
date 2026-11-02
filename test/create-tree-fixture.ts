@@ -24,8 +24,8 @@ export function buildPrompt(who: string): string {
 }
 
 export function createTreeFixture() {
-  const base = freshDb(),
-    laneFiles = { 'skills/delivery-lead/scripts/capacity.sh': '#!/bin/sh\n', 'skills/delivery-lead/pacing.json': '{}\n' };
+  const base = freshDb();
+  const laneFiles = { 'skills/delivery-lead/scripts/capacity.sh': '#!/bin/sh\n', 'skills/delivery-lead/pacing.json': '{}\n' };
   onTestFinished(base.cleanup);
   onTestFinished(createHomeOverride(base.dir));
   onTestFinished(overrideEnv('HQ_PRIVATE_DIR', `${base.dir}/.local/share/atc/workspaces/hq-private`));

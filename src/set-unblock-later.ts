@@ -11,8 +11,8 @@ import { getUnblock } from './unblock/get-unblock.ts';
 export function setUnblockLater(db: Database, id: string, until: string | null, actor: string): UnblockItem {
   return db
     .transaction(() => {
-      const current = requireUnblock(db, id),
-        due = buildLaterDue(until);
+      const current = requireUnblock(db, id);
+      const due = buildLaterDue(until);
       if (current.state !== 'open') {
         throw new HqError('bad_state', `${id} is ${current.state}, not open`);
       }
