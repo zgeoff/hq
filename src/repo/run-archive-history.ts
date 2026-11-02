@@ -92,8 +92,8 @@ function applyArchive(input: ArchiveInput, before: ArchiveSide[], reviewFiles: R
 }
 
 function createArchiveBackups(input: ArchiveInput): string[] {
-  const files = existsSync(input.store) ? [input.dbFile, input.store] : [input.dbFile],
-    stamp = `${iso(now()).replaceAll(/[-:]/gu, '')}-${randomBytes(2).toString('hex')}`;
+  const files = existsSync(input.store) ? [input.dbFile, input.store] : [input.dbFile];
+  const stamp = `${iso(now()).replaceAll(/[-:]/gu, '')}-${randomBytes(2).toString('hex')}`;
   return files.map((file) => input.createBackup(file, 'archive', stamp));
 }
 

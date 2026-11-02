@@ -24,8 +24,8 @@ export function upsertPRStatus(db: Database, repo: string, pr: number, fields: P
       answer_at: null,
       next: null,
       next_at: null,
-    },
-    updatedAt = iso(now());
+    };
+  const updatedAt = iso(now());
   const query = kdb(db)
     .insertInto('pr_status')
     .values({ ...blank, ...fields, repo, pr, updated_at: updatedAt })

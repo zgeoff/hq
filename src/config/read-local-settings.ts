@@ -4,9 +4,6 @@ import { HqError } from '../errors.ts';
 import { getLocalSettingsPath } from './get-local-settings-path.ts';
 import { LOCAL_KEYS } from './local-keys.ts';
 
-const FlatStrings = z.record(z.string(), z.string()),
-  cache = new Map<string, { mtimeMs: number; values: Record<string, string> }>();
-
 export function readLocalSettings(env: Record<string, string | undefined> = process.env): Record<string, string> {
   const path = getLocalSettingsPath(env);
   return loadIfPresent(path, readModifiedTime(path));
@@ -28,6 +25,8 @@ function readModifiedTime(path: string): number | null {
   }
 }
 
+const cache = new Map<string, { mtimeMs: number; values: Record<string, string> }>();
+
 function load(path: string, mtimeMs: number): Record<string, string> {
   const hit = cache.get(path);
   return hit?.mtimeMs === mtimeMs ? hit.values : refresh(path, mtimeMs);
@@ -38,6 +37,8 @@ function refresh(path: string, mtimeMs: number): Record<string, string> {
   cache.set(path, entry);
   return entry.values;
 }
+
+const FlatStrings = z.record(z.string(), z.string());
 
 function parseLocalSettings(path: string): Record<string, string> {
   let raw: unknown;

@@ -9,9 +9,9 @@ import { enqueue } from '../outbox/enqueue.ts';
 import { owner } from '../owner.ts';
 import { newSincePush } from './new-since-push.ts';
 
-const REPEAT_MS = 60 * 60_000,
-  TOLD_AT = 'unblock_changed_told_at',
-  TOLD_SEQ = 'unblock_changed_told_seq';
+const REPEAT_MS = 60 * 60_000;
+const TOLD_AT = 'unblock_changed_told_at';
+const TOLD_SEQ = 'unblock_changed_told_seq';
 
 export function runUnblockChangedTick(db: Database, actor: string, at: Date = now()): boolean {
   if (isQuiet(at)) {
@@ -19,10 +19,10 @@ export function runUnblockChangedTick(db: Database, actor: string, at: Date = no
   }
   return db
     .transaction(() => {
-      const last = Date.parse(getMeta(db, TOLD_AT) ?? ''),
-        repeat = Number.isNaN(last) || at.getTime() - last >= REPEAT_MS,
-        told = Number(getMeta(db, TOLD_SEQ) ?? 0),
-        top = newSincePush(db).reduce((m, u) => Math.max(m, u.added_seq), 0);
+      const last = Date.parse(getMeta(db, TOLD_AT) ?? '');
+      const repeat = Number.isNaN(last) || at.getTime() - last >= REPEAT_MS;
+      const told = Number(getMeta(db, TOLD_SEQ) ?? 0);
+      const top = newSincePush(db).reduce((highest, unblock) => Math.max(highest, unblock.added_seq), 0);
       if (top === 0 || (top <= told && !repeat)) {
         return false;
       }

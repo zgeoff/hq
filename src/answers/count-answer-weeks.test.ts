@@ -44,8 +44,8 @@ test('hq stats gets the weekly counts in its data, and as a section right after 
   const answerWeeks = [
       { from: '2026-10-11T13:00:00Z', to: '2026-10-14T02:00:00Z', partial: true, answered: 2 },
       { from: '2026-10-04T13:00:00Z', to: '2026-10-11T13:00:00Z', partial: false, answered: 1 },
-    ],
-    merged = mergeAnswerWeeks({ data: { stats: 'kettle' }, text: 'hq stats header\n\nWait on the owner\n  calls\n\nMerged to live' }, answerWeeks);
+    ];
+  const merged = mergeAnswerWeeks({ data: { stats: 'kettle' }, text: 'hq stats header\n\nWait on the owner\n  calls\n\nMerged to live' }, answerWeeks);
   expect(merged.data).toStrictEqual({ stats: 'kettle', answerWeeks });
   expect(merged.text).toBe("hq stats header\n\nWait on the owner\n  calls\n\nYes/no's the owner answered (calls, proposals, reviews; a standing grant shows as a drop; hq answers lists them)\n  week of 2026-10-12: 2 (so far)\n  week of 2026-10-05: 1\n\nMerged to live");
 });

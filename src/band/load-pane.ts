@@ -12,27 +12,28 @@ import { loadConsoleItems } from '../load-console-items.ts';
 import { sydneyUtc } from '../morning/sydney-utc.ts';
 import { sydney } from '../morning/sydney.ts';
 import { line } from '../news/line.ts';
-import type { NewsItem } from '../news/types.ts';
+import { NEWS_TOPICS } from '../news/news-topics.ts';
 import { formatCount } from '../console/format-count.ts';
 import { downtime } from '../probe/downtime.ts';
 import { formatClock } from '../probe/format-clock.ts';
 import { match } from 'ts-pattern';
+import { z } from 'zod';
 import { loadNixState } from './load-nix-state.ts';
 import type { Pane, PaneHeatRow } from './types.ts';
 
 // Links are Markdown, so the terminal makes them clickable.
 export async function loadPane(db: Database, pacingFile: string, consoleURL: string, at: Date = now()): Promise<Pane> {
-  const config = await loadPacing(pacingFile),
-    held = collectHeldIssues(db, at),
-    lanes = config.lanes ?? [],
-    overage = formatPlanOverage(buildLanePlan(config.slots?.imp ?? 0, config.impMib, capacitySettings(db))),
-    sections = [loadNeedsYouSection(db, consoleURL), loadNixSection(db, at), renderLanesSection(lanes, held, config.error, overage), loadReviewsSection(db, at), loadShippedSection(db, consoleURL, at), loadNewsSection(db)];
+  const config = await loadPacing(pacingFile);
+  const held = collectHeldIssues(db, at);
+  const lanes = config.lanes ?? [];
+  const overage = formatPlanOverage(buildLanePlan(config.slots?.imp ?? 0, config.impMib, capacitySettings(db)));
+  const sections = [loadNeedsYouSection(db, consoleURL), loadNixSection(db, at), renderLanesSection(lanes, held, config.error, overage), loadReviewsSection(db, at), loadShippedSection(db, consoleURL, at), loadNewsSection(db)];
   return { at: iso(at), markdown: sections.join('\n\n'), heat: lanes.map((lane) => buildHeatRow(lane, held)) };
 }
 
 function loadNeedsYouSection(db: Database, consoleURL: string): string {
-  const items = loadConsoleItems(db),
-    rows = items.map((item) => `- ${item.kind}: ${sanitizeCutURL(item.title)}${item.links.map((link) => ` · [${link.label}](${link.url})`).join('')}`);
+  const items = loadConsoleItems(db);
+  const rows = items.map((item) => `- ${item.kind}: ${sanitizeCutURL(item.title)}${item.links.map((link) => ` · [${link.label}](${link.url})`).join('')}`);
   return [`## Needs you (${items.length})`, ...(items.length === 0 ? ['Nothing waits on you.'] : rows), `[Open the console](${consoleURL})`].join('\n');
 }
 
@@ -47,8 +48,8 @@ function loadNixSection(db: Database, at: Date): string {
       .with({ kind: 'down' }, (nix) => `**Down** since ${formatClock(nix.since)}`)
       .with({ kind: 'unknown' }, (nix) => `**Unknown**: ${nix.reason}`)
       .with({ kind: 'up' }, () => 'Up')
-      .exhaustive(),
-    today = downtime(db, getSydneyMidnight(at), at);
+      .exhaustive();
+  const today = downtime(db, getSydneyMidnight(at), at);
   return `## Nix\n${state} · ${today.downMinutes} min down today`;
 }
 
@@ -57,8 +58,8 @@ function renderLanesSection(lanes: readonly LaneConfig[], held: Map<string, Held
     return `## Lanes\nhq can't read the lanes: ${error}`;
   }
   const rows = lanes.map((lane) => {
-    const runs = held.get(lane.name) ?? [],
-      used = runs.filter((run) => !run.parked).length;
+    const runs = held.get(lane.name) ?? [];
+    const used = runs.filter((run) => !run.parked).length;
     return `- ${lane.name} ${formatLaneCount(used, lane.size)}${runs.length === 0 ? '' : `: ${runs.map((run) => (run.parked ? `${run.issue} (parked)` : run.issue)).join(', ')}`}`;
   });
   return ['## Lanes', ...(overage === null ? [] : [`**The imp lanes, all full, cross impd's line: ${overage}**`]), ...(rows.length === 0 ? ['No lanes in pacing.json.'] : rows)].join('\n');
@@ -69,26 +70,48 @@ function formatLaneCount(used: number, size: number): string {
   return used > size ? `**${used}/${size}**` : `${used}/${size}`;
 }
 
+const ReviewRows = z.array(z.object({ ref: z.string(), url: z.string().nullable(), review_round: z.number(), review_started_at: z.string() }));
+
 function loadReviewsSection(db: Database, at: Date): string {
-  const DAY_MS = 86_400_000,
-    cutoff = iso(new Date(at.getTime() - DAY_MS)),
-    rows = db
+  const DAY_MS = 86_400_000;
+  const cutoff = iso(new Date(at.getTime() - DAY_MS));
+  const rows = ReviewRows.parse(
+    db
       .query("SELECT ref, url, review_round, review_started_at FROM run_prs WHERE state = 'open' AND review_started_at >= ? AND (reviewed_at IS NULL OR reviewed_at < review_started_at) ORDER BY review_started_at")
-      .all(cutoff) as { ref: string; url: string | null; review_round: number; review_started_at: string }[],
-    shownRows = rows.map((row) => `- [${row.ref}](${row.url ?? buildPRURL(row.ref)}): round ${row.review_round + 1}, started ${formatClock(row.review_started_at)}`);
+      .all(cutoff),
+  );
+  const shownRows = rows.map((row) => `- [${row.ref}](${row.url ?? buildPRURL(row.ref)}): round ${row.review_round + 1}, started ${formatClock(row.review_started_at)}`);
   return [`## Reviews in flight (${rows.length})`, ...(rows.length === 0 ? ['None.'] : shownRows)].join('\n');
 }
 
+const ShippedRows = z.array(z.object({ ref: z.string(), issue: z.string() }));
+
 function loadShippedSection(db: Database, consoleURL: string, at: Date): string {
-  const batch = db.query('SELECT ref, issue FROM run_prs WHERE merged_at >= ?').all(iso(getSydneyMidnight(at))) as { ref: string; issue: string }[],
-    issues = new Set(batch.map((pr) => pr.issue)).size,
-    repos = new Set(batch.map((pr) => pr.ref.split('#')[0])).size;
+  const midnight = iso(getSydneyMidnight(at));
+  const batch = ShippedRows.parse(db.query('SELECT ref, issue FROM run_prs WHERE merged_at >= ?').all(midnight));
+  const issues = new Set(batch.map((pr) => pr.issue)).size;
+  const repos = new Set(batch.map((pr) => pr.ref.split('#')[0])).size;
   return `## Shipped today\n${formatCount(batch.length, 'PR')} in ${formatCount(repos, 'repo')}, for ${formatCount(issues, 'issue')} · [Shipped tab](${consoleURL}shipped)`;
 }
 
+const NewsRows = z.array(
+  z.object({
+    id: z.number(),
+    from_name: z.string(),
+    topic: z.enum(NEWS_TOPICS),
+    text: z.string(),
+    issue: z.string().nullable(),
+    link: z.string().nullable(),
+    needs_geoff: z.number(),
+    added_at: z.string(),
+    read_at: z.string().nullable(),
+    tag: z.string().nullable(),
+  }),
+);
+
 function loadNewsSection(db: Database): string {
-  const LIMIT = 5,
-    items = db.query('SELECT * FROM news ORDER BY id DESC LIMIT ?').all(LIMIT) as NewsItem[];
+  const LIMIT = 5;
+  const items = NewsRows.parse(db.query('SELECT * FROM news ORDER BY id DESC LIMIT ?').all(LIMIT));
   return ['## News', ...(items.length === 0 ? ['No news yet.'] : items.map((item) => `- ${line(item)}`))].join('\n');
 }
 
@@ -97,10 +120,12 @@ interface HeldIssue {
   parked: boolean;
 }
 
+const RunLaneRows = z.array(z.object({ issue: z.string(), lane: z.string() }));
+
 function collectHeldIssues(db: Database, at: Date): Map<string, HeldIssue[]> {
-  const byLane = new Map<string, HeldIssue[]>(),
-    parked = new Set(parkedRuns(db, at).map((run) => run.issue)),
-    rows = db.query(`SELECT issue, COALESCE(lane, '') AS lane FROM runs WHERE place != 'none' AND state IN (${RUNNING.map(() => '?').join(', ')}) ORDER BY issue`).all(...RUNNING) as { issue: string; lane: string }[];
+  const byLane = new Map<string, HeldIssue[]>();
+  const parked = new Set(parkedRuns(db, at).map((run) => run.issue));
+  const rows = RunLaneRows.parse(db.query(`SELECT issue, COALESCE(lane, '') AS lane FROM runs WHERE place != 'none' AND state IN (${RUNNING.map(() => '?').join(', ')}) ORDER BY issue`).all(...RUNNING));
   for (const row of rows) {
     byLane.set(row.lane, [...(byLane.get(row.lane) ?? []), { issue: row.issue, parked: parked.has(row.issue) }]);
   }

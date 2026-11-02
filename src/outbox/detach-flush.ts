@@ -5,8 +5,8 @@ import type { Runner } from '../runner/types.ts';
 import type { DetachResult } from './types.ts';
 
 export async function detachFlush(run: Runner, self: string[], setenv: string[], retryFailed: boolean, ids?: number[]): Promise<DetachResult> {
-  const path = `${process.env['HOME']}/.local/bin:${process.env['HOME']}/.bun/bin:/usr/local/bin:/usr/bin:/bin`,
-    unit = `hq-send-${Date.now()}-${process.pid}`;
+  const path = `${process.env['HOME']}/.local/bin:${process.env['HOME']}/.bun/bin:/usr/local/bin:/usr/bin:/bin`;
+  const unit = `hq-send-${Date.now()}-${process.pid}`;
   // The unit starts in the manager's environment and directory: blank any session variables
   // it could inherit, and pin the database to an absolute path.
   const db = [`--setenv=HQ_DB=${resolve(dbPath())}`];

@@ -9,22 +9,18 @@ import { readingText } from './reading-text.ts';
 import { sampleCapacity } from './sample-capacity.ts';
 import type { CapacityProbe } from './types.ts';
 
-const FOUR_AM_SYDNEY_PLUS_5 = new Date(Date.parse(FOUR_AM_SYDNEY) + 300_000),
-  NOON_SYDNEY_PLUS_5 = new Date(Date.parse(NOON_SYDNEY) + 300_000),
-  SETTINGS = `${process.env['HOME'] ?? ''}/.claude/settings.json`;
-
 function setupTest() {
-  const answers = new Map<string, RunResult>(),
-    files = new Map<string, string>(),
-    fresh = freshDb(),
-    run = mock<Runner>((cmd) => Promise.resolve(answers.get(cmd[0] ?? '') ?? { code: 1, stdout: '', stderr: '' })),
-    saved = process.env['OP_SERVICE_ACCOUNT_TOKEN'],
-    stub: CapacityProbe = {
-      run,
-      readText: () => Promise.reject(new Error('no cloud here')),
-      readFile: (path) => Promise.resolve(files.get(path) ?? ''),
-      readMs: 100,
-    };
+  const answers = new Map<string, RunResult>();
+  const files = new Map<string, string>();
+  const fresh = freshDb();
+  const run = mock<Runner>((cmd) => Promise.resolve(answers.get(cmd[0] ?? '') ?? { code: 1, stdout: '', stderr: '' }));
+  const saved = process.env['OP_SERVICE_ACCOUNT_TOKEN'];
+  const stub: CapacityProbe = {
+    run,
+    readText: () => Promise.reject(new Error('no cloud here')),
+    readFile: (path) => Promise.resolve(files.get(path) ?? ''),
+    readMs: 100,
+  };
   onTestFinished(fresh.cleanup);
   delete process.env['OP_SERVICE_ACCOUNT_TOKEN'];
   onTestFinished(() => {
@@ -37,6 +33,7 @@ function setupTest() {
     db: fresh.db,
     files,
     probe: stub,
+    settingsPath: `${process.env['HOME'] ?? ''}/.claude/settings.json`,
     readOwnerOutbox: () => (fresh.db.query('SELECT text FROM outbox WHERE target = ? ORDER BY id').all(owner()) as { text: string }[]).map((message) => message.text),
     run,
   };
@@ -45,7 +42,7 @@ function setupTest() {
 test('it runs op service-account ratelimit with the token from ~/.claude/settings.json', async () => {
   const app = setupTest();
   app.answers.set('op', { code: 0, stdout: '[{"type":"account","action":"read_write","limit":1000,"used":120,"remaining":880,"reset":41269}]', stderr: '' });
-  app.files.set(SETTINGS, '{"env":{"OP_SERVICE_ACCOUNT_TOKEN":"ops_invented-kettle-0042"}}');
+  app.files.set(app.settingsPath, '{"env":{"OP_SERVICE_ACCOUNT_TOKEN":"ops_invented-kettle-0042"}}');
 
   await expect(readCapacity(app.db, app.probe, new Date(NOON_SYDNEY))).resolves.toMatchObject({ op_account_used: 120, op_account_limit: 1000, op_refused: 0 });
   expect(app.run).toHaveBeenCalledWith(['op', 'service-account', 'ratelimit', '--format', 'json'], { env: { OP_SERVICE_ACCOUNT_TOKEN: 'ops_invented-kettle-0042' }, timeoutMs: 100 });
@@ -61,10 +58,11 @@ test.each([
   onTestFinished(overrideEnv('HQ_NOW', NOON_SYDNEY));
   const app = setupTest();
   app.answers.set('op', answer);
-  app.files.set(SETTINGS, '{"env":{"OP_SERVICE_ACCOUNT_TOKEN":"invented-token"}}');
+  app.files.set(app.settingsPath, '{"env":{"OP_SERVICE_ACCOUNT_TOKEN":"invented-token"}}');
+  const fiveMinutesLater = new Date(Date.parse(NOON_SYDNEY) + 300_000);
 
   await expect(sampleCapacity(app.db, app.probe, 'hq-lanes', new Date(NOON_SYDNEY))).resolves.toMatchObject({ tick: { opened: [] } });
-  await expect(sampleCapacity(app.db, app.probe, 'hq-lanes', NOON_SYDNEY_PLUS_5)).resolves.toMatchObject({ tick: { opened: keys } });
+  await expect(sampleCapacity(app.db, app.probe, 'hq-lanes', fiveMinutesLater)).resolves.toMatchObject({ tick: { opened: keys } });
   expect(Object.keys(openAlerts(app.db)).toSorted()).toStrictEqual(keys);
   expect(app.readOwnerOutbox().join('\n')).toContain(line);
 });
@@ -73,10 +71,11 @@ test('in quiet hours a spent limit sends the refused alert at once and holds the
   onTestFinished(overrideEnv('HQ_NOW', FOUR_AM_SYDNEY));
   const app = setupTest();
   app.answers.set('op', { code: 0, stdout: '[{"type":"account","action":"read_write","limit":1000,"used":1000,"remaining":0,"reset":41269}]', stderr: '' });
-  app.files.set(SETTINGS, '{"env":{"OP_SERVICE_ACCOUNT_TOKEN":"invented-token"}}');
+  app.files.set(app.settingsPath, '{"env":{"OP_SERVICE_ACCOUNT_TOKEN":"invented-token"}}');
+  const fiveMinutesLater = new Date(Date.parse(FOUR_AM_SYDNEY) + 300_000);
 
   await expect(sampleCapacity(app.db, app.probe, 'hq-lanes', new Date(FOUR_AM_SYDNEY))).resolves.toMatchObject({ tick: { opened: [] } });
-  await expect(sampleCapacity(app.db, app.probe, 'hq-lanes', FOUR_AM_SYDNEY_PLUS_5)).resolves.toMatchObject({ tick: { opened: ['op:daily', 'op:refused'] } });
+  await expect(sampleCapacity(app.db, app.probe, 'hq-lanes', fiveMinutesLater)).resolves.toMatchObject({ tick: { opened: ['op:daily', 'op:refused'] } });
   expect(app.readOwnerOutbox()).toStrictEqual([expect.stringContaining('1Password is refusing requests')]);
 });
 
@@ -85,7 +84,7 @@ test.each([
   ['a settings file that is not JSON', '{"env":{"OP_SERVICE_ACCOUNT_TOKEN":"ops_invented-secret-0042"'],
 ])('with %s, the reading stores no 1Password use and says why, never quoting the file', async (_case, settings) => {
   const app = setupTest();
-  app.files.set(SETTINGS, settings);
+  app.files.set(app.settingsPath, settings);
 
   await expect(readCapacity(app.db, app.probe, new Date(NOON_SYDNEY))).resolves.toMatchObject({ op_account_used: null, op_refused: null, errors: { op: 'no 1Password service-account token in ~/.claude/settings.json: op-mint global' } });
   expect(app.run.mock.calls.some((call) => call[0][0] === 'op')).toBe(false);
@@ -99,7 +98,7 @@ test.each([
 ])('hq capacity shows 1Password with %s', async (_case, answer, line) => {
   const app = setupTest();
   app.answers.set('op', answer);
-  app.files.set(SETTINGS, '{"env":{"OP_SERVICE_ACCOUNT_TOKEN":"invented-token"}}');
+  app.files.set(app.settingsPath, '{"env":{"OP_SERVICE_ACCOUNT_TOKEN":"invented-token"}}');
 
   await expect(readCapacity(app.db, app.probe, new Date(NOON_SYDNEY)).then((reading) => readingText(reading).split('\n').find((text) => text.startsWith('  1Pass')))).resolves.toBe(line);
 });

@@ -17,9 +17,9 @@ function setupTest() {
 }
 
 test('a 1Password read of the key records one op read event; the cached key records none', async () => {
-  const app = setupTest(),
-    keyRead = mock<Runner>(() => Promise.resolve<RunResult>({ code: 0, stdout: 'lin_api_INVENTEDkettleKEY0042\n', stderr: '' })),
-    linear = makeAuditedLinearCaller(app.db, keyRead);
+  const app = setupTest();
+  const keyRead = mock<Runner>(() => Promise.resolve<RunResult>({ code: 0, stdout: 'lin_api_INVENTEDkettleKEY0042\n', stderr: '' }));
+  const linear = makeAuditedLinearCaller(app.db, keyRead);
   await linear('q', {});
   await linear('q', {});
 
@@ -27,9 +27,9 @@ test('a 1Password read of the key records one op read event; the cached key reco
 });
 
 test('a failed 1Password read of the key rejects the call and still records one op read event', async () => {
-  const app = setupTest(),
-    keyRead = mock<Runner>(() => Promise.resolve<RunResult>({ code: 1, stdout: '', stderr: '[ERROR] invented: item not found\n' })),
-    linear = makeAuditedLinearCaller(app.db, keyRead);
+  const app = setupTest();
+  const keyRead = mock<Runner>(() => Promise.resolve<RunResult>({ code: 1, stdout: '', stderr: '[ERROR] invented: item not found\n' }));
+  const linear = makeAuditedLinearCaller(app.db, keyRead);
 
   await expect(linear('q', {})).rejects.toThrow('op read op://kettle/teapot-key/credential failed (1): [ERROR] invented: item not found');
   expect(app.db.query("SELECT actor, data FROM events WHERE subject = 'hq' AND subject_id = 'op' AND action = 'read'").all()).toStrictEqual([{ actor: 'linear', data: '{"consumer":"linear","requests":3}' }]);

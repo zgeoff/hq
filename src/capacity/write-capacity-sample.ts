@@ -5,8 +5,8 @@ import { kdb } from '../kdb.ts';
 import type { Reading } from './types.ts';
 
 export async function writeCapacitySample(db: Database, r: Reading): Promise<void> {
-  const KEEP_DAYS = 30,
-    { at, errors, ...rest } = r;
+  const KEEP_DAYS = 30;
+  const { at, errors, ...rest } = r;
   const row: CapacitySampleRow = { at, ...rest, errors: JSON.stringify(errors) };
   const { at: _at, ...update } = row;
   await kdb(db).insertInto('capacity_samples').values(row).onConflict((oc) => oc.column('at').doUpdateSet(update)).execute();

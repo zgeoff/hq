@@ -62,8 +62,8 @@ export async function probeOnce(db: Database, fetcher: Fetcher, actor: string): 
       tell(db, seq, `Nix is ready again: unready ${mins} min (${formatClock(unready.started_at)}–${formatClock(at)} Sydney).`, 'nix-unready');
       unreadyClosed = unready.id;
     } else if (r && !r.ok && !unready) {
-      const UNREADY_AFTER_MIN = 3,
-        run = unreadyRun(db);
+      const UNREADY_AFTER_MIN = 3;
+      const run = unreadyRun(db);
       const startedAt = run[run.length - 1];
       if (startedAt && Date.parse(at) - Date.parse(startedAt) >= UNREADY_AFTER_MIN * 60_000) {
         const id = Number(db.query("INSERT INTO outages (started_at, detected_at, kind) VALUES (?, ?, 'unready')").run(startedAt, at).lastInsertRowid);

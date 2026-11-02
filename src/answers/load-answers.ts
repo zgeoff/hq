@@ -30,11 +30,13 @@ interface RoundFacts {
 
 const UNKNOWN_ROUND: RoundFacts = { title: null, issues: [], forSession: null };
 
+const AskAnswerData = z.object({ answer: z.string() });
+
 function loadAskAnswers(db: Database, window: AnswerWindow): Answer[] {
   const rows = db.query(`SELECT seq, subject_id AS id, actor, data, at FROM events WHERE subject = 'ask' AND action IN ('answered', 'answered-unopened') AND at >= ? AND at < ? ORDER BY seq`).all(window.from, window.to) as AnswerEvent[];
   return rows.flatMap((r) => {
-    const ask = getAsk(db, r.id),
-      data = JSON.parse(r.data) as { answer: string };
+    const ask = getAsk(db, r.id);
+    const data = AskAnswerData.parse(JSON.parse(r.data));
     if (ask === null) {
       return [];
     }

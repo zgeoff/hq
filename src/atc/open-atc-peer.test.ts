@@ -45,8 +45,8 @@ test('it answers a request with the daemon answer object', async () => {
 });
 
 test('it stops with both versions when the daemon refuses the hello as protocol_mismatch', () => {
-  const ctx = setupTest(),
-    daemon = startStubAtcDaemon(ctx.path, {}, { build: '7.1.0', protocol: 11 });
+  const ctx = setupTest();
+  const daemon = startStubAtcDaemon(ctx.path, {}, { build: '7.1.0', protocol: 11 });
   onTestFinished(() => daemon.stop());
 
   expect(openAtcPeer(ctx.path, 1000)).rejects.toMatchObject({
@@ -56,15 +56,15 @@ test('it stops with both versions when the daemon refuses the hello as protocol_
 });
 
 test('it says the daemon speaks an older protocol when it closes the hello with no answer', () => {
-  const ctx = setupTest(),
-    server = Bun.listen({
-      unix: ctx.path,
-      socket: {
-        data(socket) {
-          socket.end();
-        },
+  const ctx = setupTest();
+  const server = Bun.listen({
+    unix: ctx.path,
+    socket: {
+      data(socket) {
+        socket.end();
       },
-    });
+    },
+  });
   onTestFinished(() => server.stop(true));
 
   expect(openAtcPeer(ctx.path, 1000)).rejects.toMatchObject({
@@ -74,28 +74,28 @@ test('it says the daemon speaks an older protocol when it closes the hello with 
 });
 
 test('it says the daemon speaks an older protocol when it answers in the line protocol', () => {
-  const ctx = setupTest(),
-    server = Bun.listen({
-      unix: ctx.path,
-      socket: {
-        data(socket) {
-          socket.write(`${JSON.stringify({ v: 4, id: 0, err: { code: 'bad_args', msg: 'malformed line: missing v' } })}\n`);
-        },
+  const ctx = setupTest();
+  const server = Bun.listen({
+    unix: ctx.path,
+    socket: {
+      data(socket) {
+        socket.write(`${JSON.stringify({ v: 4, id: 0, err: { code: 'bad_args', msg: 'malformed line: missing v' } })}\n`);
       },
-    });
+    },
+  });
   onTestFinished(() => server.stop(true));
 
   expect(openAtcPeer(ctx.path, 1000)).rejects.toMatchObject({ code: 'atc_protocol_mismatch', message: expect.stringContaining('speaks an older protocol') });
 });
 
 test('it gives up on a hello the daemon never answers', () => {
-  const ctx = setupTest(),
-    server = Bun.listen({
-      unix: ctx.path,
-      socket: {
-        data() {},
-      },
-    });
+  const ctx = setupTest();
+  const server = Bun.listen({
+    unix: ctx.path,
+    socket: {
+      data() {},
+    },
+  });
   onTestFinished(() => server.stop(true));
 
   expect(openAtcPeer(ctx.path, 100)).rejects.toMatchObject({ code: 'atc_unreachable', message: 'atc did not answer daemon.hello' });

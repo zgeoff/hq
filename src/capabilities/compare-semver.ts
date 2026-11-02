@@ -2,8 +2,8 @@ import { HqError } from '../errors.ts';
 import { parseSemver } from './parse-semver.ts';
 
 export function compareSemver(a: string, b: string): number {
-  const x = parseSemver(a),
-    y = parseSemver(b);
+  const x = parseSemver(a);
+  const y = parseSemver(b);
   if (!x || !y) {
     throw new HqError('bad_args', `not a version like 1.2.3: ${x ? b : a}`);
   }

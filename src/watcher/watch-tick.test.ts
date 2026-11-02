@@ -35,8 +35,8 @@ import type { RunResult, Runner } from '../runner/types.ts';
 import { watchTick } from './watch-tick.ts';
 
 function setupTest() {
-  const fresh = freshDb(),
-    xdg = process.env['XDG_CACHE_HOME'];
+  const fresh = freshDb();
+  const xdg = process.env['XDG_CACHE_HOME'];
   onTestFinished(fresh.cleanup);
   onTestFinished(overrideEnv('HOME', fresh.dir));
   delete process.env['XDG_CACHE_HOME'];
@@ -55,9 +55,9 @@ test('a due kinds sync reads the Linear key from 1Password once and records that
       bash: { code: 0, stdout: JSON.stringify({ imp: { freeMib: 0, room: false }, providers: { claude: { room: false, unattended: true, target: 'imp' } } }), stderr: '' },
       gh: { code: 0, stdout: '[]', stderr: '' },
       op: { code: 0, stdout: 'lin_api_INVENTEDkettleKEY0042\n', stderr: '' },
-    },
-    ctx = setupTest(),
-    run = mock<Runner>((cmd) => Promise.resolve(answers[cmd[0] ?? ''] ?? { code: 1, stdout: '', stderr: 'invented: no answer for this command' }));
+    };
+  const ctx = setupTest();
+  const run = mock<Runner>((cmd) => Promise.resolve(answers[cmd[0] ?? ''] ?? { code: 1, stdout: '', stderr: 'invented: no answer for this command' }));
   onTestFinished(overrideEnv('HQ_NOW', '2026-10-15T20:00:00Z'));
   for (const key of ['goals_synced_at', 'goals_ok_at', 'linear_synced_at']) {
     setMeta(ctx.db, key, '2026-10-15T20:00:00Z');
@@ -445,7 +445,7 @@ test('it marks a grant that a fetched hq-private PR added, and logs each grant i
       runs: () => Promise.resolve(),
       weekly: () => Promise.resolve(false),
       health: () => Promise.resolve({ opened: [], cleared: [] }),
-      grantMarks: () => runGrantMarksTick(ctx.db, { directory: tree.dir, exists: existsSync }, 'hq-lanes'),
+      grantMarks: () => runGrantMarksTick(ctx.db, { directory: tree.directory, exists: existsSync }, 'hq-lanes'),
     },
   });
 

@@ -13,8 +13,8 @@ import { runCallReadyMorningTick } from './run-call-ready-morning-tick.ts';
 
 // Sydney is on AEDT (UTC+11) in October, so 07:00 on 21 Oct is 20:00Z on 20 Oct.
 function setupTest() {
-  const area = mkdtempSync(join(tmpdir(), 'hq-call-ready-')),
-    db = openDb(join(area, 'hq.db'));
+  const area = mkdtempSync(join(tmpdir(), 'hq-call-ready-'));
+  const db = openDb(join(area, 'hq.db'));
   onTestFinished(() => {
     db.close();
     rmSync(area, { recursive: true, force: true });

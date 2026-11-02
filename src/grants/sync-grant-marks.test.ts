@@ -20,7 +20,7 @@ test('a merged PR that adds a grant gives it a mark named for the session and id
   tree.git('fetch', '-q', 'origin');
   createGrantMark(ctx.db, { text: 'z-kettle may boil', ref: null, at: null, name: 'z-kettle-boil', actor: 'z-kettle' });
 
-  const sync = syncGrantMarks(ctx.db, tree.dir, 'hq-watcher');
+  const sync = syncGrantMarks(ctx.db, tree.directory, 'hq-watcher');
 
   expect(sync.unmarked).toStrictEqual([]);
   expect(ctx.db.query("SELECT at, text, ref, grant_name, added_by FROM marks WHERE kind = 'grant' ORDER BY grant_name").all()).toStrictEqual([
@@ -40,7 +40,7 @@ test('a grant removed and added again takes the time and PR of the later add', (
   tree.git('fetch', '-q', 'origin');
   createGrantMark(ctx.db, { text: 'z-kettle may boil', ref: null, at: null, name: 'z-kettle-boil', actor: 'z-kettle' });
 
-  syncGrantMarks(ctx.db, tree.dir, 'hq-watcher');
+  syncGrantMarks(ctx.db, tree.directory, 'hq-watcher');
 
   expect(ctx.db.query("SELECT at, ref FROM marks WHERE grant_name = 'z-kettle-pour'").all()).toStrictEqual([{ at: '2026-10-12T09:00:00Z', ref: 'hq-private#14' }]);
 });
@@ -53,7 +53,7 @@ test('a grant whose id is quoted takes the PR that added it, not a later change 
   tree.writeCommit({ 'grants/z-kettle.yaml': "# z-kettle's grants\n- id: 'pour'\n  label: Pour\n  outcome: allow\n" }, { subject: 'docs(grants): tidy the quotes (#13)', at: '2026-10-11T09:00:00Z' });
   tree.git('fetch', '-q', 'origin');
 
-  syncGrantMarks(ctx.db, tree.dir, 'hq-watcher');
+  syncGrantMarks(ctx.db, tree.directory, 'hq-watcher');
 
   expect(ctx.db.query("SELECT at, ref FROM marks WHERE grant_name = 'z-kettle-pour'").all()).toStrictEqual([{ at: '2026-10-10T09:00:00Z', ref: 'hq-private#12' }]);
 });
@@ -68,7 +68,7 @@ test('a grant hq refuses to mark is reported, and the grants after it still get 
   );
   tree.git('fetch', '-q', 'origin');
 
-  const sync = syncGrantMarks(ctx.db, tree.dir, 'hq-watcher');
+  const sync = syncGrantMarks(ctx.db, tree.directory, 'hq-watcher');
 
   expect(sync.rejected.map((rejected) => [rejected.grant.name, rejected.reason])).toStrictEqual([
     ['z-kettle-pour-the-water-slowly-into-the-pot', 'a grant name must be a slug of lowercase letters, digits and single hyphens, 40 characters at most'],
@@ -83,11 +83,11 @@ test('a grant whose add names no PR gets no mark, and the health check names it'
   tree.writeCommit({ 'grants/z-kettle.yaml': '- id: boil-twice\n  label: "Boil twice"\n  outcome: allow\n- id: pour\n  label: "Pour"\n  outcome: allow\n' }, { subject: 'feat(grants): let z-kettle pour', at: '2026-10-13T09:00:00Z' });
   tree.git('fetch', '-q', 'origin');
 
-  const sync = syncGrantMarks(ctx.db, tree.dir, 'hq-watcher');
+  const sync = syncGrantMarks(ctx.db, tree.directory, 'hq-watcher');
 
   expect(sync.added).toStrictEqual([]);
   expect(sync.unmarked.map((grant) => grant.name)).toStrictEqual(['z-kettle-boil-twice', 'z-kettle-pour']);
-  expect(readGrantMarksCheck(ctx.db, tree.dir)).toStrictEqual({
+  expect(readGrantMarksCheck(ctx.db, tree.directory)).toStrictEqual({
     key: 'grant-marks',
     ok: false,
     line: 'grant marks: 2 grant(s) on hq-private main have none, so hq grant act refuses them: z-kettle-boil-twice, z-kettle-pour',
@@ -101,7 +101,7 @@ test('the health check passes once every grant has a mark, and reads only what m
   createGrantMark(ctx.db, { text: 'z-kettle may boil', ref: null, at: null, name: 'z-kettle-boil', actor: 'z-kettle' });
   tree.writeCommit({ 'grants/z-kettle.yaml': '- id: boil\n  label: "Boil"\n  outcome: allow\n- id: pour\n  label: "Pour"\n  outcome: allow\n' }, { subject: 'feat(grants): let z-kettle pour (#12)', at: '2026-10-13T09:00:00Z' });
 
-  expect(readGrantMarksCheck(ctx.db, tree.dir)).toStrictEqual({ key: 'grant-marks', ok: true, line: 'grant marks: all 1 grants on hq-private main have one' });
+  expect(readGrantMarksCheck(ctx.db, tree.directory)).toStrictEqual({ key: 'grant-marks', ok: true, line: 'grant marks: all 1 grants on hq-private main have one' });
 });
 
 test('the health check reports a grants file it cannot read, and stays quiet with no clone', () => {
@@ -110,10 +110,10 @@ test('the health check reports a grants file it cannot read, and stays quiet wit
   tree.writeCommit({ 'grants/z-kettle.yaml': 'boil: yes\n' }, { subject: 'chore: break the grants (#15)', at: '2026-10-13T09:00:00Z' });
   tree.git('fetch', '-q', 'origin');
 
-  expect(readGrantMarksCheck(ctx.db, tree.dir)).toStrictEqual({
+  expect(readGrantMarksCheck(ctx.db, tree.directory)).toStrictEqual({
     key: 'grant-marks',
     ok: false,
     line: "grant marks: can't read hq-private's grants: grants/z-kettle.yaml at hq-private main is not a list of grants with an id and a label",
   });
-  expect(readGrantMarksCheck(ctx.db, `${tree.dir}-missing`)).toBeNull();
+  expect(readGrantMarksCheck(ctx.db, `${tree.directory}-missing`)).toBeNull();
 });

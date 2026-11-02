@@ -22,8 +22,8 @@ interface IngestOptions {
 }
 
 export async function ingestNotes(db: Database, client: AtcClient, opts: IngestOptions): Promise<IngestResult> {
-  const CURSOR_KEY = 'atc_events_cursor',
-    result: IngestResult = { read: 0, notes: 0, routed: 0, finals: [], unmatched: 0, reset: false, bootstrapped: false };
+  const CURSOR_KEY = 'atc_events_cursor';
+  const result: IngestResult = { read: 0, notes: 0, routed: 0, finals: [], unmatched: 0, reset: false, bootstrapped: false };
   let cursor = getMeta(db, CURSOR_KEY);
   const maxPages = opts.maxPages ?? 50;
   const resolveFinal = makeFinalResolver(opts.run);

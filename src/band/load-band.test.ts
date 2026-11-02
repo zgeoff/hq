@@ -9,8 +9,8 @@ import { overrideEnv } from '../config/override-env.ts';
 import { loadBand } from './load-band.ts';
 
 function setupTest() {
-  const fresh = freshDb(),
-    spy = spyOn(console, 'log').mockImplementation(() => {});
+  const fresh = freshDb();
+  const spy = spyOn(console, 'log').mockImplementation(() => {});
   onTestFinished(fresh.cleanup);
   onTestFinished(() => spy.mockRestore());
   onTestFinished(overrideEnv('HQ_AS', 'kettle-bot'));

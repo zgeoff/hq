@@ -12,14 +12,14 @@ import type { AcceptedFinal, FinalMark } from './types.ts';
 import { updateRunTime as touch } from './update-run-time.ts';
 
 export function scheduleFinalReview(db: Database, mark: FinalMark): boolean {
-  const actor = mark.actor,
-    note = mark.note,
-    pr = mustPr(db, mark.ref),
-    ref = mark.ref,
-    given = mark.sha,
-    resolution = mark.resolution ?? null,
-    source = mark.source,
-    sha = resolution?.kind === 'full' ? resolution.sha : given;
+  const actor = mark.actor;
+  const note = mark.note;
+  const pr = mustPr(db, mark.ref);
+  const ref = mark.ref;
+  const given = mark.sha;
+  const resolution = mark.resolution ?? null;
+  const source = mark.source;
+  const sha = resolution?.kind === 'full' ? resolution.sha : given;
   if (!prAllows('final', pr.state)) return false;
   if (sameSha(pr.final_sha, sha)) return false;
   const t = iso(now());

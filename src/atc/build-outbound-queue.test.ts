@@ -2,8 +2,8 @@ import { expect, mock, test } from 'bun:test';
 import { buildOutboundQueue } from './build-outbound-queue.ts';
 
 test('it sends the unwritten rest of a short write before a later frame', () => {
-  const write = mock<(data: Uint8Array) => number>(() => 3),
-    writeQueue = buildOutboundQueue({ write });
+  const write = mock<(data: Uint8Array) => number>(() => 3);
+  const writeQueue = buildOutboundQueue({ write });
 
   writeQueue.send('abcdef');
   writeQueue.send('gh');

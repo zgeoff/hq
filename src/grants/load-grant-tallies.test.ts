@@ -75,17 +75,17 @@ test('a grant whose only action is voided keeps its name, which cannot be change
 });
 
 test('hq mark add --grant, hq mark grant, hq grant act and hq grant actions work through the CLI', async () => {
-  const db = setupTest(),
-    log = spyOn(console, 'log').mockImplementation((line: string) => printed.push(line)),
-    printed: string[] = [],
-    runs = [
-      await runAt(['mark', 'add', '--kind', 'grant', '--text', 'kettle PRs merge on green CI', '--grant', 'kettle-merges', '--json']),
-      await runAt(['mark', 'add', '--kind', 'grant', '--text', 'teapot deploys', '--json']),
-      await runAt(['mark', 'grant', '2', 'teapot-deploys', '--json']),
-      await runAt(['grant', 'act', 'teapot-deploys', '--target', 'teapot#4', '--note', 'outside quiet hours', '--by', 'teapot-bot', '--json']),
-      await runAt(['grant', 'actions', '--since', '1d', '--json'], '2026-10-14T01:01:00Z'),
-      await runAt(['mark', 'add', '--kind', 'skills', '--text', 'kettle skill', '--grant', 'kettle-skill', '--json']),
-    ];
+  const db = setupTest();
+  const log = spyOn(console, 'log').mockImplementation((line: string) => printed.push(line));
+  const printed: string[] = [];
+  const runs = [
+    await runAt(['mark', 'add', '--kind', 'grant', '--text', 'kettle PRs merge on green CI', '--grant', 'kettle-merges', '--json']),
+    await runAt(['mark', 'add', '--kind', 'grant', '--text', 'teapot deploys', '--json']),
+    await runAt(['mark', 'grant', '2', 'teapot-deploys', '--json']),
+    await runAt(['grant', 'act', 'teapot-deploys', '--target', 'teapot#4', '--note', 'outside quiet hours', '--by', 'teapot-bot', '--json']),
+    await runAt(['grant', 'actions', '--since', '1d', '--json'], '2026-10-14T01:01:00Z'),
+    await runAt(['mark', 'add', '--kind', 'skills', '--text', 'kettle skill', '--grant', 'kettle-skill', '--json']),
+  ];
   onTestFinished(() => log.mockRestore());
   expect([db.query('SELECT COUNT(*) AS n FROM grant_actions').get(), runs]).toStrictEqual([{ n: 1 }, [0, 0, 0, 0, 0, 1]]);
   expect((JSON.parse(printed.at(-2) ?? '{}') as { grants: { grant: string; actions: { target: string; actor: string }[] }[] }).grants.map((g) => [g.grant, g.actions.map((a) => [a.target, a.actor])])).toStrictEqual([

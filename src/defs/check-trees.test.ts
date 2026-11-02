@@ -10,7 +10,7 @@ test('it starts the grants check with bun, not the running binary, from the hq-d
     calls.push({ argv, cwd });
     return spawnGrants(argv, cwd);
   });
-  expect(calls).toStrictEqual([{ argv: ['bun', 'scripts/grants.ts', '--check', '--private', trees.private.dir], cwd: trees.hq.dir }]);
+  expect(calls).toStrictEqual([{ argv: ['bun', 'scripts/grants.ts', '--check', '--private', trees.private.directory], cwd: trees.hq.directory }]);
 });
 
 test('it fails with a grants line, not a crash, when bun cannot start', () => {

@@ -10,13 +10,13 @@ import { sendNoticeIfOther as notifyIfOther } from './send-notice-if-other.ts';
 import type { Ask, AskStep } from './types.ts';
 
 export function updateAskState(db: Database, step: AskStep): Ask {
-  const action = step.action,
-    actor = step.actor,
-    data = step.data,
-    id = step.id,
-    kind = step.kind,
-    notice = step.notice,
-    set = step.set;
+  const action = step.action;
+  const actor = step.actor;
+  const data = step.data;
+  const id = step.id;
+  const kind = step.kind;
+  const notice = step.notice;
+  const set = step.set;
   return db
     .transaction((): Ask => {
       const a = mustGet(db, id, kind);

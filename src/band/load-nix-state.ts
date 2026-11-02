@@ -5,9 +5,9 @@ import { openOutage } from '../probe/open-outage.ts';
 export type NixState = { kind: 'down'; since: string } | { kind: 'unknown'; reason: string } | { kind: 'up' };
 
 export function loadNixState(db: Database, at: Date): NixState {
-  const STALE_MS = 5 * 60_000,
-    last = lastSample(db),
-    open = openOutage(db);
+  const STALE_MS = 5 * 60_000;
+  const last = lastSample(db);
+  const open = openOutage(db);
   if (open !== null) {
     return { kind: 'down', since: open.started_at };
   }

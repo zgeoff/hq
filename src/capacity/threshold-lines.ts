@@ -17,8 +17,8 @@ export function thresholdLines(db: Database, r: Reading | null): string[] {
 }
 
 function formatOnePasswordPct(r: Reading | null): string | null {
-  const limit = r?.op_account_limit ?? null,
-    used = r?.op_account_used ?? null;
+  const limit = r?.op_account_limit ?? null;
+  const used = r?.op_account_used ?? null;
   if (used === null || limit === null || limit === 0) {
     return null;
   }

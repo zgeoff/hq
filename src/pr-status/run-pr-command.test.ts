@@ -211,17 +211,17 @@ test('it prints the stored record and says stale is unknown when gh cannot give 
 });
 
 test('it says a PR has no record, without calling gh', async () => {
-  const ctx = setupTest(),
-    fake = ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'),
-    shown = await runPRCommand({ run: fake.run, db: ctx.db, verb: 'status', rest: ['widgets', '9'], flags: {}, actor: ctx.actor, readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) });
+  const ctx = setupTest();
+  const fake = ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678');
+  const shown = await runPRCommand({ run: fake.run, db: ctx.db, verb: 'status', rest: ['widgets', '9'], flags: {}, actor: ctx.actor, readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) });
 
   expect(shown).toStrictEqual({ data: { pr: null, acceptedRisks: [] }, text: 'No record for widgets#9.' });
   expect(fake.calls).toStrictEqual([]);
 });
 
 test('it reads the record of a PR named with the zgeoff owner', async () => {
-  const ctx = setupTest(),
-    fake = ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678');
+  const ctx = setupTest();
+  const fake = ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678');
 
   await expect(runPRCommand({ run: fake.run, db: ctx.db, verb: 'status', rest: ['zgeoff/widgets', '9'], flags: {}, actor: ctx.actor, readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) })).resolves.toStrictEqual({ data: { pr: null, acceptedRisks: [] }, text: 'No record for widgets#9.' });
 });
@@ -287,8 +287,8 @@ test('it logs an event for a next step', async () => {
 });
 
 test('it says the head was never seen and could not be read when gh is down for a next step on a PR with no record', async () => {
-  const ctx = setupTest(),
-    shown = await runPRCommand({ run: ctx.ghDown().run, db: ctx.db, verb: 'next', rest: ['widgets', '7', 'z-stu'], flags: {}, actor: ctx.actor, readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) });
+  const ctx = setupTest();
+  const shown = await runPRCommand({ run: ctx.ghDown().run, db: ctx.db, verb: 'next', rest: ['widgets', '7', 'z-stu'], flags: {}, actor: ctx.actor, readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) });
 
   expect(shown.text).toBe(['widgets#7  head never seen', 'gate: not recorded', 'answer: none', 'next: z-stu (2026-10-14T01:00:00Z)', 'The PR head could not be read, so stale is unknown.'].join('\n'));
 });

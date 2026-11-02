@@ -14,8 +14,8 @@ import { LANES } from './lanes.ts';
 const TOLD = 'lanes_ready_stale_told';
 
 export function checkReadyStale(db: Database, t: Date, freeSlots: number, actor: string): boolean {
-  const newest = loadNewestReadyAt(db),
-    staleMs = newest === null ? 0 : t.getTime() - Date.parse(newest) - LANES.readyStaleMinutes() * 60_000;
+  const newest = loadNewestReadyAt(db);
+  const staleMs = newest === null ? 0 : t.getTime() - Date.parse(newest) - LANES.readyStaleMinutes() * 60_000;
   if (newest === null || staleMs <= 0 || freeSlots === 0 || getMeta(db, TOLD) === newest || isQuiet(t)) {
     return false;
   }
@@ -31,8 +31,8 @@ interface StaleReady {
 }
 
 function sendReadyStale(db: Database, r: StaleReady, actor: string): void {
-  const hours = Math.floor(r.ageMs / 3_600_000),
-    seq = logEvent(db, 'hq', 'lanes', 'ready-stale', actor, null, null, { newest: r.newest, minutes: Math.floor(r.ageMs / 60_000), freeSlots: r.freeSlots, at: iso(r.at) });
+  const hours = Math.floor(r.ageMs / 3_600_000);
+  const seq = logEvent(db, 'hq', 'lanes', 'ready-stale', actor, null, null, { newest: r.newest, minutes: Math.floor(r.ageMs / 60_000), freeSlots: r.freeSlots, at: iso(r.at) });
   const failure = getMeta(db, 'lanes_ready_linear_error');
   const read = failure === null ? 'hq has not read Ready from Linear since then' : `hq's last read of Ready from Linear failed: ${failure}`;
   enqueue(db, seq, owner(), `Lanes: ${r.freeSlots} slot(s) free, and the newest Ready report is ${hours} h old (${r.newest}). The lanes can't tell how much work waits. ${read}. Until hq reads again, z-delivery reports Ready by hand with hq lanes ready --lane name=n,...`);
@@ -40,8 +40,8 @@ function sendReadyStale(db: Database, r: StaleReady, actor: string): void {
 }
 
 function loadNewestReadyAt(db: Database): string | null {
-  const lanes = Object.values(metaJson(db, 'lanes_ready_by_lane', READY_BY_LANE, {})).map((v) => v.at),
-    total = metaJson(db, 'lanes_ready', z.object({ at: z.string() }).nullable(), null),
-    values = total ? [total.at, ...lanes] : lanes;
+  const lanes = Object.values(metaJson(db, 'lanes_ready_by_lane', READY_BY_LANE, {})).map((ready) => ready.at);
+  const total = metaJson(db, 'lanes_ready', z.object({ at: z.string() }).nullable(), null);
+  const values = total ? [total.at, ...lanes] : lanes;
   return values.length > 0 ? values.reduce((a, b) => (Date.parse(b) > Date.parse(a) ? b : a)) : null;
 }

@@ -2,8 +2,8 @@ import { getSydneyParts } from './get-sydney-parts.ts';
 import { quietWindow } from './quiet-window.ts';
 
 export function isQuiet(d: Date): boolean {
-  const hour = getSydneyParts(d).hour,
-    window = quietWindow();
+  const hour = getSydneyParts(d).hour;
+  const window = quietWindow();
   if (window.start === window.end) {
     return false;
   }

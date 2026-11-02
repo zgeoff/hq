@@ -11,9 +11,9 @@ function formatSide(history: ArchiveHistory, before: ArchiveSide, after: Archive
 }
 
 export function formatArchiveHistory(history: ArchiveHistory): string {
-  const backups = history.backups.length > 0 ? [`backups: ${history.backups.join(', ')}`] : [],
-    head = history.dryRun ? `Dry run: nothing changed. Re-keying ${history.from} → ${history.to} would leave:` : `Re-keyed ${history.from} → ${history.to}:`,
-    sides = history.before.flatMap((side) => formatSide(history, side, history.after.find((next) => next.store === side.store)));
+  const backups = history.backups.length > 0 ? [`backups: ${history.backups.join(', ')}`] : [];
+  const head = history.dryRun ? `Dry run: nothing changed. Re-keying ${history.from} → ${history.to} would leave:` : `Re-keyed ${history.from} → ${history.to}:`;
+  const sides = history.before.flatMap((side) => formatSide(history, side, history.after.find((next) => next.store === side.store)));
   return [head, ...sides, ...formatReviewFiles(history.reviewFiles), ...backups].join('\n');
 }
 

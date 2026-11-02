@@ -32,8 +32,8 @@ function buildWhere(spec: RekeySpec, column: string, shape: string): string {
 }
 
 export function buildRekeySql(spec: RekeySpec, column: string, names: RepoNames): RekeySql {
-  const from = buildShape(spec.kind, names.from),
-    to = buildShape(spec.kind, names.to);
+  const from = buildShape(spec.kind, names.from);
+  const to = buildShape(spec.kind, names.to);
   return {
     fromWhere: buildWhere(spec, column, from),
     fromParams: [from],

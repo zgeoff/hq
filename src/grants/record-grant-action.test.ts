@@ -29,8 +29,8 @@ test('an unknown grant name is refused with the names that exist, and so is a bl
 });
 
 test('a grant mark takes a unique slug name, a refused name leaves no mark behind, and a named grant with actions cannot be dropped', () => {
-  const db = setupTest(),
-    mark = createGrantMark(db, { text: 'kettle PRs merge on green CI', ref: null, at: null, name: 'kettle-merges', actor: 'kettle-bot' });
+  const db = setupTest();
+  const mark = createGrantMark(db, { text: 'kettle PRs merge on green CI', ref: null, at: null, name: 'kettle-merges', actor: 'kettle-bot' });
   expect(() => createGrantMark(db, { text: 'kettle', ref: null, at: null, name: 'Kettle Merges', actor: 'kettle-bot' })).toThrow('a grant name must be a slug');
   expect(() => createGrantMark(db, { text: 'again', ref: null, at: null, name: 'kettle-merges', actor: 'kettle-bot' })).toThrow('mark 1 already has the grant name kettle-merges');
   expect(db.query('SELECT COUNT(*) AS n FROM marks').get()).toStrictEqual({ n: 1 });

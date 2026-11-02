@@ -9,32 +9,32 @@ interface CommitShape {
 }
 
 interface TreeCheckout {
-  dir: string;
+  directory: string;
   git: (...args: string[]) => string;
   origin: string;
   writeCommit: (files: Record<string, string>, commit?: CommitShape) => void;
 }
 
 export function createTreeCheckout(root: string, tree: TreeName, files: Record<string, string>): TreeCheckout {
-  const dir = TREES[tree].dir(),
-    origin = join(root, `${tree}-origin`),
-    remote = `git@github.com:${TREES[tree].repo}.git`,
-    writeCommit = (next: Record<string, string>, commit: CommitShape = {}) => {
-      for (const [path, text] of Object.entries(next)) {
-        mkdirSync(dirname(join(origin, path)), { recursive: true });
-        writeFileSync(join(origin, path), text);
-      }
-      runGit(origin, 'add', '-A');
-      runGit({ cwd: origin, at: commit.at }, 'commit', '-q', '-m', commit.subject ?? 'invented change');
-    };
+  const directory = TREES[tree].dir();
+  const origin = join(root, `${tree}-origin`);
+  const remote = `git@github.com:${TREES[tree].repo}.git`;
+  const writeCommit = (next: Record<string, string>, commit: CommitShape = {}) => {
+    for (const [path, text] of Object.entries(next)) {
+      mkdirSync(dirname(join(origin, path)), { recursive: true });
+      writeFileSync(join(origin, path), text);
+    }
+    runGit(origin, 'add', '-A');
+    runGit({ cwd: origin, at: commit.at }, 'commit', '-q', '-m', commit.subject ?? 'invented change');
+  };
   mkdirSync(origin, { recursive: true });
   runGit(origin, 'init', '-q', '-b', 'main');
   writeCommit(files);
-  mkdirSync(dirname(dir), { recursive: true });
-  runGit(root, 'clone', '-q', origin, dir);
-  runGit(dir, 'remote', 'set-url', 'origin', remote);
-  runGit(dir, 'config', `url.${origin}.insteadOf`, remote);
-  return { dir, git: (...args) => runGit(dir, ...args), origin, writeCommit };
+  mkdirSync(dirname(directory), { recursive: true });
+  runGit(root, 'clone', '-q', origin, directory);
+  runGit(directory, 'remote', 'set-url', 'origin', remote);
+  runGit(directory, 'config', `url.${origin}.insteadOf`, remote);
+  return { directory, git: (...args) => runGit(directory, ...args), origin, writeCommit };
 }
 
 interface DatedPlace {

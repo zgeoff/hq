@@ -11,17 +11,17 @@ import { sessionGetSchema } from './session-get-schema.ts';
 import { sessionSpawnSchema } from './session-spawn-schema.ts';
 
 function setupTest() {
-  const dir = mkdtempSync(join(tmpdir(), 'hq-atc-client-')),
-    path = join(dir, 'atc.sock');
-  onTestFinished(() => rmSync(dir, { recursive: true, force: true }));
+  const directory = mkdtempSync(join(tmpdir(), 'hq-atc-client-'));
+  const path = join(directory, 'atc.sock');
+  onTestFinished(() => rmSync(directory, { recursive: true, force: true }));
   onTestFinished(overrideEnv('HQ_ATC_SOCKET', path));
   return { path };
 }
 
 test('it lists the sessions the daemon answers with', async () => {
-  const ctx = setupTest(),
-    daemon = startStubAtcDaemon(ctx.path, { 'session.list': () => ({ sessions: [{ id: 's1-a', name: 'kettle', alive: true, state: 'running' }] }) }),
-    peer = await AtcClient.open(ctx.path);
+  const ctx = setupTest();
+  const daemon = startStubAtcDaemon(ctx.path, { 'session.list': () => ({ sessions: [{ id: 's1-a', name: 'kettle', alive: true, state: 'running' }] }) });
+  const peer = await AtcClient.open(ctx.path);
   onTestFinished(() => {
     peer.close();
     daemon.stop();
@@ -43,9 +43,9 @@ test('it rejects a session list answer with no list as a bad atc answer', async 
 });
 
 test('it asks the daemon for a session by id', async () => {
-  const ctx = setupTest(),
-    daemon = startStubAtcDaemon(ctx.path, { 'session.get': () => ({ session: { id: 's1-a' }, prompt: 'boil water', lastActivityAt: 1700, pending: null, result: null, sessionRecord: null }) }),
-    peer = await AtcClient.open(ctx.path);
+  const ctx = setupTest();
+  const daemon = startStubAtcDaemon(ctx.path, { 'session.get': () => ({ session: { id: 's1-a' }, prompt: 'boil water', lastActivityAt: 1700, pending: null, result: null, sessionRecord: null }) });
+  const peer = await AtcClient.open(ctx.path);
   onTestFinished(() => {
     peer.close();
     daemon.stop();
@@ -57,9 +57,9 @@ test('it asks the daemon for a session by id', async () => {
 });
 
 test('it returns the prompt and last activity of a session', async () => {
-  const ctx = setupTest(),
-    daemon = startStubAtcDaemon(ctx.path, { 'session.get': () => ({ session: { id: 's1-a' }, prompt: 'boil water', lastActivityAt: 1700, pending: null, result: null, sessionRecord: null }) }),
-    peer = await AtcClient.open(ctx.path);
+  const ctx = setupTest();
+  const daemon = startStubAtcDaemon(ctx.path, { 'session.get': () => ({ session: { id: 's1-a' }, prompt: 'boil water', lastActivityAt: 1700, pending: null, result: null, sessionRecord: null }) });
+  const peer = await AtcClient.open(ctx.path);
   onTestFinished(() => {
     peer.close();
     daemon.stop();
@@ -69,9 +69,9 @@ test('it returns the prompt and last activity of a session', async () => {
 });
 
 test('it spawns a session and sends the spawn as given', async () => {
-  const ctx = setupTest(),
-    daemon = startStubAtcDaemon(ctx.path, { 'session.spawn': () => ({ session: { id: 's2-b' }, warnings: [] }) }),
-    peer = await AtcClient.open(ctx.path);
+  const ctx = setupTest();
+  const daemon = startStubAtcDaemon(ctx.path, { 'session.spawn': () => ({ session: { id: 's2-b' }, warnings: [] }) });
+  const peer = await AtcClient.open(ctx.path);
   onTestFinished(() => {
     peer.close();
     daemon.stop();
@@ -83,9 +83,9 @@ test('it spawns a session and sends the spawn as given', async () => {
 });
 
 test('it reads the id of a spawned session', async () => {
-  const ctx = setupTest(),
-    daemon = startStubAtcDaemon(ctx.path, { 'session.spawn': () => ({ session: { id: 's2-b' } }) }),
-    peer = await AtcClient.open(ctx.path);
+  const ctx = setupTest();
+  const daemon = startStubAtcDaemon(ctx.path, { 'session.spawn': () => ({ session: { id: 's2-b' } }) });
+  const peer = await AtcClient.open(ctx.path);
   onTestFinished(() => {
     peer.close();
     daemon.stop();
@@ -95,9 +95,9 @@ test('it reads the id of a spawned session', async () => {
 });
 
 test('it rejects a spawn answer without a session id as a bad atc answer', async () => {
-  const ctx = setupTest(),
-    daemon = startStubAtcDaemon(ctx.path, { 'session.spawn': () => ({ session: {} }) }),
-    peer = await AtcClient.open(ctx.path);
+  const ctx = setupTest();
+  const daemon = startStubAtcDaemon(ctx.path, { 'session.spawn': () => ({ session: {} }) });
+  const peer = await AtcClient.open(ctx.path);
   onTestFinished(() => {
     peer.close();
     daemon.stop();
@@ -107,9 +107,9 @@ test('it rejects a spawn answer without a session id as a bad atc answer', async
 });
 
 test('it pins and submits to a session', async () => {
-  const ctx = setupTest(),
-    daemon = startStubAtcDaemon(ctx.path, { 'session.submit': () => ({}), 'session.update': () => ({}) }),
-    peer = await AtcClient.open(ctx.path);
+  const ctx = setupTest();
+  const daemon = startStubAtcDaemon(ctx.path, { 'session.submit': () => ({}), 'session.update': () => ({}) });
+  const peer = await AtcClient.open(ctx.path);
   onTestFinished(() => {
     peer.close();
     daemon.stop();
@@ -125,9 +125,9 @@ test('it pins and submits to a session', async () => {
 });
 
 test('it reads an events page with its cursor and more flag', async () => {
-  const ctx = setupTest(),
-    daemon = startStubAtcDaemon(ctx.path, { 'events.read': () => ({ events: [{ cursor: 'c-2', at: 1700, session: 's1-a', name: 'kettle', kind: 'note', detail: 'boiled', label: 'done' }], cursor: 'c-2', more: true }) }),
-    peer = await AtcClient.open(ctx.path);
+  const ctx = setupTest();
+  const daemon = startStubAtcDaemon(ctx.path, { 'events.read': () => ({ events: [{ cursor: 'c-2', at: 1700, session: 's1-a', name: 'kettle', kind: 'note', detail: 'boiled', label: 'done' }], cursor: 'c-2', more: true }) });
+  const peer = await AtcClient.open(ctx.path);
   onTestFinished(() => {
     peer.close();
     daemon.stop();
@@ -137,9 +137,9 @@ test('it reads an events page with its cursor and more flag', async () => {
 });
 
 test('it asks the daemon for the events after a cursor', async () => {
-  const ctx = setupTest(),
-    daemon = startStubAtcDaemon(ctx.path, { 'events.read': () => ({ events: [], cursor: 'c-1', more: false }) }),
-    peer = await AtcClient.open(ctx.path);
+  const ctx = setupTest();
+  const daemon = startStubAtcDaemon(ctx.path, { 'events.read': () => ({ events: [], cursor: 'c-1', more: false }) });
+  const peer = await AtcClient.open(ctx.path);
   onTestFinished(() => {
     peer.close();
     daemon.stop();
@@ -151,9 +151,9 @@ test('it asks the daemon for the events after a cursor', async () => {
 });
 
 test('it sends a message and returns the id the daemon gives it', async () => {
-  const ctx = setupTest(),
-    daemon = startStubAtcDaemon(ctx.path, { 'session.message': () => ({ message: 'm-7', status: 'queued' }) }),
-    peer = await AtcClient.open(ctx.path);
+  const ctx = setupTest();
+  const daemon = startStubAtcDaemon(ctx.path, { 'session.message': () => ({ message: 'm-7', status: 'queued' }) });
+  const peer = await AtcClient.open(ctx.path);
   onTestFinished(() => {
     peer.close();
     daemon.stop();
@@ -163,9 +163,9 @@ test('it sends a message and returns the id the daemon gives it', async () => {
 });
 
 test('it sends a message with its session, text, sender, idempotency key and no answer notice', async () => {
-  const ctx = setupTest(),
-    daemon = startStubAtcDaemon(ctx.path, { 'session.message': () => ({ message: 'm-7', status: 'queued' }) }),
-    peer = await AtcClient.open(ctx.path);
+  const ctx = setupTest();
+  const daemon = startStubAtcDaemon(ctx.path, { 'session.message': () => ({ message: 'm-7', status: 'queued' }) });
+  const peer = await AtcClient.open(ctx.path);
   onTestFinished(() => {
     peer.close();
     daemon.stop();
@@ -177,9 +177,9 @@ test('it sends a message with its session, text, sender, idempotency key and no 
 });
 
 test('it rejects a message answer without an id as a bad atc answer', async () => {
-  const ctx = setupTest(),
-    daemon = startStubAtcDaemon(ctx.path, { 'session.message': () => ({ status: 'queued' }) }),
-    peer = await AtcClient.open(ctx.path);
+  const ctx = setupTest();
+  const daemon = startStubAtcDaemon(ctx.path, { 'session.message': () => ({ status: 'queued' }) });
+  const peer = await AtcClient.open(ctx.path);
   onTestFinished(() => {
     peer.close();
     daemon.stop();
@@ -189,9 +189,9 @@ test('it rejects a message answer without an id as a bad atc answer', async () =
 });
 
 test('it rejects a message answer without a string status as a bad atc answer', async () => {
-  const ctx = setupTest(),
-    daemon = startStubAtcDaemon(ctx.path, { 'session.message': () => ({ message: 'm-7' }) }),
-    peer = await AtcClient.open(ctx.path);
+  const ctx = setupTest();
+  const daemon = startStubAtcDaemon(ctx.path, { 'session.message': () => ({ message: 'm-7' }) });
+  const peer = await AtcClient.open(ctx.path);
   onTestFinished(() => {
     peer.close();
     daemon.stop();
@@ -206,9 +206,9 @@ test.each([
   ['a null last activity', { session: { id: 's1-a' }, prompt: 'boil water', lastActivityAt: null }, 'lastActivityAt'],
   ['a non-numeric last activity', { session: { id: 's1-a' }, prompt: 'boil water', lastActivityAt: '1700' }, 'lastActivityAt'],
 ])('it rejects a session answer with %s as a bad atc answer', async (_label, answer, field) => {
-  const ctx = setupTest(),
-    daemon = startStubAtcDaemon(ctx.path, { 'session.get': () => answer }),
-    peer = await AtcClient.open(ctx.path);
+  const ctx = setupTest();
+  const daemon = startStubAtcDaemon(ctx.path, { 'session.get': () => answer });
+  const peer = await AtcClient.open(ctx.path);
   onTestFinished(() => {
     peer.close();
     daemon.stop();
@@ -218,13 +218,13 @@ test.each([
 });
 
 test('it maps a daemon error to atc_<code> and keeps the message', async () => {
-  const ctx = setupTest(),
-    daemon = startStubAtcDaemon(ctx.path, {
-      'session.get': () => {
-        throw new ORPCError('no_such_session', { message: "no session 's9-z'", data: { session: 's9-z' } });
-      },
-    }),
-    peer = await AtcClient.open(ctx.path);
+  const ctx = setupTest();
+  const daemon = startStubAtcDaemon(ctx.path, {
+    'session.get': () => {
+      throw new ORPCError('no_such_session', { message: "no session 's9-z'", data: { session: 's9-z' } });
+    },
+  });
+  const peer = await AtcClient.open(ctx.path);
   onTestFinished(() => {
     peer.close();
     daemon.stop();
@@ -234,13 +234,13 @@ test('it maps a daemon error to atc_<code> and keeps the message', async () => {
 });
 
 test('it decodes an error code it does not know as internal and keeps the message', async () => {
-  const ctx = setupTest(),
-    daemon = startStubAtcDaemon(ctx.path, {
-      'session.get': () => {
-        throw new ORPCError('teapot_overheated', { message: 'the kettle boiled over' });
-      },
-    }),
-    peer = await AtcClient.open(ctx.path);
+  const ctx = setupTest();
+  const daemon = startStubAtcDaemon(ctx.path, {
+    'session.get': () => {
+      throw new ORPCError('teapot_overheated', { message: 'the kettle boiled over' });
+    },
+  });
+  const peer = await AtcClient.open(ctx.path);
   onTestFinished(() => {
     peer.close();
     daemon.stop();
@@ -250,13 +250,13 @@ test('it decodes an error code it does not know as internal and keeps the messag
 });
 
 test('it keeps the cursor message of a bad_args refusal so a feed reset is recognised', async () => {
-  const ctx = setupTest(),
-    daemon = startStubAtcDaemon(ctx.path, {
-      'events.read': () => {
-        throw new ORPCError('bad_args', { message: "'zzz' is not an events.read cursor" });
-      },
-    }),
-    peer = await AtcClient.open(ctx.path);
+  const ctx = setupTest();
+  const daemon = startStubAtcDaemon(ctx.path, {
+    'events.read': () => {
+      throw new ORPCError('bad_args', { message: "'zzz' is not an events.read cursor" });
+    },
+  });
+  const peer = await AtcClient.open(ctx.path);
   onTestFinished(() => {
     peer.close();
     daemon.stop();
@@ -266,9 +266,9 @@ test('it keeps the cursor message of a bad_args refusal so a feed reset is recog
 });
 
 test('it refuses a method the daemon does not serve as atc_unknown_method', async () => {
-  const ctx = setupTest(),
-    daemon = startStubAtcDaemon(ctx.path, {}),
-    peer = await AtcClient.open(ctx.path);
+  const ctx = setupTest();
+  const daemon = startStubAtcDaemon(ctx.path, {});
+  const peer = await AtcClient.open(ctx.path);
   onTestFinished(() => {
     peer.close();
     daemon.stop();
@@ -278,9 +278,9 @@ test('it refuses a method the daemon does not serve as atc_unknown_method', asyn
 });
 
 test.each(['session.message', 'session.submit', 'session.input', 'session.spawn', 'session.kill', 'session.update', 'session.forget'])('it refuses a %s to a socket the test did not name, before it goes out', async (method) => {
-  const ctx = setupTest(),
-    daemon = startStubAtcDaemon(ctx.path, {}),
-    peer = await AtcClient.open(ctx.path);
+  const ctx = setupTest();
+  const daemon = startStubAtcDaemon(ctx.path, {});
+  const peer = await AtcClient.open(ctx.path);
   onTestFinished(() => {
     peer.close();
     daemon.stop();
@@ -292,9 +292,9 @@ test.each(['session.message', 'session.submit', 'session.input', 'session.spawn'
 });
 
 test.each(['session.kill', 'session.update', 'session.forget'])('it refuses a %s from a scratch database without a named socket, before it goes out', async (method) => {
-  const ctx = setupTest(),
-    daemon = startStubAtcDaemon(ctx.path, {}),
-    peer = await AtcClient.open(ctx.path);
+  const ctx = setupTest();
+  const daemon = startStubAtcDaemon(ctx.path, {});
+  const peer = await AtcClient.open(ctx.path);
   onTestFinished(() => {
     peer.close();
     daemon.stop();
@@ -309,9 +309,9 @@ test.each(['session.kill', 'session.update', 'session.forget'])('it refuses a %s
 });
 
 test('it still sends a read to a socket the test did not name', async () => {
-  const ctx = setupTest(),
-    daemon = startStubAtcDaemon(ctx.path, { 'session.list': () => ({ sessions: [] }) }),
-    peer = await AtcClient.open(ctx.path);
+  const ctx = setupTest();
+  const daemon = startStubAtcDaemon(ctx.path, { 'session.list': () => ({ sessions: [] }) });
+  const peer = await AtcClient.open(ctx.path);
   onTestFinished(() => {
     peer.close();
     daemon.stop();

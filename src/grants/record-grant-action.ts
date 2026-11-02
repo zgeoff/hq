@@ -6,16 +6,16 @@ import { logEvent } from '../log-event.ts';
 import type { GrantAction, GrantActionInput } from './types.ts';
 
 export function recordGrantAction(db: Database, input: GrantActionInput): GrantAction {
-  const note = input.note === null || input.note.trim() === '' ? null : input.note.trim(),
-    target = input.target.trim();
+  const note = input.note === null || input.note.trim() === '' ? null : input.note.trim();
+  const target = input.target.trim();
   if (target === '' || /[\r\n]/u.test(target)) {
     throw new HqError('bad_args', '--target must be one line: the issue, PR or command');
   }
   return db
     .transaction((): GrantAction => {
       requireNamedGrant(db, input.grant);
-      const at = iso(now()),
-        id = Number(db.query('INSERT INTO grant_actions (grant_name, target, note, actor, at) VALUES (?, ?, ?, ?, ?)').run(input.grant, target, note, input.actor, at).lastInsertRowid);
+      const at = iso(now());
+      const id = Number(db.query('INSERT INTO grant_actions (grant_name, target, note, actor, at) VALUES (?, ?, ?, ?, ?)').run(input.grant, target, note, input.actor, at).lastInsertRowid);
       logEvent(db, 'hq', `grant:${input.grant}`, 'grant-action', input.actor, null, null, { id, target, note });
       return { id, grant_name: input.grant, target, note, actor: input.actor, at };
     })

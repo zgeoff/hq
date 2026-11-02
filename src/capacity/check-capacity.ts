@@ -18,13 +18,13 @@ import type { CapacityInput, CapacityTick } from './types.ts';
 export function checkCapacity(db: Database, input: CapacityInput, actor: string, at: Date = now()): CapacityTick {
   return db
     .transaction((): CapacityTick => {
-      const COUNTS = z.record(z.string(), z.object({ bad: z.number(), good: z.number() })),
-        HELD = z.array(z.object({ key: z.string(), label: z.string(), limit: z.string(), since: z.string(), until: z.string() })),
-        TAIL = 'hq capacity shows every reading. hq changed nothing.',
-        r = input.reading,
-        s = capacitySettings(db);
+      const COUNTS = z.record(z.string(), z.object({ bad: z.number(), good: z.number() }));
+      const HELD = z.array(z.object({ key: z.string(), label: z.string(), limit: z.string(), since: z.string(), until: z.string() }));
+      const TAIL = 'hq capacity shows every reading. hq changed nothing.';
+      const reading = input.reading;
+      const settings = capacitySettings(db);
       const ruleContext = { plan: input.plan, claudeLaunchPct: input.claudeLaunchPct ?? null };
-      const hold = Math.max(1, Math.floor(s.holdSamples));
+      const hold = Math.max(1, Math.floor(settings.holdSamples));
       const names = accountLabels(db);
       const open = openAlerts(db);
       const counts = metaJson(db, 'capacity_counts', COUNTS, {});
@@ -33,7 +33,7 @@ export function checkCapacity(db: Database, input: CapacityInput, actor: string,
       const cleared: string[] = [];
       let held = metaJson(db, 'capacity_held', HELD, []);
       for (const rule of RULES) {
-        const breach = rule.breached(r, s, ruleContext);
+        const breach = rule.breached(reading, settings, ruleContext);
         const count = counts[rule.key] ?? { bad: 0, good: 0 };
         const current = open[rule.key];
         if (breach === null) {
@@ -46,17 +46,17 @@ export function checkCapacity(db: Database, input: CapacityInput, actor: string,
         }
         counts[rule.key] = count;
         if (breach && !current && count.bad >= hold) {
-          open[rule.key] = { since: stamp, line: rule.line(r, s, names, ruleContext), told: false };
+          open[rule.key] = { since: stamp, line: rule.line(reading, settings, names, ruleContext), told: false };
           opened.push(rule.key);
-          held = held.filter((h) => h.key !== rule.key);
+          held = held.filter((heldRule) => heldRule.key !== rule.key);
         } else if (breach && current) {
-          current.line = rule.line(r, s, names, ruleContext);
+          current.line = rule.line(reading, settings, names, ruleContext);
         } else if (!breach && current && count.good >= hold) {
-          const o = current;
+          const closing = current;
           delete open[rule.key];
           cleared.push(rule.key);
-          if (o.told) {
-            held.push({ key: rule.key, label: rule.label, limit: rule.limit(s), since: o.since, until: stamp });
+          if (closing.told) {
+            held.push({ key: rule.key, label: rule.label, limit: rule.limit(settings), since: closing.since, until: stamp });
           }
         }
       }
