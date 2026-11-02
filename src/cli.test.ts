@@ -21,6 +21,7 @@ import { readReadySnapshot } from './lanes/read-ready-snapshot.ts';
 import { READY_ISSUES_KEY } from './lanes/ready-issues-key.ts';
 import { resetKey } from './linear/reset-key.ts';
 import { updateNoslopRepos } from './noslop/update-noslop-repos.ts';
+import { writeNoslopSettings } from './noslop/write-noslop-settings.ts';
 import type { RunResult, Runner } from './runner/types.ts';
 import { addPr } from './runs/add-pr.ts';
 import { addRun } from './runs/add-run.ts';
@@ -1159,7 +1160,8 @@ test('it routes hq brief check to the measure of a finished brief, and opens no 
 test('it refuses an hq review --effort that is neither medium nor high on a noslop repo, before it reviews', async () => {
   const fresh = freshDb();
   onTestFinished(fresh.cleanup);
-  updateNoslopRepos(fresh.db, 'on', ['widgets']);
+  const settings = updateNoslopRepos(fresh.db, 'on', ['widgets']);
+  writeNoslopSettings(fresh.db, { ...settings, sha: buildMockSha(3) });
   const child = Bun.spawn(['bun', join(import.meta.dir, 'cli.ts'), 'review', 'widgets', '7', '--effort', 'kettle', '--json'], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, HOME: fresh.dir, HQ_DB: fresh.path, HQ_NOTIFY: 'off', HQ_NOW: NOON_SYDNEY } });
 
   const [code, stdout] = await Promise.all([child.exited, new Response(child.stdout).text()]);
