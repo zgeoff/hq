@@ -9,8 +9,6 @@ import { LOW_WATER_SINCE_KEY } from './low-water-since-key.ts';
 import { pickStalledTriage } from './pick-stalled-triage.ts';
 import type { SlotCause } from './types.ts';
 
-const SENT_AT = z.object({ sent_at: z.string() }).nullable();
-
 interface StalledTriageAlert {
   slotCause: SlotCause;
   held: boolean;
@@ -42,6 +40,8 @@ export function sendStalledTriageAlert(db: Database, alert: StalledTriageAlert):
 function probeAlerted(db: Database, subjectID: string): boolean {
   return db.query(`SELECT 1 FROM events WHERE subject = 'hq' AND subject_id = ? AND action = 'alerted'`).get(subjectID) !== null;
 }
+
+const SENT_AT = z.object({ sent_at: z.string() }).nullable();
 
 // When the alert's message reached its session: the sent_at of its outbox row, or null while it waits.
 function readDeliveredAt(db: Database, subjectID: string): string | null {

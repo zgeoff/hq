@@ -44,7 +44,8 @@ export function sendLowWaterAlert(db: Database, alert: LowWaterAlert): boolean {
     target,
   });
   if (moves.episode !== null) {
-    checkLowWater(moves.episode, since === null ? 'none' : 'open');
+    const from = since === null ? 'none' : 'open';
+    checkLowWater(moves.episode, from);
     setMeta(db, LOW_WATER_SINCE_KEY, moves.since);
   }
   if (moves.message === null || target === null) {
