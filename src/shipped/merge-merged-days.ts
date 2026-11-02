@@ -77,7 +77,6 @@ function splitByKey<T>(items: readonly T[], keyOf: (item: T) => string): T[][] {
   return sortBy([...groups.entries()], ([key]) => key).map(([, group]) => group);
 }
 
-// The UTC offset such as +11:00, as merged-prs.sh prints it.
 function buildOffset(day: string): string {
   const noon = buildNoon(day),
     parts = new Intl.DateTimeFormat('en-US', { timeZone: TZ, timeZoneName: 'longOffset' }).formatToParts(noon);
