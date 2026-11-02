@@ -5,7 +5,6 @@ import type { BriefFiles, PermissionRow } from './types.ts';
 
 const WHERE = 'skills/delivery-lead/references/briefs.private.md';
 
-// An error names the private brief wording file, never its text.
 export function readPermissionTable(files: BriefFiles, privateDir: string): PermissionRow[] {
   const found = join(privateDir, WHERE);
   if (files.readKind(found) !== 'file') {
