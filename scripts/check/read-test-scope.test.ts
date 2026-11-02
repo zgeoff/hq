@@ -1,5 +1,5 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { readTestScope } from './read-test-scope.ts';
@@ -26,6 +26,17 @@ function setupTest() {
       runGit(['-c', 'user.name=Kettle Bot', '-c', 'user.email=kettle@example.com', '-c', 'commit.gpgsign=false', 'commit', '--quiet', '-m', 'kettle']);
     },
     branch: (name: string): void => runGit(['checkout', '--quiet', '-b', name]),
+    runScript: (base: string): string => {
+      const output = join(directory, '.github-output');
+      const result = Bun.spawnSync([process.execPath, join(import.meta.dir, 'read-test-scope.ts')], {
+        cwd: directory,
+        env: { ...process.env, TEST_BASE: base, GITHUB_OUTPUT: output },
+      });
+      if (result.exitCode !== 0) {
+        throw new Error(`read-test-scope: ${result.stderr.toString()}`);
+      }
+      return readFileSync(output, 'utf8');
+    },
   };
 }
 
@@ -59,4 +70,20 @@ test('it fails the step on a base git cannot find', () => {
   repo.commit({ 'docs/kettle.md': '# Kettle\n' });
 
   expect(() => readTestScope('origin/teapot', repo.directory)).toThrow('git diff --merge-base origin/teapot failed');
+});
+
+test('it writes tests=skip to the GitHub output for a docs-only branch', () => {
+  const repo = setupTest();
+  repo.commit({ 'kettle.ts': 'export const water = 1;\n' });
+  repo.branch('docs');
+  repo.commit({ 'docs/kettle.md': '# Kettle\n' });
+
+  expect(repo.runScript('main')).toBe('tests=skip\n');
+});
+
+test('it writes tests=run to the GitHub output for a push, which has no base', () => {
+  const repo = setupTest();
+  repo.commit({ 'docs/kettle.md': '# Kettle\n' });
+
+  expect(repo.runScript('')).toBe('tests=run\n');
 });

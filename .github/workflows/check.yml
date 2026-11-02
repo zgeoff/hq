@@ -42,14 +42,14 @@ jobs:
           TEST_BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || '' }}
       # GEO-983: shellcheck and the shell tests of the skill scripts
       - run: bun run --silent ci:install-tool shellcheck
-        if: steps.scope.outputs.tests == 'run'
+        if: steps.scope.outputs.tests != 'skip'
       - run: bun run test:scripts
-        if: steps.scope.outputs.tests == 'run'
+        if: steps.scope.outputs.tests != 'skip'
       # GEO-1546: no secret in any commit. .gitleaks.toml allows the tests' invented values.
       - run: bun run --silent ci:install-tool gitleaks
       - run: gitleaks git . --redact --no-banner
       # restic is a per-run fixture of the backup tests
       - run: bun run --silent ci:install-tool restic
-        if: steps.scope.outputs.tests == 'run'
+        if: steps.scope.outputs.tests != 'skip'
       - run: bun test
-        if: steps.scope.outputs.tests == 'run'
+        if: steps.scope.outputs.tests != 'skip'
