@@ -25,13 +25,10 @@ interface Checkout {
   git: Git;
 }
 
-// z-stu (2026-10-16): hq keeps hq-defs' working tree on origin/main, since sessions read skills
-// there, and hq-private's too. Only a fast-forward, after putting a clean detached HEAD back on main:
-// a dirty tree, another branch, or local commits are refused, never reset.
+// hq keeps hq-defs' working tree on origin/main, since sessions read skills there.
 export function runTreeSync(tree: TreeName = 'hq'): TreeSync | null {
   const dir = TREES[tree].dir();
 
-  // Not set up: nothing to keep.
   return existsSync(`${dir}/.git`) ? runCheckoutSync(dir, TREES[tree].repo) : null;
 }
 
@@ -45,9 +42,8 @@ function runCheckoutSync(dir: string, repo: string): TreeSync {
   return runFetchAndForward({ at, dir, git });
 }
 
-// hq's own git calls take one flock (in .git, so it goes where the checkout goes), so the
-// watcher and a hand-run `hq defs sync` never race on a ref. flock -o drops its lock fd before
-// the command runs, so the lock dies with flock; `timeout` ends a hung git.
+// One flock in .git, so the watcher and a hand-run `hq defs sync` never race on a ref. flock -o
+// drops its lock fd before the command runs, so the lock dies with flock.
 function makeGit(dir: string): Git {
   return (...args) => {
     const gitMs = config().HQ_SYNC_GIT_TIMEOUT_MS,

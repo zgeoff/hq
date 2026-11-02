@@ -10,9 +10,6 @@ import { runDeliveryScript } from './run-delivery-script.ts';
 import type { ShippedPeriod, ShippedSources } from './types.ts';
 import { upsertCacheEntries } from './upsert-cache-entries.ts';
 
-// The merged PRs of a period, as merged-prs.sh prints them, read one Sydney day at a time. A day
-// before today is kept for good, and read again only when what is kept does not fit the schema; today
-// is read on every call. A week gives the days merged into what `weekly` prints.
 export async function loadMergedPRs(sources: ShippedSources, period: ShippedPeriod, at: Date): Promise<string> {
   const bodies = await readDays(sources, planMergedDays(period, at), at),
     [only] = bodies;

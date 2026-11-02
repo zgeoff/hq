@@ -6,7 +6,6 @@ import type { OpenProblems } from './pick-health-moves.ts';
 export function checkHealthProblem(key: string, action: HealthProblemAction, from: HealthProblemState): void {
   const allowed: readonly HealthProblemState[] = HEALTH_PROBLEM_TRANSITIONS[action].from;
 
-  // pickHealthMoves derives both the action and the state, so a move the table lacks is a bug in hq
   assert.ok(allowed.includes(from), `health problem ${key} is ${from}: ${action} needs ${allowed.join(' or ')}`);
 }
 

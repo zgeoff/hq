@@ -4,7 +4,6 @@ type FocusClass = 'maintenance' | 'roadmap';
 type FocusType = 'bug' | 'feature' | 'chore' | 'improvement' | 'investigation';
 type FocusPriority = 'urgent' | 'high+' | 'medium+';
 
-// One filter of a term. An issue matches a term when it matches every filter in it.
 export type FocusFilter =
   | { kind: 'class'; value: FocusClass }
   | { kind: 'type'; value: FocusType }
@@ -18,13 +17,11 @@ export interface FocusTerm {
   filters: FocusFilter[];
 }
 
-// n slots kept for one area while it has eligible work.
 export interface FocusReserve {
   area: string;
   slots: number;
 }
 
-// The owner's steer: terms in priority order, and the reserves.
 export interface Focus {
   terms: FocusTerm[];
   reserves: FocusReserve[];
@@ -32,15 +29,11 @@ export interface Focus {
   setBy: string;
 }
 
-// An eligible issue in the order the lanes take it; term is the index of the first focus term it
-// matches, null for other eligible work.
 export interface FocusEntry {
   issue: ReadyIssue;
   term: number | null;
 }
 
-// One free slot's issue. reserve names the area whose reserved slot it fills; place, the place whose
-// slot it fills, set only under pacing.json's placeTypes.
 export interface FocusPick {
   issue: string;
   term: number | null;
@@ -48,20 +41,16 @@ export interface FocusPick {
   place?: keyof PacingSlots;
 }
 
-// The free slots by place, and the Type names each listed place takes.
 export interface PlaceRoom {
   free: PacingSlots;
   types: PlaceTypes;
 }
 
-// The free slots a plan fills: the pool's free count and, under pacing.json's placeTypes, the free
-// slots by place.
 export interface FocusSlots {
   free: number;
   places: PlaceRoom | null;
 }
 
-// The free slots no eligible issue fits, and the places they sit in with the Type names each takes.
 export interface PlaceUnfit {
   slots: number;
   places: { place: keyof PacingSlots; types: string[] }[];
@@ -70,9 +59,7 @@ export interface PlaceUnfit {
 export interface FocusPlan {
   picks: FocusPick[];
 
-  // Reserved slots with nothing eligible in their area, given to other work.
   lent: { area: string; slots: number }[];
 
-  // Set only under pacing.json's placeTypes.
   unfit?: PlaceUnfit;
 }

@@ -1,7 +1,6 @@
 import { HqError } from '../errors.ts';
 import type { Skipped } from './types.ts';
 
-// --skipped "GEO-1=blocked by GEO-9;GEO-2=needs a design call": issue=reason pairs, semicolon apart.
 export function parseSkipped(raw: string): Skipped[] {
   const MAX_SKIPPED = 100;
   const out: Skipped[] = [];

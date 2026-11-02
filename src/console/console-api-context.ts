@@ -1,7 +1,6 @@
 import { createContext, useContext } from 'react';
 import type { ConsoleAPI } from './console-api.ts';
 
-// The console API the page entry built, for every view under it.
 export const ConsoleAPIContext = createContext<ConsoleAPI | null>(null);
 
 export function useConsoleAPI(): ConsoleAPI {

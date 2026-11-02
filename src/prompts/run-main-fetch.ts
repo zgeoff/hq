@@ -2,9 +2,7 @@ import { config } from '../config/config.ts';
 import { credentialNames } from './credential-names.ts';
 import { FETCH_STATE } from './fetch-state.ts';
 
-// Fetch origin's main in a checkout at most once a minute per process, per checkout. A failed fetch
-// is a refusal: an older origin/main could hold a prompt that main has since changed. `quick` is one
-// attempt cut off after 10s, so a slow remote cannot hold a hook that runs `hq fleet --json`.
+// `quick` is one attempt cut off after 10s, so a slow remote cannot hold a hook that runs `hq fleet --json`.
 export function runMainFetch(dir: string, quick = false): string | null {
   const last = FETCH_STATE.get(dir);
   if (last && Date.now() - last.at < 60_000) {

@@ -1,6 +1,3 @@
-// hq health: read-only checks on this PC. The watcher runs them every tick and tells
-// z-stu once per new problem, in one message per tick; a problem that clears becomes a
-// news item. It never stops, starts or restarts anything.
 import { iso } from '../clock/iso.ts';
 import type { Runner } from '../runner/types.ts';
 import { COMMAND_TIMEOUT_MS } from './command-timeout-ms.ts';
@@ -11,8 +8,6 @@ import type { Check, Probe, Samples } from './types.ts';
 
 const glob = (pattern: string) => new RegExp(`^${pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.')}$`);
 
-// Every check, plus the restart samples to keep. Pure apart from the probe.
-// unknown: key prefixes a failed read could not see; their open problems stay open.
 export async function runChecks(p: Probe, s: HealthSettings, prev: Samples, at: Date): Promise<{ checks: Check[]; samples: Samples; unknown: string[] }> {
   const checks: Check[] = [];
   const unknown: string[] = [];
@@ -181,7 +176,6 @@ export async function runChecks(p: Probe, s: HealthSettings, prev: Samples, at: 
   return { checks, samples, unknown };
 }
 
-// NRestarts per service, for one manager (user or system).
 async function restartCounts(run: Runner, scope: 'user' | 'system'): Promise<Map<string, number> | null> {
   const flag = scope === 'user' ? ['--user'] : [];
   const list = await out(run, ['systemctl', ...flag, 'list-units', '--type=service', '--all', '--no-legend', '--plain']);

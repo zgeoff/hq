@@ -14,16 +14,12 @@ interface TreeNames {
   label: string;
 }
 
-// NAMES is what each tree's health line is called.
 const NAMES: Record<TreeName, TreeNames> = {
     hq: { key: 'defs-tree', label: 'hq-defs' },
     private: { key: 'private-tree', label: 'hq-private' },
   },
   TREE_STALE_MS = 30 * 60_000;
 
-// For hq health: the last sync failed, or none ran for 30 min while the checkout exists. hq-private
-// is not optional, since the start prompts are read from it: no checkout is a fault there, where
-// hq-defs without a checkout is just not set up.
 export function readTreeCheck(db: Database, at: Date, tree: TreeName = 'hq'): TreeHealth | null {
   const dir = TREES[tree].dir();
   if (!existsSync(`${dir}/.git`)) {

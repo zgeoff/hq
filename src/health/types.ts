@@ -1,11 +1,10 @@
 import type { Runner } from '../runner/types.ts';
 
 export interface Check {
-  key: string; // stable per problem, e.g. failed:user:foo.service
+  key: string;
   ok: boolean;
   line: string;
 
-  // the session whose job it is to fix the problem, and what to ask it; without one, the problem goes to the owner's session
   owner?: CheckOwner;
 }
 
@@ -19,16 +18,13 @@ export interface AtcMcpProcess {
   sessionID: string | null;
   startedAtMs: number;
 
-  // the exe link target; ends with ' (deleted)' once the file was replaced
+  // Ends with ' (deleted)' once the file was replaced.
   exe: string;
 }
 
-// The atc mcp processes plus the installed binary, or the error that stopped the read.
 export type AtcMcpRead = { processes: AtcMcpProcess[]; binary: { path: string; mtimeMs: number } } | string;
 
-// The filesystem and PATH reads the atc mcp reader makes; each throws as node:fs does.
 export interface AtcMcpFiles {
-  // where proc is mounted: /proc on Linux
   procRoot: string;
   readFile: (path: string) => string;
   readdir: (path: string) => string[];
@@ -40,14 +36,11 @@ export interface AtcMcpFiles {
 export interface Probe {
   run: Runner;
   readFile: (path: string) => Promise<string>;
-  atcAnswers: () => Promise<string | null>; // null when atc answers, else the error
-  // each session's atc mcp process, against the installed atc binary
+  atcAnswers: () => Promise<string | null>;
   atcMcp?: () => Promise<AtcMcpRead>;
 
-  // a failing check per role state file over its size limit, else one passing check
   stateSizes?: () => Check[];
 
-  // a declared fleet name for a session id
   sessionName?: (sessionID: string) => string | null;
   home: string;
   backup?: () => { lastOk: string | null; lastError: string | null; everRan: boolean };
@@ -56,20 +49,16 @@ export interface Probe {
   goalsWeekly?: (at: Date) => Check | null;
   defsTree?: (at: Date) => Check | null;
 
-  // is hq-private's working tree on origin/main? A missing checkout is a fault
   privateTree?: (at: Date) => Check | null;
 
-  // Has every grant on hq-private's main a named mark?
   grantMarks?: () => Check | null;
-  probe?: (at: Date) => Check | null; // the Nix uptime probe: stopped, or an outage open
-  // Are the machine-specific settings (env or the local file) all set?
+  probe?: (at: Date) => Check | null;
   localConfig?: () => Check;
-  fleetTrust?: () => Check[]; // is every fleet folder trusted by Claude Code?
+  fleetTrust?: () => Check[];
 
-  // Can hq read the answer to each save request it asked?
   stuckSaves?: (at: Date) => Check[];
-  watcher?: (at: Date) => Check | null; // has the watcher completed a tick lately? // is hq-defs' working tree on origin/main?
-  defsFetch?: () => Check | null; // can hq fetch the definitions' main (hq)? Checked at most hourly
+  watcher?: (at: Date) => Check | null;
+  defsFetch?: () => Check | null;
 }
 
 export type Samples = Record<string, [string, number][]>;

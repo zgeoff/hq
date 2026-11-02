@@ -1,5 +1,3 @@
-// pacing.json `lanes`: hq sums the slot counts by place into one pool (imp and local); the names stay
-// for hq run lane and the band. `lends` is no longer read: hq focus reserves slots for an area instead.
 import { z } from 'zod';
 import { HqError } from '../errors.ts';
 import { parseSlotCounts } from '../lanes/parse-slot-counts.ts';
@@ -15,8 +13,6 @@ const placesSchema = z.record(z.string(), z.record(z.string(), z.unknown()));
 
 const sizeSchema = z.number().int().min(0).max(MAX_SIZE);
 
-// pacing.json's `lanes`: { imp: { name: size }, local: { name: size } }. Bad entries are refused. A
-// file with `slots` and no `lanes` gives one lane per place, named after it.
 export function parseLanes(raw: unknown): LaneConfig[] {
   const parsed = fileSchema.safeParse(raw);
   const file = parsed.success ? parsed.data : {};

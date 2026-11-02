@@ -6,8 +6,7 @@ import { buildAwakeSchema } from './build-awake-schema.ts';
 
 export type AwakeReading = NonNullable<z.output<ReturnType<typeof buildAwakeSchema>>>;
 
-// The sweep's record of the sessions atc shows awake, or null when none is under 15 min old, as a
-// wrong "free" could overfill the imp.
+// Null when no record is under 15 min old, as a wrong "free" could overfill the imp.
 export function readFreshAwake(db: Database, at: Date): AwakeReading | null {
   const AWAKE_FRESH_MIN = 15;
   const reading = metaJson(db, AWAKE, buildAwakeSchema(), null);

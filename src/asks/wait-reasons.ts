@@ -4,7 +4,6 @@ import { now } from '../clock/now.ts';
 import { currentHold } from './current-hold.ts';
 import { openItem } from './open-item.ts';
 
-// Why the next item cannot open right now, or [] when it can.
 export function waitReasons(db: Database): string[] {
   const reasons: string[] = [];
   const open = openItem(db);

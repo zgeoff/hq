@@ -3,11 +3,10 @@ import type { Check } from './types.ts';
 
 const OUTPUT_LINES = 10;
 
-// Starts a command and waits for it. Tests pass a fake to pin the command line.
 export type GrantsSpawn = (argv: string[], cwd: string) => Bun.SyncSubprocess<'pipe', 'pipe'>;
 
-// The grants check on hq-private, run from the hq-defs checkout: a clone of hq, so it holds
-// scripts/grants.ts and the still-ask list. hq-private has no CI of its own.
+// Run from the hq-defs checkout: a clone of hq, so it holds scripts/grants.ts and the still-ask
+// list. hq-private has no CI of its own.
 export function checkGrants(hqDir: string, privateDir: string, spawn: GrantsSpawn): Check {
   if (!existsSync(`${hqDir}/scripts/grants.ts`)) {
     return { ok: false, line: `grants: ${hqDir}/scripts/grants.ts is missing, so hq-private's grants and prompts can't be checked` };

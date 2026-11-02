@@ -1,5 +1,3 @@
-// Calls (from z-triage's check; z-refine's before the merge) and proposals (from z-steward): the questions put to
-// the owner, one at a time. Every change is a named transition, logged in events.
 import type { AskState } from '../transitions/ask-states.ts';
 import type { AskAction } from '../transitions/ask-transitions.ts';
 import type { ItemExtras } from '../parse-item-input.ts';
@@ -43,7 +41,6 @@ export interface AddInput {
   body: string;
   issues: string[];
   forSession: string | null;
-  // The filer's send order; lower opens first. undefined keeps the stored one.
   order?: number | null;
   actor: string;
 }
@@ -60,7 +57,6 @@ export interface Hold {
   by: string;
 }
 
-// A message about an ask, for one target; the events row it follows is seq.
 export interface Notice {
   seq: number;
   target: string | null;
@@ -69,8 +65,6 @@ export interface Notice {
   topic?: string | null;
 }
 
-// One named transition on an ask: the table action, the columns it sets, the event data, and the
-// notice the filer gets, if any.
 export interface AskStep {
   id: string;
   kind: Kind | undefined;

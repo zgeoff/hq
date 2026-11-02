@@ -10,7 +10,6 @@ import type { RunResult, Runner } from '../runner/types.ts';
 import { readFocus } from './read-focus.ts';
 import { runFocusCommand } from './run-focus-command.ts';
 
-// A database, and for the hq CLI: an invented Linear key from op, the actor, and console.log captured.
 function setupTest() {
   const fresh = freshDb();
   onTestFinished(fresh.cleanup);
@@ -28,7 +27,6 @@ function setupTest() {
 test('set stores the terms and reserves, and prints each term with its Ready and Backlog matches', async () => {
   const ctx = setupTest();
 
-  // GEO-9804 sits in an hq project, which the lanes never take.
   const readySeeds: ReadyNodeSeed[] = [
     { identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Bug', labels: ['nixie'] },
     { identifier: 'GEO-9802', project: 'kettle maintenance', projectLabels: ['maintenance'], type: 'Chore', labels: ['vers'] },

@@ -9,7 +9,6 @@ interface TreeResult {
   tree: TreeName;
 }
 
-// Each tree's own sync, one after the other: a failure in one never stops the other.
 export function runAllTreeSyncs(db: Database, actor: string): TreeResult[] {
   const trees: TreeName[] = ['hq', 'private'];
   return trees.map((tree) => runOneTreeSync(db, actor, tree));

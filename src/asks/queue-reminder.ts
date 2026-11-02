@@ -11,9 +11,6 @@ import { listAsks } from './list-asks.ts';
 import { nextEligible } from './next-eligible.ts';
 import { waitReasons } from './wait-reasons.ts';
 
-// When the queue could open but the owner has not heard about the next item
-// since it became openable (it arrived or fell due in quiet hours, or behind a
-// hold), tell the owner once. Run by the watcher every few minutes.
 export function queueReminder(db: Database, actor: string): { reminded: string | null; why: string } {
   return db
     .transaction(() => {

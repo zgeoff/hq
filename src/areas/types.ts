@@ -33,8 +33,6 @@ export interface AwakeSession {
   state?: string;
 }
 
-// The imp slots the lanes may fill now, and the limit that sets that number, for `hq lanes` to name
-// when it holds a slot back.
 export interface ImpRoom {
   slots: number;
   heldBy: string;

@@ -11,8 +11,6 @@ import type { LaneReady } from './ready-by-lane.ts';
 import { readReadyByLane } from './read-ready-by-lane.ts';
 import type { ReadyDetail, Skipped } from './types.ts';
 
-// A report without --ready-total or --skipped clears the last detail: it described the last report.
-// It also sets the total Ready count, the sum of the fresh per-lane counts, so the two never disagree.
 export function reportLaneReady(db: Database, counts: Record<string, number>, actor: string, detail: { total?: number | null; skipped?: Skipped[] | null; logOnlyChanges?: boolean } = {}): void {
   db.transaction(() => {
     const previous = metaJson(db, 'lanes_ready_by_lane', READY_BY_LANE, {});

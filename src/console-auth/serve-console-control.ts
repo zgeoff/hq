@@ -4,8 +4,6 @@ import { HqError } from '../errors.ts';
 import { ControlRequestSchema, encodeControlLine } from './control-protocol.ts';
 import type { ControlReply } from './control-protocol.ts';
 
-// Takes a login ControlRequest over a socket only this uid may open. The reply carries no link: the
-// console prints any new link on its own terminal, so a caller learns only whether it printed.
 export async function serveConsoleControl(path: string, onLogin: () => ControlReply): Promise<{ stop: () => void }> {
   const answering = existsSync(path) ? await probeAnswering(path) : false;
   if (answering) {

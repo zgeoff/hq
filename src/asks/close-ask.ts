@@ -6,7 +6,6 @@ import { sendNoticeIfOther as notifyIfOther } from './send-notice-if-other.ts';
 import type { Ask, Kind } from './types.ts';
 import { updateAskState as transition } from './update-ask-state.ts';
 
-// No longer needs the owner. Whoever closes, the other side hears about it.
 export function closeAsk(db: Database, id: string, kind: Kind | undefined, reason: string, actor: string): Ask {
   if (!reason.trim()) throw new HqError('bad_args', 'close needs --reason');
   return db.transaction((): Ask => {

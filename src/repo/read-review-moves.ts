@@ -3,9 +3,6 @@ import { dirname, join, relative } from 'node:path';
 import type { RepoNames } from './rekey-specs.ts';
 import type { ReviewMove } from './types.ts';
 
-// The review files below the zgeoff/<repo> folder of repo `from`, and where the re-key puts them.
-// Flat <repo><pr>-review.md files from before that layout stay put: nothing reads them, and their
-// names cannot show which repo they belong to.
 export function readReviewMoves(reviewDir: string, names: RepoNames): ReviewMove[] {
   const fromDir = join(reviewDir, 'zgeoff', names.from.toLowerCase());
   const toDir = join(reviewDir, 'zgeoff', names.to.toLowerCase());

@@ -5,6 +5,6 @@ export function parseJSONLine(line: string): Obj | null {
     const o: unknown = JSON.parse(line);
     return o && typeof o === 'object' ? (o as Obj) : null;
   } catch {
-    return null; // a partial first line, or damage: skipped
+    return null;
   }
 }

@@ -3,8 +3,6 @@ import type { MergedPRsOutput } from './merged-prs-output-schema.ts';
 
 const DATE_LENGTH = 10;
 
-// The week merged-prs.sh weekly prints, made from the days of that week that have happened, Monday
-// first: every list and total comes from the days' PRs, in the order the script gives them.
 export function mergeMergedDays(days: readonly MergedPRsOutput[]): MergedPRsOutput {
   const monday = days[0]?.start.slice(0, DATE_LENGTH) ?? '',
     prs = sortBy(
@@ -53,7 +51,7 @@ function buildSum<T>(items: readonly T[], valueOf: (item: T) => number): number 
   return items.reduce((total, item) => total + valueOf(item), 0);
 }
 
-// A stable sort by a number or a string, like jq's sort_by.
+// A stable sort, like jq's sort_by.
 function sortBy<T>(items: readonly T[], keyOf: (item: T) => number | string): T[] {
   return items.toSorted((a, b) => {
     const left = keyOf(a),
@@ -65,7 +63,7 @@ function sortBy<T>(items: readonly T[], keyOf: (item: T) => number | string): T[
   });
 }
 
-// The groups of items that share a key, ordered by key, like jq's group_by.
+// Ordered by key, like jq's group_by.
 function splitByKey<T>(items: readonly T[], keyOf: (item: T) => string): T[][] {
   const groups = new Map<string, T[]>();
   for (const item of items) {
@@ -80,7 +78,7 @@ function splitByKey<T>(items: readonly T[], keyOf: (item: T) => string): T[][] {
   return sortBy([...groups.entries()], ([key]) => key).map(([, group]) => group);
 }
 
-// Sydney's UTC offset at the end of a date, such as +11:00, as merged-prs.sh prints it.
+// The UTC offset such as +11:00, as merged-prs.sh prints it.
 function buildOffset(day: string): string {
   const noon = buildNoon(day),
     parts = new Intl.DateTimeFormat('en-US', { timeZone: TZ, timeZoneName: 'longOffset' }).formatToParts(noon);

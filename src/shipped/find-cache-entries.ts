@@ -3,7 +3,6 @@ import { iso } from '../clock/iso.ts';
 import { kdb } from '../kdb.ts';
 import type { ShippedCacheRow } from '../kdb.ts';
 
-// The bodies kept for these keys of one kind, by key, leaving out an entry that has expired by `at`.
 export async function findCacheEntries(db: Database, kind: ShippedCacheRow['kind'], keys: readonly string[], at: Date): Promise<Map<string, string>> {
   const CHUNK = 500,
     found = new Map<string, string>();

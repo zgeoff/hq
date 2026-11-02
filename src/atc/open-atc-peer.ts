@@ -30,9 +30,8 @@ interface PeerState {
   socket: Socket<unknown> | null;
 }
 
-// atc's wire: oRPC peer messages, one JSON message per line, over the daemon's unix socket. The
-// hello goes first. A daemon on another protocol refuses it with protocol_mismatch; an older
-// line-protocol daemon answers in its own frame or closes with no answer.
+// A daemon on another protocol refuses the hello with protocol_mismatch; an older line-protocol
+// daemon answers in its own frame or closes with no answer.
 export async function openAtcPeer(path: string, timeoutMs: number): Promise<AtcPeer> {
   const state = buildPeerState();
   state.socket = await withTimeout(Bun.connect({ unix: path, socket: buildHandlers(state) }), timeoutMs, `atc daemon not reachable at ${path}`);

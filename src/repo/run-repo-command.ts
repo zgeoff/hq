@@ -20,7 +20,6 @@ export interface RepoCommandArgs {
   verb: string | undefined;
 }
 
-// hq repo archive-history <from> <to> [--dry-run]
 export async function runRepoCommand(args: RepoCommandArgs): Promise<{ data: Record<string, unknown>; text: string }> {
   if (args.verb !== 'archive-history') {
     throw new HqError('bad_args', `unknown command: hq repo ${args.verb ?? ''}. Try hq repo archive-history <from> <to>`);

@@ -7,8 +7,6 @@ import { countGrantActions } from './count-grant-actions.ts';
 import { requireGrantName } from './require-grant-name.ts';
 import type { GrantNaming } from './types.ts';
 
-// Names a grant mark, for a standing grant recorded before names, or renames one with no actions
-// yet. Only a `grant` mark takes a name, and each name belongs to one mark.
 export function updateMarkGrantName(db: Database, naming: GrantNaming): Mark {
   requireGrantName(naming.name);
   return db
@@ -21,8 +19,6 @@ export function updateMarkGrantName(db: Database, naming: GrantNaming): Mark {
     .immediate();
 }
 
-// A grant mark whose name is free to set: not another mark's, and not a rename that would leave
-// recorded actions under a name no mark carries.
 function requireNameableMark(db: Database, naming: GrantNaming): Mark {
   const mark = getMark(db, naming.id),
     owner = db.query('SELECT id FROM marks WHERE grant_name = ?').get(naming.name) as { id: number } | null;

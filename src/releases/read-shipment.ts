@@ -20,14 +20,13 @@ export function readShipment(deps: ShipDeps, state: PrState, sha: string): Promi
     .exhaustive();
 }
 
-// A source run or a dirty build is no commit GitHub can compare, so it ships nothing and is no error.
+// A source run or a dirty build is no commit GitHub can compare.
 async function readBuildShipment(deps: ShipDeps, state: PrState, sha: string): Promise<Shipment | null | 'cap'> {
   const build = deps.readBuild();
   if (!build.commit || build.dirty !== false) {
     return null;
   }
 
-  // A build from an unpushed commit waits.
   const held = await readHeld(deps, state.repo, sha, build.commit);
   if (held === 'cap') {
     return 'cap';
@@ -67,7 +66,6 @@ async function readReleaseShipment(deps: ShipDeps, state: PrState, sha: string):
   return list ? readOldestContaining(list, (tag) => deps.contains(state.repo, sha, tag)) : null;
 }
 
-// Makes the reads pickRefShipment asks for, one at a time, until it decides.
 async function readRefShipment(deps: ShipDeps, state: PrState, sha: string, source: Extract<Source, { kind: 'ref' }>): Promise<Shipment | null | 'cap'> {
   const gated = source.gated;
   const facts: RefFacts = { found: await readReleaseShipment(deps, state, sha), gatedRef: gated?.ref ?? null };

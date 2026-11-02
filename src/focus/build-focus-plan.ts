@@ -2,10 +2,6 @@ import type { PacingSlots, PlaceTypes } from '../lanes/types.ts';
 import { getIssueAreas } from './get-issue-areas.ts';
 import type { FocusEntry, FocusPick, FocusPlan, FocusReserve, FocusSlots, PlaceRoom, PlaceUnfit } from './types.ts';
 
-// Fills the free slots from the queue. Each reserve first keeps its slots, less the area's running
-// runs, for the area's first eligible issues; a reserved slot with nothing eligible is lent. Every
-// slot left takes the queue in order. With places, an issue takes a free slot only at a place whose
-// Type names hold its Type, a listed place before an unlisted one, and is passed over when none does.
 export function buildFocusPlan(queue: readonly FocusEntry[], slots: FocusSlots, reserves: readonly FocusReserve[], runningByArea: Readonly<Record<string, number>>): FocusPlan {
   const picks: FocusPick[] = [];
   const lent: FocusPlan['lent'] = [];
@@ -58,9 +54,6 @@ interface SeatIssue {
   getPlace: (issue: string) => Place;
 }
 
-// Seats each issue in turn at a place that takes its Type, a listed place first. When every such place
-// is full, an augmenting path moves seated issues to their other places to make room, so the plan
-// fills as many slots as it can and never unseats an earlier issue for a later one.
 function makeSeatIssue(places: PlaceRoom): SeatIssue {
   const room = { ...places.free };
   const seated = new Map<string, { place: Place; issueType: string }>();
@@ -106,7 +99,6 @@ function makeSeatIssue(places: PlaceRoom): SeatIssue {
   };
 }
 
-// An issue with no Type label fits only a place with no list.
 function isTypeTakenAt(types: PlaceTypes, place: Place, issueType: string): boolean {
   const list = types[place];
   if (list === undefined) {
@@ -115,8 +107,6 @@ function isTypeTakenAt(types: PlaceTypes, place: Place, issueType: string): bool
   return issueType !== 'none' && list.some((type) => type.toLowerCase() === issueType.toLowerCase());
 }
 
-// The free slots no eligible issue fits: the places with a free slot that no issue in the queue may
-// take, within the pool's free count. None while nothing is eligible.
 function buildPlaceUnfit(queue: readonly FocusEntry[], free: number, places: PlaceRoom): PlaceUnfit {
   if (queue.length === 0) {
     return { slots: 0, places: [] };

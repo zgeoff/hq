@@ -9,7 +9,6 @@ function setupTest() {
   return { db: fresh.db };
 }
 
-// Linear with the Kettle project's issues over two pages, the second behind the cursor `page-2`.
 function buildTwoPageLinear(asked: unknown[]): LinearCall {
   return (_query, variables) => {
     asked.push(variables);

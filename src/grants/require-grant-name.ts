@@ -1,6 +1,5 @@
 import { HqError } from '../errors.ts';
 
-// A grant's name: a slug, short enough to type with each action.
 export function requireGrantName(name: string): string {
   const NAME_MAX = 40;
   if (name.length > NAME_MAX || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(name)) {

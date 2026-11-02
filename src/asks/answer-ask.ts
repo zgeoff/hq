@@ -15,8 +15,6 @@ export interface AnswerAskInput {
   ownerSession?: boolean;
 }
 
-// The owner's exact words. A courtesy note goes to the filer; the answer still
-// reaches a blocked session only when z-stu types it there (then `apply`).
 export function answerAsk(db: Database, input: AnswerAskInput): Ask {
   const answer = input.answer;
   if (!answer.trim()) {
@@ -37,7 +35,6 @@ export function answerAsk(db: Database, input: AnswerAskInput): Ask {
     .immediate();
 }
 
-// What the answer is about, kept on the answer itself so a later round cannot change it.
 function readAnswerFacts(db: Database, input: AnswerAskInput): { title: string; issues: string[]; forSession: string | null } {
   const ask = requireAsk(db, input.id, input.kind);
   return { title: ask.title, issues: ask.issues, forSession: ask.for_session };

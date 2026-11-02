@@ -3,8 +3,6 @@ import { HqError } from '../errors.ts';
 import { FOCUS_AREAS } from './focus-areas.ts';
 import type { FocusFilter, FocusTerm } from './types.ts';
 
-// `bug,maintenance:nixie`: terms split by `,` in priority order, filters in a term joined by `:`.
-// Any term or filter it does not know refuses the whole list.
 export function parseFocusTerms(raw: string): FocusTerm[] {
   const texts = raw.split(',').map((text) => text.trim());
   if (texts.some((text) => text === '')) {

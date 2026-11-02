@@ -8,14 +8,12 @@ import type { reportIssueSchema } from './report-issue-schema.ts';
 
 export type ShippedPeriod = 'today' | 'yesterday' | 'week';
 
-// One PR as render-report.sh --json names it.
 export interface ReportPR {
   repo: string;
   number: number;
   url: string;
 }
 
-// One issue's row: its markers, its state, and the PRs that merged for it.
 export interface ReportRow {
   issue: string;
   title: string;
@@ -35,8 +33,6 @@ export interface ReportGroup {
   rows: ReportRow[];
 }
 
-// render-report.sh --json: the delivery report as data, with the groups, rows and order the
-// Markdown shows. Days and the still-open list come only on a weekly report.
 export interface RenderedReport {
   kind: 'daily' | 'weekly';
   dateLabel: string;
@@ -56,14 +52,10 @@ export interface ShippedReport {
   at: string;
 }
 
-// A Linear issue as render-report.sh reads it.
 export type ReportIssue = z.infer<typeof reportIssueSchema>;
 
-// One issue of a project, for its burndown.
 export type ProjectIssue = z.infer<typeof projectIssuesSchema>[number];
 
-// What the Shipped tab reads from: commands, Linear, the delivery-report scripts' folder, and the
-// database that keeps what it has read.
 export interface ShippedSources {
   db: Database;
   run: Runner;
@@ -71,5 +63,4 @@ export interface ShippedSources {
   scripts: string;
 }
 
-// One merged PR as merged-prs.sh lists it.
 export type MergedPR = MergedPRsOutput['prs'][number];

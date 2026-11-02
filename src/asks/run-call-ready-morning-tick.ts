@@ -13,9 +13,6 @@ import { openItem } from './open-item.ts';
 
 const DATE = 'call_ready_morning_date';
 
-// z-triage's morning nudge, from the watcher: on the first tick at or after the quiet window's end
-// (07:00 Sydney) on each Sydney date, tell the owner "call ready" when nothing is open and a call
-// waits, as `hq status` shows them. Only that first tick counts: the date is recorded either way.
 export function runCallReadyMorningTick(db: Database, actor: string, at: Date = now()): boolean {
   if (getSydneyParts(at).hour < quietWindow().end) {
     return false;

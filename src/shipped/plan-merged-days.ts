@@ -7,8 +7,6 @@ export interface MergedDaysPlan {
   days: string[];
 }
 
-// The Sydney calendar days a period's merged PRs are read for, as YYYY-MM-DD: today, the day
-// before, or the days of the week (Monday to Sunday) that holds today, up to today.
 export function planMergedDays(period: ShippedPeriod, at: Date): MergedDaysPlan {
   const today = SYDNEY_DATE.format(at);
   return match(period)
@@ -20,7 +18,6 @@ export function planMergedDays(period: ShippedPeriod, at: Date): MergedDaysPlan 
 
 const SYDNEY_DATE = new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' });
 
-// The week's days from Monday up to `today`.
 function buildWeekDays(today: string): string[] {
   const SINCE_MONDAY = 6,
     WEEK = 7,
@@ -28,8 +25,7 @@ function buildWeekDays(today: string): string[] {
   return Array.from({ length: WEEK }, (_unused, offset) => buildShiftedDay(monday, offset)).filter((day) => day <= today);
 }
 
-// The calendar day `by` days from a YYYY-MM-DD date, counted in whole days, so a daylight saving
-// change cannot skip or repeat one.
+// Counted in whole days, so a daylight saving change cannot skip or repeat a calendar day.
 function buildShiftedDay(day: string, by: number): string {
   const date = toUTCDate(day);
   date.setUTCDate(date.getUTCDate() + by);

@@ -9,7 +9,6 @@ import { requireAsk as mustGet } from './require-ask.ts';
 import { sendNoticeIfOther as notifyIfOther } from './send-notice-if-other.ts';
 import type { Ask, AskStep } from './types.ts';
 
-// One named transition: the table's check, the row, the event, and a notice to the filer.
 export function updateAskState(db: Database, step: AskStep): Ask {
   const action = step.action,
     actor = step.actor,

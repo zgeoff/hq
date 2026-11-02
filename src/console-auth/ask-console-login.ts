@@ -2,7 +2,6 @@ import { HqError } from '../errors.ts';
 import { ControlReplySchema, encodeControlLine } from './control-protocol.ts';
 import type { ControlReply } from './control-protocol.ts';
 
-// Asks the running console to print a new login link on its own terminal, and returns its reply.
 export async function askConsoleLogin(path: string): Promise<ControlReply> {
   const reply = Promise.withResolvers<string>();
   let answer = '';

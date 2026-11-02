@@ -18,9 +18,6 @@ interface IssueNode {
   labels: { nodes: { name: string }[] };
 }
 
-// The Linear issues the merged PRs name, in the shape render-report.sh reads, 100 to a query. A Done
-// or Canceled issue is kept for good, an open one for 5 minutes; only the others, and any kept in
-// another shape, are asked for. An id Linear does not return is left out; the report names it.
 export async function loadReportIssues(call: LinearCall, db: Database, ids: readonly string[], at: Date): Promise<ReportIssue[]> {
   const BATCH = 100,
     cached = await findCacheEntries(db, 'issue', ids, at),
@@ -38,7 +35,6 @@ export async function loadReportIssues(call: LinearCall, db: Database, ids: read
   return [...hits.values(), ...fetched];
 }
 
-// The kept issues that fit the schema, by id.
 function collectValidHits(cached: ReadonlyMap<string, string>): Map<string, ReportIssue> {
   const hits = new Map<string, ReportIssue>();
   for (const [id, body] of cached) {

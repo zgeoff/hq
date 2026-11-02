@@ -6,8 +6,6 @@ const DELETED = ' (deleted)';
 // /proc/stat btime is whole seconds, so a read start time can be up to 1 s early.
 const START_SLACK_MS = 1000;
 
-// Pure: one failing check per atc mcp process older than the installed atc build, else one passing check.
-// A read error is one failing check; the caller keeps the open atc-mcp problems open.
 export function pickAtcMcpChecks(read: AtcMcpRead, nameOf: (sessionID: string) => string | null): Check[] {
   if (typeof read === 'string') {
     return [{ key: 'atc-mcp', ok: false, line: `can't read the atc mcp processes: ${read}` }];

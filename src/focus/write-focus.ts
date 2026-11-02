@@ -12,8 +12,6 @@ export interface FocusChange {
   at: Date;
 }
 
-// Sets the focus, logs it and posts it to hq news, in one transaction. The lanes read it at their
-// next tick; running work keeps its slots. The caller reads the clock and passes the set time.
 export function writeFocus(db: Database, change: FocusChange): Focus {
   const MAX_LINE = 300;
   const focus: Focus = { terms: [...change.terms], reserves: [...change.reserves], setAt: iso(change.at), setBy: change.actor };

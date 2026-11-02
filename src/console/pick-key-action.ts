@@ -6,8 +6,6 @@ export interface KeyInput {
   modified: boolean;
 }
 
-// The Brief's keys, which work whenever focus is outside a text box: 1-9 pick, y Ask Stu, i into the
-// note, j/k next and previous, ? the key list, Esc closes it. In the note, Esc steps back out.
 export function pickKeyAction(input: KeyInput): KeyAction | null {
   if (input.inText) {
     return input.key === 'Escape' ? { kind: 'close' } : null;

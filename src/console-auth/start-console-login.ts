@@ -13,8 +13,6 @@ export interface ConsoleLoginInput {
   print: (line: string) => void;
 }
 
-// Reads the gate once, at start: the start line and every later login request obey it, so a
-// console started off the owner's terminal never prints a link.
 export async function startConsoleLogin(input: ConsoleLoginInput): Promise<{ stop: () => void }> {
   const linkFor = (token: string) => `http://127.0.0.1:${input.port}/#t=${token}`;
   const gate = await readLoginGate(input.gateDeps);

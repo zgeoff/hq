@@ -22,24 +22,18 @@ export interface ArchiveInput {
   createBackup: CreateBackup;
   db: Database;
 
-  // The file `db` was opened from, which the backup copies.
   dbFile: string;
   dryRun: boolean;
   from: string;
   openStore: OpenStore;
 
-  // The folder that holds the review files; it may not exist.
   reviewDir: string;
   run: Runner;
 
-  // noslop's store file; it may not exist.
   store: string;
   to: string;
 }
 
-// Moves the history of one repo name to another in hq.db, in noslop's store and in the review
-// folder: the rows that name the repo and its review files, and nothing else. A refused run and a
-// dry run change nothing and write no backup.
 export async function runArchiveHistory(input: ArchiveInput): Promise<ArchiveHistory> {
   checkArchiveNames(input.from, input.to);
   const before = readSides(input, { from: input.from, to: input.to });

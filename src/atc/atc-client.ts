@@ -1,5 +1,4 @@
-// A small client for the atc daemon's protocol 6: oRPC peer messages, one JSON message per line,
-// a hello first. Self-contained so hq never imports atc from source.
+// Self-contained so hq never imports atc from source.
 import type { z } from 'zod';
 import { HqError } from '../errors.ts';
 import { answer } from './answer.ts';
@@ -36,8 +35,6 @@ export class AtcClient {
     return this.peer.send(m, p);
   }
 
-  // A request whose answer is checked at the boundary: a failure is bad_atc_answer naming the
-  // method and the field.
   async call<S extends z.ZodType>(m: string, p: Record<string, unknown>, schema: S): Promise<z.output<S>> {
     return answer(m, await this.request(m, p), schema);
   }
@@ -50,9 +47,8 @@ export class AtcClient {
     return this.sessionCache;
   }
 
-  // A session by id, or by name among the live ones. Refuses an ambiguous name. `known` maps a
-  // fleet name to the session id hq fleet recorded: that session, when alive, wins over the name,
-  // so a session renamed under hq (z-stu shown as "stu") still gets its messages.
+  // A `known` session, when alive, wins over the name, so a session renamed under hq (z-stu shown
+  // as "stu") still gets its messages.
   async resolve(target: string, known: Record<string, string> = {}): Promise<SessionInfo> {
     const all = await this.sessions();
     const kid = Object.hasOwn(known, target) ? known[target] : undefined;
@@ -67,7 +63,7 @@ export class AtcClient {
   }
 
   async message(session: string, text: string, from: string, idempotencyKey: string): Promise<string | undefined> {
-    // notice false: no answer notice comes back to any session. The send stays detached so the sender label is the local 'hq'.
+    // The send stays detached so the sender label is the local 'hq'.
     const reply = await this.call('session.message', { session, text, from, idempotencyKey, notice: false }, messageSchema);
     return reply.message;
   }

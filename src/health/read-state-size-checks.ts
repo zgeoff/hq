@@ -5,9 +5,6 @@ import { getStateLimit } from '../state/get-state-limit.ts';
 import { getStateOwner } from '../state/get-state-owner.ts';
 import type { Check } from './types.ts';
 
-// One failing check per role state file over its limit, else one passing check. Only <role>.md for
-// the given roles: the folder also holds archives and notes. A read error is one failing check
-// keyed 'state-size', which the caller treats as unknown.
 export function readStateSizeChecks(directory: string, roles: string[]): Check[] {
   let names: string[];
   try {

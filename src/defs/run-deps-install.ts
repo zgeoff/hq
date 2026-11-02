@@ -14,9 +14,7 @@ export interface InstallResult {
 
 export type Install = (directory: string) => InstallResult;
 
-// z-steward (2026-10-23): sessions run the repo's scripts in hq-defs, such as check:skills. hq
-// installs when node_modules is missing or bun.lock differs from the last good install; a failed
-// install turns the tree red for hq health, keeps the sync, and runs again on the next tick.
+// Sessions run the repo's scripts in hq-defs, such as check:skills.
 export function runDepsInstall(db: Database, directory: string, actor: string, install: Install): { ok: boolean; line: string } | null {
   const lockPath = `${directory}/bun.lock`;
   if (!existsSync(lockPath)) {

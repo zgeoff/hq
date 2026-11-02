@@ -14,8 +14,6 @@ function readKeyColumn(spec: RekeySpec, alias: string, name: string): string {
   return spec.zeroIfNull?.includes(name) ? `COALESCE(${alias}."${name}", 0)` : `${alias}."${name}"`;
 }
 
-// A row that holds the new name already, with the same key as a row about to take it. The join
-// pairs each row to re-key with the row it would become; a pair means the unique key would repeat.
 function readSpecCollisions(db: Database, spec: RekeySpec, names: RepoNames): string[] {
   if (spec.metaKey !== undefined) {
     return readMetaCollisions(db, spec.metaKey, spec, names);
@@ -33,7 +31,6 @@ function readSpecCollisions(db: Database, spec: RekeySpec, names: RepoNames): st
     .map((row) => formatKey(spec, row));
 }
 
-// The keys that would repeat after the re-key, for the specs whose unique key holds the column.
 export function readRekeyCollisions(db: Database, specs: RekeySpec[], names: RepoNames): string[] {
   return specs.flatMap((spec) => readSpecCollisions(db, spec, names));
 }
