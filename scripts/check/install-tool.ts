@@ -2,7 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { appendFileSync, chmodSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-interface Tool {
+export interface Tool {
   readonly url: string;
   readonly sha256: string;
   readonly unpack: 'tar.xz' | 'tar.gz' | 'bz2';
@@ -10,6 +10,13 @@ interface Tool {
   // The folder inside the archive that holds the binary, or '' for the archive root
   readonly folder: string;
   readonly version: readonly string[];
+}
+
+export interface InstallDeps {
+  readonly tools: Readonly<Record<string, Tool>>;
+  readonly download: (url: string) => Promise<Uint8Array>;
+  readonly into: string;
+  readonly githubPath: string;
 }
 
 // Each tool is pinned to the version used locally: the runner's own shellcheck reports findings 0.11.0 does not,
@@ -38,22 +45,26 @@ export const TOOLS: Readonly<Record<string, Tool>> = {
   },
 };
 
+export async function installTool(name: string, deps: InstallDeps): Promise<string> {
+  const tool = deps.tools[name];
+  if (tool === undefined) {
+    throw new Error(`install-tool: name one of ${Object.keys(deps.tools).join(', ')}, not "${name}"`);
+  }
+  const bytes = await deps.download(tool.url);
+  checkDigest(bytes, tool.sha256, tool.url);
+  const folder = unpackTool(name, tool, bytes, join(deps.into, name));
+  const version = runChecked([join(folder, tool.version[0] ?? name), ...tool.version.slice(1)]).toString().trim();
+  if (deps.githubPath !== '') {
+    appendFileSync(deps.githubPath, `${folder}\n`);
+  }
+  return version;
+}
+
 export function checkDigest(bytes: Uint8Array, sha256: string, url: string): void {
   const digest = new Bun.CryptoHasher('sha256').update(bytes).digest('hex');
   if (digest !== sha256) {
     throw new Error(`${url}: sha256 is ${digest}, expected ${sha256}`);
   }
-}
-
-function runChecked(command: string[], input?: Uint8Array): Buffer {
-  const result = spawnSync(command[0] ?? '', command.slice(1), { input, maxBuffer: 256 * 1024 * 1024 });
-  if (result.error !== undefined) {
-    throw result.error;
-  }
-  if (result.status !== 0) {
-    throw new Error(`${command.join(' ')} exited ${result.status ?? result.signal}: ${result.stderr.toString().trim()}`);
-  }
-  return result.stdout;
 }
 
 export function unpackTool(name: string, tool: Tool, bytes: Uint8Array, into: string): string {
@@ -68,23 +79,32 @@ export function unpackTool(name: string, tool: Tool, bytes: Uint8Array, into: st
   return join(into, tool.folder);
 }
 
-if (import.meta.main) {
-  const name = process.argv[2] ?? '';
-  const tool = TOOLS[name];
-  if (tool === undefined) {
-    throw new Error(`install-tool: name one of ${Object.keys(TOOLS).join(', ')}, not "${name}"`);
+function runChecked(command: string[], input?: Uint8Array): Buffer {
+  const result = spawnSync(command[0] ?? '', command.slice(1), { input, maxBuffer: 256 * 1024 * 1024 });
+  if (result.error !== undefined) {
+    throw result.error;
   }
-  const response = await fetch(tool.url);
+  if (result.status !== 0) {
+    throw new Error(`${command.join(' ')} exited ${result.status ?? result.signal}: ${result.stderr.toString().trim()}`);
+  }
+  return result.stdout;
+}
+
+async function download(url: string): Promise<Uint8Array> {
+  const response = await fetch(url);
   if (!response.ok) {
-    throw new Error(`${tool.url}: HTTP ${response.status}`);
+    throw new Error(`${url}: HTTP ${response.status}`);
   }
   const body = await response.arrayBuffer();
-  const bytes = new Uint8Array(body);
-  checkDigest(bytes, tool.sha256, tool.url);
-  const folder = unpackTool(name, tool, bytes, join(process.env['RUNNER_TEMP'] ?? process.cwd(), name));
-  console.log(runChecked([join(folder, tool.version[0] ?? name), ...tool.version.slice(1)]).toString().trim());
-  const path = process.env['GITHUB_PATH'];
-  if (path !== undefined && path !== '') {
-    appendFileSync(path, `${folder}\n`);
-  }
+  return new Uint8Array(body);
+}
+
+if (import.meta.main) {
+  const version = await installTool(process.argv[2] ?? '', {
+    tools: TOOLS,
+    download,
+    into: process.env['RUNNER_TEMP'] ?? process.cwd(),
+    githubPath: process.env['GITHUB_PATH'] ?? '',
+  });
+  console.log(version);
 }
