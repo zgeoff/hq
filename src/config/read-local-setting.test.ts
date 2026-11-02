@@ -6,10 +6,10 @@ import { readLocalSetting } from './read-local-setting.ts';
 import { readLocalSettings } from './read-local-settings.ts';
 
 function setupTest() {
-  const dir = mkdtempSync(join(tmpdir(), 'hq-local-config-'));
-  const file = join(dir, 'local.json');
-  onTestFinished(() => rmSync(dir, { recursive: true, force: true }));
-  return { dir, file };
+  const directory = mkdtempSync(join(tmpdir(), 'hq-local-config-'));
+  const file = join(directory, 'local.json');
+  onTestFinished(() => rmSync(directory, { recursive: true, force: true }));
+  return { directory, file };
 }
 
 test('a key that only the file has is read from the file', () => {

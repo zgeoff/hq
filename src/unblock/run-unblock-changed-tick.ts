@@ -22,7 +22,7 @@ export function runUnblockChangedTick(db: Database, actor: string, at: Date = no
       const last = Date.parse(getMeta(db, TOLD_AT) ?? '');
       const repeat = Number.isNaN(last) || at.getTime() - last >= REPEAT_MS;
       const told = Number(getMeta(db, TOLD_SEQ) ?? 0);
-      const top = newSincePush(db).reduce((m, u) => Math.max(m, u.added_seq), 0);
+      const top = newSincePush(db).reduce((highest, unblock) => Math.max(highest, unblock.added_seq), 0);
       if (top === 0 || (top <= told && !repeat)) {
         return false;
       }

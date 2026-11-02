@@ -11,9 +11,9 @@ import { sessionGetSchema } from './session-get-schema.ts';
 import { sessionSpawnSchema } from './session-spawn-schema.ts';
 
 function setupTest() {
-  const dir = mkdtempSync(join(tmpdir(), 'hq-atc-client-'));
-  const path = join(dir, 'atc.sock');
-  onTestFinished(() => rmSync(dir, { recursive: true, force: true }));
+  const directory = mkdtempSync(join(tmpdir(), 'hq-atc-client-'));
+  const path = join(directory, 'atc.sock');
+  onTestFinished(() => rmSync(directory, { recursive: true, force: true }));
   onTestFinished(overrideEnv('HQ_ATC_SOCKET', path));
   return { path };
 }

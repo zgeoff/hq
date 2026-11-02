@@ -1,18 +1,17 @@
 import type { Database } from 'bun:sqlite';
+import { z } from 'zod';
 import type { ImpRoom } from '../areas/types.ts';
 import { capacitySettings } from '../capacity/capacity-settings.ts';
 import { iso } from '../clock/iso.ts';
 import { now } from '../clock/now.ts';
 import { IMP_LINE_HELD } from './imp-line-held.ts';
 
+const AwakeSampleRow = z.object({ at: z.string(), nonnix_awake_mib: z.number().nullable(), nonnix_awake_vcpus: z.number().nullable() }).nullable();
+
 // With no impd reading 15 min fresh, every slot is held, as a wrong "free" overfills impd.
 export function loadImpRoom(db: Database, size: ImpSize, at: Date = now()): ImpRoom {
   const FRESH_MIN = 15;
-  const reading = db.query('SELECT at, nonnix_awake_mib, nonnix_awake_vcpus FROM capacity_samples WHERE at <= ? ORDER BY at DESC LIMIT 1').get(iso(at)) as {
-    at: string;
-    nonnix_awake_mib: number | null;
-    nonnix_awake_vcpus: number | null;
-  } | null;
+  const reading = AwakeSampleRow.parse(db.query('SELECT at, nonnix_awake_mib, nonnix_awake_vcpus FROM capacity_samples WHERE at <= ? ORDER BY at DESC LIMIT 1').get(iso(at)));
   const settings = capacitySettings(db);
   if (reading === null || reading.nonnix_awake_mib === null || reading.nonnix_awake_vcpus === null || at.getTime() - Date.parse(reading.at) > FRESH_MIN * 60_000) {
     return { slots: 0, heldBy: 'no fresh impd reading', line: null };

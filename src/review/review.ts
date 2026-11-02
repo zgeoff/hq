@@ -30,7 +30,7 @@ export async function review(run: Runner, rawRepo: string, pr: number, opts: { w
   if (opts.effort !== undefined && opts.effort !== REVIEW_EFFORT && opts.effort !== RISK_EFFORT) throw new HqError('bad_args', `--effort must be ${REVIEW_EFFORT} or ${RISK_EFFORT}`);
   const answerFile = buildReviewPath(rawRepo, opts.owner, pr, '-allow-deny.md');
   const reviewFile = buildReviewPath(rawRepo, opts.owner, pr, '-review.md');
-  const tmp = buildReviewPath(rawRepo, opts.owner, pr, '-tmp');
+  const temporaryDirectory = buildReviewPath(rawRepo, opts.owner, pr, '-tmp');
   const wt = buildReviewPath(rawRepo, opts.owner, pr, '');
   const { owner, repo } = parseRepo(rawRepo, opts.owner ?? 'zgeoff');
   if (!Number.isInteger(pr) || pr <= 0) throw new HqError('bad_args', 'pr must be a positive number');
@@ -68,9 +68,9 @@ export async function review(run: Runner, rawRepo: string, pr: number, opts: { w
     try {
       rmSync(reviewFile, { force: true });
       rmSync(answerFile, { force: true });
-      rmSync(tmp, { recursive: true, force: true });
-      mkdirSync(tmp, { recursive: true });
-      const env = cleanEnv({ TMPDIR: tmp });
+      rmSync(temporaryDirectory, { recursive: true, force: true });
+      mkdirSync(temporaryDirectory, { recursive: true });
+      const env = cleanEnv({ TMPDIR: temporaryDirectory });
       install = await runInstall(run, wt, env);
       const names = await run(['git', 'diff', '--name-only', `origin/${base}...HEAD`], { cwd: wt });
       const patch = await run(['git', 'diff', `origin/${base}...HEAD`], { cwd: wt });
@@ -88,7 +88,7 @@ export async function review(run: Runner, rawRepo: string, pr: number, opts: { w
       if (gate.run) allowDenyCode = (await run(['codex', 'exec', '-s', 'read-only', ...NO_TMP_ARGS, '-o', answerFile, allowDenyPacket(base)], { cwd: wt, env })).code;
     } finally {
       await withRepoLock(S, slug, () => run(['git', 'worktree', 'remove', '--force', wt], { cwd: dir }));
-      rmSync(tmp, { recursive: true, force: true });
+      rmSync(temporaryDirectory, { recursive: true, force: true });
     }
     const text = await Bun.file(reviewFile).text().catch(() => '');
     const codexTail = text.trimEnd().split('\n').slice(-3).join('\n');

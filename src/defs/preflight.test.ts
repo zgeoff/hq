@@ -39,7 +39,7 @@ test("it fails when hq-private's origin is another repo", () => {
 
 test('it fails on a drifted private prompt, with the output of the grants script', () => {
   const checkouts = createTreeFixture().createBoth();
-  const promptFile = `${checkouts.private.dir}/skills/preview-qa/references/session-prompt.md`;
+  const promptFile = `${checkouts.private.directory}/skills/preview-qa/references/session-prompt.md`;
   writeFileSync(promptFile, readFileSync(promptFile, 'utf8').replace('- Water: pour the water.', '- Water: pour every drop.'));
   {
     const failed = preflight('hq').filter((check) => !check.ok);
@@ -52,6 +52,6 @@ test('it fails on a drifted private prompt, with the output of the grants script
 
 test('it fails when the hq-defs checkout has no grants script', () => {
   const trees = createTreeFixture().createBoth();
-  rmSync(`${trees.hq.dir}/scripts/grants.ts`);
+  rmSync(`${trees.hq.directory}/scripts/grants.ts`);
   expect(preflight('hq').filter((check) => !check.ok)).toStrictEqual([{ ok: false, line: expect.stringContaining('scripts/grants.ts is missing') }]);
 });

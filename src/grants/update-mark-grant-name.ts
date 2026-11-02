@@ -1,4 +1,5 @@
 import type { Database } from 'bun:sqlite';
+import { z } from 'zod';
 import { HqError } from '../errors.ts';
 import { logEvent } from '../log-event.ts';
 import type { Mark } from '../marks/mark-kinds.ts';
@@ -19,9 +20,11 @@ export function updateMarkGrantName(db: Database, naming: GrantNaming): Mark {
     .immediate();
 }
 
+const MarkOwnerRow = z.object({ id: z.number() }).nullable();
+
 function requireNameableMark(db: Database, naming: GrantNaming): Mark {
   const mark = getMark(db, naming.id);
-  const owner = db.query('SELECT id FROM marks WHERE grant_name = ?').get(naming.name) as { id: number } | null;
+  const owner = MarkOwnerRow.parse(db.query('SELECT id FROM marks WHERE grant_name = ?').get(naming.name));
   if (mark === null) {
     throw new HqError('not_found', `no mark ${naming.id}`);
   }

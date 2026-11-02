@@ -8,9 +8,6 @@ import { main } from '../cli.ts';
 import { overrideEnv } from '../config/override-env.ts';
 import { loadPane } from './load-pane.ts';
 
-const AT = new Date('2026-10-15T01:00:00Z');
-const CONSOLE = 'http://127.0.0.1:4317/';
-
 function setupTest() {
   const fresh = freshDb();
   const spy = spyOn(console, 'log').mockImplementation(() => {});
@@ -21,7 +18,7 @@ function setupTest() {
 
   // hq finds pacing.json beside capacity.sh's folder, so hq run lane reads the test's own.
   onTestFinished(overrideEnv('HQ_CAPACITY', join(fresh.dir, 'scripts', 'capacity.sh')));
-  return { db: fresh.db, pacing: join(fresh.dir, 'pacing.json') };
+  return { db: fresh.db, pacing: join(fresh.dir, 'pacing.json'), consoleURL: 'http://127.0.0.1:4317/', at: new Date('2026-10-15T01:00:00Z') };
 }
 
 async function writeFleet(app: ReturnType<typeof setupTest>): Promise<Database> {
@@ -51,7 +48,7 @@ test('the pane lists what needs the owner with its links, then Nix, lanes, revie
   const pending = writePRs(createUnblockItems(fleet, { lid: { task: 'Fit the new lid on the kettle', links: [{ label: 'kettle#41', url: 'https://github.com/zgeoff/kettle/pull/41', subject: true }] } }));
   const reading = pending.query("INSERT OR REPLACE INTO meta (key, value) VALUES ('atc_awake', ?)").run(JSON.stringify({ at: '2026-10-15T01:00:00.000Z', ids: [] }));
   const sample = pending.query("INSERT INTO probe_samples (at, target_ok, control_ok) VALUES ('2026-10-15T00:58:00Z', 1, 1)").run();
-  const shown = await loadPane(pending, app.pacing, CONSOLE, AT);
+  const shown = await loadPane(pending, app.pacing, app.consoleURL, app.at);
   expect([news, parkAdd, parkLane, parkState, reading.changes, sample.changes, shown.heat]).toStrictEqual([
     0,
     0,
@@ -83,7 +80,7 @@ test('a lane holding more runs than its size shows the true count in bold, as th
     await main(['run', 'add', 'GEO-9702', '--title', 'Seal the teapot lid', '--where', 'local', '--json']),
     await main(['run', 'lane', 'GEO-9702', 'flexible', '--json']),
   ];
-  const shown = await loadPane(fleet, app.pacing, CONSOLE, AT);
+  const shown = await loadPane(fleet, app.pacing, app.consoleURL, app.at);
   expect([laned, shown.markdown.split('\n\n')[2], shown.heat]).toStrictEqual([
     [0, 0, 0, 0],
     '## Lanes\n- cleanup 1/3: GEO-9601\n- flexible **2/1**: GEO-9701, GEO-9702',
@@ -98,7 +95,7 @@ test('imp lanes whose sizes, all full, cross impd\'s line put a bold warning fir
   const app = setupTest();
   writeFileSync(app.pacing, JSON.stringify({ imp: { impMib: 3072 }, lanes: { imp: { cleanup: 5, nixie: 1 }, local: { flexible: 1 } } }));
 
-  await expect(loadPane(app.db, app.pacing, CONSOLE, AT).then((pane) => pane.markdown.split('\n\n')[2])).resolves.toBe("## Lanes\n**The imp lanes, all full, cross impd's line: plan 18/16 GiB**\n- cleanup 0/5\n- nixie 0/1\n- flexible 0/1");
+  await expect(loadPane(app.db, app.pacing, app.consoleURL, app.at).then((pane) => pane.markdown.split('\n\n')[2])).resolves.toBe("## Lanes\n**The imp lanes, all full, cross impd's line: plan 18/16 GiB**\n- cleanup 0/5\n- nixie 0/1\n- flexible 0/1");
 });
 
 test('a title the console cuts inside a URL is cut before the URL, so the pane links no broken address', async () => {
@@ -107,16 +104,16 @@ test('a title the console cuts inside a URL is cut before the URL, so the pane l
     gate: { task: 'Sign in to the kettle gateway once with your passkey (open https://kettle.example.invalid/login/passkey)' },
     lid: { task: 'Fit the new lid on the kettle' },
   });
-  const shown = await loadPane(base, app.pacing, CONSOLE, AT);
+  const shown = await loadPane(base, app.pacing, app.consoleURL, app.at);
   expect(shown.markdown.split('\n\n')[0]).toBe('## Needs you (2)\n- todo: Sign in to the kettle gateway once with your passkey (open…\n- todo: Fit the new lid on the kettle\n[Open the console](http://127.0.0.1:4317/)');
 });
 
 test('with no probe sample in 5 minutes, or a blind newest sample, Nix is unknown and says why', async () => {
   const app = setupTest();
   const olderSample = writeProbeSample(writeOpenOutage(app), '2026-10-15T00:50:00Z', 1);
-  const olderShown = await loadPane(olderSample, app.pacing, CONSOLE, AT);
+  const olderShown = await loadPane(olderSample, app.pacing, app.consoleURL, app.at);
   const recentBlind = writeProbeSample(olderSample, '2026-10-15T00:59:00Z', 0);
-  const recentShown = await loadPane(recentBlind, app.pacing, CONSOLE, AT);
+  const recentShown = await loadPane(recentBlind, app.pacing, app.consoleURL, app.at);
   expect([olderShown.markdown.split('\n\n')[1], recentShown.markdown.split('\n\n')[1]]).toStrictEqual([
     '## Nix\n**Unknown**: no probe sample in 5 min · 0 min down today',
     '## Nix\n**Unknown**: the newest probe was blind · 0 min down today',
@@ -126,7 +123,7 @@ test('with no probe sample in 5 minutes, or a blind newest sample, Nix is unknow
 test('an open outage shows Nix down since it started, and an empty fleet says so in each section', async () => {
   const app = setupTest();
   const base = writeOpenOutage(app);
-  const shown = await loadPane(base, app.pacing, CONSOLE, AT);
+  const shown = await loadPane(base, app.pacing, app.consoleURL, app.at);
   expect(shown.markdown.split('\n\n')).toStrictEqual([
     '## Needs you (0)\nNothing waits on you.\n[Open the console](http://127.0.0.1:4317/)',
     '## Nix\n**Down** since 11:50 · 0 min down today',
@@ -140,7 +137,7 @@ test('an open outage shows Nix down since it started, and an empty fleet says so
 test('a pacing.json hq refuses says why under Lanes, and draws no heat map', async () => {
   const app = setupTest();
   const base = writeRefusedPacing(app);
-  const shown = await loadPane(base, app.pacing, CONSOLE, AT);
+  const shown = await loadPane(base, app.pacing, app.consoleURL, app.at);
   expect([shown.heat, shown.markdown.split('\n\n')[2]]).toStrictEqual([[], "## Lanes\nhq can't read the lanes: pacing.json: pacing.json lanes: bad lane imp.Bad Teapot"]);
 });
 

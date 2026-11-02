@@ -8,7 +8,7 @@ import { resetFetchCache } from './reset-fetch-cache.ts';
 test('it reads a start prompt from origin/main of hq-private after a fetch, never from the working tree', () => {
   const ctx = createTreeFixture();
   const tree = ctx.createPrivate();
-  writeFileSync(`${tree.dir}/${INTAKE}`, buildPrompt('unmerged edit'));
+  writeFileSync(`${tree.directory}/${INTAKE}`, buildPrompt('unmerged edit'));
   expect(readPrompt(`main:${INTAKE}`)).toBe('You are an invented intake.');
   tree.writeCommit({ [INTAKE]: buildPrompt('intake two') });
   resetFetchCache();

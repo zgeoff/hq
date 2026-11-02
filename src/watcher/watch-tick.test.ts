@@ -445,7 +445,7 @@ test('it marks a grant that a fetched hq-private PR added, and logs each grant i
       runs: () => Promise.resolve(),
       weekly: () => Promise.resolve(false),
       health: () => Promise.resolve({ opened: [], cleared: [] }),
-      grantMarks: () => runGrantMarksTick(ctx.db, { directory: tree.dir, exists: existsSync }, 'hq-lanes'),
+      grantMarks: () => runGrantMarksTick(ctx.db, { directory: tree.directory, exists: existsSync }, 'hq-lanes'),
     },
   });
 

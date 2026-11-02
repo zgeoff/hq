@@ -52,9 +52,6 @@ export interface PRCommandInput {
   readReviewerSession: () => Promise<RoleProbe>;
 }
 
-const ANSWERS = new Set(['lgtm', 'changes', 'reject']);
-const NEXT_USAGE = 'usage: hq pr next <repo> <pr> <session> | --clear';
-
 export async function runPRCommand(input: PRCommandInput): Promise<Out> {
   const [rawRepo, rawPR, third] = input.rest;
   if (input.verb === 'status') {
@@ -159,6 +156,8 @@ async function runAnswer(input: PRCommandInput, ref: PRRef, rawAnswer: string | 
   return await readOut(input, ref, context.head);
 }
 
+const ANSWERS = new Set(['lgtm', 'changes', 'reject']);
+
 function parseAnswerArgs(flags: Flags, rawAnswer: string | undefined): AnswerArgs {
   const note = flags.note?.trim() ?? '';
   const source = requireAnswerSource(flags.source);
@@ -222,9 +221,11 @@ async function refreshWrittenStatus(input: PRCommandInput, ref: PRRef): Promise<
   return await refreshStatus(input, ref, row, false);
 }
 
+const NEXT_USAGE = 'usage: hq pr next <repo> <pr> <session> | --clear';
+
 function requireNextHolder(flags: Flags, session: string | undefined): string | null {
   const clear = flags.clear === true;
-  const names = getDeclaredSessions().map((s) => s.name);
+  const names = getDeclaredSessions().map((declared) => declared.name);
   if (clear && session !== undefined) {
     throw new HqError('bad_args', `give a session or --clear, not both; ${NEXT_USAGE}`);
   }

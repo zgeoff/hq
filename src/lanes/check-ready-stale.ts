@@ -40,7 +40,7 @@ function sendReadyStale(db: Database, r: StaleReady, actor: string): void {
 }
 
 function loadNewestReadyAt(db: Database): string | null {
-  const lanes = Object.values(metaJson(db, 'lanes_ready_by_lane', READY_BY_LANE, {})).map((v) => v.at);
+  const lanes = Object.values(metaJson(db, 'lanes_ready_by_lane', READY_BY_LANE, {})).map((ready) => ready.at);
   const total = metaJson(db, 'lanes_ready', z.object({ at: z.string() }).nullable(), null);
   const values = total ? [total.at, ...lanes] : lanes;
   return values.length > 0 ? values.reduce((a, b) => (Date.parse(b) > Date.parse(a) ? b : a)) : null;

@@ -7,10 +7,10 @@ import { migrate } from './migrate.ts';
 import { MIGRATIONS } from './migrations.ts';
 
 async function setupTest() {
-  const dir = mkdtempSync(join(tmpdir(), 'hq-migrate-'));
-  const paths = [0, 1, 2, 3].map((round) => join(dir, `hq-${round}.db`));
-  const script = join(dir, 'child.ts');
-  onTestFinished(() => rmSync(dir, { recursive: true, force: true }));
+  const directory = mkdtempSync(join(tmpdir(), 'hq-migrate-'));
+  const paths = [0, 1, 2, 3].map((round) => join(directory, `hq-${round}.db`));
+  const script = join(directory, 'child.ts');
+  onTestFinished(() => rmSync(directory, { recursive: true, force: true }));
   await Bun.write(script, `import { openDb } from ${JSON.stringify(join(import.meta.dir, 'open-db.ts'))};\nconsole.log(openDb(process.argv[2]).query('PRAGMA user_version').get().user_version);\n`);
   return { paths, script };
 }

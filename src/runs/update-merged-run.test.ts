@@ -1,4 +1,5 @@
 import { expect, onTestFinished, test } from 'bun:test';
+import { z } from 'zod';
 import { freshDb } from '../../test/helpers.ts';
 import { addPr } from './add-pr.ts';
 import { addRun } from './add-run.ts';
@@ -11,7 +12,7 @@ const SESSION = '00000031-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 
 function setupTest() {
   const fresh = freshDb();
-  const readState = () => (fresh.db.query("SELECT state FROM runs WHERE issue = 'GEO-9721'").get() as { state: string }).state;
+  const readState = () => z.object({ state: z.string() }).parse(fresh.db.query("SELECT state FROM runs WHERE issue = 'GEO-9721'").get()).state;
   onTestFinished(fresh.cleanup);
   addRun(fresh.db, { issue: 'GEO-9721', title: 'Invented kettle work', place: 'imp', session: SESSION, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
   addPr(fresh.db, 'GEO-9721', 'kettle#51', 'z-delivery');

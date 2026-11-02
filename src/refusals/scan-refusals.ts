@@ -2,6 +2,7 @@
 import type { Database } from 'bun:sqlite';
 import { closeSync, openSync, readSync } from 'node:fs';
 import { sep } from 'node:path';
+import { z } from 'zod';
 import { iso } from '../clock/iso.ts';
 import { now } from '../clock/now.ts';
 import { getProjectsDir } from '../repair/get-projects-dir.ts';
@@ -16,113 +17,158 @@ import { readSessionNames as whoBySession } from './read-session-names.ts';
 import { readTranscriptList as listTranscripts } from './read-transcript-list.ts';
 import type { Found, ScanOptions, ScanResult, Tool } from './types.ts';
 
-export async function scanRefusals(db: Database, o: ScanOptions = {}): Promise<ScanResult> {
+const KnownFileRows = z.array(z.object({ path: z.string(), offset: z.number(), size: z.number(), mtime: z.string(), tools: z.string() }));
+
+interface LineStream {
+  readonly maxLine: number;
+  offset: number;
+  carry: Buffer[];
+  carryLength: number;
+  skipping: boolean;
+}
+
+export async function scanRefusals(db: Database, options: ScanOptions = {}): Promise<ScanResult> {
   const SLICE = 8 * 1024 * 1024;
-  const who = await whoBySession(o.sessions);
-  const [dir, window, scannedAt] = [o.dir ?? getProjectsDir(), (o.windowDays ?? BACKFILL_DAYS) * 86_400_000, iso(now())];
-  const maxLine = o.maxLineBytes ?? MAX_LINE;
-  let budget = o.budgetBytes ?? BUDGET_BYTES;
-  const t0 = performance.now();
-  const late = () => performance.now() - t0 >= (o.deadlineMs ?? DEADLINE_MS);
-  const r: ScanResult = { files_read: 0, bytes_read: 0, refusals_added: 0, files_left: 0 };
-  type Known = { path: string; offset: number; size: number; mtime: string; tools: string };
-  const known = new Map((db.query('SELECT path, offset, size, mtime, tools FROM refusal_files').all() as Known[]).map((f) => [f.path, f]));
+  const who = await whoBySession(options.sessions);
+  const directory = options.dir ?? getProjectsDir();
+  const windowMs = (options.windowDays ?? BACKFILL_DAYS) * 86_400_000;
+  const scannedAt = iso(now());
+  const maxLine = options.maxLineBytes ?? MAX_LINE;
+  let budget = options.budgetBytes ?? BUDGET_BYTES;
+  const startedMs = performance.now();
+  const late = () => performance.now() - startedMs >= (options.deadlineMs ?? DEADLINE_MS);
+  const result: ScanResult = { files_read: 0, bytes_read: 0, refusals_added: 0, files_left: 0 };
+  const known = new Map(KnownFileRows.parse(db.query('SELECT path, offset, size, mtime, tools FROM refusal_files').all()).map((file) => [file.path, file]));
   const save = db.query(
     'INSERT INTO refusal_files (path, offset, size, mtime, tools) VALUES (?, ?, ?, ?, ?) ON CONFLICT (path) DO UPDATE SET offset = excluded.offset, size = excluded.size, mtime = excluded.mtime, tools = excluded.tools',
   );
   const add = db.query(`INSERT OR IGNORE INTO refusals (uuid, at, claude_session, transcript, subagent, cwd, atc_session, atc_name, issue, tool, input, reason, scanned_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, (SELECT issue FROM run_sessions WHERE session_id = ?), ?, ?, ?, ?)`);
   const subagent = `${sep}subagents${sep}`;
-  const [markB, useB] = [Buffer.from(MARK), Buffer.from('"tool_use"')];
+  const markBytes = Buffer.from(MARK);
+  const useBytes = Buffer.from('"tool_use"');
 
-  for (const f of listTranscripts(dir)) {
+  for (const transcript of listTranscripts(directory)) {
     await Bun.sleep(0);
-    const mtime = iso(new Date(f.mtimeMs));
-    const prev = known.get(f.path);
-    if (!prev && now().getTime() - f.mtimeMs > window) {
-      save.run(f.path, f.size, f.size, mtime, '[]');
+    const mtime = iso(new Date(transcript.mtimeMs));
+    const previous = known.get(transcript.path);
+    if (!previous && now().getTime() - transcript.mtimeMs > windowMs) {
+      save.run(transcript.path, transcript.size, transcript.size, mtime, '[]');
       continue;
     }
-    const shrank = !!prev && f.size < prev.offset;
-    let offset = prev && !shrank ? prev.offset : 0;
-    const tools = shrank ? new Map<string, Tool>() : storedTools(prev?.tools ?? null);
-    if (offset >= f.size) {
-      if (prev && (prev.offset !== offset || prev.size !== f.size)) save.run(f.path, offset, f.size, mtime, JSON.stringify([...tools]));
+    const shrank = previous !== undefined && transcript.size < previous.offset;
+    const from = previous && !shrank ? previous.offset : 0;
+    const tools = shrank ? new Map<string, Tool>() : storedTools(previous?.tools ?? null);
+    if (from >= transcript.size) {
+      if (previous && (previous.offset !== from || previous.size !== transcript.size)) {
+        save.run(transcript.path, from, transcript.size, mtime, JSON.stringify([...tools]));
+      }
       continue;
     }
     if (budget <= 0 || late()) {
-      r.files_left++;
+      result.files_left++;
       continue;
     }
-    let fd: number;
+    let descriptor: number;
     try {
-      fd = openSync(f.path, 'r');
+      descriptor = openSync(transcript.path, 'r');
     } catch {
       continue;
     }
     const found: Found[] = [];
     // The two checks are independent: a tool_use whose input quotes the refusal mark is still a
     // tool_use that a later refusal names.
-    const line = (b: Buffer) => {
-      if (b.includes(useB)) {
-        for (const use of toolUses(b.toString('utf8'))) {
+    const line = (record: Buffer) => {
+      if (record.includes(useBytes)) {
+        for (const use of toolUses(record.toString('utf8'))) {
           remember(tools, use);
         }
       }
-      if (b.includes(markB)) {
-        const x = refusalOf(b.toString('utf8'), tools);
-        if (x) found.push(x);
+      if (record.includes(markBytes)) {
+        const refusal = refusalOf(record.toString('utf8'), tools);
+        if (refusal) {
+          found.push(refusal);
+        }
       }
     };
-    let [pos, carry, carryLen, skipping, left] = [offset, [] as Buffer[], 0, false, false];
-    const from = offset;
+    const stream: LineStream = { maxLine, offset: from, carry: [], carryLength: 0, skipping: false };
+    let position = from;
+    let left = false;
     try {
-      while (pos < f.size) {
-        if ((budget <= 0 || late()) && (offset > from || carryLen === 0)) {
+      while (position < transcript.size) {
+        if ((budget <= 0 || late()) && (stream.offset > from || stream.carryLength === 0)) {
           left = true;
           break;
         }
         await Bun.sleep(0);
-        const buf = readAt(fd, pos, Math.min(o.sliceBytes ?? SLICE, f.size - pos));
-        budget -= buf.length;
-        r.bytes_read += buf.length;
-        if (!buf.length) break; // the file shrank under us
-        const base = pos;
-        pos += buf.length;
-        for (let i = 0; ; ) {
-          const nl = buf.indexOf(0x0a, i);
-          if (nl < 0) {
-            const rest = buf.subarray(i);
-            if (skipping) offset = pos;
-            else if (carryLen + rest.length > maxLine) {
-              // Longer than any record hq needs (a refusal is a few KB): passed over as it streams.
-              [carry, carryLen, skipping, offset] = [[], 0, true, pos];
-            } else if (rest.length) [carry, carryLen] = [[...carry, Buffer.from(rest)], carryLen + rest.length];
-            break;
-          }
-          if (skipping) skipping = false;
-          else if (carryLen + nl - i <= maxLine) {
-            const whole = carryLen ? Buffer.concat([...carry, buf.subarray(i, nl)]) : buf.subarray(i, nl);
-            line(whole);
-          }
-          [carry, carryLen, i] = [[], 0, nl + 1];
-          offset = base + i;
+        const buffer = readAt(descriptor, position, Math.min(options.sliceBytes ?? SLICE, transcript.size - position));
+        budget -= buffer.length;
+        result.bytes_read += buffer.length;
+
+        // The file shrank under us.
+        if (buffer.length === 0) {
+          break;
         }
+        splitLines(stream, buffer, position, line);
+        position += buffer.length;
       }
     } finally {
-      closeSync(fd);
+      closeSync(descriptor);
     }
-    if (left) r.files_left++;
-    r.files_read++;
+    if (left) {
+      result.files_left++;
+    }
+    result.files_read++;
+    const subagentFlag = transcript.path.includes(subagent) ? 1 : 0;
     db.transaction(() => {
-      for (const x of found) {
-        const w = x.claude_session ? who.get(x.claude_session) : undefined;
-        r.refusals_added += add.run(x.uuid, x.at, x.claude_session, f.path, f.path.includes(subagent) ? 1 : 0, x.cwd, w?.id ?? null, w?.name ?? null, w?.id ?? null, x.tool, x.input, x.reason, scannedAt).changes;
+      for (const refusal of found) {
+        const session = refusal.claude_session ? who.get(refusal.claude_session) : undefined;
+        result.refusals_added += add.run(refusal.uuid, refusal.at, refusal.claude_session, transcript.path, subagentFlag, refusal.cwd, session?.id ?? null, session?.name ?? null, session?.id ?? null, refusal.tool, refusal.input, refusal.reason, scannedAt).changes;
       }
-      save.run(f.path, offset, f.size, mtime, JSON.stringify([...tools]));
+      save.run(transcript.path, stream.offset, transcript.size, mtime, JSON.stringify([...tools]));
     }).immediate();
   }
-  return r;
+  return result;
+}
+
+function splitLines(stream: LineStream, buffer: Buffer, base: number, onLine: (record: Buffer) => void): void {
+  for (let cursor = 0; ; ) {
+    const newline = buffer.indexOf(0x0a, cursor);
+    if (newline === -1) {
+      keepTail(stream, buffer.subarray(cursor), base + buffer.length);
+      return;
+    }
+    if (stream.skipping) {
+      stream.skipping = false;
+    } else if (stream.carryLength + newline - cursor <= stream.maxLine) {
+      const whole = stream.carryLength > 0 ? Buffer.concat([...stream.carry, buffer.subarray(cursor, newline)]) : buffer.subarray(cursor, newline);
+      onLine(whole);
+    }
+    stream.carry = [];
+    stream.carryLength = 0;
+    cursor = newline + 1;
+    stream.offset = base + cursor;
+  }
+}
+
+function keepTail(stream: LineStream, rest: Buffer, end: number): void {
+  if (stream.skipping) {
+    stream.offset = end;
+    return;
+  }
+
+  // Longer than any record hq needs (a refusal is a few KB): passed over as it streams.
+  if (stream.carryLength + rest.length > stream.maxLine) {
+    stream.carry = [];
+    stream.carryLength = 0;
+    stream.skipping = true;
+    stream.offset = end;
+    return;
+  }
+  if (rest.length > 0) {
+    stream.carry = [...stream.carry, Buffer.from(rest)];
+    stream.carryLength += rest.length;
+  }
 }
 
 function readAt(fd: number, start: number, len: number): Buffer {

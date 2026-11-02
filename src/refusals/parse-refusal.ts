@@ -17,12 +17,13 @@ export function parseRefusal(line: string, tools: Map<string, Tool>): Found | nu
 
 function buildFound(rec: Obj, uuid: string, tools: Map<string, Tool>): Found {
   const block = resultBlock(rec);
-  const [id, src] = [str(block?.['tool_use_id']), str(rec['sourceToolAssistantUUID'])];
-  const t = Date.parse(str(rec['timestamp']) ?? '');
-  const tool = (id ? tools.get(id) : undefined) ?? (src ? tools.get(`a:${src}`) : undefined);
+  const id = str(block?.['tool_use_id']);
+  const sourceUUID = str(rec['sourceToolAssistantUUID']);
+  const timestampMs = Date.parse(str(rec['timestamp']) ?? '');
+  const tool = (id ? tools.get(id) : undefined) ?? (sourceUUID ? tools.get(`a:${sourceUUID}`) : undefined);
   return {
     uuid,
-    at: Number.isFinite(t) ? iso(new Date(t)) : iso(now()),
+    at: Number.isFinite(timestampMs) ? iso(new Date(timestampMs)) : iso(now()),
     claude_session: str(rec['sessionId']),
     cwd: str(rec['cwd']),
     tool: tool?.name ?? null,

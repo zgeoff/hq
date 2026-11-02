@@ -4,6 +4,9 @@ import { getReadMS as readMs } from './get-read-ms.ts';
 import type { RunResult } from '../runner/types.ts';
 import type { CapacityProbe, OnePasswordUse } from './types.ts';
 
+const Limits = z.array(z.object({ type: z.string(), used: z.number(), limit: z.number(), remaining: z.number() }));
+const RATE_LIMITED = /too many requests|rate.?limit/iu;
+
 // `op service-account ratelimit` costs no request.
 export async function readOnePassword(probe: CapacityProbe): Promise<OnePasswordUse> {
   const ran = await runRatelimit(probe);
@@ -15,10 +18,6 @@ export async function readOnePassword(probe: CapacityProbe): Promise<OnePassword
   }
   return buildUse(Limits.parse(parseJSON(ran.stdout)));
 }
-
-const Limits = z.array(z.object({ type: z.string(), used: z.number(), limit: z.number(), remaining: z.number() }));
-const RATE_LIMITED = /too many requests|rate.?limit/iu;
-const Settings = z.object({ env: z.object({ OP_SERVICE_ACCOUNT_TOKEN: z.string().min(1) }) });
 
 async function runRatelimit(probe: CapacityProbe): Promise<RunResult> {
   const token = await loadServiceAccountToken(probe);
@@ -32,6 +31,8 @@ async function loadServiceAccountToken(probe: CapacityProbe): Promise<string> {
   const text = await probe.readFile(`${process.env['HOME'] ?? ''}/.claude/settings.json`);
   return parseSettingsToken(text);
 }
+
+const Settings = z.object({ env: z.object({ OP_SERVICE_ACCOUNT_TOKEN: z.string().min(1) }) });
 
 function parseSettingsToken(text: string): string {
   // Not JSON.parse: its parse error quotes the text, and this text holds the token.

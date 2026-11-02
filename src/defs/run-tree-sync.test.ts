@@ -14,7 +14,7 @@ test('it fast-forwards hq-private, records it under its own key, and logs the tr
   expect(runTreeSync('private')).toMatchObject({ ok: true, changed: false, line: expect.stringContaining('is on origin/main') });
   tree.writeCommit({ [INTAKE]: buildPrompt('intake two') });
   expect(runTreeSyncTick(ctx.db, 'hq-lanes', 'private')).toMatchObject({ ok: true, changed: true, line: expect.stringContaining('fast-forwarded') });
-  expect(readFileSync(`${tree.dir}/${INTAKE}`, 'utf8')).toBe(buildPrompt('intake two'));
+  expect(readFileSync(`${tree.directory}/${INTAKE}`, 'utf8')).toBe(buildPrompt('intake two'));
   expect(getMeta(ctx.db, 'private_tree_sync')).toBeString();
   expect(getMeta(ctx.db, 'defs_tree_sync')).toBeNull();
   expect(ctx.db.query(`SELECT actor, data FROM events WHERE action = 'tree-forwarded'`).all()).toMatchObject([{ actor: 'hq-lanes', data: expect.stringContaining('"tree":"private"') }]);
@@ -27,7 +27,7 @@ test('it does nothing for a tree with no checkout', () => {
 });
 
 test.each([
-  ['a dirty tree', (tree: Checkout) => appendFileSync(`${tree.dir}/${INTAKE}`, ' '), 'dirty (1 changed file(s))'],
+  ['a dirty tree', (tree: Checkout) => appendFileSync(`${tree.directory}/${INTAKE}`, ' '), 'dirty (1 changed file(s))'],
   ['another branch', (tree: Checkout) => tree.git('checkout', '-q', '-b', 'side'), 'on branch side, not main'],
   ['a local commit', (tree: Checkout) => tree.git('commit', '-q', '--allow-empty', '-m', 'local'), 'has commits origin/main'],
   ["hq's own origin", (tree: Checkout) => tree.git('remote', 'set-url', 'origin', 'git@github.com:zgeoff/hq.git'), 'not zgeoff/hq-private'],
@@ -37,14 +37,14 @@ test.each([
   tree.writeCommit({ 'skills/intake/SKILL.md': 'upstream\n' });
   spoil(tree);
   expect(runTreeSync('private')).toMatchObject({ ok: false, changed: false, line: expect.stringContaining(why) });
-  expect(existsSync(`${tree.dir}/skills/intake/SKILL.md`)).toBe(false);
+  expect(existsSync(`${tree.directory}/skills/intake/SKILL.md`)).toBe(false);
 });
 
 test('it retries a ref lock in hq-private, and goes red on the second tick in a row, under its own key', () => {
   const ctx = createTreeFixture();
   const tree = ctx.createPrivate();
   tree.writeCommit({ 'skills/intake/SKILL.md': 'upstream\n' });
-  writeFileSync(`${tree.dir}/.git/refs/remotes/origin/main.lock`, '');
+  writeFileSync(`${tree.directory}/.git/refs/remotes/origin/main.lock`, '');
   expect(runTreeSyncTick(ctx.db, 'hq-lanes', 'private')).toMatchObject({ ok: true, transient: true });
   expect(runTreeSyncTick(ctx.db, 'hq-lanes', 'private')).toMatchObject({ ok: false, line: expect.stringContaining('the same on the tick before') });
   expect(getMeta(ctx.db, 'defs_tree_sync')).toBeNull();
@@ -58,7 +58,7 @@ test('it puts a clean detached tree back on main and fast-forwards it, and logs 
   expect(runTreeSyncTick(ctx.db, 'hq-lanes', 'private')).toMatchObject({ ok: true, changed: true, line: expect.stringContaining('re-attached to main from detached') });
   expect(tree.git('symbolic-ref', '--short', 'HEAD')).toBe('main');
   expect(tree.git('rev-parse', 'HEAD')).toBe(tree.git('rev-parse', 'origin/main'));
-  expect(readFileSync(`${tree.dir}/skills/intake/SKILL.md`, 'utf8')).toBe('upstream\n');
+  expect(readFileSync(`${tree.directory}/skills/intake/SKILL.md`, 'utf8')).toBe('upstream\n');
   expect(ctx.db.query(`SELECT action FROM events WHERE action LIKE 'tree-%' ORDER BY seq`).all()).toStrictEqual([{ action: 'tree-reattached' }, { action: 'tree-forwarded' }]);
 });
 
@@ -75,8 +75,8 @@ test('it logs a re-attach whose fast-forward git refused as re-attached, not as 
   const tree = ctx.createPrivate();
   tree.git('checkout', '-q', '--detach');
   tree.writeCommit({ 'skills/kettle/SKILL.md': 'upstream\n' });
-  mkdirSync(`${tree.dir}/skills/kettle`, { recursive: true });
-  writeFileSync(`${tree.dir}/skills/kettle/SKILL.md`, 'local and untracked\n');
+  mkdirSync(`${tree.directory}/skills/kettle`, { recursive: true });
+  writeFileSync(`${tree.directory}/skills/kettle/SKILL.md`, 'local and untracked\n');
 
   const result = runTreeSyncTick(ctx.db, 'hq-lanes', 'private');
 
@@ -89,7 +89,7 @@ test('it reports a detached tree with local changes, and leaves it detached and 
   const ctx = createTreeFixture();
   const tree = ctx.createPrivate();
   tree.git('checkout', '-q', '--detach');
-  appendFileSync(`${tree.dir}/${INTAKE}`, ' ');
+  appendFileSync(`${tree.directory}/${INTAKE}`, ' ');
   expect(runTreeSync('private')).toMatchObject({ ok: false, changed: false, line: expect.stringContaining('HEAD is detached') });
   expect(tree.git('branch', '--show-current')).toBe('');
   expect(tree.git('status', '--porcelain')).toBe(`M ${INTAKE}`);
@@ -124,14 +124,14 @@ test('it installs hq-defs dependencies after a sync, and never in hq-private', (
   const both = ctx.createBoth();
   const installs: string[] = [];
   both.hq.writeCommit({ 'bun.lock': '{"lockfileVersion": 1}\n' });
-  writeFileSync(`${both.private.dir}/bun.lock`, '{"lockfileVersion": 1}\n');
+  writeFileSync(`${both.private.directory}/bun.lock`, '{"lockfileVersion": 1}\n');
   const install = (directory: string) => {
     installs.push(directory);
     return { code: 0, err: '' };
   };
   expect(runTreeSyncTick(ctx.db, 'hq-lanes', 'hq', install)).toMatchObject({ ok: true, line: expect.stringContaining('installed its dependencies') });
   expect(runTreeSyncTick(ctx.db, 'hq-lanes', 'private', install)?.line).not.toContain('installed');
-  expect(installs).toStrictEqual([both.hq.dir]);
+  expect(installs).toStrictEqual([both.hq.directory]);
 });
 
 test('a failed hq-defs install turns the synced tree red and keeps it red for hq health', () => {

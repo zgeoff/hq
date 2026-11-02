@@ -12,8 +12,8 @@ test('it decodes the index of a cursor a real atc made', () => {
 });
 
 test('it builds the start cursor in the same form a real atc makes', () => {
-  const ours = JSON.parse(Buffer.from(FROM_START, 'base64url').toString()) as unknown[];
-  const real = JSON.parse(Buffer.from(fixture.cursor, 'base64url').toString()) as unknown[];
+  const ours = z.array(z.unknown()).parse(JSON.parse(Buffer.from(FROM_START, 'base64url').toString()));
+  const real = z.array(z.unknown()).parse(JSON.parse(Buffer.from(fixture.cursor, 'base64url').toString()));
 
   expect([ours.length, ours[0]]).toStrictEqual([real.length, real[0]]);
   expect(cursorIndex(FROM_START)).toBe(0);

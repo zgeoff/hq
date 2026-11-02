@@ -18,5 +18,5 @@ test('it syncs both trees in one call, and a refused tree does not stop the othe
     ]);
     expect(results[1]?.sync?.line).toContain('not zgeoff/hq-private');
   }
-  expect(readFileSync(`${hq.dir}/skills/intake/SKILL.md`, 'utf8')).toBe('hq change\n');
+  expect(readFileSync(`${hq.directory}/skills/intake/SKILL.md`, 'utf8')).toBe('hq change\n');
 });

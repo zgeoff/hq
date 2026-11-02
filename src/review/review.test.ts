@@ -352,7 +352,7 @@ function buildLockedFake(fail: string | null = null): ReturnType<typeof fake> {
 test('a repo with bun.lock gets a frozen install without scripts in the worktree, before Codex runs', async () => {
   const fakeRun = buildLockedFake();
   const result = await review(fakeRun.run, 'widgets', 7, { watch: false });
-  const texts = fakeRun.calls.map((c) => c.cmd.join(' '));
+  const texts = fakeRun.calls.map((call) => call.cmd.join(' '));
   const where = texts.indexOf('bun install --frozen-lockfile --ignore-scripts');
   expect(where).toBeGreaterThan(texts.findIndex((l) => l.startsWith('git worktree add')));
   expect(where).toBeLessThan(texts.findIndex((l) => l.startsWith('codex review')));

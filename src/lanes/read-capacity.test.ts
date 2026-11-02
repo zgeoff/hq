@@ -7,13 +7,13 @@ import { realRunner } from '../runner/real-runner.ts';
 import { readCapacity } from './read-capacity.ts';
 
 function setupTest(): string {
-  const dir = mkdtempSync(join(tmpdir(), 'hq-capacity-'));
-  const script = join(dir, 'scripts', 'capacity.sh');
-  mkdirSync(join(dir, 'scripts'));
+  const directory = mkdtempSync(join(tmpdir(), 'hq-capacity-'));
+  const script = join(directory, 'scripts', 'capacity.sh');
+  mkdirSync(join(directory, 'scripts'));
   writeFileSync(script, `echo '${JSON.stringify({ imp: { freeMib: 8192, room: true } })}'\n`);
-  onTestFinished(() => rmSync(dir, { recursive: true, force: true }));
+  onTestFinished(() => rmSync(directory, { recursive: true, force: true }));
   onTestFinished(overrideEnv('HQ_CAPACITY', script));
-  return join(dir, 'pacing.json');
+  return join(directory, 'pacing.json');
 }
 
 test('a lane pacing.json gets wrong is the sample\'s error, though capacity read, so the watcher sends no fill nudge', async () => {

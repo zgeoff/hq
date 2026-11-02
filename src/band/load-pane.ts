@@ -12,11 +12,12 @@ import { loadConsoleItems } from '../load-console-items.ts';
 import { sydneyUtc } from '../morning/sydney-utc.ts';
 import { sydney } from '../morning/sydney.ts';
 import { line } from '../news/line.ts';
-import type { NewsItem } from '../news/types.ts';
+import { NEWS_TOPICS } from '../news/news-topics.ts';
 import { formatCount } from '../console/format-count.ts';
 import { downtime } from '../probe/downtime.ts';
 import { formatClock } from '../probe/format-clock.ts';
 import { match } from 'ts-pattern';
+import { z } from 'zod';
 import { loadNixState } from './load-nix-state.ts';
 import type { Pane, PaneHeatRow } from './types.ts';
 
@@ -69,26 +70,48 @@ function formatLaneCount(used: number, size: number): string {
   return used > size ? `**${used}/${size}**` : `${used}/${size}`;
 }
 
+const ReviewRows = z.array(z.object({ ref: z.string(), url: z.string().nullable(), review_round: z.number(), review_started_at: z.string() }));
+
 function loadReviewsSection(db: Database, at: Date): string {
   const DAY_MS = 86_400_000;
   const cutoff = iso(new Date(at.getTime() - DAY_MS));
-  const rows = db
-    .query("SELECT ref, url, review_round, review_started_at FROM run_prs WHERE state = 'open' AND review_started_at >= ? AND (reviewed_at IS NULL OR reviewed_at < review_started_at) ORDER BY review_started_at")
-    .all(cutoff) as { ref: string; url: string | null; review_round: number; review_started_at: string }[];
+  const rows = ReviewRows.parse(
+    db
+      .query("SELECT ref, url, review_round, review_started_at FROM run_prs WHERE state = 'open' AND review_started_at >= ? AND (reviewed_at IS NULL OR reviewed_at < review_started_at) ORDER BY review_started_at")
+      .all(cutoff),
+  );
   const shownRows = rows.map((row) => `- [${row.ref}](${row.url ?? buildPRURL(row.ref)}): round ${row.review_round + 1}, started ${formatClock(row.review_started_at)}`);
   return [`## Reviews in flight (${rows.length})`, ...(rows.length === 0 ? ['None.'] : shownRows)].join('\n');
 }
 
+const ShippedRows = z.array(z.object({ ref: z.string(), issue: z.string() }));
+
 function loadShippedSection(db: Database, consoleURL: string, at: Date): string {
-  const batch = db.query('SELECT ref, issue FROM run_prs WHERE merged_at >= ?').all(iso(getSydneyMidnight(at))) as { ref: string; issue: string }[];
+  const midnight = iso(getSydneyMidnight(at));
+  const batch = ShippedRows.parse(db.query('SELECT ref, issue FROM run_prs WHERE merged_at >= ?').all(midnight));
   const issues = new Set(batch.map((pr) => pr.issue)).size;
   const repos = new Set(batch.map((pr) => pr.ref.split('#')[0])).size;
   return `## Shipped today\n${formatCount(batch.length, 'PR')} in ${formatCount(repos, 'repo')}, for ${formatCount(issues, 'issue')} · [Shipped tab](${consoleURL}shipped)`;
 }
 
+const NewsRows = z.array(
+  z.object({
+    id: z.number(),
+    from_name: z.string(),
+    topic: z.enum(NEWS_TOPICS),
+    text: z.string(),
+    issue: z.string().nullable(),
+    link: z.string().nullable(),
+    needs_geoff: z.number(),
+    added_at: z.string(),
+    read_at: z.string().nullable(),
+    tag: z.string().nullable(),
+  }),
+);
+
 function loadNewsSection(db: Database): string {
   const LIMIT = 5;
-  const items = db.query('SELECT * FROM news ORDER BY id DESC LIMIT ?').all(LIMIT) as NewsItem[];
+  const items = NewsRows.parse(db.query('SELECT * FROM news ORDER BY id DESC LIMIT ?').all(LIMIT));
   return ['## News', ...(items.length === 0 ? ['No news yet.'] : items.map((item) => `- ${line(item)}`))].join('\n');
 }
 
@@ -97,10 +120,12 @@ interface HeldIssue {
   parked: boolean;
 }
 
+const RunLaneRows = z.array(z.object({ issue: z.string(), lane: z.string() }));
+
 function collectHeldIssues(db: Database, at: Date): Map<string, HeldIssue[]> {
   const byLane = new Map<string, HeldIssue[]>();
   const parked = new Set(parkedRuns(db, at).map((run) => run.issue));
-  const rows = db.query(`SELECT issue, COALESCE(lane, '') AS lane FROM runs WHERE place != 'none' AND state IN (${RUNNING.map(() => '?').join(', ')}) ORDER BY issue`).all(...RUNNING) as { issue: string; lane: string }[];
+  const rows = RunLaneRows.parse(db.query(`SELECT issue, COALESCE(lane, '') AS lane FROM runs WHERE place != 'none' AND state IN (${RUNNING.map(() => '?').join(', ')}) ORDER BY issue`).all(...RUNNING));
   for (const row of rows) {
     byLane.set(row.lane, [...(byLane.get(row.lane) ?? []), { issue: row.issue, parked: parked.has(row.issue) }]);
   }

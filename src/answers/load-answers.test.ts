@@ -39,23 +39,14 @@ test('the window lists ask answers, console reviews and typed lines, oldest firs
   ]);
 });
 
-const CRACKED_OPTIONS = [
-    { label: 'The red one', effect: 'Red.', recommended: true },
-    { label: 'A new one', effect: 'Buy one.' },
-  ];
-const TEAPOT_OPTIONS = [
-  { label: 'The blue one', effect: 'Blue.' },
-  { label: 'The red one', effect: 'Red.' },
-];
-
 test('a re-asked call lists each round\'s answer once, read against that round\'s options, and an answer outside the window is left out', () => {
   const db = setupTest();
-  const item = parseItemInput('call', JSON.stringify({ title: 'Pick a teapot', question: 'Which teapot?', options: TEAPOT_OPTIONS }));
+  const item = parseItemInput('call', JSON.stringify({ title: 'Pick a teapot', question: 'Which teapot?', options: [{ label: 'The blue one', effect: 'Blue.' }, { label: 'The red one', effect: 'Red.' }] }));
   applyAskItem(db, { kind: 'call', id: 'teapot-pick', issues: [], forSession: null, actor: 'kettle-bot' }, item, 'Which teapot?');
   openAsk(db, { id: 'teapot-pick', force: true, actor: 'kettle-bot' });
   answerAsk(db, { id: 'teapot-pick', kind: 'call', answer: 'The blue one', actor: 'teapot-bot' });
   at('2026-10-14T03:00:00Z');
-  applyAskItem(db, { kind: 'call', id: 'teapot-pick', issues: [], forSession: null, actor: 'kettle-bot' }, parseItemInput('call', JSON.stringify({ title: 'Pick a teapot', question: 'Which teapot, now the blue one cracked?', options: CRACKED_OPTIONS })), 'Which teapot, now the blue one cracked?');
+  applyAskItem(db, { kind: 'call', id: 'teapot-pick', issues: [], forSession: null, actor: 'kettle-bot' }, parseItemInput('call', JSON.stringify({ title: 'Pick a teapot', question: 'Which teapot, now the blue one cracked?', options: [{ label: 'The red one', effect: 'Red.', recommended: true }, { label: 'A new one', effect: 'Buy one.' }] })), 'Which teapot, now the blue one cracked?');
   recordConsoleAnswer(db, { id: 'teapot-pick', option: 'The red one', note: '', actor: 'console' });
 
   expect(loadAnswers(db, { from: NOON_SYDNEY, to: '2026-10-14T04:00:00Z' }).map((a) => [a.at, a.picked, a.stuPick, a.words, a.via])).toStrictEqual([
