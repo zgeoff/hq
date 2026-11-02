@@ -973,9 +973,7 @@ async function healthCommand(db: Database, verb: string | undefined, args: strin
       const r = await healthTick(db, await actor(db, flags));
       return { data: { ...r }, text: `${r.checks.filter((c) => !c.ok).length} problem(s); ${r.opened.length} new (told ${owner()}); ${r.cleared.length} cleared.` };
     })
-    .with('settings', () => {
-      return { data: { settings: healthSettings(db) }, text: Object.entries(healthSettings(db)).map(([k, v]) => `${k} = ${v}`).join('\n') };
-    })
+    .with('settings', () => ({ data: { settings: healthSettings(db) }, text: Object.entries(healthSettings(db)).map(([name, value]) => `${name} = ${value}`).join('\n') }))
     .with('set', async () => {
       const key = need(args[0], 'setting name');
       const settings = setHealthSetting(db, key, args[1] ?? null, await actor(db, flags));
@@ -1269,9 +1267,7 @@ async function markCommand(db: Database, verb: string | undefined, args: string[
       const m = addMark(db, { kind: need(flags.kind, 'kind'), text: need(flags.text, 'text'), ref: flags.ref ?? null, at: flags.at ?? null, actor: await actor(db, flags) });
       return { data: { mark: m }, text: `Mark ${m.id} at ${m.at}: ${m.text}` };
     })
-    .with('grant', () => {
-      return runMarkGrant(db, args, flags);
-    })
+    .with('grant', () => runMarkGrant(db, args, flags))
     .with('drop', async () => {
       const id = intFlag(need(args[0] ?? flags.id, 'mark id'), 'id')!;
       const m = dropMark(db, id, await actor(db, flags));
@@ -2233,8 +2229,10 @@ async function runCommand(context: Ctx): Promise<Out> {
     })
     .with('next', 'gate', 'title', async (field) => {
       const value = arg(1, field);
-      const r = setField(db, arg(0, 'issue'), field, field === 'gate' && value === 'none' ? null : value, await by());
-      return { data: { run: r }, text: runLine(r) };
+      const stored = field === 'gate' && value === 'none' ? null : value;
+      const actorName = await by();
+      const updated = setField(db, arg(0, 'issue'), field, stored, actorName);
+      return { data: { run: updated }, text: runLine(updated) };
     })
     .with('place', async () => {
       const actorName = await by();
@@ -2282,7 +2280,9 @@ Round ${p.review_round} recorded at ${p.reviewed_sha}.` };
       if (already) {
         return { data: { pr: already }, text: runLine(view(already.issue)) };
       }
-      if (to === 'merged') await checkMergedOnGitHub(boundedRunner(realRunner, CALL_MS), arg(0, 'pr'));
+      if (to === 'merged') {
+        await checkMergedOnGitHub(boundedRunner(realRunner, CALL_MS), arg(0, 'pr'));
+      }
       const closed = closePr(db, arg(0, 'pr'), { to, actor: await by() });
       return { data: { pr: closed }, text: runLine(view(closed.issue)) };
     })

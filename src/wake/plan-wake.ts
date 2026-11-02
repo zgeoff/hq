@@ -40,11 +40,11 @@ function wakeText(reason: WakeReason, last: RestartRecord): string {
     .with(
       'background',
       () =>
-        'The atc daemon restarted and ended your background tasks, such as CI waits. Your work is intact. Check the state you were waiting on, start your waits again, and carry on under your launch prompt.' + LOOP_CHECK,
+        `The atc daemon restarted and ended your background tasks, such as CI waits. Your work is intact. Check the state you were waiting on, start your waits again, and carry on under your launch prompt.${LOOP_CHECK}`,
     )
     .with(
       'interrupted',
-      () => 'The atc daemon restarted and cut off your last turn. Your work is intact. Carry on from where you stopped, under your launch prompt.' + LOOP_CHECK,
+      () => `The atc daemon restarted and cut off your last turn. Your work is intact. Carry on from where you stopped, under your launch prompt.${LOOP_CHECK}`,
     )
     .exhaustive();
 }
