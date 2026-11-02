@@ -12,6 +12,7 @@ const PATTERNS: [RegExp, string][] = [
   [/\beyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]*)?/g, MASK],
   // "DB_PASSWORD=two words": the quote opens before the name, so the value runs to its close.
   [/(["'])([A-Za-z0-9_-]*(?:KEY|TOKEN|SECRET|PASSWORD)=)(?:\\[\s\S]|(?!\1)[^\\])*\1?/gi, `$1$2${MASK}$1`],
+
   // The value is the whole shell word: "double" (with \" escapes), 'single', \-escaped characters, joined runs.
   [/\b([A-Za-z0-9_-]*(?:KEY|TOKEN|SECRET|PASSWORD))=(?!\[redacted\])(?:"(?:[^"\\]|\\[\s\S])*"|'[^']*'|\\[\s\S]|\S)+/gi, `$1=${MASK}`],
 ];

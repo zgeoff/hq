@@ -253,6 +253,7 @@ export const MIGRATIONS: string[] = [
     fetched_at TEXT NOT NULL
   );
   CREATE INDEX linear_issues_closed ON linear_issues (closed_at);`,
+
   // SQLite can't change a CHECK, so the news table is rebuilt with every row and its id sequence kept;
   // nothing references news.
   `CREATE TABLE news_v15 (

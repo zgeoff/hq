@@ -53,7 +53,9 @@ export async function flush(db: Database, opts: { retryFailed?: boolean; ids?: n
       const still = () => (db.query('SELECT idem_key, status FROM outbox WHERE id = ?').get(row.id) as { idem_key: string; status: string } | null)?.idem_key === cur.idem_key;
       try {
         const session = await client.resolve(cur.target, known);
-        if (!still()) continue;
+        if (!still()) {
+          continue;
+        }
         const messageId = await client.message(session.id, row.text, 'hq', cur.idem_key);
         db.query(`UPDATE outbox SET status='sent', attempts=attempts+1, message_id=?, sent_at=?, last_error=NULL WHERE id=? AND idem_key=?`).run(
           messageId ?? null,
@@ -64,7 +66,9 @@ export async function flush(db: Database, opts: { retryFailed?: boolean; ids?: n
         result.sent++;
       } catch (e) {
         const msg = String((e as Error).message ?? e);
-        if (!still()) continue;
+        if (!still()) {
+          continue;
+        }
         // Another flush sent it meanwhile: that is no failure of this one.
         if (markFailed(db, [{ id: row.id, idem_key: cur.idem_key }], msg) === 0) {
           continue;

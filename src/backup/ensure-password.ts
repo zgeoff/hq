@@ -13,7 +13,9 @@ export function ensurePassword(): { path: string; created: boolean } {
     if (!(error instanceof Error && 'code' in error && error.code === 'EEXIST')) {
       throw error;
     }
-    if (statSync(path).mode & 0o077) chmodSync(path, 0o600);
+    if (statSync(path).mode & 0o077) {
+      chmodSync(path, 0o600);
+    }
     return { path, created: false };
   }
   chmodSync(path, 0o600);

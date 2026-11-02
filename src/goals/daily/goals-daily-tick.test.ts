@@ -248,5 +248,5 @@ test('the deploy-prod line names holds, no-apply runs and runs not yet classifie
   add(5, null);
   const l = line(dailyText(db, syd('2026-10-16', '18:00')));
   expect(l).toContain('today 100% (1 applies), 2 held, 1 no-apply, 1 not yet classified,');
-  expect(l).toMatch(/; target >=90% –$/);
+  expect(l).toMatch(/; target >=90% –$/u);
 });

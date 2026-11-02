@@ -27,7 +27,9 @@ export function parseHelp(help: string, verbsOf?: (top: string) => readonly stri
       if (toks[0] === 'hq') {
         top = alts(toks[1] ?? '');
         rest = toks.slice(2);
-      } else rest = toks;
+      } else {
+        rest = toks;
+      }
       if (!top.length) continue;
       const head = rest[0] ?? '';
       let verbs: (string | null)[];

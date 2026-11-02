@@ -57,7 +57,7 @@ test('samples are up, down or blind, and the control is fetched only when the ta
   expect(urls).toEqual(['https://target.invalid/live', 'https://target.invalid/ready']);
   urls.length = 0;
   expect((await step(1, DOWN)).state).toBe('down');
-  expect(urls).toEqual(['https://target.invalid/live', 'https://control.invalid/ok']);
+  expect(urls).toStrictEqual(['https://target.invalid/live', 'https://control.invalid/ok']);
   expect((await step(2, BLIND)).state).toBe('blind');
   expect(db.query('SELECT at, target_ok, control_ok, ready_ok FROM probe_samples ORDER BY at').all()).toEqual([
     { at: minute(0), target_ok: 1, control_ok: null, ready_ok: 1 },
@@ -104,7 +104,9 @@ test('an up sample resets the run', async () => {
 });
 
 test('an up closes the outage and queues one recovery message', async () => {
-  for (let m = 0; m <= 5; m++) await step(m, DOWN);
+  for (let minuteIndex = 0; minuteIndex <= 5; minuteIndex++) {
+    await step(minuteIndex, DOWN);
+  }
   const r = await step(6, UP);
   expect(r.closed).toBe(1);
   expect(outages()[0]!.ended_at).toBe(minute(6));
@@ -237,8 +239,8 @@ test('ready failing for 2 minutes alerts nobody; at 3 minutes one alert goes to 
   await step(3, UNREADY);
   expect(kinds()).toEqual([]);
   expect(outbox()).toEqual([]);
-  const r = await step(4, UNREADY);
-  expect(r.unreadyOpened).toBe(1);
+  const result = await step(4, UNREADY);
+  expect(result.unreadyOpened).toBe(1);
   expect(kinds()).toEqual([{ id: 1, kind: 'unready', started_at: minute(1), detected_at: minute(4), ended_at: null }]);
   expect(outbox().map((o) => o.target)).toEqual(['z-stu', 'z-delivery']);
   expect(outbox()[0]).toMatchObject({ topic: 'nix-unready', status: 'pending' });
@@ -264,7 +266,9 @@ test('the unready alert is not held over quiet hours', async () => {
 });
 
 test('the first ready sample closes the unready outage and says how long', async () => {
-  for (let m = 0; m <= 4; m++) await step(m, UNREADY);
+  for (let minuteIndex = 0; minuteIndex <= 4; minuteIndex++) {
+    await step(minuteIndex, UNREADY);
+  }
   const r = await step(5, UP);
   expect(r.unreadyClosed).toBe(1);
   expect(kinds()[0]!.ended_at).toBe(minute(5));
@@ -282,9 +286,9 @@ test('a live failure during an unready outage does not close it, and coming back
   await step(4, DOWN);
   await step(5, DOWN);
   expect(kinds().map((k) => [k.kind, k.ended_at])).toEqual([['unready', null], ['down', null]]);
-  const r = await step(6, UNREADY);
-  expect(r.closed).toBe(2);
-  expect(r.unreadyClosed).toBeUndefined();
+  const result = await step(6, UNREADY);
+  expect(result.closed).toBe(2);
+  expect(result.unreadyClosed).toBeUndefined();
   expect(kinds().map((k) => [k.kind, k.ended_at === null])).toEqual([['unready', true], ['down', false]]);
   expect(openUnready(db)?.id).toBe(1);
   await step(7, UP);
@@ -315,7 +319,7 @@ test('down and blind samples are skipped by the unready run, and an up one befor
   await step(1, UNREADY);
   await step(2, UNREADY);
   await step(3, UNREADY);
-  expect(kinds()).toEqual([]);
+  expect(kinds()).toStrictEqual([]);
   await step(4, UNREADY);
   expect(kinds().map((k) => k.started_at)).toEqual([minute(1)]);
 });

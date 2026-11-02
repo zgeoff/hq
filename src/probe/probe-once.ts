@@ -37,6 +37,7 @@ export async function probeOnce(db: Database, fetcher: Fetcher, actor: string): 
     if (state === 'up' && open) {
       const seq = logEvent(db, 'hq', 'probe', 'recovered', actor, null, null, { outage: open.id, started_at: open.started_at, ended_at: at });
       db.query('UPDATE outages SET ended_at = ?, recover_seq = ? WHERE id = ?').run(at, seq, open.id);
+
       // Minutes the PC could not see are blind, not down.
       const d = downtime(db, new Date(open.started_at), new Date(at));
       const blind = d.blindMinutes ? `; hq could not see ${d.blindMinutes} min of it (the PC was offline)` : '';
@@ -75,6 +76,7 @@ export async function probeOnce(db: Database, fetcher: Fetcher, actor: string): 
     const cutoff = iso(new Date(now().getTime() - KEEP_DAYS * 86_400_000));
     db.query('DELETE FROM probe_samples WHERE at < ?').run(cutoff);
   }).immediate();
+
   // Outage alerts are not held over quiet hours: an outage is what the probe exists to catch
   // within 5 min.
   return { state, ...(opened !== undefined ? { opened } : {}), ...(closed !== undefined ? { closed } : {}), ...(r ? { ready: r.ok } : {}), ...(unreadyOpened !== undefined ? { unreadyOpened } : {}), ...(unreadyClosed !== undefined ? { unreadyClosed } : {}), ms: t.ms };

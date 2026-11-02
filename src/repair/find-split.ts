@@ -22,7 +22,9 @@ export function findSplit(byUuid: Map<string, Rec>, recs: Rec[], path: Rec[], of
         between.unshift(p);
         p = p.obj.parentUuid ? byUuid.get(p.obj.parentUuid) : undefined;
       }
-      if (p?.obj.uuid !== use.obj.uuid) continue;
+      if (p?.obj.uuid !== use.obj.uuid) {
+        continue;
+      }
       if (!onPath.has(r.obj.uuid)) {
         offBranch.add(r.obj.uuid);
         continue;
