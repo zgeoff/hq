@@ -40,5 +40,5 @@ The `tickets` skill defines a Design issue's `## Questions to settle`, its Accep
 6. Check each Design block you wrote: that the quotes match, each path exists, and each Acceptance
    check fails today. Then get a review of the block through the `second-opinion` skill, and fix
    what it finds.
-7. Through your ATC message tool, send z-stu and z-delivery one message each with the record link
-   and the ticket IDs. Your final report carries the same links. Then the session is done.
+7. Send an ATC `progress` note that starts `DESIGN DONE <record link> <ticket IDs>`. z-delivery
+   relays it to z-stu. Your final report carries the same links. Then the session is done.
