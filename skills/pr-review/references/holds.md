@@ -1,8 +1,35 @@
 # Holds
 
-Two holds stop a merge: the owner's lgtm, which `hq review gate` enforces from hq's records, and a
-preview check, which you enforce. Each record is tied to one head commit, and a push voids it. Never
-pass an lgtm on by message.
+Three holds in this file stop a merge: the skill proof and the owner's lgtm, which `hq review gate`
+enforces, and a preview check, which you enforce. Each record hq keeps for the lgtm, such as his
+answer or an exemption, is tied to one head commit, and a push voids it. Never pass an lgtm on by
+message.
+
+## The skill proof
+
+A PR that changes a skill's `SKILL.md`, or a file under its `references/`, needs three headings in
+its description, each with text under it:
+
+- `## Skill checks`: the output of `bun x @zgeoff/chex prose links skill`.
+- `## Cold read`: each finding from the cold-read skill, and how the agent answered it.
+- `## Deslop`: what the deslop skill changed, or "none".
+
+The gate checks the proof before the owner's lgtm, so he never approves a description that still has
+to change. Check it like this:
+
+1. Once the review findings are answered, run `hq review gate <repo> <pr>`.
+2. If it blocks on the proof, its reason names the missing headings. Message the agent that reason
+   word for word.
+3. Read the sections the gate passed. It checks only that each has text. Send back failing chex
+   output, and any cold-read finding with no answer.
+4. Only then run `hq unblock add`, which puts the PR on the owner's list.
+
+An edit to the description doesn't move the head. The agent needs no new review round. A push
+doesn't void the proof either: the gate reads the description as it stands. When a push changes the
+skill's text again, ask the agent to update the proof.
+
+The gate skips the proof for a bot's PR. It also skips it for a PR with a `hq pr mechanical` or
+`hq pr exempt` record at its head, in every repo, zgeoff/hq and zgeoff/hq-private included.
 
 ## The owner's lgtm
 

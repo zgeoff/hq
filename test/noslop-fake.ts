@@ -27,7 +27,7 @@ export interface FakeScript {
   prHead?: RunResult;
 
   // What `gh pr view --json headRefOid,author,statusCheckRollup,baseRefName` answers: one passing CI check
-  // on the fixed head, with the author above, when absent.
+  // on the fixed head, with the author and body above, when absent.
   prFacts?: RunResult;
 
   // What `gh api …/contents/.github/workflows?ref=<ref>` answers at the head, and at the base branch
@@ -90,6 +90,8 @@ export interface FakeRunner {
 
 export const FAKE_FULL_SHA = '0123456789abcdef0123456789abcdef01234567';
 export const FAKE_BASE_SHA = 'ba5eba5eba5eba5eba5eba5eba5eba5eba5eba5e';
+
+export const FAKE_PROOF_BODY = ['Teach the kettle skill to pour.', '## Skill checks', 'chex skill: 0 problems', '## Cold read', 'No findings.', '## Deslop', 'none'].join('\n');
 const NOT_FOUND: RunResult = { code: 1, stdout: '', stderr: 'gh: Not Found (HTTP 404)' };
 
 export const FAKE_REVIEW_JSON = JSON.stringify({
@@ -152,7 +154,7 @@ function pickGhAnswer(script: FakeScript, line: string): RunResult | null {
     return buildResult(JSON.stringify({ headRefName: 'feat', headRefOid: FAKE_FULL_SHA, baseRefName: 'main' }));
   }
   if (line.includes('--json headRefOid,author,statusCheckRollup')) {
-    return script.prFacts ?? buildResult(JSON.stringify({ headRefOid: FAKE_FULL_SHA, baseRefName: 'main', baseRefOid: FAKE_BASE_SHA, author: JSON.parse(script.author ?? '{"author":{"login":"zgeoff","is_bot":false}}').author, statusCheckRollup: [{ __typename: 'CheckRun', name: 'test', status: 'COMPLETED', conclusion: 'SUCCESS' }] }));
+    return script.prFacts ?? buildResult(JSON.stringify({ headRefOid: FAKE_FULL_SHA, baseRefName: 'main', baseRefOid: FAKE_BASE_SHA, author: JSON.parse(script.author ?? '{"author":{"login":"zgeoff","is_bot":false}}').author, body: script.prBody ?? '', statusCheckRollup: [{ __typename: 'CheckRun', name: 'test', status: 'COMPLETED', conclusion: 'SUCCESS' }] }));
   }
   if (line.includes('--json headRefOid')) {
     return script.prHead ?? buildResult(JSON.stringify({ headRefOid: FAKE_FULL_SHA }));
