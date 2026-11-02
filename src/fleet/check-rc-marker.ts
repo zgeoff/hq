@@ -1,5 +1,5 @@
 import type { Database } from 'bun:sqlite';
-import assert from 'node:assert';
+import invariant from 'tiny-invariant';
 import { logEvent } from '../log-event.ts';
 import { owner } from '../owner.ts';
 import { isQuiet } from '../clock/is-quiet.ts';
@@ -71,7 +71,7 @@ export async function checkRcMarker(db: Database, check: RcCheck): Promise<RcEva
   const mine = iso(t);
   const endMine = (action: EnsureStep['action'], text: string, data: Record<string, unknown>, alarm?: string) => rcFinish(db, name, pending, action, text, data, check.actor, mine, alarm);
   try {
-    assert.ok(client.submit);
+    invariant(client.submit, 'checkRcMarker: the caller checks client.submit before it calls');
     await client.submit(pending.id, `/remote-control ${name}`);
   } catch (err) {
     const code = (err as { code?: string }).code ?? '';
