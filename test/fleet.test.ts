@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test';
 import { toExactOptional } from '@zgeoff/std';
 import type { Database } from 'bun:sqlite';
+import assert from 'node:assert';
 import { mkdirSync, symlinkSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { claimMissing } from '../src/fleet/claim-missing.ts';
@@ -716,8 +717,9 @@ test('a mid-turn refusal retries; a gone session, a stuck turn or a hard refusal
   atMin(30);
   expect((await ensure(f)).at(-1)).toMatchObject({ action: 'failed', detail: expect.stringContaining('did not finish its start turn in 30 min (atc shows needs_you)') });
   mark();
-  expect(sessions[0]).toBeDefined();
-  if (sessions[0]) { sessions[0].state = 'done'; }
+  const [firstSession] = sessions;
+  assert.ok(firstSession);
+  firstSession.state = 'done';
   expect((await ensure(f)).at(-1)).toMatchObject({ action: 'remote control' });
   expect(f.typed).toEqual([['id-k', '/remote-control z-kettle']]);
   f.typed.length = 0;
