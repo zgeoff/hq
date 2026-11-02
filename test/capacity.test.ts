@@ -83,7 +83,7 @@ test('the Kysely adapter inserts and selects through hq\'s own database', async 
   const rows = await k.selectFrom('capacity_samples').selectAll().execute();
   expect(rows).toHaveLength(1);
   expect(rows[0]).toMatchObject({ impd_budget_mib: 100, nonnix_awake_mib: 7, claude_five_hour: 1.5, impd_used_mib: null });
-  expect(db.query('SELECT COUNT(*) AS n FROM capacity_samples').get()).toEqual({ n: 1 });
+  expect(db.query('SELECT COUNT(*) AS count FROM capacity_samples').get()).toStrictEqual({ count: 1 });
   await k.destroy();
   expect(db.query('SELECT 1 AS x').get()).toEqual({ x: 1 });
 });
@@ -132,7 +132,7 @@ test('a failed, malformed or hung source stores NULLs and an errors entry; the o
 
   const t = Date.now();
   const hung = await readCapacity(db, { ...probe(world({ cloudHangs: true })), run: (cmd) => (cmd[0] === 'impz' ? new Promise(() => {}) : probe(world()).run(cmd)) }, minute(0));
-  expect(Date.now() - t).toBeLessThan(5_000);
+  expect(Date.now() - t).toBeLessThan(5000);
   expect(hung.cloud_avail_bytes).toBeNull();
   expect(hung.errors['cloud']).toContain('no answer');
 });
@@ -231,9 +231,9 @@ test('quiet hours: an impd open goes out at once; another alert waits for the fi
   const after = outbox().filter((m) => m.target === owner());
   expect(after).toHaveLength(2);
   expect(after[1]?.text).toContain('cloud:');
-  expect(after[1]!.text).toContain('Still open:');
+  expect(after[1]?.text).toContain('Still open:');
   await sampleAt(world({ nonnix: 20_000, cloudAvail: 2 }), new Date(morning.getTime() + 300_000));
-  expect(outbox().filter((m) => m.target === owner())).toHaveLength(2);
+  expect(outbox().filter((message) => message.target === owner())).toHaveLength(2);
 });
 
 test('quiet hours: an alert that opens and clears inside them sends nothing; a told one is cleared at wake', async () => {
@@ -243,9 +243,9 @@ test('quiet hours: an alert that opens and clears inside them sends nothing; a t
   expect(openAlerts(db)).toEqual({});
   expect(outbox()).toHaveLength(0);
 
-  for (const m of [20, 25]) await sampleAt(world({ nonnix: 20_000 }), quiet(m));
+  for (const offset of [20, 25]) { await sampleAt(world({ nonnix: 20_000 }), quiet(offset)); }
   db.query("UPDATE outbox SET status = 'sent'").run();
-  for (const m of [30, 35]) await sampleAt(world(), quiet(m));
+  for (const offset of [30, 35]) { await sampleAt(world(), quiet(offset)); }
   expect(outbox().filter((m) => m.target === owner())).toHaveLength(1);
   await sampleAt(world(), new Date(Date.parse(FOUR_AM_SYDNEY) + 3 * 3_600_000));
   const sent = outbox().filter((m) => m.target === owner());
@@ -261,13 +261,13 @@ test('awake totals count plugged memory, so elastic imps can trip the non-Nix al
 });
 
 test('an atc outage loses no notice: every open and back-under stays queued, in order, for both recipients', async () => {
-  for (const m of [0, 5]) await sampleAt(world({ nonnix: 20_000 }), minute(m));
-  for (const m of [10, 15]) await sampleAt(world({ nonnix: 20_000, cloudAvail: 2 }), minute(m));
-  for (const m of [20, 25]) await sampleAt(world({ cloudAvail: 2 }), minute(m));
-  for (const m of [30, 35]) await sampleAt(world({ nonnix: 20_000, cloudAvail: 2 }), minute(m));
-  for (const m of [40, 45]) await sampleAt(world(), minute(m));
-  for (const m of [50, 55]) await sampleAt(world({ cloudAvail: 2 }), minute(m));
-  for (const m of [60, 65]) await sampleAt(world(), minute(m));
+  for (const offset of [0, 5]) { await sampleAt(world({ nonnix: 20_000 }), minute(offset)); }
+  for (const offset of [10, 15]) { await sampleAt(world({ nonnix: 20_000, cloudAvail: 2 }), minute(offset)); }
+  for (const offset of [20, 25]) { await sampleAt(world({ cloudAvail: 2 }), minute(offset)); }
+  for (const offset of [30, 35]) { await sampleAt(world({ nonnix: 20_000, cloudAvail: 2 }), minute(offset)); }
+  for (const offset of [40, 45]) { await sampleAt(world(), minute(offset)); }
+  for (const offset of [50, 55]) { await sampleAt(world({ cloudAvail: 2 }), minute(offset)); }
+  for (const offset of [60, 65]) { await sampleAt(world(), minute(offset)); }
   for (const t of [owner(), orchestratorName()]) {
     const texts = outbox().filter((m) => m.target === t).map((m) => m.text.split('\n')[1]!);
     expect(texts).toEqual([
@@ -287,8 +287,8 @@ test('an alert that reopens in quiet hours drops its old held recovery', async (
   const q = (m: number) => new Date(Date.parse(FOUR_AM_SYDNEY) + m * 60_000);
   for (const m of [0, 5]) await sampleAt(world({ nonnix: 20_000 }), q(m));
   db.query("UPDATE outbox SET status = 'sent'").run();
-  for (const m of [10, 15]) await sampleAt(world(), q(m));
-  for (const m of [20, 25]) await sampleAt(world({ nonnix: 20_000 }), q(m));
+  for (const offset of [10, 15]) { await sampleAt(world(), q(offset)); }
+  for (const offset of [20, 25]) { await sampleAt(world({ nonnix: 20_000 }), q(offset)); }
   const n = outbox().length;
   await sampleAt(world({ nonnix: 20_000 }), new Date(Date.parse(FOUR_AM_SYDNEY) + 3 * 3_600_000));
   expect(outbox().slice(n).some((m) => m.text.includes('back under'))).toBe(false);
@@ -327,7 +327,7 @@ test('samples older than 30 days are pruned on each sample; the log reads newest
   await sampleAt(world(), new Date(Date.parse(NOON_SYDNEY) - 29 * 86_400_000));
   expect(db.query('SELECT COUNT(*) AS n FROM capacity_samples').get()).toEqual({ n: 2 });
   await sampleAt(world(), minute(0));
-  expect(db.query('SELECT COUNT(*) AS n FROM capacity_samples').get()).toEqual({ n: 2 });
+  expect(db.query('SELECT COUNT(*) AS count FROM capacity_samples').get()).toStrictEqual({ count: 2 });
   await sampleAt(world(), minute(60));
   const log = await sampleLog(db, 24, minute(60));
   expect(log.map((r) => r.at)).toEqual([minute(60), minute(0)].map((d) => d.toISOString().replace(/\.\d{3}Z$/, 'Z')));
@@ -350,7 +350,7 @@ test('the daily check-in carries the capacity line before Incidents today', asyn
   await sampleAt(world(), minute(0));
   const l = dailyText(db, minute(1)).split('\n');
   expect(l.at(-2)).toStartWith('Capacity: impd non-Nix 8,192/16,384 MiB awake');
-  expect(l.at(-2)!.length).toBeLessThanOrEqual(159);
+  expect(l.at(-2)?.length).toBeLessThanOrEqual(159);
 });
 
 function buildImpzProbe(imps: readonly Record<string, unknown>[]): CapacityProbe {

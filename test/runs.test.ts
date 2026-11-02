@@ -401,9 +401,9 @@ describe('the sweep', () => {
     add();
     const gone = [{ id: S1, name: 'kettle', alive: false, state: 'exited' }];
     addPr(db, 'GEO-9001', 'widgets#12', 'z-delivery');
-    expect(findAlerts(db, gone, new Map(), new Date(base))[0]!.line).toContain('has exited');
+    expect(findAlerts(db, gone, new Map(), new Date(base))[0]?.line).toContain('has exited');
     finalPr(db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
-    expect(findAlerts(db, gone, new Map(), new Date(base))[0]!.line).toContain('has exited');
+    expect(findAlerts(db, gone, new Map(), new Date(base))[0]?.line).toContain('has exited');
     reviewedPr(db, 'widgets#12', 'abc1234', { recheck: false, force: false }, 'z-delivery');
     expect(findAlerts(db, gone, new Map(), new Date(base))).toEqual([]);
 

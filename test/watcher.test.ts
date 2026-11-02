@@ -258,7 +258,8 @@ test('the refusals step logs a count when it finds some, stays quiet on none, an
   expect(logs.some((l) => l.includes('found'))).toBe(false);
   expect(await watchTick(db, deps({ refusals: async () => Promise.reject(new Error('disk gone')) }))).toBe(true);
   expect(logs.some((l) => l.includes('refusals scan failed: disk gone'))).toBe(true);
-  expect(await watchTick(db, deps({ refusals: () => new Promise<never>(() => {}) }))).toBe(true);
+  const hung = await watchTick(db, deps({ refusals: () => new Promise<never>(() => {}) }));
+  expect(hung).toBe(true);
   expect(logs.some((l) => l.includes('refusals did not finish'))).toBe(true);
 });
 

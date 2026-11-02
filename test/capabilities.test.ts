@@ -191,7 +191,7 @@ test('shape: fleet shows promptCheck for a declared session that is live in atc,
     const stu = json.declared.find((e) => e.name === 'z-stu')!;
     expect(typeof stu.prompt).toBe('string');
     expect(stu.promptCheck).toEqual({ state: 'unknown', since: null, hint: null, reason: expect.stringContaining('no prompt') });
-    expect(json.declared.some((e) => e.promptCheck === undefined)).toBe(true);
+    expect(json.declared.some((entry) => entry.promptCheck === undefined)).toBe(true);
     checkShape('fleet', json);
     out = [];
     expect(await main(['fleet'])).toBe(0);

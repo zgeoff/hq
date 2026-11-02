@@ -17,8 +17,7 @@ import { at, freshDb } from './helpers.ts';
 
 let db: Database;
 let cleanup: () => void;
-const T0 = '2026-10-16T01:00:00Z';
-const atMin = (m: number) => at(new Date(Date.parse(T0) + m * 60_000).toISOString().replace(/\.\d{3}Z$/, 'Z'));
+const atMin = (minutes: number) => at(new Date(Date.parse('2026-10-16T01:00:00Z') + minutes * 60_000).toISOString().replace(/\.\d{3}Z$/u, 'Z'));
 
 beforeEach(() => {
   ({ db, cleanup } = freshDb());
@@ -101,7 +100,7 @@ test('guess against actual by band, unsized runs apart, and the share that shipp
   merge('GEO-5', 'kettle#6');
   addPr(db, 'GEO-5', 'kettle#7', 'z-delivery');
   atMin(60);
-  const runs = mergedRuns(db, T0, '2026-10-17T00:00:00Z');
+  const runs = mergedRuns(db, '2026-10-16T01:00:00Z', '2026-10-17T00:00:00Z');
   expect(runs.map((r) => r.issue)).toEqual(['GEO-1', 'GEO-2', 'GEO-3']);
   const gh = fakeGh(
     {
@@ -131,7 +130,7 @@ test('guess against actual by band, unsized runs apart, and the share that shipp
 test('merged PR facts are cached; a PR GitHub lacks is left out, and gh failing gives null', async () => {
   run('GEO-1', parseSize('M', '1000'));
   merge('GEO-1', 'kettle#1', 'zgeoff/teapot#9');
-  const runs = mergedRuns(db, T0, '2026-10-17T00:00:00Z');
+  const runs = mergedRuns(db, '2026-10-16T01:00:00Z', '2026-10-17T00:00:00Z');
   const calls: string[][] = [];
   const gh = fakeGh({ 'kettle#1': { additions: 10, deletions: 0, base: 'geo-0-part' }, 'teapot#9': null }, calls, ['geo-0-part']);
   const facts = (await prFacts(db, gh, runs[0]!.prs))!;
@@ -156,7 +155,7 @@ test('a run whose last merge falls outside the window, or a dropped or unfinishe
   run('GEO-1', parseSize('S', '100'));
   merge('GEO-1', 'kettle#1');
   expect(mergedRuns(db, '2026-10-16T02:00:00Z', '2026-10-17T00:00:00Z')).toHaveLength(0);
-  expect(mergedRuns(db, T0, '2026-10-17T00:00:00Z')).toHaveLength(1);
+  expect(mergedRuns(db, '2026-10-16T01:00:00Z', '2026-10-17T00:00:00Z')).toHaveLength(1);
   db.query(`UPDATE runs SET state = 'dropped' WHERE issue = 'GEO-1'`).run();
-  expect(mergedRuns(db, T0, '2026-10-17T00:00:00Z')).toHaveLength(0);
+  expect(mergedRuns(db, '2026-10-16T01:00:00Z', '2026-10-17T00:00:00Z')).toHaveLength(0);
 });

@@ -59,7 +59,7 @@ test('re-links the advisor result to its use and moves the interloper after the 
   expect(b.length).toBe(a.length);
   expect(a.filter((l, i) => l !== b[i]).length).toBe(3);
   expect(checkRepaired(fixed)).toMatchObject({ ok: true, leaf: A6, promptLeaf: A6 });
-  expect(planRepair(fixed).changes).toEqual([]);
+  expect(planRepair(fixed).changes).toStrictEqual([]);
 });
 
 test('two interlopers move together, in their order', () => {
@@ -80,9 +80,9 @@ test('a turn with no tool use: the interloper goes after the turn\'s last record
 
 test('a healthy transcript, and a split off the live branch, are left alone', () => {
   const healthy = broken();
-  (healthy[4] as { parentUuid: string }).parentUuid = A2;
-  (healthy[3] as { parentUuid: string }).parentUuid = T1;
-  (healthy[8] as { parentUuid: string }).parentUuid = I1;
+  healthy[4] = { ...healthy[4], parentUuid: A2 };
+  healthy[3] = { ...healthy[3], parentUuid: T1 };
+  healthy[8] = { ...healthy[8], parentUuid: I1 };
   expect(planRepair(lines(healthy)).changes).toEqual([]);
   const forked = [...broken().slice(0, -1), user(U(20), R, 'Start again.'), asst(U(21), U(20), 'msg_9', [{ type: 'text', text: 'Fresh start.' }])];
   const plan = planRepair(lines(forked));

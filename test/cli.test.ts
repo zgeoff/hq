@@ -342,7 +342,7 @@ test('v15 rebuilds news with every row, its read state and its id sequence, and 
     { id: 2, topic: 'other', text: 'an invented note', read_at: '2026-10-15T01:00:00Z', needs_geoff: 0 },
   ]);
   db.query(`INSERT INTO news (from_name, topic, text, added_at) VALUES ('z-invented', 'report', 'an invented report', '2026-10-16T00:00:00Z')`).run();
-  expect(db.query(`SELECT id FROM news WHERE topic = 'report'`).get()).toEqual({ id: 4 });
+  expect(db.query(`SELECT id FROM news WHERE topic = 'report'`).get()).toStrictEqual({ id: 4 });
   expect(db.query(`SELECT name FROM sqlite_master WHERE name LIKE 'news%' ORDER BY name`).all()).toEqual([{ name: 'news' }, { name: 'news_unread' }]);
   expect(() => db.query(`INSERT INTO news (from_name, topic, text, added_at) VALUES ('z', 'gossip', 't', 't')`).run()).toThrow();
   db.close();
@@ -692,8 +692,8 @@ test('hq goals sync holds goals_ok_at while the cap leaves deploy-prod runs uncl
     const d = db();
     const ins = d.query(`INSERT INTO ci_runs (id, repo, path, event, status, conclusion, attempt, created_at, started_at, updated_at) VALUES (?, 'cloud', '.github/workflows/deploy-prod.yml', 'push', 'completed', 'success', 1, ?, ?, ?)`);
     for (let i = 0; i < 61; i++) {
-      const t = new Date(Date.now() - 3_600_000 + i * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z');
-      ins.run(8000 + i, t, t, t);
+      const stamp = new Date(Date.now() - 3_600_000 + i * 1000).toISOString().replace(/\.\d{3}Z$/u, 'Z');
+      ins.run(8000 + i, stamp, stamp, stamp);
     }
     d.close();
     const first = await hq('goals', 'sync', '--days', '2');

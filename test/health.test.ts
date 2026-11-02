@@ -126,7 +126,7 @@ test('a failed read neither clears open problems nor drops restart samples', asy
   expect(r.opened.map((check) => check.key).toSorted()).toEqual(['disk', 'restarts:system', 'restarts:user', 'systemd:system', 'systemd:user']);
   await step(world({ failedUser: ['teapot.service'], availBytes: 2 * 2 ** 30, restarts: { 'kettle.service': 106 } }), 10);
   const texts = outbox().map((m) => m.text);
-  expect(texts.filter((t) => t.includes('teapot.service'))).toHaveLength(1);
+  expect(texts.filter((text) => text.includes('teapot.service'))).toHaveLength(1);
   expect(texts.at(-1)).toContain('kettle.service is restart-looping');
 });
 

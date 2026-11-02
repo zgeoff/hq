@@ -344,7 +344,7 @@ test('--now spawns a forgotten session at once, for the named session only', asy
   expect(steps.map((s) => s.action)).toEqual(['spawned', 'waiting']);
   expect(steps[0]!.detail).toContain('(--now)');
   expect(spawns.map((s) => s.name)).toEqual(['z-kettle']);
-  expect(wakeList(db).map((w) => w.name)).toEqual(['z-kettle']);
+  expect(wakeList(db).map((entry) => entry.name)).toStrictEqual(['z-kettle']);
 });
 
 test('--now never spawns a second session: a live one by name or by known id stays the only one', async () => {
@@ -383,7 +383,8 @@ test('fleet ensure runs one at a time: an overlapping run is refused and spawns 
   const a = ensureFleet(db, client, { dryRun: false, actor: 'z-stu', fleet: one, now: ['z-kettle'] });
   await inSpawn.promise;
   await expect(ensureFleet(db, client, { dryRun: false, actor: 'hq-fleet', fleet: one, now: ['z-kettle'] })).rejects.toThrow('another hq fleet ensure is running (z-stu)');
-  expect((await ensureFleet(db, client, { dryRun: true, actor: 'z-q', fleet: one }))[0]).toBeDefined();
+  const dryRunSteps = await ensureFleet(db, client, { dryRun: true, actor: 'z-q', fleet: one });
+  expect(dryRunSteps[0]).toBeDefined();
   release();
   await a;
   expect(spawned).toHaveLength(1);
@@ -459,8 +460,8 @@ test('a spawn marks the session and starts the helper unit through the runner', 
   expect(cmd.slice(-4)).toEqual(['hq-self', 'fleet', 'rc', 'z-kettle']);
 
   expect(cmd).toContain(`--setenv=HQ_CLAUDE_JSON=${resolve(getClaudeJson())}`);
-  expect(JSON.parse(getMeta(db, 'fleet_ids')!)).toEqual({ 'z-kettle': id });
-  expect(f.typed).toEqual([]);
+  expect(JSON.parse(getMeta(db, 'fleet_ids') ?? 'null')).toStrictEqual({ 'z-kettle': id });
+  expect(f.typed).toStrictEqual([]);
 });
 
 test('a helper that will not start is reported, and the 5-minute check still types', async () => {
@@ -497,7 +498,7 @@ test('off and done: types once, then reports on when the bridge shows', async ()
   atMin(5);
   const steps = await ensure(f);
   expect(f.typed).toEqual([['id-k', '/remote-control z-kettle']]);
-  expect(f.sleeps).toEqual([2_000, 2_000]);
+  expect(f.sleeps).toStrictEqual([2000, 2000]);
   expect(steps.at(-1)).toMatchObject({ name: 'z-kettle', action: 'remote control', detail: 'id-k: typed /remote-control z-kettle; Remote Control is on.' });
   expect(told().at(-1)).toBe('hq fleet: z-kettle id-k: typed /remote-control z-kettle; Remote Control is on.');
   expect(pending()).toEqual({});
@@ -658,7 +659,8 @@ test('the helper loops until the session is done, then types and tells z-stu thr
   expect(f.typed).toEqual([['id-k', '/remote-control z-kettle']]);
   expect(step).toMatchObject({ action: 'remote control' });
   expect(told().at(-1)).toBe('hq fleet: z-kettle id-k: typed /remote-control z-kettle; Remote Control is on.');
-  expect(await rcWatch(db, f.client, f.rc, 'z-kettle', 'hq-fleet')).toBeNull();
+  const repeat = await rcWatch(db, f.client, f.rc, 'z-kettle', 'hq-fleet');
+  expect(repeat).toBeNull();
 });
 
 test('it queues the Remote Control report in the transaction that removes the marker', async () => {
@@ -701,7 +703,7 @@ test('a mid-turn refusal retries; a gone session, a stuck turn or a hard refusal
   atMin(5);
   f.refuse('atc_too_slow');
   await ensure(f);
-  expect(pending()['z-kettle']).toEqual({ id: 'id-k', since: NOON_SYDNEY });
+  expect(pending()['z-kettle']).toStrictEqual({ id: 'id-k', since: NOON_SYDNEY });
   f.refuse('atc_permission_pending');
   await ensure(f);
   expect(pending()['z-kettle'].typedAt).toBeUndefined();
@@ -714,7 +716,8 @@ test('a mid-turn refusal retries; a gone session, a stuck turn or a hard refusal
   atMin(30);
   expect((await ensure(f)).at(-1)).toMatchObject({ action: 'failed', detail: expect.stringContaining('did not finish its start turn in 30 min (atc shows needs_you)') });
   mark();
-  sessions[0]!.state = 'done';
+  expect(sessions[0]).toBeDefined();
+  if (sessions[0]) { sessions[0].state = 'done'; }
   expect((await ensure(f)).at(-1)).toMatchObject({ action: 'remote control' });
   expect(f.typed).toEqual([['id-k', '/remote-control z-kettle']]);
   f.typed.length = 0;

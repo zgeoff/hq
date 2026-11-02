@@ -617,7 +617,9 @@ async function actor(db: Database, flags: Flags): Promise<string> {
       c.close();
     }
   } catch (e) {
-    if ((e as HqError).code === 'atc_protocol_mismatch') throw e;
+    if (e instanceof HqError && e.code === 'atc_protocol_mismatch') {
+      throw e;
+    }
     return sid;
   }
 }
@@ -1168,7 +1170,9 @@ async function typedCommand(db: Database, verb: string | undefined, flags: Flags
     case 'add': {
       const to = need(flags.to, 'to');
       const source = parseSource(db, need(flags.source, 'source'));
-      if (source.kind === 'chat') source.ref = await expandSession(source.ref).catch(() => source.ref);
+      if (source.kind === 'chat') {
+        source.ref = await expandSession(source.ref).catch(() => source.ref);
+      }
       const text = await readText(flags.text, flags['text-file'], 'text');
       const target = await resolveTarget(to);
       const t = addTyped(db, { to, toId: target.id, toName: target.name, text, source, actor: await actor(db, flags) });
@@ -1389,6 +1393,7 @@ async function fleetCommand(db: Database, verb: string | undefined, args: string
     }
     case 'rc': {
       const name = need(args[0], 'name');
+
       // The call that failed is never retried, since a timed-out submit may have typed.
       let c: AtcClient | null = await AtcClient.open();
       const live = async <T,>(f: (x: FleetClient) => Promise<T>): Promise<T> => {
@@ -1431,6 +1436,7 @@ async function fleetCommand(db: Database, verb: string | undefined, args: string
       const last = loadFleetLast(db);
       const timer = (await realRunner(['systemctl', '--user', 'is-active', `${FLEET_UNIT}.timer`], { env: cleanEnv() })).stdout.trim() || 'inactive';
       const declared = declaredFleet(db);
+
       // --json skips the check unless --prompts asks: the compaction hook reads `hq fleet --json`
       // under a 5 s limit.
       let drift: Record<string, PromptDrift> = {},
@@ -2050,6 +2056,7 @@ async function runArgv(argv: string[], runner: Runner): Promise<{ out: Out; db: 
   if (noun === 'version') {
     return { out: renderVersion(VERSION, SCHEMA_VERSION, readBuild()), db: null };
   }
+
   // capabilities never opens the db: a session runs it before anything else.
   if (noun === 'capabilities') return { out: capabilities(VERSION, SCHEMA_VERSION, flags.require), db: null };
   // A bad setting stops the command here, naming it, instead of turning into NaN deep inside one.

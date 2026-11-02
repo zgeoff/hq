@@ -21,9 +21,7 @@ import { at, freshDb } from './helpers.ts';
 
 let db: Database;
 let cleanup: () => void;
-const T0 = '2026-10-16T01:00:00Z';
-const until = (m: number) => new Date(Date.parse(T0) + m * 60_000).toISOString().replace(/\.\d{3}Z$/, 'Z');
-const atMin = (m: number) => at(until(m));
+const atMin = (minutes: number) => at(new Date(Date.parse('2026-10-16T01:00:00Z') + minutes * 60_000).toISOString().replace(/\.\d{3}Z$/u, 'Z'));
 
 beforeEach(() => {
   ({ db, cleanup } = freshDb());
@@ -43,7 +41,7 @@ test('median and p90 by nearest rank; under 5 samples is thin', () => {
 test('wait on the owner: call queue → answer → apply, and run time waiting on the owner, exact or by the word', () => {
   addAsk(db, { kind: 'call', id: 'kettle-colour', title: 'Kettle colour', question: 'Red or blue?', body: 'Invented.', issues: [], forSession: null, actor: 'z-triage' });
   atMin(5);
-  db.query("UPDATE asks SET state = 'open', opened_at = ? WHERE id = 'kettle-colour'").run(until(5));
+  db.query("UPDATE asks SET state = 'open', opened_at = ? WHERE id = 'kettle-colour'").run('2026-10-16T01:05:00Z');
   atMin(65);
   answerAsk(db, { id: 'kettle-colour', kind: 'call', answer: 'Blue.', actor: 'z-stu' });
   atMin(75);
@@ -56,7 +54,7 @@ test('wait on the owner: call queue → answer → apply, and run time waiting o
   run('GEO-2');
   setState(db, 'GEO-2', 'blocked', { waitsOn: 'a release', waitsOnGeoff: true }, 'z-delivery');
   atMin(165);
-  const s = computeStats(db, { from: T0, to: until(165), gh: null });
+  const s = computeStats(db, { from: '2026-10-16T01:00:00Z', to: '2026-10-16T03:45:00Z', gh: null });
   expect(s.geoff.queueToAnswer).toMatchObject({ n: 1, medianMin: 65 });
   expect(s.geoff.answerToApply).toMatchObject({ n: 1, medianMin: 10 });
   expect(s.geoff.runGeoffWait.n).toBe(2);
@@ -73,7 +71,7 @@ test('it counts a wait as exact only from when the explicit flag was set', () =>
   atMin(20);
   setState(db, 'GEO-1', 'working', { waitsOn: null, waitsOnGeoff: false }, 'z-delivery');
 
-  const stats = computeStats(db, { from: T0, to: until(30), gh: null });
+  const stats = computeStats(db, { from: '2026-10-16T01:00:00Z', to: '2026-10-16T01:30:00Z', gh: null });
 
   expect([stats.geoff.runGeoffWait.medianMin, stats.geoff.runWaitExactShare]).toStrictEqual([20, 0.5]);
 });
@@ -86,7 +84,7 @@ test('a run blocked on "the owner" counts as waiting on the owner, as one blocke
   run('GEO-2');
   setState(db, 'GEO-2', 'blocked', { waitsOn: 'the ownership papers' }, 'z-delivery');
   atMin(60);
-  const stats = computeStats(db, { from: T0, to: until(60), gh: null });
+  const stats = computeStats(db, { from: '2026-10-16T01:00:00Z', to: '2026-10-16T02:00:00Z', gh: null });
   expect(stats.geoff.runGeoffWait.n).toBe(1);
   expect(stats.geoff.runGeoffWait.medianMin).toBe(40);
 });
@@ -107,7 +105,7 @@ test('merged to live, the backlog by repo, review rework and cycle time', () => 
   closePr(db, 'gadgets#2', { to: 'merged', actor: 'z-delivery' });
   setState(db, 'GEO-2', 'deploy-held', {}, 'z-delivery');
   atMin(210);
-  const s = computeStats(db, { from: T0, to: until(210), gh: null });
+  const s = computeStats(db, { from: '2026-10-16T01:00:00Z', to: '2026-10-16T04:30:00Z', gh: null });
   expect(s.live.mergeToDone).toMatchObject({ n: 1, medianMin: 120 });
   expect(s.live.byRepo['widgets']).toMatchObject({ n: 1 });
   expect(s.live.backlog).toEqual({ total: 1, byRepo: { gadgets: 1 }, oldest: { id: 'GEO-2', ageMin: 60 } });
@@ -121,12 +119,12 @@ test('it times merged to live from when GitHub merged the PR, not from when hq s
   run('GEO-1');
   addPr(db, 'GEO-1', 'widgets#1', 'z-delivery');
   atMin(10);
-  closePr(db, 'widgets#1', { to: 'merged', actor: 'github', facts: { mergedAt: until(0), mergeSha: null } });
+  closePr(db, 'widgets#1', { to: 'merged', actor: 'github', facts: { mergedAt: '2026-10-16T01:00:00Z', mergeSha: null } });
   setState(db, 'GEO-1', 'merged', {}, 'z-delivery');
   atMin(20);
   setState(db, 'GEO-1', 'done', {}, 'z-delivery');
 
-  const live = computeStats(db, { from: T0, to: until(30), gh: null }).live;
+  const live = computeStats(db, { from: '2026-10-16T01:00:00Z', to: '2026-10-16T01:30:00Z', gh: null }).live;
   expect(live.mergeToDone.n).toBe(1);
   expect(live.mergeToDone.medianMin).toBe(20);
 });
@@ -139,28 +137,28 @@ test('it takes the latest GitHub merge time as the last merge, whatever order hq
   addPr(db, 'GEO-2', 'widgets#3', 'z-delivery');
   addPr(db, 'GEO-2', 'gadgets#4', 'z-delivery');
   atMin(130);
-  closePr(db, 'widgets#1', { to: 'merged', actor: 'github', facts: { mergedAt: until(120), mergeSha: null } });
-  closePr(db, 'widgets#2', { to: 'merged', actor: 'github', facts: { mergedAt: until(60), mergeSha: null } });
-  closePr(db, 'gadgets#4', { to: 'merged', actor: 'github', facts: { mergedAt: until(110), mergeSha: null } });
-  closePr(db, 'widgets#3', { to: 'merged', actor: 'github', facts: { mergedAt: until(50), mergeSha: null } });
+  closePr(db, 'widgets#1', { to: 'merged', actor: 'github', facts: { mergedAt: '2026-10-16T03:00:00Z', mergeSha: null } });
+  closePr(db, 'widgets#2', { to: 'merged', actor: 'github', facts: { mergedAt: '2026-10-16T02:00:00Z', mergeSha: null } });
+  closePr(db, 'gadgets#4', { to: 'merged', actor: 'github', facts: { mergedAt: '2026-10-16T02:50:00Z', mergeSha: null } });
+  closePr(db, 'widgets#3', { to: 'merged', actor: 'github', facts: { mergedAt: '2026-10-16T01:50:00Z', mergeSha: null } });
   setState(db, 'GEO-1', 'merged', {}, 'z-delivery');
   setState(db, 'GEO-2', 'merged', {}, 'z-delivery');
   atMin(180);
   setState(db, 'GEO-1', 'done', {}, 'z-delivery');
 
-  const live = computeStats(db, { from: T0, to: until(190), gh: null }).live;
+  const live = computeStats(db, { from: '2026-10-16T01:00:00Z', to: '2026-10-16T04:10:00Z', gh: null }).live;
 
   expect([live.mergeToDone.medianMin, live.backlog]).toStrictEqual([60, { total: 1, byRepo: { gadgets: 1 }, oldest: { id: 'GEO-2', ageMin: 80 } }]);
 });
 
 test('idle capacity counts only while Ready work waited; a stale count is flagged; nudges convert', () => {
-  const sample = (m: number, slots: number, eligible: number | null) => db.query('INSERT INTO lanes_samples (at, free_mib, slots, eligible) VALUES (?, 0, ?, ?)').run(until(m), slots, eligible);
+  const sample = (minutes: number, slots: number, eligible: number | null) => db.query('INSERT INTO lanes_samples (at, free_mib, slots, eligible) VALUES (?, 0, ?, ?)').run(new Date(Date.parse('2026-10-16T01:00:00Z') + minutes * 60_000).toISOString().replace(/\.\d{3}Z$/u, 'Z'), slots, eligible);
   sample(0, 2, 3);
   sample(10, 2, 0);
   sample(20, 1, null);
   sample(30, 0, 4);
-  db.query("INSERT INTO lanes_nudges (at, slots, free_minutes, eligible, event_seq, slots_after) VALUES (?, 2, 10, 3, 1, 0), (?, 2, 10, 3, 1, 2), (?, 1, 10, null, 1, NULL)").run(until(1), until(11), until(21));
-  const s = computeStats(db, { from: T0, to: until(40), gh: null });
+  db.query("INSERT INTO lanes_nudges (at, slots, free_minutes, eligible, event_seq, slots_after) VALUES (?, 2, 10, 3, 1, 0), (?, 2, 10, 3, 1, 2), (?, 1, 10, null, 1, NULL)").run('2026-10-16T01:01:00Z', '2026-10-16T01:11:00Z', '2026-10-16T01:21:00Z');
+  const s = computeStats(db, { from: '2026-10-16T01:00:00Z', to: '2026-10-16T01:40:00Z', gh: null });
   expect(s.idle).toEqual({ slotMinutesWhileReady: 20, slotMinutesUnknown: 10, staleShare: 0.25, samples: 4, nudges: 3, nudgesConverted: 1, nudgesPending: 1 });
   expect(statsText(s)).toContain('READY COUNT STALE in 25% of 4 samples: no fresh per-lane Ready report');
 });
@@ -174,13 +172,13 @@ test('a merge that hq run unmerge took back is not counted', () => {
   closePr(db, 'gadgets#6', { to: 'merged', actor: 'z-review' });
   atMin(20);
   unmergePr(db, 'widgets#5', 'z-review', 'the merge failed on a conflict');
-  const s = computeStats(db, { from: T0, to: until(60), gh: null });
+  const s = computeStats(db, { from: '2026-10-16T01:00:00Z', to: '2026-10-16T02:00:00Z', gh: null });
   expect(s.flow).toMatchObject({ mergesSource: 'hq', mergesPerDay: { gadgets: 1 } });
   expect(s.flow.mergesPerDay['widgets']).toBeUndefined();
 });
 
 test('GitHub merges per day by repo replace the tracked count when given', () => {
-  const s = computeStats(db, { from: T0, to: until(2 * 1440), gh: [{ repo: 'widgets', mergedAt: until(5) }, { repo: 'widgets', mergedAt: until(1500) }, { repo: 'gadgets', mergedAt: until(10) }, { repo: 'gadgets', mergedAt: '2026-10-01T00:00:00Z' }] });
+  const s = computeStats(db, { from: '2026-10-16T01:00:00Z', to: '2026-10-18T01:00:00Z', gh: [{ repo: 'widgets', mergedAt: '2026-10-16T01:05:00Z' }, { repo: 'widgets', mergedAt: '2026-10-17T02:00:00Z' }, { repo: 'gadgets', mergedAt: '2026-10-16T01:10:00Z' }, { repo: 'gadgets', mergedAt: '2026-10-01T00:00:00Z' }] });
   expect(s.flow).toMatchObject({ mergesSource: 'github', days: 2, mergesPerDay: { widgets: 1, gadgets: 0.5 } });
 });
 
@@ -189,7 +187,7 @@ test('rows from before the cutoff are left out', () => {
   run('GEO-1');
   setState(db, 'GEO-1', 'blocked', { waitsOn: 'Geoff' }, 'z-delivery');
   atMin(60);
-  const s = computeStats(db, { from: '2026-10-14T00:00:00Z', to: until(60), gh: null });
+  const s = computeStats(db, { from: '2026-10-14T00:00:00Z', to: '2026-10-16T02:00:00Z', gh: null });
   expect(s.window.from).toBe('2026-10-14T20:00:00Z');
   expect(s.geoff.runGeoffWait.n).toBe(0);
 });
@@ -222,7 +220,7 @@ test('drop removes a mistaken mark and keeps what it said in the event', () => {
 });
 
 test('the stats output heads the section on waits for the owner "Wait on the owner"', () => {
-  const stats = computeStats(db, { from: T0, to: until(10), gh: null });
+  const stats = computeStats(db, { from: '2026-10-16T01:00:00Z', to: '2026-10-16T01:10:00Z', gh: null });
 
   expect(statsText(stats)).toContain('Wait on the owner (z-stu acts: batch, reorder or chase what waits longest)');
 });

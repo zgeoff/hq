@@ -18,7 +18,6 @@ const NOW = Date.parse('2026-10-16T10:00:00Z');
 const HOUR = 3_600_000;
 const entry = (pid: unknown, createdAt = NOW - HOUR, start = '9001') => ({ pid, createdAt, titleSha: 'invented', procStart: start, usedAt: createdAt + 1 });
 const alive = (_pid: number): boolean => true;
-const started = (_pid: number): string | null => '9001';
 const live = { pid: 4242 };
 const BOOT = NOW - 10 * HOUR;
 const many = (n: number) => Object.fromEntries(Array.from({ length: n }, (_, i) => [`cse_${i}`, entry(100 + i)]));
@@ -48,13 +47,15 @@ test.each([
   ['unknown: process not found', config({ cse_a: entry(4242) }), { why: 'no process' }, alive, 'unknown'],
   ['unknown: two processes found', config({ cse_a: entry(4242) }), { why: '2 processes' }, alive, 'unknown'],
 ] as const)('rcFromConfig %s', (_n, text, found, isAlive, state) => {
-  expect(rcFromConfig(text, found, isAlive, started, NOW, BOOT).state).toBe(state);
+  expect(rcFromConfig(text, found, isAlive, () => '9001', NOW, BOOT).state).toBe(state);
 });
 
 test('both answers need the live start time: unreadable means unknown', () => {
-  expect(rcFromConfig(config({ cse_a: entry(4242) }), live, alive, () => null, NOW, BOOT).state).toBe('unknown');
-  expect(rcFromConfig(config({ cse_a: entry(1) }), live, alive, () => null, NOW, BOOT).state).toBe('unknown');
-  expect(rcFromConfig(config({ cse_a: entry(4242) }), live, alive, started, NOW, null).state).toBe('unknown');
+  const matching = config({ cse_a: entry(4242) });
+  const other = config({ cse_a: entry(1) });
+  expect(rcFromConfig(matching, live, alive, () => null, NOW, BOOT).state).toBe('unknown');
+  expect(rcFromConfig(other, live, alive, () => null, NOW, BOOT).state).toBe('unknown');
+  expect(rcFromConfig(matching, live, alive, () => '9001', NOW, null).state).toBe('unknown');
 });
 
 test('bootTime reads btime from a stat file', () => {
@@ -109,15 +110,15 @@ test('rcState reads the config named by HQ_CLAUDE_JSON and leaves the file as it
   process.env['HQ_CLAUDE_JSON'] = file;
   const text = config({ cse_a: entry(4242) });
   writeFileSync(file, text);
-  const src = { findPid: () => live, alive, start: started, now: () => NOW, boot: () => BOOT };
-  expect(rcState(SID, src).state).toBe('on');
+  const source = { findPid: () => live, alive, start: () => '9001', now: () => NOW, boot: () => BOOT };
+  expect(rcState(SID, source).state).toBe('on');
   writeFileSync(file, config({ cse_a: entry(7) }));
-  expect(rcState(SID, src).state).toBe('off');
+  expect(rcState(SID, source).state).toBe('off');
   rmSync(file);
-  expect(rcState(SID, src).state).toBe('unknown');
+  expect(rcState(SID, source).state).toBe('unknown');
   writeFileSync(file, text);
   const mtime = statSync(file).mtimeMs;
-  rcState(SID, src);
+  rcState(SID, source);
   expect(statSync(file).mtimeMs).toBe(mtime);
   expect(readFileSync(file, 'utf8')).toBe(text);
 });

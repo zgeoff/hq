@@ -247,7 +247,9 @@ test('runs that have not shipped cannot hold back the rest: the next pass starts
   for (let i = 1; i <= 62; i++) {
     mergedRun(`GEO-${100 + i}`, [`nixie#${i}`]);
     w.shas[`nixie#${i}`] = sha(i);
-    if (i > 60) w.contains['v1.0.0']!.push(sha(i));
+    if (i > 60) {
+      w.contains['v1.0.0']?.push(sha(i));
+    }
   }
   const r = await shipRuns(db, gh(w), T);
   expect([r.compares, r.moved.length, r.deferred]).toEqual([60, 0, 2]);
@@ -328,7 +330,7 @@ test('a bad releases payload moves nothing and records an error', async () => {
     expect(r.errors[0]).toStartWith('nixie:');
     expect(getRun(db, 'GEO-40')!.state).toBe('merged');
   }
-  expect(db.query("SELECT COUNT(*) AS n FROM events WHERE action = 'error' AND subject_id = 'releases'").get()).toEqual({ n: 5 });
+  expect(db.query("SELECT COUNT(*) AS count FROM events WHERE action = 'error' AND subject_id = 'releases'").get()).toStrictEqual({ count: 5 });
   mergedRun('GEO-41', ['impz#1']);
   const w = world({ releases: { nixie: 'junk', impz: [rel('v0.1.0', '2026-10-16T00:00:00Z')] }, shas: { 'nixie#5': sha(5), 'impz#1': sha(1) }, contains: { 'v0.1.0': [sha(1)] } });
   const r = await shipRuns(db, gh(w), T);

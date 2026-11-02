@@ -219,7 +219,7 @@ test('a blocked run with no session awake is parked, whatever it waits on: its s
   setState(db, 'GEO-1', 'blocked', { waitsOnGeoff: true }, 'z-delivery');
 
   setState(db, 'GEO-2', 'blocked', { waitsOn: 'a release' }, 'z-delivery');
-  expect(parkedRuns(db)).toEqual([]);
+  expect(parkedRuns(db)).toStrictEqual([]);
   expect(runningByLane(db)).toEqual({ atc: 3 });
   const asleep = { id: '0000000a-aaaa-4aaa-8aaa-aaaaaaaaaaaa', alive: true, lifecycle: { vm: 'asleep' } };
   recordAwake(db, [asleep, { id: '0000000b-aaaa-4aaa-8aaa-aaaaaaaaaaaa', alive: false }, { id: '0000000c-aaaa-4aaa-8aaa-aaaaaaaaaaaa', alive: true }]);

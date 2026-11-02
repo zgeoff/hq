@@ -51,7 +51,8 @@ test('a dead daemon keeps the message for a retry, and the retry reuses its key'
   const row = db.query('SELECT status, idem_key FROM outbox').get() as { status: string; idem_key: string };
   expect(row.status).toBe('failed');
   atc = fakeAtc(dir);
-  expect(await flush(db)).toMatchObject({ sent: 0 });
+  const held = await flush(db);
+  expect(held).toMatchObject({ sent: 0 });
   expect(await flush(db, { retryFailed: true })).toMatchObject({ sent: 1 });
   expect(atc.sent[0]!.idempotencyKey).toBe(row.idem_key);
 });

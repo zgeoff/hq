@@ -58,7 +58,7 @@ test('nudges once slots stay free past 10 minutes, then not again while nothing 
   atMin(15);
   expect(tick(db, sample(16384), 'hq-lanes').why).toContain('nothing changed');
   atMin(40);
-  expect(tick(db, sample(16384), 'hq-lanes').nudged).toBe(true);
+  expect(tick(db, sample(16_384), 'hq-lanes').nudged).toBe(true);
   expect(nudgeLog(db, 5)).toHaveLength(2);
 });
 
@@ -133,7 +133,7 @@ test('a backlog of unsent nudges is cut to the newest, and to none once lanes ar
   atMin(10);
   tick(db, sample(16384), 'hq-lanes');
   atMin(41);
-  tick(db, sample(16384), 'hq-lanes');
+  tick(db, sample(16_384), 'hq-lanes');
   expect(msgs()).toHaveLength(1);
   atMin(13);
   tick(db, sample(0), 'hq-lanes');
@@ -152,7 +152,7 @@ test('a hold pauses nudges, drops an unsent one, and ends by itself', () => {
   expect(nudgeLog(db, 5)).toHaveLength(1);
   atMin(71);
   expect(getLanesHold(db)).toBeNull();
-  expect(tick(db, sample(16384), 'hq-lanes').nudged).toBe(true);
+  expect(tick(db, sample(16_384), 'hq-lanes').nudged).toBe(true);
 });
 
 test('it drops an unsent nudge at the forwarded orchestrator when the lanes are held', () => {

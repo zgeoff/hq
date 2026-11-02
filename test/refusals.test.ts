@@ -103,13 +103,15 @@ test('the next scan reads only new bytes, and a partial trailing line waits for 
   appendFileSync(p, whole.slice(40) + '\n');
   expect((await scan()).refusals_added).toBe(1);
   expect(rows().map((x) => [x['reason'], x['tool'], x['input']])).toEqual([['first', 'Bash', 'a'], ['second', 'Bash', 'b']]);
-  expect((await scan()).files_read).toBe(0);
+  const unchanged = await scan();
+  expect(unchanged.files_read).toBe(0);
 });
 
 test('a file that shrank is read again from the start; the uuid keeps it from doubling', async () => {
   const p = file('p/s.jsonl', jl(tu('t1', 'Bash', { command: 'a' }), refused('t1', 'first')));
   await scan();
-  expect((await scan()).refusals_added).toBe(0);
+  const again = await scan();
+  expect(again.refusals_added).toBe(0);
   const keep = jl(refused('t9', 'after truncation', { uuid: '00000000-0000-4000-8000-0000000000aa' }));
   truncateSync(p, 0);
   writeFileSync(p, keep);
@@ -241,7 +243,7 @@ test('redact covers each token family and leaves ordinary text and paths alone',
   expect(redact('Authorization: Bearer abc123xyz789')).toBe('Authorization: Bearer [redacted]');
   expect(redact('API_KEY="a b" run')).toBe('API_KEY=[redacted] run');
   expect(redact('bun test /home/kettle/projects/hq/src/refusals-and-more.ts')).toBe('bun test /home/kettle/projects/hq/src/refusals-and-more.ts');
-  expect(clean(`x ${'ghp_' + 'z'.repeat(40)}`, 5)).toBe('x [re');
+  expect(clean(`x ghp_${'z'.repeat(40)}`, 5)).toBe('x [re');
   expect(clean('  a \n\t b  ', 120)).toBe('a b');
 });
 
