@@ -9,9 +9,6 @@ import { HqError } from './errors.ts';
 import { enqueue } from './outbox/enqueue.ts';
 import { checkAsk } from './transitions/check-ask.ts';
 
-// The owner's console answer while another item is open with the owner: this one goes straight to answered,
-// its opened_at the answer's time, logged `answered-unopened`; the one-open rule stays as it is.
-// The filer hears it as `hq call answer` tells it.
 export function recordUnopenedAnswer(db: Database, id: string, answer: string, actor: string): Ask {
   return db
     .transaction((): Ask => {

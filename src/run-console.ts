@@ -15,8 +15,6 @@ import { CALL_MS } from './watcher/call-ms.ts';
 
 const DEFAULT_PORT = 4317;
 
-// `hq console [--port N]`: serves the console in the foreground until it is stopped. The login
-// link goes only to the owner's own terminal; `hq console login` asks this process to print another there.
 export async function runConsole(db: Database, port: number | null, gateDeps: LoginGateDeps): Promise<never> {
   const assets = await loadConsoleAssets(),
     auth = createConsoleAuth(),

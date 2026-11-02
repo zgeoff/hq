@@ -1,7 +1,5 @@
 import type { ItemInput } from './parse-item-input.ts';
 
-// The plain-text body an item filed as JSON keeps, so `hq call show` and every reader of `body`
-// still see its content.
 export function renderItemBody(item: ItemInput): string {
   const blocks: string[] = [];
   for (const d of item.details) {

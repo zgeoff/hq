@@ -7,9 +7,6 @@ interface StubPrivateDirOptions {
   marker: string;
 }
 
-// A stand-in for the hq-private checkout: briefs.private.md at the given path under the root, with
-// an invented opening, the permission phrasing table for the given rows, and a closing section that
-// holds the marker text, so a test can prove nothing outside the table is read out.
 export function createStubBriefPrivateDir(root: string, options: StubPrivateDirOptions): void {
   const file = join(root, options.path);
   mkdirSync(dirname(file), { recursive: true });

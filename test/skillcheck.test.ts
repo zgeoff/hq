@@ -75,7 +75,7 @@ test('a dropped flag, a renamed verb and an unknown command fail, naming the lin
   expect(why('ok\n`hq kettle fill --gallons 2`')).toEqual(['2: hq kettle fill has no --gallons in hq --help']);
   expect(why('`hq kettle refill`')).toEqual(['1: hq kettle refill: no such command in hq --help (hq kettle takes fill, empty)']);
   expect(why('`hq saucer`')).toEqual(['1: hq saucer is not a command in hq --help']);
-  expect(why('`hq teapot pour <cup> --minutes 3`')).toEqual(['1: hq teapot pour has no --minutes in hq --help']); // a flag of another verb
+  expect(why('`hq teapot pour <cup> --minutes 3`')).toStrictEqual(['1: hq teapot pour has no --minutes in hq --help']);
   expect(why('```\nhq tray --hot\n```')).toEqual(['2: hq tray has no --hot in hq --help']);
 });
 

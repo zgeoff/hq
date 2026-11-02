@@ -2,33 +2,20 @@ import { afterEach } from 'bun:test';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-// No test reads the real local settings file: this path never exists. A test that needs a file
-// writes one in a temp dir and points HQ_LOCAL_CONFIG at it.
 process.env['HQ_LOCAL_CONFIG'] = join(tmpdir(), 'hq-tests-no-local-config', 'local.json');
 
-// No test reads noslop's real store, which lives under the data home: this directory never exists. A
-// test that needs a store makes one in a temp dir and points XDG_DATA_HOME at that dir.
 process.env['XDG_DATA_HOME'] = join(tmpdir(), 'hq-tests-no-data-home');
 
-// No test reads or moves the real review files: this directory never exists. A test that needs
-// review files makes them in a temp dir and points REVIEW_DIR at it.
 process.env['REVIEW_DIR'] = join(tmpdir(), 'hq-tests-no-review-dir');
 
-// No test reads the real profile that holds the 1Password token for the Claude slot reads: this
-// file never exists. A test that needs one writes a file in a temp dir and points
-// HQ_SLOTS_OP_SETTINGS at it.
 process.env['HQ_SLOTS_OP_SETTINGS'] = join(tmpdir(), 'hq-tests-no-slots-settings', 'settings.local.json');
 
-// No test reads the sessions' real state files, which the goals report reads too: this directory
-// never exists. A test that needs state files makes them in a temp dir and points HQ_STATE_DIR at it.
 process.env['HQ_STATE_DIR'] = join(tmpdir(), 'hq-tests-no-state-dir');
 
 // A run from an agent's shell inherits its atc session id, and `hq call answer` then asks the real
-// atc whether that session is the owner's. A test that needs a session id sets its own.
+// atc whether that session is the owner's.
 delete process.env['ATC_SESSION_ID'];
 
-// The machine-specific settings hold invented values, so a test that never looks at them still runs;
-// a test of one sets its own through overrideEnv.
 const INVENTED_LOCAL_SETTINGS = {
   HQ_NOSLOP_OP_VAULT: 'invented-vault-id',
   HQ_NOSLOP_OP_ITEM: 'invented-item-id',
@@ -38,13 +25,11 @@ const INVENTED_LOCAL_SETTINGS = {
   HQ_CLOUD_METRICS_URL: 'http://teapot-host:9100/metrics',
   HQ_CLOUD_HOST: 'teapot-host',
 
-  // No test reads the real hq-private checkout: this directory never exists. A test of the start
-  // prompts makes one in a temp dir and points HQ_PRIVATE_DIR at it.
   HQ_PRIVATE_DIR: join(tmpdir(), 'hq-tests-no-hq-private'),
 },
 
   // Settings that test files set in beforeEach and did not put back: HQ_NOTIFY=off made every later
-  // file's flush hold its messages (GEO-1576). Each test ends with them as they were before any test.
+  // file's flush hold its messages.
   LEAKED = ['HQ_NOTIFY', 'HQ_AS', ...Object.keys(INVENTED_LOCAL_SETTINGS)] as const,
   SAVED = Object.fromEntries(LEAKED.map((name) => [name, { ...process.env, ...INVENTED_LOCAL_SETTINGS }[name]]));
 

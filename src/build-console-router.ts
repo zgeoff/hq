@@ -15,17 +15,13 @@ export interface ConsoleContext {
   db: Database;
   actor: string;
 
-  // Runs gh, to read a reviewed PR's head.
   run: Runner;
 
-  // Sends what the write queued, and says whether the owner session got it.
   notify: () => Promise<boolean>;
 
-  // The Shipped tab's report for a period, read from GitHub and Linear.
   loadShipped: (period: ShippedPeriod) => Promise<ShippedReport>;
 }
 
-// The console's typed API: the page reads the items and writes answers through hq's own functions.
 export function buildConsoleRouter() {
   const base = os.$context<ConsoleContext>();
   return {
@@ -54,15 +50,13 @@ export function buildConsoleRouter() {
   };
 }
 
-// The review is stored. Its PR's record is written next, then the owner session is told, whatever
-// the record write did.
 async function recordReviewAndNotify(context: ConsoleContext, item: UnblockItem, input: ConsolePRAnswerInput): Promise<{ id: string; state: string; told: boolean }> {
   await recordConsolePRAnswer(context.db, context.run, item, input).catch(() => false);
   const told = await context.notify();
   return { id: item.id, state: item.state, told };
 }
 
-// A failed read says why on the page; the reasons are local and hold no secret.
+// The reasons a failed read gives are local and hold no secret.
 async function readShipped(context: ConsoleContext, period: ShippedPeriod): Promise<ShippedReport> {
   try {
     return await context.loadShipped(period);

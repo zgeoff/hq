@@ -1,7 +1,5 @@
 import type { RenderedReport } from '../src/shipped/types.ts';
 
-// A day's report with one kettle group of two rows and one PR with no issue; `over` replaces
-// whole fields.
 export function buildRenderedReport(over: Partial<RenderedReport> = {}): RenderedReport {
   return {
     kind: 'daily',

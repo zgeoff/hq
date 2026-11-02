@@ -24,7 +24,6 @@ let cleanup: () => void;
 beforeEach(() => {
   ({ db, cleanup } = freshDb());
 
-  // Friday 13:00 Sydney (AEDT)
   process.env['HQ_NOW'] = '2026-10-16T02:00:00Z';
 });
 afterEach(() => {
@@ -53,7 +52,6 @@ test.each([
   [null, null],
 ] as [string | null, string | null][])('issue of %p is %p', (body, issue) => expect(issueOf(body)).toBe(issue));
 
-// A gh search that returns the given PRs for a day, keyed by day.
 function ghFake(byDay: Record<string, { repo: string; n: number; title: string; at: string; body?: string }[]>, calls: string[] = []): Runner {
   return async (cmd) => {
     const range = cmd[cmd.indexOf('--merged-at') + 1]!;
@@ -157,8 +155,8 @@ test('each issue counts in the Sydney week it closed; the three bug shares', asy
   ins.run('atc', 3, '2026-10-12T03:00:00Z', 'runs: three', 'other', null);
   ins.run('atc', 4, '2026-10-12T04:00:00Z', 'fix: four', 'fix', 'GEO-1');
   const li = db.query(`INSERT INTO linear_issues (issue, type, title, state, closed_at, fetched_at) VALUES (?, ?, 't', ?, ?, '2026-10-16T00:00:00Z')`);
-  li.run('GEO-1', 'Bug', 'completed', '2026-10-11T13:30:00Z'); // Monday 00:30 Sydney: this week, not last
-  li.run('GEO-2', 'Feature', 'completed', '2026-10-11T12:30:00Z'); // Sunday 23:30 Sydney: last week
+  li.run('GEO-1', 'Bug', 'completed', '2026-10-11T13:30:00Z');
+  li.run('GEO-2', 'Feature', 'completed', '2026-10-11T12:30:00Z');
   li.run('GEO-3', 'Chore', 'canceled', '2026-10-12T00:00:00Z');
   const [prev, cur] = kindWeeks(db, 2);
   expect(cur).toMatchObject({ from: '2026-10-11T13:00:00Z', partial: true, total: 4, bugShare: 50, prUnlinked: 1, prBugShare: 66.7, canceled: 1, issueBugShare: 100 });
@@ -188,7 +186,7 @@ test('a gh row hq cannot read records nothing', async () => {
     { ...ok, number: -1 },
     { ...ok, closedAt: 'soon' },
     { ...ok, closedAt: '0' },
-    { ...ok, closedAt: '2026-10-13T23:00:00Z' }, // another day
+    { ...ok, closedAt: '2026-10-13T23:00:00Z' },
     { ...ok, repository: { name: '../a' } },
     { ...ok, repository: { name: '..' } },
     { ...ok, repository: { name: '' } },

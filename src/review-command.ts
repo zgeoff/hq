@@ -1,5 +1,3 @@
-// `hq review <repo> <pr>` and `hq review gate`: parse the arguments, run, and
-// print what each engine found.
 import type { Ctx, Out } from './commands.ts';
 import { HqError } from './errors.ts';
 import { checkRecordedGate } from './pr-status/check-recorded-gate.ts';

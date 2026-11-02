@@ -2,7 +2,6 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { realRunner } from '../src/runner/real-runner.ts';
 
-// A commit's files: a path to its text, or null to delete the path.
 type Commit = Record<string, string | null>;
 
 interface StubPRRepoOptions {
@@ -12,20 +11,15 @@ interface StubPRRepoOptions {
   history: Commit[];
   change: Commit;
 
-  // One more commit on main after the PR branched.
   baseAfter?: Commit;
 }
 
 interface StubPRRepo {
-  // The clone hq finds under HQ_PROJECTS.
   directory: string;
   head: string;
   baseHead: string;
 }
 
-// Makes a real git repo in `<root>/projects/<repo>`: main holds `history` commit by commit, and the
-// PR head is one more commit holding `change`, served at refs/pull/<pr>/head. Its origin answers to
-// the GitHub URL of zgeoff/<repo> through a local bare repo, so a fetch needs no network.
 export async function createStubPRRepo(options: StubPRRepoOptions): Promise<StubPRRepo> {
   const bare = join(options.root, 'remotes', `${options.repo}.git`);
   const directory = join(options.root, 'projects', options.repo);

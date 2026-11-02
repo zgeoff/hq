@@ -12,34 +12,25 @@ interface StubRebaseRepoOptions {
   history: Files[];
   change: Files;
 
-  // A second PR commit on top of `change`, so the PR holds two commits.
   followUp?: Files;
 }
 
 interface StubRebaseRepo {
   directory: string;
 
-  // The PR head before anything moves.
   oldHead: string;
 
   readMainHead: () => Promise<string>;
 
-  // One more commit on main, pushed.
   moveMain: (files: Files) => Promise<void>;
 
-  // Replays the PR commits on main as it is now, adds `edit` to the last of them, and serves the
-  // result as the PR head. Gives the new head.
   rebase: (edit?: Files) => Promise<string>;
 
-  // Squashes the PR onto main as it is now into one commit, serves it as the PR head and gives it.
   squash: () => Promise<string>;
 
-  // The head origin serves for the PR now.
   readServedHead: () => Promise<string>;
 }
 
-// A stub PR repo on disk, its origin a local bare repo, whose PR head can then be rebased or squashed
-// onto a main that has moved, as a force push to the PR branch would.
 export async function createStubRebaseRepo(options: StubRebaseRepoOptions): Promise<StubRebaseRepo> {
   const stub = await createStubPRRepo({ root: options.root, repo: options.repo, pr: options.pr, history: options.history, change: options.change });
   const git = (...args: string[]) => runGit(stub.directory, args);

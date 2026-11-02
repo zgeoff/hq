@@ -20,7 +20,6 @@ afterEach(() => {
   Object.assign(process.env, saved);
 });
 
-// Every setting whose default is a value, with the default hq has always used.
 const DEFAULTS: [string, string | number][] = [
   ['HQ_REVIEW_LOCK_WAIT_MS', 300_000],
   ['HQ_LANES_FREE_MIN', 10],

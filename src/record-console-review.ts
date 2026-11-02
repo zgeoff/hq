@@ -19,9 +19,6 @@ export interface ConsoleReviewInput {
   actor: string;
 }
 
-// The owner's answer on a review item, in one write transaction. lgtm and Changes close it done
-// (the owner did the review); Reject drops it, so no session hears "carry on" about a PR going away. hq never
-// touches the PR: the owner session gets `console answer: review <id>: <answer>` and relays it.
 export function recordConsoleReview(db: Database, input: ConsoleReviewInput): UnblockItem {
   return db
     .transaction((): UnblockItem => {
@@ -34,7 +31,6 @@ export function recordConsoleReview(db: Database, input: ConsoleReviewInput): Un
     .immediate();
 }
 
-// The input, once its item has a subject PR, and a Changes answer has a note that says what to change.
 function requireReviewInput(db: Database, input: ConsoleReviewInput): ConsoleReviewInput {
   const u = getUnblock(db, input.id);
   if (u === null) {
@@ -62,7 +58,6 @@ function applyReview(db: Database, input: ConsoleReviewInput, text: string): Unb
   return closeUnblock(db, input.id, state, text, input.actor);
 }
 
-// What the review was about, kept on the answer so a later item under the same id cannot change it.
 function buildReviewFacts(item: UnblockItem): { title: string; issues: string[]; session: string; ref: string | null } {
   return { title: item.title ?? item.task, issues: item.unblocks.map((unblock) => unblock.issue), session: item.added_by, ref: findSubjectLink(item)?.url ?? null };
 }

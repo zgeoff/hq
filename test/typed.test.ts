@@ -38,7 +38,6 @@ test('a source is a known call, a known proposal, or a chat pointer with a time'
   expect(parseSource(db, `chat:${STU.toUpperCase()}@2026-10-16T00:58:30+11:00`)).toEqual({ kind: 'chat', ref: STU, at: '2026-10-15T13:58:30Z' });
 });
 
-// Every source the log must refuse: an unknown form is denied, never stored.
 const HOSTILE: [string, string][] = [
   ['', '--source must be'],
   ['call:', '--source must be'],
@@ -77,7 +76,6 @@ test('logs the full text, target and source; lists newest first, by name, id or 
   expect(listTyped(db, { session: null, limit: 1 })).toHaveLength(1);
   expect(() => listTyped(db, { session: null, limit: 0 })).toThrow('--limit');
   expect(() => listTyped(db, { session: null, limit: -5 })).toThrow('--limit');
-  // atc couldn't resolve this target: it is kept as the id it was given as, and found by prefix.
   const lost = '9f8e7d6c-0000-4000-8000-000000000003';
   addTyped(db, { to: lost, toId: null, toName: null, text: 'Invented.', source: parseSource(db, 'call:kettle-colour'), actor: 'z-stu' });
   expect(listTyped(db, { session: '9f8e7d6c', limit: 50 })).toEqual([expect.objectContaining({ id: 3, to_session: lost })]);

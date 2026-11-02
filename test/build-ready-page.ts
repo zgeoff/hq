@@ -24,8 +24,6 @@ interface ReadyPage {
   issues: { nodes: ReadyNode[]; pageInfo: { hasNextPage: boolean; endCursor: string | null } };
 }
 
-// A page of Linear's answer to the issues query. A non-null `endCursor` says another page follows.
-// A seed's type becomes a label in the Type group; priority defaults to 0 (none).
 export function buildReadyPage(seeds: ReadyNodeSeed[], endCursor: string | null): ReadyPage {
   const nodes = seeds.map((seed) => ({
     identifier: seed.identifier,
@@ -38,9 +36,6 @@ export function buildReadyPage(seeds: ReadyNodeSeed[], endCursor: string | null)
   return { issues: { nodes, pageInfo: { hasNextPage: endCursor !== null, endCursor } } };
 }
 
-// A Linear call that answers the first page (no cursor yet) with `first` and any later page with `second`,
-// which defaults to `first`. An Error answer rejects, as a failed request does; any other answer, a
-// malformed one included, resolves as given.
 export function makePagedCall(first: unknown, second: unknown = first): LinearCall {
   return (_query, variables) => {
     const answer = variables['after'] === null ? first : second;

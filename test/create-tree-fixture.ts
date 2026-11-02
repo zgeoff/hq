@@ -23,7 +23,6 @@ export function buildPrompt(who: string): string {
   return `# session prompt\n\n\`\`\`text\nYou are an invented ${who}.\n\`\`\`\n`;
 }
 
-// A test home with no checkout in it. Each tree is made on demand, cloned from a local origin.
 export function createTreeFixture() {
   const base = freshDb(),
     laneFiles = { 'skills/delivery-lead/scripts/capacity.sh': '#!/bin/sh\n', 'skills/delivery-lead/pacing.json': '{}\n' };

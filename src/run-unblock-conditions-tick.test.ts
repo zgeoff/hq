@@ -3,7 +3,6 @@ import { NOON_SYDNEY, at, freshDb } from '../test/helpers.ts';
 import { runUnblockConditionsTick } from './run-unblock-conditions-tick.ts';
 import { addUnblock } from './unblock/add-unblock.ts';
 
-// No open item has a subject link or a condition that reads gh or Linear, so the pass never calls them.
 function setupTest() {
   at(NOON_SYDNEY);
   const fresh = freshDb();

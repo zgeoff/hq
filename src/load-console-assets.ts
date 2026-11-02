@@ -3,9 +3,6 @@ import page from './console/index.html';
 
 export type ConsoleAssets = Map<string, () => Response>;
 
-// The page's files by URL path. A compiled hq carries them built (the HTML import lists them);
-// run from source, hq builds them in memory. Either way the console's own handler serves them,
-// so every file passes its request check.
 export async function loadConsoleAssets(): Promise<ConsoleAssets> {
   const built = page.files;
   if (built !== undefined) {

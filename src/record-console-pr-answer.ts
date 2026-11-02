@@ -17,9 +17,6 @@ export interface ConsolePRAnswerInput {
   actor: string;
 }
 
-// A console lgtm, Changes or Reject on an item whose subject is a zgeoff PR also goes on that PR's
-// record (keyed on the repo name alone), at the head GitHub gives now. The answer is already stored,
-// so nothing here throws; the result says whether the record was written.
 export async function recordConsolePRAnswer(db: Database, run: Runner, item: UnblockItem, input: ConsolePRAnswerInput): Promise<boolean> {
   if (input.review === 'later') {
     return false;
@@ -39,7 +36,6 @@ export async function recordConsolePRAnswer(db: Database, run: Runner, item: Unb
   }
 }
 
-// The item's subject PR when it is zgeoff's, else null.
 function findOwnPRRef(item: UnblockItem): PRURLRef | null {
   const ref = parsePRURL(findSubjectLink(item)?.url ?? '');
   return ref !== null && ref.owner.toLowerCase() === OWNER ? ref : null;

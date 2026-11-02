@@ -1,34 +1,23 @@
 import type { RunResult, Runner } from '../src/runner/types.ts';
 
 export interface StubSourceFacts {
-  // ref (repo#n) to the PR's merge commit
   shas: Record<string, string>;
 
-  // a release tag or a build commit to the merge commits it holds
   contains: Record<string, string[]>;
 
-  // repo to its release rows, as GitHub lists them
   releases?: Record<string, unknown>;
 
-  // repo to its release-please-config.json
   config?: Record<string, unknown>;
 
-  // ref (repo#n) to the PR's file records: a path, or for a rename `<new path>\t<previous path>`
   files?: Record<string, string[]>;
 
-  // compare heads GitHub does not know, which gh answers with its 404 text
   unknownHeads?: string[];
 
-  // tag name, such as deployed/prod, to the commit it points at; a tag not listed is not found
   tags?: Record<string, string>;
 
-  // repo to the raw text of its .github/gates.yml at main; a repo not listed has none
   gates?: Record<string, string>;
 }
 
-// A fake gh for the release sources: merge commits, compares, the paged release list, the
-// release-please config at a commit, a PR's files, a tag's commit and the gates file at main. A call
-// it does not know fails. Every call's line goes into `calls`.
 export function buildStubSourceGH(facts: StubSourceFacts, calls: string[]): Runner {
   return (cmd) => {
     const line = cmd.join(' ');

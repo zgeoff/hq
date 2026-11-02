@@ -1,15 +1,11 @@
 import type { RunResult, Runner } from '../src/runner/types.ts';
 
 export interface StubBriefFacts {
-  // ref to the commit it points at; a ref not listed is not found
   commits: Record<string, string>;
 
-  // path in zgeoff/hq to its text, at every listed commit; a path not listed is not found
   files: Record<string, string>;
 }
 
-// A fake gh for hq brief: a ref's commit sha, and a file of zgeoff/hq at a listed commit as the raw
-// media type gives it. A call it does not know fails. Every call's line goes into `calls`.
 export function buildStubBriefGH(facts: StubBriefFacts, calls: string[]): Runner {
   return (command) => {
     const line = command.join(' ');

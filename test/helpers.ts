@@ -8,14 +8,10 @@ import { buildFakeAtcState } from './build-fake-atc-state.ts';
 import type { FakeAtcState } from './build-fake-atc-state.ts';
 import { startStubAtcDaemon } from './start-stub-atc-daemon.ts';
 
-// A refused fetch retries after HQ_FETCH_RETRY_MS: no wait in tests.
 process.env['HQ_FETCH_RETRY_MS'] ??= '0';
-// A ref-lock fetch retries after HQ_REF_LOCK_RETRY_MS: no wait in tests.
 process.env['HQ_REF_LOCK_RETRY_MS'] ??= '0';
-// gh searches are spaced by HQ_SEARCH_GAP_MS: no wait in tests.
 process.env['HQ_SEARCH_GAP_MS'] ??= '0';
 
-// The value of an environment variable a test has set up; a missing one fails the test.
 export function requireEnv(name: string): string {
   const value = process.env[name];
   if (value === undefined) {
@@ -24,7 +20,6 @@ export function requireEnv(name: string): string {
   return value;
 }
 
-// A fresh database per test, in a temp dir. Messages stay in the outbox unless a test turns them on.
 export function freshDb(): { db: Database; dir: string; path: string; cleanup: () => void } {
   const dir = mkdtempSync(join(process.env['TMPDIR'] ?? tmpdir(), 'hq-test-'));
   const path = join(dir, 'hq.db');
@@ -36,9 +31,6 @@ export function freshDb(): { db: Database; dir: string; path: string; cleanup: (
   return { db, dir, path, cleanup: () => (db.close(), rmSync(dir, { recursive: true, force: true })) };
 }
 
-// 01:00Z on 14 Oct 2026 is 12:00 in Sydney (AEDT, UTC+11): awake hours.
-// Marks the goals data fetched for every UTC day in [from, to]: CI for each repo, and merged PRs.
-// Without it, a goal measure counts the days as not fetched and gives no colour.
 export function fetchedDays(db: Database, from = '2026-09-01', to = '2026-11-30', repos = ['atc']): void {
   const ci = db.query(`INSERT OR IGNORE INTO goal_days (kind, key, day, n, at) VALUES ('ci', ?, ?, 0, '2026-09-01T00:00:00Z')`);
   const pr = db.query(`INSERT OR IGNORE INTO merged_pr_days (day, n, at) VALUES (?, 0, '2026-09-01T00:00:00Z')`);
@@ -52,7 +44,6 @@ export function fetchedDays(db: Database, from = '2026-09-01', to = '2026-11-30'
 }
 
 export const NOON_SYDNEY = '2026-10-14T01:00:00Z';
-// 17:00Z on 14 Oct is 04:00 on 15 Oct in Sydney: quiet hours.
 export const FOUR_AM_SYDNEY = '2026-10-14T17:00:00Z';
 
 export function at(t: string): void {
@@ -73,12 +64,10 @@ export interface FakeAtc extends FakeAtcState {
   feed: FeedEvent[];
   activity: Map<string, number>;
   sent: { session: string; text: string; from: string; idempotencyKey: string; notice?: boolean }[];
-  onMessage: (() => void) | null; // runs after each new message is recorded
+  onMessage: (() => void) | null;
   stop: () => void;
 }
 
-// A unix socket that speaks atc's protocol 8 peer wire: hello, session.list, session.get,
-// atc 6.0.0 and 7.0.0's events cursor: the tuple ["events", id], base64url.
 function encodeCursor(id: number): string {
   return Buffer.from(JSON.stringify(['events', id])).toString('base64url');
 }
@@ -99,7 +88,6 @@ function readFeedStart(cursor: string): number {
   }
 }
 
-// events.read, session.message.
 export function fakeAtc(dir: string, sessions = [
   { id: 'id-stu', name: 'z-stu', alive: true, state: 'done' },
   { id: 'id-refine', name: 'z-refine', alive: true, state: 'done' },
@@ -225,7 +213,6 @@ function runGit(cwd: string, ...args: string[]): void {
   if (r.exitCode !== 0) throw new Error(`git ${args.join(' ')}: ${r.stderr.toString()}`);
 }
 
-// An origin repo with a main branch under `${dir}/${origin}`, and a clone of it at `${dir}/${clone}`.
 function createOriginClone(dir: string, origin: string, clone: string, files: Record<string, string>): RepoFixture {
   const originDir = join(dir, origin);
   const push = (f: Record<string, string>) => {
@@ -243,17 +230,12 @@ function createOriginClone(dir: string, origin: string, clone: string, files: Re
   return { dir: join(dir, clone), push };
 }
 
-// An hq-defs stand-in: an origin repo with a main branch, and a clone at `${dir}/defs` that is the
-// skills tree (HQ_DEFINITIONS_DIR). push() commits files on origin's main.
 export function createHqDefsRepo(dir: string, files: Record<string, string>): { defs: string; push: (files: Record<string, string>) => void } {
   const repo = createOriginClone(dir, 'origin', 'defs', files);
   process.env['HQ_DEFINITIONS_DIR'] = repo.dir;
   return { defs: repo.dir, push: repo.push };
 }
 
-// Both trees, each with its own origin: an hq-defs stand-in with a placeholder file, and an
-// hq-private stand-in at `${dir}/private` (HQ_PRIVATE_DIR) holding `files`. hq reads start prompts
-// through hq-private's origin/main, and push() commits files there.
 export function createDefsRepo(dir: string, files: Record<string, string>): { defs: string; private: string; push: (files: Record<string, string>) => void } {
   const hq = createHqDefsRepo(dir, { 'README.md': 'invented skills tree\n' }),
     hqPrivate = createOriginClone(dir, 'private-origin', 'private', files);

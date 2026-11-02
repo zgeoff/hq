@@ -30,8 +30,6 @@ import { buildReadyIssue } from '../test/build-ready-issue.ts';
 import { buildStubFinalGH } from '../test/build-stub-final-gh.ts';
 import { buildStubBriefGH } from '../test/build-stub-brief-gh.ts';
 
-// A database at noon Sydney, quiet notices and console, and a stand-in gh on PATH for
-// `hq goals sync`: no repos and no closed PRs, with `billing` as the billing usage call's commands.
 function setupTest(billing: string): Database {
   const fresh = freshDb(),
     log = console.log,

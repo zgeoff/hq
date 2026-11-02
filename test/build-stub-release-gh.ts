@@ -7,9 +7,6 @@ export interface StubReleaseRow {
   published_at: string | null;
 }
 
-// A fake gh for the release list a watch reads: `gh api repos/<owner>/<repo>/releases?per_page=30
-// --jq ...` answers that repo's rows, newest first as GitHub lists them. A repo it does not hold
-// answers gh's 404, and any other command fails. Every call's line goes into `calls`.
 export function buildStubReleaseGH(releases: Record<string, StubReleaseRow[]>, calls: string[]): Runner {
   return (cmd) => {
     const line = cmd.join(' ');

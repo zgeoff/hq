@@ -28,11 +28,11 @@ beforeEach(() => {
 afterEach(() => cleanup());
 
 interface World {
-  nonnix: number; // MiB awake, non-Nix
+  nonnix: number;
   nix: number;
   used: number;
-  cloudAvail: number; // GiB
-  plugged?: number; // MiB plugged into the elastic non-Nix imp
+  cloudAvail: number;
+  plugged?: number;
   impzBroken?: boolean;
   impzHangs?: boolean;
   cloudBroken?: boolean;
@@ -83,7 +83,7 @@ test('the Kysely adapter inserts and selects through hq\'s own database', async 
   const rows = await k.selectFrom('capacity_samples').selectAll().execute();
   expect(rows).toHaveLength(1);
   expect(rows[0]).toMatchObject({ impd_budget_mib: 100, nonnix_awake_mib: 7, claude_five_hour: 1.5, impd_used_mib: null });
-  expect(db.query('SELECT COUNT(*) AS n FROM capacity_samples').get()).toEqual({ n: 1 }); // close() left hq's database open
+  expect(db.query('SELECT COUNT(*) AS count FROM capacity_samples').get()).toStrictEqual({ count: 1 });
   await k.destroy();
   expect(db.query('SELECT 1 AS x').get()).toEqual({ x: 1 });
 });
@@ -132,7 +132,7 @@ test('a failed, malformed or hung source stores NULLs and an errors entry; the o
 
   const t = Date.now();
   const hung = await readCapacity(db, { ...probe(world({ cloudHangs: true })), run: (cmd) => (cmd[0] === 'impz' ? new Promise(() => {}) : probe(world()).run(cmd)) }, minute(0));
-  expect(Date.now() - t).toBeLessThan(5_000); // each read gives up at its own deadline
+  expect(Date.now() - t).toBeLessThan(5000);
   expect(hung.cloud_avail_bytes).toBeNull();
   expect(hung.errors['cloud']).toContain('no answer');
 });
@@ -148,7 +148,7 @@ test('a breach must hold two samples to open; one is not enough', async () => {
   await sampleAt(world({ nonnix: 18_432 }), minute(0));
   expect(outbox()).toHaveLength(0);
   expect(openAlerts(db)).toEqual({});
-  await sampleAt(world({ nonnix: 16_000 }), minute(5)); // back under: the count restarts
+  await sampleAt(world({ nonnix: 16_000 }), minute(5));
   await sampleAt(world({ nonnix: 18_432 }), minute(10));
   expect(outbox()).toHaveLength(0);
   const t = await sampleAt(world({ nonnix: 18_432 }), minute(15));
@@ -163,10 +163,10 @@ test('a breach must hold two samples to open; one is not enough', async () => {
 test('a clear also needs two good samples, and one message says how long it was open', async () => {
   await sampleAt(world({ nonnix: 18_432 }), minute(0));
   await sampleAt(world({ nonnix: 18_432 }), minute(5));
-  db.query("UPDATE outbox SET status = 'sent'").run(); // atc took it
+  db.query("UPDATE outbox SET status = 'sent'").run();
   const n = outbox().length;
   await sampleAt(world(), minute(10));
-  await sampleAt(world({ nonnix: 18_432 }), minute(15)); // breach again: the good count restarts
+  await sampleAt(world({ nonnix: 18_432 }), minute(15));
   await sampleAt(world(), minute(20));
   expect(outbox()).toHaveLength(n);
   await sampleAt(world(), minute(25));
@@ -179,14 +179,14 @@ test('a clear also needs two good samples, and one message says how long it was 
 
 test('a sample with no reading neither opens nor clears, and keeps the count', async () => {
   await sampleAt(world({ nonnix: 18_432 }), minute(0));
-  await sampleAt(world({ impzBroken: true }), minute(5)); // no reading
+  await sampleAt(world({ impzBroken: true }), minute(5));
   expect(outbox()).toHaveLength(0);
-  await sampleAt(world({ nonnix: 18_432 }), minute(10)); // second breach in a row, counting through the gap
+  await sampleAt(world({ nonnix: 18_432 }), minute(10));
   expect(Object.keys(openAlerts(db))).toEqual(['impd:nonnix']);
-  db.query("UPDATE outbox SET status = 'sent'").run(); // atc took it
+  db.query("UPDATE outbox SET status = 'sent'").run();
   const n = outbox().length;
   await sampleAt(world(), minute(15));
-  await sampleAt(world({ impzBroken: true }), minute(20)); // no reading: still open
+  await sampleAt(world({ impzBroken: true }), minute(20));
   expect(Object.keys(openAlerts(db))).toEqual(['impd:nonnix']);
   await sampleAt(world(), minute(25));
   expect(openAlerts(db)).toEqual({});
@@ -225,16 +225,15 @@ test('quiet hours: an impd open goes out at once; another alert waits for the fi
   expect(told[0]!.text).toContain('impd:');
   expect(told[0]?.text).not.toContain('cloud:');
   expect(Object.values(openAlerts(db)).map((o) => o.told)).toEqual([true, false]);
-  db.query("UPDATE outbox SET status = 'sent'").run(); // atc answered
-  // 07:00 Sydney is awake: the cloud alert, still open and never told, goes out once.
+  db.query("UPDATE outbox SET status = 'sent'").run();
   const morning = new Date(Date.parse(FOUR_AM_SYDNEY) + 3 * 3_600_000);
   await sampleAt(world({ nonnix: 20_000, cloudAvail: 2 }), morning);
   const after = outbox().filter((m) => m.target === owner());
   expect(after).toHaveLength(2);
   expect(after[1]?.text).toContain('cloud:');
-  expect(after[1]!.text).toContain('Still open:'); // the impd alert, already told
+  expect(after[1]?.text).toContain('Still open:');
   await sampleAt(world({ nonnix: 20_000, cloudAvail: 2 }), new Date(morning.getTime() + 300_000));
-  expect(outbox().filter((m) => m.target === owner())).toHaveLength(2); // nothing twice
+  expect(outbox().filter((message) => message.target === owner())).toHaveLength(2);
 });
 
 test('quiet hours: an alert that opens and clears inside them sends nothing; a told one is cleared at wake', async () => {
@@ -244,9 +243,9 @@ test('quiet hours: an alert that opens and clears inside them sends nothing; a t
   expect(openAlerts(db)).toEqual({});
   expect(outbox()).toHaveLength(0);
 
-  for (const m of [20, 25]) await sampleAt(world({ nonnix: 20_000 }), quiet(m)); // urgent: told
-  db.query("UPDATE outbox SET status = 'sent'").run(); // atc took it
-  for (const m of [30, 35]) await sampleAt(world(), quiet(m)); // clear: held
+  for (const offset of [20, 25]) { await sampleAt(world({ nonnix: 20_000 }), quiet(offset)); }
+  db.query("UPDATE outbox SET status = 'sent'").run();
+  for (const offset of [30, 35]) { await sampleAt(world(), quiet(offset)); }
   expect(outbox().filter((m) => m.target === owner())).toHaveLength(1);
   await sampleAt(world(), new Date(Date.parse(FOUR_AM_SYDNEY) + 3 * 3_600_000));
   const sent = outbox().filter((m) => m.target === owner());
@@ -262,13 +261,13 @@ test('awake totals count plugged memory, so elastic imps can trip the non-Nix al
 });
 
 test('an atc outage loses no notice: every open and back-under stays queued, in order, for both recipients', async () => {
-  for (const m of [0, 5]) await sampleAt(world({ nonnix: 20_000 }), minute(m)); // impd opens
-  for (const m of [10, 15]) await sampleAt(world({ nonnix: 20_000, cloudAvail: 2 }), minute(m)); // cloud opens
-  for (const m of [20, 25]) await sampleAt(world({ cloudAvail: 2 }), minute(m)); // impd clears
-  for (const m of [30, 35]) await sampleAt(world({ nonnix: 20_000, cloudAvail: 2 }), minute(m)); // impd opens again
-  for (const m of [40, 45]) await sampleAt(world(), minute(m)); // both clear on one tick
-  for (const m of [50, 55]) await sampleAt(world({ cloudAvail: 2 }), minute(m)); // cloud opens again
-  for (const m of [60, 65]) await sampleAt(world(), minute(m)); // cloud clears
+  for (const offset of [0, 5]) { await sampleAt(world({ nonnix: 20_000 }), minute(offset)); }
+  for (const offset of [10, 15]) { await sampleAt(world({ nonnix: 20_000, cloudAvail: 2 }), minute(offset)); }
+  for (const offset of [20, 25]) { await sampleAt(world({ cloudAvail: 2 }), minute(offset)); }
+  for (const offset of [30, 35]) { await sampleAt(world({ nonnix: 20_000, cloudAvail: 2 }), minute(offset)); }
+  for (const offset of [40, 45]) { await sampleAt(world(), minute(offset)); }
+  for (const offset of [50, 55]) { await sampleAt(world({ cloudAvail: 2 }), minute(offset)); }
+  for (const offset of [60, 65]) { await sampleAt(world(), minute(offset)); }
   for (const t of [owner(), orchestratorName()]) {
     const texts = outbox().filter((m) => m.target === t).map((m) => m.text.split('\n')[1]!);
     expect(texts).toEqual([
@@ -288,8 +287,8 @@ test('an alert that reopens in quiet hours drops its old held recovery', async (
   const q = (m: number) => new Date(Date.parse(FOUR_AM_SYDNEY) + m * 60_000);
   for (const m of [0, 5]) await sampleAt(world({ nonnix: 20_000 }), q(m));
   db.query("UPDATE outbox SET status = 'sent'").run();
-  for (const m of [10, 15]) await sampleAt(world(), q(m)); // clear held
-  for (const m of [20, 25]) await sampleAt(world({ nonnix: 20_000 }), q(m)); // reopens
+  for (const offset of [10, 15]) { await sampleAt(world(), q(offset)); }
+  for (const offset of [20, 25]) { await sampleAt(world({ nonnix: 20_000 }), q(offset)); }
   const n = outbox().length;
   await sampleAt(world({ nonnix: 20_000 }), new Date(Date.parse(FOUR_AM_SYDNEY) + 3 * 3_600_000));
   expect(outbox().slice(n).some((m) => m.text.includes('back under'))).toBe(false);
@@ -328,7 +327,7 @@ test('samples older than 30 days are pruned on each sample; the log reads newest
   await sampleAt(world(), new Date(Date.parse(NOON_SYDNEY) - 29 * 86_400_000));
   expect(db.query('SELECT COUNT(*) AS n FROM capacity_samples').get()).toEqual({ n: 2 });
   await sampleAt(world(), minute(0));
-  expect(db.query('SELECT COUNT(*) AS n FROM capacity_samples').get()).toEqual({ n: 2 }); // the 31-day-old one went
+  expect(db.query('SELECT COUNT(*) AS count FROM capacity_samples').get()).toStrictEqual({ count: 2 });
   await sampleAt(world(), minute(60));
   const log = await sampleLog(db, 24, minute(60));
   expect(log.map((r) => r.at)).toEqual([minute(60), minute(0)].map((d) => d.toISOString().replace(/\.\d{3}Z$/, 'Z')));
@@ -351,10 +350,9 @@ test('the daily check-in carries the capacity line before Incidents today', asyn
   await sampleAt(world(), minute(0));
   const l = dailyText(db, minute(1)).split('\n');
   expect(l.at(-2)).toStartWith('Capacity: impd non-Nix 8,192/16,384 MiB awake');
-  expect(l.at(-2)!.length).toBeLessThanOrEqual(159); // the check-in's line cap
+  expect(l.at(-2)?.length).toBeLessThanOrEqual(159);
 });
 
-// A probe whose impz lists these imps, with a budget beside them.
 function buildImpzProbe(imps: readonly Record<string, unknown>[]): CapacityProbe {
   return {
     run: (cmd) => Promise.resolve({ code: 0, stdout: cmd[1] === 'info' ? JSON.stringify({ ramBudgetMib: 20_480, ramUsedMib: 4096, ramCommittedMib: 6144 }) : JSON.stringify(imps), stderr: '' }),

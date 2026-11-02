@@ -51,7 +51,8 @@ test('a dead daemon keeps the message for a retry, and the retry reuses its key'
   const row = db.query('SELECT status, idem_key FROM outbox').get() as { status: string; idem_key: string };
   expect(row.status).toBe('failed');
   atc = fakeAtc(dir);
-  expect(await flush(db)).toMatchObject({ sent: 0 }); // failed rows wait for --retry
+  const held = await flush(db);
+  expect(held).toMatchObject({ sent: 0 });
   expect(await flush(db, { retryFailed: true })).toMatchObject({ sent: 1 });
   expect(atc.sent[0]!.idempotencyKey).toBe(row.idem_key);
 });
@@ -67,7 +68,6 @@ test('it leaves a row sent when another flush sent it while this one failed to r
 });
 
 test('a fleet session renamed under hq still gets its message, by the id hq fleet recorded', async () => {
-  // Invented: z-stu's session now shows as "stu"; another session took the name "z-stu".
   atc = fakeAtc(dir, [
     { id: 'id-stu', name: 'stu', alive: true, state: 'done' },
     { id: 'id-other', name: 'z-stu', alive: true, state: 'done' },
@@ -197,7 +197,7 @@ describe('inside an atc session', () => {
     };
     const r = await send(db, 'all', false, run, 5_000);
     expect(r.flushed).toMatchObject({ sent: 1, failed: 0, pending: 0 });
-    expect(atc.sent).toHaveLength(0); // the unit sent it, not this process
+    expect(atc.sent).toHaveLength(0);
   });
 
   test('a --retry waits for the unit to try a failed row again', async () => {
@@ -252,7 +252,6 @@ test('a row dropped or forwarded after the flush selected it is not sent to the 
   const seq = logEvent(db, 'hq', 'probe', 'probe', 'z-q', null, null);
   enqueue(db, seq, 'z-stu', 'one');
   enqueue(db, seq, 'z-kettle', 'two');
-  // the first send (to z-stu) is where the forward lands, before the z-kettle row is read again
   const orig = atc.onMessage;
   atc.onMessage = () => setForward(db, 'z-kettle', 'z-teapot');
   await flush(db);
@@ -267,7 +266,6 @@ describe('a command sends only the rows it queued', () => {
   beforeEach(() => {
     console.log = () => {};
     process.env['HQ_AS'] = 'z-steward';
-    // main() sends inline here; outside an atc session there is no detached unit
     delete process.env['ATC_SESSION_ID'];
     delete process.env['ATC_SESSION_RECORD'];
   });
@@ -278,7 +276,6 @@ describe('a command sends only the rows it queued', () => {
       else process.env[k] = saved[k];
     }
   });
-  // A row another command left pending, e.g. one whose own send failed to start.
   const foreign = (text = 'Invented note left by another command') => enqueue(db, logEvent(db, 'hq', 'probe', 'probe', 'z-q', null, null), 'z-delivery', text);
   const statuses = () => db.query('SELECT target, status FROM outbox ORDER BY id').all();
   const hq = (...argv: string[]) => main([...argv, '--json']);
@@ -297,7 +294,6 @@ describe('a command sends only the rows it queued', () => {
   test('a read-only command sends nothing', async () => {
     atc = fakeAtc(dir);
     foreign();
-    // status and outbox list were never on the old read-only list, and sent other commands' rows.
     for (const argv of [['status'], ['outbox'], ['outbox', 'forwards'], ['health', 'settings'], ['typed', 'list'], ['mark', 'list'], ['followup', 'list'], ['run', 'list']]) {
       expect(await hq(...argv)).toBe(0);
     }
@@ -307,7 +303,7 @@ describe('a command sends only the rows it queued', () => {
 
   test('a command that fails sends nothing, and its ids do not leak into the next command', async () => {
     atc = fakeAtc(dir);
-    foreign(); // queued in this process, as a failed command's rows would be
+    foreign();
     expect(await hq('proposal', 'open', 'no-such-item')).toBe(1);
     expect(await hq('status')).toBe(0);
     expect(atc.sent).toHaveLength(0);
@@ -331,7 +327,6 @@ describe('a command sends only the rows it queued', () => {
     foreign('Invented pending note');
     foreign('Invented failed note');
     db.query(`UPDATE outbox SET status = 'failed', attempts = 1 WHERE text = 'Invented failed note'`).run();
-    // the exact call the lanes watcher makes each tick (src/cli.ts, `lanes watch`)
     expect(await flush(db, { retryFailed: true })).toMatchObject({ sent: 2, failed: 0 });
     expect(statuses()).toEqual([
       { target: 'z-delivery', status: 'sent' },
@@ -340,7 +335,6 @@ describe('a command sends only the rows it queued', () => {
   });
 
   test('inside a session, the detached unit is told to send only the rows of this command', async () => {
-    // afterEach restores it
     process.env['ATC_SESSION_ID'] = 'id-caller';
     foreign('Invented note one');
     foreign('Invented note two');
@@ -352,14 +346,13 @@ describe('a command sends only the rows it queued', () => {
     };
     const r = await send(db, [second!.id], false, run, 0);
     expect(calls[0]!.slice(-4)).toEqual(['outbox', 'flush', '--ids', String(second!.id)]);
-    expect(r.flushed).toMatchObject({ sent: 0, pending: 1 }); // waits on its own row, not both
+    expect(r.flushed).toMatchObject({ sent: 0, pending: 1 });
     expect((await send(db, [], false, run, 0)).detached).toBeNull();
     expect(calls).toHaveLength(1);
   });
 });
 
 test('with sending on and no fake atc named, a queued message reaches no atc and stays for a retry', async () => {
-  // as in a test that forgot to set up a fake atc
   delete process.env['HQ_ATC_SOCKET'];
   expect(socketPath()).toBe('/nonexistent/hq-test-no-live-atc.sock');
   file('tidy-docs');

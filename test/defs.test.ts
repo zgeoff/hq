@@ -38,24 +38,19 @@ afterEach(() => {
   cleanup();
 });
 
-// A ready hq checkout at the hq source's directory: every role prompt on main, and the lane files.
 function readyHq(files: Record<string, string> = {}) {
   const all: Record<string, string> = { 'skills/delivery-lead/scripts/capacity.sh': '#!/bin/sh\n', 'skills/delivery-lead/pacing.json': '{}\n', ...files };
   const repo = createHqDefsRepo(`${dir}/build`, all);
 
-  // createHqDefsRepo sets it; these tests go through the switch
   delete process.env['HQ_DEFINITIONS_DIR'];
   process.env['HQ_PRIVATE_DIR'] = `${dir}/.local/share/atc/workspaces/hq-private`;
   mkdirSync(`${dir}/.local/share/atc/workspaces`, { recursive: true });
   Bun.spawnSync(['git', 'clone', '-q', `${dir}/build/origin`, DEFS_SOURCES.hq.dir()]);
-  // The origin as gh sets it; insteadOf sends the fetch to the local origin.
   Bun.spawnSync(['git', '-C', DEFS_SOURCES.hq.dir(), 'remote', 'set-url', 'origin', 'git@github.com:zgeoff/hq.git']);
   Bun.spawnSync(['git', '-C', DEFS_SOURCES.hq.dir(), 'config', `url.${dir}/build/origin.insteadOf`, 'git@github.com:zgeoff/hq.git']);
   return { defs: repo.defs, push: repo.push };
 }
 
-// Both trees ready for a full `hq defs check`: hq-defs with what the grants check reads of it, and
-// hq-private with every role prompt. `privateFiles` replace files in hq-private.
 function createReadyBoth(privateFiles: Record<string, string> = {}) {
   const fixture = readPrivateFixture();
   readyHq(fixture.hqFiles);
@@ -83,7 +78,6 @@ test('a switch needs a passing preflight; a failed one changes nothing', () => {
   expect(preflight('hq')[0]).toMatchObject({ ok: false, line: expect.stringContaining('not a checkout') });
   expect(() => useSource(db, 'hq', 'z-stu')).toThrow('hq is not ready; nothing changed');
 
-  // nothing written
   expect(existsSync(requireEnv('HQ_DEFS_SOURCE_FILE'))).toBe(false);
   createReadyBoth({ 'skills/preview-qa/references/session-prompt.md': '```text\na\n```\n```text\nb\n```\n' });
   const checks = preflight('hq');
@@ -111,7 +105,6 @@ test('a ready checkout writes the switch file, and the event records it', () => 
   expect(DEFS()).toBe(DEFS_SOURCES.hq.dir());
   expect(db.query(`SELECT actor, from_state, to_state FROM events WHERE action = 'source'`).get()).toEqual({ actor: 'z-stu', from_state: 'none', to_state: 'hq' });
 
-  // the preflight restored the environment
   expect(process.env['HQ_DEFINITIONS_DIR']).toBeUndefined();
   expect(defsSource()).toBe('hq');
 });
@@ -158,7 +151,6 @@ function buildLater(minutes: number): Date {
 
 test('the tree sync fast-forwards hq-defs to origin/main and records it', () => {
 
-  // no checkout yet
   expect(runTreeSync()).toBeNull();
   expect(readTreeCheck(db, new Date())).toBeNull();
   const { push } = readyHq();
@@ -182,7 +174,7 @@ test('the tree sync refuses a dirty tree, another branch, local commits and a wr
   expect(runTreeSyncTick(db, 'z-q')).toMatchObject({ ok: false, line: expect.stringContaining('dirty (1 changed file(s))') });
   expect(readTreeCheck(db, new Date())).toMatchObject({ ok: false, line: expect.stringContaining('dirty') });
   hqGit('checkout', '-q', '--', '.');
-  writeFileSync(`${DEFS_SOURCES.hq.dir()}/scratch.txt`, 'untracked\n'); // untracked files don't count as dirty
+  writeFileSync(`${DEFS_SOURCES.hq.dir()}/scratch.txt`, 'untracked\n');
   hqGit('checkout', '-q', '-b', 'side');
   expect(runTreeSync()).toMatchObject({ ok: false, line: expect.stringContaining('on branch side, not main') });
   hqGit('checkout', '-q', 'main');
@@ -210,7 +202,7 @@ test('a ref lock held by another git is retried, then left for the next tick; tw
   const { push } = readyHq();
   push({ 'skills/intake/SKILL.md': 'upstream\n' });
   const lock = `${DEFS_SOURCES.hq.dir()}/.git/refs/remotes/origin/main.lock`;
-  writeFileSync(lock, ''); // another git's fetch, mid-update
+  writeFileSync(lock, '');
   expect(runTreeSyncTick(db, 'hq-lanes')).toMatchObject({ ok: true, transient: true, changed: false, line: expect.stringContaining('another git holds a ref lock') });
   expect(readTreeCheck(db, new Date())).toMatchObject({ ok: true });
   expect(runTreeSyncTick(db, 'hq-lanes')).toMatchObject({ ok: false, transient: true, line: expect.stringContaining('the same on the tick before') });
@@ -270,12 +262,10 @@ test('one setting moves the definitions checkout for the fleet, the lanes and th
   const users = () => ({ fleet: [...new Set(declaredFleet().filter((e) => DEFS_USERS.includes(e.name)).map((e) => e.cwd))], capacity: LANES.capacityScript(), prompts: DEFS() });
   delete process.env['HQ_CAPACITY'];
   try {
-    // The switch file (the config file): hq-defs under the workspaces root.
     createReadyBoth();
     useSource(db, 'hq', 'test');
     const hqDir = DEFS_SOURCES.hq.dir();
     expect(users()).toStrictEqual({ fleet: [hqDir], capacity: `${hqDir}/skills/delivery-lead/scripts/capacity.sh`, prompts: hqDir });
-    // The env var wins over the file.
     process.env['HQ_DEFINITIONS_DIR'] = `${dir}/elsewhere`;
     expect(users()).toStrictEqual({ fleet: [`${dir}/elsewhere`], capacity: `${dir}/elsewhere/skills/delivery-lead/scripts/capacity.sh`, prompts: `${dir}/elsewhere` });
   } finally {
@@ -286,7 +276,6 @@ test('one setting moves the definitions checkout for the fleet, the lanes and th
   }
 });
 
-// Recursive, since source sits in area folders; tests beside their modules are skipped.
 test("the workspaces path is written once in hq's source", () => {
   const hits = readdirSync('src', { recursive: true, encoding: 'utf8' })
     .filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'))

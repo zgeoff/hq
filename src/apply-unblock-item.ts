@@ -1,5 +1,3 @@
-// Writes the console's structured fields onto an unblock item, wrapping addUnblock in the same
-// transaction.
 import type { Database } from 'bun:sqlite';
 import { iso } from './clock/iso.ts';
 import { now } from './clock/now.ts';
@@ -11,8 +9,6 @@ import type { UnblockInput, UnblockItem } from './unblock/types.ts';
 import { addUnblock } from './unblock/add-unblock.ts';
 import { getUnblock } from './unblock/get-unblock.ts';
 
-// `hq unblock add --item`: adds or updates the item as addUnblock does, with the question as its
-// task, then stores the title and fields.
 export function applyUnblockItem(db: Database, input: Omit<UnblockInput, 'task'>, item: ItemInput): ReturnType<typeof addUnblock> {
   return db
     .transaction(() => {

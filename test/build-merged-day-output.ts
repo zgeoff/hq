@@ -1,7 +1,5 @@
 import type { MergedPR } from '../src/shipped/types.ts';
 
-// A PR merged for GEO-9801 in the kettle repo at noon Sydney time on 15 Oct 2026; `over` replaces
-// whole fields.
 export function buildMergedPR(over: Partial<MergedPR> = {}): MergedPR {
   return {
     repo: 'kettle',
@@ -19,8 +17,6 @@ export function buildMergedPR(over: Partial<MergedPR> = {}): MergedPR {
   };
 }
 
-// What `merged-prs.sh daily <day>` prints for these PRs, as JSON text: GitHub found and sent all of
-// them unless `searchCount` says it found more.
 export function buildMergedDayOutput(day: string, prs: readonly MergedPR[], searchCount = prs.length): string {
   const issues = [...new Set(prs.flatMap((pr) => (pr.issue === null ? [] : [pr.issue])))].toSorted(),
     repos = [...new Set(prs.map((pr) => pr.repo))].toSorted();

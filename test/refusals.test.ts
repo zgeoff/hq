@@ -9,7 +9,6 @@ import { loadRefusalsSummary as refusalsSummary } from '../src/refusals/load-ref
 import { scanRefusals } from '../src/refusals/scan-refusals.ts';
 import { type FakeAtc, at, fakeAtc, freshDb } from './helpers.ts';
 
-// Invented records in the shape Claude writes; no real transcript content.
 let db: Database;
 let dir: string;
 let cleanup: () => void;
@@ -85,7 +84,6 @@ test('a file first seen older than the window skips its history; a newer one is 
   appendFileSync(old, jl(tu('t3', 'Bash', { command: 'c' }), refused('t3', 'old file, new line')));
   await scan();
 
-  // an appended refusal in a skipped file still counts
   expect(rows().map((x) => x['reason'])).toEqual(['new', 'old file, new line']);
 });
 
@@ -105,13 +103,15 @@ test('the next scan reads only new bytes, and a partial trailing line waits for 
   appendFileSync(p, whole.slice(40) + '\n');
   expect((await scan()).refusals_added).toBe(1);
   expect(rows().map((x) => [x['reason'], x['tool'], x['input']])).toEqual([['first', 'Bash', 'a'], ['second', 'Bash', 'b']]);
-  expect((await scan()).files_read).toBe(0); // nothing new: the file is not opened
+  const unchanged = await scan();
+  expect(unchanged.files_read).toBe(0);
 });
 
 test('a file that shrank is read again from the start; the uuid keeps it from doubling', async () => {
   const p = file('p/s.jsonl', jl(tu('t1', 'Bash', { command: 'a' }), refused('t1', 'first')));
   await scan();
-  expect((await scan()).refusals_added).toBe(0); // dedupe on a re-scan
+  const again = await scan();
+  expect(again.refusals_added).toBe(0);
   const keep = jl(refused('t9', 'after truncation', { uuid: '00000000-0000-4000-8000-0000000000aa' }));
   truncateSync(p, 0);
   writeFileSync(p, keep);
@@ -155,7 +155,7 @@ test('a subagent transcript is flagged by its path', async () => {
 
 test('the tool is found earlier in the scan, else from the last scan of the file, else null', async () => {
   const p = file('p/s.jsonl', jl(tu('t_early', 'Bash', { command: 'read back' })));
-  await scan(); // the chunk holds no refusal; the offset moves past the tool_use
+  await scan();
   const assistant = tu('t_bytes', 'Bash', { command: 'by assistant uuid' }, '00000000-0000-4000-8000-0000000000bb');
   const noId = refused('', 'by uuid', { sourceToolAssistantUUID: assistant.uuid });
   delete (noId.message.content[0] as { tool_use_id?: string }).tool_use_id;
@@ -243,7 +243,7 @@ test('redact covers each token family and leaves ordinary text and paths alone',
   expect(redact('Authorization: Bearer abc123xyz789')).toBe('Authorization: Bearer [redacted]');
   expect(redact('API_KEY="a b" run')).toBe('API_KEY=[redacted] run');
   expect(redact('bun test /home/kettle/projects/hq/src/refusals-and-more.ts')).toBe('bun test /home/kettle/projects/hq/src/refusals-and-more.ts');
-  expect(clean(`x ${'ghp_' + 'z'.repeat(40)}`, 5)).toBe('x [re'); // mask first, then cap
+  expect(clean(`x ghp_${'z'.repeat(40)}`, 5)).toBe('x [re');
   expect(clean('  a \n\t b  ', 120)).toBe('a b');
 });
 
@@ -267,7 +267,6 @@ test('atc names the session and hq run_sessions gives the issue; atc down scans 
   atc.stop();
   atc = null;
 
-  // tests never reach a live atc
   delete process.env['HQ_ATC_SOCKET'];
   expect((await scanRefusals(db, { dir: proj() })).refusals_added).toBe(1);
   expect(rows()[1]).toMatchObject({ reason: 'atc down', atc_session: null, atc_name: null, issue: null });
@@ -313,10 +312,10 @@ test('hq refusals lists newest first, tallies with --by, and hq refusals scan re
 });
 
 test('every physical read is charged: big records past the budget do not make later files get read', async () => {
-  const big = 'x '.repeat(1024 * 1024); // a 2 MiB record
+  const big = 'x '.repeat(1024 * 1024);
   const sizes = Array.from({ length: 10 }, (_, i) => Buffer.byteLength(readFileSync(file(`p/f${i}.jsonl`, jl({ type: 'user', uuid: U(), pad: big }), i))));
   const r = await scan({ budgetBytes: 1024 * 1024 });
-  expect(r).toMatchObject({ files_read: 1, files_left: 9, bytes_read: sizes[0] }); // the newest, read to its line end
+  expect(r).toMatchObject({ files_read: 1, files_left: 9, bytes_read: sizes[0] });
 });
 
 test('an 18 MiB record with a 32 MiB budget is passed over, and the refusal after it is found', async () => {
@@ -331,7 +330,6 @@ test('an 18 MiB record with a 32 MiB budget is passed over, and the refusal afte
 
 test('two refusals whose tool_use came before the saved offset both get their tool, on a tiny budget', async () => {
   const fill = (k: number) => ({ type: 'user', uuid: U(), pad: 'y'.repeat(k) });
-  // chunk 1 ends the scan's slice reads; tool_use sits before the saved offset
   const p = file('p/a.jsonl', jl(tu('tb', 'Bash', { command: 'ls' }), fill(1000)));
   await scan();
   appendFileSync(p, jl(fill(700_000), refused('tb', 'late'), fill(700_000), refused('tb', 'later')));

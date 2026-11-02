@@ -17,12 +17,10 @@ import { at, freshDb } from './helpers.ts';
 
 let db: Database;
 let cleanup: () => void;
-const T0 = '2026-10-16T01:00:00Z'; // after the stats cutoff
-const atMin = (m: number) => at(new Date(Date.parse(T0) + m * 60_000).toISOString().replace(/\.\d{3}Z$/, 'Z'));
 
 beforeEach(() => {
   ({ db, cleanup } = freshDb());
-  atMin(0);
+  at('2026-10-16T01:00:00Z');
 });
 afterEach(() => cleanup());
 
@@ -36,8 +34,6 @@ const merge = (issue: string, ...refs: string[]) => {
   setState(db, issue, 'merged', {}, 'z-delivery');
 };
 
-// A fake gh that answers the GraphQL queries from a table of PRs; null marks a PR GitHub doesn't
-// know. `heads` are the branches some PR was opened from.
 type Fake = { additions: number; deletions: number; base?: string; was?: string[] } | null;
 function fakeGh(prs: Record<string, Fake>, calls: string[][] = [], heads: string[] = []) {
   return async (cmd: string[], _o?: RunOpts) => {
@@ -92,24 +88,24 @@ test('a size comes with run add or later with run size, and the change is logged
 
 test('guess against actual by band, unsized runs apart, and the share that shipped as a stack', async () => {
   run('GEO-1', parseSize('L', '3000'));
-  merge('GEO-1', 'kettle#1', 'kettle#2'); // a stack: #2 was based on #1's branch, then retargeted
+  merge('GEO-1', 'kettle#1', 'kettle#2');
   run('GEO-2', parseSize('S', '300'));
-  merge('GEO-2', 'kettle#3'); // 900 lines: outside S
+  merge('GEO-2', 'kettle#3');
   run('GEO-3');
-  merge('GEO-3', 'teapot#4'); // unsized, still counted for stacks
+  merge('GEO-3', 'teapot#4');
   run('GEO-4', parseSize('M', '1000'));
-  addPr(db, 'GEO-4', 'kettle#5', 'z-delivery'); // open: not a merged run
+  addPr(db, 'GEO-4', 'kettle#5', 'z-delivery');
   run('GEO-5', parseSize('M', '1000'));
   merge('GEO-5', 'kettle#6');
-  addPr(db, 'GEO-5', 'kettle#7', 'z-delivery'); // half merged: left out until the rest merges
-  atMin(60);
-  const runs = mergedRuns(db, T0, '2026-10-17T00:00:00Z');
+  addPr(db, 'GEO-5', 'kettle#7', 'z-delivery');
+  at('2026-10-16T02:00:00Z');
+  const runs = mergedRuns(db, '2026-10-16T01:00:00Z', '2026-10-17T00:00:00Z');
   expect(runs.map((r) => r.issue)).toEqual(['GEO-1', 'GEO-2', 'GEO-3']);
   const gh = fakeGh(
     {
       'kettle#1': { additions: 1500, deletions: 500 },
       'kettle#2': { additions: 1000, deletions: 0, was: ['geo-1-part-1'] },
-      'kettle#3': { additions: 800, deletions: 100, was: ['release/1.0'] }, // a release branch: no PR came from it
+      'kettle#3': { additions: 800, deletions: 100, was: ['release/1.0'] },
       'teapot#4': { additions: 50, deletions: 50, base: 'release/1.0' },
     },
     [],
@@ -133,19 +129,18 @@ test('guess against actual by band, unsized runs apart, and the share that shipp
 test('merged PR facts are cached; a PR GitHub lacks is left out, and gh failing gives null', async () => {
   run('GEO-1', parseSize('M', '1000'));
   merge('GEO-1', 'kettle#1', 'zgeoff/teapot#9');
-  const runs = mergedRuns(db, T0, '2026-10-17T00:00:00Z');
+  const runs = mergedRuns(db, '2026-10-16T01:00:00Z', '2026-10-17T00:00:00Z');
   const calls: string[][] = [];
   const gh = fakeGh({ 'kettle#1': { additions: 10, deletions: 0, base: 'geo-0-part' }, 'teapot#9': null }, calls, ['geo-0-part']);
   const facts = (await prFacts(db, gh, runs[0]!.prs))!;
   expect(facts).toEqual({ 'kettle#1': { lines: 10, stacked: true } });
   expect(sizeStats(runs, facts)).toMatchObject({ unread: 1, stackShare: null });
   await prFacts(db, gh, runs[0]!.prs);
-  expect(calls).toHaveLength(3); // PRs, then kettle#1's base; then only teapot#9 again
+  expect(calls).toHaveLength(3);
   expect(calls[2]!.at(-1)).not.toContain('name: "kettle"');
   const broken = async () => ({ code: 1, stdout: '', stderr: 'gh: not logged in' });
   expect(await prFacts(db, broken, [{ ref: 'kettle#7', url: null }])).toBeNull();
   expect(sizeText(null).join('\n')).toContain('needs GitHub');
-  // A branch lookup GitHub doesn't answer leaves the PR unread and uncached, not "no stack".
   const half = async (cmd: string[]) => {
     if (cmd.at(-1)!.includes('b0:')) return { code: 1, stdout: JSON.stringify({ data: { b0: null, b1: { pullRequests: { totalCount: 0 } } } }), stderr: '' };
     return fakeGh({ 'kettle#8': { additions: 5, deletions: 0, base: 'geo-8-part' }, 'kettle#9': { additions: 5, deletions: 0, base: 'release/2.0' } })(cmd);
@@ -159,7 +154,7 @@ test('a run whose last merge falls outside the window, or a dropped or unfinishe
   run('GEO-1', parseSize('S', '100'));
   merge('GEO-1', 'kettle#1');
   expect(mergedRuns(db, '2026-10-16T02:00:00Z', '2026-10-17T00:00:00Z')).toHaveLength(0);
-  expect(mergedRuns(db, T0, '2026-10-17T00:00:00Z')).toHaveLength(1);
+  expect(mergedRuns(db, '2026-10-16T01:00:00Z', '2026-10-17T00:00:00Z')).toHaveLength(1);
   db.query(`UPDATE runs SET state = 'dropped' WHERE issue = 'GEO-1'`).run();
-  expect(mergedRuns(db, T0, '2026-10-17T00:00:00Z')).toHaveLength(0);
+  expect(mergedRuns(db, '2026-10-16T01:00:00Z', '2026-10-17T00:00:00Z')).toHaveLength(0);
 });

@@ -34,14 +34,12 @@ const home = process.env['HOME'],
 beforeEach(() => {
   ({ db, dir, cleanup } = freshDb());
 
-  // no live checkout, trust file or capacity script
   process.env['HOME'] = dir;
 
-  // nor the live usage cache
   delete process.env['XDG_CACHE_HOME'];
-  at('2026-10-15T20:00:00Z'); // 07:00 Sydney: before the morning-reports job
+  at('2026-10-15T20:00:00Z');
   process.env['HQ_NOTIFY'] = 'off';
-  setMeta(db, 'kinds_synced_at', new Date().toISOString()); // no GitHub or Linear in these tests
+  setMeta(db, 'kinds_synced_at', new Date().toISOString());
   setMeta(db, 'goals_synced_at', new Date().toISOString());
   setMeta(db, 'goals_ok_at', new Date().toISOString());
   setMeta(db, 'kinds_ok_at', new Date().toISOString());
@@ -121,7 +119,7 @@ test('withDeadline passes a result through and clears its timer', async () => {
 });
 
 test('a watcher with no tick for 15 min alerts z-stu once, and once more when it recovers', async () => {
-  expect(watcherState(db)).toMatchObject({ since: null, stale: false }); // never ran: no alert
+  expect(watcherState(db)).toMatchObject({ since: null, stale: false });
   expect(watcherAlert(db, 'hq-fleet')).toBeNull();
   await watchTick(db, deps());
   at('2026-10-15T20:14:00Z');
@@ -130,7 +128,7 @@ test('a watcher with no tick for 15 min alerts z-stu once, and once more when it
   expect(watcherState(db)).toMatchObject({ stale: true, minutes: 15 });
   expect(watcherAlert(db, 'hq-fleet')).toBe('alerted');
   at('2026-10-15T20:20:00Z');
-  expect(watcherAlert(db, 'hq-fleet')).toBeNull(); // once per stale spell
+  expect(watcherAlert(db, 'hq-fleet')).toBeNull();
   expect(outbox()).toEqual([{ target: 'z-stu', text: expect.stringContaining('no completed tick for 15 min (last 2026-10-15T20:00:00Z)'), topic: 'watcher-stale' }]);
   await watchTick(db, deps());
   expect(watcherAlert(db, 'hq-fleet')).toBe('recovered');
@@ -168,7 +166,7 @@ test('a tick without a usage cache stores nothing and logs nothing about it', as
 });
 
 test('at 18:00 Sydney the watcher sends the goals check-in once, after a fresh goals sync', async () => {
-  at('2026-10-16T07:00:00Z'); // 18:00 Sydney
+  at('2026-10-16T07:00:00Z');
   setMeta(db, 'goals_synced_at', '2026-10-16T06:50:00Z');
   setMeta(db, 'goals_ok_at', '2026-10-16T06:50:00Z');
   setMeta(db, 'kinds_synced_at', '2026-10-16T06:50:00Z');
@@ -181,7 +179,7 @@ test('at 18:00 Sydney the watcher sends the goals check-in once, after a fresh g
 });
 
 test('at Monday 17:00 Sydney the watcher sends the goals weekly once, after a fresh goals sync', async () => {
-  at('2026-10-19T06:00:00Z'); // Mon 19 Oct 17:00 Sydney
+  at('2026-10-19T06:00:00Z');
   for (const k of ['goals_synced_at', 'goals_ok_at', 'kinds_synced_at', 'kinds_ok_at', 'linear_synced_at']) setMeta(db, k, '2026-10-19T05:50:00Z');
   await watchTick(db, deps());
   await watchTick(db, deps());
@@ -197,7 +195,6 @@ test('a tick reads one usage row per account file', async () => {
   expect(db.query('SELECT COUNT(*) AS n FROM usage_samples').get()).toEqual({ n: 2 });
 });
 
-// A runner for the goals sync: no repos or runs on GitHub, an apply that succeeded for every stored deploy-prod run.
 function goalsRunner(): Runner {
   return async (cmd, o) => {
     if (cmd[0] !== 'gh') return capacity(cmd, o);
@@ -217,15 +214,15 @@ function storeDeployRuns(n: number) {
 
 test('the watcher holds goals_ok_at while the cap leaves deploy-prod runs unclassified, and sets it once none are left', async () => {
   const old = '2026-10-15T10:00:00Z';
-  setMeta(db, 'goals_synced_at', old); // stale: the sync is due
+  setMeta(db, 'goals_synced_at', old);
   setMeta(db, 'goals_ok_at', old);
-  storeDeployRuns(61); // the cap is 60 a sync
+  storeDeployRuns(61);
   await watchTick(db, deps({}, goalsRunner()));
-  expect(getMeta(db, 'goals_synced_at')).toBe('2026-10-15T20:00:00Z'); // the sync ran
-  expect(getMeta(db, 'goals_ok_at')).toBe(old); // one run is still unclassified
+  expect(getMeta(db, 'goals_synced_at')).toBe('2026-10-15T20:00:00Z');
+  expect(getMeta(db, 'goals_ok_at')).toBe(old);
   setMeta(db, 'goals_synced_at', old);
   await watchTick(db, deps({}, goalsRunner()));
-  expect(getMeta(db, 'goals_ok_at')).toBe('2026-10-15T20:00:00Z'); // none left
+  expect(getMeta(db, 'goals_ok_at')).toBe('2026-10-15T20:00:00Z');
 });
 
 test('it holds goals_ok_at while the cap leaves repo-days unfetched', async () => {
@@ -261,7 +258,8 @@ test('the refusals step logs a count when it finds some, stays quiet on none, an
   expect(logs.some((l) => l.includes('found'))).toBe(false);
   expect(await watchTick(db, deps({ refusals: async () => Promise.reject(new Error('disk gone')) }))).toBe(true);
   expect(logs.some((l) => l.includes('refusals scan failed: disk gone'))).toBe(true);
-  expect(await watchTick(db, deps({ refusals: () => new Promise<never>(() => {}) }))).toBe(true); // a hung scan costs the step
+  const hung = await watchTick(db, deps({ refusals: () => new Promise<never>(() => {}) }));
+  expect(hung).toBe(true);
   expect(logs.some((l) => l.includes('refusals did not finish'))).toBe(true);
 });
 

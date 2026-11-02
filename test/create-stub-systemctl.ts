@@ -5,18 +5,14 @@ import { z } from 'zod';
 interface StubSystemctlOptions {
   directory: string;
 
-  // What `systemctl show -p <property> --value` prints, by property.
   show: Record<string, string>;
 }
 
 interface StubSystemctl {
-  // A directory to put first on PATH; it holds only `systemctl`.
   bin: string;
   readCalls: () => string[][];
 }
 
-// Writes a `systemctl` that logs each call's arguments and exits 0, so a test can run code that drives
-// systemd without reaching the real user manager.
 export function createStubSystemctl(options: StubSystemctlOptions): StubSystemctl {
   const bin = join(options.directory, 'bin');
   const log = join(options.directory, 'systemctl.log');

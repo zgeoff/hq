@@ -5,14 +5,11 @@ import { realRunner } from '../src/runner/real-runner.ts';
 export interface GitRepo {
   directory: string;
 
-  // Runs git in the repo and gives its trimmed output; a failure throws with git's own words.
   git: (...args: string[]) => Promise<string>;
 
-  // Writes the files, commits them all, and gives the new commit's sha.
   commit: (files: Record<string, string>, message: string) => Promise<string>;
 }
 
-// An empty git repo on main at the directory, with an invented author and no signing.
 export async function createGitRepo(directory: string): Promise<GitRepo> {
   mkdirSync(directory, { recursive: true });
   const git = async (...args: string[]): Promise<string> => {

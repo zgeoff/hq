@@ -1,5 +1,3 @@
-// Kysely, first stage (Decision 23): a typed query builder over hq's own bun:sqlite Database.
-// Migrations stay raw SQL in db.ts; new code reads and writes through here.
 import type { Database } from 'bun:sqlite';
 import { Kysely, SqliteDialect } from 'kysely';
 import type { SqliteDatabase } from 'kysely';
@@ -26,7 +24,7 @@ export interface CapacitySampleRow {
   op_account_used: number | null;
   op_account_limit: number | null;
   op_refused: number | null;
-  errors: string; // JSON {source: message}
+  errors: string;
 }
 
 export interface PRStatusRow {
@@ -68,7 +66,7 @@ export interface HqTables {
 }
 
 // hq owns the Database, so close() does nothing. bun:sqlite statements take their parameters
-// spread; Kysely passes an array. A statement that returns columns is a reader.
+// spread; Kysely passes an array.
 function adapter(db: Database): SqliteDatabase {
   return {
     close() {},

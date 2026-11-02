@@ -7,10 +7,6 @@ import type { Runner } from './runner/types.ts';
 import { attachGitHubPRs } from './runs/attach-github-prs.ts';
 import { closeGitHubRunPRs } from './runs/close-github-run-prs.ts';
 
-// At most every 10 min, the watcher attaches PRs to runs, then learns which run PRs merged or
-// closed, so a PR opened and merged between passes gets its merge in one pass. The throttle is set
-// before the reads, so a pass that fails or hangs waits its 10 min too. The merged search starts
-// from the last pass whose merged search answered in full, so a failed pass loses no merges.
 export async function runGitHubFactsTick(db: Database, run: Runner, at: Date = now()): Promise<{ closed: string[]; attached: string[]; errors: string[] } | null> {
   const CHECKED_AT = 'run_prs_checked_at';
   const MERGED_SINCE = 'run_prs_merged_since';
@@ -21,8 +17,7 @@ export async function runGitHubFactsTick(db: Database, run: Runner, at: Date = n
   }
   setMeta(db, CHECKED_AT, iso(at));
 
-  // The merged search reaches an hour before its last full answer, for search lag, and at least a
-  // day. With no full answer recorded yet, the last pass stands in for it.
+  // The merged search reaches an hour before its last full answer, for search lag.
   const searchedAt = getMeta(db, MERGED_SINCE) ?? checkedAt;
   const dayBack = at.getTime() - 24 * 60 * 60_000;
   const reach = searchedAt === null ? dayBack : Math.min(Date.parse(searchedAt) - 60 * 60_000, dayBack);
@@ -31,7 +26,6 @@ export async function runGitHubFactsTick(db: Database, run: Runner, at: Date = n
   if (attach.mergedSearched) {
     setMeta(db, MERGED_SINCE, iso(at));
   } else if (getMeta(db, MERGED_SINCE) === null) {
-    // The throttle moved on, so with no position yet the next pass would start from this one.
     setMeta(db, MERGED_SINCE, iso(new Date(reach + 60 * 60_000)));
   }
   const closed = await closeGitHubRunPRs(db, run);

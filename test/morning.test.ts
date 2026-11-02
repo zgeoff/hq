@@ -83,7 +83,6 @@ test('hq health: quiet before 08:45, then flags a missing run or a failed send',
   expect(morningCheck(db, syd('2026-10-17', '08:50'))).toMatchObject({ ok: false, line: expect.stringContaining('failed to send') });
   skipMorning(db, '2026-10-18', 'holiday', 'z-q');
   expect(morningCheck(db, syd('2026-10-18', '10:00'))).toMatchObject({ ok: true, line: expect.stringContaining('skipped') });
-  // A skip for a later day doesn't hide today's run from the check.
   skipMorning(db, '2026-10-25', 'away', 'z-q');
   morningTick(db, 'hq-lanes', syd('2026-10-19', '08:16'));
   expect(morningCheck(db, syd('2026-10-19', '09:00'))).toMatchObject({ ok: true, line: expect.stringContaining('queued today') });

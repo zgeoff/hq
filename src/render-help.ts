@@ -1,7 +1,6 @@
 import { COMMANDS } from './commands.ts';
 import type { Command, HelpEntry } from './commands.ts';
 
-// `hq help`: the first line, then each section's lines in table order, a blank line between sections.
 export function renderHelp(version: string, commands: readonly Command[] = COMMANDS): string {
   const sections: string[][] = [];
   let previous: string | null = null;
@@ -34,7 +33,6 @@ function isHelpList(help: HelpEntry | readonly HelpEntry[]): help is readonly He
   return Array.isArray(help);
 }
 
-// Where a summary starts when the usage is short enough, and where its later lines start.
 const HELP_SUMMARY_COLUMN = 46;
 const HELP_CONTINUATION = 45;
 

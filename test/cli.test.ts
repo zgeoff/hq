@@ -342,7 +342,7 @@ test('v15 rebuilds news with every row, its read state and its id sequence, and 
     { id: 2, topic: 'other', text: 'an invented note', read_at: '2026-10-15T01:00:00Z', needs_geoff: 0 },
   ]);
   db.query(`INSERT INTO news (from_name, topic, text, added_at) VALUES ('z-invented', 'report', 'an invented report', '2026-10-16T00:00:00Z')`).run();
-  expect(db.query(`SELECT id FROM news WHERE topic = 'report'`).get()).toEqual({ id: 4 }); // 3 is never reused
+  expect(db.query(`SELECT id FROM news WHERE topic = 'report'`).get()).toStrictEqual({ id: 4 });
   expect(db.query(`SELECT name FROM sqlite_master WHERE name LIKE 'news%' ORDER BY name`).all()).toEqual([{ name: 'news' }, { name: 'news_unread' }]);
   expect(() => db.query(`INSERT INTO news (from_name, topic, text, added_at) VALUES ('z', 'gossip', 't', 't')`).run()).toThrow();
   db.close();
@@ -356,7 +356,7 @@ test('v17 adds the probe tables and allows one open outage', () => {
   const db = openDb(p);
   const add = db.query(`INSERT INTO outages (started_at, detected_at, ended_at) VALUES ('2026-10-16T00:00:00Z', '2026-10-16T00:01:00Z', ?)`);
   add.run('2026-10-16T00:05:00Z');
-  add.run('2026-10-16T00:06:00Z'); // closed ones can repeat
+  add.run('2026-10-16T00:06:00Z');
   add.run(null);
   expect(() => add.run(null)).toThrow();
   db.query(`INSERT INTO probe_samples (at, target_ok) VALUES ('2026-10-16T00:00:00Z', 1)`).run();
@@ -392,7 +392,7 @@ test('v19 adds ready_ok and an outage kind, with one open outage per kind', () =
   expect(db.query('SELECT kind, ended_at FROM outages').all()).toEqual([{ kind: 'down', ended_at: null }]);
   expect(db.query('SELECT target_ok, ready_ok FROM probe_samples').all()).toEqual([{ target_ok: 1, ready_ok: null }]);
   const add = db.query(`INSERT INTO outages (started_at, detected_at, kind) VALUES ('2026-10-16T00:02:00Z', '2026-10-16T00:05:00Z', ?)`);
-  add.run('unready'); // a down and an unready outage can be open together
+  add.run('unready');
   expect(() => add.run('unready')).toThrow();
   expect(() => add.run('down')).toThrow();
   expect(() => add.run('sideways')).toThrow();
@@ -438,7 +438,7 @@ test('v21 adds deploy_runs, with a checked outcome and one row per run', () => {
 test('hq probe status shows the last ready check and the unready episodes', async () => {
   const d = db();
   d.query(`INSERT INTO probe_samples (at, target_ok, control_ok, ready_ok) VALUES ('2026-10-14T00:59:00Z', 1, NULL, 0)`).run();
-  d.query(`INSERT INTO probe_samples (at, target_ok, control_ok, ready_ok) VALUES ('2026-10-14T01:00:00Z', 0, 1, NULL)`).run(); // newer, down: ready not checked
+  d.query(`INSERT INTO probe_samples (at, target_ok, control_ok, ready_ok) VALUES ('2026-10-14T01:00:00Z', 0, 1, NULL)`).run();
   d.query(`INSERT INTO outages (started_at, detected_at, kind) VALUES ('2026-10-14T00:55:00Z', '2026-10-14T00:59:00Z', 'unready')`).run();
   d.close();
   const r = await hq('probe', 'status');
@@ -551,7 +551,6 @@ test('it still refuses hq run merged for a PR marked closed', async () => {
   await hq('run', 'pr', 'GEO-509', 'kettle#12');
   closePr(db(), 'kettle#12', { to: 'closed', actor: 'hq-github' });
 
-  // A stand-in gh on PATH that confirms the merge, so only the closed row can make hq refuse.
   const path0 = process.env['PATH'];
   const bin = `${dir}/bin`;
   mkdirSync(bin);
@@ -672,7 +671,6 @@ test('hq lanes ready refuses --skipped and --ready-total without --lane', async 
 });
 
 test('hq goals sync holds goals_ok_at while the cap leaves deploy-prod runs unclassified, and sets it once none are left', async () => {
-  // A stand-in gh on PATH: no repos, no closed PRs, and an apply that succeeded for every deploy-prod run.
   const path0 = process.env['PATH'];
   const bin = `${dir}/bin`;
   mkdirSync(bin);
@@ -694,8 +692,8 @@ test('hq goals sync holds goals_ok_at while the cap leaves deploy-prod runs uncl
     const d = db();
     const ins = d.query(`INSERT INTO ci_runs (id, repo, path, event, status, conclusion, attempt, created_at, started_at, updated_at) VALUES (?, 'cloud', '.github/workflows/deploy-prod.yml', 'push', 'completed', 'success', 1, ?, ?, ?)`);
     for (let i = 0; i < 61; i++) {
-      const t = new Date(Date.now() - 3_600_000 + i * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z'); // inside the --days 2 window
-      ins.run(8000 + i, t, t, t);
+      const stamp = new Date(Date.now() - 3_600_000 + i * 1000).toISOString().replace(/\.\d{3}Z$/u, 'Z');
+      ins.run(8000 + i, stamp, stamp, stamp);
     }
     d.close();
     const first = await hq('goals', 'sync', '--days', '2');
@@ -775,8 +773,6 @@ test("hq capacity broker reads the broker slot's fresh slot read from the databa
   expect(quota.json.broker).toMatchObject({ state: 'read', slot: 1, used: 0, readAt: '2026-10-14T00:30:00Z' });
 });
 
-// A v27 database at `file` with a call, a chat and a deleted proposal line typed, which refuses a
-// console source; returns its typed rows.
 function createV27TypedRows(file: string): unknown[] {
   const v27 = new Database(file, { create: true });
   try {
@@ -835,7 +831,6 @@ test('hq run ship prints a vers PR shipped at its merge as at merge', async () =
   closePr(db(), 'vers#20', { to: 'merged', actor: 'hq-github', facts: { mergedAt: '2026-10-20T03:04:05Z', mergeSha: null } });
   await hq('run', 'state', 'GEO-510', 'merged');
 
-  // A stand-in gh on PATH that answers the merge commit; a vers PR needs no other call.
   const path0 = process.env['PATH'];
   const bin = `${dir}/bin`;
   mkdirSync(bin);
@@ -906,7 +901,6 @@ test('hq run ship lists a run whose helper is still active as left, and moves no
   await hq('run', 'state', 'GEO-513', 'merged');
   await hq('run', 'session', 'GEO-513', '513ab0c0-0000-4000-8000-00000000beef', '--add');
 
-  // A stand-in gh on PATH that answers the merge commit; a vers PR needs no other call.
   const bin = `${dir}/bin`;
   mkdirSync(bin);
   writeFileSync(`${bin}/gh`, ['#!/bin/sh', `echo '{"mergeCommit":{"oid":"${'c'.repeat(40)}"}}'`, ''].join('\n'));
@@ -923,7 +917,6 @@ test('hq run ship lists a run put in deploy-held after its release as left held'
   closePr(db(), 'vers#21', { to: 'merged', actor: 'hq-github', facts: { mergedAt: '2026-10-10T03:04:05Z', mergeSha: null } });
   await hq('run', 'state', 'GEO-511', 'deploy-held', '--next', 'Waits on the kettle host to switch.');
 
-  // A stand-in gh on PATH that answers the merge commit; a vers PR needs no other call.
   const path0 = process.env['PATH'];
   const bin = `${dir}/bin`;
   mkdirSync(bin);

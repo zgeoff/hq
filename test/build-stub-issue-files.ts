@@ -2,8 +2,6 @@ import { readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { basename } from 'node:path';
 import type { IssueFiles } from '../src/linear/types.ts';
 
-// The real filesystem, except that writing the page named `failing` writes half its text, as a
-// full disk would, and then throws, and removing the page named `stuck` throws as a bad disk would.
 export function buildStubIssueFiles(failing: string, stuck = ''): IssueFiles {
   return {
     statSync,

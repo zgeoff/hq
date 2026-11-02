@@ -1,6 +1,3 @@
-// What the console's Needs you view shows: every call and proposal the owner can answer now, then every
-// open unblock item but a watch, each as one Item (console brief). An item filed as free text shows its body as
-// one details section and no options, so the owner answers it in the note box.
 import type { Database } from 'bun:sqlite';
 import type { Ask } from './asks/types.ts';
 import { listAsks } from './asks/list-asks.ts';
@@ -15,7 +12,6 @@ import { listUnblocks } from './unblock/list-unblocks.ts';
 
 type ConsoleKind = 'call' | 'proposal' | 'todo' | 'review';
 
-// An option as the page shows it: noKey keeps it off the number keys, so only a click picks it.
 type ConsoleOption = ItemOption & { noKey?: true };
 
 export interface ConsoleItem {
@@ -33,8 +29,6 @@ export interface ConsoleItem {
   links: { label: string; url: string }[];
 }
 
-// Calls and proposals that are open, queued, or put off and now due, in send order; then open unblock
-// items that are not put off, in their list order.
 export function loadConsoleItems(db: Database): ConsoleItem[] {
   const t = iso(now());
   return [...sortAsks(loadDueAsks(db, t)).map((a) => buildAskItem(a)), ...loadDueTodos(db, t).map((u) => buildUnblockItem(u))];
@@ -80,7 +74,6 @@ function buildTodoOptions(): ItemOption[] {
   ];
 }
 
-// An item with a subject PR is that PR's review (GEO-1324): the owner answers in review words.
 function buildReviewOptions(): ConsoleOption[] {
   return [
     { label: 'lgtm', effect: 'Approves the merge; a note goes along as tweaks to make first.' },

@@ -22,13 +22,12 @@ const out = (stdout: string): RunResult => ({ code: 0, stdout, stderr: '' });
 const rel = (tag: string, published_at: string, extra: Record<string, unknown> = {}) => ({ tag_name: tag, draft: false, prerelease: false, published_at, ...extra });
 
 interface World {
-  releases: Record<string, unknown>; // repo -> releases payload
-  shas: Record<string, string>; // repo#n -> merge sha
-  contains: Record<string, string[]>; // tag -> merge shas it contains
+  releases: Record<string, unknown>;
+  shas: Record<string, string>;
+  contains: Record<string, string[]>;
   cloud?: unknown;
 }
 
-// A fake gh: records every call.
 function gh(w: World, calls: string[] = []): Runner {
   return async (cmd) => {
     const line = cmd.join(' ');
@@ -47,7 +46,6 @@ function gh(w: World, calls: string[] = []): Runner {
   };
 }
 
-// A run on `issue` in state `state` with one merged PR per ref.
 function mergedRun(issue: string, refs: string[], state: 'merged' | 'deploying' | 'deploy-held' = 'merged') {
   addRun(db, { issue, title: 'Invented kettle work', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, actor: 'z-delivery' });
   for (const ref of refs) {
@@ -118,7 +116,7 @@ test('state --check and run check set live_check and log it; bad values are refu
 
 test('an open PR, no containing release, or a repo with no source leaves the run alone', async () => {
   mergedRun('GEO-1', ['nixie#5']);
-  addPr(db, 'GEO-1', 'nixie#9', 'z-delivery'); // still open
+  addPr(db, 'GEO-1', 'nixie#9', 'z-delivery');
   mergedRun('GEO-2', ['nixie#6']);
   mergedRun('GEO-3', ['dotfiles#1']);
   const w = world({ releases: { nixie: [rel('v1.2.0', '2026-10-16T00:00:00Z')], dotfiles: [rel('v1.0.0', '2026-10-16T00:00:00Z')] }, shas: { 'nixie#5': sha(5), 'nixie#6': sha(6), 'dotfiles#1': sha(1) }, contains: { 'v1.2.0': [sha(5)], 'v1.0.0': [sha(1)] } });
@@ -206,7 +204,7 @@ test('a run waits until every merged PR has shipped', async () => {
   mergedRun('GEO-23', ['nixie#5', 'impz#2']);
   const w = world({ releases: { nixie: [rel('v1.0.0', '2026-10-16T00:00:00Z')], impz: [rel('v0.1.0', '2026-10-16T00:00:00Z')] }, shas: { 'nixie#5': sha(5), 'impz#2': sha(2) }, contains: { 'v1.0.0': [sha(5)] } });
   expect((await shipRuns(db, gh(w), T)).moved).toEqual([]);
-  expect(prRow('nixie#5').shipped_tag).toBe('v1.0.0'); // remembered
+  expect(prRow('nixie#5').shipped_tag).toBe('v1.0.0');
   w.releases['impz'] = [rel('v0.2.0', '2026-10-17T00:00:00Z'), rel('v0.1.0', '2026-10-16T00:00:00Z')];
   w.contains['v0.2.0'] = [sha(2)];
   const calls: string[] = [];
@@ -249,7 +247,9 @@ test('runs that have not shipped cannot hold back the rest: the next pass starts
   for (let i = 1; i <= 62; i++) {
     mergedRun(`GEO-${100 + i}`, [`nixie#${i}`]);
     w.shas[`nixie#${i}`] = sha(i);
-    if (i > 60) w.contains['v1.0.0']!.push(sha(i)); // only the last two have shipped
+    if (i > 60) {
+      w.contains['v1.0.0']?.push(sha(i));
+    }
   }
   const r = await shipRuns(db, gh(w), T);
   expect([r.compares, r.moved.length, r.deferred]).toEqual([60, 0, 2]);
@@ -330,14 +330,12 @@ test('a bad releases payload moves nothing and records an error', async () => {
     expect(r.errors[0]).toStartWith('nixie:');
     expect(getRun(db, 'GEO-40')!.state).toBe('merged');
   }
-  expect(db.query("SELECT COUNT(*) AS n FROM events WHERE action = 'error' AND subject_id = 'releases'").get()).toEqual({ n: 5 }); // logged when the error changes
-  // The failing repo does not stop another one.
+  expect(db.query("SELECT COUNT(*) AS count FROM events WHERE action = 'error' AND subject_id = 'releases'").get()).toStrictEqual({ count: 5 });
   mergedRun('GEO-41', ['impz#1']);
   const w = world({ releases: { nixie: 'junk', impz: [rel('v0.1.0', '2026-10-16T00:00:00Z')] }, shas: { 'nixie#5': sha(5), 'impz#1': sha(1) }, contains: { 'v0.1.0': [sha(1)] } });
   const r = await shipRuns(db, gh(w), T);
   expect(r.moved.map((m) => m.issue)).toEqual(['GEO-41']);
   expect(r.errors).toHaveLength(1);
-  // A bad cloud ref is refused too.
   mergedRun('GEO-42', ['cloud#1']);
   const r2 = await shipRuns(db, gh(world({ cloud: { object: { sha: 'nope' } }, shas: { 'cloud#1': sha(1) } })), T);
   expect(r2.errors.some((e) => e.startsWith('cloud:'))).toBe(true);

@@ -7,8 +7,6 @@ import { overrideEnv } from '../src/config/override-env.ts';
 import { setMeta } from '../src/db/set-meta.ts';
 import { FAKE_TOKEN } from './noslop-fake.ts';
 
-// What a run of noslop needs, with nothing real behind it: an invented 1Password settings file, empty
-// project and clone folders, and the noslop pin in the database. Undone when the test finishes.
 export function createStubNoslopEnv(db: Database): void {
   const base = mkdtempSync(join(tmpdir(), 'hq-stub-noslop-'));
   onTestFinished(() => rmSync(base, { recursive: true, force: true }));

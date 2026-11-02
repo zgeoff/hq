@@ -4,8 +4,6 @@ interface KettleIssueParts {
   actions?: string;
 }
 
-// The description of an invented kettle issue, with every section a ready issue holds. A part the
-// caller gives replaces that section's body.
 export function buildKettleIssueText(parts: KettleIssueParts = {}): string {
   const context = parts.context ?? 'It leaks at the lid.';
   const scope = parts.scope ?? 'In: the lid.\nOut: none stated.';

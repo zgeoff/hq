@@ -1,6 +1,3 @@
-// The files hq brief reads from zgeoff/hq at a commit, with invented text in the real shape: the
-// template in a text fence under a comment, the stack and imp lines in briefs.md, the review block
-// in review-lines.md, and two playbooks. `without` leaves paths out.
 export function buildStubBriefKit(options: { without?: string[] } = {}): Record<string, string> {
   const files: Record<string, string> = {
     'agent-kit/brief.md': [

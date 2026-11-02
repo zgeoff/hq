@@ -1,5 +1,3 @@
-// `hq call|proposal|unblock add --item <file|->`, `hq call|proposal stu` and `hq unblock later`: the
-// console's structured items from the command line. The other verbs stay in cli.ts.
 import type { Database } from 'bun:sqlite';
 import type { Ask } from './asks/types.ts';
 import type { Out } from './commands.ts';

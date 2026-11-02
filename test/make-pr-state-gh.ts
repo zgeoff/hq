@@ -1,18 +1,13 @@
 import type { Runner } from '../src/runner/types.ts';
 
 export interface PRStateGh {
-  // "owner/repo#n" -> the state GitHub reports, such as MERGED.
   states: Record<string, string>;
 
-  // Every command the stand-in saw.
   calls?: string[];
 
-  // Answers any other command; left out, those fail.
   fallback?: Runner;
 }
 
-// A stand-in for `gh pr view <n> -R <owner/repo> --json state`: a known PR answers {"state": ...},
-// an unknown one fails as gh does for a PR it can't find.
 export function makePRStateGh(gh: PRStateGh): Runner {
   return (cmd, opts) => {
     const line = cmd.join(' '),

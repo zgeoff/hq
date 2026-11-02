@@ -2,10 +2,8 @@ import { realRunner } from '../src/runner/real-runner.ts';
 import type { RunResult, Runner } from '../src/runner/types.ts';
 
 export interface StubImpAnswers {
-  // the names `imp ls --json` lists
   imps: string[];
 
-  // what `imp exec` answers; without it, the command after `--` runs here
   exec?: RunResult;
 }
 
@@ -14,8 +12,6 @@ export interface StubImpRunner {
   commands: string[][];
 }
 
-// A runner that stands in for the imp CLI: `imp ls --json` lists the given imps, and `imp exec`
-// answers the given result or runs its command on this machine, as if inside the imp.
 export function buildStubImpRunner(answers: StubImpAnswers): StubImpRunner {
   const commands: string[][] = [];
   const run: Runner = (cmd, opts) => {

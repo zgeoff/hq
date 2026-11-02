@@ -16,7 +16,6 @@ beforeEach(() => {
 });
 afterEach(() => rmSync(home, { recursive: true, force: true }));
 
-// Records each systemctl call; `show` answers with the value given.
 function fakeSystemctl(transient = 'no', fail: string | null = null): { run: Runner; calls: string[] } {
   const calls: string[] = [];
   const run: Runner = async (cmd) => {
@@ -129,8 +128,6 @@ test('it refuses a start whose transient read fails, before it writes the unit',
   expect(existsSync(unitPath(home))).toBe(false);
 });
 
-// install.sh with stub bun and systemctl on PATH: the stub build makes ~/.local/bin/hq a
-// wrapper around this checkout, so install.sh and a direct `hq lanes start` run the same hq.
 test('install.sh and hq lanes start write the same unit and make the same systemctl calls', async () => {
   const repo = join(import.meta.dir, '..');
   const bin = join(home, 'stub-bin');
@@ -159,7 +156,6 @@ test('install.sh and hq lanes start write the same unit and make the same system
 
   expect(viaInstall.unit).toBe(viaStart.unit);
   expect(viaInstall.unit).toContain('Restart=on-failure');
-  // install.sh asks whether the unit is installed first; the rest is the same sequence.
   expect(viaInstall.calls).toBe(`--user is-enabled --quiet hq-lanes\n${viaStart.calls}`);
   expect(viaStart.calls).toBe('--user show -p Transient --value hq-lanes.service\n--user daemon-reload\n--user enable hq-lanes.service\n--user restart hq-lanes.service\n');
   expect(existsSync(join(home, '.config/systemd/user/hq-lanes.service'))).toBe(true);

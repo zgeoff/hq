@@ -188,7 +188,7 @@ describe('one open at a time', () => {
     expect(nextEligible(db)?.id).toBe('new-urgent');
     expect(addAsk(db, call({ id: 'old-low', order: 0 })).result).toBe('updated');
     expect(nextEligible(db)?.id).toBe('old-low');
-    expect(addAsk(db, call({ id: 'old-low' })).ask.send_order).toBe(0); // no --order keeps it
+    expect(addAsk(db, call({ id: 'old-low' })).ask.send_order).toBe(0);
   });
 
   test('opens the oldest first', () => {
@@ -222,7 +222,7 @@ describe('answer, apply, later, skip, close', () => {
     const answered = answerAsk(db, { id: 'geo-1-paint', kind: 'call', answer: '  green — the  dark one ', actor: 'z-stu' });
     expect(answered.answer).toBe('  green — the  dark one ');
     const note = outbox().at(-1)!;
-    expect(note.target).toBe('z-triage'); // z-refine is retired: the table forwards it
+    expect(note.target).toBe('z-triage');
     expect(note.text).toContain('carries no grant');
     expect(outbox().some((m) => m.target === 'z-delivery')).toBe(false);
   });
@@ -248,7 +248,7 @@ describe('answer, apply, later, skip, close', () => {
     addAsk(db, call());
     openAsk(db, { force: false, actor: 'z-stu' });
     const a = laterAsk(db, 'geo-1-paint', 'call', null, 'z-stu');
-    expect(a.due_at).toBe('2026-10-14T20:00:00Z'); // 07:00 on 15 Oct, AEDT
+    expect(a.due_at).toBe('2026-10-14T20:00:00Z');
     expect(nextEligible(db)).toBeNull();
     at('2026-10-14T20:00:00Z');
     expect(nextEligible(db)?.id).toBe('geo-1-paint');
@@ -280,13 +280,13 @@ describe('answer, apply, later, skip, close', () => {
 });
 
 describe('queue reminder after quiet hours', () => {
-  const FIVE_AM = '2026-10-14T18:00:00Z'; // 05:00 on 15 Oct, Sydney
-  const SEVEN_OH_FIVE = '2026-10-14T20:05:00Z'; // 07:05
+  const FIVE_AM = '2026-10-14T18:00:00Z';
+  const SEVEN_OH_FIVE = '2026-10-14T20:05:00Z';
 
   test('a proposal filed in quiet hours reaches z-stu once after 07:00', () => {
     at(FIVE_AM);
     addAsk(db, call({ kind: 'proposal', id: 'tidy-docs', actor: 'z-steward' }));
-    expect(queueReminder(db, 'hq-lanes').reminded).toBeNull(); // still quiet
+    expect(queueReminder(db, 'hq-lanes').reminded).toBeNull();
     at(SEVEN_OH_FIVE);
     expect(queueReminder(db, 'hq-lanes').reminded).toBe('tidy-docs');
     expect(outbox().at(-1)).toEqual({ target: 'z-stu', text: expect.stringContaining('Open it with: hq open') });
@@ -316,7 +316,6 @@ describe('queue reminder after quiet hours', () => {
   });
 
   test('lastQuietEnd across the October DST change', () => {
-    // 6 Oct 2026 00:05 AEDT = 5 Oct 13:05Z; the latest 07:00 is 5 Oct 07:00 AEDT = 4 Oct 20:00Z.
     expect(iso(lastQuietEnd(new Date('2026-10-05T13:05:00Z')))).toBe('2026-10-04T20:00:00Z');
     // 4 Oct 07:00 is already AEDT (DST began at 02:00): 3 Oct 20:00Z.
     expect(iso(lastQuietEnd(new Date('2026-10-04T12:00:00Z')))).toBe('2026-10-03T20:00:00Z');
