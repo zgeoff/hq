@@ -23,7 +23,6 @@ export function readOpenRounds(dir: string): OpenRound[] {
 
 const WORKTREE_SHAPE = /^(?<repo>[^+]+)\+(?<pr>\d+)-noslop-(?<pid>\d+)$/u;
 
-// The name a worktree had before the stem held a "+": "kettle12" may be kettle1 #2 or kettle #12.
 const OLD_WORKTREE_SHAPE = /^(?<stem>.*\D\d+)-noslop-(?<pid>\d+)$/u;
 
 function parseWorktreeName(name: string): { ref: string; pid: number } | null {

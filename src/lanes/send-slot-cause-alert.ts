@@ -26,8 +26,6 @@ const REASONS: Record<SlotCauseName, string> = {
   design: 'with needs-design tickets waiting for an agent design lane',
 };
 
-// Tells the session that owns a cause once per Sydney day when the cause's slot-minutes reach 60.
-// The owner's supply alert waits out quiet hours; the others go at any hour. Returns whether it sent.
 export function sendSlotCauseAlert(db: Database, alert: SlotCauseAlert): boolean {
   if (alert.minutes < SLOT_ALERT_MINUTES) {
     return false;

@@ -1,8 +1,8 @@
 import type { Runner } from '../runner/types.ts';
 import { GitReadError } from './git-read-error.ts';
 
-// The full sha of the one commit `rev` names, or null when the repo holds none, or the prefix names
-// more than one. `rev-parse --verify -q` exits 1 for that; any other failed exit is no answer.
+// `rev-parse --verify -q` exits 1 when the repo holds none, or the prefix names more than one; any
+// other failed exit is no answer.
 export async function readCommitSha(run: Runner, dir: string, rev: string): Promise<string | null> {
   const parsed = await run(['git', 'rev-parse', '--verify', '-q', `${rev}^{commit}`], { cwd: dir });
   if (parsed.code === 1) {

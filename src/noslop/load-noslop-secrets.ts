@@ -13,8 +13,7 @@ export interface NoslopSecrets {
 }
 
 // One `op item get` per round for all three fields, by item and vault ID: 1Password counts a lookup
-// by name as 3 requests and one by ID as 1, and every hq call is a new process. `recordRead` runs
-// once op answers, before its answer is checked, so a read that fails validation still counts.
+// by name as 3 requests and one by ID as 1, and every hq call is a new process.
 export async function loadNoslopSecrets(run: Runner, recordRead: () => void = () => {}): Promise<NoslopSecrets> {
   const token = await readOpToken(),
     values = await readSecretFields(run, token, recordRead);
@@ -59,7 +58,6 @@ async function readJSONFile(path: string): Promise<unknown> {
 }
 
 async function readSecretFields(run: Runner, token: string, recordRead: () => void): Promise<z.infer<typeof OpFields>> {
-  // The item and vault IDs come from the local settings file; a moved item fails the read loudly.
   const settings = { item: readLocalSetting('HQ_NOSLOP_OP_ITEM'), vault: readLocalSetting('HQ_NOSLOP_OP_VAULT') },
     toolResult = await run(['op', 'item', 'get', settings.item, '--vault', settings.vault, '--fields', 'label=app-id,label=installation-id,label=private-key', '--reveal', '--format', 'json'], { env: cleanEnv({ OP_SERVICE_ACCOUNT_TOKEN: token }) });
   recordRead();

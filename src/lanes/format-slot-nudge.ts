@@ -6,8 +6,6 @@ const PLACE_FREE = [
   { place: 'local', key: 'localFree' },
 ] as const;
 
-// The nudge to z-delivery, leaving out a free slot no eligible issue fits: the free slots and how long they waited, then the issues to take in order,
-// each with why (a focus term, a reserve), the reserves lent, and the design lanes when one has an issue waiting.
 export function formatSlotNudge(slotPlan: SlotPlan, minutes: number): string {
   const unfit = slotPlan.plan?.unfit ?? { slots: 0, places: [] };
   const fitFree = slotPlan.pool.free - unfit.slots;

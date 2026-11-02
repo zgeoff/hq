@@ -1,7 +1,6 @@
 import type { RecordedFinding } from './record-round.ts';
 import type { StoredFinding } from './types.ts';
 
-// The flat form of a finding that noslop_rounds keeps: absent details are null, so a reader tells "not reported" from a missing key.
 export function buildStoredFinding(finding: RecordedFinding): StoredFinding {
   return {
     id: finding.id,

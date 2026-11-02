@@ -15,9 +15,6 @@ const OpenSchema = z.object({ id: z.string(), title: z.string().optional(), reas
 const ConclusionSchema = z.enum(['success', 'failure']);
 const OutcomeSchema = z.object({ conclusion: ConclusionSchema, title: z.string(), summary: z.string().optional(), open: z.array(OpenSchema).optional() });
 
-// What noslop's check set on the PR's head: the conclusion, its title, and the first problem it names
-// (an open finding with its reason, else the first line of its summary) when it failed, and every
-// finding it lists as open.
 export interface NoslopCheckOutcome {
   conclusion: 'success' | 'failure';
   title: string;
@@ -25,8 +22,8 @@ export interface NoslopCheckOutcome {
   open: { id: string; reason: string }[];
 }
 
-// Sets noslop's check run again from the replies on the PR, with no review and no model call. noslop
-// exits 0 whatever the check concludes, so a failed check is an outcome and a non-zero exit is a fault.
+// noslop exits 0 whatever the check concludes, so a failed check is an outcome and a non-zero exit is
+// a fault.
 export async function runNoslopCheck(request: PRRequest, parsed: ParsedRepo): Promise<NoslopCheckOutcome> {
   const args = ['check', '--pr', String(request.pr), '--repo', buildSlug(parsed), '--json'];
   const cli = await runNoslopCli(request, parsed, args, CHECK_TIMEOUT_MS);

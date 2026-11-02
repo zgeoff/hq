@@ -14,10 +14,8 @@ export interface BaseMoveRequest {
   repo: string;
   pr: number;
 
-  // The checkout of the repo, where the PR head and its base are fetched.
   directory: string;
 
-  // Runs a function under the repo's lock, as the review's git steps do.
   lock: <T>(fn: () => Promise<T>) => Promise<T>;
 }
 

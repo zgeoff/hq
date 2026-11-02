@@ -2,8 +2,6 @@ import type { LaneRules, ReadyIssue } from './types.ts';
 
 const DESIGN = 'Design';
 
-// Splits Ready issues by lanes.json's exclusions. An issue a rule naming the Design label excludes
-// goes to design, unless another rule excludes it too; any other excluded issue is left out.
 export function buildReadySnapshot(issues: readonly ReadyIssue[], rules: LaneRules, at: string): { at: string; eligible: ReadyIssue[]; design: ReadyIssue[] } {
   const eligible: ReadyIssue[] = [];
   const design: ReadyIssue[] = [];

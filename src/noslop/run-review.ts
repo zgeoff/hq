@@ -37,49 +37,36 @@ export interface ReviewRequest extends PRRequest {
   watch: boolean;
   effort?: Effort | undefined;
 
-  // Ask noslop for a full review of the PR. Codex PRs refuse it.
   full?: boolean | undefined;
 
-  // A plain pass-through to `noslop review --fixes-only`: no basis check, no refusal, not a round, no reviewed mark.
   fixesOnly?: boolean | undefined;
 
-  // --timeout: the minutes one noslop run may take, as typed. Codex PRs refuse it.
   timeout?: string | undefined;
 
-  // The removed --confirm flag: still read, only so that it is refused with a pointer.
   confirm?: boolean | undefined;
 }
 
 export interface TitledFixCheck extends FixCheck {
-  // The finding's title when hq stored the finding; null otherwise.
   title: string | null;
 }
 
 export interface NoslopReviewOutcome extends NoslopReviewResult {
   fixChecks: TitledFixCheck[];
 
-  // The run was a fix-checks-only run (--fixes-only, or past the emergency cap), which is not a round.
   fixesOnly: boolean;
 
-  // The emergency review cap that turned this review into fix checks only; null when it did not.
   emergencyCap: number | null;
 
-  // One line that says so when the cap did; null otherwise.
   capNote: string | null;
 
-  // The head of the last ok review when only the base moved since it, so this run was fix checks
-  // only and not a round; null otherwise.
   baseMove: string | null;
   checks: ReviewResult['checks'];
   checksError: string | null;
   openThreads: number | null;
 
-  // The round this review was: the full reviews hq ran before it, plus one. On a fix-checks-only run, the reviews so far.
   round: number;
 }
 
-// Runs the review the PR's engine gives it. A noslop PR gets noslop and its CI and thread counts;
-// any other gets the Codex review as before.
 export async function runReview(request: ReviewRequest): Promise<ReviewResult | NoslopReviewOutcome> {
   assertPR(request.pr);
   requireNoConfirm(request);
@@ -139,8 +126,6 @@ function createScratchDir(): string {
   return scratch;
 }
 
-// A planned round whose PR diff equals the last ok review's, at a new head, runs as fix checks only:
-// only the base moved. --full always runs the round.
 async function planBaseMove(plan: RoundPlan, parsed: ParsedRepo, scratch: string): Promise<RoundPlan> {
   if (plan.fixesOnly || plan.request.full === true) {
     return plan;
@@ -154,8 +139,6 @@ async function planBaseMove(plan: RoundPlan, parsed: ParsedRepo, scratch: string
   return { ...plan, round: plan.round - 1, fixesOnly: true, baseMove: move };
 }
 
-// A full review, unless the caller asked for fix checks only or the repo's emergency cap is spent:
-// past the cap, the review runs fix checks only and raises no new finding.
 function planRound(request: ReviewRequest, parsed: ParsedRepo, timeoutMs: number): RoundPlan {
   const started = readOKReviews(request.db, parsed.repo, request.pr).filter((okReview) => okReview.confirm === 0).length;
   const cap = findNoslopCap(loadNoslopSettings(request.db), parsed.owner, parsed.repo);
@@ -174,10 +157,8 @@ interface RoundPlan {
   fixesOnly: boolean;
   emergencyCap: number | null;
 
-  // The base move found since the last full review; null when there was none.
   baseMove: BaseMove | null;
 
-  // How long the round's noslop run may take.
   timeoutMs: number;
 }
 
@@ -243,7 +224,6 @@ function buildTitledFixChecks(fixChecks: FixCheck[], titles: Map<string, string>
 
 const StoredTitles = z.array(z.object({ id: z.string(), title: z.string() }));
 
-// The title of each finding the PR's ok reviews stored, by finding id.
 function loadFindingTitles(request: ReviewRequest, parsed: ParsedRepo): Map<string, string> {
   const stored = readOKReviews(request.db, parsed.repo, request.pr).flatMap((okReview) => StoredTitles.parse(JSON.parse(okReview.findings)));
   return new Map(stored.map((finding): [string, string] => [finding.id, finding.title]));

@@ -1,8 +1,6 @@
 import type { Runner } from '../runner/types.ts';
 
-// git's patch-id of the PR's own diff: from the merge base of base and head to head. --verbatim keeps
-// whitespace, so a change of indentation alone changes the id. Null when git cannot read the diff
-// or the diff is empty.
+// --verbatim keeps whitespace, so a change of indentation alone changes the id.
 export async function readPRPatchID(run: Runner, directory: string, base: string, head: string): Promise<string | null> {
   const mergeBase = await run(['git', 'merge-base', base, head], { cwd: directory });
   if (mergeBase.code !== 0) {

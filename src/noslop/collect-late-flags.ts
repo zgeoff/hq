@@ -9,7 +9,6 @@ export interface LateInput {
   repo: string;
   pr: number;
 
-  // The checkout the PR heads are fetched into.
   dir: string;
   head: string | null;
   findings: ReviewFinding[];
@@ -23,9 +22,6 @@ interface PriorReview {
 const HUNK_HEADER = /^@@ -\d+(?:,\d+)? \+(?<start>\d+)(?:,(?<length>\d+))? @@/u,
   MISSING_PATH = /does not exist|exists on disk, but not in/u;
 
-// For each new finding of a PR's later review: whether it anchors in code the PR had not changed since its
-// first review (true), or in code it had changed or added (false). Null where that cannot be told. The map
-// holds an entry for every finding id; a git failure never throws.
 export async function collectLateFlags(input: LateInput): Promise<Map<string, boolean | null>> {
   const flags = new Map<string, boolean | null>(input.findings.map((f) => [f.id, null])),
     prior = readPriorReviews(input);
@@ -51,7 +47,6 @@ async function updateLateFlags(input: LateInput, flags: Map<string, boolean | nu
   }
 }
 
-// The anchored findings no earlier ok review of the PR raised.
 function pickFreshFindings(input: LateInput, prior: PriorReview[]): ReviewFinding[] {
   const seen = new Set(prior.flatMap((r) => (JSON.parse(r.findings) as StoredFinding[]).map((f) => f.id)));
   return input.findings.filter((f) => !seen.has(f.id) && f.anchor !== undefined);
@@ -77,8 +72,6 @@ interface Span {
 
 type Hunks = Span[] | 'new' | null;
 
-// The new-side line ranges the PR changed in the file: null when git cannot say, an empty list when the
-// file is unchanged, and 'new' when the file did not exist at the first head.
 async function readHunks(input: LateInput, first: string, head: string, path: string): Promise<Hunks> {
   try {
     return await readFileHunks(input, first, head, path);

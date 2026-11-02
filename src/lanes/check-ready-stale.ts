@@ -13,9 +13,6 @@ import { LANES } from './lanes.ts';
 
 const TOLD = 'lanes_ready_stale_told';
 
-// Tells z-stu once per stale spell: free lane slots while the newest Ready report is older than
-// readyStaleMinutes. A spell is keyed by that report's time, so a new report ends it. Quiet hours
-// hold the alert until the first look after them. With no report at all, nothing is stale yet.
 export function checkReadyStale(db: Database, t: Date, freeSlots: number, actor: string): boolean {
   const newest = loadNewestReadyAt(db),
     staleMs = newest === null ? 0 : t.getTime() - Date.parse(newest) - LANES.readyStaleMinutes() * 60_000;
@@ -42,7 +39,6 @@ function sendReadyStale(db: Database, r: StaleReady, actor: string): void {
   setMeta(db, TOLD, r.newest);
 }
 
-// The newest of the total report and the per-lane reports; null when none was ever made.
 function loadNewestReadyAt(db: Database): string | null {
   const lanes = Object.values(metaJson(db, 'lanes_ready_by_lane', READY_BY_LANE, {})).map((v) => v.at),
     total = metaJson(db, 'lanes_ready', z.object({ at: z.string() }).nullable(), null),

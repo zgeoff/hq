@@ -12,8 +12,6 @@ export interface PinResult {
   clone: string;
 }
 
-// Makes the folder for a commit: fetches the base clone (cloned on first use), adds a worktree at the
-// commit and installs its dependencies, scripts off. A folder that failed its install is removed.
 export async function updateNoslopClone(run: Runner, base: string, sha: string): Promise<PinResult> {
   await requireClone(run, base);
   await requireOK(run, ['git', 'fetch', '-q', 'origin'], base);
@@ -29,7 +27,6 @@ async function requireClone(run: Runner, clone: string): Promise<void> {
   await requireOK(run, ['gh', 'repo', 'clone', 'zgeoff/noslop', clone, '--', '-q'], dirname(clone));
 }
 
-// The commit's folder, made once: a folder whose install completed is reused as it is.
 async function createRunDir(run: Runner, base: string, full: string): Promise<PinResult> {
   const clone = buildRunDir(base, full);
   if (existsSync(`${clone}/${INSTALL_MARKER}`)) {

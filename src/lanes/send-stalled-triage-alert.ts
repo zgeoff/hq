@@ -16,8 +16,6 @@ interface StalledTriageAlert {
   actor: string;
 }
 
-// Tells the owner when triage has left free slots empty for 30 minutes. pickStalledTriage decides; this
-// reads its inputs and queues what it picked. Returns whether it sent.
 export function sendStalledTriageAlert(db: Database, alert: StalledTriageAlert): boolean {
   const since = alert.slotCause.since;
   const lowWaterSince = getMeta(db, LOW_WATER_SINCE_KEY);
@@ -43,7 +41,6 @@ function probeAlerted(db: Database, subjectID: string): boolean {
 
 const SENT_AT = z.object({ sent_at: z.string() }).nullable();
 
-// When the alert's message reached its session: the sent_at of its outbox row, or null while it waits.
 function readDeliveredAt(db: Database, subjectID: string): string | null {
   const row = SENT_AT.parse(
     db.query(`SELECT outbox.sent_at FROM outbox JOIN events ON events.seq = outbox.event_seq WHERE events.subject = 'hq' AND events.subject_id = ? AND events.action = 'alerted' AND outbox.status = 'sent' AND outbox.sent_at IS NOT NULL ORDER BY outbox.sent_at LIMIT 1`).get(subjectID),

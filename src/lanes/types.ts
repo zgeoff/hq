@@ -6,61 +6,40 @@ export interface Capacity {
   providers?: Record<string, { room?: boolean; unattended?: boolean; target?: string }>;
 }
 
-// How many design passes may run at once: the agent lanes (pacing.json agentDesignSlots) and the
-// with-geoff lane (pacing.json designSlots).
 export interface DesignSlots {
   agent: number;
   withGeoff: number;
 }
 
-// The slot caps by place the lanes' pool fills (pacing.json `slots`, or its lanes summed).
 export interface PacingSlots {
   imp: number;
   local: number;
 }
 
-// The Type names each listed place may take (pacing.json `placeTypes`), matched case-insensitively; a
-// place not listed takes any Type.
 export type PlaceTypes = Partial<Record<keyof PacingSlots, string[]>>;
 
 export interface Sample {
   cap: Capacity | null;
   impMib: number;
   error: string | null;
-  lanes?: LaneConfig[] | null; // pacing.json's lanes; absent or null: one pool of imp slots
-
-  // The pool's caps; absent or null with the lanes.
+  lanes?: LaneConfig[] | null;
   slots?: PacingSlots | null;
-
-  // The local sessions an unattended provider may run on this host (pacing.json's localFallback);
-  // absent or null when one targets local, so only the local cap counts.
   localRoom?: number | null;
-
-  // The design lane counts; absent: the defaults.
   design?: DesignSlots;
-
-  // The Type names each place takes; absent or null: every place takes any Type.
   placeTypes?: PlaceTypes | null;
-
-  // pacing.json's error for those counts, which are then the defaults; absent or null: none.
   designError?: string | null;
 }
 
-// A Ready issue the lanes leave out until a time passes, another issue is Done or Canceled, or a PR merges or closes.
 export interface LaneSkip {
   issue: string;
-
-  // An ISO time, the identifier of the issue it waits on, or `pr:repo#n` for a zgeoff PR it waits on.
   until: string;
   reason: string;
   by: string;
   at: string;
 }
 
-// The causes of an empty delivery slot.
 export type PoolCauseName = 'delivery' | 'triage' | 'supply';
 
-// Every cause with slot-minutes: the pool's, and the free agent design lanes' own.
 export type SlotCauseName = PoolCauseName | 'design';
 
 export type SlotCauseUnknownReason = 'ready_never_read' | 'ready_stale' | 'backlog_unknown' | 'backlog_focus_changed' | 'backlog_stale';
@@ -88,8 +67,6 @@ export interface TickResult {
   slotCause: SlotCause;
 }
 
-// A hold pauses the nudges while z-delivery keeps slots free on purpose (a host switch,
-// a restart). It always ends by itself, so a forgotten hold can't keep the lanes empty.
 export interface LanesHold {
   until: string;
   reason: string;
@@ -106,8 +83,6 @@ export interface NudgeRow {
   checked_at: string | null;
 }
 
-// lanes.json: how Ready issues in Linear map to pacing.json's lanes. A lane takes an issue that
-// matches any of its lists; the lanes are tried in file order, then the fallback.
 export interface LaneRule {
   issues: string[];
   projects: string[];
@@ -129,7 +104,6 @@ export interface LaneRules {
   lanes: Record<string, LaneRule>;
 }
 
-// A Ready issue as Linear reports it. labels holds every label name, the Type label included;
 // priority is Linear's: 1 urgent to 4 low, 0 none.
 export interface ReadyIssue {
   identifier: string;
@@ -142,22 +116,18 @@ export interface ReadyIssue {
   parent: string | null;
 }
 
-// A Backlog issue that triage may promote to Ready.
 export interface PromotableIssue {
   identifier: string;
   title: string;
   facts: ReadyIssue;
 }
 
-// A Backlog issue that would be promotable, but for blockers In Progress whose every PR merged.
 export interface HeldIssue {
   identifier: string;
   title: string;
   blockers: { identifier: string; lastMergedAt: string }[];
 }
 
-// A Backlog issue as the promotion check sees it: the state type of each issue that blocks it, and
-// whether Linear holds more relations than the one page hq read.
 export interface BacklogIssue {
   description: string | null;
   labels: string[];

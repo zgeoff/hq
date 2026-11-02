@@ -1,7 +1,6 @@
 import { Database } from 'bun:sqlite';
 import { HqError } from '../errors.ts';
 
-// The row count of every table in the store, by table name, read without writing to the store.
 export function countStoreRows(store: string): Record<string, number> {
   try {
     const db = new Database(store, { readonly: true });

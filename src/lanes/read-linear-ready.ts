@@ -34,11 +34,6 @@ interface LinearReadyDeps {
   rules: LaneRules;
 }
 
-// Reads every Ready issue of the team, page by page, then reports the counts per lane and keeps the
-// issues for the focus plan, in one write. A failure on any page throws before anything is written,
-// so the last counts and issues stay as they were. The same write drops the skips that ended; a skip
-// whose until issue Linear or until PR GitHub could not read stays, and the issue is kept with why for
-// hq lanes skip list.
 export async function readLinearReady(db: Database, deps: LinearReadyDeps): Promise<void> {
   const untils = await readUntils(db, deps.call, deps.run);
   const issues = await readTeamIssues(deps.call, deps.rules.team, deps.rules.readyState);
@@ -64,9 +59,8 @@ interface Untils {
   unread: Record<string, string>;
 }
 
-// The until issues Linear reads Done or Canceled and the until PRs GitHub shows merged or closed, and
-// those it could not read with why; a failed read is not thrown. It reads before Ready, so a call the
-// caller's deadline aborts here still fails the Ready read and nothing is written.
+// It reads before Ready, so a call the caller's deadline aborts here still fails the Ready read and
+// nothing is written.
 async function readUntils(db: Database, call: LinearCall, run: Runner): Promise<Untils> {
   const untils = [...new Set(readLaneSkips(db).map((skip) => skip.until))];
   const [issues, prs] = await Promise.all([readUntilIssues(call, untils.filter((until) => ISSUE.test(until))), readUntilPRs(run, untils)]);
@@ -100,8 +94,7 @@ function collectFailure(issue: string, verdict: ConditionVerdict | undefined): [
 
 const AREAS_SCHEMA = z.record(z.string(), z.array(z.string()));
 
-// A run started from Ready leaves Ready, so its areas come from the read that last saw it. Entries
-// for issues neither Ready nor running are dropped.
+// A run started from Ready leaves Ready, so its areas come from the read that last saw it.
 function writeIssueAreas(db: Database, issues: readonly ReadyIssue[]): void {
   const previous = metaJson(db, ISSUE_AREAS_KEY, AREAS_SCHEMA, {});
   const rows = z.array(z.object({ issue: z.string() })).parse(db.query(`SELECT issue FROM runs WHERE state IN (${RUNNING.map(() => '?').join(', ')})`).all(...RUNNING));

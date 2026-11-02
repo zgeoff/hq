@@ -16,7 +16,6 @@ function readKettleIssue(): ReturnType<LinearCall> {
   return Promise.resolve({ issue: { identifier: 'GEO-12', title: 'Mend the kettle', description: 'It never boils.' } });
 }
 
-// A repo lock that lets the worktree be made, then times out on the cleanup.
 function buildLockThatTimesOut(): NoslopReviewContext['lock'] {
   let calls = 0;
   return (fn) => {

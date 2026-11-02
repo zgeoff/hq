@@ -11,8 +11,7 @@ const COMMAND_CHARS = 100,
   LINE_SHAPE = /^(?<pid>\d+)\s+(?<command>.*)$/u,
   PGREP_NONE = 1;
 
-// The processes running a noslop CLI from one of hq's clones, other than hq itself. Exit 1 of pgrep
-// is none; any other failure refuses, because hq cannot then tell whether noslop runs.
+// Exit 1 of pgrep is none; any other failure refuses, because hq cannot then tell whether noslop runs.
 export async function readNoslopProcesses(run: Runner): Promise<NoslopProcess[]> {
   const pattern = `${buildEscapedPattern(repoCache())}/zgeoff/noslop[^ ]*/apps/cli/src/cli\\.ts`,
     result = await run(['pgrep', '-af', '--', pattern]);

@@ -14,7 +14,6 @@ import type { PRRequest } from './types.ts';
 export interface InstructionHold {
   clear: boolean;
 
-  // Why the hold stands, for the block message; empty when it is clear.
   hint: string;
 }
 
@@ -25,8 +24,6 @@ export interface InstructionHoldInput {
   lgtm: boolean;
 }
 
-// The facts the hold turns on, cheap reads first: the diff at the head is read and proved only when
-// the owner's lgtm, a bot author and an exemption record leave the hold standing.
 export async function checkInstructionHold(request: PRRequest, parsed: ParsedRepo, input: InstructionHoldInput): Promise<InstructionHold> {
   const facts: InstructionHoldFacts = {
     lgtm: input.lgtm,

@@ -80,7 +80,6 @@ function readUnreviewedRoute(request: PRRequest, parsed: ParsedRepo, author: PRA
     return 'bot PR';
   }
 
-  // Refuses a listed repo with no pinned commit, so such a PR cannot pass on CI alone.
   resolveEngine(request.db, parsed.owner, parsed.repo);
   return null;
 }
@@ -119,8 +118,6 @@ function buildBlock(parsed: ParsedRepo, pr: number, reason: string): HqError {
   return new HqError('merge_blocked', reason, { repo: parsed.repo, pr });
 }
 
-// On every route: a change to an owner-held path needs the owner's own lgtm at the head, and a change
-// to a repo instruction file needs it unless hq clears that hold.
 async function checkOwnerHeld(request: PRRequest, parsed: ParsedRepo, facts: GateFacts, readFiles: ReadFiles): Promise<void> {
   const ownerHeld = await readOwnerHeldTest(request.run, parsed, facts.baseRefOid);
   const instructionHeld = findInstructionHeldTest(parsed);

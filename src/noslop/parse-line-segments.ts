@@ -3,8 +3,6 @@ import { parseTextSegments } from './parse-text-segments.ts';
 
 const REFERENCE_DEFINITION = /^(?<lead>\s{0,3}\[[^\]]+\]:\s*)(?<destination>\S+)/u;
 
-// A Markdown line as text, version tokens, whole code spans and link destinations (inline or a
-// reference definition's), in order.
 export function parseLineSegments(line: string): Segment[] {
   const reference = REFERENCE_DEFINITION.exec(line);
   if (reference === null) {

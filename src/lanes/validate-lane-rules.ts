@@ -10,9 +10,6 @@ const excludeSchema = z.strictObject({ projects: names, labels: names, reason: z
 
 const rulesSchema = z.strictObject({ team: z.string().min(1), readyState: z.string().min(1), exclude: z.array(excludeSchema), lanes: z.record(z.string(), laneSchema) });
 
-// lanes.json checked against pacing.json's lane names: every lane it names exists there, each lane
-// matches something, every pacing.json lane has rules, and exactly one lane is the fallback.
-// pacingLanes null: pacing.json gives only slot caps, so the rules stand on their own.
 export function validateLaneRules(raw: unknown, pacingLanes: string[] | null): LaneRules {
   const parsed = rulesSchema.safeParse(raw);
   if (!parsed.success) {

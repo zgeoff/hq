@@ -30,9 +30,6 @@ export interface HeldDiffRead {
 
 const DIFF_FLAGS = ['--no-ext-diff', '--no-textconv', '--no-color', '--inter-hunk-context=0'];
 
-// The held files' changes between the merge base and the head, read from hq's checkout of the repo
-// at exactly `head`, with what git says about every target a diff claims moved. Throws a
-// GitReadError when git cannot give them.
 export async function readHeldDiffs(request: HeldDiffRequest): Promise<HeldDiffRead> {
   const directory = await checkout(request.run, request.slug, request.repo, request.repoDir);
   const base = await readBaseRef(request, directory);
@@ -49,8 +46,6 @@ export async function readHeldDiffs(request: HeldDiffRequest): Promise<HeldDiffR
 
 const BaseSchema = z.object({ baseRefName: z.string().min(1) });
 
-// Fetches the PR's head and base into refs of hq's own, checks the head is the one asked for, and
-// gives the ref of the base.
 async function readBaseRef(request: HeldDiffRequest, directory: string): Promise<string> {
   const view = await request.run(['gh', 'pr', 'view', String(request.pr), '-R', request.slug, '--json', 'baseRefName'], { cwd: directory });
   const parsed = view.code === 0 ? BaseSchema.safeParse(parseJSON(view.stdout)) : null;

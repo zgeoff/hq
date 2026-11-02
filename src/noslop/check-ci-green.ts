@@ -7,9 +7,8 @@ export type CIVerdict = { green: true; overridden?: string[] } | { green: false;
 
 const NOSLOP_CHECK = 'noslop';
 
-// noslop's App check is skipped here because the gate's noslop route reads it by app, beside the
-// summary head and findings. The rollup names no app, but a GitHub Actions job carries its workflow's
-// name and an App check none. GitHub keeps a re-run in the rollup beside the run it replaced.
+// The rollup names no app, but a GitHub Actions job carries its workflow's name and an App check
+// none. GitHub keeps a re-run in the rollup beside the run it replaced.
 export function checkCIGreen(checks: readonly GateCheck[], overrides: readonly string[]): CIVerdict {
   const counted = pickNewestRuns(pickCountedChecks(checks, describeRun)).filter((check) => !isNoslopAppCheck(check));
   if (counted.length === 0) {

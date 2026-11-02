@@ -17,8 +17,6 @@ import { validateLaneRules } from './validate-lane-rules.ts';
 import { writeDesignBacklog } from './write-design-backlog.ts';
 import { writePromotableFocus } from './write-promotable-focus.ts';
 
-// The ISO times are 12:00 Sydney on 14 Oct 2026 and the minutes after it. Each test's sample has three
-// local slots and no imp ones, so the pool holds three free slots while no run is open.
 function setupTest() {
   const fresh = freshDb();
   onTestFinished(fresh.cleanup);

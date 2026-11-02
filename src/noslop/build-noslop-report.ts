@@ -12,7 +12,6 @@ export interface PRReport {
   fullReviews: number;
   extraRounds: number;
 
-  // --confirm reviews: checks of fixes past the cap, counted apart since they are not rounds.
   confirmReviews: number;
   findings: number;
   bySeverity: Record<string, number>;
@@ -29,8 +28,6 @@ export interface PRReport {
   mainMerge: number;
   mergeUnknown: number;
 
-  // Reviews at a new head whose PR diff equals the last ok review's: only the base moved. They are
-  // not extra rounds.
   baseMove: number;
 }
 
@@ -59,8 +56,6 @@ const RoundRecordSchema = z.object({
   base_move: z.number(),
 });
 
-// One report per PR that noslop has a round for since the time, in the order of their first round
-// since then. Churn also reads the PR's ok reviews from before the time, to tell what they raised.
 export function buildNoslopReport(db: Database, since?: string): PRReport[] {
   const cutoff = parseReportCutoff(since);
   const rows = z.array(RoundRecordSchema).parse(db.query('SELECT * FROM noslop_rounds WHERE (repo, pr) IN (SELECT repo, pr FROM noslop_rounds WHERE started_at >= ?) ORDER BY id').all(cutoff));
@@ -98,9 +93,6 @@ interface StoredOpen {
   reason: string;
 }
 
-// The rounds since the time, and the PR's rounds from before it. The earlier ok reviews feed only the
-// churn: they supply the finding ids seen and the classes cited before the window, and which review
-// came first. Every other field reads the rounds since the time.
 function buildPRReport(rounds: RoundRecord[], earlier: RoundRecord[]): PRReport {
   const moves = collectBaseMoves([...splitRounds(earlier).okReviews, ...splitRounds(rounds).okReviews]);
   const parts = splitRounds(rounds),
@@ -181,7 +173,6 @@ function countSeverities(findings: Map<string, StoredFinding>): Record<string, n
   return counts;
 }
 
-// From the first good review to the first passing check.
 function findSpan(parts: RoundParts): number | null {
   const [first] = parts.okReviews,
     pass = parts.checks.find((c) => c.conclusion === 'success');

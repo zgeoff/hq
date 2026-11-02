@@ -8,10 +8,8 @@ export interface PatchFill {
   run: Runner;
   db: Database;
 
-  // The report's window: only the PRs with a round since this time are filled. All PRs when absent.
   since?: string | undefined;
 
-  // The checkout of a zgeoff repo to read its diffs in; it throws when hq has none and cannot make one.
   checkout: (repo: string) => Promise<string>;
 }
 
@@ -40,7 +38,6 @@ export async function fillRoundPatchIDs(fill: PatchFill): Promise<number> {
   return filled;
 }
 
-// One checkout per repo for the whole fill; null when hq cannot make one.
 async function readCheckout(resolve: PatchFill['checkout'], repo: string, directories: Map<string, string | null>): Promise<string | null> {
   if (!directories.has(repo)) {
     try {

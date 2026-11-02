@@ -23,23 +23,16 @@ export interface RoundRow {
   error: string | null;
   sha: string;
 
-  // A review: whether it ran with --full. A check: absent.
   full?: boolean | undefined;
 
-  // A review: noslop's special route, 'none' when it gave none. Absent for a check and for a
-  // review with no output.
   special?: string | null | undefined;
 
-  // A fix-checks-only run (--fixes-only, or past the emergency cap), or a review of the removed --confirm: true. Not a round. Otherwise absent.
   confirm?: boolean | undefined;
 
-  // A check's title. Otherwise absent.
   title?: string | null | undefined;
 
-  // A review: the verbatim patch-id of the PR's own diff at its head; null when git could not read it.
   patchId?: string | null | undefined;
 
-  // A fix-checks-only run hq ran because only the base moved since the last ok review. Otherwise absent.
   baseMove?: boolean | undefined;
 }
 

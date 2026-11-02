@@ -16,8 +16,6 @@ export interface LowWaterInputs {
   focus: string;
   freshMinutes: number;
   at: Date;
-
-  // The open episode's start, or null; and whether z-triage was already told in it.
   since: string | null;
   alerted: boolean;
   held: boolean;
@@ -31,8 +29,6 @@ export interface LowWaterMoves {
   message: { subjectID: string; text: string } | null;
 }
 
-// What one look does to the low-water episode, and the message to z-triage if one is due. A lanes hold
-// stops the message, not the episode, so a message held back goes at the first look after the hold.
 export function pickLowWaterMoves(input: LowWaterInputs): LowWaterMoves {
   const pick = pickLowWater(input);
   if (pick.phase === 'above') {

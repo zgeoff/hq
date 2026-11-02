@@ -6,8 +6,7 @@ import type { NoslopProcess } from './read-noslop-processes.ts';
 import { readOpenRounds } from './read-open-rounds.ts';
 import type { OpenRound } from './read-open-rounds.ts';
 
-// Refuses while a noslop CLI runs from hq's clones or a review round is open: a pin that migrates
-// the store under a running review can lose that review's record.
+// A pin that migrates the store under a running review can lose that review's record.
 export async function requireNoslopIdle(run: Runner): Promise<void> {
   const processes = await readNoslopProcesses(run),
     rounds = readOpenRounds(reviewDir());

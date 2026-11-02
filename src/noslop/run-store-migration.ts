@@ -19,7 +19,6 @@ interface TableCount {
   after: number;
 }
 
-// backup is null when nothing was migrated: no store file, or no migration the store lacks.
 export interface StoreMigration {
   store: string;
   hasStore: boolean;
@@ -34,7 +33,6 @@ export interface StoreMigrationInput {
   clone: string;
   sha: string;
 
-  // Called after the backup and before the store query; it throws to stop the migration.
   requireIdle?: (() => Promise<void>) | undefined;
 }
 
@@ -42,9 +40,6 @@ const MIGRATION_QUERY = ['store', 'query', 'findings-by-pr', '--repo', 'hq-pin-g
   QUERY_TIMEOUT_MS = 300_000,
   SHORT_SHA_CHARS = 7;
 
-// Applies the migrations the new noslop holds and the store lacks, by opening the store with it, and
-// proves nothing was lost: a backup first, then every table counted before and after. It refuses
-// when a count drops or a migration is missing after, and the store is then left for a restore.
 export async function runStoreMigration(input: StoreMigrationInput): Promise<StoreMigration> {
   const none: StoreMigration = { store: input.store, hasStore: existsSync(input.store), names: [], backup: null, tables: [] };
   if (!none.hasStore) {

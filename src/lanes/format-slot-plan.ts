@@ -5,8 +5,6 @@ import type { PlaceUnfit } from '../focus/types.ts';
 import { formatPlaceUnfit } from './format-place-unfit.ts';
 import type { SlotPlan } from './read-slot-plan.ts';
 
-// hq lanes' view of the plan: the pool, the local sessions against their cap, the focus, and what the
-// free slots take now.
 export function formatSlotPlan(slotPlan: SlotPlan, at: Date): string[] {
   const pool = slotPlan.pool;
   const held = pool.held === null ? '' : ` (${Math.max(0, pool.impSize - pool.impRunning)} free by count, held: ${pool.held})`;

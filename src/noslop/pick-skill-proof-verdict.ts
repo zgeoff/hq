@@ -6,7 +6,6 @@ export interface SkillProofFacts {
   recorded: boolean;
   missing: ProofSection[];
 
-  // The PR's changed files, or null while hq has not read them.
   files: string[] | null;
 }
 

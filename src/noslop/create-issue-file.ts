@@ -29,8 +29,6 @@ export interface IssueFileRequest {
 
 const ISSUE_FLAG = '--issue-file';
 
-// Writes the linked issue to the file for noslop, or says why there is none. It never throws: the
-// review runs without the issue rather than not at all.
 export async function createIssueFile(request: IssueFileRequest): Promise<IssueFile> {
   const issue = findLinkedIssue(request.body);
   if (issue === null) {

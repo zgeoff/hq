@@ -14,13 +14,9 @@ export interface Churn {
 export interface ChurnReview {
   findings: StoredFinding[];
 
-  // False for a review before the report's window: it only tells which findings and classes came earlier.
   counted: boolean;
 }
 
-// The churn of one PR from the findings of its ok reviews, in order. A finding counts once, at the
-// review that first raised it. Repeat-class, late and their unknowns look only at findings raised after
-// the first review, since the first review has nothing earlier to repeat or be late against.
 export function countChurn(reviews: ChurnReview[]): Churn {
   const churn: Churn = { roundsWithNew: 0, repeatClass: 0, classUnknown: 0, late: { n: 0, of: 0 }, lateUnknown: 0, mainMerge: 0, mergeUnknown: 0 },
     cited = new Map<string, Set<string>>(),
@@ -80,13 +76,12 @@ function collectCited(cited: Map<string, Set<string>>, finding: StoredFinding): 
   }
 }
 
-// The class a finding repeats: the taste rule it cites, else none. A lens and criterion is too broad
-// to be a class: one criterion such as untested-change holds many unrelated findings.
+// A lens and criterion is too broad to be a class: one criterion such as untested-change holds many
+// unrelated findings.
 function findClassKey(finding: StoredFinding): string | null {
   return finding.rule ?? null;
 }
 
-// A finding stored before hq kept a criterion: whether it cites a rule is not known.
 function isClassUnread(finding: StoredFinding): boolean {
   return finding.criterion === undefined || finding.criterion === null;
 }

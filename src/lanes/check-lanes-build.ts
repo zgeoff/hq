@@ -1,9 +1,7 @@
 import table from '../../lanes.json';
 import { config } from '../config/config.ts';
 
-// The installed hq carries the lanes.json it was built with. When the checkout's copy differs, a
-// merged change to the lanes rules has not been installed, and the Ready read still uses the old
-// one. Null when they match or the checkout has no readable copy.
+// The installed hq carries the lanes.json it was built with.
 export function checkLanesBuild(readText: (path: string) => string, path = `${config().HQ_PROJECTS ?? `${process.env['HOME']}/projects`}/hq/lanes.json`): string | null {
   let source: unknown;
   try {

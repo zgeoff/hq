@@ -3,7 +3,6 @@ import { HqError } from '../errors.ts';
 
 const NAME_SHAPE = /^[ \t]*'(?<name>\d{4}-[a-z0-9-]+)':/gmu;
 
-// The migration names a noslop clone applies: the quoted keys of the object in its load-store.ts.
 export function readCloneMigrations(clone: string): string[] {
   const file = `${clone}/adapters/sqlite/src/load-store.ts`,
     names = [...readText(file).matchAll(NAME_SHAPE)].map((match) => match.groups?.['name'] ?? '');

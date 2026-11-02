@@ -1,4 +1,3 @@
-// One ok noslop review of the PR as noslop_rounds stores it, oldest first.
 export interface CoverRow {
   head: string | null;
   base: string | null;
@@ -9,9 +8,6 @@ export interface CoverRow {
 
 export type StoredCover = { stored: true; reviewBase: string; patchId: string } | { stored: false; why: string };
 
-// What hq recorded says noslop's review at the summary head covers the PR head: the newest ok run at
-// the PR head was a base move, and its diff's patch-id is the one of the full review at the summary
-// head. The gate still recomputes both patch-ids from git before it trusts this.
 export function pickBaseMoveCover(rows: readonly CoverRow[], summaryHead: string, head: string): StoredCover {
   const atHead = rows.findLast((row) => row.head === head);
   if (atHead?.base_move !== 1) {

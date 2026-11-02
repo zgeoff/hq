@@ -6,7 +6,6 @@ export interface NoslopSettings {
   repos: string[];
   sha: string | null;
 
-  // The emergency review cap per repo name (lower case); a repo with no entry has none.
   caps: Record<string, number>;
 }
 

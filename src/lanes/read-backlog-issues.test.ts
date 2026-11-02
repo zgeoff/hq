@@ -22,8 +22,6 @@ interface IssueSeed {
   blockers?: { identifier: string; state: string }[];
 }
 
-// A fake Linear that answers the Backlog query with the given pages of issues, one per call in
-// order, each but the last naming a cursor for the next, and records the variables.
 function setupTest() {
   const variables: Record<string, unknown>[] = [];
   const answerWith = (...pages: IssueSeed[][]): LinearCall => {

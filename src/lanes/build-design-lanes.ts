@@ -5,15 +5,9 @@ import type { DesignSlots } from './types.ts';
 interface DesignLanesInput {
   slots: DesignSlots;
   open: OpenDesignRuns;
-
-  // The issues each lane takes, in focus order, those with an open run already left out.
   agentQueue: readonly string[];
   withGeoffQueue: readonly string[];
-
-  // Where the owner asked for each open with-geoff pass that was added above the lane count.
   asked: readonly string[];
-
-  // pacing.json's error for the lane counts; while set, hq run add refuses a pass, so no lane names one.
   countsError: string | null;
 }
 

@@ -5,9 +5,8 @@ const providerSchema = z.object({ unattended: z.boolean().optional(), target: z.
 
 const fileSchema = z.object({ providers: z.record(z.string(), providerSchema).optional() });
 
-// The local sessions pacing.json's unattended providers may run on this host, their localFallback
-// summed; null (no cap but the local size) when one targets local or none is listed. capacity.sh
-// never launches route work on a provider that is not unattended, so its localFallback is left out.
+// capacity.sh never launches route work on a provider that is not unattended, so its localFallback
+// is left out.
 export function parseLocalRoom(raw: unknown): number | null {
   const file = fileSchema.safeParse(raw);
   if (!file.success) {

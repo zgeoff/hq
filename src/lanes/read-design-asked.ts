@@ -7,7 +7,6 @@ const eventsSchema = z.array(z.object({ subject_id: z.string(), data: z.string()
 
 const dataSchema = z.object({ asked: z.string().nullish() });
 
-// Where the owner asked for each open with-geoff pass added with --asked, in the order they were added.
 export function readDesignAsked(db: Database, designRuns: readonly DesignRun[]): string[] {
   const open = new Set(
     designRuns

@@ -5,8 +5,6 @@ export interface OwnerHeldFacts {
   pr: number;
   held: string[];
 
-  // The zgeoff repo instruction files the PR changes, and whether hq clears their hold, with the
-  // reason when it does not.
   instruction: string[];
   instructionClear: boolean;
   instructionHint: string;

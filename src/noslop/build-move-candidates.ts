@@ -2,9 +2,6 @@ import { dirname, join, normalize } from 'node:path/posix';
 
 export type TargetMode = 'file' | 'root';
 
-// The old and new target as repo paths, once per way the target may resolve: relative to the file
-// holding it, or to the repo root. A target with a leading slash resolves to the root only. A way
-// that leaves the repo is dropped; null when every way does.
 export function buildMoveCandidates(file: string, from: string, to: string, modes: TargetMode[]): [string, string][] | null {
   const candidates: [string, string][] = [];
   for (const mode of modes) {

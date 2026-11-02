@@ -12,9 +12,6 @@ export type LineChange = { ok: true; moves: Candidates[] } | { ok: false; reason
 
 const TABLE_ROW = /^\s*\|.*\|\s*$/u;
 
-// Whether one removed line and the added line that replaces it differ only by a moved link or path
-// target, a version number or table padding. A target that moved comes back as a claim for the
-// caller to prove; every other difference refuses.
 export function compareLineChange(file: string, oldLine: string, newLine: string): LineChange {
   if (TABLE_ROW.test(oldLine) && TABLE_ROW.test(newLine)) {
     return compareTableRows(file, oldLine, newLine);

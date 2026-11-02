@@ -38,36 +38,25 @@ export interface NoslopReviewContext {
   repo: string;
   pr: number;
 
-  // The checkout of the repo that the worktree is made from.
   dir: string;
 
-  // The review folder: the worktree and the output file live here.
   scratch: string;
 
-  // Hq's pinned clone of noslop, and the commit it is pinned to.
   clone: string;
   sha: string;
 
-  // The store noslop writes each review to before it posts the review to GitHub.
   store: string;
 
-  // Runs a function under the repo's lock.
   lock: <T>(fn: () => Promise<T>) => Promise<T>;
 
-  // Review the whole PR, not only the commits since the last round.
   full?: boolean | undefined;
 
-  // Fix checks only (`noslop review --fixes-only`), recorded as a review that is not a round.
   fixesOnly?: boolean | undefined;
 
-  // How long the noslop run may take before hq stops it and records no review.
   timeoutMs: number;
 
-  // The head and PR diff a base move was found at. The run is recorded as a base move only when
-  // noslop ran on that head and the diff is still that one: a push in between makes it a plain fix check.
   baseMove?: Pick<BaseMove, 'head' | 'patchId'> | undefined;
 
-  // Reads the Linear issue the PR links, for noslop's intent lens. Without it no issue is attached.
   linear?: LinearCall | undefined;
 }
 
@@ -81,23 +70,16 @@ export interface NoslopReviewResult {
   depth: string | null;
   findings: ReviewFinding[];
 
-  // The changed files no noslop call read; z-review checks them by hand.
   notReviewed: NotReviewedFile[];
 
-  // Noslop's verdict on each fix a --fixes-only run checked; empty on any other run.
   fixChecks: FixCheck[];
   ms: number;
   sha: string;
   issue: IssueNote;
 
-  // Why noslop failed after it stored the review, when the post to GitHub is all that is left; null
-  // when noslop posted the review.
   postFailed: string | null;
 }
 
-// A noslop review of the PR head, run in a throwaway worktree of the base. Any failure before noslop
-// stored the review is recorded with ok = 0 and thrown as noslop_failed; it never falls back to
-// another reviewer.
 export async function runNoslopReview(ctx: NoslopReviewContext): Promise<NoslopReviewResult> {
   const prep = await createReviewPrep(ctx),
     ran = await runNoslopProcess(ctx, prep),
@@ -175,8 +157,6 @@ interface ReviewRan {
   cleanupError: string | null;
 }
 
-// Runs `noslop review` in the worktree and removes the worktree after, whatever happened. A review
-// that ran keeps its result when the removal fails, so its round is still recorded.
 async function runNoslopProcess(ctx: NoslopReviewContext, prep: ReviewPrep): Promise<ReviewRan> {
   try {
     const ran = await runNoslopLocked(ctx, prep);
@@ -232,7 +212,6 @@ async function removeWorktree(ctx: NoslopReviewContext, worktree: string): Promi
   }
 }
 
-// Never fails the review: a git or database fault leaves every finding's late flag null.
 async function findLate(ctx: NoslopReviewContext, ran: ReviewRan): Promise<Map<string, boolean | null>> {
   if (ran.judged.value === null) {
     return new Map();
@@ -244,7 +223,6 @@ async function findLate(ctx: NoslopReviewContext, ran: ReviewRan): Promise<Map<s
   }
 }
 
-// Never fails the review: a git fault leaves the round's patch-id null.
 async function readRoundPatchID(ctx: NoslopReviewContext, ran: ReviewRan): Promise<string | null> {
   const output = ran.judged.value;
   if (output === null || output.base === null || output.head === null) {

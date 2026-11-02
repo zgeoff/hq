@@ -4,7 +4,6 @@ import { HqError } from '../errors.ts';
 export interface CapArgs {
   repo: string;
 
-  // null turns the cap off.
   cap: number | null;
 }
 

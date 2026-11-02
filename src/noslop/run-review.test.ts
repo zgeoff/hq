@@ -45,8 +45,6 @@ function setupTest() {
     setCap: (repo: string, cap: number) => setMeta(db, 'noslop', JSON.stringify({ repos: [repo], sha: PINNED, caps: { [repo]: cap } })),
     listUnpinned: () => setMeta(db, 'noslop', JSON.stringify({ repos: ['widgets'], sha: null })),
 
-    // A review of widgets#7 while GitHub gives the PR this head, noslop reviews it, and each head's
-    // PR diff has the patch-id given.
     reviewAt: async (head: string, patchIds: Record<string, string>, full?: boolean) => {
       const fake = buildFakeRunner({
         noslopReview: { code: 0, stdout: FAKE_REVIEW_JSON.replace('"head":"feat"', `"head":"${head}"`), stderr: '' },

@@ -10,9 +10,6 @@ export interface LanePlan {
   overVcpus: boolean;
 }
 
-// What the imp slot cap would take from impd with every slot full: each slot costs impMib and
-// impVcpus, against impd's non-Nix lines. The room left is for imps outside the lanes, such as
-// z-qa checks and helpers. Being at a line is not over it.
 export function buildLanePlan(imp: number, impMib: number, settings: CapacitySettings): LanePlan {
   const mib = imp * impMib;
   const vcpus = imp * settings.impVcpus;
