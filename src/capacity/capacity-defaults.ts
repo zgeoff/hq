@@ -1,5 +1,5 @@
 export const CAPACITY_DEFAULTS = {
-  nonnixMaxMib: 16384,
+  nonnixMaxMib: 16_384,
 
   // A backstop of 8 imps: impd runs imps at a lower CPU priority than Nix.
   nonnixMaxVcpus: 16,

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test';
 import { toExactOptional } from '@zgeoff/std';
+import assert from 'node:assert';
 import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { allowDenyNeeded } from './allow-deny-needed.ts';
@@ -173,7 +174,8 @@ test('the default review folder is on disk, not in /tmp', () => {
 });
 
 test('the sentence is added to the developer instructions in the Codex config, or stands alone when there are none', async () => {
-  expect(await codexInstructions()).toBe(NO_TMP);
+  const instructions = await codexInstructions();
+  expect(instructions).toBe(NO_TMP);
   mkdirSync(`${dir}/codex`);
   await Bun.write(`${dir}/codex/config.toml`, 'model = "m"\n');
   expect(await codexInstructions()).toBe(NO_TMP);
@@ -193,11 +195,15 @@ test('the sentence is added to the developer instructions in the Codex config, o
 test('both passes run at the review effort; the review pass may write Bun\'s install cache', async () => {
   const { run, calls } = fake();
   await review(run, 'widgets', 7, { watch: false });
-  const [rev, ex] = calls.filter((c) => c.cmd[0] === 'codex');
-  for (const c of [rev!, ex!]) expect(c.cmd).toContain(`model_reasoning_effort=${REVIEW_EFFORT}`);
+  const [reviewPass, execPass] = calls.filter((call) => call.cmd[0] === 'codex');
+  assert.ok(reviewPass);
+  assert.ok(execPass);
+  for (const pass of [reviewPass, execPass]) {
+    expect(pass.cmd).toContain(`model_reasoning_effort=${REVIEW_EFFORT}`);
+  }
   expect(REVIEW_EFFORT).toBe('medium');
-  expect(rev!.cmd).toContain(`sandbox_workspace_write.writable_roots=${JSON.stringify([bunCacheDir()])}`);
-  expect(ex!.cmd.slice(0, 4)).toEqual(['codex', 'exec', '-s', 'read-only']);
+  expect(reviewPass.cmd).toContain(`sandbox_workspace_write.writable_roots=${JSON.stringify([bunCacheDir()])}`);
+  expect(execPass.cmd.slice(0, 4)).toStrictEqual(['codex', 'exec', '-s', 'read-only']);
 });
 
 test('a Codex usage limit or an interrupted review fails loudly: no review is never a pass', async () => {

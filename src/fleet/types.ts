@@ -34,7 +34,7 @@ export interface PluginDrift {
 }
 
 export interface DriftClient {
-  prompt(id: string): Promise<string | undefined>;
+  prompt: (id: string) => Promise<string | undefined>;
 }
 
 export interface TranscriptReader {
@@ -96,7 +96,9 @@ export interface FleetClient extends Partial<StaleOps> {
   sessions(): Promise<FleetSession[]>;
   spawn: (p: SpawnRequest) => Promise<{ id: string }>;
   pin(id: string): Promise<void>;
-  submit?(id: string, text: string): Promise<void>; // atc refuses a line mid-turn
+
+  // atc refuses a line mid-turn.
+  submit?: (id: string, text: string) => Promise<void>;
 }
 
 export interface EnsureStep {
