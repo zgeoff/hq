@@ -1154,3 +1154,15 @@ test('it routes hq brief check to the measure of a finished brief, and opens no 
   expect(printed).toStrictEqual(['ok: 26 bytes']);
   expect(existsSync(join(fresh.dir, 'absent'))).toBe(false);
 });
+
+test('it refuses an hq review --effort that is neither medium nor high, before it reviews', async () => {
+  const fresh = freshDb();
+  onTestFinished(fresh.cleanup);
+  const child = Bun.spawn(['bun', join(import.meta.dir, 'cli.ts'), 'review', 'widgets', '7', '--effort', 'kettle', '--json'], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, HOME: fresh.dir, HQ_DB: fresh.path, HQ_NOTIFY: 'off', HQ_NOW: NOON_SYDNEY } });
+
+  const [code, stdout] = await Promise.all([child.exited, new Response(child.stdout).text()]);
+
+  expect(code).toBe(1);
+  expect(JSON.parse(stdout)).toStrictEqual({ ok: false, error: { code: 'bad_args', message: '--effort must be medium or high' } });
+  expect(fresh.db.query('SELECT COUNT(*) AS count FROM noslop_rounds').get()).toStrictEqual({ count: 0 });
+});
