@@ -5,7 +5,6 @@ import type { BriefFiles } from './types.ts';
 
 const WHERE = 'skills/delivery-lead/references/design-brief.private.md';
 
-// An error names the private design brief file, never its text.
 export function readRecordLine(files: BriefFiles, privateDir: string, issueID: string): string {
   const found = join(privateDir, WHERE);
   if (files.readKind(found) !== 'file') {
