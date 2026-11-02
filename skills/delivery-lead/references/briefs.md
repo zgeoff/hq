@@ -32,13 +32,13 @@ hq writes `Contributes to` only when the issue's Actions list Deploy or Infra. W
 The stack line:
 
 ```text
-Build this as a stack with the gh-stack skill, one reviewable layer per PR. Keep it current with `gh stack sync` rather than a rebase of one layer, and review each layer as the finish line says, with `--base <its parent branch>`.
+Build this as a stack with the gh-stack skill, one reviewable layer per PR. Sync it with `gh stack sync`, never a rebase of one layer. Review each layer as the finish line says, with `--base <its parent branch>`. Fix the same kind of defect in the layers above in the same push.
 ```
 
 The imp line:
 
 ```text
-Lint, format and other light checks run in lefthook's pre-commit and pre-push hooks. Defer to CI for larger checks. This imp has 2 GiB: stop each sub-agent when its part is done, and end each test or build process before you start the next.
+Lefthook's hooks run the light checks; leave larger ones to CI. This imp has 2 GiB: stop each sub-agent when its part is done, and end each test or build before you start the next.
 ```
 
 ## Messages to a running agent
