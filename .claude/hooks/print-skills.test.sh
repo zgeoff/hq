@@ -144,6 +144,23 @@ if [ "$total" -lt 10000 ]; then echo "ok: eight big skills with big private part
 if run id-new z-triage | grep -q '^after triage$'; then echo "ok: the after-compaction file prints beside private parts"; else echo "FAIL: no after-compaction file beside private parts"; fail=1; fi
 rm -rf "$private/skills/kettle"*
 cp "$bin/hq.orig" "$bin/hq"
+# Slot 6 with three skills, each with a private part, where the earlier ones use up most of the budget:
+# every private part still shows, printed or as a read instruction.
+for n in 6 7 8; do
+  mkdir -p "$project/skills/lamp$n" "$private/skills/lamp$n"
+  awk -v n="$n" 'BEGIN { for (i = 0; i < 40; i++) print "line " i " of lamp " n " skill text" }' > "$project/skills/lamp$n/SKILL.md"
+  awk -v n="$n" 'BEGIN { for (i = 0; i < 100; i++) print "line " i " of lamp " n " private text" }' > "$private/skills/lamp$n/SKILL.private.md"
+done
+sed -i 's/{"name":"z-triage","skills":\["linear-triage"\]/{"name":"z-triage","skills":["linear-triage","owner-calls","delivery-lead","fix-it-here","release","lamp6","lamp7","lamp8"]/' "$bin/hq"
+SLOT=6
+out=$(run id-new z-triage)
+for n in 6 7 8; do
+  if printf '%s\n' "$out" | grep -qE "^line 0 of lamp $n private text$|Read $private/skills/lamp$n/SKILL.private.md now"; then echo "ok: slot 6 keeps lamp$n's private part"; else echo "FAIL: slot 6 dropped lamp$n's private part"; fail=1; fi
+done
+if [ "$(printf '%s\n' "$out" | wc -c)" -lt 10000 ]; then echo "ok: slot 6 with several private parts stays under the cap"; else echo "FAIL: slot 6 passed the cap"; fail=1; fi
+unset SLOT
+rm -rf "$project/skills/lamp"* "$private/skills/lamp"*
+cp "$bin/hq.orig" "$bin/hq"
 # Forty missing skills with long names, after a big skill: the skipped lines stay under the cap too.
 long=$(awk 'BEGIN { s = ""; for (i = 0; i < 22; i++) s = s "kettlepour"; print s }')
 names=$(awk -v l="$long" 'BEGIN { for (i = 1; i <= 40; i++) printf ",\"%s%d\"", l, i }')

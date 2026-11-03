@@ -1184,3 +1184,28 @@ test('it requires prompts/z-q.md to list no skill bullets when its session has n
   expect(result.exitCode).toBe(1);
   expect(result.stderr.toString()).toContain('prompts/z-q.md: the prompt lists skills [intake] but fleet.json lists [] for z-kite');
 });
+
+test('it refuses with --private an extra skill that follows a blank line in the skill list', () => {
+  const ctx = setupPrivateTest();
+  const prompt = join(ctx.privateDir, 'skills/intake/references/session-prompt.md');
+  writeFileSync(
+    prompt,
+    readFileSync(prompt, 'utf8').replace('- `skills/owner-calls/SKILL.md`\n', '- `skills/owner-calls/SKILL.md`\n\n- `skills/kite-report/SKILL.md`\n'),
+  );
+  const result = ctx.runPrivate();
+  expect(result.exitCode).toBe(1);
+  expect(result.stderr.toString()).toContain('lists skills [intake, owner-calls, kite-report] but fleet.json lists [intake, owner-calls] for z-stu');
+});
+
+test('it regenerates with --private and no --check though a skill list mismatches fleet.json', () => {
+  const ctx = setupPrivateTest();
+  const fleetPath = join(ctx.dir, 'fleet.json');
+  writeFileSync(fleetPath, readFileSync(fleetPath, 'utf8').replace('"owner-calls"]', '"owner-calls", "kite-report"]'));
+  const file = join(ctx.privateDir, 'skills/preview-qa/references/session-prompt.md');
+  const source = readFileSync(file, 'utf8');
+  writeFileSync(file, source.replace('- read zgeoff PRs and their comments.', '- read every repo.'));
+  const result = ctx.runPrivate([]);
+  expect(result.stderr.toString()).toBe('');
+  expect(result.exitCode).toBe(0);
+  expect(readFileSync(file, 'utf8')).toBe(source);
+});

@@ -56,10 +56,6 @@ wants() { [ "$slot" = all ] || [ "$slot" = "$1" ]; }
 used=0
 limit=9500
 reserve=200 # room kept for each item still to print
-left=$(( $(printf "%s\n" "$skills" | grep -c . || true) + 2 ))
-[ "$slot" = all ] || left=1
-# Slot 6 can print several skills, so it keeps room for each one after the sixth.
-[ "$slot" != 6 ] || left=$(( $(printf "%s\n" "$skills" | grep -c . || true) - 5 ))
 say() { # say <line>: print it only while the total stays inside the cap
   size=$(printf '%s\n' "$1" | wc -c)
   [ $((used + size)) -le $limit ] || return 0
@@ -80,33 +76,45 @@ emit_file() { # emit_file <path to show> <path to read>
 }
 
 private_dir=${HQ_PRIVATE_DIR:-$(dirname "${CLAUDE_PROJECT_DIR:-.}")/hq-private}
+in_slot() { # in_slot <place>: whether this call prints the skill at that place
+  [ "$slot" = all ] || [ "$slot" = "$1" ] || { [ "$slot" = 6 ] && [ "$1" -gt 6 ]; }
+}
+# Count the items still to come: each skill in this call, plus its private part when it has one,
+# so the room kept covers every later part, not just the current skill's.
+left=0
 place=0
 for skill in $skills; do
   place=$((place + 1))
-  if [ "$slot" != all ]; then
-    { [ "$slot" = "$place" ] || { [ "$slot" = 6 ] && [ "$place" -gt 6 ]; }; } || continue
+  in_slot "$place" || continue
+  left=$((left + 1))
+  if [ -f "${CLAUDE_PROJECT_DIR:-.}/skills/$skill/SKILL.md" ] && [ -f "$private_dir/skills/$skill/SKILL.private.md" ]; then
+    left=$((left + 1))
   fi
+done
+[ "$slot" != all ] || left=$((left + 2))
+place=0
+for skill in $skills; do
+  place=$((place + 1))
+  in_slot "$place" || continue
   if [ -f "${CLAUDE_PROJECT_DIR:-.}/skills/$skill/SKILL.md" ]; then
+    emit "skills/$skill/SKILL.md"
+    left=$((left - 1))
     part="$private_dir/skills/$skill/SKILL.private.md"
-    # The private part is one more item still to come while the public part prints.
     if [ -f "$part" ]; then
-      left=$((left + 1))
-      emit "skills/$skill/SKILL.md"
-      left=$((left - 1))
       emit_file "$part" "$part"
-    else
-      emit "skills/$skill/SKILL.md"
+      left=$((left - 1))
     fi
   else
     say "skipped $skill: no SKILL.md in this tree"
+    left=$((left - 1))
   fi
-  case $slot in all|6) left=$((left - 1)) ;; esac
 done
 
 role=$(printf '%s\n' "$skills" | head -1)
 briefs=skills/delivery-lead/references/briefs.md
+left=1
+[ "$slot" != all ] || left=2
 if wants briefs && [ "$role" = delivery-lead ] && [ -f "${CLAUDE_PROJECT_DIR:-.}/$briefs" ]; then
-  [ "$slot" != all ] || left=2
   emit "$briefs"
 fi
 wants after || exit 0

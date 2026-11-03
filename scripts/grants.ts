@@ -588,7 +588,7 @@ function parseSkillBullets(body: string): string[] {
     const skill = /^- `skills\/(?<skill>[^/`]+)\/SKILL\.md`\s*$/u.exec(line)?.groups?.['skill'];
     if (skill !== undefined) {
       skills.push(skill);
-    } else if (line.trim() !== '' || skills.length > 0) {
+    } else if (line.trim() !== '') {
       break;
     }
   }
@@ -636,7 +636,7 @@ function runTrees(trees: Trees, check: boolean, today: string, fleetPath: string
     requireSite(file, trees, held, data);
   }
   const generated = renderTrees(trees, held, { data, grantsBySession, sessions });
-  if (trees.all.length > 1) {
+  if (check && trees.all.length > 1) {
     withTree(trees.prompts, () => checkPromptSkills(trees.prompts, fleetPath));
   }
   return writeGenerated(generated, check);
