@@ -68,7 +68,7 @@ export interface FakeRunner {
 export const FAKE_FULL_SHA = '0123456789abcdef0123456789abcdef01234567';
 export const FAKE_BASE_SHA = 'ba5eba5eba5eba5eba5eba5eba5eba5eba5eba5e';
 
-export const FAKE_PROOF_BODY = ['Teach the kettle skill to pour.', '## Skill checks', 'chex skill: 0 problems', '## Cold read', 'No findings.', '## Deslop', 'none'].join('\n');
+export const FAKE_PROOF_BODY = ['Teach the kettle skill to pour.', '## Checks', '- [x] chex prose, links and skill: cleared', '- [x] Cold read: 2 fixed, 0 declined', '- [x] Deslop: 1 edit', '', 'Declined: none.'].join('\n');
 const NOT_FOUND: RunResult = { code: 1, stdout: '', stderr: 'gh: Not Found (HTTP 404)' };
 
 export const FAKE_REVIEW_JSON = JSON.stringify({
