@@ -51,7 +51,7 @@ export function startStubAtcDaemon(path: string, procedures: Record<string, Stub
 }
 
 function buildHandlers(procedures: Record<string, StubProcedure>, requests: StubAtcRequest[], options: StubAtcOptions): SocketHandler<Connection> {
-  const daemon: DaemonIdentity = { build: options.build ?? '7.4.0', protocol: options.protocol ?? 12, peerSession: options.peerSession ?? null, helloWithoutPeerSession: options.helloWithoutPeerSession ?? false };
+  const daemon: DaemonIdentity = { build: options.build ?? '7.4.0', protocol: options.protocol ?? 13, peerSession: options.peerSession ?? null, helloWithoutPeerSession: options.helloWithoutPeerSession ?? false };
   const router = buildRouter(procedures, requests, daemon);
   return {
     open(socket) {
