@@ -1,11 +1,14 @@
 # The check
 
 The check turns each decision the owner must make into a call in hq: one question with options and
-your recommendation, which `z-stu` puts to him. Every open decision gets a call, with no cap. You
-never message the owner and never apply his answer.
+your recommendation, which `z-stu` puts to the owner. Every open decision gets a call, with no cap.
+You never message the owner, and you never apply the owner's answer.
 
-Decisions come from the issues flagged `Needs Geoff`, from the sessions they block (`z-delivery` and
-`z-review` message you, or ask you to check now), and from PRs that cite no issue.
+Decisions come from three places:
+
+- the issues flagged `Needs Geoff`;
+- sessions that a decision blocks: `z-delivery` and `z-review` message you, or ask you to check now;
+- PRs that cite no issue.
 
 Contents: [State](#state) · [Steps](#steps) · [Calls](#calls) · [Unblock list](#unblock-list)
 
@@ -13,8 +16,9 @@ Contents: [State](#state) · [Steps](#steps) · [Calls](#calls) · [Unblock list
 
 - Read hq output with `--json`. Pass no session flag; hq knows who you are. Never edit hq's database
   by hand.
-- Your state is `~/.local/share/z-sessions/refine.md`: the "CHECK at <UTC time>" lines, your atc
-  events cursor, and each open blocked decision, one JSON line with its call id.
+- The check's state is `~/.local/share/z-sessions/refine.md`: the "CHECK at <UTC time>" lines,
+  your atc events cursor, and each open blocked decision, one JSON line with its call id. The pass
+  keeps its own state in `triage.md`.
 
 ## Steps
 
@@ -24,8 +28,7 @@ Contents: [State](#state) · [Steps](#steps) · [Calls](#calls) · [Unblock list
    cursor. Save the new cursor. If `atc_events_read` refuses the cursor with `bad_args`, read
    without one, and say in the CHECK line that earlier notes may be missed. A decision stays open,
    and in `refine.md`, until `hq call list --state all` shows it answered or its sender says it's
-   settled. Something that needs his hands, not a decision, goes on the
-   [unblock list](#unblock-list).
+   settled. Put a step that needs the owner's hands on the [unblock list](#unblock-list).
 2. **Fetch the flagged issues:** team GEO, label `Needs Geoff`, with `id`, `title`, `url`, `status`,
    `priority`, `createdAt` and `updatedAt`, through `list_issues`. Save every page.
 3. **Complete `notes.json`** (start it as `{}` without a pass), one entry per flagged issue:
@@ -99,13 +102,13 @@ and sends nothing, while a new question on the same id is a new call. Ids:
 - a shared decision: `shared-<slug of the question>`, never built from its issues;
 - a blocked decision: session and slug, such as `z-delivery-export-path`.
 
-Close a call that no longer needs him with `hq call close <call id> --reason "<why>"`.
+Close a call that no longer needs the owner with `hq call close <call id> --reason "<why>"`.
 
 ## Unblock list
 
-For a step that needs his hands, when its session hasn't filed it:
-`hq unblock add --id <slug> --minutes <his minutes> --unblocks <GEO-n:urgent|high|medium|low,…> --item -`,
-with JSON `title` (80 characters at most), `question` (what he does), `details` and `links`.
+For a step that needs the owner's hands, when its session hasn't filed it:
+`hq unblock add --id <slug> --minutes <the owner's minutes> --unblocks <GEO-n:urgent|high|medium|low,…> --item -`,
+with JSON `title` (80 characters at most), `question` (what the owner does), `details` and `links`.
 
 - Give it each condition that ends it with `--done-when`: `issue:GEO-n`, `pr:<repo>#<n>`, or
   `doc:<Linear document ID>` (first line starts `Status: decided`). hq closes it and tells you.

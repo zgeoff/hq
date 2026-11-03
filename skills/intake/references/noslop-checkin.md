@@ -1,7 +1,7 @@
 # noslop check-in
 
-Once a day, post one news line on how noslop's reviews went: review churn, and any `accepted-risk`
-answer the owner never gave. Only he may accept a finding's risk.
+noslop is the automated reviewer that reviews each new head of a PR. Once a day, post one news line on how its reviews went: review churn, and any `accepted-risk`
+answer the owner never gave. Only the owner may accept a finding's risk.
 
 Your state file keeps two marks: `noslop cron=` and `noslop since=`, both UTC as
 `YYYY-MM-DDTHH:MM:SSZ`, since GitHub's `created_at` is UTC.
@@ -16,7 +16,7 @@ Your state file keeps two marks: `noslop cron=` and `noslop since=`, both UTC as
 5. From `totals`, copy the churn, each with its unknown count where it has one: `prs`,
    `roundsWithNew`, `repeatClass` (`classUnknown`), `late` as `{n, of}` (`lateUnknown`), `mainMerge`
    (`mergeUnknown`), and `baseMove`.
-6. Count `accepted-risk` answers since the mark that cite none of his words.
+6. Count `accepted-risk` answers since the mark that cite none of the owner's words.
    `skills/intake/references/noslop-checkin.private.md` in hq-private (`hq defs` shows where) says
    which sources count. Without it, write "not checked" and tell `z-q`. Per PR (`ref` is
    `<repo>#<n>`):

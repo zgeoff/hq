@@ -19,16 +19,16 @@ session. Take Ready issues in the order `hq focus show` prints.
 4. Read `launch`. With a `provider`, set `agent` to `launch.agent` and launch on `launch.target`
    (`imp` or `local`). With none, hold; `launch.reason` names the full limit.
 
-Work that reads the owner's personal data (his memories, hq's event log, or Nix's conversations)
-runs only when `launch.provider` is `claude`, since only Claude runs under his account. Otherwise
+Work that reads the owner's personal data (the owner's memories, hq's event log, or Nix's conversations)
+runs only when `launch.provider` is `claude`, since only Claude runs under the owner's account. Otherwise
 hold it, with no `hq unblock add`.
 
 ## Design lanes
 
 - An agent design session settles a `needs-design` or Design-type issue without the owner. A
-  with-geoff session works through an issue labelled `with-geoff` with him.
-- When he asks for a with-geoff session, launch it even if the lane is full: still run
-  `capacity.sh`, and pass `--asked <link to his message>` to `hq run add`. The agent lane has no
+  with-geoff session works through an issue labelled `with-geoff` with the owner.
+- When the owner asks for a with-geoff session, launch it even if the lane is full: still run
+  `capacity.sh`, and pass `--asked <link to the owner's message>` to `hq run add`. The agent lane has no
   override.
 - Right after the launch, run `hq run add --design agent|with-geoff`. Always pass the flag: without
   it, hq puts a Design-type issue in the with-geoff lane.
@@ -56,10 +56,10 @@ it with `hq unblock done` once `capacity.sh` finds room. Any other hold is routi
 
 ## Settings
 
-Change `pacing.json` only when the owner asks, quoting him in the PR. CI checks it against
+Change `pacing.json` only when the owner asks, quoting the owner in the PR. CI checks it against
 [pacing.schema.json](../pacing.schema.json); add a new field to the schema in the same PR.
 
-- `designSlots`: with-geoff design sessions at once; a soft limit he can exceed.
+- `designSlots`: with-geoff design sessions at once; a soft limit the owner can exceed.
 - `agentDesignSlots`: agent design sessions at once.
 - `slots.imp`, `slots.local`: delivery sessions on the imps, and on this host. Keep `slots.imp` at 7
   or fewer: the imps' host has 16 GiB for 8 imps of 2 GiB.

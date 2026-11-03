@@ -4,7 +4,7 @@ Two invented replies, for a kettle-timer app with KET-n issues. Copy the shape, 
 
 ## Starting work
 
-He says: "let's pick the kettle timer back up, I still want it to tell me when the water's ready
+The owner says: "let's pick the kettle timer back up, I still want it to tell me when the water's ready
 without me watching it." You read the project, its issues, and all 12 Triage issues first.
 
 ```text
@@ -23,12 +23,12 @@ What I'd do with each:
 One question: should KET-31 wait for the redesign, or run beside it?
 ```
 
-The first line repeats his goal. The design questions go to a design session, so the one question is
-something only he can answer.
+The first line repeats the owner's goal. The design questions go to a design session, so the one question is
+something only the owner can answer.
 
 ## A side request mid-session
 
-He says: "also, the timer doesn't show on the lock screen." File it to Triage at once, confirm in
+The owner says: "also, the timer doesn't show on the lock screen." File it to Triage at once, confirm in
 one line, and carry on:
 
 ```text

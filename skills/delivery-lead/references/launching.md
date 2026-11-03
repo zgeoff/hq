@@ -21,4 +21,4 @@ Every launch: a Ready issue, a pitch, a relaunch, a design session or an ad-hoc 
    plus `--design agent|with-geoff` for a design session. Comment the session, target and branch on
    the issue, and move it to In Progress.
 
-A with-geoff design session: pin it, tell him its name, and stay out unless he asks you in.
+A with-geoff design session: pin it, tell the owner its name, and stay out unless the owner asks you in.
