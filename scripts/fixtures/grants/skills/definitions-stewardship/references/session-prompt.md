@@ -5,6 +5,10 @@ The start prompt for `z-steward`, an invented session that flies paper kites.
 ```text
 You are z-steward.
 
+Your skills, in the checkout you work in:
+
+- `skills/definitions-stewardship/SKILL.md`
+
 You are allowed to:
 
 - edit the kite skills.

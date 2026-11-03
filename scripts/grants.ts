@@ -546,7 +546,82 @@ function renderSessions(entry: Held, context: RenderContext, generated: Generate
   }
 }
 
-function runTrees(trees: Trees, check: boolean, today: string): number {
+interface FleetSession {
+  name: string;
+  prompt: string | undefined;
+  skills: string[];
+}
+
+function readFleet(path: string): FleetSession[] {
+  if (!existsSync(path)) {
+    throw new Error(`--fleet ${path}: no such file`);
+  }
+  const parsed: unknown = JSON.parse(readFileSync(path, 'utf8'));
+  const sessions = typeof parsed === 'object' && parsed !== null ? (parsed as { sessions?: unknown }).sessions : undefined;
+  if (!Array.isArray(sessions)) {
+    throw new Error(`${path}: expected a "sessions" array`);
+  }
+  return sessions.map((entry: unknown, index) => {
+    const row = typeof entry === 'object' && entry !== null ? (entry as Record<string, unknown>) : {};
+    const { name, prompt, skills } = row;
+    if (typeof name !== 'string' || (skills !== undefined && !(Array.isArray(skills) && skills.every((s) => typeof s === 'string')))) {
+      throw new Error(`${path}: sessions[${index}] needs a name and, if present, a list of skill names`);
+    }
+    return { name, prompt: typeof prompt === 'string' ? prompt : undefined, skills: (skills as string[] | undefined) ?? [] };
+  });
+}
+
+function parseSkillBullets(body: string): string[] {
+  const lines = body.split('\n');
+  const start = lines.findIndex((line) => line.startsWith('Your skills'));
+  if (start === -1) {
+    return [];
+  }
+  const skills: string[] = [];
+  for (const line of lines.slice(start + 1)) {
+    const skill = /^- `skills\/([^/`]+)\/SKILL\.md`\s*$/u.exec(line)?.[1];
+    if (skill !== undefined) {
+      skills.push(skill);
+    } else if (line.trim() !== '' || skills.length > 0) {
+      break;
+    }
+  }
+  return skills;
+}
+
+function checkSkillList(file: string, body: string, owner: FleetSession | undefined, owned: string): string[] {
+  if (owner === undefined) {
+    return [`${file}: no session in fleet.json ${owned}; add one, or remove the prompt`];
+  }
+  const bullets = parseSkillBullets(body);
+  if (bullets.join('\n') === owner.skills.join('\n')) {
+    return [];
+  }
+  return [
+    `${file}: the prompt lists skills [${bullets.join(', ')}] but fleet.json lists [${owner.skills.join(', ')}] for ${owner.name}; ` +
+      `make the prompt's skill bullets match fleet.json's skills for ${owner.name}, or change fleet.json`,
+  ];
+}
+
+function checkPromptSkills(tree: Tree, fleetPath: string): void {
+  const fleet = readFleet(fleetPath);
+  const problems: string[] = [];
+  for (const file of new Bun.Glob('skills/*/references/session-prompt.md').scanSync({ cwd: tree.root, onlyFiles: true })) {
+    const role = file.split('/')[1];
+    const owner = fleet.find((session) => session.skills[0] === role);
+    problems.push(...checkSkillList(file, read(tree, file), owner, `whose first skill is ${role}`));
+  }
+  const qFile = 'prompts/z-q.md';
+  if (existsSync(join(tree.root, qFile))) {
+    const owner = fleet.find((session) => session.prompt === `main:${qFile}`);
+    problems.push(...checkSkillList(qFile, read(tree, qFile), owner, `has prompt main:${qFile}`));
+  }
+  if (problems.length > 0) {
+    throw new Error(problems.toSorted().join('\n'));
+  }
+}
+
+function runTrees(trees: Trees, check: boolean, today: string, fleetPath: string): number {
   const data = readStillAsk(trees.hq);
   const grantsBySession = withTree(trees.prompts, () => readGrants(data, trees.prompts, today));
   const held = trees.all.map((tree) => readHeld(tree));
@@ -554,7 +629,11 @@ function runTrees(trees: Trees, check: boolean, today: string): number {
   for (const file of data.sites.keys()) {
     requireSite(file, trees, held, data);
   }
-  return writeGenerated(renderTrees(trees, held, { data, grantsBySession, sessions }), check);
+  const generated = renderTrees(trees, held, { data, grantsBySession, sessions });
+  if (trees.all.length > 1) {
+    withTree(trees.prompts, () => checkPromptSkills(trees.prompts, fleetPath));
+  }
+  return writeGenerated(generated, check);
 }
 
 function requireSite(file: string, trees: Trees, held: Held[], data: StillAsk): void {
@@ -585,7 +664,7 @@ function renderTrees(trees: Trees, held: Held[], context: RenderContext): Genera
 
 function runMain(): number {
   const args = parseArgs({
-    options: { check: { type: 'boolean' }, private: { type: 'string' }, today: { type: 'string' } },
+    options: { check: { type: 'boolean' }, fleet: { type: 'string' }, private: { type: 'string' }, today: { type: 'string' } },
     strict: true,
     allowPositionals: false,
   });
@@ -593,7 +672,7 @@ function runMain(): number {
   if (!isCalendarDate(today)) {
     throw new Error(`--today ${today}: expected YYYY-MM-DD`);
   }
-  return runTrees(buildTrees(args.values.private), args.values.check ?? false, today);
+  return runTrees(buildTrees(args.values.private), args.values.check ?? false, today, resolve(args.values.fleet ?? join(root, 'fleet.json')));
 }
 
 try {
