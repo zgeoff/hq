@@ -4,7 +4,7 @@ Write or change a `z-` session's start prompt by the shape below. [sessions.md](
 
 ## the text block
 
-Each prompt is the one `text` block in `skills/<role skill>/references/session-prompt.md` in hq-private, as [starting a session](./sessions.md#starting-a-session) says. Write the block with no Markdown headings, in this order:
+Each prompt is the one `text` block in `skills/<role skill>/references/session-prompt.md` in hq-private, as [starting a session](./sessions.md#starting-a-session) says. Above the block, the file needs one line that starts ``The start prompt for `<session name>` ``, such as ``The start prompt for `z-lantern`, an invented session that tends harbour lamps.`` `scripts/grants.ts` reads the session's name from that line, and fails with `missing or duplicate session name` without it. Write the block with no Markdown headings, in this order:
 
 1. **Who you are.** The session's name, one sentence on its job that points at the role skill, and the rest of the team as a bulleted list, one sentence per session.
 2. **What to load.** The skills as a bulleted list of paths in the hq checkout, which is the session's working directory, and when to read them. Then the checkout rule: never fetch or pull, and run `hq defs sync` to get a change that merged a moment ago. Then the path of the session's state file.
