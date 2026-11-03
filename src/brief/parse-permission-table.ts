@@ -1,14 +1,11 @@
 import { collectFencedLines } from './collect-fenced-lines.ts';
 import type { PermissionRow } from './types.ts';
 
-// The private half names the section after the public placeholder it fills; older clones keep the
-// short name.
-const HEADINGS = new Set(['## permission phrasing', '## placeholders (`{{permissions}}`: the permission phrasing)']);
 const SEPARATOR = /^:?-+:?$/u;
 
 export function parsePermissionTable(markdown: string): PermissionRow[] {
   const lines = collectUnfencedLines(markdown.split('\n'));
-  const start = lines.findIndex((line) => HEADINGS.has(line.trim().toLowerCase()));
+  const start = lines.findIndex((line) => isPermissionHeading(line.trim().toLowerCase()));
   if (start === -1) {
     return [];
   }
@@ -28,6 +25,15 @@ export function parsePermissionTable(markdown: string): PermissionRow[] {
 function collectUnfencedLines(lines: readonly string[]): string[] {
   const fenced = collectFencedLines(lines);
   return lines.filter((_, index) => fenced[index] !== true);
+}
+
+// The private half names the section after the public placeholder it fills, and ends the heading
+// with "(the permission phrasing)" however that name reads; older clones keep the short name.
+const SHORT_HEADING = '## permission phrasing';
+const HEADING = /^## .*\bthe permission phrasing\)$/u;
+
+function isPermissionHeading(heading: string): boolean {
+  return heading === SHORT_HEADING || HEADING.test(heading);
 }
 
 function splitRow(row: string): string[] {
