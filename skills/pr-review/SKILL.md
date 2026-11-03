@@ -78,7 +78,10 @@ as stacks.md says.
   `hq review gate cloud <pr>` passes.
 - In zgeoff/cloud and zgeoff/vers a merge deploys: merge when the gate passes, and tell `z-release`
   at once.
-- Merge only in repos your `Merge` and `hq-merges` grants name. A ruleset block goes to
+- When `hq review gate` refuses a PR only because noslop could not check the fixes, read the fixes
+  by hand as for a delivery PR, hold the PR, and message `z-stu` with the PR. No grant lets
+  `z-review` merge it.
+- Merge only in repos your merge grants in your start prompt name. A ruleset block goes to
   `z-delivery`.
 
 ## After the merge

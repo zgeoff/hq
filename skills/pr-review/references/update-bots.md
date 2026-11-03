@@ -16,10 +16,11 @@ a weekly batch: review the batch in one sitting, each PR through `hq review`.
 
 1. From this skill's folder, run `scripts/sync-pr.sh <repo> <pr>` (repo without `zgeoff/`). It
    prints `ok: ...`, or `no` with the first failing reason.
-2. On `ok`, merge on green CI.
+2. On `ok`, merge on green CI. A repo-sync PR whose diff touches only the synced paths gets no
+   noslop review, because zgeoff/tools already reviewed its text.
 3. If the reason is a local edit the repo keeps, compare the PR's diff with the upstream change it
    copies:
-   - Merge it (your Repo sync grant covers this) when every line it removes or changes, upstream
+   - Merge it (the `z-review-repo-sync` grant in your start prompt covers this) when every line it removes or changes, upstream
      also removes or changes, and every line only the repo's copy has survives.
    - If it would lose a local edit, message `z-stu` the PR and the lines. `z-stu` decides.
 4. Any other reason: it waits for the owner's lgtm; file it with `hq unblock add` as holds.md says.
