@@ -249,7 +249,7 @@ const OLD_FORM = /^Grants:$/mu;
 const WORD_CAP = 50;
 const TEXT_BLOCK = /^```text\n(?<content>[\s\S]*?)^```[ \t]*$/gmu;
 
-function usesNewForm(body: string): boolean {
+function hasNewForm(body: string): boolean {
   return [...body.matchAll(TEXT_BLOCK)].some((block) => NEW_FORM.test(block.groups?.['content'] ?? ''));
 }
 
@@ -257,7 +257,7 @@ function normalizeSite(file: string, body: string, data: StillAsk): string {
   const mentions = [...body.matchAll(/security change/gu)].length;
   const spans = [...body.matchAll(/deleting or rewriting\b[^\n]*?\bsecurity change\b/gu)];
   const voice = data.sites.get(file);
-  if (voice && mentions === 0 && usesNewForm(body)) {
+  if (voice && mentions === 0 && hasNewForm(body)) {
     return body;
   }
   if (mentions !== spans.length || spans.length !== (voice ? 1 : 0)) {
