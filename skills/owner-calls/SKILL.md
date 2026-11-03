@@ -1,53 +1,128 @@
 ---
 name: owner-calls
 description:
-  What only the owner decides, how a session puts something to him, and how his answers count. Load
-  it before you flag an issue for him, send a decision or a step for him, decide something under a
-  grant, or act on an answer of his.
+  What only the owner decides, how a session puts something to the owner, how the owner's answers
+  count, and the fleet's shared terms. Load it before you flag an issue for the owner, send a
+  decision or a hands-on step for the owner, decide something under a grant, or act on an answer of
+  the owner's.
 ---
 
 # Owner calls
 
-The owner answers through one queue, in batches: `z-triage` turns decisions into calls, and `z-stu`
-puts each to him. No other session asks him directly. To tell him something, such as a deploy hold,
-push a notification.
+Some choices belong to the owner alone. Tell those choices from your own, put each one to the
+owner with everything needed to decide it, and act on the answer only once hq has a record of it. [Terms](#terms) defines hq, `z-stu` and the other words the role skills share.
 
-## What only he decides
+Once you have sent the decision or the hands-on step, carry on with other work. `z-stu` types the
+answer into your session after it records the answer in hq, so a line from `z-stu` is already on
+record. Nothing goes back to a caller.
 
-These always go to him: deleting or rewriting the owner's data, anything that touches Nix's memory or identity, credentials, scope and naming, a new session, a priority, and a High or Urgent security change.
+Avoid these traps:
+
+- Asking the owner directly. Every decision goes through one queue.
+- Passing an answer on by message. `hq review gate` and every session read only hq's records.
+- Adding a new behaviour to a decision, so that a "yes" also covers it.
+
+## Key rules
+
+- [Terms](#terms): the fleet's shared words, defined once for every role skill.
+- [What only the owner decides](#what-only-the-owner-decides): send each item on the list to the
+  owner, even under a grant; decide anything else yourself.
+- [Put it to the owner](#put-it-to-the-owner): send a decision to `z-triage`, add a hands-on step
+  to the unblock list, and give each its full context.
+- [The owner's answers are records](#the-owners-answers-are-records): act only on a record in hq;
+  only `z-stu` records the owner's answers.
+
+## Terms
+
+- **The owner:** the person the fleet works for. An issue with the Linear label `Needs Geoff` waits
+  on a decision from the owner. A Design issue with the Linear label `with-geoff` has the owner in
+  its design session.
+- **hq:** the CLI that runs the fleet, and the store of its records. `hq --help` lists the commands.
+- **atc:** the tool that runs the sessions and carries messages between them. Send a message to a
+  session with `atc_message_send`.
+- **`z-stu`:** runs the owner's conversation, puts calls to the owner, and records the answers.
+- **`z-triage`:** grooms Linear, and turns each decision into a call.
+- **`z-delivery`:** launches the builder agents.
+- **`z-review`:** reviews and merges PRs.
+- **`z-qa`:** runs the live checks.
+- **`z-release`:** takes merged work live.
+- **`z-q`:** develops hq itself.
+- **Nix:** the owner's personal agent. **nixie** is the service that runs Nix.
+- **A grant:** a standing permission. It is a line in the "You are allowed to:" list of your start
+  prompt, or a line the owner types into your session.
+- **A call:** an hq record of one decision put to the owner.
+- **A hands-on step:** a step only the owner can do, such as an approval tap. **The unblock list**
+  holds them: `hq unblock list` shows it.
+- **The gate:** `hq review gate`, which decides whether a PR may merge.
+- **A vault:** a 1Password vault.
+- **A pass:** one run of `z-triage` over the Linear issues, every 30 minutes.
+- **Your role's private file:** `SKILL.private.md` in hq-private, the private repo that holds the
+  start prompts. `hq defs` prints where the hq-private checkout is.
+
+## What only the owner decides
+
+Send each of these to the owner, even when a grant seems to cover it: deleting or rewriting the owner's data, anything that touches Nix's memory or identity, credentials, scope and naming, a new session, a priority, and a High or Urgent security change.
 
 Also his:
 
 - closing an issue whose work is still worth doing, or as not planned;
 - a new project;
-- an Action beyond Code delivery, Investigation, Spike or Design session: Data that deletes or
-  rewrites, Deploy, Infra, Credentials, Posting, or Paid API over its limit;
+- an Action beyond Code delivery, Investigation, Spike or Design session: Data that deletes or rewrites, Deploy, Infra, Credentials, Posting, or Paid API over its limit;
 - accepting a finding's risk, or merging a PR its gate blocks;
 - product direction, and a cost only he can accept.
 
-A choice that touches none of these is yours to make under your grants, or the issue's.
+In this list, a new session is a new z- session, a priority is an issue's priority, and scope is an issue's scope. An Action is one in the issue's Actions line, and the Paid API limit is in [Actions](../tickets/SKILL.md#actions). `z-stu` records an accepted risk with `hq pr accept-risk`, and the gate is `hq review gate`.
 
-## Putting it to him
+Code delivery, Linear edits, Investigation, Spike and Design session need no owner call. Neither does reading an existing item from a vault: [Put it to the owner](#put-it-to-the-owner) says how to look one up first.
 
-- **A decision:** message `z-triage` the question, the options and your recommendation. `z-triage`
-  itself flags the issue (`Needs Geoff`) and the check makes it a call.
-- **A step only his hands can do,** such as an approval tap:
-  `hq unblock add --task '<what he does>' --done-when issue:GEO-<n>` (or `pr:<repo>#<n>`).
-- **A credential:** first list the repo's vault and the shared vault, as your role's private file
-  says. Only a missing item, or one in his personal vaults, waits on him.
+Decide anything else yourself, under your grants or the actions that the issue's Actions line names.
 
-Each carries its full context and links, so he decides from it alone. A new behaviour he didn't ask
-for is its own question, never an add-on that a "yes" to something else would cover. Before you
-propose changing something he approved, read its history and say what he decided.
+## Put it to the owner
 
-## His answers are records
+The owner answers in batches, through one queue: `z-triage` turns each decision into a call, and
+`z-stu` puts the call to the owner. Never ask the owner directly. To tell the owner something
+without a decision, such as a deploy hold, send it with `PushNotification`.
 
-hq records his answers: `hq call answer`, `hq pr answer`, `hq pr override`, `hq pr accept-risk`, and
-each line typed into a session with `hq typed add`. Gates and sessions read only those records, so
-never pass an answer on by message. Only `z-stu` records his answers, from the sources its private
-files name. Each other session records its own acts, such as a rebase, a mechanical edit or a grant
-he gave it in chat.
+- **Send a decision to `z-triage`** with `atc_message_send`: the question, the options and your
+  recommendation. `z-triage` labels the issue `Needs Geoff`, and the check after its next pass makes
+  the decision a call, with or without an issue behind it.
+- **Add a hands-on step to the unblock list:**
+  `hq unblock add --task '<what the owner does>' --done-when <condition>`. The condition is
+  `issue:GEO-<n>`, `pr:<repo>#<n>`, `doc:<id>`, `release:<repo>` or `date:<ISO time>`.
+- **Look up a credential before you ask for it:** run `op item list --vault <repo>`, and the same
+  for the shared vault that your role's private file names. Ask the owner only for an item that is
+  missing, or that sits in the owner's personal vaults.
 
-- A grant he gives in chat holds for that session's life: log it with `hq grant act` and tell
-  `z-stu`.
-- Each act under a standing grant: `hq grant act <name> --target <issue, PR or command>`.
+Give each decision and each step its full context and links, so that the owner can decide from it
+alone.
+
+Ask about a new behaviour that the owner didn't ask for in a decision of its own. A "yes" to
+something else never covers it.
+
+Before you propose a change to something the owner approved, read the issue's comments and the PR's
+history. In the proposal, say what the owner decided.
+
+## The owner's answers are records
+
+Act only on an answer that hq records. Never pass an answer on to another session by message: the
+gate and every session read only hq's records.
+
+Only `z-stu` records the owner's answers, from the sources its private file names. It uses these
+commands:
+
+- `hq call answer`, for the answer to a call;
+- `hq pr answer`, `hq pr override` and `hq pr accept-risk`, for an answer about a PR;
+- `hq typed add`, for each line it types into a session as the owner.
+
+When the owner types a grant into your session, you may act on it for that session's life. Send the
+line to `z-stu` with `atc_message_send`, so that `z-stu` records it. This sends the record keeper
+the owner's own words; it passes no answer on for another session to act on.
+
+Every other session records only its own acts:
+
+- **Log each act under a grant:** run `hq grant act <name> --target <issue, PR or command>`. The
+  name is the one in your start prompt's "Log it with" line.
+- **In `z-review`, carry the owner's lgtm across a rebase:** run
+  `hq pr rebased <repo> <pr> --from <old head SHA>`.
+- **In `z-review`, record a mechanical edit to an instruction file:** run
+  `hq pr mechanical <repo> <pr>`.

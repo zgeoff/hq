@@ -10,9 +10,9 @@ in one.
 
 `hq restart` refuses between 23:00 and 08:00 Sydney time without `--force`, and the upgrade session
 runs it. Before you launch in those hours, check that the owner is around: `z-stu`'s transcript in
-atc shows a line he typed there in the last 30 minutes (not an atc message), or `z-stu` types into
-your session that he says he is around. If he is, add this line to the brief's Steps: "The owner is
-around: add --force to hq restart." If he isn't, launch at 08:00.
+atc shows a line the owner typed there in the last 30 minutes (not an atc message), or `z-stu` types
+into your session that the owner says they are around. If the owner is around, add this line to the
+brief's Steps: "The owner is around: add --force to hq restart." If not, launch at 08:00.
 
 ## When to restart
 
@@ -25,9 +25,9 @@ Pending changes:
   issue open until the restart.
 
 Restart when the owner asks, when a pending change blocks someone's work, or when the daemon failed
-to bring a session back. Tell him first, in one message: the restart, the upgrade session's name,
-the changes it loads, and the minute without atc. If the daemon is down, tell him and launch
-nothing.
+to bring a session back. Tell the owner first, in one message: the restart, the upgrade session's name,
+the changes it loads, and the minute without atc. If the daemon is down, tell the owner and
+launch nothing.
 
 ## Launching the upgrade
 
@@ -62,5 +62,5 @@ Finish line: the new build running in atc-daemon.service, every pending change v
 When your atc tools answer, check `daemon.build` in `atc_spawn_options_get`, then send the upgrade
 session "Verify the upgrade: run step 7 and report." and read its report. Message `z-qa` each
 pending change's issue with its check result, to close the passed ones. Tell the owner the old and
-new builds and any failure in one line. Still no answer after 5 minutes: tell him, since only he can
-restart the daemon.
+new builds and any failure in one line. Still no answer after 5 minutes: tell the owner, since only the
+owner can restart the daemon.

@@ -8,44 +8,90 @@ description:
 
 # Evidence
 
-An Acceptance item is met when something a reader can check shows it: a test, an eval run, a command
-and its output, a record, a screenshot. A claim in a PR body is not evidence.
+Judge whether an issue's Acceptance items are met, and record the evidence. The items are the checkboxes in the issue's `## Acceptance` section. An item is met when something a
+reader can open and check shows it: a test, an eval run, a command and its output, a database or
+Linear record, or a screenshot. A claim in a PR body is not evidence.
+
+You hand back a verdict on each item, pass or fail. When you run a preview check or a live check,
+you also hand back the Linear comment that records it.
+
+The traps: holding a PR for an extra that its Acceptance never asked for; taking a passed preview
+check as proof that the change is live; and sending test traffic to production.
+
+For `z-qa`, Nix and the fleet's other terms, see [owner-calls](../owner-calls/SKILL.md#terms).
+
+## Key rules
+
+- [Done by type](#done-by-type): judge only the written Acceptance, by the issue's `Type` label.
+- [Before the merge](#before-the-merge): the PR description shows the evidence for each item a test
+  or a screenshot can prove; `z-qa` checks the rest on the preview, when the repo has one.
+- [Once live](#once-live): mark whether a live check is owed; `z-qa` checks production read-only.
+- [Record it](#record-it): one Linear comment on the issue for each preview check or live check.
 
 ## Done by type
 
-Judge only the written Acceptance; an extra the PR added is no reason to hold it.
+Judge only the written Acceptance. Never hold a PR for an extra that it added.
+
+Read the type from the issue's `Type` label, as the
+[tickets](../tickets/references/fields.md#type) skill sets it.
 
 | Type          | Done when                                                                     |
 | ------------- | ----------------------------------------------------------------------------- |
-| Bug           | the reproduction passes, and a regression test or eval case covers it         |
-| Feature       | every Acceptance check passes with its evidence                               |
+| Bug           | the bug no longer reproduces, and a regression test or eval case covers it    |
+| Feature       | every Acceptance item passes with its evidence                                |
 | Improvement   | the improvement is shown, and nothing else changed unless intended            |
 | Chore         | the upkeep is done, and checks show no change a user notices                  |
 | Design        | decisions are in a Linear document, and follow-up issues are filed            |
 | Investigation | findings and a recommendation are written up, with any follow-up issues filed |
 
-An umbrella is done only with every box ticked.
+An Improvement may change an existing test when its Acceptance asks for that change.
+
+An umbrella issue has a box for each repo in its Scope. It is done when every box is ticked, each by
+a merged PR in that repo. `z-review` ticks a box when that PR merges.
 
 ## Before the merge
 
-- The PR shows evidence for each Acceptance item in its description. An image goes in as the
-  `pr-evidence` skill says, never as a commit.
-- An item only the running system shows is a live item. On a repo with PR previews, `z-qa` checks it
-  on the preview before the merge; otherwise after the release.
-- A preview check is evidence for an item, never proof that the change is live.
+- Show the evidence in the PR description for each item that a test, a command or a screenshot can
+  prove. Add an image as the [pr-evidence](../../.claude/skills/pr-evidence/SKILL.md) skill says,
+  never as a commit.
+- Leave each item that only the running system can show, such as a page that loads or a message that
+  sends, to `z-qa`. On a repo with PR previews, `z-qa` checks it on the preview and answers
+  `z-review` before the merge.
+- On a repo without previews, `z-qa` checks that item after the release. It doesn't hold the merge.
+
+A passed preview check proves the item only on the preview. The release still has to ship before the
+change is live.
 
 ## Once live
 
-- A live check owes nothing for a Chore or a test-only change (`hq run check <issue> none`), unless
-  it publishes an artifact or rolls out across repos.
-- Check production read-only. Never send test traffic to production Nix: a test turn writes into her
-  real memory.
-- An item that passed on the preview needs no second check, unless only production can show it.
-- An item that needs the owner's eyes or hands goes on his unblock list, as `owner-calls` says, and
-  doesn't hold the merge.
+Mark whether the issue owes a live check before its release ships. An issue you leave unmarked
+counts as owed.
 
-## Recording it
+- For a Chore, or a change where every changed path is a test, run `hq run check GEO-<n> none`. hq
+  closes the issue when the release ships.
+- Run `hq run check GEO-<n> owed` instead when that change publishes an artifact, such as a
+  package, or rolls out across repos.
 
-One Linear comment per check: the PR and head, or the release, then each item with pass or fail and
-the request, output or record that shows it, trimmed to what proves it. Never paste production data
-or anything from the owner's accounts.
+When the release ships, hq messages `z-qa` to run the live check, which is a check of the items on
+production:
+
+- Check production read-only. Never send a test turn to production Nix: it writes into Nix's real
+  memory.
+- Skip each item that passed its preview check. Still check an item that only production can show.
+- When every item passes, `z-qa` moves the issue to Done.
+
+An item that needs the owner's eyes or hands, before or after the merge, goes on the owner's unblock
+list, as [owner-calls](../owner-calls/SKILL.md) says. It doesn't hold the merge.
+
+## Record it
+
+Post one Linear comment on the issue for each preview check or live check. Put in it:
+
+- the PR and its head commit, or the release tag;
+- each item, with pass or fail, and the request, output or record that shows it, trimmed to what
+  proves it.
+
+For a live check, describe what production returned, such as a status code or a row count. Never
+paste production data itself, or anything from the owner's accounts.
+
+**Reply:** each item with pass or fail, and the link to the Linear comment for each check you ran.

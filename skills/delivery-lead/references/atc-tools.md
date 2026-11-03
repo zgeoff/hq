@@ -25,7 +25,7 @@ recover alone. Keep the advisor tool on whatever you do. Check its worktree with
   the owner.
 - **Its context is worth keeping:** stop it, run `hq repair advisor-400 <session_id>` as a dry run,
   and ask the owner to approve `hq repair advisor-400 <session_id> --apply` (the classifier blocks
-  transcript writes without his yes). Run it, then message the session to restart. Still failing:
+  transcript writes without the owner's yes). Run it, then message the session to restart. Still failing:
   relaunch.
 - **Otherwise, relaunch:** copy its scratch files and evidence to your scratch folder, spawn from
   the same brief on its pushed branch with a new `idempotencyKey`, and forget the old one with

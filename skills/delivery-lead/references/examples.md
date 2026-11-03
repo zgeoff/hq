@@ -5,7 +5,7 @@ Two invented replies, for a kettle-timer app with KET-n issues. Copy the shape, 
 ## Answering a correction
 
 The owner: "skip the design session with me, an agent can run it alone on the redesign issue". Take
-it as given, and ask before the next step, since he may want to add to the brief:
+it as given, and ask before the next step, since the owner may want to add to the brief:
 
 ```text
 Understood. I'll set up an agent's design session for KET-40, the alert-model redesign. Its brief links KET-40 and the two boil-time reports filed against it. Ready to start it now?

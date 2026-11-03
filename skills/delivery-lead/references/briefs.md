@@ -21,7 +21,7 @@ granting wording is in `skills/delivery-lead/references/briefs.private.md` in hq
 `hq brief --json` lists in `unfilled` what it left for you:
 
 - **`permissions:<action> (no wording)`:** the private file has no wording for that action. Pitch it
-  to the owner as SKILL.md's Refusals says, and launch once he approves.
+  to the owner as SKILL.md's Refusals says, and launch once the owner approves.
 - **`permissions:<action>`:** the wording still holds a slot, such as `<stage>`. Fill it from the
   issue.
 - **`playbook`:** the issue has no Type label, or its Type has no playbook. Ask `z-triage` to label
@@ -49,4 +49,4 @@ that can make its next push look unapproved.
 - A message that only narrows the work ("keep your version of that test"): send it.
 - An action the agent's launch prompt already grants: send nothing.
 - An action beyond the grants: if the owner's yes covers it, type it in with `atc_terminal_type`, as
-  SKILL.md's Refusals says. If not, ask him first.
+  SKILL.md's Refusals says. If not, ask the owner first.

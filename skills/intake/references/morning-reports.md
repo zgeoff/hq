@@ -6,7 +6,7 @@ far. The news digest carries them, so push nothing, even on failure. Post by 08:
 1. Get Sydney dates with `TZ=Australia/Sydney date`, never by hand. Yesterday: yesterday's date, no
    `--until`. Today so far: today's date, until now in UTC.
 2. Start one subagent per report, so the Linear pages stay out of your context. Each loads the
-   `delivery-report` skill, runs the daily report for its date and follows its Sending it section.
+   `delivery-report` skill, runs the daily report for its date and follows its Send it section.
    Give the today-so-far one
    `merged-prs.sh daily <date> --until <now in UTC, such as 2026-10-16T21:30Z>`. Each returns a gist
    link or why it failed.
