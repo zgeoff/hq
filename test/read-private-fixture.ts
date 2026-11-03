@@ -35,7 +35,7 @@ const STILL_ASK = [
 ].join("\n");
 
 function buildStubPrompt(skill: string): string {
-  return `# session prompt\n\n\`\`\`text\nYou are an invented ${skill}.\n\`\`\`\n`;
+  return `# session prompt\n\n\`\`\`text\nYou are an invented ${skill}.\n\n${buildSkillList(skill)}\n\`\`\`\n`;
 }
 
 interface PrivateFixture {
@@ -52,7 +52,7 @@ export function readPrivateFixture(): PrivateFixture {
   );
   privateFiles["skills/intake/references/session-prompt.md"] += `\nAsk before ${SPAN}.\n`;
   privateFiles["skills/preview-qa/references/session-prompt.md"] =
-    "# session prompt\n\nThe start prompt for `z-qa`.\n\n```text\nYou are an invented qa.\n\nYou are allowed to:\n\n- pour the water.\n\nThen stop.\n```\n";
+    `# session prompt\n\nThe start prompt for \`z-qa\`.\n\n\`\`\`text\nYou are an invented qa.\n\n${buildSkillList("preview-qa")}\nYou are allowed to:\n\n- pour the water.\n\nThen stop.\n\`\`\`\n`;
   privateFiles["grants/z-qa.yaml"] =
     '- id: water\n  label: Water\n  outcome: allow\n  note: "pour the water."\n';
   privateFiles["docs/skill-development/roles-design.md"] = `Ask before ${SPAN}.\n`;
@@ -60,9 +60,19 @@ export function readPrivateFixture(): PrivateFixture {
   return {
     hqFiles: {
       "scripts/grants.ts": readFileSync(resolve(import.meta.dir, "../scripts/grants.ts"), "utf8"),
+      "fleet.json": JSON.stringify({
+        sessions: [
+          ...ROLE_SKILLS.map((skill) => ({ name: `z-${skill}`, skills: [skill] })),
+          { name: "z-kettle", skills: [], prompt: "main:prompts/z-q.md" },
+        ],
+      }),
       "grants/still-ask.yaml": STILL_ASK,
       "skills/linear-triage/SKILL.md": `Ask before ${SPAN}.\n`,
     },
     privateFiles,
   };
+}
+
+function buildSkillList(skill: string): string {
+  return `Your skills, in the checkout you work in:\n\n- \`skills/${skill}/SKILL.md\`\n`;
 }

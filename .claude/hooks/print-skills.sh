@@ -12,7 +12,10 @@
 # hq hasn't recorded falls back to its atc name, which must be a declared name. Any other session,
 # or a lookup that fails, prints nothing, so no session is told to follow another role's skills.
 # It prints skills/<skill>/SKILL.md for each declared skill in order; a skill with no SKILL.md in
-# this tree gets one "skipped" line (the shared skills only exist on some branches). Then it prints
+# this tree gets one "skipped" line (the shared skills only exist on some branches). Right after a
+# skill's SKILL.md it prints that skill's SKILL.private.md from the hq-private checkout, in the same
+# slot call, found at ${HQ_PRIVATE_DIR:-<the project dir's sibling>/hq-private}; a missing checkout
+# or part prints nothing extra. Then it prints
 # the role's after-compaction file, found by the first skill, the role skill.
 # A session with no skills prints only its after-compaction file, found by its name (z-q gets q.md).
 # The delivery role also gets delivery-lead's briefs reference when this tree has it, since every
@@ -64,7 +67,10 @@ say() { # say <line>: print it only while the total stays inside the cap
   printf '%s\n' "$1"
 }
 emit() { # emit <path relative to the project dir>
-  body=$(sed -E 's/ {2,}/ /g; s/-{4,}/---/g' "${CLAUDE_PROJECT_DIR:-.}/$1")
+  emit_file "$1" "${CLAUDE_PROJECT_DIR:-.}/$1"
+}
+emit_file() { # emit_file <path to show> <path to read>
+  body=$(sed -E 's/ {2,}/ /g; s/-{4,}/---/g' "$2")
   text=$(printf 'Context was compacted. This is %s, reloaded from disk. Follow it as written.\n\n%s\n' "$1" "$body")
   size=$(printf '%s\n' "$text" | wc -c)
   if [ $((used + size + reserve * (left - 1))) -gt $limit ]; then
@@ -73,6 +79,7 @@ emit() { # emit <path relative to the project dir>
   say "$text"
 }
 
+private_dir=${HQ_PRIVATE_DIR:-$(dirname "${CLAUDE_PROJECT_DIR:-.}")/hq-private}
 place=0
 for skill in $skills; do
   place=$((place + 1))
@@ -80,7 +87,16 @@ for skill in $skills; do
     { [ "$slot" = "$place" ] || { [ "$slot" = 6 ] && [ "$place" -gt 6 ]; }; } || continue
   fi
   if [ -f "${CLAUDE_PROJECT_DIR:-.}/skills/$skill/SKILL.md" ]; then
-    emit "skills/$skill/SKILL.md"
+    part="$private_dir/skills/$skill/SKILL.private.md"
+    # The private part is one more item still to come while the public part prints.
+    if [ -f "$part" ]; then
+      left=$((left + 1))
+      emit "skills/$skill/SKILL.md"
+      left=$((left - 1))
+      emit_file "$part" "$part"
+    else
+      emit "skills/$skill/SKILL.md"
+    fi
   else
     say "skipped $skill: no SKILL.md in this tree"
   fi

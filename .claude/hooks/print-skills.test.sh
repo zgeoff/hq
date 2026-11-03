@@ -1,4 +1,5 @@
 #!/bin/sh
+# Also checks that a skill's private part prints after its SKILL.md, or becomes a read instruction.
 # Runs print-skills.sh against a stand-in `hq fleet --json`, a stand-in `atc` that reports a given
 # session name, and a temp project tree of invented skills. Checks that a session's skills print in
 # order, that a missing SKILL.md gets one "skipped" line, and that an empty list prints only its after-compaction file, that the whole output stays under the
@@ -7,8 +8,13 @@
 set -eu
 hook="$(cd "$(dirname "$0")" && pwd)/print-skills.sh"
 bin=$(mktemp -d)
-project=$(mktemp -d)
-trap 'rm -rf "$bin" "$project"' EXIT
+parent=$(mktemp -d)
+# The project tree sits next to where hq-private is found by default.
+project="$parent/hq-defs"
+private="$parent/hq-private"
+mkdir "$project"
+unset HQ_PRIVATE_DIR
+trap 'rm -rf "$bin" "$parent"' EXIT
 cat > "$bin/atc" <<'ATC'
 #!/bin/sh
 [ -n "${FAKE_NAME+x}" ] || exit 1
@@ -60,7 +66,7 @@ expect_none() { # expect_none <session id> <atc name>
 expect_order() { # expect_order <session id> <atc name> <marker>...: the markers appear in this order, one per line
   id=$1 name=$2
   shift 2
-  got=$(run "$id" "$name" | grep -E '^(body of|skipped|after) ' || true)
+  got=$(run "$id" "$name" | grep -E '^(body of|private part of|skipped|after) ' || true)
   want=$(printf '%s\n' "$@")
   if [ "$got" = "$want" ]; then echo "ok: '$id' '$name' prints $*"; else printf 'FAIL: %s %s\nwant:\n%s\ngot:\n%s\n' "$id" "$name" "$want" "$got"; fail=1; fi
 }
@@ -86,6 +92,28 @@ for name in "" z-delivery-old helper-1 stu; do
 done
 expect_none id-new down
 expect_none unset z-delivery
+# A skill's private part prints right after its SKILL.md, from the hq-private checkout next to the project.
+mkdir -p "$private/skills/owner-calls"
+echo "private part of owner-calls" > "$private/skills/owner-calls/SKILL.private.md"
+expect_order id-stu stu "body of intake" "body of owner-calls" "private part of owner-calls" "skipped tickets: no SKILL.md in this tree" "after stu"
+# HQ_PRIVATE_DIR points at the checkout when it is somewhere else.
+HQ_PRIVATE_DIR="$parent/elsewhere"; export HQ_PRIVATE_DIR
+expect_order id-stu stu "body of intake" "body of owner-calls" "skipped tickets: no SKILL.md in this tree" "after stu"
+mkdir -p "$parent/elsewhere/skills/intake"
+echo "private part of intake" > "$parent/elsewhere/skills/intake/SKILL.private.md"
+expect_order id-stu stu "body of intake" "private part of intake" "body of owner-calls" "skipped tickets: no SKILL.md in this tree" "after stu"
+rm -rf "$parent/elsewhere"
+# With no checkout, nothing extra prints.
+if run id-stu stu | grep -q "private part"; then echo "FAIL: a missing checkout printed a part"; fail=1; else echo "ok: no checkout prints no private part"; fi
+unset HQ_PRIVATE_DIR
+# A private part that would pass the budget becomes a read instruction with its absolute path.
+awk 'BEGIN { for (i = 0; i < 400; i++) print "line " i " of a long private kettle part" }' > "$private/skills/owner-calls/SKILL.private.md"
+if run id-stu stu | grep -qF "Context was compacted. Read $private/skills/owner-calls/SKILL.private.md now"; then echo "ok: an over-budget private part prints a read instruction"; else echo "FAIL: no read instruction for the private part"; fail=1; fi
+if [ "$(run id-stu stu | wc -c)" -lt 10000 ]; then echo "ok: a big private part stays under the cap"; else echo "FAIL: output passed the cap"; fail=1; fi
+SLOT=2
+if run id-stu stu | grep -qF "Read $private/skills/owner-calls/SKILL.private.md now"; then echo "ok: the slot call prints the read instruction too"; else echo "FAIL: slot 2 has no read instruction"; fail=1; fi
+unset SLOT
+echo "private part of owner-calls" > "$private/skills/owner-calls/SKILL.private.md"
 # Output past the cap: two skills that fit alone are too big together, so the second becomes a read instruction.
 mkdir -p "$project/skills/bigone" "$project/skills/bigtwo"
 awk 'BEGIN { for (i = 0; i < 170; i++) print "line " i " of a long kettle skill" }' > "$project/skills/bigone/SKILL.md"
@@ -106,6 +134,15 @@ sed -i 's/{"name":"z-triage","skills":\["linear-triage"\]/{"name":"z-triage","sk
 total=$(run id-new z-triage | wc -c)
 if [ "$total" -lt 10000 ]; then echo "ok: eight big skills stay under the cap ($total)"; else echo "FAIL: output is $total characters"; fail=1; fi
 if run id-new z-triage | grep -q '^after triage$'; then echo "ok: the after-compaction file still prints"; else echo "FAIL: no after-compaction file"; fail=1; fi
+# Each kettle also has a big private part: the total still stays under the cap, with the after-compaction file.
+for n in 1 2 3 4 5 6 7 8; do
+  mkdir -p "$private/skills/kettle$n"
+  cp "$project/skills/bigone/SKILL.md" "$private/skills/kettle$n/SKILL.private.md"
+done
+total=$(run id-new z-triage | wc -c)
+if [ "$total" -lt 10000 ]; then echo "ok: eight big skills with big private parts stay under the cap ($total)"; else echo "FAIL: output is $total characters"; fail=1; fi
+if run id-new z-triage | grep -q '^after triage$'; then echo "ok: the after-compaction file prints beside private parts"; else echo "FAIL: no after-compaction file beside private parts"; fail=1; fi
+rm -rf "$private/skills/kettle"*
 cp "$bin/hq.orig" "$bin/hq"
 # Forty missing skills with long names, after a big skill: the skipped lines stay under the cap too.
 long=$(awk 'BEGIN { s = ""; for (i = 0; i < 22; i++) s = s "kettlepour"; print s }')

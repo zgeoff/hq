@@ -552,23 +552,29 @@ interface FleetSession {
   skills: string[];
 }
 
+function isStringList(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === 'string');
+}
+
+function parseFleetSession(entry: unknown, where: string): FleetSession {
+  const row = typeof entry === 'object' && entry !== null ? Object.fromEntries(Object.entries(entry)) : {};
+  const skills = row['skills'] ?? [];
+  if (typeof row['name'] !== 'string' || !isStringList(skills)) {
+    throw new TypeError(`${where}: needs a name and, if present, a list of skill names`);
+  }
+  return { name: row['name'], prompt: typeof row['prompt'] === 'string' ? row['prompt'] : undefined, skills };
+}
+
 function readFleet(path: string): FleetSession[] {
   if (!existsSync(path)) {
     throw new Error(`--fleet ${path}: no such file`);
   }
   const parsed: unknown = JSON.parse(readFileSync(path, 'utf8'));
-  const sessions = typeof parsed === 'object' && parsed !== null ? (parsed as { sessions?: unknown }).sessions : undefined;
+  const sessions = typeof parsed === 'object' && parsed !== null && 'sessions' in parsed ? parsed.sessions : undefined;
   if (!Array.isArray(sessions)) {
-    throw new Error(`${path}: expected a "sessions" array`);
+    throw new TypeError(`${path}: expected a "sessions" array`);
   }
-  return sessions.map((entry: unknown, index) => {
-    const row = typeof entry === 'object' && entry !== null ? (entry as Record<string, unknown>) : {};
-    const { name, prompt, skills } = row;
-    if (typeof name !== 'string' || (skills !== undefined && !(Array.isArray(skills) && skills.every((s) => typeof s === 'string')))) {
-      throw new Error(`${path}: sessions[${index}] needs a name and, if present, a list of skill names`);
-    }
-    return { name, prompt: typeof prompt === 'string' ? prompt : undefined, skills: (skills as string[] | undefined) ?? [] };
-  });
+  return sessions.map((entry: unknown, index) => parseFleetSession(entry, `${path}: sessions[${index}]`));
 }
 
 function parseSkillBullets(body: string): string[] {
@@ -579,7 +585,7 @@ function parseSkillBullets(body: string): string[] {
   }
   const skills: string[] = [];
   for (const line of lines.slice(start + 1)) {
-    const skill = /^- `skills\/([^/`]+)\/SKILL\.md`\s*$/u.exec(line)?.[1];
+    const skill = /^- `skills\/(?<skill>[^/`]+)\/SKILL\.md`\s*$/u.exec(line)?.groups?.['skill'];
     if (skill !== undefined) {
       skills.push(skill);
     } else if (line.trim() !== '' || skills.length > 0) {
@@ -607,7 +613,7 @@ function checkPromptSkills(tree: Tree, fleetPath: string): void {
   const fleet = readFleet(fleetPath);
   const problems: string[] = [];
   for (const file of new Bun.Glob('skills/*/references/session-prompt.md').scanSync({ cwd: tree.root, onlyFiles: true })) {
-    const role = file.split('/')[1];
+    const [, role] = file.split('/');
     const owner = fleet.find((session) => session.skills[0] === role);
     problems.push(...checkSkillList(file, read(tree, file), owner, `whose first skill is ${role}`));
   }
