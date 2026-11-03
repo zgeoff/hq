@@ -12,7 +12,7 @@ Find out <the issue's questions, in one line> for <issue ID>, to inform <the dec
 
 <The delivery brief's Permissions block, filled in as for a delivery: the Code delivery grant, for the PR that holds the answers.>
 
-Finish line: findings with evidence and a recommendation, written to <path> in <repo> in a PR marked ready for review, and a final report that sums them up and links the PR. List a follow-up only when it belongs in another repo or needs my decision. <The delivery brief's sentence that keeps my name out and asks for invented examples.>
+Finish line: findings with evidence and a recommendation, written to <path> in <repo> in a PR marked ready for review, and a final report that sums them up and links the PR. List a follow-up only when it belongs in another repo or needs my decision. <The delivery brief's sentence that keeps my name out and asks for invented examples.> In a repo other than hq or hq-private, never name my agent sessions, their roles or the tools that run them in anything you write.
 
 <The delivery brief's imp line, when you launch the agent on an imp, a cloud machine with its own checkout.>
 
