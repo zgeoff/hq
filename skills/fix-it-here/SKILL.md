@@ -50,7 +50,8 @@ No other reason holds, including:
 - another push or restack;
 - a narrow brief, or a missing permission.
 
-Fix a security defect in the PR, whatever the reason given.
+Fix a security defect in the PR, whatever the reason given, when it is in the PR's repo. When it is
+in another repo, give it a follow-up issue as below, and mark the issue as security.
 
 For a reason that holds, answer in the finding's thread with the reason and the sections of a new
 Linear issue for the finding: Outcome, Context (file, line, evidence), Scope and Acceptance. Leave

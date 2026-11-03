@@ -19,8 +19,8 @@ Runbook commands run in the preview's imp, from `/srv/preview/preview`.
 2. Run one runbook command. `<preview imp>` is `pv-<hash>-<number>`, the first label of the
    preview link's host. Keep the outer double quotes: without them ssh drops the single quotes, and
    everything after `&&` runs on the cloud host. A command with its own quotes, such as `curl` with
-   a JSON body, breaks this. When one fails, file the gap in hq's Triage; never work around it on
-   the host.
+   a JSON body, breaks this. When one fails, file the gap in hq's Triage for `z-q`, and mark the
+   item as needing the owner, so that it doesn't hold the PR. Never work around it on the host.
 
    ```sh
    ssh root@"$HQ_CLOUD_HOST" "podman exec imp-host impz exec <preview imp> -- sh -c 'cd /srv/preview/preview && <command>'"
