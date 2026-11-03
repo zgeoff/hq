@@ -26,10 +26,15 @@ A reproduction is a command whose output shows the bug. Use the first of these t
    the test, and restore the files. Expect a failure message that shows the bug, not a setup or
    import error.
 7. When you reproduced the bug, run the reproduction again. Keep the passing output.
-8. In the PR description, under "## Verification":
-   - with a reproduction, give its command, its output before the fix and after, and the test's
-     name;
-   - without one, give the test's name, its failing and passing output, and one line:
-     `No reproduction: <why the code alone shows the defect>`.
+8. In the PR description, under "## Verification", write each item as one line, as the PR template
+   shows:
+   - with a reproduction, one line that gives the test's name and what the reproduction showed. Put
+     its output before the fix and after in an `Output:` block, and its command in a `Rerun:` block;
+   - without one, one line that gives the test's name and its failing and passing result, and
+     `No reproduction: <why the code alone shows the defect>`;
+   - one line for each other match you fixed, in this form, or the second line when there is none:
 
-   Under "## Fixed on the way", list each other match you fixed, or write `None.`
+     ```markdown
+     - [x] Fixed on the way: <the bug>, <commit>, "<test name>"
+     - [x] Fixed on the way: none
+     ```

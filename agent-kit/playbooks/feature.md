@@ -27,5 +27,6 @@ and the end state that proves it.
 5. Drive the feature with `bun verify`. It passes when it shows the end state the ticket's
    Acceptance names. When `bun verify` can't drive the feature, such as a background job, show its
    effect another way, such as the record it writes.
-6. In the PR description, under "## Verification", give the command from step 5, and the lines of
-   its output that show the end state, in a code block.
+6. In the PR description, under "## Verification", write one line for the command from step 5 and
+   the end state it shows. Put the lines of its output that show the end state in an `Output:`
+   block, and the command in a `Rerun:` block.

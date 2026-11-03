@@ -46,9 +46,9 @@ less, and a target lowered to meet it. The steps below guard against each.
 7. Stop when the target and the minimum attempts are both met, or when every guess left would cost
    more than it could gain. Never lower the target to meet it. When you stop short of the target,
    say so in the PR.
-8. In the PR description, under "## Verification", give:
+8. In the PR description, under "## Verification", write each of these as one line:
    - the metric, the target, the baseline, the final result, and how far it moved, both in its unit
      and in percent;
-   - the log, pasted in a `<details>` block;
-   - the script's path;
+   - the log, linked with `cloud up --md`, never pasted;
+   - the script's path, with the command that runs it in a `Rerun:` block;
    - the next guess you'd try.
