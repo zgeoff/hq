@@ -2,6 +2,7 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
+import { parseGrantEntries } from '../src/grants/read-main-grants.ts';
 
 function setupTest() {
   const dir = mkdtempSync(join(tmpdir(), 'hq-grants-'));
@@ -957,6 +958,19 @@ test('it refuses a new-form list with no blank line after it', () => {
   expect(result.stderr.toString()).toContain('expected one You are allowed to block ending with a blank line');
 });
 
+test('it reads a grants file with source, until and log in both grants.ts and the main-grants reader', () => {
+  const ctx = setupTest().useNewForm();
+  expect(ctx.run(['--check']).exitCode).toBe(0);
+  expect(ctx.readPrompt()).toContain('Log it with `hq grant act z-lantern-oil --target <what you acted on>`.');
+  expect(ctx.readPrompt()).not.toContain('Log it with `hq grant act z-lantern-light');
+  expect(ctx.run(['--check', '--today', '2099-01-02']).exitCode).toBe(1);
+  expect(parseGrantEntries(readFileSync(ctx.grantsPath, 'utf8'))?.map((grant) => [grant.id, grant.label])).toStrictEqual([
+    ['light', 'Light'],
+    ['oil', 'Oil'],
+    ['sail', 'Sail'],
+  ]);
+});
+
 test('it never renders a grant source', () => {
   const ctx = setupTest().useNewForm();
   expect(ctx.readPrompt()).not.toContain('The keeper, 2026-03-02');
@@ -998,11 +1012,23 @@ test.each([
   }
 });
 
-test('it refuses an impossible calendar date for --today and for until', () => {
+test.each([
+  ['an impossible month', '2026-99-99'],
+  ['an impossible day', '2026-02-30'],
+  ['a malformed date', 'tomorrow'],
+])('it refuses %s for --today', (_label, today) => {
   const ctx = setupTest().useNewForm();
-  expect(ctx.run(['--today', '2026-99-99']).stderr.toString()).toContain('expected YYYY-MM-DD');
-  expect(ctx.run(['--today', '2026-02-30']).exitCode).toBe(1);
-  ctx.editGrants((text) => text.replace('2099-01-01', '2026-99-99'));
+  const result = ctx.run(['--today', today]);
+  expect(result.exitCode).toBe(1);
+  expect(result.stderr.toString()).toContain('expected YYYY-MM-DD');
+});
+
+test.each([
+  ['an impossible date', '2026-99-99'],
+  ['a malformed date', 'soon'],
+])('it refuses %s for until', (_label, until) => {
+  const ctx = setupTest().useNewForm();
+  ctx.editGrants((text) => text.replace('2099-01-01', until));
   const result = ctx.run(['--check']);
   expect(result.exitCode).toBe(1);
   expect(result.stderr.toString()).toContain('until: expected a date as YYYY-MM-DD');
@@ -1025,13 +1051,6 @@ test('it refuses an expired grant in write mode, before it writes', () => {
   expect(result.exitCode).toBe(1);
   expect(result.stderr.toString()).toContain('grant sail ended');
   expect(ctx.readPrompt()).toBe(before);
-});
-
-test('it refuses a malformed --today and a malformed until', () => {
-  const ctx = setupTest().useNewForm();
-  expect(ctx.run(['--today', 'tomorrow']).stderr.toString()).toContain('expected YYYY-MM-DD');
-  ctx.editGrants((text) => text.replace('2099-01-01', 'soon'));
-  expect(ctx.run().stderr.toString()).toContain('until: expected a date as YYYY-MM-DD');
 });
 
 test('it fails a note over 50 words with the file, the id and the count', () => {
