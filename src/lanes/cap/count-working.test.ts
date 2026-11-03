@@ -144,3 +144,23 @@ test('it counts the design pass session once the build run takes it on as its ow
 
   expect(countWorking(ctx.db, new Date('2026-10-15T20:00:00Z'))).toStrictEqual({ count: 1, from: 'sessions' });
 });
+
+test('it counts a session added after the atc reading, which no reading has seen yet', () => {
+  const ctx = setupTest();
+  at('2026-10-15T20:00:00Z');
+  recordAwake(ctx.db, []);
+  at('2026-10-15T20:05:00Z');
+  addRun(ctx.db, { issue: 'GEO-9940', title: 'Rinse the teapot', place: 'imp', session: 'a0000040-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: null, actor: 'z-delivery' });
+
+  expect(countWorking(ctx.db, new Date('2026-10-15T20:05:00Z'))).toStrictEqual({ count: 1, from: 'sessions' });
+});
+
+test('it leaves out a session added before the atc reading that the reading does not list', () => {
+  const ctx = setupTest();
+  at('2026-10-15T20:00:00Z');
+  addRun(ctx.db, { issue: 'GEO-9941', title: 'Dry the teapot', place: 'imp', session: 'a0000041-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: null, actor: 'z-delivery' });
+  at('2026-10-15T20:01:00Z');
+  recordAwake(ctx.db, []);
+
+  expect(countWorking(ctx.db, new Date('2026-10-15T20:05:00Z'))).toStrictEqual({ count: 0, from: 'sessions' });
+});
