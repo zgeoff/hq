@@ -31,7 +31,7 @@ interface AwakeLook {
 
 function formatAwakeReading(look: AwakeLook): string {
   const idle = buildIdleSince(look.previousIdle, look.sessions, look.awake, look.activity);
-  return JSON.stringify({ at: iso(now()), ids: look.awake, idle, present: look.sessions.filter((session) => isPresentSession(session)).map((session) => session.id), local: collectLocalAwake(look.sessions, look.awake, look.fleet) });
+  return JSON.stringify({ at: iso(now()), ids: look.awake, idle, present: look.sessions.filter((session) => isPresentSession(session)).map((session) => session.id), seen: look.sessions.map((session) => session.id), local: collectLocalAwake(look.sessions, look.awake, look.fleet) });
 }
 
 function buildIdleSince(previous: Readonly<Record<string, string>>, sessions: readonly AwakeSession[], awake: readonly string[], activity: ReadonlyMap<string, number | null>): Record<string, string> {

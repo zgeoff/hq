@@ -164,3 +164,23 @@ test('it leaves out a session added before the atc reading that the reading does
 
   expect(countWorking(ctx.db, new Date('2026-10-15T20:05:00Z'))).toStrictEqual({ count: 0, from: 'sessions' });
 });
+
+test('it counts a session added in the same second as the atc reading', () => {
+  const ctx = setupTest();
+  at('2026-10-15T20:00:00Z');
+  recordAwake(ctx.db, []);
+  addRun(ctx.db, { issue: 'GEO-9942', title: 'Warm the teapot', place: 'imp', session: 'a0000042-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: null, actor: 'z-delivery' });
+
+  expect(countWorking(ctx.db, new Date('2026-10-15T20:00:30Z'))).toStrictEqual({ count: 1, from: 'sessions' });
+});
+
+test('it counts only a later second for a reading with no seen list', () => {
+  const ctx = setupTest();
+  at('2026-10-15T20:00:00Z');
+  addRun(ctx.db, { issue: 'GEO-9943', title: 'Fill the teapot', place: 'imp', session: 'a0000043-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: null, actor: 'z-delivery' });
+  setMeta(ctx.db, 'atc_awake', JSON.stringify({ at: '2026-10-15T20:00:00Z', ids: [] }));
+  at('2026-10-15T20:00:05Z');
+  addRun(ctx.db, { issue: 'GEO-9944', title: 'Pour the tea', place: 'imp', session: 'a0000044-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: null, actor: 'z-delivery' });
+
+  expect(countWorking(ctx.db, new Date('2026-10-15T20:00:30Z'))).toStrictEqual({ count: 1, from: 'sessions' });
+});
