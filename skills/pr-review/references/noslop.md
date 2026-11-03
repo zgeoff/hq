@@ -3,8 +3,8 @@
 noslop reviews every repo `hq noslop` lists (`z-stu` keeps the list). Run it with `hq review`, judge
 each answer, and merge once `hq review gate` passes. Never also run Codex on these repos.
 
-Contents: [zgeoff/noslop-config](#zgeoffnoslop-config) · [Findings](#findings) · [The answers](#the-answers) ·
-[Unfixed findings](#unfixed-findings) · [Each review](#each-review) ·
+Contents: [zgeoff/noslop-config](#zgeoffnoslop-config) · [Findings](#findings) ·
+[The answers](#the-answers) · [Unfixed findings](#unfixed-findings) · [Each review](#each-review) ·
 [The gate and overrides](#the-gate-and-overrides) · [When noslop fails](#when-noslop-fails)
 
 ## zgeoff/noslop-config

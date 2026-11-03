@@ -57,8 +57,8 @@ the live check, then hq run done GEO-n." For each issue:
 1. **Check what only production shows.** An item that passed on the preview needs nothing more. vers
    runs as below.
 2. **Stay read-only.** Never send a turn, message or memory write to production Nix. Read nixie as
-   the live-checks grant in your start prompt and `SKILL.private.md` say, and atc, imp or cloud by health, versions and
-   logs. An item that needs traffic is "needs Geoff". A write a grant in your start prompt allows,
+   the live-checks grant in your start prompt and `SKILL.private.md` say, and atc, imp or cloud by
+   health, versions and logs. An item that needs traffic is "needs Geoff". A write a grant in your start prompt allows,
    such as seeding a vers QA account: do only that write, then delete or reset what you wrote.
 3. **Record the evidence** as `evidence` says, in one comment.
 4. **Close or hand back:**
@@ -72,8 +72,8 @@ Never leave an issue open for a check no one owns.
 ## vers on production
 
 vers is the owner's web game. It has no previews, so its checks run after release, on
-`https://versidle.com`, under the vers-qa grant in your start prompt; tell `z-review` so if it sends one before. Write
-only through QA accounts, never as a real player.
+`https://versidle.com`, under the vers-qa grant in your start prompt; tell `z-review` so if it sends
+one before. Write only through QA accounts, never as a real player.
 
 1. Use vers's [QA runbook](https://github.com/zgeoff/vers/blob/main/docs/runbooks/qa.md) for every
    tool, in your own vers clone. `SKILL.private.md` says where the credentials and database are.

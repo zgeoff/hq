@@ -20,8 +20,8 @@ a weekly batch: review the batch in one sitting, each PR through `hq review`.
    noslop review, because zgeoff/tools already reviewed its text.
 3. If the reason is a local edit the repo keeps, compare the PR's diff with the upstream change it
    copies:
-   - Merge it (the `z-review-repo-sync` grant in your start prompt covers this) when every line it removes or changes, upstream
-     also removes or changes, and every line only the repo's copy has survives.
+   - Merge it, under the `z-review-repo-sync` grant in your start prompt, when every line it removes
+     or changes, upstream also removes or changes, and every line only the repo's copy has survives.
    - If it would lose a local edit, message `z-stu` the PR and the lines. `z-stu` decides.
 4. Any other reason: it waits for the owner's lgtm; file it with `hq unblock add` as holds.md says.
 

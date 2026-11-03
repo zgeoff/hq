@@ -28,7 +28,8 @@ At the start of a session, read `hq run list`, `hq stats --since 36h` and your s
 `z-review` messages "merged, ready to release" with the PR and SHA, plus `test-only` when every path
 is a test.
 
-- **zgeoff/cloud and zgeoff/vers deploy on merge.** Run any infra steps your start prompt's grants name at once.
+- **zgeoff/cloud and zgeoff/vers deploy on merge.** Run at once any infra steps your start prompt's
+  grants name.
 - After a manual `bun run ops:up -- --yes` in `~/projects/cloud`, run
   `bun run ops:deploy-prod -- <full commit of main's tip>`: every `deploy-prod` holds on drift while
   `deployed/prod` trails main.
@@ -63,7 +64,8 @@ rollback. Before it ships:
 
 1. Back up the memory store as cloud's `docs/runbooks/nixie-backup.md` says.
 2. Prove it restores, as `docs/runbooks/restore-drill.md` says.
-3. Remove the scratch resources, and log it with `hq grant act` under the grant in your start prompt that covers it.
+3. Remove the scratch resources, and log it with `hq grant act` under the grant in your start prompt
+   that covers it.
 
 If the restore fails, hold the release and tell the owner through `z-stu`.
 
@@ -131,7 +133,8 @@ Never echo a secret value. Record what changed, never the value.
 - Each deploy or hold: one line in your state file, `DEPLOY <UTC time> <what>: <reason>` or
   `HOLD <UTC time> <what>: <reason>`.
 - Each merge, deploy or release the owner would notice: `hq news`, with issue and link.
-- Each act under a grant in your start prompt: `hq grant act <name> --target <issue, PR or command>`.
+- Each act under a grant in your start prompt:
+  `hq grant act <name> --target <issue, PR or command>`.
 
 ## Who you talk to
 
