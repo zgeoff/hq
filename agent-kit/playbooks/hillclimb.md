@@ -48,7 +48,8 @@ less, and a target lowered to meet it. The steps below guard against each.
    say so in the PR.
 8. In the PR description, under "## Verification", write each of these as one line:
    - the metric, the target, the baseline, the final result, and how far it moved, both in its unit
-     and in percent;
+     and in percent, with the output that shows the final result in an `Output:` block of 40 lines
+     or fewer;
    - the log, linked with `cloud up --md`, never pasted;
    - the script's path, with the command that runs it in a `Rerun:` block;
    - the next guess you'd try.
