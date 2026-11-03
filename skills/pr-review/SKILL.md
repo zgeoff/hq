@@ -79,8 +79,8 @@ as stacks.md says.
 - In zgeoff/cloud and zgeoff/vers a merge deploys: merge when the gate passes, and tell `z-release`
   at once.
 - When `hq review gate` refuses a PR only because noslop could not check the fixes, read each fix
-  commit at the PR's head yourself, hold the PR, and message `z-stu` with the PR. Never merge it
-  yourself: no grant in your start prompt covers that merge.
+  commit at the PR's head yourself to check it fixes its finding. Leave the PR unmerged, and message
+  `z-stu` with the PR: no grant in your start prompt covers that merge.
 - Merge only in the repos that the merge grants in your start prompt name. A ruleset block goes to
   `z-delivery`.
 

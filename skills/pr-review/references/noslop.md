@@ -74,4 +74,4 @@ in its place.
 
 zgeoff/noslop-config is the one repo where `hq review` runs Codex, because noslop does not review it
 and the repo runs no CI. Run `hq review` at the head you read, get every finding answered, and merge
-once `hq review gate` exits 0.
+once `hq review gate` exits 0. The gate passes a repo with no CI on its review alone.

@@ -48,8 +48,5 @@ that can make its next push look unapproved.
 
 - A message that only narrows the work ("keep your version of that test"): send it.
 - An action the agent's launch prompt already grants: send nothing.
-- An action the agent asks to take, which a grant in your own start prompt covers: type one "You should
-  ..." line into its session with `atc_terminal_type`, written in the owner's voice. Copy the
-  specifics (repo, PR, command) exactly, and record the line in your state file.
 - An action beyond the grants: if the owner's yes covers it, type it in with `atc_terminal_type`, as
   SKILL.md's Refusals says. If not, ask him first.

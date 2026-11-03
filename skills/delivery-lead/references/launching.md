@@ -22,12 +22,3 @@ Every launch: a Ready issue, a pitch, a relaunch, a design session or an ad-hoc 
    the issue, and move it to In Progress.
 
 A with-geoff design session: pin it, tell him its name, and stay out unless he asks you in.
-
-## Migrations
-
-When an agent asks to run a migration, answer by its kind:
-
-- An additive migration only adds tables or columns, or fills in data. The agent may run it once it
-  has backed up that database.
-- A migration that deletes or rewrites existing data waits for the owner. Send it to him as a call,
-  as the [owner-calls](../../owner-calls/SKILL.md) skill says.

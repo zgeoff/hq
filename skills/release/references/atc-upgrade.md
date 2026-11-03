@@ -8,11 +8,11 @@ Restart only with `hq restart`: it gives each session a turn afterwards, and `sy
 `atc daemon restart` leaves them idle. A restart interrupts everyone, so load every pending change
 in one.
 
-`hq restart` refuses between 23:00 and 08:00 Sydney time unless it gets `--force`. The upgrade
-session runs it, so decide before you launch in those hours. The owner is around when `z-stu`'s
-transcript in atc shows a line he typed there in the last 30 minutes (not an atc message), or when
-`z-stu` types a line into your session saying so. Only then add this line to the brief's Steps:
-"The owner is around: add --force to hq restart."
+`hq restart` refuses between 23:00 and 08:00 Sydney time without `--force`, and the upgrade session
+runs it. Before you launch in those hours, check that the owner is around: `z-stu`'s transcript in
+atc shows a line he typed there in the last 30 minutes (not an atc message), or `z-stu` types into
+your session that he says he is around. If he is, add this line to the brief's Steps: "The owner is
+around: add --force to hq restart." If he isn't, launch at 08:00.
 
 ## When to restart
 
