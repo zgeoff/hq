@@ -13,6 +13,7 @@ const REPOS = {
   noslop: 'noslop',
   osrs: 'osrs',
   pepys: 'pepys',
+  skills: 'skills',
   tools: 'tools',
   vers: 'vers',
   wringer: 'wringer',

@@ -24,8 +24,8 @@ test('it reads pepys and osrs as areas beside cloud, and leaves out quality, Typ
   });
 });
 
-test('it maps noslop, wringer, dotfiles and nixie-definitions to their own repos', () => {
-  const labels = [{ name: 'noslop' }, { name: 'wringer' }, { name: 'dotfiles' }, { name: 'nixie-definitions' }];
+test('it maps noslop, wringer, dotfiles, nixie-definitions and skills to their own repos', () => {
+  const labels = [{ name: 'noslop' }, { name: 'wringer' }, { name: 'dotfiles' }, { name: 'nixie-definitions' }, { name: 'skills' }];
 
   expect(pickBriefAreas({ identifier: 'GEO-9001', description: '', labels })).toStrictEqual({
     kind: 'known',
@@ -33,6 +33,7 @@ test('it maps noslop, wringer, dotfiles and nixie-definitions to their own repos
       { label: 'dotfiles', repo: 'dotfiles' },
       { label: 'nixie-definitions', repo: 'nixie-definitions' },
       { label: 'noslop', repo: 'noslop' },
+      { label: 'skills', repo: 'skills' },
       { label: 'wringer', repo: 'wringer' },
     ],
   });
