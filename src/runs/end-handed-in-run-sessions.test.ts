@@ -8,6 +8,7 @@ import { finalPr } from './final-pr.ts';
 import { getRun } from './get-run.ts';
 import { setSession } from './set-session.ts';
 import { setState } from './set-state.ts';
+import { viewRun } from './view-run.ts';
 
 function setupTest() {
   const fresh = freshDb();
@@ -18,7 +19,14 @@ function setupTest() {
     sweep: (sessions: { id: string; state: string }[], activity: [string, number | null][]) =>
       endHandedInRunSessions(fresh.db, { sessions: sessions.map((session) => ({ ...session, alive: true })), activity: new Map(activity) }, 'z-delivery', new Date('2026-10-22T12:00:00Z')),
     readState: () => getRun(fresh.db, 'GEO-9901')?.state,
-    readSessions: () => fresh.db.query('SELECT session_id, active, ended_at, ended_by FROM run_sessions ORDER BY session_id').all(),
+    readSessions: () => {
+      const run = getRun(fresh.db, 'GEO-9901');
+      return run === null
+        ? []
+        : viewRun(fresh.db, run)
+            .sessions.map((session) => ({ session_id: session.session_id, active: session.active, ended_at: session.ended_at, ended_by: session.ended_by }))
+            .toSorted((left, right) => left.session_id.localeCompare(right.session_id));
+    },
   };
 }
 
