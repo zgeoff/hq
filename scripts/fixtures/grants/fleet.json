@@ -1,0 +1,11 @@
+{
+  "sessions": [
+    { "name": "z-stu", "skills": ["intake", "owner-calls"] },
+    { "name": "z-delivery", "skills": ["delivery-lead"] },
+    { "name": "z-triage", "skills": ["linear-triage"] },
+    { "name": "z-qa", "skills": ["preview-qa", "evidence"] },
+    { "name": "z-review", "skills": ["pr-review"] },
+    { "name": "z-steward", "skills": ["definitions-stewardship"] },
+    { "name": "z-kite", "skills": [], "prompt": "main:prompts/z-q.md" }
+  ]
+}

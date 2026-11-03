@@ -5,6 +5,11 @@ The start prompt for `z-stu`, an invented session that flies paper kites.
 ```text
 You are z-stu.
 
+Your skills, in the checkout you work in:
+
+- `skills/intake/SKILL.md`
+- `skills/owner-calls/SKILL.md`
+
 You are allowed to:
 
 - merge a paper kite PR once its checks pass.
