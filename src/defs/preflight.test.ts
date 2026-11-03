@@ -40,13 +40,13 @@ test("it fails when hq-private's origin is another repo", () => {
 test('it fails on a drifted private prompt, with the output of the grants script', () => {
   const checkouts = createTreeFixture().createBoth();
   const promptFile = `${checkouts.private.directory}/skills/preview-qa/references/session-prompt.md`;
-  writeFileSync(promptFile, readFileSync(promptFile, 'utf8').replace('- Water: pour the water.', '- Water: pour every drop.'));
+  writeFileSync(promptFile, readFileSync(promptFile, 'utf8').replace('- pour the water.', '- pour every drop.'));
   {
     const failed = preflight('hq').filter((check) => !check.ok);
     expect(failed).toHaveLength(1);
     expect(failed[0]?.line).toContain('grants: grants.ts --check --private failed (exit 1)');
     expect(failed[0]?.line).toContain('--- a/hq-private:skills/preview-qa/references/session-prompt.md');
-    expect(failed[0]?.line).toContain('+- Water: pour the water.');
+    expect(failed[0]?.line).toContain('+- pour the water.');
   }
 });
 
