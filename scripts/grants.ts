@@ -86,6 +86,14 @@ function parseEntries(value: unknown, outcome: 'ask' | 'allow', where: string, t
   });
 }
 
+function isCalendarDate(value: unknown): value is string {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/u.test(value)) {
+    return false;
+  }
+  const parsed = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+}
+
 interface UntilContext {
   at: string;
   id: string;
@@ -98,7 +106,7 @@ function checkUntil(value: unknown, context: UntilContext): void {
     return;
   }
   const until = value instanceof Date ? value.toISOString().slice(0, 10) : value;
-  if (typeof until !== 'string' || !/^\d{4}-\d{2}-\d{2}$/u.test(until)) {
+  if (!isCalendarDate(until)) {
     throw new Error(`${context.at}.until: expected a date as YYYY-MM-DD`);
   }
   if (context.today > until) {
@@ -239,12 +247,17 @@ function parseAlso(value: unknown, where: string): string[] {
 const NEW_FORM = /^You are allowed to:$/mu;
 const OLD_FORM = /^Grants:$/mu;
 const WORD_CAP = 50;
+const TEXT_BLOCK = /^```text\n(?<content>[\s\S]*?)^```[ \t]*$/gmu;
+
+function usesNewForm(body: string): boolean {
+  return [...body.matchAll(TEXT_BLOCK)].some((block) => NEW_FORM.test(block.groups?.['content'] ?? ''));
+}
 
 function normalizeSite(file: string, body: string, data: StillAsk): string {
   const mentions = [...body.matchAll(/security change/gu)].length;
   const spans = [...body.matchAll(/deleting or rewriting\b[^\n]*?\bsecurity change\b/gu)];
   const voice = data.sites.get(file);
-  if (voice && mentions === 0 && NEW_FORM.test(body)) {
+  if (voice && mentions === 0 && usesNewForm(body)) {
     return body;
   }
   if (mentions !== spans.length || spans.length !== (voice ? 1 : 0)) {
@@ -381,7 +394,7 @@ function renderSession(file: string, body: string, context: RenderContext): stri
   if (!/^skills\/[^/]+\/references\/session-prompt\.md$/u.test(file)) {
     return undefined;
   }
-  const blocks = [...body.matchAll(/^```text\n(?<content>[\s\S]*?)^```[ \t]*$/gmu)];
+  const blocks = [...body.matchAll(TEXT_BLOCK)];
   const session = /The start prompt for `(?<name>z-[a-z0-9-]+)`/u.exec(body)?.groups?.['name'];
   const withGrants = blocks.filter((block) => NEW_FORM.test(block.groups?.['content'] ?? '') || OLD_FORM.test(block.groups?.['content'] ?? ''));
   if (withGrants.length === 0) {
@@ -585,7 +598,7 @@ function runMain(): number {
     allowPositionals: false,
   });
   const today = args.values.today ?? new Date().toISOString().slice(0, 10);
-  if (!/^\d{4}-\d{2}-\d{2}$/u.test(today)) {
+  if (!isCalendarDate(today)) {
     throw new Error(`--today ${today}: expected YYYY-MM-DD`);
   }
   return runTrees(buildTrees(args.values.private), args.values.check ?? false, today);

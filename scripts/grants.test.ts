@@ -954,6 +954,39 @@ test.each([
   }
 });
 
+test.each([
+  ['in the past', '2099-01-02', 1],
+  ['on the day', '2099-01-01', 0],
+  ['in the future', '2026-11-03', 0],
+])('it handles an until date in check mode %s: today %s exits %i', (_label, today, code) => {
+  const ctx = setupTest().useNewForm();
+  const result = ctx.run(['--check', '--today', today]);
+  expect(result.exitCode).toBe(code);
+  if (code === 1) {
+    expect(result.stderr.toString()).toContain('grant sail ended on 2099-01-01 (today is 2099-01-02)');
+  }
+});
+
+test('it refuses an impossible calendar date for --today and for until', () => {
+  const ctx = setupTest().useNewForm();
+  expect(ctx.run(['--today', '2026-99-99']).stderr.toString()).toContain('expected YYYY-MM-DD');
+  expect(ctx.run(['--today', '2026-02-30']).exitCode).toBe(1);
+  ctx.editGrants((text) => text.replace('2099-01-01', '2026-99-99'));
+  const result = ctx.run(['--check']);
+  expect(result.exitCode).toBe(1);
+  expect(result.stderr.toString()).toContain('until: expected a date as YYYY-MM-DD');
+});
+
+test('it keeps the still-ask span required when the new-form header sits outside the text block', () => {
+  const ctx = setupTest().useNewForm();
+  ctx.editGrants((text) => text.replace('ask the keeper first about {still-ask}', 'ask the keeper first'));
+  const old = ctx.readPrompt().replace('You are allowed to:\n\n', 'Grants:\n').replace('\nYou never:\n\n- Move a lamp from its post.\n', '');
+  writeFileSync(ctx.promptPath, `${old}\nYou are allowed to:\n`);
+  const result = ctx.run(['--check']);
+  expect(result.exitCode).toBe(1);
+  expect(result.stderr.toString()).toContain('expected one still-ask span');
+});
+
 test('it refuses an expired grant in write mode, before it writes', () => {
   const ctx = setupTest().useNewForm();
   const before = ctx.readPrompt();
