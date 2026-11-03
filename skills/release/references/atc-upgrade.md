@@ -8,6 +8,10 @@ Restart only with `hq restart`: it gives each session a turn afterwards, and `sy
 `atc daemon restart` leaves them idle. A restart interrupts everyone, so load every pending change
 in one.
 
+`hq restart` refuses while the owner is away. Add `--force` only when z-stu's transcript in atc shows
+a line the owner typed there in the last 30 minutes (not an atc message), or when z-stu types a
+line into your session saying the owner is around.
+
 ## When to restart
 
 The daemon reads its config only at start, so a config change waits for a restart like a release.
