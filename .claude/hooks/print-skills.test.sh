@@ -161,6 +161,27 @@ if [ "$(printf '%s\n' "$out" | wc -c)" -lt 10000 ]; then echo "ok: slot 6 with s
 unset SLOT
 rm -rf "$project/skills/lamp"* "$private/skills/lamp"*
 cp "$bin/hq.orig" "$bin/hq"
+# Slot 6 with a long private checkout path: each private part's read instruction is longer than a flat
+# 200 bytes, and every part of every skill in the slot still shows, printed or as a read instruction.
+longdir="$parent/$(awk 'BEGIN { s = ""; for (i = 0; i < 15; i++) s = s "checkout-dir-"; print s }')hq-private"
+mkdir -p "$longdir"
+for n in 6 7 8; do
+  mkdir -p "$project/skills/pond$n" "$longdir/skills/pond$n"
+  awk -v n="$n" 'BEGIN { for (i = 0; i < 100; i++) print "line " i " of pond " n " private text" }' > "$longdir/skills/pond$n/SKILL.private.md"
+done
+awk 'BEGIN { for (i = 0; i < 280; i++) print "line " i " of pond 6 skill text" }' > "$project/skills/pond6/SKILL.md"
+for n in 7 8; do echo "body of pond$n" > "$project/skills/pond$n/SKILL.md"; done
+sed -i 's/{"name":"z-triage","skills":\["linear-triage"\]/{"name":"z-triage","skills":["linear-triage","owner-calls","delivery-lead","fix-it-here","release","pond6","pond7","pond8"]/' "$bin/hq"
+SLOT=6
+out=$(HQ_PRIVATE_DIR="$longdir" run id-new z-triage)
+for n in 6 7 8; do
+  if printf '%s\n' "$out" | grep -qE "^(line 0 of pond $n skill text|body of pond$n)$|Read skills/pond$n/SKILL.md now"; then echo "ok: long path slot keeps pond$n"; else echo "FAIL: long path slot dropped pond$n"; fail=1; fi
+  if printf '%s\n' "$out" | grep -qE "^line 0 of pond $n private text$|Read $longdir/skills/pond$n/SKILL.private.md now"; then echo "ok: long path slot keeps pond$n's private part"; else echo "FAIL: long path slot dropped pond$n's private part"; fail=1; fi
+done
+if [ "$(printf '%s\n' "$out" | wc -c)" -lt 10000 ]; then echo "ok: long path slot stays under the cap"; else echo "FAIL: long path slot passed the cap"; fail=1; fi
+unset SLOT
+rm -rf "$project/skills/pond"* "$longdir"
+cp "$bin/hq.orig" "$bin/hq"
 # Forty missing skills with long names, after a big skill: the skipped lines stay under the cap too.
 long=$(awk 'BEGIN { s = ""; for (i = 0; i < 22; i++) s = s "kettlepour"; print s }')
 names=$(awk -v l="$long" 'BEGIN { for (i = 1; i <= 40; i++) printf ",\"%s%d\"", l, i }')

@@ -55,7 +55,8 @@ wants() { [ "$slot" = all ] || [ "$slot" = "$1" ]; }
 
 used=0
 limit=9500
-reserve=200 # room kept for each item still to print
+reserve=200 # room kept for the briefs and after-compaction files still to print
+held=0 # room kept for the read instruction or skipped line of each skill item still to print
 say() { # say <line>: print it only while the total stays inside the cap
   size=$(printf '%s\n' "$1" | wc -c)
   [ $((used + size)) -le $limit ] || return 0
@@ -65,12 +66,20 @@ say() { # say <line>: print it only while the total stays inside the cap
 emit() { # emit <path relative to the project dir>
   emit_file "$1" "${CLAUDE_PROJECT_DIR:-.}/$1"
 }
+read_text() { # read_text <path to show>: the instruction that stands in for a file too big to print
+  printf 'Context was compacted. Read %s now, before your next action: it holds rules you must follow and is too long to print here.' "$1"
+}
+text_size() { # text_size <text>: its size as say counts it
+  printf '%s\n' "$1" | wc -c
+}
 emit_file() { # emit_file <path to show> <path to read>
   body=$(sed -E 's/ {2,}/ /g; s/-{4,}/---/g' "$2")
   text=$(printf 'Context was compacted. This is %s, reloaded from disk. Follow it as written.\n\n%s\n' "$1" "$body")
   size=$(printf '%s\n' "$text" | wc -c)
-  if [ $((used + size + reserve * (left - 1))) -gt $limit ]; then
-    text="Context was compacted. Read $1 now, before your next action: it holds rules you must follow and is too long to print here."
+  text_read=$(read_text "$1")
+  held=$((held - $(text_size "$text_read")))
+  if [ $((used + size + held)) -gt $limit ]; then
+    text=$text_read
   fi
   say "$text"
 }
@@ -79,46 +88,47 @@ private_dir=${HQ_PRIVATE_DIR:-$(dirname "${CLAUDE_PROJECT_DIR:-.}")/hq-private}
 in_slot() { # in_slot <place>: whether this call prints the skill at that place
   [ "$slot" = all ] || [ "$slot" = "$1" ] || { [ "$slot" = 6 ] && [ "$1" -gt 6 ]; }
 }
-# Count the items still to come: each skill in this call, plus its private part when it has one,
-# so the room kept covers every later part, not just the current skill's.
-left=0
+# Add up the room the items still to come need: the real length of each skill's read instruction (or
+# skipped line) and of its private part's, whose absolute path can be long.
 place=0
 for skill in $skills; do
   place=$((place + 1))
   in_slot "$place" || continue
-  left=$((left + 1))
-  if [ -f "${CLAUDE_PROJECT_DIR:-.}/skills/$skill/SKILL.md" ] && [ -f "$private_dir/skills/$skill/SKILL.private.md" ]; then
-    left=$((left + 1))
+  if [ -f "${CLAUDE_PROJECT_DIR:-.}/skills/$skill/SKILL.md" ]; then
+    held=$((held + $(text_size "$(read_text "skills/$skill/SKILL.md")")))
+    if [ -f "$private_dir/skills/$skill/SKILL.private.md" ]; then
+      held=$((held + $(text_size "$(read_text "$private_dir/skills/$skill/SKILL.private.md")")))
+    fi
+  else
+    held=$((held + $(text_size "skipped $skill: no SKILL.md in this tree")))
   fi
 done
-[ "$slot" != all ] || left=$((left + 2))
+[ "$slot" != all ] || held=$((held + 2 * reserve))
 place=0
 for skill in $skills; do
   place=$((place + 1))
   in_slot "$place" || continue
   if [ -f "${CLAUDE_PROJECT_DIR:-.}/skills/$skill/SKILL.md" ]; then
     emit "skills/$skill/SKILL.md"
-    left=$((left - 1))
     part="$private_dir/skills/$skill/SKILL.private.md"
     if [ -f "$part" ]; then
       emit_file "$part" "$part"
-      left=$((left - 1))
     fi
   else
+    held=$((held - $(text_size "skipped $skill: no SKILL.md in this tree")))
     say "skipped $skill: no SKILL.md in this tree"
-    left=$((left - 1))
   fi
 done
 
 role=$(printf '%s\n' "$skills" | head -1)
 briefs=skills/delivery-lead/references/briefs.md
-left=1
-[ "$slot" != all ] || left=2
+held=0
+[ "$slot" != all ] || held=$reserve
 if wants briefs && [ "$role" = delivery-lead ] && [ -f "${CLAUDE_PROJECT_DIR:-.}/$briefs" ]; then
   emit "$briefs"
 fi
 wants after || exit 0
-left=1
+held=0
 case $role in
   delivery-lead) after=delivery.md ;;
   release) after=release.md ;;
