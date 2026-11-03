@@ -92,3 +92,9 @@ test('it accepts a Cold read line that names its model', () => {
 
   expect(collectMissingProof(body)).toStrictEqual([]);
 });
+
+test('it counts a Second opinion decline that no listed finding answers', () => {
+  const body = ['## Checks', '', '- [x] Second opinion (Codex, high): 2 fixed, 1 declined', '- [x] chex prose, links and skill: cleared', '- [x] Cold read: 3 fixed, 0 declined', '- [x] Deslop: 1 edit', '', 'Declined:'].join('\n');
+
+  expect(collectMissingProof(body)).toStrictEqual([{ kind: 'declined', counted: 1, listed: 0 }]);
+});
