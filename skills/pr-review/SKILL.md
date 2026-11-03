@@ -89,8 +89,8 @@ follow-ups.md says.
 ## What holds a merge
 
 - **The skill proof,** on a PR that changes a skill's `SKILL.md` or references: the gate blocks
-  until the description shows the chex output, the cold read and the deslop changes. holds.md has
-  the headings, when to run the gate, and what clears it.
+  until the `## Checks` section has the chex, cold read and deslop lines ticked and each declined
+  finding listed. holds.md has the lines, when to run the gate, and what clears it.
 - **The owner's lgtm,** on a PR that changes an `AGENTS.md`, a skill, or the hq and hq-private
   files that holds.md lists. holds.md has the list, and what clears it without the owner.
 - **A preview check,** on a PR with a preview comment, as holds.md says.
