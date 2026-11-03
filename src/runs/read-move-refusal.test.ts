@@ -91,3 +91,15 @@ test('it names only the open PRs of the build run, not its design pass PR', () =
     'GEO-9872 still has open PR kettle#14, so its work is not finished: it moves to merged when its last PR merges and its session ends. Pass --force to move it to deploy-held now.',
   );
 });
+
+test('it names an active helper session apart from the main session', () => {
+  const ctx = setupTest();
+  addRun(ctx.db, { issue: 'GEO-9871', title: 'Stack the kettle layers', place: 'imp', session: '5eed5eed-0000-4000-8000-000000000001', next: 'Agent working.', gate: null, geoffChat: false, lane: null, actor: 'z-delivery' });
+  setSession(ctx.db, 'GEO-9871', '1a2b3c4d-0000-4000-8000-000000000002', 'z-delivery', 'add');
+  addPr(ctx.db, 'GEO-9871', 'kettle#11', 'z-delivery');
+  closePr(ctx.db, 'kettle#11', { to: 'merged', actor: 'hq-github', facts: { mergedAt: '2026-10-20T03:04:05Z', mergeSha: null } });
+
+  expect(readMoveRefusal(ctx.db, 'GEO-9871', 'merged', false)).toBe(
+    'GEO-9871 still has active session 5eed5eed and active helper session 1a2b3c4d, so its work is not finished: it moves to merged when its last PR merges and its session ends. Pass --force to move it to merged now.',
+  );
+});
