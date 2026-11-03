@@ -11,7 +11,7 @@ function setupTest() {
   return { path: join(dir, 'atc.sock') };
 }
 
-test('it sends a hello first that names hq, protocol 12 and no auth', async () => {
+test('it sends a hello first that names hq, protocol 13 and no auth', async () => {
   const ctx = setupTest();
   const daemon = startStubAtcDaemon(ctx.path, { 'session.list': () => ({ sessions: [] }) });
   onTestFinished(() => daemon.stop());
@@ -21,10 +21,10 @@ test('it sends a hello first that names hq, protocol 12 and no auth', async () =
   await peer.send('session.list', {});
 
   expect(daemon.requests.map((request) => request.method)).toStrictEqual(['daemon.hello', 'session.list']);
-  expect(daemon.requests[0]).toStrictEqual({ method: 'daemon.hello', input: { client: 'hq', protocol: 12, auth: { scheme: 'none' } } });
+  expect(daemon.requests[0]).toStrictEqual({ method: 'daemon.hello', input: { client: 'hq', protocol: 13, auth: { scheme: 'none' } } });
 });
 
-test('it reads the caller session from a protocol 12 hello that lists features', async () => {
+test('it reads the caller session from a protocol 13 hello that lists features', async () => {
   const ctx = setupTest();
   const daemon = startStubAtcDaemon(ctx.path, {}, { peerSession: 's-invented-caller' });
   onTestFinished(() => daemon.stop());
@@ -51,7 +51,7 @@ test('it stops with both versions when the daemon refuses the hello as protocol_
 
   expect(openAtcPeer(ctx.path, 1000)).rejects.toMatchObject({
     code: 'atc_protocol_mismatch',
-    message: 'atc 7.1.0 speaks protocol v11; hq speaks protocol v12. hq and atc install together: install the hq release that matches this atc.',
+    message: 'atc 7.1.0 speaks protocol v11; hq speaks protocol v13. hq and atc install together: install the hq release that matches this atc.',
   });
 });
 
@@ -69,7 +69,7 @@ test('it says the daemon speaks an older protocol when it closes the hello with 
 
   expect(openAtcPeer(ctx.path, 1000)).rejects.toMatchObject({
     code: 'atc_protocol_mismatch',
-    message: "the atc daemon speaks an older protocol than hq's v12 and closed the connection with no answer. hq and atc install together: install the hq release that matches this atc.",
+    message: "the atc daemon speaks an older protocol than hq's v13 and closed the connection with no answer. hq and atc install together: install the hq release that matches this atc.",
   });
 });
 
