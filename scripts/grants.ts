@@ -345,9 +345,12 @@ function countWords(note: string): number {
 }
 
 function renderGrantLines(file: string, context: SessionContext): string {
-  const fill = (note: string) =>
-    note.replaceAll('{still-ask}', () => context.data.textByVoice[context.data.sites.get(file) ?? 'first']);
+  const voice = context.data.sites.get(file);
   const bullets = context.grants.map((grant) => {
+    if (grant.note.includes('{still-ask}') && voice === undefined) {
+      throw new Error(`${file}: grant ${grant.id} uses {still-ask}, but the file is not a still-ask site; point the note at the owner-calls skill instead`);
+    }
+    const fill = (note: string) => (voice === undefined ? note : note.replaceAll('{still-ask}', () => context.data.textByVoice[voice]));
     const words = countWords(grant.note);
     if (words > WORD_CAP) {
       throw new Error(`${file}: grant ${grant.id} note is ${words} words; keep it to ${WORD_CAP} or fewer`);

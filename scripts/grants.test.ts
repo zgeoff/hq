@@ -970,6 +970,17 @@ test('it reads a grants file with source, until and log in both grants.ts and th
   ]);
 });
 
+test('it refuses {still-ask} in a grant note of a file that is not a still-ask site', () => {
+  const ctx = setupTest().useNewForm();
+  const stillAsk = join(dirname(ctx.grantsPath), 'still-ask.yaml');
+  writeFileSync(stillAsk, readFileSync(stillAsk, 'utf8').replace(/  - file: skills\/lantern\/references\/session-prompt\.md\n    voice: first\n    after: "\."\n/u, ''));
+  const prompt = ctx.readPrompt();
+  writeFileSync(ctx.promptPath, `${prompt.slice(0, prompt.indexOf('You are allowed to:'))}You are allowed to:\n\n- stale text\n\n${prompt.slice(prompt.indexOf('You never:'))}`);
+  const result = ctx.run([]);
+  expect(result.exitCode).toBe(1);
+  expect(result.stderr.toString()).toContain('grant sail uses {still-ask}, but the file is not a still-ask site; point the note at the owner-calls skill instead');
+});
+
 test('it never renders a grant source', () => {
   const ctx = setupTest().useNewForm();
   expect(ctx.readPrompt()).not.toContain('The keeper, 2026-03-02');
