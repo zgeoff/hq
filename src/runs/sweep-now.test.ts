@@ -7,6 +7,7 @@ import { fakeAtc, freshDb } from '../../test/helpers.ts';
 import { addPr } from './add-pr.ts';
 import { addRun } from './add-run.ts';
 import { closePr } from './close-pr.ts';
+import { finalPr } from './final-pr.ts';
 import { setState } from './set-state.ts';
 import { sweepNow } from './sweep-now.ts';
 
@@ -83,7 +84,7 @@ test('it ends a handed-in run\'s idle session and wraps the run up in the same s
   onTestFinished(overrideEnv('HQ_NOW', '2026-10-21T03:00:00Z'));
   addRun(ctx.db, { issue: 'GEO-9855', title: 'Invented kettle work', place: 'local', session: '0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
   addPr(ctx.db, 'GEO-9855', 'kettle#55', 'kettle-bot');
-  ctx.db.query("UPDATE run_prs SET final_sha = 'abc1234' WHERE ref = 'kettle#55'").run();
+  finalPr(ctx.db, 'kettle#55', { sha: 'abc1234', actor: 'kettle-bot' });
   closePr(ctx.db, 'kettle#55', { to: 'merged', actor: 'kettle-bot', facts: { mergedAt: '2026-10-21T01:00:00Z', mergeSha: null } });
   ctx.fake.sessions.push({ id: '0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, state: 'done' });
   const fleet = buildStubFleetClient({ sessions: [{ id: '0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true }] });
