@@ -3,9 +3,9 @@
 noslop reviews every repo `hq noslop` lists (`z-stu` keeps the list). Run it with `hq review`, judge
 each answer, and merge once `hq review gate` passes. Never also run Codex on these repos.
 
-Contents: [Findings](#findings) · [The answers](#the-answers) ·
-[Unfixed findings](#unfixed-findings) · [Each review](#each-review) ·
-[The gate and overrides](#the-gate-and-overrides) · [When noslop fails](#when-noslop-fails)
+Contents: [Findings](#findings) · [The answers](#the-answers) · [Unfixed findings](#unfixed-findings) ·
+[Each review](#each-review) · [The gate and overrides](#the-gate-and-overrides) ·
+[When noslop fails](#when-noslop-fails) · [zgeoff/noslop-config](#zgeoffnoslop-config)
 
 ## Findings
 
@@ -69,3 +69,9 @@ head, never red CI, and a push voids it. A session's approval or your own judgem
 
 Hold the merge and message `z-stu` the error; it can switch noslop off for the repo. Never run Codex
 in its place.
+
+## zgeoff/noslop-config
+
+zgeoff/noslop-config is the one repo where `hq review` runs Codex, because noslop does not review it
+and the repo runs no CI. Run `hq review` at the head you read, get every finding answered, and merge
+once `hq review gate` exits 0. The gate passes a repo with no CI on its review alone.

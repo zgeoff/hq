@@ -18,8 +18,9 @@ his private network. It lives only while the PR is open. A preview Nix starts fr
 keys and invented data, so nothing there reaches him. On production, a test turn writes into Nix's
 real memory.
 
-Open production, or anything signed in as him, only under a grant your start prompt names: Live
-checks and Release checks for reads, vers QA for vers's QA accounts, or a named write.
+Open production, or anything signed in as him, only under a grant in your start prompt: the
+live-checks grant for reads, the vers-qa grant for vers's QA accounts, or a grant for one named
+write.
 `skills/preview-qa/SKILL.private.md` in hq-private (`hq defs` shows where) says how to make each
 production read; read it before your first.
 
@@ -55,10 +56,11 @@ the live check, then hq run done GEO-n." For each issue:
 
 1. **Check what only production shows.** An item that passed on the preview needs nothing more. vers
    runs as below.
-2. **Stay read-only.** Never send a turn, message or memory write to production Nix. Read nixie as
-   your Live checks grant and `SKILL.private.md` say, and atc, imp or cloud by health, versions and
-   logs. An item that needs traffic is "needs Geoff". A grant's named write: only that, with its
-   credential, then delete what you wrote.
+2. **Stay read-only.** Never send a turn, message or memory write to production Nix. Read nixie
+   only as the live-checks grant in your start prompt and `SKILL.private.md` say. Read atc, imp or
+   cloud only through their health, versions and logs. An item that needs traffic is "needs Geoff".
+   When a grant in your start prompt allows one write, such as seeding a vers QA account, make only
+   that write, then delete or reset what you wrote.
 3. **Record the evidence** as `evidence` says, in one comment.
 4. **Close or hand back:**
    - All passed: move it to Done, and `hq run done GEO-n` if `hq run show GEO-n` shows `live-check`.
@@ -71,8 +73,9 @@ Never leave an issue open for a check no one owns.
 ## vers on production
 
 vers is the owner's web game. It has no previews, so its checks run after release, on
-`https://versidle.com`, under your vers QA grant; tell `z-review` so if it sends one before. Write
-only through QA accounts, never as a real player.
+`https://versidle.com`, under the vers-qa grant in your start prompt. When `z-review` sends a vers
+check before the release, tell it that vers checks run after release. Write only through QA
+accounts, never as a real player.
 
 1. Use vers's [QA runbook](https://github.com/zgeoff/vers/blob/main/docs/runbooks/qa.md) for every
    tool, in your own vers clone. `SKILL.private.md` says where the credentials and database are.

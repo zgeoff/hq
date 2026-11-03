@@ -68,13 +68,17 @@ briefs.md's messages section before you message one that hasn't sent its FINAL n
 - **It needs a choice:** answer it if the issue, the brief or the owner's earlier answers settle it.
   Otherwise send it to `z-triage`, as `owner-calls` says, and tell the agent to carry on with the
   rest.
+- **It asks to run a migration:** let it run one that only adds tables or columns, or fills in
+  columns it added, once it has backed up that database. Send one that deletes or rewrites existing
+  data to `z-triage` as a decision, as `owner-calls` says.
 - **A refusal blocks it:** below.
 
 ## Refusals
 
 1. If the owner's yes already covers the action (his request in your session, an action in the
-   issue's Actions, or a grant in the launch prompt), read the agent's screen and type the granting
-   line `SKILL.private.md` gives, with `atc_terminal_type`. Tell him after: the session, the refusal
+   issue's Actions, a grant in the launch prompt, or a grant in your own start prompt), read the
+   agent's screen and type the granting line `SKILL.private.md` gives, with `atc_terminal_type`.
+   Copy the specifics (repo, PR, command) exactly, and record the line in your state file. Tell him after: the session, the refusal
    and what you typed.
 2. If nothing covers it, send `z-triage` a decision: the issue, the action, the exact refusal and
    the brief's wording. Once he approves, relaunch from the pushed branch with the action in the

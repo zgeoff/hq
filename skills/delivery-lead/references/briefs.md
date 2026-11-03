@@ -47,6 +47,6 @@ Until its FINAL note, an agent's classifier reads your message as someone other 
 that can make its next push look unapproved.
 
 - A message that only narrows the work ("keep your version of that test"): send it.
-- An action the prompt already grants: send nothing.
+- An action the agent's launch prompt already grants: send nothing.
 - An action beyond the grants: if the owner's yes covers it, type it in with `atc_terminal_type`, as
   SKILL.md's Refusals says. If not, ask him first.

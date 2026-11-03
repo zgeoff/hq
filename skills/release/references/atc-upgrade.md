@@ -8,6 +8,12 @@ Restart only with `hq restart`: it gives each session a turn afterwards, and `sy
 `atc daemon restart` leaves them idle. A restart interrupts everyone, so load every pending change
 in one.
 
+`hq restart` refuses between 23:00 and 08:00 Sydney time without `--force`, and the upgrade session
+runs it. Before you launch in those hours, check that the owner is around: `z-stu`'s transcript in
+atc shows a line he typed there in the last 30 minutes (not an atc message), or `z-stu` types into
+your session that he says he is around. If he is, add this line to the brief's Steps: "The owner is
+around: add --force to hq restart." If he isn't, launch at 08:00.
+
 ## When to restart
 
 The daemon reads its config only at start, so a config change waits for a restart like a release.
@@ -44,7 +50,7 @@ Steps:
 2. Read the release notes and the PRs merged in zgeoff/atc since the running build, plus docs/architecture/remote-mcp.md, which covers the gateway and the daemon's listener. Look for deploy notes: new or renamed config keys, and changes to the daemon unit or its flags.
 3. Run atc's install script: curl -fsSL https://raw.githubusercontent.com/zgeoff/atc/main/install.sh | sh. Expect: atc --version shows the new build.
 4. Apply the deploy notes, and any pending config change that config.json doesn't hold yet: copy config.json and the unit file to a backup next to each, with a time suffix, make the edits, run atc config migrate --write to drop keys atc no longer reads, and run systemctl --user daemon-reload, which reloads the unit file and restarts nothing. List each edit for the report.
-5. From 23:00 to 08:00 Sydney time, hq restart refuses: stop and report, with steps 1 to 4 done. Otherwise send a note with your atc bridge tool's note tool, which the session that launched you reads, with the old build, the new build, and the config and unit edits with their backup paths.
+5. From 23:00 to 08:00 Sydney time, hq restart refuses without --force. Unless this brief tells you to add --force, stop and report, with steps 1 to 4 done. Otherwise send a note with your atc bridge tool's note tool, which the session that launched you reads, with the old build, the new build, and the config and unit edits with their backup paths.
 6. Start the restart with hq restart. It starts at once, and logs each step to ~/.local/state/hq/hq-restart-<time>.log, or under $XDG_STATE_HOME/hq/.
 7. The restart stops this session mid-turn. The daemon brings it back, and hq wakes it. When a message asks you to verify the upgrade, check: atc-daemon.service is active, exactly one atc daemon process runs and it has --listen, daemon.json's pid matches it, atc --version shows the new build, and each pending change passes its live check. Report each result, with the log.
 

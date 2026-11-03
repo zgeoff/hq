@@ -28,7 +28,8 @@ At the start of a session, read `hq run list`, `hq stats --since 36h` and your s
 `z-review` messages "merged, ready to release" with the PR and SHA, plus `test-only` when every path
 is a test.
 
-- **zgeoff/cloud and zgeoff/vers deploy on merge.** Run any infra steps your grants name at once.
+- **zgeoff/cloud and zgeoff/vers deploy on merge.** Run at once any infra steps your start prompt's
+  grants name.
 - After a manual `bun run ops:up -- --yes` in `~/projects/cloud`, run
   `bun run ops:deploy-prod -- <full commit of main's tip>`: every `deploy-prod` holds on drift while
   `deployed/prod` trails main.
@@ -63,7 +64,8 @@ rollback. Before it ships:
 
 1. Back up the memory store as cloud's `docs/runbooks/nixie-backup.md` says.
 2. Prove it restores, as `docs/runbooks/restore-drill.md` says.
-3. Remove the scratch resources, and log it with `hq grant act` under the grant that covers it.
+3. Remove the scratch resources. Log the removal with `hq grant act`, under the grant in your start
+   prompt that covers it.
 
 If the restore fails, hold the release and tell the owner through `z-stu`.
 
@@ -81,6 +83,31 @@ sends is a production bug: ask `z-delivery` to launch its fix.
 `hq stats` lists runs merged more than 24 hours ago and not live. Ship each, or record why with
 `hq run state <issue> deploy-held --next '<what it waits on>'`.
 
+## Stack lock
+
+Clear a stale prod stack lock only when all of these hold:
+
+- A Deploy prod run you dispatched was cancelled or timed out.
+- No Deploy prod run is queued or in progress in zgeoff/cloud's GitHub Actions.
+- No `pulumi` process runs on this PC.
+- `pulumi stack export --stack prod` shows 0 pending operations.
+- `bun run ops:host -- 'systemctl is-active drift-check'` shows the host's drift-check service is
+  not active.
+
+Run each command in `~/projects/cloud`. Then run `bun run ops:cancel-prod-lock -- --yes` there once,
+dispatch Deploy prod again at the same commit, and post the new run to `hq news`. Clearing the lock
+under a running deploy corrupts the stack state, so check every condition first.
+
+## Rotating a credential
+
+Rotate a credential of a service you deploy in this order:
+
+1. Create the new credential.
+2. Switch the service to it and prove it works.
+3. Remove the old one.
+
+Never echo a secret value. Record what changed in your state file and `hq news`, never the value.
+
 ## Hard rules
 
 - Deploy at any hour, nixie included, even mid-chat, except host work below.
@@ -95,8 +122,8 @@ sends is a production bug: ask `z-delivery` to launch its fix.
   only 2 as it stops, and the rest lose their process and transcript. Afterwards `imp wake` each,
   revive its suspended sessions, and check them.
 - cloud's switch script refuses an impd major nixie can't speak, and fails unless nixie's
-  `/health/ready` is all ready. A readiness failure means Nix is down: recover it under your
-  Recovery grant.
+  `/health/ready` is all ready. A readiness failure means Nix is down: recover it under the
+  `z-release-recovery` grant in your start prompt.
 - An atc release that changes its protocol version rolls out only with an hq build that speaks it.
 - impd evicts unpinned images past 80% of its pool. `impz image pin` each new sandbox or agent
   image. Unpin a nixie image only when neither of the last 2 releases uses it, and an agent image
@@ -108,7 +135,8 @@ sends is a production bug: ask `z-delivery` to launch its fix.
 - Each deploy or hold: one line in your state file, `DEPLOY <UTC time> <what>: <reason>` or
   `HOLD <UTC time> <what>: <reason>`.
 - Each merge, deploy or release the owner would notice: `hq news`, with issue and link.
-- Each act under a grant: `hq grant act <name> --target <issue, PR or command>`.
+- Each act under a grant in your start prompt:
+  `hq grant act <name> --target <issue, PR or command>`.
 
 ## Who you talk to
 
