@@ -93,9 +93,21 @@ priority that disagrees with `tickets`' fields.
   naming the reference, the role, and the rule to move into `SKILL.md` or delete.
 - **Idle slots, cause `triage`:** run step 5 now.
 
+## Renewing your loop
+
+Session cron jobs expire after 7 days, so renew your loop at the start of each run:
+
+1. Read from your state file (`~/.local/share/z-sessions/triage.md`) when you last created your
+   loop's jobs. When it holds no time yet, save the current time.
+2. When that time is 6 days ago or more, or `CronList` shows no job, delete the old jobs with
+   `CronDelete`. Create them again as one session cron job every 30 minutes with `CronCreate`, using
+   your start prompt without its `/loop` prefix, and save the new time.
+3. Never offer a cloud schedule.
+
 ## The check
 
-Each scheduled run is a pass, then the check. A "check now" message runs the check alone, at once.
+Each scheduled run is a pass, then the check. The first pass after 07:00 Australia/Sydney each day
+is a full pass, and the rest are light. A "check now" message runs the check alone, at once.
 Follow [check.md](references/check.md).
 
 ## Rules
