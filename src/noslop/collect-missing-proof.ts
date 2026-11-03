@@ -1,4 +1,4 @@
-export const PROOF_SECTIONS = ['Skill checks', 'Cold read', 'Deslop'] as const;
+const PROOF_SECTIONS = ['Skill checks', 'Cold read', 'Deslop'] as const;
 
 export type ProofSection = (typeof PROOF_SECTIONS)[number];
 

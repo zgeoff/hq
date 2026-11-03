@@ -74,7 +74,3 @@ The script renders that grant as this bullet:
 ```text
 - Refill a lamp from the shed barrel when it runs low. Log it with `hq grant act z-lantern-oil --target <what you acted on>`.
 ```
-
-## the older form
-
-The script renders a grants list in one of two forms, and picks the form from the line above the list. Under `Grants:`, it renders each grant as `- <label>: <note>`, and refuses a bulleted list after the grants list. When you change a prompt that still uses `Grants:`, move it to `You are allowed to:` and the shape above.

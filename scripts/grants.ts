@@ -245,7 +245,7 @@ function parseAlso(value: unknown, where: string): string[] {
 }
 
 const NEW_FORM = /^You are allowed to:$/mu;
-const OLD_FORM = /^Grants:$/mu;
+const RETIRED_FORM = /^Grants:$/mu;
 const WORD_CAP = 50;
 const TEXT_BLOCK = /^```text\n(?<content>[\s\S]*?)^```[ \t]*$/gmu;
 
@@ -344,12 +344,9 @@ function countWords(note: string): number {
   return note.split(/\s+/u).filter(Boolean).length;
 }
 
-function renderGrantLines(file: string, context: SessionContext, newForm: boolean): string {
+function renderGrantLines(file: string, context: SessionContext): string {
   const fill = (note: string) =>
     note.replaceAll('{still-ask}', () => context.data.textByVoice[context.data.sites.get(file) ?? 'first']);
-  if (!newForm) {
-    return `Grants:\n${context.grants.map((grant) => `- ${grant.label}: ${fill(grant.note)}`).join('\n')}\n\n`;
-  }
   const bullets = context.grants.map((grant) => {
     const words = countWords(grant.note);
     if (words > WORD_CAP) {
@@ -363,25 +360,17 @@ function renderGrantLines(file: string, context: SessionContext, newForm: boolea
 
 function renderSessionGrants(file: string, body: string, block: RegExpExecArray, context: SessionContext): string {
   const content = block.groups?.['content'] ?? '';
-  const newForm = NEW_FORM.test(content);
-  if (newForm && OLD_FORM.test(content)) {
-    throw new Error(`${file}: use one of "Grants:" or "You are allowed to:", not both`);
+  if (RETIRED_FORM.test(content)) {
+    throw new Error(`${file}: the "Grants:" form is gone; use "You are allowed to:" instead`);
   }
-  const pattern = newForm ? /^You are allowed to:\n\n(?:(?:- [^\n]*\n)+\n)?/gmu : /^Grants:\n[\s\S]*?\n\n/gmu;
-  const matches = [...content.matchAll(pattern)];
+  const matches = [...content.matchAll(/^You are allowed to:\n\n(?:(?:- [^\n]*\n)+\n)?/gmu)];
   const [span] = matches;
-  if (matches.length !== 1 || !span || (newForm && content.startsWith('- ', span.index + span[0].length))) {
-    throw new Error(`${file}: expected one ${newForm ? 'You are allowed to' : 'Grants'} block ending with a blank line`);
+  if (matches.length !== 1 || !span || content.startsWith('- ', span.index + span[0].length)) {
+    throw new Error(`${file}: expected one You are allowed to block ending with a blank line`);
   }
-  const rendered = renderGrantLines(file, context, newForm);
-  const rest = content.slice(span.index + span[0].length);
+  const rendered = renderGrantLines(file, context);
   const updatedBlock = block[0].replace(span[0], () => rendered);
-  const updatedBody = body.slice(0, block.index) + updatedBlock + body.slice(block.index + block[0].length);
-
-  if (!newForm && /^- /mu.test(rest)) {
-    throw new Error(`${file}: a "- " line follows the Grants block after a blank line; keep every grant in the block`);
-  }
-  return updatedBody;
+  return body.slice(0, block.index) + updatedBlock + body.slice(block.index + block[0].length);
 }
 
 interface RenderContext {
@@ -396,7 +385,7 @@ function renderSession(file: string, body: string, context: RenderContext): stri
   }
   const blocks = [...body.matchAll(TEXT_BLOCK)];
   const session = /The start prompt for `(?<name>z-[a-z0-9-]+)`/u.exec(body)?.groups?.['name'];
-  const withGrants = blocks.filter((block) => NEW_FORM.test(block.groups?.['content'] ?? '') || OLD_FORM.test(block.groups?.['content'] ?? ''));
+  const withGrants = blocks.filter((block) => NEW_FORM.test(block.groups?.['content'] ?? '') || RETIRED_FORM.test(block.groups?.['content'] ?? ''));
   if (withGrants.length === 0) {
     return undefined;
   }
