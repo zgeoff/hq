@@ -22,3 +22,9 @@ Every launch: a Ready issue, a pitch, a relaunch, a design session or an ad-hoc 
    the issue, and move it to In Progress.
 
 A with-geoff design session: pin it, tell him its name, and stay out unless he asks you in.
+
+## Migrations
+
+A launched agent may run an additive migration: one that only adds tables or columns or fills in
+data, after it backs up that database. A migration that deletes or rewrites existing data is the
+owner's call, as `owner-calls` lists.
