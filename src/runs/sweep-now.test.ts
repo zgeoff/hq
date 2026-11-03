@@ -20,7 +20,7 @@ async function setupTest() {
   const client = await AtcClient.open();
   onTestFinished(() => client.close());
 
-  return { db: fresh.db, client, fake: { sessions: roster } };
+  return { db: fresh.db, client, fake: { sessions: roster, activity: server.activity } };
 }
 
 test('it flags nothing for a final PR that GitHub shows closed unmerged, and marks it closed', async () => {
@@ -87,6 +87,7 @@ test('it ends a handed-in run\'s idle session and wraps the run up in the same s
   finalPr(ctx.db, 'kettle#55', { sha: 'abc1234', actor: 'kettle-bot' });
   closePr(ctx.db, 'kettle#55', { to: 'merged', actor: 'kettle-bot', facts: { mergedAt: '2026-10-21T01:00:00Z', mergeSha: null } });
   ctx.fake.sessions.push({ id: '0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, state: 'done' });
+  ctx.fake.activity.set('0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', Date.parse('2026-10-21T01:00:00Z'));
   const fleet = buildStubFleetClient({ sessions: [{ id: '0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true }] });
   const gh = buildStubGitHubFactsRunner({ views: {} });
 
