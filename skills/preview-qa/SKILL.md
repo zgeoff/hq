@@ -76,13 +76,27 @@ only through QA accounts, never as a real player.
 
 1. Use vers's [QA runbook](https://github.com/zgeoff/vers/blob/main/docs/runbooks/qa.md) for every
    tool, in your own vers clone. `SKILL.private.md` says where the credentials and database are.
-2. Reserve the account first: add a line with the issue and `qa-geo-<n>` to `qa.md`. Then
-   `bun run qa:seed --user qa-geo-<n> --level <level> --yes`, without `--runs` (not granted).
-3. Reset it when done, pass or fail: `bun run qa:reset --user qa-geo-<n> --all --yes`, and remove
-   the line. If seed refuses because the account exists and `qa.md` lists no other check for it, an
-   earlier check left it: reset and seed again.
-4. Never record the seeded password, a two-factor secret, or an inbox code or link.
-5. `qa:cdp offline` lasts only while it runs. Without a lasting way to go offline in the runbook, an
+2. Pick the account. An item that needs the owner's phone uses `qa-geo-1926`, his permanent phone
+   account. Its sign-in is in the vers vault. Never seed it, never reset it with `--all`, and never
+   delete it: `--all` deletes the account. Any other item uses `qa-geo-<n>`, where `<n>` is the
+   issue's number. An item on GEO-1926 uses `qa-geo-1926` under the rules for the permanent account.
+3. Reserve the account: add a line with the issue and the account to
+   `~/.local/share/z-sessions/qa.md`. If `qa.md` lists another check on the account, wait until
+   that check removes its line. Then seed a `qa-geo-<n>` account:
+   `bun run qa:seed --user qa-geo-<n> --level <level> --yes`, with the level the item names and
+   without `--runs` (not granted). Skip the seed for `qa-geo-1926`: the account exists.
+4. Drive a phone item yourself, through the phone's Chrome on the DevTools port `z-stu` gives you.
+   Hand back only the hands-on steps, such as signing in, playing or switching airplane mode.
+   `z-stu` passes each one to the owner, one at a time.
+5. Reset the account when done, pass or fail, and remove its line. Reset after a phone item only
+   once the owner's last step is done and you have read what you need. Reset `qa-geo-1926` with
+   `bun run qa:reset --user qa-geo-1926 --yes`, which keeps the account. Reset a `qa-geo-<n>`
+   account with `bun run qa:reset --user qa-geo-<n> --all --yes`. Seed can refuse a `qa-geo-<n>`
+   account because it exists. If `qa.md` lists no other check for it, an earlier check left it.
+   Reset it with `--all` and seed again.
+6. Never record the seeded password, the phone account's sign-in, a two-factor secret, or an inbox
+   code or link. After a seed, delete any file that holds the password.
+7. `qa:cdp offline` lasts only while it runs. Without a lasting way to go offline in the runbook, an
    offline item is "needs Geoff".
 
 ## Limits
