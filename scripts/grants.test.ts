@@ -926,6 +926,37 @@ test('it renders the new form as one bullet per grant, with the log sentence onl
   expect(ctx.run().exitCode).toBe(0);
 });
 
+test('it fills an empty new-form list without consuming the limits list after it', () => {
+  const ctx = setupTest().useNewForm();
+  const prompt = ctx.readPrompt();
+  const start = prompt.indexOf('You are allowed to:\n\n');
+  const end = prompt.indexOf('You never:');
+  writeFileSync(ctx.promptPath, prompt.slice(0, start) + 'You are allowed to:\n\n' + prompt.slice(end));
+  expect(ctx.readPrompt()).toContain('You are allowed to:\n\nYou never:\n\n- Move a lamp from its post.\n\n');
+  expect(ctx.run([]).exitCode).toBe(0);
+  expect(ctx.readPrompt()).toContain(
+    [
+      '- Light the harbour lamps at dusk and put them out at dawn.',
+      '- Refill a lamp from the shed barrel when it runs low. Log it with `hq grant act z-lantern-oil --target <what you acted on>`.',
+      "- Row out to a stuck buoy and free it, and ask the keeper first about deleting or rewriting my data, anything that touches Nix's memory or identity, credentials, scope and naming, a new session, a priority, and a High or Urgent security change.",
+      '',
+      'You never:',
+      '',
+      '- Move a lamp from its post.',
+      '',
+    ].join('\n'),
+  );
+});
+
+test('it refuses a new-form list with no blank line after it', () => {
+  const ctx = setupTest().useNewForm();
+  const prompt = ctx.readPrompt();
+  writeFileSync(ctx.promptPath, prompt.slice(0, prompt.indexOf('\n\nYou never:')) + '\n```\n');
+  const result = ctx.run([]);
+  expect(result.exitCode).toBe(1);
+  expect(result.stderr.toString()).toContain('expected one You are allowed to block ending with a blank line');
+});
+
 test('it never renders a grant source', () => {
   const ctx = setupTest().useNewForm();
   expect(ctx.readPrompt()).not.toContain('The keeper, 2026-03-02');

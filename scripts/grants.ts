@@ -367,10 +367,10 @@ function renderSessionGrants(file: string, body: string, block: RegExpExecArray,
   if (newForm && OLD_FORM.test(content)) {
     throw new Error(`${file}: use one of "Grants:" or "You are allowed to:", not both`);
   }
-  const pattern = newForm ? /^You are allowed to:\n\n[\s\S]*?\n\n/gmu : /^Grants:\n[\s\S]*?\n\n/gmu;
+  const pattern = newForm ? /^You are allowed to:\n\n(?:(?:- [^\n]*\n)+\n)?/gmu : /^Grants:\n[\s\S]*?\n\n/gmu;
   const matches = [...content.matchAll(pattern)];
   const [span] = matches;
-  if (matches.length !== 1 || !span) {
+  if (matches.length !== 1 || !span || (newForm && content.startsWith('- ', span.index + span[0].length))) {
     throw new Error(`${file}: expected one ${newForm ? 'You are allowed to' : 'Grants'} block ending with a blank line`);
   }
   const rendered = renderGrantLines(file, context, newForm);
