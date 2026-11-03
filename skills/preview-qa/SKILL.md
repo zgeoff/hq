@@ -81,8 +81,12 @@ only through QA accounts, never as a real player.
 3. Reset it when done, pass or fail: `bun run qa:reset --user qa-geo-<n> --all --yes`, and remove
    the line. If seed refuses because the account exists and `qa.md` lists no other check for it, an
    earlier check left it: reset and seed again.
-4. Never record the seeded password, a two-factor secret, or an inbox code or link.
-5. `qa:cdp offline` lasts only while it runs. Without a lasting way to go offline in the runbook, an
+4. `qa-geo-1926` is the owner's permanent phone account. Its sign-in is in the vers vault item
+   `qa-phone-account`. Reserve it in `qa.md` like any other, but skip the seed: `qa:seed` refuses an
+   account that exists. Reset it with `bun run qa:reset --user qa-geo-1926 --yes`, never with
+   `--all`, which deletes the account. Never delete it.
+5. Never record the seeded password, a two-factor secret, or an inbox code or link.
+6. `qa:cdp offline` lasts only while it runs. Without a lasting way to go offline in the runbook, an
    offline item is "needs Geoff".
 
 ## Limits
