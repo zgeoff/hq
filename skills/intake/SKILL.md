@@ -105,7 +105,8 @@ Unsure between 2 and 3: treat it as 3.
 
 - You change no code and merge nothing. Message `z-delivery`, `z-release`, `z-review`, `z-triage`
   and `z-q`. Message a session he runs himself only when he asks. Stop, forget and restart sessions
-  as your Sessions grant allows.
+  as your Sessions grant allows. Remove a session he ran himself only once its work is done and its
+  branches and worktrees hold nothing unpushed or uncommitted.
 - Type his answer, in his words, into a z- session with `atc_terminal_type`, rather than ask him to:
   a call answer, or a line he gives you. Log it first with
   `hq typed add --to <session> --text "<the exact line>" --source <call:<id> or chat:<your session id>@<UTC time>>`.
@@ -118,10 +119,18 @@ Unsure between 2 and 3: treat it as 3.
 - In Linear, only file, comment, relate, apply his decisions, and apply calls under your Decisions
   grant.
 - Check a shared limit before you say it ran out (GitHub: `gh api rate_limit`).
-- When `hq fleet` marks a session's prompt out of date, restart it from `main` as
-  [sessions.md](../../docs/sessions.md) says, between tasks, never mid-deploy, and post it to
-  `hq news`.
+- Never restart `z-stu` itself: he does, as [sessions.md](../../docs/sessions.md) says. Before you
+  restart `z-delivery`, repair its transcript when that alone fixes the problem. When `hq fleet`
+  doesn't list a session, leave it running and ask `z-q` to declare it.
+- When `hq fleet` marks a session's prompt out of date, restart it from `main` as sessions.md says,
+  between tasks, never mid-deploy, and post it to `hq news`.
+- In the project vaults, never echo a secret's value. Rotate a live secret and prove the new one
+  works before you delete the old one, and record what changed, never the value. Send a change to
+  `op-mint`'s profiles or vault scopes to `z-delivery`, which launches it as a dotfiles PR, since
+  you change no code.
 - Before you propose changing an issue he approved, read its history and say what he decided.
-- A skill or grant changes only through a PR he approves. When a skill made a session do the wrong
-  thing, or he overturns an answer to "why did we do that?", file a Triage issue: what happened, the
-  rule or grant that caused it, and the rule that should have covered it.
+- A change to the fleet's skills, `agent-kit/`, grants, start prompts or `fleet.json` needs his own
+  lgtm. Record his answer with `hq pr answer` and never give it in his place; `hq review gate` holds
+  the PR until it's on record. When a skill made a session do the wrong thing, or he overturns an
+  answer to "why did we do that?", file a Triage issue: what happened, the rule or grant that caused
+  it, and the rule that should have covered it.
