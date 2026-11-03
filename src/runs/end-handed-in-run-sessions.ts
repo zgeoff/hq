@@ -13,7 +13,12 @@ const SessionRows = z.array(z.object({ issue: z.string(), session_id: z.string()
 
 // A stacked run merges a lower layer with its FINAL while its agent still builds the next one, so
 // a session ends only once atc shows it done and quiet.
-export function endHandedInRunSessions(db: Database, sessions: readonly AwakeSession[], activity: ReadonlyMap<string, number | null>, actor: string, at: Date = now()): number {
+export interface AtcView {
+  sessions: readonly AwakeSession[];
+  activity: ReadonlyMap<string, number | null>;
+}
+
+export function endHandedInRunSessions(db: Database, atc: AtcView, actor: string, at: Date = now()): number {
   const prs = PrRows.parse(
     db
       .query(
@@ -25,7 +30,7 @@ export function endHandedInRunSessions(db: Database, sessions: readonly AwakeSes
   const active = SessionRows.parse(
     db.query("SELECT s.issue, s.session_id FROM run_sessions s JOIN runs r ON r.issue = s.issue WHERE r.state = 'working' AND s.active = 1 ORDER BY s.added_at").all(),
   );
-  const stateOf = new Map(sessions.map((session) => [session.id, session.state]));
+  const stateOf = new Map(atc.sessions.map((session) => [session.id, session.state]));
   const quietBefore = at.getTime() - HANDED_IN_QUIET_MS;
   const end = db.query("UPDATE run_sessions SET active = 0, ended_at = COALESCE(ended_at, ?), ended_by = 'sweep' WHERE session_id = ? AND active = 1");
   let ended = 0;
@@ -35,7 +40,7 @@ export function endHandedInRunSessions(db: Database, sessions: readonly AwakeSes
     const handedIn = merged.length > 0 && merged.length === issuePrs.length && merged.every((row) => row.final_sha !== null && Date.parse(row.merged_at ?? '') <= quietBefore);
     const ids = active.filter((row) => row.issue === issue).map((row) => row.session_id);
     const quiet = ids.every((id) => {
-      const last = activity.get(id);
+      const last = atc.activity.get(id);
       return stateOf.get(id) === 'done' && typeof last === 'number' && last <= quietBefore;
     });
     if (!handedIn || !quiet) {

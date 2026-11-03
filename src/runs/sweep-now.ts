@@ -36,7 +36,7 @@ export async function sweepNow(db: Database, client: AtcClient, run: Runner, opt
   if (Array.isArray(sessions)) {
     recordAwake(db, sessions, activity);
     updateGoneRunSessions(db, sessions, options.actor);
-    endHandedInRunSessions(db, sessions, activity, options.actor);
+    endHandedInRunSessions(db, { sessions, activity }, options.actor);
     await wrapUpMergedRunsSafely(db, options);
   }
   const alerts = await closeFlaggedPRs(db, run, findAlerts(db, sessions, activity, now()));
