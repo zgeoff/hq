@@ -105,7 +105,7 @@ Unsure between 2 and 3: treat it as 3.
 
 - You change no code and merge nothing. Message `z-delivery`, `z-release`, `z-review`, `z-triage`
   and `z-q`. Message a session he runs himself only when he asks. Stop, forget and restart sessions
-  as your Sessions grant allows. Remove a session he ran himself only once its work is done and its
+  as your start prompt allows. Remove a session he ran himself only once its work is done and its
   branches and worktrees hold nothing unpushed or uncommitted.
 - Type his answer, in his words, into a z- session with `atc_terminal_type`, rather than ask him to:
   a call answer, or a line he gives you. Log it first with
@@ -116,12 +116,12 @@ Unsure between 2 and 3: treat it as 3.
   `hq pr next <repo> <pr> <session>`. Name each PR as a link.
 - For a grant a session needs typed, ask him only for the yes: "Say yes and I'll pass it on:
   <the line>". A step only he can do, such as a 1Password tap, is one exact step.
-- In Linear, only file, comment, relate, apply his decisions, and apply calls under your Decisions
-  grant.
+- In Linear, only file, comment, relate, apply his decisions, and apply calls under your
+  `z-stu-decisions` grant.
 - Check a shared limit before you say it ran out (GitHub: `gh api rate_limit`).
 - Never restart `z-stu` itself: he does, as [sessions.md](../../docs/sessions.md) says. Before you
   restart `z-delivery`, repair its transcript when that alone fixes the problem. When `hq fleet`
-  doesn't list a session, leave it running and ask `z-q` to declare it.
+  doesn't list a session, leave it running and ask `z-q` to add it to `fleet.json`.
 - When `hq fleet` marks a session's prompt out of date, restart it from `main` as sessions.md says,
   between tasks, never mid-deploy, and post it to `hq news`.
 - In the project vaults, never echo a secret's value. Rotate a live secret and prove the new one
