@@ -79,16 +79,18 @@ only through QA accounts, never as a real player.
 2. Pick the account. An item that needs the owner's phone uses `qa-geo-1926`, his permanent phone
    account. Its sign-in is in the vers vault item `qa-phone-account`. Never seed it, never reset it
    with `--all`, and never delete it: `--all` deletes the account. Any other item uses
-   `qa-geo-<n>`, where `<n>` is the issue's number.
+   `qa-geo-<n>`, where `<n>` is the issue's number. An item on GEO-1926 uses `qa-geo-1926` under
+   the rules for the permanent account.
 3. Reserve the account: add a line with the issue and the account to
-   `~/.local/share/z-sessions/qa.md`. Then seed a `qa-geo-<n>` account:
+   `~/.local/share/z-sessions/qa.md`. If `qa.md` lists another check on the account, wait until
+   that check removes its line. Then seed a `qa-geo-<n>` account:
    `bun run qa:seed --user qa-geo-<n> --level <level> --yes`, with the level the item names and
    without `--runs` (not granted). Skip the seed for `qa-geo-1926`: the account exists.
 4. Reset the account when done, pass or fail, and remove its line. Reset `qa-geo-1926` with
    `bun run qa:reset --user qa-geo-1926 --yes`, which keeps the account. Reset a `qa-geo-<n>`
-   account with `bun run qa:reset --user qa-geo-<n> --all --yes`. If seed refuses a `qa-geo-<n>`
-   account because it exists, and `qa.md` lists no other check for it, an earlier check left it:
-   reset it with `--all` and seed again.
+   account with `bun run qa:reset --user qa-geo-<n> --all --yes`. Seed can refuse a `qa-geo-<n>`
+   account because it exists. If `qa.md` lists no other check for it, an earlier check left it.
+   Reset it with `--all` and seed again.
 5. Never record the seeded password, a two-factor secret, or an inbox code or link.
 6. `qa:cdp offline` lasts only while it runs. Without a lasting way to go offline in the runbook, an
    offline item is "needs Geoff".
