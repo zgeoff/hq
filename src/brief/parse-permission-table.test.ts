@@ -42,3 +42,9 @@ test('it reads the rows under the heading named after the permissions placeholde
 
   expect(rows).toStrictEqual([{ action: 'Code delivery', phrase: 'Work in <repo>.' }]);
 });
+
+test('it reads the rows under a heading that names the placeholder and its file', () => {
+  const rows = parsePermissionTable(['## The `{{permissions}}` placeholder, in `agent-kit/brief.md` (the permission phrasing)', '', '| Action | Phrase in the brief |', '| - | - |', '| Code delivery | Work in <repo>. |', '', '## The `{{permissions}}` placeholder, in `agent-kit/brief.md` (the permission phrasing, the Child session row)', '', '| Stray | SENTINEL-IN-THE-CHILD-SECTION |'].join('\n'));
+
+  expect(rows).toStrictEqual([{ action: 'Code delivery', phrase: 'Work in <repo>.' }]);
+});
