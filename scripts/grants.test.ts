@@ -33,7 +33,6 @@ function setupTest() {
         throw new Error(written.stderr.toString());
       }
       return {
-        dir,
         grantsPath,
         promptPath,
         run,
@@ -41,7 +40,13 @@ function setupTest() {
         editGrants: (edit: (text: string) => string) => writeFileSync(grantsPath, edit(readFileSync(grantsPath, 'utf8'))),
       };
     };
-    return { dir, fixture, run, useNewForm };
+    return {
+      dir,
+
+      fixture,
+      run,
+      useNewForm,
+    };
   }
 }
 

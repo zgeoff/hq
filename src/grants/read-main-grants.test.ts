@@ -6,7 +6,7 @@ function setupTest() {
   return createTreeFixture();
 }
 
-test('a grants file with source, until and log still reads as its id and label', () => {
+test('it reads a grants file with source, until and log still reads as its id and label', () => {
   const ctx = setupTest();
   const tree = ctx.createPrivate({
     'grants/z-lantern.yaml': [
