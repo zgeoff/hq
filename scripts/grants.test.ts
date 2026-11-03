@@ -931,7 +931,7 @@ test('it fills an empty new-form list without consuming the limits list after it
   const prompt = ctx.readPrompt();
   const start = prompt.indexOf('You are allowed to:\n\n');
   const end = prompt.indexOf('You never:');
-  writeFileSync(ctx.promptPath, prompt.slice(0, start) + 'You are allowed to:\n\n' + prompt.slice(end));
+  writeFileSync(ctx.promptPath, `${prompt.slice(0, start)}You are allowed to:\n\n${prompt.slice(end)}`);
   expect(ctx.readPrompt()).toContain('You are allowed to:\n\nYou never:\n\n- Move a lamp from its post.\n\n');
   expect(ctx.run([]).exitCode).toBe(0);
   expect(ctx.readPrompt()).toContain(
@@ -951,7 +951,7 @@ test('it fills an empty new-form list without consuming the limits list after it
 test('it refuses a new-form list with no blank line after it', () => {
   const ctx = setupTest().useNewForm();
   const prompt = ctx.readPrompt();
-  writeFileSync(ctx.promptPath, prompt.slice(0, prompt.indexOf('\n\nYou never:')) + '\n```\n');
+  writeFileSync(ctx.promptPath, `${prompt.slice(0, prompt.indexOf('\n\nYou never:'))}\n\`\`\`\n`);
   const result = ctx.run([]);
   expect(result.exitCode).toBe(1);
   expect(result.stderr.toString()).toContain('expected one You are allowed to block ending with a blank line');
