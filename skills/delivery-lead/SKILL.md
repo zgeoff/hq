@@ -55,7 +55,7 @@ hq doesn't launch Ready issues. Fill each free slot `hq lanes` shows:
 
 1. Take the next Ready issue in `hq focus show` order whose Type the slot's `placeTypes` allows.
 2. If it overlaps a running run, hold it, as [Judging overlap](#judging-overlap) says. If it needs
-   an Action the owner must approve, [pitch](#pitches) it. Then go back to step 1.
+   an Action the owner must approve, [pitch](#pitches) it.
 3. Run `hq brief`, and launch it as launching.md says.
 
 When slots marked `delivery` (Ready work waits) stay empty 60 minutes in total today, hq messages

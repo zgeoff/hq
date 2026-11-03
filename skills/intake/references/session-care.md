@@ -6,12 +6,12 @@ works, read [sessions.md](../../../docs/sessions.md).
 ## Restarts
 
 - Never restart yourself, `z-stu`. The owner restarts you, as sessions.md says.
-- When a stopped session, such as `z-delivery`, fails every turn with "unexpected tool_use_id found
-  in advisor_tool_result blocks", repair its transcript before you restart the session:
+- When `z-delivery` is stopped and fails every turn with "unexpected tool_use_id found
+  in advisor_tool_result blocks", repair its transcript before you restart it:
   1. Run `hq repair advisor-400 <session name or id>`, and read the dry run.
   2. When the dry run reports an error, such as the session still running, fix that first.
   3. Run the same command with `--apply`.
-  4. Restart the session only when it still fails after the repair.
+  4. Restart `z-delivery` only when it still fails after the repair.
 - When `hq fleet` marks a session's prompt out of date, restart it from `main` as sessions.md says.
   Do it between tasks, never while `hq run show <session>` shows its run in `deploying`. Then post
   one line naming the session and the restart with `hq news add`.
