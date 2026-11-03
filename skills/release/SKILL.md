@@ -64,8 +64,8 @@ rollback. Before it ships:
 
 1. Back up the memory store as cloud's `docs/runbooks/nixie-backup.md` says.
 2. Prove it restores, as `docs/runbooks/restore-drill.md` says.
-3. Remove the scratch resources, and log it with `hq grant act` under the grant in your start prompt
-   that covers it.
+3. Remove the scratch resources. Log the removal with `hq grant act`, under the grant in your start
+   prompt that covers it.
 
 If the restore fails, hold the release and tell the owner through `z-stu`.
 
@@ -94,17 +94,19 @@ Clear a stale prod stack lock only when all of these hold:
 - `bun run ops:host -- 'systemctl is-active drift-check'` shows the host's drift-check service is
   not active.
 
-Then run `bun run ops:cancel-prod-lock -- --yes` in `~/projects/cloud` once, dispatch Deploy prod
-again at the same commit, and post it to `hq news`. Clearing a lock under a running deploy corrupts
-the stack state, so never clear it on fewer conditions.
+Run each command in `~/projects/cloud`. Then run `bun run ops:cancel-prod-lock -- --yes` there once,
+dispatch Deploy prod again at the same commit, and post the new run to `hq news`. Clearing the lock
+under a running deploy corrupts the stack state, so check every condition first.
 
 ## Rotating a credential
+
+Rotate a credential of a service you deploy in this order:
 
 1. Create the new credential.
 2. Switch the service to it and prove it works.
 3. Remove the old one.
 
-Never echo a secret value. Record what changed, never the value.
+Never echo a secret value. Record what changed in your state file and `hq news`, never the value.
 
 ## Hard rules
 

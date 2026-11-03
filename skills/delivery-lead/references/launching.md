@@ -25,6 +25,9 @@ A with-geoff design session: pin it, tell him its name, and stay out unless he a
 
 ## Migrations
 
-A launched agent may run an additive migration: one that only adds tables or columns or fills in
-data, after it backs up that database. A migration that deletes or rewrites existing data is the
-owner's call, as `owner-calls` lists.
+When an agent asks to run a migration, answer by its kind:
+
+- An additive migration only adds tables or columns, or fills in data. The agent may run it once it
+  has backed up that database.
+- A migration that deletes or rewrites existing data waits for the owner. Send it to him as a call,
+  as the [owner-calls](../../owner-calls/SKILL.md) skill says.

@@ -47,8 +47,8 @@ Until its FINAL note, an agent's classifier reads your message as someone other 
 that can make its next push look unapproved.
 
 - A message that only narrows the work ("keep your version of that test"): send it.
-- An action the prompt already grants: send nothing.
-- An action a grant in your start prompt covers, which the agent asks to take: type one "You should
+- An action the agent's launch prompt already grants: send nothing.
+- An action the agent asks to take, which a grant in your own start prompt covers: type one "You should
   ..." line into its session with `atc_terminal_type`, written in the owner's voice. Copy the
   specifics (repo, PR, command) exactly, and record the line in your state file.
 - An action beyond the grants: if the owner's yes covers it, type it in with `atc_terminal_type`, as
