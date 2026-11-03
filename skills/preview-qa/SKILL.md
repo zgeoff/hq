@@ -83,7 +83,7 @@ only through QA accounts, never as a real player.
 3. Reserve the account: add a line with the issue and the account to
    `~/.local/share/z-sessions/qa.md`. Then seed a `qa-geo-<n>` account:
    `bun run qa:seed --user qa-geo-<n> --level <level> --yes`, with the level the item names and
-   without `--runs` (not granted). `qa-geo-1926` already exists, so skip its seed.
+   without `--runs` (not granted). Skip the seed for `qa-geo-1926`: the account exists.
 4. Reset the account when done, pass or fail, and remove its line. Reset `qa-geo-1926` with
    `bun run qa:reset --user qa-geo-1926 --yes`, which keeps the account. Reset a `qa-geo-<n>`
    account with `bun run qa:reset --user qa-geo-<n> --all --yes`. If seed refuses a `qa-geo-<n>`
