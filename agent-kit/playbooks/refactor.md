@@ -41,7 +41,8 @@ feature as a user would; the feature map in the repo's `verify-<app>` skill list
     1, run it again. Expect the same end state.
 11. In the PR description, under "## Verification", write one line for the test command and its
     result, one for each `bun verify` output (the output in an `Output:` block), and one on what got
-    simpler, or on why you reverted. Add one line for each bug you fixed, in this form, or the second
+    simpler, or on why you reverted. Put the test command and the `bun verify` commands in a `Rerun:`
+    block. Add one line for each bug you fixed, in this form, or the second
     line when there is none:
 
     ```markdown

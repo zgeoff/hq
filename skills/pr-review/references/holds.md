@@ -8,8 +8,7 @@ message.
 ## The skill proof
 
 A PR that changes a skill's `SKILL.md`, or a file under its `references/`, needs three ticked lines
-in its `## Checks` section, and one line under `Declined:` for each finding the agent declined, or
-`Declined: none.`:
+in its `## Checks` section, and one line under `Declined:` for each finding the agent declined:
 
 - `- [x] chex prose, links and skill: cleared`
 - `- [x] Cold read: <n> fixed, <n> declined`
@@ -19,8 +18,8 @@ The gate checks the proof before the owner's lgtm, so the owner never approves a
 still has to change. Check it like this:
 
 1. Once the review findings are answered, run `hq review gate <repo> <pr>`.
-2. If the gate blocks on the proof, it prints the lines to add. Message the agent that text word for
-   word.
+2. If it blocks on the proof, its reason names the missing lines. Message the agent that reason
+   word for word.
 3. Read each declined finding's reason. Send back any that fails `fix-it-here`. When you doubt a
    ticked chex line, run `bun x @zgeoff/chex prose links skill` on the PR's head.
 4. Only then run `hq unblock add`, which puts the PR on the owner's list.
