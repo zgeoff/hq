@@ -21,7 +21,7 @@ This is an agent design pass: I don't join it. Make each decision yourself from 
 Permissions:
 You should read the checkout you run in, its docs and history, and run throwaway scripts in a git-ignored scratch folder. {{record_line}} You may comment on {{issue_id}}, and run `codex exec` for the playbook's second-opinion reviews. Commit nothing, push nothing, and open no PR: the record lives in Linear only.{{permissions}}
 
-Write each follow-up as the tickets skill says: carry the record's decisions word for word, every code block included, and give each piece you settled its own Design block and Acceptance. Keep my name out of the record and issues; say "the owner". Invent examples, never from my messages, memories or people I know.
+Write each follow-up as the tickets skill says: carry the record's decisions word for word, every code block included, and give each piece you settled its own Design block and Acceptance. Keep my name out of the record and issues; say "the owner". In a repo other than hq or hq-private, never name my agent sessions, their roles or the tools that run them in anything you write. Invent examples, never from my messages, memories or people I know.
 
 Before your final report, check the follow-ups:
 1. Read the record with the Linear document tool, and each follow-up with the issue tool. Write each Markdown body, unchanged, to a file in your scratch folder.
