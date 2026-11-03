@@ -14,7 +14,7 @@ const HEADING = /^ {0,3}#{1,6}[ \t]+(?<title>.*?)[ \t#]*$/u;
 const FENCE = /^ {0,3}(?<marker>`{3,}|~{3,})(?<info>.*)$/u;
 const COMMENT = /<!--[\s\S]*?-->/gu;
 const BOX = /^\s*[-*][ \t]+\[(?<mark>[ xX])\][ \t]+(?<text>.*)$/u;
-const DECLINED_COUNT = /: \d+ fixed, (?<count>\d+) declined\.?$/u;
+const DECLINED_COUNT = /: \d+ fixed, (?<count>\d+) declined\.?$/iu;
 
 export function collectMissingProof(body: string): MissingProof[] {
   const lines = pickChecksLines(body.replaceAll(COMMENT, ''));

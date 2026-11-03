@@ -98,3 +98,9 @@ test('it counts a Second opinion decline that no listed finding answers', () => 
 
   expect(collectMissingProof(body)).toStrictEqual([{ kind: 'declined', counted: 1, listed: 0 }]);
 });
+
+test('it counts a declined finding written in capitals', () => {
+  const body = ['## Checks', '', '- [x] chex prose, links and skill: cleared', '- [x] Cold read: 0 FIXED, 1 DECLINED', '- [x] Deslop: 1 edit', '', 'Declined: none.'].join('\n');
+
+  expect(collectMissingProof(body)).toStrictEqual([{ kind: 'declined', counted: 1, listed: 0 }]);
+});
