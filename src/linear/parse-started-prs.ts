@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export type StartedPrStatus = 'open' | 'draft' | 'merged' | 'closed';
+type StartedPrStatus = 'open' | 'draft' | 'merged' | 'closed';
 
 export interface StartedPr {
   ref: string;

@@ -73,8 +73,8 @@ test('it repairs a hand edit to a generated grant and leaves check mode read-onl
     const file = 'skills/preview-qa/references/session-prompt.md';
     const path = join(ctx.dir, file);
     const source = readFileSync(path, 'utf8');
-    expect(source).toContain('- GitHub: read zgeoff PRs and their comments.');
-    writeFileSync(path, source.replace('- GitHub: read zgeoff PRs and their comments.', '- GitHub: read every repo.'));
+    expect(source).toContain('- read zgeoff PRs and their comments.');
+    writeFileSync(path, source.replace('- read zgeoff PRs and their comments.', '- read every repo.'));
     {
       const checked = ctx.run();
       const checkedSource = readFileSync(path, 'utf8');
@@ -82,9 +82,9 @@ test('it repairs a hand edit to a generated grant and leaves check mode read-onl
       const writtenSource = readFileSync(path, 'utf8');
       expect(checked.exitCode).toBe(1);
       expect(checked.stdout.toString()).toContain(`--- a/${file}\n+++ b/${file}\n@@ `);
-      expect(checked.stdout.toString()).toContain('-- GitHub: read every repo.');
-      expect(checked.stdout.toString()).toContain('+- GitHub: read zgeoff PRs and their comments.');
-      expect(checkedSource).toContain('- GitHub: read every repo.');
+      expect(checked.stdout.toString()).toContain('-- read every repo.');
+      expect(checked.stdout.toString()).toContain('+- read zgeoff PRs and their comments.');
+      expect(checkedSource).toContain('- read every repo.');
       expect(written.exitCode).toBe(0);
       expect(writtenSource).toBe(source);
       expect(ctx.run().exitCode).toBe(0);
@@ -126,10 +126,8 @@ test('it rejects an unlisted security change mention', () => {
   }
 });
 
-test.each([
-  ['missing', 'another decision'],
-  ['extra', 'deleting or rewriting my data, or a security change. deleting or rewriting my data, or a security change'],
-])('it rejects a listed site with a %s span before grant replacement', (_label, replacement) => {
+test('it rejects a listed site with an extra span before grant replacement', () => {
+  const replacement = 'deleting or rewriting my data, or a security change. deleting or rewriting my data, or a security change';
   const ctx = setupTest();
   for (const path of ['grants', 'skills', 'docs']) {
     cpSync(join(ctx.fixture, path), join(ctx.dir, path), { recursive: true });
@@ -166,7 +164,7 @@ test('it reports a diff for a hand edit inside a still-ask list', () => {
   }
 });
 
-test('it rejects a grant file whose prompt has no Grants block', () => {
+test('it rejects a grant file whose prompt has no allowed block', () => {
   const ctx = setupTest();
   for (const path of ['grants', 'skills', 'docs']) {
     cpSync(join(ctx.fixture, path), join(ctx.dir, path), { recursive: true });
@@ -174,8 +172,8 @@ test('it rejects a grant file whose prompt has no Grants block', () => {
   {
     const path = join(ctx.dir, 'skills/preview-qa/references/session-prompt.md');
     const source = readFileSync(path, 'utf8');
-    expect(source).toContain('\nGrants:\n');
-    writeFileSync(path, source.replace('\nGrants:\n', '\nAllowed:\n'));
+    expect(source).toContain('\nYou are allowed to:\n');
+    writeFileSync(path, source.replace('\nYou are allowed to:\n', '\nAllowed:\n'));
     {
       const result = ctx.run();
       expect(result.exitCode).toBe(1);
@@ -302,12 +300,12 @@ test.each([
   {
     const path = join(ctx.dir, 'skills/delivery-lead/references/session-prompt.md');
     const source = readFileSync(path, 'utf8');
-    expect(source).toContain('\n- Release: ');
-    writeFileSync(path, source.replace('\n- Release: ', '\n\n- Release: '));
+    expect(source).toContain('\n- publish a kite release');
+    writeFileSync(path, source.replace('\n- publish a kite release', '\n\n- publish a kite release'));
     {
       const result = ctx.run(args);
       expect(result.exitCode).toBe(1);
-      expect(result.stderr.toString()).toContain('follows the Grants block');
+      expect(result.stderr.toString()).toContain('expected one You are allowed to block ending with a blank line');
     }
   }
 });
@@ -350,8 +348,9 @@ test('it generates an invented fleet and passes the next check', () => {
       '```text',
       'You are z-garden.',
       '',
-      'Grants:',
-      '- Water: stale text.',
+      'You are allowed to:',
+      '',
+      '- stale text.',
       '',
       'Ask me first about deleting or rewriting my data, or a security change.',
       '```',
@@ -366,7 +365,7 @@ test('it generates an invented fleet and passes the next check', () => {
       const rechecked = ctx.run();
       expect(checked.exitCode).toBe(1);
       expect(written.exitCode).toBe(0);
-      expect(prompt).toContain('- Water: water the paper orchard each morning.\n');
+      expect(prompt).toContain('- water the paper orchard each morning.\n');
       expect(prompt).toContain('Ask me first about deleting or rewriting my data, and a High security change.');
       expect(rechecked.exitCode).toBe(0);
       expect(rechecked.stdout.toString()).toBe('grants: 1 files match\n');
@@ -535,13 +534,13 @@ test('with --private it fails on a drifted private prompt, names the tree, and w
     const file = 'skills/preview-qa/references/session-prompt.md';
     const path = join(ctx.privateDir, file);
     const source = readFileSync(path, 'utf8');
-    writeFileSync(path, source.replace('- GitHub: read zgeoff PRs and their comments.', '- GitHub: read every repo.'));
+    writeFileSync(path, source.replace('- read zgeoff PRs and their comments.', '- read every repo.'));
     {
       const checked = ctx.runPrivate();
       expect(checked.exitCode).toBe(1);
       expect(checked.stdout.toString()).toContain(`--- a/hq-private:${file}`);
-      expect(checked.stdout.toString()).toContain('+- GitHub: read zgeoff PRs and their comments.');
-      expect(readFileSync(path, 'utf8')).toContain('- GitHub: read every repo.');
+      expect(checked.stdout.toString()).toContain('+- read zgeoff PRs and their comments.');
+      expect(readFileSync(path, 'utf8')).toContain('- read every repo.');
     }
     expect(ctx.runPrivate([]).exitCode).toBe(0);
     expect(readFileSync(path, 'utf8')).toBe(source);
@@ -573,7 +572,7 @@ test('with --private it reads the grants from the private dir', () => {
   {
     const result = ctx.runPrivate();
     expect(result.exitCode).toBe(1);
-    expect(result.stdout.toString()).toContain('+- GitHub: read the invented repo.');
+    expect(result.stdout.toString()).toContain('+- read the invented repo.');
   }
 });
 
@@ -971,19 +970,31 @@ test('it reads a grants file with source, until and log in both grants.ts and th
   ]);
 });
 
+test('it refuses {still-ask} in a grant note of a file that is not a still-ask site', () => {
+  const ctx = setupTest().useNewForm();
+  const stillAsk = join(dirname(ctx.grantsPath), 'still-ask.yaml');
+  writeFileSync(stillAsk, readFileSync(stillAsk, 'utf8').replace(/  - file: skills\/lantern\/references\/session-prompt\.md\n    voice: first\n    after: "\."\n/u, ''));
+  const prompt = ctx.readPrompt();
+  writeFileSync(ctx.promptPath, `${prompt.slice(0, prompt.indexOf('You are allowed to:'))}You are allowed to:\n\n- stale text\n\n${prompt.slice(prompt.indexOf('You never:'))}`);
+  const result = ctx.run([]);
+  expect(result.exitCode).toBe(1);
+  expect(result.stderr.toString()).toContain('grant sail uses {still-ask}, but the file is not a still-ask site; point the note at the owner-calls skill instead');
+});
+
 test('it never renders a grant source', () => {
   const ctx = setupTest().useNewForm();
   expect(ctx.readPrompt()).not.toContain('The keeper, 2026-03-02');
   expect(ctx.readPrompt()).not.toContain('source');
 });
 
-test('it allows a limits list after a new-form block, and the old form still refuses one', () => {
+test('it refuses a Grants: prompt and tells the author to use You are allowed to:', () => {
   const ctx = setupTest().useNewForm();
-  const old = ctx.readPrompt().replace('You are allowed to:\n\n', 'Grants:\n');
-  writeFileSync(ctx.promptPath, old);
+  writeFileSync(ctx.promptPath, ctx.readPrompt().replace('You are allowed to:\n\n', 'Grants:\n'));
   const result = ctx.run([]);
   expect(result.exitCode).toBe(1);
-  expect(result.stderr.toString()).toContain('a "- " line follows the Grants block after a blank line');
+  expect(result.stderr.toString()).toBe(
+    'grants: skills/lantern/references/session-prompt.md: the "Grants:" form is gone; use "You are allowed to:" instead\n',
+  );
 });
 
 test.each([
@@ -1037,8 +1048,9 @@ test.each([
 test('it keeps the still-ask span required when the new-form header sits outside the text block', () => {
   const ctx = setupTest().useNewForm();
   ctx.editGrants((text) => text.replace('ask the keeper first about {still-ask}', 'ask the keeper first'));
-  const old = ctx.readPrompt().replace('You are allowed to:\n\n', 'Grants:\n').replace('\nYou never:\n\n- Move a lamp from its post.\n', '');
-  writeFileSync(ctx.promptPath, `${old}\nYou are allowed to:\n`);
+  const outside = ctx.readPrompt().replace(/You are allowed to:\n\n(?:- [^\n]*\n)+/u, 'Allowed:\n\n- none\n').replace('\nYou never:\n\n- Move a lamp from its post.\n', '');
+  writeFileSync(ctx.promptPath, `${outside}\nYou are allowed to:\n`);
+  rmSync(ctx.grantsPath);
   const result = ctx.run(['--check']);
   expect(result.exitCode).toBe(1);
   expect(result.stderr.toString()).toContain('expected one still-ask span');
@@ -1069,24 +1081,11 @@ test('it passes a note of exactly 50 words', () => {
   expect(ctx.run([]).exitCode).toBe(0);
 });
 
-test('it applies no word cap to an old-form prompt', () => {
-  const ctx = setupTest().useNewForm();
-  const words = Array.from({ length: 60 }, () => 'lamp').join(' ');
-  ctx.editGrants((text) => text.replace('Refill a lamp from the shed barrel when it runs low.', `${words}.`));
-  const oldForm = ctx.readPrompt().replace('You are allowed to:\n\n', 'Grants:\n').replace('\nYou never:\n\n- Move a lamp from its post.\n', '');
-  writeFileSync(ctx.promptPath, oldForm);
-  expect(ctx.run([]).exitCode).toBe(0);
-});
-
-test('it passes a new-form still-ask site with no span, and an old-form site still needs one', () => {
+test('it passes a still-ask site with no span', () => {
   const ctx = setupTest().useNewForm();
   ctx.editGrants((text) => text.replace('ask the keeper first about {still-ask}', 'ask the keeper first'));
   expect(ctx.run([]).stderr.toString()).toBe('');
   expect(ctx.run().exitCode).toBe(0);
-  writeFileSync(ctx.promptPath, ctx.readPrompt().replace('You are allowed to:\n\n', 'Grants:\n'));
-  const old = ctx.run();
-  expect(old.exitCode).toBe(1);
-  expect(old.stderr.toString()).toContain('expected one still-ask span');
 });
 
 test('it still fails an unknown grant field', () => {

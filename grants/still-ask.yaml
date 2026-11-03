@@ -33,10 +33,6 @@ sites:
   - file: skills/owner-calls/SKILL.md
     voice: third
     after: "."
-  - file: skills/intake/references/session-prompt.md
-    voice: first
-    after: "."
-    tree: private
   - file: docs/skill-development/roles-design.md
     voice: third
     after: "."
