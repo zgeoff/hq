@@ -33,10 +33,8 @@ export function countWorking(db: Database, at: Date, designRuns: readonly Design
 
 type RunSessionRow = z.output<typeof rowsSchema>[number];
 
-// A session added after the reading is one atc has not looked at, so it counts as awake. Both times
-// drop their milliseconds, so a session added in the reading's own second counts unless the reading
-// saw it. A reading with no seen list can't tell, and counts only a later second.
+// A session atc has not looked at counts as awake: an extra count holds a slot, a missed one
+// overfills the imp. Both times drop their milliseconds, so the reading's own second counts too.
 function isUnseen(row: RunSessionRow, seen: ReadonlySet<string> | null, readAt: number): boolean {
-  const addedAt = Date.parse(row.added_at);
-  return seen === null ? addedAt > readAt : addedAt >= readAt && !seen.has(row.session_id);
+  return Date.parse(row.added_at) >= readAt && seen?.has(row.session_id) !== true;
 }

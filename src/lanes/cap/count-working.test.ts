@@ -174,7 +174,7 @@ test('it counts a session added in the same second as the atc reading', () => {
   expect(countWorking(ctx.db, new Date('2026-10-15T20:00:30Z'))).toStrictEqual({ count: 1, from: 'sessions' });
 });
 
-test('it counts only a later second for a reading with no seen list', () => {
+test('it counts a session added in the reading\'s own second when the reading has no seen list', () => {
   const ctx = setupTest();
   at('2026-10-15T20:00:00Z');
   addRun(ctx.db, { issue: 'GEO-9943', title: 'Fill the teapot', place: 'imp', session: 'a0000043-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: null, actor: 'z-delivery' });
@@ -182,5 +182,5 @@ test('it counts only a later second for a reading with no seen list', () => {
   at('2026-10-15T20:00:05Z');
   addRun(ctx.db, { issue: 'GEO-9944', title: 'Pour the tea', place: 'imp', session: 'a0000044-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: null, actor: 'z-delivery' });
 
-  expect(countWorking(ctx.db, new Date('2026-10-15T20:00:30Z'))).toStrictEqual({ count: 1, from: 'sessions' });
+  expect(countWorking(ctx.db, new Date('2026-10-15T20:00:30Z'))).toStrictEqual({ count: 2, from: 'sessions' });
 });
