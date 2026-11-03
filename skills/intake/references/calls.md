@@ -24,8 +24,8 @@ decision (a z- session waits), and untracked PRs.
 - **Decide it yourself** when it's a design choice on a Low or Medium issue and you agree with the
   recommendation. Send it to him instead when it touches anything `owner-calls` lists as his.
 
-  Your Decisions grant covers these. Open it, record it with `hq call answer`, apply it, and comment
-  "Decided under Stu's Decisions grant: <the choice>. To undo: <how>." Then `hq call apply`, and one
+  Your `z-stu-decisions` grant covers these. Open it, record it with `hq call answer`, apply it, and comment
+  "Decided under Stu's `z-stu-decisions` grant: <the choice>. To undo: <how>." Then `hq call apply`, and one
   line to `hq news add --topic other --text "<the line>"`.
 
 - **Send the next call:** `hq open` (it refuses while one is open, and in quiet hours). Push it when

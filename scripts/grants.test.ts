@@ -9,16 +9,43 @@ function setupTest() {
   {
     const repo = resolve(import.meta.dir, '..');
     cpSync(join(repo, 'scripts/grants.ts'), join(dir, 'scripts/grants.ts'));
+    const fixture = join(repo, 'scripts/fixtures/grants');
+    const run = (args: string[] = ['--check']) =>
+      Bun.spawnSync([process.execPath, join(dir, 'scripts/grants.ts'), ...args], {
+        cwd: dir,
+        stdout: 'pipe',
+        stderr: 'pipe',
+      });
+    const useNewForm = () => {
+      for (const path of ['grants', 'skills', 'docs']) {
+        cpSync(join(fixture, path), join(dir, path), { recursive: true });
+      }
+      cpSync(join(fixture, 'new-form'), dir, { recursive: true });
+      const stillAsk = join(dir, 'grants/still-ask.yaml');
+      writeFileSync(
+        stillAsk,
+        `${readFileSync(stillAsk, 'utf8')}  - file: skills/lantern/references/session-prompt.md\n    voice: first\n    after: "."\n`,
+      );
+      const promptPath = join(dir, 'skills/lantern/references/session-prompt.md');
+      const grantsPath = join(dir, 'grants/z-lantern.yaml');
+      const written = run([]);
+      if (written.exitCode !== 0) {
+        throw new Error(written.stderr.toString());
+      }
+      return {
+        grantsPath,
+        promptPath,
+        run,
+        readPrompt: () => readFileSync(promptPath, 'utf8'),
+        editGrants: (edit: (text: string) => string) => writeFileSync(grantsPath, edit(readFileSync(grantsPath, 'utf8'))),
+      };
+    };
     return {
       dir,
 
-      fixture: join(repo, 'scripts/fixtures/grants'),
-      run: (args: string[] = ['--check']) =>
-        Bun.spawnSync([process.execPath, join(dir, 'scripts/grants.ts'), ...args], {
-          cwd: dir,
-          stdout: 'pipe',
-          stderr: 'pipe',
-        }),
+      fixture,
+      run,
+      useNewForm,
     };
   }
 }
@@ -878,4 +905,187 @@ test.each([
       expect(result.stdout.toString()).toBe('');
     }
   }
+});
+
+test('it renders the new form as one bullet per grant, with the log sentence only for a logged grant', () => {
+  const ctx = setupTest().useNewForm();
+  expect(ctx.readPrompt()).toContain(
+    [
+      'You are allowed to:',
+      '',
+      '- Light the harbour lamps at dusk and put them out at dawn.',
+      '- Refill a lamp from the shed barrel when it runs low. Log it with `hq grant act z-lantern-oil --target <what you acted on>`.',
+      "- Row out to a stuck buoy and free it, and ask the keeper first about deleting or rewriting my data, anything that touches Nix's memory or identity, credentials, scope and naming, a new session, a priority, and a High or Urgent security change.",
+      '',
+      'You never:',
+      '',
+      '- Move a lamp from its post.',
+      '',
+    ].join('\n'),
+  );
+  expect(ctx.run().exitCode).toBe(0);
+});
+
+test('it fills an empty new-form list without consuming the limits list after it', () => {
+  const ctx = setupTest().useNewForm();
+  const prompt = ctx.readPrompt();
+  const start = prompt.indexOf('You are allowed to:\n\n');
+  const end = prompt.indexOf('You never:');
+  writeFileSync(ctx.promptPath, `${prompt.slice(0, start)}You are allowed to:\n\n${prompt.slice(end)}`);
+  expect(ctx.readPrompt()).toContain('You are allowed to:\n\nYou never:\n\n- Move a lamp from its post.\n\n');
+  expect(ctx.run([]).exitCode).toBe(0);
+  expect(ctx.readPrompt()).toContain(
+    [
+      '- Light the harbour lamps at dusk and put them out at dawn.',
+      '- Refill a lamp from the shed barrel when it runs low. Log it with `hq grant act z-lantern-oil --target <what you acted on>`.',
+      "- Row out to a stuck buoy and free it, and ask the keeper first about deleting or rewriting my data, anything that touches Nix's memory or identity, credentials, scope and naming, a new session, a priority, and a High or Urgent security change.",
+      '',
+      'You never:',
+      '',
+      '- Move a lamp from its post.',
+      '',
+    ].join('\n'),
+  );
+});
+
+test('it refuses a new-form list with no blank line after it', () => {
+  const ctx = setupTest().useNewForm();
+  const prompt = ctx.readPrompt();
+  writeFileSync(ctx.promptPath, `${prompt.slice(0, prompt.indexOf('\n\nYou never:'))}\n\`\`\`\n`);
+  const result = ctx.run([]);
+  expect(result.exitCode).toBe(1);
+  expect(result.stderr.toString()).toContain('expected one You are allowed to block ending with a blank line');
+});
+
+test('it never renders a grant source', () => {
+  const ctx = setupTest().useNewForm();
+  expect(ctx.readPrompt()).not.toContain('The keeper, 2026-03-02');
+  expect(ctx.readPrompt()).not.toContain('source');
+});
+
+test('it allows a limits list after a new-form block, and the old form still refuses one', () => {
+  const ctx = setupTest().useNewForm();
+  const old = ctx.readPrompt().replace('You are allowed to:\n\n', 'Grants:\n');
+  writeFileSync(ctx.promptPath, old);
+  const result = ctx.run([]);
+  expect(result.exitCode).toBe(1);
+  expect(result.stderr.toString()).toContain('a "- " line follows the Grants block after a blank line');
+});
+
+test.each([
+  ['in the future', '2026-11-03', 0],
+  ['on the day', '2099-01-01', 0],
+  ['in the past', '2099-01-02', 1],
+])('it handles a grant with an until date %s: today %s exits %i', (_label, today, code) => {
+  const ctx = setupTest().useNewForm();
+  const result = ctx.run(['--today', today]);
+  expect(result.exitCode).toBe(code);
+  if (code === 1) {
+    expect(result.stderr.toString()).toContain('grants/z-lantern.yaml: grant sail ended on 2099-01-01 (today is 2099-01-02)');
+  }
+});
+
+test.each([
+  ['in the past', '2099-01-02', 1],
+  ['on the day', '2099-01-01', 0],
+  ['in the future', '2026-11-03', 0],
+])('it handles an until date in check mode %s: today %s exits %i', (_label, today, code) => {
+  const ctx = setupTest().useNewForm();
+  const result = ctx.run(['--check', '--today', today]);
+  expect(result.exitCode).toBe(code);
+  if (code === 1) {
+    expect(result.stderr.toString()).toContain('grant sail ended on 2099-01-01 (today is 2099-01-02)');
+  }
+});
+
+test('it refuses an impossible calendar date for --today and for until', () => {
+  const ctx = setupTest().useNewForm();
+  expect(ctx.run(['--today', '2026-99-99']).stderr.toString()).toContain('expected YYYY-MM-DD');
+  expect(ctx.run(['--today', '2026-02-30']).exitCode).toBe(1);
+  ctx.editGrants((text) => text.replace('2099-01-01', '2026-99-99'));
+  const result = ctx.run(['--check']);
+  expect(result.exitCode).toBe(1);
+  expect(result.stderr.toString()).toContain('until: expected a date as YYYY-MM-DD');
+});
+
+test('it keeps the still-ask span required when the new-form header sits outside the text block', () => {
+  const ctx = setupTest().useNewForm();
+  ctx.editGrants((text) => text.replace('ask the keeper first about {still-ask}', 'ask the keeper first'));
+  const old = ctx.readPrompt().replace('You are allowed to:\n\n', 'Grants:\n').replace('\nYou never:\n\n- Move a lamp from its post.\n', '');
+  writeFileSync(ctx.promptPath, `${old}\nYou are allowed to:\n`);
+  const result = ctx.run(['--check']);
+  expect(result.exitCode).toBe(1);
+  expect(result.stderr.toString()).toContain('expected one still-ask span');
+});
+
+test('it refuses an expired grant in write mode, before it writes', () => {
+  const ctx = setupTest().useNewForm();
+  const before = ctx.readPrompt();
+  const result = ctx.run(['--today', '2100-01-01']);
+  expect(result.exitCode).toBe(1);
+  expect(result.stderr.toString()).toContain('grant sail ended');
+  expect(ctx.readPrompt()).toBe(before);
+});
+
+test('it refuses a malformed --today and a malformed until', () => {
+  const ctx = setupTest().useNewForm();
+  expect(ctx.run(['--today', 'tomorrow']).stderr.toString()).toContain('expected YYYY-MM-DD');
+  ctx.editGrants((text) => text.replace('2099-01-01', 'soon'));
+  expect(ctx.run().stderr.toString()).toContain('until: expected a date as YYYY-MM-DD');
+});
+
+test('it fails a note over 50 words with the file, the id and the count', () => {
+  const ctx = setupTest().useNewForm();
+  const words = Array.from({ length: 51 }, () => 'lamp').join(' ');
+  ctx.editGrants((text) => text.replace('Refill a lamp from the shed barrel when it runs low.', `${words}.`));
+  const result = ctx.run();
+  expect(result.exitCode).toBe(1);
+  expect(result.stderr.toString()).toContain('skills/lantern/references/session-prompt.md: grant oil note is 51 words; keep it to 50 or fewer');
+});
+
+test('it passes a note of exactly 50 words', () => {
+  const ctx = setupTest().useNewForm();
+  const words = Array.from({ length: 50 }, () => 'lamp').join(' ');
+  ctx.editGrants((text) => text.replace('Refill a lamp from the shed barrel when it runs low.', `${words}.`));
+  expect(ctx.run([]).exitCode).toBe(0);
+});
+
+test('it applies no word cap to an old-form prompt', () => {
+  const ctx = setupTest().useNewForm();
+  const words = Array.from({ length: 60 }, () => 'lamp').join(' ');
+  ctx.editGrants((text) => text.replace('Refill a lamp from the shed barrel when it runs low.', `${words}.`));
+  const oldForm = ctx.readPrompt().replace('You are allowed to:\n\n', 'Grants:\n').replace('\nYou never:\n\n- Move a lamp from its post.\n', '');
+  writeFileSync(ctx.promptPath, oldForm);
+  expect(ctx.run([]).exitCode).toBe(0);
+});
+
+test('it passes a new-form still-ask site with no span, and an old-form site still needs one', () => {
+  const ctx = setupTest().useNewForm();
+  ctx.editGrants((text) => text.replace('ask the keeper first about {still-ask}', 'ask the keeper first'));
+  expect(ctx.run([]).stderr.toString()).toBe('');
+  expect(ctx.run().exitCode).toBe(0);
+  writeFileSync(ctx.promptPath, ctx.readPrompt().replace('You are allowed to:\n\n', 'Grants:\n'));
+  const old = ctx.run();
+  expect(old.exitCode).toBe(1);
+  expect(old.stderr.toString()).toContain('expected one still-ask span');
+});
+
+test('it still fails an unknown grant field', () => {
+  const ctx = setupTest().useNewForm();
+  ctx.editGrants((text) => `${text}  expires: 2099-01-01\n`);
+  const result = ctx.run();
+  expect(result.exitCode).toBe(1);
+  expect(result.stderr.toString()).toContain('unexpected field expires');
+});
+
+test('it fails a log that is not a boolean', () => {
+  const ctx = setupTest().useNewForm();
+  ctx.editGrants((text) => text.replace('log: true', 'log: "yes"'));
+  expect(ctx.run().stderr.toString()).toContain('log: expected true or false');
+});
+
+test('it fails a source that spans lines', () => {
+  const ctx = setupTest().useNewForm();
+  ctx.editGrants((text) => text.replace('source: "The keeper, 2026-03-02: you may light the lamps."', String.raw`source: "a\nb"`));
+  expect(ctx.run().stderr.toString()).toContain('source: expected one nonempty line');
 });

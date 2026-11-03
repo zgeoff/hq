@@ -18,6 +18,7 @@ interface Item {
 interface Grant {
   id: string;
   label: string;
+  log: boolean;
   outcome: 'allow';
   note: string;
 }
@@ -41,16 +42,16 @@ function parseText(value: unknown, where: string): string {
   return value;
 }
 
-function parseEntries(value: unknown, outcome: 'ask', where: string): Item[];
-function parseEntries(value: unknown, outcome: 'allow', where: string): Grant[];
-function parseEntries(value: unknown, outcome: 'ask' | 'allow', where: string): (Item | Grant)[] {
+function parseEntries(value: unknown, outcome: 'ask', where: string, today: string): Item[];
+function parseEntries(value: unknown, outcome: 'allow', where: string, today: string): Grant[];
+function parseEntries(value: unknown, outcome: 'ask' | 'allow', where: string, today: string): (Item | Grant)[] {
   if (!Array.isArray(value) || value.length === 0) {
     throw new Error(`${where}: expected a nonempty list`);
   }
   const ids = new Set<string>();
   return value.map((entry, i) => {
     const at = `${where}[${i}]`;
-    const fields = outcome === 'ask' ? ['id', 'outcome', 'note', 'note_first'] : ['id', 'label', 'outcome', 'note'];
+    const fields = outcome === 'ask' ? ['id', 'outcome', 'note', 'note_first'] : ['id', 'label', 'outcome', 'note', 'source', 'until', 'log'];
     const row = parseObject(entry, fields, at);
     const slug = parseText(row.id, `${at}.id`);
     if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(slug) || ids.has(slug)) {
@@ -66,7 +67,14 @@ function parseEntries(value: unknown, outcome: 'ask' | 'allow', where: string): 
         if (/deleting or rewriting\b[^\n]*?\bsecurity change\b/u.test(note)) {
           throw new Error(`${at}.note: use {still-ask} instead of a literal still-ask list`);
         }
-        return { id: slug, outcome, note, label: parseText(row.label, `${at}.label`) };
+        if (row.source !== undefined) {
+          parseText(row.source, `${at}.source`);
+        }
+        checkUntil(row.until, { at, id: slug, today, where });
+        if (row.log !== undefined && typeof row.log !== 'boolean') {
+          throw new Error(`${at}.log: expected true or false`);
+        }
+        return { id: slug, outcome, note, label: parseText(row.label, `${at}.label`), log: row.log === true };
       }
       return {
         id: slug,
@@ -76,6 +84,34 @@ function parseEntries(value: unknown, outcome: 'ask' | 'allow', where: string): 
       };
     }
   });
+}
+
+function isCalendarDate(value: unknown): value is string {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/u.test(value)) {
+    return false;
+  }
+  const parsed = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+}
+
+interface UntilContext {
+  at: string;
+  id: string;
+  today: string;
+  where: string;
+}
+
+function checkUntil(value: unknown, context: UntilContext): void {
+  if (value === undefined) {
+    return;
+  }
+  const until = value instanceof Date ? value.toISOString().slice(0, 10) : value;
+  if (!isCalendarDate(until)) {
+    throw new Error(`${context.at}.until: expected a date as YYYY-MM-DD`);
+  }
+  if (context.today > until) {
+    throw new Error(`${context.where}: grant ${context.id} ended on ${until} (today is ${context.today}); remove it or set a later until`);
+  }
 }
 
 function read(tree: Tree, file: string): string {
@@ -181,7 +217,7 @@ function buildStillAsk(dataFile: string, entries: unknown[], items: Item[], also
 function readStillAsk(tree: Tree): StillAsk {
   const dataFile = 'grants/still-ask.yaml';
   const model = parseObject(Bun.YAML.parse(read(tree, dataFile)), ['items', 'also', 'sites'], dataFile);
-  const stillAsk = parseEntries(model.items, 'ask', `${dataFile}.items`);
+  const stillAsk = parseEntries(model.items, 'ask', `${dataFile}.items`, '');
   if (!Array.isArray(model.sites) || model.sites.length === 0) {
     throw new Error(`${dataFile}: expected sites`);
   }
@@ -208,10 +244,22 @@ function parseAlso(value: unknown, where: string): string[] {
   });
 }
 
+const NEW_FORM = /^You are allowed to:$/mu;
+const OLD_FORM = /^Grants:$/mu;
+const WORD_CAP = 50;
+const TEXT_BLOCK = /^```text\n(?<content>[\s\S]*?)^```[ \t]*$/gmu;
+
+function hasNewForm(body: string): boolean {
+  return [...body.matchAll(TEXT_BLOCK)].some((block) => NEW_FORM.test(block.groups?.['content'] ?? ''));
+}
+
 function normalizeSite(file: string, body: string, data: StillAsk): string {
   const mentions = [...body.matchAll(/security change/gu)].length;
   const spans = [...body.matchAll(/deleting or rewriting\b[^\n]*?\bsecurity change\b/gu)];
   const voice = data.sites.get(file);
+  if (voice && mentions === 0 && hasNewForm(body)) {
+    return body;
+  }
   if (mentions !== spans.length || spans.length !== (voice ? 1 : 0)) {
     throw new Error(
       `${file}: expected ${voice ? 'one still-ask span' : 'no security change outside the listed sites'}; found ${spans.length} spans and ${mentions} security change mentions`,
@@ -289,35 +337,51 @@ function renderBullet(item: string): string {
 interface SessionContext {
   data: StillAsk;
   grants: Grant[];
+  session: string;
+}
+
+function countWords(note: string): number {
+  return note.split(/\s+/u).filter(Boolean).length;
+}
+
+function renderGrantLines(file: string, context: SessionContext, newForm: boolean): string {
+  const fill = (note: string) =>
+    note.replaceAll('{still-ask}', () => context.data.textByVoice[context.data.sites.get(file) ?? 'first']);
+  if (!newForm) {
+    return `Grants:\n${context.grants.map((grant) => `- ${grant.label}: ${fill(grant.note)}`).join('\n')}\n\n`;
+  }
+  const bullets = context.grants.map((grant) => {
+    const words = countWords(grant.note);
+    if (words > WORD_CAP) {
+      throw new Error(`${file}: grant ${grant.id} note is ${words} words; keep it to ${WORD_CAP} or fewer`);
+    }
+    const log = grant.log ? ` Log it with \`hq grant act ${context.session}-${grant.id} --target <what you acted on>\`.` : '';
+    return `- ${fill(grant.note)}${log}`;
+  });
+  return `You are allowed to:\n\n${bullets.join('\n')}\n\n`;
 }
 
 function renderSessionGrants(file: string, body: string, block: RegExpExecArray, context: SessionContext): string {
   const content = block.groups?.['content'] ?? '';
-  const matches = [...content.matchAll(/^Grants:\n[\s\S]*?\n\n/gmu)];
+  const newForm = NEW_FORM.test(content);
+  if (newForm && OLD_FORM.test(content)) {
+    throw new Error(`${file}: use one of "Grants:" or "You are allowed to:", not both`);
+  }
+  const pattern = newForm ? /^You are allowed to:\n\n(?:(?:- [^\n]*\n)+\n)?/gmu : /^Grants:\n[\s\S]*?\n\n/gmu;
+  const matches = [...content.matchAll(pattern)];
   const [span] = matches;
-  if (matches.length !== 1 || !span) {
-    throw new Error(`${file}: expected one Grants block ending with a blank line`);
+  if (matches.length !== 1 || !span || (newForm && content.startsWith('- ', span.index + span[0].length))) {
+    throw new Error(`${file}: expected one ${newForm ? 'You are allowed to' : 'Grants'} block ending with a blank line`);
   }
-  {
-    const notes = context.grants.map((grant) => {
-        const note = grant.note.replaceAll(
-          '{still-ask}',
-          () => context.data.textByVoice[context.data.sites.get(file) ?? 'first'],
-        );
-        return `- ${grant.label}: ${note}`;
-      });
-    const rendered = `Grants:\n${notes.join('\n')}\n\n`;
-    const rest = content.slice(span.index + span[0].length);
-    const updatedBlock = block[0].replace(span[0], () => rendered);
-    const updatedBody = body.slice(0, block.index) + updatedBlock + body.slice(block.index + block[0].length);
+  const rendered = renderGrantLines(file, context, newForm);
+  const rest = content.slice(span.index + span[0].length);
+  const updatedBlock = block[0].replace(span[0], () => rendered);
+  const updatedBody = body.slice(0, block.index) + updatedBlock + body.slice(block.index + block[0].length);
 
-    if (/^- /mu.test(rest)) {
-      throw new Error(
-        `${file}: a "- " line follows the Grants block after a blank line; keep every grant in the block`,
-      );
-    }
-    return updatedBody;
+  if (!newForm && /^- /mu.test(rest)) {
+    throw new Error(`${file}: a "- " line follows the Grants block after a blank line; keep every grant in the block`);
   }
+  return updatedBody;
 }
 
 interface RenderContext {
@@ -330,9 +394,9 @@ function renderSession(file: string, body: string, context: RenderContext): stri
   if (!/^skills\/[^/]+\/references\/session-prompt\.md$/u.test(file)) {
     return undefined;
   }
-  const blocks = [...body.matchAll(/^```text\n(?<content>[\s\S]*?)^```[ \t]*$/gmu)];
+  const blocks = [...body.matchAll(TEXT_BLOCK)];
   const session = /The start prompt for `(?<name>z-[a-z0-9-]+)`/u.exec(body)?.groups?.['name'];
-  const withGrants = blocks.filter((block) => /^Grants:$/mu.test(block.groups?.['content'] ?? ''));
+  const withGrants = blocks.filter((block) => NEW_FORM.test(block.groups?.['content'] ?? '') || OLD_FORM.test(block.groups?.['content'] ?? ''));
   if (withGrants.length === 0) {
     return undefined;
   }
@@ -346,6 +410,7 @@ function renderSession(file: string, body: string, context: RenderContext): stri
   return renderSessionGrants(file, body, withGrants[0], {
     data: context.data,
     grants: getSessionGrants(file, session, context),
+    session,
   });
 }
 
@@ -357,7 +422,7 @@ function getSessionGrants(file: string, session: string, context: RenderContext)
   return grants;
 }
 
-function readGrants(data: StillAsk, tree: Tree): Map<string, Grant[]> {
+function readGrants(data: StillAsk, tree: Tree, today: string): Map<string, Grant[]> {
   const grantsBySession = new Map<string, Grant[]>();
   for (const file of collectFiles(tree, 'grants')) {
     if (file === data.dataFile) {
@@ -370,7 +435,7 @@ function readGrants(data: StillAsk, tree: Tree): Map<string, Grant[]> {
       throw new Error(`${file}: no matching session prompt`);
     }
     const parsed: unknown = Bun.YAML.parse(read(tree, file));
-    grantsBySession.set(file.slice('grants/'.length, -'.yaml'.length), parseEntries(parsed, 'allow', file));
+    grantsBySession.set(file.slice('grants/'.length, -'.yaml'.length), parseEntries(parsed, 'allow', file, today));
   }
   return grantsBySession;
 }
@@ -489,9 +554,9 @@ function renderSessions(entry: Held, context: RenderContext, generated: Generate
   }
 }
 
-function runTrees(trees: Trees, check: boolean): number {
+function runTrees(trees: Trees, check: boolean, today: string): number {
   const data = readStillAsk(trees.hq);
-  const grantsBySession = withTree(trees.prompts, () => readGrants(data, trees.prompts));
+  const grantsBySession = withTree(trees.prompts, () => readGrants(data, trees.prompts, today));
   const held = trees.all.map((tree) => readHeld(tree));
   const sessions = new Set<string>();
   for (const file of data.sites.keys()) {
@@ -528,11 +593,15 @@ function renderTrees(trees: Trees, held: Held[], context: RenderContext): Genera
 
 function runMain(): number {
   const args = parseArgs({
-    options: { check: { type: 'boolean' }, private: { type: 'string' } },
+    options: { check: { type: 'boolean' }, private: { type: 'string' }, today: { type: 'string' } },
     strict: true,
     allowPositionals: false,
   });
-  return runTrees(buildTrees(args.values.private), args.values.check ?? false);
+  const today = args.values.today ?? new Date().toISOString().slice(0, 10);
+  if (!isCalendarDate(today)) {
+    throw new Error(`--today ${today}: expected YYYY-MM-DD`);
+  }
+  return runTrees(buildTrees(args.values.private), args.values.check ?? false, today);
 }
 
 try {

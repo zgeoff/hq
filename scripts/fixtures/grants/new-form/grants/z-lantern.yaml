@@ -1,0 +1,15 @@
+- id: light
+  label: "Light"
+  outcome: allow
+  note: "Light the harbour lamps at dusk and put them out at dawn."
+  source: "The keeper, 2026-03-02: you may light the lamps."
+- id: oil
+  label: "Oil"
+  outcome: allow
+  note: "Refill a lamp from the shed barrel when it runs low."
+  log: true
+- id: sail
+  label: "Sail"
+  outcome: allow
+  note: "Row out to a stuck buoy and free it, and ask the keeper first about {still-ask}."
+  until: 2099-01-01
