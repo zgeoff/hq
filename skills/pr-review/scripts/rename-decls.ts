@@ -35,11 +35,11 @@ interface Pair {
   readonly new: string;
 }
 
-const EXTENSION = /\.(?:ts|tsx|mts|cts|js|jsx|mjs|cjs)$/u,
-  KEYWORD = /^(?:await\s+using|const|let|using|var)\b/u,
-  PLACEHOLDER = '\u0000name\u0000',
-  ROOT = '/rename-decls',
-  entriesSchema = z.array(z.object({ path: z.string(), base: z.string().nullable(), head: z.string().nullable() }));
+const EXTENSION = /\.(?:ts|tsx|mts|cts|js|jsx|mjs|cjs)$/u;
+const KEYWORD = /^(?:await\s+using|const|let|using|var)\b/u;
+const PLACEHOLDER = '\u0000name\u0000';
+const ROOT = '/rename-decls';
+const entriesSchema = z.array(z.object({ path: z.string(), base: z.string().nullable(), head: z.string().nullable() }));
 
 function toNamed(node: Node, keyword: string): Named | undefined {
   if (isClassDeclaration(node)) {
@@ -90,8 +90,8 @@ function toKeyword(file: SourceFile, list: Node): string {
 }
 
 function collectFrom(file: SourceFile, node: Node, keyword: string, found: Declaration[]): void {
-  const next = node.kind === SyntaxKind.VariableDeclarationList ? toKeyword(file, node) : keyword,
-    parsed = toDeclaration(file, node, keyword);
+  const next = node.kind === SyntaxKind.VariableDeclarationList ? toKeyword(file, node) : keyword;
+  const parsed = toDeclaration(file, node, keyword);
   if (parsed !== undefined) {
     found.push(parsed);
   }
@@ -132,15 +132,15 @@ function buildFiles(entries: readonly Entry[]): Record<string, string> {
 }
 
 async function readFilePairs(project: Project, index: number, path: string): Promise<Pair[]> {
-  const base = await project.program.getSourceFile(`${ROOT}/${toFileName('base', index, path)}`),
-    head = await project.program.getSourceFile(`${ROOT}/${toFileName('head', index, path)}`);
+  const base = await project.program.getSourceFile(`${ROOT}/${toFileName('base', index, path)}`);
+  const head = await project.program.getSourceFile(`${ROOT}/${toFileName('head', index, path)}`);
   return collectPairs(collectDeclarations(base), collectDeclarations(head));
 }
 
 async function readOpenPairs(api: API, entries: readonly Entry[]): Promise<Pair[]> {
-  const opened = await api.updateSnapshot({ openProject: `${ROOT}/tsconfig.json` }),
-    pairs: Pair[] = [],
-    project = opened.getProjects().at(0);
+  const opened = await api.updateSnapshot({ openProject: `${ROOT}/tsconfig.json` });
+  const pairs: Pair[] = [];
+  const project = opened.getProjects().at(0);
   if (project === undefined) {
     throw new Error('the parser opened no project');
   }
@@ -153,8 +153,8 @@ async function readOpenPairs(api: API, entries: readonly Entry[]): Promise<Pair[
 }
 
 async function readPairs(entries: readonly Entry[]): Promise<Pair[]> {
-  const files = buildFiles(entries),
-    roots = Object.keys(files).map((name) => name.slice(ROOT.length + 1));
+  const files = buildFiles(entries);
+  const roots = Object.keys(files).map((name) => name.slice(ROOT.length + 1));
   if (roots.length === 0) {
     return [];
   }
@@ -183,8 +183,8 @@ function parseJson(input: string): unknown {
 }
 
 async function readEntries(): Promise<Entry[]> {
-  const input = await Bun.stdin.text(),
-    parsed = entriesSchema.safeParse(parseJson(input));
+  const input = await Bun.stdin.text();
+  const parsed = entriesSchema.safeParse(parseJson(input));
   if (!parsed.success) {
     throw new Error(`rename-decls expects a JSON list of { path, base, head } on stdin: ${parsed.error.message}`);
   }
@@ -192,9 +192,9 @@ async function readEntries(): Promise<Entry[]> {
 }
 
 async function runRenameDecls(): Promise<void> {
-  const entries = await readEntries(),
-    pairs = await readPairs(entries.filter((entry) => EXTENSION.test(entry.path))),
-    unique = new Map(pairs.map((pair) => [`${pair.old}\u0000${pair.new}`, pair]));
+  const entries = await readEntries();
+  const pairs = await readPairs(entries.filter((entry) => EXTENSION.test(entry.path)));
+  const unique = new Map(pairs.map((pair) => [`${pair.old}\u0000${pair.new}`, pair]));
   process.stdout.write(`${JSON.stringify([...unique.values()])}\n`);
 }
 
