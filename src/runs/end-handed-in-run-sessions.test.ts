@@ -77,6 +77,19 @@ test('it ends the sessions of a handed-in run, helpers included, and moves the r
   expect(ctx.db.query("SELECT subject_id, data FROM events WHERE action = 'handed-in-ended'").all()).toStrictEqual([{ subject_id: 'GEO-9901', data: JSON.stringify({ sessions: ['0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', '0000e002-aaaa-4aaa-8aaa-aaaaaaaaaaaa'] }) }]);
 });
 
+test('it ends a handed-in session that the run stores by a short id', async () => {
+  const ctx = setupTest();
+  addRun(ctx.db, { issue: 'GEO-9901', title: 'Invented kettle work', place: 'imp', session: '0000e001', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
+  addPr(ctx.db, 'GEO-9901', 'kettle#71', 'z-delivery');
+  finalPr(ctx.db, 'kettle#71', { sha: 'abc1234', actor: 'z-delivery' });
+  closePr(ctx.db, 'kettle#71', { to: 'merged', actor: 'hq-github', facts: { mergedAt: '2026-10-22T11:00:00Z', mergeSha: null } });
+
+  const ended = await ctx.sweep([{ id: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', state: 'done' }], [['0000e001', Date.parse('2026-10-22T11:00:00Z')]]);
+
+  expect(ended).toBe(1);
+  expect(ctx.readSessions()).toStrictEqual([{ session_id: '0000e001', active: 0, ended_at: '2026-10-22T12:00:00Z', ended_by: 'sweep' }]);
+});
+
 test('it keeps the sessions of a run that still has an open PR', async () => {
   const ctx = setupTest();
   addRun(ctx.db, { issue: 'GEO-9901', title: 'Invented kettle work', place: 'imp', session: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });

@@ -60,14 +60,21 @@ type PrRow = z.infer<typeof PrRows>[number];
 function isHandedIn(prs: readonly PrRow[], ids: readonly string[], atc: AtcView, quietBefore: number): boolean {
   const merged = prs.filter((row) => row.state === 'merged');
   const allMerged = merged.length > 0 && merged.length === prs.length && merged.every((row) => row.final_sha !== null && Date.parse(row.merged_at ?? '') <= quietBefore);
-  const states = new Map(atc.sessions.map((session) => [session.id, session.state]));
   return (
     allMerged &&
     ids.every((id) => {
-      const last = atc.activity.get(id);
-      return states.get(id) === 'done' && typeof last === 'number' && last <= quietBefore;
+      const session = findAtcSession(atc.sessions, id);
+      const last = atc.activity.get(id) ?? (session === null ? undefined : atc.activity.get(session.id));
+      return session?.state === 'done' && typeof last === 'number' && last <= quietBefore;
     })
   );
+}
+
+// A run can store a short session id, which matches the full id atc lists by prefix.
+function findAtcSession(sessions: readonly AwakeSession[], id: string): AwakeSession | null {
+  const prefix = id.toLowerCase();
+  const hits = sessions.filter((session) => session.id.toLowerCase().startsWith(prefix));
+  return hits.length === 1 ? (hits[0] ?? null) : null;
 }
 
 interface HandedInRun {
