@@ -9,6 +9,7 @@ import { collectGuardedSessions } from './collect-guarded-sessions.ts';
 import type { AtcSession } from './collect-guarded-sessions.ts';
 import { pickHandedInCandidates } from './pick-handed-in-candidates.ts';
 import { pickQuietSessions } from './pick-quiet-sessions.ts';
+import type { SessionActivity } from './pick-quiet-sessions.ts';
 import type { WrapUpDeps } from './run-wrap-up.ts';
 import { shareClient, wrapUpRunSafely } from './wrap-up-merged-runs.ts';
 import { writeHandedInPlan } from './write-handed-in-plan.ts';
@@ -21,7 +22,7 @@ const PrRows = z.array(z.object({ issue: z.string(), state: z.string(), final_sh
 const SessionRows = z.array(z.object({ issue: z.string(), session_id: z.string(), active: z.number() }));
 
 export interface AtcView {
-  readActivity: (id: string) => Promise<number | null>;
+  readActivity: (id: string) => Promise<SessionActivity | null>;
 }
 
 export interface HandedInOptions {
@@ -72,7 +73,7 @@ function readLastKept(db: Database, issue: string): StoredEvent | null {
   return readEvents(db, 'run', issue, ['handed-in-kept']).at(-1) ?? null;
 }
 
-async function readGuardedActivity(atc: AtcView, guarded: readonly AtcSession[]): Promise<Map<string, number | null>> {
+async function readGuardedActivity(atc: AtcView, guarded: readonly AtcSession[]): Promise<Map<string, SessionActivity | null>> {
   const read = await Promise.all(guarded.map(async (session) => [session.id, await atc.readActivity(session.id)] as const));
   return new Map(read);
 }

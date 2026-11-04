@@ -64,6 +64,7 @@ export interface FakeAtc extends FakeAtcState {
   path: string;
   feed: FeedEvent[];
   activity: Map<string, number>;
+  pending: Map<string, { message?: string }>;
   sent: { session: string; text: string; from: string; idempotencyKey: string; notice?: boolean }[];
   onMessage: (() => void) | null;
   stop: () => void;
@@ -100,6 +101,7 @@ export function fakeAtc(dir: string, sessions = [
   const seen = new Map<string, string>();
   const feed: FeedEvent[] = [];
   const activity = new Map<string, number>();
+  const pending = new Map<string, { message?: string }>();
   const fake = { onMessage: null } as unknown as FakeAtc;
   fake.stop = startStubAtcDaemon(path, {
     'session.list': () => ({ sessions }),
@@ -112,7 +114,7 @@ export function fakeAtc(dir: string, sessions = [
         }
         fake.getBudgets.set(id, left - 1);
       }
-      return { session: sessions.find((x) => x.id === id), prompt: fake.prompts.get(id) ?? null, lastActivityAt: activity.get(id) ?? 0, pending: null, result: null, sessionRecord: null };
+      return { session: sessions.find((x) => x.id === id), prompt: fake.prompts.get(id) ?? null, lastActivityAt: activity.get(id) ?? 0, pending: pending.get(id) ?? null, result: null, sessionRecord: null };
     },
     'events.read': (input) => {
       // Like atc: no cursor reads the newest page.
@@ -201,7 +203,7 @@ export function fakeAtc(dir: string, sessions = [
     },
   }).stop;
   process.env['HQ_ATC_SOCKET'] = path;
-  Object.assign(fake, buildFakeAtcState(), { path, sent, feed, activity });
+  Object.assign(fake, buildFakeAtcState(), { path, sent, feed, activity, pending });
   return fake;
 }
 
