@@ -9,6 +9,7 @@ import { writeAreaLabels } from '../focus/write-area-labels.ts';
 import { collectAreaNames } from './collect-area-names.ts';
 import { parseLinearIssuesFlags } from './parse-linear-issues-flags.ts';
 import { pickStateNames } from './pick-state-names.ts';
+import { planLinearAreas } from './plan-linear-areas.ts';
 import type { IssuesFilter } from './read-issue-pages.ts';
 import { readIssuePages } from './read-issue-pages.ts';
 import { readRepoExists } from './read-repo-exists.ts';
@@ -51,12 +52,11 @@ async function runLinearAreas(deps: LinearCommandDeps, flags: Flags): Promise<Ou
   const labels = await readTeamLabels(deps.call, team);
   const names = collectAreaNames(labels);
   const repoExists = await readRepoExists(deps.run, names, readAreaLabels(deps.db).repoExists);
-
-  // The stored list serves the team lanes reads; another team's labels are checked but not stored.
-  if (team === rulesTable.team) {
-    writeAreaLabels(deps.db, { at: iso(now()), names, repoExists });
+  const plan = planLinearAreas(team, rulesTable.team, names, repoExists, iso(now()));
+  if (plan.store !== null) {
+    writeAreaLabels(deps.db, plan.store);
   }
-  const missing = names.filter((name) => repoExists[name] === false);
+  const missing = plan.missing;
   if (missing.length > 0) {
     throw new HqError('bad_state', `${team} has area labels whose zgeoff repo does not exist: ${missing.join(', ')}. Create the repo, or take the label off the issues that carry it`, { missing });
   }
