@@ -42,3 +42,10 @@ test('it reads an open box with more than one space around its checkbox', () => 
     { name: 'mug', readsAsRepo: true },
   ]);
 });
+
+test('it reads a repo name with a dot or an underscore whole, so it never matches the launch area by its prefix', () => {
+  expect(readOpenScopeBoxes('## Scope\n\n- [ ] kettle.docs\n- [ ] kettle_tools: the spout\n- [ ] kettle.\n', ['kettle'])).toStrictEqual([
+    { name: 'kettle.docs', readsAsRepo: true },
+    { name: 'kettle_tools', readsAsRepo: true },
+  ]);
+});
