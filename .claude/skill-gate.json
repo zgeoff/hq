@@ -2,6 +2,7 @@
   "ignore": ["node_modules/"],
   "gates": [
     { "match": "skills/**", "skills": ["skill-writing"] },
-    { "match": "agent-kit/**", "skills": ["skill-writing"] }
+    { "match": "agent-kit/**", "skills": ["skill-writing"] },
+    { "match": "**/*.{ts,tsx}", "skills": ["code-style"] }
   ]
 }
