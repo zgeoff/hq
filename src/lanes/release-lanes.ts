@@ -15,8 +15,8 @@ export function releaseLanes(db: Database, actor: string): boolean {
       setMeta(db, 'lanes_hold', null);
       const last = spans.at(-1);
 
-      // Save the spans even with no hold in force: an older build's span lives only in the hold row
-      // this release clears.
+      // The hold row can hold the only record of a span, so save the spans before that row is gone,
+      // whether or not a hold is still in force.
       const kept = had && last !== undefined ? [...spans.slice(0, -1), { from: last.from, until: iso(now()) }] : spans;
       writeHeldSpans(db, kept);
       if (had) {
