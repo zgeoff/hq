@@ -26,8 +26,11 @@ export function parseBriefFlags(issue: string | undefined, flags: Flags): BriefI
   }
   const imp = flags.imp === true;
   const goalFile = flags['goal-file'] ?? null;
+  if (imp && goalFile !== null) {
+    throw new HqError('bad_args', 'an imp agent cannot read a file on this PC: give --imp without --goal-file');
+  }
 
   // An imp agent reads Linear itself, and the issue body pushes an imp brief past the limit.
-  const byLink = flags['issue-by-link'] === true || (imp && goalFile === null);
+  const byLink = flags['issue-by-link'] === true || imp;
   return { issue, ref, imp, byLink, goalFile, repo };
 }

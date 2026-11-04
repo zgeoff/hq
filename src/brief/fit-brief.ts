@@ -9,7 +9,10 @@ interface FittedBrief {
   movedIssue: boolean;
 }
 
-export function fitBrief(template: string, parts: BriefParts, movedPointer: string | null): FittedBrief {
+// GitHub's contents API resolves a 12-character prefix of a commit sha to the same file.
+const SHORT_SHA_LENGTH = 12;
+
+export function fitBrief(template: string, parts: BriefParts, movedPointer: string | null, sha: string | null = null): FittedBrief {
   const cuts: string[] = [];
   let fitted = parts;
   let sections: IssueSection[] = movedPointer === null ? [] : parts.sections;
@@ -21,8 +24,14 @@ export function fitBrief(template: string, parts: BriefParts, movedPointer: stri
     prompt = fillPlaceholders(template, buildValues(fitted, sections)).text;
     cuts.push('cut 1');
   }
+  let pointer = fitted.goalFile;
+  if (isOver(prompt) && sha !== null && prompt.includes(sha)) {
+    prompt = prompt.replaceAll(sha, sha.slice(0, SHORT_SHA_LENGTH));
+    pointer = pointer.replaceAll(sha, sha.slice(0, SHORT_SHA_LENGTH));
+    cuts.push('short refs');
+  }
   if (isOver(prompt)) {
-    prompt = dropGoalLine(prompt, fitted.goalFile);
+    prompt = dropGoalLine(prompt, pointer);
     cuts.push('cut 2');
   }
   return { prompt, bytes: Buffer.byteLength(prompt), cuts, unknown: fillPlaceholders(template, buildValues(fitted, sections)).unknown, movedIssue: cuts.includes('cut 1') };

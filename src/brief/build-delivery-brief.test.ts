@@ -333,3 +333,67 @@ test('it counts a merged PR as the goal, and asks only for the acceptance a PR c
   );
   expect(brief.out.text).toContain('evidence for each acceptance item a PR can show before merge. Keep the ID');
 });
+
+test('it fits a review-lines brief with a playbook only because the refs are short', () => {
+  const sha = 'c'.repeat(40);
+  const brief = buildDeliveryBrief({
+    input: { issue: 'GEO-9001', ref: sha, imp: true, byLink: true, goalFile: null, repo: 'kettle' },
+    issue: { identifier: 'GEO-9001', description: '## Outcome\n\nBoil.\n', labels: [{ name: 'kettle' }] },
+    sha,
+    reads: { repo: 'kettle', otherAreas: [], playbook: { type: 'bug', path: 'agent-kit/playbooks/bug.md', command: `gh api 'repos/zgeoff/hq/contents/agent-kit/playbooks/bug.md?ref=${sha}'` }, stack: false, imp: true, reviewLines: true },
+    template: `/goal Ship {{repo}} {{issue_id}}{{goal_file}}\n\n{{review_lines}}\n\n${'Mind the kettle.\n'.repeat(212)}`,
+    permissionTable: [{ action: 'Code delivery', phrase: 'Work in <repo>.' }],
+    playbookText: '# Bug playbook\n',
+    stack: '',
+    impLine: '',
+    movedGoalFile: 'briefs/GEO-9001.md',
+  });
+
+  expect(brief.out.data['cuts']).toStrictEqual(['short refs']);
+  expect(brief.out.text).toContain('/goal Ship zgeoff/kettle GEO-9001. First read GEO-9001 with your own Linear access, then the bug playbook');
+  expect(brief.out.text).not.toContain(sha);
+  expect(brief.out.data['bytes']).toBeLessThanOrEqual(4000);
+});
+
+test.each([
+  ['an open box for a repo with no label', '## Scope\n\n- [ ] kettle: the lid\n- [ ] teapot\n- [ ] mug: the handle\n- [ ] add the retry test\n', 'Contributes to', ' (teapot, mug)'],
+  ['every other box ticked', '## Scope\n\n- [ ] kettle: the lid\n- [x] teapot\n- [X] mug: the handle\n- [x] add the retry test\n', 'Fixes', ''],
+  ['the launch area in another case', '## Scope\n\n- [ ] Kettle: the lid\n', 'Fixes', ''],
+  ['an open box inside a fence', '## Scope\n\n```md\n- [ ] teapot\n```\n- [ ] kettle\n', 'Fixes', ''],
+  ['an open box that names a task', '## Scope\n\n- [ ] add the retry test\n', 'Contributes to', ''],
+  ['an open box that repeats an area label', '## Scope\n\n- [ ] teapot\n- [ ] Teapot: again\n', 'Contributes to', ' (teapot)'],
+])('it counts open Scope boxes as other areas with --repo, and with %s writes %s', (_case, description, fixes, listed) => {
+  const otherAreas = listed === ' (teapot)' ? [{ label: 'teapot', repo: 'teapot' }] : [];
+  const brief = buildDeliveryBrief({
+    input: { issue: 'GEO-9001', ref: 'main', imp: false, byLink: true, goalFile: null, repo: 'kettle' },
+    issue: { identifier: 'GEO-9001', description, labels: [{ name: 'kettle' }] },
+    sha: 'b'.repeat(40),
+    reads: { repo: 'kettle', otherAreas, playbook: null, stack: false, imp: false, reviewLines: false },
+    template: 'Leave the merge to me.{{not_yours}}\n"{{fixes}} {{issue_id}}"',
+    permissionTable: [{ action: 'Code delivery', phrase: 'Work in <repo>.' }],
+    playbookText: null,
+    stack: '',
+    impLine: '',
+    movedGoalFile: 'briefs/GEO-9001.md',
+  });
+  const line = listed === '' ? '' : ` Do only the \`kettle\` part of GEO-9001: each other area${listed} gets its own launch.`;
+
+  expect(brief.out.text).toBe(`Leave the merge to me.${line}\n"${fixes} GEO-9001"`);
+});
+
+test('it ignores open Scope boxes without --repo', () => {
+  const brief = buildDeliveryBrief({
+    input: { issue: 'GEO-9001', ref: 'main', imp: false, byLink: true, goalFile: null, repo: null },
+    issue: { identifier: 'GEO-9001', description: '## Scope\n\n- [ ] teapot\n', labels: [{ name: 'kettle' }] },
+    sha: 'b'.repeat(40),
+    reads: { repo: 'kettle', otherAreas: [], playbook: null, stack: false, imp: false, reviewLines: false },
+    template: 'Leave the merge to me.{{not_yours}}\n"{{fixes}} {{issue_id}}"',
+    permissionTable: [{ action: 'Code delivery', phrase: 'Work in <repo>.' }],
+    playbookText: null,
+    stack: '',
+    impLine: '',
+    movedGoalFile: 'briefs/GEO-9001.md',
+  });
+
+  expect(brief.out.text).toBe('Leave the merge to me.\n"Fixes GEO-9001"');
+});
