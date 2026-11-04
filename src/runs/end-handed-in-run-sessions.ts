@@ -56,7 +56,8 @@ export async function endHandedInRunSessions(db: Database, atc: AtcView, deps: W
       const activity = await readGuardedActivity(atc, guarded ?? []);
       if (isQuietTree(guarded, activity, quietBefore)) {
         const ids = rows.filter((row) => row.active === 1).map((row) => row.session_id);
-        ended += await endHandedInRun(db, shared, { issue, ids, actor: options.actor, at, lastKept });
+        const checked = (guarded ?? []).map((session) => session.id);
+        ended += await endHandedInRun(db, shared, { issue, ids, checked, actor: options.actor, at, lastKept });
       }
     }
   }
@@ -143,6 +144,7 @@ function isQuietTree(guarded: readonly AtcSession[] | null, activity: ReadonlyMa
 interface HandedInRun {
   issue: string;
   ids: string[];
+  checked: string[];
   actor: string;
   at: Date;
   lastKept: StoredEvent | null;
@@ -154,7 +156,7 @@ async function endHandedInRun(db: Database, deps: WrapUpDeps, run: HandedInRun):
     return 0;
   }
   const mergedClaimed = claim.mergedClaimed;
-  const wrapUp = await wrapUpRunSafely(db, deps, run.issue, { actor: run.actor, onlyNoteAction: !mergedClaimed });
+  const wrapUp = await wrapUpRunSafely(db, deps, run.issue, { actor: run.actor, onlyNoteAction: !mergedClaimed, onlySessions: run.checked });
   const plan = buildHandedInPlan({ ids: run.ids, wrapUp, lastKeptData: run.lastKept?.data ?? null, mergedClaimed });
   writeHandedInPlan(db, plan, { issue: run.issue, wrapUp, actor: run.actor, at: run.at });
   return plan.end.length;

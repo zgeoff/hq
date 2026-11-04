@@ -20,15 +20,17 @@ export interface WrapUpDeps {
 }
 
 // A pass that retries every sweep sets onlyNoteAction, so a retry that changes nothing leaves no
-// note.
-export type WrapUpOptions = { dryRun: true } | { dryRun?: false; actor: string; onlyNoteAction?: boolean };
+// note. A pass that checked sessions before the wrap-up sets onlySessions to their full ids, so a
+// session attached since its check stays.
+export type WrapUpOptions = { dryRun: true } | { dryRun?: false; actor: string; onlyNoteAction?: boolean; onlySessions?: readonly string[] };
 
 export async function runWrapUp(db: Database, deps: WrapUpDeps, issue: string, options: WrapUpOptions): Promise<WrapUp> {
   const run = requireRun(db, issue);
 
   // A session id is on one run only, so a session removed by hand is still this run's to forget.
   const rows = db.query('SELECT session_id FROM run_sessions WHERE issue = ? ORDER BY added_at, session_id').all(issue);
-  const ids = rows.map((row) => sessionRowSchema.parse(row).session_id);
+  const only = options.dryRun === true ? null : (options.onlySessions ?? null);
+  const ids = rows.map((row) => sessionRowSchema.parse(row).session_id).filter((id) => isAllowed(only, id));
   const wrapUp: WrapUp = { forgotten: [], destroyed: [], kept: [], failed: [] };
   if (run.geoff_chat === 1) {
     wrapUp.kept = ids.map((id) => ({ id, reason: 'the owner chats on this run' }));
@@ -39,7 +41,7 @@ export async function runWrapUp(db: Database, deps: WrapUpDeps, issue: string, o
       const fullIDs = await resolveSessionIDs(ids, sessions, wrapUp);
       const roots = sessions.filter((session) => fullIDs.includes(session.id) && !fullIDs.includes(session.parent ?? ''));
       for (const root of roots) {
-        await wrapUpTree({ client, deps, sessions, wrapUp, placedOnImp: run.place === 'imp', dryRun: options.dryRun === true }, root);
+        await wrapUpTree({ client, deps, sessions, wrapUp, placedOnImp: run.place === 'imp', dryRun: options.dryRun === true, only }, root);
       }
     } catch (error) {
       const reason = `atc: ${toMessage(error)}`;
@@ -50,6 +52,11 @@ export async function runWrapUp(db: Database, deps: WrapUpDeps, issue: string, o
     writeWrapUpNote(db, issue, wrapUp, options.actor);
   }
   return wrapUp;
+}
+
+// A stored id can be a short prefix of the full id.
+function isAllowed(only: readonly string[] | null, id: string): boolean {
+  return only === null || only.some((full) => full.toLowerCase().startsWith(id.toLowerCase()));
 }
 
 async function resolveSessionIDs(ids: string[], sessions: FleetSession[], wrapUp: WrapUp): Promise<string[]> {
@@ -74,6 +81,7 @@ interface TreePass {
   wrapUp: WrapUp;
   placedOnImp: boolean;
   dryRun: boolean;
+  only: readonly string[] | null;
 }
 
 async function wrapUpTree(pass: TreePass, root: FleetSession): Promise<void> {
@@ -97,7 +105,7 @@ interface ForgetDecision {
 type TreeDecision = { kind: 'keep'; kept: KeptSession[] } | ForgetDecision;
 
 async function planTree(pass: TreePass, root: FleetSession): Promise<TreeDecision> {
-  const children = collectChildren(pass.sessions, root.id);
+  const children = collectChildren(pass.sessions, root.id).filter((child) => isAllowed(pass.only, child.id));
   const tree = [...children, root];
   if (tree.some((session) => session.pinned === true)) {
     return { kind: 'keep', kept: tree.map((session) => ({ id: session.id, reason: 'pinned in atc' })) };

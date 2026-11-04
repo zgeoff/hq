@@ -481,3 +481,36 @@ test('it forgets a quiet run tree, its replaced session and sub-session included
   expect(ended).toBe(1);
   expect(fleet.calls).toStrictEqual(['unpin 0000e001', 'kill 0000e003', 'unpin 0000e003', 'forget 0000e003', 'kill 0000e001', 'unpin 0000e001', 'forget 0000e001', 'unpin 0000e002', 'kill 0000e002', 'unpin 0000e002', 'forget 0000e002']);
 });
+
+test('it leaves alone a helper attached to the run after the quiet check read its sessions', async () => {
+  const ctx = setupTest();
+  onTestFinished(overrideEnv('HQ_NOW', '2026-10-22T12:00:00Z'));
+  const fleet = buildStubFleetClient({
+    sessions: [
+      { id: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, state: 'done', cwd: '/workspace/kettle', locator: { targetID: 'local' } },
+      { id: '0000e002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-helper', alive: true, state: 'running', cwd: '/workspace/kettle', locator: { targetID: 'local' } },
+    ],
+  });
+  addRun(ctx.db, { issue: 'GEO-9901', title: 'Invented kettle work', place: 'imp', session: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
+  addPr(ctx.db, 'GEO-9901', 'kettle#71', 'z-delivery');
+  finalPr(ctx.db, 'kettle#71', { sha: 'abc1234', actor: 'z-delivery' });
+  closePr(ctx.db, 'kettle#71', { to: 'merged', actor: 'hq-github', facts: { mergedAt: '2026-10-22T11:00:00Z', mergeSha: null } });
+  const readActivity = mock(() => {
+    setSession(ctx.db, 'GEO-9901', '0000e002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'z-delivery', 'add');
+    return Promise.resolve(Date.parse('2026-10-22T11:00:00Z'));
+  });
+
+  const ended = await endHandedInRunSessions(
+    ctx.db,
+    { readActivity },
+    { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')), readLocalWork: () => Promise.resolve({ state: 'pushed' as const }) },
+    { actor: 'z-delivery' },
+  );
+
+  expect(ended).toBe(1);
+  expect(fleet.calls).toStrictEqual(['unpin 0000e001', 'kill 0000e001', 'unpin 0000e001', 'forget 0000e001']);
+  expect(ctx.readSessions()).toStrictEqual([
+    { session_id: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', active: 0, ended_at: '2026-10-22T12:00:00Z', ended_by: 'sweep' },
+    { session_id: '0000e002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', active: 1, ended_at: null, ended_by: null },
+  ]);
+});
