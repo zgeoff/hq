@@ -3,6 +3,7 @@ import type { FocusArea } from '../focus/focus-areas.ts';
 const REPOS = {
   atc: 'atc',
   'auto-mode': 'auto-mode',
+  boxxy: 'boxxy',
   cloud: 'cloud',
   dotfiles: 'dotfiles',
   frankie: null,
