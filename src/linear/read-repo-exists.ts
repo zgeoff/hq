@@ -1,18 +1,9 @@
-import { pickAreaRepo } from '../brief/area-repos.ts';
 import type { Runner } from '../runner/types.ts';
+import { pickRepoProbes } from './pick-repo-probes.ts';
 import { probeRepo } from './probe-repo.ts';
 
-// A label already checked, found or not, is not asked about again.
-export async function readRepoExists(run: Runner, names: readonly string[], known: Readonly<Record<string, boolean>>): Promise<Record<string, boolean>> {
-  const entries = await Promise.all(
-    names.flatMap((name) => {
-      const repo = pickAreaRepo(name);
-      if (repo === null) {
-        return [];
-      }
-      const stored = known[name];
-      return [stored === undefined ? probeRepo(run, repo).then((exists) => [name, exists] as const) : Promise.resolve([name, stored] as const)];
-    }),
-  );
-  return Object.fromEntries(entries);
+export async function readRepoExists(run: Runner, names: readonly string[], stored: Readonly<Record<string, boolean>>): Promise<Record<string, boolean>> {
+  const picked = pickRepoProbes(names, stored);
+  const found = await Promise.all(picked.probes.map(async (probe) => [probe.name, await probeRepo(run, probe.repo)] as const));
+  return { ...picked.known, ...Object.fromEntries(found) };
 }
