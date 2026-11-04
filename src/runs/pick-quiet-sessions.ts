@@ -19,11 +19,10 @@ export function pickQuietSessions(guarded: readonly AtcSession[] | null, activit
   return quiet ? guarded.map((session) => session.id) : null;
 }
 
-// Claude Code's idle notification, which it fires about a minute after a turn ends; atc then
-// shows the session as needs_you with this pending message.
+// Claude Code's idle notification: about a minute after a finished turn, and only with no menu or
+// background subagent open. atc then shows the session as needs_you with this pending message.
 const CLAUDE_IDLE_MESSAGE = 'Claude is waiting for your input';
 
-// A permission prompt also reads needs_you, with another pending message, so it still blocks.
 function isIdle(state: string | undefined, pendingMessage: string | null): boolean {
   return state === 'done' || (state === 'needs_you' && pendingMessage === CLAUDE_IDLE_MESSAGE);
 }
