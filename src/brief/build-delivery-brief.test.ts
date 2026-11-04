@@ -373,14 +373,13 @@ test('it fits a review-lines brief with a playbook only because the refs are sho
 });
 
 test.each([
-  ['an open box for a repo with no label', '## Scope\n\n- [ ] kettle: the lid\n- [ ] teapot\n- [ ] mug: the handle\n- [ ] add the retry test\n', 'Contributes to', ' (teapot, mug)'],
-  ['every other box ticked', '## Scope\n\n- [ ] kettle: the lid\n- [x] teapot\n- [X] mug: the handle\n- [x] add the retry test\n', 'Fixes', ''],
-  ['the launch area in another case', '## Scope\n\n- [ ] Kettle: the lid\n', 'Fixes', ''],
-  ['an open box inside a fence', '## Scope\n\n```md\n- [ ] teapot\n```\n- [ ] kettle\n', 'Fixes', ''],
-  ['an open box that names a task', '## Scope\n\n- [ ] add the retry test\n', 'Contributes to', ''],
-  ['an open box that repeats an area label', '## Scope\n\n- [ ] teapot\n- [ ] Teapot: again\n', 'Contributes to', ' (teapot)'],
-])('it counts open Scope boxes as other areas with --repo, and with %s writes %s', (_case, description, fixes, listed) => {
-  const otherAreas = listed === ' (teapot)' ? [{ label: 'teapot', repo: 'teapot' }] : [];
+  ['an open box for a repo with no label', '## Scope\n\n- [ ] kettle: the lid\n- [ ] teapot\n- [ ] mug: the handle\n- [ ] add the retry test\n', [], 'Leave the merge to me. Do only the `kettle` part of GEO-9001: each other area (teapot, mug) gets its own launch.\n"Contributes to GEO-9001"'],
+  ['every other box ticked', '## Scope\n\n- [ ] kettle: the lid\n- [x] teapot\n- [X] mug: the handle\n- [x] add the retry test\n', [], 'Leave the merge to me.\n"Fixes GEO-9001"'],
+  ['the launch area in another case', '## Scope\n\n- [ ] Kettle: the lid\n', [], 'Leave the merge to me.\n"Fixes GEO-9001"'],
+  ['an open box inside a fence', '## Scope\n\n```md\n- [ ] teapot\n```\n- [ ] kettle\n', [], 'Leave the merge to me.\n"Fixes GEO-9001"'],
+  ['an open box that names a task', '## Scope\n\n- [ ] add the retry test\n', [], 'Leave the merge to me.\n"Contributes to GEO-9001"'],
+  ['an open box that repeats an area label', '## Scope\n\n- [ ] teapot\n- [ ] Teapot: again\n', [{ label: 'teapot', repo: 'teapot' }], 'Leave the merge to me. Do only the `kettle` part of GEO-9001: each other area (teapot) gets its own launch.\n"Contributes to GEO-9001"'],
+])('it counts open Scope boxes as other areas with --repo, and with %s', (_case, description, otherAreas, prompt) => {
   const brief = buildDeliveryBrief({
     input: { issue: 'GEO-9001', ref: 'main', imp: false, byLink: true, goalFile: null, repo: 'kettle' },
     issue: { identifier: 'GEO-9001', description, labels: [{ name: 'kettle' }] },
@@ -393,9 +392,8 @@ test.each([
     impLine: '',
     movedGoalFile: 'briefs/GEO-9001.md',
   });
-  const line = listed === '' ? '' : ` Do only the \`kettle\` part of GEO-9001: each other area${listed} gets its own launch.`;
 
-  expect(brief.out.text).toBe(`Leave the merge to me.${line}\n"${fixes} GEO-9001"`);
+  expect(brief.out.text).toBe(prompt);
 });
 
 test('it ignores open Scope boxes without --repo', () => {
