@@ -383,6 +383,24 @@ test('it counts only the minutes after a release in the first look after it', as
   expect(readSlotMinutes(ctx.db, '2026-10-14').delivery).toBe(15);
 });
 
+test('it counts none of a hold that starts and ends between two looks', async () => {
+  const ctx = setupTest();
+  at('2026-10-14T01:00:00Z');
+  const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
+  await ctx.seedReady([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
+  tick(ctx.db, sample, 'hq-lanes');
+  at('2026-10-14T01:15:00Z');
+  tick(ctx.db, sample, 'hq-lanes');
+  const before = readSlotMinutes(ctx.db, '2026-10-14').delivery;
+  at('2026-10-14T01:16:00Z');
+  holdLanes(ctx.db, 2, 'the kettle supplier is closed', 'z-stu');
+  at('2026-10-14T01:20:00Z');
+
+  tick(ctx.db, sample, 'hq-lanes');
+
+  expect(readSlotMinutes(ctx.db, '2026-10-14').delivery - before).toBe(9);
+});
+
 test('it offers the imp room as free slots when pacing has no lanes and no cap is set', () => {
   const ctx = setupTest();
   at('2026-10-14T01:00:00Z');

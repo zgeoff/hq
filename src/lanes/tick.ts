@@ -19,8 +19,8 @@ import { formatPlaceUnfit } from './format-place-unfit.ts';
 import { formatSlotNudge } from './format-slot-nudge.ts';
 import { getLanesHold } from './get-lanes-hold.ts';
 import { LANES } from './lanes.ts';
-import { LANES_MINUTES_FROM } from './lanes-minutes-from.ts';
 import { nudgeText } from './nudge-text.ts';
+import { readHeldSpan } from './read-held-span.ts';
 import { readSlotMinutes } from './read-slot-minutes.ts';
 import { readSlotPlan } from './read-slot-plan.ts';
 import { removeLaneNudges } from './remove-lane-nudges.ts';
@@ -55,11 +55,10 @@ export function tick(db: Database, sample: Sample, actor: string): TickResult {
 
       const slotCause = trackSlotCause(db, slotPlan, t);
       const designCause = trackDesignCause(db, slotPlan, t);
-      const minutesFrom = readMinutesFrom(db, previous?.at ?? null, t);
-      if (minutesFrom !== null) {
-        writeEmptySlotMinutes(db, { slotCause, previousAt: minutesFrom, at: t });
-        writeDesignSlotMinutes(db, { designCause, previousAt: minutesFrom, at: t });
-      }
+      const previousAt = previous?.at ?? null;
+      const heldMs = readHeldMs(db, previousAt, t);
+      writeEmptySlotMinutes(db, { slotCause, previousAt, heldMs, at: t });
+      writeDesignSlotMinutes(db, { designCause, previousAt, heldMs, at: t });
       sendSlotCauseAlerts(db, { free: slotCause.slots, designFree: designCause.slots, at: t, actor });
       if (!sample.error) {
         const held = getLanesHold(db) !== null;
@@ -134,19 +133,16 @@ export function tick(db: Database, sample: Sample, actor: string): TickResult {
     .immediate();
 }
 
-// A held tick moves the start of the next counted interval to the hold's end, so the first tick
-// after a hold ends counts none of the held time. releaseLanes moves it to the release.
-function readMinutesFrom(db: Database, previousAt: string | null, at: Date): string | null {
-  const hold = getLanesHold(db);
-  if (hold !== null) {
-    setMeta(db, LANES_MINUTES_FROM, hold.until);
-    return null;
+// The held span stays on record after the hold ends, so a hold that starts and ends between two
+// looks still comes off the interval the second look counts.
+function readHeldMs(db: Database, previousAt: string | null, at: Date): number {
+  const span = readHeldSpan(db);
+  if (span === null || previousAt === null) {
+    return 0;
   }
-  const from = getMeta(db, LANES_MINUTES_FROM);
-  if (previousAt === null || from === null || from <= previousAt) {
-    return previousAt;
-  }
-  return from < iso(at) ? from : null;
+  const start = Math.max(Date.parse(previousAt), Date.parse(span.from));
+  const end = Math.min(at.getTime(), Date.parse(span.until));
+  return Math.max(0, end - start);
 }
 
 function countWanted(slotPlan: NonNullable<ReturnType<typeof readSlotPlan>>): number {
@@ -159,6 +155,7 @@ function countWanted(slotPlan: NonNullable<ReturnType<typeof readSlotPlan>>): nu
 interface EmptySlotLook {
   slotCause: SlotCause;
   previousAt: string | null;
+  heldMs: number;
   at: Date;
 }
 
@@ -167,13 +164,14 @@ function writeEmptySlotMinutes(db: Database, look: EmptySlotLook): void {
   if (cause === null || cause === 'unknown' || look.previousAt === null) {
     return;
   }
-  const minutes = look.slotCause.slots * Math.min(Math.max(0, look.at.getTime() - Date.parse(look.previousAt)) / 60_000, 30);
+  const minutes = look.slotCause.slots * Math.min(Math.max(0, look.at.getTime() - Date.parse(look.previousAt) - look.heldMs) / 60_000, 30);
   writeSlotMinutes(db, sydney(look.at).date, cause, minutes);
 }
 
 interface DesignMinutesLook {
   designCause: DesignCause;
   previousAt: string | null;
+  heldMs: number;
   at: Date;
 }
 
@@ -181,7 +179,7 @@ function writeDesignSlotMinutes(db: Database, look: DesignMinutesLook): void {
   if (look.designCause.slots === 0 || look.previousAt === null) {
     return;
   }
-  const minutes = look.designCause.slots * Math.min(Math.max(0, look.at.getTime() - Date.parse(look.previousAt)) / 60_000, 30);
+  const minutes = look.designCause.slots * Math.min(Math.max(0, look.at.getTime() - Date.parse(look.previousAt) - look.heldMs) / 60_000, 30);
   writeSlotMinutes(db, sydney(look.at).date, 'design', minutes);
 }
 
