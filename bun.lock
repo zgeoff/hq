@@ -11,7 +11,7 @@
         "@orpc/tanstack-query": "1.16.1",
         "@tanstack/react-query": "5.105.0",
         "@tanstack/react-router": "1.170.46",
-        "@zgeoff/std": "0.4.0",
+        "@zgeoff/std": "0.4.1",
         "geist": "1.8.2",
         "kysely": "0.29.7",
         "react": "19.3.1",
@@ -29,7 +29,7 @@
         "@types/bun": "latest",
         "@types/react": "19.3.0",
         "@types/react-dom": "19.3.0",
-        "@zgeoff/oxlint-config": "0.8.1",
+        "@zgeoff/oxlint-config": "0.8.3",
         "@zgeoff/skill-gate": "0.2.15",
         "knip": "6.43.0",
         "msw": "2.15.0",
@@ -463,11 +463,11 @@
 
     "@zgeoff/agent-hooks": ["@zgeoff/agent-hooks@0.1.5", "", { "bin": { "agent-hooks": "dist/cli.js" } }, "sha512-O6BGhYqQvwkxnLzIZWMQHhozRvxq3S407oh8MPlAhUI0Pw0hfB789a1lu/QPfxUg1/dgRtNjgrg364o+c1u9cQ=="],
 
-    "@zgeoff/oxlint-config": ["@zgeoff/oxlint-config@0.8.1", "", { "dependencies": { "@stylistic/eslint-plugin": "5.10.0" }, "peerDependencies": { "oxlint": ">=1.78.0" } }, "sha512-hSQHWbEMuiUFLTJdog0JA6RaiTXg30fUttxAMsZMFiwvkXxbsWufOqH0R3T4ku2w031s/AkhWZ5ZKPqsSce/bQ=="],
+    "@zgeoff/oxlint-config": ["@zgeoff/oxlint-config@0.8.3", "", { "dependencies": { "@stylistic/eslint-plugin": "5.10.0" }, "peerDependencies": { "oxlint": ">=1.78.0" } }, "sha512-0aSS+nhRTP1ptg3vgkzEgI0lJcKr+FZpinggcTlWDApkLlS9qQme+jfkcuppq1n0gt0xv5U/wk6R51w0QpM98w=="],
 
     "@zgeoff/skill-gate": ["@zgeoff/skill-gate@0.2.15", "", { "dependencies": { "@zgeoff/agent-hooks": "0.1.5" } }, "sha512-SxoReaR+N2YgplaENePsAdl8GfJPdakdhHrvzlkyycvMF8nIhhwx4bOLOrHANWW+0QgpQCLgDP904PBWJ77P4Q=="],
 
-    "@zgeoff/std": ["@zgeoff/std@0.4.0", "", {}, "sha512-7X+ACZXphdPz/HBzC2BHT7/bzNMNRfER2JcN/+kgz0NKHRoNc3ojQBMGd61US1+VFcmq9Sh6+VhVJOxtHvLW3g=="],
+    "@zgeoff/std": ["@zgeoff/std@0.4.1", "", {}, "sha512-Vr0Y8ZeRjaTmJAT0K+llbXpf5EazkGhL0zV8yRoACbbfqJdR+9Cql2MHqnr96uUSgu5vdqbknrRQtcsJYIa7oA=="],
 
     "acorn": ["acorn@8.19.0", "", { "bin": { "acorn": "bin/acorn" } }, "sha512-oJlA3XiRm7Cyk6qFD2Jn8ak9B7jSy0qy00ADO3+8dpT0LSjFihQYv4C02LFCSYJV3Q37xYwwRy5m+IpIiUzqWw=="],
 
