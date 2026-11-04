@@ -23,3 +23,15 @@ test('it finds the section whatever its case, and gives nothing when there is no
   expect(parseIssueActions([{ name: 'ACTIONS', text: '## ACTIONS\n\nData: kettle db' }])).toStrictEqual(['Data']);
   expect(parseIssueActions([{ name: 'Outcome', text: '## Outcome\n\nBoil.' }])).toStrictEqual([]);
 });
+
+test('it ends the Actions section at a collapsible block opened with +++', () => {
+  const actions = parseIssueActions([{ name: 'Actions', text: '## Actions\n\nCode delivery\n\n+++ Agent notes\n\n* Repo zgeoff/kettle.\n* Send no test traffic to the kettle.\n\n+++' }]);
+
+  expect(actions).toStrictEqual(['Code delivery']);
+});
+
+test('it ends the Actions section at a collapsible block opened with >>>', () => {
+  const actions = parseIssueActions([{ name: 'Actions', text: '## Actions\n\nCode delivery\n\n>>> Agent notes\n\n* Repo zgeoff/kettle.\n\n>>>' }]);
+
+  expect(actions).toStrictEqual(['Code delivery']);
+});
