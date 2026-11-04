@@ -31,7 +31,7 @@ test('it flags nothing for a final PR that GitHub shows closed unmerged, and mar
   ctx.db.query("UPDATE run_prs SET final_sha = 'abc1234', final_at = '2026-10-21T01:00:00Z', final_source = 'marker:kettle' WHERE ref = 'kettle#51'").run();
   const gh = buildStubGitHubFactsRunner({ views: { 'kettle#51': JSON.stringify({ state: 'CLOSED', mergedAt: null, mergeCommit: null }) } });
 
-  const swept = await sweepNow(ctx.db, ctx.client, gh, { actor: 'z-delivery', wrapUpDeps: { openClient: () => Promise.reject(new Error('no wrap-up expected')), readImpWork: () => Promise.reject(new Error('no wrap-up expected')) }, log: () => {} });
+  const swept = await sweepNow(ctx.db, ctx.client, gh, { actor: 'z-delivery', wrapUpDeps: { openClient: () => Promise.reject(new Error('no wrap-up expected')), readImpWork: () => Promise.reject(new Error('no wrap-up expected')), readLocalWork: () => Promise.resolve({ state: 'pushed' as const }) }, log: () => {} });
 
   expect(swept).toStrictEqual({ alerts: [], sent: [] });
   expect(ctx.db.query("SELECT state FROM run_prs WHERE ref = 'kettle#51'").get()).toStrictEqual({ state: 'closed' });
@@ -46,7 +46,7 @@ test('it forgets the sessions of a merged run and logs the wrap-up once', async 
   setState(ctx.db, 'GEO-9852', 'merged', {}, 'kettle-bot');
   const fleet = buildStubFleetClient({ sessions: [{ id: '0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true }] });
   const gh = buildStubGitHubFactsRunner({ views: {} });
-  const who = { actor: 'z-delivery', wrapUpDeps: { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')) }, log: () => {} };
+  const who = { actor: 'z-delivery', wrapUpDeps: { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')), readLocalWork: () => Promise.resolve({ state: 'pushed' as const }) }, log: () => {} };
 
   await sweepNow(ctx.db, ctx.client, gh, who);
   await sweepNow(ctx.db, ctx.client, gh, who);
@@ -71,7 +71,7 @@ test('it still sweeps for alerts when the wrap-up of merged runs throws', async 
   const gh = buildStubGitHubFactsRunner({ views: { 'kettle#53': JSON.stringify({ state: 'CLOSED', mergedAt: null, mergeCommit: null }) } });
   const fleet = buildStubFleetClient({ sessions: [{ id: '0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true }] });
 
-  const swept = await sweepNow(ctx.db, ctx.client, gh, { actor: 'z-delivery', wrapUpDeps: { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('no check expected')) }, log });
+  const swept = await sweepNow(ctx.db, ctx.client, gh, { actor: 'z-delivery', wrapUpDeps: { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('no check expected')), readLocalWork: () => Promise.resolve({ state: 'pushed' as const }) }, log });
 
   expect(fleet.calls).toStrictEqual(['unpin 0000d001', 'kill 0000d001', 'unpin 0000d001', 'forget 0000d001']);
   expect(log.mock.calls).toStrictEqual([['merged-run wrap-up failed: kettle refuses']]);
@@ -91,8 +91,30 @@ test('it ends a handed-in run\'s idle session and wraps the run up in the same s
   const fleet = buildStubFleetClient({ sessions: [{ id: '0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true }] });
   const gh = buildStubGitHubFactsRunner({ views: {} });
 
-  await sweepNow(ctx.db, ctx.client, gh, { actor: 'z-delivery', wrapUpDeps: { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')) }, log: () => {} });
+  await sweepNow(ctx.db, ctx.client, gh, { actor: 'z-delivery', wrapUpDeps: { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')), readLocalWork: () => Promise.resolve({ state: 'pushed' as const }) }, log: () => {} });
 
   expect(ctx.db.query("SELECT state FROM runs WHERE issue = 'GEO-9855'").get()).toStrictEqual({ state: 'merged' });
   expect(fleet.calls).toStrictEqual(['unpin 0000d001', 'kill 0000d001', 'unpin 0000d001', 'forget 0000d001']);
+});
+
+test('it forgets and ends the quiet session of a live-check run once, with one wrap-up result', async () => {
+  const ctx = await setupTest();
+  onTestFinished(overrideEnv('HQ_NOW', '2026-10-21T03:00:00Z'));
+  addRun(ctx.db, { issue: 'GEO-9856', title: 'Invented kettle work', place: 'local', session: '0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
+  addPr(ctx.db, 'GEO-9856', 'kettle#56', 'kettle-bot');
+  finalPr(ctx.db, 'kettle#56', { sha: 'abc1234', actor: 'kettle-bot' });
+  closePr(ctx.db, 'kettle#56', { to: 'merged', actor: 'kettle-bot', facts: { mergedAt: '2026-10-21T01:00:00Z', mergeSha: null } });
+  setState(ctx.db, 'GEO-9856', 'live-check', {}, 'kettle-bot');
+  ctx.db.query("DELETE FROM events WHERE action = 'merged-wrap-up'").run();
+  ctx.fake.sessions.push({ id: '0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, state: 'done' });
+  ctx.fake.activity.set('0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', Date.parse('2026-10-21T01:00:00Z'));
+  const fleet = buildStubFleetClient({ sessions: [{ id: '0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true }] });
+  const gh = buildStubGitHubFactsRunner({ views: {} });
+
+  await sweepNow(ctx.db, ctx.client, gh, { actor: 'z-delivery', wrapUpDeps: { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')), readLocalWork: () => Promise.resolve({ state: 'pushed' as const }) }, log: () => {} });
+
+  expect(ctx.db.query("SELECT state FROM runs WHERE issue = 'GEO-9856'").get()).toStrictEqual({ state: 'live-check' });
+  expect(ctx.db.query("SELECT active FROM run_sessions WHERE issue = 'GEO-9856'").all()).toStrictEqual([{ active: 0 }]);
+  expect(fleet.calls).toStrictEqual(['unpin 0000d001', 'kill 0000d001', 'unpin 0000d001', 'forget 0000d001']);
+  expect(ctx.db.query("SELECT action FROM events WHERE action = 'merged-wrap-up-result'").all()).toHaveLength(1);
 });

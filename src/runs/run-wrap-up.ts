@@ -16,9 +16,12 @@ const sessionRowSchema = z.object({ session_id: z.string() });
 export interface WrapUpDeps {
   openClient: () => Promise<FleetClient & StaleOps>;
   readImpWork: (session: FleetSession) => Promise<ImpWork>;
+  readLocalWork: (session: FleetSession) => Promise<ImpWork>;
 }
 
-export type WrapUpOptions = { dryRun: true } | { dryRun?: false; actor: string };
+// A pass that retries every sweep sets onlyNoteAction, so a retry that changes nothing leaves no
+// note.
+export type WrapUpOptions = { dryRun: true } | { dryRun?: false; actor: string; onlyNoteAction?: boolean };
 
 export async function runWrapUp(db: Database, deps: WrapUpDeps, issue: string, options: WrapUpOptions): Promise<WrapUp> {
   const run = requireRun(db, issue);
@@ -43,7 +46,7 @@ export async function runWrapUp(db: Database, deps: WrapUpDeps, issue: string, o
       wrapUp.failed.push(...ids.map((id) => ({ id, reason })));
     }
   }
-  if (options.dryRun !== true) {
+  if (options.dryRun !== true && (options.onlyNoteAction !== true || wrapUp.forgotten.length > 0)) {
     writeWrapUpNote(db, issue, wrapUp, options.actor);
   }
   return wrapUp;
@@ -99,11 +102,11 @@ async function planTree(pass: TreePass, root: FleetSession): Promise<TreeDecisio
   if (tree.some((session) => session.pinned === true)) {
     return { kind: 'keep', kept: tree.map((session) => ({ id: session.id, reason: 'pinned in atc' })) };
   }
-  let work: ImpWork | null = null;
-  if (isOnImp(root, pass.placedOnImp)) {
-    work = await readImpWorkSafely(pass.deps, root);
-  }
-  const plan = buildWrapUpPlan(root.id, children.map((child) => child.id), work);
+  const onImp = isOnImp(root, pass.placedOnImp);
+  const readWork = onImp ? pass.deps.readImpWork : pass.deps.readLocalWork;
+  const place = onImp ? 'imp' : 'local';
+  const work = await readWorkSafely(readWork, root);
+  const plan = buildWrapUpPlan(root.id, children.map((child) => child.id), work, place);
   if (plan.kind === 'keep') {
     return { kind: 'keep', kept: plan.kept };
   }
@@ -130,9 +133,9 @@ function isOnImp(session: FleetSession, placedOnImp: boolean): boolean {
   return placedOnImp;
 }
 
-async function readImpWorkSafely(deps: WrapUpDeps, session: FleetSession): Promise<ImpWork> {
+async function readWorkSafely(read: (session: FleetSession) => Promise<ImpWork>, session: FleetSession): Promise<ImpWork> {
   try {
-    return await deps.readImpWork(session);
+    return await read(session);
   } catch (error) {
     return { state: 'unknown', detail: toMessage(error) };
   }

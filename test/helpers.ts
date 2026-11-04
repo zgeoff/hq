@@ -215,6 +215,18 @@ function runGit(cwd: string, ...args: string[]): void {
   if (r.exitCode !== 0) throw new Error(`git ${args.join(' ')}: ${r.stderr.toString()}`);
 }
 
+// A clone whose every commit is on its remote and whose tree is clean, so the unpushed-work check
+// finds nothing.
+export function createPushedClone(directory: string, name: string): string {
+  const remote = join(directory, `${name}-remote.git`);
+  const clone = join(directory, name);
+  runGit(directory, 'init', '-q', '--bare', '-b', 'main', remote);
+  runGit(directory, 'clone', '-q', remote, clone);
+  runGit(clone, 'commit', '-q', '--allow-empty', '-m', 'add kettle lid');
+  runGit(clone, 'push', '-q', 'origin', 'main');
+  return clone;
+}
+
 function createOriginClone(dir: string, origin: string, clone: string, files: Record<string, string>): RepoFixture {
   const originDir = join(dir, origin);
   const push = (f: Record<string, string>) => {

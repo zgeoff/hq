@@ -6,6 +6,7 @@ import { now } from '../clock/now.ts';
 import type { Runner } from '../runner/types.ts';
 import { closeFlaggedPRs } from './close-flagged-prs.ts';
 import { endHandedInRunSessions } from './end-handed-in-run-sessions.ts';
+import type { AtcView } from './end-handed-in-run-sessions.ts';
 import { updateGoneRunSessions } from './update-gone-run-sessions.ts';
 import { findAlerts } from './find-alerts.ts';
 import type { WrapUpDeps } from './run-wrap-up.ts';
@@ -36,12 +37,20 @@ export async function sweepNow(db: Database, client: AtcClient, run: Runner, opt
   if (Array.isArray(sessions)) {
     recordAwake(db, sessions, activity);
     updateGoneRunSessions(db, sessions, options.actor);
-    endHandedInRunSessions(db, { sessions, activity }, options.actor);
+    await endHandedInRunSessionsSafely(db, { sessions, activity }, options);
     await wrapUpMergedRunsSafely(db, options);
   }
   const alerts = await closeFlaggedPRs(db, run, findAlerts(db, sessions, activity, now()));
   const swept = sweep(db, alerts, options.actor);
   return { alerts, sent: swept.sent };
+}
+
+async function endHandedInRunSessionsSafely(db: Database, atc: AtcView, options: SweepOptions): Promise<void> {
+  try {
+    await endHandedInRunSessions(db, atc, options.wrapUpDeps, { actor: options.actor });
+  } catch (error) {
+    options.log(`handed-in session end failed: ${toMessage(error)}`);
+  }
 }
 
 async function wrapUpMergedRunsSafely(db: Database, options: SweepOptions): Promise<void> {

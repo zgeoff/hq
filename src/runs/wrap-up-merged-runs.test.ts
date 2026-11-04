@@ -25,7 +25,7 @@ test.each(['merged', 'live-check', 'deploy-held'])('it wraps up a %s run whose P
   setState(ctx.db, 'GEO-9901', state, {}, 'z-delivery');
   const fleet = buildStubFleetClient({ sessions: [{ id: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true }] });
 
-  const wrapped = await wrapUpMergedRuns(ctx.db, { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')) }, { actor: 'sweep' });
+  const wrapped = await wrapUpMergedRuns(ctx.db, { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')), readLocalWork: () => Promise.resolve({ state: 'pushed' as const }) }, { actor: 'sweep' });
 
   expect(wrapped).toStrictEqual([{ issue: 'GEO-9901', wrapUp: { forgotten: ['0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa'], destroyed: [], kept: [], failed: [] } }]);
   expect(ctx.db.query("SELECT state FROM runs WHERE issue = 'GEO-9901'").get()).toStrictEqual({ state });
@@ -40,7 +40,7 @@ test.each(['working', 'blocked', 'done'])('it skips a %s run', async (state) => 
   setState(ctx.db, 'GEO-9902', state, {}, 'z-delivery');
   const openClient = mock(() => Promise.reject(new Error('no atc expected')));
 
-  const wrapped = await wrapUpMergedRuns(ctx.db, { openClient, readImpWork: () => Promise.reject(new Error('no check expected')) }, { actor: 'sweep' });
+  const wrapped = await wrapUpMergedRuns(ctx.db, { openClient, readImpWork: () => Promise.reject(new Error('no check expected')), readLocalWork: () => Promise.resolve({ state: 'pushed' as const }) }, { actor: 'sweep' });
 
   expect(wrapped).toStrictEqual([]);
   expect(openClient).not.toHaveBeenCalled();
@@ -54,7 +54,7 @@ test('it skips a deploy-held run with an open PR, with no wrap-up note and no ne
   closePr(ctx.db, 'teapot#1', { to: 'merged', actor: 'z-delivery' });
   setState(ctx.db, 'GEO-9903', 'deploy-held', {}, 'z-delivery');
 
-  const wrapped = await wrapUpMergedRuns(ctx.db, { openClient: () => Promise.reject(new Error('no atc expected')), readImpWork: () => Promise.reject(new Error('no check expected')) }, { actor: 'sweep' });
+  const wrapped = await wrapUpMergedRuns(ctx.db, { openClient: () => Promise.reject(new Error('no atc expected')), readImpWork: () => Promise.reject(new Error('no check expected')), readLocalWork: () => Promise.resolve({ state: 'pushed' as const }) }, { actor: 'sweep' });
 
   expect(wrapped).toStrictEqual([]);
   expect(ctx.db.query('SELECT COUNT(*) AS count FROM run_notes').get()).toStrictEqual({ count: 0 });
@@ -68,7 +68,7 @@ test('it wraps a run up once across two passes', async () => {
   closePr(ctx.db, 'kettle#1', { to: 'merged', actor: 'z-delivery' });
   setState(ctx.db, 'GEO-9904', 'merged', {}, 'z-delivery');
   const fleet = buildStubFleetClient({ sessions: [{ id: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true }] });
-  const deps = { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')) };
+  const deps = { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')), readLocalWork: () => Promise.resolve({ state: 'pushed' as const }) };
 
   const first = await wrapUpMergedRuns(ctx.db, deps, { actor: 'sweep' });
   const second = await wrapUpMergedRuns(ctx.db, deps, { actor: 'sweep' });
@@ -85,7 +85,7 @@ test('it wraps a run up again when it went back to working and merged again', as
   closePr(ctx.db, 'kettle#1', { to: 'merged', actor: 'z-delivery' });
   setState(ctx.db, 'GEO-9905', 'merged', {}, 'z-delivery');
   const fleet = buildStubFleetClient({ sessions: [{ id: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true }] });
-  const deps = { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')) };
+  const deps = { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')), readLocalWork: () => Promise.resolve({ state: 'pushed' as const }) };
   await wrapUpMergedRuns(ctx.db, deps, { actor: 'sweep' });
   setState(ctx.db, 'GEO-9905', 'working', {}, 'z-delivery');
   setState(ctx.db, 'GEO-9905', 'merged', {}, 'z-delivery');
@@ -110,7 +110,7 @@ test('it names each kept and each failed session of a run in one report news ite
     killFailures: ['0000a002-aaaa-4aaa-8aaa-aaaaaaaaaaaa'],
   });
 
-  await wrapUpMergedRuns(ctx.db, { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')) }, { actor: 'sweep' });
+  await wrapUpMergedRuns(ctx.db, { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')), readLocalWork: () => Promise.resolve({ state: 'pushed' as const }) }, { actor: 'sweep' });
 
   expect(ctx.db.query('SELECT from_name, topic, text, issue FROM news').all()).toStrictEqual([
     {
@@ -130,7 +130,7 @@ test('it adds no news for a run whose sessions were all forgotten', async () => 
   setState(ctx.db, 'GEO-9907', 'merged', {}, 'z-delivery');
   const fleet = buildStubFleetClient({ sessions: [{ id: '0000b001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'teapot-agent', alive: true }] });
 
-  await wrapUpMergedRuns(ctx.db, { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')) }, { actor: 'sweep' });
+  await wrapUpMergedRuns(ctx.db, { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')), readLocalWork: () => Promise.resolve({ state: 'pushed' as const }) }, { actor: 'sweep' });
 
   expect(ctx.db.query('SELECT COUNT(*) AS count FROM news').get()).toStrictEqual({ count: 0 });
 });
@@ -153,7 +153,7 @@ test('it opens one atc client and lists the sessions once for a pass over two ru
   const sessions = mock(fleet.client.sessions);
   const openClient = mock(() => Promise.resolve({ ...fleet.client, sessions }));
 
-  const wrapped = await wrapUpMergedRuns(ctx.db, { openClient, readImpWork: () => Promise.reject(new Error('a local run checks no imp')) }, { actor: 'sweep' });
+  const wrapped = await wrapUpMergedRuns(ctx.db, { openClient, readImpWork: () => Promise.reject(new Error('a local run checks no imp')), readLocalWork: () => Promise.resolve({ state: 'pushed' as const }) }, { actor: 'sweep' });
 
   expect(wrapped.map((entry) => entry.wrapUp.forgotten)).toStrictEqual([['0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa'], ['0000b001-aaaa-4aaa-8aaa-aaaaaaaaaaaa']]);
   expect(openClient).toHaveBeenCalledOnce();
@@ -175,7 +175,7 @@ test('it forgets a session removed from the run by hand', async () => {
     ],
   });
 
-  const wrapped = await wrapUpMergedRuns(ctx.db, { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')) }, { actor: 'sweep' });
+  const wrapped = await wrapUpMergedRuns(ctx.db, { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')), readLocalWork: () => Promise.resolve({ state: 'pushed' as const }) }, { actor: 'sweep' });
 
   expect(wrapped[0]?.wrapUp.forgotten).toStrictEqual(['0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', '0000a002-aaaa-4aaa-8aaa-aaaaaaaaaaaa']);
 });
@@ -196,7 +196,7 @@ test('a dry run calls no forget, unpin or destroy and writes no event, note or n
   const count = () => ctx.db.query('SELECT (SELECT COUNT(*) FROM events) AS events, (SELECT COUNT(*) FROM run_notes) AS notes, (SELECT COUNT(*) FROM news) AS news').get();
   const before = count();
 
-  const wrapped = await wrapUpMergedRuns(ctx.db, { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.resolve({ state: 'pushed' }) }, { dryRun: true });
+  const wrapped = await wrapUpMergedRuns(ctx.db, { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.resolve({ state: 'pushed' }), readLocalWork: () => Promise.resolve({ state: 'pushed' as const }) }, { dryRun: true });
 
   expect(wrapped).toStrictEqual([
     {
@@ -224,7 +224,7 @@ test('a run whose issue is not a Linear key still gets its news and event, and d
     ],
   });
 
-  const wrapped = await wrapUpMergedRuns(ctx.db, { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')) }, { actor: 'sweep' });
+  const wrapped = await wrapUpMergedRuns(ctx.db, { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')), readLocalWork: () => Promise.resolve({ state: 'pushed' as const }) }, { actor: 'sweep' });
 
   expect(wrapped.map((entry) => entry.issue)).toStrictEqual(['GEO-9910', 'kettle-10']);
   expect(fleet.calls).toStrictEqual(['unpin 0000b001', 'kill 0000b001', 'unpin 0000b001', 'forget 0000b001']);
@@ -250,7 +250,7 @@ test('a run whose wrap-up throws is marked wrapped with the failure, and the nex
     ],
   });
 
-  const wrapped = await wrapUpMergedRuns(ctx.db, { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')) }, { actor: 'sweep' });
+  const wrapped = await wrapUpMergedRuns(ctx.db, { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')), readLocalWork: () => Promise.resolve({ state: 'pushed' as const }) }, { actor: 'sweep' });
 
   expect(wrapped.map((entry) => entry.wrapUp.failed.map((failed) => failed.id))).toStrictEqual([['GEO-9911'], []]);
   expect(ctx.db.query("SELECT subject_id FROM events WHERE action = 'merged-wrap-up-result' ORDER BY subject_id").all()).toStrictEqual([{ subject_id: 'GEO-9911' }, { subject_id: 'GEO-9912' }]);
@@ -274,7 +274,7 @@ test('it records a news write that fails as the run failure, and still wraps up 
     ],
   });
 
-  const wrapped = await wrapUpMergedRuns(ctx.db, { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')) }, { actor: 'sweep' });
+  const wrapped = await wrapUpMergedRuns(ctx.db, { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')), readLocalWork: () => Promise.resolve({ state: 'pushed' as const }) }, { actor: 'sweep' });
 
   expect(wrapped).toStrictEqual([
     { issue: 'GEO-9916', wrapUp: { forgotten: [], destroyed: [], kept: [{ id: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', reason: 'pinned in atc' }], failed: [{ id: 'GEO-9916', reason: 'news: kettle refuses news' }] } },
@@ -296,7 +296,7 @@ test('it wraps a run up in one pass only when a second pass starts before the fi
   const fleet = buildStubFleetClient({ sessions: [{ id: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, pinned: true }] });
   const opened = Promise.withResolvers<FleetClient & StaleOps>();
   const openClient = mock(() => opened.promise);
-  const deps = { openClient, readImpWork: () => Promise.reject(new Error('a local run checks no imp')) };
+  const deps = { openClient, readImpWork: () => Promise.reject(new Error('a local run checks no imp')), readLocalWork: () => Promise.resolve({ state: 'pushed' as const }) };
 
   const first = wrapUpMergedRuns(ctx.db, deps, { actor: 'sweep' });
   const second = wrapUpMergedRuns(ctx.db, deps, { actor: 'z-delivery' });
@@ -325,7 +325,7 @@ test('it skips a run that another pass claimed after this pass listed it', async
     ],
   });
   const opened = Promise.withResolvers<FleetClient & StaleOps>();
-  const deps = { openClient: () => opened.promise, readImpWork: () => Promise.reject(new Error('a local run checks no imp')) };
+  const deps = { openClient: () => opened.promise, readImpWork: () => Promise.reject(new Error('a local run checks no imp')), readLocalWork: () => Promise.resolve({ state: 'pushed' as const }) };
 
   const first = wrapUpMergedRuns(ctx.db, deps, { actor: 'sweep' });
   const second = wrapUpMergedRuns(ctx.db, deps, { actor: 'z-delivery' });
@@ -348,7 +348,7 @@ test('it wraps up a merged build run whose design pass PR stays open', async () 
   setState(ctx.db, 'GEO-9921', 'merged', {}, 'z-delivery');
   const fleet = buildStubFleetClient({ sessions: [{ id: '0000a021-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true }] });
 
-  const wrapped = await wrapUpMergedRuns(ctx.db, { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')) }, { actor: 'sweep' });
+  const wrapped = await wrapUpMergedRuns(ctx.db, { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')), readLocalWork: () => Promise.resolve({ state: 'pushed' as const }) }, { actor: 'sweep' });
 
   expect(wrapped).toStrictEqual([{ issue: 'GEO-9921', wrapUp: { forgotten: ['0000a021-aaaa-4aaa-8aaa-aaaaaaaaaaaa'], destroyed: [], kept: [], failed: [] } }]);
 });
@@ -363,7 +363,7 @@ test('it skips a merged build run whose only merged PR is its design pass PR', a
   setState(ctx.db, 'GEO-9922', 'merged', {}, 'z-delivery');
   const openClient = mock(() => Promise.reject(new Error('no atc expected')));
 
-  const wrapped = await wrapUpMergedRuns(ctx.db, { openClient, readImpWork: () => Promise.reject(new Error('no check expected')) }, { actor: 'sweep' });
+  const wrapped = await wrapUpMergedRuns(ctx.db, { openClient, readImpWork: () => Promise.reject(new Error('no check expected')), readLocalWork: () => Promise.resolve({ state: 'pushed' as const }) }, { actor: 'sweep' });
 
   expect(wrapped).toStrictEqual([]);
 });

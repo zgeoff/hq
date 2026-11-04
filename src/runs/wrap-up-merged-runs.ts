@@ -50,7 +50,7 @@ export async function wrapUpMergedRuns(db: Database, deps: WrapUpDeps, options: 
 
 // A list taken before an earlier run's forgets still holds this run's sessions: a session id is on
 // one run only.
-function shareClient(deps: WrapUpDeps): WrapUpDeps {
+export function shareClient(deps: WrapUpDeps): WrapUpDeps {
   let opened: Promise<FleetClient & StaleOps> | null = null;
   return {
     openClient: () => {
@@ -58,6 +58,7 @@ function shareClient(deps: WrapUpDeps): WrapUpDeps {
       return opened;
     },
     readImpWork: deps.readImpWork,
+    readLocalWork: deps.readLocalWork,
   };
 }
 
@@ -67,7 +68,7 @@ async function openListedClient(deps: WrapUpDeps): Promise<FleetClient & StaleOp
   return { ...client, sessions: () => Promise.resolve(listed) };
 }
 
-async function wrapUpRunSafely(db: Database, deps: WrapUpDeps, issue: string, options: WrapUpOptions): Promise<WrapUp> {
+export async function wrapUpRunSafely(db: Database, deps: WrapUpDeps, issue: string, options: WrapUpOptions): Promise<WrapUp> {
   try {
     return await runWrapUp(db, deps, issue, options);
   } catch (error) {
@@ -79,7 +80,7 @@ const QUALIFYING_RUN = `SELECT r.issue FROM runs r WHERE r.issue = ? AND ${QUALI
 
 // Another pass, such as a watcher sweep beside hq run tidy, may have claimed the run since this
 // pass listed it, and its wrap-up is still running.
-function claimMergedRun(db: Database, issue: string, actor: string): boolean {
+export function claimMergedRun(db: Database, issue: string, actor: string): boolean {
   return db
     .transaction(() => {
       if (db.query(QUALIFYING_RUN).get(issue) === null) {
@@ -92,7 +93,7 @@ function claimMergedRun(db: Database, issue: string, actor: string): boolean {
 }
 
 // The news goes first so that its failure joins the result.
-function recordMergedWrapUp(db: Database, issue: string, wrapUp: WrapUp, actor: string): void {
+export function recordMergedWrapUp(db: Database, issue: string, wrapUp: WrapUp, actor: string): void {
   const text = buildMergedWrapUpNews(issue, wrapUp);
   if (text !== null) {
     try {

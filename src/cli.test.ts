@@ -10,7 +10,7 @@ import { ANTHROPIC_MESSAGES_URL, slotUsage } from '../mocks/anthropic-handlers.t
 import { LINEAR_GRAPHQL_URL, linearIssues } from '../mocks/linear-handlers.ts';
 import { server } from '../mocks/node.ts';
 import { createStubOp } from '../test/create-stub-op.ts';
-import { NOON_SYDNEY, at, fakeAtc, freshDb } from '../test/helpers.ts';
+import { NOON_SYDNEY, at, createPushedClone, fakeAtc, freshDb } from '../test/helpers.ts';
 import { main } from './cli.ts';
 import { overrideEnv } from './config/override-env.ts';
 import { setMeta } from './db/set-meta.ts';
@@ -519,10 +519,12 @@ test('hq run done closes the run, forgets its session through atc, and notes the
   const log = console.log;
   console.log = (line: string) => printed.push(line);
   onTestFinished(() => (console.log = log));
-  const atc = fakeAtc(fresh.dir, [
-    { id: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, state: 'done' },
+  const clone = createPushedClone(fresh.dir, 'kettle-clone');
+  const roster = [
+    { id: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, state: 'done', cwd: clone },
     { id: '0000a003-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'teapot-agent', alive: true, state: 'done' },
-  ]);
+  ];
+  const atc = fakeAtc(fresh.dir, roster);
   onTestFinished(atc.stop);
   addRun(fresh.db, { issue: 'GEO-9821', title: 'Invented kettle descaler', place: 'local', session: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
 

@@ -15,7 +15,7 @@ import { overrideEnv } from '../src/config/override-env.ts';
 import { isHeatList } from '../mods/hq-band/hooks/is-heat-list.ts';
 import { isSegmentList } from '../mods/hq-band/hooks/is-segment-list.ts';
 import type { Band, Pane } from '../src/band/types.ts';
-import { NOON_SYDNEY, at, fakeAtc, freshDb } from './helpers.ts';
+import { NOON_SYDNEY, at, createPushedClone, fakeAtc, freshDb } from './helpers.ts';
 
 let dir: string;
 let path: string;
@@ -851,10 +851,11 @@ test('hq run ship prints a vers PR shipped at its merge as at merge', async () =
 
 test('hq run tidy --dry-run says what it would do to a merged run and writes no row', async () => {
   onTestFinished(overrideEnv('HQ_ATC_SOCKET', `${dir}/atc.sock`));
-  const atc = fakeAtc(dir, [
-    { id: '0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, state: 'done' },
+  const roster = [
+    { id: '0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, state: 'done', cwd: createPushedClone(dir, 'kettle-clone') },
     { id: '0000d009-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'z-kettle', alive: true, state: 'done' },
-  ]);
+  ];
+  const atc = fakeAtc(dir, roster);
   onTestFinished(atc.stop);
   await hq('run', 'add', 'GEO-514', '--session', '0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', '--title', 'Invented kettle work', '--where', 'none');
   await hq('run', 'pr', 'GEO-514', 'kettle#14');
@@ -875,7 +876,8 @@ test('hq run tidy --dry-run says what it would do to a merged run and writes no 
 
 test('hq run tidy wraps a merged run up, and finds nothing to tidy when it runs again', async () => {
   onTestFinished(overrideEnv('HQ_ATC_SOCKET', `${dir}/atc.sock`));
-  const atc = fakeAtc(dir, [{ id: '0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, state: 'done' }]);
+  const roster = [{ id: '0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, state: 'done', cwd: createPushedClone(dir, 'kettle-clone') }];
+  const atc = fakeAtc(dir, roster);
   onTestFinished(atc.stop);
   await hq('run', 'add', 'GEO-515', '--session', '0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', '--title', 'Invented kettle work', '--where', 'none');
   await hq('run', 'pr', 'GEO-515', 'kettle#15');

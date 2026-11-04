@@ -33,6 +33,7 @@ import { hasStaleOps } from './fleet/has-stale-ops.ts';
 import { readStuckSaveChecks } from './fleet/read-stuck-save-checks.ts';
 import { formatWrapUp } from './runs/format-wrap-up.ts';
 import { readImpWork } from './runs/read-imp-work.ts';
+import { readLocalWork } from './runs/read-local-work.ts';
 import { runWrapUp } from './runs/run-wrap-up.ts';
 import { wrapUpMergedRuns } from './runs/wrap-up-merged-runs.ts';
 import type { MergedRunWrapUp } from './runs/wrap-up-merged-runs.ts';
@@ -2382,6 +2383,7 @@ function buildWrapUpDeps(): { deps: WrapUpDeps; close: () => void } {
       return fleetClient;
     },
     readImpWork: (session) => readImpWork(realRunner, session.id, session.cwd),
+    readLocalWork: (session) => readLocalWork(realRunner, session.cwd),
   };
   return {
     deps,
