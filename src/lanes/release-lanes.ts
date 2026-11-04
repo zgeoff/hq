@@ -11,9 +11,9 @@ export function releaseLanes(db: Database, actor: string): boolean {
   return db
     .transaction(() => {
       const had = getLanesHold(db) !== null;
+      const spans = readHeldSpans(db);
       setMeta(db, 'lanes_hold', null);
       if (had) {
-        const spans = readHeldSpans(db);
         const until = iso(now());
         const last = spans.at(-1);
         if (last !== undefined) {
