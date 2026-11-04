@@ -40,3 +40,7 @@ test('it skips a ticked box inside a code fence in Scope', () => {
 test('it counts a box that names the area by its repo', () => {
   expect(isLastArea('## Scope\n\n- [x] impz#754\n', [{ label: 'imp', repo: 'impz' }])).toBe(true);
 });
+
+test('it takes a ticked box under a plus or numbered list marker', () => {
+  expect(isLastArea('## Scope\n\n+ [x] teapot\n1. [x] mug\n', [{ label: 'teapot', repo: 'teapot' }, { label: 'mug', repo: 'mug' }])).toBe(true);
+});

@@ -27,3 +27,11 @@ test('it ignores a box inside a fenced block and a box outside the Scope section
 
   expect(readOpenScopeBoxes(description, ['kettle'])).toStrictEqual([]);
 });
+
+test('it reads open boxes under plus and numbered list markers', () => {
+  expect(readOpenScopeBoxes('## Scope\n\n+ [ ] teapot\n1. [ ] mug: the handle\n2) [ ] sieve\n', ['kettle'])).toStrictEqual([
+    { name: 'teapot', readsAsRepo: true },
+    { name: 'mug', readsAsRepo: true },
+    { name: 'sieve', readsAsRepo: true },
+  ]);
+});

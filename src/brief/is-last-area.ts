@@ -5,7 +5,7 @@ export function isLastArea(description: string, otherAreas: readonly BriefArea[]
   const lines = readScopeLines(description);
   return otherAreas.every((area) => {
     const names = [area.label, area.repo].map((name) => RegExp.escape(name)).join('|');
-    const box = new RegExp(`^\\s*[-*] \\[[xX]\\] \`?(?:${names})\`?($|[\\s:#,.)])`, 'iu');
+    const box = new RegExp(`^\\s*(?:[-*+]|\\d+[.)]) \\[[xX]\\] \`?(?:${names})\`?($|[\\s:#,.)])`, 'iu');
     return lines.some((line) => box.test(line));
   });
 }
