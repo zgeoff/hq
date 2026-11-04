@@ -1,11 +1,14 @@
 import type { Database } from 'bun:sqlite';
 import { z } from 'zod';
 import { now } from '../clock/now.ts';
-import type { FleetSession } from '../fleet/types.ts';
 import { readEvents } from '../read-events.ts';
 import type { StoredEvent } from '../read-events.ts';
 import { buildHandedInPlan } from './build-handed-in-plan.ts';
 import { claimHandedInRun } from './claim-handed-in-run.ts';
+import { collectGuardedSessions } from './collect-guarded-sessions.ts';
+import type { AtcSession } from './collect-guarded-sessions.ts';
+import { pickHandedInCandidates } from './pick-handed-in-candidates.ts';
+import { pickQuietSessions } from './pick-quiet-sessions.ts';
 import type { WrapUpDeps } from './run-wrap-up.ts';
 import { shareClient, wrapUpRunSafely } from './wrap-up-merged-runs.ts';
 import { writeHandedInPlan } from './write-handed-in-plan.ts';
@@ -30,6 +33,7 @@ export interface HandedInOptions {
 // later sweep once its work is pushed.
 export async function endHandedInRunSessions(db: Database, atc: AtcView, deps: WrapUpDeps, options: HandedInOptions): Promise<number> {
   const at = now();
+  const quietBefore = at.getTime() - HANDED_IN_QUIET_MS;
   const prs = PrRows.parse(
     db
       .query(
@@ -38,27 +42,27 @@ export async function endHandedInRunSessions(db: Database, atc: AtcView, deps: W
       )
       .all(),
   );
-  const sessionRows = SessionRows.parse(
+  const sessions = SessionRows.parse(
     db.query("SELECT s.issue, s.session_id, s.active FROM run_sessions s JOIN runs r ON r.issue = s.issue WHERE r.state NOT IN ('done', 'dropped') ORDER BY s.added_at").all(),
   );
-  const quietBefore = at.getTime() - HANDED_IN_QUIET_MS;
+  const lastKept = new Map([...new Set(sessions.map((row) => row.issue))].map((issue) => [issue, readLastKept(db, issue)] as const));
+  const candidates = pickHandedInCandidates({ prs, sessions, lastKept }, at, quietBefore);
+  if (candidates.length === 0) {
+    return 0;
+  }
+
+  // The wrap-up walks the shared client's list, so the guard walks the same one and checks every
+  // session it could forget, sub-sessions spawned since the sweep listed atc included.
   const shared = shareClient(deps);
+  const client = await shared.openClient();
+  const listed = await client.sessions();
   let ended = 0;
-  for (const issue of new Set(sessionRows.filter((row) => row.active === 1).map((row) => row.issue))) {
-    const rows = sessionRows.filter((row) => row.issue === issue);
-    const lastKept = readLastKept(db, issue);
-    if (hasHandedInPRs(prs.filter((row) => row.issue === issue), quietBefore) && !isKeptRecently(lastKept, at)) {
-      // The wrap-up walks the shared client's list, so the guard walks the same one and checks every
-      // session it could forget, sub-sessions spawned since the sweep listed atc included.
-      const client = await shared.openClient();
-      const listed = await client.sessions();
-      const guarded = collectGuardedSessions(rows, listed);
-      const activity = await readGuardedActivity(atc, guarded ?? []);
-      if (isQuietTree(guarded, activity, quietBefore)) {
-        const ids = rows.filter((row) => row.active === 1).map((row) => row.session_id);
-        const checked = (guarded ?? []).map((session) => session.id);
-        ended += await endHandedInRun(db, shared, { issue, ids, checked, actor: options.actor, at, lastKept });
-      }
+  for (const candidate of candidates) {
+    const guarded = collectGuardedSessions(candidate.rows, listed);
+    const activity = await readGuardedActivity(atc, guarded ?? []);
+    const checked = pickQuietSessions(guarded, activity, quietBefore);
+    if (checked !== null) {
+      ended += await endHandedInRun(db, shared, { ...candidate, checked, actor: options.actor, at });
     }
   }
   return ended;
@@ -68,77 +72,9 @@ function readLastKept(db: Database, issue: string): StoredEvent | null {
   return readEvents(db, 'run', issue, ['handed-in-kept']).at(-1) ?? null;
 }
 
-type PrRow = z.infer<typeof PrRows>[number];
-
-function hasHandedInPRs(prs: readonly PrRow[], quietBefore: number): boolean {
-  const merged = prs.filter((row) => row.state === 'merged');
-  return merged.length > 0 && merged.length === prs.length && merged.every((row) => row.final_sha !== null && Date.parse(row.merged_at ?? '') <= quietBefore);
-}
-
-// Each retry of a kept session reads its work again, an imp exec of up to 2 minutes or a local git
-// check, so a run whose wrap-up kept a session waits this long before the next try.
-const KEPT_RETRY_MS = 30 * 60_000;
-
-function isKeptRecently(lastKept: StoredEvent | null, at: Date): boolean {
-  return lastKept !== null && Date.parse(lastKept.at) > at.getTime() - KEPT_RETRY_MS;
-}
-
-type SessionRow = z.infer<typeof SessionRows>[number];
-
-type AtcSession = Pick<FleetSession, 'id' | 'state' | 'parent'>;
-
-// The wrap-up forgets every session of the run that atc lists, active or not, with all their
-// sub-sessions, so each of them is checked. An active session atc does not list returns null.
-function collectGuardedSessions(rows: readonly SessionRow[], sessions: readonly AtcSession[]): AtcSession[] | null {
-  const roots: AtcSession[] = [];
-  for (const row of rows) {
-    const session = findAtcSession(sessions, row.session_id);
-    if (session !== null) {
-      roots.push(session);
-    } else if (row.active === 1) {
-      return null;
-    }
-  }
-  const guarded = new Map<string, AtcSession>();
-  for (const root of roots) {
-    for (const session of [root, ...collectDescendants(sessions, root.id)]) {
-      guarded.set(session.id, session);
-    }
-  }
-  return [...guarded.values()];
-}
-
-// A run can store a short session id, which matches the full id atc lists by prefix.
-function findAtcSession(sessions: readonly AtcSession[], id: string): AtcSession | null {
-  const prefix = id.toLowerCase();
-  const hits = sessions.filter((session) => session.id.toLowerCase().startsWith(prefix));
-  return hits.length === 1 ? (hits[0] ?? null) : null;
-}
-
-function collectDescendants(sessions: readonly AtcSession[], parentID: string): AtcSession[] {
-  const found: AtcSession[] = [];
-  for (const child of sessions.filter((session) => session.parent === parentID)) {
-    found.push(child, ...collectDescendants(sessions, child.id));
-  }
-  return found;
-}
-
 async function readGuardedActivity(atc: AtcView, guarded: readonly AtcSession[]): Promise<Map<string, number | null>> {
   const read = await Promise.all(guarded.map(async (session) => [session.id, await atc.readActivity(session.id)] as const));
   return new Map(read);
-}
-
-// A stacked run merges a lower layer with its FINAL while its agent still builds the next one, so
-// a session ends only once atc shows it, and every session the wrap-up could forget, done and quiet.
-// Missing activity counts as recent.
-function isQuietTree(guarded: readonly AtcSession[] | null, activity: ReadonlyMap<string, number | null>, quietBefore: number): boolean {
-  return (
-    guarded !== null &&
-    guarded.every((session) => {
-      const last = activity.get(session.id);
-      return session.state === 'done' && typeof last === 'number' && last <= quietBefore;
-    })
-  );
 }
 
 interface HandedInRun {
