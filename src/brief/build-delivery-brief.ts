@@ -46,6 +46,7 @@ export function buildDeliveryBrief(facts: DeliveryBriefFacts): DeliveryBrief {
   const needsRelease = permissions.names.some((action) => ['deploy', 'infra'].includes(action.toLowerCase()));
   const playbook = facts.playbookText === null ? null : facts.reads.playbook;
   const openBoxes = facts.input.repo === null ? [] : readOpenScopeBoxes(facts.issue.description, [facts.reads.label, facts.reads.repo]);
+  const otherNames = listOtherAreas(facts.reads.otherAreas, openBoxes);
   const parts: BriefParts = {
     repo: facts.reads.repo,
     issueID: facts.issue.identifier,
@@ -54,7 +55,8 @@ export function buildDeliveryBrief(facts: DeliveryBriefFacts): DeliveryBrief {
     stack: facts.stack,
     fixes: needsRelease || openBoxes.length > 0 || !isLastArea(facts.issue.description, facts.reads.otherAreas) ? 'Contributes to' : 'Fixes',
     reviewLines: facts.reads.reviewLines ? buildReviewPointer(`zgeoff/${facts.reads.repo}`, facts.sha) : '',
-    notYours: buildAreaLine(facts.issue.identifier, facts.reads.repo, listOtherAreas(facts.reads.otherAreas, openBoxes)),
+    notYours: buildAreaLine(facts.issue.identifier, facts.reads.repo, otherNames),
+    notYoursShort: buildShortAreaLine(facts.issue.identifier, facts.reads.repo, otherNames),
     impLine: facts.impLine,
     goalFile: buildGoalPointer({ issue: facts.issue.identifier, playbook, byLink: facts.input.byLink, goalFile: facts.input.goalFile }),
     goalReview: buildGoalReview(facts.reads.reviewLines),
@@ -83,10 +85,6 @@ export function buildDeliveryBrief(facts: DeliveryBriefFacts): DeliveryBrief {
   };
 }
 
-function buildAreaLine(issue: string, repo: string, names: readonly string[]): string {
-  return names.length === 0 ? '' : ` Do only the \`${repo}\` part of ${issue}: each other area (${names.join(', ')}) gets its own launch.`;
-}
-
 // The area labels, then each open Scope box that names a repo no label already names.
 function listOtherAreas(otherAreas: readonly BriefArea[], openBoxes: readonly OpenScopeBox[]): string[] {
   const names = otherAreas.map((area) => area.label);
@@ -97,6 +95,15 @@ function listOtherAreas(otherAreas: readonly BriefArea[], openBoxes: readonly Op
     }
   }
   return names;
+}
+
+function buildAreaLine(issue: string, repo: string, names: readonly string[]): string {
+  return names.length === 0 ? '' : ` Do only the \`${repo}\` part of ${issue}: each other area (${names.join(', ')}) gets its own launch.`;
+}
+
+// The last cut keeps the rule and drops the names, which grow with an umbrella issue's Scope.
+function buildShortAreaLine(issue: string, repo: string, names: readonly string[]): string {
+  return names.length === 0 ? '' : ` Do only the \`${repo}\` part of ${issue}: each other area gets its own launch.`;
 }
 
 const REQUIRED_SECTIONS = ['Outcome', 'Scope', 'Acceptance'];

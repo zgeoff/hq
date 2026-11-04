@@ -34,6 +34,10 @@ export function fitBrief(template: string, parts: BriefParts, movedPointer: stri
     prompt = dropGoalLine(prompt, pointer);
     cuts.push('cut 2');
   }
+  if (isOver(prompt) && fitted.notYours !== fitted.notYoursShort) {
+    prompt = prompt.replace(fitted.notYours, fitted.notYoursShort);
+    cuts.push('cut 3');
+  }
   return { prompt, bytes: Buffer.byteLength(prompt), cuts, unknown: fillPlaceholders(template, buildValues(fitted, sections)).unknown, movedIssue: cuts.includes('cut 1') };
 }
 

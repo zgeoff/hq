@@ -17,6 +17,7 @@ test('it fits one fixed brief', () => {
       fixes: 'Fixes',
       reviewLines: 'List findings on zgeoff/kettle.',
       notYours: ' Leave the stove to me.',
+      notYoursShort: ' Leave the rest to me.',
       impLine: 'This imp has a small kettle.',
       goalFile: '. First read the bug playbook: gh api bug',
       goalReview: '',
@@ -65,6 +66,7 @@ test('it gives equal results for equal input', () => {
     fixes: 'Fixes',
     reviewLines: '',
     notYours: '',
+    notYoursShort: '',
     impLine: '',
     goalFile: '. First read the bug playbook: gh api bug',
     goalReview: '',
@@ -193,4 +195,20 @@ test('it leaves the sha whole when the prompt fits', () => {
 
   expect(fitted.cuts).toStrictEqual([]);
   expect(fitted.prompt).toContain(sha);
+});
+
+test('it drops the area names from the not-yours line as cut 3 when the prompt is still over after cut 2', () => {
+  const parts = buildBriefParts({ permissions: 'k'.repeat(3850), notYours: ` Do only the kettle part: each other area (${'teapot, '.repeat(22)}mug) gets its own launch.`, notYoursShort: ' Do only the kettle part: each other area gets its own launch.' });
+
+  const fitted = fitBrief('/goal Ship {{issue_id}}\n{{permissions}}{{not_yours}}', parts, null);
+
+  expect(fitted).toMatchObject({ cuts: ['cut 2', 'cut 3'], prompt: `${'k'.repeat(3850)} Do only the kettle part: each other area gets its own launch.` });
+});
+
+test('it makes no cut 3 when the brief has no not-yours line', () => {
+  const parts = buildBriefParts({ permissions: 'k'.repeat(4100) });
+
+  const fitted = fitBrief('/goal Ship {{issue_id}}\n{{permissions}}{{not_yours}}', parts, null);
+
+  expect(fitted.cuts).toStrictEqual(['cut 2']);
 });
