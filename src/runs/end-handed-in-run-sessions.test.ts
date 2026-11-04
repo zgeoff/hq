@@ -1,6 +1,7 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { buildStubFleetClient } from '../../test/build-stub-fleet-client.ts';
 import { freshDb } from '../../test/helpers.ts';
+import { listNews } from '../news/list-news.ts';
 import { addPr } from './add-pr.ts';
 import { addRun } from './add-run.ts';
 import { closePr } from './close-pr.ts';
@@ -28,6 +29,7 @@ function setupTest() {
         .query(`SELECT action FROM events WHERE subject_id = 'GEO-9901' AND action IN (${actions.map(() => '?').join(', ')}) ORDER BY seq`)
         .all(...actions),
 
+    readNews: () => listNews(fresh.db, { all: true, limit: 10 }).map((item) => item.text),
     fleet,
     sweep: (sessions: { id: string; state: string }[], activity: [string, number | null][], readLocalWork: WrapUpDeps['readLocalWork'] = () => Promise.resolve({ state: 'pushed' })) =>
       endHandedInRunSessions(
@@ -238,7 +240,7 @@ test('it records one wrap-up for a working run that moves to merged, so the merg
   expect(ctx.readEvents('merged-wrap-up', 'merged-wrap-up-result', 'handed-in-ended')).toStrictEqual([{ action: 'handed-in-ended' }, { action: 'merged-wrap-up' }, { action: 'merged-wrap-up-result' }]);
 });
 
-test('it keeps a session the wrap-up keeps for unpushed work, and the run stays working', async () => {
+test('it keeps a session the wrap-up keeps for unpushed work, reports it, and the run stays working', async () => {
   const ctx = setupTest();
   addRun(ctx.db, { issue: 'GEO-9901', title: 'Invented kettle work', place: 'imp', session: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
   addPr(ctx.db, 'GEO-9901', 'kettle#71', 'z-delivery');
@@ -251,7 +253,24 @@ test('it keeps a session the wrap-up keeps for unpushed work, and the run stays 
   expect(ctx.readState()).toBe('working');
   expect(ctx.fleet.calls).toStrictEqual([]);
   expect(ctx.readSessions()).toStrictEqual([{ session_id: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', active: 1, ended_at: null, ended_by: null }]);
-  expect(ctx.readEvents('merged-wrap-up', 'merged-wrap-up-result', 'handed-in-ended')).toStrictEqual([]);
+  expect(ctx.readEvents('merged-wrap-up', 'merged-wrap-up-result', 'handed-in-ended')).toStrictEqual([{ action: 'merged-wrap-up-result' }]);
+  expect(ctx.readNews()).toStrictEqual(['GEO-9901 merged; wrap-up left kept 0000e001 (its working directory holds unpushed work (/workspace/kettle: 3f2a1bc add kettle lid), so the session stays)']);
+});
+
+test('it reports a kept session once while later sweeps keep it for the same reason', async () => {
+  const ctx = setupTest();
+  addRun(ctx.db, { issue: 'GEO-9901', title: 'Invented kettle work', place: 'imp', session: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
+  addPr(ctx.db, 'GEO-9901', 'kettle#71', 'z-delivery');
+  finalPr(ctx.db, 'kettle#71', { sha: 'abc1234', actor: 'z-delivery' });
+  closePr(ctx.db, 'kettle#71', { to: 'merged', actor: 'hq-github', facts: { mergedAt: '2026-10-22T11:00:00Z', mergeSha: null } });
+  setState(ctx.db, 'GEO-9901', 'blocked', { waitsOn: 'a teapot supplier' }, 'z-delivery');
+  await ctx.sweep([{ id: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', state: 'done' }], [['0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', Date.parse('2026-10-22T11:00:00Z')]], () => Promise.resolve({ state: 'unpushed', detail: '/workspace/kettle: 3f2a1bc add kettle lid' }));
+
+  const ended = await ctx.sweep([{ id: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', state: 'done' }], [['0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', Date.parse('2026-10-22T11:00:00Z')]], () => Promise.resolve({ state: 'unpushed', detail: '/workspace/kettle: 3f2a1bc add kettle lid' }));
+
+  expect(ended).toBe(0);
+  expect(ctx.readEvents('merged-wrap-up-result')).toStrictEqual([{ action: 'merged-wrap-up-result' }]);
+  expect(ctx.readNews()).toHaveLength(1);
 });
 
 test('it retries a kept session on a later sweep once its work is pushed', async () => {

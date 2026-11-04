@@ -5,6 +5,7 @@ import { iso } from '../clock/iso.ts';
 import { now } from '../clock/now.ts';
 import { logEvent } from '../log-event.ts';
 import type { WrapUpDeps } from './run-wrap-up.ts';
+import type { KeptSession, WrapUp } from './types.ts';
 import { updateMergedRun } from './update-merged-run.ts';
 import { claimMergedRun, recordMergedWrapUp, shareClient, wrapUpRunSafely } from './wrap-up-merged-runs.ts';
 
@@ -90,8 +91,13 @@ async function endHandedInRun(db: Database, deps: WrapUpDeps, run: HandedInRun):
   const claimed = claimMergedRun(db, run.issue, run.actor);
   const wrapUp = await wrapUpRunSafely(db, deps, run.issue, { actor: run.actor, onlyNoteAction: !claimed });
   const forgotten = run.ids.filter((id) => wrapUp.forgotten.some((gone) => gone.startsWith(id) || id.startsWith(gone)));
+  const outcome = buildKeptOutcome(wrapUp);
+  const reported = readKeptOutcome(db, run.issue);
+  if (forgotten.length < run.ids.length) {
+    logEvent(db, 'run', run.issue, 'handed-in-kept', run.actor, null, null, outcome);
+  }
   if (forgotten.length === 0) {
-    if (claimed) {
+    if (claimed || !isSameOutcome(outcome, reported)) {
       recordMergedWrapUp(db, run.issue, wrapUp, run.actor);
     }
     return 0;
@@ -111,4 +117,26 @@ async function endHandedInRun(db: Database, deps: WrapUpDeps, run: HandedInRun):
   }).immediate();
   recordMergedWrapUp(db, run.issue, wrapUp, run.actor);
   return forgotten.length;
+}
+
+type KeptOutcome = Pick<WrapUp, 'kept' | 'failed'>;
+
+function buildKeptOutcome(wrapUp: WrapUp): KeptOutcome {
+  return { kept: wrapUp.kept.toSorted(compareByID), failed: wrapUp.failed.toSorted(compareByID) };
+}
+
+function compareByID(left: KeptSession, right: KeptSession): number {
+  return left.id.localeCompare(right.id);
+}
+
+const LastKeptRow = z.object({ data: z.string() }).nullable();
+
+// The event's data is the outcome as written, so the two compare as JSON text.
+function readKeptOutcome(db: Database, issue: string): string | null {
+  const row = LastKeptRow.parse(db.query("SELECT data FROM events WHERE subject = 'run' AND subject_id = ? AND action = 'handed-in-kept' ORDER BY seq DESC LIMIT 1").get(issue));
+  return row === null ? null : row.data;
+}
+
+function isSameOutcome(outcome: KeptOutcome, reported: string | null): boolean {
+  return JSON.stringify(outcome) === reported;
 }
