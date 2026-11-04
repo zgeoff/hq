@@ -22,12 +22,13 @@ test('it splits terms by comma and filters by colon', () => {
   ]);
 });
 
-test('it reads each area hq knows, the noslop, skills, wulez, boxxy and nixie-definitions labels included', () => {
-  expect(parseFocusTerms('noslop, skills, wulez, boxxy, nixie-definitions:bug')).toStrictEqual([
+test('it reads each area hq knows, the noslop, skills, wulez, boxxy, llm and nixie-definitions labels included', () => {
+  expect(parseFocusTerms('noslop, skills, wulez, boxxy, llm, nixie-definitions:bug')).toStrictEqual([
     { text: 'noslop', filters: [{ kind: 'area', value: 'noslop' }] },
     { text: 'skills', filters: [{ kind: 'area', value: 'skills' }] },
     { text: 'wulez', filters: [{ kind: 'area', value: 'wulez' }] },
     { text: 'boxxy', filters: [{ kind: 'area', value: 'boxxy' }] },
+    { text: 'llm', filters: [{ kind: 'area', value: 'llm' }] },
     {
       text: 'nixie-definitions:bug',
       filters: [

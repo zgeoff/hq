@@ -9,6 +9,7 @@ const REPOS = {
   frankie: null,
   hq: 'hq',
   imp: 'impz',
+  llm: 'llm',
   nixie: 'nixie',
   'nixie-definitions': 'nixie-definitions',
   noslop: 'noslop',
