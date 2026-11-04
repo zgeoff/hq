@@ -361,3 +361,42 @@ test.each(['done', 'dropped'])('it leaves a %s run alone', async (state) => {
   expect(fleet.calls).toStrictEqual([]);
   expect(ctx.readActions('handed-in-ended', 'merged-wrap-up-result')).toStrictEqual([]);
 });
+
+test('it lets only one of two passes that race on a handed-in run forget its sessions', async () => {
+  const ctx = setupTest();
+  onTestFinished(overrideEnv('HQ_NOW', '2026-10-22T12:00:00Z'));
+  addRun(ctx.db, { issue: 'GEO-9901', title: 'Invented kettle work', place: 'imp', session: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
+  addPr(ctx.db, 'GEO-9901', 'kettle#71', 'z-delivery');
+  finalPr(ctx.db, 'kettle#71', { sha: 'abc1234', actor: 'z-delivery' });
+  closePr(ctx.db, 'kettle#71', { to: 'merged', actor: 'hq-github', facts: { mergedAt: '2026-10-22T11:00:00Z', mergeSha: null } });
+  const listed = Promise.withResolvers<void>();
+  const fleet = buildStubFleetClient({ sessions: [{ id: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, cwd: '/workspace/kettle', locator: { targetID: 'local' } }], listedAfter: listed.promise });
+  const first = ctx.sweep(fleet, [{ id: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', state: 'done' }], [['0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', Date.parse('2026-10-22T11:00:00Z')]]);
+
+  const second = ctx.sweep(fleet, [{ id: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', state: 'done' }], [['0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', Date.parse('2026-10-22T11:00:00Z')]]);
+  listed.resolve();
+  const ended = await Promise.all([first, second]);
+
+  expect(ended).toStrictEqual([1, 0]);
+  expect(fleet.calls).toStrictEqual(['unpin 0000e001', 'kill 0000e001', 'unpin 0000e001', 'forget 0000e001']);
+});
+
+test('it keeps the merged-run pass off a run whose handed-in cleanup is still running', async () => {
+  const ctx = setupTest();
+  onTestFinished(overrideEnv('HQ_NOW', '2026-10-22T12:00:00Z'));
+  addRun(ctx.db, { issue: 'GEO-9901', title: 'Invented kettle work', place: 'imp', session: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
+  addPr(ctx.db, 'GEO-9901', 'kettle#71', 'z-delivery');
+  finalPr(ctx.db, 'kettle#71', { sha: 'abc1234', actor: 'z-delivery' });
+  closePr(ctx.db, 'kettle#71', { to: 'merged', actor: 'hq-github', facts: { mergedAt: '2026-10-22T11:00:00Z', mergeSha: null } });
+  const listed = Promise.withResolvers<void>();
+  const fleet = buildStubFleetClient({ sessions: [{ id: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, cwd: '/workspace/kettle', locator: { targetID: 'local' } }], listedAfter: listed.promise });
+  const handedIn = ctx.sweep(fleet, [{ id: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', state: 'done' }], [['0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', Date.parse('2026-10-22T11:00:00Z')]]);
+  setState(ctx.db, 'GEO-9901', 'merged', {}, 'z-delivery');
+
+  const merged = wrapUpMergedRuns(ctx.db, { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')), readLocalWork: () => Promise.resolve({ state: 'pushed' as const }) }, { actor: 'z-delivery' });
+  listed.resolve();
+  const [, wrapped] = await Promise.all([handedIn, merged]);
+
+  expect(wrapped).toStrictEqual([]);
+  expect(fleet.calls).toStrictEqual(['unpin 0000e001', 'kill 0000e001', 'unpin 0000e001', 'forget 0000e001']);
+});

@@ -2,9 +2,12 @@ import type { Database } from 'bun:sqlite';
 import { z } from 'zod';
 import type { FleetClient, StaleOps } from '../fleet/types.ts';
 import { ISSUE } from '../followups/issue.ts';
+import { now } from '../clock/now.ts';
 import { logEvent } from '../log-event.ts';
 import { addNews } from '../news/add-news.ts';
+import { readEvents } from '../read-events.ts';
 import { buildMergedWrapUpNews } from './build-merged-wrap-up-news.ts';
+import { CLEANUP_ACTIONS, isCleanupHeld } from './is-cleanup-held.ts';
 import { runWrapUp } from './run-wrap-up.ts';
 import type { WrapUpDeps, WrapUpOptions } from './run-wrap-up.ts';
 import { SWEEP_ACTOR } from './sweep-actor.ts';
@@ -80,16 +83,17 @@ const QUALIFYING_RUN = `SELECT r.issue FROM runs r WHERE r.issue = ? AND ${QUALI
 
 // Another pass, such as a watcher sweep beside hq run tidy, may have claimed the run since this
 // pass listed it, and its wrap-up is still running.
-export function claimMergedRun(db: Database, issue: string, actor: string): boolean {
-  return db
-    .transaction(() => {
-      if (db.query(QUALIFYING_RUN).get(issue) === null) {
-        return false;
-      }
-      logEvent(db, 'run', issue, 'merged-wrap-up', actor, null, null);
-      return true;
-    })
-    .immediate();
+function claimMergedRun(db: Database, issue: string, actor: string): boolean {
+  return db.transaction(() => !isCleanupHeld(readEvents(db, 'run', issue, CLEANUP_ACTIONS), now()) && writeMergedClaim(db, issue, actor)).immediate();
+}
+
+// Call it inside an immediate transaction, so the check and the claim are one step.
+export function writeMergedClaim(db: Database, issue: string, actor: string): boolean {
+  if (db.query(QUALIFYING_RUN).get(issue) === null) {
+    return false;
+  }
+  logEvent(db, 'run', issue, 'merged-wrap-up', actor, null, null);
+  return true;
 }
 
 // The news goes first so that its failure joins the result.

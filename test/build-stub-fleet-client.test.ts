@@ -45,3 +45,16 @@ test('the client spawns nothing and reads no details or message', async () => {
   await expect(details).rejects.toThrow('the stub fleet client reads no details');
   await expect(message).rejects.toThrow('the stub fleet client reads no message');
 });
+
+test('it lists its sessions only once the given promise settles', async () => {
+  const gate = Promise.withResolvers<void>();
+  const fleet = buildStubFleetClient({ sessions: [{ id: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true }], listedAfter: gate.promise });
+  const listing = fleet.client.sessions();
+
+  const early = await Promise.race([listing, Promise.resolve('still waiting')]);
+  gate.resolve();
+  const sessions = await listing;
+
+  expect(early).toBe('still waiting');
+  expect(sessions).toStrictEqual([{ id: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true }]);
+});

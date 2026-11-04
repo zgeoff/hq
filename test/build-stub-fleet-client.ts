@@ -8,6 +8,9 @@ export interface StubFleetAnswers {
   forgets?: Record<string, ForgetAnswer[]>;
 
   killFailures?: string[];
+
+  // The list answers once this settles, so a test can hold a caller part-way through.
+  listedAfter?: Promise<unknown>;
 }
 
 export interface StubFleetClient {
@@ -23,7 +26,10 @@ export function buildStubFleetClient(answers: StubFleetAnswers): StubFleetClient
     return Promise.resolve();
   };
   const client: FleetClient & StaleOps = {
-    sessions: () => Promise.resolve(answers.sessions),
+    sessions: async () => {
+      await answers.listedAfter;
+      return answers.sessions;
+    },
     spawn: () => Promise.reject(new Error('the stub fleet client spawns nothing')),
     details: () => Promise.reject(new Error('the stub fleet client reads no details')),
     message: () => Promise.reject(new Error('the stub fleet client reads no message')),

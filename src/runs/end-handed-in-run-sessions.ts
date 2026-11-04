@@ -5,8 +5,9 @@ import { now } from '../clock/now.ts';
 import { readEvents } from '../read-events.ts';
 import type { StoredEvent } from '../read-events.ts';
 import { buildHandedInPlan } from './build-handed-in-plan.ts';
+import { claimHandedInRun } from './claim-handed-in-run.ts';
 import type { WrapUpDeps } from './run-wrap-up.ts';
-import { claimMergedRun, shareClient, wrapUpRunSafely } from './wrap-up-merged-runs.ts';
+import { shareClient, wrapUpRunSafely } from './wrap-up-merged-runs.ts';
 import { writeHandedInPlan } from './write-handed-in-plan.ts';
 
 // atc shows no background shell or sub-agent, so an agent that ends its turn to wait on one reads
@@ -99,9 +100,11 @@ interface HandedInRun {
 }
 
 async function endHandedInRun(db: Database, deps: WrapUpDeps, run: HandedInRun): Promise<number> {
-  // A run already in merged, live-check or deploy-held and not yet wrapped up is claimed like the
-  // merged-run pass would, so that pass skips it afterwards.
-  const mergedClaimed = claimMergedRun(db, run.issue, run.actor);
+  const claim = claimHandedInRun(db, run.issue, run.actor, run.at);
+  if (claim === null) {
+    return 0;
+  }
+  const mergedClaimed = claim.mergedClaimed;
   const wrapUp = await wrapUpRunSafely(db, deps, run.issue, { actor: run.actor, onlyNoteAction: !mergedClaimed });
   const plan = buildHandedInPlan({ ids: run.ids, wrapUp, lastKeptData: run.lastKept?.data ?? null, mergedClaimed });
   writeHandedInPlan(db, plan, { issue: run.issue, wrapUp, actor: run.actor, at: run.at });
