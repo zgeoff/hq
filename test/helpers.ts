@@ -210,7 +210,7 @@ interface RepoFixture {
   push: (files: Record<string, string>) => void;
 }
 
-function runGit(cwd: string, ...args: string[]): void {
+export function runGit(cwd: string, ...args: string[]): void {
   const r = Bun.spawnSync(['git', '-c', 'user.name=Test', '-c', 'user.email=test@example.com', '-c', 'commit.gpgsign=false', ...args], { cwd });
   if (r.exitCode !== 0) throw new Error(`git ${args.join(' ')}: ${r.stderr.toString()}`);
 }

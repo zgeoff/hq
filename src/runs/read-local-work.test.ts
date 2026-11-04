@@ -2,7 +2,7 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createPushedClone } from '../../test/helpers.ts';
+import { createPushedClone, runGit } from '../../test/helpers.ts';
 import { realRunner } from '../runner/real-runner.ts';
 import { readLocalWork } from './read-local-work.ts';
 
@@ -24,7 +24,7 @@ test('it finds all work pushed in a clone with every commit pushed and nothing u
 test('it finds an unpushed commit to be unpushed work', async () => {
   const ctx = setupTest();
   const clone = createPushedClone(ctx.directory, 'kettle');
-  Bun.spawnSync(['git', '-C', clone, '-c', 'user.name=Kettle Bot', '-c', 'user.email=kettle@example.invalid', 'commit', '-q', '--allow-empty', '-m', 'add spout'], { stdout: 'ignore', stderr: 'ignore' });
+  runGit(clone, 'commit', '-q', '--allow-empty', '-m', 'add spout');
 
   const work = await readLocalWork(realRunner, clone);
 
