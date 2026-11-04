@@ -17,6 +17,7 @@ const REPOS = {
   tools: 'tools',
   vers: 'vers',
   wringer: 'wringer',
+  wulez: 'wulez',
 } as const satisfies Record<FocusArea, string | null>;
 
 export const AREA_REPOS: ReadonlyMap<string, string | null> = new Map(Object.entries(REPOS));
