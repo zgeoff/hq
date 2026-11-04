@@ -15,6 +15,7 @@ import type { DesignCause } from './build-design-cause.ts';
 import { checkAllSkipped } from './check-all-skipped.ts';
 import { checkReadyStale } from './check-ready-stale.ts';
 import { eligibleNow } from './eligible-now.ts';
+import { countHeldMs } from './count-held-ms.ts';
 import { formatPlaceUnfit } from './format-place-unfit.ts';
 import { formatSlotNudge } from './format-slot-nudge.ts';
 import { getLanesHold } from './get-lanes-hold.ts';
@@ -136,16 +137,14 @@ export function tick(db: Database, sample: Sample, actor: string): TickResult {
 
 // Each held span stays on record until a look counts past it, so a hold that starts and ends
 // between two looks still comes off the interval the second look counts. A hold saved before spans
-// existed has none, so it counts as held from the previous look.
+// existed gets its span here, held from the previous look.
 function takeHeldMs(db: Database, previousAt: string | null, at: Date): number {
   const hold = getLanesHold(db);
   const stored = readHeldSpans(db);
-  const spans = stored.length === 0 && hold !== null && previousAt !== null ? [{ from: previousAt, until: hold.until }] : stored;
-  writeHeldSpans(db, stored.filter((span) => Date.parse(span.until) > at.getTime()));
-  if (previousAt === null) {
-    return 0;
-  }
-  return spans.reduce((sum, span) => sum + Math.max(0, Math.min(at.getTime(), Date.parse(span.until)) - Math.max(Date.parse(previousAt), Date.parse(span.from))), 0);
+  const spans = stored.length === 0 && hold !== null ? [{ from: previousAt ?? iso(at), until: hold.until }] : stored;
+  const count = countHeldMs(spans, previousAt, at);
+  writeHeldSpans(db, count.kept);
+  return count.heldMs;
 }
 
 function countWanted(slotPlan: NonNullable<ReturnType<typeof readSlotPlan>>): number {
