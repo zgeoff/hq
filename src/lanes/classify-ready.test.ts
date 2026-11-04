@@ -89,3 +89,11 @@ test('it skips an hq-labelled issue that sits in another project, since z-q buil
 
   expect(result.skipped).toStrictEqual([{ issue: 'GEO-3002', reason: 'hq: z-q builds hq' }]);
 });
+
+test('it skips a Ready issue labelled Needs Geoff, since it waits on the owner', () => {
+  const rules = validateLaneRules(rulesTable, Object.keys(rulesTable.lanes));
+
+  const result = classifyReady([buildReadyIssue('GEO-3003', { project: 'kettle roadmap', labels: ['Needs Geoff'] })], rules, []);
+
+  expect(result.skipped).toStrictEqual([{ issue: 'GEO-3003', reason: "Needs Geoff: waits on the owner's call" }]);
+});

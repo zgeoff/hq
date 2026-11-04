@@ -7,7 +7,8 @@
       "labels": ["hq"],
       "reason": "hq: z-q builds hq"
     },
-    { "labels": ["Design"], "reason": "Design: design slot" }
+    { "labels": ["Design"], "reason": "Design: design slot" },
+    { "labels": ["Needs Geoff"], "reason": "Needs Geoff: waits on the owner's call" }
   ],
   "lanes": {
     "cleanup": {
