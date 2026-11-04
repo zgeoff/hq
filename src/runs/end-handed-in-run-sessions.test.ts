@@ -21,19 +21,8 @@ function setupTest() {
     sessions: ['0000e001', '0000e002'].map((prefix) => ({ id: `${prefix}-aaaa-4aaa-8aaa-aaaaaaaaaaaa`, name: `kettle-${prefix}`, alive: true, cwd: '/workspace/kettle', locator: { targetID: 'local' } })),
   });
 
-  const doneSessions = [{ id: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', state: 'done' }];
-  const quiet: [string, number][] = [['0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', Date.parse('2026-10-22T11:00:00Z')]];
-
   return {
     db: fresh.db,
-    doneSessions,
-    quiet,
-    addKettleRun: () => {
-      addRun(fresh.db, { issue: 'GEO-9901', title: 'Invented kettle work', place: 'imp', session: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
-      addPr(fresh.db, 'GEO-9901', 'kettle#71', 'z-delivery');
-      finalPr(fresh.db, 'kettle#71', { sha: 'abc1234', actor: 'z-delivery' });
-      closePr(fresh.db, 'kettle#71', { to: 'merged', actor: 'hq-github', facts: { mergedAt: '2026-10-22T11:00:00Z', mergeSha: null } });
-    },
     readEvents: (...actions: string[]) =>
       fresh.db
         .query(`SELECT action FROM events WHERE subject_id = 'GEO-9901' AND action IN (${actions.map(() => '?').join(', ')}) ORDER BY seq`)
@@ -201,11 +190,14 @@ test('it keeps every session of a run while its helper session is running', asyn
 
 test.each(['live-check', 'deploy-held', 'merged', 'blocked'])('it forgets and ends the quiet session of a %s run without changing the run state', async (state) => {
   const ctx = setupTest();
-  ctx.addKettleRun();
+  addRun(ctx.db, { issue: 'GEO-9901', title: 'Invented kettle work', place: 'imp', session: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
+  addPr(ctx.db, 'GEO-9901', 'kettle#71', 'z-delivery');
+  finalPr(ctx.db, 'kettle#71', { sha: 'abc1234', actor: 'z-delivery' });
+  closePr(ctx.db, 'kettle#71', { to: 'merged', actor: 'hq-github', facts: { mergedAt: '2026-10-22T11:00:00Z', mergeSha: null } });
   setState(ctx.db, 'GEO-9901', state, { waitsOn: 'a teapot supplier' }, 'z-delivery');
   ctx.db.query("DELETE FROM events WHERE action = 'merged-wrap-up'").run();
 
-  const ended = await ctx.sweep(ctx.doneSessions, ctx.quiet);
+  const ended = await ctx.sweep([{ id: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', state: 'done' }], [['0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', Date.parse('2026-10-22T11:00:00Z')]]);
 
   expect(ended).toBe(1);
   expect(ctx.readState()).toBe(state);
@@ -216,9 +208,12 @@ test.each(['live-check', 'deploy-held', 'merged', 'blocked'])('it forgets and en
 
 test('it records one wrap-up for a working run that moves to merged, so the merged-run pass skips it', async () => {
   const ctx = setupTest();
-  ctx.addKettleRun();
+  addRun(ctx.db, { issue: 'GEO-9901', title: 'Invented kettle work', place: 'imp', session: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
+  addPr(ctx.db, 'GEO-9901', 'kettle#71', 'z-delivery');
+  finalPr(ctx.db, 'kettle#71', { sha: 'abc1234', actor: 'z-delivery' });
+  closePr(ctx.db, 'kettle#71', { to: 'merged', actor: 'hq-github', facts: { mergedAt: '2026-10-22T11:00:00Z', mergeSha: null } });
 
-  await ctx.sweep(ctx.doneSessions, ctx.quiet);
+  await ctx.sweep([{ id: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', state: 'done' }], [['0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', Date.parse('2026-10-22T11:00:00Z')]]);
   const wrapped = await wrapUpMergedRuns(
     ctx.db,
     { openClient: () => Promise.resolve(ctx.fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')), readLocalWork: () => Promise.resolve({ state: 'pushed' as const }) },
@@ -233,9 +228,12 @@ test('it records one wrap-up for a working run that moves to merged, so the merg
 
 test('it keeps a session the wrap-up keeps for unpushed work, and the run stays working', async () => {
   const ctx = setupTest();
-  ctx.addKettleRun();
+  addRun(ctx.db, { issue: 'GEO-9901', title: 'Invented kettle work', place: 'imp', session: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
+  addPr(ctx.db, 'GEO-9901', 'kettle#71', 'z-delivery');
+  finalPr(ctx.db, 'kettle#71', { sha: 'abc1234', actor: 'z-delivery' });
+  closePr(ctx.db, 'kettle#71', { to: 'merged', actor: 'hq-github', facts: { mergedAt: '2026-10-22T11:00:00Z', mergeSha: null } });
 
-  const ended = await ctx.sweep(ctx.doneSessions, ctx.quiet, () => Promise.resolve({ state: 'unpushed', detail: '/workspace/kettle: 3f2a1bc add kettle lid' }));
+  const ended = await ctx.sweep([{ id: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', state: 'done' }], [['0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', Date.parse('2026-10-22T11:00:00Z')]], () => Promise.resolve({ state: 'unpushed', detail: '/workspace/kettle: 3f2a1bc add kettle lid' }));
 
   expect(ended).toBe(0);
   expect(ctx.readState()).toBe('working');
@@ -246,10 +244,13 @@ test('it keeps a session the wrap-up keeps for unpushed work, and the run stays 
 
 test('it retries a kept session on a later sweep once its work is pushed', async () => {
   const ctx = setupTest();
-  ctx.addKettleRun();
+  addRun(ctx.db, { issue: 'GEO-9901', title: 'Invented kettle work', place: 'imp', session: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
+  addPr(ctx.db, 'GEO-9901', 'kettle#71', 'z-delivery');
+  finalPr(ctx.db, 'kettle#71', { sha: 'abc1234', actor: 'z-delivery' });
+  closePr(ctx.db, 'kettle#71', { to: 'merged', actor: 'hq-github', facts: { mergedAt: '2026-10-22T11:00:00Z', mergeSha: null } });
 
-  await ctx.sweep(ctx.doneSessions, ctx.quiet, () => Promise.resolve({ state: 'unknown', detail: 'the check exited 1' }));
-  const ended = await ctx.sweep(ctx.doneSessions, ctx.quiet);
+  await ctx.sweep([{ id: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', state: 'done' }], [['0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', Date.parse('2026-10-22T11:00:00Z')]], () => Promise.resolve({ state: 'unknown', detail: 'the check exited 1' }));
+  const ended = await ctx.sweep([{ id: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', state: 'done' }], [['0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', Date.parse('2026-10-22T11:00:00Z')]]);
 
   expect(ended).toBe(1);
   expect(ctx.readState()).toBe('merged');
@@ -257,10 +258,13 @@ test('it retries a kept session on a later sweep once its work is pushed', async
 
 test.each(['done', 'dropped'])('it leaves a %s run alone', async (state) => {
   const ctx = setupTest();
-  ctx.addKettleRun();
+  addRun(ctx.db, { issue: 'GEO-9901', title: 'Invented kettle work', place: 'imp', session: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
+  addPr(ctx.db, 'GEO-9901', 'kettle#71', 'z-delivery');
+  finalPr(ctx.db, 'kettle#71', { sha: 'abc1234', actor: 'z-delivery' });
+  closePr(ctx.db, 'kettle#71', { to: 'merged', actor: 'hq-github', facts: { mergedAt: '2026-10-22T11:00:00Z', mergeSha: null } });
   setState(ctx.db, 'GEO-9901', state, {}, 'z-delivery');
 
-  const ended = await ctx.sweep(ctx.doneSessions, ctx.quiet);
+  const ended = await ctx.sweep([{ id: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', state: 'done' }], [['0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', Date.parse('2026-10-22T11:00:00Z')]]);
 
   expect(ended).toBe(0);
   expect(ctx.fleet.calls).toStrictEqual([]);
