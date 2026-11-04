@@ -4,6 +4,8 @@ import type { AwakeSession } from '../areas/types.ts';
 import { iso } from '../clock/iso.ts';
 import { now } from '../clock/now.ts';
 import { logEvent } from '../log-event.ts';
+import { readEvents } from '../read-events.ts';
+import type { StoredEvent } from '../read-events.ts';
 import type { WrapUpDeps } from './run-wrap-up.ts';
 import type { KeptSession, WrapUp } from './types.ts';
 import { updateMergedRun } from './update-merged-run.ts';
@@ -46,11 +48,16 @@ export async function endHandedInRunSessions(db: Database, atc: AtcView, deps: W
   let ended = 0;
   for (const issue of new Set(active.map((row) => row.issue))) {
     const ids = active.filter((row) => row.issue === issue).map((row) => row.session_id);
-    if (isHandedIn(prs.filter((row) => row.issue === issue), ids, atc, quietBefore) && !isKeptRecently(readLastKeptAt(db, issue), at)) {
-      ended += await endHandedInRun(db, shared, { issue, ids, actor: options.actor, at });
+    const lastKept = readLastKept(db, issue);
+    if (isHandedIn(prs.filter((row) => row.issue === issue), ids, atc, quietBefore) && !isKeptRecently(lastKept, at)) {
+      ended += await endHandedInRun(db, shared, { issue, ids, actor: options.actor, at, lastKept });
     }
   }
   return ended;
+}
+
+function readLastKept(db: Database, issue: string): StoredEvent | null {
+  return readEvents(db, 'run', issue, ['handed-in-kept']).at(-1) ?? null;
 }
 
 type PrRow = z.infer<typeof PrRows>[number];
@@ -81,15 +88,8 @@ function findAtcSession(sessions: readonly AwakeSession[], id: string): AwakeSes
 // check, so a run whose wrap-up kept a session waits this long before the next try.
 const KEPT_RETRY_MS = 30 * 60_000;
 
-function isKeptRecently(lastKeptAt: string | null, at: Date): boolean {
-  return lastKeptAt !== null && Date.parse(lastKeptAt) > at.getTime() - KEPT_RETRY_MS;
-}
-
-const LastKeptAtRow = z.object({ at: z.string() }).nullable();
-
-function readLastKeptAt(db: Database, issue: string): string | null {
-  const row = LastKeptAtRow.parse(db.query("SELECT at FROM events WHERE subject = 'run' AND subject_id = ? AND action = 'handed-in-kept' ORDER BY seq DESC LIMIT 1").get(issue));
-  return row === null ? null : row.at;
+function isKeptRecently(lastKept: StoredEvent | null, at: Date): boolean {
+  return lastKept !== null && Date.parse(lastKept.at) > at.getTime() - KEPT_RETRY_MS;
 }
 
 interface HandedInRun {
@@ -97,6 +97,7 @@ interface HandedInRun {
   ids: string[];
   actor: string;
   at: Date;
+  lastKept: StoredEvent | null;
 }
 
 async function endHandedInRun(db: Database, deps: WrapUpDeps, run: HandedInRun): Promise<number> {
@@ -106,12 +107,11 @@ async function endHandedInRun(db: Database, deps: WrapUpDeps, run: HandedInRun):
   const wrapUp = await wrapUpRunSafely(db, deps, run.issue, { actor: run.actor, onlyNoteAction: !claimed });
   const forgotten = run.ids.filter((id) => wrapUp.forgotten.some((gone) => gone.startsWith(id) || id.startsWith(gone)));
   const outcome = buildKeptOutcome(wrapUp);
-  const reported = readKeptOutcome(db, run.issue);
   if (forgotten.length < run.ids.length) {
     logEvent(db, 'run', run.issue, 'handed-in-kept', run.actor, null, null, outcome);
   }
   if (forgotten.length === 0) {
-    if (claimed || !isSameOutcome(outcome, reported)) {
+    if (claimed || !isSameOutcome(outcome, run.lastKept)) {
       recordMergedWrapUp(db, run.issue, wrapUp, run.actor);
     }
     return 0;
@@ -143,14 +143,7 @@ function compareByID(left: KeptSession, right: KeptSession): number {
   return left.id.localeCompare(right.id);
 }
 
-const LastKeptRow = z.object({ data: z.string() }).nullable();
-
 // The event's data is the outcome as written, so the two compare as JSON text.
-function readKeptOutcome(db: Database, issue: string): string | null {
-  const row = LastKeptRow.parse(db.query("SELECT data FROM events WHERE subject = 'run' AND subject_id = ? AND action = 'handed-in-kept' ORDER BY seq DESC LIMIT 1").get(issue));
-  return row === null ? null : row.data;
-}
-
-function isSameOutcome(outcome: KeptOutcome, reported: string | null): boolean {
-  return JSON.stringify(outcome) === reported;
+function isSameOutcome(outcome: KeptOutcome, reported: StoredEvent | null): boolean {
+  return JSON.stringify(outcome) === reported?.data;
 }

@@ -1,6 +1,7 @@
 import { expect, mock, onTestFinished, test } from 'bun:test';
 import { AtcClient } from '../atc/atc-client.ts';
 import { overrideEnv } from '../config/override-env.ts';
+import { readEvents } from '../read-events.ts';
 import { buildStubGitHubFactsRunner } from '../../test/build-stub-github-facts-runner.ts';
 import { buildStubFleetClient } from '../../test/build-stub-fleet-client.ts';
 import { fakeAtc, freshDb } from '../../test/helpers.ts';
@@ -52,7 +53,7 @@ test('it forgets the sessions of a merged run and logs the wrap-up once', async 
   await sweepNow(ctx.db, ctx.client, gh, who);
 
   expect(fleet.calls).toStrictEqual(['unpin 0000d001', 'kill 0000d001', 'unpin 0000d001', 'forget 0000d001']);
-  expect(ctx.db.query("SELECT action, subject_id FROM events WHERE action = 'merged-wrap-up'").all()).toStrictEqual([{ action: 'merged-wrap-up', subject_id: 'GEO-9852' }]);
+  expect(readEvents(ctx.db, 'run', 'GEO-9852', ['merged-wrap-up'])).toHaveLength(1);
 });
 
 test('it still sweeps for alerts when the wrap-up of merged runs throws', async () => {
@@ -115,7 +116,7 @@ test('it forgets and ends the quiet session of a live-check run once, with one w
   expect(ctx.db.query("SELECT state FROM runs WHERE issue = 'GEO-9856'").get()).toStrictEqual({ state: 'live-check' });
   expect(ctx.db.query("SELECT active FROM run_sessions WHERE issue = 'GEO-9856'").all()).toStrictEqual([{ active: 0 }]);
   expect(fleet.calls).toStrictEqual(['unpin 0000d001', 'kill 0000d001', 'unpin 0000d001', 'forget 0000d001']);
-  expect(ctx.db.query("SELECT action FROM events WHERE action = 'merged-wrap-up-result'").all()).toHaveLength(1);
+  expect(readEvents(ctx.db, 'run', 'GEO-9856', ['merged-wrap-up-result'])).toHaveLength(1);
 });
 
 test('it opens one atc client for both the handed-in pass and the merged-run pass', async () => {

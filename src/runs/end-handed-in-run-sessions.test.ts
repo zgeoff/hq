@@ -3,6 +3,7 @@ import { buildStubFleetClient } from '../../test/build-stub-fleet-client.ts';
 import { freshDb } from '../../test/helpers.ts';
 import { overrideEnv } from '../config/override-env.ts';
 import { listNews } from '../news/list-news.ts';
+import { readEvents } from '../read-events.ts';
 import { addPr } from './add-pr.ts';
 import { addRun } from './add-run.ts';
 import { closePr } from './close-pr.ts';
@@ -25,10 +26,8 @@ function setupTest() {
 
   return {
     db: fresh.db,
-    readEvents: (...actions: string[]) =>
-      fresh.db
-        .query(`SELECT action FROM events WHERE subject_id = 'GEO-9901' AND action IN (${actions.map(() => '?').join(', ')}) ORDER BY seq`)
-        .all(...actions),
+    readEvents: (...actions: string[]) => readEvents(fresh.db, 'run', 'GEO-9901', actions),
+    readActions: (...actions: string[]) => readEvents(fresh.db, 'run', 'GEO-9901', actions).map((event) => event.action),
 
     readNews: () => listNews(fresh.db, { all: true, limit: 10 }).map((item) => item.text),
     fleet,
@@ -78,7 +77,7 @@ test('it ends the sessions of a handed-in run, helpers included, and moves the r
   ]);
   expect(ctx.readState()).toBe('merged');
   expect(ctx.fleet.calls).toStrictEqual(['unpin 0000e001', 'kill 0000e001', 'unpin 0000e001', 'forget 0000e001', 'unpin 0000e002', 'kill 0000e002', 'unpin 0000e002', 'forget 0000e002']);
-  expect(ctx.db.query("SELECT subject_id, data FROM events WHERE action = 'handed-in-ended'").all()).toStrictEqual([{ subject_id: 'GEO-9901', data: JSON.stringify({ sessions: ['0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', '0000e002-aaaa-4aaa-8aaa-aaaaaaaaaaaa'] }) }]);
+  expect(ctx.readEvents('handed-in-ended').map((event) => event.data)).toStrictEqual([JSON.stringify({ sessions: ['0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', '0000e002-aaaa-4aaa-8aaa-aaaaaaaaaaaa'] })]);
 });
 
 test('it ends a handed-in session that the run stores by a short id', async () => {
@@ -228,7 +227,7 @@ test.each(['live-check', 'deploy-held', 'merged', 'blocked'])('it forgets and en
   expect(ctx.readState()).toBe(state);
   expect(ctx.fleet.calls).toStrictEqual(['unpin 0000e001', 'kill 0000e001', 'unpin 0000e001', 'forget 0000e001']);
   expect(ctx.readSessions()).toStrictEqual([{ session_id: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', active: 0, ended_at: '2026-10-22T12:00:00Z', ended_by: 'sweep' }]);
-  expect(ctx.readEvents('merged-wrap-up-result')).toHaveLength(1);
+  expect(ctx.readActions('merged-wrap-up-result')).toHaveLength(1);
 });
 
 test('it records one wrap-up for a working run that moves to merged, so the merged-run pass skips it', async () => {
@@ -249,7 +248,7 @@ test('it records one wrap-up for a working run that moves to merged, so the merg
   expect(wrapped).toStrictEqual([]);
   expect(ctx.readState()).toBe('merged');
   expect(ctx.fleet.calls).toStrictEqual(['unpin 0000e001', 'kill 0000e001', 'unpin 0000e001', 'forget 0000e001']);
-  expect(ctx.readEvents('merged-wrap-up', 'merged-wrap-up-result', 'handed-in-ended')).toStrictEqual([{ action: 'handed-in-ended' }, { action: 'merged-wrap-up' }, { action: 'merged-wrap-up-result' }]);
+  expect(ctx.readActions('merged-wrap-up', 'merged-wrap-up-result', 'handed-in-ended')).toStrictEqual(['handed-in-ended', 'merged-wrap-up', 'merged-wrap-up-result']);
 });
 
 test('it keeps a session the wrap-up keeps for unpushed work, reports it, and the run stays working', async () => {
@@ -266,7 +265,7 @@ test('it keeps a session the wrap-up keeps for unpushed work, reports it, and th
   expect(ctx.readState()).toBe('working');
   expect(ctx.fleet.calls).toStrictEqual([]);
   expect(ctx.readSessions()).toStrictEqual([{ session_id: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', active: 1, ended_at: null, ended_by: null }]);
-  expect(ctx.readEvents('merged-wrap-up', 'merged-wrap-up-result', 'handed-in-ended')).toStrictEqual([{ action: 'merged-wrap-up-result' }]);
+  expect(ctx.readActions('merged-wrap-up', 'merged-wrap-up-result', 'handed-in-ended')).toStrictEqual(['merged-wrap-up-result']);
   expect(ctx.readNews()).toStrictEqual(['GEO-9901 merged; wrap-up left kept 0000e001 (its working directory holds unpushed work (/workspace/kettle: 3f2a1bc add kettle lid), so the session stays)']);
 });
 
@@ -284,7 +283,7 @@ test('it reports a kept session once while later sweeps keep it for the same rea
   const ended = await ctx.sweep([{ id: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', state: 'done' }], [['0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', Date.parse('2026-10-22T11:00:00Z')]], () => Promise.resolve({ state: 'unpushed', detail: '/workspace/kettle: 3f2a1bc add kettle lid' }));
 
   expect(ended).toBe(0);
-  expect(ctx.readEvents('merged-wrap-up-result', 'handed-in-kept')).toStrictEqual([{ action: 'handed-in-kept' }, { action: 'merged-wrap-up-result' }, { action: 'handed-in-kept' }]);
+  expect(ctx.readActions('merged-wrap-up-result', 'handed-in-kept')).toStrictEqual(['handed-in-kept', 'merged-wrap-up-result', 'handed-in-kept']);
   expect(ctx.readNews()).toHaveLength(1);
 });
 
@@ -336,5 +335,5 @@ test.each(['done', 'dropped'])('it leaves a %s run alone', async (state) => {
 
   expect(ended).toBe(0);
   expect(ctx.fleet.calls).toStrictEqual([]);
-  expect(ctx.readEvents('handed-in-ended', 'merged-wrap-up-result')).toStrictEqual([]);
+  expect(ctx.readActions('handed-in-ended', 'merged-wrap-up-result')).toStrictEqual([]);
 });
