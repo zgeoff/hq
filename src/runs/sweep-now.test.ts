@@ -9,8 +9,10 @@ import { addPr } from './add-pr.ts';
 import { addRun } from './add-run.ts';
 import { closePr } from './close-pr.ts';
 import { finalPr } from './final-pr.ts';
+import { getRun } from './get-run.ts';
 import { setState } from './set-state.ts';
 import { sweepNow } from './sweep-now.ts';
+import { viewRun } from './view-run.ts';
 
 async function setupTest() {
   const fresh = freshDb();
@@ -21,7 +23,16 @@ async function setupTest() {
   const client = await AtcClient.open();
   onTestFinished(() => client.close());
 
-  return { db: fresh.db, client, fake: { sessions: roster, activity: server.activity } };
+  return {
+    db: fresh.db,
+    client,
+    fake: { sessions: roster, activity: server.activity },
+    readState: (issue: string) => getRun(fresh.db, issue)?.state,
+    readActive: (issue: string) => {
+      const run = getRun(fresh.db, issue);
+      return run === null ? [] : viewRun(fresh.db, run).sessions.map((session) => session.active);
+    },
+  };
 }
 
 test('it flags nothing for a final PR that GitHub shows closed unmerged, and marks it closed', async () => {
@@ -94,7 +105,7 @@ test('it ends a handed-in run\'s idle session and wraps the run up in the same s
 
   await sweepNow(ctx.db, ctx.client, gh, { actor: 'z-delivery', wrapUpDeps: { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')), readLocalWork: () => Promise.resolve({ state: 'pushed' as const }) }, log: () => {} });
 
-  expect(ctx.db.query("SELECT state FROM runs WHERE issue = 'GEO-9855'").get()).toStrictEqual({ state: 'merged' });
+  expect(ctx.readState('GEO-9855')).toBe('merged');
   expect(fleet.calls).toStrictEqual(['unpin 0000d001', 'kill 0000d001', 'unpin 0000d001', 'forget 0000d001']);
 });
 
@@ -113,8 +124,8 @@ test('it forgets and ends the quiet session of a live-check run once, with one w
 
   await sweepNow(ctx.db, ctx.client, gh, { actor: 'z-delivery', wrapUpDeps: { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')), readLocalWork: () => Promise.resolve({ state: 'pushed' as const }) }, log: () => {} });
 
-  expect(ctx.db.query("SELECT state FROM runs WHERE issue = 'GEO-9856'").get()).toStrictEqual({ state: 'live-check' });
-  expect(ctx.db.query("SELECT active FROM run_sessions WHERE issue = 'GEO-9856'").all()).toStrictEqual([{ active: 0 }]);
+  expect(ctx.readState('GEO-9856')).toBe('live-check');
+  expect(ctx.readActive('GEO-9856')).toStrictEqual([0]);
   expect(fleet.calls).toStrictEqual(['unpin 0000d001', 'kill 0000d001', 'unpin 0000d001', 'forget 0000d001']);
   expect(readEvents(ctx.db, 'run', 'GEO-9856', ['merged-wrap-up-result'])).toHaveLength(1);
 });
@@ -194,7 +205,7 @@ test('it keeps a handed-in run whose running sub-session the wrap-up client list
   await sweepNow(ctx.db, ctx.client, gh, { actor: 'z-delivery', wrapUpDeps: { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')), readLocalWork: () => Promise.resolve({ state: 'pushed' as const }) }, log: () => {} });
 
   expect(fleet.calls).toStrictEqual([]);
-  expect(ctx.db.query("SELECT active FROM run_sessions WHERE issue = 'GEO-9860'").all()).toStrictEqual([{ active: 1 }]);
+  expect(ctx.readActive('GEO-9860')).toStrictEqual([1]);
 });
 
 test('it opens no wrap-up client for a sweep with no handed-in run', async () => {
