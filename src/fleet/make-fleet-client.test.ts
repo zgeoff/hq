@@ -3,7 +3,7 @@ import { AtcClient } from '../atc/atc-client.ts';
 import { fakeAtc, freshDb } from '../../test/helpers.ts';
 import { makeFleetClient } from './make-fleet-client.ts';
 
-async function setupTest(sessions: { id: string; name: string; alive: boolean; state: string }[]) {
+async function setupTest(sessions: { id: string; name: string; alive: boolean; state: string; lastMsg?: unknown }[]) {
   const base = freshDb();
   onTestFinished(base.cleanup);
   const server = fakeAtc(base.dir, sessions);
@@ -23,4 +23,15 @@ test('forgetLive asks atc to forget a live session, which stops it, and keeps re
     { method: 'session.forget', input: { session: '0000c001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', refusePinned: true, refuseLive: false } },
     { method: 'session.forget', input: { session: '0000c001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', refusePinned: true, refuseLive: false, confirmToken: 'token-kettle' } },
   ]);
+});
+
+test("it lists each session's last message, and reads one that is not text as none", async () => {
+  const ctx = await setupTest([
+    { id: '0000c001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, state: 'running', lastMsg: 'revived' },
+    { id: '0000c002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'teapot-agent', alive: true, state: 'running', lastMsg: 7 },
+  ]);
+
+  const sessions = await ctx.client.sessions();
+
+  expect(sessions.map((session) => session.lastMsg)).toStrictEqual(['revived', undefined]);
 });

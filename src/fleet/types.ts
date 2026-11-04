@@ -55,6 +55,7 @@ export interface FleetSession {
   pinned?: boolean | null | undefined;
 
   parent?: string | null | undefined;
+  lastMsg?: string | null | undefined;
   cwd?: string | null | undefined;
 
   createdAt?: number | null | undefined;

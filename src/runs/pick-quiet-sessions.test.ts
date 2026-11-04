@@ -50,6 +50,30 @@ test.each([
   expect(checked).toBeNull();
 });
 
+test('it counts a running session that atc revived, with activity older than the quiet time, as quiet', () => {
+  const checked = pickQuietSessions(
+    [{ id: '0000b001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', state: 'running', lastMsg: 'revived' }],
+    new Map([['0000b001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', { lastActivityAt: Date.parse('2026-10-22T09:13:00Z'), pendingMessage: null }]]),
+    Date.parse('2026-10-22T11:30:00Z'),
+  );
+
+  expect(checked).toStrictEqual(['0000b001-aaaa-4aaa-8aaa-aaaaaaaaaaaa']);
+});
+
+test.each([
+  ['a revived running session with activity inside the quiet time', 'revived', Date.parse('2026-10-22T11:40:00Z')],
+  ['a running session with another last message', 'Brewing the next layer', Date.parse('2026-10-22T09:13:00Z')],
+  ['a running session with no last message', undefined, Date.parse('2026-10-22T09:13:00Z')],
+])('it returns null for %s', (_name, lastMsg, lastActivityAt) => {
+  const checked = pickQuietSessions(
+    [{ id: '0000b001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', state: 'running', lastMsg }],
+    new Map([['0000b001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', { lastActivityAt, pendingMessage: null }]]),
+    Date.parse('2026-10-22T11:30:00Z'),
+  );
+
+  expect(checked).toBeNull();
+});
+
 test('it returns null for a session atc gave no reading for', () => {
   const checked = pickQuietSessions([{ id: '0000b001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', state: 'done' }], new Map([['0000b001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', null]]), Date.parse('2026-10-22T11:30:00Z'));
 
