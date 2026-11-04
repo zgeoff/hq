@@ -44,3 +44,7 @@ test('it counts a box that names the area by its repo', () => {
 test('it takes a ticked box under a plus or numbered list marker', () => {
   expect(isLastArea('## Scope\n\n+ [x] teapot\n1. [x] mug\n', [{ label: 'teapot', repo: 'teapot' }, { label: 'mug', repo: 'mug' }])).toBe(true);
 });
+
+test('it takes a ticked box with more than one space around its checkbox', () => {
+  expect(isLastArea('## Scope\n\n-  [x]  teapot\n', [{ label: 'teapot', repo: 'teapot' }])).toBe(true);
+});

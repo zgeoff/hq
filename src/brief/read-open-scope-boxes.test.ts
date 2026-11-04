@@ -35,3 +35,10 @@ test('it reads open boxes under plus and numbered list markers', () => {
     { name: 'sieve', readsAsRepo: true },
   ]);
 });
+
+test('it reads an open box with more than one space around its checkbox', () => {
+  expect(readOpenScopeBoxes('## Scope\n\n-  [ ]  teapot\n1.   [ ] mug\n', ['kettle'])).toStrictEqual([
+    { name: 'teapot', readsAsRepo: true },
+    { name: 'mug', readsAsRepo: true },
+  ]);
+});

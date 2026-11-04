@@ -8,7 +8,7 @@ export interface OpenScopeBox {
   readsAsRepo: boolean;
 }
 
-const OPEN_BOX = /^\s*(?:[-*+]|\d+[.)]) \[ \] (?<text>.*)$/u;
+const OPEN_BOX = /^\s*(?:[-*+]|\d+[.)])\s+\[ \]\s+(?<text>.*)$/u;
 const FIRST_WORD = /^[A-Za-z0-9-]*/u;
 const REPO_NAME = /^`?[a-z0-9][a-z0-9-]*`?(?:$|[:#,.)])/u;
 
