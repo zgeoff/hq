@@ -31,7 +31,7 @@ function setupTest() {
     sweep: (fleet: StubFleetClient, activity: [string, number | null][], readLocalWork: WrapUpDeps['readLocalWork'] = () => Promise.resolve({ state: 'pushed' })) =>
       endHandedInRunSessions(
         fresh.db,
-        { readActivity: (id) => Promise.resolve(new Map(activity).get(id) ?? null) },
+        { readActivity: (id) => Promise.resolve(new Map(activity.map(([session, last]) => [session, { lastActivityAt: last, pendingMessage: null }])).get(id) ?? null) },
         { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')), readLocalWork },
         { actor: 'z-delivery' },
       ),
@@ -497,7 +497,7 @@ test('it leaves alone a helper attached to the run after the quiet check read it
   closePr(ctx.db, 'kettle#71', { to: 'merged', actor: 'hq-github', facts: { mergedAt: '2026-10-22T11:00:00Z', mergeSha: null } });
   const readActivity = mock(() => {
     setSession(ctx.db, 'GEO-9901', '0000e002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'z-delivery', 'add');
-    return Promise.resolve(Date.parse('2026-10-22T11:00:00Z'));
+    return Promise.resolve({ lastActivityAt: Date.parse('2026-10-22T11:00:00Z'), pendingMessage: null });
   });
 
   const ended = await endHandedInRunSessions(

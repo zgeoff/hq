@@ -26,7 +26,7 @@ async function setupTest() {
   return {
     db: fresh.db,
     client,
-    fake: { sessions: roster, activity: server.activity },
+    fake: { sessions: roster, activity: server.activity, pending: server.pending },
     readState: (issue: string) => getRun(fresh.db, issue)?.state,
     readActive: (issue: string) => {
       const run = getRun(fresh.db, issue);
@@ -220,4 +220,23 @@ test('it opens no wrap-up client for a sweep with no handed-in run', async () =>
   await sweepNow(ctx.db, ctx.client, gh, { actor: 'z-delivery', wrapUpDeps: { openClient, readImpWork: () => Promise.reject(new Error('no check expected')), readLocalWork: () => Promise.reject(new Error('no check expected')) }, log: () => {} });
 
   expect(openClient).not.toHaveBeenCalled();
+});
+
+test("it hands in a run whose session atc shows waiting on Claude's idle notice", async () => {
+  const ctx = await setupTest();
+  onTestFinished(overrideEnv('HQ_NOW', '2026-10-21T03:00:00Z'));
+  addRun(ctx.db, { issue: 'GEO-9862', title: 'Invented kettle work', place: 'local', session: '0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
+  addPr(ctx.db, 'GEO-9862', 'kettle#62', 'kettle-bot');
+  finalPr(ctx.db, 'kettle#62', { sha: 'abc1234', actor: 'kettle-bot' });
+  closePr(ctx.db, 'kettle#62', { to: 'merged', actor: 'kettle-bot', facts: { mergedAt: '2026-10-21T01:00:00Z', mergeSha: null } });
+  ctx.fake.sessions.push({ id: '0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, state: 'needs_you' });
+  ctx.fake.activity.set('0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', Date.parse('2026-10-21T01:41:00Z'));
+  ctx.fake.pending.set('0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', { message: 'Claude is waiting for your input' });
+  const fleet = buildStubFleetClient({ sessions: [{ id: '0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, state: 'needs_you' }] });
+  const gh = buildStubGitHubFactsRunner({ views: {} });
+
+  await sweepNow(ctx.db, ctx.client, gh, { actor: 'z-delivery', wrapUpDeps: { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')), readLocalWork: () => Promise.resolve({ state: 'pushed' as const }) }, log: () => {} });
+
+  expect(ctx.readState('GEO-9862')).toBe('merged');
+  expect(fleet.calls).toStrictEqual(['unpin 0000d001', 'kill 0000d001', 'unpin 0000d001', 'forget 0000d001']);
 });

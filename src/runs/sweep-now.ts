@@ -7,6 +7,7 @@ import type { Runner } from '../runner/types.ts';
 import { closeFlaggedPRs } from './close-flagged-prs.ts';
 import { endHandedInRunSessions } from './end-handed-in-run-sessions.ts';
 import type { AtcView } from './end-handed-in-run-sessions.ts';
+import type { SessionActivity } from './pick-quiet-sessions.ts';
 import { updateGoneRunSessions } from './update-gone-run-sessions.ts';
 import { findAlerts } from './find-alerts.ts';
 import type { WrapUpDeps } from './run-wrap-up.ts';
@@ -25,16 +26,18 @@ export interface SweepOptions {
 export async function sweepNow(db: Database, client: AtcClient, run: Runner, options: SweepOptions): Promise<{ alerts: Alert[]; sent: Alert[] }> {
   const sessions = await client.sessions();
   const activity = new Map<string, number | null>();
+  const read = new Map<string, SessionActivity | null>();
   for (const w of watchlist(db)) {
-    const last = await readLastActivityAt(client, w.session_id);
-    activity.set(w.session_id, last);
+    const got = await readSessionActivity(client, w.session_id);
+    activity.set(w.session_id, got?.lastActivityAt ?? null);
+    read.set(w.session_id, got);
   }
 
   if (Array.isArray(sessions)) {
     recordAwake(db, sessions, activity);
     updateGoneRunSessions(db, sessions, options.actor);
     const wrapUpDeps = shareClient(options.wrapUpDeps);
-    const readActivity = (id: string) => (activity.has(id) ? Promise.resolve(activity.get(id) ?? null) : readLastActivityAt(client, id));
+    const readActivity = (id: string) => (read.has(id) ? Promise.resolve(read.get(id) ?? null) : readSessionActivity(client, id));
     await endHandedInRunSessionsSafely(db, { readActivity }, { ...options, wrapUpDeps });
     await wrapUpMergedRunsSafely(db, { ...options, wrapUpDeps });
   }
@@ -43,10 +46,10 @@ export async function sweepNow(db: Database, client: AtcClient, run: Runner, opt
   return { alerts, sent: swept.sent };
 }
 
-async function readLastActivityAt(client: AtcClient, id: string): Promise<number | null> {
+async function readSessionActivity(client: AtcClient, id: string): Promise<SessionActivity | null> {
   try {
     const session = await client.call('session.get', { session: id }, sessionGetSchema);
-    return typeof session.lastActivityAt === 'number' ? session.lastActivityAt : null;
+    return { lastActivityAt: session.lastActivityAt, pendingMessage: session.pending?.message ?? null };
   } catch {
     return null;
   }
