@@ -202,7 +202,7 @@ test('it drops the area names from the not-yours line as cut 3 when the prompt i
 
   const fitted = fitBrief('/goal Ship {{issue_id}}\n{{permissions}}{{not_yours}}', parts, null);
 
-  expect(fitted).toMatchObject({ cuts: ['cut 2', 'cut 3'], prompt: `${'k'.repeat(3850)} Do only the kettle part: each other area gets its own launch.` });
+  expect(fitted).toStrictEqual({ prompt: `${'k'.repeat(3850)} Do only the kettle part: each other area gets its own launch.`, bytes: 3912, cuts: ['cut 2', 'cut 3'], unknown: [], movedIssue: false });
 });
 
 test('it makes no cut 3 when the brief has no not-yours line', () => {
