@@ -37,7 +37,8 @@ Your state is in `~/.local/share/z-sessions/`: `triage.md`, and `refine.md` for 
 - [Flagging](#flagging): flag only what blocks delivery and only the owner can decide.
 - [Alerts from hq](#alerts-from-hq): one action for each kind of alert.
 - [The check](#the-check): after the pass, or alone on a "check now" message.
-- [Scope, closes and comments](#scope-closes-and-comments): scope and launches are not yours.
+- [Scope, closes and comments](#scope-closes-and-comments): rewrite Scope and set priority yourself;
+  flag a lost Outcome, and leave launches to `z-delivery`.
 
 ## References
 
@@ -84,8 +85,8 @@ tickets says.
 3. **Groom each Triage issue:** its type, size, priority, project, area label and relations, as
    tickets says.
    - Mark a duplicate only when sure, after you copy any detail the original lacks.
-   - Rewrite it into the tickets sections without a change to its scope. Then move it to Ready if
-     it meets the criteria, and to Backlog if not.
+   - Rewrite it into the tickets sections, as [Scope, closes and comments](#scope-closes-and-comments)
+     allows. Then move it to Ready if it meets the criteria, and to Backlog if not.
    - For an issue whose first line starts `From design <record link>, decisions <n>`, save the
      record (a Linear document: `get_document`) and the issue as Markdown files in `<scratch>`. For
      each decision number on that line, run
@@ -109,8 +110,8 @@ tickets says.
 
 ## Flagging
 
-Flag only what blocks delivery and only the owner can decide, as owner-calls lists, such as a
-priority that disagrees with the tickets skill's fields.
+Flag only what blocks delivery and only the owner can decide, as owner-calls lists, such as an
+issue whose text drops its Outcome or adds behaviour.
 
 1. Read the issue's comments first. When one records the owner's decision, write it into the
    sections, and don't flag. Your role's private file says how to
@@ -151,7 +152,17 @@ once, in a new `<scratch>`, on a "check now" message.
 
 ## Scope, closes and comments
 
-- Scope, and closing an issue whose work is still worth doing, are the owner's calls, never yours.
+- When a rewrite keeps the issue's Outcome and keeps each Acceptance check or makes it stricter,
+  rewrite the Scope and Acceptance yourself.
+- Flag the issue instead when it needs any of these, which are the owner's calls:
+  - dropping or changing its Outcome;
+  - adding behaviour its Outcome doesn't ask for;
+  - loosening a rule the owner set in the issue or its comments;
+  - closing it while its work is still worth doing.
+- Set each issue's priority yourself, by the rules in [tickets](../tickets/SKILL.md), even over a
+  priority already set. When you set one to High or Urgent, post it with
+  `hq news add --topic other --text`.
+- On a security issue, flag a High or Urgent priority instead of setting it.
 - Launching is `z-delivery`'s. Never launch.
 - Close an issue as superseded only when you're sure other issues carry all its work: link them in a
   comment, set it Canceled, and post one line with `hq news add --topic other --text`. When you're

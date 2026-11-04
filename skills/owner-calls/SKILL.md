@@ -61,19 +61,23 @@ Avoid these traps:
 
 ## What only the owner decides
 
-Send each of these to the owner, even when a grant seems to cover it: deleting or rewriting the owner's data, anything that touches Nix's memory or identity, credentials, scope and naming, a new session, a priority, and a High or Urgent security change.
+Send each of these to the owner, even when a grant seems to cover it: deleting or rewriting the owner's data, anything that touches Nix's memory or identity, credentials the owner has not approved, naming, security design, a new session, and setting a High or Urgent priority on a security change.
 
 Also his:
 
 - closing an issue whose work is still worth doing, or as not planned;
 - a new project;
-- an Action beyond Code delivery, Investigation, Spike or Design session: Data that deletes or rewrites, Deploy, Infra, Credentials, Posting, or Paid API over its limit;
+- dropping an issue's outcome, adding behaviour to it, or loosening a rule he set in the issue or
+  its comments;
+- loosening a repo's ruleset, changing its visibility, or touching its GitHub Actions secrets;
+- an Action beyond Code delivery, Investigation, Spike or Design session: Data that deletes or
+  rewrites, Deploy, Infra, Credentials, Posting, or Paid API over its limit;
 - accepting a finding's risk, or merging a PR its gate blocks;
 - product direction, and a cost only he can accept.
 
-In this list, a new session is a new z- session, a priority is an issue's priority, and scope is an issue's scope. An Action is one in the issue's Actions line, and the Paid API limit is in [Actions](../tickets/SKILL.md#actions). `z-stu` records an accepted risk with `hq pr accept-risk`, and the gate is `hq review gate`.
+In this list, a new session is a new z- session. An Action is one in the issue's Actions line, and the Paid API limit is in [Actions](../tickets/SKILL.md#actions).
 
-Code delivery, Linear edits, Investigation, Spike and Design session need no owner call. Neither does reading an existing item from a vault: [Put it to the owner](#put-it-to-the-owner) says how to look one up first.
+Code delivery, Investigation, Spike, Design session and each Linear edit this list leaves out need no owner call. Neither does reading an existing item from a vault: [Put it to the owner](#put-it-to-the-owner) says how to look one up first.
 
 Decide anything else yourself, under your grants or the actions that the issue's Actions line names.
 
@@ -113,6 +117,11 @@ commands:
 - `hq call answer`, for the answer to a call;
 - `hq pr answer`, `hq pr override` and `hq pr accept-risk`, for an answer about a PR;
 - `hq typed add`, for each line it types into a session as the owner.
+
+When Claude Code's permission check blocks an action that the owner already approved in a call or
+a [pitch](../delivery-lead/SKILL.md#pitches), the blocked agent tells `z-stu` with
+`atc_message_send`. `z-stu` types the owner's recorded words from that approval into the agent's
+session, and sends the owner no new call.
 
 When the owner types a grant into your session, you may act on it for that session's life. Send the
 line to `z-stu` with `atc_message_send`, so that `z-stu` records it. This sends the record keeper
