@@ -13,12 +13,13 @@ export function releaseLanes(db: Database, actor: string): boolean {
       const had = getLanesHold(db) !== null;
       const spans = readHeldSpans(db);
       setMeta(db, 'lanes_hold', null);
+      const last = spans.at(-1);
+
+      // Save the spans even with no hold in force: an older build's span lives only in the hold row
+      // this release clears.
+      const kept = had && last !== undefined ? [...spans.slice(0, -1), { from: last.from, until: iso(now()) }] : spans;
+      writeHeldSpans(db, kept);
       if (had) {
-        const until = iso(now());
-        const last = spans.at(-1);
-        if (last !== undefined) {
-          writeHeldSpans(db, [...spans.slice(0, -1), { from: last.from, until }]);
-        }
         logEvent(db, 'hq', 'lanes', 'released', actor, null, null, {});
       }
       return had;

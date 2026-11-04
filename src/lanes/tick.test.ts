@@ -460,6 +460,26 @@ test('it counts none of a hold an older build saved, from its start to its relea
   expect(readSlotMinutes(ctx.db, '2026-10-14').delivery - before).toBe(18);
 });
 
+test('it counts none of a hold an older build saved, when a release clears it after it ended', async () => {
+  const ctx = setupTest();
+  at('2026-10-14T01:00:00Z');
+  const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
+  await ctx.seedReady([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
+  tick(ctx.db, sample, 'hq-lanes');
+  at('2026-10-14T01:11:00Z');
+  tick(ctx.db, sample, 'hq-lanes');
+  const before = readSlotMinutes(ctx.db, '2026-10-14').delivery;
+  holdLanes(ctx.db, 6, 'the kettle supplier is closed', 'z-stu');
+  setMeta(ctx.db, LANES_HELD_SPANS, null);
+  at('2026-10-14T01:18:00Z');
+  releaseLanes(ctx.db, 'z-stu');
+  at('2026-10-14T01:20:00Z');
+
+  tick(ctx.db, sample, 'hq-lanes');
+
+  expect(readSlotMinutes(ctx.db, '2026-10-14').delivery - before).toBe(9);
+});
+
 test('it offers the imp room as free slots when pacing has no lanes and no cap is set', () => {
   const ctx = setupTest();
   at('2026-10-14T01:00:00Z');
