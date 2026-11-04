@@ -15,11 +15,13 @@ import type { DesignCause } from './build-design-cause.ts';
 import { checkAllSkipped } from './check-all-skipped.ts';
 import { checkReadyStale } from './check-ready-stale.ts';
 import { eligibleNow } from './eligible-now.ts';
+import { countHeldMs } from './count-held-ms.ts';
 import { formatPlaceUnfit } from './format-place-unfit.ts';
 import { formatSlotNudge } from './format-slot-nudge.ts';
 import { getLanesHold } from './get-lanes-hold.ts';
 import { LANES } from './lanes.ts';
 import { nudgeText } from './nudge-text.ts';
+import { readHeldSpans } from './read-held-spans.ts';
 import { readSlotMinutes } from './read-slot-minutes.ts';
 import { readSlotPlan } from './read-slot-plan.ts';
 import { removeLaneNudges } from './remove-lane-nudges.ts';
@@ -30,6 +32,7 @@ import { slotsFrom } from './slots-from.ts';
 import { trackDesignCause } from './track-design-cause.ts';
 import { trackSlotCause } from './track-slot-cause.ts';
 import type { Sample, SlotCause, SlotCauseName, TickResult } from './types.ts';
+import { writeHeldSpans } from './write-held-spans.ts';
 import { writeSlotMinutes } from './write-slot-minutes.ts';
 
 export function tick(db: Database, sample: Sample, actor: string): TickResult {
@@ -53,9 +56,11 @@ export function tick(db: Database, sample: Sample, actor: string): TickResult {
       }
 
       const slotCause = trackSlotCause(db, slotPlan, t);
-      writeEmptySlotMinutes(db, { slotCause, previousAt: previous?.at ?? null, at: t });
       const designCause = trackDesignCause(db, slotPlan, t);
-      writeDesignSlotMinutes(db, { designCause, previousAt: previous?.at ?? null, at: t });
+      const previousAt = previous?.at ?? null;
+      const heldMs = takeHeldMs(db, previousAt, t);
+      writeEmptySlotMinutes(db, { slotCause, previousAt, heldMs, at: t });
+      writeDesignSlotMinutes(db, { designCause, previousAt, heldMs, at: t });
       sendSlotCauseAlerts(db, { free: slotCause.slots, designFree: designCause.slots, at: t, actor });
       if (!sample.error) {
         const held = getLanesHold(db) !== null;
@@ -130,6 +135,14 @@ export function tick(db: Database, sample: Sample, actor: string): TickResult {
     .immediate();
 }
 
+// Each held span stays on record until a look counts past it, so a hold that starts and ends
+// between two looks still comes off the interval the second look counts.
+function takeHeldMs(db: Database, previousAt: string | null, at: Date): number {
+  const count = countHeldMs(readHeldSpans(db), previousAt, at);
+  writeHeldSpans(db, count.kept);
+  return count.heldMs;
+}
+
 function countWanted(slotPlan: NonNullable<ReturnType<typeof readSlotPlan>>): number {
   if (slotPlan.plan === null) {
     return slotPlan.pool.free;
@@ -140,6 +153,7 @@ function countWanted(slotPlan: NonNullable<ReturnType<typeof readSlotPlan>>): nu
 interface EmptySlotLook {
   slotCause: SlotCause;
   previousAt: string | null;
+  heldMs: number;
   at: Date;
 }
 
@@ -148,13 +162,14 @@ function writeEmptySlotMinutes(db: Database, look: EmptySlotLook): void {
   if (cause === null || cause === 'unknown' || look.previousAt === null) {
     return;
   }
-  const minutes = look.slotCause.slots * Math.min(Math.max(0, look.at.getTime() - Date.parse(look.previousAt)) / 60_000, 30);
+  const minutes = look.slotCause.slots * Math.min(Math.max(0, look.at.getTime() - Date.parse(look.previousAt) - look.heldMs) / 60_000, 30);
   writeSlotMinutes(db, sydney(look.at).date, cause, minutes);
 }
 
 interface DesignMinutesLook {
   designCause: DesignCause;
   previousAt: string | null;
+  heldMs: number;
   at: Date;
 }
 
@@ -162,7 +177,7 @@ function writeDesignSlotMinutes(db: Database, look: DesignMinutesLook): void {
   if (look.designCause.slots === 0 || look.previousAt === null) {
     return;
   }
-  const minutes = look.designCause.slots * Math.min(Math.max(0, look.at.getTime() - Date.parse(look.previousAt)) / 60_000, 30);
+  const minutes = look.designCause.slots * Math.min(Math.max(0, look.at.getTime() - Date.parse(look.previousAt) - look.heldMs) / 60_000, 30);
   writeSlotMinutes(db, sydney(look.at).date, 'design', minutes);
 }
 

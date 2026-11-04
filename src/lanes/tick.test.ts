@@ -10,6 +10,9 @@ import { makeStateCall } from '../../test/make-state-call.ts';
 import { setMeta } from '../db/set-meta.ts';
 import { runFocusCommand } from '../focus/run-focus-command.ts';
 import { addRun } from '../runs/add-run.ts';
+import { holdLanes } from './hold-lanes.ts';
+import { LANES_HELD_SPANS } from './lanes-held-spans.ts';
+import { releaseLanes } from './release-lanes.ts';
 import { readLinearReady } from './read-linear-ready.ts';
 import { readSlotMinutes } from './read-slot-minutes.ts';
 import { tick } from './tick.ts';
@@ -335,6 +338,148 @@ test('it counts no slot-minutes while the cap, not the pool, holds the free slot
   expect(readSlotMinutes(ctx.db, '2026-10-14')).toStrictEqual({ delivery: 0, triage: 0, supply: 0, design: 0 });
 });
 
+test('it counts no slot-minutes while a lanes hold is in force', async () => {
+  const ctx = setupTest();
+  at('2026-10-14T01:00:00Z');
+  const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
+  await ctx.seedReady([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
+  holdLanes(ctx.db, 120, 'the kettle supplier is closed', 'z-stu');
+  tick(ctx.db, sample, 'hq-lanes');
+  at('2026-10-14T01:20:00Z');
+
+  const result = tick(ctx.db, sample, 'hq-lanes');
+
+  expect(result.slotCause.cause).toBe('delivery');
+  expect(result.nudged).toBe(false);
+  expect(readSlotMinutes(ctx.db, '2026-10-14')).toStrictEqual({ delivery: 0, triage: 0, supply: 0, design: 0 });
+});
+
+test('it counts only the minutes after a hold ends in the first look after it', async () => {
+  const ctx = setupTest();
+  at('2026-10-14T01:00:00Z');
+  const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
+  await ctx.seedReady([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
+  holdLanes(ctx.db, 20, 'the kettle supplier is closed', 'z-stu');
+  tick(ctx.db, sample, 'hq-lanes');
+  at('2026-10-14T01:25:00Z');
+
+  tick(ctx.db, sample, 'hq-lanes');
+
+  expect(readSlotMinutes(ctx.db, '2026-10-14').delivery).toBe(15);
+});
+
+test('it counts only the minutes after a release in the first look after it', async () => {
+  const ctx = setupTest();
+  at('2026-10-14T01:00:00Z');
+  const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
+  await ctx.seedReady([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
+  holdLanes(ctx.db, 120, 'the kettle supplier is closed', 'z-stu');
+  tick(ctx.db, sample, 'hq-lanes');
+  at('2026-10-14T01:10:00Z');
+  releaseLanes(ctx.db, 'z-stu');
+  at('2026-10-14T01:15:00Z');
+
+  tick(ctx.db, sample, 'hq-lanes');
+
+  expect(readSlotMinutes(ctx.db, '2026-10-14').delivery).toBe(15);
+});
+
+test('it counts none of a hold that starts and ends between two looks', async () => {
+  const ctx = setupTest();
+  at('2026-10-14T01:00:00Z');
+  const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
+  await ctx.seedReady([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
+  tick(ctx.db, sample, 'hq-lanes');
+  at('2026-10-14T01:15:00Z');
+  tick(ctx.db, sample, 'hq-lanes');
+  const before = readSlotMinutes(ctx.db, '2026-10-14').delivery;
+  at('2026-10-14T01:16:00Z');
+  holdLanes(ctx.db, 2, 'the kettle supplier is closed', 'z-stu');
+  at('2026-10-14T01:20:00Z');
+
+  tick(ctx.db, sample, 'hq-lanes');
+
+  expect(readSlotMinutes(ctx.db, '2026-10-14').delivery - before).toBe(9);
+});
+
+test('it counts none of two holds that each start and end between the same two looks', async () => {
+  const ctx = setupTest();
+  at('2026-10-14T01:00:00Z');
+  const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
+  await ctx.seedReady([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
+  tick(ctx.db, sample, 'hq-lanes');
+  at('2026-10-14T01:11:00Z');
+  tick(ctx.db, sample, 'hq-lanes');
+  const before = readSlotMinutes(ctx.db, '2026-10-14').delivery;
+  at('2026-10-14T01:12:00Z');
+  holdLanes(ctx.db, 1, 'the kettle supplier is closed', 'z-stu');
+  at('2026-10-14T01:15:00Z');
+  holdLanes(ctx.db, 2, 'the kettle supplier is closed again', 'z-stu');
+  at('2026-10-14T01:20:00Z');
+
+  tick(ctx.db, sample, 'hq-lanes');
+
+  expect(readSlotMinutes(ctx.db, '2026-10-14').delivery - before).toBe(18);
+});
+
+test('it counts none of a hold an older build saved, from its start to its end', async () => {
+  const ctx = setupTest();
+  at('2026-10-14T01:00:00Z');
+  const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
+  await ctx.seedReady([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
+  tick(ctx.db, sample, 'hq-lanes');
+  at('2026-10-14T01:11:00Z');
+  tick(ctx.db, sample, 'hq-lanes');
+  const before = readSlotMinutes(ctx.db, '2026-10-14').delivery;
+  holdLanes(ctx.db, 6, 'the kettle supplier is closed', 'z-stu');
+  setMeta(ctx.db, LANES_HELD_SPANS, null);
+  at('2026-10-14T01:20:00Z');
+
+  tick(ctx.db, sample, 'hq-lanes');
+
+  expect(readSlotMinutes(ctx.db, '2026-10-14').delivery - before).toBe(9);
+});
+
+test('it counts none of a hold an older build saved, from its start to its release', async () => {
+  const ctx = setupTest();
+  at('2026-10-14T01:00:00Z');
+  const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
+  await ctx.seedReady([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
+  tick(ctx.db, sample, 'hq-lanes');
+  at('2026-10-14T01:11:00Z');
+  tick(ctx.db, sample, 'hq-lanes');
+  const before = readSlotMinutes(ctx.db, '2026-10-14').delivery;
+  holdLanes(ctx.db, 120, 'the kettle supplier is closed', 'z-stu');
+  setMeta(ctx.db, LANES_HELD_SPANS, null);
+  at('2026-10-14T01:14:00Z');
+  releaseLanes(ctx.db, 'z-stu');
+  at('2026-10-14T01:20:00Z');
+
+  tick(ctx.db, sample, 'hq-lanes');
+
+  expect(readSlotMinutes(ctx.db, '2026-10-14').delivery - before).toBe(18);
+});
+
+test('it counts none of a hold an older build saved, when a release clears it after it ended', async () => {
+  const ctx = setupTest();
+  at('2026-10-14T01:00:00Z');
+  const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
+  await ctx.seedReady([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
+  tick(ctx.db, sample, 'hq-lanes');
+  at('2026-10-14T01:11:00Z');
+  tick(ctx.db, sample, 'hq-lanes');
+  const before = readSlotMinutes(ctx.db, '2026-10-14').delivery;
+  holdLanes(ctx.db, 6, 'the kettle supplier is closed', 'z-stu');
+  setMeta(ctx.db, LANES_HELD_SPANS, null);
+  at('2026-10-14T01:18:00Z');
+  releaseLanes(ctx.db, 'z-stu');
+  at('2026-10-14T01:20:00Z');
+
+  tick(ctx.db, sample, 'hq-lanes');
+
+  expect(readSlotMinutes(ctx.db, '2026-10-14').delivery - before).toBe(9);
+});
+
 test('it offers the imp room as free slots when pacing has no lanes and no cap is set', () => {
   const ctx = setupTest();
   at('2026-10-14T01:00:00Z');
@@ -483,6 +628,24 @@ test('it counts design minutes apart from the delivery tally once a needs-design
 
   expect(readSlotMinutes(ctx.db, '2026-10-14')).toStrictEqual({ delivery: 0, triage: 0, supply: 0, design: 3 });
   expect(result.slotCause.cause).toBe('unknown');
+});
+
+test('it counts no design minutes while a lanes hold is in force, though a needs-design ticket has waited more than 10 minutes', () => {
+  const ctx = setupTest();
+  const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 }, design: { agent: 2, withGeoff: 1 } };
+  at('2026-10-14T01:00:00Z');
+  holdLanes(ctx.db, 120, 'the kettle supplier is closed', 'z-stu');
+  writeDesignBacklog(ctx.db, { at: new Date('2026-10-14T01:00:00Z'), agent: [buildReadyIssue('GEO-9901', { project: 'kettle roadmap', labels: ['needs-design'], type: 'Design', priority: 2 })], withGeoff: [] });
+  tick(ctx.db, sample, 'hq-lanes');
+  at('2026-10-14T01:08:00Z');
+  writeDesignBacklog(ctx.db, { at: new Date('2026-10-14T01:08:00Z'), agent: [buildReadyIssue('GEO-9901', { project: 'kettle roadmap', labels: ['needs-design'], type: 'Design', priority: 2 })], withGeoff: [] });
+  tick(ctx.db, sample, 'hq-lanes');
+  at('2026-10-14T01:11:00Z');
+  writeDesignBacklog(ctx.db, { at: new Date('2026-10-14T01:11:00Z'), agent: [buildReadyIssue('GEO-9901', { project: 'kettle roadmap', labels: ['needs-design'], type: 'Design', priority: 2 })], withGeoff: [] });
+
+  tick(ctx.db, sample, 'hq-lanes');
+
+  expect(readSlotMinutes(ctx.db, '2026-10-14').design).toBe(0);
 });
 
 test('it alerts z-delivery once the design minutes reach 60', () => {
