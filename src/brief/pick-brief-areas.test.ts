@@ -48,14 +48,20 @@ test('it leaves out the with-geoff and parked labels', () => {
   expect(pickBriefAreas({ identifier: 'GEO-9001', description: '', labels })).toStrictEqual({ kind: 'known', areas: [{ label: 'vers', repo: 'vers' }] });
 });
 
-test('it returns a label that names no repo hq knows as unknown', () => {
-  expect(pickBriefAreas({ identifier: 'GEO-9001', description: '', labels: [{ name: 'cloud' }, { name: 'teapot' }] })).toStrictEqual({ kind: 'unknown', label: 'teapot' });
+test('it names the zgeoff repo of the same name for an area label that has no list', () => {
+  expect(pickBriefAreas({ identifier: 'GEO-9001', description: '', labels: [{ name: 'Teapot' }, { name: 'cloud' }] })).toStrictEqual({
+    kind: 'known',
+    areas: [
+      { label: 'cloud', repo: 'cloud' },
+      { label: 'teapot', repo: 'teapot' },
+    ],
+  });
 });
 
 test('it returns an area with no repo of its own as unknown', () => {
-  expect(pickBriefAreas({ identifier: 'GEO-9001', description: '', labels: [{ name: 'frankie' }] })).toStrictEqual({ kind: 'unknown', label: 'frankie' });
+  expect(pickBriefAreas({ identifier: 'GEO-9001', description: '', labels: [{ name: 'cloud' }, { name: 'frankie' }] })).toStrictEqual({ kind: 'unknown', label: 'frankie' });
 });
 
-test('it returns a label named like an Object property, such as constructor, as unknown', () => {
-  expect(pickBriefAreas({ identifier: 'GEO-9001', description: '', labels: [{ name: 'constructor' }] })).toStrictEqual({ kind: 'unknown', label: 'constructor' });
+test('it reads a label named like an Object property, such as constructor, as a repo of that name', () => {
+  expect(pickBriefAreas({ identifier: 'GEO-9001', description: '', labels: [{ name: 'constructor' }] })).toStrictEqual({ kind: 'known', areas: [{ label: 'constructor', repo: 'constructor' }] });
 });

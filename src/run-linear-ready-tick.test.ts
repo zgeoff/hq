@@ -5,6 +5,9 @@ import { buildStubClock } from '../test/build-stub-clock.ts';
 import { buildStubGitHubFactsRunner } from '../test/build-stub-github-facts-runner.ts';
 import { buildReadyPage, makePagedCall } from '../test/build-ready-page.ts';
 import { makeBacklogCall } from '../test/make-backlog-call.ts';
+import { makeLabelsCall } from '../test/make-labels-call.ts';
+import { readAreaLabels } from './focus/read-area-labels.ts';
+import { readFocus } from './focus/read-focus.ts';
 import { buildMockLaneConfig } from '../test/build-mock-lane-config.ts';
 import { at, freshDb } from '../test/helpers.ts';
 import { getMeta } from './db/get-meta.ts';
@@ -12,6 +15,7 @@ import { setMeta } from './db/set-meta.ts';
 import { readDesignBacklog } from './lanes/read-design-backlog.ts';
 import { readReadySnapshot } from './lanes/read-ready-snapshot.ts';
 import { runFocusCommand } from './focus/run-focus-command.ts';
+import { seedAreaLabels } from '../test/seed-area-labels.ts';
 import { makeStateCall } from '../test/make-state-call.ts';
 import type { LinearCall } from './linear/types.ts';
 import { runLinearReadyTick } from './run-linear-ready-tick.ts';
@@ -59,7 +63,7 @@ test('it runs no second pass within 10 min', async () => {
 
   expect(second).toBe(false);
   expect(third).toBe(true);
-  expect(call).toHaveBeenCalledTimes(4);
+  expect(call).toHaveBeenCalledTimes(6);
 });
 
 test('it reads now on refresh when the throttle says the read is not due', async () => {
@@ -284,4 +288,62 @@ test('it leaves a needs-design Backlog issue out of the promotable count and sto
   expect(stored?.at).toBe('2026-10-15T20:00:00Z');
   expect(stored?.agent.map((issue) => issue.identifier)).toStrictEqual(['GEO-9902']);
   expect(stored?.withGeoff.map((issue) => issue.identifier)).toStrictEqual(['GEO-9903']);
+});
+
+test('it stores the area labels it reads, so a new label is taken as a focus term and as a --reserve', async () => {
+  const ctx = setupTest();
+  const lanes = ['nixie-slice', 'nixie-maintenance', 'atc', 'imp', 'cloud', 'memory', 'flexible', 'cleanup', 'process'].map((name) => buildMockLaneConfig(name));
+  const call = makeLabelsCall(makeBacklogCall([]), ['Teapot', 'needs geoff', 'kettle']);
+
+  await runLinearReadyTick(ctx.db, { call, run: buildStubGitHubFactsRunner({}), readLanes: () => Promise.resolve(lanes), actor: 'hq-lanes', deadlineMs: 2000 });
+  await runFocusCommand({ db: ctx.db, call: makeStateCall([], []), actor: 'kettle-owner', at: new Date('2026-10-15T20:00:00Z'), verb: 'set', rest: ['teapot'], reserves: ['kettle=1'] });
+
+  expect(readAreaLabels(ctx.db)).toStrictEqual({ at: '2026-10-15T20:00:00Z', names: ['kettle', 'teapot'], repoExists: {} });
+  expect(readFocus(ctx.db)).toMatchObject({ terms: [{ text: 'teapot' }], reserves: [{ area: 'kettle', slots: 1 }] });
+});
+
+test('it keeps the last stored area labels and still runs the tick when the label read fails', async () => {
+  const ctx = setupTest();
+  const lanes = ['nixie-slice', 'nixie-maintenance', 'atc', 'imp', 'cloud', 'memory', 'flexible', 'cleanup', 'process'].map((name) => buildMockLaneConfig(name));
+  await runLinearReadyTick(ctx.db, { call: makeLabelsCall(makeBacklogCall([]), ['teapot']), run: buildStubGitHubFactsRunner({}), readLanes: () => Promise.resolve(lanes), actor: 'hq-lanes', deadlineMs: 2000 });
+  at('2026-10-15T20:10:00Z');
+
+  const ran = await runLinearReadyTick(ctx.db, { call: makeLabelsCall(makeBacklogCall([]), 'outage'), run: buildStubGitHubFactsRunner({}), readLanes: () => Promise.resolve(lanes), actor: 'hq-lanes', deadlineMs: 2000 });
+  await runFocusCommand({ db: ctx.db, call: makeStateCall([], []), actor: 'kettle-owner', at: new Date('2026-10-15T20:10:00Z'), verb: 'set', rest: ['teapot'], reserves: [] });
+
+  expect(ran).toBe(true);
+  expect(readAreaLabels(ctx.db)).toStrictEqual({ at: '2026-10-15T20:00:00Z', names: ['teapot'], repoExists: {} });
+  expect(getMeta(ctx.db, 'lanes_ready_linear_error')).toBeNull();
+  expect(getMeta(ctx.db, 'lanes_area_labels_error')).toContain('outage');
+  expect(readFocus(ctx.db)).toMatchObject({ terms: [{ text: 'teapot' }] });
+});
+
+test('it clears the stored label-read error after a good label read', async () => {
+  const ctx = setupTest();
+  const lanes = ['nixie-slice', 'nixie-maintenance', 'atc', 'imp', 'cloud', 'memory', 'flexible', 'cleanup', 'process'].map((name) => buildMockLaneConfig(name));
+  await runLinearReadyTick(ctx.db, { call: makeLabelsCall(makeBacklogCall([]), 'outage'), run: buildStubGitHubFactsRunner({}), readLanes: () => Promise.resolve(lanes), actor: 'hq-lanes', deadlineMs: 2000 });
+  at('2026-10-15T20:10:00Z');
+
+  await runLinearReadyTick(ctx.db, { call: makeLabelsCall(makeBacklogCall([]), ['teapot']), run: buildStubGitHubFactsRunner({}), readLanes: () => Promise.resolve(lanes), actor: 'hq-lanes', deadlineMs: 2000 });
+
+  expect(getMeta(ctx.db, 'lanes_area_labels_error')).toBeNull();
+});
+
+test('it keeps the repo checks that hq linear areas stored for the labels still in Linear', async () => {
+  const ctx = setupTest();
+  const lanes = ['nixie-slice', 'nixie-maintenance', 'atc', 'imp', 'cloud', 'memory', 'flexible', 'cleanup', 'process'].map((name) => buildMockLaneConfig(name));
+  seedAreaLabels(ctx.db, ['teapot', 'kettle'], { teapot: true, kettle: false });
+
+  await runLinearReadyTick(ctx.db, { call: makeLabelsCall(makeBacklogCall([]), ['teapot']), run: buildStubGitHubFactsRunner({}), readLanes: () => Promise.resolve(lanes), actor: 'hq-lanes', deadlineMs: 2000 });
+
+  expect(readAreaLabels(ctx.db)).toStrictEqual({ at: '2026-10-15T20:00:00Z', names: ['teapot'], repoExists: { teapot: true } });
+});
+
+test('it records the areas of a Ready issue that carries a label added to Linear since the last read', async () => {
+  const ctx = setupTest();
+  const call = makeLabelsCall(makePagedCall(buildReadyPage([{ identifier: 'GEO-9801', labels: ['teapot'] }], null)), ['teapot']);
+
+  await runLinearReadyTick(ctx.db, { call, run: buildStubGitHubFactsRunner({}), readLanes: () => Promise.resolve(null), actor: 'hq-lanes', deadlineMs: 2000 });
+
+  expect(JSON.parse(getMeta(ctx.db, 'lanes_issue_areas') ?? 'null')).toStrictEqual({ 'GEO-9801': ['teapot'] });
 });

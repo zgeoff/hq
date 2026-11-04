@@ -1,27 +1,10 @@
-import type { FocusArea } from '../focus/focus-areas.ts';
+const REPO_EXCEPTIONS: ReadonlyMap<string, string | null> = new Map([
+  ['imp', 'impz'],
+  ['frankie', null],
+]);
 
-const REPOS = {
-  atc: 'atc',
-  'auto-mode': 'auto-mode',
-  boxxy: 'boxxy',
-  cloud: 'cloud',
-  dotfiles: 'dotfiles',
-  frankie: null,
-  hq: 'hq',
-  imp: 'impz',
-  llm: 'llm',
-  nixie: 'nixie',
-  'nixie-definitions': 'nixie-definitions',
-  noslop: 'noslop',
-  osrs: 'osrs',
-  pepys: 'pepys',
-  skills: 'skills',
-  tools: 'tools',
-  vers: 'vers',
-  wringer: 'wringer',
-  wulez: 'wulez',
-} as const satisfies Record<FocusArea, string | null>;
-
-export const AREA_REPOS: ReadonlyMap<string, string | null> = new Map(Object.entries(REPOS));
+export function pickAreaRepo(label: string): string | null {
+  return REPO_EXCEPTIONS.has(label) ? (REPO_EXCEPTIONS.get(label) ?? null) : label;
+}
 
 export const NOT_AREA_LABELS: ReadonlySet<string> = new Set(['needs geoff', 'quality', 'enabler', 'process', 'with-geoff', 'parked']);

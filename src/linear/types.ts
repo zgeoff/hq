@@ -1,3 +1,5 @@
+import type { Database } from 'bun:sqlite';
+import type { Runner } from '../runner/types.ts';
 import type { IssueType } from './issue-types.ts';
 
 export interface LinearIssue {
@@ -23,7 +25,9 @@ interface ForceRemove {
 }
 
 export interface LinearCommandDeps {
+  db: Database;
   call: LinearCall;
+  run: Runner;
   files: IssueFiles;
 }
 

@@ -1,4 +1,4 @@
-import { AREA_REPOS } from './area-repos.ts';
+import { pickAreaRepo } from './area-repos.ts';
 import { isAreaLabel } from './is-area-label.ts';
 import type { BriefIssue } from './types.ts';
 
@@ -16,8 +16,8 @@ export function pickBriefAreas(issue: BriefIssue): BriefAreas {
     .toSorted();
   const areas: BriefArea[] = [];
   for (const label of labels) {
-    const repo = AREA_REPOS.get(label);
-    if (repo === undefined || repo === null) {
+    const repo = pickAreaRepo(label);
+    if (repo === null) {
       return { kind: 'unknown', label };
     }
     areas.push({ label, repo });

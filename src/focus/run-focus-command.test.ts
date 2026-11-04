@@ -7,6 +7,7 @@ import { main } from '../cli.ts';
 import { overrideEnv } from '../config/override-env.ts';
 import { resetKey } from '../linear/reset-key.ts';
 import type { RunResult, Runner } from '../runner/types.ts';
+import { seedAreaLabels } from '../../test/seed-area-labels.ts';
 import { readFocus } from './read-focus.ts';
 import { runFocusCommand } from './run-focus-command.ts';
 
@@ -84,6 +85,52 @@ test('set refuses an unknown filter key and a bad reserve, and stores nothing', 
   await expect(runFocusCommand({ db: ctx.db, call, actor: 'kettle-owner', at: new Date('2026-10-15T20:00:00Z'), verb: 'set', rest: ['bug:owner=kettle'], reserves: [] })).rejects.toThrow('focus: unknown filter "owner=kettle" in term "bug:owner=kettle"');
   await expect(runFocusCommand({ db: ctx.db, call, actor: 'kettle-owner', at: new Date('2026-10-15T20:00:00Z'), verb: 'set', rest: ['bug'], reserves: ['teapots=1'] })).rejects.toThrow('focus: bad --reserve "teapots=1"');
   expect(readFocus(ctx.db)).toBeNull();
+});
+
+test('it takes, on set, a new area label stored from a Linear read, as a term and as a --reserve', async () => {
+  const ctx = setupTest();
+  seedAreaLabels(ctx.db, ['teapot', 'kettle']);
+
+  await runFocusCommand({ db: ctx.db, call: makeStateCall([], []), actor: 'kettle-owner', at: new Date('2026-10-15T20:00:00Z'), verb: 'set', rest: ['teapot:bug'], reserves: ['kettle=2'] });
+
+  expect(readFocus(ctx.db)).toMatchObject({
+    terms: [{ text: 'teapot:bug', filters: [{ kind: 'area', value: 'teapot' }, { kind: 'type', value: 'bug' }] }],
+    reserves: [{ area: 'kettle', slots: 2 }],
+  });
+});
+
+test('it refuses, on set, a name that is not on the stored list, even a built-in area, by name', async () => {
+  const ctx = setupTest();
+  seedAreaLabels(ctx.db, ['teapot']);
+  const call = makeStateCall([], []);
+
+  await expect(runFocusCommand({ db: ctx.db, call, actor: 'kettle-owner', at: new Date('2026-10-15T20:00:00Z'), verb: 'set', rest: ['nixie'], reserves: [] })).rejects.toThrow('focus: unknown filter "nixie" in term "nixie"');
+  await expect(runFocusCommand({ db: ctx.db, call, actor: 'kettle-owner', at: new Date('2026-10-15T20:00:00Z'), verb: 'set', rest: ['bug'], reserves: ['nixie=1'] })).rejects.toThrow('focus: bad --reserve "nixie=1"; give <area>=<n>, n from 1 to 20, area one of teapot');
+  expect(readFocus(ctx.db)).toBeNull();
+});
+
+test('it keeps, on show, a stored term and reserve whose label left Linear, and marks them', async () => {
+  const ctx = setupTest();
+  seedAreaLabels(ctx.db, ['teapot', 'kettle']);
+  await runFocusCommand({ db: ctx.db, call: makeStateCall([], []), actor: 'kettle-owner', at: new Date('2026-10-15T20:00:00Z'), verb: 'set', rest: ['teapot,bug'], reserves: ['teapot=1', 'kettle=1'] });
+  seedAreaLabels(ctx.db, ['kettle']);
+
+  const out = await runFocusCommand({ db: ctx.db, call: makeStateCall([], []), actor: 'kettle-owner', at: new Date('2026-10-15T20:00:00Z'), verb: 'show', rest: [], reserves: [] });
+
+  expect(readFocus(ctx.db)?.reserves).toStrictEqual([
+    { area: 'teapot', slots: 1 },
+    { area: 'kettle', slots: 1 },
+  ]);
+  expect(out.text).toBe(
+    [
+      'Focus (set 2026-10-15T20:00:00Z by kettle-owner): teapot, bug; reserve teapot=1, kettle=1',
+      '  1. teapot (no longer a Linear label): 0 Ready, 0 Backlog',
+      '  2. bug: 0 Ready, 0 Backlog',
+      '  reserve: teapot (no longer a Linear label) keeps 1 slot(s), lent while it has nothing eligible',
+      '  reserve: kettle keeps 1 slot(s), lent while it has nothing eligible',
+      '  then any other eligible work',
+    ].join('\n'),
+  );
 });
 
 test('show prints the match counts of the focus set now', async () => {

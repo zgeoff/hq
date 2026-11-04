@@ -1,6 +1,6 @@
 import { match } from 'ts-pattern';
 import type { ReadyIssue } from '../lanes/types.ts';
-import { getIssueAreas } from './get-issue-areas.ts';
+import { hasIssueArea } from './has-issue-area.ts';
 import type { FocusFilter, FocusTerm } from './types.ts';
 
 // Linear's priority 0 is none, never urgent.
@@ -15,7 +15,7 @@ function isFilterMatch(issue: ReadyIssue, filter: FocusFilter): boolean {
     .with({ kind: 'class' }, (classFilter) => (classFilter.value === 'maintenance') === isMaintenance(issue))
     .with({ kind: 'type' }, (typeFilter) => issue.type.toLowerCase() === typeFilter.value)
     .with({ kind: 'project' }, (projectFilter) => issue.project?.toLowerCase() === projectFilter.value.toLowerCase())
-    .with({ kind: 'area' }, (areaFilter) => getIssueAreas(issue.labels).includes(areaFilter.value))
+    .with({ kind: 'area' }, (areaFilter) => hasIssueArea(issue.labels, areaFilter.value))
     .with({ kind: 'label' }, (labelFilter) => hasName(issue.labels, labelFilter.value))
     .with({ kind: 'priority' }, (priorityFilter) => issue.priority >= 1 && issue.priority <= PRIORITY_CEILING[priorityFilter.value])
     .exhaustive();
