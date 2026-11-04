@@ -14,7 +14,7 @@ export function pickQuietSessions(guarded: readonly AtcSession[] | null, activit
   }
   const quiet = guarded.every((session) => {
     const read = activity.get(session.id) ?? null;
-    return read !== null && isIdle(session.state, read.pendingMessage) && typeof read.lastActivityAt === 'number' && read.lastActivityAt <= quietBefore;
+    return read !== null && isIdle(session, read.pendingMessage) && typeof read.lastActivityAt === 'number' && read.lastActivityAt <= quietBefore;
   });
   return quiet ? guarded.map((session) => session.id) : null;
 }
@@ -23,6 +23,10 @@ export function pickQuietSessions(guarded: readonly AtcSession[] | null, activit
 // background subagent open. atc then shows the session as needs_you with this pending message.
 const CLAUDE_IDLE_MESSAGE = 'Claude is waiting for your input';
 
-function isIdle(state: string | undefined, pendingMessage: string | null): boolean {
-  return state === 'done' || (state === 'needs_you' && pendingMessage === CLAUDE_IDLE_MESSAGE);
+// atc revives each session after its daemon restarts, and shows it running with this last message
+// until a new turn starts; no Claude Code hook fires, since no response has finished since.
+const REVIVED_MESSAGE = 'revived';
+
+function isIdle(session: AtcSession, pendingMessage: string | null): boolean {
+  return session.state === 'done' || (session.state === 'needs_you' && pendingMessage === CLAUDE_IDLE_MESSAGE) || (session.state === 'running' && session.lastMsg === REVIVED_MESSAGE);
 }

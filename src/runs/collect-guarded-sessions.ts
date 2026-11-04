@@ -1,7 +1,7 @@
 import type { FleetSession } from '../fleet/types.ts';
 import type { HandedInSessionRow } from './pick-handed-in-candidates.ts';
 
-export type AtcSession = Pick<FleetSession, 'id' | 'state' | 'parent'>;
+export type AtcSession = Pick<FleetSession, 'id' | 'state' | 'parent' | 'lastMsg'>;
 
 // The wrap-up forgets every session of the run that atc lists, active or not, with all their
 // sub-sessions, so each of them is checked. An active session atc does not list returns null.
