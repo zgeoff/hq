@@ -3,18 +3,20 @@ import { AtcClient } from '../atc/atc-client.ts';
 import { fakeAtc, freshDb } from '../../test/helpers.ts';
 import { makeFleetClient } from './make-fleet-client.ts';
 
-async function setupTest(sessions: { id: string; name: string; alive: boolean; state: string; lastMsg?: unknown }[]) {
+async function setupTest() {
   const base = freshDb();
   onTestFinished(base.cleanup);
-  const server = fakeAtc(base.dir, sessions);
+  const roster: { id: string; name: string; alive: boolean; state: string; lastMsg?: unknown }[] = [];
+  const server = fakeAtc(base.dir, roster);
   onTestFinished(server.stop);
   const atc = await AtcClient.open(server.path);
   onTestFinished(() => atc.close());
-  return { server, client: makeFleetClient(atc) };
+  return { server, roster, client: makeFleetClient(atc) };
 }
 
 test('forgetLive asks atc to forget a live session, which stops it, and keeps refusing a pinned one', async () => {
-  const ctx = await setupTest([{ id: '0000c001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, state: 'running' }]);
+  const ctx = await setupTest();
+  ctx.roster.push({ id: '0000c001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, state: 'running' });
 
   await ctx.client.forgetLive?.('0000c001-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
   await ctx.client.forgetLive?.('0000c001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'token-kettle');
@@ -26,10 +28,11 @@ test('forgetLive asks atc to forget a live session, which stops it, and keeps re
 });
 
 test("it lists each session's last message, and reads one that is not text as none", async () => {
-  const ctx = await setupTest([
+  const ctx = await setupTest();
+  ctx.roster.push(
     { id: '0000c001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, state: 'running', lastMsg: 'revived' },
     { id: '0000c002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'teapot-agent', alive: true, state: 'running', lastMsg: 7 },
-  ]);
+  );
 
   const sessions = await ctx.client.sessions();
 
