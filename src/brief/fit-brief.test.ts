@@ -19,6 +19,7 @@ test('it fits one fixed brief', () => {
       notYours: ' Leave the stove to me.',
       impLine: 'This imp has a small kettle.',
       goalFile: '. First read the bug playbook: gh api bug',
+      goalReview: '',
     },
     '. The full issue is in briefs/GEO-9001.md; read it first.',
   );
@@ -66,6 +67,7 @@ test('it gives equal results for equal input', () => {
     notYours: '',
     impLine: '',
     goalFile: '. First read the bug playbook: gh api bug',
+    goalReview: '',
   };
 
   expect(fitBrief('/goal Ship {{repo}}{{goal_file}}\n\n{{issue}}', parts, '. The full issue is in briefs/GEO-9001.md; read it first.')).toStrictEqual(fitBrief('/goal Ship {{repo}}{{goal_file}}\n\n{{issue}}', parts, '. The full issue is in briefs/GEO-9001.md; read it first.'));

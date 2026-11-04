@@ -71,6 +71,7 @@ export interface BriefParts {
   notYours: string;
   impLine: string;
   goalFile: string;
+  goalReview: string;
 }
 
 export type SkillBriefKind = 'design' | 'pr-walk';

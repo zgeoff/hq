@@ -1,5 +1,7 @@
 import { expect, test } from 'bun:test';
+import { readFileSync } from 'node:fs';
 import { buildDeliveryBrief } from './build-delivery-brief.ts';
+import { findFencedBlock } from './find-fenced-block.ts';
 
 test('it builds the full brief from one fixed set of facts', () => {
   const brief = buildDeliveryBrief({
@@ -271,4 +273,62 @@ test.each([
   });
 
   expect(brief.out.text).toBe(`Leave the merge to me. Do only the \`kettle\` part of GEO-9001: each other area (teapot) gets its own launch.\n"${fixes} GEO-9001"`);
+});
+
+test('it asks for noslop\'s review in the /goal line for a repo on noslop\'s list', () => {
+  const brief = buildDeliveryBrief({
+    input: { issue: 'GEO-9001', ref: 'main', imp: false, byLink: true, goalFile: null, repo: null },
+    issue: { identifier: 'GEO-9001', description: '## Outcome\n\nA kettle that boils.\n', labels: [{ name: 'kettle' }] },
+    sha: 'b'.repeat(40),
+    reads: { repo: 'kettle', otherAreas: [], playbook: null, stack: false, imp: false, reviewLines: true },
+    template: '/goal Ship {{repo}} with {{goal_review}}',
+    permissionTable: [{ action: 'Code delivery', phrase: 'Work in <repo>.' }],
+    playbookText: null,
+    stack: '',
+    impLine: '',
+    movedGoalFile: 'briefs/GEO-9001.md',
+  });
+
+  expect(brief.out.text).toBe("/goal Ship zgeoff/kettle with noslop's review answered");
+});
+
+test('it asks for the agent\'s own review in the /goal line for a repo off noslop\'s list', () => {
+  const brief = buildDeliveryBrief({
+    input: { issue: 'GEO-9001', ref: 'main', imp: false, byLink: true, goalFile: null, repo: null },
+    issue: { identifier: 'GEO-9001', description: '## Outcome\n\nA kettle that boils.\n', labels: [{ name: 'kettle' }] },
+    sha: 'b'.repeat(40),
+    reads: { repo: 'kettle', otherAreas: [], playbook: null, stack: false, imp: false, reviewLines: false },
+    template: '/goal Ship {{repo}} with {{goal_review}}',
+    permissionTable: [{ action: 'Code delivery', phrase: 'Work in <repo>.' }],
+    playbookText: null,
+    stack: '',
+    impLine: '',
+    movedGoalFile: 'briefs/GEO-9001.md',
+  });
+
+  expect(brief.out.text).toBe("/goal Ship zgeoff/kettle with your own review's findings fixed");
+});
+
+test('it counts a merged PR as the goal, and asks only for the acceptance a PR can show, when the issue holds a live check', () => {
+  const template = findFencedBlock(readFileSync('agent-kit/brief.md', 'utf8'), null) ?? '';
+  const brief = buildDeliveryBrief({
+    input: { issue: 'GEO-9001', ref: 'main', imp: false, byLink: true, goalFile: null, repo: null },
+    issue: {
+      identifier: 'GEO-9001',
+      description: '## Outcome\n\nA kettle that boils.\n\n## Acceptance\n\n- [ ] The lid test passes.\n- [ ] A live check on the kettle stage shows the lid shut after the deploy.\n',
+      labels: [{ name: 'kettle' }],
+    },
+    sha: 'b'.repeat(40),
+    reads: { repo: 'kettle', otherAreas: [], playbook: null, stack: false, imp: false, reviewLines: false },
+    template,
+    permissionTable: [{ action: 'Code delivery', phrase: 'Work in <repo>.' }],
+    playbookText: null,
+    stack: '',
+    impLine: '',
+    movedGoalFile: 'briefs/GEO-9001.md',
+  });
+
+  expect(brief.out.text.split('\n')[0]).toBe(
+    "/goal A PR in zgeoff/kettle for GEO-9001 that is merged, or out of draft with evidence for each acceptance item a PR can show before merge and your own review's findings fixed. First read GEO-9001 with your own Linear access.",
+  );
 });

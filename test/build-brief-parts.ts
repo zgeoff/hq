@@ -12,6 +12,7 @@ export function buildBriefParts(overrides: Partial<BriefParts> = {}): BriefParts
     notYours: '',
     impLine: '',
     goalFile: '',
+    goalReview: '',
     ...overrides,
   };
 }
