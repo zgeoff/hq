@@ -10,6 +10,8 @@ import { writeAreaNames } from './focus/write-area-names.ts';
 import { collectAreaNames } from './linear/collect-area-names.ts';
 import { readTeamLabels } from './linear/read-team-labels.ts';
 import rulesTable from '../lanes.json';
+
+const AREA_LABELS_ERROR = 'lanes_area_labels_error';
 import { readLinearReady } from './lanes/read-linear-ready.ts';
 import { collectFocusMatches } from './focus/collect-focus-matches.ts';
 import { countFocusMatches } from './focus/count-focus-matches.ts';
@@ -56,9 +58,10 @@ export async function runLinearReadyTick(db: Database, deps: LinearReadyTickDeps
     const rules = validateLaneRules(rulesTable, lanes?.map((lane) => lane.name) ?? null);
 
     // The labels are stored before the Ready read, which records each issue's areas from the stored list.
-    const names = await readAreaNames(cancellableCall, deps.deadlineMs);
-    if (names !== null) {
-      writeAreaNames(db, names, iso(at));
+    const read = await readAreaNames(cancellableCall, deps.deadlineMs);
+    setMeta(db, AREA_LABELS_ERROR, read.error);
+    if (read.names !== null) {
+      writeAreaNames(db, read.names, iso(at));
     }
     await withDeadline(readLinearReady(db, { call: cancellableCall, run: deps.run, actor: deps.actor, rules }), deps.deadlineMs, 'lanes Ready from Linear');
   } catch (error) {
@@ -88,12 +91,12 @@ export async function runLinearReadyTick(db: Database, deps: LinearReadyTickDeps
   return true;
 }
 
-// A read that fails leaves the stored list as it was.
-async function readAreaNames(call: LinearCall, timeoutMs: number): Promise<string[] | null> {
+// A read that fails leaves the stored list as it was, and its error is stored apart from the Ready error.
+async function readAreaNames(call: LinearCall, timeoutMs: number): Promise<{ names: string[] | null; error: string | null }> {
   try {
     const labels = await withDeadline(readTeamLabels(call, rulesTable.team), timeoutMs, 'area labels');
-    return collectAreaNames(labels);
-  } catch {
-    return null;
+    return { names: collectAreaNames(labels), error: null };
+  } catch (error) {
+    return { names: null, error: toMessage(error).slice(0, 300) };
   }
 }

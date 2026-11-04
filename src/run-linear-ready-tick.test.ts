@@ -314,7 +314,19 @@ test('it keeps the last stored area labels and still runs the tick when the labe
   expect(ran).toBe(true);
   expect(readAreaLabels(ctx.db)).toStrictEqual({ at: '2026-10-15T20:00:00Z', names: ['teapot'], repoExists: {} });
   expect(getMeta(ctx.db, 'lanes_ready_linear_error')).toBeNull();
+  expect(getMeta(ctx.db, 'lanes_area_labels_error')).toContain('outage');
   expect(readFocus(ctx.db)).toMatchObject({ terms: [{ text: 'teapot' }] });
+});
+
+test('it clears the stored label-read error after a good label read', async () => {
+  const ctx = setupTest();
+  const lanes = ['nixie-slice', 'nixie-maintenance', 'atc', 'imp', 'cloud', 'memory', 'flexible', 'cleanup', 'process'].map((name) => buildMockLaneConfig(name));
+  await runLinearReadyTick(ctx.db, { call: makeLabelsCall(makeBacklogCall([]), 'outage'), run: buildStubGitHubFactsRunner({}), readLanes: () => Promise.resolve(lanes), actor: 'hq-lanes', deadlineMs: 2000 });
+  at('2026-10-15T20:10:00Z');
+
+  await runLinearReadyTick(ctx.db, { call: makeLabelsCall(makeBacklogCall([]), ['teapot']), run: buildStubGitHubFactsRunner({}), readLanes: () => Promise.resolve(lanes), actor: 'hq-lanes', deadlineMs: 2000 });
+
+  expect(getMeta(ctx.db, 'lanes_area_labels_error')).toBeNull();
 });
 
 test('it keeps the repo checks that hq linear areas stored for the labels still in Linear', async () => {
