@@ -14,7 +14,7 @@ import { sweep } from './sweep.ts';
 import { toMessage } from './to-message.ts';
 import type { Alert } from './types.ts';
 import { watchlist } from './watchlist.ts';
-import { wrapUpMergedRuns } from './wrap-up-merged-runs.ts';
+import { shareClient, wrapUpMergedRuns } from './wrap-up-merged-runs.ts';
 
 export interface SweepOptions {
   actor: string;
@@ -37,8 +37,9 @@ export async function sweepNow(db: Database, client: AtcClient, run: Runner, opt
   if (Array.isArray(sessions)) {
     recordAwake(db, sessions, activity);
     updateGoneRunSessions(db, sessions, options.actor);
-    await endHandedInRunSessionsSafely(db, { sessions, activity }, options);
-    await wrapUpMergedRunsSafely(db, options);
+    const wrapUpDeps = shareClient(options.wrapUpDeps);
+    await endHandedInRunSessionsSafely(db, { sessions, activity }, { ...options, wrapUpDeps });
+    await wrapUpMergedRunsSafely(db, { ...options, wrapUpDeps });
   }
   const alerts = await closeFlaggedPRs(db, run, findAlerts(db, sessions, activity, now()));
   const swept = sweep(db, alerts, options.actor);

@@ -23,14 +23,13 @@ export interface AtcView {
 
 export interface HandedInOptions {
   actor: string;
-  at?: Date;
 }
 
 // Hq closes a builder's session itself once its PRs have merged and nothing is unpushed, in any run
 // state. The wrap-up goes first and only the sessions it forgot end, so a kept one retries on a
 // later sweep once its work is pushed.
 export async function endHandedInRunSessions(db: Database, atc: AtcView, deps: WrapUpDeps, options: HandedInOptions): Promise<number> {
-  const at = options.at ?? now();
+  const at = now();
   const prs = PrRows.parse(
     db
       .query(
@@ -47,7 +46,7 @@ export async function endHandedInRunSessions(db: Database, atc: AtcView, deps: W
   let ended = 0;
   for (const issue of new Set(active.map((row) => row.issue))) {
     const ids = active.filter((row) => row.issue === issue).map((row) => row.session_id);
-    if (isHandedIn(prs.filter((row) => row.issue === issue), ids, atc, quietBefore)) {
+    if (isHandedIn(prs.filter((row) => row.issue === issue), ids, atc, quietBefore) && !isKeptRecently(readLastKeptAt(db, issue), at)) {
       ended += await endHandedInRun(db, shared, { issue, ids, actor: options.actor, at });
     }
   }
@@ -76,6 +75,21 @@ function findAtcSession(sessions: readonly AwakeSession[], id: string): AwakeSes
   const prefix = id.toLowerCase();
   const hits = sessions.filter((session) => session.id.toLowerCase().startsWith(prefix));
   return hits.length === 1 ? (hits[0] ?? null) : null;
+}
+
+// Each retry of a kept session reads its work again, an imp exec of up to 2 minutes or a local git
+// check, so a run whose wrap-up kept a session waits this long before the next try.
+const KEPT_RETRY_MS = 30 * 60_000;
+
+function isKeptRecently(lastKeptAt: string | null, at: Date): boolean {
+  return lastKeptAt !== null && Date.parse(lastKeptAt) > at.getTime() - KEPT_RETRY_MS;
+}
+
+const LastKeptAtRow = z.object({ at: z.string() }).nullable();
+
+function readLastKeptAt(db: Database, issue: string): string | null {
+  const row = LastKeptAtRow.parse(db.query("SELECT at FROM events WHERE subject = 'run' AND subject_id = ? AND action = 'handed-in-kept' ORDER BY seq DESC LIMIT 1").get(issue));
+  return row === null ? null : row.at;
 }
 
 interface HandedInRun {
