@@ -5,7 +5,7 @@ export interface RepoProbes {
   probes: { name: string; repo: string }[];
 }
 
-// A label already checked, found or not, is not asked about again.
+// Only a repo already found is not asked about again; a missing one may have been made since.
 export function pickRepoProbes(names: readonly string[], stored: Readonly<Record<string, boolean>>): RepoProbes {
   const known: Record<string, boolean> = {};
   const probes: RepoProbes['probes'] = [];
@@ -15,10 +15,10 @@ export function pickRepoProbes(names: readonly string[], stored: Readonly<Record
     if (repo === null) {
       continue;
     }
-    if (found === undefined) {
-      probes.push({ name, repo });
+    if (found === true) {
+      known[name] = true;
     } else {
-      known[name] = found;
+      probes.push({ name, repo });
     }
   }
   return { known, probes };

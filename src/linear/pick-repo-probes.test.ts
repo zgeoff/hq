@@ -16,3 +16,7 @@ test('it asks about the repo a label maps to', () => {
 test('it skips a label that names no repo', () => {
   expect(pickRepoProbes(['frankie'], {})).toStrictEqual({ known: {}, probes: [] });
 });
+
+test('it asks again about a label whose repo was missing, so a repo made since is found', () => {
+  expect(pickRepoProbes(['kettle'], { kettle: false })).toStrictEqual({ known: {}, probes: [{ name: 'kettle', repo: 'kettle' }] });
+});
