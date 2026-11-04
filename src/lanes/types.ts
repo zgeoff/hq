@@ -67,6 +67,12 @@ export interface TickResult {
   slotCause: SlotCause;
 }
 
+// One stretch of time a lanes hold was in force. Spans stay on record until a look counts past them.
+export interface HeldSpan {
+  from: string;
+  until: string;
+}
+
 export interface LanesHold {
   until: string;
   reason: string;

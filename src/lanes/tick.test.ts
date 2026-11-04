@@ -401,6 +401,43 @@ test('it counts none of a hold that starts and ends between two looks', async ()
   expect(readSlotMinutes(ctx.db, '2026-10-14').delivery - before).toBe(9);
 });
 
+test('it counts none of two holds that each start and end between the same two looks', async () => {
+  const ctx = setupTest();
+  at('2026-10-14T01:00:00Z');
+  const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
+  await ctx.seedReady([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
+  tick(ctx.db, sample, 'hq-lanes');
+  at('2026-10-14T01:11:00Z');
+  tick(ctx.db, sample, 'hq-lanes');
+  const before = readSlotMinutes(ctx.db, '2026-10-14').delivery;
+  at('2026-10-14T01:12:00Z');
+  holdLanes(ctx.db, 1, 'the kettle supplier is closed', 'z-stu');
+  at('2026-10-14T01:15:00Z');
+  holdLanes(ctx.db, 2, 'the kettle supplier is closed again', 'z-stu');
+  at('2026-10-14T01:20:00Z');
+
+  tick(ctx.db, sample, 'hq-lanes');
+
+  expect(readSlotMinutes(ctx.db, '2026-10-14').delivery - before).toBe(18);
+});
+
+test('it counts no slot-minutes for a hold saved before held spans were recorded', async () => {
+  const ctx = setupTest();
+  at('2026-10-14T01:00:00Z');
+  const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
+  await ctx.seedReady([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
+  tick(ctx.db, sample, 'hq-lanes');
+  at('2026-10-14T01:15:00Z');
+  tick(ctx.db, sample, 'hq-lanes');
+  const before = readSlotMinutes(ctx.db, '2026-10-14').delivery;
+  setMeta(ctx.db, 'lanes_hold', JSON.stringify({ until: '2026-10-14T03:00:00Z', reason: 'the kettle supplier is closed', by: 'z-stu' }));
+  at('2026-10-14T01:20:00Z');
+
+  tick(ctx.db, sample, 'hq-lanes');
+
+  expect(readSlotMinutes(ctx.db, '2026-10-14').delivery - before).toBe(0);
+});
+
 test('it offers the imp room as free slots when pacing has no lanes and no cap is set', () => {
   const ctx = setupTest();
   at('2026-10-14T01:00:00Z');
