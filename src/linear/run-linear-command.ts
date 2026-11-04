@@ -52,7 +52,7 @@ async function runLinearAreas(deps: LinearCommandDeps, flags: Flags): Promise<Ou
   const labels = await readTeamLabels(deps.call, team);
   const names = collectAreaNames(labels);
   const repoExists = await readRepoExists(deps.run, names, readAreaLabels(deps.db).repoExists);
-  const plan = planLinearAreas(team, rulesTable.team, names, repoExists, iso(now()));
+  const plan = planLinearAreas({ team, lanesTeam: rulesTable.team, names, repoExists, at: iso(now()) });
   if (plan.store !== null) {
     writeAreaLabels(deps.db, plan.store);
   }

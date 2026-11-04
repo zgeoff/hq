@@ -5,10 +5,18 @@ export interface LinearAreasPlan {
   missing: string[];
 }
 
+export interface LinearAreasRead {
+  team: string;
+  lanesTeam: string;
+  names: string[];
+  repoExists: Record<string, boolean>;
+  at: string;
+}
+
 // The stored list serves the team lanes reads; another team's labels are checked but not stored.
-export function planLinearAreas(team: string, lanesTeam: string, names: string[], repoExists: Record<string, boolean>, at: string): LinearAreasPlan {
+export function planLinearAreas(read: LinearAreasRead): LinearAreasPlan {
   return {
-    store: team === lanesTeam ? { at, names, repoExists } : null,
-    missing: names.filter((name) => repoExists[name] === false),
+    store: read.team === read.lanesTeam ? { at: read.at, names: read.names, repoExists: read.repoExists } : null,
+    missing: read.names.filter((name) => read.repoExists[name] === false),
   };
 }
