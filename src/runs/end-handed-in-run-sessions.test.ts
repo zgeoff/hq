@@ -2,6 +2,7 @@ import { expect, mock, onTestFinished, test } from 'bun:test';
 import { buildStubFleetClient } from '../../test/build-stub-fleet-client.ts';
 import type { StubFleetClient } from '../../test/build-stub-fleet-client.ts';
 import { freshDb } from '../../test/helpers.ts';
+import { waitFor } from '../../test/wait-for.ts';
 import { overrideEnv } from '../config/override-env.ts';
 import { listNews } from '../news/list-news.ts';
 import { readEvents } from '../read-events.ts';
@@ -27,10 +28,10 @@ function setupTest() {
     readActions: (...actions: string[]) => readEvents(fresh.db, 'run', 'GEO-9901', actions).map((event) => event.action),
 
     readNews: () => listNews(fresh.db, { all: true, limit: 10 }).map((item) => item.text),
-    sweep: (fleet: StubFleetClient, sessions: { id: string; state: string }[], activity: [string, number | null][], readLocalWork: WrapUpDeps['readLocalWork'] = () => Promise.resolve({ state: 'pushed' })) =>
+    sweep: (fleet: StubFleetClient, sessions: { id: string; state: string; parent?: string }[], activity: [string, number | null][], readLocalWork: WrapUpDeps['readLocalWork'] = () => Promise.resolve({ state: 'pushed' })) =>
       endHandedInRunSessions(
         fresh.db,
-        { sessions: sessions.map((session) => ({ ...session, alive: true })), activity: new Map(activity) },
+        { sessions, readActivity: (id) => Promise.resolve(new Map(activity).get(id) ?? null) },
         { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')), readLocalWork },
         { actor: 'z-delivery' },
       ),
@@ -92,7 +93,7 @@ test('it ends a handed-in session that the run stores by a short id', async () =
   finalPr(ctx.db, 'kettle#71', { sha: 'abc1234', actor: 'z-delivery' });
   closePr(ctx.db, 'kettle#71', { to: 'merged', actor: 'hq-github', facts: { mergedAt: '2026-10-22T11:00:00Z', mergeSha: null } });
 
-  const ended = await ctx.sweep(fleet, [{ id: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', state: 'done' }], [['0000e001', Date.parse('2026-10-22T11:00:00Z')]]);
+  const ended = await ctx.sweep(fleet, [{ id: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', state: 'done' }], [['0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', Date.parse('2026-10-22T11:00:00Z')]]);
 
   expect(ended).toBe(1);
   expect(ctx.readSessions()).toStrictEqual([{ session_id: '0000e001', active: 0, ended_at: '2026-10-22T12:00:00Z', ended_by: 'sweep' }]);
@@ -391,6 +392,7 @@ test('it keeps the merged-run pass off a run whose handed-in cleanup is still ru
   const listed = Promise.withResolvers<void>();
   const fleet = buildStubFleetClient({ sessions: [{ id: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, cwd: '/workspace/kettle', locator: { targetID: 'local' } }], listedAfter: listed.promise });
   const handedIn = ctx.sweep(fleet, [{ id: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', state: 'done' }], [['0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', Date.parse('2026-10-22T11:00:00Z')]]);
+  await waitFor('the handed-in claim', () => ctx.readActions('handed-in-claim').length === 1);
   setState(ctx.db, 'GEO-9901', 'merged', {}, 'z-delivery');
 
   const merged = wrapUpMergedRuns(ctx.db, { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')), readLocalWork: () => Promise.resolve({ state: 'pushed' as const }) }, { actor: 'z-delivery' });
@@ -399,4 +401,104 @@ test('it keeps the merged-run pass off a run whose handed-in cleanup is still ru
 
   expect(wrapped).toStrictEqual([]);
   expect(fleet.calls).toStrictEqual(['unpin 0000e001', 'kill 0000e001', 'unpin 0000e001', 'forget 0000e001']);
+});
+
+test.each([
+  ['a running sub-session', 'running', Date.parse('2026-10-22T11:00:00Z')],
+  ['a done sub-session with no activity reading', 'done', null],
+] as const)('it keeps the sessions of a run with %s', async (_name, state, lastMs) => {
+  const ctx = setupTest();
+  onTestFinished(overrideEnv('HQ_NOW', '2026-10-22T12:00:00Z'));
+  const fleet = buildStubFleetClient({
+    sessions: [
+      { id: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, cwd: '/workspace/kettle', locator: { targetID: 'local' } },
+      { id: '0000e003-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-sketch', alive: true, cwd: '/workspace/kettle', locator: { targetID: 'local' }, parent: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+    ],
+  });
+  addRun(ctx.db, { issue: 'GEO-9901', title: 'Invented kettle work', place: 'imp', session: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
+  addPr(ctx.db, 'GEO-9901', 'kettle#71', 'z-delivery');
+  finalPr(ctx.db, 'kettle#71', { sha: 'abc1234', actor: 'z-delivery' });
+  closePr(ctx.db, 'kettle#71', { to: 'merged', actor: 'hq-github', facts: { mergedAt: '2026-10-22T11:00:00Z', mergeSha: null } });
+
+  const ended = await ctx.sweep(
+    fleet,
+    [
+      { id: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', state: 'done' },
+      { id: '0000e003-aaaa-4aaa-8aaa-aaaaaaaaaaaa', state, parent: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+    ],
+    [
+      ['0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', Date.parse('2026-10-22T11:00:00Z')],
+      ['0000e003-aaaa-4aaa-8aaa-aaaaaaaaaaaa', lastMs],
+    ],
+  );
+
+  expect(ended).toBe(0);
+  expect(fleet.calls).toStrictEqual([]);
+});
+
+test('it keeps the sessions of a run whose replaced session atc still shows running', async () => {
+  const ctx = setupTest();
+  onTestFinished(overrideEnv('HQ_NOW', '2026-10-22T12:00:00Z'));
+  const fleet = buildStubFleetClient({
+    sessions: [
+      { id: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, cwd: '/workspace/kettle', locator: { targetID: 'local' } },
+      { id: '0000e002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-old-agent', alive: true, cwd: '/workspace/kettle', locator: { targetID: 'local' } },
+    ],
+  });
+  addRun(ctx.db, { issue: 'GEO-9901', title: 'Invented kettle work', place: 'imp', session: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
+  setSession(ctx.db, 'GEO-9901', '0000e002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'z-delivery', 'add');
+  setSession(ctx.db, 'GEO-9901', '0000e002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'z-delivery', 'remove');
+  addPr(ctx.db, 'GEO-9901', 'kettle#71', 'z-delivery');
+  finalPr(ctx.db, 'kettle#71', { sha: 'abc1234', actor: 'z-delivery' });
+  closePr(ctx.db, 'kettle#71', { to: 'merged', actor: 'hq-github', facts: { mergedAt: '2026-10-22T11:00:00Z', mergeSha: null } });
+
+  const ended = await ctx.sweep(
+    fleet,
+    [
+      { id: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', state: 'done' },
+      { id: '0000e002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', state: 'running' },
+    ],
+    [
+      ['0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', Date.parse('2026-10-22T11:00:00Z')],
+      ['0000e002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', Date.parse('2026-10-22T11:00:00Z')],
+    ],
+  );
+
+  expect(ended).toBe(0);
+  expect(fleet.calls).toStrictEqual([]);
+});
+
+test('it forgets a quiet run tree, its replaced session and sub-session included, and ends the active session', async () => {
+  const ctx = setupTest();
+  onTestFinished(overrideEnv('HQ_NOW', '2026-10-22T12:00:00Z'));
+  const fleet = buildStubFleetClient({
+    sessions: [
+      { id: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, cwd: '/workspace/kettle', locator: { targetID: 'local' } },
+      { id: '0000e002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-old-agent', alive: true, cwd: '/workspace/kettle', locator: { targetID: 'local' } },
+      { id: '0000e003-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-sketch', alive: true, cwd: '/workspace/kettle', locator: { targetID: 'local' }, parent: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+    ],
+  });
+  addRun(ctx.db, { issue: 'GEO-9901', title: 'Invented kettle work', place: 'imp', session: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
+  setSession(ctx.db, 'GEO-9901', '0000e002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'z-delivery', 'add');
+  setSession(ctx.db, 'GEO-9901', '0000e002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'z-delivery', 'remove');
+  addPr(ctx.db, 'GEO-9901', 'kettle#71', 'z-delivery');
+  finalPr(ctx.db, 'kettle#71', { sha: 'abc1234', actor: 'z-delivery' });
+  closePr(ctx.db, 'kettle#71', { to: 'merged', actor: 'hq-github', facts: { mergedAt: '2026-10-22T11:00:00Z', mergeSha: null } });
+
+  const ended = await ctx.sweep(
+    fleet,
+    [
+      { id: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', state: 'done' },
+      { id: '0000e002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', state: 'done' },
+      { id: '0000e003-aaaa-4aaa-8aaa-aaaaaaaaaaaa', state: 'done', parent: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+    ],
+    [
+      ['0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', Date.parse('2026-10-22T11:00:00Z')],
+      ['0000e002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', Date.parse('2026-10-22T11:00:00Z')],
+      ['0000e003-aaaa-4aaa-8aaa-aaaaaaaaaaaa', Date.parse('2026-10-22T11:00:00Z')],
+    ],
+  );
+
+  expect(ended).toBe(1);
+  expect(fleet.calls).toStrictEqual(['unpin 0000e001', 'kill 0000e003', 'unpin 0000e003', 'forget 0000e003', 'kill 0000e001', 'unpin 0000e001', 'forget 0000e001', 'unpin 0000e002', 'kill 0000e002', 'unpin 0000e002', 'forget 0000e002']);
 });

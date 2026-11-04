@@ -26,24 +26,30 @@ export async function sweepNow(db: Database, client: AtcClient, run: Runner, opt
   const sessions = await client.sessions();
   const activity = new Map<string, number | null>();
   for (const w of watchlist(db)) {
-    try {
-      const g = await client.call('session.get', { session: w.session_id }, sessionGetSchema);
-      activity.set(w.session_id, typeof g.lastActivityAt === 'number' ? g.lastActivityAt : null);
-    } catch {
-      activity.set(w.session_id, null);
-    }
+    const last = await readLastActivityAt(client, w.session_id);
+    activity.set(w.session_id, last);
   }
 
   if (Array.isArray(sessions)) {
     recordAwake(db, sessions, activity);
     updateGoneRunSessions(db, sessions, options.actor);
     const wrapUpDeps = shareClient(options.wrapUpDeps);
-    await endHandedInRunSessionsSafely(db, { sessions, activity }, { ...options, wrapUpDeps });
+    const readActivity = (id: string) => (activity.has(id) ? Promise.resolve(activity.get(id) ?? null) : readLastActivityAt(client, id));
+    await endHandedInRunSessionsSafely(db, { sessions, readActivity }, { ...options, wrapUpDeps });
     await wrapUpMergedRunsSafely(db, { ...options, wrapUpDeps });
   }
   const alerts = await closeFlaggedPRs(db, run, findAlerts(db, sessions, activity, now()));
   const swept = sweep(db, alerts, options.actor);
   return { alerts, sent: swept.sent };
+}
+
+async function readLastActivityAt(client: AtcClient, id: string): Promise<number | null> {
+  try {
+    const session = await client.call('session.get', { session: id }, sessionGetSchema);
+    return typeof session.lastActivityAt === 'number' ? session.lastActivityAt : null;
+  } catch {
+    return null;
+  }
 }
 
 async function endHandedInRunSessionsSafely(db: Database, atc: AtcView, options: SweepOptions): Promise<void> {
