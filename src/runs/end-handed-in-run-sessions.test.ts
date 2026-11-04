@@ -195,7 +195,6 @@ test.each(['live-check', 'deploy-held', 'merged', 'blocked'])('it forgets and en
   finalPr(ctx.db, 'kettle#71', { sha: 'abc1234', actor: 'z-delivery' });
   closePr(ctx.db, 'kettle#71', { to: 'merged', actor: 'hq-github', facts: { mergedAt: '2026-10-22T11:00:00Z', mergeSha: null } });
   setState(ctx.db, 'GEO-9901', state, { waitsOn: 'a teapot supplier' }, 'z-delivery');
-  ctx.db.query("DELETE FROM events WHERE action = 'merged-wrap-up'").run();
 
   const ended = await ctx.sweep([{ id: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', state: 'done' }], [['0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', Date.parse('2026-10-22T11:00:00Z')]]);
 

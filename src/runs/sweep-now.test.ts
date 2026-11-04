@@ -105,7 +105,6 @@ test('it forgets and ends the quiet session of a live-check run once, with one w
   finalPr(ctx.db, 'kettle#56', { sha: 'abc1234', actor: 'kettle-bot' });
   closePr(ctx.db, 'kettle#56', { to: 'merged', actor: 'kettle-bot', facts: { mergedAt: '2026-10-21T01:00:00Z', mergeSha: null } });
   setState(ctx.db, 'GEO-9856', 'live-check', {}, 'kettle-bot');
-  ctx.db.query("DELETE FROM events WHERE action = 'merged-wrap-up'").run();
   ctx.fake.sessions.push({ id: '0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, state: 'done' });
   ctx.fake.activity.set('0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', Date.parse('2026-10-21T01:00:00Z'));
   const fleet = buildStubFleetClient({ sessions: [{ id: '0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true }] });
