@@ -2,6 +2,7 @@ import type { Out } from '../commands.ts';
 import { HqError } from '../errors.ts';
 import { buildGoalFileText } from './build-goal-file-text.ts';
 import { buildGoalPointer } from './build-goal-pointer.ts';
+import { buildGoalReview } from './build-goal-review.ts';
 import { buildPermissions } from './build-permissions.ts';
 import { buildReviewPointer } from './build-review-pointer.ts';
 import { BRIEF_LIMIT_BYTES, fitBrief } from './fit-brief.ts';
@@ -53,6 +54,7 @@ export function buildDeliveryBrief(facts: DeliveryBriefFacts): DeliveryBrief {
     notYours: buildAreaLine(facts.issue.identifier, facts.reads.repo, facts.reads.otherAreas),
     impLine: facts.impLine,
     goalFile: buildGoalPointer({ issue: facts.issue.identifier, playbook, byLink: facts.input.byLink, goalFile: facts.input.goalFile }),
+    goalReview: buildGoalReview(facts.reads.reviewLines),
   };
   const issueInPrompt = !facts.input.byLink && facts.input.goalFile === null;
   const movedPointer = issueInPrompt ? buildGoalPointer({ issue: facts.issue.identifier, playbook, byLink: false, goalFile: facts.movedGoalFile }) : null;

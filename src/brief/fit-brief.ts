@@ -40,6 +40,7 @@ function buildValues(parts: BriefParts, sections: readonly IssueSection[]): Reco
     not_yours: parts.notYours,
     imp_line: parts.impLine,
     goal_file: parts.goalFile,
+    goal_review: parts.goalReview,
   };
 }
 
