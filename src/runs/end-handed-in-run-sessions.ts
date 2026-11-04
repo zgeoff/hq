@@ -90,18 +90,18 @@ async function endHandedInRun(db: Database, deps: WrapUpDeps, run: HandedInRun):
     return 0;
   }
   const end = db.query("UPDATE run_sessions SET active = 0, ended_at = COALESCE(ended_at, ?), ended_by = 'sweep' WHERE session_id = ? AND active = 1");
-  const moved = db.transaction(() => {
+  db.transaction(() => {
     for (const id of forgotten) {
       end.run(iso(run.at), id);
     }
     logEvent(db, 'run', run.issue, 'handed-in-ended', run.actor, null, null, { sessions: forgotten });
-    return updateMergedRun(db, run.issue, run.actor);
-  })();
 
-  // The merged-run pass qualifies a run by a wrap-up event after its move to merged.
-  if (moved) {
-    logEvent(db, 'run', run.issue, 'merged-wrap-up', run.actor, null, null);
-  }
+    // The merged-run pass qualifies a run by a wrap-up event after its move to merged, so the claim
+    // goes in with the move and no other pass can take the run between them.
+    if (updateMergedRun(db, run.issue, run.actor)) {
+      logEvent(db, 'run', run.issue, 'merged-wrap-up', run.actor, null, null);
+    }
+  }).immediate();
   recordMergedWrapUp(db, run.issue, wrapUp, run.actor);
   return forgotten.length;
 }
