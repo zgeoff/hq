@@ -54,8 +54,6 @@ export function tick(db: Database, sample: Sample, actor: string): TickResult {
 
       const slotCause = trackSlotCause(db, slotPlan, t);
       const designCause = trackDesignCause(db, slotPlan, t);
-
-      // A lanes hold is a decision to leave the slots empty, so its minutes count against no cause.
       if (getLanesHold(db) === null) {
         writeEmptySlotMinutes(db, { slotCause, previousAt: previous?.at ?? null, at: t });
         writeDesignSlotMinutes(db, { designCause, previousAt: previous?.at ?? null, at: t });
