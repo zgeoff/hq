@@ -185,7 +185,7 @@ test('a due Ready pass writes the counts before the lanes tick, and the logged e
   const counts = readReadyByLane(ctx.db, 30);
   expect([counts['atc']?.n, counts['imp']?.n]).toStrictEqual([2, 1]);
   expect(logs.find((line) => line.includes('slots='))).toContain('eligible=3');
-  expect(received.mock.calls).toMatchObject([[{ variables: { team: 'GEO', state: 'Ready' } }], [{ variables: { team: 'GEO', state: 'Backlog' } }]]);
+  expect(received.mock.calls).toMatchObject([[{ variables: { team: 'GEO', state: 'Ready' } }], [{ query: expect.stringContaining('issueLabels') }], [{ variables: { team: 'GEO', state: 'Backlog' } }]]);
   expect(metaJson(ctx.db, PROMOTABLE_FOCUS_KEY, PROMOTABLE_FOCUS, null)).toStrictEqual({ at: '2026-10-15T20:00:00Z', count: 0, focus: '[]', error: null });
 });
 

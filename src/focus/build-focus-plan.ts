@@ -1,5 +1,5 @@
 import type { PacingSlots, PlaceTypes } from '../lanes/types.ts';
-import { getIssueAreas } from './get-issue-areas.ts';
+import { hasIssueArea } from './has-issue-area.ts';
 import type { FocusEntry, FocusPick, FocusPlan, FocusReserve, FocusSlots, PlaceRoom, PlaceUnfit } from './types.ts';
 
 export function buildFocusPlan(queue: readonly FocusEntry[], slots: FocusSlots, reserves: readonly FocusReserve[], runningByArea: Readonly<Record<string, number>>): FocusPlan {
@@ -23,7 +23,7 @@ export function buildFocusPlan(queue: readonly FocusEntry[], slots: FocusSlots, 
       if (filled >= reserveRoom) {
         break;
       }
-      if (!taken.has(entry.issue.identifier) && getIssueAreas(entry.issue.labels).includes(reserve.area) && tryTake(entry, reserve.area)) {
+      if (!taken.has(entry.issue.identifier) && hasIssueArea(entry.issue.labels, reserve.area) && tryTake(entry, reserve.area)) {
         filled += 1;
       }
     }

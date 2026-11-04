@@ -6,6 +6,9 @@ import { getMeta } from './db/get-meta.ts';
 import { setMeta } from './db/set-meta.ts';
 import { buildFocusKey } from './focus/build-focus-key.ts';
 import { readFocus } from './focus/read-focus.ts';
+import { writeAreaNames } from './focus/write-area-names.ts';
+import { collectAreaNames } from './linear/collect-area-names.ts';
+import { readTeamLabels } from './linear/read-team-labels.ts';
 import rulesTable from '../lanes.json';
 import { readLinearReady } from './lanes/read-linear-ready.ts';
 import { collectFocusMatches } from './focus/collect-focus-matches.ts';
@@ -60,10 +63,15 @@ export async function runLinearReadyTick(db: Database, deps: LinearReadyTickDeps
   setMeta(db, 'lanes_ready_linear_error', null);
   const leftMs = Math.max(0, deps.deadlineMs - (readClock() - startedAt));
   const focus = readFocus(db);
+  const readingLabels = readAreaNames(cancellableCall, leftMs);
   const backlog = await withDeadline(readBacklogIssues(cancellableCall, rulesTable.team, readDoneOpenIssues(db)), leftMs, 'Backlog promotable count', abandoned).then(
     (issues) => ({ issues, error: null }),
     (error: unknown) => ({ issues: null, error: toMessage(error).slice(0, 300) }),
   );
+  const names = await readingLabels;
+  if (names !== null) {
+    writeAreaNames(db, names, iso(at));
+  }
   const count =
     backlog.issues === null
       ? null
@@ -77,4 +85,14 @@ export async function runLinearReadyTick(db: Database, deps: LinearReadyTickDeps
     writeDesignBacklog(db, { ...backlog.issues.design, at });
   }
   return true;
+}
+
+// A read that fails leaves the stored list as it was.
+async function readAreaNames(call: LinearCall, timeoutMs: number): Promise<string[] | null> {
+  try {
+    const labels = await withDeadline(readTeamLabels(call, rulesTable.team), timeoutMs, 'area labels');
+    return collectAreaNames(labels);
+  } catch {
+    return null;
+  }
 }

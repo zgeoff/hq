@@ -3,11 +3,12 @@ import { parseFocusTerms } from '../focus/parse-focus-terms.ts';
 import { formatSlotNudge } from './format-slot-nudge.ts';
 import { formatSlotPlan } from './format-slot-plan.ts';
 import type { SlotPlan } from './read-slot-plan.ts';
+import { FOCUS_AREAS } from '../focus/focus-areas.ts';
 
 test('hq lanes prints the local sessions against their cap, the focus and the picks', () => {
   const slotPlan: SlotPlan = {
     pool: { impSize: 4, localSize: 3, impRunning: 1, localRunning: 2, impFree: 2, localFree: 1, free: 3, capHeld: false, held: 'impd at line', localHeld: null, localSource: null },
-    focus: { terms: parseFocusTerms('bug'), reserves: [{ area: 'vers', slots: 1 }], setAt: '2026-10-15T20:00:00Z', setBy: 'kettle-owner' },
+    focus: { terms: parseFocusTerms('bug', FOCUS_AREAS), reserves: [{ area: 'vers', slots: 1 }], setAt: '2026-10-15T20:00:00Z', setBy: 'kettle-owner' },
     plan: {
       picks: [
         { issue: 'GEO-9801', term: 0, reserve: null },
@@ -35,7 +36,7 @@ test('hq lanes prints the local sessions against their cap, the focus and the pi
 test('the nudge names the free slots and each pick with its focus term', () => {
   const slotPlan: SlotPlan = {
     pool: { impSize: 4, localSize: 3, impRunning: 1, localRunning: 2, impFree: 2, localFree: 1, free: 3, capHeld: false, held: 'impd at line', localHeld: null, localSource: null },
-    focus: { terms: parseFocusTerms('bug'), reserves: [{ area: 'vers', slots: 1 }], setAt: '2026-10-15T20:00:00Z', setBy: 'kettle-owner' },
+    focus: { terms: parseFocusTerms('bug', FOCUS_AREAS), reserves: [{ area: 'vers', slots: 1 }], setAt: '2026-10-15T20:00:00Z', setBy: 'kettle-owner' },
     plan: {
       picks: [
         { issue: 'GEO-9801', term: 0, reserve: null },

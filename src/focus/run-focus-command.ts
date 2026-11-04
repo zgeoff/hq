@@ -9,6 +9,7 @@ import type { LinearCall } from '../linear/types.ts';
 import { buildFocusCounts } from './build-focus-counts.ts';
 import type { FocusCount } from './build-focus-counts.ts';
 import { formatFocusLine } from './format-focus-line.ts';
+import { readAreaLabels } from './read-area-labels.ts';
 import { parseFocusReserves } from './parse-focus-reserves.ts';
 import { parseFocusTerms } from './parse-focus-terms.ts';
 import { readFocus } from './read-focus.ts';
@@ -37,18 +38,19 @@ export function runFocusCommand(deps: FocusCommandDeps): Promise<FocusOut> {
     .with('show', async () => {
       const focus = readFocus(deps.db);
       const counts = await readCounts(deps.call, focus?.terms ?? []);
-      return formatShown(focus, counts);
+      return formatShown(focus, counts, readAreaLabels(deps.db).names);
     })
     .with('set', async () => {
       const [raw, ...extra] = deps.rest;
       if (raw === undefined || extra.length > 0) {
         throw new HqError('bad_args', 'usage: hq focus set <term>[,<term>...] [--reserve <area>=<n>]...');
       }
-      const terms = parseFocusTerms(raw);
-      const reserves = parseFocusReserves(deps.reserves);
+      const areas = readAreaLabels(deps.db).names;
+      const terms = parseFocusTerms(raw, areas);
+      const reserves = parseFocusReserves(deps.reserves, areas);
       const focus = writeFocus(deps.db, { terms, reserves, actor: deps.actor, at: deps.at });
       const counts = await readCounts(deps.call, focus.terms);
-      const shown = formatShown(focus, counts);
+      const shown = formatShown(focus, counts, areas);
       return { data: shown.data, text: `Focus set; the lanes use it from their next tick, and running work keeps its slots.\n${shown.text}` };
     })
     .with('clear', () => {
@@ -76,20 +78,23 @@ async function readCounts(call: LinearCall, terms: readonly FocusTerm[]): Promis
   }
 }
 
-function formatShown(focus: Focus | null, counts: Counts): FocusOut {
+const GONE = ' (no longer a Linear label)';
+
+function formatShown(focus: Focus | null, counts: Counts, areas: readonly string[]): FocusOut {
   if (focus === null) {
     return { data: { focus: null }, text: 'No focus set: the lanes take all eligible work by priority, then the enabler and quality labels, then the oldest.' };
   }
   const lines = focus.terms.map((term, index) => {
     const count = counts.counts?.[index];
-    return `  ${index + 1}. ${term.text}${count === undefined ? '' : `: ${count.ready} Ready, ${count.backlog} Backlog`}`;
+    const gone = term.filters.some((filter) => filter.kind === 'area' && !areas.includes(filter.value));
+    return `  ${index + 1}. ${term.text}${gone ? GONE : ''}${count === undefined ? '' : `: ${count.ready} Ready, ${count.backlog} Backlog`}`;
   });
   return {
     data: { focus, counts: counts.counts, countsError: counts.error },
     text: [
       `Focus (set ${focus.setAt} by ${focus.setBy}): ${formatFocusLine(focus)}`,
       ...lines,
-      ...focus.reserves.map((reserve) => `  reserve: ${reserve.area} keeps ${reserve.slots} slot(s), lent while it has nothing eligible`),
+      ...focus.reserves.map((reserve) => `  reserve: ${reserve.area}${areas.includes(reserve.area) ? '' : GONE} keeps ${reserve.slots} slot(s), lent while it has nothing eligible`),
       ...(counts.error === null ? [] : [`  counts unavailable: ${counts.error}`]),
       '  then any other eligible work',
     ].join('\n'),

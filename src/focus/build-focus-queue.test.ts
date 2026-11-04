@@ -2,6 +2,7 @@ import { expect, test } from 'bun:test';
 import { buildReadyIssue } from '../../test/build-ready-issue.ts';
 import { buildFocusQueue } from './build-focus-queue.ts';
 import { parseFocusTerms } from './parse-focus-terms.ts';
+import { FOCUS_AREAS } from './focus-areas.ts';
 
 test('it takes the terms in order, then any other eligible work', () => {
   const issues = [
@@ -10,7 +11,7 @@ test('it takes the terms in order, then any other eligible work', () => {
     buildReadyIssue('GEO-9803', { type: 'Bug' }),
   ];
 
-  const queue = buildFocusQueue(issues, parseFocusTerms('bug,maintenance'), new Set());
+  const queue = buildFocusQueue(issues, parseFocusTerms('bug,maintenance', FOCUS_AREAS), new Set());
 
   expect(queue.map((entry) => [entry.issue.identifier, entry.term])).toStrictEqual([
     ['GEO-9803', 0],
@@ -61,7 +62,7 @@ test('a term matches only issues that match every filter in it', () => {
     buildReadyIssue('GEO-9804', { project: 'kettle roadmap', labels: ['nixie', 'widgets'], priority: 2, type: 'Bug' }),
   ];
 
-  const queue = buildFocusQueue(issues, parseFocusTerms('roadmap:nixie:label=widgets:high+:project=Kettle Roadmap'), new Set());
+  const queue = buildFocusQueue(issues, parseFocusTerms('roadmap:nixie:label=widgets:high+:project=Kettle Roadmap', FOCUS_AREAS), new Set());
 
   expect(queue.filter((entry) => entry.term === 0).map((entry) => entry.issue.identifier)).toStrictEqual(['GEO-9801']);
 });

@@ -1,11 +1,16 @@
 import type { Flags } from '../cli.ts';
 import type { Out } from '../commands.ts';
 import { HqError } from '../errors.ts';
-import { collectUnmappedAreas } from './collect-unmapped-areas.ts';
+import { iso } from '../clock/iso.ts';
+import { now } from '../clock/now.ts';
+import { readAreaLabels } from '../focus/read-area-labels.ts';
+import { writeAreaLabels } from '../focus/write-area-labels.ts';
+import { collectAreaNames } from './collect-area-names.ts';
 import { parseLinearIssuesFlags } from './parse-linear-issues-flags.ts';
 import { pickStateNames } from './pick-state-names.ts';
 import type { IssuesFilter } from './read-issue-pages.ts';
 import { readIssuePages } from './read-issue-pages.ts';
+import { readRepoExists } from './read-repo-exists.ts';
 import { readTeamLabels } from './read-team-labels.ts';
 import { readTeamStateNames } from './read-team-state-names.ts';
 import type { IssueFiles, LinearCommandDeps } from './types.ts';
@@ -43,11 +48,14 @@ async function runLinearAreas(deps: LinearCommandDeps, flags: Flags): Promise<Ou
     throw new HqError('bad_args', 'hq linear areas needs --team');
   }
   const labels = await readTeamLabels(deps.call, team);
-  const unmapped = collectUnmappedAreas(labels);
-  if (unmapped.length > 0) {
-    throw new HqError('bad_state', `${team} has area labels hq does not know: ${unmapped.join(', ')}. Add each to FOCUS_AREAS in src/focus/focus-areas.ts and its repo to src/brief/area-repos.ts, or add it to NOT_AREA_LABELS there if it names no area`, { unmapped });
+  const names = collectAreaNames(labels);
+  const repoExists = await readRepoExists(deps.run, names, readAreaLabels(deps.db).repoExists);
+  writeAreaLabels(deps.db, { at: iso(now()), names, repoExists });
+  const missing = names.filter((name) => repoExists[name] === false);
+  if (missing.length > 0) {
+    throw new HqError('bad_state', `${team} has area labels whose zgeoff repo does not exist: ${missing.join(', ')}. Create the repo, or take the label off the issues that carry it`, { missing });
   }
-  return { data: { team, unmapped }, text: `every area label in ${team} names a repo hq knows` };
+  return { data: { team, areas: names, missing }, text: `every area label in ${team} names a zgeoff repo that exists` };
 }
 
 function probeDirectory(files: IssueFiles, path: string): boolean {

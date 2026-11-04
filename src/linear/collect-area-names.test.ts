@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
-import { collectUnmappedAreas } from './collect-unmapped-areas.ts';
+import { collectAreaNames } from './collect-area-names.ts';
 
-test('it names each area label hq lacks, once and in order, in any case', () => {
+test('it names each area label once and in order, in lower case', () => {
   const labels = [
     { name: 'kettle', isGroup: false, parent: null },
     { name: 'Hq', isGroup: false, parent: null },
@@ -9,7 +9,7 @@ test('it names each area label hq lacks, once and in order, in any case', () => 
     { name: 'KETTLE', isGroup: false, parent: null },
   ];
 
-  expect(collectUnmappedAreas(labels)).toStrictEqual(['kettle', 'teapot']);
+  expect(collectAreaNames(labels)).toStrictEqual(['hq', 'kettle', 'teapot']);
 });
 
 test('it skips groups, the labels in the Type and Size groups, and the labels that name no area', () => {
@@ -19,8 +19,7 @@ test('it skips groups, the labels in the Type and Size groups, and the labels th
     { name: 'S', isGroup: false, parent: { name: 'Size' } },
     { name: 'Needs Geoff', isGroup: false, parent: null },
     { name: 'parked', isGroup: false, parent: null },
-    { name: 'noslop', isGroup: false, parent: null },
   ];
 
-  expect(collectUnmappedAreas(labels)).toStrictEqual([]);
+  expect(collectAreaNames(labels)).toStrictEqual([]);
 });

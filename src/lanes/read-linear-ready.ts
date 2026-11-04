@@ -7,6 +7,7 @@ import { now } from '../clock/now.ts';
 import { metaJson } from '../db/meta-json.ts';
 import { setMeta } from '../db/set-meta.ts';
 import { getIssueAreas } from '../focus/get-issue-areas.ts';
+import { readAreaLabels } from '../focus/read-area-labels.ts';
 import { ISSUE } from '../followups/issue.ts';
 import type { Runner } from '../runner/types.ts';
 import { readGitHubPR } from '../runs/read-github-pr.ts';
@@ -100,6 +101,7 @@ function writeIssueAreas(db: Database, issues: readonly ReadyIssue[]): void {
   const rows = z.array(z.object({ issue: z.string() })).parse(db.query(`SELECT issue FROM runs WHERE state IN (${RUNNING.map(() => '?').join(', ')})`).all(...RUNNING));
   const running = new Set(rows.map((row) => row.issue));
   const kept = Object.entries(previous).filter(([issue]) => running.has(issue));
-  const areas = Object.fromEntries([...kept, ...issues.map((issue) => [issue.identifier, getIssueAreas(issue.labels)] as const)]);
+  const known = readAreaLabels(db).names;
+  const areas = Object.fromEntries([...kept, ...issues.map((issue) => [issue.identifier, getIssueAreas(issue.labels, known)] as const)]);
   setMeta(db, ISSUE_AREAS_KEY, JSON.stringify(areas));
 }
