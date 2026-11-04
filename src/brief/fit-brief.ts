@@ -25,9 +25,11 @@ export function fitBrief(template: string, parts: BriefParts, movedPointer: stri
     cuts.push('cut 1');
   }
   let pointer = fitted.goalFile;
-  if (isOver(prompt) && sha !== null && prompt.includes(sha)) {
-    prompt = prompt.replaceAll(sha, sha.slice(0, SHORT_SHA_LENGTH));
-    pointer = pointer.replaceAll(sha, sha.slice(0, SHORT_SHA_LENGTH));
+
+  // Only a gh api ref takes the short sha; a file path that holds the sha must stay whole.
+  if (isOver(prompt) && sha !== null && prompt.includes(`ref=${sha}`)) {
+    prompt = prompt.replaceAll(`ref=${sha}`, `ref=${sha.slice(0, SHORT_SHA_LENGTH)}`);
+    pointer = pointer.replaceAll(`ref=${sha}`, `ref=${sha.slice(0, SHORT_SHA_LENGTH)}`);
     cuts.push('short refs');
   }
   if (isOver(prompt)) {

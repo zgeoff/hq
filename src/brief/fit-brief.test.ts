@@ -212,3 +212,14 @@ test('it makes no cut 3 when the brief has no not-yours line', () => {
 
   expect(fitted.cuts).toStrictEqual(['cut 2']);
 });
+
+test('it keeps the whole sha in a goal-file path when it shortens the refs', () => {
+  const sha = 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678';
+  const parts = buildBriefParts({ reviewLines: `read the rules: gh api 'x?ref=${sha}'`, goalFile: `. The full issue is in goals/${sha}.md; read it first.`, permissions: 'k'.repeat(3900) });
+
+  const fitted = fitBrief('/goal Ship{{goal_file}}\n{{review_lines}}\n{{permissions}}', parts, null, sha);
+
+  expect(fitted.cuts).toStrictEqual(['short refs', 'cut 2']);
+  expect(fitted.prompt).toContain(`goals/${sha}.md`);
+  expect(fitted.prompt).toContain(`ref=${sha.slice(0, 12)}'`);
+});
