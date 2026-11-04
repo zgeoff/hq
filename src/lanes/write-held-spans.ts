@@ -4,5 +4,6 @@ import { LANES_HELD_SPANS } from './lanes-held-spans.ts';
 import type { HeldSpan } from './types.ts';
 
 export function writeHeldSpans(db: Database, spans: readonly HeldSpan[]): void {
-  setMeta(db, LANES_HELD_SPANS, spans.length === 0 ? null : JSON.stringify(spans));
+  const value = spans.length === 0 ? null : JSON.stringify(spans);
+  setMeta(db, LANES_HELD_SPANS, value);
 }
