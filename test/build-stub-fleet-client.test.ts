@@ -45,3 +45,16 @@ test('the client spawns nothing and reads no details or message', async () => {
   await expect(details).rejects.toThrow('the stub fleet client reads no details');
   await expect(message).rejects.toThrow('the stub fleet client reads no message');
 });
+
+test('it answers a forget only once the given promise settles', async () => {
+  const gate = Promise.withResolvers<void>();
+  const fleet = buildStubFleetClient({ sessions: [], forgetAfter: gate.promise });
+  const forgetting = fleet.client.forget('0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+
+  const early = await Promise.race([forgetting, Promise.resolve('still waiting')]);
+  gate.resolve();
+  const forgotten = await forgetting;
+
+  expect(early).toBe('still waiting');
+  expect(forgotten).toStrictEqual({ forgotten: true });
+});

@@ -210,9 +210,21 @@ interface RepoFixture {
   push: (files: Record<string, string>) => void;
 }
 
-function runGit(cwd: string, ...args: string[]): void {
+export function runGit(cwd: string, ...args: string[]): void {
   const r = Bun.spawnSync(['git', '-c', 'user.name=Test', '-c', 'user.email=test@example.com', '-c', 'commit.gpgsign=false', ...args], { cwd });
   if (r.exitCode !== 0) throw new Error(`git ${args.join(' ')}: ${r.stderr.toString()}`);
+}
+
+// A clone whose every commit is on its remote and whose tree is clean, so the unpushed-work check
+// finds nothing.
+export function createPushedClone(directory: string, name: string): string {
+  const remote = join(directory, `${name}-remote.git`);
+  const clone = join(directory, name);
+  runGit(directory, 'init', '-q', '--bare', '-b', 'main', remote);
+  runGit(directory, 'clone', '-q', remote, clone);
+  runGit(clone, 'commit', '-q', '--allow-empty', '-m', 'add kettle lid');
+  runGit(clone, 'push', '-q', 'origin', 'main');
+  return clone;
 }
 
 function createOriginClone(dir: string, origin: string, clone: string, files: Record<string, string>): RepoFixture {

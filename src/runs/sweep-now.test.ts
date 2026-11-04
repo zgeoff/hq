@@ -1,24 +1,38 @@
 import { expect, mock, onTestFinished, test } from 'bun:test';
 import { AtcClient } from '../atc/atc-client.ts';
 import { overrideEnv } from '../config/override-env.ts';
+import { readEvents } from '../read-events.ts';
 import { buildStubGitHubFactsRunner } from '../../test/build-stub-github-facts-runner.ts';
 import { buildStubFleetClient } from '../../test/build-stub-fleet-client.ts';
 import { fakeAtc, freshDb } from '../../test/helpers.ts';
 import { addPr } from './add-pr.ts';
 import { addRun } from './add-run.ts';
 import { closePr } from './close-pr.ts';
+import { finalPr } from './final-pr.ts';
+import { getRun } from './get-run.ts';
 import { setState } from './set-state.ts';
 import { sweepNow } from './sweep-now.ts';
+import { viewRun } from './view-run.ts';
 
 async function setupTest() {
   const fresh = freshDb();
   onTestFinished(fresh.cleanup);
-  const server = fakeAtc(fresh.dir, []);
+  const roster: { id: string; name: string; alive: boolean; state: string; parent?: string }[] = [];
+  const server = fakeAtc(fresh.dir, roster);
   onTestFinished(server.stop);
   const client = await AtcClient.open();
   onTestFinished(() => client.close());
 
-  return { db: fresh.db, client };
+  return {
+    db: fresh.db,
+    client,
+    fake: { sessions: roster, activity: server.activity },
+    readState: (issue: string) => getRun(fresh.db, issue)?.state,
+    readActive: (issue: string) => {
+      const run = getRun(fresh.db, issue);
+      return run === null ? [] : viewRun(fresh.db, run).sessions.map((session) => session.active);
+    },
+  };
 }
 
 test('it flags nothing for a final PR that GitHub shows closed unmerged, and marks it closed', async () => {
@@ -29,7 +43,7 @@ test('it flags nothing for a final PR that GitHub shows closed unmerged, and mar
   ctx.db.query("UPDATE run_prs SET final_sha = 'abc1234', final_at = '2026-10-21T01:00:00Z', final_source = 'marker:kettle' WHERE ref = 'kettle#51'").run();
   const gh = buildStubGitHubFactsRunner({ views: { 'kettle#51': JSON.stringify({ state: 'CLOSED', mergedAt: null, mergeCommit: null }) } });
 
-  const swept = await sweepNow(ctx.db, ctx.client, gh, { actor: 'z-delivery', wrapUpDeps: { openClient: () => Promise.reject(new Error('no wrap-up expected')), readImpWork: () => Promise.reject(new Error('no wrap-up expected')) }, log: () => {} });
+  const swept = await sweepNow(ctx.db, ctx.client, gh, { actor: 'z-delivery', wrapUpDeps: { openClient: () => Promise.reject(new Error('no wrap-up expected')), readImpWork: () => Promise.reject(new Error('no wrap-up expected')), readLocalWork: () => Promise.resolve({ state: 'pushed' as const }) }, log: () => {} });
 
   expect(swept).toStrictEqual({ alerts: [], sent: [] });
   expect(ctx.db.query("SELECT state FROM run_prs WHERE ref = 'kettle#51'").get()).toStrictEqual({ state: 'closed' });
@@ -42,15 +56,15 @@ test('it forgets the sessions of a merged run and logs the wrap-up once', async 
   addPr(ctx.db, 'GEO-9852', 'kettle#52', 'kettle-bot');
   closePr(ctx.db, 'kettle#52', { to: 'merged', actor: 'kettle-bot' });
   setState(ctx.db, 'GEO-9852', 'merged', {}, 'kettle-bot');
-  const fleet = buildStubFleetClient({ sessions: [{ id: '0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true }] });
+  const fleet = buildStubFleetClient({ sessions: [{ id: '0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, state: 'done' }] });
   const gh = buildStubGitHubFactsRunner({ views: {} });
-  const who = { actor: 'z-delivery', wrapUpDeps: { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')) }, log: () => {} };
+  const who = { actor: 'z-delivery', wrapUpDeps: { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')), readLocalWork: () => Promise.resolve({ state: 'pushed' as const }) }, log: () => {} };
 
   await sweepNow(ctx.db, ctx.client, gh, who);
   await sweepNow(ctx.db, ctx.client, gh, who);
 
   expect(fleet.calls).toStrictEqual(['unpin 0000d001', 'kill 0000d001', 'unpin 0000d001', 'forget 0000d001']);
-  expect(ctx.db.query("SELECT action, subject_id FROM events WHERE action = 'merged-wrap-up'").all()).toStrictEqual([{ action: 'merged-wrap-up', subject_id: 'GEO-9852' }]);
+  expect(readEvents(ctx.db, 'run', 'GEO-9852', ['merged-wrap-up'])).toHaveLength(1);
 });
 
 test('it still sweeps for alerts when the wrap-up of merged runs throws', async () => {
@@ -67,12 +81,143 @@ test('it still sweeps for alerts when the wrap-up of merged runs throws', async 
   addPr(ctx.db, 'GEO-9853', 'kettle#53', 'kettle-bot');
   ctx.db.query("UPDATE run_prs SET final_sha = 'abc1234', final_at = '2026-10-21T01:00:00Z', final_source = 'marker:kettle' WHERE ref = 'kettle#53'").run();
   const gh = buildStubGitHubFactsRunner({ views: { 'kettle#53': JSON.stringify({ state: 'CLOSED', mergedAt: null, mergeCommit: null }) } });
-  const fleet = buildStubFleetClient({ sessions: [{ id: '0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true }] });
+  const fleet = buildStubFleetClient({ sessions: [{ id: '0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, state: 'done' }] });
 
-  const swept = await sweepNow(ctx.db, ctx.client, gh, { actor: 'z-delivery', wrapUpDeps: { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('no check expected')) }, log });
+  const swept = await sweepNow(ctx.db, ctx.client, gh, { actor: 'z-delivery', wrapUpDeps: { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('no check expected')), readLocalWork: () => Promise.resolve({ state: 'pushed' as const }) }, log });
 
   expect(fleet.calls).toStrictEqual(['unpin 0000d001', 'kill 0000d001', 'unpin 0000d001', 'forget 0000d001']);
   expect(log.mock.calls).toStrictEqual([['merged-run wrap-up failed: kettle refuses']]);
   expect(swept).toStrictEqual({ alerts: [], sent: [] });
   expect(ctx.db.query("SELECT state FROM run_prs WHERE ref = 'kettle#53'").get()).toStrictEqual({ state: 'closed' });
+});
+
+test('it ends a handed-in run\'s idle session and wraps the run up in the same sweep', async () => {
+  const ctx = await setupTest();
+  onTestFinished(overrideEnv('HQ_NOW', '2026-10-21T03:00:00Z'));
+  addRun(ctx.db, { issue: 'GEO-9855', title: 'Invented kettle work', place: 'local', session: '0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
+  addPr(ctx.db, 'GEO-9855', 'kettle#55', 'kettle-bot');
+  finalPr(ctx.db, 'kettle#55', { sha: 'abc1234', actor: 'kettle-bot' });
+  closePr(ctx.db, 'kettle#55', { to: 'merged', actor: 'kettle-bot', facts: { mergedAt: '2026-10-21T01:00:00Z', mergeSha: null } });
+  ctx.fake.sessions.push({ id: '0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, state: 'done' });
+  ctx.fake.activity.set('0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', Date.parse('2026-10-21T01:00:00Z'));
+  const fleet = buildStubFleetClient({ sessions: [{ id: '0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, state: 'done' }] });
+  const gh = buildStubGitHubFactsRunner({ views: {} });
+
+  await sweepNow(ctx.db, ctx.client, gh, { actor: 'z-delivery', wrapUpDeps: { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')), readLocalWork: () => Promise.resolve({ state: 'pushed' as const }) }, log: () => {} });
+
+  expect(ctx.readState('GEO-9855')).toBe('merged');
+  expect(fleet.calls).toStrictEqual(['unpin 0000d001', 'kill 0000d001', 'unpin 0000d001', 'forget 0000d001']);
+});
+
+test('it forgets and ends the quiet session of a live-check run once, with one wrap-up result', async () => {
+  const ctx = await setupTest();
+  onTestFinished(overrideEnv('HQ_NOW', '2026-10-21T03:00:00Z'));
+  addRun(ctx.db, { issue: 'GEO-9856', title: 'Invented kettle work', place: 'local', session: '0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
+  addPr(ctx.db, 'GEO-9856', 'kettle#56', 'kettle-bot');
+  finalPr(ctx.db, 'kettle#56', { sha: 'abc1234', actor: 'kettle-bot' });
+  closePr(ctx.db, 'kettle#56', { to: 'merged', actor: 'kettle-bot', facts: { mergedAt: '2026-10-21T01:00:00Z', mergeSha: null } });
+  setState(ctx.db, 'GEO-9856', 'live-check', {}, 'kettle-bot');
+  ctx.fake.sessions.push({ id: '0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, state: 'done' });
+  ctx.fake.activity.set('0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', Date.parse('2026-10-21T01:00:00Z'));
+  const fleet = buildStubFleetClient({ sessions: [{ id: '0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, state: 'done' }] });
+  const gh = buildStubGitHubFactsRunner({ views: {} });
+
+  await sweepNow(ctx.db, ctx.client, gh, { actor: 'z-delivery', wrapUpDeps: { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')), readLocalWork: () => Promise.resolve({ state: 'pushed' as const }) }, log: () => {} });
+
+  expect(ctx.readState('GEO-9856')).toBe('live-check');
+  expect(ctx.readActive('GEO-9856')).toStrictEqual([0]);
+  expect(fleet.calls).toStrictEqual(['unpin 0000d001', 'kill 0000d001', 'unpin 0000d001', 'forget 0000d001']);
+  expect(readEvents(ctx.db, 'run', 'GEO-9856', ['merged-wrap-up-result'])).toHaveLength(1);
+});
+
+test('it opens one atc client for both the handed-in pass and the merged-run pass', async () => {
+  const ctx = await setupTest();
+  onTestFinished(overrideEnv('HQ_NOW', '2026-10-21T03:00:00Z'));
+  addRun(ctx.db, { issue: 'GEO-9857', title: 'Invented kettle work', place: 'local', session: '0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
+  addPr(ctx.db, 'GEO-9857', 'kettle#57', 'kettle-bot');
+  finalPr(ctx.db, 'kettle#57', { sha: 'abc1234', actor: 'kettle-bot' });
+  closePr(ctx.db, 'kettle#57', { to: 'merged', actor: 'kettle-bot', facts: { mergedAt: '2026-10-21T01:00:00Z', mergeSha: null } });
+  addRun(ctx.db, { issue: 'GEO-9858', title: 'Invented teapot work', place: 'local', session: '0000d002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
+  addPr(ctx.db, 'GEO-9858', 'kettle#58', 'kettle-bot');
+  closePr(ctx.db, 'kettle#58', { to: 'merged', actor: 'kettle-bot' });
+  setState(ctx.db, 'GEO-9858', 'merged', {}, 'kettle-bot');
+  ctx.fake.sessions.push({ id: '0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, state: 'done' });
+  ctx.fake.activity.set('0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', Date.parse('2026-10-21T01:00:00Z'));
+  const fleet = buildStubFleetClient({
+    sessions: [
+      { id: '0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, state: 'done' },
+      { id: '0000d002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'teapot-agent', alive: true, state: 'done' },
+    ],
+  });
+  const openClient = mock(() => Promise.resolve(fleet.client));
+  const gh = buildStubGitHubFactsRunner({ views: {} });
+
+  await sweepNow(ctx.db, ctx.client, gh, { actor: 'z-delivery', wrapUpDeps: { openClient, readImpWork: () => Promise.reject(new Error('a local run checks no imp')), readLocalWork: () => Promise.resolve({ state: 'pushed' as const }) }, log: () => {} });
+
+  expect(fleet.calls).toStrictEqual(['unpin 0000d001', 'kill 0000d001', 'unpin 0000d001', 'forget 0000d001', 'unpin 0000d002', 'kill 0000d002', 'unpin 0000d002', 'forget 0000d002']);
+  expect(openClient).toHaveBeenCalledTimes(1);
+});
+
+test('it keeps a handed-in run whose sub-session atc shows recently active', async () => {
+  const ctx = await setupTest();
+  onTestFinished(overrideEnv('HQ_NOW', '2026-10-21T03:00:00Z'));
+  addRun(ctx.db, { issue: 'GEO-9859', title: 'Invented kettle work', place: 'local', session: '0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
+  addPr(ctx.db, 'GEO-9859', 'kettle#59', 'kettle-bot');
+  finalPr(ctx.db, 'kettle#59', { sha: 'abc1234', actor: 'kettle-bot' });
+  closePr(ctx.db, 'kettle#59', { to: 'merged', actor: 'kettle-bot', facts: { mergedAt: '2026-10-21T01:00:00Z', mergeSha: null } });
+  ctx.fake.sessions.push(
+    { id: '0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, state: 'done' },
+    { id: '0000d003-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-sketch', alive: true, state: 'done', parent: '0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+  );
+  ctx.fake.activity.set('0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', Date.parse('2026-10-21T01:00:00Z'));
+  ctx.fake.activity.set('0000d003-aaaa-4aaa-8aaa-aaaaaaaaaaaa', Date.parse('2026-10-21T02:50:00Z'));
+  const fleet = buildStubFleetClient({
+    sessions: [
+      { id: '0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, state: 'done' },
+      { id: '0000d003-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-sketch', alive: true, state: 'done', parent: '0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+    ],
+  });
+  const gh = buildStubGitHubFactsRunner({ views: {} });
+
+  await sweepNow(ctx.db, ctx.client, gh, { actor: 'z-delivery', wrapUpDeps: { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')), readLocalWork: () => Promise.resolve({ state: 'pushed' as const }) }, log: () => {} });
+
+  expect(fleet.calls).toStrictEqual([]);
+});
+
+test('it keeps a handed-in run whose running sub-session the wrap-up client lists but the sweep atc list does not', async () => {
+  const ctx = await setupTest();
+  onTestFinished(overrideEnv('HQ_NOW', '2026-10-21T03:00:00Z'));
+  addRun(ctx.db, { issue: 'GEO-9860', title: 'Invented kettle work', place: 'local', session: '0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
+  addPr(ctx.db, 'GEO-9860', 'kettle#60', 'kettle-bot');
+  finalPr(ctx.db, 'kettle#60', { sha: 'abc1234', actor: 'kettle-bot' });
+  closePr(ctx.db, 'kettle#60', { to: 'merged', actor: 'kettle-bot', facts: { mergedAt: '2026-10-21T01:00:00Z', mergeSha: null } });
+  ctx.fake.sessions.push({ id: '0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, state: 'done' });
+  ctx.fake.activity.set('0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', Date.parse('2026-10-21T01:00:00Z'));
+  ctx.fake.activity.set('0000d003-aaaa-4aaa-8aaa-aaaaaaaaaaaa', Date.parse('2026-10-21T01:00:00Z'));
+  const fleet = buildStubFleetClient({
+    sessions: [
+      { id: '0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, state: 'done' },
+      { id: '0000d003-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-sketch', alive: true, state: 'running', parent: '0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+    ],
+  });
+  const gh = buildStubGitHubFactsRunner({ views: {} });
+
+  await sweepNow(ctx.db, ctx.client, gh, { actor: 'z-delivery', wrapUpDeps: { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')), readLocalWork: () => Promise.resolve({ state: 'pushed' as const }) }, log: () => {} });
+
+  expect(fleet.calls).toStrictEqual([]);
+  expect(ctx.readActive('GEO-9860')).toStrictEqual([1]);
+});
+
+test('it opens no wrap-up client for a sweep with no handed-in run', async () => {
+  const ctx = await setupTest();
+  onTestFinished(overrideEnv('HQ_NOW', '2026-10-21T03:00:00Z'));
+  addRun(ctx.db, { issue: 'GEO-9861', title: 'Invented kettle work', place: 'local', session: '0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
+  addPr(ctx.db, 'GEO-9861', 'kettle#61', 'kettle-bot');
+  ctx.fake.sessions.push({ id: '0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, state: 'done' });
+  const openClient = mock(() => Promise.reject(new Error('no wrap-up client expected')));
+  const gh = buildStubGitHubFactsRunner({ views: { 'kettle#61': JSON.stringify({ state: 'OPEN', mergedAt: null, mergeCommit: null }) } });
+
+  await sweepNow(ctx.db, ctx.client, gh, { actor: 'z-delivery', wrapUpDeps: { openClient, readImpWork: () => Promise.reject(new Error('no check expected')), readLocalWork: () => Promise.reject(new Error('no check expected')) }, log: () => {} });
+
+  expect(openClient).not.toHaveBeenCalled();
 });

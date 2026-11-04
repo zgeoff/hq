@@ -8,6 +8,9 @@ export interface StubFleetAnswers {
   forgets?: Record<string, ForgetAnswer[]>;
 
   killFailures?: string[];
+
+  // A forget answers once this settles, so a test can hold a caller part-way through.
+  forgetAfter?: Promise<unknown>;
 }
 
 export interface StubFleetClient {
@@ -36,9 +39,10 @@ export function buildStubFleetClient(answers: StubFleetAnswers): StubFleetClient
       return Promise.resolve();
     },
     unpin: (id) => record('unpin', id),
-    forget: (id, confirmToken) => {
+    forget: async (id, confirmToken) => {
       calls.push(`forget ${id.slice(0, 8)}${confirmToken === undefined ? '' : ` ${confirmToken}`}`);
-      return Promise.resolve(forgets.get(id)?.shift() ?? { forgotten: true });
+      await answers.forgetAfter;
+      return forgets.get(id)?.shift() ?? { forgotten: true };
     },
     forgetLive: (id, confirmToken) => {
       calls.push(`forget-live ${id.slice(0, 8)}${confirmToken === undefined ? '' : ` ${confirmToken}`}`);

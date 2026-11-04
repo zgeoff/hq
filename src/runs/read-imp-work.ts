@@ -5,7 +5,7 @@ import type { ImpWork } from './types.ts';
 const impListSchema = z.array(z.looseObject({ name: z.string() }));
 
 // A failed git call exits nonzero: none runs inside a pipe, whose status would be the last command's.
-const CHECK_SCRIPT = [
+export const CHECK_SCRIPT = [
   'set -eu',
   'cd "$1"',
   'trees=$(git worktree list --porcelain) || exit 1',
@@ -47,14 +47,19 @@ export async function readImpWork(run: Runner, sessionID: string, cwd: string | 
   if (checked.code !== 0) {
     return { state: 'unknown', detail: `the check in ${imp.name} exited ${checked.code}: ${firstLine(checked.stderr)}` };
   }
-  const lines = checked.stdout.split('\n').filter((line) => line.trim() !== '');
+  return summarizeFindings(checked.stdout, imp.name);
+}
+
+// The script prints one line per thing it found, so no output means all work is pushed.
+export function summarizeFindings(stdout: string, label: string): ImpWork {
+  const lines = stdout.split('\n').filter((line) => line.trim() !== '');
   if (lines.length > 0) {
-    return { state: 'unpushed', detail: `${imp.name}: ${lines.slice(0, 3).join('; ')}${lines.length > 3 ? ` and ${lines.length - 3} more` : ''}` };
+    return { state: 'unpushed', detail: `${label}: ${lines.slice(0, 3).join('; ')}${lines.length > 3 ? ` and ${lines.length - 3} more` : ''}` };
   }
   return { state: 'pushed' };
 }
 
-function firstLine(text: string): string {
+export function firstLine(text: string): string {
   return text.trim().split('\n')[0] ?? '';
 }
 
