@@ -54,6 +54,12 @@ export async function runLinearReadyTick(db: Database, deps: LinearReadyTickDeps
   try {
     const lanes = await deps.readLanes();
     const rules = validateLaneRules(rulesTable, lanes?.map((lane) => lane.name) ?? null);
+
+    // The labels are stored before the Ready read, which records each issue's areas from the stored list.
+    const names = await readAreaNames(cancellableCall, deps.deadlineMs);
+    if (names !== null) {
+      writeAreaNames(db, names, iso(at));
+    }
     await withDeadline(readLinearReady(db, { call: cancellableCall, run: deps.run, actor: deps.actor, rules }), deps.deadlineMs, 'lanes Ready from Linear');
   } catch (error) {
     abandoned.abort();
@@ -63,15 +69,10 @@ export async function runLinearReadyTick(db: Database, deps: LinearReadyTickDeps
   setMeta(db, 'lanes_ready_linear_error', null);
   const leftMs = Math.max(0, deps.deadlineMs - (readClock() - startedAt));
   const focus = readFocus(db);
-  const readingLabels = readAreaNames(cancellableCall, leftMs);
   const backlog = await withDeadline(readBacklogIssues(cancellableCall, rulesTable.team, readDoneOpenIssues(db)), leftMs, 'Backlog promotable count', abandoned).then(
     (issues) => ({ issues, error: null }),
     (error: unknown) => ({ issues: null, error: toMessage(error).slice(0, 300) }),
   );
-  const names = await readingLabels;
-  if (names !== null) {
-    writeAreaNames(db, names, iso(at));
-  }
   const count =
     backlog.issues === null
       ? null

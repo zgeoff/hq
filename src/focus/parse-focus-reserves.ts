@@ -5,7 +5,7 @@ export function parseFocusReserves(raw: readonly string[], areas: readonly strin
   const MAX_SLOTS = 20;
   const reserves: FocusReserve[] = [];
   for (const entry of raw) {
-    const parts = /^(?<area>[a-z-]+)=(?<slots>\d+)$/u.exec(entry.trim())?.groups;
+    const parts = /^(?<area>[^=]+)=(?<slots>\d+)$/u.exec(entry.trim())?.groups;
     const area = areas.find((name) => name === parts?.['area']);
     const slots = Number(parts?.['slots']);
     if (area === undefined || !Number.isInteger(slots) || slots < 1 || slots > MAX_SLOTS) {

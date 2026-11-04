@@ -326,3 +326,12 @@ test('it keeps the repo checks that hq linear areas stored for the labels still 
 
   expect(readAreaLabels(ctx.db)).toStrictEqual({ at: '2026-10-15T20:00:00Z', names: ['teapot'], repoExists: { teapot: true } });
 });
+
+test('it records the areas of a Ready issue that carries a label added to Linear since the last read', async () => {
+  const ctx = setupTest();
+  const call = makeLabelsCall(makePagedCall(buildReadyPage([{ identifier: 'GEO-9801', labels: ['teapot'] }], null)), ['teapot']);
+
+  await runLinearReadyTick(ctx.db, { call, run: buildStubGitHubFactsRunner({}), readLanes: () => Promise.resolve(null), actor: 'hq-lanes', deadlineMs: 2000 });
+
+  expect(JSON.parse(getMeta(ctx.db, 'lanes_issue_areas') ?? 'null')).toStrictEqual({ 'GEO-9801': ['teapot'] });
+});

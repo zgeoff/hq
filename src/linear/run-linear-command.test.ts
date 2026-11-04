@@ -507,15 +507,15 @@ test('it checks imp against zgeoff/impz and skips frankie, which names no repo',
   expect(readAreaLabels(ctx.db)).toMatchObject({ names: ['frankie', 'imp'], repoExists: { imp: true } });
 });
 
-test('it asks gh only about labels the stored result lacks, or found without a repo', async () => {
+test('it asks gh only about labels the stored result lacks', async () => {
   const ctx = setupTest();
   seedAreaLabels(ctx.db, ['atc', 'cloud', 'teapot'], { atc: true, cloud: true, teapot: false });
   linearLabels.push({ team: 'KET', name: 'atc', isGroup: false, parent: null }, { team: 'KET', name: 'cloud', isGroup: false, parent: null }, { team: 'KET', name: 'kettle', isGroup: false, parent: null }, { team: 'KET', name: 'teapot', isGroup: false, parent: null });
 
-  await runLinearCommand(ctx.deps, 'areas', { team: 'KET' });
+  await expect(runLinearCommand(ctx.deps, 'areas', { team: 'KET' })).rejects.toThrow('zgeoff repo does not exist: teapot');
 
-  expect(ctx.gh.mock.calls.map(([cmd]) => cmd[2]).toSorted()).toStrictEqual(['repos/zgeoff/kettle', 'repos/zgeoff/teapot']);
-  expect(readAreaLabels(ctx.db).repoExists).toStrictEqual({ atc: true, cloud: true, kettle: true, teapot: true });
+  expect(ctx.gh.mock.calls.map(([cmd]) => cmd[2]).toSorted()).toStrictEqual(['repos/zgeoff/kettle']);
+  expect(readAreaLabels(ctx.db).repoExists).toStrictEqual({ atc: true, cloud: true, kettle: true, teapot: false });
 });
 
 test('it refuses hq linear areas, naming each area label whose zgeoff repo does not exist, and still stores the list', async () => {
