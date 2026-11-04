@@ -35,7 +35,7 @@ export async function sweepNow(db: Database, client: AtcClient, run: Runner, opt
     updateGoneRunSessions(db, sessions, options.actor);
     const wrapUpDeps = shareClient(options.wrapUpDeps);
     const readActivity = (id: string) => (activity.has(id) ? Promise.resolve(activity.get(id) ?? null) : readLastActivityAt(client, id));
-    await endHandedInRunSessionsSafely(db, { sessions, readActivity }, { ...options, wrapUpDeps });
+    await endHandedInRunSessionsSafely(db, { readActivity }, { ...options, wrapUpDeps });
     await wrapUpMergedRunsSafely(db, { ...options, wrapUpDeps });
   }
   const alerts = await closeFlaggedPRs(db, run, findAlerts(db, sessions, activity, now()));

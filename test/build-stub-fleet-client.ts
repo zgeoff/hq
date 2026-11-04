@@ -9,8 +9,8 @@ export interface StubFleetAnswers {
 
   killFailures?: string[];
 
-  // The list answers once this settles, so a test can hold a caller part-way through.
-  listedAfter?: Promise<unknown>;
+  // A forget answers once this settles, so a test can hold a caller part-way through.
+  forgetAfter?: Promise<unknown>;
 }
 
 export interface StubFleetClient {
@@ -26,10 +26,7 @@ export function buildStubFleetClient(answers: StubFleetAnswers): StubFleetClient
     return Promise.resolve();
   };
   const client: FleetClient & StaleOps = {
-    sessions: async () => {
-      await answers.listedAfter;
-      return answers.sessions;
-    },
+    sessions: () => Promise.resolve(answers.sessions),
     spawn: () => Promise.reject(new Error('the stub fleet client spawns nothing')),
     details: () => Promise.reject(new Error('the stub fleet client reads no details')),
     message: () => Promise.reject(new Error('the stub fleet client reads no message')),
@@ -42,9 +39,10 @@ export function buildStubFleetClient(answers: StubFleetAnswers): StubFleetClient
       return Promise.resolve();
     },
     unpin: (id) => record('unpin', id),
-    forget: (id, confirmToken) => {
+    forget: async (id, confirmToken) => {
       calls.push(`forget ${id.slice(0, 8)}${confirmToken === undefined ? '' : ` ${confirmToken}`}`);
-      return Promise.resolve(forgets.get(id)?.shift() ?? { forgotten: true });
+      await answers.forgetAfter;
+      return forgets.get(id)?.shift() ?? { forgotten: true };
     },
     forgetLive: (id, confirmToken) => {
       calls.push(`forget-live ${id.slice(0, 8)}${confirmToken === undefined ? '' : ` ${confirmToken}`}`);

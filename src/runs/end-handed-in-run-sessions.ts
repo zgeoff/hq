@@ -17,10 +17,7 @@ const HANDED_IN_QUIET_MS = 30 * 60_000;
 const PrRows = z.array(z.object({ issue: z.string(), state: z.string(), final_sha: z.string().nullable(), merged_at: z.string().nullable() }));
 const SessionRows = z.array(z.object({ issue: z.string(), session_id: z.string(), active: z.number() }));
 
-type AtcSession = Pick<FleetSession, 'id' | 'state' | 'parent'>;
-
 export interface AtcView {
-  sessions: readonly AtcSession[];
   readActivity: (id: string) => Promise<number | null>;
 }
 
@@ -51,7 +48,11 @@ export async function endHandedInRunSessions(db: Database, atc: AtcView, deps: W
     const rows = sessionRows.filter((row) => row.issue === issue);
     const lastKept = readLastKept(db, issue);
     if (hasHandedInPRs(prs.filter((row) => row.issue === issue), quietBefore) && !isKeptRecently(lastKept, at)) {
-      const guarded = collectGuardedSessions(rows, atc.sessions);
+      // The wrap-up walks the shared client's list, so the guard walks the same one and checks every
+      // session it could forget, sub-sessions spawned since the sweep listed atc included.
+      const client = await shared.openClient();
+      const listed = await client.sessions();
+      const guarded = collectGuardedSessions(rows, listed);
       const activity = await readGuardedActivity(atc, guarded ?? []);
       if (isQuietTree(guarded, activity, quietBefore)) {
         const ids = rows.filter((row) => row.active === 1).map((row) => row.session_id);
@@ -82,6 +83,8 @@ function isKeptRecently(lastKept: StoredEvent | null, at: Date): boolean {
 }
 
 type SessionRow = z.infer<typeof SessionRows>[number];
+
+type AtcSession = Pick<FleetSession, 'id' | 'state' | 'parent'>;
 
 // The wrap-up forgets every session of the run that atc lists, active or not, with all their
 // sub-sessions, so each of them is checked. An active session atc does not list returns null.
