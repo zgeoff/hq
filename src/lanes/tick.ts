@@ -19,6 +19,7 @@ import { formatPlaceUnfit } from './format-place-unfit.ts';
 import { formatSlotNudge } from './format-slot-nudge.ts';
 import { getLanesHold } from './get-lanes-hold.ts';
 import { LANES } from './lanes.ts';
+import { LANES_MINUTES_FROM } from './lanes-minutes-from.ts';
 import { nudgeText } from './nudge-text.ts';
 import { readSlotMinutes } from './read-slot-minutes.ts';
 import { readSlotPlan } from './read-slot-plan.ts';
@@ -54,9 +55,10 @@ export function tick(db: Database, sample: Sample, actor: string): TickResult {
 
       const slotCause = trackSlotCause(db, slotPlan, t);
       const designCause = trackDesignCause(db, slotPlan, t);
-      if (getLanesHold(db) === null) {
-        writeEmptySlotMinutes(db, { slotCause, previousAt: previous?.at ?? null, at: t });
-        writeDesignSlotMinutes(db, { designCause, previousAt: previous?.at ?? null, at: t });
+      const minutesFrom = readMinutesFrom(db, previous?.at ?? null, t);
+      if (minutesFrom !== null) {
+        writeEmptySlotMinutes(db, { slotCause, previousAt: minutesFrom, at: t });
+        writeDesignSlotMinutes(db, { designCause, previousAt: minutesFrom, at: t });
       }
       sendSlotCauseAlerts(db, { free: slotCause.slots, designFree: designCause.slots, at: t, actor });
       if (!sample.error) {
@@ -130,6 +132,21 @@ export function tick(db: Database, sample: Sample, actor: string): TickResult {
       return result(true, text, since);
     })
     .immediate();
+}
+
+// A held tick moves the start of the next counted interval to the hold's end, so the first tick
+// after a hold ends counts none of the held time. releaseLanes moves it to the release.
+function readMinutesFrom(db: Database, previousAt: string | null, at: Date): string | null {
+  const hold = getLanesHold(db);
+  if (hold !== null) {
+    setMeta(db, LANES_MINUTES_FROM, hold.until);
+    return null;
+  }
+  const from = getMeta(db, LANES_MINUTES_FROM);
+  if (previousAt === null || from === null || from <= previousAt) {
+    return previousAt;
+  }
+  return from < iso(at) ? from : null;
 }
 
 function countWanted(slotPlan: NonNullable<ReturnType<typeof readSlotPlan>>): number {

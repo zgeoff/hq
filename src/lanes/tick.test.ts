@@ -11,6 +11,7 @@ import { setMeta } from '../db/set-meta.ts';
 import { runFocusCommand } from '../focus/run-focus-command.ts';
 import { addRun } from '../runs/add-run.ts';
 import { holdLanes } from './hold-lanes.ts';
+import { releaseLanes } from './release-lanes.ts';
 import { readLinearReady } from './read-linear-ready.ts';
 import { readSlotMinutes } from './read-slot-minutes.ts';
 import { tick } from './tick.ts';
@@ -350,6 +351,36 @@ test('it counts no slot-minutes while a lanes hold is in force', async () => {
   expect(result.slotCause.cause).toBe('delivery');
   expect(result.nudged).toBe(false);
   expect(readSlotMinutes(ctx.db, '2026-10-14')).toStrictEqual({ delivery: 0, triage: 0, supply: 0, design: 0 });
+});
+
+test('it counts only the minutes after a hold ends in the first look after it', async () => {
+  const ctx = setupTest();
+  at('2026-10-14T01:00:00Z');
+  const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
+  await ctx.seedReady([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
+  holdLanes(ctx.db, 20, 'the kettle supplier is closed', 'z-stu');
+  tick(ctx.db, sample, 'hq-lanes');
+  at('2026-10-14T01:25:00Z');
+
+  tick(ctx.db, sample, 'hq-lanes');
+
+  expect(readSlotMinutes(ctx.db, '2026-10-14').delivery).toBe(15);
+});
+
+test('it counts only the minutes after a release in the first look after it', async () => {
+  const ctx = setupTest();
+  at('2026-10-14T01:00:00Z');
+  const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
+  await ctx.seedReady([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
+  holdLanes(ctx.db, 120, 'the kettle supplier is closed', 'z-stu');
+  tick(ctx.db, sample, 'hq-lanes');
+  at('2026-10-14T01:10:00Z');
+  releaseLanes(ctx.db, 'z-stu');
+  at('2026-10-14T01:15:00Z');
+
+  tick(ctx.db, sample, 'hq-lanes');
+
+  expect(readSlotMinutes(ctx.db, '2026-10-14').delivery).toBe(15);
 });
 
 test('it offers the imp room as free slots when pacing has no lanes and no cap is set', () => {
