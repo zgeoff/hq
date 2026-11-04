@@ -29,7 +29,7 @@
     "@orpc/tanstack-query": "1.16.1",
     "@tanstack/react-query": "5.105.0",
     "@tanstack/react-router": "1.170.46",
-    "@zgeoff/std": "0.3.2",
+    "@zgeoff/std": "0.4.0",
     "geist": "1.8.2",
     "kysely": "0.29.7",
     "react": "19.3.1",
