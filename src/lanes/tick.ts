@@ -136,13 +136,9 @@ export function tick(db: Database, sample: Sample, actor: string): TickResult {
 }
 
 // Each held span stays on record until a look counts past it, so a hold that starts and ends
-// between two looks still comes off the interval the second look counts. A hold saved before spans
-// existed gets its span here, held from the previous look.
+// between two looks still comes off the interval the second look counts.
 function takeHeldMs(db: Database, previousAt: string | null, at: Date): number {
-  const hold = getLanesHold(db);
-  const stored = readHeldSpans(db);
-  const spans = stored.length === 0 && hold !== null ? [{ from: previousAt ?? iso(at), until: hold.until }] : stored;
-  const count = countHeldMs(spans, previousAt, at);
+  const count = countHeldMs(readHeldSpans(db), previousAt, at);
   writeHeldSpans(db, count.kept);
   return count.heldMs;
 }
