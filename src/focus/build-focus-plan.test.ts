@@ -113,3 +113,11 @@ test('it never drops an earlier issue for a later one when both want the one fre
 
   expect(plan.picks).toStrictEqual([{ issue: 'GEO-9871', term: null, reserve: null, place: 'imp' }]);
 });
+
+test('it fills a reserve for an area outside the built-in list with the issue that carries its label', () => {
+  const queue = buildFocusQueue([buildReadyIssue('GEO-9801', { type: 'Bug' }), buildReadyIssue('GEO-9802', { type: 'Feature', labels: ['teapot'] })], parseFocusTerms('bug', FOCUS_AREAS), new Set());
+
+  const plan = buildFocusPlan(queue, { free: 1, places: null }, [{ area: 'teapot', slots: 1 }], {});
+
+  expect(plan).toStrictEqual({ picks: [{ issue: 'GEO-9802', term: null, reserve: 'teapot' }], lent: [] });
+});
