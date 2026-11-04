@@ -489,9 +489,9 @@ test("it passes hq linear areas when each of the team's and the shared area labe
 
 test('it takes a new area label for the focus lists once hq linear areas has read it', async () => {
   const ctx = setupTest();
-  linearLabels.push({ team: 'KET', name: 'Teapot', isGroup: false, parent: null });
+  linearLabels.push({ team: 'GEO', name: 'Teapot', isGroup: false, parent: null });
 
-  await runLinearCommand(ctx.deps, 'areas', { team: 'KET' });
+  await runLinearCommand(ctx.deps, 'areas', { team: 'GEO' });
 
   expect(readAreaLabels(ctx.db)).toMatchObject({ names: ['teapot'], repoExists: { teapot: true } });
   expect(parseFocusReserves(['teapot=1'], readAreaLabels(ctx.db).names)).toStrictEqual([{ area: 'teapot', slots: 1 }]);
@@ -499,9 +499,9 @@ test('it takes a new area label for the focus lists once hq linear areas has rea
 
 test('it checks imp against zgeoff/impz and skips frankie, which names no repo', async () => {
   const ctx = setupTest();
-  linearLabels.push({ team: 'KET', name: 'imp', isGroup: false, parent: null }, { team: 'KET', name: 'frankie', isGroup: false, parent: null });
+  linearLabels.push({ team: 'GEO', name: 'imp', isGroup: false, parent: null }, { team: 'GEO', name: 'frankie', isGroup: false, parent: null });
 
-  await runLinearCommand(ctx.deps, 'areas', { team: 'KET' });
+  await runLinearCommand(ctx.deps, 'areas', { team: 'GEO' });
 
   expect(ctx.gh.mock.calls.map(([cmd]) => cmd[2])).toStrictEqual(['repos/zgeoff/impz']);
   expect(readAreaLabels(ctx.db)).toMatchObject({ names: ['frankie', 'imp'], repoExists: { imp: true } });
@@ -510,9 +510,9 @@ test('it checks imp against zgeoff/impz and skips frankie, which names no repo',
 test('it asks gh only about labels whose repo it has not found, and finds a repo made since a check missed it', async () => {
   const ctx = setupTest();
   seedAreaLabels(ctx.db, ['atc', 'cloud', 'teapot'], { atc: true, cloud: true, teapot: false });
-  linearLabels.push({ team: 'KET', name: 'atc', isGroup: false, parent: null }, { team: 'KET', name: 'cloud', isGroup: false, parent: null }, { team: 'KET', name: 'kettle', isGroup: false, parent: null }, { team: 'KET', name: 'teapot', isGroup: false, parent: null });
+  linearLabels.push({ team: 'GEO', name: 'atc', isGroup: false, parent: null }, { team: 'GEO', name: 'cloud', isGroup: false, parent: null }, { team: 'GEO', name: 'kettle', isGroup: false, parent: null }, { team: 'GEO', name: 'teapot', isGroup: false, parent: null });
 
-  await runLinearCommand(ctx.deps, 'areas', { team: 'KET' });
+  await runLinearCommand(ctx.deps, 'areas', { team: 'GEO' });
 
   expect(ctx.gh.mock.calls.map(([cmd]) => cmd[2]).toSorted()).toStrictEqual(['repos/zgeoff/kettle', 'repos/zgeoff/teapot']);
   expect(readAreaLabels(ctx.db).repoExists).toStrictEqual({ atc: true, cloud: true, kettle: true, teapot: true });
@@ -526,11 +526,11 @@ test('it refuses hq linear areas, naming each area label whose zgeoff repo does 
     const answer = cmd[2] === 'repos/zgeoff/atc' ? found : notFound;
     return Promise.resolve(answer);
   });
-  linearLabels.push({ team: 'KET', name: 'atc', isGroup: false, parent: null }, { team: 'KET', name: 'kettle', isGroup: false, parent: null }, { team: 'POT', name: 'mug', isGroup: false, parent: null }, { team: null, name: 'Teapot', isGroup: false, parent: null });
+  linearLabels.push({ team: 'GEO', name: 'atc', isGroup: false, parent: null }, { team: 'GEO', name: 'kettle', isGroup: false, parent: null }, { team: 'POT', name: 'mug', isGroup: false, parent: null }, { team: null, name: 'Teapot', isGroup: false, parent: null });
 
-  await expect(runLinearCommand(ctx.deps, 'areas', { team: 'KET' })).rejects.toMatchObject({
+  await expect(runLinearCommand(ctx.deps, 'areas', { team: 'GEO' })).rejects.toMatchObject({
     code: 'bad_state',
-    message: 'KET has area labels whose zgeoff repo does not exist: kettle, teapot. Create the repo, or take the label off the issues that carry it',
+    message: 'GEO has area labels whose zgeoff repo does not exist: kettle, teapot. Create the repo, or take the label off the issues that carry it',
   });
   expect(readAreaLabels(ctx.db)).toMatchObject({ names: ['atc', 'kettle', 'teapot'], repoExists: { atc: true, kettle: false, teapot: false } });
 });
@@ -538,10 +538,20 @@ test('it refuses hq linear areas, naming each area label whose zgeoff repo does 
 test('it does not store a repo as missing when gh fails for another reason than a 404', async () => {
   const ctx = setupTest();
   ctx.gh.mockImplementation(() => Promise.resolve<RunResult>({ code: 4, stdout: '', stderr: 'gh: invented auth failure' }));
+  linearLabels.push({ team: 'GEO', name: 'kettle', isGroup: false, parent: null });
+
+  await expect(runLinearCommand(ctx.deps, 'areas', { team: 'GEO' })).rejects.toMatchObject({ code: 'command_failed' });
+  expect(readAreaLabels(ctx.db).at).toBeNull();
+});
+
+test('it checks the area labels of a team other than the one lanes reads without replacing the stored list', async () => {
+  const ctx = setupTest();
+  seedAreaLabels(ctx.db, ['cloud'], { cloud: true });
   linearLabels.push({ team: 'KET', name: 'kettle', isGroup: false, parent: null });
 
-  await expect(runLinearCommand(ctx.deps, 'areas', { team: 'KET' })).rejects.toMatchObject({ code: 'command_failed' });
-  expect(readAreaLabels(ctx.db).at).toBeNull();
+  await expect(runLinearCommand(ctx.deps, 'areas', { team: 'KET' })).resolves.toMatchObject({ data: { team: 'KET', areas: ['kettle'], missing: [] } });
+
+  expect(readAreaLabels(ctx.db)).toMatchObject({ names: ['cloud'], repoExists: { cloud: true } });
 });
 
 test('it refuses hq linear areas with no --team', async () => {

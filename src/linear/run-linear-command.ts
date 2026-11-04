@@ -1,3 +1,4 @@
+import rulesTable from '../../lanes.json';
 import type { Flags } from '../cli.ts';
 import type { Out } from '../commands.ts';
 import { HqError } from '../errors.ts';
@@ -50,7 +51,11 @@ async function runLinearAreas(deps: LinearCommandDeps, flags: Flags): Promise<Ou
   const labels = await readTeamLabels(deps.call, team);
   const names = collectAreaNames(labels);
   const repoExists = await readRepoExists(deps.run, names, readAreaLabels(deps.db).repoExists);
-  writeAreaLabels(deps.db, { at: iso(now()), names, repoExists });
+
+  // The stored list serves the team lanes reads; another team's labels are checked but not stored.
+  if (team === rulesTable.team) {
+    writeAreaLabels(deps.db, { at: iso(now()), names, repoExists });
+  }
   const missing = names.filter((name) => repoExists[name] === false);
   if (missing.length > 0) {
     throw new HqError('bad_state', `${team} has area labels whose zgeoff repo does not exist: ${missing.join(', ')}. Create the repo, or take the label off the issues that carry it`, { missing });
