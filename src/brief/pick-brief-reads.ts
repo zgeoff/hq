@@ -7,6 +7,8 @@ import { pickIssueSize } from './pick-issue-size.ts';
 import type { BriefIssue, BriefPlaybook } from './types.ts';
 
 export interface BriefReads {
+  // The launch area's label, which can differ from the repo the label maps to.
+  label: string;
   repo: string;
 
   otherAreas: BriefArea[];
@@ -28,6 +30,7 @@ export function pickBriefReads(issue: BriefIssue, choice: BriefChoice, noslop: N
   const type = pickIssueType(issue.labels);
   const size = pickIssueSize(issue.labels);
   return {
+    label: choice.area.label,
     repo,
     otherAreas: choice.others,
     playbook: type === 'none' ? null : buildPlaybook(type, sha),

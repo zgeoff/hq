@@ -45,7 +45,7 @@ export function buildDeliveryBrief(facts: DeliveryBriefFacts): DeliveryBrief {
   const permissions = buildPermissions(actions, facts.permissionTable, facts.reads.repo);
   const needsRelease = permissions.names.some((action) => ['deploy', 'infra'].includes(action.toLowerCase()));
   const playbook = facts.playbookText === null ? null : facts.reads.playbook;
-  const openBoxes = facts.input.repo === null ? [] : readOpenScopeBoxes(facts.issue.description, [facts.input.repo, facts.reads.repo]);
+  const openBoxes = facts.input.repo === null ? [] : readOpenScopeBoxes(facts.issue.description, [facts.reads.label, facts.reads.repo]);
   const parts: BriefParts = {
     repo: facts.reads.repo,
     issueID: facts.issue.identifier,
