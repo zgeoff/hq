@@ -10,6 +10,7 @@ import { makeStateCall } from '../../test/make-state-call.ts';
 import { setMeta } from '../db/set-meta.ts';
 import { runFocusCommand } from '../focus/run-focus-command.ts';
 import { addRun } from '../runs/add-run.ts';
+import { holdLanes } from './hold-lanes.ts';
 import { readLinearReady } from './read-linear-ready.ts';
 import { readSlotMinutes } from './read-slot-minutes.ts';
 import { tick } from './tick.ts';
@@ -331,6 +332,22 @@ test('it counts no slot-minutes while the cap, not the pool, holds the free slot
   const result = tick(ctx.db, sample, 'hq-lanes');
 
   expect(result.slotCause).toStrictEqual({ cause: null, slots: 0, since: null, readyAgeMinutes: 20, reason: null, waitingMinutes: null, backlogError: null });
+  expect(result.nudged).toBe(false);
+  expect(readSlotMinutes(ctx.db, '2026-10-14')).toStrictEqual({ delivery: 0, triage: 0, supply: 0, design: 0 });
+});
+
+test('it counts no slot-minutes while a lanes hold is in force', async () => {
+  const ctx = setupTest();
+  at('2026-10-14T01:00:00Z');
+  const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
+  await ctx.seedReady([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
+  holdLanes(ctx.db, 120, 'the kettle supplier is closed', 'z-stu');
+  tick(ctx.db, sample, 'hq-lanes');
+  at('2026-10-14T01:20:00Z');
+
+  const result = tick(ctx.db, sample, 'hq-lanes');
+
+  expect(result.slotCause.cause).toBe('delivery');
   expect(result.nudged).toBe(false);
   expect(readSlotMinutes(ctx.db, '2026-10-14')).toStrictEqual({ delivery: 0, triage: 0, supply: 0, design: 0 });
 });
