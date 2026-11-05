@@ -138,15 +138,14 @@ Write one line per action, in these forms.
   its limit is over $5 of pay-per-use spend, or over $50 of the owner's Claude subscription.
 - **Deployment:** `Deploy: <environment>, <when, such as after CI passes on main>`.
 - **Infrastructure:** `Infra: <resources or stack>`.
-- **Data:** `Data: <datastore>, <migration, backfill, …>`. For one that only adds data, by
-  inserting rows, adding tables or columns, or filling in columns it added, write `insert-only` and
-  `after a backup` in the line, such as
-  `Data: garden db, insert-only copy of the old seed counts into a new table, after a backup`. It
-  needs no pitch unless it touches another owner-calls item, such as Nix's memory.
+- **Data:** `Data: <datastore>, <migration, backfill, …>`. For one that only adds data, as
+  owner-calls defines it, write `insert-only` and `after a backup` in the line, such as
+  `Data: garden db, insert-only copy of old seed counts, after a backup`. It needs no pitch unless
+  it touches another owner-calls item, such as Nix's memory.
 - **Posting:** `Post: <where, such as issues on zgeoff/atc>`. A vendor support question goes out
   under the owner's name: `Post: draft for the owner to send to <vendor> support`.
 - **Linear edits:** `Linear: <documents, milestones or issues>`. `z-delivery` makes these edits
-  itself, and they change no repo.
+  itself, and they change no repo, except an edit owner-calls lists, such as a new project.
 - **Design session:** `Design session, then the decision record as a Linear document`. It is the
   default for Design. The owner joins only with `with-geoff`. Nothing goes into a repo.
 

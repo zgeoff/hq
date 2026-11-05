@@ -26,14 +26,16 @@ Contents: [State](#state) · [Steps](#steps) · [Calls](#calls) · [Unblock list
 
 ## Steps
 
-1. **Gather the blocked decisions** into a JSON array in scratch:
+1. **Gather the blocked decisions that owner-calls lists as the owner's**, and settle the rest
+   yourself, as the opening says. Put them in a JSON array in scratch:
    `{"question", "recommendation", "session", "issue", "actions", "statusQuo", "ownerListed"}`,
    with `issue: null` when there's none. `actions` lists each Action line the decision would
    approve, in the [tickets](../../tickets/SKILL.md#actions) forms. Set `statusQuo: true` when the
    recommendation keeps the current course, such as "keep fixing". Set `ownerListed: true` when the
    recommended option would itself do something the owner-calls list names, such as touch Nix's
    memory or keep a cost over its limit. Settle a step on a credential the owner approved yourself:
-   find the approval with `hq call list --state all`, and tell the sender to carry on.
+   find the approval with `hq call list --state all`, which holds each pitch too, since a pitch
+   reaches the owner as a call. Then tell the sender to carry on.
    Sources: messages from sessions, and atc events of kind `decision` or `blocked` since your
    cursor. Save the new cursor. If `atc_events_read` refuses the cursor with `bad_args`, read
    without one, and say in the CHECK line that earlier notes may be missed. A decision stays open,
@@ -62,9 +64,9 @@ Contents: [State](#state) · [Steps](#steps) · [Calls](#calls) · [Unblock list
 5. **Build the calls:**
    `scripts/build-queue.sh --calls --blocked <file> --notes <file> --untracked <file> <issue pages>`
    prints each call's kind, question and recommendation as JSON, in `z-stu`'s order. It refuses a
-   decision without `ownerListed: true` that has `statusQuo: true`, or whose `actions` are all
-   `Code delivery` or insert-only Data lines, in the form that
-   [tickets](../../tickets/SKILL.md#actions) gives. It prints one `refused` line for each, and
+   decision without `ownerListed: true` that has `statusQuo: true`, or whose `actions` are all ones
+   owner-calls leaves to the fleet: `Code delivery`, Investigation, Spike, Design session, `Linear:`
+   and insert-only Data lines, in the forms that [tickets](../../tickets/SKILL.md#actions) gives. It prints one `refused` line for each, and
    exits 1.
    - Settle each refused decision yourself. Tell its sender to carry on, with `atc_message_send`,
      or, for an issue, remove `Needs Geoff` and write `{"resolved": true}`. Then run the script

@@ -5,8 +5,9 @@ hq; a proposal is a call hq makes itself, put the same way. You take the owner t
 record each answer as the owner gives it, and apply them together when the owner is done. Never edit hq's database
 by hand.
 
-Kinds: a flagged issue (`Needs Geoff`), a shared decision (one choice, several issues), and a
-blocked decision (a z- session waits).
+Each call is a flagged issue (`Needs Geoff`), a shared decision (one choice, several issues), or a
+blocked decision (a z- session waits). The untracked-PR count is not a call. When the owner asks for
+an issue for one of those PRs, file it in the PR's state (Done if merged), and link the PR.
 
 ## Commands
 
@@ -54,7 +55,6 @@ When the owner is done or steps away, apply every answer in one pass:
    - **Flagged issue or shared decision:** make the change, remove `Needs Geoff`, and comment the
      owner's decision in the owner's words, in `calls.private.md`'s form. The answer settles a close, a scope change
      or a new project.
-   - **Untracked PR:** if the owner wants an issue, file it in the PR's state (Done if merged) and link it.
 3. `hq call apply` for each, even "leave it" (`--to none`).
 4. One message: one line per call on what you changed.
 

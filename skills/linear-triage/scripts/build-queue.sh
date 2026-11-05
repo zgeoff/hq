@@ -13,8 +13,9 @@
 #                statusQuo is true when the recommendation keeps the current course; ownerListed
 #                is true when the recommended option itself does something the owner-calls list
 #                names. The script refuses, and exits 1 on, a decision without ownerListed true
-#                that has statusQuo true, or whose actions are all Code delivery lines or Data
-#                lines that say insert-only and after a backup, in upper or lower case.
+#                that has statusQuo true, or whose actions are all Code delivery, Investigation,
+#                Spike, Design session or Linear lines, or Data lines that say insert-only and
+#                after a backup, in upper or lower case.
 #   --notes      a JSON object from issue ID to {question, recommendation, actions?, statusQuo?,
 #                ownerListed?}, refused as --blocked says; issues with the same question text
 #                form one shared decision. A plain string is a recommendation alone.
@@ -51,19 +52,21 @@ notes_text=$(read_input --notes "$notes")
 untracked_text=$(read_input --untracked "$untracked")
 
 # A decision the fleet settles itself never becomes a call: one on nothing else the owner-calls list
-# names, whose recommendation keeps the status quo, or whose only Actions are Code delivery and
-# insert-only Data lines run after a backup.
+# names, whose recommendation keeps the status quo, or whose only Actions are ones owner-calls
+# leaves to the fleet: Code delivery, Investigation, Spike, Design session, Linear, and insert-only
+# Data lines run after a backup.
 refused=$(jq -n -r \
   --slurpfile blocked <(printf '%s\n' "$blocked_text") \
   --slurpfile notes <(printf '%s\n' "$notes_text") '
   def fleet_action:
-    type == "string" and (ascii_downcase | startswith("code delivery")
+    type == "string" and (ascii_downcase | (startswith("code delivery") or startswith("investigation")
+      or startswith("spike") or startswith("design session") or startswith("linear:"))
       or (startswith("data:") and contains("insert-only") and contains("after a backup")));
   def reason:
     if .ownerListed == true then empty
     elif .statusQuo == true then "its recommendation keeps the status quo"
     elif (.actions // []) as $a | ($a | length) > 0 and ($a | all(fleet_action))
-    then "its only Actions are Code delivery or data added after a backup"
+    then "its only Actions are ones owner-calls leaves to the fleet"
     else empty end;
   (($blocked[0] // [])[] | "the blocked decision \"\(.question)\": \(reason)"),
   (($notes[0] // {}) | to_entries[] | select(.value | type == "object" and (.resolved // false | not))

@@ -82,8 +82,8 @@ Also his:
 - accepting a finding's risk, or merging a PR its gate blocks;
 - product direction, and a cost only he can accept.
 
-In both of the owner's lists, a new session is a new z- session, and the Paid API limit is in
-[Actions](../tickets/SKILL.md#actions). To change either list, edit
+In both of the owner's lists, a new session is a new z- session, and the Paid API limit is the
+threshold that [Actions](../tickets/SKILL.md#actions) sets, not the limit an Action line names. To change either list, edit
 [grants/still-ask.yaml](../../grants/still-ask.yaml), then run `bun run grants` in the hq checkout
 to write it here.
 
