@@ -13,9 +13,9 @@ Understood. I'll set up an agent's design session for KET-40, the alert-model re
 
 ## A pitch
 
-List only the issues with an Action that
+List only the issues with an Action line, such as `Deploy:` or `Credentials:`, that
 [owner-calls](../../owner-calls/SKILL.md#what-only-the-owner-decides) lists as the owner's, and put
-each such Action on its own line. Launch the other issues without a pitch, as
+each such Action line under its issue. Launch the other issues without a pitch, as
 [Pitches](../SKILL.md#pitches) says.
 
 ```text

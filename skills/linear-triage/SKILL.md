@@ -119,7 +119,7 @@ issue whose text drops its Outcome or adds behaviour.
 2. When your private file names a credential as another session's, don't flag; groom the issue.
 3. Add `Needs Geoff` and a comment: the question, the options and your recommendation.
 4. Add the issue to `<scratch>/notes.json`:
-   `{"GEO-123": {"question": "…", "recommendation": "…", "actions": […], "statusQuo": false}}`,
+   `{"GEO-123": {"question": "…", "recommendation": "…", "actions": ["<Action line>"], "statusQuo": false}}`,
    with the fields that check.md's step 1 defines.
 
 Three cases:
