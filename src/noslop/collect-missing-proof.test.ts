@@ -29,6 +29,16 @@ test('it ignores proof lines that sit only inside a code fence', () => {
   ]);
 });
 
+test('it closes a fence only on the same marker, at least as long as the opening one', () => {
+  const body = ['## Checks', '', '````md', '```', '- [x] chex prose, links and skill: cleared', '~~~~', '- [x] Cold read: 6 fixed, 0 declined', '- [x] Deslop: 3 edits', '````'].join('\n');
+
+  expect(collectMissingProof(body)).toStrictEqual([
+    { kind: 'line', line: 'chex prose, links and skill' },
+    { kind: 'line', line: 'Cold read' },
+    { kind: 'line', line: 'Deslop' },
+  ]);
+});
+
 test('it accepts "Declined: none." with 0 declined', () => {
   const body = ['## Checks', '', '- [x] chex prose, links and skill: cleared', '- [x] Cold read: 4 fixed, 0 declined', '- [x] Deslop: 3 edits', '', 'Declined: none.'].join('\n');
 
