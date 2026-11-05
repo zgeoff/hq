@@ -152,17 +152,16 @@ once, in a new `<scratch>`, on a "check now" message.
 
 ## Scope, closes and comments
 
-- When a rewrite keeps the issue's Outcome and keeps each Acceptance check or makes it stricter,
-  rewrite the Scope and Acceptance yourself.
-- Flag the issue instead when it needs any of these, which are the owner's calls:
+- Rewrite the Scope and Acceptance yourself when the issue keeps its Outcome and each Acceptance
+  check stays or gets stricter.
+- Flag the issue for any of these owner's calls:
   - dropping or changing its Outcome;
   - adding behaviour its Outcome doesn't ask for;
   - loosening a rule the owner set in the issue, its comments or a design record;
   - closing it while its work is still worth doing.
-- Set each issue's priority yourself, by the rules in [tickets](../tickets/SKILL.md), even over a
-  priority already set. When you set one to High or Urgent, post it with
-  `hq news add --topic other --text`.
-- On a security issue, flag a High or Urgent priority instead of setting it.
+- Set each issue's priority yourself, by the rules in [tickets](../tickets/SKILL.md), even over an
+  existing one. Post each High or Urgent one with `hq news add --topic other --text`.
+- On a security issue, flag a High or Urgent priority instead.
 - Launching is `z-delivery`'s. Never launch.
 - Close an issue as superseded only when you're sure other issues carry all its work: link them in a
   comment, set it Canceled, and post one line with `hq news add --topic other --text`. When you're
