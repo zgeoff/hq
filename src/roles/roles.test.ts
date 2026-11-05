@@ -18,7 +18,7 @@ import invariant from 'tiny-invariant';
 import { z } from 'zod';
 import { updateEnv } from '@zgeoff/testing/helpers';
 import { createStubSystemctl } from '../../test/create-stub-systemctl.ts';
-import { NOON_SYDNEY, freshDb } from '../../test/helpers.ts';
+import { freshDb } from '../../test/helpers.ts';
 
 test('the table loads and each single role resolves to one declared session', () => {
   expect(ROLES.sessions.length).toBeGreaterThan(5);
@@ -307,19 +307,13 @@ test('no session-name literal sits in src/ outside roles.ts', () => {
 function setupTest() {
   const database = freshDb();
   onTestFinished(database.cleanup);
-
-  // hq fleet reads its timer through systemctl, which a host without systemd lacks.
-  updateEnv('PATH', `${createStubSystemctl({ directory: database.dir, show: {} }).bin}:${process.env['PATH'] ?? ''}`);
-  updateEnv('HQ_NOW', NOON_SYDNEY);
-  updateEnv('HQ_NOTIFY', 'off');
-  updateEnv('HQ_AS', roleName('owner'));
   const out: string[] = [];
   const originalLog = console.log;
   console.log = (line: string) => out.push(line);
   onTestFinished(() => {
     console.log = originalLog;
   });
-  return { db: database.db, out };
+  return { db: database.db, directory: database.dir, out };
 }
 
 test('a forward declared in fleet.json cannot be removed by command; a stored one can', () => {
@@ -355,13 +349,15 @@ test('a retired role holder is left out of the roles', () => {
 
 test('hq fleet --json carries the stale-build warning when the checkout fleet.json differs', async () => {
   const ctx = setupTest();
+
+  // hq fleet reads its timer through systemctl, which a host without systemd lacks.
+  updateEnv('PATH', `${createStubSystemctl({ directory: ctx.directory, show: {} }).bin}:${process.env['PATH'] ?? ''}`);
   const fleetText = readFileSync(join(import.meta.dir, '../../fleet.json'), 'utf8');
   const changed = z.looseObject({ forwards: z.record(z.string(), z.string()) }).parse(JSON.parse(fleetText));
-  const directory = mkdtempSync(join(tmpdir(), 'hq-fleet-projects-'));
-  onTestFinished(() => rmSync(directory, { recursive: true, force: true }));
+  const directory = join(ctx.directory, 'projects');
   updateEnv('HQ_PROJECTS', directory);
   changed.forwards['z-kettle'] = 'z-q';
-  mkdirSync(join(directory, 'hq'));
+  mkdirSync(join(directory, 'hq'), { recursive: true });
   writeFileSync(join(directory, 'hq', 'fleet.json'), JSON.stringify(changed));
   const code = await main(['fleet', '--json']);
   expect(code).toBe(0);
@@ -370,6 +366,9 @@ test('hq fleet --json carries the stale-build warning when the checkout fleet.js
 
 test('hq fleet --json gives each session its skill and roles, plus the roles and forwards', async () => {
   const ctx = setupTest();
+
+  // hq fleet reads its timer through systemctl, which a host without systemd lacks.
+  updateEnv('PATH', `${createStubSystemctl({ directory: ctx.directory, show: {} }).bin}:${process.env['PATH'] ?? ''}`);
   expect(await main(['fleet', '--json'])).toBe(0);
   const entrySchema = z.looseObject({ name: z.string(), skill: z.string().nullable(), skills: z.array(z.string()), roles: z.array(z.string()) });
   const fleetSchema = z.looseObject({ declared: z.array(entrySchema), roles: z.record(z.string(), z.unknown()), forwards: z.record(z.string(), z.string()) });
