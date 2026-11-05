@@ -48,7 +48,8 @@ check empty empty.expected
 check empty-prs empty-prs.expected --prs
 check kept kept.expected --calls --blocked "$fixtures/kept.json"
 check blocked-flagged blocked-flagged.expected --singles \
-  --blocked "$fixtures/blocked-flagged.json" "$fixtures/issues-array.json"
+  --blocked "$fixtures/blocked-flagged.json" --notes "$fixtures/blocked-flagged-notes.json" \
+  "$fixtures/issues-array.json"
 
 # A decision the fleet settles itself stops the run, with one line for each, before any queue prints.
 for mode in default calls singles; do

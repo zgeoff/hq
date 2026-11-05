@@ -47,8 +47,7 @@ Contents: [State](#state) · [Steps](#steps) · [Calls](#calls) · [Unblock list
    `priority`, `createdAt` and `updatedAt`, through `list_issues`. Save every page.
 3. **Complete `notes.json`** (start it as `{}` without a pass), one entry per flagged issue:
    `{"GEO-9001": {"question": "Split GEO-9001?", "recommendation": "Yes, because 16 PRs landed.", "actions": [], "statusQuo": false, "ownerListed": false}}`.
-   Skip an issue whose decision step 1 gathered: `build-queue.sh` makes it one call. For a flag the
-   pass didn't set, read the issue's latest comment.
+   For a flag the pass didn't set, read the issue's latest comment.
    - When the comment asks only what you can settle (a missing section, a missing `Code delivery`, a
      named blocker), fix it, remove `Needs Geoff`, and write `{"resolved": true}`.
    - When the comment asks what
@@ -58,7 +57,9 @@ Contents: [State](#state) · [Steps](#steps) · [Calls](#calls) · [Unblock list
      `check.private.md` in hq-private (`hq defs` shows where) says which credentials are another
      session's.
    - Issues waiting on one decision get the same question text, word for word, so they become one
-     call.
+     call. When that decision is one step 1 gathered, use its question: `build-queue.sh` folds the
+     issues into the blocked call, as it does the blocked decision's own issue. Add each issue to
+     that call's `--issues`.
 4. **Find untracked PRs:** `scripts/untracked-prs.sh 2` lists `zgeoff` PRs that cite no issue, open
    or merged in 2 days. Search Linear for each by repo and number first; when an issue holds it, add
    "Contributes to GEO-<n>" to the PR with `gh pr edit`. Trace the rest to an issue, or close one as

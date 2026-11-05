@@ -1,0 +1,9 @@
+{
+  "GEO-9103": {
+    "question": "May the agent post the pond survey to the garden club forum?",
+    "recommendation": "Yes, post the draft as written",
+    "actions": ["Post: the garden club forum"],
+    "statusQuo": false,
+    "ownerListed": false
+  }
+}
