@@ -24,8 +24,8 @@ test('it lists a blocker that is not completed and leaves out a completed one', 
 
   const issues = await readTeamIssues(call, 'GEO', 'Ready');
 
-  expect(issues.map((entry) => ({ identifier: entry.issue.identifier, openBlockers: entry.openBlockers, moreRelations: entry.moreRelations }))).toStrictEqual([
-    { identifier: 'GEO-9810', openBlockers: ['GEO-9811', 'GEO-9813'], moreRelations: false },
+  expect(issues).toStrictEqual([
+    { issue: { identifier: 'GEO-9810', project: null, projectLabels: [], labels: [], type: 'none', priority: 0, createdAt: '2026-10-01T00:00:00.000Z', parent: null }, openBlockers: ['GEO-9811', 'GEO-9813'], moreRelations: false },
   ]);
 });
 
@@ -34,7 +34,7 @@ test('it says an issue has more relations than the page read', async () => {
 
   const issues = await readTeamIssues(call, 'GEO', 'Ready');
 
-  expect(issues.map((entry) => ({ identifier: entry.issue.identifier, openBlockers: entry.openBlockers, moreRelations: entry.moreRelations }))).toStrictEqual([
-    { identifier: 'GEO-9820', openBlockers: [], moreRelations: true },
+  expect(issues).toStrictEqual([
+    { issue: { identifier: 'GEO-9820', project: null, projectLabels: [], labels: [], type: 'none', priority: 0, createdAt: '2026-10-01T00:00:00.000Z', parent: null }, openBlockers: [], moreRelations: true },
   ]);
 });

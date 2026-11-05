@@ -331,7 +331,9 @@ test('it leaves a Ready issue with an open blocker out of every lane and the sna
     skipped: [{ issue: 'GEO-9860', reason: 'blocked by GEO-9861, GEO-9862 (not Done)' }],
     line: 'Ready: 2 total, 1 eligible across lanes, 1 skipped with reasons, 0 unexplained',
   });
-  expect(readReadySnapshot(ctx.db)?.eligible.map((issue) => issue.identifier)).toStrictEqual(['GEO-9864']);
+  expect(readReadySnapshot(ctx.db)?.eligible).toStrictEqual([
+    { identifier: 'GEO-9864', project: 'atc roadmap', projectLabels: [], labels: [], type: 'none', priority: 0, createdAt: '2026-10-01T00:00:00.000Z', parent: null },
+  ]);
 });
 
 test('it keeps a Ready issue eligible when every blocker is Done', async () => {
