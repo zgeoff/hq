@@ -33,7 +33,8 @@ Contents: [State](#state) · [Steps](#steps) · [Calls](#calls) · [Unblock list
    approve, in the [tickets](../../tickets/SKILL.md#actions) forms. Set `statusQuo: true` when the
    recommendation keeps the current course, such as "keep fixing". Set `ownerListed: true` when the
    recommended option would itself do something the owner-calls list names, such as touch Nix's
-   memory or keep a cost over its limit. Settle a step on a credential the owner approved yourself:
+   memory or keep a cost over its limit, or when the decision is whether the owner joins a design
+   session. Settle a step on a credential the owner approved yourself:
    find the approval with `hq call list --state all`, which holds each pitch too, since a pitch
    reaches the owner as a call. Then tell the sender to carry on.
    Sources: messages from sessions, and atc events of kind `decision` or `blocked` since your

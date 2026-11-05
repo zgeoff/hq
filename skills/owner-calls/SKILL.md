@@ -83,7 +83,9 @@ Also his:
 - product direction, and a cost only he can accept.
 
 In both of the owner's lists, a new session is a new z- session, and the Paid API limit is the
-threshold that [Actions](../tickets/SKILL.md#actions) sets, not the limit an Action line names. To change either list, edit
+threshold that [Actions](../tickets/SKILL.md#actions) sets, not the limit an Action line names.
+Closing as not planned drops work that nobody carries on. The closes in linear-triage's
+[closing.md](../linear-triage/references/closing.md) stay with `z-triage`. To change either list, edit
 [grants/still-ask.yaml](../../grants/still-ask.yaml), then run `bun run grants` in the hq checkout
 to write it here.
 
@@ -94,10 +96,9 @@ Decide these yourself, with no owner call:
 - a Data Action that only adds data, run after a backup of that datastore: it inserts rows, adds
   tables or columns, or fills in columns it added. An additive change to anything else on the
   owner's lists, such as Nix's memory, stays his;
-- a step, such as a rotation, on a credential in a Credentials Action that the owner approved in a
-  call or a pitch. Look for that approval before you send a Credentials step to the owner;
-- reading an existing item from a vault: [Put it to the owner](#put-it-to-the-owner) says how to
-  look one up first;
+- a step, such as a rotation, on a credential that the owner approved in a call or a pitch. Look for
+  the approval first;
+- reading an existing item from a vault;
 - a decision whose recommendation keeps the current course, such as "keep fixing". Carry on. When
   the course itself is on the owner's lists, such as a cost over its limit, the decision stays his.
 

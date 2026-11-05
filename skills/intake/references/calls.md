@@ -5,9 +5,10 @@ hq; a proposal is a call hq makes itself, put the same way. You take the owner t
 record each answer as the owner gives it, and apply them together when the owner is done. Never edit hq's database
 by hand.
 
-Each call is a flagged issue (`Needs Geoff`), a shared decision (one choice, several issues), or a
-blocked decision (a z- session waits). The untracked-PR count is not a call. When the owner asks for
-an issue for one of those PRs, file it in the PR's state (Done if merged), and link the PR.
+Each call is a flagged issue (one with the Linear label `Needs Geoff`), a shared decision (one
+choice, several issues), or a blocked decision (a session such as `z-delivery` waits on it). The
+count of PRs that cite no Linear issue is not a call. When the owner asks for an issue for one of
+those PRs, file the issue in the state that matches the PR, Done if it merged, and link the PR.
 
 ## Commands
 
