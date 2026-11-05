@@ -1,9 +1,10 @@
 import { Database } from 'bun:sqlite';
 import { expect, mock, onTestFinished, spyOn, test } from 'bun:test';
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, renameSync, rmSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, renameSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { buildFakeRunner } from '../../test/noslop-fake.ts';
+import { createLockHolder } from '../../test/create-lock-holder.ts';
 import { buildStubStoreQuery } from '../../test/build-stub-store-query.ts';
 import { createStubNoslopClone } from '../../test/create-stub-noslop-clone.ts';
 import { createStubNoslopStore } from '../../test/create-stub-noslop-store.ts';
@@ -258,15 +259,12 @@ test('it keeps a repo turned on and a repo turned off while the store migration 
   expect(loadNoslopSettings(ctx.db)).toStrictEqual({ repos: ['widgets'], sha: ctx.fullSHA, caps: {} });
 });
 
-test('it refuses a pin while another pin\'s process still runs, however old its lock is', async () => {
+test('it refuses a pin while another pin\'s process holds the clone lock', async () => {
   const ctx = setupTest();
-  const sleeper = Bun.spawn(['sleep', '30']);
-  onTestFinished(() => sleeper.kill());
   onTestFinished(overrideEnv('HQ_REVIEW_LOCK_WAIT_MS', '0'));
-  const lock = join(ctx.base, 'reviews', '.lock-zgeoff-noslop-clone');
-  mkdirSync(lock, { recursive: true });
-  writeFileSync(join(lock, 'pid'), String(sleeper.pid));
-  utimesSync(lock, new Date(Date.now() - 3_600_000), new Date(Date.now() - 3_600_000));
+  mkdirSync(join(ctx.base, 'reviews'), { recursive: true });
+  const holder = await createLockHolder(join(ctx.base, 'reviews', '.flock-zgeoff-noslop-clone'));
+  onTestFinished(holder.kill);
 
   await expect(runNoslopCommand({ run: buildFakeRunner().run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) })).rejects.toMatchObject({ code: 'locked' });
 
