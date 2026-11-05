@@ -8,14 +8,16 @@
 # With --prs, prints the untracked PRs, one line each. With --calls, the untracked PRs come last
 # as one entry of kind "untracked", with their count by repo.
 # Usage: build-queue.sh [--calls | --singles | --prs] [--blocked <JSON>] [--notes <JSON>] [--untracked <JSON>] [<issues JSON>...]
-#   --blocked    a JSON array of {question, recommendation, session?, issue?, actions?, statusQuo?}
-#                you write. actions lists the Action lines the decision approves; statusQuo is
-#                true when the recommendation keeps the current course. The script refuses, and
-#                exits 1 on, a decision with statusQuo true, or whose actions are all Data lines
-#                that say insert-only and after a backup.
-#   --notes      a JSON object from issue ID to {question, recommendation, actions?, statusQuo?},
-#                refused as --blocked says; issues with the same question text form one shared
-#                decision. A plain string is a recommendation alone.
+#   --blocked    a JSON array of {question, recommendation, session?, issue?, actions?, statusQuo?,
+#                ownerListed?} you write. actions lists the Action lines the decision approves;
+#                statusQuo is true when the recommendation keeps the current course; ownerListed
+#                is true when the decision touches anything else the owner-calls list names. The
+#                script refuses, and exits 1 on, a decision with statusQuo true, or one without
+#                ownerListed true whose actions are all Data lines that say insert-only and after
+#                a backup.
+#   --notes      a JSON object from issue ID to {question, recommendation, actions?, statusQuo?,
+#                ownerListed?}, refused as --blocked says; issues with the same question text
+#                form one shared decision. A plain string is a recommendation alone.
 #                {"resolved": true} leaves an issue out: you settled it without the owner.
 #   --untracked  the output of untracked-prs.sh
 #   issues       saved pages of the Needs Geoff issues: an array, an object with `issues`, or
@@ -49,15 +51,16 @@ notes_text=$(read_input --notes "$notes")
 untracked_text=$(read_input --untracked "$untracked")
 
 # A decision the fleet settles itself never becomes a call: one whose recommendation keeps the
-# status quo, or whose only Actions are insert-only Data lines, run after a backup.
+# status quo, or whose only Actions are insert-only Data lines, run after a backup, on nothing else
+# the owner-calls list names.
 refused=$(jq -n -r \
   --slurpfile blocked <(printf '%s\n' "$blocked_text") \
   --slurpfile notes <(printf '%s\n' "$notes_text") '
   def reason:
     if .statusQuo == true then "its recommendation keeps the status quo"
-    elif (.actions // []) as $a | ($a | length) > 0
+    elif .ownerListed != true and ((.actions // []) as $a | ($a | length) > 0
       and ($a | all(type == "string" and startswith("Data:") and contains("insert-only")
-        and contains("after a backup")))
+        and contains("after a backup"))))
     then "its only Actions add data after a backup"
     else empty end;
   (($blocked[0] // [])[] | "the blocked decision \"\(.question)\": \(reason)"),

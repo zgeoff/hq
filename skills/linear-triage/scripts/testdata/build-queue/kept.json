@@ -17,5 +17,11 @@
     "recommendation": "Yes",
     "actions": ["Data: seed catalogue, rewrite of the shelf column, after a backup"],
     "statusQuo": false
+  },
+  {
+    "question": "May the agent add a greeting to the lantern keeper's memory?",
+    "recommendation": "Yes",
+    "actions": ["Data: keeper memory, insert-only greeting, after a backup"],
+    "ownerListed": true
   }
 ]

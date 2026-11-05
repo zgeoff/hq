@@ -28,10 +28,11 @@ Contents: [State](#state) · [Steps](#steps) · [Calls](#calls) · [Unblock list
 ## Steps
 
 1. **Gather the blocked decisions** into a JSON array in scratch:
-   `{"question", "recommendation", "session", "issue", "actions", "statusQuo"}`, with
-   `issue: null` when there's none. `actions` lists each Action line the decision would approve,
-   in the [tickets](../../tickets/SKILL.md#actions) forms. Set `statusQuo: true` when the
-   recommendation keeps the current course, such as "keep fixing".
+   `{"question", "recommendation", "session", "issue", "actions", "statusQuo", "ownerListed"}`,
+   with `issue: null` when there's none. `actions` lists each Action line the decision would
+   approve, in the [tickets](../../tickets/SKILL.md#actions) forms. Set `statusQuo: true` when the
+   recommendation keeps the current course, such as "keep fixing". Set `ownerListed: true` when the
+   decision touches anything else the owner-calls list names, such as Nix's memory.
    Sources: messages from sessions, and atc events of kind `decision` or `blocked` since your
    cursor. Save the new cursor. If `atc_events_read` refuses the cursor with `bad_args`, read
    without one, and say in the CHECK line that earlier notes may be missed. A decision stays open,
@@ -40,14 +41,14 @@ Contents: [State](#state) · [Steps](#steps) · [Calls](#calls) · [Unblock list
 2. **Fetch the flagged issues:** team GEO, label `Needs Geoff`, with `id`, `title`, `url`, `status`,
    `priority`, `createdAt` and `updatedAt`, through `list_issues`. Save every page.
 3. **Complete `notes.json`** (start it as `{}` without a pass), one entry per flagged issue:
-   `{"GEO-9001": {"question": "Split GEO-9001?", "recommendation": "Yes, because 16 PRs landed.", "actions": [], "statusQuo": false}}`.
+   `{"GEO-9001": {"question": "Split GEO-9001?", "recommendation": "Yes, because 16 PRs landed.", "actions": [], "statusQuo": false, "ownerListed": false}}`.
    For a flag the pass didn't set, read the issue's latest comment.
    - When the comment asks only what you can settle (a missing section, a missing `Code delivery`, a
      named blocker), fix it, remove `Needs Geoff`, and write `{"resolved": true}`.
    - When the comment asks what
      [owner-calls](../../owner-calls/SKILL.md#what-only-the-owner-decides) lists as the owner's,
-     or whether the owner joins a design session, keep the flag. Otherwise settle it yourself, as for the case above. Give every entry `actions`
-     and `statusQuo`, as step 1 says.
+     or whether the owner joins a design session, keep the flag. Otherwise settle it yourself, as
+     for the case above. Give every entry `actions`, `statusQuo` and `ownerListed`, as step 1 says.
      `check.private.md` in hq-private (`hq defs` shows where) says which credentials are another
      session's.
    - Issues waiting on one decision get the same question text, word for word, so they become one
@@ -59,12 +60,12 @@ Contents: [State](#state) · [Steps](#steps) · [Calls](#calls) · [Unblock list
 5. **Build the calls:**
    `scripts/build-queue.sh --calls --blocked <file> --notes <file> --untracked <file> <issue pages>`
    prints each call's kind, question and recommendation as JSON, in `z-stu`'s order. It refuses a
-   decision with `statusQuo: true`, or one whose `actions` are all insert-only Data lines, in the
-   form that [tickets](../../tickets/SKILL.md#actions) gives. It prints one `refused` line for
-   each, and exits 1.
+   decision with `statusQuo: true`, or one without `ownerListed: true` whose `actions` are all
+   insert-only Data lines, in the form that [tickets](../../tickets/SKILL.md#actions) gives. It
+   prints one `refused` line for each, and exits 1.
    - Settle each refused decision yourself. Tell its sender to carry on, with `atc_message_send`,
-     or, for an issue, remove
-     `Needs Geoff` and write `{"resolved": true}`. Then run the script again.
+     or, for an issue, remove `Needs Geoff` and write `{"resolved": true}`. Then run the script
+     again.
    - Write each call's card as [Calls](#calls) says, after reading the issue, its comments and
      linked work. The untracked call gives the count by repo and your recommendation.
 6. **Update hq:** run `hq outbox flush --retry`. Re-add every call in order, including open and

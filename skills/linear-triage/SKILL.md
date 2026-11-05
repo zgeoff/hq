@@ -119,14 +119,13 @@ issue whose text drops its Outcome or adds behaviour.
 2. When your private file names a credential as another session's, don't flag; groom the issue.
 3. Add `Needs Geoff` and a comment: the question, the options and your recommendation.
 4. Add the issue to `<scratch>/notes.json`:
-   `{"GEO-123": {"question": "…", "recommendation": "…", "actions": ["<Action line>"], "statusQuo": false}}`,
-   with the fields that check.md's step 1 defines.
+   `{"GEO-123": {"question": "…", "recommendation": "…", "actions": [], "statusQuo": false, "ownerListed": false}}`.
 
 Three cases:
 
 - **An issue that asks for the owner's approval before it is built** waits in Backlog, flagged,
-  only if it touches what owner-calls lists as the owner's. Otherwise answer the question yourself
-  in a comment, with no flag, and move it to Ready once it meets the Ready criteria.
+  only if it touches what owner-calls lists as the owner's. Otherwise answer it in a comment, and
+  move it to Ready.
 - **A doc change that only records settled behaviour** should have gone in the PR that built the
   behaviour. Comment that, then groom the issue for delivery as usual.
 - **An unreproduced one-off** stays in Backlog with a comment. Step 5 closes it after 14 days.

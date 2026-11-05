@@ -92,7 +92,8 @@ Decide these yourself, with no owner call:
 - Code delivery, Investigation, Spike, a Design session without the owner, and each Linear edit the
   owner's lists leave out. Whether the owner joins a design session is his to decide;
 - a Data Action that only adds data, run after a backup of that datastore: it inserts rows, adds
-  tables or columns, or fills in columns it added;
+  tables or columns, or fills in columns it added. An additive change to anything else on the
+  owner's lists, such as Nix's memory, stays his;
 - a step, such as a rotation, on a credential in a Credentials Action that the owner approved in a
   call or a pitch. Look for that approval before you send a Credentials step to the owner;
 - reading an existing item from a vault: [Put it to the owner](#put-it-to-the-owner) says how to

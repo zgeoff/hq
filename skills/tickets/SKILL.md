@@ -142,7 +142,7 @@ Write one line per action, in these forms.
   inserting rows, adding tables or columns, or filling in columns it added, write `insert-only` and
   `after a backup` in the line, such as
   `Data: garden db, insert-only copy of the old seed counts into a new table, after a backup`. It
-  needs no pitch.
+  needs no pitch unless it touches another owner-calls item, such as Nix's memory.
 - **Posting:** `Post: <where, such as issues on zgeoff/atc>`. A vendor support question goes out
   under the owner's name: `Post: draft for the owner to send to <vendor> support`.
 - **Linear edits:** `Linear: <documents, milestones or issues>`. `z-delivery` makes these edits
