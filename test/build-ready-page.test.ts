@@ -7,7 +7,7 @@ test('it shapes seeds as Linear answers, with no project, labels or parent by de
   expect(page).toStrictEqual({
     issues: {
       nodes: [
-        { identifier: 'GEO-1', priority: 0, createdAt: '2026-10-01T00:00:00.000Z', project: null, labels: { nodes: [] }, parent: null },
+        { identifier: 'GEO-1', priority: 0, createdAt: '2026-10-01T00:00:00.000Z', project: null, labels: { nodes: [] }, parent: null, inverseRelations: { nodes: [], pageInfo: { hasNextPage: false } } },
         {
           identifier: 'GEO-2',
           priority: 2,
@@ -15,6 +15,7 @@ test('it shapes seeds as Linear answers, with no project, labels or parent by de
           project: { name: 'invented project', labels: { nodes: [{ name: 'maintenance' }] } },
           labels: { nodes: [{ name: 'invented label', parent: null }, { name: 'Bug', parent: { name: 'Type' } }] },
           parent: { identifier: 'GEO-1' },
+          inverseRelations: { nodes: [], pageInfo: { hasNextPage: false } },
         },
       ],
       pageInfo: { hasNextPage: false, endCursor: null },

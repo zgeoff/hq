@@ -114,7 +114,7 @@ test('it lets a hand report write, and the next pass overwrites it', async () =>
   expect(readReadyByLane(ctx.db, 30)['atc']?.n).toBe(1);
 });
 
-test('it refuses to read past 20 pages, before request 21, and keeps the previous counts', async () => {
+test('it refuses to read past 100 pages, before request 101, and keeps the previous counts', async () => {
   const ctx = setupTest();
   const rules = validateLaneRules(rulesTable, Object.keys(rulesTable.lanes));
   reportLaneReady(ctx.db, { atc: 7 }, 'z-delivery');
@@ -124,7 +124,7 @@ test('it refuses to read past 20 pages, before request 21, and keeps the previou
 
   await expect(readLinearReady(ctx.db, { call, run: buildStubGitHubFactsRunner({}), actor: 'hq-lanes', rules })).rejects.toThrow('more than 5000 Ready issues; hq reads no further');
 
-  expect(call).toHaveBeenCalledTimes(20);
+  expect(call).toHaveBeenCalledTimes(100);
   expect(getMeta(ctx.db, 'lanes_ready_by_lane')).toBe(before);
 });
 
@@ -314,4 +314,37 @@ test('it keeps a skip until a PR that gh cannot read, and records why', async ()
 
   expect(readLaneSkips(ctx.db).map((skip) => skip.until)).toStrictEqual(['pr:impz#654']);
   expect(readSkipUnread(ctx.db)).toStrictEqual({ 'pr:impz#654': "impz#654: can't read it (gh exit 1): invented: no such PR" });
+});
+
+test('it leaves a Ready issue with an open blocker out of every lane and the snapshot, and lists it skipped with its blockers', async () => {
+  const ctx = setupTest();
+  const rules = validateLaneRules(rulesTable, Object.keys(rulesTable.lanes));
+  const blockers = [{ identifier: 'GEO-9861', stateType: 'started' }, { identifier: 'GEO-9862', stateType: 'unstarted' }, { identifier: 'GEO-9863', stateType: 'completed' }];
+  const call = makePagedCall(buildReadyPage([{ identifier: 'GEO-9860', project: 'atc roadmap', blockers }, { identifier: 'GEO-9864', project: 'atc roadmap' }], null));
+
+  await readLinearReady(ctx.db, { call, run: buildStubGitHubFactsRunner({}), actor: 'hq-lanes', rules });
+
+  expect(readySummary(ctx.db, 30)).toMatchObject({ total: 2, eligible: 1, unexplained: 0, skipped: [{ issue: 'GEO-9860', reason: 'blocked by GEO-9861, GEO-9862 (not Done)' }] });
+  expect(readReadySnapshot(ctx.db)?.eligible.map((issue) => issue.identifier)).toStrictEqual(['GEO-9864']);
+});
+
+test('it keeps a Ready issue eligible when every blocker is Done', async () => {
+  const ctx = setupTest();
+  const rules = validateLaneRules(rulesTable, Object.keys(rulesTable.lanes));
+  const call = makePagedCall(buildReadyPage([{ identifier: 'GEO-9865', project: 'atc roadmap', blockers: [{ identifier: 'GEO-9866', stateType: 'completed' }] }], null));
+
+  await readLinearReady(ctx.db, { call, run: buildStubGitHubFactsRunner({}), actor: 'hq-lanes', rules });
+
+  expect(readySummary(ctx.db, 30)).toMatchObject({ total: 1, eligible: 1, skipped: [] });
+});
+
+test('it skips a Ready issue with more relations than hq reads, and says to check by hand', async () => {
+  const ctx = setupTest();
+  const rules = validateLaneRules(rulesTable, Object.keys(rulesTable.lanes));
+  const call = makePagedCall(buildReadyPage([{ identifier: 'GEO-9867', project: 'atc roadmap', moreRelations: true }], null));
+
+  await readLinearReady(ctx.db, { call, run: buildStubGitHubFactsRunner({}), actor: 'hq-lanes', rules });
+
+  expect(readySummary(ctx.db, 30)).toMatchObject({ total: 1, eligible: 0, unexplained: 0, skipped: [{ issue: 'GEO-9867', reason: 'more relations than hq reads; check its blockers by hand' }] });
+  expect(readReadySnapshot(ctx.db)?.eligible).toStrictEqual([]);
 });

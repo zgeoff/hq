@@ -184,6 +184,7 @@ function buildReadyAnswer(team: unknown, state: unknown): ReadyPageAnswer {
       project: issue.project === null ? null : { name: issue.project, labels: { nodes: (issue.projectLabels ?? []).map((name) => ({ name })) } },
       labels: { nodes: [...issue.labels.map((name) => ({ name, parent: null })), ...(issue.type === undefined ? [] : [{ name: issue.type, parent: { name: 'Type' } }])] },
       parent: issue.parent === null ? null : { identifier: issue.parent },
+      inverseRelations: { nodes: [], pageInfo: { hasNextPage: false } },
     }));
   return { issues: { nodes, pageInfo: { hasNextPage: false, endCursor: null } } };
 }
