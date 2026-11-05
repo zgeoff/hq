@@ -26,8 +26,8 @@ Avoid these traps:
 
 - [Terms](#terms): the fleet's shared words, defined once for every role skill.
 - [What only the owner decides](#what-only-the-owner-decides): send each item on the list to the
-  owner, even under a grant; decide anything else yourself, such as a Data Action that only inserts
-  rows, or a decision that keeps the current course.
+  owner, even under a grant; decide anything else yourself, such as a Data Action that only adds
+  data, or a decision that keeps the current course.
 - [Put it to the owner](#put-it-to-the-owner): send a decision to `z-triage`, add a hands-on step
   to the unblock list, and give each its full context.
 - [The owner's answers are records](#the-owners-answers-are-records): act only on a record in hq;
@@ -58,8 +58,8 @@ Avoid these traps:
 - **A vault:** a 1Password vault.
 - **A pass:** one run of `z-triage` over the Linear issues, every 30 minutes.
 - **The check:** the step after each pass in which `z-triage` turns each open decision into a call.
-- **An Action:** one line in an issue's Actions section, in a form that
-  [tickets](../tickets/SKILL.md#actions) gives, such as `Code delivery` or a `Data:` line.
+- **An Action:** one line in an issue's Actions section, such as `Code delivery` or a `Data:` line.
+  [tickets](../tickets/SKILL.md#actions) gives the forms.
 - **A pitch:** the list of Actions that `z-delivery` sends as a decision before a launch, as
   [Pitches](../delivery-lead/SKILL.md#pitches) says.
 - **Your role's private file:** `SKILL.private.md` in hq-private, the private repo that holds the
@@ -90,7 +90,8 @@ Decide these yourself, with no owner call:
 
 - Code delivery, Investigation, Spike, Design session, and each Linear edit the owner's lists leave
   out;
-- a Data Action that only inserts rows, run after a backup of that datastore;
+- a Data Action that only adds data, run after a backup of that datastore: it inserts rows, adds
+  tables or columns, or fills in columns it added;
 - a step, such as a rotation, on a credential in a Credentials Action that the owner approved in a
   call or a pitch. Look for that approval before you send a Credentials step to the owner;
 - reading an existing item from a vault: [Put it to the owner](#put-it-to-the-owner) says how to

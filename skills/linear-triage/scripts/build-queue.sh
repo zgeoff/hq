@@ -49,7 +49,7 @@ notes_text=$(read_input --notes "$notes")
 untracked_text=$(read_input --untracked "$untracked")
 
 # A decision the fleet settles itself never becomes a call: one whose recommendation keeps the
-# status quo, or whose only Actions are Data lines that insert rows after a backup.
+# status quo, or whose only Actions are insert-only Data lines, run after a backup.
 refused=$(jq -n -r \
   --slurpfile blocked <(printf '%s\n' "$blocked_text") \
   --slurpfile notes <(printf '%s\n' "$notes_text") '
@@ -58,7 +58,7 @@ refused=$(jq -n -r \
     elif (.actions // []) as $a | ($a | length) > 0
       and ($a | all(type == "string" and startswith("Data:") and contains("insert-only")
         and contains("after a backup")))
-    then "its only Actions insert rows after a backup"
+    then "its only Actions add data after a backup"
     else empty end;
   (($blocked[0] // [])[] | "the blocked decision \"\(.question)\": \(reason)"),
   (($notes[0] // {}) | to_entries[] | select(.value | type == "object" and (.resolved // false | not))

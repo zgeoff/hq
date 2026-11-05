@@ -1,15 +1,19 @@
 # The check
 
 The check turns each decision the owner must make into a call in hq: one question with options and
-your recommendation, which `z-stu` puts to the owner. Every open decision gets a call, with no cap.
-The exceptions are the decisions that step 5 refuses: you settle those yourself. You never message
-the owner, and you never apply the owner's answer.
+your recommendation, which `z-stu` puts to the owner. You never message the owner, and you never
+apply the owner's answer.
 
-Decisions come from three places:
+Calls come from three places, with no cap:
 
-- the issues flagged `Needs Geoff`;
-- sessions that a decision blocks: `z-delivery` and `z-review` message you, or ask you to check now;
-- PRs that cite no issue.
+- the issues flagged `Needs Geoff`, as linear-triage's Flagging section allows;
+- each decision that blocks a session and that
+  [owner-calls](../../owner-calls/SKILL.md#what-only-the-owner-decides) lists as the owner's:
+  `z-delivery` and `z-review` message you, or ask you to check now;
+- the PRs that cite no issue, as one call.
+
+Settle any other blocked decision yourself, and tell its sender. Step 5 refuses two kinds of these
+for you.
 
 Contents: [State](#state) · [Steps](#steps) · [Calls](#calls) · [Unblock list](#unblock-list)
 
@@ -42,7 +46,8 @@ Contents: [State](#state) · [Steps](#steps) · [Calls](#calls) · [Unblock list
      named blocker), fix it, remove `Needs Geoff`, and write `{"resolved": true}`.
    - When the comment asks what
      [owner-calls](../../owner-calls/SKILL.md#what-only-the-owner-decides) lists as the owner's,
-     keep the flag. Give every entry `actions` and `statusQuo`, as step 1 says.
+     keep the flag. Otherwise settle it yourself, as for the case above. Give every entry `actions`
+     and `statusQuo`, as step 1 says.
      `check.private.md` in hq-private (`hq defs` shows where) says which credentials are another
      session's.
    - Issues waiting on one decision get the same question text, word for word, so they become one

@@ -138,9 +138,11 @@ Write one line per action, in these forms.
   its limit is over $5 of pay-per-use spend, or over $50 of the owner's Claude subscription.
 - **Deployment:** `Deploy: <environment>, <when, such as after CI passes on main>`.
 - **Infrastructure:** `Infra: <resources or stack>`.
-- **Data:** `Data: <datastore>, <migration, backfill, …>`. For one that only inserts rows, write
-  `insert-only` and `after a backup` in the line, such as
-  `Data: garden db, insert-only backfill of the shelf column, after a backup`. It needs no pitch.
+- **Data:** `Data: <datastore>, <migration, backfill, …>`. For one that only adds data, by
+  inserting rows, adding tables or columns, or filling in columns it added, write `insert-only` and
+  `after a backup` in the line, such as
+  `Data: garden db, insert-only copy of the old seed counts into a new table, after a backup`. It
+  needs no pitch.
 - **Posting:** `Post: <where, such as issues on zgeoff/atc>`. A vendor support question goes out
   under the owner's name: `Post: draft for the owner to send to <vendor> support`.
 - **Linear edits:** `Linear: <documents, milestones or issues>`. `z-delivery` makes these edits
