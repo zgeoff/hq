@@ -12,9 +12,9 @@
 #                ownerListed?} you write. actions lists the Action lines the decision approves;
 #                statusQuo is true when the recommendation keeps the current course; ownerListed
 #                is true when the decision touches anything else the owner-calls list names. The
-#                script refuses, and exits 1 on, a decision with statusQuo true, or one without
-#                ownerListed true whose actions are all Data lines that say insert-only and after
-#                a backup.
+#                script refuses, and exits 1 on, a decision without ownerListed true that has
+#                statusQuo true, or whose actions are all Code delivery lines or Data lines that
+#                say insert-only and after a backup, in any case.
 #   --notes      a JSON object from issue ID to {question, recommendation, actions?, statusQuo?,
 #                ownerListed?}, refused as --blocked says; issues with the same question text
 #                form one shared decision. A plain string is a recommendation alone.
@@ -50,18 +50,20 @@ blocked_text=$(read_input --blocked "$blocked")
 notes_text=$(read_input --notes "$notes")
 untracked_text=$(read_input --untracked "$untracked")
 
-# A decision the fleet settles itself never becomes a call: one whose recommendation keeps the
-# status quo, or whose only Actions are insert-only Data lines, run after a backup, on nothing else
-# the owner-calls list names.
+# A decision the fleet settles itself never becomes a call: one on nothing else the owner-calls list
+# names, whose recommendation keeps the status quo, or whose only Actions are Code delivery and
+# insert-only Data lines run after a backup.
 refused=$(jq -n -r \
   --slurpfile blocked <(printf '%s\n' "$blocked_text") \
   --slurpfile notes <(printf '%s\n' "$notes_text") '
+  def fleet_action:
+    type == "string" and (ascii_downcase | startswith("code delivery")
+      or (startswith("data:") and contains("insert-only") and contains("after a backup")));
   def reason:
-    if .statusQuo == true then "its recommendation keeps the status quo"
-    elif .ownerListed != true and ((.actions // []) as $a | ($a | length) > 0
-      and ($a | all(type == "string" and startswith("Data:") and contains("insert-only")
-        and contains("after a backup"))))
-    then "its only Actions add data after a backup"
+    if .ownerListed == true then empty
+    elif .statusQuo == true then "its recommendation keeps the status quo"
+    elif (.actions // []) as $a | ($a | length) > 0 and ($a | all(fleet_action))
+    then "its only Actions are Code delivery or data added after a backup"
     else empty end;
   (($blocked[0] // [])[] | "the blocked decision \"\(.question)\": \(reason)"),
   (($notes[0] // {}) | to_entries[] | select(.value | type == "object" and (.resolved // false | not))

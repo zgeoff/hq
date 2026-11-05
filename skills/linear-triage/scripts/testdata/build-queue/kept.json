@@ -23,5 +23,11 @@
     "recommendation": "Yes",
     "actions": ["Data: keeper memory, insert-only greeting, after a backup"],
     "ownerListed": true
+  },
+  {
+    "question": "Keep the lantern sampler running past its spend limit?",
+    "recommendation": "Keep it running",
+    "statusQuo": true,
+    "ownerListed": true
   }
 ]

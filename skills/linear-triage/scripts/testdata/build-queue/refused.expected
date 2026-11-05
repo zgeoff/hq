@@ -1,3 +1,4 @@
-build-queue.sh: refused the blocked decision "May the agent fill the shelf column in the seed catalogue?": its only Actions add data after a backup; settle it without a call
+build-queue.sh: refused the blocked decision "May the agent fill the shelf column in the seed catalogue?": its only Actions are Code delivery or data added after a backup; settle it without a call
 build-queue.sh: refused the blocked decision "Keep fixing the lantern review findings?": its recommendation keeps the status quo; settle it without a call
-build-queue.sh: refused GEO-9302: its only Actions add data after a backup; settle it without a call
+build-queue.sh: refused the blocked decision "May the agent ship the seed counter and add its index rows?": its only Actions are Code delivery or data added after a backup; settle it without a call
+build-queue.sh: refused GEO-9302: its only Actions are Code delivery or data added after a backup; settle it without a call

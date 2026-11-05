@@ -9,5 +9,10 @@
     "question": "Keep fixing the lantern review findings?",
     "recommendation": "Keep fixing",
     "statusQuo": true
+  },
+  {
+    "question": "May the agent ship the seed counter and add its index rows?",
+    "recommendation": "Yes",
+    "actions": ["Code delivery", "Data: seed catalogue, Insert-only index rows, After a backup"]
   }
 ]

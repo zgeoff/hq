@@ -98,7 +98,8 @@ Decide these yourself, with no owner call:
   call or a pitch. Look for that approval before you send a Credentials step to the owner;
 - reading an existing item from a vault: [Put it to the owner](#put-it-to-the-owner) says how to
   look one up first;
-- a decision whose recommendation keeps the current course, such as "keep fixing". Carry on.
+- a decision whose recommendation keeps the current course, such as "keep fixing". Carry on. When
+  the course itself is on the owner's lists, such as a cost over its limit, the decision stays his.
 
 Decide anything else yourself, under your grants or the Actions that the issue names.
 
