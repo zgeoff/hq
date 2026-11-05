@@ -29,7 +29,8 @@ Contents: [State](#state) · [Steps](#steps) · [Calls](#calls) · [Unblock list
 1. **Gather the blocked decisions that owner-calls lists as the owner's**, and settle the rest
    yourself, as the opening says. Put them in a JSON array in scratch:
    `{"question", "recommendation", "session", "issue", "actions", "statusQuo", "ownerListed"}`,
-   with `issue: null` when there's none. `actions` lists each Action line the decision would
+   with `issue: null` when there's none. `session` is the session that waits on the answer, such
+   as an agent that `z-delivery` names. `actions` lists each Action line the decision would
    approve, in the [tickets](../../tickets/SKILL.md#actions) forms. Set `statusQuo: true` when the
    recommendation keeps the current course, such as "keep fixing". Set `ownerListed: true` when the
    recommended option would itself do something the owner-calls list names, such as touch Nix's

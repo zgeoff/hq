@@ -53,7 +53,7 @@ When the owner is done or steps away, apply every answer in one pass:
 2. Apply by kind:
    - **Blocked decision:** type the owner's answer into the asking session with `atc_terminal_type`, written
      as `skills/intake/references/calls.private.md` in hq-private says. Never message the agent.
-     Remove `Needs Geoff` from each of the call's issues.
+     Remove `Needs Geoff` from each of the call's issues that no other open call names.
    - **Flagged issue or shared decision:** make the change, remove `Needs Geoff`, and comment the
      owner's decision in the owner's words, in `calls.private.md`'s form. The answer settles a close, a scope change
      or a new project.

@@ -107,7 +107,8 @@ jq -n -r \
     def plural($w): "\(.) \($w)\(if . == 1 then "" else "s" end)";
   ([$b[] | .issue // empty]) as $blockedIds
   | ([$b[] | .question]) as $blockedQuestions
-  | ($i | map(select((($n[.id].resolved // false) or (.id | IN($blockedIds[]))
+  | ($i | map(select((($n[.id].resolved // false)
+      or ((.id | IN($blockedIds[])) and ($n[.id].question // null) == null)
       or (($n[.id].question // null) | IN($blockedQuestions[]))) | not)) | sort_by(rank, .updatedAt) | map(. + {note: ($n[.id] // {question: null, recommendation: null})})) as $needs
   | ($needs | map(select(.note.question != null)) | group_by(.note.question) | map(select(length > 1))
       | sort_by(-length)) as $shared

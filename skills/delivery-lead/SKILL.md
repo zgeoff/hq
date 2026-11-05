@@ -94,7 +94,8 @@ message an agent with no FINAL note yet, read briefs.md's messages section.
   with the reason.
 - **It needs a choice:** answer it if the issue, the brief or the owner's earlier answers settle it.
   Send a choice that [owner-calls](../owner-calls/SKILL.md#what-only-the-owner-decides) lists as
-  the owner's to `z-triage`, and tell the agent to carry on with the rest. Decide any other choice
+  the owner's to `z-triage` with the agent's session, so that `z-stu` types the answer there. Tell
+  the agent to carry on with the rest. Decide any other choice
   yourself.
 - **It asks to run a migration:** let it run one that only inserts rows, adds tables or columns, or
   fills in columns it added, once it gives you the path of its backup of that database. Send one
