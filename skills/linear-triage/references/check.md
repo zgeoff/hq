@@ -47,8 +47,8 @@ Contents: [State](#state) · [Steps](#steps) · [Calls](#calls) · [Unblock list
    `priority`, `createdAt` and `updatedAt`, through `list_issues`. Save every page.
 3. **Complete `notes.json`** (start it as `{}` without a pass), one entry per flagged issue:
    `{"GEO-9001": {"question": "Split GEO-9001?", "recommendation": "Yes, because 16 PRs landed.", "actions": [], "statusQuo": false, "ownerListed": false}}`.
-   Skip an issue whose decision step 1 gathered, so that it makes one call. For a flag the pass
-   didn't set, read the issue's latest comment.
+   Skip an issue whose decision step 1 gathered: `build-queue.sh` makes it one call. For a flag the
+   pass didn't set, read the issue's latest comment.
    - When the comment asks only what you can settle (a missing section, a missing `Code delivery`, a
      named blocker), fix it, remove `Needs Geoff`, and write `{"resolved": true}`.
    - When the comment asks what

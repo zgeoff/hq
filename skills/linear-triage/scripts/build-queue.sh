@@ -105,7 +105,8 @@ jq -n -r \
     def rank: priority | if . == 0 then 9 else . end;
     def pname: .priority | if type == "object" then .name else null end;
     def plural($w): "\(.) \($w)\(if . == 1 then "" else "s" end)";
-  ($i | map(select(($n[.id].resolved // false) | not)) | sort_by(rank, .updatedAt) | map(. + {note: ($n[.id] // {question: null, recommendation: null})})) as $needs
+  ([$b[] | .issue // empty]) as $blockedIds
+  | ($i | map(select((($n[.id].resolved // false) or (.id | IN($blockedIds[]))) | not)) | sort_by(rank, .updatedAt) | map(. + {note: ($n[.id] // {question: null, recommendation: null})})) as $needs
   | ($needs | map(select(.note.question != null)) | group_by(.note.question) | map(select(length > 1))
       | sort_by(-length)) as $shared
   | ([$shared[][] | .id]) as $sharedIds
