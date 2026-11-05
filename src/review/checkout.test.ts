@@ -43,7 +43,7 @@ test('two first reviews of a repo both get one complete cached clone', async () 
 
   expect(complete).toStrictEqual([true, true]);
   expect(readFileSync(join(app.cached, 'kettle.txt'), 'utf8')).toMatch(/^cloned \d\n$/u);
-  expect(readdirSync(join(app.cached, '..'))).toStrictEqual(['kettle', 'kettle.flock']);
+  expect(readdirSync(join(app.cached, '..')).toSorted()).toStrictEqual(['kettle', 'kettle.flock']);
 });
 
 test('a review reuses a cached clone that already exists', async () => {
