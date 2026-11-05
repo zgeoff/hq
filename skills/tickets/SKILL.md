@@ -141,11 +141,12 @@ Write one line per action, in these forms.
 - **Data:** `Data: <datastore>, <migration, backfill, …>`. For one that only adds data, as
   owner-calls defines it, write `insert-only` and `after a backup` in the line, such as
   `Data: garden db, insert-only copy of old seed counts, after a backup`. It needs no pitch unless
-  it touches another owner-calls item, such as Nix's memory.
+  it touches another owner-calls item.
 - **Posting:** `Post: <where, such as issues on zgeoff/atc>`. A vendor support question goes out
   under the owner's name: `Post: draft for the owner to send to <vendor> support`.
-- **Linear edits:** `Linear: <documents, milestones or issues>`. `z-delivery` makes these edits
-  itself, and they change no repo, except an edit owner-calls lists, such as a new project.
+- **Linear edits:** `Linear: <documents, milestones or issues>`. `z-delivery` makes these, except
+  one owner-calls lists, such as a new project. They change no repo.
+- **Investigation or Spike:** `Investigation` or `Spike`, when no code merges.
 - **Design session:** `Design session, then the decision record as a Linear document`. It is the
   default for Design. The owner joins only with `with-geoff`. Nothing goes into a repo.
 

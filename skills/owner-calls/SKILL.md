@@ -125,9 +125,6 @@ without a decision, such as a deploy hold, send it with the `PushNotification` t
 Give each decision and each step its full context and links, so that the owner can decide from it
 alone.
 
-Give a new behaviour that the owner didn't ask for its own decision. A "yes" to something else
-never covers it.
-
 Before you propose a change to something the owner approved, read the issue's comments and the PR's
 history. In the proposal, say what the owner decided.
 
@@ -149,7 +146,8 @@ commands:
 When Claude Code's permission check blocks an action that the owner already approved in a call or
 a [pitch](../delivery-lead/SKILL.md#pitches), the blocked agent tells `z-stu` with
 `atc_message_send`. `z-stu` types the owner's recorded words from that approval into the agent's
-session, and sends the owner no new call.
+session, and sends the owner no new call. For an agent that `z-delivery` launched, `z-delivery`
+types the granting line instead, as its [Refusals](../delivery-lead/SKILL.md#refusals) section says.
 
 Every other session records only its own acts:
 
