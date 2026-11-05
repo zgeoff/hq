@@ -196,15 +196,23 @@ test('a sample with no reading neither opens nor clears, and keeps the count', a
 test('cloud and Claude thresholds open one alert each; several in a tick make one message', async () => {
   for (const m of [0, 5]) {
     usage(minute(m), 95, 90);
-    await sampleAt(world({ cloudAvail: 3 }), minute(m));
+    await sampleAt(world({ cloudAvail: 1.5 }), minute(m));
   }
   expect(Object.keys(openAlerts(db)).sort()).toEqual(['claude:5h', 'claude:7d', 'cloud:memory']);
   const sent = outbox().filter((m) => m.target === owner());
   expect(sent).toHaveLength(1);
   expect(sent[0]!.text).toContain('3 things are over their line');
-  expect(sent[0]?.text).toContain('- cloud: 3.0 GiB memory available, under 4 GiB (of 31.3 GiB)');
+  expect(sent[0]?.text).toContain('- cloud: 1.5 GiB memory available, under 2 GiB (of 31.3 GiB)');
   expect(sent[0]?.text).toContain('- Claude: 7-day usage at 90%, early warning at 85% (account abcdef)');
   expect(sent[0]?.text).toContain('- Claude: 5-hour usage at 95%, early warning at 90%');
+});
+
+test('it opens no cloud alert at 3 GiB available, above the 2 GiB line', async () => {
+  for (const offset of [0, 5]) {
+    await sampleAt(world({ cloudAvail: 3 }), minute(offset));
+  }
+
+  expect(openAlerts(db)).toStrictEqual({});
 });
 
 test('the PC never alerts, however low it is', async () => {
@@ -219,7 +227,9 @@ test('the PC never alerts, however low it is', async () => {
 
 test('quiet hours: an impd open goes out at once; another alert waits for the first awake tick', async () => {
   const quiet = (m: number) => new Date(Date.parse(FOUR_AM_SYDNEY) + m * 60_000);
-  for (const m of [0, 5]) await sampleAt(world({ nonnix: 20_000, cloudAvail: 2 }), quiet(m));
+  for (const offset of [0, 5]) {
+    await sampleAt(world({ nonnix: 20_000, cloudAvail: 1 }), quiet(offset));
+  }
   const told = outbox().filter((m) => m.target === owner());
   expect(told).toHaveLength(1);
   expect(told[0]!.text).toContain('impd:');
@@ -227,18 +237,20 @@ test('quiet hours: an impd open goes out at once; another alert waits for the fi
   expect(Object.values(openAlerts(db)).map((o) => o.told)).toEqual([true, false]);
   db.query("UPDATE outbox SET status = 'sent'").run();
   const morning = new Date(Date.parse(FOUR_AM_SYDNEY) + 3 * 3_600_000);
-  await sampleAt(world({ nonnix: 20_000, cloudAvail: 2 }), morning);
+  await sampleAt(world({ nonnix: 20_000, cloudAvail: 1 }), morning);
   const after = outbox().filter((m) => m.target === owner());
   expect(after).toHaveLength(2);
   expect(after[1]?.text).toContain('cloud:');
   expect(after[1]?.text).toContain('Still open:');
-  await sampleAt(world({ nonnix: 20_000, cloudAvail: 2 }), new Date(morning.getTime() + 300_000));
+  await sampleAt(world({ nonnix: 20_000, cloudAvail: 1 }), new Date(morning.getTime() + 300_000));
   expect(outbox().filter((message) => message.target === owner())).toHaveLength(2);
 });
 
 test('quiet hours: an alert that opens and clears inside them sends nothing; a told one is cleared at wake', async () => {
   const quiet = (m: number) => new Date(Date.parse(FOUR_AM_SYDNEY) + m * 60_000);
-  for (const m of [0, 5]) await sampleAt(world({ cloudAvail: 2 }), quiet(m));
+  for (const offset of [0, 5]) {
+    await sampleAt(world({ cloudAvail: 1 }), quiet(offset));
+  }
   for (const m of [10, 15]) await sampleAt(world(), quiet(m));
   expect(openAlerts(db)).toEqual({});
   expect(outbox()).toHaveLength(0);
@@ -262,11 +274,11 @@ test('awake totals count plugged memory, so elastic imps can trip the non-Nix al
 
 test('an atc outage loses no notice: every open and back-under stays queued, in order, for both recipients', async () => {
   for (const offset of [0, 5]) { await sampleAt(world({ nonnix: 20_000 }), minute(offset)); }
-  for (const offset of [10, 15]) { await sampleAt(world({ nonnix: 20_000, cloudAvail: 2 }), minute(offset)); }
-  for (const offset of [20, 25]) { await sampleAt(world({ cloudAvail: 2 }), minute(offset)); }
-  for (const offset of [30, 35]) { await sampleAt(world({ nonnix: 20_000, cloudAvail: 2 }), minute(offset)); }
+  for (const offset of [10, 15]) { await sampleAt(world({ nonnix: 20_000, cloudAvail: 1 }), minute(offset)); }
+  for (const offset of [20, 25]) { await sampleAt(world({ cloudAvail: 1 }), minute(offset)); }
+  for (const offset of [30, 35]) { await sampleAt(world({ nonnix: 20_000, cloudAvail: 1 }), minute(offset)); }
   for (const offset of [40, 45]) { await sampleAt(world(), minute(offset)); }
-  for (const offset of [50, 55]) { await sampleAt(world({ cloudAvail: 2 }), minute(offset)); }
+  for (const offset of [50, 55]) { await sampleAt(world({ cloudAvail: 1 }), minute(offset)); }
   for (const offset of [60, 65]) { await sampleAt(world(), minute(offset)); }
   for (const t of [owner(), orchestratorName()]) {
     const texts = outbox().filter((m) => m.target === t).map((m) => m.text.split('\n')[1]!);

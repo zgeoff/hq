@@ -5,7 +5,8 @@ export const CAPACITY_DEFAULTS = {
   nonnixMaxVcpus: 16,
   impVcpus: 2,
 
-  cloudMinAvailGiB: 4,
+  // geoffcloud's fixed hugetlb pool for imps never counts as MemAvailable, so the host sits near 4 GiB.
+  cloudMinAvailGiB: 2,
   claudeSevenDayPct: 85,
   claudeFiveHourPct: 90,
 
