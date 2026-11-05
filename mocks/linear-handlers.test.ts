@@ -15,7 +15,7 @@ test('it answers the Ready query with the issues in its team and state only', as
   expect(answer).toStrictEqual({
     data: {
       issues: {
-        nodes: [{ identifier: 'GEO-1', priority: 0, createdAt: '2026-10-01T00:00:00.000Z', project: { name: 'atc roadmap', labels: { nodes: [] } }, labels: { nodes: [{ name: 'process', parent: null }] }, parent: { identifier: 'GEO-9' } }],
+        nodes: [{ identifier: 'GEO-1', priority: 0, createdAt: '2026-10-01T00:00:00.000Z', project: { name: 'atc roadmap', labels: { nodes: [] } }, labels: { nodes: [{ name: 'process', parent: null }] }, parent: { identifier: 'GEO-9' }, inverseRelations: { nodes: [], pageInfo: { hasNextPage: false } } }],
         pageInfo: { hasNextPage: false, endCursor: null },
       },
     },
