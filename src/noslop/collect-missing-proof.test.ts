@@ -91,10 +91,10 @@ test('it passes the filled Checks section from the decision record', () => {
   expect(collectMissingProof(body)).toStrictEqual([]);
 });
 
-test('it reads a declined count followed by trailing spaces as listed in the line', () => {
-  const body = ['## Checks', '', '- [x] chex prose, links and skill: cleared', '- [x] Cold read: 2 fixed, 1 declined   ', '- [x] Deslop: 3 edits', '', 'Declined:', '', '- Cold read: the opening is vague. Filed GEO-9996.'].join('\n');
+test('it counts a declined count followed by trailing spaces', () => {
+  const body = ['## Checks', '', '- [x] chex prose, links and skill: cleared', '- [x] Cold read: 2 fixed, 1 declined   ', '- [x] Deslop: 3 edits', '', 'Declined:'].join('\n');
 
-  expect(collectMissingProof(body)).toStrictEqual([]);
+  expect(collectMissingProof(body)).toStrictEqual([{ kind: 'declined', counted: 1, listed: 0 }]);
 });
 
 test('it accepts a Cold read line that names its model', () => {
