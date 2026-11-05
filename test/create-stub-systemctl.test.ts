@@ -44,6 +44,20 @@ test('it answers show with an empty line for a property it was given no value fo
   expect(shown.stdout.toString()).toBe('\n');
 });
 
+test('it fails show with the message given for the property, and logs the call', () => {
+  const ctx = setupTest();
+  const stub = createStubSystemctl({ directory: ctx.directory, show: {}, failedShows: { Environment: 'no bus' } });
+
+  const shown = Bun.spawnSync([join(stub.bin, 'systemctl'), '--user', 'show', '-p', 'Environment', '--value', 'kettle.service']);
+
+  expect([shown.exitCode, shown.stdout.toString(), shown.stderr.toString(), stub.readCalls()]).toStrictEqual([
+    1,
+    '',
+    'no bus\n',
+    [['--user', 'show', '-p', 'Environment', '--value', 'kettle.service']],
+  ]);
+});
+
 test('it is the systemctl a shell finds when its directory leads PATH', () => {
   const ctx = setupTest();
   const stub = createStubSystemctl({ directory: ctx.directory, show: {} });

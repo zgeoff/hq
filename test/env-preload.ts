@@ -1,9 +1,17 @@
 import { afterEach } from 'bun:test';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { removeEnvOverrides } from '@zgeoff/testing/helpers';
+import { createStubSystemctl } from './create-stub-systemctl.ts';
 
 afterEach(removeEnvOverrides);
+
+// The host's systemctl answers only where a user bus runs, such as CI, so a test that reaches it
+// fails on a host without one. A test that needs other answers puts its own stand-in first.
+const SYSTEMCTL_DIRECTORY = mkdtempSync(join(tmpdir(), 'hq-tests-systemctl-'));
+process.on('exit', () => rmSync(SYSTEMCTL_DIRECTORY, { recursive: true, force: true }));
+process.env['PATH'] = `${createStubSystemctl({ directory: SYSTEMCTL_DIRECTORY, show: {} }).bin}:${process.env['PATH'] ?? ''}`;
 
 process.env['HQ_LOCAL_CONFIG'] = join(tmpdir(), 'hq-tests-no-local-config', 'local.json');
 
