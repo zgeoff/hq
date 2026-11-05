@@ -32,7 +32,9 @@ Contents: [State](#state) · [Steps](#steps) · [Calls](#calls) · [Unblock list
    with `issue: null` when there's none. `actions` lists each Action line the decision would
    approve, in the [tickets](../../tickets/SKILL.md#actions) forms. Set `statusQuo: true` when the
    recommendation keeps the current course, such as "keep fixing". Set `ownerListed: true` when the
-   decision touches anything else the owner-calls list names, such as Nix's memory.
+   recommended option would itself do something the owner-calls list names, such as touch Nix's
+   memory or keep a cost over its limit. Settle a step on a credential the owner approved yourself:
+   find the approval with `hq call list --state all`, and tell the sender to carry on.
    Sources: messages from sessions, and atc events of kind `decision` or `blocked` since your
    cursor. Save the new cursor. If `atc_events_read` refuses the cursor with `bad_args`, read
    without one, and say in the CHECK line that earlier notes may be missed. A decision stays open,

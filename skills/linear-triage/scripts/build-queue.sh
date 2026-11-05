@@ -11,10 +11,10 @@
 #   --blocked    a JSON array of {question, recommendation, session?, issue?, actions?, statusQuo?,
 #                ownerListed?} you write. actions lists the Action lines the decision approves;
 #                statusQuo is true when the recommendation keeps the current course; ownerListed
-#                is true when the decision touches anything else the owner-calls list names. The
-#                script refuses, and exits 1 on, a decision without ownerListed true that has
-#                statusQuo true, or whose actions are all Code delivery lines or Data lines that
-#                say insert-only and after a backup, in any case.
+#                is true when the recommended option itself does something the owner-calls list
+#                names. The script refuses, and exits 1 on, a decision without ownerListed true
+#                that has statusQuo true, or whose actions are all Code delivery lines or Data
+#                lines that say insert-only and after a backup, in any case.
 #   --notes      a JSON object from issue ID to {question, recommendation, actions?, statusQuo?,
 #                ownerListed?}, refused as --blocked says; issues with the same question text
 #                form one shared decision. A plain string is a recommendation alone.
