@@ -157,7 +157,7 @@ once, in a new `<scratch>`, on a "check now" message.
 - Flag the issue instead when it needs any of these, which are the owner's calls:
   - dropping or changing its Outcome;
   - adding behaviour its Outcome doesn't ask for;
-  - loosening a rule the owner set in the issue or its comments;
+  - loosening a rule the owner set in the issue, its comments or a design record;
   - closing it while its work is still worth doing.
 - Set each issue's priority yourself, by the rules in [tickets](../tickets/SKILL.md), even over a
   priority already set. When you set one to High or Urgent, post it with

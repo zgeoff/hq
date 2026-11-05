@@ -67,9 +67,9 @@ Also his:
 
 - closing an issue whose work is still worth doing, or as not planned;
 - a new project;
-- dropping an issue's outcome, adding behaviour to it, or loosening a rule he set in the issue or
-  its comments;
-- loosening a repo's ruleset, changing its visibility, or touching its GitHub Actions secrets;
+- dropping an issue's outcome, adding behaviour to it, or loosening a rule he set in the issue, its
+  comments or a design record;
+- loosening a repo's ruleset, changing its visibility, or touching any of its secrets;
 - an Action beyond Code delivery, Investigation, Spike or Design session: Data that deletes or
   rewrites, Deploy, Infra, Credentials, Posting, or Paid API over its limit;
 - accepting a finding's risk, or merging a PR its gate blocks;
