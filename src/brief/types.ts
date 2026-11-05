@@ -69,6 +69,7 @@ export interface BriefParts {
   fixes: string;
   reviewLines: string;
   notYours: string;
+  notYoursShort: string;
   impLine: string;
   goalFile: string;
   goalReview: string;

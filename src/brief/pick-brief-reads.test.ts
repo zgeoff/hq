@@ -5,6 +5,7 @@ test('it picks the repo and the Type playbook, and nothing optional for an M iss
   const issue = { identifier: 'GEO-9001', description: '', labels: [{ name: 'Bug', parent: { name: 'Type' } }, { name: 'cloud' }, { name: 'M', parent: { name: 'Size' } }] };
 
   expect(pickBriefReads(issue, { area: { label: 'cloud', repo: 'cloud' }, others: [], imp: false }, { repos: ['tools'], sha: null, caps: {} }, 'a'.repeat(40))).toStrictEqual({
+    label: 'cloud',
     repo: 'cloud',
     otherAreas: [],
     playbook: { type: 'bug', path: 'agent-kit/playbooks/bug.md', command: `gh api 'repos/zgeoff/hq/contents/agent-kit/playbooks/bug.md?ref=${'a'.repeat(40)}' -H 'Accept: application/vnd.github.raw'` },

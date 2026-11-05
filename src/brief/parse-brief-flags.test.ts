@@ -6,13 +6,17 @@ test('it takes main as the ref and no mode flag when the flags are empty', () =>
 });
 
 test('it carries each flag it is given', () => {
-  const input = parseBriefFlags('GEO-9001', { ref: 'refactor/kettle-rebuild', imp: true, 'goal-file': '/tmp/kettle-goal.md' });
+  const input = parseBriefFlags('GEO-9001', { ref: 'refactor/kettle-rebuild', imp: false, 'goal-file': '/tmp/kettle-goal.md' });
 
-  expect(input).toStrictEqual({ issue: 'GEO-9001', ref: 'refactor/kettle-rebuild', imp: true, byLink: false, goalFile: '/tmp/kettle-goal.md', repo: null });
+  expect(input).toStrictEqual({ issue: 'GEO-9001', ref: 'refactor/kettle-rebuild', imp: false, byLink: false, goalFile: '/tmp/kettle-goal.md', repo: null });
 });
 
 test('it sends the issue by link with --imp and no --goal-file', () => {
   expect(parseBriefFlags('GEO-9001', { imp: true })).toStrictEqual({ issue: 'GEO-9001', ref: 'main', imp: true, byLink: true, goalFile: null, repo: null });
+});
+
+test('it refuses --imp with --goal-file, because an imp agent cannot read a file on this PC', () => {
+  expect(() => parseBriefFlags('GEO-9001', { imp: true, 'goal-file': 'kettle.md' })).toThrow('an imp agent cannot read a file on this PC: give --imp without --goal-file');
 });
 
 test('it rejects a missing issue and one that is not a Linear ID', () => {

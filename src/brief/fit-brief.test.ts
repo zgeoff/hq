@@ -17,6 +17,7 @@ test('it fits one fixed brief', () => {
       fixes: 'Fixes',
       reviewLines: 'List findings on zgeoff/kettle.',
       notYours: ' Leave the stove to me.',
+      notYoursShort: ' Leave the rest to me.',
       impLine: 'This imp has a small kettle.',
       goalFile: '. First read the bug playbook: gh api bug',
       goalReview: '',
@@ -65,6 +66,7 @@ test('it gives equal results for equal input', () => {
     fixes: 'Fixes',
     reviewLines: '',
     notYours: '',
+    notYoursShort: '',
     impLine: '',
     goalFile: '. First read the bug playbook: gh api bug',
     goalReview: '',
@@ -149,4 +151,75 @@ test('it is still over the limit at 4001 bytes after cut 2, because the blank li
 
   expect(fitted.cuts).toStrictEqual(['cut 2']);
   expect(fitted.bytes).toBe(4001);
+});
+
+test('it shortens the sha as the first cut, and keeps the /goal line when that is enough', () => {
+  const sha = 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678';
+  const template = `/goal ${'Ship the kettle. '.repeat(4)}{{goal_file}}\n\n{{review_lines}}\n\n{{permissions}}`;
+  const parts = buildBriefParts({ reviewLines: `read the rules: gh api 'x?ref=${sha}'`, goalFile: `. First read the playbook: gh api 'y?ref=${sha}'` });
+  const room = 4000 - fitBrief(template, { ...parts, permissions: '' }, null).bytes;
+
+  const fitted = fitBrief(template, { ...parts, permissions: 'a'.repeat(room + 5) }, null, sha);
+
+  expect(fitted.cuts).toStrictEqual(['short refs']);
+  expect(fitted.prompt.startsWith('/goal ')).toBe(true);
+  expect(fitted.prompt).not.toContain(sha);
+  expect(fitted.prompt).toContain(`ref=${sha.slice(0, 12)}'`);
+  expect(fitted.bytes).toBeLessThanOrEqual(4000);
+});
+
+test('it carries the short sha into the pointer that cut 2 moves to the first line', () => {
+  const sha = 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678';
+  const template = `/goal ${'Ship the kettle. '.repeat(4)}{{goal_file}}\n\n{{review_lines}}\n\n{{permissions}}`;
+  const parts = buildBriefParts({ reviewLines: `read the rules: gh api 'x?ref=${sha}'`, goalFile: `. First read the playbook: gh api 'y?ref=${sha}'` });
+  const room = 4000 - fitBrief(template, { ...parts, permissions: '' }, null).bytes;
+
+  const fitted = fitBrief(template, { ...parts, permissions: 'a'.repeat(room + 70) }, null, sha);
+
+  expect(fitted.cuts).toStrictEqual(['short refs', 'cut 2']);
+  expect(fitted.prompt.startsWith(`First read the playbook: gh api 'y?ref=${sha.slice(0, 12)}'`)).toBe(true);
+  expect(fitted.prompt).not.toContain(sha);
+  expect(fitted.bytes).toBeLessThanOrEqual(4000);
+});
+
+test('it records no short refs when the prompt does not hold the sha', () => {
+  const fitted = fitBrief('/goal Ship\n\n{{permissions}}', buildBriefParts({ permissions: 'a'.repeat(4000) }), null, 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678');
+
+  expect(fitted.cuts).toStrictEqual(['cut 2']);
+});
+
+test('it leaves the sha whole when the prompt fits', () => {
+  const sha = 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678';
+
+  const fitted = fitBrief('{{review_lines}}', buildBriefParts({ reviewLines: `gh api 'x?ref=${sha}'` }), null, sha);
+
+  expect(fitted.cuts).toStrictEqual([]);
+  expect(fitted.prompt).toContain(sha);
+});
+
+test('it drops the area names from the not-yours line as cut 3 when the prompt is still over after cut 2', () => {
+  const parts = buildBriefParts({ permissions: 'k'.repeat(3850), notYours: ` Do only the kettle part: each other area (${'teapot, '.repeat(22)}mug) gets its own launch.`, notYoursShort: ' Do only the kettle part: each other area gets its own launch.' });
+
+  const fitted = fitBrief('/goal Ship {{issue_id}}\n{{permissions}}{{not_yours}}', parts, null);
+
+  expect(fitted).toStrictEqual({ prompt: `${'k'.repeat(3850)} Do only the kettle part: each other area gets its own launch.`, bytes: 3912, cuts: ['cut 2', 'cut 3'], unknown: [], movedIssue: false });
+});
+
+test('it makes no cut 3 when the brief has no not-yours line', () => {
+  const parts = buildBriefParts({ permissions: 'k'.repeat(4100) });
+
+  const fitted = fitBrief('/goal Ship {{issue_id}}\n{{permissions}}{{not_yours}}', parts, null);
+
+  expect(fitted.cuts).toStrictEqual(['cut 2']);
+});
+
+test('it keeps the whole sha in a goal-file path when it shortens the refs', () => {
+  const sha = 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678';
+  const parts = buildBriefParts({ reviewLines: `read the rules: gh api 'x?ref=${sha}'`, goalFile: `. The full issue is in goals/${sha}.md; read it first.`, permissions: 'k'.repeat(3900) });
+
+  const fitted = fitBrief('/goal Ship{{goal_file}}\n{{review_lines}}\n{{permissions}}', parts, null, sha);
+
+  expect(fitted.cuts).toStrictEqual(['short refs', 'cut 2']);
+  expect(fitted.prompt).toContain(`goals/${sha}.md`);
+  expect(fitted.prompt).toContain(`ref=${sha.slice(0, 12)}'`);
 });

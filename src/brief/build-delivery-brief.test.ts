@@ -12,7 +12,7 @@ test('it builds the full brief from one fixed set of facts', () => {
       labels: [{ name: 'Bug', parent: { name: 'Type' } }, { name: 'kettle' }, { name: 'L', parent: { name: 'Size' } }],
     },
     sha: 'b'.repeat(40),
-    reads: { repo: 'kettle', otherAreas: [], playbook: { type: 'bug', path: 'agent-kit/playbooks/bug.md', command: 'gh api bug' }, stack: true, imp: true, reviewLines: true },
+    reads: { label: 'kettle', repo: 'kettle', otherAreas: [], playbook: { type: 'bug', path: 'agent-kit/playbooks/bug.md', command: 'gh api bug' }, stack: true, imp: true, reviewLines: true },
     template: '/goal Ship {{repo}} {{issue_id}}{{goal_file}}\n\n{{issue}}\n\nPermissions:\n{{permissions}}\n\n{{stack}}\nFinish: "{{fixes}} {{issue_id}}". {{review_lines}}{{not_yours}}\n{{imp_line}}\n{{spout}}',
     permissionTable: [
       { action: 'Code delivery', phrase: 'Work in <repo>.' },
@@ -106,7 +106,7 @@ test('it gives equal briefs for equal facts', () => {
     input: { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: 'goal.md', repo: null },
     issue: { identifier: 'GEO-9001', description: '## Outcome\n\nA kettle that boils.\n', labels: [{ name: 'kettle' }] },
     sha: 'b'.repeat(40),
-    reads: { repo: 'kettle', otherAreas: [], playbook: null, stack: false, imp: false, reviewLines: false },
+    reads: { label: 'kettle', repo: 'kettle', otherAreas: [], playbook: null, stack: false, imp: false, reviewLines: false },
     template: '/goal Ship {{repo}}{{goal_file}}\n\n{{issue}}\n\n{{permissions}}',
     permissionTable: [{ action: 'Code delivery', phrase: 'Work in <repo>.' }],
     playbookText: null,
@@ -123,7 +123,7 @@ test('it marks the PR line Contributes to for a Deploy action written with its d
     input: { issue: 'GEO-9001', ref: 'main', imp: false, byLink: true, goalFile: null, repo: null },
     issue: { identifier: 'GEO-9001', description: '## Actions\n\nDeploy to the kettle stage\n', labels: [{ name: 'kettle' }] },
     sha: 'b'.repeat(40),
-    reads: { repo: 'kettle', otherAreas: [], playbook: null, stack: false, imp: false, reviewLines: false },
+    reads: { label: 'kettle', repo: 'kettle', otherAreas: [], playbook: null, stack: false, imp: false, reviewLines: false },
     template: '{{permissions}}\n"{{fixes}} {{issue_id}}"',
     permissionTable: [
       { action: 'Code delivery', phrase: 'Work in <repo>.' },
@@ -143,7 +143,7 @@ test('it warns and lists playbook in unfilled when the issue has no Type label',
     input: { issue: 'GEO-9001', ref: 'main', imp: false, byLink: true, goalFile: null, repo: null },
     issue: { identifier: 'GEO-9001', description: '', labels: [{ name: 'kettle' }] },
     sha: 'b'.repeat(40),
-    reads: { repo: 'kettle', otherAreas: [], playbook: null, stack: false, imp: false, reviewLines: false },
+    reads: { label: 'kettle', repo: 'kettle', otherAreas: [], playbook: null, stack: false, imp: false, reviewLines: false },
     template: '{{permissions}}',
     permissionTable: [{ action: 'Code delivery', phrase: 'Work in <repo>.' }],
     playbookText: null,
@@ -161,7 +161,7 @@ test('it warns, with the short sha, when the playbook file is missing at the sha
     input: { issue: 'GEO-9001', ref: 'main', imp: false, byLink: true, goalFile: null, repo: null },
     issue: { identifier: 'GEO-9001', description: '', labels: [{ name: 'kettle' }] },
     sha: 'b'.repeat(40),
-    reads: { repo: 'kettle', otherAreas: [], playbook: { type: 'chore', path: 'agent-kit/playbooks/chore.md', command: 'gh api chore' }, stack: false, imp: false, reviewLines: false },
+    reads: { label: 'kettle', repo: 'kettle', otherAreas: [], playbook: { type: 'chore', path: 'agent-kit/playbooks/chore.md', command: 'gh api chore' }, stack: false, imp: false, reviewLines: false },
     template: '{{permissions}}',
     permissionTable: [{ action: 'Code delivery', phrase: 'Work in <repo>.' }],
     playbookText: null,
@@ -179,7 +179,7 @@ test('it gives the goal file the issue sections and the playbook with --goal-fil
     input: { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: 'goal.md', repo: null },
     issue: { identifier: 'GEO-9001', description: '## Outcome\n\nBoil.\n\n## Actions\n\nCode delivery\n', labels: [{ name: 'kettle' }] },
     sha: 'b'.repeat(40),
-    reads: { repo: 'kettle', otherAreas: [], playbook: { type: 'bug', path: 'agent-kit/playbooks/bug.md', command: 'gh api bug' }, stack: false, imp: false, reviewLines: false },
+    reads: { label: 'kettle', repo: 'kettle', otherAreas: [], playbook: { type: 'bug', path: 'agent-kit/playbooks/bug.md', command: 'gh api bug' }, stack: false, imp: false, reviewLines: false },
     template: '{{permissions}}',
     permissionTable: [{ action: 'Code delivery', phrase: 'Work in <repo>.' }],
     playbookText: '# Bug playbook\n',
@@ -196,7 +196,7 @@ test('it moves the issue of a local brief to the briefs file when the issue keep
     input: { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: null, repo: null },
     issue: { identifier: 'GEO-9001', description: `## Outcome\n\nBoil.\n\n## Scope\n\n${'In: the lid. '.repeat(40)}\n\n## Acceptance\n\n- [ ] It boils.\n\n## Actions\n\nCode delivery\n`, labels: [{ name: 'kettle' }] },
     sha: 'b'.repeat(40),
-    reads: { repo: 'kettle', otherAreas: [], playbook: { type: 'bug', path: 'agent-kit/playbooks/bug.md', command: 'gh api bug' }, stack: false, imp: false, reviewLines: false },
+    reads: { label: 'kettle', repo: 'kettle', otherAreas: [], playbook: { type: 'bug', path: 'agent-kit/playbooks/bug.md', command: 'gh api bug' }, stack: false, imp: false, reviewLines: false },
     template: `/goal Ship {{repo}} {{issue_id}}{{goal_file}}\n\n{{issue}}\n\nPermissions:\n{{permissions}}\n\n${'Keep the kettle clean. '.repeat(150)}`,
     permissionTable: [{ action: 'Code delivery', phrase: 'Work in <repo>.' }],
     playbookText: '# Bug playbook\n',
@@ -219,7 +219,7 @@ test('it refuses a prompt still over 4000 bytes after every cut, with its byte c
       input: { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: null, repo: null },
       issue: { identifier: 'GEO-9001', description: '', labels: [{ name: 'kettle' }] },
       sha: 'b'.repeat(40),
-      reads: { repo: 'kettle', otherAreas: [], playbook: null, stack: false, imp: false, reviewLines: false },
+      reads: { label: 'kettle', repo: 'kettle', otherAreas: [], playbook: null, stack: false, imp: false, reviewLines: false },
       template: `/goal Ship\n${'k'.repeat(4001)}`,
       permissionTable: [{ action: 'Code delivery', phrase: 'Work in <repo>.' }],
       playbookText: null,
@@ -241,7 +241,7 @@ test.each([
     input: { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: null, repo: null },
     issue: { identifier: 'GEO-9001', description, labels: [{ name: 'kettle' }] },
     sha: 'b'.repeat(40),
-    reads: { repo: 'kettle', otherAreas: [], playbook: { type: 'bug', path: 'agent-kit/playbooks/bug.md', command: 'gh api bug' }, stack: false, imp: false, reviewLines: false },
+    reads: { label: 'kettle', repo: 'kettle', otherAreas: [], playbook: { type: 'bug', path: 'agent-kit/playbooks/bug.md', command: 'gh api bug' }, stack: false, imp: false, reviewLines: false },
     template: '{{issue}}\n{{permissions}}',
     permissionTable: [{ action: 'Code delivery', phrase: 'Work in <repo>.' }],
     playbookText: '# Bug playbook\n',
@@ -263,7 +263,7 @@ test.each([
     input: { issue: 'GEO-9001', ref: 'main', imp: false, byLink: true, goalFile: null, repo: 'kettle' },
     issue: { identifier: 'GEO-9001', description, labels: [{ name: 'kettle' }, { name: 'teapot' }] },
     sha: 'b'.repeat(40),
-    reads: { repo: 'kettle', otherAreas: [{ label: 'teapot', repo: 'teapot' }], playbook: null, stack: false, imp: false, reviewLines: false },
+    reads: { label: 'kettle', repo: 'kettle', otherAreas: [{ label: 'teapot', repo: 'teapot' }], playbook: null, stack: false, imp: false, reviewLines: false },
     template: 'Leave the merge to me.{{not_yours}}\n"{{fixes}} {{issue_id}}"',
     permissionTable: [{ action: 'Code delivery', phrase: 'Work in <repo>.' }],
     playbookText: null,
@@ -275,12 +275,29 @@ test.each([
   expect(brief.out.text).toBe(`Leave the merge to me. Do only the \`kettle\` part of GEO-9001: each other area (teapot) gets its own launch.\n"${fixes} GEO-9001"`);
 });
 
+test('it exempts the launch area label when --repo names the repo under an alias', () => {
+  const brief = buildDeliveryBrief({
+    input: { issue: 'GEO-9001', ref: 'main', imp: false, byLink: true, goalFile: null, repo: 'teapot' },
+    issue: { identifier: 'GEO-9001', description: '## Scope\n\n- [ ] kettle: the lid\n', labels: [{ name: 'kettle' }] },
+    sha: 'b'.repeat(40),
+    reads: { label: 'kettle', repo: 'teapot', otherAreas: [], playbook: null, stack: false, imp: false, reviewLines: false },
+    template: 'Leave the merge to me.{{not_yours}}\n"{{fixes}} {{issue_id}}"',
+    permissionTable: [{ action: 'Code delivery', phrase: 'Work in <repo>.' }],
+    playbookText: null,
+    stack: '',
+    impLine: '',
+    movedGoalFile: 'briefs/GEO-9001.md',
+  });
+
+  expect(brief.out.text).toBe('Leave the merge to me.\n"Fixes GEO-9001"');
+});
+
 test('it asks for noslop\'s review in the /goal line for a repo on noslop\'s list', () => {
   const brief = buildDeliveryBrief({
     input: { issue: 'GEO-9001', ref: 'main', imp: false, byLink: true, goalFile: null, repo: null },
     issue: { identifier: 'GEO-9001', description: '## Outcome\n\nA kettle that boils.\n', labels: [{ name: 'kettle' }] },
     sha: 'b'.repeat(40),
-    reads: { repo: 'kettle', otherAreas: [], playbook: null, stack: false, imp: false, reviewLines: true },
+    reads: { label: 'kettle', repo: 'kettle', otherAreas: [], playbook: null, stack: false, imp: false, reviewLines: true },
     template: '/goal Ship {{repo}} with {{goal_review}}',
     permissionTable: [{ action: 'Code delivery', phrase: 'Work in <repo>.' }],
     playbookText: null,
@@ -297,7 +314,7 @@ test('it asks for the agent\'s own review in the /goal line for a repo off noslo
     input: { issue: 'GEO-9001', ref: 'main', imp: false, byLink: true, goalFile: null, repo: null },
     issue: { identifier: 'GEO-9001', description: '## Outcome\n\nA kettle that boils.\n', labels: [{ name: 'kettle' }] },
     sha: 'b'.repeat(40),
-    reads: { repo: 'kettle', otherAreas: [], playbook: null, stack: false, imp: false, reviewLines: false },
+    reads: { label: 'kettle', repo: 'kettle', otherAreas: [], playbook: null, stack: false, imp: false, reviewLines: false },
     template: '/goal Ship {{repo}} with {{goal_review}}',
     permissionTable: [{ action: 'Code delivery', phrase: 'Work in <repo>.' }],
     playbookText: null,
@@ -319,7 +336,7 @@ test('it counts a merged PR as the goal, and asks only for the acceptance a PR c
       labels: [{ name: 'kettle' }],
     },
     sha: 'b'.repeat(40),
-    reads: { repo: 'kettle', otherAreas: [], playbook: null, stack: false, imp: false, reviewLines: false },
+    reads: { label: 'kettle', repo: 'kettle', otherAreas: [], playbook: null, stack: false, imp: false, reviewLines: false },
     template,
     permissionTable: [{ action: 'Code delivery', phrase: 'Work in <repo>.' }],
     playbookText: null,
@@ -332,4 +349,85 @@ test('it counts a merged PR as the goal, and asks only for the acceptance a PR c
     "/goal A PR in zgeoff/kettle for GEO-9001 that is merged, or out of draft with evidence for each acceptance item a PR can show before merge and your own review's findings fixed. First read GEO-9001 with your own Linear access.",
   );
   expect(brief.out.text).toContain('evidence for each acceptance item a PR can show before merge. Keep the ID');
+});
+
+test('it fits a review-lines brief with a playbook only because the refs are short', () => {
+  const sha = 'c'.repeat(40);
+  const brief = buildDeliveryBrief({
+    input: { issue: 'GEO-9001', ref: sha, imp: true, byLink: true, goalFile: null, repo: 'kettle' },
+    issue: { identifier: 'GEO-9001', description: '## Outcome\n\nBoil.\n', labels: [{ name: 'kettle' }] },
+    sha,
+    reads: { label: 'kettle', repo: 'kettle', otherAreas: [], playbook: { type: 'bug', path: 'agent-kit/playbooks/bug.md', command: `gh api 'repos/zgeoff/hq/contents/agent-kit/playbooks/bug.md?ref=${sha}'` }, stack: false, imp: true, reviewLines: true },
+    template: `/goal Ship {{repo}} {{issue_id}}{{goal_file}}\n\n{{review_lines}}\n\n${'Mind the kettle.\n'.repeat(212)}`,
+    permissionTable: [{ action: 'Code delivery', phrase: 'Work in <repo>.' }],
+    playbookText: '# Bug playbook\n',
+    stack: '',
+    impLine: '',
+    movedGoalFile: 'briefs/GEO-9001.md',
+  });
+
+  expect(brief.out.data['cuts']).toStrictEqual(['short refs']);
+  expect(brief.out.text).toContain('/goal Ship zgeoff/kettle GEO-9001. First read GEO-9001 with your own Linear access, then the bug playbook');
+  expect(brief.out.text).not.toContain(sha);
+  expect(brief.out.data['bytes']).toBeLessThanOrEqual(4000);
+});
+
+test.each([
+  ['an open box for a repo with no label', '## Scope\n\n- [ ] kettle: the lid\n- [ ] teapot\n- [ ] mug: the handle\n- [ ] add the retry test\n', [], 'Leave the merge to me. Do only the `kettle` part of GEO-9001: each other area (teapot, mug) gets its own launch.\n"Contributes to GEO-9001"'],
+  ['every other box ticked', '## Scope\n\n- [ ] kettle: the lid\n- [x] teapot\n- [X] mug: the handle\n- [x] add the retry test\n', [], 'Leave the merge to me.\n"Fixes GEO-9001"'],
+  ['the launch area in another case', '## Scope\n\n- [ ] Kettle: the lid\n', [], 'Leave the merge to me.\n"Fixes GEO-9001"'],
+  ['an open box inside a fence', '## Scope\n\n```md\n- [ ] teapot\n```\n- [ ] kettle\n', [], 'Leave the merge to me.\n"Fixes GEO-9001"'],
+  ['an open box that names a task', '## Scope\n\n- [ ] add the retry test\n', [], 'Leave the merge to me.\n"Contributes to GEO-9001"'],
+  ['an open box that repeats an area label', '## Scope\n\n- [ ] teapot\n- [ ] Teapot: again\n', [{ label: 'teapot', repo: 'teapot' }], 'Leave the merge to me. Do only the `kettle` part of GEO-9001: each other area (teapot) gets its own launch.\n"Contributes to GEO-9001"'],
+])('it counts open Scope boxes as other areas with --repo, and with %s', (_case, description, otherAreas, prompt) => {
+  const brief = buildDeliveryBrief({
+    input: { issue: 'GEO-9001', ref: 'main', imp: false, byLink: true, goalFile: null, repo: 'kettle' },
+    issue: { identifier: 'GEO-9001', description, labels: [{ name: 'kettle' }] },
+    sha: 'b'.repeat(40),
+    reads: { label: 'kettle', repo: 'kettle', otherAreas, playbook: null, stack: false, imp: false, reviewLines: false },
+    template: 'Leave the merge to me.{{not_yours}}\n"{{fixes}} {{issue_id}}"',
+    permissionTable: [{ action: 'Code delivery', phrase: 'Work in <repo>.' }],
+    playbookText: null,
+    stack: '',
+    impLine: '',
+    movedGoalFile: 'briefs/GEO-9001.md',
+  });
+
+  expect(brief.out.text).toBe(prompt);
+});
+
+test('it ignores open Scope boxes without --repo', () => {
+  const brief = buildDeliveryBrief({
+    input: { issue: 'GEO-9001', ref: 'main', imp: false, byLink: true, goalFile: null, repo: null },
+    issue: { identifier: 'GEO-9001', description: '## Scope\n\n- [ ] teapot\n', labels: [{ name: 'kettle' }] },
+    sha: 'b'.repeat(40),
+    reads: { label: 'kettle', repo: 'kettle', otherAreas: [], playbook: null, stack: false, imp: false, reviewLines: false },
+    template: 'Leave the merge to me.{{not_yours}}\n"{{fixes}} {{issue_id}}"',
+    permissionTable: [{ action: 'Code delivery', phrase: 'Work in <repo>.' }],
+    playbookText: null,
+    stack: '',
+    impLine: '',
+    movedGoalFile: 'briefs/GEO-9001.md',
+  });
+
+  expect(brief.out.text).toBe('Leave the merge to me.\n"Fixes GEO-9001"');
+});
+
+test('it keeps the not-yours rule without the area names when only cut 3 brings an umbrella brief under the limit', () => {
+  const boxes = Array.from({ length: 30 }, (_unused, index) => `- [ ] teapot-${index}`).join('\n');
+  const brief = buildDeliveryBrief({
+    input: { issue: 'GEO-9001', ref: 'main', imp: true, byLink: true, goalFile: null, repo: 'kettle' },
+    issue: { identifier: 'GEO-9001', description: `## Scope\n\n- [ ] kettle: the lid\n${boxes}\n`, labels: [{ name: 'kettle' }] },
+    sha: 'b'.repeat(40),
+    reads: { label: 'kettle', repo: 'kettle', otherAreas: [], playbook: null, stack: false, imp: true, reviewLines: false },
+    template: `/goal Ship {{issue_id}}\n${'k'.repeat(3800)}{{not_yours}}\n"{{fixes}} {{issue_id}}"`,
+    permissionTable: [{ action: 'Code delivery', phrase: 'Work in <repo>.' }],
+    playbookText: null,
+    stack: '',
+    impLine: '',
+    movedGoalFile: 'briefs/GEO-9001.md',
+  });
+
+  expect(brief.out.data['cuts']).toStrictEqual(['cut 2', 'cut 3']);
+  expect(brief.out.text).toBe(`First read GEO-9001 with your own Linear access.\n${'k'.repeat(3800)} Do only the \`kettle\` part of GEO-9001: each other area gets its own launch.\n"Contributes to GEO-9001"`);
 });

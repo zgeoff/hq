@@ -10,6 +10,7 @@ export function buildBriefParts(overrides: Partial<BriefParts> = {}): BriefParts
     fixes: 'Fixes',
     reviewLines: '',
     notYours: '',
+    notYoursShort: '',
     impLine: '',
     goalFile: '',
     goalReview: '',

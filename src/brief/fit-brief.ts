@@ -9,7 +9,10 @@ interface FittedBrief {
   movedIssue: boolean;
 }
 
-export function fitBrief(template: string, parts: BriefParts, movedPointer: string | null): FittedBrief {
+// GitHub's contents API resolves a 12-character prefix of a commit sha to the same file.
+const SHORT_SHA_LENGTH = 12;
+
+export function fitBrief(template: string, parts: BriefParts, movedPointer: string | null, sha: string | null = null): FittedBrief {
   const cuts: string[] = [];
   let fitted = parts;
   let sections: IssueSection[] = movedPointer === null ? [] : parts.sections;
@@ -21,9 +24,21 @@ export function fitBrief(template: string, parts: BriefParts, movedPointer: stri
     prompt = fillPlaceholders(template, buildValues(fitted, sections)).text;
     cuts.push('cut 1');
   }
+  let pointer = fitted.goalFile;
+
+  // Only a gh api ref takes the short sha; a file path that holds the sha must stay whole.
+  if (isOver(prompt) && sha !== null && prompt.includes(`ref=${sha}`)) {
+    prompt = prompt.replaceAll(`ref=${sha}`, `ref=${sha.slice(0, SHORT_SHA_LENGTH)}`);
+    pointer = pointer.replaceAll(`ref=${sha}`, `ref=${sha.slice(0, SHORT_SHA_LENGTH)}`);
+    cuts.push('short refs');
+  }
   if (isOver(prompt)) {
-    prompt = dropGoalLine(prompt, fitted.goalFile);
+    prompt = dropGoalLine(prompt, pointer);
     cuts.push('cut 2');
+  }
+  if (isOver(prompt) && fitted.notYours !== fitted.notYoursShort) {
+    prompt = prompt.replace(fitted.notYours, fitted.notYoursShort);
+    cuts.push('cut 3');
   }
   return { prompt, bytes: Buffer.byteLength(prompt), cuts, unknown: fillPlaceholders(template, buildValues(fitted, sections)).unknown, movedIssue: cuts.includes('cut 1') };
 }
