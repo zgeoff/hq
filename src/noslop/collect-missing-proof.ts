@@ -1,4 +1,4 @@
-export const PROOF_LINES = {
+const PROOF_LINES = {
   'chex prose, links and skill': /^chex prose, links and skill: cleared\.?$/iu,
   'Cold read': /^Cold read(?: \([^)]*\))?: \d+ fixed, \d+ declined\.?$/iu,
   Deslop: /^Deslop: \d+ edits?\.?$/iu,
