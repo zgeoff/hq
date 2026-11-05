@@ -74,7 +74,8 @@ Act on each line:
 - **`NOTE decision` or `NOTE blocked`:** answer it, as [Answering an agent](#answering-an-agent)
   says.
 - **`STATE needs_you`:** read its screen with `atc_terminal_read`. Approve only folder trust and new MCP servers,
-  with `atc_terminal_choose`. For any other prompt, alert the owner with `PushNotification`.
+  with `atc_terminal_choose`. Otherwise, follow [Refusals](#refusals) when the owner's yes covers
+  the prompt's action, or alert the owner with `PushNotification`.
 - **`STATE exited`:** look for its PR or FINAL note. With neither, unstick it.
 - **`ANSWERED`:** an agent answered your message. Read the answer with `atc_message_get`, and act
   on it as on a note.
@@ -107,8 +108,8 @@ message an agent with no FINAL note yet, read briefs.md's messages section.
 
 1. If the owner's yes covers the action, read the agent's screen, and type the granting line
    from your role's private file with `atc_terminal_type`. The yes can be the owner's request in your session, an
-   Action in the issue that the owner approved in a call or a pitch, an Action in the issue that
-   owner-calls leaves to you, or a grant in the launch prompt or your own start prompt. Copy the specifics (repo, PR, command) word for word from the yes, and record the line in your state file. Tell
+   issue Action approved in a call or a pitch or left to you by owner-calls, or a grant in the
+   launch or your start prompt. Copy the specifics (repo, PR, command) word for word from the yes, and record the line in your state file. Tell
    the owner in your reply: the session, the refusal and what you typed.
 
 2. If nothing covers it, and owner-calls lists the action as the owner's, send `z-triage` a
@@ -165,8 +166,8 @@ doesn't count.
 
 ## Pins and endings
 
-- Pin only a session that needs the owner (a question, an approval, a PR to review, a design
-  session), with `atc_session_update`, and tell the owner its name. Unpin anything else,
+- Pin only a session that needs the owner (a question, an approval, a PR to review, a `with-geoff`
+  design session), with `atc_session_update`, and tell the owner its name. Unpin anything else,
   even if it runs: the pinned list is the owner's to-do list.
 - Never forget or stop a delivery run yourself. It stays up to answer review findings, hq's sweep
   forgets its sessions once its PRs merge, and `z-qa` runs `hq run done` after the live check.
@@ -175,7 +176,7 @@ doesn't count.
   one with `atc_session_forget` and `stop: true`, or with `atc_session_stop` if it holds unpushed
   work.
 
-- Keep a design session pinned until the owner has worked through it and its record and follow-ups
+- Keep a `with-geoff` design session pinned until the owner has worked through it and its record and follow-ups
   are in Linear.
 
 **Reply:** what you launched, answered or handed on, each session this turn touched and its state,
