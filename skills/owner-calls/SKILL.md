@@ -98,7 +98,7 @@ Decide these yourself, with no owner call:
   owner's lists, such as Nix's memory, stays his;
 - a step, such as a rotation, on a credential that the owner approved in a call or a pitch. Look for
   the approval first;
-- reading an existing item from a vault;
+- listing a vault to see whether an item exists. Using the item in work is a Credentials Action;
 - a decision whose recommendation keeps the current course, such as "keep fixing". Carry on. When
   the course itself is on the owner's lists, such as a cost over its limit, the decision stays his.
 
