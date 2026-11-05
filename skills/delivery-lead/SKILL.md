@@ -74,8 +74,7 @@ Act on each line:
 - **`NOTE decision` or `NOTE blocked`:** answer it, as [Answering an agent](#answering-an-agent)
   says.
 - **`STATE needs_you`:** read its screen with `atc_terminal_read`. Approve only folder trust and new MCP servers,
-  with `atc_terminal_choose`. Otherwise, follow [Refusals](#refusals) when the owner's yes covers
-  the prompt's action, or alert the owner with `PushNotification`.
+  with `atc_terminal_choose`. For any other prompt, follow [Refusals](#refusals).
 - **`STATE exited`:** look for its PR or FINAL note. With neither, unstick it.
 - **`ANSWERED`:** an agent answered your message. Read the answer with `atc_message_get`, and act
   on it as on a note.
