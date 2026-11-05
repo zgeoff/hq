@@ -66,8 +66,9 @@ Contents: [State](#state) · [Steps](#steps) · [Calls](#calls) · [Unblock list
    `scripts/build-queue.sh --calls --blocked <file> --notes <file> --untracked <file> <issue pages>`
    prints each call's kind, question and recommendation as JSON, in `z-stu`'s order. It refuses a
    decision without `ownerListed: true` that has `statusQuo: true`, or whose `actions` are all ones
-   owner-calls leaves to the fleet: `Code delivery`, Investigation, Spike, Design session, `Linear:`
-   and insert-only Data lines, in the forms that [tickets](../../tickets/SKILL.md#actions) gives. It prints one `refused` line for each, and
+   owner-calls leaves to the fleet: lines that start `Code delivery`, `Investigation`, `Spike`,
+   `Design session` or `Linear:`, and the insert-only Data lines that
+   [tickets](../../tickets/SKILL.md#actions) describes. It prints one `refused` line for each, and
    exits 1.
    - Settle each refused decision yourself. Tell its sender to carry on, with `atc_message_send`,
      or, for an issue, remove `Needs Geoff` and write `{"resolved": true}`. Then run the script
