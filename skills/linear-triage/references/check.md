@@ -2,7 +2,8 @@
 
 The check turns each decision the owner must make into a call in hq: one question with options and
 your recommendation, which `z-stu` puts to the owner. Every open decision gets a call, with no cap.
-You never message the owner, and you never apply the owner's answer.
+The exceptions are the decisions that step 5 refuses: you settle those yourself. You never message
+the owner, and you never apply the owner's answer.
 
 Decisions come from three places:
 
@@ -23,7 +24,10 @@ Contents: [State](#state) · [Steps](#steps) · [Calls](#calls) · [Unblock list
 ## Steps
 
 1. **Gather the blocked decisions** into a JSON array in scratch:
-   `{"question", "recommendation", "session", "issue"}`, with `issue: null` when there's none.
+   `{"question", "recommendation", "session", "issue", "actions", "statusQuo"}`, with
+   `issue: null` when there's none. `actions` lists each Action line the decision would approve,
+   in the [tickets](../../tickets/SKILL.md#actions) forms. Set `statusQuo: true` when the
+   recommendation keeps the current course, such as "keep fixing".
    Sources: messages from sessions, and atc events of kind `decision` or `blocked` since your
    cursor. Save the new cursor. If `atc_events_read` refuses the cursor with `bad_args`, read
    without one, and say in the CHECK line that earlier notes may be missed. A decision stays open,
@@ -32,12 +36,13 @@ Contents: [State](#state) · [Steps](#steps) · [Calls](#calls) · [Unblock list
 2. **Fetch the flagged issues:** team GEO, label `Needs Geoff`, with `id`, `title`, `url`, `status`,
    `priority`, `createdAt` and `updatedAt`, through `list_issues`. Save every page.
 3. **Complete `notes.json`** (start it as `{}` without a pass), one entry per flagged issue:
-   `{"GEO-9001": {"question": "Split GEO-9001?", "recommendation": "Yes, because 16 PRs landed."}}`.
+   `{"GEO-9001": {"question": "Split GEO-9001?", "recommendation": "Yes, because 16 PRs landed.", "actions": [], "statusQuo": false}}`.
    For a flag the pass didn't set, read the issue's latest comment.
    - When the comment asks only what you can settle (a missing section, a missing `Code delivery`, a
      named blocker), fix it, remove `Needs Geoff`, and write `{"resolved": true}`.
-   - Only the owner answers: an Action beyond Code delivery (Data that deletes or rewrites, Deploy,
-     Infra, Credentials, Paid API over its limit), scope, priority, closing, a new project.
+   - When the comment asks what
+     [owner-calls](../../owner-calls/SKILL.md#what-only-the-owner-decides) lists as the owner's,
+     keep the flag. Give every entry `actions` and `statusQuo`, as step 1 says.
      `check.private.md` in hq-private (`hq defs` shows where) says which credentials are another
      session's.
    - Issues waiting on one decision get the same question text, word for word, so they become one
@@ -48,9 +53,15 @@ Contents: [State](#state) · [Steps](#steps) · [Calls](#calls) · [Unblock list
    superseded when you're sure. What's left becomes one call.
 5. **Build the calls:**
    `scripts/build-queue.sh --calls --blocked <file> --notes <file> --untracked <file> <issue pages>`
-   prints every call in `z-stu`'s order. Write each one as [Calls](#calls) says, after reading the
-   issue, its comments and linked work. The untracked call gives the count by repo and your
-   recommendation.
+   prints each call's kind, question and recommendation as JSON, in `z-stu`'s order. It refuses a
+   decision with `statusQuo: true`, or one whose `actions` are all insert-only Data lines, in the
+   form that [tickets](../../tickets/SKILL.md#actions) gives. It prints one `refused` line for
+   each, and exits 1.
+   - Settle each refused decision yourself. Tell its sender to carry on, with `atc_message_send`,
+     or, for an issue, remove
+     `Needs Geoff` and write `{"resolved": true}`. Then run the script again.
+   - Write each call's card as [Calls](#calls) says, after reading the issue, its comments and
+     linked work. The untracked call gives the count by repo and your recommendation.
 6. **Update hq:** run `hq outbox flush --retry`. Re-add every call in order, including open and
    put-off ones. Close each call in `hq call list` that's no longer gathered, and drop each unblock
    item whose session says it's done. hq tells `z-stu` itself.

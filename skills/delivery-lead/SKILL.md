@@ -135,12 +135,20 @@ A run is stuck when any of these holds:
 
 ## Pitches
 
-Code delivery, a Design session and an Investigation's or Spike's work need no approval. Pitch
-every other [Action](../tickets/SKILL.md#actions) to `z-triage` as a decision before the launch: a
-numbered list, one issue per item, with its ID, title, type and size, what the agent delivers, and
-each Infra, Deploy, Credentials or Data Action on its own line. An approval covers only what it
-names. On approval, add the approved Actions to the issue, and launch with a new `hq brief`,
-which puts them in the brief's Permissions.
+Before you launch a batch of issues, read each issue's [Actions](../tickets/SKILL.md#actions).
+Pitch the Actions that [owner-calls](../owner-calls/SKILL.md#what-only-the-owner-decides) lists as
+the owner's: send them to `z-triage` as one decision for the batch. Launch with every other Action
+unpitched, such as a Data Action that only inserts rows after a backup, or a Credentials Action
+that the owner approved in an earlier call or pitch.
+
+Write the pitch as a numbered list, one issue per item. Give each item:
+
+- the issue's ID, title, type and size;
+- what the agent delivers;
+- each Action you pitch, on its own line.
+
+An approval covers only what it names. On approval, add the approved Actions to the issue, and
+launch with a new `hq brief`, which puts them in the brief's Permissions.
 
 ## Judging overlap
 

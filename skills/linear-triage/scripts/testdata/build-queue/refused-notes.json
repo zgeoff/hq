@@ -1,0 +1,14 @@
+{
+  "GEO-9302": {
+    "question": "Copy the old tile counts into the new table?",
+    "recommendation": "Copy them",
+    "actions": [
+      "Data: tile store, insert-only copy of the old counts, after a backup",
+      "Data: tile store, insert-only index rows, after a backup"
+    ]
+  },
+  "GEO-9303": {
+    "resolved": true,
+    "statusQuo": true
+  }
+}

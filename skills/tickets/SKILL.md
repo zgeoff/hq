@@ -121,9 +121,14 @@ work, an umbrella, a cleanup Chore, or a review of an instruction document.
 ## Actions
 
 Name each action in the brief. The agent's auto-mode classifier might refuse any action beyond
-Code delivery. The owner approves them in the pitch, the numbered list of issues and actions that
-`z-delivery` sends before a launch. `tickets.private.md` says why they must be in the brief. Write
-one line per action, in these forms.
+Code delivery that the brief leaves out. Read `tickets.private.md` for the rest of the reason.
+
+Write each Action, and leave its approval to `z-delivery`. Before a launch, it sends the
+[pitch](../delivery-lead/SKILL.md#pitches) for the Actions that
+[owner-calls](../owner-calls/SKILL.md#what-only-the-owner-decides) lists as the owner's, and
+launches with the rest. Flag an issue for an Action only where its form below says so.
+
+Write one line per action, in these forms.
 
 - **Code delivery:** write `Code delivery` on every Bug, Feature, Improvement and Chore. It covers
   the agent's own checkout, installs, tests and evals, commits, pushing and force-pushing its branch
@@ -133,7 +138,9 @@ one line per action, in these forms.
   its limit is over $5 of pay-per-use spend, or over $50 of the owner's Claude subscription.
 - **Deployment:** `Deploy: <environment>, <when, such as after CI passes on main>`.
 - **Infrastructure:** `Infra: <resources or stack>`.
-- **Data:** `Data: <datastore>, <migration, backfill, …>`.
+- **Data:** `Data: <datastore>, <migration, backfill, …>`. For one that only inserts rows, write
+  `insert-only` and `after a backup` in the line, such as
+  `Data: garden db, insert-only backfill of the shelf column, after a backup`. It needs no pitch.
 - **Posting:** `Post: <where, such as issues on zgeoff/atc>`. A vendor support question goes out
   under the owner's name: `Post: draft for the owner to send to <vendor> support`.
 - **Linear edits:** `Linear: <documents, milestones or issues>`. `z-delivery` makes these edits

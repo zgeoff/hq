@@ -46,6 +46,24 @@ for mode in default calls singles prs; do
 done
 check empty empty.expected
 check empty-prs empty-prs.expected --prs
+check kept kept.expected --calls --blocked "$fixtures/kept.json"
+
+# A decision the fleet settles itself stops the run, with one line for each, before any queue prints.
+for mode in default calls singles; do
+  set --
+  [ "$mode" = default ] || set -- "--$mode"
+  if bash "$here/build-queue.sh" "$@" --blocked "$fixtures/refused-blocked.json" \
+    --notes "$fixtures/refused-notes.json" > "$tmp/actual" 2> "$tmp/stderr"; then
+    printf 'FAIL refused %s: script exited zero\n' "$mode"
+    fail=1
+  elif [ -s "$tmp/actual" ] || ! diff -u "$fixtures/refused.expected" "$tmp/stderr"; then
+    printf 'FAIL refused %s: output printed or the refusals differ\n' "$mode"
+    cat "$tmp/actual"
+    fail=1
+  else
+    printf 'ok refused %s\n' "$mode"
+  fi
+done
 
 # An input named on the command line that cannot be read stops the run before any queue prints.
 for option in --blocked --notes --untracked; do
