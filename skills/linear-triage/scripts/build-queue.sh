@@ -5,8 +5,8 @@
 # the number of single calls. With --singles, prints the single calls as a JSON array, in the
 # order to walk them: blocked decisions, then issues by priority. With --calls, prints every
 # call as a JSON array, in the order to send them: shared decisions, then the single calls.
-# With --prs, prints the untracked PRs, one line each. With --calls, the untracked PRs come last
-# as one entry of kind "untracked", with their count by repo.
+# With --prs, prints the untracked PRs, one line each. The untracked PRs are never a call: the
+# only pick, leaving them as they are, keeps the status quo.
 # Usage: build-queue.sh [--calls | --singles | --prs] [--blocked <JSON>] [--notes <JSON>] [--untracked <JSON>] [<issues JSON>...]
 #   --blocked    a JSON array of {question, recommendation, session?, issue?, actions?, statusQuo?,
 #                ownerListed?} you write. actions lists the Action lines the decision approves;
@@ -112,11 +112,7 @@ jq -n -r \
          question: .note.question, recommendation: .note.recommendation}]) as $calls
   | if $mode == "calls" then
       ([$shared[] | {kind: "shared", question: .[0].note.question, recommendation: .[0].note.recommendation,
-         issues: [.[] | .id]}] + $calls
-       + (if ($u | length) > 0 then
-            [{kind: "untracked", count: ($u | length),
-              repos: ([$u | group_by(.repo)[] | {repo: .[0].repo, count: length}])}]
-          else [] end)) | tojson
+         issues: [.[] | .id]}] + $calls) | tojson
     elif $mode == "singles" then $calls | tojson
     elif $mode == "prs" then
       if ($u | length) == 0 then "No untracked PRs."
@@ -132,7 +128,7 @@ jq -n -r \
         , ""
       else empty end,
       if ($u | length) > 0 then
-        "Untracked PRs: \($u | length) (\([$u | group_by(.repo)[] | "\(.[0].repo) \(length)"] | join(", "))). Recommend: leave them, unless you want an issue for one. Say \"list\" to see them.",
+        "Untracked PRs: \($u | length) (\([$u | group_by(.repo)[] | "\(.[0].repo) \(length)"] | join(", "))). Left as they are; say \"list\" to see them.",
         ""
       else empty end,
       if ($calls | length) > 0 then "Then \($calls | length | plural("single call")), one at a time." else empty end

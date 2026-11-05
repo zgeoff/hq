@@ -5,8 +5,8 @@ hq; a proposal is a call hq makes itself, put the same way. You take the owner t
 record each answer as the owner gives it, and apply them together when the owner is done. Never edit hq's database
 by hand.
 
-Kinds: a flagged issue (`Needs Geoff`), a shared decision (one choice, several issues), a blocked
-decision (a z- session waits), and untracked PRs.
+Kinds: a flagged issue (`Needs Geoff`), a shared decision (one choice, several issues), and a
+blocked decision (a z- session waits).
 
 ## Commands
 
@@ -31,7 +31,6 @@ decision (a z- session waits), and untracked PRs.
 - **Send the next call:** `hq open` (it refuses while one is open, and in quiet hours). Push it when
   your host can, headed "<what it decides> (<GEO-n>)", with its links. When hq says an open call
   closed, tell the owner in one line and open the next.
-- **Untracked PRs** are one call: the count by repo and the recommendation.
 - **"What's open?":** one line per call from `hq status` and `hq call list`: the open one, the
   put-off ones (marked), then the queue in order.
 

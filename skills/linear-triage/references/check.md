@@ -4,16 +4,15 @@ The check turns each decision the owner must make into a call in hq: one questio
 your recommendation, which `z-stu` puts to the owner. You never message the owner, and you never
 apply the owner's answer.
 
-Calls come from three places, with no cap:
+Calls come from two places, with no cap:
 
 - the issues flagged `Needs Geoff`, as linear-triage's Flagging section allows;
 - each decision that blocks a session and that
   [owner-calls](../../owner-calls/SKILL.md#what-only-the-owner-decides) lists as the owner's:
-  `z-delivery` and `z-review` message you, or ask you to check now;
-- the PRs that cite no issue, as one call.
+  `z-delivery` and `z-review` message you, or ask you to check now.
 
 Settle any other blocked decision yourself, and tell its sender. Step 5 refuses two kinds of these
-for you.
+for you. The PRs that cite no issue are never a call: step 4 reports them.
 
 Contents: [State](#state) · [Steps](#steps) · [Calls](#calls) · [Unblock list](#unblock-list)
 
@@ -58,7 +57,8 @@ Contents: [State](#state) · [Steps](#steps) · [Calls](#calls) · [Unblock list
 4. **Find untracked PRs:** `scripts/untracked-prs.sh 2` lists `zgeoff` PRs that cite no issue, open
    or merged in 2 days. Search Linear for each by repo and number first; when an issue holds it, add
    "Contributes to GEO-<n>" to the PR with `gh pr edit`. Trace the rest to an issue, or close one as
-   superseded when you're sure. What's left becomes one call.
+   superseded when you're sure. Leave the rest as they are: `build-queue.sh` counts them in part 1,
+   and `--prs` lists them.
 5. **Build the calls:**
    `scripts/build-queue.sh --calls --blocked <file> --notes <file> --untracked <file> <issue pages>`
    prints each call's kind, question and recommendation as JSON, in `z-stu`'s order. It refuses a
@@ -70,7 +70,7 @@ Contents: [State](#state) · [Steps](#steps) · [Calls](#calls) · [Unblock list
      or, for an issue, remove `Needs Geoff` and write `{"resolved": true}`. Then run the script
      again.
    - Write each call's card as [Calls](#calls) says, after reading the issue, its comments and
-     linked work. The untracked call gives the count by repo and your recommendation.
+     linked work.
 6. **Update hq:** run `hq outbox flush --retry`. Re-add every call in order, including open and
    put-off ones. Close each call in `hq call list` that's no longer gathered, and drop each unblock
    item whose session says it's done. hq tells `z-stu` itself.
