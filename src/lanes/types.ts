@@ -122,6 +122,14 @@ export interface ReadyIssue {
   parent: string | null;
 }
 
+// openBlockers names the issues that block this one and are not Done; moreRelations says Linear holds
+// more relations than hq read.
+export interface TeamIssue {
+  issue: ReadyIssue;
+  openBlockers: string[];
+  moreRelations: boolean;
+}
+
 export interface PromotableIssue {
   identifier: string;
   title: string;

@@ -22,6 +22,25 @@ test('it answers the Ready query with the issues in its team and state only', as
   });
 });
 
+test('it answers a Ready query that selects inverseRelations with each blocker and its state type', async () => {
+  linearIssues.push(
+    { identifier: 'GEO-3', team: 'GEO', state: 'In Progress', stateType: 'started', previousIdentifiers: [], project: null, labels: [], parent: null },
+    { identifier: 'GEO-4', team: 'GEO', state: 'Ready', stateType: 'unstarted', previousIdentifiers: [], project: null, labels: [], parent: null, blockedBy: ['GEO-3'] },
+  );
+
+  const response = await fetch(LINEAR_GRAPHQL_URL, { method: 'POST', body: JSON.stringify({ query: 'query Ready { inverseRelations }', variables: { after: null, team: 'GEO', state: 'Ready' } }) });
+  const answer: unknown = await response.json();
+
+  expect(answer).toStrictEqual({
+    data: {
+      issues: {
+        nodes: [{ identifier: 'GEO-4', priority: 0, createdAt: '2026-10-01T00:00:00.000Z', project: null, labels: { nodes: [] }, parent: null, inverseRelations: { nodes: [{ type: 'blocks', issue: { identifier: 'GEO-3', state: { type: 'started' } } }], pageInfo: { hasNextPage: false } } }],
+        pageInfo: { hasNextPage: false, endCursor: null },
+      },
+    },
+  });
+});
+
 test('it answers the issues query with the issues whose identifier, or a previous one, it asks for', async () => {
   linearIssues.push(
     { identifier: 'KET-1', team: 'KET', state: 'Done', stateType: 'completed', previousIdentifiers: [], project: null, labels: [], parent: null },

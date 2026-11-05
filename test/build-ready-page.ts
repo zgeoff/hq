@@ -9,6 +9,8 @@ export interface ReadyNodeSeed {
   priority?: number;
   createdAt?: string;
   parent?: string | null;
+  blockers?: { identifier: string; stateType: string }[];
+  moreRelations?: boolean;
 }
 
 interface ReadyNode {
@@ -18,6 +20,7 @@ interface ReadyNode {
   project: { name: string; labels: { nodes: { name: string }[] } } | null;
   labels: { nodes: { name: string; parent: { name: string } | null }[] };
   parent: { identifier: string } | null;
+  inverseRelations: { nodes: { type: string; issue: { identifier: string; state: { type: string } } }[]; pageInfo: { hasNextPage: boolean } };
 }
 
 interface ReadyPage {
@@ -32,6 +35,10 @@ export function buildReadyPage(seeds: ReadyNodeSeed[], endCursor: string | null)
     project: seed.project === undefined || seed.project === null ? null : { name: seed.project, labels: { nodes: (seed.projectLabels ?? []).map((name) => ({ name })) } },
     labels: { nodes: [...(seed.labels ?? []).map((name) => ({ name, parent: null })), ...(seed.type === undefined ? [] : [{ name: seed.type, parent: { name: 'Type' } }])] },
     parent: seed.parent === undefined || seed.parent === null ? null : { identifier: seed.parent },
+    inverseRelations: {
+      nodes: (seed.blockers ?? []).map((blocker) => ({ type: 'blocks', issue: { identifier: blocker.identifier, state: { type: blocker.stateType } } })),
+      pageInfo: { hasNextPage: seed.moreRelations ?? false },
+    },
   }));
   return { issues: { nodes, pageInfo: { hasNextPage: endCursor !== null, endCursor } } };
 }

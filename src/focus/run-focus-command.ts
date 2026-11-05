@@ -72,7 +72,7 @@ async function readCounts(call: LinearCall, terms: readonly FocusTerm[]): Promis
   try {
     const [ready, backlog] = await Promise.all([readTeamIssues(call, rules.team, rules.readyState), readTeamIssues(call, rules.team, BACKLOG_STATE)]);
     const at = new Date(0).toISOString();
-    return { counts: buildFocusCounts(terms, buildReadySnapshot(ready, rules, at).eligible, buildReadySnapshot(backlog, rules, at).eligible), error: null };
+    return { counts: buildFocusCounts(terms, buildReadySnapshot(ready.map((entry) => entry.issue), rules, at).eligible, buildReadySnapshot(backlog.map((entry) => entry.issue), rules, at).eligible), error: null };
   } catch (error) {
     return { counts: null, error: error instanceof Error ? error.message : String(error) };
   }

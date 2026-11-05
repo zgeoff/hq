@@ -1,5 +1,6 @@
 import type { Database } from 'bun:sqlite';
 import { z } from 'zod';
+import type { Skipped } from '../areas/types.ts';
 import { reportLaneReady } from '../areas/report-lane-ready.ts';
 import { RUNNING } from '../areas/running.ts';
 import { iso } from '../clock/iso.ts';
@@ -24,7 +25,7 @@ import { READY_ISSUES_KEY } from './ready-issues-key.ts';
 import { SKIP_UNREAD_KEY } from './skip-unread-key.ts';
 import { readTeamIssues } from './read-team-issues.ts';
 import { removeEndedSkips } from './remove-ended-skips.ts';
-import type { LaneRules, ReadyIssue } from './types.ts';
+import type { LaneRules, ReadyIssue, TeamIssue } from './types.ts';
 
 const MAX_SKIPPED = 100;
 
@@ -37,18 +38,21 @@ interface LinearReadyDeps {
 
 export async function readLinearReady(db: Database, deps: LinearReadyDeps): Promise<void> {
   const untils = await readUntils(db, deps.call, deps.run);
-  const issues = await readTeamIssues(deps.call, deps.rules.team, deps.rules.readyState);
+  const read = await readTeamIssues(deps.call, deps.rules.team, deps.rules.readyState);
+  const blocked = read.flatMap((entry) => describeBlock(entry));
+  const issues = read.filter((entry) => entry.openBlockers.length === 0 && !entry.moreRelations).map((entry) => entry.issue);
   const at = now();
   const snapshot = buildReadySnapshot(issues, deps.rules, iso(at));
   db.transaction(() => {
     removeEndedSkips(db, untils.settled, deps.actor, at);
     setMeta(db, SKIP_UNREAD_KEY, JSON.stringify(untils.unread));
     const classified = classifyReady(issues, deps.rules, readLaneSkips(db).filter((skip) => isSkipActive(skip, at)));
-    const skipped = classified.skipped.slice(0, MAX_SKIPPED);
+    const combined = [...blocked, ...classified.skipped];
+    const skipped = combined.slice(0, MAX_SKIPPED);
 
     // The summary counts every Ready issue past the eligible and the listed skipped as unexplained, so
     // the skipped issues cut from the list leave the total too.
-    const total = classified.total - (classified.skipped.length - skipped.length);
+    const total = classified.total + blocked.length - (combined.length - skipped.length);
     reportLaneReady(db, classified.counts, deps.actor, { total, skipped, logOnlyChanges: true });
     setMeta(db, READY_ISSUES_KEY, JSON.stringify(snapshot));
     writeIssueAreas(db, [...snapshot.eligible, ...snapshot.design]);
@@ -87,6 +91,13 @@ async function readUntilPRs(run: Runner, untils: readonly string[]): Promise<Unt
   const settled = new Set(answers.filter((read) => 'state' in read.answer && read.answer.state !== 'OPEN').map((read) => read.until));
   const unread = Object.fromEntries(answers.flatMap((read) => ('error' in read.answer ? [[read.until, read.answer.error]] : [])));
   return { settled, unread };
+}
+
+function describeBlock(entry: TeamIssue): Skipped[] {
+  if (entry.openBlockers.length > 0) {
+    return [{ issue: entry.issue.identifier, reason: `blocked by ${entry.openBlockers.join(', ')} (not Done)` }];
+  }
+  return entry.moreRelations ? [{ issue: entry.issue.identifier, reason: 'more relations than hq reads; check its blockers by hand' }] : [];
 }
 
 function collectFailure(issue: string, verdict: ConditionVerdict | undefined): [string, string][] {

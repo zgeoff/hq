@@ -1051,6 +1051,37 @@ test('hq lanes tick --refresh reads Ready from Linear inside the 10 min throttle
   expect(readReadySnapshot(fresh.db, new Date(NOON_SYDNEY))?.eligible.map((issue) => issue.identifier)).toStrictEqual(['GEO-9861']);
 });
 
+test('it leaves a Ready issue out of the snapshot while its blocker is not Done, through the real Linear client', async () => {
+  const fresh = freshDb();
+  const run = mock<Runner>(() => Promise.resolve<RunResult>({ code: 0, stdout: 'lin_api_INVENTEDkettleKEY0042\n', stderr: '' }));
+  const log = console.log;
+  const printed: string[] = [];
+  onTestFinished(fresh.cleanup);
+  resetKey();
+  onTestFinished(resetKey);
+  onTestFinished(overrideEnv('OP_SERVICE_ACCOUNT_TOKEN', 'invented-token'));
+  onTestFinished(overrideEnv('HQ_NOW', NOON_SYDNEY));
+  onTestFinished(overrideEnv('HQ_NOTIFY', 'off'));
+  onTestFinished(overrideEnv('HQ_AS', 'kettle-lanes'));
+  onTestFinished(overrideEnv('HQ_CAPACITY', `${fresh.dir}/defs/scripts/capacity.sh`));
+  console.log = (line: string) => void printed.push(line);
+  onTestFinished(() => (console.log = log));
+  mkdirSync(`${fresh.dir}/defs/scripts`, { recursive: true });
+  writeFileSync(`${fresh.dir}/defs/scripts/capacity.sh`, `echo '${JSON.stringify({ imp: { freeMib: 0, room: false } })}'\n`);
+  writeFileSync(`${fresh.dir}/defs/pacing.json`, JSON.stringify({ slots: { imp: 2, local: 2 } }));
+  setMeta(fresh.db, 'lanes_ready_linear_at', '2026-10-14T00:58:00Z');
+  linearIssues.push(
+    { identifier: 'GEO-9860', team: 'GEO', state: 'In Progress', stateType: 'started', previousIdentifiers: [], project: null, labels: [], parent: null },
+    { identifier: 'GEO-9861', team: 'GEO', state: 'Ready', stateType: 'unstarted', previousIdentifiers: [], project: null, labels: [], parent: null },
+    { identifier: 'GEO-9862', team: 'GEO', state: 'Ready', stateType: 'unstarted', previousIdentifiers: [], project: null, labels: [], parent: null, blockedBy: ['GEO-9860'] },
+  );
+
+  const code = await main(['lanes', 'tick', '--refresh'], run);
+
+  expect(code).toBe(0);
+  expect(readReadySnapshot(fresh.db, new Date(NOON_SYDNEY))?.eligible.map((issue) => issue.identifier)).toStrictEqual(['GEO-9861']);
+});
+
 test('hq lanes tick --refresh reports a failed Ready read, still ticks, and exits 0', async () => {
   const fresh = freshDb();
   const run = mock<Runner>(() => Promise.resolve<RunResult>({ code: 0, stdout: 'lin_api_INVENTEDkettleKEY0042\n', stderr: '' }));
