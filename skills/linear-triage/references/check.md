@@ -38,7 +38,8 @@ Contents: [State](#state) · [Steps](#steps) · [Calls](#calls) · [Unblock list
    find the approval with `hq call list --state all`, which holds each pitch too, since a pitch
    reaches the owner as a call. Then tell the sender to carry on.
    Sources: messages from sessions, and atc events of kind `decision` or `blocked` since your
-   cursor. Save the new cursor. If `atc_events_read` refuses the cursor with `bad_args`, read
+   cursor. Skip an event from an agent that `z-delivery` launched: `z-delivery` answers it, and
+   sends you any decision that owner-calls lists. Save the new cursor. If `atc_events_read` refuses the cursor with `bad_args`, read
    without one, and say in the CHECK line that earlier notes may be missed. A decision stays open,
    and in `refine.md`, until `hq call list --state all` shows it answered or its sender says it's
    settled. Put a step that needs the owner's hands on the [unblock list](#unblock-list).
