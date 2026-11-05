@@ -9,23 +9,26 @@ items:
     note: "anything that touches Nix's memory or identity"
   - id: credentials
     outcome: ask
-    note: "credentials"
-  - id: scope-naming
+    note: "credentials the owner has not approved"
+    note_first: "credentials I have not approved"
+  - id: naming
     outcome: ask
-    note: "scope and naming"
+    note: "naming"
+  - id: security-design
+    outcome: ask
+    note: "security design"
   - id: new-session
     outcome: ask
     note: "a new session"
-  - id: priority
-    outcome: ask
-    note: "a priority"
   - id: security-change
     outcome: ask
-    note: "a High or Urgent security change"
+    note: "setting a High or Urgent priority on a security change"
 # The owner's other calls, which a site that follows the still-ask sentence with "Also his:" lists as bullets in this order.
 also:
   - "closing an issue whose work is still worth doing, or as not planned"
   - "a new project"
+  - "dropping an issue's outcome, adding behaviour to it, or loosening a rule he set in the issue, its comments or a design record"
+  - "loosening a repo's ruleset, changing its visibility, or touching any of its secrets"
   - "an Action beyond Code delivery, Investigation, Spike or Design session: Data that deletes or rewrites, Deploy, Infra, Credentials, Posting, or Paid API over its limit"
   - "accepting a finding's risk, or merging a PR its gate blocks"
   - "product direction, and a cost only he can accept"
