@@ -111,10 +111,9 @@ message an agent with no FINAL note yet, read briefs.md's messages section.
 
 2. If nothing covers it, and owner-calls lists the action as the owner's, send `z-triage` a
    decision: the issue, the action, the exact refusal and the brief's wording. Wait for the owner's
-   approval. For any other action, approve it yourself.
-
-3. Add the approved action to the issue's Actions, and relaunch with a new `hq brief`, from the
-   pushed branch or `main` if nothing is pushed.
+   approval. For any other action, approve it yourself. Then add the approved action to the
+   issue's Actions, and relaunch with a new `hq brief`, from the pushed branch or `main` if nothing
+   is pushed.
 
 When the classifier refuses the launch itself, the brief is wrong. Remove the unapproved action, or
 the claim about who approved what, and launch again.
