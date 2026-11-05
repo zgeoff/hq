@@ -7,21 +7,21 @@ message.
 
 ## The skill proof
 
-A PR that changes a skill's `SKILL.md`, or a file under its `references/`, needs three headings in
-its description, each with text under it:
+A PR that changes a skill's `SKILL.md`, or a file under its `references/`, needs three ticked lines
+in its `## Checks` section, and one line under `Declined:` for each finding the agent declined:
 
-- `## Skill checks`: the output of `bun x @zgeoff/chex prose links skill`.
-- `## Cold read`: each finding from the cold-read skill, and how the agent answered it.
-- `## Deslop`: what the deslop skill changed, or "none".
+- `- [x] chex prose, links and skill: cleared`
+- `- [x] Cold read: <n> fixed, <n> declined`
+- `- [x] Deslop: <n> edits`
 
 The gate checks the proof before the owner's lgtm, so the owner never approves a description that
 still has to change. Check it like this:
 
 1. Once the review findings are answered, run `hq review gate <repo> <pr>`.
-2. If it blocks on the proof, its reason names the missing headings. Message the agent that reason
+2. If it blocks on the proof, its reason names the missing lines. Message the agent that reason
    word for word.
-3. Read the sections the gate passed. It checks only that each has text. Send back failing chex
-   output, and any cold-read finding with no answer.
+3. Read each declined finding's reason. Send back any that fails `fix-it-here`. When you doubt a
+   ticked chex line, run `bun x @zgeoff/chex prose links skill` on the PR's head.
 4. Only then run `hq unblock add`, which puts the PR on the owner's list.
 
 An edit to the description doesn't move the head. The agent needs no new review round. A push

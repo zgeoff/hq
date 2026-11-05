@@ -484,12 +484,22 @@ test('it gates a listed repo\'s PR on noslop though a Codex review file of the P
   await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked' });
 });
 
-test('it refuses a skill PR whose description lacks proof sections, before the lgtm, naming the missing ones', async () => {
+test('it refuses a skill PR whose description has only the old three headings, before the lgtm, naming the lines to add', async () => {
   const ctx = setupTest();
-  const fake = buildFakeRunner({ prBody: 'Teach the kettle skill to pour.\n\n## Cold read\n\nNo findings.', prFiles: { code: 0, stdout: 'skills/kettle/SKILL.md\n', stderr: '' } });
+  const oldBody = ['Teach the kettle skill to pour.', '## Skill checks', 'chex skill: 0 problems', '## Cold read', 'No findings.', '## Deslop', 'none'].join('\n');
+  const fake = buildFakeRunner({ prBody: oldBody, prFiles: { code: 0, stdout: 'skills/kettle/SKILL.md\n', stderr: '' } });
   recordPRAnswer(ctx.db, { repo: 'hq', pr: 7, answer: 'lgtm', head: FAKE_FULL_SHA, source: 'chat:kettle-1', note: null, actor: 'z-kettle' });
 
-  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'hq', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: 'the PR changes skill text (skills/kettle/SKILL.md) and its description lacks the proof: add "## Skill checks", "## Deslop", each with text under it (the chex output, each cold-read finding with its answer, the deslop changes or "none")' });
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'hq', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: 'the PR changes skill text (skills/kettle/SKILL.md) and its "## Checks" section lacks the skill proof: tick "- [x] chex prose, links and skill: cleared", "- [x] Cold read: <n> fixed, <n> declined", "- [x] Deslop: <n> edits"' });
+});
+
+test('it refuses a skill PR whose Checks section has an unticked Deslop and one of two declined findings listed', async () => {
+  const ctx = setupTest();
+  const body = ['Teach the kettle skill to pour.', '## Checks', '- [x] chex prose, links and skill: cleared', '- [x] Cold read: 1 fixed, 2 declined', '- [ ] Deslop: 1 edit', '', 'Declined:', '', '- Cold read: the opening is vague. Filed GEO-9996.'].join('\n');
+  const fake = buildFakeRunner({ prBody: body, prFiles: { code: 0, stdout: 'skills/kettle/SKILL.md\n', stderr: '' } });
+  recordPRAnswer(ctx.db, { repo: 'hq', pr: 7, answer: 'lgtm', head: FAKE_FULL_SHA, source: 'chat:kettle-1', note: null, actor: 'z-kettle' });
+
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'hq', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: 'the PR changes skill text (skills/kettle/SKILL.md) and its "## Checks" section lacks the skill proof: tick "- [x] Deslop: <n> edits", and list 1 more declined finding under "Declined:" (the ticked lines count 2, the list holds 1)' });
 });
 
 test('it refuses a skill PR without the proof in any zgeoff repo, a non-noslop one included', async () => {

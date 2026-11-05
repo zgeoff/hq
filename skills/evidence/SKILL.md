@@ -51,9 +51,10 @@ a merged PR in that repo. `z-review` ticks a box when that PR merges.
 
 ## Before the merge
 
-- Show the evidence in the PR description for each item that a test, a command or a screenshot can
-  prove. Add an image as the [pr-evidence](../../.claude/skills/pr-evidence/SKILL.md) skill says,
-  never as a commit.
+- Show the evidence for each Acceptance item as one line under `## Verification`: a box, the item,
+  and what shows it. Leave an item the PR can't show unticked, with why and what happens next. Put
+  longer proof in an `Output:` block under the lines, as the PR template says. Add an image as the
+  [pr-evidence](../../.claude/skills/pr-evidence/SKILL.md) skill says, never as a commit.
 - Leave each item that only the running system can show, such as a page that loads or a message that
   sends, to `z-qa`. On a repo with PR previews, `z-qa` checks it on the preview and answers
   `z-review` before the merge.

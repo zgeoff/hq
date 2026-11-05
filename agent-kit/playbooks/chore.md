@@ -17,5 +17,6 @@ step 3 and say so in the PR.
 5. A difference in step 3 or 4 means someone would see the change. When you find one, keep the
    change, open a draft PR that says what differs, and send a `decision` note. End your turn there,
    and wait for the answer.
-6. In the PR description, under "## Verification", give the test command and each `bun verify`
-   command, with a one-line result and the part of its output that shows no change.
+6. In the PR description, under "## Verification", write one line for the test command and one for
+   each `bun verify` command, each with a one-line result. Put the part of the output that shows no
+   change in an `Output:` block, and the commands in a `Rerun:` block.

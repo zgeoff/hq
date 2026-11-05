@@ -38,11 +38,11 @@ below guard against each. When the ticket sets a target and a number of attempts
 
    Then try the next kind of fix.
 
-5. In the PR description, under "## Verification", give the reviewer:
+5. In the PR description, under "## Verification", give the reviewer one line for each of these:
    - a table with a row per path you measured: path, before, after, change in percent, runs, both
-     ranges;
+     ranges, in an `Output:` block of 40 lines or fewer;
    - the slowest function or query before, and the slowest now;
    - each fix you tried, including the ones you reverted: which kind of fix from step 3 it was, the
      change, and its measured effect;
-   - the command that reproduces the measurement;
-   - the raw runs, in a `<details>` block.
+   - the command that reproduces the measurement, in a `Rerun:` block;
+   - the raw runs, linked with `cloud up --md`, never pasted.

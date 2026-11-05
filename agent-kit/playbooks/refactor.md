@@ -39,7 +39,15 @@ feature as a user would; the feature map in the repo's `verify-<app>` skill list
    change it finds, such as a different error message, as a bug in your refactor, and fix it.
 10. Run the step 1 tests again. Expect them all to pass. When you kept `bun verify` output in step
     1, run it again. Expect the same end state.
-11. In the PR description, under "## Verification", give the test command and its result, both
-    `bun verify` outputs, and one line on what got simpler, or on why you reverted. Under "## Fixed
-    on the way", list each bug you fixed, with its commit and its test, or write `None.` Then mark
-    the PR ready for review.
+11. In the PR description, under "## Verification", write one line for the test command and its
+    result, one for each `bun verify` output (the output in an `Output:` block), and one on what got
+    simpler, or on why you reverted. Put the test command and the `bun verify` commands in a `Rerun:`
+    block. Add one line for each bug you fixed, in this form, or the second
+    line when there is none:
+
+    ```markdown
+    - [x] Fixed on the way: <the bug>, <commit>, "<test name>"
+    - [x] Fixed on the way: none
+    ```
+
+    Then mark the PR ready for review.
