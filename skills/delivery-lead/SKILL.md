@@ -98,7 +98,9 @@ message an agent with no FINAL note yet, read briefs.md's messages section.
   yourself.
 - **It asks to run a migration:** let it run one that only inserts rows, adds tables or columns, or
   fills in columns it added, once it gives you the path of its backup of that database. Send one
-  that deletes or rewrites existing data to `z-triage` as a decision.
+  that deletes or rewrites existing data, or that touches anything else
+  [owner-calls](../owner-calls/SKILL.md#what-only-the-owner-decides) lists, such as Nix's memory, to
+  `z-triage` as a decision.
 - **A refusal blocks it:** follow [Refusals](#refusals).
 
 ## Refusals
