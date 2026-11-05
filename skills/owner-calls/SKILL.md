@@ -57,8 +57,8 @@ Avoid these traps:
 - **The gate:** `hq review gate`, which decides whether a PR may merge.
 - **A vault:** a 1Password vault.
 - **A pass:** one run of `z-triage` over the Linear issues, every 30 minutes.
-- **The check:** the step after each pass in which `z-triage` turns each open decision of the
-  owner's into a call.
+- **The check:** the step after each pass in which `z-triage` makes the owner's open decisions
+  calls.
 - **An Action:** one line in an issue's Actions section, such as `Code delivery` or a `Data:` line.
   [tickets](../tickets/SKILL.md#actions) gives the forms.
 - **A pitch:** the list of Actions that `z-delivery` sends as a decision before a launch, as
