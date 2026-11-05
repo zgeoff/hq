@@ -46,7 +46,7 @@ Contents: [State](#state) · [Steps](#steps) · [Calls](#calls) · [Unblock list
      named blocker), fix it, remove `Needs Geoff`, and write `{"resolved": true}`.
    - When the comment asks what
      [owner-calls](../../owner-calls/SKILL.md#what-only-the-owner-decides) lists as the owner's,
-     keep the flag. Otherwise settle it yourself, as for the case above. Give every entry `actions`
+     or whether the owner joins a design session, keep the flag. Otherwise settle it yourself, as for the case above. Give every entry `actions`
      and `statusQuo`, as step 1 says.
      `check.private.md` in hq-private (`hq defs` shows where) says which credentials are another
      session's.

@@ -42,7 +42,7 @@ Avoid these traps:
 - **atc:** the tool that runs the sessions and carries messages between them. Send a message to a
   session with `atc_message_send`.
 - **`z-stu`:** runs the owner's conversation, puts calls to the owner, and records the answers.
-- **`z-triage`:** grooms Linear, and turns each decision into a call.
+- **`z-triage`:** grooms Linear, and turns each decision of the owner's into a call.
 - **`z-delivery`:** launches the builder agents.
 - **`z-review`:** reviews and merges PRs.
 - **`z-qa`:** runs the live checks.
@@ -57,7 +57,8 @@ Avoid these traps:
 - **The gate:** `hq review gate`, which decides whether a PR may merge.
 - **A vault:** a 1Password vault.
 - **A pass:** one run of `z-triage` over the Linear issues, every 30 minutes.
-- **The check:** the step after each pass in which `z-triage` turns each open decision into a call.
+- **The check:** the step after each pass in which `z-triage` turns each open decision of the
+  owner's into a call.
 - **An Action:** one line in an issue's Actions section, such as `Code delivery` or a `Data:` line.
   [tickets](../tickets/SKILL.md#actions) gives the forms.
 - **A pitch:** the list of Actions that `z-delivery` sends as a decision before a launch, as
@@ -88,8 +89,8 @@ to write it here.
 
 Decide these yourself, with no owner call:
 
-- Code delivery, Investigation, Spike, Design session, and each Linear edit the owner's lists leave
-  out;
+- Code delivery, Investigation, Spike, a Design session without the owner, and each Linear edit the
+  owner's lists leave out. Whether the owner joins a design session is his to decide;
 - a Data Action that only adds data, run after a backup of that datastore: it inserts rows, adds
   tables or columns, or fills in columns it added;
 - a step, such as a rotation, on a credential in a Credentials Action that the owner approved in a
@@ -102,13 +103,14 @@ Decide anything else yourself, under your grants or the Actions that the issue n
 
 ## Put it to the owner
 
-The owner answers in batches, through one queue: `z-triage` turns each decision into a call, and
+The owner answers in batches, through one queue: `z-triage` turns each decision of the owner's into a call, and
 `z-stu` puts the call to the owner. Never ask the owner directly. To tell the owner something
 without a decision, such as a deploy hold, send it with the `PushNotification` tool.
 
-- **Send a decision to `z-triage`** with `atc_message_send`: the question, the options and your
-  recommendation. When the decision has an issue, `z-triage` labels it `Needs Geoff`. At its next
-  check, `z-triage` makes the decision a call, whether or not it has an issue.
+- **Send a decision on the list to `z-triage`** with `atc_message_send`: the question, the options
+  and your recommendation. When the decision has an issue, `z-triage` labels it `Needs Geoff`. At
+  its next check, `z-triage` makes the decision a call, whether or not it has an issue. When the
+  list leaves the decision to you, `z-triage` refuses it and tells you to carry on.
 - **Add a hands-on step to the unblock list:**
   `hq unblock add --task '<what the owner does>' --done-when <condition>`. The condition is
   `issue:GEO-<n>`, `pr:<repo>#<n>`, `doc:<Linear document ID>`, `release:<repo>` or
