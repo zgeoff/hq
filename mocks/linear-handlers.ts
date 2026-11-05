@@ -1,6 +1,5 @@
 import { HttpResponse, http } from 'msw';
 import { z } from 'zod';
-import type { ReadyPageAnswer } from '../src/lanes/read-team-issues.ts';
 import type { ReadyIssue } from '../src/lanes/types.ts';
 import type { IssuesFilter } from '../src/linear/read-issue-pages.ts';
 
@@ -53,7 +52,7 @@ async function readLinearAnswer(info: LinearRequest): Promise<Response> {
     return HttpResponse.json({ data: { workflowStates: { nodes: linearWorkflowStates.filter((state) => state.team === variables.teamKey).map((state) => ({ name: state.name })) } } });
   }
   if ('team' in variables && 'state' in variables) {
-    return HttpResponse.json({ data: buildReadyAnswer(variables.team, variables.state) });
+    return HttpResponse.json({ data: buildReadyAnswer(variables.team, variables.state, readQuery(body)) });
   }
   if ('ids' in variables) {
     return HttpResponse.json({ data: buildIssuesAnswer(variables.ids) });
@@ -135,6 +134,9 @@ export interface LinearIssueRecord extends Pick<ReadyIssue, 'identifier' | 'proj
   completedAt?: string | null;
   canceledAt?: string | null;
   description?: string | null;
+
+  // The identifiers of the issues that block this one; Linear answers them only to a query that selects inverseRelations.
+  blockedBy?: string[];
 }
 
 function buildIssuesPageAnswer(variables: IssuesPageVariables, query: string) {
@@ -174,19 +176,27 @@ function buildIssuePageNode(issue: LinearIssueRecord) {
 // The issues Linear holds; test/msw-preload.ts empties it after each test.
 export const linearIssues: LinearIssueRecord[] = [];
 
-function buildReadyAnswer(team: unknown, state: unknown): ReadyPageAnswer {
-  const nodes = linearIssues
-    .filter((issue) => issue.team === team && issue.state === state)
-    .map((issue) => ({
-      identifier: issue.identifier,
-      priority: issue.priority?.value ?? 0,
-      createdAt: issue.createdAt ?? DEFAULT_TIME,
-      project: issue.project === null ? null : { name: issue.project, labels: { nodes: (issue.projectLabels ?? []).map((name) => ({ name })) } },
-      labels: { nodes: [...issue.labels.map((name) => ({ name, parent: null })), ...(issue.type === undefined ? [] : [{ name: issue.type, parent: { name: 'Type' } }])] },
-      parent: issue.parent === null ? null : { identifier: issue.parent },
-      inverseRelations: { nodes: [], pageInfo: { hasNextPage: false } },
-    }));
+// Linear answers only the fields a query selects, so a Ready query without inverseRelations gets none.
+function buildReadyAnswer(team: unknown, state: unknown, query: string) {
+  const nodes = linearIssues.filter((issue) => issue.team === team && issue.state === state).map((issue) => buildReadyNode(issue, query));
   return { issues: { nodes, pageInfo: { hasNextPage: false, endCursor: null } } };
+}
+
+function buildReadyNode(issue: LinearIssueRecord, query: string) {
+  const node = {
+    identifier: issue.identifier,
+    priority: issue.priority?.value ?? 0,
+    createdAt: issue.createdAt ?? DEFAULT_TIME,
+    project: issue.project === null ? null : { name: issue.project, labels: { nodes: (issue.projectLabels ?? []).map((name) => ({ name })) } },
+    labels: { nodes: [...issue.labels.map((name) => ({ name, parent: null })), ...(issue.type === undefined ? [] : [{ name: issue.type, parent: { name: 'Type' } }])] },
+    parent: issue.parent === null ? null : { identifier: issue.parent },
+  };
+  return query.includes('inverseRelations') ? { ...node, inverseRelations: buildInverseRelations(issue.blockedBy ?? []) } : node;
+}
+
+function buildInverseRelations(blockedBy: readonly string[]) {
+  const nodes = blockedBy.map((identifier) => ({ type: 'blocks', issue: { identifier, state: { type: linearIssues.find((issue) => issue.identifier === identifier)?.stateType ?? 'unstarted' } } }));
+  return { nodes, pageInfo: { hasNextPage: false } };
 }
 
 function buildIssuesAnswer(ids: unknown) {

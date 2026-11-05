@@ -42,8 +42,6 @@ const pageInfoSchema = z.object({ hasNextPage: z.boolean(), endCursor: z.string(
 
 const pageSchema = z.object({ issues: z.object({ nodes: z.array(nodeSchema), pageInfo: pageInfoSchema }) });
 
-export type ReadyPageAnswer = z.input<typeof pageSchema>;
-
 export async function readTeamIssues(call: LinearCall, team: string, state: string): Promise<TeamIssue[]> {
   const issues: TeamIssue[] = [];
   let after: string | null = null;
