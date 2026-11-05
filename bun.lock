@@ -30,7 +30,7 @@
         "@types/react": "19.3.0",
         "@types/react-dom": "19.3.0",
         "@zgeoff/oxlint-config": "0.8.4",
-        "@zgeoff/skill-gate": "0.2.19",
+        "@zgeoff/skill-gate": "0.2.20",
         "knip": "6.43.0",
         "msw": "2.15.0",
         "oxfmt": "^0.74.0",
@@ -461,11 +461,11 @@
 
     "@typescript/typescript-win32-x64": ["@typescript/typescript-win32-x64@7.0.2", "", { "os": "win32", "cpu": "x64" }, "sha512-0BQ3HkAHHlKLSp1qRvf3SUhGpGsDuhB/jgFw75guyqbxJqEaS0Cw/VFO8i2nHglJUzQCRtMMR/IBAKE3ETMC4g=="],
 
-    "@zgeoff/agent-hooks": ["@zgeoff/agent-hooks@0.2.3", "", { "bin": { "agent-hooks": "dist/cli.js" } }, "sha512-yg4STSYyLtiFS9rWJUxXJuU6a3+ibUYqlangMsZDno/ZJSAADxV3dt81+kNpc7LAWUrkYQwShZ9uAuaEEMvs2w=="],
+    "@zgeoff/agent-hooks": ["@zgeoff/agent-hooks@0.2.4", "", { "bin": { "agent-hooks": "dist/cli.js" } }, "sha512-viHPG4t97QPtK6wFz1OgSR/lMhFYBhYwpo9aVBBmYB5aHNFx2TkS8b0RF1dTp2kf0P6gy3xTFjf26LDo+rAyUA=="],
 
     "@zgeoff/oxlint-config": ["@zgeoff/oxlint-config@0.8.4", "", { "dependencies": { "@stylistic/eslint-plugin": "5.10.0" }, "peerDependencies": { "oxlint": ">=1.78.0" } }, "sha512-VDBwQmdzkGNitlqCO4bcBqKMS2cKcKfqwmOWyxpEhATt8dAFu3ZHDBowEy5i8o4mrWx8l4JHlOopHwvYJt4nTw=="],
 
-    "@zgeoff/skill-gate": ["@zgeoff/skill-gate@0.2.19", "", { "dependencies": { "@zgeoff/agent-hooks": "0.2.3" } }, "sha512-r04itCLxsdvUx7thggMaFx34bRYfULmi3BsJ64EhymR88zs3D34yO6rJUIrVFFvLcomYOIr9Jny+j/xAqattfA=="],
+    "@zgeoff/skill-gate": ["@zgeoff/skill-gate@0.2.20", "", { "dependencies": { "@zgeoff/agent-hooks": "0.2.4" } }, "sha512-wOsHpN1HvwOrC7+gJYwNtf0BYBUfFKSBzMGS3CHLJsWAw4o9wFrGf66RmM0i6DIiw83uAiZWy4Uh4DA+IHAH3g=="],
 
     "@zgeoff/std": ["@zgeoff/std@0.4.2", "", {}, "sha512-GZnnOkrYHe6p071BWYe7XIq5klqhvVb4j/JWOrrUTSj76uLA/ZnzlqDKIq16LblMcuRF9tjfvKvGK8sLRN8fMg=="],
 
