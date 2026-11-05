@@ -27,7 +27,7 @@ Avoid these traps:
 - [Terms](#terms): the fleet's shared words, defined once for every role skill.
 - [What only the owner decides](#what-only-the-owner-decides): send each item on the list to the
   owner, even under a grant; decide anything else yourself, such as a Data Action that only adds
-  data, or a decision that keeps the current course.
+  data after a backup, or a decision that keeps a course the list doesn't name.
 - [Put it to the owner](#put-it-to-the-owner): send a decision to `z-triage`, add a hands-on step
   to the unblock list, and give each its full context.
 - [The owner's answers are records](#the-owners-answers-are-records): act only on a record in hq;
