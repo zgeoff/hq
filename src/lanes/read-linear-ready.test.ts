@@ -204,7 +204,7 @@ test('it drops a skip until a time once the time passes, and counts the issue in
   await readLinearReady(ctx.db, { call: makeSkipStateCall([{ identifier: 'GEO-9851', project: 'atc roadmap' }], {}), run: buildStubGitHubFactsRunner({}), actor: 'hq-lanes', rules });
 
   expect(readLaneSkips(ctx.db)).toStrictEqual([]);
-  expect(readySummary(ctx.db, 30)).toMatchObject({ total: 1, eligible: 1, skipped: [] });
+  expect(readySummary(ctx.db, 30)).toStrictEqual({ total: 1, eligible: 1, skipped: [], unexplained: 0, line: 'Ready: 1 total, 1 eligible across lanes, 0 skipped with reasons, 0 unexplained' });
   expect(ctx.db.query("SELECT actor, data FROM events WHERE action = 'skip-ended'").all()).toStrictEqual([
     { actor: 'hq-lanes', data: JSON.stringify({ issue: 'GEO-9851', until: '2026-10-15T20:30:00Z', reason: 'the kettle vendor answers tonight' }) },
   ]);
@@ -218,7 +218,7 @@ test('it drops a skip until an issue once Linear reads that issue Done', async (
   await readLinearReady(ctx.db, { call: makeSkipStateCall([{ identifier: 'GEO-9852', project: 'atc roadmap' }], { 'GEO-9859': 'completed' }), run: buildStubGitHubFactsRunner({}), actor: 'hq-lanes', rules });
 
   expect(readLaneSkips(ctx.db)).toStrictEqual([]);
-  expect(readySummary(ctx.db, 30)).toMatchObject({ total: 1, eligible: 1, skipped: [] });
+  expect(readySummary(ctx.db, 30)).toStrictEqual({ total: 1, eligible: 1, skipped: [], unexplained: 0, line: 'Ready: 1 total, 1 eligible across lanes, 0 skipped with reasons, 0 unexplained' });
 });
 
 test('it keeps a skip until an issue that Linear reads still open', async () => {
@@ -324,7 +324,13 @@ test('it leaves a Ready issue with an open blocker out of every lane and the sna
 
   await readLinearReady(ctx.db, { call, run: buildStubGitHubFactsRunner({}), actor: 'hq-lanes', rules });
 
-  expect(readySummary(ctx.db, 30)).toMatchObject({ total: 2, eligible: 1, unexplained: 0, skipped: [{ issue: 'GEO-9860', reason: 'blocked by GEO-9861, GEO-9862 (not Done)' }] });
+  expect(readySummary(ctx.db, 30)).toStrictEqual({
+    total: 2,
+    eligible: 1,
+    unexplained: 0,
+    skipped: [{ issue: 'GEO-9860', reason: 'blocked by GEO-9861, GEO-9862 (not Done)' }],
+    line: 'Ready: 2 total, 1 eligible across lanes, 1 skipped with reasons, 0 unexplained',
+  });
   expect(readReadySnapshot(ctx.db)?.eligible.map((issue) => issue.identifier)).toStrictEqual(['GEO-9864']);
 });
 
@@ -335,7 +341,7 @@ test('it keeps a Ready issue eligible when every blocker is Done', async () => {
 
   await readLinearReady(ctx.db, { call, run: buildStubGitHubFactsRunner({}), actor: 'hq-lanes', rules });
 
-  expect(readySummary(ctx.db, 30)).toMatchObject({ total: 1, eligible: 1, skipped: [] });
+  expect(readySummary(ctx.db, 30)).toStrictEqual({ total: 1, eligible: 1, skipped: [], unexplained: 0, line: 'Ready: 1 total, 1 eligible across lanes, 0 skipped with reasons, 0 unexplained' });
 });
 
 test('it skips a Ready issue with more relations than hq reads, and says to check by hand', async () => {
@@ -345,6 +351,34 @@ test('it skips a Ready issue with more relations than hq reads, and says to chec
 
   await readLinearReady(ctx.db, { call, run: buildStubGitHubFactsRunner({}), actor: 'hq-lanes', rules });
 
-  expect(readySummary(ctx.db, 30)).toMatchObject({ total: 1, eligible: 0, unexplained: 0, skipped: [{ issue: 'GEO-9867', reason: 'more relations than hq reads; check its blockers by hand' }] });
+  expect(readySummary(ctx.db, 30)).toStrictEqual({
+    total: 1,
+    eligible: 0,
+    unexplained: 0,
+    skipped: [{ issue: 'GEO-9867', reason: 'more relations than hq reads; check its blockers by hand' }],
+    line: 'Ready: 1 total, 0 eligible across lanes, 1 skipped with reasons, 0 unexplained',
+  });
   expect(readReadySnapshot(ctx.db)?.eligible).toStrictEqual([]);
+});
+
+test('it lists blocked skips before the lane skips, cuts the combined list at 100, and leaves nothing unexplained', async () => {
+  const ctx = setupTest();
+  const rules = validateLaneRules(rulesTable, Object.keys(rulesTable.lanes));
+  const blockers = [{ identifier: 'GEO-9900', stateType: 'started' }];
+  const blocked = Array.from({ length: 60 }, (_, index) => ({ identifier: `GEO-${9100 + index}`, project: 'atc roadmap', blockers }));
+  const laneSkipped = Array.from({ length: 60 }, (_, index) => ({ identifier: `GEO-${9200 + index}`, project: 'hq roadmap' }));
+  const call = makePagedCall(buildReadyPage([...laneSkipped, ...blocked, { identifier: 'GEO-9300', project: 'atc roadmap' }], null));
+
+  await readLinearReady(ctx.db, { call, run: buildStubGitHubFactsRunner({}), actor: 'hq-lanes', rules });
+
+  expect(readySummary(ctx.db, 30)).toStrictEqual({
+    total: 101,
+    eligible: 1,
+    unexplained: 0,
+    skipped: [
+      ...blocked.map((issue) => ({ issue: issue.identifier, reason: 'blocked by GEO-9900 (not Done)' })),
+      ...laneSkipped.slice(0, 40).map((issue) => ({ issue: issue.identifier, reason: 'hq: z-q builds hq' })),
+    ],
+    line: 'Ready: 101 total, 1 eligible across lanes, 100 skipped with reasons, 0 unexplained',
+  });
 });
