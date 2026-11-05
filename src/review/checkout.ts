@@ -5,7 +5,7 @@ import { HqError } from '../errors.ts';
 import type { Runner } from '../runner/types.ts';
 import { repoCache } from './repo-cache.ts';
 import { runCommand } from './run-command.ts';
-import { withPidLock } from './with-pid-lock.ts';
+import { withExclusiveLock } from './with-exclusive-lock.ts';
 
 export async function checkout(run: Runner, slug: string, repo: string, repoDir?: string): Promise<string> {
   if (repoDir) {
@@ -35,8 +35,8 @@ function projectsDir(): string {
 // clone into one folder, and no review gets the folder before its clone is complete.
 async function ensureCachedClone(run: Runner, slug: string, cached: string): Promise<void> {
   mkdirSync(dirname(cached), { recursive: true });
-  await withPidLock(
-    `${cached}.lock`,
+  await withExclusiveLock(
+    `${cached}.flock`,
     `a clone of ${slug}`,
     async () => {
       if (!existsSync(cached)) {

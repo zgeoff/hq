@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, expect, test } from 'bun:test';
+import { afterEach, beforeEach, expect, onTestFinished, test } from 'bun:test';
 import { toExactOptional } from '@zgeoff/std';
 import assert from 'node:assert';
 import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
@@ -15,6 +15,9 @@ import { review } from './review.ts';
 import { RISK_EFFORT } from './risk-effort.ts';
 import { riskTier } from './risk-tier.ts';
 import { withRepoLock } from './with-repo-lock.ts';
+import { createLockHolder } from '../../test/create-lock-holder.ts';
+import { waitFor } from '../../test/wait-for.ts';
+import { overrideEnv } from '../config/override-env.ts';
 import type { RunOpts, Runner } from '../runner/types.ts';
 
 let dir: string;
@@ -237,7 +240,7 @@ test('a real review that quotes the limit words in a diff or a finding still pas
   expect(calls.some((c) => c.cmd[0] === 'codex' && c.cmd[1] === 'exec')).toBe(true);
 });
 
-test('the repo lock lets one holder in at a time, and takes over a stale lock', async () => {
+test('#withRepoLock lets one holder in at a time', async () => {
   const order: string[] = [];
   const gate = Promise.withResolvers<void>();
   const hold = (tag: string) => withRepoLock(dir, 'zgeoff/widgets', async () => {
@@ -247,15 +250,30 @@ test('the repo lock lets one holder in at a time, and takes over a stale lock', 
   });
 
   const holders = [hold('a'), hold('b')];
+  await waitFor('the first holder to take the lock', () => order.length > 0);
   order.push('released');
   gate.resolve();
   await Promise.all(holders);
   expect(order).toEqual(['a in', 'released', 'a out', 'b in', 'b out']);
-  const { mkdirSync: mk, utimesSync } = await import('node:fs');
-  mk(`${dir}/.lock-zgeoff-widgets`);
-  const old = new Date(Date.now() - 11 * 60_000);
-  utimesSync(`${dir}/.lock-zgeoff-widgets`, old, old);
-  expect(await withRepoLock(dir, 'zgeoff/widgets', async () => 'got it')).toBe('got it');
+});
+
+test('#withRepoLock refuses, naming the holder\'s pid, while another process holds it', async () => {
+  onTestFinished(overrideEnv('HQ_REVIEW_LOCK_WAIT_MS', '0'));
+  const holder = await createLockHolder(`${dir}/.flock-zgeoff-widgets`);
+  onTestFinished(holder.kill);
+
+  expect(withRepoLock(dir, 'zgeoff/widgets', () => Promise.resolve('got it'))).rejects.toMatchObject({ code: 'locked', message: expect.stringContaining(`(pid ${holder.pid})`) });
+});
+
+test('#withRepoLock takes the lock at once after the process that held it was killed', async () => {
+  onTestFinished(overrideEnv('HQ_REVIEW_LOCK_WAIT_MS', '0'));
+  const holder = await createLockHolder(`${dir}/.flock-zgeoff-widgets`);
+  onTestFinished(holder.kill);
+  await holder.kill();
+
+  const result = await withRepoLock(dir, 'zgeoff/widgets', () => Promise.resolve('got it'));
+
+  expect(result).toBe('got it');
 });
 
 test('effort by risk: high for auth, secrets, money, migrations, deletion or infra permissions; medium otherwise', () => {
@@ -444,16 +462,15 @@ test('it refuses a second review of a PR while one runs, and leaves the first on
   const firstResult = await first;
   expect(worktreeCallsAfter).toBe(worktreeCalls);
   expect(firstResult.codexCode).toBe(0);
-  expect(existsSync(`${dir}/zgeoff/widgets/7.lock`)).toBe(false);
 });
 
-test('it takes over the lock of a review whose process is gone', async () => {
-  const gone = Bun.spawnSync(['true']).pid;
-  mkdirSync(`${dir}/zgeoff/widgets/7.lock`, { recursive: true });
-  await Bun.write(`${dir}/zgeoff/widgets/7.lock/pid`, String(gone));
+test('it runs a review at once after the process that held its lock was killed', async () => {
+  mkdirSync(`${dir}/zgeoff/widgets`, { recursive: true });
+  const holder = await createLockHolder(`${dir}/zgeoff/widgets/7.flock`);
+  onTestFinished(holder.kill);
+  await holder.kill();
 
   const result = await review(fake().run, 'widgets', 7, { watch: false });
 
   expect(result.codexCode).toBe(0);
-  expect(existsSync(`${dir}/zgeoff/widgets/7.lock`)).toBe(false);
 });

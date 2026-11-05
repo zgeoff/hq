@@ -8,7 +8,9 @@ import { overrideEnv } from '../config/override-env.ts';
 import { openDb } from '../db/open-db.ts';
 import { setMeta } from '../db/set-meta.ts';
 import { listRuns } from '../runs/list-runs.ts';
+import { withRepoLock } from '../review/with-repo-lock.ts';
 import { runReview } from './run-review.ts';
+import { withCloneLock } from './with-clone-lock.ts';
 
 const PINNED = '0123456789abcdef0123456789abcdef01234567';
 
@@ -257,9 +259,8 @@ test('it runs a noslop review while a pin holds the clone lock', async () => {
   const ctx = setupTest();
   const fake = buildFakeRunner();
   ctx.listWidgets();
-  mkdirSync(join(ctx.base, '.lock-zgeoff-noslop-clone'));
 
-  await expect(runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false })).resolves.toMatchObject({ engine: 'noslop', sha: PINNED });
+  await expect(withCloneLock(() => runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false }))).resolves.toMatchObject({ engine: 'noslop', sha: PINNED });
 
   expect(fake.of('bun')[0]?.cmd[2]).toBe(`${ctx.base}/repos/zgeoff/noslop-${PINNED}/apps/cli/src/cli.ts`);
 });
@@ -333,9 +334,8 @@ test('it takes the PR\'s lock for the review, and runs nothing while another rev
   const fake = buildFakeRunner();
   ctx.listWidgets();
   onTestFinished(overrideEnv('HQ_REVIEW_LOCK_WAIT_MS', '0'));
-  mkdirSync(join(ctx.base, '.lock-zgeoff-widgets-pr7'));
 
-  await expect(runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false })).rejects.toMatchObject({ code: 'locked' });
+  await expect(withRepoLock(ctx.base, 'zgeoff/widgets-pr7', () => runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false }))).rejects.toMatchObject({ code: 'locked' });
 
   expect(fake.calls).toStrictEqual([]);
 });

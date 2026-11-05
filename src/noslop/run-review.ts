@@ -100,11 +100,9 @@ function requireCodexFlags(request: ReviewRequest, parsed: ParsedRepo): void {
   }
 }
 
-const ROUND_LOCK_GRACE_MS = 300_000;
-
 // The cap check and the review run under one lock per PR, so two hq review calls on one PR cannot
 // both pass the cap: the second waits until the first has recorded its round. It is not the repo
-// lock that the git steps take inside, and it outlives this round's noslop run.
+// lock that the git steps take inside.
 async function runNoslopReviewWithCI(request: ReviewRequest, parsed: ParsedRepo, sha: string, timeoutMs: number): Promise<NoslopReviewOutcome> {
   const folder = createScratchDir();
   const ran = await withRepoLock(
@@ -114,7 +112,6 @@ async function runNoslopReviewWithCI(request: ReviewRequest, parsed: ParsedRepo,
       const plan = await planBaseMove(planRound(request, parsed, timeoutMs), parsed, folder);
       return await runPlannedRound(plan, parsed, sha, folder);
     },
-    timeoutMs + ROUND_LOCK_GRACE_MS,
   );
   const state = await readCIState(request.run, buildSlug(parsed), request.pr, request.watch);
   return { ...ran.result, fixChecks: buildTitledFixChecks(ran.result.fixChecks, loadFindingTitles(request, parsed)), fixesOnly: ran.plan.fixesOnly, emergencyCap: ran.plan.emergencyCap, capNote: formatCapNote(ran.plan.emergencyCap, parsed), baseMove: ran.plan.baseMove?.reviewed ?? null, checks: state.checks, checksError: state.checksError, openThreads: state.openThreads, round: ran.plan.round };

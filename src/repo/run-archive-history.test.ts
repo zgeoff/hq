@@ -3,8 +3,10 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { chmodSync, existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { createHistoryRows, createLookalikeRows, createStoreRows, createStoreTables } from '../../test/create-history-databases.ts';
+import { createLockHolder } from '../../test/create-lock-holder.ts';
 import { freshDb } from '../../test/helpers.ts';
 import { createStoreBackup } from '../noslop/create-store-backup.ts';
+import { withExclusiveLock } from '../review/with-exclusive-lock.ts';
 import type { RunResult } from '../runner/types.ts';
 import { REKEY_SPECS } from './rekey-specs.ts';
 import type { ArchiveInput } from './run-archive-history.ts';
@@ -365,6 +367,18 @@ test("it moves the review files in the repo's folder, and leaves other repos' fo
 
   expect(result.reviewFiles).toStrictEqual([{ from: `${ctx.dir}/reviews/zgeoff/hq/12-review.md`, to: `${ctx.dir}/reviews/zgeoff/hq-archive/12-review.md`, collides: false }]);
   expect(readdirSync(`${ctx.dir}/reviews`, { recursive: true }).map(String).toSorted()).toStrictEqual(['zgeoff', 'zgeoff/hq-archive', 'zgeoff/hq-archive/12-review.md', 'zgeoff/hq-private', 'zgeoff/hq-private/12-review.md']);
+});
+
+test('it leaves the lock file of a running review in place, so a second review of the PR stays locked out', async () => {
+  const ctx = setupTest();
+  ctx.createHistoryRows('hq', 0);
+  mkdirSync(`${ctx.dir}/reviews/zgeoff/hq`, { recursive: true });
+  writeFileSync(`${ctx.dir}/reviews/zgeoff/hq/12-review.md`, 'kettle review');
+  const holder = await createLockHolder(`${ctx.dir}/reviews/zgeoff/hq/12.flock`);
+  onTestFinished(holder.kill);
+  await ctx.archive('hq', 'hq-archive');
+
+  expect(withExclusiveLock(`${ctx.dir}/reviews/zgeoff/hq/12.flock`, 'a review of zgeoff/hq#12', () => Promise.resolve('ran'))).rejects.toMatchObject({ code: 'locked' });
 });
 
 test('it leaves a flat review file from before review folders where it is', async () => {

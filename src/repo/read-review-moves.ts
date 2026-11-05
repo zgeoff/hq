@@ -9,8 +9,11 @@ export function readReviewMoves(reviewDir: string, names: RepoNames): ReviewMove
   if (!existsSync(fromDir) || !statSync(fromDir).isDirectory()) {
     return [];
   }
+
+  // A review holds its flock on the file at its path, so moving a held lock file would let the next
+  // review lock a new file at the old path while the first still runs.
   return readdirSync(fromDir, { recursive: true, withFileTypes: true })
-    .filter((entry) => !entry.isDirectory())
+    .filter((entry) => !entry.isDirectory() && !entry.name.endsWith('.flock'))
     .map((entry) => join(entry.parentPath, entry.name))
     .toSorted()
     .map((file) => readMove(reviewDir, file, join(toDir, relative(fromDir, file))));
