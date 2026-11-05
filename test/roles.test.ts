@@ -16,6 +16,7 @@ import { withStaleBuild } from '../src/roles/with-stale-build.ts';
 import { forwardOf } from '../src/outbox/forward-of.ts';
 import { setForward } from '../src/outbox/set-forward.ts';
 import { z } from 'zod';
+import { updateEnv } from '@zgeoff/testing/helpers';
 import { createStubSystemctl } from './create-stub-systemctl.ts';
 import { NOON_SYDNEY, at, freshDb } from './helpers.ts';
 
@@ -305,7 +306,6 @@ describe('hq fleet --json and forwards', () => {
 let cleanup: () => void;
 let db: ReturnType<typeof freshDb>['db'];
 let out: string[];
-let restorePath: () => void;
 const origLog = console.log;
 const saved = { notify: process.env['HQ_NOTIFY'], as: process.env['HQ_AS'] };
 beforeEach(() => {
@@ -313,7 +313,7 @@ beforeEach(() => {
   ({ cleanup, db, dir: directory } = freshDb());
 
   // hq fleet reads its timer through systemctl, which a host without systemd lacks.
-  restorePath = overrideEnv('PATH', `${createStubSystemctl({ directory, show: {} }).bin}:${process.env['PATH'] ?? ''}`);
+  updateEnv('PATH', `${createStubSystemctl({ directory, show: {} }).bin}:${process.env['PATH'] ?? ''}`);
   at(NOON_SYDNEY);
   process.env['HQ_NOTIFY'] = 'off';
   process.env['HQ_AS'] = roleName('owner');
@@ -322,7 +322,6 @@ beforeEach(() => {
 });
 afterEach(() => {
   console.log = origLog;
-  restorePath();
   for (const [k, v] of [['HQ_NOTIFY', saved.notify], ['HQ_AS', saved.as]] as const) {
     if (v === undefined) delete process.env[k];
     else process.env[k] = v;

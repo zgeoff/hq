@@ -1,6 +1,9 @@
 import { afterEach } from 'bun:test';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { removeEnvOverrides } from '@zgeoff/testing/helpers';
+
+afterEach(removeEnvOverrides);
 
 process.env['HQ_LOCAL_CONFIG'] = join(tmpdir(), 'hq-tests-no-local-config', 'local.json');
 
