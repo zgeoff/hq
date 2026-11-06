@@ -19,6 +19,7 @@ const WrappedData = z.object({ session: z.string() });
 
 export interface PartSessionWrapOptions {
   actor: string;
+  log: (line: string) => void;
 }
 
 export interface AtcSnapshot {
@@ -28,6 +29,7 @@ export interface AtcSnapshot {
 
 // A part's helper session holds an imp slot once its PRs merge, while its run is still going. The
 // wrap-up keeps whatever it keeps for any session, such as unpushed work, and the next sweep retries.
+// A retry that changes nothing writes no note, so each failure goes to the sweep log instead.
 export async function wrapUpPartSessions(
   db: Database,
   deps: WrapUpDeps,
@@ -58,6 +60,9 @@ export async function wrapUpPartSessions(
     }
     const full = atc.sessions.find((info) => info.id.toLowerCase().startsWith(wrap.session_id.toLowerCase()))?.id ?? wrap.session_id;
     const wrapUp = await wrapUpRunSafely(db, deps, wrap.issue, { actor: options.actor, onlySessions: [full], onlyNoteAction: true });
+    for (const failure of wrapUp.failed) {
+      options.log(`part-session wrap-up of ${wrap.session_id} on ${wrap.issue} failed: ${failure.id}: ${failure.reason}`);
+    }
     match(pickPartWrapOutcome(wrap.session_id, wrapUp))
       .with({ kind: 'done' }, () => done.push(wrap.session_id))
       .with({ kind: 'retry' }, () => removePartClaim(db, claim))

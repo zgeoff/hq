@@ -20,12 +20,15 @@ async function setupTest() {
   onTestFinished(server.stop);
   const client = await AtcClient.open();
   onTestFinished(() => client.close());
+  const killFailures: string[] = [];
   const fleet = buildStubFleetClient({
     sessions: [
       { id: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'widgets-part', alive: true, state: 'done' },
       { id: '0000e002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'gadgets-part', alive: true, state: 'done' },
     ],
+    killFailures,
   });
+  const logged: string[] = [];
   roster.push({ id: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'widgets-part', alive: true, state: 'done' }, { id: '0000e002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'gadgets-part', alive: true, state: 'done' });
   server.activity.set('0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', Date.parse('2026-11-07T01:00:00Z'));
   server.activity.set('0000e002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', Date.parse('2026-11-07T01:00:00Z'));
@@ -36,9 +39,11 @@ async function setupTest() {
       sweepNow(fresh.db, client, buildStubGitHubFactsRunner({ views: {} }), {
         actor: 'sweep',
         wrapUpDeps: { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')), readLocalWork: () => Promise.resolve({ state: 'pushed' as const }) },
-        log: () => {},
+        log: (line) => logged.push(line),
       }),
     fleet,
+    killFailures,
+    logged,
   };
 }
 
@@ -82,4 +87,18 @@ test('it wraps a part session up once when two sweeps overlap', async () => {
 
   expect(ctx.fleet.calls).toStrictEqual(['unpin 0000e001', 'kill 0000e001', 'unpin 0000e001', 'forget 0000e001']);
   expect(readEvents(ctx.db, 'run', 'GEO-501', ['part-wrap-up'])).toHaveLength(1);
+});
+
+test('it logs a failed part wrap-up and releases the claim for the next sweep', async () => {
+  const ctx = await setupTest();
+  addRun(ctx.db, { issue: 'GEO-501', title: 'Invented widgets', place: 'local', session: null, next: 'Parts working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
+  setSession(ctx.db, 'GEO-501', '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'z-delivery', 'add');
+  addOwnedPr(ctx.db, 'GEO-501', 'widgets#1', { actor: 'z-delivery', session: '0000e001' });
+  closePr(ctx.db, 'widgets#1', { to: 'merged', actor: 'z-delivery' });
+  ctx.killFailures.push('0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+
+  await ctx.sweep();
+
+  expect(ctx.logged).toStrictEqual(['part-session wrap-up of 0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa on GEO-501 failed: 0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa: atc did not answer session.kill']);
+  expect(readEvents(ctx.db, 'run', 'GEO-501', ['part-wrap-up'])).toStrictEqual([]);
 });
