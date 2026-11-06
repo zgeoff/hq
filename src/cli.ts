@@ -840,7 +840,7 @@ async function watchRuns(db: Database, me: string): Promise<void> {
     if (ing.notes > 0 || ing.routed > 0 || ing.reset || ing.bootstrapped) {
       console.log(`${iso(now())} notes: ${ing.notes} recorded${ing.routed ? `, ${ing.routed} routed to ${orchestratorName()}` : ''}${ing.finals.length > 0 ? `, final: ${ing.finals.join(', ')}` : ''}${ing.reset ? ', feed cursor reset' : ''}${ing.bootstrapped ? ', feed cursor started at the end' : ''}`);
     }
-    const sw = await sweepNow(db, c, boundedRunner(realRunner, CALL_MS), { actor: me, wrapUpDeps: wrapUpDeps.deps, log: (line) => console.error(line), readIssueDescription: makeIssueDescriptionReader(db, realRunner) });
+    const sw = await sweepNow(db, c, boundedRunner(realRunner, CALL_MS), { actor: me, wrapUpDeps: wrapUpDeps.deps, log: (line) => console.error(line), readIssueDescription: makeIssueDescriptionReader(makeAuditedLinearCaller(db, realRunner)) });
     if (sw.sent.length) console.log(`${iso(now())} sweep: told ${orchestratorName()} about ${sw.sent.map((a) => a.key).join(', ')}`);
   } finally {
     wrapUpDeps.close();
@@ -2341,7 +2341,7 @@ Round ${p.review_round} recorded at ${p.reviewed_sha}.` };
       try {
         const ing = await ingestNotes(db, c, { run: boundedRunner(realRunner, CALL_MS) });
         const sweeper = await by();
-        const sw = await sweepNow(db, c, boundedRunner(realRunner, CALL_MS), { actor: sweeper, wrapUpDeps: wrapUpDeps.deps, log: (line) => console.error(line), readIssueDescription: makeIssueDescriptionReader(db, realRunner) });
+        const sw = await sweepNow(db, c, boundedRunner(realRunner, CALL_MS), { actor: sweeper, wrapUpDeps: wrapUpDeps.deps, log: (line) => console.error(line), readIssueDescription: makeIssueDescriptionReader(makeAuditedLinearCaller(db, realRunner)) });
         return {
           data: { ingest: ing, alerts: sw.alerts, sent: sw.sent },
           text: [`notes recorded: ${ing.notes}`, sw.alerts.length ? sw.alerts.map((a) => `- ${a.line}`).join('\n') : 'Nothing to flag.', sw.sent.length ? `(told ${orchestratorName()} about ${sw.sent.length})` : ''].filter(Boolean).join('\n'),
