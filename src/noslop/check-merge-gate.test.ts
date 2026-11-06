@@ -199,7 +199,7 @@ test('it clears open findings under an override the owner gave at an older head'
   createListedReview(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA });
   recordPROverride(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA, source: 'call:KET-2', note: 'Ship the kettle.', actor: 'z-kettle' });
 
-  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).resolves.toMatchObject({ mayMerge: true });
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).resolves.toStrictEqual({ mayMerge: true, reason: "The owner's override at 0123456 (call:KET-2) stands for 1 open finding: aaaaaaaaaaaaaaaa; CI green at f00dfee", reviewed: true });
 });
 
 test('it refuses an override whose source is a session', async () => {
@@ -558,7 +558,7 @@ test('it passes a PR that changes owner-held files on an lgtm the owner gave at 
   const fake = buildFakeRunner({ prBody: FAKE_PROOF_BODY, prFiles: { code: 0, stdout: 'skills/kettle/SKILL.md\n', stderr: '' } });
   recordPRAnswer(ctx.db, { repo: 'hq', pr: 7, answer: 'lgtm', head: 'f00dfeedf00dfeedf00dfeedf00dfeedf00dfeed', source: 'console:kettle-2', note: null, actor: 'z-kettle' });
 
-  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'hq', pr: 7 })).resolves.toMatchObject({ mayMerge: true });
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'hq', pr: 7 })).resolves.toStrictEqual({ mayMerge: true, reason: 'not a noslop repo: CI green at 0123456', reviewed: false });
 });
 
 test('it refuses an lgtm that a later changes answer at a newer head took back', async () => {
@@ -640,7 +640,7 @@ test('it passes a PR in hq-private on an lgtm the owner gave at an older head', 
   const fake = buildFakeRunner({ prBody: FAKE_PROOF_BODY, prFiles: { code: 0, stdout: 'skills/kettle/references/session-prompt.md\n', stderr: '' } });
   recordPRAnswer(ctx.db, { repo: 'hq-private', pr: 7, answer: 'lgtm', head: 'f00dfeedf00dfeedf00dfeedf00dfeedf00dfeed', source: 'call:kettle-3', note: null, actor: 'z-kettle' });
 
-  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'hq-private', pr: 7 })).resolves.toMatchObject({ mayMerge: true });
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'hq-private', pr: 7 })).resolves.toStrictEqual({ mayMerge: true, reason: 'not a noslop repo: CI green at 0123456', reviewed: false });
 });
 
 test("it passes a PR in hq-private that changes a start prompt once the owner's call lgtm is at its head", async () => {
