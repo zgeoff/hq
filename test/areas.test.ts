@@ -221,6 +221,7 @@ test('a blocked run with no session awake is parked, whatever it waits on: its s
   setState(db, 'GEO-2', 'blocked', { waitsOn: 'a release' }, 'z-delivery');
   expect(parkedRuns(db)).toStrictEqual([]);
   expect(runningByLane(db)).toEqual({ atc: 3 });
+  atMin(1);
   const asleep = { id: '0000000a-aaaa-4aaa-8aaa-aaaaaaaaaaaa', alive: true, lifecycle: { vm: 'asleep' } };
   recordAwake(db, [asleep, { id: '0000000b-aaaa-4aaa-8aaa-aaaaaaaaaaaa', alive: false }, { id: '0000000c-aaaa-4aaa-8aaa-aaaaaaaaaaaa', alive: true }]);
   expect(parkedRuns(db)).toEqual([
@@ -228,17 +229,18 @@ test('a blocked run with no session awake is parked, whatever it waits on: its s
     { issue: 'GEO-2', lane: 'atc' },
   ]);
   expect(runningByLane(db)).toEqual({ atc: 1 });
-  recordAwake(db, [{ ...asleep, lifecycle: {} }]);
+  recordAwake(db, [{ ...asleep, lifecycle: {} }, { id: '0000000c-aaaa-4aaa-8aaa-aaaaaaaaaaaa', alive: true }]);
   expect(runningByLane(db)).toEqual({ atc: 2 });
-  recordAwake(db, [{ id: '0000000a-aaaa-4aaa-8aaa-aaaaaaaaaaaa', alive: true, lifecycle: { harness: 'suspended' } }]);
+  recordAwake(db, [{ id: '0000000a-aaaa-4aaa-8aaa-aaaaaaaaaaaa', alive: true, lifecycle: { harness: 'suspended' } }, { id: '0000000c-aaaa-4aaa-8aaa-aaaaaaaaaaaa', alive: true }]);
   expect(runningByLane(db)).toEqual({ atc: 1 });
-  atMin(16);
-  expect(runningByLane(db)).toEqual({ atc: 3 });
 
   recordAwake(db, [asleep, { id: '0000000c-aaaa-4aaa-8aaa-aaaaaaaaaaaa', alive: true }]);
 
   setState(db, 'GEO-1', 'working', {}, 'z-delivery');
-  expect(parkedRuns(db)).toEqual([{ issue: 'GEO-2', lane: 'atc' }]);
+  expect(parkedRuns(db)).toEqual([
+    { issue: 'GEO-1', lane: 'atc' },
+    { issue: 'GEO-2', lane: 'atc' },
+  ]);
   setState(db, 'GEO-1', 'blocked', { waitsOnGeoff: true }, 'z-delivery');
   expect(runningByLane(db)).toEqual({ atc: 1 });
   atMin(-1);
@@ -301,7 +303,7 @@ test('the Ready detail is stored with the report, shown while fresh, and flags w
   expect(skippedLines({ ...s, skipped: parseSkipped(Array.from({ length: 12 }, (_, i) => `GEO-${i + 1}=r`).join(';')) })).toHaveLength(11);
 });
 
-test('a working run whose sessions atc no longer lists holds no slot, after one sweep of grace; asleep still holds one', () => {
+test('a working run whose session is asleep or no longer listed holds no slot, bar the grace of a session atc has not yet seen', () => {
   const withSession = (issue: string, session: string) =>
     addRun(db, { issue, title: 'Invented kettle work', place: 'local', session, next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
   withSession('GEO-7', '0000000e-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
@@ -309,10 +311,16 @@ test('a working run whose sessions atc no longer lists holds no slot, after one 
   recordAwake(db, [{ id: '0000000f-aaaa-4aaa-8aaa-aaaaaaaaaaaa', alive: true, lifecycle: { vm: 'asleep' } }]);
 
   // GEO-7's session is new: atc may not list it yet
-  expect(runningByLane(db)).toEqual({ flexible: 2 });
+  expect(runningByLane(db)).toEqual({ flexible: 1 });
   atMin(6);
   recordAwake(db, [{ id: '0000000f-aaaa-4aaa-8aaa-aaaaaaaaaaaa', alive: true, lifecycle: { vm: 'asleep' } }]);
-  expect([parkedRuns(db), runningByLane(db)]).toEqual([[{ issue: 'GEO-7', lane: 'flexible' }], { flexible: 1 }]);
+  expect([parkedRuns(db), runningByLane(db)]).toEqual([
+    [
+      { issue: 'GEO-7', lane: 'flexible' },
+      { issue: 'GEO-8', lane: 'flexible' },
+    ],
+    { flexible: 0 },
+  ]);
 
   atMin(22);
   expect(runningByLane(db)).toEqual({ flexible: 2 });
@@ -339,7 +347,7 @@ test('a slot a gone session frees on imp stays held while impd is at its line', 
   expect([runningByLane(db), readSlotPlan(db, reading)?.pool]).toMatchObject([{ cloud: 0 }, { impRunning: 0, impFree: 0, held: 'impd at line' }]);
 });
 
-test('an awake session idle 15 min parks its blocked-on-the-owner run; a turn or a state change counts it again', () => {
+test('an awake session idle 15 min parks its run, blocked or working; a turn counts it again', () => {
   const id = '0000000d-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
   addRun(db, { actor: 'z-delivery', gate: null, geoffChat: false, issue: 'GEO-4', lane: 'cloud', next: 'Agent working.', place: 'imp', session: id, title: 'Invented teapot work' });
   setState(db, 'GEO-4', 'blocked', { waitsOnGeoff: true }, 'z-delivery');
@@ -362,7 +370,7 @@ test('an awake session idle 15 min parks its blocked-on-the-owner run; a turn or
   recordAwake(db, [{ alive: true, id, state: 'needs_you' }]);
   expect(parkedRuns(db)).toEqual([{ issue: 'GEO-4', lane: 'cloud' }]);
   setState(db, 'GEO-4', 'working', {}, 'z-delivery');
-  expect(parkedRuns(db)).toEqual([]);
+  expect(parkedRuns(db)).toEqual([{ issue: 'GEO-4', lane: 'cloud' }]);
 });
 
 test('an awake session with no atc state still holds its slot, as before', () => {
