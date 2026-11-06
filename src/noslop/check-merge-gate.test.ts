@@ -230,9 +230,8 @@ test("it passes a head whose summary is at the head when noslop's finished check
 test('it passes a capped PR at a merged-main head whose noslop check failed with no open findings and green CI', async () => {
   const ctx = setupTest();
   const fake = buildFakeRunner({ noslopFindings: buildStubFindings('fixed'), noslopChecks: { code: 0, stdout: `${JSON.stringify({ id: 9001, name: 'noslop', app: 'noslop-review', status: 'completed', conclusion: 'failure', title: 'No noslop review of this change to AGENTS.md: the patch changed since the review of f00dfee.', completedAt: '2026-10-14T01:00:05Z' })}\n`, stderr: '' } });
+  createListedReview(ctx.db, { repo: 'widgets', pr: 7, head: 'f00dfeedf00dfeedf00dfeedf00dfeedf00dfeed' });
   setMeta(ctx.db, 'noslop', JSON.stringify({ repos: ['widgets'], sha: '0123456789abcdef0123456789abcdef01234567', caps: { widgets: 1 } }));
-  ctx.db.query("INSERT INTO noslop_rounds (repo, pr, kind, started_at, ended_at, ms, ok, head, depth, special, findings, sha, confirm) VALUES ('widgets', 7, 'review', 'a', 'b', 1, 1, 'f00dfeedf00dfeedf00dfeedf00dfeedf00dfeed', 'standard', 'none', '[]', 'x', 0)").run();
-  createListedReview(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA });
 
   await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).resolves.toStrictEqual({ mayMerge: true, reason: 'noslop findings: none open; CI green at 0123456', reviewed: true });
 });
