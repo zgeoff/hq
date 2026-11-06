@@ -4,6 +4,7 @@ import { buildStubFleetClient } from '../../test/build-stub-fleet-client.ts';
 import { buildStubGitHubFactsRunner } from '../../test/build-stub-github-facts-runner.ts';
 import { AtcClient } from '../atc/atc-client.ts';
 import type { FleetSession } from '../fleet/types.ts';
+import { logEvent } from '../log-event.ts';
 import { readEvents } from '../read-events.ts';
 import { fakeAtc, freshDb } from '../../test/helpers.ts';
 import { addOwnedPr } from './add-owned-pr.ts';
@@ -115,6 +116,39 @@ test('it keeps a helper session with unpushed work on one sweep and forgets it o
 
   expect(ctx.fleet.calls).toStrictEqual(['unpin 0000e001', 'kill 0000e001', 'unpin 0000e001', 'forget 0000e001']);
   expect(readEvents(ctx.db, 'run', 'GEO-501', ['part-wrap-up'])).toHaveLength(1);
+});
+
+test('it retries a part session whose claim an earlier sweep left without finishing', async () => {
+  const ctx = await setupTest();
+  updateEnv('HQ_NOW', '2026-11-07T02:00:00Z');
+  ctx.seed.atcSession({ id: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'widgets-part', alive: true, state: 'done' }, '2026-11-07T01:00:00Z');
+  addRun(ctx.db, { issue: 'GEO-501', title: 'Invented widgets', place: 'local', session: null, next: 'Parts working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
+  setSession(ctx.db, 'GEO-501', '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'z-delivery', 'add');
+  addOwnedPr(ctx.db, 'GEO-501', 'widgets#1', { actor: 'z-delivery', session: '0000e001' });
+  closePr(ctx.db, 'widgets#1', { to: 'merged', actor: 'z-delivery' });
+  logEvent(ctx.db, 'run', 'GEO-501', 'part-wrap-up', 'sweep', null, null, { session: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa' });
+  updateEnv('HQ_NOW', '2026-11-07T03:00:00Z');
+
+  await ctx.sweep();
+
+  expect(ctx.fleet.calls).toStrictEqual(['unpin 0000e001', 'kill 0000e001', 'unpin 0000e001', 'forget 0000e001']);
+  expect(readEvents(ctx.db, 'run', 'GEO-501', ['part-wrap-up-done']).map((event) => JSON.parse(event.data))).toStrictEqual([{ session: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }]);
+});
+
+test('it leaves a part session alone while a recent claim on it is unfinished', async () => {
+  const ctx = await setupTest();
+  updateEnv('HQ_NOW', '2026-11-07T02:55:00Z');
+  ctx.seed.atcSession({ id: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'widgets-part', alive: true, state: 'done' }, '2026-11-07T01:00:00Z');
+  addRun(ctx.db, { issue: 'GEO-501', title: 'Invented widgets', place: 'local', session: null, next: 'Parts working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
+  setSession(ctx.db, 'GEO-501', '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'z-delivery', 'add');
+  addOwnedPr(ctx.db, 'GEO-501', 'widgets#1', { actor: 'z-delivery', session: '0000e001' });
+  closePr(ctx.db, 'widgets#1', { to: 'merged', actor: 'z-delivery' });
+  logEvent(ctx.db, 'run', 'GEO-501', 'part-wrap-up', 'sweep', null, null, { session: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa' });
+  updateEnv('HQ_NOW', '2026-11-07T03:00:00Z');
+
+  await ctx.sweep();
+
+  expect(ctx.fleet.calls).toStrictEqual([]);
 });
 
 test('it keeps a helper session whose sub-session is pinned', async () => {

@@ -6,6 +6,8 @@ import { logEvent } from '../log-event.ts';
 import { readEvents } from '../read-events.ts';
 import { collectGuardedSessions } from './collect-guarded-sessions.ts';
 import { collectPartSessionWraps } from './collect-part-session-wraps.ts';
+import { collectWrappedPartSessions } from './collect-wrapped-part-sessions.ts';
+import type { PartWrapEvent } from './collect-wrapped-part-sessions.ts';
 import type { PartSessionActivity, PartSessionWrap } from './collect-part-session-wraps.ts';
 import { pickPartWrapOutcome } from './pick-part-wrap-outcome.ts';
 import type { WrapUpDeps } from './run-wrap-up.ts';
@@ -13,8 +15,11 @@ import { wrapUpRunSafely } from './wrap-up-merged-runs.ts';
 
 const SessionRows = z.array(z.object({ issue: z.string(), session_id: z.string(), helper: z.number(), active: z.number(), design_pass: z.number(), runState: z.string() }));
 const PrRows = z.array(z.object({ issue: z.string(), state: z.string(), session_id: z.string().nullable() }));
-const WrappedRows = z.array(z.object({ data: z.string() }));
-const WrappedData = z.object({ session: z.string() });
+const WrapEventRows = z.array(z.object({ action: z.string(), at: z.string(), data: z.string() }));
+
+// Sweeps run every 5 minutes by default, and a wrap-up ends within one; a claim that outlives six
+// sweeps with no done event belongs to a sweep that died.
+const PART_CLAIM_ABANDONED_MS = 30 * 60_000;
 
 export interface PartSessionWrapOptions {
   actor: string;
@@ -46,7 +51,8 @@ export async function wrapUpPartSessions(
       .all(),
   );
   const prs = PrRows.parse(db.query('SELECT issue, state, session_id FROM run_prs').all());
-  const wrapped = new Set(WrappedRows.parse(db.query("SELECT data FROM events WHERE subject = 'run' AND action = 'part-wrap-up'").all()).map((row) => WrappedData.parse(JSON.parse(row.data)).session));
+  const events = WrapEventRows.parse(db.query("SELECT action, at, data FROM events WHERE subject = 'run' AND action IN ('part-wrap-up', 'part-wrap-up-done')").all());
+  const wrapped = collectWrappedPartSessions(events.map((row) => toPartWrapEvent(row)), options.nowMs, PART_CLAIM_ABANDONED_MS);
   const activity = new Map<string, PartSessionActivity>();
   for (const session of sessions) {
     const listed = atc.sessions.find((info) => info.id.toLowerCase().startsWith(session.session_id.toLowerCase()));
@@ -55,7 +61,7 @@ export async function wrapUpPartSessions(
   const due = collectPartSessionWraps({ sessions, prs, activity, wrapped, nowMs: options.nowMs, quietMs: options.quietMs });
   const done: string[] = [];
   for (const wrap of due) {
-    const claim = writePartClaim(db, wrap, options.actor);
+    const claim = writePartClaim(db, wrap, options);
     if (claim === null) {
       continue;
     }
@@ -71,22 +77,38 @@ export async function wrapUpPartSessions(
       options.log(`part-session wrap-up of ${wrap.session_id} on ${wrap.issue} failed: ${failure.id}: ${failure.reason}`);
     }
     match(pickPartWrapOutcome(wrap.session_id, wrapUp))
-      .with({ kind: 'done' }, () => done.push(wrap.session_id))
+      .with({ kind: 'done' }, () => {
+        writePartDone(db, wrap, options.actor);
+        done.push(wrap.session_id);
+      })
       .with({ kind: 'retry' }, () => removePartClaim(db, claim))
       .exhaustive();
   }
   return done;
 }
 
+const WrappedData = z.object({ session: z.string() });
+
+type WrapEventRow = z.infer<typeof WrapEventRows>[number];
+
+function toPartWrapEvent(row: WrapEventRow): PartWrapEvent {
+  return { action: row.action, atMs: Date.parse(row.at), session: WrappedData.parse(JSON.parse(row.data)).session };
+}
+
 // A sweep that overlaps this one may have claimed the session since this pass listed it, and its
 // wrap-up is still running. The check and the claim are one step.
-function writePartClaim(db: Database, wrap: PartSessionWrap, actor: string): number | null {
+function writePartClaim(db: Database, wrap: PartSessionWrap, options: PartSessionWrapOptions): number | null {
   return db
     .transaction(() => {
-      const claimed = readEvents(db, 'run', wrap.issue, ['part-wrap-up']).some((event) => WrappedData.parse(JSON.parse(event.data)).session === wrap.session_id);
-      return claimed ? null : logEvent(db, 'run', wrap.issue, 'part-wrap-up', actor, null, null, { session: wrap.session_id });
+      const events = readEvents(db, 'run', wrap.issue, ['part-wrap-up', 'part-wrap-up-done']).map((event) => toPartWrapEvent(event));
+      const claimed = collectWrappedPartSessions(events, options.nowMs, PART_CLAIM_ABANDONED_MS).has(wrap.session_id);
+      return claimed ? null : logEvent(db, 'run', wrap.issue, 'part-wrap-up', options.actor, null, null, { session: wrap.session_id });
     })
     .immediate();
+}
+
+function writePartDone(db: Database, wrap: PartSessionWrap, actor: string): void {
+  logEvent(db, 'run', wrap.issue, 'part-wrap-up-done', actor, null, null, { session: wrap.session_id });
 }
 
 // A session that wrap-up kept is retried on the next sweep.
