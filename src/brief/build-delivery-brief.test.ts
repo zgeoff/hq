@@ -220,14 +220,14 @@ test('it refuses a prompt still over 4000 bytes after every cut, with its byte c
       issue: { identifier: 'GEO-9001', description: '', labels: [{ name: 'kettle' }] },
       sha: 'b'.repeat(40),
       reads: { label: 'kettle', repo: 'kettle', otherAreas: [], playbook: null, stack: false, imp: false, reviewLines: false },
-      template: `/goal Ship\n${'k'.repeat(4001)}`,
+      template: `/goal Ship\n${'k'.repeat(3990)}`,
       permissionTable: [{ action: 'Code delivery', phrase: 'Work in <repo>.' }],
       playbookText: null,
       stack: '',
       impLine: '',
       movedGoalFile: 'briefs/GEO-9001.md',
       }),
-  ).toThrow(expect.objectContaining({ code: 'too_long', message: 'the brief is 4001 bytes after every cut, over the 4000 limit', data: { bytes: 4001, cuts: ['cut 2'] } }));
+  ).toThrow(expect.objectContaining({ code: 'too_long', message: 'the brief is 4001 bytes after every cut, over the 4000 limit', data: { bytes: 4001, cuts: [] } }));
 });
 
 test.each([
@@ -428,6 +428,6 @@ test('it keeps the not-yours rule without the area names when only cut 3 brings 
     movedGoalFile: 'briefs/GEO-9001.md',
   });
 
-  expect(brief.out.data['cuts']).toStrictEqual(['cut 2', 'cut 3']);
-  expect(brief.out.text).toBe(`First read GEO-9001 with your own Linear access.\n${'k'.repeat(3800)} Do only the \`kettle\` part of GEO-9001: each other area gets its own launch.\n"Contributes to GEO-9001"`);
+  expect(brief.out.data['cuts']).toStrictEqual(['cut 3']);
+  expect(brief.out.text).toBe(`/goal Ship GEO-9001\n${'k'.repeat(3800)} Do only the \`kettle\` part of GEO-9001: each other area gets its own launch.\n"Contributes to GEO-9001"`);
 });

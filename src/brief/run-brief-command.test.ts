@@ -258,7 +258,7 @@ test('it moves the issue into the briefs folder as cut 1, and points the /goal l
   expect(readFileSync(moved, 'utf8')).toContain('## Acceptance\n\n- [ ] it boils');
 });
 
-test('it refuses a local prompt still over 4000 bytes after cut 1 and cut 2, and writes no briefs file', () => {
+test('it refuses a local prompt still over 4000 bytes after cut 1, and writes no briefs file', () => {
   const ctx = setupTest();
   const template = buildStubBriefKit()['agent-kit/brief.md'] ?? '';
   const stub = createStubBriefDeps(ctx.root, {
@@ -269,11 +269,11 @@ test('it refuses a local prompt still over 4000 bytes after cut 1 and cut 2, and
 
   const outcome = runBriefCommand(stub.deps, { issue: 'GEO-9001', ref: 'main', imp: false, byLink: false, goalFile: null, repo: null });
 
-  expect(outcome).rejects.toMatchObject({ code: 'too_long', data: { cuts: ['cut 1', 'cut 2'] } });
+  expect(outcome).rejects.toMatchObject({ code: 'too_long', data: { cuts: ['cut 1'] } });
   expect(existsSync(join(ctx.root, 'briefs'))).toBe(false);
 });
 
-test('it refuses a prompt still over 4000 bytes after cut 2, with its byte count, and writes no goal file', () => {
+test('it refuses a prompt still over 4000 bytes after every cut, with its byte count, and writes no goal file', () => {
   const ctx = setupTest();
   const template = buildStubBriefKit()['agent-kit/brief.md'] ?? '';
   const stub = createStubBriefDeps(ctx.root, {
