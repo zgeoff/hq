@@ -35,6 +35,6 @@ test.each<{ $title: string; waitsOn: string | null; read: IssueRead | null; expe
     read: { ok: true, description: `## Scope\n\n- [ ] a: ${'x'.repeat(200)}\n- [ ] b: ${'y'.repeat(200)}\n` },
     expected: { hold: true, why: 'open-boxes', openBoxes: `a: ${'x'.repeat(200)}; b: ${'y'.repeat(97)}`.slice(0, 300) },
   },
-])('it $title', ({ waitsOn, read, expected }) => {
-  expect(decideHandedInHold(waitsOn, read)).toStrictEqual(expected);
+])('it $title', (row) => {
+  expect(decideHandedInHold(row.waitsOn, row.read)).toStrictEqual(row.expected);
 });
