@@ -5,12 +5,20 @@
 # the number of single calls. With --singles, prints the single calls as a JSON array, in the
 # order to walk them: blocked decisions, then issues by priority. With --calls, prints every
 # call as a JSON array, in the order to send them: shared decisions, then the single calls.
-# With --prs, prints the untracked PRs, one line each. With --calls, the untracked PRs come last
-# as one entry of kind "untracked", with their count by repo.
+# With --prs, prints the untracked PRs, one line each. The untracked PRs are never a call: the
+# only pick, leaving them as they are, keeps the status quo.
 # Usage: build-queue.sh [--calls | --singles | --prs] [--blocked <JSON>] [--notes <JSON>] [--untracked <JSON>] [<issues JSON>...]
-#   --blocked    a JSON array of {question, recommendation, session?, issue?} you write
-#   --notes      a JSON object from issue ID to {question, recommendation}; issues with the same
-#                question text form one shared decision. A plain string is a recommendation alone.
+#   --blocked    a JSON array of {question, recommendation, session?, issue?, actions?, statusQuo?,
+#                ownerListed?} you write. actions lists the Action lines the decision approves;
+#                statusQuo is true when the recommendation keeps the current course; ownerListed
+#                is true when the recommended option itself does something the owner-calls list
+#                names. The script refuses, and exits 1 on, a decision without ownerListed true
+#                that has statusQuo true, or whose actions are all Code delivery, Investigation,
+#                Spike, Design session or Linear lines, or Data lines that say insert-only and
+#                after a backup, in upper or lower case.
+#   --notes      a JSON object from issue ID to {question, recommendation, actions?, statusQuo?,
+#                ownerListed?}, refused as --blocked says; issues with the same question text
+#                form one shared decision. A plain string is a recommendation alone.
 #                {"resolved": true} leaves an issue out: you settled it without the owner.
 #   --untracked  the output of untracked-prs.sh
 #   issues       saved pages of the Needs Geoff issues: an array, an object with `issues`, or
@@ -43,6 +51,31 @@ blocked_text=$(read_input --blocked "$blocked")
 notes_text=$(read_input --notes "$notes")
 untracked_text=$(read_input --untracked "$untracked")
 
+# A decision the fleet settles itself never becomes a call: one on nothing else the owner-calls list
+# names, whose recommendation keeps the status quo, or whose only Actions are ones owner-calls
+# leaves to the fleet: Code delivery, Investigation, Spike, Design session, Linear, and insert-only
+# Data lines run after a backup.
+refused=$(jq -n -r \
+  --slurpfile blocked <(printf '%s\n' "$blocked_text") \
+  --slurpfile notes <(printf '%s\n' "$notes_text") '
+  def fleet_action:
+    type == "string" and (ascii_downcase | (startswith("code delivery") or startswith("investigation")
+      or startswith("spike") or startswith("design session") or startswith("linear:"))
+      or (startswith("data:") and contains("insert-only") and contains("after a backup")));
+  def reason:
+    if .ownerListed == true then empty
+    elif .statusQuo == true then "its recommendation keeps the status quo"
+    elif (.actions // []) as $a | ($a | length) > 0 and ($a | all(fleet_action))
+    then "its only Actions are ones owner-calls leaves to the fleet"
+    else empty end;
+  (($blocked[0] // [])[] | "the blocked decision \"\(.question)\": \(reason)"),
+  (($notes[0] // {}) | to_entries[] | select(.value | type == "object" and (.resolved // false | not))
+    | "\(.key): \(.value | reason)")')
+if [ -n "$refused" ]; then
+  printf '%s\n' "$refused" | sed 's/^/build-queue.sh: refused /; s/$/; settle it without a call/' >&2
+  exit 1
+fi
+
 pages=$(mktemp)
 trap 'rm -f "$pages"' EXIT
 if [ $# -gt 0 ]; then
@@ -72,7 +105,11 @@ jq -n -r \
     def rank: priority | if . == 0 then 9 else . end;
     def pname: .priority | if type == "object" then .name else null end;
     def plural($w): "\(.) \($w)\(if . == 1 then "" else "s" end)";
-  ($i | map(select(($n[.id].resolved // false) | not)) | sort_by(rank, .updatedAt) | map(. + {note: ($n[.id] // {question: null, recommendation: null})})) as $needs
+  ([$b[] | .issue // empty]) as $blockedIds
+  | ([$b[] | .question]) as $blockedQuestions
+  | ($i | map(select((($n[.id].resolved // false)
+      or ((.id | IN($blockedIds[])) and ($n[.id].question // null) == null)
+      or (($n[.id].question // null) | IN($blockedQuestions[]))) | not)) | sort_by(rank, .updatedAt) | map(. + {note: ($n[.id] // {question: null, recommendation: null})})) as $needs
   | ($needs | map(select(.note.question != null)) | group_by(.note.question) | map(select(length > 1))
       | sort_by(-length)) as $shared
   | ([$shared[][] | .id]) as $sharedIds
@@ -82,11 +119,7 @@ jq -n -r \
          question: .note.question, recommendation: .note.recommendation}]) as $calls
   | if $mode == "calls" then
       ([$shared[] | {kind: "shared", question: .[0].note.question, recommendation: .[0].note.recommendation,
-         issues: [.[] | .id]}] + $calls
-       + (if ($u | length) > 0 then
-            [{kind: "untracked", count: ($u | length),
-              repos: ([$u | group_by(.repo)[] | {repo: .[0].repo, count: length}])}]
-          else [] end)) | tojson
+         issues: [.[] | .id]}] + $calls) | tojson
     elif $mode == "singles" then $calls | tojson
     elif $mode == "prs" then
       if ($u | length) == 0 then "No untracked PRs."
@@ -102,7 +135,7 @@ jq -n -r \
         , ""
       else empty end,
       if ($u | length) > 0 then
-        "Untracked PRs: \($u | length) (\([$u | group_by(.repo)[] | "\(.[0].repo) \(length)"] | join(", "))). Recommend: leave them, unless you want an issue for one. Say \"list\" to see them.",
+        "Untracked PRs: \($u | length) (\([$u | group_by(.repo)[] | "\(.[0].repo) \(length)"] | join(", "))). Left as they are; say \"list\" to see them.",
         ""
       else empty end,
       if ($calls | length) > 0 then "Then \($calls | length | plural("single call")), one at a time." else empty end

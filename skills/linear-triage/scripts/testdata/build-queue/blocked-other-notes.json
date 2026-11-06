@@ -1,0 +1,9 @@
+{
+  "GEO-9102": {
+    "question": "Rename the map palette to the lantern palette?",
+    "recommendation": "Keep the current name",
+    "actions": [],
+    "statusQuo": false,
+    "ownerListed": true
+  }
+}

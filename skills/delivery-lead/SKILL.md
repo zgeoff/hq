@@ -74,7 +74,7 @@ Act on each line:
 - **`NOTE decision` or `NOTE blocked`:** answer it, as [Answering an agent](#answering-an-agent)
   says.
 - **`STATE needs_you`:** read its screen with `atc_terminal_read`. Approve only folder trust and new MCP servers,
-  with `atc_terminal_choose`. For any other prompt, alert the owner with `PushNotification`.
+  with `atc_terminal_choose`. For any other prompt, follow [Refusals](#refusals).
 - **`STATE exited`:** look for its PR or FINAL note. With neither, unstick it.
 - **`ANSWERED`:** an agent answered your message. Read the answer with `atc_message_get`, and act
   on it as on a note.
@@ -93,23 +93,30 @@ message an agent with no FINAL note yet, read briefs.md's messages section.
   [fix-it-here](../fix-it-here/SKILL.md). For a reason that doesn't hold, say "Fix it in this PR",
   with the reason.
 - **It needs a choice:** answer it if the issue, the brief or the owner's earlier answers settle it.
-  Otherwise send it to `z-triage`, as [owner-calls](../owner-calls/SKILL.md) says, and tell the
-  agent to carry on with the rest.
-- **It asks to run a migration:** let it run one that only adds tables or columns, or fills in
-  columns it added, once it gives you the path of its backup of that database. Send one that
-  deletes or rewrites existing data to `z-triage` as a decision.
+  Send a choice that [owner-calls](../owner-calls/SKILL.md#what-only-the-owner-decides) lists as
+  the owner's to `z-triage` with the agent's session, so that `z-stu` types the answer there. Tell
+  the agent to carry on with the rest. Decide any other choice
+  yourself.
+- **It asks to run a migration:** let it run one that only inserts rows, adds tables or columns, or
+  fills in columns it added, once it gives you the path of its backup of that database. Send one
+  that deletes or rewrites existing data, or that touches anything else
+  [owner-calls](../owner-calls/SKILL.md#what-only-the-owner-decides) lists, such as Nix's memory, to
+  `z-triage` as a decision.
 - **A refusal blocks it:** follow [Refusals](#refusals).
 
 ## Refusals
 
 1. If the owner's yes covers the action, read the agent's screen, and type the granting line
    from your role's private file with `atc_terminal_type`. The yes can be the owner's request in your session, an
-   Action in the issue, or a grant in the launch prompt or your own start prompt. Copy the specifics (repo, PR, command) word for word from the yes, and record the line in your state file. Tell
+   issue Action approved in a call or a pitch or left to you by owner-calls, or a grant in the
+   launch or your start prompt. Copy the specifics (repo, PR, command) word for word from the yes, and record the line in your state file. Tell
    the owner in your reply: the session, the refusal and what you typed.
 
-2. If nothing covers it, send `z-triage` a decision: the issue, the action, the exact refusal and
-   the brief's wording. Once the owner approves, add the action to the issue's Actions and relaunch
-   with a new `hq brief`, from the pushed branch or `main` if nothing is pushed.
+2. If nothing covers it, and owner-calls lists the action as the owner's, send `z-triage` a
+   decision: the issue, the action, the exact refusal and the brief's wording. Wait for the owner's
+   approval. For any other action, approve it yourself. Then add the approved action to the
+   issue's Actions, and relaunch with a new `hq brief`, from the pushed branch or `main` if nothing
+   is pushed.
 
 When the classifier refuses the launch itself, the brief is wrong. Remove the unapproved action, or
 the claim about who approved what, and launch again.
@@ -135,12 +142,20 @@ A run is stuck when any of these holds:
 
 ## Pitches
 
-Code delivery, a Design session and an Investigation's or Spike's work need no approval. Pitch
-every other [Action](../tickets/SKILL.md#actions) to `z-triage` as a decision before the launch: a
-numbered list, one issue per item, with its ID, title, type and size, what the agent delivers, and
-each Infra, Deploy, Credentials or Data Action on its own line. An approval covers only what it
-names. On approval, add the approved Actions to the issue, and launch with a new `hq brief`,
-which puts them in the brief's Permissions.
+Before you launch a batch of issues, read each issue's [Actions](../tickets/SKILL.md#actions).
+Pitch the Actions that [owner-calls](../owner-calls/SKILL.md#what-only-the-owner-decides) lists as
+the owner's: send them to `z-triage` as one decision for the batch. Launch with every other Action
+unpitched, such as a Data Action that only adds data after a backup, or any Action that the owner
+approved in an earlier call or pitch, such as a Paid API limit that a flag put to him.
+
+Write the pitch as a numbered list, one issue per item. Give each item:
+
+- the issue's ID, title, type and size;
+- what the agent delivers;
+- each Action you pitch, on its own line.
+
+An approval covers only what it names. On approval, add the approved Actions to the issue, and
+launch with a new `hq brief`, which puts them in the brief's Permissions.
 
 ## Judging overlap
 
@@ -151,8 +166,8 @@ doesn't count.
 
 ## Pins and endings
 
-- Pin only a session that needs the owner (a question, an approval, a PR to review, a design
-  session), with `atc_session_update`, and tell the owner its name. Unpin anything else,
+- Pin only a session that needs the owner (a question, an approval, a PR to review, a `with-geoff`
+  design session), with `atc_session_update`, and tell the owner its name. Unpin anything else,
   even if it runs: the pinned list is the owner's to-do list.
 - Never forget or stop a delivery run yourself. It stays up to answer review findings, hq's sweep
   forgets its sessions once its PRs merge, and `z-qa` runs `hq run done` after the live check.
@@ -161,7 +176,7 @@ doesn't count.
   one with `atc_session_forget` and `stop: true`, or with `atc_session_stop` if it holds unpushed
   work.
 
-- Keep a design session pinned until the owner has worked through it and its record and follow-ups
+- Keep a `with-geoff` design session pinned until the owner has worked through it and its record and follow-ups
   are in Linear.
 
 **Reply:** what you launched, answered or handed on, each session this turn touched and its state,

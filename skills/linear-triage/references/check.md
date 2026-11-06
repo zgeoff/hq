@@ -1,14 +1,18 @@
 # The check
 
 The check turns each decision the owner must make into a call in hq: one question with options and
-your recommendation, which `z-stu` puts to the owner. Every open decision gets a call, with no cap.
-You never message the owner, and you never apply the owner's answer.
+your recommendation, which `z-stu` puts to the owner. You never message the owner, and you never
+apply the owner's answer.
 
-Decisions come from three places:
+Calls come from two places, with no cap:
 
-- the issues flagged `Needs Geoff`;
-- sessions that a decision blocks: `z-delivery` and `z-review` message you, or ask you to check now;
-- PRs that cite no issue.
+- the issues flagged `Needs Geoff`, as linear-triage's Flagging section allows;
+- each decision that blocks a session and that
+  [owner-calls](../../owner-calls/SKILL.md#what-only-the-owner-decides) lists as the owner's:
+  `z-delivery` and `z-review` message you, or ask you to check now.
+
+Settle any other blocked decision yourself, and tell its sender. Step 5 refuses two kinds of these
+for you. The PRs that cite no issue are never a call: step 4 reports them.
 
 Contents: [State](#state) · [Steps](#steps) · [Calls](#calls) · [Unblock list](#unblock-list)
 
@@ -22,35 +26,59 @@ Contents: [State](#state) · [Steps](#steps) · [Calls](#calls) · [Unblock list
 
 ## Steps
 
-1. **Gather the blocked decisions** into a JSON array in scratch:
-   `{"question", "recommendation", "session", "issue"}`, with `issue: null` when there's none.
+1. **Gather the blocked decisions that owner-calls lists as the owner's**, and settle the rest
+   yourself, as the opening says. Put them in a JSON array in scratch:
+   `{"question", "recommendation", "session", "issue", "actions", "statusQuo", "ownerListed"}`,
+   with `issue: null` when there's none. `session` is the session that waits on the answer, such
+   as an agent that `z-delivery` names. `actions` lists each Action line the decision would
+   approve, in the [tickets](../../tickets/SKILL.md#actions) forms. Set `statusQuo: true` when the
+   recommendation keeps the current course, such as "keep fixing". Set `ownerListed: true` when the
+   recommended option would itself do something the owner-calls list names, such as touch Nix's
+   memory or keep a cost over its limit, or when the decision is whether the owner joins a design
+   session. Settle a step on a credential the owner approved yourself:
+   find the approval with `hq call list --state all`, which holds each pitch too, since a pitch
+   reaches the owner as a call. Then tell the sender to carry on.
    Sources: messages from sessions, and atc events of kind `decision` or `blocked` since your
-   cursor. Save the new cursor. If `atc_events_read` refuses the cursor with `bad_args`, read
+   cursor. Skip an event from an agent that `z-delivery` launched: `z-delivery` answers it, and
+   sends you any decision that owner-calls lists. Save the new cursor. If `atc_events_read` refuses the cursor with `bad_args`, read
    without one, and say in the CHECK line that earlier notes may be missed. A decision stays open,
    and in `refine.md`, until `hq call list --state all` shows it answered or its sender says it's
    settled. Put a step that needs the owner's hands on the [unblock list](#unblock-list).
 2. **Fetch the flagged issues:** team GEO, label `Needs Geoff`, with `id`, `title`, `url`, `status`,
    `priority`, `createdAt` and `updatedAt`, through `list_issues`. Save every page.
 3. **Complete `notes.json`** (start it as `{}` without a pass), one entry per flagged issue:
-   `{"GEO-9001": {"question": "Split GEO-9001?", "recommendation": "Yes, because 16 PRs landed."}}`.
+   `{"GEO-9001": {"question": "Split GEO-9001?", "recommendation": "Yes, because 16 PRs landed.", "actions": [], "statusQuo": false, "ownerListed": false}}`.
    For a flag the pass didn't set, read the issue's latest comment.
    - When the comment asks only what you can settle (a missing section, a missing `Code delivery`, a
      named blocker), fix it, remove `Needs Geoff`, and write `{"resolved": true}`.
-   - Only the owner answers: an Action beyond Code delivery (Data that deletes or rewrites, Deploy,
-     Infra, Credentials, Paid API over its limit), scope, priority, closing, a new project.
+   - When the comment asks what
+     [owner-calls](../../owner-calls/SKILL.md#what-only-the-owner-decides) lists as the owner's,
+     or whether the owner joins a design session, keep the flag. Otherwise settle it yourself, as
+     for the case above. Give every entry `actions`, `statusQuo` and `ownerListed`, as step 1 says.
      `check.private.md` in hq-private (`hq defs` shows where) says which credentials are another
      session's.
    - Issues waiting on one decision get the same question text, word for word, so they become one
-     call.
+     call. When that decision is one step 1 gathered, use its question: `build-queue.sh` folds the
+     issues into the blocked call, as it does the blocked decision's own issue. Add each issue to
+     that call's `--issues`.
 4. **Find untracked PRs:** `scripts/untracked-prs.sh 2` lists `zgeoff` PRs that cite no issue, open
    or merged in 2 days. Search Linear for each by repo and number first; when an issue holds it, add
    "Contributes to GEO-<n>" to the PR with `gh pr edit`. Trace the rest to an issue, or close one as
-   superseded when you're sure. What's left becomes one call.
+   superseded when you're sure. Leave the rest as they are: `build-queue.sh` counts them in part 1,
+   and `--prs` lists them.
 5. **Build the calls:**
    `scripts/build-queue.sh --calls --blocked <file> --notes <file> --untracked <file> <issue pages>`
-   prints every call in `z-stu`'s order. Write each one as [Calls](#calls) says, after reading the
-   issue, its comments and linked work. The untracked call gives the count by repo and your
-   recommendation.
+   prints each call's kind, question and recommendation as JSON, in `z-stu`'s order. It refuses a
+   decision without `ownerListed: true` that has `statusQuo: true`, or whose `actions` are all ones
+   owner-calls leaves to the fleet: lines that start `Code delivery`, `Investigation`, `Spike`,
+   `Design session` or `Linear:`, and the insert-only Data lines that
+   [tickets](../../tickets/SKILL.md#actions) describes. It prints one `refused` line for each, and
+   exits 1.
+   - Settle each refused decision yourself. Tell its sender to carry on, with `atc_message_send`,
+     or, for an issue, remove `Needs Geoff` and write `{"resolved": true}`. Then run the script
+     again.
+   - Write each call's card as [Calls](#calls) says, after reading the issue, its comments and
+     linked work.
 6. **Update hq:** run `hq outbox flush --retry`. Re-add every call in order, including open and
    put-off ones. Close each call in `hq call list` that's no longer gathered, and drop each unblock
    item whose session says it's done. hq tells `z-stu` itself.

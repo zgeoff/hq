@@ -3,6 +3,6 @@
 Shared (answer "all yes" or by number):
 1. Use the dusk palette? (2 issues: GEO-9101, GEO-9102). Recommend: Use dusk.
 
-Untracked PRs: 3 (zgeoff/lantern-demo 2, zgeoff/paper-orchard 1). Recommend: leave them, unless you want an issue for one. Say "list" to see them.
+Untracked PRs: 3 (zgeoff/lantern-demo 2, zgeoff/paper-orchard 1). Left as they are; say "list" to see them.
 
 Then 5 single calls, one at a time.

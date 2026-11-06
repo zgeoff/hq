@@ -6,6 +6,7 @@ interface StubSystemctlOptions {
   directory: string;
 
   show: Record<string, string>;
+  failedShows?: Record<string, string>;
 }
 
 interface StubSystemctl {
@@ -19,7 +20,7 @@ export function createStubSystemctl(options: StubSystemctlOptions): StubSystemct
   const config = join(options.directory, 'systemctl.json');
   mkdirSync(bin, { recursive: true });
   writeFileSync(log, '');
-  writeFileSync(config, JSON.stringify({ log, show: options.show }));
+  writeFileSync(config, JSON.stringify({ log, show: options.show, failedShows: options.failedShows ?? {} }));
   writeFileSync(join(bin, 'systemctl'), `#!/bin/sh\nexec '${process.execPath}' '${resolve(import.meta.dir, 'run-stub-systemctl.ts')}' '${config}' "$@"\n`);
   chmodSync(join(bin, 'systemctl'), 0o755);
   return {

@@ -34,8 +34,12 @@ Judge by the `evidence` skill. Take the first case that fits:
 ## Stalled In Progress issues
 
 No movement on the agent or the PR in 3 days. Find the session with `atc_sessions_list` (its name
-has the issue ID) and the PR with `gh search prs GEO-<n> --owner zgeoff`. Flag it: "Stalled: nothing
-has moved since <date>. Recommend <keep, relaunch, or close>, because <reason>."
+has the issue ID) and the PR with `gh search prs GEO-<n> --owner zgeoff`. Then pick one:
+
+- **Keep or relaunch:** message `z-delivery` the issue, what stalled, and your pick. Don't flag it.
+  [owner-calls](../../owner-calls/SKILL.md#what-only-the-owner-decides) leaves both to the fleet.
+- **Close while the work is still worth doing:** flag it: "Stalled: nothing has moved since
+  <date>. Recommend close, because <reason>."
 
 ## Obsolete Backlog issues
 

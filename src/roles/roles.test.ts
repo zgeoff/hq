@@ -1,22 +1,24 @@
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { expect, onTestFinished, test } from 'bun:test';
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { main } from '../src/cli.ts';
-import { overrideEnv } from '../src/config/override-env.ts';
-import { checkFleetBuild } from '../src/roles/check-fleet-build.ts';
-import { getDeclaredForwards as declaredForwards } from '../src/roles/get-declared-forwards.ts';
-import { getDeclaredSessions as declaredSessions } from '../src/roles/get-declared-sessions.ts';
-import { findRoleSkill } from '../src/roles/find-role-skill.ts';
-import { roleName } from '../src/roles/role-name.ts';
-import { rolesByName } from '../src/roles/roles-by-name.ts';
-import { ROLES } from '../src/roles/roles.ts';
-import { validateRoles } from '../src/roles/validate-roles.ts';
-import { withStaleBuild } from '../src/roles/with-stale-build.ts';
-import { forwardOf } from '../src/outbox/forward-of.ts';
-import { setForward } from '../src/outbox/set-forward.ts';
+import { main } from '../cli.ts';
+import { checkFleetBuild } from './check-fleet-build.ts';
+import { getDeclaredForwards as declaredForwards } from './get-declared-forwards.ts';
+import { getDeclaredSessions as declaredSessions } from './get-declared-sessions.ts';
+import { findRoleSkill } from './find-role-skill.ts';
+import { roleName } from './role-name.ts';
+import { rolesByName } from './roles-by-name.ts';
+import { ROLES } from './roles.ts';
+import { validateRoles } from './validate-roles.ts';
+import { withStaleBuild } from './with-stale-build.ts';
+import { forwardOf } from '../outbox/forward-of.ts';
+import { setForward } from '../outbox/set-forward.ts';
+import invariant from 'tiny-invariant';
 import { z } from 'zod';
-import { NOON_SYDNEY, at, freshDb } from './helpers.ts';
+import { updateEnv } from '@zgeoff/testing/helpers';
+import { createStubSystemctl } from '../../test/create-stub-systemctl.ts';
+import { freshDb } from '../../test/helpers.ts';
 
 test('the table loads and each single role resolves to one declared session', () => {
   expect(ROLES.sessions.length).toBeGreaterThan(5);
@@ -293,54 +295,50 @@ test('a declared forward needs no meta row, and a meta row wins', () => {
 
 test('no session-name literal sits in src/ outside roles.ts', () => {
   const hits: string[] = [];
-  for (const f of readdirSync(`${import.meta.dir}/../src`, { recursive: true, encoding: 'utf8' }).filter((n) => n.endsWith('.ts') && !n.endsWith('.test.ts') && n !== 'roles.ts')) {
-    const code = readFileSync(`${import.meta.dir}/../src/${f}`, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
-    for (const m of code.matchAll(/['"`]z-[a-z]+['"`]/g)) hits.push(`${f}: ${m[0]}`);
+  for (const file of readdirSync(`${import.meta.dir}/..`, { recursive: true, encoding: 'utf8' }).filter((name) => name.endsWith('.ts') && !name.endsWith('.test.ts') && name !== 'roles.ts')) {
+    const code = readFileSync(`${import.meta.dir}/../${file}`, 'utf8').replaceAll(/\/\*[\s\S]*?\*\//gu, '').replaceAll(/\/\/.*$/gmu, '');
+    for (const match of code.matchAll(/['"`]z-[a-z]+['"`]/gu)) {
+      hits.push(`${file}: ${match[0]}`);
+    }
   }
   expect(hits).toEqual([]);
 });
 
-describe('hq fleet --json and forwards', () => {
-let cleanup: () => void;
-let db: ReturnType<typeof freshDb>['db'];
-let out: string[];
-const origLog = console.log;
-const saved = { notify: process.env['HQ_NOTIFY'], as: process.env['HQ_AS'] };
-beforeEach(() => {
-  ({ cleanup, db } = freshDb());
-  at(NOON_SYDNEY);
-  process.env['HQ_NOTIFY'] = 'off';
-  process.env['HQ_AS'] = roleName('owner');
-  out = [];
-  console.log = (s: string) => out.push(s);
-});
-afterEach(() => {
-  console.log = origLog;
-  for (const [k, v] of [['HQ_NOTIFY', saved.notify], ['HQ_AS', saved.as]] as const) {
-    if (v === undefined) delete process.env[k];
-    else process.env[k] = v;
-  }
-  cleanup();
-});
+function setupTest() {
+  const database = freshDb();
+  onTestFinished(database.cleanup);
+  const out: string[] = [];
+  const originalLog = console.log;
+  console.log = (line: string) => out.push(line);
+  onTestFinished(() => {
+    console.log = originalLog;
+  });
+  return { db: database.db, directory: database.dir, out };
+}
 
 test('a forward declared in fleet.json cannot be removed by command; a stored one can', () => {
+  const ctx = setupTest();
   const [from] = Object.keys(declaredForwards());
-  expect(() => setForward(db, from!, null)).toThrow('declared in fleet.json');
-  setForward(db, 'z-gone', roleName('qa'));
-  setForward(db, 'z-gone', null);
-  expect(forwardOf(db, 'z-gone')).toBe('z-gone');
+  invariant(from);
+  expect(() => setForward(ctx.db, from, null)).toThrow('declared in fleet.json');
+  setForward(ctx.db, 'z-gone', roleName('qa'));
+  setForward(ctx.db, 'z-gone', null);
+  expect(forwardOf(ctx.db, 'z-gone')).toBe('z-gone');
 });
 
 test('removing a stored override refuses when the declared forward it brings back makes a loop', () => {
+  const ctx = setupTest();
   const [from] = Object.keys(declaredForwards());
-  const declaredTo = declaredForwards()[from!]!;
-  setForward(db, from!, roleName('qa'));
-  setForward(db, declaredTo, from!);
-  expect(() => setForward(db, from!, null)).toThrow('makes a loop');
-  expect(forwardOf(db, declaredTo)).toBe(roleName('qa'));
-  setForward(db, declaredTo, null);
-  setForward(db, from!, null);
-  expect(forwardOf(db, from!)).toBe(declaredTo);
+  invariant(from);
+  const declaredTo = declaredForwards()[from];
+  invariant(declaredTo);
+  setForward(ctx.db, from, roleName('qa'));
+  setForward(ctx.db, declaredTo, from);
+  expect(() => setForward(ctx.db, from, null)).toThrow('makes a loop');
+  expect(forwardOf(ctx.db, declaredTo)).toBe(roleName('qa'));
+  setForward(ctx.db, declaredTo, null);
+  setForward(ctx.db, from, null);
+  expect(forwardOf(ctx.db, from)).toBe(declaredTo);
 });
 
 test('a retired role holder is left out of the roles', () => {
@@ -350,55 +348,59 @@ test('a retired role holder is left out of the roles', () => {
 });
 
 test('hq fleet --json carries the stale-build warning when the checkout fleet.json differs', async () => {
-  const fleetText = readFileSync(join(import.meta.dir, '../fleet.json'), 'utf8');
+  const ctx = setupTest();
+
+  // hq fleet reads its timer through systemctl, which a host without systemd lacks.
+  updateEnv('PATH', `${createStubSystemctl({ directory: ctx.directory, show: {} }).bin}:${process.env['PATH'] ?? ''}`);
+  const fleetText = readFileSync(join(import.meta.dir, '../../fleet.json'), 'utf8');
   const changed = z.looseObject({ forwards: z.record(z.string(), z.string()) }).parse(JSON.parse(fleetText));
-  const directory = mkdtempSync(join(tmpdir(), 'hq-fleet-projects-'));
-  const restore = overrideEnv('HQ_PROJECTS', directory);
-  try {
-    changed.forwards['z-kettle'] = 'z-q';
-    mkdirSync(join(directory, 'hq'));
-    writeFileSync(join(directory, 'hq', 'fleet.json'), JSON.stringify(changed));
-    const code = await main(['fleet', '--json']);
-    expect(code).toBe(0);
-    expect(JSON.parse(out.join('\n')).staleBuild).toContain(`older fleet.json than ${directory}/hq/fleet.json`);
-  } finally {
-    restore();
-    rmSync(directory, { recursive: true, force: true });
-  }
+  const directory = join(ctx.directory, 'projects');
+  updateEnv('HQ_PROJECTS', directory);
+  changed.forwards['z-kettle'] = 'z-q';
+  mkdirSync(join(directory, 'hq'), { recursive: true });
+  writeFileSync(join(directory, 'hq', 'fleet.json'), JSON.stringify(changed));
+  const code = await main(['fleet', '--json']);
+  expect(code).toBe(0);
+  expect(JSON.parse(ctx.out.join('\n')).staleBuild).toContain(`older fleet.json than ${directory}/hq/fleet.json`);
 });
 
 test('hq fleet --json gives each session its skill and roles, plus the roles and forwards', async () => {
+  const ctx = setupTest();
+
+  // hq fleet reads its timer through systemctl, which a host without systemd lacks.
+  updateEnv('PATH', `${createStubSystemctl({ directory: ctx.directory, show: {} }).bin}:${process.env['PATH'] ?? ''}`);
   expect(await main(['fleet', '--json'])).toBe(0);
-  const j = JSON.parse(out.join('\n'));
-  const q = j.declared.find((e: { name: string }) => e.name === 'z-q');
-  expect(q.skill).toBeNull();
-  expect(q.skills).toStrictEqual([]);
-  expect(q.roles).toEqual(['developer']);
-  const owner = j.declared.find((e: { name: string }) => e.name === roleName('owner'));
-  expect(owner.skill).toBe('intake');
-  expect(owner.skills).toStrictEqual(['intake', 'owner-calls', 'tickets', 'evidence', 'delivery-report']);
-  for (const entry of j.declared) {
+  const entrySchema = z.looseObject({ name: z.string(), skill: z.string().nullable(), skills: z.array(z.string()), roles: z.array(z.string()) });
+  const fleetSchema = z.looseObject({ declared: z.array(entrySchema), roles: z.record(z.string(), z.unknown()), forwards: z.record(z.string(), z.string()) });
+  const fleet = fleetSchema.parse(JSON.parse(ctx.out.join('\n')));
+  const developer = fleet.declared.find((entry) => entry.name === 'z-q');
+  expect(developer?.skill).toBeNull();
+  expect(developer?.skills).toStrictEqual([]);
+  expect(developer?.roles).toStrictEqual(['developer']);
+  const owner = fleet.declared.find((entry) => entry.name === roleName('owner'));
+  expect(owner?.skill).toBe('intake');
+  expect(owner?.skills).toStrictEqual(['intake', 'owner-calls', 'tickets', 'evidence', 'delivery-report']);
+  for (const entry of fleet.declared) {
     expect(entry.skill).toBe(entry.skills[0] ?? null);
   }
-  expect(owner.roles).toEqual(['owner']);
-  expect(owner.cwd).toBeTruthy();
-  expect(j.roles).toEqual(rolesByName());
-  expect(j.roles.reviewer).toBe(roleName('reviewer'));
-  expect(j.roles.developer).toEqual(['z-q']);
-  expect(j.forwards['z-refine']).toBe(declaredForwards()['z-refine']);
+  expect(owner?.roles).toStrictEqual(['owner']);
+  expect(owner?.['cwd']).toBeTruthy();
+  expect(fleet.roles).toStrictEqual(rolesByName());
+  expect(fleet.roles['reviewer']).toBe(roleName('reviewer'));
+  expect(fleet.roles['developer']).toStrictEqual(['z-q']);
+  expect(fleet.forwards['z-refine']).toBe(declaredForwards()['z-refine']);
 
   // The compact hook (.claude/hooks/print-skills.sh) reads these: change it with them.
-  for (const entry of j.declared) {
+  for (const entry of fleet.declared) {
     expect(Object.keys(entry)).toStrictEqual(expect.arrayContaining(['name', 'skills', 'skill']));
   }
-  expect('last' in j).toBe(true);
-});
+  expect('last' in fleet).toBe(true);
 });
 
 test('the stale-build check is quiet when the checkout fleet.json matches the build, or is missing', () => {
   const dir = mkdtempSync(join(tmpdir(), 'hq-fleet-build-'));
   try {
-    writeFileSync(join(dir, 'fleet.json'), readFileSync(join(import.meta.dir, '../fleet.json'), 'utf8'));
+    writeFileSync(join(dir, 'fleet.json'), readFileSync(join(import.meta.dir, '../../fleet.json'), 'utf8'));
     expect(checkFleetBuild(join(dir, 'fleet.json'))).toBeNull();
     expect(checkFleetBuild(join(dir, 'none.json'))).toBeNull();
   } finally {
@@ -409,7 +411,7 @@ test('the stale-build check is quiet when the checkout fleet.json matches the bu
 test('the stale-build check warns when the checkout fleet.json differs from the build', () => {
   const dir = mkdtempSync(join(tmpdir(), 'hq-fleet-build-'));
   try {
-    const fleetText = readFileSync(join(import.meta.dir, '../fleet.json'), 'utf8');
+    const fleetText = readFileSync(join(import.meta.dir, '../../fleet.json'), 'utf8');
     const sessionSchema = z.looseObject({ model: z.string() });
     const changed = z.looseObject({ sessions: z.array(sessionSchema) }).parse(JSON.parse(fleetText));
     const path = join(dir, 'fleet.json');

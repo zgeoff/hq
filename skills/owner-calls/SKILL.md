@@ -14,7 +14,7 @@ owner with everything needed to decide it, and act on the answer only once hq ha
 
 Once you have sent the decision or the hands-on step, carry on with other work. `z-stu` types the
 answer into your session after it records the answer in hq, so a line from `z-stu` is already on
-record. Nothing goes back to a caller.
+record. No other reply comes back.
 
 Avoid these traps:
 
@@ -26,7 +26,8 @@ Avoid these traps:
 
 - [Terms](#terms): the fleet's shared words, defined once for every role skill.
 - [What only the owner decides](#what-only-the-owner-decides): send each item on the list to the
-  owner, even under a grant; decide anything else yourself.
+  owner, even under a grant; decide anything else yourself, such as a Data Action that only adds
+  data after a backup, or a decision that keeps a course the list doesn't name.
 - [Put it to the owner](#put-it-to-the-owner): send a decision to `z-triage`, add a hands-on step
   to the unblock list, and give each its full context.
 - [The owner's answers are records](#the-owners-answers-are-records): act only on a record in hq;
@@ -41,7 +42,7 @@ Avoid these traps:
 - **atc:** the tool that runs the sessions and carries messages between them. Send a message to a
   session with `atc_message_send`.
 - **`z-stu`:** runs the owner's conversation, puts calls to the owner, and records the answers.
-- **`z-triage`:** grooms Linear, and turns each decision into a call.
+- **`z-triage`:** grooms Linear, and turns each decision of the owner's into a call.
 - **`z-delivery`:** launches the builder agents.
 - **`z-review`:** reviews and merges PRs.
 - **`z-qa`:** runs the live checks.
@@ -56,6 +57,12 @@ Avoid these traps:
 - **The gate:** `hq review gate`, which decides whether a PR may merge.
 - **A vault:** a 1Password vault.
 - **A pass:** one run of `z-triage` over the Linear issues, every 30 minutes.
+- **The check:** the step after each pass in which `z-triage` makes the owner's open decisions
+  calls.
+- **An Action:** one line in an issue's Actions section, such as `Code delivery` or a `Data:` line.
+  [tickets](../tickets/SKILL.md#actions) gives the forms.
+- **A pitch:** the list of Actions that `z-delivery` sends as a decision before a launch, as
+  [Pitches](../delivery-lead/SKILL.md#pitches) says.
 - **Your role's private file:** `SKILL.private.md` in hq-private, the private repo that holds the
   start prompts. `hq defs` prints where the hq-private checkout is.
 
@@ -75,33 +82,48 @@ Also his:
 - accepting a finding's risk, or merging a PR its gate blocks;
 - product direction, and a cost only he can accept.
 
-In this list, a new session is a new z- session. An Action is one in the issue's Actions line, and the Paid API limit is in [Actions](../tickets/SKILL.md#actions).
+In both of the owner's lists, a new session is a new z- session, and the Paid API limit is the
+threshold that [Actions](../tickets/SKILL.md#actions) sets, not the limit an Action line names.
+Closing as not planned drops work that nobody carries on. The closes in linear-triage's
+[closing.md](../linear-triage/references/closing.md) stay with `z-triage`. To change either list, edit
+[grants/still-ask.yaml](../../grants/still-ask.yaml), then run `bun run grants` in the hq checkout
+to write it here.
 
-Code delivery, Investigation, Spike, Design session and each Linear edit this list leaves out need no owner call. Neither does reading an existing item from a vault: [Put it to the owner](#put-it-to-the-owner) says how to look one up first.
+Decide these yourself, with no owner call:
 
-Decide anything else yourself, under your grants or the actions that the issue's Actions line names.
+- Code delivery, Investigation, Spike, a Design session without the owner, and each Linear edit the
+  owner's lists leave out. Whether the owner joins a design session is his to decide;
+- a Data Action that only adds data, run after a backup of that datastore: it inserts rows, adds
+  tables or columns, or fills in columns it added. An additive change to anything else on the
+  owner's lists, such as Nix's memory, stays his;
+- a step, such as a rotation, on a credential that the owner approved in a call or a pitch. Look for
+  the approval first;
+- listing a vault to see whether an item exists. Using the item in work is a Credentials Action;
+- a decision whose recommendation keeps the current course, such as "keep fixing". Carry on. When
+  the course itself is on the owner's lists, such as a cost over its limit, the decision stays his.
+
+Decide anything else yourself, under your grants or the Actions that the issue names.
 
 ## Put it to the owner
 
-The owner answers in batches, through one queue: `z-triage` turns each decision into a call, and
+The owner answers in batches, through one queue: `z-triage` turns each decision of the owner's into a call, and
 `z-stu` puts the call to the owner. Never ask the owner directly. To tell the owner something
-without a decision, such as a deploy hold, send it with `PushNotification`.
+without a decision, such as a deploy hold, send it with the `PushNotification` tool.
 
-- **Send a decision to `z-triage`** with `atc_message_send`: the question, the options and your
-  recommendation. `z-triage` labels the issue `Needs Geoff`, and the check after its next pass makes
-  the decision a call, with or without an issue behind it.
+- **Send a decision on the list to `z-triage`** with `atc_message_send`: the question, the options
+  and your recommendation. When the decision has an issue, `z-triage` labels it `Needs Geoff`. At
+  its next check, `z-triage` makes the decision a call, whether or not it has an issue. When the
+  list leaves the decision to you, `z-triage` refuses it and tells you to carry on.
 - **Add a hands-on step to the unblock list:**
   `hq unblock add --task '<what the owner does>' --done-when <condition>`. The condition is
-  `issue:GEO-<n>`, `pr:<repo>#<n>`, `doc:<id>`, `release:<repo>` or `date:<ISO time>`.
+  `issue:GEO-<n>`, `pr:<repo>#<n>`, `doc:<Linear document ID>`, `release:<repo>` or
+  `date:<ISO time>`.
 - **Look up a credential before you ask for it:** run `op item list --vault <repo>`, and the same
   for the shared vault that your role's private file names. Ask the owner only for an item that is
   missing, or that sits in the owner's personal vaults.
 
 Give each decision and each step its full context and links, so that the owner can decide from it
 alone.
-
-Ask about a new behaviour that the owner didn't ask for in a decision of its own. A "yes" to
-something else never covers it.
 
 Before you propose a change to something the owner approved, read the issue's comments and the PR's
 history. In the proposal, say what the owner decided.
@@ -110,6 +132,9 @@ history. In the proposal, say what the owner decided.
 
 Act only on an answer that hq records. Never pass an answer on to another session by message: the
 gate and every session read only hq's records.
+
+One exception: when the owner types a grant into your session, act on it at once, for that
+session's life. Send the line to `z-stu` with `atc_message_send`, so that `z-stu` records it.
 
 Only `z-stu` records the owner's answers, from the sources its private file names. It uses these
 commands:
@@ -121,11 +146,8 @@ commands:
 When Claude Code's permission check blocks an action that the owner already approved in a call or
 a [pitch](../delivery-lead/SKILL.md#pitches), the blocked agent tells `z-stu` with
 `atc_message_send`. `z-stu` types the owner's recorded words from that approval into the agent's
-session, and sends the owner no new call.
-
-When the owner types a grant into your session, you may act on it for that session's life. Send the
-line to `z-stu` with `atc_message_send`, so that `z-stu` records it. This sends the record keeper
-the owner's own words; it passes no answer on for another session to act on.
+session, and sends the owner no new call. For an agent that `z-delivery` launched, `z-delivery`
+types the granting line instead, as its [Refusals](../delivery-lead/SKILL.md#refusals) section says.
 
 Every other session records only its own acts:
 

@@ -1,0 +1,23 @@
+[
+  {
+    "question": "May the agent fill the shelf column in the seed catalogue?",
+    "recommendation": "Yes, it only adds rows",
+    "issue": "GEO-9301",
+    "actions": ["Data: seed catalogue, insert-only backfill of the shelf column, after a backup"]
+  },
+  {
+    "question": "Keep fixing the lantern review findings?",
+    "recommendation": "Keep fixing",
+    "statusQuo": true
+  },
+  {
+    "question": "May the agent ship the seed counter and add its index rows?",
+    "recommendation": "Yes",
+    "actions": ["Code delivery", "Data: seed catalogue, Insert-only index rows, After a backup"]
+  },
+  {
+    "question": "May the agent split the lantern epic into two issues?",
+    "recommendation": "Yes",
+    "actions": ["Linear: split GEO-9304 into two issues", "Spike"]
+  }
+]

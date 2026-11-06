@@ -5,8 +5,10 @@ hq; a proposal is a call hq makes itself, put the same way. You take the owner t
 record each answer as the owner gives it, and apply them together when the owner is done. Never edit hq's database
 by hand.
 
-Kinds: a flagged issue (`Needs Geoff`), a shared decision (one choice, several issues), a blocked
-decision (a z- session waits), and untracked PRs.
+Each call is a flagged issue (one with the Linear label `Needs Geoff`), a shared decision (one
+choice, several issues), or a blocked decision (a session such as `z-delivery` waits on it). The
+count of PRs that cite no Linear issue is not a call. When the owner asks for an issue for one of
+those PRs, file the issue in the state that matches the PR, Done if it merged, and link the PR.
 
 ## Commands
 
@@ -31,7 +33,6 @@ decision (a z- session waits), and untracked PRs.
 - **Send the next call:** `hq open` (it refuses while one is open, and in quiet hours). Push it when
   your host can, headed "<what it decides> (<GEO-n>)", with its links. When hq says an open call
   closed, tell the owner in one line and open the next.
-- **Untracked PRs** are one call: the count by repo and the recommendation.
 - **"What's open?":** one line per call from `hq status` and `hq call list`: the open one, the
   put-off ones (marked), then the queue in order.
 
@@ -52,10 +53,10 @@ When the owner is done or steps away, apply every answer in one pass:
 2. Apply by kind:
    - **Blocked decision:** type the owner's answer into the asking session with `atc_terminal_type`, written
      as `skills/intake/references/calls.private.md` in hq-private says. Never message the agent.
+     Remove `Needs Geoff` from each of the call's issues that no other open call names.
    - **Flagged issue or shared decision:** make the change, remove `Needs Geoff`, and comment the
      owner's decision in the owner's words, in `calls.private.md`'s form. The answer settles a close, a scope change
      or a new project.
-   - **Untracked PR:** if the owner wants an issue, file it in the PR's state (Done if merged) and link it.
 3. `hq call apply` for each, even "leave it" (`--to none`).
 4. One message: one line per call on what you changed.
 

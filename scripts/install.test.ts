@@ -1,5 +1,5 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { appendFileSync, chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { z } from 'zod';
@@ -105,9 +105,8 @@ test('it warns and still restarts the lanes watcher when the unit scrub fails', 
   const home = join(ctx.directory, 'home');
   const units = join(home, '.config', 'systemd', 'user');
   mkdirSync(units, { recursive: true });
-  writeFileSync(join(units, 'hq-fleet.service'), '[Service]\nEnvironment="HQ_NOW=2031-03-04T05:06:07Z"\nExecStart=/bin/hq fleet ensure\n');
-  chmodSync(join(units, 'hq-fleet.service'), 0o444);
-  const systemctl = createStubSystemctl({ directory: join(ctx.directory, 'systemd'), show: { Transient: 'no' } });
+  writeFileSync(join(units, 'hq-fleet.service'), '[Service]\nExecStart=/bin/hq fleet ensure\n');
+  const systemctl = createStubSystemctl({ directory: join(ctx.directory, 'systemd'), show: { Transient: 'no' }, failedShows: { Environment: 'no bus' } });
 
   const installed = Bun.spawnSync(['sh', 'scripts/install.sh'], {
     cwd: ctx.tree,
@@ -119,6 +118,7 @@ test('it warns and still restarts the lanes watcher when the unit scrub fails', 
   expect(installed.stderr.toString()).toContain('install: hq units scrub failed, so a unit may still set HQ_NOW or HQ_QUIET; run hq units scrub again\n');
   expect(installed.stdout.toString()).toContain('hq-lanes restarted on ');
   expect(systemctl.readCalls()).toStrictEqual([
+    ['--user', 'show', '-p', 'Environment', '--value', 'hq-fleet.service'],
     ['--user', 'is-enabled', '--quiet', 'hq-lanes'],
     ['--user', 'show', '-p', 'Transient', '--value', 'hq-lanes.service'],
     ['--user', 'daemon-reload'],

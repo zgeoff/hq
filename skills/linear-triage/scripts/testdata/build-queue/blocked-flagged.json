@@ -1,0 +1,11 @@
+[
+  {
+    "question": "May the agent post the pond survey to the garden club forum?",
+    "recommendation": "Yes, post the draft as written",
+    "session": "cccccccc-9001-4000-8000-000000000002",
+    "issue": "GEO-9102",
+    "actions": ["Post: the garden club forum"],
+    "statusQuo": false,
+    "ownerListed": false
+  }
+]

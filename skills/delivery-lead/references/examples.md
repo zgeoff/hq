@@ -13,7 +13,10 @@ Understood. I'll set up an agent's design session for KET-40, the alert-model re
 
 ## A pitch
 
-Only issues with an action beyond the standard brief, each extra action on its own line:
+List only the issues with an Action line, such as `Deploy:` or `Credentials:`, that
+[owner-calls](../../owner-calls/SKILL.md#what-only-the-owner-decides) lists as the owner's, and put
+each such Action line under its issue. Launch the other issues without a pitch, as
+[Pitches](../SKILL.md#pitches) says.
 
 ```text
 Ready to launch, once you approve the actions:
