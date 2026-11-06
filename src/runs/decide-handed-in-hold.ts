@@ -1,10 +1,8 @@
 import { listOpenScopeBoxTexts } from './list-open-scope-box-texts.ts';
 
-const BOXES_CAP = 300;
-
 export type IssueRead = { ok: true; description: string } | { ok: false; reason: string };
 
-export type HandedInHold = { hold: false } | { hold: true; why: 'open-boxes'; openBoxes: string } | { hold: true; why: 'read-failed'; reason: string };
+export type HandedInHold = { hold: false } | { hold: true; why: 'open-boxes'; boxes: string[] } | { hold: true; why: 'read-failed'; reason: string };
 
 // A run that waits on more parts to launch stays working while its Linear Scope has an open box.
 // The read is null when the run waits on nothing, so Linear was never asked.
@@ -16,5 +14,5 @@ export function decideHandedInHold(waitsOn: string | null, read: IssueRead | nul
     return { hold: true, why: 'read-failed', reason: read === null ? 'no Linear read' : read.reason };
   }
   const texts = listOpenScopeBoxTexts(read.description);
-  return texts.length > 0 ? { hold: true, why: 'open-boxes', openBoxes: texts.join('; ').slice(0, BOXES_CAP) } : { hold: false };
+  return texts.length > 0 ? { hold: true, why: 'open-boxes', boxes: texts } : { hold: false };
 }

@@ -9,7 +9,7 @@ test.each<{ $title: string; waitsOn: string | null; read: IssueRead | null; expe
     $title: 'holds a run that waits on parts while a Scope box is open',
     waitsOn: 'free slots for the widgets#12 part',
     read: { ok: true, description: '## Scope\n\n- [x] kettle: done\n- [ ] widgets: next part\n' },
-    expected: { hold: true, why: 'open-boxes', openBoxes: 'widgets: next part' },
+    expected: { hold: true, why: 'open-boxes', boxes: ['widgets: next part'] },
   },
   {
     $title: 'hands in a run that waits on parts once every Scope box is ticked',
@@ -30,10 +30,16 @@ test.each<{ $title: string; waitsOn: string | null; read: IssueRead | null; expe
     expected: { hold: true, why: 'read-failed', reason: 'Linear answered 500' },
   },
   {
-    $title: 'names every open Scope box, joined and capped at 300 characters',
+    $title: 'lists every open Scope box in order',
     waitsOn: 'free slots for the widgets#12 part',
-    read: { ok: true, description: `## Scope\n\n- [ ] a: ${'x'.repeat(200)}\n- [ ] b: ${'y'.repeat(200)}\n` },
-    expected: { hold: true, why: 'open-boxes', openBoxes: `a: ${'x'.repeat(200)}; b: ${'y'.repeat(97)}`.slice(0, 300) },
+    read: { ok: true, description: '## Scope\n\n- [ ] a: first\n- [x] b: done\n- [ ] c: third\n' },
+    expected: { hold: true, why: 'open-boxes', boxes: ['a: first', 'c: third'] },
+  },
+  {
+    $title: 'holds a run whose open Scope box has no text',
+    waitsOn: 'free slots for the widgets#12 part',
+    read: { ok: true, description: '## Scope\n- [ ]\n' },
+    expected: { hold: true, why: 'open-boxes', boxes: ['(empty box)'] },
   },
 ])('it $title', (row) => {
   expect(decideHandedInHold(row.waitsOn, row.read)).toStrictEqual(row.expected);

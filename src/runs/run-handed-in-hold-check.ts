@@ -1,4 +1,5 @@
 import type { Database } from 'bun:sqlite';
+import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { logEvent } from '../log-event.ts';
 import { readEvents } from '../read-events.ts';
@@ -12,7 +13,9 @@ export interface HandedInHolds {
   log: (line: string) => void;
 }
 
-const HeldData = z.object({ openBoxes: z.string() });
+const BOXES_CAP = 300;
+
+const HeldData = z.object({ boxesHash: z.string() });
 
 // Linear is read only for a run that waits on something, and a held run logs once per change in the
 // set of its open boxes, not once per sweep.
@@ -26,10 +29,12 @@ export async function runHandedInHoldCheck(db: Database, holds: HandedInHolds, i
   }
   if (hold.hold && hold.why === 'open-boxes') {
     const last = readEvents(db, 'run', issue, ['handed-in-held']).at(-1);
-    const lastBoxes = last === undefined ? null : (HeldData.safeParse(JSON.parse(last.data)).data?.openBoxes ?? null);
-    if (lastBoxes !== hold.openBoxes) {
-      logEvent(db, 'run', issue, 'handed-in-held', actor, null, null, { openBoxes: hold.openBoxes });
-      holds.log(`handed-in held for ${issue}: it waits on more parts and its Linear Scope has open boxes: ${hold.openBoxes}`);
+    const lastHash = last === undefined ? null : (HeldData.safeParse(JSON.parse(last.data)).data?.boxesHash ?? null);
+    const boxesHash = createHash('sha256').update(JSON.stringify(hold.boxes)).digest('hex');
+    if (lastHash !== boxesHash) {
+      const openBoxes = hold.boxes.join('; ').slice(0, BOXES_CAP);
+      logEvent(db, 'run', issue, 'handed-in-held', actor, null, null, { openBoxes, boxesHash });
+      holds.log(`handed-in held for ${issue}: it waits on more parts and its Linear Scope has open boxes: ${openBoxes}`);
     }
   }
   return hold;

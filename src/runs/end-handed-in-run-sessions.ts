@@ -5,6 +5,7 @@ import { readEvents } from '../read-events.ts';
 import type { StoredEvent } from '../read-events.ts';
 import { buildHandedInPlan } from './build-handed-in-plan.ts';
 import { claimHandedInRun } from './claim-handed-in-run.ts';
+import { CLEANUP_ACTIONS, isCleanupHeld } from './is-cleanup-held.ts';
 import { collectGuardedSessions } from './collect-guarded-sessions.ts';
 import type { AtcSession } from './collect-guarded-sessions.ts';
 import { runHandedInHoldCheck } from './run-handed-in-hold-check.ts';
@@ -67,7 +68,7 @@ export async function endHandedInRunSessions(db: Database, atc: AtcView, deps: W
     const guarded = collectGuardedSessions(candidate.rows, listed);
     const activity = await readGuardedActivity(atc, guarded ?? []);
     const checked = pickQuietSessions(guarded, activity, quietBefore);
-    if (checked !== null && !(await probeHeld(db, options, candidate.issue))) {
+    if (checked !== null && !(await probeHeld(db, options, candidate.issue, at))) {
       ended += await endHandedInRun(db, shared, { ...candidate, checked, actor: options.actor, at });
     }
   }
@@ -83,8 +84,9 @@ async function readGuardedActivity(atc: AtcView, guarded: readonly AtcSession[])
   return new Map(read);
 }
 
-async function probeHeld(db: Database, options: HandedInOptions, issue: string): Promise<boolean> {
-  if (options.holds === undefined) {
+async function probeHeld(db: Database, options: HandedInOptions, issue: string, at: Date): Promise<boolean> {
+  // Another sweep's fresh claim rejects the hand-in anyway, so Linear is not read for it.
+  if (options.holds === undefined || isCleanupHeld(readEvents(db, 'run', issue, CLEANUP_ACTIONS), at)) {
     return false;
   }
   const check = await runHandedInHoldCheck(db, options.holds, issue, options.actor);
