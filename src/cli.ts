@@ -73,7 +73,7 @@ import { addRun } from './runs/add-run.ts';
 import { checkMergedOnGitHub } from './runs/check-merged-on-github.ts';
 import { readMergedPR } from './runs/read-merged-pr.ts';
 import { closePr } from './runs/close-pr.ts';
-import { normalizePrRef } from './runs/normalize-pr-ref.ts';
+import { PR_REF } from './runs/pr-ref.ts';
 import { finalPr } from './runs/final-pr.ts';
 import { makeFinalResolver } from './runs/make-final-resolver.ts';
 import { resolveCliFinal } from './runs/resolve-cli-final.ts';
@@ -2285,7 +2285,12 @@ Round ${p.review_round} recorded at ${p.reviewed_sha}.` };
       if (already) {
         return { data: { pr: already }, text: runLine(view(already.issue)) };
       }
-      const supersededBy = flags['superseded-by'] === undefined ? undefined : normalizePrRef(flags['superseded-by']).ref;
+      const supersededBy = flags['superseded-by'];
+
+      // A URL or owner/repo#n could name a repo outside zgeoff, which the GitHub check would not see.
+      if (supersededBy !== undefined && !PR_REF.test(supersededBy)) {
+        throw new HqError('bad_args', `--superseded-by takes repo#n, not "${supersededBy}"`);
+      }
       if (to === 'merged' && supersededBy !== undefined) {
         throw new HqError('bad_args', '--superseded-by goes with hq run closed: a merged PR supersedes nothing');
       }

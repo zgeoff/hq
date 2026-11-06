@@ -889,6 +889,16 @@ test('it logs the merged replacement with the close event', async () => {
   }
 });
 
+test.each(['https://github.com/cedar-labs/kettle/pull/21', 'cedar-labs/kettle#21'])('it refuses --superseded-by %s, which names an owner', async (named) => {
+  await hq('run', 'add', 'GEO-520', '--title', 'Invented kettle work', '--where', 'none');
+  await hq('run', 'pr', 'GEO-520', 'kettle#26');
+
+  const refused = await hq('run', 'closed', 'kettle#26', '--superseded-by', named);
+
+  expect(refused.json.error).toStrictEqual({ code: 'bad_args', message: `--superseded-by takes repo#n, not "${named}"` });
+  expect(db().query("SELECT state FROM run_prs WHERE ref = 'kettle#26'").get()).toStrictEqual({ state: 'open' });
+});
+
 test('it refuses --superseded-by on hq run merged', async () => {
   await hq('run', 'add', 'GEO-519', '--title', 'Invented kettle work', '--where', 'none');
   await hq('run', 'pr', 'GEO-519', 'kettle#24');
