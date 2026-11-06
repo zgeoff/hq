@@ -52,7 +52,7 @@ moved: review that one.
 Keep one line for each PR in flight in `~/.local/share/z-sessions/review.md`, such as
 `cloud#88 3fa91c2 reviewing`. Delete the line after the merge. Before you message anyone about a
 PR, read `hq pr status <repo> <pr>`: it shows the gate, the owner's answer and who holds the next
-step, and it goes stale when the head moves. When another session holds the next step, record it
+step. When another session holds the next step, record it
 with `hq pr next <repo> <pr> <session>`.
 
 1. **Check that it's ready.** It isn't a draft, CI is green on the head, and the PR description

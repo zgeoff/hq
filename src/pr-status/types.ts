@@ -33,7 +33,6 @@ export interface PRStatusView {
   answerSource: string | null;
   answerNote: string | null;
   answerAt: string | null;
-  answerStale: boolean;
   next: string | null;
   nextAt: string | null;
 

@@ -16,8 +16,6 @@ export interface SourceRequest {
   ref: PRRef;
   wanted: OwnerAction;
   source: string;
-
-  head: string | null;
 }
 
 // chat: has no record to check, so only the owner's own session may give it.
@@ -54,19 +52,15 @@ function findCallRefusal(db: Database, check: CallCheck): string | null {
   if (answer === null) {
     return `${check.source} has no owner answer for its current round, in the console or by \`hq call answer\` from the owner's session (z-stu), as atc finds the caller`;
   }
-  const reused = check.wanted.action === 'override' ? findOverrideAtOtherHead(db, check, answer.seq) : null;
-  if (reused !== null) {
-    return `${check.source} already backs an override of ${check.ref.slug}#${check.ref.pr} at ${reused.slice(0, 7)}, and the owner answered it for that head only`;
-  }
   const data = AnswerDataSchema.parse(JSON.parse(answer.data));
   const options = readRoundOptions(db, check.id, answer.seq);
   if (check.needsGrant || options.some((option) => option.grants !== undefined)) {
     return findGrantRefusal(check, options, data.answer);
   }
 
-  // A plain yes names no head, so its first use could pass a head the owner never saw.
+  // A call title can name an override of one CI check, so a plain yes cannot show the owner meant the findings.
   if (check.wanted.action === 'override') {
-    return `${check.source} has no option that grants the override: an override needs the owner to pick an option whose grants name the PR and the head, and a plain yes names no head`;
+    return `${check.source} has no option that grants the override: an override needs the owner to pick an option whose grants name the PR`;
   }
   const title = data.title ?? call.title;
   if (!hasPRName(title, check.ref)) {
@@ -81,18 +75,6 @@ function findCallRefusal(db: Database, check: CallCheck): string | null {
   return null;
 }
 
-const OverrideHeadsSchema = z.array(z.object({ head: z.string() }));
-
-// call:<id> and console:<id> name the same answer, so an override under either form counts.
-function findOverrideAtOtherHead(db: Database, check: CallCheck, answerSeq: number): string | null {
-  const rows = OverrideHeadsSchema.parse(
-    db
-      .query("SELECT json_extract(data, '$.head') AS head FROM events WHERE subject = 'hq' AND subject_id = ? AND action = 'pr-override' AND json_extract(data, '$.source') IN (?, ?) AND seq > ? ORDER BY seq")
-      .all(`pr:${check.ref.repo}#${check.ref.pr}`, `call:${check.id}`, `console:${check.id}`, answerSeq),
-  );
-  return rows.find((row) => row.head !== check.head)?.head ?? null;
-}
-
 // The option the console stores before ` | ` (or the whole answer) is the one the owner picked.
 function findGrantRefusal(check: CallCheck, options: ItemOption[], answer: string): string | null {
   const picked = (answer.split(' | ')[0] ?? '').trim();
@@ -100,31 +82,25 @@ function findGrantRefusal(check: CallCheck, options: ItemOption[], answer: strin
   if (option?.grants === undefined) {
     return `the option the owner picked in ${check.source} ("${picked}") grants no ${check.wanted.action}`;
   }
-  if (check.wanted.action === 'override' && option.grants.head === undefined) {
-    return `the option the owner picked in ${check.source} grants an override with no head: an override grant names the head the owner approved`;
-  }
   if (!isMatchingGrant(option.grants, check)) {
-    return `the option the owner picked in ${check.source} grants ${formatGrant(option.grants)}, not ${formatWanted(check, option.grants)}`;
+    return `the option the owner picked in ${check.source} grants ${formatGrant(option.grants)}, not ${formatWanted(check)}`;
   }
   return null;
 }
 
 function isMatchingGrant(grant: ItemGrant, check: CallCheck): boolean {
   const finding = check.wanted.action === 'accept-risk' ? check.wanted.finding : undefined;
-  const atHead = grant.head === undefined || grant.head === check.head;
-  return grant.action === check.wanted.action && grant.pr.toLowerCase() === `${check.ref.slug}#${check.ref.pr}`.toLowerCase() && grant.finding === finding && atHead;
+  return grant.action === check.wanted.action && grant.pr.toLowerCase() === `${check.ref.slug}#${check.ref.pr}`.toLowerCase() && grant.finding === finding;
 }
 
 function formatGrant(grant: ItemGrant): string {
   const finding = grant.finding === undefined ? '' : ` finding ${grant.finding}`;
-  const head = grant.head === undefined ? '' : ` at ${grant.head.slice(0, 7)}`;
-  return `${grant.action} of ${grant.pr}${finding}${head}`;
+  return `${grant.action} of ${grant.pr}${finding}`;
 }
 
-function formatWanted(check: CallCheck, grant: ItemGrant): string {
+function formatWanted(check: CallCheck): string {
   const finding = check.wanted.action === 'accept-risk' ? ` finding ${check.wanted.finding}` : '';
-  const head = grant.head === undefined ? '' : ` at ${check.head === null ? 'a head gh could not read' : check.head.slice(0, 7)}`;
-  return `${check.wanted.action} of ${check.ref.slug}#${check.ref.pr}${finding}${head}`;
+  return `${check.wanted.action} of ${check.ref.slug}#${check.ref.pr}${finding}`;
 }
 
 function hasActionName(title: string, wanted: OwnerAction): boolean {

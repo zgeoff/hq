@@ -2,9 +2,9 @@ import { match } from 'ts-pattern';
 import { z } from 'zod';
 import { HqError } from '../errors.ts';
 import { findAcceptedRisks } from '../pr-status/find-accepted-risks.ts';
-import { readHeadLgtm } from '../pr-status/read-head-lgtm.ts';
+import { readOwnerLgtm } from '../pr-status/read-owner-lgtm.ts';
 import { readHeadCIOverrides } from '../pr-status/read-head-ci-overrides.ts';
-import { findOwnerOverride } from '../pr-status/find-owner-override.ts';
+import { readOwnerOverride } from '../pr-status/read-owner-override.ts';
 import { readPRHead } from '../pr-status/read-pr-head.ts';
 import { OWNER } from '../releases/owner.ts';
 import { assertPR } from './assert-pr.ts';
@@ -128,7 +128,7 @@ async function checkOwnerHeld(request: PRRequest, parsed: ParsedRepo, facts: Gat
   const isInstruction = instructionHeld ?? (() => false);
   const head = facts.headRefOid;
   const files = await readFiles();
-  const lgtm = readHeadLgtm(request.db, parsed.repo, request.pr, head) !== null;
+  const lgtm = readOwnerLgtm(request.db, parsed.repo, request.pr) !== null;
   const instruction = files.filter((file) => isInstruction(file));
   if (ownerHeld === null && instruction.length === 0) {
     return;
@@ -159,7 +159,7 @@ async function checkNoslopGate(request: PRRequest, parsed: ParsedRepo, facts: Ga
 
 async function readNoslopGateFacts(request: PRRequest, parsed: ParsedRepo, facts: GateFacts): Promise<NoslopGateFacts> {
   const head = facts.headRefOid;
-  const override = findOwnerOverride(request.db, parsed.repo, request.pr, head);
+  const override = readOwnerOverride(request.db, parsed.repo, request.pr);
   if (override !== null) {
     const findings = await readFindings(request, parsed);
     const headNow = await readPRHead(request.run, buildSlug(parsed), request.pr);

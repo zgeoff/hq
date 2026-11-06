@@ -10,7 +10,7 @@ import type { Runner } from '../runner/types.ts';
 import { buildPRStatusView } from './build-pr-status-view.ts';
 import { readHeadExemption } from './read-head-exemption.ts';
 import { readHeadMechanical } from './read-head-mechanical.ts';
-import { findOwnerOverride } from './find-owner-override.ts';
+import { readOwnerOverride } from './read-owner-override.ts';
 import type { OwnerOverride } from './read-owner-overrides.ts';
 import { readAnswerSourceRefusal } from './read-answer-source-refusal.ts';
 import { findPRStatus } from './find-pr-status.ts';
@@ -36,7 +36,6 @@ import { recordPROverride } from './record-pr-override.ts';
 import { recordPRNext } from './record-pr-next.ts';
 import { runPRExempt } from './run-pr-exempt.ts';
 import { runPRMechanical } from './run-pr-mechanical.ts';
-import { runPRRebased } from './run-pr-rebased.ts';
 import { requireAnswerSource } from './require-answer-source.ts';
 import type { CIOverrideView, PRAnswer, PRStatusView } from './types.ts';
 import { updatePRHead } from './update-pr-head.ts';
@@ -69,16 +68,13 @@ export async function runPRCommand(input: PRCommandInput): Promise<Out> {
   if (input.verb === 'mechanical') {
     return await runPRMechanical(input, parsePRRef(rawRepo, rawPR));
   }
-  if (input.verb === 'rebased') {
-    return await runPRRebased(input, parsePRRef(rawRepo, rawPR));
-  }
   if (input.verb === 'exempt') {
     return await runPRExempt(input, parsePRRef(rawRepo, rawPR));
   }
   if (input.verb === 'next') {
     return await runNext(input, parsePRRef(rawRepo, rawPR), third);
   }
-  throw new HqError('bad_args', 'usage: hq pr status|answer|override|accept-risk|mechanical|rebased|exempt|next <repo> <pr>');
+  throw new HqError('bad_args', 'usage: hq pr status|answer|override|accept-risk|mechanical|exempt|next <repo> <pr>');
 }
 
 async function runStatus(input: PRCommandInput, ref: PRRef): Promise<Out> {
@@ -96,7 +92,7 @@ async function readUnrecordedStatus(input: PRCommandInput, ref: PRRef): Promise<
     return none;
   }
   const head = await readPRHead(input.run, ref.slug, ref.pr);
-  const override = findStandingOverride(input, ref, head);
+  const override = readStandingOverride(input, ref);
   const records = readStandingRecords(input, ref, head);
   const ciOverrides = readStandingCIOverrides(input, ref, head);
   const shown = override === null ? null : { head: override.head, source: override.source, note: override.note, at: override.at };
@@ -108,8 +104,8 @@ async function readUnrecordedStatus(input: PRCommandInput, ref: PRRef): Promise<
   return { data: { pr: null, ...(shown === null ? {} : { override: shown }), ...(ciOverrides.length === 0 ? {} : { ciOverrides }), ...(recordsLine === null ? {} : { reviewRecords: records }), acceptedRisks: risks }, text: lines.join('\n') };
 }
 
-function findStandingOverride(input: PRCommandInput, ref: PRRef, head: string | null): OwnerOverride | null {
-  return head === null ? null : findOwnerOverride(input.db, ref.repo, ref.pr, head);
+function readStandingOverride(input: PRCommandInput, ref: PRRef): OwnerOverride | null {
+  return readOwnerOverride(input.db, ref.repo, ref.pr);
 }
 
 function readStandingCIOverrides(input: PRCommandInput, ref: PRRef, head: string | null): CIOverrideView[] {
@@ -130,7 +126,7 @@ async function refreshStatus(input: PRCommandInput, ref: PRRef, row: PRStatusRow
   if (current !== null) {
     await updatePRHead(input.db, ref.repo, ref.pr, current);
   }
-  return buildOut(buildPRStatusView(row, current, findStandingOverride(input, ref, current), { ciOverrides: readStandingCIOverrides(input, ref, current), reviewRecords: readStandingRecords(input, ref, current), acceptedRisks: await readAcceptedRiskViews(input.run, input.db, ref, readNoslop) }));
+  return buildOut(buildPRStatusView(row, current, readStandingOverride(input, ref), { ciOverrides: readStandingCIOverrides(input, ref, current), reviewRecords: readStandingRecords(input, ref, current), acceptedRisks: await readAcceptedRiskViews(input.run, input.db, ref, readNoslop) }));
 }
 
 function buildOut(view: PRStatusView): Out {
@@ -182,7 +178,7 @@ async function runOverride(input: PRCommandInput, ref: PRRef): Promise<Out> {
   const check = parseCheckFlag(input.flags.check);
   const target = check === null ? 'the open findings' : `the ${check} check`;
   const head = await readPRHead(input.run, ref.slug, ref.pr);
-  const source = await requireOwnerSource(input, { ref, wanted: check === null ? { action: 'override' } : { action: 'override', check }, head });
+  const source = await requireOwnerSource(input, { ref, wanted: check === null ? { action: 'override' } : { action: 'override', check } });
   const note = input.flags.note?.trim() ?? '';
   if (note === '') {
     throw new HqError('bad_args', `--note is required: why the owner overrides ${target} at this head`);
@@ -243,7 +239,7 @@ function requireNextHolder(flags: Flags, session: string | undefined): string | 
 
 async function readOut(input: PRCommandInput, ref: PRRef, head: string): Promise<Out> {
   const row = await readWrittenRow(input, ref);
-  return buildOut(buildPRStatusView(row, head, findStandingOverride(input, ref, head), { ciOverrides: readStandingCIOverrides(input, ref, head), reviewRecords: readStandingRecords(input, ref, head), acceptedRisks: await readAcceptedRiskViews(input.run, input.db, ref, false) }));
+  return buildOut(buildPRStatusView(row, head, readStandingOverride(input, ref), { ciOverrides: readStandingCIOverrides(input, ref, head), reviewRecords: readStandingRecords(input, ref, head), acceptedRisks: await readAcceptedRiskViews(input.run, input.db, ref, false) }));
 }
 
 async function readWrittenRow(input: PRCommandInput, ref: PRRef): Promise<PRStatusRow> {

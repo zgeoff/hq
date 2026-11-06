@@ -153,7 +153,5 @@ Every other session records only its own acts:
 
 - **Log each act under a grant:** run `hq grant act <name> --target <issue, PR or command>`. The
   name is the one in your start prompt's "Log it with" line.
-- **In `z-review`, carry the owner's lgtm across a rebase:** run
-  `hq pr rebased <repo> <pr> --from <old head SHA>`.
 - **In `z-review`, record a mechanical edit to an instruction file:** run
   `hq pr mechanical <repo> <pr>`.

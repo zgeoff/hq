@@ -1,11 +1,6 @@
 import type { Database } from 'bun:sqlite';
 import { z } from 'zod';
 
-export interface OwnerWords {
-  source: string;
-  note: string | null;
-}
-
 export interface OwnerAnswer {
   seq: number;
   at: string;
@@ -13,8 +8,6 @@ export interface OwnerAnswer {
   answer: 'lgtm' | 'changes' | 'reject';
   source: string;
   note: string | null;
-
-  carried: OwnerWords | null;
 }
 
 const AnswerRowSchema = z.object({ seq: z.number(), at: z.string(), data: z.string() });
@@ -25,14 +18,14 @@ export function readPRAnswers(db: Database, repo: string, pr: number): OwnerAnsw
   return answers.includes(null) ? null : answers.filter((answer) => answer !== null);
 }
 
-const AnswerSchema = z.object({ answer: z.enum(['lgtm', 'changes', 'reject']), head: z.string().nullable(), source: z.string(), note: z.string().nullish(), carried: z.object({ source: z.string(), note: z.string().nullable() }).nullish() });
+const AnswerSchema = z.object({ answer: z.enum(['lgtm', 'changes', 'reject']), head: z.string().nullable(), source: z.string(), note: z.string().nullish() });
 
 type AnswerRow = z.output<typeof AnswerRowSchema>;
 
 function parseAnswer(row: AnswerRow): OwnerAnswer | null {
   try {
     const parsed = AnswerSchema.safeParse(JSON.parse(row.data));
-    return parsed.success ? { seq: row.seq, at: row.at, head: parsed.data.head, answer: parsed.data.answer, source: parsed.data.source, note: parsed.data.note ?? null, carried: parsed.data.carried ?? null } : null;
+    return parsed.success ? { seq: row.seq, at: row.at, head: parsed.data.head, answer: parsed.data.answer, source: parsed.data.source, note: parsed.data.note ?? null } : null;
   } catch {
     return null;
   }

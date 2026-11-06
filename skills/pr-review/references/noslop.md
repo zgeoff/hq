@@ -57,14 +57,14 @@ things: tell `z-stu`.
 
 ## The gate and overrides
 
-`hq review gate <repo> <pr>` passes on green CI with no open finding, or with the owner's override
-at that head. A finding is closed by a confirmed fix, `not-a-defect`, `deferred GEO-<n>`, or the
+`hq review gate <repo> <pr>` passes on green CI when no finding is open or the owner overrode them.
+A finding is closed by a confirmed fix, `not-a-defect`, `deferred GEO-<n>`, or the
 owner's recorded `accepted-risk`. If the head moves while the gate runs, review the new head and run it
 again.
 
 When the owner says to merge anyway, in an answer that counts, ask `z-stu` to record
-`hq pr override <repo> <pr> --source <source> --note '<why>'`. It passes every open finding at that
-head, never red CI, and a push voids it. A session's approval or your own judgement is no override.
+`hq pr override <repo> <pr> --source <source> --note '<why>'`. It passes every open finding, never
+red CI. A session's approval or your own judgement is no override.
 
 ## When noslop fails
 

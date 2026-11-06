@@ -44,7 +44,6 @@ export const SHAPES: Record<string, { command: string; keys: string[] }> = {
       'pr?.answerSource?',
       'pr?.answerNote?',
       'pr?.answerAt?',
-      'pr?.answerStale',
       'pr?.next?',
       'pr?.nextAt?',
       'pr?.updatedAt',

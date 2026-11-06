@@ -2,8 +2,6 @@ import { formatAcceptedRiskLine } from './format-accepted-risk-line.ts';
 import { formatCIOverrideLine } from './format-ci-override-line.ts';
 import { formatOverrideLine } from './format-override-line.ts';
 import { formatReviewRecordsLine } from './format-review-records-line.ts';
-import { formatAnswerSource } from './format-answer-source.ts';
-import { isRebasedSource } from './is-rebased-source.ts';
 import type { PRStatusView } from './types.ts';
 
 export function formatPRStatus(view: PRStatusView): string {
@@ -37,12 +35,8 @@ function formatAnswerLine(view: PRStatusView): string {
   if (view.answer === null) {
     return 'answer: none';
   }
-  const at = formatAt(view.answerHead, view.answerStale);
+  const at = formatAt(view.answerHead, false);
   const when = formatWhen(view.answerAt);
-  if (view.answerSource !== null && isRebasedSource(view.answerSource)) {
-    const carried = view.answerNote === null ? '' : ` (${view.answerNote})`;
-    return `answer: ${view.answer} ${at} via ${formatAnswerSource(view.answerSource)}${carried}${when}`;
-  }
   const note = view.answerNote === null ? '' : `: ${view.answerNote}`;
   const source = view.answerSource === null ? '' : ` via ${view.answerSource}`;
   return `answer: ${view.answer} ${at}${source}${when}${note}`;
