@@ -74,7 +74,7 @@ interface FinalMarkInput {
   resolutions: FinalResolutions;
 }
 
-const RunPrOwnerSchema =z.object({ issue: z.string() }).nullable();
+const RunPrOwnerSchema = z.object({ issue: z.string() }).nullable();
 
 function applyFinalMark(db: Database, input: FinalMarkInput): string | null {
   const ref = parseMarkedRef(input.ref);
