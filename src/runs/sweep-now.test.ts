@@ -133,7 +133,7 @@ test('it keeps a handed-in run working while it waits on parts and its Scope has
 
   expect(ctx.readState('GEO-9856')).toBe('working');
   expect(fleet.calls).toStrictEqual([]);
-  expect(log.mock.calls).toStrictEqual([['handed-in held for GEO-9856: it waits on more parts and its Linear Scope has 1 open box']]);
+  expect(log.mock.calls).toStrictEqual([['handed-in held for GEO-9856: it waits on more parts and its Linear Scope has open boxes: widgets: the next part']]);
 
   await sweepNow(ctx.db, ctx.client, gh, options);
 

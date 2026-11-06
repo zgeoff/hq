@@ -12,10 +12,10 @@ export interface HandedInHolds {
   log: (line: string) => void;
 }
 
-const HeldData = z.object({ openBoxes: z.number() });
+const HeldData = z.object({ openBoxes: z.string() });
 
-// Linear is read only for a run that waits on something, and a held run logs once per change in its
-// open box count, not once per sweep.
+// Linear is read only for a run that waits on something, and a held run logs once per change in the
+// set of its open boxes, not once per sweep.
 export async function runHandedInHoldCheck(db: Database, holds: HandedInHolds, issue: string, actor: string): Promise<HandedInHold> {
   const waitsOn = getRun(db, issue)?.waits_on ?? null;
   const hasWait = waitsOn !== null && waitsOn.trim() !== '';
@@ -29,7 +29,7 @@ export async function runHandedInHoldCheck(db: Database, holds: HandedInHolds, i
     const lastBoxes = last === undefined ? null : (HeldData.safeParse(JSON.parse(last.data)).data?.openBoxes ?? null);
     if (lastBoxes !== hold.openBoxes) {
       logEvent(db, 'run', issue, 'handed-in-held', actor, null, null, { openBoxes: hold.openBoxes });
-      holds.log(`handed-in held for ${issue}: it waits on more parts and its Linear Scope has ${hold.openBoxes} open box${hold.openBoxes === 1 ? '' : 'es'}`);
+      holds.log(`handed-in held for ${issue}: it waits on more parts and its Linear Scope has open boxes: ${hold.openBoxes}`);
     }
   }
   return hold;
