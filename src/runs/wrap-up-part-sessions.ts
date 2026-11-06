@@ -4,6 +4,7 @@ import { z } from 'zod';
 import type { SessionInfo } from '../atc/session-schema.ts';
 import { logEvent } from '../log-event.ts';
 import { readEvents } from '../read-events.ts';
+import { collectGuardedSessions } from './collect-guarded-sessions.ts';
 import { collectPartSessionWraps } from './collect-part-session-wraps.ts';
 import type { PartSessionActivity, PartSessionWrap } from './collect-part-session-wraps.ts';
 import { pickPartWrapOutcome } from './pick-part-wrap-outcome.ts';
@@ -58,8 +59,11 @@ export async function wrapUpPartSessions(
     if (claim === null) {
       continue;
     }
-    const full = atc.sessions.find((info) => info.id.toLowerCase().startsWith(wrap.session_id.toLowerCase()))?.id ?? wrap.session_id;
-    const wrapUp = await wrapUpRunSafely(db, deps, wrap.issue, { actor: options.actor, onlySessions: [full], onlyNoteAction: true });
+
+    // The wrap-up skips a sub-session left off this list before its pin check, so the list carries
+    // the helper's whole tree.
+    const tree = collectGuardedSessions([{ issue: wrap.issue, session_id: wrap.session_id, active: 1 }], atc.sessions) ?? [];
+    const wrapUp = await wrapUpRunSafely(db, deps, wrap.issue, { actor: options.actor, onlySessions: tree.map((session) => session.id), onlyNoteAction: true });
     for (const failure of wrapUp.failed) {
       options.log(`part-session wrap-up of ${wrap.session_id} on ${wrap.issue} failed: ${failure.id}: ${failure.reason}`);
     }
