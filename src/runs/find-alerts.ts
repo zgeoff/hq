@@ -52,7 +52,9 @@ export function findAlerts(db: Database, sessions: SessionInfo[], activity: Map<
       if (!s.alive) {
         continue;
       }
-      if (r.geoff_chat || r.waits_on_geoff) {
+
+      // The delivery lead has named what the run waits on, so an idle session is expected.
+      if (r.geoff_chat || r.waits_on_geoff || r.waits_on !== null) {
         continue;
       }
       if ((!active.helper || !mainActive) && probeHandedIn(db, r.prs)) {
