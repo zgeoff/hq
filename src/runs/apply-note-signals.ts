@@ -87,18 +87,15 @@ function applyFinalMark(db: Database, input: FinalMarkInput): string | null {
   } else if (owner.issue !== input.issue) {
     return null;
   }
-  if (!markResolved(db, { ...input, ref })) {
-    return null;
-  }
   writeMarkerOwner(db, input.issue, ref, input.source);
-  return ref;
+  return markResolved(db, { ...input, ref }) ? ref : null;
 }
 
 const ATC_MARKER_SOURCE = /^marker:atc:(?<prefix>[0-9a-f]+)$/iu;
 const SessionIDRows = z.array(z.object({ session_id: z.string() }));
 
-// A marker from an atc session names that session's prefix. It replaces an owner an earlier marker
-// set, and never one set with hq run pr --session.
+// A marker from an atc session names that session's prefix, even when its SHA is already final. It
+// replaces an owner an earlier marker set, and never one set with hq run pr --session.
 function writeMarkerOwner(db: Database, issue: string, ref: string, source: string): void {
   const prefix = ATC_MARKER_SOURCE.exec(source)?.groups?.['prefix'];
   if (prefix === undefined) {

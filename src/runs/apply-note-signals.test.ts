@@ -79,3 +79,29 @@ test('it hands the owner to the session of a later FINAL marker when an earlier 
 
   expect(ctx.db.query("SELECT session_id FROM run_prs WHERE ref = 'kettle#85'").get()).toStrictEqual({ session_id: '0000f002-aaaa-4aaa-8aaa-aaaaaaaaaaaa' });
 });
+
+test('it hands the owner to the session of a later FINAL marker at the same SHA', () => {
+  const ctx = setupTest();
+  addRun(ctx.db, { issue: 'GEO-508', title: 'Invented kettle work', place: 'local', session: null, next: 'Working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
+  setSession(ctx.db, 'GEO-508', '0000f001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'z-delivery', 'add');
+  setSession(ctx.db, 'GEO-508', '0000f002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'z-delivery', 'add');
+  addPr(ctx.db, 'GEO-508', 'kettle#86', 'z-delivery');
+  applyNoteSignals(ctx.db, 'GEO-508', 'FINAL kettle#86 39f05fe', { source: 'atc:0000f001' });
+
+  applyNoteSignals(ctx.db, 'GEO-508', 'FINAL kettle#86 39f05fe', { source: 'atc:0000f002' });
+
+  expect(ctx.db.query("SELECT session_id FROM run_prs WHERE ref = 'kettle#86'").get()).toStrictEqual({ session_id: '0000f002-aaaa-4aaa-8aaa-aaaaaaaaaaaa' });
+});
+
+test('it keeps an owner set by hand when an atc FINAL marker at the same SHA names another session', () => {
+  const ctx = setupTest();
+  addRun(ctx.db, { issue: 'GEO-509', title: 'Invented kettle work', place: 'local', session: null, next: 'Working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
+  setSession(ctx.db, 'GEO-509', '0000f001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'z-delivery', 'add');
+  setSession(ctx.db, 'GEO-509', '0000f002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'z-delivery', 'add');
+  addOwnedPr(ctx.db, 'GEO-509', 'kettle#87', { actor: 'z-delivery', session: '0000f002' });
+  applyNoteSignals(ctx.db, 'GEO-509', 'FINAL kettle#87 39f05fe', { source: 'atc:0000f002' });
+
+  applyNoteSignals(ctx.db, 'GEO-509', 'FINAL kettle#87 39f05fe', { source: 'atc:0000f001' });
+
+  expect(ctx.db.query("SELECT session_id FROM run_prs WHERE ref = 'kettle#87'").get()).toStrictEqual({ session_id: '0000f002-aaaa-4aaa-8aaa-aaaaaaaaaaaa' });
+});
