@@ -21,6 +21,7 @@ export interface PrClose {
   to: 'merged' | 'closed';
   actor: string;
   facts?: MergeFacts | undefined;
+  supersededBy?: string | undefined;
 }
 
 export function closePr(db: Database, raw: string, close: PrClose): RunPr {
@@ -34,7 +35,8 @@ export function closePr(db: Database, raw: string, close: PrClose): RunPr {
       const mergeSha = close.to === 'merged' ? (close.facts?.mergeSha ?? null) : null;
       db.query('UPDATE run_prs SET state = ?, merged_at = ?, merge_sha = COALESCE(?, merge_sha), updated_at = ? WHERE ref = ?').run(close.to, mergedAt, mergeSha, t, ref);
       touch(db, pr.issue);
-      logEvent(db, 'run', pr.issue, close.to, close.actor, 'open', close.to, { ref });
+      const data = close.supersededBy === undefined ? { ref } : { ref, supersededBy: close.supersededBy };
+      logEvent(db, 'run', pr.issue, close.to, close.actor, 'open', close.to, data);
       dropTopic(db, REVIEWER, `final:${ref}`);
       if (close.to === 'merged') {
         clearOwnerWait(db, pr.issue, ref, close.actor);

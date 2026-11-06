@@ -849,6 +849,55 @@ test('hq run ship prints a vers PR shipped at its merge as at merge', async () =
   }
 });
 
+test.each([
+  ['MERGED', { pr: { ref: 'kettle#20', state: 'closed' } }, { state: 'closed' }],
+  ['OPEN', { error: { code: 'not_merged', message: 'kettle#21 is OPEN on GitHub, not merged; hq leaves it open' } }, { state: 'open' }],
+])('it closes a run PR in hq with --superseded-by only when GitHub shows the replacement %s', async (ghState, reply, row) => {
+  await hq('run', 'add', 'GEO-517', '--title', 'Invented kettle work', '--where', 'none');
+  await hq('run', 'pr', 'GEO-517', 'kettle#20');
+  const path0 = process.env['PATH'];
+  const bin = `${dir}/bin`;
+  mkdirSync(bin, { recursive: true });
+  writeFileSync(`${bin}/gh`, ['#!/bin/sh', `echo '{"state":"${ghState}"}'`, ''].join('\n'));
+  chmodSync(`${bin}/gh`, 0o755);
+  process.env['PATH'] = `${bin}:${path0}`;
+  try {
+    const result = await hq('run', 'closed', 'kettle#20', '--superseded-by', 'kettle#21');
+
+    expect(result.json).toMatchObject(reply);
+    expect(db().query("SELECT state FROM run_prs WHERE ref = 'kettle#20'").get()).toStrictEqual(row);
+  } finally {
+    process.env['PATH'] = path0;
+  }
+});
+
+test('it logs the merged replacement with the close event', async () => {
+  await hq('run', 'add', 'GEO-518', '--title', 'Invented kettle work', '--where', 'none');
+  await hq('run', 'pr', 'GEO-518', 'kettle#22');
+  const path0 = process.env['PATH'];
+  const bin = `${dir}/bin`;
+  mkdirSync(bin, { recursive: true });
+  writeFileSync(`${bin}/gh`, ['#!/bin/sh', 'echo \'{"state":"MERGED"}\'', ''].join('\n'));
+  chmodSync(`${bin}/gh`, 0o755);
+  process.env['PATH'] = `${bin}:${path0}`;
+  try {
+    await hq('run', 'closed', 'kettle#22', '--superseded-by', 'kettle#23');
+
+    expect(db().query("SELECT data FROM events WHERE action = 'closed' AND subject_id = 'GEO-518'").get()).toStrictEqual({ data: JSON.stringify({ ref: 'kettle#22', supersededBy: 'kettle#23' }) });
+  } finally {
+    process.env['PATH'] = path0;
+  }
+});
+
+test('it refuses --superseded-by on hq run merged', async () => {
+  await hq('run', 'add', 'GEO-519', '--title', 'Invented kettle work', '--where', 'none');
+  await hq('run', 'pr', 'GEO-519', 'kettle#24');
+
+  const refused = await hq('run', 'merged', 'kettle#24', '--superseded-by', 'kettle#21');
+
+  expect(refused.json.error).toStrictEqual({ code: 'bad_args', message: '--superseded-by goes with hq run closed: a merged PR supersedes nothing' });
+});
+
 test('hq run tidy --dry-run says what it would do to a merged run and writes no row', async () => {
   onTestFinished(overrideEnv('HQ_ATC_SOCKET', `${dir}/atc.sock`));
   const roster = [

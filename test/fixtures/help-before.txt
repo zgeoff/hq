@@ -36,7 +36,7 @@ hq 0.79.0: headquarters for the z- sessions. Every command takes --json.
   hq run tidy [--dry-run]            forget the sessions of runs past merge now, as the sweep does once per merge; --dry-run lists what it would forget, destroy and keep, and changes nothing
   hq run done|drop <issue> [--note T] | next|gate|title <issue> <text> | geoff-chat <issue> on|off
   hq run pr <issue> <repo#n|URL> | final <pr> --sha S [--fixed N] [--followups GEO-1,GEO-2] | reviewing <pr> | reviewed <pr> --sha S [--recheck]
-  hq run merged|closed <pr> | note <issue|session> <text> [--label L]
+  hq run merged|closed <pr> [--superseded-by <repo#n>] | note <issue|session> <text> [--label L]
   hq run unmerge <pr> [--reason T]   undo a wrong merged mark: the PR is open again in hq (hq run merged asks GitHub first)
   hq run unfinal <pr> [--reason T]   clear a final mark the head has moved past; the sweep stops flagging the PR until the next final
 
