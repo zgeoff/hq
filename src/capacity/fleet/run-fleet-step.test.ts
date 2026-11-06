@@ -77,9 +77,9 @@ test('it reads the slots now when forced, whatever the age of the newest read', 
 test('it adds a news line for the forecast pause and leaks no token into it, the rows or the result', async () => {
   const ctx = setupTest();
   const tokens: Record<string, RunResult> = {
-    'op://claude-slots/claude-setup-token-1/credential': { code: 0, stdout: 'sk-ant-kettle-slot-1\n', stderr: '' },
-    'op://claude-slots/claude-setup-token-2/credential': { code: 0, stdout: 'sk-ant-kettle-slot-2\n', stderr: '' },
-    'op://claude-slots/claude-setup-token-3/credential': { code: 0, stdout: 'sk-ant-kettle-slot-3\n', stderr: '' },
+    'op://fleet/claude-setup-token-1/credential': { code: 0, stdout: 'sk-ant-kettle-slot-1\n', stderr: '' },
+    'op://fleet/claude-setup-token-2/credential': { code: 0, stdout: 'sk-ant-kettle-slot-2\n', stderr: '' },
+    'op://fleet/claude-setup-token-3/credential': { code: 0, stdout: 'sk-ant-kettle-slot-3\n', stderr: '' },
   };
   const run = mock<Runner>((cmd) => Promise.resolve(tokens[cmd[2] ?? ''] ?? { code: 1, stdout: '', stderr: 'invented: no such item' }));
 
@@ -105,9 +105,9 @@ test('it adds a news line for the forecast pause and leaks no token into it, the
 test('it stores no slot row and no news line when the step is aborted', async () => {
   const ctx = setupTest();
   const tokens: Record<string, RunResult> = {
-    'op://claude-slots/claude-setup-token-1/credential': { code: 0, stdout: 'sk-ant-kettle-slot-1\n', stderr: '' },
-    'op://claude-slots/claude-setup-token-2/credential': { code: 0, stdout: 'sk-ant-kettle-slot-2\n', stderr: '' },
-    'op://claude-slots/claude-setup-token-3/credential': { code: 0, stdout: 'sk-ant-kettle-slot-3\n', stderr: '' },
+    'op://fleet/claude-setup-token-1/credential': { code: 0, stdout: 'sk-ant-kettle-slot-1\n', stderr: '' },
+    'op://fleet/claude-setup-token-2/credential': { code: 0, stdout: 'sk-ant-kettle-slot-2\n', stderr: '' },
+    'op://fleet/claude-setup-token-3/credential': { code: 0, stdout: 'sk-ant-kettle-slot-3\n', stderr: '' },
   };
   const run = mock<Runner>((cmd) => Promise.resolve(tokens[cmd[2] ?? ''] ?? { code: 1, stdout: '', stderr: 'invented: no such item' }));
 

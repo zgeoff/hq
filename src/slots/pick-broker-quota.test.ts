@@ -32,6 +32,13 @@ test('it gives unknown with no room once the proof is 24 h old', () => {
   expect(pickBrokerQuota(record, [], new Date('2026-10-20T06:00:00Z'))).toStrictEqual({ state: 'unknown', slot: 2, proof: 'req-0002', proofAgeHours: 30, why: "no slot read of the imp broker's slot 2 in the last 2.5 h, and its proof is 30 h old" });
 });
 
+test('it reads the broker slot from a fresh read when the proof is more than 24 h old', () => {
+  const record = { slot: 2, proof: 'req-0004', note: null, at: '2026-10-19T00:00:00Z', by: 'z-release' };
+  const rows = [buildMockSlotRow({ at: '2026-10-20T05:00:00Z', slot: 2, five: 12, seven: 40, sevenResetsAt: '2026-10-23T00:00:00Z' })];
+
+  expect(pickBrokerQuota(record, rows, new Date('2026-10-20T06:00:00Z'))).toStrictEqual({ state: 'read', slot: 2, proof: 'req-0004', proofAgeHours: 30, used: 40, resetsAt: '2026-10-23T00:00:00Z', readAt: '2026-10-20T05:00:00Z' });
+});
+
 test('it treats a good read with neither window as unknown', () => {
   const record = { slot: 1, proof: 'req-0003', note: null, at: '2026-10-20T05:00:00Z', by: 'z-release' };
   const rows = [buildMockSlotRow({ at: '2026-10-20T05:30:00Z', five: null, seven: null })];

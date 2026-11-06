@@ -16,6 +16,7 @@ A capped PR passes the merge gate after a merge from main, and the owner's lgtm 
 - The sweep raises no quiet or prompt-wait alert while a run names what it waits on (hq#364).
 - The owner's newest lgtm and override hold for the PR at any head, a later `changes` or `reject` still blocks, and `hq pr rebased` is gone (hq#365).
 - A brief for one area of a multi-area issue leaves out the stack line (hq#369).
+- The slot reads take each Claude slot's token from the `fleet` vault, `op://fleet/claude-setup-token-<slot>`, where the slot items now live.
 
 ### New
 

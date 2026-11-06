@@ -850,9 +850,9 @@ test('hq capacity --refresh-slots reads the three slots through op and prints th
   const op = createStubOp({
     directory: fresh.dir,
     answers: {
-      'op://claude-slots/claude-setup-token-1/credential': 'sk-ant-kettle-cli-1',
-      'op://claude-slots/claude-setup-token-2/credential': 'sk-ant-kettle-cli-2',
-      'op://claude-slots/claude-setup-token-3/credential': 'sk-ant-kettle-cli-3',
+      'op://fleet/claude-setup-token-1/credential': 'sk-ant-kettle-cli-1',
+      'op://fleet/claude-setup-token-2/credential': 'sk-ant-kettle-cli-2',
+      'op://fleet/claude-setup-token-3/credential': 'sk-ant-kettle-cli-3',
     },
   });
   onTestFinished(overrideEnv('PATH', `${op.bin}:${process.env['PATH']}`));
@@ -884,8 +884,8 @@ test('hq capacity --refresh-slots --json carries the refresh problems in the fle
   const op = createStubOp({
     directory: fresh.dir,
     answers: {
-      'op://claude-slots/claude-setup-token-1/credential': 'sk-ant-kettle-cli-1',
-      'op://claude-slots/claude-setup-token-2/credential': 'sk-ant-kettle-cli-2',
+      'op://fleet/claude-setup-token-1/credential': 'sk-ant-kettle-cli-1',
+      'op://fleet/claude-setup-token-2/credential': 'sk-ant-kettle-cli-2',
     },
   });
   onTestFinished(overrideEnv('PATH', `${op.bin}:${process.env['PATH']}`));
@@ -911,10 +911,10 @@ test('hq capacity --refresh-slots prints no profile token when op and the slot r
   const op = createStubOp({
     directory: fresh.dir,
     answers: {
-      'op://claude-slots/claude-setup-token-2/credential': 'kettle-slot-credential-2',
-      'op://claude-slots/claude-setup-token-3/credential': 'kettle-slot-credential-3',
+      'op://fleet/claude-setup-token-2/credential': 'kettle-slot-credential-2',
+      'op://fleet/claude-setup-token-3/credential': 'kettle-slot-credential-3',
     },
-    failures: { 'op://claude-slots/claude-setup-token-1/credential': '[ERROR] invented: the vault refused kettle-profile-credential' },
+    failures: { 'op://fleet/claude-setup-token-1/credential': '[ERROR] invented: the vault refused kettle-profile-credential' },
   });
   onTestFinished(overrideEnv('PATH', `${op.bin}:${process.env['PATH']}`));
   writeFileSync(settings, JSON.stringify({ env: { OP_SERVICE_ACCOUNT_TOKEN: 'kettle-profile-credential' } }));
@@ -948,10 +948,10 @@ test('hq capacity --refresh-slots --json carries neither a slot token nor the pr
   const op = createStubOp({
     directory: fresh.dir,
     answers: {
-      'op://claude-slots/claude-setup-token-2/credential': 'kettle-slot-credential-2',
-      'op://claude-slots/claude-setup-token-3/credential': 'kettle-slot-credential-3',
+      'op://fleet/claude-setup-token-2/credential': 'kettle-slot-credential-2',
+      'op://fleet/claude-setup-token-3/credential': 'kettle-slot-credential-3',
     },
-    failures: { 'op://claude-slots/claude-setup-token-1/credential': '[ERROR] invented: kettle-slot-credential-1 is held back from kettle-profile-credential' },
+    failures: { 'op://fleet/claude-setup-token-1/credential': '[ERROR] invented: kettle-slot-credential-1 is held back from kettle-profile-credential' },
   });
   const failures: Record<string, string> = {
     'Bearer kettle-slot-credential-2': 'invented proxy dropped kettle-slot-credential-2 minted by kettle-profile-credential',
@@ -990,10 +990,10 @@ test('hq capacity --refresh-slots stores neither a slot token nor the profile to
   const op = createStubOp({
     directory: fresh.dir,
     answers: {
-      'op://claude-slots/claude-setup-token-2/credential': 'kettle-slot-credential-2',
-      'op://claude-slots/claude-setup-token-3/credential': 'kettle-slot-credential-3',
+      'op://fleet/claude-setup-token-2/credential': 'kettle-slot-credential-2',
+      'op://fleet/claude-setup-token-3/credential': 'kettle-slot-credential-3',
     },
-    failures: { 'op://claude-slots/claude-setup-token-1/credential': '[ERROR] invented: kettle-slot-credential-1 is held back from kettle-profile-credential' },
+    failures: { 'op://fleet/claude-setup-token-1/credential': '[ERROR] invented: kettle-slot-credential-1 is held back from kettle-profile-credential' },
   });
   const answers: Record<string, Response> = {
     'Bearer kettle-slot-credential-2': HttpResponse.json(
