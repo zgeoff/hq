@@ -7,6 +7,7 @@ import { FINAL_PHRASE } from './final-phrase.ts';
 import { normalizePrRef } from './normalize-pr-ref.ts';
 import { parseMarkedRef } from './parse-marked-ref.ts';
 import { pickPhraseTarget } from './pick-phrase-target.ts';
+import { pickRunSession } from './pick-run-session.ts';
 import { PR_IN_TEXT } from './pr-in-text.ts';
 import { scheduleFinalReview as markFinal } from './schedule-final-review.ts';
 import { sendFinalRefusal } from './send-final-refusal.ts';
@@ -86,7 +87,26 @@ function applyFinalMark(db: Database, input: FinalMarkInput): string | null {
   } else if (owner.issue !== input.issue) {
     return null;
   }
+  writeMarkerOwner(db, input.issue, ref, input.source);
   return markResolved(db, { ...input, ref }) ? ref : null;
+}
+
+const ATC_MARKER_SOURCE = /^marker:atc:(?<prefix>[0-9a-f]+)$/iu;
+const SessionIDRows = z.array(z.object({ session_id: z.string() }));
+
+// A marker from an atc session names that session's prefix, even when its SHA is already final. It
+// replaces an owner an earlier marker set, and never one set with hq run pr --session.
+function writeMarkerOwner(db: Database, issue: string, ref: string, source: string): void {
+  const prefix = ATC_MARKER_SOURCE.exec(source)?.groups?.['prefix'];
+  if (prefix === undefined) {
+    return;
+  }
+  const rows = SessionIDRows.parse(db.query('SELECT session_id FROM run_sessions WHERE issue = ?').all(issue));
+  const owner = pickRunSession(
+    rows.map((row) => row.session_id),
+    prefix,
+  );
+  db.query('UPDATE run_prs SET session_id = ? WHERE ref = ? AND session_by_hand = 0').run(owner ?? prefix, ref);
 }
 
 function markResolved(db: Database, input: FinalMarkInput): boolean {
