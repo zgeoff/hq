@@ -24,17 +24,11 @@ export function fitBrief(template: string, parts: BriefParts, movedPointer: stri
     prompt = fillPlaceholders(template, buildValues(fitted, sections)).text;
     cuts.push('cut 1');
   }
-  let pointer = fitted.goalFile;
 
   // Only a gh api ref takes the short sha; a file path that holds the sha must stay whole.
   if (isOver(prompt) && sha !== null && prompt.includes(`ref=${sha}`)) {
     prompt = prompt.replaceAll(`ref=${sha}`, `ref=${sha.slice(0, SHORT_SHA_LENGTH)}`);
-    pointer = pointer.replaceAll(`ref=${sha}`, `ref=${sha.slice(0, SHORT_SHA_LENGTH)}`);
     cuts.push('short refs');
-  }
-  if (isOver(prompt)) {
-    prompt = dropGoalLine(prompt, pointer);
-    cuts.push('cut 2');
   }
   if (isOver(prompt) && fitted.notYours !== fitted.notYoursShort) {
     prompt = prompt.replace(fitted.notYours, fitted.notYoursShort);
@@ -63,11 +57,4 @@ export const BRIEF_LIMIT_BYTES = 4000;
 
 function isOver(prompt: string): boolean {
   return Buffer.byteLength(prompt) > BRIEF_LIMIT_BYTES;
-}
-
-// The pointer to the issue and playbook has no other place in the prompt, so it takes the /goal
-// line's place.
-function dropGoalLine(prompt: string, pointer: string): string {
-  const rest = prompt.split('\n').slice(1);
-  return (pointer === '' ? rest : [pointer.replace(/^\. /u, ''), ...rest]).join('\n');
 }

@@ -115,21 +115,13 @@ test('it moves the whole issue out as cut 1 when the issue in the prompt is over
   expect(fitted.bytes).toBeLessThan(4000);
 });
 
-test('it applies cut 2 after cut 1, keeping the file pointer as a line of its own with the blank line under it', () => {
+test('it keeps the /goal line, with its file pointer, when the prompt is still over after cut 1', () => {
   const parts = buildBriefParts({ permissions: 'Work in kettle.\n'.repeat(260), sections: [{ name: 'Scope', text: `## Scope\n\n${'In: the kettle. '.repeat(300)}` }] });
 
   const fitted = fitBrief('/goal Ship {{repo}} {{issue_id}}{{goal_file}}\n\n{{issue}}\n\nPermissions:\n{{permissions}}\n\n{{stack}}\nFinish: "{{fixes}} {{issue_id}}". {{review_lines}} Done.{{not_yours}}\n{{imp_line}}\nEnd.', parts, '. The full issue is in briefs/GEO-9001.md; read it first.');
 
-  expect(fitted.cuts).toStrictEqual(['cut 1', 'cut 2']);
-  expect(fitted.prompt.startsWith('The full issue is in briefs/GEO-9001.md; read it first.\n\n\n\nPermissions:')).toBe(true);
-});
-
-test('it applies cut 2 without cut 1 when the issue is already out of the prompt', () => {
-  const parts = buildBriefParts({ permissions: 'Work in kettle.\n'.repeat(400) });
-
-  const fitted = fitBrief('/goal Ship {{repo}} {{issue_id}}{{goal_file}}\n\n{{issue}}\n\nPermissions:\n{{permissions}}\n\n{{stack}}\nFinish: "{{fixes}} {{issue_id}}". {{review_lines}} Done.{{not_yours}}\n{{imp_line}}\nEnd.', parts, null);
-
-  expect(fitted.cuts).toStrictEqual(['cut 2']);
+  expect(fitted.cuts).toStrictEqual(['cut 1']);
+  expect(fitted.prompt.startsWith('/goal Ship zgeoff/kettle GEO-9001. The full issue is in briefs/GEO-9001.md; read it first.\n\n\n\nPermissions:')).toBe(true);
 });
 
 test('it counts bytes, not characters', () => {
@@ -138,19 +130,20 @@ test('it counts bytes, not characters', () => {
   expect(fitted.bytes).toBe(2);
 });
 
-test('it passes at exactly 4000 bytes after cut 2 and keeps the blank line that follows the /goal line', () => {
-  const fitted = fitBrief('/goal Ship\n\n{{permissions}}', buildBriefParts({ permissions: 'a'.repeat(3999) }), null);
+test('it passes at exactly 4000 bytes with no cut', () => {
+  const fitted = fitBrief('/goal Ship\n\n{{permissions}}', buildBriefParts({ permissions: 'a'.repeat(3988) }), null);
 
-  expect(fitted.cuts).toStrictEqual(['cut 2']);
+  expect(fitted.cuts).toStrictEqual([]);
   expect(fitted.bytes).toBe(4000);
-  expect(fitted.prompt).toBe(`\n${'a'.repeat(3999)}`);
+  expect(fitted.prompt).toBe(`/goal Ship\n\n${'a'.repeat(3988)}`);
 });
 
-test('it is still over the limit at 4001 bytes after cut 2, because the blank line is kept', () => {
-  const fitted = fitBrief('/goal Ship\n\n{{permissions}}', buildBriefParts({ permissions: 'a'.repeat(4000) }), null);
+test('it is still over the limit at 4001 bytes, and keeps the /goal line', () => {
+  const fitted = fitBrief('/goal Ship\n\n{{permissions}}', buildBriefParts({ permissions: 'a'.repeat(3989) }), null);
 
-  expect(fitted.cuts).toStrictEqual(['cut 2']);
+  expect(fitted.cuts).toStrictEqual([]);
   expect(fitted.bytes).toBe(4001);
+  expect(fitted.prompt.startsWith('/goal Ship\n')).toBe(true);
 });
 
 test('it shortens the sha as the first cut, and keeps the /goal line when that is enough', () => {
@@ -168,24 +161,38 @@ test('it shortens the sha as the first cut, and keeps the /goal line when that i
   expect(fitted.bytes).toBeLessThanOrEqual(4000);
 });
 
-test('it carries the short sha into the pointer that cut 2 moves to the first line', () => {
+test('it keeps the first /goal line unchanged and makes cut 3 when the prompt is still over after short refs', () => {
   const sha = 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678';
-  const template = `/goal ${'Ship the kettle. '.repeat(4)}{{goal_file}}\n\n{{review_lines}}\n\n{{permissions}}`;
-  const parts = buildBriefParts({ reviewLines: `read the rules: gh api 'x?ref=${sha}'`, goalFile: `. First read the playbook: gh api 'y?ref=${sha}'` });
-  const room = 4000 - fitBrief(template, { ...parts, permissions: '' }, null).bytes;
+  const goalLine = `/goal Ship the kettle. First read the playbook: gh api 'y?ref=${sha.slice(0, 12)}'`;
+  const template = `/goal Ship the kettle.{{goal_file}}\n{{permissions}}{{not_yours}}`;
+  const parts = buildBriefParts({
+    goalFile: ` First read the playbook: gh api 'y?ref=${sha}'`,
+    permissions: 'k'.repeat(3850),
+    notYours: ` Do only the kettle part: each other area (${'teapot, '.repeat(22)}mug) gets its own launch.`,
+    notYoursShort: ' Do only the kettle part: each other area gets its own launch.',
+  });
 
-  const fitted = fitBrief(template, { ...parts, permissions: 'a'.repeat(room + 70) }, null, sha);
+  const fitted = fitBrief(template, parts, null, sha);
 
-  expect(fitted.cuts).toStrictEqual(['short refs', 'cut 2']);
-  expect(fitted.prompt.startsWith(`First read the playbook: gh api 'y?ref=${sha.slice(0, 12)}'`)).toBe(true);
-  expect(fitted.prompt).not.toContain(sha);
+  expect(fitted.cuts).toStrictEqual(['short refs', 'cut 3']);
+  expect(fitted.prompt.split('\n')[0]).toBe(goalLine);
   expect(fitted.bytes).toBeLessThanOrEqual(4000);
+});
+
+test('it keeps the /goal line as the first line when the prompt is still over after every cut', () => {
+  const parts = buildBriefParts({ permissions: 'k'.repeat(4100), notYours: ' Leave the stove to me.', notYoursShort: ' Leave the rest to me.' });
+
+  const fitted = fitBrief('/goal Ship {{issue_id}}\n{{permissions}}{{not_yours}}', parts, null);
+
+  expect(fitted.cuts).toStrictEqual(['cut 3']);
+  expect(fitted.prompt.split('\n')[0]).toBe('/goal Ship GEO-9001');
+  expect(fitted.bytes).toBeGreaterThan(4000);
 });
 
 test('it records no short refs when the prompt does not hold the sha', () => {
   const fitted = fitBrief('/goal Ship\n\n{{permissions}}', buildBriefParts({ permissions: 'a'.repeat(4000) }), null, 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678');
 
-  expect(fitted.cuts).toStrictEqual(['cut 2']);
+  expect(fitted.cuts).toStrictEqual([]);
 });
 
 test('it leaves the sha whole when the prompt fits', () => {
@@ -197,12 +204,12 @@ test('it leaves the sha whole when the prompt fits', () => {
   expect(fitted.prompt).toContain(sha);
 });
 
-test('it drops the area names from the not-yours line as cut 3 when the prompt is still over after cut 2', () => {
+test('it drops the area names from the not-yours line as cut 3 when the prompt is still over after short refs', () => {
   const parts = buildBriefParts({ permissions: 'k'.repeat(3850), notYours: ` Do only the kettle part: each other area (${'teapot, '.repeat(22)}mug) gets its own launch.`, notYoursShort: ' Do only the kettle part: each other area gets its own launch.' });
 
   const fitted = fitBrief('/goal Ship {{issue_id}}\n{{permissions}}{{not_yours}}', parts, null);
 
-  expect(fitted).toStrictEqual({ prompt: `${'k'.repeat(3850)} Do only the kettle part: each other area gets its own launch.`, bytes: 3912, cuts: ['cut 2', 'cut 3'], unknown: [], movedIssue: false });
+  expect(fitted).toStrictEqual({ prompt: `/goal Ship GEO-9001\n${'k'.repeat(3850)} Do only the kettle part: each other area gets its own launch.`, bytes: 3932, cuts: ['cut 3'], unknown: [], movedIssue: false });
 });
 
 test('it makes no cut 3 when the brief has no not-yours line', () => {
@@ -210,7 +217,7 @@ test('it makes no cut 3 when the brief has no not-yours line', () => {
 
   const fitted = fitBrief('/goal Ship {{issue_id}}\n{{permissions}}{{not_yours}}', parts, null);
 
-  expect(fitted.cuts).toStrictEqual(['cut 2']);
+  expect(fitted.cuts).toStrictEqual([]);
 });
 
 test('it keeps the whole sha in a goal-file path when it shortens the refs', () => {
@@ -219,7 +226,7 @@ test('it keeps the whole sha in a goal-file path when it shortens the refs', () 
 
   const fitted = fitBrief('/goal Ship{{goal_file}}\n{{review_lines}}\n{{permissions}}', parts, null, sha);
 
-  expect(fitted.cuts).toStrictEqual(['short refs', 'cut 2']);
+  expect(fitted.cuts).toStrictEqual(['short refs']);
   expect(fitted.prompt).toContain(`goals/${sha}.md`);
   expect(fitted.prompt).toContain(`ref=${sha.slice(0, 12)}'`);
 });
