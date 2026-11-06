@@ -23,7 +23,7 @@ function setupTest() {
 
 async function writeFleet(app: ReturnType<typeof setupTest>): Promise<Database> {
   writeFileSync(app.pacing, JSON.stringify({ imp: { impMib: 2048 }, lanes: { imp: { cleanup: 3 }, local: { flexible: 1 } } }));
-  const added = await main(['run', 'add', 'GEO-9601', '--title', 'Fit the long spout', '--where', 'imp', '--json']);
+  const added = await main(['run', 'add', 'GEO-9601', '--title', 'Fit the long spout', '--where', 'imp', '--session', 'a0000601-aaaa-4aaa-8aaa-aaaaaaaaaaaa', '--json']);
   const laned = await main(['run', 'lane', 'GEO-9601', 'cleanup', '--json']);
   expect([added, laned]).toStrictEqual([0, 0]);
   return app.db;
@@ -46,7 +46,7 @@ test('the pane lists what needs the owner with its links, then Nix, lanes, revie
   const parkLane = await main(['run', 'lane', 'GEO-9602', 'cleanup', '--json']);
   const parkState = await main(['run', 'state', 'GEO-9602', 'blocked', '--waits-on', 'the teapot supplier', '--json']);
   const pending = writePRs(createUnblockItems(fleet, { lid: { task: 'Fit the new lid on the kettle', links: [{ label: 'kettle#41', url: 'https://github.com/zgeoff/kettle/pull/41', subject: true }] } }));
-  const reading = pending.query("INSERT OR REPLACE INTO meta (key, value) VALUES ('atc_awake', ?)").run(JSON.stringify({ at: '2026-10-15T01:00:00.000Z', ids: [] }));
+  const reading = pending.query("INSERT OR REPLACE INTO meta (key, value) VALUES ('atc_awake', ?)").run(JSON.stringify({ at: '2026-10-15T01:00:00.000Z', ids: ['a0000601-aaaa-4aaa-8aaa-aaaaaaaaaaaa'] }));
   const sample = pending.query("INSERT INTO probe_samples (at, target_ok, control_ok) VALUES ('2026-10-15T00:58:00Z', 1, 1)").run();
   const shown = await loadPane(pending, app.pacing, app.consoleURL, app.at);
   expect([news, parkAdd, parkLane, parkState, reading.changes, sample.changes, shown.heat]).toStrictEqual([

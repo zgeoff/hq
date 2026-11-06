@@ -56,14 +56,14 @@ test('it leaves out a fleet session though a run lists it', () => {
   expect(countWorking(ctx.db, new Date('2026-10-15T20:00:00Z'))).toStrictEqual({ count: 0, from: 'sessions' });
 });
 
-test('it leaves out a blocked run, which waits', () => {
+test('it counts the awake and busy session of a blocked run', () => {
   const ctx = setupTest();
   at('2026-10-15T20:00:00Z');
   addRun(ctx.db, { issue: 'GEO-9901', title: 'Descale the kettle', place: 'imp', session: 'a0000001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
   setState(ctx.db, 'GEO-9901', 'blocked', {}, 'z-delivery');
   recordAwake(ctx.db, [{ id: 'a0000001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, state: 'running', locator: { targetID: 'imp-kettle' } }]);
 
-  expect(countWorking(ctx.db, new Date('2026-10-15T20:00:00Z'))).toStrictEqual({ count: 0, from: 'sessions' });
+  expect(countWorking(ctx.db, new Date('2026-10-15T20:00:00Z'))).toStrictEqual({ count: 1, from: 'sessions' });
 });
 
 test('it leaves out a merged run, which waits', () => {
@@ -183,4 +183,18 @@ test('it counts a session added in the reading\'s own second when the reading ha
   addRun(ctx.db, { issue: 'GEO-9944', title: 'Pour the tea', place: 'imp', session: 'a0000044-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: null, actor: 'z-delivery' });
 
   expect(countWorking(ctx.db, new Date('2026-10-15T20:00:30Z'))).toStrictEqual({ count: 2, from: 'sessions' });
+});
+
+test.each([
+  { title: 'a working run', state: 'working' },
+  { title: 'a blocked run', state: 'blocked' },
+] as const)('it frees the lane of $title whose only session is asleep', ({ state }) => {
+  const ctx = setupTest();
+  at('2026-10-15T20:00:00Z');
+  addRun(ctx.db, { issue: 'GEO-9951', title: 'Descale the kettle', place: 'imp', session: 'a0000051-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
+  setState(ctx.db, 'GEO-9951', state, {}, 'z-delivery');
+  at('2026-10-15T20:01:00Z');
+  recordAwake(ctx.db, [{ id: 'a0000051-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, state: 'running', lifecycle: { vm: 'asleep' }, locator: { targetID: 'imp-kettle' } }]);
+
+  expect(countWorking(ctx.db, new Date('2026-10-15T20:02:00Z'))).toStrictEqual({ count: 0, from: 'sessions' });
 });

@@ -25,11 +25,11 @@ test('it counts a run filed imp whose awake session runs here as local, not imp'
 
 test('it counts a run filed imp whose session runs here among the local runs when those runs outnumber the live sessions', () => {
   const ctx = setupTest();
-  addRun(ctx.db, { issue: 'GEO-9911', title: 'Descale the kettle', place: 'local', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
-  addRun(ctx.db, { issue: 'GEO-9912', title: 'Polish the teapot', place: 'local', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
-  addRun(ctx.db, { issue: 'GEO-9913', title: 'Fill the kettle', place: 'local', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
-  addRun(ctx.db, { issue: 'GEO-9914', title: 'Warm the teapot', place: 'imp', session: 'a0000014-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
   recordAwake(ctx.db, [{ id: 'a0000014-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'teapot-agent', alive: true, state: 'running', locator: { targetID: 'local' } }]);
+  addRun(ctx.db, { issue: 'GEO-9911', title: 'Descale the kettle', place: 'local', session: 'a0000011-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
+  addRun(ctx.db, { issue: 'GEO-9912', title: 'Polish the teapot', place: 'local', session: 'a0000012-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
+  addRun(ctx.db, { issue: 'GEO-9913', title: 'Fill the kettle', place: 'local', session: 'a0000013-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
+  addRun(ctx.db, { issue: 'GEO-9914', title: 'Warm the teapot', place: 'imp', session: 'a0000014-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
 
   expect(readRunningByPlace(ctx.db)).toStrictEqual({ imp: 0, local: 4, issues: ['GEO-9911', 'GEO-9912', 'GEO-9913', 'GEO-9914'], impIssues: [], localSource: null });
 });
@@ -179,4 +179,26 @@ test('it counts one live session here for a build run while its design pass sess
   ]);
 
   expect(readRunningByPlace(ctx.db)).toStrictEqual({ imp: 0, local: 1, issues: ['GEO-9932'], impIssues: [], localSource: null });
+});
+
+test.each([
+  { title: 'a working run', state: 'working' },
+  { title: 'a blocked run', state: 'blocked' },
+] as const)('it leaves $title whose only session is asleep out of the running runs', ({ state }) => {
+  const ctx = setupTest();
+  addRun(ctx.db, { issue: 'GEO-9961', title: 'Descale the kettle', place: 'imp', session: 'a0000061-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
+  setState(ctx.db, 'GEO-9961', state, {}, 'z-delivery');
+  at('2026-10-15T20:01:00Z');
+  recordAwake(ctx.db, [{ id: 'a0000061-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, state: 'running', lifecycle: { vm: 'asleep' }, locator: { targetID: 'imp-kettle' } }]);
+
+  expect(readRunningByPlace(ctx.db, new Date('2026-10-15T20:02:00Z'))).toStrictEqual({ imp: 0, local: 0, issues: [], impIssues: [], localSource: null });
+});
+
+test('it counts a blocked run whose session is awake and busy', () => {
+  const ctx = setupTest();
+  addRun(ctx.db, { issue: 'GEO-9962', title: 'Polish the teapot', place: 'imp', session: 'a0000062-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
+  setState(ctx.db, 'GEO-9962', 'blocked', {}, 'z-delivery');
+  recordAwake(ctx.db, [{ id: 'a0000062-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'teapot-agent', alive: true, state: 'running', locator: { targetID: 'imp-teapot' } }]);
+
+  expect(readRunningByPlace(ctx.db)).toStrictEqual({ imp: 1, local: 0, issues: ['GEO-9962'], impIssues: ['GEO-9962'], localSource: null });
 });
