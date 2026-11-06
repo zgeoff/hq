@@ -224,7 +224,17 @@ test("it passes a head whose summary is at the head when noslop's finished check
   const fake = buildFakeRunner({ noslopFindings: buildStubFindings('fixed'), noslopChecks: { code: 0, stdout: `${JSON.stringify({ id: 9001, name: 'noslop', app: 'noslop-review', status: 'completed', conclusion: 'failure', title: '3 review calls failed.', completedAt: '2026-10-14T01:00:05Z' })}\n`, stderr: '' } });
   createListedReview(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA });
 
-  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).resolves.toMatchObject({ mayMerge: true, reviewed: true });
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).resolves.toStrictEqual({ mayMerge: true, reason: 'noslop findings: none open; CI green at 0123456', reviewed: true });
+});
+
+test('it passes a capped PR at a merged-main head whose noslop check failed with no open findings and green CI', async () => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ noslopFindings: buildStubFindings('fixed'), noslopChecks: { code: 0, stdout: `${JSON.stringify({ id: 9001, name: 'noslop', app: 'noslop-review', status: 'completed', conclusion: 'failure', title: 'No noslop review of this change to AGENTS.md: the patch changed since the review of f00dfee.', completedAt: '2026-10-14T01:00:05Z' })}\n`, stderr: '' } });
+  setMeta(ctx.db, 'noslop', JSON.stringify({ repos: ['widgets'], sha: '0123456789abcdef0123456789abcdef01234567', caps: { widgets: 1 } }));
+  ctx.db.query("INSERT INTO noslop_rounds (repo, pr, kind, started_at, ended_at, ms, ok, head, depth, special, findings, sha, confirm) VALUES ('widgets', 7, 'review', 'a', 'b', 1, 1, 'f00dfeedf00dfeedf00dfeedf00dfeedf00dfeed', 'standard', 'none', '[]', 'x', 0)").run();
+  createListedReview(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA });
+
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).resolves.toStrictEqual({ mayMerge: true, reason: 'noslop findings: none open; CI green at 0123456', reviewed: true });
 });
 
 test("it blocks a passing noslop check that completed before noslop last edited its summary", async () => {
@@ -240,7 +250,7 @@ test("it passes a head whose summary holds a rejected merge resolution when no f
   const fake = buildFakeRunner({ noslopChecks: { code: 0, stdout: `${JSON.stringify({ id: 9001, name: 'noslop', app: 'noslop-review', status: 'completed', conclusion: 'failure', title: 'The merge resolution was rejected.', completedAt: '2026-10-14T01:00:05Z' })}\n`, stderr: '' } });
   createListedReview(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA });
 
-  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).resolves.toMatchObject({ mayMerge: true, reviewed: true });
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).resolves.toStrictEqual({ mayMerge: true, reason: 'noslop findings: none open; CI green at 0123456', reviewed: true });
 });
 
 test("it passes when the noslop App's own run failed but no finding is open, the workflow job named noslop passed", async () => {
@@ -248,7 +258,7 @@ test("it passes when the noslop App's own run failed but no finding is open, the
   const fake = buildFakeRunner({ noslopChecks: { code: 0, stdout: [JSON.stringify({ id: 9002, name: 'noslop', app: 'github-actions', status: 'completed', conclusion: 'success', title: null, completedAt: null }), JSON.stringify({ id: 9001, name: 'noslop', app: 'noslop-review', status: 'completed', conclusion: 'failure', title: '1 finding is open.', completedAt: '2026-10-14T01:00:05Z' })].join('\n'), stderr: '' } });
   createListedReview(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA });
 
-  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).resolves.toMatchObject({ mayMerge: true, reviewed: true });
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).resolves.toStrictEqual({ mayMerge: true, reason: 'noslop findings: none open; CI green at 0123456', reviewed: true });
 });
 
 test('it blocks when only a workflow job named noslop ran at the head and the noslop App has no run there', async () => {
