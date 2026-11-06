@@ -2,14 +2,12 @@ import type { Database } from 'bun:sqlite';
 import { match } from 'ts-pattern';
 import { z } from 'zod';
 import type { SessionInfo } from '../atc/session-schema.ts';
-import { now } from '../clock/now.ts';
 import { logEvent } from '../log-event.ts';
 import { readEvents } from '../read-events.ts';
 import { collectPartSessionWraps } from './collect-part-session-wraps.ts';
 import type { PartSessionActivity, PartSessionWrap } from './collect-part-session-wraps.ts';
 import { pickPartWrapOutcome } from './pick-part-wrap-outcome.ts';
 import type { WrapUpDeps } from './run-wrap-up.ts';
-import { SWEEP_MINUTES as SWEEP } from './sweep-minutes.ts';
 import { wrapUpRunSafely } from './wrap-up-merged-runs.ts';
 
 const SessionRows = z.array(z.object({ issue: z.string(), session_id: z.string(), helper: z.number(), active: z.number(), design_pass: z.number(), runState: z.string() }));
@@ -20,6 +18,8 @@ const WrappedData = z.object({ session: z.string() });
 export interface PartSessionWrapOptions {
   actor: string;
   log: (line: string) => void;
+  nowMs: number;
+  quietMs: number;
 }
 
 export interface AtcSnapshot {
@@ -51,7 +51,7 @@ export async function wrapUpPartSessions(
     const listed = atc.sessions.find((info) => info.id.toLowerCase().startsWith(session.session_id.toLowerCase()));
     activity.set(session.session_id, { atcState: listed?.state ?? null, lastActivityAt: atc.activity.get(session.session_id) ?? null });
   }
-  const due = collectPartSessionWraps({ sessions, prs, activity, wrapped, nowMs: now().getTime(), quietMs: SWEEP.quietMinutes() * 60_000 });
+  const due = collectPartSessionWraps({ sessions, prs, activity, wrapped, nowMs: options.nowMs, quietMs: options.quietMs });
   const done: string[] = [];
   for (const wrap of due) {
     const claim = writePartClaim(db, wrap, options.actor);

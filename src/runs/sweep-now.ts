@@ -12,6 +12,7 @@ import { updateGoneRunSessions } from './update-gone-run-sessions.ts';
 import { findAlerts } from './find-alerts.ts';
 import type { WrapUpDeps } from './run-wrap-up.ts';
 import { sweep } from './sweep.ts';
+import { SWEEP_MINUTES as SWEEP } from './sweep-minutes.ts';
 import { toMessage } from './to-message.ts';
 import type { Alert } from './types.ts';
 import { watchlist } from './watchlist.ts';
@@ -76,7 +77,7 @@ async function wrapUpMergedRunsSafely(db: Database, options: SweepOptions): Prom
 
 async function wrapUpPartSessionsSafely(db: Database, deps: WrapUpDeps, atc: AtcSnapshot, options: SweepOptions): Promise<void> {
   try {
-    await wrapUpPartSessions(db, deps, atc, { actor: options.actor, log: options.log });
+    await wrapUpPartSessions(db, deps, atc, { actor: options.actor, log: options.log, nowMs: now().getTime(), quietMs: SWEEP.quietMinutes() * 60_000 });
   } catch (error) {
     options.log(`part-session wrap-up failed: ${toMessage(error)}`);
   }
