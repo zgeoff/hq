@@ -184,10 +184,10 @@ test('it counts one live session here for a build run while its design pass sess
 test.each([
   { title: 'a working run', state: 'working' },
   { title: 'a blocked run', state: 'blocked' },
-] as const)('it leaves $title whose only session is asleep out of the running runs', ({ state }) => {
+] as const)('it leaves $title whose only session is asleep out of the running runs', (row) => {
   const ctx = setupTest();
   addRun(ctx.db, { issue: 'GEO-9961', title: 'Descale the kettle', place: 'imp', session: 'a0000061-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
-  setState(ctx.db, 'GEO-9961', state, {}, 'z-delivery');
+  setState(ctx.db, 'GEO-9961', row.state, {}, 'z-delivery');
   at('2026-10-15T20:01:00Z');
   recordAwake(ctx.db, [{ id: 'a0000061-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, state: 'running', lifecycle: { vm: 'asleep' }, locator: { targetID: 'imp-kettle' } }]);
 

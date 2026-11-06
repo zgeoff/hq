@@ -188,11 +188,11 @@ test('it counts a session added in the reading\'s own second when the reading ha
 test.each([
   { title: 'a working run', state: 'working' },
   { title: 'a blocked run', state: 'blocked' },
-] as const)('it frees the lane of $title whose only session is asleep', ({ state }) => {
+] as const)('it frees the lane of $title whose only session is asleep', (row) => {
   const ctx = setupTest();
   at('2026-10-15T20:00:00Z');
   addRun(ctx.db, { issue: 'GEO-9951', title: 'Descale the kettle', place: 'imp', session: 'a0000051-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
-  setState(ctx.db, 'GEO-9951', state, {}, 'z-delivery');
+  setState(ctx.db, 'GEO-9951', row.state, {}, 'z-delivery');
   at('2026-10-15T20:01:00Z');
   recordAwake(ctx.db, [{ id: 'a0000051-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, state: 'running', lifecycle: { vm: 'asleep' }, locator: { targetID: 'imp-kettle' } }]);
 
