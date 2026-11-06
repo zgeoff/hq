@@ -1,5 +1,31 @@
 # Changelog
 
+## Unreleased — 2026-11-07
+
+A capped PR passes the merge gate after a merge from main, and the owner's lgtm holds at any head.
+
+### The merge gate no longer takes noslop's check conclusion or a base-move cover.
+
+- The gate needs noslop's last review to have read the PR's head, a fixes-only run included, and its check at the head to have finished after its latest summary. Open findings and CI still decide the rest.
+- The base-move cover, which refused a capped PR that merged main, is gone.
+
+### Fixes
+
+- `hq lanes` skips a Ready issue whose blocker is not Done and names the blockers (hq#360).
+- `hq brief` keeps the goal line when the brief is over the limit, and refuses to build when it is still too long after the other cuts (hq#363).
+- The sweep raises no quiet or prompt-wait alert while a run names what it waits on (hq#364).
+- The owner's newest lgtm and override hold for the PR at any head, a later `changes` or `reject` still blocks, and `hq pr rebased` is gone (hq#365).
+- A brief for one area of a multi-area issue leaves out the stack line (hq#369).
+
+### New
+
+- `hq run closed <pr> --superseded-by <repo#n>` closes a superseded run PR in hq once GitHub shows its replacement merged (hq#366).
+- The sweep wraps up a run's part session once every PR it owns has merged, and `hq run pr <issue> <pr> --session <id>` sets a PR's owner (hq#368).
+
+### Docs
+
+- REQUESTS.md gains the rows for hq#350 and hq#360 (hq#361).
+
 ## 0.98.0 — 2026-10-24
 
 Claude usage alerts name when each window resets, and a lanes skip can wait on a PR.
