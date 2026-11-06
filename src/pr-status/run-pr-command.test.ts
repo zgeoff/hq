@@ -638,14 +638,13 @@ test.each(['Accept-risk aaaaaaaaaaaaaaaa on zgeoff/widgets#7?', 'Widgets#7: acce
 test.each([
   ['the console', (ctx: ReturnType<typeof setupTest>) => Promise.resolve(ctx.answerInConsole('KET-5'))],
   ['hq call answer in the z-stu session', async (ctx: ReturnType<typeof setupTest>) => await ctx.answerByHqCall('KET-5', 'owner')],
-])('it records an override from a plain Yes in %s to a call that names the PR and the override', async (_case, answer) => {
+])('it refuses a call: source for override from a plain Yes in %s, even to a call that names an override of the PR', async (_case, answer) => {
   const ctx = setupTest();
-  ctx.fileCall('KET-5', 'Override widgets#7 now?');
+  ctx.fileCall('KET-5', 'Override widgets#7 preview check?');
   await answer(ctx);
 
-  await ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'call:KET-5', note: 'Ship it.' });
-
-  expect(ctx.db.query("SELECT COUNT(*) AS total FROM events WHERE action = 'pr-override'").get()).toStrictEqual({ total: 1 });
+  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'call:KET-5', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: '--source refused: call:KET-5 has no option that grants the override: an override needs the owner to pick an option whose grants name the PR; ask z-stu to record it' });
+  expect(ctx.db.query("SELECT COUNT(*) AS total FROM events WHERE action = 'pr-override'").get()).toStrictEqual({ total: 0 });
 });
 
 test.each([
@@ -779,7 +778,7 @@ test('it refuses a call: source whose answer picks a grant label the call showed
   ctx.refileCall('KET-47', 'Override widgets#7?');
   recordConsoleAnswer(ctx.db, { id: 'KET-47', option: '', note: 'Go', actor: 'owner' });
 
-  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'call:KET-47', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: '--source refused: the owner\'s answer to call:KET-47 is not a yes: "Go"; ask z-stu to record it' });
+  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'call:KET-47', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: '--source refused: call:KET-47 has no option that grants the override: an override needs the owner to pick an option whose grants name the PR; ask z-stu to record it' });
   expect(ctx.db.query("SELECT COUNT(*) AS total FROM events WHERE action = 'pr-override'").get()).toStrictEqual({ total: 0 });
 });
 

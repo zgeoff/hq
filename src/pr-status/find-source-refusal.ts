@@ -57,6 +57,10 @@ function findCallRefusal(db: Database, check: CallCheck): string | null {
   if (check.needsGrant || options.some((option) => option.grants !== undefined)) {
     return findGrantRefusal(check, options, data.answer);
   }
+  // A call title can name an override of one CI check, so a plain yes cannot show the owner meant the findings.
+  if (check.wanted.action === 'override') {
+    return `${check.source} has no option that grants the override: an override needs the owner to pick an option whose grants name the PR`;
+  }
   const title = data.title ?? call.title;
   if (!hasPRName(title, check.ref)) {
     return `${check.source} does not name ${check.ref.slug}#${check.ref.pr} in the title the owner answered`;
