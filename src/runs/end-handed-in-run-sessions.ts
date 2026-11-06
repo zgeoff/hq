@@ -6,7 +6,9 @@ import type { StoredEvent } from '../read-events.ts';
 import { buildHandedInPlan } from './build-handed-in-plan.ts';
 import { claimHandedInRun } from './claim-handed-in-run.ts';
 import { CLEANUP_ACTIONS, isCleanupHeld } from './is-cleanup-held.ts';
+import { SCOPE_HOLD_ACTIONS } from './is-scope-held.ts';
 import { collectGuardedSessions } from './collect-guarded-sessions.ts';
+import { collectHeldIdleRuns } from './collect-held-idle-runs.ts';
 import type { AtcSession } from './collect-guarded-sessions.ts';
 import { runHandedInHoldCheck } from './run-handed-in-hold-check.ts';
 import type { HandedInHolds } from './run-handed-in-hold-check.ts';
@@ -14,6 +16,7 @@ import { pickHandedInCandidates } from './pick-handed-in-candidates.ts';
 import { pickQuietSessions } from './pick-quiet-sessions.ts';
 import type { SessionActivity } from './pick-quiet-sessions.ts';
 import type { WrapUpDeps } from './run-wrap-up.ts';
+import { updateMergedRun } from './update-merged-run.ts';
 import { shareClient, wrapUpRunSafely } from './wrap-up-merged-runs.ts';
 import { writeHandedInPlan } from './write-handed-in-plan.ts';
 
@@ -52,6 +55,9 @@ export async function endHandedInRunSessions(db: Database, atc: AtcView, deps: W
   const sessions = SessionRows.parse(
     db.query("SELECT s.issue, s.session_id, s.active FROM run_sessions s JOIN runs r ON r.issue = s.issue WHERE r.state NOT IN ('done', 'dropped') ORDER BY s.added_at").all(),
   );
+  if (options.holds !== undefined) {
+    await runIdleHoldChecks(db, options.holds, sessions, options.actor);
+  }
   const lastKept = new Map([...new Set(sessions.map((row) => row.issue))].map((issue) => [issue, readLastKept(db, issue)] as const));
   const candidates = pickHandedInCandidates({ prs, sessions, lastKept }, at, quietBefore);
   if (candidates.length === 0) {
@@ -73,6 +79,20 @@ export async function endHandedInRunSessions(db: Database, atc: AtcView, deps: W
     }
   }
   return ended;
+}
+
+const WorkingRows = z.array(z.object({ issue: z.string(), waits_on: z.string().nullable() }));
+
+async function runIdleHoldChecks(db: Database, holds: HandedInHolds, sessions: z.infer<typeof SessionRows>, actor: string): Promise<void> {
+  const working = WorkingRows.parse(db.query("SELECT issue, waits_on FROM runs WHERE state = 'working' AND waits_on IS NOT NULL").all());
+  const runs = working.map((row) => ({ issue: row.issue, waitsOn: row.waits_on, newestScopeEvent: readEvents(db, 'run', row.issue, SCOPE_HOLD_ACTIONS).at(-1) }));
+  const active = new Set(sessions.filter((row) => row.active === 1).map((row) => row.issue));
+  for (const issue of collectHeldIdleRuns(runs, active)) {
+    const check = await runHandedInHoldCheck(db, holds, issue, actor);
+    if (!check.hold) {
+      updateMergedRun(db, issue, actor);
+    }
+  }
 }
 
 function readLastKept(db: Database, issue: string): StoredEvent | null {

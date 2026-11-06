@@ -7,7 +7,8 @@ export const LINEAR_GRAPHQL_URL = 'https://api.linear.app/graphql';
 
 // Linear's GraphQL API, answering as the key's user, kettle-bot. A query with team and state
 // variables is the Ready query, answered in one page from the issues in that team and state. An
-// `ids` query answers the issues whose identifier, or a previous one, is among the ids. A `filter`
+// `ids` query answers the issues whose identifier, or a previous one, is among the ids, and an
+// `identifier` query that one issue, or null. A `filter`
 // query answers one page, of its `first` size, of the issues that match its team key, state names and updatedAt
 // bound, and a `teamKey` query the workflow states of that team. An issueLabels query answers the
 // labels its filter's team key and null-team clauses match, two to a page. A `slugID`
@@ -56,6 +57,9 @@ async function readLinearAnswer(info: LinearRequest): Promise<Response> {
   }
   if ('ids' in variables) {
     return HttpResponse.json({ data: buildIssuesAnswer(variables.ids) });
+  }
+  if ('identifier' in variables) {
+    return HttpResponse.json({ data: { issue: buildIssueAnswer(variables.identifier) } });
   }
   if ('slugID' in variables) {
     return HttpResponse.json({ data: { documents: { nodes: linearDocuments.filter((document) => document.slugID === variables.slugID).map((document) => ({ content: document.content })) } } });
@@ -197,6 +201,14 @@ function buildReadyNode(issue: LinearIssueRecord, query: string) {
 function buildInverseRelations(blockedBy: readonly string[]) {
   const nodes = blockedBy.map((identifier) => ({ type: 'blocks', issue: { identifier, state: { type: linearIssues.find((issue) => issue.identifier === identifier)?.stateType ?? 'unstarted' } } }));
   return { nodes, pageInfo: { hasNextPage: false } };
+}
+
+function buildIssueAnswer(identifier: unknown) {
+  const issue = linearIssues.find((record) => record.identifier === identifier);
+  if (issue === undefined) {
+    return null;
+  }
+  return { identifier: issue.identifier, description: issue.description ?? null, labels: { nodes: issue.labels.map((name) => ({ name, parent: null })) } };
 }
 
 function buildIssuesAnswer(ids: unknown) {

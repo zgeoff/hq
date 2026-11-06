@@ -1,7 +1,11 @@
 import { expect, mock, onTestFinished, test } from 'bun:test';
+import { linearIssues } from '../../mocks/linear-handlers.ts';
 import { AtcClient } from '../atc/atc-client.ts';
 import { overrideEnv } from '../config/override-env.ts';
+import { makeAuditedLinearCaller } from '../linear/make-audited-linear-caller.ts';
+import { resetKey } from '../linear/reset-key.ts';
 import { readEvents } from '../read-events.ts';
+import type { RunResult, Runner } from '../runner/types.ts';
 import { buildStubGitHubFactsRunner } from '../../test/build-stub-github-facts-runner.ts';
 import { buildStubFleetClient } from '../../test/build-stub-fleet-client.ts';
 import { fakeAtc, freshDb } from '../../test/helpers.ts';
@@ -12,6 +16,8 @@ import { closePr } from './close-pr.ts';
 import { finalPr } from './final-pr.ts';
 import { getRun } from './get-run.ts';
 import { makeIssueDescriptionReader } from './make-issue-description-reader.ts';
+import { runHandedInHoldCheck } from './run-handed-in-hold-check.ts';
+import { setSession } from './set-session.ts';
 import { setState } from './set-state.ts';
 import { sweepNow } from './sweep-now.ts';
 import { viewRun } from './view-run.ts';
@@ -307,6 +313,56 @@ test('it never reads Linear for a handed-in run that waits on nothing', async ()
   expect(ctx.readState('GEO-9858')).toBe('merged');
 });
 
+test('it moves a held run with no active session to merged once every Scope box is ticked', async () => {
+  const ctx = await setupTest();
+  onTestFinished(overrideEnv('HQ_NOW', '2026-10-21T03:00:00Z'));
+  addRun(ctx.db, { issue: 'GEO-9864', title: 'Invented kettle work', place: 'local', session: '0000d064-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
+  setState(ctx.db, 'GEO-9864', 'working', { waitsOn: 'free slots for the widgets#9 part' }, 'kettle-bot');
+  addPr(ctx.db, 'GEO-9864', 'kettle#64', 'kettle-bot');
+  closePr(ctx.db, 'kettle#64', { to: 'merged', actor: 'kettle-bot' });
+  await runHandedInHoldCheck(ctx.db, { readIssueDescription: () => Promise.resolve('## Scope\n\n- [ ] widgets: the next part\n'), log: () => {} }, 'GEO-9864', 'kettle-bot');
+  setSession(ctx.db, 'GEO-9864', '0000d064-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'kettle-bot', 'remove');
+  const fleet = buildStubFleetClient({ sessions: [] });
+  const gh = buildStubGitHubFactsRunner({ views: {} });
+
+  await sweepNow(ctx.db, ctx.client, gh, { actor: 'z-delivery', wrapUpDeps: { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')), readLocalWork: () => Promise.resolve({ state: 'pushed' as const }) }, log: () => {}, readIssueDescription: () => Promise.resolve('## Scope\n\n- [x] widgets: the next part\n') });
+
+  expect(ctx.readState('GEO-9864')).toBe('merged');
+});
+
+test('it keeps a held run with no active session working while a Scope box is open', async () => {
+  const ctx = await setupTest();
+  onTestFinished(overrideEnv('HQ_NOW', '2026-10-21T03:00:00Z'));
+  addRun(ctx.db, { issue: 'GEO-9865', title: 'Invented kettle work', place: 'local', session: '0000d065-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
+  setState(ctx.db, 'GEO-9865', 'working', { waitsOn: 'free slots for the widgets#9 part' }, 'kettle-bot');
+  addPr(ctx.db, 'GEO-9865', 'kettle#65', 'kettle-bot');
+  closePr(ctx.db, 'kettle#65', { to: 'merged', actor: 'kettle-bot' });
+  await runHandedInHoldCheck(ctx.db, { readIssueDescription: () => Promise.resolve('## Scope\n\n- [ ] widgets: the next part\n'), log: () => {} }, 'GEO-9865', 'kettle-bot');
+  setSession(ctx.db, 'GEO-9865', '0000d065-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'kettle-bot', 'remove');
+  const fleet = buildStubFleetClient({ sessions: [] });
+  const gh = buildStubGitHubFactsRunner({ views: {} });
+
+  await sweepNow(ctx.db, ctx.client, gh, { actor: 'z-delivery', wrapUpDeps: { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')), readLocalWork: () => Promise.resolve({ state: 'pushed' as const }) }, log: () => {}, readIssueDescription: () => Promise.resolve('## Scope\n\n- [ ] widgets: the next part\n') });
+
+  expect(ctx.readState('GEO-9865')).toBe('working');
+});
+
+test('it reads no Linear for a run with no active session that waits on parts but is not held', async () => {
+  const ctx = await setupTest();
+  onTestFinished(overrideEnv('HQ_NOW', '2026-10-21T03:00:00Z'));
+  addRun(ctx.db, { issue: 'GEO-9866', title: 'Invented kettle work', place: 'local', session: '0000d066-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
+  setState(ctx.db, 'GEO-9866', 'working', { waitsOn: 'free slots for the widgets#9 part' }, 'kettle-bot');
+  addPr(ctx.db, 'GEO-9866', 'kettle#66', 'kettle-bot');
+  setSession(ctx.db, 'GEO-9866', '0000d066-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'kettle-bot', 'remove');
+  const fleet = buildStubFleetClient({ sessions: [] });
+  const gh = buildStubGitHubFactsRunner({ views: { 'kettle#66': JSON.stringify({ state: 'OPEN', mergedAt: null, mergeCommit: null }) } });
+  const readIssueDescription = mock(() => Promise.resolve('## Scope\n\n- [ ] widgets: the next part\n'));
+
+  await sweepNow(ctx.db, ctx.client, gh, { actor: 'z-delivery', wrapUpDeps: { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')), readLocalWork: () => Promise.resolve({ state: 'pushed' as const }) }, log: () => {}, readIssueDescription });
+
+  expect(readIssueDescription.mock.calls).toStrictEqual([]);
+});
+
 test('it keeps a handed-in run working through the Linear issue reader when its Scope has an open box', async () => {
   const ctx = await setupTest();
   onTestFinished(overrideEnv('HQ_NOW', '2026-10-21T03:00:00Z'));
@@ -320,7 +376,12 @@ test('it keeps a handed-in run working through the Linear issue reader when its 
   const fleet = buildStubFleetClient({ sessions: [{ id: '0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, state: 'done' }] });
   const gh = buildStubGitHubFactsRunner({ views: {} });
   const log = mock();
-  const readIssueDescription = makeIssueDescriptionReader((_query, variables) => Promise.resolve({ issue: { identifier: variables['identifier'], description: '## Scope\n\n- [x] kettle: done\n- [ ] widgets: the next part\n', labels: { nodes: [] } } }));
+  resetKey();
+  onTestFinished(resetKey);
+  onTestFinished(overrideEnv('OP_SERVICE_ACCOUNT_TOKEN', 'invented-token'));
+  linearIssues.push({ identifier: 'GEO-9863', team: 'GEO', state: 'In Progress', stateType: 'started', previousIdentifiers: [], project: null, labels: [], parent: null, description: '## Scope\n\n- [x] kettle: done\n- [ ] widgets: the next part\n' });
+  const keyRead = mock<Runner>(() => Promise.resolve<RunResult>({ code: 0, stdout: 'lin_api_INVENTEDkettleKEY0063\n', stderr: '' }));
+  const readIssueDescription = makeIssueDescriptionReader(makeAuditedLinearCaller(ctx.db, keyRead));
 
   await sweepNow(ctx.db, ctx.client, gh, { actor: 'z-delivery', wrapUpDeps: { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')), readLocalWork: () => Promise.resolve({ state: 'pushed' as const }) }, log, readIssueDescription });
 
