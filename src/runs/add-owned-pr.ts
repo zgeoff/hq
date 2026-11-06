@@ -26,12 +26,12 @@ export function addOwnedPr(db: Database, issue: string, raw: string, input: Owne
         touch(db, issue);
         logEvent(db, 'run', issue, 'pr', input.actor, null, null, { ref: pr.ref });
       }
-      if (pr.session_id === owner) {
+      if (pr.session_id === owner && pr.session_by_hand === 1) {
         return pr;
       }
-      db.query('UPDATE run_prs SET session_id = ? WHERE ref = ?').run(owner, pr.ref);
+      db.query('UPDATE run_prs SET session_id = ?, session_by_hand = 1 WHERE ref = ?').run(owner, pr.ref);
       logEvent(db, 'run', issue, 'pr-owner', input.actor, pr.session_id, owner, { ref: pr.ref });
-      return { ...pr, session_id: owner };
+      return { ...pr, session_id: owner, session_by_hand: 1 };
     })
     .immediate();
 }

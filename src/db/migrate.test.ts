@@ -313,8 +313,8 @@ test('it adds run_prs.session_id in v49, keeps the earlier rows with no owner, a
   onTestFinished(() => db.close());
   db.exec('PRAGMA journal_mode = WAL;');
   migrate(db, path, false, MIGRATIONS.slice(0, 48));
-  db.query("INSERT INTO runs (issue, title, place, state, created_at, updated_at) VALUES ('GEO-9901', 'Descale the kettle', 'imp', 'working', '2026-10-14T01:00:00Z', '2026-10-14T01:00:00Z')").run();
-  db.query("INSERT INTO run_prs (ref, issue, state, added_at, updated_at) VALUES ('kettle#41', 'GEO-9901', 'open', '2026-10-14T01:00:00Z', '2026-10-14T01:00:00Z')").run();
+  db.query("INSERT INTO runs (issue, title, place, state, created_at, updated_at) VALUES ('GEO-501', 'Descale the kettle', 'imp', 'working', '2026-10-14T01:00:00Z', '2026-10-14T01:00:00Z')").run();
+  db.query("INSERT INTO run_prs (ref, issue, state, added_at, updated_at) VALUES ('kettle#41', 'GEO-501', 'open', '2026-10-14T01:00:00Z', '2026-10-14T01:00:00Z')").run();
 
   expect(migrate(db, path, true)).not.toBeNull();
   expect(db.query('SELECT ref, session_id FROM run_prs').all()).toStrictEqual([{ ref: 'kettle#41', session_id: null }]);

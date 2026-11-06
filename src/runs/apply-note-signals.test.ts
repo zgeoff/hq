@@ -26,43 +26,56 @@ test('it marks the open PR of the build run final from a note that names no PR, 
 
 test('it sets the PR owner to the session an atc FINAL marker names, resolved to the run session', () => {
   const ctx = setupTest();
-  addRun(ctx.db, { issue: 'GEO-9952', title: 'Invented kettle work', place: 'local', session: null, next: 'Working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
-  setSession(ctx.db, 'GEO-9952', '0000f001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'z-delivery', 'add');
-  addPr(ctx.db, 'GEO-9952', 'kettle#81', 'z-delivery');
+  addRun(ctx.db, { issue: 'GEO-502', title: 'Invented kettle work', place: 'local', session: null, next: 'Working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
+  setSession(ctx.db, 'GEO-502', '0000f001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'z-delivery', 'add');
+  addPr(ctx.db, 'GEO-502', 'kettle#81', 'z-delivery');
 
-  applyNoteSignals(ctx.db, 'GEO-9952', 'FINAL kettle#81 39f05fe', { source: 'atc:0000f001' });
+  applyNoteSignals(ctx.db, 'GEO-502', 'FINAL kettle#81 39f05fe', { source: 'atc:0000f001' });
 
   expect(ctx.db.query("SELECT session_id FROM run_prs WHERE ref = 'kettle#81'").get()).toStrictEqual({ session_id: '0000f001-aaaa-4aaa-8aaa-aaaaaaaaaaaa' });
 });
 
 test('it stores the marker session as given when the run has no matching session', () => {
   const ctx = setupTest();
-  addRun(ctx.db, { issue: 'GEO-9953', title: 'Invented kettle work', place: 'local', session: null, next: 'Working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
-  addPr(ctx.db, 'GEO-9953', 'kettle#82', 'z-delivery');
+  addRun(ctx.db, { issue: 'GEO-503', title: 'Invented kettle work', place: 'local', session: null, next: 'Working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
+  addPr(ctx.db, 'GEO-503', 'kettle#82', 'z-delivery');
 
-  applyNoteSignals(ctx.db, 'GEO-9953', 'FINAL kettle#82 39f05fe', { source: 'atc:0000f009' });
+  applyNoteSignals(ctx.db, 'GEO-503', 'FINAL kettle#82 39f05fe', { source: 'atc:0000f009' });
 
   expect(ctx.db.query("SELECT session_id FROM run_prs WHERE ref = 'kettle#82'").get()).toStrictEqual({ session_id: '0000f009' });
 });
 
 test('it keeps an owner set by hand when an atc FINAL marker names another session', () => {
   const ctx = setupTest();
-  addRun(ctx.db, { issue: 'GEO-9954', title: 'Invented kettle work', place: 'local', session: null, next: 'Working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
-  setSession(ctx.db, 'GEO-9954', '0000f001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'z-delivery', 'add');
-  setSession(ctx.db, 'GEO-9954', '0000f002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'z-delivery', 'add');
-  addOwnedPr(ctx.db, 'GEO-9954', 'kettle#83', { actor: 'z-delivery', session: '0000f002' });
+  addRun(ctx.db, { issue: 'GEO-504', title: 'Invented kettle work', place: 'local', session: null, next: 'Working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
+  setSession(ctx.db, 'GEO-504', '0000f001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'z-delivery', 'add');
+  setSession(ctx.db, 'GEO-504', '0000f002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'z-delivery', 'add');
+  addOwnedPr(ctx.db, 'GEO-504', 'kettle#83', { actor: 'z-delivery', session: '0000f002' });
 
-  applyNoteSignals(ctx.db, 'GEO-9954', 'FINAL kettle#83 39f05fe', { source: 'atc:0000f001' });
+  applyNoteSignals(ctx.db, 'GEO-504', 'FINAL kettle#83 39f05fe', { source: 'atc:0000f001' });
 
   expect(ctx.db.query("SELECT session_id FROM run_prs WHERE ref = 'kettle#83'").get()).toStrictEqual({ session_id: '0000f002-aaaa-4aaa-8aaa-aaaaaaaaaaaa' });
 });
 
 test('it sets no owner for a FINAL marker from the cli', () => {
   const ctx = setupTest();
-  addRun(ctx.db, { issue: 'GEO-9955', title: 'Invented kettle work', place: 'local', session: null, next: 'Working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
-  addPr(ctx.db, 'GEO-9955', 'kettle#84', 'z-delivery');
+  addRun(ctx.db, { issue: 'GEO-505', title: 'Invented kettle work', place: 'local', session: null, next: 'Working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
+  addPr(ctx.db, 'GEO-505', 'kettle#84', 'z-delivery');
 
-  applyNoteSignals(ctx.db, 'GEO-9955', 'FINAL kettle#84 39f05fe', { source: 'cli' });
+  applyNoteSignals(ctx.db, 'GEO-505', 'FINAL kettle#84 39f05fe', { source: 'cli' });
 
   expect(ctx.db.query("SELECT session_id FROM run_prs WHERE ref = 'kettle#84'").get()).toStrictEqual({ session_id: null });
+});
+
+test('it hands the owner to the session of a later FINAL marker when an earlier marker set it', () => {
+  const ctx = setupTest();
+  addRun(ctx.db, { issue: 'GEO-506', title: 'Invented kettle work', place: 'local', session: null, next: 'Working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
+  setSession(ctx.db, 'GEO-506', '0000f001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'z-delivery', 'add');
+  setSession(ctx.db, 'GEO-506', '0000f002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'z-delivery', 'add');
+  addPr(ctx.db, 'GEO-506', 'kettle#85', 'z-delivery');
+  applyNoteSignals(ctx.db, 'GEO-506', 'FINAL kettle#85 39f05fe', { source: 'atc:0000f001' });
+
+  applyNoteSignals(ctx.db, 'GEO-506', 'FINAL kettle#85 4a1b2c3', { source: 'atc:0000f002' });
+
+  expect(ctx.db.query("SELECT session_id FROM run_prs WHERE ref = 'kettle#85'").get()).toStrictEqual({ session_id: '0000f002-aaaa-4aaa-8aaa-aaaaaaaaaaaa' });
 });

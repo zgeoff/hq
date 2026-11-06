@@ -97,8 +97,8 @@ function applyFinalMark(db: Database, input: FinalMarkInput): string | null {
 const ATC_MARKER_SOURCE = /^marker:atc:(?<prefix>[0-9a-f]+)$/iu;
 const SessionIDRows = z.array(z.object({ session_id: z.string() }));
 
-// A marker from an atc session names that session's prefix. An owner already on the PR stays, so
-// one set with hq run pr --session is never overwritten.
+// A marker from an atc session names that session's prefix. It replaces an owner an earlier marker
+// set, and never one set with hq run pr --session.
 function writeMarkerOwner(db: Database, issue: string, ref: string, source: string): void {
   const prefix = ATC_MARKER_SOURCE.exec(source)?.groups?.['prefix'];
   if (prefix === undefined) {
@@ -109,7 +109,7 @@ function writeMarkerOwner(db: Database, issue: string, ref: string, source: stri
     rows.map((row) => row.session_id),
     prefix,
   );
-  db.query('UPDATE run_prs SET session_id = ? WHERE ref = ? AND session_id IS NULL').run(owner ?? prefix, ref);
+  db.query('UPDATE run_prs SET session_id = ? WHERE ref = ? AND session_by_hand = 0').run(owner ?? prefix, ref);
 }
 
 function markResolved(db: Database, input: FinalMarkInput): boolean {

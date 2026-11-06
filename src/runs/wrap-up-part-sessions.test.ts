@@ -68,3 +68,14 @@ test('it wraps a part session up once across two sweeps', async () => {
 
   expect(readEvents(ctx.db, 'run', 'GEO-501', ['part-wrap-up'])).toHaveLength(1);
 });
+
+test('it wraps a part session up once when two sweeps overlap', async () => {
+  const ctx = await setupTest();
+  addOwnedPr(ctx.db, 'GEO-501', 'widgets#1', { actor: 'z-delivery', session: '0000e001' });
+  closePr(ctx.db, 'widgets#1', { to: 'merged', actor: 'z-delivery' });
+
+  await Promise.all([ctx.sweep(), ctx.sweep()]);
+
+  expect(ctx.fleet.calls).toStrictEqual(['unpin 0000e001', 'kill 0000e001', 'unpin 0000e001', 'forget 0000e001']);
+  expect(readEvents(ctx.db, 'run', 'GEO-501', ['part-wrap-up'])).toHaveLength(1);
+});

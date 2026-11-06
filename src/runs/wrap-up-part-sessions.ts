@@ -3,8 +3,9 @@ import { z } from 'zod';
 import type { SessionInfo } from '../atc/session-schema.ts';
 import { now } from '../clock/now.ts';
 import { logEvent } from '../log-event.ts';
+import { readEvents } from '../read-events.ts';
 import { collectPartSessionWraps } from './collect-part-session-wraps.ts';
-import type { PartSessionActivity } from './collect-part-session-wraps.ts';
+import type { PartSessionActivity, PartSessionWrap } from './collect-part-session-wraps.ts';
 import type { WrapUpDeps } from './run-wrap-up.ts';
 import { SWEEP_MINUTES as SWEEP } from './sweep-minutes.ts';
 import { wrapUpRunSafely } from './wrap-up-merged-runs.ts';
@@ -49,12 +50,33 @@ export async function wrapUpPartSessions(
   const due = collectPartSessionWraps({ sessions, prs, activity, wrapped, nowMs: now().getTime(), quietMs: SWEEP.quietMinutes() * 60_000 });
   const done: string[] = [];
   for (const wrap of due) {
+    const claim = writePartClaim(db, wrap, options.actor);
+    if (claim === null) {
+      continue;
+    }
     const full = atc.sessions.find((info) => info.id.toLowerCase().startsWith(wrap.session_id.toLowerCase()))?.id ?? wrap.session_id;
     const wrapUp = await wrapUpRunSafely(db, deps, wrap.issue, { actor: options.actor, onlySessions: [full], onlyNoteAction: true });
     if (wrapUp.forgotten.length > 0) {
-      logEvent(db, 'run', wrap.issue, 'part-wrap-up', options.actor, null, null, { session: wrap.session_id });
       done.push(wrap.session_id);
+    } else {
+      removePartClaim(db, claim);
     }
   }
   return done;
+}
+
+// A sweep that overlaps this one may have claimed the session since this pass listed it, and its
+// wrap-up is still running. The check and the claim are one step.
+function writePartClaim(db: Database, wrap: PartSessionWrap, actor: string): number | null {
+  return db
+    .transaction(() => {
+      const claimed = readEvents(db, 'run', wrap.issue, ['part-wrap-up']).some((event) => WrappedData.parse(JSON.parse(event.data)).session === wrap.session_id);
+      return claimed ? null : logEvent(db, 'run', wrap.issue, 'part-wrap-up', actor, null, null, { session: wrap.session_id });
+    })
+    .immediate();
+}
+
+// A session that wrap-up kept is retried on the next sweep.
+function removePartClaim(db: Database, seq: number): void {
+  db.query('DELETE FROM events WHERE seq = ?').run(seq);
 }
