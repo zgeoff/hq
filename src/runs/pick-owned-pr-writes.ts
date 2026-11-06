@@ -1,6 +1,6 @@
 import { pickRunSession } from './pick-run-session.ts';
 
-export interface OwnedPrState {
+interface OwnedPrState {
   session_id: string | null;
   session_by_hand: number;
 }
