@@ -285,7 +285,7 @@ test('it forgets the two newest cached merge days in v47, so the next sync recor
   ]);
 });
 
-test('it adds linear_started_prs in v48, keeps the earlier rows, and v48 is the newest schema', () => {
+test('it adds linear_started_prs in v48, and keeps the earlier rows', () => {
   const base = mkdtempSync(join(tmpdir(), 'hq-migrate-v48-'));
   const path = join(base, 'hq.db');
   const db = new Database(path, { create: true, strict: true });
@@ -293,16 +293,31 @@ test('it adds linear_started_prs in v48, keeps the earlier rows, and v48 is the 
   onTestFinished(() => db.close());
   db.exec('PRAGMA journal_mode = WAL;');
   migrate(db, path, false, MIGRATIONS.slice(0, 47));
-  db.query("INSERT INTO linear_started (issue, started_at, fetched_at) VALUES ('GEO-9901', '2026-10-14T01:00:00Z', '2026-10-15T01:00:00Z')").run();
-  db.query("INSERT INTO runs (issue, title, place, state, created_at, updated_at) VALUES ('GEO-9901', 'Descale the kettle', 'imp', 'working', '2026-10-14T01:00:00Z', '2026-10-14T01:00:00Z')").run();
-  db.query("INSERT INTO run_prs (ref, issue, state, added_at, updated_at) VALUES ('kettle#41', 'GEO-9901', 'open', '2026-10-14T01:00:00Z', '2026-10-14T01:00:00Z')").run();
+  db.query("INSERT INTO linear_started (issue, started_at, fetched_at) VALUES ('GEO-502', '2026-10-14T01:00:00Z', '2026-10-15T01:00:00Z')").run();
+  db.query("INSERT INTO runs (issue, title, place, state, created_at, updated_at) VALUES ('GEO-502', 'Descale the kettle', 'imp', 'working', '2026-10-14T01:00:00Z', '2026-10-14T01:00:00Z')").run();
+  db.query("INSERT INTO run_prs (ref, issue, state, added_at, updated_at) VALUES ('kettle#41', 'GEO-502', 'open', '2026-10-14T01:00:00Z', '2026-10-14T01:00:00Z')").run();
 
   expect(migrate(db, path, true)).not.toBeNull();
-  expect(db.query('SELECT issue, started_at, fetched_at FROM linear_started').all()).toStrictEqual([{ issue: 'GEO-9901', started_at: '2026-10-14T01:00:00Z', fetched_at: '2026-10-15T01:00:00Z' }]);
-  expect(db.query('SELECT issue, state FROM runs').all()).toStrictEqual([{ issue: 'GEO-9901', state: 'working' }]);
-  expect(db.query('SELECT ref, issue, state FROM run_prs').all()).toStrictEqual([{ ref: 'kettle#41', issue: 'GEO-9901', state: 'open' }]);
-  db.query("INSERT INTO linear_started_prs (issue, ref, status, merged_at) VALUES ('GEO-9901', 'kettle#41', 'merged', '2026-10-14T02:00:00Z')").run();
-  expect(db.query('SELECT issue, ref, status, merged_at FROM linear_started_prs').all()).toStrictEqual([{ issue: 'GEO-9901', ref: 'kettle#41', status: 'merged', merged_at: '2026-10-14T02:00:00Z' }]);
-  expect(db.query('PRAGMA user_version').get()).toStrictEqual({ user_version: 48 });
-  expect(MIGRATIONS).toHaveLength(48);
+  expect(db.query('SELECT issue, started_at, fetched_at FROM linear_started').all()).toStrictEqual([{ issue: 'GEO-502', started_at: '2026-10-14T01:00:00Z', fetched_at: '2026-10-15T01:00:00Z' }]);
+  expect(db.query('SELECT issue, state FROM runs').all()).toStrictEqual([{ issue: 'GEO-502', state: 'working' }]);
+  expect(db.query('SELECT ref, issue, state FROM run_prs').all()).toStrictEqual([{ ref: 'kettle#41', issue: 'GEO-502', state: 'open' }]);
+  db.query("INSERT INTO linear_started_prs (issue, ref, status, merged_at) VALUES ('GEO-502', 'kettle#41', 'merged', '2026-10-14T02:00:00Z')").run();
+  expect(db.query('SELECT issue, ref, status, merged_at FROM linear_started_prs').all()).toStrictEqual([{ issue: 'GEO-502', ref: 'kettle#41', status: 'merged', merged_at: '2026-10-14T02:00:00Z' }]);
+});
+
+test('it adds run_prs.session_id in v49, keeps the earlier rows with no owner, and v49 is the newest schema', () => {
+  const base = mkdtempSync(join(tmpdir(), 'hq-migrate-v49-'));
+  const path = join(base, 'hq.db');
+  const db = new Database(path, { create: true, strict: true });
+  onTestFinished(() => rmSync(base, { recursive: true, force: true }));
+  onTestFinished(() => db.close());
+  db.exec('PRAGMA journal_mode = WAL;');
+  migrate(db, path, false, MIGRATIONS.slice(0, 48));
+  db.query("INSERT INTO runs (issue, title, place, state, created_at, updated_at) VALUES ('GEO-501', 'Descale the kettle', 'imp', 'working', '2026-10-14T01:00:00Z', '2026-10-14T01:00:00Z')").run();
+  db.query("INSERT INTO run_prs (ref, issue, state, added_at, updated_at) VALUES ('kettle#41', 'GEO-501', 'open', '2026-10-14T01:00:00Z', '2026-10-14T01:00:00Z')").run();
+
+  expect(migrate(db, path, true)).not.toBeNull();
+  expect(db.query('SELECT ref, session_id FROM run_prs').all()).toStrictEqual([{ ref: 'kettle#41', session_id: null }]);
+  expect(db.query('PRAGMA user_version').get()).toStrictEqual({ user_version: 49 });
+  expect(MIGRATIONS).toHaveLength(49);
 });

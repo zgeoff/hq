@@ -68,6 +68,7 @@ import { checkLanesBuild } from './lanes/check-lanes-build.ts';
 import { rolesByName } from './roles/roles-by-name.ts';
 import { withStaleBuild } from './roles/with-stale-build.ts';
 import { addNote } from './runs/add-note.ts';
+import { addOwnedPr } from './runs/add-owned-pr.ts';
 import { addPr } from './runs/add-pr.ts';
 import { addRun } from './runs/add-run.ts';
 import { checkMergedOnGitHub } from './runs/check-merged-on-github.ts';
@@ -2252,8 +2253,12 @@ async function runCommand(context: Ctx): Promise<Out> {
       return { data: { run: r }, text: runLine(r) };
     })
     .with('pr', async () => {
-      const p = addPr(db, arg(0, 'issue'), arg(1, 'pr (repo#n or URL)'), await by());
-      return { data: { pr: p }, text: runLine(view(p.issue)) };
+      const attachedBy = await by();
+      const issue = arg(0, 'issue');
+      const ref = arg(1, 'pr (repo#n or URL)');
+      const named = flags.session;
+      const pr = named === undefined ? addPr(db, issue, ref, attachedBy) : addOwnedPr(db, issue, ref, { actor: attachedBy, session: named });
+      return { data: { pr }, text: runLine(view(pr.issue)) };
     })
     .with('final', async () => {
       const sha = need(flags.sha, 'sha');

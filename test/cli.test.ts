@@ -4,6 +4,7 @@ import { Database } from 'bun:sqlite';
 import { chmodSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { updateEnv } from '@zgeoff/testing/helpers';
 import { closePr } from '../src/runs/close-pr.ts';
+import { setSession } from '../src/runs/set-session.ts';
 import { requirePR } from '../src/runs/require-pr.ts';
 import { readEvents } from '../src/read-events.ts';
 import { main } from '../src/cli.ts';
@@ -534,6 +535,27 @@ test('hq run reopen brings a dropped run back to working, as the refusal says', 
   expect((await hq('run', 'pr', 'GEO-508', 'kettle#10')).code).toBe(0);
   expect((await hq('run', 'reopen', 'GEO-508')).json.error.message).toBe('GEO-508 is working, not done or dropped: nothing to reopen');
   expect((await hq('run', 'reopen', 'GEO-404')).code).not.toBe(0);
+});
+
+test('it attaches with hq run pr --session the PR and sets its owner, and works again on the attached PR', async () => {
+  await hq('run', 'add', 'GEO-531', '--title', 'Invented kettle work', '--where', 'none');
+  setSession(db(), 'GEO-531', '0000e101-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'z-stu', 'add');
+  setSession(db(), 'GEO-531', '0000e102-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'z-stu', 'add');
+
+  const first = await hq('run', 'pr', 'GEO-531', 'kettle#31', '--session', '0000E101');
+  const again = await hq('run', 'pr', 'GEO-531', 'kettle#31', '--session', '0000e102');
+
+  expect([first.code, first.json.pr.session_id]).toStrictEqual([0, '0000e101-aaaa-4aaa-8aaa-aaaaaaaaaaaa']);
+  expect([again.code, again.json.pr.session_id]).toStrictEqual([0, '0000e102-aaaa-4aaa-8aaa-aaaaaaaaaaaa']);
+});
+
+test('it refuses hq run pr --session a session that is not on the run, naming the issue', async () => {
+  await hq('run', 'add', 'GEO-532', '--title', 'Invented kettle work', '--where', 'none');
+
+  const refused = await hq('run', 'pr', 'GEO-532', 'kettle#32', '--session', '0000e1ff');
+
+  expect([refused.code === 0, refused.json.error.code, refused.json.error.message]).toStrictEqual([false, 'bad_args', '--session 0000e1ff names no single session of GEO-532']);
+  expect(db().query("SELECT COUNT(*) AS count FROM run_prs WHERE ref = 'kettle#32'").get()).toStrictEqual({ count: 0 });
 });
 
 test('it succeeds and changes nothing when hq run merged names a PR already marked merged', async () => {

@@ -45,6 +45,8 @@ export interface RunPr {
   final_sha: string | null;
   final_at: string | null;
   final_source: string | null;
+  session_id: string | null;
+  session_by_hand: number;
   review_started_at: string | null;
   reviewed_sha: string | null;
   review_round: number;
