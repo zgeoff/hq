@@ -67,15 +67,11 @@ export async function endHandedInRunSessions(db: Database, atc: AtcView, deps: W
     const guarded = collectGuardedSessions(candidate.rows, listed);
     const activity = await readGuardedActivity(atc, guarded ?? []);
     const checked = pickQuietSessions(guarded, activity, quietBefore);
-    if (checked !== null && !(await isHeld(db, options, candidate.issue))) {
+    if (checked !== null && !(await probeHeld(db, options, candidate.issue))) {
       ended += await endHandedInRun(db, shared, { ...candidate, checked, actor: options.actor, at });
     }
   }
   return ended;
-}
-
-async function isHeld(db: Database, options: HandedInOptions, issue: string): Promise<boolean> {
-  return options.holds === undefined ? false : (await runHandedInHoldCheck(db, options.holds, issue, options.actor)).hold;
 }
 
 function readLastKept(db: Database, issue: string): StoredEvent | null {
@@ -85,6 +81,14 @@ function readLastKept(db: Database, issue: string): StoredEvent | null {
 async function readGuardedActivity(atc: AtcView, guarded: readonly AtcSession[]): Promise<Map<string, SessionActivity | null>> {
   const read = await Promise.all(guarded.map(async (session) => [session.id, await atc.readActivity(session.id)] as const));
   return new Map(read);
+}
+
+async function probeHeld(db: Database, options: HandedInOptions, issue: string): Promise<boolean> {
+  if (options.holds === undefined) {
+    return false;
+  }
+  const check = await runHandedInHoldCheck(db, options.holds, issue, options.actor);
+  return check.hold;
 }
 
 interface HandedInRun {
