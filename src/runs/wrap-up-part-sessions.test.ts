@@ -1,13 +1,15 @@
 import { expect, onTestFinished, test } from 'bun:test';
+import { updateEnv } from '@zgeoff/testing/helpers';
 import { buildStubFleetClient } from '../../test/build-stub-fleet-client.ts';
 import { buildStubGitHubFactsRunner } from '../../test/build-stub-github-facts-runner.ts';
 import { AtcClient } from '../atc/atc-client.ts';
-import { overrideEnv } from '../config/override-env.ts';
+import type { FleetSession } from '../fleet/types.ts';
 import { readEvents } from '../read-events.ts';
 import { fakeAtc, freshDb } from '../../test/helpers.ts';
 import { addOwnedPr } from './add-owned-pr.ts';
 import { addRun } from './add-run.ts';
 import { closePr } from './close-pr.ts';
+import { requireRun } from './require-run.ts';
 import { setSession } from './set-session.ts';
 import type { ImpWork } from './types.ts';
 import { sweepNow } from './sweep-now.ts';
@@ -15,25 +17,16 @@ import { sweepNow } from './sweep-now.ts';
 async function setupTest() {
   const fresh = freshDb();
   onTestFinished(fresh.cleanup);
-  onTestFinished(overrideEnv('HQ_NOW', '2026-11-07T03:00:00Z'));
-  const roster: { id: string; name: string; alive: boolean; state: string }[] = [];
+  const roster: { id: string; name: string; alive: boolean; state: string; parent?: string; pinned?: boolean }[] = [];
   const server = fakeAtc(fresh.dir, roster);
   onTestFinished(server.stop);
   const client = await AtcClient.open();
   onTestFinished(() => client.close());
+  const fleetSessions: FleetSession[] = [];
   const killFailures: string[] = [];
-  const fleet = buildStubFleetClient({
-    sessions: [
-      { id: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'widgets-part', alive: true, state: 'done' },
-      { id: '0000e002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'gadgets-part', alive: true, state: 'done' },
-    ],
-    killFailures,
-  });
+  const fleet = buildStubFleetClient({ sessions: fleetSessions, killFailures });
   const logged: string[] = [];
   const localWork: { current: ImpWork } = { current: { state: 'pushed' } };
-  roster.push({ id: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'widgets-part', alive: true, state: 'done' }, { id: '0000e002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'gadgets-part', alive: true, state: 'done' });
-  server.activity.set('0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', Date.parse('2026-11-07T01:00:00Z'));
-  server.activity.set('0000e002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', Date.parse('2026-11-07T01:00:00Z'));
 
   return {
     db: fresh.db,
@@ -43,6 +36,13 @@ async function setupTest() {
         wrapUpDeps: { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')), readLocalWork: () => Promise.resolve(localWork.current) },
         log: (line) => logged.push(line),
       }),
+    seed: {
+      atcSession: (session: (typeof roster)[number], lastActivityAt: string) => {
+        roster.push(session);
+        fleetSessions.push(session);
+        server.activity.set(session.id, Date.parse(lastActivityAt));
+      },
+    },
     fleet,
     killFailures,
     logged,
@@ -52,6 +52,9 @@ async function setupTest() {
 
 test('it forgets the helper session whose PRs merged, keeps the one with an open PR, and leaves the run state', async () => {
   const ctx = await setupTest();
+  updateEnv('HQ_NOW', '2026-11-07T03:00:00Z');
+  ctx.seed.atcSession({ id: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'widgets-part', alive: true, state: 'done' }, '2026-11-07T01:00:00Z');
+  ctx.seed.atcSession({ id: '0000e002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'gadgets-part', alive: true, state: 'done' }, '2026-11-07T01:00:00Z');
   addRun(ctx.db, { issue: 'GEO-501', title: 'Invented widgets and gadgets', place: 'local', session: null, next: 'Parts working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
   setSession(ctx.db, 'GEO-501', '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'z-delivery', 'add');
   setSession(ctx.db, 'GEO-501', '0000e002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'z-delivery', 'add');
@@ -62,12 +65,14 @@ test('it forgets the helper session whose PRs merged, keeps the one with an open
   await ctx.sweep();
 
   expect(ctx.fleet.calls).toStrictEqual(['unpin 0000e001', 'kill 0000e001', 'unpin 0000e001', 'forget 0000e001']);
-  expect(ctx.db.query("SELECT state FROM runs WHERE issue = 'GEO-501'").get()).toStrictEqual({ state: 'working' });
+  expect(requireRun(ctx.db, 'GEO-501').state).toBe('working');
   expect(readEvents(ctx.db, 'run', 'GEO-501', ['part-wrap-up']).map((event) => JSON.parse(event.data))).toStrictEqual([{ session: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }]);
 });
 
 test('it wraps a part session up once across two sweeps', async () => {
   const ctx = await setupTest();
+  updateEnv('HQ_NOW', '2026-11-07T03:00:00Z');
+  ctx.seed.atcSession({ id: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'widgets-part', alive: true, state: 'done' }, '2026-11-07T01:00:00Z');
   addRun(ctx.db, { issue: 'GEO-501', title: 'Invented widgets', place: 'local', session: null, next: 'Parts working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
   setSession(ctx.db, 'GEO-501', '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'z-delivery', 'add');
   addOwnedPr(ctx.db, 'GEO-501', 'widgets#1', { actor: 'z-delivery', session: '0000e001' });
@@ -81,6 +86,8 @@ test('it wraps a part session up once across two sweeps', async () => {
 
 test('it wraps a part session up once when two sweeps overlap', async () => {
   const ctx = await setupTest();
+  updateEnv('HQ_NOW', '2026-11-07T03:00:00Z');
+  ctx.seed.atcSession({ id: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'widgets-part', alive: true, state: 'done' }, '2026-11-07T01:00:00Z');
   addRun(ctx.db, { issue: 'GEO-501', title: 'Invented widgets', place: 'local', session: null, next: 'Parts working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
   setSession(ctx.db, 'GEO-501', '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'z-delivery', 'add');
   addOwnedPr(ctx.db, 'GEO-501', 'widgets#1', { actor: 'z-delivery', session: '0000e001' });
@@ -94,6 +101,8 @@ test('it wraps a part session up once when two sweeps overlap', async () => {
 
 test('it keeps a helper session with unpushed work on one sweep and forgets it on the next once the work is pushed', async () => {
   const ctx = await setupTest();
+  updateEnv('HQ_NOW', '2026-11-07T03:00:00Z');
+  ctx.seed.atcSession({ id: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'widgets-part', alive: true, state: 'done' }, '2026-11-07T01:00:00Z');
   addRun(ctx.db, { issue: 'GEO-501', title: 'Invented widgets', place: 'local', session: null, next: 'Parts working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
   setSession(ctx.db, 'GEO-501', '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'z-delivery', 'add');
   addOwnedPr(ctx.db, 'GEO-501', 'widgets#1', { actor: 'z-delivery', session: '0000e001' });
@@ -110,6 +119,8 @@ test('it keeps a helper session with unpushed work on one sweep and forgets it o
 
 test('it logs a failed part wrap-up and releases the claim for the next sweep', async () => {
   const ctx = await setupTest();
+  updateEnv('HQ_NOW', '2026-11-07T03:00:00Z');
+  ctx.seed.atcSession({ id: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'widgets-part', alive: true, state: 'done' }, '2026-11-07T01:00:00Z');
   addRun(ctx.db, { issue: 'GEO-501', title: 'Invented widgets', place: 'local', session: null, next: 'Parts working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
   setSession(ctx.db, 'GEO-501', '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'z-delivery', 'add');
   addOwnedPr(ctx.db, 'GEO-501', 'widgets#1', { actor: 'z-delivery', session: '0000e001' });
