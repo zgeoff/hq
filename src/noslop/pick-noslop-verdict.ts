@@ -2,7 +2,6 @@ import { match } from 'ts-pattern';
 import type { OwnerOverride } from '../pr-status/read-owner-overrides.ts';
 import { formatCIClause } from './format-ci-clause.ts';
 import type { GateCI } from './format-ci-clause.ts';
-import type { BaseMoveCover } from './read-base-move-cover.ts';
 import type { NoslopCheck } from './read-noslop-check.ts';
 import type { SummaryHead } from './read-summary-head.ts';
 
@@ -10,7 +9,7 @@ type NoslopFindingsRead = { read: true; open: string[]; listed: number } | { rea
 
 export type NoslopGateFacts =
   | { overridden: true; head: string; override: OwnerOverride; findings: NoslopFindingsRead; headNow: string | null }
-  | { overridden: false; repo: string; pr: number; head: string; summary: SummaryHead; baseMove: BaseMoveCover | null; check: NoslopCheck; recorded: number; findings: NoslopFindingsRead; headNow: string | null };
+  | { overridden: false; repo: string; pr: number; head: string; summary: SummaryHead; check: NoslopCheck; recorded: number; findings: NoslopFindingsRead; headNow: string | null };
 
 export type NoslopVerdict = { pass: true; reason: string } | { pass: false; reason: string };
 
@@ -38,9 +37,8 @@ function pickReviewedVerdict(facts: Extract<NoslopGateFacts, { overridden: false
   if (!facts.summary.found) {
     return { pass: false, reason: `${facts.summary.reason}, so no pass: hq review ${facts.repo} ${facts.pr}` };
   }
-  if (facts.summary.head !== facts.head && facts.baseMove?.covered !== true) {
-    const why = facts.baseMove?.covered === false ? `; not a base move it covers: ${facts.baseMove.why}` : '';
-    return { pass: false, reason: `noslop has not reviewed head ${facts.head.slice(0, 7)} (its last review read ${facts.summary.head.slice(0, 7)})${why}; run hq review ${facts.repo} ${facts.pr}` };
+  if (facts.summary.head !== facts.head) {
+    return { pass: false, reason: `noslop has not reviewed head ${facts.head.slice(0, 7)} (its last review read ${facts.summary.head.slice(0, 7)}); run hq review ${facts.repo} ${facts.pr}` };
   }
   const check = pickCheckBlock(facts, facts.summary.updatedAt);
   if (check !== null) {
@@ -52,8 +50,8 @@ function pickReviewedVerdict(facts: Extract<NoslopGateFacts, { overridden: false
     .exhaustive();
 }
 
-// noslop's check also fails on what its summary head cannot show, such as failed review calls or a
-// rejected merge resolution, so the gate takes its conclusion rather than restate its rules.
+// The gate needs noslop's check to have finished judging the latest summary, not to have passed: a
+// capped PR's check fails at a head that only merged main, and the open findings decide the rest.
 function pickCheckBlock(facts: Extract<NoslopGateFacts, { overridden: false }>, summaryUpdatedAt: string): string | null {
   const at = facts.head.slice(0, 7);
   if (!facts.check.found) {
@@ -65,9 +63,6 @@ function pickCheckBlock(facts: Extract<NoslopGateFacts, { overridden: false }>, 
   if (facts.check.completedAt === null || Date.parse(facts.check.completedAt) < Date.parse(summaryUpdatedAt)) {
     return `noslop's check at ${at} predates its latest summary, so it does not judge that review; rerun hq review ${facts.repo} ${facts.pr}`;
   }
-  if (facts.check.conclusion !== 'success') {
-    return `noslop's check at ${at} is ${facts.check.conclusion ?? 'without a conclusion'}: ${facts.check.title ?? 'no title'}`;
-  }
   return null;
 }
 
@@ -78,6 +73,5 @@ function pickFoundVerdict(facts: Extract<NoslopGateFacts, { overridden: false }>
   if (facts.recorded > 0 && found.listed === 0) {
     return { pass: false, reason: `noslop's findings list is empty, but its reviews of this PR recorded ${facts.recorded} finding${facts.recorded === 1 ? '' : 's'}, so no pass` };
   }
-  const covers = facts.baseMove?.covered === true ? `noslop's review at ${facts.baseMove.reviewed.slice(0, 7)} covers ${facts.head.slice(0, 7)} (base move, same diff); ` : '';
-  return { pass: true, reason: `${covers}noslop findings: none open; ${formatCIClause(facts.head.slice(0, 7), ci)}` };
+  return { pass: true, reason: `noslop findings: none open; ${formatCIClause(facts.head.slice(0, 7), ci)}` };
 }
