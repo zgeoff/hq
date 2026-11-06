@@ -16,6 +16,8 @@ import { toMessage } from './to-message.ts';
 import type { Alert } from './types.ts';
 import { watchlist } from './watchlist.ts';
 import { shareClient, wrapUpMergedRuns } from './wrap-up-merged-runs.ts';
+import type { AtcSnapshot } from './wrap-up-part-sessions.ts';
+import { wrapUpPartSessions } from './wrap-up-part-sessions.ts';
 
 export interface SweepOptions {
   actor: string;
@@ -40,6 +42,7 @@ export async function sweepNow(db: Database, client: AtcClient, run: Runner, opt
     const readActivity = (id: string) => (read.has(id) ? Promise.resolve(read.get(id) ?? null) : readSessionActivity(client, id));
     await endHandedInRunSessionsSafely(db, { readActivity }, { ...options, wrapUpDeps });
     await wrapUpMergedRunsSafely(db, { ...options, wrapUpDeps });
+    await wrapUpPartSessionsSafely(db, wrapUpDeps, { sessions, activity }, options);
   }
   const alerts = await closeFlaggedPRs(db, run, findAlerts(db, sessions, activity, now()));
   const swept = sweep(db, alerts, options.actor);
@@ -68,5 +71,13 @@ async function wrapUpMergedRunsSafely(db: Database, options: SweepOptions): Prom
     await wrapUpMergedRuns(db, options.wrapUpDeps, { actor: options.actor });
   } catch (error) {
     options.log(`merged-run wrap-up failed: ${toMessage(error)}`);
+  }
+}
+
+async function wrapUpPartSessionsSafely(db: Database, deps: WrapUpDeps, atc: AtcSnapshot, options: SweepOptions): Promise<void> {
+  try {
+    await wrapUpPartSessions(db, deps, atc, { actor: options.actor });
+  } catch (error) {
+    options.log(`part-session wrap-up failed: ${toMessage(error)}`);
   }
 }

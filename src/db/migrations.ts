@@ -597,4 +597,6 @@ export const MIGRATIONS: string[] = [
     merged_at TEXT,
     PRIMARY KEY (issue, ref)
   );`,
+
+  `ALTER TABLE run_prs ADD COLUMN session_id TEXT;`,
 ];
