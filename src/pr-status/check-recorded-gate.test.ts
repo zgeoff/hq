@@ -151,7 +151,7 @@ test('it records a fail at the head it read when a reviewed PR changes an owner-
   const fake = buildFakeRunner({ prBody: FAKE_PROOF_BODY, prFiles: { code: 0, stdout: 'skills/kettle/SKILL.md\n', stderr: '' } });
   createListedReview(ctx.db, { repo: 'hq', pr: 7, head: FAKE_FULL_SHA });
 
-  await expect(checkRecordedGate({ run: fake.run, db: ctx.db, rawRepo: 'hq', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: expect.stringContaining("needs the owner's lgtm at 0123456") });
+  await expect(checkRecordedGate({ run: fake.run, db: ctx.db, rawRepo: 'hq', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: expect.stringContaining("needs the owner's lgtm:") });
 
   expect(ctx.db.query('SELECT gate, gate_head FROM pr_status').all()).toStrictEqual([{ gate: 'fail', gate_head: FAKE_FULL_SHA }]);
 });

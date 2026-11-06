@@ -8,7 +8,6 @@ import type { AcceptedRiskRecord } from './find-accepted-risks.ts';
 import type { PRRef } from './parse-pr-ref.ts';
 import { ReplyFailureError, postAcceptRiskReply } from './post-accept-risk-reply.ts';
 import type { PostedReply } from './post-accept-risk-reply.ts';
-import { readPRHead } from './read-pr-head.ts';
 import { recordPRAcceptedRisk } from './record-pr-accepted-risk.ts';
 import { requireOwnerSource } from './require-owner-source.ts';
 import type { PRCommandInput } from './run-pr-command.ts';
@@ -30,12 +29,7 @@ export async function runAcceptRisk(input: PRCommandInput, ref: PRRef, finding: 
   if (!FINDING_ID.test(finding)) {
     throw new HqError('bad_args', `finding id "${finding}" must be noslop's 16 lowercase hex characters, as its comment shows them`);
   }
-  const head = await readPRHead(input.run, ref.slug, ref.pr);
-  const source = await requireOwnerSource(input, {
-    ref,
-    wanted: { action: 'accept-risk', finding },
-    head,
-  });
+  const source = await requireOwnerSource(input, { ref, wanted: { action: 'accept-risk', finding } });
   const note = input.flags.note?.trim() ?? '';
   if (note === '') {
     throw new HqError('bad_args', '--note is required: why the owner accepts this risk');

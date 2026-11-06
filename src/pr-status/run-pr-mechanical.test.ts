@@ -5,7 +5,7 @@ import { buildFakeRunner } from '../../test/noslop-fake.ts';
 import { NOON_SYDNEY, at, freshDb } from '../../test/helpers.ts';
 import { overrideEnv } from '../config/override-env.ts';
 import { listNews } from '../news/list-news.ts';
-import { readHeadLgtm } from './read-head-lgtm.ts';
+import { readOwnerLgtm } from './read-owner-lgtm.ts';
 import { runPRCommand } from './run-pr-command.ts';
 
 function setupTest() {
@@ -38,7 +38,7 @@ test('it records no owner answer, so the owner lines of the record stay empty', 
 
   await runPRCommand({ run: fake.run, db: ctx.db, verb: 'mechanical', rest: ['widgets', '7'], flags: {}, actor: () => Promise.resolve('z-review'), readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) });
 
-  expect(readHeadLgtm(ctx.db, 'widgets', 7, stub.head)).toBeNull();
+  expect(readOwnerLgtm(ctx.db, 'widgets', 7)).toBeNull();
 });
 
 test('it shows the record on its own line of hq pr status', async () => {

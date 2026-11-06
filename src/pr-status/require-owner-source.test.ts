@@ -14,7 +14,7 @@ function setupTest() {
     require: async (flags: Flags, probe: OwnerProbe) =>
       await requireOwnerSource(
         { run: buildFakeRunner().run, db: fresh.db, verb: 'accept-risk', rest: [], flags, actor: () => Promise.resolve('z-kettle'), readOwnerSession: () => Promise.resolve(probe), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) },
-        { ref: parsePRRef('widgets', '7'), wanted: { action: 'accept-risk', finding: 'aaaaaaaaaaaaaaaa' }, head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678' },
+        { ref: parsePRRef('widgets', '7'), wanted: { action: 'accept-risk', finding: 'aaaaaaaaaaaaaaaa' } },
       ),
   };
 }

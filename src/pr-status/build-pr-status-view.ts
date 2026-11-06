@@ -23,7 +23,6 @@ export function buildPRStatusView(row: PRStatusRow, current: string | null, over
     answerSource: row.answer_source,
     answerNote: row.answer_note,
     answerAt: row.answer_at,
-    answerStale: isStale(row.answer_head, current),
     next: row.next,
     nextAt: row.next_at,
     override: override === null ? null : { head: override.head, source: override.source, note: override.note, at: override.at },

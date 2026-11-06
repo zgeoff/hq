@@ -67,7 +67,6 @@ test('it shows a changes answer at the head it was given, with its source and no
         answerSource: 'chat:kettle-12',
         answerNote: 'Descale it first.',
         answerAt: '2026-10-14T01:00:00Z',
-        answerStale: false,
         next: null,
         nextAt: null,
         override: null,
@@ -81,7 +80,7 @@ test('it shows a changes answer at the head it was given, with its source and no
   });
 });
 
-test.each(['lgtm', 'changes'])('it marks an older %s answer stale at the head it was given once the PR has a new head', async (answer) => {
+test.each(['lgtm', 'changes'])('it shows an older %s answer at the head it was given, not as stale, once the PR has a new head', async (answer) => {
   const ctx = setupTest();
   await ctx.answer(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), answer, { source: 'chat:kettle-3', note: 'Shorter spout.' });
 
@@ -101,7 +100,6 @@ test.each(['lgtm', 'changes'])('it marks an older %s answer stale at the head it
         answerSource: 'chat:kettle-3',
         answerNote: 'Shorter spout.',
         answerAt: '2026-10-14T01:00:00Z',
-        answerStale: true,
         next: null,
         nextAt: null,
         override: null,
@@ -111,7 +109,7 @@ test.each(['lgtm', 'changes'])('it marks an older %s answer stale at the head it
         updatedAt: '2026-10-14T01:00:00Z',
       },
     },
-    text: ['widgets#7  head b9c8d7e', 'gate: not recorded', `answer: ${answer} stale at a1b2c3d via chat:kettle-3 (2026-10-14T01:00:00Z): Shorter spout.`, 'next: nobody'].join('\n'),
+    text: ['widgets#7  head b9c8d7e', 'gate: not recorded', `answer: ${answer} at a1b2c3d via chat:kettle-3 (2026-10-14T01:00:00Z): Shorter spout.`, 'next: nobody'].join('\n'),
   });
 });
 
@@ -190,7 +188,6 @@ test('it prints the stored record and says stale is unknown when gh cannot give 
         answerSource: 'chat:review-7',
         answerNote: 'Wrong spout.',
         answerAt: '2026-10-14T01:00:00Z',
-        answerStale: false,
         next: null,
         nextAt: null,
         override: null,
@@ -264,7 +261,6 @@ test('it sets who holds the next step, and shows the record against the head gh 
         answerSource: null,
         answerNote: null,
         answerAt: null,
-        answerStale: false,
         next: 'z-stu',
         nextAt: '2026-10-14T01:00:00Z',
         override: null,
@@ -352,7 +348,6 @@ test('it shows a gate none plainly, as a PR noslop does not review', async () =>
         answerSource: null,
         answerNote: null,
         answerAt: null,
-        answerStale: false,
         next: null,
         nextAt: null,
         override: null,
@@ -386,7 +381,6 @@ test("it marks a gate recorded at an older head stale once the PR has a new head
         answerSource: null,
         answerNote: null,
         answerAt: null,
-        answerStale: false,
         next: null,
         nextAt: null,
         override: null,
@@ -420,7 +414,6 @@ test("it shows a gate recorded at the PR's head now as not stale", async () => {
         answerSource: null,
         answerNote: null,
         answerAt: null,
-        answerStale: false,
         next: null,
         nextAt: null,
         override: null,
@@ -498,7 +491,7 @@ test('it shows the override that stands at the head now, in text and in JSON', a
   expect(shown.data).toMatchObject({ pr: { override: { head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', source: 'chat:kettle-2', note: 'The base moved under the stack.', at: '2026-10-14T01:00:00Z' } } });
 });
 
-test('it shows no override once the PR has a new head', async () => {
+test('it still shows the override once the PR has a new head', async () => {
   const ctx = setupTest();
   const head = ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678');
   await ctx.answer(head, 'lgtm', { source: 'chat:kettle-1' });
@@ -506,8 +499,8 @@ test('it shows no override once the PR has a new head', async () => {
 
   const shown = await ctx.status(ctx.headAt('b9c8d7e6f5a40312213f4e5d6c7b8a9087654321'));
 
-  expect(shown.data).toMatchObject({ pr: { override: null } });
-  expect(shown.text).not.toInclude('override:');
+  expect(shown.data).toMatchObject({ pr: { override: { head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', source: 'chat:kettle-2' } } });
+  expect(shown.text).toInclude('override: at a1b2c3d via chat:kettle-2');
 });
 
 test('it shows a standing override for a PR with no record, in text and in JSON', async () => {
@@ -645,13 +638,14 @@ test.each(['Accept-risk aaaaaaaaaaaaaaaa on zgeoff/widgets#7?', 'Widgets#7: acce
 test.each([
   ['the console', (ctx: ReturnType<typeof setupTest>) => Promise.resolve(ctx.answerInConsole('KET-5'))],
   ['hq call answer in the z-stu session', async (ctx: ReturnType<typeof setupTest>) => await ctx.answerByHqCall('KET-5', 'owner')],
-])('it refuses a call: source for override from a plain Yes in %s, since a plain yes names no head', async (_case, answer) => {
+])('it records an override from a plain Yes in %s to a call that names the PR and the override', async (_case, answer) => {
   const ctx = setupTest();
   ctx.fileCall('KET-5', 'Override widgets#7 now?');
   await answer(ctx);
 
-  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'call:KET-5', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: '--source refused: call:KET-5 has no option that grants the override: an override needs the owner to pick an option whose grants name the PR and the head, and a plain yes names no head; ask z-stu to record it' });
-  expect(ctx.db.query("SELECT COUNT(*) AS total FROM events WHERE action = 'pr-override'").get()).toStrictEqual({ total: 0 });
+  await ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'call:KET-5', note: 'Ship it.' });
+
+  expect(ctx.db.query("SELECT COUNT(*) AS total FROM events WHERE action = 'pr-override'").get()).toStrictEqual({ total: 1 });
 });
 
 test.each([
@@ -724,9 +718,9 @@ test('it refuses a console: source for a call whose options grant nothing, even 
 });
 
 test.each([
-  { mismatch: 'an action', verb: 'override', rest: ['widgets', '7'], grants: { action: 'accept-risk', pr: 'zgeoff/widgets#7', finding: 'aaaaaaaaaaaaaaaa', head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678' }, why: 'accept-risk of zgeoff/widgets#7 finding aaaaaaaaaaaaaaaa at a1b2c3d, not override of zgeoff/widgets#7 at a1b2c3d' },
-  { mismatch: 'a repo', verb: 'override', rest: ['widgets', '7'], grants: { action: 'override', pr: 'zgeoff/teapots#7', head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678' }, why: 'override of zgeoff/teapots#7 at a1b2c3d, not override of zgeoff/widgets#7 at a1b2c3d' },
-  { mismatch: 'a PR', verb: 'override', rest: ['widgets', '7'], grants: { action: 'override', pr: 'zgeoff/widgets#8', head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678' }, why: 'override of zgeoff/widgets#8 at a1b2c3d, not override of zgeoff/widgets#7 at a1b2c3d' },
+  { mismatch: 'an action', verb: 'override', rest: ['widgets', '7'], grants: { action: 'accept-risk', pr: 'zgeoff/widgets#7', finding: 'aaaaaaaaaaaaaaaa', head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678' }, why: 'accept-risk of zgeoff/widgets#7 finding aaaaaaaaaaaaaaaa, not override of zgeoff/widgets#7' },
+  { mismatch: 'a repo', verb: 'override', rest: ['widgets', '7'], grants: { action: 'override', pr: 'zgeoff/teapots#7', head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678' }, why: 'override of zgeoff/teapots#7, not override of zgeoff/widgets#7' },
+  { mismatch: 'a PR', verb: 'override', rest: ['widgets', '7'], grants: { action: 'override', pr: 'zgeoff/widgets#8', head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678' }, why: 'override of zgeoff/widgets#8, not override of zgeoff/widgets#7' },
   { mismatch: 'a finding', verb: 'accept-risk', rest: ['widgets', '7', 'aaaaaaaaaaaaaaaa'], grants: { action: 'accept-risk', pr: 'zgeoff/widgets#7', finding: 'bbbbbbbbbbbbbbbb' }, why: 'accept-risk of zgeoff/widgets#7 finding bbbbbbbbbbbbbbbb, not accept-risk of zgeoff/widgets#7 finding aaaaaaaaaaaaaaaa' },
 ])('it refuses a console: source whose picked option grants $mismatch other than the one asked for', async (row) => {
   const ctx = setupTest();
@@ -756,15 +750,16 @@ test.each(['console:KET-42', 'call:KET-42'])('it records an accepted risk from %
 });
 
 test.each([
-  { verb: 'override', rest: ['widgets', '7'], grants: { action: 'override', pr: 'zgeoff/widgets#7', head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678' }, why: 'override of zgeoff/widgets#7 at a1b2c3d, not override of zgeoff/widgets#7 at b9c8d7e' },
-  { verb: 'accept-risk', rest: ['widgets', '7', 'aaaaaaaaaaaaaaaa'], grants: { action: 'accept-risk', pr: 'zgeoff/widgets#7', finding: 'aaaaaaaaaaaaaaaa', head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678' }, why: 'accept-risk of zgeoff/widgets#7 finding aaaaaaaaaaaaaaaa at a1b2c3d, not accept-risk of zgeoff/widgets#7 finding aaaaaaaaaaaaaaaa at b9c8d7e' },
-])('it refuses a grant of $verb made for one head once the PR has another', async (row) => {
+  { verb: 'override', rest: ['widgets', '7'], grants: { action: 'override', pr: 'zgeoff/widgets#7', head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678' } },
+  { verb: 'accept-risk', rest: ['widgets', '7', 'aaaaaaaaaaaaaaaa'], grants: { action: 'accept-risk', pr: 'zgeoff/widgets#7', finding: 'aaaaaaaaaaaaaaaa', head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678' } },
+])('it records a grant of $verb made at one head once the PR has another', async (row) => {
   const ctx = setupTest();
   applyAskItem(ctx.db, { kind: 'call', id: 'KET-44', issues: [], forSession: null, actor: 'z-kettle' }, parseItemInput('call', JSON.stringify({ title: 'Merge widgets#7?', question: 'Merge past the findings?', options: [{ label: 'Go', effect: 'Merge it.', grants: row.grants }, { label: 'Wait', effect: 'Fix them first.' }] })), 'Merge past the findings?');
   recordConsoleAnswer(ctx.db, { id: 'KET-44', option: 'Go', note: '', actor: 'owner' });
 
-  await expect(ctx.asOther(ctx.headAt('b9c8d7e6f5a40312213f4e5d6c7b8a9087654321'), row.verb, [...row.rest], { source: 'console:KET-44', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: `--source refused: the option the owner picked in console:KET-44 grants ${row.why}; ask z-stu to record it` });
-  expect(ctx.db.query("SELECT COUNT(*) AS total FROM events WHERE action IN ('pr-override', 'pr-accepted-risk')").get()).toStrictEqual({ total: 0 });
+  await ctx.asOther(ctx.headAt('b9c8d7e6f5a40312213f4e5d6c7b8a9087654321'), row.verb, [...row.rest], { source: 'console:KET-44', note: 'Ship it.' });
+
+  expect(ctx.db.query("SELECT COUNT(*) AS total FROM events WHERE action IN ('pr-override', 'pr-accepted-risk')").get()).toStrictEqual({ total: 1 });
 });
 
 test('it records an override from a grant made for the head the PR has now', async () => {
@@ -777,53 +772,6 @@ test('it records an override from a grant made for the head the PR has now', asy
   expect(ctx.db.query("SELECT json_extract(data, '$.head') AS head FROM events WHERE action = 'pr-override'").all()).toStrictEqual([{ head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678' }]);
 });
 
-test.each([
-  ['a grant at the first head', [{ label: 'Yes', effect: 'Merge it.', grants: { action: 'override', pr: 'zgeoff/widgets#7', head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678' } }, { label: 'No', effect: 'Wait.' }]],
-])('it refuses a call: source from %s that already backs an override at another head, and keeps the first', async (_case, options) => {
-  const ctx = setupTest();
-  applyAskItem(ctx.db, { kind: 'call', id: 'KET-46', issues: [], forSession: null, actor: 'z-kettle' }, parseItemInput('call', JSON.stringify({ title: 'Override widgets#7?', question: 'Merge past the findings?', options })), 'Merge past the findings?');
-  recordConsoleAnswer(ctx.db, { id: 'KET-46', option: 'Yes', note: '', actor: 'owner' });
-  await ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'call:KET-46', note: 'Ship it.' });
-
-  await expect(ctx.asOther(ctx.headAt('b9c8d7e6f5a40312213f4e5d6c7b8a9087654321'), 'override', ['widgets', '7'], { source: 'call:KET-46', note: 'Ship it again.' })).rejects.toMatchObject({ code: 'bad_args', message: '--source refused: call:KET-46 already backs an override of zgeoff/widgets#7 at a1b2c3d, and the owner answered it for that head only; ask z-stu to record it' });
-  expect(ctx.db.query("SELECT json_extract(data, '$.head') AS head FROM events WHERE action = 'pr-override'").all()).toStrictEqual([{ head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678' }]);
-});
-
-test('it refuses a console: source whose picked option grants an override with no head', async () => {
-  const ctx = setupTest();
-  applyAskItem(ctx.db, { kind: 'call', id: 'KET-49', issues: [], forSession: null, actor: 'z-kettle' }, parseItemInput('call', JSON.stringify({ title: 'Override widgets#7?', question: 'Merge past the findings?', options: [{ label: 'Go', effect: 'Merge it.', grants: { action: 'override', pr: 'zgeoff/widgets#7' } }, { label: 'Wait', effect: 'Fix them first.' }] })), 'Merge past the findings?');
-  recordConsoleAnswer(ctx.db, { id: 'KET-49', option: 'Go', note: '', actor: 'owner' });
-
-  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'console:KET-49', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: '--source refused: the option the owner picked in console:KET-49 grants an override with no head: an override grant names the head the owner approved; ask z-stu to record it' });
-});
-
-test('it refuses a console: source for an answer that already backs an override through call: at another head', async () => {
-  const ctx = setupTest();
-  applyAskItem(ctx.db, { kind: 'call', id: 'KET-47', issues: [], forSession: null, actor: 'z-kettle' }, parseItemInput('call', JSON.stringify({ title: 'Override widgets#7?', question: 'Merge past the findings?', options: [{ label: 'Yes', effect: 'Merge it.', grants: { action: 'override', pr: 'zgeoff/widgets#7', head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678' } }, { label: 'No', effect: 'Wait.' }] })), 'Merge past the findings?');
-  recordConsoleAnswer(ctx.db, { id: 'KET-47', option: 'Yes', note: '', actor: 'owner' });
-  await ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'call:KET-47', note: 'Ship it.' });
-
-  await expect(ctx.asOther(ctx.headAt('b9c8d7e6f5a40312213f4e5d6c7b8a9087654321'), 'override', ['widgets', '7'], { source: 'console:KET-47', note: 'Ship it again.' })).rejects.toMatchObject({ code: 'bad_args', message: '--source refused: console:KET-47 already backs an override of zgeoff/widgets#7 at a1b2c3d, and the owner answered it for that head only; ask z-stu to record it' });
-});
-
-test('it accepts a call: source at a new head once the owner answers a new round, after it backed an override at the old head', async () => {
-  const ctx = setupTest();
-  const fileRound = (head: string) => {
-    const question = `Merge past the findings at ${head.slice(0, 7)}?`;
-    const item = parseItemInput('call', JSON.stringify({ title: 'Override widgets#7?', question, options: [{ label: 'Go', effect: 'Merge it.', grants: { action: 'override', pr: 'zgeoff/widgets#7', head } }, { label: 'Wait', effect: 'Fix them first.' }] }));
-    applyAskItem(ctx.db, { kind: 'call', id: 'KET-48', issues: [], forSession: null, actor: 'z-kettle' }, item, question);
-  };
-  fileRound('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678');
-  recordConsoleAnswer(ctx.db, { id: 'KET-48', option: 'Go', note: '', actor: 'owner' });
-  await ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'call:KET-48', note: 'Ship it.' });
-  fileRound('b9c8d7e6f5a40312213f4e5d6c7b8a9087654321');
-  recordConsoleAnswer(ctx.db, { id: 'KET-48', option: 'Go', note: '', actor: 'owner' });
-
-  await ctx.asOther(ctx.headAt('b9c8d7e6f5a40312213f4e5d6c7b8a9087654321'), 'override', ['widgets', '7'], { source: 'call:KET-48', note: 'Ship it again.' });
-
-  expect(ctx.db.query("SELECT json_extract(data, '$.head') AS head FROM events WHERE action = 'pr-override' ORDER BY seq").all()).toStrictEqual([{ head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678' }, { head: 'b9c8d7e6f5a40312213f4e5d6c7b8a9087654321' }]);
-});
-
 test('it refuses a call: source whose answer picks a grant label the call showed before it was re-asked as free text', async () => {
   const ctx = setupTest();
   applyAskItem(ctx.db, { kind: 'call', id: 'KET-47', issues: [], forSession: null, actor: 'z-kettle' }, parseItemInput('call', JSON.stringify({ title: 'Override widgets#7?', question: 'Merge past the findings?', options: [{ label: 'Go', effect: 'Merge it.', grants: { action: 'override', pr: 'zgeoff/widgets#7' } }, { label: 'Wait', effect: 'Fix them first.' }] })), 'Merge past the findings?');
@@ -831,7 +779,7 @@ test('it refuses a call: source whose answer picks a grant label the call showed
   ctx.refileCall('KET-47', 'Override widgets#7?');
   recordConsoleAnswer(ctx.db, { id: 'KET-47', option: '', note: 'Go', actor: 'owner' });
 
-  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'call:KET-47', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: '--source refused: call:KET-47 has no option that grants the override: an override needs the owner to pick an option whose grants name the PR and the head, and a plain yes names no head; ask z-stu to record it' });
+  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'call:KET-47', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: '--source refused: the owner\'s answer to call:KET-47 is not a yes: "Go"; ask z-stu to record it' });
   expect(ctx.db.query("SELECT COUNT(*) AS total FROM events WHERE action = 'pr-override'").get()).toStrictEqual({ total: 0 });
 });
 
@@ -975,7 +923,6 @@ test('it shows a CI override at the head now, and not as the findings override',
       answerSource: 'chat:kettle-1',
       answerNote: null,
       answerAt: '2026-10-14T01:00:00Z',
-      answerStale: false,
       next: null,
       nextAt: null,
       override: null,
@@ -1010,7 +957,6 @@ test('it shows no CI override once the PR has a new head', async () => {
       answerSource: 'chat:kettle-1',
       answerNote: null,
       answerAt: '2026-10-14T01:00:00Z',
-      answerStale: true,
       next: null,
       nextAt: null,
       override: null,

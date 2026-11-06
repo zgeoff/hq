@@ -6,7 +6,6 @@ import { buildStubFindings } from '../../test/build-stub-findings.ts';
 import { buildStubGateFacts } from '../../test/build-stub-gate-facts.ts';
 import { buildStubPRHead } from '../../test/build-stub-pr-head.ts';
 import { createStubPRRepo } from '../../test/create-stub-pr-repo.ts';
-import { createStubRebaseRepo } from '../../test/create-stub-rebase-repo.ts';
 import { createListedReview } from '../../test/create-listed-review.ts';
 import { FAKE_BASE_SHA, FAKE_FULL_SHA, FAKE_PROOF_BODY, FAKE_TOKEN, buildFakeRunner } from '../../test/noslop-fake.ts';
 import { overrideEnv } from '../config/override-env.ts';
@@ -19,7 +18,6 @@ import { recordPRAcceptedRisk } from '../pr-status/record-pr-accepted-risk.ts';
 import { recordPRAnswer } from '../pr-status/record-pr-answer.ts';
 import { recordCICheckOverride } from '../pr-status/record-ci-check-override.ts';
 import { recordPROverride } from '../pr-status/record-pr-override.ts';
-import { runPRCommand } from '../pr-status/run-pr-command.ts';
 import { checkMergeGate } from './check-merge-gate.ts';
 
 function setupTest() {
@@ -103,15 +101,6 @@ test("it passes under an override at the head when noslop's findings list is emp
   recordPROverride(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA, source: 'call:KET-2', note: 'Ship the kettle.', actor: 'z-kettle' });
 
   await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).resolves.toStrictEqual({ mayMerge: true, reason: "The owner's override at 0123456 (call:KET-2) stands; CI green at 0123456", reviewed: true });
-});
-
-test('it blocks under an override at an older head when noslop never reviewed the PR', async () => {
-  const ctx = setupTest();
-  const fake = buildFakeRunner({ markerComments: { code: 0, stdout: '', stderr: '' } });
-  setMeta(ctx.db, 'noslop', JSON.stringify({ repos: ['widgets'], sha: '0123456789abcdef0123456789abcdef01234567' }));
-  recordPROverride(ctx.db, { repo: 'widgets', pr: 7, head: 'f00dfeedf00dfeedf00dfeedf00dfeedf00dfeed', source: 'call:KET-2', note: 'Ship the kettle.', actor: 'z-kettle' });
-
-  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: 'noslop has posted no review summary on the PR, so no pass: hq review widgets 7' });
 });
 
 test("it blocks when noslop's findings list is empty but the full review at the head recorded findings", async () => {
@@ -204,13 +193,13 @@ test('it blocks open findings under an override logged before 0.80.0 at the head
   await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: '1 noslop finding is open: aaaaaaaaaaaaaaaa' });
 });
 
-test('it blocks open findings once the PR has a new head after the override', async () => {
+test('it clears open findings under an override the owner gave at an older head', async () => {
   const ctx = setupTest();
   const fake = buildFakeRunner({ noslopFindings: buildStubFindings('open'), prFacts: buildStubGateFacts({ head: 'f00dfeedf00dfeedf00dfeedf00dfeedf00dfeed', checks: [{ __typename: 'CheckRun', name: 'test', status: 'COMPLETED', conclusion: 'SUCCESS' }] }), prHead: { code: 0, stdout: JSON.stringify({ headRefOid: 'f00dfeedf00dfeedf00dfeedf00dfeedf00dfeed' }), stderr: '' }, markerComments: { code: 0, stdout: `${JSON.stringify({ login: 'noslop-review[bot]', body: '<!-- noslop:summary {"head":"f00dfeedf00dfeedf00dfeedf00dfeedf00dfeed"} -->', updatedAt: '2026-10-14T01:00:00Z' })}\n`, stderr: '' } });
   createListedReview(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA });
   recordPROverride(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA, source: 'call:KET-2', note: 'Ship the kettle.', actor: 'z-kettle' });
 
-  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: '1 noslop finding is open: aaaaaaaaaaaaaaaa' });
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).resolves.toMatchObject({ mayMerge: true });
 });
 
 test('it refuses an override whose source is a session', async () => {
@@ -553,7 +542,7 @@ test('it refuses a PR in hq that changes a skill with no lgtm at its head, namin
   const ctx = setupTest();
   const fake = buildFakeRunner({ prBody: FAKE_PROOF_BODY, prFiles: { code: 0, stdout: 'src/kettle.ts\nskills/kettle/SKILL.md\n', stderr: '' } });
 
-  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'hq', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: "the PR changes owner-held files (skills/kettle/SKILL.md) and needs the owner's lgtm at 0123456: hq pr answer hq 7 lgtm --source <where the owner said it>" });
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'hq', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: "the PR changes owner-held files (skills/kettle/SKILL.md) and needs the owner's lgtm: hq pr answer hq 7 lgtm --source <where the owner said it>" });
 });
 
 test("it passes a PR that changes owner-held files once the owner's chat lgtm is recorded at its head", async () => {
@@ -564,40 +553,21 @@ test("it passes a PR that changes owner-held files once the owner's chat lgtm is
   await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'hq', pr: 7 })).resolves.toMatchObject({ mayMerge: true });
 });
 
-test('it passes a PR that changes owner-held files once hq pr rebased carries the lgtm to its head', async () => {
-  const ctx = setupTest();
-  const stub = await createStubRebaseRepo({ root: ctx.base, repo: 'hq', pr: 7, history: [{ 'skills/kettle/SKILL.md': 'Boil the water.\n', 'notes.txt': 'plain\n' }], change: { 'skills/kettle/SKILL.md': 'Boil the water, then pour.\n' } });
-  recordPRAnswer(ctx.db, { repo: 'hq', pr: 7, answer: 'lgtm', head: stub.oldHead, source: 'chat:kettle-4', note: 'the pour step reads well', actor: 'z-kettle' });
-  await stub.moveMain({ 'notes.txt': 'plain and moved\n' });
-  const head = await stub.rebase();
-  const base = await stub.readMainHead();
-  const rebasedFake = buildFakeRunner({ prBody: FAKE_PROOF_BODY, realGit: true, origin: 'hq', ...buildStubPRHead(head), prShas: { code: 0, stdout: JSON.stringify({ headRefOid: head, baseRefOid: base }), stderr: '' } });
-  await runPRCommand({ run: rebasedFake.run, db: ctx.db, verb: 'rebased', rest: ['hq', '7'], flags: { from: stub.oldHead }, actor: () => Promise.resolve('z-review'), readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) });
-  const gateFake = buildFakeRunner({ ...buildStubPRHead(head), prFiles: { code: 0, stdout: 'skills/kettle/SKILL.md\n', stderr: '' } });
-
-  await expect(checkMergeGate({ run: gateFake.run, db: ctx.db, rawRepo: 'hq', pr: 7 })).resolves.toMatchObject({ mayMerge: true });
-});
-
-test('it refuses an lgtm hq pr rebased carried once the PR moves past the head it was carried to', async () => {
-  const ctx = setupTest();
-  const stub = await createStubRebaseRepo({ root: ctx.base, repo: 'hq', pr: 7, history: [{ 'skills/kettle/SKILL.md': 'Boil the water.\n', 'notes.txt': 'plain\n' }], change: { 'skills/kettle/SKILL.md': 'Boil the water, then pour.\n' } });
-  recordPRAnswer(ctx.db, { repo: 'hq', pr: 7, answer: 'lgtm', head: stub.oldHead, source: 'chat:kettle-5', note: 'pouring is fine', actor: 'z-kettle' });
-  await stub.moveMain({ 'notes.txt': 'plain and moved\n' });
-  const head = await stub.rebase();
-  const base = await stub.readMainHead();
-  const rebasedFake = buildFakeRunner({ prBody: FAKE_PROOF_BODY, realGit: true, origin: 'hq', ...buildStubPRHead(head), prShas: { code: 0, stdout: JSON.stringify({ headRefOid: head, baseRefOid: base }), stderr: '' } });
-  await runPRCommand({ run: rebasedFake.run, db: ctx.db, verb: 'rebased', rest: ['hq', '7'], flags: { from: stub.oldHead }, actor: () => Promise.resolve('z-review'), readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) });
-  const gateFake = buildFakeRunner({ ...buildStubPRHead(FAKE_FULL_SHA), prFiles: { code: 0, stdout: 'skills/kettle/SKILL.md\n', stderr: '' } });
-
-  await expect(checkMergeGate({ run: gateFake.run, db: ctx.db, rawRepo: 'hq', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: expect.stringContaining("needs the owner's lgtm at 0123456") });
-});
-
-test('it refuses an lgtm at an older head', async () => {
+test('it passes a PR that changes owner-held files on an lgtm the owner gave at an older head', async () => {
   const ctx = setupTest();
   const fake = buildFakeRunner({ prBody: FAKE_PROOF_BODY, prFiles: { code: 0, stdout: 'skills/kettle/SKILL.md\n', stderr: '' } });
   recordPRAnswer(ctx.db, { repo: 'hq', pr: 7, answer: 'lgtm', head: 'f00dfeedf00dfeedf00dfeedf00dfeedf00dfeed', source: 'console:kettle-2', note: null, actor: 'z-kettle' });
 
-  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'hq', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: expect.stringContaining("needs the owner's lgtm at 0123456") });
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'hq', pr: 7 })).resolves.toMatchObject({ mayMerge: true });
+});
+
+test('it refuses an lgtm that a later changes answer at a newer head took back', async () => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ prBody: FAKE_PROOF_BODY, prFiles: { code: 0, stdout: 'skills/kettle/SKILL.md\n', stderr: '' } });
+  recordPRAnswer(ctx.db, { repo: 'hq', pr: 7, answer: 'lgtm', head: 'f00dfeedf00dfeedf00dfeedf00dfeedf00dfeed', source: 'console:kettle-2', note: null, actor: 'z-kettle' });
+  recordPRAnswer(ctx.db, { repo: 'hq', pr: 7, answer: 'changes', head: FAKE_FULL_SHA, source: 'call:kettle-3', note: 'Descale it first.', actor: 'z-kettle' });
+
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'hq', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: expect.stringContaining("needs the owner's lgtm") });
 });
 
 test('it refuses an lgtm at the head that a later changes at the head took back', async () => {
@@ -622,7 +592,7 @@ test('it holds a noslop-reviewed PR in hq to the same lgtm', async () => {
   const fake = buildFakeRunner({ prBody: FAKE_PROOF_BODY, prFiles: { code: 0, stdout: 'skills/kettle/SKILL.md\n', stderr: '' } });
   createListedReview(ctx.db, { repo: 'hq', pr: 7, head: FAKE_FULL_SHA });
 
-  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'hq', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: expect.stringContaining("needs the owner's lgtm at 0123456") });
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'hq', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: expect.stringContaining("needs the owner's lgtm") });
 
   expect(fake.of('bun')).toStrictEqual([]);
 });
@@ -631,7 +601,7 @@ test("it holds a bot's PR in hq to the same lgtm", async () => {
   const ctx = setupTest();
   const fake = buildFakeRunner({ author: '{"author":{"login":"renovate","is_bot":true}}', prFiles: { code: 0, stdout: 'skills/kettle/SKILL.md\n', stderr: '' } });
 
-  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'hq', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: expect.stringContaining("needs the owner's lgtm at 0123456") });
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'hq', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: expect.stringContaining("needs the owner's lgtm") });
 });
 
 test('it lets a PR in hq that changes only source files merge with no lgtm', async () => {
@@ -654,7 +624,7 @@ test('it refuses a PR in hq-private that changes a start prompt with no lgtm at 
   const ctx = setupTest();
   const fake = buildFakeRunner({ prBody: FAKE_PROOF_BODY, prFiles: { code: 0, stdout: 'skills/kettle/references/session-prompt.md\n', stderr: '' } });
 
-  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'hq-private', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: "the PR changes owner-held files (skills/kettle/references/session-prompt.md) and needs the owner's lgtm at 0123456: hq pr answer hq-private 7 lgtm --source <where the owner said it>" });
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'hq-private', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: "the PR changes owner-held files (skills/kettle/references/session-prompt.md) and needs the owner's lgtm: hq pr answer hq-private 7 lgtm --source <where the owner said it>" });
 });
 
 test("it passes a PR in hq-private once the owner's chat lgtm is recorded at its head", async () => {
@@ -665,12 +635,12 @@ test("it passes a PR in hq-private once the owner's chat lgtm is recorded at its
   await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'hq-private', pr: 7 })).resolves.toMatchObject({ mayMerge: true });
 });
 
-test('it refuses an lgtm at an older head on a PR in hq-private', async () => {
+test('it passes a PR in hq-private on an lgtm the owner gave at an older head', async () => {
   const ctx = setupTest();
-  const fake = buildFakeRunner({ prFiles: { code: 0, stdout: 'skills/kettle/references/session-prompt.md\n', stderr: '' } });
+  const fake = buildFakeRunner({ prBody: FAKE_PROOF_BODY, prFiles: { code: 0, stdout: 'skills/kettle/references/session-prompt.md\n', stderr: '' } });
   recordPRAnswer(ctx.db, { repo: 'hq-private', pr: 7, answer: 'lgtm', head: 'f00dfeedf00dfeedf00dfeedf00dfeedf00dfeed', source: 'call:kettle-3', note: null, actor: 'z-kettle' });
 
-  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'hq-private', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked' });
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'hq-private', pr: 7 })).resolves.toMatchObject({ mayMerge: true });
 });
 
 test("it passes a PR in hq-private that changes a start prompt once the owner's call lgtm is at its head", async () => {

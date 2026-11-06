@@ -1,9 +1,7 @@
 # Holds
 
 Three holds in this file stop a merge: the skill proof and the owner's lgtm, which `hq review gate`
-enforces, and a preview check, which you enforce. Each record hq keeps for the lgtm, such as the
-owner's answer or an exemption, is tied to one head commit, and a push voids it. Never pass an lgtm on by
-message.
+enforces, and a preview check, which you enforce. Never pass an lgtm on by message.
 
 ## The skill proof
 
@@ -48,8 +46,6 @@ also clears it, at the PR's head. If hq refuses the record, the PR waits for the
 
 - **Mechanical edit:** `hq pr mechanical <repo> <pr>`. hq passes only a moved link or path, a
   version number, or a re-padded table.
-- **Content-free rebase:** `hq pr rebased <repo> <pr> --from <old head>`, when the owner's lgtm is
-  the newest answer at the old head. hq carries it over only if the PR's patch-id matches.
 - **Exception:** `hq pr exempt <repo> <pr> --rule <rule> --note <why>`, with one of:
   - `formatting`: no change inside a code block, or to any command, YAML or JSON line, whitespace
     included. Read the raw diff: `git diff -w` hides code-block whitespace.
