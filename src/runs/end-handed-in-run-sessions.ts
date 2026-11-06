@@ -7,6 +7,8 @@ import { buildHandedInPlan } from './build-handed-in-plan.ts';
 import { claimHandedInRun } from './claim-handed-in-run.ts';
 import { collectGuardedSessions } from './collect-guarded-sessions.ts';
 import type { AtcSession } from './collect-guarded-sessions.ts';
+import { runHandedInHoldCheck } from './run-handed-in-hold-check.ts';
+import type { HandedInHolds } from './run-handed-in-hold-check.ts';
 import { pickHandedInCandidates } from './pick-handed-in-candidates.ts';
 import { pickQuietSessions } from './pick-quiet-sessions.ts';
 import type { SessionActivity } from './pick-quiet-sessions.ts';
@@ -27,6 +29,9 @@ export interface AtcView {
 
 export interface HandedInOptions {
   actor: string;
+
+  // Absent, no run is held for its Linear Scope.
+  holds?: HandedInHolds;
 }
 
 // Hq closes a builder's session itself once its PRs have merged and nothing is unpushed, in any run
@@ -62,11 +67,15 @@ export async function endHandedInRunSessions(db: Database, atc: AtcView, deps: W
     const guarded = collectGuardedSessions(candidate.rows, listed);
     const activity = await readGuardedActivity(atc, guarded ?? []);
     const checked = pickQuietSessions(guarded, activity, quietBefore);
-    if (checked !== null) {
+    if (checked !== null && !(await isHeld(db, options, candidate.issue))) {
       ended += await endHandedInRun(db, shared, { ...candidate, checked, actor: options.actor, at });
     }
   }
   return ended;
+}
+
+async function isHeld(db: Database, options: HandedInOptions, issue: string): Promise<boolean> {
+  return options.holds === undefined ? false : (await runHandedInHoldCheck(db, options.holds, issue, options.actor)).hold;
 }
 
 function readLastKept(db: Database, issue: string): StoredEvent | null {

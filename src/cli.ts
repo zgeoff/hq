@@ -328,6 +328,7 @@ import { syncLinear } from './kinds/sync-linear.ts';
 import { weeksBack } from './kinds/weeks-back.ts';
 import { makeAuditedLinearCaller } from './linear/make-audited-linear-caller.ts';
 import { makeLinearCaller } from './linear/make-linear-caller.ts';
+import { readBriefIssue } from './brief/read-brief-issue.ts';
 import { readNoslopSettings } from './brief/read-noslop-settings.ts';
 import { buildNodeBriefFiles } from './brief/build-node-brief-files.ts';
 import { dbPath } from './db/db-path.ts';
@@ -831,6 +832,11 @@ async function unblockCommand(db: Database, verb: string, args: string[], flags:
     });
 }
 
+function buildIssueDescriptionReader(db: Database): (issue: string) => Promise<string> {
+  const linear = makeAuditedLinearCaller(db, realRunner);
+  return async (issue) => (await readBriefIssue(linear, issue)).description;
+}
+
 async function watchRuns(db: Database, me: string): Promise<void> {
   const c = await AtcClient.open();
   const wrapUpDeps = buildWrapUpDeps();
@@ -839,7 +845,7 @@ async function watchRuns(db: Database, me: string): Promise<void> {
     if (ing.notes > 0 || ing.routed > 0 || ing.reset || ing.bootstrapped) {
       console.log(`${iso(now())} notes: ${ing.notes} recorded${ing.routed ? `, ${ing.routed} routed to ${orchestratorName()}` : ''}${ing.finals.length > 0 ? `, final: ${ing.finals.join(', ')}` : ''}${ing.reset ? ', feed cursor reset' : ''}${ing.bootstrapped ? ', feed cursor started at the end' : ''}`);
     }
-    const sw = await sweepNow(db, c, boundedRunner(realRunner, CALL_MS), { actor: me, wrapUpDeps: wrapUpDeps.deps, log: (line) => console.error(line) });
+    const sw = await sweepNow(db, c, boundedRunner(realRunner, CALL_MS), { actor: me, wrapUpDeps: wrapUpDeps.deps, log: (line) => console.error(line), readIssueDescription: buildIssueDescriptionReader(db) });
     if (sw.sent.length) console.log(`${iso(now())} sweep: told ${orchestratorName()} about ${sw.sent.map((a) => a.key).join(', ')}`);
   } finally {
     wrapUpDeps.close();
@@ -2340,7 +2346,7 @@ Round ${p.review_round} recorded at ${p.reviewed_sha}.` };
       try {
         const ing = await ingestNotes(db, c, { run: boundedRunner(realRunner, CALL_MS) });
         const sweeper = await by();
-        const sw = await sweepNow(db, c, boundedRunner(realRunner, CALL_MS), { actor: sweeper, wrapUpDeps: wrapUpDeps.deps, log: (line) => console.error(line) });
+        const sw = await sweepNow(db, c, boundedRunner(realRunner, CALL_MS), { actor: sweeper, wrapUpDeps: wrapUpDeps.deps, log: (line) => console.error(line), readIssueDescription: buildIssueDescriptionReader(db) });
         return {
           data: { ingest: ing, alerts: sw.alerts, sent: sw.sent },
           text: [`notes recorded: ${ing.notes}`, sw.alerts.length ? sw.alerts.map((a) => `- ${a.line}`).join('\n') : 'Nothing to flag.', sw.sent.length ? `(told ${orchestratorName()} about ${sw.sent.length})` : ''].filter(Boolean).join('\n'),
