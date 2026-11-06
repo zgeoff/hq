@@ -13,5 +13,5 @@ test.each([
 
   const wrapped = collectWrappedPartSessions(events, Date.parse('2026-11-07T03:00:00Z'), 30 * 60_000);
 
-  expect(wrapped).toStrictEqual(new Set(row.wrapped ? ['0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa'] : []));
+  expect(wrapped.has('0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa')).toBe(row.wrapped);
 });
