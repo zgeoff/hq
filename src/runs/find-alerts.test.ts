@@ -297,6 +297,26 @@ test('it raises the exited alert for a session that ended on a run that waits on
   expect(findAlerts(ctx.db, [], new Map(), new Date('2026-10-21T03:00:00Z')).map((alert) => alert.line)).toStrictEqual(['GEO-9858: session 98580000 has exited; check for its PR or final note']);
 });
 
+test('it raises no prompt-wait alert for a session past the quiet limit on a run whose wait is named', () => {
+  const ctx = setupTest();
+  const session = '98590000-0000-4000-8000-000000000001';
+  addRun(ctx.db, { issue: 'GEO-9859', title: 'Invented kettle work', place: 'imp', session, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
+  setState(ctx.db, 'GEO-9859', 'working', { next: 'The reviewer rules on kettle#59.', waitsOn: 'the reviewer (ruling on kettle#59)' }, 'kettle-bot');
+
+  const activity = new Map([[session, Date.parse('2026-10-21T01:30:00Z')]]);
+
+  expect(findAlerts(ctx.db, [{ id: session, name: 'kettle', alive: true, state: 'needs_you' }], activity, new Date('2026-10-21T03:00:00Z'))).toStrictEqual([]);
+});
+
+test('it raises the exited alert for a session that ended on a run whose wait is named', () => {
+  const ctx = setupTest();
+  const session = '98600000-0000-4000-8000-000000000001';
+  addRun(ctx.db, { issue: 'GEO-9860', title: 'Invented kettle work', place: 'imp', session, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
+  setState(ctx.db, 'GEO-9860', 'working', { next: 'The reviewer rules on kettle#60.', waitsOn: 'the reviewer (ruling on kettle#60)' }, 'kettle-bot');
+
+  expect(findAlerts(ctx.db, [], new Map(), new Date('2026-10-21T03:00:00Z')).map((alert) => alert.line)).toStrictEqual(['GEO-9860: session 98600000 has exited; check for its PR or final note']);
+});
+
 test('it raises a FINAL alert for a PR whose only override at its FINAL head is of a CI check', () => {
   const ctx = setupTest();
   addRun(ctx.db, { issue: 'GEO-9828', title: 'Invented kettle work', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
