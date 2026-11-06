@@ -73,6 +73,7 @@ import { addRun } from './runs/add-run.ts';
 import { checkMergedOnGitHub } from './runs/check-merged-on-github.ts';
 import { readMergedPR } from './runs/read-merged-pr.ts';
 import { closePr } from './runs/close-pr.ts';
+import { PR_REF } from './runs/pr-ref.ts';
 import { finalPr } from './runs/final-pr.ts';
 import { makeFinalResolver } from './runs/make-final-resolver.ts';
 import { resolveCliFinal } from './runs/resolve-cli-final.ts';
@@ -497,6 +498,7 @@ const OPTIONS = {
   asked: { type: 'string' },
   size: { type: 'string' },
   lines: { type: 'string' },
+  'superseded-by': { type: 'string' },
   'waits-on-geoff': { type: 'boolean' },
   'not-geoff': { type: 'boolean' },
   since: { type: 'string' },
@@ -2283,10 +2285,22 @@ Round ${p.review_round} recorded at ${p.reviewed_sha}.` };
       if (already) {
         return { data: { pr: already }, text: runLine(view(already.issue)) };
       }
+      const supersededBy = flags['superseded-by'];
+
+      // A URL or owner/repo#n could name a repo outside zgeoff, which the GitHub check would not see.
+      if (supersededBy !== undefined && !PR_REF.test(supersededBy)) {
+        throw new HqError('bad_args', `--superseded-by takes repo#n, not "${supersededBy}"`);
+      }
+      if (to === 'merged' && supersededBy !== undefined) {
+        throw new HqError('bad_args', '--superseded-by goes with hq run closed: a merged PR supersedes nothing');
+      }
       if (to === 'merged') {
         await checkMergedOnGitHub(boundedRunner(realRunner, CALL_MS), arg(0, 'pr'));
       }
-      const closed = closePr(db, arg(0, 'pr'), { to, actor: await by() });
+      if (supersededBy !== undefined) {
+        await checkMergedOnGitHub(boundedRunner(realRunner, CALL_MS), supersededBy);
+      }
+      const closed = closePr(db, arg(0, 'pr'), { to, actor: await by(), supersededBy });
       return { data: { pr: closed }, text: runLine(view(closed.issue)) };
     })
     .with('note', async () => {

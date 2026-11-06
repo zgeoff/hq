@@ -2,7 +2,10 @@
 import { afterEach, beforeEach, expect, onTestFinished, test } from 'bun:test';
 import { Database } from 'bun:sqlite';
 import { chmodSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
+import { updateEnv } from '@zgeoff/testing/helpers';
 import { closePr } from '../src/runs/close-pr.ts';
+import { requirePR } from '../src/runs/require-pr.ts';
+import { readEvents } from '../src/read-events.ts';
 import { main } from '../src/cli.ts';
 import { getMeta } from '../src/db/get-meta.ts';
 import { migrate } from '../src/db/migrate.ts';
@@ -847,6 +850,57 @@ test('hq run ship prints a vers PR shipped at its merge as at merge', async () =
   } finally {
     process.env['PATH'] = path0;
   }
+});
+
+test.each([
+  ['MERGED', { pr: { ref: 'kettle#20', state: 'closed' } }, { state: 'closed' }],
+  ['OPEN', { error: { code: 'not_merged', message: 'kettle#21 is OPEN on GitHub, not merged; hq leaves it open' } }, { state: 'open' }],
+])('it closes a run PR in hq with --superseded-by only when GitHub shows the replacement %s', async (ghState, reply, row) => {
+  await hq('run', 'add', 'GEO-517', '--title', 'Invented kettle work', '--where', 'none');
+  await hq('run', 'pr', 'GEO-517', 'kettle#20');
+  const bin = `${dir}/bin`;
+  mkdirSync(bin, { recursive: true });
+  writeFileSync(`${bin}/gh`, ['#!/bin/sh', `echo '{"state":"${ghState}"}'`, ''].join('\n'));
+  chmodSync(`${bin}/gh`, 0o755);
+  updateEnv('PATH', `${bin}:${process.env['PATH'] ?? ''}`);
+
+  const result = await hq('run', 'closed', 'kettle#20', '--superseded-by', 'kettle#21');
+
+  expect(result.json).toMatchObject(reply);
+  expect(requirePR(db(), 'kettle#20')).toMatchObject(row);
+});
+
+test('it logs the merged replacement with the close event', async () => {
+  await hq('run', 'add', 'GEO-518', '--title', 'Invented kettle work', '--where', 'none');
+  await hq('run', 'pr', 'GEO-518', 'kettle#22');
+  const bin = `${dir}/bin`;
+  mkdirSync(bin, { recursive: true });
+  writeFileSync(`${bin}/gh`, ['#!/bin/sh', 'echo \'{"state":"MERGED"}\'', ''].join('\n'));
+  chmodSync(`${bin}/gh`, 0o755);
+  updateEnv('PATH', `${bin}:${process.env['PATH'] ?? ''}`);
+
+  await hq('run', 'closed', 'kettle#22', '--superseded-by', 'kettle#23');
+
+  expect(readEvents(db(), 'run', 'GEO-518', ['closed']).map((event) => JSON.parse(event.data))).toStrictEqual([{ ref: 'kettle#22', supersededBy: 'kettle#23' }]);
+});
+
+test.each(['https://github.com/cedar-labs/kettle/pull/21', 'cedar-labs/kettle#21'])('it refuses --superseded-by %s, which names an owner', async (named) => {
+  await hq('run', 'add', 'GEO-520', '--title', 'Invented kettle work', '--where', 'none');
+  await hq('run', 'pr', 'GEO-520', 'kettle#26');
+
+  const refused = await hq('run', 'closed', 'kettle#26', '--superseded-by', named);
+
+  expect(refused.json.error).toStrictEqual({ code: 'bad_args', message: `--superseded-by takes repo#n, not "${named}"` });
+  expect(requirePR(db(), 'kettle#26')).toMatchObject({ state: 'open' });
+});
+
+test('it refuses --superseded-by on hq run merged', async () => {
+  await hq('run', 'add', 'GEO-519', '--title', 'Invented kettle work', '--where', 'none');
+  await hq('run', 'pr', 'GEO-519', 'kettle#24');
+
+  const refused = await hq('run', 'merged', 'kettle#24', '--superseded-by', 'kettle#21');
+
+  expect(refused.json.error).toStrictEqual({ code: 'bad_args', message: '--superseded-by goes with hq run closed: a merged PR supersedes nothing' });
 });
 
 test('hq run tidy --dry-run says what it would do to a merged run and writes no row', async () => {
