@@ -9,6 +9,7 @@ import { addOwnedPr } from './add-owned-pr.ts';
 import { addRun } from './add-run.ts';
 import { closePr } from './close-pr.ts';
 import { setSession } from './set-session.ts';
+import type { ImpWork } from './types.ts';
 import { sweepNow } from './sweep-now.ts';
 
 async function setupTest() {
@@ -29,6 +30,7 @@ async function setupTest() {
     killFailures,
   });
   const logged: string[] = [];
+  const localWork: { current: ImpWork } = { current: { state: 'pushed' } };
   roster.push({ id: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'widgets-part', alive: true, state: 'done' }, { id: '0000e002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'gadgets-part', alive: true, state: 'done' });
   server.activity.set('0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', Date.parse('2026-11-07T01:00:00Z'));
   server.activity.set('0000e002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', Date.parse('2026-11-07T01:00:00Z'));
@@ -38,12 +40,13 @@ async function setupTest() {
     sweep: () =>
       sweepNow(fresh.db, client, buildStubGitHubFactsRunner({ views: {} }), {
         actor: 'sweep',
-        wrapUpDeps: { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')), readLocalWork: () => Promise.resolve({ state: 'pushed' as const }) },
+        wrapUpDeps: { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')), readLocalWork: () => Promise.resolve(localWork.current) },
         log: (line) => logged.push(line),
       }),
     fleet,
     killFailures,
     logged,
+    localWork,
   };
 }
 
@@ -84,6 +87,22 @@ test('it wraps a part session up once when two sweeps overlap', async () => {
   closePr(ctx.db, 'widgets#1', { to: 'merged', actor: 'z-delivery' });
 
   await Promise.all([ctx.sweep(), ctx.sweep()]);
+
+  expect(ctx.fleet.calls).toStrictEqual(['unpin 0000e001', 'kill 0000e001', 'unpin 0000e001', 'forget 0000e001']);
+  expect(readEvents(ctx.db, 'run', 'GEO-501', ['part-wrap-up'])).toHaveLength(1);
+});
+
+test('it keeps a helper session with unpushed work on one sweep and forgets it on the next once the work is pushed', async () => {
+  const ctx = await setupTest();
+  addRun(ctx.db, { issue: 'GEO-501', title: 'Invented widgets', place: 'local', session: null, next: 'Parts working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
+  setSession(ctx.db, 'GEO-501', '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'z-delivery', 'add');
+  addOwnedPr(ctx.db, 'GEO-501', 'widgets#1', { actor: 'z-delivery', session: '0000e001' });
+  closePr(ctx.db, 'widgets#1', { to: 'merged', actor: 'z-delivery' });
+  ctx.localWork.current = { state: 'unpushed', detail: '1 commit ahead of origin' };
+  await ctx.sweep();
+  ctx.localWork.current = { state: 'pushed' };
+
+  await ctx.sweep();
 
   expect(ctx.fleet.calls).toStrictEqual(['unpin 0000e001', 'kill 0000e001', 'unpin 0000e001', 'forget 0000e001']);
   expect(readEvents(ctx.db, 'run', 'GEO-501', ['part-wrap-up'])).toHaveLength(1);
