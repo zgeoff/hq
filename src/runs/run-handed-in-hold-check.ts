@@ -30,7 +30,7 @@ export async function runHandedInHoldCheck(db: Database, holds: HandedInHolds, i
   if (hold.hold && hold.why === 'open-boxes') {
     const last = readEvents(db, 'run', issue, ['handed-in-held']).at(-1);
     const lastHash = last === undefined ? null : (HeldData.safeParse(JSON.parse(last.data)).data?.boxesHash ?? null);
-    const boxesHash = createHash('sha256').update(JSON.stringify(hold.boxes)).digest('hex');
+    const boxesHash = createHash('sha256').update(JSON.stringify(hold.boxes.toSorted())).digest('hex');
     if (lastHash !== boxesHash) {
       const openBoxes = hold.boxes.join('; ').slice(0, BOXES_CAP);
       logEvent(db, 'run', issue, 'handed-in-held', actor, null, null, { openBoxes, boxesHash });

@@ -220,6 +220,33 @@ test('it logs a held run again when a later box changes behind a first box that 
   expect(log.mock.calls).toHaveLength(2);
 });
 
+test('it logs a held run once when its open Scope boxes only change order', async () => {
+  const ctx = await setupTest();
+  onTestFinished(overrideEnv('HQ_NOW', '2026-10-21T03:00:00Z'));
+  addRun(ctx.db, { issue: 'GEO-9862', title: 'Invented kettle work', place: 'local', session: '0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
+  setState(ctx.db, 'GEO-9862', 'working', { waitsOn: 'free slots for the widgets#9 part' }, 'kettle-bot');
+  addPr(ctx.db, 'GEO-9862', 'kettle#62', 'kettle-bot');
+  finalPr(ctx.db, 'kettle#62', { sha: 'abc1234', actor: 'kettle-bot' });
+  closePr(ctx.db, 'kettle#62', { to: 'merged', actor: 'kettle-bot', facts: { mergedAt: '2026-10-21T01:00:00Z', mergeSha: null } });
+  ctx.fake.sessions.push({ id: '0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, state: 'done' });
+  ctx.fake.activity.set('0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', Date.parse('2026-10-21T01:00:00Z'));
+  const fleet = buildStubFleetClient({ sessions: [{ id: '0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, state: 'done' }] });
+  const gh = buildStubGitHubFactsRunner({ views: {} });
+  const log = mock();
+  const readIssueDescription = mock()
+    .mockResolvedValueOnce('## Scope\n\n- [ ] widgets: part one\n- [ ] gadgets: part two\n')
+    .mockResolvedValueOnce('## Scope\n\n- [ ] gadgets: part two\n- [ ] widgets: part one\n');
+  const options = { actor: 'z-delivery', wrapUpDeps: { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')), readLocalWork: () => Promise.resolve({ state: 'pushed' as const }) }, log, readIssueDescription };
+
+  await sweepNow(ctx.db, ctx.client, gh, options);
+  await sweepNow(ctx.db, ctx.client, gh, options);
+
+  expect(log.mock.calls).toStrictEqual([
+    ['handed-in held for GEO-9862: it waits on more parts and its Linear Scope has open boxes: widgets: part one; gadgets: part two'],
+  ]);
+  expect(readEvents(ctx.db, 'run', 'GEO-9862', ['handed-in-held'])).toHaveLength(1);
+});
+
 test('it holds a run whose open Scope box has no text', async () => {
   const ctx = await setupTest();
   onTestFinished(overrideEnv('HQ_NOW', '2026-10-21T03:00:00Z'));
