@@ -133,6 +133,23 @@ test('it keeps a helper session whose sub-session is pinned', async () => {
   expect(readEvents(ctx.db, 'run', 'GEO-501', ['part-wrap-up'])).toStrictEqual([]);
 });
 
+test('it logs a part session kept because its unpushed-work check could not run', async () => {
+  const ctx = await setupTest();
+  updateEnv('HQ_NOW', '2026-11-07T03:00:00Z');
+  ctx.seed.atcSession({ id: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'widgets-part', alive: true, state: 'done' }, '2026-11-07T01:00:00Z');
+  addRun(ctx.db, { issue: 'GEO-501', title: 'Invented widgets', place: 'local', session: null, next: 'Parts working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
+  setSession(ctx.db, 'GEO-501', '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'z-delivery', 'add');
+  addOwnedPr(ctx.db, 'GEO-501', 'widgets#1', { actor: 'z-delivery', session: '0000e001' });
+  closePr(ctx.db, 'widgets#1', { to: 'merged', actor: 'z-delivery' });
+  ctx.localWork.current = { state: 'unknown', detail: 'git status exited 128' };
+
+  await ctx.sweep();
+
+  expect(ctx.logged).toStrictEqual([
+    'part-session wrap-up of 0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa on GEO-501 kept 0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa: the unpushed-work check could not run (git status exited 128), so the session stays',
+  ]);
+});
+
 test('it logs a failed part wrap-up and releases the claim for the next sweep', async () => {
   const ctx = await setupTest();
   updateEnv('HQ_NOW', '2026-11-07T03:00:00Z');

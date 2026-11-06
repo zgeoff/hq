@@ -28,9 +28,9 @@ export interface AtcSnapshot {
   activity: ReadonlyMap<string, number | null>;
 }
 
-// A part's helper session holds an imp slot once its PRs merge, while its run is still going. The
-// wrap-up keeps whatever it keeps for any session, such as unpushed work, and the next sweep retries.
-// A retry that changes nothing writes no note, so each failure goes to the sweep log instead.
+// A part's helper session holds an imp slot once its PRs merge, while its run is still going. A
+// retry that changes nothing writes no note, so what the wrap-up keeps or fails to forget goes to
+// the sweep log, and the next sweep retries.
 export async function wrapUpPartSessions(
   db: Database,
   deps: WrapUpDeps,
@@ -64,6 +64,9 @@ export async function wrapUpPartSessions(
     // the helper's whole tree.
     const tree = collectGuardedSessions([{ issue: wrap.issue, session_id: wrap.session_id, active: 1 }], atc.sessions) ?? [];
     const wrapUp = await wrapUpRunSafely(db, deps, wrap.issue, { actor: options.actor, onlySessions: tree.map((session) => session.id), onlyNoteAction: true });
+    for (const kept of wrapUp.kept) {
+      options.log(`part-session wrap-up of ${wrap.session_id} on ${wrap.issue} kept ${kept.id}: ${kept.reason}`);
+    }
     for (const failure of wrapUp.failed) {
       options.log(`part-session wrap-up of ${wrap.session_id} on ${wrap.issue} failed: ${failure.id}: ${failure.reason}`);
     }
