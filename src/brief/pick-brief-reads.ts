@@ -29,12 +29,15 @@ export function pickBriefReads(issue: BriefIssue, choice: BriefChoice, noslop: N
   const repo = choice.area.repo;
   const type = pickIssueType(issue.labels);
   const size = pickIssueSize(issue.labels);
+
+  // The size label sizes the whole issue, so with other areas it says nothing about this part.
+  const stack = (size === 'L' || size === 'XL') && choice.others.length === 0;
   return {
     label: choice.area.label,
     repo,
     otherAreas: choice.others,
     playbook: type === 'none' ? null : buildPlaybook(type, sha),
-    stack: size === 'L' || size === 'XL',
+    stack,
     imp: choice.imp,
     reviewLines: isNoslopListed(noslop, 'zgeoff', repo),
   };

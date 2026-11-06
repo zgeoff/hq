@@ -32,6 +32,12 @@ test.each([
   expect(pickBriefReads(issue, { area: { label: 'cloud', repo: 'cloud' }, others: [], imp: false }, { repos: [], sha: null, caps: {} }, 'a'.repeat(40)).stack).toBe(expected);
 });
 
+test.each(['L', 'XL'])('it reads no stack line for a size %s issue that has other areas', (size) => {
+  const issue = { identifier: 'GEO-9001', description: '', labels: [{ name: 'cloud' }, { name: 'vers' }, { name: size, parent: { name: 'Size' } }] };
+
+  expect(pickBriefReads(issue, { area: { label: 'cloud', repo: 'cloud' }, others: [{ label: 'vers', repo: 'vers' }], imp: false }, { repos: [], sha: null, caps: {} }, 'a'.repeat(40)).stack).toBe(false);
+});
+
 test('it reads the imp line with --imp', () => {
   const issue = { identifier: 'GEO-9001', description: '', labels: [{ name: 'cloud' }] };
 
