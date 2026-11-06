@@ -1,4 +1,5 @@
 import type { Database } from 'bun:sqlite';
+import { match } from 'ts-pattern';
 import { z } from 'zod';
 import type { SessionInfo } from '../atc/session-schema.ts';
 import { now } from '../clock/now.ts';
@@ -6,6 +7,7 @@ import { logEvent } from '../log-event.ts';
 import { readEvents } from '../read-events.ts';
 import { collectPartSessionWraps } from './collect-part-session-wraps.ts';
 import type { PartSessionActivity, PartSessionWrap } from './collect-part-session-wraps.ts';
+import { pickPartWrapOutcome } from './pick-part-wrap-outcome.ts';
 import type { WrapUpDeps } from './run-wrap-up.ts';
 import { SWEEP_MINUTES as SWEEP } from './sweep-minutes.ts';
 import { wrapUpRunSafely } from './wrap-up-merged-runs.ts';
@@ -56,11 +58,10 @@ export async function wrapUpPartSessions(
     }
     const full = atc.sessions.find((info) => info.id.toLowerCase().startsWith(wrap.session_id.toLowerCase()))?.id ?? wrap.session_id;
     const wrapUp = await wrapUpRunSafely(db, deps, wrap.issue, { actor: options.actor, onlySessions: [full], onlyNoteAction: true });
-    if (wrapUp.forgotten.length > 0) {
-      done.push(wrap.session_id);
-    } else {
-      removePartClaim(db, claim);
-    }
+    match(pickPartWrapOutcome(wrap.session_id, wrapUp))
+      .with({ kind: 'done' }, () => done.push(wrap.session_id))
+      .with({ kind: 'retry' }, () => removePartClaim(db, claim))
+      .exhaustive();
   }
   return done;
 }
