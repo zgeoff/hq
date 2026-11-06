@@ -9,6 +9,7 @@ import { collectPartSessionWraps } from './collect-part-session-wraps.ts';
 import { collectWrappedPartSessions } from './collect-wrapped-part-sessions.ts';
 import type { PartWrapEvent } from './collect-wrapped-part-sessions.ts';
 import type { PartSessionActivity, PartSessionWrap } from './collect-part-session-wraps.ts';
+import { pickPartWrapLog } from './pick-part-wrap-log.ts';
 import { pickPartWrapOutcome } from './pick-part-wrap-outcome.ts';
 import type { WrapUpDeps } from './run-wrap-up.ts';
 import { wrapUpRunSafely } from './wrap-up-merged-runs.ts';
@@ -70,13 +71,19 @@ export async function wrapUpPartSessions(
     // the helper's whole tree.
     const tree = collectGuardedSessions([{ issue: wrap.issue, session_id: wrap.session_id, active: 1 }], atc.sessions) ?? [];
     const wrapUp = await wrapUpRunSafely(db, deps, wrap.issue, { actor: options.actor, onlySessions: tree.map((session) => session.id), onlyNoteAction: true });
-    for (const kept of wrapUp.kept) {
-      options.log(`part-session wrap-up of ${wrap.session_id} on ${wrap.issue} kept ${kept.id}: ${kept.reason}`);
+    const lines = [
+      ...wrapUp.kept.map((kept) => `part-session wrap-up of ${wrap.session_id} on ${wrap.issue} kept ${kept.id}: ${kept.reason}`),
+      ...wrapUp.failed.map((failure) => `part-session wrap-up of ${wrap.session_id} on ${wrap.issue} failed: ${failure.id}: ${failure.reason}`),
+    ];
+    const outcome = pickPartWrapOutcome(wrap.session_id, wrapUp);
+    const picked = pickPartWrapLog(lines, outcome.kind, readLastRetryReasons(db, wrap));
+    for (const line of picked.lines) {
+      options.log(line);
     }
-    for (const failure of wrapUp.failed) {
-      options.log(`part-session wrap-up of ${wrap.session_id} on ${wrap.issue} failed: ${failure.id}: ${failure.reason}`);
+    if (picked.fingerprint !== null) {
+      logEvent(db, 'run', wrap.issue, 'part-wrap-up-retry', options.actor, null, null, { session: wrap.session_id, reasons: picked.fingerprint });
     }
-    match(pickPartWrapOutcome(wrap.session_id, wrapUp))
+    match(outcome)
       .with({ kind: 'done' }, () => {
         writePartDone(db, wrap, options.actor);
         done.push(wrap.session_id);
@@ -105,6 +112,15 @@ function writePartClaim(db: Database, wrap: PartSessionWrap, options: PartSessio
       return claimed ? null : logEvent(db, 'run', wrap.issue, 'part-wrap-up', options.actor, null, null, { session: wrap.session_id });
     })
     .immediate();
+}
+
+const RetryData = z.object({ session: z.string(), reasons: z.string() });
+
+function readLastRetryReasons(db: Database, wrap: PartSessionWrap): string | null {
+  const retries = readEvents(db, 'run', wrap.issue, ['part-wrap-up-retry'])
+    .map((event) => RetryData.parse(JSON.parse(event.data)))
+    .filter((data) => data.session === wrap.session_id);
+  return retries.at(-1)?.reasons ?? null;
 }
 
 function writePartDone(db: Database, wrap: PartSessionWrap, actor: string): void {
