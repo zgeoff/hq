@@ -31,7 +31,7 @@ export function pickBriefReads(issue: BriefIssue, choice: BriefChoice, noslop: N
   const size = pickIssueSize(issue.labels);
 
   // The size label sizes the whole issue, so with other areas it says nothing about this part.
-  const stack = (size === 'L' || size === 'XL') && choice.others.length === 0;
+  const stack = (size === 'L' || size === 'XL') && choice.others.every((other) => other.repo === repo);
   return {
     label: choice.area.label,
     repo,

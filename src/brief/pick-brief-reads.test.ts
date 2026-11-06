@@ -38,6 +38,12 @@ test.each(['L', 'XL'])('it reads no stack line for a size %s issue that has othe
   expect(pickBriefReads(issue, { area: { label: 'cloud', repo: 'cloud' }, others: [{ label: 'vers', repo: 'vers' }], imp: false }, { repos: [], sha: null, caps: {} }, 'a'.repeat(40)).stack).toBe(false);
 });
 
+test('it reads the stack line for a size L issue whose other area label maps to the same repo', () => {
+  const issue = { identifier: 'GEO-9001', description: '', labels: [{ name: 'imp' }, { name: 'impz' }, { name: 'L', parent: { name: 'Size' } }] };
+
+  expect(pickBriefReads(issue, { area: { label: 'imp', repo: 'impz' }, others: [{ label: 'impz', repo: 'impz' }], imp: false }, { repos: [], sha: null, caps: {} }, 'a'.repeat(40)).stack).toBe(true);
+});
+
 test('it reads the imp line with --imp', () => {
   const issue = { identifier: 'GEO-9001', description: '', labels: [{ name: 'cloud' }] };
 
