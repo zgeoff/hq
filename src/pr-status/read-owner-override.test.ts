@@ -3,6 +3,7 @@ import { NOON_SYDNEY, at, freshDb } from '../../test/helpers.ts';
 import { logEvent } from '../log-event.ts';
 import { readOwnerOverride } from './read-owner-override.ts';
 import { recordCICheckOverride } from './record-ci-check-override.ts';
+import { recordPRAnswer } from './record-pr-answer.ts';
 import { recordPROverride } from './record-pr-override.ts';
 
 function setupTest() {
@@ -18,6 +19,22 @@ test('it finds the newest override, whatever its head', () => {
   recordPROverride(ctx.db, { repo: 'widgets', pr: 7, head: 'e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1', source: 'console:kettle-2', note: 'Second.', actor: 'z-kettle' });
 
   expect(readOwnerOverride(ctx.db, 'widgets', 7)).toMatchObject({ head: 'e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1', source: 'console:kettle-2', note: 'Second.' });
+});
+
+test.each(['changes', 'reject'] as const)('it finds nothing once the owner answers %s after the override', (answer) => {
+  const ctx = setupTest();
+  recordPROverride(ctx.db, { repo: 'widgets', pr: 7, head: 'b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2', source: 'chat:kettle-1', note: 'Ship it.', actor: 'z-kettle' });
+  recordPRAnswer(ctx.db, { repo: 'widgets', pr: 7, answer, head: 'e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1', source: 'chat:kettle-2', note: 'Descale it first.', actor: 'z-kettle' });
+
+  expect(readOwnerOverride(ctx.db, 'widgets', 7)).toBeNull();
+});
+
+test('it finds the override when the owner answers changes before it', () => {
+  const ctx = setupTest();
+  recordPRAnswer(ctx.db, { repo: 'widgets', pr: 7, answer: 'changes', head: 'e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1', source: 'chat:kettle-1', note: 'Descale it first.', actor: 'z-kettle' });
+  recordPROverride(ctx.db, { repo: 'widgets', pr: 7, head: 'b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2', source: 'chat:kettle-2', note: 'Ship it.', actor: 'z-kettle' });
+
+  expect(readOwnerOverride(ctx.db, 'widgets', 7)).toMatchObject({ source: 'chat:kettle-2' });
 });
 
 test('it finds nothing for an override on another PR', () => {
