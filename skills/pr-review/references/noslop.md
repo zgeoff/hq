@@ -52,8 +52,9 @@ head).
 `hq noslop` shows each repo's emergency cap, off by default. Past it, `hq review` runs only fix
 calls, and the gate passes once every finding is answered and confirmed. A push past the cap with no
 `fixed` answer leaves noslop's last review on the old head, so the gate holds until the owner
-overrides or `z-stu` lifts the cap. A PR that hits the cap means the reviewer keeps finding new
-things: tell `z-stu`.
+overrides or `z-stu` lifts the cap. A PR that hits the cap means noslop keeps finding new
+things: post it with
+`hq news add --topic other --text "<repo>#<pr> hit the noslop cap" --link <PR URL>`.
 
 ## The gate and overrides
 

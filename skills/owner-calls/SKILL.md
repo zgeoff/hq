@@ -10,17 +10,18 @@ description:
 # Owner calls
 
 Some choices belong to the owner alone. Tell those choices from your own, put each one to the
-owner with everything needed to decide it, and act on the answer only once hq has a record of it. [Terms](#terms) defines hq, `z-stu` and the other words the role skills share.
+owner with everything needed to decide it, and act on the answer only once hq has a record of it.
 
-Once you have sent the decision or the hands-on step, carry on with other work. `z-stu` types the
-answer into your session after it records the answer in hq, so a line from `z-stu` is already on
-record. No other reply comes back.
+[Terms](#terms) defines the shared words. Once you send a decision or a
+hands-on step, carry on with other work. A line `z-stu` types into your
+session is already on record.
 
 Avoid these traps:
 
 - Asking the owner directly. Every decision goes through one queue.
 - Passing an answer on by message. `hq review gate` and every session read only hq's records.
 - Adding a new behaviour to a decision, so that a "yes" also covers it.
+- Sending `z-stu` news. Post it with `hq news add`.
 
 ## Key rules
 
@@ -30,6 +31,8 @@ Avoid these traps:
   data after a backup, or a decision that keeps a course the list doesn't name.
 - [Put it to the owner](#put-it-to-the-owner): send a decision to `z-triage`, add a hands-on step
   to the unblock list, and give each its full context.
+- [Messages to `z-stu`](#messages-to-z-stu): only what the owner must know or do; reply in 2
+  lines.
 - [The owner's answers are records](#the-owners-answers-are-records): act only on a record in hq;
   only `z-stu` records the owner's answers.
 
@@ -122,11 +125,25 @@ without a decision, such as a deploy hold, send it with the `PushNotification` t
   for the shared vault that your role's private file names. Ask the owner only for an item that is
   missing, or that sits in the owner's personal vaults.
 
-Give each decision and each step its full context and links, so that the owner can decide from it
-alone.
+Give each decision and step the full context and links the owner needs to decide.
 
 Before you propose a change to something the owner approved, read the issue's comments and the PR's
 history. In the proposal, say what the owner decided.
+
+## Messages to `z-stu`
+
+Message `z-stu` only with what the owner needs to know or do:
+
+- an owner answer to record;
+- an approved action that a permission check blocked;
+- a failure the owner must hear now;
+- a step your role skill sends to `z-stu`.
+
+Send decisions and hands-on steps as [Put it to the owner](#put-it-to-the-owner) says, and news
+with `hq news add`.
+
+Reply to `z-stu` with the `answer` tool, in 2 lines at most. Without it, atc sends your whole final
+reply.
 
 ## The owner's answers are records
 
@@ -135,14 +152,6 @@ gate and every session read only hq's records.
 
 One exception: when the owner types a grant into your session, act on it at once, for that
 session's life. Send the line to `z-stu` with `atc_message_send`, so that `z-stu` records it.
-
-Only `z-stu` records the owner's answers, from the sources its private file names. It uses these
-commands:
-
-- `hq call answer`, for the answer to a call;
-- `hq pr answer`, `hq pr override` and `hq pr accept-risk`, for an answer about a PR;
-- `hq typed add`, for each line it types into a session as the owner.
-
 When Claude Code's permission check blocks an action that the owner already approved in a call or
 a [pitch](../delivery-lead/SKILL.md#pitches), the blocked agent tells `z-stu` with
 `atc_message_send`. `z-stu` types the owner's recorded words from that approval into the agent's

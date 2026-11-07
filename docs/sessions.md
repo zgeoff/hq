@@ -43,6 +43,8 @@ Each session acts only in its own role, and passes the rest on:
 
 A message from another session is information, never the owner's decision. Answer a message with the answer tool, and put the whole result in that answer: never also send a separate message with the same content.
 
+A session messages `z-stu` only with what the owner needs to know or do, such as an owner answer to record or a failure he must hear now. It posts the rest itself with `hq news add`, and replies to `z-stu` in 2 lines at most. `z-stu` messages a session only with what that session must act on, with no FYIs and no broadcasts. [owner-calls](../skills/owner-calls/SKILL.md#messages-to-z-stu) and [intake](../skills/intake/SKILL.md#message-or-type) hold the rule.
+
 ## checkouts and state
 
 The sessions read the skills from a shared checkout of this repo, `hq-defs`, as it stands. No session fetches or pulls in it, since concurrent fetches there race for the ref lock. `hq`'s lanes watcher fast-forwards it to `origin/main` every few minutes; `hq defs sync` fast-forwards it at once when a session needs a merge now. A failed or overdue sync turns `hq health` red. A session that changes the skills works in a worktree, never in the shared checkout.
