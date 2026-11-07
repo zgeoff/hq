@@ -30,5 +30,5 @@ pre-push:
     - name: lint
       skip: true
     - name: lint-changed
-      glob: '*.{js,mjs,cjs,jsx,ts,mts,cts,tsx}'
+      glob: "*.{js,mjs,cjs,jsx,ts,mts,cts,tsx}"
       run: bun run lint:changed
