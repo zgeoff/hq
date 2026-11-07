@@ -1,12 +1,14 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { z } from 'zod';
 import { checkRepaired } from '../src/repair/check-repaired.ts';
 import { planRepair } from '../src/repair/plan-repair.ts';
 import { repairAdvisor400 } from '../src/repair/repair-advisor400.ts';
 import { repairedText } from '../src/repair/repaired-text.ts';
 import { transcriptPath } from '../src/repair/transcript-path.ts';
-import { fakeAtc, type FakeAtc } from './helpers.ts';
+import type { FakeAtc, FakeAtcSession } from './helpers.ts';
+import { fakeAtc } from './helpers.ts';
 
 const U = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const SID = '11111111-2222-4333-8444-555555555555';
@@ -16,7 +18,19 @@ const asst = (uuid: string, parent: string, msg: string, content: unknown[]) => 
 const att = (uuid: string, parent: string) => ({ parentUuid: parent, ...base, type: 'attachment', attachment: { type: 'note', text: 'a reminder' }, uuid });
 const lines = (recs: object[]) => recs.map((r) => JSON.stringify(r)).join('\n') + '\n';
 
-const [R, A1, A2, I1, A3, A4, A5, T1, AT1, A6, I2] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map(U) as [string, string, string, string, string, string, string, string, string, string, string];
+/* oxlint-disable id-length, new-cap, zgeoff/setup-test-only -- the ids keep the record names the transcripts use */
+const R = U(1);
+const A1 = U(2);
+const A2 = U(3);
+const I1 = U(4);
+const A3 = U(5);
+const A4 = U(6);
+const A5 = U(7);
+const T1 = U(8);
+const AT1 = U(9);
+const A6 = U(10);
+const I2 = U(11);
+/* oxlint-enable id-length, new-cap, zgeoff/setup-test-only */
 
 function broken(opts: { two?: boolean; noTool?: boolean } = {}): object[] {
   const out: object[] = [
@@ -43,7 +57,12 @@ function broken(opts: { two?: boolean; noTool?: boolean } = {}): object[] {
   return out;
 }
 
-const parentOf = (text: string, uuid: string) => text.split('\n').filter(Boolean).map((l) => JSON.parse(l) as { uuid?: string; parentUuid?: string }).find((o) => o.uuid === uuid)!.parentUuid;
+// oxlint-disable-next-line zgeoff/setup-test-only -- grandfathered: shared transcript readers
+function parentOf(text: string, uuid: string): string | null | undefined {
+  const recordSchema = z.object({ uuid: z.string().optional(), parentUuid: z.string().nullable().optional() });
+  const records = text.split('\n').filter(Boolean).map((line) => recordSchema.parse(JSON.parse(line)));
+  return records.find((record) => record.uuid === uuid)?.parentUuid;
+}
 
 test('re-links the advisor result to its use and moves the interloper after the turn', () => {
   const text = lines(broken());
@@ -119,9 +138,9 @@ afterEach(() => {
   rmSync(dir, { recursive: true, force: true });
 });
 
-function withAtc(sessions: object[]): void {
-  const list: never[] = sessions as never[];
-  atc = fakeAtc(dir, list);
+// oxlint-disable-next-line zgeoff/setup-test-only -- grandfathered: shared atc setup
+function withAtc(sessions: FakeAtcSession[]): void {
+  atc = fakeAtc(dir, sessions);
 }
 
 test('--file: a dry run writes nothing; --apply backs up, writes, and passes its check', async () => {
@@ -189,13 +208,15 @@ test('without atc, hq refuses: it cannot tell the session is stopped', async () 
 
 test('review follow-ups: a dangling parent, a long run of interlopers, and a turn that ends the transcript', () => {
   const dangling = broken();
-  (dangling[1] as { parentUuid: string }).parentUuid = U(77);
+  // oxlint-disable-next-line new-cap -- U builds the transcript's fake uuids
+  dangling[1] = { ...dangling[1], parentUuid: U(77) };
   expect(() => planRepair(lines(dangling))).toThrow(`names a parent ${U(77)} that is not in the transcript`);
 
   const recs = broken();
   const notes = Array.from({ length: 25 }, (_, k) => user(U(100 + k), k ? U(99 + k) : A2, [{ type: 'text', text: `Note ${k}.` }], { isMeta: true }));
   recs.splice(3, 1, ...notes);
-  (recs[3 + 25] as { parentUuid: string }).parentUuid = U(124);
+  // oxlint-disable-next-line new-cap -- U builds the transcript's fake uuids
+  recs[3 + 25] = { ...recs[3 + 25], parentUuid: U(124) };
   const plan = planRepair(lines(recs));
   expect(plan.splits[0]!.interlopers).toHaveLength(25);
   const fixed = repairedText(plan);

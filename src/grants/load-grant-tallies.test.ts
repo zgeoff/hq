@@ -89,7 +89,11 @@ test('hq mark add --grant, hq mark grant, hq grant act and hq grant actions work
   ];
   onTestFinished(() => log.mockRestore());
   expect([db.query('SELECT COUNT(*) AS n FROM grant_actions').get(), runs]).toStrictEqual([{ n: 1 }, [0, 0, 0, 0, 0, 1]]);
-  expect(z.object({ grants: z.array(z.object({ grant: z.string(), actions: z.array(z.object({ target: z.string(), actor: z.string() })) })) }).parse(JSON.parse(printed.at(-2) ?? '{}')).grants.map((g) => [g.grant, g.actions.map((a) => [a.target, a.actor])])).toStrictEqual([
+  const actionSchema = z.object({ target: z.string(), actor: z.string() });
+  const tallySchema = z.object({ grant: z.string(), actions: z.array(actionSchema) });
+  const report = z.object({ grants: z.array(tallySchema) }).parse(JSON.parse(printed.at(-2) ?? '{}'));
+
+  expect(report.grants.map((tally) => [tally.grant, tally.actions.map((action) => [action.target, action.actor])])).toStrictEqual([
     ['kettle-merges', []],
     ['teapot-deploys', [['teapot#4', 'teapot-bot']]],
   ]);

@@ -71,6 +71,7 @@ function probe(w: World): CapacityProbe {
 }
 
 const minute = (m: number) => new Date(Date.parse(NOON_SYDNEY) + m * 60_000);
+// oxlint-disable-next-line zgeoff/setup-test-only, zgeoff/no-top-level-arrow -- this file's shared beforeEach state is GEO-1318's lint debt
 const outbox = () => queryRows(db, 'SELECT target, text, topic FROM outbox ORDER BY id', z.object({ target: z.string(), text: z.string(), topic: z.string().nullable() }));
 const sampleAt = async (w: World, d: Date) => {
   at(d.toISOString());

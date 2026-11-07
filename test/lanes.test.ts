@@ -27,6 +27,7 @@ const cap = (freeMib: number, claudeRoom = true): Capacity => ({
   providers: { claude: { room: claudeRoom, unattended: true, target: 'imp' }, codex: { room: true, unattended: false, target: 'local' } },
 });
 const sample = (freeMib: number, claudeRoom = true) => ({ cap: cap(freeMib, claudeRoom), impMib: 2048, error: null });
+// oxlint-disable-next-line zgeoff/setup-test-only, zgeoff/no-top-level-arrow -- this file's shared beforeEach state is GEO-1318's lint debt
 const msgs = () => queryRows(db, 'SELECT target, text FROM outbox', z.object({ target: z.string(), text: z.string() }));
 const atMin = (m: number) => at(new Date(new Date(NOON_SYDNEY).getTime() + m * 60_000).toISOString());
 

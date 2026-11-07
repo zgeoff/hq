@@ -18,6 +18,8 @@ function collectPRs(groups: readonly { rows: readonly { prs: readonly unknown[] 
 }
 
 test('a report in another shape is refused, naming the fields', () => {
-  const daily = z.record(z.string(), z.unknown()).parse(JSON.parse(readFileSync(join(FIXTURES, 'daily.json.expected'), 'utf8')));
+  const text = readFileSync(join(FIXTURES, 'daily.json.expected'), 'utf8');
+  const daily = z.record(z.string(), z.unknown()).parse(JSON.parse(text));
+
   expect(() => parseRenderedReport(JSON.stringify({ ...daily, kind: 'monthly', groups: [{ project: 'Lantern Garden' }] }))).toThrow('render-report.sh printed an unexpected shape: kind, groups.0.issues, groups.0.prs, groups.0.burndown, groups.0.rows');
 });

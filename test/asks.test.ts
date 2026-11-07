@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import type { Database } from 'bun:sqlite';
 import { z } from 'zod';
-import { queryRow, queryRows } from '../src/test-utils/query-rows.ts';
+import { queryColumn, queryRow, queryRows } from '../src/test-utils/query-rows.ts';
 import { applyAskItem } from '../src/apply-ask-item.ts';
 import { addAsk } from '../src/asks/add-ask.ts';
 import { answerAsk } from '../src/asks/answer-ask.ts';
@@ -35,6 +35,7 @@ const call = (over: Partial<AddInput> = {}): AddInput => ({
   ...over,
 });
 
+// oxlint-disable-next-line zgeoff/setup-test-only, zgeoff/no-top-level-arrow -- this file's shared beforeEach state is GEO-1318's lint debt
 const outbox = () => queryRows(db, 'SELECT target, text FROM outbox ORDER BY id', z.object({ target: z.string(), text: z.string() }));
 
 beforeEach(() => {
@@ -276,7 +277,7 @@ describe('answer, apply, later, skip, close', () => {
     openAsk(db, { force: false, actor: 'z-stu' });
     answerAsk(db, { id: 'geo-1-paint', kind: 'call', answer: 'green', actor: 'z-stu' });
     applyAsk(db, 'geo-1-paint', 'call', 'none', null, 'z-stu');
-    const actions = queryRows(db, `SELECT action FROM events WHERE subject_id='geo-1-paint' ORDER BY seq`, z.object({ action: z.string() })).map((e) => e.action);
+    const actions = queryColumn(db, `SELECT action FROM events WHERE subject_id='geo-1-paint' ORDER BY seq`, z.string());
     expect(actions).toEqual(['added', 'opened', 'answered', 'applied']);
   });
 });

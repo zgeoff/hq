@@ -172,7 +172,11 @@ test('hq answers --json lists the last 7 days by default, and --since sets the w
   const runSince = await main(['answers', '--since', '10d', '--json']);
   onTestFinished(() => log.mockRestore());
   expect([db.query('SELECT COUNT(*) AS n FROM typed').get(), runDefault, runSince]).toStrictEqual([{ n: 2 }, 0, 0]);
-  expect(printed.map((p) => z.object({ window: z.object({ from: z.string() }), answers: z.array(z.object({ words: z.string() })) }).parse(JSON.parse(p))).map((j) => [j.window.from, j.answers.map((a) => a.words)])).toStrictEqual([
+  const answerSchema = z.object({ words: z.string() });
+  const reportSchema = z.object({ window: z.object({ from: z.string() }), answers: z.array(answerSchema) });
+  const reports = printed.map((line) => reportSchema.parse(JSON.parse(line)));
+
+  expect(reports.map((report) => [report.window.from, report.answers.map((answer) => answer.words)])).toStrictEqual([
     ['2026-10-07T01:00:00Z', ['Descale it.']],
     ['2026-10-04T01:00:00Z', ['Old news.', 'Descale it.']],
   ]);

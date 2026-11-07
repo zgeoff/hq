@@ -8,12 +8,11 @@ import { realRunner } from '../runner/real-runner.ts';
 import { buildMergedDayOutput, buildMergedPR } from '../../test/build-merged-day-output.ts';
 import { buildStubDeliveryRunner } from '../../test/build-stub-delivery-runner.ts';
 import { freshDb } from '../../test/helpers.ts';
-import { makeLinearFake } from '../../test/make-linear-fake.ts';
+import { FakeIssueSchema, makeLinearFake } from '../../test/make-linear-fake.ts';
 import { loadShippedReport } from './load-shipped-report.ts';
 import { mergedPRsOutputSchema } from './merged-prs-output-schema.ts';
 import { parseRenderedReport } from './parse-rendered-report.ts';
 import { projectIssuesSchema } from './project-issues-schema.ts';
-import { reportIssueSchema } from './report-issue-schema.ts';
 import type { ProjectIssue } from './types.ts';
 
 function setupTest() {
@@ -272,13 +271,13 @@ function readFixture(file: string): string {
   return readFileSync(join(import.meta.dir, '../../skills/delivery-report/scripts/testdata/render-report', file), 'utf8');
 }
 
-const FixtureIssueSchema = reportIssueSchema.extend({ priority: z.union([z.number(), z.object({ value: z.number(), name: z.string() })]) });
-
+// oxlint-disable-next-line zgeoff/setup-test-only -- grandfathered: the fixture readers sit beside readFixture
 function readIssues<Schema extends z.ZodType>(file: string, schema: Schema): z.output<Schema>[] {
-  const parsed = z.union([z.array(schema), z.object({ issues: z.array(schema) })]).parse(JSON.parse(readFixture(file)));
+  const listSchema = z.array(schema);
+  const parsed = z.union([listSchema, z.object({ issues: listSchema })]).parse(JSON.parse(readFixture(file)));
   return Array.isArray(parsed) ? parsed : parsed.issues;
 }
 
 function loadLinearFake(projectIssues: readonly ProjectIssue[], asked: unknown[]): LinearCall {
-  return makeLinearFake([...readIssues('issues-array.json', FixtureIssueSchema), ...readIssues('issues-object.json', FixtureIssueSchema)], projectIssues, asked);
+  return makeLinearFake([...readIssues('issues-array.json', FakeIssueSchema), ...readIssues('issues-object.json', FakeIssueSchema)], projectIssues, asked);
 }

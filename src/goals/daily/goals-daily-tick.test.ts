@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test';
 import type { Database } from 'bun:sqlite';
-import { z } from 'zod';
+import { OutboxRowSchema } from '../../test-utils/outbox-row-schema.ts';
 import { queryRows } from '../../test-utils/query-rows.ts';
 import { iso } from '../../clock/iso.ts';
 import { setMeta } from '../../db/set-meta.ts';
@@ -26,7 +26,8 @@ const syd = (date: string, hm: string) => {
   const [h, mi] = hm.split(':').map(Number);
   return sydneyUtc(y!, mo!, d!, h!, mi!);
 };
-const outbox = () => queryRows(db, 'SELECT target, text, status, topic FROM outbox', z.object({ target: z.string(), text: z.string(), status: z.string(), topic: z.string() }));
+// oxlint-disable-next-line zgeoff/setup-test-only, zgeoff/no-top-level-arrow -- this file's shared beforeEach state is GEO-1318's lint debt
+const outbox = () => queryRows(db, 'SELECT target, text, status, topic FROM outbox', OutboxRowSchema);
 const synced = (when: Date) => {
   for (const k of ['goals_ok_at', 'kinds_ok_at', 'linear_synced_at']) setMeta(db, k, iso(when));
 };

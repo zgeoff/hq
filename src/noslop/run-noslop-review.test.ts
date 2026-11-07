@@ -390,7 +390,7 @@ function makeGitlessRunner(run: Runner): Runner {
 
 function readLateFlags(db: Database): (boolean | null | undefined)[] {
   const rows = queryRows(db, 'SELECT findings FROM noslop_rounds ORDER BY id', z.object({ findings: z.string() }));
-  return rows.map((r) => z.array(z.object({ late: z.boolean().nullable() })).parse(JSON.parse(r.findings))[0]?.late);
+  return rows.map((row) => z.array(z.object({ late: z.boolean().nullable() })).parse(JSON.parse(row.findings))[0]?.late);
 }
 
 test('it records late on a new finding of a later review and leaves it null on the first', async () => {

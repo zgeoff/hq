@@ -57,7 +57,9 @@ function mergedRun(issue: string, refs: string[], state: 'merged' | 'deploying' 
   setState(db, issue, state, {}, 'z-delivery');
 }
 
+// oxlint-disable-next-line zgeoff/setup-test-only, zgeoff/no-top-level-arrow -- this file's shared beforeEach state is GEO-1318's lint debt
 const msgs = () => queryRows(db, 'SELECT target, text, topic FROM outbox ORDER BY id', z.object({ target: z.string(), text: z.string(), topic: z.string() }));
+// oxlint-disable-next-line zgeoff/setup-test-only, zgeoff/no-top-level-arrow -- this file's shared beforeEach state is GEO-1318's lint debt
 const prRow = (ref: string) => queryRow(db, 'SELECT merge_sha, shipped_tag, shipped_at FROM run_prs WHERE ref = ?', z.object({ merge_sha: z.string().nullable(), shipped_tag: z.string().nullable(), shipped_at: z.string().nullable() }), ref);
 const T = new Date(NOON_SYDNEY);
 
@@ -113,7 +115,6 @@ test('state --check and run check set live_check and log it; bad values are refu
   expect(getRun(db, 'GEO-14')!.live_check).toBe('owed');
   expect(db.query("SELECT COUNT(*) AS n FROM events WHERE subject_id = 'GEO-14' AND action = 'check'").get()).toEqual({ n: 1 });
   expect(() => setLiveCheck(db, 'GEO-14', 'maybe', 'z-delivery')).toThrow('owed or none');
-  expect(() => setState(db, 'GEO-14', 'deploying', { liveCheck: 'maybe' as 'owed' }, 'z-delivery')).toThrow('owed or none');
 });
 
 test('an open PR, no containing release, or a repo with no source leaves the run alone', async () => {

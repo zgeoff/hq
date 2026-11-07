@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import type { Database } from 'bun:sqlite';
 import { z } from 'zod';
-import { queryRow, queryRows } from '../src/test-utils/query-rows.ts';
+import { queryColumn, queryRow, queryRows, queryValue } from '../src/test-utils/query-rows.ts';
 import { AtcClient } from '../src/atc/atc-client.ts';
 import { getMeta } from '../src/db/get-meta.ts';
 import { addNote } from '../src/runs/add-note.ts';
@@ -44,7 +44,9 @@ const base = new Date(NOON_SYDNEY).getTime();
 const atMin = (m: number) => at(new Date(base + m * 60_000).toISOString());
 const add = (issue = 'GEO-9001', session: string | null = S1) =>
   addRun(db, { issue, title: 'Teach the kettle to whistle', place: 'imp', session, next: 'Agent working.', gate: null, geoffChat: false, actor: 'z-delivery' });
+// oxlint-disable-next-line zgeoff/setup-test-only, zgeoff/no-top-level-arrow -- this file's shared beforeEach state is GEO-1318's lint debt
 const outbox = () => queryRows(db, `SELECT target, text FROM outbox WHERE target != 'z-review'`, z.object({ target: z.string(), text: z.string() }));
+// oxlint-disable-next-line zgeoff/setup-test-only, zgeoff/no-top-level-arrow -- this file's shared beforeEach state is GEO-1318's lint debt
 const toReview = () => queryRows(db, `SELECT text, topic, status FROM outbox WHERE target = 'z-review' ORDER BY id`, z.object({ text: z.string(), topic: z.string(), status: z.string() }));
 
 beforeEach(() => {
@@ -181,7 +183,7 @@ describe('reading the event feed', () => {
     } finally {
       c.close();
     }
-    expect(queryRow(db, 'SELECT COUNT(*) AS n FROM run_notes', z.object({ n: z.number() })).n).toBe(1);
+    expect(queryValue(db, 'SELECT COUNT(*) FROM run_notes', z.number())).toBe(1);
   });
 
   test('a sweep ends every gone session, and a working run\'s exit alert repeats from the sweep\'s mark; a session removed by hand raises none', async () => {
@@ -454,7 +456,7 @@ describe('review fixes', () => {
     } finally {
       c.close();
     }
-    const texts = queryRows(db, 'SELECT text FROM run_notes ORDER BY id', z.object({ text: z.string() })).map((n) => n.text);
+    const texts = queryColumn(db, 'SELECT text FROM run_notes ORDER BY id', z.string());
     expect(texts).toEqual(['first note', 'second note']);
   });
 
@@ -501,7 +503,7 @@ describe('re-check fixes', () => {
     } finally {
       c.close();
     }
-    expect(queryRow(db, 'SELECT COUNT(*) AS n FROM run_notes', z.object({ n: z.number() })).n).toBe(201);
+    expect(queryValue(db, 'SELECT COUNT(*) FROM run_notes', z.number())).toBe(201);
   });
 
   test('a phrase in a note that names a foreign PR marks nothing', () => {

@@ -1,11 +1,13 @@
+// oxlint-disable zgeoff/test-beside-module -- grandfathered: the health checks run through every probe at once
 import { afterEach, beforeEach, expect, jest, onTestFinished, test } from 'bun:test';
 import { toExactOptional } from '@zgeoff/std';
 import type { Database } from 'bun:sqlite';
 import { z } from 'zod';
-import { findRow, queryRows } from '../src/test-utils/query-rows.ts';
+import { queryRows } from '../src/test-utils/query-rows.ts';
 import assert from 'node:assert';
 import { applyHealth } from '../src/health/apply-health.ts';
 import { HEALTH_DEFAULTS } from '../src/health/health-defaults.ts';
+import { healthSamples } from '../src/health/health-samples.ts';
 import { healthSettings } from '../src/health/health-settings.ts';
 import { runChecks } from '../src/health/run-checks.ts';
 import { setHealthSetting } from '../src/health/set-health-setting.ts';
@@ -62,10 +64,10 @@ function probe(w: World): Probe {
 
 async function step(w: World, minute: number) {
   at(new Date(Date.parse(NOON_SYDNEY) + minute * 60_000).toISOString());
-  const prev = JSON.parse(findRow(db, "SELECT value FROM meta WHERE key = 'health_samples'", z.object({ value: z.string() }))?.value ?? '{}');
-  const { checks, samples, unknown } = await runChecks(probe(w), healthSettings(db), prev, new Date(Date.parse(NOON_SYDNEY) + minute * 60_000));
-  return applyHealth(db, checks, samples, 'hq-lanes', unknown);
+  const checked = await runChecks(probe(w), healthSettings(db), healthSamples(db), new Date(Date.parse(NOON_SYDNEY) + minute * 60_000));
+  return applyHealth(db, checked.checks, checked.samples, 'hq-lanes', checked.unknown);
 }
+// oxlint-disable-next-line zgeoff/setup-test-only, zgeoff/no-top-level-arrow -- this file's shared beforeEach state is GEO-1318's lint debt
 const outbox = () => queryRows(db, 'SELECT target, text FROM outbox', z.object({ target: z.string(), text: z.string() }));
 
 test('all clear sends nothing', async () => {
@@ -226,9 +228,9 @@ test('a command that hangs counts as a failed read', async () => {
     await Promise.resolve();
   }
   jest.advanceTimersByTime(COMMAND_TIMEOUT_MS);
-  const { unknown } = await pending;
+  const result = await pending;
 
-  expect(unknown).toContain('disk:');
+  expect(result.unknown).toContain('disk:');
 });
 
 test('a stale or failing backup is a problem once hq backup has run', async () => {

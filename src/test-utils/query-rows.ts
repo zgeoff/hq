@@ -8,6 +8,21 @@ export function queryRows<Schema extends z.ZodType>(db: Database, sql: string, s
   return z.array(schema).parse(db.query(sql).all(...BindingsSchema.parse(bindings)));
 }
 
+// The first column of every row.
+export function queryColumn<Schema extends z.ZodType>(db: Database, sql: string, schema: Schema, ...bindings: (string | number | null)[]): z.output<Schema>[] {
+  return z
+    .array(z.array(z.unknown()))
+    .parse(db.query(sql).values(...BindingsSchema.parse(bindings)))
+    .map((row) => schema.parse(row[0]));
+}
+
+// The first column of the first row; a test that calls it expects one.
+export function queryValue<Schema extends z.ZodType>(db: Database, sql: string, schema: Schema, ...bindings: (string | number | null)[]): z.output<Schema> {
+  const [value] = queryColumn(db, sql, schema, ...bindings);
+  invariant(value !== undefined, 'the query returned no row');
+  return value;
+}
+
 // The first row, or null when the query returns none.
 export function findRow<Schema extends z.ZodType>(db: Database, sql: string, schema: Schema, ...bindings: (string | number | null)[]): z.output<Schema> | null {
   return schema.nullable().parse(db.query(sql).get(...BindingsSchema.parse(bindings)));

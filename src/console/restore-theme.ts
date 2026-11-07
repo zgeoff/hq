@@ -1,6 +1,6 @@
 import { THEME_KEY } from './theme-key.ts';
 
-export function restoreTheme(root: HTMLElement, readStorage: () => Storage): void {
+export function restoreTheme(root: Pick<HTMLElement, 'dataset'>, readStorage: () => Storage): void {
   try {
     const theme = readStorage().getItem(THEME_KEY);
     if (theme === 'light' || theme === 'dark') {

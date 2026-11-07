@@ -17,7 +17,7 @@ function setupTest(): Database {
 }
 
 function readOwnerMessages(db: Database): string[] {
-  return queryRows(db, 'SELECT text FROM outbox WHERE target = ? ORDER BY id', z.object({ text: z.string() }), roleName('owner')).map((m) => m.text);
+  return queryRows(db, 'SELECT text FROM outbox WHERE target = ? ORDER BY id', z.object({ text: z.string() }), roleName('owner')).map((message) => message.text);
 }
 
 test('each review answer lands as its own console answer, and closes, drops or puts off the item', () => {

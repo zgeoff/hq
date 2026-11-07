@@ -8,13 +8,11 @@ import { checkRun } from '../transitions/check-run.ts';
 import { CLOSED_RUN_STATES as CLOSED } from '../transitions/closed-run-states.ts';
 import { RUN_STATES } from '../transitions/run-states.ts';
 import { getRun } from './get-run.ts';
-import { requireLiveCheck as checkLiveCheck } from './require-live-check.ts';
 import { requireRun as mustRun } from './require-run.ts';
 import type { LiveCheck, RunView } from './types.ts';
 import { viewRun } from './view-run.ts';
 
 export function setState(db: Database, issue: string, state: string, opts: { next?: string; waitsOn?: string | null; waitsOnGeoff?: boolean; note?: string | null; reopen?: boolean; liveCheck?: LiveCheck }, actor: string): RunView {
-  if (opts.liveCheck !== undefined) checkLiveCheck(opts.liveCheck);
   if (!isOneOf(state, RUN_STATES)) {
     throw new HqError('bad_args', `state must be one of ${RUN_STATES.join(', ')}`);
   }

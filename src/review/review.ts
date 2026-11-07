@@ -14,7 +14,6 @@ import { codexInstructions } from './codex-instructions.ts';
 import { NO_ALLOW_DENY } from './no-allow-deny.ts';
 import { parseRepo } from './parse-repo.ts';
 import { readCIState } from './read-ci-state.ts';
-import { REVIEW_EFFORT } from './review-effort.ts';
 import { reviewDir } from './review-dir.ts';
 import { RISK_EFFORT } from './risk-effort.ts';
 import { riskTier } from './risk-tier.ts';
@@ -27,7 +26,6 @@ import { withRepoLock } from './with-repo-lock.ts';
 const PRRefs = z.object({ headRefName: z.string(), headRefOid: z.string(), baseRefName: z.string() });
 
 export async function review(run: Runner, rawRepo: string, pr: number, opts: { watch: boolean; owner?: string; repoDir?: string; effort?: Effort }): Promise<ReviewResult> {
-  if (opts.effort !== undefined && opts.effort !== REVIEW_EFFORT && opts.effort !== RISK_EFFORT) throw new HqError('bad_args', `--effort must be ${REVIEW_EFFORT} or ${RISK_EFFORT}`);
   const answerFile = buildReviewPath(rawRepo, opts.owner, pr, '-allow-deny.md');
   const reviewFile = buildReviewPath(rawRepo, opts.owner, pr, '-review.md');
   const temporaryDirectory = buildReviewPath(rawRepo, opts.owner, pr, '-tmp');

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test';
 import type { Database } from 'bun:sqlite';
 import { z } from 'zod';
-import { queryRow } from '../src/test-utils/query-rows.ts';
+import { queryRows, queryValue } from '../src/test-utils/query-rows.ts';
 import { appendFileSync, mkdirSync, readFileSync, rmSync, truncateSync, utimesSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { main } from '../src/cli.ts';
@@ -39,7 +39,8 @@ const setAge = (p: string, days: number) => {
   utimesSync(p, t, t);
 };
 const scan = (o: Parameters<typeof scanRefusals>[1] = {}) => scanRefusals(db, { dir: proj(), sessions: async () => [], ...o });
-const rows = () => db.query('SELECT * FROM refusals ORDER BY rowid').all() as Record<string, unknown>[];
+// oxlint-disable-next-line zgeoff/setup-test-only, zgeoff/no-top-level-arrow -- this file's shared beforeEach state is GEO-1318's lint debt
+const rows = () => queryRows(db, 'SELECT * FROM refusals ORDER BY rowid', z.record(z.string(), z.unknown()));
 
 beforeEach(() => {
   ({ db, dir, cleanup } = freshDb());
@@ -70,8 +71,7 @@ test('it names the tool of a refused call whose input quotes the refusal mark', 
 });
 
 test('input is the command or the path; any other tool shows nothing; the reason may be absent or in text parts', async () => {
-  const parts = refused('toolu_4', null);
-  (parts.message.content[0] as { content: unknown }).content = [{ type: 'text', text: 'Blocked.\nReason: the part reason\n' }];
+  const parts = refused('toolu_4', null, { message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'toolu_4', is_error: true, content: [{ type: 'text', text: 'Blocked.\nReason: the part reason\n' }] }] } });
   file('p/s.jsonl', jl(tu('toolu_2', 'Edit', { file_path: '/work/a.ts', old_string: 'secret' }), refused('toolu_2', null), tu('toolu_3', 'WebFetch', { url: 'https://example.test/x' }), refused('toolu_3', 'r'), tu('toolu_4', 'Read', { file_path: '/work/b.ts' }), parts));
   await scan();
   expect(rows().map((x) => [x['tool'], x['input'], x['reason']])).toEqual([['Edit', '/work/a.ts', null], ['WebFetch', null, 'r'], ['Read', '/work/b.ts', 'the part reason']]);
@@ -159,8 +159,7 @@ test('the tool is found earlier in the scan, else from the last scan of the file
   const p = file('p/s.jsonl', jl(tu('t_early', 'Bash', { command: 'read back' })));
   await scan();
   const assistant = tu('t_bytes', 'Bash', { command: 'by assistant uuid' }, '00000000-0000-4000-8000-0000000000bb');
-  const noId = refused('', 'by uuid', { sourceToolAssistantUUID: assistant.uuid });
-  delete (noId.message.content[0] as { tool_use_id?: string }).tool_use_id;
+  const noId = refused('', 'by uuid', { sourceToolAssistantUUID: assistant.uuid, message: { role: 'user', content: [{ type: 'tool_result', is_error: true, content: 'Permission denied. Reason: by uuid\nTo allow it, ask.' }] } });
   appendFileSync(p, jl(refused('t_early', 'read back'), assistant, noId, refused('t_missing', 'nowhere'), tu('t_in', 'Write', { file_path: '/w/x' }), refused('t_in', 'in chunk')));
   await scan();
   expect(rows().map((x) => [x['reason'], x['tool'], x['input']])).toEqual(expect.arrayContaining([
@@ -183,7 +182,7 @@ test('parallel calls with a 10 MiB result between: the third call refusal still 
 test('the tools kept between scans hold the masked input only', async () => {
   const p = file('p/s.jsonl', jl(tu('tk', 'Bash', { command: 'curl -H "Authorization: Bearer abcdef0123456789xyz" https://example.test', description: 'RAW-INPUT-FIELD' })));
   await scan();
-  const kept = queryRow(db, 'SELECT tools FROM refusal_files WHERE path = ?', z.object({ tools: z.string() }), p).tools;
+  const kept = queryValue(db, 'SELECT tools FROM refusal_files WHERE path = ?', z.string(), p);
   expect(kept).not.toContain('abcdef0123456789xyz');
   expect(kept).not.toContain('RAW-INPUT-FIELD');
   appendFileSync(p, jl(refused('tk', 'auth header')));
@@ -201,7 +200,7 @@ test('a scan that stops inside an oversized line resumes on a fragment, which is
   await scan(o);
   await scan(o);
   expect(rows().map((x) => [x['reason'], x['tool']])).toEqual([['after the fragment', 'Bash']]);
-  expect(queryRow(db, 'SELECT tools FROM refusal_files WHERE path = ?', z.object({ tools: z.string() }), p).tools).not.toContain('automode');
+  expect(queryValue(db, 'SELECT tools FROM refusal_files WHERE path = ?', z.string(), p)).not.toContain('automode');
 });
 
 test('a line whose newline arrives past the line limit is skipped, and the next line is read', async () => {
@@ -260,7 +259,7 @@ test('atc names the session and hq run_sessions gives the issue; atc down scans 
   db.query(`INSERT INTO runs (issue, title, place, state, created_at, updated_at) VALUES ('GEO-9', 't', 'local', 'working', '2026-10-16T00:00:00Z', '2026-10-16T00:00:00Z')`).run();
   db.query(`INSERT INTO run_sessions (session_id, issue, added_at) VALUES ('id-w', 'GEO-9', '2026-10-16T00:00:00Z')`).run();
   file('p/s.jsonl', jl(tu('t1', 'Bash', { command: 'a' }), refused('t1', 'with atc')));
-  atc = fakeAtc(dir, [{ id: 'id-w', name: 'z-worker', alive: true, state: 'done', agentSessionID: SID }] as never[]);
+  atc = fakeAtc(dir, [{ id: 'id-w', name: 'z-worker', alive: true, state: 'done', agentSessionID: SID }]);
   process.env['HQ_ATC_SOCKET'] = join(dir, 'atc.sock');
   await scanRefusals(db, { dir: proj() });
   expect(rows()[0]).toMatchObject({ atc_session: 'id-w', atc_name: 'z-worker', issue: 'GEO-9' });
@@ -301,7 +300,9 @@ test('hq refusals lists newest first, tallies with --by, and hq refusals scan re
   };
   try {
     expect(JSON.parse((await hq('refusals', 'scan', '--json')).text)).toMatchObject({ files_read: 1, bytes_read: expect.any(Number), refusals_added: 2, files_left: 0 });
-    const list = JSON.parse((await hq('refusals', '--json')).text) as { items: { tool: string }[] };
+    const listed = await hq('refusals', '--json');
+    const itemSchema = z.object({ tool: z.string() });
+    const list = z.object({ items: z.array(itemSchema) }).parse(JSON.parse(listed.text));
     expect(list.items.map((i) => i.tool)).toEqual(['Edit', 'Bash']);
     expect(JSON.parse((await hq('refusals', '--by', 'reason', '--json')).text)).toMatchObject({ tally: [{ key: 'same', count: 2 }] });
     expect((await hq('refusals', '--by', 'tool', '--days', '30')).text).toMatch(/1  Bash\n.*1  Edit|1  Edit\n.*1  Bash/s);
@@ -324,7 +325,7 @@ test('an 18 MiB record with a 32 MiB budget is passed over, and the refusal afte
   const p = file('p/a.jsonl', jl({ type: 'user', uuid: U(), pad: 'x'.repeat(18 * 1024 * 1024) }) + jl(tu('t1', 'Bash', { command: 'ls' }), refused('t1', 'after')));
   const budgetBytes = 32 * 1024 * 1024;
   await scan({ budgetBytes });
-  const offset = () => queryRow(db, 'SELECT offset FROM refusal_files WHERE path = ?', z.object({ offset: z.number() }), p).offset;
+  const offset = () => queryValue(db, 'SELECT offset FROM refusal_files WHERE path = ?', z.number(), p);
   expect(offset()).toBeGreaterThan(18 * 1024 * 1024);
   for (let i = 0; i < 3 && rows().length < 1; i++) await scan({ budgetBytes });
   expect(rows().map((x) => x['reason'])).toEqual(['after']);

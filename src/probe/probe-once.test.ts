@@ -50,7 +50,9 @@ async function step(m: number, world: { target: boolean; control: boolean; ready
   at(minute(m));
   return probeOnce(db, fake(world), 'hq-probe');
 }
+// oxlint-disable-next-line zgeoff/setup-test-only, zgeoff/no-top-level-arrow -- this file's shared beforeEach state is GEO-1318's lint debt
 const outbox = () => queryRows(db, 'SELECT target, text, topic, status FROM outbox ORDER BY id', z.object({ target: z.string(), text: z.string(), topic: z.string(), status: z.string() }));
+// oxlint-disable-next-line zgeoff/setup-test-only, zgeoff/no-top-level-arrow -- this file's shared beforeEach state is GEO-1318's lint debt
 const outages = () => queryRows(db, 'SELECT * FROM outages ORDER BY id', z.object({ id: z.number(), kind: z.string(), alert_seq: z.number().nullable(), recover_seq: z.number().nullable(), started_at: z.string(), detected_at: z.string(), ended_at: z.string().nullable() }));
 
 test('samples are up, down or blind, and the control is fetched only when the target fails', async () => {
@@ -226,6 +228,7 @@ test('the recovery message counts blind minutes as blind, as downtime() does', a
 });
 
 const UNREADY = { target: true, control: true, ready: false };
+// oxlint-disable-next-line zgeoff/setup-test-only, zgeoff/no-top-level-arrow -- this file's shared beforeEach state is GEO-1318's lint debt
 const kinds = () => queryRows(db, 'SELECT id, kind, started_at, detected_at, ended_at FROM outages ORDER BY id', z.object({ id: z.number(), kind: z.string(), started_at: z.string(), detected_at: z.string(), ended_at: z.string().nullable() }));
 
 test('live and ready both fine opens nothing', async () => {

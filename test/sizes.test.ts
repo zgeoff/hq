@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test';
 import type { Database } from 'bun:sqlite';
 import { z } from 'zod';
-import { queryRow } from '../src/test-utils/query-rows.ts';
+import { queryValue } from '../src/test-utils/query-rows.ts';
 import { addPr } from '../src/runs/add-pr.ts';
 import { addRun } from '../src/runs/add-run.ts';
 import { closePr } from '../src/runs/close-pr.ts';
@@ -61,7 +61,9 @@ function fakeGh(prs: Record<string, Fake>, calls: string[][] = [], heads: string
       };
     }
     for (const m of q.matchAll(/(b\d+): repository\(owner: "[\w.-]+", name: "[\w.-]+"\) \{ pullRequests\(headRefName: ("[^"]*")/g)) {
-      data[m[1]!] = { pullRequests: { totalCount: heads.includes(JSON.parse(m[2]!) as string) ? 1 : 0 } };
+      const [, alias = '', quoted = '""'] = m;
+      const head = z.string().parse(JSON.parse(quoted));
+      data[alias] = { pullRequests: { totalCount: heads.includes(head) ? 1 : 0 } };
     }
     return { code: missing ? 1 : 0, stdout: JSON.stringify({ data, ...(missing ? { errors: [{ message: 'not found' }] } : {}) }), stderr: '' };
   };
@@ -149,7 +151,10 @@ test('merged PR facts are cached; a PR GitHub lacks is left out, and gh failing 
   };
   const two = [{ ref: 'kettle#8', url: null }, { ref: 'kettle#9', url: null }];
   expect(await prFacts(db, half, two)).toEqual({ 'kettle#9': { lines: 5, stacked: false } });
-  expect(Object.keys(JSON.parse(queryRow(db, `SELECT value FROM meta WHERE key = 'stats_pr_facts_v2'`, z.object({ value: z.string() })).value))).not.toContain('kettle#8');
+  const stored = queryValue(db, `SELECT value FROM meta WHERE key = 'stats_pr_facts_v2'`, z.string());
+  const keptFacts = z.record(z.string(), z.unknown()).parse(JSON.parse(stored));
+
+  expect(Object.keys(keptFacts)).not.toContain('kettle#8');
 });
 
 test('a run whose last merge falls outside the window, or a dropped or unfinished run, is left out', () => {

@@ -601,7 +601,10 @@ test('hq run add refuses a session id given as a second word, and stores the run
   const stored = await hq('run', 'add', 'GEO-9701', '--session', '9701ab0c-0000-4000-8000-00000000beef', '--title', 'Invented kettle work', '--where', 'none');
   expect([refused.code, refused.json.error.message]).toEqual([1, 'hq run add takes one issue: pass the session as --session 9701ab0c-0000-4000-8000-00000000beef']);
   expect(remaining.json.runs).toEqual([]);
-  expect(z.array(z.object({ session_id: z.string() })).parse(stored.json.run.sessions).map((x) => x.session_id)).toEqual(['9701ab0c-0000-4000-8000-00000000beef']);
+  const sessionSchema = z.object({ session_id: z.string() });
+  const run = z.object({ run: z.object({ sessions: z.array(sessionSchema) }) }).parse(stored.json);
+
+  expect(run.run.sessions.map((session) => session.session_id)).toStrictEqual(['9701ab0c-0000-4000-8000-00000000beef']);
 });
 
 test('#run add names hq run session --add for a --session it ignores on a run already on the board', async () => {
@@ -862,7 +865,10 @@ test('hq whois names the fleet session hq fleet saw under an id, and null for an
 
 test('hq band --json gives the segments the band mod draws, by the mod\'s own check', async () => {
   const shown = await hq('band');
-  expect([shown.code, z.object({ segments: z.array(z.object({ key: z.string() })) }).parse(shown.json.band).segments.map((segment) => segment.key), isSegmentList(shown.json.band.segments)]).toStrictEqual([0, ['needs', 'nix', 'lanes', 'ci', 'reviews'], true]);
+  const segmentSchema = z.looseObject({ key: z.string() });
+  const segments = z.object({ band: z.object({ segments: z.array(segmentSchema) }) }).parse(shown.json).band.segments;
+
+  expect([shown.code, segments.map((segment) => segment.key), isSegmentList(segments)]).toStrictEqual([0, ['needs', 'nix', 'lanes', 'ci', 'reviews'], true]);
 });
 
 test('hq pane --json gives Markdown and a heat map the pane draws, by the mod\'s own check', async () => {

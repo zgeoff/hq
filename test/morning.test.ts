@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test';
 import type { Database } from 'bun:sqlite';
 import { z } from 'zod';
+import { OutboxRowSchema } from '../src/test-utils/outbox-row-schema.ts';
 import { queryRows } from '../src/test-utils/query-rows.ts';
 import { morningCheck } from '../src/morning/morning-check.ts';
 import { morningText } from '../src/morning/morning-text.ts';
@@ -20,7 +21,8 @@ const syd = (date: string, hm: string) => {
   const [h, mi] = hm.split(':').map(Number);
   return sydneyUtc(y!, mo!, d!, h!, mi!);
 };
-const outbox = () => queryRows(db, 'SELECT target, text, status, topic FROM outbox', z.object({ target: z.string(), text: z.string(), status: z.string(), topic: z.string() }));
+// oxlint-disable-next-line zgeoff/setup-test-only, zgeoff/no-top-level-arrow -- this file's shared beforeEach state is GEO-1318's lint debt
+const outbox = () => queryRows(db, 'SELECT target, text, status, topic FROM outbox', OutboxRowSchema);
 
 beforeEach(() => {
   ({ db, cleanup } = freshDb());

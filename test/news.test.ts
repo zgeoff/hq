@@ -19,6 +19,7 @@ afterEach(() => cleanup());
 
 const item = (over: Partial<Parameters<typeof addNews>[1]> = {}) =>
   addNews(db, { from: 'z-delivery', topic: 'merge', text: 'Merged widgets#12: the kettle whistles once.', issue: 'GEO-9001', link: null, needsGeoff: false, ...over });
+// oxlint-disable-next-line zgeoff/setup-test-only, zgeoff/no-top-level-arrow -- this file's shared beforeEach state is GEO-1318's lint debt
 const outbox = () => queryRows(db, 'SELECT target, text FROM outbox', z.object({ target: z.string(), text: z.string() }));
 
 test('adding news sends nothing; the digest groups unread items by topic', () => {

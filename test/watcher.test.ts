@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test';
 import type { Database } from 'bun:sqlite';
 import { z } from 'zod';
-import { queryRows } from '../src/test-utils/query-rows.ts';
+import { queryColumn, queryRows } from '../src/test-utils/query-rows.ts';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { addPr } from '../src/runs/add-pr.ts';
 import { addRun } from '../src/runs/add-run.ts';
@@ -76,6 +76,7 @@ function deps(over: Partial<WatchDeps['steps']> = {}, run: Runner = capacity): W
   };
 }
 
+// oxlint-disable-next-line zgeoff/setup-test-only, zgeoff/no-top-level-arrow -- this file's shared beforeEach state is GEO-1318's lint debt
 const outbox = () => queryRows(db, 'SELECT target, text, topic FROM outbox ORDER BY id', z.object({ target: z.string(), text: z.string(), topic: z.string().nullable() }));
 
 test('a completed tick records its time', async () => {
@@ -331,7 +332,7 @@ test('it logs every run PR GitHub could not answer for, one line each', async ()
 });
 
 function readAlertStatuses(): string[] {
-  return queryRows(db, `SELECT status FROM outbox WHERE topic = 'watcher-stale'`, z.object({ status: z.string() })).map((r) => r.status);
+  return queryColumn(db, `SELECT status FROM outbox WHERE topic = 'watcher-stale'`, z.string());
 }
 
 test('an alert that failed while atc was down is sent once atc is back', async () => {

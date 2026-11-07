@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, test } from 'bun:test';
 import type { Database } from 'bun:sqlite';
 import { z } from 'zod';
 import { buildMockFetch } from '../src/test-utils/build-mock-fetch.ts';
-import { queryRows } from '../src/test-utils/query-rows.ts';
+import { queryColumn } from '../src/test-utils/query-rows.ts';
 import { toErrorMessage } from '../src/to-error-message.ts';
 import { issueOf } from '../src/kinds/issue-of.ts';
 import { kindOf } from '../src/kinds/kind-of.ts';
@@ -44,9 +44,9 @@ test.each<[string, ReturnType<typeof kindOf>]>([
   ['no prefix at all', 'other'],
   ['fixes: not a known kind', 'other'],
   ['fix an invented thing', 'other'],
-])('kind of %p is %p', (title, kind) => expect(kindOf(title)).toBe(kind));
+])('it reads the kind of %p as %p', (title, kind) => expect(kindOf(title)).toBe(kind));
 
-test.each([
+test.each<[string | null, string | null]>([
   ['Fixes GEO-12', 'GEO-12'],
   ['Related to GEO-3\nFixes: GEO-12', 'GEO-12'],
   ['Contributes to GEO-7, Related to GEO-3', 'GEO-7'],
@@ -54,7 +54,7 @@ test.each([
   ['Fixes geo-12', null],
   ['', null],
   [null, null],
-] as [string | null, string | null][])('issue of %p is %p', (body, issue) => expect(issueOf(body)).toBe(issue));
+])('it reads the issue of %p as %p', (body, issue) => expect(issueOf(body)).toBe(issue));
 
 function ghFake(byDay: Record<string, { repo: string; n: number; title: string; at: string; body?: string }[]>, calls: string[] = []): Runner {
   return async (cmd) => {
@@ -77,7 +77,7 @@ test('a past day is recorded once; today is fetched each time', async () => {
   );
   const r = await syncKinds(db, run, { from: new Date('2026-10-14T00:00:00Z'), maxDays: 10 });
   expect(r).toMatchObject({ days: ['2026-10-14', '2026-10-15', '2026-10-16'], prs: 2, left: 0 });
-  expect(queryRows(db, 'SELECT day FROM merged_pr_days ORDER BY day', z.object({ day: z.string() })).map((x) => x.day)).toEqual(['2026-10-14', '2026-10-15']);
+  expect(queryColumn(db, 'SELECT day FROM merged_pr_days ORDER BY day', z.string())).toStrictEqual(['2026-10-14', '2026-10-15']);
   expect(db.query('SELECT kind, issue FROM merged_prs WHERE number = 1').get()).toEqual({ kind: 'fix', issue: 'GEO-1' });
   calls.length = 0;
   await syncKinds(db, run, { from: new Date('2026-10-14T00:00:00Z'), maxDays: 10 });
@@ -208,7 +208,7 @@ test('Linear ids hq did not ask for are not stored; an inherited type name count
   db.query(`INSERT INTO merged_prs (repo, number, merged_at, title, kind, issue) VALUES ('atc', 1, '2026-10-12T00:00:00Z', 'fix: x', 'fix', 'GEO-5')`).run();
   const call: LinearCall = async () => ({ issues: { nodes: [node('GEO-5', 'Bug'), node('GEO-999', 'Bug')] } });
   await syncPrIssues(db, call);
-  expect(queryRows(db, 'SELECT issue FROM linear_issues ORDER BY issue', z.object({ issue: z.string() })).map((r) => r.issue)).toEqual(['GEO-5']);
+  expect(queryColumn(db, 'SELECT issue FROM linear_issues ORDER BY issue', z.string())).toStrictEqual(['GEO-5']);
   db.query(`UPDATE linear_issues SET type = 'constructor'`).run();
   const [w] = kindWeeks(db, 1);
   expect(w!.prTypes.none).toBe(1);
@@ -219,10 +219,8 @@ test('the key never reaches an error or hq.db, even when Linear echoes it', asyn
   forgetKey();
   process.env['OP_SERVICE_ACCOUNT_TOKEN'] = 'invented-token';
   const run: Runner = async () => ({ code: 0, stdout: `${KEY}\n`, stderr: '' });
-  const echo = buildMockFetch(async () => new Response(JSON.stringify({ errors: [{ message: `bad key ${KEY} sent` }, { message: 'also lin_api_OTHERinventedKEY' }] }), { status: 400 }));
-  const down = buildMockFetch(async () => {
-    throw new Error(`socket closed after ${KEY}`);
-  });
+  const echo = buildMockFetch(() => Promise.resolve(Response.json({ errors: [{ message: `bad key ${KEY} sent` }, { message: 'also lin_api_OTHERinventedKEY' }] }, { status: 400 })));
+  const down = buildMockFetch(() => Promise.reject(new Error(`socket closed after ${KEY}`)));
   try {
     for (const f of [echo, down]) {
       const err = await syncLinear(db, makeLinearCaller(run, f), new Date('2026-10-14T00:00:00Z')).catch((error: unknown) => error);
@@ -248,11 +246,11 @@ test('the key is cut from an op failure and a stored title, and a traced fetch i
     process.env['BUN_CONFIG_VERBOSE_FETCH'] = 'curl';
     const ok: Runner = async () => ({ code: 0, stdout: KEY, stderr: '' });
     let fetched = false;
-    const f = buildMockFetch(async () => {
+    const tracedFetch = buildMockFetch(() => {
       fetched = true;
-      return new Response('{}');
+      return Promise.resolve(new Response('{}'));
     });
-    await expect(makeLinearCaller(ok, f)('q', {})).rejects.toThrow('BUN_CONFIG_VERBOSE_FETCH');
+    await expect(makeLinearCaller(ok, tracedFetch)('q', {})).rejects.toThrow('BUN_CONFIG_VERBOSE_FETCH');
     expect(fetched).toBe(false);
   } finally {
     delete process.env['BUN_CONFIG_VERBOSE_FETCH'];

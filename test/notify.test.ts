@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { toExactOptional } from '@zgeoff/std';
 import type { Database } from 'bun:sqlite';
 import { z } from 'zod';
-import { queryRow, queryRows } from '../src/test-utils/query-rows.ts';
+import { queryRow, queryRows, queryValue } from '../src/test-utils/query-rows.ts';
 import { addAsk } from '../src/asks/add-ask.ts';
 import { socketPath } from '../src/atc/socket-path.ts';
 import { setMeta } from '../src/db/set-meta.ts';
@@ -106,7 +106,7 @@ test('HQ_NOTIFY=off leaves messages pending', async () => {
   process.env['HQ_NOTIFY'] = 'off';
   file('tidy-docs');
   expect((await flush(db)).skipped).toBe(true);
-  expect(queryRow(db, 'SELECT status FROM outbox', z.object({ status: z.string() })).status).toBe('pending');
+  expect(queryValue(db, 'SELECT status FROM outbox', z.string())).toBe('pending');
 });
 
 test('a ready notice for an item that left the queue before sending is dropped', async () => {
@@ -157,7 +157,7 @@ describe('inside an atc session', () => {
     expect(calls[0]?.cmd.findLast((a) => a.startsWith('--setenv=HQ_DB='))).toBe(`--setenv=HQ_DB=${process.env['HQ_DB']}`);
     expect(calls[0]?.cmd).toContain('--setenv=ATC_SESSION_ID=');
     expect(calls[0]?.opts?.env?.['ATC_SESSION_ID']).toBeUndefined();
-    expect(queryRow(db, 'SELECT status FROM outbox', z.object({ status: z.string() })).status).toBe('pending');
+    expect(queryValue(db, 'SELECT status FROM outbox', z.string())).toBe('pending');
   });
 
   test('sends inline when the unit cannot start', async () => {
@@ -234,11 +234,11 @@ test('a forward sends a retired session\'s messages to its successor, and moves 
   ]);
   const seq3 = logEvent(db, 'hq', 'probe', 'probe', 'z-q', null, null);
   enqueue(db, seq3, 'z-kettle', 'FYI three');
-  expect(queryRow(db, 'SELECT target FROM outbox ORDER BY id DESC LIMIT 1', z.object({ target: z.string() })).target).toBe('z-teapot');
+  expect(queryValue(db, 'SELECT target FROM outbox ORDER BY id DESC LIMIT 1', z.string())).toBe('z-teapot');
   expect(() => setForward(db, 'z-teapot', 'z-kettle')).toThrow('loop');
   setForward(db, 'z-kettle', null);
   enqueue(db, logEvent(db, 'hq', 'probe', 'probe', 'z-q', null, null), 'z-kettle', 'FYI four');
-  expect(queryRow(db, 'SELECT target FROM outbox ORDER BY id DESC LIMIT 1', z.object({ target: z.string() })).target).toBe('z-kettle');
+  expect(queryValue(db, 'SELECT target FROM outbox ORDER BY id DESC LIMIT 1', z.string())).toBe('z-kettle');
 });
 
 test('a long forward chain that closes a loop is refused', () => {

@@ -1,10 +1,15 @@
 import { z } from 'zod';
 import type { LinearCall } from '../src/linear/types.ts';
+import { reportIssueSchema } from '../src/shipped/report-issue-schema.ts';
 import type { ProjectIssue, ReportIssue } from '../src/shipped/types.ts';
 
 // The report fixtures write a priority as a number or as Linear's `{ value, name }`; GraphQL
 // answers the number.
-export type FakeIssue = Omit<ReportIssue, 'priority'> & { readonly priority: number | { readonly value: number; readonly name: string } };
+const FakePrioritySchema = z.union([z.number(), z.object({ value: z.number(), name: z.string() })]);
+
+export const FakeIssueSchema = reportIssueSchema.extend({ priority: FakePrioritySchema });
+
+export type FakeIssue =Omit<ReportIssue, 'priority'> & { readonly priority: number | { readonly value: number; readonly name: string } };
 
 export function makeLinearFake(issues: readonly FakeIssue[], projectIssues: readonly ProjectIssue[], asked: unknown[] = []): LinearCall {
   return (_query, variables) => {

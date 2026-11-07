@@ -24,7 +24,9 @@ test('an imp lane plan over impd\'s line opens the lanes:plan alert after 2 samp
     checkCapacity(ctx.db, { reading, plan: fits }, 'hq-lanes', new Date('2026-10-15T01:15:00Z')),
   ];
 
-  expect([ticks.map((tick) => [tick.opened, tick.cleared]), [...new Set(queryRows(ctx.db, 'SELECT text FROM outbox ORDER BY id', z.object({ text: z.string() })).map((row) => row.text))]]).toStrictEqual([
+  const texts = queryRows(ctx.db, 'SELECT text FROM outbox ORDER BY id', z.object({ text: z.string() })).map((row) => row.text);
+
+  expect([ticks.map((tick) => [tick.opened, tick.cleared]), [...new Set(texts)]]).toStrictEqual([
     [
       [[], []],
       [['lanes:plan'], []],

@@ -94,13 +94,37 @@ function readFeedStart(cursor: string): number {
   }
 }
 
-export function fakeAtc(dir: string, sessions = [
+const SpawnInputSchema = z.object({ name: z.string() });
+const PinInputSchema = z.object({ pinned: z.boolean().optional() });
+
+export function readSpawnedNames(atc: FakeAtc): string[] {
+  return atc.calls.filter((call) => call.method === 'session.spawn').map((call) => SpawnInputSchema.parse(call.input).name);
+}
+
+export function readCallPins(atc: FakeAtc): [string, boolean | undefined][] {
+  return atc.calls.map((call) => [call.method, PinInputSchema.parse(call.input).pinned]);
+}
+
+export interface FakeAtcSession {
+  id: string;
+  name: string;
+  alive: boolean;
+  state: string;
+  agentSessionID?: string;
+  pinned?: boolean;
+  cwd?: string;
+  createdAt?: number;
+  agent?: string;
+  locator?: { targetID: string };
+}
+
+export function fakeAtc(directory: string, sessions: FakeAtcSession[] = [
   { id: 'id-stu', name: 'z-stu', alive: true, state: 'done' },
   { id: 'id-refine', name: 'z-refine', alive: true, state: 'done' },
   { id: 'id-steward', name: 'z-steward', alive: true, state: 'done' },
   { id: 'id-delivery', name: 'z-delivery', alive: true, state: 'done' },
 ]): FakeAtc {
-  const path = join(dir, 'atc.sock');
+  const path = join(directory, 'atc.sock');
   const sent: FakeAtc['sent'] = [];
   const seen = new Map<string, string>();
   const feed: FeedEvent[] = [];
