@@ -14,7 +14,9 @@ import { flush } from '../outbox/flush.ts';
 import { readOutboxRows } from '../outbox/read-outbox-rows.ts';
 import { logEvent } from '../log-event.ts';
 import { resetFetchCache } from '../prompts/reset-fetch-cache.ts';
-import { FOUR_AM_SYDNEY, NOON_SYDNEY, at, createDefsRepo, fakeAtc, freshDb, readCallPins, readSpawnedNames } from '../../test/helpers.ts';
+import { readCallPins } from '../test-utils/read-call-pins.ts';
+import { readSpawnedNames } from '../test-utils/read-spawned-names.ts';
+import { FOUR_AM_SYDNEY, NOON_SYDNEY, at, createDefsRepo, fakeAtc, freshDb } from '../../test/helpers.ts';
 
 interface RosterSession {
   id: string;

@@ -94,17 +94,6 @@ function readFeedStart(cursor: string): number {
   }
 }
 
-const SpawnInputSchema = z.object({ name: z.string() });
-const PinInputSchema = z.object({ pinned: z.boolean().optional() });
-
-export function readSpawnedNames(atc: FakeAtc): string[] {
-  return atc.calls.filter((call) => call.method === 'session.spawn').map((call) => SpawnInputSchema.parse(call.input).name);
-}
-
-export function readCallPins(atc: FakeAtc): [string, boolean | undefined][] {
-  return atc.calls.map((call) => [call.method, PinInputSchema.parse(call.input).pinned]);
-}
-
 export interface FakeAtcSession {
   id: string;
   name: string;
