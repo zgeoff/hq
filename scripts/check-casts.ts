@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import { z } from 'zod';
 import { parseJSON } from '../src/noslop/parse-json.ts';
+import { TYPE_AWARE_ARGS, UNSAFE_PREFIX, UNSAFE_RULES } from './unsafe-rules.ts';
 
 const rowSchema = z.object({ code: z.string() });
 const reportSchema = z.object({ diagnostics: z.array(rowSchema) });
@@ -16,8 +17,6 @@ interface Counts {
 }
 
 const CAST_CODE = 'typescript(consistent-type-assertions)';
-const UNSAFE_PREFIX = 'typescript(no-unsafe-';
-const UNSAFE_RULES = ['assignment', 'member-access', 'argument', 'call', 'return'] as const;
 const PATHS = ['src', 'test', 'scripts'];
 
 export function collectCounts(plain: readonly Row[], typeAware: readonly Row[]): Counts {
@@ -54,8 +53,7 @@ function readRows(args: readonly string[]): readonly Row[] {
 }
 
 export function runCheckCasts(): number {
-  const unsafeFlags = UNSAFE_RULES.flatMap((rule) => ['-D', `typescript/no-unsafe-${rule}`]);
-  const counts = collectCounts(readRows([]), readRows(['--type-aware', '-A', 'all', ...unsafeFlags]));
+  const counts = collectCounts(readRows([]), readRows(TYPE_AWARE_ARGS));
   for (const line of formatCounts(counts)) {
     console.log(line);
   }

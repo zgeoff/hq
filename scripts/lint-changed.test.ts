@@ -216,13 +216,13 @@ test('it enables only the five no-unsafe rules in the type-aware run', () => {
     '-D',
     'typescript/no-unsafe-assignment',
     '-D',
-    'typescript/no-unsafe-argument',
-    '-D',
-    'typescript/no-unsafe-return',
-    '-D',
     'typescript/no-unsafe-member-access',
     '-D',
+    'typescript/no-unsafe-argument',
+    '-D',
     'typescript/no-unsafe-call',
+    '-D',
+    'typescript/no-unsafe-return',
     'src/kettle.ts',
   ]);
 });

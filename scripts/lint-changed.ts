@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { z } from 'zod';
 import { probeImportBase } from './probe-import-base.ts';
 import { readDiff } from './read-diff.ts';
+import { TYPE_AWARE_ARGS, UNSAFE_PREFIX } from './unsafe-rules.ts';
 
 const labelSchema = z.object({ span: z.object({ line: z.number() }) });
 const diagnosticSchema = z.object({ code: z.string(), filename: z.string(), labels: z.array(labelSchema), message: z.string() });
@@ -146,16 +147,13 @@ function runCommand(command: string, args: readonly string[]): string {
   return result.stdout;
 }
 
-const UNSAFE_PREFIX = 'typescript(no-unsafe-';
-const UNSAFE_RULES = ['assignment', 'argument', 'return', 'member-access', 'call'] as const;
-
 // -A all leaves the JS-plugin rules on, so the type-aware report repeats the plain run's findings; collectReported drops them.
 export function buildLintArgs(files: readonly string[], typeAware: boolean): string[] {
   const base = ['oxlint', '--format', 'json'];
   if (!typeAware) {
     return [...base, ...files];
   }
-  return [...base, '--type-aware', '-A', 'all', ...UNSAFE_RULES.flatMap((rule) => ['-D', `typescript/no-unsafe-${rule}`]), ...files];
+  return [...base, ...TYPE_AWARE_ARGS, ...files];
 }
 
 export function collectReported(plain: readonly Diagnostic[], typeAware: readonly Diagnostic[]): readonly Diagnostic[] {
