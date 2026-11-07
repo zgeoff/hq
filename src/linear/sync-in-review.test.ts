@@ -52,11 +52,12 @@ test('it asks Linear for the In Review state by name, 50 issues a page, and foll
   expect(queries[0]).toContain('filter: { state: { name: { eq: "In Review" } } }');
 });
 
-const call = () => Promise.resolve({ issues: { nodes: [], pageInfo: { hasNextPage: true, endCursor: 'c' } } });
-
 test('it rejects when more than 40 pages are In Review, and keeps the earlier rows', async () => {
   const ctx = setupTest();
   ctx.db.query("INSERT INTO linear_in_review (issue, updated_at, fetched_at) VALUES ('GEO-9800', '2026-10-14T07:00:00Z', '2026-10-15T07:00:00Z')").run();
+  const never = { issues: { nodes: [], pageInfo: { hasNextPage: true, endCursor: 'c' } } };
+  const call = () => Promise.resolve(never);
+
   await expect(syncInReview(ctx.db, call, new Date('2026-10-16T07:00:00Z'))).rejects.toThrow(/more than 2000 issues In Review/u);
   expect(ctx.readRows()).toStrictEqual([{ issue: 'GEO-9800', updated_at: '2026-10-14T07:00:00Z', fetched_at: '2026-10-15T07:00:00Z' }]);
 });
