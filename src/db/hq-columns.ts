@@ -245,6 +245,8 @@ export const HQ_COLUMNS = {
     confirm: 'integer',
     patch_id: 'text?',
     base_move: 'integer',
+    adapter: { values: ['codex', 'claude'], nullable: true },
+    adapter_source: { values: ['flag', 'setting', 'default'], nullable: true },
   },
   outages: {
     id: 'integer',
