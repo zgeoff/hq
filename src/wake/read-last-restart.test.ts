@@ -2,13 +2,13 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { overrideEnv } from '../config/override-env.ts';
+import { updateEnv } from '@zgeoff/testing/helpers';
 import { readLastRestart } from './read-last-restart.ts';
 
 function setupTest() {
   const directory = mkdtempSync(join(tmpdir(), 'hq-last-restart-'));
   onTestFinished(() => rmSync(directory, { recursive: true, force: true }));
-  onTestFinished(overrideEnv('HQ_ATC_STATE', directory));
+  updateEnv('HQ_ATC_STATE', directory);
   return {
     writeRecord: (text: string) => {
       mkdirSync(join(directory, 'restarts'), { recursive: true });
