@@ -11,7 +11,7 @@
         "@orpc/tanstack-query": "1.16.1",
         "@tanstack/react-query": "5.105.0",
         "@tanstack/react-router": "1.170.46",
-        "@zgeoff/kysely-bun-sqlite": "0.3.1",
+        "@zgeoff/kysely-bun-sqlite": "0.3.2",
         "@zgeoff/std": "0.4.3",
         "geist": "1.9.0",
         "kysely": "0.29.7",
@@ -486,7 +486,7 @@
 
     "@zgeoff/diet": ["@zgeoff/diet@0.2.2", "", { "bin": { "diet": "diet.sh" } }, "sha512-zrToDuLnJJGeSxYOvrydH+AlWdtITX4zNENeVh8Y56e1qbSMZl9UNvIp9x4kcs/dMguQW5ihuAupnqngFBYJ4w=="],
 
-    "@zgeoff/kysely-bun-sqlite": ["@zgeoff/kysely-bun-sqlite@0.3.1", "", { "peerDependencies": { "kysely": ">=0.29.5 <0.30.0" } }, "sha512-Dz1Q+f7FvrjL9++65x+W2vz6vU/NAXB3nCg3aTZKLq0keCb7wkJaXE1M4XUT7QVzvj+Yg5vpmtLvzScN7K3Yxg=="],
+    "@zgeoff/kysely-bun-sqlite": ["@zgeoff/kysely-bun-sqlite@0.3.2", "", { "peerDependencies": { "kysely": ">=0.29.5 <0.30.0" } }, "sha512-vPVzoBWIDXrO6VCfHY8XJSCTnRlTgW078HtyjrVSQP9grT8UswGlad2CP+G8D0GzQLfDRwpRWqqsg4LgxgNRoA=="],
 
     "@zgeoff/oxlint-config": ["@zgeoff/oxlint-config@0.10.2", "", { "dependencies": { "@stylistic/eslint-plugin": "5.10.0" }, "peerDependencies": { "oxlint": ">=1.78.0" } }, "sha512-vfcft4AlI7JOt6Eo++5wGo9I/Okabu90+a66ujMKgRCUgijkqt0Aa8XLI4Ji+NCnIUAdNLs224KbY7LdyebcOg=="],
 
