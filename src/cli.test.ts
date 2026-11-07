@@ -1,4 +1,3 @@
-import type { Database } from 'bun:sqlite';
 import { expect, mock, onTestFinished, spyOn, test } from 'bun:test';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -35,26 +34,23 @@ import { buildReadyIssue } from '../test/build-ready-issue.ts';
 import { buildStubFinalGH } from '../test/build-stub-final-gh.ts';
 import { buildStubBriefGH } from '../test/build-stub-brief-gh.ts';
 
-function setupTest(billing: string): Database {
+function setupTest() {
   const fresh = freshDb();
   const log = console.log;
-  const path0 = process.env['PATH'];
-  const stubBin = `${fresh.dir}/bin`;
+  const lines: string[] = [];
+  const bin = `${fresh.dir}/bin`;
   onTestFinished(fresh.cleanup);
-  onTestFinished(overrideEnv('HQ_NOW', NOON_SYDNEY));
-  onTestFinished(overrideEnv('HQ_NOTIFY', 'off'));
-  console.log = () => {};
+  updateEnv('HQ_NOW', NOON_SYDNEY);
+  updateEnv('HQ_NOTIFY', 'off');
+  console.log = (line: string) => void lines.push(line);
   onTestFinished(() => (console.log = log));
-  mkdirSync(stubBin);
-  writeFileSync(`${stubBin}/gh`, ['#!/bin/sh', 'case "$*" in', `  *settings/billing/usage*) ${billing} ;;`, '  "repo "*) echo "[]" ;;', '  *) echo \'[{"total_count":0,"incomplete_results":false,"items":[]}]\' ;;', 'esac', ''].join('\n'));
-  chmodSync(`${stubBin}/gh`, 0o755);
-  process.env['PATH'] = `${stubBin}:${path0}`;
-  onTestFinished(() => (process.env['PATH'] = path0));
-  return fresh.db;
+  mkdirSync(bin);
+  updateEnv('PATH', `${bin}:${process.env['PATH'] ?? ''}`);
+  return { db: fresh.db, directory: fresh.dir, bin, lines };
 }
 
 test('it reports the plan for an oversized role file in hq state trim --dry-run', async () => {
-  setupTest('true');
+  setupTest();
   const directory = mkdtempSync(join(tmpdir(), 'hq-state-cli-'));
   onTestFinished(() => rmSync(directory, { recursive: true, force: true }));
   onTestFinished(overrideEnv('HQ_STATE_DIR', directory));
@@ -77,7 +73,7 @@ test('it reports the plan for an oversized role file in hq state trim --dry-run'
 });
 
 test('it changes no file in hq state trim --dry-run', async () => {
-  setupTest('true');
+  setupTest();
   const directory = mkdtempSync(join(tmpdir(), 'hq-state-cli-'));
   onTestFinished(() => rmSync(directory, { recursive: true, force: true }));
   onTestFinished(overrideEnv('HQ_STATE_DIR', directory));
@@ -92,18 +88,22 @@ test('it changes no file in hq state trim --dry-run', async () => {
 });
 
 test("hq goals sync stores the month's Actions spend from GitHub billing", async () => {
-  const db = setupTest(`echo '{"usageItems":[{"product":"actions","netAmount":12.5}]}'`);
+  const ctx = setupTest();
+  writeFileSync(`${ctx.bin}/gh`, ['#!/bin/sh', 'case "$*" in', `  *settings/billing/usage*) echo '{"usageItems":[{"product":"actions","netAmount":12.5}]}' ;;`, '  "repo "*) echo "[]" ;;', '  *) echo \'[{"total_count":0,"incomplete_results":false,"items":[]}]\' ;;', 'esac', ''].join('\n'));
+  chmodSync(`${ctx.bin}/gh`, 0o755);
   await main(['goals', 'sync', '--days', '1', '--json']);
 
-  expect(loadActionsSpend(db, new Date(NOON_SYDNEY))).toBe(12.5);
+  expect(loadActionsSpend(ctx.db, new Date(NOON_SYDNEY))).toBe(12.5);
 });
 
 test('hq goals sync replaces an earlier good Actions spend with unknown when gh fails', async () => {
-  const db = setupTest(`echo 'HTTP 403' >&2; exit 1`);
-  setMeta(db, 'actions_spend', JSON.stringify({ at: '2026-10-14T00:50:00Z', month: '2026-10', net: 4 }));
+  const ctx = setupTest();
+  writeFileSync(`${ctx.bin}/gh`, ['#!/bin/sh', 'case "$*" in', `  *settings/billing/usage*) echo 'HTTP 403' >&2; exit 1 ;;`, '  "repo "*) echo "[]" ;;', '  *) echo \'[{"total_count":0,"incomplete_results":false,"items":[]}]\' ;;', 'esac', ''].join('\n'));
+  chmodSync(`${ctx.bin}/gh`, 0o755);
+  setMeta(ctx.db, 'actions_spend', JSON.stringify({ at: '2026-10-14T00:50:00Z', month: '2026-10', net: 4 }));
   await main(['goals', 'sync', '--days', '1', '--json']);
 
-  expect(loadActionsSpend(db, new Date(NOON_SYDNEY))).toBeNull();
+  expect(loadActionsSpend(ctx.db, new Date(NOON_SYDNEY))).toBeNull();
 });
 
 test('it warns in hq lanes status when the checkout lanes.json differs from the build', async () => {
@@ -876,16 +876,11 @@ test('hq capacity --refresh-slots reads the three slots through op and prints th
 });
 
 test("it reads the broker slot's fleet-vault token in hq capacity broker after a refresh when the proof is more than 24 h old", async () => {
-  const fresh = freshDb();
-  const log = console.log;
-  const lines: string[] = [];
-  const settings = `${fresh.dir}/settings.local.json`;
-  onTestFinished(fresh.cleanup);
-  onTestFinished(overrideEnv('HQ_NOW', NOON_SYDNEY));
-  onTestFinished(overrideEnv('HQ_SLOTS_OP_SETTINGS', settings));
-  onTestFinished(() => (console.log = log));
-  const op = createStubOp({
-    directory: fresh.dir,
+  const ctx = setupTest();
+  const settings = `${ctx.directory}/settings.local.json`;
+  updateEnv('HQ_SLOTS_OP_SETTINGS', settings);
+  createStubOp({
+    directory: ctx.directory,
     answers: {
       'op://fleet/claude-setup-token-1/credential': 'sk-ant-kettle-fleet-1',
       'op://fleet/claude-setup-token-2/credential': 'sk-ant-kettle-fleet-2',
@@ -895,9 +890,8 @@ test("it reads the broker slot's fleet-vault token in hq capacity broker after a
       'op://claude-slots/claude-setup-token-3/credential': 'sk-ant-kettle-old-3',
     },
   });
-  onTestFinished(overrideEnv('PATH', `${op.bin}:${process.env['PATH']}`));
   writeFileSync(settings, JSON.stringify({ env: { OP_SERVICE_ACCOUNT_TOKEN: 'ops_kettle-profile-0001' } }));
-  writeBrokerSlot(fresh.db, { slot: '2', proof: 'req-7c8d', note: undefined, actor: 'z-release', at: new Date('2026-10-12T19:00:00Z') });
+  writeBrokerSlot(ctx.db, { slot: '2', proof: 'req-7c8d', note: undefined, actor: 'z-release', at: new Date('2026-10-12T19:00:00Z') });
   slotUsage.set('Bearer sk-ant-kettle-fleet-1', { seven: { utilization: 0.4, reset: 1_792_540_800 } });
   slotUsage.set('Bearer sk-ant-kettle-fleet-2', { seven: { utilization: 0.4, reset: 1_792_540_800 } });
   slotUsage.set('Bearer sk-ant-kettle-fleet-3', { seven: { utilization: 0.4, reset: 1_792_540_800 } });
@@ -905,11 +899,10 @@ test("it reads the broker slot's fleet-vault token in hq capacity broker after a
   slotUsage.set('Bearer sk-ant-kettle-old-2', { seven: { utilization: 0.97, reset: 1_792_540_800 } });
   slotUsage.set('Bearer sk-ant-kettle-old-3', { seven: { utilization: 0.97, reset: 1_792_540_800 } });
   await main(['capacity', '--refresh-slots']);
-  console.log = (line: string) => lines.push(line);
 
   await main(['capacity', 'broker', '--json']);
 
-  expect(JSON.parse(lines.join('\n')).broker).toStrictEqual({ state: 'read', slot: 2, proof: 'req-7c8d', proofAgeHours: 30, used: 40, resetsAt: '2026-10-21T00:00:00Z', readAt: '2026-10-14T01:00:00Z' });
+  expect(JSON.parse(ctx.lines.at(-1) ?? '{}').broker).toStrictEqual({ state: 'read', slot: 2, proof: 'req-7c8d', proofAgeHours: 30, used: 40, resetsAt: '2026-10-21T00:00:00Z', readAt: '2026-10-14T01:00:00Z' });
 });
 
 test("it reads the slot token from hq's own file under ~/.config/hq by default for hq capacity --refresh-slots", async () => {
