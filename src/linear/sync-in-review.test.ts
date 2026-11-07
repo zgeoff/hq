@@ -1,5 +1,6 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { freshDb } from '../../test/helpers.ts';
+import { makePagedLinearCall } from '../../test/make-paged-linear-call.ts';
 import { makeThroughputLinearCall } from '../../test/make-throughput-linear-call.ts';
 import { syncInReview } from './sync-in-review.ts';
 
@@ -34,16 +35,7 @@ test('it stores each In Review issue with its update time and replaces them on t
 test('it asks Linear for the In Review state by name, 50 issues a page, and follows the cursor', async () => {
   const ctx = setupTest();
   const queries: string[] = [];
-  const call = (query: string, variables: Record<string, unknown>) => {
-    queries.push(query);
-    const first = variables['after'] === null;
-    return Promise.resolve({
-      issues: {
-        nodes: [{ identifier: first ? 'GEO-9801' : 'GEO-9802', updatedAt: '2026-10-14T07:00:00Z' }],
-        pageInfo: { hasNextPage: first, endCursor: first ? 'c1' : null },
-      },
-    });
-  };
+  const call = makePagedLinearCall([[{ identifier: 'GEO-9801', updatedAt: '2026-10-14T07:00:00Z' }], [{ identifier: 'GEO-9802', updatedAt: '2026-10-14T07:00:00Z' }]], queries);
 
   const count = await syncInReview(ctx.db, call, new Date('2026-10-16T07:00:00Z'));
   expect(count).toBe(2);
