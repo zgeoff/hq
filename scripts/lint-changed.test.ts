@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { isChanged, parseChanges } from './lint-changed.ts';
+import { buildLintArgs, collectReported, isChanged, parseChanges } from './lint-changed.ts';
 
 const DIFF = [
   'diff --git a/src/kettle.ts b/src/kettle.ts',
@@ -199,4 +199,37 @@ describe('moved lines', () => {
     expect(isChanged(buildDiagnostic('src/teapot.ts', 9), refund)).toBe(true);
     expect([10, 11, 12].map((line) => isChanged(buildDiagnostic('src/teapot.ts', line), refund))).toStrictEqual([false, false, false]);
   });
+});
+
+test('it lints the files of the plain run with every rule the config enables', () => {
+  expect(buildLintArgs(['src/kettle.ts'], false)).toStrictEqual(['oxlint', '--format', 'json', 'src/kettle.ts']);
+});
+
+test('it enables only the five no-unsafe rules in the type-aware run', () => {
+  expect(buildLintArgs(['src/kettle.ts'], true)).toStrictEqual([
+    'oxlint',
+    '--format',
+    'json',
+    '--type-aware',
+    '-A',
+    'all',
+    '-D',
+    'typescript/no-unsafe-assignment',
+    '-D',
+    'typescript/no-unsafe-member-access',
+    '-D',
+    'typescript/no-unsafe-argument',
+    '-D',
+    'typescript/no-unsafe-call',
+    '-D',
+    'typescript/no-unsafe-return',
+    'src/kettle.ts',
+  ]);
+});
+
+test('it reports a plugin finding once when both runs return it, and keeps the type-aware no-unsafe finding', () => {
+  const plugin = { code: 'zgeoff(test-shape)', filename: 'src/kettle.ts', labels: [{ span: { line: 3 } }], message: 'no loops' };
+  const unsafe = { code: 'typescript(no-unsafe-call)', filename: 'src/kettle.ts', labels: [{ span: { line: 4 } }], message: 'unsafe call' };
+
+  expect(collectReported([plugin], [plugin, unsafe])).toStrictEqual([plugin, unsafe]);
 });
