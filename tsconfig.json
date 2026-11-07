@@ -18,6 +18,7 @@
     "src",
     "test",
     "mocks",
+    "scripts/grants.ts",
     "scripts/lint-changed.ts",
     "scripts/lint-changed.test.ts",
     "scripts/check",
