@@ -133,7 +133,9 @@ each issue:
    - Otherwise, comment on the issue which items remain and who owns each. Message `z-release` each
      failure as a production bug. File each item that needs the owner with
      `hq unblock add --task '<the step>' --id qa-geo-<n>-<k> --notify z-qa`, where `<k>` counts the
-     issue's steps from 1. Leave out `--done-when`: the issue closes only after the step is done.
+     issue's steps from 1. Leave out `--done-when`, though owner-calls asks for it on each step.
+     The condition `issue:GEO-n` closes the step only when the issue closes, and here the issue
+     closes only after the step is done.
 
    Keep the check's line in `qa.md` while an item remains, with each step's id in it. hq messages
    you when a step is marked done, and `z-release` tells you when a fix ships. Then check that

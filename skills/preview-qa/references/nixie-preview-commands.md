@@ -9,8 +9,8 @@ run a runbook command on the cloud host itself.
   `enrol` logs instead, as step 3 of [Take a check](../SKILL.md#take-a-check) says.
 - Run the API check from its step 2 to its last step in one call. Each call starts a new shell, so
   `origin`, `token` and `sent` are gone in the next one, and another enrol uses up another sign-in
-  code. Where the check says to repeat a step, write a loop that waits 5 seconds between tries and
-  stops after 5 minutes.
+  code. Where the check says to repeat a read, write a loop that waits 5 seconds between tries and
+  stops after 5 minutes. Never put a `conversation/send` in a loop: each one is a model turn.
 - Keep `-i` on `podman exec` in step 2. Without it, the commands never reach the imp, and the line
   prints nothing.
 - Keep the quotes on `'EOF'`. Then your shell passes each `$` and each quote to the imp unchanged.
