@@ -24,11 +24,27 @@ export function loadImpRoom(db: Database, size: ImpSize, at: Date = now()): ImpR
     db.query('SELECT at, nonnix_awake_mib, nonnix_awake_vcpus, nix_awake_mib, impd_budget_mib, impd_priority_kept_mib FROM capacity_samples WHERE at <= ? ORDER BY at DESC LIMIT 1').get(iso(at)),
   );
   const settings = capacitySettings(db);
-  if (reading === null || reading.nonnix_awake_mib === null || reading.nonnix_awake_vcpus === null || at.getTime() - Date.parse(reading.at) > FRESH_MIN * 60_000) {
-    return { slots: 0, heldBy: 'no fresh impd reading', line: null, budget: null };
+  if (
+    reading === null ||
+    reading.nonnix_awake_mib === null ||
+    reading.nonnix_awake_vcpus === null ||
+    reading.nix_awake_mib === null ||
+    reading.impd_budget_mib === null ||
+    reading.impd_priority_kept_mib === null ||
+    at.getTime() - Date.parse(reading.at) > FRESH_MIN * 60_000
+  ) {
+    return { slots: 0, heldBy: 'no fresh impd reading', line: null };
   }
-  const budget = reading.impd_budget_mib === null || reading.nix_awake_mib === null ? null : { budgetMib: reading.impd_budget_mib, nixAwakeMib: reading.nix_awake_mib, keptMib: reading.impd_priority_kept_mib ?? 0 };
-  return buildLineRoom({ awakeMib: reading.nonnix_awake_mib, maxMib: settings.nonnixMaxMib, awakeVcpus: reading.nonnix_awake_vcpus, maxVcpus: settings.nonnixMaxVcpus }, budget, { ...size, impVcpus: settings.impVcpus });
+  const line = {
+    awakeMib: reading.nonnix_awake_mib,
+    maxMib: settings.nonnixMaxMib,
+    awakeVcpus: reading.nonnix_awake_vcpus,
+    maxVcpus: settings.nonnixMaxVcpus,
+    budgetMib: reading.impd_budget_mib,
+    nixAwakeMib: reading.nix_awake_mib,
+    keptMib: reading.impd_priority_kept_mib,
+  };
+  return buildLineRoom(line, { ...size, impVcpus: settings.impVcpus });
 }
 
 interface ImpSize {
@@ -36,14 +52,14 @@ interface ImpSize {
   impMib: number;
 }
 
-function buildLineRoom(line: NonNullable<ImpRoom['line']>, budget: ImpRoom['budget'], size: ImpSize & { impVcpus: number }): ImpRoom {
+function buildLineRoom(line: NonNullable<ImpRoom['line']>, size: ImpSize & { impVcpus: number }): ImpRoom {
   const memorySlots = slotsIn(line.maxMib - line.awakeMib, size.impMib);
   const vcpuSlots = slotsIn(line.maxVcpus - line.awakeVcpus, size.impVcpus);
-  const impdRoomMib = budget === null ? Infinity : budget.budgetMib - line.awakeMib - budget.nixAwakeMib;
+  const impdRoomMib = line.budgetMib - line.awakeMib - line.nixAwakeMib;
   const lineSlots = Math.min(size.budgetSlots, memorySlots, vcpuSlots);
   const unkeptSlots = Math.min(lineSlots, slotsIn(impdRoomMib, size.impMib));
-  const wholeSlots = Math.min(unkeptSlots, slotsIn(impdRoomMib - (budget?.keptMib ?? 0), size.impMib));
-  const room = { slots: wholeSlots, line, budget };
+  const wholeSlots = Math.min(unkeptSlots, slotsIn(impdRoomMib - line.keptMib, size.impMib));
+  const room = { slots: wholeSlots, line };
   if (wholeSlots === size.budgetSlots) {
     return { ...room, heldBy: 'imp budget or provider quota' };
   }
