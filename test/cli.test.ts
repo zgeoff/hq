@@ -709,6 +709,18 @@ test('hq run state refuses --check given twice, and leaves the run as it was', a
   expect(shown.json.run.state).toBe('working');
 });
 
+test('it refuses a --check other than owed or none on hq run state, and leaves the run as it was', async () => {
+  await hq('run', 'add', 'GEO-14', '--title', 'Invented kettle work', '--where', 'none');
+
+  const refused = await hq('run', 'state', 'GEO-14', 'deploying', '--check', 'maybe');
+  const shown = await hq('run', 'show', 'GEO-14');
+
+  const shownRun = z.object({ run: z.object({ state: z.string() }) }).parse(shown.json).run;
+
+  expect(refused).toStrictEqual({ code: 1, json: { ok: false, error: { code: 'bad_args', message: '--check must be owed or none' } } });
+  expect(shownRun.state).toBe('working');
+});
+
 test('hq pr override refuses --check given twice', async () => {
   const refused = await hq('pr', 'override', 'widgets', '7', '--check', 'preview', '--check', 'test', '--source', 'chat:kettle-12', '--note', 'Rebased.');
 
