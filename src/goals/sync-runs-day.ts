@@ -1,4 +1,5 @@
 import type { Database } from 'bun:sqlite';
+import { z } from 'zod';
 import { now } from '../clock/now.ts';
 import { HqError } from '../errors.ts';
 import type { RunOpts, Runner } from '../runner/types.ts';
@@ -8,17 +9,20 @@ import { NAME } from './name.ts';
 import { toUTCDay } from './to-utc-day.ts';
 import { upsertGoalDay } from './upsert-goal-day.ts';
 
-interface Run {
-  id: number;
-  path: string;
-  event: string;
-  status: string;
-  conclusion: string | null;
-  run_attempt: number;
-  created_at: string;
-  run_started_at: string | null;
-  updated_at: string;
-}
+const RunSchema = z.object({
+  id: z.number().int().safe().positive(),
+  path: z.string(),
+  event: z.string(),
+  status: z.string(),
+  conclusion: z.string().nullable(),
+  run_attempt: z.number().int().safe().min(1),
+  created_at: z.string().regex(ISO_Z),
+  run_started_at: z.string().regex(ISO_Z).nullable(),
+  updated_at: z.string().regex(ISO_Z),
+});
+const RunListSchema = z.object({ total_count: z.number().int().safe().min(0), workflow_runs: z.array(z.unknown()) });
+
+type Run = z.output<typeof RunSchema>;
 
 // The API lists at most 1000 runs per query, so a busier window is split in half, down to one hour
 // (nixie ran 1,277 on 2026-10-16).
@@ -31,20 +35,31 @@ export async function syncRunsDay(db: Database, run: Runner, repo: string, day: 
     const range = `${stamp(from)}..${stamp(to - 1000)}`;
     const got: Run[] = [];
     for (let page = 1; page <= 10; page++) {
-      const j = (await readGhJSON(run, ['api', `repos/zgeoff/${repo}/actions/runs?created=${range}&per_page=100&page=${page}`], env, `runs of ${repo} on ${day}`)) as { total_count?: unknown; workflow_runs?: unknown };
-      if (!Array.isArray(j.workflow_runs) || !Number.isSafeInteger(j.total_count) || (j.total_count as number) < 0) throw new HqError('command_failed', `runs of ${repo} on ${day}: not a run list`);
-      if ((j.total_count as number) > 1000) {
-        if (to - from <= HOUR) throw new HqError('too_many', `${repo} has ${j.total_count} runs in the hour from ${stamp(from)}, more than the API lists; not recorded`);
+      const body = await readGhJSON(run, ['api', `repos/zgeoff/${repo}/actions/runs?created=${range}&per_page=100&page=${page}`], env, `runs of ${repo} on ${day}`);
+      const list = RunListSchema.safeParse(body);
+      if (!list.success) {
+        throw new HqError('command_failed', `runs of ${repo} on ${day}: not a run list`);
+      }
+      const listed = list.data;
+      if (listed.total_count > 1000) {
+        if (to - from <= HOUR) {
+          throw new HqError('too_many', `${repo} has ${listed.total_count} runs in the hour from ${stamp(from)}, more than the API lists; not recorded`);
+        }
         const mid = from + Math.ceil((to - from) / 2 / HOUR) * HOUR;
         await fetchWindow(from, mid);
         await fetchWindow(mid, to);
         return;
       }
-      for (const x of j.workflow_runs as Partial<Run>[]) {
-        if (!goodRun(x, day)) throw new HqError('command_failed', `runs of ${repo} on ${day}: a run hq can't read; not recorded`);
-        got.push(x);
+      for (const entry of listed.workflow_runs) {
+        const parsedRun = RunSchema.safeParse(entry);
+        if (!parsedRun.success || parsedRun.data.created_at.slice(0, 10) !== day) {
+          throw new HqError('command_failed', `runs of ${repo} on ${day}: a run hq can't read; not recorded`);
+        }
+        got.push(parsedRun.data);
       }
-      if (j.workflow_runs.length < 100) break;
+      if (listed.workflow_runs.length < 100) {
+        break;
+      }
     }
     for (const r of got) rows.set(r.id, r);
   };
@@ -59,23 +74,4 @@ export async function syncRunsDay(db: Database, run: Runner, repo: string, day: 
     }
   }).immediate();
   return rows.size;
-}
-
-function goodRun(x: Partial<Run>, day: string): x is Run {
-  return (
-    Number.isSafeInteger(x.id) &&
-    x.id! > 0 &&
-    typeof x.path === 'string' &&
-    typeof x.event === 'string' &&
-    typeof x.status === 'string' &&
-    (x.conclusion === null || typeof x.conclusion === 'string') &&
-    Number.isSafeInteger(x.run_attempt) &&
-    x.run_attempt! >= 1 &&
-    typeof x.created_at === 'string' &&
-    ISO_Z.test(x.created_at) &&
-    x.created_at.slice(0, 10) === day &&
-    (x.run_started_at === null || (typeof x.run_started_at === 'string' && ISO_Z.test(x.run_started_at))) &&
-    typeof x.updated_at === 'string' &&
-    ISO_Z.test(x.updated_at)
-  );
 }

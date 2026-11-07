@@ -1,5 +1,6 @@
 import type { Database } from 'bun:sqlite';
 import { z } from 'zod';
+import { StoredFindingsColumn } from './stored-finding-schema.ts';
 import type { StoredFinding } from './types.ts';
 import { countChurn } from './count-churn.ts';
 import { parseReportCutoff } from './parse-report-cutoff.ts';
@@ -133,7 +134,7 @@ function isSameDiff(last: RoundRecord, review: RoundRecord): boolean {
 }
 
 function buildChurnReview(round: RoundRecord, counted: boolean): ChurnReview {
-  return { findings: JSON.parse(round.findings) as StoredFinding[], counted };
+  return { findings: StoredFindingsColumn.parse(round.findings), counted };
 }
 
 interface RoundParts {
@@ -154,7 +155,7 @@ function splitRounds(rounds: RoundRecord[]): RoundParts {
 function collectFindings(okReviews: RoundRecord[]): Map<string, StoredFinding> {
   const found = new Map<string, StoredFinding>();
   for (const round of okReviews) {
-    for (const finding of JSON.parse(round.findings) as StoredFinding[]) {
+    for (const finding of StoredFindingsColumn.parse(round.findings)) {
       found.set(finding.id, finding);
     }
   }

@@ -1,11 +1,13 @@
 import type { Database } from 'bun:sqlite';
+import { z } from 'zod';
 import { getMeta } from '../db/get-meta.ts';
-import type { Targets } from './types.ts';
 
-export function loadStoredTargets(db: Database): Partial<Targets> {
+const StoredSchema = z.record(z.string(), z.unknown());
+
+export function loadStoredTargets(db: Database): Record<string, unknown> {
   try {
-    const j = JSON.parse(getMeta(db, 'goal_targets') ?? '{}') as unknown;
-    return j && typeof j === 'object' && !Array.isArray(j) ? (j as Partial<Targets>) : {};
+    const parsed = StoredSchema.safeParse(JSON.parse(getMeta(db, 'goal_targets') ?? '{}'));
+    return parsed.success ? parsed.data : {};
   } catch {
     return {};
   }

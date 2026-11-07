@@ -1,6 +1,7 @@
 import type { Database } from 'bun:sqlite';
 import { recordOpRead } from '../one-password/record-op-read.ts';
 import { rmSync } from 'node:fs';
+import { z } from 'zod';
 import { logEvent } from '../log-event.ts';
 import { iso } from '../clock/iso.ts';
 import { now } from '../clock/now.ts';
@@ -106,11 +107,9 @@ export async function runNoslopReview(ctx: NoslopReviewContext): Promise<NoslopR
   return { engine: 'noslop', repo: ctx.repo, pr: ctx.pr, head: prep.refs.headRefName, base: prep.refs.baseRefName, reviewFile: prep.reviewFile, depth: ran.judged.value.depth, findings: ran.judged.value.findings, notReviewed: ran.judged.value.notReviewed, fixChecks: ran.judged.value.fixChecks, ms: ran.ms, sha: ran.sha, issue: prep.issueFile.note, postFailed: ran.postFailed, adapter: ctx.adapter ?? DEFAULT_ADAPTER };
 }
 
-interface PRRefs {
-  headRefName: string;
-  baseRefName: string;
-  body?: string | undefined;
-}
+const PRRefsSchema = z.object({ headRefName: z.string(), baseRefName: z.string(), body: z.string().optional() });
+
+type PRRefs = z.output<typeof PRRefsSchema>;
 
 interface ReviewPrep {
   secrets: NoslopSecrets;
@@ -135,7 +134,7 @@ async function createReviewPrep(ctx: NoslopReviewContext): Promise<ReviewPrep> {
 
 async function readPRRefs(ctx: NoslopReviewContext): Promise<PRRefs> {
   const raw = await requireOK(ctx.run, ['gh', 'pr', 'view', String(ctx.pr), '-R', ctx.slug, '--json', 'headRefName,baseRefName,body'], ctx.dir);
-  return JSON.parse(raw) as PRRefs;
+  return PRRefsSchema.parse(JSON.parse(raw));
 }
 
 async function createWorktree(ctx: NoslopReviewContext, worktree: string, base: string): Promise<void> {

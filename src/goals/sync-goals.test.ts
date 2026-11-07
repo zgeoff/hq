@@ -254,6 +254,17 @@ test('classify a deploy-prod run from its jobs', () => {
   expect(one(noConclusion)).toBeNull();
 });
 
+test('it classifies a deploy-prod run whose steps include entries that are not objects', () => {
+  const steps = [null, 7, { name: 'Terraform apply', conclusion: 'failure' }];
+  const jobs = { total_count: 1, jobs: [{ name: 'apply', conclusion: 'failure', steps }] };
+
+  expect(classifyDeploy(jobs, 'failure')).toStrictEqual({ outcome: 'applied_failed', apply_conclusion: 'failure', failed_step: 'Terraform apply' });
+});
+
+test('it classifies no deploy-prod run whose job list has an entry that is not a job', () => {
+  expect(classifyDeploy({ total_count: 2, jobs: [{ name: 'apply', conclusion: 'success' }, 'x'] }, 'success')).toBeNull();
+});
+
 const depRun = (id: number, over: Partial<Record<string, unknown>> = {}) => run({ id, path: DEPLOY.path, created_at: `2026-10-14T0${id % 10}:00:00Z`, ...over });
 
 function jobsGh(answers: Record<number, unknown>, asked: number[] = []): Runner {
