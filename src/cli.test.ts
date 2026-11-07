@@ -913,12 +913,25 @@ test("it takes a newer login sample on the broker slot's account over the slot r
   const ctx = setupTest();
   writeBrokerSlot(ctx.db, { slot: '2', proof: 'req-9b0c', note: undefined, actor: 'z-release', at: new Date('2026-10-13T22:00:00Z') });
   writeSlotUsage(ctx.db, [{ slot: 2, status: '200', five: 20, fiveResetsAt: '2026-10-14T03:00:00Z', seven: 91, sevenResetsAt: '2026-10-18T00:00:00Z' }], 2, new Date('2026-10-14T00:00:00Z'));
-  await writeCapacitySample(ctx.db, { at: '2026-10-14T00:50:00Z', impd_budget_mib: null, impd_used_mib: null, impd_committed_mib: null, nonnix_awake_mib: null, nonnix_awake_vcpus: null, nix_awake_mib: null, impd_priority_kept_mib: null, cloud_avail_bytes: null, cloud_total_bytes: null, claude_account: 'abcdef012345', claude_five_hour: 30, claude_seven_day: 98, claude_five_hour_resets_at: '2026-10-14T03:00:00Z', claude_seven_day_resets_at: '2026-10-18T00:00:00Z', claude_at: '2026-10-14T00:50:00Z', ci_minutes_today: null, pc_disk_free_bytes: null, pc_mem_avail_bytes: null, op_account_used: null, op_account_limit: null, op_refused: null, errors: {} });
+  ctx.db.query('INSERT INTO usage_samples (at, account, five_hour, seven_day, five_hour_resets_at, seven_day_resets_at) VALUES (?, ?, ?, ?, ?, ?)').run('2026-10-14T00:50:00Z', 'abcdef012345', 30, 98, '2026-10-14T03:00:00Z', '2026-10-18T00:00:00Z');
 
   await main(['capacity', 'broker', '--json']);
   const printed: unknown = JSON.parse(ctx.lines.at(-1) ?? '{}');
 
   expect(z.object({ reading: z.unknown() }).parse(printed).reading).toStrictEqual({ slot: 2, proof: 'req-9b0c', proofAgeHours: 3, used: 98, resetsAt: '2026-10-18T00:00:00Z', source: "hq login sample on the imp broker slot 2's account, 2026-10-14T00:50:00Z" });
+});
+
+test('it keeps the slot read in hq capacity broker when a later capacity sample carries an older usage reading', async () => {
+  const ctx = setupTest();
+  writeBrokerSlot(ctx.db, { slot: '2', proof: 'req-9b0c', note: undefined, actor: 'z-release', at: new Date('2026-10-13T22:00:00Z') });
+  ctx.db.query('INSERT INTO usage_samples (at, account, five_hour, seven_day, five_hour_resets_at, seven_day_resets_at) VALUES (?, ?, ?, ?, ?, ?)').run('2026-10-14T00:00:00Z', 'abcdef012345', 30, 98, '2026-10-14T03:00:00Z', '2026-10-18T00:00:00Z');
+  writeSlotUsage(ctx.db, [{ slot: 2, status: '200', five: 20, fiveResetsAt: '2026-10-14T03:00:00Z', seven: 91, sevenResetsAt: '2026-10-18T00:00:00Z' }], 2, new Date('2026-10-14T00:17:00Z'));
+  await writeCapacitySample(ctx.db, { at: '2026-10-14T00:25:00Z', impd_budget_mib: null, impd_used_mib: null, impd_committed_mib: null, nonnix_awake_mib: null, nonnix_awake_vcpus: null, nix_awake_mib: null, impd_priority_kept_mib: null, cloud_avail_bytes: null, cloud_total_bytes: null, claude_account: 'abcdef012345', claude_five_hour: 30, claude_seven_day: 98, claude_five_hour_resets_at: '2026-10-14T03:00:00Z', claude_seven_day_resets_at: '2026-10-18T00:00:00Z', claude_at: '2026-10-14T00:00:00Z', ci_minutes_today: null, pc_disk_free_bytes: null, pc_mem_avail_bytes: null, op_account_used: null, op_account_limit: null, op_refused: null, errors: {} });
+
+  await main(['capacity', 'broker', '--json']);
+  const printed: unknown = JSON.parse(ctx.lines.at(-1) ?? '{}');
+
+  expect(z.object({ reading: z.unknown() }).parse(printed).reading).toStrictEqual({ slot: 2, proof: 'req-9b0c', proofAgeHours: 3, used: 91, resetsAt: '2026-10-18T00:00:00Z', source: 'hq slot read of the imp broker slot 2, 2026-10-14T00:17:00Z' });
 });
 
 test("it reads the slot token from hq's own file under ~/.config/hq by default for hq capacity --refresh-slots", async () => {

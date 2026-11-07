@@ -20,8 +20,8 @@ interface UsageWindows {
   sevenResetsAt: string | null;
 }
 
-// This machine's Claude login, sampled every few minutes; it is the broker slot's account whenever
-// its 7-day reset matches that slot's.
+// A usage reading of this machine's Claude login, dated when the reading was taken; it is the broker
+// slot's account whenever its 7-day reset matches that slot's.
 export interface LoginSample extends UsageWindows {
   at: string;
 }
@@ -33,7 +33,7 @@ const READ_FRESH_MS = 2.5 * HOUR_MS;
 
 const PROOF_ROOM_MS = 24 * HOUR_MS;
 
-export function pickBrokerQuota(record: BrokerRecord | null, rows: readonly SlotRow[], sample: LoginSample | null, at: Date): BrokerQuota {
+export function pickBrokerQuota(record: BrokerRecord | null, rows: readonly SlotRow[], samples: readonly LoginSample[], at: Date): BrokerQuota {
   if (record === null) {
     return { state: 'none', why: 'no imp broker slot recorded: hq slots broker <n> --proof <id>' };
   }
@@ -45,8 +45,9 @@ export function pickBrokerQuota(record: BrokerRecord | null, rows: readonly Slot
   const read = newest !== undefined && isFresh(newest.at) ? newest : undefined;
   const lastSevenResetsAt = slotRows.findLast((row) => row.sevenResetsAt !== null)?.sevenResetsAt ?? null;
   const matchReset = read === undefined ? lastSevenResetsAt : read.sevenResetsAt;
-  const sampleFullest = sample !== null && matchReset !== null && isFresh(sample.at) && isSampleOnSlot(sample, matchReset, read) ? pickFullestWindow(sample) : null;
-  if (sample !== null && sampleFullest !== null) {
+  const sample = matchReset === null ? undefined : samples.findLast((candidate) => isFresh(candidate.at) && isSampleOnSlot(candidate, matchReset, read) && pickFullestWindow(candidate) !== null);
+  const sampleFullest = sample === undefined ? null : pickFullestWindow(sample);
+  if (sample !== undefined && sampleFullest !== null) {
     return { state: 'read', ...proof, from: 'login-sample', used: sampleFullest.used, resetsAt: sampleFullest.resetsAt, readAt: sample.at };
   }
   const fullest = read === undefined ? null : pickFullestWindow(read);
