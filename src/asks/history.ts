@@ -7,7 +7,7 @@ import { kdb } from '../kdb.ts';
 
 const EventSchema = buildRowSchema('events').extend({ data: buildJSONColumn(z.unknown()) });
 
-export function history(db: Database, subject: 'ask' | 'unblock', id: string): unknown[] {
+export function history(db: Database, subject: 'ask' | 'unblock', id: string): z.output<typeof EventSchema>[] {
   const query = kdb(db).selectFrom('events').selectAll().where('subject', '=', subject).where('subject_id', '=', id).orderBy('seq').compile();
   return runSyncQuery(db, query, EventSchema);
 }
