@@ -406,6 +406,7 @@ import { applyHealth } from './health/apply-health.ts';
 import { healthSamples } from './health/health-samples.ts';
 import { healthSettings } from './health/health-settings.ts';
 import { openProblems } from './health/open-problems.ts';
+import { COMMAND_TIMEOUT_MS } from './health/command-timeout-ms.ts';
 import { runChecks } from './health/run-checks.ts';
 import { setHealthSetting } from './health/set-health-setting.ts';
 import type { Probe } from './health/types.ts';
@@ -882,6 +883,7 @@ function realProbe(db: Database): Probe {
   return {
     // coreutils timeout kills a hung check, so a stuck systemctl or df never piles up.
     run: (cmd, opts) => realRunner(['timeout', '-k', '2', '15', ...cmd], { ...opts, env: cleanEnv() }),
+    commandTimeoutMs: COMMAND_TIMEOUT_MS,
     readFile: (path) => Bun.file(path).text(),
     atcAnswers: async () => {
       try {

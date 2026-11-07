@@ -1,5 +1,5 @@
 // oxlint-disable zgeoff/test-beside-module -- grandfathered: the health checks run through every probe at once
-import { afterEach, beforeEach, expect, jest, onTestFinished, test } from 'bun:test';
+import { afterEach, beforeEach, expect, test } from 'bun:test';
 import { toExactOptional } from '@zgeoff/std';
 import type { Database } from 'bun:sqlite';
 import assert from 'node:assert';
@@ -13,7 +13,7 @@ import type { Probe } from '../src/health/types.ts';
 import { listNews } from '../src/news/list-news.ts';
 import { readOutboxRows } from '../src/outbox/read-outbox-rows.ts';
 import { probeHealth } from '../src/probe/probe-health.ts';
-import type { Runner } from '../src/runner/types.ts';
+import type { RunResult, Runner } from '../src/runner/types.ts';
 import { NOON_SYDNEY, at, freshDb } from './helpers.ts';
 import { COMMAND_TIMEOUT_MS } from '../src/health/command-timeout-ms.ts';
 
@@ -55,6 +55,7 @@ function probe(w: World): Probe {
   };
   return {
     run,
+    commandTimeoutMs: COMMAND_TIMEOUT_MS,
     readFile: async (p) => (p.endsWith('pressure/memory') ? `some avg10=0.00 avg60=${w.memSome60} avg300=0.00 total=1\nfull avg10=0 avg60=0 avg300=0 total=1` : 'MemTotal: 1000000 kB\nMemAvailable: 500000 kB'),
     atcAnswers: async () => w.atc,
     home: '/home/someone',
@@ -216,18 +217,11 @@ test('it reports a failed restart-count read as a problem, not as no restart loo
 
 test('a command that hangs counts as a failed read', async () => {
   const p = probe(world());
-  const hang: Probe = { ...p, run: async (cmd) => (cmd[0] === 'df' ? new Promise(() => {}) : p.run(cmd)) };
+  const hang: Probe = { ...p, commandTimeoutMs: 10, run: (cmd) => (cmd[0] === 'df' ? new Promise<RunResult>(() => {}) : p.run(cmd)) };
+
+  const result = await runChecks(hang, healthSettings(db), {}, new Date(NOON_SYDNEY));
+
   expect(COMMAND_TIMEOUT_MS).toBeLessThanOrEqual(20_000);
-  jest.useFakeTimers();
-  onTestFinished(() => jest.useRealTimers());
-
-  const pending = runChecks(hang, healthSettings(db), {}, new Date(NOON_SYDNEY));
-  for (let tick = 0; tick < 50; tick++) {
-    await Promise.resolve();
-  }
-  jest.advanceTimersByTime(COMMAND_TIMEOUT_MS);
-  const result = await pending;
-
   expect(result.unknown).toContain('disk:');
 });
 

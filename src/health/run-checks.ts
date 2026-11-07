@@ -1,6 +1,5 @@
 import { iso } from '../clock/iso.ts';
 import type { Runner } from '../runner/types.ts';
-import { COMMAND_TIMEOUT_MS } from './command-timeout-ms.ts';
 import type { HealthSettings } from './health-defaults.ts';
 import { out } from './out.ts';
 import { pickAtcMcpChecks } from './pick-atc-mcp-checks.ts';
@@ -9,6 +8,7 @@ import type { Check, Probe, Samples } from './types.ts';
 const glob = (pattern: string) => new RegExp(`^${pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.')}$`);
 
 export async function runChecks(p: Probe, s: HealthSettings, prev: Samples, at: Date): Promise<{ checks: Check[]; samples: Samples; unknown: string[] }> {
+  const timeoutMs = p.commandTimeoutMs;
   const checks: Check[] = [];
   const unknown: string[] = [];
   const ignore = s.ignoreUnits.split(',').map((x) => x.trim()).filter(Boolean).map(glob);
@@ -16,7 +16,7 @@ export async function runChecks(p: Probe, s: HealthSettings, prev: Samples, at: 
 
   for (const scope of ['user', 'system'] as const) {
     const flag = scope === 'user' ? ['--user'] : [];
-    const failed = await out(p.run, ['systemctl', ...flag, 'list-units', '--state=failed', '--no-legend', '--plain']);
+    const failed = await out(p.run, ['systemctl', ...flag, 'list-units', '--state=failed', '--no-legend', '--plain'], timeoutMs);
     if (failed === null) {
       checks.push({ key: `systemd:${scope}`, ok: false, line: `can't read ${scope} units (systemctl failed)` });
       unknown.push(`failed:${scope}:`);
@@ -32,7 +32,7 @@ export async function runChecks(p: Probe, s: HealthSettings, prev: Samples, at: 
   let loops = 0;
   let unread = 0;
   for (const scope of ['user', 'system'] as const) {
-    const counts = await restartCounts(p.run, scope);
+    const counts = await restartCounts(p.run, scope, timeoutMs);
     if (!counts) {
       unread++;
       checks.push({ key: `restarts:${scope}`, ok: false, line: `can't read ${scope} unit restart counts (systemctl failed)` });
@@ -58,7 +58,7 @@ export async function runChecks(p: Probe, s: HealthSettings, prev: Samples, at: 
   }
 
   // /tmp too: on this PC it's a 16 GB tmpfs, and agent build caches filled it once (2026-10-16).
-  const df = await out(p.run, ['df', '-P', '-B1', '/', p.home, '/tmp']);
+  const df = await out(p.run, ['df', '-P', '-B1', '/', p.home, '/tmp'], timeoutMs);
   if (df === null) {
     checks.push({ key: 'disk', ok: false, line: "can't read disk space (df failed)" });
     unknown.push('disk:');
@@ -168,22 +168,24 @@ export async function runChecks(p: Probe, s: HealthSettings, prev: Samples, at: 
 
   let lanes = 'unknown';
   try {
-    const r = await Promise.race([p.run(['systemctl', '--user', 'is-active', 'hq-lanes']), Bun.sleep(COMMAND_TIMEOUT_MS).then(() => null)]);
-    if (r) lanes = r.stdout.trim() || 'inactive';
+    const result = await Promise.race([p.run(['systemctl', '--user', 'is-active', 'hq-lanes']), Bun.sleep(timeoutMs).then(() => null)]);
+    if (result) {
+      lanes = result.stdout.trim() || 'inactive';
+    }
   } catch {}
   checks.push({ key: 'hq-lanes', ok: lanes === 'active', line: `hq-lanes watcher: ${lanes}` });
 
   return { checks, samples, unknown };
 }
 
-async function restartCounts(run: Runner, scope: 'user' | 'system'): Promise<Map<string, number> | null> {
+async function restartCounts(run: Runner, scope: 'user' | 'system', timeoutMs: number): Promise<Map<string, number> | null> {
   const flag = scope === 'user' ? ['--user'] : [];
-  const list = await out(run, ['systemctl', ...flag, 'list-units', '--type=service', '--all', '--no-legend', '--plain']);
+  const list = await out(run, ['systemctl', ...flag, 'list-units', '--type=service', '--all', '--no-legend', '--plain'], timeoutMs);
   if (list === null) return null;
   const names = list.split('\n').map((l) => l.trim().split(/\s+/)[0]).filter((n): n is string => !!n && n.endsWith('.service'));
   const counts = new Map<string, number>();
   if (!names.length) return counts;
-  const show = await out(run, ['systemctl', ...flag, 'show', '-p', 'Id', '-p', 'NRestarts', ...names]);
+  const show = await out(run, ['systemctl', ...flag, 'show', '-p', 'Id', '-p', 'NRestarts', ...names], timeoutMs);
   if (show === null) return null;
   for (const block of show.split(/\n\s*\n/)) {
     const id = /^Id=(.+)$/m.exec(block)?.[1];
