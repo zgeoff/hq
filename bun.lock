@@ -33,7 +33,7 @@
         "@zgeoff/agent-hooks": "0.2.9",
         "@zgeoff/diet": "0.2.2",
         "@zgeoff/oxlint-config": "0.10.0",
-        "@zgeoff/testing": "0.2.1",
+        "@zgeoff/testing": "0.3.0",
         "knip": "6.43.0",
         "msw": "2.15.0",
         "oxfmt": "^0.74.0",
@@ -487,7 +487,7 @@
 
     "@zgeoff/std": ["@zgeoff/std@0.4.3", "", {}, "sha512-wCaqH8+vrkR+6R/grWUUDraryyFY1NW0Gjbhg85bXX38k9Q+N3aHFu+Yc+EjzZ/Sp9n5aJnCvZqbO5F2mUjWAg=="],
 
-    "@zgeoff/testing": ["@zgeoff/testing@0.2.1", "", { "dependencies": { "bun-pty": "0.5.2" } }, "sha512-i/x931QYNWJJEydeGCDhlIBEm+SuXhjmLzmiZWP/jyQlsCXYy7AFv0RAVRktltEPNdGnHlcCZqKZeWNkIjH3Lg=="],
+    "@zgeoff/testing": ["@zgeoff/testing@0.3.0", "", { "dependencies": { "bun-pty": "0.6.0" } }, "sha512-9oeaSUJ3XtoXzYwBgT5DtiHA2OgjyzeFsggIzNGdTUrrDMfwytB3HCA0kGCnVNh/o84nqli4jvDD5eYWWv6QeA=="],
 
     "acorn": ["acorn@8.19.0", "", { "bin": { "acorn": "bin/acorn" } }, "sha512-oJlA3XiRm7Cyk6qFD2Jn8ak9B7jSy0qy00ADO3+8dpT0LSjFihQYv4C02LFCSYJV3Q37xYwwRy5m+IpIiUzqWw=="],
 
@@ -509,7 +509,7 @@
 
     "buffer-image-size": ["buffer-image-size@0.6.4", "", { "dependencies": { "@types/node": "*" } }, "sha512-nEh+kZOPY1w+gcCMobZ6ETUp9WfibndnosbpwB1iJk/8Gt5ZF2bhS6+B6bPYz424KtwsR6Rflc3tCz1/ghX2dQ=="],
 
-    "bun-pty": ["bun-pty@0.5.2", "", {}, "sha512-3CbZE6qgNevRf5HkbTsxudwxWyJqGgqfwXsKy3fmOD8/wirEfmOmVADdMhHihU3k7hFaG+tktpKSUdQBfU4ZWA=="],
+    "bun-pty": ["bun-pty@0.6.0", "", {}, "sha512-tRVhUKbu18DSg/lUdp9vXzzEAlevBcdWJ+3TXX0CuvSmtdC6EIbzKmklRpiKZmmtN6qwkIqB2QeEFghpI1/z3g=="],
 
     "bun-types": ["bun-types@1.4.4", "", { "dependencies": { "@types/node": "*", "undici-types": "*" } }, "sha512-yjrJh5oGX7mMPKGd19YXyIjmEuj4G4zNC30bs7PM9Az7NQ3ndF3j6hbeRdvJTRQEhJ/FYQwW0a2moweEi2hMxQ=="],
 
