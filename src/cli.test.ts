@@ -1302,3 +1302,22 @@ test('it refuses an hq review --effort that is neither medium nor high on a nosl
   expect(JSON.parse(stdout)).toStrictEqual({ ok: false, error: { code: 'bad_args', message: '--effort must be medium or high' } });
   expect(fresh.db.query('SELECT COUNT(*) AS count FROM noslop_rounds').get()).toStrictEqual({ count: 0 });
 });
+
+test.each([
+  ['queued', ['kettle-mint']],
+  ['all', ['kettle-mint']],
+  ['bogus,queued', ['kettle-mint']],
+  ['open', []],
+  ['bogus', []],
+])('it lists the asks that hq call list --state %s names', async (state, expected) => {
+  const ctx = setupTest();
+  await main(['call', 'add', 'kettle-mint', '--title', 'Mint the kettle', '--question', 'Mint the kettle tokens?', '--body', 'Details.', '--json']);
+  ctx.lines.length = 0;
+
+  await main(['call', 'list', '--state', state, '--json']);
+
+  const listed = z.object({ id: z.string() });
+  const listing = z.object({ calls: z.array(listed) });
+  const printed = listing.parse(JSON.parse(ctx.lines[0] ?? '{}'));
+  expect(printed.calls.map((row) => row.id)).toStrictEqual(expected);
+});

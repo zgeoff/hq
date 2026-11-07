@@ -1,9 +1,8 @@
+import { isRecord } from '@zgeoff/std';
 import { HqError } from '../errors.ts';
 import type { Rec, Split } from './types.ts';
 
 type Block = { type?: string; id?: string; tool_use_id?: string };
-
-const blocks = (r: Rec): Block[] => (Array.isArray(r.obj.message?.content) ? (r.obj.message!.content as Block[]) : []);
 
 export function findSplit(byUuid: Map<string, Rec>, recs: Rec[], path: Rec[], offBranch: Set<string>): Split | null {
   const uses = new Map<string, Rec>();
@@ -54,4 +53,20 @@ export function findSplit(byUuid: Map<string, Rec>, recs: Rec[], path: Rec[], of
     }
   }
   return null;
+}
+
+function blocks(rec: Rec): Block[] {
+  const content = rec.obj.message?.content;
+  return Array.isArray(content) ? content.flatMap((block: unknown) => (isRecord(block) ? [toBlock(block)] : [])) : [];
+}
+
+function toBlock(block: Record<string, unknown>): Block {
+  const type = block['type'];
+  const id = block['id'];
+  const toolUseID = block['tool_use_id'];
+  return {
+    ...(typeof type === 'string' ? { type } : {}),
+    ...(typeof id === 'string' ? { id } : {}),
+    ...(typeof toolUseID === 'string' ? { tool_use_id: toolUseID } : {}),
+  };
 }

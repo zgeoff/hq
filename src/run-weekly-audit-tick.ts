@@ -1,4 +1,7 @@
 import type { Database } from 'bun:sqlite';
+import { buildRowSchema } from './db/build-row-schema.ts';
+import { runSyncRow } from './db/run-sync-row.ts';
+import { kdb } from './kdb.ts';
 import { logEvent } from './log-event.ts';
 import { loadOpWeek } from './one-password/load-op-week.ts';
 import { isQuiet } from './clock/is-quiet.ts';
@@ -54,8 +57,10 @@ function buildAuditWeek(y: number, mo: number, day: number): AuditWeek {
   return { key: sydney(monday).date, due: sydneyUtc(y, mo, day, 9, 0), late: sydneyUtc(y, mo, day, 9, 30), end: sydneyUtc(y, mo, day + 1), from: sydneyUtc(y, mo, day - 7), to: monday };
 }
 
+const JobRunSchema = buildRowSchema('job_runs');
+
 function readRun(db: Database, key: string): JobRun | null {
-  return db.query('SELECT * FROM job_runs WHERE job = ? AND key = ?').get(JOB, key) as JobRun | null;
+  return runSyncRow(db, kdb(db).selectFrom('job_runs').selectAll().where('job', '=', JOB).where('key', '=', key).compile(), JobRunSchema);
 }
 
 function formatAuditText(week: AuditWeek, late: boolean): string {

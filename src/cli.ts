@@ -21,6 +21,9 @@ import { waitReasons } from './asks/wait-reasons.ts';
 import { logEvent } from './log-event.ts';
 import { owner } from './owner.ts';
 import type { AskState } from './transitions/ask-states.ts';
+import { ASK_STATES } from './transitions/ask-states.ts';
+import { countAsksByState } from './asks/count-asks-by-state.ts';
+import { listLaterAsks } from './asks/list-later-asks.ts';
 import { AtcClient } from './atc/atc-client.ts';
 import { readStateSizeChecks } from './health/read-state-size-checks.ts';
 import { getStateRoles } from './state/get-state-roles.ts';
@@ -112,7 +115,10 @@ import { lookup } from './lookup.ts';
 import { z } from 'zod';
 import { config } from './config/config.ts';
 import { isOneOf, isRecord, toExactOptional } from '@zgeoff/std';
-import type { DetachResult, FlushResult, OutboxRow } from './outbox/types.ts';
+import type { DetachResult, FlushResult } from './outbox/types.ts';
+import { countUnsentByStatus } from './outbox/count-unsent-by-status.ts';
+import { listUnsentRows } from './outbox/list-unsent-rows.ts';
+import { parseJSON } from './noslop/parse-json.ts';
 import { dropOutboxItem } from './outbox/drop-outbox-item.ts';
 import { forwards } from './outbox/forwards.ts';
 import { setForward } from './outbox/set-forward.ts';
@@ -567,16 +573,6 @@ function intFlag(v: string | undefined, flag: string): number | null {
   return Number(v);
 }
 
-function pickAskStates(state: string | undefined): AskState[] | undefined {
-  if (state === 'all') {
-    return undefined;
-  }
-  if (state) {
-    return list(state) as AskState[];
-  }
-  return ['open', 'queued', 'later', 'answered'];
-}
-
 function parseWaitsOn(v: string | undefined): string | null | undefined {
   if (v === undefined) {
     return undefined;
@@ -749,12 +745,12 @@ async function askCommand(db: Database, kind: Kind, verb: string, args: string[]
       const a = getAsk(db, needId());
       if (!a || a.kind !== kind) throw new HqError('not_found', `no ${kind} with id ${id}`);
       const h = flags.history ? history(db, 'ask', a.id) : undefined;
-      const htext = h ? `\n\nhistory:\n${(h as { at: string; action: string; actor: string }[]).map((e) => `  ${e.at} ${e.action} by ${e.actor}`).join('\n')}` : '';
+      const htext = h ? `\n\nhistory:\n${h.map((event) => `  ${event.at} ${event.action} by ${event.actor}`).join('\n')}` : '';
       return { data: { [kind]: a, ...(h ? { history: h } : {}) }, text: askFull(a) + htext };
     })
     .with('list', () => {
       const asked = pickAskStates(flags.state);
-      const rows = listAsks(db, toExactOptional({ kind, states: asked }));
+      const rows = asked === null ? [] : listAsks(db, toExactOptional({ kind, states: asked }));
       return { data: { [`${kind}s`]: rows }, text: rows.length ? rows.map(askLine).join('\n') : `No ${kind}s here.` };
     })
     .otherwise(() => {
@@ -868,13 +864,17 @@ function runLine(r: RunView): string {
 
 async function expandSession(raw: string): Promise<string> {
   let client: AtcClient | null = null;
+
+  // A closure assigns the client, so TypeScript narrows a direct read in finally to null.
+  const readClient = (): AtcClient | null => client;
   try {
     return await fullSessionId(async () => {
-      client = await AtcClient.open();
-      return client.sessions();
+      const opened = await AtcClient.open();
+      client = opened;
+      return opened.sessions();
     }, raw);
   } finally {
-    (client as AtcClient | null)?.close();
+    readClient()?.close();
   }
 }
 
@@ -1005,20 +1005,22 @@ function sinceArg(raw: string | undefined, to: Date): string {
 
 const GH_CACHE = z.object({ day: z.string(), at: z.string(), merges: z.array(z.object({ repo: z.string(), mergedAt: z.string() })) });
 
+const GH_REPOSITORY = z.object({ name: z.string() });
+const GH_SEARCH_ROWS = z.array(z.object({ closedAt: z.string(), repository: GH_REPOSITORY }));
+
 async function ghMerges(db: Database, from: string, run: Runner = realRunner): Promise<GhMerge[] | null> {
   const day = from.slice(0, 10);
   const c = metaJson(db, 'stats_gh_cache', GH_CACHE.nullable(), null);
   if (c && c.day <= day && Date.now() - Date.parse(c.at) < 30 * 60_000) return c.merges;
   const r = await run(['gh', 'search', 'prs', '--owner', 'zgeoff', '--merged', '--merged-at', `>=${day}`, '--json', 'repository,closedAt', '--limit', '1000'], { env: cleanEnv() });
   if (r.code !== 0) return null;
-  try {
-    const rows = JSON.parse(r.stdout) as { closedAt: string; repository: { name: string } }[];
-    const merges = rows.map((x) => ({ repo: x.repository.name, mergedAt: x.closedAt }));
-    setMeta(db, 'stats_gh_cache', JSON.stringify({ day, at: new Date().toISOString(), merges }));
-    return merges;
-  } catch {
+  const parsed = GH_SEARCH_ROWS.safeParse(parseJSON(r.stdout));
+  if (!parsed.success) {
     return null;
   }
+  const merges = parsed.data.map((search) => ({ repo: search.repository.name, mergedAt: search.closedAt }));
+  setMeta(db, 'stats_gh_cache', JSON.stringify({ day, at: new Date().toISOString(), merges }));
+  return merges;
 }
 
 const KIND_WEEKS = 8;
@@ -1169,7 +1171,7 @@ async function resolveTarget(raw: string): Promise<{ id: string | null; name: st
     }
     return { id: null, name: null };
   } finally {
-    (client as AtcClient | null)?.close();
+    client?.close();
   }
 }
 
@@ -1804,17 +1806,18 @@ function status(db: Database): Out {
   const open = openItem(db);
   const next = nextEligible(db);
   const reasons = waitReasons(db);
-  const counts = db.query('SELECT kind, state, COUNT(*) AS n FROM asks GROUP BY kind, state').all() as { kind: Kind; state: AskState; n: number }[];
+  const counts = countAsksByState(db);
   const byKind: Record<string, Record<string, number>> = { call: {}, proposal: {} };
-  for (const c of counts) byKind[c.kind]![c.state] = c.n;
-  const later = db.query(`SELECT id, kind, due_at FROM asks WHERE state='later' ORDER BY due_at, id`).all() as { id: string; kind: Kind; due_at: string }[];
+  for (const row of counts) {
+    byKind[row.kind] = { ...byKind[row.kind], [row.state]: row.count };
+  }
+  const later = listLaterAsks(db);
   const nextLater = later[0] ?? null;
   const openUnblocks = listUnblocks(db, 'open');
   const unblockOpen = openUnblocks.filter((item) => item.kind !== 'watch').length;
   const unblockWatching = openUnblocks.length - unblockOpen;
   const unblockNew = newSincePush(db).length;
-  const outbox = db.query(`SELECT status, COUNT(*) AS n FROM outbox WHERE status != 'sent' GROUP BY status`).all() as { status: string; n: number }[];
-  const ob = Object.fromEntries(outbox.map((o) => [o.status, o.n]));
+  const ob = countUnsentByStatus(db);
   const hold = currentHold(db);
 
   const waits = next ? reasons : [];
@@ -1954,7 +1957,7 @@ async function outboxCommand(db: Database, verb: string | undefined, rest: strin
     const map = forwards(db);
     return { data: { forwards: map }, text: Object.keys(map).length ? Object.entries(map).map(([a, b]) => `${a} → ${b}`).join('\n') : 'No forwards.' };
   }
-  const rows = db.query(`SELECT * FROM outbox WHERE status != 'sent' ORDER BY id`).all() as OutboxRow[];
+  const rows = listUnsentRows(db);
   return { data: { outbox: rows }, text: rows.length ? rows.map((r) => `${r.id} [${r.status}] → ${r.target}: ${r.text}${r.last_error ? `\n   last error: ${r.last_error}` : ''}`).join('\n') : 'Outbox empty.' };
 }
 
@@ -2453,6 +2456,19 @@ function formatTidy(wrapped: MergedRunWrapUp[], dryRun: boolean): string {
   const tense = dryRun ? 'planned' : 'done';
   const lines = wrapped.map((entry) => `${entry.issue}: ${formatWrapUp(entry.wrapUp, tense)}`);
   return [dryRun ? 'Would tidy (nothing changed):' : 'Tidied:', ...lines.map((line) => `  ${line}`)].join('\n');
+}
+
+// undefined lists every state; null lists none, for a --state that names only states no ask has.
+function pickAskStates(state: string | undefined): AskState[] | undefined | null {
+  if (state === 'all') {
+    return undefined;
+  }
+  if (state) {
+    const requested = list(state);
+    const known = requested.filter((name) => isOneOf(name, ASK_STATES));
+    return requested.length > 0 && known.length === 0 ? null : known;
+  }
+  return ['open', 'queued', 'later', 'answered'];
 }
 
 if (import.meta.main) process.exit(await main(process.argv.slice(2)));

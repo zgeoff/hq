@@ -7,6 +7,7 @@ import { now } from '../clock/now.ts';
 import { setMeta } from '../db/set-meta.ts';
 import { HqError } from '../errors.ts';
 import { logEvent } from '../log-event.ts';
+import { parseJSON } from '../noslop/parse-json.ts';
 import type { Runner } from '../runner/types.ts';
 import { backupPaths } from './backup-paths.ts';
 import { ensurePassword } from './ensure-password.ts';
@@ -14,11 +15,14 @@ import { getLocalRepo as localRepo } from './get-local-repo.ts';
 import { getStagingDir as staging } from './get-staging-dir.ts';
 import { KEEP } from './keep.ts';
 import { loadResticEnv as resticEnv } from './load-restic-env.ts';
+import { parseSnapshots } from './parse-snapshots.ts';
 import { readRemoteEnv } from './read-remote-env.ts';
 import { runRestic as restic } from './run-restic.ts';
 import { sources } from './sources.ts';
 import type { BackupRun, Snapshot } from './types.ts';
 import { toErrorMessage } from '../to-error-message.ts';
+
+const SummaryLineSchema = z.object({ message_type: z.string().optional(), snapshot_id: z.string().optional() });
 
 export async function runBackup(db: Database, run: Runner, actor: string): Promise<BackupRun> {
   const started = Date.now();
@@ -44,14 +48,8 @@ export async function runBackup(db: Database, run: Runner, actor: string): Promi
     const out = await restic(run, [...local, 'backup', '--json', '--tag', 'hq', '--host', 'hq', ...src.exclude.flatMap((e) => ['--exclude', e]), staged, ...src.dirs.filter((d) => existsSync(d))]);
     const summary = out
       .split('\n')
-      .map((l) => {
-        try {
-          return JSON.parse(l) as { message_type?: string; snapshot_id?: string };
-        } catch {
-          return null;
-        }
-      })
-      .find((m) => m?.message_type === 'summary');
+      .map((line) => SummaryLineSchema.safeParse(parseJSON(line)).data)
+      .find((message) => message?.message_type === 'summary');
     result.snapshot = summary?.snapshot_id?.slice(0, 8) ?? null;
     await restic(run, [...local, 'forget', '--tag', 'hq', '--keep-hourly', String(KEEP.hourly), '--keep-daily', String(KEEP.daily), '--prune']);
 
@@ -62,8 +60,10 @@ export async function runBackup(db: Database, run: Runner, actor: string): Promi
         await ensureRepo(run, [], extra, ['--from-repo', localRepo(), '--from-password-file', backupPaths().password, '--copy-chunker-params']);
         await restic(run, ['copy', '--from-repo', localRepo(), '--from-password-file', backupPaths().password, '--tag', 'hq'], extra);
         const newest = (snaps: Snapshot[]) => snaps.map((x) => x.time).sort().at(-1);
-        const want = newest(JSON.parse(await restic(run, ['-r', localRepo(), 'snapshots', '--json', '--tag', 'hq'])) as Snapshot[]);
-        const got = JSON.parse(await restic(run, ['snapshots', '--json', '--tag', 'hq'], extra)) as Snapshot[];
+        const localListing = await restic(run, ['-r', localRepo(), 'snapshots', '--json', '--tag', 'hq']);
+        const remoteListing = await restic(run, ['snapshots', '--json', '--tag', 'hq'], extra);
+        const want = newest(parseSnapshots(localListing));
+        const got = parseSnapshots(remoteListing);
         if (!want || !got.some((x) => x.time === want)) throw new HqError('remote_copy_missing', `the remote lacks the newest snapshot (${got.length} remote snapshots)`);
         await restic(run, ['forget', '--tag', 'hq', '--keep-hourly', String(KEEP.hourly), '--keep-daily', String(KEEP.daily), '--prune'], extra);
         result.remote = 'copied';

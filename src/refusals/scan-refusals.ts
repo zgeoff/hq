@@ -5,6 +5,7 @@ import { sep } from 'node:path';
 import { z } from 'zod';
 import { iso } from '../clock/iso.ts';
 import { now } from '../clock/now.ts';
+import { parseJSON } from '../noslop/parse-json.ts';
 import { getProjectsDir } from '../repair/get-projects-dir.ts';
 import { BACKFILL_DAYS } from './backfill-days.ts';
 import { BUDGET_BYTES } from './budget-bytes.ts';
@@ -191,11 +192,11 @@ const remember = (tools: Map<string, Tool>, [k, v]: [string, Tool]) => {
   if (tools.size > TOOLS_KEPT) tools.delete(tools.keys().next().value!);
 };
 
+const StoredToolSchema = z.object({ name: z.string(), input: z.string().nullable() });
+const StoredToolsSchema = z.array(z.tuple([z.string(), StoredToolSchema]));
+
 function storedTools(raw: string | null): Map<string, Tool> {
-  try {
-    const v: unknown = JSON.parse(raw ?? '[]');
-    return new Map(Array.isArray(v) ? (v as [string, Tool][]) : []);
-  } catch {
-    return new Map();
-  }
+  const parsed = StoredToolsSchema.safeParse(parseJSON(raw ?? '[]'));
+  const entries = parsed.success ? parsed.data : [];
+  return new Map(entries);
 }

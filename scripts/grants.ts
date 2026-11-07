@@ -1,3 +1,4 @@
+import { isRecord } from '@zgeoff/std';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
@@ -32,7 +33,7 @@ function parseObject(value: unknown, keys: string[], where: string): Record<stri
       throw new Error(`${where}: unexpected field ${key}`);
     }
   }
-  return value as Record<string, unknown>;
+  return Object.fromEntries(Object.entries(value));
 }
 
 function parseText(value: unknown, where: string): string {
@@ -53,34 +54,34 @@ function parseEntries(value: unknown, outcome: 'ask' | 'allow', where: string, t
     const at = `${where}[${i}]`;
     const fields = outcome === 'ask' ? ['id', 'outcome', 'note', 'note_first'] : ['id', 'label', 'outcome', 'note', 'source', 'until', 'log'];
     const row = parseObject(entry, fields, at);
-    const slug = parseText(row.id, `${at}.id`);
+    const slug = parseText(row['id'], `${at}.id`);
     if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(slug) || ids.has(slug)) {
       throw new Error(`${at}: id must be a unique slug`);
     }
     ids.add(slug);
-    if (row.outcome !== outcome) {
+    if (row['outcome'] !== outcome) {
       throw new Error(`${at}: outcome must be ${outcome}`);
     }
     {
-      const note = parseText(row.note, `${at}.note`);
+      const note = parseText(row['note'], `${at}.note`);
       if (outcome === 'allow') {
         if (/deleting or rewriting\b[^\n]*?\bsecurity change\b/u.test(note)) {
           throw new Error(`${at}.note: use {still-ask} instead of a literal still-ask list`);
         }
-        if (row.source !== undefined) {
-          parseText(row.source, `${at}.source`);
+        if (row['source'] !== undefined) {
+          parseText(row['source'], `${at}.source`);
         }
-        checkUntil(row.until, { at, id: slug, today, where });
-        if (row.log !== undefined && typeof row.log !== 'boolean') {
+        checkUntil(row['until'], { at, id: slug, today, where });
+        if (row['log'] !== undefined && typeof row['log'] !== 'boolean') {
           throw new Error(`${at}.log: expected true or false`);
         }
-        return { id: slug, outcome, note, label: parseText(row.label, `${at}.label`), log: row.log === true };
+        return { id: slug, outcome, note, label: parseText(row['label'], `${at}.label`), log: row['log'] === true };
       }
       return {
         id: slug,
         outcome,
         note,
-        ...(row.note_first === undefined ? {} : { note_first: parseText(row.note_first, `${at}.note_first`) }),
+        ...(row['note_first'] === undefined ? {} : { note_first: parseText(row['note_first'], `${at}.note_first`) }),
       };
     }
   });
@@ -178,22 +179,22 @@ function buildStillAsk(dataFile: string, entries: unknown[], items: Item[], also
   const textByVoice = { first: formatList(getNotes('first')), third: formatList(getNotes('third')) };
   for (const entry of entries) {
     const row = parseObject(entry, ['file', 'voice', 'after', 'tree'], `${dataFile}.sites`);
-    const site = parseText(row.file, 'site.file');
+    const site = parseText(row['file'], 'site.file');
     const voice = site.endsWith('/references/session-prompt.md') ? 'first' : 'third';
     if (!/^(?:skills|docs)\//u.test(site) || site.split('/').includes('..') || sites.has(site)) {
       throw new Error(`invalid or duplicate site: ${site}`);
     }
-    if (row.voice !== voice) {
+    if (row['voice'] !== voice) {
       throw new Error(`${site}: expected ${voice} voice`);
     }
-    if (row.tree !== undefined && row.tree !== 'private') {
+    if (row['tree'] !== undefined && row['tree'] !== 'private') {
       throw new Error(`${site}: tree must be private, or left out for a site hq holds`);
     }
-    if (row.tree === 'private') {
+    if (row['tree'] === 'private') {
       privateSites.add(site);
     }
     sites.set(site, voice);
-    afters.set(site, parseText(row.after, 'site.after'));
+    afters.set(site, parseText(row['after'], 'site.after'));
   }
 
   for (const voice of ['first', 'third'] as const) {
@@ -217,12 +218,13 @@ function buildStillAsk(dataFile: string, entries: unknown[], items: Item[], also
 function readStillAsk(tree: Tree): StillAsk {
   const dataFile = 'grants/still-ask.yaml';
   const model = parseObject(Bun.YAML.parse(read(tree, dataFile)), ['items', 'also', 'sites'], dataFile);
-  const stillAsk = parseEntries(model.items, 'ask', `${dataFile}.items`, '');
-  if (!Array.isArray(model.sites) || model.sites.length === 0) {
+  const stillAsk = parseEntries(model['items'], 'ask', `${dataFile}.items`, '');
+  const sites = model['sites'];
+  if (!Array.isArray(sites) || sites.length === 0) {
     throw new Error(`${dataFile}: expected sites`);
   }
-  const also = model.also === undefined ? undefined : parseAlso(model.also, `${dataFile}.also`);
-  return buildStillAsk(dataFile, model.sites, stillAsk, also);
+  const also = model['also'] === undefined ? undefined : parseAlso(model['also'], `${dataFile}.also`);
+  return buildStillAsk(dataFile, sites, stillAsk, also);
 }
 
 function parseAlso(value: unknown, where: string): string[] {
@@ -557,7 +559,7 @@ function isStringList(value: unknown): value is string[] {
 }
 
 function parseFleetSession(entry: unknown, where: string): FleetSession {
-  const row = typeof entry === 'object' && entry !== null ? Object.fromEntries(Object.entries(entry)) : {};
+  const row = isRecord(entry) ? entry : {};
   const skills = row['skills'] ?? [];
   if (typeof row['name'] !== 'string' || !isStringList(skills)) {
     throw new TypeError(`${where}: needs a name and, if present, a list of skill names`);

@@ -1,7 +1,10 @@
 import type { Database } from 'bun:sqlite';
+import { z } from 'zod';
 import { iso } from '../clock/iso.ts';
 import { now } from '../clock/now.ts';
 import { HqError } from '../errors.ts';
+import { runSyncQuery } from '../db/run-sync-query.ts';
+import { kdb } from '../kdb.ts';
 import { logEvent } from '../log-event.ts';
 import type { GrantAction, GrantActionInput } from './types.ts';
 
@@ -22,8 +25,11 @@ export function recordGrantAction(db: Database, input: GrantActionInput): GrantA
     .immediate();
 }
 
+const GrantNameSchema = z.object({ grant_name: z.string() });
+
 function requireNamedGrant(db: Database, name: string): void {
-  const names = (db.query('SELECT grant_name FROM marks WHERE grant_name IS NOT NULL ORDER BY grant_name').all() as { grant_name: string }[]).map((r) => r.grant_name);
+  const query = kdb(db).selectFrom('marks').select('grant_name').where('grant_name', 'is not', null).orderBy('grant_name').compile();
+  const names = runSyncQuery(db, query, GrantNameSchema).map((row) => row.grant_name);
   if (!names.includes(name)) {
     throw new HqError('not_found', `no grant named ${name}; named grants: ${names.length > 0 ? names.join(', ') : 'none (name one with hq mark grant ID NAME)'}`);
   }

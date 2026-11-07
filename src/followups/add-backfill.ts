@@ -1,8 +1,12 @@
 import type { Database } from 'bun:sqlite';
 import { iso } from '../clock/iso.ts';
 import { now } from '../clock/now.ts';
+import invariant from 'tiny-invariant';
+import { runSyncRow } from '../db/run-sync-row.ts';
 import { HqError } from '../errors.ts';
+import { kdb } from '../kdb.ts';
 import { logEvent } from '../log-event.ts';
+import { FollowupRowSchema } from './followup-row-schema.ts';
 import { ISSUE } from './issue.ts';
 import type { Followup } from './types.ts';
 
@@ -19,7 +23,9 @@ export function addBackfill(db: Database, input: { issue: string; fromRef: strin
       const t = iso(now());
       db.query(`INSERT INTO followups (issue, from_ref, filed_at, source, added_by, added_at) VALUES (?, ?, ?, 'linear backfill', ?, ?)`).run(issue, input.fromRef, iso(at), input.actor, t);
       logEvent(db, 'hq', `followup:${issue}`, 'backfilled', input.actor, null, null, { from: input.fromRef, at: iso(at) });
-      return db.query('SELECT * FROM followups WHERE issue = ?').get(issue) as Followup;
+      const followup = runSyncRow(db, kdb(db).selectFrom('followups').selectAll().where('issue', '=', issue).compile(), FollowupRowSchema);
+      invariant(followup, 'the followup just inserted is readable in the same transaction');
+      return followup;
     })
     .immediate();
 }

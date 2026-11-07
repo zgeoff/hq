@@ -1,6 +1,8 @@
+import { isRecord } from '@zgeoff/std';
 import { iso } from '../clock/iso.ts';
 import { now } from '../clock/now.ts';
 import { clean } from '../redact/clean.ts';
+import { findMessageContent } from './find-message-content.ts';
 import { findString as str } from './find-string.ts';
 import { MARK } from './mark.ts';
 import { parseJSONLine as jsonLine } from './parse-json-line.ts';
@@ -33,16 +35,16 @@ function buildFound(rec: Obj, uuid: string, tools: Map<string, Tool>): Found {
 }
 
 function resultBlock(rec: Obj): Obj | null {
-  const c = rec['message']?.content;
-  return Array.isArray(c) ? ((c as Obj[]).find((b) => b?.['type'] === 'tool_result') ?? null) : null;
+  const content = findMessageContent(rec);
+  return Array.isArray(content) ? (content.find((block: unknown): block is Obj => isRecord(block) && block['type'] === 'tool_result') ?? null) : null;
 }
 
-function readText(c: unknown): string {
-  if (typeof c === 'string') {
-    return c;
+function readText(content: unknown): string {
+  if (typeof content === 'string') {
+    return content;
   }
-  if (Array.isArray(c)) {
-    return (c as Obj[]).map((p) => (typeof p?.['text'] === 'string' ? p['text'] : '')).join('\n');
+  if (Array.isArray(content)) {
+    return content.map((part: unknown) => (isRecord(part) && typeof part['text'] === 'string' ? part['text'] : '')).join('\n');
   }
   return '';
 }

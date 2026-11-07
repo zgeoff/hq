@@ -288,15 +288,18 @@ async function readTaggedReleases(run: Runner, repo: string, tag: RegExp): Promi
   return parseReleases(raw, tag);
 }
 
+const TagRefSchema = z.object({ object: z.object({ sha: z.string() }) });
+
 async function readMovingTag(run: Runner, repo: string, ref: string, at: Date): Promise<Release[]> {
   const out = await gh(run, ['api', `repos/${OWNER}/${repo}/git/ref/tags/${ref}`], `tag ${ref} of ${repo}`);
-  let raw: { object?: { sha?: unknown } } | null;
+  let raw: unknown;
   try {
     raw = JSON.parse(out);
   } catch {
     throw new HqError('bad_releases', `tag ${ref} of ${repo} is not JSON`);
   }
-  if (typeof raw?.object?.sha !== 'string' || !HEX40.test(raw.object.sha)) {
+  const sha = TagRefSchema.safeParse(raw).data?.object.sha;
+  if (sha === undefined || !HEX40.test(sha)) {
     throw new HqError('bad_releases', `tag ${ref} of ${repo} has no commit`);
   }
   return [{ tag: ref, at: iso(at) }];

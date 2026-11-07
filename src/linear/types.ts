@@ -1,6 +1,8 @@
 import type { Database } from 'bun:sqlite';
+import type { z } from 'zod';
 import type { Runner } from '../runner/types.ts';
 import type { IssueType } from './issue-types.ts';
+import type { NodeSchema } from './node-schema.ts';
 
 export interface LinearIssue {
   issue: string;
@@ -31,13 +33,7 @@ export interface LinearCommandDeps {
   files: IssueFiles;
 }
 
-export interface Node {
-  identifier: string;
-  title: string;
-  completedAt: string | null;
-  canceledAt: string | null;
-  labels: { nodes: { name: string; parent: { name: string } | null }[] };
-}
+export type Node = z.output<typeof NodeSchema>;
 
 export type FiledSource = 'owner' | 'design' | 'agent' | 'live check' | 'bot';
 

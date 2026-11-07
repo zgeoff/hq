@@ -1,11 +1,10 @@
 import type { IssueType } from '../linear/issue-types.ts';
 import type { LaneConfig } from '../areas/types.ts';
-import type { HqTables } from '../db/hq-columns.ts';
+import type { z } from 'zod';
+import type { CapacitySchema } from './capacity-schema.ts';
+import type { NudgeRowSchema } from './nudge-row-schema.ts';
 
-export interface Capacity {
-  imp?: { freeMib?: number; room?: boolean; error?: string };
-  providers?: Record<string, { room?: boolean; unattended?: boolean; target?: string }>;
-}
+export type Capacity = z.output<typeof CapacitySchema>;
 
 export interface DesignSlots {
   agent: number;
@@ -80,7 +79,7 @@ export interface LanesHold {
   by: string;
 }
 
-export type NudgeRow = Pick<HqTables['lanes_nudges'], 'id' | 'at' | 'slots' | 'free_minutes' | 'eligible' | 'slots_after' | 'checked_at'>;
+export type NudgeRow = z.output<typeof NudgeRowSchema>;
 
 export interface LaneRule {
   issues: string[];

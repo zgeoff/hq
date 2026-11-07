@@ -10,12 +10,14 @@ const StateSchema = z.object({ state: z.unknown() });
 // nothing could undo it.
 export async function checkMergedOnGitHub(run: Runner, raw: string): Promise<void> {
   const { ref } = normalizePrRef(raw);
-  const [repo, n] = ref.split('#') as [string, string];
-  const r = await run(['gh', 'pr', 'view', n, '-R', `zgeoff/${repo}`, '--json', 'state,mergedAt'], { env: cleanEnv() });
-  if (r.code !== 0) throw new HqError('github_unreachable', `can't confirm ${ref} merged on GitHub (gh exit ${r.code}): ${(r.stderr || r.stdout).trim().slice(0, 200)}; hq leaves it open`);
+  const [repo = '', prNumber = ''] = ref.split('#');
+  const result = await run(['gh', 'pr', 'view', prNumber, '-R', `zgeoff/${repo}`, '--json', 'state,mergedAt'], { env: cleanEnv() });
+  if (result.code !== 0) {
+    throw new HqError('github_unreachable', `can't confirm ${ref} merged on GitHub (gh exit ${result.code}): ${(result.stderr || result.stdout).trim().slice(0, 200)}; hq leaves it open`);
+  }
   let json: unknown;
   try {
-    json = JSON.parse(r.stdout);
+    json = JSON.parse(result.stdout);
   } catch {
     throw new HqError('github_unreachable', `gh gave no JSON for ${ref}; hq leaves it open`);
   }
