@@ -272,6 +272,7 @@ async function collectReviewRow(ctx: NoslopReviewContext, ran: ReviewRan): Promi
     error: ran.postFailed === null ? ran.judged.why : `stored, but not posted to GitHub: ${ran.postFailed}`,
     sha: ran.sha,
     adapter: ctx.adapter?.adapter ?? null,
+    adapterSource: (ctx.adapter ?? DEFAULT_ADAPTER).source,
     full: ctx.full === true,
     confirm: ctx.fixesOnly === true,
     patchId,

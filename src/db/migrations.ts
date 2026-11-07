@@ -609,6 +609,8 @@ export const MIGRATIONS: string[] = [
     fetched_at TEXT NOT NULL
   );`,
 
-  // NULL: hq passed no --adapter, so noslop's default adapter ran.
-  `ALTER TABLE noslop_rounds ADD COLUMN adapter TEXT CHECK (adapter IN ('codex', 'claude'));`,
+  // adapter NULL: hq passed no --adapter, so noslop's default adapter ran. adapter_source NULL: a
+  // round from before v52.
+  `ALTER TABLE noslop_rounds ADD COLUMN adapter TEXT CHECK (adapter IN ('codex', 'claude'));
+  ALTER TABLE noslop_rounds ADD COLUMN adapter_source TEXT CHECK (adapter_source IN ('flag', 'setting', 'default'));`,
 ];

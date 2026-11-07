@@ -338,6 +338,22 @@ test.each([
   expect(noslop?.opts?.env?.['ANTHROPIC_MODEL']).toBe(model);
 });
 
+test.each([
+  { name: 'the flag', flag: 'claude', setting: ['codex'], until: undefined, recorded: { adapter: 'claude', adapter_source: 'flag' } },
+  { name: 'the stored setting', flag: undefined, setting: ['claude'], until: '2026-11-11T13:00:00Z', recorded: { adapter: 'claude', adapter_source: 'setting' } },
+  { name: 'noslop\'s default', flag: undefined, setting: ['codex'], until: undefined, recorded: { adapter: null, adapter_source: 'default' } },
+] as const)('it records the adapter and $name as the source that chose it on the round', async (row) => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
+  ctx.listWidgets();
+  onTestFinished(overrideEnv('HQ_NOW', '2026-11-08T00:00:00Z'));
+  await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'adapter', rest: [...row.setting], since: undefined, until: row.until, actor: 'kettle-owner', readOwnerSession: () => Promise.reject(new Error('the adapter setting reads no owner session')) });
+
+  await runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false, adapter: row.flag });
+
+  expect(ctx.db.query('SELECT adapter, adapter_source FROM noslop_rounds').all()).toStrictEqual([row.recorded]);
+});
+
 test('it passes no --adapter to noslop when none is asked', async () => {
   const ctx = setupTest();
   const fake = buildFakeRunner();
