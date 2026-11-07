@@ -2,6 +2,7 @@ import type { Database } from 'bun:sqlite';
 import { expect, onTestFinished, test } from 'bun:test';
 import { createUnblockItems } from '../test/create-unblock-items.ts';
 import { NOON_SYDNEY, at, freshDb } from '../test/helpers.ts';
+import { readOutboxRows } from './outbox/read-outbox-rows.ts';
 import { recordConsoleMark } from './record-console-mark.ts';
 import { recordConsoleReview } from './record-console-review.ts';
 import { roleName } from './roles/role-name.ts';
@@ -15,7 +16,9 @@ function setupTest(): Database {
 }
 
 function readOwnerMessages(db: Database): string[] {
-  return (db.query('SELECT text FROM outbox WHERE target = ? ORDER BY id').all(roleName('owner')) as { text: string }[]).map((m) => m.text);
+  return readOutboxRows(db)
+    .filter((message) => message.target === roleName('owner'))
+    .map((message) => message.text);
 }
 
 test('each review answer lands as its own console answer, and closes, drops or puts off the item', () => {

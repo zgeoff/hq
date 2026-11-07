@@ -17,27 +17,21 @@ import { finalPr } from '../src/runs/final-pr.ts';
 import { setState } from '../src/runs/set-state.ts';
 import { unfinalPr } from '../src/runs/unfinal-pr.ts';
 import { unmergePr } from '../src/runs/unmerge-pr.ts';
-import type { AskState } from '../src/transitions/ask-states.ts';
+import { isOneOf } from '@zgeoff/std';
+import { collectKeys } from '../src/test-utils/collect-keys.ts';
 import { ASK_STATES } from '../src/transitions/ask-states.ts';
-import type { AskAction } from '../src/transitions/ask-transitions.ts';
 import { ASK_TRANSITIONS } from '../src/transitions/ask-transitions.ts';
 import { checkAsk } from '../src/transitions/check-ask.ts';
 import { checkPr } from '../src/transitions/check-pr.ts';
 import { checkRun } from '../src/transitions/check-run.ts';
-import type { PrState } from '../src/transitions/pr-states.ts';
 import { PR_STATES } from '../src/transitions/pr-states.ts';
-import type { PrAction } from '../src/transitions/pr-transitions.ts';
 import { PR_TRANSITIONS } from '../src/transitions/pr-transitions.ts';
-import type { RunState } from '../src/transitions/run-states.ts';
 import { RUN_STATES } from '../src/transitions/run-states.ts';
-import type { RunAction } from '../src/transitions/run-transitions.ts';
 import { RUN_TRANSITIONS } from '../src/transitions/run-transitions.ts';
 import { checkUnblock } from '../src/check-unblock.ts';
 import { addUnblock } from '../src/unblock/add-unblock.ts';
 import { closeUnblock } from '../src/unblock/close-unblock.ts';
 import type { UnblockInput } from '../src/unblock/types.ts';
-import type { UnblockState } from '../src/unblock-state.ts';
-import type { UnblockAction } from '../src/unblock-transitions.ts';
 import { UNBLOCK_TRANSITIONS } from '../src/unblock-transitions.ts';
 import { NOON_SYDNEY, at, freshDb } from './helpers.ts';
 
@@ -54,46 +48,46 @@ const throwsBadState = (fn: () => void): boolean => {
     fn();
     return false;
   } catch (e) {
-    expect((e as { code?: string }).code).toBe('bad_state');
+    expect(e).toMatchObject({ code: 'bad_state' });
     return true;
   }
 };
 
 describe('the tables match the checks, pair by pair', () => {
-  for (const action of Object.keys(ASK_TRANSITIONS) as AskAction[]) {
+  for (const action of collectKeys(ASK_TRANSITIONS)) {
     test(`ask ${action}`, () => {
       for (const from of ASK_STATES) {
-        const allowed = (ASK_TRANSITIONS[action].from as readonly AskState[]).includes(from);
+        const allowed = isOneOf(from, ASK_TRANSITIONS[action].from);
         expect([action, from, throwsBadState(() => checkAsk('x', action, from))]).toEqual([action, from, !allowed]);
       }
     });
   }
 
-  for (const action of Object.keys(RUN_TRANSITIONS) as RunAction[]) {
+  for (const action of collectKeys(RUN_TRANSITIONS)) {
     test(`run ${action}`, () => {
       for (const from of RUN_STATES) {
         for (const to of RUN_STATES) {
           const row = RUN_TRANSITIONS[action];
-          const allowed = (row.from as readonly RunState[]).includes(from) && (row.to as readonly RunState[]).includes(to);
+          const allowed = isOneOf(from, row.from) && isOneOf(to, [row.to].flat());
           expect([action, from, to, throwsBadState(() => checkRun('x', action, from, to))]).toEqual([action, from, to, !allowed]);
         }
       }
     });
   }
 
-  for (const action of Object.keys(PR_TRANSITIONS) as PrAction[]) {
+  for (const action of collectKeys(PR_TRANSITIONS)) {
     test(`pr ${action}`, () => {
       for (const from of PR_STATES) {
-        const allowed = (PR_TRANSITIONS[action].from as readonly PrState[]).includes(from);
+        const allowed = isOneOf(from, PR_TRANSITIONS[action].from);
         expect([action, from, throwsBadState(() => checkPr('x#1', action, from))]).toEqual([action, from, !allowed]);
       }
     });
   }
 
-  for (const action of Object.keys(UNBLOCK_TRANSITIONS) as UnblockAction[]) {
+  for (const action of collectKeys(UNBLOCK_TRANSITIONS)) {
     test(`unblock ${action}`, () => {
       for (const from of ['open', 'done', 'dropped'] as const) {
-        const allowed = (UNBLOCK_TRANSITIONS[action].from as readonly UnblockState[]).includes(from);
+        const allowed = isOneOf(from, UNBLOCK_TRANSITIONS[action].from);
         expect([action, from, throwsBadState(() => checkUnblock('x', action, from))]).toEqual([action, from, !allowed]);
       }
     });

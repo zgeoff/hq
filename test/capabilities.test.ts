@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test';
+import { isRecord } from '@zgeoff/std';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import invariant from 'tiny-invariant';
+import { z } from 'zod';
 import { main } from '../src/cli.ts';
 import { HELP } from '../src/help.ts';
 import { VERSION } from '../src/version.ts';
@@ -122,7 +125,8 @@ test('semver compares by number, not text', () => {
 });
 
 test('package.json carries the same version as VERSION', () => {
-  const pkg = JSON.parse(readFileSync(join(import.meta.dir, '../package.json'), 'utf8')) as { version: string };
+  const text = readFileSync(join(import.meta.dir, '../package.json'), 'utf8');
+  const pkg = z.object({ version: z.string() }).parse(JSON.parse(text));
   expect(pkg.version).toBe(VERSION);
 });
 
@@ -143,8 +147,10 @@ function missing(value: unknown, path: string): string | null {
   const bare = optional ? head!.slice(0, -1) : head!;
   const isArray = bare.endsWith('[]');
   const key = isArray ? bare.slice(0, -2) : bare;
-  if (value === null || typeof value !== 'object' || !(key in (value as object))) return optional ? null : `${key} is missing`;
-  const next = (value as Record<string, unknown>)[key];
+  if (!isRecord(value) || !(key in value)) {
+    return optional ? null : `${key} is missing`;
+  }
+  const next = value[key];
   if (optional && next === null) return null;
   if (!isArray) return rest ? missing(next, rest) : null;
   if (!Array.isArray(next)) {
@@ -184,13 +190,17 @@ test('shape: fleet', async () => {
 test('shape: fleet shows promptCheck for a declared session that is live in atc, and says so in the text', async () => {
   const atc = fakeAtc(dir);
   try {
-    expect(((await hq('fleet')).json as { declared: { promptCheck?: object }[] }).declared.every((e) => e.promptCheck === undefined)).toBe(true);
-    const json = (await hq('fleet', '--prompts')).json as { declared: { name: string; prompt: string; promptCheck?: object }[] };
+    const plain = await hq('fleet');
+    const checkedSchema = z.object({ promptCheck: z.unknown().optional() });
+    expect(z.object({ declared: z.array(checkedSchema) }).parse(plain.json).declared.every((entry) => entry.promptCheck === undefined)).toBe(true);
+    const prompted = await hq('fleet', '--prompts');
+    const entrySchema = z.object({ name: z.string(), prompt: z.string(), promptCheck: z.unknown().optional() });
+    const json = z.object({ declared: z.array(entrySchema) }).parse(prompted.json);
     const stu = json.declared.find((e) => e.name === 'z-stu')!;
     expect(typeof stu.prompt).toBe('string');
     expect(stu.promptCheck).toEqual({ state: 'unknown', since: null, hint: null, reason: expect.stringContaining('no prompt') });
     expect(json.declared.some((entry) => entry.promptCheck === undefined)).toBe(true);
-    checkShape('fleet', json);
+    checkShape('fleet', prompted.json);
     out = [];
     expect(await main(['fleet'])).toBe(0);
     expect(out.join('\n')).toContain('z-stu: prompt check unknown (atc gave no prompt for the session)');
@@ -200,15 +210,13 @@ test('shape: fleet shows promptCheck for a declared session that is live in atc,
   }
 });
 
-interface FleetPluginJson {
-  declared: { name: string; pluginCheck?: object }[];
-}
-
 test("shape: fleet --prompts gives pluginCheck for a live session whose plugin folders differ from fleet.json's", async () => {
   const atc = fakeAtc(dir);
   try {
     const ran = await hq('fleet', '--prompts');
-    expect((ran.json as FleetPluginJson).declared.filter((e) => e.pluginCheck !== undefined)).toEqual([expect.objectContaining({ name: 'z-stu', pluginCheck: { declared: ['~/projects/hq/mods/hq-band'], running: [] } })]);
+    const entrySchema = z.object({ name: z.string(), pluginCheck: z.unknown().optional() });
+    const withPlugins = z.object({ declared: z.array(entrySchema) }).parse(ran.json).declared.filter((entry) => entry.pluginCheck !== undefined);
+    expect(withPlugins).toStrictEqual([{ name: 'z-stu', pluginCheck: { declared: ['~/projects/hq/mods/hq-band'], running: [] } }]);
     checkShape('fleet', ran.json);
   } finally {
     atc.stop();
@@ -229,16 +237,19 @@ test("hq fleet's text names a live session whose plugin folders differ from flee
 });
 
 test('shape: fleet before the first ensure has no last', async () => {
-  const json = (await hq('fleet')).json as { last?: unknown };
-  expect(json.last ?? null).toBeNull();
-  checkShape('fleet', json);
+  const fleet = await hq('fleet');
+  expect(z.object({ last: z.unknown().optional() }).parse(fleet.json).last ?? null).toBeNull();
+  checkShape('fleet', fleet.json);
 });
 
 test('shape: fleet with a waiting step that has no id', async () => {
   setMeta(db, 'fleet_last', JSON.stringify({ at: '2026-10-14T01:00:00Z', dryRun: false, steps: [{ name: 'z-kettle', action: 'waiting', detail: 'invented' }] }));
-  const json = (await hq('fleet')).json as { last: { steps: { id?: string }[] } };
-  expect(json.last.steps[0]!.id).toBeUndefined();
-  checkShape('fleet', json);
+  const fleet = await hq('fleet');
+  const stepSchema = z.object({ id: z.string().optional() });
+  const [step] = z.object({ last: z.object({ steps: z.array(stepSchema) }) }).parse(fleet.json).last.steps;
+  invariant(step);
+  expect(step.id).toBeUndefined();
+  checkShape('fleet', fleet.json);
 });
 
 test('shape: run list and run show', async () => {

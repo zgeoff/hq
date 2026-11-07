@@ -35,6 +35,7 @@ export interface AtcMcpFiles {
 
 export interface Probe {
   run: Runner;
+  commandTimeoutMs: number;
   readFile: (path: string) => Promise<string>;
   atcAnswers: () => Promise<string | null>;
   atcMcp?: () => Promise<AtcMcpRead>;

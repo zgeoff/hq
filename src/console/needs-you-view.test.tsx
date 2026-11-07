@@ -2,6 +2,7 @@ import { expect, onTestFinished, spyOn, test } from 'bun:test';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { QueryClient, QueryClientProvider, environmentManager } from '@tanstack/react-query';
+import invariant from 'tiny-invariant';
 import { createUnblockItems } from '../../test/create-unblock-items.ts';
 import { NOON_SYDNEY, at, freshDb } from '../../test/helpers.ts';
 import { createSignedInAuth } from '../../test/create-signed-in-auth.ts';
@@ -83,7 +84,10 @@ test('the owner answers by click, key and note, Ask Stu copies its prompt, a rev
   });
   await lib.within(document.body).findByText('Fit the long spout?');
 
-  expect((lib.within(document.body).getByLabelText('Note or your own answer') as HTMLTextAreaElement).value).toBe('');
+  const note = lib.within(document.body).getByLabelText('Note or your own answer');
+  invariant(note instanceof HTMLTextAreaElement);
+
+  expect(note.value).toBe('');
 
   lib.fireEvent.keyDown(lib.within(document.body).getByLabelText('Note or your own answer'), { key: 'Enter' });
 

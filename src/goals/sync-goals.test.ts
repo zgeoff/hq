@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, expect, onTestFinished, test } from 'bun:test';
 import { overrideEnv } from '../config/override-env.ts';
 import type { Database } from 'bun:sqlite';
+import { readDeployRuns } from './read-deploy-runs.ts';
+import { readGoalDays } from './read-goal-days.ts';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { classifyDeploy } from './classify-deploy.ts';
 import { DEPLOY } from './deploy.ts';
@@ -170,7 +172,7 @@ test('a capped sync fetches the newest repo-days first and counts the rest as le
   expect(r.days).toBe(3);
   expect(r.errors).toEqual([]);
   expect(r.left).toBe(2 * 5 - 3);
-  const got = db.query(`SELECT day FROM goal_days WHERE kind = 'ci' ORDER BY day`).all() as { day: string }[];
+  const got = readGoalDays(db, 'ci');
   expect(got.every((x) => x.day === '2026-10-15')).toBe(true);
   const again = await syncGoals(db, gh({}, {}), { from: new Date('2026-10-12T00:00:00Z') });
   expect(again.left).toBe(0);
@@ -315,7 +317,7 @@ test('syncDeploys takes at most 60 a call, oldest first, and counts what is left
   }
   const first = await syncDeploys(db, jobsGh(answers));
   expect(first).toMatchObject({ fetched: 60, left: 5 });
-  const stored = (db.query('SELECT run_id FROM deploy_runs').all() as { run_id: number }[]).map((x) => x.run_id);
+  const stored = readDeployRuns(db).map((x) => x.run_id);
   expect(stored).not.toContain(8000);
   expect(stored).not.toContain(8004);
   expect(stored).toContain(8005);

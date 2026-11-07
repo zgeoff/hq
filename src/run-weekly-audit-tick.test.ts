@@ -3,6 +3,7 @@ import { at, fakeAtc, freshDb } from '../test/helpers.ts';
 import { overrideEnv } from './config/override-env.ts';
 import { sydneyUtc } from './morning/sydney-utc.ts';
 import { flush } from './outbox/flush.ts';
+import { readOutboxRows } from './outbox/read-outbox-rows.ts';
 import { runWeeklyAuditTick } from './run-weekly-audit-tick.ts';
 
 function setupTest() {
@@ -12,7 +13,7 @@ function setupTest() {
   return {
     db: fresh.db,
     dir: fresh.dir,
-    readOutbox: () => fresh.db.query('SELECT text, topic FROM outbox').all() as { text: string; topic: string }[],
+    readOutbox: () => readOutboxRows(fresh.db).map((row) => ({ text: row.text, topic: row.topic })),
   };
 }
 

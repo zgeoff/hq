@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test';
 import type { Database } from 'bun:sqlite';
+import invariant from 'tiny-invariant';
+import { getMeta } from '../src/db/get-meta.ts';
+import { listEvents } from '../src/list-events.ts';
+import { readOutboxRows } from '../src/outbox/read-outbox-rows.ts';
 import { checkLane } from '../src/areas/check-lane.ts';
 import { laneArgs } from '../src/areas/lane-args.ts';
 import { parkedRuns } from '../src/areas/parked-runs.ts';
@@ -20,6 +24,7 @@ import { reportReady } from '../src/lanes/report-ready.ts';
 import { formatLineRoom } from '../src/lanes/format-line-room.ts';
 import { loadImpRoom } from '../src/lanes/load-imp-room.ts';
 import { parsePacingSlots } from '../src/lanes/parse-pacing-slots.ts';
+import { readLanesSamples } from '../src/lanes/read-lanes-samples.ts';
 import { readSlotPlan } from '../src/lanes/read-slot-plan.ts';
 import { tick } from '../src/lanes/tick.ts';
 import { checkReadyStale } from '../src/lanes/check-ready-stale.ts';
@@ -46,7 +51,6 @@ const cap = (freeMib: number) => ({ imp: { freeMib, room: true }, providers: { c
 const sample = (freeMib: number) => ({ cap: cap(freeMib), impMib: 2048, error: null, lanes: LANES, slots: SLOTS });
 const run = (issue: string, lane: string | null, place: 'imp' | 'local' = 'imp') =>
   addRun(db, { issue, title: 'Invented kettle work', place, session: null, next: 'Agent working.', gate: null, geoffChat: false, lane, actor: 'z-delivery' });
-const msgs = () => db.query('SELECT text FROM outbox').all() as { text: string }[];
 
 beforeEach(() => {
   ({ db, cleanup } = freshDb());
@@ -136,7 +140,7 @@ test('the watcher nudges with the picks after 10 min, and again only on a change
   atMin(10);
   const r = tick(db, sample(16384), 'hq-lanes');
   expect(r.nudged).toBe(true);
-  expect(msgs()[0]?.text).toBe(
+  expect(readOutboxRows(db)[0]?.text).toBe(
     '10 slots free for 10 min (imp 8, local 2). Take, in this order: GEO-21, GEO-22. (hq lanes shows the plan, hq focus the focus; capacity.sh still picks the provider and where it runs, and you write the briefs.)',
   );
   atMin(15);
@@ -145,7 +149,7 @@ test('the watcher nudges with the picks after 10 min, and again only on a change
   atMin(16);
 
   expect(tick(db, sample(16_384), 'hq-lanes').nudged).toBe(true);
-  const nudges = msgs().filter((message) => message.text.includes('Take, in this order'));
+  const nudges = readOutboxRows(db).filter((message) => message.text.includes('Take, in this order'));
   expect(nudges).toHaveLength(1);
   expect(nudges[0]?.text).toContain('Take, in this order: GEO-22.');
 });
@@ -158,7 +162,7 @@ test('it starts no nudge for a Design issue alone, though the plan names it for 
 
   const result = tick(db, withDesign, 'hq-lanes');
 
-  expect([readSlotPlan(db, withDesign)?.design.withGeoff.next, result.nudged, result.why, msgs()]).toStrictEqual([['GEO-24'], false, '10 slot(s) free, nothing eligible', []]);
+  expect([readSlotPlan(db, withDesign)?.design.withGeoff.next, result.nudged, result.why, readOutboxRows(db)]).toStrictEqual([['GEO-24'], false, '10 slot(s) free, nothing eligible', []]);
 });
 
 test('the samples count the slots the plan fills from the first free minute; only the nudge waits', () => {
@@ -167,7 +171,7 @@ test('the samples count the slots the plan fills from the first free minute; onl
     atMin(m);
     tick(db, { ...sample(0), lanes: LANES, slots: SLOTS }, 'hq-lanes');
   }
-  expect((db.query('SELECT slots FROM lanes_samples ORDER BY seq').all() as { slots: number }[]).map((r) => r.slots)).toEqual([2, 2, 2]);
+  expect(readLanesSamples(db).map((row) => row.slots)).toStrictEqual([2, 2, 2]);
   expect(idleSlotMinutes(db, 1).slotMinutes).toBe(20);
 });
 
@@ -248,7 +252,7 @@ test('a blocked run with no session awake is parked, whatever it waits on: its s
 });
 
 test('the sample records the eligible issues the Ready read holds, the hand count while it is stale, and unknown with neither', () => {
-  const eligible = () => (db.query('SELECT eligible, slots FROM lanes_samples ORDER BY seq DESC LIMIT 1').get() as { eligible: number | null; slots: number });
+  const eligible = () => readLanesSamples(db).map((row) => ({ eligible: row.eligible, slots: row.slots })).at(-1);
   setMeta(db, 'lanes_ready_issues', JSON.stringify({ at: T0, eligible: [], design: [] }));
   tick(db, sample(16384), 'hq-lanes');
   expect(eligible()).toStrictEqual({ eligible: 0, slots: 0 });
@@ -265,7 +269,7 @@ test('the sample records the eligible issues the Ready read holds, the hand coun
   reportReady(db, 5, 'z-delivery');
   atMin(3);
   tick(db, sample(16384), 'hq-lanes');
-  expect(eligible().eligible).toBe(5);
+  expect(eligible()?.eligible).toBe(5);
 });
 
 const SK = 'GEO-1=blocked by GEO-9;GEO-2=needs a design call';
@@ -287,8 +291,11 @@ test('--skipped reads ISSUE=reason pairs and refuses the rest', () => {
 
 test('the Ready detail is stored with the report, shown while fresh, and flags what is unexplained', () => {
   reportLaneReady(db, parseReady(LANES, 'atc=0,flexible=0'), 'z-delivery', { total: 53, skipped: parseSkipped(SK) });
-  expect(JSON.parse((db.query("SELECT value FROM meta WHERE key = 'lanes_ready_detail'").get() as { value: string }).value)).toMatchObject({ total: 53, skipped: [{ issue: 'GEO-1' }, { issue: 'GEO-2' }] });
-  expect((db.query("SELECT data FROM events WHERE action = 'ready-by-lane'").get() as { data: string }).data).toContain('blocked by GEO-9');
+  const detail = getMeta(db, 'lanes_ready_detail');
+  invariant(detail !== null);
+  const event = listEvents(db, 'ready-by-lane')[0]?.data;
+  expect(JSON.parse(detail)).toMatchObject({ total: 53, skipped: [{ issue: 'GEO-1' }, { issue: 'GEO-2' }] });
+  expect(event).toContain('blocked by GEO-9');
   const s = readySummary(db, 30)!;
   expect(s.line).toBe('Ready: 53 total, 0 eligible across lanes, 2 skipped with reasons, 51 unexplained UNEXPLAINED');
   expect(skippedLines(s)).toEqual(['  GEO-1: blocked by GEO-9', '  GEO-2: needs a design call']);
@@ -404,7 +411,7 @@ test('the stale alert names the last Linear read\'s error and gives the hand rep
 
   expect(alerted).toBe(true);
 
-  expect(msgs()[0]?.text).toMatchInlineSnapshot(`"Lanes: 3 slot(s) free, and the newest Ready report is 2 h old (2026-10-16T01:00:00Z). The lanes can't tell how much work waits. hq's last read of Ready from Linear failed: Linear answered 401: invented failure. Until hq reads again, z-delivery reports Ready by hand with hq lanes ready --lane name=n,..."`);
+  expect(readOutboxRows(db)[0]?.text).toMatchInlineSnapshot(`"Lanes: 3 slot(s) free, and the newest Ready report is 2 h old (2026-10-16T01:00:00Z). The lanes can't tell how much work waits. hq's last read of Ready from Linear failed: Linear answered 401: invented failure. Until hq reads again, z-delivery reports Ready by hand with hq lanes ready --lane name=n,..."`);
 });
 
 test('the stale alert says hq has not read Ready from Linear when no read failed', () => {
@@ -414,5 +421,5 @@ test('the stale alert says hq has not read Ready from Linear when no read failed
 
   expect(alerted).toBe(true);
 
-  expect(msgs()[0]?.text).toMatchInlineSnapshot(`"Lanes: 3 slot(s) free, and the newest Ready report is 2 h old (2026-10-16T01:00:00Z). The lanes can't tell how much work waits. hq has not read Ready from Linear since then. Until hq reads again, z-delivery reports Ready by hand with hq lanes ready --lane name=n,..."`);
+  expect(readOutboxRows(db)[0]?.text).toMatchInlineSnapshot(`"Lanes: 3 slot(s) free, and the newest Ready report is 2 h old (2026-10-16T01:00:00Z). The lanes can't tell how much work waits. hq has not read Ready from Linear since then. Until hq reads again, z-delivery reports Ready by hand with hq lanes ready --lane name=n,..."`);
 });

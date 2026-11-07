@@ -24,7 +24,7 @@ export function downtime(db: Database, from: Date, to: Date): Downtime {
     longestMs = Math.max(longestMs, Date.parse(o.detected_at) - Date.parse(o.started_at));
   }
   const covered = coveredMs(db, f, e);
-  const total = readCount(db, kdb(db).selectFrom('probe_samples').select((eb) => eb.fn.countAll<number>().as('count')).where('at', '>=', iso(from)).where('at', '<=', iso(to)).compile());
+  const total = readCount(db, kdb(db).selectFrom('probe_samples').select((eb) => eb.fn.countAll().as('count')).where('at', '>=', iso(from)).where('at', '<=', iso(to)).compile());
   const blindMs = Math.max(0, e - f - covered);
   return { from: iso(from), to: iso(to), samples: total, downMinutes: round(downMs / 60_000), outages: rows.length, longestDetectMinutes: round(longestMs / 60_000), blindMinutes: round(blindMs / 60_000), downMs, longestDetectMs: longestMs, blindMs };
 }

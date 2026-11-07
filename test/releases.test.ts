@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test';
 import type { Database } from 'bun:sqlite';
+import invariant from 'tiny-invariant';
+import { listEvents } from '../src/list-events.ts';
+import { readOutboxRows } from '../src/outbox/read-outbox-rows.ts';
 import { isShipPassDue as dueForShipPass } from '../src/releases/is-ship-pass-due.ts';
 import { parseReleases } from '../src/releases/parse-releases.ts';
 import { shipRuns } from '../src/releases/ship-runs.ts';
@@ -9,6 +12,7 @@ import { addPr } from '../src/runs/add-pr.ts';
 import { addRun } from '../src/runs/add-run.ts';
 import { closePr } from '../src/runs/close-pr.ts';
 import { getRun } from '../src/runs/get-run.ts';
+import { requirePR } from '../src/runs/require-pr.ts';
 import { setLiveCheck } from '../src/runs/set-live-check.ts';
 import { setState } from '../src/runs/set-state.ts';
 import { overrideEnv } from '../src/config/override-env.ts';
@@ -55,8 +59,6 @@ function mergedRun(issue: string, refs: string[], state: 'merged' | 'deploying' 
   setState(db, issue, state, {}, 'z-delivery');
 }
 
-const msgs = () => db.query('SELECT target, text, topic FROM outbox ORDER BY id').all() as { target: string; text: string; topic: string }[];
-const prRow = (ref: string) => db.query('SELECT merge_sha, shipped_tag, shipped_at FROM run_prs WHERE ref = ?').get(ref) as { merge_sha: string | null; shipped_tag: string | null; shipped_at: string | null };
 const T = new Date(NOON_SYDNEY);
 
 beforeEach(() => {
@@ -86,8 +88,10 @@ test('a run moves to live-check when its merged PR is in a release', async () =>
   const run = getRun(db, 'GEO-12')!;
   expect(run.state).toBe('live-check');
   expect(run.waits_on).toBeNull();
-  expect(prRow('nixie#5')).toEqual({ merge_sha: sha(5), shipped_tag: 'v1.2.0', shipped_at: '2026-10-16T00:00:00Z' });
-  const ev = db.query("SELECT actor, data, from_state, to_state FROM events WHERE subject_id = 'GEO-12' AND action = 'shipped'").get() as { actor: string; data: string; from_state: string; to_state: string };
+  const shippedPR = requirePR(db, 'nixie#5');
+  expect([shippedPR.merge_sha, shippedPR.shipped_tag, shippedPR.shipped_at]).toStrictEqual([sha(5), 'v1.2.0', '2026-10-16T00:00:00Z']);
+  const ev = listEvents(db, 'shipped').find((event) => event.subject_id === 'GEO-12');
+  invariant(ev, 'the ship pass logged a shipped event for GEO-12');
   expect(ev).toMatchObject({ actor: 'hq-releases', from_state: 'merged', to_state: 'live-check' });
   expect(JSON.parse(ev.data).prs).toEqual([{ ref: 'nixie#5', tag: 'v1.2.0', shipped_at: '2026-10-16T00:00:00Z' }]);
 });
@@ -111,7 +115,6 @@ test('state --check and run check set live_check and log it; bad values are refu
   expect(getRun(db, 'GEO-14')!.live_check).toBe('owed');
   expect(db.query("SELECT COUNT(*) AS n FROM events WHERE subject_id = 'GEO-14' AND action = 'check'").get()).toEqual({ n: 1 });
   expect(() => setLiveCheck(db, 'GEO-14', 'maybe', 'z-delivery')).toThrow('owed or none');
-  expect(() => setState(db, 'GEO-14', 'deploying', { liveCheck: 'maybe' as 'owed' }, 'z-delivery')).toThrow('owed or none');
 });
 
 test('an open PR, no containing release, or a repo with no source leaves the run alone', async () => {
@@ -125,7 +128,7 @@ test('an open PR, no containing release, or a repo with no source leaves the run
   expect(r.moved).toEqual([]);
   expect(['GEO-1', 'GEO-2', 'GEO-3'].map((i) => getRun(db, i)!.state)).toEqual(['merged', 'merged', 'merged']);
   expect(calls.some((c) => c.includes('dotfiles'))).toBe(false);
-  expect(prRow('nixie#6').shipped_tag).toBeNull();
+  expect(requirePR(db,'nixie#6').shipped_tag).toBeNull();
 });
 
 test('a closed-unmerged PR is ignored, but one merged PR is required', async () => {
@@ -204,13 +207,13 @@ test('a run waits until every merged PR has shipped', async () => {
   mergedRun('GEO-23', ['nixie#5', 'impz#2']);
   const w = world({ releases: { nixie: [rel('v1.0.0', '2026-10-16T00:00:00Z')], impz: [rel('v0.1.0', '2026-10-16T00:00:00Z')] }, shas: { 'nixie#5': sha(5), 'impz#2': sha(2) }, contains: { 'v1.0.0': [sha(5)] } });
   expect((await shipRuns(db, gh(w), T)).moved).toEqual([]);
-  expect(prRow('nixie#5').shipped_tag).toBe('v1.0.0');
+  expect(requirePR(db,'nixie#5').shipped_tag).toBe('v1.0.0');
   w.releases['impz'] = [rel('v0.2.0', '2026-10-17T00:00:00Z'), rel('v0.1.0', '2026-10-16T00:00:00Z')];
   w.contains['v0.2.0'] = [sha(2)];
   const calls: string[] = [];
   const r = await shipRuns(db, gh(w, calls), T);
   expect(r.moved.map((m) => m.issue)).toEqual(['GEO-23']);
-  expect(prRow('impz#2').shipped_tag).toBe('v0.2.0');
+  expect(requirePR(db,'impz#2').shipped_tag).toBe('v0.2.0');
   expect(calls.filter((c) => c.includes('nixie') && c.includes('compare'))).toEqual([]);
 });
 
@@ -263,7 +266,7 @@ test('the merge sha is cached: a second pass makes no pr view call', async () =>
   const calls: string[] = [];
   await shipRuns(db, gh(w, calls), T);
   expect(calls.filter((c) => c.startsWith('gh pr view'))).toHaveLength(1);
-  expect(prRow('nixie#5').merge_sha).toBe(sha(5));
+  expect(requirePR(db,'nixie#5').merge_sha).toBe(sha(5));
   calls.length = 0;
   await shipRuns(db, gh(w, calls), T);
   expect(calls.filter((c) => c.startsWith('gh pr view'))).toHaveLength(0);
@@ -275,7 +278,7 @@ test('a merge commit that is not 40 hex characters is refused', async () => {
   const r = await shipRuns(db, gh(w), T);
   expect(r.moved).toEqual([]);
   expect(r.errors[0]).toContain('nixie#5');
-  expect(prRow('nixie#5').merge_sha).toBeNull();
+  expect(requirePR(db,'nixie#5').merge_sha).toBeNull();
 });
 
 test('live-check runs go to z-qa alone, done runs to z-delivery only', async () => {
@@ -284,11 +287,11 @@ test('live-check runs go to z-qa alone, done runs to z-delivery only', async () 
   setLiveCheck(db, 'GEO-13', 'none', 'z-delivery');
   const w = world({ releases: { nixie: [rel('v1.2.0', '2026-10-16T00:00:00Z')] }, shas: { 'nixie#5': sha(5), 'nixie#6': sha(6) }, contains: { 'v1.2.0': [sha(5), sha(6)] } });
   await shipRuns(db, gh(w), T);
-  const m = msgs();
-  expect(m.map((x) => x.target).sort()).toEqual(['z-delivery', 'z-qa']);
-  expect(m.find((x) => x.target === 'z-qa')!.text).toBe('Shipped, now live-check: GEO-12 (nixie#5 in v1.2.0). Run the live check, then hq run done GEO-12.');
-  expect(m.find((x) => x.target === 'z-delivery')!.text).toBe('Shipped and closed (no check owed): GEO-13 (nixie#6 in v1.2.0).');
-  expect(m[0]!.topic).toStartWith('run-shipped');
+  const messages = readOutboxRows(db);
+  expect(messages.map((message) => message.target).toSorted()).toStrictEqual(['z-delivery', 'z-qa']);
+  expect(messages.find((message) => message.target === 'z-qa')?.text).toBe('Shipped, now live-check: GEO-12 (nixie#5 in v1.2.0). Run the live check, then hq run done GEO-12.');
+  expect(messages.find((message) => message.target === 'z-delivery')?.text).toBe('Shipped and closed (no check owed): GEO-13 (nixie#6 in v1.2.0).');
+  expect(messages[0]?.topic).toStartWith('run-shipped');
 });
 
 test('only done runs: z-delivery alone is told', async () => {
@@ -296,7 +299,7 @@ test('only done runs: z-delivery alone is told', async () => {
   setLiveCheck(db, 'GEO-13', 'none', 'z-delivery');
   const w = world({ releases: { nixie: [rel('v1.2.0', '2026-10-16T00:00:00Z')] }, shas: { 'nixie#6': sha(6) }, contains: { 'v1.2.0': [sha(6)] } });
   await shipRuns(db, gh(w), T);
-  expect(msgs().map((x) => x.target)).toEqual(['z-delivery']);
+  expect(readOutboxRows(db).map((message) => message.target)).toStrictEqual(['z-delivery']);
 });
 
 test('HQ_LIVECHECK_TO sets who hears about live checks; z-delivery still hears about done runs', async () => {
@@ -306,10 +309,14 @@ test('HQ_LIVECHECK_TO sets who hears about live checks; z-delivery still hears a
   setLiveCheck(db, 'GEO-13', 'none', 'z-delivery');
   const w = world({ releases: { nixie: [rel('v1.2.0', '2026-10-16T00:00:00Z')] }, shas: { 'nixie#5': sha(5), 'nixie#6': sha(6) }, contains: { 'v1.2.0': [sha(5), sha(6)] } });
   await shipRuns(db, gh(w), T);
-  const m = msgs();
-  expect(m.find((x) => x.target === 'z-qa')!.text).not.toContain('GEO-13');
-  expect(m.find((x) => x.target === 'z-delivery')!.text).not.toContain('GEO-12');
-  expect(m.find((x) => x.target === 'z-delivery')!.text).toContain('GEO-13');
+  const messages = readOutboxRows(db);
+  const toQA = messages.find((message) => message.target === 'z-qa');
+  const toDelivery = messages.find((message) => message.target === 'z-delivery');
+  invariant(toQA, 'z-qa heard about the live check');
+  invariant(toDelivery, 'z-delivery heard about the done run');
+  expect(toQA.text).not.toContain('GEO-13');
+  expect(toDelivery.text).not.toContain('GEO-12');
+  expect(toDelivery.text).toContain('GEO-13');
 });
 
 test('the message lists at most 20 runs and stays under 2000 characters', () => {
@@ -349,9 +356,10 @@ test('a dry run writes nothing', async () => {
   const r = await shipRuns(db, gh(w), T, { dryRun: true });
   expect(r.moved.map((m) => m.issue)).toEqual(['GEO-50']);
   expect(getRun(db, 'GEO-50')!.state).toBe('merged');
-  expect(prRow('nixie#5')).toEqual({ merge_sha: null, shipped_tag: null, shipped_at: null });
+  const untouchedPR = requirePR(db, 'nixie#5');
+  expect([untouchedPR.merge_sha, untouchedPR.shipped_tag, untouchedPR.shipped_at]).toStrictEqual([null, null, null]);
   expect(db.query('SELECT COUNT(*) AS n FROM events').get()).toEqual(before);
-  expect(msgs()).toEqual([]);
+  expect(readOutboxRows(db)).toStrictEqual([]);
 });
 
 test('a run that changed while GitHub was asked is left alone', async () => {

@@ -14,11 +14,10 @@ import { DEADLINE_MS } from './deadline-ms.ts';
 import { MARK } from './mark.ts';
 import { MAX_LINE } from './max-line.ts';
 import { parseRefusal as refusalOf } from './parse-refusal.ts';
+import { readRefusalFiles } from './read-refusal-files.ts';
 import { readSessionNames as whoBySession } from './read-session-names.ts';
 import { readTranscriptList as listTranscripts } from './read-transcript-list.ts';
 import type { Found, ScanOptions, ScanResult, Tool } from './types.ts';
-
-const KnownFileRows = z.array(z.object({ path: z.string(), offset: z.number(), size: z.number(), mtime: z.string(), tools: z.string() }));
 
 interface LineStream {
   readonly maxLine: number;
@@ -39,7 +38,7 @@ export async function scanRefusals(db: Database, options: ScanOptions = {}): Pro
   const startedMs = performance.now();
   const late = () => performance.now() - startedMs >= (options.deadlineMs ?? DEADLINE_MS);
   const result: ScanResult = { files_read: 0, bytes_read: 0, refusals_added: 0, files_left: 0 };
-  const known = new Map(KnownFileRows.parse(db.query('SELECT path, offset, size, mtime, tools FROM refusal_files').all()).map((file) => [file.path, file]));
+  const known = new Map(readRefusalFiles(db).map((file) => [file.path, file]));
   const save = db.query(
     'INSERT INTO refusal_files (path, offset, size, mtime, tools) VALUES (?, ?, ?, ?, ?) ON CONFLICT (path) DO UPDATE SET offset = excluded.offset, size = excluded.size, mtime = excluded.mtime, tools = excluded.tools',
   );

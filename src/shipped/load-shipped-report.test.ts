@@ -8,11 +8,13 @@ import { realRunner } from '../runner/real-runner.ts';
 import { buildMergedDayOutput, buildMergedPR } from '../../test/build-merged-day-output.ts';
 import { buildStubDeliveryRunner } from '../../test/build-stub-delivery-runner.ts';
 import { freshDb } from '../../test/helpers.ts';
-import { makeLinearFake } from '../../test/make-linear-fake.ts';
+import { FakeIssueSchema, makeLinearFake } from '../../test/make-linear-fake.ts';
+import { parseIssueFixture } from '../test-utils/parse-issue-fixture.ts';
 import { loadShippedReport } from './load-shipped-report.ts';
 import { mergedPRsOutputSchema } from './merged-prs-output-schema.ts';
 import { parseRenderedReport } from './parse-rendered-report.ts';
-import type { ProjectIssue, ReportIssue } from './types.ts';
+import { projectIssuesSchema } from './project-issues-schema.ts';
+import type { ProjectIssue } from './types.ts';
 
 function setupTest() {
   const fresh = freshDb();
@@ -71,7 +73,7 @@ test('a week read a day at a time renders in full, with each project\'s burndown
     },
     otherwise: realRunner,
   });
-  const fixtures = ['project-array.json', 'project-object.json'].flatMap((file) => readIssues<ProjectIssue>(file));
+  const fixtures = ['project-array.json', 'project-object.json'].flatMap((file) => parseIssueFixture(readFixture(file), projectIssuesSchema.element));
   const report = await loadShippedReport({ db: ctx.db, run: fake.run, call: loadLinearFake(fixtures, []), scripts: ctx.scripts }, 'week', new Date('2026-10-15T02:00:00Z'));
 
   expect(report.report).toMatchInlineSnapshot(`
@@ -213,7 +215,7 @@ test('a week whose Monday GitHub capped at 1,000 of 1,200 PRs keeps the fetch-ga
 
 test('a day carries each project\'s burndown beside its heading when Linear gives the projects\' issues', async () => {
   const ctx = setupTest();
-  const fixtures = ['project-array.json', 'project-object.json'].flatMap((file) => readIssues<ProjectIssue>(file));
+  const fixtures = ['project-array.json', 'project-object.json'].flatMap((file) => parseIssueFixture(readFixture(file), projectIssuesSchema.element));
   const report = await loadShippedReport({ db: ctx.db, run: makeScriptRunner('daily-prs.json', []), call: loadLinearFake(fixtures, []), scripts: ctx.scripts }, 'today', new Date('2026-10-15T02:00:00Z'));
   expect(report.report.groups.slice(0, 2).map((group) => [group.project, group.burndown])).toStrictEqual([
     ['Lantern Garden', { total: 3, done: 1, triage: 1 }],
@@ -270,11 +272,6 @@ function readFixture(file: string): string {
   return readFileSync(join(import.meta.dir, '../../skills/delivery-report/scripts/testdata/render-report', file), 'utf8');
 }
 
-function readIssues<T>(file: string): T[] {
-  const parsed = JSON.parse(readFixture(file)) as T[] | { issues: T[] };
-  return Array.isArray(parsed) ? parsed : parsed.issues;
-}
-
 function loadLinearFake(projectIssues: readonly ProjectIssue[], asked: unknown[]): LinearCall {
-  return makeLinearFake([...readIssues<ReportIssue>('issues-array.json'), ...readIssues<ReportIssue>('issues-object.json')], projectIssues, asked);
+  return makeLinearFake([...parseIssueFixture(readFixture('issues-array.json'), FakeIssueSchema), ...parseIssueFixture(readFixture('issues-object.json'), FakeIssueSchema)], projectIssues, asked);
 }

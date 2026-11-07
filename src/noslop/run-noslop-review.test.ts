@@ -3,11 +3,13 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { z } from 'zod';
 import { FAKE_REVIEW_JSON, FAKE_SECRETS, FAKE_TOKEN, buildFakeRunner } from '../../test/noslop-fake.ts';
 import { overrideEnv } from '../config/override-env.ts';
 import { openDb } from '../db/open-db.ts';
 import type { LinearCall } from '../linear/types.ts';
 import type { Runner } from '../runner/types.ts';
+import { readOKReviews } from './read-ok-reviews.ts';
 import { resetIssueFlags } from './reset-issue-flags.ts';
 import { runNoslopReview } from './run-noslop-review.ts';
 import type { NoslopReviewContext } from './run-noslop-review.ts';
@@ -387,8 +389,7 @@ function makeGitlessRunner(run: Runner): Runner {
 }
 
 function readLateFlags(db: Database): (boolean | null | undefined)[] {
-  const rows = db.query('SELECT findings FROM noslop_rounds ORDER BY id').all() as { findings: string }[];
-  return rows.map((r) => (JSON.parse(r.findings) as { late: boolean | null }[])[0]?.late);
+  return readOKReviews(db, 'widgets', 7).map((row) => z.array(z.object({ late: z.boolean().nullable() })).parse(JSON.parse(row.findings))[0]?.late);
 }
 
 test('it records late on a new finding of a later review and leaves it null on the first', async () => {

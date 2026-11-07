@@ -8,7 +8,6 @@ import { runSyncRow } from '../db/run-sync-row.ts';
 import { kdb } from '../kdb.ts';
 import { match } from 'ts-pattern';
 import { z } from 'zod';
-import { HqError } from '../errors.ts';
 import { logEvent } from '../log-event.ts';
 import { enqueue } from '../outbox/enqueue.ts';
 import { owner } from '../owner.ts';
@@ -103,9 +102,6 @@ async function readFleetView(
   const all = await client.sessions();
   const known = fleetIds(db);
   const sessions: Record<string, FleetSession> = {};
-  if (!Array.isArray(all)) {
-    throw new HqError('atc_bad_answer', 'atc returned no session list; no stale restart');
-  }
   for (const entry of fleet) {
     const found = findLiveSession(entry.name, all, known);
     if (found) {

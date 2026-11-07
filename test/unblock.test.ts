@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test';
 import type { Database } from 'bun:sqlite';
+import { readOutboxRows } from '../src/outbox/read-outbox-rows.ts';
 import { addUnblock } from '../src/unblock/add-unblock.ts';
 import { closeUnblock } from '../src/unblock/close-unblock.ts';
 import { listUnblocks } from '../src/unblock/list-unblocks.ts';
@@ -81,8 +82,9 @@ test('done notifies the listed sessions; drop does not', () => {
   addUnblock(db, item({ id: 'b', notify: ['z-delivery'] }));
   closeUnblock(db, 'a', 'done', 'all good', 'z-stu');
   closeUnblock(db, 'b', 'dropped', null, 'z-stu');
-  const msgs = db.query('SELECT target, text FROM outbox').all() as { target: string; text: string }[];
-  expect(msgs).toEqual([{ target: 'z-delivery', text: expect.stringContaining('unblocks GEO-9') }]);
+  const messages = readOutboxRows(db);
+  expect(messages.map((row) => row.target)).toStrictEqual(['z-delivery']);
+  expect(messages[0]?.text).toContain('unblocks GEO-9');
   expect(() => closeUnblock(db, 'a', 'done', null, 'z-stu')).toThrow('not open');
 });
 

@@ -42,7 +42,7 @@ export function kindWeeks(db: Database, weeks: number, at: Date = now()): KindWe
       db,
       kdb(db)
         .selectFrom('merged_prs')
-        .select((eb) => ['kind', eb.fn.countAll<number>().as('count')])
+        .select((eb) => ['kind', eb.fn.countAll().as('count')])
         .where('merged_at', '>=', from)
         .where('merged_at', '<', to)
         .where('repo', 'in', IN_SCOPE)
@@ -68,7 +68,7 @@ export function kindWeeks(db: Database, weeks: number, at: Date = now()): KindWe
       kdb(db)
         .selectFrom('merged_prs as p')
         .leftJoin('linear_issues as l', 'l.issue', 'p.issue')
-        .select((eb) => ['l.type as type', eb.fn.countAll<number>().as('count')])
+        .select((eb) => ['l.type as type', eb.fn.countAll().as('count')])
         .where('p.merged_at', '>=', from)
         .where('p.merged_at', '<', to)
         .where('p.repo', 'in', IN_SCOPE)
@@ -89,7 +89,7 @@ export function kindWeeks(db: Database, weeks: number, at: Date = now()): KindWe
       db,
       kdb(db)
         .selectFrom('linear_issues')
-        .select((eb) => ['state', 'type', eb.fn.countAll<number>().as('count')])
+        .select((eb) => ['state', 'type', eb.fn.countAll().as('count')])
         .where('state', '!=', 'open')
         .where('closed_at', '>=', from)
         .where('closed_at', '<', to)

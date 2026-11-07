@@ -110,7 +110,6 @@ async function ensureOnce(db: Database, client: FleetClient, opts: { dryRun: boo
   const unknown = [...hurry].filter((n) => !fleet.some((e) => e.name === n));
   if (unknown.length) throw new HqError('bad_args', `--now names ${unknown.join(', ')}, not in the declared fleet (${fleet.map((e) => e.name).join(', ')}); nothing spawned`);
   const all = await client.sessions();
-  if (!Array.isArray(all)) throw new HqError('atc_bad_answer', 'atc returned no session list; spawning nothing');
   const missing = metaJson(db, 'fleet_missing_since', strMap, {});
   const known = metaJson(db, 'fleet_ids', strMap, {});
 

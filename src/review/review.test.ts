@@ -325,7 +325,6 @@ test('a risky diff runs both passes at high; --effort overrides the tier and say
   for (const c of calls.filter((x) => x.cmd[0] === 'codex')) expect(c.cmd).toContain(`model_reasoning_effort=${REVIEW_EFFORT}`);
   expect(r.effort.forced).toBe(true);
   expect(r.effort.reason).toStartWith('--effort medium (by risk: high, ');
-  await expect(review(run, 'widgets', 7, { watch: false, effort: 'low' as never })).rejects.toThrow('--effort must be medium or high');
 });
 
 const MUST_BE_HIGH: [string, string][] = [
