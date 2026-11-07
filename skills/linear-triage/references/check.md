@@ -51,9 +51,10 @@ Contents: [State](#state) · [Steps](#steps) · [Calls](#calls) · [Unblock list
    For a flag the pass didn't set, look for the owner's answer first. `hq call list --state all`
    gives each call's `issues`, `state`, `answer` and `answered_at`. A call is `applied` once
    `z-stu` has carried out the answer.
-   - When a call in state `answered` or `applied` holds the issue, and every comment on the issue
-     is older than its `answered_at`, the owner has answered the flag. Remove `Needs Geoff`, add a
-     comment that quotes the answer, and write `{"resolved": true}`.
+   - When a call in state `answered` or `applied` holds the issue, and every comment after its
+     `answered_at` asks the owner nothing new, the owner has answered the flag. Remove
+     `Needs Geoff`, add a comment that quotes the answer, and write `{"resolved": true}`. Judge a
+     comment by what it says: every session comments as the owner's Linear user.
    - Otherwise read the issue's latest comment:
      - When the comment asks only what you can settle (a missing section, a missing `Code
        delivery`, a named blocker), fix it, remove `Needs Geoff`, and write `{"resolved": true}`.
@@ -89,10 +90,11 @@ Contents: [State](#state) · [Steps](#steps) · [Calls](#calls) · [Unblock list
    put-off ones. Close each call in `hq call list` that's no longer gathered, and drop each unblock
    item whose session says it's done. hq tells `z-stu` itself.
    - When `hq call add` prints `reasked`, the owner already answered that call. If every comment
-     on the issue is older than the answer, close the call at once with `hq call close`, and settle
-     the flag as step 3 says for an answered call. If a newer comment exists, keep the call open as
-     a new question, and write its card from that comment. For a call with no issue, close it and
-     send its sender the answer.
+     after the answer asks the owner nothing new, close the call at once with `hq call close`.
+     Then remove `Needs Geoff`, and add a comment that quotes the answer. Leave `notes.json` as it
+     is: step 5 has already read it. If a later comment asks the owner a new question, keep the
+     call: `reasked` put it back in the queue as a new round. Write its card from that comment.
+     For a call with no issue, close it, and send the answer to its session in `refine.md`.
 7. **End:** save "CHECK at <UTC time>" in `refine.md`, and delete your scratch files and the pass's.
 
 **Reply:** one line per call added or closed, or "<UTC time> check: nothing new."
