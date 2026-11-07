@@ -287,7 +287,7 @@ test('it alerts on an In Review issue whose run is past merge or dropped, or tha
 
   expect({ first, line: ctx.findLine('Stale') }).toStrictEqual({
     first: ['stale:in-review:GEO-9801', 'stale:in-review:GEO-9802', 'stale:in-review:GEO-9803', 'stale:in-review:GEO-9804'],
-    line: '- Stale: 4 older than 24h (GEO-9801 In Review, run merged, GEO-9802 In Review, run live-check, GEO-9803 In Review, no run; 1 more), 4 in all; target 0 older than 24h 🔴 red',
+    line: '- Stale: 4 older than 24h (GEO-9801 In Review, run merged, GEO-9802 In Review, run live-check, GEO-9803 In Review, no run; 1 m…; target 0 older than 24h 🔴 red',
   });
   expect(ctx.readOutbox()).toStrictEqual([
     { target: 'z-triage', text: 'Stale: GEO-9801 is In Review (Linear last updated 2026-10-13T07:00:00Z) and its hq run is merged, with no open watch naming it. Run its live check, record `hq run check GEO-9801 none` if it has none, add a watch with `hq unblock add` for what it waits on, or close it.' },
