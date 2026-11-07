@@ -8,9 +8,9 @@ test('it finds a value through object keys and array indexes', () => {
 });
 
 test('it returns the value itself for an empty path', () => {
-  const value: unknown = JSON.parse('{"a":1}');
+  const value: unknown = JSON.parse('{"value":1}');
 
-  expect(findPath(value)).toStrictEqual({ a: 1 });
+  expect(findPath(value)).toStrictEqual({ value: 1 });
 });
 
 test.each([
