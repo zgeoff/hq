@@ -177,7 +177,7 @@ may merge: noslop findings: none open; CI green at b061edc
 - `src/`: the CLI, one folder per command family, and the schema migrations in `src/db/`.
 - `skills/`: the crew's skills, one folder per role.
 - `docs/`: how the sessions work together.
-- `mods/`: the status band in Stu's terminal.
+- `mods/`: the status band in Stu's terminal, which [hq-band](./docs/hq-band.md) describes.
 
 ## Documentation
 
