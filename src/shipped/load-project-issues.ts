@@ -1,6 +1,8 @@
 import type { Database } from 'bun:sqlite';
 import { iso } from '../clock/iso.ts';
+import { z } from 'zod';
 import { HqError } from '../errors.ts';
+import { parseLinearData } from '../linear/parse-linear-data.ts';
 import type { LinearCall } from '../linear/types.ts';
 import { buildOpenExpiry } from './build-open-expiry.ts';
 import { findCacheEntries } from './find-cache-entries.ts';
@@ -9,9 +11,12 @@ import { projectIssuesSchema } from './project-issues-schema.ts';
 import type { ProjectIssue } from './types.ts';
 import { upsertCacheEntries } from './upsert-cache-entries.ts';
 
-interface IssuePage {
-  issues: { nodes: { identifier: string; state: { type: string }; project: { name: string } | null }[]; pageInfo: { hasNextPage: boolean; endCursor: string | null } };
-}
+const IssuePageSchema = z.object({
+  issues: z.object({
+    nodes: z.array(z.object({ identifier: z.string(), state: z.object({ type: z.string() }), project: z.object({ name: z.string() }).nullable() })),
+    pageInfo: z.object({ hasNextPage: z.boolean(), endCursor: z.string().nullable() }),
+  }),
+});
 
 export async function loadProjectIssues(call: LinearCall, db: Database, projects: readonly string[], at: Date): Promise<ProjectIssue[]> {
   const issues: ProjectIssue[] = [];
@@ -38,7 +43,7 @@ async function loadOneProject(call: LinearCall, project: string): Promise<Projec
   const issues: ProjectIssue[] = [];
   let after: string | null = null;
   for (let page = 0; page < MAX_PAGES; page++) {
-    const data = (await call(QUERY, { after, name: project })) as IssuePage;
+    const data: z.output<typeof IssuePageSchema> = parseLinearData(await call(QUERY, { after, name: project }), IssuePageSchema);
     issues.push(...data.issues.nodes.map((node) => ({ id: node.identifier, statusType: node.state.type, project: node.project?.name ?? null })));
     if (!data.issues.pageInfo.hasNextPage) {
       return issues;

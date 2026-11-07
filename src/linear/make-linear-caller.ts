@@ -8,7 +8,9 @@ import { KEY_CACHE } from './key-cache.ts';
 import { redact } from './redact.ts';
 import type { LinearCall } from './types.ts';
 
-const LinearAnswer = z.object({ data: z.unknown().optional(), errors: z.array(z.unknown()).optional() });
+// A settings file of another shape throws into the same empty catch as an unreadable one.
+const ClaudeSettingsSchema = z.object({ env: z.record(z.string(), z.unknown()).optional() });
+const LinearAnswer =z.object({ data: z.unknown().optional(), errors: z.array(z.unknown()).optional() });
 
 export function makeLinearCaller(run: Runner, doFetch: typeof fetch = fetch, recordRead: () => void = () => {}): LinearCall {
   return async (query, variables) => {
@@ -66,7 +68,8 @@ async function readKey(run: Runner, recordRead: () => void): Promise<string> {
   const env: Record<string, string | undefined> = { ...process.env };
   if (!env['OP_SERVICE_ACCOUNT_TOKEN']) {
     try {
-      env['OP_SERVICE_ACCOUNT_TOKEN'] = (JSON.parse(readFileSync(`${process.env['HOME']}/.claude/settings.json`, 'utf8')) as { env?: Record<string, string> }).env?.['OP_SERVICE_ACCOUNT_TOKEN'];
+      const token = ClaudeSettingsSchema.parse(JSON.parse(readFileSync(`${process.env['HOME']}/.claude/settings.json`, 'utf8'))).env?.['OP_SERVICE_ACCOUNT_TOKEN'];
+      env['OP_SERVICE_ACCOUNT_TOKEN'] = typeof token === 'string' ? token : undefined;
     } catch {}
   }
   if (!env['OP_SERVICE_ACCOUNT_TOKEN']) {
