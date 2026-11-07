@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test';
 import type { Database } from 'bun:sqlite';
 import { z } from 'zod';
-import { queryColumn, queryRow, queryValue } from '../src/test-utils/query-rows.ts';
+import invariant from 'tiny-invariant';
+import { queryColumn, queryRow } from '../src/test-utils/query-rows.ts';
+import { getMeta } from '../src/db/get-meta.ts';
 import { listEvents } from '../src/list-events.ts';
 import { readOutboxRows } from '../src/outbox/read-outbox-rows.ts';
 import { checkLane } from '../src/areas/check-lane.ts';
@@ -290,7 +292,8 @@ test('--skipped reads ISSUE=reason pairs and refuses the rest', () => {
 
 test('the Ready detail is stored with the report, shown while fresh, and flags what is unexplained', () => {
   reportLaneReady(db, parseReady(LANES, 'atc=0,flexible=0'), 'z-delivery', { total: 53, skipped: parseSkipped(SK) });
-  const detail = queryValue(db, "SELECT value FROM meta WHERE key = 'lanes_ready_detail'", z.string());
+  const detail = getMeta(db, 'lanes_ready_detail');
+  invariant(detail !== null);
   const event = listEvents(db, 'ready-by-lane')[0]?.data;
   expect(JSON.parse(detail)).toMatchObject({ total: 53, skipped: [{ issue: 'GEO-1' }, { issue: 'GEO-2' }] });
   expect(event).toContain('blocked by GEO-9');
