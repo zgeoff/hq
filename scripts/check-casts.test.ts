@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { collectCounts, formatCounts } from './check-casts.ts';
+import { collectCounts, formatCounts, parseOxlintReport } from './check-casts.ts';
 
 test('it counts nothing when oxlint reports nothing', () => {
   expect(collectCounts([], [])).toStrictEqual({
@@ -52,4 +52,16 @@ test('it formats one line per total with the rule breakdown', () => {
   const counts = collectCounts([{ code: 'typescript(consistent-type-assertions)' }], [{ code: 'typescript(no-unsafe-call)' }]);
 
   expect(formatCounts(counts)).toStrictEqual(['casts: 1', 'no-unsafe: 1 (assignment 0, member-access 0, argument 0, call 1, return 0)']);
+});
+
+test.each([
+  { name: 'empty stdout', status: 1, stdout: '', stderr: 'Failed to load config: oxlintrc.json\n', message: 'oxlint exited 1 with no JSON report: Failed to load config: oxlintrc.json' },
+  { name: 'stdout that is not a report', status: 0, stdout: '{"other":true}', stderr: '', message: 'oxlint exited 0 with no JSON report: no stderr' },
+  { name: 'a run a signal ended', status: null, stdout: '', stderr: 'tsgolint crashed', message: 'oxlint exited on a signal with no JSON report: tsgolint crashed' },
+])('it names the exit status and stderr when oxlint gives $name', (row) => {
+  expect(() => parseOxlintReport(row.status, row.stdout, row.stderr)).toThrow(row.message);
+});
+
+test('it reads the diagnostics of a JSON report', () => {
+  expect(parseOxlintReport(1, '{"diagnostics":[{"code":"typescript-eslint(consistent-type-assertions)"}]}', '')).toStrictEqual([{ code: 'typescript-eslint(consistent-type-assertions)' }]);
 });

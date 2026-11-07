@@ -36,12 +36,28 @@ export function formatCounts(counts: Counts): string[] {
   return [`casts: ${counts.casts}`, `no-unsafe: ${counts.unsafe} (${breakdown})`];
 }
 
+export function parseOxlintReport(status: number | null, stdout: string, stderr: string): readonly Row[] {
+  const parsed = reportSchema.safeParse(parseJSONText(stdout));
+  if (!parsed.success) {
+    throw new Error(`oxlint exited ${status ?? 'on a signal'} with no JSON report: ${stderr.trim().slice(-500) || 'no stderr'}`);
+  }
+  return parsed.data.diagnostics;
+}
+
+function parseJSONText(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
 function readRows(args: readonly string[]): readonly Row[] {
   const result = spawnSync('bunx', ['oxlint', '--format', 'json', ...args, ...PATHS], { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 });
   if (result.error !== undefined) {
     throw result.error;
   }
-  return reportSchema.parse(JSON.parse(result.stdout)).diagnostics;
+  return parseOxlintReport(result.status, result.stdout, result.stderr);
 }
 
 export function runCheckCasts(): number {
@@ -56,6 +72,13 @@ export function runCheckCasts(): number {
   return 1;
 }
 
+// Exit 2 on a broken run, so it never reads as exit 1, a check that counted casts.
 if (import.meta.main) {
-  process.exit(runCheckCasts());
+  try {
+    process.exit(runCheckCasts());
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(message);
+    process.exit(2);
+  }
 }
