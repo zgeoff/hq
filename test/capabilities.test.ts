@@ -82,11 +82,8 @@ test('commands are the registry rows, data only', async () => {
   const { json } = await hq('capabilities');
   const commandSchema = z.looseObject({ usage: z.string(), nouns: z.array(z.string()), readOnly: z.boolean() });
   const commands = z.array(commandSchema).parse(findPath(json, 'commands'));
-  expect(commands).toHaveLength(COMMANDS.length);
-  expect(commands.map((command) => command.usage)).toStrictEqual(COMMANDS.map((command) => command.usage));
-  for (const [index, command] of COMMANDS.entries()) {
-    expect(findPath(json, 'commands', index)).toStrictEqual({ nouns: command.nouns, verbs: command.verbs, bare: command.bare, usage: command.usage, summary: command.summary, section: command.section, readOnly: command.readOnly });
-  }
+  const expected = COMMANDS.map((command) => ({ nouns: command.nouns, verbs: command.verbs, bare: command.bare, usage: command.usage, summary: command.summary, section: command.section, readOnly: command.readOnly }));
+  expect(findPath(json, 'commands')).toStrictEqual(expected);
   const self = commands.find((command) => command.nouns.includes('capabilities'));
   expect(self?.readOnly).toBe(true);
 });
@@ -112,7 +109,7 @@ test('help lists capabilities', () => {
 test('--require: older fails with too_old, equal and newer pass, bad input is bad_args', async () => {
   const older = await hq('capabilities', '--require', '99.0.0');
   expect(older.code).toBe(1);
-  expect(older.json).toEqual({ ok: false, error: { code: 'too_old', message: `hq ${VERSION} is older than 99.0.0: run bun run install-bin in ~/projects/hq` } });
+  expect(older.json).toStrictEqual({ ok: false, error: { code: 'too_old', message: `hq ${VERSION} is older than 99.0.0: run bun run install-bin in ~/projects/hq` } });
   expect((await hq('capabilities', '--require', VERSION)).code).toBe(0);
   const newer = await hq('capabilities', '--require', '0.1.0');
   expect(findPath(newer.json, 'version')).toBe(VERSION);
