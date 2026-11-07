@@ -12,6 +12,7 @@ import { addRun } from './add-run.ts';
 import { closePr } from './close-pr.ts';
 import { requireRun } from './require-run.ts';
 import { setSession } from './set-session.ts';
+import { parseJSON } from '../noslop/parse-json.ts';
 import type { ImpWork } from './types.ts';
 import { sweepNow } from './sweep-now.ts';
 
@@ -67,7 +68,7 @@ test('it forgets the helper session whose PRs merged, keeps the one with an open
 
   expect(ctx.fleet.calls).toStrictEqual(['unpin 0000e001', 'kill 0000e001', 'unpin 0000e001', 'forget 0000e001']);
   expect(requireRun(ctx.db, 'GEO-501').state).toBe('working');
-  expect(readEvents(ctx.db, 'run', 'GEO-501', ['part-wrap-up']).map((event) => JSON.parse(event.data))).toStrictEqual([{ session: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }]);
+  expect(readEvents(ctx.db, 'run', 'GEO-501', ['part-wrap-up']).map((event) => parseJSON(event.data))).toStrictEqual([{ session: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }]);
 });
 
 test('it wraps a part session up once across two sweeps', async () => {
@@ -132,7 +133,7 @@ test('it retries a part session whose claim an earlier sweep left without finish
   await ctx.sweep();
 
   expect(ctx.fleet.calls).toStrictEqual(['unpin 0000e001', 'kill 0000e001', 'unpin 0000e001', 'forget 0000e001']);
-  expect(readEvents(ctx.db, 'run', 'GEO-501', ['part-wrap-up-done']).map((event) => JSON.parse(event.data))).toStrictEqual([{ session: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }]);
+  expect(readEvents(ctx.db, 'run', 'GEO-501', ['part-wrap-up-done']).map((event) => parseJSON(event.data))).toStrictEqual([{ session: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }]);
 });
 
 test('it leaves a part session alone while a recent claim on it is unfinished', async () => {

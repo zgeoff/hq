@@ -44,7 +44,8 @@ test('it gives pre-v45 reviews the patch-id of their PR diff, so the report find
   const refilled = await fillRoundPatchIDs({ run: realRunner, db: ctx.db, checkout: () => Promise.resolve(ctx.directory) });
 
   expect(filled).toBe(2);
-  expect(stored).toStrictEqual([expect.stringMatching(/^[0-9a-f]{40}$/u), stored[0], '']);
+  expect(stored).toStrictEqual([expect.stringMatching(/^[0-9a-f]{40}$/u), expect.stringMatching(/^[0-9a-f]{40}$/u), '']);
+  expect(stored[1]).toBe(stored[0]);
   expect(buildNoslopReport(ctx.db)[0]).toMatchObject({ reviewsOk: 3, extraRounds: 1, baseMove: 1 });
   expect(refilled).toBe(0);
 });

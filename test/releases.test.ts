@@ -16,6 +16,7 @@ import { requirePR } from '../src/runs/require-pr.ts';
 import { setLiveCheck } from '../src/runs/set-live-check.ts';
 import { setState } from '../src/runs/set-state.ts';
 import { overrideEnv } from '../src/config/override-env.ts';
+import { findPath } from '../src/test-utils/find-path.ts';
 import { NOON_SYDNEY, at, freshDb } from './helpers.ts';
 
 let db: Database;
@@ -93,7 +94,7 @@ test('a run moves to live-check when its merged PR is in a release', async () =>
   const ev = listEvents(db, 'shipped').find((event) => event.subject_id === 'GEO-12');
   invariant(ev, 'the ship pass logged a shipped event for GEO-12');
   expect(ev).toMatchObject({ actor: 'hq-releases', from_state: 'merged', to_state: 'live-check' });
-  expect(JSON.parse(ev.data).prs).toEqual([{ ref: 'nixie#5', tag: 'v1.2.0', shipped_at: '2026-10-16T00:00:00Z' }]);
+  expect(findPath(JSON.parse(ev.data), 'prs')).toStrictEqual([{ ref: 'nixie#5', tag: 'v1.2.0', shipped_at: '2026-10-16T00:00:00Z' }]);
 });
 
 test('with --check none the run goes to done and closes', async () => {
