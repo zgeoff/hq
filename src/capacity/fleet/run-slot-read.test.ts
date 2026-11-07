@@ -25,9 +25,9 @@ function setupTest() {
 test('it reads three slots, stores one row each with the working lane count, and keeps a refused token and an op failure as rows', async () => {
   const ctx = setupTest();
   const answers: Record<string, RunResult> = {
-    'op://claude-slots/claude-setup-token-1/credential': { code: 0, stdout: 'sk-ant-kettle-slot-1\n', stderr: '' },
-    'op://claude-slots/claude-setup-token-2/credential': { code: 0, stdout: 'sk-ant-kettle-slot-2\n', stderr: '' },
-    'op://claude-slots/claude-setup-token-3/credential': { code: 1, stdout: '', stderr: 'invented: item not found' },
+    'op://fleet/claude-setup-token-1/credential': { code: 0, stdout: 'sk-ant-kettle-slot-1\n', stderr: '' },
+    'op://fleet/claude-setup-token-2/credential': { code: 0, stdout: 'sk-ant-kettle-slot-2\n', stderr: '' },
+    'op://fleet/claude-setup-token-3/credential': { code: 1, stdout: '', stderr: 'invented: item not found' },
   };
   const run = mock<Runner>((cmd) => Promise.resolve(answers[cmd[2] ?? ''] ?? { code: 1, stdout: '', stderr: 'invented: no answer' }));
 
@@ -58,9 +58,9 @@ test('it reads no slot and stores nothing when the slot reads are not set up', a
 test('it keeps every token out of the stored rows and the problems, even when the API echoes one', async () => {
   const ctx = setupTest();
   const tokens: Record<string, RunResult> = {
-    'op://claude-slots/claude-setup-token-1/credential': { code: 0, stdout: 'sk-ant-kettle-one-token-0042\n', stderr: '' },
-    'op://claude-slots/claude-setup-token-2/credential': { code: 0, stdout: 'sk-ant-kettle-other-token-0042\n', stderr: '' },
-    'op://claude-slots/claude-setup-token-3/credential': { code: 0, stdout: 'sk-ant-kettle-other-token-0042\n', stderr: '' },
+    'op://fleet/claude-setup-token-1/credential': { code: 0, stdout: 'sk-ant-kettle-one-token-0042\n', stderr: '' },
+    'op://fleet/claude-setup-token-2/credential': { code: 0, stdout: 'sk-ant-kettle-other-token-0042\n', stderr: '' },
+    'op://fleet/claude-setup-token-3/credential': { code: 0, stdout: 'sk-ant-kettle-other-token-0042\n', stderr: '' },
   };
   const run = mock<Runner>((cmd) => Promise.resolve(tokens[cmd[2] ?? ''] ?? { code: 1, stdout: '', stderr: 'invented: no such item' }));
 
