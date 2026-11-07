@@ -46,21 +46,10 @@ function setupTest() {
   onTestFinished(() => (console.log = log));
   mkdirSync(bin);
   updateEnv('PATH', `${bin}:${process.env['PATH'] ?? ''}`);
-  const op = createStubOp({
-    directory: fresh.dir,
-    answers: {
-      'op://fleet/claude-setup-token-1/credential': 'sk-ant-kettle-fleet-1',
-      'op://fleet/claude-setup-token-2/credential': 'sk-ant-kettle-fleet-2',
-      'op://fleet/claude-setup-token-3/credential': 'sk-ant-kettle-fleet-3',
-      'op://claude-slots/claude-setup-token-1/credential': 'sk-ant-kettle-old-1',
-      'op://claude-slots/claude-setup-token-2/credential': 'sk-ant-kettle-old-2',
-      'op://claude-slots/claude-setup-token-3/credential': 'sk-ant-kettle-old-3',
-    },
-  });
+  const op = createStubOp({ directory: fresh.dir, answers: {} });
   const opSettings = `${fresh.dir}/settings.local.json`;
-  writeFileSync(opSettings, JSON.stringify({ env: { OP_SERVICE_ACCOUNT_TOKEN: 'ops_kettle-profile-0001' } }));
   updateEnv('HQ_SLOTS_OP_SETTINGS', opSettings);
-  return { db: fresh.db, directory: fresh.dir, bin, lines, op };
+  return { db: fresh.db, directory: fresh.dir, bin, lines, op, opSettings };
 }
 
 test('it reports the plan for an oversized role file in hq state trim --dry-run', async () => {
@@ -891,6 +880,15 @@ test('hq capacity --refresh-slots reads the three slots through op and prints th
 
 test("it reads the broker slot's fleet-vault token in hq capacity broker after a refresh when the proof is more than 24 h old", async () => {
   const ctx = setupTest();
+  ctx.op.writeAnswers({
+    'op://fleet/claude-setup-token-1/credential': 'sk-ant-kettle-fleet-1',
+    'op://fleet/claude-setup-token-2/credential': 'sk-ant-kettle-fleet-2',
+    'op://fleet/claude-setup-token-3/credential': 'sk-ant-kettle-fleet-3',
+    'op://claude-slots/claude-setup-token-1/credential': 'sk-ant-kettle-old-1',
+    'op://claude-slots/claude-setup-token-2/credential': 'sk-ant-kettle-old-2',
+    'op://claude-slots/claude-setup-token-3/credential': 'sk-ant-kettle-old-3',
+  });
+  writeFileSync(ctx.opSettings, JSON.stringify({ env: { OP_SERVICE_ACCOUNT_TOKEN: 'ops_kettle-profile-0001' } }));
   writeBrokerSlot(ctx.db, { slot: '2', proof: 'req-7c8d', note: undefined, actor: 'z-release', at: new Date('2026-10-12T19:00:00Z') });
   slotUsage.set('Bearer sk-ant-kettle-fleet-1', { seven: { utilization: 0.4, reset: 1_792_540_800 } });
   slotUsage.set('Bearer sk-ant-kettle-fleet-2', { seven: { utilization: 0.4, reset: 1_792_540_800 } });

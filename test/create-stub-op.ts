@@ -12,14 +12,17 @@ interface StubOpOptions {
 
 interface StubOp {
   bin: string;
+
+  writeAnswers: (answers: Record<string, string>) => void;
 }
 
 export function createStubOp(options: StubOpOptions): StubOp {
   const bin = join(options.directory, 'bin');
   const config = join(options.directory, 'op.json');
+  const failures = options.failures ?? {};
   mkdirSync(bin, { recursive: true });
-  writeFileSync(config, JSON.stringify({ answers: options.answers, failures: options.failures ?? {} }));
+  writeFileSync(config, JSON.stringify({ answers: options.answers, failures }));
   writeFileSync(join(bin, 'op'), `#!/bin/sh\nexec '${process.execPath}' '${resolve(import.meta.dir, 'run-stub-op.ts')}' --config '${config}' "$@"\n`);
   chmodSync(join(bin, 'op'), 0o755);
-  return { bin };
+  return { bin, writeAnswers: (answers) => writeFileSync(config, JSON.stringify({ answers, failures })) };
 }
