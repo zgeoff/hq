@@ -51,7 +51,7 @@ export function tick(db: Database, sample: Sample, actor: string): TickResult {
       const slotPlan = readSlotPlan(db, sample, t, capAt);
       const { freeMib, slots: impSlots } = sample.cap ? slotsFrom(sample.cap, sample.impMib) : { freeMib: null, slots: 0 };
 
-      const look = slotPlan ? { slots: countWanted(slotPlan), capHeld: slotPlan.pool.capHeld } : readCappedImpRoom(db, { budgetSlots: impSlots, impMib: sample.impMib }, t, capAt);
+      const look = slotPlan ? { slots: countWanted(slotPlan), capHeld: slotPlan.pool.capHeld } : readCappedImpRoom(db, { budgetSlots: impSlots, impMib: sample.impMib }, { at: t, capAt, impd: sample.impd ?? null });
       const slots = look.slots;
       const eligible = slotPlan?.eligible ?? eligibleNow(db).count;
       const previous = z.object({ at: z.string() }).nullable().parse(db.query('SELECT at FROM lanes_samples ORDER BY seq DESC LIMIT 1').get());

@@ -1734,7 +1734,7 @@ async function lanesCommand(context: Pick<Ctx, 'db' | 'verb' | 'rest' | 'flags' 
       const laneLines = slotPlan
         ? [
             `imp room now: ${slotsFrom(sample.cap!, sample.impMib).slots} slot(s) (${sample.cap!.imp?.freeMib ?? '?'} MiB free; 0 when no unattended imp provider has quota)`,
-            formatLineRoom(loadImpRoom(db, { budgetSlots: slotsFrom(sample.cap ?? {}, sample.impMib).slots, impMib: sample.impMib })),
+            formatLineRoom(loadImpRoom(db, { budgetSlots: slotsFrom(sample.cap ?? {}, sample.impMib).slots, impMib: sample.impMib }, lookAt, sample.impd ?? null)),
             ...formatSlotPlan(slotPlan, lookAt),
             ...formatSlotCause(slotCause, slotMinutesToday, slotPlan.pool.capHeld),
             ...(readyNote ? [`  ${readyNote.line}`, ...skippedLines(readyNote).map((l) => `  ${l}`)] : []),

@@ -1,5 +1,6 @@
 import type { IssueType } from '../linear/issue-types.ts';
 import type { LaneConfig } from '../areas/types.ts';
+import type { Impd } from '../capacity/types.ts';
 import type { z } from 'zod';
 import type { CapacitySchema } from './capacity-schema.ts';
 import type { NudgeRowSchema } from './nudge-row-schema.ts';
@@ -28,6 +29,8 @@ export interface Sample {
   design?: DesignSlots;
   placeTypes?: PlaceTypes | null;
   designError?: string | null;
+  impd?: Impd | null;
+  impdError?: string | null;
 }
 
 export interface LaneSkip {
