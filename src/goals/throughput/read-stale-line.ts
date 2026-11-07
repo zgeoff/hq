@@ -115,7 +115,7 @@ function readInReviewItems(db: Database, at: Date): StaleItem[] {
        WHERE (r.state IS NULL OR r.state IN ('merged', 'live-check', 'dropped'))
          AND NOT EXISTS (
            SELECT 1 FROM unblocks u, json_each(u.unblocks) j
-           WHERE u.state = 'open' AND json_extract(j.value, '$.issue') = i.issue)
+           WHERE u.state = 'open' AND u.kind = 'watch' AND json_extract(j.value, '$.issue') = i.issue)
        ORDER BY i.issue`,
     )
     .all();

@@ -296,3 +296,14 @@ test('it alerts on an In Review issue whose run is past merge or dropped, or tha
     { target: 'z-triage', text: 'Stale: GEO-9804 is In Review (Linear last updated 2026-10-16T06:00:00Z) and its hq run is dropped, with no open watch naming it. Its run was dropped: close or cancel the issue, or relaunch it.' },
   ]);
 });
+
+test('it alerts on a stuck In Review issue that an open owner task names, since only a watch silences it', async () => {
+  const ctx = setupTest();
+  ctx.seedRun('GEO-9801', 'merged');
+  addUnblock(ctx.db, { id: 'kettle-descale', task: 'Descale the kettle', minutes: 5, unblocks: [{ issue: 'GEO-9801', priority: 'none' }], notify: [], actor: 'z-triage', kind: 'owner' });
+  await syncLinear(ctx.db, makeThroughputLinearCall([], [], [{ identifier: 'GEO-9801', updatedAt: '2026-10-13T07:00:00Z' }]), new Date('2026-10-14T00:00:00Z'), new Date(ctx.now));
+
+  const sent = sendThroughputAlerts(ctx.db, 'hq-lanes', new Date('2026-10-14T00:00:00Z'), new Date(ctx.now));
+
+  expect(sent).toStrictEqual(['stale:in-review:GEO-9801']);
+});
