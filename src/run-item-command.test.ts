@@ -10,6 +10,7 @@ import { overrideEnv } from './config/override-env.ts';
 import { migrate } from './db/migrate.ts';
 import { MIGRATIONS } from './db/migrations.ts';
 import { loadConsoleItems } from './load-console-items.ts';
+import { findPath } from './test-utils/find-path.ts';
 import { roleName } from './roles/role-name.ts';
 import { getUnblock } from './unblock/get-unblock.ts';
 
@@ -111,7 +112,7 @@ test('hq call add --item refuses the free-text flags beside it, and a bad item',
   const refusedItem = await main(['call', 'add', 'k2', '--item', bad, '--json']);
 
   expect([refusedFlags, refusedItem]).not.toContain(0);
-  expect(app.lines.map((l) => JSON.parse(l).error.code)).toStrictEqual(['bad_args', 'bad_args']);
+  expect(app.lines.map((line) => findPath(JSON.parse(line), 'error', 'code'))).toStrictEqual(['bad_args', 'bad_args']);
   expect(getAsk(app.db, 'k1')).toBeNull();
   expect(getAsk(app.db, 'k2')).toBeNull();
 });
@@ -123,7 +124,7 @@ test('a re-add of a queued call with the same question updates its fields in pla
   await main(['call', 'add', 'kettle-mint', '--item', first, '--json']);
   await main(['call', 'add', 'kettle-mint', '--item', changed, '--json']);
 
-  expect(JSON.parse(app.lines[1] ?? '').result).toBe('updated');
+  expect(findPath(JSON.parse(app.lines[1] ?? ''), 'result')).toBe('updated');
   expect(getAsk(app.db, 'kettle-mint')?.stu_view).toBe('Boil it later instead.');
 });
 
@@ -181,8 +182,9 @@ test('an unchanged hq unblock add --item is a no-op that keeps its subject link'
   const second = await main(['unblock', 'add', '--id', 'review-4', '--item', doc, '--json']);
 
   expect([first, second]).toStrictEqual([0, 0]);
-  expect(app.lines.map((l) => JSON.parse(l).result)).toStrictEqual(['added', 'noop']);
-  expect(JSON.parse(getUnblock(app.db, 'review-4')?.item ?? '{}').links).toStrictEqual(body.links);
+  expect(app.lines.map((line) => findPath(JSON.parse(line), 'result'))).toStrictEqual(['added', 'noop']);
+  const stored: unknown = JSON.parse(getUnblock(app.db, 'review-4')?.item ?? '{}');
+  expect(findPath(stored, 'links')).toStrictEqual(body.links);
 });
 
 test('an unblock item filed as a task shows its minutes and the issues it unblocks', async () => {

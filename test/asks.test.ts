@@ -20,6 +20,7 @@ import { listEvents } from '../src/list-events.ts';
 import { readOutboxRows } from '../src/outbox/read-outbox-rows.ts';
 import { parseItemInput } from '../src/parse-item-input.ts';
 import { readSubjectEvents } from '../src/read-subject-events.ts';
+import { findPath } from '../src/test-utils/find-path.ts';
 import { FOUR_AM_SYDNEY, NOON_SYDNEY, at, freshDb } from './helpers.ts';
 
 let db: Database;
@@ -107,7 +108,7 @@ describe('add', () => {
     expect(r.ask).toMatchObject({ state: 'queued', round: 2, answer: null });
     const [ev] = listEvents(db, 'requeued');
     invariant(ev, 'the re-add logged a requeued event');
-    expect(JSON.parse(ev.data).previous_answer).toBe('green');
+    expect(findPath(JSON.parse(ev.data), 'previous_answer')).toBe('green');
   });
 
   test('a skipped call returns to the queue when re-added', () => {

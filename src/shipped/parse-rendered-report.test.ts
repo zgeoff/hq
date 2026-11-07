@@ -8,7 +8,10 @@ const FIXTURES = join(import.meta.dir, '../../skills/delivery-report/scripts/tes
 
 test.each(['daily.json.expected', 'weekly.json.expected'])('the skill\'s own %s reads whole', (file) => {
   const body = readFileSync(join(FIXTURES, file), 'utf8');
-  const raw: { groups: { rows: { prs: unknown[] }[] }[] } = JSON.parse(body);
+  const rowSchema = z.object({ prs: z.array(z.unknown()) });
+  const groupSchema = z.object({ rows: z.array(rowSchema) });
+  const parsed: unknown = JSON.parse(body);
+  const raw = z.object({ groups: z.array(groupSchema) }).parse(parsed);
   const read = parseRenderedReport(body);
   expect(collectPRs(read.groups)).toStrictEqual(collectPRs(raw.groups));
 });

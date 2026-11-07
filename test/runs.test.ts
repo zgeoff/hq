@@ -31,6 +31,7 @@ import { sweep } from '../src/runs/sweep.ts';
 import { unfinalPr } from '../src/runs/unfinal-pr.ts';
 import { unmergePr } from '../src/runs/unmerge-pr.ts';
 import { watchlist } from '../src/runs/watchlist.ts';
+import { parseJSON } from '../src/noslop/parse-json.ts';
 import { buildStubFinalGH } from './build-stub-final-gh.ts';
 import { buildStubGitHubFactsRunner } from './build-stub-github-facts-runner.ts';
 import { type FakeAtc, NOON_SYDNEY, at, fakeAtc, freshDb } from './helpers.ts';
@@ -130,7 +131,7 @@ describe('note signals', () => {
     const ev = listEvents(db, 'final');
     expect(ev).toHaveLength(1);
     expect(ev[0]).toMatchObject({ subject_id: 'GEO-9001', actor: 'z-delivery', from_state: null, to_state: 'abc1234' });
-    expect(ev.map((event) => JSON.parse(event.data))).toStrictEqual([{ ref: 'widgets#12', sha: 'abc1234', source: 'marker:note:z-delivery', note: note.id, given: 'abc1234', resolved: false, reason: 'not resolved in this pass' }]);
+    expect(ev.map((event) => parseJSON(event.data))).toStrictEqual([{ ref: 'widgets#12', sha: 'abc1234', source: 'marker:note:z-delivery', note: note.id, given: 'abc1234', resolved: false, reason: 'not resolved in this pass' }]);
     finalPr(db, 'widgets#12', { sha: 'def5678', actor: 'z-q' });
     const last = listEvents(db, 'final').at(-1);
     invariant(last, 'the second final logged an event');
