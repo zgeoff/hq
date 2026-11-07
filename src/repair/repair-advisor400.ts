@@ -46,17 +46,6 @@ export async function repairAdvisor400(target: string | undefined, opts: { file?
   return { data: { file, session, ...summary, applied: !!backup, backup, check }, text: planText(plan, file, applied) };
 }
 
-interface WireSession {
-  id: string;
-  name: string;
-  alive: boolean;
-  state: string;
-  cwd?: string;
-  agent?: string;
-  agentSessionID?: string;
-  locator?: { targetID?: string };
-}
-
 async function locate(target: string | undefined, file: string | undefined): Promise<{ file: string; session: string | null }> {
   let atc: AtcClient;
   try {
@@ -65,7 +54,7 @@ async function locate(target: string | undefined, file: string | undefined): Pro
     throw new HqError('atc_unreachable', `hq checks with atc that the session is stopped before it repairs; ${toErrorMessage(e)}`);
   }
   try {
-    const all = (await atc.sessions()) as WireSession[];
+    const all = await atc.sessions();
     if (file) {
       const id = basename(file).replace(/\.jsonl$/, '');
       const live = all.find((s) => s.alive && s.agentSessionID === id);
@@ -77,7 +66,8 @@ async function locate(target: string | undefined, file: string | undefined): Pro
     if (hits.length > 1) throw new HqError('ambiguous_session', `${hits.length} sessions are named ${target}; give its id`);
     const s = hits[0]!;
     if (s.alive || s.state !== 'exited') throw new HqError('session_running', `${s.name} is ${s.alive ? 'alive' : s.state}; stop it before the repair`);
-    if (s.agent && s.agent !== 'claude') throw new HqError('bad_args', `${s.name} runs ${s.agent}, not claude`);
+    const agent = s['agent'];
+    if (typeof agent === 'string' && agent !== 'claude') throw new HqError('bad_args', `${s.name} runs ${agent}, not claude`);
     if ((s.locator?.targetID ?? 'local') !== 'local') throw new HqError('not_local', `${s.name} runs on the ${s.locator!.targetID} target; its transcript is not on this machine`);
     if (!s.cwd || !s.agentSessionID) throw new HqError('no_transcript', `atc gives no cwd or Claude session id for ${s.name}`);
     const holder = all.find((x) => x.alive && x.agentSessionID === s.agentSessionID);
@@ -92,7 +82,7 @@ async function locate(target: string | undefined, file: string | undefined): Pro
 function checkRoundTrip(plan: ReturnType<typeof planRepair>): void {
   for (const c of plan.changes) {
     const raw = plan.lineText[c.line - 1]!;
-    const o = JSON.parse(raw) as Record<string, unknown>;
+    const o: unknown = JSON.parse(raw);
     if (JSON.stringify(o) !== raw) throw new HqError('unknown_shape', `line ${c.line} does not round-trip through JSON; hq would change more than its parentUuid`);
   }
 }
