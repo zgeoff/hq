@@ -1,10 +1,11 @@
 import type { Database } from 'bun:sqlite';
 import { createDBBackup } from './create-db-backup.ts';
 import { MIGRATIONS } from './migrations.ts';
+import { userVersion } from './user-version.ts';
 
 export function migrate(db: Database, path: string, existed: boolean, migrations = MIGRATIONS): string | null {
   const target = migrations.length;
-  const current = (db.query('PRAGMA user_version').get() as { user_version: number }).user_version;
+  const current = userVersion(db);
   if (current > target) {
     throw new Error(`hq.db is schema v${current}, this hq knows v${target}: install a newer hq`);
   }
@@ -29,7 +30,7 @@ function applyPendingMigrations(db: Database, migrations: readonly string[]): vo
 function applyNextMigration(db: Database, migrations: readonly string[]): boolean {
   return db
     .transaction(() => {
-      const version = readVersion(db);
+      const version = userVersion(db);
       if (version >= migrations.length) {
         return false;
       }
@@ -38,8 +39,4 @@ function applyNextMigration(db: Database, migrations: readonly string[]): boolea
       return true;
     })
     .immediate();
-}
-
-function readVersion(db: Database): number {
-  return (db.query('PRAGMA user_version').get() as { user_version: number }).user_version;
 }

@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { migrate } from './migrate.ts';
 import { MIGRATIONS } from './migrations.ts';
+import { userVersion } from './user-version.ts';
 
 async function setupTest() {
   const directory = mkdtempSync(join(tmpdir(), 'hq-migrate-'));
@@ -65,7 +66,7 @@ test('v36 adds the shipped_cache table and keeps the rows already in the databas
   expect(migrate(db, path, true, MIGRATIONS.slice(0, 36))).not.toBeNull();
   expect(db.query('SELECT repo, pr FROM pr_status').all()).toStrictEqual([{ repo: 'kettle', pr: 7 }]);
   expect(db.query("SELECT name FROM pragma_table_info('shipped_cache') ORDER BY cid").all()).toStrictEqual(['kind', 'key', 'body', 'fetched_at', 'expires_at'].map((name) => ({ name })));
-  expect((db.query('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(36);
+  expect(userVersion(db)).toBe(36);
 });
 
 test('it adds done_when to unblocks in v37 and keeps every row', () => {
