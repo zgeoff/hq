@@ -5,7 +5,7 @@ test.each([
   ['codex', 'codex'],
   ['claude', 'claude'],
   [undefined, undefined],
-])('it reads --adapter %p as %p', (value, adapter) => {
+] as const)('it reads --adapter %p as %p', (value, adapter) => {
   expect(parseReviewAdapter(value)).toBe(adapter);
 });
 
