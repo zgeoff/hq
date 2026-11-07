@@ -30,7 +30,7 @@ test('it reads the slots when there is no read yet', async () => {
   const step = await runFleetStep(ctx.db, { run, httpClient: fetch, settings: { path: ctx.path, readFile: readOptionalFile } }, new Date('2026-10-14T00:00:00Z'), { force: false, signal: new AbortController().signal });
 
   expect(step.read?.kind).toBe('read');
-  expect(ctx.db.query('SELECT COUNT(*) AS total FROM slot_usage').get()).toStrictEqual({ total: 3 });
+  expect(ctx.db.query('SELECT COUNT(*) AS total FROM slot_usage').get()).toStrictEqual({ total: 4 });
 });
 
 test('it reads no slot when the newest read is under 2 hours old', async () => {
@@ -44,7 +44,7 @@ test('it reads no slot when the newest read is under 2 hours old', async () => {
   const step = await runFleetStep(ctx.db, { run, httpClient: fetch, settings: { path: ctx.path, readFile: readOptionalFile } }, new Date('2026-10-14T01:59:00Z'), { force: false, signal: new AbortController().signal });
 
   expect(step.read).toBeNull();
-  expect(ctx.db.query('SELECT COUNT(*) AS total FROM slot_usage').get()).toStrictEqual({ total: 3 });
+  expect(ctx.db.query('SELECT COUNT(*) AS total FROM slot_usage').get()).toStrictEqual({ total: 4 });
 });
 
 test('it reads the slots again when the newest read is 2 hours old', async () => {
@@ -58,7 +58,7 @@ test('it reads the slots again when the newest read is 2 hours old', async () =>
   const step = await runFleetStep(ctx.db, { run, httpClient: fetch, settings: { path: ctx.path, readFile: readOptionalFile } }, new Date('2026-10-14T02:00:00Z'), { force: false, signal: new AbortController().signal });
 
   expect(step.read?.kind).toBe('read');
-  expect(ctx.db.query('SELECT COUNT(*) AS total FROM slot_usage').get()).toStrictEqual({ total: 6 });
+  expect(ctx.db.query('SELECT COUNT(*) AS total FROM slot_usage').get()).toStrictEqual({ total: 8 });
 });
 
 test('it reads the slots now when forced, whatever the age of the newest read', async () => {
@@ -80,6 +80,7 @@ test('it adds a news line for the forecast pause and leaks no token into it, the
     'op://fleet/claude-setup-token-1/credential': { code: 0, stdout: 'sk-ant-kettle-slot-1\n', stderr: '' },
     'op://fleet/claude-setup-token-2/credential': { code: 0, stdout: 'sk-ant-kettle-slot-2\n', stderr: '' },
     'op://fleet/claude-setup-token-3/credential': { code: 0, stdout: 'sk-ant-kettle-slot-3\n', stderr: '' },
+    'op://fleet/claude-setup-token-4/credential': { code: 0, stdout: 'sk-ant-kettle-slot-4\n', stderr: '' },
   };
   const run = mock<Runner>((cmd) => Promise.resolve(tokens[cmd[2] ?? ''] ?? { code: 1, stdout: '', stderr: 'invented: no such item' }));
 
@@ -87,6 +88,7 @@ test('it adds a news line for the forecast pause and leaks no token into it, the
   slotUsage.set('Bearer sk-ant-kettle-slot-1', { seven: { utilization: 0.4, reset: 1_792_281_600 } });
   slotUsage.set('Bearer sk-ant-kettle-slot-2', { seven: { utilization: 0.96, reset: 1_792_324_800 } });
   slotUsage.set('Bearer sk-ant-kettle-slot-3', { seven: { utilization: 0.97, reset: 1_792_303_200 } });
+  slotUsage.set('Bearer sk-ant-kettle-slot-4', { seven: { utilization: 0.98, reset: 1_792_346_400 } });
   for (const [index, time] of ['2026-10-13T23:30:00Z', '2026-10-14T00:00:00Z', '2026-10-14T00:30:00Z', '2026-10-14T01:00:00Z'].entries()) {
     ctx.db.query('INSERT INTO usage_samples (at, account, five_hour, seven_day, five_hour_resets_at, seven_day_resets_at) VALUES (?, ?, ?, ?, ?, ?)').run(time, 'abcdef012345', 5, 38.5 + index * 0.5, null, '2026-10-18T00:00:00Z');
   }
@@ -108,6 +110,7 @@ test('it stores no slot row and no news line when the step is aborted', async ()
     'op://fleet/claude-setup-token-1/credential': { code: 0, stdout: 'sk-ant-kettle-slot-1\n', stderr: '' },
     'op://fleet/claude-setup-token-2/credential': { code: 0, stdout: 'sk-ant-kettle-slot-2\n', stderr: '' },
     'op://fleet/claude-setup-token-3/credential': { code: 0, stdout: 'sk-ant-kettle-slot-3\n', stderr: '' },
+    'op://fleet/claude-setup-token-4/credential': { code: 0, stdout: 'sk-ant-kettle-slot-4\n', stderr: '' },
   };
   const run = mock<Runner>((cmd) => Promise.resolve(tokens[cmd[2] ?? ''] ?? { code: 1, stdout: '', stderr: 'invented: no such item' }));
 
@@ -115,6 +118,7 @@ test('it stores no slot row and no news line when the step is aborted', async ()
   slotUsage.set('Bearer sk-ant-kettle-slot-1', { seven: { utilization: 0.4, reset: 1_792_281_600 } });
   slotUsage.set('Bearer sk-ant-kettle-slot-2', { seven: { utilization: 0.96, reset: 1_792_324_800 } });
   slotUsage.set('Bearer sk-ant-kettle-slot-3', { seven: { utilization: 0.97, reset: 1_792_303_200 } });
+  slotUsage.set('Bearer sk-ant-kettle-slot-4', { seven: { utilization: 0.98, reset: 1_792_346_400 } });
   for (const [index, time] of ['2026-10-13T23:30:00Z', '2026-10-14T00:00:00Z', '2026-10-14T00:30:00Z', '2026-10-14T01:00:00Z'].entries()) {
     ctx.db.query('INSERT INTO usage_samples (at, account, five_hour, seven_day, five_hour_resets_at, seven_day_resets_at) VALUES (?, ?, ?, ?, ?, ?)').run(time, 'abcdef012345', 5, 38.5 + index * 0.5, null, '2026-10-18T00:00:00Z');
   }

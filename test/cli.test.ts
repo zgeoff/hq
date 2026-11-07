@@ -13,6 +13,7 @@ import { migrate } from '../src/db/migrate.ts';
 import { MIGRATIONS } from '../src/db/migrations.ts';
 import { openDb } from '../src/db/open-db.ts';
 import { setMeta } from '../src/db/set-meta.ts';
+import { userVersion } from '../src/db/user-version.ts';
 import { startStubAtcDaemon } from './start-stub-atc-daemon.ts';
 import { OWNER_PROBE_OPENER } from '../src/pr-status/owner-probe-opener.ts';
 import { overrideEnv } from '../src/config/override-env.ts';
@@ -292,7 +293,7 @@ test('a schema upgrade backs up the live database first', () => {
   db.close();
   expect(backup).toMatch(new RegExp(`hq\\.db\\.bak-v${MIGRATIONS.length}-`));
   const copy = new Database(backup!, { readonly: true });
-  expect((copy.query('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(MIGRATIONS.length);
+  expect(userVersion(copy)).toBe(MIGRATIONS.length);
   expect(copy.query(`SELECT value FROM meta WHERE key='marker'`).get()).toEqual({ value: 'kept' });
   copy.close();
 });
@@ -310,7 +311,7 @@ test('migrating from v1 backs up first and runs each later step', () => {
   migrate(v1, p1, false, MIGRATIONS.slice(0, 1));
   v1.close();
   const db = openDb(p1);
-  expect((db.query('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(MIGRATIONS.length);
+  expect(userVersion(db)).toBe(MIGRATIONS.length);
   db.close();
   expect(readdirSync(dir).some((f) => f.startsWith('v1.db.bak-v1-'))).toBe(true);
 });
@@ -381,7 +382,7 @@ test('v18 adds a news tag and the usage samples', () => {
   db.query(`INSERT INTO usage_samples (at, account, five_hour, seven_day) VALUES ('2026-10-16T00:00:00Z', 'abc', NULL, NULL)`).run();
   expect(() => db.query(`INSERT INTO usage_samples (at, account) VALUES ('2026-10-16T00:00:00Z', 'active')`).run()).toThrow();
   expect(() => db.query(`INSERT INTO usage_samples (at) VALUES ('2026-10-16T00:00:01Z')`).run()).toThrow();
-  expect((db.query('PRAGMA user_version').get() as { user_version: number }).user_version).toBeGreaterThanOrEqual(18);
+  expect(userVersion(db)).toBeGreaterThanOrEqual(18);
   db.close();
 });
 
@@ -400,7 +401,7 @@ test('v19 adds ready_ok and an outage kind, with one open outage per kind', () =
   expect(() => add.run('unready')).toThrow();
   expect(() => add.run('down')).toThrow();
   expect(() => add.run('sideways')).toThrow();
-  expect((db.query('PRAGMA user_version').get() as { user_version: number }).user_version).toBeGreaterThanOrEqual(19);
+  expect(userVersion(db)).toBeGreaterThanOrEqual(19);
   db.close();
 });
 
@@ -419,7 +420,7 @@ test('v22 adds the refusal log tables, backing hq.db up first', () => {
   db.query(`INSERT INTO refusals (uuid, at, subagent, transcript, scanned_at) VALUES ('u1', '2026-10-17T00:00:00Z', 0, '/t.jsonl', '2026-10-17T00:00:00Z')`).run();
   expect(() => db.query(`INSERT INTO refusals (uuid, at, subagent, transcript, scanned_at) VALUES ('u1', '2026-10-17T00:00:00Z', 0, '/t.jsonl', '2026-10-17T00:00:00Z')`).run()).toThrow();
   db.query(`INSERT INTO refusal_files (path, offset, size, mtime) VALUES ('/t.jsonl', 5, 9, '2026-10-17T00:00:00Z')`).run();
-  expect((db.query('PRAGMA user_version').get() as { user_version: number }).user_version).toBeGreaterThanOrEqual(22);
+  expect(userVersion(db)).toBeGreaterThanOrEqual(22);
   db.close();
 });
 
@@ -435,7 +436,7 @@ test('v21 adds deploy_runs, with a checked outcome and one row per run', () => {
   expect(() => add.run(5002, 'sideways')).toThrow();
   for (const o of ['applied_ok', 'applied_failed', 'no_apply', 'cancelled', 'unknown']) add.run(6000 + o.length, o);
   expect(db.query('SELECT outcome FROM deploy_runs WHERE run_id = 5001').get()).toEqual({ outcome: 'held' });
-  expect((db.query('PRAGMA user_version').get() as { user_version: number }).user_version).toBeGreaterThanOrEqual(21);
+  expect(userVersion(db)).toBeGreaterThanOrEqual(21);
   db.close();
 });
 
@@ -628,9 +629,47 @@ test('#run add prints the hq run session --add line in text output only for a se
   out = [];
   await main(['run', 'add', 'GEO-9703', '--session', '9703ab0c-0000-4000-8000-00000000aaaa', '--title', 'Invented kettle work', '--where', 'none']);
   const sameText = out.join('\n');
-  expect(ignoredText).toContain('Already on the board.\nIgnored --session 9703ab0c-0000-4000-8000-00000000bbbb: to add it to the run, use hq run session GEO-9703 9703ab0c-0000-4000-8000-00000000bbbb --add');
+  expect(ignoredText).toContain('Already on the board.\nIgnored --session 9703ab0c-0000-4000-8000-00000000bbbb: the session is not attached to the run. To add it, use hq run session GEO-9703 9703ab0c-0000-4000-8000-00000000bbbb --add');
   expect(sameText).toContain('Already on the board.');
   expect(sameText).not.toContain('Ignored --session');
+});
+
+test('#run add prints both lanes and hq run lane for a different --lane it ignores on a run already on the board', async () => {
+  mkdirSync(`${dir}/defs/scripts`, { recursive: true });
+  writeFileSync(`${dir}/defs/pacing.json`, JSON.stringify({ lanes: { imp: { kettle: 2, teapot: 1 } } }));
+  updateEnv('HQ_CAPACITY', `${dir}/defs/scripts/capacity.sh`);
+  await hq('run', 'add', 'GEO-9704', '--lane', 'kettle', '--title', 'Invented kettle work', '--where', 'imp');
+  out = [];
+
+  const code = await main(['run', 'add', 'GEO-9704', '--lane', 'teapot', '--title', 'Invented kettle work', '--where', 'imp']);
+
+  expect([code, out.join('\n').split('\n').slice(-2)]).toStrictEqual([0, ['Already on the board.', "Ignored --lane teapot: one issue has one run, and GEO-9704's run is in lane kettle. To move it, use hq run lane GEO-9704 teapot"]]);
+});
+
+test('#run add gives both lanes in JSON for a different --lane it ignores on a run already on the board', async () => {
+  mkdirSync(`${dir}/defs/scripts`, { recursive: true });
+  writeFileSync(`${dir}/defs/pacing.json`, JSON.stringify({ lanes: { imp: { kettle: 2, teapot: 1 } } }));
+  updateEnv('HQ_CAPACITY', `${dir}/defs/scripts/capacity.sh`);
+  await hq('run', 'add', 'GEO-9705', '--lane', 'kettle', '--title', 'Invented kettle work', '--where', 'imp');
+
+  const again = await hq('run', 'add', 'GEO-9705', '--lane', 'teapot', '--title', 'Invented kettle work', '--where', 'imp');
+
+  expect([again.code, again.json.result, again.json.ignoredLane, again.json.run.lane]).toStrictEqual([0, 'noop', { lane: 'teapot', runLane: 'kettle', next: 'hq run lane GEO-9705 teapot' }, 'kettle']);
+});
+
+test.each([
+  ['no --lane', []],
+  ['the same --lane', ['--lane', 'kettle']],
+])('#run add prints only "Already on the board." on a run already on the board given %s and no --session', async (_case, laneFlags) => {
+  mkdirSync(`${dir}/defs/scripts`, { recursive: true });
+  writeFileSync(`${dir}/defs/pacing.json`, JSON.stringify({ lanes: { imp: { kettle: 2, teapot: 1 } } }));
+  updateEnv('HQ_CAPACITY', `${dir}/defs/scripts/capacity.sh`);
+  await hq('run', 'add', 'GEO-9706', '--lane', 'kettle', '--title', 'Invented kettle work', '--where', 'imp');
+  out = [];
+
+  const code = await main(['run', 'add', 'GEO-9706', ...laneFlags, '--title', 'Invented kettle work', '--where', 'imp']);
+
+  expect([code, out.join('\n').split('\n').slice(1)]).toStrictEqual([0, ['Already on the board.']]);
 });
 
 test('v20 adds live_check to runs and the merge and release columns to run_prs', () => {
@@ -645,7 +684,7 @@ test('v20 adds live_check to runs and the merge and release columns to run_prs',
   expect(db.query('SELECT merge_sha, shipped_tag, shipped_at FROM run_prs').all()).toEqual([{ merge_sha: null, shipped_tag: null, shipped_at: null }]);
   db.query(`UPDATE runs SET live_check = 'none'`).run();
   expect(() => db.query(`UPDATE runs SET live_check = 'maybe'`).run()).toThrow();
-  expect((db.query('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(MIGRATIONS.length);
+  expect(userVersion(db)).toBe(MIGRATIONS.length);
   expect(MIGRATIONS.length).toBeGreaterThanOrEqual(20);
   db.close();
 });

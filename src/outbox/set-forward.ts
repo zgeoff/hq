@@ -1,9 +1,12 @@
 import type { Database } from 'bun:sqlite';
+import { runSyncQuery } from '../db/run-sync-query.ts';
 import { HqError } from '../errors.ts';
+import { kdb } from '../kdb.ts';
 import { getDeclaredForwards as declaredForwards } from '../roles/get-declared-forwards.ts';
 import { forwardOf } from './forward-of.ts';
 import { forwards } from './forwards.ts';
 import { loadForwards as metaForwards } from './load-forwards.ts';
+import { OutboxSchema } from './outbox-schema.ts';
 
 export function setForward(db: Database, from: string, to: string | null): { moved: number; merged: number } {
   return db
@@ -39,7 +42,7 @@ export function setForward(db: Database, from: string, to: string | null): { mov
       let merged = 0;
       if (to !== null) {
         const dest = forwardOf(db, from);
-        const rows = db.query(`SELECT id, event_seq FROM outbox WHERE target = ? AND status IN ('pending', 'failed')`).all(from) as { id: number; event_seq: number }[];
+        const rows = runSyncQuery(db, kdb(db).selectFrom('outbox').select(['id', 'event_seq']).where('target', '=', from).where('status', 'in', ['pending', 'failed']).compile(), OutboxSchema.pick({ id: true, event_seq: true }));
         for (const r of rows) {
           const key = `hq-ev${r.event_seq}-${dest}`;
           if (db.query('SELECT 1 FROM outbox WHERE idem_key = ?').get(key)) {

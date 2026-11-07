@@ -9,7 +9,7 @@
   "scripts": {
     "test": "bun test",
     "typecheck": "tsrs --noEmit",
-    "deadcode": "knip",
+    "deadcode": "bash scripts/run-knip.sh",
     "fmt": "oxfmt '**/*.{md,yml,yaml,json}'",
     "fmt:check": "oxfmt --check '**/*.{md,yml,yaml,json}'",
     "check:skills": "bun scripts/check-skills.ts",
@@ -20,7 +20,8 @@
     "check:grants": "bun scripts/grants.ts --check",
     "check:skill-writing": "sh scripts/check-skill-writing.sh",
     "ci:install-tool": "bun scripts/check/install-tool.ts",
-    "ci:test-scope": "bun scripts/check/read-test-scope.ts"
+    "ci:test-scope": "bun scripts/check/read-test-scope.ts",
+    "check:casts": "bun scripts/check-casts.ts"
   },
   "dependencies": {
     "@orpc/client": "1.16.1",
@@ -29,7 +30,8 @@
     "@orpc/tanstack-query": "1.16.1",
     "@tanstack/react-query": "5.105.0",
     "@tanstack/react-router": "1.170.46",
-    "@zgeoff/std": "0.4.2",
+    "@zgeoff/kysely-bun-sqlite": "0.3.0",
+    "@zgeoff/std": "0.4.3",
     "geist": "1.9.0",
     "kysely": "0.29.7",
     "react": "19.3.1",
@@ -47,14 +49,15 @@
     "@types/bun": "latest",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
-    "@zgeoff/diet": "0.2.1",
-    "@zgeoff/oxlint-config": "0.8.5",
-    "@zgeoff/skill-gate": "0.2.22",
+    "@zgeoff/agent-hooks": "0.2.9",
+    "@zgeoff/diet": "0.2.2",
+    "@zgeoff/oxlint-config": "0.10.0",
     "@zgeoff/testing": "0.2.1",
     "knip": "6.43.0",
     "msw": "2.15.0",
     "oxfmt": "^0.74.0",
     "oxlint": "1.89.0",
+    "oxlint-tsgolint": "7.0.2006",
     "tsrs": "0.18.0-ts7.1.0-dev.20260929",
     "typescript": "7.0.2"
   }

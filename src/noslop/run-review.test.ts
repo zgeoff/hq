@@ -9,6 +9,7 @@ import { openDb } from '../db/open-db.ts';
 import { setMeta } from '../db/set-meta.ts';
 import { listRuns } from '../runs/list-runs.ts';
 import { withRepoLock } from '../review/with-repo-lock.ts';
+import { runNoslopCommand } from './run-noslop-command.ts';
 import { runReview } from './run-review.ts';
 import { withCloneLock } from './with-clone-lock.ts';
 
@@ -147,6 +148,16 @@ test('it refuses --timeout for a PR on Codex, and runs nothing', async () => {
   const fake = buildFakeRunner();
 
   await expect(runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false, timeout: '30' })).rejects.toMatchObject({ code: 'bad_args' });
+
+  expect(fake.of('codex')).toStrictEqual([]);
+  expect(fake.of('bun')).toStrictEqual([]);
+});
+
+test('it refuses --adapter for a PR on Codex, and runs nothing', async () => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
+
+  await expect(runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false, adapter: 'claude' })).rejects.toMatchObject({ code: 'bad_args' });
 
   expect(fake.of('codex')).toStrictEqual([]);
   expect(fake.of('bun')).toStrictEqual([]);
@@ -296,6 +307,61 @@ test('it runs a full review however many reviews the PR has had, while no cap is
   await expect(runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false })).resolves.toMatchObject({ round: 4, fixesOnly: false });
 
   expect(fake.of('bun')[0]?.cmd).not.toContain('--fixes-only');
+});
+
+test('it passes --adapter claude to noslop when asked', async () => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
+  ctx.listWidgets();
+
+  await runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false, adapter: 'claude' });
+
+  expect(fake.of('bun')[0]?.cmd.join(' ')).toContain(' --adapter claude');
+});
+
+test.each([
+  ['before the setting ends', '2026-11-08T00:00:00Z', true, 'opus'],
+  ['once the setting ends', '2026-11-12T00:00:00Z', false, undefined],
+] as const)('it reviews with the stored claude setting %s', async (_case, reviewAt, passesClaude, model) => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
+  ctx.listWidgets();
+  const restoreClock = overrideEnv('HQ_NOW', '2026-11-07T10:00:00Z');
+  await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'adapter', rest: ['claude'], since: undefined, until: '2026-11-11T13:00:00Z', actor: 'kettle-owner', readOwnerSession: () => Promise.reject(new Error('the adapter setting reads no owner session')) });
+  restoreClock();
+  onTestFinished(overrideEnv('HQ_NOW', reviewAt));
+
+  await runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false });
+
+  const [noslop] = fake.of('bun');
+  expect(noslop?.cmd.join(' ').includes(' --adapter claude')).toBe(passesClaude);
+  expect(noslop?.opts?.env?.['ANTHROPIC_MODEL']).toBe(model);
+});
+
+test.each([
+  { name: 'the flag', flag: 'claude', setting: ['codex'], until: undefined, recorded: { adapter: 'claude', adapter_source: 'flag' } },
+  { name: 'the stored setting', flag: undefined, setting: ['claude'], until: '2026-11-11T13:00:00Z', recorded: { adapter: 'claude', adapter_source: 'setting' } },
+  { name: 'noslop\'s default', flag: undefined, setting: ['codex'], until: undefined, recorded: { adapter: null, adapter_source: 'default' } },
+] as const)('it records the adapter and $name as the source that chose it on the round', async (row) => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
+  ctx.listWidgets();
+  onTestFinished(overrideEnv('HQ_NOW', '2026-11-08T00:00:00Z'));
+  await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'adapter', rest: [...row.setting], since: undefined, until: row.until, actor: 'kettle-owner', readOwnerSession: () => Promise.reject(new Error('the adapter setting reads no owner session')) });
+
+  await runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false, adapter: row.flag });
+
+  expect(ctx.db.query('SELECT adapter, adapter_source FROM noslop_rounds').all()).toStrictEqual([row.recorded]);
+});
+
+test('it passes no --adapter to noslop when none is asked', async () => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
+  ctx.listWidgets();
+
+  await runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false });
+
+  expect(fake.of('bun')[0]?.cmd).not.toContain('--adapter');
 });
 
 test('it does not count a failed review or a check as a round', async () => {

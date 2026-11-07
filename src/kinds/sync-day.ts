@@ -1,5 +1,6 @@
 import { toExactOptional } from '@zgeoff/std';
 import type { Database } from 'bun:sqlite';
+import { z } from 'zod';
 import { iso } from '../clock/iso.ts';
 import { now } from '../clock/now.ts';
 import { HqError } from '../errors.ts';
@@ -13,24 +14,19 @@ import { toUTCDay as utcDay } from './to-utc-day.ts';
 
 const CAP = 1000; // gh search's most results per query: a full day means rows are missing
 
-interface GhPr {
-  number: number;
-  title: string;
-  body?: string | null;
-  closedAt: string;
-  repository: { name: string };
-}
-
 export async function syncDay(db: Database, run: Runner, day: string, env?: RunOpts['env'], at: Date = now()): Promise<number> {
   const r = await run(['gh', 'search', 'prs', '--owner', 'zgeoff', '--merged', '--merged-at', `${day}T00:00:00Z..${day}T23:59:59Z`, '--json', 'repository,number,title,body,closedAt', '--limit', String(CAP)], toExactOptional({ env }));
   if (r.code !== 0) throw new HqError('command_failed', `gh search prs for ${day} failed (${r.code}): ${(r.stderr || r.stdout).trim().slice(0, 200)}`);
-  const raw = JSON.parse(r.stdout) as unknown;
+  const raw: unknown = JSON.parse(r.stdout);
   if (!Array.isArray(raw)) throw new HqError('command_failed', `gh search prs for ${day} did not return a list`);
-  const all = raw as GhPr[];
-  if (all.length >= CAP) throw new HqError('too_many', `${day} has ${CAP}+ merged PRs, more than one search returns; not recorded`);
-  const inDay = (t: unknown) => typeof t === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/.test(t) && t.slice(0, 10) === day;
-  const bad = all.find((p) => !Number.isSafeInteger(p?.number) || p.number < 1 || typeof p.title !== 'string' || !inDay(p.closedAt) || typeof p.repository?.name !== 'string' || !/^[A-Za-z0-9_.-]{1,100}$/.test(p.repository.name) || /^\.+$/.test(p.repository.name));
-  if (bad) throw new HqError('command_failed', `gh search prs for ${day} returned a row hq can't read; not recorded`);
+  if (raw.length >= CAP) {
+    throw new HqError('too_many', `${day} has ${CAP}+ merged PRs, more than one search returns; not recorded`);
+  }
+  const parsed = buildPRListSchema(day).safeParse(raw);
+  if (!parsed.success) {
+    throw new HqError('command_failed', `gh search prs for ${day} returned a row hq can't read; not recorded`);
+  }
+  const all = parsed.data;
   const rows = all.filter((p) => inScope(p.repository.name));
   const done = utcDay(at.getTime()) > day;
   db.transaction(() => {
@@ -45,4 +41,17 @@ export async function syncDay(db: Database, run: Runner, day: string, env?: RunO
     if (done) db.query('INSERT INTO merged_pr_days (day, n, at) VALUES (?, ?, ?) ON CONFLICT (day) DO UPDATE SET n = excluded.n, at = excluded.at').run(day, rows.length, iso(at));
   }).immediate();
   return rows.length;
+}
+
+const TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/u;
+const REPO_NAME = /^[A-Za-z0-9_.-]{1,100}$/u;
+const ONLY_DOTS = /^\.+$/u;
+
+function buildPRListSchema(day: string) {
+  const repositoryName = z
+    .string()
+    .regex(REPO_NAME)
+    .refine((name) => !ONLY_DOTS.test(name));
+  const closedAt = z.string().refine((time) => TIMESTAMP.test(time) && time.startsWith(day));
+  return z.array(z.object({ number: z.number().int().min(1), title: z.string(), body: z.string().nullish(), closedAt, repository: z.object({ name: repositoryName }) }));
 }

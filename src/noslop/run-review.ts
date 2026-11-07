@@ -29,7 +29,11 @@ import { resolveNoslopDir } from './resolve-noslop-dir.ts';
 import { parseReviewTimeout } from './parse-review-timeout.ts';
 import { runNoslopReview } from './run-noslop-review.ts';
 import type { NoslopReviewContext, NoslopReviewResult } from './run-noslop-review.ts';
+import { now } from '../clock/now.ts';
 import { loadNoslopSettings } from './load-noslop-settings.ts';
+import type { ReviewAdapter } from './parse-review-adapter.ts';
+import { pickReviewAdapter } from './pick-review-adapter.ts';
+import { readAdapterSetting } from './read-adapter-setting.ts';
 import type { PRRequest } from './types.ts';
 import type { FixCheck } from './parse-review-run.ts';
 
@@ -40,6 +44,8 @@ export interface ReviewRequest extends PRRequest {
   full?: boolean | undefined;
 
   fixesOnly?: boolean | undefined;
+
+  adapter?: ReviewAdapter | undefined;
 
   timeout?: string | undefined;
 
@@ -97,6 +103,9 @@ function requireCodexFlags(request: ReviewRequest, parsed: ParsedRepo): void {
   }
   if (request.timeout !== undefined) {
     throw new HqError('bad_args', `--timeout limits a noslop run, but ${parsed.repo}#${request.pr} is reviewed by Codex`);
+  }
+  if (request.adapter !== undefined) {
+    throw new HqError('bad_args', `--adapter picks the model of a noslop run, but ${parsed.repo}#${request.pr} is reviewed by Codex`);
   }
 }
 
@@ -190,6 +199,7 @@ async function createNoslopContext(plan: RoundPlan, parsed: ParsedRepo, sha: str
     lock: (fn) => withRepoLock(scratch, buildSlug(parsed), fn),
     full: request.full,
     fixesOnly: plan.fixesOnly,
+    adapter: pickReviewAdapter(request.adapter, readAdapterSetting(request.db), now()),
     timeoutMs: plan.timeoutMs,
     baseMove: plan.baseMove ?? undefined,
     linear: makeAuditedLinearCaller(request.db, request.run),

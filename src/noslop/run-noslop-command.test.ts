@@ -68,9 +68,21 @@ test('it shows noslop off everywhere, with no pin, until someone turns it on', a
   const fake = buildFakeRunner();
 
   await expect(runNoslopCommand({ run: fake.run, db: ctx.db, verb: undefined, rest: [], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) })).resolves.toStrictEqual({
-    data: { repos: [], caps: {}, sha: null, clone: `${ctx.base}/repos/zgeoff/noslop` },
-    text: `repos: none (noslop is off everywhere)\nemergency review cap: off everywhere (hq noslop cap <repo> <n>)\npinned: nothing yet (hq noslop pin <sha>)\nclone: ${ctx.base}/repos/zgeoff/noslop (not cloned yet)`,
+    data: { repos: [], caps: {}, sha: null, clone: `${ctx.base}/repos/zgeoff/noslop`, adapter: { adapter: undefined, source: 'default', until: null } },
+    text: `repos: none (noslop is off everywhere)\nemergency review cap: off everywhere (hq noslop cap <repo> <n>)\npinned: nothing yet (hq noslop pin <sha>)\nclone: ${ctx.base}/repos/zgeoff/noslop (not cloned yet)\nadapter: noslop's default`,
   });
+});
+
+test('it stores the claude setting, shows it until it ends, and logs who set it', async () => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
+  onTestFinished(overrideEnv('HQ_NOW', '2026-11-07T10:00:00Z'));
+
+  await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'adapter', rest: ['claude'], until: '2026-11-12T00:00:00Z', since: undefined, actor: 'kettle-owner', readOwnerSession: () => Promise.reject(new Error('the adapter setting reads no owner session')) });
+  const shown = await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'show', rest: [], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) });
+
+  expect(shown.text.split('\n').at(-1)).toBe('adapter: claude on Opus (stored setting until 2026-11-12T00:00:00.000Z; hq noslop adapter codex ends it)');
+  expect(ctx.db.query("SELECT action, actor FROM events WHERE subject_id = 'noslop' AND action = 'adapter'").all()).toStrictEqual([{ action: 'adapter', actor: 'kettle-owner' }]);
 });
 
 test('it turns repos on and off, sorted, and the second identical call changes nothing', async () => {
@@ -408,7 +420,7 @@ test('it pins with no store migration, no backup and no store query when the sto
   createStubNoslopStore(ctx.store, { migrations: ctx.newMigrations, tables: { dispositions: 2 } });
   createStubNoslopClone(paths.folder, ctx.newMigrations);
 
-  await expect(runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) })).resolves.toMatchObject({ text: `repos: none (noslop is off everywhere)\nemergency review cap: off everywhere (hq noslop cap <repo> <n>)\npinned: ${ctx.fullSHA}\nclone: ${paths.folder}\nno store migration` });
+  await expect(runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) })).resolves.toMatchObject({ text: `repos: none (noslop is off everywhere)\nemergency review cap: off everywhere (hq noslop cap <repo> <n>)\npinned: ${ctx.fullSHA}\nclone: ${paths.folder}\nadapter: noslop's default\nno store migration` });
 
   expect(ctx.readBackups()).toStrictEqual([]);
   expect(fake.of('bun')).toStrictEqual([]);
@@ -628,7 +640,7 @@ test('it pins with no backup when there is no store file', async () => {
   createStubNoslopClone(paths.folder, ctx.newMigrations);
 
   await expect(runNoslopCommand({ run: buildFakeRunner().run, db: ctx.db, verb: 'pin', rest: ['0123456'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'owner' }) })).resolves.toMatchObject({
-    text: `repos: none (noslop is off everywhere)\nemergency review cap: off everywhere (hq noslop cap <repo> <n>)\npinned: ${ctx.fullSHA}\nclone: ${paths.folder}\nno store migration (no store at ${ctx.store})`,
+    text: `repos: none (noslop is off everywhere)\nemergency review cap: off everywhere (hq noslop cap <repo> <n>)\npinned: ${ctx.fullSHA}\nclone: ${paths.folder}\nadapter: noslop's default\nno store migration (no store at ${ctx.store})`,
   });
 
   expect(existsSync(ctx.store)).toBe(false);

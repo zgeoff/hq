@@ -1,9 +1,7 @@
 import type { Database } from 'bun:sqlite';
-import { z } from 'zod';
+import { BindingsSchema } from '../db/bindings-schema.ts';
 import { kdb } from '../kdb.ts';
 import type { SlotCauseName } from './types.ts';
-
-const BindingsSchema = z.array(z.union([z.string(), z.number(), z.null()]));
 
 // Kysely's execute waits on its own connection lock, so the write runs here, at once, and a caller's
 // bun:sqlite transaction holds it.

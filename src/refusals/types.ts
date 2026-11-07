@@ -1,4 +1,5 @@
 import type { SessionInfo } from '../atc/session-schema.ts';
+import type { HqTables } from '../db/hq-columns.ts';
 import type { BY } from './by.ts';
 
 export interface ScanOptions {
@@ -41,19 +42,6 @@ export interface Tool {
   input: string | null;
 }
 
-export interface RefusalRow {
-  uuid: string;
-  at: string;
-  claude_session: string | null;
-  transcript: string;
-  subagent: number;
-  cwd: string | null;
-  atc_session: string | null;
-  atc_name: string | null;
-  issue: string | null;
-  tool: string | null;
-  input: string | null;
-  reason: string | null;
-}
+export type RefusalRow = Omit<HqTables['refusals'], 'scanned_at'>;
 
 export type By = (typeof BY)[number];

@@ -214,7 +214,7 @@ test.each([
   ['the output is version 3', { code: 0, stdout: '{"version":3,"findings":[]}', stderr: '' }, 'output version 3, hq reads versions 4, 5, 6 and 7'],
   ['the output is version 8', { code: 0, stdout: '{"version":8,"findings":[]}', stderr: '' }, 'output version 8, hq reads versions 4, 5, 6 and 7'],
   ['a version 6 output has no notReviewed list', { code: 0, stdout: JSON.stringify({ ...JSON.parse(FAKE_REVIEW_JSON), version: 6, dropped: [] }), stderr: '' }, 'output version 6 has no notReviewed list'],
-  ['a noslop call failed', { code: 0, stdout: JSON.stringify({ ...JSON.parse(FAKE_REVIEW_JSON), failedCalls: [{ lens: 'security' }] }), stderr: '' }, '1 noslop call(s) failed'],
+  ['a noslop call failed', { code: 0, stdout: JSON.stringify({ ...JSON.parse(FAKE_REVIEW_JSON), failedCalls: [{ id: 'security', reason: 'codex exited 1 on call security: ' }] }), stderr: '' }, '1 noslop call(s) failed: codex exited 1: noslop gave no error text (security)'],
 ])('it throws noslop_failed and records no review when %s', async (_name, noslopReview, why) => {
   const ctx = setupTest();
   const fake = buildFakeRunner({ noslopReview });
@@ -227,6 +227,18 @@ test.each([
   expect(ctx.db.query('SELECT ok, error, kind FROM noslop_rounds').all()).toStrictEqual([{ ok: 0, error: why, kind: 'review' }]);
   expect(fake.of('codex')).toStrictEqual([]);
   expect(fake.lines().some((l) => l.startsWith('git worktree remove --force'))).toBe(true);
+});
+
+test.each(Object.entries(FAKE_SECRETS))('it redacts the %s from a failed call\'s reason before it shows or records it', async (_label, secret) => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ noslopReview: { code: 0, stdout: JSON.stringify({ ...JSON.parse(FAKE_REVIEW_JSON), failedCalls: [{ id: 'security', reason: `claude exited 1 on call security: bad key ${secret}` }] }), stderr: '' } });
+
+  const failure = await runNoslopReview(ctx.reviewContext(fake.run)).catch(String);
+
+  expect(failure).toContain('claude exited 1: bad key [redacted] (security)');
+  expect(failure).not.toContain(secret);
+  await expect(Bun.file(`${ctx.base}/widgets+7-noslop.json`).text()).resolves.not.toContain(secret);
+  expect(ctx.db.query('SELECT error FROM noslop_rounds').get()).toStrictEqual({ error: '1 noslop call(s) failed: claude exited 1: bad key [redacted] (security)' });
 });
 
 test('it reads a version 5 review, which adds the dropped findings', async () => {
