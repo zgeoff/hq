@@ -609,3 +609,18 @@ test('it ships a build run whose delivery PR is released while its design pass P
 
   expect(result.moved).toStrictEqual([{ issue: 'GEO-79', to: 'live-check', prs: [{ ref: 'tools#14', tag: 'alpha@1.0.0', shipped_at: '2026-10-15T00:00:00Z' }] }]);
 });
+
+test.each([
+  { name: 'a string', stdout: '{"mergeCommit":"a string"}' },
+  { name: 'a number', stdout: '{"mergeCommit":5}' },
+  { name: 'a list', stdout: '{"mergeCommit":[]}' },
+  { name: 'null', stdout: '{"mergeCommit":null}' },
+  { name: 'missing', stdout: '{}' },
+])('it records a PR as having no merge commit when gh gives its merge commit as $name', async (testCase) => {
+  const ctx = setupTest();
+  createMergedRun(ctx.db, 'GEO-83', ['tools#33']);
+
+  const result = await shipRuns(ctx.db, () => Promise.resolve({ code: 0, stdout: testCase.stdout, stderr: '' }), ctx.now);
+
+  expect([result.moved, result.errors]).toStrictEqual([[], ['tools#33: tools#33 has no merge commit']]);
+});

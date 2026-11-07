@@ -3,7 +3,6 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { z } from 'zod';
 import { kdb } from '../kdb.ts';
 import { runSyncQuery } from './run-sync-query.ts';
-import { runSyncRow } from './run-sync-row.ts';
 
 function setupTest() {
   const db = new Database(':memory:');
@@ -48,16 +47,4 @@ test('it throws instead of binding undefined', () => {
     .compile();
 
   expect(() => runSyncQuery(ctx.db, query, ctx.schema)).toThrow();
-});
-
-test('it returns the first row of a compiled query, parsed', () => {
-  const ctx = setupTest();
-
-  expect(runSyncRow(ctx.db, ctx.queryBefore('c'), ctx.schema)).toStrictEqual({ key: 'a', value: '1' });
-});
-
-test('it returns null when the query has no row', () => {
-  const ctx = setupTest();
-
-  expect(runSyncRow(ctx.db, ctx.queryBefore('a'), ctx.schema)).toBeNull();
 });

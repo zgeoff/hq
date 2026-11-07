@@ -13,11 +13,16 @@ export async function checkMergedOnGitHub(run: Runner, raw: string): Promise<voi
   const [repo, n] = ref.split('#') as [string, string];
   const r = await run(['gh', 'pr', 'view', n, '-R', `zgeoff/${repo}`, '--json', 'state,mergedAt'], { env: cleanEnv() });
   if (r.code !== 0) throw new HqError('github_unreachable', `can't confirm ${ref} merged on GitHub (gh exit ${r.code}): ${(r.stderr || r.stdout).trim().slice(0, 200)}; hq leaves it open`);
-  let state: unknown;
+  let json: unknown;
   try {
-    state = StateSchema.parse(JSON.parse(r.stdout)).state;
+    json = JSON.parse(r.stdout);
   } catch {
     throw new HqError('github_unreachable', `gh gave no JSON for ${ref}; hq leaves it open`);
   }
+  if (json === null) {
+    throw new HqError('github_unreachable', `gh gave no JSON for ${ref}; hq leaves it open`);
+  }
+  const view = StateSchema.safeParse(json);
+  const state = view.success ? view.data.state : undefined;
   if (state !== 'MERGED') throw new HqError('not_merged', `${ref} is ${typeof state === 'string' ? state : 'unknown'} on GitHub, not merged; hq leaves it open`);
 }

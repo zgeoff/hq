@@ -1,6 +1,7 @@
 import type { Database } from 'bun:sqlite';
-import { runSyncRow } from '../db/run-sync-row.ts';
+import invariant from 'tiny-invariant';
 import { z } from 'zod';
+import { runSyncQuery } from '../db/run-sync-query.ts';
 import { setMeta } from '../db/set-meta.ts';
 import { HqError } from '../errors.ts';
 import { kdb } from '../kdb.ts';
@@ -19,7 +20,9 @@ export function markPushed(db: Database, upto: number, actor: string): { cursor:
       if (upto <= prev) {
         return { cursor: prev, covered: 0 };
       }
-      const max = runSyncRow(db, kdb(db).selectFrom('unblocks').select((eb) => eb.fn.max('added_seq').as('max')).compile(), MaxSeqSchema)?.max ?? 0;
+      const [newest] = runSyncQuery(db, kdb(db).selectFrom('unblocks').select((eb) => eb.fn.max('added_seq').as('max')).compile(), MaxSeqSchema);
+      invariant(newest, 'MAX with no GROUP BY returns one row');
+      const max = newest.max ?? 0;
       if (upto > max) throw new HqError('bad_args', `--upto ${upto} is past the newest item (${max})`);
       const covered = newSincePush(db).filter((u) => u.added_seq <= upto).length;
       setMeta(db, 'unblock_pushed_seq', String(upto));

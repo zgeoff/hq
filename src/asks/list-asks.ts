@@ -8,10 +8,9 @@ import type { Ask, Kind } from './types.ts';
 
 export function listAsks(db: Database, opts: { kind?: Kind; states?: AskState[] } = {}): Ask[] {
   const states = opts.states ?? [];
-  const query = kdb(db)
-    .selectFrom('asks')
-    .selectAll()
-    .$if(Boolean(opts.kind), (builder) => builder.where('kind', '=', opts.kind ?? 'call'))
+  const kind = opts.kind;
+  const base = kdb(db).selectFrom('asks').selectAll();
+  const query = (kind === undefined ? base : base.where('kind', '=', kind))
     .$if(states.length > 0, (builder) => builder.where('state', 'in', states))
     .orderBy('queued_at')
     .orderBy('id')

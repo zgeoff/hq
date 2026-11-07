@@ -170,7 +170,8 @@ export async function shipRuns(db: Database, run: Runner, at: Date = now(), opts
       try {
         if (!s.sha) {
           const out = await gh(run, ['pr', 'view', numOf(ref), '-R', `${OWNER}/${s.repo}`, '--json', 'mergeCommit'], `pr view ${ref}`);
-          const sha = PrViewSchema.parse(JSON.parse(out)).mergeCommit?.oid;
+          const view = PrViewSchema.safeParse(JSON.parse(out));
+          const sha = view.success ? view.data.mergeCommit?.oid : undefined;
           if (typeof sha !== 'string' || !HEX40.test(sha)) throw new HqError('bad_pr', `${ref} has no merge commit`);
           s.sha = sha;
           save(s);

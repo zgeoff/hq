@@ -11,11 +11,11 @@ import type { Ask, Kind } from './types.ts';
 // oxlint-disable-next-line zgeoff/function-verb -- named as its callers use it
 export function nextEligible(db: Database, kind?: Kind, at: Date = now()): Ask | null {
   const t = iso(at);
-  const query = kdb(db)
+  const base = kdb(db)
     .selectFrom('asks')
     .selectAll()
-    .where((eb) => eb.or([eb('state', '=', 'queued'), eb.and([eb('state', '=', 'later'), eb('due_at', '<=', t)])]))
-    .$if(kind !== undefined, (builder) => builder.where('kind', '=', kind ?? 'call'))
+    .where((eb) => eb.or([eb('state', '=', 'queued'), eb.and([eb('state', '=', 'later'), eb('due_at', '<=', t)])]));
+  const query = (kind === undefined ? base : base.where('kind', '=', kind))
     .orderBy(sql`send_order IS NULL`)
     .orderBy('send_order')
     .orderBy(sql`COALESCE(CASE WHEN state = 'later' THEN due_at END, queued_at)`)

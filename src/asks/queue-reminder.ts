@@ -1,9 +1,10 @@
 import type { Database } from 'bun:sqlite';
+import invariant from 'tiny-invariant';
 import { iso } from '../clock/iso.ts';
 import { now } from '../clock/now.ts';
 import { CountSchema } from '../db/count-schema.ts';
 import { getMeta } from '../db/get-meta.ts';
-import { runSyncRow } from '../db/run-sync-row.ts';
+import { runSyncQuery } from '../db/run-sync-query.ts';
 import { setMeta } from '../db/set-meta.ts';
 import { kdb } from '../kdb.ts';
 import { logEvent } from '../log-event.ts';
@@ -28,7 +29,9 @@ export function queueReminder(db: Database, actor: string): { reminded: string |
       const epoch = Math.max(Date.parse(since), lastQuietEnd(t).getTime(), holdEnd ? Date.parse(holdEnd) : 0);
       const told = getMeta(db, `told:${next.id}`);
       if (told && Date.parse(told) >= epoch) return { reminded: null, why: `${owner()} already told about ${next.id}` };
-      const waiting = listAsks(db, { states: ['queued'] }).length + (runSyncRow(db, kdb(db).selectFrom('asks').select((eb) => eb.fn.countAll<number>().as('count')).where('state', '=', 'later').where('due_at', '<=', iso(t)).compile(), CountSchema)?.count ?? 0);
+      const [due] = runSyncQuery(db, kdb(db).selectFrom('asks').select((eb) => eb.fn.countAll<number>().as('count')).where('state', '=', 'later').where('due_at', '<=', iso(t)).compile(), CountSchema);
+      invariant(due, 'COUNT(*) with no GROUP BY returns one row');
+      const waiting = listAsks(db, { states: ['queued'] }).length + due.count;
       const seq = logEvent(db, 'ask', next.id, 'reminded', actor, next.state, next.state, { waiting });
       enqueue(db, seq, owner(), `${waiting} waiting for the owner; the floor is free. Next: ${next.kind} ${next.id}: ${next.title}. Open it with: hq open`, 'queue-reminder');
       setMeta(db, `told:${next.id}`, t.toISOString());

@@ -9,12 +9,7 @@ export function unsent(db: Database, retryFailed: boolean, ids: number[] | undef
     return [];
   }
   const states = retryFailed ? (['pending', 'failed'] as const) : (['pending'] as const);
-  const query = kdb(db)
-    .selectFrom('outbox')
-    .selectAll()
-    .where('status', 'in', states)
-    .$if(ids !== undefined, (builder) => builder.where('id', 'in', ids ?? []))
-    .orderBy('id')
-    .compile();
+  const base = kdb(db).selectFrom('outbox').selectAll().where('status', 'in', states);
+  const query = (ids === undefined ? base : base.where('id', 'in', ids)).orderBy('id').compile();
   return runSyncQuery(db, query, OutboxSchema);
 }

@@ -4,7 +4,6 @@ import { now } from '../clock/now.ts';
 import type { IssueType } from '../linear/issue-types.ts';
 import { sydneyUtc } from '../morning/sydney-utc.ts';
 import { sydney } from '../morning/sydney.ts';
-import { z } from 'zod';
 import { buildRowSchema } from '../db/build-row-schema.ts';
 import { CountSchema } from '../db/count-schema.ts';
 import { runSyncQuery } from '../db/run-sync-query.ts';
@@ -13,6 +12,7 @@ import { IN_SCOPE } from '../scope/in-scope.ts';
 import { DAY } from './day.ts';
 import type { Kind } from './kinds.ts';
 import { isIssueType } from './is-issue-type.ts';
+import { isKind } from './is-kind.ts';
 import { KINDS } from './kinds.ts';
 import { mondayOf } from './monday-of.ts';
 import { readFetchedDays } from './read-fetched-days.ts';
@@ -20,7 +20,7 @@ import { toUTCDay as utcDay } from './to-utc-day.ts';
 import { TYPE_COLS } from './type-cols.ts';
 import type { KindWeek } from './types.ts';
 
-const KindCountSchema = CountSchema.extend({ kind: z.enum([...KINDS, 'other']) });
+const KindCountSchema = CountSchema.extend({ kind: buildRowSchema('merged_prs').shape.kind });
 const TypeCountSchema = CountSchema.extend({ type: buildRowSchema('linear_issues').shape.type.nullable() });
 const ClosedCountSchema = CountSchema.extend({ state: buildRowSchema('linear_issues').shape.state, type: buildRowSchema('linear_issues').shape.type });
 
@@ -51,7 +51,11 @@ export function kindWeeks(db: Database, weeks: number, at: Date = now()): KindWe
     );
     const kinds = Object.fromEntries([...KINDS, 'other'].map((k) => [k, 0])) as Record<Kind, number>;
     for (const row of rows) {
-      kinds[row.kind] = row.count;
+      if (isKind(row.kind)) {
+        kinds[row.kind] = row.count;
+      } else {
+        Object.assign(kinds, { [row.kind]: row.count });
+      }
     }
     const total = rows.reduce((sum, row) => sum + row.count, 0);
     let missing = 0;
