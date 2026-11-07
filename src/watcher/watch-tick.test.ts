@@ -466,10 +466,10 @@ test('it logs no slot token and no profile token when op, a slot request and a s
   const op = createStubOp({
     directory: ctx.directory,
     answers: {
-      'op://claude-slots/claude-setup-token-2/credential': 'kettle-slot-credential-2',
-      'op://claude-slots/claude-setup-token-3/credential': 'kettle-slot-credential-3',
+      'op://fleet/claude-setup-token-2/credential': 'kettle-slot-credential-2',
+      'op://fleet/claude-setup-token-3/credential': 'kettle-slot-credential-3',
     },
-    failures: { 'op://claude-slots/claude-setup-token-1/credential': '[ERROR] invented: kettle-slot-credential-1 is held back from kettle-profile-credential' },
+    failures: { 'op://fleet/claude-setup-token-1/credential': '[ERROR] invented: kettle-slot-credential-1 is held back from kettle-profile-credential' },
   });
   const slotAnswers: Record<string, () => Response> = {
     'Bearer kettle-slot-credential-2': () => {
