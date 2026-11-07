@@ -19,6 +19,7 @@ import { z } from 'zod';
 import { updateEnv } from '@zgeoff/testing/helpers';
 import { createStubSystemctl } from '../../test/create-stub-systemctl.ts';
 import { freshDb } from '../../test/helpers.ts';
+import { findPath } from '../test-utils/find-path.ts';
 
 test('the table loads and each single role resolves to one declared session', () => {
   expect(ROLES.sessions.length).toBeGreaterThan(5);
@@ -361,7 +362,8 @@ test('hq fleet --json carries the stale-build warning when the checkout fleet.js
   writeFileSync(join(directory, 'hq', 'fleet.json'), JSON.stringify(changed));
   const code = await main(['fleet', '--json']);
   expect(code).toBe(0);
-  expect(JSON.parse(ctx.out.join('\n')).staleBuild).toContain(`older fleet.json than ${directory}/hq/fleet.json`);
+  const report: unknown = JSON.parse(ctx.out.join('\n'));
+  expect(findPath(report, 'staleBuild')).toContain(`older fleet.json than ${directory}/hq/fleet.json`);
 });
 
 test('hq fleet --json gives each session its skill and roles, plus the roles and forwards', async () => {

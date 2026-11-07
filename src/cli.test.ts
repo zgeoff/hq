@@ -1,4 +1,5 @@
 import { expect, mock, onTestFinished, spyOn, test } from 'bun:test';
+import { findPath } from './test-utils/find-path.ts';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -539,7 +540,8 @@ test('hq run done closes the run, forgets its session through atc, and notes the
   const code = await main(['run', 'done', 'GEO-9821', '--json']);
 
   expect(code).toBe(0);
-  expect(JSON.parse(printed.join('\n')).wrapUp).toStrictEqual({ forgotten: ['0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa'], destroyed: [], kept: [], failed: [] });
+  const report: unknown = JSON.parse(printed.join('\n'));
+  expect(findPath(report, 'wrapUp')).toStrictEqual({ forgotten: ['0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa'], destroyed: [], kept: [], failed: [] });
   expect(atc.calls).toStrictEqual([
     { method: 'session.update', input: { session: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', pinned: false } },
     { method: 'session.kill', input: { session: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', stopOnly: true } },
@@ -632,7 +634,7 @@ test('hq lanes shows the cause of the empty slots and the minutes by cause for t
 
   expect(text).toInclude('cause: triage, 2 free slot(s) since 2026-10-14T00:40:00Z');
   expect(text).toInclude('empty slot-minutes today (Sydney): delivery 12, triage 41, supply 0');
-  expect(JSON.parse(json).slotCauses).toStrictEqual({
+  expect(findPath(JSON.parse(json), 'slotCauses')).toStrictEqual({
     now: { cause: 'triage', slots: 2, since: '2026-10-14T00:40:00Z', readyAgeMinutes: 5, reason: null, backlogError: null },
     today: { delivery: 12.4, triage: 40.6, supply: 0, design: 0 },
   });
@@ -694,7 +696,7 @@ test('hq lanes --json carries the stored cap with the working count and what lim
 
   const [, stdout] = await Promise.all([child.exited, new Response(child.stdout).text()]);
 
-  expect(JSON.parse(stdout).cap).toStrictEqual({ cap: 1, until: '2026-10-18T21:00:00Z', reason: 'weekend pacing', by: 'z-stu', working: 0, limitedBy: 'cap', workingFrom: 'runs' });
+  expect(findPath(JSON.parse(stdout), 'cap')).toStrictEqual({ cap: 1, until: '2026-10-18T21:00:00Z', reason: 'weekend pacing', by: 'z-stu', working: 0, limitedBy: 'cap', workingFrom: 'runs' });
 });
 
 test('hq lanes --json carries the stored cap the watcher enforces when pacing has no lanes', async () => {
@@ -827,7 +829,7 @@ test('hq grant actions shows a voided act struck out with its reason in text and
   const json = await hq('--json');
 
   expect(text.trim()).toBe('kettle-merges (mark 1): 1: kettle#9 (teapot-bot); ~~kettle#8 (teapot-bot)~~ void act 1, 2026-10-14T01:30:00Z by z-stu: logged before the merge failed');
-  expect(JSON.parse(json).grants[0].voided).toStrictEqual([{ id: 1, target: 'kettle#8', note: null, actor: 'teapot-bot', at: NOON_SYDNEY, voidedAt: '2026-10-14T01:30:00Z', voidedBy: 'z-stu', voidReason: 'logged before the merge failed' }]);
+  expect(findPath(JSON.parse(json), 'grants', 0, 'voided')).toStrictEqual([{ id: 1, target: 'kettle#8', note: null, actor: 'teapot-bot', at: NOON_SYDNEY, voidedAt: '2026-10-14T01:30:00Z', voidedBy: 'z-stu', voidReason: 'logged before the merge failed' }]);
 });
 
 test('hq capacity says the slot reads are not set up, in text and in --json', async () => {
@@ -843,7 +845,7 @@ test('hq capacity says the slot reads are not set up, in text and in --json', as
   await main(['capacity', '--json']);
 
   expect(lines[0]).toInclude('  fleet: no forecast, slot reads are not set up');
-  expect(JSON.parse(lines[1] ?? '{}').fleet).toMatchObject({ notSetUp: expect.stringContaining('no settings file at '), active: null, slots: [], forecast: null, note: 'slot reads are not set up' });
+  expect(findPath(JSON.parse(lines[1] ?? '{}'), 'fleet')).toMatchObject({ notSetUp: expect.stringContaining('no settings file at '), active: null, slots: [], forecast: null, note: 'slot reads are not set up' });
 });
 
 test('it reads the four slots through op and prints the fleet block without a token for hq capacity --refresh-slots', async () => {
@@ -984,7 +986,8 @@ test('hq capacity --refresh-slots --json carries the refresh problems in the fle
 
   await main(['capacity', '--refresh-slots', '--json']);
 
-  expect(JSON.parse(lines.join('\n')).fleet.problems).toStrictEqual(['slot 3: op read failed (exit 1)']);
+  const report: unknown = JSON.parse(lines.join('\n'));
+  expect(findPath(report, 'fleet', 'problems')).toStrictEqual(['slot 3: op read failed (exit 1)']);
 });
 
 test('hq capacity --refresh-slots prints no profile token when op and the slot request fail naming it', async () => {
@@ -1062,7 +1065,7 @@ test('hq capacity --refresh-slots --json carries neither a slot token nor the pr
   await main(['capacity', '--refresh-slots', '--json']);
 
   const output = lines.join('\n');
-  expect(JSON.parse(output).fleet.problems).toStrictEqual([
+  expect(findPath(JSON.parse(output), 'fleet', 'problems')).toStrictEqual([
     'slot 1: op read failed (exit 1)',
     'slot 2: invented proxy dropped [redacted] minted by [redacted]',
     'slot 3: invented proxy dropped [redacted] minted by [redacted]',

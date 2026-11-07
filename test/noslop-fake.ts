@@ -1,4 +1,5 @@
 import { realRunner } from '../src/runner/real-runner.ts';
+import { findPath } from '../src/test-utils/find-path.ts';
 import type { RunOpts, RunResult, Runner } from '../src/runner/types.ts';
 
 interface FakeCall {
@@ -134,7 +135,8 @@ function pickGhAnswer(script: FakeScript, line: string): RunResult | null {
     return buildResult(JSON.stringify({ headRefName: 'feat', headRefOid: FAKE_FULL_SHA, baseRefName: 'main' }));
   }
   if (line.includes('--json headRefOid,author,statusCheckRollup')) {
-    return script.prFacts ?? buildResult(JSON.stringify({ headRefOid: FAKE_FULL_SHA, baseRefName: 'main', baseRefOid: FAKE_BASE_SHA, author: JSON.parse(script.author ?? '{"author":{"login":"zgeoff","is_bot":false}}').author, body: script.prBody ?? '', statusCheckRollup: [{ __typename: 'CheckRun', name: 'test', status: 'COMPLETED', conclusion: 'SUCCESS' }] }));
+    const author = findPath(JSON.parse(script.author ?? '{"author":{"login":"zgeoff","is_bot":false}}'), 'author');
+    return script.prFacts ?? buildResult(JSON.stringify({ headRefOid: FAKE_FULL_SHA, baseRefName: 'main', baseRefOid: FAKE_BASE_SHA, author, body: script.prBody ?? '', statusCheckRollup: [{ __typename: 'CheckRun', name: 'test', status: 'COMPLETED', conclusion: 'SUCCESS' }] }));
   }
   if (line.includes('--json headRefOid')) {
     return script.prHead ?? buildResult(JSON.stringify({ headRefOid: FAKE_FULL_SHA }));

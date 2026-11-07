@@ -18,6 +18,7 @@ import { review } from '../src/review/review.ts';
 import type { RunOpts, Runner } from '../src/runner/types.ts';
 import { rolesByName } from '../src/roles/roles-by-name.ts';
 import { ASK_TRANSITIONS } from '../src/transitions/ask-transitions.ts';
+import { findPath } from '../src/test-utils/find-path.ts';
 import { PR_TRANSITIONS } from '../src/transitions/pr-transitions.ts';
 import { RUN_TRANSITIONS } from '../src/transitions/run-transitions.ts';
 import { NOON_SYDNEY, at, fakeAtc, freshDb } from './helpers.ts';
@@ -61,34 +62,38 @@ afterEach(() => {
 const hq = async (...argv: string[]) => {
   out = [];
   const code = await main([...argv, '--json']);
-  return { code, json: JSON.parse(out.join('\n')) };
+  const json: unknown = JSON.parse(out.join('\n'));
+  return { code, json };
 };
 
 test('--json gives the version, schema, commands, transitions, roles and shapes', async () => {
   const { code, json } = await hq('capabilities');
   expect(code).toBe(0);
-  expect(json.ok).toBe(true);
-  expect(Object.keys(json).sort()).toEqual(['commands', 'ok', 'roles', 'schema', 'shapes', 'transitions', 'version']);
-  expect(json.version).toBe(VERSION);
-  expect(json.schema).toBe(SCHEMA_VERSION);
-  expect(json.shapes).toEqual(SHAPES);
-  expect(json.roles).toEqual(rolesByName());
+  expect(findPath(json, 'ok')).toBe(true);
+  const keys = Object.keys(z.record(z.string(), z.unknown()).parse(json));
+  expect(keys.toSorted()).toStrictEqual(['commands', 'ok', 'roles', 'schema', 'shapes', 'transitions', 'version']);
+  expect(findPath(json, 'version')).toBe(VERSION);
+  expect(findPath(json, 'schema')).toBe(SCHEMA_VERSION);
+  expect(findPath(json, 'shapes')).toStrictEqual(SHAPES);
+  expect(findPath(json, 'roles')).toStrictEqual(rolesByName());
 });
 
 test('commands are the registry rows, data only', async () => {
   const { json } = await hq('capabilities');
-  expect(json.commands).toHaveLength(COMMANDS.length);
-  expect(json.commands.map((c: { usage: string }) => c.usage)).toEqual(COMMANDS.map((c) => c.usage));
-  for (const [i, c] of COMMANDS.entries()) {
-    expect(json.commands[i]).toEqual({ nouns: c.nouns, verbs: c.verbs, bare: c.bare, usage: c.usage, summary: c.summary, section: c.section, readOnly: c.readOnly });
+  const commandSchema = z.looseObject({ usage: z.string(), nouns: z.array(z.string()), readOnly: z.boolean() });
+  const commands = z.array(commandSchema).parse(findPath(json, 'commands'));
+  expect(commands).toHaveLength(COMMANDS.length);
+  expect(commands.map((command) => command.usage)).toStrictEqual(COMMANDS.map((command) => command.usage));
+  for (const [index, command] of COMMANDS.entries()) {
+    expect(findPath(json, 'commands', index)).toStrictEqual({ nouns: command.nouns, verbs: command.verbs, bare: command.bare, usage: command.usage, summary: command.summary, section: command.section, readOnly: command.readOnly });
   }
-  const self = json.commands.find((c: { nouns: string[] }) => c.nouns.includes('capabilities'));
-  expect(self.readOnly).toBe(true);
+  const self = commands.find((command) => command.nouns.includes('capabilities'));
+  expect(self?.readOnly).toBe(true);
 });
 
 test('transitions are the exported tables', async () => {
   const { json } = await hq('capabilities');
-  expect(json.transitions).toEqual(JSON.parse(JSON.stringify({ ask: ASK_TRANSITIONS, run: RUN_TRANSITIONS, pr: PR_TRANSITIONS })));
+  expect(findPath(json, 'transitions')).toStrictEqual(structuredClone({ ask: ASK_TRANSITIONS, run: RUN_TRANSITIONS, pr: PR_TRANSITIONS }));
 });
 
 test('text mode is a short summary', async () => {
@@ -109,11 +114,12 @@ test('--require: older fails with too_old, equal and newer pass, bad input is ba
   expect(older.code).toBe(1);
   expect(older.json).toEqual({ ok: false, error: { code: 'too_old', message: `hq ${VERSION} is older than 99.0.0: run bun run install-bin in ~/projects/hq` } });
   expect((await hq('capabilities', '--require', VERSION)).code).toBe(0);
-  expect((await hq('capabilities', '--require', '0.1.0')).json.version).toBe(VERSION);
+  const newer = await hq('capabilities', '--require', '0.1.0');
+  expect(findPath(newer.json, 'version')).toBe(VERSION);
   for (const bad of ['1.2', 'v1.2.3', '1.2.3-rc1', 'latest', '']) {
     const r = await hq('capabilities', '--require', bad);
     expect(r.code, bad).toBe(1);
-    expect(r.json.error.code, bad).toBe('bad_args');
+    expect(findPath(r.json, 'error', 'code'), bad).toBe('bad_args');
   }
 });
 
