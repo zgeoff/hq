@@ -52,7 +52,7 @@
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@zgeoff/agent-hooks": "0.2.9",
-    "@zgeoff/chex": "0.1.8",
+    "@zgeoff/chex": "0.2.4",
     "@zgeoff/diet": "0.2.2",
     "@zgeoff/oxlint-config": "0.10.0",
     "@zgeoff/rig": "0.1.5",
