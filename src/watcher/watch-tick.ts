@@ -94,7 +94,7 @@ export async function watchTick(db: Database, d: WatchDeps): Promise<boolean> {
     if (sample.impdError) {
       d.log(`${at()} live impd read failed, the newest stored sample stands in: ${sample.impdError}`);
     }
-    const r = tick(db, sample, d.me);
+    const look = tick(db, sample, d.me);
     const q = queueReminder(db, d.me);
     if (q.reminded) d.log(`${at()} reminded ${owner()} about ${q.reminded}`);
     await step('notes and sweep', () => d.steps.runs());
@@ -312,7 +312,7 @@ export async function watchTick(db: Database, d: WatchDeps): Promise<boolean> {
     }
     takeQueued(); // the watcher sends every pending row, its own and the rest
     const f = await step('send', () => flush(db, { retryFailed: true }));
-    d.log(`${r.at} slots=${r.slots} free=${r.freeMib} eligible=${r.eligible ?? '?'} ${r.nudged ? 'NUDGED' : r.why}${f.failed ? ` send-failed: ${f.errors.join('; ')}` : ''}`);
+    d.log(`${look.at} slots=${look.slots} free=${look.freeMib} eligible=${look.eligible ?? '?'} ${look.nudged ? 'NUDGED' : look.why}${f.failed ? ` send-failed: ${f.errors.join('; ')}` : ''}`);
     setMeta(db, LAST_TICK, at());
     return true;
   } catch (e) {

@@ -19,10 +19,6 @@ const AwakeSampleRow = z
   })
   .nullable();
 
-type StoredSample = z.output<typeof AwakeSampleRow>;
-
-const FRESH_MIN = 15;
-
 // A live impd reading, when whole, sets the room. Without one, the newest stored sample does, held
 // to 0 slots when it is over 15 min old, as a wrong "free" overfills impd.
 export function loadImpRoom(db: Database, size: ImpSize, at: Date = now(), live: Impd | null = null): ImpRoom {
@@ -54,6 +50,10 @@ interface WholeImpdReading {
   nixAwakeMib: number;
   priorityKeptMib: number;
 }
+
+type StoredSample = z.output<typeof AwakeSampleRow>;
+
+const FRESH_MIN = 15;
 
 function pickImpdReading(live: Impd | null, stored: StoredSample, at: Date): WholeImpdReading | null {
   const fromLive = live === null ? null : toWholeReading(live);

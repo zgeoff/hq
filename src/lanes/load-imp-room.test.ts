@@ -111,7 +111,7 @@ test('it takes the last slot away when impd has more committed than awake, from 
   expect(room.slots).toBe(0);
 });
 
-test('a live reading replaces the stored sample for the room', () => {
+test('it replaces the stored sample with a live reading for the room', () => {
   const db = createCapacitySample(setupTest(), { at: '2026-10-16T00:55:00Z', nonnixAwakeMib: 12_288, nixAwakeMib: 0, impdBudgetMib: 20_480, impdPriorityKeptMib: 6144 });
   setCapacitySetting(db, 'nonnixMaxMib', '20480', 'kettle-bot');
   const woken = { budgetMib: 20_480, usedMib: 14_336, committedMib: 14_336, nonnixAwakeMib: 14_336, nonnixAwakeVcpus: 4, nixAwakeMib: 0, priorityKeptMib: 6144 };
@@ -121,7 +121,7 @@ test('a live reading replaces the stored sample for the room', () => {
   expect(rooms.map((room) => room.slots)).toStrictEqual([1, 0]);
 });
 
-test('a live reading with a missing figure falls back to the stored sample', () => {
+test('it falls back to the stored sample when a live reading has a missing figure', () => {
   const db = createCapacitySample(setupTest(), { at: '2026-10-16T00:55:00Z', nonnixAwakeMib: 12_288, nixAwakeMib: 0, impdBudgetMib: 20_480, impdPriorityKeptMib: 6144 });
   setCapacitySetting(db, 'nonnixMaxMib', '20480', 'kettle-bot');
   const partial = { budgetMib: 20_480, usedMib: 14_336, committedMib: 14_336, nonnixAwakeMib: null, nonnixAwakeVcpus: null, nixAwakeMib: null, priorityKeptMib: 6144 };
@@ -131,7 +131,7 @@ test('a live reading with a missing figure falls back to the stored sample', () 
   expect(room.slots).toBe(1);
 });
 
-test('a live reading is not held by a stored sample over 15 min old', () => {
+test('it does not hold a live reading for a stored sample over 15 min old', () => {
   const db = createCapacitySample(setupTest(), { at: '2026-10-16T00:30:00Z', nonnixAwakeMib: 0 });
   const live = { budgetMib: 20_480, usedMib: 0, committedMib: 0, nonnixAwakeMib: 0, nonnixAwakeVcpus: 0, nixAwakeMib: 0, priorityKeptMib: 0 };
 

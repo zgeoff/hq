@@ -25,12 +25,11 @@ test('a lane pacing.json gets wrong is the sample\'s error, though capacity read
 });
 
 test.each([
-  { name: 'reads impd live into the sample', impzCode: 0, impd: { budgetMib: 20_480, usedMib: 14_336, committedMib: 14_336, nonnixAwakeMib: 0, nonnixAwakeVcpus: 0, nixAwakeMib: 0, priorityKeptMib: 0 }, impdError: null },
-  { name: 'carries no live reading, and why, when impz fails', impzCode: 1, impd: null, impdError: 'impz info failed or timed out; impz ls failed or timed out' },
+  { name: 'reads impd live into the sample', impz: buildStubImpzRunner({ info: { ramBudgetMib: 20_480, ramUsedMib: 14_336, ramCommittedMib: 14_336 }, imps: [] }), impd: { budgetMib: 20_480, usedMib: 14_336, committedMib: 14_336, nonnixAwakeMib: 0, nonnixAwakeVcpus: 0, nixAwakeMib: 0, priorityKeptMib: 0 }, impdError: null },
+  { name: 'carries no live reading, and why, when impz fails', impz: () => Promise.resolve({ code: 1, stdout: '', stderr: 'impz: impd is down' }), impd: null, impdError: 'impz info failed or timed out; impz ls failed or timed out' },
 ])('it $name', async (row) => {
   writeFileSync(setupTest(), JSON.stringify({ lanes: { imp: { cleanup: 2 }, local: {} } }));
-  const impz = buildStubImpzRunner({ info: { ramBudgetMib: 20_480, ramUsedMib: 14_336, ramCommittedMib: 14_336 }, imps: [] });
-  const run: Runner = (command, options) => (command[0] === 'impz' ? impz(command, options).then((result) => ({ ...result, code: row.impzCode })) : realRunner(command, options));
+  const run: Runner = (command, options) => (command[0] === 'impz' ? row.impz(command, options) : realRunner(command, options));
 
   const sample = await readCapacity(run);
 

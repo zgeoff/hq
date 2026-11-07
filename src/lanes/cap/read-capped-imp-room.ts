@@ -9,12 +9,18 @@ export interface CappedSlots {
   capHeld: boolean;
 }
 
-export function readCappedImpRoom(db: Database, size: Parameters<typeof loadImpRoom>[1], at: Date, capAt: Date, live: Impd | null): CappedSlots {
-  const room = loadImpRoom(db, size, at, live).slots;
-  const active = readActiveCap(db, capAt);
+interface CappedLook {
+  at: Date;
+  capAt: Date;
+  impd: Impd | null;
+}
+
+export function readCappedImpRoom(db: Database, size: Parameters<typeof loadImpRoom>[1], look: CappedLook): CappedSlots {
+  const room = loadImpRoom(db, size, look.at, look.impd).slots;
+  const active = readActiveCap(db, look.capAt);
   if (active === null) {
     return { slots: room, capHeld: false };
   }
-  const capRoom = Math.max(0, active.cap - countWorking(db, at).count);
+  const capRoom = Math.max(0, active.cap - countWorking(db, look.at).count);
   return { slots: Math.min(room, capRoom), capHeld: capRoom < room };
 }
