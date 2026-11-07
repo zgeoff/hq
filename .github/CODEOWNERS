@@ -6,8 +6,8 @@
 /test/ @zgeoff
 /scripts/ @zgeoff
 
-# the owner: skills, the agent kit, docs, hooks and grants change only with his lgtm
-/skills/ @zgeoff
+# the owner: skill text, the agent kit, docs, hooks and grants change only with his lgtm
+/skills/**/*.md @zgeoff
 /agent-kit/ @zgeoff
 /docs/ @zgeoff
 /.claude/ @zgeoff
