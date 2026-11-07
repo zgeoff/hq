@@ -46,7 +46,7 @@ function loadAskAnswers(db: Database, window: AnswerWindow): Answer[] {
     if (ask === null) {
       return [];
     }
-    const round = loadRoundFacts(db, r) ?? (isChangedSince(db, 'ask', r) ? UNKNOWN_ROUND : { title: ask.title, issues: ask.issues, forSession: ask.for_session });
+    const round = loadRoundFacts(db, r) ?? (probeChangedSince(db, 'ask', r) ? UNKNOWN_ROUND : { title: ask.title, issues: ask.issues, forSession: ask.for_session });
     return [{ source: 'ask', id: ask.id, kind: ask.kind, title: round.title, issues: round.issues, session: round.forSession, ...parsePickedOption(data.answer, readRoundOptions(db, r.id, r.seq)), ref: null, via: r.actor, at: r.at }];
   });
 }
@@ -66,7 +66,7 @@ function loadRoundFacts(db: Database, answer: z.output<typeof AnswerEventSchema>
 
 const CHANGE_ACTIONS: Record<'ask' | 'unblock', string[]> = { ask: ['added', 'updated', 'reasked', 'requeued'], unblock: ['added', 'item', 'reopened', 'updated'] };
 
-function isChangedSince(db: Database, subject: 'ask' | 'unblock', answer: z.output<typeof AnswerEventSchema>): boolean {
+function probeChangedSince(db: Database, subject: 'ask' | 'unblock', answer: z.output<typeof AnswerEventSchema>): boolean {
   const actions = CHANGE_ACTIONS[subject];
   return db.query(`SELECT 1 FROM events WHERE subject = ? AND subject_id = ? AND seq > ? AND action IN (${actions.map(() => '?').join(', ')}) LIMIT 1`).get(subject, answer.id, answer.seq, ...actions) !== null;
 }
@@ -93,7 +93,7 @@ function loadReviewAnswers(db: Database, window: AnswerWindow): Answer[] {
       return [];
     }
 
-    const facts = data.facts ?? (isChangedSince(db, 'unblock', r) ? { title: null, issues: [], session: null, ref: null } : { title: item.title ?? item.task, issues: item.unblocks.map((unblock) => unblock.issue), session: item.added_by, ref: findSubjectLink(item)?.url ?? null });
+    const facts = data.facts ?? (probeChangedSince(db, 'unblock', r) ? { title: null, issues: [], session: null, ref: null } : { title: item.title ?? item.task, issues: item.unblocks.map((unblock) => unblock.issue), session: item.added_by, ref: findSubjectLink(item)?.url ?? null });
     return [{ source: 'review', id: item.id, kind: 'review', title: facts.title, issues: facts.issues, session: facts.session, picked: REVIEW_LABELS[data.review], stuPick: null, words: data.note, ref: facts.ref, via: r.actor, at: r.at }];
   });
 }
