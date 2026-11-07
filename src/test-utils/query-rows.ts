@@ -1,19 +1,18 @@
 import type { Database } from 'bun:sqlite';
+import { CompiledQuery } from 'kysely';
 import invariant from 'tiny-invariant';
 import { z } from 'zod';
-import { BindingsSchema } from '../db/bindings-schema.ts';
+import { runSyncQuery } from '../db/run-sync-query.ts';
+import { runSyncRow } from '../db/run-sync-row.ts';
 
 // Reads raw SQL for a test that asserts on stored rows, and parses each row through the schema.
 export function queryRows<Schema extends z.ZodType>(db: Database, sql: string, schema: Schema, ...bindings: (string | number | null)[]): z.output<Schema>[] {
-  return z.array(schema).parse(db.query(sql).all(...BindingsSchema.parse(bindings)));
+  return runSyncQuery(db, CompiledQuery.raw(sql, bindings), schema);
 }
 
 // The first column of every row.
 export function queryColumn<Schema extends z.ZodType>(db: Database, sql: string, schema: Schema, ...bindings: (string | number | null)[]): z.output<Schema>[] {
-  return z
-    .array(z.array(z.unknown()))
-    .parse(db.query(sql).values(...BindingsSchema.parse(bindings)))
-    .map((row) => schema.parse(row[0]));
+  return queryRows(db, sql, z.record(z.string(), z.unknown()), ...bindings).map((row) => schema.parse(Object.values(row)[0]));
 }
 
 // The first column of the first row; a test that calls it expects one.
@@ -25,7 +24,7 @@ export function queryValue<Schema extends z.ZodType>(db: Database, sql: string, 
 
 // The first row, or null when the query returns none.
 export function findRow<Schema extends z.ZodType>(db: Database, sql: string, schema: Schema, ...bindings: (string | number | null)[]): z.output<Schema> | null {
-  return schema.nullable().parse(db.query(sql).get(...BindingsSchema.parse(bindings)));
+  return runSyncRow(db, CompiledQuery.raw(sql, bindings), schema);
 }
 
 // The first row; a test that calls it expects one.
