@@ -459,6 +459,7 @@ const OPTIONS = {
   'no-watch': { type: 'boolean' },
   full: { type: 'boolean' },
   'fixes-only': { type: 'boolean' },
+  adapter: { type: 'string' },
   timeout: { type: 'string' },
   confirm: { type: 'boolean' },
   effort: { type: 'string' },

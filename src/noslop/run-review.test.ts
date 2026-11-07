@@ -298,6 +298,26 @@ test('it runs a full review however many reviews the PR has had, while no cap is
   expect(fake.of('bun')[0]?.cmd).not.toContain('--fixes-only');
 });
 
+test('it passes --adapter claude to noslop when asked', async () => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
+  ctx.listWidgets();
+
+  await runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false, adapter: 'claude' });
+
+  expect(fake.of('bun')[0]?.cmd.join(' ')).toContain(' --adapter claude');
+});
+
+test('it passes no --adapter to noslop when none is asked', async () => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
+  ctx.listWidgets();
+
+  await runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false });
+
+  expect(fake.of('bun')[0]?.cmd).not.toContain('--adapter');
+});
+
 test('it does not count a failed review or a check as a round', async () => {
   const ctx = setupTest();
   const fake = buildFakeRunner();

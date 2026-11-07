@@ -214,7 +214,7 @@ test.each([
   ['the output is version 3', { code: 0, stdout: '{"version":3,"findings":[]}', stderr: '' }, 'output version 3, hq reads versions 4, 5, 6 and 7'],
   ['the output is version 8', { code: 0, stdout: '{"version":8,"findings":[]}', stderr: '' }, 'output version 8, hq reads versions 4, 5, 6 and 7'],
   ['a version 6 output has no notReviewed list', { code: 0, stdout: JSON.stringify({ ...JSON.parse(FAKE_REVIEW_JSON), version: 6, dropped: [] }), stderr: '' }, 'output version 6 has no notReviewed list'],
-  ['a noslop call failed', { code: 0, stdout: JSON.stringify({ ...JSON.parse(FAKE_REVIEW_JSON), failedCalls: [{ lens: 'security' }] }), stderr: '' }, '1 noslop call(s) failed'],
+  ['a noslop call failed', { code: 0, stdout: JSON.stringify({ ...JSON.parse(FAKE_REVIEW_JSON), failedCalls: [{ id: 'security', reason: 'codex exited 1 on call security: ' }] }), stderr: '' }, '1 noslop call(s) failed: codex exited 1: noslop gave no error text (security)'],
 ])('it throws noslop_failed and records no review when %s', async (_name, noslopReview, why) => {
   const ctx = setupTest();
   const fake = buildFakeRunner({ noslopReview });

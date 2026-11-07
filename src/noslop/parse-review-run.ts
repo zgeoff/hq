@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { buildMiss } from './build-miss.ts';
 import { findRunFault } from './find-run-fault.ts';
+import { formatFailedCalls } from './format-failed-calls.ts';
 import { formatIssue } from './format-issue.ts';
 import { parseJSON } from './parse-json.ts';
 import type { Judged } from './types.ts';
@@ -91,7 +92,7 @@ function parseReviewShape(raw: unknown, version: number): Judged<ReviewOutput> {
     return buildMiss(`output does not fit its version at ${formatIssue(parsed.error)}`);
   }
   if (parsed.data.failedCalls.length > 0) {
-    return buildMiss(`${parsed.data.failedCalls.length} noslop call(s) failed`, parsed.data.failedCalls.length);
+    return buildMiss(formatFailedCalls(parsed.data.failedCalls), parsed.data.failedCalls.length);
   }
   if (version >= NOT_REVIEWED_SINCE && parsed.data.notReviewed === undefined) {
     return buildMiss(`output version ${version} has no notReviewed list`);

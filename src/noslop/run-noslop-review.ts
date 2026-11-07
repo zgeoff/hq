@@ -53,6 +53,8 @@ export interface NoslopReviewContext {
 
   fixesOnly?: boolean | undefined;
 
+  adapter?: string | undefined;
+
   timeoutMs: number;
 
   baseMove?: Pick<BaseMove, 'head' | 'patchId'> | undefined;
@@ -199,8 +201,9 @@ function readPostFailedReview(store: string, stdout: string, verdict: Judged<Rev
 function buildReviewArgs(ctx: NoslopReviewContext, prep: ReviewPrep): string[] {
   const fixesOnly = ctx.fixesOnly === true ? ['--fixes-only'] : [];
   const full = ctx.full === true ? ['--full'] : [];
+  const adapter = ctx.adapter === undefined ? [] : ['--adapter', ctx.adapter];
   const issue = buildIssueArgs(prep.issueFile);
-  return ['review', '--pr', String(ctx.pr), '--repo', ctx.slug, '--report', 'sqlite,github', '--json', ...full, ...fixesOnly, ...issue];
+  return ['review', '--pr', String(ctx.pr), '--repo', ctx.slug, '--report', 'sqlite,github', '--json', ...full, ...fixesOnly, ...adapter, ...issue];
 }
 
 async function removeWorktree(ctx: NoslopReviewContext, worktree: string): Promise<string | null> {

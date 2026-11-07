@@ -41,6 +41,8 @@ export interface ReviewRequest extends PRRequest {
 
   fixesOnly?: boolean | undefined;
 
+  adapter?: string | undefined;
+
   timeout?: string | undefined;
 
   confirm?: boolean | undefined;
@@ -190,6 +192,7 @@ async function createNoslopContext(plan: RoundPlan, parsed: ParsedRepo, sha: str
     lock: (fn) => withRepoLock(scratch, buildSlug(parsed), fn),
     full: request.full,
     fixesOnly: plan.fixesOnly,
+    adapter: request.adapter,
     timeoutMs: plan.timeoutMs,
     baseMove: plan.baseMove ?? undefined,
     linear: makeAuditedLinearCaller(request.db, request.run),
