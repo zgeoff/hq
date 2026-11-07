@@ -459,6 +459,7 @@ const OPTIONS = {
   'no-watch': { type: 'boolean' },
   full: { type: 'boolean' },
   'fixes-only': { type: 'boolean' },
+  adapter: { type: 'string' },
   timeout: { type: 'string' },
   confirm: { type: 'boolean' },
   effort: { type: 'string' },
@@ -1029,7 +1030,7 @@ async function kindsCommand(db: Database, verb: string | undefined, flags: Flags
     .with('sync', async () => {
       const kinds = await syncKinds(db, realRunner, { from: weeksBack(weeks), maxDays: weeks * 7 + 2, env: cleanEnv() });
       const linear = await syncLinear(db, makeAuditedLinearCaller(db, realRunner), weeksBack(weeks)).catch((error: unknown) => ({ error: error instanceof Error ? error.message : String(error) }));
-      const said = 'error' in linear ? `Linear failed: ${linear.error}` : `Linear: ${linear.closed} closed issue(s), ${linear.typed} PR issue(s) typed.`;
+      const said = 'error' in linear ? `Linear failed: ${linear.error}` : `Linear: ${linear.closed} closed issue(s), ${linear.typed} PR issue(s) typed, ${linear.inReview} In Review issue(s) read.`;
       const weekRows = kindWeeks(db, weeks);
 
       // The daily check-in trusts kinds_ok_at.
@@ -1978,7 +1979,7 @@ const GROUPS: Record<string, (context: Ctx) => Promise<Out>> = {
   review: (c) => runReviewCommand(c),
   // oxlint-disable-next-line id-length -- grandfathered handler parameter shared by every entry of this table
   pr: (c) => runPRCommand({ run: realRunner, db: c.db, verb: c.verb, rest: c.rest, flags: c.flags, actor: () => actor(c.db, c.flags), readOwnerSession: () => readOwnerSession(c.db, readOwnerProbeDeps()), readReviewerSession: () => readRoleSession(c.db, readOwnerProbeDeps(), 'reviewer') }),
-  noslop: async (command) => runNoslopCommand({ run: command.run, db: command.db, verb: command.verb, rest: command.rest, since: typeof command.flags.since === 'string' ? command.flags.since : undefined, force: command.flags.force === true, actor: await actor(command.db, command.flags), readOwnerSession: () => readOwnerSession(command.db, readOwnerProbeDeps()) }),
+  noslop: async (command) => runNoslopCommand({ run: command.run, db: command.db, verb: command.verb, rest: command.rest, since: typeof command.flags.since === 'string' ? command.flags.since : undefined, until: typeof command.flags.until === 'string' ? command.flags.until : undefined, force: command.flags.force === true, actor: await actor(command.db, command.flags), readOwnerSession: () => readOwnerSession(command.db, readOwnerProbeDeps()) }),
   repair: (c) => repairCommand(c.verb, c.rest, c.flags),
   refs: (context) => refsCommand(context.verb, context.flags),
   refusals: (c) => refusalsCommand(c.db, c.verb, c.flags),
@@ -2154,9 +2155,15 @@ async function runCommand(context: Ctx): Promise<Out> {
       const ignored = r.result === 'noop' && session && !r.run.sessions.some((row) => row.active === 1 && row.session_id === session)
         ? { session, next: `hq run session ${r.run.issue} ${session} --add` }
         : undefined;
+      const ignoredLane = r.result === 'noop' && flags.lane && flags.lane !== r.run.lane
+        ? { lane: flags.lane, runLane: r.run.lane, next: `hq run lane ${r.run.issue} ${flags.lane}` }
+        : undefined;
       const said = r.result === 'added' ? 'On the board.' : 'Already on the board.';
-      const hint = ignored ? `\nIgnored --session ${session}: to add it to the run, use ${ignored.next}` : '';
-      return { data: { result: r.result, run: r.run, ignored }, text: `${runLine(r.run)}\n${said}${hint}` };
+      const laneHint = ignoredLane
+        ? `\nIgnored --lane ${ignoredLane.lane}: one issue has one run, and ${r.run.issue}'s run ${ignoredLane.runLane === null ? 'has no lane' : `is in lane ${ignoredLane.runLane}`}. To move it, use ${ignoredLane.next}`
+        : '';
+      const hint = ignored ? `\nIgnored --session ${session}: the session is not attached to the run. To add it, use ${ignored.next}` : '';
+      return { data: { result: r.result, run: r.run, ignored, ignoredLane }, text: `${runLine(r.run)}\n${said}${laneHint}${hint}` };
     })
     .with('size', async () => {
       const issue = resolveRun(db, arg(0, 'issue')).issue;

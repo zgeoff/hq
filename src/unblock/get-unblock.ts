@@ -1,8 +1,9 @@
 import type { Database } from 'bun:sqlite';
-import { parseUnblockRow as hydrate } from './parse-unblock-row.ts';
-import type { Row, UnblockItem } from './types.ts';
+import { runSyncRow } from '../db/run-sync-row.ts';
+import { kdb } from '../kdb.ts';
+import { UnblockRowSchema } from './unblock-row-schema.ts';
+import type { UnblockItem } from './types.ts';
 
 export function getUnblock(db: Database, id: string): UnblockItem | null {
-  const r = db.query('SELECT * FROM unblocks WHERE id = ?').get(id) as Row | null;
-  return r ? hydrate(r) : null;
+  return runSyncRow(db, kdb(db).selectFrom('unblocks').selectAll().where('id', '=', id).compile(), UnblockRowSchema);
 }

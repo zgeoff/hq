@@ -1,13 +1,13 @@
 import { spawnSync } from 'node:child_process';
+import { z } from 'zod';
 import { probeImportBase } from './probe-import-base.ts';
 import { readDiff } from './read-diff.ts';
+import { TYPE_AWARE_ARGS, UNSAFE_PREFIX } from './unsafe-rules.ts';
 
-interface Diagnostic {
-  readonly code: string;
-  readonly filename: string;
-  readonly labels: readonly { readonly span: { readonly line: number } }[];
-  readonly message: string;
-}
+const labelSchema = z.object({ span: z.object({ line: z.number() }) });
+const diagnosticSchema = z.object({ code: z.string(), filename: z.string(), labels: z.array(labelSchema), message: z.string() });
+
+type Diagnostic = z.infer<typeof diagnosticSchema>;
 
 interface ChangeSet {
   readonly lines: ReadonlyMap<string, ReadonlySet<number>>;
@@ -146,9 +146,29 @@ function runCommand(command: string, args: readonly string[]): string {
   return result.stdout;
 }
 
+// -A all leaves the JS-plugin rules on, so the type-aware report repeats the plain run's findings,
+// which are dropped before the two reports join.
+export function buildLintArgs(files: readonly string[], typeAware: boolean): string[] {
+  const base = ['oxlint', '--format', 'json'];
+  if (!typeAware) {
+    return [...base, ...files];
+  }
+  return [...base, ...TYPE_AWARE_ARGS, ...files];
+}
+
+export function collectReported(plain: readonly Diagnostic[], typeAware: readonly Diagnostic[]): readonly Diagnostic[] {
+  return [...plain, ...typeAware.filter((diagnostic) => diagnostic.code.startsWith(UNSAFE_PREFIX))];
+}
+
 function readDiagnostics(files: readonly string[]): readonly Diagnostic[] {
-  const report = JSON.parse(runCommand('bunx', ['oxlint', '--format', 'json', ...files])) as { readonly diagnostics: readonly Diagnostic[] };
-  return report.diagnostics;
+  return collectReported(readReport(buildLintArgs(files, false)), readReport(buildLintArgs(files, true)));
+}
+
+const reportSchema = z.object({ diagnostics: z.array(diagnosticSchema) });
+
+function readReport(args: readonly string[]): readonly Diagnostic[] {
+  const output: unknown = JSON.parse(runCommand('bunx', args));
+  return reportSchema.parse(output).diagnostics;
 }
 
 function printFound(found: readonly Diagnostic[], files: readonly string[], base: string): number {

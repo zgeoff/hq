@@ -9,7 +9,7 @@
     "mocks/**/*.test.ts",
     "src/console/main.tsx",
     "mods/hq-band/hooks/register.tsx",
-    ".claude/hooks/*/*.ts"
+    ".claude/hooks/start.ts"
   ],
   "project": [
     "src/**/*.{ts,tsx}",

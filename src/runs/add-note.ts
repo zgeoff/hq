@@ -1,10 +1,14 @@
 import type { Database } from 'bun:sqlite';
+import invariant from 'tiny-invariant';
 import { iso } from '../clock/iso.ts';
 import { now } from '../clock/now.ts';
+import { runSyncRow } from '../db/run-sync-row.ts';
 import { HqError } from '../errors.ts';
+import { kdb } from '../kdb.ts';
 import { applyNoteSignals } from './apply-note-signals.ts';
 import { findNoteSession } from './find-note-session.ts';
 import { resolveRun } from './resolve-run.ts';
+import { RunNoteSchema } from './run-note-schema.ts';
 import type { FinalResolutions, RunNote } from './types.ts';
 import { updateRunTime as touch } from './update-run-time.ts';
 
@@ -35,7 +39,9 @@ export function addNote(db: Database, key: string, text: string, input: NoteInpu
         }
         touch(db, noted.issue);
       }
-      return db.query('SELECT * FROM run_notes WHERE id = ?').get(id) as RunNote;
+      const note = runSyncRow(db, kdb(db).selectFrom('run_notes').selectAll().where('id', '=', id).compile(), RunNoteSchema);
+      invariant(note, 'the note just inserted is stored');
+      return note;
     })
     .immediate();
 }

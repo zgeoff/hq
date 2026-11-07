@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { migrate } from './migrate.ts';
 import { MIGRATIONS } from './migrations.ts';
+import { userVersion } from './user-version.ts';
 
 async function setupTest() {
   const directory = mkdtempSync(join(tmpdir(), 'hq-migrate-'));
@@ -65,7 +66,7 @@ test('v36 adds the shipped_cache table and keeps the rows already in the databas
   expect(migrate(db, path, true, MIGRATIONS.slice(0, 36))).not.toBeNull();
   expect(db.query('SELECT repo, pr FROM pr_status').all()).toStrictEqual([{ repo: 'kettle', pr: 7 }]);
   expect(db.query("SELECT name FROM pragma_table_info('shipped_cache') ORDER BY cid").all()).toStrictEqual(['kind', 'key', 'body', 'fetched_at', 'expires_at'].map((name) => ({ name })));
-  expect((db.query('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(36);
+  expect(userVersion(db)).toBe(36);
 });
 
 test('it adds done_when to unblocks in v37 and keeps every row', () => {
@@ -320,7 +321,7 @@ test('it adds run_prs.session_id in v49, and keeps the earlier rows with no owne
   expect(db.query('SELECT ref, session_id FROM run_prs').all()).toStrictEqual([{ ref: 'kettle#41', session_id: null }]);
 });
 
-test('it adds capacity_samples.impd_priority_kept_mib in v50, keeps the earlier samples with no reading, and v50 is the newest schema', () => {
+test('it adds capacity_samples.impd_priority_kept_mib in v50, keeps the earlier samples with no reading', () => {
   const base = mkdtempSync(join(tmpdir(), 'hq-migrate-v50-'));
   const path = join(base, 'hq.db');
   const db = new Database(path, { create: true, strict: true });
@@ -332,6 +333,38 @@ test('it adds capacity_samples.impd_priority_kept_mib in v50, keeps the earlier 
 
   expect(migrate(db, path, true)).not.toBeNull();
   expect(db.query('SELECT at, impd_budget_mib, impd_priority_kept_mib FROM capacity_samples').all()).toStrictEqual([{ at: '2026-10-14T01:00:00Z', impd_budget_mib: 20_480, impd_priority_kept_mib: null }]);
-  expect(db.query('PRAGMA user_version').get()).toStrictEqual({ user_version: 50 });
-  expect(MIGRATIONS).toHaveLength(50);
+});
+
+test('it adds linear_in_review in v51 and keeps the earlier rows', () => {
+  const base = mkdtempSync(join(tmpdir(), 'hq-migrate-v51-'));
+  const path = join(base, 'hq.db');
+  const db = new Database(path, { create: true, strict: true });
+  onTestFinished(() => rmSync(base, { recursive: true, force: true }));
+  onTestFinished(() => db.close());
+  db.exec('PRAGMA journal_mode = WAL;');
+  migrate(db, path, false, MIGRATIONS.slice(0, 50));
+  db.query("INSERT INTO linear_started (issue, started_at, fetched_at) VALUES ('GEO-502', '2026-10-14T01:00:00Z', '2026-10-15T01:00:00Z')").run();
+
+  expect(migrate(db, path, true)).not.toBeNull();
+  expect(db.query('SELECT issue, started_at, fetched_at FROM linear_started').all()).toStrictEqual([{ issue: 'GEO-502', started_at: '2026-10-14T01:00:00Z', fetched_at: '2026-10-15T01:00:00Z' }]);
+  db.query("INSERT INTO linear_in_review (issue, updated_at, fetched_at) VALUES ('GEO-503', '2026-10-14T02:00:00Z', '2026-10-15T01:00:00Z')").run();
+  expect(db.query('SELECT issue, updated_at, fetched_at FROM linear_in_review').all()).toStrictEqual([{ issue: 'GEO-503', updated_at: '2026-10-14T02:00:00Z', fetched_at: '2026-10-15T01:00:00Z' }]);
+});
+
+test('it adds noslop_rounds.adapter and adapter_source in v52, keeps the earlier rounds with neither, and v52 is the newest schema', () => {
+  const base = mkdtempSync(join(tmpdir(), 'hq-migrate-v52-'));
+  const path = join(base, 'hq.db');
+  const db = new Database(path, { create: true, strict: true });
+  onTestFinished(() => rmSync(base, { recursive: true, force: true }));
+  onTestFinished(() => db.close());
+  db.exec('PRAGMA journal_mode = WAL;');
+  migrate(db, path, false, MIGRATIONS.slice(0, 51));
+  db.query("INSERT INTO noslop_rounds (repo, pr, kind, started_at, ended_at, ms, ok, findings, failed_calls, open, sha) VALUES ('widgets', 7, 'review', '2026-10-14T01:00:00Z', '2026-10-14T01:05:00Z', 300000, 1, '[]', 0, '[]', 'abc1234')").run();
+
+  expect(migrate(db, path, true)).not.toBeNull();
+  expect(db.query('SELECT repo, pr, adapter, adapter_source FROM noslop_rounds').all()).toStrictEqual([{ repo: 'widgets', pr: 7, adapter: null, adapter_source: null }]);
+  expect(() => db.query("UPDATE noslop_rounds SET adapter = 'gemini'").run()).toThrow('CHECK constraint failed');
+  expect(() => db.query("UPDATE noslop_rounds SET adapter_source = 'guess'").run()).toThrow('CHECK constraint failed');
+  expect(db.query('PRAGMA user_version').get()).toStrictEqual({ user_version: 52 });
+  expect(MIGRATIONS).toHaveLength(52);
 });

@@ -844,7 +844,7 @@ test('hq capacity says the slot reads are not set up, in text and in --json', as
   expect(JSON.parse(lines[1] ?? '{}').fleet).toMatchObject({ notSetUp: expect.stringContaining('no settings file at '), active: null, slots: [], forecast: null, note: 'slot reads are not set up' });
 });
 
-test('hq capacity --refresh-slots reads the three slots through op and prints the fleet block without a token', async () => {
+test('it reads the four slots through op and prints the fleet block without a token for hq capacity --refresh-slots', async () => {
   const fresh = freshDb();
   const log = console.log;
   const lines: string[] = [];
@@ -859,6 +859,7 @@ test('hq capacity --refresh-slots reads the three slots through op and prints th
       'op://fleet/claude-setup-token-1/credential': 'sk-ant-kettle-cli-1',
       'op://fleet/claude-setup-token-2/credential': 'sk-ant-kettle-cli-2',
       'op://fleet/claude-setup-token-3/credential': 'sk-ant-kettle-cli-3',
+      'op://fleet/claude-setup-token-4/credential': 'sk-ant-kettle-cli-4',
     },
   });
   onTestFinished(overrideEnv('PATH', `${op.bin}:${process.env['PATH']}`));
@@ -867,6 +868,7 @@ test('hq capacity --refresh-slots reads the three slots through op and prints th
   slotUsage.set('Bearer sk-ant-kettle-cli-1', { seven: { utilization: 0.4, reset: 1_792_540_800 } });
   slotUsage.set('Bearer sk-ant-kettle-cli-2', { seven: { utilization: 0.4, reset: 1_792_368_000 } });
   slotUsage.set('Bearer sk-ant-kettle-cli-3', { seven: { utilization: 0.4, reset: 1_792_713_600 } });
+  slotUsage.set('Bearer sk-ant-kettle-cli-4', { seven: { utilization: 0.6, reset: 1_792_800_000 } });
   console.log = (line: string) => lines.push(line);
 
   await main(['capacity', '--refresh-slots']);
@@ -874,8 +876,9 @@ test('hq capacity --refresh-slots reads the three slots through op and prints th
   const text = lines.join('\n');
   expect(text).toInclude('  slot 2 (active): 5h ?, 7d 40% (resets 19 Oct 00:00Z), read 0 min ago');
   expect(text).toInclude('  slot 1: 5h ?, 7d 40% (resets 21 Oct 00:00Z), read 0 min ago');
+  expect(text).toInclude('  slot 4: 5h ?, 7d 60% (resets 24 Oct 00:00Z), read 0 min ago');
   expect(text).not.toInclude('sk-ant-kettle');
-  expect(fresh.db.query('SELECT COUNT(*) AS total FROM slot_usage').get()).toStrictEqual({ total: 3 });
+  expect(fresh.db.query('SELECT COUNT(*) AS total FROM slot_usage').get()).toStrictEqual({ total: 4 });
 });
 
 test("it reads the broker slot's fleet-vault token in hq capacity broker after a refresh when the proof is more than 24 h old", async () => {
@@ -912,18 +915,19 @@ test("it reads the slot token from hq's own file under ~/.config/hq by default f
   updateEnv('HQ_SLOTS_OP_SETTINGS', undefined);
   updateEnv('HOME', fresh.dir);
   onTestFinished(() => (console.log = log));
-  const op = createStubOp({ directory: fresh.dir, answers: { 'op://fleet/claude-setup-token-1/credential': 'sk-ant-kettle-home-1', 'op://fleet/claude-setup-token-2/credential': 'sk-ant-kettle-home-2', 'op://fleet/claude-setup-token-3/credential': 'sk-ant-kettle-home-3' } });
+  const op = createStubOp({ directory: fresh.dir, answers: { 'op://fleet/claude-setup-token-1/credential': 'sk-ant-kettle-home-1', 'op://fleet/claude-setup-token-2/credential': 'sk-ant-kettle-home-2', 'op://fleet/claude-setup-token-3/credential': 'sk-ant-kettle-home-3', 'op://fleet/claude-setup-token-4/credential': 'sk-ant-kettle-home-4' } });
   updateEnv('PATH', `${op.bin}:${process.env['PATH'] ?? ''}`);
   mkdirSync(`${fresh.dir}/.config/hq`, { recursive: true });
   writeFileSync(`${fresh.dir}/.config/hq/slots-op.json`, JSON.stringify({ env: { OP_SERVICE_ACCOUNT_TOKEN: 'ops_kettle-profile-0002' } }));
   slotUsage.set('Bearer sk-ant-kettle-home-1', { seven: { utilization: 0.4, reset: 1_792_540_800 } });
   slotUsage.set('Bearer sk-ant-kettle-home-2', { seven: { utilization: 0.4, reset: 1_792_368_000 } });
   slotUsage.set('Bearer sk-ant-kettle-home-3', { seven: { utilization: 0.4, reset: 1_792_713_600 } });
+  slotUsage.set('Bearer sk-ant-kettle-home-4', { seven: { utilization: 0.4, reset: 1_792_800_000 } });
   console.log = (line: string) => lines.push(line);
 
   await main(['capacity', '--refresh-slots']);
 
-  expect(readSlotRows(fresh.db, new Date(0), new Date(NOON_SYDNEY)).map((row) => row.slot)).toStrictEqual([1, 2, 3]);
+  expect(readSlotRows(fresh.db, new Date(0), new Date(NOON_SYDNEY)).map((row) => row.slot)).toStrictEqual([1, 2, 3, 4]);
 });
 
 test('hq capacity --refresh-slots --json carries the refresh problems in the fleet block', async () => {
@@ -940,12 +944,14 @@ test('hq capacity --refresh-slots --json carries the refresh problems in the fle
     answers: {
       'op://fleet/claude-setup-token-1/credential': 'sk-ant-kettle-cli-1',
       'op://fleet/claude-setup-token-2/credential': 'sk-ant-kettle-cli-2',
+      'op://fleet/claude-setup-token-4/credential': 'sk-ant-kettle-cli-4',
     },
   });
   onTestFinished(overrideEnv('PATH', `${op.bin}:${process.env['PATH']}`));
   writeFileSync(settings, JSON.stringify({ env: { OP_SERVICE_ACCOUNT_TOKEN: 'ops_kettle-profile-0001' } }));
   slotUsage.set('Bearer sk-ant-kettle-cli-1', { seven: { utilization: 0.4, reset: 1_792_540_800 } });
   slotUsage.set('Bearer sk-ant-kettle-cli-2', { seven: { utilization: 0.4, reset: 1_792_540_800 } });
+  slotUsage.set('Bearer sk-ant-kettle-cli-4', { seven: { utilization: 0.4, reset: 1_792_540_800 } });
   console.log = (line: string) => lines.push(line);
 
   await main(['capacity', '--refresh-slots', '--json']);
@@ -967,6 +973,7 @@ test('hq capacity --refresh-slots prints no profile token when op and the slot r
     answers: {
       'op://fleet/claude-setup-token-2/credential': 'kettle-slot-credential-2',
       'op://fleet/claude-setup-token-3/credential': 'kettle-slot-credential-3',
+      'op://fleet/claude-setup-token-4/credential': 'kettle-slot-credential-4',
     },
     failures: { 'op://fleet/claude-setup-token-1/credential': '[ERROR] invented: the vault refused kettle-profile-credential' },
   });
@@ -986,6 +993,7 @@ test('hq capacity --refresh-slots prints no profile token when op and the slot r
     '  ! slot 1: op read failed (exit 1)',
     '  ! slot 2: invented proxy dropped a request minted by [redacted]',
     '  ! slot 3: invented proxy dropped a request minted by [redacted]',
+    '  ! slot 4: invented proxy dropped a request minted by [redacted]',
   ]);
   expect(lines.join('\n')).not.toInclude('kettle-profile-credential');
 });
@@ -1004,12 +1012,14 @@ test('hq capacity --refresh-slots --json carries neither a slot token nor the pr
     answers: {
       'op://fleet/claude-setup-token-2/credential': 'kettle-slot-credential-2',
       'op://fleet/claude-setup-token-3/credential': 'kettle-slot-credential-3',
+      'op://fleet/claude-setup-token-4/credential': 'kettle-slot-credential-4',
     },
     failures: { 'op://fleet/claude-setup-token-1/credential': '[ERROR] invented: kettle-slot-credential-1 is held back from kettle-profile-credential' },
   });
   const failures: Record<string, string> = {
     'Bearer kettle-slot-credential-2': 'invented proxy dropped kettle-slot-credential-2 minted by kettle-profile-credential',
     'Bearer kettle-slot-credential-3': 'invented proxy dropped kettle-slot-credential-3 minted by kettle-profile-credential',
+    'Bearer kettle-slot-credential-4': 'invented proxy dropped kettle-slot-credential-4 minted by kettle-profile-credential',
   };
   onTestFinished(overrideEnv('PATH', `${op.bin}:${process.env['PATH']}`));
   writeFileSync(settings, JSON.stringify({ env: { OP_SERVICE_ACCOUNT_TOKEN: 'kettle-profile-credential' } }));
@@ -1028,6 +1038,7 @@ test('hq capacity --refresh-slots --json carries neither a slot token nor the pr
     'slot 1: op read failed (exit 1)',
     'slot 2: invented proxy dropped [redacted] minted by [redacted]',
     'slot 3: invented proxy dropped [redacted] minted by [redacted]',
+    'slot 4: invented proxy dropped [redacted] minted by [redacted]',
   ]);
   expect(output).not.toInclude('kettle-slot-credential');
   expect(output).not.toInclude('kettle-profile-credential');
@@ -1046,6 +1057,7 @@ test('hq capacity --refresh-slots stores neither a slot token nor the profile to
     answers: {
       'op://fleet/claude-setup-token-2/credential': 'kettle-slot-credential-2',
       'op://fleet/claude-setup-token-3/credential': 'kettle-slot-credential-3',
+      'op://fleet/claude-setup-token-4/credential': 'kettle-slot-credential-4',
     },
     failures: { 'op://fleet/claude-setup-token-1/credential': '[ERROR] invented: kettle-slot-credential-1 is held back from kettle-profile-credential' },
   });
@@ -1057,6 +1069,10 @@ test('hq capacity --refresh-slots stores neither a slot token nor the profile to
     'Bearer kettle-slot-credential-3': HttpResponse.json(
       { id: 'msg_invented0002', type: 'message', role: 'assistant', model: 'claude-haiku-4-5', content: [{ type: 'text', text: 'kettle-profile-credential' }], stop_reason: 'max_tokens', stop_sequence: null, usage: { input_tokens: 8, output_tokens: 1 } },
       { headers: { 'x-invented-echo': 'kettle-slot-credential-3 kettle-profile-credential', 'anthropic-ratelimit-unified-5h-utilization': 'kettle-profile-credential', 'anthropic-ratelimit-unified-5h-reset': 'kettle-slot-credential-3', 'anthropic-ratelimit-unified-7d-utilization': '0.4', 'anthropic-ratelimit-unified-7d-reset': '1792540800' } },
+    ),
+    'Bearer kettle-slot-credential-4': HttpResponse.json(
+      { type: 'error', error: { type: 'authentication_error', message: 'invented refusal of kettle-slot-credential-4 minted by kettle-profile-credential' } },
+      { status: 401, headers: { 'x-invented-echo': 'kettle-slot-credential-4 kettle-profile-credential' } },
     ),
   };
   onTestFinished(overrideEnv('PATH', `${op.bin}:${process.env['PATH']}`));
@@ -1072,6 +1088,7 @@ test('hq capacity --refresh-slots stores neither a slot token nor the profile to
     { slot: 1, status: 'op-failed', five_hour: null, five_hour_resets_at: null, seven_day: null, seven_day_resets_at: null },
     { slot: 2, status: '429', five_hour: null, five_hour_resets_at: null, seven_day: 100, seven_day_resets_at: null },
     { slot: 3, status: '200', five_hour: null, five_hour_resets_at: null, seven_day: 40, seven_day_resets_at: '2026-10-21T00:00:00Z' },
+    { slot: 4, status: '401', five_hour: null, five_hour_resets_at: null, seven_day: null, seven_day_resets_at: null },
   ]);
   expect(stored.length).toBeGreaterThan(1);
   expect(stored.filter((table) => table.rows.includes('kettle-slot-credential') || table.rows.includes('kettle-profile-credential'))).toStrictEqual([]);

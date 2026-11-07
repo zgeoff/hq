@@ -2,3 +2,5 @@ node_modules/
 *.db
 *.db-*
 dist/
+# git worktrees
+.worktrees

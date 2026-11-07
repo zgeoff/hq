@@ -31,8 +31,6 @@ export interface Ask {
   stu_view: string | null;
 }
 
-export type Row = Omit<Ask, 'issues' | 'item'> & { issues: string; item: string | null };
-
 export interface AddInput {
   kind: Kind;
   id: string;

@@ -13,7 +13,11 @@ import { HqError } from '../errors.ts';
 import type { OwnerProbe } from '../pr-status/read-owner-session.ts';
 import { roleName } from '../roles/role-name.ts';
 import type { Runner } from '../runner/types.ts';
+import { buildAdapterSetting } from './build-adapter-setting.ts';
+import { formatAdapter } from './format-adapter.ts';
+import { pickReviewAdapter } from './pick-review-adapter.ts';
 import { buildNoslopReport } from './build-noslop-report.ts';
+import { ADAPTER_KEY, readAdapterSetting } from './read-adapter-setting.ts';
 import { buildNoslopTotals } from './build-noslop-totals.ts';
 import { checkout } from '../review/checkout.ts';
 import { buildRunDir } from './build-run-dir.ts';
@@ -41,6 +45,7 @@ export interface NoslopArgs {
   verb: string | undefined;
   rest: string[];
   since: string | undefined;
+  until?: string | undefined;
   force?: boolean | undefined;
   actor: string;
   readOwnerSession: () => Promise<OwnerProbe>;
@@ -56,6 +61,9 @@ export async function runNoslopCommand(args: NoslopArgs): Promise<Out> {
   if (args.verb === 'pin') {
     return await updatePin(args);
   }
+  if (args.verb === 'adapter') {
+    return updateAdapter(args);
+  }
   if (args.verb === 'report') {
     await fillRoundPatchIDs({ run: args.run, db: args.db, since: args.since, checkout: (repo) => checkout(args.run, `zgeoff/${repo}`, repo) });
     const reports = buildNoslopReport(args.db, args.since);
@@ -64,7 +72,7 @@ export async function runNoslopCommand(args: NoslopArgs): Promise<Out> {
   if (args.verb === undefined || args.verb === 'show') {
     return renderSettings(args.db);
   }
-  throw new HqError('bad_args', 'hq noslop [on <repo...> | off <repo...> | cap <repo> <n|off> | pin <sha> [--force <reason>] | report [--since ISO]]');
+  throw new HqError('bad_args', 'hq noslop [on <repo...> | off <repo...> | cap <repo> <n|off> | pin <sha> [--force <reason>] | adapter claude --until ISO | adapter codex | report [--since ISO]]');
 }
 
 function updateRepoList(args: NoslopArgs, change: 'on' | 'off'): Out {
@@ -76,7 +84,8 @@ function updateRepoList(args: NoslopArgs, change: 'on' | 'off'): Out {
 
 function renderSettings(db: Database): Out {
   const settings = loadNoslopSettings(db);
-  return { data: { repos: settings.repos, caps: settings.caps, sha: settings.sha, clone: resolveRunDir(settings) }, text: formatSettings(settings) };
+  const adapter = pickReviewAdapter(undefined, readAdapterSetting(db), now());
+  return { data: { repos: settings.repos, caps: settings.caps, sha: settings.sha, clone: resolveRunDir(settings), adapter }, text: [formatSettings(settings), `adapter: ${formatAdapter(adapter)}`].join('\n') };
 }
 
 function resolveRunDir(settings: NoslopSettings): string {
@@ -225,6 +234,15 @@ function buildPinData(migration: StoreMigration, force: string | undefined): Rec
   const counts = Object.fromEntries(migration.tables.map((count) => [count.table, { before: count.before, after: count.after }]));
   const moved = migration.backup === null ? {} : { migrations: migration.names, backup: migration.backup, counts };
   return force === undefined ? moved : { ...moved, force };
+}
+
+function updateAdapter(args: NoslopArgs): Out {
+  const setting = buildAdapterSetting(args.rest, args.until, args.actor, now());
+  const before = readAdapterSetting(args.db);
+  const stored = setting === null ? null : JSON.stringify(setting);
+  setMeta(args.db, ADAPTER_KEY, stored);
+  logEvent(args.db, 'hq', 'noslop', 'adapter', args.actor, JSON.stringify(before), JSON.stringify(setting), {});
+  return { data: { adapter: setting }, text: setting === null ? 'noslop reviews with its default adapter, codex.' : `noslop reviews with ${setting.adapter} until ${setting.until}, then with codex again.` };
 }
 
 function requireForce(args: NoslopArgs): string | undefined {
