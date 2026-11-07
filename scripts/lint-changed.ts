@@ -6,7 +6,6 @@ import { TYPE_AWARE_ARGS, UNSAFE_PREFIX } from './unsafe-rules.ts';
 
 const labelSchema = z.object({ span: z.object({ line: z.number() }) });
 const diagnosticSchema = z.object({ code: z.string(), filename: z.string(), labels: z.array(labelSchema), message: z.string() });
-const reportSchema = z.object({ diagnostics: z.array(diagnosticSchema) });
 
 type Diagnostic = z.infer<typeof diagnosticSchema>;
 
@@ -147,7 +146,8 @@ function runCommand(command: string, args: readonly string[]): string {
   return result.stdout;
 }
 
-// -A all leaves the JS-plugin rules on, so the type-aware report repeats the plain run's findings; collectReported drops them.
+// -A all leaves the JS-plugin rules on, so the type-aware report repeats the plain run's findings,
+// which are dropped before the two reports join.
 export function buildLintArgs(files: readonly string[], typeAware: boolean): string[] {
   const base = ['oxlint', '--format', 'json'];
   if (!typeAware) {
@@ -163,6 +163,8 @@ export function collectReported(plain: readonly Diagnostic[], typeAware: readonl
 function readDiagnostics(files: readonly string[]): readonly Diagnostic[] {
   return collectReported(readReport(buildLintArgs(files, false)), readReport(buildLintArgs(files, true)));
 }
+
+const reportSchema = z.object({ diagnostics: z.array(diagnosticSchema) });
 
 function readReport(args: readonly string[]): readonly Diagnostic[] {
   const output: unknown = JSON.parse(runCommand('bunx', args));
