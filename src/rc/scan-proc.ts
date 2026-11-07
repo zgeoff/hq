@@ -1,6 +1,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { pidFromCmdlines } from './pid-from-cmdlines.ts';
 import type { PidFind } from './types.ts';
+import { toErrorMessage } from '../to-error-message.ts';
 
 export function scanProc(sessionId: string, proc = '/proc'): PidFind {
   const procs: { pid: number; args: string[] }[] = [];
@@ -8,7 +9,7 @@ export function scanProc(sessionId: string, proc = '/proc'): PidFind {
   try {
     names = readdirSync(proc);
   } catch (e) {
-    return { why: `can't read ${proc}: ${String((e as Error).message ?? e).slice(0, 100)}` };
+    return { why: `can't read ${proc}: ${toErrorMessage(e).slice(0, 100)}` };
   }
   for (const n of names) {
     if (!/^\d+$/.test(n)) continue;

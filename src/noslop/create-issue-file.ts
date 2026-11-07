@@ -6,6 +6,7 @@ import { checkIssueFlag } from './check-issue-flag.ts';
 import { findLinkedIssue } from './find-linked-issue.ts';
 import { readIssueText } from './read-issue-text.ts';
 import { removeIssueFile } from './remove-issue-file.ts';
+import { toErrorMessage } from '../to-error-message.ts';
 
 export interface IssueNote {
   issue: string | null;
@@ -60,5 +61,5 @@ function buildSkip(issue: string | null, why: string): IssueFile {
 }
 
 function toMessage(error: unknown): string {
-  return redact(String((error as Error).message), null).slice(0, 200);
+  return redact(toErrorMessage(error), null).slice(0, 200);
 }

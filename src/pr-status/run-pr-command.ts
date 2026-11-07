@@ -1,3 +1,4 @@
+import { isOneOf } from '@zgeoff/std';
 import type { Database } from 'bun:sqlite';
 import type { Flags } from '../cli.ts';
 import type { Out } from '../commands.ts';
@@ -152,18 +153,18 @@ async function runAnswer(input: PRCommandInput, ref: PRRef, rawAnswer: string | 
   return await readOut(input, ref, context.head);
 }
 
-const ANSWERS = new Set(['lgtm', 'changes', 'reject']);
+const ANSWERS = ['lgtm', 'changes', 'reject'] as const satisfies readonly PRAnswer[];
 
 function parseAnswerArgs(flags: Flags, rawAnswer: string | undefined): AnswerArgs {
   const note = flags.note?.trim() ?? '';
   const source = requireAnswerSource(flags.source);
-  if (rawAnswer === undefined || !ANSWERS.has(rawAnswer)) {
+  if (rawAnswer === undefined || !isOneOf(rawAnswer, ANSWERS)) {
     throw new HqError('bad_args', 'the answer must be lgtm, changes or reject');
   }
   if (rawAnswer === 'changes' && note === '') {
     throw new HqError('bad_args', "'changes' needs --note: what the owner asked to change");
   }
-  return { answer: rawAnswer as PRAnswer, note: note === '' ? null : note, source };
+  return { answer: rawAnswer, note: note === '' ? null : note, source };
 }
 
 async function readAnswerContext(input: PRCommandInput, ref: PRRef, head: string | null): Promise<{ head: string; actor: string }> {

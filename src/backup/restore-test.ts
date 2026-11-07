@@ -8,6 +8,7 @@ import { HqError } from '../errors.ts';
 import { logEvent } from '../log-event.ts';
 import type { Runner } from '../runner/types.ts';
 import { restore } from './restore.ts';
+import { toErrorMessage } from '../to-error-message.ts';
 
 export async function restoreTest(db: Database, run: Runner, opts: { remote: boolean; scratch: string }, actor: string): Promise<{ ok: boolean; files: number; dbCheck: string; error: string | null }> {
   const dir = join(opts.scratch, `hq-restore-test-${Date.now()}`);
@@ -20,7 +21,7 @@ export async function restoreTest(db: Database, run: Runner, opts: { remote: boo
     const files = (await run(['find', dir, '-type', 'f'])).stdout.split('\n').filter(Boolean).length;
     result = { ok: check.stdout.trim() === 'ok' && Number(tables.stdout.trim()) > 0, files, dbCheck: `${check.stdout.trim()}, ${tables.stdout.trim()} tables`, error: null };
   } catch (e) {
-    result.error = String((e as Error).message ?? e);
+    result.error = toErrorMessage(e);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

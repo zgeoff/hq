@@ -28,6 +28,7 @@ import { writeFleetRefresh } from './write-fleet-refresh.ts';
 import { STALE_LIMITS } from './stale-limits.ts';
 import type { StaleSinceMap } from './stale-since-schema.ts';
 import type { FleetClient, FleetEntry, FleetSession, PromptDrift, RestartCause, StaleOps } from './types.ts';
+import { toErrorMessage } from '../to-error-message.ts';
 
 export interface StaleTickOptions {
   fleet: FleetEntry[];
@@ -252,7 +253,7 @@ async function runRestart(pass: StalePass, turn: StaleTurn, asked: Entry): Promi
     pass.restarted.push({ name: turn.entry.name, cause: turn.cause });
     logEvent(pass.db, 'hq', 'fleet', restart.action, pass.opts.actor, null, null, detail);
   } catch (error) {
-    logEvent(pass.db, 'hq', 'fleet', 'stale-restart-failed', pass.opts.actor, null, null, { ...detail, error: String((error as Error).message ?? error) });
+    logEvent(pass.db, 'hq', 'fleet', 'stale-restart-failed', pass.opts.actor, null, null, { ...detail, error: toErrorMessage(error) });
     recordSkip(pass, turn.entry.name, asked, turn.cause);
   }
 }

@@ -7,6 +7,7 @@ import { planWake } from './plan-wake.ts';
 import { readLastRestart } from './read-last-restart.ts';
 import type { RestartRecord, WakeResult } from './types.ts';
 import { wakeList } from './wake-list.ts';
+import { toErrorMessage } from '../to-error-message.ts';
 
 export async function runWake(db: Database, opts: { dryRun: boolean; waitMs: number; actor: string; last?: RestartRecord }): Promise<WakeResult> {
   const last = opts.last ?? (await readLastRestart());
@@ -25,7 +26,7 @@ export async function runWake(db: Database, opts: { dryRun: boolean; waitMs: num
         const id = await client.message(m.session, m.text, 'orchestrator', m.idempotencyKey);
         result.sent.push({ session: m.session, name: m.name, reason: m.reason, ...toExactOptional({ message: id }) });
       } catch (e) {
-        result.sent.push({ session: m.session, name: m.name, reason: m.reason, error: String((e as Error).message ?? e) });
+        result.sent.push({ session: m.session, name: m.name, reason: m.reason, error: toErrorMessage(e) });
       }
     }
     if (!opts.dryRun) {

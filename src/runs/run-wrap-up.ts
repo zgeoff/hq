@@ -7,7 +7,7 @@ import { buildWrapUpPlan } from './build-wrap-up-plan.ts';
 import { forgetWrappedSession } from './forget-wrapped-session.ts';
 import { fullSessionId } from './full-session-id.ts';
 import { requireRun } from './require-run.ts';
-import { toMessage } from './to-message.ts';
+import { toErrorMessage } from '../to-error-message.ts';
 import type { ImpWork, KeptSession, WrapUp } from './types.ts';
 import { writeWrapUpNote } from './write-wrap-up-note.ts';
 
@@ -44,7 +44,7 @@ export async function runWrapUp(db: Database, deps: WrapUpDeps, issue: string, o
         await wrapUpTree({ client, deps, sessions, wrapUp, placedOnImp: run.place === 'imp', dryRun: options.dryRun === true, only }, root);
       }
     } catch (error) {
-      const reason = `atc: ${toMessage(error)}`;
+      const reason = `atc: ${toErrorMessage(error)}`;
       wrapUp.failed.push(...ids.map((id) => ({ id, reason })));
     }
   }
@@ -67,7 +67,7 @@ async function resolveSessionIDs(ids: string[], sessions: FleetSession[], wrapUp
       fullIDs.push(fullID);
     } catch (error) {
       if (!(error instanceof HqError && error.code === 'no_such_session')) {
-        wrapUp.failed.push({ id, reason: toMessage(error) });
+        wrapUp.failed.push({ id, reason: toErrorMessage(error) });
       }
     }
   }
@@ -145,7 +145,7 @@ async function readWorkSafely(read: (session: FleetSession) => Promise<ImpWork>,
   try {
     return await read(session);
   } catch (error) {
-    return { state: 'unknown', detail: toMessage(error) };
+    return { state: 'unknown', detail: toErrorMessage(error) };
   }
 }
 
@@ -164,7 +164,7 @@ async function forgetTree(pass: TreePass, decision: ForgetDecision): Promise<voi
   try {
     await pass.client.unpin(root.id);
   } catch (error) {
-    pass.wrapUp.failed.push({ id: root.id, reason: `unpin: ${toMessage(error)}` });
+    pass.wrapUp.failed.push({ id: root.id, reason: `unpin: ${toErrorMessage(error)}` });
     return;
   }
   for (const child of children) {
@@ -172,7 +172,7 @@ async function forgetTree(pass: TreePass, decision: ForgetDecision): Promise<voi
       await forgetWrappedSession(pass.client, child.id);
       pass.wrapUp.forgotten.push(child.id);
     } catch (error) {
-      pass.wrapUp.failed.push({ id: child.id, reason: toMessage(error) });
+      pass.wrapUp.failed.push({ id: child.id, reason: toErrorMessage(error) });
     }
   }
   if (!decision.destroyImp) {
@@ -180,7 +180,7 @@ async function forgetTree(pass: TreePass, decision: ForgetDecision): Promise<voi
       await forgetWrappedSession(pass.client, root.id);
       pass.wrapUp.forgotten.push(root.id);
     } catch (error) {
-      pass.wrapUp.failed.push({ id: root.id, reason: toMessage(error) });
+      pass.wrapUp.failed.push({ id: root.id, reason: toErrorMessage(error) });
     }
     return;
   }
@@ -206,6 +206,6 @@ async function removeImpSession(pass: TreePass, id: string): Promise<void> {
     pass.wrapUp.forgotten.push(id);
     pass.wrapUp.destroyed.push(id);
   } catch (error) {
-    pass.wrapUp.failed.push({ id, reason: toMessage(error) });
+    pass.wrapUp.failed.push({ id, reason: toErrorMessage(error) });
   }
 }

@@ -1,3 +1,4 @@
+import { isOneOf } from '@zgeoff/std';
 import type { Database } from 'bun:sqlite';
 import { isQuiet } from '../clock/is-quiet.ts';
 import { iso } from '../clock/iso.ts';
@@ -6,7 +7,6 @@ import { setMeta } from '../db/set-meta.ts';
 import { HqError } from '../errors.ts';
 import { logEvent } from '../log-event.ts';
 import { owner } from '../owner.ts';
-import type { AskState } from '../transitions/ask-states.ts';
 import { ASK_TRANSITIONS } from '../transitions/ask-transitions.ts';
 import { checkAsk } from '../transitions/check-ask.ts';
 import { getAsk } from './get-ask.ts';
@@ -51,7 +51,7 @@ export function addAsk(db: Database, input: AddInput): AddResult {
         updateIssuesOnly(db, prev, input, t);
         return { ask: getAsk(db, prev.id)!, result: 'noop', note: `already ${prev.state}: not sent again` };
       }
-      if (!sameQuestion && (ASK_TRANSITIONS.reasked.from as readonly AskState[]).includes(prev.state)) {
+      if (!sameQuestion && isOneOf(prev.state, ASK_TRANSITIONS.reasked.from)) {
         checkAsk(prev.id, 'reasked', prev.state);
         db.query(
           `UPDATE asks SET title=?, question=?, body=?, issues=?, for_session=?, send_order=?, item=NULL, stu_view=NULL, state='queued', round=round+1, due_at=NULL,
@@ -67,7 +67,7 @@ export function addAsk(db: Database, input: AddInput): AddResult {
         updateIssuesOnly(db, prev, input, t);
         return { ask: getAsk(db, prev.id)!, result: 'noop', note: 'answered, then closed: not sent again' };
       }
-      if ((ASK_TRANSITIONS.requeued.from as readonly AskState[]).includes(prev.state)) {
+      if (isOneOf(prev.state, ASK_TRANSITIONS.requeued.from)) {
         checkAsk(prev.id, 'requeued', prev.state);
         updateText(db, prev, input, t);
         const newRound = prev.answer !== null;

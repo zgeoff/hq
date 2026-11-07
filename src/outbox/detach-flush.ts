@@ -3,6 +3,7 @@ import { dbPath } from '../db/db-path.ts';
 import { cleanEnv } from '../runner/clean-env.ts';
 import type { Runner } from '../runner/types.ts';
 import type { DetachResult } from './types.ts';
+import { toErrorMessage } from '../to-error-message.ts';
 
 export async function detachFlush(run: Runner, self: string[], setenv: string[], retryFailed: boolean, ids?: number[]): Promise<DetachResult> {
   const path = `${process.env['HOME']}/.local/bin:${process.env['HOME']}/.bun/bin:/usr/local/bin:/usr/bin:/bin`;
@@ -19,6 +20,6 @@ export async function detachFlush(run: Runner, self: string[], setenv: string[],
     const r = await run(cmd, { env: cleanEnv() });
     return r.code === 0 ? { unit, error: null } : { unit: null, error: (r.stderr || r.stdout).trim() || `exit ${r.code}` };
   } catch (e) {
-    return { unit: null, error: String((e as Error).message ?? e) };
+    return { unit: null, error: toErrorMessage(e) };
   }
 }

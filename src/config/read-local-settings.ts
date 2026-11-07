@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { HqError } from '../errors.ts';
 import { getLocalSettingsPath } from './get-local-settings-path.ts';
 import { LOCAL_KEYS } from './local-keys.ts';
+import { toErrorMessage } from '../to-error-message.ts';
 
 export function readLocalSettings(env: Record<string, string | undefined> = process.env): Record<string, string> {
   const path = getLocalSettingsPath(env);
@@ -17,11 +18,11 @@ function readModifiedTime(path: string): number | null {
   try {
     return statSync(path).mtimeMs;
   } catch (error) {
-    const code = (error as NodeJS.ErrnoException).code;
+    const code = error instanceof Error && 'code' in error ? error.code : undefined;
     if (code === 'ENOENT' || code === 'ENOTDIR') {
       return null;
     }
-    throw new HqError('bad_config', `${path} cannot be read: ${(error as Error).message}`, { setting: 'HQ_LOCAL_CONFIG' });
+    throw new HqError('bad_config', `${path} cannot be read: ${toErrorMessage(error)}`, { setting: 'HQ_LOCAL_CONFIG' });
   }
 }
 

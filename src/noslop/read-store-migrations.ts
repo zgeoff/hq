@@ -1,5 +1,6 @@
 import { Database } from 'bun:sqlite';
 import { HqError } from '../errors.ts';
+import { toErrorMessage } from '../to-error-message.ts';
 
 export function readStoreMigrations(store: string): string[] {
   try {
@@ -10,6 +11,6 @@ export function readStoreMigrations(store: string): string[] {
       db.close();
     }
   } catch (error) {
-    throw new HqError('store_unreadable', `hq cannot read the migrations the store holds: ${store}: ${(error as Error).message}`);
+    throw new HqError('store_unreadable', `hq cannot read the migrations the store holds: ${store}: ${toErrorMessage(error)}`);
   }
 }

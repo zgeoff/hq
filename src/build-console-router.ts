@@ -10,6 +10,7 @@ import { recordConsolePRAnswer } from './record-console-pr-answer.ts';
 import { recordConsoleReview } from './record-console-review.ts';
 import type { Runner } from './runner/types.ts';
 import type { ShippedPeriod, ShippedReport } from './shipped/types.ts';
+import { toErrorMessage } from './to-error-message.ts';
 
 export interface ConsoleContext {
   db: Database;
@@ -61,7 +62,7 @@ async function readShipped(context: ConsoleContext, period: ShippedPeriod): Prom
   try {
     return await context.loadShipped(period);
   } catch (error) {
-    throw new ORPCError('INTERNAL_SERVER_ERROR', { message: (error as Error).message });
+    throw new ORPCError('INTERNAL_SERVER_ERROR', { message: toErrorMessage(error) });
   }
 }
 

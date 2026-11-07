@@ -9,6 +9,7 @@ import { syncFiled } from '../linear/sync-filed.ts';
 import { syncInReview } from '../linear/sync-in-review.ts';
 import { syncPrIssues } from '../linear/sync-pr-issues.ts';
 import { syncStarted } from '../linear/sync-started.ts';
+import { toErrorMessage } from '../to-error-message.ts';
 
 export async function syncLinear(db: Database, call: LinearCall, from: Date, at: Date = now()): Promise<{ closed: number; typed: number; filed: number; started: number; inReview: number }> {
   let closed = 0;
@@ -20,7 +21,7 @@ export async function syncLinear(db: Database, call: LinearCall, from: Date, at:
     setMeta(db, 'linear_synced_at', iso(at));
     setMeta(db, 'linear_error', '');
   } catch (e) {
-    setMeta(db, 'linear_error', String((e as Error).message ?? e).slice(0, 300));
+    setMeta(db, 'linear_error', toErrorMessage(e).slice(0, 300));
     throw e;
   }
   let filed = 0;

@@ -35,6 +35,7 @@ import { runStaleRestartTick } from './run-stale-restart-tick.ts';
 import type { RestartedSession } from './run-stale-restart-tick.ts';
 import type { EnsureStep, FleetClient, FleetEntry, RcDeps, SpawnRequest } from './types.ts';
 import { updateRcPending as setPending } from './update-rc-pending.ts';
+import { toErrorMessage } from '../to-error-message.ts';
 
 export async function ensureFleet(db: Database, client: FleetClient, opts: { dryRun: boolean; actor: string; fleet?: FleetEntry[]; now?: string[]; rc?: RcDeps }): Promise<EnsureStep[]> {
   // One ensure at a time: two that overlap could each read "missing" and spawn (a --now beside
@@ -69,7 +70,7 @@ async function tryStaleRestart(db: Database, client: FleetClient, opts: StaleRes
   try {
     return await runStaleRestartTick(db, client, { fleet: opts.fleet ?? declaredFleet(db), actor: opts.actor, selfSessionID: process.env['ATC_SESSION_ID'] });
   } catch (error) {
-    logEvent(db, 'hq', 'fleet', 'stale-restart-failed', opts.actor, null, null, { error: String((error as Error).message ?? error) });
+    logEvent(db, 'hq', 'fleet', 'stale-restart-failed', opts.actor, null, null, { error: toErrorMessage(error) });
     return [];
   }
 }
@@ -170,7 +171,7 @@ async function ensureOnce(db: Database, client: FleetClient, opts: { dryRun: boo
       if (!trust.trusted) throw new HqError('untrusted_cwd', trust.why);
       prompt = readPrompt(e.prompt);
     } catch (err) {
-      steps.push({ name: e.name, action: 'failed', detail: String((err as Error).message ?? err) });
+      steps.push({ name: e.name, action: 'failed', detail: toErrorMessage(err) });
       continue;
     }
     if (opts.dryRun) {
@@ -199,7 +200,7 @@ async function ensureOnce(db: Database, client: FleetClient, opts: { dryRun: boo
       }
       steps.push(step);
     } catch (err) {
-      steps.push({ name: e.name, action: 'failed', detail: String((err as Error).message ?? err) });
+      steps.push({ name: e.name, action: 'failed', detail: toErrorMessage(err) });
     }
   }
   const rcReported = new Set<EnsureStep>();
@@ -265,7 +266,7 @@ async function startHelper(rc: RcDeps, name: string): Promise<string | null> {
     const r = await rc.run(cmd, { env: cleanEnv() });
     return r.code === 0 ? null : (r.stderr || r.stdout).trim() || `exit ${r.code}`;
   } catch (e) {
-    return String((e as Error).message ?? e);
+    return toErrorMessage(e);
   }
 }
 

@@ -4,6 +4,7 @@ import { readPrompt } from '../prompts/read-prompt.ts';
 import { runMainFetch } from '../prompts/run-main-fetch.ts';
 import { DRIFT_BUDGET_MS } from './drift-budget-ms.ts';
 import type { DriftClient, FleetEntry, FleetSession, PromptDrift } from './types.ts';
+import { toErrorMessage } from '../to-error-message.ts';
 
 export async function promptDrift(client: DriftClient, entries: FleetEntry[], live: FleetSession[], known: Record<string, string> = {}, budgetMs = DRIFT_BUDGET_MS): Promise<Record<string, PromptDrift>> {
   const out: Record<string, PromptDrift> = {};
@@ -38,7 +39,7 @@ export async function promptDrift(client: DriftClient, entries: FleetEntry[], li
       }
       atcPrompt = got;
     } catch (err) {
-      out[e.name] = unknown(`atc session.get failed: ${String((err as Error).message ?? err).slice(0, 120)}`);
+      out[e.name] = unknown(`atc session.get failed: ${toErrorMessage(err).slice(0, 120)}`);
       return;
     }
     if (atcPrompt === undefined) {
@@ -49,7 +50,7 @@ export async function promptDrift(client: DriftClient, entries: FleetEntry[], li
     try {
       wanted = readPrompt(e.prompt, true);
     } catch (err) {
-      out[e.name] = unknown(`can't read the prompt hq would spawn with: ${String((err as Error).message ?? err).slice(0, 160)}`);
+      out[e.name] = unknown(`can't read the prompt hq would spawn with: ${toErrorMessage(err).slice(0, 160)}`);
       return;
     }
     const a = normalize(wanted);

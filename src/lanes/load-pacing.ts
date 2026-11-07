@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { parseLanes } from '../areas/parse-lanes.ts';
-import { toMessage } from '../runs/to-message.ts';
+import { toErrorMessage } from '../to-error-message.ts';
 import type { LaneConfig } from '../areas/types.ts';
 import { DEFAULT_DESIGN_SLOTS } from './default-design-slots.ts';
 import { parseDesignSlots } from './parse-design-slots.ts';
@@ -50,7 +50,7 @@ export async function loadPacing(path: string): Promise<Pacing> {
     }
     return { impMib, lanes: parseLanes(file), slots: parsePacingSlots(file), placeTypes: placeRead.placeTypes, localRoom: parseLocalRoom(file), claudeLaunchPct, ...design, error: null };
   } catch (error) {
-    return { impMib, lanes: null, slots: null, placeTypes: null, localRoom: null, claudeLaunchPct, ...design, error: `pacing.json: ${toMessage(error)}` };
+    return { impMib, lanes: null, slots: null, placeTypes: null, localRoom: null, claudeLaunchPct, ...design, error: `pacing.json: ${toErrorMessage(error)}` };
   }
 }
 
@@ -72,6 +72,6 @@ function parseDesignCounts(file: unknown): DesignCountsRead {
   try {
     return { design: parseDesignSlots(file), error: null };
   } catch (error) {
-    return { design: DEFAULT_DESIGN_SLOTS, error: `pacing.json: ${toMessage(error)}` };
+    return { design: DEFAULT_DESIGN_SLOTS, error: `pacing.json: ${toErrorMessage(error)}` };
   }
 }

@@ -15,6 +15,7 @@ import { orchestratorName } from '../wake/orchestrator-name.ts';
 import { sendNoteToOrchestrator } from './send-note-to-orchestrator.ts';
 import type { FeedEvent, FinalClaim, FinalResolutions, IngestResult } from './types.ts';
 import { updateRunTime as touch } from './update-run-time.ts';
+import { toErrorMessage } from '../to-error-message.ts';
 
 interface IngestOptions {
   maxPages?: number;
@@ -51,7 +52,7 @@ export async function ingestNotes(db: Database, client: AtcClient, opts: IngestO
     try {
       r = await client.call('events.read', { cursor, limit: 200 }, eventsReadSchema);
     } catch (e) {
-      if (String((e as Error).message).includes('is not an events.read cursor')) {
+      if (toErrorMessage(e).includes('is not an events.read cursor')) {
         restart();
         return result;
       }

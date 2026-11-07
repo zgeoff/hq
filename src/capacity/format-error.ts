@@ -1,3 +1,5 @@
+import { toErrorMessage } from '../to-error-message.ts';
+
 export function formatError(e: unknown): string {
-  return String((e as Error).message ?? e).slice(0, 200);
+  return toErrorMessage(e).slice(0, 200);
 }

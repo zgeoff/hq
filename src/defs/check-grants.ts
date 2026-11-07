@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs';
 import type { Check } from './types.ts';
+import { toErrorMessage } from '../to-error-message.ts';
 
 const OUTPUT_LINES = 10;
 
@@ -15,7 +16,7 @@ export function checkGrants(hqDir: string, privateDir: string, spawn: GrantsSpaw
     return formatGrantsRun(spawn(['bun', 'scripts/grants.ts', '--check', '--private', privateDir], hqDir));
   } catch (error) {
     // Bun throws, rather than failing the run, when bun is not on PATH.
-    return { ok: false, line: `grants: could not start bun: ${String((error as Error).message ?? error).slice(0, 200)}` };
+    return { ok: false, line: `grants: could not start bun: ${toErrorMessage(error).slice(0, 200)}` };
   }
 }
 
