@@ -5,6 +5,7 @@ import { sep } from 'node:path';
 import { z } from 'zod';
 import { iso } from '../clock/iso.ts';
 import { now } from '../clock/now.ts';
+import { parseJSON } from '../noslop/parse-json.ts';
 import { getProjectsDir } from '../repair/get-projects-dir.ts';
 import { BACKFILL_DAYS } from './backfill-days.ts';
 import { BUDGET_BYTES } from './budget-bytes.ts';
@@ -185,17 +186,15 @@ function readAt(fd: number, start: number, len: number): Buffer {
 // A tool_result follows its tool_use within a few records, parallel calls included.
 const TOOLS_KEPT = 128;
 
-const remember = (tools: Map<string, Tool>, [k, v]: [string, Tool]) => {
+const StoredToolsSchema = z.array(z.tuple([z.string(), z.object({ name: z.string(), input: z.string().nullable() })]));
+
+const remember =(tools: Map<string, Tool>, [k, v]: [string, Tool]) => {
   tools.delete(k);
   tools.set(k, v);
   if (tools.size > TOOLS_KEPT) tools.delete(tools.keys().next().value!);
 };
 
 function storedTools(raw: string | null): Map<string, Tool> {
-  try {
-    const v: unknown = JSON.parse(raw ?? '[]');
-    return new Map(Array.isArray(v) ? (v as [string, Tool][]) : []);
-  } catch {
-    return new Map();
-  }
+  const parsed = StoredToolsSchema.safeParse(parseJSON(raw ?? '[]'));
+  return new Map(parsed.success ? parsed.data : []);
 }

@@ -10,9 +10,16 @@ import type { Runner } from '../runner/types.ts';
 import { restore } from './restore.ts';
 import { toErrorMessage } from '../to-error-message.ts';
 
-export async function restoreTest(db: Database, run: Runner, opts: { remote: boolean; scratch: string }, actor: string): Promise<{ ok: boolean; files: number; dbCheck: string; error: string | null }> {
+interface RestoreTestResult {
+  ok: boolean;
+  files: number;
+  dbCheck: string;
+  error: string | null;
+}
+
+export async function restoreTest(db: Database, run: Runner, opts: { remote: boolean; scratch: string }, actor: string): Promise<RestoreTestResult> {
   const dir = join(opts.scratch, `hq-restore-test-${Date.now()}`);
-  let result = { ok: false, files: 0, dbCheck: 'not run', error: null as string | null };
+  let result: RestoreTestResult = { ok: false, files: 0, dbCheck: 'not run', error: null };
   try {
     const r = await restore(run, dir, { snapshot: 'latest', remote: opts.remote });
     if (!r.db) throw new HqError('restore_test_failed', 'the snapshot holds no hq.db');

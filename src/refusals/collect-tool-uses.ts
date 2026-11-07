@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { clean } from '../redact/clean.ts';
+import { findMessageContent } from './find-message-content.ts';
 import { findString as str } from './find-string.ts';
 import { parseJSONLine as jsonLine } from './parse-json-line.ts';
 import type { Obj, Tool } from './types.ts';
@@ -45,7 +46,7 @@ function pickInput(tool: string, input: unknown): unknown {
 }
 
 function collectUses(record: Obj | null): ToolUse[] {
-  const content: unknown = record?.['message']?.content;
+  const content = findMessageContent(record);
   if (!Array.isArray(content)) {
     return [];
   }
