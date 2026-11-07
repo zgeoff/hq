@@ -1,4 +1,4 @@
-import type { ColumnSpec } from '../kdb.ts';
+import type { ColumnSpec } from '../db/hq-columns.ts';
 
 export function buildDeclaredColumns(tables: Readonly<Record<string, Readonly<Record<string, ColumnSpec>>>>): Record<string, Record<string, string>> {
   return Object.fromEntries(

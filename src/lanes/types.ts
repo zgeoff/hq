@@ -1,6 +1,6 @@
 import type { IssueType } from '../linear/issue-types.ts';
 import type { LaneConfig } from '../areas/types.ts';
-import type { HqTables } from '../kdb.ts';
+import type { HqTables } from '../db/hq-columns.ts';
 
 export interface Capacity {
   imp?: { freeMib?: number; room?: boolean; error?: string };

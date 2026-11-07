@@ -1,5 +1,5 @@
 import type { SessionInfo } from '../atc/session-schema.ts';
-import type { HqTables } from '../kdb.ts';
+import type { HqTables } from '../db/hq-columns.ts';
 import type { BY } from './by.ts';
 
 export interface ScanOptions {

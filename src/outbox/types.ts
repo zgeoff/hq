@@ -1,4 +1,4 @@
-import type { HqTables } from '../kdb.ts';
+import type { HqTables } from '../db/hq-columns.ts';
 
 export type OutboxRow = HqTables['outbox'];
 
