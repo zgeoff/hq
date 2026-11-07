@@ -130,7 +130,8 @@ Once `gh pr view <n> -R zgeoff/<repo> --json state,mergeCommit` shows `MERGED`:
    - If it owes one, move it to In Review, and leave its delivery run at `live-check` for `z-qa`.
 2. Message `z-release` "merged, ready to release: <repo>#<n> <merge sha> (GEO-n)", leaving out the
    issue when the PR has none. Add `test-only` to that message when every changed path is a test.
-   For a PR another session sent, tell that session instead.
+   For a PR another session sent, tell that session instead. For a PR `z-stu` sent, post the merge
+   with `hq news add --topic merge`.
 3. Post it to `hq news` when the owner would notice the change, such as a deploy or a skill change.
 
 When a merge fails for any reason other than a ruleset, the PR stays open: send it back to the

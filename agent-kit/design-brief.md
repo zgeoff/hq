@@ -23,7 +23,7 @@ Before your final report, check the follow-up issues you filed, then send the do
 1. Read the record with the Linear document tool, and each follow-up issue with the issue tool. Write each Markdown body, unchanged, to a file in your scratch folder.
 2. For each follow-up, and each decision it covers, run `skills/linear-triage/scripts/check-sketches.sh --decision <decision number> <record file> <issue file>`, with the hq-defs clone, at <the path `hq defs status` prints>, as the working folder. The decision number is the one in the record's heading for it, such as "Decision 7".
 3. Copy each code block the script marks `"found": false` into that issue's description.
-4. When every follow-up passes, send an ATC `progress` note that starts `DESIGN DONE <record link> <follow-up IDs>`. z-delivery relays it to z-stu.
+4. When every follow-up passes, send an ATC `progress` note that starts `DESIGN DONE <record link> <follow-up IDs>`.
 
 Finish line: that note, and a final report with the same links.
 ```
