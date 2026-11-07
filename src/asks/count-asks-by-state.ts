@@ -10,7 +10,7 @@ export function countAsksByState(db: Database): z.output<typeof AskCountSchema>[
   const query = kdb(db)
     .selectFrom('asks')
     .select(['kind', 'state'])
-    .select((eb) => eb.fn.countAll<number>().as('count'))
+    .select((eb) => eb.fn.countAll().as('count'))
     .groupBy(['kind', 'state'])
     .compile();
   return runSyncQuery(db, query, AskCountSchema);

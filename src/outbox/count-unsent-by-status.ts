@@ -10,7 +10,7 @@ export function countUnsentByStatus(db: Database): Record<string, number> {
   const query = kdb(db)
     .selectFrom('outbox')
     .select('status')
-    .select((eb) => eb.fn.countAll<number>().as('count'))
+    .select((eb) => eb.fn.countAll().as('count'))
     .where('status', '!=', 'sent')
     .groupBy('status')
     .compile();
