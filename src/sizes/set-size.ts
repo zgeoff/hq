@@ -8,11 +8,11 @@ import { kdb } from '../kdb.ts';
 import { logEvent } from '../log-event.ts';
 import type { Size } from './bands.ts';
 
-const PrevSchema = buildRowSchema('runs').pick({ size: true, size_lines: true });
+const PreviousSizeSchema = buildRowSchema('runs').pick({ size: true, size_lines: true });
 
 export function setSize(db: Database, issue: string, guess: { size: Size; lines: number }, actor: string): void {
   db.transaction(() => {
-    const previous = runSyncRow(db, kdb(db).selectFrom('runs').select(['size', 'size_lines']).where('issue', '=', issue).compile(), PrevSchema);
+    const previous = runSyncRow(db, kdb(db).selectFrom('runs').select(['size', 'size_lines']).where('issue', '=', issue).compile(), PreviousSizeSchema);
     if (!previous) {
       throw new HqError('not_found', `no run ${issue}`);
     }

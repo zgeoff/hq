@@ -6,12 +6,12 @@ import { HqError } from '../errors.ts';
 import { kdb } from '../kdb.ts';
 import { normalizePrRef } from './normalize-pr-ref.ts';
 import { requirePR as mustPr } from './require-pr.ts';
-import { RunPrSchema } from './run-pr-schema.ts';
+import { RunPRSchema } from './run-pr-schema.ts';
 import type { RunPr } from './types.ts';
 
 export function registerRunPR(db: Database, issue: string, raw: string): { pr: RunPr; added: boolean } {
   const { ref, url } = normalizePrRef(raw);
-  const previous = runSyncRow(db, kdb(db).selectFrom('run_prs').selectAll().where('ref', '=', ref).compile(), RunPrSchema);
+  const previous = runSyncRow(db, kdb(db).selectFrom('run_prs').selectAll().where('ref', '=', ref).compile(), RunPRSchema);
   if (previous) {
     if (previous.issue !== issue) {
       throw new HqError('pr_taken', `${ref} is on ${previous.issue}`);

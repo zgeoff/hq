@@ -285,9 +285,13 @@ test('kindWeeks counts no stored merge of a repo now out of scope', () => {
   expect(w!.total).toBe(1);
 });
 
-test('#kindWeeks keeps a stored kind it does not know under its own name, and counts it in the total', () => {
+test('#kindWeeks keeps a stored kind it does not know under its own name, and counts it in the total', async () => {
   at('2026-10-16T01:00:00Z');
-  db.query(`INSERT INTO merged_prs (repo, number, merged_at, title, kind, issue) VALUES ('atc', 1, '2026-10-14T02:00:00Z', 'fix: x', 'fix', NULL), ('atc', 2, '2026-10-14T03:00:00Z', 'wip: y', 'wip', NULL)`).run();
+  await syncDay(db, ghFake({ '2026-10-14': [{ repo: 'atc', 'n': 1, title: 'fix: an invented fix', at: '2026-10-14T02:00:00Z' }] }), '2026-10-14');
+
+  // A kind kindOf never gives, as a row from an older kindOf or a hand edit holds: syncDay can't store it.
+  db.query(`INSERT INTO merged_prs (repo, number, merged_at, title, kind, issue) VALUES ('atc', 2, '2026-10-14T03:00:00Z', 'wip: y', 'wip', NULL)`).run();
+
   const [week] = kindWeeks(db, 1);
   expect(week?.total).toBe(2);
   expect<unknown>(week?.kinds).toStrictEqual({ fix: 1, feat: 0, chore: 0, docs: 0, test: 0, refactor: 0, ci: 0, build: 0, perf: 0, revert: 0, style: 0, other: 0, wip: 1 });

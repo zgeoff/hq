@@ -16,7 +16,7 @@ import { logEvent } from '../log-event.ts';
 import { enqueue } from '../outbox/enqueue.ts';
 import { roleName } from '../roles/role-name.ts';
 import type { Runner } from '../runner/types.ts';
-import { RunPrSchema } from '../runs/run-pr-schema.ts';
+import { RunPRSchema } from '../runs/run-pr-schema.ts';
 import { RunSchema } from '../runs/run-schema.ts';
 import { setState } from '../runs/set-state.ts';
 import type { Run } from '../runs/types.ts';
@@ -49,7 +49,7 @@ import { readActiveSession } from '../runs/read-active-session.ts';
 import type { PrState, Release, ShipMove, ShipResult, Source } from './types.ts';
 
 const CompareSchema = z.object({ status: z.unknown() });
-const PrViewSchema = z.object({ mergeCommit: z.object({ oid: z.unknown() }).nullish() });
+const PRViewSchema = z.object({ mergeCommit: z.object({ oid: z.unknown() }).nullish() });
 
 export async function shipRuns(db: Database, run: Runner, at: Date = now(), opts: { dryRun?: boolean; readBuild?: () => Build } = {}): Promise<ShipResult> {
   const dryRun = !!opts.dryRun;
@@ -57,7 +57,7 @@ export async function shipRuns(db: Database, run: Runner, at: Date = now(), opts
   const err = (m: string) => res.errors.push(m);
 
   const runs = runSyncQuery(db, kdb(db).selectFrom('runs').selectAll().where('state', 'in', ['merged', 'deploying', 'deploy-held']).orderBy('created_at').compile(), RunSchema);
-  const prsOf = (issue: string) => runSyncQuery(db, kdb(db).selectFrom('run_prs').selectAll().where('issue', '=', issue).orderBy('added_at').compile(), RunPrSchema);
+  const prsOf = (issue: string) => runSyncQuery(db, kdb(db).selectFrom('run_prs').selectAll().where('issue', '=', issue).orderBy('added_at').compile(), RunPRSchema);
 
   const deliveryPRsOf = (issue: string) => prsOf(issue).filter((pr) => pr.design_pass === 0);
   const states = new Map<string, PrState>();
@@ -170,7 +170,7 @@ export async function shipRuns(db: Database, run: Runner, at: Date = now(), opts
       try {
         if (!s.sha) {
           const out = await gh(run, ['pr', 'view', numOf(ref), '-R', `${OWNER}/${s.repo}`, '--json', 'mergeCommit'], `pr view ${ref}`);
-          const view = PrViewSchema.safeParse(JSON.parse(out));
+          const view = PRViewSchema.safeParse(JSON.parse(out));
           const sha = view.success ? view.data.mergeCommit?.oid : undefined;
           if (typeof sha !== 'string' || !HEX40.test(sha)) throw new HqError('bad_pr', `${ref} has no merge commit`);
           s.sha = sha;

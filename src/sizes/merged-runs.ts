@@ -3,13 +3,13 @@ import { sql } from 'kysely';
 import { z } from 'zod';
 import { runSyncQuery } from '../db/run-sync-query.ts';
 import { kdb } from '../kdb.ts';
-import { RunPrSchema } from '../runs/run-pr-schema.ts';
+import { RunPRSchema } from '../runs/run-pr-schema.ts';
 import { RunSchema } from '../runs/run-schema.ts';
 import { getCutoff as cutoff } from '../stats/get-cutoff.ts';
 import type { SizedRun } from './types.ts';
 
 const MergedRunSchema = RunSchema.pick({ issue: true, size: true, size_lines: true }).extend({ lastMerge: z.string() });
-const MergedPrSchema = RunPrSchema.pick({ ref: true, url: true });
+const MergedPRSchema = RunPRSchema.pick({ ref: true, url: true });
 
 export function mergedRuns(db: Database, from: string, to: string): SizedRun[] {
   const lo = from < cutoff() ? cutoff() : from;
@@ -21,6 +21,6 @@ export function mergedRuns(db: Database, from: string, to: string): SizedRun[] {
   const rows = runSyncQuery(db, query, MergedRunSchema);
   return rows.map((row) => {
     const prs = kdb(db).selectFrom('run_prs').select(['ref', 'url']).where('issue', '=', row.issue).where('state', '=', 'merged').where('design_pass', '=', 0).orderBy('ref').compile();
-    return { issue: row.issue, size: row.size, size_lines: row.size_lines, lastMerge: row.lastMerge, prs: runSyncQuery(db, prs, MergedPrSchema) };
+    return { issue: row.issue, size: row.size, size_lines: row.size_lines, lastMerge: row.lastMerge, prs: runSyncQuery(db, prs, MergedPRSchema) };
   });
 }
