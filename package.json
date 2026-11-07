@@ -49,7 +49,7 @@
     "@types/react-dom": "19.3.0",
     "@zgeoff/diet": "0.2.1",
     "@zgeoff/oxlint-config": "0.8.5",
-    "@zgeoff/skill-gate": "0.2.22",
+    "@zgeoff/skill-gate": "0.2.23",
     "@zgeoff/testing": "0.2.1",
     "knip": "6.43.0",
     "msw": "2.15.0",
