@@ -1726,7 +1726,7 @@ async function lanesCommand(context: Pick<Ctx, 'db' | 'verb' | 'rest' | 'flags' 
             ...formatSlotPlan(slotPlan, lookAt),
             ...formatSlotCause(slotCause, slotMinutesToday, slotPlan.pool.capHeld),
             ...(readyNote ? [`  ${readyNote.line}`, ...skippedLines(readyNote).map((l) => `  ${l}`)] : []),
-            ...(parked.length > 0 ? [`  parked, not counted (blocked with no session awake, or working with every session gone): ${parked.map((parkedRun) => parkedRun.issue).join(', ')}`] : []),
+            ...(parked.length > 0 ? [`  parked, not counted (no session awake and busy in the last 15 min): ${parked.map((parkedRun) => parkedRun.issue).join(', ')}`] : []),
           ]
         : [`lanes: no slot plan (${sample.error ?? `no lanes in ${pacingPath()}`})`, ...(fallbackCapLine === null ? [] : [fallbackCapLine])];
       const lines = [
