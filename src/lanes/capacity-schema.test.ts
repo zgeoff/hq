@@ -1,5 +1,4 @@
 import { expect, test } from 'bun:test';
-import invariant from 'tiny-invariant';
 import { CapacitySchema } from './capacity-schema.ts';
 
 test('it reads the imp room and the providers', () => {
@@ -9,11 +8,7 @@ test('it reads the imp room and the providers', () => {
 });
 
 test('it reads an imp field of the wrong type as missing', () => {
-  const imp = CapacitySchema.parse({ imp: { freeMib: '4096', error: 'down' } }).imp;
-  invariant(imp);
-
-  expect(imp.freeMib).toBeUndefined();
-  expect(imp.error).toBe('down');
+  expect(CapacitySchema.parse({ imp: { freeMib: '4096', error: 'down' } })).toStrictEqual({ imp: { freeMib: undefined, error: 'down' } });
 });
 
 test('it reads providers of the wrong type as missing', () => {
