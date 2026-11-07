@@ -616,6 +616,7 @@ test.each([
   { name: 'a list', stdout: '{"mergeCommit":[]}' },
   { name: 'null', stdout: '{"mergeCommit":null}' },
   { name: 'missing', stdout: '{}' },
+  { name: 'a bare null', stdout: 'null' },
 ])('it records a PR as having no merge commit when gh gives its merge commit as $name', async (testCase) => {
   const ctx = setupTest();
   createMergedRun(ctx.db, 'GEO-83', ['tools#33']);
