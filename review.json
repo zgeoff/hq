@@ -12,6 +12,7 @@
     "socket.yml",
     ".claude/skills/testing/**",
     ".claude/skills/docs-writing/**",
-    ".claude/skills/code-style/**"
+    ".claude/skills/code-style/**",
+    ".claude/hooks/start.ts"
   ]
 }
