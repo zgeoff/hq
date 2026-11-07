@@ -34,7 +34,7 @@ Avoid these traps:
 - [Unsticking a run](#unsticking-a-run): find the cause, then relaunch, change the brief, or hand
   it on.
 - [Pitches](#pitches): a numbered list to `z-triage`, each Action needing approval on its own line.
-- [Judging overlap](#judging-overlap): an issue whose Scope touches a running run's files waits.
+- [Judging overlap](#judging-overlap): hold an issue whose Scope touches a running run's files.
 - [Pins and endings](#pins-and-endings): pin only what needs the owner; end only a relaunch's old
   session.
 
@@ -159,9 +159,14 @@ launch with a new `hq brief`, which puts them in the brief's Permissions.
 
 ## Judging overlap
 
-A Ready issue waits for a running run's PR to merge when both are in one repo and the Ready issue's
-Scope names files in the run's Scope or diff. Skip it until that PR merges or closes:
-`hq lanes skip <issue> --until pr:<repo>#<n> --reason overlap`. Overlap only in a shared config file or lockfile doesn't count.
+Hold a Ready issue when a run in its repo changes a file its Scope names, by the running issue's
+Scope or the run's diff. A shared config file or lockfile doesn't count.
+
+```bash
+hq lanes skip <issue> --until <the running issue's ID> --reason overlap
+```
+
+The hold ends when the running issue is Done or Canceled.
 
 ## Pins and endings
 
