@@ -1,18 +1,20 @@
 import type { Database } from 'bun:sqlite';
+import { sql } from 'kysely';
+import invariant from 'tiny-invariant';
+import { z } from 'zod';
 import { iso } from '../clock/iso.ts';
 import { now } from '../clock/now.ts';
+import { buildRowSchema } from '../db/build-row-schema.ts';
+import { runSyncQuery } from '../db/run-sync-query.ts';
+import { runSyncRow } from '../db/run-sync-row.ts';
+import { kdb } from '../kdb.ts';
 import { row as goalRow } from './row.ts';
 import { downtime } from '../probe/downtime.ts';
 import { IN_SQL } from '../scope/in-sql.ts';
 import { computeStats } from '../stats/compute-stats.ts';
 import type { Measure, Measures } from './types.ts';
 
-interface Usage {
-  at: string;
-  account: string;
-  five_hour: number | null;
-  seven_day: number | null;
-}
+const UsageSchema = buildRowSchema('usage_samples');
 
 export function measure(db: Database, from: Date, to: Date, at: Date = now()): Measures {
   const [f, t] = [iso(from), iso(new Date(Math.min(to.getTime(), at.getTime())))];
@@ -36,8 +38,8 @@ export function measure(db: Database, from: Date, to: Date, at: Date = now()): M
   const s = computeStats(db, { from: f, to: t, gh: null }).flow;
   const mustfix = share(pct(s.rechecked, s.reviewed), s.reviewed, 'reviewed runs', `${s.rechecked} of ${s.reviewed} reviewed runs had a must-fix at the first review`);
 
-  const latest = db.query('SELECT * FROM usage_samples ORDER BY at DESC LIMIT 1').get() as Usage | null;
-  const inWin = latest ? (db.query('SELECT COUNT(*) AS n, MAX(seven_day) AS peak FROM usage_samples WHERE account = ? AND at >= ? AND at <= ?').get(latest.account, f, t) as { n: number; peak: number | null }) : { n: 0, peak: null };
+  const latest = runSyncRow(db, kdb(db).selectFrom('usage_samples').selectAll().orderBy('at', 'desc').limit(1).compile(), UsageSchema);
+  const inWin = latest ? readWindow(db, latest.account, f, t) : { readings: 0, peak: null };
   const peak = inWin.peak === null ? null : Math.round(inWin.peak);
   const exactPeak = inWin.peak ?? undefined;
   const now7 = latest?.seven_day == null ? '?' : `${Math.round(latest.seven_day)}%`;
@@ -45,7 +47,7 @@ export function measure(db: Database, from: Date, to: Date, at: Date = now()): M
   const cost: Measure = {
     value: peak,
     ...(exactPeak === undefined ? {} : { exact: exactPeak }),
-    denominator: inWin.n,
+    denominator: inWin.readings,
     ci: g.ci.minutes,
     unit: 'readings',
     shown: peak === null ? 'no data' : `${peak}%`,
@@ -64,8 +66,18 @@ export function measure(db: Database, from: Date, to: Date, at: Date = now()): M
   };
 }
 
+const WindowSchema = z.object({ readings: z.number(), peak: z.number().nullable() });
+
+function readWindow(db: Database, account: string, from: string, to: string): { readings: number; peak: number | null } {
+  const [window] = runSyncQuery(db, sql`SELECT COUNT(*) AS readings, MAX(seven_day) AS peak FROM usage_samples WHERE account = ${account} AND at >= ${from} AND at <= ${to}`.compile(kdb(db)), WindowSchema);
+  invariant(window, 'an aggregate without GROUP BY returns one row');
+  return window;
+}
+
+const TypeShareSchema = z.object({ type: z.string().nullable(), count: z.number() });
+
 function typeShares(db: Database, from: string, to: string): { typed: number; bug: number; feature: number } {
-  const rows = db.query(`SELECT l.type AS type, COUNT(*) AS n FROM merged_prs p LEFT JOIN linear_issues l ON l.issue = p.issue WHERE p.merged_at >= ? AND p.merged_at < ? AND p.repo IN ${IN_SQL} GROUP BY 1`).all(from, to) as { type: string | null; n: number }[];
+  const rows = runSyncQuery(db, sql`SELECT l.type AS type, COUNT(*) AS count FROM merged_prs p LEFT JOIN linear_issues l ON l.issue = p.issue WHERE p.merged_at >= ${from} AND p.merged_at < ${to} AND p.repo IN ${sql.raw(IN_SQL)} GROUP BY 1`.compile(kdb(db)), TypeShareSchema);
   let typed = 0;
   let bug = 0;
   let feature = 0;
@@ -73,9 +85,13 @@ function typeShares(db: Database, from: string, to: string): { typed: number; bu
     if (r.type === null || r.type === 'none') {
       continue;
     }
-    typed += r.n;
-    if (r.type === 'Bug') bug += r.n;
-    if (r.type === 'Feature' || r.type === 'Improvement') feature += r.n;
+    typed += r.count;
+    if (r.type === 'Bug') {
+      bug += r.count;
+    }
+    if (r.type === 'Feature' || r.type === 'Improvement') {
+      feature += r.count;
+    }
   }
   return { typed, bug, feature };
 }
