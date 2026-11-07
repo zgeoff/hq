@@ -35,3 +35,11 @@ test('#readLastRestart rejects a record of the wrong shape with bad_restart', ()
 
   expect(readLastRestart()).rejects.toMatchObject({ code: 'bad_restart' });
 });
+
+test('#readLastRestart rejects a record that is not JSON with bad_restart', () => {
+  const ctx = setupTest();
+  mkdirSync(join(ctx.directory, 'restarts'));
+  writeFileSync(join(ctx.directory, 'restarts', 'last.json'), '{"runID": "run-1", "code":');
+
+  expect(readLastRestart()).rejects.toMatchObject({ code: 'bad_restart' });
+});

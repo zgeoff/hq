@@ -1,4 +1,5 @@
 import { HqError } from '../errors.ts';
+import { parseJSON } from '../noslop/parse-json.ts';
 import { atcStateDir } from './atc-state-dir.ts';
 import { RestartRecordSchema } from './restart-record-schema.ts';
 import type { RestartRecord } from './types.ts';
@@ -9,8 +10,8 @@ export async function readLastRestart(): Promise<RestartRecord> {
   if (!(await file.exists())) {
     throw new HqError('no_restart', `no restart record at ${path}`);
   }
-  const record: unknown = await file.json();
-  const parsed = RestartRecordSchema.safeParse(record);
+  const text = await file.text();
+  const parsed = RestartRecordSchema.safeParse(parseJSON(text));
   if (!parsed.success) {
     const [issue] = parsed.error.issues;
     throw new HqError('bad_restart', `the restart record at ${path} is malformed at ${issue?.path.join('.') || 'the top'}`);
