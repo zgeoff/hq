@@ -8,7 +8,9 @@ import type { LinearCall } from '../linear/types.ts';
 import { boundedRunner } from '../runner/bounded-runner.ts';
 import type { Runner } from '../runner/types.ts';
 import { buildFailure } from './build-failure.ts';
+import { buildAdapterEnv } from './build-adapter-env.ts';
 import { buildIssueArgs } from './build-issue-args.ts';
+import type { ReviewAdapter } from './parse-review-adapter.ts';
 import { buildRoundStem } from './build-round-stem.ts';
 import { buildNoslopCommand } from './build-noslop-command.ts';
 import { buildNoslopEnv } from './build-noslop-env.ts';
@@ -53,7 +55,7 @@ export interface NoslopReviewContext {
 
   fixesOnly?: boolean | undefined;
 
-  adapter?: string | undefined;
+  adapter?: ReviewAdapter | undefined;
 
   timeoutMs: number;
 
@@ -178,7 +180,7 @@ async function runNoslopLocked(ctx: NoslopReviewContext, prep: ReviewPrep): Prom
   const began = Date.now();
   const begun = iso(now());
   const command = buildNoslopCommand(ctx.clone, args);
-  const finished = await boundedRunner(ctx.run, ctx.timeoutMs)(command, { cwd: prep.worktree, env: buildNoslopEnv(prep.secrets) });
+  const finished = await boundedRunner(ctx.run, ctx.timeoutMs)(command, { cwd: prep.worktree, env: { ...buildNoslopEnv(prep.secrets), ...buildAdapterEnv(ctx.adapter) } });
   const verdict = parseReviewRun(finished.code, finished.stdout, getTail(finished.stderr, prep.secrets), ctx.timeoutMs);
   await Bun.write(prep.reviewFile, finished.stdout);
   // oxlint-disable-next-line zgeoff/no-abbreviated-names -- grandfathered property of the recorded round

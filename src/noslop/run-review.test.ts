@@ -9,6 +9,7 @@ import { openDb } from '../db/open-db.ts';
 import { setMeta } from '../db/set-meta.ts';
 import { listRuns } from '../runs/list-runs.ts';
 import { withRepoLock } from '../review/with-repo-lock.ts';
+import { runNoslopCommand } from './run-noslop-command.ts';
 import { runReview } from './run-review.ts';
 import { withCloneLock } from './with-clone-lock.ts';
 
@@ -316,6 +317,25 @@ test('it passes --adapter claude to noslop when asked', async () => {
   await runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false, adapter: 'claude' });
 
   expect(fake.of('bun')[0]?.cmd.join(' ')).toContain(' --adapter claude');
+});
+
+test.each([
+  ['before the setting ends', '2026-11-08T00:00:00Z', true, 'opus'],
+  ['once the setting ends', '2026-11-12T00:00:00Z', false, undefined],
+] as const)('it reviews with the stored claude setting %s', async (_case, reviewAt, passesClaude, model) => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
+  ctx.listWidgets();
+  const restoreClock = overrideEnv('HQ_NOW', '2026-11-07T10:00:00Z');
+  await runNoslopCommand({ run: fake.run, db: ctx.db, verb: 'adapter', rest: ['claude'], since: undefined, until: '2026-11-11T13:00:00Z', actor: 'kettle-owner', readOwnerSession: () => Promise.reject(new Error('the adapter setting reads no owner session')) });
+  restoreClock();
+  onTestFinished(overrideEnv('HQ_NOW', reviewAt));
+
+  await runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false });
+
+  const [noslop] = fake.of('bun');
+  expect(noslop?.cmd.join(' ').includes(' --adapter claude')).toBe(passesClaude);
+  expect(noslop?.opts?.env?.['ANTHROPIC_MODEL']).toBe(model);
 });
 
 test('it passes no --adapter to noslop when none is asked', async () => {

@@ -29,8 +29,11 @@ import { resolveNoslopDir } from './resolve-noslop-dir.ts';
 import { parseReviewTimeout } from './parse-review-timeout.ts';
 import { runNoslopReview } from './run-noslop-review.ts';
 import type { NoslopReviewContext, NoslopReviewResult } from './run-noslop-review.ts';
+import { now } from '../clock/now.ts';
 import { loadNoslopSettings } from './load-noslop-settings.ts';
 import type { ReviewAdapter } from './parse-review-adapter.ts';
+import { pickReviewAdapter } from './pick-review-adapter.ts';
+import { readAdapterSetting } from './read-adapter-setting.ts';
 import type { PRRequest } from './types.ts';
 import type { FixCheck } from './parse-review-run.ts';
 
@@ -196,7 +199,7 @@ async function createNoslopContext(plan: RoundPlan, parsed: ParsedRepo, sha: str
     lock: (fn) => withRepoLock(scratch, buildSlug(parsed), fn),
     full: request.full,
     fixesOnly: plan.fixesOnly,
-    adapter: request.adapter,
+    adapter: pickReviewAdapter(request.adapter, readAdapterSetting(request.db), now()).adapter,
     timeoutMs: plan.timeoutMs,
     baseMove: plan.baseMove ?? undefined,
     linear: makeAuditedLinearCaller(request.db, request.run),
