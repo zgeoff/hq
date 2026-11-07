@@ -1,4 +1,6 @@
+import { parseJSON } from '../noslop/parse-json.ts';
 import type { RunResult, Runner } from '../runner/types.ts';
+import { CapacitySchema } from './capacity-schema.ts';
 import { LANES } from './lanes.ts';
 import { loadPacing } from './load-pacing.ts';
 import { pacingPath } from './pacing-path.ts';
@@ -33,9 +35,6 @@ function parseCapacityRun(ran: RunResult): CapacityRead {
 }
 
 function parseCapacity(stdout: string): Capacity | null {
-  try {
-    return JSON.parse(stdout) as Capacity;
-  } catch {
-    return null;
-  }
+  const parsed = CapacitySchema.safeParse(parseJSON(stdout));
+  return parsed.success ? parsed.data : null;
 }

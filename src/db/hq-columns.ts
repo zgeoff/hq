@@ -101,7 +101,7 @@ export const HQ_COLUMNS = {
     issue: 'text',
     from_ref: 'text?',
     filed_at: 'text',
-    source: 'text',
+    source: { values: ['final', 'linear backfill', 'review'], nullable: false },
     added_by: 'text',
     added_at: 'text',
   },

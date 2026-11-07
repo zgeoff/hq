@@ -1,12 +1,7 @@
-export interface RestartRecord {
-  runID: string;
-  code: number;
-  restored: number;
-  total: number;
-  interrupted?: { id: string; name: string }[];
-  failed?: unknown[];
-  error?: unknown;
-}
+import type { z } from 'zod';
+import type { RestartRecordSchema } from './restart-record-schema.ts';
+
+export type RestartRecord = z.output<typeof RestartRecordSchema>;
 
 export interface WakeEntry {
   session_id: string;

@@ -3,8 +3,12 @@ import { z } from 'zod';
 import { iso } from '../clock/iso.ts';
 import { now } from '../clock/now.ts';
 import { readWallClock } from '../clock/read-wall-clock.ts';
+import { buildRowSchema } from '../db/build-row-schema.ts';
 import { getMeta } from '../db/get-meta.ts';
+import { runSyncQuery } from '../db/run-sync-query.ts';
+import { runSyncRow } from '../db/run-sync-row.ts';
 import { setMeta } from '../db/set-meta.ts';
+import { kdb } from '../kdb.ts';
 import { sydney } from '../morning/sydney.ts';
 import { logEvent } from '../log-event.ts';
 import { enqueue } from '../outbox/enqueue.ts';
@@ -34,6 +38,8 @@ import { trackSlotCause } from './track-slot-cause.ts';
 import type { Sample, SlotCause, SlotCauseName, TickResult } from './types.ts';
 import { writeHeldSpans } from './write-held-spans.ts';
 import { writeSlotMinutes } from './write-slot-minutes.ts';
+
+const NudgeSchema = buildRowSchema('lanes_nudges');
 
 export function tick(db: Database, sample: Sample, actor: string): TickResult {
   return db
@@ -70,7 +76,7 @@ export function tick(db: Database, sample: Sample, actor: string): TickResult {
         sendStalledTriageAlert(db, { slotCause, held, at: t, actor });
       }
 
-      const due = db.query('SELECT id, at FROM lanes_nudges WHERE slots_after IS NULL').all() as { id: number; at: string }[];
+      const due = runSyncQuery(db, kdb(db).selectFrom('lanes_nudges').select(['id', 'at']).where('slots_after', 'is', null).compile(), NudgeSchema.pick({ id: true, at: true }));
       for (const n of due) {
         if (t.getTime() - new Date(n.at).getTime() >= LANES.followMinutes() * 60_000 && sample.cap) {
           db.query('UPDATE lanes_nudges SET slots_after = ?, checked_at = ? WHERE id = ?').run(slots, at, n.id);
@@ -120,7 +126,7 @@ export function tick(db: Database, sample: Sample, actor: string): TickResult {
       }
 
       const detail = slotPlan ? JSON.stringify({ picks: slotPlan.plan?.picks.map((pick) => pick.issue) ?? null, design: slotPlan.design, free: slotPlan.pool.free }) : null;
-      const last = db.query('SELECT at, slots, eligible, detail FROM lanes_nudges ORDER BY id DESC LIMIT 1').get() as { at: string; slots: number; eligible: number | null; detail: string | null } | null;
+      const last = runSyncRow(db, kdb(db).selectFrom('lanes_nudges').select(['at', 'slots', 'eligible', 'detail']).orderBy('id', 'desc').limit(1).compile(), NudgeSchema.pick({ at: true, slots: true, eligible: true, detail: true }));
       if (last && last.at >= since) {
         const same = detail === null ? last.slots === slots && last.eligible === eligible : last.detail === detail;
         const age = (t.getTime() - new Date(last.at).getTime()) / 60_000;
