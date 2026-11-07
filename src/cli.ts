@@ -2154,9 +2154,15 @@ async function runCommand(context: Ctx): Promise<Out> {
       const ignored = r.result === 'noop' && session && !r.run.sessions.some((row) => row.active === 1 && row.session_id === session)
         ? { session, next: `hq run session ${r.run.issue} ${session} --add` }
         : undefined;
+      const ignoredLane = r.result === 'noop' && flags.lane && flags.lane !== r.run.lane
+        ? { lane: flags.lane, runLane: r.run.lane, next: `hq run lane ${r.run.issue} ${flags.lane}` }
+        : undefined;
       const said = r.result === 'added' ? 'On the board.' : 'Already on the board.';
-      const hint = ignored ? `\nIgnored --session ${session}: to add it to the run, use ${ignored.next}` : '';
-      return { data: { result: r.result, run: r.run, ignored }, text: `${runLine(r.run)}\n${said}${hint}` };
+      const laneHint = ignoredLane
+        ? `\nIgnored --lane ${ignoredLane.lane}: one issue has one run, and ${r.run.issue}'s run ${ignoredLane.runLane === null ? 'has no lane' : `is in lane ${ignoredLane.runLane}`}. To move it, use ${ignoredLane.next}`
+        : '';
+      const hint = ignored ? `\nIgnored --session ${session}: the session is not attached to the run. To add it, use ${ignored.next}` : '';
+      return { data: { result: r.result, run: r.run, ignored, ignoredLane }, text: `${runLine(r.run)}\n${said}${laneHint}${hint}` };
     })
     .with('size', async () => {
       const issue = resolveRun(db, arg(0, 'issue')).issue;
