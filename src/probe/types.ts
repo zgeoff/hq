@@ -1,3 +1,4 @@
+import type { Selectable } from 'kysely';
 import type { HqTables } from '../db/hq-columns.ts';
 
 interface FetchResult {
@@ -20,7 +21,7 @@ export interface ProbeResult {
   ms: number;
 }
 
-export type OutageRow = HqTables['outages'];
+export type OutageRow = Selectable<HqTables['outages']>;
 
 export interface Downtime {
   from: string;

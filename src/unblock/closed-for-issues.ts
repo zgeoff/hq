@@ -1,11 +1,13 @@
 import type { Database } from 'bun:sqlite';
-import { parseUnblockRow as hydrate } from './parse-unblock-row.ts';
-import type { Row, UnblockWarning } from './types.ts';
+import { runSyncQuery } from '../db/run-sync-query.ts';
+import { kdb } from '../kdb.ts';
+import type { UnblockWarning } from './types.ts';
+import { UnblockRowSchema } from './unblock-row-schema.ts';
 
 export function closedForIssues(db: Database, issues: string[], except: string): UnblockWarning[] {
   const want = new Set(issues.map((i) => i.toUpperCase()));
   if (!want.size) return [];
-  const rows = (db.query("SELECT * FROM unblocks WHERE state IN ('done', 'dropped') AND id != ?").all(except) as Row[]).map(hydrate);
+  const rows = runSyncQuery(db, kdb(db).selectFrom('unblocks').selectAll().where('state', 'in', ['done', 'dropped']).where('id', '!=', except).compile(), UnblockRowSchema);
   return rows
     .flatMap((u) =>
       u.unblocks

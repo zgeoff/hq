@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { parseUnblockRow } from './parse-unblock-row.ts';
+import { UnblockRowSchema } from './unblock-row-schema.ts';
 
 test.each([
   ['a condition of an unknown kind', '[{"kind":"wiki","ref":"KET-7"}]'],
@@ -30,7 +30,7 @@ test.each([
     overdue_told_at: null,
   };
 
-  expect(parseUnblockRow(row).done_when).toStrictEqual([]);
+  expect(UnblockRowSchema.parse(row).done_when).toStrictEqual([]);
 });
 
 test('it reads stored release and date conditions', () => {
@@ -57,7 +57,7 @@ test('it reads stored release and date conditions', () => {
     overdue_told_at: null,
   };
 
-  expect(parseUnblockRow(row).done_when).toStrictEqual([
+  expect(UnblockRowSchema.parse(row).done_when).toStrictEqual([
     { kind: 'release', ref: 'kettle-co/kettle' },
     { kind: 'date', ref: '2026-10-20T00:00:00Z' },
   ]);

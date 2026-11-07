@@ -1,10 +1,9 @@
 import type { Database } from 'bun:sqlite';
-import { z } from 'zod';
+import { buildRowSchema } from '../db/build-row-schema.ts';
+import { runSyncQuery } from '../db/run-sync-query.ts';
 import { kdb } from '../kdb.ts';
 
-const BindingsSchema = z.array(z.union([z.string(), z.number(), z.null()]));
-
-const rowsSchema = z.array(z.object({ cause: z.enum(['delivery', 'triage', 'supply', 'design']), minutes: z.number() }));
+const rowSchema = buildRowSchema('slot_minutes').pick({ cause: true, minutes: true });
 
 export interface SlotMinutes {
   delivery: number;
@@ -15,7 +14,7 @@ export interface SlotMinutes {
 
 export function readSlotMinutes(db: Database, day: string): SlotMinutes {
   const query = kdb(db).selectFrom('slot_minutes').select(['cause', 'minutes']).where('day', '=', day).compile();
-  const rows = rowsSchema.parse(db.prepare(query.sql).all(...BindingsSchema.parse(query.parameters)));
+  const rows = runSyncQuery(db, query, rowSchema);
   const totals: SlotMinutes = { delivery: 0, triage: 0, supply: 0, design: 0 };
   for (const row of rows) {
     totals[row.cause] = row.minutes;

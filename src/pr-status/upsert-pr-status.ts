@@ -1,13 +1,11 @@
 import type { Database } from 'bun:sqlite';
 import { iso } from '../clock/iso.ts';
 import { now } from '../clock/now.ts';
-import { z } from 'zod';
+import { BindingsSchema } from '../db/bindings-schema.ts';
 import { kdb } from '../kdb.ts';
 import type { PRStatusRow } from '../kdb.ts';
 
 export type PRStatusFields = Partial<Omit<PRStatusRow, 'repo' | 'pr' | 'updated_at'>>;
-
-const BindingsSchema = z.array(z.union([z.string(), z.number(), z.null()]));
 
 // Kysely's execute waits on its own connection lock before it runs, so the write runs here, at once,
 // and a caller's bun:sqlite transaction holds it.

@@ -21,7 +21,7 @@ export async function send(
 ): Promise<{ flushed: (FlushResult & { pending?: number }) | null; detached: DetachResult | null }> {
   const ids = scope === 'all' ? undefined : scope;
   if (inSession() && config().HQ_NOTIFY !== 'off') {
-    const start = unsent(db, retry, ids, 'id, attempts') as { id: number; attempts: number }[];
+    const start = unsent(db, retry, ids);
     if (start.length > 0) {
       const detached = await detachFlush(run, selfCommand(), hqSetenv(), retry, ids);
       if (detached.unit) return { flushed: await awaitDetached(db, start, waitMs), detached };

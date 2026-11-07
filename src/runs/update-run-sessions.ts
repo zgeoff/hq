@@ -1,14 +1,17 @@
 import type { Database } from 'bun:sqlite';
 import { iso } from '../clock/iso.ts';
 import { now } from '../clock/now.ts';
+import { runSyncRow } from '../db/run-sync-row.ts';
 import { HqError } from '../errors.ts';
+import { kdb } from '../kdb.ts';
+import { RunSessionSchema } from './run-session-schema.ts';
 
 export function updateRunSessions(db: Database, issue: string, session: string, helper = false): void {
   if (!/^[0-9a-f-]{8,}$/i.test(session)) throw new HqError('bad_args', `session "${session}" must be an atc session id`);
-  const other = db.query('SELECT issue FROM run_sessions WHERE session_id = ?').get(session) as { issue: string } | null;
+  const other = runSyncRow(db, kdb(db).selectFrom('run_sessions').select('issue').where('session_id', '=', session).compile(), RunSessionSchema.pick({ issue: true }));
   if (other && other.issue !== issue) throw new HqError('session_taken', `session ${session} is on ${other.issue}`);
   const t = iso(now());
-  const cur = db.query('SELECT active, helper FROM run_sessions WHERE session_id = ?').get(session) as { active: number; helper: number } | null;
+  const cur = runSyncRow(db, kdb(db).selectFrom('run_sessions').select(['active', 'helper']).where('session_id', '=', session).compile(), RunSessionSchema.pick({ active: true, helper: true }));
   if (helper && cur?.active === 1 && cur.helper === 0) return;
   if (!helper) {
     db.query('UPDATE run_sessions SET active = 0, ended_at = COALESCE(ended_at, ?) WHERE issue = ? AND active = 1 AND helper = 0 AND session_id != ?').run(t, issue, session);
