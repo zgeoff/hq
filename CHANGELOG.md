@@ -20,7 +20,7 @@ A capped PR passes the merge gate after a merge from main, and the owner's lgtm 
 - `hq lanes` holds an imp launch that would take the RAM impd keeps for priority imps, and names that reservation. A sample with no impd budget or kept RAM reading holds every imp slot. Schema v50 stores the kept RAM in `capacity_samples`; older rows hold NULL (hq#375).
 - The sweep keeps a run working while it waits on more parts and its Linear Scope has an open box (hq#371).
 - A run holds a lane only while one of its sessions is awake and busy in the last 15 minutes, or is new and unseen, so a waiting builder can sleep and free it (hq#376).
-- hq reads the Claude slot tokens from the fleet vault, with its own token in `~/.config/hq/slots-op.json` (hq#378, hq#381, hq#373).
+- hq reads the Claude slot tokens from the fleet vault, with its own token in `~/.config/hq/slots-op.json` (hq#378, hq#381).
 - The owner's override also clears the CODEOWNERS owner-held check, so a fork that keeps upstream's CODEOWNERS passes on his word (hq#379).
 
 ### New
