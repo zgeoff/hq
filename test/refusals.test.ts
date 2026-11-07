@@ -1,13 +1,15 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test';
 import type { Database } from 'bun:sqlite';
+import invariant from 'tiny-invariant';
 import { z } from 'zod';
-import { queryRows, queryValue } from '../src/test-utils/query-rows.ts';
 import { appendFileSync, mkdirSync, readFileSync, rmSync, truncateSync, utimesSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { main } from '../src/cli.ts';
 import { clean } from '../src/redact/clean.ts';
 import { redact } from '../src/redact/redact.ts';
 import { loadRefusalsSummary as refusalsSummary } from '../src/refusals/load-refusals-summary.ts';
+import { readRefusalFiles } from '../src/refusals/read-refusal-files.ts';
+import { readRefusalRows } from '../src/refusals/read-refusal-rows.ts';
 import { scanRefusals } from '../src/refusals/scan-refusals.ts';
 import { type FakeAtc, at, fakeAtc, freshDb } from './helpers.ts';
 
@@ -41,7 +43,7 @@ const setAge = (p: string, days: number) => {
 const scan = (o: Parameters<typeof scanRefusals>[1] = {}) => scanRefusals(db, { dir: proj(), sessions: async () => [], ...o });
 // oxlint-disable-next-line zgeoff/setup-test-only -- it reads every stored column, in insert order, from the database that this file's beforeEach opens
 function rows() {
-  return queryRows(db, 'SELECT * FROM refusals ORDER BY rowid', z.record(z.string(), z.unknown()));
+  return readRefusalRows(db);
 }
 
 beforeEach(() => {
@@ -184,9 +186,10 @@ test('parallel calls with a 10 MiB result between: the third call refusal still 
 test('the tools kept between scans hold the masked input only', async () => {
   const p = file('p/s.jsonl', jl(tu('tk', 'Bash', { command: 'curl -H "Authorization: Bearer abcdef0123456789xyz" https://example.test', description: 'RAW-INPUT-FIELD' })));
   await scan();
-  const kept = queryValue(db, 'SELECT tools FROM refusal_files WHERE path = ?', z.string(), p);
-  expect(kept).not.toContain('abcdef0123456789xyz');
-  expect(kept).not.toContain('RAW-INPUT-FIELD');
+  const kept = readRefusalFiles(db).find((row) => row.path === p);
+  invariant(kept);
+  expect(kept.tools).not.toContain('abcdef0123456789xyz');
+  expect(kept.tools).not.toContain('RAW-INPUT-FIELD');
   appendFileSync(p, jl(refused('tk', 'auth header')));
   await scan();
   expect(rows()[0]).toMatchObject({ tool: 'Bash', input: expect.stringContaining('Bearer [redacted]') });
@@ -202,7 +205,9 @@ test('a scan that stops inside an oversized line resumes on a fragment, which is
   await scan(o);
   await scan(o);
   expect(rows().map((x) => [x['reason'], x['tool']])).toEqual([['after the fragment', 'Bash']]);
-  expect(queryValue(db, 'SELECT tools FROM refusal_files WHERE path = ?', z.string(), p)).not.toContain('automode');
+  const kept = readRefusalFiles(db).find((row) => row.path === p);
+  invariant(kept);
+  expect(kept.tools).not.toContain('automode');
 });
 
 test('a line whose newline arrives past the line limit is skipped, and the next line is read', async () => {
@@ -327,7 +332,7 @@ test('an 18 MiB record with a 32 MiB budget is passed over, and the refusal afte
   const p = file('p/a.jsonl', jl({ type: 'user', uuid: U(), pad: 'x'.repeat(18 * 1024 * 1024) }) + jl(tu('t1', 'Bash', { command: 'ls' }), refused('t1', 'after')));
   const budgetBytes = 32 * 1024 * 1024;
   await scan({ budgetBytes });
-  const offset = () => queryValue(db, 'SELECT offset FROM refusal_files WHERE path = ?', z.number(), p);
+  const offset = () => readRefusalFiles(db).find((row) => row.path === p)?.offset;
   expect(offset()).toBeGreaterThan(18 * 1024 * 1024);
   for (let i = 0; i < 3 && rows().length < 1; i++) await scan({ budgetBytes });
   expect(rows().map((x) => x['reason'])).toEqual(['after']);

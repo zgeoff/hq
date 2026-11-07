@@ -1,8 +1,6 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test';
 import type { Database } from 'bun:sqlite';
-import { z } from 'zod';
 import invariant from 'tiny-invariant';
-import { queryColumn, queryRow } from '../src/test-utils/query-rows.ts';
 import { getMeta } from '../src/db/get-meta.ts';
 import { listEvents } from '../src/list-events.ts';
 import { readOutboxRows } from '../src/outbox/read-outbox-rows.ts';
@@ -26,6 +24,7 @@ import { reportReady } from '../src/lanes/report-ready.ts';
 import { formatLineRoom } from '../src/lanes/format-line-room.ts';
 import { loadImpRoom } from '../src/lanes/load-imp-room.ts';
 import { parsePacingSlots } from '../src/lanes/parse-pacing-slots.ts';
+import { readLanesSamples } from '../src/lanes/read-lanes-samples.ts';
 import { readSlotPlan } from '../src/lanes/read-slot-plan.ts';
 import { tick } from '../src/lanes/tick.ts';
 import { checkReadyStale } from '../src/lanes/check-ready-stale.ts';
@@ -172,7 +171,7 @@ test('the samples count the slots the plan fills from the first free minute; onl
     atMin(m);
     tick(db, { ...sample(0), lanes: LANES, slots: SLOTS }, 'hq-lanes');
   }
-  expect(queryColumn(db, 'SELECT slots FROM lanes_samples ORDER BY seq', z.number())).toStrictEqual([2, 2, 2]);
+  expect(readLanesSamples(db).map((row) => row.slots)).toStrictEqual([2, 2, 2]);
   expect(idleSlotMinutes(db, 1).slotMinutes).toBe(20);
 });
 
@@ -253,7 +252,7 @@ test('a blocked run with no session awake is parked, whatever it waits on: its s
 });
 
 test('the sample records the eligible issues the Ready read holds, the hand count while it is stale, and unknown with neither', () => {
-  const eligible = () => queryRow(db, 'SELECT eligible, slots FROM lanes_samples ORDER BY seq DESC LIMIT 1', z.object({ eligible: z.number().nullable(), slots: z.number() }));
+  const eligible = () => readLanesSamples(db).map((row) => ({ eligible: row.eligible, slots: row.slots })).at(-1);
   setMeta(db, 'lanes_ready_issues', JSON.stringify({ at: T0, eligible: [], design: [] }));
   tick(db, sample(16384), 'hq-lanes');
   expect(eligible()).toStrictEqual({ eligible: 0, slots: 0 });
@@ -270,7 +269,7 @@ test('the sample records the eligible issues the Ready read holds, the hand coun
   reportReady(db, 5, 'z-delivery');
   atMin(3);
   tick(db, sample(16384), 'hq-lanes');
-  expect(eligible().eligible).toBe(5);
+  expect(eligible()?.eligible).toBe(5);
 });
 
 const SK = 'GEO-1=blocked by GEO-9;GEO-2=needs a design call';

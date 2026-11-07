@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test';
 import type { Database } from 'bun:sqlite';
+import invariant from 'tiny-invariant';
 import { z } from 'zod';
-import { queryValue } from '../src/test-utils/query-rows.ts';
+import { getMeta } from '../src/db/get-meta.ts';
 import { addPr } from '../src/runs/add-pr.ts';
 import { addRun } from '../src/runs/add-run.ts';
 import { closePr } from '../src/runs/close-pr.ts';
@@ -151,7 +152,8 @@ test('merged PR facts are cached; a PR GitHub lacks is left out, and gh failing 
   };
   const two = [{ ref: 'kettle#8', url: null }, { ref: 'kettle#9', url: null }];
   expect(await prFacts(db, half, two)).toEqual({ 'kettle#9': { lines: 5, stacked: false } });
-  const stored = queryValue(db, `SELECT value FROM meta WHERE key = 'stats_pr_facts_v2'`, z.string());
+  const stored = getMeta(db, 'stats_pr_facts_v2');
+  invariant(stored !== null);
   const keptFacts = z.record(z.string(), z.unknown()).parse(JSON.parse(stored));
 
   expect(Object.keys(keptFacts)).not.toContain('kettle#8');

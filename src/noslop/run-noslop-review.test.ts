@@ -9,7 +9,7 @@ import { overrideEnv } from '../config/override-env.ts';
 import { openDb } from '../db/open-db.ts';
 import type { LinearCall } from '../linear/types.ts';
 import type { Runner } from '../runner/types.ts';
-import { queryRows } from '../test-utils/query-rows.ts';
+import { readOKReviews } from './read-ok-reviews.ts';
 import { resetIssueFlags } from './reset-issue-flags.ts';
 import { runNoslopReview } from './run-noslop-review.ts';
 import type { NoslopReviewContext } from './run-noslop-review.ts';
@@ -389,8 +389,7 @@ function makeGitlessRunner(run: Runner): Runner {
 }
 
 function readLateFlags(db: Database): (boolean | null | undefined)[] {
-  const rows = queryRows(db, 'SELECT findings FROM noslop_rounds ORDER BY id', z.object({ findings: z.string() }));
-  return rows.map((row) => z.array(z.object({ late: z.boolean().nullable() })).parse(JSON.parse(row.findings))[0]?.late);
+  return readOKReviews(db, 'widgets', 7).map((row) => z.array(z.object({ late: z.boolean().nullable() })).parse(JSON.parse(row.findings))[0]?.late);
 }
 
 test('it records late on a new finding of a later review and leaves it null on the first', async () => {
