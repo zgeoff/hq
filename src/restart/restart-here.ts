@@ -5,6 +5,7 @@ import type { Database } from 'bun:sqlite';
 import { iso } from '../clock/iso.ts';
 import { now } from '../clock/now.ts';
 import { config } from '../config/config.ts';
+import { HqError } from '../errors.ts';
 import type { Runner } from '../runner/types.ts';
 import { cleanEnv } from '../runner/clean-env.ts';
 import { connectWithRetry } from '../wake/connect-with-retry.ts';
@@ -45,7 +46,12 @@ export async function restartHere(db: Database, run: Runner, actor: string, forc
   await write(`restart exit ${restart.code}`);
   let settled: Settled | null = null;
   // Read atc's report once: the wake must use the same one, even if another restart writes a new one meanwhile.
-  const last = await readLastRestart().catch(() => null);
+  const last = await readLastRestart().catch(async (error: unknown) => {
+    if (!(error instanceof HqError && error.code === 'no_restart')) {
+      await write(`restart record unreadable, restore check skipped: ${toErrorMessage(error)}`);
+    }
+    return null;
+  });
   if (restart.code !== 0 && last) {
     try {
       if ((last.failed ?? []).length) {
