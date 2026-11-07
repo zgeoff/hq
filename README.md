@@ -170,7 +170,7 @@ may merge: noslop findings: none open; CI green at b061edc
 - Every change reaches `main` through a PR, a noslop review and green CI. Nobody bypasses the
   ruleset, the Toolsmith included.
 - Every review finding gets an answer: fixed with its commit, or the reason it is not a defect.
-- Locally, run `bun run fmt:check`, `bun run typecheck`, `bun run lint:changed` and `bun test`.
+- Locally, run `bun run format:check`, `bun run typecheck`, `bun run lint:changed` and `bun test`.
 
 ## Layout
 

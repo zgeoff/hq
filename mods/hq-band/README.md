@@ -2,7 +2,7 @@
 
 A Claude Code mod that draws one line above z-stu's prompt, refreshed every minute:
 
-```
+```text
 Needs you 0 · Nix up · lanes 10/17 (impd 16/16 GiB, 16/16 vCPU) · CI green · reviews 3
 ```
 

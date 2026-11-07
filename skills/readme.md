@@ -49,7 +49,7 @@ the skill gate refuses an edit under `skills/` until you have.
   `bun run grants --private <hq-private>` from an hq checkout to write each start prompt's Grants
   block, and add `<session>-<id>` to the names that prompt lists for `hq grant act`. The still-ask
   list lives once in `grants/still-ask.yaml`.
-- **Run the checks:** `bun run fmt`, `bun run check:grants`, `bun run check:skills` (each `hq`
+- **Run the checks:** `bun run format`, `bun run check:grants`, `bun run check:skills` (each `hq`
   command a skill names against `hq --help`), `bun run test:scripts`, the `skill-writing` skill's
   `check-skill.sh` with 0 warnings, and `hq defs check` when the change touches hq-private.
 - **Keep each `SKILL.md` the compact hook reprints at or under 9,700 characters,** as
