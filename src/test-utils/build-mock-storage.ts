@@ -1,4 +1,3 @@
-// An in-memory Storage, standing in for window.localStorage.
 export function buildMockStorage(): Storage {
   const kept = new Map<string, string>();
   return {
