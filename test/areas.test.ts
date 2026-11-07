@@ -181,7 +181,7 @@ test('impd at its non-Nix line holds the pool\'s imp slots and says why; a stale
   setCapacitySetting(db, 'nonnixMaxMib', null, 'z-delivery');
   createCapacitySample(db, { at: T0, nonnixAwakeMib: 14_336 });
   expect(readImpFree()).toStrictEqual([1, 'impd at line']);
-  expect(formatLineRoom(loadImpRoom(db, { budgetSlots: 4, impMib: 2048 }))).toBe('impd non-Nix line: 14336/16384 MiB, 0/1000 vCPUs awake; 1 imp slot(s) to fill, set by impd at line');
+  expect(formatLineRoom(loadImpRoom(db, { budgetSlots: 4, impMib: 2048 }))).toBe('impd non-Nix line: 14336/16384 MiB, 0/1000 vCPUs awake; impd budget 14336/1048576 MiB awake, 0 MiB kept for priority imps; 1 imp slot(s) to fill, set by impd at line');
   createCapacitySample(db, { at: T0, nonnixAwakeMib: 16_384 });
   expect(readImpFree()).toStrictEqual([0, 'impd at line']);
   expect(tick(db, reading, 'hq-lanes').slots).toBe(2);

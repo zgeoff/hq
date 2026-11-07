@@ -151,6 +151,30 @@ test('it names each imp run and its state when impd at its line holds the imp sl
   ]);
 });
 
+test('it names each imp run when the RAM impd keeps for priority imps holds the imp slots', async () => {
+  const ctx = setupTest();
+  const heldSample = {
+    cap: { imp: { freeMib: 16_384, room: true }, providers: { claude: { room: true, unattended: true, target: 'imp' as const } } },
+    impMib: 2048,
+    error: null,
+    slots: { imp: 2, local: 0 },
+  };
+  await ctx.seedReady([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
+  ctx.skip('GEO-9801', 'pr:impz#654');
+  setCapacitySetting(ctx.db, 'nonnixMaxMib', '65536', 'z-delivery');
+  createCapacitySample(ctx.db, { at: '2026-10-15T19:58:00Z', nonnixAwakeMib: 16_384, nixAwakeMib: 1024, impdBudgetMib: 20_480, impdPriorityKeptMib: 3072 });
+  addRun(ctx.db, { issue: 'GEO-9805', title: 'Descale the kettle', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: null, actor: 'z-delivery' });
+
+  tick(ctx.db, heldSample, 'hq-lanes');
+
+  expect(ctx.sent()).toStrictEqual([
+    {
+      target: 'z-delivery',
+      text: 'Lanes: 1 imp slot(s) held by impd priority reservation, and every eligible Ready issue is skipped. Imp runs holding a slot: GEO-9805 (working). Sleep any that only wait. Check each skip still holds: GEO-9801 until pr:impz#654: waits on the kettle PR. Drop one with hq lanes skip drop <issue>.',
+    },
+  ]);
+});
+
 test('it lists at most 20 skips and counts the rest', async () => {
   const ctx = setupTest();
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };

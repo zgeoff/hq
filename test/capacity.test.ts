@@ -90,7 +90,7 @@ test('the Kysely adapter inserts and selects through hq\'s own database', async 
 
 test('impd: info gives the budget, ls splits the awake imps into Nix and the rest, sleeping ones do not count', async () => {
   const r = await readImpd(probe(world()));
-  expect(r).toEqual({ impd: { budgetMib: 20_480, usedMib: 10_240, committedMib: 12_288, nonnixAwakeMib: 8192, nonnixAwakeVcpus: 2, nixAwakeMib: 4096 }, error: null });
+  expect(r).toStrictEqual({ impd: { budgetMib: 20_480, usedMib: 10_240, committedMib: 12_288, nonnixAwakeMib: 8192, nonnixAwakeVcpus: 2, nixAwakeMib: 4096, priorityKeptMib: 0 }, error: null });
 });
 
 test('impd: the awake non-Nix imps\' vCPUs are counted, Nix and sleeping ones left out; one with none makes the count unknown', async () => {
