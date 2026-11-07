@@ -1057,6 +1057,14 @@ test("it passes under the owner's override though CODEOWNERS has no owner sectio
   await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'hq', pr: 7 })).resolves.toMatchObject({ mayMerge: true });
 });
 
+test("it still blocks a head that moved while the gate ran, under the owner's override on a repo noslop does not review", async () => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ prFiles: { code: 0, stdout: 'src/x.ts\n', stderr: '' }, prHead: { code: 0, stdout: JSON.stringify({ headRefOid: 'f00dfeedf00dfeedf00dfeedf00dfeedf00dfeed' }), stderr: '' } });
+  recordPROverride(ctx.db, { repo: 'hq', pr: 7, head: FAKE_FULL_SHA, source: 'call:KET-6', note: 'Ship the kettle.', actor: 'z-kettle' });
+
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'hq', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: expect.stringContaining("the PR's head moved") });
+});
+
 test('it confirms the base commit is readable before it takes two CODEOWNERS 404s as no file', async () => {
   const ctx = setupTest();
   const fake = buildFakeRunner({ prFiles: { code: 0, stdout: 'src/x.ts\n', stderr: '' } });
