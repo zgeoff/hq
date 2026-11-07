@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { z } from 'zod';
+import { parseJSON } from '../src/noslop/parse-json.ts';
 
 const rowSchema = z.object({ code: z.string() });
 const reportSchema = z.object({ diagnostics: z.array(rowSchema) });
@@ -37,19 +38,11 @@ export function formatCounts(counts: Counts): string[] {
 }
 
 export function parseOxlintReport(status: number | null, stdout: string, stderr: string): readonly Row[] {
-  const parsed = reportSchema.safeParse(parseJSONText(stdout));
+  const parsed = reportSchema.safeParse(parseJSON(stdout));
   if (!parsed.success) {
     throw new Error(`oxlint exited ${status ?? 'on a signal'} with no JSON report: ${stderr.trim().slice(-500) || 'no stderr'}`);
   }
   return parsed.data.diagnostics;
-}
-
-function parseJSONText(text: string): unknown {
-  try {
-    return JSON.parse(text);
-  } catch {
-    return null;
-  }
 }
 
 function readRows(args: readonly string[]): readonly Row[] {
