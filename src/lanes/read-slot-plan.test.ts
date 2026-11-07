@@ -566,7 +566,7 @@ test('it names the place and its Types in the tick when the free slots fit no el
 
   expect(result.nudged).toBe(false);
   expect(result.why).toBe('1 free slot(s) fit no eligible issue (local takes Design, Refactor, Investigation)');
-  expect(unsent(ctx.db, false, undefined, 'target, text')).toStrictEqual([]);
+  expect(unsent(ctx.db, false, undefined)).toStrictEqual([]);
 });
 
 test('it keeps saying nothing is eligible in the tick under placeTypes when no issue is eligible at all', async () => {

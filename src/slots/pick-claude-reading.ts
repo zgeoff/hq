@@ -10,8 +10,15 @@ export type ClaudeReading =
 
 export function pickClaudeReading(quota: BrokerQuota): ClaudeReading {
   return match(quota)
-    .with({ state: 'read' }, (read) => ({ slot: read.slot, proof: read.proof, proofAgeHours: read.proofAgeHours, used: read.used, resetsAt: read.resetsAt, source: `hq slot read of the imp broker slot ${read.slot}, ${read.readAt}` }))
+    .with({ state: 'read' }, (read) => ({ slot: read.slot, proof: read.proof, proofAgeHours: read.proofAgeHours, used: read.used, resetsAt: read.resetsAt, source: pickReadSource(read) }))
     .with({ state: 'unknown-proved' }, (unknown) => ({ slot: unknown.slot, proof: unknown.proof, proofAgeHours: unknown.proofAgeHours, used: null, unknown: true as const, why: unknown.why, source: 'hq capacity broker' }))
     .with({ state: 'unknown' }, { state: 'none' }, (held) => ({ error: `imp broker quota unknown: ${held.why}` }))
+    .exhaustive();
+}
+
+function pickReadSource(read: Extract<BrokerQuota, { state: 'read' }>): string {
+  return match(read.from)
+    .with('slot-read', () => `hq slot read of the imp broker slot ${read.slot}, ${read.readAt}`)
+    .with('login-sample', () => `hq login sample on the imp broker slot ${read.slot}'s account, ${read.readAt}`)
     .exhaustive();
 }

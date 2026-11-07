@@ -1,17 +1,18 @@
+import type { Generated } from 'kysely';
 // oxlint-disable eslint/id-length, zgeoff/no-abbreviated-names -- the keys are the database's column names
-export type ColumnSpec = 'integer' | 'integer?' | 'real' | 'real?' | 'text' | 'text?' | { readonly values: readonly string[]; readonly nullable: boolean };
+export type ColumnSpec = 'generated' | 'integer' | 'integer?' | 'real' | 'real?' | 'text' | 'text?' | { readonly values: readonly string[]; readonly nullable: boolean };
 
 export const HQ_COLUMNS = {
   asks: {
     id: 'text',
-    kind: 'text',
+    kind: { values: ['call', 'proposal'], nullable: false },
     title: 'text',
     question: 'text',
     body: 'text',
     issues: 'text',
     filed_by: 'text',
     for_session: 'text?',
-    state: 'text',
+    state: { values: ['queued', 'open', 'answered', 'applied', 'later', 'skipped', 'closed'], nullable: false },
     round: 'integer',
     due_at: 'text?',
     answer: 'text?',
@@ -79,7 +80,7 @@ export const HQ_COLUMNS = {
     fetched_at: 'text',
   },
   events: {
-    seq: 'integer',
+    seq: 'generated',
     subject: 'text',
     subject_id: 'text',
     action: 'text',
@@ -112,7 +113,7 @@ export const HQ_COLUMNS = {
     at: 'text',
   },
   grant_actions: {
-    id: 'integer',
+    id: 'generated',
     grant_name: 'text',
     target: 'text',
     note: 'text?',
@@ -126,12 +127,12 @@ export const HQ_COLUMNS = {
     job: 'text',
     key: 'text',
     at: 'text',
-    result: 'text',
+    result: { values: ['queued', 'skipped'], nullable: false },
     detail: 'text?',
     outbox_key: 'text?',
   },
   lanes_nudges: {
-    id: 'integer',
+    id: 'generated',
     at: 'text',
     slots: 'integer',
     free_minutes: 'integer',
@@ -142,7 +143,7 @@ export const HQ_COLUMNS = {
     detail: 'text?',
   },
   lanes_samples: {
-    seq: 'integer',
+    seq: 'generated',
     at: 'text',
     free_mib: 'integer?',
     slots: 'integer',
@@ -181,7 +182,7 @@ export const HQ_COLUMNS = {
     merged_at: 'text?',
   },
   marks: {
-    id: 'integer',
+    id: 'generated',
     at: 'text',
     kind: 'text',
     text: 'text',
@@ -208,9 +209,9 @@ export const HQ_COLUMNS = {
     value: 'text',
   },
   news: {
-    id: 'integer',
+    id: 'generated',
     from_name: 'text',
-    topic: 'text',
+    topic: { values: ['merge', 'release', 'deploy', 'fix', 'report', 'other'], nullable: false },
     text: 'text',
     issue: 'text?',
     link: 'text?',
@@ -220,7 +221,7 @@ export const HQ_COLUMNS = {
     tag: 'text?',
   },
   noslop_rounds: {
-    id: 'integer',
+    id: 'generated',
     repo: 'text',
     pr: 'integer',
     kind: 'text',
@@ -249,7 +250,7 @@ export const HQ_COLUMNS = {
     adapter_source: { values: ['flag', 'setting', 'default'], nullable: true },
   },
   outages: {
-    id: 'integer',
+    id: 'generated',
     started_at: 'text',
     detected_at: 'text',
     ended_at: 'text?',
@@ -258,7 +259,7 @@ export const HQ_COLUMNS = {
     kind: { values: ['down', 'unready'], nullable: false },
   },
   outbox: {
-    id: 'integer',
+    id: 'generated',
     event_seq: 'integer',
     target: 'text',
     text: 'text',
@@ -324,12 +325,12 @@ export const HQ_COLUMNS = {
     event_seq: 'integer?',
   },
   run_notes: {
-    id: 'integer',
+    id: 'generated',
     issue: 'text',
     session_id: 'text?',
     label: 'text?',
     text: 'text',
-    source: 'text',
+    source: { values: ['atc', 'cli'], nullable: false },
     event_key: 'text?',
     at: 'text',
   },
@@ -337,7 +338,7 @@ export const HQ_COLUMNS = {
     ref: 'text',
     issue: 'text',
     url: 'text?',
-    state: 'text',
+    state: { values: ['open', 'merged', 'closed'], nullable: false },
     final_sha: 'text?',
     final_at: 'text?',
     final_source: 'text?',
@@ -364,14 +365,14 @@ export const HQ_COLUMNS = {
     added_at: 'text',
     ended_at: 'text?',
     helper: 'integer',
-    ended_by: 'text?',
+    ended_by: { values: ['sweep'], nullable: true },
     design_pass: 'integer',
   },
   runs: {
     issue: 'text',
     title: 'text',
-    place: 'text',
-    state: 'text',
+    place: { values: ['local', 'imp', 'none'], nullable: false },
+    state: { values: ['working', 'blocked', 'merged', 'deploying', 'deploy-held', 'live-check', 'done', 'dropped'], nullable: false },
     next: 'text',
     gate: 'text?',
     geoff_chat: 'integer',
@@ -382,10 +383,10 @@ export const HQ_COLUMNS = {
     closed_at: 'text?',
     ready_since: 'text?',
     waits_on_geoff: 'integer',
-    size: 'text?',
+    size: { values: ['S', 'M', 'L', 'XL'], nullable: true },
     size_lines: 'integer?',
     lane: 'text?',
-    live_check: 'text?',
+    live_check: { values: ['owed', 'none'], nullable: true },
     design_lane: 'text?',
   },
   shipped_cache: {
@@ -411,7 +412,7 @@ export const HQ_COLUMNS = {
     working_lanes: 'integer',
   },
   typed: {
-    id: 'integer',
+    id: 'generated',
     to_session: 'text',
     to_id: 'text?',
     to_name: 'text?',
@@ -438,7 +439,7 @@ export const HQ_COLUMNS = {
     rank: 'integer?',
     notify: 'text',
     added_by: 'text',
-    state: 'text',
+    state: { values: ['open', 'done', 'dropped'], nullable: false },
     added_seq: 'integer',
     added_at: 'text',
     closed_at: 'text?',
@@ -448,7 +449,7 @@ export const HQ_COLUMNS = {
     title: 'text?',
     due_at: 'text?',
     done_when: 'text?',
-    kind: 'text',
+    kind: { values: ['owner', 'watch'], nullable: false },
     deadline: 'text?',
     overdue_told_at: 'text?',
   },
@@ -469,8 +470,10 @@ export const HQ_COLUMNS = {
   },
 } as const satisfies Record<string, Record<string, ColumnSpec>>;
 
-type ColumnType<Spec extends ColumnSpec> = Spec extends 'text'
-  ? string
+type ColumnType<Spec extends ColumnSpec> = Spec extends 'generated'
+  ? Generated<number>
+  : Spec extends 'text'
+    ? string
   : Spec extends 'text?'
     ? string | null
     : Spec extends 'integer' | 'real'
