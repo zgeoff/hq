@@ -160,9 +160,8 @@ launch with a new `hq brief`, which puts them in the brief's Permissions.
 ## Judging overlap
 
 A Ready issue waits for a running run's PR to merge when both are in one repo and the Ready issue's
-Scope names files the run changes, by its Scope or diff. Record it with
-`hq run note <issue> waits on <the running issue's ID>`. Overlap only in a shared config file or lockfile
-doesn't count.
+Scope names files in the run's Scope or diff. Skip it until that PR merges or closes:
+`hq lanes skip <issue> --until pr:<repo>#<n> --reason overlap`. Overlap only in a shared config file or lockfile doesn't count.
 
 ## Pins and endings
 
