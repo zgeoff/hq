@@ -872,6 +872,29 @@ test('hq capacity --refresh-slots reads the three slots through op and prints th
   expect(fresh.db.query('SELECT COUNT(*) AS total FROM slot_usage').get()).toStrictEqual({ total: 3 });
 });
 
+test("it reads the slot token from hq's own file under ~/.config/hq by default for hq capacity --refresh-slots", async () => {
+  const fresh = freshDb();
+  const log = console.log;
+  const lines: string[] = [];
+  onTestFinished(fresh.cleanup);
+  onTestFinished(overrideEnv('HQ_NOW', NOON_SYDNEY));
+  onTestFinished(overrideEnv('HQ_SLOTS_OP_SETTINGS', undefined));
+  onTestFinished(overrideEnv('HOME', fresh.dir));
+  onTestFinished(() => (console.log = log));
+  const op = createStubOp({ directory: fresh.dir, answers: { 'op://claude-slots/claude-setup-token-1/credential': 'sk-ant-kettle-home-1', 'op://claude-slots/claude-setup-token-2/credential': 'sk-ant-kettle-home-2', 'op://claude-slots/claude-setup-token-3/credential': 'sk-ant-kettle-home-3' } });
+  onTestFinished(overrideEnv('PATH', `${op.bin}:${process.env['PATH']}`));
+  mkdirSync(`${fresh.dir}/.config/hq`, { recursive: true });
+  writeFileSync(`${fresh.dir}/.config/hq/slots-op.json`, JSON.stringify({ env: { OP_SERVICE_ACCOUNT_TOKEN: 'ops_kettle-profile-0002' } }));
+  slotUsage.set('Bearer sk-ant-kettle-home-1', { seven: { utilization: 0.4, reset: 1_792_540_800 } });
+  slotUsage.set('Bearer sk-ant-kettle-home-2', { seven: { utilization: 0.4, reset: 1_792_368_000 } });
+  slotUsage.set('Bearer sk-ant-kettle-home-3', { seven: { utilization: 0.4, reset: 1_792_713_600 } });
+  console.log = (line: string) => lines.push(line);
+
+  await main(['capacity', '--refresh-slots']);
+
+  expect(fresh.db.query('SELECT COUNT(*) AS total FROM slot_usage').get()).toStrictEqual({ total: 3 });
+});
+
 test('hq capacity --refresh-slots --json carries the refresh problems in the fleet block', async () => {
   const fresh = freshDb();
   const log = console.log;
