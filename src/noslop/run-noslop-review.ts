@@ -10,7 +10,8 @@ import type { Runner } from '../runner/types.ts';
 import { buildFailure } from './build-failure.ts';
 import { buildAdapterEnv } from './build-adapter-env.ts';
 import { buildIssueArgs } from './build-issue-args.ts';
-import type { ReviewAdapter } from './parse-review-adapter.ts';
+import { redactSecrets } from './redact-secrets.ts';
+import type { PickedAdapter } from './pick-review-adapter.ts';
 import { buildRoundStem } from './build-round-stem.ts';
 import { buildNoslopCommand } from './build-noslop-command.ts';
 import { buildNoslopEnv } from './build-noslop-env.ts';
@@ -55,7 +56,7 @@ export interface NoslopReviewContext {
 
   fixesOnly?: boolean | undefined;
 
-  adapter?: ReviewAdapter | undefined;
+  adapter?: PickedAdapter | undefined;
 
   timeoutMs: number;
 
@@ -82,7 +83,11 @@ export interface NoslopReviewResult {
   issue: IssueNote;
 
   postFailed: string | null;
+
+  adapter: PickedAdapter;
 }
+
+const DEFAULT_ADAPTER: PickedAdapter = { adapter: undefined, source: 'default', until: null };
 
 export async function runNoslopReview(ctx: NoslopReviewContext): Promise<NoslopReviewResult> {
   const prep = await createReviewPrep(ctx);
@@ -98,7 +103,7 @@ export async function runNoslopReview(ctx: NoslopReviewContext): Promise<NoslopR
     throw buildFailure(ran.judged.why ?? 'unknown', prep.reviewFile);
   }
   // oxlint-disable-next-line zgeoff/no-abbreviated-names -- grandfathered property of the review result
-  return { engine: 'noslop', repo: ctx.repo, pr: ctx.pr, head: prep.refs.headRefName, base: prep.refs.baseRefName, reviewFile: prep.reviewFile, depth: ran.judged.value.depth, findings: ran.judged.value.findings, notReviewed: ran.judged.value.notReviewed, fixChecks: ran.judged.value.fixChecks, ms: ran.ms, sha: ran.sha, issue: prep.issueFile.note, postFailed: ran.postFailed };
+  return { engine: 'noslop', repo: ctx.repo, pr: ctx.pr, head: prep.refs.headRefName, base: prep.refs.baseRefName, reviewFile: prep.reviewFile, depth: ran.judged.value.depth, findings: ran.judged.value.findings, notReviewed: ran.judged.value.notReviewed, fixChecks: ran.judged.value.fixChecks, ms: ran.ms, sha: ran.sha, issue: prep.issueFile.note, postFailed: ran.postFailed, adapter: ctx.adapter ?? DEFAULT_ADAPTER };
 }
 
 interface PRRefs {
@@ -180,11 +185,16 @@ async function runNoslopLocked(ctx: NoslopReviewContext, prep: ReviewPrep): Prom
   const began = Date.now();
   const begun = iso(now());
   const command = buildNoslopCommand(ctx.clone, args);
-  const finished = await boundedRunner(ctx.run, ctx.timeoutMs)(command, { cwd: prep.worktree, env: { ...buildNoslopEnv(prep.secrets), ...buildAdapterEnv(ctx.adapter) } });
-  const verdict = parseReviewRun(finished.code, finished.stdout, getTail(finished.stderr, prep.secrets), ctx.timeoutMs);
-  await Bun.write(prep.reviewFile, finished.stdout);
+  const finished = await boundedRunner(ctx.run, ctx.timeoutMs)(command, { cwd: prep.worktree, env: { ...buildNoslopEnv(prep.secrets), ...buildAdapterEnv(ctx.adapter?.adapter) } });
+  const parsed = parseReviewRun(finished.code, finished.stdout, getTail(finished.stderr, prep.secrets), ctx.timeoutMs);
+  const verdict = { ...parsed, why: parsed.why === null ? null : redactSecrets(parsed.why, prep.secrets) };
+  const judged = readPostFailedReview(ctx.store, finished.stdout, verdict);
+
+  // `noslop post` reads the file of a parsed review, so only a failed run's file is redacted.
+  const kept = judged.judged.value === null ? redactSecrets(finished.stdout, prep.secrets) : finished.stdout;
+  await Bun.write(prep.reviewFile, kept);
   // oxlint-disable-next-line zgeoff/no-abbreviated-names -- grandfathered property of the recorded round
-  return { ...readPostFailedReview(ctx.store, finished.stdout, verdict), ms: Date.now() - began, startedAt: begun, sha: ctx.sha };
+  return { ...judged, ms: Date.now() - began, startedAt: begun, sha: ctx.sha };
 }
 
 // noslop prints the review, then writes it to its store, then posts it to GitHub. A run that failed
@@ -203,7 +213,7 @@ function readPostFailedReview(store: string, stdout: string, verdict: Judged<Rev
 function buildReviewArgs(ctx: NoslopReviewContext, prep: ReviewPrep): string[] {
   const fixesOnly = ctx.fixesOnly === true ? ['--fixes-only'] : [];
   const full = ctx.full === true ? ['--full'] : [];
-  const adapter = ctx.adapter === undefined ? [] : ['--adapter', ctx.adapter];
+  const adapter = ctx.adapter?.adapter === undefined ? [] : ['--adapter', ctx.adapter.adapter];
   const issue = buildIssueArgs(prep.issueFile);
   return ['review', '--pr', String(ctx.pr), '--repo', ctx.slug, '--report', 'sqlite,github', '--json', ...full, ...fixesOnly, ...adapter, ...issue];
 }
@@ -261,6 +271,8 @@ async function collectReviewRow(ctx: NoslopReviewContext, ran: ReviewRan): Promi
     open: [],
     error: ran.postFailed === null ? ran.judged.why : `stored, but not posted to GitHub: ${ran.postFailed}`,
     sha: ran.sha,
+    adapter: ctx.adapter?.adapter ?? null,
+    adapterSource: (ctx.adapter ?? DEFAULT_ADAPTER).source,
     full: ctx.full === true,
     confirm: ctx.fixesOnly === true,
     patchId,

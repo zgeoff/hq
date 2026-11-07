@@ -1,3 +1,4 @@
+import { formatAdapter } from './format-adapter.ts';
 import { formatChecks } from '../review/format-checks.ts';
 import { formatNotReviewed } from './format-not-reviewed.ts';
 import type { NoslopReviewOutcome, TitledFixCheck } from './run-review.ts';
@@ -9,6 +10,7 @@ export function formatNoslopReview(r: NoslopReviewOutcome): string {
   const findings = r.findings.map((f) => `  - [${f.severity}] ${f.lens}: ${f.title} (${f.id})`);
   return [
     `== engine: noslop (commit ${r.sha.slice(0, 7)}, depth ${r.depth ?? 'unknown'})`,
+    `== adapter: ${formatAdapter(r.adapter)}`,
     `== issue: ${r.issue.issue ?? 'none'} (${r.issue.why})`,
     `== noslop: ${r.findings.length} finding(s), full output: ${r.reviewFile}`,
     ...formatPostFailed(r),
@@ -30,6 +32,7 @@ function formatFixesOnly(r: NoslopReviewOutcome): string {
   return [
     ...formatCapNote(r),
     `== engine: noslop (commit ${r.sha.slice(0, 7)}), fixes only: ${r.fixChecks.length} fix(es) checked, full output: ${r.reviewFile}`,
+    `== adapter: ${formatAdapter(r.adapter)}`,
     ...formatPostFailed(r),
     ...r.fixChecks.map(formatFixCheck),
     ...formatNotReviewed(r.notReviewed),

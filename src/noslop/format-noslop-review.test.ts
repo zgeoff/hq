@@ -28,11 +28,13 @@ const REVIEW: NoslopReviewOutcome = {
   baseMove: null,
   round: 1,
   postFailed: null,
+  adapter: { adapter: undefined, source: 'default', until: null },
 };
 
 test('hq review prints a version 6 review\'s files no call read, with their reasons, after the findings', () => {
   expect(formatNoslopReview(REVIEW).split('\n')).toStrictEqual([
     '== engine: noslop (commit 0123456, depth standard)',
+    '== adapter: noslop\'s default',
     '== issue: GEO-9701 (linked in the PR body)',
     '== noslop: 1 finding(s), full output: /reviews/widgets7-noslop.json',
     '  - [P2] correctness: Kettle never boils (00112233445566aa)',
@@ -60,8 +62,15 @@ test('hq review says only the base moved since the last review, before the engin
   ]);
 });
 
+test('it names the stored claude setting after the engine line', () => {
+  expect(formatNoslopReview({ ...REVIEW, adapter: { adapter: 'claude', source: 'setting', until: '2026-11-12T00:00:00.000Z' } }).split('\n').slice(0, 2)).toStrictEqual([
+    '== engine: noslop (commit 0123456, depth standard)',
+    '== adapter: claude on Opus (stored setting until 2026-11-12T00:00:00.000Z; hq noslop adapter codex ends it)',
+  ]);
+});
+
 test('hq review tells the caller to post a review noslop stored but did not post, after the findings line', () => {
-  expect(formatNoslopReview({ ...REVIEW, postFailed: 'exit 1: the github reporter failed: HTTP 500' }).split('\n').slice(2, 5)).toStrictEqual([
+  expect(formatNoslopReview({ ...REVIEW, postFailed: 'exit 1: the github reporter failed: HTTP 500' }).split('\n').slice(3, 6)).toStrictEqual([
     '== noslop: 1 finding(s), full output: /reviews/widgets7-noslop.json',
     '== not posted: noslop stored this review but did not post it to GitHub (exit 1: the github reporter failed: HTTP 500). Run noslop post /reviews/widgets7-noslop.json to finish the post.',
     '  - [P2] correctness: Kettle never boils (00112233445566aa)',
@@ -69,8 +78,9 @@ test('hq review tells the caller to post a review noslop stored but did not post
 });
 
 test('hq review --fixes-only tells the caller to post a run noslop stored but did not post, after its first line', () => {
-  expect(formatNoslopReview({ ...REVIEW, findings: [], fixesOnly: true, postFailed: 'exit 1: the github reporter failed: HTTP 500' }).split('\n').slice(0, 2)).toStrictEqual([
+  expect(formatNoslopReview({ ...REVIEW, findings: [], fixesOnly: true, postFailed: 'exit 1: the github reporter failed: HTTP 500' }).split('\n').slice(0, 3)).toStrictEqual([
     '== engine: noslop (commit 0123456), fixes only: 0 fix(es) checked, full output: /reviews/widgets7-noslop.json',
+    '== adapter: noslop\'s default',
     '== not posted: noslop stored this review but did not post it to GitHub (exit 1: the github reporter failed: HTTP 500). Run noslop post /reviews/widgets7-noslop.json to finish the post.',
   ]);
 });
@@ -89,6 +99,7 @@ test('hq review --fixes-only prints each fix check, with the finding title when 
 
   expect(formatNoslopReview(run).split('\n')).toStrictEqual([
     '== engine: noslop (commit 0123456), fixes only: 2 fix(es) checked, full output: /reviews/widgets7-noslop.json',
+    '== adapter: noslop\'s default',
     '  - 00112233445566aa fixed (Kettle never boils)',
     '  - 00112233445566bb not fixed: the lid still leaks',
     '== not reviewed by noslop: 2 file(s), check them by hand',

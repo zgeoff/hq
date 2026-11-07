@@ -199,7 +199,7 @@ async function createNoslopContext(plan: RoundPlan, parsed: ParsedRepo, sha: str
     lock: (fn) => withRepoLock(scratch, buildSlug(parsed), fn),
     full: request.full,
     fixesOnly: plan.fixesOnly,
-    adapter: pickReviewAdapter(request.adapter, readAdapterSetting(request.db), now()).adapter,
+    adapter: pickReviewAdapter(request.adapter, readAdapterSetting(request.db), now()),
     timeoutMs: plan.timeoutMs,
     baseMove: plan.baseMove ?? undefined,
     linear: makeAuditedLinearCaller(request.db, request.run),
