@@ -1,19 +1,20 @@
 import type { Database } from 'bun:sqlite';
+import { runSyncQuery } from '../db/run-sync-query.ts';
+import { kdb } from '../kdb.ts';
 import type { AskState } from '../transitions/ask-states.ts';
+import { AskRowSchema } from './ask-row-schema.ts';
 import { parseAskRow as hydrate } from './parse-ask-row.ts';
-import type { Ask, Kind, Row } from './types.ts';
+import type { Ask, Kind } from './types.ts';
 
 export function listAsks(db: Database, opts: { kind?: Kind; states?: AskState[] } = {}): Ask[] {
-  const where: string[] = [];
-  const args: string[] = [];
-  if (opts.kind) {
-    where.push('kind = ?');
-    args.push(opts.kind);
-  }
-  if (opts.states?.length) {
-    where.push(`state IN (${opts.states.map(() => '?').join(',')})`);
-    args.push(...opts.states);
-  }
-  const sql = `SELECT * FROM asks ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY queued_at, id`;
-  return (db.query(sql).all(...args) as Row[]).map((r) => hydrate(r)!);
+  const states = opts.states ?? [];
+  const query = kdb(db)
+    .selectFrom('asks')
+    .selectAll()
+    .$if(Boolean(opts.kind), (builder) => builder.where('kind', '=', opts.kind ?? 'call'))
+    .$if(states.length > 0, (builder) => builder.where('state', 'in', states))
+    .orderBy('queued_at')
+    .orderBy('id')
+    .compile();
+  return runSyncQuery(db, query, AskRowSchema).map((r) => hydrate(r)!);
 }

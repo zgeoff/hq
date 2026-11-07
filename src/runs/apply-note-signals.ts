@@ -1,5 +1,7 @@
 import type { Database } from 'bun:sqlite';
 import { z } from 'zod';
+import { runSyncRow } from '../db/run-sync-row.ts';
+import { kdb } from '../kdb.ts';
 import { buildFinalKey } from './build-final-key.ts';
 import { collectMentionedPRs } from './collect-mentioned-prs.ts';
 import { FINAL_MARK } from './final-mark.ts';
@@ -14,6 +16,7 @@ import { sendFinalRefusal } from './send-final-refusal.ts';
 import { readIssueRefs } from './read-issue-refs.ts';
 import { registerRunPR as attachPr } from './register-run-pr.ts';
 import { requirePR } from './require-pr.ts';
+import { RunPrSchema } from './run-pr-schema.ts';
 import { prAllows } from '../transitions/pr-allows.ts';
 import type { FinalResolutions } from './types.ts';
 
@@ -43,7 +46,7 @@ export function applyNoteSignals(db: Database, issue: string, text: string, opti
     } catch {
       continue;
     }
-    const owner = db.query('SELECT issue FROM run_prs WHERE ref = ?').get(parsed.ref) as { issue: string } | null;
+    const owner = runSyncRow(db, kdb(db).selectFrom('run_prs').select('issue').where('ref', '=', parsed.ref).compile(), RunPrSchema.pick({ issue: true }));
     if (owner && owner.issue !== issue) continue;
     attachPr(db, issue, m[0]);
     if (!found.includes(parsed.ref)) found.push(parsed.ref);
