@@ -37,6 +37,26 @@ test('it fails with exit 1 and its failure message on stderr for a reference in 
   expect({ code: read.exitCode, stdout: read.stdout.toString(), stderr: read.stderr.toString() }).toStrictEqual({ code: 1, stdout: '', stderr: '[ERROR] invented: the kettle is cold\n' });
 });
 
+test('it answers from the table that writeAnswers gave it, in place of the first table', () => {
+  const ctx = setupTest();
+  const stub = createStubOp({ directory: ctx.directory, answers: { 'op://kettle-vault/teapot-item/credential': 'sk-ant-kettle-stub-0001' } });
+  stub.writeAnswers({ 'op://kettle-vault/teapot-item/credential': 'sk-ant-kettle-stub-0002' });
+
+  const read = Bun.spawnSync([join(stub.bin, 'op'), 'read', 'op://kettle-vault/teapot-item/credential']);
+
+  expect({ code: read.exitCode, stdout: read.stdout.toString(), stderr: read.stderr.toString() }).toStrictEqual({ code: 0, stdout: 'sk-ant-kettle-stub-0002\n', stderr: '' });
+});
+
+test('it keeps its failure table after writeAnswers', () => {
+  const ctx = setupTest();
+  const stub = createStubOp({ directory: ctx.directory, answers: {}, failures: { 'op://kettle-vault/teapot-item/credential': '[ERROR] invented: the kettle is cold' } });
+  stub.writeAnswers({ 'op://kettle-vault/other-item/credential': 'sk-ant-kettle-stub-0003' });
+
+  const read = Bun.spawnSync([join(stub.bin, 'op'), 'read', 'op://kettle-vault/teapot-item/credential']);
+
+  expect({ code: read.exitCode, stdout: read.stdout.toString(), stderr: read.stderr.toString() }).toStrictEqual({ code: 1, stdout: '', stderr: '[ERROR] invented: the kettle is cold\n' });
+});
+
 test('it fails a command other than read', () => {
   const ctx = setupTest();
   const stub = createStubOp({ directory: ctx.directory, answers: { 'op://kettle-vault/teapot-item/credential': 'sk-ant-kettle-stub-0001' } });
