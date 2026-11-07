@@ -23,9 +23,9 @@ test('it overlays the stored settings on the defaults', () => {
   expect(capacitySettings(ctx.db)).toStrictEqual({ ...CAPACITY_DEFAULTS, holdSamples: 3 });
 });
 
-test('it throws a bad meta error when a stored setting is not a number', () => {
+test('it reads the default for a stored setting that is not a number, and keeps the others', () => {
   const ctx = setupTest();
-  setMeta(ctx.db, 'capacity_settings', '{"holdSamples":"three"}');
+  setMeta(ctx.db, 'capacity_settings', '{"holdSamples":"three","opDailyPct":80}');
 
-  expect(() => capacitySettings(ctx.db)).toThrow(/capacity_settings/u);
+  expect(capacitySettings(ctx.db)).toStrictEqual({ ...CAPACITY_DEFAULTS, opDailyPct: 80 });
 });

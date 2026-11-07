@@ -34,15 +34,16 @@ test('unreadable stored targets fall back to the defaults', () => {
   expect(stored.overridden).toStrictEqual(['features']);
 });
 
-test('it falls back to the default for a stored target with a value that is not a number falls back to the default', () => {
+test.each([
+  { name: 'a value that is not a number', target: { op: '<', value: 'high' } },
+  { name: 'an until that is not text', target: { op: '>', value: 70, until: 4 } },
+])('it falls back to the default for a stored target with $name', ({ target }) => {
   const ctx = setupTest();
-  setMeta(ctx.db, 'goal_targets', JSON.stringify({ bugs: { op: '<', value: 'high' }, features: { op: '>', value: 70, until: 4 } }));
+  setMeta(ctx.db, 'goal_targets', JSON.stringify({ features: target }));
 
   const stored = goalTargets(ctx.db);
 
-  expect(stored.targets.bugs).toStrictEqual(DEFAULT_TARGETS.bugs);
-  expect(stored.targets.features).toStrictEqual(DEFAULT_TARGETS.features);
-  expect(stored.overridden).toStrictEqual([]);
+  expect(stored).toStrictEqual({ targets: DEFAULT_TARGETS, overridden: [] });
 });
 
 test('it falls back to the defaults for a stored list of targets', () => {

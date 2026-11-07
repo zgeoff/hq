@@ -25,7 +25,7 @@ export function row(db: Database, label: string, lo: number, hi: number, at: Dat
   const [from, to] = [iso(new Date(lo)), iso(new Date(Math.min(hi, at.getTime())))];
   const rs = runSyncQuery(db, sql`SELECT id, repo, path, status, conclusion, attempt, started_at, updated_at FROM ci_runs WHERE created_at >= ${from} AND created_at < ${to} AND repo IN ${sql.raw(IN_SQL)}`.compile(kdb(db)), RunSchema);
   const dep = rs.filter((r) => r.repo === DEPLOY.repo && r.path === DEPLOY.path);
-  const outcome = new Map(runSyncQuery(db, kdb(db).selectFrom('deploy_runs').select(['run_id', 'outcome', 'attempt']).compile(), OutcomeSchema).map((x) => [x.run_id, x]));
+  const outcome = new Map(runSyncQuery(db, kdb(db).selectFrom('deploy_runs').select(['run_id', 'outcome', 'attempt']).compile(), OutcomeSchema).map((deployRun) => [deployRun.run_id, deployRun]));
   const classified = (r: { id: number; attempt: number }) => outcome.get(r.id)?.attempt === r.attempt;
   const kind = (o: string) => dep.filter((r) => classified(r) && outcome.get(r.id)!.outcome === o).length;
   const [depFirst] = runSyncQuery(db, sql`SELECT MIN(created_at) AS earliest FROM ci_runs WHERE repo = ${DEPLOY.repo} AND path = ${DEPLOY.path}`.compile(kdb(db)), FirstSchema);
