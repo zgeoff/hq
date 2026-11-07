@@ -11,7 +11,6 @@ import { collectAreaNames } from './linear/collect-area-names.ts';
 import { readTeamLabels } from './linear/read-team-labels.ts';
 import rulesTable from '../lanes.json';
 
-const AREA_LABELS_ERROR = 'lanes_area_labels_error';
 import { readLinearReady } from './lanes/read-linear-ready.ts';
 import { collectFocusMatches } from './focus/collect-focus-matches.ts';
 import { countFocusMatches } from './focus/count-focus-matches.ts';
@@ -26,6 +25,7 @@ import type { Runner } from './runner/types.ts';
 import type { LinearCall } from './linear/types.ts';
 import { withDeadline } from './watcher/with-deadline.ts';
 
+const AREA_LABELS_ERROR = 'lanes_area_labels_error';
 const READ_AT = 'lanes_ready_linear_at';
 
 interface LinearReadyTickDeps {

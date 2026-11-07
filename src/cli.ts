@@ -1872,8 +1872,8 @@ async function refusalsCommand(db: Database, verb: string | undefined, flags: Fl
     if (!isOneOf(flags.by, BY)) {
       throw new HqError('bad_args', `--by must be one of ${BY.join(', ')}`);
     }
-    const t = tally(rows, flags.by);
-    return { data: { tally: t }, text: t.length ? t.map((x) => `${String(x.count).padStart(4)}  ${x.key}`).join('\n') : `No refusals in the last ${days} day(s).` };
+    const counts = tally(rows, flags.by);
+    return { data: { tally: counts }, text: counts.length ? counts.map((x) => `${String(x.count).padStart(4)}  ${x.key}`).join('\n') : `No refusals in the last ${days} day(s).` };
   }
   return { data: { items: rows }, text: rows.length ? rows.map(refusalLine).join('\n') : `No refusals in the last ${days} day(s).` };
 }
