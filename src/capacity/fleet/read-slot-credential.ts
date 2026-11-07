@@ -5,7 +5,7 @@ export type SlotCredential = { kind: 'ready'; credential: string } | { kind: 'fa
 
 // Never quotes op's stderr, which can echo what it was given.
 export async function readSlotCredential(run: Runner, opToken: string, slot: number, signal: AbortSignal): Promise<SlotCredential> {
-  const result = await run(['op', 'read', `op://claude-slots/claude-setup-token-${slot}/credential`], { env: cleanEnv({ OP_SERVICE_ACCOUNT_TOKEN: opToken }), signal });
+  const result = await run(['op', 'read', `op://fleet/claude-setup-token-${slot}/credential`], { env: cleanEnv({ OP_SERVICE_ACCOUNT_TOKEN: opToken }), signal });
   if (result.code !== 0) {
     return { kind: 'failed', reason: `op read failed (exit ${result.code})${pickFailureReason(result.stderr)}` };
   }
