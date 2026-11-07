@@ -3,6 +3,14 @@
 Run nixie's preview runbook commands, the API check's included, inside the PR's preview imp. Never
 run a runbook command on the cloud host itself.
 
+- Skip each runbook step that starts or removes the preview, such as `docker compose up` or
+  `docker compose down --volumes`. The preview is already running: the first rebinds its origin
+  away from the preview link, and the second deletes its data. Read the sign-in code from the
+  `enrol` logs instead, as step 3 of [Take a check](../SKILL.md#take-a-check) says.
+- Run the API check from its step 2 to its last step in one call. Each call starts a new shell, so
+  `origin`, `token` and `sent` are gone in the next one, and another enrol uses up another sign-in
+  code. Where the check says to repeat a step, write a loop that waits 5 seconds between tries and
+  stops after 5 minutes.
 - Keep `-i` on `podman exec` in step 2. Without it, the commands never reach the imp, and the line
   prints nothing.
 - Keep the quotes on `'EOF'`. Then your shell passes each `$` and each quote to the imp unchanged.
@@ -17,8 +25,8 @@ line, and stop at the cap that [Limits](../SKILL.md#limits) sets.
 
 ## Run a command in the preview
 
-Run steps 1 and 2 in the same shell call, each time you run commands, because step 2 reads the
-variable that step 1 sets.
+Run steps 1 and 2 in the same shell call, each time you run commands. Step 2 reads the variable
+that step 1 sets.
 
 1. Set `HQ_CLOUD_HOST`, the cloud host's ssh name. Expect: no output. When the second line prints
    `HQ_CLOUD_HOST is not set`, run `hq health`, file its whole output for `z-q`, the session that

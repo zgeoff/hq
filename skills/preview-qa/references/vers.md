@@ -10,8 +10,8 @@ never as a real player.
   `--runs`. Mark an item that needs a higher level as needing the owner.
 
 1. **Use vers's [QA runbook](https://github.com/zgeoff/vers/blob/main/docs/runbooks/qa.md)** for
-   every tool. Run the tools in your clone of zgeoff/vers at `~/.local/share/z-sessions/qa/vers`,
-   and pull `main` there before each check. Your private file says where the credentials and the
+   every tool. Run the tools in your clone of zgeoff/vers at `~/.local/share/z-sessions/vers`,
+   outside the scratch folder, and pull `main` there before each check. Your private file says where the credentials and the
    database are.
 2. **Pick the account:**
    - Use `qa-geo-1926`, the owner's permanent phone account, for an item that needs the owner's

@@ -6,9 +6,9 @@
   </p>
 
   <p>
-    <a href="./docs/sessions.md">How the crew works</a> •
-    <a href="./CHANGELOG.md">Changelog</a> •
-    <a href="./REQUESTS.md">Requests</a>
+    <a href="./docs/README.md">Docs</a> •
+    <a href="./docs/crew.md">The crew</a> •
+    <a href="./docs/sessions.md">How the crew works</a>
   </p>
 </div>
 
@@ -29,23 +29,6 @@ hq needs [Bun](https://bun.sh) and a local [atc](https://github.com/zgeoff/atc) 
 bun install
 bun run install-bin   # builds ~/.local/bin/hq
 hq status
-```
-
-A quiet night looks like this:
-
-```text
-$ hq status
-OPEN: none
-NEXT: none
-calls: 137 applied, 3 closed, 2 skipped · proposals: 56 applied, 2 closed
-unblock: 2 open, 0 new since push
-```
-
-And this is the line Gatekeeper waits for before a merge:
-
-```text
-$ hq review gate hq 9
-may merge: noslop findings: none open; CI green at b061edc
 ```
 
 ## Checks

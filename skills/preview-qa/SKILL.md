@@ -52,14 +52,12 @@ production, or anything signed in as the owner, only under a grant in your start
 
 ## Terms
 
-hq, atc, Nix, a grant, a hands-on step, your role's private file and each `z-` session, such as
-`z-review`, `z-release` and `z-stu`, are defined in [owner-calls](../owner-calls/SKILL.md#terms).
-Terms of this skill:
+hq, atc, Nix, nixie, a grant, a hands-on step, your role's private file and each `z-` session, such
+as `z-review`, `z-release` and `z-stu`, are defined in
+[owner-calls](../owner-calls/SKILL.md#terms). Terms of this skill:
 
 - **A live item:** an item in the issue's Acceptance section that only the running app can show.
   `z-review` picks the live items and sends them to you.
-- **nixie:** the service that runs Nix, and the repo that holds it. A preview of nixie runs a Nix
-  of its own.
 - **The cloud host:** the server that runs the imps.
 - **An imp:** a sandboxed machine on the cloud host.
 - **A preview:** a PR's own running copy of its repo, in an imp, linked from the PR's preview
@@ -83,8 +81,10 @@ Terms of this skill:
    to look at and where.
 
 2. **Open the preview** with the link in the PR's preview comment. Opening the link boots the
-   preview. Wait until the health URL in the repo's preview runbook, `docs/runbooks/preview.md`,
-   answers with HTTP 200, up to the [limit](#limits). If the comment names an older head, wait, up
+   preview. Take the health path from the repo's preview runbook, `docs/runbooks/preview.md`, such
+   as `/health/ready`, and put it on the preview link's origin. The runbook's own URL, such as
+   `http://127.0.0.1:8080/health/ready`, answers only inside the imp. Wait until the preview's
+   health URL answers with HTTP 200, up to the [limit](#limits). If the comment names an older head, wait, up
    to the limit, until it names the head `z-review` sent. Then open its link again.
 3. **Drive the preview** with the steps in the preview runbook, and run each command where the
    runbook says. For nixie, run each command in the preview's imp as
@@ -131,12 +131,13 @@ each issue:
    - When every item passed, move the issue to Done with `save_issue`. Then, if `hq run show GEO-n`
      shows the run at `live-check`, run `hq run done GEO-n`. Skip it at any other state.
    - Otherwise, comment on the issue which items remain and who owns each. Message `z-release` each
-     failure as a production bug, and file each item that needs the owner with `hq unblock add`, as
-     step 5 of [Take a check](#take-a-check) shows.
+     failure as a production bug. File each item that needs the owner with
+     `hq unblock add --task '<the step>' --id qa-geo-<n>-<k> --notify z-qa`, where `<k>` counts the
+     issue's steps from 1. Leave out `--done-when`: the issue closes only after the step is done.
 
-   Keep the check's line in `qa.md` while an item remains. When `z-release` reports a fix shipped,
-   or `hq unblock show <id>` shows the owner's step done, check that item again. Move the issue to
-   Done once the last item passes.
+   Keep the check's line in `qa.md` while an item remains, with each step's id in it. hq messages
+   you when a step is marked done, and `z-release` tells you when a fix ships. Then check that
+   item again. Move the issue to Done once the last item passes.
 
 ## Limits
 
@@ -152,10 +153,10 @@ each issue:
 
 - Keep scratch in `~/.local/share/z-sessions/qa/`. Delete a check's scratch once you answer.
 - Keep one line per check in flight in `~/.local/share/z-sessions/qa.md`, and remove it when the
-  check is done. Write `account=-` while the check holds no QA account:
+  check is done. Write `-` for a field with no value:
 
   ```text
-  GEO-<n> <repo>#<PR number> <head sha or release tag> account=<QA account> turns=<model turns>
+  GEO-<n> <repo>#<PR number> <head sha or release tag> account=<QA account> turns=<model turns> steps=<unblock ids>
   ```
 
 - Run headless browsers with `TMPDIR=~/.local/share/z-sessions/qa/t`. Chromium fails on long socket

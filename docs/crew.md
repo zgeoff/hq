@@ -125,3 +125,20 @@ review rounds, the merge and the release.
   session at work.
 - **Quiet hours.** hq refuses to restart the crew's daemon from 23:00 to 08:00 Sydney time, and Stu
   sends the owner nothing from 03:00 to 07:00.
+
+A quiet night looks like this:
+
+```text
+$ hq status
+OPEN: none
+NEXT: none
+calls: 137 applied, 3 closed, 2 skipped · proposals: 56 applied, 2 closed
+unblock: 2 open, 0 new since push
+```
+
+And this is the line Gatekeeper waits for before a merge:
+
+```text
+$ hq review gate hq 9
+may merge: noslop findings: none open; CI green at b061edc
+```
