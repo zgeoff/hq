@@ -7,7 +7,7 @@ import type { CapacityProbe, Impd } from './types.ts';
 const InfoSchema = z.record(z.string(), z.unknown());
 const ImpListSchema = z.array(z.unknown());
 
-export async function readImpd(probe: CapacityProbe): Promise<{ impd: Impd; error: string | null }> {
+export async function readImpd(probe: Pick<CapacityProbe, 'run' | 'readMs'>): Promise<{ impd: Impd; error: string | null }> {
   const impd: Impd = { budgetMib: null, usedMib: null, committedMib: null, nonnixAwakeMib: null, nonnixAwakeVcpus: null, nixAwakeMib: null, priorityKeptMib: null };
   const errors: string[] = [];
   const [info, ls] = await Promise.all([out(probe.run, ['impz', 'info', '--json'], readMs(probe)), out(probe.run, ['impz', 'ls', '--json'], readMs(probe))]);

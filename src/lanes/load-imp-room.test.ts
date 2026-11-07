@@ -3,7 +3,7 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { createCapacitySample } from '../../test/create-capacity-sample.ts';
 import { at, freshDb } from '../../test/helpers.ts';
 import { setCapacitySetting } from '../capacity/set-capacity-setting.ts';
-import { loadImpRoom } from './load-imp-room.ts';
+import { buildLineRoom, loadImpRoom } from './load-imp-room.ts';
 
 function setupTest(): Database {
   const fresh = freshDb();
@@ -88,6 +88,56 @@ test('it names the non-Nix line, not the RAM kept for priority imps, when the li
   const room = loadImpRoom(db, { budgetSlots: 6, impMib: 2048 });
 
   expect([room.slots, room.heldBy]).toStrictEqual([1, 'impd at line']);
+});
+
+test.each([
+  { committedMib: null, slots: 1 },
+  { committedMib: 12_288, slots: 1 },
+  { committedMib: 14_336, slots: 0 },
+])('it leaves $slots slot(s) when impd has $committedMib MiB committed and 12288 MiB awake', (row) => {
+  const line = { awakeMib: 12_288, maxMib: 20_480, awakeVcpus: 0, maxVcpus: 16, budgetMib: 20_480, nixAwakeMib: 0, keptMib: 6144 };
+
+  const room = buildLineRoom(line, { budgetSlots: 6, impMib: 2048, impVcpus: 1 }, row.committedMib);
+
+  expect(room.slots).toBe(row.slots);
+});
+
+test('it takes the last slot away when impd has more committed than awake, from a stored sample', () => {
+  const db = createCapacitySample(setupTest(), { at: '2026-10-16T00:55:00Z', nonnixAwakeMib: 12_288, nixAwakeMib: 0, impdBudgetMib: 20_480, impdPriorityKeptMib: 6144, impdCommittedMib: 14_336 });
+  setCapacitySetting(db, 'nonnixMaxMib', '20480', 'kettle-bot');
+
+  const room = loadImpRoom(db, { budgetSlots: 6, impMib: 2048 });
+
+  expect(room.slots).toBe(0);
+});
+
+test('a live reading replaces the stored sample for the room', () => {
+  const db = createCapacitySample(setupTest(), { at: '2026-10-16T00:55:00Z', nonnixAwakeMib: 12_288, nixAwakeMib: 0, impdBudgetMib: 20_480, impdPriorityKeptMib: 6144 });
+  setCapacitySetting(db, 'nonnixMaxMib', '20480', 'kettle-bot');
+  const woken = { budgetMib: 20_480, usedMib: 14_336, committedMib: 14_336, nonnixAwakeMib: 14_336, nonnixAwakeVcpus: 4, nixAwakeMib: 0, priorityKeptMib: 6144 };
+
+  const rooms = [loadImpRoom(db, { budgetSlots: 6, impMib: 2048 }), loadImpRoom(db, { budgetSlots: 6, impMib: 2048 }, new Date('2026-10-16T01:00:00Z'), woken)];
+
+  expect(rooms.map((room) => room.slots)).toStrictEqual([1, 0]);
+});
+
+test('a live reading with a missing figure falls back to the stored sample', () => {
+  const db = createCapacitySample(setupTest(), { at: '2026-10-16T00:55:00Z', nonnixAwakeMib: 12_288, nixAwakeMib: 0, impdBudgetMib: 20_480, impdPriorityKeptMib: 6144 });
+  setCapacitySetting(db, 'nonnixMaxMib', '20480', 'kettle-bot');
+  const partial = { budgetMib: 20_480, usedMib: 14_336, committedMib: 14_336, nonnixAwakeMib: null, nonnixAwakeVcpus: null, nixAwakeMib: null, priorityKeptMib: 6144 };
+
+  const room = loadImpRoom(db, { budgetSlots: 6, impMib: 2048 }, new Date('2026-10-16T01:00:00Z'), partial);
+
+  expect(room.slots).toBe(1);
+});
+
+test('a live reading is not held by a stored sample over 15 min old', () => {
+  const db = createCapacitySample(setupTest(), { at: '2026-10-16T00:30:00Z', nonnixAwakeMib: 0 });
+  const live = { budgetMib: 20_480, usedMib: 0, committedMib: 0, nonnixAwakeMib: 0, nonnixAwakeVcpus: 0, nixAwakeMib: 0, priorityKeptMib: 0 };
+
+  const room = loadImpRoom(db, { budgetSlots: 2, impMib: 2048 }, new Date('2026-10-16T01:00:00Z'), live);
+
+  expect(room.slots).toBe(2);
 });
 
 function setCapacityImpVcpus(db: Database, vcpus: string): Database {

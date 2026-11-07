@@ -90,7 +90,11 @@ export async function watchTick(db: Database, d: WatchDeps): Promise<boolean> {
     d.log(`${at()} lanes Ready from Linear failed: ${toErrorMessage(error)}`);
   }
   try {
-    const r = tick(db, await step('capacity', () => readCapacity(d.run)), d.me);
+    const sample = await step('capacity', () => readCapacity(d.run));
+    if (sample.impdError) {
+      d.log(`${at()} live impd read failed, the newest stored sample stands in: ${sample.impdError}`);
+    }
+    const r = tick(db, sample, d.me);
     const q = queueReminder(db, d.me);
     if (q.reminded) d.log(`${at()} reminded ${owner()} about ${q.reminded}`);
     await step('notes and sweep', () => d.steps.runs());

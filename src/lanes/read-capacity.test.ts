@@ -2,8 +2,10 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
+import { buildStubImpzRunner } from '../../test/build-stub-impz-runner.ts';
 import { overrideEnv } from '../config/override-env.ts';
 import { realRunner } from '../runner/real-runner.ts';
+import type { Runner } from '../runner/types.ts';
 import { readCapacity } from './read-capacity.ts';
 
 function setupTest(): string {
@@ -20,6 +22,19 @@ test('a lane pacing.json gets wrong is the sample\'s error, though capacity read
   writeFileSync(setupTest(), JSON.stringify({ lanes: { imp: { 'Bad Teapot': 2 }, local: {} } }));
   const sample = await readCapacity(realRunner);
   expect([sample.cap?.imp?.freeMib, sample.lanes, sample.error]).toStrictEqual([8192, null, 'pacing.json: pacing.json lanes: bad lane imp.Bad Teapot']);
+});
+
+test.each([
+  { name: 'reads impd live into the sample', impzCode: 0, impd: { budgetMib: 20_480, usedMib: 14_336, committedMib: 14_336, nonnixAwakeMib: 0, nonnixAwakeVcpus: 0, nixAwakeMib: 0, priorityKeptMib: 0 }, impdError: null },
+  { name: 'carries no live reading, and why, when impz fails', impzCode: 1, impd: null, impdError: 'impz info failed or timed out; impz ls failed or timed out' },
+])('it $name', async (row) => {
+  writeFileSync(setupTest(), JSON.stringify({ lanes: { imp: { cleanup: 2 }, local: {} } }));
+  const impz = buildStubImpzRunner({ info: { ramBudgetMib: 20_480, ramUsedMib: 14_336, ramCommittedMib: 14_336 }, imps: [] });
+  const run: Runner = (command, options) => (command[0] === 'impz' ? impz(command, options).then((result) => ({ ...result, code: row.impzCode })) : realRunner(command, options));
+
+  const sample = await readCapacity(run);
+
+  expect([sample.impd, sample.impdError]).toStrictEqual([row.impd, row.impdError]);
 });
 
 test('good lanes read with capacity carry no error', async () => {

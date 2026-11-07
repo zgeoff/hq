@@ -53,7 +53,7 @@ export function readSlotPlan(db: Database, sample: Sample, at: Date = now(), cap
   }
   const designRuns = readDesignRuns(db);
   const running = readRunningByPlace(db, at, designRuns);
-  const room = loadImpRoom(db, { budgetSlots: slotsFrom(sample.cap, sample.impMib).slots, impMib: sample.impMib }, at);
+  const room = loadImpRoom(db, { budgetSlots: slotsFrom(sample.cap, sample.impMib).slots, impMib: sample.impMib }, at, sample.impd ?? null);
   const active = readActiveCap(db, capAt);
   const working = countWorking(db, at, designRuns);
   const capRoom = active === null ? null : Math.max(0, active.cap - working.count);
