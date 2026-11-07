@@ -1,7 +1,8 @@
 import { spawnSync } from 'node:child_process';
 import { z } from 'zod';
 
-const reportSchema = z.object({ diagnostics: z.array(z.object({ code: z.string() })) });
+const rowSchema = z.object({ code: z.string() });
+const reportSchema = z.object({ diagnostics: z.array(rowSchema) });
 
 interface Row {
   readonly code: string;
