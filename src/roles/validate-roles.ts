@@ -1,3 +1,4 @@
+import { isOneOf } from '@zgeoff/std';
 import { HqError } from '../errors.ts';
 import type { Role } from './role-names.ts';
 import { ROLE_NAMES } from './role-names.ts';
@@ -77,9 +78,11 @@ export function validateRoles(raw: unknown): RolesTable {
     }
     for (const [from, to] of Object.entries(raw['forwards'])) {
       if (!NAME.test(from)) bad(`forwards.${from}`, 'must be a name matching ^z-[a-z]+$');
-      if (typeof to !== 'string' || !names.has(to)) bad(`forwards.${from}`, `must point to a declared session (got ${JSON.stringify(to)})`);
+      if (typeof to !== 'string' || !names.has(to)) {
+        return bad(`forwards.${from}`, `must point to a declared session (got ${JSON.stringify(to)})`);
+      }
       if (names.has(from)) bad(`forwards.${from}`, 'is a declared session, so it cannot be a retired name');
-      forwards[from] = to as string;
+      forwards[from] = to;
     }
   }
   return { sessions, forwards };
@@ -107,7 +110,7 @@ function isPromptSource(value: unknown): value is string {
 }
 
 function parseRoles(at: string, list: unknown[]): Role[] {
-  const roles = list.map((r: unknown) => ((ROLE_NAMES as readonly unknown[]).includes(r) ? (r as Role) : bad(`${at}.roles`, `has unknown role ${JSON.stringify(r)}`)));
+  const roles = list.map((role: unknown) => (isOneOf(role, ROLE_NAMES) ? role : bad(`${at}.roles`, `has unknown role ${JSON.stringify(role)}`)));
   if (new Set(roles).size !== roles.length) {
     return bad(`${at}.roles`, 'repeats a role');
   }

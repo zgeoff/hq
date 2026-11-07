@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { HqError } from '../errors.ts';
+import { toErrorMessage } from '../to-error-message.ts';
 
 const NAME_SHAPE = /^[ \t]*'(?<name>\d{4}-[a-z0-9-]+)':/gmu;
 
@@ -16,6 +17,6 @@ function readText(file: string): string {
   try {
     return readFileSync(file, 'utf8');
   } catch (error) {
-    throw new HqError('store_unreadable', `hq cannot read the store migrations the new noslop applies: ${file}: ${(error as Error).message}`);
+    throw new HqError('store_unreadable', `hq cannot read the store migrations the new noslop applies: ${file}: ${toErrorMessage(error)}`);
   }
 }

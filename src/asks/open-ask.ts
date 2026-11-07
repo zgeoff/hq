@@ -1,10 +1,10 @@
+import { isOneOf } from '@zgeoff/std';
 import type { Database } from 'bun:sqlite';
 import { isQuiet } from '../clock/is-quiet.ts';
 import { iso } from '../clock/iso.ts';
 import { now } from '../clock/now.ts';
 import { HqError } from '../errors.ts';
 import { logEvent } from '../log-event.ts';
-import type { AskState } from '../transitions/ask-states.ts';
 import { ASK_TRANSITIONS } from '../transitions/ask-transitions.ts';
 import { checkAsk } from '../transitions/check-ask.ts';
 import { currentHold } from './current-hold.ts';
@@ -32,7 +32,7 @@ export function openAsk(db: Database, opts: { kind?: Kind; id?: string; force: b
       if (opts.id) {
         a = mustGet(db, opts.id, opts.kind);
         const due = a.state === 'later' && a.due_at !== null && a.due_at <= iso(now());
-        if (!(ASK_TRANSITIONS.opened.from as readonly AskState[]).includes(a.state) || (a.state === 'later' && !due && !opts.force)) {
+        if (!isOneOf(a.state, ASK_TRANSITIONS.opened.from) || (a.state === 'later' && !due && !opts.force)) {
           throw new HqError('bad_state', `${a.id} is ${a.state}${a.due_at ? ` until ${a.due_at}` : ''}: only queued or due items open`);
         }
       } else {

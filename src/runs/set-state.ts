@@ -1,9 +1,9 @@
+import { isOneOf } from '@zgeoff/std';
 import type { Database } from 'bun:sqlite';
 import { logEvent } from '../log-event.ts';
 import { iso } from '../clock/iso.ts';
 import { now } from '../clock/now.ts';
 import { HqError } from '../errors.ts';
-import type { RunState } from '../transitions/run-states.ts';
 import { checkRun } from '../transitions/check-run.ts';
 import { CLOSED_RUN_STATES as CLOSED } from '../transitions/closed-run-states.ts';
 import { RUN_STATES } from '../transitions/run-states.ts';
@@ -15,13 +15,16 @@ import { viewRun } from './view-run.ts';
 
 export function setState(db: Database, issue: string, state: string, opts: { next?: string; waitsOn?: string | null; waitsOnGeoff?: boolean; note?: string | null; reopen?: boolean; liveCheck?: LiveCheck }, actor: string): RunView {
   if (opts.liveCheck !== undefined) checkLiveCheck(opts.liveCheck);
-  if (!RUN_STATES.includes(state as RunState)) throw new HqError('bad_args', `state must be one of ${RUN_STATES.join(', ')}`);
+  if (!isOneOf(state, RUN_STATES)) {
+    throw new HqError('bad_args', `state must be one of ${RUN_STATES.join(', ')}`);
+  }
   return db
     .transaction(() => {
       const prev = mustRun(db, issue);
-      checkRun(issue, opts.reopen && CLOSED.includes(prev.state) ? 'reopen' : 'state', prev.state, state as RunState);
+      const action = opts.reopen && CLOSED.includes(prev.state) ? 'reopen' : 'state';
+      checkRun(issue, action, prev.state, state);
       const t = iso(now());
-      const closing = CLOSED.includes(state as RunState);
+      const closing = CLOSED.includes(state);
       db.query(
         `UPDATE runs SET state = ?, next = COALESCE(?, next), waits_on = ?, waits_on_geoff = ?, close_note = ?, closed_at = ?, live_check = ?, updated_at = ? WHERE issue = ?`,
       ).run(

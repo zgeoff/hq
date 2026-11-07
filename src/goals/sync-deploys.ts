@@ -12,6 +12,7 @@ import { DEPLOY } from './deploy.ts';
 import { DEPLOY_BATCH } from './deploy-batch.ts';
 
 import { readGhJSON } from './read-gh-json.ts';
+import { toErrorMessage } from '../to-error-message.ts';
 
 const TodoSchema = buildRowSchema('ci_runs').pick({ id: true, conclusion: true, attempt: true, created_at: true });
 
@@ -34,11 +35,13 @@ export async function syncDeploys(db: Database, run: Runner, env?: RunOpts['env'
         ins.run(r.id, c.outcome, r.attempt, c.apply_conclusion, c.failed_step, iso(at));
         fetched++;
       } catch (e) {
-        const m = String((e as Error).message ?? e);
-        if (/HTTP 404|Not Found/.test(m)) {
+        const message = toErrorMessage(e);
+        if (/HTTP 404|Not Found/u.test(message)) {
           ins.run(r.id, 'unknown', r.attempt, null, null, iso(at));
           fetched++;
-        } else (r.created_at >= since ? errors : oldErrors).push(m);
+        } else {
+          (r.created_at >= since ? errors : oldErrors).push(message);
+        }
       }
     }
   };

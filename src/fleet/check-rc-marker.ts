@@ -1,4 +1,5 @@
 import type { Database } from 'bun:sqlite';
+import { isRecord } from '@zgeoff/std';
 import invariant from 'tiny-invariant';
 import { logEvent } from '../log-event.ts';
 import { owner } from '../owner.ts';
@@ -18,6 +19,7 @@ import { RC_PENDING } from './rc-pending.ts';
 import { RC_SETTLE_MIN } from './rc-settle-min.ts';
 import type { EnsureStep, RcCheck, RcEval, RcPending } from './types.ts';
 import { updateRcPending as setPending } from './update-rc-pending.ts';
+import { toErrorMessage } from '../to-error-message.ts';
 
 export async function checkRcMarker(db: Database, check: RcCheck): Promise<RcEval> {
   const RC_CONFIRM_POLLS = 15;
@@ -74,12 +76,12 @@ export async function checkRcMarker(db: Database, check: RcCheck): Promise<RcEva
     invariant(client.submit, 'checkRcMarker: the caller checks client.submit before it calls');
     await client.submit(pending.id, `/remote-control ${name}`);
   } catch (err) {
-    const code = (err as { code?: string }).code ?? '';
+    const code = isRecord(err) && typeof err['code'] === 'string' ? err['code'] : '';
     if (RC_RETRY.has(code)) {
       releaseTyping(db, name, pending.id);
       return { kind: 'wait' };
     }
-    return endMine('failed', `typing into the session failed (${String((err as Error).message ?? err)}); check the session and type /remote-control yourself if it is off.`, { result: 'type failed', code });
+    return endMine('failed', `typing into the session failed (${toErrorMessage(err)}); check the session and type /remote-control yourself if it is off.`, { result: 'type failed', code });
   }
   const sleep = rc.sleep ?? Bun.sleep;
   let last: RcState = st;

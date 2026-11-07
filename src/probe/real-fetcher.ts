@@ -1,4 +1,5 @@
 import type { Fetcher } from './types.ts';
+import { toErrorMessage } from '../to-error-message.ts';
 
 const FETCH_MS = 10_000;
 
@@ -10,6 +11,7 @@ export const realFetcher: Fetcher = async (url) => {
     await res.body?.cancel();
     return { ok: res.status === 200, status: res.status, ms: Date.now() - t0, ...(res.status === 200 ? {} : { error: `HTTP ${res.status}` }) };
   } catch (e) {
-    return { ok: false, status: null, ms: Date.now() - t0, error: String((e as Error).message ?? e).slice(0, 160) };
+    // oxlint-disable-next-line zgeoff/no-abbreviated-names -- ms is the probe sample's own field
+    return { ok: false, status: null, ms: Date.now() - t0, error: toErrorMessage(e).slice(0, 160) };
   }
 };

@@ -8,6 +8,7 @@ import { syncClosedDay } from './sync-closed-day.ts';
 import { syncDeploys } from './sync-deploys.ts';
 import { syncRunsDay } from './sync-runs-day.ts';
 import { toUTCDay } from './to-utc-day.ts';
+import { toErrorMessage } from '../to-error-message.ts';
 
 const DAY = 86_400_000;
 
@@ -36,7 +37,7 @@ export async function syncGoals(db: Database, run: Runner, opts: SyncGoalsOption
         runs += n;
         days++;
       } catch (e) {
-        errors.push(String((e as Error).message ?? e));
+        errors.push(toErrorMessage(e));
       }
     }
   };
@@ -57,7 +58,7 @@ export async function syncGoals(db: Database, run: Runner, opts: SyncGoalsOption
     try {
       closed += await syncClosedDay(db, run, d, opts.env, at);
     } catch (e) {
-      errors.push(String((e as Error).message ?? e));
+      errors.push(toErrorMessage(e));
     }
   }
   return { days, runs, closed, left, deployRuns: dep.fetched, deployLeft: dep.left, errors };

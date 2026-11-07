@@ -47,6 +47,7 @@ import { isHeldPastShip } from './is-held-past-ship.ts';
 import { readHeldAt } from './read-held-at.ts';
 import { readActiveSession } from '../runs/read-active-session.ts';
 import type { PrState, Release, ShipMove, ShipResult, Source } from './types.ts';
+import { toErrorMessage } from '../to-error-message.ts';
 
 const CompareSchema = z.object({ status: z.unknown() });
 const PRViewSchema = z.object({ mergeCommit: z.object({ oid: z.unknown() }).nullish() });
@@ -87,7 +88,7 @@ export async function shipRuns(db: Database, run: Runner, at: Date = now(), opts
       return list;
     } catch (e) {
       failedRepos.add(repo);
-      err(`${repo}: ${(e as Error).message}`);
+      err(`${repo}: ${toErrorMessage(e)}`);
       return null;
     }
   };
@@ -189,7 +190,7 @@ export async function shipRuns(db: Database, run: Runner, at: Date = now(), opts
           res.shippedPrs++;
         }
       } catch (e) {
-        err(`${ref}: ${(e as Error).message}`);
+        err(`${ref}: ${toErrorMessage(e)}`);
       }
     }
   }

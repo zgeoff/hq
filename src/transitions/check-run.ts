@@ -12,6 +12,9 @@ export function checkRun(id: string, action: RunAction, from: RunState, to: RunS
   if (!targets(row, from).includes(to)) throw new HqError('bad_state', `${id} is ${from}: ${action} cannot go to ${to}`, { state: from });
 }
 
-function targets<S extends string>(row: Row<S>, from: S): readonly S[] {
-  return row.to === 'same' ? [from] : typeof row.to === 'string' ? [row.to as S] : (row.to as readonly S[]);
+function targets(row: Row<RunState>, from: RunState): readonly RunState[] {
+  if (row.to === 'same') {
+    return [from];
+  }
+  return typeof row.to === 'string' ? [row.to] : row.to;
 }

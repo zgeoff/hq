@@ -1,6 +1,7 @@
 import { resolve } from 'node:path';
 import { config } from '../config/config.ts';
 import { dbPath } from '../db/db-path.ts';
+import { toErrorMessage } from '../to-error-message.ts';
 
 // Only hq on the live database writes to the live atc: a test, or a run on a scratch database (a
 // review, a check from source), once sent invented alerts to z-stu.
@@ -11,7 +12,7 @@ export function writeRefusal(): string | null {
   try {
     db = resolve(dbPath());
   } catch (e) {
-    return String((e as Error).message ?? e);
+    return toErrorMessage(e);
   }
   const live = resolve(`${process.env['HOME']}/.local/share/z-sessions/hq.db`);
   return db === live ? null : `hq on a scratch database (${db}) never writes to the live atc`;

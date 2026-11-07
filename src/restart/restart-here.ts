@@ -17,6 +17,7 @@ import { logPath } from './log-path.ts';
 import { PATH } from './path.ts';
 import { settleRestores } from './settle-restores.ts';
 import type { RestartResult, Settled } from './types.ts';
+import { toErrorMessage } from '../to-error-message.ts';
 
 const restoreWaitMs = () => {
   const n = config().HQ_RESTORE_WAIT_MS;
@@ -60,7 +61,7 @@ export async function restartHere(db: Database, run: Runner, actor: string, forc
         await write(settled.down.length ? `${settled.down.length} session(s) still down` : `all ${settled.late.length} restored late: the restart is good`);
       }
     } catch (e) {
-      await write(`restore check failed: ${String((e as Error).message ?? e)}`);
+      await write(`restore check failed: ${toErrorMessage(e)}`);
     }
   }
   await write(`== ${iso(now())} wake`);
@@ -70,7 +71,7 @@ export async function restartHere(db: Database, run: Runner, actor: string, forc
     for (const s of wake.sent) await write(`${s.error ? 'failed' : 'messaged'} ${s.session} ${s.name} (${s.reason})${s.error ? `: ${s.error}` : `: ${s.message}`}`);
     for (const s of wake.skipped) await write(`skipped ${s.session || '-'} ${s.name}: ${s.why}`);
   } catch (e) {
-    wake = { error: String((e as Error).message ?? e) };
+    wake = { error: toErrorMessage(e) };
     await write(`wake failed: ${wake.error}`);
   }
   await write(`== ${iso(now())} done`);

@@ -2,6 +2,7 @@ import { THIN } from '../stats/thin.ts';
 import { bandOf } from './band-of.ts';
 import { SIZES } from './sizes.ts';
 import type { PrFacts, SizeRow, SizeStats, SizedRun } from './types.ts';
+import { buildRecord } from '../build-record.ts';
 
 const median = (xs: number[]) => {
   const s = [...xs].sort((a, b) => a - b);
@@ -29,11 +30,10 @@ export function sizeStats(runs: SizedRun[], facts: Record<string, PrFacts>): Siz
     const actual = f.reduce((a, x) => a + x!.lines, 0);
     rows.push({ issue: r.issue, size: r.size, guess: r.size_lines, actual, actualBand: bandOf(actual), ratio: actual / r.size_lines });
   }
-  const byBand = Object.fromEntries(
-    SIZES.map((s) => {
-      const xs = rows.filter((x) => x.size === s);
-      return [s, { n: xs.length, medianRatio: median(xs.map((x) => x.ratio)), medianActual: median(xs.map((x) => x.actual)), outside: xs.filter((x) => x.actualBand !== s).length, thin: xs.length < THIN }];
-    }),
-  ) as SizeStats['byBand'];
+  const byBand = buildRecord(SIZES, (size) => {
+    const bandRows = rows.filter((row) => row.size === size);
+    // oxlint-disable-next-line eslint/id-length -- n is the SizeStats band field
+    return { n: bandRows.length, medianRatio: median(bandRows.map((row) => row.ratio)), medianActual: median(bandRows.map((row) => row.actual)), outside: bandRows.filter((row) => row.actualBand !== size).length, thin: bandRows.length < THIN };
+  });
   return { runs: runs.length, unread, unsized, byBand, rows, stacked, stackShare: known ? stacked / known : null };
 }

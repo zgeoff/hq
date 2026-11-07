@@ -18,6 +18,7 @@ import { readRemoteEnv } from './read-remote-env.ts';
 import { runRestic as restic } from './run-restic.ts';
 import { sources } from './sources.ts';
 import type { BackupRun, Snapshot } from './types.ts';
+import { toErrorMessage } from '../to-error-message.ts';
 
 export async function runBackup(db: Database, run: Runner, actor: string): Promise<BackupRun> {
   const started = Date.now();
@@ -67,13 +68,13 @@ export async function runBackup(db: Database, run: Runner, actor: string): Promi
         await restic(run, ['forget', '--tag', 'hq', '--keep-hourly', String(KEEP.hourly), '--keep-daily', String(KEEP.daily), '--prune'], extra);
         result.remote = 'copied';
       } catch (e) {
-        result.remote = `failed: ${redact(String((e as Error).message ?? e), remote)}`;
+        result.remote = `failed: ${redact(toErrorMessage(e), remote)}`;
       }
     }
     result.ok = !result.remote.startsWith('failed');
     if (!result.ok) result.error = result.remote;
   } catch (e) {
-    result.error = String((e as Error).message ?? e);
+    result.error = toErrorMessage(e);
   } finally {
     if (lock !== null) {
       rmSync(staging(), { recursive: true, force: true });

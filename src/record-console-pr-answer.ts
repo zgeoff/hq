@@ -10,6 +10,7 @@ import { OWNER } from './releases/owner.ts';
 import type { Runner } from './runner/types.ts';
 import type { ConsoleReview } from './record-console-review.ts';
 import type { UnblockItem } from './unblock/types.ts';
+import { toErrorMessage } from './to-error-message.ts';
 
 export interface ConsolePRAnswerInput {
   review: ConsoleReview;
@@ -31,7 +32,7 @@ export async function recordConsolePRAnswer(db: Database, run: Runner, item: Unb
     await recordPRAnswer(db, { repo: ref.repo.toLowerCase(), pr: ref.number, answer: input.review, head, source: `console:${item.id}`, note: note === '' ? null : note, actor: input.actor });
     return true;
   } catch (error) {
-    console.log(`${iso(now())} console: the ${input.review} on ${item.id} was not written to the PR record of ${ref.repo}#${ref.number}: ${(error as Error).message}`);
+    console.log(`${iso(now())} console: the ${input.review} on ${item.id} was not written to the PR record of ${ref.repo}#${ref.number}: ${toErrorMessage(error)}`);
     return false;
   }
 }

@@ -1,4 +1,5 @@
 import { HqError } from '../errors.ts';
+import { toErrorMessage } from '../to-error-message.ts';
 
 // The sweep and the note feed match sessions by full id, so a short id is expanded before it is
 // stored.
@@ -10,7 +11,7 @@ export async function fullSessionId(sessions: () => Promise<{ id: string }[]>, r
   try {
     all = await sessions();
   } catch (e) {
-    throw new HqError('atc_unreachable', `can't expand short session id ${raw} (${(e as Error).message}); give the full id`);
+    throw new HqError('atc_unreachable', `can't expand short session id ${raw} (${toErrorMessage(e)}); give the full id`);
   }
   const hits = all.filter((x) => x.id.toLowerCase().startsWith(raw.toLowerCase()));
   if (hits.length === 1) return hits[0]!.id;

@@ -3,6 +3,9 @@ import { iso } from '../clock/iso.ts';
 import { now } from '../clock/now.ts';
 import { HqError } from '../errors.ts';
 import type { Source } from './types.ts';
+import { isOneOf } from '@zgeoff/std';
+
+const ASK_SOURCE_KINDS = ['call', 'proposal'] as const;
 
 export function parseSource(db: Database, raw: string): Source {
   const consoleAnswer = /^console:(?<id>[A-Za-z0-9._-]+)$/u.exec(raw);
@@ -10,8 +13,8 @@ export function parseSource(db: Database, raw: string): Source {
     return requireConsoleSource(db, consoleAnswer.groups['id']);
   }
   const ask = /^(call|proposal):([A-Za-z0-9._-]+)$/.exec(raw);
-  if (ask) {
-    const kind = ask[1] as 'call' | 'proposal';
+  const kind = ask?.[1];
+  if (ask && isOneOf(kind, ASK_SOURCE_KINDS)) {
     const row = db.query('SELECT kind FROM asks WHERE id = ?').get(ask[2]!) as { kind: string } | null;
     if (!row) throw new HqError('not_found', `no ${kind} ${ask[2]} in hq`);
     if (row.kind !== kind) throw new HqError('bad_args', `${ask[2]} is a ${row.kind}, not a ${kind}`);

@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { getClaudeJson } from './get-claude-json.ts';
 import type { Trust } from './types.ts';
+import { toErrorMessage } from '../to-error-message.ts';
 
 export function checkFolderTrust(cwd: string, file = getClaudeJson()): Trust {
   let projects: Record<string, { hasTrustDialogAccepted?: unknown }>;
@@ -12,7 +13,7 @@ export function checkFolderTrust(cwd: string, file = getClaudeJson()): Trust {
     const raw = JSON.parse(readFileSync(file, 'utf8')) as { projects?: unknown };
     projects = raw.projects && typeof raw.projects === 'object' ? (raw.projects as typeof projects) : {};
   } catch (e) {
-    return { trusted: false, why: `can't read ${file}: ${String((e as Error).message ?? e).slice(0, 120)}` };
+    return { trusted: false, why: `can't read ${file}: ${toErrorMessage(e).slice(0, 120)}` };
   }
   for (let d = resolve(cwd); ; d = dirname(d)) {
     if (Object.hasOwn(projects, d) && projects[d]?.hasTrustDialogAccepted === true) return { trusted: true, by: d };

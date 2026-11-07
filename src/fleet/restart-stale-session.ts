@@ -1,5 +1,6 @@
 import { HqError } from '../errors.ts';
 import type { FleetClient, StaleOps } from './types.ts';
+import { toErrorMessage } from '../to-error-message.ts';
 
 // A confirmToken answer is a failure: this forget never destroys the session's host.
 export async function restartStaleSession(client: FleetClient & StaleOps, id: string): Promise<void> {
@@ -14,7 +15,7 @@ export async function restartStaleSession(client: FleetClient & StaleOps, id: st
       failure = 'atc did not forget the session';
     }
   } catch (error) {
-    failure = String((error as Error).message ?? error);
+    failure = toErrorMessage(error);
   }
   if (failure === null) {
     return;

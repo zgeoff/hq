@@ -13,6 +13,7 @@ import { isLanesAlertTopic } from '../lanes/lanes-alert-topics.ts';
 import { OutboxSchema } from './outbox-schema.ts';
 import type { FlushResult, OutboxRow } from './types.ts';
 import { unsent } from './unsent.ts';
+import { toErrorMessage } from '../to-error-message.ts';
 
 const AskStateSchema = buildRowSchema('asks').pick({ state: true });
 const CurrentSchema = OutboxSchema.pick({ target: true, idem_key: true, status: true });
@@ -73,16 +74,16 @@ export async function flush(db: Database, opts: { retryFailed?: boolean; ids?: n
         );
         result.sent++;
       } catch (e) {
-        const msg = String((e as Error).message ?? e);
+        const message = toErrorMessage(e);
         if (!still()) {
           continue;
         }
         // Another flush sent it meanwhile: that is no failure of this one.
-        if (markFailed(db, [{ id: row.id, idem_key: cur.idem_key }], msg) === 0) {
+        if (markFailed(db, [{ id: row.id, idem_key: cur.idem_key }], message) === 0) {
           continue;
         }
         result.failed++;
-        result.errors.push(`${row.target}: ${msg}`);
+        result.errors.push(`${row.target}: ${message}`);
       }
     }
   } finally {

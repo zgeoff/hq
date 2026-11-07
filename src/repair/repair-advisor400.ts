@@ -13,6 +13,7 @@ import { planRepair } from './plan-repair.ts';
 import { planText } from './plan-text.ts';
 import { repairedText } from './repaired-text.ts';
 import { transcriptPath } from './transcript-path.ts';
+import { toErrorMessage } from '../to-error-message.ts';
 
 export async function repairAdvisor400(target: string | undefined, opts: { file?: string; apply: boolean }): Promise<{ data: Record<string, unknown>; text: string }> {
   if (!target && !opts.file) throw new HqError('bad_args', 'give the session: hq repair advisor-400 <session>, or --file <transcript.jsonl>');
@@ -61,7 +62,7 @@ async function locate(target: string | undefined, file: string | undefined): Pro
   try {
     atc = await AtcClient.open();
   } catch (e) {
-    throw new HqError('atc_unreachable', `hq checks with atc that the session is stopped before it repairs; ${(e as Error).message}`);
+    throw new HqError('atc_unreachable', `hq checks with atc that the session is stopped before it repairs; ${toErrorMessage(e)}`);
   }
   try {
     const all = (await atc.sessions()) as WireSession[];
