@@ -21,7 +21,7 @@ const TOLD = 'lanes_all_skipped_told';
 const TOPIC = 'lanes-all-skipped';
 
 export function checkAllSkipped(db: Database, slotPlan: SlotPlan, actor: string): boolean {
-  const held = [IMP_LINE_HELD.memory, IMP_LINE_HELD.vcpu].some((line) => line === slotPlan.pool.held);
+  const held = Object.values(IMP_LINE_HELD).some((line) => line === slotPlan.pool.held);
   if (slotPlan.eligible !== 0 || slotPlan.skipped.length === 0 || (slotPlan.pool.free === 0 && !held)) {
     setMeta(db, TOLD, null);
     removeAllSkippedAlerts(db);

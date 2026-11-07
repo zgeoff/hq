@@ -43,6 +43,7 @@ export interface Impd {
   nonnixAwakeMib: number | null;
   nonnixAwakeVcpus: number | null;
   nixAwakeMib: number | null;
+  priorityKeptMib: number | null;
 }
 
 export interface Rule {
