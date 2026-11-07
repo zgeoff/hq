@@ -22,6 +22,10 @@ function formatReason(reason: string | undefined): string {
   if (reason === undefined || reason.trim() === '') {
     return NO_TEXT;
   }
+  const timedOut = /^(?<adapter>\S+) timed out after \d+ ms on call \S+$/u.exec(reason.trim());
+  if (timedOut?.groups?.['adapter'] !== undefined) {
+    return `${timedOut.groups['adapter']} timed out`;
+  }
   const generic = reason.replace(/ on call \S+:\s*/u, ': ').trim();
   return generic.endsWith(':') ? `${generic} ${NO_TEXT}` : generic;
 }

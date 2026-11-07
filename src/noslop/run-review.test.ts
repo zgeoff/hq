@@ -152,6 +152,16 @@ test('it refuses --timeout for a PR on Codex, and runs nothing', async () => {
   expect(fake.of('bun')).toStrictEqual([]);
 });
 
+test('it refuses --adapter for a PR on Codex, and runs nothing', async () => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner();
+
+  await expect(runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false, adapter: 'claude' })).rejects.toMatchObject({ code: 'bad_args' });
+
+  expect(fake.of('codex')).toStrictEqual([]);
+  expect(fake.of('bun')).toStrictEqual([]);
+});
+
 test('it reviews a listed repo\'s PR on noslop though a Codex review file of the PR exists', async () => {
   const ctx = setupTest();
   const fake = buildFakeRunner();

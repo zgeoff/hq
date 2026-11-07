@@ -30,6 +30,7 @@ import { parseReviewTimeout } from './parse-review-timeout.ts';
 import { runNoslopReview } from './run-noslop-review.ts';
 import type { NoslopReviewContext, NoslopReviewResult } from './run-noslop-review.ts';
 import { loadNoslopSettings } from './load-noslop-settings.ts';
+import type { ReviewAdapter } from './parse-review-adapter.ts';
 import type { PRRequest } from './types.ts';
 import type { FixCheck } from './parse-review-run.ts';
 
@@ -41,7 +42,7 @@ export interface ReviewRequest extends PRRequest {
 
   fixesOnly?: boolean | undefined;
 
-  adapter?: string | undefined;
+  adapter?: ReviewAdapter | undefined;
 
   timeout?: string | undefined;
 
@@ -99,6 +100,9 @@ function requireCodexFlags(request: ReviewRequest, parsed: ParsedRepo): void {
   }
   if (request.timeout !== undefined) {
     throw new HqError('bad_args', `--timeout limits a noslop run, but ${parsed.repo}#${request.pr} is reviewed by Codex`);
+  }
+  if (request.adapter !== undefined) {
+    throw new HqError('bad_args', `--adapter picks the model of a noslop run, but ${parsed.repo}#${request.pr} is reviewed by Codex`);
   }
 }
 

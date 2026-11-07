@@ -2,6 +2,7 @@ import type { Ctx, Out } from './commands.ts';
 import { HqError } from './errors.ts';
 import { checkRecordedGate } from './pr-status/check-recorded-gate.ts';
 import { findReviewTimeoutRefusal } from './noslop/find-review-timeout-refusal.ts';
+import { parseReviewAdapter } from './noslop/parse-review-adapter.ts';
 import { runReview } from './noslop/run-review.ts';
 import { formatNoslopReview } from './noslop/format-noslop-review.ts';
 import type { PRRequest } from './noslop/types.ts';
@@ -59,7 +60,7 @@ async function runReviewPR(ctx: Ctx): Promise<Out> {
   }
   const base = buildRequest(ctx, ctx.verb, ctx.rest[0]);
   const effort = parseEffort(toTextFlag(ctx.flags.effort));
-  const result = await runReview({ ...base, watch: !ctx.flags['no-watch'], effort, full: ctx.flags.full === true, fixesOnly: ctx.flags['fixes-only'] === true, adapter: toTextFlag(ctx.flags.adapter), timeout, confirm: ctx.flags.confirm === true });
+  const result = await runReview({ ...base, watch: !ctx.flags['no-watch'], effort, full: ctx.flags.full === true, fixesOnly: ctx.flags['fixes-only'] === true, adapter: parseReviewAdapter(toTextFlag(ctx.flags.adapter)), timeout, confirm: ctx.flags.confirm === true });
   if ('engine' in result) {
     return { data: { ...result }, text: formatNoslopReview(result) };
   }
