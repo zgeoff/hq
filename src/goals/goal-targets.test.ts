@@ -37,9 +37,9 @@ test('unreadable stored targets fall back to the defaults', () => {
 test.each([
   { name: 'a value that is not a number', target: { op: '<', value: 'high' } },
   { name: 'an until that is not text', target: { op: '>', value: 70, until: 4 } },
-])('it falls back to the default for a stored target with $name', ({ target }) => {
+])('it falls back to the default for a stored target with $name', (row) => {
   const ctx = setupTest();
-  setMeta(ctx.db, 'goal_targets', JSON.stringify({ features: target }));
+  setMeta(ctx.db, 'goal_targets', JSON.stringify({ features: row.target }));
 
   const stored = goalTargets(ctx.db);
 

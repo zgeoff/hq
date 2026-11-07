@@ -21,7 +21,7 @@ test('it reads the errors a sample stored', async () => {
 
   const log = await ctx.readLog();
 
-  expect(log.map((reading) => reading.errors)).toStrictEqual([{ cloud: 'timed out' }]);
+  expect(log.map((sample) => sample.errors)).toStrictEqual([{ cloud: 'timed out' }]);
 });
 
 test('it reads an empty errors column as no errors', async () => {
@@ -36,9 +36,9 @@ test('it reads an empty errors column as no errors', async () => {
 test.each([
   { name: 'text that is not JSON', errorsText: '{oops' },
   { name: 'an error that is not text', errorsText: '{"cloud":4}' },
-])('it rejects a sample whose errors column holds $name', async ({ errorsText }) => {
+])('it rejects a sample whose errors column holds $name', async (row) => {
   const ctx = setupTest();
-  seedCapacitySampleErrors(ctx.db, '2026-10-14T00:00:00Z', errorsText);
+  seedCapacitySampleErrors(ctx.db, '2026-10-14T00:00:00Z', row.errorsText);
 
   await expect(ctx.readLog()).rejects.toThrow();
 });
