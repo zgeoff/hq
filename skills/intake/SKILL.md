@@ -50,6 +50,7 @@ Avoid these traps:
 - [examples.md](references/examples.md): starting work, and a side request.
 - [morning-reports.md](references/morning-reports.md): hq's "Morning reports due".
 - [noslop-checkin.md](references/noslop-checkin.md): the daily noslop check-in.
+- [requests.md](references/requests.md): a bug or request that needs a subagent's draft.
 - [pr-walk.md](references/pr-walk.md): a walk through PRs whose reviews took rework.
 - [post-review.md](references/post-review.md): the PRs to review after their merge.
 - [session-care.md](references/session-care.md): a restart, forgetting a session, and the vaults.
@@ -100,16 +101,11 @@ yes, so offer no choice of slot or of which session goes first.
 ## Bugs and requests
 
 1. Ask only what the owner alone knows, at most two questions.
-2. Spawn a subagent for anything beyond a one-line request whose repo is obvious. It loads the
-   [tickets](../tickets/SKILL.md) skill, searches GEO for duplicates, reads the code, recent PRs and
-   running sessions, and reproduces the bug if that is cheap and read-only. It returns only a draft
-   in the tickets skill's sections, the evidence, any duplicate, and up to two questions.
-3. Put its questions to the owner, and fit the draft to the answers. For a duplicate of GEO-n,
-   comment the new evidence there. Otherwise file it in GEO's Triage, related to each issue the
-   subagent found.
-4. If the bug blocks shipped work or a running agent, tell `z-delivery` the issue and why it's
+2. Spawn a subagent for anything beyond a one-line request whose repo is obvious, and file its draft
+   as [requests.md](references/requests.md) says.
+3. If the bug blocks shipped work or a running agent, tell `z-delivery` the issue and why it's
    urgent.
-5. Tell the owner the issue ID and title in one line.
+4. Tell the owner the issue ID and title in one line.
 
 File a side remark the owner doesn't ask you to act on straight to Triage, with no subagent. For
 several requests, run the subagents in parallel, and take each result to the owner in turn, opening
