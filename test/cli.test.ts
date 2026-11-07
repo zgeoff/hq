@@ -81,7 +81,7 @@ test('errors have one JSON shape and a nonzero exit', async () => {
   await hq('proposal', 'add', 'tidy', '--title', 'Tidy', '--question', 'Ok?', '--body', 'Invented.');
   const r = await hq('proposal', 'open');
   expect(r.code).toBe(1);
-  expect(r.json).toEqual({ ok: false, error: { code: 'already_open', message: expect.any(String), open: 'geo-1-paint' } });
+  expect(r.json).toStrictEqual({ ok: false, error: { code: 'already_open', message: expect.any(String), open: 'geo-1-paint' } });
   const nope = await hq('call', 'add', '--nope');
   expect(findPath(nope.json, 'error', 'code')).toBe('bad_args');
 });
