@@ -34,7 +34,7 @@ Avoid these traps:
 - [Unsticking a run](#unsticking-a-run): find the cause, then relaunch, change the brief, or hand
   it on.
 - [Pitches](#pitches): a numbered list to `z-triage`, each Action needing approval on its own line.
-- [Judging overlap](#judging-overlap): hold an issue whose Scope touches a running run's files.
+- [Judging overlap](#judging-overlap): skip an issue whose Scope touches a running run's files.
 - [Pins and endings](#pins-and-endings): pin only what needs the owner; end only a relaunch's old
   session.
 
@@ -54,7 +54,7 @@ Read the first three before every launch.
 hq doesn't launch Ready issues. Fill each free slot `hq lanes` shows:
 
 1. Take the next Ready issue in `hq focus show` order whose Type the slot's `placeTypes` allows.
-2. If it overlaps a running run, hold it, as [Judging overlap](#judging-overlap) says. If it needs
+2. If it overlaps a running run, skip it, as [Judging overlap](#judging-overlap) says. If it needs
    an Action the owner must approve, [pitch](#pitches) it.
 3. Run `hq brief`, and launch it as launching.md says.
 
@@ -159,14 +159,9 @@ launch with a new `hq brief`, which puts them in the brief's Permissions.
 
 ## Judging overlap
 
-Hold a Ready issue when a run in its repo changes a file its Scope names, by the running issue's
-Scope or the run's diff. A shared config file or lockfile doesn't count.
-
-```bash
-hq lanes skip <issue> --until <the running issue's ID> --reason overlap
-```
-
-The hold ends when the running issue is Done or Canceled.
+Skip a Ready issue when a running issue in its repo, by Scope or PR diff, changes a file the Ready
+issue's Scope names. A shared config file or lockfile doesn't count. Run
+`hq lanes skip <issue> --until <the running issue's ID> --reason overlap`. hq ends the skip when the running issue is Done or Canceled.
 
 ## Pins and endings
 
