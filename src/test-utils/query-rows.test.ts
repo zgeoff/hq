@@ -1,92 +1,97 @@
-import { Database } from 'bun:sqlite';
 import { expect, onTestFinished, test } from 'bun:test';
 import { z } from 'zod';
+import { freshDb } from '../../test/helpers.ts';
+import { logEvent } from '../log-event.ts';
 import { queryColumn, queryRow, queryRows, queryValue, readRow } from './query-rows.ts';
 
 function setupTest() {
-  const db = new Database(':memory:');
-  onTestFinished(() => db.close());
-  db.run('CREATE TABLE notes (id INTEGER PRIMARY KEY, title TEXT NOT NULL, owner TEXT)');
-  return { db, titleSchema: z.object({ title: z.string() }) };
+  const fresh = freshDb();
+  onTestFinished(fresh.cleanup);
+  return { db: fresh.db, actionSchema: z.object({ action: z.string() }) };
 }
 
 test('it reads every row that matches, dropping columns the schema omits', () => {
   const ctx = setupTest();
-  ctx.db.run("INSERT INTO notes (title, owner) VALUES ('Groceries', 'ada'), ('Taxes', 'bo')");
+  logEvent(ctx.db, 'ask', 'ask-1', 'kettle-boiled', 'ada', null, null);
+  logEvent(ctx.db, 'ask', 'ask-1', 'tea-poured', 'bo', null, null);
 
-  expect(queryRows(ctx.db, 'SELECT * FROM notes ORDER BY id', ctx.titleSchema)).toStrictEqual([{ title: 'Groceries' }, { title: 'Taxes' }]);
+  expect(queryRows(ctx.db, 'SELECT * FROM events ORDER BY seq', ctx.actionSchema)).toStrictEqual([{ action: 'kettle-boiled' }, { action: 'tea-poured' }]);
 });
 
 test('it binds the values it is given', () => {
   const ctx = setupTest();
-  ctx.db.run("INSERT INTO notes (title, owner) VALUES ('Groceries', 'ada'), ('Taxes', 'bo')");
+  logEvent(ctx.db, 'ask', 'ask-1', 'kettle-boiled', 'ada', null, null);
+  logEvent(ctx.db, 'ask', 'ask-1', 'tea-poured', 'bo', null, null);
 
-  expect(queryRows(ctx.db, 'SELECT title FROM notes WHERE owner = ?', ctx.titleSchema, 'bo')).toStrictEqual([{ title: 'Taxes' }]);
+  expect(queryRows(ctx.db, 'SELECT action FROM events WHERE actor = ?', ctx.actionSchema, 'bo')).toStrictEqual([{ action: 'tea-poured' }]);
 });
 
 test('it rejects a row that does not fit the schema', () => {
   const ctx = setupTest();
-  ctx.db.run("INSERT INTO notes (title, owner) VALUES ('Groceries', NULL)");
+  logEvent(ctx.db, 'ask', 'ask-1', 'kettle-boiled', 'ada', null, null);
 
-  expect(() => queryRows(ctx.db, 'SELECT owner FROM notes', z.object({ owner: z.string() }))).toThrow(/owner/u);
+  expect(() => queryRows(ctx.db, 'SELECT to_state FROM events', z.object({ to_state: z.string() }))).toThrow(/to_state/u);
 });
 
 test('it reads null when a query that can miss returns no row', () => {
   const ctx = setupTest();
 
-  expect(readRow(ctx.db, 'SELECT title FROM notes', ctx.titleSchema)).toBeNull();
+  expect(readRow(ctx.db, 'SELECT action FROM events', ctx.actionSchema)).toBeNull();
 });
 
 test('it reads the first row of a query that can miss', () => {
   const ctx = setupTest();
-  ctx.db.run("INSERT INTO notes (title) VALUES ('Groceries'), ('Taxes')");
+  logEvent(ctx.db, 'ask', 'ask-1', 'kettle-boiled', 'ada', null, null);
+  logEvent(ctx.db, 'ask', 'ask-1', 'tea-poured', 'bo', null, null);
 
-  expect(readRow(ctx.db, 'SELECT title FROM notes ORDER BY id', ctx.titleSchema)).toStrictEqual({ title: 'Groceries' });
+  expect(readRow(ctx.db, 'SELECT action FROM events ORDER BY seq', ctx.actionSchema)).toStrictEqual({ action: 'kettle-boiled' });
 });
 
 test('it throws when a query that must return a row returns none', () => {
   const ctx = setupTest();
 
-  expect(() => queryRow(ctx.db, 'SELECT title FROM notes', ctx.titleSchema)).toThrow(/no row/u);
+  expect(() => queryRow(ctx.db, 'SELECT action FROM events', ctx.actionSchema)).toThrow(/no row/u);
 });
 
 test('it returns the first row of a query that must return one', () => {
   const ctx = setupTest();
-  ctx.db.run("INSERT INTO notes (title) VALUES ('Groceries')");
+  logEvent(ctx.db, 'ask', 'ask-1', 'kettle-boiled', 'ada', null, null);
 
-  expect(queryRow(ctx.db, 'SELECT title FROM notes', ctx.titleSchema)).toStrictEqual({ title: 'Groceries' });
+  expect(queryRow(ctx.db, 'SELECT action FROM events', ctx.actionSchema)).toStrictEqual({ action: 'kettle-boiled' });
 });
 
 test('it reads the first column of every row', () => {
   const ctx = setupTest();
-  ctx.db.run("INSERT INTO notes (title, owner) VALUES ('Groceries', 'ada'), ('Taxes', 'bo')");
+  logEvent(ctx.db, 'ask', 'ask-1', 'kettle-boiled', 'ada', null, null);
+  logEvent(ctx.db, 'ask', 'ask-1', 'tea-poured', 'bo', null, null);
 
-  expect(queryColumn(ctx.db, 'SELECT title, owner FROM notes ORDER BY id', z.string())).toStrictEqual(['Groceries', 'Taxes']);
+  expect(queryColumn(ctx.db, 'SELECT action, actor FROM events ORDER BY seq', z.string())).toStrictEqual(['kettle-boiled', 'tea-poured']);
 });
 
 test('it rejects a column value that does not fit the schema', () => {
   const ctx = setupTest();
-  ctx.db.run("INSERT INTO notes (title) VALUES ('Groceries')");
+  logEvent(ctx.db, 'ask', 'ask-1', 'kettle-boiled', 'ada', null, null);
 
-  expect(() => queryColumn(ctx.db, 'SELECT title FROM notes', z.number())).toThrow(/number/u);
+  expect(() => queryColumn(ctx.db, 'SELECT action FROM events', z.number())).toThrow(/number/u);
 });
 
 test('it reads the first column of the first row, with the binds it is given', () => {
   const ctx = setupTest();
-  ctx.db.run("INSERT INTO notes (title, owner) VALUES ('Groceries', 'ada'), ('Taxes', 'bo')");
+  logEvent(ctx.db, 'ask', 'ask-1', 'kettle-boiled', 'ada', null, null);
+  logEvent(ctx.db, 'ask', 'ask-1', 'tea-poured', 'bo', null, null);
 
-  expect(queryValue(ctx.db, 'SELECT title FROM notes WHERE owner = ?', z.string(), 'bo')).toBe('Taxes');
+  expect(queryValue(ctx.db, 'SELECT action FROM events WHERE actor = ?', z.string(), 'bo')).toBe('tea-poured');
 });
 
 test('it reads a null first column when the schema allows one', () => {
   const ctx = setupTest();
-  ctx.db.run("INSERT INTO notes (title, owner) VALUES ('Groceries', NULL)");
+  logEvent(ctx.db, 'ask', 'ask-1', 'kettle-boiled', 'ada', null, null);
 
-  expect(queryValue(ctx.db, 'SELECT owner FROM notes', z.string().nullable())).toBeNull();
+  expect(queryValue(ctx.db, 'SELECT to_state FROM events', z.string().nullable())).toBeNull();
 });
 
 test('it throws when a query that must return a value returns no row', () => {
   const ctx = setupTest();
 
-  expect(() => queryValue(ctx.db, 'SELECT title FROM notes', z.string())).toThrow(/no row/u);
+  expect(() => queryValue(ctx.db, 'SELECT action FROM events', z.string())).toThrow(/no row/u);
 });
