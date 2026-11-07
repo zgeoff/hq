@@ -8,7 +8,7 @@ import { logEvent } from '../log-event.ts';
 import { newSincePush } from './new-since-push.ts';
 import { pushedSeq } from './pushed-seq.ts';
 
-const MaxSeqSchema = z.object({ m: z.number().nullable() });
+const MaxSeqSchema = z.object({ max: z.number().nullable() });
 
 // Moves the cursor to `upto`, the cursor value `hq unblock new` returned, so an
 // item added between reading the list and pushing it is never marked pushed.
@@ -19,7 +19,7 @@ export function markPushed(db: Database, upto: number, actor: string): { cursor:
       if (upto <= prev) {
         return { cursor: prev, covered: 0 };
       }
-      const max = runSyncRow(db, kdb(db).selectFrom('unblocks').select((eb) => eb.fn.max('added_seq').as('m')).compile(), MaxSeqSchema)?.m ?? 0;
+      const max = runSyncRow(db, kdb(db).selectFrom('unblocks').select((eb) => eb.fn.max('added_seq').as('max')).compile(), MaxSeqSchema)?.max ?? 0;
       if (upto > max) throw new HqError('bad_args', `--upto ${upto} is past the newest item (${max})`);
       const covered = newSincePush(db).filter((u) => u.added_seq <= upto).length;
       setMeta(db, 'unblock_pushed_seq', String(upto));

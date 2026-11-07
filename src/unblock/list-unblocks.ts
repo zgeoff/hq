@@ -8,5 +8,5 @@ import type { UnblockItem } from './types.ts';
 export function listUnblocks(db: Database, state: 'open' | 'done' | 'dropped' | 'all' = 'open'): UnblockItem[] {
   const all = kdb(db).selectFrom('unblocks').selectAll();
   const query = (state === 'all' ? all : all.where('state', '=', state)).compile();
-  return runSyncQuery(db, query, UnblockRowSchema).sort(compareUnblock);
+  return runSyncQuery(db, query, UnblockRowSchema).toSorted(compareUnblock);
 }

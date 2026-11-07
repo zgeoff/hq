@@ -25,9 +25,11 @@ export function sweep(db: Database, alerts: Alert[], actor: string): { sent: Ale
         if (!keys.has(row.key)) db.query('DELETE FROM run_alerts WHERE key = ?').run(row.key);
       }
       const due = alerts.filter((a) => {
-        const prev = runSyncRow(db, kdb(db).selectFrom('run_alerts').select(['fingerprint', 'sent_at', 'event_seq']).where('key', '=', a.key).compile(), AlertSchema.pick({ fingerprint: true, sent_at: true, event_seq: true }));
-        if (!prev || prev.fingerprint !== a.fingerprint || mins(prev.sent_at, t) >= SWEEP.repeatMinutes()) return true;
-        const delivered = prev.event_seq !== null && db.query(`SELECT 1 FROM outbox WHERE event_seq = ? AND status = 'sent'`).get(prev.event_seq);
+        const previous = runSyncRow(db, kdb(db).selectFrom('run_alerts').select(['fingerprint', 'sent_at', 'event_seq']).where('key', '=', a.key).compile(), AlertSchema.pick({ fingerprint: true, sent_at: true, event_seq: true }));
+        if (!previous || previous.fingerprint !== a.fingerprint || mins(previous.sent_at, t) >= SWEEP.repeatMinutes()) {
+          return true;
+        }
+        const delivered = previous.event_seq !== null && db.query(`SELECT 1 FROM outbox WHERE event_seq = ? AND status = 'sent'`).get(previous.event_seq);
         return !delivered;
       });
       if (alerts.length === 0) dropTopic(db, orchestratorName(), 'run-sweep');
@@ -47,6 +49,6 @@ export function sweep(db: Database, alerts: Alert[], actor: string): { sent: Ale
 
 // An undelivered alert alone waits for the outbox retry instead of re-queueing every tick.
 function isNews(db: Database, a: Alert, t: Date): boolean {
-  const prev = runSyncRow(db, kdb(db).selectFrom('run_alerts').select(['fingerprint', 'sent_at']).where('key', '=', a.key).compile(), AlertSchema.pick({ fingerprint: true, sent_at: true }));
-  return !prev || prev.fingerprint !== a.fingerprint || mins(prev.sent_at, t) >= SWEEP.repeatMinutes();
+  const previous = runSyncRow(db, kdb(db).selectFrom('run_alerts').select(['fingerprint', 'sent_at']).where('key', '=', a.key).compile(), AlertSchema.pick({ fingerprint: true, sent_at: true }));
+  return !previous || previous.fingerprint !== a.fingerprint || mins(previous.sent_at, t) >= SWEEP.repeatMinutes();
 }

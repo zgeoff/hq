@@ -8,11 +8,11 @@ import { RunSessionSchema } from './run-session-schema.ts';
 import type { Run, RunView } from './types.ts';
 
 export function viewRun(db: Database, r: Run): RunView {
-  const k = kdb(db);
+  const database = kdb(db);
   return {
     ...r,
-    sessions: runSyncQuery(db, k.selectFrom('run_sessions').selectAll().where('issue', '=', r.issue).orderBy('active', 'desc').orderBy('helper').orderBy('added_at', 'desc').compile(), RunSessionSchema),
-    prs: runSyncQuery(db, k.selectFrom('run_prs').selectAll().where('issue', '=', r.issue).orderBy('added_at').compile(), RunPrSchema),
-    lastNote: runSyncRow(db, k.selectFrom('run_notes').selectAll().where('issue', '=', r.issue).orderBy('id', 'desc').limit(1).compile(), RunNoteSchema),
+    sessions: runSyncQuery(db, database.selectFrom('run_sessions').selectAll().where('issue', '=', r.issue).orderBy('active', 'desc').orderBy('helper').orderBy('added_at', 'desc').compile(), RunSessionSchema),
+    prs: runSyncQuery(db, database.selectFrom('run_prs').selectAll().where('issue', '=', r.issue).orderBy('added_at').compile(), RunPrSchema),
+    lastNote: runSyncRow(db, database.selectFrom('run_notes').selectAll().where('issue', '=', r.issue).orderBy('id', 'desc').limit(1).compile(), RunNoteSchema),
   };
 }

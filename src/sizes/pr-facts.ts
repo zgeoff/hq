@@ -8,13 +8,14 @@ import type { PrFacts } from './types.ts';
 const OWNER = 'zgeoff';
 const ownerOf = (p: { url: string | null }) => (p.url ? /github\.com\/([\w.-]+)\//.exec(p.url)?.[1] : null) ?? OWNER;
 
-interface Gql {
-  additions: number;
-  deletions: number;
-  baseRefName: string;
-  repository: { defaultBranchRef: { name: string } | null };
-  timelineItems: { nodes: { previousRefName?: string }[] };
-}
+const BaseChangeSchema = z.object({ previousRefName: z.string().optional() });
+const TimelineSchema = z.object({ nodes: z.array(BaseChangeSchema) });
+const BranchRefSchema = z.object({ name: z.string() });
+const RepositorySchema = z.object({ defaultBranchRef: BranchRefSchema.nullable() });
+const PullRequestFieldsSchema = z.object({ additions: z.number(), deletions: z.number(), baseRefName: z.string(), repository: RepositorySchema, timelineItems: TimelineSchema });
+const PullRequestSchema = z.object({ pullRequest: PullRequestFieldsSchema.nullable() });
+const BranchSchema = z.object({ pullRequests: z.object({ totalCount: z.number() }) });
+const ReplySchema = z.object({ data: z.record(z.string(), z.unknown()).nullish() });
 
 // A base counts as a stack only when another PR's head was that branch (a release branch is not).
 // A merged PR doesn't change, so its facts are cached for good.
@@ -26,7 +27,7 @@ export async function prFacts(db: Database, run: Runner, prs: { ref: string; url
     const r = await run(['gh', 'api', 'graphql', '-f', `query=query { ${parts.join(' ')} }`], env ? { env } : {});
     try {
       // GitHub answers a missing repo or PR with partial data and errors: keep what it found.
-      const data = (JSON.parse(r.stdout) as { data?: Record<string, unknown> }).data ?? {};
+      const data = ReplySchema.parse(JSON.parse(r.stdout)).data ?? {};
       return r.code !== 0 && !Object.values(data).some(Boolean) ? null : data;
     } catch {
       return null;
@@ -43,7 +44,7 @@ export async function prFacts(db: Database, run: Runner, prs: { ref: string; url
     );
     if (!data) return null;
     chunk.forEach((p, k) => {
-      const pr = (data[`p${k}`] as { pullRequest: Gql | null } | null)?.pullRequest;
+      const pr = PullRequestSchema.nullish().parse(data[`p${k}`])?.pullRequest;
       if (!pr) return;
       const main = pr.repository.defaultBranchRef?.name ?? 'main';
       const bases = [pr.baseRefName, ...pr.timelineItems.nodes.map((n) => n.previousRefName ?? '')].filter((b) => b && b !== main);
@@ -59,7 +60,7 @@ export async function prFacts(db: Database, run: Runner, prs: { ref: string; url
     const data = await ask(chunk.map(([, x], k) => `b${k}: repository(owner: "${x.owner}", name: "${x.repo}") { pullRequests(headRefName: ${JSON.stringify(x.b)}, first: 1) { totalCount } }`));
     if (!data) return null;
     chunk.forEach(([id], k) => {
-      const hit = data[`b${k}`] as { pullRequests: { totalCount: number } } | null | undefined;
+      const hit = BranchSchema.nullish().parse(data[`b${k}`]);
       if (!hit) unknown.add(id);
       else if (hit.pullRequests.totalCount > 0) fromPr.add(id);
     });

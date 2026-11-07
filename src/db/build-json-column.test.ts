@@ -12,12 +12,14 @@ test.each([
   { name: 'text that is not JSON', text: '{oops' },
   { name: 'JSON of the wrong shape', text: '{"a":1}' },
   { name: 'an empty string', text: '' },
-])('it fails $name as a schema issue', ({ text }) => {
-  const result = buildJSONColumn(z.array(z.string())).safeParse(text);
+])('it fails $name as a schema issue', (testCase) => {
+  const column = buildJSONColumn(z.array(z.string()));
 
-  expect(result.success).toBe(false);
+  expect(column.safeParse(testCase.text).success).toBe(false);
 });
 
 test('it fails a value that is not text', () => {
-  expect(buildJSONColumn(z.array(z.string())).safeParse(['GEO-1']).success).toBe(false);
+  const column = buildJSONColumn(z.array(z.string()));
+
+  expect(column.safeParse(['GEO-1']).success).toBe(false);
 });

@@ -12,5 +12,5 @@ export function listRuns(db: Database, all = false): RunView[] {
     .$if(!all, (builder) => builder.where('state', 'not in', ['done', 'dropped']))
     .orderBy('created_at')
     .compile();
-  return runSyncQuery(db, query, RunSchema).map((r) => viewRun(db, r));
+  return runSyncQuery(db, query, RunSchema).map((run) => viewRun(db, run));
 }

@@ -4,15 +4,23 @@ import { fleetIds } from '../atc/fleet-ids.ts';
 import { iso } from '../clock/iso.ts';
 import { now } from '../clock/now.ts';
 import { config } from '../config/config.ts';
+import { buildRowSchema } from '../db/build-row-schema.ts';
+import { runSyncRow } from '../db/run-sync-row.ts';
 import { isQuietHeld } from '../is-quiet-held.ts';
 import { getLanesHold } from '../lanes/get-lanes-hold.ts';
+import { kdb } from '../kdb.ts';
 import { isLanesAlertTopic } from '../lanes/lanes-alert-topics.ts';
+import { OutboxSchema } from './outbox-schema.ts';
 import type { FlushResult, OutboxRow } from './types.ts';
 import { unsent } from './unsent.ts';
 
+const AskStateSchema = buildRowSchema('asks').pick({ state: true });
+const CurrentSchema = OutboxSchema.pick({ target: true, idem_key: true, status: true });
+const KeySchema = OutboxSchema.pick({ idem_key: true });
+
 export async function flush(db: Database, opts: { retryFailed?: boolean; ids?: number[] } = {}): Promise<FlushResult> {
   const result: FlushResult = { sent: 0, failed: 0, dropped: 0, skipped: false, errors: [] };
-  const rows = unsent(db, opts.retryFailed ?? false, opts.ids, '*') as OutboxRow[];
+  const rows = unsent(db, opts.retryFailed ?? false, opts.ids);
   if (rows.length === 0) return result;
   if (config().HQ_NOTIFY === 'off') {
     result.skipped = true;
@@ -34,8 +42,8 @@ export async function flush(db: Database, opts: { retryFailed?: boolean; ids?: n
     for (const row of rows) {
       const readyId = row.topic?.startsWith('ready:') ? row.topic.slice(6) : null;
       if (readyId) {
-        const a = db.query('SELECT state FROM asks WHERE id = ?').get(readyId) as { state: string } | null;
-        if (!a || a.state !== 'queued') {
+        const ask = runSyncRow(db, kdb(db).selectFrom('asks').select('state').where('id', '=', readyId).compile(), AskStateSchema);
+        if (!ask || ask.state !== 'queued') {
           db.query('DELETE FROM outbox WHERE id = ?').run(row.id);
           result.dropped++;
           continue;
@@ -48,9 +56,9 @@ export async function flush(db: Database, opts: { retryFailed?: boolean; ids?: n
         continue;
       }
       // Read the row again: a forward or a drop may have changed it since the select.
-      const cur = db.query('SELECT target, idem_key, status FROM outbox WHERE id = ?').get(row.id) as { target: string; idem_key: string; status: string } | null;
+      const cur = runSyncRow(db, kdb(db).selectFrom('outbox').select(['target', 'idem_key', 'status']).where('id', '=', row.id).compile(), CurrentSchema);
       if (!cur || cur.status === 'sent') continue;
-      const still = () => (db.query('SELECT idem_key, status FROM outbox WHERE id = ?').get(row.id) as { idem_key: string; status: string } | null)?.idem_key === cur.idem_key;
+      const still = () => runSyncRow(db, kdb(db).selectFrom('outbox').select('idem_key').where('id', '=', row.id).compile(), KeySchema)?.idem_key === cur.idem_key;
       try {
         const session = await client.resolve(cur.target, known);
         if (!still()) {

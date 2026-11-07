@@ -15,6 +15,7 @@ import type { Kind } from './kinds.ts';
 import { isIssueType } from './is-issue-type.ts';
 import { KINDS } from './kinds.ts';
 import { mondayOf } from './monday-of.ts';
+import { readFetchedDays } from './read-fetched-days.ts';
 import { toUTCDay as utcDay } from './to-utc-day.ts';
 import { TYPE_COLS } from './type-cols.ts';
 import type { KindWeek } from './types.ts';
@@ -27,7 +28,7 @@ const zeroTypes = () => Object.fromEntries(TYPE_COLS.map((t) => [t, 0])) as Reco
 const pct = (a: number, b: number) => (b ? Math.round((a / b) * 1000) / 10 : null);
 
 export function kindWeeks(db: Database, weeks: number, at: Date = now()): KindWeek[] {
-  const have = new Set(runSyncQuery(db, kdb(db).selectFrom('merged_pr_days').select('day').compile(), buildRowSchema('merged_pr_days').pick({ day: true })).map((r) => r.day));
+  const have = readFetchedDays(db);
   const today = utcDay(at.getTime());
   const out: KindWeek[] = [];
   let mon = mondayOf(at);
@@ -40,7 +41,7 @@ export function kindWeeks(db: Database, weeks: number, at: Date = now()): KindWe
       db,
       kdb(db)
         .selectFrom('merged_prs')
-        .select((eb) => ['kind', eb.fn.countAll<number>().as('n')])
+        .select((eb) => ['kind', eb.fn.countAll<number>().as('count')])
         .where('merged_at', '>=', from)
         .where('merged_at', '<', to)
         .where('repo', 'in', IN_SCOPE)
@@ -49,8 +50,10 @@ export function kindWeeks(db: Database, weeks: number, at: Date = now()): KindWe
       KindCountSchema,
     );
     const kinds = Object.fromEntries([...KINDS, 'other'].map((k) => [k, 0])) as Record<Kind, number>;
-    for (const r of rows) kinds[r.kind] = r.n;
-    const total = rows.reduce((a, r) => a + r.n, 0);
+    for (const row of rows) {
+      kinds[row.kind] = row.count;
+    }
+    const total = rows.reduce((sum, row) => sum + row.count, 0);
     let missing = 0;
     for (let t = Date.parse(`${utcDay(mon.getTime())}T00:00:00Z`); t < hi; t += DAY) if (utcDay(t) !== today && !have.has(utcDay(t))) missing++;
     const prTypes = zeroTypes();
@@ -60,7 +63,7 @@ export function kindWeeks(db: Database, weeks: number, at: Date = now()): KindWe
       kdb(db)
         .selectFrom('merged_prs as p')
         .leftJoin('linear_issues as l', 'l.issue', 'p.issue')
-        .select((eb) => ['l.type as type', eb.fn.countAll<number>().as('n')])
+        .select((eb) => ['l.type as type', eb.fn.countAll<number>().as('count')])
         .where('p.merged_at', '>=', from)
         .where('p.merged_at', '<', to)
         .where('p.repo', 'in', IN_SCOPE)
@@ -68,9 +71,12 @@ export function kindWeeks(db: Database, weeks: number, at: Date = now()): KindWe
         .compile(),
       TypeCountSchema,
     );
-    for (const r of prTypeRows) {
-      if (r.type === null) prUnlinked += r.n;
-      else prTypes[isIssueType(r.type) ? r.type : 'none'] += r.n;
+    for (const row of prTypeRows) {
+      if (row.type === null) {
+        prUnlinked += row.count;
+      } else {
+        prTypes[isIssueType(row.type) ? row.type : 'none'] += row.count;
+      }
     }
     const issues = zeroTypes();
     let canceled = 0;
@@ -78,7 +84,7 @@ export function kindWeeks(db: Database, weeks: number, at: Date = now()): KindWe
       db,
       kdb(db)
         .selectFrom('linear_issues')
-        .select((eb) => ['state', 'type', eb.fn.countAll<number>().as('n')])
+        .select((eb) => ['state', 'type', eb.fn.countAll<number>().as('count')])
         .where('state', '!=', 'open')
         .where('closed_at', '>=', from)
         .where('closed_at', '<', to)
@@ -86,9 +92,12 @@ export function kindWeeks(db: Database, weeks: number, at: Date = now()): KindWe
         .compile(),
       ClosedCountSchema,
     );
-    for (const r of closedRows) {
-      if (r.state === 'canceled') canceled += r.n;
-      else issues[isIssueType(r.type) ? r.type : 'none'] += r.n;
+    for (const row of closedRows) {
+      if (row.state === 'canceled') {
+        canceled += row.count;
+      } else {
+        issues[isIssueType(row.type) ? row.type : 'none'] += row.count;
+      }
     }
     const linked = TYPE_COLS.reduce((a, t) => a + prTypes[t], 0);
     const done = TYPE_COLS.reduce((a, t) => a + issues[t], 0);

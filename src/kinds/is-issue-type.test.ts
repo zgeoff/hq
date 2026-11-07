@@ -7,6 +7,6 @@ test.each([
   { value: 'bug', expected: false },
   { value: 'toString', expected: false },
   { value: '', expected: false },
-])('it answers $expected for the issue type $value', ({ value, expected }) => {
-  expect(isIssueType(value)).toBe(expected);
+])('it answers $expected for the issue type $value', (testCase) => {
+  expect(isIssueType(testCase.value)).toBe(testCase.expected);
 });

@@ -1,16 +1,14 @@
 import type { Database } from 'bun:sqlite';
 import { now } from '../clock/now.ts';
 import { config } from '../config/config.ts';
-import { buildRowSchema } from '../db/build-row-schema.ts';
-import { runSyncQuery } from '../db/run-sync-query.ts';
-import { kdb } from '../kdb.ts';
 import type { RunOpts, Runner } from '../runner/types.ts';
 import { DAY } from './day.ts';
+import { readFetchedDays } from './read-fetched-days.ts';
 import { syncDay } from './sync-day.ts';
 import { toUTCDay as utcDay } from './to-utc-day.ts';
 
 export async function syncKinds(db: Database, run: Runner, opts: { from: Date; maxDays: number; env?: RunOpts['env'] }, at: Date = now()): Promise<{ days: string[]; prs: number; left: number }> {
-  const have = new Set(runSyncQuery(db, kdb(db).selectFrom('merged_pr_days').select('day').compile(), buildRowSchema('merged_pr_days').pick({ day: true })).map((r) => r.day));
+  const have = readFetchedDays(db);
   const want: string[] = [];
   for (let t = Date.parse(`${utcDay(opts.from.getTime())}T00:00:00Z`); t <= at.getTime(); t += DAY) {
     const d = utcDay(t);

@@ -9,11 +9,11 @@ const DoneWhenSchema = z.array(z.object({ kind: z.enum(['issue', 'pr', 'doc', 'r
 // A condition column nothing can read counts as no conditions, so one bad row never hides the list.
 const DoneWhenColumnSchema = z.string().nullable().transform(parseDoneWhenColumn);
 
-export const UnblockRowSchema = buildRowSchema('unblocks').extend({
-  unblocks: buildJSONColumn(z.array(z.object({ issue: z.string(), priority: z.enum(PRIORITIES) }))),
-  notify: buildJSONColumn(z.array(z.string())),
-  done_when: DoneWhenColumnSchema,
-});
+const UnblockedItemSchema = z.object({ issue: z.string(), priority: z.enum(PRIORITIES) });
+const UnblockedSchema = buildJSONColumn(z.array(UnblockedItemSchema));
+const NotifySchema = buildJSONColumn(z.array(z.string()));
+
+export const UnblockRowSchema = buildRowSchema('unblocks').extend({ unblocks: UnblockedSchema, notify: NotifySchema, done_when: DoneWhenColumnSchema });
 
 function parseDoneWhenColumn(column: string | null): DoneWhen[] {
   if (column === null) {

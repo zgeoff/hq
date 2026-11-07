@@ -28,7 +28,7 @@ export function queueReminder(db: Database, actor: string): { reminded: string |
       const epoch = Math.max(Date.parse(since), lastQuietEnd(t).getTime(), holdEnd ? Date.parse(holdEnd) : 0);
       const told = getMeta(db, `told:${next.id}`);
       if (told && Date.parse(told) >= epoch) return { reminded: null, why: `${owner()} already told about ${next.id}` };
-      const waiting = listAsks(db, { states: ['queued'] }).length + (runSyncRow(db, kdb(db).selectFrom('asks').select((eb) => eb.fn.countAll<number>().as('n')).where('state', '=', 'later').where('due_at', '<=', iso(t)).compile(), CountSchema)?.n ?? 0);
+      const waiting = listAsks(db, { states: ['queued'] }).length + (runSyncRow(db, kdb(db).selectFrom('asks').select((eb) => eb.fn.countAll<number>().as('count')).where('state', '=', 'later').where('due_at', '<=', iso(t)).compile(), CountSchema)?.count ?? 0);
       const seq = logEvent(db, 'ask', next.id, 'reminded', actor, next.state, next.state, { waiting });
       enqueue(db, seq, owner(), `${waiting} waiting for the owner; the floor is free. Next: ${next.kind} ${next.id}: ${next.title}. Open it with: hq open`, 'queue-reminder');
       setMeta(db, `told:${next.id}`, t.toISOString());

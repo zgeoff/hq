@@ -36,8 +36,6 @@ export interface UnblockItem {
   overdue_told_at: string | null;
 }
 
-export type Row = Omit<UnblockItem, 'unblocks' | 'notify' | 'done_when'> & { unblocks: string; notify: string; done_when: string | null };
-
 export interface UnblockInput {
   id: string | null;
   task: string;

@@ -1,7 +1,10 @@
+import { z } from 'zod';
 import { HqError } from '../errors.ts';
 import type { Runner } from '../runner/types.ts';
 import { cleanEnv } from '../runner/clean-env.ts';
 import { normalizePrRef } from './normalize-pr-ref.ts';
+
+const StateSchema = z.object({ state: z.unknown() });
 
 // A `gh pr merge` that failed on a conflict once left a PR open on GitHub but merged in hq, and
 // nothing could undo it.
@@ -12,7 +15,7 @@ export async function checkMergedOnGitHub(run: Runner, raw: string): Promise<voi
   if (r.code !== 0) throw new HqError('github_unreachable', `can't confirm ${ref} merged on GitHub (gh exit ${r.code}): ${(r.stderr || r.stdout).trim().slice(0, 200)}; hq leaves it open`);
   let state: unknown;
   try {
-    state = (JSON.parse(r.stdout) as { state?: unknown }).state;
+    state = StateSchema.parse(JSON.parse(r.stdout)).state;
   } catch {
     throw new HqError('github_unreachable', `gh gave no JSON for ${ref}; hq leaves it open`);
   }

@@ -16,5 +16,5 @@ export function listAsks(db: Database, opts: { kind?: Kind; states?: AskState[] 
     .orderBy('queued_at')
     .orderBy('id')
     .compile();
-  return runSyncQuery(db, query, AskRowSchema).map((r) => hydrate(r)!);
+  return runSyncQuery(db, query, AskRowSchema).flatMap((row) => hydrate(row) ?? []);
 }

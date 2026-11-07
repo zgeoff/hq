@@ -6,7 +6,9 @@ import { RunPrSchema } from './run-pr-schema.ts';
 import type { RunPr } from './types.ts';
 
 export function requirePR(db: Database, ref: string): RunPr {
-  const p = runSyncRow(db, kdb(db).selectFrom('run_prs').selectAll().where('ref', '=', ref).compile(), RunPrSchema);
-  if (!p) throw new HqError('not_found', `no PR ${ref} on any run: hq run pr <issue> ${ref}`);
-  return p;
+  const pr = runSyncRow(db, kdb(db).selectFrom('run_prs').selectAll().where('ref', '=', ref).compile(), RunPrSchema);
+  if (!pr) {
+    throw new HqError('not_found', `no PR ${ref} on any run: hq run pr <issue> ${ref}`);
+  }
+  return pr;
 }

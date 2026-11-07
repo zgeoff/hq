@@ -1,19 +1,25 @@
 import type { Database } from 'bun:sqlite';
 import { match } from 'ts-pattern';
+import { z } from 'zod';
 import { iso } from '../clock/iso.ts';
 import { now } from '../clock/now.ts';
 import { getMeta } from '../db/get-meta.ts';
 import { metaJson } from '../db/meta-json.ts';
+import { runSyncQuery } from '../db/run-sync-query.ts';
+import { runSyncRow } from '../db/run-sync-row.ts';
 import { setMeta } from '../db/set-meta.ts';
 import { readBuild as readInstalledBuild } from '../build/read-build.ts';
 import type { Build } from '../build/read-build.ts';
 import { HqError } from '../errors.ts';
+import { kdb } from '../kdb.ts';
 import { logEvent } from '../log-event.ts';
 import { enqueue } from '../outbox/enqueue.ts';
 import { roleName } from '../roles/role-name.ts';
 import type { Runner } from '../runner/types.ts';
+import { RunPrSchema } from '../runs/run-pr-schema.ts';
+import { RunSchema } from '../runs/run-schema.ts';
 import { setState } from '../runs/set-state.ts';
-import type { Run, RunPr } from '../runs/types.ts';
+import type { Run } from '../runs/types.ts';
 import { ACTOR } from './actor.ts';
 import { buildShippedPR } from './build-shipped-pr.ts';
 import { formatShippedAt } from './format-shipped-at.ts';
@@ -42,13 +48,16 @@ import { readHeldAt } from './read-held-at.ts';
 import { readActiveSession } from '../runs/read-active-session.ts';
 import type { PrState, Release, ShipMove, ShipResult, Source } from './types.ts';
 
+const CompareSchema = z.object({ status: z.unknown() });
+const PrViewSchema = z.object({ mergeCommit: z.object({ oid: z.unknown() }).nullish() });
+
 export async function shipRuns(db: Database, run: Runner, at: Date = now(), opts: { dryRun?: boolean; readBuild?: () => Build } = {}): Promise<ShipResult> {
   const dryRun = !!opts.dryRun;
   const res: ShipResult = { dryRun, moved: [], shippedPrs: 0, compares: 0, deferred: 0, held: [], busy: [], errors: [] };
   const err = (m: string) => res.errors.push(m);
 
-  const runs = db.query(`SELECT * FROM runs WHERE state IN ('merged','deploying','deploy-held') ORDER BY created_at`).all() as Run[];
-  const prsOf = (issue: string) => db.query('SELECT * FROM run_prs WHERE issue = ? ORDER BY added_at').all(issue) as RunPr[];
+  const runs = runSyncQuery(db, kdb(db).selectFrom('runs').selectAll().where('state', 'in', ['merged', 'deploying', 'deploy-held']).orderBy('created_at').compile(), RunSchema);
+  const prsOf = (issue: string) => runSyncQuery(db, kdb(db).selectFrom('run_prs').selectAll().where('issue', '=', issue).orderBy('added_at').compile(), RunPrSchema);
 
   const deliveryPRsOf = (issue: string) => prsOf(issue).filter((pr) => pr.design_pass === 0);
   const states = new Map<string, PrState>();
@@ -119,7 +128,7 @@ export async function shipRuns(db: Database, run: Runner, at: Date = now(), opts
     let status = out;
     if (out.startsWith('{')) {
       try {
-        status = String((JSON.parse(out) as { status?: unknown }).status);
+        status = String(CompareSchema.parse(JSON.parse(out)).status);
       } catch {}
     }
     if (!['ahead', 'identical', 'behind', 'diverged'].includes(status)) throw new HqError('bad_compare', `compare ${sha.slice(0, 7)} with ${tag} gave "${status.slice(0, 30)}"`);
@@ -161,7 +170,7 @@ export async function shipRuns(db: Database, run: Runner, at: Date = now(), opts
       try {
         if (!s.sha) {
           const out = await gh(run, ['pr', 'view', numOf(ref), '-R', `${OWNER}/${s.repo}`, '--json', 'mergeCommit'], `pr view ${ref}`);
-          const sha = (JSON.parse(out) as { mergeCommit?: { oid?: unknown } | null }).mergeCommit?.oid;
+          const sha = PrViewSchema.parse(JSON.parse(out)).mergeCommit?.oid;
           if (typeof sha !== 'string' || !HEX40.test(sha)) throw new HqError('bad_pr', `${ref} has no merge commit`);
           s.sha = sha;
           save(s);
@@ -216,7 +225,7 @@ export async function shipRuns(db: Database, run: Runner, at: Date = now(), opts
       const moved = db
         .transaction((): ShipMove['to'] | null => {
           // The run may have changed while GitHub was asked: look again.
-          const now0 = db.query('SELECT * FROM runs WHERE issue = ?').get(c.run.issue) as Run | null;
+          const now0 = runSyncRow(db, kdb(db).selectFrom('runs').selectAll().where('issue', '=', c.run.issue).compile(), RunSchema);
           if (!now0 || !SHIPPABLE.includes(now0.state)) return null;
           if (readActiveSession(db, c.run.issue) !== null) {
             return null;

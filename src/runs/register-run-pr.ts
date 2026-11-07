@@ -11,10 +11,14 @@ import type { RunPr } from './types.ts';
 
 export function registerRunPR(db: Database, issue: string, raw: string): { pr: RunPr; added: boolean } {
   const { ref, url } = normalizePrRef(raw);
-  const prev = runSyncRow(db, kdb(db).selectFrom('run_prs').selectAll().where('ref', '=', ref).compile(), RunPrSchema);
-  if (prev) {
-    if (prev.issue !== issue) throw new HqError('pr_taken', `${ref} is on ${prev.issue}`);
-    if (url && !prev.url) db.query('UPDATE run_prs SET url = ? WHERE ref = ?').run(url, ref);
+  const previous = runSyncRow(db, kdb(db).selectFrom('run_prs').selectAll().where('ref', '=', ref).compile(), RunPrSchema);
+  if (previous) {
+    if (previous.issue !== issue) {
+      throw new HqError('pr_taken', `${ref} is on ${previous.issue}`);
+    }
+    if (url && !previous.url) {
+      db.query('UPDATE run_prs SET url = ? WHERE ref = ?').run(url, ref);
+    }
     return { pr: mustPr(db, ref), added: false };
   }
   const t = iso(now());
