@@ -19,5 +19,5 @@
     "mods/**/*.{ts,tsx}",
     ".claude/hooks/**/*.ts"
   ],
-  "ignoreDependencies": ["geist", "@stylistic/eslint-plugin", "claude-code"]
+  "ignoreDependencies": ["geist", "@stylistic/eslint-plugin", "@zgeoff/diet", "claude-code"]
 }
