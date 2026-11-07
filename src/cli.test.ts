@@ -11,6 +11,7 @@ import { LINEAR_GRAPHQL_URL, linearIssues } from '../mocks/linear-handlers.ts';
 import { server } from '../mocks/node.ts';
 import { createStubOp } from '../test/create-stub-op.ts';
 import { NOON_SYDNEY, at, createPushedClone, fakeAtc, freshDb } from '../test/helpers.ts';
+import { readSlotRows } from './capacity/fleet/read-slot-rows.ts';
 import { main } from './cli.ts';
 import { overrideEnv } from './config/override-env.ts';
 import { setMeta } from './db/set-meta.ts';
@@ -892,7 +893,7 @@ test("it reads the slot token from hq's own file under ~/.config/hq by default f
 
   await main(['capacity', '--refresh-slots']);
 
-  expect(fresh.db.query('SELECT COUNT(*) AS total FROM slot_usage').get()).toStrictEqual({ total: 3 });
+  expect(readSlotRows(fresh.db, new Date(0), new Date(NOON_SYDNEY)).map((row) => row.slot)).toStrictEqual([1, 2, 3]);
 });
 
 test('hq capacity --refresh-slots --json carries the refresh problems in the fleet block', async () => {
