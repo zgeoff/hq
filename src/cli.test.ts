@@ -26,6 +26,7 @@ import type { RunResult, Runner } from './runner/types.ts';
 import { addPr } from './runs/add-pr.ts';
 import { addRun } from './runs/add-run.ts';
 import { setState } from './runs/set-state.ts';
+import { writeBrokerSlot } from './slots/write-broker-slot.ts';
 import { getStateRoles } from './state/get-state-roles.ts';
 import { buildMockSha } from '../test/build-mock-sha.ts';
 import { buildReadyIssue } from '../test/build-ready-issue.ts';
@@ -870,6 +871,43 @@ test('hq capacity --refresh-slots reads the three slots through op and prints th
   expect(text).toInclude('  slot 1: 5h ?, 7d 40% (resets 21 Oct 00:00Z), read 0 min ago');
   expect(text).not.toInclude('sk-ant-kettle');
   expect(fresh.db.query('SELECT COUNT(*) AS total FROM slot_usage').get()).toStrictEqual({ total: 3 });
+});
+
+test("it reads the broker slot's fleet-vault token in hq capacity broker after a refresh when the proof is more than 24 h old", async () => {
+  const fresh = freshDb();
+  const log = console.log;
+  const lines: string[] = [];
+  const settings = `${fresh.dir}/settings.local.json`;
+  onTestFinished(fresh.cleanup);
+  onTestFinished(overrideEnv('HQ_NOW', NOON_SYDNEY));
+  onTestFinished(overrideEnv('HQ_SLOTS_OP_SETTINGS', settings));
+  onTestFinished(() => (console.log = log));
+  const op = createStubOp({
+    directory: fresh.dir,
+    answers: {
+      'op://fleet/claude-setup-token-1/credential': 'sk-ant-kettle-fleet-1',
+      'op://fleet/claude-setup-token-2/credential': 'sk-ant-kettle-fleet-2',
+      'op://fleet/claude-setup-token-3/credential': 'sk-ant-kettle-fleet-3',
+      'op://claude-slots/claude-setup-token-1/credential': 'sk-ant-kettle-old-1',
+      'op://claude-slots/claude-setup-token-2/credential': 'sk-ant-kettle-old-2',
+      'op://claude-slots/claude-setup-token-3/credential': 'sk-ant-kettle-old-3',
+    },
+  });
+  onTestFinished(overrideEnv('PATH', `${op.bin}:${process.env['PATH']}`));
+  writeFileSync(settings, JSON.stringify({ env: { OP_SERVICE_ACCOUNT_TOKEN: 'ops_kettle-profile-0001' } }));
+  writeBrokerSlot(fresh.db, { slot: '2', proof: 'req-7c8d', note: undefined, actor: 'z-release', at: new Date('2026-10-12T19:00:00Z') });
+  slotUsage.set('Bearer sk-ant-kettle-fleet-1', { seven: { utilization: 0.4, reset: 1_792_540_800 } });
+  slotUsage.set('Bearer sk-ant-kettle-fleet-2', { seven: { utilization: 0.4, reset: 1_792_540_800 } });
+  slotUsage.set('Bearer sk-ant-kettle-fleet-3', { seven: { utilization: 0.4, reset: 1_792_540_800 } });
+  slotUsage.set('Bearer sk-ant-kettle-old-1', { seven: { utilization: 0.97, reset: 1_792_540_800 } });
+  slotUsage.set('Bearer sk-ant-kettle-old-2', { seven: { utilization: 0.97, reset: 1_792_540_800 } });
+  slotUsage.set('Bearer sk-ant-kettle-old-3', { seven: { utilization: 0.97, reset: 1_792_540_800 } });
+  await main(['capacity', '--refresh-slots']);
+  console.log = (line: string) => lines.push(line);
+
+  await main(['capacity', 'broker', '--json']);
+
+  expect(JSON.parse(lines.join('\n')).broker).toStrictEqual({ state: 'read', slot: 2, proof: 'req-7c8d', proofAgeHours: 30, used: 40, resetsAt: '2026-10-21T00:00:00Z', readAt: '2026-10-14T01:00:00Z' });
 });
 
 test('hq capacity --refresh-slots --json carries the refresh problems in the fleet block', async () => {
