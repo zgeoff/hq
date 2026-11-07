@@ -12,7 +12,7 @@ function setupTest() {
   return { directory };
 }
 
-test('#readLastRestart reads the record atc wrote', async () => {
+test('it reads the record atc wrote', async () => {
   const ctx = setupTest();
   mkdirSync(join(ctx.directory, 'restarts'));
   writeFileSync(join(ctx.directory, 'restarts', 'last.json'), JSON.stringify({ runID: 'run-1', code: 0, restored: 3, total: 4, interrupted: [{ id: 'id-1', name: 'z-kettle' }], failed: [{ id: 'id-2' }] }));
@@ -22,13 +22,13 @@ test('#readLastRestart reads the record atc wrote', async () => {
   expect(record).toStrictEqual({ runID: 'run-1', code: 0, restored: 3, total: 4, interrupted: [{ id: 'id-1', name: 'z-kettle' }], failed: [{ id: 'id-2' }] });
 });
 
-test('#readLastRestart rejects a missing record with no_restart', () => {
+test('it rejects a missing record with no_restart', () => {
   setupTest();
 
   expect(readLastRestart()).rejects.toMatchObject({ code: 'no_restart' });
 });
 
-test('#readLastRestart rejects a record of the wrong shape with bad_restart', () => {
+test('it rejects a record of the wrong shape with bad_restart', () => {
   const ctx = setupTest();
   mkdirSync(join(ctx.directory, 'restarts'));
   writeFileSync(join(ctx.directory, 'restarts', 'last.json'), JSON.stringify({ runID: 'run-1', code: 'zero' }));
@@ -36,7 +36,7 @@ test('#readLastRestart rejects a record of the wrong shape with bad_restart', ()
   expect(readLastRestart()).rejects.toMatchObject({ code: 'bad_restart' });
 });
 
-test('#readLastRestart rejects a record that is not JSON with bad_restart', () => {
+test('it rejects a record that is not JSON with bad_restart', () => {
   const ctx = setupTest();
   mkdirSync(join(ctx.directory, 'restarts'));
   writeFileSync(join(ctx.directory, 'restarts', 'last.json'), '{"runID": "run-1", "code":');
