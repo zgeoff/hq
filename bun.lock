@@ -31,7 +31,7 @@
         "@types/react": "19.3.0",
         "@types/react-dom": "19.3.0",
         "@zgeoff/agent-hooks": "0.2.9",
-        "@zgeoff/chex": "0.1.8",
+        "@zgeoff/chex": "0.2.4",
         "@zgeoff/diet": "0.2.2",
         "@zgeoff/oxlint-config": "0.10.0",
         "@zgeoff/rig": "0.1.5",
@@ -482,7 +482,7 @@
 
     "@zgeoff/agent-hooks": ["@zgeoff/agent-hooks@0.2.9", "", { "bin": { "agent-hooks": "dist/cli.js" } }, "sha512-/iQJGYhtysHFAP6e8Ib4lpO7G513fdfAEMFc1bkq9IAW76ZMpUbmgpMuUTbLGzkKJT8z0uBTZ4sBJrotag9FEA=="],
 
-    "@zgeoff/chex": ["@zgeoff/chex@0.1.8", "", { "dependencies": { "@zgeoff/std": "0.4.2", "oxc-parser": "0.156.0", "ts-pattern": "5.9.2" }, "bin": { "chex": "src/cli.ts" } }, "sha512-+k2NDAr3P1W2AxKyY92SBqq4gLtPmIzrUgCEjw91KWnIq3fIVqyOnhFf1EAWnyYxbQOKSA/+Qqd7Uovz6Li34Q=="],
+    "@zgeoff/chex": ["@zgeoff/chex@0.2.4", "", { "dependencies": { "@zgeoff/std": "0.4.3", "oxc-parser": "0.156.0", "ts-pattern": "5.9.2" }, "bin": { "chex": "src/cli.ts" } }, "sha512-HI8O1M6pBg698sBrOgQZlvI6VHNmXJWjKYmORPmv5wVjz7763KiJDBFg3/DJSeUsjBq7glP+naVEbwivcBAQrA=="],
 
     "@zgeoff/diet": ["@zgeoff/diet@0.2.2", "", { "bin": { "diet": "diet.sh" } }, "sha512-zrToDuLnJJGeSxYOvrydH+AlWdtITX4zNENeVh8Y56e1qbSMZl9UNvIp9x4kcs/dMguQW5ihuAupnqngFBYJ4w=="],
 
@@ -851,8 +851,6 @@
     "@img/sharp-wasm32/@emnapi/runtime": ["@emnapi/runtime@1.11.3", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-Xz4Tpyki7XyrpbUK1jR1AhdAdaXyhhY4lZ3neLodmhpuWfy2PAQN5B46sAiU4liOXGLkHypn/qU+jvfWSCYYLA=="],
 
     "@mswjs/interceptors/@open-draft/deferred-promise": ["@open-draft/deferred-promise@2.2.0", "", {}, "sha512-CecwLWx3rhxVQF6V4bAgPS5t+So2sTbPgAzafKkVizyi7tlwpcFpdFqq+wqF2OwNBmqFuu6tOyouTuxgpMfzmA=="],
-
-    "@zgeoff/chex/@zgeoff/std": ["@zgeoff/std@0.4.2", "", {}, "sha512-GZnnOkrYHe6p071BWYe7XIq5klqhvVb4j/JWOrrUTSj76uLA/ZnzlqDKIq16LblMcuRF9tjfvKvGK8sLRN8fMg=="],
 
     "@zgeoff/rig/@zgeoff/diet": ["@zgeoff/diet@0.2.1", "", { "bin": { "diet": "diet.sh" } }, "sha512-8xzPM1AlurcFcXt3aDdyGblvEtdtlDP2CAie3lf/AVGWkK4y1Qz40RGz22fl9Ad9SioEb+9EJHUPGshEtt7fjw=="],
 
