@@ -58,11 +58,11 @@ test('it counts each awake imp session of a run filed imp, so two area launches 
   expect(readRunningByPlace(ctx.db)).toStrictEqual({ imp: 2, local: 0, issues: ['GEO-9917'], impIssues: ['GEO-9917'], localSource: null });
 });
 
-test('it counts the awake local session of a merged run', () => {
+test.each([{ title: 'merged', state: 'merged' }, { title: 'done', state: 'done' }] as const)('it gives an awake and busy session of a $title run no local slot', (row) => {
   const ctx = setupTest();
   addRun(ctx.db, { issue: 'GEO-9902', title: 'Polish the teapot', place: 'local', session: 'a0000002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
   addRun(ctx.db, { issue: 'GEO-9903', title: 'Fill the kettle', place: 'local', session: 'a0000003-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
-  setState(ctx.db, 'GEO-9903', 'merged', {}, 'z-delivery');
+  setState(ctx.db, 'GEO-9903', row.state, {}, 'z-delivery');
   recordAwake(ctx.db, [
     { id: 'a0000002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'teapot-agent', alive: true, state: 'running', locator: { targetID: 'local' } },
     { id: 'a0000003-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, state: 'running', locator: { targetID: 'local' } },
@@ -70,8 +70,8 @@ test('it counts the awake local session of a merged run', () => {
 
   const running = readRunningByPlace(ctx.db);
 
-  expect(running.local).toBe(2);
-  expect(running.localSource).toBe('2 live sessions here');
+  expect(running.local).toBe(1);
+  expect(running.localSource).toBeNull();
 });
 
 test('it counts a helper session of a flexible-lane run beside its main session', () => {
