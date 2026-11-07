@@ -31,7 +31,6 @@ import { readNoslopFindings } from './read-noslop-findings.ts';
 import { readOKReviews } from './read-ok-reviews.ts';
 import type { OKReviewRecord } from './read-ok-reviews.ts';
 import { readPRFiles } from './read-pr-files.ts';
-import { readSummaryHead } from './read-summary-head.ts';
 import { pickNoslopVerdict } from './pick-noslop-verdict.ts';
 import { pickOwnerHeldVerdict } from './pick-owner-held-verdict.ts';
 import { probeNoCI } from './probe-no-ci.ts';
@@ -163,11 +162,11 @@ async function readNoslopGateFacts(request: PRRequest, parsed: ParsedRepo, facts
     const headNow = await readPRHead(request.run, buildSlug(parsed), request.pr);
     return { overridden: true, head, override, findings, headNow };
   }
-  const summary = await readSummaryHead(request.run, buildSlug(parsed), request.pr);
+  const reviews = readOKReviews(request.db, parsed.repo, request.pr);
   const check = await readNoslopCheck(request.run, buildSlug(parsed), head);
   const findings = await readFindings(request, parsed);
   const headNow = await readPRHead(request.run, buildSlug(parsed), request.pr);
-  return { overridden: false, repo: parsed.repo, pr: request.pr, head, summary, check, recorded: countRecordedFindings(readOKReviews(request.db, parsed.repo, request.pr)), findings, headNow };
+  return { overridden: false, repo: parsed.repo, pr: request.pr, head, reviewedHead: reviews.some((review) => review.head === head), check, recorded: countRecordedFindings(reviews), findings, headNow };
 }
 
 async function readFindings(request: PRRequest, parsed: ParsedRepo): Promise<NoslopGateFacts['findings']> {
