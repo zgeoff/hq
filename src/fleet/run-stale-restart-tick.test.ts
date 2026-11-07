@@ -25,7 +25,7 @@ interface RosterSession {
   agentSessionID?: string;
 }
 
-function setupTest(config:{ sessions?: RosterSession[]; cwd?: string } = {}) {
+function setupTest(config: { sessions?: RosterSession[]; cwd?: string } = {}) {
   resetFetchCache();
   const kettlePromptPath = 'skills/kettle/references/session-prompt.md';
   const newPrompt = 'You are Kettle. Boil water when asked.';
