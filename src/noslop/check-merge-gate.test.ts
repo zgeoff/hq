@@ -525,11 +525,18 @@ test('it reads the changed files once when the description lacks the proof and n
   expect(fake.lines().filter((line) => line.includes('/files?'))).toHaveLength(1);
 });
 
-test('it asks no proof of a PR that changes only a skill script, and leaves it to the owner hold', async () => {
+test('it passes a PR that changes only a skill script, with no proof and no owner hold', async () => {
   const ctx = setupTest();
   const fake = buildFakeRunner({ prFiles: { code: 0, stdout: 'skills/kettle/scripts/boil.sh\n', stderr: '' } });
 
-  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: expect.stringContaining('repo instruction files (skills/kettle/scripts/boil.sh)') });
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).resolves.toMatchObject({ mayMerge: true });
+});
+
+test('it passes a PR that changes only a code file in a skills module', async () => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ prFiles: { code: 0, stdout: 'modules/skills/src/read-kettle-skill.ts\n', stderr: '' } });
+
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).resolves.toMatchObject({ mayMerge: true });
 });
 
 test("it asks no proof of a bot's skill PR", async () => {

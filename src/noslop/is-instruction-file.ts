@@ -6,5 +6,5 @@ export function isInstructionFile(path: string): boolean {
     return false;
   }
   const name = path.split('/').at(-1) ?? '';
-  return !name.includes('.test.') && !path.includes('/testdata/') && !path.includes('/__tests__/');
+  return name.endsWith('.md') && !path.includes('/testdata/') && !path.includes('/__tests__/');
 }
