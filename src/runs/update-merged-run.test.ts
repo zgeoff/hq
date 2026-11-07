@@ -4,6 +4,7 @@ import { freshDb } from '../../test/helpers.ts';
 import { addPr } from './add-pr.ts';
 import { addRun } from './add-run.ts';
 import { closePr } from './close-pr.ts';
+import { runHandedInHoldCheck } from './run-handed-in-hold-check.ts';
 import { setSession } from './set-session.ts';
 import { setState } from './set-state.ts';
 import { updateGoneRunSessions } from './update-gone-run-sessions.ts';
@@ -19,6 +20,7 @@ function setupTest() {
   return {
     db: fresh.db,
     readState,
+    checkScope: (description: string) => runHandedInHoldCheck(fresh.db, { readIssueDescription: () => Promise.resolve(description), log: () => {} }, 'GEO-9721', 'z-delivery'),
 
     step: (fn: () => unknown) => {
       fn();
@@ -72,4 +74,53 @@ test('a run stays as it is with a PR still open, with only a closed PR, or in an
       { issue: 'GEO-9723', state: 'blocked' },
     ],
   ]);
+});
+
+test('it keeps a run held for open Scope boxes working when the sweep ends its last gone session', async () => {
+  const LATER = new Date(Date.now() + 10 * 60_000);
+  const app = setupTest();
+  setState(app.db, 'GEO-9721', 'working', { waitsOn: 'free slots for the spout#3 part' }, 'z-delivery');
+  await app.checkScope('## Scope\n\n- [x] kettle: done\n- [ ] spout: next part\n');
+  closePr(app.db, 'kettle#51', { to: 'merged', actor: 'z-review' });
+
+  updateGoneRunSessions(app.db, [], 'z-delivery', LATER);
+
+  expect(app.readState()).toBe('working');
+});
+
+test('it moves a run released from its Scope hold to merged when the sweep ends its last gone session', async () => {
+  const LATER = new Date(Date.now() + 10 * 60_000);
+  const app = setupTest();
+  setState(app.db, 'GEO-9721', 'working', { waitsOn: 'free slots for the spout#3 part' }, 'z-delivery');
+  await app.checkScope('## Scope\n\n- [x] kettle: done\n- [ ] spout: next part\n');
+  await app.checkScope('## Scope\n\n- [x] kettle: done\n- [x] spout: next part\n');
+  closePr(app.db, 'kettle#51', { to: 'merged', actor: 'z-review' });
+
+  updateGoneRunSessions(app.db, [], 'z-delivery', LATER);
+
+  expect(app.readState()).toBe('merged');
+});
+
+test('it moves a run whose waits_on is cleared to merged despite an earlier Scope hold', async () => {
+  const LATER = new Date(Date.now() + 10 * 60_000);
+  const app = setupTest();
+  setState(app.db, 'GEO-9721', 'working', { waitsOn: 'free slots for the spout#3 part' }, 'z-delivery');
+  await app.checkScope('## Scope\n\n- [x] kettle: done\n- [ ] spout: next part\n');
+  setState(app.db, 'GEO-9721', 'working', { waitsOn: null }, 'z-delivery');
+  closePr(app.db, 'kettle#51', { to: 'merged', actor: 'z-review' });
+
+  updateGoneRunSessions(app.db, [], 'z-delivery', LATER);
+
+  expect(app.readState()).toBe('merged');
+});
+
+test('it keeps a run held for open Scope boxes working when its last PR merges', async () => {
+  const app = setupTest();
+  setSession(app.db, 'GEO-9721', SESSION, 'z-delivery', 'remove');
+  setState(app.db, 'GEO-9721', 'working', { waitsOn: 'free slots for the spout#3 part' }, 'z-delivery');
+  await app.checkScope('## Scope\n\n- [ ] spout: next part\n');
+
+  closePr(app.db, 'kettle#51', { to: 'merged', actor: 'z-review' });
+
+  expect(app.readState()).toBe('working');
 });
