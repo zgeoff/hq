@@ -1,7 +1,7 @@
 import { Database } from 'bun:sqlite';
 import { expect, onTestFinished, test } from 'bun:test';
 import { z } from 'zod';
-import { findRow, queryColumn, queryRow, queryRows, queryValue } from './query-rows.ts';
+import { queryColumn, queryRow, queryRows, queryValue, readRow } from './query-rows.ts';
 
 function setupTest() {
   const db = new Database(':memory:');
@@ -31,14 +31,17 @@ test('it rejects a row that does not fit the schema', () => {
   expect(() => queryRows(ctx.db, 'SELECT owner FROM notes', z.object({ owner: z.string() }))).toThrow(/owner/u);
 });
 
-test('it reads the first row, or null when there is none', () => {
+test('it reads null when a query that can miss returns no row', () => {
   const ctx = setupTest();
 
-  expect(findRow(ctx.db, 'SELECT title FROM notes', ctx.titleSchema)).toBeNull();
+  expect(readRow(ctx.db, 'SELECT title FROM notes', ctx.titleSchema)).toBeNull();
+});
 
-  ctx.db.run("INSERT INTO notes (title) VALUES ('Groceries')");
+test('it reads the first row of a query that can miss', () => {
+  const ctx = setupTest();
+  ctx.db.run("INSERT INTO notes (title) VALUES ('Groceries'), ('Taxes')");
 
-  expect(findRow(ctx.db, 'SELECT title FROM notes', ctx.titleSchema)).toStrictEqual({ title: 'Groceries' });
+  expect(readRow(ctx.db, 'SELECT title FROM notes ORDER BY id', ctx.titleSchema)).toStrictEqual({ title: 'Groceries' });
 });
 
 test('it throws when a query that must return a row returns none', () => {

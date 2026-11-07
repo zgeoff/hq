@@ -23,13 +23,13 @@ export function queryValue<Schema extends z.ZodType>(db: Database, sql: string, 
 }
 
 // The first row, or null when the query returns none.
-export function findRow<Schema extends z.ZodType>(db: Database, sql: string, schema: Schema, ...bindings: (string | number | null)[]): z.output<Schema> | null {
+export function readRow<Schema extends z.ZodType>(db: Database, sql: string, schema: Schema, ...bindings: (string | number | null)[]): z.output<Schema> | null {
   return runSyncRow(db, CompiledQuery.raw(sql, bindings), schema);
 }
 
 // The first row; a test that calls it expects one.
 export function queryRow<Schema extends z.ZodType>(db: Database, sql: string, schema: Schema, ...bindings: (string | number | null)[]): z.output<Schema> {
-  const row = findRow(db, sql, schema, ...bindings);
+  const row = readRow(db, sql, schema, ...bindings);
   invariant(row, 'the query returned no row');
   return row;
 }
