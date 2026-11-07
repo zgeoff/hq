@@ -1,8 +1,8 @@
 import type { Database } from 'bun:sqlite';
-import invariant from 'tiny-invariant';
+import { z } from 'zod';
+
+const rowSchema = z.object({ user_version: z.number() });
 
 export function userVersion(db: Database): number {
-  const row = db.query<{ user_version: number }, []>('PRAGMA user_version').get();
-  invariant(row, 'PRAGMA user_version returns one row');
-  return row.user_version;
+  return rowSchema.parse(db.query('PRAGMA user_version').get()).user_version;
 }

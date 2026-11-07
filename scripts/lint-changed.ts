@@ -3,18 +3,11 @@ import { z } from 'zod';
 import { probeImportBase } from './probe-import-base.ts';
 import { readDiff } from './read-diff.ts';
 
-const reportSchema = z.object({
-  diagnostics: z.array(
-    z.object({
-      code: z.string(),
-      filename: z.string(),
-      labels: z.array(z.object({ span: z.object({ line: z.number() }) })),
-      message: z.string(),
-    }),
-  ),
-});
+const labelSchema = z.object({ span: z.object({ line: z.number() }) });
+const diagnosticSchema = z.object({ code: z.string(), filename: z.string(), labels: z.array(labelSchema), message: z.string() });
+const reportSchema = z.object({ diagnostics: z.array(diagnosticSchema) });
 
-type Diagnostic = z.infer<typeof reportSchema>['diagnostics'][number];
+type Diagnostic = z.infer<typeof diagnosticSchema>;
 
 interface ChangeSet {
   readonly lines: ReadonlyMap<string, ReadonlySet<number>>;
@@ -165,10 +158,12 @@ export function buildLintArgs(files: readonly string[], typeAware: boolean): str
 }
 
 function readDiagnostics(files: readonly string[]): readonly Diagnostic[] {
-  return [false, true].flatMap((typeAware) => {
-    const report = reportSchema.parse(JSON.parse(runCommand('bunx', buildLintArgs(files, typeAware))));
-    return report.diagnostics;
-  });
+  return [false, true].flatMap((typeAware) => readReport(buildLintArgs(files, typeAware)));
+}
+
+function readReport(args: readonly string[]): readonly Diagnostic[] {
+  const output: unknown = JSON.parse(runCommand('bunx', args));
+  return reportSchema.parse(output).diagnostics;
 }
 
 function printFound(found: readonly Diagnostic[], files: readonly string[], base: string): number {

@@ -1,3 +1,4 @@
+// oxlint-disable eslint/id-length, zgeoff/no-abbreviated-names -- the keys are the database's column names
 import type { ColumnSpec } from '../kdb.ts';
 
 export const HQ_COLUMNS = {

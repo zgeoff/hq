@@ -1,7 +1,7 @@
 import type { Database } from 'bun:sqlite';
 import { buildSQLiteDialect } from '@zgeoff/kysely-bun-sqlite';
 import { Kysely } from 'kysely';
-import { HQ_COLUMNS } from './db/hq-columns.ts';
+import type { HQ_COLUMNS } from './db/hq-columns.ts';
 
 export type ColumnSpec = 'integer' | 'integer?' | 'real' | 'real?' | 'text' | 'text?' | { readonly values: readonly string[]; readonly nullable: boolean };
 

@@ -201,30 +201,28 @@ describe('moved lines', () => {
   });
 });
 
-describe('buildLintArgs', () => {
-  test('the plain run lints the files with every rule the config enables', () => {
-    expect(buildLintArgs(['src/kettle.ts'], false)).toStrictEqual(['oxlint', '--format', 'json', 'src/kettle.ts']);
-  });
+test('it lints the files of the plain run with every rule the config enables', () => {
+  expect(buildLintArgs(['src/kettle.ts'], false)).toStrictEqual(['oxlint', '--format', 'json', 'src/kettle.ts']);
+});
 
-  test('the type-aware run enables only the five no-unsafe rules', () => {
-    expect(buildLintArgs(['src/kettle.ts'], true)).toStrictEqual([
-      'oxlint',
-      '--format',
-      'json',
-      '--type-aware',
-      '-A',
-      'all',
-      '-D',
-      'typescript/no-unsafe-assignment',
-      '-D',
-      'typescript/no-unsafe-argument',
-      '-D',
-      'typescript/no-unsafe-return',
-      '-D',
-      'typescript/no-unsafe-member-access',
-      '-D',
-      'typescript/no-unsafe-call',
-      'src/kettle.ts',
-    ]);
-  });
+test('it enables only the five no-unsafe rules in the type-aware run', () => {
+  expect(buildLintArgs(['src/kettle.ts'], true)).toStrictEqual([
+    'oxlint',
+    '--format',
+    'json',
+    '--type-aware',
+    '-A',
+    'all',
+    '-D',
+    'typescript/no-unsafe-assignment',
+    '-D',
+    'typescript/no-unsafe-argument',
+    '-D',
+    'typescript/no-unsafe-return',
+    '-D',
+    'typescript/no-unsafe-member-access',
+    '-D',
+    'typescript/no-unsafe-call',
+    'src/kettle.ts',
+  ]);
 });
