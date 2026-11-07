@@ -1,88 +1,33 @@
 import type { Database } from 'bun:sqlite';
-import { Kysely, SqliteDialect } from 'kysely';
-import type { SqliteDatabase } from 'kysely';
+import { buildSQLiteDialect } from '@zgeoff/kysely-bun-sqlite';
+import { Kysely } from 'kysely';
+import { HQ_COLUMNS } from './db/hq-columns.ts';
 
-export interface CapacitySampleRow {
-  at: string;
-  impd_budget_mib: number | null;
-  impd_used_mib: number | null;
-  impd_committed_mib: number | null;
-  nonnix_awake_mib: number | null;
-  nonnix_awake_vcpus: number | null;
-  nix_awake_mib: number | null;
-  impd_priority_kept_mib: number | null;
-  cloud_avail_bytes: number | null;
-  cloud_total_bytes: number | null;
-  claude_account: string | null;
-  claude_five_hour: number | null;
-  claude_seven_day: number | null;
-  claude_five_hour_resets_at: string | null;
-  claude_seven_day_resets_at: string | null;
-  claude_at: string | null;
-  ci_minutes_today: number | null;
-  pc_disk_free_bytes: number | null;
-  pc_mem_avail_bytes: number | null;
-  op_account_used: number | null;
-  op_account_limit: number | null;
-  op_refused: number | null;
-  errors: string;
-}
+export type ColumnSpec = 'integer' | 'integer?' | 'real' | 'real?' | 'text' | 'text?' | { readonly values: readonly string[]; readonly nullable: boolean };
 
-export interface PRStatusRow {
-  repo: string;
-  pr: number;
-  head: string | null;
-  gate: 'pass' | 'fail' | 'none' | null;
-  gate_head: string | null;
-  gate_at: string | null;
-  answer: 'lgtm' | 'changes' | 'reject' | null;
-  answer_head: string | null;
-  answer_source: string | null;
-  answer_note: string | null;
-  answer_at: string | null;
-  next: string | null;
-  next_at: string | null;
-  updated_at: string;
-}
+type ColumnType<Spec extends ColumnSpec> = Spec extends 'text'
+  ? string
+  : Spec extends 'text?'
+    ? string | null
+    : Spec extends 'integer' | 'real'
+      ? number
+      : Spec extends 'integer?' | 'real?'
+        ? number | null
+        : Spec extends { readonly values: infer Values extends readonly string[]; readonly nullable: infer Nullable }
+          ? Nullable extends true
+            ? Values[number] | null
+            : Values[number]
+          : never;
 
-export interface ShippedCacheRow {
-  kind: 'merged-day' | 'issue' | 'project';
-  key: string;
-  body: string;
-  fetched_at: string;
-  expires_at: string | null;
-}
+type RowOf<Columns> = { -readonly [Column in keyof Columns]: Columns[Column] extends ColumnSpec ? ColumnType<Columns[Column]> : never };
 
-interface SlotMinutesRow {
-  day: string;
-  cause: 'delivery' | 'triage' | 'supply' | 'design';
-  minutes: number;
-}
+export type HqTables = { [Table in keyof typeof HQ_COLUMNS]: RowOf<(typeof HQ_COLUMNS)[Table]> };
 
-export interface HqTables {
-  capacity_samples: CapacitySampleRow;
-  pr_status: PRStatusRow;
-  shipped_cache: ShippedCacheRow;
-  slot_minutes: SlotMinutesRow;
-}
+export type CapacitySampleRow = HqTables['capacity_samples'];
+export type PRStatusRow = HqTables['pr_status'];
+export type ShippedCacheRow = HqTables['shipped_cache'];
 
-// hq owns the Database, so close() does nothing. bun:sqlite statements take their parameters
-// spread; Kysely passes an array.
-function adapter(db: Database): SqliteDatabase {
-  return {
-    close() {},
-    prepare(sql) {
-      const stmt = db.prepare(sql);
-      return {
-        reader: stmt.columnNames.length > 0,
-        all: (p) => stmt.all(...(p as never[])),
-        run: (p) => stmt.run(...(p as never[])),
-        iterate: (p) => stmt.iterate(...(p as never[])) as IterableIterator<unknown>,
-      };
-    },
-  };
-}
-
+// hq owns the Database: destroying the Kysely instance leaves it open.
 export function kdb(db: Database): Kysely<HqTables> {
-  return new Kysely<HqTables>({ dialect: new SqliteDialect({ database: adapter(db) }) });
+  return new Kysely<HqTables>({ dialect: buildSQLiteDialect(db) });
 }
