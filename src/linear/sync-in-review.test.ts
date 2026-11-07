@@ -51,7 +51,8 @@ test('it asks Linear for the In Review state by name, 50 issues a page, and foll
     http.post(
       LINEAR_GRAPHQL_URL,
       async (info) => {
-        asked(await info.request.json());
+        const body: unknown = await info.request.json();
+        asked(body);
         return HttpResponse.json(first);
       },
       { once: true },
@@ -59,7 +60,8 @@ test('it asks Linear for the In Review state by name, 50 issues a page, and foll
     http.post(
       LINEAR_GRAPHQL_URL,
       async (info) => {
-        asked(await info.request.json());
+        const body: unknown = await info.request.json();
+        asked(body);
         return HttpResponse.json(second);
       },
       { once: true },
