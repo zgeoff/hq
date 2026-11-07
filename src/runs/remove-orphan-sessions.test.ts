@@ -31,7 +31,7 @@ async function setupTest() {
   onTestFinished(() => client.close());
   const fleetSessions: FleetSession[] = [];
   const fleet = buildStubFleetClient({ sessions: fleetSessions });
-  const work: { current: ImpWork } = { current: { state: 'pushed' } };
+  const work: { current: ImpWork; bySession: Map<string, ImpWork> } = { current: { state: 'pushed' }, bySession: new Map() };
 
   return {
     db: fresh.db,
@@ -40,7 +40,7 @@ async function setupTest() {
     sweep: () =>
       sweepNow(fresh.db, client, buildStubGitHubFactsRunner({ views: {} }), {
         actor: 'sweep',
-        wrapUpDeps: { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local session checks no imp')), readLocalWork: () => Promise.resolve(work.current) },
+        wrapUpDeps: { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local session checks no imp')), readLocalWork: (session) => Promise.resolve(work.bySession.get(session.id) ?? work.current) },
         log: () => {},
       }),
     seed: {
@@ -117,4 +117,30 @@ test('it forgets an exited child of a fleet session that no run recorded', async
   await ctx.sweep();
 
   expect(ctx.fleet.calls).toStrictEqual(['kill 0000f003', 'unpin 0000f003', 'forget 0000f003']);
+});
+
+test('it keeps an exited parent that has a live child', async () => {
+  const ctx = await setupTest();
+  updateEnv('HQ_NOW', '2026-11-07T03:00:00Z');
+  ctx.seed.atcSession({ id: '0000f001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: false, state: 'exited' }, '2026-11-07T01:00:00Z');
+  ctx.seed.atcSession({ id: '0000f004-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-helper', alive: true, state: 'done', parent: '0000f001-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }, '2026-11-07T02:59:00Z');
+  ctx.seed.closedRun('GEO-601', '0000f001');
+
+  await ctx.sweep();
+
+  expect(ctx.fleet.calls).toStrictEqual([]);
+});
+
+test('it keeps an exited parent whose child stays for unpushed work, and forgets neither', async () => {
+  const ctx = await setupTest();
+  updateEnv('HQ_NOW', '2026-11-07T03:00:00Z');
+  ctx.work.bySession.set('0000f004-aaaa-4aaa-8aaa-aaaaaaaaaaaa', { state: 'unpushed', detail: 'one commit' });
+  ctx.seed.atcSession({ id: '0000f001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: false, state: 'exited' }, '2026-11-07T01:00:00Z');
+  ctx.seed.atcSession({ id: '0000f004-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-helper', alive: false, state: 'exited', parent: '0000f001-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }, '2026-11-07T01:00:00Z');
+  ctx.seed.closedRun('GEO-601', '0000f001');
+
+  await ctx.sweep();
+
+  expect(ctx.fleet.calls).toStrictEqual([]);
+  expect(readEvents(ctx.db, 'hq', '0000f004-aaaa-4aaa-8aaa-aaaaaaaaaaaa', ['session-kept'])).toHaveLength(1);
 });

@@ -36,12 +36,15 @@ export async function removeOrphanSessions(db: Database, deps: WrapUpDeps, sessi
     openActive: rows.filter((row) => row.active === 1 && !isOneOf(row.state, CLOSED_RUN_STATES)).map((row) => row.session_id),
   });
   const forgotten: string[] = [];
+  const staying = new Set<string>();
   if (picked.length === 0) {
     return forgotten;
   }
   const client = await deps.openClient();
   for (const session of picked) {
-    if (probeRecentlyKept(db, session.id, options.nowMs)) {
+    const hasStayingChild = picked.some((child) => child.parent === session.id && staying.has(child.id));
+    if (hasStayingChild || probeRecentlyKept(db, session.id, options.nowMs)) {
+      staying.add(session.id);
       continue;
     }
     const issue = rows.findLast((row) => isStoredSession([row.session_id], session.id))?.issue ?? null;
@@ -54,6 +57,7 @@ export async function removeOrphanSessions(db: Database, deps: WrapUpDeps, sessi
       const reason = plan.kept[0]?.reason ?? 'unpushed work';
       logEvent(db, 'hq', session.id, 'session-kept', options.actor, null, null, { reason, issue });
       options.log(`orphan session ${session.id} (${session.name}) kept: ${reason}`);
+      staying.add(session.id);
       continue;
     }
     try {
@@ -65,6 +69,7 @@ export async function removeOrphanSessions(db: Database, deps: WrapUpDeps, sessi
       const reason = `forget failed: ${toErrorMessage(error)}`;
       logEvent(db, 'hq', session.id, 'session-kept', options.actor, null, null, { reason, issue });
       options.log(`orphan session ${session.id} (${session.name}) kept: ${reason}`);
+      staying.add(session.id);
     }
   }
   return forgotten;
