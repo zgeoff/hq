@@ -31,7 +31,6 @@ import { readNoslopFindings } from './read-noslop-findings.ts';
 import { readOKReviews } from './read-ok-reviews.ts';
 import type { OKReviewRecord } from './read-ok-reviews.ts';
 import { readPRFiles } from './read-pr-files.ts';
-import { readSummaryHead } from './read-summary-head.ts';
 import { pickNoslopVerdict } from './pick-noslop-verdict.ts';
 import { pickOwnerHeldVerdict } from './pick-owner-held-verdict.ts';
 import { probeNoCI } from './probe-no-ci.ts';
@@ -159,27 +158,33 @@ async function readNoslopGateFacts(request: PRRequest, parsed: ParsedRepo, facts
   const head = facts.headRefOid;
   const override = readOwnerOverride(request.db, parsed.repo, request.pr);
   if (override !== null) {
-    const findings = await readFindings(request, parsed);
+    const findings = await readFindings(request, parsed, []);
     const headNow = await readPRHead(request.run, buildSlug(parsed), request.pr);
     return { overridden: true, head, override, findings, headNow };
   }
-  const summary = await readSummaryHead(request.run, buildSlug(parsed), request.pr);
+  const reviews = readOKReviews(request.db, parsed.repo, request.pr);
   const check = await readNoslopCheck(request.run, buildSlug(parsed), head);
-  const findings = await readFindings(request, parsed);
+  const findings = await readFindings(request, parsed, collectRecordedFindingIDs(reviews));
   const headNow = await readPRHead(request.run, buildSlug(parsed), request.pr);
-  return { overridden: false, repo: parsed.repo, pr: request.pr, head, summary, check, recorded: countRecordedFindings(readOKReviews(request.db, parsed.repo, request.pr)), findings, headNow };
+  return { overridden: false, repo: parsed.repo, pr: request.pr, head, reviewedHead: reviews.some((review) => review.head === head), check, findings, headNow };
 }
 
-async function readFindings(request: PRRequest, parsed: ParsedRepo): Promise<NoslopGateFacts['findings']> {
+async function readFindings(request: PRRequest, parsed: ParsedRepo, recorded: readonly string[]): Promise<NoslopGateFacts['findings']> {
   return await readNoslopFindings(request, parsed).then(
-    (read) => ({ read: true as const, open: collectOpenFindingIDs(read, findAcceptedRisks(request.db, parsed.repo, request.pr)), listed: read.length }),
+    (read) => ({ read: true as const, open: collectOpenFindingIDs(read, findAcceptedRisks(request.db, parsed.repo, request.pr)), unlisted: collectUnlistedIDs(recorded, read) }),
     (error: unknown) => ({ read: false as const, error: error instanceof Error ? error.message : String(error) }),
   );
 }
 
+// A review whose GitHub post failed still records its findings here, so a finding hq holds that
+// noslop's list lacks was never published for the author to answer.
+function collectUnlistedIDs(recorded: readonly string[], listed: readonly { id: string }[]): string[] {
+  const ids = new Set(listed.map((finding) => finding.id));
+  return recorded.filter((id) => !ids.has(id));
+}
+
 const StoredFindingIDs = z.array(z.object({ id: z.string() }));
 
-function countRecordedFindings(reviews: OKReviewRecord[]): number {
-  const ids = reviews.flatMap((review) => StoredFindingIDs.parse(JSON.parse(review.findings)).map((finding) => finding.id));
-  return new Set(ids).size;
+function collectRecordedFindingIDs(reviews: OKReviewRecord[]): string[] {
+  return [...new Set(reviews.flatMap((review) => StoredFindingIDs.parse(JSON.parse(review.findings)).map((finding) => finding.id)))];
 }

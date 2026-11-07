@@ -3,13 +3,12 @@ import type { OwnerOverride } from '../pr-status/read-owner-overrides.ts';
 import { formatCIClause } from './format-ci-clause.ts';
 import type { GateCI } from './format-ci-clause.ts';
 import type { NoslopCheck } from './read-noslop-check.ts';
-import type { SummaryHead } from './read-summary-head.ts';
 
-type NoslopFindingsRead = { read: true; open: string[]; listed: number } | { read: false; error: string };
+type NoslopFindingsRead = { read: true; open: string[]; unlisted: string[] } | { read: false; error: string };
 
 export type NoslopGateFacts =
   | { overridden: true; head: string; override: OwnerOverride; findings: NoslopFindingsRead; headNow: string | null }
-  | { overridden: false; repo: string; pr: number; head: string; summary: SummaryHead; check: NoslopCheck; recorded: number; findings: NoslopFindingsRead; headNow: string | null };
+  | { overridden: false; repo: string; pr: number; head: string; reviewedHead: boolean; check: NoslopCheck; findings: NoslopFindingsRead; headNow: string | null };
 
 export type NoslopVerdict = { pass: true; reason: string } | { pass: false; reason: string };
 
@@ -34,13 +33,10 @@ function pickOverriddenVerdict(facts: Extract<NoslopGateFacts, { overridden: tru
 }
 
 function pickReviewedVerdict(facts: Extract<NoslopGateFacts, { overridden: false }>, ci: GateCI): NoslopVerdict {
-  if (!facts.summary.found) {
-    return { pass: false, reason: `${facts.summary.reason}, so no pass: hq review ${facts.repo} ${facts.pr}` };
+  if (!facts.reviewedHead) {
+    return { pass: false, reason: `hq has no noslop run recorded at head ${facts.head.slice(0, 7)}; run hq review ${facts.repo} ${facts.pr}` };
   }
-  if (facts.summary.head !== facts.head) {
-    return { pass: false, reason: `noslop has not reviewed head ${facts.head.slice(0, 7)} (its last review read ${facts.summary.head.slice(0, 7)}); run hq review ${facts.repo} ${facts.pr}` };
-  }
-  const check = pickCheckBlock(facts, facts.summary.updatedAt);
+  const check = pickCheckBlock(facts);
   if (check !== null) {
     return { pass: false, reason: check };
   }
@@ -50,18 +46,15 @@ function pickReviewedVerdict(facts: Extract<NoslopGateFacts, { overridden: false
     .exhaustive();
 }
 
-// The gate needs noslop's check to have finished judging the latest summary, not to have passed: a
-// capped PR's check fails at a head that only merged main, and the open findings decide the rest.
-function pickCheckBlock(facts: Extract<NoslopGateFacts, { overridden: false }>, summaryUpdatedAt: string): string | null {
+// The gate needs noslop's check to have finished, not to have passed: a capped PR's check fails at a
+// head that only merged main, and the open findings decide the rest.
+function pickCheckBlock(facts: Extract<NoslopGateFacts, { overridden: false }>): string | null {
   const at = facts.head.slice(0, 7);
   if (!facts.check.found) {
     return `${facts.check.reason}, so no pass: hq review ${facts.repo} ${facts.pr}`;
   }
   if (facts.check.status !== 'completed') {
     return `noslop's check at ${at} is ${facts.check.status}, so no pass: wait for it to finish`;
-  }
-  if (facts.check.completedAt === null || Date.parse(facts.check.completedAt) < Date.parse(summaryUpdatedAt)) {
-    return `noslop's check at ${at} predates its latest summary, so it does not judge that review; rerun hq review ${facts.repo} ${facts.pr}`;
   }
   return null;
 }
@@ -70,8 +63,8 @@ function pickFoundVerdict(facts: Extract<NoslopGateFacts, { overridden: false }>
   if (found.open.length > 0) {
     return { pass: false, reason: `${found.open.length} noslop finding${found.open.length === 1 ? ' is' : 's are'} open: ${found.open.join(', ')}` };
   }
-  if (facts.recorded > 0 && found.listed === 0) {
-    return { pass: false, reason: `noslop's findings list is empty, but its reviews of this PR recorded ${facts.recorded} finding${facts.recorded === 1 ? '' : 's'}, so no pass` };
+  if (found.unlisted.length > 0) {
+    return { pass: false, reason: `noslop's findings list lacks ${found.unlisted.length} finding${found.unlisted.length === 1 ? '' : 's'} hq's reviews of this PR recorded: ${found.unlisted.join(', ')}, so no pass` };
   }
   return { pass: true, reason: `noslop findings: none open; ${formatCIClause(facts.head.slice(0, 7), ci)}` };
 }
