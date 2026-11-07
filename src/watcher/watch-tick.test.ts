@@ -468,6 +468,7 @@ test('it logs no slot token and no profile token when op, a slot request and a s
     answers: {
       'op://fleet/claude-setup-token-2/credential': 'kettle-slot-credential-2',
       'op://fleet/claude-setup-token-3/credential': 'kettle-slot-credential-3',
+      'op://fleet/claude-setup-token-4/credential': 'kettle-slot-credential-4',
     },
     failures: { 'op://fleet/claude-setup-token-1/credential': '[ERROR] invented: kettle-slot-credential-1 is held back from kettle-profile-credential' },
   });
@@ -480,6 +481,11 @@ test('it logs no slot token and no profile token when op, a slot request and a s
       HttpResponse.json(
         { type: 'error', error: { type: 'api_error', message: 'invented outage for kettle-slot-credential-3 minted by kettle-profile-credential' } },
         { status: 500, headers: { 'x-invented-echo': 'kettle-slot-credential-3 kettle-profile-credential' } },
+      ),
+    'Bearer kettle-slot-credential-4': () =>
+      HttpResponse.json(
+        { type: 'error', error: { type: 'authentication_error', message: 'invented refusal of kettle-slot-credential-4 minted by kettle-profile-credential' } },
+        { status: 401, headers: { 'x-invented-echo': 'kettle-slot-credential-4 kettle-profile-credential' } },
       ),
   };
   onTestFinished(overrideEnv('HQ_NOW', '2026-10-15T20:00:00Z'));
@@ -504,10 +510,11 @@ test('it logs no slot token and no profile token when op, a slot request and a s
   });
 
   expect(logs.filter((line) => line.includes('Claude slots'))).toStrictEqual([
-    '2026-10-15T20:00:00Z Claude slots: read, 3 problem(s)',
+    '2026-10-15T20:00:00Z Claude slots: read, 4 problem(s)',
     '2026-10-15T20:00:00Z Claude slots: slot 1: op read failed (exit 1)',
     '2026-10-15T20:00:00Z Claude slots: slot 2: invented proxy dropped [redacted] minted by [redacted]',
     '2026-10-15T20:00:00Z Claude slots: slot 3: the messages API answered 500',
+    '2026-10-15T20:00:00Z Claude slots: slot 4: the messages API answered 401',
   ]);
   expect(logs.filter((line) => line.includes('kettle-slot-credential') || line.includes('kettle-profile-credential'))).toStrictEqual([]);
 });
