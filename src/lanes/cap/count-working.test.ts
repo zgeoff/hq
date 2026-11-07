@@ -67,6 +67,23 @@ test('it counts the awake and busy session of a blocked run', () => {
 });
 
 test.each([
+  { title: 'a working run idle 14 min', state: 'working', idleAt: '2026-10-15T20:14:00Z', count: 1 },
+  { title: 'a working run idle 16 min', state: 'working', idleAt: '2026-10-15T20:16:00Z', count: 0 },
+  { title: 'a blocked run idle 14 min', state: 'blocked', idleAt: '2026-10-15T20:14:00Z', count: 1 },
+  { title: 'a blocked run idle 16 min', state: 'blocked', idleAt: '2026-10-15T20:16:00Z', count: 0 },
+] as const)('it counts $title against the cap only while it is busy', (row) => {
+  const ctx = setupTest();
+  at('2026-10-15T20:00:00Z');
+  addRun(ctx.db, { issue: 'GEO-9952', title: 'Steep the tea', place: 'imp', session: 'a0000052-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
+  setState(ctx.db, 'GEO-9952', row.state, {}, 'z-delivery');
+  recordAwake(ctx.db, [{ id: 'a0000052-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'tea-agent', alive: true, state: 'needs_you', locator: { targetID: 'imp-tea' } }]);
+  at(row.idleAt);
+  recordAwake(ctx.db, [{ id: 'a0000052-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'tea-agent', alive: true, state: 'needs_you', locator: { targetID: 'imp-tea' } }]);
+
+  expect(countWorking(ctx.db, new Date(row.idleAt))).toStrictEqual({ count: row.count, from: 'sessions' });
+});
+
+test.each([
   { title: 'a working run', state: 'working' },
   { title: 'a blocked run', state: 'blocked' },
 ] as const)('it frees the lane of $title whose only session is asleep', (row) => {
