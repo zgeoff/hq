@@ -116,7 +116,8 @@ function buildBlock(parsed: ParsedRepo, pr: number, reason: string): HqError {
 }
 
 async function checkOwnerHeld(request: PRRequest, parsed: ParsedRepo, facts: GateFacts, readFiles: ReadFiles): Promise<void> {
-  const ownerHeld = await readOwnerHeldTest(request.run, parsed, facts.baseRefOid);
+  const overridden = parsed.owner === OWNER && readOwnerOverride(request.db, parsed.repo, request.pr) !== null;
+  const ownerHeld = overridden ? () => false : await readOwnerHeldTest(request.run, parsed, facts.baseRefOid);
   const instructionHeld = findInstructionHeldTest(parsed);
   if (ownerHeld === null && instructionHeld === null) {
     return;
@@ -125,7 +126,7 @@ async function checkOwnerHeld(request: PRRequest, parsed: ParsedRepo, facts: Gat
   const isInstruction = instructionHeld ?? (() => false);
   const head = facts.headRefOid;
   const files = await readFiles();
-  const lgtm = readOwnerLgtm(request.db, parsed.repo, request.pr) !== null;
+  const lgtm = overridden || readOwnerLgtm(request.db, parsed.repo, request.pr) !== null;
   const instruction = files.filter((file) => isInstruction(file));
   if (ownerHeld === null && instruction.length === 0) {
     return;
