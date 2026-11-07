@@ -229,6 +229,17 @@ test.each([
   expect(fake.lines().some((l) => l.startsWith('git worktree remove --force'))).toBe(true);
 });
 
+test.each(Object.entries(FAKE_SECRETS))('it redacts the %s from a failed call\'s reason before it shows or records it', async (_label, secret) => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ noslopReview: { code: 0, stdout: JSON.stringify({ ...JSON.parse(FAKE_REVIEW_JSON), failedCalls: [{ id: 'security', reason: `claude exited 1 on call security: bad key ${secret}` }] }), stderr: '' } });
+
+  const failure = await runNoslopReview(ctx.reviewContext(fake.run)).catch(String);
+
+  expect(failure).toContain('claude exited 1: bad key [redacted] (security)');
+  expect(failure).not.toContain(secret);
+  expect(ctx.db.query('SELECT error FROM noslop_rounds').get()).toStrictEqual({ error: '1 noslop call(s) failed: claude exited 1: bad key [redacted] (security)' });
+});
+
 test('it reads a version 5 review, which adds the dropped findings', async () => {
   const ctx = setupTest();
   const fake = buildFakeRunner({ noslopReview: { code: 0, stdout: JSON.stringify({ ...JSON.parse(FAKE_REVIEW_JSON), version: 5, dropped: [{ lens: 'style', reason: 'no quote', title: 'Lid is loose' }] }), stderr: '' } });

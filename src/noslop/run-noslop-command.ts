@@ -14,6 +14,8 @@ import type { OwnerProbe } from '../pr-status/read-owner-session.ts';
 import { roleName } from '../roles/role-name.ts';
 import type { Runner } from '../runner/types.ts';
 import { buildAdapterSetting } from './build-adapter-setting.ts';
+import { formatAdapter } from './format-adapter.ts';
+import { pickReviewAdapter } from './pick-review-adapter.ts';
 import { buildNoslopReport } from './build-noslop-report.ts';
 import { ADAPTER_KEY, readAdapterSetting } from './read-adapter-setting.ts';
 import { buildNoslopTotals } from './build-noslop-totals.ts';
@@ -82,7 +84,8 @@ function updateRepoList(args: NoslopArgs, change: 'on' | 'off'): Out {
 
 function renderSettings(db: Database): Out {
   const settings = loadNoslopSettings(db);
-  return { data: { repos: settings.repos, caps: settings.caps, sha: settings.sha, clone: resolveRunDir(settings) }, text: formatSettings(settings) };
+  const adapter = pickReviewAdapter(undefined, readAdapterSetting(db), now());
+  return { data: { repos: settings.repos, caps: settings.caps, sha: settings.sha, clone: resolveRunDir(settings), adapter }, text: [formatSettings(settings), `adapter: ${formatAdapter(adapter)}`].join('\n') };
 }
 
 function resolveRunDir(settings: NoslopSettings): string {

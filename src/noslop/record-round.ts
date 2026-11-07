@@ -34,13 +34,15 @@ export interface RoundRow {
   patchId?: string | null | undefined;
 
   baseMove?: boolean | undefined;
+
+  adapter?: string | null | undefined;
 }
 
 export function recordRound(db: Database, row: RoundRow): void {
   const full = row.full === undefined ? null : toFlag(row.full);
   db.query(
-    `INSERT INTO noslop_rounds (repo, pr, kind, started_at, ended_at, ms, ok, head, base, depth, findings, failed_calls, conclusion, open, error, sha, full, title, special, confirm, patch_id, base_move)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO noslop_rounds (repo, pr, kind, started_at, ended_at, ms, ok, head, base, depth, findings, failed_calls, conclusion, open, error, sha, full, title, special, confirm, patch_id, base_move, adapter)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     row.repo,
     row.pr,
@@ -64,6 +66,7 @@ export function recordRound(db: Database, row: RoundRow): void {
     toFlag(row.confirm === true),
     row.patchId ?? null,
     toFlag(row.baseMove === true),
+    row.adapter ?? null,
   );
 }
 
