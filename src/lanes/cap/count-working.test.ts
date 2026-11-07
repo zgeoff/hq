@@ -1,12 +1,12 @@
-import { expect, onTestFinished, test } from "bun:test";
-import { at, freshDb } from "../../../test/helpers.ts";
-import { recordAwake } from "../../areas/record-awake.ts";
-import { setMeta } from "../../db/set-meta.ts";
-import { writeIssues } from "../../linear/write-issues.ts";
-import { addRun } from "../../runs/add-run.ts";
-import { setSession } from "../../runs/set-session.ts";
-import { setState } from "../../runs/set-state.ts";
-import { countWorking } from "./count-working.ts";
+import { expect, onTestFinished, test } from 'bun:test';
+import { at, freshDb } from '../../../test/helpers.ts';
+import { recordAwake } from '../../areas/record-awake.ts';
+import { setMeta } from '../../db/set-meta.ts';
+import { writeIssues } from '../../linear/write-issues.ts';
+import { addRun } from '../../runs/add-run.ts';
+import { setSession } from '../../runs/set-session.ts';
+import { setState } from '../../runs/set-state.ts';
+import { countWorking } from './count-working.ts';
 
 function setupTest() {
   const fresh = freshDb();
@@ -14,630 +14,626 @@ function setupTest() {
   return { db: fresh.db };
 }
 
-test("it counts the awake sessions of a working run, its helper included", () => {
+test('it counts the awake sessions of a working run, its helper included', () => {
   const ctx = setupTest();
-  at("2026-10-15T20:00:00Z");
+  at('2026-10-15T20:00:00Z');
   addRun(ctx.db, {
-    issue: "GEO-9901",
-    title: "Descale the kettle",
-    place: "imp",
-    session: "a0000001-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-    next: "Agent working.",
+    issue: 'GEO-9901',
+    title: 'Descale the kettle',
+    place: 'imp',
+    session: 'a0000001-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    next: 'Agent working.',
     gate: null,
     geoffChat: false,
-    lane: "cloud",
-    actor: "z-delivery",
+    lane: 'cloud',
+    actor: 'z-delivery',
   });
-  setSession(ctx.db, "GEO-9901", "a0000002-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "z-delivery", "add");
+  setSession(ctx.db, 'GEO-9901', 'a0000002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'z-delivery', 'add');
   recordAwake(ctx.db, [
     {
-      id: "a0000001-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-      name: "kettle-agent",
+      id: 'a0000001-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      name: 'kettle-agent',
       alive: true,
-      state: "running",
-      locator: { targetID: "imp-kettle" },
+      state: 'running',
+      locator: { targetID: 'imp-kettle' },
     },
     {
-      id: "a0000002-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-      name: "kettle-helper",
+      id: 'a0000002-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      name: 'kettle-helper',
       alive: true,
-      state: "running",
-      locator: { targetID: "imp-kettle" },
+      state: 'running',
+      locator: { targetID: 'imp-kettle' },
     },
   ]);
 
-  expect(countWorking(ctx.db, new Date("2026-10-15T20:00:00Z"))).toStrictEqual({
+  expect(countWorking(ctx.db, new Date('2026-10-15T20:00:00Z'))).toStrictEqual({
     count: 2,
-    from: "sessions",
+    from: 'sessions',
   });
 });
 
-test("it leaves out a session that is not awake", () => {
+test('it leaves out a session that is not awake', () => {
   const ctx = setupTest();
-  at("2026-10-15T20:00:00Z");
+  at('2026-10-15T20:00:00Z');
   addRun(ctx.db, {
-    issue: "GEO-9901",
-    title: "Descale the kettle",
-    place: "imp",
-    session: "a0000001-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-    next: "Agent working.",
+    issue: 'GEO-9901',
+    title: 'Descale the kettle',
+    place: 'imp',
+    session: 'a0000001-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    next: 'Agent working.',
     gate: null,
     geoffChat: false,
-    lane: "cloud",
-    actor: "z-delivery",
+    lane: 'cloud',
+    actor: 'z-delivery',
   });
   recordAwake(ctx.db, [
     {
-      id: "a0000001-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-      name: "kettle-agent",
+      id: 'a0000001-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      name: 'kettle-agent',
       alive: false,
-      state: "running",
-      locator: { targetID: "imp-kettle" },
+      state: 'running',
+      locator: { targetID: 'imp-kettle' },
     },
   ]);
 
-  expect(countWorking(ctx.db, new Date("2026-10-15T20:00:00Z"))).toStrictEqual({
+  expect(countWorking(ctx.db, new Date('2026-10-15T20:00:00Z'))).toStrictEqual({
     count: 0,
-    from: "sessions",
+    from: 'sessions',
   });
 });
 
-test("it leaves out a Design run", () => {
+test('it leaves out a Design run', () => {
   const ctx = setupTest();
-  at("2026-10-15T20:00:00Z");
+  at('2026-10-15T20:00:00Z');
   writeIssues(ctx.db, [
     {
-      issue: "GEO-9921",
-      type: "Design",
-      title: "Design: a quieter kettle whistle",
-      state: "open",
+      issue: 'GEO-9921',
+      type: 'Design',
+      title: 'Design: a quieter kettle whistle',
+      state: 'open',
       closed_at: null,
     },
   ]);
   addRun(ctx.db, {
-    issue: "GEO-9921",
-    title: "Design: a quieter kettle whistle",
-    place: "local",
-    session: "a0000001-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-    next: "The owner chats.",
+    issue: 'GEO-9921',
+    title: 'Design: a quieter kettle whistle',
+    place: 'local',
+    session: 'a0000001-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    next: 'The owner chats.',
     gate: null,
     geoffChat: true,
-    lane: "flexible",
-    actor: "z-delivery",
+    lane: 'flexible',
+    actor: 'z-delivery',
   });
   recordAwake(ctx.db, [
     {
-      id: "a0000001-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-      name: "whistle-design",
+      id: 'a0000001-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      name: 'whistle-design',
       alive: true,
-      state: "running",
-      locator: { targetID: "local" },
+      state: 'running',
+      locator: { targetID: 'local' },
     },
   ]);
 
-  expect(countWorking(ctx.db, new Date("2026-10-15T20:00:00Z"))).toStrictEqual({
+  expect(countWorking(ctx.db, new Date('2026-10-15T20:00:00Z'))).toStrictEqual({
     count: 0,
-    from: "sessions",
+    from: 'sessions',
   });
 });
 
-test("it leaves out a fleet session though a run lists it", () => {
+test('it leaves out a fleet session though a run lists it', () => {
   const ctx = setupTest();
-  at("2026-10-15T20:00:00Z");
-  setMeta(
-    ctx.db,
-    "fleet_ids",
-    JSON.stringify({ "z-kettle": "a0000001-aaaa-4aaa-8aaa-aaaaaaaaaaaa" }),
-  );
+  at('2026-10-15T20:00:00Z');
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-kettle': 'a0000001-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }));
   addRun(ctx.db, {
-    issue: "GEO-9901",
-    title: "Descale the kettle",
-    place: "imp",
-    session: "a0000001-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-    next: "Agent working.",
+    issue: 'GEO-9901',
+    title: 'Descale the kettle',
+    place: 'imp',
+    session: 'a0000001-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    next: 'Agent working.',
     gate: null,
     geoffChat: false,
-    lane: "cloud",
-    actor: "z-delivery",
+    lane: 'cloud',
+    actor: 'z-delivery',
   });
   recordAwake(ctx.db, [
     {
-      id: "a0000001-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-      name: "z-kettle",
+      id: 'a0000001-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      name: 'z-kettle',
       alive: true,
-      state: "running",
-      locator: { targetID: "local" },
+      state: 'running',
+      locator: { targetID: 'local' },
     },
   ]);
 
-  expect(countWorking(ctx.db, new Date("2026-10-15T20:00:00Z"))).toStrictEqual({
+  expect(countWorking(ctx.db, new Date('2026-10-15T20:00:00Z'))).toStrictEqual({
     count: 0,
-    from: "sessions",
+    from: 'sessions',
   });
 });
 
-test("it counts the awake and busy session of a blocked run", () => {
+test('it counts the awake and busy session of a blocked run', () => {
   const ctx = setupTest();
-  at("2026-10-15T20:00:00Z");
+  at('2026-10-15T20:00:00Z');
   addRun(ctx.db, {
-    issue: "GEO-9901",
-    title: "Descale the kettle",
-    place: "imp",
-    session: "a0000001-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-    next: "Agent working.",
+    issue: 'GEO-9901',
+    title: 'Descale the kettle',
+    place: 'imp',
+    session: 'a0000001-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    next: 'Agent working.',
     gate: null,
     geoffChat: false,
-    lane: "cloud",
-    actor: "z-delivery",
+    lane: 'cloud',
+    actor: 'z-delivery',
   });
-  setState(ctx.db, "GEO-9901", "blocked", {}, "z-delivery");
+  setState(ctx.db, 'GEO-9901', 'blocked', {}, 'z-delivery');
   recordAwake(ctx.db, [
     {
-      id: "a0000001-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-      name: "kettle-agent",
+      id: 'a0000001-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      name: 'kettle-agent',
       alive: true,
-      state: "running",
-      locator: { targetID: "imp-kettle" },
+      state: 'running',
+      locator: { targetID: 'imp-kettle' },
     },
   ]);
 
-  expect(countWorking(ctx.db, new Date("2026-10-15T20:00:00Z"))).toStrictEqual({
+  expect(countWorking(ctx.db, new Date('2026-10-15T20:00:00Z'))).toStrictEqual({
     count: 1,
-    from: "sessions",
+    from: 'sessions',
   });
 });
 
-test("it leaves out a merged run, which waits", () => {
+test('it leaves out a merged run, which waits', () => {
   const ctx = setupTest();
-  at("2026-10-15T20:00:00Z");
+  at('2026-10-15T20:00:00Z');
   addRun(ctx.db, {
-    issue: "GEO-9901",
-    title: "Descale the kettle",
-    place: "imp",
-    session: "a0000001-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-    next: "Agent working.",
+    issue: 'GEO-9901',
+    title: 'Descale the kettle',
+    place: 'imp',
+    session: 'a0000001-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    next: 'Agent working.',
     gate: null,
     geoffChat: false,
-    lane: "cloud",
-    actor: "z-delivery",
+    lane: 'cloud',
+    actor: 'z-delivery',
   });
-  setState(ctx.db, "GEO-9901", "merged", {}, "z-delivery");
+  setState(ctx.db, 'GEO-9901', 'merged', {}, 'z-delivery');
   recordAwake(ctx.db, [
     {
-      id: "a0000001-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-      name: "kettle-agent",
+      id: 'a0000001-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      name: 'kettle-agent',
       alive: true,
-      state: "running",
-      locator: { targetID: "imp-kettle" },
+      state: 'running',
+      locator: { targetID: 'imp-kettle' },
     },
   ]);
 
-  expect(countWorking(ctx.db, new Date("2026-10-15T20:00:00Z"))).toStrictEqual({
+  expect(countWorking(ctx.db, new Date('2026-10-15T20:00:00Z'))).toStrictEqual({
     count: 0,
-    from: "sessions",
+    from: 'sessions',
   });
 });
 
-test("it counts an owner-chat Investigation run", () => {
+test('it counts an owner-chat Investigation run', () => {
   const ctx = setupTest();
-  at("2026-10-15T20:00:00Z");
+  at('2026-10-15T20:00:00Z');
   writeIssues(ctx.db, [
     {
-      issue: "GEO-9923",
-      type: "Investigation",
-      title: "Spike: how loud a kettle may whistle",
-      state: "open",
+      issue: 'GEO-9923',
+      type: 'Investigation',
+      title: 'Spike: how loud a kettle may whistle',
+      state: 'open',
       closed_at: null,
     },
   ]);
   addRun(ctx.db, {
-    issue: "GEO-9923",
-    title: "Spike: how loud a kettle may whistle",
-    place: "local",
-    session: "a0000003-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-    next: "The owner chats.",
+    issue: 'GEO-9923',
+    title: 'Spike: how loud a kettle may whistle',
+    place: 'local',
+    session: 'a0000003-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    next: 'The owner chats.',
     gate: null,
     geoffChat: true,
-    lane: "flexible",
-    actor: "z-delivery",
+    lane: 'flexible',
+    actor: 'z-delivery',
   });
   recordAwake(ctx.db, [
     {
-      id: "a0000003-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-      name: "whistle-spike",
+      id: 'a0000003-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      name: 'whistle-spike',
       alive: true,
-      state: "running",
-      locator: { targetID: "local" },
+      state: 'running',
+      locator: { targetID: 'local' },
     },
   ]);
 
-  expect(countWorking(ctx.db, new Date("2026-10-15T20:00:00Z"))).toStrictEqual({
+  expect(countWorking(ctx.db, new Date('2026-10-15T20:00:00Z'))).toStrictEqual({
     count: 1,
-    from: "sessions",
+    from: 'sessions',
   });
 });
 
-test("it counts the working and blocked runs, less Design ones, when the atc reading is over 15 minutes old", () => {
+test('it counts the working and blocked runs, less Design ones, when the atc reading is over 15 minutes old', () => {
   const ctx = setupTest();
-  at("2026-10-15T20:00:00Z");
+  at('2026-10-15T20:00:00Z');
   writeIssues(ctx.db, [
     {
-      issue: "GEO-9921",
-      type: "Design",
-      title: "Design: a quieter kettle whistle",
-      state: "open",
+      issue: 'GEO-9921',
+      type: 'Design',
+      title: 'Design: a quieter kettle whistle',
+      state: 'open',
       closed_at: null,
     },
   ]);
   addRun(ctx.db, {
-    issue: "GEO-9921",
-    title: "Design: a quieter kettle whistle",
-    place: "local",
-    session: "a0000001-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-    next: "The owner chats.",
+    issue: 'GEO-9921',
+    title: 'Design: a quieter kettle whistle',
+    place: 'local',
+    session: 'a0000001-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    next: 'The owner chats.',
     gate: null,
     geoffChat: true,
-    lane: "flexible",
-    actor: "z-delivery",
+    lane: 'flexible',
+    actor: 'z-delivery',
   });
   addRun(ctx.db, {
-    issue: "GEO-9901",
-    title: "Descale the kettle",
-    place: "imp",
-    session: "a0000002-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-    next: "Agent working.",
+    issue: 'GEO-9901',
+    title: 'Descale the kettle',
+    place: 'imp',
+    session: 'a0000002-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    next: 'Agent working.',
     gate: null,
     geoffChat: false,
-    lane: "cloud",
-    actor: "z-delivery",
+    lane: 'cloud',
+    actor: 'z-delivery',
   });
   addRun(ctx.db, {
-    issue: "GEO-9902",
-    title: "Polish the teapot",
-    place: "imp",
-    session: "a0000003-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-    next: "Agent working.",
+    issue: 'GEO-9902',
+    title: 'Polish the teapot',
+    place: 'imp',
+    session: 'a0000003-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    next: 'Agent working.',
     gate: null,
     geoffChat: false,
-    lane: "cloud",
-    actor: "z-delivery",
+    lane: 'cloud',
+    actor: 'z-delivery',
   });
-  setState(ctx.db, "GEO-9902", "blocked", {}, "z-delivery");
+  setState(ctx.db, 'GEO-9902', 'blocked', {}, 'z-delivery');
   recordAwake(ctx.db, [
     {
-      id: "a0000002-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-      name: "kettle-agent",
+      id: 'a0000002-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      name: 'kettle-agent',
       alive: true,
-      state: "running",
-      locator: { targetID: "imp-kettle" },
+      state: 'running',
+      locator: { targetID: 'imp-kettle' },
     },
   ]);
 
-  expect(countWorking(ctx.db, new Date("2026-10-15T20:16:00Z"))).toStrictEqual({
+  expect(countWorking(ctx.db, new Date('2026-10-15T20:16:00Z'))).toStrictEqual({
     count: 2,
-    from: "runs",
+    from: 'runs',
   });
 });
 
-test("it counts the working runs when no atc reading exists", () => {
+test('it counts the working runs when no atc reading exists', () => {
   const ctx = setupTest();
-  at("2026-10-15T20:00:00Z");
+  at('2026-10-15T20:00:00Z');
   addRun(ctx.db, {
-    issue: "GEO-9901",
-    title: "Descale the kettle",
-    place: "imp",
-    session: "a0000001-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-    next: "Agent working.",
+    issue: 'GEO-9901',
+    title: 'Descale the kettle',
+    place: 'imp',
+    session: 'a0000001-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    next: 'Agent working.',
     gate: null,
     geoffChat: false,
-    lane: "cloud",
-    actor: "z-delivery",
+    lane: 'cloud',
+    actor: 'z-delivery',
   });
 
-  expect(countWorking(ctx.db, new Date("2026-10-15T20:00:00Z"))).toStrictEqual({
+  expect(countWorking(ctx.db, new Date('2026-10-15T20:00:00Z'))).toStrictEqual({
     count: 1,
-    from: "runs",
+    from: 'runs',
   });
 });
 
-test("it counts a blocked run when no atc reading exists", () => {
+test('it counts a blocked run when no atc reading exists', () => {
   const ctx = setupTest();
-  at("2026-10-15T20:00:00Z");
+  at('2026-10-15T20:00:00Z');
   addRun(ctx.db, {
-    issue: "GEO-9903",
-    title: "Rinse the teapot",
-    place: "imp",
-    session: "a0000001-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-    next: "Agent working.",
+    issue: 'GEO-9903',
+    title: 'Rinse the teapot',
+    place: 'imp',
+    session: 'a0000001-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    next: 'Agent working.',
     gate: null,
     geoffChat: false,
-    lane: "cloud",
-    actor: "z-delivery",
+    lane: 'cloud',
+    actor: 'z-delivery',
   });
-  setState(ctx.db, "GEO-9903", "blocked", {}, "z-delivery");
+  setState(ctx.db, 'GEO-9903', 'blocked', {}, 'z-delivery');
 
-  expect(countWorking(ctx.db, new Date("2026-10-15T20:00:00Z"))).toStrictEqual({
+  expect(countWorking(ctx.db, new Date('2026-10-15T20:00:00Z'))).toStrictEqual({
     count: 1,
-    from: "runs",
+    from: 'runs',
   });
 });
 
-test("it leaves out an agent design run on a non-Design issue, by its design lane", () => {
+test('it leaves out an agent design run on a non-Design issue, by its design lane', () => {
   const ctx = setupTest();
-  at("2026-10-15T20:00:00Z");
+  at('2026-10-15T20:00:00Z');
   addRun(ctx.db, {
-    issue: "GEO-9930",
-    title: "Design the kettle spout",
-    place: "imp",
-    session: "a0000030-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-    next: "Agent working.",
+    issue: 'GEO-9930',
+    title: 'Design the kettle spout',
+    place: 'imp',
+    session: 'a0000030-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    next: 'Agent working.',
     gate: null,
     geoffChat: false,
-    lane: "cloud",
-    design: "agent",
-    actor: "z-delivery",
+    lane: 'cloud',
+    design: 'agent',
+    actor: 'z-delivery',
   });
   addRun(ctx.db, {
-    issue: "GEO-9932",
-    title: "Descale the kettle",
-    place: "imp",
-    session: "a0000032-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-    next: "Agent working.",
+    issue: 'GEO-9932',
+    title: 'Descale the kettle',
+    place: 'imp',
+    session: 'a0000032-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    next: 'Agent working.',
     gate: null,
     geoffChat: false,
-    lane: "cloud",
-    actor: "z-delivery",
+    lane: 'cloud',
+    actor: 'z-delivery',
   });
   recordAwake(ctx.db, [
     {
-      id: "a0000030-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-      name: "spout-design",
+      id: 'a0000030-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      name: 'spout-design',
       alive: true,
-      state: "running",
-      locator: { targetID: "imp-spout" },
+      state: 'running',
+      locator: { targetID: 'imp-spout' },
     },
     {
-      id: "a0000032-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-      name: "kettle-agent",
+      id: 'a0000032-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      name: 'kettle-agent',
       alive: true,
-      state: "running",
-      locator: { targetID: "imp-kettle" },
+      state: 'running',
+      locator: { targetID: 'imp-kettle' },
     },
   ]);
 
-  expect(countWorking(ctx.db, new Date("2026-10-15T20:00:00Z"))).toStrictEqual({
+  expect(countWorking(ctx.db, new Date('2026-10-15T20:00:00Z'))).toStrictEqual({
     count: 1,
-    from: "sessions",
+    from: 'sessions',
   });
 });
 
-test("it counts one delivery session for a build run while its design pass session stays awake", () => {
+test('it counts one delivery session for a build run while its design pass session stays awake', () => {
   const ctx = setupTest();
-  at("2026-10-15T20:00:00Z");
+  at('2026-10-15T20:00:00Z');
   addRun(ctx.db, {
-    issue: "GEO-9931",
-    title: "Design the kettle spout",
-    place: "imp",
-    session: "a0000031-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-    next: "Agent working.",
+    issue: 'GEO-9931',
+    title: 'Design the kettle spout',
+    place: 'imp',
+    session: 'a0000031-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    next: 'Agent working.',
     gate: null,
     geoffChat: false,
-    lane: "cloud",
-    design: "agent",
-    actor: "z-delivery",
+    lane: 'cloud',
+    design: 'agent',
+    actor: 'z-delivery',
   });
-  setState(ctx.db, "GEO-9931", "done", { note: "design settled" }, "z-delivery");
+  setState(ctx.db, 'GEO-9931', 'done', { note: 'design settled' }, 'z-delivery');
   addRun(ctx.db, {
-    issue: "GEO-9931",
-    title: "Build the kettle spout",
-    place: "imp",
-    session: "a0000032-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-    next: "Building.",
+    issue: 'GEO-9931',
+    title: 'Build the kettle spout',
+    place: 'imp',
+    session: 'a0000032-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    next: 'Building.',
     gate: null,
     geoffChat: false,
-    lane: "cloud",
-    actor: "z-delivery",
+    lane: 'cloud',
+    actor: 'z-delivery',
   });
   recordAwake(ctx.db, [
     {
-      id: "a0000031-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-      name: "spout-design",
+      id: 'a0000031-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      name: 'spout-design',
       alive: true,
-      state: "running",
-      locator: { targetID: "imp-kettle" },
+      state: 'running',
+      locator: { targetID: 'imp-kettle' },
     },
     {
-      id: "a0000032-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-      name: "spout-build",
+      id: 'a0000032-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      name: 'spout-build',
       alive: true,
-      state: "running",
-      locator: { targetID: "imp-kettle" },
+      state: 'running',
+      locator: { targetID: 'imp-kettle' },
     },
   ]);
 
-  expect(countWorking(ctx.db, new Date("2026-10-15T20:00:00Z"))).toStrictEqual({
+  expect(countWorking(ctx.db, new Date('2026-10-15T20:00:00Z'))).toStrictEqual({
     count: 1,
-    from: "sessions",
+    from: 'sessions',
   });
 });
 
-test("it counts the design pass session once the build run takes it on as its own", () => {
+test('it counts the design pass session once the build run takes it on as its own', () => {
   const ctx = setupTest();
-  at("2026-10-15T20:00:00Z");
+  at('2026-10-15T20:00:00Z');
   addRun(ctx.db, {
-    issue: "GEO-9934",
-    title: "Design the kettle lid",
-    place: "imp",
-    session: "a0000037-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-    next: "Agent working.",
+    issue: 'GEO-9934',
+    title: 'Design the kettle lid',
+    place: 'imp',
+    session: 'a0000037-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    next: 'Agent working.',
     gate: null,
     geoffChat: false,
-    lane: "cloud",
-    design: "agent",
-    actor: "z-delivery",
+    lane: 'cloud',
+    design: 'agent',
+    actor: 'z-delivery',
   });
-  setState(ctx.db, "GEO-9934", "done", { note: "design settled" }, "z-delivery");
+  setState(ctx.db, 'GEO-9934', 'done', { note: 'design settled' }, 'z-delivery');
   addRun(ctx.db, {
-    issue: "GEO-9934",
-    title: "Build the kettle lid",
-    place: "imp",
-    session: "a0000037-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-    next: "Building.",
+    issue: 'GEO-9934',
+    title: 'Build the kettle lid',
+    place: 'imp',
+    session: 'a0000037-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    next: 'Building.',
     gate: null,
     geoffChat: false,
-    lane: "cloud",
-    actor: "z-delivery",
+    lane: 'cloud',
+    actor: 'z-delivery',
   });
   recordAwake(ctx.db, [
     {
-      id: "a0000037-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-      name: "lid-agent",
+      id: 'a0000037-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      name: 'lid-agent',
       alive: true,
-      state: "running",
-      locator: { targetID: "imp-kettle" },
+      state: 'running',
+      locator: { targetID: 'imp-kettle' },
     },
   ]);
 
-  expect(countWorking(ctx.db, new Date("2026-10-15T20:00:00Z"))).toStrictEqual({
+  expect(countWorking(ctx.db, new Date('2026-10-15T20:00:00Z'))).toStrictEqual({
     count: 1,
-    from: "sessions",
+    from: 'sessions',
   });
 });
 
-test("it counts a session added after the atc reading, which no reading has seen yet", () => {
+test('it counts a session added after the atc reading, which no reading has seen yet', () => {
   const ctx = setupTest();
-  at("2026-10-15T20:00:00Z");
+  at('2026-10-15T20:00:00Z');
   recordAwake(ctx.db, []);
-  at("2026-10-15T20:05:00Z");
+  at('2026-10-15T20:05:00Z');
   addRun(ctx.db, {
-    issue: "GEO-9940",
-    title: "Rinse the teapot",
-    place: "imp",
-    session: "a0000040-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-    next: "Agent working.",
+    issue: 'GEO-9940',
+    title: 'Rinse the teapot',
+    place: 'imp',
+    session: 'a0000040-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    next: 'Agent working.',
     gate: null,
     geoffChat: false,
     lane: null,
-    actor: "z-delivery",
+    actor: 'z-delivery',
   });
 
-  expect(countWorking(ctx.db, new Date("2026-10-15T20:05:00Z"))).toStrictEqual({
+  expect(countWorking(ctx.db, new Date('2026-10-15T20:05:00Z'))).toStrictEqual({
     count: 1,
-    from: "sessions",
+    from: 'sessions',
   });
 });
 
-test("it leaves out a session added before the atc reading that the reading does not list", () => {
+test('it leaves out a session added before the atc reading that the reading does not list', () => {
   const ctx = setupTest();
-  at("2026-10-15T20:00:00Z");
+  at('2026-10-15T20:00:00Z');
   addRun(ctx.db, {
-    issue: "GEO-9941",
-    title: "Dry the teapot",
-    place: "imp",
-    session: "a0000041-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-    next: "Agent working.",
+    issue: 'GEO-9941',
+    title: 'Dry the teapot',
+    place: 'imp',
+    session: 'a0000041-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    next: 'Agent working.',
     gate: null,
     geoffChat: false,
     lane: null,
-    actor: "z-delivery",
+    actor: 'z-delivery',
   });
-  at("2026-10-15T20:01:00Z");
+  at('2026-10-15T20:01:00Z');
   recordAwake(ctx.db, []);
 
-  expect(countWorking(ctx.db, new Date("2026-10-15T20:05:00Z"))).toStrictEqual({
+  expect(countWorking(ctx.db, new Date('2026-10-15T20:05:00Z'))).toStrictEqual({
     count: 0,
-    from: "sessions",
+    from: 'sessions',
   });
 });
 
-test("it counts a session added in the same second as the atc reading", () => {
+test('it counts a session added in the same second as the atc reading', () => {
   const ctx = setupTest();
-  at("2026-10-15T20:00:00Z");
+  at('2026-10-15T20:00:00Z');
   recordAwake(ctx.db, []);
   addRun(ctx.db, {
-    issue: "GEO-9942",
-    title: "Warm the teapot",
-    place: "imp",
-    session: "a0000042-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-    next: "Agent working.",
+    issue: 'GEO-9942',
+    title: 'Warm the teapot',
+    place: 'imp',
+    session: 'a0000042-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    next: 'Agent working.',
     gate: null,
     geoffChat: false,
     lane: null,
-    actor: "z-delivery",
+    actor: 'z-delivery',
   });
 
-  expect(countWorking(ctx.db, new Date("2026-10-15T20:00:30Z"))).toStrictEqual({
+  expect(countWorking(ctx.db, new Date('2026-10-15T20:00:30Z'))).toStrictEqual({
     count: 1,
-    from: "sessions",
+    from: 'sessions',
   });
 });
 
 test("it counts a session added in the reading's own second when the reading has no seen list", () => {
   const ctx = setupTest();
-  at("2026-10-15T20:00:00Z");
+  at('2026-10-15T20:00:00Z');
   addRun(ctx.db, {
-    issue: "GEO-9943",
-    title: "Fill the teapot",
-    place: "imp",
-    session: "a0000043-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-    next: "Agent working.",
+    issue: 'GEO-9943',
+    title: 'Fill the teapot',
+    place: 'imp',
+    session: 'a0000043-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    next: 'Agent working.',
     gate: null,
     geoffChat: false,
     lane: null,
-    actor: "z-delivery",
+    actor: 'z-delivery',
   });
-  setMeta(ctx.db, "atc_awake", JSON.stringify({ at: "2026-10-15T20:00:00Z", ids: [] }));
-  at("2026-10-15T20:00:05Z");
+  setMeta(ctx.db, 'atc_awake', JSON.stringify({ at: '2026-10-15T20:00:00Z', ids: [] }));
+  at('2026-10-15T20:00:05Z');
   addRun(ctx.db, {
-    issue: "GEO-9944",
-    title: "Pour the tea",
-    place: "imp",
-    session: "a0000044-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-    next: "Agent working.",
+    issue: 'GEO-9944',
+    title: 'Pour the tea',
+    place: 'imp',
+    session: 'a0000044-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    next: 'Agent working.',
     gate: null,
     geoffChat: false,
     lane: null,
-    actor: "z-delivery",
+    actor: 'z-delivery',
   });
 
-  expect(countWorking(ctx.db, new Date("2026-10-15T20:00:30Z"))).toStrictEqual({
+  expect(countWorking(ctx.db, new Date('2026-10-15T20:00:30Z'))).toStrictEqual({
     count: 2,
-    from: "sessions",
+    from: 'sessions',
   });
 });
 
 test.each([
-  { title: "a working run", state: "working" },
-  { title: "a blocked run", state: "blocked" },
-] as const)("it frees the lane of $title whose only session is asleep", (row) => {
+  { title: 'a working run', state: 'working' },
+  { title: 'a blocked run', state: 'blocked' },
+] as const)('it frees the lane of $title whose only session is asleep', (row) => {
   const ctx = setupTest();
-  at("2026-10-15T20:00:00Z");
+  at('2026-10-15T20:00:00Z');
   addRun(ctx.db, {
-    issue: "GEO-9951",
-    title: "Descale the kettle",
-    place: "imp",
-    session: "a0000051-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-    next: "Agent working.",
+    issue: 'GEO-9951',
+    title: 'Descale the kettle',
+    place: 'imp',
+    session: 'a0000051-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    next: 'Agent working.',
     gate: null,
     geoffChat: false,
-    lane: "cloud",
-    actor: "z-delivery",
+    lane: 'cloud',
+    actor: 'z-delivery',
   });
-  setState(ctx.db, "GEO-9951", row.state, {}, "z-delivery");
-  at("2026-10-15T20:01:00Z");
+  setState(ctx.db, 'GEO-9951', row.state, {}, 'z-delivery');
+  at('2026-10-15T20:01:00Z');
   recordAwake(ctx.db, [
     {
-      id: "a0000051-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-      name: "kettle-agent",
+      id: 'a0000051-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      name: 'kettle-agent',
       alive: true,
-      state: "running",
-      lifecycle: { vm: "asleep" },
-      locator: { targetID: "imp-kettle" },
+      state: 'running',
+      lifecycle: { vm: 'asleep' },
+      locator: { targetID: 'imp-kettle' },
     },
   ]);
 
-  expect(countWorking(ctx.db, new Date("2026-10-15T20:02:00Z"))).toStrictEqual({
+  expect(countWorking(ctx.db, new Date('2026-10-15T20:02:00Z'))).toStrictEqual({
     count: 0,
-    from: "sessions",
+    from: 'sessions',
   });
 });
