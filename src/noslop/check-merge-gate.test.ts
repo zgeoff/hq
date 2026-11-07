@@ -1054,7 +1054,7 @@ test("it passes under the owner's override though CODEOWNERS has no owner sectio
   setMeta(ctx.db, 'noslop', JSON.stringify({ repos: ['hq'], sha: '0123456789abcdef0123456789abcdef01234567' }));
   recordPROverride(ctx.db, { repo: 'hq', pr: 7, head: FAKE_FULL_SHA, source: 'call:KET-5', note: 'Ship the kettle fork fix.', actor: 'z-kettle' });
 
-  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'hq', pr: 7 })).resolves.toMatchObject({ mayMerge: true });
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'hq', pr: 7 })).resolves.toStrictEqual({ mayMerge: true, reason: "The owner's override at 0123456 (call:KET-5) stands for 1 open finding: aaaaaaaaaaaaaaaa; CI green at 0123456", reviewed: true });
 });
 
 test("it still blocks a head that moved while the gate ran, under the owner's override on a repo noslop does not review", async () => {
