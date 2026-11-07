@@ -19,7 +19,8 @@ import { OWNER_PROBE_OPENER } from '../src/pr-status/owner-probe-opener.ts';
 import { overrideEnv } from '../src/config/override-env.ts';
 import { isHeatList } from '../mods/hq-band/hooks/is-heat-list.ts';
 import { isSegmentList } from '../mods/hq-band/hooks/is-segment-list.ts';
-import type { Band, Pane } from '../src/band/types.ts';
+import { z } from 'zod';
+import type { Pane } from '../src/band/types.ts';
 import { NOON_SYDNEY, at, createPushedClone, fakeAtc, freshDb } from './helpers.ts';
 
 let dir: string;
@@ -594,17 +595,13 @@ test('it still refuses hq run merged for a PR marked closed', async () => {
   }
 });
 
-interface RunSessionRow {
-  session_id: string;
-}
-
 test('hq run add refuses a session id given as a second word, and stores the run only with --session', async () => {
   const refused = await hq('run', 'add', 'GEO-9701', '9701ab0c-0000-4000-8000-00000000beef', '--title', 'Invented kettle work', '--where', 'none');
   const remaining = await hq('run', 'list');
   const stored = await hq('run', 'add', 'GEO-9701', '--session', '9701ab0c-0000-4000-8000-00000000beef', '--title', 'Invented kettle work', '--where', 'none');
   expect([refused.code, refused.json.error.message]).toEqual([1, 'hq run add takes one issue: pass the session as --session 9701ab0c-0000-4000-8000-00000000beef']);
   expect(remaining.json.runs).toEqual([]);
-  expect((stored.json.run.sessions as RunSessionRow[]).map((x) => x.session_id)).toEqual(['9701ab0c-0000-4000-8000-00000000beef']);
+  expect(z.array(z.object({ session_id: z.string() })).parse(stored.json.run.sessions).map((x) => x.session_id)).toEqual(['9701ab0c-0000-4000-8000-00000000beef']);
 });
 
 test('#run add names hq run session --add for a --session it ignores on a run already on the board', async () => {
@@ -865,7 +862,7 @@ test('hq whois names the fleet session hq fleet saw under an id, and null for an
 
 test('hq band --json gives the segments the band mod draws, by the mod\'s own check', async () => {
   const shown = await hq('band');
-  expect([shown.code, (shown.json.band as Band).segments.map((segment) => segment.key), isSegmentList(shown.json.band.segments)]).toStrictEqual([0, ['needs', 'nix', 'lanes', 'ci', 'reviews'], true]);
+  expect([shown.code, z.object({ segments: z.array(z.object({ key: z.string() })) }).parse(shown.json.band).segments.map((segment) => segment.key), isSegmentList(shown.json.band.segments)]).toStrictEqual([0, ['needs', 'nix', 'lanes', 'ci', 'reviews'], true]);
 });
 
 test('hq pane --json gives Markdown and a heat map the pane draws, by the mod\'s own check', async () => {

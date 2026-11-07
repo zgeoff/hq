@@ -45,11 +45,11 @@ const NUMERIC = DEFAULTS.filter(([, d]) => typeof d === 'number').map(([n]) => n
 const STRICT = NUMERIC.filter((n) => !['HQ_RC_POLL_MS', 'HQ_SEND_WAIT_MS', 'HQ_RESTORE_WAIT_MS'].includes(n));
 
 test.each(DEFAULTS)('%s defaults to %p on an empty environment', (name, dflt) => {
-  expect((config({}) as Record<string, unknown>)[name]).toBe(dflt);
+  expect(Object.fromEntries(Object.entries(config({})))[name]).toBe(dflt);
 });
 
 test('settings with no default are undefined on an empty environment', () => {
-  const c = config({}) as Record<string, unknown>;
+  const c = Object.fromEntries(Object.entries(config({})));
   for (const n of ['HQ_DB', 'HQ_AS', 'HQ_NOTIFY', 'HQ_LIVE', 'REVIEW_DIR', 'HQ_REPOS', 'HQ_NOW', 'HQ_ATC_SOCKET']) expect(c[n]).toBeUndefined();
 });
 

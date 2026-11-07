@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test';
 import type { Database } from 'bun:sqlite';
+import { z } from 'zod';
+import { buildMockFetch } from '../src/test-utils/build-mock-fetch.ts';
+import { queryRows } from '../src/test-utils/query-rows.ts';
+import { toErrorMessage } from '../src/to-error-message.ts';
 import { issueOf } from '../src/kinds/issue-of.ts';
 import { kindOf } from '../src/kinds/kind-of.ts';
 import { kindText } from '../src/kinds/kind-text.ts';
@@ -31,7 +35,7 @@ afterEach(() => {
   cleanup();
 });
 
-test.each([
+test.each<[string, ReturnType<typeof kindOf>]>([
   ['fix(geo-12): an invented fix', 'fix'],
   ['feat!: an invented feature', 'feat'],
   ['Fix: capital prefix', 'fix'],
@@ -40,7 +44,7 @@ test.each([
   ['no prefix at all', 'other'],
   ['fixes: not a known kind', 'other'],
   ['fix an invented thing', 'other'],
-] as [string, string][])('kind of %p is %p', (title, kind) => expect(kindOf(title)).toBe(kind as ReturnType<typeof kindOf>));
+])('kind of %p is %p', (title, kind) => expect(kindOf(title)).toBe(kind));
 
 test.each([
   ['Fixes GEO-12', 'GEO-12'],
@@ -73,7 +77,7 @@ test('a past day is recorded once; today is fetched each time', async () => {
   );
   const r = await syncKinds(db, run, { from: new Date('2026-10-14T00:00:00Z'), maxDays: 10 });
   expect(r).toMatchObject({ days: ['2026-10-14', '2026-10-15', '2026-10-16'], prs: 2, left: 0 });
-  expect((db.query('SELECT day FROM merged_pr_days ORDER BY day').all() as { day: string }[]).map((x) => x.day)).toEqual(['2026-10-14', '2026-10-15']);
+  expect(queryRows(db, 'SELECT day FROM merged_pr_days ORDER BY day', z.object({ day: z.string() })).map((x) => x.day)).toEqual(['2026-10-14', '2026-10-15']);
   expect(db.query('SELECT kind, issue FROM merged_prs WHERE number = 1').get()).toEqual({ kind: 'fix', issue: 'GEO-1' });
   calls.length = 0;
   await syncKinds(db, run, { from: new Date('2026-10-14T00:00:00Z'), maxDays: 10 });
@@ -129,7 +133,7 @@ test('closed issues page through Linear; PR issues are typed, and an unknown id 
     return { issues: pages.shift() };
   };
   expect(await syncClosed(db, call, new Date('2026-10-11T13:00:00Z'))).toBe(2);
-  expect((seen[1] as { after: string }).after).toBe('c1');
+  expect(z.object({ after: z.string() }).parse(seen[1]).after).toBe('c1');
   db.query(`INSERT INTO merged_prs (repo, number, merged_at, title, kind, issue) VALUES ('atc', 1, '2026-10-12T00:00:00Z', 'fix: x', 'fix', 'GEO-5'), ('atc', 2, '2026-10-12T00:00:00Z', 'fix: y', 'fix', 'GEO-404'), ('atc', 3, '2026-10-12T00:00:00Z', 'fix: z', 'fix', 'GEO-1')`).run();
   expect(await syncPrIssues(db, call)).toBe(1);
   expect(db.query('SELECT issue, type, state FROM linear_issues ORDER BY issue').all()).toEqual([
@@ -204,7 +208,7 @@ test('Linear ids hq did not ask for are not stored; an inherited type name count
   db.query(`INSERT INTO merged_prs (repo, number, merged_at, title, kind, issue) VALUES ('atc', 1, '2026-10-12T00:00:00Z', 'fix: x', 'fix', 'GEO-5')`).run();
   const call: LinearCall = async () => ({ issues: { nodes: [node('GEO-5', 'Bug'), node('GEO-999', 'Bug')] } });
   await syncPrIssues(db, call);
-  expect((db.query('SELECT issue FROM linear_issues ORDER BY issue').all() as { issue: string }[]).map((r) => r.issue)).toEqual(['GEO-5']);
+  expect(queryRows(db, 'SELECT issue FROM linear_issues ORDER BY issue', z.object({ issue: z.string() })).map((r) => r.issue)).toEqual(['GEO-5']);
   db.query(`UPDATE linear_issues SET type = 'constructor'`).run();
   const [w] = kindWeeks(db, 1);
   expect(w!.prTypes.none).toBe(1);
@@ -215,14 +219,14 @@ test('the key never reaches an error or hq.db, even when Linear echoes it', asyn
   forgetKey();
   process.env['OP_SERVICE_ACCOUNT_TOKEN'] = 'invented-token';
   const run: Runner = async () => ({ code: 0, stdout: `${KEY}\n`, stderr: '' });
-  const echo = (async () => new Response(JSON.stringify({ errors: [{ message: `bad key ${KEY} sent` }, { message: 'also lin_api_OTHERinventedKEY' }] }), { status: 400 })) as unknown as typeof fetch;
-  const down = (async () => {
+  const echo = buildMockFetch(async () => new Response(JSON.stringify({ errors: [{ message: `bad key ${KEY} sent` }, { message: 'also lin_api_OTHERinventedKEY' }] }), { status: 400 }));
+  const down = buildMockFetch(async () => {
     throw new Error(`socket closed after ${KEY}`);
-  }) as unknown as typeof fetch;
+  });
   try {
     for (const f of [echo, down]) {
       const err = await syncLinear(db, makeLinearCaller(run, f), new Date('2026-10-14T00:00:00Z')).catch((error: unknown) => error);
-      expect(String((err as Error).message)).not.toContain('lin_api_');
+      expect(toErrorMessage(err)).not.toContain('lin_api_');
       expect(linearState(db).error).not.toContain('lin_api_');
       expect(JSON.stringify(db.query('SELECT * FROM meta').all())).not.toContain(KEY);
     }
@@ -240,14 +244,14 @@ test('the key is cut from an op failure and a stored title, and a traced fetch i
   try {
     const caller = makeLinearCaller(() => Promise.resolve({ code: 1, stdout: KEY, stderr: `[ERROR] ${KEY} could not be read` }));
     const err = await caller('q', {}).catch((error: unknown) => error);
-    expect(String((err as Error).message)).not.toContain(KEY);
+    expect(toErrorMessage(err)).not.toContain(KEY);
     process.env['BUN_CONFIG_VERBOSE_FETCH'] = 'curl';
     const ok: Runner = async () => ({ code: 0, stdout: KEY, stderr: '' });
     let fetched = false;
-    const f = (async () => {
+    const f = buildMockFetch(async () => {
       fetched = true;
       return new Response('{}');
-    }) as unknown as typeof fetch;
+    });
     await expect(makeLinearCaller(ok, f)('q', {})).rejects.toThrow('BUN_CONFIG_VERBOSE_FETCH');
     expect(fetched).toBe(false);
   } finally {
