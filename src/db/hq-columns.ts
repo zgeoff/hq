@@ -127,7 +127,7 @@ export const HQ_COLUMNS = {
     job: 'text',
     key: 'text',
     at: 'text',
-    result: 'text',
+    result: { values: ['queued', 'skipped'], nullable: false },
     detail: 'text?',
     outbox_key: 'text?',
   },
