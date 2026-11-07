@@ -1047,6 +1047,16 @@ test('it blocks the merge when CODEOWNERS has no owner section', async () => {
   await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'hq', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: expect.stringContaining('has no "# the owner" section') });
 });
 
+test("it passes under the owner's override though CODEOWNERS has no owner section", async () => {
+  const ctx = setupTest();
+  const codeowners = Buffer.from('* @kettle-upstream\n').toString('base64');
+  const fake = buildFakeRunner({ noslopFindings: buildStubFindings('open'), prFiles: { code: 0, stdout: 'src/x.ts\n', stderr: '' }, contents: { [`.github/CODEOWNERS?ref=${FAKE_BASE_SHA}`]: { code: 0, stdout: JSON.stringify({ type: 'file', encoding: 'base64', content: codeowners }), stderr: '' } } });
+  setMeta(ctx.db, 'noslop', JSON.stringify({ repos: ['hq'], sha: '0123456789abcdef0123456789abcdef01234567' }));
+  recordPROverride(ctx.db, { repo: 'hq', pr: 7, head: FAKE_FULL_SHA, source: 'call:KET-5', note: 'Ship the kettle fork fix.', actor: 'z-kettle' });
+
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'hq', pr: 7 })).resolves.toMatchObject({ mayMerge: true });
+});
+
 test('it confirms the base commit is readable before it takes two CODEOWNERS 404s as no file', async () => {
   const ctx = setupTest();
   const fake = buildFakeRunner({ prFiles: { code: 0, stdout: 'src/x.ts\n', stderr: '' } });

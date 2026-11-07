@@ -116,6 +116,9 @@ function buildBlock(parsed: ParsedRepo, pr: number, reason: string): HqError {
 }
 
 async function checkOwnerHeld(request: PRRequest, parsed: ParsedRepo, facts: GateFacts, readFiles: ReadFiles): Promise<void> {
+  if (parsed.owner === OWNER && readOwnerOverride(request.db, parsed.repo, request.pr) !== null) {
+    return;
+  }
   const ownerHeld = await readOwnerHeldTest(request.run, parsed, facts.baseRefOid);
   const instructionHeld = findInstructionHeldTest(parsed);
   if (ownerHeld === null && instructionHeld === null) {
