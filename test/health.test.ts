@@ -1,4 +1,3 @@
-// oxlint-disable zgeoff/test-beside-module -- grandfathered: the health checks run through every probe at once
 import { afterEach, beforeEach, expect, test } from 'bun:test';
 import { toExactOptional } from '@zgeoff/std';
 import type { Database } from 'bun:sqlite';

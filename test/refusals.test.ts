@@ -39,8 +39,10 @@ const setAge = (p: string, days: number) => {
   utimesSync(p, t, t);
 };
 const scan = (o: Parameters<typeof scanRefusals>[1] = {}) => scanRefusals(db, { dir: proj(), sessions: async () => [], ...o });
-// oxlint-disable-next-line zgeoff/setup-test-only, zgeoff/no-top-level-arrow -- this file's shared beforeEach state is GEO-1318's lint debt
-const rows = () => queryRows(db, 'SELECT * FROM refusals ORDER BY rowid', z.record(z.string(), z.unknown()));
+// oxlint-disable-next-line zgeoff/setup-test-only -- it reads every stored column, in insert order, from the database that this file's beforeEach opens
+function rows() {
+  return queryRows(db, 'SELECT * FROM refusals ORDER BY rowid', z.record(z.string(), z.unknown()));
+}
 
 beforeEach(() => {
   ({ db, dir, cleanup } = freshDb());
