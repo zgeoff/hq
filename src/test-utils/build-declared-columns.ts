@@ -4,7 +4,7 @@ export function buildDeclaredColumns(tables: Readonly<Record<string, Readonly<Re
   return Object.fromEntries(
     Object.entries(tables).map(([table, columns]) => [
       table,
-      Object.fromEntries(Object.entries(columns).map(([column, spec]) => [column, typeof spec === 'string' ? spec : `text${spec.nullable ? '?' : ''}`])),
+      Object.fromEntries(Object.entries(columns).map(([column, spec]) => [column, typeof spec === 'string' ? (spec === 'generated' ? 'integer' : spec) : `text${spec.nullable ? '?' : ''}`])),
     ]),
   );
 }
