@@ -6,8 +6,9 @@ A capped PR passes the merge gate after a merge from main, and the owner's lgtm 
 
 ### The merge gate no longer takes noslop's check conclusion or a base-move cover.
 
-- The gate needs noslop's last review to have read the PR's head, a fixes-only run included, and its check at the head to have finished after its latest summary. Open findings and CI still decide the rest.
-- The base-move cover, which refused a capped PR that merged main, is gone.
+- The gate needs noslop's last review to have read the PR's head, a fixes-only run included, and its check at the head to have finished after its latest summary. Open findings and CI still decide the rest (hq#372).
+- The base-move cover, which refused a capped PR that merged main, is gone (hq#372).
+- The gate counts hq's own noslop run at the head, and holds a PR while a finding hq recorded is missing from noslop's list (hq#374).
 
 ### Fixes
 
@@ -17,6 +18,10 @@ A capped PR passes the merge gate after a merge from main, and the owner's lgtm 
 - The owner's newest lgtm and override hold for the PR at any head, a later `changes` or `reject` still blocks, and `hq pr rebased` is gone (hq#365).
 - A brief for one area of a multi-area issue leaves out the stack line (hq#369).
 - `hq lanes` holds an imp launch that would take the RAM impd keeps for priority imps, and names that reservation. A sample with no impd budget or kept RAM reading holds every imp slot. Schema v50 stores the kept RAM in `capacity_samples`; older rows hold NULL (hq#375).
+- The sweep keeps a run working while it waits on more parts and its Linear Scope has an open box (hq#371).
+- A run holds a lane only while one of its sessions is awake and busy in the last 15 minutes, or is new and unseen, so a waiting builder can sleep and free it (hq#376).
+- hq reads the Claude slot tokens from the fleet vault, with its own token in `~/.config/hq/slots-op.json` (hq#378, hq#381, hq#373).
+- The owner's override also clears the CODEOWNERS owner-held check, so a fork that keeps upstream's CODEOWNERS passes on his word (hq#379).
 
 ### New
 
@@ -26,6 +31,7 @@ A capped PR passes the merge gate after a merge from main, and the owner's lgtm 
 ### Docs
 
 - REQUESTS.md gains the rows for hq#350 and hq#360 (hq#361).
+- A session tells `z-stu` only what the owner must know or do, and `z-stu` tells a session only what it must act on (hq#380).
 
 ## 0.98.0 — 2026-10-24
 
