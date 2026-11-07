@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { isChanged, parseChanges } from './lint-changed.ts';
+import { buildLintArgs, isChanged, parseChanges } from './lint-changed.ts';
 
 const DIFF = [
   'diff --git a/src/kettle.ts b/src/kettle.ts',
@@ -198,5 +198,33 @@ describe('moved lines', () => {
 
     expect(isChanged(buildDiagnostic('src/teapot.ts', 9), refund)).toBe(true);
     expect([10, 11, 12].map((line) => isChanged(buildDiagnostic('src/teapot.ts', line), refund))).toStrictEqual([false, false, false]);
+  });
+});
+
+describe('buildLintArgs', () => {
+  test('the plain run lints the files with every rule the config enables', () => {
+    expect(buildLintArgs(['src/kettle.ts'], false)).toStrictEqual(['oxlint', '--format', 'json', 'src/kettle.ts']);
+  });
+
+  test('the type-aware run enables only the five no-unsafe rules', () => {
+    expect(buildLintArgs(['src/kettle.ts'], true)).toStrictEqual([
+      'oxlint',
+      '--format',
+      'json',
+      '--type-aware',
+      '-A',
+      'all',
+      '-D',
+      'typescript/no-unsafe-assignment',
+      '-D',
+      'typescript/no-unsafe-argument',
+      '-D',
+      'typescript/no-unsafe-return',
+      '-D',
+      'typescript/no-unsafe-member-access',
+      '-D',
+      'typescript/no-unsafe-call',
+      'src/kettle.ts',
+    ]);
   });
 });

@@ -1,13 +1,20 @@
 import { spawnSync } from 'node:child_process';
+import { z } from 'zod';
 import { probeImportBase } from './probe-import-base.ts';
 import { readDiff } from './read-diff.ts';
 
-interface Diagnostic {
-  readonly code: string;
-  readonly filename: string;
-  readonly labels: readonly { readonly span: { readonly line: number } }[];
-  readonly message: string;
-}
+const reportSchema = z.object({
+  diagnostics: z.array(
+    z.object({
+      code: z.string(),
+      filename: z.string(),
+      labels: z.array(z.object({ span: z.object({ line: z.number() }) })),
+      message: z.string(),
+    }),
+  ),
+});
+
+type Diagnostic = z.infer<typeof reportSchema>['diagnostics'][number];
 
 interface ChangeSet {
   readonly lines: ReadonlyMap<string, ReadonlySet<number>>;
@@ -146,9 +153,22 @@ function runCommand(command: string, args: readonly string[]): string {
   return result.stdout;
 }
 
+const UNSAFE_RULES = ['assignment', 'argument', 'return', 'member-access', 'call'] as const;
+
+// The type-aware run turns every other rule off, so the plain run keeps reporting those.
+export function buildLintArgs(files: readonly string[], typeAware: boolean): string[] {
+  const base = ['oxlint', '--format', 'json'];
+  if (!typeAware) {
+    return [...base, ...files];
+  }
+  return [...base, '--type-aware', '-A', 'all', ...UNSAFE_RULES.flatMap((rule) => ['-D', `typescript/no-unsafe-${rule}`]), ...files];
+}
+
 function readDiagnostics(files: readonly string[]): readonly Diagnostic[] {
-  const report = JSON.parse(runCommand('bunx', ['oxlint', '--format', 'json', ...files])) as { readonly diagnostics: readonly Diagnostic[] };
-  return report.diagnostics;
+  return [false, true].flatMap((typeAware) => {
+    const report = reportSchema.parse(JSON.parse(runCommand('bunx', buildLintArgs(files, typeAware))));
+    return report.diagnostics;
+  });
 }
 
 function printFound(found: readonly Diagnostic[], files: readonly string[], base: string): number {
