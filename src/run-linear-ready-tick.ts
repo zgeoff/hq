@@ -18,7 +18,7 @@ import { countFocusMatches } from './focus/count-focus-matches.ts';
 import { readDoneOpenIssues } from './lanes/read-done-open-issues.ts';
 import { readBacklogIssues } from './lanes/read-backlog-issues.ts';
 import { writeDesignBacklog } from './lanes/write-design-backlog.ts';
-import { toMessage } from './runs/to-message.ts';
+import { toErrorMessage } from './to-error-message.ts';
 import { writePromotableFocus } from './lanes/write-promotable-focus.ts';
 import { writePromotableTop } from './lanes/write-promotable-top.ts';
 import { validateLaneRules } from './lanes/validate-lane-rules.ts';
@@ -74,7 +74,7 @@ export async function runLinearReadyTick(db: Database, deps: LinearReadyTickDeps
   const focus = readFocus(db);
   const backlog = await withDeadline(readBacklogIssues(cancellableCall, rulesTable.team, readDoneOpenIssues(db)), leftMs, 'Backlog promotable count', abandoned).then(
     (issues) => ({ issues, error: null }),
-    (error: unknown) => ({ issues: null, error: toMessage(error).slice(0, 300) }),
+    (error: unknown) => ({ issues: null, error: toErrorMessage(error).slice(0, 300) }),
   );
   const count =
     backlog.issues === null
@@ -97,6 +97,6 @@ async function readAreaNames(call: LinearCall, timeoutMs: number): Promise<{ nam
     const labels = await withDeadline(readTeamLabels(call, rulesTable.team), timeoutMs, 'area labels');
     return { names: collectAreaNames(labels), error: null };
   } catch (error) {
-    return { names: null, error: toMessage(error).slice(0, 300) };
+    return { names: null, error: toErrorMessage(error).slice(0, 300) };
   }
 }

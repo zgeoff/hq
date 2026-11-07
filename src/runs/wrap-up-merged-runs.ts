@@ -11,7 +11,7 @@ import { CLEANUP_ACTIONS, isCleanupHeld } from './is-cleanup-held.ts';
 import { runWrapUp } from './run-wrap-up.ts';
 import type { WrapUpDeps, WrapUpOptions } from './run-wrap-up.ts';
 import { SWEEP_ACTOR } from './sweep-actor.ts';
-import { toMessage } from './to-message.ts';
+import { toErrorMessage } from '../to-error-message.ts';
 import type { WrapUp } from './types.ts';
 
 export interface MergedRunWrapUp {
@@ -75,7 +75,7 @@ export async function wrapUpRunSafely(db: Database, deps: WrapUpDeps, issue: str
   try {
     return await runWrapUp(db, deps, issue, options);
   } catch (error) {
-    return { forgotten: [], destroyed: [], kept: [], failed: [{ id: issue, reason: toMessage(error) }] };
+    return { forgotten: [], destroyed: [], kept: [], failed: [{ id: issue, reason: toErrorMessage(error) }] };
   }
 }
 
@@ -103,7 +103,7 @@ export function recordMergedWrapUp(db: Database, issue: string, wrapUp: WrapUp, 
     try {
       addNews(db, { from: SWEEP_ACTOR, topic: 'report', text, issue: ISSUE.test(issue) ? issue : null, link: null, needsGeoff: false });
     } catch (error) {
-      wrapUp.failed.push({ id: issue, reason: `news: ${toMessage(error)}` });
+      wrapUp.failed.push({ id: issue, reason: `news: ${toErrorMessage(error)}` });
     }
   }
   logEvent(db, 'run', issue, 'merged-wrap-up-result', actor, null, null, { ...wrapUp });

@@ -282,7 +282,6 @@ import { formatRefusalLine as refusalLine } from './refusals/format-refusal-line
 import { loadRefusalRows as refusalRows } from './refusals/load-refusal-rows.ts';
 import { parseDays } from './refusals/parse-days.ts';
 import { scanRefusals } from './refusals/scan-refusals.ts';
-import type { By } from './refusals/types.ts';
 import { addNews } from './news/add-news.ts';
 import { digest } from './news/digest.ts';
 import { listNews } from './news/list-news.ts';
@@ -1873,7 +1872,7 @@ async function refusalsCommand(db: Database, verb: string | undefined, flags: Fl
     if (!isOneOf(flags.by, BY)) {
       throw new HqError('bad_args', `--by must be one of ${BY.join(', ')}`);
     }
-    const t = tally(rows, flags.by as By);
+    const t = tally(rows, flags.by);
     return { data: { tally: t }, text: t.length ? t.map((x) => `${String(x.count).padStart(4)}  ${x.key}`).join('\n') : `No refusals in the last ${days} day(s).` };
   }
   return { data: { items: rows }, text: rows.length ? rows.map(refusalLine).join('\n') : `No refusals in the last ${days} day(s).` };
