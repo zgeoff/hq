@@ -1,5 +1,5 @@
 import type { ItemExtras } from './parse-item-input.ts';
-import { defineItemExtrasSchema } from './parse-item-input.ts';
+import { defineItemExtrasSchema } from './define-item-extras-schema.ts';
 
 const ExtrasSchema = defineItemExtrasSchema();
 
