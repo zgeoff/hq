@@ -1,3 +1,4 @@
+/* oxlint-disable id-length -- n is the goal_days column and GoalDay's own field */
 import { expect, onTestFinished, test } from 'bun:test';
 import { freshDb } from '../../test/helpers.ts';
 import { readGoalDays } from './read-goal-days.ts';

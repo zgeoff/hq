@@ -21,7 +21,8 @@ test('it reads the scan state of every transcript scanned, ordered by path', asy
   utimesSync(join(ctx.projects, 'kettle', 'a.jsonl'), written, written);
   utimesSync(join(ctx.projects, 'kettle', 'b.jsonl'), written, written);
   updateEnv('HQ_NOW', '2026-10-22T00:00:00Z');
-  await scanRefusals(ctx.db, { dir: ctx.projects, sessions: async () => [] });
+  // oxlint-disable-next-line zgeoff/no-abbreviated-names -- dir is scanRefusals' own option name
+  await scanRefusals(ctx.db, { dir: ctx.projects, sessions: () => Promise.resolve([]) });
 
   expect(readRefusalFiles(ctx.db)).toStrictEqual([
     { path: join(ctx.projects, 'kettle', 'a.jsonl'), offset: 124, size: 124, mtime: '2026-10-21T22:00:00Z', tools: '[]' },
