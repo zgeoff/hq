@@ -1029,7 +1029,7 @@ async function kindsCommand(db: Database, verb: string | undefined, flags: Flags
     .with('sync', async () => {
       const kinds = await syncKinds(db, realRunner, { from: weeksBack(weeks), maxDays: weeks * 7 + 2, env: cleanEnv() });
       const linear = await syncLinear(db, makeAuditedLinearCaller(db, realRunner), weeksBack(weeks)).catch((error: unknown) => ({ error: error instanceof Error ? error.message : String(error) }));
-      const said = 'error' in linear ? `Linear failed: ${linear.error}` : `Linear: ${linear.closed} closed issue(s), ${linear.typed} PR issue(s) typed.`;
+      const said = 'error' in linear ? `Linear failed: ${linear.error}` : `Linear: ${linear.closed} closed issue(s), ${linear.typed} PR issue(s) typed, ${linear.inReview} In Review issue(s) read.`;
       const weekRows = kindWeeks(db, weeks);
 
       // The daily check-in trusts kinds_ok_at.

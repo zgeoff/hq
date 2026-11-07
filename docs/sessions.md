@@ -14,7 +14,7 @@ hq does the mechanical work between them: it forgets a run's sessions once the r
 | `z-qa`       | `preview-qa`                   | live checks on previews before the merge, read-only after the release                        | never; his steps go to `hq unblock`         |
 | `z-q`        | none; builds `hq` in zgeoff/hq | builds hq                                                                                    | through `z-stu`                             |
 
-Times are Australia/Sydney. `z-triage` runs its full pass on the first run after 07:00, and each run ends with the check. `z-stu` sends the owner nothing from 03:00 to 07:00, and the first check after 07:00 messages it again about a call held overnight.
+Times are Australia/Sydney. `z-triage` runs its full pass on the first run after 07:00, and each run ends with the check. `z-stu` sends the owner nothing from 03:00 to 07:00, and the first check after 07:00 messages it again about a call held overnight. The check's Stale line reads In Review issues as well as In Progress ones. It flags an In Review issue whose Linear update is over 2 days old when its run is `merged` or `live-check`, or it has no run, unless an open `hq unblock` watch names the issue. It flags one whose run was `dropped` at once, whatever its age.
 
 ## starting a session
 
