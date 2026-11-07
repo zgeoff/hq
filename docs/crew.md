@@ -1,8 +1,9 @@
 # The crew
 
 Seven Claude Code sessions run one owner's software team, with hq as their shared record. This page
-introduces each session, shows one fix from report to release, and lists the hq features the crew
-leans on. [How the crew works](./sessions.md) covers how the sessions hand work to each other.
+introduces each session, shows one fix from report to release, and lists the crew's house rules and
+the hq features it leans on. [How the crew works](./sessions.md) covers how the sessions hand work
+to each other.
 
 ## By the numbers
 
@@ -42,7 +43,7 @@ two agents out of the same files.
 
 Takes every merge to live: the nightly release batch, cloud deploys, bump PRs, host switches and atc
 upgrades, at 3 a.m. if that is when it lands. Before a release that allows no rollback, it backs up
-Nix's memory and proves the backup restores.
+the memory of Nix, the owner's personal agent that nixie runs, and proves the backup restores.
 
 **Never:** sends test traffic to production Nix.
 
@@ -58,8 +59,8 @@ its options and its recommendation.
 
 Reviews every pull request, checks the merge gate, and squash-merges it only when every finding has
 an answer. It is also the only one that files an issue from a PR, and only when the fix is in
-another repo or needs the owner's choice. A PR that says "done" is a claim, and Gatekeeper reads the diff before it
-believes one.
+another repo or needs the owner's choice. A PR that says "done" is a claim, and Gatekeeper reads the
+diff before it believes one.
 
 **Never:** launches, releases or deploys.
 
@@ -102,6 +103,12 @@ fix, and the agent fixed each one in its own commit before the gate let it throu
 ran all 4 acceptance tests, confirmed the release on npm with provenance, and checked that hq's
 review pin used it before it closed the issue. hq kept each step on record: the run, its PR, the
 review rounds, the merge and the release.
+
+## House rules
+
+- Every change reaches `main` through a PR, a noslop review and green CI. Nobody bypasses the
+  ruleset, the Toolsmith included.
+- Every review finding gets an answer: fixed with its commit, or the reason it is not a defect.
 
 ## The gadgets
 

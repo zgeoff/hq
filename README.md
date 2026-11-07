@@ -18,11 +18,8 @@ Seven sessions share one machine and one job: take an issue from "someone should
 checked", with the owner asked as little as possible and never skipped where it counts. They
 triage, delegate, review, merge, release and verify. hq is the ground they stand on: one SQLite
 file that remembers every run, review round, merge gate, call for the owner and standing grant, and
-one CLI that every session drives with `--json`.
-
-hq has no human user. Its users are the crew, and every feature in it started as one of them asking
-for it. [The crew](./docs/crew.md) introduces each session, follows one fix from report to release,
-and lists the features they lean on.
+one CLI that every session drives with `--json`. hq has no human user: its users are the crew, and
+every feature in it started as one of them asking for it.
 
 ## Quick start
 
@@ -53,22 +50,27 @@ may merge: noslop findings: none open; CI green at b061edc
 
 ## Checks
 
-- Every change reaches `main` through a PR, a noslop review and green CI. Nobody bypasses the
-  ruleset, the Toolsmith included.
-- Every review finding gets an answer: fixed with its commit, or the reason it is not a defect.
-- Locally, run `bun run format:check`, `bun run typecheck`, `bun run lint:changed` and `bun test`.
+```sh
+bun run format:check && bun run typecheck && bun run lint:changed
+bun run check:skills && bun run check:skill-writing && bun run check:docs && bun run check:grants
+bun run test:scripts && bun test
+```
+
+CI also scans every commit for secrets with gitleaks.
 
 ## Layout
 
 - `src/`: the CLI, one folder per command family, and the schema migrations in `src/db/`.
 - `skills/`: the crew's skills, one folder per role.
+- `agent-kit/`: the briefs and playbooks that sessions hand to the agents they launch.
+- `grants/`, `linear/`: the standing grants' data and the Linear templates.
 - `docs/`: how the sessions work together.
 - `mods/`: the status band in Stu's terminal, which [hq-band](./docs/hq-band.md) describes.
+- `scripts/`, `test/`, `mocks/`: the repo's checks, the CLI's tests and their stand-ins.
 
 ## Documentation
 
-Start with [how the crew works](./docs/sessions.md) and [the crew](./docs/crew.md). `hq --help`
-lists every command.
+[`docs/`](./docs/) explains the [crew](./docs/crew.md) and its work; `hq --help` lists commands.
 
 ## License
 

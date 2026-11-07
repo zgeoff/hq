@@ -3,7 +3,7 @@
 Run nixie's preview runbook commands, the API check's included, inside a PR's preview imp, the
 sandboxed machine on the cloud host that holds the preview.
 
-- Keep the outer double quotes of the ssh line in step 2. Without them, the rest of the command runs
+- Keep the outer double quotes of the ssh line in step 2. Without them, everything after `&&` runs
   on the cloud host.
 - Run each command only through that line. When the line can't run a command, file the gap as
   [After the command](#after-the-command) says, and never run the command on the host directly.
@@ -29,8 +29,9 @@ variable that step 1 sets.
    ```
 
 2. Run the command in the preview's imp, from `/srv/preview/preview`. Replace `<preview imp>` with
-   the first label of the host in the link in the PR's preview comment, which starts `pv-`. Replace
-   `<command>` with the runbook command. Expect: the output the runbook gives for that command.
+   the first label of the host in the link in the PR's preview comment, `pv-<hash>-<number>`.
+   Replace `<command>` with the runbook command. Expect: the output the runbook gives for that
+   command.
 
    ```sh
    ssh root@"$HQ_CLOUD_HOST" "podman exec imp-host impz exec <preview imp> -- sh -c 'cd /srv/preview/preview && <command>'"
@@ -43,10 +44,10 @@ variable that step 1 sets.
 
 Act on what the command did:
 
-- **The line can't run it.** ssh or podman fails, or the command has single quotes of its own, such
-  as a `curl` with a JSON body. File the gap in hq's Triage for `z-q`. Then answer the live item
-  that needed the command as needing the owner, in step 5 of [Take a check](../SKILL.md#take-a-check),
-  so that the gap doesn't hold the PR.
+- **The line can't run it.** ssh or podman fails, or the command has quotes of its own, single or
+  double, such as a `curl` with a JSON body. File the gap in hq's Triage for `z-q`. Then answer the
+  live item that needed the command as needing the owner, in step 5 of
+  [Take a check](../SKILL.md#take-a-check), so that the gap doesn't hold the PR.
 - **The runbook step doesn't work as written.** File the step in nixie's Triage, as step 3 of
   [Take a check](../SKILL.md#take-a-check) says.
 - **The step works and shows a fault in the PR.** Record the fault as a finding, and go on to the

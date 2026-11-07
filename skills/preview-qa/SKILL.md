@@ -55,8 +55,8 @@ production read. Read it first.
    how it feels. Hand those back in step 5, with the reason.
 2. **Open the preview** with the link in the PR's preview comment. Opening the link boots the
    preview. Wait until the health URL in the repo's preview runbook, `docs/runbooks/preview.md`,
-   answers with HTTP 200, up to the [limit](#limits). If the comment names an older head, wait until the comment
-   names the head `z-review` sent, then open its link again.
+   answers with HTTP 200, up to the [limit](#limits). If the comment names an older head, wait
+   until the comment names the head `z-review` sent, then open its link again.
 3. **Drive the preview** with the steps in the preview runbook. For nixie, run each command in the
    preview's imp as [nixie-preview-api.md](references/nixie-preview-api.md) shows:
    - Sign in as a test device with the code from `docker compose logs --no-log-prefix enrol`.
