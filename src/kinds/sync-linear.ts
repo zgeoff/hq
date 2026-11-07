@@ -6,10 +6,11 @@ import { decideUmbrellaBoxes } from '../linear/decide-umbrella-boxes.ts';
 import type { LinearCall } from '../linear/types.ts';
 import { syncClosed } from '../linear/sync-closed.ts';
 import { syncFiled } from '../linear/sync-filed.ts';
+import { syncInReview } from '../linear/sync-in-review.ts';
 import { syncPrIssues } from '../linear/sync-pr-issues.ts';
 import { syncStarted } from '../linear/sync-started.ts';
 
-export async function syncLinear(db: Database, call: LinearCall, from: Date, at: Date = now()): Promise<{ closed: number; typed: number; filed: number; started: number }> {
+export async function syncLinear(db: Database, call: LinearCall, from: Date, at: Date = now()): Promise<{ closed: number; typed: number; filed: number; started: number; inReview: number }> {
   let closed = 0;
   let typed = 0;
   try {
@@ -24,9 +25,11 @@ export async function syncLinear(db: Database, call: LinearCall, from: Date, at:
   }
   let filed = 0;
   let started = 0;
+  let inReview = 0;
   try {
     filed = await syncFiled(db, call, from, at);
     started = await syncStarted(db, call, at);
+    inReview = await syncInReview(db, call, at);
     setMeta(db, 'linear_throughput_at', iso(at));
     setMeta(db, 'linear_throughput_error', '');
   } catch (error) {
@@ -34,5 +37,5 @@ export async function syncLinear(db: Database, call: LinearCall, from: Date, at:
     setMeta(db, 'linear_throughput_error', message.slice(0, 300));
     throw error;
   }
-  return { closed, typed, filed, started };
+  return { closed, typed, filed, started, inReview };
 }

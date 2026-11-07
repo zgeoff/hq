@@ -320,7 +320,7 @@ test('it adds run_prs.session_id in v49, and keeps the earlier rows with no owne
   expect(db.query('SELECT ref, session_id FROM run_prs').all()).toStrictEqual([{ ref: 'kettle#41', session_id: null }]);
 });
 
-test('it adds capacity_samples.impd_priority_kept_mib in v50, keeps the earlier samples with no reading, and v50 is the newest schema', () => {
+test('it adds capacity_samples.impd_priority_kept_mib in v50, keeps the earlier samples with no reading', () => {
   const base = mkdtempSync(join(tmpdir(), 'hq-migrate-v50-'));
   const path = join(base, 'hq.db');
   const db = new Database(path, { create: true, strict: true });
@@ -332,6 +332,22 @@ test('it adds capacity_samples.impd_priority_kept_mib in v50, keeps the earlier 
 
   expect(migrate(db, path, true)).not.toBeNull();
   expect(db.query('SELECT at, impd_budget_mib, impd_priority_kept_mib FROM capacity_samples').all()).toStrictEqual([{ at: '2026-10-14T01:00:00Z', impd_budget_mib: 20_480, impd_priority_kept_mib: null }]);
-  expect(db.query('PRAGMA user_version').get()).toStrictEqual({ user_version: 50 });
-  expect(MIGRATIONS).toHaveLength(50);
+});
+
+test('it adds linear_in_review in v51, keeps the earlier rows, and v51 is the newest schema', () => {
+  const base = mkdtempSync(join(tmpdir(), 'hq-migrate-v51-'));
+  const path = join(base, 'hq.db');
+  const db = new Database(path, { create: true, strict: true });
+  onTestFinished(() => rmSync(base, { recursive: true, force: true }));
+  onTestFinished(() => db.close());
+  db.exec('PRAGMA journal_mode = WAL;');
+  migrate(db, path, false, MIGRATIONS.slice(0, 50));
+  db.query("INSERT INTO linear_started (issue, started_at, fetched_at) VALUES ('GEO-502', '2026-10-14T01:00:00Z', '2026-10-15T01:00:00Z')").run();
+
+  expect(migrate(db, path, true)).not.toBeNull();
+  expect(db.query('SELECT issue, started_at, fetched_at FROM linear_started').all()).toStrictEqual([{ issue: 'GEO-502', started_at: '2026-10-14T01:00:00Z', fetched_at: '2026-10-15T01:00:00Z' }]);
+  db.query("INSERT INTO linear_in_review (issue, updated_at, fetched_at) VALUES ('GEO-503', '2026-10-14T02:00:00Z', '2026-10-15T01:00:00Z')").run();
+  expect(db.query('SELECT issue, updated_at, fetched_at FROM linear_in_review').all()).toStrictEqual([{ issue: 'GEO-503', updated_at: '2026-10-14T02:00:00Z', fetched_at: '2026-10-15T01:00:00Z' }]);
+  expect(db.query('PRAGMA user_version').get()).toStrictEqual({ user_version: 51 });
+  expect(MIGRATIONS).toHaveLength(51);
 });
