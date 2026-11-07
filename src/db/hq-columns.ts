@@ -253,7 +253,7 @@ export const HQ_COLUMNS = {
     ended_at: 'text?',
     alert_seq: 'integer?',
     recover_seq: 'integer?',
-    kind: 'text',
+    kind: { values: ['down', 'unready'], nullable: false },
   },
   outbox: {
     id: 'integer',
@@ -261,7 +261,7 @@ export const HQ_COLUMNS = {
     target: 'text',
     text: 'text',
     idem_key: 'text',
-    status: 'text',
+    status: { values: ['pending', 'sent', 'failed'], nullable: false },
     attempts: 'integer',
     last_error: 'text?',
     message_id: 'text?',

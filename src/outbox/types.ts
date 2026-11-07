@@ -1,17 +1,6 @@
-export interface OutboxRow {
-  id: number;
-  event_seq: number;
-  target: string;
-  text: string;
-  idem_key: string;
-  status: 'pending' | 'sent' | 'failed';
-  attempts: number;
-  last_error: string | null;
-  topic: string | null;
-  message_id: string | null;
-  created_at: string;
-  sent_at: string | null;
-}
+import type { HqTables } from '../kdb.ts';
+
+export type OutboxRow = HqTables['outbox'];
 
 export interface FlushResult {
   sent: number;

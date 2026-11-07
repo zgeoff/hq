@@ -146,9 +146,10 @@ function runCommand(command: string, args: readonly string[]): string {
   return result.stdout;
 }
 
+const UNSAFE_PREFIX = 'typescript(no-unsafe-';
 const UNSAFE_RULES = ['assignment', 'argument', 'return', 'member-access', 'call'] as const;
 
-// The type-aware run turns every other rule off, so the plain run keeps reporting those.
+// -A all leaves the JS-plugin rules on, so the type-aware report repeats the plain run's findings; collectReported drops them.
 export function buildLintArgs(files: readonly string[], typeAware: boolean): string[] {
   const base = ['oxlint', '--format', 'json'];
   if (!typeAware) {
@@ -157,8 +158,12 @@ export function buildLintArgs(files: readonly string[], typeAware: boolean): str
   return [...base, '--type-aware', '-A', 'all', ...UNSAFE_RULES.flatMap((rule) => ['-D', `typescript/no-unsafe-${rule}`]), ...files];
 }
 
+export function collectReported(plain: readonly Diagnostic[], typeAware: readonly Diagnostic[]): readonly Diagnostic[] {
+  return [...plain, ...typeAware.filter((diagnostic) => diagnostic.code.startsWith(UNSAFE_PREFIX))];
+}
+
 function readDiagnostics(files: readonly string[]): readonly Diagnostic[] {
-  return [false, true].flatMap((typeAware) => readReport(buildLintArgs(files, typeAware)));
+  return collectReported(readReport(buildLintArgs(files, false)), readReport(buildLintArgs(files, true)));
 }
 
 function readReport(args: readonly string[]): readonly Diagnostic[] {

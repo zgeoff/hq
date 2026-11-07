@@ -1,3 +1,5 @@
+import type { HqTables } from '../kdb.ts';
+
 interface FetchResult {
   ok: boolean;
   status: number | null;
@@ -18,15 +20,7 @@ export interface ProbeResult {
   ms: number;
 }
 
-export interface OutageRow {
-  id: number;
-  started_at: string;
-  detected_at: string;
-  ended_at: string | null;
-  alert_seq: number | null;
-  recover_seq: number | null;
-  kind: 'down' | 'unready';
-}
+export type OutageRow = HqTables['outages'];
 
 export interface Downtime {
   from: string;

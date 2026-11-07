@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { buildLintArgs, isChanged, parseChanges } from './lint-changed.ts';
+import { buildLintArgs, collectReported, isChanged, parseChanges } from './lint-changed.ts';
 
 const DIFF = [
   'diff --git a/src/kettle.ts b/src/kettle.ts',
@@ -225,4 +225,11 @@ test('it enables only the five no-unsafe rules in the type-aware run', () => {
     'typescript/no-unsafe-call',
     'src/kettle.ts',
   ]);
+});
+
+test('it reports a plugin finding once when both runs return it, and keeps the type-aware no-unsafe finding', () => {
+  const plugin = { code: 'zgeoff(test-shape)', filename: 'src/kettle.ts', labels: [{ span: { line: 3 } }], message: 'no loops' };
+  const unsafe = { code: 'typescript(no-unsafe-call)', filename: 'src/kettle.ts', labels: [{ span: { line: 4 } }], message: 'unsafe call' };
+
+  expect(collectReported([plugin], [plugin, unsafe])).toStrictEqual([plugin, unsafe]);
 });

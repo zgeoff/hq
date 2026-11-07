@@ -1,5 +1,6 @@
 import type { IssueType } from '../linear/issue-types.ts';
 import type { LaneConfig } from '../areas/types.ts';
+import type { HqTables } from '../kdb.ts';
 
 export interface Capacity {
   imp?: { freeMib?: number; room?: boolean; error?: string };
@@ -79,15 +80,7 @@ export interface LanesHold {
   by: string;
 }
 
-export interface NudgeRow {
-  id: number;
-  at: string;
-  slots: number;
-  free_minutes: number;
-  eligible: number | null;
-  slots_after: number | null;
-  checked_at: string | null;
-}
+export type NudgeRow = Pick<HqTables['lanes_nudges'], 'id' | 'at' | 'slots' | 'free_minutes' | 'eligible' | 'slots_after' | 'checked_at'>;
 
 export interface LaneRule {
   issues: string[];
