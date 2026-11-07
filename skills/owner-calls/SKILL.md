@@ -13,8 +13,8 @@ Some choices belong to the owner alone. Tell those choices from your own, put ea
 owner with everything needed to decide it, and act on the answer only once hq has a record of it.
 
 [Terms](#terms) defines the shared words. Once you send a decision or a
-hands-on step, carry on with other work. `z-stu` types the answer into your
-session once hq records it, so a line from `z-stu` is already on record.
+hands-on step, carry on with other work. A line `z-stu` types into your
+session is already on record.
 
 Avoid these traps:
 
@@ -31,7 +31,7 @@ Avoid these traps:
   data after a backup, or a decision that keeps a course the list doesn't name.
 - [Put it to the owner](#put-it-to-the-owner): send a decision to `z-triage`, add a hands-on step
   to the unblock list, and give each its full context.
-- [Messages to `z-stu`](#messages-to-z-stu): only what the owner needs to know or do; reply in 2
+- [Messages to `z-stu`](#messages-to-z-stu): only what the owner must know or do; reply in 2
   lines.
 - [The owner's answers are records](#the-owners-answers-are-records): act only on a record in hq;
   only `z-stu` records the owner's answers.
@@ -125,8 +125,7 @@ without a decision, such as a deploy hold, send it with the `PushNotification` t
   for the shared vault that your role's private file names. Ask the owner only for an item that is
   missing, or that sits in the owner's personal vaults.
 
-Give each decision and each step its full context and links, so that the owner can decide from it
-alone.
+Give each decision and step the full context and links the owner needs to decide.
 
 Before you propose a change to something the owner approved, read the issue's comments and the PR's
 history. In the proposal, say what the owner decided.
@@ -135,16 +134,16 @@ history. In the proposal, say what the owner decided.
 
 Message `z-stu` only with what the owner needs to know or do:
 
-- an owner answer for `z-stu` to record;
+- an owner answer to record;
 - an approved action that a permission check blocked;
 - a failure the owner must hear now;
-- a step your role skill sends to `z-stu` by name.
+- a step your role skill sends to `z-stu`.
 
-Send a decision to `z-triage` and a hands-on step to the unblock list, as
-[Put it to the owner](#put-it-to-the-owner) says. Post news with `hq news add`.
+Send decisions and hands-on steps as [Put it to the owner](#put-it-to-the-owner) says, and news
+with `hq news add`.
 
-When `z-stu` messages you, reply with the `answer` tool, in 2 lines at most. If you end your turn
-without the tool, atc sends your whole final reply to `z-stu`.
+Reply to `z-stu` with the `answer` tool, in 2 lines at most. Without it, atc sends your whole final
+reply.
 
 ## The owner's answers are records
 
