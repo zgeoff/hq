@@ -945,8 +945,8 @@ async function capacityCommand(db: Database, verb: string | undefined, args: str
       const f = (x: number | null, div: number, d = 0) => (x === null ? '-' : (x / div).toFixed(d));
       return { data: { samples: rows }, text: rows.length ? rows.map((r) => `${r.at}  non-Nix ${f(r.nonnix_awake_mib, 1)} MiB  cloud ${f(r.cloud_avail_bytes, 2 ** 30, 1)} GiB  Claude 5h ${f(r.claude_five_hour, 1)}% 7d ${f(r.claude_seven_day, 1)}%  CI ${f(r.ci_minutes_today, 1)} min${Object.keys(r.errors).length ? `  ! ${Object.keys(r.errors).join(',')}` : ''}`).join('\n') : `No samples in the last ${hours} h.` };
     })
-    .with('broker', () => {
-      const broker = readBrokerQuota(db, now());
+    .with('broker', async () => {
+      const broker = await readBrokerQuota(db, now());
       return { data: { broker, reading: pickClaudeReading(broker) }, text: formatBrokerQuota(broker) };
     })
     .with('set', async () => {

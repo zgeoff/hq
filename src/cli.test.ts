@@ -11,6 +11,8 @@ import { server } from '../mocks/node.ts';
 import { createStubOp } from '../test/create-stub-op.ts';
 import { NOON_SYDNEY, at, createPushedClone, fakeAtc, freshDb } from '../test/helpers.ts';
 import { readSlotRows } from './capacity/fleet/read-slot-rows.ts';
+import { writeSlotUsage } from './capacity/fleet/write-slot-usage.ts';
+import { writeCapacitySample } from './capacity/write-capacity-sample.ts';
 import { updateEnv } from '@zgeoff/testing/helpers';
 import { main } from './cli.ts';
 import { overrideEnv } from './config/override-env.ts';
@@ -902,8 +904,21 @@ test("it reads the broker slot's fleet-vault token in hq capacity broker after a
   await main(['capacity', '--refresh-slots']);
 
   await main(['capacity', 'broker', '--json']);
+  const printed: unknown = JSON.parse(ctx.lines.at(-1) ?? '{}');
 
-  expect(JSON.parse(ctx.lines.at(-1) ?? '{}').broker).toStrictEqual({ state: 'read', slot: 2, proof: 'req-7c8d', proofAgeHours: 30, used: 40, resetsAt: '2026-10-21T00:00:00Z', readAt: '2026-10-14T01:00:00Z' });
+  expect(z.object({ broker: z.unknown() }).parse(printed).broker).toStrictEqual({ state: 'read', slot: 2, proof: 'req-7c8d', proofAgeHours: 30, from: 'slot-read', used: 40, resetsAt: '2026-10-21T00:00:00Z', readAt: '2026-10-14T01:00:00Z' });
+});
+
+test("it takes a newer login sample on the broker slot's account over the slot read in hq capacity broker", async () => {
+  const ctx = setupTest();
+  writeBrokerSlot(ctx.db, { slot: '2', proof: 'req-9b0c', note: undefined, actor: 'z-release', at: new Date('2026-10-13T22:00:00Z') });
+  writeSlotUsage(ctx.db, [{ slot: 2, status: '200', five: 20, fiveResetsAt: '2026-10-14T03:00:00Z', seven: 91, sevenResetsAt: '2026-10-18T00:00:00Z' }], 2, new Date('2026-10-14T00:00:00Z'));
+  await writeCapacitySample(ctx.db, { at: '2026-10-14T00:50:00Z', impd_budget_mib: null, impd_used_mib: null, impd_committed_mib: null, nonnix_awake_mib: null, nonnix_awake_vcpus: null, nix_awake_mib: null, impd_priority_kept_mib: null, cloud_avail_bytes: null, cloud_total_bytes: null, claude_account: 'abcdef012345', claude_five_hour: 30, claude_seven_day: 98, claude_five_hour_resets_at: '2026-10-14T03:00:00Z', claude_seven_day_resets_at: '2026-10-18T00:00:00Z', claude_at: '2026-10-14T00:50:00Z', ci_minutes_today: null, pc_disk_free_bytes: null, pc_mem_avail_bytes: null, op_account_used: null, op_account_limit: null, op_refused: null, errors: {} });
+
+  await main(['capacity', 'broker', '--json']);
+  const printed: unknown = JSON.parse(ctx.lines.at(-1) ?? '{}');
+
+  expect(z.object({ reading: z.unknown() }).parse(printed).reading).toStrictEqual({ slot: 2, proof: 'req-9b0c', proofAgeHours: 3, used: 98, resetsAt: '2026-10-18T00:00:00Z', source: "hq login sample on the imp broker slot 2's account, 2026-10-14T00:50:00Z" });
 });
 
 test("it reads the slot token from hq's own file under ~/.config/hq by default for hq capacity --refresh-slots", async () => {
