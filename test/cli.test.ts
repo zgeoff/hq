@@ -628,9 +628,47 @@ test('#run add prints the hq run session --add line in text output only for a se
   out = [];
   await main(['run', 'add', 'GEO-9703', '--session', '9703ab0c-0000-4000-8000-00000000aaaa', '--title', 'Invented kettle work', '--where', 'none']);
   const sameText = out.join('\n');
-  expect(ignoredText).toContain('Already on the board.\nIgnored --session 9703ab0c-0000-4000-8000-00000000bbbb: to add it to the run, use hq run session GEO-9703 9703ab0c-0000-4000-8000-00000000bbbb --add');
+  expect(ignoredText).toContain('Already on the board.\nIgnored --session 9703ab0c-0000-4000-8000-00000000bbbb: the session is not attached to the run. To add it, use hq run session GEO-9703 9703ab0c-0000-4000-8000-00000000bbbb --add');
   expect(sameText).toContain('Already on the board.');
   expect(sameText).not.toContain('Ignored --session');
+});
+
+test('#run add prints both lanes and hq run lane for a different --lane it ignores on a run already on the board', async () => {
+  mkdirSync(`${dir}/defs/scripts`, { recursive: true });
+  writeFileSync(`${dir}/defs/pacing.json`, JSON.stringify({ lanes: { imp: { kettle: 2, teapot: 1 } } }));
+  updateEnv('HQ_CAPACITY', `${dir}/defs/scripts/capacity.sh`);
+  await hq('run', 'add', 'GEO-9704', '--lane', 'kettle', '--title', 'Invented kettle work', '--where', 'imp');
+  out = [];
+
+  const code = await main(['run', 'add', 'GEO-9704', '--lane', 'teapot', '--title', 'Invented kettle work', '--where', 'imp']);
+
+  expect([code, out.join('\n').split('\n').slice(-2)]).toStrictEqual([0, ['Already on the board.', "Ignored --lane teapot: one issue has one run, and GEO-9704's run is in lane kettle. To move it, use hq run lane GEO-9704 teapot"]]);
+});
+
+test('#run add gives both lanes in JSON for a different --lane it ignores on a run already on the board', async () => {
+  mkdirSync(`${dir}/defs/scripts`, { recursive: true });
+  writeFileSync(`${dir}/defs/pacing.json`, JSON.stringify({ lanes: { imp: { kettle: 2, teapot: 1 } } }));
+  updateEnv('HQ_CAPACITY', `${dir}/defs/scripts/capacity.sh`);
+  await hq('run', 'add', 'GEO-9705', '--lane', 'kettle', '--title', 'Invented kettle work', '--where', 'imp');
+
+  const again = await hq('run', 'add', 'GEO-9705', '--lane', 'teapot', '--title', 'Invented kettle work', '--where', 'imp');
+
+  expect([again.code, again.json.result, again.json.ignoredLane, again.json.run.lane]).toStrictEqual([0, 'noop', { lane: 'teapot', runLane: 'kettle', next: 'hq run lane GEO-9705 teapot' }, 'kettle']);
+});
+
+test.each([
+  ['no --lane', []],
+  ['the same --lane', ['--lane', 'kettle']],
+])('#run add prints only "Already on the board." on a run already on the board given %s and no --session', async (_case, laneFlags) => {
+  mkdirSync(`${dir}/defs/scripts`, { recursive: true });
+  writeFileSync(`${dir}/defs/pacing.json`, JSON.stringify({ lanes: { imp: { kettle: 2, teapot: 1 } } }));
+  updateEnv('HQ_CAPACITY', `${dir}/defs/scripts/capacity.sh`);
+  await hq('run', 'add', 'GEO-9706', '--lane', 'kettle', '--title', 'Invented kettle work', '--where', 'imp');
+  out = [];
+
+  const code = await main(['run', 'add', 'GEO-9706', ...laneFlags, '--title', 'Invented kettle work', '--where', 'imp']);
+
+  expect([code, out.join('\n').split('\n').slice(1)]).toStrictEqual([0, ['Already on the board.']]);
 });
 
 test('v20 adds live_check to runs and the merge and release columns to run_prs', () => {
