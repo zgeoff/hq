@@ -2,6 +2,9 @@
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "extends": ["./node_modules/@zgeoff/oxlint-config/oxlintrc.json"],
   "ignorePatterns": ["**/node_modules/**", "**/*.json"],
+  "rules": {
+    "zgeoff/feature-folders": ["error", { "pending": ["."] }]
+  },
   "overrides": [
     {
       "files": ["mods/**"],
