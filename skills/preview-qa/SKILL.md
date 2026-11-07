@@ -17,8 +17,7 @@ read-only, after the release. You hand back:
 - after a release, the issue moved to Done, or a comment on it with each remaining item and its
   owner.
 
-A check is done when its evidence comment is on the issue, you have answered, and its line is gone
-from `qa.md`.
+A check is done when its evidence comment is on the issue and you have answered.
 
 Avoid these traps:
 
@@ -40,9 +39,9 @@ production, or anything signed in as the owner, only under a grant in your start
 - [Take a check](#take-a-check): only what a preview can show; record it, answer per item.
 - [After a release ships](#after-a-release-ships): read-only; close or hand each item to an owner.
 - [Limits](#limits): one preview at a time, 20 model turns per nixie PR, 10 minutes of silence
-  fails, 30 minutes for a new head.
-- [Files, messages and faults](#files-messages-and-faults): scratch under `z-sessions/qa/`, one
-  line per check in `qa.md`, each fault in Triage.
+  fails.
+- [Files, messages and faults](#files-messages-and-faults): scratch under `z-sessions/qa/`; file
+  each fault in Triage.
 
 ## References
 
@@ -68,8 +67,7 @@ as `z-review`, `z-release` and `z-stu`, are defined in
 
 ## Take a check
 
-`z-review` sends an issue, its PR and head, and the live items. Add the check's line to `qa.md`, as
-[Files, messages and faults](#files-messages-and-faults) shows. For each item:
+`z-review` sends an issue, its PR and head, and the live items. For each item:
 
 1. **Ask whether a preview can show it.** A preview can't show an item that needs any of these:
    - the owner's real Nix, devices or accounts;
@@ -84,8 +82,8 @@ as `z-review`, `z-release` and `z-stu`, are defined in
    preview. Take the health path from the repo's preview runbook, `docs/runbooks/preview.md`, such
    as `/health/ready`, and put it on the preview link's origin. The runbook's own URL, such as
    `http://127.0.0.1:8080/health/ready`, answers only inside the imp. Wait until the preview's
-   health URL answers with HTTP 200, up to the [limit](#limits). If the comment names an older head, wait, up
-   to the limit, until it names the head `z-review` sent. Then open its link again.
+   health URL answers with HTTP 200, up to the [limit](#limits). If the comment names an older head, wait until
+   it names the head `z-review` sent. Then open its link again.
 3. **Drive the preview** with the steps in the preview runbook, and run each command where the
    runbook says. For nixie, run each command in the preview's imp as
    [nixie-preview-commands.md](references/nixie-preview-commands.md) shows:
@@ -131,36 +129,21 @@ each issue:
    - When every item passed, move the issue to Done with `save_issue`. Then, if `hq run show GEO-n`
      shows the run at `live-check`, run `hq run done GEO-n`. Skip it at any other state.
    - Otherwise, comment on the issue which items remain and who owns each. Message `z-release` each
-     failure as a production bug. File each item that needs the owner with
-     `hq unblock add --task '<the step>' --id qa-geo-<n>-<k> --notify z-qa`, where `<k>` counts the
-     issue's steps from 1. Leave out `--done-when`, though owner-calls asks for it on each step.
-     The condition `issue:GEO-n` closes the step only when the issue closes, and here the issue
-     closes only after the step is done.
-
-   Keep the check's line in `qa.md` while an item remains, with each step's id in it. hq messages
-   you when a step is marked done, and `z-release` tells you when a fix ships. Then check that
-   item again. Move the issue to Done once the last item passes.
+     failure as a production bug, and file each item that needs the owner with `hq unblock add`.
+     Close the issue on the day the last item passes.
 
 ## Limits
 
 - Open one preview at a time, and finish its PR first: opening another sleeps the older one.
-- Use at most 20 model turns per nixie PR, across all its checks, and count them in the check's
-  `qa.md` line. Past that, stop and report the limit.
+- Use at most 20 model turns per nixie PR, across all its checks. Past that, stop and report the
+  limit.
 - Fail a check when its preview's health URL gives no HTTP 200 for 10 minutes. Give the last HTTP
   status it returned, or "no answer".
-- Wait at most 30 minutes for the preview comment to name the head `z-review` sent. Then tell
-  `z-review` that the preview never reached that head.
 
 ## Files, messages and faults
 
-- Keep scratch in `~/.local/share/z-sessions/qa/`. Delete a check's scratch once you answer.
-- Keep one line per check in flight in `~/.local/share/z-sessions/qa.md`, and remove it when the
-  check is done. Write `-` for a field with no value:
-
-  ```text
-  GEO-<n> <repo>#<PR number> <head sha or release tag> account=<QA account> turns=<model turns> steps=<unblock ids>
-  ```
-
+- Keep scratch in `~/.local/share/z-sessions/qa/`, and the checks in flight in
+  `~/.local/share/z-sessions/qa.md`. Delete a check's scratch once you answer.
 - Run headless browsers with `TMPDIR=~/.local/share/z-sessions/qa/t`. Chromium fails on long socket
   paths.
 - Message a session with `atc_message_send`, and answer a message with the answer tool.

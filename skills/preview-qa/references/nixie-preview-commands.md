@@ -20,8 +20,8 @@ Read nixie's [preview.md](https://github.com/zgeoff/nixie/blob/main/docs/runbook
 at the head that `z-review` sent. The links show `main`, so read each runbook at the head, such as
 with
 `gh api 'repos/zgeoff/nixie/contents/docs/runbooks/preview.md?ref=<head sha>' -H 'Accept: application/vnd.github.raw'`.
-Count each `conversation/send` request in the API check, retries included, in the check's `qa.md`
-line, and stop at the cap that [Limits](../SKILL.md#limits) sets.
+Count each `conversation/send` request in the API check, retries included, against the PR's model
+turns, and stop at the cap that [Limits](../SKILL.md#limits) sets.
 
 ## Run a command in the preview
 
