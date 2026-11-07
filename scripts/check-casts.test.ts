@@ -1,0 +1,67 @@
+import { expect, test } from 'bun:test';
+import { collectCounts, formatCounts, parseOxlintReport } from './check-casts.ts';
+
+test('it counts nothing when oxlint reports nothing', () => {
+  expect(collectCounts([], [])).toStrictEqual({
+    casts: 0,
+    unsafe: 0,
+    unsafeByRule: { assignment: 0, 'member-access': 0, argument: 0, call: 0, return: 0 },
+  });
+});
+
+test('it counts only cast diagnostics as casts', () => {
+  const plain = [{ code: 'typescript(consistent-type-assertions)' }, { code: 'typescript(consistent-type-assertions)' }, { code: 'typescript(no-non-null-assertion)' }];
+
+  const counts = collectCounts(plain, []);
+
+  expect(counts.casts).toBe(2);
+  expect(counts.unsafe).toBe(0);
+});
+
+test('it counts each no-unsafe rule apart and sums them', () => {
+  const typeAware = [
+    { code: 'typescript(no-unsafe-assignment)' },
+    { code: 'typescript(no-unsafe-assignment)' },
+    { code: 'typescript(no-unsafe-member-access)' },
+    { code: 'typescript(no-unsafe-argument)' },
+    { code: 'typescript(no-unsafe-call)' },
+    { code: 'typescript(no-unsafe-return)' },
+    { code: 'typescript(no-unsafe-return)' },
+  ];
+
+  expect(collectCounts([], typeAware)).toStrictEqual({
+    casts: 0,
+    unsafe: 7,
+    unsafeByRule: { assignment: 2, 'member-access': 1, argument: 1, call: 1, return: 2 },
+  });
+});
+
+test('it ignores unrelated codes in both reports', () => {
+  const unrelated = [{ code: 'zgeoff(test-shape)' }, { code: 'typescript(no-unsafe-type-assertion)' }];
+  const plain = [{ code: 'typescript(consistent-type-assertions)' }, ...unrelated];
+  const typeAware = [{ code: 'typescript(no-unsafe-call)' }, ...unrelated];
+
+  expect(collectCounts(plain, typeAware)).toStrictEqual({
+    casts: 1,
+    unsafe: 1,
+    unsafeByRule: { assignment: 0, 'member-access': 0, argument: 0, call: 1, return: 0 },
+  });
+});
+
+test('it formats one line per total with the rule breakdown', () => {
+  const counts = collectCounts([{ code: 'typescript(consistent-type-assertions)' }], [{ code: 'typescript(no-unsafe-call)' }]);
+
+  expect(formatCounts(counts)).toStrictEqual(['casts: 1', 'no-unsafe: 1 (assignment 0, member-access 0, argument 0, call 1, return 0)']);
+});
+
+test.each([
+  { name: 'empty stdout', status: 1, stdout: '', stderr: 'Failed to load config: oxlintrc.json\n', message: 'oxlint exited 1 with no JSON report: Failed to load config: oxlintrc.json' },
+  { name: 'stdout that is not a report', status: 0, stdout: '{"other":true}', stderr: '', message: 'oxlint exited 0 with no JSON report: no stderr' },
+  { name: 'a run a signal ended', status: null, stdout: '', stderr: 'tsgolint crashed', message: 'oxlint exited on a signal with no JSON report: tsgolint crashed' },
+])('it names the exit status and stderr when oxlint gives $name', (row) => {
+  expect(() => parseOxlintReport(row.status, row.stdout, row.stderr)).toThrow(row.message);
+});
+
+test('it reads the diagnostics of a JSON report', () => {
+  expect(parseOxlintReport(1, '{"diagnostics":[{"code":"typescript-eslint(consistent-type-assertions)"}]}', '')).toStrictEqual([{ code: 'typescript-eslint(consistent-type-assertions)' }]);
+});
