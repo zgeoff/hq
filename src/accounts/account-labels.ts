@@ -7,12 +7,14 @@ import { ACCOUNT_NAME_RE } from './account-name-re.ts';
 import { NAME_MAX } from './name-max.ts';
 
 export function accountLabels(db: Database): Record<string, string> {
-  const j = parseJSON(getMeta(db, 'usage_accounts') ?? '{}');
-  if (!isRecord(j)) return {};
+  const stored = parseJSON(getMeta(db, 'usage_accounts') ?? '{}');
+  if (!isRecord(stored)) {
+    return {};
+  }
   const out: Record<string, string> = {};
-  for (const [k, v] of Object.entries(j)) {
-    if (ACCOUNT_KEY.test(k) && typeof v === 'string' && v.length <= NAME_MAX && ACCOUNT_NAME_RE.test(v)) {
-      out[k] = v;
+  for (const [key, value] of Object.entries(stored)) {
+    if (ACCOUNT_KEY.test(key) && typeof value === 'string' && value.length <= NAME_MAX && ACCOUNT_NAME_RE.test(value)) {
+      out[key] = value;
     }
   }
   return out;

@@ -18,7 +18,6 @@ export function loadAnswers(db: Database, window: AnswerWindow): Answer[] {
 }
 
 const AnswerEventSchema = buildRowSchema('events').pick({ seq: true, actor: true, data: true, at: true }).extend({ id: z.string() });
-type AnswerEvent = z.output<typeof AnswerEventSchema>;
 
 interface RoundFacts {
   title: string | null;
@@ -56,20 +55,20 @@ const RoundFactsSchema = z.object({ title: z.string(), issues: z.array(z.string(
 
 const EventDataSchema = z.object({ data: z.string() }).nullable();
 
-const CHANGE_ACTIONS: Record<'ask' | 'unblock', string[]> = { ask: ['added', 'updated', 'reasked', 'requeued'], unblock: ['added', 'item', 'reopened', 'updated'] };
-
-function isChangedSince(db: Database, subject: 'ask' | 'unblock', answer: AnswerEvent): boolean {
-  const actions = CHANGE_ACTIONS[subject];
-  return db.query(`SELECT 1 FROM events WHERE subject = ? AND subject_id = ? AND seq > ? AND action IN (${actions.map(() => '?').join(', ')}) LIMIT 1`).get(subject, answer.id, answer.seq, ...actions) !== null;
-}
-
-function loadRoundFacts(db: Database, answer: AnswerEvent): RoundFacts | null {
+function loadRoundFacts(db: Database, answer: z.output<typeof AnswerEventSchema>): RoundFacts | null {
   const kept = RoundFactsSchema.safeParse(JSON.parse(answer.data));
   if (kept.success) {
     return kept.data;
   }
   const row = EventDataSchema.parse(db.query(`SELECT data FROM events WHERE subject = 'ask' AND subject_id = ? AND action IN ('added', 'updated', 'reasked', 'requeued') AND json_extract(data, '$.title') IS NOT NULL AND seq < ? ORDER BY seq DESC LIMIT 1`).get(answer.id, answer.seq));
   return row === null ? null : RoundFactsSchema.parse(JSON.parse(row.data));
+}
+
+const CHANGE_ACTIONS: Record<'ask' | 'unblock', string[]> = { ask: ['added', 'updated', 'reasked', 'requeued'], unblock: ['added', 'item', 'reopened', 'updated'] };
+
+function isChangedSince(db: Database, subject: 'ask' | 'unblock', answer: z.output<typeof AnswerEventSchema>): boolean {
+  const actions = CHANGE_ACTIONS[subject];
+  return db.query(`SELECT 1 FROM events WHERE subject = ? AND subject_id = ? AND seq > ? AND action IN (${actions.map(() => '?').join(', ')}) LIMIT 1`).get(subject, answer.id, answer.seq, ...actions) !== null;
 }
 
 const ReviewFactsSchema = z.object({ title: z.string(), issues: z.array(z.string()), session: z.string(), ref: z.string().nullable() });

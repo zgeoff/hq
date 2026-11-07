@@ -5,9 +5,15 @@ import type { RestartRecord } from './types.ts';
 
 export async function readLastRestart(): Promise<RestartRecord> {
   const path = `${atcStateDir()}/restarts/last.json`;
-  const f = Bun.file(path);
-  if (!(await f.exists())) throw new HqError('no_restart', `no restart record at ${path}`);
-  const parsed = RestartRecordSchema.safeParse(await f.json());
-  if (!parsed.success) throw new HqError('bad_restart', `the restart record at ${path} is malformed at ${parsed.error.issues[0]?.path.join('.') || 'the top'}`);
+  const file = Bun.file(path);
+  if (!(await file.exists())) {
+    throw new HqError('no_restart', `no restart record at ${path}`);
+  }
+  const record: unknown = await file.json();
+  const parsed = RestartRecordSchema.safeParse(record);
+  if (!parsed.success) {
+    const [issue] = parsed.error.issues;
+    throw new HqError('bad_restart', `the restart record at ${path} is malformed at ${issue?.path.join('.') || 'the top'}`);
+  }
   return parsed.data;
 }

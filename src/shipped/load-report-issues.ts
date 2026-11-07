@@ -10,6 +10,7 @@ import { reportIssueSchema } from './report-issue-schema.ts';
 import type { ReportIssue } from './types.ts';
 import { upsertCacheEntries } from './upsert-cache-entries.ts';
 
+const LabelSchema = z.object({ name: z.string() });
 const IssueNodeSchema = z.object({
   identifier: z.string(),
   title: z.string(),
@@ -17,11 +18,9 @@ const IssueNodeSchema = z.object({
   priority: z.number(),
   state: z.object({ name: z.string(), type: z.string() }),
   project: z.object({ name: z.string() }).nullable(),
-  labels: z.object({ nodes: z.array(z.object({ name: z.string() })) }),
+  labels: z.object({ nodes: z.array(LabelSchema) }),
 });
 const IssuesSchema = z.object({ issues: z.object({ nodes: z.array(IssueNodeSchema) }) });
-
-type IssueNode = z.output<typeof IssueNodeSchema>;
 
 export async function loadReportIssues(call: LinearCall, db: Database, ids: readonly string[], at: Date): Promise<ReportIssue[]> {
   const BATCH = 100;
@@ -30,7 +29,8 @@ export async function loadReportIssues(call: LinearCall, db: Database, ids: read
   const hits = collectValidHits(cached);
   const wanted = ids.filter((id) => !hits.has(id));
   for (let i = 0; i < wanted.length; i += BATCH) {
-    const data = parseLinearData(await call(QUERY, { ids: wanted.slice(i, i + BATCH) }), IssuesSchema);
+    const answer = await call(QUERY, { ids: wanted.slice(i, i + BATCH) });
+    const data = parseLinearData(answer, IssuesSchema);
     fetched.push(...data.issues.nodes.map((node) => toReportIssue(node)));
   }
   await upsertCacheEntries(
@@ -53,6 +53,8 @@ function collectValidHits(cached: ReadonlyMap<string, string>): Map<string, Repo
 
 const QUERY = `query($ids: [ID!]) { issues(first: 100, includeArchived: true, filter: { id: { in: $ids } }) {
   nodes { identifier title url priority state { name type } project { name } labels { nodes { name } } } } }`;
+
+type IssueNode = z.output<typeof IssueNodeSchema>;
 
 function toReportIssue(node: IssueNode): ReportIssue {
   return {

@@ -14,10 +14,14 @@ export function checkRepaired(text: string): { ok: true; leaf: string | null; pr
   const off = new Set<string>();
   if (findSplit(byUuid, recs, path, off)) throw new HqError('repair_failed', 'a split advisor result is still on the live branch');
   let promptLeaf: string | null = null;
-  for (const l of text.split('\n')) {
-    if (!l.includes('"last-prompt"')) continue;
-    const o = LastPromptSchema.safeParse(parseJSON(l)).data;
-    if (o?.type === 'last-prompt' && o.leafUuid) promptLeaf = o.leafUuid;
+  for (const line of text.split('\n')) {
+    if (!line.includes('"last-prompt"')) {
+      continue;
+    }
+    const entry = LastPromptSchema.safeParse(parseJSON(line)).data;
+    if (entry?.type === 'last-prompt' && entry.leafUuid) {
+      promptLeaf = entry.leafUuid;
+    }
   }
   if (promptLeaf && !path.some((r) => r.obj.uuid === promptLeaf)) throw new HqError('repair_failed', `the last-prompt leaf ${promptLeaf} is not on the live branch`);
   return { ok: true, leaf: path.at(-1)?.obj.uuid ?? null, promptLeaf };

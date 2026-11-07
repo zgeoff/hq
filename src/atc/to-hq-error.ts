@@ -9,7 +9,8 @@ export function toHqError(error: unknown): HqError {
   }
   if (error instanceof ORPCError) {
     const code: unknown = error.code;
-    return buildDaemonError(typeof code === 'string' ? code : 'internal', error.message);
+    const daemonCode = typeof code === 'string' ? code : 'internal';
+    return buildDaemonError(daemonCode, error.message);
   }
   const message = error instanceof Error ? error.message : String(error);
   return new HqError('atc_internal', message);

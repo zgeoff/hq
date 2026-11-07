@@ -19,11 +19,16 @@ export function parseSource(db: Database, raw: string): Source {
   }
   const ask = /^(call|proposal):([A-Za-z0-9._-]+)$/.exec(raw);
   const kind = ask?.[1];
-  if (ask && isOneOf(kind, ASK_SOURCE_KINDS)) {
-    const row = runSyncRow(db, kdb(db).selectFrom('asks').select('kind').where('id', '=', ask[2]!).compile(), AskKindSchema);
-    if (!row) throw new HqError('not_found', `no ${kind} ${ask[2]} in hq`);
-    if (row.kind !== kind) throw new HqError('bad_args', `${ask[2]} is a ${row.kind}, not a ${kind}`);
-    return { kind, ref: ask[2]!, at: null };
+  const askID = ask?.[2];
+  if (askID !== undefined && isOneOf(kind, ASK_SOURCE_KINDS)) {
+    const row = runSyncRow(db, kdb(db).selectFrom('asks').select('kind').where('id', '=', askID).compile(), AskKindSchema);
+    if (!row) {
+      throw new HqError('not_found', `no ${kind} ${askID} in hq`);
+    }
+    if (row.kind !== kind) {
+      throw new HqError('bad_args', `${askID} is a ${row.kind}, not a ${kind}`);
+    }
+    return { kind, ref: askID, at: null };
   }
   const chat = /^chat:([0-9a-f-]{8,})@(.+)$/i.exec(raw);
   if (chat) {

@@ -4,8 +4,11 @@ import { metaJson } from '../db/meta-json.ts';
 import type { HealthSettings } from './health-defaults.ts';
 import { HEALTH_DEFAULTS } from './health-defaults.ts';
 
+const StoredSettingsSchema = z.record(z.string(), z.unknown());
+
 export function healthSettings(db: Database): HealthSettings {
-  return pickHealthSettings(metaJson(db, 'health_settings', z.record(z.string(), z.unknown()), {}));
+  const stored = metaJson(db, 'health_settings', StoredSettingsSchema, {});
+  return pickHealthSettings(stored);
 }
 
 // A stored value of the wrong type falls back to its default, and a key that is no setting is dropped.

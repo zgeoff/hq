@@ -8,9 +8,7 @@ import { KEY_CACHE } from './key-cache.ts';
 import { redact } from './redact.ts';
 import type { LinearCall } from './types.ts';
 
-// A settings file of another shape throws into the same empty catch as an unreadable one.
-const ClaudeSettingsSchema = z.object({ env: z.record(z.string(), z.unknown()).optional() });
-const LinearAnswer =z.object({ data: z.unknown().optional(), errors: z.array(z.unknown()).optional() });
+const LinearAnswer = z.object({ data: z.unknown().optional(), errors: z.array(z.unknown()).optional() });
 
 export function makeLinearCaller(run: Runner, doFetch: typeof fetch = fetch, recordRead: () => void = () => {}): LinearCall {
   return async (query, variables) => {
@@ -58,6 +56,9 @@ function formatLinearError(error: unknown): string {
   }
   return String(parsed.data.message ?? '');
 }
+
+// A settings file of another shape throws into the same empty catch as an unreadable one.
+const ClaudeSettingsSchema = z.object({ env: z.record(z.string(), z.unknown()).optional() });
 
 async function readKey(run: Runner, recordRead: () => void): Promise<string> {
   const ITEM = readLocalSetting('HQ_LINEAR_OP_REF');

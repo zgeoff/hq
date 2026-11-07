@@ -11,9 +11,11 @@ const LaneSchema = buildRowSchema('runs').pick({ lane: true });
 
 export function setRunLane(db: Database, issue: string, lane: string, actor: string): void {
   db.transaction(() => {
-    const prev = runSyncRow(db, kdb(db).selectFrom('runs').select('lane').where('issue', '=', issue).compile(), LaneSchema);
-    if (!prev) throw new HqError('not_found', `no run ${issue}`);
+    const previous = runSyncRow(db, kdb(db).selectFrom('runs').select('lane').where('issue', '=', issue).compile(), LaneSchema);
+    if (!previous) {
+      throw new HqError('not_found', `no run ${issue}`);
+    }
     db.query('UPDATE runs SET lane = ?, updated_at = ? WHERE issue = ?').run(lane, iso(now()), issue);
-    logEvent(db, 'run', issue, 'lane', actor, prev.lane, lane, {});
+    logEvent(db, 'run', issue, 'lane', actor, previous.lane, lane, {});
   }).immediate();
 }

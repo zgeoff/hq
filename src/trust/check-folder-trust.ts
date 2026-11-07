@@ -18,7 +18,9 @@ export function checkFolderTrust(cwd: string, file = getClaudeJson()): Trust {
   }
   for (let d = resolve(cwd); ; d = dirname(d)) {
     const project = projects[d];
-    if (Object.hasOwn(projects, d) && isRecord(project) && project['hasTrustDialogAccepted'] === true) return { trusted: true, by: d };
+    if (Object.hasOwn(projects, d) && isRecord(project) && project['hasTrustDialogAccepted'] === true) {
+      return { trusted: true, by: d };
+    }
     if (dirname(d) === d) break;
   }
   return { trusted: false, why: `${cwd} is not trusted by Claude Code; open claude there once and answer its trust dialog` };

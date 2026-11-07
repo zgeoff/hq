@@ -19,10 +19,10 @@ export async function settleRestores(
   const clock = opts.clock ?? Date.now;
   const down: Settled['down'] = [];
   let waiting: { id: string; name: string; reason: string }[] = [];
-  for (const f of failed ?? []) {
-    const fields = isRecord(f) ? f : {};
-    const e = { id: String(fields['id'] ?? ''), name: String(fields['name'] ?? ''), reason: String(fields['reason'] ?? '') };
-    (e.id && e.reason.includes(WAITING) ? waiting : down).push(e);
+  for (const entry of failed ?? []) {
+    const fields = isRecord(entry) ? entry : {};
+    const restore = { id: String(fields['id'] ?? ''), name: String(fields['name'] ?? ''), reason: String(fields['reason'] ?? '') };
+    (restore.id && restore.reason.includes(WAITING) ? waiting : down).push(restore);
   }
   const late: Settled['late'] = [];
   const until = clock() + opts.timeoutMs;

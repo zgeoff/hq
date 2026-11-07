@@ -48,8 +48,8 @@ export async function runBackup(db: Database, run: Runner, actor: string): Promi
     const out = await restic(run, [...local, 'backup', '--json', '--tag', 'hq', '--host', 'hq', ...src.exclude.flatMap((e) => ['--exclude', e]), staged, ...src.dirs.filter((d) => existsSync(d))]);
     const summary = out
       .split('\n')
-      .map((l) => SummaryLineSchema.safeParse(parseJSON(l)).data)
-      .find((m) => m?.message_type === 'summary');
+      .map((line) => SummaryLineSchema.safeParse(parseJSON(line)).data)
+      .find((message) => message?.message_type === 'summary');
     result.snapshot = summary?.snapshot_id?.slice(0, 8) ?? null;
     await restic(run, [...local, 'forget', '--tag', 'hq', '--keep-hourly', String(KEEP.hourly), '--keep-daily', String(KEEP.daily), '--prune']);
 
@@ -60,8 +60,10 @@ export async function runBackup(db: Database, run: Runner, actor: string): Promi
         await ensureRepo(run, [], extra, ['--from-repo', localRepo(), '--from-password-file', backupPaths().password, '--copy-chunker-params']);
         await restic(run, ['copy', '--from-repo', localRepo(), '--from-password-file', backupPaths().password, '--tag', 'hq'], extra);
         const newest = (snaps: Snapshot[]) => snaps.map((x) => x.time).sort().at(-1);
-        const want = newest(parseSnapshots(await restic(run, ['-r', localRepo(), 'snapshots', '--json', '--tag', 'hq'])));
-        const got = parseSnapshots(await restic(run, ['snapshots', '--json', '--tag', 'hq'], extra));
+        const localListing = await restic(run, ['-r', localRepo(), 'snapshots', '--json', '--tag', 'hq']);
+        const remoteListing = await restic(run, ['snapshots', '--json', '--tag', 'hq'], extra);
+        const want = newest(parseSnapshots(localListing));
+        const got = parseSnapshots(remoteListing);
         if (!want || !got.some((x) => x.time === want)) throw new HqError('remote_copy_missing', `the remote lacks the newest snapshot (${got.length} remote snapshots)`);
         await restic(run, ['forget', '--tag', 'hq', '--keep-hourly', String(KEEP.hourly), '--keep-daily', String(KEEP.daily), '--prune'], extra);
         result.remote = 'copied';

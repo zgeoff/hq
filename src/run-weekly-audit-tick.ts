@@ -15,7 +15,6 @@ import { enqueue } from './outbox/enqueue.ts';
 import { roleName } from './roles/role-name.ts';
 
 const JOB = 'weekly-audit';
-const JobRunSchema = buildRowSchema('job_runs');
 
 export function runWeeklyAuditTick(db: Database, actor: string, at: Date = now()): JobRun | null {
   const week = findAuditWeek(at);
@@ -57,6 +56,8 @@ function buildAuditWeek(y: number, mo: number, day: number): AuditWeek {
   const monday = sydneyUtc(y, mo, day);
   return { key: sydney(monday).date, due: sydneyUtc(y, mo, day, 9, 0), late: sydneyUtc(y, mo, day, 9, 30), end: sydneyUtc(y, mo, day + 1), from: sydneyUtc(y, mo, day - 7), to: monday };
 }
+
+const JobRunSchema = buildRowSchema('job_runs');
 
 function readRun(db: Database, key: string): JobRun | null {
   return runSyncRow(db, kdb(db).selectFrom('job_runs').selectAll().where('job', '=', JOB).where('key', '=', key).compile(), JobRunSchema);

@@ -6,7 +6,8 @@ import { pinListSchema } from './pin-list-schema.ts';
 import type { Pin } from './types.ts';
 
 export async function listPins(client: AtcClient): Promise<Pin[]> {
-  const { sessions: raw } = await client.call('session.list', {}, pinListSchema);
+  const listing = await client.call('session.list', {}, pinListSchema);
+  const raw = listing.sessions;
   const activity = new Map<string, number | null>();
   for (const s of raw.filter((x) => x.pinned)) {
     try {

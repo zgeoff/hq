@@ -35,16 +35,16 @@ function buildFound(rec: Obj, uuid: string, tools: Map<string, Tool>): Found {
 }
 
 function resultBlock(rec: Obj): Obj | null {
-  const c = findMessageContent(rec);
-  return Array.isArray(c) ? (c.find((b: unknown): b is Obj => isRecord(b) && b['type'] === 'tool_result') ?? null) : null;
+  const content = findMessageContent(rec);
+  return Array.isArray(content) ? (content.find((block: unknown): block is Obj => isRecord(block) && block['type'] === 'tool_result') ?? null) : null;
 }
 
-function readText(c: unknown): string {
-  if (typeof c === 'string') {
-    return c;
+function readText(content: unknown): string {
+  if (typeof content === 'string') {
+    return content;
   }
-  if (Array.isArray(c)) {
-    return c.map((p: unknown) => (isRecord(p) && typeof p['text'] === 'string' ? p['text'] : '')).join('\n');
+  if (Array.isArray(content)) {
+    return content.map((part: unknown) => (isRecord(part) && typeof part['text'] === 'string' ? part['text'] : '')).join('\n');
   }
   return '';
 }

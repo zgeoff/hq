@@ -11,7 +11,8 @@ export async function awaitDetached(db: Database, start: { id: number; attempts:
   const before = new Map(start.map((r) => [r.id, r.attempts]));
   const ids = start.map((r) => r.id);
   for (;;) {
-    const rows = ids.length ? runSyncQuery(db, kdb(db).selectFrom('outbox').select(['id', 'status', 'attempts', 'last_error']).where('id', 'in', ids).compile(), OutboxProgressSchema) : [];
+    const query = kdb(db).selectFrom('outbox').select(['id', 'status', 'attempts', 'last_error']).where('id', 'in', ids).compile();
+    const rows = ids.length > 0 ? runSyncQuery(db, query, OutboxProgressSchema) : [];
     const sent = rows.filter((r) => r.status === 'sent').length;
     const failed = rows.filter((r) => r.status === 'failed' && r.attempts > (before.get(r.id) ?? 0));
     const pending = rows.length - sent - failed.length;

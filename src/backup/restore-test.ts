@@ -17,7 +17,12 @@ interface RestoreTestResult {
   error: string | null;
 }
 
-export async function restoreTest(db: Database, run: Runner, opts: { remote: boolean; scratch: string }, actor: string): Promise<RestoreTestResult> {
+interface RestoreTestOptions {
+  remote: boolean;
+  scratch: string;
+}
+
+export async function restoreTest(db: Database, run: Runner, opts: RestoreTestOptions, actor: string): Promise<RestoreTestResult> {
   const dir = join(opts.scratch, `hq-restore-test-${Date.now()}`);
   let result: RestoreTestResult = { ok: false, files: 0, dbCheck: 'not run', error: null };
   try {

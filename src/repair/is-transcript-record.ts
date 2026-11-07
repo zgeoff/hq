@@ -7,12 +7,16 @@ export function isTranscriptRecord(value: unknown): value is Rec['obj'] {
   if (!isRecord(value)) {
     return false;
   }
-  const { uuid, parentUuid, type, isSidechain, message } = value;
+  const message = value['message'];
   return (
-    typeof uuid === 'string' &&
-    (parentUuid === undefined || parentUuid === null || typeof parentUuid === 'string') &&
-    (type === undefined || typeof type === 'string') &&
-    (isSidechain === undefined || typeof isSidechain === 'boolean') &&
-    (message === undefined || (isRecord(message) && (message['id'] === undefined || typeof message['id'] === 'string')))
+    typeof value['uuid'] === 'string' &&
+    isOptional(value['parentUuid'], 'string', true) &&
+    isOptional(value['type'], 'string', false) &&
+    isOptional(value['isSidechain'], 'boolean', false) &&
+    (message === undefined || (isRecord(message) && isOptional(message['id'], 'string', false)))
   );
+}
+
+function isOptional(field: unknown, type: 'string' | 'boolean', allowNull: boolean): boolean {
+  return field === undefined || (allowNull && field === null) || typeof field === type;
 }

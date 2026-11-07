@@ -2,7 +2,8 @@ import { z } from 'zod';
 import { HqError } from '../errors.ts';
 import { parseJSON } from '../noslop/parse-json.ts';
 
-const SnapshotListSchema = z.array(z.object({ short_id: z.string(), time: z.string(), paths: z.array(z.string()) }));
+const SnapshotSchema = z.object({ short_id: z.string(), time: z.string(), paths: z.array(z.string()) });
+const SnapshotListSchema = z.array(SnapshotSchema);
 
 export function parseSnapshots(stdout: string): z.output<typeof SnapshotListSchema> {
   const parsed = SnapshotListSchema.safeParse(parseJSON(stdout));

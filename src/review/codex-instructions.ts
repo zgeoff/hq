@@ -7,7 +7,8 @@ export async function codexInstructions(): Promise<string> {
   const path = `${process.env['CODEX_HOME'] ?? `${process.env['HOME']}/.codex`}/config.toml`;
   let own: unknown;
   try {
-    const config: unknown = Bun.TOML.parse(await Bun.file(path).text());
+    const text = await Bun.file(path).text();
+    const config: unknown = Bun.TOML.parse(text);
     own = isRecord(config) ? config['developer_instructions'] : undefined;
   } catch {}
   return typeof own === 'string' && own.trim() ? `${own.trimEnd()}\n\n${NO_TMP}` : NO_TMP;

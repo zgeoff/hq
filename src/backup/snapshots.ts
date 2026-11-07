@@ -6,5 +6,6 @@ import type { Snapshot } from './types.ts';
 
 export async function snapshots(run: Runner, remote: boolean): Promise<Snapshot[]> {
   const { args, extra } = repoFor(remote);
-  return parseSnapshots(await restic(run, [...args, 'snapshots', '--json', '--tag', 'hq'], extra));
+  const stdout = await restic(run, [...args, 'snapshots', '--json', '--tag', 'hq'], extra);
+  return parseSnapshots(stdout);
 }

@@ -33,8 +33,6 @@ import type { StaleSinceMap } from './stale-since-schema.ts';
 import type { FleetClient, FleetEntry, FleetSession, PromptDrift, RestartCause, StaleOps } from './types.ts';
 import { toErrorMessage } from '../to-error-message.ts';
 
-const SentMessageSchema = z.object({ message_id: z.string() });
-
 export interface StaleTickOptions {
   fleet: FleetEntry[];
   actor: string;
@@ -285,6 +283,8 @@ async function readAnswerFor(pass: StalePass, turn: StaleTurn, asked: Entry): Pr
   const lookup = await readMessageLookup(pass, turn, asked);
   return parseMessageReply(lookup);
 }
+
+const SentMessageSchema = z.object({ message_id: z.string() });
 
 async function readMessageLookup(pass: StalePass, turn: StaleTurn, asked: Entry): Promise<MessageLookup> {
   const session = turn.session;

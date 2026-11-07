@@ -186,15 +186,17 @@ function readAt(fd: number, start: number, len: number): Buffer {
 // A tool_result follows its tool_use within a few records, parallel calls included.
 const TOOLS_KEPT = 128;
 
-const StoredToolsSchema = z.array(z.tuple([z.string(), z.object({ name: z.string(), input: z.string().nullable() })]));
-
-const remember =(tools: Map<string, Tool>, [k, v]: [string, Tool]) => {
+const remember = (tools: Map<string, Tool>, [k, v]: [string, Tool]) => {
   tools.delete(k);
   tools.set(k, v);
   if (tools.size > TOOLS_KEPT) tools.delete(tools.keys().next().value!);
 };
 
+const StoredToolSchema = z.object({ name: z.string(), input: z.string().nullable() });
+const StoredToolsSchema = z.array(z.tuple([z.string(), StoredToolSchema]));
+
 function storedTools(raw: string | null): Map<string, Tool> {
   const parsed = StoredToolsSchema.safeParse(parseJSON(raw ?? '[]'));
-  return new Map(parsed.success ? parsed.data : []);
+  const entries = parsed.success ? parsed.data : [];
+  return new Map(entries);
 }
