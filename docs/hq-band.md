@@ -1,16 +1,16 @@
 # hq-band
 
-A Claude Code mod that draws one line above z-stu's prompt, refreshed every minute:
+A Claude Code mod in [`mods/hq-band`](../mods/hq-band) that draws one line above z-stu's prompt, refreshed every minute:
 
 ```text
 Needs you 0 · Nix up · lanes 10/17 (impd 16/16 GiB, 16/16 vCPU) · CI green · reviews 3
 ```
 
-The line comes from `hq band --json`, which reads only what hq already stores. hq decides each segment's text and tone, and the mod only draws them: red when something needs Geoff, Nix is down or CI failed, amber near impd's line or when hq can't tell. When hq can't be read, the band says `hq unreachable`.
+The line comes from `hq band --json`, which reads only what hq already stores. hq decides each segment's text and tone, and the mod only draws them: red when something needs the owner, Nix is down or CI failed, amber near impd's line or when hq can't tell. When hq can't be read, the band says `hq unreachable`.
 
 ## /hq
 
-`/hq` opens a pane with the detail behind the band, and `/hq close` closes it. The pane shows what needs Geoff with its links, Nix today, a heat map of the lanes with the runs that hold each slot, reviews in flight, what merged today, and the newest news. It comes from `hq pane --json`, read with the band each minute. The terminal draws the heat map as a Raster, two columns to a slot: green while the lane has room, amber when it is full.
+`/hq` opens a pane with the detail behind the band, and `/hq close` closes it. The pane shows what needs the owner with its links, Nix today, a heat map of the lanes with the runs that hold each slot, reviews in flight, what merged today, and the newest news. It comes from `hq pane --json`, read with the band each minute. The terminal draws the heat map as a Raster, two columns to a slot: green while the lane has room, amber when it is full.
 
 ## Only z-stu
 
@@ -29,7 +29,7 @@ A `--plugin-dir` folder is watched. The band reloads when the folder changes, fo
 
 ## Checks
 
-Run these from this folder; hq's CI runs neither, because CI has no `claude`.
+Run these from `mods/hq-band`; hq's CI runs neither, because CI has no `claude`.
 
 ```sh
 claude plugin validate .
