@@ -10,7 +10,6 @@ import type { ThroughputAlert, ThroughputLine } from './types.ts';
 
 const NAME = 'Stale';
 const DAY_MS = 86_400_000;
-const IN_REVIEW_QUIET_MS = 2 * DAY_MS;
 
 export function readStaleLine(db: Database, _from: Date, at: Date): ThroughputLine {
   const unread = findUnreadLine(db, NAME, '0 older than 24h');
@@ -105,6 +104,8 @@ function readClosedRunItems(db: Database): StaleItem[] {
 }
 
 const inReviewRowSchema = z.object({ issue: z.string(), updated_at: z.string(), run_state: z.enum(['merged', 'live-check', 'dropped']).nullable() });
+
+const IN_REVIEW_QUIET_MS = 2 * DAY_MS;
 
 // A run in any other state has an owner moving the issue, so only these states and no run at all are read.
 function readInReviewItems(db: Database, at: Date): StaleItem[] {
