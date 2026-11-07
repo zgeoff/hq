@@ -29,7 +29,7 @@ export function queueReminder(db: Database, actor: string): { reminded: string |
       const epoch = Math.max(Date.parse(since), lastQuietEnd(t).getTime(), holdEnd ? Date.parse(holdEnd) : 0);
       const told = getMeta(db, `told:${next.id}`);
       if (told && Date.parse(told) >= epoch) return { reminded: null, why: `${owner()} already told about ${next.id}` };
-      const [due] = runSyncQuery(db, kdb(db).selectFrom('asks').select((eb) => eb.fn.countAll<number>().as('count')).where('state', '=', 'later').where('due_at', '<=', iso(t)).compile(), CountSchema);
+      const [due] = runSyncQuery(db, kdb(db).selectFrom('asks').select((eb) => eb.fn.countAll().as('count')).where('state', '=', 'later').where('due_at', '<=', iso(t)).compile(), CountSchema);
       invariant(due, 'COUNT(*) with no GROUP BY returns one row');
       const waiting = listAsks(db, { states: ['queued'] }).length + due.count;
       const seq = logEvent(db, 'ask', next.id, 'reminded', actor, next.state, next.state, { waiting });

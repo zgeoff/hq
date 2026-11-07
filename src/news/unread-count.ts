@@ -7,7 +7,7 @@ import { kdb } from '../kdb.ts';
 export function unreadCount(db: Database): number {
   const query = kdb(db)
     .selectFrom('news')
-    .select((eb) => eb.fn.countAll<number>().as('count'))
+    .select((eb) => eb.fn.countAll().as('count'))
     .where('read_at', 'is', null)
     .compile();
   const [row] = runSyncQuery(db, query, CountSchema);
