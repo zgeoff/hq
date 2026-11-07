@@ -602,4 +602,10 @@ export const MIGRATIONS: string[] = [
   ALTER TABLE run_prs ADD COLUMN session_by_hand INTEGER NOT NULL DEFAULT 0;`,
 
   `ALTER TABLE capacity_samples ADD COLUMN impd_priority_kept_mib INTEGER;`,
+
+  `CREATE TABLE linear_in_review (
+    issue      TEXT PRIMARY KEY,
+    updated_at TEXT NOT NULL,
+    fetched_at TEXT NOT NULL
+  );`,
 ];

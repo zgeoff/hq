@@ -16,8 +16,8 @@ export function readStaleLine(db: Database, _from: Date, at: Date): ThroughputLi
   if (unread !== null) {
     return unread;
   }
-  const items = [...readUnrunItems(db), ...readClosedRunItems(db)];
-  const old = items.filter((item) => at.getTime() - Date.parse(item.since) > DAY_MS);
+  const items = [...readUnrunItems(db), ...readClosedRunItems(db), ...readInReviewItems(db, at)];
+  const old = items.filter((item) => item.immediate === true || at.getTime() - Date.parse(item.since) > DAY_MS);
   return {
     name: NAME,
     detail: `${old.length} older than 24h${formatItemList(old.map((item) => item.summary))}, ${items.length} in all`,
@@ -31,6 +31,7 @@ interface StaleItem {
   since: string;
   summary: string;
   alert: ThroughputAlert;
+  immediate?: true;
 }
 
 const startedRowSchema = z.object({ issue: z.string(), started_at: z.string() });
@@ -100,4 +101,50 @@ function readClosedRunItems(db: Database): StaleItem[] {
         text: `Stale: ${row.issue}'s hq run is still open, but Linear marked the issue ${row.state} at ${row.closed_at}. Close the run, or reopen the issue.`,
       },
     }));
+}
+
+const inReviewRowSchema = z.object({ issue: z.string(), updated_at: z.string(), run_state: z.enum(['merged', 'live-check', 'dropped']).nullable() });
+
+const IN_REVIEW_QUIET_MS = 2 * DAY_MS;
+
+// A run in any other state has an owner moving the issue, so only these states and no run at all are read.
+function readInReviewItems(db: Database, at: Date): StaleItem[] {
+  const rows = db
+    .query(
+      `SELECT i.issue, i.updated_at, r.state AS run_state FROM linear_in_review i LEFT JOIN runs r ON r.issue = i.issue
+       WHERE (r.state IS NULL OR r.state IN ('merged', 'live-check', 'dropped'))
+         AND NOT EXISTS (
+           SELECT 1 FROM unblocks u, json_each(u.unblocks) j
+           WHERE u.state = 'open' AND u.kind = 'watch' AND json_extract(j.value, '$.issue') = i.issue)
+       ORDER BY i.issue`,
+    )
+    .all();
+  return z
+    .array(inReviewRowSchema)
+    .parse(rows)
+    .filter((row) => row.run_state === 'dropped' || at.getTime() - Date.parse(row.updated_at) > IN_REVIEW_QUIET_MS)
+    .map((row) => buildInReviewItem(row.issue, row.updated_at, row.run_state));
+}
+
+const IN_REVIEW_WAY_OUT = {
+  merged: 'Run its live check, record `hq run check <issue> none` if it has none, add a watch with `hq unblock add` for what it waits on, or close it.',
+  'live-check': 'Run the live check and close it, or add a watch with `hq unblock add` for what it waits on.',
+  dropped: 'Its run was dropped: close or cancel the issue, or relaunch it.',
+  none: 'Close it, or add a watch with `hq unblock add` for what it waits on.',
+} as const;
+
+function buildInReviewItem(issue: string, updatedAt: string, runState: 'merged' | 'live-check' | 'dropped' | null): StaleItem {
+  const key = runState ?? 'none';
+  const wayOut = IN_REVIEW_WAY_OUT[key].replace('<issue>', issue);
+  const cause = runState === null ? 'it has no hq run' : `its hq run is ${runState}`;
+  return {
+    since: updatedAt,
+    summary: `${issue} In Review, ${runState === null ? 'no run' : `run ${runState}`}`,
+    alert: {
+      key: `stale:in-review:${issue}`,
+      text: `Stale: ${issue} is In Review (Linear last updated ${updatedAt}) and ${cause}, with no open watch naming it. ${wayOut}`,
+      role: 'triage',
+    },
+    ...(runState === 'dropped' ? { immediate: true as const } : {}),
+  };
 }

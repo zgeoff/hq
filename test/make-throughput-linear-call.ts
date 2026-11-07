@@ -7,13 +7,21 @@ interface StartedSeed {
   attachments?: readonly unknown[];
 }
 
-export function makeThroughputLinearCall(filed: readonly FiledNode[], started: readonly StartedSeed[] = []): LinearCall {
+interface InReviewSeed {
+  identifier: string;
+  updatedAt: string;
+}
+
+export function makeThroughputLinearCall(filed: readonly FiledNode[], started: readonly StartedSeed[] = [], inReview: readonly InReviewSeed[] = []): LinearCall {
   return (query) => {
     if (query.includes('createdAt: {')) {
       return Promise.resolve(buildPage(filed));
     }
     if (query.includes('"In Progress"')) {
       return Promise.resolve(buildPage(started.map((issue) => buildStartedNode(issue))));
+    }
+    if (query.includes('"In Review"')) {
+      return Promise.resolve(buildPage(inReview));
     }
     return Promise.resolve(buildPage([]));
   };

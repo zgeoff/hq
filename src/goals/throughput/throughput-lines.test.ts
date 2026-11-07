@@ -9,6 +9,8 @@ import { addFollowup } from '../../followups/add-followup.ts';
 import { syncLinear } from '../../kinds/sync-linear.ts';
 import type { LinearCall } from '../../linear/types.ts';
 import { addRun } from '../../runs/add-run.ts';
+import { setState } from '../../runs/set-state.ts';
+import { addUnblock } from '../../unblock/add-unblock.ts';
 import { dailyText } from '../daily/daily-text.ts';
 import { sendThroughputAlerts } from './send-throughput-alerts.ts';
 
@@ -26,6 +28,12 @@ function setupTest() {
   return {
     db: fresh.db,
     now,
+    seedRun: (issue: string, state: 'working' | 'merged' | 'live-check' | 'dropped') => {
+      addRun(fresh.db, { issue, title: 'Invented kettle work', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, actor: 'z-delivery' });
+      if (state !== 'working') {
+        setState(fresh.db, issue, state, { note: 'invented' }, 'z-delivery');
+      }
+    },
     readOutbox: () => fresh.db.query('SELECT target, text FROM outbox ORDER BY id').all(),
     findLine: (name: string) =>
       dailyText(fresh.db, new Date(now))
@@ -253,4 +261,49 @@ test('it sends a done-but-open issue to triage 24 hours after its last merge and
     { target: 'z-triage', text: 'Stale: GEO-9801 is In Progress, but every PR merged (last kettle#2, at 2026-10-14T07:00:00Z). Close it, or name the live check or owner step that holds it.' },
     { target: 'z-delivery', text: 'Stale: GEO-9803 has been In Progress since 2026-10-14T07:00:00Z with no hq run, no session and no open PR. Relaunch its run, or move it out of In Progress.' },
   ]);
+});
+
+test('it alerts on an In Review issue whose run is past merge or dropped, or that has no run, and not on one with an owner or a recent update', async () => {
+  const ctx = setupTest();
+  ctx.seedRun('GEO-9801', 'merged');
+  ctx.seedRun('GEO-9802', 'live-check');
+  ctx.seedRun('GEO-9804', 'dropped');
+  ctx.seedRun('GEO-9805', 'merged');
+  ctx.seedRun('GEO-9806', 'merged');
+  ctx.seedRun('GEO-9807', 'working');
+  addUnblock(ctx.db, { id: 'kettle-watch', task: 'Watch the kettle release', minutes: null, unblocks: [{ issue: 'GEO-9805', priority: 'none' }], notify: [], actor: 'z-triage', kind: 'watch', deadline: '2026-10-30T00:00:00Z' });
+  const inReview = [
+    { identifier: 'GEO-9801', updatedAt: '2026-10-13T07:00:00Z' },
+    { identifier: 'GEO-9802', updatedAt: '2026-10-13T07:00:00Z' },
+    { identifier: 'GEO-9803', updatedAt: '2026-10-13T07:00:00Z' },
+    { identifier: 'GEO-9804', updatedAt: '2026-10-16T06:00:00Z' },
+    { identifier: 'GEO-9805', updatedAt: '2026-10-13T07:00:00Z' },
+    { identifier: 'GEO-9806', updatedAt: '2026-10-15T07:00:00Z' },
+    { identifier: 'GEO-9807', updatedAt: '2026-10-13T07:00:00Z' },
+  ];
+  await syncLinear(ctx.db, makeThroughputLinearCall([], [], inReview), new Date('2026-10-14T00:00:00Z'), new Date(ctx.now));
+
+  const first = sendThroughputAlerts(ctx.db, 'hq-lanes', new Date('2026-10-14T00:00:00Z'), new Date(ctx.now));
+
+  expect({ first, line: ctx.findLine('Stale') }).toStrictEqual({
+    first: ['stale:in-review:GEO-9801', 'stale:in-review:GEO-9802', 'stale:in-review:GEO-9803', 'stale:in-review:GEO-9804'],
+    line: '- Stale: 4 older than 24h (GEO-9801 In Review, run merged, GEO-9802 In Review, run live-check, GEO-9803 In Review, no run; 1 m…; target 0 older than 24h 🔴 red',
+  });
+  expect(ctx.readOutbox()).toStrictEqual([
+    { target: 'z-triage', text: 'Stale: GEO-9801 is In Review (Linear last updated 2026-10-13T07:00:00Z) and its hq run is merged, with no open watch naming it. Run its live check, record `hq run check GEO-9801 none` if it has none, add a watch with `hq unblock add` for what it waits on, or close it.' },
+    { target: 'z-triage', text: 'Stale: GEO-9802 is In Review (Linear last updated 2026-10-13T07:00:00Z) and its hq run is live-check, with no open watch naming it. Run the live check and close it, or add a watch with `hq unblock add` for what it waits on.' },
+    { target: 'z-triage', text: 'Stale: GEO-9803 is In Review (Linear last updated 2026-10-13T07:00:00Z) and it has no hq run, with no open watch naming it. Close it, or add a watch with `hq unblock add` for what it waits on.' },
+    { target: 'z-triage', text: 'Stale: GEO-9804 is In Review (Linear last updated 2026-10-16T06:00:00Z) and its hq run is dropped, with no open watch naming it. Its run was dropped: close or cancel the issue, or relaunch it.' },
+  ]);
+});
+
+test('it alerts on a stuck In Review issue that an open owner task names, since only a watch silences it', async () => {
+  const ctx = setupTest();
+  ctx.seedRun('GEO-9801', 'merged');
+  addUnblock(ctx.db, { id: 'kettle-descale', task: 'Descale the kettle', minutes: 5, unblocks: [{ issue: 'GEO-9801', priority: 'none' }], notify: [], actor: 'z-triage', kind: 'owner' });
+  await syncLinear(ctx.db, makeThroughputLinearCall([], [], [{ identifier: 'GEO-9801', updatedAt: '2026-10-13T07:00:00Z' }]), new Date('2026-10-14T00:00:00Z'), new Date(ctx.now));
+
+  const sent = sendThroughputAlerts(ctx.db, 'hq-lanes', new Date('2026-10-14T00:00:00Z'), new Date(ctx.now));
+
+  expect(sent).toStrictEqual(['stale:in-review:GEO-9801']);
 });
