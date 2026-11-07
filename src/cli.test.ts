@@ -11,6 +11,8 @@ import { LINEAR_GRAPHQL_URL, linearIssues } from '../mocks/linear-handlers.ts';
 import { server } from '../mocks/node.ts';
 import { createStubOp } from '../test/create-stub-op.ts';
 import { NOON_SYDNEY, at, createPushedClone, fakeAtc, freshDb } from '../test/helpers.ts';
+import { readSlotRows } from './capacity/fleet/read-slot-rows.ts';
+import { updateEnv } from '@zgeoff/testing/helpers';
 import { main } from './cli.ts';
 import { overrideEnv } from './config/override-env.ts';
 import { setMeta } from './db/set-meta.ts';
@@ -908,6 +910,29 @@ test("it reads the broker slot's fleet-vault token in hq capacity broker after a
   await main(['capacity', 'broker', '--json']);
 
   expect(JSON.parse(lines.join('\n')).broker).toStrictEqual({ state: 'read', slot: 2, proof: 'req-7c8d', proofAgeHours: 30, used: 40, resetsAt: '2026-10-21T00:00:00Z', readAt: '2026-10-14T01:00:00Z' });
+});
+
+test("it reads the slot token from hq's own file under ~/.config/hq by default for hq capacity --refresh-slots", async () => {
+  const fresh = freshDb();
+  const log = console.log;
+  const lines: string[] = [];
+  onTestFinished(fresh.cleanup);
+  updateEnv('HQ_NOW', NOON_SYDNEY);
+  updateEnv('HQ_SLOTS_OP_SETTINGS', undefined);
+  updateEnv('HOME', fresh.dir);
+  onTestFinished(() => (console.log = log));
+  const op = createStubOp({ directory: fresh.dir, answers: { 'op://fleet/claude-setup-token-1/credential': 'sk-ant-kettle-home-1', 'op://fleet/claude-setup-token-2/credential': 'sk-ant-kettle-home-2', 'op://fleet/claude-setup-token-3/credential': 'sk-ant-kettle-home-3' } });
+  updateEnv('PATH', `${op.bin}:${process.env['PATH'] ?? ''}`);
+  mkdirSync(`${fresh.dir}/.config/hq`, { recursive: true });
+  writeFileSync(`${fresh.dir}/.config/hq/slots-op.json`, JSON.stringify({ env: { OP_SERVICE_ACCOUNT_TOKEN: 'ops_kettle-profile-0002' } }));
+  slotUsage.set('Bearer sk-ant-kettle-home-1', { seven: { utilization: 0.4, reset: 1_792_540_800 } });
+  slotUsage.set('Bearer sk-ant-kettle-home-2', { seven: { utilization: 0.4, reset: 1_792_368_000 } });
+  slotUsage.set('Bearer sk-ant-kettle-home-3', { seven: { utilization: 0.4, reset: 1_792_713_600 } });
+  console.log = (line: string) => lines.push(line);
+
+  await main(['capacity', '--refresh-slots']);
+
+  expect(readSlotRows(fresh.db, new Date(0), new Date(NOON_SYDNEY)).map((row) => row.slot)).toStrictEqual([1, 2, 3]);
 });
 
 test('hq capacity --refresh-slots --json carries the refresh problems in the fleet block', async () => {

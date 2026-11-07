@@ -11,7 +11,7 @@ function setupTest() {
   return { db: fresh.db };
 }
 
-test('it keeps a new build run with no session of its own unparked, though its design pass session is gone', () => {
+test('it parks a build run with no session of its own, as a design pass session never holds a lane', () => {
   const ctx = setupTest();
   at('2026-10-15T20:00:00Z');
   addRun(ctx.db, { issue: 'GEO-9933', title: 'Design the kettle base', place: 'imp', session: 'a0000035-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', design: 'agent', actor: 'z-delivery' });
@@ -20,5 +20,5 @@ test('it keeps a new build run with no session of its own unparked, though its d
   addRun(ctx.db, { issue: 'GEO-9933', title: 'Build the kettle base', place: 'imp', session: null, next: 'Building.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
   recordAwake(ctx.db, [{ id: 'a0000036-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'teapot-agent', alive: true, state: 'running', locator: { targetID: 'imp-teapot' } }]);
 
-  expect(parkedRuns(ctx.db, new Date('2026-10-15T20:10:00Z'))).toStrictEqual([]);
+  expect(parkedRuns(ctx.db, new Date('2026-10-15T20:10:00Z'))).toStrictEqual([{ issue: 'GEO-9933', lane: 'cloud' }]);
 });
