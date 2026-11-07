@@ -24,6 +24,7 @@ export interface SweepOptions {
   actor: string;
   wrapUpDeps: WrapUpDeps;
   log: (line: string) => void;
+  readIssueDescription?: (issue: string) => Promise<string>;
 }
 
 export async function sweepNow(db: Database, client: AtcClient, run: Runner, options: SweepOptions): Promise<{ alerts: Alert[]; sent: Alert[] }> {
@@ -61,7 +62,10 @@ async function readSessionActivity(client: AtcClient, id: string): Promise<Sessi
 
 async function endHandedInRunSessionsSafely(db: Database, atc: AtcView, options: SweepOptions): Promise<void> {
   try {
-    await endHandedInRunSessions(db, atc, options.wrapUpDeps, { actor: options.actor });
+    await endHandedInRunSessions(db, atc, options.wrapUpDeps, {
+      actor: options.actor,
+      ...(options.readIssueDescription === undefined ? {} : { holds: { readIssueDescription: options.readIssueDescription, log: options.log } }),
+    });
   } catch (error) {
     options.log(`handed-in session end failed: ${toMessage(error)}`);
   }
