@@ -1,8 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import type { Database } from 'bun:sqlite';
 import invariant from 'tiny-invariant';
-import { z } from 'zod';
-import { queryColumn, queryValue } from '../src/test-utils/query-rows.ts';
 import { AtcClient } from '../src/atc/atc-client.ts';
 import { getMeta } from '../src/db/get-meta.ts';
 import { listEvents } from '../src/list-events.ts';
@@ -19,6 +17,7 @@ import { fullSessionId } from '../src/runs/full-session-id.ts';
 import { ingestNotes } from '../src/runs/ingest-notes.ts';
 import { listRuns } from '../src/runs/list-runs.ts';
 import { normalizePrRef } from '../src/runs/normalize-pr-ref.ts';
+import { notesFor } from '../src/runs/notes-for.ts';
 import { resolveRun } from '../src/runs/resolve-run.ts';
 import { reviewStarted } from '../src/runs/review-started.ts';
 import { reviewedPr } from '../src/runs/reviewed-pr.ts';
@@ -183,7 +182,7 @@ describe('reading the event feed', () => {
     } finally {
       c.close();
     }
-    expect(queryValue(db, 'SELECT COUNT(*) FROM run_notes', z.number())).toBe(1);
+    expect(notesFor(db, 'GEO-9001', 10)).toHaveLength(1);
   });
 
   test('a sweep ends every gone session, and a working run\'s exit alert repeats from the sweep\'s mark; a session removed by hand raises none', async () => {
@@ -460,8 +459,8 @@ describe('review fixes', () => {
     } finally {
       c.close();
     }
-    const texts = queryColumn(db, 'SELECT text FROM run_notes ORDER BY id', z.string());
-    expect(texts).toEqual(['first note', 'second note']);
+    const texts = notesFor(db, 'GEO-9001', 10).map((note) => note.text);
+    expect(texts).toStrictEqual(['second note', 'first note']);
   });
 
   test('an undelivered alert rides along with a new one', () => {
@@ -507,7 +506,7 @@ describe('re-check fixes', () => {
     } finally {
       c.close();
     }
-    expect(queryValue(db, 'SELECT COUNT(*) FROM run_notes', z.number())).toBe(201);
+    expect(notesFor(db, 'GEO-9001', 1000)).toHaveLength(201);
   });
 
   test('a phrase in a note that names a foreign PR marks nothing', () => {
