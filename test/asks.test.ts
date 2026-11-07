@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import type { Database } from 'bun:sqlite';
+import { z } from 'zod';
+import { queryRow, queryRows } from '../src/test-utils/query-rows.ts';
 import { applyAskItem } from '../src/apply-ask-item.ts';
 import { addAsk } from '../src/asks/add-ask.ts';
 import { answerAsk } from '../src/asks/answer-ask.ts';
@@ -33,7 +35,7 @@ const call = (over: Partial<AddInput> = {}): AddInput => ({
   ...over,
 });
 
-const outbox = () => db.query('SELECT target, text FROM outbox ORDER BY id').all() as { target: string; text: string }[];
+const outbox = () => queryRows(db, 'SELECT target, text FROM outbox ORDER BY id', z.object({ target: z.string(), text: z.string() }));
 
 beforeEach(() => {
   ({ db, cleanup } = freshDb());
@@ -102,7 +104,7 @@ describe('add', () => {
     const r = addAsk(db, call());
     expect(r.result).toBe('requeued');
     expect(r.ask).toMatchObject({ state: 'queued', round: 2, answer: null });
-    const ev = db.query(`SELECT data FROM events WHERE action='requeued'`).get() as { data: string };
+    const ev = queryRow(db, `SELECT data FROM events WHERE action='requeued'`, z.object({ data: z.string() }));
     expect(JSON.parse(ev.data).previous_answer).toBe('green');
   });
 
@@ -274,7 +276,7 @@ describe('answer, apply, later, skip, close', () => {
     openAsk(db, { force: false, actor: 'z-stu' });
     answerAsk(db, { id: 'geo-1-paint', kind: 'call', answer: 'green', actor: 'z-stu' });
     applyAsk(db, 'geo-1-paint', 'call', 'none', null, 'z-stu');
-    const actions = (db.query(`SELECT action FROM events WHERE subject_id='geo-1-paint' ORDER BY seq`).all() as { action: string }[]).map((e) => e.action);
+    const actions = queryRows(db, `SELECT action FROM events WHERE subject_id='geo-1-paint' ORDER BY seq`, z.object({ action: z.string() })).map((e) => e.action);
     expect(actions).toEqual(['added', 'opened', 'answered', 'applied']);
   });
 });

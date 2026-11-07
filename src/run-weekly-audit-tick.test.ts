@@ -1,9 +1,11 @@
 import { expect, onTestFinished, test } from 'bun:test';
+import { z } from 'zod';
 import { at, fakeAtc, freshDb } from '../test/helpers.ts';
 import { overrideEnv } from './config/override-env.ts';
 import { sydneyUtc } from './morning/sydney-utc.ts';
 import { flush } from './outbox/flush.ts';
 import { runWeeklyAuditTick } from './run-weekly-audit-tick.ts';
+import { queryRows } from './test-utils/query-rows.ts';
 
 function setupTest() {
   const fresh = freshDb();
@@ -12,7 +14,7 @@ function setupTest() {
   return {
     db: fresh.db,
     dir: fresh.dir,
-    readOutbox: () => fresh.db.query('SELECT text, topic FROM outbox').all() as { text: string; topic: string }[],
+    readOutbox: () => queryRows(fresh.db, 'SELECT text, topic FROM outbox', z.object({ text: z.string(), topic: z.string() })),
   };
 }
 

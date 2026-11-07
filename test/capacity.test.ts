@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test';
 import type { Database } from 'bun:sqlite';
+import { z } from 'zod';
+import { queryRows } from '../src/test-utils/query-rows.ts';
 import { join } from 'node:path';
 import { owner } from '../src/owner.ts';
 import { loadCapacityLine } from '../src/capacity/load-capacity-line.ts';
@@ -69,7 +71,7 @@ function probe(w: World): CapacityProbe {
 }
 
 const minute = (m: number) => new Date(Date.parse(NOON_SYDNEY) + m * 60_000);
-const outbox = () => db.query('SELECT target, text, topic FROM outbox ORDER BY id').all() as { target: string; text: string; topic: string | null }[];
+const outbox = () => queryRows(db, 'SELECT target, text, topic FROM outbox ORDER BY id', z.object({ target: z.string(), text: z.string(), topic: z.string().nullable() }));
 const sampleAt = async (w: World, d: Date) => {
   at(d.toISOString());
   return sampleCapacity(db, probe(w), 'hq-lanes', d);

@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test';
 import type { Database } from 'bun:sqlite';
+import { z } from 'zod';
+import { queryRow, queryRows } from '../src/test-utils/query-rows.ts';
 import { checkLane } from '../src/areas/check-lane.ts';
 import { laneArgs } from '../src/areas/lane-args.ts';
 import { parkedRuns } from '../src/areas/parked-runs.ts';
@@ -46,7 +48,7 @@ const cap = (freeMib: number) => ({ imp: { freeMib, room: true }, providers: { c
 const sample = (freeMib: number) => ({ cap: cap(freeMib), impMib: 2048, error: null, lanes: LANES, slots: SLOTS });
 const run = (issue: string, lane: string | null, place: 'imp' | 'local' = 'imp') =>
   addRun(db, { issue, title: 'Invented kettle work', place, session: null, next: 'Agent working.', gate: null, geoffChat: false, lane, actor: 'z-delivery' });
-const msgs = () => db.query('SELECT text FROM outbox').all() as { text: string }[];
+const msgs = () => queryRows(db, 'SELECT text FROM outbox', z.object({ text: z.string() }));
 
 beforeEach(() => {
   ({ db, cleanup } = freshDb());
@@ -167,7 +169,7 @@ test('the samples count the slots the plan fills from the first free minute; onl
     atMin(m);
     tick(db, { ...sample(0), lanes: LANES, slots: SLOTS }, 'hq-lanes');
   }
-  expect((db.query('SELECT slots FROM lanes_samples ORDER BY seq').all() as { slots: number }[]).map((r) => r.slots)).toEqual([2, 2, 2]);
+  expect(queryRows(db, 'SELECT slots FROM lanes_samples ORDER BY seq', z.object({ slots: z.number() })).map((r) => r.slots)).toEqual([2, 2, 2]);
   expect(idleSlotMinutes(db, 1).slotMinutes).toBe(20);
 });
 
@@ -248,7 +250,7 @@ test('a blocked run with no session awake is parked, whatever it waits on: its s
 });
 
 test('the sample records the eligible issues the Ready read holds, the hand count while it is stale, and unknown with neither', () => {
-  const eligible = () => (db.query('SELECT eligible, slots FROM lanes_samples ORDER BY seq DESC LIMIT 1').get() as { eligible: number | null; slots: number });
+  const eligible = () => queryRow(db, 'SELECT eligible, slots FROM lanes_samples ORDER BY seq DESC LIMIT 1', z.object({ eligible: z.number().nullable(), slots: z.number() }));
   setMeta(db, 'lanes_ready_issues', JSON.stringify({ at: T0, eligible: [], design: [] }));
   tick(db, sample(16384), 'hq-lanes');
   expect(eligible()).toStrictEqual({ eligible: 0, slots: 0 });
@@ -287,8 +289,8 @@ test('--skipped reads ISSUE=reason pairs and refuses the rest', () => {
 
 test('the Ready detail is stored with the report, shown while fresh, and flags what is unexplained', () => {
   reportLaneReady(db, parseReady(LANES, 'atc=0,flexible=0'), 'z-delivery', { total: 53, skipped: parseSkipped(SK) });
-  expect(JSON.parse((db.query("SELECT value FROM meta WHERE key = 'lanes_ready_detail'").get() as { value: string }).value)).toMatchObject({ total: 53, skipped: [{ issue: 'GEO-1' }, { issue: 'GEO-2' }] });
-  expect((db.query("SELECT data FROM events WHERE action = 'ready-by-lane'").get() as { data: string }).data).toContain('blocked by GEO-9');
+  expect(JSON.parse(queryRow(db, "SELECT value FROM meta WHERE key = 'lanes_ready_detail'", z.object({ value: z.string() })).value)).toMatchObject({ total: 53, skipped: [{ issue: 'GEO-1' }, { issue: 'GEO-2' }] });
+  expect(queryRow(db, "SELECT data FROM events WHERE action = 'ready-by-lane'", z.object({ data: z.string() })).data).toContain('blocked by GEO-9');
   const s = readySummary(db, 30)!;
   expect(s.line).toBe('Ready: 53 total, 0 eligible across lanes, 2 skipped with reasons, 51 unexplained UNEXPLAINED');
   expect(skippedLines(s)).toEqual(['  GEO-1: blocked by GEO-9', '  GEO-2: needs a design call']);

@@ -1,5 +1,6 @@
 import type { Database } from 'bun:sqlite';
 import { expect, onTestFinished, spyOn, test } from 'bun:test';
+import { z } from 'zod';
 import { createUnblockItems } from '../../test/create-unblock-items.ts';
 import { NOON_SYDNEY, at, freshDb } from '../../test/helpers.ts';
 import { addAsk } from '../asks/add-ask.ts';
@@ -171,7 +172,7 @@ test('hq answers --json lists the last 7 days by default, and --since sets the w
   const runSince = await main(['answers', '--since', '10d', '--json']);
   onTestFinished(() => log.mockRestore());
   expect([db.query('SELECT COUNT(*) AS n FROM typed').get(), runDefault, runSince]).toStrictEqual([{ n: 2 }, 0, 0]);
-  expect(printed.map((p) => JSON.parse(p) as { window: { from: string }; answers: { words: string }[] }).map((j) => [j.window.from, j.answers.map((a) => a.words)])).toStrictEqual([
+  expect(printed.map((p) => z.object({ window: z.object({ from: z.string() }), answers: z.array(z.object({ words: z.string() })) }).parse(JSON.parse(p))).map((j) => [j.window.from, j.answers.map((a) => a.words)])).toStrictEqual([
     ['2026-10-07T01:00:00Z', ['Descale it.']],
     ['2026-10-04T01:00:00Z', ['Old news.', 'Descale it.']],
   ]);

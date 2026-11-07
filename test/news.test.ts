@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test';
 import type { Database } from 'bun:sqlite';
+import { z } from 'zod';
+import { queryRows } from '../src/test-utils/query-rows.ts';
 import { addNews } from '../src/news/add-news.ts';
 import { digest } from '../src/news/digest.ts';
 import { listNews } from '../src/news/list-news.ts';
@@ -17,7 +19,7 @@ afterEach(() => cleanup());
 
 const item = (over: Partial<Parameters<typeof addNews>[1]> = {}) =>
   addNews(db, { from: 'z-delivery', topic: 'merge', text: 'Merged widgets#12: the kettle whistles once.', issue: 'GEO-9001', link: null, needsGeoff: false, ...over });
-const outbox = () => db.query('SELECT target, text FROM outbox').all() as { target: string; text: string }[];
+const outbox = () => queryRows(db, 'SELECT target, text FROM outbox', z.object({ target: z.string(), text: z.string() }));
 
 test('adding news sends nothing; the digest groups unread items by topic', () => {
   item();

@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test';
 import type { Database } from 'bun:sqlite';
+import { z } from 'zod';
+import { queryRows } from '../src/test-utils/query-rows.ts';
 import { addAsk } from '../src/asks/add-ask.ts';
 import { addTyped } from '../src/typed/add-typed.ts';
 import { listTyped } from '../src/typed/list-typed.ts';
@@ -79,7 +81,7 @@ test('logs the full text, target and source; lists newest first, by name, id or 
   const lost = '9f8e7d6c-0000-4000-8000-000000000003';
   addTyped(db, { to: lost, toId: null, toName: null, text: 'Invented.', source: parseSource(db, 'call:kettle-colour'), actor: 'z-stu' });
   expect(listTyped(db, { session: '9f8e7d6c', limit: 50 })).toEqual([expect.objectContaining({ id: 3, to_session: lost })]);
-  const ev = db.query(`SELECT actor, data FROM events WHERE action = 'typed' ORDER BY seq`).all() as { actor: string; data: string }[];
+  const ev = queryRows(db, `SELECT actor, data FROM events WHERE action = 'typed' ORDER BY seq`, z.object({ actor: z.string(), data: z.string() }));
   expect(ev.slice(0, 2).map((e) => JSON.parse(e.data))).toEqual([{ to: 'z-triage', source: 'call:kettle-colour' }, { to: 'z-delivery', source: `chat:${STU}` }]);
 });
 

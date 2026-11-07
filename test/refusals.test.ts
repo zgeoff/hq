@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test';
 import type { Database } from 'bun:sqlite';
+import { z } from 'zod';
+import { queryRow } from '../src/test-utils/query-rows.ts';
 import { appendFileSync, mkdirSync, readFileSync, rmSync, truncateSync, utimesSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { main } from '../src/cli.ts';
@@ -181,7 +183,7 @@ test('parallel calls with a 10 MiB result between: the third call refusal still 
 test('the tools kept between scans hold the masked input only', async () => {
   const p = file('p/s.jsonl', jl(tu('tk', 'Bash', { command: 'curl -H "Authorization: Bearer abcdef0123456789xyz" https://example.test', description: 'RAW-INPUT-FIELD' })));
   await scan();
-  const kept = (db.query('SELECT tools FROM refusal_files WHERE path = ?').get(p) as { tools: string }).tools;
+  const kept = queryRow(db, 'SELECT tools FROM refusal_files WHERE path = ?', z.object({ tools: z.string() }), p).tools;
   expect(kept).not.toContain('abcdef0123456789xyz');
   expect(kept).not.toContain('RAW-INPUT-FIELD');
   appendFileSync(p, jl(refused('tk', 'auth header')));
@@ -199,7 +201,7 @@ test('a scan that stops inside an oversized line resumes on a fragment, which is
   await scan(o);
   await scan(o);
   expect(rows().map((x) => [x['reason'], x['tool']])).toEqual([['after the fragment', 'Bash']]);
-  expect((db.query('SELECT tools FROM refusal_files WHERE path = ?').get(p) as { tools: string }).tools).not.toContain('automode');
+  expect(queryRow(db, 'SELECT tools FROM refusal_files WHERE path = ?', z.object({ tools: z.string() }), p).tools).not.toContain('automode');
 });
 
 test('a line whose newline arrives past the line limit is skipped, and the next line is read', async () => {
@@ -322,7 +324,7 @@ test('an 18 MiB record with a 32 MiB budget is passed over, and the refusal afte
   const p = file('p/a.jsonl', jl({ type: 'user', uuid: U(), pad: 'x'.repeat(18 * 1024 * 1024) }) + jl(tu('t1', 'Bash', { command: 'ls' }), refused('t1', 'after')));
   const budgetBytes = 32 * 1024 * 1024;
   await scan({ budgetBytes });
-  const offset = () => (db.query('SELECT offset FROM refusal_files WHERE path = ?').get(p) as { offset: number }).offset;
+  const offset = () => queryRow(db, 'SELECT offset FROM refusal_files WHERE path = ?', z.object({ offset: z.number() }), p).offset;
   expect(offset()).toBeGreaterThan(18 * 1024 * 1024);
   for (let i = 0; i < 3 && rows().length < 1; i++) await scan({ budgetBytes });
   expect(rows().map((x) => x['reason'])).toEqual(['after']);

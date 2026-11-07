@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test';
 import type { Database } from 'bun:sqlite';
+import { z } from 'zod';
+import { queryRow, queryRows } from '../src/test-utils/query-rows.ts';
 import { isShipPassDue as dueForShipPass } from '../src/releases/is-ship-pass-due.ts';
 import { parseReleases } from '../src/releases/parse-releases.ts';
 import { shipRuns } from '../src/releases/ship-runs.ts';
@@ -55,8 +57,8 @@ function mergedRun(issue: string, refs: string[], state: 'merged' | 'deploying' 
   setState(db, issue, state, {}, 'z-delivery');
 }
 
-const msgs = () => db.query('SELECT target, text, topic FROM outbox ORDER BY id').all() as { target: string; text: string; topic: string }[];
-const prRow = (ref: string) => db.query('SELECT merge_sha, shipped_tag, shipped_at FROM run_prs WHERE ref = ?').get(ref) as { merge_sha: string | null; shipped_tag: string | null; shipped_at: string | null };
+const msgs = () => queryRows(db, 'SELECT target, text, topic FROM outbox ORDER BY id', z.object({ target: z.string(), text: z.string(), topic: z.string() }));
+const prRow = (ref: string) => queryRow(db, 'SELECT merge_sha, shipped_tag, shipped_at FROM run_prs WHERE ref = ?', z.object({ merge_sha: z.string().nullable(), shipped_tag: z.string().nullable(), shipped_at: z.string().nullable() }), ref);
 const T = new Date(NOON_SYDNEY);
 
 beforeEach(() => {
@@ -87,7 +89,7 @@ test('a run moves to live-check when its merged PR is in a release', async () =>
   expect(run.state).toBe('live-check');
   expect(run.waits_on).toBeNull();
   expect(prRow('nixie#5')).toEqual({ merge_sha: sha(5), shipped_tag: 'v1.2.0', shipped_at: '2026-10-16T00:00:00Z' });
-  const ev = db.query("SELECT actor, data, from_state, to_state FROM events WHERE subject_id = 'GEO-12' AND action = 'shipped'").get() as { actor: string; data: string; from_state: string; to_state: string };
+  const ev = queryRow(db, "SELECT actor, data, from_state, to_state FROM events WHERE subject_id = 'GEO-12' AND action = 'shipped'", z.object({ actor: z.string(), data: z.string(), from_state: z.string(), to_state: z.string() }));
   expect(ev).toMatchObject({ actor: 'hq-releases', from_state: 'merged', to_state: 'live-check' });
   expect(JSON.parse(ev.data).prs).toEqual([{ ref: 'nixie#5', tag: 'v1.2.0', shipped_at: '2026-10-16T00:00:00Z' }]);
 });

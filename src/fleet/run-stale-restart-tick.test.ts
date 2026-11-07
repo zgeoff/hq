@@ -1,5 +1,7 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { z } from 'zod';
+import { queryRows } from '../test-utils/query-rows.ts';
 import { AtcClient } from '../atc/atc-client.ts';
 import { overrideEnv } from '../config/override-env.ts';
 import { getMeta } from '../db/get-meta.ts';
@@ -23,7 +25,11 @@ interface RosterSession {
   agentSessionID?: string;
 }
 
-function setupTest(config: { sessions?: RosterSession[]; cwd?: string } = {}) {
+const OutboxRowSchema = z.object({ target: z.string(), text: z.string() });
+const SpawnInputSchema = z.object({ name: z.string() });
+const PinInputSchema = z.object({ pinned: z.boolean().optional() });
+
+function setupTest(config:{ sessions?: RosterSession[]; cwd?: string } = {}) {
   resetFetchCache();
   const kettlePromptPath = 'skills/kettle/references/session-prompt.md';
   const newPrompt = 'You are Kettle. Boil water when asked.';
@@ -78,7 +84,7 @@ function setupTest(config: { sessions?: RosterSession[]; cwd?: string } = {}) {
     async tick(minutes: number, fleet: FleetEntry[]) {
       await this.tickAt(new Date(Date.parse(NOON_SYDNEY) + minutes * 60_000).toISOString(), fleet);
     },
-    outboxTo: (target: string) => base.db.query('SELECT target, text FROM outbox WHERE target = ? ORDER BY id').all(target) as { target: string; text: string }[],
+    outboxTo: (target: string) => queryRows(base.db, 'SELECT target, text FROM outbox WHERE target = ? ORDER BY id', OutboxRowSchema, target),
     setState(id: string, state: string) {
       Object.assign(roster.find((s) => s.id === id) ?? {}, { state });
     },
@@ -92,11 +98,7 @@ function setupTest(config: { sessions?: RosterSession[]; cwd?: string } = {}) {
     setRefresh: (value: unknown) => setMeta(base.db, 'fleet_refresh', JSON.stringify(value)),
     staleSince: () => staleSinceSchema.parse(JSON.parse(getMeta(base.db, 'fleet_stale_since') ?? '{}')),
     staleCommit: () => staleSinceSchema.parse(JSON.parse(getMeta(base.db, 'fleet_stale_since') ?? '{}'))['z-kettle']?.commit,
-    outbox: () =>
-      base.db.query('SELECT target, text FROM outbox ORDER BY id').all() as {
-        target: string;
-        text: string;
-      }[],
+    outbox: () => queryRows(base.db, 'SELECT target, text FROM outbox ORDER BY id', OutboxRowSchema),
     refresh: () => refreshSchema.parse(JSON.parse(getMeta(base.db, 'fleet_refresh') ?? '{}')),
   };
 }
@@ -373,7 +375,7 @@ test('it still respawns and reports a restarted session when a later session che
   ctx.atc.getBudgets.set('id-urn', 1);
   await ctx.tick(131, [ctx.kettle, ctx.urn]);
 
-  expect(ctx.atc.calls.filter((c) => c.method === 'session.spawn').map((c) => (c.input as { name: string }).name)).toStrictEqual(['z-kettle']);
+  expect(ctx.atc.calls.filter((c) => c.method === 'session.spawn').map((c) => SpawnInputSchema.parse(c.input).name)).toStrictEqual(['z-kettle']);
   expect(ctx.db.query('SELECT text FROM news').all()).toStrictEqual([{ text: `z-kettle restarted from main; its old prompt predated ${ctx.staleCommit()}` }]);
   expect(ctx.db.query(`SELECT json_extract(data, '$.name') AS name, json_extract(data, '$.error') AS error FROM events WHERE action = 'stale-restart-failed'`).all()).toStrictEqual([
     { name: 'z-urn', error: 'invented session.get failure' },
@@ -396,7 +398,7 @@ test('it keeps a restart when another session skips earlier in the same tick', a
   ctx.atc.messages.set('m-2', { status: 'answered', answer: 'saved' });
   await ctx.tick(131, [ctx.urn, ctx.kettle]);
 
-  expect(ctx.atc.calls.filter((c) => c.method === 'session.spawn').map((c) => (c.input as { name: string }).name)).toStrictEqual(['z-kettle']);
+  expect(ctx.atc.calls.filter((c) => c.method === 'session.spawn').map((c) => SpawnInputSchema.parse(c.input).name)).toStrictEqual(['z-kettle']);
   expect(ctx.refresh()).toStrictEqual({ 'z-urn': { sessionId: 'id-urn', phase: 'idle', skips: 1, retryAt: new Date(Date.parse(NOON_SYDNEY) + (131 + 60) * 60_000).toISOString().replace('.000Z', 'Z') } });
 });
 
@@ -409,7 +411,7 @@ test('it pins the session again and spawns nothing when atc refuses the forget a
   ctx.atc.messages.set('m-1', { status: 'answered', answer: 'saved' });
   await ctx.tick(126, [ctx.kettle]);
 
-  expect(ctx.atc.calls.map((c) => [c.method, (c.input as { pinned?: boolean }).pinned])).toStrictEqual([
+  expect(ctx.atc.calls.map((c) => [c.method, PinInputSchema.parse(c.input).pinned])).toStrictEqual([
     ['session.kill', undefined],
     ['session.update', false],
     ['session.forget', undefined],

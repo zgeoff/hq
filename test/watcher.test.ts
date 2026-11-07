@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test';
 import type { Database } from 'bun:sqlite';
+import { z } from 'zod';
+import { queryRows } from '../src/test-utils/query-rows.ts';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { addPr } from '../src/runs/add-pr.ts';
 import { addRun } from '../src/runs/add-run.ts';
@@ -74,7 +76,7 @@ function deps(over: Partial<WatchDeps['steps']> = {}, run: Runner = capacity): W
   };
 }
 
-const outbox = () => db.query('SELECT target, text, topic FROM outbox ORDER BY id').all() as { target: string; text: string; topic: string | null }[];
+const outbox = () => queryRows(db, 'SELECT target, text, topic FROM outbox ORDER BY id', z.object({ target: z.string(), text: z.string(), topic: z.string().nullable() }));
 
 test('a completed tick records its time', async () => {
   expect(getMeta(db, LAST_TICK)).toBeNull();
@@ -329,7 +331,7 @@ test('it logs every run PR GitHub could not answer for, one line each', async ()
 });
 
 function readAlertStatuses(): string[] {
-  return (db.query(`SELECT status FROM outbox WHERE topic = 'watcher-stale'`).all() as { status: string }[]).map((r) => r.status);
+  return queryRows(db, `SELECT status FROM outbox WHERE topic = 'watcher-stale'`, z.object({ status: z.string() })).map((r) => r.status);
 }
 
 test('an alert that failed while atc was down is sent once atc is back', async () => {

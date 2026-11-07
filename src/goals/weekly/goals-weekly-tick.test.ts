@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test';
 import type { Database } from 'bun:sqlite';
+import { z } from 'zod';
+import { queryRows } from '../../test-utils/query-rows.ts';
 import { iso } from '../../clock/iso.ts';
 import { setMeta } from '../../db/set-meta.ts';
 import { goalsWeeklyCheck } from './goals-weekly-check.ts';
@@ -25,7 +27,7 @@ const syd = (date: string, hm: string) => {
   const [h, mi] = hm.split(':').map(Number);
   return sydneyUtc(y!, mo!, d!, h!, mi!);
 };
-const outbox = () => db.query('SELECT target, text, status, topic FROM outbox').all() as { target: string; text: string; status: string; topic: string }[];
+const outbox = () => queryRows(db, 'SELECT target, text, status, topic FROM outbox', z.object({ target: z.string(), text: z.string(), status: z.string(), topic: z.string() }));
 const synced = (when: Date) => {
   for (const k of ['goals_ok_at', 'kinds_ok_at', 'linear_synced_at']) setMeta(db, k, iso(when));
 };

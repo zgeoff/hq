@@ -1,5 +1,7 @@
 import { expect, mock, onTestFinished, test } from 'bun:test';
+import { z } from 'zod';
 import { FOUR_AM_SYDNEY, NOON_SYDNEY, freshDb } from '../../test/helpers.ts';
+import { queryRows } from '../test-utils/query-rows.ts';
 import { overrideEnv } from '../config/override-env.ts';
 import { owner } from '../owner.ts';
 import type { RunResult, Runner } from '../runner/types.ts';
@@ -34,7 +36,7 @@ function setupTest() {
     files,
     probe: stub,
     settingsPath: `${process.env['HOME'] ?? ''}/.claude/settings.json`,
-    readOwnerOutbox: () => (fresh.db.query('SELECT text FROM outbox WHERE target = ? ORDER BY id').all(owner()) as { text: string }[]).map((message) => message.text),
+    readOwnerOutbox: () => queryRows(fresh.db, 'SELECT text FROM outbox WHERE target = ? ORDER BY id', z.object({ text: z.string() }), owner()).map((message) => message.text),
     run,
   };
 }

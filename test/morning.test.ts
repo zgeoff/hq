@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test';
 import type { Database } from 'bun:sqlite';
 import { z } from 'zod';
+import { queryRows } from '../src/test-utils/query-rows.ts';
 import { morningCheck } from '../src/morning/morning-check.ts';
 import { morningText } from '../src/morning/morning-text.ts';
 import { morningTick } from '../src/morning/morning-tick.ts';
@@ -19,7 +20,7 @@ const syd = (date: string, hm: string) => {
   const [h, mi] = hm.split(':').map(Number);
   return sydneyUtc(y!, mo!, d!, h!, mi!);
 };
-const outbox = () => db.query('SELECT target, text, status, topic FROM outbox').all() as { target: string; text: string; status: string; topic: string }[];
+const outbox = () => queryRows(db, 'SELECT target, text, status, topic FROM outbox', z.object({ target: z.string(), text: z.string(), status: z.string(), topic: z.string() }));
 
 beforeEach(() => {
   ({ db, cleanup } = freshDb());

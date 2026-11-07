@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import type { Database } from 'bun:sqlite';
+import { z } from 'zod';
+import { queryRow, queryRows } from '../src/test-utils/query-rows.ts';
 import { AtcClient } from '../src/atc/atc-client.ts';
 import { getMeta } from '../src/db/get-meta.ts';
 import { addNote } from '../src/runs/add-note.ts';
@@ -42,8 +44,8 @@ const base = new Date(NOON_SYDNEY).getTime();
 const atMin = (m: number) => at(new Date(base + m * 60_000).toISOString());
 const add = (issue = 'GEO-9001', session: string | null = S1) =>
   addRun(db, { issue, title: 'Teach the kettle to whistle', place: 'imp', session, next: 'Agent working.', gate: null, geoffChat: false, actor: 'z-delivery' });
-const outbox = () => db.query(`SELECT target, text FROM outbox WHERE target != 'z-review'`).all() as { target: string; text: string }[];
-const toReview = () => db.query(`SELECT text, topic, status FROM outbox WHERE target = 'z-review' ORDER BY id`).all() as { text: string; topic: string; status: string }[];
+const outbox = () => queryRows(db, `SELECT target, text FROM outbox WHERE target != 'z-review'`, z.object({ target: z.string(), text: z.string() }));
+const toReview = () => queryRows(db, `SELECT text, topic, status FROM outbox WHERE target = 'z-review' ORDER BY id`, z.object({ text: z.string(), topic: z.string(), status: z.string() }));
 
 beforeEach(() => {
   ({ db, dir, cleanup } = freshDb());
@@ -125,12 +127,12 @@ describe('note signals', () => {
   test('a note that marks a PR final leaves an event with the note id and the sha', () => {
     add();
     const note = addNote(db, 'GEO-9001', 'FINAL widgets#12 abc1234 all green', { label: null, actor: 'z-delivery' });
-    const ev = db.query(`SELECT subject_id, action, actor, from_state, to_state, data FROM events WHERE action = 'final'`).all() as { data: string }[];
+    const ev = queryRows(db, `SELECT subject_id, action, actor, from_state, to_state, data FROM events WHERE action = 'final'`, z.object({ subject_id: z.string(), action: z.string(), actor: z.string(), from_state: z.string().nullable(), to_state: z.string().nullable(), data: z.string() }));
     expect(ev).toHaveLength(1);
     expect(ev[0]).toMatchObject({ subject_id: 'GEO-9001', actor: 'z-delivery', from_state: null, to_state: 'abc1234' });
     expect(ev.map((event) => JSON.parse(event.data))).toStrictEqual([{ ref: 'widgets#12', sha: 'abc1234', source: 'marker:note:z-delivery', note: note.id, given: 'abc1234', resolved: false, reason: 'not resolved in this pass' }]);
     finalPr(db, 'widgets#12', { sha: 'def5678', actor: 'z-q' });
-    const last = db.query(`SELECT from_state, to_state, data FROM events WHERE action = 'final' ORDER BY seq DESC LIMIT 1`).get() as { data: string };
+    const last = queryRow(db, `SELECT from_state, to_state, data FROM events WHERE action = 'final' ORDER BY seq DESC LIMIT 1`, z.object({ from_state: z.string().nullable(), to_state: z.string().nullable(), data: z.string() }));
     expect(last).toMatchObject({ from_state: 'abc1234', to_state: 'def5678' });
     expect(JSON.parse(last.data)).toMatchObject({ source: 'cli:z-q', note: null });
   });
@@ -179,7 +181,7 @@ describe('reading the event feed', () => {
     } finally {
       c.close();
     }
-    expect((db.query('SELECT COUNT(*) AS n FROM run_notes').get() as { n: number }).n).toBe(1);
+    expect(queryRow(db, 'SELECT COUNT(*) AS n FROM run_notes', z.object({ n: z.number() })).n).toBe(1);
   });
 
   test('a sweep ends every gone session, and a working run\'s exit alert repeats from the sweep\'s mark; a session removed by hand raises none', async () => {
@@ -287,7 +289,7 @@ describe('the sweep', () => {
     expect(findAlerts(db, alive(), new Map(), new Date(base + 31 * 60_000))).toHaveLength(1);
     const p = unfinalPr(db, 'widgets#12', 'z-delivery', 'head moved; waits on a release');
     expect([p.final_sha, p.final_at, p.final_source]).toEqual([null, null, null]);
-    const ev = db.query(`SELECT from_state AS from_value, to_state AS to_value, data FROM events WHERE action = 'unfinal'`).get() as { from_value: string; to_value: string | null; data: string };
+    const ev = queryRow(db, `SELECT from_state AS from_value, to_state AS to_value, data FROM events WHERE action = 'unfinal'`, z.object({ from_value: z.string(), to_value: z.string().nullable(), data: z.string() }));
     expect(ev.from_value).toBe('abc1234');
     expect(ev.to_value).toBeNull();
     expect(JSON.parse(ev.data)).toMatchObject({ ref: 'widgets#12', reason: 'head moved; waits on a release' });
@@ -342,7 +344,7 @@ describe('the sweep', () => {
     closePr(db, 'widgets#12', { to: 'merged', actor: 'z-review' });
     const p = unmergePr(db, 'widgets#12', 'z-review', 'merge failed on a conflict');
     expect(p).toMatchObject({ state: 'open', merged_at: null, final_sha: 'abc1234', reviewed_sha: 'abc1234' });
-    const ev = db.query(`SELECT from_state, to_state, data FROM events WHERE action = 'unmerged'`).get() as { from_state: string; to_state: string; data: string };
+    const ev = queryRow(db, `SELECT from_state, to_state, data FROM events WHERE action = 'unmerged'`, z.object({ from_state: z.string(), to_state: z.string(), data: z.string() }));
     expect(ev).toMatchObject({ from_state: 'merged', to_state: 'open' });
     expect(JSON.parse(ev.data)).toMatchObject({ ref: 'widgets#12', reason: 'merge failed on a conflict' });
 
@@ -452,7 +454,7 @@ describe('review fixes', () => {
     } finally {
       c.close();
     }
-    const texts = (db.query('SELECT text FROM run_notes ORDER BY id').all() as { text: string }[]).map((n) => n.text);
+    const texts = queryRows(db, 'SELECT text FROM run_notes ORDER BY id', z.object({ text: z.string() })).map((n) => n.text);
     expect(texts).toEqual(['first note', 'second note']);
   });
 
@@ -499,7 +501,7 @@ describe('re-check fixes', () => {
     } finally {
       c.close();
     }
-    expect((db.query('SELECT COUNT(*) AS n FROM run_notes').get() as { n: number }).n).toBe(201);
+    expect(queryRow(db, 'SELECT COUNT(*) AS n FROM run_notes', z.object({ n: z.number() })).n).toBe(201);
   });
 
   test('a phrase in a note that names a foreign PR marks nothing', () => {

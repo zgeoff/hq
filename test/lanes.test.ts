@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test';
 import type { Database } from 'bun:sqlite';
+import { z } from 'zod';
+import { queryRows } from '../src/test-utils/query-rows.ts';
 import { checkReadyStale } from '../src/lanes/check-ready-stale.ts';
 import { getLanesHold } from '../src/lanes/get-lanes-hold.ts';
 import { holdLanes } from '../src/lanes/hold-lanes.ts';
@@ -25,7 +27,7 @@ const cap = (freeMib: number, claudeRoom = true): Capacity => ({
   providers: { claude: { room: claudeRoom, unattended: true, target: 'imp' }, codex: { room: true, unattended: false, target: 'local' } },
 });
 const sample = (freeMib: number, claudeRoom = true) => ({ cap: cap(freeMib, claudeRoom), impMib: 2048, error: null });
-const msgs = () => db.query('SELECT target, text FROM outbox').all() as { target: string; text: string }[];
+const msgs = () => queryRows(db, 'SELECT target, text FROM outbox', z.object({ target: z.string(), text: z.string() }));
 const atMin = (m: number) => at(new Date(new Date(NOON_SYDNEY).getTime() + m * 60_000).toISOString());
 
 beforeEach(() => {

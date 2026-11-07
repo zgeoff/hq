@@ -1,6 +1,8 @@
-import { afterEach, beforeEach, expect, test } from 'bun:test';
+import { afterEach, beforeEach, expect, jest, onTestFinished, test } from 'bun:test';
 import { toExactOptional } from '@zgeoff/std';
 import type { Database } from 'bun:sqlite';
+import { z } from 'zod';
+import { findRow, queryRows } from '../src/test-utils/query-rows.ts';
 import assert from 'node:assert';
 import { applyHealth } from '../src/health/apply-health.ts';
 import { HEALTH_DEFAULTS } from '../src/health/health-defaults.ts';
@@ -60,11 +62,11 @@ function probe(w: World): Probe {
 
 async function step(w: World, minute: number) {
   at(new Date(Date.parse(NOON_SYDNEY) + minute * 60_000).toISOString());
-  const prev = JSON.parse((db.query("SELECT value FROM meta WHERE key = 'health_samples'").get() as { value: string } | null)?.value ?? '{}');
+  const prev = JSON.parse(findRow(db, "SELECT value FROM meta WHERE key = 'health_samples'", z.object({ value: z.string() }))?.value ?? '{}');
   const { checks, samples, unknown } = await runChecks(probe(w), healthSettings(db), prev, new Date(Date.parse(NOON_SYDNEY) + minute * 60_000));
   return applyHealth(db, checks, samples, 'hq-lanes', unknown);
 }
-const outbox = () => db.query('SELECT target, text FROM outbox').all() as { target: string; text: string }[];
+const outbox = () => queryRows(db, 'SELECT target, text FROM outbox', z.object({ target: z.string(), text: z.string() }));
 
 test('all clear sends nothing', async () => {
   const r = await step(world(), 0);
@@ -216,16 +218,17 @@ test('a command that hangs counts as a failed read', async () => {
   const p = probe(world());
   const hang: Probe = { ...p, run: async (cmd) => (cmd[0] === 'df' ? new Promise(() => {}) : p.run(cmd)) };
   expect(COMMAND_TIMEOUT_MS).toBeLessThanOrEqual(20_000);
-  const started = Date.now();
-  const orig = setTimeout;
-  (globalThis as { setTimeout: unknown }).setTimeout = ((fn: () => void, _ms: number) => orig(fn, 10)) as typeof setTimeout;
-  try {
-    const { unknown } = await runChecks(hang, healthSettings(db), {}, new Date(NOON_SYDNEY));
-    expect(unknown).toContain('disk:');
-  } finally {
-    (globalThis as { setTimeout: unknown }).setTimeout = orig;
+  jest.useFakeTimers();
+  onTestFinished(() => jest.useRealTimers());
+
+  const pending = runChecks(hang, healthSettings(db), {}, new Date(NOON_SYDNEY));
+  for (let tick = 0; tick < 50; tick++) {
+    await Promise.resolve();
   }
-  expect(Date.now() - started).toBeLessThan(5_000);
+  jest.advanceTimersByTime(COMMAND_TIMEOUT_MS);
+  const { unknown } = await pending;
+
+  expect(unknown).toContain('disk:');
 });
 
 test('a stale or failing backup is a problem once hq backup has run', async () => {

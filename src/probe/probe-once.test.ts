@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test';
 import type { Database } from 'bun:sqlite';
+import { z } from 'zod';
+import { queryRows } from '../test-utils/query-rows.ts';
 import { iso } from '../clock/iso.ts';
 import { takeQueued } from '../outbox/take-queued.ts';
 import { downtime } from './downtime.ts';
@@ -48,8 +50,8 @@ async function step(m: number, world: { target: boolean; control: boolean; ready
   at(minute(m));
   return probeOnce(db, fake(world), 'hq-probe');
 }
-const outbox = () => db.query('SELECT target, text, topic, status FROM outbox ORDER BY id').all() as { target: string; text: string; topic: string; status: string }[];
-const outages = () => db.query('SELECT * FROM outages ORDER BY id').all() as { id: number; kind: string; alert_seq: number | null; recover_seq: number | null; started_at: string; detected_at: string; ended_at: string | null }[];
+const outbox = () => queryRows(db, 'SELECT target, text, topic, status FROM outbox ORDER BY id', z.object({ target: z.string(), text: z.string(), topic: z.string(), status: z.string() }));
+const outages = () => queryRows(db, 'SELECT * FROM outages ORDER BY id', z.object({ id: z.number(), kind: z.string(), alert_seq: z.number().nullable(), recover_seq: z.number().nullable(), started_at: z.string(), detected_at: z.string(), ended_at: z.string().nullable() }));
 
 test('samples are up, down or blind, and the control is fetched only when the target fails', async () => {
   urls.length = 0;
@@ -224,7 +226,7 @@ test('the recovery message counts blind minutes as blind, as downtime() does', a
 });
 
 const UNREADY = { target: true, control: true, ready: false };
-const kinds = () => db.query('SELECT id, kind, started_at, detected_at, ended_at FROM outages ORDER BY id').all() as { id: number; kind: string; started_at: string; detected_at: string; ended_at: string | null }[];
+const kinds = () => queryRows(db, 'SELECT id, kind, started_at, detected_at, ended_at FROM outages ORDER BY id', z.object({ id: z.number(), kind: z.string(), started_at: z.string(), detected_at: z.string(), ended_at: z.string().nullable() }));
 
 test('live and ready both fine opens nothing', async () => {
   for (let m = 0; m < 6; m++) expect((await step(m, UP)).ready).toBe(true);

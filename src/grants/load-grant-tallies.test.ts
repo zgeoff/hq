@@ -1,5 +1,6 @@
 import type { Database } from 'bun:sqlite';
 import { expect, onTestFinished, spyOn, test } from 'bun:test';
+import { z } from 'zod';
 import { NOON_SYDNEY, at, freshDb } from '../../test/helpers.ts';
 import { main } from '../cli.ts';
 import { setMeta } from '../db/set-meta.ts';
@@ -88,7 +89,7 @@ test('hq mark add --grant, hq mark grant, hq grant act and hq grant actions work
   ];
   onTestFinished(() => log.mockRestore());
   expect([db.query('SELECT COUNT(*) AS n FROM grant_actions').get(), runs]).toStrictEqual([{ n: 1 }, [0, 0, 0, 0, 0, 1]]);
-  expect((JSON.parse(printed.at(-2) ?? '{}') as { grants: { grant: string; actions: { target: string; actor: string }[] }[] }).grants.map((g) => [g.grant, g.actions.map((a) => [a.target, a.actor])])).toStrictEqual([
+  expect(z.object({ grants: z.array(z.object({ grant: z.string(), actions: z.array(z.object({ target: z.string(), actor: z.string() })) })) }).parse(JSON.parse(printed.at(-2) ?? '{}')).grants.map((g) => [g.grant, g.actions.map((a) => [a.target, a.actor])])).toStrictEqual([
     ['kettle-merges', []],
     ['teapot-deploys', [['teapot#4', 'teapot-bot']]],
   ]);

@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { toExactOptional } from '@zgeoff/std';
 import type { Database } from 'bun:sqlite';
+import { z } from 'zod';
+import { queryRow, queryRows } from '../src/test-utils/query-rows.ts';
 import { addAsk } from '../src/asks/add-ask.ts';
 import { socketPath } from '../src/atc/socket-path.ts';
 import { setMeta } from '../src/db/set-meta.ts';
@@ -48,7 +50,7 @@ test('a dead daemon keeps the message for a retry, and the retry reuses its key'
   file('tidy-docs');
   const r = await flush(db);
   expect(r.failed).toBe(1);
-  const row = db.query('SELECT status, idem_key FROM outbox').get() as { status: string; idem_key: string };
+  const row = queryRow(db, 'SELECT status, idem_key FROM outbox', z.object({ status: z.string(), idem_key: z.string() }));
   expect(row.status).toBe('failed');
   atc = fakeAtc(dir);
   const held = await flush(db);
@@ -104,7 +106,7 @@ test('HQ_NOTIFY=off leaves messages pending', async () => {
   process.env['HQ_NOTIFY'] = 'off';
   file('tidy-docs');
   expect((await flush(db)).skipped).toBe(true);
-  expect((db.query('SELECT status FROM outbox').get() as { status: string }).status).toBe('pending');
+  expect(queryRow(db, 'SELECT status FROM outbox', z.object({ status: z.string() })).status).toBe('pending');
 });
 
 test('a ready notice for an item that left the queue before sending is dropped', async () => {
@@ -155,7 +157,7 @@ describe('inside an atc session', () => {
     expect(calls[0]?.cmd.findLast((a) => a.startsWith('--setenv=HQ_DB='))).toBe(`--setenv=HQ_DB=${process.env['HQ_DB']}`);
     expect(calls[0]?.cmd).toContain('--setenv=ATC_SESSION_ID=');
     expect(calls[0]?.opts?.env?.['ATC_SESSION_ID']).toBeUndefined();
-    expect((db.query('SELECT status FROM outbox').get() as { status: string }).status).toBe('pending');
+    expect(queryRow(db, 'SELECT status FROM outbox', z.object({ status: z.string() })).status).toBe('pending');
   });
 
   test('sends inline when the unit cannot start', async () => {
@@ -232,11 +234,11 @@ test('a forward sends a retired session\'s messages to its successor, and moves 
   ]);
   const seq3 = logEvent(db, 'hq', 'probe', 'probe', 'z-q', null, null);
   enqueue(db, seq3, 'z-kettle', 'FYI three');
-  expect((db.query('SELECT target FROM outbox ORDER BY id DESC LIMIT 1').get() as { target: string }).target).toBe('z-teapot');
+  expect(queryRow(db, 'SELECT target FROM outbox ORDER BY id DESC LIMIT 1', z.object({ target: z.string() })).target).toBe('z-teapot');
   expect(() => setForward(db, 'z-teapot', 'z-kettle')).toThrow('loop');
   setForward(db, 'z-kettle', null);
   enqueue(db, logEvent(db, 'hq', 'probe', 'probe', 'z-q', null, null), 'z-kettle', 'FYI four');
-  expect((db.query('SELECT target FROM outbox ORDER BY id DESC LIMIT 1').get() as { target: string }).target).toBe('z-kettle');
+  expect(queryRow(db, 'SELECT target FROM outbox ORDER BY id DESC LIMIT 1', z.object({ target: z.string() })).target).toBe('z-kettle');
 });
 
 test('a long forward chain that closes a loop is refused', () => {
@@ -313,7 +315,7 @@ describe('a command sends only the rows it queued', () => {
     atc = fakeAtc(dir);
     foreign('Invented note one');
     foreign('Invented note two');
-    const [first] = db.query('SELECT id FROM outbox ORDER BY id').all() as { id: number }[];
+    const [first] = queryRows(db, 'SELECT id FROM outbox ORDER BY id', z.object({ id: z.number() }));
     expect(await hq('outbox', 'flush', '--ids', String(first!.id))).toBe(0);
     expect(atc.sent.map((m) => m.text)).toEqual(['Invented note one']);
     foreign('Invented note three');
@@ -338,7 +340,7 @@ describe('a command sends only the rows it queued', () => {
     process.env['ATC_SESSION_ID'] = 'id-caller';
     foreign('Invented note one');
     foreign('Invented note two');
-    const [, second] = db.query('SELECT id FROM outbox ORDER BY id').all() as { id: number }[];
+    const [, second] = queryRows(db, 'SELECT id FROM outbox ORDER BY id', z.object({ id: z.number() }));
     const calls: string[][] = [];
     const run: Runner = async (cmd) => {
       calls.push(cmd);

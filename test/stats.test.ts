@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test';
 import type { Database } from 'bun:sqlite';
+import { z } from 'zod';
+import { queryRow } from '../src/test-utils/query-rows.ts';
 import { addAsk } from '../src/asks/add-ask.ts';
 import { answerAsk } from '../src/asks/answer-ask.ts';
 import { applyAsk } from '../src/asks/apply-ask.ts';
@@ -217,7 +219,7 @@ test('drop removes a mistaken mark and keeps what it said in the event', () => {
   expect(dropMark(db, m.id, 'z-q')?.text).toBe('Invented skills tidy-up');
   expect(listMarks(db)).toHaveLength(0);
   expect(dropMark(db, m.id, 'z-q')).toBeNull();
-  const ev = db.query("SELECT data FROM events WHERE action = 'mark-dropped'").get() as { data: string };
+  const ev = queryRow(db, "SELECT data FROM events WHERE action = 'mark-dropped'", z.object({ data: z.string() }));
   expect(JSON.parse(ev.data)).toMatchObject({ text: 'Invented skills tidy-up', ref: 'widgets#3' });
 });
 
