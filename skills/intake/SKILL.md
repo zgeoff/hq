@@ -120,7 +120,8 @@ messages you "Morning reports due", read morning-reports.md.
 
 When the owner answers a PR, record it at once with
 `hq pr answer <repo> <pr> lgtm|changes|reject --source <source>` (`--note` for `changes`). For an
-answer in chat, the source is `chat:$ATC_SESSION_ID`. Relay nothing. "Later" has no record: the
+answer in chat, the source is `chat:$ATC_SESSION_ID`. `z-review` and `hq review gate` read the
+record. Relay nothing. "Later" has no record: the
 PR waits.
 
 Put each PR `z-review` sends you to the owner. It sends only what `hq pr mechanical` and
@@ -143,7 +144,8 @@ to a session, run `hq pr next <repo> <pr> <session>`. Name each PR as a link.
 ## Messages from the sessions
 
 1. For a repeat, do nothing more.
-2. For news that asks nothing of the owner, add it with `hq news add --topic <topic>`. When the owner asks what's new, give `hq news` as one digest by
+2. For news that asks nothing of the owner, add it with `hq news add --topic <topic>` unless
+   `hq news` shows it. When the owner asks what's new, give `hq news` as one digest by
    topic, then run `hq news read --upto <N>` with its highest number.
 3. For anything that needs the owner, such as a decision, a failure, a security or credential
    worry, a step only the owner can take, or a change to an owner's decision, give it in full, and
