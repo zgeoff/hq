@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { HqError } from '../errors.ts';
 import type { FleetClient, FleetSession, StaleOps } from '../fleet/types.ts';
 import { buildWrapUpPlan } from './build-wrap-up-plan.ts';
+import { forgetImpSession } from './forget-imp-session.ts';
 import { forgetWrappedSession } from './forget-wrapped-session.ts';
 import { fullSessionId } from './full-session-id.ts';
 import { requireRun } from './require-run.ts';
@@ -129,7 +130,7 @@ function collectChildren(sessions: FleetSession[], parentID: string): FleetSessi
   return found;
 }
 
-function isOnImp(session: FleetSession, placedOnImp: boolean): boolean {
+export function isOnImp(session: FleetSession, placedOnImp: boolean): boolean {
   const targetID = session.locator?.targetID;
   if (typeof targetID === 'string') {
     return targetID !== 'local';
@@ -187,24 +188,13 @@ async function forgetTree(pass: TreePass, decision: ForgetDecision): Promise<voi
   await removeImpSession(pass, root.id);
 }
 
-// A separate stop before forgetting the live session would suspend a cloud imp, which outlasts the
-// atc call.
 async function removeImpSession(pass: TreePass, id: string): Promise<void> {
   try {
-    const first = await pass.client.forgetLive(id);
-    if (first.confirmToken === undefined) {
-      if (!first.forgotten) {
-        throw new Error('atc did not forget the session');
-      }
-      pass.wrapUp.forgotten.push(id);
-      return;
-    }
-    const confirmed = await pass.client.forgetLive(id, first.confirmToken);
-    if (!confirmed.forgotten) {
-      throw new Error('atc did not forget the session after the confirmed destroy');
-    }
+    const forgotten = await forgetImpSession(pass.client, id);
     pass.wrapUp.forgotten.push(id);
-    pass.wrapUp.destroyed.push(id);
+    if (forgotten.destroyed) {
+      pass.wrapUp.destroyed.push(id);
+    }
   } catch (error) {
     pass.wrapUp.failed.push({ id, reason: toErrorMessage(error) });
   }
