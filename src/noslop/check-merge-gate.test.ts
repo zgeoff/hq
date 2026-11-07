@@ -106,7 +106,16 @@ test("it blocks when noslop's findings list is empty but the full review at the 
   setMeta(ctx.db, 'noslop', JSON.stringify({ repos: ['widgets'], sha: '0123456789abcdef0123456789abcdef01234567' }));
   ctx.db.query("INSERT INTO noslop_rounds (repo, pr, kind, started_at, ended_at, ms, ok, head, depth, special, findings, sha, confirm) VALUES ('widgets', 7, 'review', 'a', 'b', 1, 1, ?, 'standard', 'none', ?, 'x', 0)").run(FAKE_FULL_SHA, '[{"id":"aaaaaaaaaaaaaaaa","lens":"correctness","severity":"high","title":"Kettle never boils"},{"id":"bbbb","lens":"tests","severity":"P2","title":"Lid untested"}]');
 
-  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: "noslop's findings list is empty, but its reviews of this PR recorded 2 findings, so no pass" });
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: "noslop's findings list lacks 2 findings hq's reviews of this PR recorded: aaaaaaaaaaaaaaaa, bbbb, so no pass" });
+});
+
+test("it blocks a finding a review at the head recorded but never posted, while noslop lists only an older fixed one", async () => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ noslopFindings: buildStubFindings('fixed') });
+  createListedReview(ctx.db, { repo: 'widgets', pr: 7, head: 'f00dfeedf00dfeedf00dfeedf00dfeedf00dfeed' });
+  ctx.db.query("INSERT INTO noslop_rounds (repo, pr, kind, started_at, ended_at, ms, ok, head, depth, special, findings, sha, confirm, error) VALUES ('widgets', 7, 'review', 'a', 'b', 1, 1, ?, 'standard', 'none', ?, 'x', 0, 'stored, but not posted to GitHub: HTTP 500')").run(FAKE_FULL_SHA, '[{"id":"dddddddddddddddd","lens":"correctness","severity":"P1","title":"Kettle leaks when full"}]');
+
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: "noslop's findings list lacks 1 finding hq's reviews of this PR recorded: dddddddddddddddd, so no pass" });
 });
 
 test("it blocks when noslop's findings list is empty but an older round recorded findings and the round at the head recorded none", async () => {
@@ -116,7 +125,7 @@ test("it blocks when noslop's findings list is empty but an older round recorded
   ctx.db.query("INSERT INTO noslop_rounds (repo, pr, kind, started_at, ended_at, ms, ok, head, depth, special, findings, sha, confirm) VALUES ('widgets', 7, 'review', 'a', 'b', 1, 1, 'f00dfeedf00dfeedf00dfeedf00dfeedf00dfeed', 'standard', 'none', ?, 'x', 0)").run('[{"id":"aaaaaaaaaaaaaaaa","lens":"correctness","severity":"P1","title":"Kettle never boils"},{"id":"bbbb","lens":"tests","severity":"P2","title":"Lid untested"},{"id":"cccc","lens":"intent","severity":"P2","title":"Spout points inward"}]');
   ctx.db.query("INSERT INTO noslop_rounds (repo, pr, kind, started_at, ended_at, ms, ok, head, depth, special, findings, sha, confirm) VALUES ('widgets', 7, 'review', 'a', 'b', 1, 1, ?, 'standard', 'none', '[]', 'x', 0)").run(FAKE_FULL_SHA);
 
-  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: "noslop's findings list is empty, but its reviews of this PR recorded 3 findings, so no pass" });
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: "noslop's findings list lacks 3 findings hq's reviews of this PR recorded: aaaaaaaaaaaaaaaa, bbbb, cccc, so no pass" });
 });
 
 test('it tells the head it read to the caller', async () => {

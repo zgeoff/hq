@@ -4,11 +4,11 @@ import { formatCIClause } from './format-ci-clause.ts';
 import type { GateCI } from './format-ci-clause.ts';
 import type { NoslopCheck } from './read-noslop-check.ts';
 
-type NoslopFindingsRead = { read: true; open: string[]; listed: number } | { read: false; error: string };
+type NoslopFindingsRead = { read: true; open: string[]; unlisted: string[] } | { read: false; error: string };
 
 export type NoslopGateFacts =
   | { overridden: true; head: string; override: OwnerOverride; findings: NoslopFindingsRead; headNow: string | null }
-  | { overridden: false; repo: string; pr: number; head: string; reviewedHead: boolean; check: NoslopCheck; recorded: number; findings: NoslopFindingsRead; headNow: string | null };
+  | { overridden: false; repo: string; pr: number; head: string; reviewedHead: boolean; check: NoslopCheck; findings: NoslopFindingsRead; headNow: string | null };
 
 export type NoslopVerdict = { pass: true; reason: string } | { pass: false; reason: string };
 
@@ -63,8 +63,8 @@ function pickFoundVerdict(facts: Extract<NoslopGateFacts, { overridden: false }>
   if (found.open.length > 0) {
     return { pass: false, reason: `${found.open.length} noslop finding${found.open.length === 1 ? ' is' : 's are'} open: ${found.open.join(', ')}` };
   }
-  if (facts.recorded > 0 && found.listed === 0) {
-    return { pass: false, reason: `noslop's findings list is empty, but its reviews of this PR recorded ${facts.recorded} finding${facts.recorded === 1 ? '' : 's'}, so no pass` };
+  if (found.unlisted.length > 0) {
+    return { pass: false, reason: `noslop's findings list lacks ${found.unlisted.length} finding${found.unlisted.length === 1 ? '' : 's'} hq's reviews of this PR recorded: ${found.unlisted.join(', ')}, so no pass` };
   }
   return { pass: true, reason: `noslop findings: none open; ${formatCIClause(facts.head.slice(0, 7), ci)}` };
 }
