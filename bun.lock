@@ -30,7 +30,7 @@
         "@types/react": "19.3.0",
         "@types/react-dom": "19.3.0",
         "@zgeoff/diet": "0.2.1",
-        "@zgeoff/oxlint-config": "0.8.5",
+        "@zgeoff/oxlint-config": "0.8.6",
         "@zgeoff/skill-gate": "0.2.23",
         "@zgeoff/testing": "0.2.1",
         "knip": "6.43.0",
@@ -467,7 +467,7 @@
 
     "@zgeoff/diet": ["@zgeoff/diet@0.2.1", "", { "bin": { "diet": "diet.sh" } }, "sha512-8xzPM1AlurcFcXt3aDdyGblvEtdtlDP2CAie3lf/AVGWkK4y1Qz40RGz22fl9Ad9SioEb+9EJHUPGshEtt7fjw=="],
 
-    "@zgeoff/oxlint-config": ["@zgeoff/oxlint-config@0.8.5", "", { "dependencies": { "@stylistic/eslint-plugin": "5.10.0" }, "peerDependencies": { "oxlint": ">=1.78.0" } }, "sha512-0KyV8A9U66Ixur+0sZbTaqZ3SXpmajR2IewhuEcErzhmFcn1vue9bCFJK90Nm/6NWUAipcB4eB2NX1+ZfVR1eQ=="],
+    "@zgeoff/oxlint-config": ["@zgeoff/oxlint-config@0.8.6", "", { "dependencies": { "@stylistic/eslint-plugin": "5.10.0" }, "peerDependencies": { "oxlint": ">=1.78.0" } }, "sha512-gBnGBTPgUNK3j4S6CDMwMlGMxPrjmcdDSLAiXs0bAl252PMBILMujeqGnmBZ6NVo+WwCAHvWQFrsjixHozl1DA=="],
 
     "@zgeoff/skill-gate": ["@zgeoff/skill-gate@0.2.23", "", { "dependencies": { "@zgeoff/agent-hooks": "0.2.7" } }, "sha512-ytwHizyjWYwr0VqD/MeDpISkD3glpW8YEqATRMkQv/pCWVCbv9DHlN0cAQwrLFBN/RmICo6pTmeXq/grRurLgw=="],
 
