@@ -188,9 +188,13 @@ async function runNoslopLocked(ctx: NoslopReviewContext, prep: ReviewPrep): Prom
   const finished = await boundedRunner(ctx.run, ctx.timeoutMs)(command, { cwd: prep.worktree, env: { ...buildNoslopEnv(prep.secrets), ...buildAdapterEnv(ctx.adapter?.adapter) } });
   const parsed = parseReviewRun(finished.code, finished.stdout, getTail(finished.stderr, prep.secrets), ctx.timeoutMs);
   const verdict = { ...parsed, why: parsed.why === null ? null : redactSecrets(parsed.why, prep.secrets) };
-  await Bun.write(prep.reviewFile, finished.stdout);
+  const judged = readPostFailedReview(ctx.store, finished.stdout, verdict);
+
+  // `noslop post` reads the file of a parsed review, so only a failed run's file is redacted.
+  const kept = judged.judged.value === null ? redactSecrets(finished.stdout, prep.secrets) : finished.stdout;
+  await Bun.write(prep.reviewFile, kept);
   // oxlint-disable-next-line zgeoff/no-abbreviated-names -- grandfathered property of the recorded round
-  return { ...readPostFailedReview(ctx.store, finished.stdout, verdict), ms: Date.now() - began, startedAt: begun, sha: ctx.sha };
+  return { ...judged, ms: Date.now() - began, startedAt: begun, sha: ctx.sha };
 }
 
 // noslop prints the review, then writes it to its store, then posts it to GitHub. A run that failed

@@ -237,6 +237,7 @@ test.each(Object.entries(FAKE_SECRETS))('it redacts the %s from a failed call\'s
 
   expect(failure).toContain('claude exited 1: bad key [redacted] (security)');
   expect(failure).not.toContain(secret);
+  await expect(Bun.file(`${ctx.base}/widgets+7-noslop.json`).text()).resolves.not.toContain(secret);
   expect(ctx.db.query('SELECT error FROM noslop_rounds').get()).toStrictEqual({ error: '1 noslop call(s) failed: claude exited 1: bad key [redacted] (security)' });
 });
 
