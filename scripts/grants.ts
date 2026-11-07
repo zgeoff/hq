@@ -1,3 +1,4 @@
+import { isRecord } from '@zgeoff/std';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
@@ -558,7 +559,7 @@ function isStringList(value: unknown): value is string[] {
 }
 
 function parseFleetSession(entry: unknown, where: string): FleetSession {
-  const row = typeof entry === 'object' && entry !== null ? Object.fromEntries(Object.entries(entry)) : {};
+  const row = isRecord(entry) ? entry : {};
   const skills = row['skills'] ?? [];
   if (typeof row['name'] !== 'string' || !isStringList(skills)) {
     throw new TypeError(`${where}: needs a name and, if present, a list of skill names`);
