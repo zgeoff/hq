@@ -10,6 +10,7 @@ export interface CapacitySampleRow {
   nonnix_awake_mib: number | null;
   nonnix_awake_vcpus: number | null;
   nix_awake_mib: number | null;
+  impd_priority_kept_mib: number | null;
   cloud_avail_bytes: number | null;
   cloud_total_bytes: number | null;
   claude_account: string | null;

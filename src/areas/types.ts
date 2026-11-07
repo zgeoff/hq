@@ -36,5 +36,5 @@ export interface AwakeSession {
 export interface ImpRoom {
   slots: number;
   heldBy: string;
-  line: { awakeMib: number; maxMib: number; awakeVcpus: number; maxVcpus: number } | null;
+  line: { awakeMib: number; maxMib: number; awakeVcpus: number; maxVcpus: number; budgetMib: number; nixAwakeMib: number; keptMib: number } | null;
 }

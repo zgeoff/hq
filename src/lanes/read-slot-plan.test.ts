@@ -1,10 +1,13 @@
 import { expect, onTestFinished, test } from 'bun:test';
+import invariant from 'tiny-invariant';
 import rulesTable from '../../lanes.json';
 import { buildReadyPage, makePagedCall } from '../../test/build-ready-page.ts';
 import type { ReadyNodeSeed } from '../../test/build-ready-page.ts';
 import { buildStubGitHubFactsRunner } from '../../test/build-stub-github-facts-runner.ts';
 import { buildReadyIssue } from '../../test/build-ready-issue.ts';
+import { createCapacitySample } from '../../test/create-capacity-sample.ts';
 import { at, freshDb } from '../../test/helpers.ts';
+import { setCapacitySetting } from '../capacity/set-capacity-setting.ts';
 import { makeStateCall } from '../../test/make-state-call.ts';
 import { runFocusCommand } from '../focus/run-focus-command.ts';
 import { addRun } from '../runs/add-run.ts';
@@ -178,6 +181,23 @@ test('local slots free none, and say why, when the localFallback is used up', as
   expect(plan.pool).toStrictEqual({ impSize: 0, localSize: 3, impRunning: 0, localRunning: 2, impFree: 0, localFree: 0, free: 0, capHeld: false, held: null, localHeld: 'no unattended provider can start local work: localFallback 2 in use', localSource: null });
   expect(plan.plan?.picks).toStrictEqual([]);
   expect(formatSlotPlan(plan, new Date('2026-10-15T20:00:00Z'))[0]).toBe('slots (running/size, free now): imp 0/0, 0 free; local 2/3, 0 free (no unattended provider can start local work: localFallback 2 in use)');
+});
+
+test('it holds an imp launch that would cut into the RAM impd keeps for priority imps, and names that RAM', async () => {
+  const ctx = setupTest();
+  await ctx.seedReady(ctx.readySeeds);
+  setCapacitySetting(ctx.db, 'nonnixMaxMib', '20480', 'z-delivery');
+  createCapacitySample(ctx.db, { at: '2026-10-15T19:58:00Z', nonnixAwakeMib: 14_336, nixAwakeMib: 1024, impdBudgetMib: 20_480, impdPriorityKeptMib: 3072 });
+  const sample = { cap: { imp: { freeMib: 16_384, room: true }, providers: { claude: { room: true, unattended: true, target: 'imp' as const } } }, impMib: 2048, error: null, slots: { imp: 3, local: 0 } };
+
+  const plan = readSlotPlan(ctx.db, sample);
+
+  invariant(plan);
+  expect([plan.pool.impFree, plan.pool.held, formatSlotPlan(plan, new Date('2026-10-15T20:00:00Z'))[0]]).toStrictEqual([
+    1,
+    'impd priority reservation',
+    'slots (running/size, free now): imp 0/3, 1 free (3 free by count, held: impd priority reservation); local 0/0, 0 free',
+  ]);
 });
 
 test('the tick nudges for no local slot when the localFallback is used up', async () => {

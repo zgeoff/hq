@@ -13,7 +13,7 @@ import type { CapacityProbe, Errors, Impd, Reading } from './types.ts';
 export async function readCapacity(db: Database, probe: CapacityProbe, at: Date = now()): Promise<Reading> {
   const errors: Errors = {};
   const [impd, cloud, pc, op] = await Promise.all([
-  readImpd(probe).catch((e) => ({ impd: { budgetMib: null, usedMib: null, committedMib: null, nonnixAwakeMib: null, nixAwakeMib: null } as Impd, error: msg(e) })),
+  readImpd(probe).catch((error: unknown): { impd: Impd; error: string } => ({ impd: { budgetMib: null, usedMib: null, committedMib: null, nonnixAwakeMib: null, nonnixAwakeVcpus: null, nixAwakeMib: null, priorityKeptMib: null }, error: msg(error) })),
   readCloud(probe).catch((e) => {
     errors['cloud'] = msg(e);
     return null;
@@ -50,6 +50,7 @@ export async function readCapacity(db: Database, probe: CapacityProbe, at: Date 
     nonnix_awake_mib: impd.impd.nonnixAwakeMib,
     nonnix_awake_vcpus: impd.impd.nonnixAwakeVcpus ?? null,
     nix_awake_mib: impd.impd.nixAwakeMib,
+    impd_priority_kept_mib: impd.impd.priorityKeptMib,
     cloud_avail_bytes: cloud?.avail ?? null,
     cloud_total_bytes: cloud?.total ?? null,
     claude_account: claude?.account ?? null,

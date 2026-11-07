@@ -81,7 +81,7 @@ test("it records gate none with no head for a bot's PR, which noslop never revie
 test('it records a noslop gate, not gate none, for a listed repo\'s PR that has a Codex review file', async () => {
   const ctx = setupTest();
   const fake = buildFakeRunner();
-  setMeta(ctx.db, 'noslop', JSON.stringify({ repos: ['widgets'], sha: '0123456789abcdef0123456789abcdef01234567' }));
+  createListedReview(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA });
   writeFileSync(join(ctx.base, 'widgets7-review.md'), 'No findings.\n');
 
   await expect(checkRecordedGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).resolves.toStrictEqual({ mayMerge: true, reason: `noslop findings: none open; CI green at ${FAKE_FULL_SHA.slice(0, 7)}`, reviewed: true });

@@ -4,7 +4,7 @@ import { getReadMS as readMs } from './get-read-ms.ts';
 import type { CapacityProbe, Impd } from './types.ts';
 
 export async function readImpd(probe: CapacityProbe): Promise<{ impd: Impd; error: string | null }> {
-  const impd: Impd = { budgetMib: null, usedMib: null, committedMib: null, nonnixAwakeMib: null, nonnixAwakeVcpus: null, nixAwakeMib: null };
+  const impd: Impd = { budgetMib: null, usedMib: null, committedMib: null, nonnixAwakeMib: null, nonnixAwakeVcpus: null, nixAwakeMib: null, priorityKeptMib: null };
   const errors: string[] = [];
   const [info, ls] = await Promise.all([out(probe.run, ['impz', 'info', '--json'], readMs(probe)), out(probe.run, ['impz', 'ls', '--json'], readMs(probe))]);
   try {
@@ -13,9 +13,10 @@ export async function readImpd(probe: CapacityProbe): Promise<{ impd: Impd; erro
     impd.budgetMib = num(j['ramBudgetMib']);
     impd.usedMib = num(j['ramUsedMib']);
     impd.committedMib = num(j['ramCommittedMib']);
+    impd.priorityKeptMib = parseKeptMib(j['ramPriorityKeptMib']);
     if (impd.budgetMib === null || impd.usedMib === null) throw new Error('impz info has no ramBudgetMib or ramUsedMib');
   } catch (e) {
-    Object.assign(impd, { budgetMib: null, usedMib: null, committedMib: null });
+    Object.assign(impd, { budgetMib: null, usedMib: null, committedMib: null, priorityKeptMib: null });
     errors.push(msg(e));
   }
   try {
@@ -41,6 +42,18 @@ export async function readImpd(probe: CapacityProbe): Promise<{ impd: Impd; erro
 }
 
 const num = (x: unknown): number | null => (typeof x === 'number' && Number.isFinite(x) ? Math.round(x) : null);
+
+// impd releases from before the priority reservation print no ramPriorityKeptMib, and keep no RAM.
+function parseKeptMib(field: unknown): number {
+  if (field === undefined) {
+    return 0;
+  }
+  const keptMib = num(field);
+  if (keptMib === null) {
+    throw new Error('impz info has a ramPriorityKeptMib that is not a number');
+  }
+  return keptMib;
+}
 
 // An awake imp that reports no vCPUs makes the count unknown, rather than a count too low.
 function countNonnixVcpus(imps: readonly { name?: unknown; state?: unknown; vcpus?: unknown }[]): number | null {

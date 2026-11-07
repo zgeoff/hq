@@ -17,6 +17,7 @@ A capped PR passes the merge gate after a merge from main, and the owner's lgtm 
 - The owner's newest lgtm and override hold for the PR at any head, a later `changes` or `reject` still blocks, and `hq pr rebased` is gone (hq#365).
 - A brief for one area of a multi-area issue leaves out the stack line (hq#369).
 - The slot reads take each Claude slot's token from the `fleet` vault, `op://fleet/claude-setup-token-<slot>`, where the slot items now live (hq#373).
+- `hq lanes` holds an imp launch that would take the RAM impd keeps for priority imps, and names that reservation. A sample with no impd budget or kept RAM reading holds every imp slot. Schema v50 stores the kept RAM in `capacity_samples`; older rows hold NULL (hq#375).
 
 ### New
 
