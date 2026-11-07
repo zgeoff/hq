@@ -1,7 +1,7 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { buildStubImpzRunner } from '../../test/build-stub-impz-runner.ts';
 import { at, freshDb } from '../../test/helpers.ts';
-import { seedCapacitySampleErrors } from '../../test/seed-capacity-sample-errors.ts';
+import { seedCapacitySampleErrors } from '../test-utils/seed-capacity-sample-errors.ts';
 import { readCapacity } from './read-capacity.ts';
 import { sampleLog } from './sample-log.ts';
 import { writeCapacitySample } from './write-capacity-sample.ts';
@@ -26,7 +26,7 @@ test('it reads the errors a sample stored', async () => {
 
 test('it reads an empty errors column as no errors', async () => {
   const ctx = setupTest();
-  seedCapacitySampleErrors(ctx.db, '2026-10-14T00:00:00Z', '');
+  seedCapacitySampleErrors(ctx.db, '2026-10-14T00:00:00Z', 'empty');
 
   const log = await ctx.readLog();
 
@@ -34,11 +34,11 @@ test('it reads an empty errors column as no errors', async () => {
 });
 
 test.each([
-  { name: 'text that is not JSON', errorsText: '{oops' },
-  { name: 'an error that is not text', errorsText: '{"cloud":4}' },
-])('it rejects a sample whose errors column holds $name', async (row) => {
+  { state: 'text that is not JSON' as const },
+  { state: 'an error that is not text' as const },
+])('it rejects a sample whose errors column holds $state', async (row) => {
   const ctx = setupTest();
-  seedCapacitySampleErrors(ctx.db, '2026-10-14T00:00:00Z', row.errorsText);
+  seedCapacitySampleErrors(ctx.db, '2026-10-14T00:00:00Z', row.state);
 
   await expect(ctx.readLog()).rejects.toThrow();
 });
