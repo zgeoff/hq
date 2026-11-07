@@ -45,11 +45,11 @@ Out, as the owner decided on 2026-10-17 (decision D-repo-scope):
 
 ## setup
 
-Run `bun install` once. It installs oxfmt; no pre-commit hook runs. Before you commit, run `bun run fmt` to format markdown, YAML, and JSON files, and `bun run check:skills` after a skill change. CI fails a PR whose files oxfmt would change.
+Run `bun install` once. It installs oxfmt and the git hooks: a commit and a push run the chex baseline, which lefthook.yml extends. Before you commit, run `bun run format` to format markdown, YAML, and JSON files, and `bun run check:skills` after a skill change. CI fails a PR whose files oxfmt would change.
 
 ## writing
 
-Load the `docs-writing` skill for technical documentation: `readme.md` files, `docs/`, `linear/`, and this file. Run its `check-prose.sh` over the files you touched.
+Load the `docs-writing` skill for technical documentation: `readme.md` files, `docs/`, `linear/`, and this file. Run `bun x chex prose` over the files you touched.
 
 Skip `docs-writing` for `skills/`. Those files are prompts for a model, and their style follows [the Anthropic digest](anthropic-guidance.md).
 
