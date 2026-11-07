@@ -23,7 +23,7 @@
     "ci:test-scope": "bun scripts/check/read-test-scope.ts",
     "check:casts": "bun scripts/check-casts.ts",
     "prepare": "command -v git > /dev/null 2>&1 && lefthook install --force || true",
-    "check:docs": "chex prose links readmes skill"
+    "check:docs": "chex prose length links readmes skill"
   },
   "dependencies": {
     "@orpc/client": "1.16.1",
