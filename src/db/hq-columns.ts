@@ -184,7 +184,7 @@ export const HQ_COLUMNS = {
   marks: {
     id: 'generated',
     at: 'text',
-    kind: 'text',
+    kind: { values: ['skills', 'grant', 'hq', 'other'], nullable: false },
     text: 'text',
     ref: 'text?',
     added_by: 'text',
@@ -417,7 +417,7 @@ export const HQ_COLUMNS = {
     to_id: 'text?',
     to_name: 'text?',
     text: 'text',
-    source_kind: 'text',
+    source_kind: { values: ['call', 'proposal', 'chat', 'console'], nullable: false },
     source_ref: 'text',
     source_at: 'text?',
     typed_by: 'text',

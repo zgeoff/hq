@@ -1,21 +1,19 @@
 import type { Database } from 'bun:sqlite';
+import { isRecord } from '@zgeoff/std';
 import { getMeta } from '../db/get-meta.ts';
 import { ACCOUNT_KEY } from '../goals/account-key.ts';
+import { parseJSON } from '../noslop/parse-json.ts';
 import { ACCOUNT_NAME_RE } from './account-name-re.ts';
 import { NAME_MAX } from './name-max.ts';
 
 export function accountLabels(db: Database): Record<string, string> {
-  try {
-    const j = JSON.parse(getMeta(db, 'usage_accounts') ?? '{}') as unknown;
-    if (!j || typeof j !== 'object' || Array.isArray(j)) return {};
-    const out: Record<string, string> = {};
-    for (const [k, v] of Object.entries(j)) {
-      if (ACCOUNT_KEY.test(k) && typeof v === 'string' && v.length <= NAME_MAX && ACCOUNT_NAME_RE.test(v)) {
-        out[k] = v;
-      }
+  const j = parseJSON(getMeta(db, 'usage_accounts') ?? '{}');
+  if (!isRecord(j)) return {};
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(j)) {
+    if (ACCOUNT_KEY.test(k) && typeof v === 'string' && v.length <= NAME_MAX && ACCOUNT_NAME_RE.test(v)) {
+      out[k] = v;
     }
-    return out;
-  } catch {
-    return {};
   }
+  return out;
 }

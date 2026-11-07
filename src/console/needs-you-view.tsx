@@ -203,7 +203,7 @@ async function sendAnswer(consoleAPI: ConsoleAPI, choice: Choice): Promise<boole
 }
 
 function isTextTarget(target: EventTarget | null): boolean {
-  const name = (target as HTMLElement | null)?.tagName;
+  const name = target !== null && 'tagName' in target ? target.tagName : undefined;
   return name === 'TEXTAREA' || name === 'INPUT';
 }
 

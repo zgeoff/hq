@@ -1,3 +1,4 @@
+import { isRecord } from '@zgeoff/std';
 import type { z } from 'zod';
 import type { listedSchema } from './listed-schema.ts';
 import type { Settled } from './types.ts';
@@ -16,11 +17,11 @@ export async function settleRestores(
 ): Promise<Settled> {
   const sleep = opts.sleep ?? Bun.sleep;
   const clock = opts.clock ?? Date.now;
-  const entries = (failed ?? []) as { id?: string; name?: string; reason?: string }[];
   const down: Settled['down'] = [];
   let waiting: { id: string; name: string; reason: string }[] = [];
-  for (const f of entries) {
-    const e = { id: String(f.id ?? ''), name: String(f.name ?? ''), reason: String(f.reason ?? '') };
+  for (const f of failed ?? []) {
+    const fields = isRecord(f) ? f : {};
+    const e = { id: String(fields['id'] ?? ''), name: String(fields['name'] ?? ''), reason: String(fields['reason'] ?? '') };
     (e.id && e.reason.includes(WAITING) ? waiting : down).push(e);
   }
   const late: Settled['late'] = [];

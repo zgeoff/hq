@@ -9,6 +9,10 @@ export type ItemDetail = ItemInput['details'][number];
 
 export type ItemExtras = Omit<ItemInput, 'title' | 'question' | 'stuView'>;
 
+export function defineItemExtrasSchema() {
+  return defineItemInputSchema().omit({ title: true, question: true, stuView: true });
+}
+
 export type ItemKind = 'call' | 'proposal' | 'unblock';
 
 export function parseItemInput(kind: ItemKind, raw: string): ItemInput {

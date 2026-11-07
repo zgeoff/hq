@@ -1,9 +1,14 @@
 import type { Database } from 'bun:sqlite';
 import { iso } from '../clock/iso.ts';
 import { now } from '../clock/now.ts';
+import { buildRowSchema } from '../db/build-row-schema.ts';
+import { runSyncRow } from '../db/run-sync-row.ts';
 import { HqError } from '../errors.ts';
+import { kdb } from '../kdb.ts';
 import type { Source } from './types.ts';
 import { isOneOf } from '@zgeoff/std';
+
+const AskKindSchema = buildRowSchema('asks').pick({ kind: true });
 
 const ASK_SOURCE_KINDS = ['call', 'proposal'] as const;
 
@@ -15,7 +20,7 @@ export function parseSource(db: Database, raw: string): Source {
   const ask = /^(call|proposal):([A-Za-z0-9._-]+)$/.exec(raw);
   const kind = ask?.[1];
   if (ask && isOneOf(kind, ASK_SOURCE_KINDS)) {
-    const row = db.query('SELECT kind FROM asks WHERE id = ?').get(ask[2]!) as { kind: string } | null;
+    const row = runSyncRow(db, kdb(db).selectFrom('asks').select('kind').where('id', '=', ask[2]!).compile(), AskKindSchema);
     if (!row) throw new HqError('not_found', `no ${kind} ${ask[2]} in hq`);
     if (row.kind !== kind) throw new HqError('bad_args', `${ask[2]} is a ${row.kind}, not a ${kind}`);
     return { kind, ref: ask[2]!, at: null };

@@ -4,7 +4,10 @@ import { isQuiet } from '../clock/is-quiet.ts';
 import { iso } from '../clock/iso.ts';
 import { now } from '../clock/now.ts';
 import { metaJson } from '../db/meta-json.ts';
+import { runSyncRow } from '../db/run-sync-row.ts';
+import { kdb } from '../kdb.ts';
 import { match } from 'ts-pattern';
+import { z } from 'zod';
 import { HqError } from '../errors.ts';
 import { logEvent } from '../log-event.ts';
 import { enqueue } from '../outbox/enqueue.ts';
@@ -29,6 +32,8 @@ import { STALE_LIMITS } from './stale-limits.ts';
 import type { StaleSinceMap } from './stale-since-schema.ts';
 import type { FleetClient, FleetEntry, FleetSession, PromptDrift, RestartCause, StaleOps } from './types.ts';
 import { toErrorMessage } from '../to-error-message.ts';
+
+const SentMessageSchema = z.object({ message_id: z.string() });
 
 export interface StaleTickOptions {
   fleet: FleetEntry[];
@@ -283,7 +288,13 @@ async function readAnswerFor(pass: StalePass, turn: StaleTurn, asked: Entry): Pr
 
 async function readMessageLookup(pass: StalePass, turn: StaleTurn, asked: Entry): Promise<MessageLookup> {
   const session = turn.session;
-  const row = pass.db.query('SELECT message_id FROM outbox WHERE event_seq = ? AND message_id IS NOT NULL').get(asked.eventSeq ?? -1) as { message_id: string } | null;
+  const query = kdb(pass.db)
+    .selectFrom('outbox')
+    .select('message_id')
+    .where('event_seq', '=', asked.eventSeq ?? -1)
+    .where('message_id', 'is not', null)
+    .compile();
+  const row = runSyncRow(pass.db, query, SentMessageSchema);
   if (!row) {
     return { kind: 'unsent' };
   }

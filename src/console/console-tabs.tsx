@@ -54,6 +54,6 @@ function openPath(router: ReturnType<typeof useRouter> | undefined, path: string
 }
 
 function isTextTarget(target: EventTarget | null): boolean {
-  const name = (target as HTMLElement | null)?.tagName;
+  const name = target !== null && 'tagName' in target ? target.tagName : undefined;
   return name === 'TEXTAREA' || name === 'INPUT';
 }
