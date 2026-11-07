@@ -53,11 +53,12 @@ production read. Read it first.
 1. **Ask whether a preview can show it.** A preview can't show an item that needs the owner's real
    Nix, devices or accounts, a real outside connector, production data, or the owner's judgement of
    how it feels. Hand those back in step 5, with the reason.
-2. **Open the preview** from the PR's preview comment, which boots it. Wait until the health URL in
-   the repo's `preview/README.md` answers, up to the [limit](#limits). If the comment names an older
-   head, wait until it names the head `z-review` sent, then open it again.
-3. **Drive it** as `preview/README.md` says. For nixie, run each command in the preview's imp as
-   [nixie-preview-api.md](references/nixie-preview-api.md) says:
+2. **Open the preview** with the link in the PR's preview comment. Opening the link boots the
+   preview. Wait until the health URL in the repo's preview runbook, `docs/runbooks/preview.md`,
+   answers with HTTP 200, up to the [limit](#limits). If the comment names an older head, wait until the comment
+   names the head `z-review` sent, then open its link again.
+3. **Drive the preview** with the steps in the preview runbook. For nixie, run each command in the
+   preview's imp as [nixie-preview-api.md](references/nixie-preview-api.md) shows:
    - Sign in as a test device with the code from `docker compose logs --no-log-prefix enrol`.
      `docker compose run --rm enrol` prints another code.
    - Use the API as nixie's `docs/runbooks/preview-api-check.md` says.
@@ -148,7 +149,7 @@ player.
   `~/.local/share/z-sessions/qa.md`. Delete a check's scratch once answered.
 - Run headless browsers with `TMPDIR=~/.local/share/z-sessions/qa/t`. Chromium fails on long socket
   paths.
-- File a skill fault in hq's Triage, or a gap in a `preview/README.md` in its repo's Triage, and
+- File a skill fault in hq's Triage, or a gap in a preview runbook in its repo's Triage, and
   name the rule that should have covered it.
 
 **Reply:** for a preview check, your answer for each item, with the evidence link; after a release,
