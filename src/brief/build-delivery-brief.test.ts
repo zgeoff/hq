@@ -348,7 +348,27 @@ test('it counts a merged PR as the goal, and asks only for the acceptance a PR c
   expect(brief.out.text.split('\n')[0]).toBe(
     "/goal A PR in zgeoff/kettle for GEO-9001 that is merged, or out of draft with evidence for each acceptance item a PR can show before merge and your own review's findings fixed. First read GEO-9001 with your own Linear access.",
   );
-  expect(brief.out.text).toContain('evidence for each acceptance item a PR can show before merge. Keep the ID');
+  expect(brief.out.text).toContain('the evidence the goal names. Keep the ID');
+});
+
+test('it fits the real template for an imp stack launch with a playbook, the review lines and a long repo name', () => {
+  const sha = 'd'.repeat(40);
+  const briefs = readFileSync('skills/delivery-lead/references/briefs.md', 'utf8');
+  const brief = buildDeliveryBrief({
+    input: { issue: 'GEO-9001', ref: sha, imp: true, byLink: true, goalFile: null, repo: null },
+    issue: { identifier: 'GEO-9001', description: '## Outcome\n\nEvery kettle boils.\n', labels: [{ name: 'kettle-co' }] },
+    sha,
+    reads: { label: 'kettle-co', repo: 'kettle-co', otherAreas: [], playbook: { type: 'chore', path: 'agent-kit/playbooks/chore.md', command: `gh api 'repos/zgeoff/hq/contents/agent-kit/playbooks/chore.md?ref=${sha}' -H 'Accept: application/vnd.github.raw'` }, stack: true, imp: true, reviewLines: true },
+    template: findFencedBlock(readFileSync('agent-kit/brief.md', 'utf8'), null) ?? '',
+    permissionTable: [{ action: 'Code delivery', phrase: 'You should create a branch, install dependencies, run the tests and evals, edit any file in `<repo>` this work needs, `.github/workflows/` files included, commit, push your branch to `<repo>`, rebase it onto `main` and force-push it with `git push --force-with-lease` when it falls behind, and open a ready (non-draft) PR.' }],
+    playbookText: '# Chore playbook\n',
+    stack: findFencedBlock(briefs, 'The stack line:') ?? '',
+    impLine: findFencedBlock(briefs, 'The imp line:') ?? '',
+    movedGoalFile: 'briefs/GEO-9001.md',
+  });
+
+  expect(brief.out.data['cuts']).toStrictEqual(['short refs']);
+  expect(brief.out.data['bytes']).toBeLessThanOrEqual(3980);
 });
 
 test('it fits a review-lines brief with a playbook only because the refs are short', () => {
