@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import type { Database } from 'bun:sqlite';
-import { z } from 'zod';
-import { queryColumn, queryRow, queryRows } from '../src/test-utils/query-rows.ts';
+import invariant from 'tiny-invariant';
 import { applyAskItem } from '../src/apply-ask-item.ts';
 import { addAsk } from '../src/asks/add-ask.ts';
 import { answerAsk } from '../src/asks/answer-ask.ts';
@@ -17,7 +16,10 @@ import { skipAsk } from '../src/asks/skip-ask.ts';
 import type { AddInput } from '../src/asks/types.ts';
 import { waitReasons } from '../src/asks/wait-reasons.ts';
 import { iso } from '../src/clock/iso.ts';
+import { listEvents } from '../src/list-events.ts';
+import { readOutboxRows } from '../src/outbox/read-outbox-rows.ts';
 import { parseItemInput } from '../src/parse-item-input.ts';
+import { readSubjectEvents } from '../src/read-subject-events.ts';
 import { FOUR_AM_SYDNEY, NOON_SYDNEY, at, freshDb } from './helpers.ts';
 
 let db: Database;
@@ -35,9 +37,6 @@ const call = (over: Partial<AddInput> = {}): AddInput => ({
   ...over,
 });
 
-// oxlint-disable-next-line zgeoff/setup-test-only, zgeoff/no-top-level-arrow -- this file's shared beforeEach state is GEO-1318's lint debt
-const outbox = () => queryRows(db, 'SELECT target, text FROM outbox ORDER BY id', z.object({ target: z.string(), text: z.string() }));
-
 beforeEach(() => {
   ({ db, cleanup } = freshDb());
   at(NOON_SYDNEY);
@@ -49,12 +48,13 @@ describe('add', () => {
     const r = addAsk(db, call());
     expect(r.result).toBe('added');
     expect(r.ask.state).toBe('queued');
-    expect(outbox()).toEqual([{ target: 'z-stu', text: expect.stringContaining('call ready: geo-1-paint') }]);
+    expect(readOutboxRows(db).map((row) => row.target)).toStrictEqual(['z-stu']);
+    expect(readOutboxRows(db)[0]?.text).toContain('call ready: geo-1-paint');
   });
 
   test('the owner filing its own item sends nothing', () => {
     addAsk(db, call({ actor: 'z-stu' }));
-    expect(outbox()).toEqual([]);
+    expect(readOutboxRows(db)).toStrictEqual([]);
   });
 
   test('same id and question again is a no-op, even once answered', () => {
@@ -65,7 +65,7 @@ describe('add', () => {
     const again = addAsk(db, call({ body: 'reworded body, same question' }));
     expect(again.result).toBe('noop');
     expect(again.ask.state).toBe('answered');
-    expect(outbox().filter((m) => m.target === 'z-stu')).toHaveLength(1);
+    expect(readOutboxRows(db).filter((row) => row.target === 'z-stu')).toHaveLength(1);
   });
 
   test('an issue joining a shared call keeps the id and sends nothing', () => {
@@ -73,7 +73,7 @@ describe('add', () => {
     const r = addAsk(db, call({ issues: ['GEO-1', 'GEO-2'] }));
     expect(r.result).toBe('updated');
     expect(r.ask.issues).toEqual(['GEO-1', 'GEO-2']);
-    expect(outbox()).toHaveLength(1);
+    expect(readOutboxRows(db)).toHaveLength(1);
   });
 
   test('a new question on a settled id starts a new round', () => {
@@ -105,7 +105,8 @@ describe('add', () => {
     const r = addAsk(db, call());
     expect(r.result).toBe('requeued');
     expect(r.ask).toMatchObject({ state: 'queued', round: 2, answer: null });
-    const ev = queryRow(db, `SELECT data FROM events WHERE action='requeued'`, z.object({ data: z.string() }));
+    const [ev] = listEvents(db, 'requeued');
+    invariant(ev, 'the re-add logged a requeued event');
     expect(JSON.parse(ev.data).previous_answer).toBe('green');
   });
 
@@ -224,10 +225,10 @@ describe('answer, apply, later, skip, close', () => {
     openAsk(db, { force: false, actor: 'z-stu' });
     const answered = answerAsk(db, { id: 'geo-1-paint', kind: 'call', answer: '  green — the  dark one ', actor: 'z-stu' });
     expect(answered.answer).toBe('  green — the  dark one ');
-    const note = outbox().at(-1)!;
-    expect(note.target).toBe('z-triage');
-    expect(note.text).toContain('carries no grant');
-    expect(outbox().some((m) => m.target === 'z-delivery')).toBe(false);
+    const note = readOutboxRows(db).at(-1);
+    expect(note?.target).toBe('z-triage');
+    expect(note?.text).toContain('carries no grant');
+    expect(readOutboxRows(db).some((row) => row.target === 'z-delivery')).toBe(false);
   });
 
   test('the filer hears that the owner answered, with the exact notice text', () => {
@@ -235,7 +236,7 @@ describe('answer, apply, later, skip, close', () => {
     openAsk(db, { force: false, actor: 'z-stu' });
     answerAsk(db, { id: 'geo-1-paint', kind: 'call', answer: 'green', actor: 'z-stu' });
 
-    expect(outbox().at(-1)?.text).toBe('FYI call geo-1-paint answered by the owner: "green". This note carries no grant: z-stu applies the answer.');
+    expect(readOutboxRows(db).at(-1)?.text).toBe('FYI call geo-1-paint answered by the owner: "green". This note carries no grant: z-stu applies the answer.');
   });
 
   test('apply needs an answer first and a known target', () => {
@@ -266,9 +267,9 @@ describe('answer, apply, later, skip, close', () => {
     addAsk(db, call());
     openAsk(db, { force: false, actor: 'z-stu' });
     closeAsk(db, 'geo-1-paint', 'call', 'issue lost Needs Geoff', 'z-refine');
-    const last = outbox().at(-1)!;
-    expect(last.target).toBe('z-stu');
-    expect(last.text).toContain('it was open with the owner, so tell them it is settled');
+    const last = readOutboxRows(db).at(-1);
+    expect(last?.target).toBe('z-stu');
+    expect(last?.text).toContain('it was open with the owner, so tell them it is settled');
     expect(() => closeAsk(db, 'geo-1-paint', 'call', 'again', 'z-refine')).toThrow('is closed');
   });
 
@@ -277,7 +278,7 @@ describe('answer, apply, later, skip, close', () => {
     openAsk(db, { force: false, actor: 'z-stu' });
     answerAsk(db, { id: 'geo-1-paint', kind: 'call', answer: 'green', actor: 'z-stu' });
     applyAsk(db, 'geo-1-paint', 'call', 'none', null, 'z-stu');
-    const actions = queryColumn(db, `SELECT action FROM events WHERE subject_id='geo-1-paint' ORDER BY seq`, z.string());
+    const actions = readSubjectEvents(db, 'ask', 'geo-1-paint').map((event) => event.action);
     expect(actions).toEqual(['added', 'opened', 'answered', 'applied']);
   });
 });
@@ -292,7 +293,8 @@ describe('queue reminder after quiet hours', () => {
     expect(queueReminder(db, 'hq-lanes').reminded).toBeNull();
     at(SEVEN_OH_FIVE);
     expect(queueReminder(db, 'hq-lanes').reminded).toBe('tidy-docs');
-    expect(outbox().at(-1)).toEqual({ target: 'z-stu', text: expect.stringContaining('Open it with: hq open') });
+    expect(readOutboxRows(db).at(-1)?.target).toBe('z-stu');
+    expect(readOutboxRows(db).at(-1)?.text).toContain('Open it with: hq open');
     at('2026-10-14T20:10:00Z');
     expect(queueReminder(db, 'hq-lanes').reminded).toBeNull();
   });

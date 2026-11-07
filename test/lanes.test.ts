@@ -1,7 +1,5 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test';
 import type { Database } from 'bun:sqlite';
-import { z } from 'zod';
-import { queryRows } from '../src/test-utils/query-rows.ts';
 import { checkReadyStale } from '../src/lanes/check-ready-stale.ts';
 import { getLanesHold } from '../src/lanes/get-lanes-hold.ts';
 import { holdLanes } from '../src/lanes/hold-lanes.ts';
@@ -16,6 +14,7 @@ import type { Capacity } from '../src/lanes/types.ts';
 import { setCapacitySetting } from '../src/capacity/set-capacity-setting.ts';
 import { createCapacitySample } from './create-capacity-sample.ts';
 import { FOUR_AM_SYDNEY, NOON_SYDNEY, at, freshDb } from './helpers.ts';
+import { readOutboxRows } from '../src/outbox/read-outbox-rows.ts';
 import { setForward } from '../src/outbox/set-forward.ts';
 import { orchestratorName } from '../src/wake/orchestrator-name.ts';
 
@@ -27,8 +26,6 @@ const cap = (freeMib: number, claudeRoom = true): Capacity => ({
   providers: { claude: { room: claudeRoom, unattended: true, target: 'imp' }, codex: { room: true, unattended: false, target: 'local' } },
 });
 const sample = (freeMib: number, claudeRoom = true) => ({ cap: cap(freeMib, claudeRoom), impMib: 2048, error: null });
-// oxlint-disable-next-line zgeoff/setup-test-only, zgeoff/no-top-level-arrow -- this file's shared beforeEach state is GEO-1318's lint debt
-const msgs = () => queryRows(db, 'SELECT target, text FROM outbox', z.object({ target: z.string(), text: z.string() }));
 const atMin = (m: number) => at(new Date(new Date(NOON_SYDNEY).getTime() + m * 60_000).toISOString());
 
 beforeEach(() => {
@@ -57,7 +54,8 @@ test('nudges once slots stay free past 10 minutes, then not again while nothing 
   atMin(10);
   const r = tick(db, sample(16384), 'hq-lanes');
   expect(r.nudged).toBe(true);
-  expect(msgs()).toEqual([{ target: 'z-delivery', text: expect.stringContaining('8 agent slots free for 10 min, Ready count unknown') }]);
+  expect(readOutboxRows(db).map((row) => row.target)).toStrictEqual(['z-delivery']);
+  expect(readOutboxRows(db)[0]?.text).toContain('8 agent slots free for 10 min, Ready count unknown');
   atMin(15);
   expect(tick(db, sample(16384), 'hq-lanes').why).toContain('nothing changed');
   atMin(40);
@@ -83,11 +81,11 @@ test('full lanes reset the clock; a reported count informs but never suppresses'
   atMin(30);
   const r = tick(db, sample(4096), 'hq-lanes');
   expect(r.nudged).toBe(true);
-  expect(msgs()[0]!.text).toContain('0 eligible Ready issues');
+  expect(readOutboxRows(db)[0]?.text).toContain('0 eligible Ready issues');
   reportReady(db, 6, 'z-delivery');
   atMin(31);
   expect(tick(db, sample(4096), 'hq-lanes').nudged).toBe(true);
-  expect(msgs()[0]!.text).toContain('6 eligible Ready issues');
+  expect(readOutboxRows(db)[0]?.text).toContain('6 eligible Ready issues');
   atMin(62);
   expect(tick(db, sample(4096), 'hq-lanes').eligible).toBeNull();
 });
@@ -119,7 +117,7 @@ test('unsent nudges never pile up: only the newest stays in the outbox', () => {
     atMin(m);
     expect(tick(db, sample(16384), 'hq-lanes').nudged).toBe(true);
   }
-  const rows = msgs();
+  const rows = readOutboxRows(db);
   expect(rows).toHaveLength(1);
   expect(rows[0]!.text).toContain('free for 100 min');
 });
@@ -137,19 +135,19 @@ test('a backlog of unsent nudges is cut to the newest, and to none once lanes ar
   tick(db, sample(16384), 'hq-lanes');
   atMin(41);
   tick(db, sample(16_384), 'hq-lanes');
-  expect(msgs()).toHaveLength(1);
+  expect(readOutboxRows(db)).toHaveLength(1);
   atMin(13);
   tick(db, sample(0), 'hq-lanes');
-  expect(msgs()).toHaveLength(0);
+  expect(readOutboxRows(db)).toHaveLength(0);
 });
 
 test('a hold pauses nudges, drops an unsent one, and ends by itself', () => {
   tick(db, sample(16384), 'hq-lanes');
   atMin(10);
   expect(tick(db, sample(16384), 'hq-lanes').nudged).toBe(true);
-  expect(msgs()).toHaveLength(1);
+  expect(readOutboxRows(db)).toHaveLength(1);
   holdLanes(db, 60, 'host switch', 'z-delivery');
-  expect(msgs()).toHaveLength(0);
+  expect(readOutboxRows(db)).toHaveLength(0);
   atMin(45);
   expect(tick(db, sample(16384), 'hq-lanes').why).toContain('held until');
   expect(nudgeLog(db, 5)).toHaveLength(1);
@@ -166,7 +164,7 @@ test('it drops an unsent nudge at the forwarded orchestrator when the lanes are 
 
   holdLanes(db, 60, 'host switch', 'z-delivery');
 
-  expect(msgs()).toStrictEqual([]);
+  expect(readOutboxRows(db)).toStrictEqual([]);
 });
 
 test('it drops an unsent nudge at the forwarded orchestrator once the lanes are full', () => {
@@ -178,7 +176,7 @@ test('it drops an unsent nudge at the forwarded orchestrator once the lanes are 
 
   tick(db, sample(0), 'hq-lanes');
 
-  expect(msgs()).toStrictEqual([]);
+  expect(readOutboxRows(db)).toStrictEqual([]);
 });
 
 test('release ends a hold early; bad holds are refused', () => {
@@ -195,19 +193,21 @@ test('a Ready report over 2 h old with a free slot alerts z-stu once per stale s
   reportReady(db, 4, 'z-delivery');
   atMin(0);
   tick(db, sample(16_384), 'hq-lanes');
-  expect(msgs().filter((m) => m.target === 'z-stu')).toEqual([{ target: 'z-stu', text: expect.stringContaining('8 slot(s) free, and the newest Ready report is 3 h old') }]);
+  const toOwner = readOutboxRows(db).filter((row) => row.target === 'z-stu');
+  expect(toOwner).toHaveLength(1);
+  expect(toOwner[0]?.text).toContain('8 slot(s) free, and the newest Ready report is 3 h old');
   atMin(5);
   tick(db, sample(16_384), 'hq-lanes');
-  expect(msgs().filter((m) => m.target === 'z-stu')).toHaveLength(1);
+  expect(readOutboxRows(db).filter((row) => row.target === 'z-stu')).toHaveLength(1);
   reportReady(db, 2, 'z-delivery');
   atMin(100);
   tick(db, sample(16_384), 'hq-lanes');
-  expect(msgs().filter((m) => m.target === 'z-stu')).toHaveLength(1);
+  expect(readOutboxRows(db).filter((row) => row.target === 'z-stu')).toHaveLength(1);
 
   createCapacitySample(db, { at: new Date(Date.parse(NOON_SYDNEY) + 125 * 60_000).toISOString().replace('.000Z', 'Z'), nonnixAwakeMib: 0 });
   atMin(126);
   tick(db, sample(16_384), 'hq-lanes');
-  expect(msgs().filter((m) => m.target === 'z-stu')).toHaveLength(2);
+  expect(readOutboxRows(db).filter((row) => row.target === 'z-stu')).toHaveLength(2);
 });
 
 test('a fresh Ready report, full lanes, a failed reading or no report at all sends no stale alert', () => {
@@ -220,7 +220,7 @@ test('a fresh Ready report, full lanes, a failed reading or no report at all sen
   reportReady(db, 4, 'z-delivery');
   atMin(60);
   tick(db, sample(16_384), 'hq-lanes');
-  expect(msgs().filter((m) => m.target === 'z-stu')).toEqual([]);
+  expect(readOutboxRows(db).filter((row) => row.target === 'z-stu')).toStrictEqual([]);
 });
 
 test('the stale alert is due once the report is past 2 h, not at the next whole minute', () => {
@@ -239,5 +239,6 @@ test('quiet hours hold the stale alert until the first look after them', () => {
 
   const noon = new Date(Date.parse(FOUR_AM_SYDNEY) + 8 * 60 * 60_000);
   expect(checkReadyStale(db, noon, 3, 'hq-lanes')).toBe(true);
-  expect(msgs()).toEqual([{ target: 'z-stu', text: expect.stringContaining('3 slot(s) free') }]);
+  expect(readOutboxRows(db).map((row) => row.target)).toStrictEqual(['z-stu']);
+  expect(readOutboxRows(db)[0]?.text).toContain('3 slot(s) free');
 });

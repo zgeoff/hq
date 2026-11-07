@@ -3,6 +3,7 @@ import type { Database } from 'bun:sqlite';
 import { z } from 'zod';
 import { queryRows } from '../test-utils/query-rows.ts';
 import { iso } from '../clock/iso.ts';
+import { readOutboxRows } from '../outbox/read-outbox-rows.ts';
 import { takeQueued } from '../outbox/take-queued.ts';
 import { downtime } from './downtime.ts';
 import { KEEP_DAYS } from './keep-days.ts';
@@ -51,8 +52,6 @@ async function step(m: number, world: { target: boolean; control: boolean; ready
   return probeOnce(db, fake(world), 'hq-probe');
 }
 // oxlint-disable-next-line zgeoff/setup-test-only, zgeoff/no-top-level-arrow -- this file's shared beforeEach state is GEO-1318's lint debt
-const outbox = () => queryRows(db, 'SELECT target, text, topic, status FROM outbox ORDER BY id', z.object({ target: z.string(), text: z.string(), topic: z.string(), status: z.string() }));
-// oxlint-disable-next-line zgeoff/setup-test-only, zgeoff/no-top-level-arrow -- this file's shared beforeEach state is GEO-1318's lint debt
 const outages = () => queryRows(db, 'SELECT * FROM outages ORDER BY id', z.object({ id: z.number(), kind: z.string(), alert_seq: z.number().nullable(), recover_seq: z.number().nullable(), started_at: z.string(), detected_at: z.string(), ended_at: z.string().nullable() }));
 
 test('samples are up, down or blind, and the control is fetched only when the target fails', async () => {
@@ -73,17 +72,17 @@ test('samples are up, down or blind, and the control is fetched only when the ta
 test('two downs open one outage dated from the first; a third queues nothing more', async () => {
   await step(0, UP);
   expect((await step(1, DOWN)).opened).toBeUndefined();
-  expect(outbox()).toEqual([]);
+  expect(readOutboxRows(db)).toStrictEqual([]);
   const r = await step(2, DOWN);
   expect(r.opened).toBe(1);
   expect(outages()).toEqual([{ id: 1, started_at: minute(1), detected_at: minute(2), ended_at: null, alert_seq: expect.any(Number), recover_seq: null, kind: 'down' }]);
 
-  expect(outbox().map((o) => o.target)).toEqual(['z-stu', 'z-delivery']);
-  expect(outbox()[0]).toMatchObject({ topic: 'nix-outage', status: 'pending' });
-  expect(outbox()[1]!.text).toBe(outbox()[0]!.text);
-  expect(outbox()[0]!.text).toContain('Nix is down: https://target.invalid/live failing since 12:01 (2 checks; control URL fine)');
+  expect(readOutboxRows(db).map((row) => row.target)).toStrictEqual(['z-stu', 'z-delivery']);
+  expect(readOutboxRows(db)[0]).toMatchObject({ topic: 'nix-outage', status: 'pending' });
+  expect(readOutboxRows(db)[1]?.text).toBe(readOutboxRows(db)[0]?.text);
+  expect(readOutboxRows(db)[0]?.text).toContain('Nix is down: https://target.invalid/live failing since 12:01 (2 checks; control URL fine)');
   await step(3, DOWN);
-  expect(outbox()).toHaveLength(2);
+  expect(readOutboxRows(db)).toHaveLength(2);
   expect(outages()).toHaveLength(1);
   expect(db.query("SELECT COUNT(*) AS n FROM events WHERE subject = 'hq' AND subject_id = 'probe' AND action = 'outage'").get()).toEqual({ n: 1 });
 });
@@ -114,26 +113,26 @@ test('an up closes the outage and queues one recovery message', async () => {
   const r = await step(6, UP);
   expect(r.closed).toBe(1);
   expect(outages()[0]!.ended_at).toBe(minute(6));
-  expect(outbox().map((o) => [o.target, o.text])).toEqual([
+  expect(readOutboxRows(db).map((row) => [row.target, row.text])).toStrictEqual([
     ['z-stu', 'Nix is back: down 6 min (12:00–12:06 Sydney).'],
     ['z-delivery', 'Nix is back: down 6 min (12:00–12:06 Sydney).'],
   ]);
   await step(7, UP);
-  expect(outbox()).toHaveLength(2);
+  expect(readOutboxRows(db)).toHaveLength(2);
 });
 
 test('a single down then up opens nothing', async () => {
   await step(0, DOWN);
   await step(1, UP);
   expect(outages()).toEqual([]);
-  expect(outbox()).toEqual([]);
+  expect(readOutboxRows(db)).toStrictEqual([]);
 });
 
 test('the probe sends nothing itself: the alert is queued for the command that ran it to send', async () => {
   takeQueued();
   await step(0, DOWN);
   await step(1, DOWN);
-  expect(outbox().map((o) => o.status)).toEqual(['pending', 'pending']);
+  expect(readOutboxRows(db).map((row) => row.status)).toStrictEqual(['pending', 'pending']);
   const ids = takeQueued();
   expect(ids).toHaveLength(2);
   expect(db.query(`SELECT DISTINCT topic FROM outbox WHERE id IN (${ids.join(',')})`).all()).toEqual([{ topic: 'nix-outage' }]);
@@ -222,7 +221,7 @@ test('the recovery message counts blind minutes as blind, as downtime() does', a
   for (let m = 2; m <= 59; m++) await step(m, BLIND);
   await step(60, UP);
   const d = downtime(db, new Date(T0), new Date(T0 + 60 * 60_000));
-  const back = outbox().find((o) => o.target === 'z-stu')!.text;
+  const back = readOutboxRows(db).find((row) => row.target === 'z-stu')?.text;
   expect(back).toBe(`Nix is back: down ${d.downMinutes} min (12:00–13:00 Sydney; hq could not see ${d.blindMinutes} min of it (the PC was offline)).`);
   expect(d.downMinutes).toBeLessThan(5);
 });
@@ -234,7 +233,7 @@ const kinds = () => queryRows(db, 'SELECT id, kind, started_at, detected_at, end
 test('live and ready both fine opens nothing', async () => {
   for (let m = 0; m < 6; m++) expect((await step(m, UP)).ready).toBe(true);
   expect(kinds()).toEqual([]);
-  expect(outbox()).toEqual([]);
+  expect(readOutboxRows(db)).toStrictEqual([]);
 });
 
 test('ready failing for 2 minutes alerts nobody; at 3 minutes one alert goes to both, and later samples add none', async () => {
@@ -243,18 +242,18 @@ test('ready failing for 2 minutes alerts nobody; at 3 minutes one alert goes to 
   await step(2, UNREADY);
   await step(3, UNREADY);
   expect(kinds()).toEqual([]);
-  expect(outbox()).toEqual([]);
+  expect(readOutboxRows(db)).toStrictEqual([]);
   const result = await step(4, UNREADY);
   expect(result.unreadyOpened).toBe(1);
   expect(kinds()).toEqual([{ id: 1, kind: 'unready', started_at: minute(1), detected_at: minute(4), ended_at: null }]);
-  expect(outbox().map((o) => o.target)).toEqual(['z-stu', 'z-delivery']);
-  expect(outbox()[0]).toMatchObject({ topic: 'nix-unready', status: 'pending' });
-  expect(outbox()[0]!.text).toBe('Nix is unready: https://target.invalid/ready failing since 12:01 (4 checks; /health/live is fine). hq checks every minute and tells you when it is ready again.');
-  expect(outbox()[1]!.text).toBe(outbox()[0]!.text);
+  expect(readOutboxRows(db).map((row) => row.target)).toStrictEqual(['z-stu', 'z-delivery']);
+  expect(readOutboxRows(db)[0]).toMatchObject({ topic: 'nix-unready', status: 'pending' });
+  expect(readOutboxRows(db)[0]?.text).toBe('Nix is unready: https://target.invalid/ready failing since 12:01 (4 checks; /health/live is fine). hq checks every minute and tells you when it is ready again.');
+  expect(readOutboxRows(db)[1]?.text).toBe(readOutboxRows(db)[0]?.text);
   expect(db.query("SELECT COUNT(*) AS n FROM events WHERE subject_id = 'probe' AND action = 'unready'").get()).toEqual({ n: 1 });
   await step(5, UNREADY);
   await step(6, UNREADY);
-  expect(outbox()).toHaveLength(2);
+  expect(readOutboxRows(db)).toHaveLength(2);
   expect(kinds()).toHaveLength(1);
   expect(openUnready(db)?.id).toBe(1);
   expect(probeHealth(db, new Date(T0 + 7 * 60_000)).line).toContain('Nix up');
@@ -267,7 +266,7 @@ test('the unready alert is not held over quiet hours', async () => {
     return probeOnce(db, fake(w), 'hq-probe');
   };
   for (let m = 0; m <= 3; m++) await go(m, UNREADY);
-  expect(outbox().map((o) => [o.target, o.status])).toEqual([['z-stu', 'pending'], ['z-delivery', 'pending']]);
+  expect(readOutboxRows(db).map((row) => [row.target, row.status])).toStrictEqual([['z-stu', 'pending'], ['z-delivery', 'pending']]);
 });
 
 test('the first ready sample closes the unready outage and says how long', async () => {
@@ -278,12 +277,12 @@ test('the first ready sample closes the unready outage and says how long', async
   expect(r.unreadyClosed).toBe(1);
   expect(kinds()[0]!.ended_at).toBe(minute(5));
   expect(db.query('SELECT recover_seq FROM outages').get()).toEqual({ recover_seq: expect.any(Number) });
-  expect(outbox().map((o) => [o.target, o.text])).toEqual([
+  expect(readOutboxRows(db).map((row) => [row.target, row.text])).toStrictEqual([
     ['z-stu', 'Nix is ready again: unready 5 min (12:00–12:05 Sydney).'],
     ['z-delivery', 'Nix is ready again: unready 5 min (12:00–12:05 Sydney).'],
   ]);
   await step(6, UP);
-  expect(outbox()).toHaveLength(2);
+  expect(readOutboxRows(db)).toHaveLength(2);
 });
 
 test('a live failure during an unready outage does not close it, and coming back unready continues it', async () => {

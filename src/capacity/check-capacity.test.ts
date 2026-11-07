@@ -1,7 +1,7 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { z } from 'zod';
 import { freshDb } from '../../test/helpers.ts';
-import { queryRows } from '../test-utils/query-rows.ts';
+import { readOutboxRows } from '../outbox/read-outbox-rows.ts';
 import { checkCapacity } from './check-capacity.ts';
 import { setCapacitySetting } from './set-capacity-setting.ts';
 
@@ -24,7 +24,7 @@ test('an imp lane plan over impd\'s line opens the lanes:plan alert after 2 samp
     checkCapacity(ctx.db, { reading, plan: fits }, 'hq-lanes', new Date('2026-10-15T01:15:00Z')),
   ];
 
-  const texts = queryRows(ctx.db, 'SELECT text FROM outbox ORDER BY id', z.object({ text: z.string() })).map((row) => row.text);
+  const texts = readOutboxRows(ctx.db).map((row) => row.text);
 
   expect([ticks.map((tick) => [tick.opened, tick.cleared]), [...new Set(texts)]]).toStrictEqual([
     [

@@ -1,8 +1,6 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test';
 import type { Database } from 'bun:sqlite';
 import { z } from 'zod';
-import { OutboxRowSchema } from '../src/test-utils/outbox-row-schema.ts';
-import { queryRows } from '../src/test-utils/query-rows.ts';
 import { morningCheck } from '../src/morning/morning-check.ts';
 import { morningText } from '../src/morning/morning-text.ts';
 import { morningTick } from '../src/morning/morning-tick.ts';
@@ -12,6 +10,7 @@ import { sydneyUtc } from '../src/morning/sydney-utc.ts';
 import { sydney } from '../src/morning/sydney.ts';
 import { windows } from '../src/morning/windows.ts';
 import { at, freshDb } from './helpers.ts';
+import { readOutboxRows } from '../src/outbox/read-outbox-rows.ts';
 import { setForward } from '../src/outbox/set-forward.ts';
 
 let db: Database;
@@ -21,8 +20,6 @@ const syd = (date: string, hm: string) => {
   const [h, mi] = hm.split(':').map(Number);
   return sydneyUtc(y!, mo!, d!, h!, mi!);
 };
-// oxlint-disable-next-line zgeoff/setup-test-only, zgeoff/no-top-level-arrow -- this file's shared beforeEach state is GEO-1318's lint debt
-const outbox = () => queryRows(db, 'SELECT target, text, status, topic FROM outbox', OutboxRowSchema);
 
 beforeEach(() => {
   ({ db, cleanup } = freshDb());
@@ -56,12 +53,14 @@ test('fires once per Sydney day from 08:15, queued to z-stu; late after 08:45', 
   expect(morningTick(db, 'hq-lanes', syd('2026-10-17', '08:14'))).toBeNull();
   const r = morningTick(db, 'hq-lanes', syd('2026-10-17', '08:16'))!;
   expect(r).toMatchObject({ job: 'morning-reports', key: '2026-10-17', result: 'queued', detail: null });
-  expect(outbox()).toEqual([{ target: 'z-stu', text: expect.stringContaining('Morning reports due. Both windows'), status: 'pending', topic: 'job:morning-reports:2026-10-17' }]);
+  const queued = readOutboxRows(db);
+  expect(queued.map((row) => ({ target: row.target, status: row.status, topic: row.topic }))).toStrictEqual([{ target: 'z-stu', status: 'pending', topic: 'job:morning-reports:2026-10-17' }]);
+  expect(queued[0]?.text).toContain('Morning reports due. Both windows');
   expect(morningTick(db, 'hq-lanes', syd('2026-10-17', '08:21'))).toBeNull();
   expect(morningTick(db, 'hq-lanes', syd('2026-10-17', '23:59'))).toBeNull();
   const late = morningTick(db, 'hq-lanes', syd('2026-10-18', '09:30'))!;
   expect(late).toMatchObject({ key: '2026-10-18', detail: 'late' });
-  expect(outbox().at(-1)!.text).toContain('Morning reports due (late: hq did not run at 08:15)');
+  expect(readOutboxRows(db).at(-1)?.text).toContain('Morning reports due (late: hq did not run at 08:15)');
   expect(recentRuns(db).map((x) => [x.key, x.result, x.sent])).toEqual([
     ['2026-10-18', 'queued', 'pending'],
     ['2026-10-17', 'queued', 'pending'],
@@ -71,7 +70,7 @@ test('fires once per Sydney day from 08:15, queued to z-stu; late after 08:45', 
 test('a skipped morning is left alone; bad skips are refused', () => {
   skipMorning(db, '2026-10-16', 'z-stu ran them by hand', 'z-q');
   expect(morningTick(db, 'hq-lanes', syd('2026-10-16', '09:00'))).toBeNull();
-  expect(outbox()).toEqual([]);
+  expect(readOutboxRows(db)).toStrictEqual([]);
   expect(() => skipMorning(db, '2026-10-16', 'again', 'z-q')).toThrow('already ran (skipped');
   for (const d of ['16/10/2026', '2026-10-16; DROP TABLE job_runs', 'today', '2026-13-40', '2026-02-30', '2026-1-05', '']) expect(() => skipMorning(db, d, 'x', 'z-q')).toThrow('--date');
   expect(() => skipMorning(db, '2026-10-19', '  ', 'z-q')).toThrow('--reason');

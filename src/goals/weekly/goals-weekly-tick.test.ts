@@ -1,9 +1,8 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test';
 import type { Database } from 'bun:sqlite';
-import { OutboxRowSchema } from '../../test-utils/outbox-row-schema.ts';
-import { queryRows } from '../../test-utils/query-rows.ts';
 import { iso } from '../../clock/iso.ts';
 import { setMeta } from '../../db/set-meta.ts';
+import { readOutboxRows } from '../../outbox/read-outbox-rows.ts';
 import { goalsWeeklyCheck } from './goals-weekly-check.ts';
 import { goalsWeeklyTick } from './goals-weekly-tick.ts';
 import { sendWeekly } from './send-weekly.ts';
@@ -27,8 +26,6 @@ const syd = (date: string, hm: string) => {
   const [h, mi] = hm.split(':').map(Number);
   return sydneyUtc(y!, mo!, d!, h!, mi!);
 };
-// oxlint-disable-next-line zgeoff/setup-test-only, zgeoff/no-top-level-arrow -- this file's shared beforeEach state is GEO-1318's lint debt
-const outbox = () => queryRows(db, 'SELECT target, text, status, topic FROM outbox', OutboxRowSchema);
 const synced = (when: Date) => {
   for (const k of ['goals_ok_at', 'kinds_ok_at', 'linear_synced_at']) setMeta(db, k, iso(when));
 };
@@ -60,7 +57,7 @@ test('nothing before Monday 17:00, and nothing on another day', () => {
   synced(syd('2026-10-20', '17:40'));
   expect(tick('2026-10-20', '17:05')).toEqual({ run: null, waiting: null });
   expect(tick('2026-10-18', '17:05')).toEqual({ run: null, waiting: null });
-  expect(outbox()).toEqual([]);
+  expect(readOutboxRows(db)).toStrictEqual([]);
 });
 
 test('at Monday 17:00 one message goes to z-stu with the table, both weeks and the flags; a second tick sends nothing', () => {
@@ -73,21 +70,22 @@ test('at Monday 17:00 one message goes to z-stu with the table, both weeks and t
   synced(syd(MON, '16:50'));
   const r = tick(MON, '17:01');
   expect(r.run).toMatchObject({ job: 'goals-weekly', key: MON, result: 'queued', detail: null });
-  expect(outbox()).toHaveLength(1);
-  const [msg] = outbox();
-  expect(msg).toMatchObject({ target: 'z-stu', status: 'pending', topic: 'job:goals-weekly:2026-10-19' });
-  const lines = msg!.text.split('\n');
+  expect(readOutboxRows(db)).toHaveLength(1);
+  const [message] = readOutboxRows(db);
+  expect(message).toMatchObject({ target: 'z-stu', status: 'pending', topic: 'job:goals-weekly:2026-10-19' });
+  const text = message?.text ?? '';
+  const lines = text.split('\n');
   expect(lines[0]).toBe('Goals weekly, week of 12 Oct:');
   expect(lines).toContain('| goal | target | this week | last week | |');
-  expect(row(msg!.text, 'Bug share')).toBe('| Bug share | <20% by 2 Nov | 50% of 2 typed PRs | 0% of 1 typed PRs | 🔴 red |');
-  expect(row(msg!.text, 'Feature + Improvement share')).toBe('| Feature + Improvement share | >=60% | 50% of 2 typed PRs | 100% of 1 typed PRs | 🔴 red |');
-  expect(row(msg!.text, 'deploy-prod success')).toContain('| >=90% | no data (0 applies) | no data (0 applies) | – |');
+  expect(row(text, 'Bug share')).toBe('| Bug share | <20% by 2 Nov | 50% of 2 typed PRs | 0% of 1 typed PRs | 🔴 red |');
+  expect(row(text, 'Feature + Improvement share')).toBe('| Feature + Improvement share | >=60% | 50% of 2 typed PRs | 100% of 1 typed PRs | 🔴 red |');
+  expect(row(text, 'deploy-prod success')).toContain('| >=90% | no data (0 applies) | no data (0 applies) | – |');
   expect(lines.filter((line) => line.startsWith('| ')).length).toBe(2 + 7);
   expect(lines).toContain('Flags you kept:');
   expect(lines.at(-1)).toBe('Targets live in hq config: hq goals targets; move one with hq goals target <key> <op> <value>.');
   expect(tick(MON, '17:06')).toEqual({ run: null, waiting: null });
   expect(tick(MON, '23:59')).toEqual({ run: null, waiting: null });
-  expect(outbox()).toHaveLength(1);
+  expect(readOutboxRows(db)).toHaveLength(1);
 });
 
 test('a green row says so, and the colour follows the unrounded share', () => {
@@ -190,7 +188,7 @@ test('flags are the weekly-flag items since the last weekly, filtered by tag and
   addNews(db, { from: 'z-qa', topic: 'other', text: 'No tag at all.', issue: null, link: null, needsGeoff: false });
   synced(syd(MON, '16:50'));
   tick(MON, '17:00');
-  const first = outbox()[0]!.text;
+  const first = readOutboxRows(db)[0]?.text;
   expect(first).toContain('Flags you kept:\n- The kettle whistles twice. (z-qa, Thu 12:00)\n\n');
   expect(first).not.toContain('Too old');
   expect(first).not.toContain('A different tag');
@@ -209,11 +207,11 @@ test('with no flags the section says none', () => {
 test('stale goals data makes it wait, and it sends once the data is fresh', () => {
   synced(syd(MON, '15:00'));
   expect(tick(MON, '17:00')).toEqual({ run: null, waiting: 'goals data 120 min old' });
-  expect(outbox()).toEqual([]);
+  expect(readOutboxRows(db)).toStrictEqual([]);
   expect(db.query('SELECT COUNT(*) AS n FROM job_runs').get()).toEqual({ n: 0 });
   synced(syd(MON, '17:02'));
   expect(tick(MON, '17:05').run).toMatchObject({ key: MON });
-  expect(outbox()).toHaveLength(1);
+  expect(readOutboxRows(db)).toHaveLength(1);
 });
 
 test('data that was never synced waits; a Monday after 17:30 is sent late and marked so', () => {
@@ -226,18 +224,18 @@ test('a dry run is the text alone: nothing sent, no job row; a manual send runs 
   synced(syd(MON, '10:00'));
   const t = syd(MON, '10:10');
   weeklyText(db, t);
-  expect(outbox()).toEqual([]);
+  expect(readOutboxRows(db)).toStrictEqual([]);
   expect(db.query('SELECT COUNT(*) AS n FROM job_runs').get()).toEqual({ n: 0 });
   expect(sendWeekly(db, 'z-stu', t)).toMatchObject({ result: 'queued', detail: 'manual', key: MON });
   expect(() => sendWeekly(db, 'z-stu', t)).toThrow('already ran');
   expect(tick(MON, '17:00')).toEqual({ run: null, waiting: null });
-  expect(outbox()).toHaveLength(1);
+  expect(readOutboxRows(db)).toHaveLength(1);
 });
 
 test('a manual send on a Thursday reviews the last complete week and keys on that Monday', () => {
   synced(syd('2026-10-22', '10:00'));
   expect(sendWeekly(db, 'z-stu', syd('2026-10-22', '10:10')).key).toBe(MON);
-  expect(outbox()[0]!.text.split('\n')[0]).toBe('Goals weekly, week of 12 Oct:');
+  expect(readOutboxRows(db)[0]?.text.split('\n')[0]).toBe('Goals weekly, week of 12 Oct:');
   const stale = () => sendWeekly(db, 'z-stu', syd('2026-11-05', '10:10'));
   expect(stale).toThrow('run hq goals sync first');
 });
@@ -246,7 +244,7 @@ test('skip leaves a Monday alone; bad skips are refused', () => {
   synced(syd(MON, '16:50'));
   skipWeekly(db, MON, 'done by hand', 'z-stu');
   expect(tick(MON, '17:00')).toEqual({ run: null, waiting: null });
-  expect(outbox()).toEqual([]);
+  expect(readOutboxRows(db)).toStrictEqual([]);
   expect(() => skipWeekly(db, MON, 'again', 'z-stu')).toThrow('already ran');
   expect(() => skipWeekly(db, '2026-02-30', 'x', 'z-stu')).toThrow('Sydney Monday');
   expect(() => skipWeekly(db, '2026-10-20', 'x', 'z-stu')).toThrow('not a Monday');

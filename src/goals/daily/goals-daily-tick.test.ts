@@ -1,9 +1,8 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test';
 import type { Database } from 'bun:sqlite';
-import { OutboxRowSchema } from '../../test-utils/outbox-row-schema.ts';
-import { queryRows } from '../../test-utils/query-rows.ts';
 import { iso } from '../../clock/iso.ts';
 import { setMeta } from '../../db/set-meta.ts';
+import { readOutboxRows } from '../../outbox/read-outbox-rows.ts';
 import { dailyText } from './daily-text.ts';
 import { goalsDailyCheck } from './goals-daily-check.ts';
 import { goalsDailyTick } from './goals-daily-tick.ts';
@@ -26,8 +25,6 @@ const syd = (date: string, hm: string) => {
   const [h, mi] = hm.split(':').map(Number);
   return sydneyUtc(y!, mo!, d!, h!, mi!);
 };
-// oxlint-disable-next-line zgeoff/setup-test-only, zgeoff/no-top-level-arrow -- this file's shared beforeEach state is GEO-1318's lint debt
-const outbox = () => queryRows(db, 'SELECT target, text, status, topic FROM outbox', OutboxRowSchema);
 const synced = (when: Date) => {
   for (const k of ['goals_ok_at', 'kinds_ok_at', 'linear_synced_at']) setMeta(db, k, iso(when));
 };
@@ -47,17 +44,17 @@ afterEach(() => {
 test('nothing before 18:00', () => {
   synced(syd('2026-10-16', '17:40'));
   expect(tick('2026-10-16', '17:59')).toEqual({ run: null, waiting: null });
-  expect(outbox()).toEqual([]);
+  expect(readOutboxRows(db)).toStrictEqual([]);
 });
 
 test('at 18:00 one message goes to z-stu: 7 goal lines, 3 throughput lines and the incidents; a second tick sends nothing', () => {
   synced(syd('2026-10-16', '17:50'));
   const r = tick('2026-10-16', '18:01');
   expect(r.run).toMatchObject({ job: 'goals-daily', key: '2026-10-16', result: 'queued', detail: null });
-  const [msg] = outbox();
-  expect(outbox()).toHaveLength(1);
-  expect(msg).toMatchObject({ target: 'z-stu', status: 'pending', topic: 'job:goals-daily:2026-10-16' });
-  const lines = msg!.text.split('\n');
+  const [message] = readOutboxRows(db);
+  expect(readOutboxRows(db)).toHaveLength(1);
+  expect(message).toMatchObject({ target: 'z-stu', status: 'pending', topic: 'job:goals-daily:2026-10-16' });
+  const lines = message?.text.split('\n') ?? [];
   expect(lines[0]).toBe('Goals check-in, Fri 16 Oct:');
   expect(lines).toHaveLength(13);
   expect(lines.slice(1, 11).map((goalLine) => goalLine.split(':')[0])).toEqual(['- Bug share', '- Feature + Improvement share', '- deploy-prod success', '- Nix downtime', '- CI minutes wasted', '- First review must-fix', '- Cost', '- Issues', '- Bad filings', '- Stale']);
@@ -67,7 +64,7 @@ test('at 18:00 one message goes to z-stu: 7 goal lines, 3 throughput lines and t
   expect(lines[1]).toBe('- Bug share: today no data (0 typed PRs), week so far no data (0 typed PRs); target <20% by 2 Nov –');
   expect(tick('2026-10-16', '18:06')).toEqual({ run: null, waiting: null });
   expect(tick('2026-10-16', '23:59')).toEqual({ run: null, waiting: null });
-  expect(outbox()).toHaveLength(1);
+  expect(readOutboxRows(db)).toHaveLength(1);
 });
 
 test('a line carries the colour as words after the emoji', () => {
@@ -146,11 +143,11 @@ test('incidents today list an unready episode beside the outages, one line each'
 test('stale goals data makes it wait, and it sends once the data is fresh', () => {
   synced(syd('2026-10-16', '16:00'));
   expect(tick('2026-10-16', '18:00')).toEqual({ run: null, waiting: 'goals data 120 min old' });
-  expect(outbox()).toEqual([]);
+  expect(readOutboxRows(db)).toStrictEqual([]);
   expect(db.query('SELECT COUNT(*) AS n FROM job_runs').get()).toEqual({ n: 0 });
   synced(syd('2026-10-16', '18:02'));
   expect(tick('2026-10-16', '18:05').run).toMatchObject({ key: '2026-10-16' });
-  expect(outbox()).toHaveLength(1);
+  expect(readOutboxRows(db)).toHaveLength(1);
 });
 
 test('goals data that was never synced waits too; 35 minutes old still sends', () => {
@@ -168,10 +165,10 @@ test('hq goals daily sends now, once; a dry run sends nothing and writes no job 
   synced(syd('2026-10-16', '10:00'));
   const t = syd('2026-10-16', '10:10');
   dailyText(db, t);
-  expect(outbox()).toEqual([]);
+  expect(readOutboxRows(db)).toStrictEqual([]);
   expect(db.query('SELECT COUNT(*) AS n FROM job_runs').get()).toEqual({ n: 0 });
   expect(sendDaily(db, 'z-stu', t)).toMatchObject({ result: 'queued', detail: 'manual' });
-  expect(outbox()).toHaveLength(1);
+  expect(readOutboxRows(db)).toHaveLength(1);
   expect(() => sendDaily(db, 'z-stu', t)).toThrow('already ran');
   expect(tick('2026-10-16', '18:00')).toEqual({ run: null, waiting: null });
 });
@@ -179,14 +176,14 @@ test('hq goals daily sends now, once; a dry run sends nothing and writes no job 
 test('a manual send refuses stale data', () => {
   synced(syd('2026-10-16', '08:00'));
   expect(() => sendDaily(db, 'z-stu', syd('2026-10-16', '10:10'))).toThrow('run hq goals sync first');
-  expect(outbox()).toEqual([]);
+  expect(readOutboxRows(db)).toStrictEqual([]);
 });
 
 test('skip leaves a day alone; bad skips are refused', () => {
   synced(syd('2026-10-16', '17:50'));
   skipDaily(db, '2026-10-16', 'done by hand', 'z-stu');
   expect(tick('2026-10-16', '18:00')).toEqual({ run: null, waiting: null });
-  expect(outbox()).toEqual([]);
+  expect(readOutboxRows(db)).toStrictEqual([]);
   expect(() => skipDaily(db, '2026-10-16', 'again', 'z-stu')).toThrow('already ran');
   expect(() => skipDaily(db, '2026-02-30', 'x', 'z-stu')).toThrow('Sydney date');
   expect(() => skipDaily(db, '2026-10-17', ' ', 'z-stu')).toThrow('--reason');

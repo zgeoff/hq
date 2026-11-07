@@ -1,7 +1,5 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { OutboxMessageSchema } from '../test-utils/outbox-row-schema.ts';
-import { queryRows } from '../test-utils/query-rows.ts';
 import { AtcClient } from '../atc/atc-client.ts';
 import { overrideEnv } from '../config/override-env.ts';
 import { getMeta } from '../db/get-meta.ts';
@@ -13,6 +11,7 @@ import { staleSinceSchema } from './stale-since-schema.ts';
 import type { FleetEntry } from './types.ts';
 import { enqueue } from '../outbox/enqueue.ts';
 import { flush } from '../outbox/flush.ts';
+import { readOutboxRows } from '../outbox/read-outbox-rows.ts';
 import { logEvent } from '../log-event.ts';
 import { resetFetchCache } from '../prompts/reset-fetch-cache.ts';
 import { FOUR_AM_SYDNEY, NOON_SYDNEY, at, createDefsRepo, fakeAtc, freshDb, readCallPins, readSpawnedNames } from '../../test/helpers.ts';
@@ -80,7 +79,10 @@ function setupTest(config: { sessions?: RosterSession[]; cwd?: string } = {}) {
     async tick(minutes: number, fleet: FleetEntry[]) {
       await this.tickAt(new Date(Date.parse(NOON_SYDNEY) + minutes * 60_000).toISOString(), fleet);
     },
-    outboxTo: (target: string) => queryRows(base.db, 'SELECT target, text FROM outbox WHERE target = ? ORDER BY id', OutboxMessageSchema, target),
+    outboxTo: (target: string) =>
+      readOutboxRows(base.db)
+        .filter((row) => row.target === target)
+        .map((row) => ({ target: row.target, text: row.text })),
     setState(id: string, state: string) {
       Object.assign(roster.find((s) => s.id === id) ?? {}, { state });
     },
@@ -94,7 +96,7 @@ function setupTest(config: { sessions?: RosterSession[]; cwd?: string } = {}) {
     setRefresh: (value: unknown) => setMeta(base.db, 'fleet_refresh', JSON.stringify(value)),
     staleSince: () => staleSinceSchema.parse(JSON.parse(getMeta(base.db, 'fleet_stale_since') ?? '{}')),
     staleCommit: () => staleSinceSchema.parse(JSON.parse(getMeta(base.db, 'fleet_stale_since') ?? '{}'))['z-kettle']?.commit,
-    outbox: () => queryRows(base.db, 'SELECT target, text FROM outbox ORDER BY id', OutboxMessageSchema),
+    outbox: () => readOutboxRows(base.db).map((row) => ({ target: row.target, text: row.text })),
     refresh: () => refreshSchema.parse(JSON.parse(getMeta(base.db, 'fleet_refresh') ?? '{}')),
   };
 }
