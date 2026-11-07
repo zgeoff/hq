@@ -1,6 +1,10 @@
 // A failure only counts as Nix being down when a known-up control URL answers; when both fail,
 // the PC's own network, DNS or sleep is the cause, and the sample is blind.
 import type { Database } from 'bun:sqlite';
+import { sql } from 'kysely';
+import { buildRowSchema } from '../db/build-row-schema.ts';
+import { runSyncQuery } from '../db/run-sync-query.ts';
+import { kdb } from '../kdb.ts';
 import { logEvent } from '../log-event.ts';
 import { owner } from '../owner.ts';
 import { iso } from '../clock/iso.ts';
@@ -82,11 +86,12 @@ export async function probeOnce(db: Database, fetcher: Fetcher, actor: string): 
   return { state, ...(opened !== undefined ? { opened } : {}), ...(closed !== undefined ? { closed } : {}), ...(r ? { ready: r.ok } : {}), ...(unreadyOpened !== undefined ? { unreadyOpened } : {}), ...(unreadyClosed !== undefined ? { unreadyClosed } : {}), ms: t.ms };
 }
 
+const UnreadySampleSchema = buildRowSchema('probe_samples').pick({ at: true, target_ok: true, ready_ok: true });
 const CONTROL = 'https://api.github.com/zen';
 const control = () => config().HQ_PROBE_CONTROL ?? CONTROL;
 
 function unreadyRun(db: Database): string[] {
-  const rows = db.query('SELECT at, target_ok, ready_ok FROM probe_samples WHERE target_ok = 1 ORDER BY at DESC LIMIT 200').all() as { at: string; target_ok: number; ready_ok: number | null }[];
+  const rows = runSyncQuery(db, kdb(db).selectFrom('probe_samples').select(['at', 'target_ok', 'ready_ok']).where('target_ok', '=', 1).orderBy('at', 'desc').limit(200).compile(), UnreadySampleSchema);
   const run: string[] = [];
   for (const r of rows) {
     if (r.ready_ok !== 0) break;
@@ -95,8 +100,10 @@ function unreadyRun(db: Database): string[] {
   return run;
 }
 
+const DownSampleSchema = buildRowSchema('probe_samples').pick({ at: true, target_ok: true, control_ok: true });
+
 function downRun(db: Database): string[] {
-  const rows = db.query(`SELECT at, target_ok, control_ok FROM probe_samples WHERE NOT (target_ok = 0 AND control_ok = 0) ORDER BY at DESC LIMIT 50`).all() as { at: string; target_ok: number; control_ok: number | null }[];
+  const rows = runSyncQuery(db, sql`SELECT at, target_ok, control_ok FROM probe_samples WHERE NOT (target_ok = 0 AND control_ok = 0) ORDER BY at DESC LIMIT 50`.compile(kdb(db)), DownSampleSchema);
   const run: string[] = [];
   for (const r of rows) {
     if (r.target_ok) break;

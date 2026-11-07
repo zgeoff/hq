@@ -2,6 +2,10 @@ import type { Database } from 'bun:sqlite';
 import { accountLabels } from '../../accounts/account-labels.ts';
 import { accountName } from '../../accounts/account-name.ts';
 import { iso } from '../../clock/iso.ts';
+import { buildRowSchema } from '../../db/build-row-schema.ts';
+import { runSyncQuery } from '../../db/run-sync-query.ts';
+import { runSyncRow } from '../../db/run-sync-row.ts';
+import { kdb } from '../../kdb.ts';
 import { now } from '../../clock/now.ts';
 import { mondayOf } from '../../kinds/monday-of.ts';
 import { sydneyUtc } from '../../morning/sydney-utc.ts';
@@ -62,6 +66,8 @@ const weeksBefore = (monday: Date, weeks: number) => {
   return sydneyUtc(s.y, s.mo, s.d - 7 * weeks);
 };
 
+const UsageSchema = buildRowSchema('usage_samples').pick({ at: true, account: true, five_hour: true, seven_day: true });
+
 interface AccountWeek {
   account: string;
   peak: number | null;
@@ -72,7 +78,7 @@ interface AccountWeek {
 
 function accountWeeks(db: Database, from: Date, to: Date): AccountWeek[] {
   const [f, t] = [iso(from), iso(to)];
-  const rows = db.query('SELECT at, account, five_hour, seven_day FROM usage_samples WHERE at >= ? AND at < ? ORDER BY account, at').all(f, t) as { at: string; account: string; five_hour: number | null; seven_day: number | null }[];
+  const rows = runSyncQuery(db, kdb(db).selectFrom('usage_samples').select(['at', 'account', 'five_hour', 'seven_day']).where('at', '>=', f).where('at', '<', t).orderBy('account').orderBy('at').compile(), UsageSchema);
   const out = new Map<string, AccountWeek>();
   for (const row of rows) {
     const week = out.get(row.account) ?? { account: row.account, peak: null, five: null, seven: null, readings: 0 };
@@ -116,6 +122,6 @@ const cell = (k: GoalKey, m: Measure): string => {
 const flat = (t: string) => t.replace(/\s+/g, ' ').trim().slice(0, 240);
 
 function flagsSince(db: Database, at: Date): string {
-  const last = db.query(`SELECT at FROM job_runs WHERE job = ? AND result = 'queued' ORDER BY at DESC LIMIT 1`).get(JOB) as { at: string } | null;
+  const last = runSyncRow(db, kdb(db).selectFrom('job_runs').select('at').where('job', '=', JOB).where('result', '=', 'queued').orderBy('at', 'desc').limit(1).compile(), buildRowSchema('job_runs').pick({ at: true }));
   return last?.at ?? iso(new Date(at.getTime() - 7 * 86_400_000));
 }

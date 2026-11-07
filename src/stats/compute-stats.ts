@@ -1,6 +1,10 @@
 // Rows from before the bulk import are left out: their times mark the import, not the work.
 import type { Database } from 'bun:sqlite';
+import { sql } from 'kysely';
 import { z } from 'zod';
+import { buildRowSchema } from '../db/build-row-schema.ts';
+import { runSyncQuery } from '../db/run-sync-query.ts';
+import { kdb } from '../kdb.ts';
 import { dist } from './dist.ts';
 import { getCutoff as cutoff } from './get-cutoff.ts';
 import type { GhMerge, Oldest, Stats } from './types.ts';
@@ -14,6 +18,16 @@ const MovesSchema = z.array(z.object({ issue: z.string(), seq: z.number() }));
 const DoneEventsSchema = z.array(z.object({ issue: z.string(), seq: z.number(), at: z.string() }));
 const RunsSchema = z.array(z.object({ issue: z.string(), state: z.string(), created_at: z.string(), closed_at: z.string().nullable(), ready_since: z.string().nullable() }));
 
+const AskSchema = buildRowSchema('asks').pick({ id: true, state: true, queued_at: true, answered_at: true, applied_at: true });
+const UnblockSchema = buildRowSchema('unblocks').pick({ id: true, state: true, added_at: true, closed_at: true });
+const StateEventSchema = z.object({ issue: z.string(), at: z.string(), to_state: z.string().nullable(), data: z.string() });
+const StateDataSchema = z.object({ waitsOn: z.string().nullable().optional(), waitsOnGeoff: z.boolean().optional() });
+const WaitingSchema = z.object({ issue: z.string() });
+const SampleSchema = buildRowSchema('lanes_samples').pick({ at: true, slots: true, eligible: true, error: true });
+const NudgeSchema = buildRowSchema('lanes_nudges').pick({ slots: true, slots_after: true });
+const FirstReviewSchema = z.object({ ref: z.string().nullable(), at: z.string() });
+const RoundSchema = buildRowSchema('run_prs').pick({ ref: true, review_round: true });
+
 const mins = (a: string, b: string) => (Date.parse(b) - Date.parse(a)) / 60_000;
 const clip = (s: string, lo: string, hi: string) => (s < lo ? lo : s > hi ? hi : s);
 const repoOf = (ref: string) => ref.split('#')[0]!;
@@ -23,7 +37,7 @@ export function computeStats(db: Database, opts: { from: string; to: string; gh:
   const to = opts.to;
   const inWin = (t: string | null) => !!t && t >= from && t < to;
 
-  const asks = db.query('SELECT id, state, queued_at, answered_at, applied_at FROM asks').all() as { id: string; state: string; queued_at: string; answered_at: string | null; applied_at: string | null }[];
+  const asks = runSyncQuery(db, kdb(db).selectFrom('asks').select(['id', 'state', 'queued_at', 'answered_at', 'applied_at']).compile(), AskSchema);
   const qa = asks.filter((a) => inWin(a.answered_at) && a.queued_at >= cutoff() && a.answered_at! >= a.queued_at).map((a) => mins(a.queued_at, a.answered_at!));
   const ap = asks.filter((a) => inWin(a.applied_at) && a.answered_at && a.answered_at >= cutoff()).map((a) => mins(a.answered_at!, a.applied_at!));
   const oldestOf = (rows: { id: string; t: string }[]): Oldest | null => {
@@ -33,12 +47,12 @@ export function computeStats(db: Database, opts: { from: string; to: string; gh:
   const oldestQueued = oldestOf(asks.filter((a) => a.state === 'queued' || a.state === 'open').map((a) => ({ id: a.id, t: a.queued_at })));
   const oldestUnapplied = oldestOf(asks.filter((a) => a.state === 'answered').map((a) => ({ id: a.id, t: a.answered_at ?? a.queued_at })));
 
-  const unb = db.query('SELECT id, state, added_at, closed_at FROM unblocks').all() as { id: string; state: string; added_at: string; closed_at: string | null }[];
+  const unb = runSyncQuery(db, kdb(db).selectFrom('unblocks').select(['id', 'state', 'added_at', 'closed_at']).compile(), UnblockSchema);
   const ud = unb.filter((u) => u.state === 'done' && inWin(u.closed_at) && u.added_at >= cutoff()).map((u) => mins(u.added_at, u.closed_at!));
   const oldestUnblock = oldestOf(unb.filter((u) => u.state === 'open').map((u) => ({ id: u.id, t: u.added_at })));
 
   const runs = RunsSchema.parse(db.query('SELECT issue, state, created_at, closed_at, ready_since FROM runs WHERE created_at >= ? AND design_lane IS NULL').all(cutoff()));
-  const stateEvents = db.query(`SELECT subject_id AS issue, at, to_state, data FROM events WHERE subject = 'run' AND action = 'state' ORDER BY seq`).all() as { issue: string; at: string; to_state: string; data: string }[];
+  const stateEvents = runSyncQuery(db, kdb(db).selectFrom('events').select(['subject_id as issue', 'at', 'to_state', 'data']).where('subject', '=', 'run').where('action', '=', 'state').orderBy('seq').compile(), StateEventSchema);
   const byIssue = new Map<string, typeof stateEvents>();
   for (const e of stateEvents) byIssue.set(e.issue, [...(byIssue.get(e.issue) ?? []), e]);
   const waitTotals: number[] = [];
@@ -59,14 +73,14 @@ export function computeStats(db: Database, opts: { from: string; to: string; gh:
       }
     };
     for (const e of byIssue.get(r.issue) ?? []) {
-      const d = JSON.parse(e.data) as { waitsOn?: string | null; waitsOnGeoff?: boolean };
+      const data = StateDataSchema.parse(JSON.parse(e.data));
       let next: boolean = geoff;
       let nextExact: boolean = exact;
-      if (d.waitsOnGeoff !== undefined) {
-        next = d.waitsOnGeoff;
+      if (data.waitsOnGeoff !== undefined) {
+        next = data.waitsOnGeoff;
         nextExact = true;
-      } else if (d.waitsOn !== undefined) {
-        next = /\b(?:geoff|the owner)\b/iu.test(d.waitsOn ?? '');
+      } else if (data.waitsOn !== undefined) {
+        next = /\b(?:geoff|the owner)\b/iu.test(data.waitsOn ?? '');
         nextExact = false;
       }
       if (e.to_state === 'done' || e.to_state === 'dropped') next = false;
@@ -125,12 +139,14 @@ export function computeStats(db: Database, opts: { from: string; to: string; gh:
     const last = merges.findLast((merge) => merge.issue === r.issue && merge.seq > (buildStarts.get(r.issue) ?? 0) && merge.at <= done);
     if (!last) continue;
     const m = mins(last.at, done);
-    const repo = repoOf((JSON.parse(last.data) as { ref: string }).ref);
+    const repo = repoOf(readMergeRef(last.data));
     mergeTimes.push(m);
     (perRepo[repo] ??= []).push(m);
   }
-  for (const m of merges) lastMerge.set(m.issue, { at: m.at, repo: repoOf((JSON.parse(m.data) as { ref: string }).ref) });
-  const waiting = db.query(`SELECT issue FROM runs WHERE state IN ('merged', 'deploying', 'deploy-held', 'live-check')`).all() as { issue: string }[];
+  for (const merge of merges) {
+    lastMerge.set(merge.issue, { at: merge.at, repo: repoOf(readMergeRef(merge.data)) });
+  }
+  const waiting = runSyncQuery(db, sql`SELECT issue FROM runs WHERE state IN ('merged', 'deploying', 'deploy-held', 'live-check')`.compile(kdb(db)), WaitingSchema);
   const backlog: Stats['live']['backlog'] = { total: 0, byRepo: {}, oldest: null };
   for (const w of waiting) {
     const lm = lastMerge.get(w.issue);
@@ -143,7 +159,7 @@ export function computeStats(db: Database, opts: { from: string; to: string; gh:
     }
   }
 
-  const samples = db.query('SELECT at, slots, eligible, error FROM lanes_samples WHERE at >= ? AND at < ? ORDER BY seq').all(from, to) as { at: string; slots: number; eligible: number | null; error: string | null }[];
+  const samples = runSyncQuery(db, kdb(db).selectFrom('lanes_samples').select(['at', 'slots', 'eligible', 'error']).where('at', '>=', from).where('at', '<', to).orderBy('seq').compile(), SampleSchema);
   let ready = 0;
   let unknown = 0;
   let stale = 0;
@@ -156,7 +172,7 @@ export function computeStats(db: Database, opts: { from: string; to: string; gh:
     if (s.eligible === null) unknown += s.slots * dt;
     else if (s.eligible > 0) ready += Math.min(s.slots, s.eligible) * dt;
   }
-  const nudges = db.query('SELECT slots, slots_after FROM lanes_nudges WHERE at >= ? AND at < ?').all(from, to) as { slots: number; slots_after: number | null }[];
+  const nudges = runSyncQuery(db, kdb(db).selectFrom('lanes_nudges').select(['slots', 'slots_after']).where('at', '>=', from).where('at', '<', to).compile(), NudgeSchema);
 
   const days = Math.max(1 / 24, (Date.parse(to) - Date.parse(from)) / 86_400_000);
   const mergesPerDay: Record<string, number> = {};
@@ -164,14 +180,22 @@ export function computeStats(db: Database, opts: { from: string; to: string; gh:
   if (opts.gh) {
     source = 'github';
     for (const m of opts.gh) if (inWin(m.mergedAt)) mergesPerDay[m.repo] = (mergesPerDay[m.repo] ?? 0) + 1;
-  } else for (const m of merges) if (inWin(m.at)) mergesPerDay[repoOf((JSON.parse(m.data) as { ref: string }).ref)] = (mergesPerDay[repoOf((JSON.parse(m.data) as { ref: string }).ref)] ?? 0) + 1;
+  } else {
+    for (const merge of merges) {
+      if (!inWin(merge.at)) {
+        continue;
+      }
+      const repo = repoOf(readMergeRef(merge.data));
+      mergesPerDay[repo] = (mergesPerDay[repo] ?? 0) + 1;
+    }
+  }
   // Under a day, the counts stay counts: a rate from a few hours overstates.
   if (days >= 1) for (const k of Object.keys(mergesPerDay)) mergesPerDay[k] = Math.round((mergesPerDay[k]! / days) * 10) / 10;
 
-  const firstReview = db.query(`SELECT json_extract(data, '$.ref') AS ref, MIN(at) AS at FROM events WHERE subject = 'run' AND action = 'reviewed' GROUP BY ref`).all() as { ref: string; at: string }[];
-  const rounds = new Map((db.query('SELECT ref, review_round FROM run_prs').all() as { ref: string; review_round: number }[]).map((r) => [r.ref, r.review_round]));
+  const firstReview = runSyncQuery(db, sql`SELECT json_extract(data, '$.ref') AS ref, MIN(at) AS at FROM events WHERE subject = 'run' AND action = 'reviewed' GROUP BY ref`.compile(kdb(db)), FirstReviewSchema);
+  const rounds = new Map(runSyncQuery(db, kdb(db).selectFrom('run_prs').select(['ref', 'review_round']).compile(), RoundSchema).map((round) => [round.ref, round.review_round]));
   const reviewed = firstReview.filter((r) => inWin(r.at));
-  const rechecked = reviewed.filter((r) => (rounds.get(r.ref) ?? 0) >= 2).length;
+  const rechecked = reviewed.filter((review) => ((review.ref === null ? undefined : rounds.get(review.ref)) ?? 0) >= 2).length;
 
   const cycle: number[] = [];
   let fromReady = 0;
@@ -216,4 +240,8 @@ export function computeStats(db: Database, opts: { from: string; to: string; gh:
       cycleFromReady: fromReady,
     },
   };
+}
+
+function readMergeRef(data: string): string {
+  return MergeDataSchema.parse(JSON.parse(data)).ref;
 }

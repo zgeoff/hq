@@ -1,7 +1,11 @@
 import type { Database } from 'bun:sqlite';
+import type { z } from 'zod';
+import { buildRowSchema } from '../db/build-row-schema.ts';
+import { runSyncQuery } from '../db/run-sync-query.ts';
+import { kdb } from '../kdb.ts';
 import type { Runner } from '../runner/types.ts';
 import type { ReviewFinding } from './parse-review-run.ts';
-import type { StoredFinding } from './types.ts';
+import { StoredFindingsColumn } from './stored-finding-schema.ts';
 
 export interface LateInput {
   run: Runner;
@@ -14,10 +18,6 @@ export interface LateInput {
   findings: ReviewFinding[];
 }
 
-interface PriorReview {
-  head: string | null;
-  findings: string;
-}
 
 export async function collectLateFlags(input: LateInput): Promise<Map<string, boolean | null>> {
   const flags = new Map<string, boolean | null>(input.findings.map((finding) => [finding.id, null]));
@@ -45,12 +45,16 @@ async function updateLateFlags(input: LateInput, flags: Map<string, boolean | nu
 }
 
 function pickFreshFindings(input: LateInput, prior: PriorReview[]): ReviewFinding[] {
-  const seen = new Set(prior.flatMap((r) => (JSON.parse(r.findings) as StoredFinding[]).map((f) => f.id)));
+  const seen = new Set(prior.flatMap((review) => StoredFindingsColumn.parse(review.findings).map((finding) => finding.id)));
   return input.findings.filter((f) => !seen.has(f.id) && f.anchor !== undefined);
 }
 
+const PriorReviewSchema = buildRowSchema('noslop_rounds').pick({ head: true, findings: true });
+
+type PriorReview = z.output<typeof PriorReviewSchema>;
+
 function readPriorReviews(input: LateInput): PriorReview[] {
-  return input.db.query("SELECT head, findings FROM noslop_rounds WHERE repo = ? AND pr = ? AND kind = 'review' AND ok = 1 ORDER BY id").all(input.repo, input.pr) as PriorReview[];
+  return runSyncQuery(input.db, kdb(input.db).selectFrom('noslop_rounds').select(['head', 'findings']).where('repo', '=', input.repo).where('pr', '=', input.pr).where('kind', '=', 'review').where('ok', '=', 1).orderBy('id').compile(), PriorReviewSchema);
 }
 
 async function checkCommitExists(input: LateInput, sha: string): Promise<boolean> {

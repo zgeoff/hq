@@ -1,4 +1,7 @@
 import type { Database } from 'bun:sqlite';
+import { buildRowSchema } from '../../db/build-row-schema.ts';
+import { runSyncRow } from '../../db/run-sync-row.ts';
+import { kdb } from '../../kdb.ts';
 import { owner } from '../../owner.ts';
 import { ghAuthCause } from '../../ghauth/gh-auth-cause.ts';
 import { sydney } from '../../morning/sydney.ts';
@@ -17,7 +20,7 @@ export function goalsWeeklyCheck(db: Database, at: Date): { key: string; ok: boo
   const run = getRun(db, s.date);
   // Join on the event, not the target: a forward re-keys the outbox row to another session.
   const seq = Number(/^hq-ev(\d+)-/.exec(run?.outbox_key ?? '')?.[1]);
-  const sent = Number.isNaN(seq) ? null : ((db.query('SELECT status FROM outbox WHERE event_seq = ?').get(seq) as { status: string } | null)?.status ?? null);
+  const sent = Number.isNaN(seq) ? null : (runSyncRow(db, kdb(db).selectFrom('outbox').select('status').where('event_seq', '=', seq).compile(), buildRowSchema('outbox').pick({ status: true }))?.status ?? null);
   const r = run && { ...run, sent };
   if (!r) return { key: `job:${JOB}`, ok: false, line: `goals weekly: no run today (${s.date}); due 17:00 Sydney on Mondays${cause(db)}` };
   if (r.result === 'queued' && r.sent === 'failed') return { key: `job:${JOB}`, ok: false, line: `goals weekly: today's message to ${owner()} failed to send (hq outbox)` };
