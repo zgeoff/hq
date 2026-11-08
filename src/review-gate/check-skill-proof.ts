@@ -5,11 +5,11 @@ import { readHeadMechanical } from '../pr-status/read-head-mechanical.ts';
 import { OWNER } from '../releases/owner.ts';
 import { collectMissingProof } from './collect-missing-proof.ts';
 import { isBotAuthor } from './is-bot-author.ts';
-import type { ParsedRepo } from './parse-lower-repo.ts';
+import type { ParsedRepo } from '../noslop/parse-lower-repo.ts';
 import { pickSkillProofVerdict } from './pick-skill-proof-verdict.ts';
 import type { SkillProofFacts } from './pick-skill-proof-verdict.ts';
 import type { GateFacts } from './read-gate-facts.ts';
-import type { PRRequest } from './types.ts';
+import type { PRRequest } from '../noslop/types.ts';
 
 export type ReadFiles = () => Promise<string[]>;
 

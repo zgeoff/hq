@@ -1,6 +1,6 @@
 import { HqError } from '../errors.ts';
-import { checkMergeGate } from '../noslop/check-merge-gate.ts';
-import type { GateOutcome } from '../noslop/check-merge-gate.ts';
+import { checkMergeGate } from '../review-gate/check-merge-gate.ts';
+import type { GateOutcome } from '../review-gate/check-merge-gate.ts';
 import { parseLowerRepo } from '../noslop/parse-lower-repo.ts';
 import type { PRRequest } from '../noslop/types.ts';
 import { OWNER } from '../releases/owner.ts';

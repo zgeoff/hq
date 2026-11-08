@@ -1,7 +1,7 @@
 import type { Out } from '../commands.ts';
 import { HqError } from '../errors.ts';
-import { proveMechanical } from '../noslop/prove-mechanical.ts';
-import { readHeldDiffs } from '../noslop/read-held-diffs.ts';
+import { proveMechanical } from '../review-gate/prove-mechanical.ts';
+import { readHeldDiffs } from '../review-gate/read-held-diffs.ts';
 import { roleName } from '../roles/role-name.ts';
 import { addNews } from '../news/add-news.ts';
 import { formatHeldFiles } from './format-held-files.ts';

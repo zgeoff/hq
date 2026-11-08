@@ -1,10 +1,10 @@
 import { HqError } from '../errors.ts';
 import { OWNER } from '../releases/owner.ts';
 import type { Runner } from '../runner/types.ts';
-import { buildSlug } from './build-slug.ts';
+import { buildSlug } from '../noslop/build-slug.ts';
 import { findOwnerHeldTest } from './find-owner-held-test.ts';
 import { isCodeownersMatch } from './is-codeowners-match.ts';
-import type { ParsedRepo } from './parse-lower-repo.ts';
+import type { ParsedRepo } from '../noslop/parse-lower-repo.ts';
 import { parseOwnerPatterns } from './parse-owner-patterns.ts';
 import { readCodeowners } from './read-codeowners.ts';
 

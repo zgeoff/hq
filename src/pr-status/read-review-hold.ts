@@ -1,7 +1,7 @@
 import { HqError } from '../errors.ts';
-import { findInstructionHeldTest } from '../noslop/find-instruction-held-test.ts';
+import { findInstructionHeldTest } from '../review-gate/find-instruction-held-test.ts';
 import { parseLowerRepo } from '../noslop/parse-lower-repo.ts';
-import { readPRFiles } from '../noslop/read-pr-files.ts';
+import { readPRFiles } from '../review-gate/read-pr-files.ts';
 import type { Runner } from '../runner/types.ts';
 import type { PRRef } from './parse-pr-ref.ts';
 import type { RoleProbe } from './read-role-session.ts';

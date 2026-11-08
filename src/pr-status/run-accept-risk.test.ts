@@ -8,7 +8,7 @@ import { FAKE_FULL_SHA, buildFakeRunner } from '../../test/noslop-fake.ts';
 import type { FakeRunner, FakeScript } from '../../test/noslop-fake.ts';
 import { buildAcceptRiskScenario, buildReplyDrivenNoslop } from '../../test/build-stub-accept-risk.ts';
 import type { Flags } from '../cli.ts';
-import { checkMergeGate } from '../noslop/check-merge-gate.ts';
+import { checkMergeGate } from '../review-gate/check-merge-gate.ts';
 import { runPRCommand } from './run-pr-command.ts';
 
 function setupTest() {

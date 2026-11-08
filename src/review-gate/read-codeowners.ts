@@ -4,7 +4,7 @@ import { boundedRunner } from '../runner/bounded-runner.ts';
 import { toRunFailure } from '../runner/to-run-failure.ts';
 import type { Runner } from '../runner/types.ts';
 import { CALL_MS } from '../watcher/call-ms.ts';
-import { parseJSON } from './parse-json.ts';
+import { parseJSON } from '../noslop/parse-json.ts';
 
 const PATHS = ['.github/CODEOWNERS', 'CODEOWNERS'];
 const MISSING_PATH = /\bNot Found \(HTTP 404\)/u;

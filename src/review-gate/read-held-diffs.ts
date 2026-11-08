@@ -6,7 +6,7 @@ import { buildHeadRef } from './build-head-ref.ts';
 import { collectMovePaths } from './collect-move-paths.ts';
 import { GitReadError } from './git-read-error.ts';
 import type { HeldDiff, MoveFacts } from './types.ts';
-import { parseJSON } from './parse-json.ts';
+import { parseJSON } from '../noslop/parse-json.ts';
 import { parseRenameLog } from './parse-rename-log.ts';
 import { parseTreeEntry } from './parse-tree-entry.ts';
 import { pickHistoryReads } from './pick-history-reads.ts';
