@@ -235,7 +235,7 @@ test('it forgets an exited imp session of a closed run with its work pushed, des
   ]);
 });
 
-test('it forgets an exited parent and its exited child together, the child first', async () => {
+test('it forgets an exited parent and its exited child, the child first', async () => {
   const ctx = await setupTest();
   updateEnv('HQ_NOW', '2026-11-07T03:00:00Z');
   ctx.seed.atcSession({ id: '0000f001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: false, state: 'exited' }, '2026-11-07T01:00:00Z');
@@ -244,5 +244,31 @@ test('it forgets an exited parent and its exited child together, the child first
 
   await ctx.sweep();
 
-  expect(ctx.fleet.calls).toStrictEqual(['unpin 0000f001', 'kill 0000f004', 'unpin 0000f004', 'forget 0000f004', 'kill 0000f001', 'unpin 0000f001', 'forget 0000f001']);
+  expect(ctx.fleet.calls).toStrictEqual(['unpin 0000f004', 'kill 0000f004', 'unpin 0000f004', 'forget 0000f004', 'unpin 0000f001', 'kill 0000f001', 'unpin 0000f001', 'forget 0000f001']);
+});
+
+test('it keeps an exited parent when its child fails to be forgotten', async () => {
+  const ctx = await setupTest();
+  updateEnv('HQ_NOW', '2026-11-07T03:00:00Z');
+  ctx.forgets['0000f004-aaaa-4aaa-8aaa-aaaaaaaaaaaa'] = [{ forgotten: false }];
+  ctx.seed.atcSession({ id: '0000f001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: false, state: 'exited' }, '2026-11-07T01:00:00Z');
+  ctx.seed.atcSession({ id: '0000f004-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-helper', alive: false, state: 'exited', parent: '0000f001-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }, '2026-11-07T01:00:00Z');
+  ctx.seed.closedRun('GEO-601', '0000f001');
+
+  await ctx.sweep();
+
+  expect(ctx.fleet.calls).toStrictEqual(['unpin 0000f004', 'kill 0000f004', 'unpin 0000f004', 'forget 0000f004']);
+});
+
+test('it destroys the imp of an exited imp child under a local parent', async () => {
+  const ctx = await setupTest();
+  updateEnv('HQ_NOW', '2026-11-07T03:00:00Z');
+  ctx.forgets['0000f004-aaaa-4aaa-8aaa-aaaaaaaaaaaa'] = [{ forgotten: false, confirmToken: 'token-kettle' }];
+  ctx.seed.atcSession({ id: '0000f001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: false, state: 'exited', locator: { targetID: 'local' } }, '2026-11-07T01:00:00Z');
+  ctx.seed.atcSession({ id: '0000f004-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-helper', alive: false, state: 'exited', parent: '0000f001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', locator: { targetID: 'imp-kettle' } }, '2026-11-07T01:00:00Z');
+  ctx.seed.closedRun('GEO-601', '0000f001');
+
+  await ctx.sweep();
+
+  expect(ctx.fleet.calls).toStrictEqual(['unpin 0000f004', 'forget-live 0000f004', 'forget-live 0000f004 token-kettle', 'unpin 0000f001', 'kill 0000f001', 'unpin 0000f001', 'forget 0000f001']);
 });

@@ -37,26 +37,16 @@ export function pickOrphanTrees(checked: readonly CheckedOrphan[]): OrphanPlan {
     }
     destroyImp.set(id, outcome.destroyImp);
   }
-  const going = checked.filter((orphan) => !staying.has(orphan.session.id));
-  const byID = new Map(going.map((orphan) => [orphan.session.id, orphan]));
-  const roots = going.filter((orphan) => !byID.has(orphan.session.parent ?? ''));
-  const trees = roots.map((root) => {
-    const rootDestroysImp = destroyImp.get(root.session.id);
-    invariant(rootDestroysImp !== undefined, 'every going orphan has a forget outcome');
-    const children = going.filter((orphan) => orphan !== root && getRootID(byID, orphan) === root.session.id);
-    return { root, children, destroyImp: rootDestroysImp };
-  });
-  return { kept, trees };
-}
 
-function getRootID(byID: ReadonlyMap<string, CheckedOrphan>, orphan: CheckedOrphan): string {
-  let current = orphan;
-  for (let step = 0; step < byID.size; step += 1) {
-    const parent = byID.get(current.session.parent ?? '');
-    if (parent === undefined) {
-      break;
-    }
-    current = parent;
-  }
-  return current.session.id;
+  // Each orphan goes as its own tree, in the deepest-first order it came in: a child on another host
+  // than its parent needs its own imp destroy, and the sweep must see a child's forget fail before
+  // it forgets the parent.
+  const trees = checked
+    .filter((orphan) => !staying.has(orphan.session.id))
+    .map((root) => {
+      const rootDestroysImp = destroyImp.get(root.session.id);
+      invariant(rootDestroysImp !== undefined, 'every going orphan has a forget outcome');
+      return { root, children: [], destroyImp: rootDestroysImp };
+    });
+  return { kept, trees };
 }

@@ -4,6 +4,7 @@ import { logEvent } from '../log-event.ts';
 import { readEvents } from '../read-events.ts';
 import { getDeclaredSessions } from '../roles/get-declared-sessions.ts';
 import { collectOrphanEvents } from './collect-orphan-events.ts';
+import { isOverFailedChild } from './is-over-failed-child.ts';
 import { pickOrphanSessions } from './pick-orphan-sessions.ts';
 import type { CheckedOrphan } from './pick-orphan-trees.ts';
 import { pickOrphanTrees } from './pick-orphan-trees.ts';
@@ -42,11 +43,20 @@ export async function removeOrphanSessions(db: Database, deps: WrapUpDeps, sessi
   }
   const client = await deps.openClient();
   const forgotten: string[] = [];
+  const failedIDs = new Set<string>();
   for (const tree of plan.trees) {
+    // The child's kept event holds the parent back on later sweeps too.
+    if (isOverFailedChild(tree.root, checked, failedIDs)) {
+      failedIDs.add(tree.root.session.id);
+      continue;
+    }
     const wrapUp: WrapUp = { forgotten: [], destroyed: [], kept: [], failed: [] };
     await forgetTree({ client, wrapUp }, { kind: 'forget', root: tree.root.session, children: tree.children.map((child) => child.session), destroyImp: tree.destroyImp });
     writeOrphanEvents(db, collectOrphanEvents(tree, wrapUp), options);
     forgotten.push(...wrapUp.forgotten);
+    for (const failure of wrapUp.failed) {
+      failedIDs.add(failure.id);
+    }
   }
   return forgotten;
 }
