@@ -1,6 +1,8 @@
 import type { Database } from 'bun:sqlite';
 import { recordAwake } from '../areas/record-awake.ts';
 import type { AtcClient } from '../atc/atc-client.ts';
+import type { SessionInfo } from '../atc/session-schema.ts';
+import { sessionListRequiredSchema } from '../atc/session-list-required-schema.ts';
 import { sessionGetSchema } from '../atc/session-get-schema.ts';
 import { now } from '../clock/now.ts';
 import type { Runner } from '../runner/types.ts';
@@ -18,7 +20,9 @@ import type { Alert } from './types.ts';
 import { watchlist } from './watchlist.ts';
 import { shareClient, wrapUpMergedRuns } from './wrap-up-merged-runs.ts';
 import type { AtcSnapshot } from './wrap-up-part-sessions.ts';
+import { removeOrphanSessions } from './remove-orphan-sessions.ts';
 import { wrapUpPartSessions } from './wrap-up-part-sessions.ts';
+import { writeIdlePinReports } from './write-idle-pin-reports.ts';
 
 export interface SweepOptions {
   actor: string;
@@ -45,6 +49,8 @@ export async function sweepNow(db: Database, client: AtcClient, run: Runner, opt
     await endHandedInRunSessionsSafely(db, { readActivity }, { ...options, wrapUpDeps });
     await wrapUpMergedRunsSafely(db, { ...options, wrapUpDeps });
     await wrapUpPartSessionsSafely(db, wrapUpDeps, { sessions, activity }, options);
+    await removeOrphanSessionsSafely(db, client, options);
+    await writeIdlePinReportsSafely(db, sessions, readActivity, options);
   }
   const alerts = await closeFlaggedPRs(db, run, findAlerts(db, sessions, activity, now()));
   const swept = sweep(db, alerts, options.actor);
@@ -84,5 +90,24 @@ async function wrapUpPartSessionsSafely(db: Database, deps: WrapUpDeps, atc: Atc
     await wrapUpPartSessions(db, deps, atc, { actor: options.actor, log: options.log, nowMs: now().getTime(), quietMs: SWEEP.quietMinutes() * 60_000 });
   } catch (error) {
     options.log(`part-session wrap-up failed: ${toErrorMessage(error)}`);
+  }
+}
+
+// The earlier wrap-ups have forgotten sessions since the sweep's first listing, so this pass lists
+// again, past the client's cache.
+async function removeOrphanSessionsSafely(db: Database, client: AtcClient, options: SweepOptions): Promise<void> {
+  try {
+    const listed = await client.call('session.list', {}, sessionListRequiredSchema);
+    await removeOrphanSessions(db, options.wrapUpDeps, listed.sessions, { actor: options.actor, log: options.log, nowMs: now().getTime() });
+  } catch (error) {
+    options.log(`orphan session sweep failed: ${toErrorMessage(error)}`);
+  }
+}
+
+async function writeIdlePinReportsSafely(db: Database, sessions: readonly SessionInfo[], readActivity: (id: string) => Promise<SessionActivity | null>, options: SweepOptions): Promise<void> {
+  try {
+    await writeIdlePinReports(db, sessions, { actor: options.actor, nowMs: now().getTime(), readActivity });
+  } catch (error) {
+    options.log(`idle pin report failed: ${toErrorMessage(error)}`);
   }
 }

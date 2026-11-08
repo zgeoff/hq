@@ -4,8 +4,10 @@ import { z } from 'zod';
 import { HqError } from '../errors.ts';
 import type { FleetClient, FleetSession, StaleOps } from '../fleet/types.ts';
 import { buildWrapUpPlan } from './build-wrap-up-plan.ts';
+import { forgetImpSession } from './forget-imp-session.ts';
 import { forgetWrappedSession } from './forget-wrapped-session.ts';
 import { fullSessionId } from './full-session-id.ts';
+import { readWorkSafely } from './read-work-safely.ts';
 import { requireRun } from './require-run.ts';
 import { toErrorMessage } from '../to-error-message.ts';
 import type { ImpWork, KeptSession, WrapUp } from './types.ts';
@@ -95,7 +97,7 @@ async function wrapUpTree(pass: TreePass, root: FleetSession): Promise<void> {
     .exhaustive();
 }
 
-interface ForgetDecision {
+export interface ForgetDecision {
   kind: 'forget';
   children: FleetSession[];
   root: FleetSession;
@@ -129,7 +131,7 @@ function collectChildren(sessions: FleetSession[], parentID: string): FleetSessi
   return found;
 }
 
-function isOnImp(session: FleetSession, placedOnImp: boolean): boolean {
+export function isOnImp(session: FleetSession, placedOnImp: boolean): boolean {
   const targetID = session.locator?.targetID;
   if (typeof targetID === 'string') {
     return targetID !== 'local';
@@ -141,14 +143,6 @@ function isOnImp(session: FleetSession, placedOnImp: boolean): boolean {
   return placedOnImp;
 }
 
-async function readWorkSafely(read: (session: FleetSession) => Promise<ImpWork>, session: FleetSession): Promise<ImpWork> {
-  try {
-    return await read(session);
-  } catch (error) {
-    return { state: 'unknown', detail: toErrorMessage(error) };
-  }
-}
-
 function reportForget(pass: TreePass, decision: ForgetDecision): void {
   pass.wrapUp.forgotten.push(...decision.children.map((child) => child.id), decision.root.id);
   if (decision.destroyImp) {
@@ -156,7 +150,7 @@ function reportForget(pass: TreePass, decision: ForgetDecision): void {
   }
 }
 
-async function forgetTree(pass: TreePass, decision: ForgetDecision): Promise<void> {
+export async function forgetTree(pass: Pick<TreePass, 'client' | 'wrapUp'>, decision: ForgetDecision): Promise<void> {
   const children = decision.children;
   const root = decision.root;
 
@@ -187,24 +181,13 @@ async function forgetTree(pass: TreePass, decision: ForgetDecision): Promise<voi
   await removeImpSession(pass, root.id);
 }
 
-// A separate stop before forgetting the live session would suspend a cloud imp, which outlasts the
-// atc call.
-async function removeImpSession(pass: TreePass, id: string): Promise<void> {
+async function removeImpSession(pass: Pick<TreePass, 'client' | 'wrapUp'>, id: string): Promise<void> {
   try {
-    const first = await pass.client.forgetLive(id);
-    if (first.confirmToken === undefined) {
-      if (!first.forgotten) {
-        throw new Error('atc did not forget the session');
-      }
-      pass.wrapUp.forgotten.push(id);
-      return;
-    }
-    const confirmed = await pass.client.forgetLive(id, first.confirmToken);
-    if (!confirmed.forgotten) {
-      throw new Error('atc did not forget the session after the confirmed destroy');
-    }
+    const forgotten = await forgetImpSession(pass.client, id);
     pass.wrapUp.forgotten.push(id);
-    pass.wrapUp.destroyed.push(id);
+    if (forgotten.destroyed) {
+      pass.wrapUp.destroyed.push(id);
+    }
   } catch (error) {
     pass.wrapUp.failed.push({ id, reason: toErrorMessage(error) });
   }
