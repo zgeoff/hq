@@ -51,7 +51,7 @@ export async function removeOrphanSessions(db: Database, deps: WrapUpDeps, sessi
       continue;
     }
     const wrapUp: WrapUp = { forgotten: [], destroyed: [], kept: [], failed: [] };
-    await forgetTree({ client, wrapUp }, { kind: 'forget', root: tree.root.session, children: tree.children.map((child) => child.session), destroyImp: tree.destroyImp });
+    await forgetTree({ client, wrapUp }, { kind: 'forget', root: tree.root.session, children: [], destroyImp: tree.destroyImp });
     writeOrphanEvents(db, collectOrphanEvents(tree, wrapUp), options);
     forgotten.push(...wrapUp.forgotten);
     for (const failure of wrapUp.failed) {

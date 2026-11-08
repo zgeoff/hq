@@ -260,6 +260,21 @@ test('it keeps an exited parent when its child fails to be forgotten', async () 
   expect(ctx.fleet.calls).toStrictEqual(['unpin 0000f004', 'kill 0000f004', 'unpin 0000f004', 'forget 0000f004']);
 });
 
+test('it keeps an exited parent and grandparent when the grandchild fails to be forgotten', async () => {
+  const ctx = await setupTest();
+  updateEnv('HQ_NOW', '2026-11-07T03:00:00Z');
+  ctx.forgets['0000f005-aaaa-4aaa-8aaa-aaaaaaaaaaaa'] = [{ forgotten: false }];
+  ctx.seed.atcSession({ id: '0000f001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: false, state: 'exited' }, '2026-11-07T01:00:00Z');
+  ctx.seed.atcSession({ id: '0000f004-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-helper', alive: false, state: 'exited', parent: '0000f001-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }, '2026-11-07T01:00:00Z');
+  ctx.seed.atcSession({ id: '0000f005-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-scout', alive: false, state: 'exited', parent: '0000f004-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }, '2026-11-07T01:00:00Z');
+  ctx.seed.closedRun('GEO-601', '0000f001');
+  ctx.seed.closedRun('GEO-602', '0000f004');
+
+  await ctx.sweep();
+
+  expect(ctx.fleet.calls).toStrictEqual(['unpin 0000f005', 'kill 0000f005', 'unpin 0000f005', 'forget 0000f005']);
+});
+
 test('it destroys the imp of an exited imp child under a local parent', async () => {
   const ctx = await setupTest();
   updateEnv('HQ_NOW', '2026-11-07T03:00:00Z');

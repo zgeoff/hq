@@ -8,8 +8,8 @@ test('it forgets a pushed child and its pushed parent as separate trees, the chi
   expect(pickOrphanTrees([child, parent])).toStrictEqual({
     kept: [],
     trees: [
-      { root: child, children: [], destroyImp: false },
-      { root: parent, children: [], destroyImp: false },
+      { root: child, destroyImp: false },
+      { root: parent, destroyImp: false },
     ],
   });
 });
@@ -21,8 +21,8 @@ test('it destroys the imp of a pushed imp child under a local parent', () => {
   expect(pickOrphanTrees([child, parent])).toStrictEqual({
     kept: [],
     trees: [
-      { root: child, children: [], destroyImp: true },
-      { root: parent, children: [], destroyImp: false },
+      { root: child, destroyImp: true },
+      { root: parent, destroyImp: false },
     ],
   });
 });
@@ -57,12 +57,12 @@ test('it forgets a pushed child alone when its parent stays for an unchecked imp
         line: 'orphan session 0000f001-aaaa-4aaa-8aaa-aaaaaaaaaaaa (kettle-agent) kept: the unpushed-work check could not run (imp asleep), so the imp stays',
       },
     ],
-    trees: [{ root: child, children: [], destroyImp: false }],
+    trees: [{ root: child, destroyImp: false }],
   });
 });
 
 test('it destroys the imp of a pushed imp root', () => {
   const root = { session: { id: '0000f001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: false, state: 'exited', locator: { targetID: 'imp-kettle' } }, issue: 'GEO-601', place: 'imp', work: { state: 'pushed' } } as const;
 
-  expect(pickOrphanTrees([root])).toStrictEqual({ kept: [], trees: [{ root, children: [], destroyImp: true }] });
+  expect(pickOrphanTrees([root])).toStrictEqual({ kept: [], trees: [{ root, destroyImp: true }] });
 });

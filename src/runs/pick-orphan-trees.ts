@@ -10,7 +10,6 @@ export interface CheckedOrphan extends OrphanSession {
 
 export interface OrphanTree {
   root: OrphanSession;
-  children: readonly OrphanSession[];
   destroyImp: boolean;
 }
 
@@ -46,7 +45,7 @@ export function pickOrphanTrees(checked: readonly CheckedOrphan[]): OrphanPlan {
     .map((root) => {
       const rootDestroysImp = destroyImp.get(root.session.id);
       invariant(rootDestroysImp !== undefined, 'every going orphan has a forget outcome');
-      return { root, children: [], destroyImp: rootDestroysImp };
+      return { root, destroyImp: rootDestroysImp };
     });
   return { kept, trees };
 }
