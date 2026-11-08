@@ -65,7 +65,7 @@ test('it reports a non-fleet pin idle 25 hours once, not on the next sweep', asy
     {
       id: expect.any(Number),
       event_seq: expect.any(Number),
-      target: 'z-delivery',
+      target: 'z-stu',
       text: 'long-chat (0000f004) is pinned and has been idle for 25h00m. It is not part of the fleet; decide whether it still needs its pin.',
       idem_key: expect.any(String),
       status: 'pending',
@@ -91,7 +91,7 @@ test('it names the run of a pinned session a run recorded', async () => {
     {
       id: expect.any(Number),
       event_seq: expect.any(Number),
-      target: 'z-delivery',
+      target: 'z-stu',
       text: 'run-chat (0000f007) is pinned and has been idle for 25h00m, on run GEO-607. It is not part of the fleet; decide whether it still needs its pin.',
       idem_key: expect.any(String),
       status: 'pending',

@@ -6,7 +6,7 @@ import { buildPins } from '../pins/build-pins.ts';
 import { fmtIdle } from '../pins/fmt-idle.ts';
 import { readEvents } from '../read-events.ts';
 import { getDeclaredSessions } from '../roles/get-declared-sessions.ts';
-import { orchestratorName } from '../wake/orchestrator-name.ts';
+import { roleName } from '../roles/role-name.ts';
 import { findSessionIssue } from './find-session-issue.ts';
 import { pickIdlePinReports } from './pick-idle-pin-reports.ts';
 import type { SessionActivity } from './pick-quiet-sessions.ts';
@@ -45,7 +45,7 @@ export async function writeIdlePinReports(db: Database, sessions: readonly Sessi
     const text = `${pin.name} (${pin.id.slice(0, 8)}) is pinned and has been idle for ${fmtIdle(pin.idleMs)}${issue === null ? '' : `, on run ${issue}`}. It is not part of the fleet; decide whether it still needs its pin.`;
     db.transaction(() => {
       const seq = logEvent(db, 'hq', pin.id, 'idle-pin-report', options.actor, null, null, { name: pin.name, issue, idleMs: pin.idleMs, idleSince: new Date(report.idleSinceMs).toISOString() });
-      enqueue(db, seq, orchestratorName(), text);
+      enqueue(db, seq, roleName('owner'), text);
     })();
   }
   return reports.length;
