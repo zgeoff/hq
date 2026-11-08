@@ -8,6 +8,7 @@ test.each([
   ['.claude/skills/kettle/references/descale.md', true],
   ['skills/kettle/scripts/boil.test.ts', false],
   ['modules/skills/src/read-kettle-skill.ts', false],
+  ['modules/skills/README.md', false],
   ['skills/kettle/scripts/boil.sh', false],
   ['skills/kettle/references/descale.md', true],
   ['skills/kettle/testdata/steam.md', false],
