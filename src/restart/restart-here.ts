@@ -5,6 +5,7 @@ import type { Database } from 'bun:sqlite';
 import { iso } from '../clock/iso.ts';
 import { now } from '../clock/now.ts';
 import { config } from '../config/config.ts';
+import { HqError } from '../errors.ts';
 import type { Runner } from '../runner/types.ts';
 import { cleanEnv } from '../runner/clean-env.ts';
 import { connectWithRetry } from '../wake/connect-with-retry.ts';
@@ -17,6 +18,7 @@ import { logPath } from './log-path.ts';
 import { PATH } from './path.ts';
 import { settleRestores } from './settle-restores.ts';
 import type { RestartResult, Settled } from './types.ts';
+import { toErrorMessage } from '../to-error-message.ts';
 
 const restoreWaitMs = () => {
   const n = config().HQ_RESTORE_WAIT_MS;
@@ -44,7 +46,12 @@ export async function restartHere(db: Database, run: Runner, actor: string, forc
   await write(`restart exit ${restart.code}`);
   let settled: Settled | null = null;
   // Read atc's report once: the wake must use the same one, even if another restart writes a new one meanwhile.
-  const last = await readLastRestart().catch(() => null);
+  const last = await readLastRestart().catch(async (error: unknown) => {
+    if (!(error instanceof HqError && error.code === 'no_restart')) {
+      await write(`restart record unreadable, restore check skipped: ${toErrorMessage(error)}`);
+    }
+    return null;
+  });
   if (restart.code !== 0 && last) {
     try {
       if ((last.failed ?? []).length) {
@@ -60,7 +67,7 @@ export async function restartHere(db: Database, run: Runner, actor: string, forc
         await write(settled.down.length ? `${settled.down.length} session(s) still down` : `all ${settled.late.length} restored late: the restart is good`);
       }
     } catch (e) {
-      await write(`restore check failed: ${String((e as Error).message ?? e)}`);
+      await write(`restore check failed: ${toErrorMessage(e)}`);
     }
   }
   await write(`== ${iso(now())} wake`);
@@ -70,7 +77,7 @@ export async function restartHere(db: Database, run: Runner, actor: string, forc
     for (const s of wake.sent) await write(`${s.error ? 'failed' : 'messaged'} ${s.session} ${s.name} (${s.reason})${s.error ? `: ${s.error}` : `: ${s.message}`}`);
     for (const s of wake.skipped) await write(`skipped ${s.session || '-'} ${s.name}: ${s.why}`);
   } catch (e) {
-    wake = { error: String((e as Error).message ?? e) };
+    wake = { error: toErrorMessage(e) };
     await write(`wake failed: ${wake.error}`);
   }
   await write(`== ${iso(now())} done`);

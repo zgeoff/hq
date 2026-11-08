@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test';
+import { isRecord } from '@zgeoff/std';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import invariant from 'tiny-invariant';
+import { z } from 'zod';
 import { main } from '../src/cli.ts';
 import { HELP } from '../src/help.ts';
 import { VERSION } from '../src/version.ts';
@@ -15,6 +18,7 @@ import { review } from '../src/review/review.ts';
 import type { RunOpts, Runner } from '../src/runner/types.ts';
 import { rolesByName } from '../src/roles/roles-by-name.ts';
 import { ASK_TRANSITIONS } from '../src/transitions/ask-transitions.ts';
+import { findPath } from '../src/test-utils/find-path.ts';
 import { PR_TRANSITIONS } from '../src/transitions/pr-transitions.ts';
 import { RUN_TRANSITIONS } from '../src/transitions/run-transitions.ts';
 import { NOON_SYDNEY, at, fakeAtc, freshDb } from './helpers.ts';
@@ -58,34 +62,35 @@ afterEach(() => {
 const hq = async (...argv: string[]) => {
   out = [];
   const code = await main([...argv, '--json']);
-  return { code, json: JSON.parse(out.join('\n')) };
+  const json: unknown = JSON.parse(out.join('\n'));
+  return { code, json };
 };
 
 test('--json gives the version, schema, commands, transitions, roles and shapes', async () => {
   const { code, json } = await hq('capabilities');
   expect(code).toBe(0);
-  expect(json.ok).toBe(true);
-  expect(Object.keys(json).sort()).toEqual(['commands', 'ok', 'roles', 'schema', 'shapes', 'transitions', 'version']);
-  expect(json.version).toBe(VERSION);
-  expect(json.schema).toBe(SCHEMA_VERSION);
-  expect(json.shapes).toEqual(SHAPES);
-  expect(json.roles).toEqual(rolesByName());
+  expect(findPath(json, 'ok')).toBe(true);
+  const keys = Object.keys(z.record(z.string(), z.unknown()).parse(json));
+  expect(keys.toSorted()).toStrictEqual(['commands', 'ok', 'roles', 'schema', 'shapes', 'transitions', 'version']);
+  expect(findPath(json, 'version')).toBe(VERSION);
+  expect(findPath(json, 'schema')).toBe(SCHEMA_VERSION);
+  expect(findPath(json, 'shapes')).toStrictEqual(SHAPES);
+  expect(findPath(json, 'roles')).toStrictEqual(rolesByName());
 });
 
 test('commands are the registry rows, data only', async () => {
   const { json } = await hq('capabilities');
-  expect(json.commands).toHaveLength(COMMANDS.length);
-  expect(json.commands.map((c: { usage: string }) => c.usage)).toEqual(COMMANDS.map((c) => c.usage));
-  for (const [i, c] of COMMANDS.entries()) {
-    expect(json.commands[i]).toEqual({ nouns: c.nouns, verbs: c.verbs, bare: c.bare, usage: c.usage, summary: c.summary, section: c.section, readOnly: c.readOnly });
-  }
-  const self = json.commands.find((c: { nouns: string[] }) => c.nouns.includes('capabilities'));
-  expect(self.readOnly).toBe(true);
+  const commandSchema = z.looseObject({ usage: z.string(), nouns: z.array(z.string()), readOnly: z.boolean() });
+  const commands = z.array(commandSchema).parse(findPath(json, 'commands'));
+  const expected = COMMANDS.map((command) => ({ nouns: command.nouns, verbs: command.verbs, bare: command.bare, usage: command.usage, summary: command.summary, section: command.section, readOnly: command.readOnly }));
+  expect(findPath(json, 'commands')).toStrictEqual(expected);
+  const self = commands.find((command) => command.nouns.includes('capabilities'));
+  expect(self?.readOnly).toBe(true);
 });
 
 test('transitions are the exported tables', async () => {
   const { json } = await hq('capabilities');
-  expect(json.transitions).toEqual(JSON.parse(JSON.stringify({ ask: ASK_TRANSITIONS, run: RUN_TRANSITIONS, pr: PR_TRANSITIONS })));
+  expect(findPath(json, 'transitions')).toStrictEqual(structuredClone({ ask: ASK_TRANSITIONS, run: RUN_TRANSITIONS, pr: PR_TRANSITIONS }));
 });
 
 test('text mode is a short summary', async () => {
@@ -104,13 +109,14 @@ test('help lists capabilities', () => {
 test('--require: older fails with too_old, equal and newer pass, bad input is bad_args', async () => {
   const older = await hq('capabilities', '--require', '99.0.0');
   expect(older.code).toBe(1);
-  expect(older.json).toEqual({ ok: false, error: { code: 'too_old', message: `hq ${VERSION} is older than 99.0.0: run bun run install-bin in ~/projects/hq` } });
+  expect(older.json).toStrictEqual({ ok: false, error: { code: 'too_old', message: `hq ${VERSION} is older than 99.0.0: run bun run install-bin in ~/projects/hq` } });
   expect((await hq('capabilities', '--require', VERSION)).code).toBe(0);
-  expect((await hq('capabilities', '--require', '0.1.0')).json.version).toBe(VERSION);
+  const newer = await hq('capabilities', '--require', '0.1.0');
+  expect(findPath(newer.json, 'version')).toBe(VERSION);
   for (const bad of ['1.2', 'v1.2.3', '1.2.3-rc1', 'latest', '']) {
     const r = await hq('capabilities', '--require', bad);
     expect(r.code, bad).toBe(1);
-    expect(r.json.error.code, bad).toBe('bad_args');
+    expect(findPath(r.json, 'error', 'code'), bad).toBe('bad_args');
   }
 });
 
@@ -122,7 +128,8 @@ test('semver compares by number, not text', () => {
 });
 
 test('package.json carries the same version as VERSION', () => {
-  const pkg = JSON.parse(readFileSync(join(import.meta.dir, '../package.json'), 'utf8')) as { version: string };
+  const text = readFileSync(join(import.meta.dir, '../package.json'), 'utf8');
+  const pkg = z.object({ version: z.string() }).parse(JSON.parse(text));
   expect(pkg.version).toBe(VERSION);
 });
 
@@ -143,8 +150,10 @@ function missing(value: unknown, path: string): string | null {
   const bare = optional ? head!.slice(0, -1) : head!;
   const isArray = bare.endsWith('[]');
   const key = isArray ? bare.slice(0, -2) : bare;
-  if (value === null || typeof value !== 'object' || !(key in (value as object))) return optional ? null : `${key} is missing`;
-  const next = (value as Record<string, unknown>)[key];
+  if (!isRecord(value) || !(key in value)) {
+    return optional ? null : `${key} is missing`;
+  }
+  const next = value[key];
   if (optional && next === null) return null;
   if (!isArray) return rest ? missing(next, rest) : null;
   if (!Array.isArray(next)) {
@@ -184,13 +193,17 @@ test('shape: fleet', async () => {
 test('shape: fleet shows promptCheck for a declared session that is live in atc, and says so in the text', async () => {
   const atc = fakeAtc(dir);
   try {
-    expect(((await hq('fleet')).json as { declared: { promptCheck?: object }[] }).declared.every((e) => e.promptCheck === undefined)).toBe(true);
-    const json = (await hq('fleet', '--prompts')).json as { declared: { name: string; prompt: string; promptCheck?: object }[] };
+    const plain = await hq('fleet');
+    const checkedSchema = z.object({ promptCheck: z.unknown().optional() });
+    expect(z.object({ declared: z.array(checkedSchema) }).parse(plain.json).declared.every((entry) => entry.promptCheck === undefined)).toBe(true);
+    const prompted = await hq('fleet', '--prompts');
+    const entrySchema = z.object({ name: z.string(), prompt: z.string(), promptCheck: z.unknown().optional() });
+    const json = z.object({ declared: z.array(entrySchema) }).parse(prompted.json);
     const stu = json.declared.find((e) => e.name === 'z-stu')!;
     expect(typeof stu.prompt).toBe('string');
     expect(stu.promptCheck).toEqual({ state: 'unknown', since: null, hint: null, reason: expect.stringContaining('no prompt') });
     expect(json.declared.some((entry) => entry.promptCheck === undefined)).toBe(true);
-    checkShape('fleet', json);
+    checkShape('fleet', prompted.json);
     out = [];
     expect(await main(['fleet'])).toBe(0);
     expect(out.join('\n')).toContain('z-stu: prompt check unknown (atc gave no prompt for the session)');
@@ -200,15 +213,13 @@ test('shape: fleet shows promptCheck for a declared session that is live in atc,
   }
 });
 
-interface FleetPluginJson {
-  declared: { name: string; pluginCheck?: object }[];
-}
-
 test("shape: fleet --prompts gives pluginCheck for a live session whose plugin folders differ from fleet.json's", async () => {
   const atc = fakeAtc(dir);
   try {
     const ran = await hq('fleet', '--prompts');
-    expect((ran.json as FleetPluginJson).declared.filter((e) => e.pluginCheck !== undefined)).toEqual([expect.objectContaining({ name: 'z-stu', pluginCheck: { declared: ['~/projects/hq/mods/hq-band'], running: [] } })]);
+    const entrySchema = z.object({ name: z.string(), pluginCheck: z.unknown().optional() });
+    const withPlugins = z.object({ declared: z.array(entrySchema) }).parse(ran.json).declared.filter((entry) => entry.pluginCheck !== undefined);
+    expect(withPlugins).toStrictEqual([{ name: 'z-stu', pluginCheck: { declared: ['~/projects/hq/mods/hq-band'], running: [] } }]);
     checkShape('fleet', ran.json);
   } finally {
     atc.stop();
@@ -229,16 +240,19 @@ test("hq fleet's text names a live session whose plugin folders differ from flee
 });
 
 test('shape: fleet before the first ensure has no last', async () => {
-  const json = (await hq('fleet')).json as { last?: unknown };
-  expect(json.last ?? null).toBeNull();
-  checkShape('fleet', json);
+  const fleet = await hq('fleet');
+  expect(z.object({ last: z.unknown().optional() }).parse(fleet.json).last ?? null).toBeNull();
+  checkShape('fleet', fleet.json);
 });
 
 test('shape: fleet with a waiting step that has no id', async () => {
   setMeta(db, 'fleet_last', JSON.stringify({ at: '2026-10-14T01:00:00Z', dryRun: false, steps: [{ name: 'z-kettle', action: 'waiting', detail: 'invented' }] }));
-  const json = (await hq('fleet')).json as { last: { steps: { id?: string }[] } };
-  expect(json.last.steps[0]!.id).toBeUndefined();
-  checkShape('fleet', json);
+  const fleet = await hq('fleet');
+  const stepSchema = z.object({ id: z.string().optional() });
+  const [step] = z.object({ last: z.object({ steps: z.array(stepSchema) }) }).parse(fleet.json).last.steps;
+  invariant(step);
+  expect(step.id).toBeUndefined();
+  checkShape('fleet', fleet.json);
 });
 
 test('shape: run list and run show', async () => {

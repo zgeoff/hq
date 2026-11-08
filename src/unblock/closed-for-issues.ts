@@ -3,6 +3,9 @@ import { runSyncQuery } from '../db/run-sync-query.ts';
 import { kdb } from '../kdb.ts';
 import type { UnblockWarning } from './types.ts';
 import { UnblockRowSchema } from './unblock-row-schema.ts';
+import { isOneOf } from '@zgeoff/std';
+
+const CLOSED_STATES = ['done', 'dropped'] as const;
 
 export function closedForIssues(db: Database, issues: string[], except: string): UnblockWarning[] {
   const want = new Set(issues.map((i) => i.toUpperCase()));
@@ -12,7 +15,7 @@ export function closedForIssues(db: Database, issues: string[], except: string):
     .flatMap((u) =>
       u.unblocks
         .filter((x) => want.has(x.issue.toUpperCase()))
-        .map((x) => ({ issue: x.issue, id: u.id, state: u.state as 'done' | 'dropped', closed_at: u.closed_at, task: u.task })),
+        .flatMap((x) => (isOneOf(u.state, CLOSED_STATES) ? [{ issue: x.issue, id: u.id, state: u.state, closed_at: u.closed_at, task: u.task }] : [])),
     )
     .sort((a, b) => a.issue.localeCompare(b.issue) || (b.closed_at ?? '').localeCompare(a.closed_at ?? ''));
 }

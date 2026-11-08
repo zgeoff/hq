@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test';
 import type { Database } from 'bun:sqlite';
+import { readOutboxRows } from '../src/outbox/read-outbox-rows.ts';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { addPr } from '../src/runs/add-pr.ts';
 import { addRun } from '../src/runs/add-run.ts';
@@ -74,8 +75,6 @@ function deps(over: Partial<WatchDeps['steps']> = {}, run: Runner = capacity): W
   };
 }
 
-const outbox = () => db.query('SELECT target, text, topic FROM outbox ORDER BY id').all() as { target: string; text: string; topic: string | null }[];
-
 test('a completed tick records its time', async () => {
   expect(getMeta(db, LAST_TICK)).toBeNull();
   expect(await watchTick(db, deps())).toBe(true);
@@ -132,10 +131,12 @@ test('a watcher with no tick for 15 min alerts z-stu once, and once more when it
   expect(watcherAlert(db, 'hq-fleet')).toBe('alerted');
   at('2026-10-15T20:20:00Z');
   expect(watcherAlert(db, 'hq-fleet')).toBeNull();
-  expect(outbox()).toEqual([{ target: 'z-stu', text: expect.stringContaining('no completed tick for 15 min (last 2026-10-15T20:00:00Z)'), topic: 'watcher-stale' }]);
+  expect(readOutboxRows(db).map((row) => ({ target: row.target, topic: row.topic }))).toStrictEqual([{ target: 'z-stu', topic: 'watcher-stale' }]);
+  expect(readOutboxRows(db)[0]?.text).toContain('no completed tick for 15 min (last 2026-10-15T20:00:00Z)');
   await watchTick(db, deps());
   expect(watcherAlert(db, 'hq-fleet')).toBe('recovered');
-  expect(outbox().at(-1)).toMatchObject({ target: 'z-stu', text: expect.stringContaining('ticking again') });
+  expect(readOutboxRows(db).at(-1)?.target).toBe('z-stu');
+  expect(readOutboxRows(db).at(-1)?.text).toContain('ticking again');
   expect(watcherAlert(db, 'hq-fleet')).toBeNull();
 });
 
@@ -143,14 +144,14 @@ test('a watcher that started but never completed a tick counts from its start', 
   setMeta(db, 'watcher_started_at', '2026-10-15T19:40:00Z');
   expect(watcherState(db)).toMatchObject({ lastTick: null, stale: true, minutes: 20 });
   expect(watcherAlert(db, 'hq-fleet')).toBe('alerted');
-  expect(outbox()[0]!.text).toContain('none since it started at 2026-10-15T19:40:00Z');
+  expect(readOutboxRows(db)[0]?.text).toContain('none since it started at 2026-10-15T19:40:00Z');
 });
 
 test.each(['yesterday', '', 'NaN', '2026-13-45T99:99:99Z', '2026-10-16T09:00:00Z'])('a last tick of %p counts as stale and alerts', (raw) => {
   setMeta(db, LAST_TICK, raw);
   expect(watcherState(db)).toMatchObject({ stale: true, minutes: null });
   expect(watcherAlert(db, 'hq-fleet')).toBe('alerted');
-  expect(outbox()[0]!.text).toContain('last tick time is unreadable');
+  expect(readOutboxRows(db)[0]?.text).toContain('last tick time is unreadable');
 });
 
 test('each tick samples the Claude usage cache once per new reading', async () => {
@@ -177,7 +178,7 @@ test('at 18:00 Sydney the watcher sends the goals check-in once, after a fresh g
   setMeta(db, 'linear_synced_at', '2026-10-16T06:50:00Z');
   await watchTick(db, deps());
   await watchTick(db, deps());
-  expect(outbox().filter((o) => o.topic === 'job:goals-daily:2026-10-16')).toHaveLength(1);
+  expect(readOutboxRows(db).filter((row) => row.topic === 'job:goals-daily:2026-10-16')).toHaveLength(1);
   expect(logs.filter((l) => l.includes('goals check-in due'))).toHaveLength(1);
 });
 
@@ -186,7 +187,7 @@ test('at Monday 17:00 Sydney the watcher sends the goals weekly once, after a fr
   for (const k of ['goals_synced_at', 'goals_ok_at', 'kinds_synced_at', 'kinds_ok_at', 'linear_synced_at']) setMeta(db, k, '2026-10-19T05:50:00Z');
   await watchTick(db, deps());
   await watchTick(db, deps());
-  expect(outbox().filter((o) => o.topic === 'job:goals-weekly:2026-10-19')).toHaveLength(1);
+  expect(readOutboxRows(db).filter((row) => row.topic === 'job:goals-weekly:2026-10-19')).toHaveLength(1);
   expect(logs.filter((l) => l.includes('goals weekly due'))).toHaveLength(1);
 });
 
@@ -287,7 +288,7 @@ test('a tick drops an unblock item once GitHub reports its subject PR merged, an
   expect(ok).toBe(true);
   expect(getUnblock(db, 'review-kettle-4')?.state).toBe('dropped');
   expect(logs.some((line) => line.includes('unblock conditions: dropped review-kettle-4'))).toBe(true);
-  expect(outbox().filter((m) => m.text.includes('kettle'))).toStrictEqual([]);
+  expect(readOutboxRows(db).filter((row) => row.text.includes('kettle'))).toStrictEqual([]);
 });
 
 test('it marks a run PR merged from GitHub and attaches an opened PR to its run in one tick', async () => {
@@ -329,7 +330,9 @@ test('it logs every run PR GitHub could not answer for, one line each', async ()
 });
 
 function readAlertStatuses(): string[] {
-  return (db.query(`SELECT status FROM outbox WHERE topic = 'watcher-stale'`).all() as { status: string }[]).map((r) => r.status);
+  return readOutboxRows(db)
+    .filter((row) => row.topic === 'watcher-stale')
+    .map((row) => row.status);
 }
 
 test('an alert that failed while atc was down is sent once atc is back', async () => {

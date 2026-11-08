@@ -1,3 +1,4 @@
+import { isOneOf } from '@zgeoff/std';
 import type { Database } from 'bun:sqlite';
 import { iso } from '../clock/iso.ts';
 import { now } from '../clock/now.ts';
@@ -8,7 +9,9 @@ import type { Mark } from './mark-kinds.ts';
 import { MARK_KINDS } from './mark-kinds.ts';
 
 export function addMark(db: Database, input: { kind: string; text: string; ref: string | null; at: string | null; actor: string }): Mark {
-  if (!(MARK_KINDS as readonly string[]).includes(input.kind)) throw new HqError('bad_args', `--kind must be one of ${MARK_KINDS.join(', ')}`);
+  if (!isOneOf(input.kind, MARK_KINDS)) {
+    throw new HqError('bad_args', `--kind must be one of ${MARK_KINDS.join(', ')}`);
+  }
   const text = input.text.trim();
   if (!text || /[\r\n]/.test(text) || text.length > 300) throw new HqError('bad_args', '--text must be one line, at most 300 characters');
   if (input.ref !== null && !/^https?:\/\/\S+$|^[A-Za-z0-9._-]+#\d+$|^[A-Z][A-Z0-9]*-\d+$/.test(input.ref)) throw new HqError('bad_args', '--ref must be a URL, repo#n or GEO-n');

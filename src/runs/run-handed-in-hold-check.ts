@@ -7,7 +7,7 @@ import type { HandedInHold, IssueRead } from './decide-handed-in-hold.ts';
 import { getRun } from './get-run.ts';
 import { SCOPE_HOLD_ACTIONS } from './is-scope-held.ts';
 import { pickHandedInHoldWrite } from './pick-handed-in-hold-write.ts';
-import { toMessage } from './to-message.ts';
+import { toErrorMessage } from '../to-error-message.ts';
 
 export interface HandedInHolds {
   readIssueDescription: (issue: string) => Promise<string>;
@@ -42,6 +42,6 @@ async function readIssue(holds: HandedInHolds, issue: string): Promise<IssueRead
   try {
     return { ok: true, description: await holds.readIssueDescription(issue) };
   } catch (error) {
-    return { ok: false, reason: toMessage(error).slice(0, 200) };
+    return { ok: false, reason: toErrorMessage(error).slice(0, 200) };
   }
 }

@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test';
 import { toExactOptional } from '@zgeoff/std';
+import { updateEnv } from '@zgeoff/testing/helpers';
+import invariant from 'tiny-invariant';
 import type { Database } from 'bun:sqlite';
 import { mkdirSync, statSync } from 'node:fs';
 import { launchDetached } from '../src/restart/launch-detached.ts';
@@ -183,6 +185,18 @@ test('the detached half: restart, then wake, all logged', async () => {
   expect(log).toContain('== ');
 });
 
+test('#restartHere logs a restart record it cannot read', async () => {
+  updateEnv('HQ_RESTART_LOG', `${dir}/r.log`);
+  await Bun.write(`${dir}/restarts/last.json`, '{"runID": "run-1", "code":');
+  atc = fakeAtc(dir, sessions);
+  const runner = fakeRunner();
+
+  await restartHere(db, runner.run, 'z-q', false);
+
+  const log = await Bun.file(`${dir}/r.log`).text();
+  expect(log).toMatch(/restart record unreadable, restore check skipped: the restart record at .+ is malformed/u);
+});
+
 test('slow restores: sessions that come up in time are late, the rest stay down', async () => {
   const failed = [
     { id: 'id-a', name: 'kettle', reason: 'listed in state running without a terminal: waiting to restore' },
@@ -234,7 +248,9 @@ test('a bad restore wait falls back to 180 s; the wake keeps the report read aft
   delete process.env['HQ_RESTART_LOG'];
   delete process.env['HQ_RESTORE_WAIT_MS'];
   expect(await Bun.file(`${dir}/r.log`).text()).toContain('waiting up to 180s');
-  expect((r.wake as { runID: string }).runID).toBe('run-1');
+  invariant('runID' in r.wake);
+
+  expect(r.wake.runID).toBe('run-1');
 });
 
 test('the default restart log is under hq\'s own state dir, and the dir is created', async () => {

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test';
 import type { Database } from 'bun:sqlite';
+import { readOutboxRows } from '../src/outbox/read-outbox-rows.ts';
 import { join } from 'node:path';
 import { owner } from '../src/owner.ts';
 import { loadCapacityLine } from '../src/capacity/load-capacity-line.ts';
@@ -69,7 +70,6 @@ function probe(w: World): CapacityProbe {
 }
 
 const minute = (m: number) => new Date(Date.parse(NOON_SYDNEY) + m * 60_000);
-const outbox = () => db.query('SELECT target, text, topic FROM outbox ORDER BY id').all() as { target: string; text: string; topic: string | null }[];
 const sampleAt = async (w: World, d: Date) => {
   at(d.toISOString());
   return sampleCapacity(db, probe(w), 'hq-lanes', d);
@@ -146,14 +146,14 @@ test('a Claude sample older than 30 minutes is no reading', async () => {
 
 test('a breach must hold two samples to open; one is not enough', async () => {
   await sampleAt(world({ nonnix: 18_432 }), minute(0));
-  expect(outbox()).toHaveLength(0);
+  expect(readOutboxRows(db)).toHaveLength(0);
   expect(openAlerts(db)).toEqual({});
   await sampleAt(world({ nonnix: 16_000 }), minute(5));
   await sampleAt(world({ nonnix: 18_432 }), minute(10));
-  expect(outbox()).toHaveLength(0);
+  expect(readOutboxRows(db)).toHaveLength(0);
   const t = await sampleAt(world({ nonnix: 18_432 }), minute(15));
   expect(t.tick.opened).toEqual(['impd:nonnix']);
-  const sent = outbox();
+  const sent = readOutboxRows(db);
   expect(sent.map((m) => m.target).sort()).toEqual([owner(), orchestratorName()].sort());
   expect(sent[0]!.text).toContain('- impd: non-Nix imps awake 18,432 MiB, over 16,384 MiB (budget used 10,240/20,480)');
   expect(sent[0]!.text).toContain('hq capacity shows every reading. hq changed nothing.');
@@ -164,33 +164,33 @@ test('a clear also needs two good samples, and one message says how long it was 
   await sampleAt(world({ nonnix: 18_432 }), minute(0));
   await sampleAt(world({ nonnix: 18_432 }), minute(5));
   db.query("UPDATE outbox SET status = 'sent'").run();
-  const n = outbox().length;
+  const before = readOutboxRows(db).length;
   await sampleAt(world(), minute(10));
   await sampleAt(world({ nonnix: 18_432 }), minute(15));
   await sampleAt(world(), minute(20));
-  expect(outbox()).toHaveLength(n);
+  expect(readOutboxRows(db)).toHaveLength(before);
   await sampleAt(world(), minute(25));
-  const sent = outbox().slice(n);
+  const sent = readOutboxRows(db).slice(before);
   expect(sent).toHaveLength(2);
-  expect(sent[0]!.text).toContain('back under 16,384 MiB (open 20 min)');
-  expect(sent[0]!.topic).toBeNull();
+  expect(sent[0]?.text).toContain('back under 16,384 MiB (open 20 min)');
+  expect(sent[0]?.topic).toBeNull();
   expect(openAlerts(db)).toEqual({});
 });
 
 test('a sample with no reading neither opens nor clears, and keeps the count', async () => {
   await sampleAt(world({ nonnix: 18_432 }), minute(0));
   await sampleAt(world({ impzBroken: true }), minute(5));
-  expect(outbox()).toHaveLength(0);
+  expect(readOutboxRows(db)).toHaveLength(0);
   await sampleAt(world({ nonnix: 18_432 }), minute(10));
   expect(Object.keys(openAlerts(db))).toEqual(['impd:nonnix']);
   db.query("UPDATE outbox SET status = 'sent'").run();
-  const n = outbox().length;
+  const before = readOutboxRows(db).length;
   await sampleAt(world(), minute(15));
   await sampleAt(world({ impzBroken: true }), minute(20));
   expect(Object.keys(openAlerts(db))).toEqual(['impd:nonnix']);
   await sampleAt(world(), minute(25));
   expect(openAlerts(db)).toEqual({});
-  expect(outbox().length).toBe(n + 2);
+  expect(readOutboxRows(db)).toHaveLength(before + 2);
 });
 
 test('cloud and Claude thresholds open one alert each; several in a tick make one message', async () => {
@@ -199,7 +199,7 @@ test('cloud and Claude thresholds open one alert each; several in a tick make on
     await sampleAt(world({ cloudAvail: 1.5 }), minute(m));
   }
   expect(Object.keys(openAlerts(db)).sort()).toEqual(['claude:5h', 'claude:7d', 'cloud:memory']);
-  const sent = outbox().filter((m) => m.target === owner());
+  const sent = readOutboxRows(db).filter((row) => row.target === owner());
   expect(sent).toHaveLength(1);
   expect(sent[0]!.text).toContain('3 things are over their line');
   expect(sent[0]?.text).toContain('- cloud: 1.5 GiB memory available, under 2 GiB (of 31.3 GiB)');
@@ -221,7 +221,7 @@ test('the PC never alerts, however low it is', async () => {
     at(minute(m).toISOString());
     await sampleCapacity(db, low, 'hq-lanes', minute(m));
   }
-  expect(outbox()).toHaveLength(0);
+  expect(readOutboxRows(db)).toHaveLength(0);
   expect((await latestSample(db))!.pc_disk_free_bytes).toBe(1);
 });
 
@@ -230,7 +230,7 @@ test('quiet hours: an impd open goes out at once; another alert waits for the fi
   for (const offset of [0, 5]) {
     await sampleAt(world({ nonnix: 20_000, cloudAvail: 1 }), quiet(offset));
   }
-  const told = outbox().filter((m) => m.target === owner());
+  const told = readOutboxRows(db).filter((row) => row.target === owner());
   expect(told).toHaveLength(1);
   expect(told[0]!.text).toContain('impd:');
   expect(told[0]?.text).not.toContain('cloud:');
@@ -238,12 +238,12 @@ test('quiet hours: an impd open goes out at once; another alert waits for the fi
   db.query("UPDATE outbox SET status = 'sent'").run();
   const morning = new Date(Date.parse(FOUR_AM_SYDNEY) + 3 * 3_600_000);
   await sampleAt(world({ nonnix: 20_000, cloudAvail: 1 }), morning);
-  const after = outbox().filter((m) => m.target === owner());
+  const after = readOutboxRows(db).filter((row) => row.target === owner());
   expect(after).toHaveLength(2);
   expect(after[1]?.text).toContain('cloud:');
   expect(after[1]?.text).toContain('Still open:');
   await sampleAt(world({ nonnix: 20_000, cloudAvail: 1 }), new Date(morning.getTime() + 300_000));
-  expect(outbox().filter((message) => message.target === owner())).toHaveLength(2);
+  expect(readOutboxRows(db).filter((message) => message.target === owner())).toHaveLength(2);
 });
 
 test('quiet hours: an alert that opens and clears inside them sends nothing; a told one is cleared at wake', async () => {
@@ -253,14 +253,14 @@ test('quiet hours: an alert that opens and clears inside them sends nothing; a t
   }
   for (const m of [10, 15]) await sampleAt(world(), quiet(m));
   expect(openAlerts(db)).toEqual({});
-  expect(outbox()).toHaveLength(0);
+  expect(readOutboxRows(db)).toHaveLength(0);
 
   for (const offset of [20, 25]) { await sampleAt(world({ nonnix: 20_000 }), quiet(offset)); }
   db.query("UPDATE outbox SET status = 'sent'").run();
   for (const offset of [30, 35]) { await sampleAt(world(), quiet(offset)); }
-  expect(outbox().filter((m) => m.target === owner())).toHaveLength(1);
+  expect(readOutboxRows(db).filter((row) => row.target === owner())).toHaveLength(1);
   await sampleAt(world(), new Date(Date.parse(FOUR_AM_SYDNEY) + 3 * 3_600_000));
-  const sent = outbox().filter((m) => m.target === owner());
+  const sent = readOutboxRows(db).filter((row) => row.target === owner());
   expect(sent).toHaveLength(2);
   expect(sent[1]!.text).toContain('back under 16,384 MiB');
 });
@@ -281,7 +281,9 @@ test('an atc outage loses no notice: every open and back-under stays queued, in 
   for (const offset of [50, 55]) { await sampleAt(world({ cloudAvail: 1 }), minute(offset)); }
   for (const offset of [60, 65]) { await sampleAt(world(), minute(offset)); }
   for (const t of [owner(), orchestratorName()]) {
-    const texts = outbox().filter((m) => m.target === t).map((m) => m.text.split('\n')[1]!);
+    const texts = readOutboxRows(db)
+      .filter((row) => row.target === t)
+      .map((row) => row.text.split('\n')[1]);
     expect(texts).toEqual([
       expect.stringContaining('impd:'),
       expect.stringContaining('cloud:'),
@@ -292,7 +294,7 @@ test('an atc outage loses no notice: every open and back-under stays queued, in 
       expect.stringContaining('back under'),
     ]);
   }
-  expect(outbox().every((m) => m.topic === null)).toBe(true);
+  expect(readOutboxRows(db).every((row) => row.topic === null)).toBe(true);
 });
 
 test('an alert that reopens in quiet hours drops its old held recovery', async () => {
@@ -301,9 +303,9 @@ test('an alert that reopens in quiet hours drops its old held recovery', async (
   db.query("UPDATE outbox SET status = 'sent'").run();
   for (const offset of [10, 15]) { await sampleAt(world(), q(offset)); }
   for (const offset of [20, 25]) { await sampleAt(world({ nonnix: 20_000 }), q(offset)); }
-  const n = outbox().length;
+  const before = readOutboxRows(db).length;
   await sampleAt(world({ nonnix: 20_000 }), new Date(Date.parse(FOUR_AM_SYDNEY) + 3 * 3_600_000));
-  expect(outbox().slice(n).some((m) => m.text.includes('back under'))).toBe(false);
+  expect(readOutboxRows(db).slice(before).some((row) => row.text.includes('back under'))).toBe(false);
 });
 
 test('it keeps every setting when processes set different ones at once', async () => {

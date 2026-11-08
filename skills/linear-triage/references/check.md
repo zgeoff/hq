@@ -48,15 +48,22 @@ Contents: [State](#state) · [Steps](#steps) · [Calls](#calls) · [Unblock list
    `priority`, `createdAt` and `updatedAt`, through `list_issues`. Save every page.
 3. **Complete `notes.json`** (start it as `{}` without a pass), one entry per flagged issue:
    `{"GEO-9001": {"question": "Split GEO-9001?", "recommendation": "Yes, because 16 PRs landed.", "actions": [], "statusQuo": false, "ownerListed": false}}`.
-   For a flag the pass didn't set, read the issue's latest comment.
-   - When the comment asks only what you can settle (a missing section, a missing `Code delivery`, a
-     named blocker), fix it, remove `Needs Geoff`, and write `{"resolved": true}`.
-   - When the comment asks what
-     [owner-calls](../../owner-calls/SKILL.md#what-only-the-owner-decides) lists as the owner's,
-     or whether the owner joins a design session, keep the flag. Otherwise settle it yourself, as
-     for the case above. Give every entry `actions`, `statusQuo` and `ownerListed`, as step 1 says.
-     `check.private.md` in hq-private (`hq defs` shows where) says which credentials are another
-     session's.
+   For a flag the pass didn't set, look for the owner's answer first. `hq call list --state all`
+   gives each call's `issues`, `state`, `answer` and `answered_at`. A call is `applied` once
+   `z-stu` has carried out the answer.
+   - When a call in state `answered` or `applied` holds the issue, and every comment after its
+     `answered_at` asks the owner nothing new, the owner has answered the flag. Remove
+     `Needs Geoff`, add a comment that quotes the answer, and write `{"resolved": true}`. Judge a
+     comment by what it says: every session comments as the owner's Linear user.
+   - Otherwise read the issue's latest comment:
+     - When the comment asks only what you can settle (a missing section, a missing `Code
+       delivery`, a named blocker), fix it, remove `Needs Geoff`, and write `{"resolved": true}`.
+     - When the comment asks what
+       [owner-calls](../../owner-calls/SKILL.md#what-only-the-owner-decides) lists as the owner's,
+       or whether the owner joins a design session, keep the flag. Otherwise settle it yourself, as
+       for the case above. Give every entry `actions`, `statusQuo` and `ownerListed`, as step 1
+       says. `check.private.md` in hq-private (`hq defs` shows where) says which credentials are
+       another session's.
    - Issues waiting on one decision get the same question text, word for word, so they become one
      call. When that decision is one step 1 gathered, use its question: `build-queue.sh` folds the
      issues into the blocked call, as it does the blocked decision's own issue. Add each issue to
@@ -82,6 +89,12 @@ Contents: [State](#state) · [Steps](#steps) · [Calls](#calls) · [Unblock list
 6. **Update hq:** run `hq outbox flush --retry`. Re-add every call in order, including open and
    put-off ones. Close each call in `hq call list` that's no longer gathered, and drop each unblock
    item whose session says it's done. hq tells `z-stu` itself.
+   - When `hq call add` prints `reasked`, the owner already answered that call. If every comment
+     after the answer asks the owner nothing new, close the call at once with `hq call close`.
+     Then remove `Needs Geoff`, and add a comment that quotes the answer. Leave `notes.json` as it
+     is: step 5 has already read it. If a later comment asks the owner a new question, keep the
+     call: `reasked` put it back in the queue as a new round. Write its card from that comment.
+     For a call with no issue, close it, and send the answer to its session in `refine.md`.
 7. **End:** save "CHECK at <UTC time>" in `refine.md`, and delete your scratch files and the pass's.
 
 **Reply:** one line per call added or closed, or "<UTC time> check: nothing new."

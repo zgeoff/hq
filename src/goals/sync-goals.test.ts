@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, expect, onTestFinished, test } from 'bun:test';
 import { overrideEnv } from '../config/override-env.ts';
 import type { Database } from 'bun:sqlite';
+import { readDeployRuns } from './read-deploy-runs.ts';
+import { readGoalDays } from './read-goal-days.ts';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { classifyDeploy } from './classify-deploy.ts';
 import { DEPLOY } from './deploy.ts';
@@ -170,7 +172,7 @@ test('a capped sync fetches the newest repo-days first and counts the rest as le
   expect(r.days).toBe(3);
   expect(r.errors).toEqual([]);
   expect(r.left).toBe(2 * 5 - 3);
-  const got = db.query(`SELECT day FROM goal_days WHERE kind = 'ci' ORDER BY day`).all() as { day: string }[];
+  const got = readGoalDays(db, 'ci');
   expect(got.every((x) => x.day === '2026-10-15')).toBe(true);
   const again = await syncGoals(db, gh({}, {}), { from: new Date('2026-10-12T00:00:00Z') });
   expect(again.left).toBe(0);
@@ -254,6 +256,17 @@ test('classify a deploy-prod run from its jobs', () => {
   expect(one(noConclusion)).toBeNull();
 });
 
+test('it classifies a deploy-prod run whose steps include entries that are not objects', () => {
+  const steps = [null, 7, { name: 'Terraform apply', conclusion: 'failure' }];
+  const jobs = { total_count: 1, jobs: [{ name: 'apply', conclusion: 'failure', steps }] };
+
+  expect(classifyDeploy(jobs, 'failure')).toStrictEqual({ outcome: 'applied_failed', apply_conclusion: 'failure', failed_step: 'Terraform apply' });
+});
+
+test('it classifies no deploy-prod run whose job list has an entry that is not a job', () => {
+  expect(classifyDeploy({ total_count: 2, jobs: [{ name: 'apply', conclusion: 'success' }, 'x'] }, 'success')).toBeNull();
+});
+
 const depRun = (id: number, over: Partial<Record<string, unknown>> = {}) => run({ id, path: DEPLOY.path, created_at: `2026-10-14T0${id % 10}:00:00Z`, ...over });
 
 function jobsGh(answers: Record<number, unknown>, asked: number[] = []): Runner {
@@ -304,7 +317,7 @@ test('syncDeploys takes at most 60 a call, oldest first, and counts what is left
   }
   const first = await syncDeploys(db, jobsGh(answers));
   expect(first).toMatchObject({ fetched: 60, left: 5 });
-  const stored = (db.query('SELECT run_id FROM deploy_runs').all() as { run_id: number }[]).map((x) => x.run_id);
+  const stored = readDeployRuns(db).map((x) => x.run_id);
   expect(stored).not.toContain(8000);
   expect(stored).not.toContain(8004);
   expect(stored).toContain(8005);

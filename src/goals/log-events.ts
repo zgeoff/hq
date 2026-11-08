@@ -1,6 +1,9 @@
 import { iso } from '../clock/iso.ts';
 import { stepLogDay } from './step-log-day.ts';
 import type { LogDay } from './step-log-day.ts';
+import { isOneOf } from '@zgeoff/std';
+
+const LOG_EVENT_KINDS = ['DEPLOY', 'HOLD'] as const;
 
 export function logEvents(texts: string[]): { kind: 'DEPLOY' | 'HOLD'; at: string }[] {
   const out: { kind: 'DEPLOY' | 'HOLD'; at: string }[] = [];
@@ -12,7 +15,10 @@ export function logEvents(texts: string[]): { kind: 'DEPLOY' | 'HOLD'; at: strin
       if (last === null) continue;
       for (const m of line.matchAll(/(MORNING )?\b(DEPLOY|HOLD)\b(-START| lifted)?/g)) {
         if (m[1] || m[3]) continue;
-        out.push({ kind: m[2] as 'DEPLOY' | 'HOLD', at: iso(new Date(last)) });
+        const kind = m.at(2);
+        if (isOneOf(kind, LOG_EVENT_KINDS)) {
+          out.push({ kind, at: iso(new Date(last)) });
+        }
       }
     }
   }

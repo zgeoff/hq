@@ -1,3 +1,4 @@
+import { isOneOf } from '@zgeoff/std';
 import type { Database } from 'bun:sqlite';
 import { logEvent } from '../log-event.ts';
 import { setMeta } from '../db/set-meta.ts';
@@ -8,31 +9,37 @@ import type { GoalKey } from './goal-keys.ts';
 import { goalTargets } from './goal-targets.ts';
 import { loadStoredTargets } from './load-stored-targets.ts';
 import { OPS } from './ops.ts';
-import type { Op } from './ops.ts';
 import type { Target } from './types.ts';
 
 const VALUE = /^\d{1,6}(?:\.\d{1,3})?$/u;
 
 export function setTarget(db: Database, key: string, op: string, value: string | undefined, actor: string): Target | null {
-  if (!(GOAL_KEYS as readonly string[]).includes(key)) throw new HqError('bad_args', `unknown goal ${JSON.stringify(key).slice(0, 40)}: one of ${GOAL_KEYS.join(', ')}`);
-  const k = key as GoalKey;
+  if (!isOneOf(key, GOAL_KEYS)) {
+    throw new HqError('bad_args', `unknown goal ${JSON.stringify(key).slice(0, 40)}: one of ${GOAL_KEYS.join(', ')}`);
+  }
   let next: Target | null = null;
-  if (op !== 'none') {
-    if (!(OPS as readonly string[]).includes(op)) throw new HqError('bad_args', `the operator must be one of ${OPS.join(' ')}, or use none to clear the target`);
-    const range = getValueRange(k);
+  if (op === 'none') {
+    if (value !== undefined) {
+      throw new HqError('bad_args', 'none takes no value');
+    }
+  } else {
+    if (!isOneOf(op, OPS)) {
+      throw new HqError('bad_args', `the operator must be one of ${OPS.join(' ')}, or use none to clear the target`);
+    }
+    const range = getValueRange(key);
     if (value === undefined || !VALUE.test(value) || Number(value) > range.max) {
       throw new HqError('bad_args', `the value must be a number from 0 to ${range.max} (${range.unit})`);
     }
-    const cur = goalTargets(db).targets[k] ?? DEFAULT_TARGETS[k];
-    next = { op: op as Op, value: Number(value), ...(cur?.until ? { until: cur.until } : {}), ...(cur?.detectMax !== undefined ? { detectMax: cur.detectMax } : {}) };
-  } else if (value !== undefined) throw new HqError('bad_args', 'none takes no value');
+    const cur = goalTargets(db).targets[key] ?? DEFAULT_TARGETS[key];
+    next = { op, value: Number(value), ...(cur?.until ? { until: cur.until } : {}), ...(cur?.detectMax === undefined ? {} : { detectMax: cur.detectMax }) };
+  }
   return db
     .transaction(() => {
-      const before = goalTargets(db).targets[k];
+      const before = goalTargets(db).targets[key];
       const stored = loadStoredTargets(db);
-      stored[k] = next;
+      stored[key] = next;
       setMeta(db, 'goal_targets', JSON.stringify(stored));
-      logEvent(db, 'hq', 'goals', 'target', actor, formatTarget(before), formatTarget(next), { key: k });
+      logEvent(db, 'hq', 'goals', 'target', actor, formatTarget(before), formatTarget(next), { key });
       return next;
     })
     .immediate();

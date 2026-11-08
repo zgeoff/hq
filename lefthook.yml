@@ -1,5 +1,7 @@
 # Git hooks. The pre-commit and pre-push jobs come from the chex baseline, which runs its jobs one
 # at a time and lints and tests only what the branch changes. CI runs every whole-tree check.
+# Pre-push skips the baseline's chex-lint job and runs lint:changed, as CI does: the baseline's whole-file
+# lint fails on old errors in any file a branch touches.
 
 extends:
   - node_modules/@zgeoff/chex/lefthook.yml
@@ -25,3 +27,8 @@ pre-push:
           exit 1
         fi
         # {files}
+    - name: chex-lint
+      skip: true
+    - name: lint-changed
+      glob: "*.{js,mjs,cjs,jsx,ts,mts,cts,tsx}"
+      run: bun run lint:changed

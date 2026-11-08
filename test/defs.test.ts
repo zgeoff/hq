@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test';
 import type { Database } from 'bun:sqlite';
-import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, unlinkSync, writeFileSync } from 'node:fs';
 import { isContention } from '../src/defs/is-contention.ts';
 import { originMatches } from '../src/defs/origin-matches.ts';
 import { parseSource } from '../src/defs/parse-source.ts';
@@ -207,7 +207,6 @@ test('a ref lock held by another git is retried, then left for the next tick; tw
   expect(readTreeCheck(db, new Date())).toMatchObject({ ok: true });
   expect(runTreeSyncTick(db, 'hq-lanes')).toMatchObject({ ok: false, transient: true, line: expect.stringContaining('the same on the tick before') });
   expect(readTreeCheck(db, new Date())).toMatchObject({ ok: false });
-  const { unlinkSync } = require('node:fs') as typeof import('node:fs');
   unlinkSync(lock);
   expect(runTreeSyncTick(db, 'hq-lanes')).toMatchObject({ ok: true, changed: true });
 });

@@ -1,9 +1,11 @@
 import type { Database } from 'bun:sqlite';
 import { z } from 'zod';
+import { StoredEventSchema } from './stored-event-schema.ts';
+import type { StoredEvent } from './stored-event-schema.ts';
 
-const Rows = z.array(z.object({ seq: z.number(), action: z.string(), actor: z.string(), at: z.string(), data: z.string() }));
+export type { StoredEvent } from './stored-event-schema.ts';
 
-export type StoredEvent = z.infer<typeof Rows>[number];
+const Rows = z.array(StoredEventSchema);
 
 export function readEvents(db: Database, subject: 'ask' | 'unblock' | 'hq' | 'run', subjectID: string, actions: readonly string[]): StoredEvent[] {
   const rows = db

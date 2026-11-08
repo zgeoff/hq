@@ -1,9 +1,11 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test';
 import type { Database } from 'bun:sqlite';
+import { listEvents } from '../src/list-events.ts';
 import { addAsk } from '../src/asks/add-ask.ts';
 import { addTyped } from '../src/typed/add-typed.ts';
 import { listTyped } from '../src/typed/list-typed.ts';
 import { parseSource } from '../src/typed/parse-source.ts';
+import { parseJSON } from '../src/noslop/parse-json.ts';
 import { typedSource } from '../src/typed/typed-source.ts';
 import { addUnblock } from '../src/unblock/add-unblock.ts';
 import { at, freshDb } from './helpers.ts';
@@ -79,8 +81,8 @@ test('logs the full text, target and source; lists newest first, by name, id or 
   const lost = '9f8e7d6c-0000-4000-8000-000000000003';
   addTyped(db, { to: lost, toId: null, toName: null, text: 'Invented.', source: parseSource(db, 'call:kettle-colour'), actor: 'z-stu' });
   expect(listTyped(db, { session: '9f8e7d6c', limit: 50 })).toEqual([expect.objectContaining({ id: 3, to_session: lost })]);
-  const ev = db.query(`SELECT actor, data FROM events WHERE action = 'typed' ORDER BY seq`).all() as { actor: string; data: string }[];
-  expect(ev.slice(0, 2).map((e) => JSON.parse(e.data))).toEqual([{ to: 'z-triage', source: 'call:kettle-colour' }, { to: 'z-delivery', source: `chat:${STU}` }]);
+  const ev = listEvents(db, 'typed');
+  expect(ev.slice(0, 2).map((event) => parseJSON(event.data))).toStrictEqual([{ to: 'z-triage', source: 'call:kettle-colour' }, { to: 'z-delivery', source: `chat:${STU}` }]);
 });
 
 test('an empty target or text is refused', () => {

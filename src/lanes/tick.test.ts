@@ -10,6 +10,8 @@ import { makeStateCall } from '../../test/make-state-call.ts';
 import { setMeta } from '../db/set-meta.ts';
 import { runFocusCommand } from '../focus/run-focus-command.ts';
 import { addRun } from '../runs/add-run.ts';
+import { setCapacitySetting } from '../capacity/set-capacity-setting.ts';
+import { readOutboxRows } from '../outbox/read-outbox-rows.ts';
 import { holdLanes } from './hold-lanes.ts';
 import { LANES_HELD_SPANS } from './lanes-held-spans.ts';
 import { releaseLanes } from './release-lanes.ts';
@@ -758,4 +760,22 @@ test('it counts no design minutes while the design counts in pacing.json are unr
   tick(ctx.db, sample, 'hq-lanes');
 
   expect(readSlotMinutes(ctx.db, '2026-10-14').design).toBe(0);
+});
+
+test.each([
+  { name: 'no live reading, the stored sample stands in', impd: null, nudged: true, slots: 1 },
+  { name: 'a live reading that shows a woken imp', impd: { budgetMib: 20_480, usedMib: 14_336, committedMib: 14_336, nonnixAwakeMib: 14_336, nonnixAwakeVcpus: 4, nixAwakeMib: 0, priorityKeptMib: 6144 }, nudged: false, slots: 0 },
+])('it offers $slots imp slot(s) and nudges $nudged given $name, though the stored sample shows 1 free', (row) => {
+  const ctx = setupTest();
+  at('2026-10-14T01:00:00Z');
+  createCapacitySample(ctx.db, { at: '2026-10-14T00:58:00Z', nonnixAwakeMib: 12_288, nixAwakeMib: 0, impdBudgetMib: 20_480, impdPriorityKeptMib: 6144 });
+  setCapacitySetting(ctx.db, 'nonnixMaxMib', '20480', 'hq-lanes');
+  const sample = { cap: { imp: { freeMib: 2048, room: true }, providers: { kettle: { unattended: true, room: true, target: 'imp' } } }, impMib: 2048, error: null, impd: row.impd };
+  tick(ctx.db, sample, 'hq-lanes');
+  at('2026-10-14T01:10:00Z');
+  createCapacitySample(ctx.db, { at: '2026-10-14T01:08:00Z', nonnixAwakeMib: 12_288, nixAwakeMib: 0, impdBudgetMib: 20_480, impdPriorityKeptMib: 6144 });
+
+  const result = tick(ctx.db, sample, 'hq-lanes');
+
+  expect([result.slots, result.nudged, readOutboxRows(ctx.db).length > 0]).toStrictEqual([row.slots, row.nudged, row.nudged]);
 });

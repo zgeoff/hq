@@ -5,6 +5,7 @@ import { digest } from '../src/news/digest.ts';
 import { listNews } from '../src/news/list-news.ts';
 import { newsTagged } from '../src/news/news-tagged.ts';
 import { readNews } from '../src/news/read-news.ts';
+import { readOutboxRows } from '../src/outbox/read-outbox-rows.ts';
 import { NOON_SYDNEY, at, freshDb } from './helpers.ts';
 
 let db: Database;
@@ -17,13 +18,12 @@ afterEach(() => cleanup());
 
 const item = (over: Partial<Parameters<typeof addNews>[1]> = {}) =>
   addNews(db, { from: 'z-delivery', topic: 'merge', text: 'Merged widgets#12: the kettle whistles once.', issue: 'GEO-9001', link: null, needsGeoff: false, ...over });
-const outbox = () => db.query('SELECT target, text FROM outbox').all() as { target: string; text: string }[];
 
 test('adding news sends nothing; the digest groups unread items by topic', () => {
   item();
   item({ topic: 'deploy', text: 'Deployed gadgets 1.4 to the lab.', issue: null, link: 'https://example.com/run/7' });
   item({ topic: 'merge', from: 'z-steward', text: 'Merged a skill tidy-up.', issue: null });
-  expect(outbox()).toHaveLength(0);
+  expect(readOutboxRows(db)).toHaveLength(0);
   const d = digest(listNews(db, { all: false, limit: 200 }));
   expect(d).toBe(
     [
@@ -49,9 +49,9 @@ test('read --upto marks only items up to that id; a later item stays unread', ()
 
 test('--needs-geoff tells z-stu at once, unless z-stu filed it', () => {
   item({ topic: 'fix', text: 'The teapot fix needs a yes before deploy.', needsGeoff: true });
-  expect(outbox()).toEqual([{ target: 'z-stu', text: 'News 1 needs the owner, from z-delivery: The teapot fix needs a yes before deploy. [GEO-9001]' }]);
+  expect(readOutboxRows(db).map((row) => ({ target: row.target, text: row.text }))).toStrictEqual([{ target: 'z-stu', text: 'News 1 needs the owner, from z-delivery: The teapot fix needs a yes before deploy. [GEO-9001]' }]);
   item({ from: 'z-stu', needsGeoff: true });
-  expect(outbox()).toHaveLength(1);
+  expect(readOutboxRows(db)).toHaveLength(1);
 });
 
 test.each(['gossip', 'Report', 'REPORT', 'report ', '', 'reports', '__proto__', 'constructor', 'toString'])('the topic %p is refused', (topic) => expect(() => item({ topic })).toThrow('--topic must be one of'));

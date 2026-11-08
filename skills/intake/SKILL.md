@@ -50,6 +50,7 @@ Avoid these traps:
 - [examples.md](references/examples.md): starting work, and a side request.
 - [morning-reports.md](references/morning-reports.md): hq's "Morning reports due".
 - [noslop-checkin.md](references/noslop-checkin.md): the daily noslop check-in.
+- [requests.md](references/requests.md): a bug or request that needs a subagent's draft.
 - [pr-walk.md](references/pr-walk.md): a walk through PRs whose reviews took rework.
 - [post-review.md](references/post-review.md): the PRs to review after their merge.
 - [session-care.md](references/session-care.md): a restart, forgetting a session, and the vaults.
@@ -91,19 +92,20 @@ them. Then open with:
 
 Put design questions in a Triage issue for a design session, never in chat.
 
+When the owner asks you for a design session, ask `z-delivery` to launch it now. Give it the issue,
+filed in Triage first if there is none, and where the owner asked (`chat:$ATC_SESSION_ID`).
+`z-delivery` launches it even when the owner's design slots, the with-geoff lane in
+[pacing](../delivery-lead/references/pacing.md#design-lanes), are full. The request is the owner's
+yes, so offer no choice of slot or of which session goes first.
+
 ## Bugs and requests
 
 1. Ask only what the owner alone knows, at most two questions.
-2. Spawn a subagent for anything beyond a one-line request whose repo is obvious. It loads the
-   [tickets](../tickets/SKILL.md) skill, searches GEO for duplicates, reads the code, recent PRs and
-   running sessions, and reproduces the bug if that is cheap and read-only. It returns only a draft
-   in the tickets skill's sections, the evidence, any duplicate, and up to two questions.
-3. Put its questions to the owner, and fit the draft to the answers. For a duplicate of GEO-n,
-   comment the new evidence there. Otherwise file it in GEO's Triage, related to each issue the
-   subagent found.
-4. If the bug blocks shipped work or a running agent, tell `z-delivery` the issue and why it's
+2. Spawn a subagent for anything beyond a one-line request whose repo is obvious, and file its draft
+   as [requests.md](references/requests.md) says.
+3. If the bug blocks shipped work or a running agent, tell `z-delivery` the issue and why it's
    urgent.
-5. Tell the owner the issue ID and title in one line.
+4. Tell the owner the issue ID and title in one line.
 
 File a side remark the owner doesn't ask you to act on straight to Triage, with no subagent. For
 several requests, run the subagents in parallel, and take each result to the owner in turn, opening
@@ -118,8 +120,8 @@ messages you "Morning reports due", read morning-reports.md.
 
 When the owner answers a PR, record it at once with
 `hq pr answer <repo> <pr> lgtm|changes|reject --source <source>` (`--note` for `changes`). For an
-answer in chat, the source is `chat:$ATC_SESSION_ID`. `z-review` and
-`hq review gate` read the record. Relay nothing. "Later" has no record: the
+answer in chat, the source is `chat:$ATC_SESSION_ID`. `z-review` and `hq review gate` read the
+record. Relay nothing. "Later" has no record: the
 PR waits.
 
 Put each PR `z-review` sends you to the owner. It sends only what `hq pr mechanical` and

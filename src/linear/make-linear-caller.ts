@@ -57,6 +57,9 @@ function formatLinearError(error: unknown): string {
   return String(parsed.data.message ?? '');
 }
 
+// A settings file of another shape throws into the same empty catch as an unreadable one.
+const ClaudeSettingsSchema = z.object({ env: z.record(z.string(), z.unknown()).optional() });
+
 async function readKey(run: Runner, recordRead: () => void): Promise<string> {
   const ITEM = readLocalSetting('HQ_LINEAR_OP_REF');
   const KEY_TTL_MS = 12 * 3_600_000;
@@ -66,7 +69,8 @@ async function readKey(run: Runner, recordRead: () => void): Promise<string> {
   const env: Record<string, string | undefined> = { ...process.env };
   if (!env['OP_SERVICE_ACCOUNT_TOKEN']) {
     try {
-      env['OP_SERVICE_ACCOUNT_TOKEN'] = (JSON.parse(readFileSync(`${process.env['HOME']}/.claude/settings.json`, 'utf8')) as { env?: Record<string, string> }).env?.['OP_SERVICE_ACCOUNT_TOKEN'];
+      const token = ClaudeSettingsSchema.parse(JSON.parse(readFileSync(`${process.env['HOME']}/.claude/settings.json`, 'utf8'))).env?.['OP_SERVICE_ACCOUNT_TOKEN'];
+      env['OP_SERVICE_ACCOUNT_TOKEN'] = typeof token === 'string' ? token : undefined;
     } catch {}
   }
   if (!env['OP_SERVICE_ACCOUNT_TOKEN']) {

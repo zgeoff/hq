@@ -42,10 +42,9 @@ import { LAST_TICK } from './last-tick.ts';
 import { STEP_MS } from './step-ms.ts';
 import type { WatchDeps } from './types.ts';
 import { withDeadline } from './with-deadline.ts';
+import { toErrorMessage } from '../to-error-message.ts';
 
 const LOOKBACK_DAYS = 15;
-
-const msg = (e: unknown) => String((e as Error).message ?? e);
 
 export async function watchTick(db: Database, d: WatchDeps): Promise<boolean> {
   const ms = d.stepMs ?? STEP_MS;
@@ -83,22 +82,26 @@ export async function watchTick(db: Database, d: WatchDeps): Promise<boolean> {
       d.log(`${at()} grant marks: refused ${rejected.grant.name}: ${rejected.reason}`);
     }
   } catch (error) {
-    d.log(`${at()} grant marks failed: ${msg(error)}`);
+    d.log(`${at()} grant marks failed: ${toErrorMessage(error)}`);
   }
   try {
     await runLinearReadyTick(db, { call: makeAuditedLinearCaller(db, d.run), run: d.run, readLanes: readPacingLanes, actor: d.me, deadlineMs: ms });
   } catch (error) {
-    d.log(`${at()} lanes Ready from Linear failed: ${msg(error)}`);
+    d.log(`${at()} lanes Ready from Linear failed: ${toErrorMessage(error)}`);
   }
   try {
-    const r = tick(db, await step('capacity', () => readCapacity(d.run)), d.me);
+    const sample = await step('capacity', () => readCapacity(d.run));
+    if (sample.impdError) {
+      d.log(`${at()} live impd read failed, the newest stored sample stands in: ${sample.impdError}`);
+    }
+    const look = tick(db, sample, d.me);
     const q = queueReminder(db, d.me);
     if (q.reminded) d.log(`${at()} reminded ${owner()} about ${q.reminded}`);
     await step('notes and sweep', () => d.steps.runs());
     try {
       if (await step('weekly stats', () => d.steps.weekly())) d.log(`${at()} filed the weekly stats line`);
     } catch (e) {
-      d.log(`${at()} weekly stats failed: ${msg(e)}`);
+      d.log(`${at()} weekly stats failed: ${toErrorMessage(e)}`);
     }
     try {
       if (now().getTime() - Date.parse(getMeta(db, 'kinds_synced_at') ?? '1970-01-01T00:00:00Z') > 30 * 60_000) {
@@ -125,8 +128,8 @@ export async function watchTick(db: Database, d: WatchDeps): Promise<boolean> {
         }
       }
     } catch (e) {
-      noteGhAuth(db, msg(e));
-      d.log(`${at()} merged PR kinds failed: ${msg(e)}`);
+      noteGhAuth(db, toErrorMessage(e));
+      d.log(`${at()} merged PR kinds failed: ${toErrorMessage(e)}`);
     }
     try {
       if (now().getTime() - Date.parse(getMeta(db, 'goals_synced_at') ?? '1970-01-01T00:00:00Z') > 30 * 60_000) {
@@ -151,8 +154,8 @@ export async function watchTick(db: Database, d: WatchDeps): Promise<boolean> {
         }
       }
     } catch (e) {
-      noteGhAuth(db, msg(e));
-      d.log(`${at()} team goals failed: ${msg(e)}`);
+      noteGhAuth(db, toErrorMessage(e));
+      d.log(`${at()} team goals failed: ${toErrorMessage(e)}`);
     }
     try {
       if (dueForShipPass(db)) {
@@ -162,8 +165,8 @@ export async function watchTick(db: Database, d: WatchDeps): Promise<boolean> {
         if (s.errors.length) d.log(`${at()} releases: ${s.errors.length} problem(s): ${s.errors.slice(0, 2).join('; ')}`);
       }
     } catch (e) {
-      noteGhAuth(db, msg(e));
-      d.log(`${at()} releases failed: ${msg(e)}`);
+      noteGhAuth(db, toErrorMessage(e));
+      d.log(`${at()} releases failed: ${toErrorMessage(e)}`);
     }
     try {
       const conditions = await step('unblock conditions', () => runUnblockConditionsTick(db, { call: makeAuditedLinearCaller(db, d.run), run: d.run, ownerSession: owner() }, d.me));
@@ -180,8 +183,8 @@ export async function watchTick(db: Database, d: WatchDeps): Promise<boolean> {
         d.log(`${at()} unblock conditions: ${problem}`);
       }
     } catch (error) {
-      noteGhAuth(db, msg(error));
-      d.log(`${at()} unblock conditions failed: ${msg(error)}`);
+      noteGhAuth(db, toErrorMessage(error));
+      d.log(`${at()} unblock conditions failed: ${toErrorMessage(error)}`);
     }
 
     // Set only by a GitHub pass in this tick that read every PR: the one pass a drop may trust.
@@ -203,8 +206,8 @@ export async function watchTick(db: Database, d: WatchDeps): Promise<boolean> {
         d.log(`${at()} run PRs: ${problem}`);
       }
     } catch (error) {
-      noteGhAuth(db, msg(error));
-      d.log(`${at()} run PRs failed: ${msg(error)}`);
+      noteGhAuth(db, toErrorMessage(error));
+      d.log(`${at()} run PRs failed: ${toErrorMessage(error)}`);
     }
     try {
       if (now().getTime() - Date.parse(getMeta(db, 'run_issues_checked_at') ?? '1970-01-01T00:00:00Z') > 10 * 60_000) {
@@ -216,32 +219,32 @@ export async function watchTick(db: Database, d: WatchDeps): Promise<boolean> {
         }
       }
     } catch (error) {
-      d.log(`${at()} run issues in Linear failed: ${msg(error)}`);
+      d.log(`${at()} run issues in Linear failed: ${toErrorMessage(error)}`);
     }
     try {
       if (sampleUsage(db)) d.log(`${at()} Claude usage: new reading stored`);
     } catch (e) {
-      d.log(`${at()} Claude usage sample failed: ${msg(e)}`);
+      d.log(`${at()} Claude usage sample failed: ${toErrorMessage(e)}`);
     }
     try {
       const m = morningTick(db, d.me);
       if (m) d.log(`${at()} morning reports due: told ${owner()} (${m.key}${m.detail ? `, ${m.detail}` : ''})`);
     } catch (e) {
-      d.log(`${at()} morning reports failed: ${msg(e)}`);
+      d.log(`${at()} morning reports failed: ${toErrorMessage(e)}`);
     }
     try {
       if (runCallReadyMorningTick(db, d.me)) {
         d.log(`${at()} morning call ready: told ${owner()}`);
       }
     } catch (error) {
-      d.log(`${at()} morning call ready failed: ${msg(error)}`);
+      d.log(`${at()} morning call ready failed: ${toErrorMessage(error)}`);
     }
     try {
       if (runUnblockChangedTick(db, d.me)) {
         d.log(`${at()} unblock list changed: told ${owner()}`);
       }
     } catch (error) {
-      d.log(`${at()} unblock list changed failed: ${msg(error)}`);
+      d.log(`${at()} unblock list changed failed: ${toErrorMessage(error)}`);
     }
     try {
       const audit = runWeeklyAuditTick(db, d.me);
@@ -249,7 +252,7 @@ export async function watchTick(db: Database, d: WatchDeps): Promise<boolean> {
         d.log(`${at()} weekly audit due: told ${owner()} (${audit.key})`);
       }
     } catch (error) {
-      d.log(`${at()} weekly audit failed: ${msg(error)}`);
+      d.log(`${at()} weekly audit failed: ${toErrorMessage(error)}`);
     }
     try {
       const readSlots = d.steps.slots;
@@ -270,14 +273,14 @@ export async function watchTick(db: Database, d: WatchDeps): Promise<boolean> {
         d.log(`${at()} Claude slots: fleet forecast news line added`);
       }
     } catch (error) {
-      d.log(`${at()} Claude slots failed: ${msg(error)}`);
+      d.log(`${at()} Claude slots failed: ${toErrorMessage(error)}`);
     }
     // After the goals sync (CI minutes come from it) and before the check-in that quotes the sample.
     try {
       const c = d.steps.capacity ? await step('capacity sample', () => d.steps.capacity!()) : null;
       if (c && (c.opened.length || c.cleared.length)) d.log(`${at()} capacity: ${c.opened.length} opened, ${c.cleared.length} cleared`);
     } catch (e) {
-      d.log(`${at()} capacity failed: ${msg(e)}`);
+      d.log(`${at()} capacity failed: ${toErrorMessage(e)}`);
     }
     try {
       // After the goals sync, so the numbers it sends are fresh.
@@ -285,35 +288,35 @@ export async function watchTick(db: Database, d: WatchDeps): Promise<boolean> {
       if (g.run) d.log(`${at()} goals check-in due: told ${owner()} (${g.run.key}${g.run.detail ? `, ${g.run.detail}` : ''})`);
       else if (g.waiting) d.log(`${at()} goals check-in waits: ${g.waiting}`);
     } catch (e) {
-      d.log(`${at()} goals check-in failed: ${msg(e)}`);
+      d.log(`${at()} goals check-in failed: ${toErrorMessage(e)}`);
     }
     // Before the weekly, so its refusals line counts what the scan finds this tick.
     try {
       const n = d.steps.refusals ? await step('refusals', () => d.steps.refusals!()) : 0;
       if (n > 0) d.log(`${at()} found ${n} refusals`);
     } catch (e) {
-      d.log(`${at()} refusals scan failed: ${msg(e)}`);
+      d.log(`${at()} refusals scan failed: ${toErrorMessage(e)}`);
     }
     try {
       const g = goalsWeeklyTick(db, d.me);
       if (g.run) d.log(`${at()} goals weekly due: told ${owner()} (${g.run.key}${g.run.detail ? `, ${g.run.detail}` : ''})`);
       else if (g.waiting) d.log(`${at()} goals weekly waits: ${g.waiting}`);
     } catch (e) {
-      d.log(`${at()} goals weekly failed: ${msg(e)}`);
+      d.log(`${at()} goals weekly failed: ${toErrorMessage(e)}`);
     }
     try {
       const h = await step('health', () => d.steps.health());
       if (h.opened.length || h.cleared.length) d.log(`${at()} health: ${h.opened.length} new, ${h.cleared.length} cleared`);
     } catch (e) {
-      d.log(`${at()} health failed: ${msg(e)}`);
+      d.log(`${at()} health failed: ${toErrorMessage(e)}`);
     }
     takeQueued(); // the watcher sends every pending row, its own and the rest
     const f = await step('send', () => flush(db, { retryFailed: true }));
-    d.log(`${r.at} slots=${r.slots} free=${r.freeMib} eligible=${r.eligible ?? '?'} ${r.nudged ? 'NUDGED' : r.why}${f.failed ? ` send-failed: ${f.errors.join('; ')}` : ''}`);
+    d.log(`${look.at} slots=${look.slots} free=${look.freeMib} eligible=${look.eligible ?? '?'} ${look.nudged ? 'NUDGED' : look.why}${f.failed ? ` send-failed: ${f.errors.join('; ')}` : ''}`);
     setMeta(db, LAST_TICK, at());
     return true;
   } catch (e) {
-    d.log(`${at()} tick failed: ${msg(e)}`);
+    d.log(`${at()} tick failed: ${toErrorMessage(e)}`);
     return false;
   }
 }

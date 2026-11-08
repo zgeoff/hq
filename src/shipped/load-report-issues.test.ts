@@ -1,4 +1,5 @@
 import { expect, onTestFinished, test } from 'bun:test';
+import { z } from 'zod';
 import { makeLinearFake } from '../../test/make-linear-fake.ts';
 import { freshDb } from '../../test/helpers.ts';
 import { loadReportIssues } from './load-report-issues.ts';
@@ -75,7 +76,7 @@ test('only the issues not kept are asked for, 100 to a query', async () => {
   );
 
   expect([first.length, second.length]).toStrictEqual([1, 251]);
-  expect(asked.map((variables) => (variables as { ids: string[] }).ids.length)).toStrictEqual([1, 100, 100, 50]);
+  expect(asked.map((variables) => z.object({ ids: z.array(z.string()) }).parse(variables).ids.length)).toStrictEqual([1, 100, 100, 50]);
 });
 
 test('an id Linear does not return is left out and asked for again next time', async () => {

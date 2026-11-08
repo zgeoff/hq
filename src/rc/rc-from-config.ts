@@ -3,6 +3,7 @@ import { pidAlive } from './pid-alive.ts';
 import { procStart } from './proc-start.ts';
 import { RC_CAP } from './rc-cap.ts';
 import type { PidFind, RcState } from './types.ts';
+import { isRecord } from '@zgeoff/std';
 
 const DAY_MS = 86_400_000;
 
@@ -18,20 +19,27 @@ export function rcFromConfig(text: string | null, found: PidFind, alive: (pid: n
   } catch {
     return { state: 'unknown', why: "the Claude Code config file isn't valid JSON" };
   }
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { state: 'unknown', why: 'the Claude Code config file has an unexpected shape' };
+  if (!isRecord(raw)) {
+    return { state: 'unknown', why: 'the Claude Code config file has an unexpected shape' };
+  }
 
-  raw = (raw as Record<string, unknown>)['replBridgePlaceholders'];
-  if (raw === undefined) {
+  const placeholders = raw['replBridgePlaceholders'];
+  if (placeholders === undefined) {
     return { state: 'unknown', why: 'the config has no bridge record list, so no proof that records are written' };
   }
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+  if (!isRecord(placeholders)) {
     return { state: 'unknown', why: 'replBridgePlaceholders has an unexpected shape' };
   }
   const entries: { pid: number; createdAt: number | null; procStart: string | null }[] = [];
-  for (const e of Object.values(raw as Record<string, unknown>)) {
-    const r = e && typeof e === 'object' ? (e as { pid?: unknown; createdAt?: unknown; procStart?: unknown }) : {};
-    if (typeof r.pid !== 'number' || !Number.isInteger(r.pid)) return { state: 'unknown', why: 'a bridge entry has no process id' };
-    entries.push({ pid: r.pid, createdAt: typeof r.createdAt === 'number' ? r.createdAt : null, procStart: typeof r.procStart === 'string' ? r.procStart : null });
+  for (const entry of Object.values(placeholders)) {
+    const record: Record<string, unknown> = isRecord(entry) ? entry : {};
+    const entryPID = record['pid'];
+    const entryCreatedAt = record['createdAt'];
+    const entryProcStart = record['procStart'];
+    if (typeof entryPID !== 'number' || !Number.isInteger(entryPID)) {
+      return { state: 'unknown', why: 'a bridge entry has no process id' };
+    }
+    entries.push({ pid: entryPID, createdAt: typeof entryCreatedAt === 'number' ? entryCreatedAt : null, procStart: typeof entryProcStart === 'string' ? entryProcStart : null });
   }
   const mine = entries.filter((e) => e.pid === found.pid);
   if (mine.length) {

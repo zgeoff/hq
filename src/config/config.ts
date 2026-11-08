@@ -9,7 +9,7 @@ export type HqConfig = z.infer<typeof schema>;
 
 export type ConfigName = keyof typeof CONFIG_SHAPE | 'HOME' | 'NODE_ENV' | 'ATC_SESSION_ID' | 'OP_SERVICE_ACCOUNT_TOKEN' | 'PATH';
 
-const RULES: Partial<Record<ConfigName, string>> = {
+const RULES: Readonly<Record<string, string | undefined>> = {
   HQ_QUIET: 'two hours like 03-07',
 };
 
@@ -28,7 +28,7 @@ export function config(env: Record<string, string | undefined> = process.env): H
   }
   const r = schema.safeParse(input);
   if (r.success) return r.data;
-  const name = String(r.error.issues[0]!.path[0]) as ConfigName;
+  const name = String(r.error.issues[0]?.path[0]);
   const rule = RULES[name] ?? (/_(MIN|MS)$/.test(name) ? NUMBER_RULE : 'valid');
   throw new HqError('bad_config', `${name} must be ${rule}, got '${input[name] ?? ''}'`, { setting: name });
 }

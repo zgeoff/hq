@@ -3,6 +3,7 @@ import { buildMergedDayOutput, buildMergedPR } from '../../test/build-merged-day
 import { buildStubDeliveryRunner } from '../../test/build-stub-delivery-runner.ts';
 import { freshDb } from '../../test/helpers.ts';
 import type { Runner } from '../runner/types.ts';
+import { toErrorMessage } from '../to-error-message.ts';
 import { loadMergedPRs } from './load-merged-prs.ts';
 import { mergedPRsOutputSchema } from './merged-prs-output-schema.ts';
 
@@ -138,7 +139,7 @@ test('a week whose Wednesday fails keeps Monday and Tuesday, which the next try 
   const ctx = setupTest();
   const failure = await loadMergedPRs(ctx.buildSources(broken.run), 'week', THURSDAY).then(
     () => null,
-    (error: unknown) => (error as Error).message,
+    toErrorMessage,
   );
   const mended = buildStubDeliveryRunner({ days: { '2026-10-14': buildMergedDayOutput('2026-10-14', []), '2026-10-15': buildMergedDayOutput('2026-10-15', []) } });
 

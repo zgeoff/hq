@@ -15,6 +15,7 @@ import { loadNoslopSettings } from './load-noslop-settings.ts';
 import { updateNoslopRepos } from './update-noslop-repos.ts';
 import { runNoslopCommand } from './run-noslop-command.ts';
 import { recordRound } from './record-round.ts';
+import { parseJSON } from './parse-json.ts';
 import type { Runner } from '../runner/types.ts';
 
 function buildPinPaths(root: string) {
@@ -693,7 +694,7 @@ test('it answers hq noslop on and hq noslop through the cli, as JSON', async () 
   await expect(main(['noslop', 'on', 'atc', '--json'])).resolves.toBe(0);
   await expect(main(['noslop', '--json'])).resolves.toBe(0);
 
-  expect(lines.map((l) => JSON.parse(l))).toMatchObject([{ ok: true, repos: ['atc'], sha: null }, { ok: true, repos: ['atc'], sha: null }]);
+  expect(lines.map((line) => parseJSON(line))).toMatchObject([{ ok: true, repos: ['atc'], sha: null }, { ok: true, repos: ['atc'], sha: null }]);
 });
 
 test('it pins through hq noslop pin --force on the cli while noslop runs, and records the reason', async () => {

@@ -19,7 +19,9 @@ import { OWNER_PROBE_OPENER } from '../src/pr-status/owner-probe-opener.ts';
 import { overrideEnv } from '../src/config/override-env.ts';
 import { isHeatList } from '../mods/hq-band/hooks/is-heat-list.ts';
 import { isSegmentList } from '../mods/hq-band/hooks/is-segment-list.ts';
-import type { Band, Pane } from '../src/band/types.ts';
+import { z } from 'zod';
+import { findPath } from '../src/test-utils/find-path.ts';
+import { parseJSON } from '../src/noslop/parse-json.ts';
 import { NOON_SYDNEY, at, createPushedClone, fakeAtc, freshDb } from './helpers.ts';
 
 let dir: string;
@@ -48,23 +50,29 @@ const db = () => openDb(path);
 const hq = async (...argv: string[]) => {
   out = [];
   const code = await main([...argv, '--json']);
-  return { code, json: JSON.parse(out.join('\n')) };
+  const json: unknown = JSON.parse(out.join('\n'));
+  return { code, json };
 };
 
 test('a call goes queued, open, answered, applied through the CLI', async () => {
-  expect((await hq('call', 'add', 'geo-1-paint', '--title', 'Paint', '--question', 'Green?', '--body', 'Invented.', '--issues', 'GEO-1')).json.result).toBe('added');
-  expect((await hq('open')).json.item.id).toBe('geo-1-paint');
-  expect((await hq('status')).json.open.id).toBe('geo-1-paint');
-  expect((await hq('call', 'answer', 'geo-1-paint', '--answer', 'yes please')).json.call.answer).toBe('yes please');
+  const added = await hq('call', 'add', 'geo-1-paint', '--title', 'Paint', '--question', 'Green?', '--body', 'Invented.', '--issues', 'GEO-1');
+  expect(findPath(added.json, 'result')).toBe('added');
+  const opened = await hq('open');
+  expect(findPath(opened.json, 'item', 'id')).toBe('geo-1-paint');
+  const status = await hq('status');
+  expect(findPath(status.json, 'open', 'id')).toBe('geo-1-paint');
+  const answered = await hq('call', 'answer', 'geo-1-paint', '--answer', 'yes please');
+  expect(findPath(answered.json, 'call', 'answer')).toBe('yes please');
   const applied = await hq('call', 'apply', 'geo-1-paint', '--to', 'typed:z-delivery');
-  expect(applied.json.call.state).toBe('applied');
-  expect((await hq('status')).json.open).toBeNull();
+  expect(findPath(applied.json, 'call', 'state')).toBe('applied');
+  const after = await hq('status');
+  expect(findPath(after.json, 'open')).toBeNull();
 });
 
 test('the retired hq noslop backfill is refused with bad_args and a nonzero exit', async () => {
   const r = await hq('noslop', 'backfill');
   expect(r.code).not.toBe(0);
-  expect(r.json.error.code).toBe('bad_args');
+  expect(findPath(r.json, 'error', 'code')).toBe('bad_args');
 });
 
 test('errors have one JSON shape and a nonzero exit', async () => {
@@ -73,18 +81,20 @@ test('errors have one JSON shape and a nonzero exit', async () => {
   await hq('proposal', 'add', 'tidy', '--title', 'Tidy', '--question', 'Ok?', '--body', 'Invented.');
   const r = await hq('proposal', 'open');
   expect(r.code).toBe(1);
-  expect(r.json).toEqual({ ok: false, error: { code: 'already_open', message: expect.any(String), open: 'geo-1-paint' } });
-  expect((await hq('call', 'add', '--nope')).json.error.code).toBe('bad_args');
+  expect(r.json).toStrictEqual({ ok: false, error: { code: 'already_open', message: expect.any(String), open: 'geo-1-paint' } });
+  const nope = await hq('call', 'add', '--nope');
+  expect(findPath(nope.json, 'error', 'code')).toBe('bad_args');
 });
 
 test('status names why the next item waits', async () => {
   await hq('call', 'add', 'geo-1-paint', '--title', 'Paint', '--question', 'Green?', '--body', 'Invented.');
   await hq('hold', '--reason', 'the owner is mid-intake');
   const s = (await hq('status')).json;
-  expect(s.next.id).toBe('geo-1-paint');
-  expect(s.waits).toEqual(['held: the owner is mid-intake']);
+  expect(findPath(s, 'next', 'id')).toBe('geo-1-paint');
+  expect(findPath(s, 'waits')).toStrictEqual(['held: the owner is mid-intake']);
   await hq('release');
-  expect((await hq('status')).json.waits).toEqual([]);
+  const released = await hq('status');
+  expect(findPath(released.json, 'waits')).toStrictEqual([]);
 });
 
 test('status counts a watch apart from the open items that need the owner', async () => {
@@ -93,26 +103,31 @@ test('status counts a watch apart from the open items that need the owner', asyn
 
   const status = await hq('status');
 
-  expect(status.json.unblock).toStrictEqual({ open: 1, newSincePush: 1, watching: 1 });
+  expect(findPath(status.json, 'unblock')).toStrictEqual({ open: 1, newSincePush: 1, watching: 1 });
 });
 
 test('unblock add, list, new, pushed', async () => {
   await hq('unblock', 'add', '--id', 'kettle', '--task', 'Try the kettle', '--minutes', '5', '--unblocks', 'GEO-2:high');
-  expect((await hq('unblock', 'list')).json.items).toHaveLength(1);
-  expect((await hq('unblock', 'new')).json.items).toHaveLength(1);
-  const upto = (await hq('unblock', 'new')).json.upto;
-  expect((await hq('unblock', 'pushed')).json.error.code).toBe('bad_args');
-  expect((await hq('unblock', 'pushed', '--upto', String(upto))).json.covered).toBe(1);
-  expect((await hq('unblock', 'new')).json.items).toHaveLength(0);
+  const listed = await hq('unblock', 'list');
+  expect(findPath(listed.json, 'items')).toHaveLength(1);
+  const fresh = await hq('unblock', 'new');
+  expect(findPath(fresh.json, 'items')).toHaveLength(1);
+  const upto = findPath(fresh.json, 'upto');
+  const refused = await hq('unblock', 'pushed');
+  expect(findPath(refused.json, 'error', 'code')).toBe('bad_args');
+  const pushed = await hq('unblock', 'pushed', '--upto', String(upto));
+  expect(findPath(pushed.json, 'covered')).toBe(1);
+  const drained = await hq('unblock', 'new');
+  expect(findPath(drained.json, 'items')).toHaveLength(0);
   await hq('unblock', 'done', 'kettle');
   const again = await hq('unblock', 'add', '--id', 'kettle-2', '--task', 'Try the kettle again', '--unblocks', 'GEO-2:high');
-  expect(again.json.warnings).toEqual([expect.objectContaining({ issue: 'GEO-2', id: 'kettle', state: 'done' })]);
+  expect(findPath(again.json, 'warnings')).toStrictEqual([expect.objectContaining({ issue: 'GEO-2', id: 'kettle', state: 'done' })]);
 });
 
 test('it stores each --done-when condition of hq unblock add', async () => {
   const added = await hq('unblock', 'add', '--id', 'kettle', '--task', 'Try the kettle', '--done-when', 'issue:ket-7', '--done-when', 'pr:kettle#4');
 
-  expect(added.json.item.done_when).toStrictEqual([
+  expect(findPath(added.json, 'item', 'done_when')).toStrictEqual([
     { kind: 'issue', ref: 'KET-7' },
     { kind: 'pr', ref: 'zgeoff/kettle#4' },
   ]);
@@ -123,7 +138,7 @@ test('it lists the conditions of an item in hq unblock list --json', async () =>
 
   const listed = await hq('unblock', 'list');
 
-  expect(listed.json.items[0].done_when).toStrictEqual([
+  expect(findPath(listed.json, 'items', 0, 'done_when')).toStrictEqual([
     { kind: 'issue', ref: 'KET-7' },
     { kind: 'pr', ref: 'zgeoff/kettle#4' },
   ]);
@@ -142,8 +157,8 @@ test('it refuses a bad --done-when of hq unblock add as bad_args and adds nothin
   const added = await hq('unblock', 'add', '--id', 'kettle', '--task', 'Try the kettle', '--done-when', 'foo:1');
   const listed = await hq('unblock', 'list');
 
-  expect(added.json.error.code).toBe('bad_args');
-  expect(listed.json.items).toStrictEqual([]);
+  expect(findPath(added.json, 'error', 'code')).toBe('bad_args');
+  expect(findPath(listed.json, 'items')).toStrictEqual([]);
 });
 
 test('it adds conditions to an open item with hq unblock done-when', async () => {
@@ -151,7 +166,7 @@ test('it adds conditions to an open item with hq unblock done-when', async () =>
 
   const added = await hq('unblock', 'done-when', 'kettle', 'doc:descaling-plan-abc123def456', 'issue:KET-7');
 
-  expect(added.json.item.done_when).toStrictEqual([
+  expect(findPath(added.json, 'item', 'done_when')).toStrictEqual([
     { kind: 'doc', ref: 'descaling-plan-abc123def456' },
     { kind: 'issue', ref: 'KET-7' },
   ]);
@@ -162,7 +177,7 @@ test('it refuses hq unblock done-when with no condition as bad_args', async () =
 
   const none = await hq('unblock', 'done-when', 'kettle');
 
-  expect(none.json.error.code).toBe('bad_args');
+  expect(findPath(none.json, 'error', 'code')).toBe('bad_args');
 });
 
 test('it refuses hq unblock done-when on a closed item as bad_state', async () => {
@@ -171,7 +186,7 @@ test('it refuses hq unblock done-when on a closed item as bad_state', async () =
 
   const closed = await hq('unblock', 'done-when', 'kettle', 'issue:KET-8');
 
-  expect(closed.json.error.code).toBe('bad_state');
+  expect(findPath(closed.json, 'error', 'code')).toBe('bad_state');
 });
 
 test('it marks an item with no condition as recheck in hq unblock list after 3 days', async () => {
@@ -180,7 +195,7 @@ test('it marks an item with no condition as recheck in hq unblock list after 3 d
 
   const listed = await hq('unblock', 'list');
 
-  expect(listed.json.items).toStrictEqual([
+  expect(findPath(listed.json, 'items')).toStrictEqual([
     {
       id: 'plain',
       task: 'Try the kettle',
@@ -214,7 +229,7 @@ test('it does not mark an item with no condition as recheck in hq unblock list a
 
   const listed = await hq('unblock', 'list');
 
-  expect(listed.json.items).toStrictEqual([
+  expect(findPath(listed.json, 'items')).toStrictEqual([
     {
       id: 'plain',
       task: 'Try the kettle',
@@ -248,7 +263,7 @@ test('it never marks an item with a condition as recheck in hq unblock list', as
 
   const listed = await hq('unblock', 'list');
 
-  expect(listed.json.items).toStrictEqual([
+  expect(findPath(listed.json, 'items')).toStrictEqual([
     {
       id: 'waiting',
       task: 'Try the teapot',
@@ -447,12 +462,12 @@ test('hq probe status shows the last ready check and the unready episodes', asyn
   d.query(`INSERT INTO outages (started_at, detected_at, kind) VALUES ('2026-10-14T00:55:00Z', '2026-10-14T00:59:00Z', 'unready')`).run();
   d.close();
   const r = await hq('probe', 'status');
-  expect(r.json.openUnready).toMatchObject({ kind: 'unready', started_at: '2026-10-14T00:55:00Z' });
-  expect(r.json.open).toBeNull();
-  expect(r.json.outages).toEqual([]);
-  expect(r.json.unready).toHaveLength(1);
-  expect(r.json.lastReady).toEqual({ at: '2026-10-14T00:59:00Z', ready_ok: 0 });
-  expect(r.json.last).toMatchObject({ at: '2026-10-14T01:00:00Z', ready_ok: null });
+  expect(findPath(r.json, 'openUnready')).toMatchObject({ kind: 'unready', started_at: '2026-10-14T00:55:00Z' });
+  expect(findPath(r.json, 'open')).toBeNull();
+  expect(findPath(r.json, 'outages')).toStrictEqual([]);
+  expect(findPath(r.json, 'unready')).toHaveLength(1);
+  expect(findPath(r.json, 'lastReady')).toStrictEqual({ at: '2026-10-14T00:59:00Z', ready_ok: 0 });
+  expect(findPath(r.json, 'last')).toMatchObject({ at: '2026-10-14T01:00:00Z', ready_ok: null });
   out = [];
   await main(['probe', 'status']);
   const text = out.join('\n');
@@ -463,39 +478,51 @@ test('hq probe status shows the last ready check and the unready episodes', asyn
 });
 
 test('hq goals target and targets, the daily dry run, and news --tag work through the CLI', async () => {
-  expect((await hq('goals', 'targets')).json.overridden).toEqual([]);
-  expect((await hq('goals', 'target', 'bugs', '<=', '15')).json.target).toMatchObject({ op: '<=', value: 15 });
-  expect((await hq('goals', 'targets')).json.overridden).toEqual(['bugs']);
-  expect((await hq('goals', 'target', 'cost', 'none')).json.target).toBeNull();
+  const targets = await hq('goals', 'targets');
+  expect(findPath(targets.json, 'overridden')).toStrictEqual([]);
+  const bugs = await hq('goals', 'target', 'bugs', '<=', '15');
+  expect(findPath(bugs.json, 'target')).toMatchObject({ op: '<=', value: 15 });
+  const overridden = await hq('goals', 'targets');
+  expect(findPath(overridden.json, 'overridden')).toStrictEqual(['bugs']);
+  const cleared = await hq('goals', 'target', 'cost', 'none');
+  expect(findPath(cleared.json, 'target')).toBeNull();
   const bad = await hq('goals', 'target', 'moon', '<', '5');
   expect(bad.code).not.toBe(0);
-  expect(bad.json.error.code).toBe('bad_args');
+  expect(findPath(bad.json, 'error', 'code')).toBe('bad_args');
   const dry = await hq('goals', 'daily', '--dry-run');
-  expect(dry.json.dryRun).toBe(true);
-  expect(dry.json.text).toContain('Goals check-in, Wed 14 Oct:');
+  expect(findPath(dry.json, 'dryRun')).toBe(true);
+  expect(findPath(dry.json, 'text')).toContain('Goals check-in, Wed 14 Oct:');
   expect(db().query('SELECT COUNT(*) AS n FROM job_runs').get()).toEqual({ n: 0 });
   expect((await hq('goals', 'daily', 'skip', '2026-10-14', '--reason', 'by hand')).code).toBe(0);
-  expect((await hq('news', 'add', '--topic', 'fix', '--text', 'Invented flag.', '--tag', 'weekly-flag')).json.news.tag).toBe('weekly-flag');
+  const tagged = await hq('news', 'add', '--topic', 'fix', '--text', 'Invented flag.', '--tag', 'weekly-flag');
+  expect(findPath(tagged.json, 'news', 'tag')).toBe('weekly-flag');
   expect((await hq('news', 'add', '--topic', 'fix', '--text', 'Invented flag.', '--tag', 'Bad Tag')).code).not.toBe(0);
-  expect((await hq('news')).json.news[0].tag).toBe('weekly-flag');
+  const news = await hq('news');
+  expect(findPath(news.json, 'news', 0, 'tag')).toBe('weekly-flag');
 });
 
 test('hq goals weekly dry run and skip, and hq goals account, work through the CLI', async () => {
   const dry = await hq('goals', 'weekly', '--dry-run');
-  expect(dry.json.dryRun).toBe(true);
-  expect(dry.json.text).toContain('Goals weekly, week of 05 Oct:');
+  expect(findPath(dry.json, 'dryRun')).toBe(true);
+  expect(findPath(dry.json, 'text')).toContain('Goals weekly, week of 05 Oct:');
   expect(db().query('SELECT COUNT(*) AS n FROM job_runs').get()).toEqual({ n: 0 });
   expect(db().query('SELECT COUNT(*) AS n FROM outbox').get()).toEqual({ n: 0 });
   expect((await hq('goals', 'weekly', 'skip', '2026-10-12', '--reason', 'by hand')).code).toBe(0);
-  expect((await hq('goals', 'weekly', 'skip', '2026-10-14', '--reason', 'by hand')).json.error.code).toBe('bad_args');
-  expect((await hq('goals', 'account')).json.labels).toEqual({});
-  expect((await hq('goals', 'account', 'abcdef012345', 'work')).json.name).toBe('work');
-  expect((await hq('goals', 'account')).json.labels).toEqual({ abcdef012345: 'work' });
-  expect((await hq('goals', 'account', 'geoff@example.com', 'work')).json.error.code).toBe('bad_args');
+  const skipped = await hq('goals', 'weekly', 'skip', '2026-10-14', '--reason', 'by hand');
+  expect(findPath(skipped.json, 'error', 'code')).toBe('bad_args');
+  const unlabelled = await hq('goals', 'account');
+  expect(findPath(unlabelled.json, 'labels')).toStrictEqual({});
+  const named = await hq('goals', 'account', 'abcdef012345', 'work');
+  expect(findPath(named.json, 'name')).toBe('work');
+  const labelled = await hq('goals', 'account');
+  expect(findPath(labelled.json, 'labels')).toStrictEqual({ abcdef012345: 'work' });
+  const refused = await hq('goals', 'account', 'geoff@example.com', 'work');
+  expect(findPath(refused.json, 'error', 'code')).toBe('bad_args');
 });
 
 test('--version and version both answer', async () => {
-  expect((await hq('--version')).json.version).toMatch(/^\d+\.\d+\.\d+$/);
+  const shown = await hq('--version');
+  expect(findPath(shown.json, 'version')).toMatch(/^\d+\.\d+\.\d+$/u);
   expect((await hq('version')).code).toBe(0);
 });
 
@@ -510,9 +537,11 @@ test('version names no commit for a run from source', async () => {
 });
 
 test('release without a hold changes nothing', async () => {
-  expect((await hq('release')).json.released).toBe(false);
+  const idle = await hq('release');
+  expect(findPath(idle.json, 'released')).toBe(false);
   await hq('hold', '--reason', 'busy');
-  expect((await hq('release')).json.released).toBe(true);
+  const held = await hq('release');
+  expect(findPath(held.json, 'released')).toBe(true);
 });
 
 test('status lists every later item', async () => {
@@ -521,7 +550,8 @@ test('status lists every later item', async () => {
     await hq('call', 'later', id, '--until', '+4h');
   }
   const s = (await hq('status')).json;
-  expect(s.later.map((l: { id: string }) => l.id)).toEqual(['a-one', 'b-two']);
+  const later = z.array(z.looseObject({ id: z.string() })).parse(findPath(s, 'later'));
+  expect(later.map((item) => item.id)).toStrictEqual(['a-one', 'b-two']);
 });
 
 test('hq run reopen brings a dropped run back to working, as the refusal says', async () => {
@@ -529,12 +559,14 @@ test('hq run reopen brings a dropped run back to working, as the refusal says', 
   await hq('run', 'pr', 'GEO-508', 'kettle#9');
   await hq('run', 'state', 'GEO-508', 'dropped', '--note', 'paused');
   const refused = await hq('run', 'add', 'GEO-508', '--title', 'Invented kettle work');
-  expect(refused.json.error.message).toBe('GEO-508 is dropped: hq run reopen GEO-508');
+  expect(findPath(refused.json, 'error', 'message')).toBe('GEO-508 is dropped: hq run reopen GEO-508');
   const r = await hq('run', 'reopen', 'GEO-508', '--next', 'Back on it.');
-  expect(r.json.run).toMatchObject({ issue: 'GEO-508', state: 'working', next: 'Back on it.', closed_at: null });
-  expect(r.json.run.prs.map((p: { ref: string }) => p.ref)).toEqual(['kettle#9']);
+  expect(findPath(r.json, 'run')).toMatchObject({ issue: 'GEO-508', state: 'working', next: 'Back on it.', closed_at: null });
+  const prs = z.array(z.looseObject({ ref: z.string() })).parse(findPath(r.json, 'run', 'prs'));
+  expect(prs.map((pr) => pr.ref)).toStrictEqual(['kettle#9']);
   expect((await hq('run', 'pr', 'GEO-508', 'kettle#10')).code).toBe(0);
-  expect((await hq('run', 'reopen', 'GEO-508')).json.error.message).toBe('GEO-508 is working, not done or dropped: nothing to reopen');
+  const working = await hq('run', 'reopen', 'GEO-508');
+  expect(findPath(working.json, 'error', 'message')).toBe('GEO-508 is working, not done or dropped: nothing to reopen');
   expect((await hq('run', 'reopen', 'GEO-404')).code).not.toBe(0);
 });
 
@@ -546,8 +578,8 @@ test('it attaches with hq run pr --session the PR and sets its owner, and works 
   const first = await hq('run', 'pr', 'GEO-531', 'kettle#31', '--session', '0000E101');
   const again = await hq('run', 'pr', 'GEO-531', 'kettle#31', '--session', '0000e102');
 
-  expect([first.code, first.json.pr.session_id]).toStrictEqual([0, '0000e101-aaaa-4aaa-8aaa-aaaaaaaaaaaa']);
-  expect([again.code, again.json.pr.session_id]).toStrictEqual([0, '0000e102-aaaa-4aaa-8aaa-aaaaaaaaaaaa']);
+  expect([first.code, findPath(first.json, 'pr', 'session_id')]).toStrictEqual([0, '0000e101-aaaa-4aaa-8aaa-aaaaaaaaaaaa']);
+  expect([again.code, findPath(again.json, 'pr', 'session_id')]).toStrictEqual([0, '0000e102-aaaa-4aaa-8aaa-aaaaaaaaaaaa']);
 });
 
 test('it refuses hq run pr --session a session that is not on the run, naming the issue', async () => {
@@ -555,7 +587,7 @@ test('it refuses hq run pr --session a session that is not on the run, naming th
 
   const refused = await hq('run', 'pr', 'GEO-532', 'kettle#32', '--session', '0000e1ff');
 
-  expect([refused.code === 0, refused.json.error.code, refused.json.error.message]).toStrictEqual([false, 'bad_args', '--session 0000e1ff names no single session of GEO-532']);
+  expect([refused.code === 0, findPath(refused.json, 'error', 'code'), findPath(refused.json, 'error', 'message')]).toStrictEqual([false, 'bad_args', '--session 0000e1ff names no single session of GEO-532']);
   expect(db().query("SELECT COUNT(*) AS count FROM run_prs WHERE ref = 'kettle#32'").get()).toStrictEqual({ count: 0 });
 });
 
@@ -568,7 +600,7 @@ test('it succeeds and changes nothing when hq run merged names a PR already mark
   const again = await hq('run', 'merged', 'kettle#11');
 
   expect(again.code).toBe(0);
-  expect(again.json.pr).toMatchObject({ ref: 'kettle#11', state: 'merged', merged_at: '2026-10-20T03:04:05Z' });
+  expect(findPath(again.json, 'pr')).toMatchObject({ ref: 'kettle#11', state: 'merged', merged_at: '2026-10-20T03:04:05Z' });
   expect(db().query("SELECT * FROM run_prs WHERE ref = 'kettle#11'").get()).toStrictEqual(before);
 });
 
@@ -587,24 +619,23 @@ test('it still refuses hq run merged for a PR marked closed', async () => {
     const again = await hq('run', 'merged', 'kettle#12');
 
     expect(again.code).not.toBe(0);
-    expect(again.json.error).toMatchObject({ code: 'bad_state', message: 'kettle#12 is closed' });
+    expect(findPath(again.json, 'error')).toMatchObject({ code: 'bad_state', message: 'kettle#12 is closed' });
     expect(db().query("SELECT state FROM run_prs WHERE ref = 'kettle#12'").get()).toStrictEqual({ state: 'closed' });
   } finally {
     process.env['PATH'] = path0;
   }
 });
 
-interface RunSessionRow {
-  session_id: string;
-}
-
 test('hq run add refuses a session id given as a second word, and stores the run only with --session', async () => {
   const refused = await hq('run', 'add', 'GEO-9701', '9701ab0c-0000-4000-8000-00000000beef', '--title', 'Invented kettle work', '--where', 'none');
   const remaining = await hq('run', 'list');
   const stored = await hq('run', 'add', 'GEO-9701', '--session', '9701ab0c-0000-4000-8000-00000000beef', '--title', 'Invented kettle work', '--where', 'none');
-  expect([refused.code, refused.json.error.message]).toEqual([1, 'hq run add takes one issue: pass the session as --session 9701ab0c-0000-4000-8000-00000000beef']);
-  expect(remaining.json.runs).toEqual([]);
-  expect((stored.json.run.sessions as RunSessionRow[]).map((x) => x.session_id)).toEqual(['9701ab0c-0000-4000-8000-00000000beef']);
+  expect([refused.code, findPath(refused.json, 'error', 'message')]).toStrictEqual([1, 'hq run add takes one issue: pass the session as --session 9701ab0c-0000-4000-8000-00000000beef']);
+  expect(findPath(remaining.json, 'runs')).toStrictEqual([]);
+  const sessionSchema = z.object({ session_id: z.string() });
+  const run = z.object({ run: z.object({ sessions: z.array(sessionSchema) }) }).parse(stored.json);
+
+  expect(run.run.sessions.map((session) => session.session_id)).toStrictEqual(['9701ab0c-0000-4000-8000-00000000beef']);
 });
 
 test('#run add names hq run session --add for a --session it ignores on a run already on the board', async () => {
@@ -617,8 +648,8 @@ test('#run add names hq run session --add for a --session it ignores on a run al
     ignored: { session: '9702ab0c-0000-4000-8000-00000000bbbb', next: 'hq run session GEO-9702 9702ab0c-0000-4000-8000-00000000bbbb --add' },
     run: { sessions: [{ session_id: '9702ab0c-0000-4000-8000-00000000aaaa' }] },
   });
-  expect(same.json.result).toBe('noop');
-  expect(same.json.ignored).toBeUndefined();
+  expect(findPath(same.json, 'result')).toBe('noop');
+  expect(findPath(same.json, 'ignored')).toBeUndefined();
 });
 
 test('#run add prints the hq run session --add line in text output only for a session it ignores', async () => {
@@ -654,7 +685,7 @@ test('#run add gives both lanes in JSON for a different --lane it ignores on a r
 
   const again = await hq('run', 'add', 'GEO-9705', '--lane', 'teapot', '--title', 'Invented kettle work', '--where', 'imp');
 
-  expect([again.code, again.json.result, again.json.ignoredLane, again.json.run.lane]).toStrictEqual([0, 'noop', { lane: 'teapot', runLane: 'kettle', next: 'hq run lane GEO-9705 teapot' }, 'kettle']);
+  expect([again.code, findPath(again.json, 'result'), findPath(again.json, 'ignoredLane'), findPath(again.json, 'run', 'lane')]).toStrictEqual([0, 'noop', { lane: 'teapot', runLane: 'kettle', next: 'hq run lane GEO-9705 teapot' }, 'kettle']);
 });
 
 test.each([
@@ -691,10 +722,12 @@ test('v20 adds live_check to runs and the merge and release columns to run_prs',
 
 test('hq run check and state --check set live_check, and show it', async () => {
   await hq('run', 'add', 'GEO-509', '--title', 'Invented kettle work', '--where', 'none');
-  expect((await hq('run', 'check', 'GEO-509', 'none')).json.run.live_check).toBe('none');
+  const none = await hq('run', 'check', 'GEO-509', 'none');
+  expect(findPath(none.json, 'run', 'live_check')).toBe('none');
   const s = await hq('run', 'state', 'GEO-509', 'deploying', '--check', 'owed');
-  expect(s.json.run).toMatchObject({ state: 'deploying', live_check: 'owed' });
-  expect((await hq('run', 'show', 'GEO-509')).json.run.live_check).toBe('owed');
+  expect(findPath(s.json, 'run')).toMatchObject({ state: 'deploying', live_check: 'owed' });
+  const shown = await hq('run', 'show', 'GEO-509');
+  expect(findPath(shown.json, 'run', 'live_check')).toBe('owed');
   expect((await hq('run', 'check', 'GEO-509', 'maybe')).code).not.toBe(0);
   expect((await hq('run', 'state', 'GEO-509', 'deploying', '--check', 'maybe')).code).not.toBe(0);
 });
@@ -705,14 +738,26 @@ test('hq run state refuses --check given twice, and leaves the run as it was', a
   const refused = await hq('run', 'state', 'GEO-510', 'deploying', '--check', 'owed', '--check', 'none');
   const shown = await hq('run', 'show', 'GEO-510');
 
-  expect(refused.json.error).toStrictEqual({ code: 'bad_args', message: 'give --check once, not 2 times' });
-  expect(shown.json.run.state).toBe('working');
+  expect(findPath(refused.json, 'error')).toStrictEqual({ code: 'bad_args', message: 'give --check once, not 2 times' });
+  expect(findPath(shown.json, 'run', 'state')).toBe('working');
+});
+
+test('it refuses a --check other than owed or none on hq run state, and leaves the run as it was', async () => {
+  await hq('run', 'add', 'GEO-14', '--title', 'Invented kettle work', '--where', 'none');
+
+  const refused = await hq('run', 'state', 'GEO-14', 'deploying', '--check', 'maybe');
+  const shown = await hq('run', 'show', 'GEO-14');
+
+  const shownRun = z.object({ run: z.object({ state: z.string() }) }).parse(shown.json).run;
+
+  expect(refused).toStrictEqual({ code: 1, json: { ok: false, error: { code: 'bad_args', message: '--check must be owed or none' } } });
+  expect(shownRun.state).toBe('working');
 });
 
 test('hq pr override refuses --check given twice', async () => {
   const refused = await hq('pr', 'override', 'widgets', '7', '--check', 'preview', '--check', 'test', '--source', 'chat:kettle-12', '--note', 'Rebased.');
 
-  expect(refused.json.error).toStrictEqual({ code: 'bad_args', message: 'give --check once, not 2 times' });
+  expect(findPath(refused.json, 'error')).toStrictEqual({ code: 'bad_args', message: 'give --check once, not 2 times' });
 });
 
 test('hq run state refuses to move a run past its merge while a PR is open, and --force moves it', async () => {
@@ -722,11 +767,11 @@ test('hq run state refuses to move a run past its merge while a PR is open, and 
   const refused = await hq('run', 'state', 'GEO-512', 'deploy-held', '--next', 'Waits on the kettle release.');
   const forced = await hq('run', 'state', 'GEO-512', 'deploy-held', '--next', 'Waits on the kettle release.', '--force');
 
-  expect([refused.code, refused.json.error]).toStrictEqual([
+  expect([refused.code, findPath(refused.json, 'error')]).toStrictEqual([
     1,
     { code: 'bad_state', message: 'GEO-512 still has open PR vers#30 and active session 512ab0c0, so its work is not finished: it moves to merged when its last PR merges and its session ends. Pass --force to move it to deploy-held now.' },
   ]);
-  expect([forced.code, forced.json.run.state]).toStrictEqual([0, 'deploy-held']);
+  expect([forced.code, findPath(forced.json, 'run', 'state')]).toStrictEqual([0, 'deploy-held']);
 });
 
 test('hq lanes ready refuses --skipped and --ready-total without --lane', async () => {
@@ -761,10 +806,10 @@ test('hq goals sync holds goals_ok_at while the cap leaves deploy-prod runs uncl
     }
     d.close();
     const first = await hq('goals', 'sync', '--days', '2');
-    expect(first.json.deployLeft).toBe(1);
+    expect(findPath(first.json, 'deployLeft')).toBe(1);
     expect(getMeta(db(), 'goals_ok_at')).toBeNull();
     const second = await hq('goals', 'sync', '--days', '2');
-    expect(second.json.deployLeft).toBe(0);
+    expect(findPath(second.json, 'deployLeft')).toBe(0);
     expect(getMeta(db(), 'goals_ok_at')).not.toBeNull();
   } finally {
     process.env['PATH'] = path0;
@@ -774,19 +819,22 @@ test('hq goals sync holds goals_ok_at while the cap leaves deploy-prod runs uncl
 test('hq capacity: no sample yet, set and reset a threshold, bad key, an empty log', async () => {
   const empty = await hq('capacity');
   expect(empty.code).toBe(0);
-  expect(empty.json.sample).toBeNull();
-  expect(empty.json.settings.nonnixMaxMib).toBe(16384);
-  expect((await hq('capacity', 'set', 'nonnixMaxMib', '12000')).json.settings.nonnixMaxMib).toBe(12000);
-  expect((await hq('capacity', 'set', 'nonnixMaxMib', '--reset')).json.settings.nonnixMaxMib).toBe(16384);
+  expect(findPath(empty.json, 'sample')).toBeNull();
+  expect(findPath(empty.json, 'settings', 'nonnixMaxMib')).toBe(16_384);
+  const raised = await hq('capacity', 'set', 'nonnixMaxMib', '12000');
+  expect(findPath(raised.json, 'settings', 'nonnixMaxMib')).toBe(12_000);
+  const reset = await hq('capacity', 'set', 'nonnixMaxMib', '--reset');
+  expect(findPath(reset.json, 'settings', 'nonnixMaxMib')).toBe(16_384);
   expect((await hq('capacity', 'set', 'bogus', '1')).code).not.toBe(0);
   expect((await hq('capacity', 'set', 'holdSamples')).code).not.toBe(0);
-  expect((await hq('capacity', 'log', '--hours', '6')).json.samples).toEqual([]);
+  const log = await hq('capacity', 'log', '--hours', '6');
+  expect(findPath(log.json, 'samples')).toStrictEqual([]);
 });
 
 test('hq slots broker shows no record before one is recorded', async () => {
   const shown = await hq('slots', 'broker');
 
-  expect(shown.json.broker).toBeNull();
+  expect(findPath(shown.json, 'broker')).toBeNull();
 });
 
 test('hq slots broker refuses a slot outside 1 to 4', async () => {
@@ -812,8 +860,8 @@ test('hq slots broker records a slot with its proof and note, and shows it after
   const shown = await hq('slots', 'broker');
 
   expect(recorded.code).toBe(0);
-  expect(recorded.json.broker).toMatchObject({ slot: 1, proof: 'req-1a2b', note: 'after the account switch' });
-  expect(shown.json.broker).toStrictEqual(recorded.json.broker);
+  expect(findPath(recorded.json, 'broker')).toMatchObject({ slot: 1, proof: 'req-1a2b', note: 'after the account switch' });
+  expect(findPath(shown.json, 'broker')).toStrictEqual(findPath(recorded.json, 'broker'));
 });
 
 test('hq capacity broker gives an unknown quota with room for a new proof and no slot read', async () => {
@@ -821,7 +869,7 @@ test('hq capacity broker gives an unknown quota with room for a new proof and no
 
   const quota = await hq('capacity', 'broker');
 
-  expect(quota.json.broker).toMatchObject({ state: 'unknown-proved', slot: 1, proof: 'req-1a2b' });
+  expect(findPath(quota.json, 'broker')).toMatchObject({ state: 'unknown-proved', slot: 1, proof: 'req-1a2b' });
 });
 
 test("hq capacity broker reads the broker slot's fresh slot read from the database, not another slot's", async () => {
@@ -834,7 +882,7 @@ test("hq capacity broker reads the broker slot's fresh slot read from the databa
 
   const quota = await hq('capacity', 'broker');
 
-  expect(quota.json.broker).toMatchObject({ state: 'read', slot: 1, used: 0, readAt: '2026-10-14T00:30:00Z' });
+  expect(findPath(quota.json, 'broker')).toMatchObject({ state: 'read', slot: 1, used: 0, readAt: '2026-10-14T00:30:00Z' });
 });
 
 function createV27TypedRows(file: string): unknown[] {
@@ -865,12 +913,15 @@ test('hq whois names the fleet session hq fleet saw under an id, and null for an
 
 test('hq band --json gives the segments the band mod draws, by the mod\'s own check', async () => {
   const shown = await hq('band');
-  expect([shown.code, (shown.json.band as Band).segments.map((segment) => segment.key), isSegmentList(shown.json.band.segments)]).toStrictEqual([0, ['needs', 'nix', 'lanes', 'ci', 'reviews'], true]);
+  const segmentSchema = z.looseObject({ key: z.string() });
+  const segments = z.object({ band: z.object({ segments: z.array(segmentSchema) }) }).parse(shown.json).band.segments;
+
+  expect([shown.code, segments.map((segment) => segment.key), isSegmentList(segments)]).toStrictEqual([0, ['needs', 'nix', 'lanes', 'ci', 'reviews'], true]);
 });
 
 test('hq pane --json gives Markdown and a heat map the pane draws, by the mod\'s own check', async () => {
   const answer = await hq('pane');
-  const pane: Pane = answer.json.pane;
+  const pane = z.object({ pane: z.looseObject({ markdown: z.string(), heat: z.unknown() }) }).parse(answer.json).pane;
   expect([answer.code, pane.markdown.startsWith('## Needs you'), isHeatList(pane.heat)]).toStrictEqual([0, true, true]);
 });
 
@@ -942,7 +993,7 @@ test('it logs the merged replacement with the close event', async () => {
 
   await hq('run', 'closed', 'kettle#22', '--superseded-by', 'kettle#23');
 
-  expect(readEvents(db(), 'run', 'GEO-518', ['closed']).map((event) => JSON.parse(event.data))).toStrictEqual([{ ref: 'kettle#22', supersededBy: 'kettle#23' }]);
+  expect(readEvents(db(), 'run', 'GEO-518', ['closed']).map((event) => parseJSON(event.data))).toStrictEqual([{ ref: 'kettle#22', supersededBy: 'kettle#23' }]);
 });
 
 test.each(['https://github.com/cedar-labs/kettle/pull/21', 'cedar-labs/kettle#21'])('it refuses --superseded-by %s, which names an owner', async (named) => {
@@ -951,7 +1002,7 @@ test.each(['https://github.com/cedar-labs/kettle/pull/21', 'cedar-labs/kettle#21
 
   const refused = await hq('run', 'closed', 'kettle#26', '--superseded-by', named);
 
-  expect(refused.json.error).toStrictEqual({ code: 'bad_args', message: `--superseded-by takes repo#n, not "${named}"` });
+  expect(findPath(refused.json, 'error')).toStrictEqual({ code: 'bad_args', message: `--superseded-by takes repo#n, not "${named}"` });
   expect(requirePR(db(), 'kettle#26')).toMatchObject({ state: 'open' });
 });
 
@@ -961,7 +1012,7 @@ test('it refuses --superseded-by on hq run merged', async () => {
 
   const refused = await hq('run', 'merged', 'kettle#24', '--superseded-by', 'kettle#21');
 
-  expect(refused.json.error).toStrictEqual({ code: 'bad_args', message: '--superseded-by goes with hq run closed: a merged PR supersedes nothing' });
+  expect(findPath(refused.json, 'error')).toStrictEqual({ code: 'bad_args', message: '--superseded-by goes with hq run closed: a merged PR supersedes nothing' });
 });
 
 test('hq run tidy --dry-run says what it would do to a merged run and writes no row', async () => {
@@ -1064,13 +1115,9 @@ test('hq pr override and accept-risk refuse a chat source named by --by and HQ_A
   const override = await hq('pr', 'override', 'widgets', '7', '--source', 'chat:kettle-1', '--by', 'z-stu', '--note', 'Teapot is fine.');
   const acceptRisk = await hq('pr', 'accept-risk', 'widgets', '7', 'f1f1f1f1f1f1f1f1', '--source', 'chat:kettle-1', '--by', 'z-stu', '--note', 'Teapot is fine.');
 
-  expect([override.code === 0, override.json.error.code, override.json.error.message.endsWith('; ask z-stu to record it')]).toStrictEqual([false, 'bad_args', true]);
-  expect([acceptRisk.code === 0, acceptRisk.json.error.code, acceptRisk.json.error.message.endsWith('; ask z-stu to record it')]).toStrictEqual([false, 'bad_args', true]);
+  expect([override.code === 0, findPath(override.json, 'error', 'code'), z.string().parse(findPath(override.json, 'error', 'message')).endsWith('; ask z-stu to record it')]).toStrictEqual([false, 'bad_args', true]);
+  expect([acceptRisk.code === 0, findPath(acceptRisk.json, 'error', 'code'), z.string().parse(findPath(acceptRisk.json, 'error', 'message')).endsWith('; ask z-stu to record it')]).toStrictEqual([false, 'bad_args', true]);
 });
-
-interface HistoryEvent {
-  action: string;
-}
 
 test('hq call answer refuses and saves nothing when atc cannot say whether the caller is the owner session', async () => {
   onTestFinished(overrideEnv('ATC_SESSION_ID', 'id-stu'));
@@ -1082,12 +1129,13 @@ test('hq call answer refuses and saves nothing when atc cannot say whether the c
   const answered = await hq('call', 'answer', 'KET-31', '--answer', 'Yes');
   const shown = await hq('call', 'show', 'KET-31', '--history');
 
-  expect([answered.code === 0, answered.json.error.code, answered.json.error.message]).toStrictEqual([
+  expect([answered.code === 0, findPath(answered.json, 'error', 'code'), findPath(answered.json, 'error', 'message')]).toStrictEqual([
     false,
     'atc_unreachable',
     "atc could not say whether this caller is the owner's session (z-stu), so the answer is not saved: Failed to connect. Run it again once atc answers, or answer in the console",
   ]);
-  expect([shown.json.call.state, shown.json.history.map((event: HistoryEvent) => event.action)]).toStrictEqual(['open', ['added', 'opened']]);
+  const history = z.array(z.looseObject({ action: z.string() })).parse(findPath(shown.json, 'history'));
+  expect([findPath(shown.json, 'call', 'state'), history.map((event) => event.action)]).toStrictEqual(['open', ['added', 'opened']]);
 });
 
 test("hq call answer ignores a daemon at HQ_ATC_SOCKET that names the owner's session, and saves nothing", async () => {
@@ -1101,7 +1149,7 @@ test("hq call answer ignores a daemon at HQ_ATC_SOCKET that names the owner's se
 
   const answered = await hq('call', 'answer', 'KET-32', '--answer', 'Yes');
 
-  expect([answered.code === 0, answered.json.error.code, daemon.requests]).toStrictEqual([false, 'atc_unreachable', []]);
+  expect([answered.code === 0, findPath(answered.json, 'error', 'code'), daemon.requests]).toStrictEqual([false, 'atc_unreachable', []]);
 });
 
 test("hq call answer from a caller hq cannot place as the owner saves the answer with no owner mark", async () => {
@@ -1134,5 +1182,5 @@ test('hq console login with no console running says how to start one, and prints
   const refused = await hq('console', 'login');
 
   expect(refused.code).toBe(1);
-  expect(refused.json.error).toStrictEqual({ code: 'not_running', message: expect.stringContaining('no hq console answers at /nonexistent/hq-test-no-console.sock: start it with hq console in your own terminal') });
+  expect(findPath(refused.json, 'error')).toStrictEqual({ code: 'not_running', message: expect.stringContaining('no hq console answers at /nonexistent/hq-test-no-console.sock: start it with hq console in your own terminal') });
 });

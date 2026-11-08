@@ -8,10 +8,23 @@ import { HqError } from '../errors.ts';
 import { logEvent } from '../log-event.ts';
 import type { Runner } from '../runner/types.ts';
 import { restore } from './restore.ts';
+import { toErrorMessage } from '../to-error-message.ts';
 
-export async function restoreTest(db: Database, run: Runner, opts: { remote: boolean; scratch: string }, actor: string): Promise<{ ok: boolean; files: number; dbCheck: string; error: string | null }> {
+interface RestoreTestResult {
+  ok: boolean;
+  files: number;
+  dbCheck: string;
+  error: string | null;
+}
+
+interface RestoreTestOptions {
+  remote: boolean;
+  scratch: string;
+}
+
+export async function restoreTest(db: Database, run: Runner, opts: RestoreTestOptions, actor: string): Promise<RestoreTestResult> {
   const dir = join(opts.scratch, `hq-restore-test-${Date.now()}`);
-  let result = { ok: false, files: 0, dbCheck: 'not run', error: null as string | null };
+  let result: RestoreTestResult = { ok: false, files: 0, dbCheck: 'not run', error: null };
   try {
     const r = await restore(run, dir, { snapshot: 'latest', remote: opts.remote });
     if (!r.db) throw new HqError('restore_test_failed', 'the snapshot holds no hq.db');
@@ -20,7 +33,7 @@ export async function restoreTest(db: Database, run: Runner, opts: { remote: boo
     const files = (await run(['find', dir, '-type', 'f'])).stdout.split('\n').filter(Boolean).length;
     result = { ok: check.stdout.trim() === 'ok' && Number(tables.stdout.trim()) > 0, files, dbCheck: `${check.stdout.trim()}, ${tables.stdout.trim()} tables`, error: null };
   } catch (e) {
-    result.error = String((e as Error).message ?? e);
+    result.error = toErrorMessage(e);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

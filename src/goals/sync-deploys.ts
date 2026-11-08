@@ -1,4 +1,8 @@
 import type { Database } from 'bun:sqlite';
+import { sql } from 'kysely';
+import { buildRowSchema } from '../db/build-row-schema.ts';
+import { runSyncQuery } from '../db/run-sync-query.ts';
+import { kdb } from '../kdb.ts';
 import { iso } from '../clock/iso.ts';
 import { now } from '../clock/now.ts';
 import { HqError } from '../errors.ts';
@@ -6,13 +10,17 @@ import type { RunOpts, Runner } from '../runner/types.ts';
 import { classifyDeploy } from './classify-deploy.ts';
 import { DEPLOY } from './deploy.ts';
 import { DEPLOY_BATCH } from './deploy-batch.ts';
+
 import { readGhJSON } from './read-gh-json.ts';
+import { toErrorMessage } from '../to-error-message.ts';
+
+const TodoSchema = buildRowSchema('ci_runs').pick({ id: true, conclusion: true, attempt: true, created_at: true });
 
 // The jobs come from the run's current attempt, so a re-run GitHub made since hq cached the run can't
 // stand in for it.
 export async function syncDeploys(db: Database, run: Runner, env?: RunOpts['env'], at: Date = now(), cap = DEPLOY_BATCH, from: Date = new Date(0)): Promise<{ fetched: number; left: number; errors: string[]; oldErrors: string[] }> {
   const since = iso(from);
-  const todo = db.query(`SELECT c.id AS id, c.conclusion AS conclusion, c.attempt AS attempt, c.created_at AS created_at FROM ci_runs c LEFT JOIN deploy_runs d ON d.run_id = c.id WHERE c.repo = ? AND c.path = ? AND c.status = 'completed' AND (d.run_id IS NULL OR d.attempt != c.attempt) ORDER BY (c.created_at >= ?) DESC, c.created_at ASC, c.id ASC`).all(DEPLOY.repo, DEPLOY.path, since) as { id: number; conclusion: string | null; attempt: number; created_at: string }[];
+  const todo = runSyncQuery(db, sql`SELECT c.id AS id, c.conclusion AS conclusion, c.attempt AS attempt, c.created_at AS created_at FROM ci_runs c LEFT JOIN deploy_runs d ON d.run_id = c.id WHERE c.repo = ${DEPLOY.repo} AND c.path = ${DEPLOY.path} AND c.status = 'completed' AND (d.run_id IS NULL OR d.attempt != c.attempt) ORDER BY (c.created_at >= ${since}) DESC, c.created_at ASC, c.id ASC`.compile(kdb(db)), TodoSchema);
   const batch = todo.slice(0, cap);
   const errors: string[] = [];
   const oldErrors: string[] = [];
@@ -27,11 +35,13 @@ export async function syncDeploys(db: Database, run: Runner, env?: RunOpts['env'
         ins.run(r.id, c.outcome, r.attempt, c.apply_conclusion, c.failed_step, iso(at));
         fetched++;
       } catch (e) {
-        const m = String((e as Error).message ?? e);
-        if (/HTTP 404|Not Found/.test(m)) {
+        const message = toErrorMessage(e);
+        if (/HTTP 404|Not Found/u.test(message)) {
           ins.run(r.id, 'unknown', r.attempt, null, null, iso(at));
           fetched++;
-        } else (r.created_at >= since ? errors : oldErrors).push(m);
+        } else {
+          (r.created_at >= since ? errors : oldErrors).push(message);
+        }
       }
     }
   };

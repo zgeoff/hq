@@ -45,12 +45,16 @@ const NUMERIC = DEFAULTS.filter(([, d]) => typeof d === 'number').map(([n]) => n
 const STRICT = NUMERIC.filter((n) => !['HQ_RC_POLL_MS', 'HQ_SEND_WAIT_MS', 'HQ_RESTORE_WAIT_MS'].includes(n));
 
 test.each(DEFAULTS)('%s defaults to %p on an empty environment', (name, dflt) => {
-  expect((config({}) as Record<string, unknown>)[name]).toBe(dflt);
+  const settings = Object.fromEntries(Object.entries(config({})));
+
+  expect(settings[name]).toBe(dflt);
 });
 
 test('settings with no default are undefined on an empty environment', () => {
-  const c = config({}) as Record<string, unknown>;
-  for (const n of ['HQ_DB', 'HQ_AS', 'HQ_NOTIFY', 'HQ_LIVE', 'REVIEW_DIR', 'HQ_REPOS', 'HQ_NOW', 'HQ_ATC_SOCKET']) expect(c[n]).toBeUndefined();
+  const settings = Object.fromEntries(Object.entries(config({})));
+  for (const name of ['HQ_DB', 'HQ_AS', 'HQ_NOTIFY', 'HQ_LIVE', 'REVIEW_DIR', 'HQ_REPOS', 'HQ_NOW', 'HQ_ATC_SOCKET']) {
+    expect(settings[name]).toBeUndefined();
+  }
 });
 
 test('a set value is read, as a number for the numeric settings', () => {

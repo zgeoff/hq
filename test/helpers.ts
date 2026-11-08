@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import type { Database } from 'bun:sqlite';
 import { ORPCError } from '@orpc/client';
+import { toExactOptional } from '@zgeoff/std';
 import { z } from 'zod';
 import { openDb } from '../src/db/open-db.ts';
 import { buildFakeAtcState } from './build-fake-atc-state.ts';
@@ -70,6 +71,9 @@ export interface FakeAtc extends FakeAtcState {
   stop: () => void;
 }
 
+const SessionInputSchema = z.object({ session: z.string() });
+const SentMessageSchema = z.object({ session: z.string(), text: z.string(), from: z.string(), idempotencyKey: z.string(), notice: z.boolean().optional() });
+
 function encodeCursor(id: number): string {
   return Buffer.from(JSON.stringify(['events', id])).toString('base64url');
 }
@@ -90,19 +94,32 @@ function readFeedStart(cursor: string): number {
   }
 }
 
-export function fakeAtc(dir: string, sessions = [
+export interface FakeAtcSession {
+  id: string;
+  name: string;
+  alive: boolean;
+  state: string;
+  agentSessionID?: string;
+  pinned?: boolean;
+  cwd?: string;
+  createdAt?: number;
+  agent?: string;
+  locator?: { targetID: string };
+}
+
+export function fakeAtc(directory: string, sessions: FakeAtcSession[] = [
   { id: 'id-stu', name: 'z-stu', alive: true, state: 'done' },
   { id: 'id-refine', name: 'z-refine', alive: true, state: 'done' },
   { id: 'id-steward', name: 'z-steward', alive: true, state: 'done' },
   { id: 'id-delivery', name: 'z-delivery', alive: true, state: 'done' },
 ]): FakeAtc {
-  const path = join(dir, 'atc.sock');
+  const path = join(directory, 'atc.sock');
   const sent: FakeAtc['sent'] = [];
   const seen = new Map<string, string>();
   const feed: FeedEvent[] = [];
   const activity = new Map<string, number>();
   const pending = new Map<string, { message?: string }>();
-  const fake = { onMessage: null } as unknown as FakeAtc;
+  const fake: FakeAtc = { ...buildFakeAtcState(), path, sent, feed, activity, pending, onMessage: null, stop: () => {} };
   fake.stop = startStubAtcDaemon(path, {
     'session.list': () => ({ sessions }),
     'session.get': (input) => {
@@ -134,7 +151,7 @@ export function fakeAtc(dir: string, sessions = [
       return { session: { id } };
     },
     'session.kill': (input) => {
-      const found = sessions.find((x) => x.id === (input as { session: string }).session);
+      const found = sessions.find((x) => x.id === SessionInputSchema.parse(input).session);
       if (found) {
         Object.assign(found, { alive: false, state: 'exited' });
       }
@@ -156,7 +173,7 @@ export function fakeAtc(dir: string, sessions = [
       return {};
     },
     'session.forget': (input) => {
-      const id = (input as { session: string }).session;
+      const id = SessionInputSchema.parse(input).session;
       fake.calls.push({ method: 'session.forget', input });
       if (fake.forgetRefusals.has(id)) {
         throw new ORPCError('session_pinned', { message: `${id} is pinned` });
@@ -193,7 +210,7 @@ export function fakeAtc(dir: string, sessions = [
       };
     },
     'session.message': (input) => {
-      const raw = input as FakeAtc['sent'][number];
+      const raw = toExactOptional(SentMessageSchema.parse(input));
       if (!seen.has(raw.idempotencyKey)) {
         seen.set(raw.idempotencyKey, `m-${seen.size + 1}`);
         sent.push(raw);
@@ -203,7 +220,6 @@ export function fakeAtc(dir: string, sessions = [
     },
   }).stop;
   process.env['HQ_ATC_SOCKET'] = path;
-  Object.assign(fake, buildFakeAtcState(), { path, sent, feed, activity, pending });
   return fake;
 }
 

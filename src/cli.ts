@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 import { Database } from 'bun:sqlite';
 import { parseArgs } from 'node:util';
+import invariant from 'tiny-invariant';
 import { match } from 'ts-pattern';
 import { addAsk } from './asks/add-ask.ts';
 import { answerAsk } from './asks/answer-ask.ts';
@@ -20,6 +21,9 @@ import { waitReasons } from './asks/wait-reasons.ts';
 import { logEvent } from './log-event.ts';
 import { owner } from './owner.ts';
 import type { AskState } from './transitions/ask-states.ts';
+import { ASK_STATES } from './transitions/ask-states.ts';
+import { countAsksByState } from './asks/count-asks-by-state.ts';
+import { listLaterAsks } from './asks/list-later-asks.ts';
 import { AtcClient } from './atc/atc-client.ts';
 import { readStateSizeChecks } from './health/read-state-size-checks.ts';
 import { getStateRoles } from './state/get-state-roles.ts';
@@ -110,8 +114,11 @@ import { registerGroups } from './register-groups.ts';
 import { lookup } from './lookup.ts';
 import { z } from 'zod';
 import { config } from './config/config.ts';
-import { toExactOptional } from '@zgeoff/std';
-import type { DetachResult, FlushResult, OutboxRow } from './outbox/types.ts';
+import { isOneOf, isRecord, toExactOptional } from '@zgeoff/std';
+import type { DetachResult, FlushResult } from './outbox/types.ts';
+import { countUnsentByStatus } from './outbox/count-unsent-by-status.ts';
+import { listUnsentRows } from './outbox/list-unsent-rows.ts';
+import { parseJSON } from './noslop/parse-json.ts';
 import { dropOutboxItem } from './outbox/drop-outbox-item.ts';
 import { forwards } from './outbox/forwards.ts';
 import { setForward } from './outbox/set-forward.ts';
@@ -281,7 +288,6 @@ import { formatRefusalLine as refusalLine } from './refusals/format-refusal-line
 import { loadRefusalRows as refusalRows } from './refusals/load-refusal-rows.ts';
 import { parseDays } from './refusals/parse-days.ts';
 import { scanRefusals } from './refusals/scan-refusals.ts';
-import type { By } from './refusals/types.ts';
 import { addNews } from './news/add-news.ts';
 import { digest } from './news/digest.ts';
 import { listNews } from './news/list-news.ts';
@@ -400,6 +406,7 @@ import { applyHealth } from './health/apply-health.ts';
 import { healthSamples } from './health/health-samples.ts';
 import { healthSettings } from './health/health-settings.ts';
 import { openProblems } from './health/open-problems.ts';
+import { COMMAND_TIMEOUT_MS } from './health/command-timeout-ms.ts';
 import { runChecks } from './health/run-checks.ts';
 import { setHealthSetting } from './health/set-health-setting.ts';
 import type { Probe } from './health/types.ts';
@@ -413,6 +420,10 @@ import { pickClaudeReading } from './slots/pick-claude-reading.ts';
 import { readBrokerQuota } from './slots/read-broker-quota.ts';
 import { readBrokerSlot } from './slots/read-broker-slot.ts';
 import { writeBrokerSlot } from './slots/write-broker-slot.ts';
+import { toErrorMessage } from './to-error-message.ts';
+
+const UNBLOCK_LIST_STATES = ['open', 'done', 'dropped', 'all'] as const;
+const RUN_PLACES = ['local', 'imp', 'none'] as const;
 
 const OPTIONS = {
   json: { type: 'boolean' },
@@ -561,16 +572,6 @@ function intFlag(v: string | undefined, flag: string): number | null {
   if (v === undefined || v === 'none') return null;
   if (!/^-?\d+$/.test(v)) throw new HqError('bad_args', `--${flag} must be a whole number`);
   return Number(v);
-}
-
-function pickAskStates(state: string | undefined): AskState[] | undefined {
-  if (state === 'all') {
-    return undefined;
-  }
-  if (state) {
-    return list(state) as AskState[];
-  }
-  return ['open', 'queued', 'later', 'answered'];
 }
 
 function parseWaitsOn(v: string | undefined): string | null | undefined {
@@ -745,12 +746,12 @@ async function askCommand(db: Database, kind: Kind, verb: string, args: string[]
       const a = getAsk(db, needId());
       if (!a || a.kind !== kind) throw new HqError('not_found', `no ${kind} with id ${id}`);
       const h = flags.history ? history(db, 'ask', a.id) : undefined;
-      const htext = h ? `\n\nhistory:\n${(h as { at: string; action: string; actor: string }[]).map((e) => `  ${e.at} ${e.action} by ${e.actor}`).join('\n')}` : '';
+      const htext = h ? `\n\nhistory:\n${h.map((event) => `  ${event.at} ${event.action} by ${event.actor}`).join('\n')}` : '';
       return { data: { [kind]: a, ...(h ? { history: h } : {}) }, text: askFull(a) + htext };
     })
     .with('list', () => {
       const asked = pickAskStates(flags.state);
-      const rows = listAsks(db, toExactOptional({ kind, states: asked }));
+      const rows = asked === null ? [] : listAsks(db, toExactOptional({ kind, states: asked }));
       return { data: { [`${kind}s`]: rows }, text: rows.length ? rows.map(askLine).join('\n') : `No ${kind}s here.` };
     })
     .otherwise(() => {
@@ -787,8 +788,8 @@ async function unblockCommand(db: Database, verb: string, args: string[], flags:
       return { data: { result: r.result, item: r.item, warnings: r.warnings }, text: [unblockLine(r.item), r.result, ...warn].join('\n') };
     })
     .with('list', () => {
-      const state = (flags.state ?? 'open') as 'open' | 'done' | 'dropped' | 'all';
-      const items = listUnblocks(db, state);
+      const state = flags.state ?? 'open';
+      const items = isOneOf(state, UNBLOCK_LIST_STATES) ? listUnblocks(db, state) : [];
       return { data: { items: items.map((item) => ({ ...item, recheck: isRecheck(item, now()), overdue: isOverdue(item, now()) })) }, text: items.length > 0 ? items.map((item) => unblockLine(item)).join('\n') : 'Nothing needs the owner\'s hands. Remarkable.' };
     })
     .with('new', () => {
@@ -864,13 +865,17 @@ function runLine(r: RunView): string {
 
 async function expandSession(raw: string): Promise<string> {
   let client: AtcClient | null = null;
+
+  // A closure assigns the client, so TypeScript narrows a direct read in finally to null.
+  const readClient = (): AtcClient | null => client;
   try {
     return await fullSessionId(async () => {
-      client = await AtcClient.open();
-      return client.sessions();
+      const opened = await AtcClient.open();
+      client = opened;
+      return opened.sessions();
     }, raw);
   } finally {
-    (client as AtcClient | null)?.close();
+    readClient()?.close();
   }
 }
 
@@ -878,6 +883,7 @@ function realProbe(db: Database): Probe {
   return {
     // coreutils timeout kills a hung check, so a stuck systemctl or df never piles up.
     run: (cmd, opts) => realRunner(['timeout', '-k', '2', '15', ...cmd], { ...opts, env: cleanEnv() }),
+    commandTimeoutMs: COMMAND_TIMEOUT_MS,
     readFile: (path) => Bun.file(path).text(),
     atcAnswers: async () => {
       try {
@@ -889,7 +895,7 @@ function realProbe(db: Database): Probe {
           c.close();
         }
       } catch (e) {
-        return String((e as Error).message ?? e);
+        return toErrorMessage(e);
       }
     },
     atcMcp: () => Promise.resolve(readAtcMcp(buildNodeAtcMcpFiles())),
@@ -954,7 +960,7 @@ async function capacityCommand(db: Database, verb: string | undefined, args: str
       if (flags.reset && args[1] !== undefined) throw new HqError('bad_args', 'give a VALUE or --reset, not both');
       if (!flags.reset && args[1] === undefined) throw new HqError('bad_args', 'give a VALUE, or --reset for the default');
       const settings = setCapacitySetting(db, key, flags.reset ? null : args[1]!, await actor(db, flags));
-      return { data: { settings }, text: `${key} = ${settings[key as keyof typeof settings]}${flags.reset ? ' (default)' : ''}` };
+      return { data: { settings }, text: `${key} = ${Object.entries(settings).find(([name]) => name === key)?.[1]}${flags.reset ? ' (default)' : ''}` };
     })
     .otherwise(() => {
       throw new HqError('bad_args', `unknown command: hq capacity ${verb}`);
@@ -983,7 +989,7 @@ async function healthCommand(db: Database, verb: string | undefined, args: strin
     .with('set', async () => {
       const key = need(args[0], 'setting name');
       const settings = setHealthSetting(db, key, args[1] ?? null, await actor(db, flags));
-      return { data: { settings }, text: `${key} = ${settings[key as keyof typeof settings]}${args[1] === undefined ? ' (default)' : ''}` };
+      return { data: { settings }, text: `${key} = ${Object.entries(settings).find(([name]) => name === key)?.[1]}${args[1] === undefined ? ' (default)' : ''}` };
     })
     .otherwise(() => {
       throw new HqError('bad_args', `unknown command: hq health ${verb}`);
@@ -1001,20 +1007,22 @@ function sinceArg(raw: string | undefined, to: Date): string {
 
 const GH_CACHE = z.object({ day: z.string(), at: z.string(), merges: z.array(z.object({ repo: z.string(), mergedAt: z.string() })) });
 
+const GH_REPOSITORY = z.object({ name: z.string() });
+const GH_SEARCH_ROWS = z.array(z.object({ closedAt: z.string(), repository: GH_REPOSITORY }));
+
 async function ghMerges(db: Database, from: string, run: Runner = realRunner): Promise<GhMerge[] | null> {
   const day = from.slice(0, 10);
   const c = metaJson(db, 'stats_gh_cache', GH_CACHE.nullable(), null);
   if (c && c.day <= day && Date.now() - Date.parse(c.at) < 30 * 60_000) return c.merges;
   const r = await run(['gh', 'search', 'prs', '--owner', 'zgeoff', '--merged', '--merged-at', `>=${day}`, '--json', 'repository,closedAt', '--limit', '1000'], { env: cleanEnv() });
   if (r.code !== 0) return null;
-  try {
-    const rows = JSON.parse(r.stdout) as { closedAt: string; repository: { name: string } }[];
-    const merges = rows.map((x) => ({ repo: x.repository.name, mergedAt: x.closedAt }));
-    setMeta(db, 'stats_gh_cache', JSON.stringify({ day, at: new Date().toISOString(), merges }));
-    return merges;
-  } catch {
+  const parsed = GH_SEARCH_ROWS.safeParse(parseJSON(r.stdout));
+  if (!parsed.success) {
     return null;
   }
+  const merges = parsed.data.map((search) => ({ repo: search.repository.name, mergedAt: search.closedAt }));
+  setMeta(db, 'stats_gh_cache', JSON.stringify({ day, at: new Date().toISOString(), merges }));
+  return merges;
 }
 
 const KIND_WEEKS = 8;
@@ -1072,7 +1080,8 @@ async function goalsCommand(db: Database, verb: string | undefined, rest: string
     .with('target', async () => {
       const key = need(rest[0], 'goal');
       const t = setTarget(db, key, need(rest[1], 'operator or none'), rest[2], await actor(db, flags));
-      return { data: { key, target: t }, text: `Target for ${key}: ${targetLine(key as (typeof GOAL_KEYS)[number], t)}` };
+      invariant(isOneOf(key, GOAL_KEYS), 'setTarget rejects a key outside GOAL_KEYS');
+      return { data: { key, target: t }, text: `Target for ${key}: ${targetLine(key, t)}` };
     })
     .with('daily', async () => {
       const a = await actor(db, flags);
@@ -1159,10 +1168,12 @@ async function resolveTarget(raw: string): Promise<{ id: string | null; name: st
     const s = await client.resolve(key);
     return { id: s.id, name: s.name };
   } catch (e) {
-    if ((e as HqError).code === 'atc_protocol_mismatch') throw e;
+    if (e instanceof HqError && e.code === 'atc_protocol_mismatch') {
+      throw e;
+    }
     return { id: null, name: null };
   } finally {
-    (client as AtcClient | null)?.close();
+    client?.close();
   }
 }
 
@@ -1535,7 +1546,7 @@ async function backupCommand(db: Database, verb: string | undefined, args: strin
       try {
         remote = readRemoteEnv() ? 'configured' : `not configured (${backupPaths().remoteEnv})`;
       } catch (e) {
-        remote = `misconfigured: ${(e as Error).message}`;
+        remote = `misconfigured: ${toErrorMessage(e)}`;
       }
       const timer = (await realRunner(['systemctl', '--user', 'is-active', `${BACKUP_UNIT}.timer`], { env: cleanEnv() })).stdout.trim() || 'inactive';
       let snaps: { short_id: string; time: string }[] = [];
@@ -1640,7 +1651,7 @@ async function lanesCommand(context: Pick<Ctx, 'db' | 'verb' | 'rest' | 'flags' 
       try {
         if (markVersion(db, VERSION, me)) console.log(`${iso(now())} marked hq ${VERSION}`);
       } catch (e) {
-        console.log(`${iso(now())} version mark failed: ${String((e as Error).message ?? e)}`);
+        console.log(`${iso(now())} version mark failed: ${toErrorMessage(e)}`);
       }
       const steps = {
         runs: () => watchRuns(db, me),
@@ -1723,7 +1734,7 @@ async function lanesCommand(context: Pick<Ctx, 'db' | 'verb' | 'rest' | 'flags' 
       const laneLines = slotPlan
         ? [
             `imp room now: ${slotsFrom(sample.cap!, sample.impMib).slots} slot(s) (${sample.cap!.imp?.freeMib ?? '?'} MiB free; 0 when no unattended imp provider has quota)`,
-            formatLineRoom(loadImpRoom(db, { budgetSlots: slotsFrom(sample.cap ?? {}, sample.impMib).slots, impMib: sample.impMib })),
+            formatLineRoom(loadImpRoom(db, { budgetSlots: slotsFrom(sample.cap ?? {}, sample.impMib).slots, impMib: sample.impMib }, lookAt, sample.impd ?? null)),
             ...formatSlotPlan(slotPlan, lookAt),
             ...formatSlotCause(slotCause, slotMinutesToday, slotPlan.pool.capHeld),
             ...(readyNote ? [`  ${readyNote.line}`, ...skippedLines(readyNote).map((l) => `  ${l}`)] : []),
@@ -1797,17 +1808,18 @@ function status(db: Database): Out {
   const open = openItem(db);
   const next = nextEligible(db);
   const reasons = waitReasons(db);
-  const counts = db.query('SELECT kind, state, COUNT(*) AS n FROM asks GROUP BY kind, state').all() as { kind: Kind; state: AskState; n: number }[];
+  const counts = countAsksByState(db);
   const byKind: Record<string, Record<string, number>> = { call: {}, proposal: {} };
-  for (const c of counts) byKind[c.kind]![c.state] = c.n;
-  const later = db.query(`SELECT id, kind, due_at FROM asks WHERE state='later' ORDER BY due_at, id`).all() as { id: string; kind: Kind; due_at: string }[];
+  for (const row of counts) {
+    byKind[row.kind] = { ...byKind[row.kind], [row.state]: row.count };
+  }
+  const later = listLaterAsks(db);
   const nextLater = later[0] ?? null;
   const openUnblocks = listUnblocks(db, 'open');
   const unblockOpen = openUnblocks.filter((item) => item.kind !== 'watch').length;
   const unblockWatching = openUnblocks.length - unblockOpen;
   const unblockNew = newSincePush(db).length;
-  const outbox = db.query(`SELECT status, COUNT(*) AS n FROM outbox WHERE status != 'sent' GROUP BY status`).all() as { status: string; n: number }[];
-  const ob = Object.fromEntries(outbox.map((o) => [o.status, o.n]));
+  const ob = countUnsentByStatus(db);
   const hold = currentHold(db);
 
   const waits = next ? reasons : [];
@@ -1862,9 +1874,11 @@ async function refusalsCommand(db: Database, verb: string | undefined, flags: Fl
   if (days > 365) throw new HqError('bad_args', '--days must be 1 to 365');
   const rows = refusalRows(db, new Date(now().getTime() - days * 86_400_000), new Date(now().getTime() + 60_000));
   if (flags.by !== undefined) {
-    if (!(BY as readonly string[]).includes(flags.by)) throw new HqError('bad_args', `--by must be one of ${BY.join(', ')}`);
-    const t = tally(rows, flags.by as By);
-    return { data: { tally: t }, text: t.length ? t.map((x) => `${String(x.count).padStart(4)}  ${x.key}`).join('\n') : `No refusals in the last ${days} day(s).` };
+    if (!isOneOf(flags.by, BY)) {
+      throw new HqError('bad_args', `--by must be one of ${BY.join(', ')}`);
+    }
+    const counts = tally(rows, flags.by);
+    return { data: { tally: counts }, text: counts.length > 0 ? counts.map((x) => `${String(x.count).padStart(4)}  ${x.key}`).join('\n') : `No refusals in the last ${days} day(s).` };
   }
   return { data: { items: rows }, text: rows.length ? rows.map(refusalLine).join('\n') : `No refusals in the last ${days} day(s).` };
 }
@@ -1883,7 +1897,7 @@ async function refsCommand(verb: string | undefined, flags: Flags): Promise<Out>
 
 async function repairCommand(verb: string | undefined, rest: string[], flags: Flags): Promise<Out> {
   if (verb !== 'advisor-400') throw new HqError('bad_args', 'hq repair advisor-400 <session> [--file T.jsonl] [--apply]');
-  return await repairAdvisor400(rest[0], toExactOptional({ file: flags.file as string | undefined, apply: Boolean(flags.apply) }));
+  return await repairAdvisor400(rest[0], toExactOptional({ file: flags.file, apply: Boolean(flags.apply) }));
 }
 
 async function pinsCommand(): Promise<Out> {
@@ -1945,7 +1959,7 @@ async function outboxCommand(db: Database, verb: string | undefined, rest: strin
     const map = forwards(db);
     return { data: { forwards: map }, text: Object.keys(map).length ? Object.entries(map).map(([a, b]) => `${a} → ${b}`).join('\n') : 'No forwards.' };
   }
-  const rows = db.query(`SELECT * FROM outbox WHERE status != 'sent' ORDER BY id`).all() as OutboxRow[];
+  const rows = listUnsentRows(db);
   return { data: { outbox: rows }, text: rows.length ? rows.map((r) => `${r.id} [${r.status}] → ${r.target}: ${r.text}${r.last_error ? `\n   last error: ${r.last_error}` : ''}`).join('\n') : 'Outbox empty.' };
 }
 
@@ -2027,7 +2041,10 @@ const GROUPS: Record<string, (context: Ctx) => Promise<Out>> = {
   state: async (context) => runStateCommand({ verb: context.verb, rest: context.rest, dryRun: context.flags['dry-run'] === true, directory: stateDir(), roles: getStateRoles(), actor: await actor(context.db, context.flags), at: now(), files: buildNodeStateFiles() }),
   news: (c) => newsCommand(c.db, c.verb, c.flags),
   outbox: (c) => outboxCommand(c.db, c.verb, c.rest, c.flags),
-  ask: (c) => askCommand(c.db, c.noun as Kind, need(c.verb, 'command'), c.rest, c.flags),
+  ask: (context) => {
+    invariant(context.noun === 'call' || context.noun === 'proposal', 'the ask group holds only call and proposal');
+    return askCommand(context.db, context.noun, need(context.verb, 'command'), context.rest, context.flags);
+  },
   unblock: (c) => unblockCommand(c.db, need(c.verb, 'command'), c.rest, c.flags),
   capabilities: async (c) => capabilities(VERSION, SCHEMA_VERSION, c.flags.require),
   version: () => Promise.resolve(renderVersion(VERSION, SCHEMA_VERSION, readBuild())),
@@ -2094,8 +2111,9 @@ export async function main(argv: string[], runner: Runner = realRunner): Promise
     }
     return 0;
   } catch (e) {
-    const code = (e as { code?: string }).code ?? '';
-    const err = e instanceof HqError ? e : new HqError(code.startsWith('ERR_PARSE_ARGS') ? 'bad_args' : 'internal', String((e as Error).message ?? e));
+    const code = isRecord(e) && typeof e['code'] === 'string' ? e['code'] : '';
+    const fallbackCode = code.startsWith('ERR_PARSE_ARGS') ? 'bad_args' : 'internal';
+    const err = e instanceof HqError ? e : new HqError(fallbackCode, toErrorMessage(e));
     if (json) console.log(JSON.stringify({ ok: false, error: { code: err.code, message: err.message, ...(err.data ?? {}) } }, null, 2));
     else console.error(`hq: ${err.message}`);
     return err.code === 'internal' ? 2 : 1;
@@ -2130,8 +2148,10 @@ async function runCommand(context: Ctx): Promise<Out> {
       if (args.length > 1) {
         throw new HqError('bad_args', `hq run add takes one issue: pass the session as --session ${args[1]}`);
       }
-      const where = (flags.where ?? 'imp') as 'local' | 'imp' | 'none';
-      if (!['local', 'imp', 'none'].includes(where)) throw new HqError('bad_args', '--where must be local, imp or none');
+      const where = flags.where ?? 'imp';
+      if (!isOneOf(where, RUN_PLACES)) {
+        throw new HqError('bad_args', '--where must be local, imp or none');
+      }
       const pacing = await loadPacing(pacingPath());
       const session = flags.session ? await expandSession(flags.session) : null;
       const r = addRun(db, {
@@ -2438,6 +2458,19 @@ function formatTidy(wrapped: MergedRunWrapUp[], dryRun: boolean): string {
   const tense = dryRun ? 'planned' : 'done';
   const lines = wrapped.map((entry) => `${entry.issue}: ${formatWrapUp(entry.wrapUp, tense)}`);
   return [dryRun ? 'Would tidy (nothing changed):' : 'Tidied:', ...lines.map((line) => `  ${line}`)].join('\n');
+}
+
+// undefined lists every state; null lists none, for a --state that names only states no ask has.
+function pickAskStates(state: string | undefined): AskState[] | undefined | null {
+  if (state === 'all') {
+    return undefined;
+  }
+  if (state) {
+    const requested = list(state);
+    const known = requested.filter((name) => isOneOf(name, ASK_STATES));
+    return requested.length > 0 && known.length === 0 ? null : known;
+  }
+  return ['open', 'queued', 'later', 'answered'];
 }
 
 if (import.meta.main) process.exit(await main(process.argv.slice(2)));

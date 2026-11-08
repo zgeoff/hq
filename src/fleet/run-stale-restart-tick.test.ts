@@ -11,8 +11,11 @@ import { staleSinceSchema } from './stale-since-schema.ts';
 import type { FleetEntry } from './types.ts';
 import { enqueue } from '../outbox/enqueue.ts';
 import { flush } from '../outbox/flush.ts';
+import { readOutboxRows } from '../outbox/read-outbox-rows.ts';
 import { logEvent } from '../log-event.ts';
 import { resetFetchCache } from '../prompts/reset-fetch-cache.ts';
+import { readCallPins } from '../test-utils/read-call-pins.ts';
+import { readSpawnedNames } from '../test-utils/read-spawned-names.ts';
 import { FOUR_AM_SYDNEY, NOON_SYDNEY, at, createDefsRepo, fakeAtc, freshDb } from '../../test/helpers.ts';
 
 interface RosterSession {
@@ -78,7 +81,10 @@ function setupTest(config: { sessions?: RosterSession[]; cwd?: string } = {}) {
     async tick(minutes: number, fleet: FleetEntry[]) {
       await this.tickAt(new Date(Date.parse(NOON_SYDNEY) + minutes * 60_000).toISOString(), fleet);
     },
-    outboxTo: (target: string) => base.db.query('SELECT target, text FROM outbox WHERE target = ? ORDER BY id').all(target) as { target: string; text: string }[],
+    outboxTo: (target: string) =>
+      readOutboxRows(base.db)
+        .filter((row) => row.target === target)
+        .map((row) => ({ target: row.target, text: row.text })),
     setState(id: string, state: string) {
       Object.assign(roster.find((s) => s.id === id) ?? {}, { state });
     },
@@ -92,11 +98,7 @@ function setupTest(config: { sessions?: RosterSession[]; cwd?: string } = {}) {
     setRefresh: (value: unknown) => setMeta(base.db, 'fleet_refresh', JSON.stringify(value)),
     staleSince: () => staleSinceSchema.parse(JSON.parse(getMeta(base.db, 'fleet_stale_since') ?? '{}')),
     staleCommit: () => staleSinceSchema.parse(JSON.parse(getMeta(base.db, 'fleet_stale_since') ?? '{}'))['z-kettle']?.commit,
-    outbox: () =>
-      base.db.query('SELECT target, text FROM outbox ORDER BY id').all() as {
-        target: string;
-        text: string;
-      }[],
+    outbox: () => readOutboxRows(base.db).map((row) => ({ target: row.target, text: row.text })),
     refresh: () => refreshSchema.parse(JSON.parse(getMeta(base.db, 'fleet_refresh') ?? '{}')),
   };
 }
@@ -373,7 +375,7 @@ test('it still respawns and reports a restarted session when a later session che
   ctx.atc.getBudgets.set('id-urn', 1);
   await ctx.tick(131, [ctx.kettle, ctx.urn]);
 
-  expect(ctx.atc.calls.filter((c) => c.method === 'session.spawn').map((c) => (c.input as { name: string }).name)).toStrictEqual(['z-kettle']);
+  expect(readSpawnedNames(ctx.atc)).toStrictEqual(['z-kettle']);
   expect(ctx.db.query('SELECT text FROM news').all()).toStrictEqual([{ text: `z-kettle restarted from main; its old prompt predated ${ctx.staleCommit()}` }]);
   expect(ctx.db.query(`SELECT json_extract(data, '$.name') AS name, json_extract(data, '$.error') AS error FROM events WHERE action = 'stale-restart-failed'`).all()).toStrictEqual([
     { name: 'z-urn', error: 'invented session.get failure' },
@@ -396,7 +398,7 @@ test('it keeps a restart when another session skips earlier in the same tick', a
   ctx.atc.messages.set('m-2', { status: 'answered', answer: 'saved' });
   await ctx.tick(131, [ctx.urn, ctx.kettle]);
 
-  expect(ctx.atc.calls.filter((c) => c.method === 'session.spawn').map((c) => (c.input as { name: string }).name)).toStrictEqual(['z-kettle']);
+  expect(readSpawnedNames(ctx.atc)).toStrictEqual(['z-kettle']);
   expect(ctx.refresh()).toStrictEqual({ 'z-urn': { sessionId: 'id-urn', phase: 'idle', skips: 1, retryAt: new Date(Date.parse(NOON_SYDNEY) + (131 + 60) * 60_000).toISOString().replace('.000Z', 'Z') } });
 });
 
@@ -409,7 +411,7 @@ test('it pins the session again and spawns nothing when atc refuses the forget a
   ctx.atc.messages.set('m-1', { status: 'answered', answer: 'saved' });
   await ctx.tick(126, [ctx.kettle]);
 
-  expect(ctx.atc.calls.map((c) => [c.method, (c.input as { pinned?: boolean }).pinned])).toStrictEqual([
+  expect(readCallPins(ctx.atc)).toStrictEqual([
     ['session.kill', undefined],
     ['session.update', false],
     ['session.forget', undefined],

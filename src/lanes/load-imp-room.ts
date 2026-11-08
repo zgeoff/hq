@@ -2,6 +2,7 @@ import type { Database } from 'bun:sqlite';
 import { z } from 'zod';
 import type { ImpRoom } from '../areas/types.ts';
 import { capacitySettings } from '../capacity/capacity-settings.ts';
+import type { Impd } from '../capacity/types.ts';
 import { iso } from '../clock/iso.ts';
 import { now } from '../clock/now.ts';
 import { IMP_LINE_HELD } from './imp-line-held.ts';
@@ -14,37 +15,77 @@ const AwakeSampleRow = z
     nix_awake_mib: z.number().nullable(),
     impd_budget_mib: z.number().nullable(),
     impd_priority_kept_mib: z.number().nullable(),
+    impd_committed_mib: z.number().nullable(),
   })
   .nullable();
 
-// With no impd reading 15 min fresh, every slot is held, as a wrong "free" overfills impd.
-export function loadImpRoom(db: Database, size: ImpSize, at: Date = now()): ImpRoom {
-  const FRESH_MIN = 15;
-  const reading = AwakeSampleRow.parse(
-    db.query('SELECT at, nonnix_awake_mib, nonnix_awake_vcpus, nix_awake_mib, impd_budget_mib, impd_priority_kept_mib FROM capacity_samples WHERE at <= ? ORDER BY at DESC LIMIT 1').get(iso(at)),
+// A live impd reading, when whole, sets the room. Without one, the newest stored sample does, held
+// to 0 slots when it is over 15 min old, as a wrong "free" overfills impd.
+export function loadImpRoom(db: Database, size: ImpSize, at: Date = now(), live: Impd | null = null): ImpRoom {
+  const stored = AwakeSampleRow.parse(
+    db.query('SELECT at, nonnix_awake_mib, nonnix_awake_vcpus, nix_awake_mib, impd_budget_mib, impd_priority_kept_mib, impd_committed_mib FROM capacity_samples WHERE at <= ? ORDER BY at DESC LIMIT 1').get(iso(at)),
   );
   const settings = capacitySettings(db);
-  if (
-    reading === null ||
-    reading.nonnix_awake_mib === null ||
-    reading.nonnix_awake_vcpus === null ||
-    reading.nix_awake_mib === null ||
-    reading.impd_budget_mib === null ||
-    reading.impd_priority_kept_mib === null ||
-    at.getTime() - Date.parse(reading.at) > FRESH_MIN * 60_000
-  ) {
+  const reading = pickImpdReading(live, stored, at);
+  if (reading === null) {
     return { slots: 0, heldBy: 'no fresh impd reading', line: null };
   }
   const line = {
-    awakeMib: reading.nonnix_awake_mib,
+    awakeMib: reading.nonnixAwakeMib,
     maxMib: settings.nonnixMaxMib,
-    awakeVcpus: reading.nonnix_awake_vcpus,
+    awakeVcpus: reading.nonnixAwakeVcpus,
     maxVcpus: settings.nonnixMaxVcpus,
-    budgetMib: reading.impd_budget_mib,
-    nixAwakeMib: reading.nix_awake_mib,
-    keptMib: reading.impd_priority_kept_mib,
+    budgetMib: reading.budgetMib,
+    nixAwakeMib: reading.nixAwakeMib,
+    keptMib: reading.priorityKeptMib,
   };
-  return buildLineRoom(line, { ...size, impVcpus: settings.impVcpus });
+  return buildLineRoom(line, { ...size, impVcpus: settings.impVcpus }, reading.committedMib);
+}
+
+interface WholeImpdReading {
+  budgetMib: number;
+  committedMib: number | null;
+  nonnixAwakeMib: number;
+  nonnixAwakeVcpus: number;
+  nixAwakeMib: number;
+  priorityKeptMib: number;
+}
+
+type StoredSample = z.output<typeof AwakeSampleRow>;
+
+const FRESH_MIN = 15;
+
+function pickImpdReading(live: Impd | null, stored: StoredSample, at: Date): WholeImpdReading | null {
+  const fromLive = live === null ? null : toWholeReading(live);
+  if (fromLive !== null) {
+    return fromLive;
+  }
+  if (stored === null || at.getTime() - Date.parse(stored.at) > FRESH_MIN * 60_000) {
+    return null;
+  }
+  return toWholeReading({
+    budgetMib: stored.impd_budget_mib,
+    usedMib: null,
+    committedMib: stored.impd_committed_mib,
+    nonnixAwakeMib: stored.nonnix_awake_mib,
+    nonnixAwakeVcpus: stored.nonnix_awake_vcpus,
+    nixAwakeMib: stored.nix_awake_mib,
+    priorityKeptMib: stored.impd_priority_kept_mib,
+  });
+}
+
+function toWholeReading(impd: Impd): WholeImpdReading | null {
+  if (impd.budgetMib === null || impd.nonnixAwakeMib === null || impd.nonnixAwakeVcpus === null || impd.nixAwakeMib === null || impd.priorityKeptMib === null) {
+    return null;
+  }
+  return {
+    budgetMib: impd.budgetMib,
+    committedMib: impd.committedMib,
+    nonnixAwakeMib: impd.nonnixAwakeMib,
+    nonnixAwakeVcpus: impd.nonnixAwakeVcpus,
+    nixAwakeMib: impd.nixAwakeMib,
+    priorityKeptMib: impd.priorityKeptMib,
+  };
 }
 
 interface ImpSize {
@@ -52,10 +93,11 @@ interface ImpSize {
   impMib: number;
 }
 
-function buildLineRoom(line: NonNullable<ImpRoom['line']>, size: ImpSize & { impVcpus: number }): ImpRoom {
+// impd counts the larger of what it has promised and what is awake as taken.
+export function buildLineRoom(line: NonNullable<ImpRoom['line']>, size: ImpSize & { impVcpus: number }, committedMib: number | null): ImpRoom {
   const memorySlots = slotsIn(line.maxMib - line.awakeMib, size.impMib);
   const vcpuSlots = slotsIn(line.maxVcpus - line.awakeVcpus, size.impVcpus);
-  const impdRoomMib = line.budgetMib - line.awakeMib - line.nixAwakeMib;
+  const impdRoomMib = line.budgetMib - Math.max(committedMib ?? 0, line.awakeMib + line.nixAwakeMib);
   const lineSlots = Math.min(size.budgetSlots, memorySlots, vcpuSlots);
   const unkeptSlots = Math.min(lineSlots, slotsIn(impdRoomMib, size.impMib));
   const wholeSlots = Math.min(unkeptSlots, slotsIn(impdRoomMib - line.keptMib, size.impMib));

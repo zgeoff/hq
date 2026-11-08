@@ -9,6 +9,7 @@ import type { Command } from '../src/commands.ts';
 import { COMMANDS } from '../src/commands.ts';
 import { lookup } from '../src/lookup.ts';
 import { renderHelp } from '../src/render-help.ts';
+import { findPath } from '../src/test-utils/find-path.ts';
 import { NOON_SYDNEY, at, freshDb } from './helpers.ts';
 
 const root = join(import.meta.dir, '..');
@@ -184,7 +185,7 @@ test('hq run as the entry point answers a command', async () => {
     const text = await new Response(p.stdout).text();
     expect(await p.exited).toBe(0);
     clearTimeout(timer);
-    expect(JSON.parse(text).ok).toBe(true);
+    expect(findPath(JSON.parse(text), 'ok')).toBe(true);
   } finally {
     done();
   }

@@ -1,5 +1,6 @@
 import { Database } from 'bun:sqlite';
 import { HqError } from '../errors.ts';
+import { toErrorMessage } from '../to-error-message.ts';
 
 export function countStoreRows(store: string): Record<string, number> {
   try {
@@ -11,6 +12,6 @@ export function countStoreRows(store: string): Record<string, number> {
       db.close();
     }
   } catch (error) {
-    throw new HqError('store_unreadable', `hq cannot count the rows of the store: ${store}: ${(error as Error).message}`);
+    throw new HqError('store_unreadable', `hq cannot count the rows of the store: ${store}: ${toErrorMessage(error)}`);
   }
 }

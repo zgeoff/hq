@@ -6,6 +6,7 @@ import type { PRRequest } from '../noslop/types.ts';
 import { OWNER } from '../releases/owner.ts';
 import { recordPRGate } from './record-pr-gate.ts';
 import type { PRGateResult } from './record-pr-gate.ts';
+import { toErrorMessage } from '../to-error-message.ts';
 
 export async function checkRecordedGate(request: PRRequest): Promise<GateOutcome> {
   const seen: { head: string | null } = { head: null };
@@ -42,7 +43,7 @@ async function tryRecord(request: PRRequest, result: PRGateResult | null): Promi
     await recordPRGate(request.db, { repo: parsed.repo, pr: request.pr }, result, 'hq');
     return true;
   } catch (error) {
-    console.error(`hq: warning: the gate's ${result.gate} was not written to the PR record of ${request.rawRepo}#${request.pr}: ${(error as Error).message}`);
+    console.error(`hq: warning: the gate's ${result.gate} was not written to the PR record of ${request.rawRepo}#${request.pr}: ${toErrorMessage(error)}`);
     return false;
   }
 }

@@ -1,4 +1,7 @@
+import { readImpd } from '../capacity/read-impd.ts';
+import { parseJSON } from '../noslop/parse-json.ts';
 import type { RunResult, Runner } from '../runner/types.ts';
+import { CapacitySchema } from './capacity-schema.ts';
 import { LANES } from './lanes.ts';
 import { loadPacing } from './load-pacing.ts';
 import { pacingPath } from './pacing-path.ts';
@@ -6,9 +9,21 @@ import type { Capacity, Sample } from './types.ts';
 
 export async function readCapacity(run: Runner): Promise<Sample> {
   const pacing = await loadPacing(pacingPath());
-  const ran = await run(['bash', LANES.capacityScript()]);
+  const [ran, live] = await Promise.all([run(['bash', LANES.capacityScript()]), readImpd({ run })]);
   const read = parseCapacityRun(ran);
-  return { cap: read.cap, impMib: pacing.impMib, lanes: pacing.lanes, slots: pacing.slots, placeTypes: pacing.placeTypes, localRoom: pacing.localRoom, design: pacing.design, designError: pacing.designError, error: read.cap === null ? read.error : pacing.error };
+  return {
+    cap: read.cap,
+    impMib: pacing.impMib,
+    lanes: pacing.lanes,
+    slots: pacing.slots,
+    placeTypes: pacing.placeTypes,
+    localRoom: pacing.localRoom,
+    design: pacing.design,
+    designError: pacing.designError,
+    impd: live.error === null ? live.impd : null,
+    impdError: live.error,
+    error: read.cap === null ? read.error : pacing.error,
+  };
 }
 
 interface CapacityRead {
@@ -33,9 +48,6 @@ function parseCapacityRun(ran: RunResult): CapacityRead {
 }
 
 function parseCapacity(stdout: string): Capacity | null {
-  try {
-    return JSON.parse(stdout) as Capacity;
-  } catch {
-    return null;
-  }
+  const parsed = CapacitySchema.safeParse(parseJSON(stdout));
+  return parsed.success ? parsed.data : null;
 }

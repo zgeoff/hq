@@ -1,7 +1,6 @@
 import type { Database } from 'bun:sqlite';
 import { iso } from '../clock/iso.ts';
 import { now } from '../clock/now.ts';
-import type { IssueType } from '../linear/issue-types.ts';
 import { sydneyUtc } from '../morning/sydney-utc.ts';
 import { sydney } from '../morning/sydney.ts';
 import { buildRowSchema } from '../db/build-row-schema.ts';
@@ -19,12 +18,14 @@ import { readFetchedDays } from './read-fetched-days.ts';
 import { toUTCDay as utcDay } from './to-utc-day.ts';
 import { TYPE_COLS } from './type-cols.ts';
 import type { KindWeek } from './types.ts';
+import { buildRecord } from '../build-record.ts';
 
 const KindCountSchema = CountSchema.extend({ kind: buildRowSchema('merged_prs').shape.kind });
 const TypeCountSchema = CountSchema.extend({ type: buildRowSchema('linear_issues').shape.type.nullable() });
 const ClosedCountSchema = CountSchema.extend({ state: buildRowSchema('linear_issues').shape.state, type: buildRowSchema('linear_issues').shape.type });
 
-const zeroTypes = () => Object.fromEntries(TYPE_COLS.map((t) => [t, 0])) as Record<IssueType, number>;
+const ALL_KINDS: readonly Kind[] = [...KINDS, 'other'];
+
 const pct = (a: number, b: number) => (b ? Math.round((a / b) * 1000) / 10 : null);
 
 export function kindWeeks(db: Database, weeks: number, at: Date = now()): KindWeek[] {
@@ -41,7 +42,7 @@ export function kindWeeks(db: Database, weeks: number, at: Date = now()): KindWe
       db,
       kdb(db)
         .selectFrom('merged_prs')
-        .select((eb) => ['kind', eb.fn.countAll<number>().as('count')])
+        .select((eb) => ['kind', eb.fn.countAll().as('count')])
         .where('merged_at', '>=', from)
         .where('merged_at', '<', to)
         .where('repo', 'in', IN_SCOPE)
@@ -49,7 +50,7 @@ export function kindWeeks(db: Database, weeks: number, at: Date = now()): KindWe
         .compile(),
       KindCountSchema,
     );
-    const kinds = Object.fromEntries([...KINDS, 'other'].map((k) => [k, 0])) as Record<Kind, number>;
+    const kinds = buildRecord(ALL_KINDS, () => 0);
     for (const row of rows) {
       if (isKind(row.kind)) {
         kinds[row.kind] = row.count;
@@ -67,7 +68,7 @@ export function kindWeeks(db: Database, weeks: number, at: Date = now()): KindWe
       kdb(db)
         .selectFrom('merged_prs as p')
         .leftJoin('linear_issues as l', 'l.issue', 'p.issue')
-        .select((eb) => ['l.type as type', eb.fn.countAll<number>().as('count')])
+        .select((eb) => ['l.type as type', eb.fn.countAll().as('count')])
         .where('p.merged_at', '>=', from)
         .where('p.merged_at', '<', to)
         .where('p.repo', 'in', IN_SCOPE)
@@ -88,7 +89,7 @@ export function kindWeeks(db: Database, weeks: number, at: Date = now()): KindWe
       db,
       kdb(db)
         .selectFrom('linear_issues')
-        .select((eb) => ['state', 'type', eb.fn.countAll<number>().as('count')])
+        .select((eb) => ['state', 'type', eb.fn.countAll().as('count')])
         .where('state', '!=', 'open')
         .where('closed_at', '>=', from)
         .where('closed_at', '<', to)
@@ -123,4 +124,8 @@ export function kindWeeks(db: Database, weeks: number, at: Date = now()): KindWe
     mon = sydneyUtc(s.y, s.mo, s.d - 7);
   }
   return out.reverse();
+}
+
+function zeroTypes() {
+  return buildRecord(TYPE_COLS, () => 0);
 }

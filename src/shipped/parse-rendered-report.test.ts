@@ -1,13 +1,17 @@
 import { expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { z } from 'zod';
 import { parseRenderedReport } from './parse-rendered-report.ts';
 
 const FIXTURES = join(import.meta.dir, '../../skills/delivery-report/scripts/testdata/render-report');
 
 test.each(['daily.json.expected', 'weekly.json.expected'])('the skill\'s own %s reads whole', (file) => {
   const body = readFileSync(join(FIXTURES, file), 'utf8');
-  const raw: { groups: { rows: { prs: unknown[] }[] }[] } = JSON.parse(body);
+  const rowSchema = z.object({ prs: z.array(z.unknown()) });
+  const groupSchema = z.object({ rows: z.array(rowSchema) });
+  const parsed: unknown = JSON.parse(body);
+  const raw = z.object({ groups: z.array(groupSchema) }).parse(parsed);
   const read = parseRenderedReport(body);
   expect(collectPRs(read.groups)).toStrictEqual(collectPRs(raw.groups));
 });
@@ -17,6 +21,8 @@ function collectPRs(groups: readonly { rows: readonly { prs: readonly unknown[] 
 }
 
 test('a report in another shape is refused, naming the fields', () => {
-  const daily = JSON.parse(readFileSync(join(FIXTURES, 'daily.json.expected'), 'utf8')) as Record<string, unknown>;
+  const text = readFileSync(join(FIXTURES, 'daily.json.expected'), 'utf8');
+  const daily = z.record(z.string(), z.unknown()).parse(JSON.parse(text));
+
   expect(() => parseRenderedReport(JSON.stringify({ ...daily, kind: 'monthly', groups: [{ project: 'Lantern Garden' }] }))).toThrow('render-report.sh printed an unexpected shape: kind, groups.0.issues, groups.0.prs, groups.0.burndown, groups.0.rows');
 });

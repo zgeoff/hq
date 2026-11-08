@@ -1,3 +1,4 @@
+import { isOneOf } from '@zgeoff/std';
 import { ok } from 'node:assert/strict';
 import type { Database } from 'bun:sqlite';
 import { iso } from '../clock/iso.ts';
@@ -13,7 +14,9 @@ import { TAG_RE } from './tag-re.ts';
 import type { AddNewsInput, NewsItem } from './types.ts';
 
 export function addNews(db: Database, input: AddNewsInput): NewsItem {
-  if (!(NEWS_TOPICS as readonly string[]).includes(input.topic)) throw new HqError('bad_args', `--topic must be one of ${NEWS_TOPICS.join(', ')}`);
+  if (!isOneOf(input.topic, NEWS_TOPICS)) {
+    throw new HqError('bad_args', `--topic must be one of ${NEWS_TOPICS.join(', ')}`);
+  }
   const text = input.text.trim();
   if (!text) throw new HqError('bad_args', '--text is empty');
   if (/[\r\n]/.test(text)) throw new HqError('bad_args', '--text must be one line');

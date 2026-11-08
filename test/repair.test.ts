@@ -6,6 +6,7 @@ import { planRepair } from '../src/repair/plan-repair.ts';
 import { repairAdvisor400 } from '../src/repair/repair-advisor400.ts';
 import { repairedText } from '../src/repair/repaired-text.ts';
 import { transcriptPath } from '../src/repair/transcript-path.ts';
+import { findParentUUID as parentOf } from '../src/test-utils/find-parent-uuid.ts';
 import { fakeAtc, type FakeAtc } from './helpers.ts';
 
 const U = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
@@ -16,12 +17,24 @@ const asst = (uuid: string, parent: string, msg: string, content: unknown[]) => 
 const att = (uuid: string, parent: string) => ({ parentUuid: parent, ...base, type: 'attachment', attachment: { type: 'note', text: 'a reminder' }, uuid });
 const lines = (recs: object[]) => recs.map((r) => JSON.stringify(r)).join('\n') + '\n';
 
-const [R, A1, A2, I1, A3, A4, A5, T1, AT1, A6, I2] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map(U) as [string, string, string, string, string, string, string, string, string, string, string];
+/* oxlint-disable zgeoff/setup-test-only -- the transcript builder below and every test name the same records by these uuids */
+const ROOT = '00000000-0000-4000-8000-000000000001';
+const A1 = '00000000-0000-4000-8000-000000000002';
+const A2 = '00000000-0000-4000-8000-000000000003';
+const I1 = '00000000-0000-4000-8000-000000000004';
+const A3 = '00000000-0000-4000-8000-000000000005';
+const A4 = '00000000-0000-4000-8000-000000000006';
+const A5 = '00000000-0000-4000-8000-000000000007';
+const T1 = '00000000-0000-4000-8000-000000000008';
+const AT1 = '00000000-0000-4000-8000-000000000009';
+const A6 = '00000000-0000-4000-8000-000000000010';
+const I2 = '00000000-0000-4000-8000-000000000011';
+/* oxlint-enable zgeoff/setup-test-only */
 
 function broken(opts: { two?: boolean; noTool?: boolean } = {}): object[] {
   const out: object[] = [
-    user(R, null, 'Please check the widget count.'),
-    asst(A1, R, 'msg_1', [{ type: 'thinking', thinking: 'Count them.' }]),
+    user(ROOT, null, 'Please check the widget count.'),
+    asst(A1, ROOT, 'msg_1', [{ type: 'thinking', thinking: 'Count them.' }]),
     asst(A2, A1, 'msg_1', [{ type: 'server_tool_use', id: 'srvtoolu_1', name: 'advisor', input: {} }]),
     user(I1, A2, [{ type: 'text', text: 'A note from a teammate: the count changed.' }], { isMeta: true, origin: 'plugin' }),
   ];
@@ -42,8 +55,6 @@ function broken(opts: { two?: boolean; noTool?: boolean } = {}): object[] {
   out.push({ type: 'last-prompt', lastPrompt: 'Please check the widget count.', leafUuid: A6, sessionId: SID });
   return out;
 }
-
-const parentOf = (text: string, uuid: string) => text.split('\n').filter(Boolean).map((l) => JSON.parse(l) as { uuid?: string; parentUuid?: string }).find((o) => o.uuid === uuid)!.parentUuid;
 
 test('re-links the advisor result to its use and moves the interloper after the turn', () => {
   const text = lines(broken());
@@ -84,7 +95,8 @@ test('a healthy transcript, and a split off the live branch, are left alone', ()
   healthy[3] = { ...healthy[3], parentUuid: T1 };
   healthy[8] = { ...healthy[8], parentUuid: I1 };
   expect(planRepair(lines(healthy)).changes).toEqual([]);
-  const forked = [...broken().slice(0, -1), user(U(20), R, 'Start again.'), asst(U(21), U(20), 'msg_9', [{ type: 'text', text: 'Fresh start.' }])];
+  const restart = '00000000-0000-4000-8000-000000000020';
+  const forked = [...broken().slice(0, -1), user(restart, ROOT, 'Start again.'), asst('00000000-0000-4000-8000-000000000021', restart, 'msg_9', [{ type: 'text', text: 'Fresh start.' }])];
   const plan = planRepair(lines(forked));
   expect(plan.changes).toEqual([]);
   expect(plan.offBranch).toEqual([A3]);
@@ -119,13 +131,8 @@ afterEach(() => {
   rmSync(dir, { recursive: true, force: true });
 });
 
-function withAtc(sessions: object[]): void {
-  const list: never[] = sessions as never[];
-  atc = fakeAtc(dir, list);
-}
-
 test('--file: a dry run writes nothing; --apply backs up, writes, and passes its check', async () => {
-  withAtc([{ id: 'id-other', name: 'z-other', alive: true, state: 'done', agentSessionID: 'aaaa' }]);
+  atc = fakeAtc(dir, [{ id: 'id-other', name: 'z-other', alive: true, state: 'done', agentSessionID: 'aaaa' }]);
   const file = join(dir, `${SID}.jsonl`);
   const text = lines(broken());
   writeFileSync(file, text);
@@ -151,7 +158,7 @@ test('--file: a dry run writes nothing; --apply backs up, writes, and passes its
 test('refuses a transcript a live session holds, and a session that is running or not on this machine', async () => {
   const file = join(dir, `${SID}.jsonl`);
   writeFileSync(file, lines(broken()));
-  withAtc([
+  atc = fakeAtc(dir, [
     { id: 'id-live', name: 'z-live', alive: true, state: 'running', agent: 'claude', agentSessionID: SID, cwd: '/work/widgets', locator: { targetID: 'local' } },
     { id: 'id-cloud', name: 'z-cloud', alive: false, state: 'exited', agent: 'claude', agentSessionID: 'c1', cwd: '/root/w', locator: { targetID: 'cloud' } },
     { id: 'id-dup', name: 'twin', alive: false, state: 'exited' },
@@ -167,7 +174,7 @@ test('refuses a transcript a live session holds, and a session that is running o
 });
 
 test('a stopped local session: hq finds its transcript from atc\'s cwd and Claude session id', async () => {
-  withAtc([{ id: 'id-stopped', name: 'z-stopped', alive: false, state: 'exited', agent: 'claude', agentSessionID: SID, cwd: '/work/my.widgets', locator: { targetID: 'local' } }]);
+  atc = fakeAtc(dir, [{ id: 'id-stopped', name: 'z-stopped', alive: false, state: 'exited', agent: 'claude', agentSessionID: SID, cwd: '/work/my.widgets', locator: { targetID: 'local' } }]);
   const file = transcriptPath('/work/my.widgets', SID);
   expect(file).toBe(`${dir}/projects/-work-my-widgets/${SID}.jsonl`);
   mkdirSync(`${dir}/projects/-work-my-widgets`, { recursive: true });
@@ -189,13 +196,13 @@ test('without atc, hq refuses: it cannot tell the session is stopped', async () 
 
 test('review follow-ups: a dangling parent, a long run of interlopers, and a turn that ends the transcript', () => {
   const dangling = broken();
-  (dangling[1] as { parentUuid: string }).parentUuid = U(77);
+  dangling[1] = { ...dangling[1], parentUuid: '00000000-0000-4000-8000-000000000077' };
   expect(() => planRepair(lines(dangling))).toThrow(`names a parent ${U(77)} that is not in the transcript`);
 
   const recs = broken();
   const notes = Array.from({ length: 25 }, (_, k) => user(U(100 + k), k ? U(99 + k) : A2, [{ type: 'text', text: `Note ${k}.` }], { isMeta: true }));
   recs.splice(3, 1, ...notes);
-  (recs[3 + 25] as { parentUuid: string }).parentUuid = U(124);
+  recs[3 + 25] = { ...recs[3 + 25], parentUuid: '00000000-0000-4000-8000-000000000124' };
   const plan = planRepair(lines(recs));
   expect(plan.splits[0]!.interlopers).toHaveLength(25);
   const fixed = repairedText(plan);
@@ -207,7 +214,7 @@ test('review follow-ups: a dangling parent, a long run of interlopers, and a tur
 });
 
 test('review follow-ups: a stopped session whose transcript a live session holds, and a shortened project folder', async () => {
-  withAtc([
+  atc = fakeAtc(dir, [
     { id: 'id-old', name: 'z-old', alive: false, state: 'exited', agent: 'claude', agentSessionID: SID, cwd: '/work/widgets', locator: { targetID: 'local' } },
     { id: 'id-new', name: 'z-new', alive: true, state: 'running', agent: 'claude', agentSessionID: SID, cwd: '/work/widgets', locator: { targetID: 'local' } },
   ]);

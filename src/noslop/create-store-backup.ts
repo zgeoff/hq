@@ -1,6 +1,7 @@
 import { Database } from 'bun:sqlite';
 import { rmSync } from 'node:fs';
 import { HqError } from '../errors.ts';
+import { toErrorMessage } from '../to-error-message.ts';
 
 export function createStoreBackup(store: string, shortSha: string, stamp: string): string {
   const backup = `${store}.bak-${shortSha}-${stamp}`;
@@ -12,7 +13,7 @@ export function createStoreBackup(store: string, shortSha: string, stamp: string
       source.close();
     }
   } catch (error) {
-    throw new HqError('store_unreadable', `hq cannot back up the store ${store}: ${(error as Error).message}`);
+    throw new HqError('store_unreadable', `hq cannot back up the store ${store}: ${toErrorMessage(error)}`);
   }
   return requireIntact(backup, store);
 }

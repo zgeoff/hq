@@ -4,13 +4,15 @@ import type { Database } from 'bun:sqlite';
 import assert from 'node:assert';
 import { applyHealth } from '../src/health/apply-health.ts';
 import { HEALTH_DEFAULTS } from '../src/health/health-defaults.ts';
+import { healthSamples } from '../src/health/health-samples.ts';
 import { healthSettings } from '../src/health/health-settings.ts';
 import { runChecks } from '../src/health/run-checks.ts';
 import { setHealthSetting } from '../src/health/set-health-setting.ts';
 import type { Probe } from '../src/health/types.ts';
 import { listNews } from '../src/news/list-news.ts';
+import { readOutboxRows } from '../src/outbox/read-outbox-rows.ts';
 import { probeHealth } from '../src/probe/probe-health.ts';
-import type { Runner } from '../src/runner/types.ts';
+import type { RunResult, Runner } from '../src/runner/types.ts';
 import { NOON_SYDNEY, at, freshDb } from './helpers.ts';
 import { COMMAND_TIMEOUT_MS } from '../src/health/command-timeout-ms.ts';
 
@@ -52,6 +54,7 @@ function probe(w: World): Probe {
   };
   return {
     run,
+    commandTimeoutMs: COMMAND_TIMEOUT_MS,
     readFile: async (p) => (p.endsWith('pressure/memory') ? `some avg10=0.00 avg60=${w.memSome60} avg300=0.00 total=1\nfull avg10=0 avg60=0 avg300=0 total=1` : 'MemTotal: 1000000 kB\nMemAvailable: 500000 kB'),
     atcAnswers: async () => w.atc,
     home: '/home/someone',
@@ -60,31 +63,30 @@ function probe(w: World): Probe {
 
 async function step(w: World, minute: number) {
   at(new Date(Date.parse(NOON_SYDNEY) + minute * 60_000).toISOString());
-  const prev = JSON.parse((db.query("SELECT value FROM meta WHERE key = 'health_samples'").get() as { value: string } | null)?.value ?? '{}');
-  const { checks, samples, unknown } = await runChecks(probe(w), healthSettings(db), prev, new Date(Date.parse(NOON_SYDNEY) + minute * 60_000));
-  return applyHealth(db, checks, samples, 'hq-lanes', unknown);
+  const checked = await runChecks(probe(w), healthSettings(db), healthSamples(db), new Date(Date.parse(NOON_SYDNEY) + minute * 60_000));
+  return applyHealth(db, checked.checks, checked.samples, 'hq-lanes', checked.unknown);
 }
-const outbox = () => db.query('SELECT target, text FROM outbox').all() as { target: string; text: string }[];
 
 test('all clear sends nothing', async () => {
   const r = await step(world(), 0);
   expect(r.checks.every((c) => c.ok)).toBe(true);
-  expect(outbox()).toHaveLength(0);
+  expect(readOutboxRows(db)).toHaveLength(0);
 });
 
 test('a new problem tells z-stu once, in one message per tick; clearing files news', async () => {
   await step(world({ failedUser: ['teapot.service', 'run-r123.service'], availBytes: 2 * 2 ** 30 }), 0);
-  expect(outbox()).toHaveLength(1);
-  const m = outbox()[0]!;
-  expect(m.target).toBe('z-stu');
-  expect(m.text).toContain('2 new problems');
-  expect(m.text).toContain('user unit teapot.service has failed');
-  expect(m.text).toContain('disk /: 2.0 GiB free');
-  expect(m.text).not.toContain('run-r123');
+  expect(readOutboxRows(db)).toHaveLength(1);
+  const [message] = readOutboxRows(db);
+  assert.ok(message);
+  expect(message.target).toBe('z-stu');
+  expect(message.text).toContain('2 new problems');
+  expect(message.text).toContain('user unit teapot.service has failed');
+  expect(message.text).toContain('disk /: 2.0 GiB free');
+  expect(message.text).not.toContain('run-r123');
   await step(world({ failedUser: ['teapot.service'], availBytes: 2 * 2 ** 30 }), 5);
-  expect(outbox()).toHaveLength(1);
+  expect(readOutboxRows(db)).toHaveLength(1);
   await step(world(), 10);
-  expect(outbox()).toHaveLength(1);
+  expect(readOutboxRows(db)).toHaveLength(1);
   expect(listNews(db, { all: false, limit: 10 }).map((n) => n.text)).toEqual([
     expect.stringContaining('Cleared: user unit teapot.service has failed'),
     expect.stringContaining('Cleared: disk /'),
@@ -94,7 +96,7 @@ test('a new problem tells z-stu once, in one message per tick; clearing files ne
 test('a restart loop trips on restarts gained inside the window, and clears when it stops', async () => {
   await step(world({ restarts: { 'kettle.service': 100 } }), 0);
   await step(world({ restarts: { 'kettle.service': 103 } }), 5);
-  expect(outbox()).toHaveLength(0);
+  expect(readOutboxRows(db)).toHaveLength(0);
   const r = await step(world({ restarts: { 'kettle.service': 106 } }), 10);
   expect(r.opened.map((c) => c.line)).toEqual(['user unit kettle.service is restart-looping: 6 restarts in 30 min (NRestarts 106)']);
   const r2 = await step(world({ restarts: { 'kettle.service': 106 } }), 36);
@@ -121,12 +123,12 @@ test('settings change thresholds and refuse nonsense; checks only read', async (
 
 test('a failed read neither clears open problems nor drops restart samples', async () => {
   await step(world({ failedUser: ['teapot.service'], availBytes: 2 * 2 ** 30, restarts: { 'kettle.service': 100 } }), 0);
-  expect(outbox()).toHaveLength(1);
+  expect(readOutboxRows(db)).toHaveLength(1);
   const r = await step(world({ broken: true }), 5);
   expect(r.cleared).toEqual([]);
   expect(r.opened.map((check) => check.key).toSorted()).toEqual(['disk', 'restarts:system', 'restarts:user', 'systemd:system', 'systemd:user']);
   await step(world({ failedUser: ['teapot.service'], availBytes: 2 * 2 ** 30, restarts: { 'kettle.service': 106 } }), 10);
-  const texts = outbox().map((m) => m.text);
+  const texts = readOutboxRows(db).map((row) => row.text);
   expect(texts.filter((text) => text.includes('teapot.service'))).toHaveLength(1);
   expect(texts.at(-1)).toContain('kettle.service is restart-looping');
 });
@@ -141,12 +143,12 @@ test('it asks the owning session of an oversized state file first, then z-stu on
 
   await tick(0);
   await tick(119);
-  const beforeDeadline = outbox().map((message) => message.target);
+  const beforeDeadline = readOutboxRows(db).map((message) => message.target);
   await tick(120);
   await tick(180);
 
   expect(beforeDeadline).toStrictEqual(['z-kettle']);
-  expect(outbox()).toStrictEqual([
+  expect(readOutboxRows(db).map((row) => ({ target: row.target, text: row.text }))).toStrictEqual([
     { target: 'z-kettle', text: 'hq health: state file kettle.md is 20.0 KB, over its 16 KB limit. It is yours to fix: trim it. If it still fails in 2 hours, hq tells z-stu as Needs Geoff.' },
     {
       target: 'z-stu',
@@ -168,7 +170,7 @@ test('it never tells z-stu about an oversized state file fixed inside 2 hours', 
   const cleared = await tick(30, fixed);
   await tick(150, fixed);
 
-  expect(outbox().map((message) => message.target)).toStrictEqual(['z-kettle']);
+  expect(readOutboxRows(db).map((message) => message.target)).toStrictEqual(['z-kettle']);
   expect(cleared.cleared.map((item) => item.key)).toStrictEqual(['state-size:kettle.md']);
 });
 
@@ -179,7 +181,7 @@ test('it does not escalate a state-file problem opened before owners existed', a
   const result = await runChecks({ ...probe(world()), stateSizes: () => over }, healthSettings(db), {}, new Date(NOON_SYDNEY));
   applyHealth(db, result.checks, result.samples, 'hq-lanes', result.unknown);
 
-  expect(outbox()).toStrictEqual([]);
+  expect(readOutboxRows(db)).toStrictEqual([]);
 });
 
 test('it reports a failed memory-pressure read as a problem', async () => {
@@ -214,18 +216,12 @@ test('it reports a failed restart-count read as a problem, not as no restart loo
 
 test('a command that hangs counts as a failed read', async () => {
   const p = probe(world());
-  const hang: Probe = { ...p, run: async (cmd) => (cmd[0] === 'df' ? new Promise(() => {}) : p.run(cmd)) };
+  const hang: Probe = { ...p, commandTimeoutMs: 10, run: (cmd) => (cmd[0] === 'df' ? new Promise<RunResult>(() => {}) : p.run(cmd)) };
+
+  const result = await runChecks(hang, healthSettings(db), {}, new Date(NOON_SYDNEY));
+
   expect(COMMAND_TIMEOUT_MS).toBeLessThanOrEqual(20_000);
-  const started = Date.now();
-  const orig = setTimeout;
-  (globalThis as { setTimeout: unknown }).setTimeout = ((fn: () => void, _ms: number) => orig(fn, 10)) as typeof setTimeout;
-  try {
-    const { unknown } = await runChecks(hang, healthSettings(db), {}, new Date(NOON_SYDNEY));
-    expect(unknown).toContain('disk:');
-  } finally {
-    (globalThis as { setTimeout: unknown }).setTimeout = orig;
-  }
-  expect(Date.now() - started).toBeLessThan(5_000);
+  expect(result.unknown).toContain('disk:');
 });
 
 test('a stale or failing backup is a problem once hq backup has run', async () => {

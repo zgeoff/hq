@@ -47,6 +47,7 @@ import { isHeldPastShip } from './is-held-past-ship.ts';
 import { readHeldAt } from './read-held-at.ts';
 import { readActiveSession } from '../runs/read-active-session.ts';
 import type { PrState, Release, ShipMove, ShipResult, Source } from './types.ts';
+import { toErrorMessage } from '../to-error-message.ts';
 
 const CompareSchema = z.object({ status: z.unknown() });
 const PRViewSchema = z.object({ mergeCommit: z.object({ oid: z.unknown() }).nullish() });
@@ -87,7 +88,7 @@ export async function shipRuns(db: Database, run: Runner, at: Date = now(), opts
       return list;
     } catch (e) {
       failedRepos.add(repo);
-      err(`${repo}: ${(e as Error).message}`);
+      err(`${repo}: ${toErrorMessage(e)}`);
       return null;
     }
   };
@@ -189,7 +190,7 @@ export async function shipRuns(db: Database, run: Runner, at: Date = now(), opts
           res.shippedPrs++;
         }
       } catch (e) {
-        err(`${ref}: ${(e as Error).message}`);
+        err(`${ref}: ${toErrorMessage(e)}`);
       }
     }
   }
@@ -287,15 +288,18 @@ async function readTaggedReleases(run: Runner, repo: string, tag: RegExp): Promi
   return parseReleases(raw, tag);
 }
 
+const TagRefSchema = z.object({ object: z.object({ sha: z.string() }) });
+
 async function readMovingTag(run: Runner, repo: string, ref: string, at: Date): Promise<Release[]> {
   const out = await gh(run, ['api', `repos/${OWNER}/${repo}/git/ref/tags/${ref}`], `tag ${ref} of ${repo}`);
-  let raw: { object?: { sha?: unknown } } | null;
+  let raw: unknown;
   try {
     raw = JSON.parse(out);
   } catch {
     throw new HqError('bad_releases', `tag ${ref} of ${repo} is not JSON`);
   }
-  if (typeof raw?.object?.sha !== 'string' || !HEX40.test(raw.object.sha)) {
+  const sha = TagRefSchema.safeParse(raw).data?.object.sha;
+  if (sha === undefined || !HEX40.test(sha)) {
     throw new HqError('bad_releases', `tag ${ref} of ${repo} has no commit`);
   }
   return [{ tag: ref, at: iso(at) }];

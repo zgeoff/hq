@@ -13,7 +13,7 @@ import { findAlerts } from './find-alerts.ts';
 import type { WrapUpDeps } from './run-wrap-up.ts';
 import { sweep } from './sweep.ts';
 import { SWEEP_MINUTES as SWEEP } from './sweep-minutes.ts';
-import { toMessage } from './to-message.ts';
+import { toErrorMessage } from '../to-error-message.ts';
 import type { Alert } from './types.ts';
 import { watchlist } from './watchlist.ts';
 import { shareClient, wrapUpMergedRuns } from './wrap-up-merged-runs.ts';
@@ -67,7 +67,7 @@ async function endHandedInRunSessionsSafely(db: Database, atc: AtcView, options:
       ...(options.readIssueDescription === undefined ? {} : { holds: { readIssueDescription: options.readIssueDescription, log: options.log } }),
     });
   } catch (error) {
-    options.log(`handed-in session end failed: ${toMessage(error)}`);
+    options.log(`handed-in session end failed: ${toErrorMessage(error)}`);
   }
 }
 
@@ -75,7 +75,7 @@ async function wrapUpMergedRunsSafely(db: Database, options: SweepOptions): Prom
   try {
     await wrapUpMergedRuns(db, options.wrapUpDeps, { actor: options.actor });
   } catch (error) {
-    options.log(`merged-run wrap-up failed: ${toMessage(error)}`);
+    options.log(`merged-run wrap-up failed: ${toErrorMessage(error)}`);
   }
 }
 
@@ -83,6 +83,6 @@ async function wrapUpPartSessionsSafely(db: Database, deps: WrapUpDeps, atc: Atc
   try {
     await wrapUpPartSessions(db, deps, atc, { actor: options.actor, log: options.log, nowMs: now().getTime(), quietMs: SWEEP.quietMinutes() * 60_000 });
   } catch (error) {
-    options.log(`part-session wrap-up failed: ${toMessage(error)}`);
+    options.log(`part-session wrap-up failed: ${toErrorMessage(error)}`);
   }
 }

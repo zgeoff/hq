@@ -4,6 +4,9 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdirSync, symlinkSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { z } from 'zod';
+import { AtcClient } from '../src/atc/atc-client.ts';
+import { makeFleetClient } from '../src/fleet/make-fleet-client.ts';
+import { startStubAtcDaemon } from './start-stub-atc-daemon.ts';
 import { claimMissing } from '../src/fleet/claim-missing.ts';
 import { checkRcMarker } from '../src/fleet/check-rc-marker.ts';
 import { claimTyping } from '../src/fleet/claim-typing.ts';
@@ -262,8 +265,12 @@ test('a renamed live session or an asleep one is not duplicated; a bad list spaw
   expect(steps[0]!.detail).toContain('now named kettle renamed');
   expect(later[1]!.detail).toContain('asleep or restoring');
   expect(spawns).toHaveLength(0);
-  const bad: FleetClient = { ...client, sessions: async () => undefined as unknown as FleetSession[] };
-  await expect(ensureFleet(ctx.db, bad, { dryRun: false, actor: 'hq-fleet', fleet: ctx.fleet })).rejects.toThrow('spawning nothing');
+  const stub = startStubAtcDaemon(`${ctx.directory}/atc.sock`, { 'session.list': () => ({}) });
+  onTestFinished(stub.stop);
+  const peer = await AtcClient.open(stub.path);
+  onTestFinished(() => peer.close());
+  await expect(ensureFleet(ctx.db, makeFleetClient(peer), { dryRun: false, actor: 'hq-fleet', fleet: ctx.fleet })).rejects.toMatchObject({ code: 'bad_atc_answer' });
+  expect(stub.requests.map((request) => request.method)).not.toContain('session.spawn');
 });
 
 test('a known id missing from the list waits 30 minutes, and comes back without a spawn', async () => {

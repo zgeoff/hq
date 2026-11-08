@@ -1,6 +1,7 @@
 import type { SessionInfo } from '../atc/session-schema.ts';
-import type { HqTables } from '../db/hq-columns.ts';
+import type { z } from 'zod';
 import type { BY } from './by.ts';
+import type { RefusalRowSchema } from './refusal-row-schema.ts';
 
 export interface ScanOptions {
   dir?: string;
@@ -34,14 +35,13 @@ export interface Found {
   reason: string | null;
 }
 
-// oxlint-disable-next-line typescript/no-explicit-any -- a transcript record is untyped JSON read field by field
-export type Obj = Record<string, any>;
+export type Obj = Record<string, unknown>;
 
 export interface Tool {
   name: string;
   input: string | null;
 }
 
-export type RefusalRow = Omit<HqTables['refusals'], 'scanned_at'>;
+export type RefusalRow = z.output<typeof RefusalRowSchema>;
 
 export type By = (typeof BY)[number];
