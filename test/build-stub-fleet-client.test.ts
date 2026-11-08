@@ -25,6 +25,18 @@ test('a forget answers the scripted answers for its session in turn, then forget
   expect(fleet.calls).toStrictEqual(['forget 0000a001', 'forget 0000a001 token-kettle', 'forget 0000a001', 'forget 0000a002']);
 });
 
+test('it answers a live forget with the answers scripted for its session after the client was built', async () => {
+  const forgets: Record<string, { forgotten: boolean; confirmToken?: string }[]> = {};
+  const fleet = buildStubFleetClient({ sessions: [], forgets });
+  forgets['0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa'] = [{ forgotten: false, confirmToken: 'token-kettle' }];
+
+  const first = await fleet.client.forgetLive('0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+  const second = await fleet.client.forgetLive('0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'token-kettle');
+
+  expect([first, second]).toStrictEqual([{ forgotten: false, confirmToken: 'token-kettle' }, { forgotten: true }]);
+  expect(forgets['0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa']).toHaveLength(1);
+});
+
 test('a kill of a session atc does not answer fails, and is recorded', async () => {
   const fleet = buildStubFleetClient({ sessions: [], killFailures: ['0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa'] });
 

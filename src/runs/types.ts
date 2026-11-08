@@ -184,3 +184,10 @@ export interface WrapUp {
 }
 
 export type WrapUpPlan = { kind: 'keep'; kept: KeptSession[] } | { kind: 'forget'; destroyImp: boolean };
+
+export interface OrphanEvent {
+  sessionID: string;
+  action: 'session-forgotten' | 'session-kept';
+  data: Record<string, unknown>;
+  line: string;
+}

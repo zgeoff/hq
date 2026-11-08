@@ -23,13 +23,13 @@ export interface IdlePinOptions {
 export async function writeIdlePinReports(db: Database, sessions: readonly SessionInfo[], options: IdlePinOptions): Promise<number> {
   const fleetNames = new Set(getDeclaredSessions().map((declared) => declared.name));
   const fleetIDs = new Set(sessions.filter((session) => fleetNames.has(session.name)).map((session) => session.id));
-  const raw = sessions.filter((session) => session.pinned === true && !fleetIDs.has(session.id));
+  const nonFleetPinnedSessions = sessions.filter((session) => session.pinned === true && !fleetIDs.has(session.id));
   const activity = new Map<string, number | null>();
-  for (const session of raw) {
+  for (const session of nonFleetPinnedSessions) {
     const read = await options.readActivity(session.id);
     activity.set(session.id, read?.lastActivityAt ?? null);
   }
-  const pins = buildPins(raw.map((session) => ({ id: session.id, name: session.name, state: session.state, alive: session.alive, pinned: true })), activity, new Date(options.nowMs));
+  const pins = buildPins(nonFleetPinnedSessions.map((session) => ({ id: session.id, name: session.name, state: session.state, alive: session.alive, pinned: true })), activity, new Date(options.nowMs));
   const lastReportMs = new Map<string, number>();
   for (const pin of pins) {
     const last = readEvents(db, 'hq', pin.id, ['idle-pin-report']).at(-1);

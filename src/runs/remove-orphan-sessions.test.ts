@@ -19,6 +19,7 @@ interface Seeded {
   state: string;
   parent?: string;
   pinned?: boolean;
+  locator?: { targetID: string };
 }
 
 async function setupTest() {
@@ -30,17 +31,21 @@ async function setupTest() {
   const client = await AtcClient.open();
   onTestFinished(() => client.close());
   const fleetSessions: FleetSession[] = [];
-  const fleet = buildStubFleetClient({ sessions: fleetSessions });
+  const forgets: Record<string, { forgotten: boolean; confirmToken?: string }[]> = {};
+  const fleet = buildStubFleetClient({ sessions: fleetSessions, forgets });
   const work: { current: ImpWork; bySession: Map<string, ImpWork> } = { current: { state: 'pushed' }, bySession: new Map() };
+
+  const readWork = (session: FleetSession) => Promise.resolve(work.bySession.get(session.id) ?? work.current);
 
   return {
     db: fresh.db,
     fleet,
+    forgets,
     work,
     sweep: () =>
       sweepNow(fresh.db, client, buildStubGitHubFactsRunner({ views: {} }), {
         actor: 'sweep',
-        wrapUpDeps: { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local session checks no imp')), readLocalWork: (session) => Promise.resolve(work.bySession.get(session.id) ?? work.current) },
+        wrapUpDeps: { openClient: () => Promise.resolve(fleet.client), readImpWork: readWork, readLocalWork: readWork },
         log: () => {},
       }),
     seed: {
@@ -71,7 +76,7 @@ test('it forgets an exited session of a closed run and logs why', async () => {
 
   await ctx.sweep();
 
-  expect(ctx.fleet.calls).toStrictEqual(['kill 0000f001', 'unpin 0000f001', 'forget 0000f001']);
+  expect(ctx.fleet.calls).toStrictEqual(['unpin 0000f001', 'kill 0000f001', 'unpin 0000f001', 'forget 0000f001']);
   expect(readEvents(ctx.db, 'hq', '0000f001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', ['session-forgotten'])).toHaveLength(1);
 });
 
@@ -102,7 +107,7 @@ test('it checks a kept session again more than a day later, and forgets it once 
 
   await ctx.sweep();
 
-  expect(ctx.fleet.calls).toStrictEqual(['kill 0000f001', 'unpin 0000f001', 'forget 0000f001']);
+  expect(ctx.fleet.calls).toStrictEqual(['unpin 0000f001', 'kill 0000f001', 'unpin 0000f001', 'forget 0000f001']);
   expect(readEvents(ctx.db, 'hq', '0000f001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', ['session-forgotten'])).toStrictEqual([
     {
       seq: expect.any(Number),
@@ -156,7 +161,7 @@ test('it forgets an exited child of a fleet session that no run recorded', async
 
   await ctx.sweep();
 
-  expect(ctx.fleet.calls).toStrictEqual(['kill 0000f003', 'unpin 0000f003', 'forget 0000f003']);
+  expect(ctx.fleet.calls).toStrictEqual(['unpin 0000f003', 'kill 0000f003', 'unpin 0000f003', 'forget 0000f003']);
 });
 
 test('it keeps an exited parent that has a live child', async () => {
@@ -183,4 +188,61 @@ test('it keeps an exited parent whose child stays for unpushed work, and forgets
 
   expect(ctx.fleet.calls).toStrictEqual([]);
   expect(readEvents(ctx.db, 'hq', '0000f004-aaaa-4aaa-8aaa-aaaaaaaaaaaa', ['session-kept'])).toHaveLength(1);
+});
+
+test('it keeps a pinned exited session of a closed run without a call to atc or a kept event', async () => {
+  const ctx = await setupTest();
+  updateEnv('HQ_NOW', '2026-11-07T03:00:00Z');
+  ctx.seed.atcSession({ id: '0000f001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: false, state: 'exited', pinned: true }, '2026-11-07T01:00:00Z');
+  ctx.seed.closedRun('GEO-601', '0000f001');
+
+  await ctx.sweep();
+
+  expect(ctx.fleet.calls).toStrictEqual([]);
+  expect(readEvents(ctx.db, 'hq', '0000f001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', ['session-kept'])).toStrictEqual([]);
+});
+
+test('it keeps an exited child of a pinned fleet session without a call to atc or a kept event', async () => {
+  const ctx = await setupTest();
+  updateEnv('HQ_NOW', '2026-11-07T03:00:00Z');
+  ctx.seed.atcSession({ id: '0000f002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'z-stu', alive: true, state: 'done', pinned: true }, '2026-11-07T02:59:00Z');
+  ctx.seed.atcSession({ id: '0000f003-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'helper', alive: false, state: 'exited', parent: '0000f002-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }, '2026-11-07T01:00:00Z');
+
+  await ctx.sweep();
+
+  expect(ctx.fleet.calls).toStrictEqual([]);
+  expect(readEvents(ctx.db, 'hq', '0000f003-aaaa-4aaa-8aaa-aaaaaaaaaaaa', ['session-kept'])).toStrictEqual([]);
+});
+
+test('it forgets an exited imp session of a closed run with its work pushed, destroys the imp, and logs it', async () => {
+  const ctx = await setupTest();
+  updateEnv('HQ_NOW', '2026-11-07T03:00:00Z');
+  ctx.forgets['0000f001-aaaa-4aaa-8aaa-aaaaaaaaaaaa'] = [{ forgotten: false, confirmToken: 'token-kettle' }];
+  ctx.seed.atcSession({ id: '0000f001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: false, state: 'exited', locator: { targetID: 'imp-kettle' } }, '2026-11-07T01:00:00Z');
+  ctx.seed.closedRun('GEO-601', '0000f001');
+
+  await ctx.sweep();
+
+  expect(ctx.fleet.calls).toStrictEqual(['unpin 0000f001', 'forget-live 0000f001', 'forget-live 0000f001 token-kettle']);
+  expect(readEvents(ctx.db, 'hq', '0000f001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', ['session-forgotten'])).toStrictEqual([
+    {
+      seq: expect.any(Number),
+      action: 'session-forgotten',
+      actor: 'sweep',
+      at: '2026-11-07T03:00:00Z',
+      data: JSON.stringify({ name: 'kettle-agent', issue: 'GEO-601', reason: 'exited, with its work pushed and no open run needing it', destroyed: true }),
+    },
+  ]);
+});
+
+test('it forgets an exited parent and its exited child together, the child first', async () => {
+  const ctx = await setupTest();
+  updateEnv('HQ_NOW', '2026-11-07T03:00:00Z');
+  ctx.seed.atcSession({ id: '0000f001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: false, state: 'exited' }, '2026-11-07T01:00:00Z');
+  ctx.seed.atcSession({ id: '0000f004-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-helper', alive: false, state: 'exited', parent: '0000f001-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }, '2026-11-07T01:00:00Z');
+  ctx.seed.closedRun('GEO-601', '0000f001');
+
+  await ctx.sweep();
+
+  expect(ctx.fleet.calls).toStrictEqual(['unpin 0000f001', 'kill 0000f004', 'unpin 0000f004', 'forget 0000f004', 'kill 0000f001', 'unpin 0000f001', 'forget 0000f001']);
 });

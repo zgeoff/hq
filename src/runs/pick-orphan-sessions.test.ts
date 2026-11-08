@@ -29,7 +29,34 @@ test('it picks an exited session of a closed run with the newest run that record
     nowMs: Date.parse('2026-11-07T03:00:00Z'),
   });
 
-  expect(picked).toStrictEqual([{ session: { id: '0000f001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: false, state: 'exited' }, issue: 'GEO-603' }]);
+  expect(picked).toStrictEqual([{ session: { id: '0000f001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: false, state: 'exited' }, issue: 'GEO-603', place: 'local' }]);
+});
+
+test('it picks an exited session on an imp with the imp as its place', () => {
+  const picked = pickOrphanSessions({
+    sessions: [{ id: '0000f001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: false, state: 'exited', locator: { targetID: 'imp-kettle' } }],
+    fleetNames: new Set(),
+    runSessions: [{ sessionID: '0000f001', issue: 'GEO-601', active: false, open: false, ownerChats: false }],
+    lastKeptMs: new Map(),
+    nowMs: Date.parse('2026-11-07T03:00:00Z'),
+  });
+
+  expect(picked.map((orphan) => orphan.place)).toStrictEqual(['imp']);
+});
+
+test.each([
+  ['a pinned fleet session', { id: '0000f002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'z-stu', alive: true, state: 'done', pinned: true }],
+  ['a pinned session of a closed run', { id: '0000f001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: false, state: 'exited', pinned: true }],
+])('it never picks an exited child of %s', (_name, parent) => {
+  const picked = pickOrphanSessions({
+    sessions: [parent, { id: '0000f003-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-helper', alive: false, state: 'exited', parent: parent.id }],
+    fleetNames: new Set(['z-stu']),
+    runSessions: [{ sessionID: '0000f001', issue: 'GEO-601', active: false, open: false, ownerChats: false }],
+    lastKeptMs: new Map(),
+    nowMs: Date.parse('2026-11-07T03:00:00Z'),
+  });
+
+  expect(picked).toStrictEqual([]);
 });
 
 test.each([

@@ -20,7 +20,14 @@ export interface StubFleetClient {
 
 export function buildStubFleetClient(answers: StubFleetAnswers): StubFleetClient {
   const calls: string[] = [];
-  const forgets = new Map(Object.entries(answers.forgets ?? {}).map(([id, list]) => [id, [...list]]));
+
+  // Each session's answers are copied on its first forget, so a test can script them after the build.
+  const forgets = new Map<string, ForgetAnswer[]>();
+  const readNextForget = (id: string) => {
+    const left = forgets.get(id) ?? [...(answers.forgets?.[id] ?? [])];
+    forgets.set(id, left);
+    return left.shift() ?? { forgotten: true };
+  };
   const record = (verb: string, id: string) => {
     calls.push(`${verb} ${id.slice(0, 8)}`);
     return Promise.resolve();
@@ -42,11 +49,11 @@ export function buildStubFleetClient(answers: StubFleetAnswers): StubFleetClient
     forget: async (id, confirmToken) => {
       calls.push(`forget ${id.slice(0, 8)}${confirmToken === undefined ? '' : ` ${confirmToken}`}`);
       await answers.forgetAfter;
-      return forgets.get(id)?.shift() ?? { forgotten: true };
+      return readNextForget(id);
     },
     forgetLive: (id, confirmToken) => {
       calls.push(`forget-live ${id.slice(0, 8)}${confirmToken === undefined ? '' : ` ${confirmToken}`}`);
-      return Promise.resolve(forgets.get(id)?.shift() ?? { forgotten: true });
+      return Promise.resolve(readNextForget(id));
     },
   };
   return { client, calls };

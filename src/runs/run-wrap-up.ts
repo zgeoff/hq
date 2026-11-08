@@ -97,7 +97,7 @@ async function wrapUpTree(pass: TreePass, root: FleetSession): Promise<void> {
     .exhaustive();
 }
 
-interface ForgetDecision {
+export interface ForgetDecision {
   kind: 'forget';
   children: FleetSession[];
   root: FleetSession;
@@ -150,7 +150,7 @@ function reportForget(pass: TreePass, decision: ForgetDecision): void {
   }
 }
 
-async function forgetTree(pass: TreePass, decision: ForgetDecision): Promise<void> {
+export async function forgetTree(pass: Pick<TreePass, 'client' | 'wrapUp'>, decision: ForgetDecision): Promise<void> {
   const children = decision.children;
   const root = decision.root;
 
@@ -181,7 +181,7 @@ async function forgetTree(pass: TreePass, decision: ForgetDecision): Promise<voi
   await removeImpSession(pass, root.id);
 }
 
-async function removeImpSession(pass: TreePass, id: string): Promise<void> {
+async function removeImpSession(pass: Pick<TreePass, 'client' | 'wrapUp'>, id: string): Promise<void> {
   try {
     const forgotten = await forgetImpSession(pass.client, id);
     pass.wrapUp.forgotten.push(id);
