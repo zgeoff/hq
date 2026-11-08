@@ -525,11 +525,18 @@ test('it reads the changed files once when the description lacks the proof and n
   expect(fake.lines().filter((line) => line.includes('/files?'))).toHaveLength(1);
 });
 
-test('it asks no proof of a PR that changes only a skill script, and leaves it to the owner hold', async () => {
+test('it passes a PR that changes only a skill script, with no proof and no owner hold', async () => {
   const ctx = setupTest();
   const fake = buildFakeRunner({ prFiles: { code: 0, stdout: 'skills/kettle/scripts/boil.sh\n', stderr: '' } });
 
-  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: expect.stringContaining('repo instruction files (skills/kettle/scripts/boil.sh)') });
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).resolves.toMatchObject({ mayMerge: true });
+});
+
+test('it passes a PR that changes only a code file in a skills module', async () => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ prFiles: { code: 0, stdout: 'modules/skills/src/read-kettle-skill.ts\n', stderr: '' } });
+
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).resolves.toMatchObject({ mayMerge: true });
 });
 
 test("it asks no proof of a bot's skill PR", async () => {
@@ -958,6 +965,22 @@ test("it holds an agent-kit file in hq through the repo's own CODEOWNERS", async
   const fake = buildFakeRunner({ prFiles: { code: 0, stdout: 'agent-kit/brief.md\n', stderr: '' }, contents: { [`.github/CODEOWNERS?ref=${FAKE_BASE_SHA}`]: { code: 0, stdout: JSON.stringify({ type: 'file', encoding: 'base64', content: codeowners }), stderr: '' } } });
 
   await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'hq', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: expect.stringContaining('owner-held files (agent-kit/brief.md)') });
+});
+
+test("it passes a skill script in hq through the repo's own CODEOWNERS", async () => {
+  const ctx = setupTest();
+  const codeowners = readFileSync(join(import.meta.dir, '..', '..', '.github', 'CODEOWNERS')).toString('base64');
+  const fake = buildFakeRunner({ prFiles: { code: 0, stdout: 'skills/kettle/scripts/boil.sh\n', stderr: '' }, contents: { [`.github/CODEOWNERS?ref=${FAKE_BASE_SHA}`]: { code: 0, stdout: JSON.stringify({ type: 'file', encoding: 'base64', content: codeowners }), stderr: '' } } });
+
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'hq', pr: 7 })).resolves.toMatchObject({ mayMerge: true });
+});
+
+test("it holds a skill's reference file in hq through the repo's own CODEOWNERS", async () => {
+  const ctx = setupTest();
+  const codeowners = readFileSync(join(import.meta.dir, '..', '..', '.github', 'CODEOWNERS')).toString('base64');
+  const fake = buildFakeRunner({ prFiles: { code: 0, stdout: 'skills/kettle/references/descale.md\n', stderr: '' }, contents: { [`.github/CODEOWNERS?ref=${FAKE_BASE_SHA}`]: { code: 0, stdout: JSON.stringify({ type: 'file', encoding: 'base64', content: codeowners }), stderr: '' } } });
+
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'hq', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: expect.stringContaining('(skills/kettle/references/descale.md)') });
 });
 
 test("it holds a grants file in hq through the repo's own CODEOWNERS", async () => {
