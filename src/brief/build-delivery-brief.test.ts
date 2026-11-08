@@ -346,7 +346,7 @@ test('it counts a merged PR as the goal, and asks only for the acceptance a PR c
   });
 
   expect(brief.out.text.split('\n')[0]).toBe(
-    "/goal A PR in zgeoff/kettle for GEO-9001 that is merged, or out of draft with evidence for each acceptance item a PR can show before merge and your own review's findings fixed. First read GEO-9001 with your own Linear access.",
+    "/goal Either a merged PR in zgeoff/kettle for GEO-9001, or one out of draft with evidence for each acceptance item a PR can show before merge and your own review's findings fixed. First read GEO-9001 with your own Linear access.",
   );
   expect(brief.out.text).toContain('the evidence the goal names. Keep the ID');
 });

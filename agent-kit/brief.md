@@ -5,7 +5,7 @@ agent word for word.
 -->
 
 ```text
-/goal A PR in {{repo}} for {{issue_id}} that is merged, or out of draft with evidence for each acceptance item a PR can show before merge and {{goal_review}}{{goal_file}}
+/goal Either a merged PR in {{repo}} for {{issue_id}}, or one out of draft with evidence for each acceptance item a PR can show before merge and {{goal_review}}{{goal_file}}
 
 {{issue}}
 
