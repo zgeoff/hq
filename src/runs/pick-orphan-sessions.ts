@@ -64,7 +64,6 @@ export function pickOrphanSessions(facts: OrphanFacts): OrphanSession[] {
     .map((session) => ({ session, issue: findSessionIssue(facts.runSessions, session.id), place: isOnImp(session, false) ? 'imp' : 'local' }));
 }
 
-// Every ancestor of a session that is not picked, up the whole chain.
 function findBlockedAncestors(byID: ReadonlyMap<string, FleetSession>, unpicked: readonly FleetSession[]): Set<string> {
   const blocked = new Set<string>();
   for (const session of unpicked) {

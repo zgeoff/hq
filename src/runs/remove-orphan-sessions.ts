@@ -20,7 +20,7 @@ export interface OrphanOptions {
   nowMs: number;
 }
 
-export async function removeOrphanSessions(db: Database, deps: WrapUpDeps, sessions: readonly FleetSession[], options: OrphanOptions): Promise<string[]> {
+export async function removeOrphanSessions(db: Database, deps: WrapUpDeps, sessions: readonly FleetSession[], options: OrphanOptions): Promise<void> {
   const picked = pickOrphanSessions({
     sessions,
     fleetNames: new Set(getDeclaredSessions().map((declared) => declared.name)),
@@ -29,7 +29,7 @@ export async function removeOrphanSessions(db: Database, deps: WrapUpDeps, sessi
     nowMs: options.nowMs,
   });
   if (picked.length === 0) {
-    return [];
+    return;
   }
   const readers = { imp: deps.readImpWork, local: deps.readLocalWork };
   const checked: CheckedOrphan[] = [];
@@ -39,10 +39,9 @@ export async function removeOrphanSessions(db: Database, deps: WrapUpDeps, sessi
   const plan = pickOrphanTrees(checked);
   writeOrphanEvents(db, plan.kept, options);
   if (plan.trees.length === 0) {
-    return [];
+    return;
   }
   const client = await deps.openClient();
-  const forgotten: string[] = [];
   const failedIDs = new Set<string>();
   for (const tree of plan.trees) {
     // The child's kept event holds the parent back on later sweeps too.
@@ -53,12 +52,10 @@ export async function removeOrphanSessions(db: Database, deps: WrapUpDeps, sessi
     const wrapUp: WrapUp = { forgotten: [], destroyed: [], kept: [], failed: [] };
     await forgetTree({ client, wrapUp }, { kind: 'forget', root: tree.root.session, children: [], destroyImp: tree.destroyImp });
     writeOrphanEvents(db, collectOrphanEvents(tree, wrapUp), options);
-    forgotten.push(...wrapUp.forgotten);
     for (const failure of wrapUp.failed) {
       failedIDs.add(failure.id);
     }
   }
-  return forgotten;
 }
 
 function readLastKeptMs(db: Database, sessions: readonly FleetSession[]): Map<string, number> {

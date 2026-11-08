@@ -18,9 +18,7 @@ export interface IdlePinOptions {
   readActivity: (id: string) => Promise<SessionActivity | null>;
 }
 
-// Tells the orchestrator once per idle stretch about each pinned session outside the fleet that
-// has sat idle for over a day. It forgets nothing.
-export async function writeIdlePinReports(db: Database, sessions: readonly SessionInfo[], options: IdlePinOptions): Promise<number> {
+export async function writeIdlePinReports(db: Database, sessions: readonly SessionInfo[], options: IdlePinOptions): Promise<void> {
   const fleetNames = new Set(getDeclaredSessions().map((declared) => declared.name));
   const fleetIDs = new Set(sessions.filter((session) => fleetNames.has(session.name)).map((session) => session.id));
   const nonFleetPinnedSessions = sessions.filter((session) => session.pinned === true && !fleetIDs.has(session.id));
@@ -48,5 +46,4 @@ export async function writeIdlePinReports(db: Database, sessions: readonly Sessi
       enqueue(db, seq, roleName('owner'), text);
     })();
   }
-  return reports.length;
 }

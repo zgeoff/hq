@@ -32,6 +32,7 @@ async function setupTest() {
 
   return {
     db: fresh.db,
+    fleet,
     sweep: () =>
       sweepNow(fresh.db, client, buildStubGitHubFactsRunner({ views: {} }), {
         actor: 'sweep',
@@ -53,7 +54,7 @@ async function setupTest() {
   };
 }
 
-test('it reports a non-fleet pin idle 25 hours once, not on the next sweep', async () => {
+test('it reports a non-fleet pin idle 25 hours to z-stu once per idle stretch, not on the next sweep', async () => {
   const ctx = await setupTest();
   updateEnv('HQ_NOW', '2026-11-07T03:00:00Z');
   ctx.seed.atcSession({ id: '0000f004-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'long-chat', alive: true, state: 'done', pinned: true }, '2026-11-06T02:00:00Z');
@@ -103,6 +104,16 @@ test('it names the run of a pinned session a run recorded', async () => {
       topic: null,
     },
   ]);
+});
+
+test('it forgets nothing and calls atc for nothing when it reports a non-fleet pin idle 25 hours', async () => {
+  const ctx = await setupTest();
+  updateEnv('HQ_NOW', '2026-11-07T03:00:00Z');
+  ctx.seed.atcSession({ id: '0000f004-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'long-chat', alive: true, state: 'done', pinned: true }, '2026-11-06T02:00:00Z');
+
+  await ctx.sweep();
+
+  expect(ctx.fleet.calls).toStrictEqual([]);
 });
 
 test('it reports neither a fleet pin nor a pin idle 23 hours', async () => {
