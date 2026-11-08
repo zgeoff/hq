@@ -1,5 +1,5 @@
 import { match } from 'ts-pattern';
-import type { MechanicalProof } from './types.ts';
+import type { MechanicalProof } from '../noslop/types.ts';
 
 export type HeldDiffFact = { kind: 'unread' } | { kind: 'failed'; error: string } | { kind: 'read'; proof: MechanicalProof };
 

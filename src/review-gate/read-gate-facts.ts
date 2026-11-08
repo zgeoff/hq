@@ -4,7 +4,7 @@ import { boundedRunner } from '../runner/bounded-runner.ts';
 import { toRunFailure } from '../runner/to-run-failure.ts';
 import type { Runner } from '../runner/types.ts';
 import { CALL_MS } from '../watcher/call-ms.ts';
-import { parseJSON } from './parse-json.ts';
+import { parseJSON } from '../noslop/parse-json.ts';
 
 const TimeSchema = z.string().nullable().optional();
 const CheckRunSchema = z.object({ __typename: z.literal('CheckRun'), name: z.string(), workflowName: z.string().optional(), detailsUrl: z.string().nullable().optional(), status: z.string(), conclusion: z.string().nullable(), startedAt: TimeSchema, completedAt: TimeSchema });

@@ -1,6 +1,6 @@
 import { OWNER } from '../releases/owner.ts';
 import { isSkillText } from './is-skill-text.ts';
-import type { ParsedRepo } from './parse-lower-repo.ts';
+import type { ParsedRepo } from '../noslop/parse-lower-repo.ts';
 
 type HeldTest = (path: string) => boolean;
 

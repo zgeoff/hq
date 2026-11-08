@@ -1,6 +1,6 @@
 import { analyzeHeldDiffs } from './analyze-held-diffs.ts';
 import { isMovedTarget } from './is-moved-target.ts';
-import type { HeldDiff, MechanicalProof, MoveFacts } from './types.ts';
+import type { HeldDiff, MechanicalProof, MoveFacts } from '../noslop/types.ts';
 
 export function proveMechanical(files: HeldDiff[], facts: MoveFacts): MechanicalProof {
   const analysis = analyzeHeldDiffs(files);

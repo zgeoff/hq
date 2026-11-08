@@ -1,15 +1,15 @@
 import { match } from 'ts-pattern';
 import { readHeadExemption } from '../pr-status/read-head-exemption.ts';
 import { readHeadMechanical } from '../pr-status/read-head-mechanical.ts';
-import { buildSlug } from './build-slug.ts';
+import { buildSlug } from '../noslop/build-slug.ts';
 import { isBotAuthor } from './is-bot-author.ts';
 import type { PRAuthor } from './is-bot-author.ts';
-import type { ParsedRepo } from './parse-lower-repo.ts';
+import type { ParsedRepo } from '../noslop/parse-lower-repo.ts';
 import { pickInstructionHold } from './pick-instruction-hold.ts';
 import type { HeldDiffFact, InstructionHoldFacts } from './pick-instruction-hold.ts';
 import { proveMechanical } from './prove-mechanical.ts';
 import { readHeldDiffs } from './read-held-diffs.ts';
-import type { PRRequest } from './types.ts';
+import type { PRRequest } from '../noslop/types.ts';
 
 export interface InstructionHold {
   clear: boolean;
