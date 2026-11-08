@@ -7,6 +7,7 @@ import { buildWrapUpPlan } from './build-wrap-up-plan.ts';
 import { forgetImpSession } from './forget-imp-session.ts';
 import { forgetWrappedSession } from './forget-wrapped-session.ts';
 import { fullSessionId } from './full-session-id.ts';
+import { readWorkSafely } from './read-work-safely.ts';
 import { requireRun } from './require-run.ts';
 import { toErrorMessage } from '../to-error-message.ts';
 import type { ImpWork, KeptSession, WrapUp } from './types.ts';
@@ -140,14 +141,6 @@ export function isOnImp(session: FleetSession, placedOnImp: boolean): boolean {
     return vm !== 'none';
   }
   return placedOnImp;
-}
-
-async function readWorkSafely(read: (session: FleetSession) => Promise<ImpWork>, session: FleetSession): Promise<ImpWork> {
-  try {
-    return await read(session);
-  } catch (error) {
-    return { state: 'unknown', detail: toErrorMessage(error) };
-  }
 }
 
 function reportForget(pass: TreePass, decision: ForgetDecision): void {

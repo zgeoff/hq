@@ -10,14 +10,12 @@ import { addRun } from './add-run.ts';
 import { setSession } from './set-session.ts';
 import { setState } from './set-state.ts';
 import { sweepNow } from './sweep-now.ts';
-import type { ImpWork } from './types.ts';
 
 interface Seeded {
   id: string;
   name: string;
   alive: boolean;
   state: string;
-  parent?: string;
   pinned?: boolean;
 }
 
@@ -31,16 +29,13 @@ async function setupTest() {
   onTestFinished(() => client.close());
   const fleetSessions: FleetSession[] = [];
   const fleet = buildStubFleetClient({ sessions: fleetSessions });
-  const work: { current: ImpWork } = { current: { state: 'pushed' } };
 
   return {
     db: fresh.db,
-    fleet,
-    work,
     sweep: () =>
       sweepNow(fresh.db, client, buildStubGitHubFactsRunner({ views: {} }), {
         actor: 'sweep',
-        wrapUpDeps: { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local session checks no imp')), readLocalWork: () => Promise.resolve(work.current) },
+        wrapUpDeps: { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local session checks no imp')), readLocalWork: () => Promise.resolve({ state: 'pushed' }) },
         log: () => {},
       }),
     seed: {
@@ -63,12 +58,51 @@ test('it reports a non-fleet pin idle 25 hours once, not on the next sweep', asy
   updateEnv('HQ_NOW', '2026-11-07T03:00:00Z');
   ctx.seed.atcSession({ id: '0000f004-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'long-chat', alive: true, state: 'done', pinned: true }, '2026-11-06T02:00:00Z');
   await ctx.sweep();
-  const first = readOutboxRows(ctx.db).length;
 
   await ctx.sweep();
 
-  expect([first, readOutboxRows(ctx.db).length]).toStrictEqual([1, 1]);
-  expect(readOutboxRows(ctx.db)[0]?.text).toMatch(/long-chat .* idle for 25h00m/u);
+  expect(readOutboxRows(ctx.db)).toStrictEqual([
+    {
+      id: expect.any(Number),
+      event_seq: expect.any(Number),
+      target: 'z-delivery',
+      text: 'long-chat (0000f004) is pinned and has been idle for 25h00m. It is not part of the fleet; decide whether it still needs its pin.',
+      idem_key: expect.any(String),
+      status: 'pending',
+      attempts: 0,
+      last_error: null,
+      message_id: null,
+      created_at: '2026-11-07T03:00:00Z',
+      sent_at: null,
+      topic: null,
+    },
+  ]);
+});
+
+test('it names the run of a pinned session a run recorded', async () => {
+  const ctx = await setupTest();
+  updateEnv('HQ_NOW', '2026-11-07T03:00:00Z');
+  ctx.seed.atcSession({ id: '0000f007-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'run-chat', alive: true, state: 'done', pinned: true }, '2026-11-06T02:00:00Z');
+  ctx.seed.closedRun('GEO-607', '0000f007');
+
+  await ctx.sweep();
+
+  expect(readOutboxRows(ctx.db)).toStrictEqual([
+    {
+      id: expect.any(Number),
+      event_seq: expect.any(Number),
+      target: 'z-delivery',
+      text: 'run-chat (0000f007) is pinned and has been idle for 25h00m, on run GEO-607. It is not part of the fleet; decide whether it still needs its pin.',
+      idem_key: expect.any(String),
+      status: 'pending',
+      attempts: 0,
+      last_error: null,
+      message_id: null,
+      created_at: '2026-11-07T03:00:00Z',
+      sent_at: null,
+      topic: null,
+    },
+  ]);
 });
 
 test('it reports neither a fleet pin nor a pin idle 23 hours', async () => {

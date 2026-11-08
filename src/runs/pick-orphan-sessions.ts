@@ -1,44 +1,62 @@
 import type { FleetSession } from '../fleet/types.ts';
+import { findSessionIssue } from './find-session-issue.ts';
+import { isStoredSession } from './is-stored-session.ts';
+import type { RunSessionRow } from './read-run-session-rows.ts';
+
+export const ORPHAN_RETRY_MS = 24 * 3_600_000;
 
 export interface OrphanFacts {
   sessions: readonly FleetSession[];
   fleetNames: ReadonlySet<string>;
 
-  // Every session id any run recorded, including replaced and removed ones.
-  recorded: readonly string[];
+  // Every session any run recorded, including replaced and removed ones, oldest first.
+  runSessions: readonly RunSessionRow[];
 
-  // Every session id an open run lists as active.
-  openActive: readonly string[];
+  // Maps a full session id to the time the sweep last kept it.
+  lastKeptMs: ReadonlyMap<string, number>;
+  nowMs: number;
 }
 
-// A run stores a short session id, which matches the full id atc lists by prefix.
-export function isStoredSession(stored: readonly string[], id: string): boolean {
-  return stored.some((short) => id.toLowerCase().startsWith(short.toLowerCase()));
+export interface OrphanSession {
+  session: FleetSession;
+  issue: string | null;
 }
 
-// The owner's own sessions, and any session with an unknown parent, are never picked. A session
-// with a descendant that is not also picked stays, as the whole tree is one unit. A child comes
-// before its parent, so a parent's forget finds no children left.
-export function pickOrphanSessions(facts: OrphanFacts): FleetSession[] {
+// A session with a descendant that is not also picked stays, as the whole tree is one unit. A
+// child comes before its parent, so a parent's forget finds no children left.
+export function pickOrphanSessions(facts: OrphanFacts): OrphanSession[] {
   const fleetIDs = new Set(facts.sessions.filter((session) => facts.fleetNames.has(session.name)).map((session) => session.id));
   const byID = new Map(facts.sessions.map((session) => [session.id, session]));
-  const isFromRuns = (session: FleetSession) => isStoredSession(facts.recorded, session.id);
+  const recorded = facts.runSessions.map((row) => row.sessionID);
+  const openActive = facts.runSessions.filter((row) => row.active && row.open).map((row) => row.sessionID);
+  const ownerChat = facts.runSessions.filter((row) => row.ownerChats).map((row) => row.sessionID);
+  const isFromRuns = (session: FleetSession) => isStoredSession(recorded, session.id);
+  const findParent = (session: FleetSession) => (session.parent === null || session.parent === undefined ? undefined : byID.get(session.parent));
   const isChildOfFleet = (session: FleetSession) => {
-    const parent = session.parent === null || session.parent === undefined ? undefined : byID.get(session.parent);
+    const parent = findParent(session);
     return parent !== undefined && (fleetIDs.has(parent.id) || isFromRuns(parent));
   };
+  const isOwnerChat = (session: FleetSession) => {
+    const parent = findParent(session);
+    return isStoredSession(ownerChat, session.id) || (parent !== undefined && isStoredSession(ownerChat, parent.id));
+  };
+  const isRecentlyKept = (session: FleetSession) => facts.nowMs - (facts.lastKeptMs.get(session.id) ?? -Infinity) < ORPHAN_RETRY_MS;
   const candidates = facts.sessions.filter(
     (session) =>
       session.state === 'exited' &&
       session.pinned !== true &&
       !fleetIDs.has(session.id) &&
-      !isStoredSession(facts.openActive, session.id) &&
+      !isStoredSession(openActive, session.id) &&
+      !isOwnerChat(session) &&
+      !isRecentlyKept(session) &&
       (isFromRuns(session) || isChildOfFleet(session)),
   );
   const candidateIDs = new Set(candidates.map((session) => session.id));
   const blocked = findBlockedAncestors(byID, facts.sessions.filter((session) => !candidateIDs.has(session.id)));
   const picked = candidates.filter((session) => !blocked.has(session.id));
-  return picked.toSorted((first, second) => countDepth(byID, second) - countDepth(byID, first));
+  return picked
+    .toSorted((first, second) => countDepth(byID, second) - countDepth(byID, first))
+    .map((session) => ({ session, issue: findSessionIssue(facts.runSessions, session.id) }));
 }
 
 // Every ancestor of a session that is not picked, up the whole chain.

@@ -1,5 +1,4 @@
 import type { Database } from 'bun:sqlite';
-import { z } from 'zod';
 import type { SessionInfo } from '../atc/session-schema.ts';
 import { logEvent } from '../log-event.ts';
 import { enqueue } from '../outbox/enqueue.ts';
@@ -8,11 +7,10 @@ import { fmtIdle } from '../pins/fmt-idle.ts';
 import { readEvents } from '../read-events.ts';
 import { getDeclaredSessions } from '../roles/get-declared-sessions.ts';
 import { orchestratorName } from '../wake/orchestrator-name.ts';
+import { findSessionIssue } from './find-session-issue.ts';
 import { pickIdlePinReports } from './pick-idle-pin-reports.ts';
-import { isStoredSession } from './pick-orphan-sessions.ts';
 import type { SessionActivity } from './pick-quiet-sessions.ts';
-
-const RunSessionRows = z.array(z.object({ session_id: z.string(), issue: z.string() }));
+import { readRunSessionRows } from './read-run-session-rows.ts';
 
 export interface IdlePinOptions {
   actor: string;
@@ -39,14 +37,16 @@ export async function writeIdlePinReports(db: Database, sessions: readonly Sessi
       lastReportMs.set(pin.id, Date.parse(last.at));
     }
   }
-  const rows = RunSessionRows.parse(db.query('SELECT session_id, issue FROM run_sessions ORDER BY added_at, session_id').all());
+  const rows = readRunSessionRows(db);
   const reports = pickIdlePinReports(pins, fleetIDs, lastReportMs);
   for (const report of reports) {
     const pin = report.pin;
-    const issue = rows.findLast((row) => isStoredSession([row.session_id], pin.id))?.issue ?? null;
+    const issue = findSessionIssue(rows, pin.id);
     const text = `${pin.name} (${pin.id.slice(0, 8)}) is pinned and has been idle for ${fmtIdle(pin.idleMs)}${issue === null ? '' : `, on run ${issue}`}. It is not part of the fleet; decide whether it still needs its pin.`;
-    const seq = logEvent(db, 'hq', pin.id, 'idle-pin-report', options.actor, null, null, { name: pin.name, issue, idleMs: pin.idleMs, idleSince: new Date(report.idleSinceMs).toISOString() });
-    enqueue(db, seq, orchestratorName(), text);
+    db.transaction(() => {
+      const seq = logEvent(db, 'hq', pin.id, 'idle-pin-report', options.actor, null, null, { name: pin.name, issue, idleMs: pin.idleMs, idleSince: new Date(report.idleSinceMs).toISOString() });
+      enqueue(db, seq, orchestratorName(), text);
+    })();
   }
   return reports.length;
 }
