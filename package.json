@@ -23,7 +23,7 @@
     "ci:test-scope": "bun scripts/check/read-test-scope.ts",
     "check:casts": "bun scripts/check-casts.ts",
     "prepare": "command -v git > /dev/null 2>&1 && lefthook install --force || true",
-    "check:docs": "chex prose links skill",
+    "check:docs": "chex prose length links readmes skill",
     "test:related": "rig related"
   },
   "dependencies": {

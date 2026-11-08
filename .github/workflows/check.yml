@@ -35,6 +35,8 @@ jobs:
       - run: bun run check:skills
       # The shared skill-writing check: 0 errors and 0 warnings in every skill
       - run: bun run check:skill-writing
+      # the docs checks that check:docs names, from chex
+      - run: bun run --silent check:docs
       # GEO-1046: each generated copy of grants/ matches its data
       - run: bun run check:grants
       # A PR that changes only docs or data skips the test steps below; a push to main runs them all.
