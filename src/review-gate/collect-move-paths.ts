@@ -1,5 +1,5 @@
 import { analyzeHeldDiffs } from './analyze-held-diffs.ts';
-import type { HeldDiff } from '../noslop/types.ts';
+import type { HeldDiff } from './types.ts';
 
 export function collectMovePaths(files: HeldDiff[]): [string, string][] {
   const analysis = analyzeHeldDiffs(files);
