@@ -7,7 +7,7 @@ import { HELP } from '../src/help.ts';
 import { VERSION } from '../src/version.ts';
 import type { Command } from '../src/commands.ts';
 import { COMMANDS } from '../src/commands.ts';
-import { lookup } from '../src/lookup.ts';
+import { findCommand } from '../src/find-command.ts';
 import { renderHelp } from '../src/render-help.ts';
 import { findPath } from '../src/test-utils/find-path.ts';
 import { NOON_SYDNEY, at, freshDb } from './helpers.ts';
@@ -31,9 +31,9 @@ test('--help is generated from the rows: a changed summary shows in the text', (
 test('every row resolves through the dispatcher lookup to itself', () => {
   for (const c of COMMANDS) {
     for (const noun of c.nouns) {
-      for (const verb of c.verbs ?? []) expect(lookup(noun, verb)).toBe(c);
-      if (c.bare || c.verbs === null) expect(lookup(noun, undefined)).toBe(c);
-      if (c.verbs === null) expect(lookup(noun, 'no-such-verb')).toBe(c);
+      for (const verb of c.verbs ?? []) expect(findCommand(noun, verb)).toBe(c);
+      if (c.bare || c.verbs === null) expect(findCommand(noun, undefined)).toBe(c);
+      if (c.verbs === null) expect(findCommand(noun, 'no-such-verb')).toBe(c);
     }
   }
 });
@@ -105,11 +105,11 @@ test('every verb a group function handles has a row, or a catch-all row covers i
     const { verbs, bare } = verbsOf(fn);
     expect(verbs.length, fn).toBeGreaterThan(0);
     for (const verb of verbs) {
-      const c = lookup(noun, verb);
+      const c = findCommand(noun, verb);
       expect(c && (c.verbs === null || c.verbs.includes(verb)), `${noun} ${verb}`).toBe(true);
     }
     if (bare) {
-      const c = lookup(noun, undefined);
+      const c = findCommand(noun, undefined);
       expect(c && (c.bare || c.verbs === null), `${noun} with no verb`).toBe(true);
     }
   }
@@ -123,7 +123,7 @@ test('every noun cli.ts used to dispatch has a row', () => {
 });
 
 test('a read-only row is one that never writes: spot checks', () => {
-  const ro = (noun: string, verb?: string) => lookup(noun, verb)!.readOnly;
+  const ro = (noun: string, verb?: string) => findCommand(noun, verb)!.readOnly;
   expect(ro('status')).toBe(true);
   expect(ro('run', 'list')).toBe(true);
   expect(ro('call', 'list')).toBe(true);

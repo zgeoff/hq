@@ -32,7 +32,7 @@ const mins = (a: string, b: string) => (Date.parse(b) - Date.parse(a)) / 60_000;
 const clip = (s: string, lo: string, hi: string) => (s < lo ? lo : s > hi ? hi : s);
 const repoOf = (ref: string) => ref.split('#')[0]!;
 
-export function computeStats(db: Database, opts: { from: string; to: string; gh: GhMerge[] | null }): Stats {
+export function readStats(db: Database, opts: { from: string; to: string; gh: GhMerge[] | null }): Stats {
   const from = opts.from < cutoff() ? cutoff() : opts.from;
   const to = opts.to;
   const inWin = (t: string | null) => !!t && t >= from && t < to;

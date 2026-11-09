@@ -140,7 +140,7 @@ export async function shipRuns(db: Database, run: Runner, at: Date = now(), opts
     return yes;
   };
 
-  const save = (s: PrState) => {
+  const writeShipped = (s: PrState) => {
     if (dryRun) return;
     db.query('UPDATE run_prs SET merge_sha = ?, shipped_tag = ?, shipped_at = ? WHERE ref = ?').run(s.sha, s.tag, s.at, s.ref);
   };
@@ -175,7 +175,7 @@ export async function shipRuns(db: Database, run: Runner, at: Date = now(), opts
           const sha = view.success ? view.data.mergeCommit?.oid : undefined;
           if (typeof sha !== 'string' || !HEX40.test(sha)) throw new HqError('bad_pr', `${ref} has no merge commit`);
           s.sha = sha;
-          save(s);
+          writeShipped(s);
         }
         const found = await readShipment(deps, s, s.sha);
         if (found === 'cap') {
@@ -185,7 +185,7 @@ export async function shipRuns(db: Database, run: Runner, at: Date = now(), opts
         }
         if (found) {
           const shipped = { ...s, tag: found.tag, at: found.at ?? iso(at) };
-          save(shipped);
+          writeShipped(shipped);
           Object.assign(s, shipped);
           res.shippedPrs++;
         }

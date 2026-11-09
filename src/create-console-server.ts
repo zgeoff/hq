@@ -29,31 +29,29 @@ const SIGN_IN = 'hq console: sign in first: open the login link on the terminal 
 export function createConsoleServer(input: ConsoleServerInput): Server<undefined> {
   const context = { db: input.db, actor: input.actor, run: input.run, notify: input.notify, loadShipped: input.loadShipped };
   const handler = new RPCHandler(buildConsoleRouter());
-  return Bun.serve({
-    hostname: '127.0.0.1',
-    port: input.port,
-    async fetch(req, server) {
-      if (!checkConsoleRequest(req, server.port ?? input.port)) {
-        return applyFrameGuard(new Response('hq console: this request does not come from the console page\n', { status: 403 }));
-      }
-      const path = new URL(req.url).pathname;
-      if (path === EXCHANGE_PATH) {
-        const exchanged = await readExchange(input.auth, req);
-        return applyFrameGuard(exchanged);
-      }
+  async function handleRequest(req: Request, server: Server<undefined>): Promise<Response> {
+    if (!checkConsoleRequest(req, server.port ?? input.port)) {
+      return applyFrameGuard(new Response('hq console: this request does not come from the console page\n', { status: 403 }));
+    }
+    const path = new URL(req.url).pathname;
+    if (path === EXCHANGE_PATH) {
+      const exchanged = await readExchange(input.auth, req);
+      return applyFrameGuard(exchanged);
+    }
 
-      // A local process can send the page's Host with no Origin; only the session a login link
-      // gave the page's own tab gets through.
-      if (path.startsWith('/rpc') && !input.auth.hasSession(req.headers.get(SESSION_HEADER))) {
-        return applyFrameGuard(new Response(SIGN_IN, { status: 401 }));
-      }
-      const result = await handler.handle(req, { prefix: '/rpc', context });
-      if (result.matched) {
-        return applyFrameGuard(result.response);
-      }
-      return applyFrameGuard(buildAssetResponse(input.assets, req));
-    },
-  });
+    // A local process can send the page's Host with no Origin; only the session a login link
+    // gave the page's own tab gets through.
+    if (path.startsWith('/rpc') && !input.auth.hasSession(req.headers.get(SESSION_HEADER))) {
+      return applyFrameGuard(new Response(SIGN_IN, { status: 401 }));
+    }
+    const result = await handler.handle(req, { prefix: '/rpc', context });
+    if (result.matched) {
+      return applyFrameGuard(result.response);
+    }
+    return applyFrameGuard(buildAssetResponse(input.assets, req));
+  }
+
+  return Bun.serve({ hostname: '127.0.0.1', port: input.port, fetch: handleRequest });
 }
 
 async function readExchange(auth: ConsoleAuth, req: Request): Promise<Response> {

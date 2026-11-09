@@ -111,7 +111,7 @@ import { realRunner } from './runner/real-runner.ts';
 import type { Runner } from './runner/types.ts';
 import type { Ctx, Out } from './commands.ts';
 import { registerGroups } from './register-groups.ts';
-import { lookup } from './lookup.ts';
+import { findCommand } from './find-command.ts';
 import { z } from 'zod';
 import { config } from './config/config.ts';
 import { isOneOf, isRecord, toExactOptional } from '@zgeoff/std';
@@ -321,7 +321,7 @@ import { getMark } from './marks/get-mark.ts';
 import { listMarks } from './marks/list-marks.ts';
 import { markVersion } from './marks/mark-version.ts';
 import { compareText } from './stats/compare-text.ts';
-import { computeStats } from './stats/compute-stats.ts';
+import { readStats } from './stats/read-stats.ts';
 import { headline } from './stats/headline.ts';
 import { statsText } from './stats/stats-text.ts';
 import type { GhMerge } from './stats/types.ts';
@@ -1142,12 +1142,12 @@ async function statsCommand(db: Database, flags: Flags): Promise<Out> {
     if (!m) throw new HqError('not_found', `no mark ${flags.around}`);
     const at = Date.parse(m.at);
     const week = 7 * 86_400_000;
-    const before = computeStats(db, { from: iso(new Date(at - week)), to: m.at, gh: null });
-    const after = computeStats(db, { from: m.at, to: iso(new Date(Math.min(at + week, t.getTime()))), gh: null });
+    const before = readStats(db, { from: iso(new Date(at - week)), to: m.at, gh: null });
+    const after = readStats(db, { from: m.at, to: iso(new Date(Math.min(at + week, t.getTime()))), gh: null });
     return { data: { mark: m, before, after }, text: compareText(m, before, after) };
   }
   const from = sinceArg(flags.since, t);
-  const s = computeStats(db, { from, to: iso(t), gh: await ghMerges(db, from) });
+  const s = readStats(db, { from, to: iso(t), gh: await ghMerges(db, from) });
   const merged = mergedRuns(db, from, iso(t));
   const facts = await prFacts(db, realRunner, merged.flatMap((r) => r.prs), cleanEnv());
   const sizes = facts ? sizeStats(merged, facts) : null;
@@ -1349,7 +1349,7 @@ async function weeklyStats(db: Database, actor: string, run: Runner = realRunner
   return db
     .transaction(() => {
       if (getMeta(db, 'stats_weekly_last') === key) return false;
-      const s = computeStats(db, { from, to: iso(t), gh });
+      const s = readStats(db, { from, to: iso(t), gh });
       addNews(db, { from: actor, topic: 'other', text: headline(s), issue: null, link: null, needsGeoff: false });
       setMeta(db, 'stats_weekly_last', key);
       return true;
@@ -2073,7 +2073,7 @@ async function runArgv(argv: string[], runner: Runner): Promise<{ out: Out; db: 
     return { out: await runBrief(runner, verb, rest, flags), db: null };
   }
   const db = openDb();
-  const command = lookup(noun, verb);
+  const command = findCommand(noun, verb);
   if (!command) throw new HqError('bad_args', `unknown command: ${noun}. Try hq help`);
   return { out: await command.handler({ db, noun, verb, rest, flags, run: runner }), db };
 }
@@ -2084,7 +2084,6 @@ function idsFlag(raw: string): number[] {
   return parts.map(Number);
 }
 
-// oxlint-disable-next-line zgeoff/function-verb -- the entry point that the bin and every CLI test call
 export async function main(argv: string[], runner: Runner = realRunner): Promise<number> {
   const json = argv.includes('--json');
   writeClockWarnings(process.env, (line) => console.error(line));
