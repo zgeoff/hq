@@ -4,15 +4,15 @@ import type { ImpWork } from './types.ts';
 
 const impListSchema = z.array(z.looseObject({ name: z.string() }));
 
-// A removed local working directory holds no work, so the check says so with its own exit code. A cd
-// that fails for another reason, such as permissions, stays an unknown.
+// A removed local working directory holds no work, so the check says so with its own exit code. A
+// test for a path also fails when a parent can't be searched, so the parent must be searchable.
 const GONE_CODE = 3;
 const GONE_MARKER = 'workspace gone';
 
 // A failed git call exits nonzero: none runs inside a pipe, whose status would be the last command's.
 export const CHECK_SCRIPT = [
   'set -eu',
-  String.raw`if [ ! -e "$1" ]; then echo "${GONE_MARKER}" >&2; exit ${GONE_CODE}; fi`,
+  String.raw`if [ ! -e "$1" ] && [ -d "$(dirname "$1")" ] && [ -x "$(dirname "$1")" ]; then echo "${GONE_MARKER}" >&2; exit ${GONE_CODE}; fi`,
   'cd "$1"',
   'trees=$(git worktree list --porcelain) || exit 1',
   String.raw`printf "%s\n" "$trees" | while IFS=' ' read -r key tree; do`,

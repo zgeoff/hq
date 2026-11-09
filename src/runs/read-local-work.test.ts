@@ -49,6 +49,16 @@ test('it finds a removed working directory to hold no work', async () => {
   expect(work).toStrictEqual({ state: 'pushed' });
 });
 
+test.skipIf(process.getuid?.() === 0)('it gives no answer when a parent of the working directory cannot be searched', async () => {
+  const ctx = setupTest();
+  const locked = join(ctx.directory, 'locked');
+  mkdirSync(locked, { mode: 0o600 });
+
+  const work = await readLocalWork(realRunner, join(locked, 'kettle'));
+
+  expect(work.state).toBe('unknown');
+});
+
 test('it gives no answer for an exit 3 without the removed-directory marker', async () => {
   const run = () => Promise.resolve({ code: 3, stdout: '', stderr: 'boom\n' });
 
