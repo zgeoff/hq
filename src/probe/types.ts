@@ -35,3 +35,18 @@ export interface Downtime {
   longestDetectMs: number;
   blindMs: number;
 }
+
+export interface ProbeSampleInput {
+  at: string;
+  targetOk: boolean;
+  controlOk: boolean | null;
+  durationMs: number | null;
+  detail: string | null;
+  readyOk: boolean | null;
+}
+
+export interface OutageInput {
+  startedAt: string;
+  detectedAt: string;
+  kind: OutageRow['kind'];
+}

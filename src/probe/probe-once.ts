@@ -20,6 +20,10 @@ import { OPEN_AFTER } from './open-after.ts';
 import { openOutage } from './open-outage.ts';
 import { openUnready } from './open-unready.ts';
 import type { Fetcher, ProbeResult, ProbeState } from './types.ts';
+import { writeOutage } from './write-outage.ts';
+import { writeOutageAlert } from './write-outage-alert.ts';
+import { writeOutageEnd } from './write-outage-end.ts';
+import { writeProbeSample } from './write-probe-sample.ts';
 
 export async function probeOnce(db: Database, fetcher: Fetcher, actor: string): Promise<ProbeResult> {
   const t = await fetcher(readLocalSetting('HQ_PROBE_TARGET'));
@@ -36,11 +40,11 @@ export async function probeOnce(db: Database, fetcher: Fetcher, actor: string): 
   let unreadyOpened: number | undefined;
   let unreadyClosed: number | undefined;
   db.transaction(() => {
-    db.query('INSERT OR REPLACE INTO probe_samples (at, target_ok, control_ok, ms, detail, ready_ok) VALUES (?, ?, ?, ?, ?, ?)').run(at, t.ok ? 1 : 0, c ? (c.ok ? 1 : 0) : null, t.ms, r && !r.ok ? `ready ${r.error ?? r.status}` : detail, r ? (r.ok ? 1 : 0) : null);
+    writeProbeSample(db, { at, targetOk: t.ok, controlOk: c ? c.ok : null, durationMs: t.ms, detail: r && !r.ok ? `ready ${r.error ?? r.status}` : detail, readyOk: r ? r.ok : null });
     const open = openOutage(db);
     if (state === 'up' && open) {
       const seq = logEvent(db, 'hq', 'probe', 'recovered', actor, null, null, { outage: open.id, started_at: open.started_at, ended_at: at });
-      db.query('UPDATE outages SET ended_at = ?, recover_seq = ? WHERE id = ?').run(at, seq, open.id);
+      writeOutageEnd(db, open.id, at, seq);
 
       // Minutes the PC could not see are blind, not down.
       const d = downtime(db, new Date(open.started_at), new Date(at));
@@ -51,9 +55,9 @@ export async function probeOnce(db: Database, fetcher: Fetcher, actor: string): 
       const run = downRun(db);
       if (run.length >= OPEN_AFTER) {
         const startedAt = run[run.length - 1]!;
-        const id = Number(db.query('INSERT INTO outages (started_at, detected_at) VALUES (?, ?)').run(startedAt, at).lastInsertRowid);
+        const id = writeOutage(db, { startedAt, detectedAt: at, kind: 'down' });
         const seq = logEvent(db, 'hq', 'probe', 'outage', actor, null, null, { outage: id, started_at: startedAt, checks: run.length });
-        db.query('UPDATE outages SET alert_seq = ? WHERE id = ?').run(seq, id);
+        writeOutageAlert(db, id, seq);
         tell(db, seq, `Nix is down: ${readLocalSetting('HQ_PROBE_TARGET')} failing since ${formatClock(startedAt)} (${run.length} checks; control URL fine). hq checks every minute and tells you when it is back.`);
         opened = id;
       }
@@ -61,7 +65,7 @@ export async function probeOnce(db: Database, fetcher: Fetcher, actor: string): 
     const unready = openUnready(db);
     if (r?.ok && unready) {
       const seq = logEvent(db, 'hq', 'probe', 'ready', actor, null, null, { outage: unready.id, started_at: unready.started_at, ended_at: at });
-      db.query('UPDATE outages SET ended_at = ?, recover_seq = ? WHERE id = ?').run(at, seq, unready.id);
+      writeOutageEnd(db, unready.id, at, seq);
       const mins = Math.round((Date.parse(at) - Date.parse(unready.started_at)) / 60_000);
       tell(db, seq, `Nix is ready again: unready ${mins} min (${formatClock(unready.started_at)}–${formatClock(at)} Sydney).`, 'nix-unready');
       unreadyClosed = unready.id;
@@ -70,9 +74,9 @@ export async function probeOnce(db: Database, fetcher: Fetcher, actor: string): 
       const run = unreadyRun(db);
       const startedAt = run[run.length - 1];
       if (startedAt && Date.parse(at) - Date.parse(startedAt) >= UNREADY_AFTER_MIN * 60_000) {
-        const id = Number(db.query("INSERT INTO outages (started_at, detected_at, kind) VALUES (?, ?, 'unready')").run(startedAt, at).lastInsertRowid);
+        const id = writeOutage(db, { startedAt, detectedAt: at, kind: 'unready' });
         const seq = logEvent(db, 'hq', 'probe', 'unready', actor, null, null, { outage: id, started_at: startedAt, checks: run.length });
-        db.query('UPDATE outages SET alert_seq = ? WHERE id = ?').run(seq, id);
+        writeOutageAlert(db, id, seq);
         tell(db, seq, `Nix is unready: ${readLocalSetting('HQ_PROBE_READY')} failing since ${formatClock(startedAt)} (${run.length} checks; /health/live is fine). hq checks every minute and tells you when it is ready again.`, 'nix-unready');
         unreadyOpened = id;
       }

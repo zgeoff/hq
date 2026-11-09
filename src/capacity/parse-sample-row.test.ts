@@ -1,7 +1,7 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { buildStubImpzRunner } from '../../test/build-stub-impz-runner.ts';
 import { at, freshDb } from '../../test/helpers.ts';
-import { buildCapacitySampleSeeder } from '../test-utils/build-capacity-sample-seeder.ts';
+import { buildSeeder } from '../test-utils/build-seeder.ts';
 import { readCapacity } from './read-capacity.ts';
 import { sampleLog } from './sample-log.ts';
 import { writeCapacitySample } from './write-capacity-sample.ts';
@@ -9,7 +9,7 @@ import { writeCapacitySample } from './write-capacity-sample.ts';
 function setupTest() {
   const fresh = freshDb();
   onTestFinished(fresh.cleanup);
-  return { db: fresh.db, seed: buildCapacitySampleSeeder(fresh.db), readLog: () => sampleLog(fresh.db, 1, new Date('2026-10-14T00:30:00Z')) };
+  return { db: fresh.db, seed: buildSeeder(fresh), readLog: () => sampleLog(fresh.db, 1, new Date('2026-10-14T00:30:00Z')) };
 }
 
 test('it reads the errors a sample stored', async () => {
@@ -26,7 +26,7 @@ test('it reads the errors a sample stored', async () => {
 
 test('it reads an empty errors column as no errors', async () => {
   const ctx = setupTest();
-  ctx.seed.sampleWithEmptyErrors('2026-10-14T00:00:00Z');
+  await ctx.seed.capacitySampleWithEmptyErrors({ at: '2026-10-14T00:00:00Z' });
 
   const log = await ctx.readLog();
 
@@ -35,14 +35,14 @@ test('it reads an empty errors column as no errors', async () => {
 
 test('it rejects a sample whose errors column is not JSON', async () => {
   const ctx = setupTest();
-  ctx.seed.sampleWithErrorsNotJSON('2026-10-14T00:00:00Z');
+  await ctx.seed.capacitySampleWithErrorsNotJSON({ at: '2026-10-14T00:00:00Z' });
 
   await expect(ctx.readLog()).rejects.toThrow();
 });
 
 test('it rejects a sample whose error is a number', async () => {
   const ctx = setupTest();
-  ctx.seed.sampleWithNonTextError('2026-10-14T00:00:00Z');
+  await ctx.seed.capacitySampleWithNonTextError({ at: '2026-10-14T00:00:00Z' });
 
   await expect(ctx.readLog()).rejects.toThrow();
 });

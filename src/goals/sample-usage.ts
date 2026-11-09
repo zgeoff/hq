@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { ACCOUNT_KEY } from './account-key.ts';
 import { getUsageCache } from './get-usage-cache.ts';
 import { getUsageDir } from './get-usage-dir.ts';
+import { writeUsageSample } from './write-usage-sample.ts';
 
 const lastAt = z.object({ at: z.string().nullable() });
 
@@ -13,7 +14,6 @@ const LAST_ROW = z.object({ account: z.string(), five_hour: z.number().nullable(
 
 export function sampleUsage(db: Database, at: Date = now()): boolean {
   const cachePath = getUsageCache();
-  const insert = db.query('INSERT OR IGNORE INTO usage_samples (at, account, five_hour, seven_day, five_hour_resets_at, seven_day_resets_at) VALUES (?, ?, ?, ?, ?, ?)');
   let files: string[] = [];
   try {
     files = readdirSync(getUsageDir()).filter((name) => name.endsWith('.json'));
@@ -31,7 +31,7 @@ export function sampleUsage(db: Database, at: Date = now()): boolean {
       if (last.at !== null && reading.when <= last.at) {
         continue;
       }
-      if (insert.run(reading.when, key, reading.five, reading.seven, reading.fiveResetsAt, reading.sevenResetsAt).changes > 0) {
+      if (writeUsageSample(db, { at: reading.when, account: key, five_hour: reading.five, seven_day: reading.seven, five_hour_resets_at: reading.fiveResetsAt, seven_day_resets_at: reading.sevenResetsAt })) {
         stored = true;
       }
     }
@@ -49,7 +49,7 @@ export function sampleUsage(db: Database, at: Date = now()): boolean {
   if (isSameReading(last, { ...cached, account })) {
     return false;
   }
-  return insert.run(iso(at), account, cached.five, cached.seven, cached.fiveResetsAt, cached.sevenResetsAt).changes > 0;
+  return writeUsageSample(db, { at: iso(at), account, five_hour: cached.five, seven_day: cached.seven, five_hour_resets_at: cached.fiveResetsAt, seven_day_resets_at: cached.sevenResetsAt });
 }
 
 interface WindowResets {

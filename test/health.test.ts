@@ -251,14 +251,18 @@ test('a full /tmp is a problem, as a full disk is', async () => {
 });
 
 test('the nix probe check is red when stale or while an outage is open, and quiet with no samples', async () => {
+  const ctx = setupTest();
   const w = world();
   const at0 = new Date(NOON_SYDNEY);
-  const ask = async (m: number) => (await runChecks({ ...probe(w), probe: (t) => probeHealth(db, t) }, healthSettings(db), {}, new Date(at0.getTime() + m * 60_000))).checks.find((c) => c.key === 'nix-probe');
+  const ask = async (minutes: number) => {
+    const result = await runChecks({ ...probe(w), probe: (target) => probeHealth(ctx.db, target) }, healthSettings(ctx.db), {}, new Date(at0.getTime() + minutes * 60_000));
+    return result.checks.find((check) => check.key === 'nix-probe');
+  };
   expect(await ask(0)).toMatchObject({ ok: true, line: expect.stringContaining('no samples') });
-  db.query(`INSERT INTO probe_samples (at, target_ok, control_ok, ms) VALUES (?, 1, NULL, 20)`).run(NOON_SYDNEY);
+  ctx.seed.probeSample({ at: NOON_SYDNEY, durationMs: 20 });
   expect((await ask(2))?.ok).toBe(true);
   expect(await ask(7)).toMatchObject({ ok: false, line: expect.stringContaining('stopped') });
-  db.query(`INSERT INTO outages (started_at, detected_at) VALUES (?, ?)`).run(NOON_SYDNEY, NOON_SYDNEY);
+  ctx.seed.outage({ startedAt: NOON_SYDNEY, detectedAt: NOON_SYDNEY });
   expect(await ask(2)).toMatchObject({ ok: false, line: expect.stringContaining('Nix is down') });
 });
 

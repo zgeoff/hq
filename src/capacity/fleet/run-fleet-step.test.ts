@@ -7,7 +7,9 @@ import { freshDb } from '../../../test/helpers.ts';
 import { addRun } from '../../runs/add-run.ts';
 import type { RunResult, Runner } from '../../runner/types.ts';
 import { readOptionalFile } from './read-optional-file.ts';
+import { readSlotRows } from './read-slot-rows.ts';
 import { runFleetStep } from './run-fleet-step.ts';
+import { buildSeeder } from '../../test-utils/build-seeder.ts';
 
 function setupTest() {
   const fresh = freshDb();
@@ -17,7 +19,7 @@ function setupTest() {
   onTestFinished(fresh.cleanup);
   onTestFinished(() => rmSync(directory, { recursive: true, force: true }));
 
-  return { db: fresh.db, path };
+  return { db: fresh.db, seed: buildSeeder(fresh), path };
 }
 
 test('it reads the slots when there is no read yet', async () => {
@@ -30,7 +32,7 @@ test('it reads the slots when there is no read yet', async () => {
   const step = await runFleetStep(ctx.db, { run, httpClient: fetch, settings: { path: ctx.path, readFile: readOptionalFile } }, new Date('2026-10-14T00:00:00Z'), { force: false, signal: new AbortController().signal });
 
   expect(step.read?.kind).toBe('read');
-  expect(ctx.db.query('SELECT COUNT(*) AS total FROM slot_usage').get()).toStrictEqual({ total: 4 });
+  expect(readSlotRows(ctx.db, new Date(0), new Date('2026-10-14T00:00:00Z'))).toHaveLength(4);
 });
 
 test('it reads no slot when the newest read is under 2 hours old', async () => {
@@ -44,7 +46,7 @@ test('it reads no slot when the newest read is under 2 hours old', async () => {
   const step = await runFleetStep(ctx.db, { run, httpClient: fetch, settings: { path: ctx.path, readFile: readOptionalFile } }, new Date('2026-10-14T01:59:00Z'), { force: false, signal: new AbortController().signal });
 
   expect(step.read).toBeNull();
-  expect(ctx.db.query('SELECT COUNT(*) AS total FROM slot_usage').get()).toStrictEqual({ total: 4 });
+  expect(readSlotRows(ctx.db, new Date(0), new Date('2026-10-14T01:59:00Z'))).toHaveLength(4);
 });
 
 test('it reads the slots again when the newest read is 2 hours old', async () => {
@@ -58,7 +60,7 @@ test('it reads the slots again when the newest read is 2 hours old', async () =>
   const step = await runFleetStep(ctx.db, { run, httpClient: fetch, settings: { path: ctx.path, readFile: readOptionalFile } }, new Date('2026-10-14T02:00:00Z'), { force: false, signal: new AbortController().signal });
 
   expect(step.read?.kind).toBe('read');
-  expect(ctx.db.query('SELECT COUNT(*) AS total FROM slot_usage').get()).toStrictEqual({ total: 8 });
+  expect(readSlotRows(ctx.db, new Date(0), new Date('2026-10-14T02:00:00Z'))).toHaveLength(8);
 });
 
 test('it reads the slots now when forced, whatever the age of the newest read', async () => {
@@ -90,13 +92,13 @@ test('it adds a news line for the forecast pause and leaks no token into it, the
   slotUsage.set('Bearer sk-ant-kettle-slot-3', { seven: { utilization: 0.97, reset: 1_792_303_200 } });
   slotUsage.set('Bearer sk-ant-kettle-slot-4', { seven: { utilization: 0.98, reset: 1_792_346_400 } });
   for (const [index, time] of ['2026-10-13T23:30:00Z', '2026-10-14T00:00:00Z', '2026-10-14T00:30:00Z', '2026-10-14T01:00:00Z'].entries()) {
-    ctx.db.query('INSERT INTO usage_samples (at, account, five_hour, seven_day, five_hour_resets_at, seven_day_resets_at) VALUES (?, ?, ?, ?, ?, ?)').run(time, 'abcdef012345', 5, 38.5 + index * 0.5, null, '2026-10-18T00:00:00Z');
+    ctx.seed.usageSample({ at: time, account: 'abcdef012345', five_hour: 5, seven_day: 38.5 + index * 0.5, seven_day_resets_at: '2026-10-18T00:00:00Z' });
   }
   for (const issue of ['GEO-9901', 'GEO-9902']) {
     addRun(ctx.db, { issue, title: 'Descale the kettle', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
   }
   const step = await runFleetStep(ctx.db, { run, httpClient: fetch, settings: { path: ctx.path, readFile: readOptionalFile } }, new Date('2026-10-14T01:00:00Z'), { force: false, signal: new AbortController().signal });
-  const everything = JSON.stringify([step, ctx.db.query('SELECT * FROM slot_usage').all(), ctx.db.query('SELECT * FROM news').all(), ctx.db.query('SELECT * FROM meta').all()]);
+  const everything = JSON.stringify([step, readSlotRows(ctx.db, new Date(0), new Date('2026-10-14T01:00:00Z')), ctx.db.query('SELECT * FROM news').all(), ctx.db.query('SELECT * FROM meta').all()]);
 
   expect(step.news).toBe(true);
   expect(ctx.db.query('SELECT text FROM news').all()).toStrictEqual([{ text: 'Fleet forecast: every Claude slot is at 95% from 16 Oct 08:00Z for 40.0 h at the current rate; a cap of 1 lane avoids it' }]);
@@ -120,7 +122,7 @@ test('it stores no slot row and no news line when the step is aborted', async ()
   slotUsage.set('Bearer sk-ant-kettle-slot-3', { seven: { utilization: 0.97, reset: 1_792_303_200 } });
   slotUsage.set('Bearer sk-ant-kettle-slot-4', { seven: { utilization: 0.98, reset: 1_792_346_400 } });
   for (const [index, time] of ['2026-10-13T23:30:00Z', '2026-10-14T00:00:00Z', '2026-10-14T00:30:00Z', '2026-10-14T01:00:00Z'].entries()) {
-    ctx.db.query('INSERT INTO usage_samples (at, account, five_hour, seven_day, five_hour_resets_at, seven_day_resets_at) VALUES (?, ?, ?, ?, ?, ?)').run(time, 'abcdef012345', 5, 38.5 + index * 0.5, null, '2026-10-18T00:00:00Z');
+    ctx.seed.usageSample({ at: time, account: 'abcdef012345', five_hour: 5, seven_day: 38.5 + index * 0.5, seven_day_resets_at: '2026-10-18T00:00:00Z' });
   }
   for (const issue of ['GEO-9901', 'GEO-9902']) {
     addRun(ctx.db, { issue, title: 'Descale the kettle', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
@@ -132,7 +134,7 @@ test('it stores no slot row and no news line when the step is aborted', async ()
   );
 
   expect(outcome).toMatchObject({ name: 'AbortError' });
-  expect(ctx.db.query('SELECT COUNT(*) AS total FROM slot_usage').get()).toStrictEqual({ total: 0 });
+  expect(readSlotRows(ctx.db, new Date(0), new Date('2026-10-14T01:00:00Z'))).toStrictEqual([]);
   expect(ctx.db.query('SELECT COUNT(*) AS total FROM news').get()).toStrictEqual({ total: 0 });
 });
 
@@ -145,10 +147,10 @@ test('it adds no news line when the step is aborted after a read it did not need
     [2, 96, '2026-10-18T12:00:00Z'],
     [4, 97, '2026-10-18T06:00:00Z'],
   ] as const) {
-    ctx.db.query('INSERT INTO slot_usage (at, slot, status, five_hour, five_hour_resets_at, seven_day, seven_day_resets_at, working_lanes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run('2026-10-14T00:30:00Z', slot, '200', 0, null, seven, reset, 2);
+    ctx.seed.slotUsage({ at: '2026-10-14T00:30:00Z', slot, seven, sevenResetsAt: reset });
   }
   for (const [index, time] of ['2026-10-13T23:30:00Z', '2026-10-14T00:00:00Z', '2026-10-14T00:30:00Z', '2026-10-14T01:00:00Z'].entries()) {
-    ctx.db.query('INSERT INTO usage_samples (at, account, five_hour, seven_day, five_hour_resets_at, seven_day_resets_at) VALUES (?, ?, ?, ?, ?, ?)').run(time, 'abcdef012345', 5, 38.5 + index * 0.5, null, '2026-10-18T00:00:00Z');
+    ctx.seed.usageSample({ at: time, account: 'abcdef012345', five_hour: 5, seven_day: 38.5 + index * 0.5, seven_day_resets_at: '2026-10-18T00:00:00Z' });
   }
   for (const issue of ['GEO-9901', 'GEO-9902']) {
     addRun(ctx.db, { issue, title: 'Descale the kettle', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });

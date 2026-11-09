@@ -5,6 +5,7 @@ import { sydneyUtc } from './morning/sydney-utc.ts';
 import { flush } from './outbox/flush.ts';
 import { readOutboxRows } from './outbox/read-outbox-rows.ts';
 import { runWeeklyAuditTick } from './run-weekly-audit-tick.ts';
+import { buildSeeder } from './test-utils/build-seeder.ts';
 
 function setupTest() {
   const fresh = freshDb();
@@ -12,18 +13,18 @@ function setupTest() {
   onTestFinished(overrideEnv('HQ_QUIET', '03-07'));
   return {
     db: fresh.db,
+    seed: buildSeeder(fresh),
     dir: fresh.dir,
     readOutbox: () => readOutboxRows(fresh.db).map((row) => ({ text: row.text, topic: row.topic })),
   };
 }
 
-test('it tells the owner once, from Monday 09:00 Sydney, with the last 7 days as the window', () => {
+test('it tells the owner once, from Monday 09:00 Sydney, with the last 7 days as the window', async () => {
   const ctx = setupTest();
   const read = ctx.db.query("INSERT INTO events (subject, subject_id, action, actor, at, data) VALUES ('hq', 'op', 'read', ?, ?, ?)");
-  const sample = ctx.db.query('INSERT INTO capacity_samples (at, op_account_used, op_account_limit, op_refused) VALUES (?, ?, 1000, 0)');
-  sample.run('2026-10-11T23:00:00Z', 640);
-  sample.run('2026-10-12T12:00:00Z', 812);
-  sample.run('2026-10-13T13:30:00Z', 90);
+  await ctx.seed.capacitySample({ at: '2026-10-11T23:00:00Z', op_account_used: 640, op_account_limit: 1000, op_refused: 0 });
+  await ctx.seed.capacitySample({ at: '2026-10-12T12:00:00Z', op_account_used: 812, op_account_limit: 1000, op_refused: 0 });
+  await ctx.seed.capacitySample({ at: '2026-10-13T13:30:00Z', op_account_used: 90, op_account_limit: 1000, op_refused: 0 });
   read.run('noslop', '2026-10-11T13:00:00Z', '{"consumer":"noslop","requests":1}');
   read.run('noslop', '2026-10-12T05:00:00Z', '{"consumer":"noslop","requests":1}');
   read.run('linear', '2026-10-12T06:00:00Z', '{"consumer":"linear","requests":3}');
