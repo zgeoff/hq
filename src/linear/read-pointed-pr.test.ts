@@ -1,5 +1,6 @@
 import { expect, test } from 'bun:test';
 import { isOwnFixPR, readPointedPR } from './read-pointed-pr.ts';
+import type { PRLink } from './read-pointed-pr.ts';
 
 test.each([
   ['a GitHub PR attachment that opened before the issue', '', [{ url: 'https://github.com/zgeoff/widgets/pull/7', openedAt: '2026-10-20T09:00:00Z' }], 'widgets#7'],
@@ -36,7 +37,7 @@ test.each([
 
 test('it skips an attachment whose PR names the issue as its own fix, and counts one whose body does not', async () => {
   const bodies: Record<string, string> = { 'widgets#7': 'Contributes to GEO-9700', 'widgets#8': 'Fixes GEO-9600' };
-  const readBody = (ref: string) => Promise.resolve(bodies[ref] ?? null);
+  const readBody = (link: PRLink) => Promise.resolve(bodies[`${link.repo}#${link.number}`] ?? null);
   const own = { url: 'https://github.com/zgeoff/widgets/pull/7', openedAt: '2026-10-20T09:00:00Z' };
   const source = { url: 'https://github.com/zgeoff/widgets/pull/8', openedAt: '2026-10-20T09:00:00Z' };
 
@@ -49,14 +50,26 @@ test('it skips an attachment whose PR names the issue as its own fix, and counts
 });
 
 test('#readPointedPR reads the description of no attachment after the first one that counts as the source', async () => {
-  const read: string[] = [];
+  const read: PRLink[] = [];
   const source = { url: 'https://github.com/zgeoff/widgets/pull/8', openedAt: '2026-10-20T09:00:00Z' };
   const later = { url: 'https://github.com/zgeoff/widgets/pull/9', openedAt: '2026-10-20T10:00:00Z' };
 
-  await readPointedPR({ id: 'GEO-9700', description: '', createdAt: '2026-10-20T11:54:00Z', attachments: [source, later] }, (ref) => {
-    read.push(ref);
+  await readPointedPR({ id: 'GEO-9700', description: '', createdAt: '2026-10-20T11:54:00Z', attachments: [source, later] }, (link) => {
+    read.push(link);
     return Promise.resolve('Fixes GEO-9600');
   });
 
-  expect(read).toStrictEqual(['widgets#8']);
+  expect(read).toStrictEqual([{ owner: 'zgeoff', repo: 'widgets', number: '8' }]);
+});
+
+test('#readPointedPR counts an earlier attachment from another owner as the source without reading its PR', async () => {
+  const read: PRLink[] = [];
+  const attachment = { url: 'https://github.com/acme/widgets/pull/7', openedAt: '2026-10-20T09:00:00Z' };
+
+  const pointed = await readPointedPR({ id: 'GEO-9700', description: '', createdAt: '2026-10-20T11:54:00Z', attachments: [attachment] }, (link) => {
+    read.push(link);
+    return Promise.resolve('Fixes GEO-9700');
+  });
+
+  expect({ pointed, read }).toStrictEqual({ pointed: 'widgets#7', read: [] });
 });

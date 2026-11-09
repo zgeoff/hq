@@ -50,7 +50,7 @@ export async function syncFiled(db: Database, call: LinearCall, from: Date, opti
       // A null creator is an issue an integration filed, with no Linear user behind it.
       const source = pickFiledSource({ title: node.title, description, labels, isBotCreator: node.creator === null || node.creator.app });
       const attachments = node.attachments.nodes.map((attachment) => ({ url: attachment.url, openedAt: attachment.metadata?.createdAt ?? null }));
-      const pointedPR = await readPointedPR({ id: node.identifier, description, createdAt: node.createdAt, attachments }, (ref) => readPRBody(options.run, ref));
+      const pointedPR = await readPointedPR({ id: node.identifier, description, createdAt: node.createdAt, attachments }, (link) => readPRBody(options.run, link));
       rows.push({ node, source, pointedPR });
     }
     db.transaction(() => {

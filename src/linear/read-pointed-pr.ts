@@ -13,20 +13,33 @@ export interface FiledIssue {
   attachments: readonly PRAttachment[];
 }
 
-export type PRBodyReader = (ref: string) => Promise<string | null>;
+export interface PRLink {
+  owner: string;
+  repo: string;
+  number: string;
+}
+
+export type PRBodyReader = (link: PRLink) => Promise<string | null>;
+
+// hq reads PRs only in the zgeoff repos, so another owner's PR counts with no read.
+const READ_OWNER = 'zgeoff';
 
 export async function readPointedPR(issue: FiledIssue, readBody: PRBodyReader): Promise<string | null> {
   const explicit = findExplicitSource(issue.description);
   if (explicit !== null) {
     return explicit;
   }
-  for (const ref of collectEarlierPRLinks(issue.attachments, issue.createdAt)) {
-    const body = await readBody(ref);
+  for (const link of collectEarlierPRLinks(issue.attachments, issue.createdAt)) {
+    if (link.owner !== READ_OWNER) {
+      return toPRRef(link);
+    }
+    const body = await readBody(link);
     if (body === null || !isOwnFixPR(body, issue.id)) {
-      return ref;
+      return toPRRef(link);
     }
   }
-  return findPRLink(issue.description);
+  const described = findPRLink(issue.description);
+  return described === null ? null : toPRRef(described);
 }
 
 function findExplicitSource(description: string): string | null {
@@ -37,22 +50,26 @@ function findExplicitSource(description: string): string | null {
   return /^[ \t]*(?:[*-][ \t]+)?Found by the .*? agent on (?<ref>[\w.-]+#\d+)/mu.exec(description)?.groups?.['ref'] ?? null;
 }
 
-function collectEarlierPRLinks(attachments: readonly PRAttachment[], issueCreatedAt: string): string[] {
+function collectEarlierPRLinks(attachments: readonly PRAttachment[], issueCreatedAt: string): PRLink[] {
   const filedAt = Date.parse(issueCreatedAt);
   return attachments.flatMap((attachment) => {
-    const ref = findPRLink(attachment.url);
-    return ref !== null && attachment.openedAt !== null && Date.parse(attachment.openedAt) < filedAt ? [ref] : [];
+    const link = findPRLink(attachment.url);
+    return link !== null && attachment.openedAt !== null && Date.parse(attachment.openedAt) < filedAt ? [link] : [];
   });
+}
+
+function findPRLink(text: string): PRLink | null {
+  const link = /github\.com\/(?<owner>[\w.-]+)\/(?<repo>[\w.-]+)\/pull\/(?<number>\d+)/u.exec(text)?.groups;
+  if (!link?.['owner'] || !link['repo'] || !link['number']) {
+    return null;
+  }
+  return { owner: link['owner'], repo: link['repo'], number: link['number'] };
+}
+
+function toPRRef(link: PRLink): string {
+  return `${link.repo}#${link.number}`;
 }
 
 export function isOwnFixPR(body: string, issueID: string): boolean {
   return parseIssueLinks(body).some((link) => link.id === issueID);
-}
-
-function findPRLink(text: string): string | null {
-  const link = /github\.com\/[\w.-]+\/(?<repo>[\w.-]+)\/pull\/(?<number>\d+)/u.exec(text)?.groups;
-  if (!link?.['repo'] || !link['number']) {
-    return null;
-  }
-  return `${link['repo']}#${link['number']}`;
 }
