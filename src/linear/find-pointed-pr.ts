@@ -1,3 +1,5 @@
+import { parseIssueLinks } from '../parse-issue-links.ts';
+
 // metadata.createdAt is the PR's own open time, not when Linear attached it. body is absent until
 // something reads the PR's description.
 export interface PRAttachment {
@@ -33,8 +35,7 @@ export function collectEarlierPRAttachments(attachments: readonly PRAttachment[]
 }
 
 export function isOwnFixPR(body: string, issueID: string): boolean {
-  const escaped = issueID.replaceAll(/[.*+?^${}()|[\]\\]/gu, String.raw`\$&`);
-  return new RegExp(`^[ \\t]*(?:[*-][ \\t]+)?(?:Fixes|Contributes to|Related to) ${escaped}(?!\\w)`, 'mu').test(body);
+  return parseIssueLinks(body).some((link) => link.id === issueID);
 }
 
 export function findPRLink(text: string): string | null {
