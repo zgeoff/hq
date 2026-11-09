@@ -3,9 +3,8 @@ import { z } from 'zod';
 import { iso } from '../clock/iso.ts';
 import { HqError } from '../errors.ts';
 import type { Runner } from '../runner/types.ts';
-import { collectEarlierPRAttachments, findExplicitSource, findPRLink, findPointedPR } from './find-pointed-pr.ts';
-import type { PRAttachment } from './find-pointed-pr.ts';
 import { pickFiledSource } from './pick-filed-source.ts';
+import { readPointedPR } from './read-pointed-pr.ts';
 import { readPRBody } from './read-pr-body.ts';
 import type { LinearCall } from './types.ts';
 
@@ -50,8 +49,9 @@ export async function syncFiled(db: Database, call: LinearCall, from: Date, opti
 
       // A null creator is an issue an integration filed, with no Linear user behind it.
       const source = pickFiledSource({ title: node.title, description, labels, isBotCreator: node.creator === null || node.creator.app });
-      const attachments = await readAttachments(options.run, node.attachments.nodes, description, node.createdAt);
-      rows.push({ node, source, pointedPR: findPointedPR(description, attachments, node.createdAt, node.identifier) });
+      const attachments = node.attachments.nodes.map((attachment) => ({ url: attachment.url, openedAt: attachment.metadata?.createdAt ?? null }));
+      const pointedPR = await readPointedPR({ id: node.identifier, description, createdAt: node.createdAt, attachments }, (ref) => readPRBody(options.run, ref));
+      rows.push({ node, source, pointedPR });
     }
     db.transaction(() => {
       for (const row of rows) {
@@ -65,20 +65,4 @@ export async function syncFiled(db: Database, call: LinearCall, from: Date, opti
     after = issues.pageInfo.endCursor;
   }
   throw new HqError('linear_failed', 'more than 4,000 filed issues in the window; narrow it');
-}
-
-// Only an attachment that would otherwise count as the source PR costs a GitHub call.
-async function readAttachments(run: Runner, nodes: readonly z.infer<typeof attachmentSchema>[], description: string, issueCreatedAt: string): Promise<PRAttachment[]> {
-  const attachments: PRAttachment[] = nodes.map((attachment) => ({ url: attachment.url, openedAt: attachment.metadata?.createdAt ?? null }));
-  if (findExplicitSource(description) !== null) {
-    return attachments;
-  }
-  for (const attachment of collectEarlierPRAttachments(attachments, issueCreatedAt)) {
-    const ref = findPRLink(attachment.url);
-    const body = ref === null ? null : await readPRBody(run, ref);
-    if (body !== null) {
-      attachment.body = body;
-    }
-  }
-  return attachments;
 }

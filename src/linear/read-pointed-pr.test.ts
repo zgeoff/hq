@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { findPointedPR, isOwnFixPR } from './find-pointed-pr.ts';
+import { isOwnFixPR, readPointedPR } from './read-pointed-pr.ts';
 
 test.each([
   ['a GitHub PR attachment that opened before the issue', '', [{ url: 'https://github.com/zgeoff/widgets/pull/7', openedAt: '2026-10-20T09:00:00Z' }], 'widgets#7'],
@@ -14,7 +14,7 @@ test.each([
   ['an attachment that is not a PR', 'Descale the kettle.', [{ url: 'https://github.com/zgeoff/widgets/issues/7', openedAt: '2026-10-20T09:00:00Z' }], null],
   ['no PR: From in the middle of a line', 'Taken From widgets#7 by hand.', [], null],
 ])('it reads %s', (_case, description, attachments, expected) => {
-  expect(findPointedPR(description, attachments, '2026-10-20T11:54:00Z', 'GEO-9700')).toBe(expected);
+  expect(readPointedPR({ id: 'GEO-9700', description, createdAt: '2026-10-20T11:54:00Z', attachments }, () => Promise.resolve(null))).resolves.toBe(expected);
 });
 
 test.each([
@@ -34,9 +34,29 @@ test.each([
   expect(isOwnFixPR(body, 'GEO-9700')).toBe(expected);
 });
 
-test('it skips an attachment whose PR names the issue as its own fix, and counts one whose body does not', () => {
-  const own = { url: 'https://github.com/zgeoff/widgets/pull/7', openedAt: '2026-10-20T09:00:00Z', body: 'Contributes to GEO-9700' };
-  const source = { url: 'https://github.com/zgeoff/widgets/pull/8', openedAt: '2026-10-20T09:00:00Z', body: 'Fixes GEO-9600' };
+test('it skips an attachment whose PR names the issue as its own fix, and counts one whose body does not', async () => {
+  const bodies: Record<string, string> = { 'widgets#7': 'Contributes to GEO-9700', 'widgets#8': 'Fixes GEO-9600' };
+  const readBody = (ref: string) => Promise.resolve(bodies[ref] ?? null);
+  const own = { url: 'https://github.com/zgeoff/widgets/pull/7', openedAt: '2026-10-20T09:00:00Z' };
+  const source = { url: 'https://github.com/zgeoff/widgets/pull/8', openedAt: '2026-10-20T09:00:00Z' };
 
-  expect({ own: findPointedPR('', [own], '2026-10-20T11:54:00Z', 'GEO-9700'), both: findPointedPR('', [own, source], '2026-10-20T11:54:00Z', 'GEO-9700') }).toStrictEqual({ own: null, both: 'widgets#8' });
+  const pointed = {
+    own: await readPointedPR({ id: 'GEO-9700', description: '', createdAt: '2026-10-20T11:54:00Z', attachments: [own] }, readBody),
+    both: await readPointedPR({ id: 'GEO-9700', description: '', createdAt: '2026-10-20T11:54:00Z', attachments: [own, source] }, readBody),
+  };
+
+  expect(pointed).toStrictEqual({ own: null, both: 'widgets#8' });
+});
+
+test('#readPointedPR reads the description of no attachment after the first one that counts as the source', async () => {
+  const read: string[] = [];
+  const source = { url: 'https://github.com/zgeoff/widgets/pull/8', openedAt: '2026-10-20T09:00:00Z' };
+  const later = { url: 'https://github.com/zgeoff/widgets/pull/9', openedAt: '2026-10-20T10:00:00Z' };
+
+  await readPointedPR({ id: 'GEO-9700', description: '', createdAt: '2026-10-20T11:54:00Z', attachments: [source, later] }, (ref) => {
+    read.push(ref);
+    return Promise.resolve('Fixes GEO-9600');
+  });
+
+  expect(read).toStrictEqual(['widgets#8']);
 });
