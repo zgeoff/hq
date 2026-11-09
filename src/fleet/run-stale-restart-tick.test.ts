@@ -140,9 +140,20 @@ test('it names the session and the commit in the save request and the news', asy
   expect(ctx.atc.sent[0]?.text).toBe(
     `hq: z-kettle, your start prompt is stale: main has ${ctx.staleCommit()} (invented change), which your prompt predates. hq restarts you from main once you have saved your state. Save it now, then answer this message with the atc answer tool: \`saved\`, or \`busy\` to defer.`,
   );
-  expect(ctx.db.query('SELECT text FROM news').all()).toStrictEqual([
-    { text: 'hq fleet: z-kettle spawned: spawned- after 0 min without a live session (--now).' },
-    { text: `z-kettle restarted from main; its old prompt predated ${ctx.staleCommit()}` },
+  expect(ctx.db.query('SELECT text FROM news').all()).toStrictEqual([{ text: `z-kettle restarted from main; its old prompt predated ${ctx.staleCommit()}` }]);
+});
+
+test('it posts exactly one news item for a stale restart, the restart line with its reason', async () => {
+  const ctx = setupTest();
+  await ctx.tick(0, [ctx.kettle]);
+  await ctx.tick(121, [ctx.kettle]);
+  ctx.atc.messages.set('m-1', { status: 'answered', answer: 'saved' });
+
+  await ctx.tick(126, [ctx.kettle]);
+
+  expect(readSpawnedNames(ctx.atc)).toStrictEqual(['z-kettle']);
+  expect(ctx.db.query('SELECT from_name, text, tag FROM news').all()).toStrictEqual([
+    { from_name: 'hq-fleet', text: `z-kettle restarted from main; its old prompt predated ${ctx.staleCommit()}`, tag: null },
   ]);
 });
 
@@ -377,10 +388,7 @@ test('it still respawns and reports a restarted session when a later session che
   await ctx.tick(131, [ctx.kettle, ctx.urn]);
 
   expect(readSpawnedNames(ctx.atc)).toStrictEqual(['z-kettle']);
-  expect(ctx.db.query('SELECT text FROM news').all()).toStrictEqual([
-    { text: 'hq fleet: z-kettle spawned: spawned- after 0 min without a live session (--now).' },
-    { text: `z-kettle restarted from main; its old prompt predated ${ctx.staleCommit()}` },
-  ]);
+  expect(ctx.db.query('SELECT text FROM news').all()).toStrictEqual([{ text: `z-kettle restarted from main; its old prompt predated ${ctx.staleCommit()}` }]);
   expect(ctx.db.query(`SELECT json_extract(data, '$.name') AS name, json_extract(data, '$.error') AS error FROM events WHERE action = 'stale-restart-failed'`).all()).toStrictEqual([
     { name: 'z-urn', error: 'invented session.get failure' },
   ]);
@@ -621,10 +629,7 @@ test('it restarts an orchestrator session six hours after its start, through the
     { action: 'save-requested', data: JSON.stringify({ name: 'z-delivery', sessionId: 'id-delivery', reason: '6 h since start' }) },
     { action: 'scheduled-restarted', data: JSON.stringify({ name: 'z-delivery', sessionId: 'id-delivery', reason: '6 h since start' }) },
   ]);
-  expect(ctx.db.query('SELECT text FROM news').all()).toStrictEqual([
-    { text: 'hq fleet: z-delivery spawned: spawned- after 0 min without a live session (--now).' },
-    { text: 'z-delivery restarted from main; scheduled restart, 6 h since start' },
-  ]);
+  expect(ctx.db.query('SELECT text FROM news').all()).toStrictEqual([{ text: 'z-delivery restarted from main; scheduled restart, 6 h since start' }]);
 });
 
 test('it restarts an orchestrator session one hour old after three compactions since its start', async () => {

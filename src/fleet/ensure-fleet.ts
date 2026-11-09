@@ -46,9 +46,10 @@ export async function ensureFleet(db: Database, client: FleetClient, opts: { dry
   const lease = takeLease(db, opts.actor);
   try {
     const restarted = await tryStaleRestart(db, client, opts);
+    const restartedNames = restarted.map((session) => session.name);
     let steps: EnsureStep[];
     try {
-      steps = await ensureOnce(db, client, { ...opts, now: [...(opts.now ?? []), ...restarted.map((r) => r.name)] });
+      steps = await ensureOnce(db, client, { ...opts, now: [...(opts.now ?? []), ...restartedNames], restarting: new Set(restartedNames) });
     } catch (error) {
       recordStaleRestarts(db, restarted, null, opts.actor);
       throw error;
@@ -100,7 +101,16 @@ function dropLease(db: Database, token: string): void {
 }
 const FLEET_UNPINNED = 'fleet_unpinned';
 
-async function ensureOnce(db: Database, client: FleetClient, opts: { dryRun: boolean; actor: string; fleet?: FleetEntry[]; now?: string[]; rc?: RcDeps }): Promise<EnsureStep[]> {
+interface EnsureOnceOptions {
+  dryRun: boolean;
+  actor: string;
+  fleet?: FleetEntry[];
+  now?: string[];
+  restarting?: ReadonlySet<string>;
+  rc?: RcDeps;
+}
+
+async function ensureOnce(db: Database, client: FleetClient, opts: EnsureOnceOptions): Promise<EnsureStep[]> {
   // A missing name waits before a spawn (a restore after a daemon restart keeps its id); a z- session
   // doesn't sleep for an hour, so a session atc still means to run is taken as dead after that.
   const GRACE_MIN = 10;
@@ -228,7 +238,7 @@ async function ensureOnce(db: Database, client: FleetClient, opts: { dryRun: boo
     const told = steps.filter((step) => !rcReported.has(step) && (step.action === 'spawned' || step.action === 'failed' || step.action === 'duplicates' || step.action === 'remote control'));
     if (!opts.dryRun && told.length) {
       const seq = logEvent(db, 'hq', 'fleet', 'ensured', opts.actor, null, null, { steps: told });
-      const picked = pickStepsToTell(told);
+      const picked = pickStepsToTell(told, opts.restarting ?? new Set());
       for (const step of picked.news) {
         addNews(db, { from: opts.actor, topic: 'other', text: `hq fleet: ${sayStep(step)}.`.replaceAll(/\s*[\r\n]+\s*/gu, ' ').slice(0, 400), issue: null, link: null, needsGeoff: false, tag: 'fleet-respawn' });
       }
