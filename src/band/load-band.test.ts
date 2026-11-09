@@ -28,8 +28,8 @@ function setupTest() {
 test('all clear: nothing needs the owner, Nix is up, impd has room, CI passed, and each segment is plain', async () => {
   const ctx = setupTest();
   writeFileSync(ctx.pacing, JSON.stringify({ imp: { impMib: 2048 }, lanes: { imp: { cleanup: 3 }, local: { flexible: 1 } } }));
-  ctx.db.query("INSERT INTO probe_samples (at, target_ok, control_ok) VALUES ('2026-10-15T00:59:00Z', 1, 1)").run();
-  ctx.db.query("INSERT INTO capacity_samples (at, nonnix_awake_mib, nonnix_awake_vcpus) VALUES ('2026-10-15T00:55:00Z', 8192, 6)").run();
+  ctx.seed.probeSample({ at: '2026-10-15T00:59:00Z' });
+  await ctx.seed.capacitySample({ at: '2026-10-15T00:55:00Z', nonnix_awake_mib: 8192, nonnix_awake_vcpus: 6 });
   ctx.db.query("INSERT INTO ci_runs (id, repo, path, event, status, conclusion, attempt, created_at, started_at, updated_at) VALUES (1, 'kettle', '.github/workflows/ci.yml', 'push', 'completed', 'success', 1, '2026-10-15T00:00:00Z', '2026-10-15T00:00:00Z', '2026-10-15T00:05:00Z')").run();
   await main(['run', 'add', 'GEO-9601', '--title', 'Fit the long spout', '--where', 'imp', '--json']);
   await main(['run', 'lane', 'GEO-9601', 'cleanup', '--json']);
@@ -43,7 +43,7 @@ test('all clear: nothing needs the owner, Nix is up, impd has room, CI passed, a
 test('a cap turns the lanes segment into working over the cap, with the pool size, until and impd text', async () => {
   const ctx = setupTest();
   writeFileSync(ctx.pacing, JSON.stringify({ imp: { impMib: 2048 }, lanes: { imp: { cleanup: 3 }, local: { flexible: 1 } } }));
-  ctx.db.query("INSERT INTO capacity_samples (at, nonnix_awake_mib, nonnix_awake_vcpus) VALUES ('2026-10-15T00:55:00Z', 8192, 6)").run();
+  await ctx.seed.capacitySample({ at: '2026-10-15T00:55:00Z', nonnix_awake_mib: 8192, nonnix_awake_vcpus: 6 });
   setMeta(ctx.db, 'lanes_cap', JSON.stringify({ cap: 2, until: '2026-10-18T21:00:00Z', reason: 'weekend pacing', by: 'z-stu', at: '2026-10-15T00:00:00Z' }));
   await main(['run', 'add', 'GEO-9601', '--title', 'Fit the long spout', '--where', 'imp', '--json']);
 
@@ -55,7 +55,7 @@ test('a cap turns the lanes segment into working over the cap, with the pool siz
 test('a cap with no until leaves the until out of the lanes segment', async () => {
   const ctx = setupTest();
   writeFileSync(ctx.pacing, JSON.stringify({ imp: { impMib: 2048 }, lanes: { imp: { cleanup: 3 }, local: { flexible: 1 } } }));
-  ctx.db.query("INSERT INTO capacity_samples (at, nonnix_awake_mib, nonnix_awake_vcpus) VALUES ('2026-10-15T00:55:00Z', 8192, 6)").run();
+  await ctx.seed.capacitySample({ at: '2026-10-15T00:55:00Z', nonnix_awake_mib: 8192, nonnix_awake_vcpus: 6 });
   setMeta(ctx.db, 'lanes_cap', JSON.stringify({ cap: 3, until: null, reason: null, by: 'z-stu', at: '2026-10-15T00:00:00Z' }));
 
   const band = await loadBand(ctx.db, ctx.pacing, new Date('2026-10-15T01:00:00Z'));
@@ -75,23 +75,23 @@ test.each([
   ['once the probe falls silent', '2026-10-15T01:05:00Z'],
 ])('it shows an open outage as Nix down in red %s', async (_case, lookedAt) => {
   const ctx = setupTest();
-  ctx.db.query("INSERT INTO probe_samples (at, target_ok, control_ok) VALUES ('2026-10-15T00:59:00Z', 1, 1)").run();
-  ctx.db.query("INSERT INTO outages (started_at, detected_at, kind) VALUES ('2026-10-15T00:50:00Z', '2026-10-15T00:53:00Z', 'down')").run();
+  ctx.seed.probeSample({ at: '2026-10-15T00:59:00Z' });
+  ctx.seed.outage({ startedAt: '2026-10-15T00:50:00Z', detectedAt: '2026-10-15T00:53:00Z' });
 
   await expect(loadBand(ctx.db, ctx.pacing, new Date(lookedAt)).then((band) => band.segments[1])).resolves.toStrictEqual({ key: 'nix', text: 'Nix down', tone: 'alert' });
 });
 
 test('a probe silent over 5 minutes with no outage open is Nix unknown in amber', async () => {
   const ctx = setupTest();
-  ctx.db.query("INSERT INTO probe_samples (at, target_ok, control_ok) VALUES ('2026-10-15T00:59:00Z', 1, 1)").run();
+  ctx.seed.probeSample({ at: '2026-10-15T00:59:00Z' });
 
   await expect(loadBand(ctx.db, ctx.pacing, new Date('2026-10-15T01:05:00Z')).then((band) => band.segments[1])).resolves.toStrictEqual({ key: 'nix', text: 'Nix ?', tone: 'warn' });
 });
 
 test('a fresh probe sample that was blind, the target and the control both failing, is Nix unknown in amber', async () => {
   const ctx = setupTest();
-  ctx.db.query("INSERT INTO probe_samples (at, target_ok, control_ok) VALUES ('2026-10-15T00:59:00Z', 1, 1)").run();
-  ctx.db.query("INSERT INTO probe_samples (at, target_ok, control_ok) VALUES ('2026-10-15T00:59:30Z', 0, 0)").run();
+  ctx.seed.probeSample({ at: '2026-10-15T00:59:00Z' });
+  ctx.seed.blindProbeSample({ at: '2026-10-15T00:59:30Z' });
 
   await expect(loadBand(ctx.db, ctx.pacing, new Date('2026-10-15T01:00:00Z')).then((band) => band.segments[1])).resolves.toStrictEqual({ key: 'nix', text: 'Nix ?', tone: 'warn' });
 });
@@ -123,7 +123,7 @@ test.each([
 ])('one imp from the %s line turns lanes amber', async (_line, mib, vcpus, text) => {
   const ctx = setupTest();
   writeFileSync(ctx.pacing, JSON.stringify({ imp: { impMib: 2048 }, lanes: { imp: { cleanup: 3 }, local: { flexible: 1 } } }));
-  ctx.db.query("INSERT INTO capacity_samples (at, nonnix_awake_mib, nonnix_awake_vcpus) VALUES ('2026-10-15T00:58:00Z', ?, ?)").run(mib, vcpus);
+  await ctx.seed.capacitySample({ at: '2026-10-15T00:58:00Z', nonnix_awake_mib: mib, nonnix_awake_vcpus: vcpus });
 
   await expect(loadBand(ctx.db, ctx.pacing, new Date('2026-10-15T01:00:00Z')).then((band) => band.segments[2])).resolves.toStrictEqual({ key: 'lanes', text: `lanes 0/4 (${text})`, tone: 'warn' });
 });
@@ -134,7 +134,7 @@ test.each([
 ])('imp lanes whose sizes, all full, cross impd\'s %s line turn lanes amber and say which', async (_line, impMib, nixie, text) => {
   const ctx = setupTest();
   writeFileSync(ctx.pacing, JSON.stringify({ imp: { impMib }, lanes: { imp: { cleanup: 5, nixie }, local: { flexible: 1 } } }));
-  ctx.db.query("INSERT INTO capacity_samples (at, nonnix_awake_mib, nonnix_awake_vcpus) VALUES ('2026-10-15T00:55:00Z', 8192, 6)").run();
+  await ctx.seed.capacitySample({ at: '2026-10-15T00:55:00Z', nonnix_awake_mib: 8192, nonnix_awake_vcpus: 6 });
 
   await expect(loadBand(ctx.db, ctx.pacing, new Date('2026-10-15T01:00:00Z')).then((band) => band.segments[2])).resolves.toStrictEqual({ key: 'lanes', text, tone: 'warn' });
 });
@@ -142,7 +142,7 @@ test.each([
 test('an impd reading over 15 minutes old shows impd unknown and turns lanes amber', async () => {
   const ctx = setupTest();
   writeFileSync(ctx.pacing, JSON.stringify({ imp: { impMib: 2048 }, lanes: { imp: { cleanup: 3 }, local: { flexible: 1 } } }));
-  ctx.db.query("INSERT INTO capacity_samples (at, nonnix_awake_mib, nonnix_awake_vcpus) VALUES ('2026-10-15T00:44:00Z', 8192, 6)").run();
+  await ctx.seed.capacitySample({ at: '2026-10-15T00:44:00Z', nonnix_awake_mib: 8192, nonnix_awake_vcpus: 6 });
 
   await expect(loadBand(ctx.db, ctx.pacing, new Date('2026-10-15T01:00:00Z')).then((band) => band.segments[2])).resolves.toStrictEqual({ key: 'lanes', text: 'lanes 0/4 (impd ?)', tone: 'warn' });
 });
@@ -155,7 +155,7 @@ test.each([
 ] as const)('$title', async (row) => {
   const ctx = setupTest();
   writeFileSync(ctx.pacing, JSON.stringify({ imp: { impMib: 2048 }, lanes: { imp: { cleanup: 3 }, local: { flexible: 1 } } }));
-  ctx.db.query("INSERT INTO capacity_samples (at, nonnix_awake_mib, nonnix_awake_vcpus) VALUES ('2026-10-15T00:55:00Z', 8192, 6)").run();
+  await ctx.seed.capacitySample({ at: '2026-10-15T00:55:00Z', nonnix_awake_mib: 8192, nonnix_awake_vcpus: 6 });
   at('2026-10-15T00:00:00Z');
   for (let index = 1; index <= row.count; index++) {
     ctx.seed.run({ issue: `GEO-970${index}`, title: 'Fit the long spout', place: row.place, lane: 'cleanup' });

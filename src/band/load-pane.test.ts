@@ -54,14 +54,13 @@ test('the pane lists what needs the owner with its links, then Nix, lanes, revie
   setNow('2026-10-15T01:00:00Z');
   const pending = createUnblockItems(fleet, { lid: { task: 'Fit the new lid on the kettle', links: [{ label: 'kettle#41', url: 'https://github.com/zgeoff/kettle/pull/41', subject: true }] } });
   app.seed.meta({ key: 'atc_awake', value: JSON.stringify({ at: '2026-10-15T01:00:00.000Z', ids: ['a0000601-aaaa-4aaa-8aaa-aaaaaaaaaaaa'] }) });
-  const sample = pending.query("INSERT INTO probe_samples (at, target_ok, control_ok) VALUES ('2026-10-15T00:58:00Z', 1, 1)").run();
+  app.seed.probeSample({ at: '2026-10-15T00:58:00Z' });
   const shown = await loadPane(pending, app.pacing, app.consoleURL, app.at);
-  expect([news, parkAdd, parkLane, parkState, sample.changes, shown.heat]).toStrictEqual([
+  expect([news, parkAdd, parkLane, parkState, shown.heat]).toStrictEqual([
     0,
     0,
     0,
     0,
-    1,
     [
       { lane: 'cleanup', size: 3, used: 1 },
       { lane: 'flexible', size: 1, used: 0 },
@@ -116,10 +115,11 @@ test('a title the console cuts inside a URL is cut before the URL, so the pane l
 
 test('with no probe sample in 5 minutes, or a blind newest sample, Nix is unknown and says why', async () => {
   const app = setupTest();
-  const olderSample = writeProbeSample(writeOpenOutage(app), '2026-10-15T00:50:00Z', 1);
-  const olderShown = await loadPane(olderSample, app.pacing, app.consoleURL, app.at);
-  const recentBlind = writeProbeSample(olderSample, '2026-10-15T00:59:00Z', 0);
-  const recentShown = await loadPane(recentBlind, app.pacing, app.consoleURL, app.at);
+  writeFileSync(app.pacing, JSON.stringify({ imp: { impMib: 2048 } }));
+  app.seed.probeSample({ at: '2026-10-15T00:50:00Z' });
+  const olderShown = await loadPane(app.db, app.pacing, app.consoleURL, app.at);
+  app.seed.blindProbeSample({ at: '2026-10-15T00:59:00Z' });
+  const recentShown = await loadPane(app.db, app.pacing, app.consoleURL, app.at);
   expect([olderShown.markdown.split('\n\n')[1], recentShown.markdown.split('\n\n')[1]]).toStrictEqual([
     '## Nix\n**Unknown**: no probe sample in 5 min · 0 min down today',
     '## Nix\n**Unknown**: the newest probe was blind · 0 min down today',
@@ -147,15 +147,9 @@ test('a pacing.json hq refuses says why under Lanes, and draws no heat map', asy
   expect([shown.heat, shown.markdown.split('\n\n')[2]]).toStrictEqual([[], "## Lanes\nhq can't read the lanes: pacing.json: pacing.json lanes: bad lane imp.Bad Teapot"]);
 });
 
-function writeProbeSample(db: Database, at: string, ok: number): Database {
-  db.query('DELETE FROM outages').run();
-  db.query('INSERT INTO probe_samples (at, target_ok, control_ok) VALUES (?, ?, ?)').run(at, ok, ok);
-  return db;
-}
-
 function writeOpenOutage(app: ReturnType<typeof setupTest>): Database {
   writeFileSync(app.pacing, JSON.stringify({ imp: { impMib: 2048 } }));
-  app.db.query("INSERT INTO outages (started_at, detected_at, kind) VALUES (?, ?, 'down')").run('2026-10-15T00:50:00Z', '2026-10-15T00:53:00Z');
+  app.seed.outage({ startedAt: '2026-10-15T00:50:00Z', detectedAt: '2026-10-15T00:53:00Z' });
   return app.db;
 }
 
