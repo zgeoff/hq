@@ -9,7 +9,6 @@ import { addFollowup } from '../../followups/add-followup.ts';
 import { syncLinear } from '../../kinds/sync-linear.ts';
 import type { LinearCall } from '../../linear/types.ts';
 import { addRun } from '../../runs/add-run.ts';
-import { setState } from '../../runs/set-state.ts';
 import { addUnblock } from '../../unblock/add-unblock.ts';
 import { dailyText } from '../daily/daily-text.ts';
 import { sendThroughputAlerts } from './send-throughput-alerts.ts';
@@ -30,12 +29,6 @@ function setupTest() {
     db: fresh.db,
     seed: buildSeeder(fresh),
     now,
-    seedRun: (issue: string, state: 'working' | 'merged' | 'live-check' | 'dropped') => {
-      addRun(fresh.db, { issue, title: 'Invented kettle work', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, actor: 'z-delivery' });
-      if (state !== 'working') {
-        setState(fresh.db, issue, state, { note: 'invented' }, 'z-delivery');
-      }
-    },
     readOutbox: () => fresh.db.query('SELECT target, text FROM outbox ORDER BY id').all(),
     findLine: (name: string) =>
       dailyText(fresh.db, new Date(now))
@@ -46,7 +39,7 @@ function setupTest() {
 
 test('hq goals daily --dry-run prints the issues, bad filings and stale lines with their targets and colours', async () => {
   const ctx = setupTest();
-  ctx.db.query(`INSERT INTO linear_issues (issue, type, title, state, closed_at, fetched_at) VALUES ('GEO-9810', 'Bug', 't', 'completed', '2026-10-16T02:00:00Z', '${ctx.now}')`).run();
+  ctx.seed.linearIssue({ issue: 'GEO-9810', type: 'Bug', closed_at: '2026-10-16T02:00:00Z' });
   await syncLinear(ctx.db, makeThroughputLinearCall([buildFiledNode('GEO-9801', 'From widgets#7\n\nThe widget drops a retry.'), buildFiledNode('GEO-9802', 'Descale the kettle.')]), new Date('2026-10-14T00:00:00Z'), new Date(ctx.now));
   const printed: string[] = [];
   const log = console.log;
@@ -137,9 +130,8 @@ test('it alerts on an In Progress issue with no run and no PR, or an open run on
   run('GEO-9803');
   run('GEO-9804');
   run('GEO-9805');
-  const closed = ctx.db.query(`INSERT INTO linear_issues (issue, type, title, state, closed_at, fetched_at) VALUES (?, 'Bug', 't', ?, ?, '${ctx.now}')`);
-  closed.run('GEO-9804', 'completed', '2026-10-14T07:00:00Z');
-  closed.run('GEO-9805', 'canceled', '2026-10-16T01:00:00Z');
+  ctx.seed.linearIssue({ issue: 'GEO-9804', type: 'Bug', state: 'completed', closed_at: '2026-10-14T07:00:00Z' });
+  ctx.seed.linearIssue({ issue: 'GEO-9805', type: 'Bug', state: 'canceled', closed_at: '2026-10-16T01:00:00Z' });
   const started = [
     { identifier: 'GEO-9801', startedAt: '2026-10-14T07:00:00Z' },
     { identifier: 'GEO-9802', startedAt: '2026-10-16T01:00:00Z' },
@@ -269,12 +261,12 @@ test('it sends a done-but-open issue to triage 24 hours after its last merge and
 
 test('it alerts on an In Review issue whose run is past merge or dropped, or that has no run, and not on one with an owner or a recent update', async () => {
   const ctx = setupTest();
-  ctx.seedRun('GEO-9801', 'merged');
-  ctx.seedRun('GEO-9802', 'live-check');
-  ctx.seedRun('GEO-9804', 'dropped');
-  ctx.seedRun('GEO-9805', 'merged');
-  ctx.seedRun('GEO-9806', 'merged');
-  ctx.seedRun('GEO-9807', 'working');
+  ctx.seed.mergedRun({ issue: 'GEO-9801' });
+  ctx.seed.liveCheckRun({ issue: 'GEO-9802' });
+  ctx.seed.droppedRun({ issue: 'GEO-9804' });
+  ctx.seed.mergedRun({ issue: 'GEO-9805' });
+  ctx.seed.mergedRun({ issue: 'GEO-9806' });
+  ctx.seed.run({ issue: 'GEO-9807' });
   addUnblock(ctx.db, { id: 'kettle-watch', task: 'Watch the kettle release', minutes: null, unblocks: [{ issue: 'GEO-9805', priority: 'none' }], notify: [], actor: 'z-triage', kind: 'watch', deadline: '2026-10-30T00:00:00Z' });
   const inReview = [
     { identifier: 'GEO-9801', updatedAt: '2026-10-13T07:00:00Z' },
@@ -303,7 +295,7 @@ test('it alerts on an In Review issue whose run is past merge or dropped, or tha
 
 test('it alerts on a stuck In Review issue that an open owner task names, since only a watch silences it', async () => {
   const ctx = setupTest();
-  ctx.seedRun('GEO-9801', 'merged');
+  ctx.seed.mergedRun({ issue: 'GEO-9801' });
   addUnblock(ctx.db, { id: 'kettle-descale', task: 'Descale the kettle', minutes: 5, unblocks: [{ issue: 'GEO-9801', priority: 'none' }], notify: [], actor: 'z-triage', kind: 'owner' });
   await syncLinear(ctx.db, makeThroughputLinearCall([], [], [{ identifier: 'GEO-9801', updatedAt: '2026-10-13T07:00:00Z' }]), new Date('2026-10-14T00:00:00Z'), new Date(ctx.now));
 
