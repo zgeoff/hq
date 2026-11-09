@@ -1,10 +1,15 @@
 import type { StoredEvent } from '../read-events.ts';
 
-export const CLEANUP_ACTIONS = ['handed-in-claim', 'handed-in-kept', 'handed-in-ended', 'merged-wrap-up', 'merged-wrap-up-retry', 'merged-wrap-up-result'] as const;
+export const CLEANUP_ACTIONS = ['handed-in-claim', 'handed-in-kept', 'handed-in-ended', 'merged-wrap-up', 'merged-wrap-up-retry', 'merged-wrap-up-result', 'design-done-close', 'design-done-close-result'] as const;
 
-// A handed-in claim ends with its kept or ended event, and a merged-run claim or retry claim with its result.
+// A handed-in claim ends with its kept or ended event, and a merged-run, retry or design-done claim with its result.
 export function isCleanupHeld(events: readonly StoredEvent[], at: Date): boolean {
-  return isOpenClaim(events, 'handed-in-claim', ['handed-in-kept', 'handed-in-ended'], at) || isOpenClaim(events, 'merged-wrap-up', ['merged-wrap-up-result'], at) || isOpenClaim(events, 'merged-wrap-up-retry', ['merged-wrap-up-result'], at);
+  return (
+    isOpenClaim(events, 'handed-in-claim', ['handed-in-kept', 'handed-in-ended'], at) ||
+    isOpenClaim(events, 'merged-wrap-up', ['merged-wrap-up-result'], at) ||
+    isOpenClaim(events, 'merged-wrap-up-retry', ['merged-wrap-up-result'], at) ||
+    isOpenClaim(events, 'design-done-close', ['design-done-close-result'], at)
+  );
 }
 
 // A cleanup reads each tree's work through an imp exec of up to 2 minutes, so a claim this old

@@ -348,14 +348,14 @@ test('it keeps the atc client of a design-run close open past the step deadline 
   const held = Promise.withResolvers<never>();
   const logs: string[] = [];
   let closes = 0;
-  const wrapUpDeps = () => ({
+  const buildWrapUpDeps = () => ({
     deps: { openClient: () => held.promise, readImpWork: () => Promise.resolve({ state: 'pushed' as const }), readLocalWork: () => Promise.resolve({ state: 'pushed' as const }) },
     close: () => {
       closes += 1;
     },
   });
 
-  await watchTick(ctx.db, { me: 'hq-lanes', run, log: (line) => logs.push(line), stepMs: 200, steps: { runs: () => Promise.resolve(), weekly: () => Promise.resolve(false), health: () => Promise.resolve({ opened: [], cleared: [] }), wrapUpDeps } });
+  await watchTick(ctx.db, { me: 'hq-lanes', run, log: (line) => logs.push(line), stepMs: 200, steps: { runs: () => Promise.resolve(), weekly: () => Promise.resolve(false), health: () => Promise.resolve({ opened: [], cleared: [] }), buildWrapUpDeps } });
   const closesAtDeadline = closes;
   held.reject(new Error('invented: atc answered late'));
   await waitFor('the given-up design-run close to stop', () => logs.some((line) => line.endsWith('done design runs from an earlier pass stopped')));

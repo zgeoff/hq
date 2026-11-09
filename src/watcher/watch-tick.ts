@@ -223,7 +223,7 @@ export async function watchTick(db: Database, d: WatchDeps): Promise<boolean> {
       d.log(`${at()} run issues in Linear failed: ${toErrorMessage(error)}`);
     }
     try {
-      const buildWrapUpDeps = d.steps.wrapUpDeps;
+      const buildWrapUpDeps = d.steps.buildWrapUpDeps;
 
       // The atc client closes when the work settles: a step past its deadline keeps running.
       const designRuns = buildWrapUpDeps

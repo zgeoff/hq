@@ -11,7 +11,7 @@ interface WatchSteps {
   slots?: (signal: AbortSignal) => Promise<{ read: SlotReadRun | null; news: boolean }>;
   capacity?: () => Promise<{ opened: unknown[]; cleared: unknown[] }>;
 
-  wrapUpDeps?: () => { deps: WrapUpDeps; close: () => void };
+  buildWrapUpDeps?: () => { deps: WrapUpDeps; close: () => void };
 
   grantMarks?: () => GrantMarkSync | null;
 }
