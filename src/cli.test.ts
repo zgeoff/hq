@@ -1399,8 +1399,9 @@ test.each([
   ctx.lines.length = 0;
 
   const code = await main(['run', 'review-wait', 'kettle#747', '--clear', ...row.args, '--json']);
+  const printed: unknown = JSON.parse(ctx.lines.join('\n'));
 
-  expect({ code, printed: JSON.parse(ctx.lines.join('\n')) }).toStrictEqual({
+  expect({ code, printed }).toStrictEqual({
     code: 1,
     printed: { ok: false, error: { code: 'bad_args', message: 'give --clear alone, or --until with --reason, not both' } },
   });
