@@ -6,7 +6,6 @@ import type { NoslopCheck } from './read-noslop-check.ts';
 
 type NoslopFindingsRead = { read: true; open: string[]; unlisted: string[] } | { read: false; error: string };
 
-// Present only for Nix's skill PR: each finding ID's lenses, from the rounds hq stored.
 export type NixLenses = ReadonlyMap<string, readonly string[]>;
 
 export type NoslopGateFacts =

@@ -11,7 +11,8 @@ const CheckRunSchema = z.object({ __typename: z.literal('CheckRun'), name: z.str
 const StatusContextSchema = z.object({ __typename: z.literal('StatusContext'), context: z.string(), state: z.string(), startedAt: TimeSchema });
 const FactsSchema = z.object({
     headRefOid: z.string().min(1),
-    headRefName: z.string().default(''),
+    headRefName: z.string().min(1),
+    isCrossRepository: z.boolean(),
     baseRefName: z.string().min(1),
     baseRefOid: z.string().min(1),
     author: z.object({ login: z.string().optional(), is_bot: z.boolean().optional() }),
@@ -24,7 +25,7 @@ export type GateCheck = GateFacts['statusCheckRollup'][number];
 
 // One GitHub read, so the head, base, author, checks and body describe the same moment.
 export async function readGateFacts(run: Runner, slug: string, pr: number): Promise<GateFacts> {
-  const result = await boundedRunner(run, CALL_MS)(['gh', 'pr', 'view', String(pr), '-R', slug, '--json', 'headRefOid,author,statusCheckRollup,baseRefName,baseRefOid,body,headRefName']).catch(toRunFailure);
+  const result = await boundedRunner(run, CALL_MS)(['gh', 'pr', 'view', String(pr), '-R', slug, '--json', 'headRefOid,author,statusCheckRollup,baseRefName,baseRefOid,body,headRefName,isCrossRepository']).catch(toRunFailure);
   const parsed = result.code === 0 ? FactsSchema.safeParse(parseJSON(result.stdout)) : null;
   if (parsed?.success !== true) {
     throw new HqError('merge_blocked', `could not read the PR's head, author and checks from GitHub, so the gate cannot pass: ${(result.stderr || result.stdout).trim().slice(0, 300)}`);

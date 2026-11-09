@@ -513,7 +513,7 @@ test('it reads the PR body in the same GitHub read as the head and checks', asyn
 
   await checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 });
 
-  expect(fake.lines().filter((line) => line.includes('--json headRefOid,author'))).toStrictEqual(['gh pr view 7 -R zgeoff/widgets --json headRefOid,author,statusCheckRollup,baseRefName,baseRefOid,body,headRefName']);
+  expect(fake.lines().filter((line) => line.includes('--json headRefOid,author'))).toStrictEqual(['gh pr view 7 -R zgeoff/widgets --json headRefOid,author,statusCheckRollup,baseRefName,baseRefOid,body,headRefName,isCrossRepository']);
 });
 
 test('it reads the changed files once when the description lacks the proof and no skill text changed', async () => {
@@ -961,6 +961,25 @@ test("it gives Nix's skill PR that also changes persona.md today's verdict", asy
   await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'nixie-definitions', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: expect.stringContaining('"## Checks" section lacks the skill proof') });
 });
 
+test("it holds Nix's skill PR that also changes persona.md on an open non-security finding, with valid Checks lines", async () => {
+  const ctx = setupTest();
+  const body = ['Teach the kettle skill to pour.', '## Checks', '- [x] chex prose, links and skill: cleared', '- [x] Cold read: 2 fixed, 0 declined', '- [x] Deslop: 1 edit', '', 'Declined: none.'].join('\n');
+  const fake = buildFakeRunner({ prHeadBranch: 'nixie/skill/descale', prBody: body, noslopFindings: buildStubFindings('open'), prFiles: { code: 0, stdout: 'skills/kettle/SKILL.md\npersona.md\n', stderr: '' } });
+  setMeta(ctx.db, 'noslop', JSON.stringify({ repos: ['nixie-definitions'], sha: '0123456789abcdef0123456789abcdef01234567' }));
+  seedReviewRound(ctx, { repo: 'nixie-definitions', pr: 7, head: FAKE_FULL_SHA, findings: [{ id: 'aaaaaaaaaaaaaaaa', lens: 'correctness', severity: 'high', title: 'Kettle never boils' }] });
+
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'nixie-definitions', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: '1 noslop finding is open: aaaaaaaaaaaaaaaa' });
+});
+
+test("it gives a fork PR on Nix's skill branch that changes only skills/ today's verdict", async () => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ prHeadBranch: 'nixie/skill/descale', prFromFork: true, noslopFindings: buildStubFindings('open'), prFiles: { code: 0, stdout: 'skills/kettle/SKILL.md\n', stderr: '' } });
+  setMeta(ctx.db, 'noslop', JSON.stringify({ repos: ['nixie-definitions'], sha: '0123456789abcdef0123456789abcdef01234567' }));
+  seedReviewRound(ctx, { repo: 'nixie-definitions', pr: 7, head: FAKE_FULL_SHA, findings: [{ id: 'aaaaaaaaaaaaaaaa', lens: 'correctness', severity: 'high', title: 'Kettle never boils' }] });
+
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'nixie-definitions', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: expect.stringContaining('"## Checks" section lacks the skill proof') });
+});
+
 test("it holds Nix's skill PR with an open security finding, for the owner to decide", async () => {
   const ctx = setupTest();
   const fake = buildFakeRunner({ prHeadBranch: 'nixie/skill/descale', noslopFindings: buildStubFindings('open'), prFiles: { code: 0, stdout: 'skills/kettle/SKILL.md\n', stderr: '' } });
@@ -1159,7 +1178,7 @@ test('it names the override on a repo off the noslop list', async () => {
 
 test("it names the override on a bot's PR", async () => {
   const ctx = setupTest();
-  const fake = buildFakeRunner({ author: '{"author":{"login":"renovate","is_bot":true}}', prFacts: { code: 0, stdout: JSON.stringify({ headRefOid: FAKE_FULL_SHA, baseRefName: 'main', baseRefOid: FAKE_BASE_SHA, author: { login: 'renovate', is_bot: true }, statusCheckRollup: [{ __typename: 'CheckRun', name: 'preview', status: 'COMPLETED', conclusion: 'FAILURE' }] }), stderr: '' } });
+  const fake = buildFakeRunner({ author: '{"author":{"login":"renovate","is_bot":true}}', prFacts: { code: 0, stdout: JSON.stringify({ headRefOid: FAKE_FULL_SHA, headRefName: 'renovate/kettle', isCrossRepository: false, baseRefName: 'main', baseRefOid: FAKE_BASE_SHA, author: { login: 'renovate', is_bot: true }, statusCheckRollup: [{ __typename: 'CheckRun', name: 'preview', status: 'COMPLETED', conclusion: 'FAILURE' }] }), stderr: '' } });
   setMeta(ctx.db, 'noslop', JSON.stringify({ repos: ['widgets'], sha: '0123456789abcdef0123456789abcdef01234567' }));
   recordCICheckOverride(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA, source: 'call:KET-2', note: 'Intended infra change.', actor: 'z-kettle', check: 'preview' });
 

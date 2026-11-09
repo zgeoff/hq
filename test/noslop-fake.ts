@@ -19,6 +19,7 @@ export interface FakeScript {
   author?: string;
   prBody?: string;
   prHeadBranch?: string;
+  prFromFork?: boolean;
 
   prHead?: RunResult;
 
@@ -137,7 +138,7 @@ function pickGhAnswer(script: FakeScript, line: string): RunResult | null {
   }
   if (line.includes('--json headRefOid,author,statusCheckRollup')) {
     const author = findPath(JSON.parse(script.author ?? '{"author":{"login":"zgeoff","is_bot":false}}'), 'author');
-    return script.prFacts ?? buildResult(JSON.stringify({ headRefOid: FAKE_FULL_SHA, headRefName: script.prHeadBranch ?? 'feat', baseRefName: 'main', baseRefOid: FAKE_BASE_SHA, author, body: script.prBody ?? '', statusCheckRollup: [{ __typename: 'CheckRun', name: 'test', status: 'COMPLETED', conclusion: 'SUCCESS' }] }));
+    return script.prFacts ?? buildResult(JSON.stringify({ headRefOid: FAKE_FULL_SHA, headRefName: script.prHeadBranch ?? 'feat', isCrossRepository: script.prFromFork ?? false,baseRefName: 'main', baseRefOid: FAKE_BASE_SHA, author, body: script.prBody ?? '', statusCheckRollup: [{ __typename: 'CheckRun', name: 'test', status: 'COMPLETED', conclusion: 'SUCCESS' }] }));
   }
   if (line.includes('--json headRefOid')) {
     return script.prHead ?? buildResult(JSON.stringify({ headRefOid: FAKE_FULL_SHA }));

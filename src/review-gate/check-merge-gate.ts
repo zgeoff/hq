@@ -15,7 +15,7 @@ import type { CIOverrideUse, GateCI } from '../noslop/format-ci-clause.ts';
 import { collectOpenFindingIDs } from '../noslop/collect-open-finding-ids.ts';
 import { checkInstructionHold } from './check-instruction-hold.ts';
 import { checkSkillProof } from './check-skill-proof.ts';
-import type { ReadFiles } from './check-skill-proof.ts';
+import type { NixGate, ReadFiles } from './check-skill-proof.ts';
 import { findInstructionHeldTest } from './find-instruction-held-test.ts';
 import { isBotAuthor } from './is-bot-author.ts';
 import type { PRAuthor } from './is-bot-author.ts';
@@ -33,6 +33,7 @@ import type { OKReviewRecord } from '../noslop/read-ok-reviews.ts';
 import { probeNixSkillPR } from './probe-nix-skill-pr.ts';
 import { readPRFiles } from './read-pr-files.ts';
 import { pickNoslopVerdict } from '../noslop/pick-noslop-verdict.ts';
+import { StoredFindingsColumn } from '../noslop/stored-finding-schema.ts';
 import { pickOwnerHeldVerdict } from './pick-owner-held-verdict.ts';
 import { probeNoCI } from './probe-no-ci.ts';
 import type { NoslopGateFacts } from '../noslop/pick-noslop-verdict.ts';
@@ -60,13 +61,13 @@ export async function checkMergeGate(request: PRRequest, onHead?: OnGateHead): P
   const readFiles = readFilesOnce(request, parsed);
 
   // Before the owner's hold, so his lgtm never lands on a description that still has to change.
-  const nixSkill = await probeNixSkillPR(parsed, facts, readFiles);
-  await checkSkillProof(request, parsed, facts, readFiles);
+  const gate: NixGate = { facts, nixSkill: await probeNixSkillPR(parsed, facts, readFiles) };
+  await checkSkillProof(request, parsed, gate, readFiles);
   await checkOwnerHeld(request, parsed, facts, readFiles);
   if (unreviewed !== null) {
     return { mayMerge: true, reason: `${unreviewed}: ${formatCIClause(facts.headRefOid.slice(0, 7), ci)}`, reviewed: false, ...pickOverriddenChecks(ci.used) };
   }
-  const outcome = await checkNoslopGate(request, parsed, { facts, nixSkill }, ci);
+  const outcome = await checkNoslopGate(request, parsed, gate, ci);
   return { ...outcome, ...pickOverriddenChecks(ci.used) };
 }
 
@@ -147,11 +148,6 @@ function pickOverriddenChecks(used: readonly CIOverrideUse[]): Pick<GateOutcome,
   return used.length === 0 ? {} : { overriddenChecks: used.map((override) => override.check) };
 }
 
-interface NixGate {
-  facts: GateFacts;
-  nixSkill: boolean;
-}
-
 async function checkNoslopGate(request: PRRequest, parsed: ParsedRepo, gate: NixGate, ci: GateCI): Promise<GateOutcome> {
   const noslopFacts = await readNoslopGateFacts(request, parsed, gate.facts, gate.nixSkill);
   return match(pickNoslopVerdict(noslopFacts, ci))
@@ -197,12 +193,10 @@ function collectRecordedFindingIDs(reviews: OKReviewRecord[]): string[] {
   return [...new Set(reviews.flatMap((review) => StoredFindingIDs.parse(JSON.parse(review.findings)).map((finding) => finding.id)))];
 }
 
-const StoredFindingLenses = z.array(z.object({ id: z.string(), lens: z.string().optional() }));
-
 function collectRecordedLenses(reviews: OKReviewRecord[]): Map<string, string[]> {
   const lenses = new Map<string, string[]>();
-  for (const finding of reviews.flatMap((review) => StoredFindingLenses.parse(JSON.parse(review.findings)))) {
-    lenses.set(finding.id, [...(lenses.get(finding.id) ?? []), ...(finding.lens === undefined ? [] : [finding.lens])]);
+  for (const finding of reviews.flatMap((review) => StoredFindingsColumn.parse(review.findings))) {
+    lenses.set(finding.id, [...(lenses.get(finding.id) ?? []), finding.lens]);
   }
   return lenses;
 }
