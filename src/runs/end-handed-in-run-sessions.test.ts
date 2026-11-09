@@ -160,11 +160,25 @@ test.each([
   expect(ctx.readState()).toBe('working');
 });
 
+test('it ends the session of a run merged 6 minutes ago whose session has been idle 6 minutes', async () => {
+  const ctx = setupTest();
+  const fleet = buildStubFleetClient({ sessions: [{ id: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, state: 'done', cwd: '/workspace/kettle', locator: { targetID: 'local' } }] });
+  onTestFinished(overrideEnv('HQ_NOW', '2026-10-22T12:00:00Z'));
+  addRun(ctx.db, { issue: 'GEO-9901', title: 'Invented kettle work', place: 'imp', session: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
+  addPr(ctx.db, 'GEO-9901', 'kettle#71', 'z-delivery');
+  finalPr(ctx.db, 'kettle#71', { sha: 'abc1234', actor: 'z-delivery' });
+  closePr(ctx.db, 'kettle#71', { to: 'merged', actor: 'hq-github', facts: { mergedAt: '2026-10-22T11:54:00Z', mergeSha: null } });
+
+  const ended = await ctx.sweep(fleet, [['0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', Date.parse('2026-10-22T11:54:00Z')]]);
+
+  expect(ended).toBe(1);
+  expect(ctx.readState()).toBe('merged');
+});
+
 test.each([
-  ['a session idle for 6 minutes after a merge 6 minutes ago', '2026-10-22T11:54:00Z', '2026-10-22T11:54:00Z', 1, 'merged'],
-  ['a session active 4 minutes ago after a merge 6 minutes ago', '2026-10-22T11:54:00Z', '2026-10-22T11:56:00Z', 0, 'working'],
-  ['a session idle for 6 minutes after a merge 4 minutes ago', '2026-10-22T11:56:00Z', '2026-10-22T11:54:00Z', 0, 'working'],
-] as const)('it handles %s', async (_name, mergedAt, lastActivity, expectedEnded, expectedState) => {
+  ['a session active 4 minutes ago after a merge 6 minutes ago', '2026-10-22T11:54:00Z', '2026-10-22T11:56:00Z'],
+  ['a merge 4 minutes ago and a session idle for 6 minutes', '2026-10-22T11:56:00Z', '2026-10-22T11:54:00Z'],
+] as const)('it keeps the session of a run with %s', async (_name, mergedAt, lastActivity) => {
   const ctx = setupTest();
   const fleet = buildStubFleetClient({ sessions: [{ id: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, state: 'done', cwd: '/workspace/kettle', locator: { targetID: 'local' } }] });
   onTestFinished(overrideEnv('HQ_NOW', '2026-10-22T12:00:00Z'));
@@ -175,8 +189,8 @@ test.each([
 
   const ended = await ctx.sweep(fleet, [['0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', Date.parse(lastActivity)]]);
 
-  expect(ended).toBe(expectedEnded);
-  expect(ctx.readState()).toBe(expectedState);
+  expect(ended).toBe(0);
+  expect(ctx.readState()).toBe('working');
 });
 
 test('it keeps a session with unpushed work after the 5 minutes of quiet', async () => {
