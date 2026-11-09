@@ -26,7 +26,7 @@ export function setReviewWait(db: Database, raw: string, input: ReviewWaitInput,
       }
       db.query('UPDATE run_prs SET review_wait_until = ?, review_wait_sha = ?, review_wait_reason = ?, updated_at = ? WHERE ref = ?').run(write.until, write.sha, write.reason, iso(at), ref);
       const action = request.kind === 'clear' ? 'review-wait-cleared' : 'review-wait';
-      logEvent(db, 'run', pr.issue, action, actor, write.sha, null, { ref, until: write.until, reason: write.reason });
+      logEvent(db, 'run', pr.issue, action, actor, null, null, { ref, sha: write.sha, until: write.until, reason: write.reason });
       touch(db, pr.issue);
       return mustPr(db, ref);
     })
