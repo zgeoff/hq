@@ -450,7 +450,7 @@ test('it keeps a handed-in run whose sub-session atc shows recently active', asy
     { id: '0000d003-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-sketch', alive: true, state: 'done', parent: '0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
   );
   ctx.fake.activity.set('0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', Date.parse('2026-10-21T01:00:00Z'));
-  ctx.fake.activity.set('0000d003-aaaa-4aaa-8aaa-aaaaaaaaaaaa', Date.parse('2026-10-21T02:50:00Z'));
+  ctx.fake.activity.set('0000d003-aaaa-4aaa-8aaa-aaaaaaaaaaaa', Date.parse('2026-10-21T02:58:00Z'));
   const fleet = buildStubFleetClient({
     sessions: [
       { id: '0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, state: 'done' },

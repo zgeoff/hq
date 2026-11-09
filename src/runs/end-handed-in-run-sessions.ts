@@ -20,9 +20,9 @@ import { updateMergedRun } from './update-merged-run.ts';
 import { shareClient, wrapUpRunSafely } from './wrap-up-merged-runs.ts';
 import { writeHandedInPlan } from './write-handed-in-plan.ts';
 
-// atc shows no background shell or sub-agent, so an agent that ends its turn to wait on one reads
-// as done: the quiet time outlasts a CI watch or a sketch run between a stack's layers.
-const HANDED_IN_QUIET_MS = 30 * 60_000;
+// A session ends once it has been idle 5 minutes after its run's PRs merged; the unpushed-work check
+// still keeps any session with work in its worktree or imp.
+const HANDED_IN_QUIET_MS = 5 * 60_000;
 
 const PrRows = z.array(z.object({ issue: z.string(), state: z.string(), final_sha: z.string().nullable(), merged_at: z.string().nullable() }));
 const SessionRows = z.array(z.object({ issue: z.string(), session_id: z.string(), active: z.number() }));
