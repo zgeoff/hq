@@ -102,14 +102,18 @@ test('a green row says so, and the colour follows the unrounded share', () => {
 
 test('a week with days not fetched says so and gets no colour', () => {
   const ctx = setupTest();
-  fetchedDays(ctx.db, undefined, undefined, undefined, ['2026-10-12', '2026-10-13']);
+  fetchedDays(ctx.db, undefined, undefined, undefined, { prDays: ['2026-10-12', '2026-10-13'] });
   ctx.seed.linearIssue({ issue: 'GEO-1', type: 'Feature' });
   ctx.seed.mergedPR({ merged_at: '2026-10-14T03:00:00Z', issue: 'GEO-1' });
   const text = weeklyText(ctx.db, syd(MON, '17:00'));
   expect(row(text, 'Feature + Improvement share')).toContain('100% of 1 typed PRs, 2 day(s) not fetched | no data (0 typed PRs) | – |');
-  ctx.db.query(`DELETE FROM goal_days WHERE day = '2026-10-08'`).run();
-  const unfetched = weeklyText(ctx.db, syd(MON, '17:00'));
-  expect(row(unfetched, 'CI minutes wasted')).toContain('| no data (0 CI min, 1 day(s) not fetched) |');
+});
+
+test('a week with a CI day not fetched says so and gets no colour', () => {
+  const ctx = setupTest();
+  fetchedDays(ctx.db, undefined, undefined, undefined, { ciDays: ['2026-10-08'] });
+  const text = weeklyText(ctx.db, syd(MON, '17:00'));
+  expect(row(text, 'CI minutes wasted')).toContain('| no data (0 CI min, 1 day(s) not fetched) |');
 });
 
 test('the downtime row gives outages, the slowest detection and blind minutes, judged on exact durations', () => {

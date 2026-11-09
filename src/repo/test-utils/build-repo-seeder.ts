@@ -3,6 +3,6 @@ import type { RepoDeps } from './types.ts';
 
 export function buildRepoSeeder(deps: RepoDeps) {
   return {
-    storeDisposition: (input?: Parameters<typeof seedStoreDisposition>[1]) => seedStoreDisposition(deps, input),
+    noslopDisposition: (input?: Parameters<typeof seedStoreDisposition>[1]) => seedStoreDisposition(deps, input),
   };
 }
