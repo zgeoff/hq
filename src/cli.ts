@@ -1667,6 +1667,7 @@ async function lanesCommand(context: Pick<Ctx, 'db' | 'verb' | 'rest' | 'flags' 
         runs: () => watchRuns(db, me),
         weekly: () => weeklyStats(db, me, boundedRunner(realRunner, CALL_MS)),
         health: () => healthTick(db, me),
+        wrapUpDeps: buildWrapUpDeps,
         capacity: () => capacityTick(db, me),
         slots: (signal: AbortSignal) => runFleetStep(db, buildFleetIO(), now(), { force: false, signal }),
         grantMarks: () => runGrantMarksTick(db, { directory: PRIVATE_TREE.dir(), exists: existsSync }, me),

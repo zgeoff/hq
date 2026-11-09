@@ -1,5 +1,6 @@
 import type { SlotReadRun } from '../capacity/fleet/run-slot-read.ts';
 import type { GrantMarkSync } from '../grants/sync-grant-marks.ts';
+import type { WrapUpDeps } from '../runs/run-wrap-up.ts';
 import type { Runner } from '../runner/types.ts';
 
 interface WatchSteps {
@@ -9,6 +10,8 @@ interface WatchSteps {
   refusals?: () => Promise<number>;
   slots?: (signal: AbortSignal) => Promise<{ read: SlotReadRun | null; news: boolean }>;
   capacity?: () => Promise<{ opened: unknown[]; cleared: unknown[] }>;
+
+  wrapUpDeps?: () => { deps: WrapUpDeps; close: () => void };
 
   grantMarks?: () => GrantMarkSync | null;
 }

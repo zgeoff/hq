@@ -20,6 +20,7 @@ import { goalsWeeklyTick } from '../goals/weekly/goals-weekly-tick.ts';
 import { syncKinds } from '../kinds/sync-kinds.ts';
 import { syncLinear } from '../kinds/sync-linear.ts';
 import { syncRunIssues } from '../linear/sync-run-issues.ts';
+import { closeDoneDesignRuns } from '../runs/close-done-design-runs.ts';
 import { dropCanceledRuns } from '../runs/drop-canceled-runs.ts';
 import { readCapacity } from '../lanes/read-capacity.ts';
 import { readPacingLanes } from '../lanes/read-pacing-lanes.ts';
@@ -220,6 +221,21 @@ export async function watchTick(db: Database, d: WatchDeps): Promise<boolean> {
       }
     } catch (error) {
       d.log(`${at()} run issues in Linear failed: ${toErrorMessage(error)}`);
+    }
+    try {
+      const wrapUp = d.steps.wrapUpDeps?.();
+      if (wrapUp) {
+        try {
+          const closed = await step('done design runs', () => closeDoneDesignRuns(db, wrapUp.deps, d.me));
+          if (closed.length > 0) {
+            d.log(`${at()} design runs: closed ${closed.join(', ')}, Done in Linear`);
+          }
+        } finally {
+          wrapUp.close();
+        }
+      }
+    } catch (error) {
+      d.log(`${at()} design runs failed: ${toErrorMessage(error)}`);
     }
     try {
       if (sampleUsage(db)) d.log(`${at()} Claude usage: new reading stored`);
