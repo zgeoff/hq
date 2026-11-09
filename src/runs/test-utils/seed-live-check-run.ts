@@ -2,9 +2,9 @@ import invariant from 'tiny-invariant';
 import { setState } from '../set-state.ts';
 import type { AddRunInput, RunView } from '../types.ts';
 import { seedRun } from './seed-run.ts';
-import type { TestDeps } from '../../test-utils/build-seeder.ts';
+import type { RunsDeps } from './types.ts';
 
-export function seedLiveCheckRun(deps: TestDeps, input: Partial<AddRunInput> = {}): RunView {
+export function seedLiveCheckRun(deps: RunsDeps, input: Partial<AddRunInput> = {}): RunView {
   const run = seedRun(deps, input);
   const moved = setState(deps.db, run.issue, 'live-check', {}, 'delivery-bot');
   invariant(moved.state === 'live-check');

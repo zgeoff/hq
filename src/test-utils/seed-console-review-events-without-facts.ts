@@ -3,9 +3,9 @@ import { iso } from '../clock/iso.ts';
 import { now } from '../clock/now.ts';
 import { buildMockEventRow } from './build-mock-event-row.ts';
 import type { EventRow } from './build-mock-event-row.ts';
-import type { TestDeps } from './build-seeder.ts';
+import type { EventsDeps } from './types.ts';
 
-export function seedConsoleReviewEventsWithoutFacts(deps: TestDeps, input: Partial<EventRow> = {}): number {
+export function seedConsoleReviewEventsWithoutFacts(deps: EventsDeps, input: Partial<EventRow> = {}): number {
   const row = buildMockEventRow({ subject: 'unblock', action: 'console-review', actor: 'console', at: iso(now()), ...input });
   const { facts, ...data } = z.record(z.string(), z.unknown()).parse(JSON.parse(row.data));
 

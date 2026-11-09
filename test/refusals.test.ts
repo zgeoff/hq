@@ -13,6 +13,7 @@ import { readRefusalRows } from '../src/refusals/read-refusal-rows.ts';
 import { scanRefusals } from '../src/refusals/scan-refusals.ts';
 import { type FakeAtc, at, fakeAtc, freshDb } from './helpers.ts';
 import { buildSeeder } from '../src/test-utils/build-seeder.ts';
+import { createTestDb } from './create-test-db.ts';
 
 let db: Database;
 let dir: string;
@@ -269,18 +270,21 @@ test('atc names the session and hq run_sessions gives the issue; atc down scans 
   ctx.seed.run({ issue: 'GEO-9', title: 't', place: 'local' });
   ctx.seed.runSession({ issue: 'GEO-9', session: 'a0000009-aaaa-4aaa-8aaa-aaaaaaaaaaaa' });
   file('p/s.jsonl', jl(tu('t1', 'Bash', { command: 'a' }), refused('t1', 'with atc')));
-  atc = fakeAtc(dir, [{ id: 'a0000009-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'z-worker', alive: true, state: 'done', agentSessionID: SID }]);
-  process.env['HQ_ATC_SOCKET'] = join(dir, 'atc.sock');
-  await scanRefusals(db, { dir: proj() });
-  expect(rows()[0]).toMatchObject({ atc_session: 'a0000009-aaaa-4aaa-8aaa-aaaaaaaaaaaa', atc_name: 'z-worker', issue: 'GEO-9' });
+  atc = fakeAtc(ctx.directory, [{ id: 'a0000009-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'z-worker', alive: true, state: 'done', agentSessionID: SID }]);
+  process.env['HQ_ATC_SOCKET'] = join(ctx.directory, 'atc.sock');
+  // oxlint-disable-next-line zgeoff/no-abbreviated-names -- dir is scanRefusals' own option name
+  await scanRefusals(ctx.db, { dir: proj() });
+  expect(readRefusalRows(ctx.db)[0]).toMatchObject({ atc_session: 'a0000009-aaaa-4aaa-8aaa-aaaaaaaaaaaa', atc_name: 'z-worker', issue: 'GEO-9' });
 
   appendFileSync(join(proj(), 'p/s.jsonl'), jl(tu('t2', 'Bash', { command: 'b' }), refused('t2', 'atc down')));
   atc.stop();
   atc = null;
 
   delete process.env['HQ_ATC_SOCKET'];
-  expect((await scanRefusals(db, { dir: proj() })).refusals_added).toBe(1);
-  expect(rows()[1]).toMatchObject({ reason: 'atc down', atc_session: null, atc_name: null, issue: null });
+  // oxlint-disable-next-line zgeoff/no-abbreviated-names -- dir is scanRefusals' own option name
+  const rescan = await scanRefusals(ctx.db, { dir: proj() });
+  expect(rescan.refusals_added).toBe(1);
+  expect(readRefusalRows(ctx.db)[1]).toMatchObject({ reason: 'atc down', atc_session: null, atc_name: null, issue: null });
 });
 
 test('a missing projects dir scans nothing', async () => {
@@ -367,5 +371,7 @@ test('redact masks a whole shell-escaped or quoted secret value', () => {
 });
 
 function setupTest() {
-  return { db, seed: buildSeeder({ db }) };
+  const fresh = createTestDb();
+  at(NOW);
+  return { db: fresh.db, directory: fresh.dir, seed: buildSeeder(fresh) };
 }

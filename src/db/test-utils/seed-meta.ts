@@ -1,11 +1,11 @@
 import { setMeta } from '../set-meta.ts';
-import type { TestDeps } from '../../test-utils/build-seeder.ts';
+import type { MetaDeps } from './types.ts';
 
 interface MetaInput {
   key: string;
   value: string;
 }
 
-export function seedMeta(deps: TestDeps, input: MetaInput): void {
+export function seedMeta(deps: MetaDeps, input: MetaInput): void {
   setMeta(deps.db, input.key, input.value);
 }

@@ -2,9 +2,9 @@ import { iso } from '../clock/iso.ts';
 import { now } from '../clock/now.ts';
 import { buildMockEventRow } from './build-mock-event-row.ts';
 import type { EventRow } from './build-mock-event-row.ts';
-import type { TestDeps } from './build-seeder.ts';
+import type { EventsDeps } from './types.ts';
 
-export function seedAskAnswerEventWithNumber(deps: TestDeps, input: Partial<EventRow> = {}): number {
+export function seedAskAnswerEventWithNumber(deps: EventsDeps, input: Partial<EventRow> = {}): number {
   const row = { ...buildMockEventRow({ subject: 'ask', action: 'answered', at: iso(now()), ...input }), data: '{"answer":42}' };
 
   // An answered-ask event whose answer is a number: the answer writers only store text.

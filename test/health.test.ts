@@ -16,6 +16,7 @@ import type { RunResult, Runner } from '../src/runner/types.ts';
 import { NOON_SYDNEY, at, freshDb } from './helpers.ts';
 import { COMMAND_TIMEOUT_MS } from '../src/health/command-timeout-ms.ts';
 import { buildSeeder } from '../src/test-utils/build-seeder.ts';
+import { createTestDb } from './create-test-db.ts';
 
 let db: Database;
 let cleanup: () => void;
@@ -180,10 +181,10 @@ test('it does not escalate a state-file problem opened before owners existed', a
   ctx.seed.meta({ key: 'health_open', value: JSON.stringify({ 'state-size:kettle.md': { since: '2026-10-13T20:00:00.000Z', line: 'state file kettle.md is 20.0 KB, over its 16 KB limit' } }) });
   const over = [{ key: 'state-size:kettle.md', ok: false, line: 'state file kettle.md is 20.0 KB, over its 16 KB limit', owner: { session: 'z-kettle', ask: 'trim it' } }];
 
-  const result = await runChecks({ ...probe(world()), stateSizes: () => over }, healthSettings(db), {}, new Date(NOON_SYDNEY));
-  applyHealth(db, result.checks, result.samples, 'hq-lanes', result.unknown);
+  const result = await runChecks({ ...probe(world()), stateSizes: () => over }, healthSettings(ctx.db), {}, new Date(NOON_SYDNEY));
+  applyHealth(ctx.db, result.checks, result.samples, 'hq-lanes', result.unknown);
 
-  expect(readOutboxRows(db)).toStrictEqual([]);
+  expect(readOutboxRows(ctx.db)).toStrictEqual([]);
 });
 
 test('it reports a failed memory-pressure read as a problem', async () => {
@@ -342,5 +343,7 @@ test('it reports an oversized state file as a problem but not unknown', async ()
 });
 
 function setupTest() {
-  return { db, seed: buildSeeder({ db }) };
+  const fresh = createTestDb();
+  at(NOON_SYDNEY);
+  return { db: fresh.db, seed: buildSeeder(fresh) };
 }

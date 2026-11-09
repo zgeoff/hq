@@ -19,6 +19,7 @@ import { markOutboxFailed } from '../src/outbox/mark-outbox-failed.ts';
 import { markOutboxSent } from '../src/outbox/mark-outbox-sent.ts';
 import { unsent } from '../src/outbox/unsent.ts';
 import { buildSeeder } from '../src/test-utils/build-seeder.ts';
+import { createTestDb } from './create-test-db.ts';
 
 let db: Database;
 let dir: string;
@@ -341,11 +342,12 @@ describe('a command sends only the rows it queued', () => {
 
   test("the watcher's send (flush with no ids) sends every pending and failed row", async () => {
     const ctx = setupTest();
-    atc = fakeAtc(dir);
-    foreign('Invented pending note');
+    atc = fakeAtc(ctx.directory);
+    ctx.seed.outboxItem({ target: 'z-delivery', text: 'Invented pending note' });
     ctx.seed.failedOutboxItem({ target: 'z-delivery', text: 'Invented failed note' });
-    expect(await flush(db, { retryFailed: true })).toMatchObject({ sent: 2, failed: 0 });
-    expect(statuses()).toEqual([
+    const flushed = await flush(ctx.db, { retryFailed: true });
+    expect(flushed).toMatchObject({ sent: 2, failed: 0 });
+    expect(ctx.db.query('SELECT target, status FROM outbox ORDER BY id').all()).toStrictEqual([
       { target: 'z-delivery', status: 'sent' },
       { target: 'z-delivery', status: 'sent' },
     ]);
@@ -387,5 +389,7 @@ test('the flush asks atc for no answer notice, so no session hears an answer to 
 });
 
 function setupTest() {
-  return { db, seed: buildSeeder({ db }) };
+  const fresh = createTestDb();
+  at(NOON_SYDNEY);
+  return { db: fresh.db, directory: fresh.dir, seed: buildSeeder(fresh) };
 }

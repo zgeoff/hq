@@ -2,9 +2,9 @@ import invariant from 'tiny-invariant';
 import { setState } from '../set-state.ts';
 import type { AddRunInput, RunView } from '../types.ts';
 import { seedRun } from './seed-run.ts';
-import type { TestDeps } from '../../test-utils/build-seeder.ts';
+import type { RunsDeps } from './types.ts';
 
-export function seedMergedRun(deps: TestDeps, input: Partial<AddRunInput> = {}): RunView {
+export function seedMergedRun(deps: RunsDeps, input: Partial<AddRunInput> = {}): RunView {
   const run = seedRun(deps, input);
   const moved = setState(deps.db, run.issue, 'merged', {}, 'delivery-bot');
   invariant(moved.state === 'merged');

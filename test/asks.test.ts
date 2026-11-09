@@ -24,6 +24,7 @@ import { findPath } from '../src/test-utils/find-path.ts';
 import { FOUR_AM_SYDNEY, NOON_SYDNEY, at, freshDb } from './helpers.ts';
 import { setMeta } from '../src/db/set-meta.ts';
 import { buildSeeder } from '../src/test-utils/build-seeder.ts';
+import { createTestDb } from './create-test-db.ts';
 
 let db: Database;
 let cleanup: () => void;
@@ -216,10 +217,10 @@ describe('quiet hours and hold', () => {
 
   test('a hold blocks opening until released', () => {
     const ctx = setupTest();
-    addAsk(db, call());
+    addAsk(ctx.db, call());
     ctx.seed.meta({ key: 'hold', value: JSON.stringify({ reason: 'mid-intake', since: NOON_SYDNEY, by: 'z-stu' }) });
-    expect(() => openAsk(db, { force: false, actor: 'z-stu' })).toThrow('held: mid-intake');
-    expect(waitReasons(db)).toEqual(['held: mid-intake']);
+    expect(() => openAsk(ctx.db, { force: false, actor: 'z-stu' })).toThrow('held: mid-intake');
+    expect(waitReasons(ctx.db)).toStrictEqual(['held: mid-intake']);
   });
 });
 
@@ -334,11 +335,11 @@ describe('queue reminder after quiet hours', () => {
     const ctx = setupTest();
     ctx.seed.meta({ key: 'hold', value: '{"reason":"x","since":"","by":"z-stu"}' });
     at('2026-10-14T01:00:00.100Z');
-    addAsk(db, call({ actor: 'z-refine' }));
-    setMeta(db, 'hold', null);
+    addAsk(ctx.db, call({ actor: 'z-refine' }));
+    setMeta(ctx.db, 'hold', null);
     ctx.seed.meta({ key: 'hold_released_at', value: '2026-10-14T01:00:00.900Z' });
     at('2026-10-14T01:05:00Z');
-    expect(queueReminder(db, 'hq-lanes').reminded).toBe('geo-1-paint');
+    expect(queueReminder(ctx.db, 'hq-lanes').reminded).toBe('geo-1-paint');
   });
 
   test('lastQuietEnd is the latest 07:00 Sydney', () => {
@@ -356,5 +357,7 @@ test('an open shared call takes a new issue even when the question text changed'
 });
 
 function setupTest() {
-  return { db, seed: buildSeeder({ db }) };
+  const fresh = createTestDb();
+  at(NOON_SYDNEY);
+  return { db: fresh.db, seed: buildSeeder(fresh) };
 }

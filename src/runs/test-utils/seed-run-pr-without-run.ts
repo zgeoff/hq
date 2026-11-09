@@ -1,10 +1,10 @@
 import { iso } from '../../clock/iso.ts';
 import { now } from '../../clock/now.ts';
-import type { TestDeps } from '../../test-utils/build-seeder.ts';
+import type { RunsDeps } from './types.ts';
 import { buildMockRunPrRow } from './build-mock-run-pr-row.ts';
 import type { RunPrRow } from './build-mock-run-pr-row.ts';
 
-export function seedRunPrWithoutRun(deps: TestDeps, input: Partial<RunPrRow> = {}): void {
+export function seedRunPrWithoutRun(deps: RunsDeps, input: Partial<RunPrRow> = {}): void {
   const at = iso(now());
   const row = buildMockRunPrRow({ added_at: at, updated_at: at, ...input });
   const columns = Object.keys(row);
