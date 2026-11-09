@@ -22,6 +22,9 @@ import { parseItemInput } from '../src/parse-item-input.ts';
 import { readSubjectEvents } from '../src/read-subject-events.ts';
 import { findPath } from '../src/test-utils/find-path.ts';
 import { FOUR_AM_SYDNEY, NOON_SYDNEY, at, freshDb } from './helpers.ts';
+import { setMeta } from '../src/db/set-meta.ts';
+import { buildSeeder } from '../src/test-utils/build-seeder.ts';
+import { createTestDb } from './create-test-db.ts';
 
 let db: Database;
 let cleanup: () => void;
@@ -213,10 +216,11 @@ describe('quiet hours and hold', () => {
   });
 
   test('a hold blocks opening until released', () => {
-    addAsk(db, call());
-    db.query(`INSERT INTO meta (key, value) VALUES ('hold', ?)`).run(JSON.stringify({ reason: 'mid-intake', since: NOON_SYDNEY, by: 'z-stu' }));
-    expect(() => openAsk(db, { force: false, actor: 'z-stu' })).toThrow('held: mid-intake');
-    expect(waitReasons(db)).toEqual(['held: mid-intake']);
+    const ctx = setupTest();
+    addAsk(ctx.db, call());
+    ctx.seed.meta({ key: 'hold', value: JSON.stringify({ reason: 'mid-intake', since: NOON_SYDNEY, by: 'z-stu' }) });
+    expect(() => openAsk(ctx.db, { force: false, actor: 'z-stu' })).toThrow('held: mid-intake');
+    expect(waitReasons(ctx.db)).toStrictEqual(['held: mid-intake']);
   });
 });
 
@@ -328,13 +332,14 @@ describe('queue reminder after quiet hours', () => {
   });
 
   test('a hold released within the same second as the add still announces', () => {
-    db.query(`INSERT INTO meta (key, value) VALUES ('hold', '{"reason":"x","since":"","by":"z-stu"}')`).run();
+    const ctx = setupTest();
+    ctx.seed.meta({ key: 'hold', value: '{"reason":"x","since":"","by":"z-stu"}' });
     at('2026-10-14T01:00:00.100Z');
-    addAsk(db, call({ actor: 'z-refine' }));
-    db.query(`DELETE FROM meta WHERE key = 'hold'`).run();
-    db.query(`INSERT INTO meta (key, value) VALUES ('hold_released_at', '2026-10-14T01:00:00.900Z')`).run();
+    addAsk(ctx.db, call({ actor: 'z-refine' }));
+    setMeta(ctx.db, 'hold', null);
+    ctx.seed.meta({ key: 'hold_released_at', value: '2026-10-14T01:00:00.900Z' });
     at('2026-10-14T01:05:00Z');
-    expect(queueReminder(db, 'hq-lanes').reminded).toBe('geo-1-paint');
+    expect(queueReminder(ctx.db, 'hq-lanes').reminded).toBe('geo-1-paint');
   });
 
   test('lastQuietEnd is the latest 07:00 Sydney', () => {
@@ -350,3 +355,9 @@ test('an open shared call takes a new issue even when the question text changed'
   expect(r.result).toBe('noop');
   expect(r.ask).toMatchObject({ state: 'open', question: 'Green or grey?', issues: ['GEO-1', 'GEO-2'] });
 });
+
+function setupTest() {
+  const fresh = createTestDb();
+  at(NOON_SYDNEY);
+  return { db: fresh.db, seed: buildSeeder(fresh) };
+}

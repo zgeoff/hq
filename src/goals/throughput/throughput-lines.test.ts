@@ -1,7 +1,7 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { buildFiledNode } from '../../../test/build-filed-node.ts';
 import { buildGithubAttachment } from '../../../test/build-github-attachment.ts';
-import { freshDb } from '../../../test/helpers.ts';
+import { at, freshDb } from '../../../test/helpers.ts';
 import { makeThroughputLinearCall } from '../../../test/make-throughput-linear-call.ts';
 import { main } from '../../cli.ts';
 import { overrideEnv } from '../../config/override-env.ts';
@@ -13,6 +13,7 @@ import { setState } from '../../runs/set-state.ts';
 import { addUnblock } from '../../unblock/add-unblock.ts';
 import { dailyText } from '../daily/daily-text.ts';
 import { sendThroughputAlerts } from './send-throughput-alerts.ts';
+import { buildSeeder } from '../../test-utils/build-seeder.ts';
 
 function setupTest() {
   const fresh = freshDb();
@@ -27,6 +28,7 @@ function setupTest() {
   });
   return {
     db: fresh.db,
+    seed: buildSeeder(fresh),
     now,
     seedRun: (issue: string, state: 'working' | 'merged' | 'live-check' | 'dropped') => {
       addRun(fresh.db, { issue, title: 'Invented kettle work', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, actor: 'z-delivery' });
@@ -174,14 +176,14 @@ test('hq followup add GEO-n --from repo#n records a review follow-up without --b
 
 test('the Linear sync stamps the filed and In Progress issues with the time it was given, not the clock', async () => {
   const ctx = setupTest();
-  const at = '2026-10-16T05:00:00Z';
+  const syncedAt = '2026-10-16T05:00:00Z';
 
-  await syncLinear(ctx.db, makeThroughputLinearCall([buildFiledNode('GEO-9801', 'Descale the kettle.')], [{ identifier: 'GEO-9802', startedAt: '2026-10-16T01:00:00Z' }]), new Date('2026-10-14T00:00:00Z'), new Date(at));
+  await syncLinear(ctx.db, makeThroughputLinearCall([buildFiledNode('GEO-9801', 'Descale the kettle.')], [{ identifier: 'GEO-9802', startedAt: '2026-10-16T01:00:00Z' }]), new Date('2026-10-14T00:00:00Z'), new Date(syncedAt));
 
   expect({
     filed: ctx.db.query('SELECT issue, fetched_at FROM linear_filed').all(),
     started: ctx.db.query('SELECT issue, fetched_at FROM linear_started').all(),
-  }).toStrictEqual({ filed: [{ issue: 'GEO-9801', fetched_at: at }], started: [{ issue: 'GEO-9802', fetched_at: at }] });
+  }).toStrictEqual({ filed: [{ issue: 'GEO-9801', fetched_at: syncedAt }], started: [{ issue: 'GEO-9802', fetched_at: syncedAt }] });
 });
 
 test('a failed read of the filed issues leaves the lines unavailable, with no colour and no alerts, until a read succeeds', async () => {
@@ -214,9 +216,11 @@ test('a filing read just after Sydney midnight but filed just before it still al
 
 test('an In Progress issue with an active session and no open run is not stale', async () => {
   const ctx = setupTest();
-  addRun(ctx.db, { issue: 'GEO-9801', title: 'Invented kettle work', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, actor: 'z-delivery' });
-  ctx.db.run(`UPDATE runs SET closed_at = '2026-10-15T07:00:00Z' WHERE issue = 'GEO-9801'`);
-  ctx.db.run(`INSERT INTO run_sessions (session_id, issue, active, added_at) VALUES ('id-kettle', 'GEO-9801', 1, '2026-10-14T07:00:00Z')`);
+  at('2026-10-14T06:00:00Z');
+  ctx.seed.doneRun({ issue: 'GEO-9801' });
+  at('2026-10-14T07:00:00Z');
+  ctx.seed.runSession({ issue: 'GEO-9801', session: 'a0000001-aaaa-4aaa-8aaa-aaaaaaaaaaaa' });
+  at(ctx.now);
   await syncLinear(ctx.db, makeThroughputLinearCall([], [{ identifier: 'GEO-9801', startedAt: '2026-10-14T07:00:00Z' }]), new Date('2026-10-14T00:00:00Z'), new Date(ctx.now));
 
   expect({ sent: sendThroughputAlerts(ctx.db, 'hq-lanes', new Date('2026-10-14T00:00:00Z'), new Date(ctx.now)), line: ctx.findLine('Stale') }).toStrictEqual({

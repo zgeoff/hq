@@ -1,6 +1,8 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { createLanesLook } from '../../test/create-lanes-look.ts';
 import { at, freshDb } from '../../test/helpers.ts';
+import { markOutboxSent } from '../outbox/mark-outbox-sent.ts';
+import { unsent } from '../outbox/unsent.ts';
 import { holdLanes } from './hold-lanes.ts';
 import { tick } from './tick.ts';
 
@@ -35,7 +37,10 @@ test('it sends nothing to z-stu at 29 minutes, one message at 30, and none later
 test('it names when the low-water message reached z-triage, and leaves it out while the message waits', async () => {
   const ctx = setupTest();
   await ctx.lookAt('2026-10-14T01:00:00Z', 0);
-  ctx.db.query("UPDATE outbox SET status = 'sent', sent_at = '2026-10-14T01:07:00Z' WHERE topic = 'lanes-low-water'").run();
+  at('2026-10-14T01:07:00Z');
+  for (const row of unsent(ctx.db, true, undefined)) {
+    markOutboxSent(ctx.db, row, null);
+  }
   await ctx.lookAt('2026-10-14T01:30:00Z', 0);
 
   expect(ctx.look.stalled()).toStrictEqual([{ target: 'z-stu', text: 'Lanes: 3 slots empty for 30 min with Backlog issues to promote (triage). z-triage got the low-water message at 12:07.' }]);

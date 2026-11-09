@@ -35,6 +35,8 @@ import { parseJSON } from '../src/noslop/parse-json.ts';
 import { buildStubFinalGH } from './build-stub-final-gh.ts';
 import { buildStubGitHubFactsRunner } from './build-stub-github-facts-runner.ts';
 import { type FakeAtc, NOON_SYDNEY, at, fakeAtc, freshDb } from './helpers.ts';
+import { buildSeeder } from '../src/test-utils/build-seeder.ts';
+import { createTestDb } from './create-test-db.ts';
 
 let db: Database;
 let dir: string;
@@ -229,30 +231,32 @@ describe('reading the event feed', () => {
   });
 
   test('a cursor the daemon no longer knows is re-synced to the end', async () => {
-    atc = fakeAtc(dir, []);
-    db.query(`INSERT INTO meta (key, value) VALUES ('atc_events_cursor', 'not-a-cursor')`).run();
+    const ctx = setupTest();
+    atc = fakeAtc(ctx.directory, []);
+    ctx.seed.meta({ key: 'atc_events_cursor', value: 'not-a-cursor' });
     const c = await AtcClient.open();
     try {
-      const resynced = await ingestNotes(db, c, { run: buildStubFinalGH({ commits: 'fault' }, []) });
+      const resynced = await ingestNotes(ctx.db, c, { run: buildStubFinalGH({ commits: 'fault' }, []) });
       expect(resynced.reset).toBe(true);
     } finally {
       c.close();
     }
-    expect(getMeta(db, 'atc_events_cursor')).not.toBe('not-a-cursor');
+    expect(getMeta(ctx.db, 'atc_events_cursor')).not.toBe('not-a-cursor');
   });
 
   test('a cursor past the end (log reset) is caught after three empty reads', async () => {
-    atc = fakeAtc(dir, []);
+    const ctx = setupTest();
+    atc = fakeAtc(ctx.directory, []);
     atc.feed.push({ at: base, session: S1, name: 'x', kind: 'turn-done', detail: null });
     const past = Buffer.from(JSON.stringify(['events', 500])).toString('base64url');
-    db.query(`INSERT INTO meta (key, value) VALUES ('atc_events_cursor', ?)`).run(past);
+    ctx.seed.meta({ key: 'atc_events_cursor', value: past });
     const c = await AtcClient.open();
     try {
-      const first = await ingestNotes(db, c, { run: buildStubFinalGH({ commits: 'fault' }, []) });
+      const first = await ingestNotes(ctx.db, c, { run: buildStubFinalGH({ commits: 'fault' }, []) });
       expect(first.reset).toBe(false);
-      const second = await ingestNotes(db, c, { run: buildStubFinalGH({ commits: 'fault' }, []) });
+      const second = await ingestNotes(ctx.db, c, { run: buildStubFinalGH({ commits: 'fault' }, []) });
       expect(second.reset).toBe(false);
-      const third = await ingestNotes(db, c, { run: buildStubFinalGH({ commits: 'fault' }, []) });
+      const third = await ingestNotes(ctx.db, c, { run: buildStubFinalGH({ commits: 'fault' }, []) });
       expect(third.reset).toBe(true);
     } finally {
       c.close();
@@ -495,19 +499,20 @@ describe('review fixes', () => {
 
 describe('re-check fixes', () => {
   test('reset recovery reads the whole new feed from its oldest event', async () => {
-    atc = fakeAtc(dir, [{ id: S1, name: 'kettle', alive: true, state: 'running' }]);
-    add();
+    const ctx = setupTest();
+    atc = fakeAtc(ctx.directory, [{ id: S1, name: 'kettle', alive: true, state: 'running' }]);
+    ctx.seed.run({ issue: 'GEO-9001', title: 'Teach the kettle to whistle', session: S1, actor: 'z-delivery' });
     for (let i = 0; i < 201; i++) atc.feed.push({ at: base + i * 1000, session: S1, name: 'kettle', kind: 'note', detail: `note ${i}`, label: 'progress' });
-    db.query(`INSERT INTO meta (key, value) VALUES ('atc_events_cursor', 'not-a-cursor')`).run();
+    ctx.seed.meta({ key: 'atc_events_cursor', value: 'not-a-cursor' });
     const c = await AtcClient.open();
     try {
-      const reset = await ingestNotes(db, c, { run: buildStubFinalGH({ commits: 'fault' }, []) });
+      const reset = await ingestNotes(ctx.db, c, { run: buildStubFinalGH({ commits: 'fault' }, []) });
       expect(reset.reset).toBe(true);
-      await ingestNotes(db, c, { run: buildStubFinalGH({ commits: 'fault' }, []) });
+      await ingestNotes(ctx.db, c, { run: buildStubFinalGH({ commits: 'fault' }, []) });
     } finally {
       c.close();
     }
-    expect(notesFor(db, 'GEO-9001', 1000)).toHaveLength(201);
+    expect(notesFor(ctx.db, 'GEO-9001', 1000)).toHaveLength(201);
   });
 
   test('a phrase in a note that names a foreign PR marks nothing', () => {
@@ -584,3 +589,9 @@ describe('session ids', () => {
     await expect(fullSessionId(list, 'kettle')).rejects.toThrow('must be an atc session id');
   });
 });
+
+function setupTest() {
+  const fresh = createTestDb();
+  at(NOON_SYDNEY);
+  return { db: fresh.db, directory: fresh.dir, seed: buildSeeder(fresh) };
+}

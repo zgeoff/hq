@@ -303,7 +303,7 @@ test('it prints recheck after an item that needs one in hq unblock list', async 
 
 test('a schema upgrade backs up the live database first', () => {
   const db = openDb(path);
-  db.exec(`INSERT INTO meta (key, value) VALUES ('marker', 'kept')`);
+  setMeta(db, 'marker', 'kept');
   const backup = migrate(db, path, true, [...MIGRATIONS, 'CREATE TABLE gadgets (name TEXT)']);
   db.close();
   expect(backup).toMatch(new RegExp(`hq\\.db\\.bak-v${MIGRATIONS.length}-`));

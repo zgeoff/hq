@@ -17,6 +17,7 @@ import { resetFetchCache } from '../prompts/reset-fetch-cache.ts';
 import { readCallPins } from '../test-utils/read-call-pins.ts';
 import { readSpawnedNames } from '../test-utils/read-spawned-names.ts';
 import { FOUR_AM_SYDNEY, NOON_SYDNEY, at, createDefsRepo, fakeAtc, freshDb } from '../../test/helpers.ts';
+import { buildSeeder } from '../test-utils/build-seeder.ts';
 
 interface RosterSession {
   id: string;
@@ -55,6 +56,7 @@ function setupTest(config: { sessions?: RosterSession[]; cwd?: string } = {}) {
 
   return {
     db: base.db,
+    seed: buildSeeder(base),
     atc: server,
     kettle,
     urn,
@@ -152,11 +154,9 @@ test.each(['running', 'needs_you'])('it never asks a %s session', async (state) 
 });
 
 test('it never asks a session while a run of its own is deploying', async () => {
-  const ctx = setupTest();
-  ctx.db.run(
-    `INSERT INTO runs (issue, title, place, state, created_at, updated_at) VALUES ('GEO-901', 'Invented deploy', 'local', 'deploying', '2026-10-14T00:00:00Z', '2026-10-14T00:00:00Z')`,
-  );
-  ctx.db.run(`INSERT INTO run_sessions (session_id, issue, active, added_at) VALUES ('id-kettle', 'GEO-901', 1, '2026-10-14T00:00:00Z')`);
+  const ctx = setupTest({ sessions: [{ id: 'a0000001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'z-kettle', state: 'done' }] });
+  ctx.seed.deployingRun({ issue: 'GEO-901', title: 'Invented deploy', place: 'local' });
+  ctx.seed.runSession({ issue: 'GEO-901', session: 'a0000001-aaaa-4aaa-8aaa-aaaaaaaaaaaa' });
 
   await ctx.tick(0, [ctx.kettle]);
   await ctx.tick(121, [ctx.kettle]);
@@ -166,10 +166,8 @@ test('it never asks a session while a run of its own is deploying', async () => 
 
 test("it asks a session while another session's run is deploying", async () => {
   const ctx = setupTest();
-  ctx.db.run(
-    `INSERT INTO runs (issue, title, place, state, created_at, updated_at) VALUES ('GEO-902', 'Invented deploy', 'local', 'deploy-held', '2026-10-14T00:00:00Z', '2026-10-14T00:00:00Z')`,
-  );
-  ctx.db.run(`INSERT INTO run_sessions (session_id, issue, active, added_at) VALUES ('id-other', 'GEO-902', 1, '2026-10-14T00:00:00Z')`);
+  ctx.seed.deployHeldRun({ issue: 'GEO-902', title: 'Invented deploy', place: 'local' });
+  ctx.seed.runSession({ issue: 'GEO-902', session: 'a0000002-aaaa-4aaa-8aaa-aaaaaaaaaaaa' });
 
   await ctx.tick(0, [ctx.kettle]);
   await ctx.tick(121, [ctx.kettle]);

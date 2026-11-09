@@ -5,21 +5,21 @@ import { addRun } from '../runs/add-run.ts';
 import { setState } from '../runs/set-state.ts';
 import { countOpenDesignRuns } from './count-open-design-runs.ts';
 import { readDesignRuns } from './read-design-runs.ts';
+import { buildSeeder } from '../test-utils/build-seeder.ts';
 
 function setupTest() {
   const fresh = freshDb();
   onTestFinished(fresh.cleanup);
-  return { db: fresh.db };
+  return { db: fresh.db, seed: buildSeeder(fresh) };
 }
 
 test('it reads a run with a design lane, and a run with none whose issue is Design type as with-geoff', () => {
   const ctx = setupTest();
   at('2026-10-15T20:00:00Z');
   writeIssues(ctx.db, [{ issue: 'GEO-9901', type: 'Design', title: 'Design: a quieter kettle whistle', state: 'open', closed_at: null }]);
-  addRun(ctx.db, { issue: 'GEO-9901', title: 'Design: a quieter kettle whistle', place: 'local', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: null, actor: 'z-delivery' });
+  ctx.seed.runBeforeDesignLanes({ issue: 'GEO-9901', title: 'Design: a quieter kettle whistle', place: 'local', lane: null });
   addRun(ctx.db, { issue: 'GEO-9902', title: 'Design the kettle spout', place: 'local', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: null, design: 'agent', actor: 'z-delivery' });
   addRun(ctx.db, { issue: 'GEO-9903', title: 'Descale the kettle', place: 'local', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: null, actor: 'z-delivery' });
-  ctx.db.query('UPDATE runs SET design_lane = NULL WHERE issue = ?').run('GEO-9901');
 
   expect(readDesignRuns(ctx.db)).toStrictEqual([
     { issue: 'GEO-9901', state: 'working', lane: 'with-geoff' },

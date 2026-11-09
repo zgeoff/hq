@@ -5,6 +5,8 @@ import { join } from 'node:path';
 import { createUnblockItems } from '../../test/create-unblock-items.ts';
 import { getMeta } from '../db/get-meta.ts';
 import { openDb } from '../db/open-db.ts';
+import { dropOutboxItem } from '../outbox/drop-outbox-item.ts';
+import { readOutboxRows } from '../outbox/read-outbox-rows.ts';
 import { owner } from '../owner.ts';
 import { closeUnblock } from './close-unblock.ts';
 import { markPushed } from './mark-pushed.ts';
@@ -22,7 +24,7 @@ function setupTest() {
   });
   return {
     db,
-    clearOutbox: () => db.query('DELETE FROM outbox').run(),
+    clearOutbox: () => readOutboxRows(db).forEach((row) => dropOutboxItem(db, row.id)),
     readOutbox: () => db.query('SELECT target, text, topic FROM outbox WHERE topic = ? ORDER BY id').all('unblock-changed'),
   };
 }

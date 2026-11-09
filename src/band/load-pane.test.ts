@@ -3,10 +3,14 @@ import type { Database } from 'bun:sqlite';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createUnblockItems } from '../../test/create-unblock-items.ts';
-import { freshDb } from '../../test/helpers.ts';
+import { freshDb, at as setNow } from '../../test/helpers.ts';
 import { main } from '../cli.ts';
 import { overrideEnv } from '../config/override-env.ts';
+import { buildMockSha } from '../../test/build-mock-sha.ts';
+import { reviewStarted } from '../runs/review-started.ts';
+import { writeReviewed } from '../runs/write-reviewed.ts';
 import { loadPane } from './load-pane.ts';
+import { buildSeeder } from '../test-utils/build-seeder.ts';
 
 function setupTest() {
   const fresh = freshDb();
@@ -18,7 +22,7 @@ function setupTest() {
 
   // hq finds pacing.json beside capacity.sh's folder, so hq run lane reads the test's own.
   onTestFinished(overrideEnv('HQ_CAPACITY', join(fresh.dir, 'scripts', 'capacity.sh')));
-  return { db: fresh.db, pacing: join(fresh.dir, 'pacing.json'), consoleURL: 'http://127.0.0.1:4317/', at: new Date('2026-10-15T01:00:00Z') };
+  return { db: fresh.db, seed: buildSeeder(fresh), pacing: join(fresh.dir, 'pacing.json'), consoleURL: 'http://127.0.0.1:4317/', at: new Date('2026-10-15T01:00:00Z') };
 }
 
 async function writeFleet(app: ReturnType<typeof setupTest>): Promise<Database> {
@@ -29,15 +33,6 @@ async function writeFleet(app: ReturnType<typeof setupTest>): Promise<Database> 
   return app.db;
 }
 
-function writePRs(db: Database): Database {
-  const pr = db.query("INSERT INTO run_prs (ref, issue, url, state, review_started_at, reviewed_at, merged_at, added_at, updated_at) VALUES (?, 'GEO-9601', ?, ?, ?, ?, ?, '2026-10-14T00:00:00Z', '2026-10-15T00:00:00Z')");
-  pr.run('kettle#41', null, 'open', '2026-10-15T00:30:00Z', null, null);
-  pr.run('kettle#42', 'https://github.com/zgeoff/kettle/pull/42', 'open', '2026-10-15T00:10:00Z', '2026-10-15T00:20:00Z', null);
-  pr.run('kettle#43', null, 'merged', null, null, '2026-10-14T22:00:00Z');
-  pr.run('teapot#7', null, 'merged', null, null, '2026-10-14T23:00:00Z');
-  return db;
-}
-
 test('the pane lists what needs the owner with its links, then Nix, lanes, reviews, shipped today and news, as Markdown', async () => {
   const app = setupTest();
   const fleet = await writeFleet(app);
@@ -45,16 +40,27 @@ test('the pane lists what needs the owner with its links, then Nix, lanes, revie
   const parkAdd = await main(['run', 'add', 'GEO-9602', '--title', 'Seal the teapot lid', '--where', 'imp', '--json']);
   const parkLane = await main(['run', 'lane', 'GEO-9602', 'cleanup', '--json']);
   const parkState = await main(['run', 'state', 'GEO-9602', 'blocked', '--waits-on', 'the teapot supplier', '--json']);
-  const pending = writePRs(createUnblockItems(fleet, { lid: { task: 'Fit the new lid on the kettle', links: [{ label: 'kettle#41', url: 'https://github.com/zgeoff/kettle/pull/41', subject: true }] } }));
-  const reading = pending.query("INSERT OR REPLACE INTO meta (key, value) VALUES ('atc_awake', ?)").run(JSON.stringify({ at: '2026-10-15T01:00:00.000Z', ids: ['a0000601-aaaa-4aaa-8aaa-aaaaaaaaaaaa'] }));
+  setNow('2026-10-14T00:00:00Z');
+  app.seed.runPr({ issue: 'GEO-9601', ref: 'kettle#41' });
+  app.seed.runPr({ issue: 'GEO-9601', ref: 'https://github.com/zgeoff/kettle/pull/42' });
+  app.seed.mergedRunPr({ issue: 'GEO-9601', ref: 'kettle#43', mergedAt: '2026-10-14T22:00:00Z' });
+  app.seed.mergedRunPr({ issue: 'GEO-9601', ref: 'teapot#7', mergedAt: '2026-10-14T23:00:00Z' });
+  setNow('2026-10-15T00:10:00Z');
+  reviewStarted(fleet, 'kettle#42', 'kettle-bot');
+  setNow('2026-10-15T00:20:00Z');
+  writeReviewed(fleet, 'kettle', 42, { head: buildMockSha(42), countsRound: false });
+  setNow('2026-10-15T00:30:00Z');
+  reviewStarted(fleet, 'kettle#41', 'kettle-bot');
+  setNow('2026-10-15T01:00:00Z');
+  const pending = createUnblockItems(fleet, { lid: { task: 'Fit the new lid on the kettle', links: [{ label: 'kettle#41', url: 'https://github.com/zgeoff/kettle/pull/41', subject: true }] } });
+  app.seed.meta({ key: 'atc_awake', value: JSON.stringify({ at: '2026-10-15T01:00:00.000Z', ids: ['a0000601-aaaa-4aaa-8aaa-aaaaaaaaaaaa'] }) });
   const sample = pending.query("INSERT INTO probe_samples (at, target_ok, control_ok) VALUES ('2026-10-15T00:58:00Z', 1, 1)").run();
   const shown = await loadPane(pending, app.pacing, app.consoleURL, app.at);
-  expect([news, parkAdd, parkLane, parkState, reading.changes, sample.changes, shown.heat]).toStrictEqual([
+  expect([news, parkAdd, parkLane, parkState, sample.changes, shown.heat]).toStrictEqual([
     0,
     0,
     0,
     0,
-    1,
     1,
     [
       { lane: 'cleanup', size: 3, used: 1 },

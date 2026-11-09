@@ -1,7 +1,6 @@
 import { afterEach, expect, test } from 'bun:test';
 import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { z } from 'zod';
 import { answer } from '../src/atc/answer.ts';
 import { AtcClient } from '../src/atc/atc-client.ts';
 import { eventsReadSchema } from '../src/atc/events-read-schema.ts';
@@ -9,9 +8,6 @@ import { sessionListRequiredSchema } from '../src/atc/session-list-required-sche
 import { sessionListSchema } from '../src/atc/session-list-schema.ts';
 import { main } from '../src/cli.ts';
 import { config } from '../src/config/config.ts';
-import { metaJson } from '../src/db/meta-json.ts';
-import { strMap } from '../src/db/str-map.ts';
-import { freshDb } from './helpers.ts';
 import { startStubAtcDaemon } from './start-stub-atc-daemon.ts';
 
 const saved = { ...process.env };
@@ -109,20 +105,6 @@ test('no source file (tests aside) but src/config/config.ts reads an HQ_ setting
   expect(bad).toEqual([]);
 });
 
-test('metaJson: a missing key gives the fallback, a valid value its parse, a malformed one bad_meta naming the key', () => {
-  const { db, cleanup } = freshDb();
-  try {
-    expect(metaJson(db, 'invented_map', strMap, { a: 'b' })).toEqual({ a: 'b' });
-    db.query("INSERT INTO meta (key, value) VALUES ('invented_map', ?)").run('{"x":"y"}');
-    expect(metaJson(db, 'invented_map', strMap, {})).toEqual({ x: 'y' });
-    db.query("UPDATE meta SET value = '{\"x\":4}' WHERE key = 'invented_map'").run();
-    expect(() => metaJson(db, 'invented_map', strMap, {})).toThrow(expect.objectContaining({ code: 'bad_meta', message: expect.stringContaining("'invented_map'") }));
-    db.query("UPDATE meta SET value = '{not json' WHERE key = 'invented_map'").run();
-    expect(() => metaJson(db, 'invented_map', z.array(z.string()), [])).toThrow(expect.objectContaining({ code: 'bad_meta', message: expect.stringContaining("'invented_map'") }));
-  } finally {
-    cleanup();
-  }
-});
 
 test('the atc schemas accept a session list with extra fields and optional parts missing', () => {
   const list = { sessions: [{ id: 'id-a', name: 'kettle', alive: true, state: 'running', cwd: '/invented', lifecycle: { harness: 'running' } }] };

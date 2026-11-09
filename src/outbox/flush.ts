@@ -1,7 +1,6 @@
 import type { Database } from 'bun:sqlite';
 import { AtcClient } from '../atc/atc-client.ts';
 import { fleetIds } from '../atc/fleet-ids.ts';
-import { iso } from '../clock/iso.ts';
 import { now } from '../clock/now.ts';
 import { config } from '../config/config.ts';
 import { buildRowSchema } from '../db/build-row-schema.ts';
@@ -11,7 +10,9 @@ import { getLanesHold } from '../lanes/get-lanes-hold.ts';
 import { kdb } from '../kdb.ts';
 import { isLanesAlertTopic } from '../lanes/lanes-alert-topics.ts';
 import { OutboxSchema } from './outbox-schema.ts';
-import type { FlushResult, OutboxRow } from './types.ts';
+import type { FlushResult } from './types.ts';
+import { markOutboxFailed } from './mark-outbox-failed.ts';
+import { markOutboxSent } from './mark-outbox-sent.ts';
 import { unsent } from './unsent.ts';
 import { toErrorMessage } from '../to-error-message.ts';
 
@@ -33,7 +34,7 @@ export async function flush(db: Database, opts: { retryFailed?: boolean; ids?: n
     client = await AtcClient.open();
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
-    result.failed = markFailed(db, rows, reason);
+    result.failed = markOutboxFailed(db, rows, reason);
     if (result.failed > 0) {
       result.errors.push(reason);
     }
@@ -66,12 +67,7 @@ export async function flush(db: Database, opts: { retryFailed?: boolean; ids?: n
           continue;
         }
         const messageId = await client.message(session.id, row.text, 'hq', cur.idem_key);
-        db.query(`UPDATE outbox SET status='sent', attempts=attempts+1, message_id=?, sent_at=?, last_error=NULL WHERE id=? AND idem_key=?`).run(
-          messageId ?? null,
-          iso(now()),
-          row.id,
-          cur.idem_key,
-        );
+        markOutboxSent(db, { id: row.id, idem_key: cur.idem_key }, messageId ?? null);
         result.sent++;
       } catch (e) {
         const message = toErrorMessage(e);
@@ -79,7 +75,7 @@ export async function flush(db: Database, opts: { retryFailed?: boolean; ids?: n
           continue;
         }
         // Another flush sent it meanwhile: that is no failure of this one.
-        if (markFailed(db, [{ id: row.id, idem_key: cur.idem_key }], message) === 0) {
+        if (markOutboxFailed(db, [{ id: row.id, idem_key: cur.idem_key }], message) === 0) {
           continue;
         }
         result.failed++;
@@ -90,10 +86,4 @@ export async function flush(db: Database, opts: { retryFailed?: boolean; ids?: n
     client.close();
   }
   return result;
-}
-
-// Another flush may have sent the row, or a forward rekeyed it, while this one waited on atc.
-function markFailed(db: Database, rows: Pick<OutboxRow, 'id' | 'idem_key'>[], error: string): number {
-  const update = db.query(`UPDATE outbox SET status='failed', attempts=attempts+1, last_error=? WHERE id=? AND idem_key=? AND status != 'sent'`);
-  return rows.reduce((marked, row) => marked + update.run(error, row.id, row.idem_key).changes, 0);
 }

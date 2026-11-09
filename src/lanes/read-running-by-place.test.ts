@@ -7,12 +7,13 @@ import { addRun } from '../runs/add-run.ts';
 import { setSession } from '../runs/set-session.ts';
 import { setState } from '../runs/set-state.ts';
 import { readRunningByPlace } from './read-running-by-place.ts';
+import { buildSeeder } from '../test-utils/build-seeder.ts';
 
 function setupTest() {
   const fresh = freshDb();
   onTestFinished(fresh.cleanup);
   at('2026-10-15T20:00:00Z');
-  return { db: fresh.db };
+  return { db: fresh.db, seed: buildSeeder(fresh) };
 }
 
 test('it counts a run filed imp whose awake session runs here as local, not imp', () => {
@@ -157,8 +158,7 @@ test('it leaves an agent design run on a non-Design issue out of the slot counts
   const ctx = setupTest();
   writeIssues(ctx.db, [{ issue: 'GEO-9931', type: 'Design', title: 'Design: a teapot lid that stays on', state: 'open', closed_at: null }]);
   addRun(ctx.db, { issue: 'GEO-9930', title: 'Design the kettle spout', place: 'imp', session: 'a0000030-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', design: 'agent', actor: 'z-delivery' });
-  addRun(ctx.db, { issue: 'GEO-9931', title: 'Design: a teapot lid that stays on', place: 'imp', session: null, next: 'The owner chats.', gate: null, geoffChat: true, lane: 'cloud', actor: 'z-delivery' });
-  ctx.db.query('UPDATE runs SET design_lane = NULL WHERE issue = ?').run('GEO-9931');
+  ctx.seed.runBeforeDesignLanes({ issue: 'GEO-9931', title: 'Design: a teapot lid that stays on', place: 'imp', next: 'The owner chats.', geoffChat: true, lane: 'cloud' });
   addRun(ctx.db, { issue: 'GEO-9932', title: 'Descale the kettle', place: 'imp', session: 'a0000032-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
   recordAwake(ctx.db, [
     { id: 'a0000030-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'spout-design', alive: true, state: 'running', locator: { targetID: 'local' } },

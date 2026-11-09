@@ -15,6 +15,8 @@ import { setTarget } from '../set-target.ts';
 import { at, fetchedDays, freshDb } from '../../../test/helpers.ts';
 import { owner } from '../../owner.ts';
 import { setForward } from '../../outbox/set-forward.ts';
+import { markOutboxFailed } from '../../outbox/mark-outbox-failed.ts';
+import { unsent } from '../../outbox/unsent.ts';
 
 let db: Database;
 let dir: string;
@@ -195,7 +197,7 @@ test('health is red at 18:31 with no run, quiet before 18:30, green once it ran'
   synced(syd('2026-10-16', '17:50'));
   tick('2026-10-16', '18:05');
   expect(goalsDailyCheck(db, syd('2026-10-16', '18:31'))).toMatchObject({ ok: true });
-  db.query("UPDATE outbox SET status = 'failed'").run();
+  markOutboxFailed(db, unsent(db, false, undefined), 'invented send failure');
   expect(goalsDailyCheck(db, syd('2026-10-16', '18:31'))).toMatchObject({ ok: false, line: expect.stringContaining('failed to send') });
 });
 
@@ -203,7 +205,7 @@ test('it still sees a failed message after the owner session is forwarded', () =
   synced(syd('2026-10-16', '17:50'));
   tick('2026-10-16', '18:05');
   setForward(db, owner(), 'z-other');
-  db.query("UPDATE outbox SET status = 'failed'").run();
+  markOutboxFailed(db, unsent(db, false, undefined), 'invented send failure');
 
   expect(goalsDailyCheck(db, syd('2026-10-16', '18:31'))).toMatchObject({ ok: false, line: expect.stringContaining('failed to send') });
 });
