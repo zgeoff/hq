@@ -62,6 +62,8 @@ test.each([
 
 test('it keeps a repo another hq process turns on while this change waits for the database', async () => {
   const ctx = setupTest();
+
+  // A second process holds hq.db's write lock while it writes the setting: only a raw statement keeps the lock open.
   const other = Bun.spawn(
     [
       'bun',

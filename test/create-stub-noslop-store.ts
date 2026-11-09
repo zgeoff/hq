@@ -9,6 +9,7 @@ export function createStubNoslopStore(path: string, store: StubNoslopStore): voi
   const db = new Database(path, { create: true });
   db.run('CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT NOT NULL)');
   for (const name of store.migrations) {
+    // A noslop store row: hq reads that database but does not own it, so no hq module can write it.
     db.query('INSERT INTO kysely_migration (name, timestamp) VALUES (?, ?)').run(name, '2026-10-01T00:00:00.000Z');
   }
   for (const [table, rows] of Object.entries(store.tables)) {

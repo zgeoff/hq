@@ -13,6 +13,8 @@ import type { Runner } from '../runner/types.ts';
 import { realRunner } from '../runner/real-runner.ts';
 import { createResticRepo } from '../../test/create-restic-repo.ts';
 import { freshDb, requireEnv } from '../../test/helpers.ts';
+import { buildSeeder } from '../test-utils/build-seeder.ts';
+import { seedStagingLock } from './test-utils/seed-staging-lock.ts';
 
 const canRunRestic = process.env['CI'] !== undefined || (Bun.which('restic') !== null && Bun.which('sqlite3') !== null);
 
@@ -43,7 +45,7 @@ afterEach(() => {
 
 test.skipIf(!canRunRestic)('backs up hq.db online plus the dirs, restores them, and passes a restore test', async () => {
   createResticRepo(`${dir}/backup/repo`, requireEnv('HQ_BACKUP_PASSWORD_FILE'), 'local');
-  db.exec("CREATE TABLE kettle (note TEXT); INSERT INTO kettle VALUES ('whistles once')");
+  buildSeeder({ db }).meta({ key: 'kettle', value: 'whistles once' });
   const r = await runBackup(db, realRunner, 'z-q');
   expect(r.error).toBeNull();
   expect(r.ok).toBe(true);
@@ -55,7 +57,7 @@ test.skipIf(!canRunRestic)('backs up hq.db online plus the dirs, restores them, 
   const back = await restore(realRunner, out, { snapshot: 'latest', remote: false });
   expect(back.db).not.toBeNull();
   const copy = new Database(back.db!, { readonly: true });
-  expect(copy.query('SELECT note FROM kettle').get()).toEqual({ note: 'whistles once' });
+  expect(copy.query("SELECT value FROM meta WHERE key = 'kettle'").get()).toStrictEqual({ value: 'whistles once' });
   copy.close();
   expect(readFileSync(join(out, dir, 'sessions/notes.md'), 'utf8')).toContain('kettle is fine');
   expect(existsSync(join(out, dir, 'transcripts/t1.jsonl'))).toBe(true);
@@ -139,7 +141,7 @@ test.skipIf(!canRunRestic)('a bad remote fails the run without losing the local 
 
 test.skipIf(!canRunRestic)('it finds the restored hq.db where the snapshot staged it, when the backup dir has moved since', async () => {
   createResticRepo(`${dir}/backup/repo`, requireEnv('HQ_BACKUP_PASSWORD_FILE'), 'local');
-  db.exec("CREATE TABLE kettle (note TEXT); INSERT INTO kettle VALUES ('whistles twice')");
+  buildSeeder({ db }).meta({ key: 'kettle', value: 'whistles twice' });
   const backedUp = await runBackup(db, realRunner, 'z-q');
   expect(backedUp.ok).toBe(true);
   mkdirSync(`${dir}/moved`, { recursive: true });
@@ -153,9 +155,7 @@ test.skipIf(!canRunRestic)('it finds the restored hq.db where the snapshot stage
 test("it refuses to back up while another run holds the staging dir, and leaves that run's staged copy alone", async () => {
   mkdirSync(`${dir}/backup/staging`, { recursive: true });
   writeFileSync(`${dir}/backup/staging/hq.db`, 'the other run staged this');
-  const held = new Database(`${dir}/backup/staging-lock.sqlite`, { create: true });
-  held.run('CREATE TABLE holder (id INTEGER PRIMARY KEY CHECK (id = 1), pid INTEGER NOT NULL)');
-  held.query('INSERT INTO holder (id, pid) VALUES (1, ?)').run(process.pid);
+  const held = seedStagingLock({ backupDir: `${dir}/backup` }, { pid: process.pid });
 
   const result = await runBackup(db, realRunner, 'z-q');
   expect(result).toMatchObject({ ok: false, error: `another hq backup is running (pid ${process.pid}); this run left its staging dir alone` });
@@ -168,9 +168,7 @@ test('it lets one run take over a dead staging lock when several find it at once
   const gone = Bun.spawn(['true']);
   await gone.exited;
   mkdirSync(`${dir}/backup`, { recursive: true });
-  const held = new Database(`${dir}/backup/staging-lock.sqlite`, { create: true });
-  held.run('CREATE TABLE holder (id INTEGER PRIMARY KEY CHECK (id = 1), pid INTEGER NOT NULL)');
-  held.query('INSERT INTO holder (id, pid) VALUES (1, ?)').run(gone.pid);
+  const held = seedStagingLock({ backupDir: `${dir}/backup` }, { pid: gone.pid });
   held.close();
   const barrier = `${dir}/barrier`;
   mkdirSync(barrier);
@@ -200,9 +198,7 @@ test.skipIf(!canRunRestic)('it takes over a staging lock whose run is gone, and 
   const gone = Bun.spawn(['true']);
   await gone.exited;
   mkdirSync(`${dir}/backup`, { recursive: true });
-  const held = new Database(`${dir}/backup/staging-lock.sqlite`, { create: true });
-  held.run('CREATE TABLE holder (id INTEGER PRIMARY KEY CHECK (id = 1), pid INTEGER NOT NULL)');
-  held.query('INSERT INTO holder (id, pid) VALUES (1, ?)').run(gone.pid);
+  const held = seedStagingLock({ backupDir: `${dir}/backup` }, { pid: gone.pid });
 
   const result = await runBackup(db, realRunner, 'z-q');
   expect(result.error).toBeNull();

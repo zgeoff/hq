@@ -12,7 +12,6 @@ function setupTest() {
 test('the schema itself refuses a second open row', () => {
   const ctx = setupTest();
   ctx.seed.openAsk({ id: 'geo-1-paint' });
-  ctx.seed.ask({ id: 'geo-2-fence' });
 
-  expect(() => ctx.db.query(`UPDATE asks SET state='open' WHERE id='geo-2-fence'`).run()).toThrow('UNIQUE');
+  expect(() => ctx.seed.secondOpenAsk({ id: 'geo-2-fence' })).toThrow('UNIQUE');
 });

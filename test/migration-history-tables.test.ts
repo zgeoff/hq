@@ -21,6 +21,8 @@ test('v28 keeps every typed row and id, and then takes a console source', () => 
   const rows = createV27TypedRows(file);
   const upgraded = openDb(file);
   expect(upgraded.query('SELECT * FROM typed ORDER BY id').all()).toStrictEqual(rows);
+
+  // An old schema that no current owner can write: this migration test builds it by hand.
   upgraded.query(`INSERT INTO typed (to_session, text, source_kind, source_ref, typed_by, at) VALUES ('z-invented', 'Descale it.', 'console', 'descale-kettle', 'z-stu', '2026-10-15T01:00:00Z')`).run();
   expect(upgraded.query('SELECT id, source_kind FROM typed ORDER BY id').all()).toStrictEqual([
     { id: 1, source_kind: 'call' },

@@ -358,6 +358,8 @@ test('v15 rebuilds news with every row, its read state and its id sequence, and 
   const file = `${ctx.directory}/v14.db`;
   const v14 = new Database(file, { create: true });
   migrate(v14, file, false, MIGRATIONS.slice(0, 14));
+
+  // An old schema that no current owner can write: this migration test builds it by hand.
   const add = v14.query(`INSERT INTO news (from_name, topic, text, added_at, read_at, needs_geoff) VALUES ('z-invented', ?, ?, '2026-10-15T00:00:00Z', ?, ?)`);
   add.run('merge', 'an invented merge', null, 1);
   add.run('other', 'an invented note', '2026-10-15T01:00:00Z', 0);
@@ -649,6 +651,8 @@ test('v20 adds live_check to runs and the merge and release columns to run_prs',
   const file = `${ctx.directory}/v19.db`;
   const v19 = new Database(file, { create: true });
   migrate(v19, file, false, MIGRATIONS.slice(0, 19));
+
+  // An old schema that no current owner can write: this migration test builds it by hand.
   v19.query(`INSERT INTO runs (issue, title, place, state, next, created_at, updated_at) VALUES ('GEO-1', 'Invented kettle work', 'none', 'merged', 'x', '2026-10-16T00:00:00Z', '2026-10-16T00:00:00Z')`).run();
   v19.query(`INSERT INTO run_prs (ref, issue, state, added_at, updated_at) VALUES ('nixie#1', 'GEO-1', 'merged', '2026-10-16T00:00:00Z', '2026-10-16T00:00:00Z')`).run();
   v19.close();

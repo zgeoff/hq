@@ -54,6 +54,8 @@ function setupTest() {
   return {
     base,
     db,
+
+    // A noslop store row: hq reads that database but does not own it, so no hq module can write it.
     addDispositionsMigration: "INSERT INTO kysely_migration (name, timestamp) VALUES ('0007-dispositions-by-pull-request', '2026-10-20T00:00:00.000Z')",
     busyPgrep: { code: 0, stdout: '4242 bun /x/apps/cli/src/cli.ts review\n', stderr: '' },
     fullSHA: '0123456789abcdef0123456789abcdef01234567',

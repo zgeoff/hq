@@ -44,6 +44,8 @@ test('v35 adds the pr_status table and keeps the rows already in the database', 
   onTestFinished(() => db.close());
   db.exec('PRAGMA journal_mode = WAL;');
   migrate(db, path, false, MIGRATIONS.slice(0, 34));
+
+  // An old schema that no current owner can write: this migration test builds it by hand.
   db.query("INSERT INTO events (subject, subject_id, action, actor, at, data) VALUES ('hq', 'kettle', 'boil', 'z-kettle', '2026-10-14T01:00:00Z', '{}')").run();
 
   expect(migrate(db, path, true, MIGRATIONS.slice(0, 35))).not.toBeNull();

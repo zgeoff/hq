@@ -1,6 +1,4 @@
 import type { Database } from 'bun:sqlite';
-import { iso } from './clock/iso.ts';
-import { now } from './clock/now.ts';
 import { logEvent } from './log-event.ts';
 import { HqError } from './errors.ts';
 import type { ItemInput } from './parse-item-input.ts';
@@ -8,6 +6,7 @@ import { splitItemExtras } from './split-item-extras.ts';
 import type { UnblockInput, UnblockItem } from './unblock/types.ts';
 import { addUnblock } from './unblock/add-unblock.ts';
 import { getUnblock } from './unblock/get-unblock.ts';
+import { writeUnblockItem } from './unblock/write-unblock-item.ts';
 
 export function applyUnblockItem(db: Database, input: Omit<UnblockInput, 'task'>, item: ItemInput): ReturnType<typeof addUnblock> {
   return db
@@ -17,7 +16,7 @@ export function applyUnblockItem(db: Database, input: Omit<UnblockInput, 'task'>
       if (added.item.title === item.title && added.item.item === extras) {
         return added;
       }
-      db.query('UPDATE unblocks SET title = ?, item = ?, updated_at = ? WHERE id = ?').run(item.title, extras, iso(now()), added.item.id);
+      writeUnblockItem(db, added.item.id, item.title, extras);
       logEvent(db, 'unblock', added.item.id, 'item', input.actor, added.item.state, added.item.state, { item: extras });
       return { ...added, item: requireUnblock(db, added.item.id), result: added.result === 'noop' ? 'updated' : added.result };
     })

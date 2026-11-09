@@ -1,6 +1,7 @@
 import { seedReviewRound } from './seed-review-round.ts';
 import { seedReviewRoundWithBareFindings } from './seed-review-round-with-bare-findings.ts';
 import { seedReviewRoundWithCorruptOpen } from './seed-review-round-with-corrupt-open.ts';
+import { seedRoundRowOutsideChecks } from './seed-round-row-outside-checks.ts';
 import type { NoslopDeps } from './types.ts';
 
 export function buildNoslopSeeder(deps: NoslopDeps) {
@@ -8,5 +9,6 @@ export function buildNoslopSeeder(deps: NoslopDeps) {
     reviewRound: (input?: Parameters<typeof seedReviewRound>[1]) => seedReviewRound(deps, input),
     reviewRoundWithBareFindings: (input?: Parameters<typeof seedReviewRoundWithBareFindings>[1]) => seedReviewRoundWithBareFindings(deps, input),
     reviewRoundWithCorruptOpen: (input?: Parameters<typeof seedReviewRoundWithCorruptOpen>[1]) => seedReviewRoundWithCorruptOpen(deps, input),
+    roundRowOutsideChecks: (input?: Parameters<typeof seedRoundRowOutsideChecks>[1]) => seedRoundRowOutsideChecks(deps, input),
   };
 }
