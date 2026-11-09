@@ -1,5 +1,4 @@
-import { spawnSync } from 'node:child_process';
-import { parseOxlintReport } from '../check-casts.ts';
+import { readRows } from '../check-casts.ts';
 
 interface Row {
   readonly code: string;
@@ -24,20 +23,10 @@ export function formatSeedCounts(counts: Readonly<Record<string, number>>): stri
   return `seed rules: ${SEED_RULES.map((rule) => `${rule} ${counts[rule] ?? 0}`).join(', ')}`;
 }
 
-const PATHS = ['src', 'test', 'scripts'];
-
-function readRows(): readonly Row[] {
-  const result = spawnSync('bunx', ['oxlint', '--format', 'json', ...PATHS], { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 });
-  if (result.error !== undefined) {
-    throw result.error;
-  }
-  return parseOxlintReport(result.status, result.stdout, result.stderr);
-}
-
 // Exit 2 on a broken run, so it never reads as exit 1, a check that found seed-rule findings.
 if (import.meta.main) {
   try {
-    process.exit(checkSeeds(readRows()));
+    process.exit(checkSeeds(readRows([])));
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(message);
