@@ -9,6 +9,7 @@ import { buildMockSha } from '../../test/build-mock-sha.ts';
 import { buildStubSourceGH } from '../../test/build-stub-source-gh.ts';
 import { createMergedRun } from '../../test/create-merged-run.ts';
 import { NOON_SYDNEY, freshDb } from '../../test/helpers.ts';
+import { buildSeeder } from '../test-utils/build-seeder.ts';
 
 function setupTest() {
   const base = freshDb();
@@ -21,9 +22,7 @@ function setupTest() {
     db: base.db,
     now: new Date(NOON_SYDNEY),
     calls,
-    setMergedAt: (ref: string, mergedAt: string) => {
-      base.db.query('UPDATE run_prs SET merged_at = ? WHERE ref = ?').run(mergedAt, ref);
-    },
+    seed: buildSeeder(base),
     readPr: (ref: string) => base.db.query('SELECT merge_sha, shipped_tag, shipped_at FROM run_prs WHERE ref = ?').get(ref),
   };
 }
@@ -135,8 +134,9 @@ test('it counts a noslop package at the repo root as changed by any file', async
 
 test('it ships a tools PR that changes no package at its merge time, with no tag and no release read', async () => {
   const ctx = setupTest();
-  createMergedRun(ctx.db, 'GEO-73', ['tools#7']);
-  ctx.setMergedAt('tools#7', '2026-10-12T05:06:07Z');
+  ctx.seed.run({ issue: 'GEO-73' });
+  ctx.seed.mergedRunPr({ issue: 'GEO-73', ref: 'tools#7', mergedAt: '2026-10-12T05:06:07Z' });
+  setState(ctx.db, 'GEO-73', 'merged', {}, 'z-delivery');
   const run = buildStubSourceGH({ shas: { 'tools#7': buildMockSha(7) }, contains: {}, config: { tools: { packages: { 'packages/alpha': { component: 'alpha' } } } }, files: { 'tools#7': ['docs/readme.md'] } }, ctx.calls);
 
   const result = await shipRuns(ctx.db, run, ctx.now);
@@ -148,8 +148,10 @@ test('it ships a tools PR that changes no package at its merge time, with no tag
 
 test('it keeps a PR shipped at its merge with no tag on the next pass, with no gh call for it, while another PR of the run waits', async () => {
   const ctx = setupTest();
-  createMergedRun(ctx.db, 'GEO-74', ['tools#8', 'tools#9']);
-  ctx.setMergedAt('tools#8', '2026-10-12T05:06:07Z');
+  ctx.seed.run({ issue: 'GEO-74' });
+  ctx.seed.mergedRunPr({ issue: 'GEO-74', ref: 'tools#8', mergedAt: '2026-10-12T05:06:07Z' });
+  ctx.seed.mergedRunPr({ issue: 'GEO-74', ref: 'tools#9' });
+  setState(ctx.db, 'GEO-74', 'merged', {}, 'z-delivery');
   const facts = {
     shas: { 'tools#8': buildMockSha(8), 'tools#9': buildMockSha(9) },
     contains: {},
@@ -257,8 +259,9 @@ test.each([
 
 test('it ships a vers PR at its merge time', async () => {
   const ctx = setupTest();
-  createMergedRun(ctx.db, 'GEO-90', ['vers#4']);
-  ctx.setMergedAt('vers#4', '2026-10-12T05:06:07Z');
+  ctx.seed.run({ issue: 'GEO-90' });
+  ctx.seed.mergedRunPr({ issue: 'GEO-90', ref: 'vers#4', mergedAt: '2026-10-12T05:06:07Z' });
+  setState(ctx.db, 'GEO-90', 'merged', {}, 'z-delivery');
   const run = buildStubSourceGH({ shas: { 'vers#4': buildMockSha(4) }, contains: {} }, ctx.calls);
 
   const result = await shipRuns(ctx.db, run, ctx.now);
@@ -378,8 +381,9 @@ test('it waits on an hq PR, with no error, when GitHub does not know the clean i
 
 test('it leaves a run alone that was put in deploy-held after the release that holds its PR', async () => {
   const ctx = setupTest();
-  createMergedRun(ctx.db, 'GEO-91', ['vers#6']);
-  ctx.setMergedAt('vers#6', '2026-10-12T05:06:07Z');
+  ctx.seed.run({ issue: 'GEO-91' });
+  ctx.seed.mergedRunPr({ issue: 'GEO-91', ref: 'vers#6', mergedAt: '2026-10-12T05:06:07Z' });
+  setState(ctx.db, 'GEO-91', 'merged', {}, 'z-delivery');
   setState(ctx.db, 'GEO-91', 'deploy-held', { next: 'Waits on the kettle host to switch.' }, 'z-release');
   const run = buildStubSourceGH({ shas: { 'vers#6': buildMockSha(6) }, contains: {} }, ctx.calls);
 
@@ -392,8 +396,9 @@ test('it leaves a run alone that was put in deploy-held after the release that h
 
 test('it ships a run that was put in deploy-held before the release that holds its PR', async () => {
   const ctx = setupTest();
-  createMergedRun(ctx.db, 'GEO-92', ['vers#7']);
-  ctx.setMergedAt('vers#7', '2026-10-15T05:06:07Z');
+  ctx.seed.run({ issue: 'GEO-92' });
+  ctx.seed.mergedRunPr({ issue: 'GEO-92', ref: 'vers#7', mergedAt: '2026-10-15T05:06:07Z' });
+  setState(ctx.db, 'GEO-92', 'merged', {}, 'z-delivery');
   setState(ctx.db, 'GEO-92', 'deploy-held', { next: 'Waits on the kettle release.' }, 'z-release');
   const run = buildStubSourceGH({ shas: { 'vers#7': buildMockSha(7) }, contains: {} }, ctx.calls);
 
@@ -592,8 +597,10 @@ test('it reads a failed gates file once in a pass for two cloud PRs, records one
 
 test('it ships a build run whose delivery PR is released while its design pass PR stays open', async () => {
   const ctx = setupTest();
+  ctx.seed.run({ issue: 'GEO-79', title: 'Design the kettle spout', design: 'agent', lane: 'cloud' });
+  ctx.seed.runPr({ issue: 'GEO-79', ref: 'tools#13' });
+  setState(ctx.db, 'GEO-79', 'done', { note: 'design settled' }, 'z-delivery');
   createMergedRun(ctx.db, 'GEO-79', ['tools#14']);
-  ctx.db.query("INSERT INTO run_prs (ref, issue, state, design_pass, added_at, updated_at) VALUES ('tools#13', 'GEO-79', 'open', 1, '2026-10-14T00:00:00Z', '2026-10-14T00:00:00Z')").run();
   const run = buildStubSourceGH(
     {
       shas: { 'tools#14': buildMockSha(14) },

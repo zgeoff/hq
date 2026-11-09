@@ -1,29 +1,31 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { z } from 'zod';
-import { freshDb } from '../../test/helpers.ts';
+import { NOON_SYDNEY, at, freshDb } from '../../test/helpers.ts';
+import { buildSeeder } from '../test-utils/build-seeder.ts';
+import { reviewedPr } from './reviewed-pr.ts';
 import { writeReviewed } from './write-reviewed.ts';
 
 function setupTest() {
   const fresh = freshDb();
   onTestFinished(fresh.cleanup);
+  at(NOON_SYDNEY);
   return {
     db: fresh.db,
-    createRunPR: (state: string, round: number) => {
-      fresh.db.query("INSERT INTO runs (issue, title, place, state, created_at, updated_at) VALUES ('GEO-9701', 'Fit the kettle lid', 'local', 'working', '2026-10-14T00:00:00Z', '2026-10-14T00:00:00Z')").run();
-      fresh.db.query("INSERT INTO run_prs (ref, issue, state, review_round, added_at, updated_at) VALUES ('widgets#7', 'GEO-9701', ?, ?, '2026-10-14T00:00:00Z', '2026-10-14T00:00:00Z')").run(state, round);
-    },
+    seed: buildSeeder(fresh),
     readPR: () => fresh.db.query("SELECT review_started_at IS NOT NULL AS started, reviewed_sha, review_round FROM run_prs WHERE ref = 'widgets#7'").get(),
     readActions: () =>
       z
         .array(z.object({ action: z.string(), actor: z.string() }))
-        .parse(fresh.db.query("SELECT action, actor FROM events WHERE subject = 'run' ORDER BY seq").all())
+        .parse(fresh.db.query("SELECT action, actor FROM events WHERE subject = 'run' AND actor = 'hq review' ORDER BY seq").all())
         .map((row) => `${row.action} by ${row.actor}`),
   };
 }
 
 test('it marks an open PR on a run as reviewed at the head with the next round', () => {
   const ctx = setupTest();
-  ctx.createRunPR('open', 1);
+  ctx.seed.run({ issue: 'GEO-9701' });
+  ctx.seed.runPr({ issue: 'GEO-9701', ref: 'widgets#7' });
+  reviewedPr(ctx.db, 'widgets#7', 'abc1234', { recheck: false, force: false }, 'kettle-review');
 
   writeReviewed(ctx.db, 'widgets', 7, { head: '0123456789abcdef0123456789abcdef01234567', countsRound: true });
 
@@ -33,7 +35,10 @@ test('it marks an open PR on a run as reviewed at the head with the next round',
 
 test('it counts a round past round 2, since no round limit applies', () => {
   const ctx = setupTest();
-  ctx.createRunPR('open', 2);
+  ctx.seed.run({ issue: 'GEO-9701' });
+  ctx.seed.runPr({ issue: 'GEO-9701', ref: 'widgets#7' });
+  reviewedPr(ctx.db, 'widgets#7', 'abc1234', { recheck: false, force: false }, 'kettle-review');
+  reviewedPr(ctx.db, 'widgets#7', 'abc1234', { recheck: true, force: false }, 'kettle-review');
 
   writeReviewed(ctx.db, 'widgets', 7, { head: '0123456789abcdef0123456789abcdef01234567', countsRound: true });
 
@@ -42,7 +47,9 @@ test('it counts a round past round 2, since no round limit applies', () => {
 
 test('it marks the head and keeps the round for a run that does not count as a round', () => {
   const ctx = setupTest();
-  ctx.createRunPR('open', 1);
+  ctx.seed.run({ issue: 'GEO-9701' });
+  ctx.seed.runPr({ issue: 'GEO-9701', ref: 'widgets#7' });
+  reviewedPr(ctx.db, 'widgets#7', 'abc1234', { recheck: false, force: false }, 'kettle-review');
 
   writeReviewed(ctx.db, 'widgets', 7, { head: '0123456789abcdef0123456789abcdef01234567', countsRound: false });
 
@@ -51,7 +58,8 @@ test('it marks the head and keeps the round for a run that does not count as a r
 
 test('it leaves a merged PR alone', () => {
   const ctx = setupTest();
-  ctx.createRunPR('merged', 0);
+  ctx.seed.run({ issue: 'GEO-9701' });
+  ctx.seed.mergedRunPr({ issue: 'GEO-9701', ref: 'widgets#7' });
 
   writeReviewed(ctx.db, 'widgets', 7, { head: '0123456789abcdef0123456789abcdef01234567', countsRound: true });
 

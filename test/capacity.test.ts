@@ -125,7 +125,7 @@ test('a reading carries every source; PC and CI are shown', async () => {
 
 test('CI minutes today count the Sydney day from the goals CI runs', async () => {
   const ctx = setupTest();
-  ctx.db.query("INSERT INTO ci_runs (id, repo, path, event, status, conclusion, attempt, created_at, started_at, updated_at) VALUES (1, 'atc', 'ci.yml', 'push', 'completed', 'success', 1, '2026-10-14T00:10:00Z', '2026-10-14T00:10:00Z', '2026-10-14T00:40:00Z')").run();
+  ctx.seed.ciRun({ id: 1, repo: 'atc', path: 'ci.yml', created_at: '2026-10-14T00:10:00Z', started_at: '2026-10-14T00:10:00Z', updated_at: '2026-10-14T00:40:00Z' });
   const reading = await readCapacity(ctx.db, probe(world()), minute(0));
   expect(reading.ci_minutes_today).toBe(30);
 });

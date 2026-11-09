@@ -4,6 +4,7 @@ import { seedDeployHeldRun } from './seed-deploy-held-run.ts';
 import { seedDeployingRun } from './seed-deploying-run.ts';
 import { seedDoneRun } from './seed-done-run.ts';
 import { seedDroppedRun } from './seed-dropped-run.ts';
+import { seedFinalRunPr } from './seed-final-run-pr.ts';
 import { seedLiveCheckRun } from './seed-live-check-run.ts';
 import { seedMergedRun } from './seed-merged-run.ts';
 import { seedMergedRunPr } from './seed-merged-run-pr.ts';
@@ -28,6 +29,7 @@ export function buildRunSeeder(deps: RunsDeps) {
     runSession: (input?: Parameters<typeof seedRunSession>[1]) => seedRunSession(deps, input),
     runPr: (input?: Parameters<typeof seedRunPr>[1]) => seedRunPr(deps, input),
     mergedRunPr: (input?: Parameters<typeof seedMergedRunPr>[1]) => seedMergedRunPr(deps, input),
+    finalRunPr: (input?: Parameters<typeof seedFinalRunPr>[1]) => seedFinalRunPr(deps, input),
     closedRunPr: (input?: Parameters<typeof seedRunPr>[1]) => seedClosedRunPr(deps, input),
     runPrWithoutRun: (input?: Parameters<typeof seedRunPrWithoutRun>[1]) => seedRunPrWithoutRun(deps, input),
   };

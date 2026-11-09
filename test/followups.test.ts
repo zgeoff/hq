@@ -21,7 +21,6 @@ const day = (d: number) => new Date(Date.parse(RULE) + d * 86_400_000).toISOStri
 beforeEach(() => {
   ({ db, cleanup } = freshDb());
   at(day(0));
-  addMark(db, { kind: 'skills', text: '#135: findings fixed in their own PR', ref: 'nixie-definitions#135', at: RULE, actor: 'z-steward' });
 });
 afterEach(() => cleanup());
 
@@ -53,6 +52,7 @@ test('parses follow-ups and counts; leaving both off records nothing', () => {
   expect(parseFollowups(undefined)).toBeNull();
   expect(parseFixed('0')).toBe(0);
   expect(parseFixed(undefined)).toBeNull();
+  addMark(db, { kind: 'skills', text: '#135: findings fixed in their own PR', ref: 'nixie-definitions#135', at: RULE, actor: 'z-steward' });
   run('GEO-1');
   addPr(db, 'GEO-1', 'kettle#1', 'z-delivery');
   finalPr(db, 'kettle#1', { sha: 'abc1234', actor: 'z-delivery', tally: { fixed: null, followups: null } });
@@ -61,6 +61,7 @@ test('parses follow-ups and counts; leaving both off records nothing', () => {
 });
 
 test('weekly counts around the rule: a hand-counted baseline before, PR tallies after', () => {
+  addMark(db, { kind: 'skills', text: '#135: findings fixed in their own PR', ref: 'nixie-definitions#135', at: RULE, actor: 'z-steward' });
   addBackfill(db, { issue: 'GEO-101', fromRef: 'kettle#40', at: day(-12), actor: 'z-q' });
   addBackfill(db, { issue: 'GEO-102', fromRef: null, at: day(-9), actor: 'z-q' });
   addBackfill(db, { issue: 'GEO-103', fromRef: 'teapot#7', at: day(-2), actor: 'z-q' });
@@ -100,6 +101,5 @@ test('weekly counts around the rule: a hand-counted baseline before, PR tallies 
 });
 
 test('without the rule mark, the section says how to add it', () => {
-  db.query('DELETE FROM marks').run();
   expect(reviewText(reviewStats(db)).join('\n')).toContain('no mark for nixie-definitions#135');
 });

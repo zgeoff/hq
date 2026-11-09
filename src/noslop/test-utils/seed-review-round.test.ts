@@ -18,6 +18,16 @@ test('#seedReviewRound stores a passing review round, and input overrides apply'
   ]);
 });
 
+test('#seedReviewRound stores a check round, a confirm review and its open findings when the input names them', () => {
+  const ctx = setupTest();
+
+  seedReviewRound(ctx, { kind: 'check', confirm: true, special: 'docs-only', open: [{ id: 'kettle0000000001', title: 'Kettle never boils', reason: 'still open' }] });
+
+  expect(ctx.db.query('SELECT kind, confirm, special, open FROM noslop_rounds').all()).toStrictEqual([
+    { kind: 'check', confirm: 1, special: 'docs-only', open: '[{"id":"kettle0000000001","title":"Kettle never boils","reason":"still open"}]' },
+  ]);
+});
+
 test('#seedReviewRound stores a failed round with its error', () => {
   const ctx = setupTest();
 

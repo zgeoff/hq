@@ -21,6 +21,7 @@ import { ASK_TRANSITIONS } from '../src/transitions/ask-transitions.ts';
 import { findPath } from '../src/test-utils/find-path.ts';
 import { PR_TRANSITIONS } from '../src/transitions/pr-transitions.ts';
 import { RUN_TRANSITIONS } from '../src/transitions/run-transitions.ts';
+import { seedReviewRound } from '../src/noslop/test-utils/seed-review-round.ts';
 import { NOON_SYDNEY, at, fakeAtc, freshDb } from './helpers.ts';
 import { FAKE_FULL_SHA, FAKE_TOKEN, buildFakeRunner } from './noslop-fake.ts';
 
@@ -323,7 +324,7 @@ test('shape: review (noslop)', async () => {
   process.env['HQ_PROJECTS'] = join(dir, 'projects');
   process.env['HQ_REPOS'] = join(dir, 'repos');
   setMeta(db, 'noslop', JSON.stringify({ repos: ['widgets'], sha: FAKE_FULL_SHA }));
-  db.query("INSERT INTO noslop_rounds (repo, pr, kind, started_at, ended_at, ms, ok, head, depth, special, findings, sha) VALUES ('widgets', 7, 'review', 'a', 'b', 1, 1, 'aaaa000000000000000000000000000000000001', 'standard', 'none', ?, 'x')").run('[{"id":"kettle0000000001","lens":"correctness","severity":"high","title":"Kettle never boils"}]');
+  seedReviewRound({ db }, { head: 'aaaa000000000000000000000000000000000001', special: 'none', findings: [{ id: 'kettle0000000001', lens: 'correctness', severity: 'high', title: 'Kettle never boils' }] });
   const fake = buildFakeRunner({
       noslopReview: {
         code: 0,

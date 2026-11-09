@@ -36,6 +36,7 @@ import { buildStubFinalGH } from './build-stub-final-gh.ts';
 import { buildStubGitHubFactsRunner } from './build-stub-github-facts-runner.ts';
 import { type FakeAtc, NOON_SYDNEY, at, fakeAtc, freshDb } from './helpers.ts';
 import { buildSeeder } from '../src/test-utils/build-seeder.ts';
+import { writeShippedPR } from '../src/releases/write-shipped-pr.ts';
 import { createTestDb } from './create-test-db.ts';
 
 let db: Database;
@@ -365,7 +366,7 @@ describe('the sweep', () => {
     add();
     addPr(db, 'GEO-9001', 'widgets#12', 'z-delivery');
     closePr(db, 'widgets#12', { to: 'merged', actor: 'z-review' });
-    db.query("UPDATE run_prs SET merge_sha = ?, shipped_tag = 'widgets@1.0.0', shipped_at = '2026-10-15T00:00:00Z' WHERE ref = 'widgets#12'").run('c'.repeat(40));
+    writeShippedPR(db, { ref: 'widgets#12', sha: 'c'.repeat(40), tag: 'widgets@1.0.0', at: '2026-10-15T00:00:00Z' });
     expect(unmergePr(db, 'widgets#12', 'z-review', 'merged the wrong branch')).toMatchObject({ state: 'open', merge_sha: null, shipped_tag: null, shipped_at: null });
     expect(db.query("SELECT json_extract(data, '$.merge_sha') AS sha, json_extract(data, '$.shipped_tag') AS tag, json_extract(data, '$.shipped_at') AS shipped FROM events WHERE action = 'unmerged'").get()).toStrictEqual({ sha: 'c'.repeat(40), tag: 'widgets@1.0.0', shipped: '2026-10-15T00:00:00Z' });
   });

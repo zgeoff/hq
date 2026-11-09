@@ -10,6 +10,7 @@ import { buildAcceptRiskScenario, buildReplyDrivenNoslop } from '../../test/buil
 import type { Flags } from '../cli.ts';
 import { checkMergeGate } from '../review-gate/check-merge-gate.ts';
 import { runPRCommand } from './run-pr-command.ts';
+import { buildSeeder } from '../test-utils/build-seeder.ts';
 
 function setupTest() {
   const fresh = freshDb();
@@ -18,6 +19,7 @@ function setupTest() {
   createStubNoslopEnv(fresh.db);
   return {
     db: fresh.db,
+    seed: buildSeeder(fresh),
     posts: (fake: ReturnType<typeof buildFakeRunner>): string[][] => fake.calls.map((call) => call.cmd).filter((cmd) => cmd[0] === 'gh' && cmd.includes('POST')),
     fake: (script: FakeScript) => buildFakeRunner(script),
     command: async (fake: ReturnType<typeof buildFakeRunner>, verb: string, rest: string[], given: Flags) => await runPRCommand({ run: fake.run, db: fresh.db, verb, rest, flags: given, actor: () => Promise.resolve('z-kettle'), readOwnerSession: () => Promise.resolve({ verdict: 'owner' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) }),
@@ -304,7 +306,7 @@ test('it lets the merge gate pass when two runs at once each post the same reply
 test('it shows each accepted risk with its finding, source, event and the state noslop gives it, in text and json', async () => {
   const ctx = setupTest();
   const scenario = buildAcceptRiskScenario();
-  ctx.db.query("INSERT INTO pr_status (repo, pr, head, updated_at) VALUES ('widgets', 7, ?, '2026-10-14T01:00:00Z')").run(FAKE_FULL_SHA);
+  ctx.seed.prStatus({ head: FAKE_FULL_SHA });
   await ctx.accept(ctx.fake(scenario.thread), scenario.flags);
   const fake = ctx.fake({ ...scenario.thread, noslopFindings: buildStubFindings('accepted-risk') });
 
@@ -341,7 +343,7 @@ test('it shows an accepted risk of a PR with no record, and the state noslop giv
 test('it shows no state and the error when noslop findings cannot be read, and does not fail status', async () => {
   const ctx = setupTest();
   const scenario = buildAcceptRiskScenario();
-  ctx.db.query("INSERT INTO pr_status (repo, pr, head, updated_at) VALUES ('widgets', 7, ?, '2026-10-14T01:00:00Z')").run(FAKE_FULL_SHA);
+  ctx.seed.prStatus({ head: FAKE_FULL_SHA });
   await ctx.accept(ctx.fake(scenario.thread), scenario.flags);
   const fake = ctx.fake({ ...scenario.thread, noslopFindings: { code: 1, stdout: '', stderr: 'bad credentials' } });
 
@@ -367,7 +369,7 @@ test('it shows no state and the error when noslop findings cannot be read, and d
 test('it reads no findings and shows an empty list when the PR holds no accepted risk', async () => {
   const ctx = setupTest();
   const scenario = buildAcceptRiskScenario();
-  ctx.db.query("INSERT INTO pr_status (repo, pr, head, updated_at) VALUES ('widgets', 7, ?, '2026-10-14T01:00:00Z')").run(FAKE_FULL_SHA);
+  ctx.seed.prStatus({ head: FAKE_FULL_SHA });
   const fake = ctx.fake(scenario.thread);
 
   const out = await ctx.command(fake, 'status', ['widgets', '7'], {});
@@ -415,7 +417,7 @@ test('it gives both reply forms when the thread comments cannot be read, since t
 test('it reads no noslop findings when hq pr next prints the record of a PR that holds an accepted risk', async () => {
   const ctx = setupTest();
   const scenario = buildAcceptRiskScenario();
-  ctx.db.query("INSERT INTO pr_status (repo, pr, head, updated_at) VALUES ('widgets', 7, ?, '2026-10-14T01:00:00Z')").run(FAKE_FULL_SHA);
+  ctx.seed.prStatus({ head: FAKE_FULL_SHA });
   await ctx.accept(ctx.fake(scenario.thread), scenario.flags);
   const fake = ctx.fake({ ...scenario.thread, noslopFindings: buildStubFindings('accepted-risk') });
 

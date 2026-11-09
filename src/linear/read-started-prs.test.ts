@@ -1,13 +1,21 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { freshDb } from '../../test/helpers.ts';
 import { readStartedPrs } from './read-started-prs.ts';
+import { seedStartedPR } from './test-utils/seed-started-pr.ts';
 
-test('it groups the stored PRs by issue', () => {
+function setupTest() {
   const fresh = freshDb();
   onTestFinished(fresh.cleanup);
-  fresh.db.run(`INSERT INTO linear_started_prs (issue, ref, status, merged_at) VALUES ('GEO-9801', 'kettle#2', 'open', NULL), ('GEO-9801', 'kettle#1', 'merged', '2026-10-14T01:00:00Z'), ('GEO-9802', 'teapot#3', 'closed', NULL)`);
+  return { db: fresh.db };
+}
 
-  expect(readStartedPrs(fresh.db)).toStrictEqual(
+test('it groups the stored PRs by issue', () => {
+  const ctx = setupTest();
+  seedStartedPR(ctx, { issue: 'GEO-9801', ref: 'kettle#2', status: 'open', merged_at: null });
+  seedStartedPR(ctx, { issue: 'GEO-9801', ref: 'kettle#1', status: 'merged', merged_at: '2026-10-14T01:00:00Z' });
+  seedStartedPR(ctx, { issue: 'GEO-9802', ref: 'teapot#3', status: 'closed', merged_at: null });
+
+  expect(readStartedPrs(ctx.db)).toStrictEqual(
     new Map([
       [
         'GEO-9801',

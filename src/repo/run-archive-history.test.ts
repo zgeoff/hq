@@ -123,7 +123,7 @@ test('it re-keys exactly the listed columns, in both databases', async () => {
 test('it re-keys the cached PR facts of the stats with the rest of hq.db', async () => {
   const ctx = setupTest();
   ctx.createHistoryRows('hq', 0);
-  ctx.db.query("INSERT INTO meta (key, value) VALUES ('stats_pr_facts_v2', ?)").run(JSON.stringify({ 'hq#5': { lines: 40, stacked: false }, 'hq-tools#5': { lines: 3, stacked: true }, 'hq#abc': { lines: 1, stacked: false } }));
+  ctx.seed.meta({ key: 'stats_pr_facts_v2', value: JSON.stringify({ 'hq#5': { lines: 40, stacked: false }, 'hq-tools#5': { lines: 3, stacked: true }, 'hq#abc': { lines: 1, stacked: false } }) });
   await ctx.archive('hq', 'hq-archive');
   expect(ctx.db.query("SELECT value FROM meta WHERE key = 'stats_pr_facts_v2'").get()).toStrictEqual({
     value: JSON.stringify({ 'hq-archive#5': { lines: 40, stacked: false }, 'hq-tools#5': { lines: 3, stacked: true }, 'hq#abc': { lines: 1, stacked: false } }),
@@ -133,7 +133,7 @@ test('it re-keys the cached PR facts of the stats with the rest of hq.db', async
 test('it counts the cached PR facts of the stats on a dry run, and changes nothing', async () => {
   const ctx = setupTest();
   ctx.createHistoryRows('hq', 0);
-  ctx.db.query("INSERT INTO meta (key, value) VALUES ('stats_pr_facts_v2', ?)").run(JSON.stringify({ 'hq#5': { lines: 40, stacked: false }, 'hq#6': { lines: 2, stacked: true }, 'hq-archive#1': { lines: 9, stacked: false } }));
+  ctx.seed.meta({ key: 'stats_pr_facts_v2', value: JSON.stringify({ 'hq#5': { lines: 40, stacked: false }, 'hq#6': { lines: 2, stacked: true }, 'hq-archive#1': { lines: 9, stacked: false } }) });
   {
     const result = await ctx.archive('hq', 'hq-archive', { dryRun: true });
     expect(result.before[0]?.counts.find((count) => count.table === 'meta')).toStrictEqual({ table: 'meta', column: 'value', from: 2, to: 1 });
@@ -145,7 +145,7 @@ test('it counts the cached PR facts of the stats on a dry run, and changes nothi
 test('it refuses a cached PR fact that would repeat a key, names it, and changes nothing', async () => {
   const ctx = setupTest();
   ctx.createHistoryRows('hq', 0);
-  ctx.db.query("INSERT INTO meta (key, value) VALUES ('stats_pr_facts_v2', ?)").run(JSON.stringify({ 'hq#5': { lines: 40, stacked: false }, 'hq-archive#5': { lines: 2, stacked: true } }));
+  ctx.seed.meta({ key: 'stats_pr_facts_v2', value: JSON.stringify({ 'hq#5': { lines: 40, stacked: false }, 'hq-archive#5': { lines: 2, stacked: true } }) });
   {
     const before = readHistoryRows(ctx.db);
     await expect(ctx.archive('hq', 'hq-archive')).rejects.toThrow('meta.stats_pr_facts_v2=hq-archive#5');

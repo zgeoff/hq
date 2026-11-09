@@ -749,10 +749,9 @@ test('hq goals sync holds goals_ok_at while the cap leaves deploy-prod runs uncl
   );
   chmodSync(`${bin}/gh`, 0o755);
   updateEnv('PATH', `${bin}:${process.env['PATH'] ?? ''}`);
-  const insert = ctx.db.query(`INSERT INTO ci_runs (id, repo, path, event, status, conclusion, attempt, created_at, started_at, updated_at) VALUES (?, 'cloud', '.github/workflows/deploy-prod.yml', 'push', 'completed', 'success', 1, ?, ?, ?)`);
   for (let index = 0; index < 61; index++) {
     const stamp = new Date(Date.now() - 3_600_000 + index * 1000).toISOString().replace(/\.\d{3}Z$/u, 'Z');
-    insert.run(8000 + index, stamp, stamp, stamp);
+    ctx.seed.ciRun({ id: 8000 + index, repo: 'cloud', path: '.github/workflows/deploy-prod.yml', created_at: stamp, started_at: stamp, updated_at: stamp });
   }
 
   const first = await ctx.hq('goals', 'sync', '--days', '2');

@@ -10,6 +10,7 @@ import { openUnready } from './open-unready.ts';
 import { probeHealth } from './probe-health.ts';
 import { probeOnce } from './probe-once.ts';
 import { readOutageRows } from './read-outage-rows.ts';
+import { seedProbeSample } from './test-utils/seed-probe-sample.ts';
 import type { Fetcher } from './types.ts';
 import { unreadyIn } from './unready-in.ts';
 import { NOON_SYDNEY, at, freshDb } from '../../test/helpers.ts';
@@ -308,15 +309,16 @@ test('a down and an unready outage are open together, and downtime counts only t
   expect(unreadyIn(db, new Date(T0), new Date(T0 + 10 * 60_000))).toHaveLength(1);
 });
 
-test('down and blind samples are skipped by the unready run, and an up one before v19 ends it', async () => {
+test('it skips down and blind samples in the unready run', async () => {
   await step(0, UNREADY);
   await step(1, DOWN);
   await step(2, BLIND);
   await step(3, UNREADY);
   expect(readOutageRows(db).map((row) => [row.kind, row.started_at])).toStrictEqual([['unready', minute(0)]]);
-  db.query('DELETE FROM outages').run();
-  db.query('DELETE FROM probe_samples').run();
-  db.query('INSERT INTO probe_samples (at, target_ok, control_ok, ready_ok) VALUES (?, 1, NULL, NULL)').run(minute(0));
+});
+
+test('it ends the unready run at an up sample with no ready check', async () => {
+  seedProbeSample({ db }, { at: minute(0) });
   await step(1, UNREADY);
   await step(2, UNREADY);
   await step(3, UNREADY);

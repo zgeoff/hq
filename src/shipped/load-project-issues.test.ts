@@ -2,11 +2,12 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { freshDb } from '../../test/helpers.ts';
 import type { LinearCall } from '../linear/types.ts';
 import { loadProjectIssues } from './load-project-issues.ts';
+import { buildSeeder } from '../test-utils/build-seeder.ts';
 
 function setupTest() {
   const fresh = freshDb();
   onTestFinished(fresh.cleanup);
-  return { db: fresh.db };
+  return { db: fresh.db, seed: buildSeeder(fresh) };
 }
 
 function buildTwoPageLinear(asked: unknown[]): LinearCall {
@@ -55,9 +56,7 @@ test('a project\'s issues are read again once 5 minutes have passed', async () =
 test('a project\'s kept issues in another shape are read again, and Linear\'s answer replaces them', async () => {
   const asked: unknown[] = [];
   const ctx = setupTest();
-  ctx.db
-    .query("INSERT INTO shipped_cache (kind, key, body, fetched_at, expires_at) VALUES ('project', 'Kettle', ?, '2026-10-15T02:00:00Z', '2026-10-15T02:05:00Z')")
-    .run(JSON.stringify([{ id: 'GEO-9701', statusType: 3, project: 'Kettle' }]));
+  await ctx.seed.cacheEntry({ kind: 'project', key: 'Kettle', body: JSON.stringify([{ id: 'GEO-9701', statusType: 3, project: 'Kettle' }]), fetched_at: '2026-10-15T02:00:00Z', expires_at: '2026-10-15T02:05:00Z' });
 
   await expect(loadProjectIssues(buildTwoPageLinear(asked), ctx.db, ['Kettle'], new Date('2026-10-15T02:01:00Z'))).resolves.toStrictEqual([
     { id: 'GEO-9701', statusType: 'completed', project: 'Kettle' },

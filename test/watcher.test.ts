@@ -19,6 +19,8 @@ import { watcherState } from '../src/watcher/watcher-state.ts';
 import { withDeadline } from '../src/watcher/with-deadline.ts';
 import { DEPLOY } from '../src/goals/deploy.ts';
 import { addUnblock } from '../src/unblock/add-unblock.ts';
+import { applyUnblockItem } from '../src/apply-unblock-item.ts';
+import { parseItemInput } from '../src/parse-item-input.ts';
 import { getUnblock } from '../src/unblock/get-unblock.ts';
 import { at, fakeAtc, freshDb } from './helpers.ts';
 import { buildStubGitHubFactsRunner } from './build-stub-github-facts-runner.ts';
@@ -336,8 +338,11 @@ test('a tick drops an unblock item once GitHub reports its subject PR merged, an
   for (const key of ['kinds_synced_at', 'goals_synced_at', 'goals_ok_at', 'kinds_ok_at', 'linear_synced_at', 'lanes_ready_linear_at']) {
     ctx.seed.meta({ key, value: new Date().toISOString() });
   }
-  addUnblock(ctx.db, { id: 'review-kettle-4', task: 'Review kettle#4 and say lgtm', minutes: null, unblocks: [], notify: ['kettle-session'], actor: 'kettle-triage' });
-  ctx.db.query('UPDATE unblocks SET item = ? WHERE id = ?').run(JSON.stringify({ details: [], unblocks: [], links: [{ label: 'kettle#4', url: 'https://github.com/kettle-co/kettle/pull/4', subject: true }] }), 'review-kettle-4');
+  applyUnblockItem(
+    ctx.db,
+    { id: 'review-kettle-4', minutes: null, unblocks: [], notify: ['kettle-session'], actor: 'kettle-triage' },
+    parseItemInput('unblock', JSON.stringify({ title: 'Review kettle#4', question: 'Review kettle#4 and say lgtm', links: [{ label: 'kettle#4', url: 'https://github.com/kettle-co/kettle/pull/4', subject: true }] })),
+  );
 
   const ok = await watchTick(ctx.db, ctx.deps({}, makePRStateGh({ states: { 'kettle-co/kettle#4': 'MERGED' }, fallback: capacity })));
 

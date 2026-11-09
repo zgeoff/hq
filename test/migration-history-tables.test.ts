@@ -50,7 +50,7 @@ test('v22 adds the refusal log tables, backing hq.db up first', () => {
   db.close();
 });
 
-test('v21 adds deploy_runs, with a checked outcome and one row per run', () => {
+test('it adds deploy_runs at v21, with a checked outcome and one row per run', () => {
   const ctx = setupTest();
   const file = `${ctx.directory}/v20.db`;
   const v20 = new Database(file, { create: true });

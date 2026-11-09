@@ -21,15 +21,19 @@ function setupTest() {
 
 test('it tells the owner once, from Monday 09:00 Sydney, with the last 7 days as the window', async () => {
   const ctx = setupTest();
-  const read = ctx.db.query("INSERT INTO events (subject, subject_id, action, actor, at, data) VALUES ('hq', 'op', 'read', ?, ?, ?)");
   await ctx.seed.capacitySample({ at: '2026-10-11T23:00:00Z', op_account_used: 640, op_account_limit: 1000, op_refused: 0 });
   await ctx.seed.capacitySample({ at: '2026-10-12T12:00:00Z', op_account_used: 812, op_account_limit: 1000, op_refused: 0 });
   await ctx.seed.capacitySample({ at: '2026-10-13T13:30:00Z', op_account_used: 90, op_account_limit: 1000, op_refused: 0 });
-  read.run('noslop', '2026-10-11T13:00:00Z', '{"consumer":"noslop","requests":1}');
-  read.run('noslop', '2026-10-12T05:00:00Z', '{"consumer":"noslop","requests":1}');
-  read.run('linear', '2026-10-12T06:00:00Z', '{"consumer":"linear","requests":3}');
-  read.run('noslop', '2026-10-12T13:00:00Z', '{"consumer":"noslop","requests":1}');
-  read.run('noslop', '2026-10-18T13:00:00Z', '{"consumer":"noslop","requests":1}');
+  at('2026-10-11T13:00:00Z');
+  ctx.seed.event({ subject: 'hq', subjectID: 'op', action: 'read', actor: 'noslop', data: { consumer: 'noslop', requests: 1 } });
+  at('2026-10-12T05:00:00Z');
+  ctx.seed.event({ subject: 'hq', subjectID: 'op', action: 'read', actor: 'noslop', data: { consumer: 'noslop', requests: 1 } });
+  at('2026-10-12T06:00:00Z');
+  ctx.seed.event({ subject: 'hq', subjectID: 'op', action: 'read', actor: 'linear', data: { consumer: 'linear', requests: 3 } });
+  at('2026-10-12T13:00:00Z');
+  ctx.seed.event({ subject: 'hq', subjectID: 'op', action: 'read', actor: 'noslop', data: { consumer: 'noslop', requests: 1 } });
+  at('2026-10-18T13:00:00Z');
+  ctx.seed.event({ subject: 'hq', subjectID: 'op', action: 'read', actor: 'noslop', data: { consumer: 'noslop', requests: 1 } });
 
   expect(runWeeklyAuditTick(ctx.db, 'hq', sydneyUtc(2026, 10, 19, 8, 59))).toBeNull();
   expect(runWeeklyAuditTick(ctx.db, 'hq', sydneyUtc(2026, 10, 19, 9, 0))).toMatchObject({ job: 'weekly-audit', key: '2026-10-19', result: 'queued', detail: null });

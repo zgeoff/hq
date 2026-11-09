@@ -8,6 +8,7 @@ import { buildNoslopTotals } from './build-noslop-totals.ts';
 import { recordRound } from './record-round.ts';
 import type { RoundRow } from './record-round.ts';
 import { renderNoslopReport } from './render-noslop-report.ts';
+import { buildSeeder } from '../test-utils/build-seeder.ts';
 
 function setupTest() {
   const base = mkdtempSync(join(tmpdir(), 'hq-noslop-report-'));
@@ -19,6 +20,7 @@ function setupTest() {
   });
 
   return {
+    seed: buildSeeder({ db }),
     boilFinding: { id: 'aaaaaaaaaaaaaaaa', lens: 'correctness', severity: 'high', title: 'Kettle never boils' },
     lidFinding: { id: 'bbbbbbbbbbbbbbbb', lens: 'style', severity: 'low', title: 'Lid is loose' },
     cordFinding: { id: 'cccccccccccccccc', lens: 'security', severity: 'high', title: 'Cord is bare' },
@@ -192,8 +194,8 @@ test('it leaves a finding of a failed review out of the churn', () => {
 
 test('it counts rows stored before the new fields as unknown', () => {
   const ctx = setupTest();
-  ctx.db.query("INSERT INTO noslop_rounds (repo, pr, kind, started_at, ended_at, ms, ok, findings, sha) VALUES ('widgets', 7, 'review', '2026-10-18T01:00:00Z', 'b', 1, 1, ?, 'x')").run(JSON.stringify([ctx.boilFinding]));
-  ctx.db.query("INSERT INTO noslop_rounds (repo, pr, kind, started_at, ended_at, ms, ok, findings, sha) VALUES ('widgets', 7, 'review', '2026-10-18T02:00:00Z', 'b', 1, 1, ?, 'x')").run(JSON.stringify([ctx.boilFinding, ctx.lidFinding]));
+  ctx.seed.reviewRoundWithBareFindings({ startedAt: '2026-10-18T01:00:00Z', head: null, findings: [ctx.boilFinding] });
+  ctx.seed.reviewRoundWithBareFindings({ startedAt: '2026-10-18T02:00:00Z', head: null, findings: [ctx.boilFinding, ctx.lidFinding] });
 
   expect(buildNoslopReport(ctx.db)[0]).toMatchObject({ roundsWithNew: 2, repeatClass: 0, classUnknown: 1, late: { n: 0, of: 0 }, lateUnknown: 1, mainMerge: 0, mergeUnknown: 2 });
 });
@@ -264,10 +266,7 @@ test('a round whose PR diff git could not read is never a base move', () => {
 test('it throws on a check round whose stored open findings are corrupt', () => {
   const ctx = setupTest();
   ctx.addRound({ findings: [ctx.boilFinding] });
-  ctx.addRound({ kind: 'check', conclusion: 'success' });
-
-  // recordRound's types cannot write a corrupt row, so the test corrupts the stored one
-  ctx.db.run(`UPDATE noslop_rounds SET open = '[{"id":42}]' WHERE kind = 'check'`);
+  ctx.seed.reviewRoundWithCorruptOpen({ kind: 'check', conclusion: 'success', startedAt: '2026-10-18T01:00:00Z', endedAt: '2026-10-18T01:01:00Z', head: null });
 
   expect(() => buildNoslopReport(ctx.db)).toThrow('expected string, received number');
 });

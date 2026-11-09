@@ -4,11 +4,12 @@ import { makeLinearFake } from '../../test/make-linear-fake.ts';
 import { freshDb } from '../../test/helpers.ts';
 import { loadReportIssues } from './load-report-issues.ts';
 import type { ReportIssue } from './types.ts';
+import { buildSeeder } from '../test-utils/build-seeder.ts';
 
 function setupTest() {
   const fresh = freshDb();
   onTestFinished(fresh.cleanup);
-  return { db: fresh.db };
+  return { db: fresh.db, seed: buildSeeder(fresh) };
 }
 
 function buildIssue(over: Partial<ReportIssue>): ReportIssue {
@@ -94,9 +95,12 @@ test('a kept issue in another shape is asked for again, and Linear\'s answer rep
   const asked: unknown[] = [];
   const ctx = setupTest();
   const fakeLinear = makeLinearFake([buildIssue({ status: 'Done', statusType: 'completed' })], [], asked);
-  ctx.db
-    .query("INSERT INTO shipped_cache (kind, key, body, fetched_at, expires_at) VALUES ('issue', 'GEO-9801', ?, '2026-10-14T02:00:00Z', NULL)")
-    .run(JSON.stringify({ id: 'GEO-9801', title: 'Fit the long spout', url: 'https://linear.example/issue/GEO-9801', status: 'Done', statusType: 'completed', project: 'Kettle', priority: 2 }));
+  await ctx.seed.cacheEntry({
+    kind: 'issue',
+    key: 'GEO-9801',
+    body: JSON.stringify({ id: 'GEO-9801', title: 'Fit the long spout', url: 'https://linear.example/issue/GEO-9801', status: 'Done', statusType: 'completed', project: 'Kettle', priority: 2 }),
+    fetched_at: '2026-10-14T02:00:00Z',
+  });
 
   await expect(loadReportIssues(fakeLinear, ctx.db, ['GEO-9801'], T0)).resolves.toStrictEqual([buildIssue({ status: 'Done', statusType: 'completed' })]);
   expect(asked).toStrictEqual([{ ids: ['GEO-9801'] }]);

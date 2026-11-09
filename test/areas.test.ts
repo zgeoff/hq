@@ -58,9 +58,6 @@ beforeEach(() => {
 
   setCapacitySetting(db, 'nonnixMaxMib', '65536', 'z-delivery');
   setCapacitySetting(db, 'nonnixMaxVcpus', '1000', 'z-delivery');
-  for (let m = -5; m <= 185; m += 5) {
-    createCapacitySample(db, { at: new Date(Date.parse(T0) + m * 60_000).toISOString().replace('.000Z', 'Z'), nonnixAwakeMib: 0 });
-  }
 });
 afterEach(() => cleanup());
 
@@ -135,6 +132,9 @@ test('a reported 0 Ready stays fresh for its own, longer window', () => {
 });
 
 test('the watcher nudges with the picks after 10 min, and again only on a change or after 30 min', () => {
+  for (let offsetMin = -5; offsetMin <= 185; offsetMin += 5) {
+    createCapacitySample(db, { at: new Date(Date.parse(T0) + offsetMin * 60_000).toISOString().replace('.000Z', 'Z'), nonnixAwakeMib: 0 });
+  }
   setMeta(db, 'lanes_ready_issues', JSON.stringify({ at: T0, eligible: [buildReadyIssue('GEO-21', { priority: 2 }), buildReadyIssue('GEO-22', { priority: 3 })], design: [] }));
   expect(tick(db, sample(16384), 'hq-lanes').nudged).toBe(false);
   atMin(10);
@@ -155,6 +155,9 @@ test('the watcher nudges with the picks after 10 min, and again only on a change
 });
 
 test('it starts no nudge for a Design issue alone, though the plan names it for the with-geoff lane', () => {
+  for (let offsetMin = -5; offsetMin <= 185; offsetMin += 5) {
+    createCapacitySample(db, { at: new Date(Date.parse(T0) + offsetMin * 60_000).toISOString().replace('.000Z', 'Z'), nonnixAwakeMib: 0 });
+  }
   setMeta(db, 'lanes_ready_issues', JSON.stringify({ at: T0, eligible: [], design: [buildReadyIssue('GEO-24', { type: 'Design' })] }));
   const withDesign = sample(16_384);
   tick(db, withDesign, 'hq-lanes');
@@ -181,7 +184,6 @@ test('impd at its non-Nix line holds the pool\'s imp slots and says why; a stale
     const pool = readSlotPlan(db, reading)?.pool;
     return [pool?.impFree, pool?.held];
   };
-  db.query('DELETE FROM capacity_samples').run();
   setCapacitySetting(db, 'nonnixMaxMib', null, 'z-delivery');
   createCapacitySample(db, { at: T0, nonnixAwakeMib: 14_336 });
   expect(readImpFree()).toStrictEqual([1, 'impd at line']);
@@ -195,7 +197,6 @@ test('impd at its non-Nix line holds the pool\'s imp slots and says why; a stale
 });
 
 test('with no lanes in pacing.json, the one imp pool is held under impd\'s non-Nix line too', () => {
-  db.query('DELETE FROM capacity_samples').run();
   setCapacitySetting(db, 'nonnixMaxMib', null, 'z-delivery');
   createCapacitySample(db, { at: T0, nonnixAwakeMib: 14_336 });
   expect(tick(db, { ...sample(8192), lanes: null, slots: null }, 'hq-lanes').slots).toBe(1);
@@ -252,6 +253,9 @@ test('a blocked run with no session awake is parked, whatever it waits on: its s
 });
 
 test('the sample records the eligible issues the Ready read holds, the hand count while it is stale, and unknown with neither', () => {
+  for (let offsetMin = -5; offsetMin <= 185; offsetMin += 5) {
+    createCapacitySample(db, { at: new Date(Date.parse(T0) + offsetMin * 60_000).toISOString().replace('.000Z', 'Z'), nonnixAwakeMib: 0 });
+  }
   const eligible = () => readLanesSamples(db).map((row) => ({ eligible: row.eligible, slots: row.slots })).at(-1);
   setMeta(db, 'lanes_ready_issues', JSON.stringify({ at: T0, eligible: [], design: [] }));
   tick(db, sample(16384), 'hq-lanes');
@@ -346,7 +350,6 @@ test('a blocked run waiting on the owner whose session is idle 15 min holds no s
 test('a slot a gone session frees on imp stays held while impd is at its line', () => {
   const reading = { cap: cap(8192), impMib: 2048, error: null, lanes: LANES, slots: SLOTS };
   addRun(db, { issue: 'GEO-10', title: 'Invented kettle work', place: 'imp', session: '00000011-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
-  db.query('DELETE FROM capacity_samples').run();
   setCapacitySetting(db, 'nonnixMaxMib', null, 'z-delivery');
   atMin(6);
   createCapacitySample(db, { at: new Date(Date.parse(T0) + 6 * 60_000).toISOString().replace('.000Z', 'Z'), nonnixAwakeMib: 18_432 });

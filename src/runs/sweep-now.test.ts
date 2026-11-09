@@ -8,7 +8,7 @@ import { readEvents } from '../read-events.ts';
 import type { RunResult, Runner } from '../runner/types.ts';
 import { buildStubGitHubFactsRunner } from '../../test/build-stub-github-facts-runner.ts';
 import { buildStubFleetClient } from '../../test/build-stub-fleet-client.ts';
-import { fakeAtc, freshDb } from '../../test/helpers.ts';
+import { at, fakeAtc, freshDb } from '../../test/helpers.ts';
 import { addPr } from './add-pr.ts';
 import { addRun } from './add-run.ts';
 import { claimHandedInRun } from './claim-handed-in-run.ts';
@@ -21,6 +21,7 @@ import { setSession } from './set-session.ts';
 import { setState } from './set-state.ts';
 import { sweepNow } from './sweep-now.ts';
 import { viewRun } from './view-run.ts';
+import { buildSeeder } from '../test-utils/build-seeder.ts';
 
 async function setupTest() {
   const fresh = freshDb();
@@ -33,6 +34,7 @@ async function setupTest() {
 
   return {
     db: fresh.db,
+    seed: buildSeeder(fresh),
     client,
     fake: { sessions: roster, activity: server.activity, pending: server.pending },
     readState: (issue: string) => getRun(fresh.db, issue)?.state,
@@ -47,8 +49,9 @@ test('it flags nothing for a final PR that GitHub shows closed unmerged, and mar
   const ctx = await setupTest();
   onTestFinished(overrideEnv('HQ_NOW', '2026-10-21T03:00:00Z'));
   addRun(ctx.db, { issue: 'GEO-9851', title: 'Invented kettle work', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
-  addPr(ctx.db, 'GEO-9851', 'kettle#51', 'kettle-bot');
-  ctx.db.query("UPDATE run_prs SET final_sha = 'abc1234', final_at = '2026-10-21T01:00:00Z', final_source = 'marker:kettle' WHERE ref = 'kettle#51'").run();
+  at('2026-10-21T01:00:00Z');
+  ctx.seed.finalRunPr({ issue: 'GEO-9851', ref: 'kettle#51' });
+  at('2026-10-21T03:00:00Z');
   const gh = buildStubGitHubFactsRunner({ views: { 'kettle#51': JSON.stringify({ state: 'CLOSED', mergedAt: null, mergeCommit: null }) } });
 
   const swept = await sweepNow(ctx.db, ctx.client, gh, { actor: 'z-delivery', wrapUpDeps: { openClient: () => Promise.reject(new Error('no wrap-up expected')), readImpWork: () => Promise.reject(new Error('no wrap-up expected')), readLocalWork: () => Promise.resolve({ state: 'pushed' as const }) }, log: () => {} });
@@ -86,8 +89,9 @@ test('it still sweeps for alerts when the wrap-up of merged runs throws', async 
 
   ctx.db.exec("CREATE TRIGGER kettle_refuses_wrap_up BEFORE INSERT ON events WHEN NEW.action = 'merged-wrap-up-result' BEGIN SELECT RAISE(ABORT, 'kettle refuses'); END");
   addRun(ctx.db, { issue: 'GEO-9853', title: 'Invented teapot work', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
-  addPr(ctx.db, 'GEO-9853', 'kettle#53', 'kettle-bot');
-  ctx.db.query("UPDATE run_prs SET final_sha = 'abc1234', final_at = '2026-10-21T01:00:00Z', final_source = 'marker:kettle' WHERE ref = 'kettle#53'").run();
+  at('2026-10-21T01:00:00Z');
+  ctx.seed.finalRunPr({ issue: 'GEO-9853', ref: 'kettle#53' });
+  at('2026-10-21T03:00:00Z');
   const gh = buildStubGitHubFactsRunner({ views: { 'kettle#53': JSON.stringify({ state: 'CLOSED', mergedAt: null, mergeCommit: null }) } });
   const fleet = buildStubFleetClient({ sessions: [{ id: '0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, state: 'done' }] });
 

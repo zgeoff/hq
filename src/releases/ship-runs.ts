@@ -48,6 +48,7 @@ import { readHeldAt } from './read-held-at.ts';
 import { readActiveSession } from '../runs/read-active-session.ts';
 import type { PrState, Release, ShipMove, ShipResult, Source } from './types.ts';
 import { toErrorMessage } from '../to-error-message.ts';
+import { writeShippedPR } from './write-shipped-pr.ts';
 
 const CompareSchema = z.object({ status: z.unknown() });
 const PRViewSchema = z.object({ mergeCommit: z.object({ oid: z.unknown() }).nullish() });
@@ -142,7 +143,7 @@ export async function shipRuns(db: Database, run: Runner, at: Date = now(), opts
 
   const writeShipped = (state: PrState) => {
     if (dryRun) return;
-    db.query('UPDATE run_prs SET merge_sha = ?, shipped_tag = ?, shipped_at = ? WHERE ref = ?').run(state.sha, state.tag, state.at, state.ref);
+    writeShippedPR(db, state);
   };
 
   const deps = {

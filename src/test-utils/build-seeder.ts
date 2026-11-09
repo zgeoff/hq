@@ -24,14 +24,20 @@ import { buildNoslopSeeder } from '../noslop/test-utils/build-noslop-seeder.ts';
 import type { NoslopDeps } from '../noslop/test-utils/types.ts';
 import { buildOutboxSeeder } from '../outbox/test-utils/build-outbox-seeder.ts';
 import type { OutboxDeps } from '../outbox/test-utils/types.ts';
+import { buildPRStatusSeeder } from '../pr-status/test-utils/build-pr-status-seeder.ts';
+import type { PRStatusDeps } from '../pr-status/test-utils/types.ts';
 import { buildProbeSeeder } from '../probe/test-utils/build-probe-seeder.ts';
 import type { ProbeDeps } from '../probe/test-utils/types.ts';
 import { buildRefusalsSeeder } from '../refusals/test-utils/build-refusals-seeder.ts';
 import type { RefusalsDeps } from '../refusals/test-utils/types.ts';
 import { buildRunSeeder } from '../runs/test-utils/build-run-seeder.ts';
 import type { RunsDeps } from '../runs/test-utils/types.ts';
+import { buildShippedSeeder } from '../shipped/test-utils/build-shipped-seeder.ts';
+import type { ShippedDeps } from '../shipped/test-utils/types.ts';
 import { buildTypedSeeder } from '../typed/test-utils/build-typed-seeder.ts';
 import type { TypedDeps } from '../typed/test-utils/types.ts';
+import { buildUnblockSeeder } from '../unblock/test-utils/build-unblock-seeder.ts';
+import type { UnblockDeps } from '../unblock/test-utils/types.ts';
 import { buildEventSeeder } from './build-event-seeder.ts';
 import type { EventsDeps } from './types.ts';
 
@@ -52,7 +58,10 @@ export type TestDeps = MetaDeps &
   AsksDeps &
   MorningDeps &
   FocusDeps &
-  NoslopDeps;
+  NoslopDeps &
+  PRStatusDeps &
+  UnblockDeps &
+  ShippedDeps;
 
 export function buildSeeder(deps: TestDeps) {
   return {
@@ -74,5 +83,8 @@ export function buildSeeder(deps: TestDeps) {
     ...buildMorningSeeder(deps),
     ...buildFocusSeeder(deps),
     ...buildNoslopSeeder(deps),
+    ...buildPRStatusSeeder(deps),
+    ...buildUnblockSeeder(deps),
+    ...buildShippedSeeder(deps),
   };
 }

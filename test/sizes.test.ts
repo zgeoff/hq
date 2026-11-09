@@ -164,6 +164,6 @@ test('a run whose last merge falls outside the window, or a dropped or unfinishe
   merge('GEO-1', 'kettle#1');
   expect(mergedRuns(db, '2026-10-16T02:00:00Z', '2026-10-17T00:00:00Z')).toHaveLength(0);
   expect(mergedRuns(db, '2026-10-16T01:00:00Z', '2026-10-17T00:00:00Z')).toHaveLength(1);
-  db.query(`UPDATE runs SET state = 'dropped' WHERE issue = 'GEO-1'`).run();
+  setState(db, 'GEO-1', 'dropped', {}, 'z-delivery');
   expect(mergedRuns(db, '2026-10-16T01:00:00Z', '2026-10-17T00:00:00Z')).toHaveLength(0);
 });
