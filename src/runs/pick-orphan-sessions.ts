@@ -41,7 +41,12 @@ export function pickOrphanSessions(facts: OrphanFacts): OrphanSession[] {
     const parent = findParent(session);
     return parent !== undefined && (fleetIDs.has(parent.id) || isFromRuns(parent));
   };
-  const isUnderPin = (session: FleetSession) => findParent(session)?.pinned === true;
+  const isSweptAsleep = (session: FleetSession) => isAsleepSession(session) && isStoredSession(sweptOpen, session.id);
+  const isChildOfSweptAsleep = (session: FleetSession) => {
+    const parent = findParent(session);
+    return isAsleepSession(session) && parent !== undefined && isSweptAsleep(parent);
+  };
+  const isUnderPin =(session: FleetSession) => findParent(session)?.pinned === true;
   const isOwnerChat = (session: FleetSession) => {
     const parent = findParent(session);
     return isStoredSession(ownerChat, session.id) || (parent !== undefined && isStoredSession(ownerChat, parent.id));
@@ -55,7 +60,7 @@ export function pickOrphanSessions(facts: OrphanFacts): OrphanSession[] {
       !isStoredSession(openActive, session.id) &&
       !isOwnerChat(session) &&
       !isRecentlyKept(session) &&
-      ((session.state === 'exited' && (isFromRuns(session) || isChildOfKnownSession(session))) || (isAsleepSession(session) && isStoredSession(sweptOpen, session.id))),
+      ((session.state === 'exited' && (isFromRuns(session) || isChildOfKnownSession(session))) || isSweptAsleep(session) || isChildOfSweptAsleep(session)),
   );
   const candidateIDs = new Set(candidates.map((session) => session.id));
   const blocked = findBlockedAncestors(byID, facts.sessions.filter((session) => !candidateIDs.has(session.id)));

@@ -94,3 +94,21 @@ test.each<[string, { active: boolean; endedBy: string | null; open: boolean }, s
 
   expect(picked.map((orphan) => orphan.session.id)).toStrictEqual(expected);
 });
+
+test.each<[string, string | null, string[]]>([
+  ['the sweep ended the parent on an open run', 'sweep', ['0000f003-aaaa-4aaa-8aaa-aaaaaaaaaaaa', '0000f001-aaaa-4aaa-8aaa-aaaaaaaaaaaa']],
+  ['the owner removed the parent', null, []],
+])('it picks an unrecorded asleep child with its asleep parent only when %s', (_name, endedBy, expected) => {
+  const picked = pickOrphanSessions({
+    sessions: [
+      { id: '0000f001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: false, state: 'idle', lifecycle: { vm: 'asleep' } },
+      { id: '0000f003-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-helper', alive: false, state: 'idle', lifecycle: { vm: 'asleep' }, parent: '0000f001-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+    ],
+    fleetNames: new Set(),
+    runSessions: [{ sessionID: '0000f001', issue: 'GEO-601', active: false, endedBy, open: true, ownerChats: false }],
+    lastKeptMs: new Map(),
+    nowMs: Date.parse('2026-11-07T03:00:00Z'),
+  });
+
+  expect(picked.map((orphan) => orphan.session.id)).toStrictEqual(expected);
+});
