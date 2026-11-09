@@ -71,5 +71,5 @@ function toPRRef(link: PRLink): string {
 }
 
 export function isOwnFixPR(body: string, issueID: string): boolean {
-  return parseIssueLinks(body).some((link) => link.id === issueID);
+  return parseIssueLinks(body).some((link) => link.id.toUpperCase() === issueID.toUpperCase());
 }

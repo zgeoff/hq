@@ -29,7 +29,7 @@ test.each([
   ['the id only in prose', 'The kettle work from GEO-9700 needs a retry.', false],
   ['a Fixes line with a colon', 'Fixes: GEO-9700', true],
   ['a link in the middle of a line', 'Descales the kettle and contributes to GEO-9700 along the way.', true],
-  ['a lowercase id', 'fixes geo-9700', false],
+  ['a lowercase id', 'fixes geo-9700', true],
   ['an empty body', '', false],
 ])('#isOwnFixPR reads %s as %p', (_case, body, expected) => {
   expect(isOwnFixPR(body, 'GEO-9700')).toBe(expected);
