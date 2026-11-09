@@ -5,6 +5,8 @@ import { buildStubGitHubFactsRunner } from '../../test/build-stub-github-facts-r
 import { AtcClient } from '../atc/atc-client.ts';
 import type { FleetSession } from '../fleet/types.ts';
 import { readEvents } from '../read-events.ts';
+import { realRunner } from '../runner/real-runner.ts';
+import { readLocalWork } from './read-local-work.ts';
 import { fakeAtc, freshDb } from '../../test/helpers.ts';
 import { addRun } from './add-run.ts';
 import { setSession } from './set-session.ts';
@@ -78,6 +80,18 @@ test('it forgets an exited session of a closed run and logs why', async () => {
 
   expect(ctx.fleet.calls).toStrictEqual(['unpin 0000f001', 'kill 0000f001', 'unpin 0000f001', 'forget 0000f001']);
   expect(readEvents(ctx.db, 'hq', '0000f001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', ['session-forgotten'])).toHaveLength(1);
+});
+
+test('it forgets an exited session whose working directory was removed', async () => {
+  const ctx = await setupTest();
+  updateEnv('HQ_NOW', '2026-11-07T03:00:00Z');
+  ctx.seed.atcSession({ id: '0000f001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: false, state: 'exited' }, '2026-11-07T01:00:00Z');
+  ctx.seed.closedRun('GEO-601', '0000f001');
+  ctx.work.current = await readLocalWork(realRunner, '/nonexistent/hq-test/kettle-workspace');
+
+  await ctx.sweep();
+
+  expect(ctx.fleet.calls).toStrictEqual(['unpin 0000f001', 'kill 0000f001', 'unpin 0000f001', 'forget 0000f001']);
 });
 
 test('it keeps an exited session with unpushed work, and checks it again only after a day', async () => {
