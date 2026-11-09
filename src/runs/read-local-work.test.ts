@@ -60,9 +60,7 @@ test.skipIf(process.getuid?.() === 0)('it gives no answer when a parent of the w
 });
 
 test('it gives no answer for an exit 3 without the removed-directory marker', async () => {
-  const run = () => Promise.resolve({ code: 3, stdout: '', stderr: 'boom\n' });
-
-  const work = await readLocalWork(run, '/workspace/kettle');
+  const work = await readLocalWork(() => Promise.resolve({ code: 3, stdout: '', stderr: 'boom\n' }), '/workspace/kettle');
 
   expect(work).toStrictEqual({ state: 'unknown', detail: 'the check in /workspace/kettle exited 3: boom' });
 });

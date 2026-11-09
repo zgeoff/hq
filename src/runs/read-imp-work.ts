@@ -55,6 +55,7 @@ export async function readImpWork(run: Runner, sessionID: string, cwd: string | 
   if (imp === undefined) {
     return { state: 'unknown', detail: `no imp ends with ${suffix}` };
   }
+
   // A pushed imp is destroyed, so a missing working directory, such as an unmounted volume, stays an
   // unknown here.
   const checked = await run(['imp', 'exec', imp.name, '--', 'sh', '-c', CHECK_SCRIPT, 'sh', cwd], { timeoutMs: IMP_CALL_MS });
