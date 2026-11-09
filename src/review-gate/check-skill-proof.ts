@@ -6,6 +6,7 @@ import { OWNER } from '../releases/owner.ts';
 import { collectMissingProof } from './collect-missing-proof.ts';
 import { isBotAuthor } from './is-bot-author.ts';
 import type { ParsedRepo } from '../noslop/parse-lower-repo.ts';
+import { readNixSkillPR } from './read-nix-skill-pr.ts';
 import { pickSkillProofVerdict } from './pick-skill-proof-verdict.ts';
 import type { SkillProofFacts } from './pick-skill-proof-verdict.ts';
 import type { GateFacts } from './read-gate-facts.ts';
@@ -15,6 +16,10 @@ export type ReadFiles = () => Promise<string[]>;
 
 export async function checkSkillProof(request: PRRequest, parsed: ParsedRepo, facts: GateFacts, readFiles: ReadFiles): Promise<void> {
   if (parsed.owner !== OWNER) {
+    return;
+  }
+  const nixSkill = await readNixSkillPR(parsed, facts, readFiles);
+  if (nixSkill) {
     return;
   }
   const head = facts.headRefOid;

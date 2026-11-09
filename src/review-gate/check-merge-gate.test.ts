@@ -513,7 +513,7 @@ test('it reads the PR body in the same GitHub read as the head and checks', asyn
 
   await checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 });
 
-  expect(fake.lines().filter((line) => line.includes('--json headRefOid,author'))).toStrictEqual(['gh pr view 7 -R zgeoff/widgets --json headRefOid,author,statusCheckRollup,baseRefName,baseRefOid,body']);
+  expect(fake.lines().filter((line) => line.includes('--json headRefOid,author'))).toStrictEqual(['gh pr view 7 -R zgeoff/widgets --json headRefOid,author,statusCheckRollup,baseRefName,baseRefOid,body,headRefName']);
 });
 
 test('it reads the changed files once when the description lacks the proof and no skill text changed', async () => {
@@ -941,6 +941,33 @@ test('it holds no instruction file of nixie-definitions', async () => {
   const fake = buildFakeRunner({ prBody: FAKE_PROOF_BODY, prFiles: { code: 0, stdout: 'skills/kettle/SKILL.md\n', stderr: '' } });
 
   await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'nixie-definitions', pr: 7 })).resolves.toMatchObject({ mayMerge: true });
+});
+
+test("it passes Nix's skill PR with an open non-security finding, no owner answer and no Checks lines", async () => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ prHeadBranch: 'nixie/skill/descale', noslopFindings: buildStubFindings('open'), prFiles: { code: 0, stdout: 'skills/kettle/SKILL.md\n', stderr: '' } });
+  setMeta(ctx.db, 'noslop', JSON.stringify({ repos: ['nixie-definitions'], sha: '0123456789abcdef0123456789abcdef01234567' }));
+  seedReviewRound(ctx, { repo: 'nixie-definitions', pr: 7, head: FAKE_FULL_SHA, findings: [{ id: 'aaaaaaaaaaaaaaaa', lens: 'correctness', severity: 'high', title: 'Kettle never boils' }] });
+
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'nixie-definitions', pr: 7 })).resolves.toStrictEqual({ mayMerge: true, reason: "noslop findings: 1 open, none from the security lens, which Nix's skill PR rule allows; CI green at 0123456", reviewed: true });
+});
+
+test("it gives Nix's skill PR that also changes persona.md today's verdict", async () => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ prHeadBranch: 'nixie/skill/descale', noslopFindings: buildStubFindings('open'), prFiles: { code: 0, stdout: 'skills/kettle/SKILL.md\npersona.md\n', stderr: '' } });
+  setMeta(ctx.db, 'noslop', JSON.stringify({ repos: ['nixie-definitions'], sha: '0123456789abcdef0123456789abcdef01234567' }));
+  seedReviewRound(ctx, { repo: 'nixie-definitions', pr: 7, head: FAKE_FULL_SHA, findings: [{ id: 'aaaaaaaaaaaaaaaa', lens: 'correctness', severity: 'high', title: 'Kettle never boils' }] });
+
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'nixie-definitions', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: expect.stringContaining('"## Checks" section lacks the skill proof') });
+});
+
+test("it holds Nix's skill PR with an open security finding, for the owner to decide", async () => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ prHeadBranch: 'nixie/skill/descale', noslopFindings: buildStubFindings('open'), prFiles: { code: 0, stdout: 'skills/kettle/SKILL.md\n', stderr: '' } });
+  setMeta(ctx.db, 'noslop', JSON.stringify({ repos: ['nixie-definitions'], sha: '0123456789abcdef0123456789abcdef01234567' }));
+  seedReviewRound(ctx, { repo: 'nixie-definitions', pr: 7, head: FAKE_FULL_SHA, findings: [{ id: 'aaaaaaaaaaaaaaaa', lens: 'security', severity: 'high', title: 'Lid leaks a token' }] });
+
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'nixie-definitions', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: '1 open finding is a security finding or has no stored lens: aaaaaaaaaaaaaaaa; the owner decides it' });
 });
 
 test('it holds docs/sessions.md in hq, as its CODEOWNERS lists /docs/', async () => {

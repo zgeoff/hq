@@ -7,5 +7,5 @@ interface StubGateFacts {
 }
 
 export function buildStubGateFacts(facts: StubGateFacts): RunResult {
-  return { code: 0, stdout: JSON.stringify({ headRefOid: facts.head, baseRefName: 'main', baseRefOid: FAKE_BASE_SHA, author: { login: 'zgeoff', is_bot: false }, statusCheckRollup: facts.checks }), stderr: '' };
+  return { code: 0, stdout: JSON.stringify({ headRefOid: facts.head, headRefName: 'feat', baseRefName: 'main', baseRefOid: FAKE_BASE_SHA, author: { login: 'zgeoff', is_bot: false }, statusCheckRollup: facts.checks }), stderr: '' };
 }

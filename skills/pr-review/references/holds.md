@@ -41,6 +41,10 @@ A PR is held when it changes:
 Not held: test files or data in a skill folder; a bot's PR (except repo-sync, which needs its
 record); anything in zgeoff/nixie-definitions.
 
+Nix owns her own skills. A nixie-definitions PR on a `nixie/skill/` branch that changes only
+`skills/` merges on green CI, with no owner lgtm, no Checks lines and no hold for open findings.
+If an open finding is from the security lens, or has no stored lens, the PR goes to the owner.
+
 In zgeoff/hq and zgeoff/hq-private only the owner's lgtm clears it. Elsewhere, one of these records you make
 also clears it, at the PR's head. If hq refuses the record, the PR waits for the owner.
 

@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { pickNoslopVerdict } from './pick-noslop-verdict.ts';
+import { pickNixSecurityHold, pickNoslopVerdict } from './pick-noslop-verdict.ts';
 
 test('it blocks when hq has no noslop run recorded at the head, naming the command to review the PR', () => {
   expect(pickNoslopVerdict({ overridden: false, repo: 'widgets', pr: 7, head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', reviewedHead: false, check: { found: true, status: 'completed', conclusion: 'success', title: 'No findings need attention.', completedAt: '2026-10-14T01:00:05Z' }, findings: { read: true, open: [], unlisted: [] }, headNow: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678' }, { noCI: false, used: [] })).toStrictEqual({ pass: false, reason: 'hq has no noslop run recorded at head a1b2c3d; run hq review widgets 7' });
@@ -71,4 +71,17 @@ test('it blocks a PR whose own changes came after noslop\'s last review', () => 
 
 test('it blocks a noslop check that is still running', () => {
   expect(pickNoslopVerdict({ overridden: false, repo: 'widgets', pr: 7, head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', reviewedHead: true, check: { found: true, status: 'in_progress', conclusion: null, title: null, completedAt: null }, findings: { read: true, open: [], unlisted: [] }, headNow: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678' }, { noCI: false, used: [] })).toStrictEqual({ pass: false, reason: "noslop's check at a1b2c3d is in_progress, so no pass: wait for it to finish" });
+});
+
+test.each([
+  { name: 'a non-security finding', open: ['aaaa'], lenses: { aaaa: ['correctness'] }, held: [] },
+  { name: 'a security finding', open: ['aaaa'], lenses: { aaaa: ['security'] }, held: ['aaaa'] },
+  { name: 'a finding some round recorded under the security lens', open: ['aaaa'], lenses: { aaaa: ['correctness', 'security'] }, held: ['aaaa'] },
+  { name: 'a finding with no stored lens', open: ['aaaa'], lenses: {}, held: ['aaaa'] },
+  { name: 'a mix of three findings', open: ['aaaa', 'bbbb', 'cccc'], lenses: { aaaa: ['tests'], bbbb: ['security'] }, held: ['bbbb', 'cccc'] },
+  { name: 'no open finding', open: [], lenses: { aaaa: ['security'] }, held: [] },
+])('it picks the findings that hold a Nix skill PR for $name', (row) => {
+  const lenses = new Map(Object.entries(row.lenses));
+
+  expect(pickNixSecurityHold([...row.open], lenses)).toStrictEqual([...row.held]);
 });
