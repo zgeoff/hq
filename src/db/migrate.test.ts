@@ -353,7 +353,7 @@ test('it adds linear_in_review in v51 and keeps the earlier rows', () => {
   expect(db.query('SELECT issue, updated_at, fetched_at FROM linear_in_review').all()).toStrictEqual([{ issue: 'GEO-503', updated_at: '2026-10-14T02:00:00Z', fetched_at: '2026-10-15T01:00:00Z' }]);
 });
 
-test('it adds noslop_rounds.adapter and adapter_source in v52, keeps the earlier rounds with neither, and v52 is the newest schema', () => {
+test('it adds noslop_rounds.adapter and adapter_source in v52, and keeps the earlier rounds with neither', () => {
   const base = mkdtempSync(join(tmpdir(), 'hq-migrate-v52-'));
   const path = join(base, 'hq.db');
   const db = new Database(path, { create: true, strict: true });
@@ -363,10 +363,25 @@ test('it adds noslop_rounds.adapter and adapter_source in v52, keeps the earlier
   migrate(db, path, false, MIGRATIONS.slice(0, 51));
   db.query("INSERT INTO noslop_rounds (repo, pr, kind, started_at, ended_at, ms, ok, findings, failed_calls, open, sha) VALUES ('widgets', 7, 'review', '2026-10-14T01:00:00Z', '2026-10-14T01:05:00Z', 300000, 1, '[]', 0, '[]', 'abc1234')").run();
 
-  expect(migrate(db, path, true)).not.toBeNull();
+  expect(migrate(db, path, true, MIGRATIONS.slice(0, 52))).not.toBeNull();
   expect(db.query('SELECT repo, pr, adapter, adapter_source FROM noslop_rounds').all()).toStrictEqual([{ repo: 'widgets', pr: 7, adapter: null, adapter_source: null }]);
   expect(() => db.query("UPDATE noslop_rounds SET adapter = 'gemini'").run()).toThrow('CHECK constraint failed');
   expect(() => db.query("UPDATE noslop_rounds SET adapter_source = 'guess'").run()).toThrow('CHECK constraint failed');
   expect(db.query('PRAGMA user_version').get()).toStrictEqual({ user_version: 52 });
-  expect(MIGRATIONS).toHaveLength(52);
+});
+
+test('it adds the run_prs review wait columns in v53, keeps the earlier PRs with no wait, and v53 is the newest schema', () => {
+  const base = mkdtempSync(join(tmpdir(), 'hq-migrate-v53-'));
+  const path = join(base, 'hq.db');
+  const db = new Database(path, { create: true, strict: true });
+  onTestFinished(() => rmSync(base, { recursive: true, force: true }));
+  onTestFinished(() => db.close());
+  db.exec('PRAGMA journal_mode = WAL;');
+  migrate(db, path, false, MIGRATIONS.slice(0, 52));
+  db.query("INSERT INTO run_prs (ref, issue, state, added_at, updated_at) VALUES ('kettle#41', 'GEO-501', 'open', '2026-10-14T01:00:00Z', '2026-10-14T01:00:00Z')").run();
+
+  expect(migrate(db, path, true)).not.toBeNull();
+  expect(db.query('SELECT ref, review_wait_until, review_wait_sha, review_wait_reason FROM run_prs').all()).toStrictEqual([{ ref: 'kettle#41', review_wait_until: null, review_wait_sha: null, review_wait_reason: null }]);
+  expect(db.query('PRAGMA user_version').get()).toStrictEqual({ user_version: 53 });
+  expect(MIGRATIONS).toHaveLength(53);
 });

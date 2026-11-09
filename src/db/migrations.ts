@@ -613,4 +613,9 @@ export const MIGRATIONS: string[] = [
   // round from before v52.
   `ALTER TABLE noslop_rounds ADD COLUMN adapter TEXT CHECK (adapter IN ('codex', 'claude'));
   ALTER TABLE noslop_rounds ADD COLUMN adapter_source TEXT CHECK (adapter_source IN ('flag', 'setting', 'default'));`,
+
+  // A dated wait on a FINAL's review. review_wait_sha is the final_sha it applies to, so a new FINAL ends it.
+  `ALTER TABLE run_prs ADD COLUMN review_wait_until TEXT;
+  ALTER TABLE run_prs ADD COLUMN review_wait_sha TEXT;
+  ALTER TABLE run_prs ADD COLUMN review_wait_reason TEXT;`,
 ];

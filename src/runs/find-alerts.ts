@@ -5,6 +5,7 @@ import { countMinutesSince as mins } from './count-minutes-since.ts';
 import { probeFinalAnswered } from './probe-final-answered.ts';
 import { probeHandedIn } from './probe-handed-in.ts';
 import { readClosedIssueAlerts } from './read-closed-issue-alerts.ts';
+import { isReviewWaitActive } from './is-review-wait-active.ts';
 import { listRuns } from './list-runs.ts';
 import { probeOpenUnblockWait } from './probe-open-unblock-wait.ts';
 import { SWEEP_MINUTES as SWEEP } from './sweep-minutes.ts';
@@ -22,6 +23,9 @@ export function findAlerts(db: Database, sessions: SessionInfo[], activity: Map<
       // A blocked run waits on something outside the PR (a release, a yes); its review can wait too.
       if (r.state === 'blocked') continue;
       if (probeOpenUnblockWait(db, r.waits_on)) {
+        continue;
+      }
+      if (isReviewWaitActive(p, at)) {
         continue;
       }
       if (mins(p.final_at, at) < SWEEP.finalMinutes()) continue;

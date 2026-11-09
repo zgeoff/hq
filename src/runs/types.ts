@@ -55,6 +55,9 @@ export interface RunPr {
   merge_sha: string | null;
   shipped_tag: string | null;
   shipped_at: string | null;
+  review_wait_until: string | null;
+  review_wait_sha: string | null;
+  review_wait_reason: string | null;
 
   design_pass: 0 | 1;
   added_at: string;

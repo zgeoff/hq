@@ -1309,3 +1309,59 @@ test.each([
   const printed = listing.parse(JSON.parse(ctx.lines[0] ?? '{}'));
   expect(printed.calls.map((row) => row.id)).toStrictEqual(expected);
 });
+
+test('it records a review wait with hq run review-wait on the FINAL, and hq run show names it until the date passes', async () => {
+  const ctx = setupTest();
+  updateEnv('HQ_AS', 'z-delivery');
+  ctx.seed.run({ issue: 'GEO-9741' });
+  ctx.seed.finalRunPR({ issue: 'GEO-9741', ref: 'kettle#741', sha: 'abc1234' });
+
+  const code = await main(['run', 'review-wait', 'kettle#741', '--until', '2026-10-16T01:00:00Z', '--reason', 'the only reviewer is out of quota']);
+  ctx.lines.length = 0;
+  await main(['run', 'show', 'GEO-9741']);
+  const shownBefore = ctx.lines.join('\n');
+  ctx.lines.length = 0;
+  at('2026-10-16T01:00:00Z');
+  await main(['run', 'show', 'GEO-9741']);
+
+  expect(code).toBe(0);
+  expect(shownBefore).toInclude('  kettle#741 review waits until Fri, 16 Oct, 12:00 (the only reviewer is out of quota)');
+  expect(ctx.lines.join('\n')).not.toInclude('review waits');
+  expect(ctx.db.query(`SELECT review_wait_until, review_wait_sha FROM run_prs WHERE ref = 'kettle#741'`).get()).toStrictEqual({ review_wait_until: '2026-10-16T01:00:00Z', review_wait_sha: 'abc1234' });
+});
+
+test.each([
+  { name: 'a PR no run has', args: ['kettle#999', '--until', '2026-10-16T01:00:00Z', '--reason', 'out of quota'], message: /no PR kettle#999/u },
+  { name: 'a PR with no FINAL', args: ['kettle#742', '--until', '2026-10-16T01:00:00Z', '--reason', 'out of quota'], message: /kettle#742 has no FINAL/u },
+  { name: 'a PR that is not open', args: ['kettle#743', '--until', '2026-10-16T01:00:00Z', '--reason', 'out of quota'], message: /kettle#743 is merged, not open/u },
+  { name: 'a time that has passed', args: ['kettle#744', '--until', '2026-10-13T01:00:00Z', '--reason', 'out of quota'], message: /has passed/u },
+  { name: 'no reason', args: ['kettle#744', '--until', '2026-10-16T01:00:00Z'], message: /--reason is required/u },
+])('it refuses hq run review-wait for $name and records no wait', async (row) => {
+  const ctx = setupTest();
+  updateEnv('HQ_AS', 'z-delivery');
+  ctx.seed.run({ issue: 'GEO-9742' });
+  ctx.seed.runPR({ issue: 'GEO-9742', ref: 'kettle#742' });
+  ctx.seed.run({ issue: 'GEO-9743' });
+  ctx.seed.mergedRunPR({ issue: 'GEO-9743', ref: 'kettle#743' });
+  ctx.seed.run({ issue: 'GEO-9744' });
+  ctx.seed.finalRunPR({ issue: 'GEO-9744', ref: 'kettle#744' });
+
+  const code = await main(['run', 'review-wait', ...row.args, '--json']);
+
+  expect(code).toBe(1);
+  expect(ctx.lines.join('\n')).toMatch(row.message);
+  expect(ctx.db.query('SELECT ref FROM run_prs WHERE review_wait_until IS NOT NULL').all()).toStrictEqual([]);
+});
+
+test('it removes the review wait with hq run review-wait --clear', async () => {
+  const ctx = setupTest();
+  updateEnv('HQ_AS', 'z-delivery');
+  ctx.seed.run({ issue: 'GEO-9745' });
+  ctx.seed.finalRunPR({ issue: 'GEO-9745', ref: 'kettle#745' });
+  await main(['run', 'review-wait', 'kettle#745', '--until', '2026-10-16T01:00:00Z', '--reason', 'out of quota']);
+
+  const code = await main(['run', 'review-wait', 'kettle#745', '--clear']);
+
+  expect(code).toBe(0);
+  expect(ctx.db.query(`SELECT review_wait_until, review_wait_sha, review_wait_reason FROM run_prs WHERE ref = 'kettle#745'`).get()).toStrictEqual({ review_wait_until: null, review_wait_sha: null, review_wait_reason: null });
+});

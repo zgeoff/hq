@@ -357,6 +357,9 @@ export const HQ_COLUMNS = {
     design_pass: 'integer',
     session_id: 'text?',
     session_by_hand: 'integer',
+    review_wait_until: 'text?',
+    review_wait_sha: 'text?',
+    review_wait_reason: 'text?',
   },
   run_sessions: {
     session_id: 'text',
