@@ -71,8 +71,8 @@ For "How are things?", give a status of a few lines:
 ## Focus
 
 When the owner says what the agents work on, run
-`hq focus set <term>[,<term>...] [--reserve <area>=<n>]`. hq fills each free builder
-place with work that matches it. `--reserve` keeps `<n>` places for the repo with the area label
+`hq focus set <term>[,<term>...] [--reserve <area>=<n>]`. `z-delivery` fills each free builder
+place with work that matches the focus. `--reserve` keeps `<n>` places for the repo with the area label
 `<area>`. Give the owner what `hq focus show` prints, each term's Ready and Backlog matches. Name
 each term with none. A new focus leaves running work alone.
 

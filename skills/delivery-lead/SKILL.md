@@ -22,12 +22,12 @@ Avoid these traps:
 
 - Rewording a refused action to get it past the auto-mode classifier, Claude Code's check that
   reads each launch prompt and blocks any action nobody approved.
-- Leaving a run with no next step. It keeps its place.
+- Leaving a run with no next step. It still fills a place.
 - Asking an agent for status. Read its notes instead.
 
 ## Key rules
 
-- [Starting builders](#starting-builders): the next Ready issue a free place takes.
+- [Starting builders](#starting-builders): give each free place the next Ready issue.
 - [Watching](#watching): keep the event watch running, and act on each line.
 - [Answering an agent](#answering-an-agent): answer within minutes; judge leftovers by the fix-it-here skill.
 - [Refusals](#refusals): type the granting line only when the owner's yes covers the action.

@@ -1,8 +1,8 @@
 # Pacing
 
 A session launches only while the imps have memory free and its provider's quota has room. A design
-session also needs its kind, agent or with-geoff, to be under its limit, as
-[Design session limits](#design-session-limits) says. An imp is a cloud machine that runs one session;
+session also waits while the design sessions of its kind, agent or with-geoff, are at the limit in
+[Design session limits](#design-session-limits). An imp is a cloud machine that runs one session;
 a provider is the agent CLI, such as Claude or Codex. `scripts/capacity.sh` reads memory and quotas
 and picks the provider; hq counts design sessions; [pacing.json](../pacing.json) holds the limits.
 
@@ -11,8 +11,8 @@ session. Take Ready issues in the order `hq focus show` prints.
 
 ## Before a launch
 
-1. **Design session:** read the `design:` line in `hq lanes`. Hold when its kind is at its limit,
-   unless the owner asked for this with-geoff session.
+1. **Design session:** read the `design:` line in `hq lanes`. Hold when design sessions of that
+   kind are at their limit, unless the owner asked for this with-geoff session.
 2. Count the delivery sessions running on this host, from `hq lanes`.
 3. Run `scripts/capacity.sh --size <S|M|L|XL> --local-open <n>`, with the size from
    `hq run show <issue>` (an investigation, or no size: M). For a design session, pass `--design`
