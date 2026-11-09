@@ -24,7 +24,7 @@ import { writeHandedInPlan } from './write-handed-in-plan.ts';
 // as done. Every PR has merged by now, and the unpushed-work check keeps a waiting agent's commits.
 const HANDED_IN_QUIET_MS = 5 * 60_000;
 
-const PrRows = z.array(z.object({ issue: z.string(), state: z.string(), final_sha: z.string().nullable(), merged_at: z.string().nullable() }));
+const PRRows = z.array(z.object({ issue: z.string(), state: z.string(), final_sha: z.string().nullable(), merged_at: z.string().nullable() }));
 const SessionRows = z.array(z.object({ issue: z.string(), session_id: z.string(), active: z.number() }));
 
 export interface AtcView {
@@ -44,7 +44,7 @@ export interface HandedInOptions {
 export async function endHandedInRunSessions(db: Database, atc: AtcView, deps: WrapUpDeps, options: HandedInOptions): Promise<number> {
   const at = now();
   const quietBefore = at.getTime() - HANDED_IN_QUIET_MS;
-  const prs = PrRows.parse(
+  const prs = PRRows.parse(
     db
       .query(
         `SELECT p.issue, p.state, p.final_sha, p.merged_at FROM run_prs p JOIN runs r ON r.issue = p.issue

@@ -2,7 +2,7 @@ import type { Database } from 'bun:sqlite';
 import { z } from 'zod';
 import type { Runner } from '../runner/types.ts';
 import { CLOSED_RUN_STATES } from '../transitions/closed-run-states.ts';
-import { closePr } from './close-pr.ts';
+import { closePR } from './close-pr.ts';
 import { GITHUB_ACTOR } from './github-actor.ts';
 import { readGitHubPR } from './read-github-pr.ts';
 
@@ -33,7 +33,7 @@ async function closeOne(db: Database, run: Runner, ref: string): Promise<{ ref: 
   }
   try {
     const facts = pr.state === 'MERGED' ? { mergedAt: pr.mergedAt, mergeSha: pr.mergeSha } : undefined;
-    closePr(db, ref, { to: pr.state === 'MERGED' ? 'merged' : 'closed', actor: GITHUB_ACTOR, facts });
+    closePR(db, ref, { to: pr.state === 'MERGED' ? 'merged' : 'closed', actor: GITHUB_ACTOR, facts });
     return { ref, closed: true, error: null };
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);

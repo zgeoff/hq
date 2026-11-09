@@ -2,7 +2,7 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { z } from 'zod';
 import { NOON_SYDNEY, at, freshDb } from '../../test/helpers.ts';
 import { buildSeeder } from '../test-utils/build-seeder.ts';
-import { reviewedPr } from './reviewed-pr.ts';
+import { reviewedPR } from './reviewed-pr.ts';
 import { writeReviewStarted } from './write-review-started.ts';
 
 function setupTest() {
@@ -25,7 +25,7 @@ test('it marks an open PR on a run as started, leaving its round and head alone'
   const ctx = setupTest();
   ctx.seed.run({ issue: 'GEO-9701' });
   ctx.seed.runPR({ issue: 'GEO-9701', ref: 'widgets#7' });
-  reviewedPr(ctx.db, 'widgets#7', 'abc1234', { recheck: false, force: false }, 'kettle-review');
+  reviewedPR(ctx.db, { raw: 'widgets#7', sha: 'abc1234', recheck: false, force: false }, 'kettle-review');
 
   writeReviewStarted(ctx.db, 'widgets', 7);
 

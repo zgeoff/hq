@@ -5,7 +5,7 @@ import { buildStubGitHubFactsRunner } from '../../test/build-stub-github-facts-r
 import { buildStubSourceGH } from '../../test/build-stub-source-gh.ts';
 import { createMergedRun } from '../../test/create-merged-run.ts';
 import { freshDb } from '../../test/helpers.ts';
-import { addPr } from './add-pr.ts';
+import { addPR } from './add-pr.ts';
 import { addRun } from './add-run.ts';
 import { shipRuns } from '../releases/ship-runs.ts';
 import { IN_SCOPE } from '../scope/in-scope.ts';
@@ -76,7 +76,7 @@ test('it leaves a PR already on a run, open or closed, where it is', async () =>
   const ctx = setupTest();
   addRun(ctx.db, { issue: 'GEO-9811', title: 'Invented kettle work', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
   addRun(ctx.db, { issue: 'GEO-9812', title: 'Invented kettle work', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
-  addPr(ctx.db, 'GEO-9812', 'hq#12', 'kettle-bot');
+  addPR(ctx.db, 'GEO-9812', 'hq#12', 'kettle-bot');
   setState(ctx.db, 'GEO-9812', 'dropped', { note: 'paused' }, 'kettle-bot');
 
   const result = await attachGitHubPRs(ctx.db, buildStubGitHubFactsRunner({ search: JSON.stringify([{ number: 12, repository: { name: 'hq' }, author: { login: 'zgeoff' }, body: 'Fixes GEO-9811' }]) }), new Date('2026-10-20T00:00:00Z'));

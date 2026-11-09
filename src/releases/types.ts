@@ -18,7 +18,7 @@ export interface ShipMove {
 export interface ShipResult {
   dryRun: boolean;
   moved: ShipMove[];
-  shippedPrs: number;
+  shippedPRs: number;
   compares: number;
   deferred: number;
   held: string[];
@@ -27,7 +27,7 @@ export interface ShipResult {
   errors: string[];
 }
 
-export interface PrState {
+export interface PRState {
   ref: string;
   repo: string;
   sha: string | null;

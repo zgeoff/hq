@@ -20,7 +20,7 @@ import { readLinearIssues } from '../src/linear/read-linear-issues.ts';
 import { redact } from '../src/linear/redact.ts';
 import { resetKey as forgetKey } from '../src/linear/reset-key.ts';
 import { syncClosed } from '../src/linear/sync-closed.ts';
-import { syncPrIssues } from '../src/linear/sync-pr-issues.ts';
+import { syncPRIssues } from '../src/linear/sync-pr-issues.ts';
 import type { LinearCall } from '../src/linear/types.ts';
 import type { Runner } from '../src/runner/types.ts';
 import { buildSeeder } from '../src/test-utils/build-seeder.ts';
@@ -141,7 +141,7 @@ test('closed issues page through Linear; PR issues are typed, and an unknown id 
   ctx.seed.mergedPR({ repo: 'atc', number: 1, merged_at: '2026-10-12T00:00:00Z', title: 'fix: x', kind: 'fix', issue: 'GEO-5' });
   ctx.seed.mergedPR({ repo: 'atc', number: 2, merged_at: '2026-10-12T00:00:00Z', title: 'fix: y', kind: 'fix', issue: 'GEO-404' });
   ctx.seed.mergedPR({ repo: 'atc', number: 3, merged_at: '2026-10-12T00:00:00Z', title: 'fix: z', kind: 'fix', issue: 'GEO-1' });
-  const typed = await syncPrIssues(ctx.db, call);
+  const typed = await syncPRIssues(ctx.db, call);
   expect(typed).toBe(1);
   expect(ctx.db.query('SELECT issue, type, state FROM linear_issues ORDER BY issue').all()).toStrictEqual([
     { issue: 'GEO-1', type: 'Bug', state: 'completed' },
@@ -219,7 +219,7 @@ test('Linear ids hq did not ask for are not stored; an inherited type name count
   const ctx = setupTest();
   ctx.seed.mergedPR({ repo: 'atc', number: 1, merged_at: '2026-10-12T00:00:00Z', title: 'fix: x', kind: 'fix', issue: 'GEO-5' });
   const call: LinearCall = async () => ({ issues: { nodes: [node('GEO-5', 'Bug'), node('GEO-999', 'Bug')] } });
-  await syncPrIssues(ctx.db, call);
+  await syncPRIssues(ctx.db, call);
   expect(readLinearIssues(ctx.db).map((issue) => issue.issue)).toStrictEqual(['GEO-5']);
   ctx.seed.linearIssueOfUnknownType({ issue: 'GEO-5', type: 'constructor' });
   const [week] = kindWeeks(ctx.db, 1);

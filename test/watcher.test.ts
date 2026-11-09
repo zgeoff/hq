@@ -2,7 +2,7 @@ import { readOutboxRows } from '../src/outbox/read-outbox-rows.ts';
 import { expect, onTestFinished, test } from 'bun:test';
 import { updateEnv } from '@zgeoff/testing/helpers';
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { addPr } from '../src/runs/add-pr.ts';
+import { addPR } from '../src/runs/add-pr.ts';
 import { addRun } from '../src/runs/add-run.ts';
 import { addAsk } from '../src/asks/add-ask.ts';
 import { owner } from '../src/owner.ts';
@@ -358,7 +358,7 @@ test('it marks a run PR merged from GitHub and attaches an opened PR to its run 
     ctx.seed.meta({ key, value: new Date().toISOString() });
   }
   addRun(ctx.db, { issue: 'GEO-9821', title: 'Invented kettle work', place: 'none', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: null, actor: 'kettle-bot' });
-  addPr(ctx.db, 'GEO-9821', 'kettle#4', 'kettle-bot');
+  addPR(ctx.db, 'GEO-9821', 'kettle#4', 'kettle-bot');
   addRun(ctx.db, { issue: 'GEO-9822', title: 'Invented teapot work', place: 'none', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: null, actor: 'kettle-bot' });
   const calls: string[] = [];
   const gh = buildStubGitHubFactsRunner({
@@ -385,7 +385,7 @@ test('it logs every run PR GitHub could not answer for, one line each', async ()
   }
   addRun(ctx.db, { issue: 'GEO-9821', title: 'Invented kettle work', place: 'none', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: null, actor: 'kettle-bot' });
   for (const ref of ['kettle#4', 'kettle#5', 'kettle#6']) {
-    addPr(ctx.db, 'GEO-9821', ref, 'kettle-bot');
+    addPR(ctx.db, 'GEO-9821', ref, 'kettle-bot');
   }
   const gh = buildStubGitHubFactsRunner({ views: {}, search: '[]', fallback: capacity });
 

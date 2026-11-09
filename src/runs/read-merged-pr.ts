@@ -1,9 +1,9 @@
 import type { Database } from 'bun:sqlite';
-import { normalizePrRef } from './normalize-pr-ref.ts';
+import { normalizePRRef } from './normalize-pr-ref.ts';
 import { requirePR } from './require-pr.ts';
-import type { RunPr } from './types.ts';
+import type { RunPR } from './types.ts';
 
-export function readMergedPR(db: Database, raw: string): RunPr | null {
-  const pr = requirePR(db, normalizePrRef(raw).ref);
+export function readMergedPR(db: Database, raw: string): RunPR | null {
+  const pr = requirePR(db, normalizePRRef(raw).ref);
   return pr.state === 'merged' ? pr : null;
 }

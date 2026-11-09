@@ -54,7 +54,7 @@ export function measure(db: Database, from: Date, to: Date, at: Date = now()): M
     detail: `Claude 7-day ${now7} and 5-hour ${now5} used at last reading (active account only), 7-day peak ${peak === null ? '?' : `${peak}%`}; CI ${num(g.ci.minutes)} min`,
   };
 
-  const prDays = unfetchedPrDays(db, from, to, at);
+  const prDays = unfetchedPRDays(db, from, to, at);
   return {
     bugs: gap(share(pct(ty.bug, ty.typed), ty.typed, unit, `${ty.bug} Bug of ${ty.typed} merged PRs with a typed Linear issue`), prDays),
     features: gap(share(pct(ty.feature, ty.typed), ty.typed, unit, `${ty.feature} Feature or Improvement of ${ty.typed} merged PRs with a typed Linear issue`), prDays),
@@ -98,7 +98,7 @@ function typeShares(db: Database, from: string, to: string): { typed: number; bu
 
 const gap = (m: Measure, missing: number): Measure => (missing > 0 ? { ...m, missing, detail: `${m.detail}; ${missing} day(s) not fetched yet, so no colour` } : m);
 
-function unfetchedPrDays(db: Database, from: Date, to: Date, at: Date): number {
+function unfetchedPRDays(db: Database, from: Date, to: Date, at: Date): number {
   const end = Math.min(to.getTime(), at.getTime());
   const today = utcDay(at.getTime());
   const has = db.query('SELECT 1 FROM merged_pr_days WHERE day = ?');

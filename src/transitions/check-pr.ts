@@ -1,9 +1,11 @@
 import { HqError } from '../errors.ts';
-import { prAllows } from './pr-allows.ts';
-import type { PrState } from './pr-states.ts';
-import type { PrAction } from './pr-transitions.ts';
+import { isPRActionAllowed } from './is-pr-action-allowed.ts';
+import type { PRState } from './pr-states.ts';
+import type { PRAction } from './pr-transitions.ts';
 
-export function checkPr(ref: string, action: PrAction, from: PrState): void {
-  if (prAllows(action, from)) return;
+export function checkPR(ref: string, action: PRAction, from: PRState): void {
+  if (isPRActionAllowed(action, from)) {
+    return;
+  }
   throw new HqError('bad_state', action === 'unmerge' ? `${ref} is ${from}, not merged` : `${ref} is ${from}`, { state: from });
 }

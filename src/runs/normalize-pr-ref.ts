@@ -1,7 +1,7 @@
 import { HqError } from '../errors.ts';
 import { PR_REF } from './pr-ref.ts';
 
-export function normalizePrRef(raw: string): { ref: string; url: string | null } {
+export function normalizePRRef(raw: string): { ref: string; url: string | null } {
   const url = /github\.com\/([\w.-]+)\/([\w.-]+)\/pull\/(\d+)/.exec(raw);
   if (url) return { ref: `${url[2]}#${url[3]}`, url: `https://github.com/${url[1]}/${url[2]}/pull/${url[3]}` };
   const short = /^(?:[\w.-]+\/)?([\w.-]+#\d+)$/.exec(raw.trim());

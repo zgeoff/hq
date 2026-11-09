@@ -1,8 +1,8 @@
 import type { FinalMarks } from './is-final-answered.ts';
 import { isFinalAnswered } from './is-final-answered.ts';
-import type { RunPr } from './types.ts';
+import type { RunPR } from './types.ts';
 
-export function formatPRTag(pr: FinalMarks & Pick<RunPr, 'state' | 'review_round'>): string {
+export function formatPRTag(pr: FinalMarks & Pick<RunPR, 'state' | 'review_round'>): string {
   if (pr.state !== 'open') {
     return pr.state;
   }

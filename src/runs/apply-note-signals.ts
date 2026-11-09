@@ -6,7 +6,7 @@ import { buildFinalKey } from './build-final-key.ts';
 import { collectMentionedPRs } from './collect-mentioned-prs.ts';
 import { FINAL_MARK } from './final-mark.ts';
 import { FINAL_PHRASE } from './final-phrase.ts';
-import { normalizePrRef } from './normalize-pr-ref.ts';
+import { normalizePRRef } from './normalize-pr-ref.ts';
 import { parseMarkedRef } from './parse-marked-ref.ts';
 import { pickPhraseTarget } from './pick-phrase-target.ts';
 import { pickRunSession } from './pick-run-session.ts';
@@ -14,10 +14,10 @@ import { PR_IN_TEXT } from './pr-in-text.ts';
 import { scheduleFinalReview as markFinal } from './schedule-final-review.ts';
 import { sendFinalRefusal } from './send-final-refusal.ts';
 import { readIssueRefs } from './read-issue-refs.ts';
-import { registerRunPR as attachPr } from './register-run-pr.ts';
+import { registerRunPR as attachPR } from './register-run-pr.ts';
 import { requirePR } from './require-pr.ts';
 import { RunPRSchema } from './run-pr-schema.ts';
-import { prAllows } from '../transitions/pr-allows.ts';
+import { isPRActionAllowed } from '../transitions/is-pr-action-allowed.ts';
 import type { FinalResolutions } from './types.ts';
 
 interface SignalOptions {
@@ -42,13 +42,13 @@ export function applyNoteSignals(db: Database, issue: string, text: string, opti
     if (!/\bopen(?:ed|s)?\b/i.test(before)) continue;
     let parsed: { ref: string; url: string | null };
     try {
-      parsed = normalizePrRef(m[0]);
+      parsed = normalizePRRef(m[0]);
     } catch {
       continue;
     }
     const owner = runSyncRow(db, kdb(db).selectFrom('run_prs').select('issue').where('ref', '=', parsed.ref).compile(), RunPRSchema.pick({ issue: true }));
     if (owner && owner.issue !== issue) continue;
-    attachPr(db, issue, m[0]);
+    attachPR(db, issue, m[0]);
     if (!found.includes(parsed.ref)) found.push(parsed.ref);
   }
   let final: string | null = null;
@@ -77,16 +77,16 @@ interface FinalMarkInput {
   resolutions: FinalResolutions;
 }
 
-const RunPrOwnerSchema = z.object({ issue: z.string() }).nullable();
+const RunPROwnerSchema = z.object({ issue: z.string() }).nullable();
 
 function applyFinalMark(db: Database, input: FinalMarkInput): string | null {
   const ref = parseMarkedRef(input.ref);
   if (ref === null) {
     return null;
   }
-  const owner = RunPrOwnerSchema.parse(db.query('SELECT issue FROM run_prs WHERE ref = ?').get(ref));
+  const owner = RunPROwnerSchema.parse(db.query('SELECT issue FROM run_prs WHERE ref = ?').get(ref));
   if (owner === null) {
-    attachPr(db, input.issue, ref);
+    attachPR(db, input.issue, ref);
   } else if (owner.issue !== input.issue) {
     return null;
   }
@@ -115,7 +115,7 @@ function writeMarkerOwner(db: Database, issue: string, ref: string, source: stri
 function markResolved(db: Database, input: FinalMarkInput): boolean {
   const resolution = input.resolutions.get(buildFinalKey(input.ref, input.sha)) ?? null;
   if (resolution?.kind === 'refused') {
-    if (!prAllows('final', requirePR(db, input.ref).state)) {
+    if (!isPRActionAllowed('final', requirePR(db, input.ref).state)) {
       return false;
     }
     sendFinalRefusal(db, { issue: input.issue, ref: input.ref, given: input.sha, refusal: resolution, actor: input.actor });

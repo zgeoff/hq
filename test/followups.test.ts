@@ -8,9 +8,9 @@ import { parseFollowups } from '../src/followups/parse-followups.ts';
 import { reviewStats } from '../src/followups/review-stats.ts';
 import { reviewText } from '../src/followups/review-text.ts';
 import { addMark } from '../src/marks/add-mark.ts';
-import { addPr } from '../src/runs/add-pr.ts';
+import { addPR } from '../src/runs/add-pr.ts';
 import { addRun } from '../src/runs/add-run.ts';
-import { finalPr } from '../src/runs/final-pr.ts';
+import { finalPR } from '../src/runs/final-pr.ts';
 import { at, freshDb } from './helpers.ts';
 
 function setupTest() {
@@ -55,8 +55,8 @@ test('it parses follow-ups and counts, and records nothing when both are left of
   expect(parseFixed(undefined)).toBeNull();
   addMark(ctx.db, { kind: 'skills', text: '#135: findings fixed in their own PR', ref: 'nixie-definitions#135', at: '2026-10-15T12:00:00Z', actor: 'z-steward' });
   ctx.addRun('GEO-1');
-  addPr(ctx.db, 'GEO-1', 'kettle#1', 'z-delivery');
-  finalPr(ctx.db, 'kettle#1', { sha: 'abc1234', actor: 'z-delivery', tally: { fixed: null, followups: null } });
+  addPR(ctx.db, 'GEO-1', 'kettle#1', 'z-delivery');
+  finalPR(ctx.db, 'kettle#1', { sha: 'abc1234', actor: 'z-delivery', tally: { fixed: null, followups: null } });
   expect(ctx.db.query('SELECT fixed_in_pr, tally_at FROM run_prs').get()).toStrictEqual({ fixed_in_pr: null, tally_at: null });
   expect(ctx.db.query(`SELECT COUNT(*) AS count FROM events WHERE action = 'tally'`).get()).toStrictEqual({ count: 0 });
 });
@@ -71,14 +71,14 @@ test('it counts the weeks around the rule: a hand-counted baseline before, PR ta
   expect(() => addBackfill(ctx.db, { issue: 'geo-103', fromRef: null, at: '2026-10-13T12:00:00Z', actor: 'z-q' })).toThrow('already counted');
   at('2026-10-18T12:00:00Z');
   ctx.addRun('GEO-1');
-  addPr(ctx.db, 'GEO-1', 'kettle#1', 'z-delivery');
-  finalPr(ctx.db, 'kettle#1', { sha: 'abc1234', actor: 'z-delivery', tally: { fixed: 4, followups: ['GEO-200'] } });
+  addPR(ctx.db, 'GEO-1', 'kettle#1', 'z-delivery');
+  finalPR(ctx.db, 'kettle#1', { sha: 'abc1234', actor: 'z-delivery', tally: { fixed: 4, followups: ['GEO-200'] } });
   at('2026-10-19T12:00:00Z');
   ctx.addRun('GEO-2');
-  addPr(ctx.db, 'GEO-2', 'kettle#2', 'z-delivery');
-  finalPr(ctx.db, 'kettle#2', { sha: 'def5678', actor: 'z-delivery', tally: { fixed: 0, followups: null } });
+  addPR(ctx.db, 'GEO-2', 'kettle#2', 'z-delivery');
+  finalPR(ctx.db, 'kettle#2', { sha: 'def5678', actor: 'z-delivery', tally: { fixed: 0, followups: null } });
 
-  finalPr(ctx.db, 'kettle#2', { sha: 'def5678', actor: 'z-delivery', tally: { fixed: 2, followups: null } });
+  finalPR(ctx.db, 'kettle#2', { sha: 'def5678', actor: 'z-delivery', tally: { fixed: 2, followups: null } });
   at('2026-10-24T12:00:00Z');
   const stats = reviewStats(ctx.db);
   expect(stats.baseline).toStrictEqual({ followupsPerWeek: 1.5, backfilled: 3, fixed: 'none' });

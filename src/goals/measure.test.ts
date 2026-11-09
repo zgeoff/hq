@@ -2,9 +2,9 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { at, freshDb } from '../../test/helpers.ts';
 import { updateEnv } from '@zgeoff/testing/helpers';
 import { iso } from '../clock/iso.ts';
-import { addPr } from '../runs/add-pr.ts';
+import { addPR } from '../runs/add-pr.ts';
 import { addRun } from '../runs/add-run.ts';
-import { reviewedPr } from '../runs/reviewed-pr.ts';
+import { reviewedPR } from '../runs/reviewed-pr.ts';
 import { DEFAULT_TARGETS } from './default-targets.ts';
 import { measure } from './measure.ts';
 import { verdict } from './verdict.ts';
@@ -222,10 +222,10 @@ test('must-fix is first reviews that needed a recheck, of the reviewed runs', ()
   const ctx = setupTest();
   const run = (issueId: string, p: string, recheck: boolean) => {
     addRun(ctx.db, { issue: issueId, title: 'Invented', place: 'imp', session: null, next: 'x', gate: null, geoffChat: false, actor: 'z-delivery' });
-    addPr(ctx.db, issueId, p, 'z-delivery');
-    reviewedPr(ctx.db, p, 'abc1234', { recheck: false, force: false }, 'z-delivery');
+    addPR(ctx.db, issueId, p, 'z-delivery');
+    reviewedPR(ctx.db, { raw: p, sha: 'abc1234', recheck: false, force: false }, 'z-delivery');
     if (recheck) {
-      reviewedPr(ctx.db, p, 'abc1234', { recheck: true, force: false }, 'z-delivery');
+      reviewedPR(ctx.db, { raw: p, sha: 'abc1234', recheck: true, force: false }, 'z-delivery');
     }
   };
   at('2026-10-16T06:00:00Z');

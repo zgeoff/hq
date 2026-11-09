@@ -8,9 +8,9 @@ import type { RefFacts } from './pick-ref-shipment.ts';
 import { getPRNumber } from './get-pr-number.ts';
 import { getSource } from './get-source.ts';
 import { readChangedPrefixes } from './read-changed-prefixes.ts';
-import type { PrState, ShipDeps, Shipment, Source } from './types.ts';
+import type { PRState, ShipDeps, Shipment, Source } from './types.ts';
 
-export function readShipment(deps: ShipDeps, state: PrState, sha: string): Promise<Shipment | null | 'cap'> {
+export function readShipment(deps: ShipDeps, state: PRState, sha: string): Promise<Shipment | null | 'cap'> {
   return match(getSource(state.repo))
     .with({ kind: 'merge' }, () => Promise.resolve({ tag: null, at: state.mergedAt }))
     .with({ kind: 'build' }, () => readBuildShipment(deps, state, sha))
@@ -21,7 +21,7 @@ export function readShipment(deps: ShipDeps, state: PrState, sha: string): Promi
 }
 
 // A source run or a dirty build is no commit GitHub can compare.
-async function readBuildShipment(deps: ShipDeps, state: PrState, sha: string): Promise<Shipment | null | 'cap'> {
+async function readBuildShipment(deps: ShipDeps, state: PRState, sha: string): Promise<Shipment | null | 'cap'> {
   const build = deps.readBuild();
   if (!build.commit || build.dirty !== false) {
     return null;
@@ -46,7 +46,7 @@ async function readHeld(deps: ShipDeps, repo: string, sha: string, head: string)
   }
 }
 
-async function readPackagesShipment(deps: ShipDeps, state: PrState, sha: string): Promise<Shipment | null | 'cap'> {
+async function readPackagesShipment(deps: ShipDeps, state: PRState, sha: string): Promise<Shipment | null | 'cap'> {
   if (deps.hasFailed(state.repo)) {
     return null;
   }
@@ -61,12 +61,12 @@ async function readPackagesShipment(deps: ShipDeps, state: PrState, sha: string)
   return list ? readPackageRelease(list, prefixes, (tag) => deps.contains(state.repo, sha, tag)) : null;
 }
 
-async function readReleaseShipment(deps: ShipDeps, state: PrState, sha: string): Promise<Shipment | null | 'cap'> {
+async function readReleaseShipment(deps: ShipDeps, state: PRState, sha: string): Promise<Shipment | null | 'cap'> {
   const list = await deps.getReleases(state.repo);
   return list ? readOldestContaining(list, (tag) => deps.contains(state.repo, sha, tag)) : null;
 }
 
-async function readRefShipment(deps: ShipDeps, state: PrState, sha: string, source: Extract<Source, { kind: 'ref' }>): Promise<Shipment | null | 'cap'> {
+async function readRefShipment(deps: ShipDeps, state: PRState, sha: string, source: Extract<Source, { kind: 'ref' }>): Promise<Shipment | null | 'cap'> {
   const gated = source.gated;
   const facts: RefFacts = { found: await readReleaseShipment(deps, state, sha), gatedRef: gated?.ref ?? null };
   for (;;) {

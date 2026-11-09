@@ -1,12 +1,12 @@
 import { match } from 'ts-pattern';
-import type { RunPr } from './types.ts';
+import type { RunPR } from './types.ts';
 
 export type ReviewWaitRequest = { kind: 'clear' } | { kind: 'set'; until: string; reason: string | null };
 
 export type ReviewWaitWrite = { ok: true; until: string | null; sha: string | null; reason: string | null } | { ok: false; refusal: string };
 
 // until is already parsed and in the future; a clear needs no FINAL, since a stale wait may be cleared.
-export function pickReviewWait(pr: Pick<RunPr, 'ref' | 'state' | 'final_sha'>, request: ReviewWaitRequest): ReviewWaitWrite {
+export function pickReviewWait(pr: Pick<RunPR, 'ref' | 'state' | 'final_sha'>, request: ReviewWaitRequest): ReviewWaitWrite {
   if (pr.state !== 'open') {
     return { ok: false, refusal: `${pr.ref} is ${pr.state}, not open` };
   }

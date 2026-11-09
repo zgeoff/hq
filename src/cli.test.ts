@@ -27,7 +27,7 @@ import { resetKey } from './linear/reset-key.ts';
 import { updateNoslopRepos } from './noslop/update-noslop-repos.ts';
 import { writeNoslopSettings } from './noslop/write-noslop-settings.ts';
 import type { RunResult, Runner } from './runner/types.ts';
-import { addPr } from './runs/add-pr.ts';
+import { addPR } from './runs/add-pr.ts';
 import { addRun } from './runs/add-run.ts';
 import { setState } from './runs/set-state.ts';
 import { writeBrokerSlot } from './slots/write-broker-slot.ts';
@@ -213,7 +213,7 @@ test('it marks the design pass PRs in the hq run show text', async () => {
   onTestFinished(() => (console.log = log));
   at(NOON_SYDNEY);
   addRun(fresh.db, { issue: 'GEO-9956', title: 'Design the kettle spout', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', design: 'agent', actor: 'z-delivery' });
-  addPr(fresh.db, 'GEO-9956', 'kettle#71', 'z-delivery');
+  addPR(fresh.db, 'GEO-9956', 'kettle#71', 'z-delivery');
   setState(fresh.db, 'GEO-9956', 'done', { note: 'design settled' }, 'z-delivery');
   addRun(fresh.db, { issue: 'GEO-9956', title: 'Build the kettle spout', place: 'imp', session: null, next: 'Building.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
 
@@ -1207,7 +1207,7 @@ test('hq run final refuses a sha that is no commit of the PR and records no FINA
   console.log = (line: string) => void printed.push(line);
   onTestFinished(() => (console.log = log));
   addRun(fresh.db, { issue: 'GEO-9731', title: 'Invented kettle work', place: 'local', session: null, next: 'Agent working.', gate: null, geoffChat: false, actor: 'z-delivery' });
-  addPr(fresh.db, 'GEO-9731', 'kettle#714', 'z-delivery');
+  addPR(fresh.db, 'GEO-9731', 'kettle#714', 'z-delivery');
   const run = buildStubFinalGH({ commits: [`44238662${buildMockSha(2).slice(8)}`] }, []);
 
   const code = await main(['run', 'final', 'kettle#714', '--sha', '4423866e', '--json'], run);
@@ -1230,7 +1230,7 @@ test('hq run note keeps a note whose FINAL is no commit of the PR, records no FI
   console.log = () => {};
   onTestFinished(() => (console.log = log));
   addRun(fresh.db, { issue: 'GEO-9731', title: 'Invented kettle work', place: 'local', session: null, next: 'Agent working.', gate: null, geoffChat: false, actor: 'z-delivery' });
-  addPr(fresh.db, 'GEO-9731', 'kettle#714', 'z-delivery');
+  addPR(fresh.db, 'GEO-9731', 'kettle#714', 'z-delivery');
   const run = buildStubFinalGH({ commits: [`44238662${buildMockSha(2).slice(8)}`] }, []);
 
   const code = await main(['run', 'note', 'GEO-9731', 'FINAL kettle#714 4423866e all green', '--json'], run);

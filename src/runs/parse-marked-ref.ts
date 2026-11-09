@@ -1,8 +1,8 @@
-import { normalizePrRef } from './normalize-pr-ref.ts';
+import { normalizePRRef } from './normalize-pr-ref.ts';
 
 export function parseMarkedRef(raw: string): string | null {
   try {
-    return normalizePrRef(raw).ref;
+    return normalizePRRef(raw).ref;
   } catch {
     return null;
   }

@@ -1,4 +1,4 @@
-import type { PrState } from './pr-states.ts';
+import type { PRState } from './pr-states.ts';
 import type { Row } from './types.ts';
 
 export const PR_TRANSITIONS = {
@@ -8,5 +8,5 @@ export const PR_TRANSITIONS = {
   merged: { from: ['open'], to: 'merged' },
   closed: { from: ['open'], to: 'closed' },
   unmerge: { from: ['merged'], to: 'open' },
-} as const satisfies Record<string, Row<PrState>>;
-export type PrAction = keyof typeof PR_TRANSITIONS;
+} as const satisfies Record<string, Row<PRState>>;
+export type PRAction = keyof typeof PR_TRANSITIONS;

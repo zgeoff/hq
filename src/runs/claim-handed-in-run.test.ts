@@ -2,10 +2,10 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { freshDb } from '../../test/helpers.ts';
 import { overrideEnv } from '../config/override-env.ts';
 import { readEvents } from '../read-events.ts';
-import { addPr } from './add-pr.ts';
+import { addPR } from './add-pr.ts';
 import { addRun } from './add-run.ts';
 import { claimHandedInRun } from './claim-handed-in-run.ts';
-import { closePr } from './close-pr.ts';
+import { closePR } from './close-pr.ts';
 import { setState } from './set-state.ts';
 import { writeMergedClaim } from './wrap-up-merged-runs.ts';
 import { writeHandedInPlan } from './write-handed-in-plan.ts';
@@ -70,8 +70,8 @@ test('it claims the merged wrap-up of a merged run that the merged-run pass has 
   const ctx = setupTest();
   onTestFinished(overrideEnv('HQ_NOW', '2026-10-22T12:00:00Z'));
   addRun(ctx.db, { issue: 'GEO-9921', title: 'Invented kettle work', place: 'local', session: '0000c001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
-  addPr(ctx.db, 'GEO-9921', 'kettle#81', 'z-delivery');
-  closePr(ctx.db, 'kettle#81', { to: 'merged', actor: 'hq-github' });
+  addPR(ctx.db, 'GEO-9921', 'kettle#81', 'z-delivery');
+  closePR(ctx.db, 'kettle#81', { to: 'merged', actor: 'hq-github' });
   setState(ctx.db, 'GEO-9921', 'merged', {}, 'z-delivery');
 
   const claim = claimHandedInRun(ctx.db, 'GEO-9921', 'z-delivery', new Date('2026-10-22T12:00:00Z'));
@@ -84,8 +84,8 @@ test('it refuses a run whose merged wrap-up another pass has claimed and not fin
   const ctx = setupTest();
   onTestFinished(overrideEnv('HQ_NOW', '2026-10-22T12:00:00Z'));
   addRun(ctx.db, { issue: 'GEO-9921', title: 'Invented kettle work', place: 'local', session: '0000c001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
-  addPr(ctx.db, 'GEO-9921', 'kettle#81', 'z-delivery');
-  closePr(ctx.db, 'kettle#81', { to: 'merged', actor: 'hq-github' });
+  addPR(ctx.db, 'GEO-9921', 'kettle#81', 'z-delivery');
+  closePR(ctx.db, 'kettle#81', { to: 'merged', actor: 'hq-github' });
   setState(ctx.db, 'GEO-9921', 'merged', {}, 'z-delivery');
   writeMergedClaim(ctx.db, 'GEO-9921', 'z-delivery');
 

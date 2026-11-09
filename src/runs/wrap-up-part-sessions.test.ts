@@ -7,9 +7,9 @@ import type { FleetSession } from '../fleet/types.ts';
 import { logEvent } from '../log-event.ts';
 import { readEvents } from '../read-events.ts';
 import { fakeAtc, freshDb } from '../../test/helpers.ts';
-import { addOwnedPr } from './add-owned-pr.ts';
+import { addOwnedPR } from './add-owned-pr.ts';
 import { addRun } from './add-run.ts';
-import { closePr } from './close-pr.ts';
+import { closePR } from './close-pr.ts';
 import { requireRun } from './require-run.ts';
 import { setSession } from './set-session.ts';
 import { parseJSON } from '../noslop/parse-json.ts';
@@ -60,9 +60,9 @@ test('it forgets the helper session whose PRs merged, keeps the one with an open
   addRun(ctx.db, { issue: 'GEO-501', title: 'Invented widgets and gadgets', place: 'local', session: null, next: 'Parts working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
   setSession(ctx.db, 'GEO-501', '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'z-delivery', 'add');
   setSession(ctx.db, 'GEO-501', '0000e002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'z-delivery', 'add');
-  addOwnedPr(ctx.db, 'GEO-501', 'widgets#1', { actor: 'z-delivery', session: '0000e001' });
-  addOwnedPr(ctx.db, 'GEO-501', 'gadgets#1', { actor: 'z-delivery', session: '0000e002' });
-  closePr(ctx.db, 'widgets#1', { to: 'merged', actor: 'z-delivery' });
+  addOwnedPR(ctx.db, 'GEO-501', 'widgets#1', { actor: 'z-delivery', session: '0000e001' });
+  addOwnedPR(ctx.db, 'GEO-501', 'gadgets#1', { actor: 'z-delivery', session: '0000e002' });
+  closePR(ctx.db, 'widgets#1', { to: 'merged', actor: 'z-delivery' });
 
   await ctx.sweep();
 
@@ -77,8 +77,8 @@ test('it wraps a part session up once across two sweeps', async () => {
   ctx.seed.atcSession({ id: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'widgets-part', alive: true, state: 'done' }, '2026-11-07T01:00:00Z');
   addRun(ctx.db, { issue: 'GEO-501', title: 'Invented widgets', place: 'local', session: null, next: 'Parts working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
   setSession(ctx.db, 'GEO-501', '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'z-delivery', 'add');
-  addOwnedPr(ctx.db, 'GEO-501', 'widgets#1', { actor: 'z-delivery', session: '0000e001' });
-  closePr(ctx.db, 'widgets#1', { to: 'merged', actor: 'z-delivery' });
+  addOwnedPR(ctx.db, 'GEO-501', 'widgets#1', { actor: 'z-delivery', session: '0000e001' });
+  closePR(ctx.db, 'widgets#1', { to: 'merged', actor: 'z-delivery' });
   await ctx.sweep();
 
   await ctx.sweep();
@@ -92,8 +92,8 @@ test('it wraps a part session up once when two sweeps overlap', async () => {
   ctx.seed.atcSession({ id: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'widgets-part', alive: true, state: 'done' }, '2026-11-07T01:00:00Z');
   addRun(ctx.db, { issue: 'GEO-501', title: 'Invented widgets', place: 'local', session: null, next: 'Parts working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
   setSession(ctx.db, 'GEO-501', '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'z-delivery', 'add');
-  addOwnedPr(ctx.db, 'GEO-501', 'widgets#1', { actor: 'z-delivery', session: '0000e001' });
-  closePr(ctx.db, 'widgets#1', { to: 'merged', actor: 'z-delivery' });
+  addOwnedPR(ctx.db, 'GEO-501', 'widgets#1', { actor: 'z-delivery', session: '0000e001' });
+  closePR(ctx.db, 'widgets#1', { to: 'merged', actor: 'z-delivery' });
 
   await Promise.all([ctx.sweep(), ctx.sweep()]);
 
@@ -107,8 +107,8 @@ test('it keeps a helper session with unpushed work on one sweep and forgets it o
   ctx.seed.atcSession({ id: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'widgets-part', alive: true, state: 'done' }, '2026-11-07T01:00:00Z');
   addRun(ctx.db, { issue: 'GEO-501', title: 'Invented widgets', place: 'local', session: null, next: 'Parts working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
   setSession(ctx.db, 'GEO-501', '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'z-delivery', 'add');
-  addOwnedPr(ctx.db, 'GEO-501', 'widgets#1', { actor: 'z-delivery', session: '0000e001' });
-  closePr(ctx.db, 'widgets#1', { to: 'merged', actor: 'z-delivery' });
+  addOwnedPR(ctx.db, 'GEO-501', 'widgets#1', { actor: 'z-delivery', session: '0000e001' });
+  closePR(ctx.db, 'widgets#1', { to: 'merged', actor: 'z-delivery' });
   ctx.localWork.current = { state: 'unpushed', detail: '1 commit ahead of origin' };
   await ctx.sweep();
   ctx.localWork.current = { state: 'pushed' };
@@ -125,8 +125,8 @@ test('it retries a part session whose claim an earlier sweep left without finish
   ctx.seed.atcSession({ id: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'widgets-part', alive: true, state: 'done' }, '2026-11-07T01:00:00Z');
   addRun(ctx.db, { issue: 'GEO-501', title: 'Invented widgets', place: 'local', session: null, next: 'Parts working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
   setSession(ctx.db, 'GEO-501', '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'z-delivery', 'add');
-  addOwnedPr(ctx.db, 'GEO-501', 'widgets#1', { actor: 'z-delivery', session: '0000e001' });
-  closePr(ctx.db, 'widgets#1', { to: 'merged', actor: 'z-delivery' });
+  addOwnedPR(ctx.db, 'GEO-501', 'widgets#1', { actor: 'z-delivery', session: '0000e001' });
+  closePR(ctx.db, 'widgets#1', { to: 'merged', actor: 'z-delivery' });
   logEvent(ctx.db, 'run', 'GEO-501', 'part-wrap-up', 'sweep', null, null, { session: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa' });
   updateEnv('HQ_NOW', '2026-11-07T03:00:00Z');
 
@@ -142,8 +142,8 @@ test('it leaves a part session alone while a recent claim on it is unfinished', 
   ctx.seed.atcSession({ id: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'widgets-part', alive: true, state: 'done' }, '2026-11-07T01:00:00Z');
   addRun(ctx.db, { issue: 'GEO-501', title: 'Invented widgets', place: 'local', session: null, next: 'Parts working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
   setSession(ctx.db, 'GEO-501', '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'z-delivery', 'add');
-  addOwnedPr(ctx.db, 'GEO-501', 'widgets#1', { actor: 'z-delivery', session: '0000e001' });
-  closePr(ctx.db, 'widgets#1', { to: 'merged', actor: 'z-delivery' });
+  addOwnedPR(ctx.db, 'GEO-501', 'widgets#1', { actor: 'z-delivery', session: '0000e001' });
+  closePR(ctx.db, 'widgets#1', { to: 'merged', actor: 'z-delivery' });
   logEvent(ctx.db, 'run', 'GEO-501', 'part-wrap-up', 'sweep', null, null, { session: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa' });
   updateEnv('HQ_NOW', '2026-11-07T03:00:00Z');
 
@@ -159,8 +159,8 @@ test('it keeps a helper session whose sub-session is pinned', async () => {
   ctx.seed.atcSession({ id: '0000e00a-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'widgets-probe', alive: true, state: 'needs_you', parent: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', pinned: true }, '2026-11-07T01:00:00Z');
   addRun(ctx.db, { issue: 'GEO-501', title: 'Invented widgets', place: 'local', session: null, next: 'Parts working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
   setSession(ctx.db, 'GEO-501', '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'z-delivery', 'add');
-  addOwnedPr(ctx.db, 'GEO-501', 'widgets#1', { actor: 'z-delivery', session: '0000e001' });
-  closePr(ctx.db, 'widgets#1', { to: 'merged', actor: 'z-delivery' });
+  addOwnedPR(ctx.db, 'GEO-501', 'widgets#1', { actor: 'z-delivery', session: '0000e001' });
+  closePR(ctx.db, 'widgets#1', { to: 'merged', actor: 'z-delivery' });
 
   await ctx.sweep();
 
@@ -174,8 +174,8 @@ test('it logs a part session kept because its unpushed-work check could not run'
   ctx.seed.atcSession({ id: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'widgets-part', alive: true, state: 'done' }, '2026-11-07T01:00:00Z');
   addRun(ctx.db, { issue: 'GEO-501', title: 'Invented widgets', place: 'local', session: null, next: 'Parts working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
   setSession(ctx.db, 'GEO-501', '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'z-delivery', 'add');
-  addOwnedPr(ctx.db, 'GEO-501', 'widgets#1', { actor: 'z-delivery', session: '0000e001' });
-  closePr(ctx.db, 'widgets#1', { to: 'merged', actor: 'z-delivery' });
+  addOwnedPR(ctx.db, 'GEO-501', 'widgets#1', { actor: 'z-delivery', session: '0000e001' });
+  closePR(ctx.db, 'widgets#1', { to: 'merged', actor: 'z-delivery' });
   ctx.localWork.current = { state: 'unknown', detail: 'git status exited 128' };
 
   await ctx.sweep();
@@ -191,8 +191,8 @@ test('it logs a part session kept for the same reason once, and again when the r
   ctx.seed.atcSession({ id: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'widgets-part', alive: true, state: 'done' }, '2026-11-07T01:00:00Z');
   addRun(ctx.db, { issue: 'GEO-501', title: 'Invented widgets', place: 'local', session: null, next: 'Parts working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
   setSession(ctx.db, 'GEO-501', '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'z-delivery', 'add');
-  addOwnedPr(ctx.db, 'GEO-501', 'widgets#1', { actor: 'z-delivery', session: '0000e001' });
-  closePr(ctx.db, 'widgets#1', { to: 'merged', actor: 'z-delivery' });
+  addOwnedPR(ctx.db, 'GEO-501', 'widgets#1', { actor: 'z-delivery', session: '0000e001' });
+  closePR(ctx.db, 'widgets#1', { to: 'merged', actor: 'z-delivery' });
   ctx.localWork.current = { state: 'unknown', detail: 'git status exited 128' };
 
   await ctx.sweep();
@@ -214,8 +214,8 @@ test('it logs a failed part wrap-up and releases the claim for the next sweep', 
   ctx.seed.atcSession({ id: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'widgets-part', alive: true, state: 'done' }, '2026-11-07T01:00:00Z');
   addRun(ctx.db, { issue: 'GEO-501', title: 'Invented widgets', place: 'local', session: null, next: 'Parts working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
   setSession(ctx.db, 'GEO-501', '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'z-delivery', 'add');
-  addOwnedPr(ctx.db, 'GEO-501', 'widgets#1', { actor: 'z-delivery', session: '0000e001' });
-  closePr(ctx.db, 'widgets#1', { to: 'merged', actor: 'z-delivery' });
+  addOwnedPR(ctx.db, 'GEO-501', 'widgets#1', { actor: 'z-delivery', session: '0000e001' });
+  closePR(ctx.db, 'widgets#1', { to: 'merged', actor: 'z-delivery' });
   ctx.killFailures.push('0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
 
   await ctx.sweep();

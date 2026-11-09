@@ -1,6 +1,6 @@
 import type { Size } from './bands.ts';
 
-export interface PrFacts {
+export interface PRFacts {
   lines: number;
   stacked: boolean;
 }

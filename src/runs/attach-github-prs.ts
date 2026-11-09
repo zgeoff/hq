@@ -6,7 +6,7 @@ import type { Runner } from '../runner/types.ts';
 import { OWNER } from '../releases/owner.ts';
 import { IN_SCOPE } from '../scope/in-scope.ts';
 import { CLOSED_RUN_STATES } from '../transitions/closed-run-states.ts';
-import { addPr } from './add-pr.ts';
+import { addPR } from './add-pr.ts';
 import { GITHUB_ACTOR } from './github-actor.ts';
 import { planAttachments } from './plan-attachments.ts';
 import type { OpenPR } from './plan-attachments.ts';
@@ -115,7 +115,7 @@ function readOpenRuns(db: Database): Set<string> {
 
 function tryAttach(db: Database, issue: string, url: string): string | null {
   try {
-    addPr(db, issue, url, GITHUB_ACTOR);
+    addPR(db, issue, url, GITHUB_ACTOR);
     return null;
   } catch (error) {
     return error instanceof Error ? error.message : String(error);

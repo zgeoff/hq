@@ -8,21 +8,21 @@ import { getMeta } from '../src/db/get-meta.ts';
 import { listEvents } from '../src/list-events.ts';
 import { readOutboxRows } from '../src/outbox/read-outbox-rows.ts';
 import { addNote } from '../src/runs/add-note.ts';
-import { addPr } from '../src/runs/add-pr.ts';
+import { addPR } from '../src/runs/add-pr.ts';
 import { addRun } from '../src/runs/add-run.ts';
 import { applyNoteSignals } from '../src/runs/apply-note-signals.ts';
 import { checkMergedOnGitHub } from '../src/runs/check-merged-on-github.ts';
-import { closePr } from '../src/runs/close-pr.ts';
-import { finalPr } from '../src/runs/final-pr.ts';
+import { closePR } from '../src/runs/close-pr.ts';
+import { finalPR } from '../src/runs/final-pr.ts';
 import { findAlerts } from '../src/runs/find-alerts.ts';
 import { fullSessionId } from '../src/runs/full-session-id.ts';
 import { ingestNotes } from '../src/runs/ingest-notes.ts';
 import { listRuns } from '../src/runs/list-runs.ts';
-import { normalizePrRef } from '../src/runs/normalize-pr-ref.ts';
+import { normalizePRRef } from '../src/runs/normalize-pr-ref.ts';
 import { notesFor } from '../src/runs/notes-for.ts';
 import { resolveRun } from '../src/runs/resolve-run.ts';
 import { reviewStarted } from '../src/runs/review-started.ts';
-import { reviewedPr } from '../src/runs/reviewed-pr.ts';
+import { reviewedPR } from '../src/runs/reviewed-pr.ts';
 import { setGeoffChat } from '../src/runs/set-geoff-chat.ts';
 import { setSession } from '../src/runs/set-session.ts';
 import { setState } from '../src/runs/set-state.ts';
@@ -30,8 +30,8 @@ import { SWEEP_MINUTES } from '../src/runs/sweep-minutes.ts';
 import { sweepNow } from '../src/runs/sweep-now.ts';
 import { updateGoneRunSessions } from '../src/runs/update-gone-run-sessions.ts';
 import { sweep } from '../src/runs/sweep.ts';
-import { unfinalPr } from '../src/runs/unfinal-pr.ts';
-import { unmergePr } from '../src/runs/unmerge-pr.ts';
+import { unfinalPR } from '../src/runs/unfinal-pr.ts';
+import { unmergePR } from '../src/runs/unmerge-pr.ts';
 import { watchlist } from '../src/runs/watchlist.ts';
 import { parseJSON } from '../src/noslop/parse-json.ts';
 import { buildStubFinalGH } from './build-stub-final-gh.ts';
@@ -75,21 +75,21 @@ test('#setState records what a merged run waits on, and refuses an unknown state
   expect(() => setState(ctx.db, 'GEO-9001', 'vibing', {}, 'z-delivery')).toThrow('state must be one of');
 });
 
-test('#normalizePrRef normalises a PR ref from a URL or an owner/repo form', () => {
-  expect(normalizePrRef('https://github.com/acme/widgets/pull/12')).toStrictEqual({ ref: 'widgets#12', url: 'https://github.com/acme/widgets/pull/12' });
-  expect(normalizePrRef('acme/widgets#12').ref).toBe('widgets#12');
-  expect(() => normalizePrRef('#12')).toThrow('cannot read a PR');
+test('#normalizePRRef normalises a PR ref from a URL or an owner/repo form', () => {
+  expect(normalizePRRef('https://github.com/acme/widgets/pull/12')).toStrictEqual({ ref: 'widgets#12', url: 'https://github.com/acme/widgets/pull/12' });
+  expect(normalizePRRef('acme/widgets#12').ref).toBe('widgets#12');
+  expect(() => normalizePRRef('#12')).toThrow('cannot read a PR');
 });
 
-test('#reviewedPr counts review rounds and needs --force for a third', () => {
+test('#reviewedPR counts review rounds and needs --force for a third', () => {
   const ctx = setupTest();
   ctx.addRun();
-  addPr(ctx.db, 'GEO-9001', 'widgets#12', 'z-delivery');
-  expect(() => reviewedPr(ctx.db, 'widgets#12', 'abc1234', { recheck: true, force: false }, 'z-delivery')).toThrow('no first review');
-  expect(reviewedPr(ctx.db, 'widgets#12', 'abc1234', { recheck: false, force: false }, 'z-delivery').review_round).toBe(1);
-  expect(() => reviewedPr(ctx.db, 'widgets#12', 'def5678', { recheck: false, force: false }, 'z-delivery')).toThrow('use --recheck');
-  expect(reviewedPr(ctx.db, 'widgets#12', 'def5678', { recheck: true, force: false }, 'z-delivery').review_round).toBe(2);
-  expect(() => reviewedPr(ctx.db, 'widgets#12', 'fff0000', { recheck: true, force: false }, 'z-delivery')).toThrow('third round');
+  addPR(ctx.db, 'GEO-9001', 'widgets#12', 'z-delivery');
+  expect(() => reviewedPR(ctx.db, { raw: 'widgets#12', sha: 'abc1234', recheck: true, force: false }, 'z-delivery')).toThrow('no first review');
+  expect(reviewedPR(ctx.db, { raw: 'widgets#12', sha: 'abc1234', recheck: false, force: false }, 'z-delivery').review_round).toBe(1);
+  expect(() => reviewedPR(ctx.db, { raw: 'widgets#12', sha: 'def5678', recheck: false, force: false }, 'z-delivery')).toThrow('use --recheck');
+  expect(reviewedPR(ctx.db, { raw: 'widgets#12', sha: 'def5678', recheck: true, force: false }, 'z-delivery').review_round).toBe(2);
+  expect(() => reviewedPR(ctx.db, { raw: 'widgets#12', sha: 'fff0000', recheck: true, force: false }, 'z-delivery')).toThrow('third round');
 });
 
 test('#applyNoteSignals attaches the PR and marks it final on a FINAL marker', () => {
@@ -119,7 +119,7 @@ test('#addNote leaves an event with the note id and the sha when the note marks 
   expect(events).toHaveLength(1);
   expect(events[0]).toMatchObject({ subject_id: 'GEO-9001', actor: 'z-delivery', from_state: null, to_state: 'abc1234' });
   expect(events.map((event) => parseJSON(event.data))).toStrictEqual([{ ref: 'widgets#12', sha: 'abc1234', source: 'marker:note:z-delivery', note: note.id, given: 'abc1234', resolved: false, reason: 'not resolved in this pass' }]);
-  finalPr(ctx.db, 'widgets#12', { sha: 'def5678', actor: 'z-q' });
+  finalPR(ctx.db, 'widgets#12', { sha: 'def5678', actor: 'z-q' });
   const last = listEvents(ctx.db, 'final').at(-1);
   invariant(last, 'the second final logged an event');
   expect(last).toMatchObject({ from_state: 'abc1234', to_state: 'def5678' });
@@ -129,7 +129,7 @@ test('#addNote leaves an event with the note id and the sha when the note marks 
 test("#applyNoteSignals marks the row's only open PR final on today's wording", () => {
   const ctx = setupTest();
   ctx.addRun();
-  addPr(ctx.db, 'GEO-9001', 'widgets#12', 'z-delivery');
+  addPR(ctx.db, 'GEO-9001', 'widgets#12', 'z-delivery');
   expect(applyNoteSignals(ctx.db, 'GEO-9001', 'PR #12 is final again at 39f05fe. CI green.', { source: 'test' }).final).toBe('widgets#12');
 });
 
@@ -143,8 +143,8 @@ test('#applyNoteSignals attaches an opened PR and not a merely mentioned one', (
 test('#applyNoteSignals marks nothing final when two PRs are open and the note names neither', () => {
   const ctx = setupTest();
   ctx.addRun();
-  addPr(ctx.db, 'GEO-9001', 'widgets#12', 'z-delivery');
-  addPr(ctx.db, 'GEO-9001', 'widgets#13', 'z-delivery');
+  addPR(ctx.db, 'GEO-9001', 'widgets#12', 'z-delivery');
+  addPR(ctx.db, 'GEO-9001', 'widgets#13', 'z-delivery');
   expect(applyNoteSignals(ctx.db, 'GEO-9001', 'it is final at 39f05fe', { source: 'test' }).final).toBeNull();
 });
 
@@ -255,8 +255,8 @@ test('#findAlerts flags a final PR with no review for 30 min once, then again af
   const ctx = setupTest();
   const sessions = [{ id: 'aaaaaaaa-1111-4111-8111-111111111111', name: 'kettle', alive: true, state: 'running' }];
   ctx.addRun();
-  addPr(ctx.db, 'GEO-9001', 'widgets#12', 'z-delivery');
-  finalPr(ctx.db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
+  addPR(ctx.db, 'GEO-9001', 'widgets#12', 'z-delivery');
+  finalPR(ctx.db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
   at('2026-10-14T01:29:00.000Z');
   expect(findAlerts(ctx.db, sessions, new Map(), new Date('2026-10-14T01:29:00Z'))).toStrictEqual([]);
   at('2026-10-14T01:31:00.000Z');
@@ -272,16 +272,16 @@ test('#findAlerts flags a final PR with no review for 30 min once, then again af
   expect(readOutboxRows(ctx.db).filter((row) => row.target !== 'z-review')).toHaveLength(1);
 });
 
-test('#unfinalPr clears a stale final so the sweep stops, and a new final starts it again', () => {
+test('#unfinalPR clears a stale final so the sweep stops, and a new final starts it again', () => {
   const ctx = setupTest();
   const sessions = [{ id: 'aaaaaaaa-1111-4111-8111-111111111111', name: 'kettle', alive: true, state: 'running' }];
   ctx.addRun();
-  addPr(ctx.db, 'GEO-9001', 'widgets#12', 'z-delivery');
-  expect(() => unfinalPr(ctx.db, 'widgets#12', 'z-delivery', null)).toThrow('has no final mark');
-  finalPr(ctx.db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
+  addPR(ctx.db, 'GEO-9001', 'widgets#12', 'z-delivery');
+  expect(() => unfinalPR(ctx.db, 'widgets#12', 'z-delivery', null)).toThrow('has no final mark');
+  finalPR(ctx.db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
   at('2026-10-14T01:31:00.000Z');
   expect(findAlerts(ctx.db, sessions, new Map(), new Date('2026-10-14T01:31:00Z'))).toHaveLength(1);
-  const unfinalled = unfinalPr(ctx.db, 'widgets#12', 'z-delivery', 'head moved; waits on a release');
+  const unfinalled = unfinalPR(ctx.db, 'widgets#12', 'z-delivery', 'head moved; waits on a release');
   expect([unfinalled.final_sha, unfinalled.final_at, unfinalled.final_source]).toStrictEqual([null, null, null]);
   const [event] = listEvents(ctx.db, 'unfinal');
   invariant(event, 'unfinal logged an event');
@@ -289,19 +289,19 @@ test('#unfinalPr clears a stale final so the sweep stops, and a new final starts
   expect(event.to_state).toBeNull();
   expect(JSON.parse(event.data)).toMatchObject({ ref: 'widgets#12', reason: 'head moved; waits on a release' });
   expect(findAlerts(ctx.db, sessions, new Map(), new Date('2026-10-14T04:20:00Z'))).toStrictEqual([]);
-  finalPr(ctx.db, 'widgets#12', { sha: 'def5678', actor: 'z-delivery' });
+  finalPR(ctx.db, 'widgets#12', { sha: 'def5678', actor: 'z-delivery' });
   at('2026-10-14T05:00:00.000Z');
   expect(findAlerts(ctx.db, sessions, new Map(), new Date('2026-10-14T05:00:00Z'))[0]?.line).toContain('final at def5678');
-  closePr(ctx.db, 'widgets#12', { to: 'merged', actor: 'z-delivery' });
-  expect(() => unfinalPr(ctx.db, 'widgets#12', 'z-delivery', null)).toThrow('is merged');
+  closePR(ctx.db, 'widgets#12', { to: 'merged', actor: 'z-delivery' });
+  expect(() => unfinalPR(ctx.db, 'widgets#12', 'z-delivery', null)).toThrow('is merged');
 });
 
-test('#finalPr tells z-review once for each new final sha, and nothing for the same sha again', () => {
+test('#finalPR tells z-review once for each new final sha, and nothing for the same sha again', () => {
   const ctx = setupTest();
   ctx.addRun();
-  addPr(ctx.db, 'GEO-9001', 'widgets#12', 'z-delivery');
-  finalPr(ctx.db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
-  finalPr(ctx.db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
+  addPR(ctx.db, 'GEO-9001', 'widgets#12', 'z-delivery');
+  finalPR(ctx.db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
+  finalPR(ctx.db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
   const first = readOutboxRows(ctx.db).filter((row) => row.target === 'z-review');
   applyNoteSignals(ctx.db, 'GEO-9001', 'FINAL widgets#12 def5678', { source: 'atc:s1' });
   const pending = readOutboxRows(ctx.db).filter((row) => row.target === 'z-review' && row.status === 'pending');
@@ -313,13 +313,13 @@ test('#finalPr tells z-review once for each new final sha, and nothing for the s
 test('it drops an unsent final notice to z-review on an unfinal, a merge or a close', () => {
   const ctx = setupTest();
   ctx.addRun();
-  addPr(ctx.db, 'GEO-9001', 'widgets#12', 'z-delivery');
-  addPr(ctx.db, 'GEO-9001', 'widgets#13', 'z-delivery');
-  finalPr(ctx.db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
-  finalPr(ctx.db, 'widgets#13', { sha: 'abc5678', actor: 'z-delivery' });
-  unfinalPr(ctx.db, 'widgets#12', 'z-delivery', null);
+  addPR(ctx.db, 'GEO-9001', 'widgets#12', 'z-delivery');
+  addPR(ctx.db, 'GEO-9001', 'widgets#13', 'z-delivery');
+  finalPR(ctx.db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
+  finalPR(ctx.db, 'widgets#13', { sha: 'abc5678', actor: 'z-delivery' });
+  unfinalPR(ctx.db, 'widgets#12', 'z-delivery', null);
   expect(readOutboxRows(ctx.db).filter((row) => row.target === 'z-review').map((row) => row.topic)).toStrictEqual(['final:widgets#13']);
-  closePr(ctx.db, 'widgets#13', { to: 'merged', actor: 'z-review' });
+  closePR(ctx.db, 'widgets#13', { to: 'merged', actor: 'z-review' });
   expect(readOutboxRows(ctx.db).filter((row) => row.target === 'z-review')).toStrictEqual([]);
 });
 
@@ -338,31 +338,31 @@ test('#checkMergedOnGitHub passes only a MERGED PR, and refuses an open or close
   await expect(checkMergedOnGitHub(gh(1, ''), 'widgets#12')).rejects.toThrow("can't confirm widgets#12 merged");
 });
 
-test('#unmergePr puts a wrong merged mark back to open and logs it, keeping the final and review marks', () => {
+test('#unmergePR puts a wrong merged mark back to open and logs it, keeping the final and review marks', () => {
   const ctx = setupTest();
   ctx.addRun();
-  addPr(ctx.db, 'GEO-9001', 'widgets#12', 'z-delivery');
-  finalPr(ctx.db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
-  reviewedPr(ctx.db, 'widgets#12', 'abc1234', { recheck: false, force: false }, 'z-review');
-  expect(() => unmergePr(ctx.db, 'widgets#12', 'z-review', null)).toThrow('is open, not merged');
-  closePr(ctx.db, 'widgets#12', { to: 'merged', actor: 'z-review' });
-  const unmerged = unmergePr(ctx.db, 'widgets#12', 'z-review', 'merge failed on a conflict');
+  addPR(ctx.db, 'GEO-9001', 'widgets#12', 'z-delivery');
+  finalPR(ctx.db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
+  reviewedPR(ctx.db, { raw: 'widgets#12', sha: 'abc1234', recheck: false, force: false }, 'z-review');
+  expect(() => unmergePR(ctx.db, 'widgets#12', 'z-review', null)).toThrow('is open, not merged');
+  closePR(ctx.db, 'widgets#12', { to: 'merged', actor: 'z-review' });
+  const unmerged = unmergePR(ctx.db, 'widgets#12', 'z-review', 'merge failed on a conflict');
   expect(unmerged).toMatchObject({ state: 'open', merged_at: null, final_sha: 'abc1234', reviewed_sha: 'abc1234' });
   const [event] = listEvents(ctx.db, 'unmerged');
   invariant(event, 'unmerge logged an event');
   expect(event).toMatchObject({ from_state: 'merged', to_state: 'open' });
   expect(JSON.parse(event.data)).toMatchObject({ ref: 'widgets#12', reason: 'merge failed on a conflict' });
 
-  finalPr(ctx.db, 'widgets#12', { sha: 'def5678', actor: 'z-delivery' });
+  finalPR(ctx.db, 'widgets#12', { sha: 'def5678', actor: 'z-delivery' });
 });
 
-test('#unmergePr drops the merge commit and the shipment of the wrong merge, and the event keeps them', () => {
+test('#unmergePR drops the merge commit and the shipment of the wrong merge, and the event keeps them', () => {
   const ctx = setupTest();
   ctx.addRun();
-  addPr(ctx.db, 'GEO-9001', 'widgets#12', 'z-delivery');
-  closePr(ctx.db, 'widgets#12', { to: 'merged', actor: 'z-review' });
+  addPR(ctx.db, 'GEO-9001', 'widgets#12', 'z-delivery');
+  closePR(ctx.db, 'widgets#12', { to: 'merged', actor: 'z-review' });
   writeShippedPR(ctx.db, { ref: 'widgets#12', sha: 'c'.repeat(40), tag: 'widgets@1.0.0', at: '2026-10-15T00:00:00Z' });
-  expect(unmergePr(ctx.db, 'widgets#12', 'z-review', 'merged the wrong branch')).toMatchObject({ state: 'open', merge_sha: null, shipped_tag: null, shipped_at: null });
+  expect(unmergePR(ctx.db, 'widgets#12', 'z-review', 'merged the wrong branch')).toMatchObject({ state: 'open', merge_sha: null, shipped_tag: null, shipped_at: null });
   expect(ctx.db.query("SELECT json_extract(data, '$.merge_sha') AS sha, json_extract(data, '$.shipped_tag') AS tag, json_extract(data, '$.shipped_at') AS shipped FROM events WHERE action = 'unmerged'").get()).toStrictEqual({ sha: 'c'.repeat(40), tag: 'widgets@1.0.0', shipped: '2026-10-15T00:00:00Z' });
 });
 
@@ -370,12 +370,12 @@ test('#findAlerts stays silent on a final PR after a recent review start, or a r
   const ctx = setupTest();
   const sessions = [{ id: 'aaaaaaaa-1111-4111-8111-111111111111', name: 'kettle', alive: true, state: 'running' }];
   ctx.addRun();
-  addPr(ctx.db, 'GEO-9001', 'widgets#12', 'z-delivery');
-  finalPr(ctx.db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
+  addPR(ctx.db, 'GEO-9001', 'widgets#12', 'z-delivery');
+  finalPR(ctx.db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
   at('2026-10-14T01:31:00.000Z');
   reviewStarted(ctx.db, 'widgets#12', 'z-delivery');
   expect(findAlerts(ctx.db, sessions, new Map(), new Date('2026-10-14T01:40:00Z'))).toStrictEqual([]);
-  reviewedPr(ctx.db, 'widgets#12', 'abc1234', { recheck: false, force: false }, 'z-delivery');
+  reviewedPR(ctx.db, { raw: 'widgets#12', sha: 'abc1234', recheck: false, force: false }, 'z-delivery');
   expect(findAlerts(ctx.db, sessions, new Map(), new Date('2026-10-14T04:20:00Z'))).toStrictEqual([]);
 });
 
@@ -383,11 +383,11 @@ test('#findAlerts counts a short final sha and a full reviewed sha of the same c
   const ctx = setupTest();
   const sessions = [{ id: 'aaaaaaaa-1111-4111-8111-111111111111', name: 'kettle', alive: true, state: 'running' }];
   ctx.addRun();
-  addPr(ctx.db, 'GEO-9001', 'widgets#12', 'z-delivery');
-  finalPr(ctx.db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
-  reviewedPr(ctx.db, 'widgets#12', 'abc1234def5678abc1234def5678abc1234def56', { recheck: false, force: false }, 'z-delivery');
+  addPR(ctx.db, 'GEO-9001', 'widgets#12', 'z-delivery');
+  finalPR(ctx.db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
+  reviewedPR(ctx.db, { raw: 'widgets#12', sha: 'abc1234def5678abc1234def5678abc1234def56', recheck: false, force: false }, 'z-delivery');
   expect(findAlerts(ctx.db, sessions, new Map(), new Date('2026-10-14T01:31:00Z'))).toStrictEqual([]);
-  finalPr(ctx.db, 'widgets#12', { sha: 'abc1234def', actor: 'z-delivery' });
+  finalPR(ctx.db, 'widgets#12', { sha: 'abc1234def', actor: 'z-delivery' });
   expect(findAlerts(ctx.db, sessions, new Map(), new Date('2026-10-14T01:31:00Z'))).toStrictEqual([]);
 });
 
@@ -395,8 +395,8 @@ test('#findAlerts does not flag the unreviewed final PR of a blocked run', () =>
   const ctx = setupTest();
   const sessions = [{ id: 'aaaaaaaa-1111-4111-8111-111111111111', name: 'kettle', alive: true, state: 'running' }];
   ctx.addRun();
-  addPr(ctx.db, 'GEO-9001', 'widgets#12', 'z-delivery');
-  finalPr(ctx.db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
+  addPR(ctx.db, 'GEO-9001', 'widgets#12', 'z-delivery');
+  finalPR(ctx.db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
   setState(ctx.db, 'GEO-9001', 'blocked', { waitsOn: 'a gadgets release' }, 'z-delivery');
   expect(findAlerts(ctx.db, sessions, new Map(), new Date('2026-10-14T01:31:00Z'))).toStrictEqual([]);
   setState(ctx.db, 'GEO-9001', 'working', {}, 'z-delivery');
@@ -406,9 +406,9 @@ test('#findAlerts does not flag the unreviewed final PR of a blocked run', () =>
 test('#findAlerts flags a head that moved after the review as moved', () => {
   const ctx = setupTest();
   ctx.addRun();
-  addPr(ctx.db, 'GEO-9001', 'widgets#12', 'z-delivery');
-  reviewedPr(ctx.db, 'widgets#12', 'abc1234', { recheck: false, force: false }, 'z-delivery');
-  finalPr(ctx.db, 'widgets#12', { sha: 'def5678', actor: 'z-delivery' });
+  addPR(ctx.db, 'GEO-9001', 'widgets#12', 'z-delivery');
+  reviewedPR(ctx.db, { raw: 'widgets#12', sha: 'abc1234', recheck: false, force: false }, 'z-delivery');
+  finalPR(ctx.db, 'widgets#12', { sha: 'def5678', actor: 'z-delivery' });
   expect(findAlerts(ctx.db, [{ id: 'aaaaaaaa-1111-4111-8111-111111111111', name: 'kettle', alive: true, state: 'running' }], new Map(), new Date('2026-10-14T01:31:00Z'))[0]?.line).toContain('head moved since your review at abc1234');
 });
 
@@ -416,14 +416,14 @@ test('#findAlerts does not flag an exited session whose PR is final and reviewed
   const ctx = setupTest();
   ctx.addRun();
   const gone = [{ id: 'aaaaaaaa-1111-4111-8111-111111111111', name: 'kettle', alive: false, state: 'exited' }];
-  addPr(ctx.db, 'GEO-9001', 'widgets#12', 'z-delivery');
+  addPR(ctx.db, 'GEO-9001', 'widgets#12', 'z-delivery');
   expect(findAlerts(ctx.db, gone, new Map(), new Date(NOON_SYDNEY))[0]?.line).toContain('has exited');
-  finalPr(ctx.db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
+  finalPR(ctx.db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
   expect(findAlerts(ctx.db, gone, new Map(), new Date(NOON_SYDNEY))[0]?.line).toContain('has exited');
-  reviewedPr(ctx.db, 'widgets#12', 'abc1234', { recheck: false, force: false }, 'z-delivery');
+  reviewedPR(ctx.db, { raw: 'widgets#12', sha: 'abc1234', recheck: false, force: false }, 'z-delivery');
   expect(findAlerts(ctx.db, gone, new Map(), new Date(NOON_SYDNEY))).toStrictEqual([]);
 
-  finalPr(ctx.db, 'widgets#12', { sha: 'def5678', actor: 'z-delivery' });
+  finalPR(ctx.db, 'widgets#12', { sha: 'def5678', actor: 'z-delivery' });
   expect(findAlerts(ctx.db, gone, new Map(), new Date(NOON_SYDNEY)).map((alert) => alert.line).join('\n')).toContain('has exited');
 });
 
@@ -441,9 +441,9 @@ test('#findAlerts flags an exited session, and a quiet one unless the owner chat
 test('#findAlerts never flags a merged PR or a closed row', () => {
   const ctx = setupTest();
   ctx.addRun();
-  addPr(ctx.db, 'GEO-9001', 'widgets#12', 'z-delivery');
-  finalPr(ctx.db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
-  closePr(ctx.db, 'widgets#12', { to: 'merged', actor: 'z-delivery' });
+  addPR(ctx.db, 'GEO-9001', 'widgets#12', 'z-delivery');
+  finalPR(ctx.db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
+  closePR(ctx.db, 'widgets#12', { to: 'merged', actor: 'z-delivery' });
   setState(ctx.db, 'GEO-9001', 'merged', { waitsOn: 'release' }, 'z-delivery');
   expect(findAlerts(ctx.db, [{ id: 'aaaaaaaa-1111-4111-8111-111111111111', name: 'kettle', alive: true, state: 'done' }], new Map([['aaaaaaaa-1111-4111-8111-111111111111', 0]]), new Date('2026-10-14T09:20:00Z'))).toStrictEqual([]);
 });
@@ -479,8 +479,8 @@ test('#sweep sends an undelivered alert along with a new one', () => {
   const ctx = setupTest();
   ctx.addRun();
   ctx.addRun('GEO-9002', 'bbbbbbbb-2222-4222-8222-222222222222');
-  addPr(ctx.db, 'GEO-9001', 'widgets#12', 'z-delivery');
-  finalPr(ctx.db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
+  addPR(ctx.db, 'GEO-9001', 'widgets#12', 'z-delivery');
+  finalPR(ctx.db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
   const kettle = { id: 'aaaaaaaa-1111-4111-8111-111111111111', name: 'kettle', alive: true, state: 'running' };
   const toaster = { id: 'bbbbbbbb-2222-4222-8222-222222222222', name: 'toaster', alive: true, state: 'running' };
   at('2026-10-14T01:31:00.000Z');
@@ -498,7 +498,7 @@ test('#sweep sends an undelivered alert along with a new one', () => {
 test("#applyNoteSignals never marks this row's PR final from a note about another repo's PR", () => {
   const ctx = setupTest();
   ctx.addRun();
-  addPr(ctx.db, 'GEO-9001', 'widgets#12', 'z-delivery');
+  addPR(ctx.db, 'GEO-9001', 'widgets#12', 'z-delivery');
   expect(applyNoteSignals(ctx.db, 'GEO-9001', 'gadgets#99 is final at abc1234', { source: 'test' }).final).toBeNull();
   expect(listRuns(ctx.db)[0]?.prs[0]?.final_sha).toBeNull();
 });
@@ -525,8 +525,8 @@ test('#ingestNotes reads the whole new feed from its oldest event when it recove
 test('#applyNoteSignals marks nothing from a phrase in a note that names a foreign PR', () => {
   const ctx = setupTest();
   ctx.addRun();
-  addPr(ctx.db, 'GEO-9001', 'widgets#12', 'z-delivery');
-  addPr(ctx.db, 'GEO-9001', 'widgets#13', 'z-delivery');
+  addPR(ctx.db, 'GEO-9001', 'widgets#12', 'z-delivery');
+  addPR(ctx.db, 'GEO-9001', 'widgets#13', 'z-delivery');
   expect(applyNoteSignals(ctx.db, 'GEO-9001', 'Rebased widgets#12. gadgets#99 is final at abc1234', { source: 'test' }).final).toBeNull();
   expect(listRuns(ctx.db)[0]?.prs.every((pr) => pr.final_sha === null)).toBe(true);
   expect(applyNoteSignals(ctx.db, 'GEO-9001', 'widgets#13 is final at abc1234', { source: 'test' }).final).toBe('widgets#13');

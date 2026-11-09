@@ -3,7 +3,7 @@ import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createUnblockItems } from '../../test/create-unblock-items.ts';
 import { buildMockSha } from '../../test/build-mock-sha.ts';
-import { closePr } from '../runs/close-pr.ts';
+import { closePR } from '../runs/close-pr.ts';
 import { reviewStarted } from '../runs/review-started.ts';
 import { writeReviewed } from '../runs/write-reviewed.ts';
 import { at, freshDb } from '../../test/helpers.ts';
@@ -112,7 +112,7 @@ test('reviews counts open PRs whose review started in the last 24 hours and has 
   at('2026-10-15T00:30:00Z');
   reviewStarted(ctx.db, 'kettle#41', 'kettle-bot');
   reviewStarted(ctx.db, 'kettle#43', 'kettle-bot');
-  closePr(ctx.db, 'kettle#43', { to: 'closed', actor: 'kettle-bot' });
+  closePR(ctx.db, 'kettle#43', { to: 'closed', actor: 'kettle-bot' });
 
   await expect(loadBand(ctx.db, ctx.pacing, new Date('2026-10-15T01:00:00Z')).then((band) => band.segments[4])).resolves.toStrictEqual({ key: 'reviews', text: 'reviews 1', tone: 'ok' });
 });

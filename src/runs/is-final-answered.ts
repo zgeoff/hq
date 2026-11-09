@@ -1,7 +1,7 @@
 import { sameSha } from './same-sha.ts';
-import type { RunPr } from './types.ts';
+import type { RunPR } from './types.ts';
 
-export type FinalMarks = Pick<RunPr, 'final_sha' | 'final_at' | 'review_started_at' | 'reviewed_sha' | 'reviewed_at'>;
+export type FinalMarks = Pick<RunPR, 'final_sha' | 'final_at' | 'review_started_at' | 'reviewed_sha' | 'reviewed_at'>;
 
 // hq keeps no commit order, so time decides when the shas differ. The marks keep whole seconds, so
 // a review in the FINAL's own second may have come first: it counts not.

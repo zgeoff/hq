@@ -72,14 +72,14 @@ import { checkLanesBuild } from './lanes/check-lanes-build.ts';
 import { rolesByName } from './roles/roles-by-name.ts';
 import { withStaleBuild } from './roles/with-stale-build.ts';
 import { addNote } from './runs/add-note.ts';
-import { addOwnedPr } from './runs/add-owned-pr.ts';
-import { addPr } from './runs/add-pr.ts';
+import { addOwnedPR } from './runs/add-owned-pr.ts';
+import { addPR } from './runs/add-pr.ts';
 import { addRun } from './runs/add-run.ts';
 import { checkMergedOnGitHub } from './runs/check-merged-on-github.ts';
 import { readMergedPR } from './runs/read-merged-pr.ts';
-import { closePr } from './runs/close-pr.ts';
+import { closePR } from './runs/close-pr.ts';
 import { PR_REF } from './runs/pr-ref.ts';
-import { finalPr } from './runs/final-pr.ts';
+import { finalPR } from './runs/final-pr.ts';
 import { makeFinalResolver } from './runs/make-final-resolver.ts';
 import { resolveCliFinal } from './runs/resolve-cli-final.ts';
 import { resolveNoteFinals } from './runs/resolve-note-finals.ts';
@@ -90,7 +90,7 @@ import { listRuns } from './runs/list-runs.ts';
 import { notesFor } from './runs/notes-for.ts';
 import { resolveRun } from './runs/resolve-run.ts';
 import { reviewStarted } from './runs/review-started.ts';
-import { reviewedPr } from './runs/reviewed-pr.ts';
+import { reviewedPR } from './runs/reviewed-pr.ts';
 import { buildRunPRView } from './runs/build-run-pr-view.ts';
 import { findActiveReviewWait } from './runs/find-active-review-wait.ts';
 import { formatReviewWait } from './runs/format-review-wait.ts';
@@ -105,8 +105,8 @@ import { sweepNow } from './runs/sweep-now.ts';
 import type { RunView, WrapUp } from './runs/types.ts';
 import { requireLiveCheck } from './runs/require-live-check.ts';
 import { setReviewWait } from './runs/set-review-wait.ts';
-import { unfinalPr } from './runs/unfinal-pr.ts';
-import { unmergePr } from './runs/unmerge-pr.ts';
+import { unfinalPR } from './runs/unfinal-pr.ts';
+import { unmergePR } from './runs/unmerge-pr.ts';
 import { viewRun } from './runs/view-run.ts';
 import { watchlist } from './runs/watchlist.ts';
 import { boundedRunner } from './runner/bounded-runner.ts';
@@ -2249,7 +2249,7 @@ async function runCommand(context: Ctx): Promise<Out> {
       const text = [
         r.moved.length ? `${head}:` : `${r.dryRun ? 'Would move' : 'Moved'} nothing.`,
         ...r.moved.map((move) => `  ${move.issue} -> ${move.to}: ${move.prs.map((pr) => `${pr.ref} ${formatShippedAt(pr.tag)} (${pr.shipped_at})`).join(', ')}`),
-        `${r.shippedPrs} PR(s) ${r.dryRun ? 'found' : 'newly marked'} shipped; ${r.compares} compare call(s)${r.deferred ? `; ${r.deferred} PR(s) left for the next pass` : ''}.`,
+        `${r.shippedPRs} PR(s) ${r.dryRun ? 'found' : 'newly marked'} shipped; ${r.compares} compare call(s)${r.deferred ? `; ${r.deferred} PR(s) left for the next pass` : ''}.`,
         ...r.held.map((issue) => `  left held: ${issue} was put in deploy-held after the release that holds its PRs`),
         ...r.busy.map((left) => `  left: ${left.issue} has session ${left.session.slice(0, 8)} still active`),
         ...r.errors.map((e) => `  error: ${e}`),
@@ -2292,19 +2292,20 @@ async function runCommand(context: Ctx): Promise<Out> {
       const issue = arg(0, 'issue');
       const ref = arg(1, 'pr (repo#n or URL)');
       const named = flags.session;
-      const pr = named === undefined ? addPr(db, issue, ref, attachedBy) : addOwnedPr(db, issue, ref, { actor: attachedBy, session: named });
+      const pr = named === undefined ? addPR(db, issue, ref, attachedBy) : addOwnedPR(db, issue, ref, { actor: attachedBy, session: named });
       return { data: { pr }, text: runLine(view(pr.issue)) };
     })
     .with('final', async () => {
       const sha = need(flags.sha, 'sha');
       const resolution = await resolveCliFinal(makeFinalResolver(boundedRunner(run, CALL_MS)), arg(0, 'pr'), sha);
       const finalizer = await by();
-      const finalized = finalPr(db, arg(0, 'pr'), { sha, actor: finalizer, tally: { fixed: parseFixed(flags.fixed), followups: parseFollowups(flags.followups) }, resolution });
+      const finalized = finalPR(db, arg(0, 'pr'), { sha, actor: finalizer, tally: { fixed: parseFixed(flags.fixed), followups: parseFollowups(flags.followups) }, resolution });
       return { data: { pr: finalized }, text: runLine(view(finalized.issue)) };
     })
     .with('unfinal', async () => {
-      const p = unfinalPr(db, arg(0, 'pr'), await by(), flags.reason ?? null);
-      return { data: { pr: p }, text: runLine(view(p.issue)) };
+      const unfinalizer = await by();
+      const unfinalized = unfinalPR(db, arg(0, 'pr'), unfinalizer, flags.reason ?? null);
+      return { data: { pr: unfinalized }, text: runLine(view(unfinalized.issue)) };
     })
     .with('review-wait', async () => {
       if (flags.clear && (flags.until !== undefined || flags.reason !== undefined)) {
@@ -2320,13 +2321,15 @@ async function runCommand(context: Ctx): Promise<Out> {
       return { data: { pr: p }, text: runLine(view(p.issue)) };
     })
     .with('reviewed', async () => {
-      const p = reviewedPr(db, arg(0, 'pr'), need(flags.sha, 'sha'), { recheck: !!flags.recheck, force: !!flags.force }, await by());
-      return { data: { pr: p }, text: `${runLine(view(p.issue))}
-Round ${p.review_round} recorded at ${p.reviewed_sha}.` };
+      const reviewer = await by();
+      const reviewed = reviewedPR(db, { raw: arg(0, 'pr'), sha: need(flags.sha, 'sha'), recheck: Boolean(flags.recheck), force: Boolean(flags.force) }, reviewer);
+      return { data: { pr: reviewed }, text: `${runLine(view(reviewed.issue))}
+Round ${reviewed.review_round} recorded at ${reviewed.reviewed_sha}.` };
     })
     .with('unmerge', async () => {
-      const p = unmergePr(db, arg(0, 'pr'), await by(), flags.reason ?? null);
-      return { data: { pr: p }, text: runLine(view(p.issue)) };
+      const unmerger = await by();
+      const unmerged = unmergePR(db, arg(0, 'pr'), unmerger, flags.reason ?? null);
+      return { data: { pr: unmerged }, text: runLine(view(unmerged.issue)) };
     })
     .with('merged', 'closed', async (to) => {
       // The watcher may have marked it merged already: the call then succeeds and changes nothing.
@@ -2349,7 +2352,7 @@ Round ${p.review_round} recorded at ${p.reviewed_sha}.` };
       if (supersededBy !== undefined) {
         await checkMergedOnGitHub(boundedRunner(realRunner, CALL_MS), supersededBy);
       }
-      const closed = closePr(db, arg(0, 'pr'), { to, actor: await by(), supersededBy });
+      const closed = closePR(db, arg(0, 'pr'), { to, actor: await by(), supersededBy });
       return { data: { pr: closed }, text: runLine(view(closed.issue)) };
     })
     .with('note', async () => {

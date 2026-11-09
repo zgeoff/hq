@@ -14,7 +14,7 @@ import { writeIssues as store } from './write-issues.ts';
 const WantedIssueSchema = z.object({ issue: z.string() });
 const IssuesSchema = z.object({ issues: z.object({ nodes: z.array(NodeSchema) }) });
 
-export async function syncPrIssues(db: Database, call: LinearCall, max = 200): Promise<number> {
+export async function syncPRIssues(db: Database, call: LinearCall, max = 200): Promise<number> {
   const wantQuery = sql`SELECT DISTINCT p.issue FROM merged_prs p LEFT JOIN linear_issues l ON l.issue = p.issue WHERE p.issue IS NOT NULL AND l.issue IS NULL AND p.repo IN ${sql.raw(IN_SQL)} LIMIT ${max}`.compile(kdb(db));
   const want = runSyncQuery(db, wantQuery, WantedIssueSchema).map((row) => row.issue);
   let n = 0;

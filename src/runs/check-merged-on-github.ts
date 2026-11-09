@@ -2,14 +2,14 @@ import { z } from 'zod';
 import { HqError } from '../errors.ts';
 import type { Runner } from '../runner/types.ts';
 import { cleanEnv } from '../runner/clean-env.ts';
-import { normalizePrRef } from './normalize-pr-ref.ts';
+import { normalizePRRef } from './normalize-pr-ref.ts';
 
 const StateSchema = z.object({ state: z.unknown() });
 
 // A `gh pr merge` that failed on a conflict once left a PR open on GitHub but merged in hq, and
 // nothing could undo it.
 export async function checkMergedOnGitHub(run: Runner, raw: string): Promise<void> {
-  const { ref } = normalizePrRef(raw);
+  const ref = normalizePRRef(raw).ref;
   const [repo = '', prNumber = ''] = ref.split('#');
   const result = await run(['gh', 'pr', 'view', prNumber, '-R', `zgeoff/${repo}`, '--json', 'state,mergedAt'], { env: cleanEnv() });
   if (result.code !== 0) {

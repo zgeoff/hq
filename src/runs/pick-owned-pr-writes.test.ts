@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { pickOwnedPrWrites } from './pick-owned-pr-writes.ts';
+import { pickOwnedPRWrites } from './pick-owned-pr-writes.ts';
 
 test.each([
   {
@@ -39,5 +39,5 @@ test.each([
     expected: { kind: 'no-session' },
   },
 ])('it picks the writes for $title', (row) => {
-  expect(pickOwnedPrWrites({ existing: row.existing, sessionIDs: ['0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', '0000d002-aaaa-4aaa-8aaa-aaaaaaaaaaaa'], given: row.given })).toStrictEqual(row.expected);
+  expect(pickOwnedPRWrites({ existing: row.existing, sessionIDs: ['0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', '0000d002-aaaa-4aaa-8aaa-aaaaaaaaaaaa'], given: row.given })).toStrictEqual(row.expected);
 });

@@ -10,19 +10,19 @@ import { closeAsk } from '../src/asks/close-ask.ts';
 import { laterAsk } from '../src/asks/later-ask.ts';
 import { openAsk } from '../src/asks/open-ask.ts';
 import { skipAsk } from '../src/asks/skip-ask.ts';
-import { addPr } from '../src/runs/add-pr.ts';
+import { addPR } from '../src/runs/add-pr.ts';
 import { addRun } from '../src/runs/add-run.ts';
-import { closePr } from '../src/runs/close-pr.ts';
-import { finalPr } from '../src/runs/final-pr.ts';
+import { closePR } from '../src/runs/close-pr.ts';
+import { finalPR } from '../src/runs/final-pr.ts';
 import { setState } from '../src/runs/set-state.ts';
-import { unfinalPr } from '../src/runs/unfinal-pr.ts';
-import { unmergePr } from '../src/runs/unmerge-pr.ts';
+import { unfinalPR } from '../src/runs/unfinal-pr.ts';
+import { unmergePR } from '../src/runs/unmerge-pr.ts';
 import { isOneOf } from '@zgeoff/std';
 import { collectKeys } from '../src/test-utils/collect-keys.ts';
 import { ASK_STATES } from '../src/transitions/ask-states.ts';
 import { ASK_TRANSITIONS } from '../src/transitions/ask-transitions.ts';
 import { checkAsk } from '../src/transitions/check-ask.ts';
-import { checkPr } from '../src/transitions/check-pr.ts';
+import { checkPR } from '../src/transitions/check-pr.ts';
 import { checkRun } from '../src/transitions/check-run.ts';
 import { PR_STATES } from '../src/transitions/pr-states.ts';
 import { PR_TRANSITIONS } from '../src/transitions/pr-transitions.ts';
@@ -75,11 +75,11 @@ test.each(collectKeys(RUN_TRANSITIONS))('#checkRun refuses %s between exactly th
   }
 });
 
-test.each(collectKeys(PR_TRANSITIONS))('#checkPr refuses %s from exactly the states the table leaves out', (action) => {
+test.each(collectKeys(PR_TRANSITIONS))('#checkPR refuses %s from exactly the states the table leaves out', (action) => {
   const ctx = setupTest();
   for (const from of PR_STATES) {
     const allowed = isOneOf(from, PR_TRANSITIONS[action].from);
-    expect([action, from, ctx.isBadState(() => checkPr('x#1', action, from))]).toStrictEqual([action, from, !allowed]);
+    expect([action, from, ctx.isBadState(() => checkPR('x#1', action, from))]).toStrictEqual([action, from, !allowed]);
   }
 });
 
@@ -149,23 +149,23 @@ test('#setState moves an open run to any state, its own included', () => {
   }
 });
 
-test('#unmergePr refuses an open PR', () => {
+test('#unmergePR refuses an open PR', () => {
   const ctx = setupTest();
   at(NOON_SYDNEY);
   ctx.addRun();
-  addPr(ctx.db, 'GEO-9100', 'hq#901', 'z-delivery');
-  expect(() => unmergePr(ctx.db, 'hq#901', 'z-review', null)).toThrow('hq#901 is open, not merged');
+  addPR(ctx.db, 'GEO-9100', 'hq#901', 'z-delivery');
+  expect(() => unmergePR(ctx.db, 'hq#901', 'z-review', null)).toThrow('hq#901 is open, not merged');
 });
 
 test('it refuses final, unfinal and close on a merged PR', () => {
   const ctx = setupTest();
   at(NOON_SYDNEY);
   ctx.addRun();
-  addPr(ctx.db, 'GEO-9100', 'hq#902', 'z-delivery');
-  closePr(ctx.db, 'hq#902', { to: 'merged', actor: 'z-review' });
-  expect(() => finalPr(ctx.db, 'hq#902', { sha: 'abcdef1', actor: 'z-delivery' })).toThrow('hq#902 is merged');
-  expect(() => unfinalPr(ctx.db, 'hq#902', 'z-delivery', null)).toThrow('hq#902 is merged');
-  expect(() => closePr(ctx.db, 'hq#902', { to: 'closed', actor: 'z-review' })).toThrow('hq#902 is merged');
+  addPR(ctx.db, 'GEO-9100', 'hq#902', 'z-delivery');
+  closePR(ctx.db, 'hq#902', { to: 'merged', actor: 'z-review' });
+  expect(() => finalPR(ctx.db, 'hq#902', { sha: 'abcdef1', actor: 'z-delivery' })).toThrow('hq#902 is merged');
+  expect(() => unfinalPR(ctx.db, 'hq#902', 'z-delivery', null)).toThrow('hq#902 is merged');
+  expect(() => closePR(ctx.db, 'hq#902', { to: 'closed', actor: 'z-review' })).toThrow('hq#902 is merged');
 });
 
 test('it adds, updates, closes done, and reopens an unblock item after done or dropped', () => {

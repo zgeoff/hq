@@ -1,7 +1,7 @@
 import { THIN } from '../stats/thin.ts';
 import { bandOf } from './band-of.ts';
 import { SIZES } from './sizes.ts';
-import type { PrFacts, SizeRow, SizeStats, SizedRun } from './types.ts';
+import type { PRFacts, SizeRow, SizeStats, SizedRun } from './types.ts';
 import { buildRecord } from '../build-record.ts';
 
 const median = (xs: number[]) => {
@@ -9,7 +9,7 @@ const median = (xs: number[]) => {
   return s.length ? (s.length % 2 ? s[(s.length - 1) / 2]! : (s[s.length / 2 - 1]! + s[s.length / 2]!) / 2) : null;
 };
 
-export function sizeStats(runs: SizedRun[], facts: Record<string, PrFacts>): SizeStats {
+export function sizeStats(runs: SizedRun[], facts: Record<string, PRFacts>): SizeStats {
   const rows: SizeRow[] = [];
   let unread = 0;
   let unsized = 0;

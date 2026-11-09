@@ -1,9 +1,9 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { freshDb } from '../../test/helpers.ts';
 import { writeIssues } from '../linear/write-issues.ts';
-import { addPr } from './add-pr.ts';
+import { addPR } from './add-pr.ts';
 import { addRun } from './add-run.ts';
-import { closePr } from './close-pr.ts';
+import { closePR } from './close-pr.ts';
 import { dropCanceledRuns } from './drop-canceled-runs.ts';
 import { setState } from './set-state.ts';
 
@@ -25,8 +25,8 @@ test('it drops a canceled run with no open or merged PR, notes why, and tells z-
   const ctx = setupTest();
   ctx.addKettleRun('GEO-9841', 'canceled');
   ctx.addKettleRun('GEO-9842', 'canceled');
-  addPr(ctx.db, 'GEO-9842', 'kettle#42', 'kettle-bot');
-  closePr(ctx.db, 'kettle#42', { to: 'closed', actor: 'kettle-bot' });
+  addPR(ctx.db, 'GEO-9842', 'kettle#42', 'kettle-bot');
+  closePR(ctx.db, 'kettle#42', { to: 'closed', actor: 'kettle-bot' });
 
   const dropped = dropCanceledRuns(ctx.db, 'hq-lanes', '2026-10-21T02:00:00Z');
 
@@ -46,10 +46,10 @@ test('it drops a canceled run with no open or merged PR, notes why, and tells z-
 test('it keeps a canceled run with an open or merged PR, and every run whose issue is open or done', () => {
   const ctx = setupTest();
   ctx.addKettleRun('GEO-9851', 'canceled');
-  addPr(ctx.db, 'GEO-9851', 'kettle#51', 'kettle-bot');
+  addPR(ctx.db, 'GEO-9851', 'kettle#51', 'kettle-bot');
   ctx.addKettleRun('GEO-9852', 'canceled');
-  addPr(ctx.db, 'GEO-9852', 'kettle#52', 'kettle-bot');
-  closePr(ctx.db, 'kettle#52', { to: 'merged', actor: 'kettle-bot' });
+  addPR(ctx.db, 'GEO-9852', 'kettle#52', 'kettle-bot');
+  closePR(ctx.db, 'kettle#52', { to: 'merged', actor: 'kettle-bot' });
   ctx.addKettleRun('GEO-9853', 'open');
   ctx.addKettleRun('GEO-9854', 'completed');
 
@@ -70,8 +70,8 @@ test('it waits for a GitHub pass that ran after the cancellation before it drops
 test('it drops a canceled build run whose only merged PR is its design pass PR, after a GitHub read', () => {
   const ctx = setupTest();
   addRun(ctx.db, { issue: 'GEO-9848', title: 'Design the kettle spout', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', design: 'agent', actor: 'kettle-bot' });
-  addPr(ctx.db, 'GEO-9848', 'kettle#48', 'kettle-bot');
-  closePr(ctx.db, 'kettle#48', { to: 'merged', actor: 'kettle-bot' });
+  addPR(ctx.db, 'GEO-9848', 'kettle#48', 'kettle-bot');
+  closePR(ctx.db, 'kettle#48', { to: 'merged', actor: 'kettle-bot' });
   setState(ctx.db, 'GEO-9848', 'done', { note: 'design settled' }, 'kettle-bot');
   addRun(ctx.db, { issue: 'GEO-9848', title: 'Build the kettle spout', place: 'imp', session: null, next: 'Building.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
   writeIssues(ctx.db, [{ issue: 'GEO-9848', type: 'none', title: 'Build the kettle spout', state: 'canceled', closed_at: '2026-10-21T01:02:03Z' }]);

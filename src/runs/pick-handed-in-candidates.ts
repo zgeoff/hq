@@ -1,6 +1,6 @@
 import type { StoredEvent } from '../read-events.ts';
 
-interface HandedInPr {
+interface HandedInPR {
   issue: string;
   state: string;
   final_sha: string | null;
@@ -14,7 +14,7 @@ export interface HandedInSessionRow {
 }
 
 export interface HandedInFactsRead {
-  prs: readonly HandedInPr[];
+  prs: readonly HandedInPR[];
   sessions: readonly HandedInSessionRow[];
   lastKept: ReadonlyMap<string, StoredEvent | null>;
 }
@@ -40,7 +40,7 @@ export function pickHandedInCandidates(facts: HandedInFactsRead, at: Date, quiet
   return candidates;
 }
 
-function hasHandedInPRs(prs: readonly HandedInPr[], quietBefore: number): boolean {
+function hasHandedInPRs(prs: readonly HandedInPR[], quietBefore: number): boolean {
   const merged = prs.filter((row) => row.state === 'merged');
   return merged.length > 0 && merged.length === prs.length && merged.every((row) => row.final_sha !== null && Date.parse(row.merged_at ?? '') <= quietBefore);
 }

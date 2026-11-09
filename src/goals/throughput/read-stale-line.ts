@@ -3,7 +3,7 @@ import { match } from 'ts-pattern';
 import { z } from 'zod';
 import { pickStaleKind } from '../../linear/pick-stale-kind.ts';
 import type { StaleKind } from '../../linear/pick-stale-kind.ts';
-import { readStartedPrs } from '../../linear/read-started-prs.ts';
+import { readStartedPRs } from '../../linear/read-started-prs.ts';
 import { findUnreadLine } from './find-unread-line.ts';
 import { formatItemList } from './format-item-list.ts';
 import type { ThroughputAlert, ThroughputLine } from './types.ts';
@@ -45,7 +45,7 @@ function readUnrunItems(db: Database): StaleItem[] {
        ORDER BY s.issue`,
     )
     .all();
-  const prs = readStartedPrs(db);
+  const prs = readStartedPRs(db);
   return z
     .array(startedRowSchema)
     .parse(rows)
