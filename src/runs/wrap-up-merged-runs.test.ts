@@ -1,7 +1,10 @@
 import { expect, mock, onTestFinished, test } from 'bun:test';
 import { buildStubFleetClient } from '../../test/build-stub-fleet-client.ts';
 import { freshDb } from '../../test/helpers.ts';
+import { overrideEnv } from '../config/override-env.ts';
 import type { FleetClient, StaleOps } from '../fleet/types.ts';
+import { now } from '../clock/now.ts';
+import { claimHandedInRun } from './claim-handed-in-run.ts';
 import type { ImpWork } from './types.ts';
 import { addPr } from './add-pr.ts';
 import { addRun } from './add-run.ts';
@@ -438,6 +441,7 @@ test('it gives no retry when the first check failed for another reason', async (
 
 test('it gives no retry more than 10 minutes after the merge', async () => {
   const ctx = setupTest();
+  onTestFinished(overrideEnv('HQ_NOW', '2026-10-22T12:00:00Z'));
   addRun(ctx.db, { issue: 'GEO-9914', title: 'Invented kettle descaler', place: 'imp', session: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
   addPr(ctx.db, 'GEO-9914', 'kettle#1', 'z-delivery');
   closePr(ctx.db, 'kettle#1', { to: 'merged', actor: 'z-delivery' });
@@ -448,7 +452,9 @@ test('it gives no retry more than 10 minutes after the merge', async () => {
   const deps = { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.resolve(answers.shift() ?? { state: 'unknown' as const, detail: 'no answer scripted' }), readLocalWork: () => Promise.reject(new Error('an imp run checks no local work')) };
   await wrapUpMergedRuns(ctx.db, deps, { actor: 'sweep' });
   answers.push({ state: 'pushed' });
-  ctx.db.query("UPDATE events SET at = '2020-01-01T00:00:00.000Z' WHERE subject = 'run' AND subject_id = ? AND action = 'state' AND to_state = 'merged'").run('GEO-9914');
+
+  // The restore registered above puts back the value from before the test.
+  overrideEnv('HQ_NOW', '2026-10-22T12:11:00Z');
 
   const retried = await wrapUpMergedRuns(ctx.db, deps, { actor: 'sweep' });
 
@@ -495,4 +501,79 @@ test('it runs a retry once when two sweeps race for it', async () => {
 
   expect(left.length + right.length).toBe(1);
   expect(ctx.db.query("SELECT COUNT(*) AS count FROM events WHERE subject_id = 'GEO-9916' AND action = 'merged-wrap-up-retry'").get()).toStrictEqual({ count: 1 });
+});
+
+test('it gives no retry while a fresh handed-in claim holds the run', async () => {
+  const ctx = setupTest();
+  addRun(ctx.db, { issue: 'GEO-9921', title: 'Invented kettle descaler', place: 'imp', session: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
+  addPr(ctx.db, 'GEO-9921', 'kettle#1', 'z-delivery');
+  closePr(ctx.db, 'kettle#1', { to: 'merged', actor: 'z-delivery' });
+  setState(ctx.db, 'GEO-9921', 'merged', {}, 'z-delivery');
+  const fleet = buildStubFleetClient({ sessions: [{ id: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, cwd: '/workspace/kettle' }], forgets: { '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa': [{ forgotten: false, confirmToken: 'token-kettle' }] } });
+  const ramUnknown = { state: 'unknown' as const, detail: 'the check in home-0000a001aaaa4aaa8aaa exited 1: imp: RAM_BUDGET_EXCEEDED: not enough 2 MiB pages', retry: true as const };
+  const answers: ImpWork[] = [ramUnknown];
+  const deps = { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.resolve(answers.shift() ?? { state: 'unknown' as const, detail: 'no answer scripted' }), readLocalWork: () => Promise.reject(new Error('an imp run checks no local work')) };
+  await wrapUpMergedRuns(ctx.db, deps, { actor: 'sweep' });
+  answers.push({ state: 'pushed' });
+  claimHandedInRun(ctx.db, 'GEO-9921', 'other-sweep', now());
+
+  const retried = await wrapUpMergedRuns(ctx.db, deps, { actor: 'sweep' });
+
+  expect(retried).toStrictEqual([]);
+  expect(ctx.db.query("SELECT COUNT(*) AS count FROM events WHERE subject_id = 'GEO-9921' AND action = 'merged-wrap-up-retry'").get()).toStrictEqual({ count: 0 });
+});
+
+test('it adds no news for a retry that keeps the session while another retry remains', async () => {
+  const ctx = setupTest();
+  addRun(ctx.db, { issue: 'GEO-9922', title: 'Invented kettle descaler', place: 'imp', session: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
+  addPr(ctx.db, 'GEO-9922', 'kettle#1', 'z-delivery');
+  closePr(ctx.db, 'kettle#1', { to: 'merged', actor: 'z-delivery' });
+  setState(ctx.db, 'GEO-9922', 'merged', {}, 'z-delivery');
+  const fleet = buildStubFleetClient({ sessions: [{ id: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, cwd: '/workspace/kettle' }] });
+  const ramUnknown = { state: 'unknown' as const, detail: 'the check in home-0000a001aaaa4aaa8aaa exited 1: imp: RAM_BUDGET_EXCEEDED: not enough 2 MiB pages', retry: true as const };
+  const deps = { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.resolve(ramUnknown), readLocalWork: () => Promise.reject(new Error('an imp run checks no local work')) };
+  await wrapUpMergedRuns(ctx.db, deps, { actor: 'sweep' });
+
+  await wrapUpMergedRuns(ctx.db, deps, { actor: 'sweep' });
+
+  expect(ctx.db.query('SELECT COUNT(*) AS count FROM news').get()).toStrictEqual({ count: 1 });
+});
+
+test('it adds news when the last allowed retry still keeps the session', async () => {
+  const ctx = setupTest();
+  addRun(ctx.db, { issue: 'GEO-9923', title: 'Invented kettle descaler', place: 'imp', session: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
+  addPr(ctx.db, 'GEO-9923', 'kettle#1', 'z-delivery');
+  closePr(ctx.db, 'kettle#1', { to: 'merged', actor: 'z-delivery' });
+  setState(ctx.db, 'GEO-9923', 'merged', {}, 'z-delivery');
+  const fleet = buildStubFleetClient({ sessions: [{ id: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, cwd: '/workspace/kettle' }] });
+  const ramUnknown = { state: 'unknown' as const, detail: 'the check in home-0000a001aaaa4aaa8aaa exited 1: imp: RAM_BUDGET_EXCEEDED: not enough 2 MiB pages', retry: true as const };
+  const deps = { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.resolve(ramUnknown), readLocalWork: () => Promise.reject(new Error('an imp run checks no local work')) };
+  await wrapUpMergedRuns(ctx.db, deps, { actor: 'sweep' });
+  await wrapUpMergedRuns(ctx.db, deps, { actor: 'sweep' });
+
+  await wrapUpMergedRuns(ctx.db, deps, { actor: 'sweep' });
+
+  expect(ctx.db.query('SELECT COUNT(*) AS count FROM news').get()).toStrictEqual({ count: 2 });
+});
+
+test('it reports a due retry in a dry run, and claims or changes nothing', async () => {
+  const ctx = setupTest();
+  addRun(ctx.db, { issue: 'GEO-9924', title: 'Invented kettle descaler', place: 'imp', session: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
+  addPr(ctx.db, 'GEO-9924', 'kettle#1', 'z-delivery');
+  closePr(ctx.db, 'kettle#1', { to: 'merged', actor: 'z-delivery' });
+  setState(ctx.db, 'GEO-9924', 'merged', {}, 'z-delivery');
+  const fleet = buildStubFleetClient({ sessions: [{ id: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, cwd: '/workspace/kettle' }] });
+  const ramUnknown = { state: 'unknown' as const, detail: 'the check in home-0000a001aaaa4aaa8aaa exited 1: imp: RAM_BUDGET_EXCEEDED: not enough 2 MiB pages', retry: true as const };
+  const answers: ImpWork[] = [ramUnknown];
+  const deps = { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.resolve(answers.shift() ?? { state: 'unknown' as const, detail: 'no answer scripted' }), readLocalWork: () => Promise.reject(new Error('an imp run checks no local work')) };
+  await wrapUpMergedRuns(ctx.db, deps, { actor: 'sweep' });
+  answers.push({ state: 'pushed' });
+  const count = () => ctx.db.query('SELECT (SELECT COUNT(*) FROM events) AS events, (SELECT COUNT(*) FROM run_notes) AS notes, (SELECT COUNT(*) FROM news) AS news').get();
+  const before = count();
+
+  const wrapped = await wrapUpMergedRuns(ctx.db, deps, { dryRun: true });
+
+  expect(wrapped).toStrictEqual([{ issue: 'GEO-9924', wrapUp: { forgotten: ['0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa'], destroyed: ['0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa'], kept: [], failed: [] } }]);
+  expect(fleet.calls).toStrictEqual([]);
+  expect(count()).toStrictEqual(before);
 });
