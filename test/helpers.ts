@@ -193,8 +193,6 @@ export function fakeAtc(directory: string, sessions: FakeAtcSession[] = [
         status: 'delivered',
         sentAt: 1_792_499_100_360,
         deliveredAt: 1_792_499_100_377,
-        answeredAt: null,
-        answer: null,
         turn: null,
         answeredWith: [],
         ...fake.messages.get(id),

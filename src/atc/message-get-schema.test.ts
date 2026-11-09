@@ -20,6 +20,21 @@ test('it accepts an answered message with epoch-millisecond times', () => {
   expect(messageGetSchema.safeParse(payload).data).toStrictEqual(payload);
 });
 
+test('it accepts a delivered message that atc sends with no answer fields', () => {
+  const payload = {
+    message: 'm-invented-2',
+    session: 'id-kettle',
+    from: 'hq',
+    text: 'invented save request',
+    status: 'delivered' as const,
+    sentAt: 1_792_499_100_360,
+    turn: null,
+    answeredWith: [],
+  };
+
+  expect(messageGetSchema.safeParse(payload).data).toStrictEqual(payload);
+});
+
 test('it rejects an answeredAt sent as a string', () => {
   const result = messageGetSchema.safeParse({
     message: 'm-invented-1',
