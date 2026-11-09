@@ -285,6 +285,24 @@ test('it holds the failure message for morning in quiet hours', async () => {
   expect(ctx.outbox()).toStrictEqual([{ target: 'z-stu', text: expect.stringContaining('(held over quiet hours)') }]);
 });
 
+test('it posts a successful respawn in quiet hours to news and holds nothing for morning', async () => {
+  const ctx = setupTest();
+  const stub = fake([{ id: 'id-teapot', name: 'z-teapot', alive: true }]);
+  at('2026-10-14T16:00:00Z');
+  await ensureFleet(ctx.db, stub.client, { dryRun: false, actor: 'hq-fleet', fleet: ctx.fleet });
+  at('2026-10-14T16:20:00Z');
+
+  await ensureFleet(ctx.db, stub.client, { dryRun: false, actor: 'hq-fleet', fleet: ctx.fleet });
+  const held = getMeta(ctx.db, 'fleet_held');
+  at('2026-10-14T20:30:00Z');
+  await ensureFleet(ctx.db, stub.client, { dryRun: false, actor: 'hq-fleet', fleet: ctx.fleet });
+
+  expect(stub.spawns.map((request) => request.name)).toStrictEqual(['z-kettle']);
+  expect(listNews(ctx.db, { all: true, limit: 10 })).toStrictEqual([expect.objectContaining({ text: expect.stringContaining('hq fleet: z-kettle spawned') })]);
+  expect(held).toBeNull();
+  expect(ctx.outbox()).toStrictEqual([]);
+});
+
 test('malformed prompts fail before any spawn', () => {
   const ctx = setupTest();
   const f = `main:${KETTLE}`;
