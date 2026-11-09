@@ -1,42 +1,33 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { z } from 'zod';
-import rulesTable from '../../lanes.json';
-import { buildReadyPage, makePagedCall } from '../../test/build-ready-page.ts';
-import type { ReadyNodeSeed } from '../../test/build-ready-page.ts';
-import { buildStubGitHubFactsRunner } from '../../test/build-stub-github-facts-runner.ts';
 import { createCapacitySample } from '../../test/create-capacity-sample.ts';
 import { at, freshDb } from '../../test/helpers.ts';
 import { setCapacitySetting } from '../capacity/set-capacity-setting.ts';
 import { addRun } from '../runs/add-run.ts';
 import { holdLanes } from './hold-lanes.ts';
-import { readLinearReady } from './read-linear-ready.ts';
 import { setState } from '../runs/set-state.ts';
 import { setForward } from '../outbox/set-forward.ts';
+import { buildSeeder } from '../test-utils/build-seeder.ts';
 import { removeLaneSkip } from './remove-lane-skip.ts';
 import { tick } from './tick.ts';
-import { validateLaneRules } from './validate-lane-rules.ts';
 import { writeLaneSkip } from './write-lane-skip.ts';
 
 function setupTest() {
   const fresh = freshDb();
   onTestFinished(fresh.cleanup);
   at('2026-10-15T20:00:00Z');
-  const rules = validateLaneRules(rulesTable, null);
-  const seedReady = async (seeds: ReadyNodeSeed[]): Promise<void> => {
-    await readLinearReady(fresh.db, { call: makePagedCall(buildReadyPage(seeds, null)), run: buildStubGitHubFactsRunner({}), actor: 'hq-lanes', rules });
-  };
   const skip = (issue: string, until: string): void => {
     writeLaneSkip(fresh.db, { issue, until, reason: 'waits on the kettle PR', actor: 'z-delivery', at: new Date('2026-10-15T20:00:00Z') });
   };
   const sent = (): { target: string; text: string }[] => z.array(z.object({ target: z.string(), text: z.string() })).parse(fresh.db.query("SELECT target, text FROM outbox WHERE topic = 'lanes-all-skipped'").all());
   const told = (): unknown => fresh.db.query("SELECT count(*) AS total FROM events WHERE action = 'all-skipped'").get();
-  return { db: fresh.db, seedReady, skip, sent, told };
+  return { db: fresh.db, seed: buildSeeder(fresh), skip, sent, told };
 }
 
 test('it tells z-delivery once when slots are free and every eligible Ready issue is skipped', async () => {
   const ctx = setupTest();
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
-  await ctx.seedReady([
+  await ctx.seed.readyIssues([
     { identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 },
     { identifier: 'GEO-9802', project: 'kettle roadmap', type: 'Bug', labels: ['vers'], priority: 3 },
   ]);
@@ -57,7 +48,7 @@ test('it tells z-delivery once when slots are free and every eligible Ready issu
 test('it tells again when the set of skips changes', async () => {
   const ctx = setupTest();
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
-  await ctx.seedReady([
+  await ctx.seed.readyIssues([
     { identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 },
     { identifier: 'GEO-9802', project: 'kettle roadmap', type: 'Bug', labels: ['vers'], priority: 3 },
   ]);
@@ -74,7 +65,7 @@ test('it tells again when the set of skips changes', async () => {
 test('it tells again in a new spell after an issue stops being skipped', async () => {
   const ctx = setupTest();
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
-  await ctx.seedReady([
+  await ctx.seed.readyIssues([
     { identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 },
     { identifier: 'GEO-9802', project: 'kettle roadmap', type: 'Bug', labels: ['vers'], priority: 3 },
   ]);
@@ -93,7 +84,7 @@ test('it tells again in a new spell after an issue stops being skipped', async (
 test('it sends nothing while a lanes hold is active', async () => {
   const ctx = setupTest();
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
-  await ctx.seedReady([
+  await ctx.seed.readyIssues([
     { identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 },
     { identifier: 'GEO-9802', project: 'kettle roadmap', type: 'Bug', labels: ['vers'], priority: 3 },
   ]);
@@ -109,7 +100,7 @@ test('it sends nothing while a lanes hold is active', async () => {
 test('it sends nothing while an eligible Ready issue is not skipped', async () => {
   const ctx = setupTest();
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
-  await ctx.seedReady([
+  await ctx.seed.readyIssues([
     { identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 },
     { identifier: 'GEO-9802', project: 'kettle roadmap', type: 'Bug', labels: ['vers'], priority: 3 },
   ]);
@@ -128,7 +119,7 @@ test('it names each imp run and its state when impd at its line holds the imp sl
     error: null,
     slots: { imp: 3, local: 0 },
   };
-  await ctx.seedReady([
+  await ctx.seed.readyIssues([
     { identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 },
     { identifier: 'GEO-9802', project: 'kettle roadmap', type: 'Bug', labels: ['vers'], priority: 3 },
   ]);
@@ -159,7 +150,7 @@ test('it names each imp run when the RAM impd keeps for priority imps holds the 
     error: null,
     slots: { imp: 2, local: 0 },
   };
-  await ctx.seedReady([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
+  await ctx.seed.readyIssues([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
   ctx.skip('GEO-9801', 'pr:impz#654');
   setCapacitySetting(ctx.db, 'nonnixMaxMib', '65536', 'z-delivery');
   createCapacitySample(ctx.db, { at: '2026-10-15T19:58:00Z', nonnixAwakeMib: 16_384, nixAwakeMib: 1024, impdBudgetMib: 20_480, impdPriorityKeptMib: 3072 });
@@ -179,7 +170,7 @@ test('it lists at most 20 skips and counts the rest', async () => {
   const ctx = setupTest();
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
   const issues = Array.from({ length: 22 }, (_, index) => `GEO-${9900 + index}`);
-  await ctx.seedReady(issues.map((identifier) => ({ identifier, project: 'kettle roadmap', type: 'Feature', labels: ['atc'] })));
+  await ctx.seed.readyIssues(issues.map((identifier) => ({ identifier, project: 'kettle roadmap', type: 'Feature', labels: ['atc'] })));
   for (const issue of issues) {
     ctx.skip(issue, 'pr:impz#654');
   }
@@ -197,7 +188,7 @@ test('it lists at most 20 skips and counts the rest', async () => {
 test('it sends nothing while no slot is free and impd holds none back', async () => {
   const ctx = setupTest();
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
-  await ctx.seedReady([
+  await ctx.seed.readyIssues([
     { identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 },
     { identifier: 'GEO-9802', project: 'kettle roadmap', type: 'Bug', labels: ['vers'], priority: 3 },
   ]);
@@ -218,7 +209,7 @@ test('it tells again when the impd line comes to hold the slots while the skips 
     error: null,
     slots: { imp: 3, local: 0 },
   };
-  await ctx.seedReady([
+  await ctx.seed.readyIssues([
     { identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 },
     { identifier: 'GEO-9802', project: 'kettle roadmap', type: 'Bug', labels: ['vers'], priority: 3 },
   ]);
@@ -237,7 +228,7 @@ test('it tells again when the impd line comes to hold the slots while the skips 
 test('it drops the unsent alert once an issue stops being skipped', async () => {
   const ctx = setupTest();
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
-  await ctx.seedReady([
+  await ctx.seed.readyIssues([
     { identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 },
     { identifier: 'GEO-9802', project: 'kettle roadmap', type: 'Bug', labels: ['vers'], priority: 3 },
   ]);
@@ -254,7 +245,7 @@ test('it drops the unsent alert once an issue stops being skipped', async () => 
 test('it drops the unsent alert once a lanes hold starts', async () => {
   const ctx = setupTest();
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
-  await ctx.seedReady([
+  await ctx.seed.readyIssues([
     { identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 },
     { identifier: 'GEO-9802', project: 'kettle roadmap', type: 'Bug', labels: ['vers'], priority: 3 },
   ]);
@@ -271,7 +262,7 @@ test('it drops the unsent alert once a lanes hold starts', async () => {
 test('it tells again after a hold that dropped the unsent alert ends', async () => {
   const ctx = setupTest();
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
-  await ctx.seedReady([
+  await ctx.seed.readyIssues([
     { identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 },
     { identifier: 'GEO-9802', project: 'kettle roadmap', type: 'Bug', labels: ['vers'], priority: 3 },
   ]);
@@ -290,7 +281,7 @@ test('it tells again after a hold that dropped the unsent alert ends', async () 
 test('it drops the unsent alert at the destination z-delivery forwards to', async () => {
   const ctx = setupTest();
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
-  await ctx.seedReady([
+  await ctx.seed.readyIssues([
     { identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 },
     { identifier: 'GEO-9802', project: 'kettle roadmap', type: 'Bug', labels: ['vers'], priority: 3 },
   ]);

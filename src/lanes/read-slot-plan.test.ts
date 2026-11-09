@@ -1,9 +1,6 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import invariant from 'tiny-invariant';
-import rulesTable from '../../lanes.json';
-import { buildReadyPage, makePagedCall } from '../../test/build-ready-page.ts';
 import type { ReadyNodeSeed } from '../../test/build-ready-page.ts';
-import { buildStubGitHubFactsRunner } from '../../test/build-stub-github-facts-runner.ts';
 import { buildReadyIssue } from '../../test/build-ready-issue.ts';
 import { createCapacitySample } from '../../test/create-capacity-sample.ts';
 import { at, freshDb } from '../../test/helpers.ts';
@@ -19,11 +16,9 @@ import { setState } from '../runs/set-state.ts';
 import { formatSlotNudge } from './format-slot-nudge.ts';
 import { formatSlotPlan } from './format-slot-plan.ts';
 import { parseLocalRoom } from './parse-local-room.ts';
-import { readLinearReady } from './read-linear-ready.ts';
 import { readSlotMinutes } from './read-slot-minutes.ts';
 import { readSlotPlan } from './read-slot-plan.ts';
 import { tick } from './tick.ts';
-import { validateLaneRules } from './validate-lane-rules.ts';
 import { writeDesignBacklog } from './write-design-backlog.ts';
 import { writeLaneSkip } from './write-lane-skip.ts';
 import { buildSeeder } from '../test-utils/build-seeder.ts';
@@ -40,23 +35,18 @@ function setupTest() {
     { identifier: 'GEO-9805', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 },
   ];
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
-  const rules = validateLaneRules(rulesTable, null);
-  const seedReady = async (seeds: ReadyNodeSeed[]): Promise<void> => {
-    const call = makePagedCall(buildReadyPage(seeds, null));
-    await readLinearReady(fresh.db, { call, run: buildStubGitHubFactsRunner({}), actor: 'hq-lanes', rules });
-  };
   const addLocalRun = (issue: string): void => {
     addRun(fresh.db, { issue, title: 'Descale the kettle', place: 'local', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: null, actor: 'z-delivery' });
   };
   const addImpRun = (issue: string): void => {
     addRun(fresh.db, { issue, title: 'Polish the kettle', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: null, actor: 'z-delivery' });
   };
-  return { db: fresh.db, seed: buildSeeder(fresh), readySeeds, sample, seedReady, addLocalRun, addImpRun };
+  return { db: fresh.db, seed: buildSeeder(fresh), readySeeds, sample, addLocalRun, addImpRun };
 }
 
 test('a focus set changes what the next plan picks, and the running run keeps its slot', async () => {
   const ctx = setupTest();
-  await ctx.seedReady(ctx.readySeeds);
+  await ctx.seed.readyIssues(ctx.readySeeds);
   ctx.addLocalRun('GEO-9805');
   const before = readSlotPlan(ctx.db, ctx.sample);
 
@@ -76,10 +66,10 @@ test('a focus set changes what the next plan picks, and the running run keeps it
 
 test('a reserve its area fills with running runs keeps no slot, read from the areas of the Ready read', async () => {
   const ctx = setupTest();
-  await ctx.seedReady([...ctx.readySeeds, { identifier: 'GEO-9806', project: 'kettle roadmap', type: 'Feature', labels: ['nixie'], priority: 2 }]);
+  await ctx.seed.readyIssues([...ctx.readySeeds, { identifier: 'GEO-9806', project: 'kettle roadmap', type: 'Feature', labels: ['nixie'], priority: 2 }]);
   ctx.addLocalRun('GEO-9806');
   at('2026-10-15T20:10:00Z');
-  await ctx.seedReady(ctx.readySeeds);
+  await ctx.seed.readyIssues(ctx.readySeeds);
 
   await runFocusCommand({ db: ctx.db, call: makeStateCall([], []), actor: 'kettle-owner', at: new Date('2026-10-15T20:10:00Z'), verb: 'set', rest: ['maintenance'], reserves: ['nixie=1'] });
 
@@ -88,7 +78,7 @@ test('a reserve its area fills with running runs keeps no slot, read from the ar
 
 test('a reserved slot with nothing eligible in its area is lent to the focus work', async () => {
   const ctx = setupTest();
-  await ctx.seedReady(ctx.readySeeds);
+  await ctx.seed.readyIssues(ctx.readySeeds);
 
   await runFocusCommand({ db: ctx.db, call: makeStateCall([], []), actor: 'kettle-owner', at: new Date('2026-10-15T20:00:00Z'), verb: 'set', rest: ['bug'], reserves: ['imp=2'] });
 
@@ -104,7 +94,7 @@ test('a reserved slot with nothing eligible in its area is lent to the focus wor
 
 test('a closed run still in the Ready read stays out of the picks', async () => {
   const ctx = setupTest();
-  await ctx.seedReady(ctx.readySeeds);
+  await ctx.seed.readyIssues(ctx.readySeeds);
   ctx.addLocalRun('GEO-9801');
   setState(ctx.db, 'GEO-9801', 'dropped', { note: 'kettle recalled' }, 'z-delivery');
 
@@ -115,7 +105,7 @@ test('a closed run still in the Ready read stays out of the picks', async () => 
 
 test('a skip set after the Ready read leaves its issue out of the picks at the next look', async () => {
   const ctx = setupTest();
-  await ctx.seedReady(ctx.readySeeds);
+  await ctx.seed.readyIssues(ctx.readySeeds);
   writeLaneSkip(ctx.db, { issue: 'GEO-9801', until: 'GEO-9899', reason: 'waits on the descaler PR', actor: 'z-delivery', at: new Date('2026-10-15T20:00:00Z') });
 
   const plan = readSlotPlan(ctx.db, ctx.sample);
@@ -126,7 +116,7 @@ test('a skip set after the Ready read leaves its issue out of the picks at the n
 test('it gives the time the Ready read its picks come from was stored', async () => {
   const ctx = setupTest();
   at('2026-10-15T20:03:00Z');
-  await ctx.seedReady([{ identifier: 'GEO-9821', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 2 }]);
+  await ctx.seed.readyIssues([{ identifier: 'GEO-9821', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 2 }]);
 
   const plan = readSlotPlan(ctx.db, ctx.sample, new Date('2026-10-15T20:10:00Z'));
 
@@ -144,7 +134,7 @@ test('it gives no Ready read time with no Ready read', () => {
 
 test('the plan lists the active skips of eligible Ready issues, leaving out those with a run or not in Ready', async () => {
   const ctx = setupTest();
-  await ctx.seedReady(ctx.readySeeds);
+  await ctx.seed.readyIssues(ctx.readySeeds);
   const skip = (issue: string): void => {
     writeLaneSkip(ctx.db, { issue, until: 'pr:impz#654', reason: 'waits on the descaler PR', actor: 'z-delivery', at: new Date('2026-10-15T20:00:00Z') });
   };
@@ -160,7 +150,7 @@ test('the plan lists the active skips of eligible Ready issues, leaving out thos
 
 test('a skip whose time has passed stops leaving its issue out, with no fresh Ready read', async () => {
   const ctx = setupTest();
-  await ctx.seedReady(ctx.readySeeds);
+  await ctx.seed.readyIssues(ctx.readySeeds);
   writeLaneSkip(ctx.db, { issue: 'GEO-9801', until: '2026-10-15T20:10:00Z', reason: 'held for ten minutes', actor: 'z-delivery', at: new Date('2026-10-15T20:00:00Z') });
 
   const plan = readSlotPlan(ctx.db, ctx.sample, new Date('2026-10-15T20:15:00Z'));
@@ -170,7 +160,7 @@ test('a skip whose time has passed stops leaving its issue out, with no fresh Re
 
 test('local slots free none, and say why, when the localFallback is used up', async () => {
   const ctx = setupTest();
-  await ctx.seedReady(ctx.readySeeds);
+  await ctx.seed.readyIssues(ctx.readySeeds);
   ctx.addLocalRun('GEO-9804');
   ctx.addLocalRun('GEO-9805');
 
@@ -186,7 +176,7 @@ test('local slots free none, and say why, when the localFallback is used up', as
 
 test('it holds an imp launch that would cut into the RAM impd keeps for priority imps, and names that RAM', async () => {
   const ctx = setupTest();
-  await ctx.seedReady(ctx.readySeeds);
+  await ctx.seed.readyIssues(ctx.readySeeds);
   setCapacitySetting(ctx.db, 'nonnixMaxMib', '20480', 'z-delivery');
   createCapacitySample(ctx.db, { at: '2026-10-15T19:58:00Z', nonnixAwakeMib: 14_336, nixAwakeMib: 1024, impdBudgetMib: 20_480, impdPriorityKeptMib: 3072 });
   const sample = { cap: { imp: { freeMib: 16_384, room: true }, providers: { claude: { room: true, unattended: true, target: 'imp' as const } } }, impMib: 2048, error: null, slots: { imp: 3, local: 0 } };
@@ -203,7 +193,7 @@ test('it holds an imp launch that would cut into the RAM impd keeps for priority
 
 test('the tick nudges for no local slot when the localFallback is used up', async () => {
   const ctx = setupTest();
-  await ctx.seedReady(ctx.readySeeds);
+  await ctx.seed.readyIssues(ctx.readySeeds);
   ctx.addLocalRun('GEO-9804');
   ctx.addLocalRun('GEO-9805');
 
@@ -214,7 +204,7 @@ test('the tick nudges for no local slot when the localFallback is used up', asyn
 
 test('local slots stay free by count when an unattended provider targets local', async () => {
   const ctx = setupTest();
-  await ctx.seedReady(ctx.readySeeds);
+  await ctx.seed.readyIssues(ctx.readySeeds);
   ctx.addLocalRun('GEO-9804');
   ctx.addLocalRun('GEO-9805');
   const localRoom = parseLocalRoom({ providers: { teapot: { unattended: true, target: 'local' }, kettle: { unattended: true, target: 'imp', localFallback: 2 } } });
@@ -226,7 +216,7 @@ test('local slots stay free by count when an unattended provider targets local',
 
 test('a cap below the pool free slots takes the difference off the free slots and the picks', async () => {
   const ctx = setupTest();
-  await ctx.seedReady(ctx.readySeeds);
+  await ctx.seed.readyIssues(ctx.readySeeds);
   ctx.addLocalRun('GEO-9805');
   setMeta(ctx.db, 'lanes_cap', JSON.stringify({ cap: 2, until: null, reason: 'quota', by: 'z-stu', at: '2026-10-15T19:00:00Z' }));
 
@@ -239,7 +229,7 @@ test('a cap below the pool free slots takes the difference off the free slots an
 
 test('a cap above the pool free slots leaves the pool in charge', async () => {
   const ctx = setupTest();
-  await ctx.seedReady(ctx.readySeeds);
+  await ctx.seed.readyIssues(ctx.readySeeds);
   ctx.addLocalRun('GEO-9805');
   setMeta(ctx.db, 'lanes_cap', JSON.stringify({ cap: 9, until: null, reason: null, by: 'z-stu', at: '2026-10-15T19:00:00Z' }));
 
@@ -251,7 +241,7 @@ test('a cap above the pool free slots leaves the pool in charge', async () => {
 
 test('a cap of zero frees no slot and picks nothing', async () => {
   const ctx = setupTest();
-  await ctx.seedReady(ctx.readySeeds);
+  await ctx.seed.readyIssues(ctx.readySeeds);
   setMeta(ctx.db, 'lanes_cap', JSON.stringify({ cap: 0, until: null, reason: 'freeze', by: 'z-stu', at: '2026-10-15T19:00:00Z' }));
 
   const plan = readSlotPlan(ctx.db, ctx.sample);
@@ -263,7 +253,7 @@ test('a cap of zero frees no slot and picks nothing', async () => {
 test('a cap whose time has passed no longer limits the slots', async () => {
   const ctx = setupTest();
   at('2026-10-15T20:00:00Z');
-  await ctx.seedReady(ctx.readySeeds);
+  await ctx.seed.readyIssues(ctx.readySeeds);
   setMeta(ctx.db, 'lanes_cap', JSON.stringify({ cap: 0, until: '2026-10-15T19:30:00Z', reason: 'freeze', by: 'z-stu', at: '2026-10-15T19:00:00Z' }));
 
   const plan = readSlotPlan(ctx.db, ctx.sample, new Date('2026-10-15T20:00:00Z'));
@@ -274,7 +264,7 @@ test('a cap whose time has passed no longer limits the slots', async () => {
 
 test('a malformed stored cap limits nothing', async () => {
   const ctx = setupTest();
-  await ctx.seedReady(ctx.readySeeds);
+  await ctx.seed.readyIssues(ctx.readySeeds);
   setMeta(ctx.db, 'lanes_cap', '{"cap":-3}');
 
   const plan = readSlotPlan(ctx.db, ctx.sample);
@@ -481,7 +471,7 @@ test('it lists where the owner asked for a with-geoff pass reopened above the la
 
 test('it plans, prints and ticks the same with placeTypes null as with no placeTypes key', async () => {
   const ctx = setupTest();
-  await ctx.seedReady(ctx.readySeeds);
+  await ctx.seed.readyIssues(ctx.readySeeds);
   ctx.addLocalRun('GEO-9805');
 
   const withoutKey = readSlotPlan(ctx.db, ctx.sample);
@@ -502,7 +492,7 @@ test('it plans, prints and ticks the same with placeTypes null as with no placeT
 
 test('it passes over a Bug for the free local slot and picks the next issue whose Type local takes', async () => {
   const ctx = setupTest();
-  await ctx.seedReady([
+  await ctx.seed.readyIssues([
     { identifier: 'GEO-9821', project: 'kettle roadmap', type: 'Bug', labels: ['atc'], priority: 1 },
     { identifier: 'GEO-9822', project: 'kettle roadmap', type: 'Investigation', labels: ['atc'], priority: 2 },
     { identifier: 'GEO-9823', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 },
@@ -516,7 +506,7 @@ test('it passes over a Bug for the free local slot and picks the next issue whos
 
 test('it picks no issue when only Bugs are eligible and only a local slot is free, and says so in one line', async () => {
   const ctx = setupTest();
-  await ctx.seedReady([
+  await ctx.seed.readyIssues([
     { identifier: 'GEO-9831', project: 'kettle roadmap', type: 'Bug', labels: ['atc'], priority: 1 },
     { identifier: 'GEO-9832', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 },
   ]);
@@ -533,7 +523,7 @@ test('it picks no issue when only Bugs are eligible and only a local slot is fre
 
 test('it counts a free slot no eligible issue may fill as supply minutes, not empty delivery minutes or idle slot-minutes', async () => {
   const ctx = setupTest();
-  await ctx.seedReady([
+  await ctx.seed.readyIssues([
     { identifier: 'GEO-9841', project: 'kettle roadmap', type: 'Bug', labels: ['atc'], priority: 1 },
     { identifier: 'GEO-9842', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 },
   ]);
@@ -553,7 +543,7 @@ test('it counts a free slot no eligible issue may fill as supply minutes, not em
 
 test('it names the place and its Types in the tick when the free slots fit no eligible issue, and sends no nudge', async () => {
   const ctx = setupTest();
-  await ctx.seedReady([
+  await ctx.seed.readyIssues([
     { identifier: 'GEO-9851', project: 'kettle roadmap', type: 'Bug', labels: ['atc'], priority: 1 },
     { identifier: 'GEO-9852', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 },
   ]);
@@ -571,7 +561,7 @@ test('it names the place and its Types in the tick when the free slots fit no el
 
 test('it keeps saying nothing is eligible in the tick under placeTypes when no issue is eligible at all', async () => {
   const ctx = setupTest();
-  await ctx.seedReady([]);
+  await ctx.seed.readyIssues([]);
 
   const result = tick(ctx.db, { ...ctx.sample, placeTypes: { local: ['Investigation'] } }, 'hq-lanes');
 

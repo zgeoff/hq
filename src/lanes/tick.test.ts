@@ -1,8 +1,4 @@
 import { expect, onTestFinished, setSystemTime, test } from 'bun:test';
-import rulesTable from '../../lanes.json';
-import { buildReadyPage, makePagedCall } from '../../test/build-ready-page.ts';
-import type { ReadyNodeSeed } from '../../test/build-ready-page.ts';
-import { buildStubGitHubFactsRunner } from '../../test/build-stub-github-facts-runner.ts';
 import { createCapacitySample } from '../../test/create-capacity-sample.ts';
 import { buildReadyIssue } from '../../test/build-ready-issue.ts';
 import { at, freshDb } from '../../test/helpers.ts';
@@ -15,29 +11,24 @@ import { readOutboxRows } from '../outbox/read-outbox-rows.ts';
 import { holdLanes } from './hold-lanes.ts';
 import { LANES_HELD_SPANS } from './lanes-held-spans.ts';
 import { releaseLanes } from './release-lanes.ts';
-import { readLinearReady } from './read-linear-ready.ts';
+import { buildSeeder } from '../test-utils/build-seeder.ts';
 import { readSlotMinutes } from './read-slot-minutes.ts';
 import { tick } from './tick.ts';
-import { validateLaneRules } from './validate-lane-rules.ts';
 import { writeDesignBacklog } from './write-design-backlog.ts';
 import { writePromotableFocus } from './write-promotable-focus.ts';
 
 function setupTest() {
   const fresh = freshDb();
   onTestFinished(fresh.cleanup);
-  const rules = validateLaneRules(rulesTable, null);
-  const seedReady = async (seeds: ReadyNodeSeed[]): Promise<void> => {
-    await readLinearReady(fresh.db, { call: makePagedCall(buildReadyPage(seeds, null)), run: buildStubGitHubFactsRunner({}), actor: 'hq-lanes', rules });
-  };
   const queued = () => fresh.db.query("SELECT target, text FROM outbox WHERE text LIKE 'Lanes: % slot-minutes empty today%' ORDER BY id").all();
-  return { db: fresh.db, seedReady, queued };
+  return { db: fresh.db, seed: buildSeeder(fresh), queued };
 }
 
 test('it tags no cause and counts no minutes while Ready work has waited 10 minutes or less', async () => {
   const ctx = setupTest();
   at('2026-10-14T01:00:00Z');
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
-  await ctx.seedReady([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
+  await ctx.seed.readyIssues([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
   tick(ctx.db, sample, 'hq-lanes');
   at('2026-10-14T01:04:00Z');
 
@@ -51,7 +42,7 @@ test('it tags delivery once Ready work has waited more than 10 minutes, and coun
   const ctx = setupTest();
   at('2026-10-14T01:00:00Z');
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
-  await ctx.seedReady([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
+  await ctx.seed.readyIssues([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
   tick(ctx.db, sample, 'hq-lanes');
   at('2026-10-14T01:05:00Z');
   tick(ctx.db, sample, 'hq-lanes');
@@ -67,12 +58,12 @@ test('it counts at most 30 minutes for a gap between looks', async () => {
   const ctx = setupTest();
   at('2026-10-14T01:00:00Z');
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
-  await ctx.seedReady([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
+  await ctx.seed.readyIssues([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
   tick(ctx.db, sample, 'hq-lanes');
   at('2026-10-14T01:11:00Z');
   tick(ctx.db, sample, 'hq-lanes');
   at('2026-10-14T01:51:00Z');
-  await ctx.seedReady([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
+  await ctx.seed.readyIssues([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
 
   tick(ctx.db, sample, 'hq-lanes');
 
@@ -83,7 +74,7 @@ test('it restarts the grace time when no free slot meets Ready work for a look',
   const ctx = setupTest();
   at('2026-10-14T01:00:00Z');
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
-  await ctx.seedReady([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
+  await ctx.seed.readyIssues([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
   tick(ctx.db, sample, 'hq-lanes');
   at('2026-10-14T01:08:00Z');
   tick(ctx.db, { ...sample, slots: { imp: 0, local: 0 } }, 'hq-lanes');
@@ -99,7 +90,7 @@ test('it keeps the grace time running through a look whose capacity read failed'
   const ctx = setupTest();
   at('2026-10-14T01:00:00Z');
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
-  await ctx.seedReady([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
+  await ctx.seed.readyIssues([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
   tick(ctx.db, sample, 'hq-lanes');
   at('2026-10-14T01:05:00Z');
   tick(ctx.db, { ...sample, cap: null, error: 'capacity.sh timed out' }, 'hq-lanes');
@@ -115,7 +106,7 @@ test('it tags triage when no Ready work waits and Backlog work asks for promotio
   const ctx = setupTest();
   at('2026-10-14T01:00:00Z');
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
-  await ctx.seedReady([]);
+  await ctx.seed.readyIssues([]);
   writePromotableFocus(ctx.db, { count: 2, focus: '[]', at: new Date('2026-10-14T01:00:00Z'), error: null });
   tick(ctx.db, sample, 'hq-lanes');
   at('2026-10-14T01:05:00Z');
@@ -130,7 +121,7 @@ test('it tags supply when no Ready work waits and no Backlog issue matches the f
   const ctx = setupTest();
   at('2026-10-14T01:00:00Z');
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
-  await ctx.seedReady([]);
+  await ctx.seed.readyIssues([]);
   writePromotableFocus(ctx.db, { count: 0, focus: '[]', at: new Date('2026-10-14T01:00:00Z'), error: null });
   tick(ctx.db, sample, 'hq-lanes');
   at('2026-10-14T01:05:00Z');
@@ -145,7 +136,7 @@ test('it tags unknown and counts nothing when the Backlog count is unknown', asy
   const ctx = setupTest();
   at('2026-10-14T01:00:00Z');
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
-  await ctx.seedReady([]);
+  await ctx.seed.readyIssues([]);
   writePromotableFocus(ctx.db, { count: null, focus: '[]', at: new Date('2026-10-14T01:00:00Z'), error: null });
   tick(ctx.db, sample, 'hq-lanes');
   at('2026-10-14T01:05:00Z');
@@ -162,7 +153,7 @@ test('it tags unknown and counts nothing when the focus has changed since the Ba
   const ctx = setupTest();
   at('2026-10-14T01:00:00Z');
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
-  await ctx.seedReady([]);
+  await ctx.seed.readyIssues([]);
   writePromotableFocus(ctx.db, { count: 2, focus: '[]', at: new Date('2026-10-14T01:00:00Z'), error: null });
   tick(ctx.db, sample, 'hq-lanes');
   at('2026-10-14T01:05:00Z');
@@ -178,7 +169,7 @@ test('it tags unknown with the age of the Ready data and counts nothing when the
   const ctx = setupTest();
   at('2026-10-14T01:00:00Z');
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
-  await ctx.seedReady([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
+  await ctx.seed.readyIssues([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
   tick(ctx.db, sample, 'hq-lanes');
   at('2026-10-14T01:42:00Z');
 
@@ -192,7 +183,7 @@ test('it tags no cause when no slot is free', async () => {
   const ctx = setupTest();
   at('2026-10-14T01:00:00Z');
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
-  await ctx.seedReady([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
+  await ctx.seed.readyIssues([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
   tick(ctx.db, sample, 'hq-lanes');
   at('2026-10-14T01:20:00Z');
 
@@ -206,7 +197,7 @@ test('it tells the delivery session once a day when delivery reaches 60 slot-min
   const ctx = setupTest();
   at('2026-10-14T01:00:00Z');
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
-  await ctx.seedReady([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
+  await ctx.seed.readyIssues([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
   tick(ctx.db, sample, 'hq-lanes');
   at('2026-10-14T01:11:00Z');
   tick(ctx.db, sample, 'hq-lanes');
@@ -227,7 +218,7 @@ test('it tells the triage session at any hour when triage reaches 60 slot-minute
   const ctx = setupTest();
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
   at('2026-10-14T17:00:00Z');
-  await ctx.seedReady([]);
+  await ctx.seed.readyIssues([]);
   writePromotableFocus(ctx.db, { count: 1, focus: '[]', at: new Date('2026-10-14T17:00:00Z'), error: null });
   tick(ctx.db, sample, 'hq-lanes');
   at('2026-10-14T17:30:00Z');
@@ -241,16 +232,16 @@ test('it tells the triage and delivery sessions during quiet hours while the sup
   const ctx = setupTest();
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
   at('2026-10-14T17:00:00Z');
-  await ctx.seedReady([]);
+  await ctx.seed.readyIssues([]);
   writePromotableFocus(ctx.db, { count: 0, focus: '[]', at: new Date('2026-10-14T17:00:00Z'), error: null });
   tick(ctx.db, sample, 'hq-lanes');
   at('2026-10-14T17:30:00Z');
   tick(ctx.db, sample, 'hq-lanes');
   at('2026-10-14T18:00:00Z');
-  await ctx.seedReady([]);
+  await ctx.seed.readyIssues([]);
   writePromotableFocus(ctx.db, { count: 2, focus: '[]', at: new Date('2026-10-14T18:00:00Z'), error: null });
   tick(ctx.db, sample, 'hq-lanes');
-  await ctx.seedReady([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
+  await ctx.seed.readyIssues([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
   at('2026-10-14T18:01:00Z');
   tick(ctx.db, sample, 'hq-lanes');
   at('2026-10-14T18:12:00Z');
@@ -269,14 +260,14 @@ test('it holds the supply alert for the owner through quiet hours and sends it a
   const ctx = setupTest();
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
   at('2026-10-14T17:00:00Z');
-  await ctx.seedReady([]);
+  await ctx.seed.readyIssues([]);
   writePromotableFocus(ctx.db, { count: 0, focus: '[]', at: new Date('2026-10-14T17:00:00Z'), error: null });
   tick(ctx.db, sample, 'hq-lanes');
   at('2026-10-14T17:30:00Z');
   tick(ctx.db, sample, 'hq-lanes');
   const quiet = ctx.queued();
   at('2026-10-14T20:00:00Z');
-  await ctx.seedReady([]);
+  await ctx.seed.readyIssues([]);
   writePromotableFocus(ctx.db, { count: 0, focus: '[]', at: new Date('2026-10-14T20:00:00Z'), error: null });
 
   tick(ctx.db, sample, 'hq-lanes');
@@ -289,14 +280,14 @@ test('it sends the owner the held supply alert at the first look after quiet hou
   const ctx = setupTest();
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
   at('2026-10-14T17:00:00Z');
-  await ctx.seedReady([]);
+  await ctx.seed.readyIssues([]);
   writePromotableFocus(ctx.db, { count: 0, focus: '[]', at: new Date('2026-10-14T17:00:00Z'), error: null });
   tick(ctx.db, sample, 'hq-lanes');
   at('2026-10-14T17:30:00Z');
   tick(ctx.db, sample, 'hq-lanes');
   const quiet = ctx.queued();
   at('2026-10-14T20:00:00Z');
-  await ctx.seedReady([]);
+  await ctx.seed.readyIssues([]);
   writePromotableFocus(ctx.db, { count: 2, focus: '[]', at: new Date('2026-10-14T20:00:00Z'), error: null });
 
   const result = tick(ctx.db, sample, 'hq-lanes');
@@ -313,7 +304,7 @@ test('it adds a look to the Sydney day it falls in, with no split at midnight', 
   const ctx = setupTest();
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
   at('2026-10-14T12:59:00Z');
-  await ctx.seedReady([]);
+  await ctx.seed.readyIssues([]);
   writePromotableFocus(ctx.db, { count: 0, focus: '[]', at: new Date('2026-10-14T12:59:00Z'), error: null });
   tick(ctx.db, sample, 'hq-lanes');
   at('2026-10-14T13:03:00Z');
@@ -329,7 +320,7 @@ test('it counts no slot-minutes while the cap, not the pool, holds the free slot
   at('2026-10-14T01:00:00Z');
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
   setMeta(ctx.db, 'lanes_cap', JSON.stringify({ cap: 0, until: null, reason: 'freeze', by: 'z-stu', at: '2026-10-14T00:00:00Z' }));
-  await ctx.seedReady([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
+  await ctx.seed.readyIssues([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
   tick(ctx.db, sample, 'hq-lanes');
   at('2026-10-14T01:20:00Z');
 
@@ -344,7 +335,7 @@ test('it counts no slot-minutes while a lanes hold is in force', async () => {
   const ctx = setupTest();
   at('2026-10-14T01:00:00Z');
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
-  await ctx.seedReady([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
+  await ctx.seed.readyIssues([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
   holdLanes(ctx.db, 120, 'the kettle supplier is closed', 'z-stu');
   tick(ctx.db, sample, 'hq-lanes');
   at('2026-10-14T01:20:00Z');
@@ -360,7 +351,7 @@ test('it counts only the minutes after a hold ends in the first look after it', 
   const ctx = setupTest();
   at('2026-10-14T01:00:00Z');
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
-  await ctx.seedReady([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
+  await ctx.seed.readyIssues([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
   holdLanes(ctx.db, 20, 'the kettle supplier is closed', 'z-stu');
   tick(ctx.db, sample, 'hq-lanes');
   at('2026-10-14T01:25:00Z');
@@ -374,7 +365,7 @@ test('it counts only the minutes after a release in the first look after it', as
   const ctx = setupTest();
   at('2026-10-14T01:00:00Z');
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
-  await ctx.seedReady([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
+  await ctx.seed.readyIssues([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
   holdLanes(ctx.db, 120, 'the kettle supplier is closed', 'z-stu');
   tick(ctx.db, sample, 'hq-lanes');
   at('2026-10-14T01:10:00Z');
@@ -390,7 +381,7 @@ test('it counts none of a hold that starts and ends between two looks', async ()
   const ctx = setupTest();
   at('2026-10-14T01:00:00Z');
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
-  await ctx.seedReady([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
+  await ctx.seed.readyIssues([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
   tick(ctx.db, sample, 'hq-lanes');
   at('2026-10-14T01:15:00Z');
   tick(ctx.db, sample, 'hq-lanes');
@@ -408,7 +399,7 @@ test('it counts none of two holds that each start and end between the same two l
   const ctx = setupTest();
   at('2026-10-14T01:00:00Z');
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
-  await ctx.seedReady([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
+  await ctx.seed.readyIssues([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
   tick(ctx.db, sample, 'hq-lanes');
   at('2026-10-14T01:11:00Z');
   tick(ctx.db, sample, 'hq-lanes');
@@ -428,7 +419,7 @@ test('it counts none of a hold an older build saved, from its start to its end',
   const ctx = setupTest();
   at('2026-10-14T01:00:00Z');
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
-  await ctx.seedReady([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
+  await ctx.seed.readyIssues([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
   tick(ctx.db, sample, 'hq-lanes');
   at('2026-10-14T01:11:00Z');
   tick(ctx.db, sample, 'hq-lanes');
@@ -446,7 +437,7 @@ test('it counts none of a hold an older build saved, from its start to its relea
   const ctx = setupTest();
   at('2026-10-14T01:00:00Z');
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
-  await ctx.seedReady([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
+  await ctx.seed.readyIssues([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
   tick(ctx.db, sample, 'hq-lanes');
   at('2026-10-14T01:11:00Z');
   tick(ctx.db, sample, 'hq-lanes');
@@ -466,7 +457,7 @@ test('it counts none of a hold an older build saved, when a release clears it af
   const ctx = setupTest();
   at('2026-10-14T01:00:00Z');
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
-  await ctx.seedReady([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
+  await ctx.seed.readyIssues([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
   tick(ctx.db, sample, 'hq-lanes');
   at('2026-10-14T01:11:00Z');
   tick(ctx.db, sample, 'hq-lanes');
@@ -509,7 +500,7 @@ test('it counts slot-minutes for the free slots the cap leaves', async () => {
   at('2026-10-14T01:00:00Z');
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
   setMeta(ctx.db, 'lanes_cap', JSON.stringify({ cap: 2, until: null, reason: null, by: 'z-stu', at: '2026-10-14T00:00:00Z' }));
-  await ctx.seedReady([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
+  await ctx.seed.readyIssues([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
   tick(ctx.db, sample, 'hq-lanes');
   at('2026-10-14T01:05:00Z');
   tick(ctx.db, sample, 'hq-lanes');
