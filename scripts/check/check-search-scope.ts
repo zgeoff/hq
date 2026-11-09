@@ -24,7 +24,7 @@ const COMMAND = /\bgh search (?:prs|issues|repos|code|commits)\b.*\s--?\w|'searc
 
 // An owner such as zgeoff-labs is another org, so the owner name must end where zgeoff ends.
 const QUERY_SCOPE = /\b(?:owner|org|user):zgeoff(?![\w-])|\brepo:zgeoff\//u;
-const COMMAND_SCOPE = /--owner[ =]zgeoff(?![\w-])|'--owner', 'zgeoff'|--repo[ =]zgeoff\/|'--repo', `zgeoff\//u;
+const COMMAND_SCOPE = /--owner[ =]zgeoff(?![\w-])|['"]--owner['"], ['"]zgeoff['"]|--repo[ =]zgeoff\/|['"]--repo['"], ['"`]zgeoff\//u;
 
 function isUnscoped(text: string): boolean {
   if (QUERY.test(text) && !QUERY_SCOPE.test(text)) {
