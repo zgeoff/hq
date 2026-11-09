@@ -1,10 +1,12 @@
 import type { Database } from 'bun:sqlite';
 import { z } from 'zod';
 import { iso } from '../clock/iso.ts';
-import { now } from '../clock/now.ts';
 import { HqError } from '../errors.ts';
-import { findPointedPR } from './find-pointed-pr.ts';
+import { logEvent } from '../log-event.ts';
+import type { Runner } from '../runner/types.ts';
 import { pickFiledSource } from './pick-filed-source.ts';
+import { readPointedPR } from './read-pointed-pr.ts';
+import { readPRBody } from './read-pr-body.ts';
 import type { LinearCall } from './types.ts';
 
 const labelSchema = z.object({ name: z.string() });
@@ -22,7 +24,13 @@ const filedNodeSchema = z.object({
 const pageInfoSchema = z.object({ hasNextPage: z.boolean(), endCursor: z.string().nullable() });
 const filedPageSchema = z.object({ issues: z.object({ nodes: z.array(filedNodeSchema), pageInfo: pageInfoSchema }) });
 
-export async function syncFiled(db: Database, call: LinearCall, from: Date, to: Date = now()): Promise<number> {
+interface SyncFiledOptions {
+  to: Date;
+  run: Runner;
+}
+
+export async function syncFiled(db: Database, call: LinearCall, from: Date, options: SyncFiledOptions): Promise<number> {
+  const to = options.to;
   const query = `query($after: String, $from: DateTimeOrDuration!, $to: DateTimeOrDuration!) {
     issues(first: 100, after: $after, includeArchived: true, filter: { createdAt: { gte: $from, lt: $to } }) {
       nodes { identifier title createdAt description creator { app } labels { nodes { name } } attachments { nodes { url metadata } } }
@@ -35,16 +43,27 @@ export async function syncFiled(db: Database, call: LinearCall, from: Date, to: 
     const answer = await call(query, { after, from: iso(from), to: iso(to) });
     const issues = filedPageSchema.parse(answer).issues;
     const fetchedAt = iso(to);
-    db.transaction(() => {
-      for (const node of issues.nodes) {
-        const description = node.description ?? '';
-        const labels = node.labels.nodes.map((label) => label.name);
+    const rows: { node: z.infer<typeof filedNodeSchema>; source: string; pointedPR: string | null }[] = [];
+    for (const node of issues.nodes) {
+      const description = node.description ?? '';
+      const labels = node.labels.nodes.map((label) => label.name);
 
-        // A null creator is an issue an integration filed, with no Linear user behind it.
-        const source = pickFiledSource({ title: node.title, description, labels, isBotCreator: node.creator === null || node.creator.app });
-        const attachments = node.attachments.nodes.map((attachment) => ({ url: attachment.url, openedAt: attachment.metadata?.createdAt ?? null }));
-        const pointedPR = findPointedPR(description, attachments, node.createdAt);
-        insert.run(node.identifier, iso(new Date(node.createdAt)), source, pointedPR, fetchedAt);
+      // A null creator is an issue an integration filed, with no Linear user behind it.
+      const source = pickFiledSource({ title: node.title, description, labels, isBotCreator: node.creator === null || node.creator.app });
+      const attachments = node.attachments.nodes.map((attachment) => ({ url: attachment.url, openedAt: attachment.metadata?.createdAt ?? null }));
+      const pointedPR = await readPointedPR({ id: node.identifier, description, createdAt: node.createdAt, attachments }, async (link) => {
+        const read = await readPRBody(options.run, link);
+        if (read.ok) {
+          return read.body;
+        }
+        logEvent(db, 'hq', `${link.owner}/${link.repo}#${link.number}`, 'pr-body-unread', 'hq', null, null, { issue: node.identifier, reason: read.reason });
+        return null;
+      });
+      rows.push({ node, source, pointedPR });
+    }
+    db.transaction(() => {
+      for (const row of rows) {
+        insert.run(row.node.identifier, iso(new Date(row.node.createdAt)), row.source, row.pointedPR, fetchedAt);
       }
     }).immediate();
     count += issues.nodes.length;

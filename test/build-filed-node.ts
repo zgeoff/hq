@@ -5,7 +5,7 @@ export interface FiledNode {
   description: string | null;
   creator: { app: boolean } | null;
   labels: { nodes: { name: string }[] };
-  attachments: { nodes: { url: string }[] };
+  attachments: { nodes: { url: string; metadata?: { createdAt: string } }[] };
 }
 
 export function buildFiledNode(identifier: string, description: string | null, overrides: Partial<FiledNode> = {}): FiledNode {

@@ -118,7 +118,7 @@ export async function watchTick(db: Database, d: WatchDeps): Promise<boolean> {
         }
         const linearAt = now();
         const linearFrom = new Date(linearAt.getTime() - 2 * 86_400_000);
-        await step('Linear issue types', () => syncLinear(db, makeAuditedLinearCaller(db, d.run), linearFrom, linearAt));
+        await step('Linear issue types', () => syncLinear(db, makeAuditedLinearCaller(db, d.run), linearFrom, { at: linearAt, run: d.run }));
         const alerted = sendThroughputAlerts(db, d.me, linearFrom, linearAt);
         if (alerted.length > 0) {
           d.log(`${at()} goals: told triage about ${alerted.join(', ')}`);
