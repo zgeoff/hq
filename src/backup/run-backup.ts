@@ -19,6 +19,7 @@ import { parseSnapshots } from './parse-snapshots.ts';
 import { readRemoteEnv } from './read-remote-env.ts';
 import { runRestic as restic } from './run-restic.ts';
 import { sources } from './sources.ts';
+import { createStagingHolderTable, writeStagingHolder } from './write-staging-holder.ts';
 import type { BackupRun, Snapshot } from './types.ts';
 import { toErrorMessage } from '../to-error-message.ts';
 
@@ -100,12 +101,12 @@ function createStagingLock(): Database {
   lock.run('PRAGMA busy_timeout = 5000');
   const holder = lock
     .transaction((): number | null => {
-      lock.run('CREATE TABLE IF NOT EXISTS holder (id INTEGER PRIMARY KEY CHECK (id = 1), pid INTEGER NOT NULL)');
+      createStagingHolderTable(lock);
       const row = HolderSchema.parse(lock.query('SELECT pid FROM holder WHERE id = 1').get());
       if (row !== null && isRunning(row.pid)) {
         return row.pid;
       }
-      lock.query('INSERT OR REPLACE INTO holder (id, pid) VALUES (1, ?)').run(process.pid);
+      writeStagingHolder(lock, process.pid);
       return null;
     })
     .immediate();
