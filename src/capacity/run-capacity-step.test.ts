@@ -5,6 +5,7 @@ import { freshDb } from '../../test/helpers.ts';
 import { overrideEnv } from '../config/override-env.ts';
 import { runCapacityStep } from './run-capacity-step.ts';
 import type { CapacityProbe } from './types.ts';
+import { buildSeeder } from '../test-utils/build-seeder.ts';
 
 function setupTest() {
   const fresh = freshDb();
@@ -18,7 +19,7 @@ function setupTest() {
   onTestFinished(fresh.cleanup);
   delete process.env['OP_SERVICE_ACCOUNT_TOKEN'];
   onTestFinished(() => saved !== undefined && (process.env['OP_SERVICE_ACCOUNT_TOKEN'] = saved));
-  return { db: fresh.db, pacing: join(fresh.dir, 'pacing.json'), probe };
+  return { db: fresh.db, seed: buildSeeder(fresh), pacing: join(fresh.dir, 'pacing.json'), probe };
 }
 
 test.each([
@@ -38,7 +39,7 @@ test.each([
 test("the Claude alert names pacing.json's launch limit", async () => {
   const ctx = setupTest();
   writeFileSync(ctx.pacing, JSON.stringify({ imp: { impMib: 2048 }, providers: { claude: { threshold: 95, unattended: true, target: 'imp' } } }));
-  ctx.db.query('INSERT INTO usage_samples (at, account, five_hour, seven_day) VALUES (?, ?, ?, ?)').run('2026-10-14T00:58:00Z', 'abcdef012345', 10, 91);
+  ctx.seed.usageSample({ at: '2026-10-14T00:58:00Z', account: 'abcdef012345', five_hour: 10, seven_day: 91 });
   onTestFinished(overrideEnv('HQ_NOW', '2026-10-14T01:00:00Z'));
   await runCapacityStep(ctx.db, ctx.probe, ctx.pacing, 'hq-lanes');
   process.env['HQ_NOW'] = '2026-10-14T01:05:00Z';
