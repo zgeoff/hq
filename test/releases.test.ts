@@ -18,6 +18,7 @@ import { setState } from '../src/runs/set-state.ts';
 import { overrideEnv } from '../src/config/override-env.ts';
 import { findPath } from '../src/test-utils/find-path.ts';
 import { NOON_SYDNEY, at, freshDb } from './helpers.ts';
+import { buildSeeder } from '../src/test-utils/build-seeder.ts';
 
 let db: Database;
 let cleanup: () => void;
@@ -377,7 +378,7 @@ test('a run that changed while GitHub was asked is left alone', async () => {
 
 test('the pass is due every 10 minutes', () => {
   expect(dueForShipPass(db, T)).toBe(true);
-  db.query("INSERT INTO meta (key, value) VALUES ('releases_checked_at', ?)").run(NOON_SYDNEY);
+  buildSeeder({ db }).meta({ key: 'releases_checked_at', value: NOON_SYDNEY });
   expect(dueForShipPass(db, new Date(T.getTime() + 9 * 60_000))).toBe(false);
   expect(dueForShipPass(db, new Date(T.getTime() + 10 * 60_000))).toBe(true);
 });

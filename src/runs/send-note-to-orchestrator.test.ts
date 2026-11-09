@@ -7,6 +7,7 @@ import { FROM_START } from './from-start.ts';
 import { ingestNotes } from './ingest-notes.ts';
 import { sendNoteToOrchestrator } from './send-note-to-orchestrator.ts';
 import { setState } from './set-state.ts';
+import { buildSeeder } from '../test-utils/build-seeder.ts';
 
 function setupTest() {
   const kettle = '00000032-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
@@ -24,15 +25,16 @@ function setupTest() {
       client.close();
     }
   };
-  const rewind = () => fresh.db.query("UPDATE meta SET value = ? WHERE key = 'atc_events_cursor'").run(FROM_START);
+  const seed = buildSeeder(fresh);
+  const rewind = () => seed.meta({ key: 'atc_events_cursor', value: FROM_START });
   const outbox = () => fresh.db.query('SELECT target, text FROM outbox ORDER BY id').all();
-  return { db: fresh.db, kettle, feed: stub.feed, tick, rewind, outbox };
+  return { db: fresh.db, kettle, feed: stub.feed, tick, rewind, outbox, seed };
 }
 
 test('a decision note reaches the orchestrator once across two ticks that both read it', async () => {
   const app = setupTest();
   addRun(app.db, { issue: 'GEO-9832', title: 'Invented kettle work', place: 'local', session: app.kettle, next: 'Agent working.', gate: null, geoffChat: false, actor: 'z-delivery' });
-  app.db.query("INSERT INTO meta (key, value) VALUES ('atc_events_cursor', ?)").run(FROM_START);
+  app.seed.meta({ key: 'atc_events_cursor', value: FROM_START });
   app.feed.push({ at: Date.parse(NOON_SYDNEY), session: app.kettle, name: 'kettle', kind: 'note', detail: 'descale with vinegar, not citric acid', label: 'decision' });
 
   await app.tick();
@@ -44,7 +46,7 @@ test('a decision note reaches the orchestrator once across two ticks that both r
 
 test('a blocked note from a session with no run names no issue', async () => {
   const app = setupTest();
-  app.db.query("INSERT INTO meta (key, value) VALUES ('atc_events_cursor', ?)").run(FROM_START);
+  app.seed.meta({ key: 'atc_events_cursor', value: FROM_START });
   app.feed.push({ at: Date.parse(NOON_SYDNEY), session: '00000033-bbbb-4bbb-8bbb-bbbbbbbbbbbb', name: 'widget', kind: 'note', detail: 'the widget press has no power', label: 'blocked' });
 
   await app.tick();
@@ -55,7 +57,7 @@ test('a blocked note from a session with no run names no issue', async () => {
 test('a progress note is not routed', async () => {
   const app = setupTest();
   addRun(app.db, { issue: 'GEO-9832', title: 'Invented kettle work', place: 'local', session: app.kettle, next: 'Agent working.', gate: null, geoffChat: false, actor: 'z-delivery' });
-  app.db.query("INSERT INTO meta (key, value) VALUES ('atc_events_cursor', ?)").run(FROM_START);
+  app.seed.meta({ key: 'atc_events_cursor', value: FROM_START });
   app.feed.push({ at: Date.parse(NOON_SYDNEY), session: app.kettle, name: 'kettle', kind: 'note', detail: 'filled the kettle', label: 'progress' });
 
   await app.tick();
@@ -66,7 +68,7 @@ test('a progress note is not routed', async () => {
 test('two decision notes at the same time each reach the orchestrator once across two ticks', async () => {
   const app = setupTest();
   addRun(app.db, { issue: 'GEO-9832', title: 'Invented kettle work', place: 'local', session: app.kettle, next: 'Agent working.', gate: null, geoffChat: false, actor: 'z-delivery' });
-  app.db.query("INSERT INTO meta (key, value) VALUES ('atc_events_cursor', ?)").run(FROM_START);
+  app.seed.meta({ key: 'atc_events_cursor', value: FROM_START });
   const at = Date.parse(NOON_SYDNEY);
   app.feed.push(
     { at, session: app.kettle, name: 'kettle', kind: 'note', detail: 'descale with vinegar', label: 'decision' },
@@ -96,7 +98,7 @@ test('a blocked note from the design pass session names the design pass, not the
   addRun(app.db, { issue: 'GEO-9833', title: 'Design the kettle spout', place: 'local', session: app.kettle, next: 'Agent working.', gate: null, geoffChat: false, design: 'agent', actor: 'z-delivery' });
   setState(app.db, 'GEO-9833', 'done', { note: 'design settled' }, 'z-delivery');
   addRun(app.db, { issue: 'GEO-9833', title: 'Build the kettle spout', place: 'local', session: null, next: 'Building.', gate: null, geoffChat: false, actor: 'z-delivery' });
-  app.db.query("INSERT INTO meta (key, value) VALUES ('atc_events_cursor', ?)").run(FROM_START);
+  app.seed.meta({ key: 'atc_events_cursor', value: FROM_START });
   app.feed.push({ at: Date.parse(NOON_SYDNEY), session: app.kettle, name: 'kettle', kind: 'note', detail: 'waiting on a spout sketch review', label: 'blocked' });
 
   await app.tick();

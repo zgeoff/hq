@@ -23,6 +23,7 @@ import { z } from 'zod';
 import { findPath } from '../src/test-utils/find-path.ts';
 import { parseJSON } from '../src/noslop/parse-json.ts';
 import { NOON_SYDNEY, at, createPushedClone, fakeAtc, freshDb } from './helpers.ts';
+import { buildSeeder } from '../src/test-utils/build-seeder.ts';
 
 let dir: string;
 let path: string;
@@ -303,7 +304,7 @@ test('it prints recheck after an item that needs one in hq unblock list', async 
 
 test('a schema upgrade backs up the live database first', () => {
   const db = openDb(path);
-  db.exec(`INSERT INTO meta (key, value) VALUES ('marker', 'kept')`);
+  buildSeeder({ db }).meta({ key: 'marker', value: 'kept' });
   const backup = migrate(db, path, true, [...MIGRATIONS, 'CREATE TABLE gadgets (name TEXT)']);
   db.close();
   expect(backup).toMatch(new RegExp(`hq\\.db\\.bak-v${MIGRATIONS.length}-`));

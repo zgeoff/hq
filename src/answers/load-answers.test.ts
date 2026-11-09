@@ -13,6 +13,7 @@ import { recordConsoleAnswer } from '../record-console-answer.ts';
 import { recordConsoleReview } from '../record-console-review.ts';
 import { addTyped } from '../typed/add-typed.ts';
 import { loadAnswers } from './load-answers.ts';
+import { buildSeeder } from '../test-utils/build-seeder.ts';
 
 function setupTest(): Database {
   const fresh = freshDb();
@@ -113,7 +114,7 @@ test('it reads an answer against the options it was given, after new text cleare
 test("it lists an earlier round's answer with that round's title, issues and session when its change events hold none of them", () => {
   const db = setupTest();
   addAsk(db, { kind: 'call', id: 'kettle-handle', title: 'Pick a handle', question: 'Wood or steel?', body: 'Wood or steel?', issues: ['GEO-9003'], forSession: 'kettle-bot', actor: 'kettle-bot' });
-  db.run("UPDATE events SET data = json_remove(data, '$.title', '$.issues', '$.forSession') WHERE subject = 'ask'");
+  buildSeeder({ db }).askEventsWithoutDetail();
   openAsk(db, { id: 'kettle-handle', force: true, actor: 'kettle-bot' });
   answerAsk(db, { id: 'kettle-handle', kind: 'call', answer: 'Wood', actor: 'teapot-bot' });
   at('2026-10-14T03:00:00Z');
@@ -136,7 +137,7 @@ test('it reads a review answer from before its facts were kept against the item 
   const db = setupTest();
   createUnblockItems(db, { 'review-6': { task: 'Review kettle#7 and say lgtm', links: [{ label: 'kettle#7', url: 'https://github.com/kettle-co/kettle/pull/7', subject: true }] } });
   recordConsoleReview(db, { id: 'review-6', review: 'changes', note: 'Wider lid.', actor: 'console' });
-  db.run("UPDATE events SET data = json_remove(data, '$.facts') WHERE action = 'console-review'");
+  buildSeeder({ db }).consoleReviewEventsWithoutFacts();
 
   expect(loadAnswers(db, { from: NOON_SYDNEY, to: '2026-10-14T04:00:00Z' }).map((answer) => [answer.title, answer.ref, answer.words])).toStrictEqual([['Review kettle#7 and say lgtm', 'https://github.com/kettle-co/kettle/pull/7', 'Wider lid.']]);
 });
@@ -148,7 +149,7 @@ test("it lists an earlier round's answer with no title, issues or session when n
   answerAsk(db, { id: 'kettle-spout', kind: 'call', answer: 'Long', actor: 'teapot-bot' });
   at('2026-10-14T03:00:00Z');
   addAsk(db, { kind: 'call', id: 'kettle-spout', title: 'Pick a lid', question: 'Flat or domed?', body: 'Flat or domed?', issues: ['GEO-9006'], forSession: 'teapot-bot', actor: 'kettle-bot' });
-  db.run("UPDATE events SET data = json_remove(data, '$.title', '$.issues', '$.forSession') WHERE subject = 'ask'");
+  buildSeeder({ db }).askEventsWithoutDetail();
 
   expect(loadAnswers(db, { from: NOON_SYDNEY, to: '2026-10-14T04:00:00Z' }).map((answer) => [answer.title, answer.issues, answer.session, answer.words])).toStrictEqual([[null, [], null, 'Long']]);
 });
@@ -157,7 +158,7 @@ test('it lists a review answer from before its facts were kept with no title or 
   const db = setupTest();
   createUnblockItems(db, { 'review-7': { task: 'Review kettle#8 and say lgtm', links: [{ label: 'kettle#8', url: 'https://github.com/kettle-co/kettle/pull/8', subject: true }] } });
   recordConsoleReview(db, { id: 'review-7', review: 'lgtm', note: '', actor: 'console' });
-  db.run("UPDATE events SET data = json_remove(data, '$.facts') WHERE action = 'console-review'");
+  buildSeeder({ db }).consoleReviewEventsWithoutFacts();
   at('2026-10-14T03:00:00Z');
   createUnblockItems(db, { 'review-7': { task: 'Review kettle#9 and say lgtm', links: [{ label: 'kettle#9', url: 'https://github.com/kettle-co/kettle/pull/9', subject: true }] } });
 
@@ -198,8 +199,7 @@ test('it throws on a stored ask answer whose text is not a string', () => {
   at('2026-10-14T01:01:00Z');
   recordConsoleAnswer(db, { id: 'kettle-descale', option: 'Descale it', note: '', actor: 'console' });
 
-  // the answer writers cannot store a non-string answer, so the test corrupts the stored event
-  db.run(`UPDATE events SET data = '{"answer":42}' WHERE subject = 'ask' AND action = 'answered'`);
+  buildSeeder({ db }).askAnswerEventWithNumber();
 
   expect(() => loadAnswers(db, { from: NOON_SYDNEY, to: '2026-10-14T02:00:00Z' })).toThrow('expected string, received number');
 });

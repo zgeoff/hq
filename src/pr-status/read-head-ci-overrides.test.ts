@@ -4,12 +4,13 @@ import { logEvent } from '../log-event.ts';
 import { readHeadCIOverrides } from './read-head-ci-overrides.ts';
 import { recordCICheckOverride } from './record-ci-check-override.ts';
 import { recordPROverride } from './record-pr-override.ts';
+import { buildSeeder } from '../test-utils/build-seeder.ts';
 
 function setupTest() {
   const fresh = freshDb();
   at(NOON_SYDNEY);
   onTestFinished(fresh.cleanup);
-  return { db: fresh.db };
+  return { db: fresh.db, seed: buildSeeder(fresh) };
 }
 
 test('it reads the CI overrides recorded at the head, newest record of a check winning', () => {
@@ -27,7 +28,7 @@ test('it reads the CI overrides recorded at the head, newest record of a check w
 test('it reads no CI override at the head once an override event of the PR holds text that is not JSON', () => {
   const ctx = setupTest();
   recordCICheckOverride(ctx.db, { repo: 'widgets', pr: 7, head: 'b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2', source: 'chat:kettle-1', note: 'An intended infra change.', actor: 'z-kettle', check: 'preview' });
-  ctx.db.query("INSERT INTO events (subject, subject_id, action, actor, at, data) VALUES ('hq', 'pr:widgets#7', 'pr-override', 'z-kettle', '2026-10-14T01:05:00Z', '{')").run();
+  ctx.seed.eventWithBrokenData({ subjectID: 'pr:widgets#7', action: 'pr-override', actor: 'z-kettle' });
 
   expect(readHeadCIOverrides(ctx.db, 'widgets', 7, 'b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2')).toStrictEqual([]);
 });

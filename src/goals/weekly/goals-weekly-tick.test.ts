@@ -16,6 +16,7 @@ import { setAccountLabel } from '../../accounts/set-account-label.ts';
 import type { Runner } from '../../runner/types.ts';
 import { refreshActionsSpend } from '../refresh-actions-spend.ts';
 import { at, fetchedDays, freshDb } from '../../../test/helpers.ts';
+import { buildSeeder } from '../../test-utils/build-seeder.ts';
 
 let db: Database;
 let dir: string;
@@ -258,7 +259,7 @@ test('health is red at 17:31 on a Monday with no run, quiet before 17:30 and on 
   synced(syd(MON, '16:50'));
   tick(MON, '17:05');
   expect(goalsWeeklyCheck(db, syd(MON, '17:31'))).toMatchObject({ ok: true });
-  db.query("UPDATE outbox SET status = 'failed'").run();
+  buildSeeder({ db }).failedOutbox();
   expect(goalsWeeklyCheck(db, syd(MON, '17:31'))).toMatchObject({ ok: false, line: expect.stringContaining('failed to send') });
 });
 
@@ -266,7 +267,7 @@ test('health still sees a failed message after the owner session is forwarded', 
   synced(syd(MON, '16:50'));
   tick(MON, '17:05');
   setForward(db, owner(), 'z-other');
-  db.query("UPDATE outbox SET status = 'failed'").run();
+  buildSeeder({ db }).failedOutbox();
   expect(db.query('SELECT target FROM outbox').get()).toEqual({ target: 'z-other' });
   expect(goalsWeeklyCheck(db, syd(MON, '17:31'))).toMatchObject({ ok: false, line: expect.stringContaining('failed to send') });
 });

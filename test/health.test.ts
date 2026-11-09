@@ -15,6 +15,7 @@ import { probeHealth } from '../src/probe/probe-health.ts';
 import type { RunResult, Runner } from '../src/runner/types.ts';
 import { NOON_SYDNEY, at, freshDb } from './helpers.ts';
 import { COMMAND_TIMEOUT_MS } from '../src/health/command-timeout-ms.ts';
+import { buildSeeder } from '../src/test-utils/build-seeder.ts';
 
 let db: Database;
 let cleanup: () => void;
@@ -175,7 +176,7 @@ test('it never tells z-stu about an oversized state file fixed inside 2 hours', 
 });
 
 test('it does not escalate a state-file problem opened before owners existed', async () => {
-  db.query("INSERT INTO meta (key, value) VALUES ('health_open', ?)").run(JSON.stringify({ 'state-size:kettle.md': { since: '2026-10-13T20:00:00.000Z', line: 'state file kettle.md is 20.0 KB, over its 16 KB limit' } }));
+  buildSeeder({ db }).meta({ key: 'health_open', value: JSON.stringify({ 'state-size:kettle.md': { since: '2026-10-13T20:00:00.000Z', line: 'state file kettle.md is 20.0 KB, over its 16 KB limit' } }) });
   const over = [{ key: 'state-size:kettle.md', ok: false, line: 'state file kettle.md is 20.0 KB, over its 16 KB limit', owner: { session: 'z-kettle', ask: 'trim it' } }];
 
   const result = await runChecks({ ...probe(world()), stateSizes: () => over }, healthSettings(db), {}, new Date(NOON_SYDNEY));

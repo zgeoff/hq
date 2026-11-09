@@ -1,6 +1,7 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { createLanesLook } from '../../test/create-lanes-look.ts';
 import { at, freshDb } from '../../test/helpers.ts';
+import { buildSeeder } from '../test-utils/build-seeder.ts';
 import { holdLanes } from './hold-lanes.ts';
 import { tick } from './tick.ts';
 
@@ -15,7 +16,7 @@ function setupTest() {
     look.promotable(2, time);
     tick(fresh.db, look.sample, 'hq-lanes');
   };
-  return { db: fresh.db, look, lookAt };
+  return { db: fresh.db, look, lookAt, seed: buildSeeder(fresh) };
 }
 
 test('it sends nothing to z-stu at 29 minutes, one message at 30, and none later in the same cause episode', async () => {
@@ -35,7 +36,8 @@ test('it sends nothing to z-stu at 29 minutes, one message at 30, and none later
 test('it names when the low-water message reached z-triage, and leaves it out while the message waits', async () => {
   const ctx = setupTest();
   await ctx.lookAt('2026-10-14T01:00:00Z', 0);
-  ctx.db.query("UPDATE outbox SET status = 'sent', sent_at = '2026-10-14T01:07:00Z' WHERE topic = 'lanes-low-water'").run();
+  at('2026-10-14T01:07:00Z');
+  ctx.seed.sentOutbox({ topic: 'lanes-low-water' });
   await ctx.lookAt('2026-10-14T01:30:00Z', 0);
 
   expect(ctx.look.stalled()).toStrictEqual([{ target: 'z-stu', text: 'Lanes: 3 slots empty for 30 min with Backlog issues to promote (triage). z-triage got the low-water message at 12:07.' }]);

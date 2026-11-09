@@ -2,11 +2,16 @@ import { expect, onTestFinished, spyOn, test } from 'bun:test';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createUnblockItems } from '../../test/create-unblock-items.ts';
-import { freshDb } from '../../test/helpers.ts';
+import { buildMockSha } from '../../test/build-mock-sha.ts';
+import { closePr } from '../runs/close-pr.ts';
+import { reviewStarted } from '../runs/review-started.ts';
+import { writeReviewed } from '../runs/write-reviewed.ts';
+import { at, freshDb } from '../../test/helpers.ts';
 import { main } from '../cli.ts';
 import { setMeta } from '../db/set-meta.ts';
 import { overrideEnv } from '../config/override-env.ts';
 import { loadBand } from './load-band.ts';
+import { buildSeeder } from '../test-utils/build-seeder.ts';
 
 function setupTest() {
   const fresh = freshDb();
@@ -17,7 +22,7 @@ function setupTest() {
 
   // hq finds pacing.json beside capacity.sh's folder, so hq run lane reads the test's own.
   onTestFinished(overrideEnv('HQ_CAPACITY', join(fresh.dir, 'scripts', 'capacity.sh')));
-  return { db: fresh.db, pacing: join(fresh.dir, 'pacing.json') };
+  return { db: fresh.db, seed: buildSeeder(fresh), pacing: join(fresh.dir, 'pacing.json') };
 }
 
 test('all clear: nothing needs the owner, Nix is up, impd has room, CI passed, and each segment is plain', async () => {
@@ -68,12 +73,12 @@ test('something waiting on the owner turns Needs you red', async () => {
 test.each([
   ['with a fresh probe sample', '2026-10-15T01:00:00Z'],
   ['once the probe falls silent', '2026-10-15T01:05:00Z'],
-])('an open outage is Nix down in red %s', async (_case, at) => {
+])('it shows an open outage as Nix down in red %s', async (_case, lookedAt) => {
   const ctx = setupTest();
   ctx.db.query("INSERT INTO probe_samples (at, target_ok, control_ok) VALUES ('2026-10-15T00:59:00Z', 1, 1)").run();
   ctx.db.query("INSERT INTO outages (started_at, detected_at, kind) VALUES ('2026-10-15T00:50:00Z', '2026-10-15T00:53:00Z', 'down')").run();
 
-  await expect(loadBand(ctx.db, ctx.pacing, new Date(at)).then((band) => band.segments[1])).resolves.toStrictEqual({ key: 'nix', text: 'Nix down', tone: 'alert' });
+  await expect(loadBand(ctx.db, ctx.pacing, new Date(lookedAt)).then((band) => band.segments[1])).resolves.toStrictEqual({ key: 'nix', text: 'Nix down', tone: 'alert' });
 });
 
 test('a probe silent over 5 minutes with no outage open is Nix unknown in amber', async () => {
@@ -93,16 +98,21 @@ test('a fresh probe sample that was blind, the target and the control both faili
 
 test('reviews counts open PRs whose review started in the last 24 hours and has not finished', async () => {
   const ctx = setupTest();
-  ctx.db.query("INSERT INTO runs (issue, title, place, state, created_at, updated_at) VALUES ('GEO-9601', 'Fit the long spout', 'imp', 'working', '2026-10-13T00:00:00Z', '2026-10-15T00:00:00Z')").run();
-  ctx.db
-    .query(
-      `INSERT INTO run_prs (ref, issue, state, review_started_at, reviewed_at, added_at, updated_at) VALUES
-         ('kettle#41', 'GEO-9601', 'open', '2026-10-15T00:30:00Z', NULL, '2026-10-13T00:00:00Z', '2026-10-15T00:00:00Z'),
-         ('kettle#42', 'GEO-9601', 'open', '2026-10-15T00:10:00Z', '2026-10-15T00:20:00Z', '2026-10-13T00:00:00Z', '2026-10-15T00:00:00Z'),
-         ('kettle#43', 'GEO-9601', 'closed', '2026-10-15T00:30:00Z', NULL, '2026-10-13T00:00:00Z', '2026-10-15T00:00:00Z'),
-         ('kettle#44', 'GEO-9601', 'open', '2026-10-13T00:30:00Z', NULL, '2026-10-13T00:00:00Z', '2026-10-15T00:00:00Z')`,
-    )
-    .run();
+  at('2026-10-13T00:00:00Z');
+  ctx.seed.run({ issue: 'GEO-9601', title: 'Fit the long spout', place: 'imp' });
+  for (const ref of ['kettle#41', 'kettle#42', 'kettle#43', 'kettle#44']) {
+    ctx.seed.runPr({ issue: 'GEO-9601', ref });
+  }
+  at('2026-10-13T00:30:00Z');
+  reviewStarted(ctx.db, 'kettle#44', 'kettle-bot');
+  at('2026-10-15T00:10:00Z');
+  reviewStarted(ctx.db, 'kettle#42', 'kettle-bot');
+  at('2026-10-15T00:20:00Z');
+  writeReviewed(ctx.db, 'kettle', 42, { head: buildMockSha(42), countsRound: false });
+  at('2026-10-15T00:30:00Z');
+  reviewStarted(ctx.db, 'kettle#41', 'kettle-bot');
+  reviewStarted(ctx.db, 'kettle#43', 'kettle-bot');
+  closePr(ctx.db, 'kettle#43', { to: 'closed', actor: 'kettle-bot' });
 
   await expect(loadBand(ctx.db, ctx.pacing, new Date('2026-10-15T01:00:00Z')).then((band) => band.segments[4])).resolves.toStrictEqual({ key: 'reviews', text: 'reviews 1', tone: 'ok' });
 });
@@ -146,9 +156,10 @@ test.each([
   const ctx = setupTest();
   writeFileSync(ctx.pacing, JSON.stringify({ imp: { impMib: 2048 }, lanes: { imp: { cleanup: 3 }, local: { flexible: 1 } } }));
   ctx.db.query("INSERT INTO capacity_samples (at, nonnix_awake_mib, nonnix_awake_vcpus) VALUES ('2026-10-15T00:55:00Z', 8192, 6)").run();
-  ctx.db
-    .query("WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < ?) INSERT INTO runs (issue, title, place, state, lane, created_at, updated_at) SELECT 'GEO-970' || i, 'Fit the long spout', ?, 'working', 'cleanup', '2026-10-15T00:00:00Z', '2026-10-15T00:00:00Z' FROM n")
-    .run(row.count, row.place);
+  at('2026-10-15T00:00:00Z');
+  for (let index = 1; index <= row.count; index++) {
+    ctx.seed.run({ issue: `GEO-970${index}`, title: 'Fit the long spout', place: row.place, lane: 'cleanup' });
+  }
 
   await expect(loadBand(ctx.db, ctx.pacing, new Date('2026-10-15T01:00:00Z')).then((band) => band.segments[2])).resolves.toStrictEqual({ key: 'lanes', text: row.text, tone: row.tone });
 });

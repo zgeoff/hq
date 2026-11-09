@@ -26,6 +26,7 @@ import { tick } from './tick.ts';
 import { validateLaneRules } from './validate-lane-rules.ts';
 import { writeDesignBacklog } from './write-design-backlog.ts';
 import { writeLaneSkip } from './write-lane-skip.ts';
+import { buildSeeder } from '../test-utils/build-seeder.ts';
 
 function setupTest() {
   const fresh = freshDb();
@@ -50,7 +51,7 @@ function setupTest() {
   const addImpRun = (issue: string): void => {
     addRun(fresh.db, { issue, title: 'Polish the kettle', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: null, actor: 'z-delivery' });
   };
-  return { db: fresh.db, readySeeds, sample, seedReady, addLocalRun, addImpRun };
+  return { db: fresh.db, seed: buildSeeder(fresh), readySeeds, sample, seedReady, addLocalRun, addImpRun };
 }
 
 test('a focus set changes what the next plan picks, and the running run keeps its slot', async () => {
@@ -354,8 +355,7 @@ test('it picks the Ready issue of a closed design pass and leaves out one whose 
 test('it leaves out of the picks a Ready issue whose closed run from before v46 was its Design-type pass', () => {
   const ctx = setupTest();
   writeIssues(ctx.db, [{ issue: 'GEO-9816', type: 'Design', title: 'Design: a quieter kettle whistle', state: 'open', closed_at: null }]);
-  addRun(ctx.db, { issue: 'GEO-9816', title: 'Design: a quieter kettle whistle', place: 'local', session: null, next: 'The owner chats.', gate: null, geoffChat: true, lane: null, actor: 'z-delivery' });
-  ctx.db.query('UPDATE runs SET design_lane = NULL WHERE issue = ?').run('GEO-9816');
+  ctx.seed.runBeforeDesignLanes({ issue: 'GEO-9816', title: 'Design: a quieter kettle whistle', place: 'local', next: 'The owner chats.', geoffChat: true, lane: null });
   setState(ctx.db, 'GEO-9816', 'done', { note: 'design settled' }, 'z-delivery');
   setMeta(ctx.db, 'lanes_ready_issues', JSON.stringify({ at: '2026-10-15T20:00:00Z', eligible: [buildReadyIssue('GEO-9816', { project: 'kettle roadmap', type: 'Feature', priority: 2 })], design: [] }));
 

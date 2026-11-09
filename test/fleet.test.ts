@@ -30,6 +30,7 @@ import { wakeList } from '../src/wake/wake-list.ts';
 import { FOUR_AM_SYDNEY, NOON_SYDNEY, at, createDefsRepo, freshDb, requireEnv } from './helpers.ts';
 import { readPrompt } from '../src/prompts/read-prompt.ts';
 import { resetFetchCache } from '../src/prompts/reset-fetch-cache.ts';
+import { buildSeeder } from '../src/test-utils/build-seeder.ts';
 
 
 const KETTLE = 'skills/kettle/references/session-prompt.md';
@@ -62,6 +63,7 @@ function setupTest() {
   const rcFleet = () => [{ ...kettleEntry, remoteControl: true }];
   return {
     db: fresh.db,
+    seed: buildSeeder(fresh),
     directory,
     fleet,
     hqPrivate: defs.private,
@@ -448,9 +450,9 @@ test('fleet ensure runs one at a time: an overlapping run is refused and spawns 
 test('a lease left by a crashed run expires', async () => {
   const ctx = setupTest();
   const { client } = fake([]);
-  ctx.db.query(`INSERT INTO meta (key, value) VALUES ('fleet_ensure_lease', ?)`).run(JSON.stringify({ token: 'old', by: 'hq-fleet', until: Date.now() - 1 }));
+  ctx.seed.meta({ key: 'fleet_ensure_lease', value: JSON.stringify({ token: 'old', by: 'hq-fleet', until: Date.now() - 1 }) });
   await ensureFleet(ctx.db, client, { dryRun: false, actor: 'z-stu', fleet: ctx.fleet });
-  ctx.db.query(`INSERT OR REPLACE INTO meta (key, value) VALUES ('fleet_ensure_lease', ?)`).run(JSON.stringify({ token: 'live', by: 'hq-fleet', until: Date.now() + 60_000 }));
+  ctx.seed.meta({ key: 'fleet_ensure_lease', value: JSON.stringify({ token: 'live', by: 'hq-fleet', until: Date.now() + 60_000 }) });
   await expect(ensureFleet(ctx.db, client, { dryRun: false, actor: 'z-stu', fleet: ctx.fleet })).rejects.toThrow('another hq fleet ensure is running (hq-fleet)');
 });
 

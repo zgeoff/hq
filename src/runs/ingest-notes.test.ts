@@ -10,6 +10,7 @@ import { FROM_START } from './from-start.ts';
 import { listRuns } from './list-runs.ts';
 import { ingestNotes } from './ingest-notes.ts';
 import { setState } from './set-state.ts';
+import { buildSeeder } from '../test-utils/build-seeder.ts';
 
 const KETTLE = '00000031-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 
@@ -22,13 +23,14 @@ function setupTest() {
   });
   addRun(fresh.db, { issue: 'GEO-9731', title: 'Invented kettle work', place: 'local', session: KETTLE, next: 'Agent working.', gate: null, geoffChat: false, actor: 'z-delivery' });
   stub.feed.push({ at: new Date(NOON_SYDNEY).getTime(), session: KETTLE, name: 'kettle', kind: 'note', detail: 'descaled the kettle', label: 'progress' });
-  fresh.db.query("INSERT INTO meta (key, value) VALUES ('atc_events_cursor', ?)").run(Buffer.from(JSON.stringify({ k: 'ev', i: 0 })).toString('base64url'));
+  const seed = buildSeeder(fresh);
+  seed.meta({ key: 'atc_events_cursor', value: Buffer.from('{"k":"ev","i":0}').toString('base64url') });
   const eventData = () =>
     z
       .array(z.object({ data: z.string() }))
       .parse(fresh.db.query(`SELECT data FROM events WHERE action = 'final'`).all())
       .map((event) => z.record(z.string(), z.unknown()).parse(JSON.parse(event.data)));
-  return { db: fresh.db, stub, eventData };
+  return { db: fresh.db, stub, eventData, seed };
 }
 
 async function openClient(): Promise<AtcClient> {
@@ -86,7 +88,7 @@ test('it reads GitHub nothing for a FINAL note read again after the feed rewinds
   await ingestNotes(app.db, client, { run });
   app.stub.feed.push({ at: new Date(NOON_SYDNEY).getTime() + 1000, session: KETTLE, name: 'kettle', kind: 'note', detail: 'FINAL kettle#714 44238662', label: 'progress' });
   await ingestNotes(app.db, client, { run });
-  app.db.query("UPDATE meta SET value = ? WHERE key = 'atc_events_cursor'").run(FROM_START);
+  app.seed.meta({ key: 'atc_events_cursor', value: FROM_START });
 
   await ingestNotes(app.db, client, { run });
 
@@ -177,7 +179,7 @@ test('it keeps a late note from the design pass session but marks no build PR fi
   addRun(fresh.db, { issue: 'GEO-9732', title: 'Build the kettle spout', place: 'local', session: null, next: 'Building.', gate: null, geoffChat: false, actor: 'z-delivery' });
   addPr(fresh.db, 'GEO-9732', 'kettle#32', 'z-delivery');
   stub.feed.push({ at: new Date(NOON_SYDNEY).getTime(), session: KETTLE, name: 'kettle', kind: 'note', detail: 'the spout sketch is final at 39f05fe', label: 'progress' });
-  fresh.db.query("INSERT INTO meta (key, value) VALUES ('atc_events_cursor', ?)").run(FROM_START);
+  buildSeeder(fresh).meta({ key: 'atc_events_cursor', value: FROM_START });
   const client = await openClient();
 
   const ingested = await ingestNotes(fresh.db, client, { run: buildStubFinalGH({ commits: [] }, []) });
@@ -198,7 +200,7 @@ test('it asks GitHub nothing about a FINAL in a late note from the design pass s
   addRun(fresh.db, { issue: 'GEO-9732', title: 'Build the kettle spout', place: 'local', session: null, next: 'Building.', gate: null, geoffChat: false, actor: 'z-delivery' });
   addPr(fresh.db, 'GEO-9732', 'kettle#32', 'z-delivery');
   stub.feed.push({ at: new Date(NOON_SYDNEY).getTime(), session: KETTLE, name: 'kettle', kind: 'note', detail: 'the spout sketch is final at 39f05fe', label: 'progress' });
-  fresh.db.query("INSERT INTO meta (key, value) VALUES ('atc_events_cursor', ?)").run(FROM_START);
+  buildSeeder(fresh).meta({ key: 'atc_events_cursor', value: FROM_START });
   const client = await openClient();
   const calls: string[] = [];
 

@@ -12,6 +12,7 @@ import { readRefusalFiles } from '../src/refusals/read-refusal-files.ts';
 import { readRefusalRows } from '../src/refusals/read-refusal-rows.ts';
 import { scanRefusals } from '../src/refusals/scan-refusals.ts';
 import { type FakeAtc, at, fakeAtc, freshDb } from './helpers.ts';
+import { buildSeeder } from '../src/test-utils/build-seeder.ts';
 
 let db: Database;
 let dir: string;
@@ -263,13 +264,14 @@ test('the caps: input 120, reason 300', async () => {
 });
 
 test('atc names the session and hq run_sessions gives the issue; atc down scans with nulls', async () => {
-  db.query(`INSERT INTO runs (issue, title, place, state, created_at, updated_at) VALUES ('GEO-9', 't', 'local', 'working', '2026-10-16T00:00:00Z', '2026-10-16T00:00:00Z')`).run();
-  db.query(`INSERT INTO run_sessions (session_id, issue, added_at) VALUES ('id-w', 'GEO-9', '2026-10-16T00:00:00Z')`).run();
+  at('2026-10-16T00:00:00Z');
+  buildSeeder({ db }).run({ issue: 'GEO-9', title: 't', place: 'local' });
+  buildSeeder({ db }).runSession({ issue: 'GEO-9', session: 'a0000009-aaaa-4aaa-8aaa-aaaaaaaaaaaa' });
   file('p/s.jsonl', jl(tu('t1', 'Bash', { command: 'a' }), refused('t1', 'with atc')));
-  atc = fakeAtc(dir, [{ id: 'id-w', name: 'z-worker', alive: true, state: 'done', agentSessionID: SID }]);
+  atc = fakeAtc(dir, [{ id: 'a0000009-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'z-worker', alive: true, state: 'done', agentSessionID: SID }]);
   process.env['HQ_ATC_SOCKET'] = join(dir, 'atc.sock');
   await scanRefusals(db, { dir: proj() });
-  expect(rows()[0]).toMatchObject({ atc_session: 'id-w', atc_name: 'z-worker', issue: 'GEO-9' });
+  expect(rows()[0]).toMatchObject({ atc_session: 'a0000009-aaaa-4aaa-8aaa-aaaaaaaaaaaa', atc_name: 'z-worker', issue: 'GEO-9' });
 
   appendFileSync(join(proj(), 'p/s.jsonl'), jl(tu('t2', 'Bash', { command: 'b' }), refused('t2', 'atc down')));
   atc.stop();

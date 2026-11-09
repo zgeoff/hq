@@ -8,6 +8,7 @@ import { MIGRATIONS } from '../db/migrations.ts';
 import { openDb } from '../db/open-db.ts';
 import { SCHEMA_VERSION } from '../db/schema-version.ts';
 import { recordRound } from './record-round.ts';
+import { buildSeeder } from '../test-utils/build-seeder.ts';
 
 function setupTest() {
   const base = mkdtempSync(join(tmpdir(), 'hq-noslop-'));
@@ -35,7 +36,7 @@ test('it upgrades a v23 database to v24 after taking a backup, keeping its rows'
   const stored = new Database(path, { create: true, strict: true });
   onTestFinished(() => stored.close());
   migrate(stored, path, false, MIGRATIONS.slice(0, 23));
-  stored.query("INSERT INTO meta (key, value) VALUES ('keep', 'me')").run();
+  buildSeeder({ db: stored }).meta({ key: 'keep', value: 'me' });
 
   expect(migrate(stored, path, true, MIGRATIONS.slice(0, 24))).toContain('.bak-v23-');
 

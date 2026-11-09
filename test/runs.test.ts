@@ -35,6 +35,7 @@ import { parseJSON } from '../src/noslop/parse-json.ts';
 import { buildStubFinalGH } from './build-stub-final-gh.ts';
 import { buildStubGitHubFactsRunner } from './build-stub-github-facts-runner.ts';
 import { type FakeAtc, NOON_SYDNEY, at, fakeAtc, freshDb } from './helpers.ts';
+import { buildSeeder } from '../src/test-utils/build-seeder.ts';
 
 let db: Database;
 let dir: string;
@@ -230,7 +231,7 @@ describe('reading the event feed', () => {
 
   test('a cursor the daemon no longer knows is re-synced to the end', async () => {
     atc = fakeAtc(dir, []);
-    db.query(`INSERT INTO meta (key, value) VALUES ('atc_events_cursor', 'not-a-cursor')`).run();
+    buildSeeder({ db }).meta({ key: 'atc_events_cursor', value: 'not-a-cursor' });
     const c = await AtcClient.open();
     try {
       const resynced = await ingestNotes(db, c, { run: buildStubFinalGH({ commits: 'fault' }, []) });
@@ -245,7 +246,7 @@ describe('reading the event feed', () => {
     atc = fakeAtc(dir, []);
     atc.feed.push({ at: base, session: S1, name: 'x', kind: 'turn-done', detail: null });
     const past = Buffer.from(JSON.stringify(['events', 500])).toString('base64url');
-    db.query(`INSERT INTO meta (key, value) VALUES ('atc_events_cursor', ?)`).run(past);
+    buildSeeder({ db }).meta({ key: 'atc_events_cursor', value: past });
     const c = await AtcClient.open();
     try {
       const first = await ingestNotes(db, c, { run: buildStubFinalGH({ commits: 'fault' }, []) });
@@ -498,7 +499,7 @@ describe('re-check fixes', () => {
     atc = fakeAtc(dir, [{ id: S1, name: 'kettle', alive: true, state: 'running' }]);
     add();
     for (let i = 0; i < 201; i++) atc.feed.push({ at: base + i * 1000, session: S1, name: 'kettle', kind: 'note', detail: `note ${i}`, label: 'progress' });
-    db.query(`INSERT INTO meta (key, value) VALUES ('atc_events_cursor', 'not-a-cursor')`).run();
+    buildSeeder({ db }).meta({ key: 'atc_events_cursor', value: 'not-a-cursor' });
     const c = await AtcClient.open();
     try {
       const reset = await ingestNotes(db, c, { run: buildStubFinalGH({ commits: 'fault' }, []) });

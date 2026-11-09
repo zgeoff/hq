@@ -261,7 +261,7 @@ test('the sample records the eligible issues the Ready read holds, the hand coun
   tick(db, sample(16384), 'hq-lanes');
   expect(eligible()).toStrictEqual({ eligible: 2, slots: 2 });
 
-  db.query("DELETE FROM meta WHERE key = 'lanes_ready_issues'").run();
+  setMeta(db, 'lanes_ready_issues', null);
   atMin(2);
   tick(db, sample(16384), 'hq-lanes');
   expect(eligible()).toStrictEqual({ eligible: null, slots: 10 });

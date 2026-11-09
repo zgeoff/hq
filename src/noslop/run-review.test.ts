@@ -12,6 +12,7 @@ import { withRepoLock } from '../review/with-repo-lock.ts';
 import { runNoslopCommand } from './run-noslop-command.ts';
 import { runReview } from './run-review.ts';
 import { withCloneLock } from './with-clone-lock.ts';
+import { buildSeeder } from '../test-utils/build-seeder.ts';
 
 const PINNED = '0123456789abcdef0123456789abcdef01234567';
 
@@ -41,6 +42,7 @@ function setupTest() {
   return {
     base,
     db,
+    seed: buildSeeder({ db }),
 
     addReview: (findings: string, head: string | null = null) => db.query("INSERT INTO noslop_rounds (repo, pr, kind, started_at, ended_at, ms, ok, head, depth, special, findings, sha) VALUES ('widgets', 7, 'review', 'a', 'b', 1, 1, ?, 'standard', 'none', ?, 'x')").run(head, findings),
     addRound: (kind: 'review' | 'check', ok: number, depth: string | null, special: string | null) => db.query("INSERT INTO noslop_rounds (repo, pr, kind, started_at, ended_at, ms, ok, depth, special, sha) VALUES ('widgets', 7, ?, 'a', 'b', 1, ?, ?, ?, 'x')").run(kind, ok, depth, special),
@@ -190,8 +192,7 @@ test('it reviews a listed repo\'s PR on noslop though a run already gave it a Co
   const ctx = setupTest();
   const fake = buildFakeRunner();
   ctx.listWidgets();
-  ctx.db.exec('PRAGMA foreign_keys = OFF');
-  ctx.db.query("INSERT INTO run_prs (ref, issue, state, review_round, added_at, updated_at) VALUES ('widgets#7', 'GEO-1', 'open', 1, '2026-10-18T00:00:00Z', '2026-10-18T00:00:00Z')").run();
+  ctx.seed.runPrWithoutRun({ ref: 'widgets#7', issue: 'GEO-1', reviewRound: 1 });
 
   await expect(runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false })).resolves.toMatchObject({ engine: 'noslop' });
 
@@ -234,8 +235,9 @@ test('it never falls back to Codex when noslop gives no review', async () => {
 });
 
 function createRunPR(db: ReturnType<typeof openDb>): void {
-  db.query("INSERT INTO runs (issue, title, place, state, created_at, updated_at) VALUES ('GEO-9702', 'Fit the kettle lid', 'local', 'working', '2026-10-14T00:00:00Z', '2026-10-14T00:00:00Z')").run();
-  db.query("INSERT INTO run_prs (ref, issue, state, review_round, added_at, updated_at) VALUES ('widgets#7', 'GEO-9702', 'open', 0, '2026-10-14T00:00:00Z', '2026-10-14T00:00:00Z')").run();
+  const seed = buildSeeder({ db });
+  seed.run({ issue: 'GEO-9702', title: 'Fit the kettle lid', place: 'local' });
+  seed.runPr({ issue: 'GEO-9702', ref: 'widgets#7' });
 }
 
 test('it marks the PR on its run reviewed at the head the round read, with no session writing it', async () => {

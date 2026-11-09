@@ -20,6 +20,7 @@ import { updateEnv } from '@zgeoff/testing/helpers';
 import { createStubSystemctl } from '../../test/create-stub-systemctl.ts';
 import { freshDb } from '../../test/helpers.ts';
 import { findPath } from '../test-utils/find-path.ts';
+import { buildSeeder } from '../test-utils/build-seeder.ts';
 
 test('the table loads and each single role resolves to one declared session', () => {
   expect(ROLES.sessions.length).toBeGreaterThan(5);
@@ -287,7 +288,7 @@ test('a declared forward needs no meta row, and a meta row wins', () => {
   const { db, cleanup } = freshDb();
   try {
     expect(forwardOf(db, 'z-refine')).toBe(declaredForwards()['z-refine']!);
-    db.query(`INSERT INTO meta (key, value) VALUES ('outbox_forwards', ?)`).run(JSON.stringify({ 'z-refine': 'z-other' }));
+    buildSeeder({ db }).meta({ key: 'outbox_forwards', value: JSON.stringify({ 'z-refine': 'z-other' }) });
     expect(forwardOf(db, 'z-refine')).toBe('z-other');
   } finally {
     cleanup();

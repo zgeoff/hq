@@ -13,6 +13,7 @@ import { metaJson } from '../src/db/meta-json.ts';
 import { strMap } from '../src/db/str-map.ts';
 import { freshDb } from './helpers.ts';
 import { startStubAtcDaemon } from './start-stub-atc-daemon.ts';
+import { buildSeeder } from '../src/test-utils/build-seeder.ts';
 
 const saved = { ...process.env };
 afterEach(() => {
@@ -113,11 +114,12 @@ test('metaJson: a missing key gives the fallback, a valid value its parse, a mal
   const { db, cleanup } = freshDb();
   try {
     expect(metaJson(db, 'invented_map', strMap, { a: 'b' })).toEqual({ a: 'b' });
-    db.query("INSERT INTO meta (key, value) VALUES ('invented_map', ?)").run('{"x":"y"}');
+    const seed = buildSeeder({ db });
+    seed.meta({ key: 'invented_map', value: '{"x":"y"}' });
     expect(metaJson(db, 'invented_map', strMap, {})).toEqual({ x: 'y' });
-    db.query("UPDATE meta SET value = '{\"x\":4}' WHERE key = 'invented_map'").run();
+    seed.meta({ key: 'invented_map', value: '{"x":4}' });
     expect(() => metaJson(db, 'invented_map', strMap, {})).toThrow(expect.objectContaining({ code: 'bad_meta', message: expect.stringContaining("'invented_map'") }));
-    db.query("UPDATE meta SET value = '{not json' WHERE key = 'invented_map'").run();
+    seed.meta({ key: 'invented_map', value: '{not json' });
     expect(() => metaJson(db, 'invented_map', z.array(z.string()), [])).toThrow(expect.objectContaining({ code: 'bad_meta', message: expect.stringContaining("'invented_map'") }));
   } finally {
     cleanup();

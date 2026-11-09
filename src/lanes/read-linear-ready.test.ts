@@ -15,12 +15,13 @@ import { readReadySnapshot } from './read-ready-snapshot.ts';
 import { readSkipUnread } from './read-skip-unread.ts';
 import { validateLaneRules } from './validate-lane-rules.ts';
 import { writeLaneSkip } from './write-lane-skip.ts';
+import { buildSeeder } from '../test-utils/build-seeder.ts';
 
 function setupTest() {
   const fresh = freshDb();
   onTestFinished(fresh.cleanup);
   at('2026-10-15T20:00:00Z');
-  return { db: fresh.db };
+  return { db: fresh.db, seed: buildSeeder(fresh) };
 }
 
 test('it sums two pages into one report', async () => {
@@ -177,7 +178,8 @@ test('it keeps the areas of a running issue after it leaves Ready', async () => 
   const ctx = setupTest();
   const rules = validateLaneRules(rulesTable, Object.keys(rulesTable.lanes));
   await readLinearReady(ctx.db, { call: makePagedCall(buildReadyPage([{ identifier: 'GEO-9801', labels: ['nixie'] }, { identifier: 'GEO-9802', labels: ['vers'] }], null)), run: buildStubGitHubFactsRunner({}), actor: 'hq-lanes', rules });
-  ctx.db.query("INSERT INTO runs (issue, title, place, state, created_at, updated_at) VALUES ('GEO-9801', 'Polish the kettle', 'imp', 'working', '2026-10-15T20:00:00Z', '2026-10-15T20:00:00Z')").run();
+  at('2026-10-15T20:00:00Z');
+  ctx.seed.run({ issue: 'GEO-9801', title: 'Polish the kettle', place: 'imp' });
   at('2026-10-15T20:10:00Z');
 
   await readLinearReady(ctx.db, { call: makePagedCall(buildReadyPage([], null)), run: buildStubGitHubFactsRunner({}), actor: 'hq-lanes', rules });
