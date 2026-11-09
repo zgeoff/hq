@@ -1,4 +1,5 @@
 import { expect, mock, onTestFinished, test } from 'bun:test';
+import { join } from 'node:path';
 import { buildStubFleetClient } from '../../test/build-stub-fleet-client.ts';
 import { freshDb } from '../../test/helpers.ts';
 import { overrideEnv } from '../config/override-env.ts';
@@ -25,7 +26,7 @@ import { wrapUpMergedRuns } from './wrap-up-merged-runs.ts';
 function setupTest() {
   const fresh = freshDb();
   onTestFinished(fresh.cleanup);
-  return { db: fresh.db, path: fresh.path };
+  return { db: fresh.db, directory: fresh.dir, path: fresh.path };
 }
 
 test.each(['merged', 'live-check', 'deploy-held'])('it wraps up a %s run whose PRs are all merged or closed', async (state) => {
@@ -53,7 +54,7 @@ test('it forgets a session whose working directory was removed', async () => {
   setState(ctx.db, 'GEO-9901', 'merged', {}, 'z-delivery');
   const fleet = buildStubFleetClient({ sessions: [{ id: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true }] });
 
-  const wrapped = await wrapUpMergedRuns(ctx.db, { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')), readLocalWork: () => readLocalWork(realRunner, '/nonexistent/hq-test/kettle-workspace') }, { actor: 'sweep' });
+  const wrapped = await wrapUpMergedRuns(ctx.db, { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')), readLocalWork: () => readLocalWork(realRunner, join(ctx.directory, 'kettle-workspace')) }, { actor: 'sweep' });
 
   expect(wrapped[0]?.wrapUp.forgotten).toStrictEqual(['0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa']);
 });

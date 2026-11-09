@@ -1,4 +1,5 @@
 import { expect, onTestFinished, test } from 'bun:test';
+import { join } from 'node:path';
 import { updateEnv } from '@zgeoff/testing/helpers';
 import { buildStubFleetClient } from '../../test/build-stub-fleet-client.ts';
 import { buildStubGitHubFactsRunner } from '../../test/build-stub-github-facts-runner.ts';
@@ -41,6 +42,7 @@ async function setupTest() {
 
   return {
     db: fresh.db,
+    directory: fresh.dir,
     fleet,
     forgets,
     work,
@@ -87,7 +89,7 @@ test('it forgets an exited session whose working directory was removed', async (
   updateEnv('HQ_NOW', '2026-11-07T03:00:00Z');
   ctx.seed.atcSession({ id: '0000f001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: false, state: 'exited' }, '2026-11-07T01:00:00Z');
   ctx.seed.closedRun('GEO-601', '0000f001');
-  ctx.work.current = await readLocalWork(realRunner, '/nonexistent/hq-test/kettle-workspace');
+  ctx.work.current = await readLocalWork(realRunner, join(ctx.directory, 'kettle-workspace'));
 
   await ctx.sweep();
 
