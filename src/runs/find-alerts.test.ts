@@ -1,6 +1,7 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { at, freshDb } from '../../test/helpers.ts';
 import { addRun } from './add-run.ts';
+import { finalPr } from './final-pr.ts';
 import { findAlerts } from './find-alerts.ts';
 import { recordCICheckOverride } from '../pr-status/record-ci-check-override.ts';
 import { recordPROverride } from '../pr-status/record-pr-override.ts';
@@ -11,6 +12,7 @@ import { setReviewWait } from './set-review-wait.ts';
 import { setSession } from './set-session.ts';
 import { buildSeeder } from '../test-utils/build-seeder.ts';
 import { setState } from './set-state.ts';
+import { unfinalPr } from './unfinal-pr.ts';
 import { updateGoneRunSessions } from './update-gone-run-sessions.ts';
 import { addUnblock } from '../unblock/add-unblock.ts';
 import { closeUnblock } from '../unblock/close-unblock.ts';
@@ -417,9 +419,24 @@ test('it raises the FINAL alert again when a new FINAL at another head follows a
   ctx.seed.finalRunPR({ issue: 'GEO-9825', ref: 'kettle#25' });
   setReviewWait(ctx.db, 'kettle#25', { clear: false, until: '2026-10-25T01:00:00Z', reason: 'the only reviewer is out of quota' }, 'kettle-bot');
   at('2026-10-21T02:00:00Z');
-  scheduleFinalReview(ctx.db, { ref: 'kettle#25', sha: 'def5678', source: 'marker:kettle', actor: 'kettle-bot', note: null });
+  finalPr(ctx.db, 'kettle#25', { sha: 'def5678', actor: 'kettle-bot' });
 
   expect(findAlerts(ctx.db, [], new Map(), new Date('2026-10-21T04:00:00Z'))).toStrictEqual([
-    { key: 'pr:kettle#25', fingerprint: 'final:def5678', issue: 'GEO-9825', line: 'kettle#25 (GEO-9825) final at def5678 for 120 min, no review [from marker:kettle]' },
+    { key: 'pr:kettle#25', fingerprint: 'final:def5678', issue: 'GEO-9825', line: 'kettle#25 (GEO-9825) final at def5678 for 120 min, no review [from cli:kettle-bot]' },
+  ]);
+});
+
+test('it raises the FINAL alert again when the FINAL is withdrawn and sent again at the same head after a review wait', () => {
+  const ctx = setupTest();
+  at('2026-10-21T01:00:00Z');
+  ctx.seed.run({ issue: 'GEO-9826' });
+  ctx.seed.finalRunPR({ issue: 'GEO-9826', ref: 'kettle#26' });
+  setReviewWait(ctx.db, 'kettle#26', { clear: false, until: '2026-10-25T01:00:00Z', reason: 'the only reviewer is out of quota' }, 'kettle-bot');
+  at('2026-10-21T02:00:00Z');
+  unfinalPr(ctx.db, 'kettle#26', 'kettle-bot', 'the head needs one more fix');
+  finalPr(ctx.db, 'kettle#26', { sha: 'abc1234', actor: 'kettle-bot' });
+
+  expect(findAlerts(ctx.db, [], new Map(), new Date('2026-10-21T04:00:00Z'))).toStrictEqual([
+    { key: 'pr:kettle#26', fingerprint: 'final:abc1234', issue: 'GEO-9826', line: 'kettle#26 (GEO-9826) final at abc1234 for 120 min, no review [from cli:kettle-bot]' },
   ]);
 });
