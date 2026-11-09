@@ -24,7 +24,7 @@ test('it reads every recorded session with its run, oldest first', () => {
   setSession(ctx.db, 'GEO-612', '0000f002', 'z-delivery', 'add');
 
   expect(readRunSessionRows(ctx.db)).toStrictEqual([
-    { sessionID: '0000f001', issue: 'GEO-611', active: false, open: false, ownerChats: false },
-    { sessionID: '0000f002', issue: 'GEO-612', active: true, open: true, ownerChats: true },
+    { sessionID: '0000f001', issue: 'GEO-611', active: false, endedBy: null, open: false, ownerChats: false },
+    { sessionID: '0000f002', issue: 'GEO-612', active: true, endedBy: null, open: true, ownerChats: true },
   ]);
 });
