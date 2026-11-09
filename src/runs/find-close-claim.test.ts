@@ -71,10 +71,10 @@ test.each<{ name: string; state: string | null; events: StoredEvent[]; ownSeqs: 
     ownSeqs: [],
     expected: 9,
   },
-])('#findCloseClaim gives $name', ({ state, events, ownSeqs, expected }) => {
-  const claim = findCloseClaim({ issue: 'GEO-9720', state, events, at: new Date('2026-10-21T02:00:00Z'), ownSeqs: new Set(ownSeqs) });
+])('#findCloseClaim gives $name', (row) => {
+  const claim = findCloseClaim({ issue: 'GEO-9720', state: row.state, events: row.events, at: new Date('2026-10-21T02:00:00Z'), ownSeqs: new Set(row.ownSeqs) });
 
-  expect(claim?.seq ?? null).toBe(expected);
+  expect(claim?.seq ?? null).toBe(row.expected);
 });
 
 test('#findCloseClaim gives the sessions the claim recorded', () => {

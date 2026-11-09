@@ -35,7 +35,8 @@ export function findCloseClaim(facts: CloseClaimFacts): CloseClaim | null {
   return { seq: claim.seq, issue: facts.issue, sessions: parseClaimSessions(claim.data) };
 }
 
-const ClaimDataSchema = z.object({ sessions: z.array(z.object({ id: z.string(), active: z.boolean() })) });
+const ClaimedSessionSchema = z.object({ id: z.string(), active: z.boolean() });
+const ClaimDataSchema = z.object({ sessions: z.array(ClaimedSessionSchema) });
 
 function parseClaimSessions(data: string): ClaimedSession[] {
   const parsed: unknown = JSON.parse(data);
