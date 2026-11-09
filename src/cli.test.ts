@@ -20,6 +20,7 @@ import { setMeta } from './db/set-meta.ts';
 import { loadActionsSpend } from './goals/load-actions-spend.ts';
 import { createGrantMark } from './grants/create-grant-mark.ts';
 import { recordGrantAction } from './grants/record-grant-action.ts';
+import { seedVoidedGrantAction } from './grants/test-utils/seed-voided-grant-action.ts';
 import { readReadySnapshot } from './lanes/read-ready-snapshot.ts';
 import { READY_ISSUES_KEY } from './lanes/ready-issues-key.ts';
 import { resetKey } from './linear/reset-key.ts';
@@ -810,9 +811,8 @@ test('hq grant actions shows a voided act struck out with its reason in text and
   onTestFinished(fresh.cleanup);
   at(NOON_SYDNEY);
   createGrantMark(fresh.db, { text: 'kettle PRs merge on green CI', ref: null, at: null, name: 'kettle-merges', actor: 'kettle-bot' });
-  recordGrantAction(fresh.db, { grant: 'kettle-merges', target: 'kettle#8', note: null, actor: 'teapot-bot' });
+  await seedVoidedGrantAction(fresh, { target: 'kettle#8', reason: 'logged before the merge failed', voidedAt: '2026-10-14T01:30:00Z' });
   recordGrantAction(fresh.db, { grant: 'kettle-merges', target: 'kettle#9', note: null, actor: 'teapot-bot' });
-  fresh.db.query("UPDATE grant_actions SET voided_at = '2026-10-14T01:30:00Z', voided_by = 'z-stu', void_reason = 'logged before the merge failed' WHERE id = 1").run();
   const hq = async (...args: string[]): Promise<string> => {
     const child = Bun.spawn(['bun', join(import.meta.dir, 'cli.ts'), 'grant', 'actions', '--since', '1d', ...args], {
       stdout: 'pipe',

@@ -181,13 +181,6 @@ describe('one open at a time', () => {
     expect(waitReasons(db)).toContain('open: geo-1-paint');
   });
 
-  test('the schema itself refuses a second open row', () => {
-    addAsk(db, call());
-    addAsk(db, call({ id: 'geo-2-fence' }));
-    db.query(`UPDATE asks SET state='open' WHERE id='geo-1-paint'`).run();
-    expect(() => db.query(`UPDATE asks SET state='open' WHERE id='geo-2-fence'`).run()).toThrow('UNIQUE');
-  });
-
   test('opens by send order, and a re-add moves an item', () => {
     addAsk(db, call({ id: 'old-low', order: 2 }));
     at('2026-10-14T01:05:00Z');

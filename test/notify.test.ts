@@ -3,6 +3,7 @@ import { toExactOptional } from '@zgeoff/std';
 import type { Database } from 'bun:sqlite';
 import invariant from 'tiny-invariant';
 import { addAsk } from '../src/asks/add-ask.ts';
+import { laterAsk } from '../src/asks/later-ask.ts';
 import { socketPath } from '../src/atc/socket-path.ts';
 import { setMeta } from '../src/db/set-meta.ts';
 import { enqueue } from '../src/outbox/enqueue.ts';
@@ -120,7 +121,7 @@ test('HQ_NOTIFY=off leaves messages pending', async () => {
 test('a ready notice for an item that left the queue before sending is dropped', async () => {
   atc = fakeAtc(dir);
   file('tidy-docs');
-  db.query(`UPDATE asks SET state = 'later' WHERE id = 'tidy-docs'`).run();
+  laterAsk(db, 'tidy-docs', 'proposal', null, 'z-steward');
   const r = await flush(db);
   expect(r).toMatchObject({ sent: 0, dropped: 1 });
   expect(atc.sent).toHaveLength(0);

@@ -10,7 +10,9 @@ import { sydneyUtc } from '../src/morning/sydney-utc.ts';
 import { sydney } from '../src/morning/sydney.ts';
 import { windows } from '../src/morning/windows.ts';
 import { at, freshDb } from './helpers.ts';
+import { seedMorningRunKeyedToTarget } from '../src/morning/test-utils/seed-morning-run-keyed-to-target.ts';
 import { readOutboxRows } from '../src/outbox/read-outbox-rows.ts';
+import { seedOutboxItem } from '../src/outbox/test-utils/seed-outbox-item.ts';
 import { setForward } from '../src/outbox/set-forward.ts';
 import { markOutboxFailed } from '../src/outbox/mark-outbox-failed.ts';
 import { unsent } from '../src/outbox/unsent.ts';
@@ -117,8 +119,8 @@ test('it links a morning run queued under a forward to its event alone', () => {
 
 test('it reads the send status of a morning run whose key also names the target', () => {
   setForward(db, 'z-stu', 'z-other');
-  morningTick(db, 'hq-lanes', syd('2026-10-17', '08:16'));
-  db.query(`UPDATE job_runs SET outbox_key = outbox_key || '-z-stu'`).run();
+  const item = seedOutboxItem({ db }, { target: 'z-stu' });
+  seedMorningRunKeyedToTarget({ db }, { key: '2026-10-17', outbox_key: `hq-ev${item.event_seq}-z-stu` });
   markOutboxFailed(db, unsent(db, false, undefined), 'invented send failure');
 
   expect(recentRuns(db).map((run) => [run.key, run.sent])).toStrictEqual([['2026-10-17', 'failed']]);
