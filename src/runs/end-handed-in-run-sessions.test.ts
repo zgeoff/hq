@@ -173,6 +173,8 @@ test('it ends the session of a run merged 6 minutes ago whose session has been i
 
   expect(ended).toBe(1);
   expect(ctx.readState()).toBe('merged');
+  expect(ctx.readSessions()).toStrictEqual([{ session_id: '0000e001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', active: 0, ended_at: '2026-10-22T12:00:00Z', ended_by: 'sweep' }]);
+  expect(fleet.calls).toStrictEqual(['unpin 0000e001', 'kill 0000e001', 'unpin 0000e001', 'forget 0000e001']);
 });
 
 test.each([
