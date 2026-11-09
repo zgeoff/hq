@@ -112,6 +112,7 @@ test('it reads an answer against the options it was given, after new text cleare
 
 test("it lists an earlier round's answer with that round's title, issues and session when its change events hold none of them", () => {
   const ctx = setupTest();
+  ctx.seed.askEventsWithoutDetail({ subject_id: 'kettle-handle', action: 'added', data: '{"body":"Wood or steel?"}' });
   ctx.seed.event({ subject: 'ask', subjectID: 'kettle-handle', action: 'answered', actor: 'teapot-bot', data: { answer: 'Wood', title: 'Pick a handle', issues: ['GEO-9003'], forSession: 'kettle-bot' } });
   at('2026-10-14T03:00:00Z');
   addAsk(ctx.db, { kind: 'call', id: 'kettle-handle', title: 'Pick a base', question: 'Flat or round?', body: 'Flat or round?', issues: ['GEO-9004'], forSession: 'teapot-bot', actor: 'kettle-bot' });

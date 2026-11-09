@@ -187,9 +187,9 @@ test('it records a FINAL phrase for a PR an earlier note in the same page attach
 test('it keeps a late note from the design pass session but marks no build PR final from it', async () => {
   const ctx = setupTest();
   addRun(ctx.db, { issue: 'GEO-9732', title: 'Design the kettle spout', place: 'local', session: KETTLE, next: 'Agent working.', gate: null, geoffChat: false, design: 'agent', actor: 'z-delivery' });
-  setState(ctx.db,'GEO-9732', 'done', { note: 'design settled' }, 'z-delivery');
+  setState(ctx.db, 'GEO-9732', 'done', { note: 'design settled' }, 'z-delivery');
   addRun(ctx.db, { issue: 'GEO-9732', title: 'Build the kettle spout', place: 'local', session: null, next: 'Building.', gate: null, geoffChat: false, actor: 'z-delivery' });
-  addPr(ctx.db,'GEO-9732', 'kettle#32', 'z-delivery');
+  addPr(ctx.db, 'GEO-9732', 'kettle#32', 'z-delivery');
   ctx.stub.feed.push({ at: new Date(NOON_SYDNEY).getTime(), session: KETTLE, name: 'kettle', kind: 'note', detail: 'the spout sketch is final at 39f05fe', label: 'progress' });
   ctx.seed.meta({ key: 'atc_events_cursor', value: FROM_START });
   const client = await openClient();
@@ -203,9 +203,9 @@ test('it keeps a late note from the design pass session but marks no build PR fi
 test('it asks GitHub nothing about a FINAL in a late note from the design pass session', async () => {
   const ctx = setupTest();
   addRun(ctx.db, { issue: 'GEO-9732', title: 'Design the kettle spout', place: 'local', session: KETTLE, next: 'Agent working.', gate: null, geoffChat: false, design: 'agent', actor: 'z-delivery' });
-  setState(ctx.db,'GEO-9732', 'done', { note: 'design settled' }, 'z-delivery');
+  setState(ctx.db, 'GEO-9732', 'done', { note: 'design settled' }, 'z-delivery');
   addRun(ctx.db, { issue: 'GEO-9732', title: 'Build the kettle spout', place: 'local', session: null, next: 'Building.', gate: null, geoffChat: false, actor: 'z-delivery' });
-  addPr(ctx.db,'GEO-9732', 'kettle#32', 'z-delivery');
+  addPr(ctx.db, 'GEO-9732', 'kettle#32', 'z-delivery');
   ctx.stub.feed.push({ at: new Date(NOON_SYDNEY).getTime(), session: KETTLE, name: 'kettle', kind: 'note', detail: 'the spout sketch is final at 39f05fe', label: 'progress' });
   ctx.seed.meta({ key: 'atc_events_cursor', value: FROM_START });
   const client = await openClient();
