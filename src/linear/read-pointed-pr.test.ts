@@ -14,7 +14,7 @@ test.each([
   ['no PR: a Found by quote inside a sentence', '* GEO-9701 says "Found by the GEO-9700 agent on widgets#41", but the check named its delivery PR.', [], null],
   ['an attachment that is not a PR', 'Descale the kettle.', [{ url: 'https://github.com/zgeoff/widgets/issues/7', openedAt: '2026-10-20T09:00:00Z' }], null],
   ['no PR: From in the middle of a line', 'Taken From widgets#7 by hand.', [], null],
-])('it reads %s', (_case, description, attachments, expected) => {
+])('#readPointedPR reads %s', (_case, description, attachments, expected) => {
   expect(readPointedPR({ id: 'GEO-9700', description, createdAt: '2026-10-20T11:54:00Z', attachments }, () => Promise.resolve(null))).resolves.toBe(expected);
 });
 
@@ -35,7 +35,7 @@ test.each([
   expect(isOwnFixPR(body, 'GEO-9700')).toBe(expected);
 });
 
-test('it skips an attachment whose PR names the issue as its own fix, and counts one whose body does not', async () => {
+test('#readPointedPR skips an attachment whose PR names the issue as its own fix, and counts one whose body does not', async () => {
   const bodies: Record<string, string> = { 'widgets#7': 'Contributes to GEO-9700', 'widgets#8': 'Fixes GEO-9600' };
   const readBody = (link: PRLink) => Promise.resolve(bodies[`${link.repo}#${link.number}`] ?? null);
   const own = { url: 'https://github.com/zgeoff/widgets/pull/7', openedAt: '2026-10-20T09:00:00Z' };

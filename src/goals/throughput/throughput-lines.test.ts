@@ -105,7 +105,7 @@ test('a filing z-review recorded is a review issue, not a bad filing, and sends 
   });
 });
 
-test('it counts no bad filing for an issue whose attached PR opened first and names it in a Contributes to line is no bad filing', async () => {
+test('it counts no bad filing for an issue whose attached PR opened first and names it in a Contributes to line', async () => {
   const ctx = setupTest();
   const attachment = { url: 'https://github.com/zgeoff/widgets/pull/7', metadata: { createdAt: '2026-10-16T00:40:00Z' } };
   const run = buildStubGitHubFactsRunner({ views: { 'widgets#7': JSON.stringify({ body: 'Fixes the retry.\n\nContributes to GEO-9801' }) } });
