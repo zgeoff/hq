@@ -6,6 +6,7 @@ import { at, freshDb } from '../../test/helpers.ts';
 import { buildSeeder } from '../test-utils/build-seeder.ts';
 import { addRun } from './add-run.ts';
 import { getRun } from './get-run.ts';
+import { readRunSessionRows } from './read-run-session-rows.ts';
 import { removeOrphanSessions } from './remove-orphan-sessions.ts';
 import { runHandedInHoldCheck } from './run-handed-in-hold-check.ts';
 import { setState } from './set-state.ts';
@@ -32,7 +33,7 @@ function setupTest() {
     fleet,
     deps,
     checkScope: (issue: string, description: string) => runHandedInHoldCheck(fresh.db, { readIssueDescription: () => Promise.resolve(description), log: () => {} }, issue, 'z-delivery'),
-    readSession: () => fresh.db.query("SELECT active, ended_by FROM run_sessions WHERE session_id = '00000031-aaaa-4aaa-8aaa-aaaaaaaaaaaa'").get() };
+    readSession: () => readRunSessionRows(fresh.db).filter((row) => row.sessionID === '00000031-aaaa-4aaa-8aaa-aaaaaaaaaaaa').map((row) => ({ active: row.active, endedBy: row.endedBy })) };
 }
 
 test('a run session atc no longer lists, or lists as ended, ends after one sweep of grace; a present or new one stays active, whatever its run\'s state', () => {
@@ -82,7 +83,7 @@ test('it ends the asleep session of a working run with every PR merged, moves th
   ctx.sessions.push(asleep);
 
   expect(updateGoneRunSessions(ctx.db, [asleep], 'z-delivery', new Date('2026-10-19T01:00:00Z'))).toBe(1);
-  expect(ctx.readSession()).toStrictEqual({ active: 0, ended_by: 'sweep' });
+  expect(ctx.readSession()).toStrictEqual([{ active: false, endedBy: 'sweep' }]);
   expect(getRun(ctx.db, 'GEO-9731')?.state).toBe('merged');
   const wrapped = await wrapUpMergedRuns(ctx.db, ctx.deps, { actor: 'sweep' });
   expect(wrapped).toStrictEqual([{ issue: 'GEO-9731', wrapUp: { forgotten: ['00000031-aaaa-4aaa-8aaa-aaaaaaaaaaaa'], destroyed: [], kept: [], failed: [] } }]);
@@ -132,7 +133,7 @@ test('it keeps the asleep session of a working run held for open Scope boxes act
   const asleep = { id: '00000031-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: false, state: 'idle', lifecycle: { vm: 'asleep' } };
 
   expect(updateGoneRunSessions(ctx.db, [asleep], 'z-delivery', new Date('2026-10-19T01:00:00Z'))).toBe(0);
-  expect(ctx.readSession()).toStrictEqual({ active: 1, ended_by: null });
+  expect(ctx.readSession()).toStrictEqual([{ active: true, endedBy: null }]);
   expect(getRun(ctx.db, 'GEO-9731')?.state).toBe('working');
 });
 
@@ -173,7 +174,7 @@ test('it keeps the alive session of a fully merged run active', () => {
   ctx.seed.mergedRunPR({ issue: 'GEO-9731', ref: 'kettle#31' });
 
   expect(updateGoneRunSessions(ctx.db, [{ id: '00000031-aaaa-4aaa-8aaa-aaaaaaaaaaaa', alive: true }], 'z-delivery', new Date('2026-10-19T01:00:00Z'))).toBe(0);
-  expect(ctx.readSession()).toStrictEqual({ active: 1, ended_by: null });
+  expect(ctx.readSession()).toStrictEqual([{ active: true, endedBy: null }]);
   expect(getRun(ctx.db, 'GEO-9731')?.state).toBe('working');
 });
 
@@ -186,6 +187,6 @@ test('it keeps the asleep session of a run with an open PR active', () => {
   const asleep = { id: '00000031-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: false, state: 'idle', lifecycle: { vm: 'asleep' } };
 
   expect(updateGoneRunSessions(ctx.db, [asleep], 'z-delivery', new Date('2026-10-19T01:00:00Z'))).toBe(0);
-  expect(ctx.readSession()).toStrictEqual({ active: 1, ended_by: null });
+  expect(ctx.readSession()).toStrictEqual([{ active: true, endedBy: null }]);
 });
 
