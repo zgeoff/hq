@@ -1,5 +1,13 @@
 import { expect, test } from 'bun:test';
-import { collectSeedCounts, formatSeedCounts } from './check-seeds.ts';
+import { checkSeeds, collectSeedCounts, formatSeedCounts } from './check-seeds.ts';
+
+test('#checkSeeds returns 0 when no seed rule has a finding', () => {
+  expect(checkSeeds([{ code: 'zgeoff(test-shape)' }])).toBe(0);
+});
+
+test.each(['seed-only', 'function-verb', 'test-beside-seed'])('#checkSeeds returns 1 when %s has a finding', (rule) => {
+  expect(checkSeeds([{ code: `zgeoff(${rule})` }])).toBe(1);
+});
 
 test('#collectSeedCounts counts nothing when oxlint reports nothing', () => {
   expect(collectSeedCounts([])).toStrictEqual({ 'seed-only': 0, 'function-verb': 0, 'test-beside-seed': 0 });
