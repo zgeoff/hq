@@ -4,8 +4,8 @@ import type { ImpWork } from './types.ts';
 
 const impListSchema = z.array(z.looseObject({ name: z.string() }));
 
-// A removed working directory holds no work, so the check says so with its own exit code. A cd that
-// fails for another reason, such as permissions, stays an unknown.
+// A removed local working directory holds no work, so the check says so with its own exit code. A cd
+// that fails for another reason, such as permissions, stays an unknown.
 const GONE_CODE = 3;
 const GONE_MARKER = 'workspace gone';
 
@@ -55,10 +55,9 @@ export async function readImpWork(run: Runner, sessionID: string, cwd: string | 
   if (imp === undefined) {
     return { state: 'unknown', detail: `no imp ends with ${suffix}` };
   }
+  // A pushed imp is destroyed, so a missing working directory, such as an unmounted volume, stays an
+  // unknown here.
   const checked = await run(['imp', 'exec', imp.name, '--', 'sh', '-c', CHECK_SCRIPT, 'sh', cwd], { timeoutMs: IMP_CALL_MS });
-  if (isWorkspaceGone(checked)) {
-    return { state: 'pushed' };
-  }
   if (checked.code !== 0) {
     const detail = `the check in ${imp.name} exited ${checked.code}: ${firstLine(checked.stderr)}`;
     return checked.stderr.includes(RAM_LIMIT_CODE) ? { state: 'unknown', detail, retry: true } : { state: 'unknown', detail };

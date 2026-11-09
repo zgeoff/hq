@@ -49,6 +49,14 @@ test('it finds a removed working directory to hold no work', async () => {
   expect(work).toStrictEqual({ state: 'pushed' });
 });
 
+test('it gives no answer for an exit 3 without the removed-directory marker', async () => {
+  const run = () => Promise.resolve({ code: 3, stdout: '', stderr: 'boom\n' });
+
+  const work = await readLocalWork(run, '/workspace/kettle');
+
+  expect(work).toStrictEqual({ state: 'unknown', detail: 'the check in /workspace/kettle exited 3: boom' });
+});
+
 test('it gives no answer when the check fails in a folder that is no clone', async () => {
   const ctx = setupTest();
 
