@@ -1,3 +1,4 @@
+import { isAsleepSession } from '../areas/is-asleep-session.ts';
 import type { FleetSession } from '../fleet/types.ts';
 import { findSessionIssue } from './find-session-issue.ts';
 import { isStoredSession } from './is-stored-session.ts';
@@ -47,14 +48,13 @@ export function pickOrphanSessions(facts: OrphanFacts): OrphanSession[] {
   const isRecentlyKept = (session: FleetSession) => facts.nowMs - (facts.lastKeptMs.get(session.id) ?? -Infinity) < ORPHAN_RETRY_MS;
   const candidates = facts.sessions.filter(
     (session) =>
-      session.state === 'exited' &&
       session.pinned !== true &&
       !isUnderPin(session) &&
       !fleetIDs.has(session.id) &&
       !isStoredSession(openActive, session.id) &&
       !isOwnerChat(session) &&
       !isRecentlyKept(session) &&
-      (isFromRuns(session) || isChildOfKnownSession(session)),
+      ((session.state === 'exited' && (isFromRuns(session) || isChildOfKnownSession(session))) || (isAsleepSession(session) && isFromRuns(session))),
   );
   const candidateIDs = new Set(candidates.map((session) => session.id));
   const blocked = findBlockedAncestors(byID, facts.sessions.filter((session) => !candidateIDs.has(session.id)));

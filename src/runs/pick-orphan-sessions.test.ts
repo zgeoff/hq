@@ -73,3 +73,19 @@ test.each([
 
   expect(picked).toStrictEqual([]);
 });
+
+test('it picks an asleep session that a run recorded, and no other asleep session', () => {
+  const picked = pickOrphanSessions({
+    sessions: [
+      { id: '0000f001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: false, state: 'idle', lifecycle: { vm: 'asleep' } },
+      { id: '0000f003-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-helper', alive: false, state: 'idle', lifecycle: { vm: 'asleep' }, parent: '0000f002-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+      { id: '0000f002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'z-stu', alive: true, state: 'idle' },
+    ],
+    fleetNames: new Set(['z-stu']),
+    runSessions: [{ sessionID: '0000f001', issue: 'GEO-601', active: false, open: true, ownerChats: false }],
+    lastKeptMs: new Map(),
+    nowMs: Date.parse('2026-11-07T03:00:00Z'),
+  });
+
+  expect(picked.map((orphan) => orphan.session.id)).toStrictEqual(['0000f001-aaaa-4aaa-8aaa-aaaaaaaaaaaa']);
+});
