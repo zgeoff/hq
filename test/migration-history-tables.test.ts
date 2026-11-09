@@ -1,4 +1,4 @@
-// oxlint-disable zgeoff/test-beside-module -- grandfathered: runs the whole migration list, as the CLI suite did
+// oxlint-disable zgeoff/test-beside-module -- runs the whole migration list, which no single module owns
 import { Database } from 'bun:sqlite';
 import { expect, onTestFinished, test } from 'bun:test';
 import { readdirSync } from 'node:fs';

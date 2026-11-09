@@ -7,21 +7,15 @@ import { voidGrantAction } from '../void-grant-action.ts';
 import { seedGrantAction } from './seed-grant-action.ts';
 import type { GrantsDeps } from './types.ts';
 
-interface VoidedGrantActionInput extends Partial<GrantActionInput> {
-  reason?: string;
-  voidedAt?: string;
-}
-
-export async function seedVoidedGrantAction(deps: GrantsDeps, input: VoidedGrantActionInput = {}): Promise<GrantActionRow> {
-  const { reason = 'logged before the merge failed', voidedAt = '2026-10-14T01:30:00Z', ...actionInput } = input;
-  const action = seedGrantAction(deps, actionInput);
+export async function seedVoidedGrantAction(deps: GrantsDeps, input: Partial<GrantActionInput> = {}): Promise<GrantActionRow> {
+  const action = seedGrantAction(deps, input);
   const owner = roleName('owner');
   setMeta(deps.db, 'fleet_ids', JSON.stringify({ ...fleetIds(deps.db), [owner]: 'seeded-owner-session' }));
   const voided = await voidGrantAction({
     db: deps.db,
-    args: { id: action.id, reason },
+    args: { id: action.id, reason: 'logged before the merge failed' },
     probe: { openClient: () => Promise.resolve({ peerSession: 'seeded-owner-session', close: () => {} }) },
-    clock: () => new Date(voidedAt),
+    clock: () => new Date('2026-10-14T01:30:00Z'),
   });
   invariant(voided.voided_by === owner);
 

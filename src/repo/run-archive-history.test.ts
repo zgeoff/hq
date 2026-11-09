@@ -205,7 +205,7 @@ test('it refuses a repeated finding in the store, names it, and changes nothing'
   const ctx = setupTest();
   ctx.createStoreRows('hq', 0);
   await ctx.archive('hq', 'hq-archive');
-  ctx.seed.noslopDisposition({ pull_request: 1 });
+  ctx.seed.storeDisposition({ pull_request: 1 });
   {
     const before = readStoreRows(ctx.store);
     await expect(ctx.archive('hq-archive', 'hq')).rejects.toThrow('dispositions.repo=zgeoff/hq (pull_request=1, finding_id=f1, source=s, at=2026-10-01T00:00:00Z)');
@@ -217,7 +217,7 @@ test('it re-keys back when a new disposition shares a finding id with an archive
   const ctx = setupTest();
   ctx.createStoreRows('hq', 0);
   await ctx.archive('hq', 'hq-archive');
-  ctx.seed.noslopDisposition({ pull_request: 2 });
+  ctx.seed.storeDisposition({ pull_request: 2 });
   await ctx.archive('hq-archive', 'hq');
   expect(readStoreRows(ctx.store)).toMatchObject({ dispositions: [{ repo: 'zgeoff/hq', pull_request: 1 }, { repo: 'zgeoff/hq', pull_request: 2 }] });
 });

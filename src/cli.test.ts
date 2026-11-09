@@ -811,7 +811,7 @@ test('hq grant actions shows a voided act struck out with its reason in text and
   onTestFinished(fresh.cleanup);
   at(NOON_SYDNEY);
   createGrantMark(fresh.db, { text: 'kettle PRs merge on green CI', ref: null, at: null, name: 'kettle-merges', actor: 'kettle-bot' });
-  await seedVoidedGrantAction(fresh, { target: 'kettle#8', reason: 'logged before the merge failed', voidedAt: '2026-10-14T01:30:00Z' });
+  await seedVoidedGrantAction(fresh, { target: 'kettle#8' });
   recordGrantAction(fresh.db, { grant: 'kettle-merges', target: 'kettle#9', note: null, actor: 'teapot-bot' });
   const hq = async (...args: string[]): Promise<string> => {
     const child = Bun.spawn(['bun', join(import.meta.dir, 'cli.ts'), 'grant', 'actions', '--since', '1d', ...args], {
