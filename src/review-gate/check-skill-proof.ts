@@ -13,10 +13,16 @@ import type { PRRequest } from '../noslop/types.ts';
 
 export type ReadFiles = () => Promise<string[]>;
 
-export async function checkSkillProof(request: PRRequest, parsed: ParsedRepo, facts: GateFacts, readFiles: ReadFiles): Promise<void> {
-  if (parsed.owner !== OWNER) {
+export interface NixGate {
+  facts: GateFacts;
+  nixSkill: boolean;
+}
+
+export async function checkSkillProof(request: PRRequest, parsed: ParsedRepo, gate: NixGate, readFiles: ReadFiles): Promise<void> {
+  if (parsed.owner !== OWNER || gate.nixSkill) {
     return;
   }
+  const facts = gate.facts;
   const head = facts.headRefOid;
   const proof: SkillProofFacts = {
     bot: isBotAuthor(facts.author),

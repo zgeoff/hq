@@ -15,7 +15,7 @@ import type { CIOverrideUse, GateCI } from '../noslop/format-ci-clause.ts';
 import { collectOpenFindingIDs } from '../noslop/collect-open-finding-ids.ts';
 import { checkInstructionHold } from './check-instruction-hold.ts';
 import { checkSkillProof } from './check-skill-proof.ts';
-import type { ReadFiles } from './check-skill-proof.ts';
+import type { NixGate, ReadFiles } from './check-skill-proof.ts';
 import { findInstructionHeldTest } from './find-instruction-held-test.ts';
 import { isBotAuthor } from './is-bot-author.ts';
 import type { PRAuthor } from './is-bot-author.ts';
@@ -30,8 +30,10 @@ import { readNoslopCheck } from '../noslop/read-noslop-check.ts';
 import { readNoslopFindings } from '../noslop/read-noslop-findings.ts';
 import { readOKReviews } from '../noslop/read-ok-reviews.ts';
 import type { OKReviewRecord } from '../noslop/read-ok-reviews.ts';
+import { probeNixSkillPR } from './probe-nix-skill-pr.ts';
 import { readPRFiles } from './read-pr-files.ts';
 import { pickNoslopVerdict } from '../noslop/pick-noslop-verdict.ts';
+import { StoredFindingsColumn } from '../noslop/stored-finding-schema.ts';
 import { pickOwnerHeldVerdict } from './pick-owner-held-verdict.ts';
 import { probeNoCI } from './probe-no-ci.ts';
 import type { NoslopGateFacts } from '../noslop/pick-noslop-verdict.ts';
@@ -59,12 +61,13 @@ export async function checkMergeGate(request: PRRequest, onHead?: OnGateHead): P
   const readFiles = readFilesOnce(request, parsed);
 
   // Before the owner's hold, so his lgtm never lands on a description that still has to change.
-  await checkSkillProof(request, parsed, facts, readFiles);
+  const gate: NixGate = { facts, nixSkill: await probeNixSkillPR(parsed, facts, readFiles) };
+  await checkSkillProof(request, parsed, gate, readFiles);
   await checkOwnerHeld(request, parsed, facts, readFiles);
   if (unreviewed !== null) {
     return { mayMerge: true, reason: `${unreviewed}: ${formatCIClause(facts.headRefOid.slice(0, 7), ci)}`, reviewed: false, ...pickOverriddenChecks(ci.used) };
   }
-  const outcome = await checkNoslopGate(request, parsed, facts, ci);
+  const outcome = await checkNoslopGate(request, parsed, gate, ci);
   return { ...outcome, ...pickOverriddenChecks(ci.used) };
 }
 
@@ -145,8 +148,8 @@ function pickOverriddenChecks(used: readonly CIOverrideUse[]): Pick<GateOutcome,
   return used.length === 0 ? {} : { overriddenChecks: used.map((override) => override.check) };
 }
 
-async function checkNoslopGate(request: PRRequest, parsed: ParsedRepo, facts: GateFacts, ci: GateCI): Promise<GateOutcome> {
-  const noslopFacts = await readNoslopGateFacts(request, parsed, facts);
+async function checkNoslopGate(request: PRRequest, parsed: ParsedRepo, gate: NixGate, ci: GateCI): Promise<GateOutcome> {
+  const noslopFacts = await readNoslopGateFacts(request, parsed, gate.facts, gate.nixSkill);
   return match(pickNoslopVerdict(noslopFacts, ci))
     .with({ pass: true }, (passed): GateOutcome => ({ mayMerge: true, reason: passed.reason, reviewed: true }))
     .with({ pass: false }, (blocked) => {
@@ -155,7 +158,7 @@ async function checkNoslopGate(request: PRRequest, parsed: ParsedRepo, facts: Ga
     .exhaustive();
 }
 
-async function readNoslopGateFacts(request: PRRequest, parsed: ParsedRepo, facts: GateFacts): Promise<NoslopGateFacts> {
+async function readNoslopGateFacts(request: PRRequest, parsed: ParsedRepo, facts: GateFacts, nixSkill: boolean): Promise<NoslopGateFacts> {
   const head = facts.headRefOid;
   const override = readOwnerOverride(request.db, parsed.repo, request.pr);
   if (override !== null) {
@@ -167,7 +170,7 @@ async function readNoslopGateFacts(request: PRRequest, parsed: ParsedRepo, facts
   const check = await readNoslopCheck(request.run, buildSlug(parsed), head);
   const findings = await readFindings(request, parsed, collectRecordedFindingIDs(reviews));
   const headNow = await readPRHead(request.run, buildSlug(parsed), request.pr);
-  return { overridden: false, repo: parsed.repo, pr: request.pr, head, reviewedHead: reviews.some((review) => review.head === head), check, findings, headNow };
+  return { overridden: false, repo: parsed.repo, pr: request.pr, head, reviewedHead: reviews.some((review) => review.head === head), ...(nixSkill ? { nixLenses: collectRecordedLenses(reviews) } : {}), check, findings, headNow };
 }
 
 async function readFindings(request: PRRequest, parsed: ParsedRepo, recorded: readonly string[]): Promise<NoslopGateFacts['findings']> {
@@ -188,4 +191,12 @@ const StoredFindingIDs = z.array(z.object({ id: z.string() }));
 
 function collectRecordedFindingIDs(reviews: OKReviewRecord[]): string[] {
   return [...new Set(reviews.flatMap((review) => StoredFindingIDs.parse(JSON.parse(review.findings)).map((finding) => finding.id)))];
+}
+
+function collectRecordedLenses(reviews: OKReviewRecord[]): Map<string, string[]> {
+  const lenses = new Map<string, string[]>();
+  for (const finding of reviews.flatMap((review) => StoredFindingsColumn.parse(review.findings))) {
+    lenses.set(finding.id, [...(lenses.get(finding.id) ?? []), finding.lens]);
+  }
+  return lenses;
 }

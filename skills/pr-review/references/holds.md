@@ -3,6 +3,27 @@
 Three holds in this file stop a merge: the skill proof and the owner's lgtm, which `hq review gate`
 enforces, and a preview check, which you enforce. Never pass an lgtm on by message.
 
+- [Nix's own skill PRs](#nixs-own-skill-prs)
+- [The skill proof](#the-skill-proof)
+- [The owner's lgtm](#the-owners-lgtm)
+- [The owner's answer](#the-owners-answer)
+- [A preview check](#a-preview-check)
+
+## Nix's own skill PRs
+
+Merge a PR of Nix's own skills once `hq review gate` passes on green CI. Nix is the agent defined in
+zgeoff/nixie-definitions, and she owns her skills. Such a PR needs no Checks lines and no answer to
+its noslop findings, in place of step 3 of [Take a PR](../SKILL.md#take-a-pr). Like every
+nixie-definitions PR, it needs no owner lgtm.
+
+The gate counts a PR as Nix's when it comes from a `nixie/skill/` branch in nixie-definitions, not
+from a fork, and changes only `skills/`. Any other nixie-definitions PR follows the rest of this
+file.
+
+The gate still holds the PR when an open finding is a security finding, or when hq has no record of
+the finding's kind. Take the finding's ID from the gate's reason, and send the finding to `z-triage`
+as a decision for the owner, as [owner-calls](../../owner-calls/SKILL.md) says.
+
 ## The skill proof
 
 A PR that changes a skill's `SKILL.md`, or a file under its `references/`, needs three ticked lines
@@ -27,7 +48,8 @@ doesn't void the proof either: the gate reads the description as it stands. When
 skill's text again, ask the agent to update the proof.
 
 The gate skips the proof for a bot's PR. It also skips it for a PR with a `hq pr mechanical` or
-`hq pr exempt` record at its head, in every repo, zgeoff/hq and zgeoff/hq-private included.
+`hq pr exempt` record at its head, in every repo, zgeoff/hq and zgeoff/hq-private included. It
+skips it for [Nix's own skill PRs](#nixs-own-skill-prs) too.
 
 ## The owner's lgtm
 
