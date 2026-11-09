@@ -37,6 +37,9 @@ import { trackDesignCause } from './track-design-cause.ts';
 import { trackSlotCause } from './track-slot-cause.ts';
 import type { Sample, SlotCause, SlotCauseName, TickResult } from './types.ts';
 import { writeHeldSpans } from './write-held-spans.ts';
+import { writeLanesNudge } from './write-lanes-nudge.ts';
+import { writeLanesNudgeFollowUp } from './write-lanes-nudge-follow-up.ts';
+import { writeLanesSample } from './write-lanes-sample.ts';
 import { writeSlotMinutes } from './write-slot-minutes.ts';
 
 const NudgeSchema = buildRowSchema('lanes_nudges');
@@ -55,7 +58,7 @@ export function tick(db: Database, sample: Sample, actor: string): TickResult {
       const slots = look.slots;
       const eligible = slotPlan?.eligible ?? eligibleNow(db).count;
       const previous = z.object({ at: z.string() }).nullable().parse(db.query('SELECT at FROM lanes_samples ORDER BY seq DESC LIMIT 1').get());
-      db.query('INSERT INTO lanes_samples (at, free_mib, slots, eligible, error) VALUES (?, ?, ?, ?, ?)').run(at, freeMib, slots, eligible, sample.error);
+      writeLanesSample(db, { at, freeMib, slots, eligible, error: sample.error });
       if (!sample.error) {
         const freeSlots = slotPlan ? slotPlan.pool.free : slots;
         checkReadyStale(db, t, freeSlots, actor);
@@ -79,7 +82,7 @@ export function tick(db: Database, sample: Sample, actor: string): TickResult {
       const due = runSyncQuery(db, kdb(db).selectFrom('lanes_nudges').select(['id', 'at']).where('slots_after', 'is', null).compile(), NudgeSchema.pick({ id: true, at: true }));
       for (const n of due) {
         if (t.getTime() - new Date(n.at).getTime() >= LANES.followMinutes() * 60_000 && sample.cap) {
-          db.query('UPDATE lanes_nudges SET slots_after = ?, checked_at = ? WHERE id = ?').run(slots, at, n.id);
+          writeLanesNudgeFollowUp(db, n.id, slots, at);
         }
       }
 
@@ -135,7 +138,7 @@ export function tick(db: Database, sample: Sample, actor: string): TickResult {
       const text = slotPlan ? formatSlotNudge(slotPlan, minutes) : nudgeText(slots, minutes, eligible);
       const seq = logEvent(db, 'hq', 'lanes', 'nudged', actor, null, null, { slots, minutes, eligible, freeMib, lanes: detail });
       enqueue(db, seq, orchestratorName(), text, 'lanes');
-      db.query('INSERT INTO lanes_nudges (at, slots, free_minutes, eligible, event_seq, detail) VALUES (?, ?, ?, ?, ?, ?)').run(at, slots, minutes, eligible, seq, detail);
+      writeLanesNudge(db, { at, slots, freeMinutes: minutes, eligible, eventSeq: seq, detail });
       return result(true, text, since);
     })
     .immediate();

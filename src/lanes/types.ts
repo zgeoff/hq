@@ -143,3 +143,20 @@ export interface BacklogIssue {
   blockerStates: string[];
   moreRelations: boolean;
 }
+
+export interface LanesSampleInput {
+  at: string;
+  freeMib: number | null;
+  slots: number;
+  eligible: number | null;
+  error: string | null;
+}
+
+export interface LanesNudgeInput {
+  at: string;
+  slots: number;
+  freeMinutes: number;
+  eligible: number | null;
+  eventSeq: number;
+  detail: string | null;
+}
