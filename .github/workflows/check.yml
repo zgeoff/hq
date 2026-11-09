@@ -33,6 +33,8 @@ jobs:
       - run: bun run check:casts
       # The seed lint rules (seed-only, function-verb, test-beside-seed) across src, test and scripts stay at 0
       - run: bun run check:seeds
+      # Every GitHub search in src, scripts, skills and agent-kit names the zgeoff owner
+      - run: bun run check:search-scope
       # GEO-989: every `hq …` line in skills/ against hq --help
       - run: bun run check:skills
       # The shared skill-writing check: 0 errors and 0 warnings in every skill
