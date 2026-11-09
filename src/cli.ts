@@ -2306,6 +2306,9 @@ async function runCommand(context: Ctx): Promise<Out> {
       return { data: { pr: p }, text: runLine(view(p.issue)) };
     })
     .with('review-wait', async () => {
+      if (flags.clear && (flags.until !== undefined || flags.reason !== undefined)) {
+        throw new HqError('bad_args', 'give --clear alone, or --until with --reason, not both');
+      }
       const input = flags.clear ? { clear: true as const } : { clear: false as const, until: flags.until, reason: flags.reason };
       const waiter = await by();
       const waiting = setReviewWait(db, arg(0, 'pr'), input, waiter);

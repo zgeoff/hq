@@ -1369,6 +1369,26 @@ test('it removes the review wait with hq run review-wait --clear', async () => {
   expect({ until: stored.review_wait_until, sha: stored.review_wait_sha, reason: stored.review_wait_reason }).toStrictEqual({ until: null, sha: null, reason: null });
 });
 
+test.each([
+  { name: '--until', args: ['--until', '2026-10-17T01:00:00Z'] },
+  { name: '--reason', args: ['--reason', 'the reviewer is back'] },
+])('it refuses hq run review-wait --clear with $name and keeps the wait', async (row) => {
+  const ctx = setupTest();
+  updateEnv('HQ_AS', 'z-delivery');
+  ctx.seed.run({ issue: 'GEO-9747' });
+  ctx.seed.finalRunPR({ issue: 'GEO-9747', ref: 'kettle#747' });
+  await main(['run', 'review-wait', 'kettle#747', '--until', '2026-10-16T01:00:00Z', '--reason', 'out of quota']);
+  ctx.lines.length = 0;
+
+  const code = await main(['run', 'review-wait', 'kettle#747', '--clear', ...row.args, '--json']);
+
+  expect({ code, printed: JSON.parse(ctx.lines.join('\n')) }).toStrictEqual({
+    code: 1,
+    printed: { ok: false, error: { code: 'bad_args', message: 'give --clear alone, or --until with --reason, not both' } },
+  });
+  expect(requirePR(ctx.db, 'kettle#747').review_wait_until).toBe('2026-10-16T01:00:00Z');
+});
+
 test('it reports the review wait in hq run show --json only while it is active', async () => {
   const ctx = setupTest();
   updateEnv('HQ_AS', 'z-delivery');
