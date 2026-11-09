@@ -1423,6 +1423,6 @@ test('it reports the review wait in hq run show --json only while it is active',
   await main(['run', 'show', 'GEO-9746', '--json']);
   const after = ctx.lines.join('\n');
 
-  expect(before).toMatch(/"review_wait": \{\s+"until": "2026-10-16T01:00:00Z",\s+"reason": "out of quota"\s+\}/u);
+  expect(before).toMatch(/"review_wait": \{\s+"until": "2026-10-16T01:00:00Z",\s+"reason": "out of quota",\s+"sha": "abc1234"\s+\}/u);
   expect(after).toInclude('"review_wait": null');
 });

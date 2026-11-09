@@ -92,6 +92,7 @@ import { resolveRun } from './runs/resolve-run.ts';
 import { reviewStarted } from './runs/review-started.ts';
 import { reviewedPr } from './runs/reviewed-pr.ts';
 import { buildRunPrView } from './runs/build-run-pr-view.ts';
+import { findActiveReviewWait } from './runs/find-active-review-wait.ts';
 import { formatReviewWait } from './runs/format-review-wait.ts';
 import { formatPRTag } from './runs/format-pr-tag.ts';
 import { setField } from './runs/set-field.ts';
@@ -2362,8 +2363,8 @@ Round ${p.review_round} recorded at ${p.reviewed_sha}.` };
       const notes = notesFor(db, shown.issue, intFlag(flags.notes, 'notes') ?? 5);
       const designPass = readDesignMoves(db, shown.issue);
       const waits = shown.prs.flatMap((pr) => {
-        const wait = formatReviewWait(pr, now());
-        return wait === null ? [] : [`  ${pr.ref} ${wait}`];
+        const wait = findActiveReviewWait(pr, now());
+        return wait === null ? [] : [`  ${pr.ref} ${formatReviewWait(wait)}`];
       });
       const text = [runLine(shown), ...waits, ...shown.sessions.map((session) => `  ${session.helper ? 'helper' : 'session'} ${session.session_id}${session.active ? ' (active)' : ` (ended ${session.ended_at})`}`), ...notes.map((note) => `  ${note.at} [${note.source}${note.label ? `/${note.label}` : ''}] ${note.text.replaceAll(/\s+/gu, ' ').slice(0, 200)}`)].join('\n');
       const runWithWaits = { ...shown, prs: shown.prs.map((pr) => buildRunPrView(pr, now())) };

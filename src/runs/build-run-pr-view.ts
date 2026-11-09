@@ -1,6 +1,6 @@
-import { buildReviewWait } from './build-review-wait.ts';
+import { findActiveReviewWait } from './find-active-review-wait.ts';
 import type { RunPr } from './types.ts';
 
 export function buildRunPrView(pr: RunPr, at: Date) {
-  return { ...pr, review_wait: buildReviewWait(pr, at) };
+  return { ...pr, review_wait: findActiveReviewWait(pr, at) };
 }
