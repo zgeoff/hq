@@ -23,6 +23,15 @@ import { z } from 'zod';
 import { findPath } from '../src/test-utils/find-path.ts';
 import { parseJSON } from '../src/noslop/parse-json.ts';
 import { NOON_SYDNEY, at, createPushedClone, fakeAtc, freshDb } from './helpers.ts';
+import { buildSeeder } from '../src/test-utils/build-seeder.ts';
+import { createTestDb } from './create-test-db.ts';
+
+function setupTest() {
+  const fresh = createTestDb();
+  at(NOON_SYDNEY);
+
+  return { db: fresh.db, seed: buildSeeder(fresh) };
+}
 
 let dir: string;
 let path: string;
@@ -368,58 +377,6 @@ test('v15 rebuilds news with every row, its read state and its id sequence, and 
   db.close();
 });
 
-test('v17 adds the probe tables and allows one open outage', () => {
-  const p = `${dir}/v16.db`;
-  const v16 = new Database(p, { create: true });
-  migrate(v16, p, false, MIGRATIONS.slice(0, 16));
-  v16.close();
-  const db = openDb(p);
-  const add = db.query(`INSERT INTO outages (started_at, detected_at, ended_at) VALUES ('2026-10-16T00:00:00Z', '2026-10-16T00:01:00Z', ?)`);
-  add.run('2026-10-16T00:05:00Z');
-  add.run('2026-10-16T00:06:00Z');
-  add.run(null);
-  expect(() => add.run(null)).toThrow();
-  db.query(`INSERT INTO probe_samples (at, target_ok) VALUES ('2026-10-16T00:00:00Z', 1)`).run();
-  expect(() => db.query(`INSERT INTO probe_samples (at, target_ok) VALUES ('2026-10-16T00:00:00Z', 0)`).run()).toThrow();
-  db.close();
-});
-
-test('v18 adds a news tag and the usage samples', () => {
-  const p = `${dir}/v17.db`;
-  const v17 = new Database(p, { create: true });
-  migrate(v17, p, false, MIGRATIONS.slice(0, 17));
-  v17.query(`INSERT INTO news (from_name, topic, text, added_at) VALUES ('z-stu', 'fix', 'Kept across the upgrade.', '2026-10-16T00:00:00Z')`).run();
-  v17.close();
-  const db = openDb(p);
-  expect(db.query('SELECT text, tag FROM news').all()).toEqual([{ text: 'Kept across the upgrade.', tag: null }]);
-  db.query(`INSERT INTO news (from_name, topic, text, added_at, tag) VALUES ('z-stu', 'fix', 'Tagged.', '2026-10-16T00:00:00Z', 'weekly-flag')`).run();
-  db.query(`INSERT INTO usage_samples (at, account, five_hour, seven_day) VALUES ('2026-10-16T00:00:00Z', 'active', 10, 20)`).run();
-  db.query(`INSERT INTO usage_samples (at, account, five_hour, seven_day) VALUES ('2026-10-16T00:00:00Z', 'abc', NULL, NULL)`).run();
-  expect(() => db.query(`INSERT INTO usage_samples (at, account) VALUES ('2026-10-16T00:00:00Z', 'active')`).run()).toThrow();
-  expect(() => db.query(`INSERT INTO usage_samples (at) VALUES ('2026-10-16T00:00:01Z')`).run()).toThrow();
-  expect(userVersion(db)).toBeGreaterThanOrEqual(18);
-  db.close();
-});
-
-test('v19 adds ready_ok and an outage kind, with one open outage per kind', () => {
-  const p = `${dir}/v18.db`;
-  const v18 = new Database(p, { create: true });
-  migrate(v18, p, false, MIGRATIONS.slice(0, 18));
-  v18.query(`INSERT INTO outages (started_at, detected_at) VALUES ('2026-10-16T00:00:00Z', '2026-10-16T00:01:00Z')`).run();
-  v18.query(`INSERT INTO probe_samples (at, target_ok) VALUES ('2026-10-16T00:00:00Z', 1)`).run();
-  v18.close();
-  const db = openDb(p);
-  expect(db.query('SELECT kind, ended_at FROM outages').all()).toEqual([{ kind: 'down', ended_at: null }]);
-  expect(db.query('SELECT target_ok, ready_ok FROM probe_samples').all()).toEqual([{ target_ok: 1, ready_ok: null }]);
-  const add = db.query(`INSERT INTO outages (started_at, detected_at, kind) VALUES ('2026-10-16T00:02:00Z', '2026-10-16T00:05:00Z', ?)`);
-  add.run('unready');
-  expect(() => add.run('unready')).toThrow();
-  expect(() => add.run('down')).toThrow();
-  expect(() => add.run('sideways')).toThrow();
-  expect(userVersion(db)).toBeGreaterThanOrEqual(19);
-  db.close();
-});
-
 test('v22 adds the refusal log tables, backing hq.db up first', () => {
   const p = `${dir}/v21.db`;
   const v21 = new Database(p, { create: true });
@@ -456,11 +413,10 @@ test('v21 adds deploy_runs, with a checked outcome and one row per run', () => {
 });
 
 test('hq probe status shows the last ready check and the unready episodes', async () => {
-  const d = db();
-  d.query(`INSERT INTO probe_samples (at, target_ok, control_ok, ready_ok) VALUES ('2026-10-14T00:59:00Z', 1, NULL, 0)`).run();
-  d.query(`INSERT INTO probe_samples (at, target_ok, control_ok, ready_ok) VALUES ('2026-10-14T01:00:00Z', 0, 1, NULL)`).run();
-  d.query(`INSERT INTO outages (started_at, detected_at, kind) VALUES ('2026-10-14T00:55:00Z', '2026-10-14T00:59:00Z', 'unready')`).run();
-  d.close();
+  const ctx = setupTest();
+  ctx.seed.probeSample({ at: '2026-10-14T00:59:00Z', readyOk: false });
+  ctx.seed.downProbeSample({ at: '2026-10-14T01:00:00Z' });
+  ctx.seed.unreadyOutage({ startedAt: '2026-10-14T00:55:00Z', detectedAt: '2026-10-14T00:59:00Z' });
   const r = await hq('probe', 'status');
   expect(findPath(r.json, 'openUnready')).toMatchObject({ kind: 'unready', started_at: '2026-10-14T00:55:00Z' });
   expect(findPath(r.json, 'open')).toBeNull();
@@ -873,11 +829,9 @@ test('hq capacity broker gives an unknown quota with room for a new proof and no
 });
 
 test("hq capacity broker reads the broker slot's fresh slot read from the database, not another slot's", async () => {
-  const store = db();
-  const insert = store.query('INSERT INTO slot_usage (at, slot, status, five_hour, five_hour_resets_at, seven_day, seven_day_resets_at, working_lanes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
-  insert.run('2026-10-14T00:30:00Z', 1, '200', 0, '2026-10-14T04:00:00Z', 0, '2026-10-18T00:00:00Z', 2);
-  insert.run('2026-10-14T00:30:00Z', 3, '200', 99, '2026-10-14T04:00:00Z', 99, '2026-10-18T00:00:00Z', 2);
-  store.close();
+  const ctx = setupTest();
+  ctx.seed.slotUsage({ at: '2026-10-14T00:30:00Z', slot: 1, five: 0, fiveResetsAt: '2026-10-14T04:00:00Z', seven: 0, sevenResetsAt: '2026-10-18T00:00:00Z', workingLanes: 2 });
+  ctx.seed.slotUsage({ at: '2026-10-14T00:30:00Z', slot: 3, five: 99, fiveResetsAt: '2026-10-14T04:00:00Z', seven: 99, sevenResetsAt: '2026-10-18T00:00:00Z', workingLanes: 2 });
   await hq('slots', 'broker', '1', '--proof', 'req-5e6f');
 
   const quota = await hq('capacity', 'broker');

@@ -132,7 +132,7 @@ test('a long cost line gives up its middle and keeps the target and colour', asy
   ctx.seed.usageSample({ at: '2026-10-16T05:00:00Z', account: 'abcdef012345', five_hour: 99, seven_day: 99 });
   await refreshActionsSpend(ctx.db, makeActionsGh(123_456.78), syd('2026-10-16', '17:50'));
 
-  const line = dailyText(ctx.db, syd('2026-10-16', '18:00')).split('\n').find((l) => l.startsWith('- Cost'));
+  const line = dailyText(ctx.db, syd('2026-10-16', '18:00')).split('\n').find((text) => text.startsWith('- Cost'));
 
   expect(line).toStartWith('- Cost: Actions $123456.78 of $25.81 budget to date; Claude 7-day 99%');
   expect(line).toEndWith('…; target <=$50 a month on Actions 🔴 red');
@@ -144,7 +144,10 @@ test('incidents today list the outages opened today, with minutes', () => {
   fetchedDays(ctx.db);
   ctx.seed.closedOutage({ startedAt: '2026-10-16T03:00:00Z', detectedAt: '2026-10-16T03:01:00Z', endedAt: '2026-10-16T03:05:00Z' });
   ctx.seed.closedOutage({ startedAt: '2026-10-15T03:00:00Z', detectedAt: '2026-10-15T03:01:00Z', endedAt: '2026-10-15T03:20:00Z' });
-  for (let i = 0; i < 5; i++) ctx.seed.downProbeSample({ at: iso(new Date(Date.parse('2026-10-16T03:00:00Z') + i * 60_000)) });
+  for (const minute of [0, 1, 2, 3, 4]) {
+    const sampleMs = Date.parse('2026-10-16T03:00:00Z') + minute * 60_000;
+    ctx.seed.downProbeSample({ at: iso(new Date(sampleMs)) });
+  }
   const last = dailyText(ctx.db, syd('2026-10-16', '18:00')).split('\n').at(-1);
   expect(last).toBe('Incidents today: Nix outage 14:00–14:05 Sydney, 5 min');
 });
@@ -154,7 +157,10 @@ test('incidents today list an unready episode beside the outages, one line each'
   fetchedDays(ctx.db);
   ctx.seed.closedOutage({ startedAt: '2026-10-16T03:00:00Z', detectedAt: '2026-10-16T03:01:00Z', endedAt: '2026-10-16T03:05:00Z' });
   ctx.seed.closedUnreadyOutage({ startedAt: '2026-10-16T05:00:00Z', detectedAt: '2026-10-16T05:03:00Z', endedAt: '2026-10-16T05:12:00Z' });
-  for (let i = 0; i < 5; i++) ctx.seed.downProbeSample({ at: iso(new Date(Date.parse('2026-10-16T03:00:00Z') + i * 60_000)) });
+  for (const minute of [0, 1, 2, 3, 4]) {
+    const sampleMs = Date.parse('2026-10-16T03:00:00Z') + minute * 60_000;
+    ctx.seed.downProbeSample({ at: iso(new Date(sampleMs)) });
+  }
   const last = dailyText(ctx.db, syd('2026-10-16', '18:00')).split('\n').at(-1);
   expect(last).toBe('Incidents today: Nix outage 14:00–14:05 Sydney, 5 min; Nix unready 16:00–16:12 (12 min)');
 });

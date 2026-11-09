@@ -12,7 +12,7 @@ function setupTest() {
   return { db: fresh.db, seed: buildSeeder(fresh) };
 }
 
-test('the tightest of the budget, the memory line and the vCPU line sets the slots, and is named', async () => {
+test('it sets the slots by the tightest of the budget, the memory line and the vCPU line, and names it', async () => {
   const ctx = setupTest();
   await ctx.seed.capacitySample({ at: '2026-10-16T00:55:00Z', nonnix_awake_mib: 8192, nonnix_awake_vcpus: 4 });
   const line = { awakeMib: 8192, maxMib: 16_384, awakeVcpus: 4, maxVcpus: 16, budgetMib: 1_048_576, nixAwakeMib: 0, keptMib: 0 };
@@ -27,13 +27,13 @@ test('the tightest of the budget, the memory line and the vCPU line sets the slo
   ]);
 });
 
-test('one more imp takes some vCPUs: 0 is refused, so the vCPU line is always checked', () => {
+test('it refuses 0 vCPUs for one more imp, so the vCPU line is always checked', () => {
   const ctx = setupTest();
   expect(() => setCapacitySetting(ctx.db, 'impVcpus', '0', 'kettle-bot')).toThrow('impVcpus must be more than 0');
   expect(setCapacitySetting(ctx.db, 'nonnixMaxVcpus', '0', 'kettle-bot').nonnixMaxVcpus).toBe(0);
 });
 
-test('both lines are the capacity watch\'s settings, their overrides included', async () => {
+test('it takes both lines from the capacity watch\'s settings, their overrides included', async () => {
   const ctx = setupTest();
   await ctx.seed.capacitySample({ at: '2026-10-16T00:55:00Z', nonnix_awake_mib: 16_384, nonnix_awake_vcpus: 16 });
   const size = { budgetSlots: 4, impMib: 2048 };
@@ -44,18 +44,18 @@ test('both lines are the capacity watch\'s settings, their overrides included', 
   expect(loadImpRoom(ctx.db, size)).toStrictEqual({ slots: 2, heldBy: 'impd at line', line: { awakeMib: 16_384, maxMib: 20_480, awakeVcpus: 16, maxVcpus: 20, budgetMib: 1_048_576, nixAwakeMib: 0, keptMib: 0 } });
 });
 
-test('no sample holds every slot', () => {
+test('it holds every slot when there is no sample', () => {
   const ctx = setupTest();
 
   expect(loadImpRoom(ctx.db, { budgetSlots: 4, impMib: 2048 })).toStrictEqual({ slots: 0, heldBy: 'no fresh impd reading', line: null });
 });
 
 test.each([
-  { title: 'one with no memory reading', samples: [{ at: '2026-10-16T00:55:00Z', nonnix_awake_mib: null }] },
-  { title: 'one with no vCPU reading', samples: [{ at: '2026-10-16T00:55:00Z', nonnix_awake_mib: 0, nonnix_awake_vcpus: null }] },
-  { title: 'one over 15 min old', samples: [{ at: '2026-10-16T00:44:00Z', nonnix_awake_mib: 0 }] },
-  { title: 'one over 15 min old, with a later one not read yet', samples: [{ at: '2026-10-16T00:44:00Z', nonnix_awake_mib: 0 }, { at: '2026-10-16T01:01:00Z', nonnix_awake_mib: 0 }] },
-])('$title holds every slot', async (row) => {
+  { title: 'a sample with no memory reading', samples: [{ at: '2026-10-16T00:55:00Z', nonnix_awake_mib: null }] },
+  { title: 'a sample with no vCPU reading', samples: [{ at: '2026-10-16T00:55:00Z', nonnix_awake_mib: 0, nonnix_awake_vcpus: null }] },
+  { title: 'a sample over 15 min old', samples: [{ at: '2026-10-16T00:44:00Z', nonnix_awake_mib: 0 }] },
+  { title: 'a sample over 15 min old beside a later one not read yet', samples: [{ at: '2026-10-16T00:44:00Z', nonnix_awake_mib: 0 }, { at: '2026-10-16T01:01:00Z', nonnix_awake_mib: 0 }] },
+])('it holds every slot for $title', async (row) => {
   const ctx = setupTest();
   for (const sample of row.samples) {
     await ctx.seed.capacitySample(sample);

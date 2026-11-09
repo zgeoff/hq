@@ -1,4 +1,5 @@
-import { expect, onTestFinished, test } from 'bun:test';
+// oxlint-disable zgeoff/test-beside-module -- grandfathered: the whole-program capacity suite
+import { afterEach, beforeEach, expect, onTestFinished, test } from 'bun:test';
 import type { Database } from 'bun:sqlite';
 import { readOutboxRows } from '../src/outbox/read-outbox-rows.ts';
 import { join } from 'node:path';
@@ -15,6 +16,7 @@ import { sampleLog } from '../src/capacity/sample-log.ts';
 import { setCapacitySetting } from '../src/capacity/set-capacity-setting.ts';
 import type { CapacityProbe } from '../src/capacity/types.ts';
 import { dailyText } from '../src/goals/daily/daily-text.ts';
+import { iso } from '../src/clock/iso.ts';
 import { kdb } from '../src/kdb.ts';
 import type { Runner } from '../src/runner/types.ts';
 import { orchestratorName } from '../src/wake/orchestrator-name.ts';
@@ -22,6 +24,14 @@ import { FOUR_AM_SYDNEY, NOON_SYDNEY, at, freshDb } from './helpers.ts';
 import { markOutboxSent } from '../src/outbox/mark-outbox-sent.ts';
 import { unsent } from '../src/outbox/unsent.ts';
 import { buildSeeder } from '../src/test-utils/build-seeder.ts';
+
+let db: Database;
+let cleanup: () => void;
+beforeEach(() => {
+  ({ db, cleanup } = freshDb());
+  at(NOON_SYDNEY);
+});
+afterEach(() => cleanup());
 
 function setupTest() {
   const fresh = freshDb();
@@ -73,21 +83,19 @@ function probe(w: World): CapacityProbe {
 }
 
 const minute = (m: number) => new Date(Date.parse(NOON_SYDNEY) + m * 60_000);
-const sampleAt = async (db: Database, w: World, d: Date) => {
+const sampleAt = async (w: World, d: Date) => {
   at(d.toISOString());
   return sampleCapacity(db, probe(w), 'hq-lanes', d);
 };
-
 test('the Kysely adapter inserts and selects through hq\'s own database', async () => {
-  const ctx = setupTest();
-  const k = kdb(ctx.db);
+  const k = kdb(db);
   await k.insertInto('capacity_samples').values({ at: '2026-10-14T01:00:00Z', impd_budget_mib: 100, impd_used_mib: null, impd_committed_mib: null, nonnix_awake_mib: 7, nix_awake_mib: null, cloud_avail_bytes: null, cloud_total_bytes: null, claude_account: null, claude_five_hour: 1.5, claude_seven_day: null, claude_at: null, ci_minutes_today: null, pc_disk_free_bytes: null, pc_mem_avail_bytes: null, errors: '{}' }).execute();
   const rows = await k.selectFrom('capacity_samples').selectAll().execute();
   expect(rows).toHaveLength(1);
   expect(rows[0]).toMatchObject({ impd_budget_mib: 100, nonnix_awake_mib: 7, claude_five_hour: 1.5, impd_used_mib: null });
-  expect(ctx.db.query('SELECT COUNT(*) AS count FROM capacity_samples').get()).toStrictEqual({ count: 1 });
+  expect(db.query('SELECT COUNT(*) AS count FROM capacity_samples').get()).toStrictEqual({ count: 1 });
   await k.destroy();
-  expect(ctx.db.query('SELECT 1 AS x').get()).toEqual({ x: 1 });
+  expect(db.query('SELECT 1 AS x').get()).toEqual({ x: 1 });
 });
 
 test('impd: info gives the budget, ls splits the awake imps into Nix and the rest, sleeping ones do not count', async () => {
@@ -115,28 +123,26 @@ test('prometheus text: exponent form parses, a missing metric is null', () => {
 
 test('a reading carries every source; PC and CI are shown', async () => {
   const ctx = setupTest();
-  ctx.seed.usageSample({ at: minute(-5).toISOString().replace(/\.\d{3}Z$/, 'Z'), account: 'abcdef012345', five_hour: 40, seven_day: 62 });
-  const r = await readCapacity(ctx.db, probe(world()), minute(0));
-  expect(r).toMatchObject({ nonnix_awake_mib: 8192, nix_awake_mib: 4096, impd_budget_mib: 20480, cloud_avail_bytes: 14 * 2 ** 30, cloud_total_bytes: 33635024896, claude_account: 'abcdef012345', claude_five_hour: 40, claude_seven_day: 62, ci_minutes_today: 0, pc_disk_free_bytes: 120 * 2 ** 30, pc_mem_avail_bytes: 9544371 * 1024, errors: {} });
+  ctx.seed.usageSample({ at: iso(minute(-5)), account: 'abcdef012345', five_hour: 40, seven_day: 62 });
+  const reading = await readCapacity(ctx.db, probe(world()), minute(0));
+  expect(reading).toMatchObject({ nonnix_awake_mib: 8192, nix_awake_mib: 4096, impd_budget_mib: 20_480, cloud_avail_bytes: 14 * 2 ** 30, cloud_total_bytes: 33_635_024_896, claude_account: 'abcdef012345', claude_five_hour: 40, claude_seven_day: 62, ci_minutes_today: 0, pc_disk_free_bytes: 120 * 2 ** 30, pc_mem_avail_bytes: 9_544_371 * 1024, errors: {} });
 });
 
 test('CI minutes today count the Sydney day from the goals CI runs', async () => {
-  const ctx = setupTest();
-  ctx.db.query("INSERT INTO ci_runs (id, repo, path, event, status, conclusion, attempt, created_at, started_at, updated_at) VALUES (1, 'atc', 'ci.yml', 'push', 'completed', 'success', 1, '2026-10-14T00:10:00Z', '2026-10-14T00:10:00Z', '2026-10-14T00:40:00Z')").run();
-  expect((await readCapacity(ctx.db, probe(world()), minute(0))).ci_minutes_today).toBe(30);
+  db.query("INSERT INTO ci_runs (id, repo, path, event, status, conclusion, attempt, created_at, started_at, updated_at) VALUES (1, 'atc', 'ci.yml', 'push', 'completed', 'success', 1, '2026-10-14T00:10:00Z', '2026-10-14T00:10:00Z', '2026-10-14T00:40:00Z')").run();
+  expect((await readCapacity(db, probe(world()), minute(0))).ci_minutes_today).toBe(30);
 });
 
 test('a failed, malformed or hung source stores NULLs and an errors entry; the others still read', async () => {
-  const ctx = setupTest();
-  const bad = await readCapacity(ctx.db, probe(world({ impzBroken: true, cloudBroken: true })), minute(0));
+  const bad = await readCapacity(db, probe(world({ impzBroken: true, cloudBroken: true })), minute(0));
   expect(bad).toMatchObject({ nonnix_awake_mib: null, impd_budget_mib: null, cloud_avail_bytes: null, pc_disk_free_bytes: 120 * 2 ** 30 });
   expect(Object.keys(bad.errors).toSorted()).toEqual(['claude', 'cloud', 'impd', 'op']);
-  const missing = await readCapacity(ctx.db, probe(world({ metrics: 'node_memory_MemTotal_bytes 5\n' })), minute(0));
+  const missing = await readCapacity(db, probe(world({ metrics: 'node_memory_MemTotal_bytes 5\n' })), minute(0));
   expect(missing.cloud_avail_bytes).toBeNull();
   expect(missing.errors['cloud']).toContain('MemAvailable');
 
   const t = Date.now();
-  const hung = await readCapacity(ctx.db, { ...probe(world({ cloudHangs: true })), run: (cmd) => (cmd[0] === 'impz' ? new Promise(() => {}) : probe(world()).run(cmd)) }, minute(0));
+  const hung = await readCapacity(db, { ...probe(world({ cloudHangs: true })), run: (cmd) => (cmd[0] === 'impz' ? new Promise(() => {}) : probe(world()).run(cmd)) }, minute(0));
   expect(Date.now() - t).toBeLessThan(5000);
   expect(hung.cloud_avail_bytes).toBeNull();
   expect(hung.errors['cloud']).toContain('no answer');
@@ -144,23 +150,22 @@ test('a failed, malformed or hung source stores NULLs and an errors entry; the o
 
 test('a Claude sample older than 30 minutes is no reading', async () => {
   const ctx = setupTest();
-  ctx.seed.usageSample({ at: minute(-40).toISOString().replace(/\.\d{3}Z$/, 'Z'), account: 'abcdef012345', five_hour: 40, seven_day: 62 });
-  const r = await readCapacity(ctx.db, probe(world()), minute(0));
-  expect(r.claude_seven_day).toBeNull();
-  expect(r.errors['claude']).toContain('old');
+  ctx.seed.usageSample({ at: iso(minute(-40)), account: 'abcdef012345', five_hour: 40, seven_day: 62 });
+  const reading = await readCapacity(ctx.db, probe(world()), minute(0));
+  expect(reading.claude_seven_day).toBeNull();
+  expect(reading.errors['claude']).toContain('old');
 });
 
 test('a breach must hold two samples to open; one is not enough', async () => {
-  const ctx = setupTest();
-  await sampleAt(ctx.db, world({ nonnix: 18_432 }), minute(0));
-  expect(readOutboxRows(ctx.db)).toHaveLength(0);
-  expect(openAlerts(ctx.db)).toEqual({});
-  await sampleAt(ctx.db, world({ nonnix: 16_000 }), minute(5));
-  await sampleAt(ctx.db, world({ nonnix: 18_432 }), minute(10));
-  expect(readOutboxRows(ctx.db)).toHaveLength(0);
-  const t = await sampleAt(ctx.db, world({ nonnix: 18_432 }), minute(15));
+  await sampleAt(world({ nonnix: 18_432 }), minute(0));
+  expect(readOutboxRows(db)).toHaveLength(0);
+  expect(openAlerts(db)).toEqual({});
+  await sampleAt(world({ nonnix: 16_000 }), minute(5));
+  await sampleAt(world({ nonnix: 18_432 }), minute(10));
+  expect(readOutboxRows(db)).toHaveLength(0);
+  const t = await sampleAt(world({ nonnix: 18_432 }), minute(15));
   expect(t.tick.opened).toEqual(['impd:nonnix']);
-  const sent = readOutboxRows(ctx.db);
+  const sent = readOutboxRows(db);
   expect(sent.map((m) => m.target).sort()).toEqual([owner(), orchestratorName()].sort());
   expect(sent[0]!.text).toContain('- impd: non-Nix imps awake 18,432 MiB, over 16,384 MiB (budget used 10,240/20,480)');
   expect(sent[0]!.text).toContain('hq capacity shows every reading. hq changed nothing.');
@@ -168,51 +173,50 @@ test('a breach must hold two samples to open; one is not enough', async () => {
 });
 
 test('a clear also needs two good samples, and one message says how long it was open', async () => {
-  const ctx = setupTest();
-  await sampleAt(ctx.db, world({ nonnix: 18_432 }), minute(0));
-  await sampleAt(ctx.db, world({ nonnix: 18_432 }), minute(5));
-  for (const row of unsent(ctx.db, true, undefined)) {
-    markOutboxSent(ctx.db, row, null);
+  await sampleAt(world({ nonnix: 18_432 }), minute(0));
+  await sampleAt(world({ nonnix: 18_432 }), minute(5));
+  for (const row of unsent(db, true, undefined)) {
+    markOutboxSent(db, row, null);
   }
-  const before = readOutboxRows(ctx.db).length;
-  await sampleAt(ctx.db, world(), minute(10));
-  await sampleAt(ctx.db, world({ nonnix: 18_432 }), minute(15));
-  await sampleAt(ctx.db, world(), minute(20));
-  expect(readOutboxRows(ctx.db)).toHaveLength(before);
-  await sampleAt(ctx.db, world(), minute(25));
-  const sent = readOutboxRows(ctx.db).slice(before);
+  const before = readOutboxRows(db).length;
+  await sampleAt(world(), minute(10));
+  await sampleAt(world({ nonnix: 18_432 }), minute(15));
+  await sampleAt(world(), minute(20));
+  expect(readOutboxRows(db)).toHaveLength(before);
+  await sampleAt(world(), minute(25));
+  const sent = readOutboxRows(db).slice(before);
   expect(sent).toHaveLength(2);
   expect(sent[0]?.text).toContain('back under 16,384 MiB (open 20 min)');
   expect(sent[0]?.topic).toBeNull();
-  expect(openAlerts(ctx.db)).toEqual({});
+  expect(openAlerts(db)).toEqual({});
 });
 
 test('a sample with no reading neither opens nor clears, and keeps the count', async () => {
-  const ctx = setupTest();
-  await sampleAt(ctx.db, world({ nonnix: 18_432 }), minute(0));
-  await sampleAt(ctx.db, world({ impzBroken: true }), minute(5));
-  expect(readOutboxRows(ctx.db)).toHaveLength(0);
-  await sampleAt(ctx.db, world({ nonnix: 18_432 }), minute(10));
-  expect(Object.keys(openAlerts(ctx.db))).toEqual(['impd:nonnix']);
-  for (const row of unsent(ctx.db, true, undefined)) {
-    markOutboxSent(ctx.db, row, null);
+  await sampleAt(world({ nonnix: 18_432 }), minute(0));
+  await sampleAt(world({ impzBroken: true }), minute(5));
+  expect(readOutboxRows(db)).toHaveLength(0);
+  await sampleAt(world({ nonnix: 18_432 }), minute(10));
+  expect(Object.keys(openAlerts(db))).toEqual(['impd:nonnix']);
+  for (const row of unsent(db, true, undefined)) {
+    markOutboxSent(db, row, null);
   }
-  const before = readOutboxRows(ctx.db).length;
-  await sampleAt(ctx.db, world(), minute(15));
-  await sampleAt(ctx.db, world({ impzBroken: true }), minute(20));
-  expect(Object.keys(openAlerts(ctx.db))).toEqual(['impd:nonnix']);
-  await sampleAt(ctx.db, world(), minute(25));
-  expect(openAlerts(ctx.db)).toEqual({});
-  expect(readOutboxRows(ctx.db)).toHaveLength(before + 2);
+  const before = readOutboxRows(db).length;
+  await sampleAt(world(), minute(15));
+  await sampleAt(world({ impzBroken: true }), minute(20));
+  expect(Object.keys(openAlerts(db))).toEqual(['impd:nonnix']);
+  await sampleAt(world(), minute(25));
+  expect(openAlerts(db)).toEqual({});
+  expect(readOutboxRows(db)).toHaveLength(before + 2);
 });
 
 test('cloud and Claude thresholds open one alert each; several in a tick make one message', async () => {
   const ctx = setupTest();
   for (const m of [0, 5]) {
-    ctx.seed.usageSample({ at: minute(m).toISOString().replace(/\.\d{3}Z$/, 'Z'), account: 'abcdef012345', five_hour: 95, seven_day: 90 });
-    await sampleAt(ctx.db, world({ cloudAvail: 1.5 }), minute(m));
+    ctx.seed.usageSample({ at: iso(minute(m)), account: 'abcdef012345', five_hour: 95, seven_day: 90 });
+    at(minute(m).toISOString());
+    await sampleCapacity(ctx.db, probe(world({ cloudAvail: 1.5 })), 'hq-lanes', minute(m));
   }
-  expect(Object.keys(openAlerts(ctx.db)).sort()).toEqual(['claude:5h', 'claude:7d', 'cloud:memory']);
+  expect(Object.keys(openAlerts(ctx.db)).toSorted()).toStrictEqual(['claude:5h', 'claude:7d', 'cloud:memory']);
   const sent = readOutboxRows(ctx.db).filter((row) => row.target === owner());
   expect(sent).toHaveLength(1);
   expect(sent[0]!.text).toContain('3 things are over their line');
@@ -222,90 +226,84 @@ test('cloud and Claude thresholds open one alert each; several in a tick make on
 });
 
 test('it opens no cloud alert at 3 GiB available, above the 2 GiB line', async () => {
-  const ctx = setupTest();
   for (const offset of [0, 5]) {
-    await sampleAt(ctx.db, world({ cloudAvail: 3 }), minute(offset));
+    await sampleAt(world({ cloudAvail: 3 }), minute(offset));
   }
 
-  expect(openAlerts(ctx.db)).toStrictEqual({});
+  expect(openAlerts(db)).toStrictEqual({});
 });
 
 test('the PC never alerts, however low it is', async () => {
-  const ctx = setupTest();
   const low: CapacityProbe = { ...probe(world()), run: async (cmd) => (cmd[0] === 'df' ? { code: 0, stdout: 'h\n/dev/x 100 99 1 99% /', stderr: '' } : probe(world()).run(cmd)), readFile: async () => 'MemAvailable: 10 kB' };
   for (const m of [0, 5, 10]) {
     at(minute(m).toISOString());
-    await sampleCapacity(ctx.db, low, 'hq-lanes', minute(m));
+    await sampleCapacity(db, low, 'hq-lanes', minute(m));
   }
-  expect(readOutboxRows(ctx.db)).toHaveLength(0);
-  expect((await latestSample(ctx.db))!.pc_disk_free_bytes).toBe(1);
+  expect(readOutboxRows(db)).toHaveLength(0);
+  expect((await latestSample(db))!.pc_disk_free_bytes).toBe(1);
 });
 
 test('quiet hours: an impd open goes out at once; another alert waits for the first awake tick', async () => {
-  const ctx = setupTest();
   const quiet = (m: number) => new Date(Date.parse(FOUR_AM_SYDNEY) + m * 60_000);
   for (const offset of [0, 5]) {
-    await sampleAt(ctx.db, world({ nonnix: 20_000, cloudAvail: 1 }), quiet(offset));
+    await sampleAt(world({ nonnix: 20_000, cloudAvail: 1 }), quiet(offset));
   }
-  const told = readOutboxRows(ctx.db).filter((row) => row.target === owner());
+  const told = readOutboxRows(db).filter((row) => row.target === owner());
   expect(told).toHaveLength(1);
   expect(told[0]!.text).toContain('impd:');
   expect(told[0]?.text).not.toContain('cloud:');
-  expect(Object.values(openAlerts(ctx.db)).map((o) => o.told)).toEqual([true, false]);
-  for (const row of unsent(ctx.db, true, undefined)) {
-    markOutboxSent(ctx.db, row, null);
+  expect(Object.values(openAlerts(db)).map((o) => o.told)).toEqual([true, false]);
+  for (const row of unsent(db, true, undefined)) {
+    markOutboxSent(db, row, null);
   }
   const morning = new Date(Date.parse(FOUR_AM_SYDNEY) + 3 * 3_600_000);
-  await sampleAt(ctx.db, world({ nonnix: 20_000, cloudAvail: 1 }), morning);
-  const after = readOutboxRows(ctx.db).filter((row) => row.target === owner());
+  await sampleAt(world({ nonnix: 20_000, cloudAvail: 1 }), morning);
+  const after = readOutboxRows(db).filter((row) => row.target === owner());
   expect(after).toHaveLength(2);
   expect(after[1]?.text).toContain('cloud:');
   expect(after[1]?.text).toContain('Still open:');
-  await sampleAt(ctx.db, world({ nonnix: 20_000, cloudAvail: 1 }), new Date(morning.getTime() + 300_000));
-  expect(readOutboxRows(ctx.db).filter((message) => message.target === owner())).toHaveLength(2);
+  await sampleAt(world({ nonnix: 20_000, cloudAvail: 1 }), new Date(morning.getTime() + 300_000));
+  expect(readOutboxRows(db).filter((message) => message.target === owner())).toHaveLength(2);
 });
 
 test('quiet hours: an alert that opens and clears inside them sends nothing; a told one is cleared at wake', async () => {
-  const ctx = setupTest();
   const quiet = (m: number) => new Date(Date.parse(FOUR_AM_SYDNEY) + m * 60_000);
   for (const offset of [0, 5]) {
-    await sampleAt(ctx.db, world({ cloudAvail: 1 }), quiet(offset));
+    await sampleAt(world({ cloudAvail: 1 }), quiet(offset));
   }
-  for (const m of [10, 15]) await sampleAt(ctx.db, world(), quiet(m));
-  expect(openAlerts(ctx.db)).toEqual({});
-  expect(readOutboxRows(ctx.db)).toHaveLength(0);
+  for (const m of [10, 15]) await sampleAt(world(), quiet(m));
+  expect(openAlerts(db)).toEqual({});
+  expect(readOutboxRows(db)).toHaveLength(0);
 
-  for (const offset of [20, 25]) { await sampleAt(ctx.db, world({ nonnix: 20_000 }), quiet(offset)); }
-  for (const row of unsent(ctx.db, true, undefined)) {
-    markOutboxSent(ctx.db, row, null);
+  for (const offset of [20, 25]) { await sampleAt(world({ nonnix: 20_000 }), quiet(offset)); }
+  for (const row of unsent(db, true, undefined)) {
+    markOutboxSent(db, row, null);
   }
-  for (const offset of [30, 35]) { await sampleAt(ctx.db, world(), quiet(offset)); }
-  expect(readOutboxRows(ctx.db).filter((row) => row.target === owner())).toHaveLength(1);
-  await sampleAt(ctx.db, world(), new Date(Date.parse(FOUR_AM_SYDNEY) + 3 * 3_600_000));
-  const sent = readOutboxRows(ctx.db).filter((row) => row.target === owner());
+  for (const offset of [30, 35]) { await sampleAt(world(), quiet(offset)); }
+  expect(readOutboxRows(db).filter((row) => row.target === owner())).toHaveLength(1);
+  await sampleAt(world(), new Date(Date.parse(FOUR_AM_SYDNEY) + 3 * 3_600_000));
+  const sent = readOutboxRows(db).filter((row) => row.target === owner());
   expect(sent).toHaveLength(2);
   expect(sent[1]!.text).toContain('back under 16,384 MiB');
 });
 
 test('awake totals count plugged memory, so elastic imps can trip the non-Nix alert', async () => {
-  const ctx = setupTest();
-  const r = await sampleAt(ctx.db, world({ nonnix: 12_288, plugged: 6144 }), minute(0));
+  const r = await sampleAt(world({ nonnix: 12_288, plugged: 6144 }), minute(0));
   expect(r.reading.nonnix_awake_mib).toBe(18_432);
-  await sampleAt(ctx.db, world({ nonnix: 12_288, plugged: 6144 }), minute(5));
-  expect(Object.keys(openAlerts(ctx.db))).toEqual(['impd:nonnix']);
+  await sampleAt(world({ nonnix: 12_288, plugged: 6144 }), minute(5));
+  expect(Object.keys(openAlerts(db))).toEqual(['impd:nonnix']);
 });
 
 test('an atc outage loses no notice: every open and back-under stays queued, in order, for both recipients', async () => {
-  const ctx = setupTest();
-  for (const offset of [0, 5]) { await sampleAt(ctx.db, world({ nonnix: 20_000 }), minute(offset)); }
-  for (const offset of [10, 15]) { await sampleAt(ctx.db, world({ nonnix: 20_000, cloudAvail: 1 }), minute(offset)); }
-  for (const offset of [20, 25]) { await sampleAt(ctx.db, world({ cloudAvail: 1 }), minute(offset)); }
-  for (const offset of [30, 35]) { await sampleAt(ctx.db, world({ nonnix: 20_000, cloudAvail: 1 }), minute(offset)); }
-  for (const offset of [40, 45]) { await sampleAt(ctx.db, world(), minute(offset)); }
-  for (const offset of [50, 55]) { await sampleAt(ctx.db, world({ cloudAvail: 1 }), minute(offset)); }
-  for (const offset of [60, 65]) { await sampleAt(ctx.db, world(), minute(offset)); }
+  for (const offset of [0, 5]) { await sampleAt(world({ nonnix: 20_000 }), minute(offset)); }
+  for (const offset of [10, 15]) { await sampleAt(world({ nonnix: 20_000, cloudAvail: 1 }), minute(offset)); }
+  for (const offset of [20, 25]) { await sampleAt(world({ cloudAvail: 1 }), minute(offset)); }
+  for (const offset of [30, 35]) { await sampleAt(world({ nonnix: 20_000, cloudAvail: 1 }), minute(offset)); }
+  for (const offset of [40, 45]) { await sampleAt(world(), minute(offset)); }
+  for (const offset of [50, 55]) { await sampleAt(world({ cloudAvail: 1 }), minute(offset)); }
+  for (const offset of [60, 65]) { await sampleAt(world(), minute(offset)); }
   for (const t of [owner(), orchestratorName()]) {
-    const texts = readOutboxRows(ctx.db)
+    const texts = readOutboxRows(db)
       .filter((row) => row.target === t)
       .map((row) => row.text.split('\n')[1]);
     expect(texts).toEqual([
@@ -318,25 +316,23 @@ test('an atc outage loses no notice: every open and back-under stays queued, in 
       expect.stringContaining('back under'),
     ]);
   }
-  expect(readOutboxRows(ctx.db).every((row) => row.topic === null)).toBe(true);
+  expect(readOutboxRows(db).every((row) => row.topic === null)).toBe(true);
 });
 
 test('an alert that reopens in quiet hours drops its old held recovery', async () => {
-  const ctx = setupTest();
   const q = (m: number) => new Date(Date.parse(FOUR_AM_SYDNEY) + m * 60_000);
-  for (const m of [0, 5]) await sampleAt(ctx.db, world({ nonnix: 20_000 }), q(m));
-  for (const row of unsent(ctx.db, true, undefined)) {
-    markOutboxSent(ctx.db, row, null);
+  for (const m of [0, 5]) await sampleAt(world({ nonnix: 20_000 }), q(m));
+  for (const row of unsent(db, true, undefined)) {
+    markOutboxSent(db, row, null);
   }
-  for (const offset of [10, 15]) { await sampleAt(ctx.db, world(), q(offset)); }
-  for (const offset of [20, 25]) { await sampleAt(ctx.db, world({ nonnix: 20_000 }), q(offset)); }
-  const before = readOutboxRows(ctx.db).length;
-  await sampleAt(ctx.db, world({ nonnix: 20_000 }), new Date(Date.parse(FOUR_AM_SYDNEY) + 3 * 3_600_000));
-  expect(readOutboxRows(ctx.db).slice(before).some((row) => row.text.includes('back under'))).toBe(false);
+  for (const offset of [10, 15]) { await sampleAt(world(), q(offset)); }
+  for (const offset of [20, 25]) { await sampleAt(world({ nonnix: 20_000 }), q(offset)); }
+  const before = readOutboxRows(db).length;
+  await sampleAt(world({ nonnix: 20_000 }), new Date(Date.parse(FOUR_AM_SYDNEY) + 3 * 3_600_000));
+  expect(readOutboxRows(db).slice(before).some((row) => row.text.includes('back under'))).toBe(false);
 });
 
 test('it keeps every setting when processes set different ones at once', async () => {
-  const ctx = setupTest();
   const go = String(Date.now() + 2000);
   const keys = ['nonnixMaxMib', 'nonnixMaxVcpus', 'impVcpus', 'cloudMinAvailGiB', 'claudeSevenDayPct', 'claudeFiveHourPct', 'opDailyPct', 'holdSamples'];
   const runs = keys.map((key) =>
@@ -344,58 +340,56 @@ test('it keeps every setting when processes set different ones at once', async (
   );
   const exits = await Promise.all(runs.map((run) => run.exited));
   expect(exits).toStrictEqual([0, 0, 0, 0, 0, 0, 0, 0]);
-  expect(capacitySettings(ctx.db)).toStrictEqual({ nonnixMaxMib: 7, nonnixMaxVcpus: 7, impVcpus: 7, cloudMinAvailGiB: 7, claudeSevenDayPct: 7, claudeFiveHourPct: 7, opDailyPct: 7, holdSamples: 7 });
+  expect(capacitySettings(db)).toStrictEqual({ nonnixMaxMib: 7, nonnixMaxVcpus: 7, impVcpus: 7, cloudMinAvailGiB: 7, claudeSevenDayPct: 7, claudeFiveHourPct: 7, opDailyPct: 7, holdSamples: 7 });
 });
 
 test('settings: set, reset, bad key, bad value; each change is logged', () => {
-  const ctx = setupTest();
-  expect(capacitySettings(ctx.db).nonnixMaxMib).toBe(16384);
-  expect(setCapacitySetting(ctx.db, 'nonnixMaxMib', '12000', 'z-stu').nonnixMaxMib).toBe(12000);
-  expect(capacitySettings(ctx.db).nonnixMaxMib).toBe(12000);
-  expect(setCapacitySetting(ctx.db, 'nonnixMaxMib', null, 'z-stu').nonnixMaxMib).toBe(16384);
-  expect(() => setCapacitySetting(ctx.db, 'bogus', '1', 'z-stu')).toThrow('unknown setting');
-  expect(() => setCapacitySetting(ctx.db, 'holdSamples', '-1', 'z-stu')).toThrow('0 or more');
-  expect(() => setCapacitySetting(ctx.db, 'holdSamples', 'x', 'z-stu')).toThrow('0 or more');
-  expect(ctx.db.query("SELECT COUNT(*) AS n FROM events WHERE action = 'setting' AND subject_id = 'capacity'").get()).toEqual({ n: 2 });
+  expect(capacitySettings(db).nonnixMaxMib).toBe(16384);
+  expect(setCapacitySetting(db, 'nonnixMaxMib', '12000', 'z-stu').nonnixMaxMib).toBe(12000);
+  expect(capacitySettings(db).nonnixMaxMib).toBe(12000);
+  expect(setCapacitySetting(db, 'nonnixMaxMib', null, 'z-stu').nonnixMaxMib).toBe(16384);
+  expect(() => setCapacitySetting(db, 'bogus', '1', 'z-stu')).toThrow('unknown setting');
+  expect(() => setCapacitySetting(db, 'holdSamples', '-1', 'z-stu')).toThrow('0 or more');
+  expect(() => setCapacitySetting(db, 'holdSamples', 'x', 'z-stu')).toThrow('0 or more');
+  expect(db.query("SELECT COUNT(*) AS n FROM events WHERE action = 'setting' AND subject_id = 'capacity'").get()).toEqual({ n: 2 });
 });
 
 test('holdSamples 1 opens on the first breach', async () => {
-  const ctx = setupTest();
-  setCapacitySetting(ctx.db, 'holdSamples', '1', 'z-stu');
-  await sampleAt(ctx.db, world({ nonnix: 20_000 }), minute(0));
-  expect(Object.keys(openAlerts(ctx.db))).toEqual(['impd:nonnix']);
+  setCapacitySetting(db, 'holdSamples', '1', 'z-stu');
+  await sampleAt(world({ nonnix: 20_000 }), minute(0));
+  expect(Object.keys(openAlerts(db))).toEqual(['impd:nonnix']);
 });
 
 test('samples older than 30 days are pruned on each sample; the log reads newest first', async () => {
-  const ctx = setupTest();
-  await sampleAt(ctx.db, world(), new Date(Date.parse(NOON_SYDNEY) - 31 * 86_400_000));
-  await sampleAt(ctx.db, world(), new Date(Date.parse(NOON_SYDNEY) - 29 * 86_400_000));
-  expect(ctx.db.query('SELECT COUNT(*) AS n FROM capacity_samples').get()).toEqual({ n: 2 });
-  await sampleAt(ctx.db, world(), minute(0));
-  expect(ctx.db.query('SELECT COUNT(*) AS count FROM capacity_samples').get()).toStrictEqual({ count: 2 });
-  await sampleAt(ctx.db, world(), minute(60));
-  const log = await sampleLog(ctx.db, 24, minute(60));
+  await sampleAt(world(), new Date(Date.parse(NOON_SYDNEY) - 31 * 86_400_000));
+  await sampleAt(world(), new Date(Date.parse(NOON_SYDNEY) - 29 * 86_400_000));
+  expect(db.query('SELECT COUNT(*) AS n FROM capacity_samples').get()).toEqual({ n: 2 });
+  await sampleAt(world(), minute(0));
+  expect(db.query('SELECT COUNT(*) AS count FROM capacity_samples').get()).toStrictEqual({ count: 2 });
+  await sampleAt(world(), minute(60));
+  const log = await sampleLog(db, 24, minute(60));
   expect(log.map((r) => r.at)).toEqual([minute(60), minute(0)].map((d) => d.toISOString().replace(/\.\d{3}Z$/, 'Z')));
 });
 
 test('the daily line: from a recent sample, each part, and no reading when null; none when stale', async () => {
   const ctx = setupTest();
   expect(loadCapacityLine(ctx.db, minute(0))).toBe('Capacity: no recent reading');
-  ctx.seed.usageSample({ at: minute(-1).toISOString().replace(/\.\d{3}Z$/, 'Z'), account: 'abcdef012345', five_hour: 40, seven_day: 62 });
-  await sampleAt(ctx.db, world({ nonnix: 14_336, used: 10_858, cloudAvail: 14.5 }), minute(0));
+  ctx.seed.usageSample({ at: iso(minute(-1)), account: 'abcdef012345', five_hour: 40, seven_day: 62 });
+  at(minute(0).toISOString());
+  await sampleCapacity(ctx.db, probe(world({ nonnix: 14_336, used: 10_858, cloudAvail: 14.5 })), 'hq-lanes', minute(0));
   expect(loadCapacityLine(ctx.db, minute(10))).toBe('Capacity: impd non-Nix 14,336/16,384 MiB awake (used 10,858/20,480); cloud 14.5 GiB free; Claude 5h 40%, 7d 62%; CI today 0 min; PC 120 GiB disk, 9.1 GiB memory free');
   expect(loadCapacityLine(ctx.db, minute(16))).toBe('Capacity: no recent reading');
-  await sampleAt(ctx.db, world({ impzBroken: true, cloudBroken: true }), minute(30));
+  at(minute(30).toISOString());
+  await sampleCapacity(ctx.db, probe(world({ impzBroken: true, cloudBroken: true })), 'hq-lanes', minute(30));
   expect(loadCapacityLine(ctx.db, minute(31))).toContain('impd no reading; cloud no reading;');
 });
 
 test('the daily check-in carries the capacity line before Incidents today', async () => {
-  const ctx = setupTest();
-  const lines = dailyText(ctx.db, minute(0)).split('\n');
+  const lines = dailyText(db, minute(0)).split('\n');
   expect(lines.at(-2)).toBe('Capacity: no recent reading');
   expect(lines.at(-1)).toStartWith('Incidents today');
-  await sampleAt(ctx.db, world(), minute(0));
-  const l = dailyText(ctx.db, minute(1)).split('\n');
+  await sampleAt(world(), minute(0));
+  const l = dailyText(db, minute(1)).split('\n');
   expect(l.at(-2)).toStartWith('Capacity: impd non-Nix 8,192/16,384 MiB awake');
   expect(l.at(-2)?.length).toBeLessThanOrEqual(159);
 });

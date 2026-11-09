@@ -387,7 +387,7 @@ test('a detection of exactly 5 min is green', () => {
   expect(verdict(DEFAULT_TARGETS.downtime, ctx.readMeasures().downtime)).toBe('green');
 });
 
-test('14 min 59 s down is green, though it shows as 15 min', () => {
+test('it counts 14 min 59 s down as green, though it shows as 15 min', () => {
   const ctx = setupTest();
   ctx.seedExactOutage(14 * 60 + 59, 60);
   const result = ctx.readMeasures().downtime;
@@ -396,7 +396,7 @@ test('14 min 59 s down is green, though it shows as 15 min', () => {
   expect(verdict(DEFAULT_TARGETS.downtime, result)).toBe('green');
 });
 
-test('15 min 0 s down is red', () => {
+test('it counts 15 min 0 s down as red', () => {
   const ctx = setupTest();
   ctx.seedExactOutage(15 * 60, 60);
   const result = ctx.readMeasures().downtime;

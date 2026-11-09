@@ -122,9 +122,15 @@ test('the downtime row gives outages, the slowest detection and blind minutes, j
   fetchedDays(ctx.db);
   const t0 = Date.parse('2026-10-14T01:00:00Z');
   const z = (ms: number) => iso(new Date(t0 + ms));
-  for (let i = -20; i < 0; i++) ctx.seed.probeSample({ at: z(i * 60_000) });
-  for (let i = 0; i < 4; i++) ctx.seed.downProbeSample({ at: z(i * 60_000) });
-  for (let i = 4; i < 40; i++) ctx.seed.probeSample({ at: z(i * 60_000) });
+  for (const minute of Array.from({ length: 20 }, (_, offset) => offset - 20)) {
+    ctx.seed.probeSample({ at: z(minute * 60_000) });
+  }
+  for (const minute of [0, 1, 2, 3]) {
+    ctx.seed.downProbeSample({ at: z(minute * 60_000) });
+  }
+  for (const minute of Array.from({ length: 36 }, (_, offset) => offset + 4)) {
+    ctx.seed.probeSample({ at: z(minute * 60_000) });
+  }
   ctx.seed.closedOutage({ startedAt: z(0), detectedAt: z(2 * 60_000), endedAt: z(4 * 60_000) });
   const text = weeklyText(ctx.db, syd(MON, '17:00'));
   expect(row(text, 'Nix downtime')).toMatch(/^\| Nix downtime \| <15 min a week, each outage caught within 5 min \| 4 min down, 1 outage\(s\), slowest caught in 2 min, [\d.]+ min blind \(\d+ samples\) \| no data \(0 samples\) \| 🟢 green \|$/);
@@ -138,6 +144,7 @@ test('the cost row names an account by its label when set, else by the short key
   ctx.seed.usageSample({ at: '2026-10-15T01:00:00Z', account: 'abcdef012345', five_hour: 30, seven_day: 55 });
   ctx.seed.usageSample({ at: '2026-10-15T02:00:00Z', account: '0123456789ab', five_hour: 5, seven_day: 12 });
   ctx.seed.usageSample({ at: '2026-10-07T01:00:00Z', account: 'abcdef012345', five_hour: 1, seven_day: 33 });
+  // oxlint-disable-next-line zgeoff/seed-only -- no seed publishes ci_runs
   ctx.db.query(`INSERT INTO ci_runs (id, repo, path, event, status, conclusion, attempt, created_at, started_at, updated_at) VALUES (1, 'atc', 'ci.yml', 'push', 'completed', 'success', 1, '2026-10-14T02:00:00Z', '2026-10-14T02:00:00Z', '2026-10-14T03:30:00Z')`).run();
   let cost = row(weeklyText(ctx.db, syd(MON, '17:00')), 'Cost');
   expect(cost).toContain('012345: 7-day peak 12%, latest 5-hour 5% and 7-day 12% (1 readings)');
@@ -198,7 +205,8 @@ test('legacy active readings stay in a mixed week beside the keyed ones', () => 
 test('the cost row says active account only when a week has no per-account rows', () => {
   const ctx = setupTest();
   fetchedDays(ctx.db);
-  expect(row(weeklyText(ctx.db, syd(MON, '17:00')), 'Cost')).toContain('active account only: no readings');
+  const before = row(weeklyText(ctx.db, syd(MON, '17:00')), 'Cost');
+  expect(before).toContain('active account only: no readings');
   ctx.seed.usageSample({ at: '2026-10-14T01:00:00Z', account: 'active', five_hour: 20, seven_day: 60 });
   const cost = row(weeklyText(ctx.db, syd(MON, '17:00')), 'Cost');
   expect(cost).toContain('active account only: 7-day peak 60%, latest 5-hour 20% and 7-day 60% (1 readings)');
