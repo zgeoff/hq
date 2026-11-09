@@ -1,6 +1,18 @@
 {
   "permissions": {
-    "allow": ["Bash(op-mint *)"]
+    "allow": [
+      "Bash(op-mint --list)",
+      "Bash(op-mint global)",
+      "Bash(op-mint hq)",
+      "Bash(op-mint cloud)",
+      "Bash(op-mint imp)",
+      "Bash(op-mint nixie)",
+      "Bash(op-mint noslop)",
+      "Bash(op-mint osrs)",
+      "Bash(op-mint pepys)",
+      "Bash(op-mint vers)",
+      "Bash(op-mint wow-forever)"
+    ]
   },
   "hooks": {
     "SessionStart": [
