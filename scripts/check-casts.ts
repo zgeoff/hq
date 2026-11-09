@@ -44,7 +44,7 @@ export function parseOxlintReport(status: number | null, stdout: string, stderr:
   return parsed.data.diagnostics;
 }
 
-function readRows(args: readonly string[]): readonly Row[] {
+export function readRows(args: readonly string[]): readonly Row[] {
   const result = spawnSync('bunx', ['oxlint', '--format', 'json', ...args, ...PATHS], { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 });
   if (result.error !== undefined) {
     throw result.error;

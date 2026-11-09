@@ -22,6 +22,7 @@
     "ci:install-tool": "bun scripts/check/install-tool.ts",
     "ci:test-scope": "bun scripts/check/read-test-scope.ts",
     "check:casts": "bun scripts/check-casts.ts",
+    "check:seeds": "bun scripts/check/check-seeds.ts",
     "prepare": "command -v git > /dev/null 2>&1 && lefthook install --force || true",
     "check:docs": "chex prose length links readmes skill",
     "test:related": "rig related"
