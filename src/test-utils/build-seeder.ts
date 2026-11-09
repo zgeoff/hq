@@ -6,6 +6,8 @@ import { buildCapacitySeeder } from '../capacity/test-utils/build-capacity-seede
 import type { CapacityDeps } from '../capacity/test-utils/types.ts';
 import { buildMetaSeeder } from '../db/test-utils/build-meta-seeder.ts';
 import type { MetaDeps } from '../db/test-utils/types.ts';
+import { buildFocusSeeder } from '../focus/test-utils/build-focus-seeder.ts';
+import type { FocusDeps } from '../focus/test-utils/types.ts';
 import { buildGoalsSeeder } from '../goals/test-utils/build-goals-seeder.ts';
 import type { GoalsDeps } from '../goals/test-utils/types.ts';
 import { buildGrantsSeeder } from '../grants/test-utils/build-grants-seeder.ts';
@@ -18,6 +20,8 @@ import { buildLinearSeeder } from '../linear/test-utils/build-linear-seeder.ts';
 import type { LinearDeps } from '../linear/test-utils/types.ts';
 import { buildMorningSeeder } from '../morning/test-utils/build-morning-seeder.ts';
 import type { MorningDeps } from '../morning/test-utils/types.ts';
+import { buildNoslopSeeder } from '../noslop/test-utils/build-noslop-seeder.ts';
+import type { NoslopDeps } from '../noslop/test-utils/types.ts';
 import { buildOutboxSeeder } from '../outbox/test-utils/build-outbox-seeder.ts';
 import type { OutboxDeps } from '../outbox/test-utils/types.ts';
 import { buildProbeSeeder } from '../probe/test-utils/build-probe-seeder.ts';
@@ -46,7 +50,9 @@ export type TestDeps = MetaDeps &
   GrantsDeps &
   TypedDeps &
   AsksDeps &
-  MorningDeps;
+  MorningDeps &
+  FocusDeps &
+  NoslopDeps;
 
 export function buildSeeder(deps: TestDeps) {
   return {
@@ -66,5 +72,7 @@ export function buildSeeder(deps: TestDeps) {
     ...buildTypedSeeder(deps),
     ...buildAsksSeeder(deps),
     ...buildMorningSeeder(deps),
+    ...buildFocusSeeder(deps),
+    ...buildNoslopSeeder(deps),
   };
 }

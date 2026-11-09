@@ -7,7 +7,7 @@ import { buildStubGateFacts } from '../../test/build-stub-gate-facts.ts';
 import { buildStubPRHead } from '../../test/build-stub-pr-head.ts';
 import { createStubPRRepo } from '../../test/create-stub-pr-repo.ts';
 import { createListedReview } from '../../test/create-listed-review.ts';
-import { seedReviewRound } from '../../test/seed-review-round.ts';
+import { seedReviewRound } from '../noslop/test-utils/seed-review-round.ts';
 import { FAKE_BASE_SHA, FAKE_FULL_SHA, FAKE_PROOF_BODY, FAKE_TOKEN, buildFakeRunner } from '../../test/noslop-fake.ts';
 import { overrideEnv } from '../config/override-env.ts';
 import { openDb } from '../db/open-db.ts';
@@ -59,7 +59,7 @@ test('it passes when a fix-checks-only run past the emergency cap checked no fix
   const fake = buildFakeRunner({ noslopFindings: buildStubFindings('fixed'), markerComments: { code: 0, stdout: `${JSON.stringify({ login: 'noslop-review[bot]', body: '<!-- noslop:summary {"head":"f00dfeedf00dfeedf00dfeedf00dfeedf00dfeed"} -->', updatedAt: '2026-10-14T01:00:00Z' })}\n`, stderr: '' } });
   createListedReview(ctx.db, { repo: 'widgets', pr: 7, head: 'f00dfeedf00dfeedf00dfeedf00dfeedf00dfeed' });
   setMeta(ctx.db, 'noslop', JSON.stringify({ repos: ['widgets'], sha: '0123456789abcdef0123456789abcdef01234567', caps: { widgets: 1 } }));
-  seedReviewRound(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA });
+  seedReviewRound(ctx,{ repo: 'widgets', pr: 7, head: FAKE_FULL_SHA });
 
   await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).resolves.toStrictEqual({ mayMerge: true, reason: 'noslop findings: none open; CI green at 0123456', reviewed: true });
 });
@@ -68,7 +68,7 @@ test('it blocks when the only run hq recorded at the head failed', async () => {
   const ctx = setupTest();
   const fake = buildFakeRunner({ noslopFindings: buildStubFindings('fixed') });
   createListedReview(ctx.db, { repo: 'widgets', pr: 7, head: 'f00dfeedf00dfeedf00dfeedf00dfeedf00dfeed' });
-  seedReviewRound(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA, ok: false });
+  seedReviewRound(ctx,{ repo: 'widgets', pr: 7, head: FAKE_FULL_SHA, ok: false });
 
   await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: 'hq has no noslop run recorded at head 0123456; run hq review widgets 7' });
 });
@@ -77,7 +77,7 @@ test('it passes when a hand-run fix-checks-only run read the new head and noslop
   const ctx = setupTest();
   const fake = buildFakeRunner({ noslopFindings: buildStubFindings('fixed'), markerComments: { code: 0, stdout: `${JSON.stringify({ login: 'noslop-review[bot]', body: '<!-- noslop:summary {"head":"f00dfeedf00dfeedf00dfeedf00dfeedf00dfeed"} -->', updatedAt: '2026-10-14T01:00:00Z' })}\n`, stderr: '' } });
   createListedReview(ctx.db, { repo: 'widgets', pr: 7, head: 'f00dfeedf00dfeedf00dfeedf00dfeedf00dfeed' });
-  seedReviewRound(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA });
+  seedReviewRound(ctx,{ repo: 'widgets', pr: 7, head: FAKE_FULL_SHA });
 
   await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).resolves.toStrictEqual({ mayMerge: true, reason: 'noslop findings: none open; CI green at 0123456', reviewed: true });
 });
@@ -95,7 +95,7 @@ test("it passes under an override at the head when noslop's findings list is emp
   const ctx = setupTest();
   const fake = buildFakeRunner();
   setMeta(ctx.db, 'noslop', JSON.stringify({ repos: ['widgets'], sha: '0123456789abcdef0123456789abcdef01234567' }));
-  seedReviewRound(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA, findings: [{ id: 'aaaaaaaaaaaaaaaa', lens: 'correctness', severity: 'high', title: 'Kettle never boils' }] });
+  seedReviewRound(ctx,{ repo: 'widgets', pr: 7, head: FAKE_FULL_SHA, findings: [{ id: 'aaaaaaaaaaaaaaaa', lens: 'correctness', severity: 'high', title: 'Kettle never boils' }] });
   recordPROverride(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA, source: 'call:KET-2', note: 'Ship the kettle.', actor: 'z-kettle' });
 
   await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).resolves.toStrictEqual({ mayMerge: true, reason: "The owner's override at 0123456 (call:KET-2) stands; CI green at 0123456", reviewed: true });
@@ -105,7 +105,7 @@ test("it blocks when noslop's findings list is empty but the full review at the 
   const ctx = setupTest();
   const fake = buildFakeRunner();
   setMeta(ctx.db, 'noslop', JSON.stringify({ repos: ['widgets'], sha: '0123456789abcdef0123456789abcdef01234567' }));
-  seedReviewRound(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA, findings: [{ id: 'aaaaaaaaaaaaaaaa', lens: 'correctness', severity: 'high', title: 'Kettle never boils' }, { id: 'bbbb', lens: 'tests', severity: 'P2', title: 'Lid untested' }] });
+  seedReviewRound(ctx,{ repo: 'widgets', pr: 7, head: FAKE_FULL_SHA, findings: [{ id: 'aaaaaaaaaaaaaaaa', lens: 'correctness', severity: 'high', title: 'Kettle never boils' }, { id: 'bbbb', lens: 'tests', severity: 'P2', title: 'Lid untested' }] });
 
   await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: "noslop's findings list lacks 2 findings hq's reviews of this PR recorded: aaaaaaaaaaaaaaaa, bbbb, so no pass" });
 });
@@ -114,7 +114,7 @@ test("it blocks a finding a review at the head recorded but never posted, while 
   const ctx = setupTest();
   const fake = buildFakeRunner({ noslopFindings: buildStubFindings('fixed') });
   createListedReview(ctx.db, { repo: 'widgets', pr: 7, head: 'f00dfeedf00dfeedf00dfeedf00dfeedf00dfeed' });
-  seedReviewRound(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA, findings: [{ id: 'dddddddddddddddd', lens: 'correctness', severity: 'P1', title: 'Kettle leaks when full' }], error: 'stored, but not posted to GitHub: HTTP 500' });
+  seedReviewRound(ctx,{ repo: 'widgets', pr: 7, head: FAKE_FULL_SHA, findings: [{ id: 'dddddddddddddddd', lens: 'correctness', severity: 'P1', title: 'Kettle leaks when full' }], error: 'stored, but not posted to GitHub: HTTP 500' });
 
   await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: "noslop's findings list lacks 1 finding hq's reviews of this PR recorded: dddddddddddddddd, so no pass" });
 });
@@ -123,8 +123,8 @@ test("it blocks when noslop's findings list is empty but an older round recorded
   const ctx = setupTest();
   const fake = buildFakeRunner();
   setMeta(ctx.db, 'noslop', JSON.stringify({ repos: ['widgets'], sha: '0123456789abcdef0123456789abcdef01234567' }));
-  seedReviewRound(ctx.db, { repo: 'widgets', pr: 7, head: 'f00dfeedf00dfeedf00dfeedf00dfeedf00dfeed', findings: [{ id: 'aaaaaaaaaaaaaaaa', lens: 'correctness', severity: 'P1', title: 'Kettle never boils' }, { id: 'bbbb', lens: 'tests', severity: 'P2', title: 'Lid untested' }, { id: 'cccc', lens: 'intent', severity: 'P2', title: 'Spout points inward' }] });
-  seedReviewRound(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA });
+  seedReviewRound(ctx,{ repo: 'widgets', pr: 7, head: 'f00dfeedf00dfeedf00dfeedf00dfeedf00dfeed', findings: [{ id: 'aaaaaaaaaaaaaaaa', lens: 'correctness', severity: 'P1', title: 'Kettle never boils' }, { id: 'bbbb', lens: 'tests', severity: 'P2', title: 'Lid untested' }, { id: 'cccc', lens: 'intent', severity: 'P2', title: 'Spout points inward' }] });
+  seedReviewRound(ctx,{ repo: 'widgets', pr: 7, head: FAKE_FULL_SHA });
 
   await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: "noslop's findings list lacks 3 findings hq's reviews of this PR recorded: aaaaaaaaaaaaaaaa, bbbb, cccc, so no pass" });
 });
@@ -239,7 +239,7 @@ test('it passes a capped PR at a merged-main head whose noslop check failed with
   const fake = buildFakeRunner({ noslopFindings: buildStubFindings('fixed'), noslopChecks: { code: 0, stdout: `${JSON.stringify({ id: 9001, name: 'noslop', app: 'noslop-review', status: 'completed', conclusion: 'failure', title: 'No noslop review of this change to AGENTS.md: the patch changed since the review of f00dfee.', completedAt: '2026-10-14T01:00:05Z' })}\n`, stderr: '' } });
   createListedReview(ctx.db, { repo: 'widgets', pr: 7, head: 'f00dfeedf00dfeedf00dfeedf00dfeedf00dfeed' });
   setMeta(ctx.db, 'noslop', JSON.stringify({ repos: ['widgets'], sha: '0123456789abcdef0123456789abcdef01234567', caps: { widgets: 1 } }));
-  seedReviewRound(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA });
+  seedReviewRound(ctx,{ repo: 'widgets', pr: 7, head: FAKE_FULL_SHA });
 
   await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).resolves.toStrictEqual({ mayMerge: true, reason: 'noslop findings: none open; CI green at 0123456', reviewed: true });
 });

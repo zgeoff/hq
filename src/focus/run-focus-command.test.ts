@@ -7,7 +7,7 @@ import { main } from '../cli.ts';
 import { overrideEnv } from '../config/override-env.ts';
 import { resetKey } from '../linear/reset-key.ts';
 import type { RunResult, Runner } from '../runner/types.ts';
-import { seedAreaLabels } from '../../test/seed-area-labels.ts';
+import { seedAreaLabels } from './test-utils/seed-area-labels.ts';
 import { readFocus } from './read-focus.ts';
 import { runFocusCommand } from './run-focus-command.ts';
 
@@ -89,7 +89,7 @@ test('set refuses an unknown filter key and a bad reserve, and stores nothing', 
 
 test('it takes, on set, a new area label stored from a Linear read, as a term and as a --reserve', async () => {
   const ctx = setupTest();
-  seedAreaLabels(ctx.db, ['teapot', 'kettle']);
+  seedAreaLabels(ctx, { names: ['teapot', 'kettle'] });
 
   await runFocusCommand({ db: ctx.db, call: makeStateCall([], []), actor: 'kettle-owner', at: new Date('2026-10-15T20:00:00Z'), verb: 'set', rest: ['teapot:bug'], reserves: ['kettle=2'] });
 
@@ -101,7 +101,7 @@ test('it takes, on set, a new area label stored from a Linear read, as a term an
 
 test('it refuses, on set, a name that is not on the stored list, even a built-in area, by name', async () => {
   const ctx = setupTest();
-  seedAreaLabels(ctx.db, ['teapot']);
+  seedAreaLabels(ctx, { names: ['teapot'] });
   const call = makeStateCall([], []);
 
   await expect(runFocusCommand({ db: ctx.db, call, actor: 'kettle-owner', at: new Date('2026-10-15T20:00:00Z'), verb: 'set', rest: ['nixie'], reserves: [] })).rejects.toThrow('focus: unknown filter "nixie" in term "nixie"');
@@ -111,9 +111,9 @@ test('it refuses, on set, a name that is not on the stored list, even a built-in
 
 test('it keeps, on show, a stored term and reserve whose label left Linear, and marks them', async () => {
   const ctx = setupTest();
-  seedAreaLabels(ctx.db, ['teapot', 'kettle']);
+  seedAreaLabels(ctx, { names: ['teapot', 'kettle'] });
   await runFocusCommand({ db: ctx.db, call: makeStateCall([], []), actor: 'kettle-owner', at: new Date('2026-10-15T20:00:00Z'), verb: 'set', rest: ['teapot,bug'], reserves: ['teapot=1', 'kettle=1'] });
-  seedAreaLabels(ctx.db, ['kettle']);
+  seedAreaLabels(ctx, { names: ['kettle'] });
 
   const out = await runFocusCommand({ db: ctx.db, call: makeStateCall([], []), actor: 'kettle-owner', at: new Date('2026-10-15T20:00:00Z'), verb: 'show', rest: [], reserves: [] });
 

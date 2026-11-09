@@ -9,7 +9,7 @@ import { buildStubLinearIssuePages } from '../../mocks/build-stub-linear-issue-p
 import { LINEAR_GRAPHQL_URL, linearIssues, linearLabels, linearWorkflowStates } from '../../mocks/linear-handlers.ts';
 import { server } from '../../mocks/node.ts';
 import { buildStubIssueFiles } from '../../test/build-stub-issue-files.ts';
-import { seedAreaLabels } from '../../test/seed-area-labels.ts';
+import { seedAreaLabels } from '../focus/test-utils/seed-area-labels.ts';
 import { freshDb } from '../../test/helpers.ts';
 import { main } from '../cli.ts';
 import { overrideEnv } from '../config/override-env.ts';
@@ -509,7 +509,7 @@ test('it checks imp against zgeoff/impz and skips frankie, which names no repo',
 
 test('it asks gh only about labels whose repo it has not found, and finds a repo made since a check missed it', async () => {
   const ctx = setupTest();
-  seedAreaLabels(ctx.db, ['atc', 'cloud', 'teapot'], { atc: true, cloud: true, teapot: false });
+  seedAreaLabels(ctx, { names: ['atc', 'cloud', 'teapot'], repoExists: { atc: true, cloud: true, teapot: false } });
   linearLabels.push({ team: 'GEO', name: 'atc', isGroup: false, parent: null }, { team: 'GEO', name: 'cloud', isGroup: false, parent: null }, { team: 'GEO', name: 'kettle', isGroup: false, parent: null }, { team: 'GEO', name: 'teapot', isGroup: false, parent: null });
 
   await runLinearCommand(ctx.deps, 'areas', { team: 'GEO' });
@@ -546,7 +546,7 @@ test('it does not store a repo as missing when gh fails for another reason than 
 
 test('it checks the area labels of a team other than the one lanes reads without replacing the stored list', async () => {
   const ctx = setupTest();
-  seedAreaLabels(ctx.db, ['cloud'], { cloud: true });
+  seedAreaLabels(ctx, { names: ['cloud'], repoExists: { cloud: true } });
   linearLabels.push({ team: 'KET', name: 'kettle', isGroup: false, parent: null });
 
   await expect(runLinearCommand(ctx.deps, 'areas', { team: 'KET' })).resolves.toMatchObject({ data: { team: 'KET', areas: ['kettle'], missing: [] } });

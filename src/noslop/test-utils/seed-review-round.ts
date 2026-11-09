@@ -1,18 +1,11 @@
-import type { Database } from 'bun:sqlite';
-import { recordRound } from '../src/noslop/record-round.ts';
-import type { RecordedFinding } from '../src/noslop/record-round.ts';
+import { recordRound } from '../record-round.ts';
+import { buildMockReviewRound } from './build-mock-review-round.ts';
+import type { ReviewRound } from './build-mock-review-round.ts';
+import type { NoslopDeps } from './types.ts';
 
-interface ReviewRound {
-  repo: string;
-  pr: number;
-  head: string;
-  ok?: boolean;
-  findings?: RecordedFinding[];
-  error?: string | null;
-}
-
-export function seedReviewRound(db: Database, round: ReviewRound): void {
-  recordRound(db, {
+export function seedReviewRound(deps: NoslopDeps, input: Partial<ReviewRound> = {}): void {
+  const round = buildMockReviewRound(input);
+  recordRound(deps.db, {
     repo: round.repo,
     pr: round.pr,
     kind: 'review',
