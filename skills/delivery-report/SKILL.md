@@ -108,7 +108,7 @@ output:
 Below the script's output, add:
 
 1. One line with the number of open `zgeoff` PRs, as the PRs that wait on the owner. Get it with
-   `gh api -X GET search/issues -f q='author:zgeoff is:pr is:open' --jq .total_count`.
+   `gh api -X GET search/issues -f q='owner:zgeoff author:zgeoff is:pr is:open' --jq .total_count`.
    `gh search prs` stops at 30 results.
 2. For a daily report, a `**Releases and deploys**` list:
    - Take it from the period's `DEPLOY` and `HOLD` lines in `~/.local/share/z-sessions/release.md`
