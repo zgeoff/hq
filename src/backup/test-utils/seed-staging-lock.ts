@@ -6,7 +6,11 @@ interface StagingLockDeps {
   backupDir: string;
 }
 
-export function seedStagingLock(deps: StagingLockDeps, input: { pid: number }): Database {
+interface StagingLockInput {
+  pid: number;
+}
+
+export function seedStagingLock(deps: StagingLockDeps, input: StagingLockInput): Database {
   const lock = new Database(join(deps.backupDir, 'staging-lock.sqlite'), { create: true });
 
   createStagingHolderTable(lock);

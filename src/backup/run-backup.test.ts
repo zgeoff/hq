@@ -19,13 +19,10 @@ import { seedStagingLock } from './test-utils/seed-staging-lock.ts';
 const canRunRestic = process.env['CI'] !== undefined || (Bun.which('restic') !== null && Bun.which('sqlite3') !== null);
 
 let db: Database;
-let seed: ReturnType<typeof buildSeeder>;
 let dir: string;
 let cleanup: () => void;
 beforeEach(() => {
-  const fresh = freshDb();
-  ({ db, dir, cleanup } = fresh);
-  seed = buildSeeder(fresh);
+  ({ db, dir, cleanup } = freshDb());
   process.env['HQ_BACKUP_DIR'] = `${dir}/backup`;
   process.env['HQ_BACKUP_PASSWORD_FILE'] = `${dir}/cfg/backup-password`;
   process.env['HQ_BACKUP_REMOTE_ENV'] = `${dir}/cfg/remote.env`;
@@ -48,7 +45,7 @@ afterEach(() => {
 
 test.skipIf(!canRunRestic)('backs up hq.db online plus the dirs, restores them, and passes a restore test', async () => {
   createResticRepo(`${dir}/backup/repo`, requireEnv('HQ_BACKUP_PASSWORD_FILE'), 'local');
-  seed.meta({ key: 'kettle', value: 'whistles once' });
+  buildSeeder({ db }).meta({ key: 'kettle', value: 'whistles once' });
   const r = await runBackup(db, realRunner, 'z-q');
   expect(r.error).toBeNull();
   expect(r.ok).toBe(true);
@@ -60,7 +57,7 @@ test.skipIf(!canRunRestic)('backs up hq.db online plus the dirs, restores them, 
   const back = await restore(realRunner, out, { snapshot: 'latest', remote: false });
   expect(back.db).not.toBeNull();
   const copy = new Database(back.db!, { readonly: true });
-  expect(copy.query("SELECT value FROM meta WHERE key = 'kettle'").get()).toEqual({ value: 'whistles once' });
+  expect(copy.query("SELECT value FROM meta WHERE key = 'kettle'").get()).toStrictEqual({ value: 'whistles once' });
   copy.close();
   expect(readFileSync(join(out, dir, 'sessions/notes.md'), 'utf8')).toContain('kettle is fine');
   expect(existsSync(join(out, dir, 'transcripts/t1.jsonl'))).toBe(true);
@@ -144,7 +141,7 @@ test.skipIf(!canRunRestic)('a bad remote fails the run without losing the local 
 
 test.skipIf(!canRunRestic)('it finds the restored hq.db where the snapshot staged it, when the backup dir has moved since', async () => {
   createResticRepo(`${dir}/backup/repo`, requireEnv('HQ_BACKUP_PASSWORD_FILE'), 'local');
-  seed.meta({ key: 'kettle', value: 'whistles twice' });
+  buildSeeder({ db }).meta({ key: 'kettle', value: 'whistles twice' });
   const backedUp = await runBackup(db, realRunner, 'z-q');
   expect(backedUp.ok).toBe(true);
   mkdirSync(`${dir}/moved`, { recursive: true });

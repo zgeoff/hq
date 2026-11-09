@@ -52,6 +52,7 @@ test('it upgrades a v24 database to v25 after taking a backup, leaving full NULL
   const stored = new Database(path, { create: true, strict: true });
   onTestFinished(() => stored.close());
   migrate(stored, path, false, MIGRATIONS.slice(0, 24));
+
   // An old-schema database: no current code writes a round the way this version did.
   stored.query("INSERT INTO noslop_rounds (repo, pr, kind, started_at, ended_at, ms, ok, sha) VALUES ('widgets', 7, 'review', 'a', 'b', 1, 1, 'x')").run();
 

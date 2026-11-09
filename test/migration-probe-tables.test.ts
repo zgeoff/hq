@@ -21,6 +21,7 @@ test('v17 adds the probe tables and allows one open outage', () => {
   migrate(v16, path, false, MIGRATIONS.slice(0, 16));
   v16.close();
   const db = openDb(path);
+
   // An old schema that no current owner can write: this migration test builds it by hand.
   const add = db.query(`INSERT INTO outages (started_at, detected_at, ended_at) VALUES ('2026-10-16T00:00:00Z', '2026-10-16T00:01:00Z', ?)`);
   add.run('2026-10-16T00:05:00Z');
