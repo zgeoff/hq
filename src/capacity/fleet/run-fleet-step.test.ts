@@ -7,6 +7,7 @@ import { freshDb } from '../../../test/helpers.ts';
 import { addRun } from '../../runs/add-run.ts';
 import type { RunResult, Runner } from '../../runner/types.ts';
 import { readOptionalFile } from './read-optional-file.ts';
+import { readSlotRows } from './read-slot-rows.ts';
 import { runFleetStep } from './run-fleet-step.ts';
 import { buildSeeder } from '../../test-utils/build-seeder.ts';
 
@@ -31,7 +32,7 @@ test('it reads the slots when there is no read yet', async () => {
   const step = await runFleetStep(ctx.db, { run, httpClient: fetch, settings: { path: ctx.path, readFile: readOptionalFile } }, new Date('2026-10-14T00:00:00Z'), { force: false, signal: new AbortController().signal });
 
   expect(step.read?.kind).toBe('read');
-  expect(ctx.db.query('SELECT COUNT(*) AS total FROM slot_usage').get()).toStrictEqual({ total: 4 });
+  expect(readSlotRows(ctx.db, new Date(0), new Date('2026-10-14T00:00:00Z'))).toHaveLength(4);
 });
 
 test('it reads no slot when the newest read is under 2 hours old', async () => {
@@ -45,7 +46,7 @@ test('it reads no slot when the newest read is under 2 hours old', async () => {
   const step = await runFleetStep(ctx.db, { run, httpClient: fetch, settings: { path: ctx.path, readFile: readOptionalFile } }, new Date('2026-10-14T01:59:00Z'), { force: false, signal: new AbortController().signal });
 
   expect(step.read).toBeNull();
-  expect(ctx.db.query('SELECT COUNT(*) AS total FROM slot_usage').get()).toStrictEqual({ total: 4 });
+  expect(readSlotRows(ctx.db, new Date(0), new Date('2026-10-14T01:59:00Z'))).toHaveLength(4);
 });
 
 test('it reads the slots again when the newest read is 2 hours old', async () => {
@@ -59,7 +60,7 @@ test('it reads the slots again when the newest read is 2 hours old', async () =>
   const step = await runFleetStep(ctx.db, { run, httpClient: fetch, settings: { path: ctx.path, readFile: readOptionalFile } }, new Date('2026-10-14T02:00:00Z'), { force: false, signal: new AbortController().signal });
 
   expect(step.read?.kind).toBe('read');
-  expect(ctx.db.query('SELECT COUNT(*) AS total FROM slot_usage').get()).toStrictEqual({ total: 8 });
+  expect(readSlotRows(ctx.db, new Date(0), new Date('2026-10-14T02:00:00Z'))).toHaveLength(8);
 });
 
 test('it reads the slots now when forced, whatever the age of the newest read', async () => {
@@ -97,7 +98,7 @@ test('it adds a news line for the forecast pause and leaks no token into it, the
     addRun(ctx.db, { issue, title: 'Descale the kettle', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
   }
   const step = await runFleetStep(ctx.db, { run, httpClient: fetch, settings: { path: ctx.path, readFile: readOptionalFile } }, new Date('2026-10-14T01:00:00Z'), { force: false, signal: new AbortController().signal });
-  const everything = JSON.stringify([step, ctx.db.query('SELECT * FROM slot_usage').all(), ctx.db.query('SELECT * FROM news').all(), ctx.db.query('SELECT * FROM meta').all()]);
+  const everything = JSON.stringify([step, readSlotRows(ctx.db, new Date(0), new Date('2026-10-14T01:00:00Z')), ctx.db.query('SELECT * FROM news').all(), ctx.db.query('SELECT * FROM meta').all()]);
 
   expect(step.news).toBe(true);
   expect(ctx.db.query('SELECT text FROM news').all()).toStrictEqual([{ text: 'Fleet forecast: every Claude slot is at 95% from 16 Oct 08:00Z for 40.0 h at the current rate; a cap of 1 lane avoids it' }]);
@@ -133,7 +134,7 @@ test('it stores no slot row and no news line when the step is aborted', async ()
   );
 
   expect(outcome).toMatchObject({ name: 'AbortError' });
-  expect(ctx.db.query('SELECT COUNT(*) AS total FROM slot_usage').get()).toStrictEqual({ total: 0 });
+  expect(readSlotRows(ctx.db, new Date(0), new Date('2026-10-14T01:00:00Z'))).toStrictEqual([]);
   expect(ctx.db.query('SELECT COUNT(*) AS total FROM news').get()).toStrictEqual({ total: 0 });
 });
 

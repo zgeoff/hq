@@ -1100,11 +1100,11 @@ test('hq capacity --refresh-slots stores neither a slot token nor the profile to
 
   const tables = z.array(z.object({ name: z.string() })).parse(fresh.db.query("SELECT name FROM sqlite_master WHERE type = 'table'").all());
   const stored = tables.map((table) => ({ table: table.name, rows: JSON.stringify(fresh.db.query(`SELECT * FROM "${table.name}"`).all()) }));
-  expect(fresh.db.query('SELECT slot, status, five_hour, five_hour_resets_at, seven_day, seven_day_resets_at FROM slot_usage ORDER BY slot').all()).toStrictEqual([
-    { slot: 1, status: 'op-failed', five_hour: null, five_hour_resets_at: null, seven_day: null, seven_day_resets_at: null },
-    { slot: 2, status: '429', five_hour: null, five_hour_resets_at: null, seven_day: 100, seven_day_resets_at: null },
-    { slot: 3, status: '200', five_hour: null, five_hour_resets_at: null, seven_day: 40, seven_day_resets_at: '2026-10-21T00:00:00Z' },
-    { slot: 4, status: '401', five_hour: null, five_hour_resets_at: null, seven_day: null, seven_day_resets_at: null },
+  expect(readSlotRows(fresh.db, new Date(0), new Date(NOON_SYDNEY)).map((row) => ({ slot: row.slot, status: row.status, five: row.five, fiveResetsAt: row.fiveResetsAt, seven: row.seven, sevenResetsAt: row.sevenResetsAt }))).toStrictEqual([
+    { slot: 1, status: 'op-failed', five: null, fiveResetsAt: null, seven: null, sevenResetsAt: null },
+    { slot: 2, status: '429', five: null, fiveResetsAt: null, seven: 100, sevenResetsAt: null },
+    { slot: 3, status: '200', five: null, fiveResetsAt: null, seven: 40, sevenResetsAt: '2026-10-21T00:00:00Z' },
+    { slot: 4, status: '401', five: null, fiveResetsAt: null, seven: null, sevenResetsAt: null },
   ]);
   expect(stored.length).toBeGreaterThan(1);
   expect(stored.filter((table) => table.rows.includes('kettle-slot-credential') || table.rows.includes('kettle-profile-credential'))).toStrictEqual([]);

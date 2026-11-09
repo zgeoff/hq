@@ -363,9 +363,11 @@ test('holdSamples 1 opens on the first breach', async () => {
 test('samples older than 30 days are pruned on each sample; the log reads newest first', async () => {
   await sampleAt(world(), new Date(Date.parse(NOON_SYDNEY) - 31 * 86_400_000));
   await sampleAt(world(), new Date(Date.parse(NOON_SYDNEY) - 29 * 86_400_000));
-  expect(db.query('SELECT COUNT(*) AS n FROM capacity_samples').get()).toEqual({ n: 2 });
+  const before = await sampleLog(db, 32 * 24, minute(0));
+  expect(before).toHaveLength(2);
   await sampleAt(world(), minute(0));
-  expect(db.query('SELECT COUNT(*) AS count FROM capacity_samples').get()).toStrictEqual({ count: 2 });
+  const after = await sampleLog(db, 32 * 24, minute(0));
+  expect(after).toHaveLength(2);
   await sampleAt(world(), minute(60));
   const log = await sampleLog(db, 24, minute(60));
   expect(log.map((r) => r.at)).toEqual([minute(60), minute(0)].map((d) => d.toISOString().replace(/\.\d{3}Z$/, 'Z')));
