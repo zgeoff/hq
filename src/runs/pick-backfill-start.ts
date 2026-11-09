@@ -1,6 +1,13 @@
+import { match } from 'ts-pattern';
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-// A session's earlier notes count from the run's start, or from 24 hours before now when that is later.
-export function pickBackfillStart(runCreatedAt: string, nowMs: number): number {
-  return Math.max(Date.parse(runCreatedAt), nowMs - DAY_MS);
+export type BackfillAttach = 'run-add' | 'session-add';
+
+export function pickBackfillStart(attach: BackfillAttach, runCreatedAt: string, nowMs: number): number {
+  const dayAgoMs = nowMs - DAY_MS;
+  return match(attach)
+    .with('run-add', () => dayAgoMs)
+    .with('session-add', () => Math.max(Date.parse(runCreatedAt), dayAgoMs))
+    .exhaustive();
 }

@@ -5,14 +5,15 @@ import { buildMockSha } from '../../test/build-mock-sha.ts';
 import { buildStubFinalGH } from '../../test/build-stub-final-gh.ts';
 import { AtcClient } from '../atc/atc-client.ts';
 import { setMeta } from '../db/set-meta.ts';
-import { HqError } from '../errors.ts';
 import { addPR } from './add-pr.ts';
 import { addRun } from './add-run.ts';
 import { FROM_START } from './from-start.ts';
 import { ingestNotes } from './ingest-notes.ts';
 import { listRuns } from './list-runs.ts';
+import type { BackfillAttach } from './pick-backfill-start.ts';
 import { runNoteBackfill } from './run-note-backfill.ts';
 import { setSession } from './set-session.ts';
+import { setState } from './set-state.ts';
 
 function setupTest() {
   const kettle = '00000031-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
@@ -26,7 +27,6 @@ function setupTest() {
   });
   const head = `44238662${buildMockSha(2).slice(8)}`;
   const run = buildStubFinalGH({ commits: [head] }, []);
-  const deps = { issue: 'GEO-9731', session: kettle, run, openClient: () => AtcClient.open() };
   return {
     db: fresh.db,
     stub,
@@ -35,8 +35,7 @@ function setupTest() {
     noonMs,
     hourMs,
     head,
-    backfill: () => runNoteBackfill(fresh.db, deps),
-    backfillWith: (openClient: () => Promise<AtcClient>) => runNoteBackfill(fresh.db, { ...deps, openClient }),
+    backfill: (attach: BackfillAttach) => runNoteBackfill(fresh.db, { issue: 'GEO-9731', session: kettle, attach, run, openClient: () => AtcClient.open() }),
     addRunWithoutSession: (startedAt: string) => {
       updateEnv('HQ_NOW', startedAt);
       addRun(fresh.db, { issue: 'GEO-9731', title: 'Invented kettle work', place: 'local', session: null, next: 'Agent working.', gate: null, geoffChat: false, actor: 'z-delivery' });
@@ -54,11 +53,23 @@ test('it marks the PR final and queues one Final message for a FINAL sent before
   ctx.stub.feed.push(ctx.finalNote(ctx.noonMs));
   ctx.attach();
 
-  const result = await ctx.backfill();
+  const result = await ctx.backfill('session-add');
 
   expect(result).toStrictEqual({ kind: 'read', notes: 1, finals: ['kettle#714'] });
   expect(listRuns(ctx.db)[0]?.prs[0]?.final_sha).toBe(`44238662${buildMockSha(2).slice(8)}`);
   expect(ctx.readFinalMessages()).toStrictEqual([{ text: 'Final: GEO-9731 (kettle#714 at 4423866). Review it, then merge.' }]);
+});
+
+test('it marks the PR final for a FINAL the session sent before hq run add gave it a new run', async () => {
+  const ctx = setupTest();
+  ctx.stub.feed.push(ctx.finalNote(ctx.noonMs - ctx.hourMs));
+  updateEnv('HQ_NOW', NOON_SYDNEY);
+  addRun(ctx.db, { issue: 'GEO-9731', title: 'Invented kettle work', place: 'local', session: ctx.kettle, next: 'Agent working.', gate: null, geoffChat: false, actor: 'z-delivery' });
+
+  const result = await ctx.backfill('run-add');
+
+  expect(result).toStrictEqual({ kind: 'read', notes: 1, finals: ['kettle#714'] });
+  expect(listRuns(ctx.db)[0]?.prs[0]?.final_sha).toBe(`44238662${buildMockSha(2).slice(8)}`);
 });
 
 test('it stores and applies nothing more when the backfill runs twice', async () => {
@@ -66,16 +77,16 @@ test('it stores and applies nothing more when the backfill runs twice', async ()
   ctx.addRunWithoutSession(new Date(ctx.noonMs - ctx.hourMs).toISOString());
   ctx.stub.feed.push(ctx.finalNote(ctx.noonMs));
   ctx.attach();
-  await ctx.backfill();
+  await ctx.backfill('session-add');
 
-  const second = await ctx.backfill();
+  const second = await ctx.backfill('session-add');
 
   expect(second).toStrictEqual({ kind: 'read', notes: 0, finals: [] });
   expect(ctx.db.query('SELECT count(*) AS total FROM run_notes').get()).toStrictEqual({ total: 1 });
   expect(ctx.readFinalMessages()).toHaveLength(1);
 });
 
-test('it skips a note the live ingest already stored', async () => {
+test('it skips a note the live ingest stored before a feed reset changed its event key', async () => {
   const ctx = setupTest();
   ctx.addRunWithoutSession(new Date(ctx.noonMs - ctx.hourMs).toISOString());
   ctx.attach();
@@ -84,8 +95,10 @@ test('it skips a note the live ingest already stored', async () => {
   const client = await AtcClient.open();
   onTestFinished(() => client.close());
   await ingestNotes(ctx.db, client, { run: ctx.run });
+  setMeta(ctx.db, 'atc_events_cursor', Buffer.from('{"k":"ev","i":0}').toString('base64url'));
+  await ingestNotes(ctx.db, client, { run: ctx.run });
 
-  const result = await ctx.backfill();
+  const result = await ctx.backfill('session-add');
 
   expect(result).toStrictEqual({ kind: 'read', notes: 0, finals: [] });
   expect(ctx.readFinalMessages()).toHaveLength(1);
@@ -97,7 +110,7 @@ test('it skips a note older than the run started', async () => {
   ctx.stub.feed.push(ctx.finalNote(ctx.noonMs - ctx.hourMs));
   ctx.attach();
 
-  const result = await ctx.backfill();
+  const result = await ctx.backfill('session-add');
 
   expect(result).toStrictEqual({ kind: 'read', notes: 0, finals: [] });
   expect(listRuns(ctx.db)[0]?.prs[0]?.final_sha).toBeNull();
@@ -110,33 +123,34 @@ test('it skips a note from more than a day before now on a run that started earl
   updateEnv('HQ_NOW', NOON_SYDNEY);
   ctx.attach();
 
-  const result = await ctx.backfill();
+  const result = await ctx.backfill('session-add');
 
   expect(result).toStrictEqual({ kind: 'read', notes: 0, finals: [] });
 });
 
 test('it keeps a design pass note and applies no signal from it', async () => {
   const ctx = setupTest();
+  updateEnv('HQ_NOW', new Date(ctx.noonMs - 2 * ctx.hourMs).toISOString());
+  addRun(ctx.db, { issue: 'GEO-9731', title: 'Design the kettle spout', place: 'local', session: ctx.kettle, next: 'Agent working.', gate: null, geoffChat: false, design: 'agent', actor: 'z-delivery' });
+  setState(ctx.db, 'GEO-9731', 'done', { note: 'design settled' }, 'z-delivery');
   updateEnv('HQ_NOW', new Date(ctx.noonMs - ctx.hourMs).toISOString());
-  addRun(ctx.db, { issue: 'GEO-9731', title: 'Design the kettle spout', place: 'local', session: null, next: 'Agent working.', gate: null, geoffChat: false, design: 'agent', actor: 'z-delivery' });
-  addPR(ctx.db, 'GEO-9731', 'kettle#714', 'z-delivery');
-  ctx.db.query('UPDATE run_sessions SET design_pass = 1').run();
+  addRun(ctx.db, { issue: 'GEO-9731', title: 'Build the kettle spout', place: 'local', session: null, next: 'Building.', gate: null, geoffChat: false, actor: 'z-delivery' });
   ctx.stub.feed.push(ctx.finalNote(ctx.noonMs));
-  ctx.db.query(`INSERT INTO run_sessions (session_id, issue, active, helper, added_at, design_pass) VALUES (?, 'GEO-9731', 1, 0, ?, 1)`).run(ctx.kettle, NOON_SYDNEY);
 
-  const result = await ctx.backfill();
+  const result = await ctx.backfill('session-add');
 
   expect(result).toStrictEqual({ kind: 'read', notes: 1, finals: [] });
-  expect(listRuns(ctx.db)[0]?.prs[0]?.final_sha).toBeNull();
+  expect(listRuns(ctx.db)[0]?.prs).toStrictEqual([]);
 });
 
 test('it reports an atc read failure and leaves the session attached', async () => {
   const ctx = setupTest();
   ctx.addRunWithoutSession(NOON_SYDNEY);
   ctx.attach();
+  ctx.stub.stop();
 
-  const result = await ctx.backfillWith(() => Promise.reject(new HqError('atc_unreachable', 'invented socket failure')));
+  const result = await ctx.backfill('session-add');
 
-  expect(result).toStrictEqual({ kind: 'unread', reason: 'invented socket failure' });
+  expect(result).toStrictEqual({ kind: 'unread', reason: expect.any(String) });
   expect(listRuns(ctx.db)[0]?.sessions.map((row) => [row.session_id, row.active])).toStrictEqual([[ctx.kettle, 1]]);
 });

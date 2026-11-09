@@ -11,7 +11,6 @@ interface NoteTarget {
   resolutions: FinalResolutions;
 }
 
-// Stores one feed note on a run and, for an 'apply' plan, applies its signals. Returns the PR it marked final, or null.
 export function writeNote(db: Database, event: FeedEvent, plan: NoteIngest, target: NoteTarget): { stored: boolean; final: string | null } {
   const inserted = db
     .query(`INSERT INTO run_notes (issue, session_id, label, text, source, event_key, at) VALUES (?, ?, ?, ?, 'atc', ?, ?) ON CONFLICT (event_key) DO NOTHING`)

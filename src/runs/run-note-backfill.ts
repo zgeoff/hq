@@ -7,6 +7,7 @@ import { toErrorMessage } from '../to-error-message.ts';
 import { getRun } from './get-run.ts';
 import { makeFinalResolver } from './make-final-resolver.ts';
 import { pickBackfillStart } from './pick-backfill-start.ts';
+import type { BackfillAttach } from './pick-backfill-start.ts';
 import { readFeedFinals } from './read-feed-finals.ts';
 import { readNotePlan } from './read-note-plan.ts';
 import { readSessionNotes } from './read-session-notes.ts';
@@ -15,14 +16,13 @@ import { writeNote } from './write-note.ts';
 interface BackfillInput {
   issue: string;
   session: string;
+  attach: BackfillAttach;
   run: Runner;
   openClient: () => Promise<AtcClient>;
 }
 
 export type BackfillResult = { kind: 'read'; notes: number; finals: string[] } | { kind: 'unread'; reason: string };
 
-// Notes the session sent before it joined the run: stored and applied as the live read would have. The
-// events a live read already stored are skipped by their session, time and text.
 export async function runNoteBackfill(db: Database, input: BackfillInput): Promise<BackfillResult> {
   const run = getRun(db, input.issue);
   if (run === null) {
@@ -32,7 +32,7 @@ export async function runNoteBackfill(db: Database, input: BackfillInput): Promi
   try {
     const client = await input.openClient();
     try {
-      events = await readSessionNotes(client, input.session, pickBackfillStart(run.created_at, now().getTime()));
+      events = await readSessionNotes(client, input.session, pickBackfillStart(input.attach, run.created_at, now().getTime()));
     } finally {
       client.close();
     }

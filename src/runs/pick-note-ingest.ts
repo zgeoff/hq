@@ -5,7 +5,6 @@ interface NoteFacts {
 
 export type NoteIngest = 'unmatched' | 'duplicate' | 'store' | 'apply';
 
-// A design pass stores its notes and applies no signals.
 export function pickNoteIngest(facts: NoteFacts): NoteIngest {
   if (facts.session === null) {
     return 'unmatched';

@@ -2192,7 +2192,7 @@ async function runCommand(context: Ctx): Promise<Out> {
         ? `\nIgnored --lane ${ignoredLane.lane}: one issue has one run, and ${r.run.issue}'s run ${ignoredLane.runLane === null ? 'has no lane' : `is in lane ${ignoredLane.runLane}`}. To move it, use ${ignoredLane.next}`
         : '';
       const hint = ignored ? `\nIgnored --session ${session}: the session is not attached to the run. To add it, use ${ignored.next}` : '';
-      const backfill = r.result === 'added' && session ? await runNoteBackfill(db, { issue: r.run.issue, session, run: boundedRunner(run, CALL_MS), openClient: () => AtcClient.open(undefined, 1500) }) : undefined;
+      const backfill = r.result === 'added' && session ? await runNoteBackfill(db, { issue: r.run.issue, session, attach: 'run-add', run: boundedRunner(run, CALL_MS), openClient: () => AtcClient.open(undefined, 1500) }) : undefined;
       return { data: { result: r.result, run: r.run, ignored, ignoredLane, backfill }, text: `${runLine(r.run)}\n${said}${laneHint}${hint}${formatBackfill(backfill)}` };
     })
     .with('size', async () => {
@@ -2205,7 +2205,7 @@ async function runCommand(context: Ctx): Promise<Out> {
       if (flags.add && flags.remove) throw new HqError('bad_args', 'give --add or --remove, not both');
       const raw = arg(1, 'session id');
       const r = setSession(db, arg(0, 'issue'), flags.remove ? await expandSession(raw).catch(() => raw.toLowerCase()) : await expandSession(raw), await by(), flags.add ? 'add' : flags.remove ? 'remove' : 'main');
-      const backfill = flags.add ? await runNoteBackfill(db, { issue: r.issue, session: await expandSession(raw), run: boundedRunner(run, CALL_MS), openClient: () => AtcClient.open(undefined, 1500) }) : undefined;
+      const backfill = flags.add ? await runNoteBackfill(db, { issue: r.issue, session: await expandSession(raw), attach: 'session-add', run: boundedRunner(run, CALL_MS), openClient: () => AtcClient.open(undefined, 1500) }) : undefined;
       return { data: { run: r, backfill }, text: `${runLine(r)}${formatBackfill(backfill)}` };
     })
     .with('lane', async () => {
