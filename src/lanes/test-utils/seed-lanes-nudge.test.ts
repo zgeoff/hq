@@ -11,7 +11,7 @@ function setupTest() {
 test('#seedLanesNudge stores a nudge not yet followed up, on its own event, and input overrides apply', () => {
   const ctx = setupTest();
 
-  seedLanesNudge(ctx, { at: '2026-10-16T01:11:00Z', slots: 1, eligible: null });
+  const id = seedLanesNudge(ctx, { at: '2026-10-16T01:11:00Z', slots: 1, eligible: null });
 
-  expect(ctx.readNudges()).toStrictEqual([{ at: '2026-10-16T01:11:00Z', slots: 1, free_minutes: 10, eligible: null, event_seq: 1, slots_after: null, checked_at: null, detail: null }]);
+  expect([id, ctx.readNudges()]).toStrictEqual([1, [{ at: '2026-10-16T01:11:00Z', slots: 1, free_minutes: 10, eligible: null, event_seq: 1, slots_after: null, checked_at: null, detail: null }]]);
 });
