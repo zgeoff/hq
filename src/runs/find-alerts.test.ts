@@ -1,15 +1,18 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { at, freshDb } from '../../test/helpers.ts';
 import { addRun } from './add-run.ts';
+import { finalPr } from './final-pr.ts';
 import { findAlerts } from './find-alerts.ts';
 import { recordCICheckOverride } from '../pr-status/record-ci-check-override.ts';
 import { recordPROverride } from '../pr-status/record-pr-override.ts';
 import { reviewStarted } from './review-started.ts';
 import { reviewedPr } from './reviewed-pr.ts';
 import { scheduleFinalReview } from './schedule-final-review.ts';
+import { setReviewWait } from './set-review-wait.ts';
 import { setSession } from './set-session.ts';
 import { buildSeeder } from '../test-utils/build-seeder.ts';
 import { setState } from './set-state.ts';
+import { unfinalPr } from './unfinal-pr.ts';
 import { updateGoneRunSessions } from './update-gone-run-sessions.ts';
 import { addUnblock } from '../unblock/add-unblock.ts';
 import { closeUnblock } from '../unblock/close-unblock.ts';
@@ -390,4 +393,50 @@ test('it raises no exit alert for the design pass session the sweep ended, while
   addRun(ctx.db, { issue: 'GEO-9861', title: 'Build the kettle spout', place: 'imp', session: null, next: 'Building.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
 
   expect(findAlerts(ctx.db, [], new Map(), new Date('2026-10-21T02:00:00Z'))).toStrictEqual([]);
+});
+
+test('it raises no FINAL alert before the review wait ends, and raises it at the date', () => {
+  const ctx = setupTest();
+  at('2026-10-21T01:00:00Z');
+  ctx.seed.run({ issue: 'GEO-9824' });
+  ctx.seed.finalRunPR({ issue: 'GEO-9824', ref: 'kettle#24' });
+  at('2026-10-21T02:00:00Z');
+  setReviewWait(ctx.db, 'kettle#24', { clear: false, until: '2026-10-22T01:00:00Z', reason: 'the only reviewer is out of quota' }, 'kettle-bot');
+
+  const before = findAlerts(ctx.db, [], new Map(), new Date('2026-10-22T00:59:00Z'));
+  const after = findAlerts(ctx.db, [], new Map(), new Date('2026-10-22T01:00:00Z'));
+
+  expect(before).toStrictEqual([]);
+  expect(after).toStrictEqual([
+    { key: 'pr:kettle#24', fingerprint: 'final:abc1234', issue: 'GEO-9824', line: 'kettle#24 (GEO-9824) final at abc1234 for 1440 min, no review [from marker:kettle]' },
+  ]);
+});
+
+test('it raises the FINAL alert again when a new FINAL at another head follows a review wait', () => {
+  const ctx = setupTest();
+  at('2026-10-21T01:00:00Z');
+  ctx.seed.run({ issue: 'GEO-9825' });
+  ctx.seed.finalRunPR({ issue: 'GEO-9825', ref: 'kettle#25' });
+  setReviewWait(ctx.db, 'kettle#25', { clear: false, until: '2026-10-25T01:00:00Z', reason: 'the only reviewer is out of quota' }, 'kettle-bot');
+  at('2026-10-21T02:00:00Z');
+  finalPr(ctx.db, 'kettle#25', { sha: 'def5678', actor: 'kettle-bot' });
+
+  expect(findAlerts(ctx.db, [], new Map(), new Date('2026-10-21T04:00:00Z'))).toStrictEqual([
+    { key: 'pr:kettle#25', fingerprint: 'final:def5678', issue: 'GEO-9825', line: 'kettle#25 (GEO-9825) final at def5678 for 120 min, no review [from cli:kettle-bot]' },
+  ]);
+});
+
+test('it raises the FINAL alert again when the FINAL is withdrawn and sent again at the same head after a review wait', () => {
+  const ctx = setupTest();
+  at('2026-10-21T01:00:00Z');
+  ctx.seed.run({ issue: 'GEO-9826' });
+  ctx.seed.finalRunPR({ issue: 'GEO-9826', ref: 'kettle#26' });
+  setReviewWait(ctx.db, 'kettle#26', { clear: false, until: '2026-10-25T01:00:00Z', reason: 'the only reviewer is out of quota' }, 'kettle-bot');
+  at('2026-10-21T02:00:00Z');
+  unfinalPr(ctx.db, 'kettle#26', 'kettle-bot', 'the head needs one more fix');
+  finalPr(ctx.db, 'kettle#26', { sha: 'abc1234', actor: 'kettle-bot' });
+
+  expect(findAlerts(ctx.db, [], new Map(), new Date('2026-10-21T04:00:00Z'))).toStrictEqual([
+    { key: 'pr:kettle#26', fingerprint: 'final:abc1234', issue: 'GEO-9826', line: 'kettle#26 (GEO-9826) final at abc1234 for 120 min, no review [from cli:kettle-bot]' },
+  ]);
 });

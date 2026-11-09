@@ -18,7 +18,7 @@ export function unfinalPr(db: Database, raw: string, actor: string, reason: stri
       const pr = mustPr(db, ref);
       checkPr(ref, 'unfinal', pr.state);
       if (!pr.final_sha) throw new HqError('bad_state', `${ref} has no final mark`);
-      db.query('UPDATE run_prs SET final_sha = NULL, final_at = NULL, final_source = NULL, updated_at = ? WHERE ref = ?').run(iso(now()), ref);
+      db.query('UPDATE run_prs SET final_sha = NULL, final_at = NULL, final_source = NULL, review_wait_until = NULL, review_wait_sha = NULL, review_wait_reason = NULL, updated_at = ? WHERE ref = ?').run(iso(now()), ref);
       logEvent(db, 'run', pr.issue, 'unfinal', actor, pr.final_sha, null, { ref, source: pr.final_source, reason });
       dropTopic(db, REVIEWER, `final:${ref}`);
       touch(db, pr.issue);

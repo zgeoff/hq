@@ -23,7 +23,7 @@ export function scheduleFinalReview(db: Database, mark: FinalMark): boolean {
   if (!prAllows('final', pr.state)) return false;
   if (sameSha(pr.final_sha, sha)) return false;
   const t = iso(now());
-  db.query('UPDATE run_prs SET final_sha = ?, final_at = ?, final_source = ?, updated_at = ? WHERE ref = ?').run(sha, t, source, t, ref);
+  db.query('UPDATE run_prs SET final_sha = ?, final_at = ?, final_source = ?, review_wait_until = NULL, review_wait_sha = NULL, review_wait_reason = NULL, updated_at = ? WHERE ref = ?').run(sha, t, source, t, ref);
   const seq = logEvent(db, 'run', pr.issue, 'final', actor, pr.final_sha, sha, { ref, sha, source, note, ...describeResolution(given, resolution) });
   touch(db, pr.issue);
   enqueue(db, seq, REVIEWER, `Final: ${pr.issue} (${ref} at ${sha.slice(0, 7)}). Review it, then merge.`, `final:${ref}`);

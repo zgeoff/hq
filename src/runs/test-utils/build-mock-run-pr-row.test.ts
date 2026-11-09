@@ -25,6 +25,9 @@ test('it builds a default run PR row', () => {
     design_pass: 0,
     session_id: null,
     session_by_hand: 0,
+    review_wait_until: null,
+    review_wait_sha: null,
+    review_wait_reason: null,
   });
 });
 
@@ -52,5 +55,8 @@ test('it applies overrides on top of the defaults', () => {
     design_pass: 0,
     session_id: null,
     session_by_hand: 0,
+    review_wait_until: null,
+    review_wait_sha: null,
+    review_wait_reason: null,
   });
 });

@@ -91,6 +91,9 @@ import { notesFor } from './runs/notes-for.ts';
 import { resolveRun } from './runs/resolve-run.ts';
 import { reviewStarted } from './runs/review-started.ts';
 import { reviewedPr } from './runs/reviewed-pr.ts';
+import { buildRunPRView } from './runs/build-run-pr-view.ts';
+import { findActiveReviewWait } from './runs/find-active-review-wait.ts';
+import { formatReviewWait } from './runs/format-review-wait.ts';
 import { formatPRTag } from './runs/format-pr-tag.ts';
 import { setField } from './runs/set-field.ts';
 import { setGeoffChat } from './runs/set-geoff-chat.ts';
@@ -101,6 +104,7 @@ import { setState } from './runs/set-state.ts';
 import { sweepNow } from './runs/sweep-now.ts';
 import type { RunView, WrapUp } from './runs/types.ts';
 import { requireLiveCheck } from './runs/require-live-check.ts';
+import { setReviewWait } from './runs/set-review-wait.ts';
 import { unfinalPr } from './runs/unfinal-pr.ts';
 import { unmergePr } from './runs/unmerge-pr.ts';
 import { viewRun } from './runs/view-run.ts';
@@ -2302,6 +2306,15 @@ async function runCommand(context: Ctx): Promise<Out> {
       const p = unfinalPr(db, arg(0, 'pr'), await by(), flags.reason ?? null);
       return { data: { pr: p }, text: runLine(view(p.issue)) };
     })
+    .with('review-wait', async () => {
+      if (flags.clear && (flags.until !== undefined || flags.reason !== undefined)) {
+        throw new HqError('bad_args', 'give --clear alone, or --until with --reason, not both');
+      }
+      const input = flags.clear ? { clear: true as const } : { clear: false as const, until: flags.until, reason: flags.reason };
+      const waiter = await by();
+      const waiting = setReviewWait(db, arg(0, 'pr'), input, waiter);
+      return { data: { pr: waiting }, text: runLine(view(waiting.issue)) };
+    })
     .with('reviewing', async () => {
       const p = reviewStarted(db, arg(0, 'pr'), await by());
       return { data: { pr: p }, text: runLine(view(p.issue)) };
@@ -2349,8 +2362,13 @@ Round ${p.review_round} recorded at ${p.reviewed_sha}.` };
       const shown = viewRun(db, resolveRun(db, arg(0, 'issue or session'), 'allow'));
       const notes = notesFor(db, shown.issue, intFlag(flags.notes, 'notes') ?? 5);
       const designPass = readDesignMoves(db, shown.issue);
-      const text = [runLine(shown), ...shown.sessions.map((session) => `  ${session.helper ? 'helper' : 'session'} ${session.session_id}${session.active ? ' (active)' : ` (ended ${session.ended_at})`}`), ...notes.map((note) => `  ${note.at} [${note.source}${note.label ? `/${note.label}` : ''}] ${note.text.replaceAll(/\s+/gu, ' ').slice(0, 200)}`)].join('\n');
-      return { data: { run: shown, notes, designPass }, text: [text, ...formatDesignMoves(designPass)].join('\n') };
+      const waits = shown.prs.flatMap((pr) => {
+        const wait = findActiveReviewWait(pr, now());
+        return wait === null ? [] : [`  ${pr.ref} ${formatReviewWait(wait)}`];
+      });
+      const text = [runLine(shown), ...waits, ...shown.sessions.map((session) => `  ${session.helper ? 'helper' : 'session'} ${session.session_id}${session.active ? ' (active)' : ` (ended ${session.ended_at})`}`), ...notes.map((note) => `  ${note.at} [${note.source}${note.label ? `/${note.label}` : ''}] ${note.text.replaceAll(/\s+/gu, ' ').slice(0, 200)}`)].join('\n');
+      const runWithWaits = { ...shown, prs: shown.prs.map((pr) => buildRunPRView(pr, now())) };
+      return { data: { run: runWithWaits, notes, designPass }, text: [text, ...formatDesignMoves(designPass)].join('\n') };
     })
     .with('list', undefined, () => {
       const rows = listRuns(db, !!flags.all);

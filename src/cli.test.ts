@@ -36,6 +36,7 @@ import { buildMockSha } from '../test/build-mock-sha.ts';
 import { buildReadyIssue } from '../test/build-ready-issue.ts';
 import { buildStubFinalGH } from '../test/build-stub-final-gh.ts';
 import { buildStubBriefGH } from '../test/build-stub-brief-gh.ts';
+import { requirePR } from './runs/require-pr.ts';
 import { buildSeeder } from './test-utils/build-seeder.ts';
 
 function setupTest() {
@@ -1308,4 +1309,120 @@ test.each([
   const listing = z.object({ calls: z.array(listed) });
   const printed = listing.parse(JSON.parse(ctx.lines[0] ?? '{}'));
   expect(printed.calls.map((row) => row.id)).toStrictEqual(expected);
+});
+
+test('it records a review wait with hq run review-wait on the FINAL, and hq run show names it until the date passes', async () => {
+  const ctx = setupTest();
+  updateEnv('HQ_AS', 'z-delivery');
+  ctx.seed.run({ issue: 'GEO-9741' });
+  ctx.seed.finalRunPR({ issue: 'GEO-9741', ref: 'kettle#741', sha: 'abc1234' });
+
+  const code = await main(['run', 'review-wait', 'kettle#741', '--until', '2026-10-16T01:00:00Z', '--reason', 'the only reviewer is out of quota']);
+  const waited = ctx.lines.join('\n');
+  ctx.lines.length = 0;
+  await main(['run', 'show', 'GEO-9741']);
+  const shownBefore = ctx.lines.join('\n');
+  ctx.lines.length = 0;
+  at('2026-10-16T01:00:00Z');
+  await main(['run', 'show', 'GEO-9741']);
+
+  expect({ code, waited }).toStrictEqual({ code: 0, waited: '| no session | GEO-9741 Invented kettle work [working] | kettle#741 final abc1234 | Agent working. |' });
+  expect(shownBefore).toInclude('  kettle#741 review waits until Fri 16 Oct 12:00 Sydney (the only reviewer is out of quota)');
+  expect(ctx.lines.join('\n')).not.toInclude('review waits');
+  const stored = requirePR(ctx.db, 'kettle#741');
+  expect({ until: stored.review_wait_until, sha: stored.review_wait_sha }).toStrictEqual({ until: '2026-10-16T01:00:00Z', sha: 'abc1234' });
+});
+
+test('it hides a review wait from hq run show once a new FINAL at another head is recorded', async () => {
+  const ctx = setupTest();
+  updateEnv('HQ_AS', 'z-delivery');
+  ctx.seed.run({ issue: 'GEO-9748' });
+  ctx.seed.finalRunPR({ issue: 'GEO-9748', ref: 'kettle#748', sha: 'abc1234' });
+  const code = await main(['run', 'review-wait', 'kettle#748', '--until', '2026-10-16T01:00:00Z', '--reason', 'the only reviewer is out of quota']);
+  const waited = ctx.lines.join('\n');
+  const head = `def56789${buildMockSha(3).slice(8)}`;
+  await main(['run', 'final', 'kettle#748', '--sha', head], buildStubFinalGH({ commits: [head] }, []));
+  ctx.lines.length = 0;
+
+  await main(['run', 'show', 'GEO-9748']);
+
+  expect({ code, waited }).toStrictEqual({ code: 0, waited: '| no session | GEO-9748 Invented kettle work [working] | kettle#748 final abc1234 | Agent working. |' });
+  expect(ctx.lines.join('\n')).toBe(`| no session | GEO-9748 Invented kettle work [working] | kettle#748 final ${head.slice(0, 7)} | Agent working. |`);
+});
+
+test.each([
+  { name: 'a PR no run has', args: ['kettle#999', '--until', '2026-10-16T01:00:00Z', '--reason', 'out of quota'], message: /no PR kettle#999/u },
+  { name: 'a PR with no FINAL', args: ['kettle#742', '--until', '2026-10-16T01:00:00Z', '--reason', 'out of quota'], message: /kettle#742 has no FINAL/u },
+  { name: 'a PR that is not open', args: ['kettle#743', '--until', '2026-10-16T01:00:00Z', '--reason', 'out of quota'], message: /kettle#743 is merged, not open/u },
+  { name: 'a time that has passed', args: ['kettle#744', '--until', '2026-10-13T01:00:00Z', '--reason', 'out of quota'], message: /has passed/u },
+  { name: 'no reason', args: ['kettle#744', '--until', '2026-10-16T01:00:00Z'], message: /--reason is required/u },
+])('it refuses hq run review-wait for $name and records no wait', async (row) => {
+  const ctx = setupTest();
+  updateEnv('HQ_AS', 'z-delivery');
+  ctx.seed.run({ issue: 'GEO-9742' });
+  ctx.seed.runPR({ issue: 'GEO-9742', ref: 'kettle#742' });
+  ctx.seed.run({ issue: 'GEO-9743' });
+  ctx.seed.mergedRunPR({ issue: 'GEO-9743', ref: 'kettle#743' });
+  ctx.seed.run({ issue: 'GEO-9744' });
+  ctx.seed.finalRunPR({ issue: 'GEO-9744', ref: 'kettle#744' });
+
+  const code = await main(['run', 'review-wait', ...row.args, '--json']);
+
+  expect(code).toBe(1);
+  expect(ctx.lines.join('\n')).toMatch(row.message);
+  expect(requirePR(ctx.db, 'kettle#744').review_wait_until).toBeNull();
+});
+
+test('it removes the review wait with hq run review-wait --clear', async () => {
+  const ctx = setupTest();
+  updateEnv('HQ_AS', 'z-delivery');
+  ctx.seed.run({ issue: 'GEO-9745' });
+  ctx.seed.finalRunPR({ issue: 'GEO-9745', ref: 'kettle#745' });
+  await main(['run', 'review-wait', 'kettle#745', '--until', '2026-10-16T01:00:00Z', '--reason', 'out of quota']);
+
+  const code = await main(['run', 'review-wait', 'kettle#745', '--clear']);
+
+  expect(code).toBe(0);
+  const stored = requirePR(ctx.db, 'kettle#745');
+  expect({ until: stored.review_wait_until, sha: stored.review_wait_sha, reason: stored.review_wait_reason }).toStrictEqual({ until: null, sha: null, reason: null });
+});
+
+test.each([
+  { name: '--until', args: ['--until', '2026-10-17T01:00:00Z'] },
+  { name: '--reason', args: ['--reason', 'the reviewer is back'] },
+])('it refuses hq run review-wait --clear with $name and keeps the wait', async (row) => {
+  const ctx = setupTest();
+  updateEnv('HQ_AS', 'z-delivery');
+  ctx.seed.run({ issue: 'GEO-9747' });
+  ctx.seed.finalRunPR({ issue: 'GEO-9747', ref: 'kettle#747' });
+  await main(['run', 'review-wait', 'kettle#747', '--until', '2026-10-16T01:00:00Z', '--reason', 'out of quota']);
+  ctx.lines.length = 0;
+
+  const code = await main(['run', 'review-wait', 'kettle#747', '--clear', ...row.args, '--json']);
+  const printed: unknown = JSON.parse(ctx.lines.join('\n'));
+
+  expect({ code, printed }).toStrictEqual({
+    code: 1,
+    printed: { ok: false, error: { code: 'bad_args', message: 'give --clear alone, or --until with --reason, not both' } },
+  });
+  expect(requirePR(ctx.db, 'kettle#747').review_wait_until).toBe('2026-10-16T01:00:00Z');
+});
+
+test('it reports the review wait in hq run show --json only while it is active', async () => {
+  const ctx = setupTest();
+  updateEnv('HQ_AS', 'z-delivery');
+  ctx.seed.run({ issue: 'GEO-9746' });
+  ctx.seed.finalRunPR({ issue: 'GEO-9746', ref: 'kettle#746', sha: 'abc1234' });
+  await main(['run', 'review-wait', 'kettle#746', '--until', '2026-10-16T01:00:00Z', '--reason', 'out of quota']);
+
+  ctx.lines.length = 0;
+  await main(['run', 'show', 'GEO-9746', '--json']);
+  const before = ctx.lines.join('\n');
+  ctx.lines.length = 0;
+  at('2026-10-16T01:00:00Z');
+  await main(['run', 'show', 'GEO-9746', '--json']);
+  const after = ctx.lines.join('\n');
+
+  expect(before).toMatch(/"review_wait": \{\s+"until": "2026-10-16T01:00:00Z",\s+"reason": "out of quota",\s+"sha": "abc1234"\s+\}/u);
+  expect(after).toInclude('"review_wait": null');
 });
