@@ -17,7 +17,6 @@ function setupTest() {
   updateEnv('HOME', base.dir);
   updateEnv('XDG_CACHE_HOME', undefined);
   at('2026-10-16T07:00:00.000Z');
-  fetchedDays(db);
   const seedCIRun = (id: number, over: Partial<{ repo: string; path: string; status: string; conclusion: string | null; minutes: number }> = {}) => {
     const run = { repo: 'atc', path: '.github/workflows/ci.yml', status: 'completed', conclusion: 'success', minutes: 10, ...over };
     const start = '2026-10-16T02:00:00Z';
@@ -44,6 +43,7 @@ function setupTest() {
 
 test('bugs and features share one denominator: merged PRs with a typed Linear issue', () => {
   const ctx = setupTest();
+  fetchedDays(ctx.db);
   ctx.seedIssue('GEO-1', 'Bug');
   ctx.seedIssue('GEO-2', 'Feature');
   ctx.seedIssue('GEO-3', 'Improvement');
@@ -75,6 +75,7 @@ test('a window with no typed PRs has no data, and no data is never green', () =>
 
 test('green at the edge of a target: bugs under 20, features at 60', () => {
   const ctx = setupTest();
+  fetchedDays(ctx.db);
   for (const [offset, type] of ['Bug', 'Feature', 'Feature', 'Feature', 'Improvement'].entries()) {
     ctx.seedIssue(`GEO-${offset + 1}`, type);
   }
@@ -89,6 +90,7 @@ test('green at the edge of a target: bugs under 20, features at 60', () => {
 
 test('deploy-prod rate counts applies only; holds and no-applies are shown apart', () => {
   const ctx = setupTest();
+  fetchedDays(ctx.db);
   let id = 100;
   for (let index = 0; index < 39; index++) {
     ctx.seedDeployRun(id++, 'applied_ok');
@@ -114,6 +116,7 @@ test('deploy-prod rate counts applies only; holds and no-applies are shown apart
 
 test('deploy-prod rate: 9 of 10 applies with holds is 90%, and unclassified runs are named', () => {
   const ctx = setupTest();
+  fetchedDays(ctx.db);
   let id = 100;
   for (let index = 0; index < 9; index++) {
     ctx.seedDeployRun(id++, 'applied_ok');
@@ -132,6 +135,7 @@ test('deploy-prod rate: 9 of 10 applies with holds is 90%, and unclassified runs
 
 test('deploy-prod with a run not yet classified keeps its value but gets no colour', () => {
   const ctx = setupTest();
+  fetchedDays(ctx.db);
   for (let index = 0; index < 10; index++) {
     ctx.seedDeployRun(100 + index, 'applied_ok');
   }
@@ -144,6 +148,7 @@ test('deploy-prod with a run not yet classified keeps its value but gets no colo
 
 test('it names an unknown deploy outcome and withholds the colour while one remains', () => {
   const ctx = setupTest();
+  fetchedDays(ctx.db);
   for (let index = 0; index < 9; index++) {
     ctx.seedDeployRun(100 + index, 'applied_ok');
   }
@@ -157,6 +162,7 @@ test('it names an unknown deploy outcome and withholds the colour while one rema
 
 test('deploy-prod with no applies has no data, still naming holds', () => {
   const ctx = setupTest();
+  fetchedDays(ctx.db);
   ctx.seedDeployRun(1, 'held', { conclusion: 'failure' });
   ctx.seedDeployRun(2, 'no_apply');
   const result = ctx.readMeasures().deploys;
@@ -167,6 +173,7 @@ test('deploy-prod with no applies has no data, still naming holds', () => {
 
 test('ci waste is the minutes in failed or cancelled runs over all minutes', () => {
   const ctx = setupTest();
+  fetchedDays(ctx.db);
   ctx.seedCIRun(1, { minutes: 80 });
   ctx.seedCIRun(2, { minutes: 10, conclusion: 'failure' });
   ctx.seedCIRun(3, { minutes: 10, conclusion: 'cancelled' });
@@ -180,6 +187,7 @@ test('ci waste is the minutes in failed or cancelled runs over all minutes', () 
 
 test('a past day not fetched leaves the measure incomplete, with no colour; today never counts', () => {
   const ctx = setupTest();
+  fetchedDays(ctx.db);
   ctx.seedCIRun(1, { minutes: 100 });
   expect(verdict(DEFAULT_TARGETS.ciwaste, ctx.readMeasures().ciwaste)).toBe('green');
   ctx.db.query(`DELETE FROM goal_days WHERE day = '2026-10-15'`).run();
@@ -303,6 +311,7 @@ test('cost reports the latest readings and the window peak', () => {
 
 test('targets are judged on the unrounded share: 10 of 51 is under 20, 59.6% is under 60', () => {
   const ctx = setupTest();
+  fetchedDays(ctx.db);
   ctx.seedIssue('GEO-1', 'Bug');
   ctx.seedIssue('GEO-2', 'Feature');
   for (let index = 1; index <= 10; index++) {
@@ -320,6 +329,7 @@ test('targets are judged on the unrounded share: 10 of 51 is under 20, 59.6% is 
 
 test('a 59.6% feature share does not pass the 60% target', () => {
   const ctx = setupTest();
+  fetchedDays(ctx.db);
   ctx.seedIssue('GEO-1', 'Feature');
   ctx.seedIssue('GEO-2', 'Bug');
   for (let index = 1; index <= 149; index++) {
@@ -335,6 +345,7 @@ test('a 59.6% feature share does not pass the 60% target', () => {
 
 test('ci waste is judged on raw durations: 100s ok plus 20s failed is 16.7%, not 0%', () => {
   const ctx = setupTest();
+  fetchedDays(ctx.db);
   ctx.seedCIRun(1, { minutes: 100 / 60 });
   ctx.seedCIRun(2, { conclusion: 'failure', minutes: 20 / 60 });
   const result = ctx.readMeasures().ciwaste;
