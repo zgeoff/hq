@@ -132,14 +132,14 @@ test('it lists a review answer with the PR it was about, after its id comes back
 test('it reads a review answer from before its facts were kept against the item as it stands', () => {
   const ctx = setupTest();
   createUnblockItems(ctx.db, { 'review-6': { task: 'Review kettle#7 and say lgtm', links: [{ label: 'kettle#7', url: 'https://github.com/kettle-co/kettle/pull/7', subject: true }] } });
-  ctx.seed.event({ subject: 'unblock', subjectID: 'review-6', action: 'console-review', actor: 'console', data: { review: 'changes', note: 'Wider lid.' } });
+  ctx.seed.consoleReviewEventsWithoutFacts({ subject_id: 'review-6', data: '{"review":"changes","note":"Wider lid."}' });
 
   expect(loadAnswers(ctx.db, { from: NOON_SYDNEY, to: '2026-10-14T04:00:00Z' }).map((answer) => [answer.title, answer.ref, answer.words])).toStrictEqual([['Review kettle#7 and say lgtm', 'https://github.com/kettle-co/kettle/pull/7', 'Wider lid.']]);
 });
 
 test("it lists an earlier round's answer with no title, issues or session when no event kept them and the ask changed after", () => {
   const ctx = setupTest();
-  ctx.seed.event({ subject: 'ask', subjectID: 'kettle-spout', action: 'answered', actor: 'teapot-bot', data: { answer: 'Long' } });
+  ctx.seed.askEventsWithoutDetail({ subject_id: 'kettle-spout', actor: 'teapot-bot', data: '{"answer":"Long"}' });
   at('2026-10-14T03:00:00Z');
   addAsk(ctx.db, { kind: 'call', id: 'kettle-spout', title: 'Pick a lid', question: 'Flat or domed?', body: 'Flat or domed?', issues: ['GEO-9006'], forSession: 'teapot-bot', actor: 'kettle-bot' });
 
@@ -149,7 +149,7 @@ test("it lists an earlier round's answer with no title, issues or session when n
 test('it lists a review answer from before its facts were kept with no title or PR once its id comes back for another PR', () => {
   const ctx = setupTest();
   createUnblockItems(ctx.db, { 'review-7': { task: 'Review kettle#8 and say lgtm', links: [{ label: 'kettle#8', url: 'https://github.com/kettle-co/kettle/pull/8', subject: true }] } });
-  ctx.seed.event({ subject: 'unblock', subjectID: 'review-7', action: 'console-review', actor: 'console', data: { review: 'lgtm', note: null } });
+  ctx.seed.consoleReviewEventsWithoutFacts({ subject_id: 'review-7', data: '{"review":"lgtm","note":null}' });
   at('2026-10-14T03:00:00Z');
   createUnblockItems(ctx.db, { 'review-7': { task: 'Review kettle#9 and say lgtm', links: [{ label: 'kettle#9', url: 'https://github.com/kettle-co/kettle/pull/9', subject: true }] } });
 
@@ -183,7 +183,7 @@ test('it throws on a stored ask answer whose text is not a string', () => {
   const ctx = setupTest();
   const item = parseItemInput('call', JSON.stringify({ title: 'Descale the kettle', question: 'Descale it now?', options: [{ label: 'Descale it', effect: 'It gets descaled.' }, { label: 'Leave it', effect: 'Nothing changes.' }] }));
   applyAskItem(ctx.db, { kind: 'call', id: 'kettle-descale', issues: [], forSession: null, actor: 'kettle-bot' }, item, 'Descale it now?');
-  ctx.seed.event({ subject: 'ask', subjectID: 'kettle-descale', action: 'answered', actor: 'console', data: { answer: 42 } });
+  ctx.seed.askAnswerEventWithNumber({ subject_id: 'kettle-descale', actor: 'console' });
 
   expect(() => loadAnswers(ctx.db, { from: NOON_SYDNEY, to: '2026-10-14T02:00:00Z' })).toThrow('expected string, received number');
 });
