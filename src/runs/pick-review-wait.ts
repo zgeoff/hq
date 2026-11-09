@@ -1,3 +1,4 @@
+import { match } from 'ts-pattern';
 import type { RunPr } from './types.ts';
 
 export type ReviewWaitRequest = { kind: 'clear' } | { kind: 'set'; until: string; reason: string | null };
@@ -9,15 +10,17 @@ export function pickReviewWait(pr: Pick<RunPr, 'ref' | 'state' | 'final_sha'>, r
   if (pr.state !== 'open') {
     return { ok: false, refusal: `${pr.ref} is ${pr.state}, not open` };
   }
-  if (request.kind === 'clear') {
-    return { ok: true, until: null, sha: null, reason: null };
-  }
-  if (pr.final_sha === null) {
-    return { ok: false, refusal: `${pr.ref} has no FINAL, so no review to wait on: hq run final first` };
-  }
-  const reason = request.reason?.trim() ?? '';
-  if (reason === '') {
-    return { ok: false, refusal: '--reason is required: say why the review waits' };
-  }
-  return { ok: true, until: request.until, sha: pr.final_sha, reason };
+  return match(request)
+    .with({ kind: 'clear' }, (): ReviewWaitWrite => ({ ok: true, until: null, sha: null, reason: null }))
+    .with({ kind: 'set' }, (set): ReviewWaitWrite => {
+      if (pr.final_sha === null) {
+        return { ok: false, refusal: `${pr.ref} has no FINAL, so no review to wait on: hq run final first` };
+      }
+      const reason = set.reason?.trim() ?? '';
+      if (reason === '') {
+        return { ok: false, refusal: '--reason is required: say why the review waits' };
+      }
+      return { ok: true, until: set.until, sha: pr.final_sha, reason };
+    })
+    .exhaustive();
 }

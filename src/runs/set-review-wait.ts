@@ -1,4 +1,5 @@
 import type { Database } from 'bun:sqlite';
+import { match } from 'ts-pattern';
 import { iso } from '../clock/iso.ts';
 import { now } from '../clock/now.ts';
 import { HqError } from '../errors.ts';
@@ -25,7 +26,10 @@ export function setReviewWait(db: Database, raw: string, input: ReviewWaitInput,
         throw new HqError('bad_state', write.refusal);
       }
       db.query('UPDATE run_prs SET review_wait_until = ?, review_wait_sha = ?, review_wait_reason = ?, updated_at = ? WHERE ref = ?').run(write.until, write.sha, write.reason, iso(at), ref);
-      const action = request.kind === 'clear' ? 'review-wait-cleared' : 'review-wait';
+      const action = match(request)
+        .with({ kind: 'clear' }, () => 'review-wait-cleared')
+        .with({ kind: 'set' }, () => 'review-wait')
+        .exhaustive();
       logEvent(db, 'run', pr.issue, action, actor, null, null, { ref, sha: write.sha, until: write.until, reason: write.reason });
       touch(db, pr.issue);
       return mustPr(db, ref);
@@ -34,11 +38,13 @@ export function setReviewWait(db: Database, raw: string, input: ReviewWaitInput,
 }
 
 function buildRequest(input: ReviewWaitInput, at: Date): ReviewWaitRequest {
-  if (input.clear) {
-    return { kind: 'clear' };
-  }
-  if (input.until === undefined) {
-    throw new HqError('bad_args', '--until is required: an ISO time or a Sydney time such as Mon 08:00, or --clear');
-  }
-  return { kind: 'set', until: parseCapUntil(input.until, at), reason: input.reason ?? null };
+  return match(input)
+    .with({ clear: true }, (): ReviewWaitRequest => ({ kind: 'clear' }))
+    .with({ clear: false }, (set): ReviewWaitRequest => {
+      if (set.until === undefined) {
+        throw new HqError('bad_args', '--until is required: an ISO time or a Sydney time such as Mon 08:00, or --clear');
+      }
+      return { kind: 'set', until: parseCapUntil(set.until, at), reason: set.reason ?? null };
+    })
+    .exhaustive();
 }
