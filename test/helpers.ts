@@ -33,14 +33,16 @@ export function freshDb(): { db: Database; dir: string; path: string; cleanup: (
   return { db, dir, path, cleanup: () => (db.close(), rmSync(dir, { recursive: true, force: true })) };
 }
 
-export function fetchedDays(db: Database, from = '2026-09-01', to = '2026-11-30', repos = ['atc']): void {
+export function fetchedDays(db: Database, from = '2026-09-01', to = '2026-11-30', repos = ['atc'], unfetchedPRDays: readonly string[] = []): void {
   const ci = db.query(`INSERT OR IGNORE INTO goal_days (kind, key, day, n, at) VALUES ('ci', ?, ?, 0, '2026-09-01T00:00:00Z')`);
   const pr = db.query(`INSERT OR IGNORE INTO merged_pr_days (day, n, at) VALUES (?, 0, '2026-09-01T00:00:00Z')`);
   db.transaction(() => {
     for (let t = Date.parse(`${from}T00:00:00Z`); t <= Date.parse(`${to}T00:00:00Z`); t += 86_400_000) {
       const d = new Date(t).toISOString().slice(0, 10);
       for (const r of repos) ci.run(r, d);
-      pr.run(d);
+      if (!unfetchedPRDays.includes(d)) {
+        pr.run(d);
+      }
     }
   })(); // one commit: a commit per row makes each test seconds slower
 }

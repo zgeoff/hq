@@ -64,16 +64,12 @@ test('nothing before Monday 17:00, and nothing on another day', () => {
 test('at Monday 17:00 one message goes to z-stu with the table, both weeks and the flags; a second tick sends nothing', () => {
   const ctx = setupTest();
   fetchedDays(ctx.db);
-  // oxlint-disable-next-line zgeoff/seed-only -- no seed publishes linear_issues
-  const writeIssue = ctx.db.query(`INSERT INTO linear_issues (issue, type, title, state, closed_at, fetched_at) VALUES (?, ?, 't', 'completed', NULL, '2026-10-16T00:00:00Z')`);
-  writeIssue.run('GEO-1', 'Bug');
-  writeIssue.run('GEO-2', 'Feature');
-  // oxlint-disable-next-line zgeoff/seed-only -- no seed publishes merged_prs
-  const writeMergedPR = ctx.db.query(`INSERT INTO merged_prs (repo, number, merged_at, title, kind, issue) VALUES ('atc', ?, ?, 'x: y', 'other', ?)`);
-  writeMergedPR.run(1, '2026-10-14T03:00:00Z', 'GEO-1');
-  writeMergedPR.run(2, '2026-10-15T03:00:00Z', 'GEO-2');
-  writeMergedPR.run(3, '2026-10-08T03:00:00Z', 'GEO-2');
-  writeMergedPR.run(4, '2026-10-19T03:00:00Z', 'GEO-2');
+  ctx.seed.linearIssue({ issue: 'GEO-1', type: 'Bug' });
+  ctx.seed.linearIssue({ issue: 'GEO-2', type: 'Feature' });
+  ctx.seed.mergedPR({ number: 1, merged_at: '2026-10-14T03:00:00Z', issue: 'GEO-1' });
+  ctx.seed.mergedPR({ number: 2, merged_at: '2026-10-15T03:00:00Z', issue: 'GEO-2' });
+  ctx.seed.mergedPR({ number: 3, merged_at: '2026-10-08T03:00:00Z', issue: 'GEO-2' });
+  ctx.seed.mergedPR({ number: 4, merged_at: '2026-10-19T03:00:00Z', issue: 'GEO-2' });
   ctx.synced(syd(MON, '16:50'));
   const result = ctx.tick(MON, '17:01');
   expect(result.run).toMatchObject({ job: 'goals-weekly', key: MON, result: 'queued', detail: null });
@@ -98,26 +94,19 @@ test('at Monday 17:00 one message goes to z-stu with the table, both weeks and t
 test('a green row says so, and the colour follows the unrounded share', () => {
   const ctx = setupTest();
   fetchedDays(ctx.db);
-  // oxlint-disable-next-line zgeoff/seed-only -- no seed publishes linear_issues
-  ctx.db.query(`INSERT INTO linear_issues (issue, type, title, state, closed_at, fetched_at) VALUES ('GEO-1', 'Feature', 't', 'completed', NULL, '2026-10-16T00:00:00Z')`).run();
-  // oxlint-disable-next-line zgeoff/seed-only -- no seed publishes merged_prs
-  ctx.db.query(`INSERT INTO merged_prs (repo, number, merged_at, title, kind, issue) VALUES ('atc', 1, '2026-10-14T03:00:00Z', 'x: y', 'other', 'GEO-1')`).run();
+  ctx.seed.linearIssue({ issue: 'GEO-1', type: 'Feature' });
+  ctx.seed.mergedPR({ merged_at: '2026-10-14T03:00:00Z', issue: 'GEO-1' });
   const text = weeklyText(ctx.db, syd(MON, '17:00'));
   expect(row(text, 'Feature + Improvement share')).toContain('100% of 1 typed PRs | no data (0 typed PRs) | 🟢 green |');
 });
 
 test('a week with days not fetched says so and gets no colour', () => {
   const ctx = setupTest();
-  fetchedDays(ctx.db);
-  // oxlint-disable-next-line zgeoff/seed-only -- no seed publishes linear_issues
-  ctx.db.query(`INSERT INTO linear_issues (issue, type, title, state, closed_at, fetched_at) VALUES ('GEO-1', 'Feature', 't', 'completed', NULL, '2026-10-16T00:00:00Z')`).run();
-  // oxlint-disable-next-line zgeoff/seed-only -- no seed publishes merged_prs
-  ctx.db.query(`INSERT INTO merged_prs (repo, number, merged_at, title, kind, issue) VALUES ('atc', 1, '2026-10-14T03:00:00Z', 'x: y', 'other', 'GEO-1')`).run();
-  // oxlint-disable-next-line zgeoff/seed-only -- no seed leaves a day unfetched
-  ctx.db.query(`DELETE FROM merged_pr_days WHERE day IN ('2026-10-12', '2026-10-13')`).run();
+  fetchedDays(ctx.db, undefined, undefined, undefined, ['2026-10-12', '2026-10-13']);
+  ctx.seed.linearIssue({ issue: 'GEO-1', type: 'Feature' });
+  ctx.seed.mergedPR({ merged_at: '2026-10-14T03:00:00Z', issue: 'GEO-1' });
   const text = weeklyText(ctx.db, syd(MON, '17:00'));
   expect(row(text, 'Feature + Improvement share')).toContain('100% of 1 typed PRs, 2 day(s) not fetched | no data (0 typed PRs) | – |');
-  // oxlint-disable-next-line zgeoff/seed-only -- no seed leaves a day unfetched
   ctx.db.query(`DELETE FROM goal_days WHERE day = '2026-10-08'`).run();
   const unfetched = weeklyText(ctx.db, syd(MON, '17:00'));
   expect(row(unfetched, 'CI minutes wasted')).toContain('| no data (0 CI min, 1 day(s) not fetched) |');
@@ -150,8 +139,7 @@ test('the cost row names an account by its label when set, else by the short key
   ctx.seed.usageSample({ at: '2026-10-15T01:00:00Z', account: 'abcdef012345', five_hour: 30, seven_day: 55 });
   ctx.seed.usageSample({ at: '2026-10-15T02:00:00Z', account: '0123456789ab', five_hour: 5, seven_day: 12 });
   ctx.seed.usageSample({ at: '2026-10-07T01:00:00Z', account: 'abcdef012345', five_hour: 1, seven_day: 33 });
-  // oxlint-disable-next-line zgeoff/seed-only -- no seed publishes ci_runs
-  ctx.db.query(`INSERT INTO ci_runs (id, repo, path, event, status, conclusion, attempt, created_at, started_at, updated_at) VALUES (1, 'atc', 'ci.yml', 'push', 'completed', 'success', 1, '2026-10-14T02:00:00Z', '2026-10-14T02:00:00Z', '2026-10-14T03:30:00Z')`).run();
+  ctx.seed.ciRun({ path: 'ci.yml', created_at: '2026-10-14T02:00:00Z', started_at: '2026-10-14T02:00:00Z', updated_at: '2026-10-14T03:30:00Z' });
   let cost = row(weeklyText(ctx.db, syd(MON, '17:00')), 'Cost');
   expect(cost).toContain('012345: 7-day peak 12%, latest 5-hour 5% and 7-day 12% (1 readings)');
   expect(cost).toContain('abcdef: 7-day peak 71%, latest 5-hour 30% and 7-day 55% (3 readings); CI 90 min');
@@ -343,11 +331,9 @@ test('the deploy-prod row names holds, no-apply runs and runs not yet classified
   const ctx = setupTest();
   fetchedDays(ctx.db, undefined, undefined, ['atc', 'cloud']);
   const add = (id: number, outcome: string | null) => {
-    // oxlint-disable-next-line zgeoff/seed-only -- no seed publishes ci_runs
-    ctx.db.query(`INSERT INTO ci_runs (id, repo, path, event, status, conclusion, attempt, created_at, started_at, updated_at) VALUES (?, 'cloud', '.github/workflows/deploy-prod.yml', 'push', 'completed', 'success', 1, '2026-10-14T02:00:00Z', '2026-10-14T02:00:00Z', '2026-10-14T02:10:00Z')`).run(id);
+    ctx.seed.ciRun({ id, repo: 'cloud', path: '.github/workflows/deploy-prod.yml', created_at: '2026-10-14T02:00:00Z', started_at: '2026-10-14T02:00:00Z', updated_at: '2026-10-14T02:10:00Z' });
     if (outcome) {
-      // oxlint-disable-next-line zgeoff/seed-only -- no seed publishes deploy_runs
-      ctx.db.query(`INSERT INTO deploy_runs (run_id, outcome, attempt, fetched_at) VALUES (?, ?, 1, '2026-10-14T03:00:00Z')`).run(id, outcome);
+      ctx.seed.deployRun({ run_id: id, outcome, fetched_at: '2026-10-14T03:00:00Z' });
     }
   };
   for (const id of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]) {
@@ -365,14 +351,12 @@ test('the deploy-prod row names holds, no-apply runs and runs not yet classified
 test('the weekly ends with the week\'s refusals and their top reasons, after the flags', () => {
   const ctx = setupTest();
   fetchedDays(ctx.db);
-  // oxlint-disable-next-line zgeoff/seed-only -- no seed publishes refusals
-  const writeRefusal = ctx.db.query(`INSERT INTO refusals (uuid, at, transcript, subagent, reason, scanned_at) VALUES (?, ?, '/t.jsonl', 0, ?, '2026-10-19T00:00:00Z')`);
-  writeRefusal.run('r1', '2026-10-13T01:00:00Z', 'pushing to main');
-  writeRefusal.run('r2', '2026-10-14T01:00:00Z', 'pushing to main');
-  writeRefusal.run('r3', '2026-10-15T01:00:00Z', 'deleting a branch');
-  writeRefusal.run('r4', '2026-10-15T02:00:00Z', null);
-  writeRefusal.run('r5', '2026-10-08T01:00:00Z', 'last week');
-  writeRefusal.run('r6', '2026-10-19T08:00:00Z', 'this week, not yet reviewed');
+  ctx.seed.refusal({ uuid: 'r1', at: '2026-10-13T01:00:00Z', reason: 'pushing to main' });
+  ctx.seed.refusal({ uuid: 'r2', at: '2026-10-14T01:00:00Z', reason: 'pushing to main' });
+  ctx.seed.refusal({ uuid: 'r3', at: '2026-10-15T01:00:00Z', reason: 'deleting a branch' });
+  ctx.seed.refusal({ uuid: 'r4', at: '2026-10-15T02:00:00Z', reason: null });
+  ctx.seed.refusal({ uuid: 'r5', at: '2026-10-08T01:00:00Z', reason: 'last week' });
+  ctx.seed.refusal({ uuid: 'r6', at: '2026-10-19T08:00:00Z', reason: 'this week, not yet reviewed' });
   const text = weeklyText(ctx.db, syd(MON, '17:00'));
   expect(text).toContain('Refusals: 4 (top reasons: pushing to main x2; deleting a branch x1)');
   expect(text.indexOf('Flags you kept:')).toBeLessThan(text.indexOf('Refusals:'));

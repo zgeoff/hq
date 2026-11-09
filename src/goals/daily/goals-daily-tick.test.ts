@@ -76,10 +76,8 @@ test('at 18:00 one message goes to z-stu: 7 goal lines, 3 throughput lines and t
 test('a line carries the colour as words after the emoji', () => {
   const ctx = setupTest();
   fetchedDays(ctx.db);
-  // oxlint-disable-next-line zgeoff/seed-only -- no seed publishes linear_issues
-  ctx.db.query(`INSERT INTO linear_issues (issue, type, title, state, closed_at, fetched_at) VALUES ('GEO-1', 'Feature', 't', 'completed', NULL, '2026-10-16T00:00:00Z')`).run();
-  // oxlint-disable-next-line zgeoff/seed-only -- no seed publishes merged_prs
-  ctx.db.query(`INSERT INTO merged_prs (repo, number, merged_at, title, kind, issue) VALUES ('atc', 1, '2026-10-16T03:00:00Z', 'feat: x', 'feat', 'GEO-1')`).run();
+  ctx.seed.linearIssue({ issue: 'GEO-1', type: 'Feature' });
+  ctx.seed.mergedPR({ issue: 'GEO-1' });
   ctx.synced(syd('2026-10-16', '17:50'));
   const text = dailyText(ctx.db, syd('2026-10-16', '18:00'));
   expect(text).toContain('- Bug share: today 0% (1 typed PRs), week so far 0% (1 typed PRs); target <20% by 2 Nov 🟢 green');
@@ -289,11 +287,9 @@ test('the deploy-prod line names holds, no-apply runs and runs not yet classifie
   const ctx = setupTest();
   fetchedDays(ctx.db, undefined, undefined, ['atc', 'cloud']);
   const add = (id: number, outcome: string | null) => {
-    // oxlint-disable-next-line zgeoff/seed-only -- no seed publishes ci_runs
-    ctx.db.query(`INSERT INTO ci_runs (id, repo, path, event, status, conclusion, attempt, created_at, started_at, updated_at) VALUES (?, 'cloud', '.github/workflows/deploy-prod.yml', 'push', 'completed', 'success', 1, '2026-10-16T02:00:00Z', '2026-10-16T02:00:00Z', '2026-10-16T02:10:00Z')`).run(id);
+    ctx.seed.ciRun({ id, repo: 'cloud', path: '.github/workflows/deploy-prod.yml' });
     if (outcome) {
-      // oxlint-disable-next-line zgeoff/seed-only -- no seed publishes deploy_runs
-      ctx.db.query(`INSERT INTO deploy_runs (run_id, outcome, attempt, fetched_at) VALUES (?, ?, 1, '2026-10-16T03:00:00Z')`).run(id, outcome);
+      ctx.seed.deployRun({ run_id: id, outcome });
     }
   };
   add(1, 'applied_ok');
