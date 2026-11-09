@@ -17,7 +17,7 @@ export const CHECK_SCRIPT = [
   'trees=$(git worktree list --porcelain) || exit 1',
   String.raw`printf "%s\n" "$trees" | while IFS=' ' read -r key tree; do`,
   '  if [ "$key" != worktree ]; then continue; fi',
-  '  changes=$(git -C "$tree" status --porcelain) || exit 1',
+  '  changes=$(git -C "$tree" status --porcelain --untracked-files=normal)|| exit 1',
   String.raw`  printf "%s\n" "$changes" | while IFS= read -r change; do`,
   '    case "$change" in',
   `      "?? .scratch/"|"?? .worktrees/"|"") ;;`,

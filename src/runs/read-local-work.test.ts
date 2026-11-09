@@ -76,6 +76,18 @@ test.each(['.scratch', '.worktrees'])('it finds an untracked %s folder to be no 
   expect(work).toStrictEqual({ state: 'pushed' });
 });
 
+test('it finds an untracked .scratch folder to be no work when git lists every untracked file', async () => {
+  const ctx = setupTest();
+  const clone = createPushedClone(ctx.directory, 'kettle');
+  runGit(clone, 'config', 'status.showUntrackedFiles', 'all');
+  mkdirSync(join(clone, '.scratch'));
+  writeFileSync(join(clone, '.scratch', 'note.txt'), 'invented note\n');
+
+  const work = await readLocalWork(realRunner, clone);
+
+  expect(work).toStrictEqual({ state: 'pushed' });
+});
+
 test('it finds an untracked file beside an untracked .scratch folder to be unpushed work', async () => {
   const ctx = setupTest();
   const clone = createPushedClone(ctx.directory, 'kettle');
