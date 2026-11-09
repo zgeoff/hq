@@ -64,6 +64,32 @@ test('it forgets an unpinned, fully pushed session of a closed design run and as
   expect(ctx.readOutbox()).toStrictEqual([]);
 });
 
+test('it wraps up a closed design run only once across passes', async () => {
+  const ctx = setupTest();
+  ctx.addDesignRun('GEO-9709');
+  ctx.seed.runSession({ issue: 'GEO-9709', session: ctx.pinned });
+  ctx.addKettleIssue('GEO-9709', 'completed');
+  const answers = { sessions: [{ id: ctx.pinned, name: 'kettle-design', alive: true, cwd: '/workspace/kettle' }] };
+  await ctx.closeDesignRuns(answers);
+
+  const second = await ctx.closeDesignRuns(answers);
+
+  expect(second).toStrictEqual({ issues: [], errors: [], calls: [] });
+});
+
+test('it records why the wrap-up failed in its result event', async () => {
+  const ctx = setupTest();
+  ctx.addDesignRun('GEO-9710');
+  ctx.seed.runSession({ issue: 'GEO-9710', session: ctx.pinned });
+  ctx.addKettleIssue('GEO-9710', 'completed');
+
+  await closeDoneDesignRuns(ctx.db, { openClient: () => Promise.reject(new Error('invented: atc is down')), readImpWork: () => Promise.resolve({ state: 'pushed' }), readLocalWork: () => Promise.resolve({ state: 'pushed' }) }, 'hq-lanes');
+
+  expect(readEvents(ctx.db, 'run', 'GEO-9710', ['design-done-close-result'])).toStrictEqual([
+    { seq: expect.any(Number), action: 'design-done-close-result', actor: 'hq-lanes', at: expect.any(String), data: JSON.stringify({ forgotten: [], destroyed: [], kept: [], failed: [{ id: ctx.pinned, reason: 'atc: invented: atc is down' }] }) },
+  ]);
+});
+
 test('it leaves a design run whose issue is open, and its pinned session, alone', async () => {
   const ctx = setupTest();
   ctx.addDesignRun('GEO-9703');
