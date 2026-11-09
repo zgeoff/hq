@@ -71,7 +71,7 @@ test('it stores and applies nothing more when the backfill runs twice', async ()
   const second = await ctx.backfill();
 
   expect(second).toStrictEqual({ kind: 'read', notes: 0, finals: [] });
-  expect(ctx.db.query('SELECT count(*) AS n FROM run_notes').get()).toStrictEqual({ n: 1 });
+  expect(ctx.db.query('SELECT count(*) AS total FROM run_notes').get()).toStrictEqual({ total: 1 });
   expect(ctx.readFinalMessages()).toHaveLength(1);
 });
 
