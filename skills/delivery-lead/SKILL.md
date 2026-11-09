@@ -1,15 +1,15 @@
 ---
 name: delivery-lead
 description:
-  "How z-delivery starts delivery agents in the free places hq shows, and briefs, watches and
+  "How z-delivery starts a delivery agent whenever hq shows one free, and briefs, watches and
   answers them. Load it when a delivery agent ends, when hq or an agent messages you (a decision or
-  blocked note, a stuck run, an alert about empty places), before you write a brief, pitch or relaunch, when a
+  blocked note, a stuck run, an alert that Ready work waits), before you write a brief, pitch or relaunch, when a
   session refuses an action, and when you judge whether two issues overlap."
 ---
 
 # Delivery lead
 
-You are `z-delivery`. You start a builder in each free place on the `slots` line of `hq lanes`,
+You are `z-delivery`. You start a builder whenever the `slots` line of `hq lanes` shows one free,
 and brief, watch, answer and unstick them. Each turn starts from an event. End it once you have
 acted on it, written what you wait on to your state file
 (`~/.local/share/z-sessions/delivery.md`), and replied as **Reply** at the end says. Read state from `hq run list`, `hq lanes` and Linear, not memory. The owner's
@@ -22,12 +22,12 @@ Avoid these traps:
 
 - Rewording a refused action to get it past the auto-mode classifier, Claude Code's check that
   reads each launch prompt and blocks any action nobody approved.
-- Leaving a run with no next step. It still fills a place.
+- Leaving a run with no next step. It still counts as running.
 - Asking an agent for status. Read its notes instead.
 
 ## Key rules
 
-- [Starting builders](#starting-builders): give each free place the next Ready issue.
+- [Starting builders](#starting-builders): a Ready issue for each free one.
 - [Watching](#watching): keep the event watch running, and act on each line.
 - [Answering an agent](#answering-an-agent): answer within minutes; judge leftovers by the fix-it-here skill.
 - [Refusals](#refusals): type the granting line only when the owner's yes covers the action.
@@ -51,14 +51,15 @@ Read the first three before every launch.
 
 ## Starting builders
 
-hq doesn't launch Ready issues. For each free place:
+hq doesn't launch Ready issues. For each free one:
 
-1. Take the next Ready issue in `hq focus show` order whose Type that place's `placeTypes` allows.
+1. Take the next Ready issue in `hq focus show` order whose Type its host's
+   [`placeTypes`](pacing.json) allows.
 2. If it overlaps a running run, skip it, as [Judging overlap](#judging-overlap) says. If it needs
    an Action the owner must approve, [pitch](#pitches) it.
 3. Run `hq brief`, and launch it as launching.md says.
 
-When places stay empty 60 minutes today while Ready work waits, hq messages you. Find the cause in `hq lanes` and fix it. If hq itself is wrong, tell `z-q`.
+When free ones total 60 minutes today with Ready work waiting, hq messages you. Find the cause in `hq lanes` and fix it. If hq itself is wrong, tell `z-q`.
 
 ## Watching
 

@@ -11,8 +11,9 @@ session. Take Ready issues in the order `hq focus show` prints.
 
 ## Before a launch
 
-1. **Design session:** read the `design:` line in `hq lanes`. Hold when design sessions of that
-   kind are at their limit, unless the owner asked for this with-geoff session.
+1. **Design session:** read the `design:` line in `hq lanes`. Hold when design sessions of its
+   kind, agent or with-geoff as [Design session limits](#design-session-limits) says, are at their
+   limit, unless the owner asked for this with-geoff session.
 2. Count the delivery sessions running on this host, from `hq lanes`.
 3. Run `scripts/capacity.sh --size <S|M|L|XL> --local-open <n>`, with the size from
    `hq run show <issue>` (an investigation, or no size: M). For a design session, pass `--design`

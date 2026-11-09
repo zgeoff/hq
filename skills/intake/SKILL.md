@@ -65,20 +65,21 @@ For "How are things?", give a status of a few lines:
 - what runs;
 - what merged since the owner last looked;
 - which PRs wait on the owner;
-- the focus, and the free builder places on the `slots` line of `hq lanes`;
+- the focus, and how many the `slots` line of `hq lanes` shows free;
 - anything blocked.
 
 ## Focus
 
 When the owner says what the agents work on, run
-`hq focus set <term>[,<term>...] [--reserve <area>=<n>]`. `z-delivery` fills each free builder
-place with work that matches the focus. `--reserve` keeps `<n>` places for the repo with the area label
-`<area>`. Give the owner what `hq focus show` prints, each term's Ready and Backlog matches. Name
-each term with none. A new focus leaves running work alone.
+`hq focus set <term>[,<term>...] [--reserve <area>=<n>]`. Whenever `hq lanes` shows a builder
+free, `z-delivery` starts one on work that matches the focus. `--reserve` keeps `<n>` builders for
+issues with the area label `<area>`. Give the owner what
+`hq focus show` prints, each term's Ready and Backlog matches. Name each term with none. A new focus
+leaves running work alone.
 
 When the `cause:` line of `hq lanes` gives `supply`, no issue that is Ready or in
-`hq lanes promotable` fits the free places. Tell the owner once, with the focus and the kind of
-issue that would fill those places.
+`hq lanes promotable` fits the free builders. Tell the owner once, with the focus and the kind
+of issue that would use them.
 
 ## Starting work
 
@@ -94,7 +95,7 @@ Put design questions in a Triage issue for a design session, never in chat.
 
 When the owner asks you for a design session, ask `z-delivery` to launch it now. Give it the issue,
 filed in Triage first if there is none, and where the owner asked (`chat:$ATC_SESSION_ID`).
-`z-delivery` launches it even when the owner's design sessions are at their limit in
+`z-delivery` launches it even when with-geoff design sessions are at their limit in
 [pacing](../delivery-lead/references/pacing.md#design-session-limits). The request is the owner's
 yes, so offer no choice of when it starts or of which session goes first.
 
