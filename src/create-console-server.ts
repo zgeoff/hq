@@ -29,7 +29,7 @@ const SIGN_IN = 'hq console: sign in first: open the login link on the terminal 
 export function createConsoleServer(input: ConsoleServerInput): Server<undefined> {
   const context = { db: input.db, actor: input.actor, run: input.run, notify: input.notify, loadShipped: input.loadShipped };
   const handler = new RPCHandler(buildConsoleRouter());
-  async function handleRequest(req: Request, server: Server<undefined>): Promise<Response> {
+  const handleRequest = async (req: Request, server: Server<undefined>): Promise<Response> => {
     if (!checkConsoleRequest(req, server.port ?? input.port)) {
       return applyFrameGuard(new Response('hq console: this request does not come from the console page\n', { status: 403 }));
     }
@@ -49,7 +49,7 @@ export function createConsoleServer(input: ConsoleServerInput): Server<undefined
       return applyFrameGuard(result.response);
     }
     return applyFrameGuard(buildAssetResponse(input.assets, req));
-  }
+  };
 
   return Bun.serve({ hostname: '127.0.0.1', port: input.port, fetch: handleRequest });
 }

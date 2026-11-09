@@ -1,3 +1,4 @@
+// oxlint-disable eslint/id-length -- n is the stored merged_pr_days column
 import { expect, test } from 'bun:test';
 import { buildMockMergedPRDay } from './build-mock-merged-pr-day.ts';
 

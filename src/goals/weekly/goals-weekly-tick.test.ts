@@ -102,16 +102,16 @@ test('a green row says so, and the colour follows the unrounded share', () => {
 
 test('a week with days not fetched says so and gets no colour', () => {
   const ctx = setupTest();
-  fetchedDays(ctx.db, undefined, undefined, undefined, { prDays: ['2026-10-12', '2026-10-13'] });
+  fetchedDays(ctx.db, undefined, undefined, { unfetchedPRDays: ['2026-10-12', '2026-10-13'] });
   ctx.seed.linearIssue({ issue: 'GEO-1', type: 'Feature' });
   ctx.seed.mergedPR({ merged_at: '2026-10-14T03:00:00Z', issue: 'GEO-1' });
   const text = weeklyText(ctx.db, syd(MON, '17:00'));
   expect(row(text, 'Feature + Improvement share')).toContain('100% of 1 typed PRs, 2 day(s) not fetched | no data (0 typed PRs) | – |');
 });
 
-test('a week with a CI day not fetched says so and gets no colour', () => {
+test('it says a week with a CI day not fetched has no colour', () => {
   const ctx = setupTest();
-  fetchedDays(ctx.db, undefined, undefined, undefined, { ciDays: ['2026-10-08'] });
+  fetchedDays(ctx.db, undefined, undefined, { unfetchedCIDays: ['2026-10-08'] });
   const text = weeklyText(ctx.db, syd(MON, '17:00'));
   expect(row(text, 'CI minutes wasted')).toContain('| no data (0 CI min, 1 day(s) not fetched) |');
 });
@@ -333,7 +333,7 @@ test('health is red for a Monday whose data stayed stale', () => {
 
 test('the deploy-prod row names holds, no-apply runs and runs not yet classified, and gets no colour while any is unclassified', () => {
   const ctx = setupTest();
-  fetchedDays(ctx.db, undefined, undefined, ['atc', 'cloud']);
+  fetchedDays(ctx.db, undefined, undefined, { repos: ['atc', 'cloud'] });
   const add = (id: number, outcome: string | null) => {
     ctx.seed.ciRun({ id, repo: 'cloud', path: '.github/workflows/deploy-prod.yml', created_at: '2026-10-14T02:00:00Z', started_at: '2026-10-14T02:00:00Z', updated_at: '2026-10-14T02:10:00Z' });
     if (outcome) {

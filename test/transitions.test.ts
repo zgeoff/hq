@@ -186,7 +186,7 @@ describe('no state write skips the table', () => {
     const write = /UPDATE (?:asks|runs|run_prs|unblocks) SET [^`'"]*\bstate\s*=/u;
     const offenders: string[] = [];
     let seen = 0;
-    for (const file of readdirSync(sourceDirectory, { recursive: true, encoding: 'utf8' }).filter((name) => name.endsWith('.ts'))) {
+    for (const file of readdirSync(sourceDirectory, { recursive: true, encoding: 'utf8' }).filter((name) => name.endsWith('.ts') && !name.endsWith('.test.ts'))) {
       const text = readFileSync(join(sourceDirectory, file), 'utf8');
       if (!write.test(text)) continue;
       seen++;

@@ -285,7 +285,7 @@ test('stale merged-PR kinds or Linear types hold the check-in even when CI is fr
 
 test('the deploy-prod line names holds, no-apply runs and runs not yet classified', () => {
   const ctx = setupTest();
-  fetchedDays(ctx.db, undefined, undefined, ['atc', 'cloud']);
+  fetchedDays(ctx.db, undefined, undefined, { repos: ['atc', 'cloud'] });
   const add = (id: number, outcome: string | null) => {
     ctx.seed.ciRun({ id, repo: 'cloud', path: '.github/workflows/deploy-prod.yml' });
     if (outcome) {

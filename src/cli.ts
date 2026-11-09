@@ -1142,22 +1142,26 @@ async function statsCommand(db: Database, flags: Flags): Promise<Out> {
     if (!m) throw new HqError('not_found', `no mark ${flags.around}`);
     const at = Date.parse(m.at);
     const week = 7 * 86_400_000;
-    const before = readStats(db, { from: iso(new Date(at - week)), to: m.at, gh: null });
-    const after = readStats(db, { from: m.at, to: iso(new Date(Math.min(at + week, t.getTime()))), gh: null });
+    const beforeFrom = iso(new Date(at - week));
+    const afterToMs = Math.min(at + week, t.getTime());
+    const afterTo = iso(new Date(afterToMs));
+    const before = readStats(db, { from: beforeFrom, to: m.at, gh: null });
+    const after = readStats(db, { from: m.at, to: afterTo, gh: null });
     return { data: { mark: m, before, after }, text: compareText(m, before, after) };
   }
   const from = sinceArg(flags.since, t);
-  const s = readStats(db, { from, to: iso(t), gh: await ghMerges(db, from) });
+  const merges = await ghMerges(db, from);
+  const stats = readStats(db, { from, to: iso(t), gh: merges });
   const merged = mergedRuns(db, from, iso(t));
   const facts = await prFacts(db, realRunner, merged.flatMap((r) => r.prs), cleanEnv());
   const sizes = facts ? sizeStats(merged, facts) : null;
-  const marks = listMarks(db, s.window.from);
+  const marks = listMarks(db, stats.window.from);
   const reviews = reviewStats(db, t);
   await syncKinds(db, realRunner, { from: weeksBack(KIND_WEEKS, t), maxDays: 3, env: cleanEnv() }, t).catch(() => null);
   const kinds = kindWeeks(db, KIND_WEEKS, t);
   const goals = goalRows(db, 14, t);
-  const text = `${statsText(s)}\n\n${sizeText(sizes).join('\n')}\n\n${reviewText(reviews).join('\n')}\n\n${kindText(kinds, linearState(db)).join('\n')}\n\n${goalsText(goals, false).join('\n')}\n  (by day: hq goals)${marks.length ? `\n\nMarks in the window (hq stats --around ID):\n${marks.map((m) => `  ${m.id} ${m.at} [${m.kind}] ${m.text}`).join('\n')}` : ''}`;
-  return mergeAnswerWeeks({ data: { stats: s, sizes, reviews, kinds, goals: goals.weeks, marks }, text }, countAnswerWeeks(db, 4, t));
+  const text = `${statsText(stats)}\n\n${sizeText(sizes).join('\n')}\n\n${reviewText(reviews).join('\n')}\n\n${kindText(kinds, linearState(db)).join('\n')}\n\n${goalsText(goals, false).join('\n')}\n  (by day: hq goals)${marks.length > 0 ? `\n\nMarks in the window (hq stats --around ID):\n${marks.map((mark) => `  ${mark.id} ${mark.at} [${mark.kind}] ${mark.text}`).join('\n')}` : ''}`;
+  return mergeAnswerWeeks({ data: { stats, sizes, reviews, kinds, goals: goals.weeks, marks }, text }, countAnswerWeeks(db, 4, t));
 }
 
 async function resolveTarget(raw: string): Promise<{ id: string | null; name: string | null }> {
@@ -1349,8 +1353,8 @@ async function weeklyStats(db: Database, actor: string, run: Runner = realRunner
   return db
     .transaction(() => {
       if (getMeta(db, 'stats_weekly_last') === key) return false;
-      const s = readStats(db, { from, to: iso(t), gh });
-      addNews(db, { from: actor, topic: 'other', text: headline(s), issue: null, link: null, needsGeoff: false });
+      const stats = readStats(db, { from, to: iso(t), gh });
+      addNews(db, { from: actor, topic: 'other', text: headline(stats), issue: null, link: null, needsGeoff: false });
       setMeta(db, 'stats_weekly_last', key);
       return true;
     })

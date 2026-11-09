@@ -67,8 +67,19 @@ export async function syncRunsDay(db: Database, run: Runner, repo: string, day: 
   const start = Date.parse(`${day}T00:00:00Z`);
   await readWindow(start, start + 24 * HOUR);
   db.transaction(() => {
-    for (const r of rows.values()) {
-      writeCIRun(db, { id: r.id, repo, path: r.path, event: r.event, status: r.status, conclusion: r.conclusion, attempt: r.run_attempt, created_at: r.created_at, started_at: r.run_started_at, updated_at: r.updated_at });
+    for (const listed of rows.values()) {
+      writeCIRun(db, {
+        id: listed.id,
+        repo,
+        path: listed.path,
+        event: listed.event,
+        status: listed.status,
+        conclusion: listed.conclusion,
+        attempt: listed.run_attempt,
+        created_at: listed.created_at,
+        started_at: listed.run_started_at,
+        updated_at: listed.updated_at,
+      });
     }
     if (toUTCDay(at.getTime()) > day && [...rows.values()].every((r) => r.status === 'completed')) {
       upsertGoalDay(db, { kind: 'ci', key: repo, day, n: rows.size, at });

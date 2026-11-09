@@ -41,7 +41,6 @@ export async function scanRefusals(db: Database, options: ScanOptions = {}): Pro
   const late = () => performance.now() - startedMs >= (options.deadlineMs ?? DEADLINE_MS);
   const result: ScanResult = { files_read: 0, bytes_read: 0, refusals_added: 0, files_left: 0 };
   const known = new Map(readRefusalFiles(db).map((file) => [file.path, file]));
-  const writeFile = (path: string, offset: number, size: number, mtime: string, tools: string): void => writeRefusalFile(db, { path, offset, size, mtime, tools });
   const subagent = `${sep}subagents${sep}`;
   const markBytes = Buffer.from(MARK);
   const useBytes = Buffer.from('"tool_use"');
@@ -51,7 +50,7 @@ export async function scanRefusals(db: Database, options: ScanOptions = {}): Pro
     const mtime = iso(new Date(transcript.mtimeMs));
     const previous = known.get(transcript.path);
     if (!previous && now().getTime() - transcript.mtimeMs > windowMs) {
-      writeFile(transcript.path, transcript.size, transcript.size, mtime, '[]');
+      writeRefusalFile(db, { path: transcript.path, offset: transcript.size, size: transcript.size, mtime, tools: '[]' });
       continue;
     }
     const shrank = previous !== undefined && transcript.size < previous.offset;
@@ -59,7 +58,7 @@ export async function scanRefusals(db: Database, options: ScanOptions = {}): Pro
     const tools = shrank ? new Map<string, Tool>() : storedTools(previous?.tools ?? null);
     if (from >= transcript.size) {
       if (previous && (previous.offset !== from || previous.size !== transcript.size)) {
-        writeFile(transcript.path, from, transcript.size, mtime, JSON.stringify([...tools]));
+        writeRefusalFile(db, { path: transcript.path, offset: from, size: transcript.size, mtime, tools: JSON.stringify([...tools]) });
       }
       continue;
     }
@@ -137,7 +136,7 @@ export async function scanRefusals(db: Database, options: ScanOptions = {}): Pro
         });
         result.refusals_added += added ? 1 : 0;
       }
-      writeFile(transcript.path, stream.offset, transcript.size, mtime, JSON.stringify([...tools]));
+      writeRefusalFile(db, { path: transcript.path, offset: stream.offset, size: transcript.size, mtime, tools: JSON.stringify([...tools]) });
     }).immediate();
   }
   return result;

@@ -29,11 +29,17 @@ test('--help is generated from the rows: a changed summary shows in the text', (
 });
 
 test('every row resolves through the dispatcher lookup to itself', () => {
-  for (const c of COMMANDS) {
-    for (const noun of c.nouns) {
-      for (const verb of c.verbs ?? []) expect(findCommand(noun, verb)).toBe(c);
-      if (c.bare || c.verbs === null) expect(findCommand(noun, undefined)).toBe(c);
-      if (c.verbs === null) expect(findCommand(noun, 'no-such-verb')).toBe(c);
+  for (const command of COMMANDS) {
+    for (const noun of command.nouns) {
+      for (const verb of command.verbs ?? []) {
+        expect(findCommand(noun, verb)).toBe(command);
+      }
+      if (command.bare || command.verbs === null) {
+        expect(findCommand(noun, undefined)).toBe(command);
+      }
+      if (command.verbs === null) {
+        expect(findCommand(noun, 'no-such-verb')).toBe(command);
+      }
     }
   }
 });
@@ -105,12 +111,12 @@ test('every verb a group function handles has a row, or a catch-all row covers i
     const { verbs, bare } = verbsOf(fn);
     expect(verbs.length, fn).toBeGreaterThan(0);
     for (const verb of verbs) {
-      const c = findCommand(noun, verb);
-      expect(c && (c.verbs === null || c.verbs.includes(verb)), `${noun} ${verb}`).toBe(true);
+      const command = findCommand(noun, verb);
+      expect(command && (command.verbs === null || command.verbs.includes(verb)), `${noun} ${verb}`).toBe(true);
     }
     if (bare) {
-      const c = findCommand(noun, undefined);
-      expect(c && (c.bare || c.verbs === null), `${noun} with no verb`).toBe(true);
+      const command = findCommand(noun, undefined);
+      expect(command && (command.bare || command.verbs === null), `${noun} with no verb`).toBe(true);
     }
   }
 });
@@ -123,14 +129,13 @@ test('every noun cli.ts used to dispatch has a row', () => {
 });
 
 test('a read-only row is one that never writes: spot checks', () => {
-  const ro = (noun: string, verb?: string) => findCommand(noun, verb)!.readOnly;
-  expect(ro('status')).toBe(true);
-  expect(ro('run', 'list')).toBe(true);
-  expect(ro('call', 'list')).toBe(true);
-  expect(ro('run', 'add')).toBe(false);
-  expect(ro('hold')).toBe(false);
-  expect(ro('outbox', 'flush')).toBe(false);
-  expect(ro('stats')).toBe(false);
+  expect(findCommand('status', undefined)?.readOnly).toBe(true);
+  expect(findCommand('run', 'list')?.readOnly).toBe(true);
+  expect(findCommand('call', 'list')?.readOnly).toBe(true);
+  expect(findCommand('run', 'add')?.readOnly).toBe(false);
+  expect(findCommand('hold', undefined)?.readOnly).toBe(false);
+  expect(findCommand('outbox', 'flush')?.readOnly).toBe(false);
+  expect(findCommand('stats', undefined)?.readOnly).toBe(false);
 });
 
 let cleanup: () => void;

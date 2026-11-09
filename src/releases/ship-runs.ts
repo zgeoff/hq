@@ -140,9 +140,9 @@ export async function shipRuns(db: Database, run: Runner, at: Date = now(), opts
     return yes;
   };
 
-  const writeShipped = (s: PrState) => {
+  const writeShipped = (state: PrState) => {
     if (dryRun) return;
-    db.query('UPDATE run_prs SET merge_sha = ?, shipped_tag = ?, shipped_at = ? WHERE ref = ?').run(s.sha, s.tag, s.at, s.ref);
+    db.query('UPDATE run_prs SET merge_sha = ?, shipped_tag = ?, shipped_at = ? WHERE ref = ?').run(state.sha, state.tag, state.at, state.ref);
   };
 
   const deps = {

@@ -39,6 +39,7 @@ export async function syncDay(db: Database, run: Runner, day: string, env?: RunO
       }
     }
     if (done) {
+      // oxlint-disable-next-line eslint/id-length -- n is the stored merged_pr_days column
       writeMergedPRDay(db, { day, n: rows.length, at: iso(at) });
     }
   }).immediate();

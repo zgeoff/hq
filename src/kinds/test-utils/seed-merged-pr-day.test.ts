@@ -1,3 +1,4 @@
+// oxlint-disable eslint/id-length -- n is the stored merged_pr_days column
 import { expect, onTestFinished, test } from 'bun:test';
 import { freshDb } from '../../../test/helpers.ts';
 import { seedMergedPRDay } from './seed-merged-pr-day.ts';

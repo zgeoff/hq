@@ -184,7 +184,7 @@ test('ci waste is the minutes in failed or cancelled runs over all minutes', () 
 
 test('a past day not fetched leaves the measure incomplete, with no colour; today never counts', () => {
   const ctx = setupTest();
-  fetchedDays(ctx.db, undefined, undefined, undefined, { prDays: ['2026-10-16'] });
+  fetchedDays(ctx.db, undefined, undefined, { unfetchedPRDays: ['2026-10-16'] });
   ctx.seed.ciRun({ id: 1, updated_at: '2026-10-16T03:40:00Z' });
   expect(verdict(DEFAULT_TARGETS.ciwaste, ctx.readMeasures().ciwaste)).toBe('green');
   ctx.db.query(`DELETE FROM goal_days WHERE day = '2026-10-15'`).run();
@@ -196,9 +196,9 @@ test('a past day not fetched leaves the measure incomplete, with no colour; toda
   expect(ctx.readMeasures().bugs.missing).toBeUndefined();
 });
 
-test('a past day of merged PRs not fetched leaves the features measure incomplete, with no colour', () => {
+test('it leaves the features measure incomplete, with no colour, when a past day of merged PRs is not fetched', () => {
   const ctx = setupTest();
-  fetchedDays(ctx.db, undefined, undefined, undefined, { prDays: ['2026-10-15', '2026-10-16'] });
+  fetchedDays(ctx.db, undefined, undefined, { unfetchedPRDays: ['2026-10-15', '2026-10-16'] });
   ctx.seed.linearIssue({ issue: 'GEO-1', type: 'Feature' });
   ctx.seed.mergedPR({ number: 1, issue: 'GEO-1' });
   expect(ctx.readMeasures().features).toMatchObject({ value: 100, missing: 1 });
