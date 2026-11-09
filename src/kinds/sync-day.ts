@@ -11,6 +11,8 @@ import { issueOf } from './issue-of.ts';
 import { kindOf } from './kind-of.ts';
 import { parseContributedIssues } from './parse-contributed-issues.ts';
 import { toUTCDay as utcDay } from './to-utc-day.ts';
+import { writeMergedPR } from './write-merged-pr.ts';
+import { writeMergedPRDay } from './write-merged-pr-day.ts';
 
 const CAP = 1000; // gh search's most results per query: a full day means rows are missing
 
@@ -30,15 +32,15 @@ export async function syncDay(db: Database, run: Runner, day: string, env?: RunO
   const rows = all.filter((p) => inScope(p.repository.name));
   const done = utcDay(at.getTime()) > day;
   db.transaction(() => {
-    const up = db.query(`INSERT INTO merged_prs (repo, number, merged_at, title, kind, issue) VALUES (?, ?, ?, ?, ?, ?)
-      ON CONFLICT (repo, number) DO UPDATE SET merged_at = excluded.merged_at, title = excluded.title, kind = excluded.kind, issue = excluded.issue`);
     for (const pr of rows) {
-      up.run(pr.repository.name, pr.number, pr.closedAt, pr.title, kindOf(pr.title), issueOf(pr.body));
+      writeMergedPR(db, { repo: pr.repository.name, number: pr.number, merged_at: pr.closedAt, title: pr.title, kind: kindOf(pr.title), issue: issueOf(pr.body) });
       for (const issue of parseContributedIssues(pr.body)) {
         recordUmbrellaBox(db, { repo: pr.repository.name, number: pr.number, issue, mergedAt: pr.closedAt });
       }
     }
-    if (done) db.query('INSERT INTO merged_pr_days (day, n, at) VALUES (?, ?, ?) ON CONFLICT (day) DO UPDATE SET n = excluded.n, at = excluded.at').run(day, rows.length, iso(at));
+    if (done) {
+      writeMergedPRDay(db, { day, n: rows.length, at: iso(at) });
+    }
   }).immediate();
   return rows.length;
 }

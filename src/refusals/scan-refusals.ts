@@ -18,6 +18,8 @@ import { readRefusalFiles } from './read-refusal-files.ts';
 import { readSessionNames as whoBySession } from './read-session-names.ts';
 import { readTranscriptList as listTranscripts } from './read-transcript-list.ts';
 import type { Found, ScanOptions, ScanResult, Tool } from './types.ts';
+import { writeRefusal } from './write-refusal.ts';
+import { writeRefusalFile } from './write-refusal-file.ts';
 
 interface LineStream {
   readonly maxLine: number;
@@ -39,11 +41,7 @@ export async function scanRefusals(db: Database, options: ScanOptions = {}): Pro
   const late = () => performance.now() - startedMs >= (options.deadlineMs ?? DEADLINE_MS);
   const result: ScanResult = { files_read: 0, bytes_read: 0, refusals_added: 0, files_left: 0 };
   const known = new Map(readRefusalFiles(db).map((file) => [file.path, file]));
-  const save = db.query(
-    'INSERT INTO refusal_files (path, offset, size, mtime, tools) VALUES (?, ?, ?, ?, ?) ON CONFLICT (path) DO UPDATE SET offset = excluded.offset, size = excluded.size, mtime = excluded.mtime, tools = excluded.tools',
-  );
-  const add = db.query(`INSERT OR IGNORE INTO refusals (uuid, at, claude_session, transcript, subagent, cwd, atc_session, atc_name, issue, tool, input, reason, scanned_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, (SELECT issue FROM run_sessions WHERE session_id = ?), ?, ?, ?, ?)`);
+  const writeFile = (path: string, offset: number, size: number, mtime: string, tools: string): void => writeRefusalFile(db, { path, offset, size, mtime, tools });
   const subagent = `${sep}subagents${sep}`;
   const markBytes = Buffer.from(MARK);
   const useBytes = Buffer.from('"tool_use"');
@@ -53,7 +51,7 @@ export async function scanRefusals(db: Database, options: ScanOptions = {}): Pro
     const mtime = iso(new Date(transcript.mtimeMs));
     const previous = known.get(transcript.path);
     if (!previous && now().getTime() - transcript.mtimeMs > windowMs) {
-      save.run(transcript.path, transcript.size, transcript.size, mtime, '[]');
+      writeFile(transcript.path, transcript.size, transcript.size, mtime, '[]');
       continue;
     }
     const shrank = previous !== undefined && transcript.size < previous.offset;
@@ -61,7 +59,7 @@ export async function scanRefusals(db: Database, options: ScanOptions = {}): Pro
     const tools = shrank ? new Map<string, Tool>() : storedTools(previous?.tools ?? null);
     if (from >= transcript.size) {
       if (previous && (previous.offset !== from || previous.size !== transcript.size)) {
-        save.run(transcript.path, from, transcript.size, mtime, JSON.stringify([...tools]));
+        writeFile(transcript.path, from, transcript.size, mtime, JSON.stringify([...tools]));
       }
       continue;
     }
@@ -123,9 +121,23 @@ export async function scanRefusals(db: Database, options: ScanOptions = {}): Pro
     db.transaction(() => {
       for (const refusal of found) {
         const session = refusal.claude_session ? who.get(refusal.claude_session) : undefined;
-        result.refusals_added += add.run(refusal.uuid, refusal.at, refusal.claude_session, transcript.path, subagentFlag, refusal.cwd, session?.id ?? null, session?.name ?? null, session?.id ?? null, refusal.tool, refusal.input, refusal.reason, scannedAt).changes;
+        const added = writeRefusal(db, {
+          uuid: refusal.uuid,
+          at: refusal.at,
+          claude_session: refusal.claude_session,
+          transcript: transcript.path,
+          subagent: subagentFlag,
+          cwd: refusal.cwd,
+          atc_session: session?.id ?? null,
+          atc_name: session?.name ?? null,
+          tool: refusal.tool,
+          input: refusal.input,
+          reason: refusal.reason,
+          scanned_at: scannedAt,
+        });
+        result.refusals_added += added ? 1 : 0;
       }
-      save.run(transcript.path, stream.offset, transcript.size, mtime, JSON.stringify([...tools]));
+      writeFile(transcript.path, stream.offset, transcript.size, mtime, JSON.stringify([...tools]));
     }).immediate();
   }
   return result;

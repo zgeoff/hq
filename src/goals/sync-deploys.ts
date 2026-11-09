@@ -13,6 +13,7 @@ import { DEPLOY_BATCH } from './deploy-batch.ts';
 
 import { readGhJSON } from './read-gh-json.ts';
 import { toErrorMessage } from '../to-error-message.ts';
+import { writeDeployRun } from './write-deploy-run.ts';
 
 const TodoSchema = buildRowSchema('ci_runs').pick({ id: true, conclusion: true, attempt: true, created_at: true });
 
@@ -25,19 +26,18 @@ export async function syncDeploys(db: Database, run: Runner, env?: RunOpts['env'
   const errors: string[] = [];
   const oldErrors: string[] = [];
   let fetched = 0;
-  const ins = db.query('INSERT OR REPLACE INTO deploy_runs (run_id, outcome, attempt, apply_conclusion, failed_step, fetched_at) VALUES (?, ?, ?, ?, ?, ?)');
   const worker = async () => {
     for (let r = batch.shift(); r; r = batch.shift()) {
       try {
         const jobs = await readGhJSON(run, ['api', `repos/zgeoff/${DEPLOY.repo}/actions/runs/${r.id}/attempts/${r.attempt}/jobs?per_page=100`], env, `jobs of deploy-prod run ${r.id} attempt ${r.attempt}`);
         const c = classifyDeploy(jobs, r.conclusion);
         if (!c) throw new HqError('command_failed', `jobs of deploy-prod run ${r.id}: not a job list hq can read; not recorded`);
-        ins.run(r.id, c.outcome, r.attempt, c.apply_conclusion, c.failed_step, iso(at));
+        writeDeployRun(db, { run_id: r.id, outcome: c.outcome, attempt: r.attempt, apply_conclusion: c.apply_conclusion, failed_step: c.failed_step, fetched_at: iso(at) });
         fetched++;
       } catch (e) {
         const message = toErrorMessage(e);
         if (/HTTP 404|Not Found/u.test(message)) {
-          ins.run(r.id, 'unknown', r.attempt, null, null, iso(at));
+          writeDeployRun(db, { run_id: r.id, outcome: 'unknown', attempt: r.attempt, apply_conclusion: null, failed_step: null, fetched_at: iso(at) });
           fetched++;
         } else {
           (r.created_at >= since ? errors : oldErrors).push(message);

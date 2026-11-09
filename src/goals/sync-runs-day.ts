@@ -8,6 +8,7 @@ import { readGhJSON } from './read-gh-json.ts';
 import { NAME } from './name.ts';
 import { toUTCDay } from './to-utc-day.ts';
 import { upsertGoalDay } from './upsert-goal-day.ts';
+import { writeCIRun } from './write-ci-run.ts';
 
 const RunSchema = z.object({
   id: z.number().int().safe().positive(),
@@ -31,7 +32,7 @@ export async function syncRunsDay(db: Database, run: Runner, repo: string, day: 
   if (!NAME.test(repo) || /^\.+$/.test(repo)) throw new HqError('bad_args', `bad repo name ${repo}`);
   const rows = new Map<number, Run>();
   const stamp = (t: number) => new Date(t).toISOString().replace(/\.\d{3}Z$/, 'Z');
-  const fetchWindow = async (from: number, to: number): Promise<void> => {
+  const readWindow = async (from: number, to: number): Promise<void> => {
     const range = `${stamp(from)}..${stamp(to - 1000)}`;
     const got: Run[] = [];
     for (let page = 1; page <= 10; page++) {
@@ -46,8 +47,8 @@ export async function syncRunsDay(db: Database, run: Runner, repo: string, day: 
           throw new HqError('too_many', `${repo} has ${listed.total_count} runs in the hour from ${stamp(from)}, more than the API lists; not recorded`);
         }
         const mid = from + Math.ceil((to - from) / 2 / HOUR) * HOUR;
-        await fetchWindow(from, mid);
-        await fetchWindow(mid, to);
+        await readWindow(from, mid);
+        await readWindow(mid, to);
         return;
       }
       for (const entry of listed.workflow_runs) {
@@ -64,11 +65,11 @@ export async function syncRunsDay(db: Database, run: Runner, repo: string, day: 
     for (const r of got) rows.set(r.id, r);
   };
   const start = Date.parse(`${day}T00:00:00Z`);
-  await fetchWindow(start, start + 24 * HOUR);
+  await readWindow(start, start + 24 * HOUR);
   db.transaction(() => {
-    const up = db.query(`INSERT INTO ci_runs (id, repo, path, event, status, conclusion, attempt, created_at, started_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT (id) DO UPDATE SET status = excluded.status, conclusion = excluded.conclusion, attempt = excluded.attempt, started_at = excluded.started_at, updated_at = excluded.updated_at`);
-    for (const r of rows.values()) up.run(r.id, repo, r.path, r.event, r.status, r.conclusion, r.run_attempt, r.created_at, r.run_started_at, r.updated_at);
+    for (const r of rows.values()) {
+      writeCIRun(db, { id: r.id, repo, path: r.path, event: r.event, status: r.status, conclusion: r.conclusion, attempt: r.run_attempt, created_at: r.created_at, started_at: r.run_started_at, updated_at: r.updated_at });
+    }
     if (toUTCDay(at.getTime()) > day && [...rows.values()].every((r) => r.status === 'completed')) {
       upsertGoalDay(db, { kind: 'ci', key: repo, day, n: rows.size, at });
     }

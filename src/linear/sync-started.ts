@@ -5,6 +5,8 @@ import { HqError } from '../errors.ts';
 import { parseStartedPrs } from './parse-started-prs.ts';
 import type { StartedPr } from './parse-started-prs.ts';
 import type { LinearCall } from './types.ts';
+import { writeStartedIssue } from './write-started-issue.ts';
+import { writeStartedPR } from './write-started-pr.ts';
 
 const pageInfoSchema = z.object({ hasNextPage: z.boolean(), endCursor: z.string().nullable() });
 const attachmentsSchema = z.object({ nodes: z.array(z.unknown()), pageInfo: pageInfoSchema.nullish() });
@@ -69,12 +71,10 @@ function writeStarted(db: Database, started: readonly { issue: string; startedAt
   db.transaction(() => {
     db.query('DELETE FROM linear_started').run();
     db.query('DELETE FROM linear_started_prs').run();
-    const insert = db.query('INSERT INTO linear_started (issue, started_at, fetched_at) VALUES (?, ?, ?)');
-    const insertPr = db.query('INSERT INTO linear_started_prs (issue, ref, status, merged_at) VALUES (?, ?, ?, ?)');
     for (const row of started) {
-      insert.run(row.issue, row.startedAt, fetchedAt);
+      writeStartedIssue(db, { issue: row.issue, started_at: row.startedAt, fetched_at: fetchedAt });
       for (const pr of row.prs) {
-        insertPr.run(row.issue, pr.ref, pr.status, pr.mergedAt);
+        writeStartedPR(db, { issue: row.issue, ref: pr.ref, status: pr.status, merged_at: pr.mergedAt });
       }
     }
   }).immediate();
