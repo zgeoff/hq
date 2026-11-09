@@ -12,6 +12,9 @@ import { mondayOf } from '../src/kinds/monday-of.ts';
 import { readFetchedDays } from '../src/kinds/read-fetched-days.ts';
 import { syncDay } from '../src/kinds/sync-day.ts';
 import { syncKinds } from '../src/kinds/sync-kinds.ts';
+import { seedMergedPR } from '../src/kinds/test-utils/seed-merged-pr.ts';
+import { seedLinearIssue } from '../src/linear/test-utils/seed-linear-issue.ts';
+import { seedLinearIssueOfUnknownType } from '../src/linear/test-utils/seed-linear-issue-of-unknown-type.ts';
 import { syncLinear } from '../src/kinds/sync-linear.ts';
 import { makeLinearCaller } from '../src/linear/make-linear-caller.ts';
 import { pickIssueType as typeOf } from '../src/linear/pick-issue-type.ts';
@@ -154,15 +157,13 @@ test('it counts an issue Linear closed a millisecond into Monday in that week', 
 });
 
 test('each issue counts in the Sydney week it closed; the three bug shares', async () => {
-  const ins = db.query('INSERT INTO merged_prs (repo, number, merged_at, title, kind, issue) VALUES (?, ?, ?, ?, ?, ?)');
-  ins.run('atc', 1, '2026-10-12T01:00:00Z', 'fix: one', 'fix', 'GEO-1');
-  ins.run('atc', 2, '2026-10-12T02:00:00Z', 'feat: two', 'feat', 'GEO-2');
-  ins.run('atc', 3, '2026-10-12T03:00:00Z', 'runs: three', 'other', null);
-  ins.run('atc', 4, '2026-10-12T04:00:00Z', 'fix: four', 'fix', 'GEO-1');
-  const li = db.query(`INSERT INTO linear_issues (issue, type, title, state, closed_at, fetched_at) VALUES (?, ?, 't', ?, ?, '2026-10-16T00:00:00Z')`);
-  li.run('GEO-1', 'Bug', 'completed', '2026-10-11T13:30:00Z');
-  li.run('GEO-2', 'Feature', 'completed', '2026-10-11T12:30:00Z');
-  li.run('GEO-3', 'Chore', 'canceled', '2026-10-12T00:00:00Z');
+  seedMergedPR({ db }, { repo: 'atc', number: 1, merged_at: '2026-10-12T01:00:00Z', title: 'fix: one', kind: 'fix', issue: 'GEO-1' });
+  seedMergedPR({ db }, { repo: 'atc', number: 2, merged_at: '2026-10-12T02:00:00Z', title: 'feat: two', kind: 'feat', issue: 'GEO-2' });
+  seedMergedPR({ db }, { repo: 'atc', number: 3, merged_at: '2026-10-12T03:00:00Z', title: 'runs: three', kind: 'other', issue: null });
+  seedMergedPR({ db }, { repo: 'atc', number: 4, merged_at: '2026-10-12T04:00:00Z', title: 'fix: four', kind: 'fix', issue: 'GEO-1' });
+  seedLinearIssue({ db }, { issue: 'GEO-1', type: 'Bug', state: 'completed', closed_at: '2026-10-11T13:30:00Z' });
+  seedLinearIssue({ db }, { issue: 'GEO-2', type: 'Feature', state: 'completed', closed_at: '2026-10-11T12:30:00Z' });
+  seedLinearIssue({ db }, { issue: 'GEO-3', type: 'Chore', state: 'canceled', closed_at: '2026-10-12T00:00:00Z' });
   const [prev, cur] = kindWeeks(db, 2);
   expect(cur).toMatchObject({ from: '2026-10-11T13:00:00Z', partial: true, total: 4, bugShare: 50, prUnlinked: 1, prBugShare: 66.7, canceled: 1, issueBugShare: 100 });
   expect(cur!.issues).toMatchObject({ Bug: 1, Feature: 0 });
@@ -210,7 +211,7 @@ test('Linear ids hq did not ask for are not stored; an inherited type name count
   const call: LinearCall = async () => ({ issues: { nodes: [node('GEO-5', 'Bug'), node('GEO-999', 'Bug')] } });
   await syncPrIssues(db, call);
   expect(readLinearIssues(db).map((issue) => issue.issue)).toStrictEqual(['GEO-5']);
-  db.query(`UPDATE linear_issues SET type = 'constructor'`).run();
+  seedLinearIssueOfUnknownType({ db }, { issue: 'GEO-5', type: 'constructor' });
   const [w] = kindWeeks(db, 1);
   expect(w!.prTypes.none).toBe(1);
 });

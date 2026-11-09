@@ -18,6 +18,7 @@ import { watcherAlert } from '../src/watcher/watcher-alert.ts';
 import { watcherState } from '../src/watcher/watcher-state.ts';
 import { withDeadline } from '../src/watcher/with-deadline.ts';
 import { DEPLOY } from '../src/goals/deploy.ts';
+import { seedCIRun } from '../src/goals/test-utils/seed-ci-run.ts';
 import { addUnblock } from '../src/unblock/add-unblock.ts';
 import { getUnblock } from '../src/unblock/get-unblock.ts';
 import { at, fakeAtc, freshDb } from './helpers.ts';
@@ -208,19 +209,14 @@ function goalsRunner(): Runner {
   };
 }
 
-function storeDeployRuns(n: number) {
-  const ins = db.query(`INSERT INTO ci_runs (id, repo, path, event, status, conclusion, attempt, created_at, started_at, updated_at) VALUES (?, ?, ?, 'push', 'completed', 'success', 1, ?, ?, ?)`);
-  for (let i = 0; i < n; i++) {
-    const t = `2026-10-14T00:${String(i % 60).padStart(2, '0')}:00Z`;
-    ins.run(7000 + i, DEPLOY.repo, DEPLOY.path, t, t, t);
-  }
-}
-
 test('the watcher holds goals_ok_at while the cap leaves deploy-prod runs unclassified, and sets it once none are left', async () => {
   const old = '2026-10-15T10:00:00Z';
   setMeta(db, 'goals_synced_at', old);
   setMeta(db, 'goals_ok_at', old);
-  storeDeployRuns(61);
+  for (let index = 0; index < 61; index++) {
+    const created = `2026-10-14T00:${String(index % 60).padStart(2, '0')}:00Z`;
+    seedCIRun({ db }, { id: 7000 + index, repo: DEPLOY.repo, path: DEPLOY.path, created_at: created, started_at: created, updated_at: created });
+  }
   await watchTick(db, deps({}, goalsRunner()));
   expect(getMeta(db, 'goals_synced_at')).toBe('2026-10-15T20:00:00Z');
   expect(getMeta(db, 'goals_ok_at')).toBe(old);
