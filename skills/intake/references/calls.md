@@ -72,3 +72,9 @@ has no record. Relay nothing.
   `hq pr accept-risk <repo> <pr> <finding-id> --source <source> --note '<why>'`.
 
 Message `z-review` that each is on record. `calls.private.md` says which source counts.
+
+## Pushing the unblock list
+
+When hq says "unblock list changed", push the items `hq unblock new` lists in one
+`PushNotification`. Then run `hq unblock pushed --upto <N>`, with the highest item number it listed.
+Push nothing from 03:00 to 07:00 Sydney, or when an item only left the list.
