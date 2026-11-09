@@ -39,6 +39,7 @@ hq 0.79.0: headquarters for the z- sessions. Every command takes --json.
   hq run merged|closed <pr> [--superseded-by <repo#n>] | note <issue|session> <text> [--label L]
   hq run unmerge <pr> [--reason T]   undo a wrong merged mark: the PR is open again in hq (hq run merged asks GitHub first)
   hq run unfinal <pr> [--reason T]   clear a final mark the head has moved past; the sweep stops flagging the PR until the next final
+  hq run review-wait <pr> --until <ISO time|Ddd HH:MM> --reason T | --clear   the FINAL's review is known to wait until a date; the sweep stays quiet until then or until a new FINAL
 
   hq lanes [status|log] [--limit N]           watcher state, nudges and whether slots dropped
   hq lanes start [--interval SECONDS] | stop  install, enable and start the watcher unit (default every 300s); stop disables it
