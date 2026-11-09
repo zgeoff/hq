@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { buildMockSha } from '../../test/build-mock-sha.ts';
 import { buildStubFinalGH } from '../../test/build-stub-final-gh.ts';
 import { NOON_SYDNEY, at, freshDb } from '../../test/helpers.ts';
+import { findPRStatus } from '../pr-status/find-pr-status.ts';
 import { addPR } from './add-pr.ts';
 import { addRun } from './add-run.ts';
 import { finalPR } from './final-pr.ts';
@@ -125,6 +126,27 @@ test('it tells the reviewer the stored sha', async () => {
   finalPR(ctx.db, 'kettle#714', { sha: '44238662', actor: 'z-q', resolution });
 
   expect(ctx.db.query(`SELECT text FROM outbox WHERE target = 'z-review'`).all()).toStrictEqual([{ text: 'Final: GEO-9731 (kettle#714 at 4423866). Review it, then merge.' }]);
+});
+
+test('it hands the PR record next step to the reviewer', async () => {
+  const ctx = setupTest();
+  addRun(ctx.db, {
+    issue: 'GEO-9732',
+    title: 'Invented teapot work',
+    place: 'local',
+    session: null,
+    next: 'Agent working.',
+    gate: null,
+    geoffChat: false,
+    actor: 'z-delivery',
+  });
+  addPR(ctx.db, 'GEO-9732', 'teapot#88', 'z-delivery');
+
+  finalPR(ctx.db, 'teapot#88', { sha: buildMockSha(3), actor: 'z-q', resolution: null });
+
+  const status = await findPRStatus(ctx.db, 'teapot', 88);
+
+  expect(status?.next).toBe('z-review');
 });
 
 test('it records the sha of an earlier commit of the PR in full', async () => {

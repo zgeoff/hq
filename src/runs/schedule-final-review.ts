@@ -4,6 +4,7 @@ import { logEvent } from '../log-event.ts';
 import { iso } from '../clock/iso.ts';
 import { now } from '../clock/now.ts';
 import { enqueue } from '../outbox/enqueue.ts';
+import { upsertPRStatus } from '../pr-status/upsert-pr-status.ts';
 import { isPRActionAllowed } from '../transitions/is-pr-action-allowed.ts';
 import { requirePR as mustPR } from './require-pr.ts';
 import { REVIEWER } from './reviewer.ts';
@@ -31,7 +32,22 @@ export function scheduleFinalReview(db: Database, mark: FinalMark): boolean {
   const seq = logEvent(db, 'run', pr.issue, 'final', actor, pr.final_sha, sha, { ref, sha, source, note, ...describeResolution(given, resolution) });
   touch(db, pr.issue);
   enqueue(db, seq, REVIEWER, `Final: ${pr.issue} (${ref} at ${sha.slice(0, 7)}). Review it, then merge.`, `final:${ref}`);
+  writeReviewerNext(db, ref, actor);
   return true;
+}
+
+const BARE_REF = /^(?<repo>[\w.-]+)#(?<pr>\d+)$/u;
+
+// The PR record keys on zgeoff's bare repo name, so a ref with an owner gets no record.
+function writeReviewerNext(db: Database, ref: string, actor: string): void {
+  const parts = BARE_REF.exec(ref)?.groups;
+  if (parts?.['repo'] === undefined || parts['pr'] === undefined) {
+    return;
+  }
+  const repo = parts['repo'].toLowerCase();
+  const pr = Number(parts['pr']);
+  upsertPRStatus(db, repo, pr, { next: REVIEWER, next_at: iso(now()) });
+  logEvent(db, 'hq', `pr:${repo}#${pr}`, 'pr-next', actor, null, null, { next: REVIEWER });
 }
 
 function describeResolution(given: string, resolution: AcceptedFinal | null): Record<string, unknown> {
