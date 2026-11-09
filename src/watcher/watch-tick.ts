@@ -223,14 +223,24 @@ export async function watchTick(db: Database, d: WatchDeps): Promise<boolean> {
       d.log(`${at()} run issues in Linear failed: ${toErrorMessage(error)}`);
     }
     try {
-      const wrapUp = d.steps.wrapUpDeps?.();
-      try {
-        const closed = wrapUp ? await step('done design runs', () => closeDoneDesignRuns(db, wrapUp.deps, d.me)) : [];
-        if (closed.length > 0) {
-          d.log(`${at()} design runs: closed ${closed.join(', ')}, Done in Linear`);
-        }
-      } finally {
-        wrapUp?.close();
+      const buildWrapUpDeps = d.steps.wrapUpDeps;
+
+      // The atc client closes when the work settles: a step past its deadline keeps running.
+      const designRuns = buildWrapUpDeps
+        ? await step('done design runs', async () => {
+            const wrapUp = buildWrapUpDeps();
+            try {
+              return await closeDoneDesignRuns(db, wrapUp.deps, d.me);
+            } finally {
+              wrapUp.close();
+            }
+          })
+        : null;
+      if (designRuns && designRuns.closed.length > 0) {
+        d.log(`${at()} design runs: closed ${designRuns.closed.join(', ')}, Done in Linear`);
+      }
+      for (const problem of designRuns?.errors ?? []) {
+        d.log(`${at()} design runs: ${problem}`);
       }
     } catch (error) {
       d.log(`${at()} design runs failed: ${toErrorMessage(error)}`);

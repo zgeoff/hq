@@ -24,7 +24,9 @@ import { loadActionsSpend } from '../goals/load-actions-spend.ts';
 import { runGrantMarksTick } from '../grants/run-grant-marks-tick.ts';
 import { PROMOTABLE_FOCUS } from '../lanes/promotable-focus.ts';
 import { PROMOTABLE_FOCUS_KEY } from '../lanes/promotable-focus-key.ts';
+import { writeIssues } from '../linear/write-issues.ts';
 import { addRun } from '../runs/add-run.ts';
+import { buildRunSeeder } from '../runs/test-utils/build-run-seeder.ts';
 import { addUnblock } from '../unblock/add-unblock.ts';
 import { getUnblock } from '../unblock/get-unblock.ts';
 import { makePRStateGh } from '../../test/make-pr-state-gh.ts';
@@ -328,6 +330,37 @@ test('a due run-issue pass drops a run whose issue Linear canceled, tells z-deli
   expect(ctx.db.query('SELECT target FROM outbox').all()).toStrictEqual([{ target: 'z-delivery' }]);
   expect(logs.filter((line) => line.includes('run issues'))).toStrictEqual(['2026-10-15T20:00:00Z run issues: dropped KET-8, canceled in Linear before any merge']);
   expect(runIssueReads).toStrictEqual(['2026-10-15T20:00:00Z']);
+});
+
+test('it keeps the atc client of a design-run close open past the step deadline until its wrap-up settles', async () => {
+  const ctx = setupTest();
+  const capacity = JSON.stringify({ imp: { freeMib: 0, room: false }, providers: { claude: { room: false, unattended: true, target: 'imp' } } });
+  const answers: Record<string, string> = { op: 'lin_api_INVENTED\n', gh: '[]' };
+  const run: Runner = (command) => Promise.resolve({ code: 0, stdout: answers[command[0] ?? ''] ?? capacity, stderr: '' });
+  onTestFinished(overrideEnv('HQ_NOW', '2026-10-15T20:00:00Z'));
+  for (const key of ['kinds_synced_at', 'goals_synced_at', 'goals_ok_at', 'kinds_ok_at', 'linear_synced_at', 'lanes_ready_linear_at', 'run_issues_checked_at']) {
+    setMeta(ctx.db, key, '2026-10-15T20:00:00Z');
+  }
+  const seed = buildRunSeeder({ db: ctx.db });
+  seed.run({ issue: 'KET-11', title: 'Invented kettle design', place: 'local', design: 'with-geoff', designSlots: { agent: 2, withGeoff: 1 } });
+  seed.runSession({ issue: 'KET-11', session: '0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa' });
+  writeIssues(ctx.db, [{ issue: 'KET-11', type: 'Design', title: 'Invented kettle design', state: 'completed', closed_at: '2026-10-15T19:00:00Z' }]);
+  const held = Promise.withResolvers<never>();
+  const logs: string[] = [];
+  let closes = 0;
+  const wrapUpDeps = () => ({
+    deps: { openClient: () => held.promise, readImpWork: () => Promise.resolve({ state: 'pushed' as const }), readLocalWork: () => Promise.resolve({ state: 'pushed' as const }) },
+    close: () => {
+      closes += 1;
+    },
+  });
+
+  await watchTick(ctx.db, { me: 'hq-lanes', run, log: (line) => logs.push(line), stepMs: 200, steps: { runs: () => Promise.resolve(), weekly: () => Promise.resolve(false), health: () => Promise.resolve({ opened: [], cleared: [] }), wrapUpDeps } });
+  const closesAtDeadline = closes;
+  held.reject(new Error('invented: atc answered late'));
+  await waitFor('the given-up design-run close to stop', () => logs.some((line) => line.endsWith('done design runs from an earlier pass stopped')));
+
+  expect({ closesAtDeadline, closes }).toStrictEqual({ closesAtDeadline: 0, closes: 1 });
 });
 
 test('a run-issue pass drops nothing when this tick\'s GitHub pass did not read every PR', async () => {
