@@ -24,6 +24,7 @@ import { syncPRIssues } from '../src/linear/sync-pr-issues.ts';
 import type { LinearCall } from '../src/linear/types.ts';
 import type { Runner } from '../src/runner/types.ts';
 import { buildSeeder } from '../src/test-utils/build-seeder.ts';
+import { buildStubGitHubFactsRunner } from './build-stub-github-facts-runner.ts';
 import { at, freshDb } from './helpers.ts';
 
 function setupTest() {
@@ -188,7 +189,7 @@ test('a Linear failure is kept for the text and thrown', async () => {
   const call: LinearCall = async () => {
     throw new Error('invented outage');
   };
-  await expect(syncLinear(ctx.db, call, new Date('2026-10-14T00:00:00Z'))).rejects.toThrow('invented outage');
+  await expect(syncLinear(ctx.db, call, new Date('2026-10-14T00:00:00Z'), { run: buildStubGitHubFactsRunner({}) })).rejects.toThrow('invented outage');
   expect(linearState(ctx.db)).toStrictEqual({ syncedAt: null, error: 'invented outage' });
 });
 
@@ -236,7 +237,7 @@ test('the key never reaches an error or hq.db, even when Linear echoes it', asyn
   const down = buildMockFetch(() => Promise.reject(new Error(`socket closed after ${KEY}`)));
   try {
     for (const f of [echo, down]) {
-      const err = await syncLinear(ctx.db, makeLinearCaller(run, f), new Date('2026-10-14T00:00:00Z')).catch((error: unknown) => error);
+      const err = await syncLinear(ctx.db, makeLinearCaller(run, f), new Date('2026-10-14T00:00:00Z'), { run }).catch((error: unknown) => error);
       expect(toErrorMessage(err)).not.toContain('lin_api_');
       expect(linearState(ctx.db).error).not.toContain('lin_api_');
       expect(JSON.stringify(ctx.db.query('SELECT * FROM meta').all())).not.toContain(KEY);

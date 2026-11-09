@@ -29,6 +29,7 @@ function setupTest() {
   return {
     db: fresh.db,
     seed: buildSeeder(fresh),
+    run: buildStubGitHubFactsRunner({}),
     now,
     readOutbox: () => fresh.db.query('SELECT target, text FROM outbox ORDER BY id').all(),
     findLine: (name: string) =>
@@ -41,7 +42,7 @@ function setupTest() {
 test('hq goals daily --dry-run prints the issues, bad filings and stale lines with their targets and colours', async () => {
   const ctx = setupTest();
   ctx.seed.linearIssue({ issue: 'GEO-9810', type: 'Bug', closed_at: '2026-10-16T02:00:00Z' });
-  await syncLinear(ctx.db, makeThroughputLinearCall([buildFiledNode('GEO-9801', 'From widgets#7\n\nThe widget drops a retry.'), buildFiledNode('GEO-9802', 'Descale the kettle.')]), new Date('2026-10-14T00:00:00Z'), { at: new Date(ctx.now) });
+  await syncLinear(ctx.db, makeThroughputLinearCall([buildFiledNode('GEO-9801', 'From widgets#7\n\nThe widget drops a retry.'), buildFiledNode('GEO-9802', 'Descale the kettle.')]), new Date('2026-10-14T00:00:00Z'), { at: new Date(ctx.now), run: ctx.run });
   const printed: string[] = [];
   const log = console.log;
   console.log = (text: string) => printed.push(text);
@@ -75,7 +76,7 @@ test('a filing that points at a PR with no follow-up record is counted, and tria
       buildFiledNode('GEO-9803', 'No PR here.'),
     ]),
     new Date('2026-10-14T00:00:00Z'),
-    { at: new Date(ctx.now) },
+    { at: new Date(ctx.now), run: ctx.run },
   );
 
   const first = sendThroughputAlerts(ctx.db, 'hq-lanes', new Date('2026-10-14T00:00:00Z'), new Date(ctx.now));
@@ -94,7 +95,7 @@ test('a filing that points at a PR with no follow-up record is counted, and tria
 
 test('a filing z-review recorded is a review issue, not a bad filing, and sends nothing', async () => {
   const ctx = setupTest();
-  await syncLinear(ctx.db, makeThroughputLinearCall([buildFiledNode('GEO-9801', null, { attachments: { nodes: [{ url: 'https://github.com/zgeoff/widgets/pull/7' }] } })]), new Date('2026-10-14T00:00:00Z'), { at: new Date(ctx.now) });
+  await syncLinear(ctx.db, makeThroughputLinearCall([buildFiledNode('GEO-9801', null, { attachments: { nodes: [{ url: 'https://github.com/zgeoff/widgets/pull/7' }] } })]), new Date('2026-10-14T00:00:00Z'), { at: new Date(ctx.now), run: ctx.run });
   addFollowup(ctx.db, { issue: 'GEO-9801', fromRef: 'widgets#7', actor: 'z-review' });
 
   expect({ sent: sendThroughputAlerts(ctx.db, 'hq-lanes', new Date('2026-10-14T00:00:00Z'), new Date(ctx.now)), issues: ctx.findLine('Issues'), bad: ctx.findLine('Bad filings') }).toStrictEqual({
@@ -140,7 +141,7 @@ test('the issues line splits filings by source', async () => {
       buildFiledNode('GEO-9808', 'Filed yesterday in Sydney.', { createdAt: '2026-10-15T12:59:00Z' }),
     ]),
     new Date('2026-10-14T00:00:00Z'),
-    { at: new Date(ctx.now) },
+    { at: new Date(ctx.now), run: ctx.run },
   );
 
   expect(ctx.findLine('Issues')).toBe('- Issues: today 7 filed (owner 1, design 1, agent 1, review 0, live check 2, bot 2), 0 closed; target none –');
@@ -159,7 +160,7 @@ test('it alerts on an In Progress issue with no run and no PR, or an open run on
     { identifier: 'GEO-9802', startedAt: '2026-10-16T01:00:00Z' },
     { identifier: 'GEO-9803', startedAt: '2026-10-10T01:00:00Z' },
   ];
-  await syncLinear(ctx.db, makeThroughputLinearCall([], started), new Date('2026-10-14T00:00:00Z'), { at: new Date(ctx.now) });
+  await syncLinear(ctx.db, makeThroughputLinearCall([], started), new Date('2026-10-14T00:00:00Z'), { at: new Date(ctx.now), run: ctx.run });
 
   const first = sendThroughputAlerts(ctx.db, 'hq-lanes', new Date('2026-10-14T00:00:00Z'), new Date(ctx.now));
   const second = sendThroughputAlerts(ctx.db, 'hq-lanes', new Date('2026-10-14T00:00:00Z'), new Date(ctx.now));
@@ -192,7 +193,7 @@ test('the Linear sync stamps the filed and In Progress issues with the time it w
   const ctx = setupTest();
   const syncedAt = '2026-10-16T05:00:00Z';
 
-  await syncLinear(ctx.db, makeThroughputLinearCall([buildFiledNode('GEO-9801', 'Descale the kettle.')], [{ identifier: 'GEO-9802', startedAt: '2026-10-16T01:00:00Z' }]), new Date('2026-10-14T00:00:00Z'), { at: new Date(syncedAt) });
+  await syncLinear(ctx.db, makeThroughputLinearCall([buildFiledNode('GEO-9801', 'Descale the kettle.')], [{ identifier: 'GEO-9802', startedAt: '2026-10-16T01:00:00Z' }]), new Date('2026-10-14T00:00:00Z'), { at: new Date(syncedAt), run: ctx.run });
 
   expect({
     filed: ctx.db.query('SELECT issue, fetched_at FROM linear_filed').all(),
@@ -203,13 +204,13 @@ test('the Linear sync stamps the filed and In Progress issues with the time it w
 test('a failed read of the filed issues leaves the lines unavailable, with no colour and no alerts, until a read succeeds', async () => {
   const ctx = setupTest();
   const filed = [buildFiledNode('GEO-9801', 'From widgets#7\n\nThe widget drops a retry.')];
-  await syncLinear(ctx.db, makeThroughputLinearCall([]), new Date('2026-10-14T00:00:00Z'), { at: new Date('2026-10-16T06:00:00Z') });
+  await syncLinear(ctx.db, makeThroughputLinearCall([]), new Date('2026-10-14T00:00:00Z'), { at: new Date('2026-10-16T06:00:00Z'), run: ctx.run });
   const working = makeThroughputLinearCall(filed);
   const failing: LinearCall = (query, variables) => (query.includes('createdAt: {') ? Promise.reject(new Error('Linear answered 502: invented outage')) : working(query, variables));
 
-  const failure = await syncLinear(ctx.db, failing, new Date('2026-10-14T00:00:00Z'), { at: new Date(ctx.now) }).catch((error: unknown) => error);
+  const failure = await syncLinear(ctx.db, failing, new Date('2026-10-14T00:00:00Z'), { at: new Date(ctx.now), run: ctx.run }).catch((error: unknown) => error);
   const failed = { line: ctx.findLine('Bad filings'), sent: sendThroughputAlerts(ctx.db, 'hq-lanes', new Date('2026-10-14T00:00:00Z'), new Date(ctx.now)) };
-  await syncLinear(ctx.db, working, new Date('2026-10-14T00:00:00Z'), { at: new Date(ctx.now) });
+  await syncLinear(ctx.db, working, new Date('2026-10-14T00:00:00Z'), { at: new Date(ctx.now), run: ctx.run });
 
   expect({ failure, failed, recovered: ctx.findLine('Bad filings') }).toStrictEqual({
     failure: new Error('Linear answered 502: invented outage'),
@@ -220,7 +221,7 @@ test('a failed read of the filed issues leaves the lines unavailable, with no co
 
 test('a filing read just after Sydney midnight but filed just before it still alerts, and stays off the line for today', async () => {
   const ctx = setupTest();
-  await syncLinear(ctx.db, makeThroughputLinearCall([buildFiledNode('GEO-9801', 'From widgets#7\n\nThe widget drops a retry.', { createdAt: '2026-10-15T12:55:00Z' })]), new Date('2026-10-14T00:00:00Z'), { at: new Date(ctx.now) });
+  await syncLinear(ctx.db, makeThroughputLinearCall([buildFiledNode('GEO-9801', 'From widgets#7\n\nThe widget drops a retry.', { createdAt: '2026-10-15T12:55:00Z' })]), new Date('2026-10-14T00:00:00Z'), { at: new Date(ctx.now), run: ctx.run });
 
   expect({ sent: sendThroughputAlerts(ctx.db, 'hq-lanes', new Date('2026-10-14T07:00:00Z'), new Date(ctx.now)), line: ctx.findLine('Bad filings') }).toStrictEqual({
     sent: ['bad-filing:GEO-9801'],
@@ -235,7 +236,7 @@ test('an In Progress issue with an active session and no open run is not stale',
   at('2026-10-14T07:00:00Z');
   ctx.seed.runSession({ issue: 'GEO-9801', session: 'a0000001-aaaa-4aaa-8aaa-aaaaaaaaaaaa' });
   at(ctx.now);
-  await syncLinear(ctx.db, makeThroughputLinearCall([], [{ identifier: 'GEO-9801', startedAt: '2026-10-14T07:00:00Z' }]), new Date('2026-10-14T00:00:00Z'), { at: new Date(ctx.now) });
+  await syncLinear(ctx.db, makeThroughputLinearCall([], [{ identifier: 'GEO-9801', startedAt: '2026-10-14T07:00:00Z' }]), new Date('2026-10-14T00:00:00Z'), { at: new Date(ctx.now), run: ctx.run });
 
   expect({ sent: sendThroughputAlerts(ctx.db, 'hq-lanes', new Date('2026-10-14T00:00:00Z'), new Date(ctx.now)), line: ctx.findLine('Stale') }).toStrictEqual({
     sent: [],
@@ -246,7 +247,7 @@ test('an In Progress issue with an active session and no open run is not stale',
 test('it says the merge time is unknown when Linear gives none, and ages the issue from its start', async () => {
   const ctx = setupTest();
   const started = [{ identifier: 'GEO-9811', startedAt: '2026-10-10T07:00:00Z', attachments: [buildGithubAttachment(9, 'merged')] }];
-  await syncLinear(ctx.db, makeThroughputLinearCall([], started), new Date('2026-10-14T00:00:00Z'), { at: new Date(ctx.now) });
+  await syncLinear(ctx.db, makeThroughputLinearCall([], started), new Date('2026-10-14T00:00:00Z'), { at: new Date(ctx.now), run: ctx.run });
 
   sendThroughputAlerts(ctx.db, 'hq-lanes', new Date('2026-10-14T00:00:00Z'), new Date(ctx.now));
 
@@ -265,7 +266,7 @@ test('it sends a done-but-open issue to triage 24 hours after its last merge and
     { identifier: 'GEO-9805', startedAt: '2026-10-10T07:00:00Z', attachments: [buildGithubAttachment(6, 'merged', '2026-10-12T07:00:00Z'), buildGithubAttachment(7, 'open')] },
     { identifier: 'GEO-9806', startedAt: '2026-10-10T07:00:00Z', attachments: [buildGithubAttachment(8, 'draft')] },
   ];
-  await syncLinear(ctx.db, makeThroughputLinearCall([], started), new Date('2026-10-14T00:00:00Z'), { at: new Date(ctx.now) });
+  await syncLinear(ctx.db, makeThroughputLinearCall([], started), new Date('2026-10-14T00:00:00Z'), { at: new Date(ctx.now), run: ctx.run });
 
   const first = sendThroughputAlerts(ctx.db, 'hq-lanes', new Date('2026-10-14T00:00:00Z'), new Date(ctx.now));
   const second = sendThroughputAlerts(ctx.db, 'hq-lanes', new Date('2026-10-14T00:00:00Z'), new Date(ctx.now));
@@ -299,7 +300,7 @@ test('it alerts on an In Review issue whose run is past merge or dropped, or tha
     { identifier: 'GEO-9806', updatedAt: '2026-10-15T07:00:00Z' },
     { identifier: 'GEO-9807', updatedAt: '2026-10-13T07:00:00Z' },
   ];
-  await syncLinear(ctx.db, makeThroughputLinearCall([], [], inReview), new Date('2026-10-14T00:00:00Z'), { at: new Date(ctx.now) });
+  await syncLinear(ctx.db, makeThroughputLinearCall([], [], inReview), new Date('2026-10-14T00:00:00Z'), { at: new Date(ctx.now), run: ctx.run });
 
   const first = sendThroughputAlerts(ctx.db, 'hq-lanes', new Date('2026-10-14T00:00:00Z'), new Date(ctx.now));
 
@@ -319,7 +320,7 @@ test('it alerts on a stuck In Review issue that an open owner task names, since 
   const ctx = setupTest();
   ctx.seed.mergedRun({ issue: 'GEO-9801' });
   addUnblock(ctx.db, { id: 'kettle-descale', task: 'Descale the kettle', minutes: 5, unblocks: [{ issue: 'GEO-9801', priority: 'none' }], notify: [], actor: 'z-triage', kind: 'owner' });
-  await syncLinear(ctx.db, makeThroughputLinearCall([], [], [{ identifier: 'GEO-9801', updatedAt: '2026-10-13T07:00:00Z' }]), new Date('2026-10-14T00:00:00Z'), { at: new Date(ctx.now) });
+  await syncLinear(ctx.db, makeThroughputLinearCall([], [], [{ identifier: 'GEO-9801', updatedAt: '2026-10-13T07:00:00Z' }]), new Date('2026-10-14T00:00:00Z'), { at: new Date(ctx.now), run: ctx.run });
 
   const sent = sendThroughputAlerts(ctx.db, 'hq-lanes', new Date('2026-10-14T00:00:00Z'), new Date(ctx.now));
 

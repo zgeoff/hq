@@ -1,7 +1,6 @@
 import type { Database } from 'bun:sqlite';
 import { z } from 'zod';
 import { iso } from '../clock/iso.ts';
-import { now } from '../clock/now.ts';
 import { HqError } from '../errors.ts';
 import type { Runner } from '../runner/types.ts';
 import { collectEarlierPRAttachments, findExplicitSource, findPRLink, findPointedPR } from './find-pointed-pr.ts';
@@ -26,13 +25,12 @@ const pageInfoSchema = z.object({ hasNextPage: z.boolean(), endCursor: z.string(
 const filedPageSchema = z.object({ issues: z.object({ nodes: z.array(filedNodeSchema), pageInfo: pageInfoSchema }) });
 
 interface SyncFiledOptions {
-  to?: Date;
-  run?: Runner | undefined;
+  to: Date;
+  run: Runner;
 }
 
-export async function syncFiled(db: Database, call: LinearCall, from: Date, options: SyncFiledOptions = {}): Promise<number> {
-  const to = options.to ?? now();
-  const run = options.run;
+export async function syncFiled(db: Database, call: LinearCall, from: Date, options: SyncFiledOptions): Promise<number> {
+  const to = options.to;
   const query = `query($after: String, $from: DateTimeOrDuration!, $to: DateTimeOrDuration!) {
     issues(first: 100, after: $after, includeArchived: true, filter: { createdAt: { gte: $from, lt: $to } }) {
       nodes { identifier title createdAt description creator { app } labels { nodes { name } } attachments { nodes { url metadata } } }
@@ -52,7 +50,7 @@ export async function syncFiled(db: Database, call: LinearCall, from: Date, opti
 
       // A null creator is an issue an integration filed, with no Linear user behind it.
       const source = pickFiledSource({ title: node.title, description, labels, isBotCreator: node.creator === null || node.creator.app });
-      const attachments = await readAttachments(run, node.attachments.nodes, description, node.createdAt);
+      const attachments = await readAttachments(options.run, node.attachments.nodes, description, node.createdAt);
       rows.push({ node, source, pointedPR: findPointedPR(description, attachments, node.createdAt, node.identifier) });
     }
     db.transaction(() => {
@@ -70,9 +68,9 @@ export async function syncFiled(db: Database, call: LinearCall, from: Date, opti
 }
 
 // Only an attachment that would otherwise count as the source PR costs a GitHub call.
-async function readAttachments(run: Runner | undefined, nodes: readonly z.infer<typeof attachmentSchema>[], description: string, issueCreatedAt: string): Promise<PRAttachment[]> {
+async function readAttachments(run: Runner, nodes: readonly z.infer<typeof attachmentSchema>[], description: string, issueCreatedAt: string): Promise<PRAttachment[]> {
   const attachments: PRAttachment[] = nodes.map((attachment) => ({ url: attachment.url, openedAt: attachment.metadata?.createdAt ?? null }));
-  if (run === undefined || findExplicitSource(description) !== null) {
+  if (findExplicitSource(description) !== null) {
     return attachments;
   }
   for (const attachment of collectEarlierPRAttachments(attachments, issueCreatedAt)) {

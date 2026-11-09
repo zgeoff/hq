@@ -14,10 +14,10 @@ import { toErrorMessage } from '../to-error-message.ts';
 
 interface SyncLinearOptions {
   at?: Date;
-  run?: Runner;
+  run: Runner;
 }
 
-export async function syncLinear(db: Database, call: LinearCall, from: Date, options: SyncLinearOptions = {}): Promise<{ closed: number; typed: number; filed: number; started: number; inReview: number }> {
+export async function syncLinear(db: Database, call: LinearCall, from: Date, options: SyncLinearOptions): Promise<{ closed: number; typed: number; filed: number; started: number; inReview: number }> {
   const at = options.at ?? now();
   let closed = 0;
   let typed = 0;

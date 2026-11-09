@@ -1,4 +1,5 @@
 import { expect, onTestFinished, test } from 'bun:test';
+import { buildStubGitHubFactsRunner } from '../../test/build-stub-github-facts-runner.ts';
 import { freshDb } from '../../test/helpers.ts';
 import { syncFiled } from './sync-filed.ts';
 
@@ -7,7 +8,7 @@ function setupTest() {
 
   onTestFinished(fresh.cleanup);
 
-  return { db: fresh.db };
+  return { db: fresh.db, run: buildStubGitHubFactsRunner({}) };
 }
 
 test('it stores the PR attachment that opened before the issue, and skips one that opened after or has no open time', async () => {
@@ -45,7 +46,7 @@ test('it stores the PR attachment that opened before the issue, and skips one th
       ],
       pageInfo: { hasNextPage: false, endCursor: null },
     },
-  }), new Date('2026-10-21T00:00:00Z'), { to: new Date('2026-10-22T00:00:00Z') });
+  }), new Date('2026-10-21T00:00:00Z'), { to: new Date('2026-10-22T00:00:00Z'), run: ctx.run });
 
   expect(read).toBe(3);
   expect(ctx.db.query('SELECT issue, pr_ref FROM linear_filed ORDER BY issue').all()).toStrictEqual([
