@@ -20,6 +20,7 @@ import { goalsWeeklyTick } from '../goals/weekly/goals-weekly-tick.ts';
 import { syncKinds } from '../kinds/sync-kinds.ts';
 import { syncLinear } from '../kinds/sync-linear.ts';
 import { syncRunIssues } from '../linear/sync-run-issues.ts';
+import { closeDoneDesignRuns } from '../runs/close-done-design-runs.ts';
 import { dropCanceledRuns } from '../runs/drop-canceled-runs.ts';
 import { readCapacity } from '../lanes/read-capacity.ts';
 import { readPacingLanes } from '../lanes/read-pacing-lanes.ts';
@@ -220,6 +221,29 @@ export async function watchTick(db: Database, d: WatchDeps): Promise<boolean> {
       }
     } catch (error) {
       d.log(`${at()} run issues in Linear failed: ${toErrorMessage(error)}`);
+    }
+    try {
+      const buildWrapUpDeps = d.steps.buildWrapUpDeps;
+
+      // The atc client closes when the work settles: a step past its deadline keeps running.
+      const designRuns = buildWrapUpDeps
+        ? await step('done design runs', async () => {
+            const wrapUp = buildWrapUpDeps();
+            try {
+              return await closeDoneDesignRuns(db, wrapUp.deps, d.me);
+            } finally {
+              wrapUp.close();
+            }
+          })
+        : null;
+      if (designRuns && designRuns.closed.length > 0) {
+        d.log(`${at()} design runs: closed ${designRuns.closed.join(', ')}, Done in Linear`);
+      }
+      for (const problem of designRuns?.errors ?? []) {
+        d.log(`${at()} design runs: ${problem}`);
+      }
+    } catch (error) {
+      d.log(`${at()} design runs failed: ${toErrorMessage(error)}`);
     }
     try {
       if (sampleUsage(db)) d.log(`${at()} Claude usage: new reading stored`);
