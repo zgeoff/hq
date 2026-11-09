@@ -1,4 +1,6 @@
-import { afterEach, beforeEach, expect, test } from 'bun:test';
+// oxlint-disable zgeoff/test-beside-module -- the whole-program capabilities suite, run through the CLI
+import { expect, onTestFinished, spyOn, test } from 'bun:test';
+import { updateEnv } from '@zgeoff/testing/helpers';
 import { isRecord } from '@zgeoff/std';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -25,79 +27,70 @@ import { seedReviewRound } from '../src/noslop/test-utils/seed-review-round.ts';
 import { NOON_SYDNEY, at, fakeAtc, freshDb } from './helpers.ts';
 import { FAKE_FULL_SHA, FAKE_TOKEN, buildFakeRunner } from './noslop-fake.ts';
 
-let db: ReturnType<typeof freshDb>['db'];
-let dir: string;
-let cleanup: () => void;
-let out: string[];
-beforeEach(() => {
-  ({ db, dir, cleanup } = freshDb());
-  const removeFreshDb = cleanup;
-  const originalError = console.error;
-  const originalLog = console.log;
+function setupTest() {
+  // freshDb assigns HQ_DB itself, so record the value the preload puts back before it runs.
+  updateEnv('HQ_DB', process.env['HQ_DB']);
+  const fresh = freshDb();
+  onTestFinished(fresh.cleanup);
+  updateEnv('HQ_NOTIFY', 'off');
+  updateEnv('HQ_AS', 'z-stu');
+  const out: string[] = [];
+  const log = spyOn(console, 'log').mockImplementation((line: string) => out.push(line));
+  onTestFinished(() => log.mockRestore());
+  const error = spyOn(console, 'error').mockImplementation((line: string) => out.push(line));
+  onTestFinished(() => error.mockRestore());
 
-  // The noslop review test sets the last four.
-  const savedEnv = ['HQ_NOTIFY', 'HQ_AS', 'HQ_DB', 'HQ_NOSLOP_OP_SETTINGS', 'REVIEW_DIR', 'HQ_PROJECTS', 'HQ_REPOS'].map((name) => [name, process.env[name]] as const);
-  cleanup = () => {
-    console.log = originalLog;
-    console.error = originalError;
-    for (const [name, value] of savedEnv) {
-      if (value === undefined) {
-        delete process.env[name];
-      } else {
-        process.env[name] = value;
-      }
-    }
-    removeFreshDb();
+  return {
+    db: fresh.db,
+    directory: fresh.dir,
+    out,
+    hq: async (...argv: string[]) => {
+      out.length = 0;
+      const code = await main([...argv, '--json']);
+      const json: unknown = JSON.parse(out.join('\n'));
+      return { code, json };
+    },
   };
-  at(NOON_SYDNEY);
-  process.env['HQ_NOTIFY'] = 'off';
-  process.env['HQ_AS'] = 'z-stu';
-  out = [];
-  console.log = (s: string) => out.push(s);
-  console.error = (s: string) => out.push(s);
-});
-afterEach(() => {
-  cleanup();
-});
-
-const hq = async (...argv: string[]) => {
-  out = [];
-  const code = await main([...argv, '--json']);
-  const json: unknown = JSON.parse(out.join('\n'));
-  return { code, json };
-};
+}
 
 test('--json gives the version, schema, commands, transitions, roles and shapes', async () => {
-  const { code, json } = await hq('capabilities');
-  expect(code).toBe(0);
-  expect(findPath(json, 'ok')).toBe(true);
-  const keys = Object.keys(z.record(z.string(), z.unknown()).parse(json));
+  const ctx = setupTest();
+  at(NOON_SYDNEY);
+  const answer = await ctx.hq('capabilities');
+  expect(answer.code).toBe(0);
+  expect(findPath(answer.json, 'ok')).toBe(true);
+  const keys = Object.keys(z.record(z.string(), z.unknown()).parse(answer.json));
   expect(keys.toSorted()).toStrictEqual(['commands', 'ok', 'roles', 'schema', 'shapes', 'transitions', 'version']);
-  expect(findPath(json, 'version')).toBe(VERSION);
-  expect(findPath(json, 'schema')).toBe(SCHEMA_VERSION);
-  expect(findPath(json, 'shapes')).toStrictEqual(SHAPES);
-  expect(findPath(json, 'roles')).toStrictEqual(rolesByName());
+  expect(findPath(answer.json, 'version')).toBe(VERSION);
+  expect(findPath(answer.json, 'schema')).toBe(SCHEMA_VERSION);
+  expect(findPath(answer.json, 'shapes')).toStrictEqual(SHAPES);
+  expect(findPath(answer.json, 'roles')).toStrictEqual(rolesByName());
 });
 
 test('commands are the registry rows, data only', async () => {
-  const { json } = await hq('capabilities');
+  const ctx = setupTest();
+  at(NOON_SYDNEY);
+  const answer = await ctx.hq('capabilities');
   const commandSchema = z.looseObject({ usage: z.string(), nouns: z.array(z.string()), readOnly: z.boolean() });
-  const commands = z.array(commandSchema).parse(findPath(json, 'commands'));
+  const commands = z.array(commandSchema).parse(findPath(answer.json, 'commands'));
   const expected = COMMANDS.map((command) => ({ nouns: command.nouns, verbs: command.verbs, bare: command.bare, usage: command.usage, summary: command.summary, section: command.section, readOnly: command.readOnly }));
-  expect(findPath(json, 'commands')).toStrictEqual(expected);
+  expect(findPath(answer.json, 'commands')).toStrictEqual(expected);
   const self = commands.find((command) => command.nouns.includes('capabilities'));
   expect(self?.readOnly).toBe(true);
 });
 
 test('transitions are the exported tables', async () => {
-  const { json } = await hq('capabilities');
-  expect(findPath(json, 'transitions')).toStrictEqual(structuredClone({ ask: ASK_TRANSITIONS, run: RUN_TRANSITIONS, pr: PR_TRANSITIONS }));
+  const ctx = setupTest();
+  at(NOON_SYDNEY);
+  const answer = await ctx.hq('capabilities');
+  expect(findPath(answer.json, 'transitions')).toStrictEqual(structuredClone({ ask: ASK_TRANSITIONS, run: RUN_TRANSITIONS, pr: PR_TRANSITIONS }));
 });
 
 test('text mode is a short summary', async () => {
-  out = [];
+  const ctx = setupTest();
+  at(NOON_SYDNEY);
   expect(await main(['capabilities'])).toBe(0);
-  const text = out.join('\n');
+  const text = ctx.out.join('\n');
   expect(text).toContain(`hq ${VERSION} (schema v${SCHEMA_VERSION})`);
   expect(text).toContain(`${COMMANDS.length} commands (${COMMANDS.filter((c) => c.readOnly).length} read-only)`);
   for (const name of Object.keys(SHAPES)) expect(text).toContain(name);
@@ -108,16 +101,19 @@ test('help lists capabilities', () => {
 });
 
 test('--require: older fails with too_old, equal and newer pass, bad input is bad_args', async () => {
-  const older = await hq('capabilities', '--require', '99.0.0');
+  const ctx = setupTest();
+  at(NOON_SYDNEY);
+  const older = await ctx.hq('capabilities', '--require', '99.0.0');
   expect(older.code).toBe(1);
   expect(older.json).toStrictEqual({ ok: false, error: { code: 'too_old', message: `hq ${VERSION} is older than 99.0.0: run bun run install-bin in ~/projects/hq` } });
-  expect((await hq('capabilities', '--require', VERSION)).code).toBe(0);
-  const newer = await hq('capabilities', '--require', '0.1.0');
+  const equal = await ctx.hq('capabilities', '--require', VERSION);
+  expect(equal.code).toBe(0);
+  const newer = await ctx.hq('capabilities', '--require', '0.1.0');
   expect(findPath(newer.json, 'version')).toBe(VERSION);
   for (const bad of ['1.2', 'v1.2.3', '1.2.3-rc1', 'latest', '']) {
-    const r = await hq('capabilities', '--require', bad);
-    expect(r.code, bad).toBe(1);
-    expect(findPath(r.json, 'error', 'code'), bad).toBe('bad_args');
+    const refused = await ctx.hq('capabilities', '--require', bad);
+    expect(refused.code, bad).toBe(1);
+    expect(findPath(refused.json, 'error', 'code'), bad).toBe('bad_args');
   }
 });
 
@@ -135,12 +131,17 @@ test('package.json carries the same version as VERSION', () => {
 });
 
 test('capabilities does not open the db; a command that does would', async () => {
-  const gone = join(dir, 'missing', 'hq.db');
-  process.env['HQ_DB'] = gone;
-  expect((await hq('capabilities')).code).toBe(0);
-  expect((await hq('version')).code).toBe(0);
-  expect(existsSync(join(dir, 'missing'))).toBe(false);
-  expect((await hq('status')).code).toBe(0);
+  const ctx = setupTest();
+  at(NOON_SYDNEY);
+  const gone = join(ctx.directory, 'missing', 'hq.db');
+  updateEnv('HQ_DB', gone);
+  const capabilities = await ctx.hq('capabilities');
+  expect(capabilities.code).toBe(0);
+  const version = await ctx.hq('version');
+  expect(version.code).toBe(0);
+  expect(existsSync(join(ctx.directory, 'missing'))).toBe(false);
+  const status = await ctx.hq('status');
+  expect(status.code).toBe(0);
   expect(existsSync(gone)).toBe(true);
 });
 
@@ -175,7 +176,9 @@ function checkShape(name: string, actual: unknown): void {
 }
 
 test('shape: status', async () => {
-  const status = await hq('status');
+  const ctx = setupTest();
+  at(NOON_SYDNEY);
+  const status = await ctx.hq('status');
   const keys = SHAPES['status']?.keys ?? [];
 
   expect(keys).not.toHaveLength(0);
@@ -183,8 +186,10 @@ test('shape: status', async () => {
 });
 
 test('shape: fleet', async () => {
-  setMeta(db, 'fleet_last', JSON.stringify({ at: '2026-10-14T01:00:00Z', dryRun: false, steps: [{ name: 'z-kettle', action: 'ok', detail: 'invented', id: 'id-kettle' }] }));
-  const fleet = await hq('fleet');
+  const ctx = setupTest();
+  at(NOON_SYDNEY);
+  setMeta(ctx.db, 'fleet_last', JSON.stringify({ at: '2026-10-14T01:00:00Z', dryRun: false, steps: [{ name: 'z-kettle', action: 'ok', detail: 'invented', id: 'id-kettle' }] }));
+  const fleet = await ctx.hq('fleet');
   const keys = SHAPES['fleet']?.keys ?? [];
 
   expect(keys).not.toHaveLength(0);
@@ -192,12 +197,14 @@ test('shape: fleet', async () => {
 });
 
 test('shape: fleet shows promptCheck for a declared session that is live in atc, and says so in the text', async () => {
-  const atc = fakeAtc(dir);
+  const ctx = setupTest();
+  at(NOON_SYDNEY);
+  const atc = fakeAtc(ctx.directory);
   try {
-    const plain = await hq('fleet');
+    const plain = await ctx.hq('fleet');
     const checkedSchema = z.object({ promptCheck: z.unknown().optional() });
     expect(z.object({ declared: z.array(checkedSchema) }).parse(plain.json).declared.every((entry) => entry.promptCheck === undefined)).toBe(true);
-    const prompted = await hq('fleet', '--prompts');
+    const prompted = await ctx.hq('fleet', '--prompts');
     const entrySchema = z.object({ name: z.string(), prompt: z.string(), promptCheck: z.unknown().optional() });
     const json = z.object({ declared: z.array(entrySchema) }).parse(prompted.json);
     const stu = json.declared.find((e) => e.name === 'z-stu')!;
@@ -205,9 +212,9 @@ test('shape: fleet shows promptCheck for a declared session that is live in atc,
     expect(stu.promptCheck).toEqual({ state: 'unknown', since: null, hint: null, reason: expect.stringContaining('no prompt') });
     expect(json.declared.some((entry) => entry.promptCheck === undefined)).toBe(true);
     checkShape('fleet', prompted.json);
-    out = [];
+    ctx.out.length = 0;
     expect(await main(['fleet'])).toBe(0);
-    expect(out.join('\n')).toContain('z-stu: prompt check unknown (atc gave no prompt for the session)');
+    expect(ctx.out.join('\n')).toContain('z-stu: prompt check unknown (atc gave no prompt for the session)');
   } finally {
     atc.stop();
     delete process.env['HQ_ATC_SOCKET'];
@@ -215,9 +222,11 @@ test('shape: fleet shows promptCheck for a declared session that is live in atc,
 });
 
 test("shape: fleet --prompts gives pluginCheck for a live session whose plugin folders differ from fleet.json's", async () => {
-  const atc = fakeAtc(dir);
+  const ctx = setupTest();
+  at(NOON_SYDNEY);
+  const atc = fakeAtc(ctx.directory);
   try {
-    const ran = await hq('fleet', '--prompts');
+    const ran = await ctx.hq('fleet', '--prompts');
     const entrySchema = z.object({ name: z.string(), pluginCheck: z.unknown().optional() });
     const withPlugins = z.object({ declared: z.array(entrySchema) }).parse(ran.json).declared.filter((entry) => entry.pluginCheck !== undefined);
     expect(withPlugins).toStrictEqual([{ name: 'z-stu', pluginCheck: { declared: ['~/projects/hq/mods/hq-band'], running: [] } }]);
@@ -229,11 +238,13 @@ test("shape: fleet --prompts gives pluginCheck for a live session whose plugin f
 });
 
 test("hq fleet's text names a live session whose plugin folders differ from fleet.json's", async () => {
-  const atc = fakeAtc(dir);
+  const ctx = setupTest();
+  at(NOON_SYDNEY);
+  const atc = fakeAtc(ctx.directory);
   try {
     const code = await main(['fleet']);
     expect(code).toBe(0);
-    expect(out.join('\n')).toContain('z-stu: plugin folders differ: declared ~/projects/hq/mods/hq-band, running none — a respawn loads the declared ones');
+    expect(ctx.out.join('\n')).toContain('z-stu: plugin folders differ: declared ~/projects/hq/mods/hq-band, running none — a respawn loads the declared ones');
   } finally {
     atc.stop();
     delete process.env['HQ_ATC_SOCKET'];
@@ -241,14 +252,18 @@ test("hq fleet's text names a live session whose plugin folders differ from flee
 });
 
 test('shape: fleet before the first ensure has no last', async () => {
-  const fleet = await hq('fleet');
+  const ctx = setupTest();
+  at(NOON_SYDNEY);
+  const fleet = await ctx.hq('fleet');
   expect(z.object({ last: z.unknown().optional() }).parse(fleet.json).last ?? null).toBeNull();
   checkShape('fleet', fleet.json);
 });
 
 test('shape: fleet with a waiting step that has no id', async () => {
-  setMeta(db, 'fleet_last', JSON.stringify({ at: '2026-10-14T01:00:00Z', dryRun: false, steps: [{ name: 'z-kettle', action: 'waiting', detail: 'invented' }] }));
-  const fleet = await hq('fleet');
+  const ctx = setupTest();
+  at(NOON_SYDNEY);
+  setMeta(ctx.db, 'fleet_last', JSON.stringify({ at: '2026-10-14T01:00:00Z', dryRun: false, steps: [{ name: 'z-kettle', action: 'waiting', detail: 'invented' }] }));
+  const fleet = await ctx.hq('fleet');
   const stepSchema = z.object({ id: z.string().optional() });
   const [step] = z.object({ last: z.object({ steps: z.array(stepSchema) }) }).parse(fleet.json).last.steps;
   invariant(step);
@@ -257,25 +272,35 @@ test('shape: fleet with a waiting step that has no id', async () => {
 });
 
 test('shape: run list and run show', async () => {
-  await hq('run', 'add', 'GEO-9', '--title', 'Invented kettle work', '--where', 'none');
-  checkShape('run list', (await hq('run', 'list')).json);
-  checkShape('run show', (await hq('run', 'show', 'GEO-9')).json);
+  const ctx = setupTest();
+  at(NOON_SYDNEY);
+  await ctx.hq('run', 'add', 'GEO-9', '--title', 'Invented kettle work', '--where', 'none');
+  const list = await ctx.hq('run', 'list');
+  checkShape('run list', list.json);
+  const shown = await ctx.hq('run', 'show', 'GEO-9');
+  checkShape('run show', shown.json);
 });
 
 test('shape: call list and proposal list', async () => {
+  const ctx = setupTest();
+  at(NOON_SYDNEY);
   for (const kind of ['call', 'proposal']) {
-    await hq(kind, 'add', `geo-1-${kind}`, '--title', 'Paint', '--question', 'Green?', '--body', 'Invented.', '--issues', 'GEO-1');
+    await ctx.hq(kind, 'add', `geo-1-${kind}`, '--title', 'Paint', '--question', 'Green?', '--body', 'Invented.', '--issues', 'GEO-1');
   }
-  checkShape('call list', (await hq('call', 'list')).json);
-  checkShape('proposal list', (await hq('proposal', 'list')).json);
+  const calls = await ctx.hq('call', 'list');
+  checkShape('call list', calls.json);
+  const proposals = await ctx.hq('proposal', 'list');
+  checkShape('proposal list', proposals.json);
 });
 
 // `hq review` takes no runner and uses the real gh and codex, so it needs the network.
 test('shape: review', async () => {
-  process.env['REVIEW_DIR'] = join(dir, 'reviews');
-  process.env['HQ_PROJECTS'] = join(dir, 'projects');
-  process.env['HQ_REPOS'] = join(dir, 'repos');
-  process.env['CODEX_HOME'] = join(dir, 'codex');
+  const ctx = setupTest();
+  at(NOON_SYDNEY);
+  updateEnv('REVIEW_DIR', join(ctx.directory, 'reviews'));
+  updateEnv('HQ_PROJECTS', join(ctx.directory, 'projects'));
+  updateEnv('HQ_REPOS', join(ctx.directory, 'repos'));
+  updateEnv('CODEX_HOME', join(ctx.directory, 'codex'));
   const run: Runner = async (cmd: string[], opts?: RunOpts) => {
     const line = cmd.join(' ');
     if (line === 'git remote get-url origin') return { code: 0, stdout: 'git@github.com:zgeoff/widgets.git\n', stderr: '' };
@@ -302,9 +327,11 @@ test('shape: review', async () => {
 
 // `hq pr` reads the head with the real gh.
 test('it gives every pr status shape key, in the answer output and the status output of a PR with a record', async () => {
+  const ctx = setupTest();
+  at(NOON_SYDNEY);
   const fake = buildFakeRunner({ prHead: { code: 0, stdout: JSON.stringify({ headRefOid: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678' }), stderr: '' } });
-  const recorded = await runPRCommand({ run: fake.run, db, verb: 'answer', rest: ['widgets', '7', 'lgtm'], flags: { source: 'chat:kettle-12' }, actor: () => Promise.resolve('z-kettle'), readOwnerSession: () => Promise.resolve({ verdict: 'owner' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) });
-  const status = await runPRCommand({ run: fake.run, db, verb: 'status', rest: ['widgets', '7'], flags: {}, actor: () => Promise.resolve('z-kettle'), readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) });
+  const recorded = await runPRCommand({ run: fake.run, db: ctx.db, verb: 'answer', rest: ['widgets', '7', 'lgtm'], flags: { source: 'chat:kettle-12' }, actor: () => Promise.resolve('z-kettle'), readOwnerSession: () => Promise.resolve({ verdict: 'owner' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) });
+  const status = await runPRCommand({ run: fake.run, db: ctx.db, verb: 'status', rest: ['widgets', '7'], flags: {}, actor: () => Promise.resolve('z-kettle'), readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) });
 
   checkShape('pr status', { ok: true, ...recorded.data });
   checkShape('pr status', { ok: true, ...status.data });
@@ -312,19 +339,23 @@ test('it gives every pr status shape key, in the answer output and the status ou
 });
 
 test('it gives the pr status shape for a PR with no record', async () => {
-  const shown = await hq('pr', 'status', 'widgets', '9');
+  const ctx = setupTest();
+  at(NOON_SYDNEY);
+  const shown = await ctx.hq('pr', 'status', 'widgets', '9');
 
   checkShape('pr status', shown.json);
 });
 
 test('shape: review (noslop)', async () => {
-  writeFileSync(join(dir, 'settings.json'), JSON.stringify({ env: { OP_SERVICE_ACCOUNT_TOKEN: FAKE_TOKEN } }));
-  process.env['HQ_NOSLOP_OP_SETTINGS'] = join(dir, 'settings.json');
-  process.env['REVIEW_DIR'] = join(dir, 'reviews');
-  process.env['HQ_PROJECTS'] = join(dir, 'projects');
-  process.env['HQ_REPOS'] = join(dir, 'repos');
-  setMeta(db, 'noslop', JSON.stringify({ repos: ['widgets'], sha: FAKE_FULL_SHA }));
-  seedReviewRound({ db }, { head: 'aaaa000000000000000000000000000000000001', special: 'none', findings: [{ id: 'kettle0000000001', lens: 'correctness', severity: 'high', title: 'Kettle never boils' }] });
+  const ctx = setupTest();
+  at(NOON_SYDNEY);
+  writeFileSync(join(ctx.directory, 'settings.json'), JSON.stringify({ env: { OP_SERVICE_ACCOUNT_TOKEN: FAKE_TOKEN } }));
+  updateEnv('HQ_NOSLOP_OP_SETTINGS', join(ctx.directory, 'settings.json'));
+  updateEnv('REVIEW_DIR', join(ctx.directory, 'reviews'));
+  updateEnv('HQ_PROJECTS', join(ctx.directory, 'projects'));
+  updateEnv('HQ_REPOS', join(ctx.directory, 'repos'));
+  setMeta(ctx.db, 'noslop', JSON.stringify({ repos: ['widgets'], sha: FAKE_FULL_SHA }));
+  seedReviewRound({ db: ctx.db }, { head: 'aaaa000000000000000000000000000000000001', special: 'none', findings: [{ id: 'kettle0000000001', lens: 'correctness', severity: 'high', title: 'Kettle never boils' }] });
   const fake = buildFakeRunner({
       noslopReview: {
         code: 0,
@@ -332,7 +363,7 @@ test('shape: review (noslop)', async () => {
         stderr: '',
       },
     });
-  const result = await runReview({ run: fake.run, db, rawRepo: 'widgets', pr: 7, watch: false, fixesOnly: true });
+  const result = await runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false, fixesOnly: true });
 
   expect(result).toMatchObject({ engine: 'noslop', fixesOnly: true, fixChecks: [{ findingID: 'kettle0000000001', fixed: true, reason: 'the kettle boils now', title: 'Kettle never boils' }] });
   checkShape('review (noslop)', { ok: true, ...result });

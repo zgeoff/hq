@@ -24,7 +24,7 @@ function setupTest() {
 test('it marks an open PR on a run as reviewed at the head with the next round', () => {
   const ctx = setupTest();
   ctx.seed.run({ issue: 'GEO-9701' });
-  ctx.seed.runPr({ issue: 'GEO-9701', ref: 'widgets#7' });
+  ctx.seed.runPR({ issue: 'GEO-9701', ref: 'widgets#7' });
   reviewedPr(ctx.db, 'widgets#7', 'abc1234', { recheck: false, force: false }, 'kettle-review');
 
   writeReviewed(ctx.db, 'widgets', 7, { head: '0123456789abcdef0123456789abcdef01234567', countsRound: true });
@@ -36,7 +36,7 @@ test('it marks an open PR on a run as reviewed at the head with the next round',
 test('it counts a round past round 2, since no round limit applies', () => {
   const ctx = setupTest();
   ctx.seed.run({ issue: 'GEO-9701' });
-  ctx.seed.runPr({ issue: 'GEO-9701', ref: 'widgets#7' });
+  ctx.seed.runPR({ issue: 'GEO-9701', ref: 'widgets#7' });
   reviewedPr(ctx.db, 'widgets#7', 'abc1234', { recheck: false, force: false }, 'kettle-review');
   reviewedPr(ctx.db, 'widgets#7', 'abc1234', { recheck: true, force: false }, 'kettle-review');
 
@@ -48,7 +48,7 @@ test('it counts a round past round 2, since no round limit applies', () => {
 test('it marks the head and keeps the round for a run that does not count as a round', () => {
   const ctx = setupTest();
   ctx.seed.run({ issue: 'GEO-9701' });
-  ctx.seed.runPr({ issue: 'GEO-9701', ref: 'widgets#7' });
+  ctx.seed.runPR({ issue: 'GEO-9701', ref: 'widgets#7' });
   reviewedPr(ctx.db, 'widgets#7', 'abc1234', { recheck: false, force: false }, 'kettle-review');
 
   writeReviewed(ctx.db, 'widgets', 7, { head: '0123456789abcdef0123456789abcdef01234567', countsRound: false });
@@ -59,7 +59,7 @@ test('it marks the head and keeps the round for a run that does not count as a r
 test('it leaves a merged PR alone', () => {
   const ctx = setupTest();
   ctx.seed.run({ issue: 'GEO-9701' });
-  ctx.seed.mergedRunPr({ issue: 'GEO-9701', ref: 'widgets#7' });
+  ctx.seed.mergedRunPR({ issue: 'GEO-9701', ref: 'widgets#7' });
 
   writeReviewed(ctx.db, 'widgets', 7, { head: '0123456789abcdef0123456789abcdef01234567', countsRound: true });
 

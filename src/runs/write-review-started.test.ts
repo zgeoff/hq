@@ -24,7 +24,7 @@ function setupTest() {
 test('it marks an open PR on a run as started, leaving its round and head alone', () => {
   const ctx = setupTest();
   ctx.seed.run({ issue: 'GEO-9701' });
-  ctx.seed.runPr({ issue: 'GEO-9701', ref: 'widgets#7' });
+  ctx.seed.runPR({ issue: 'GEO-9701', ref: 'widgets#7' });
   reviewedPr(ctx.db, 'widgets#7', 'abc1234', { recheck: false, force: false }, 'kettle-review');
 
   writeReviewStarted(ctx.db, 'widgets', 7);
@@ -36,7 +36,7 @@ test('it marks an open PR on a run as started, leaving its round and head alone'
 test('it leaves a merged PR alone', () => {
   const ctx = setupTest();
   ctx.seed.run({ issue: 'GEO-9701' });
-  ctx.seed.mergedRunPr({ issue: 'GEO-9701', ref: 'widgets#7' });
+  ctx.seed.mergedRunPR({ issue: 'GEO-9701', ref: 'widgets#7' });
 
   writeReviewStarted(ctx.db, 'widgets', 7);
 

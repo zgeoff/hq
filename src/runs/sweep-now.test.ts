@@ -50,7 +50,7 @@ test('it flags nothing for a final PR that GitHub shows closed unmerged, and mar
   onTestFinished(overrideEnv('HQ_NOW', '2026-10-21T03:00:00Z'));
   addRun(ctx.db, { issue: 'GEO-9851', title: 'Invented kettle work', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
   at('2026-10-21T01:00:00Z');
-  ctx.seed.finalRunPr({ issue: 'GEO-9851', ref: 'kettle#51' });
+  ctx.seed.finalRunPR({ issue: 'GEO-9851', ref: 'kettle#51' });
   at('2026-10-21T03:00:00Z');
   const gh = buildStubGitHubFactsRunner({ views: { 'kettle#51': JSON.stringify({ state: 'CLOSED', mergedAt: null, mergeCommit: null }) } });
 
@@ -90,7 +90,7 @@ test('it still sweeps for alerts when the wrap-up of merged runs throws', async 
   ctx.db.exec("CREATE TRIGGER kettle_refuses_wrap_up BEFORE INSERT ON events WHEN NEW.action = 'merged-wrap-up-result' BEGIN SELECT RAISE(ABORT, 'kettle refuses'); END");
   addRun(ctx.db, { issue: 'GEO-9853', title: 'Invented teapot work', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
   at('2026-10-21T01:00:00Z');
-  ctx.seed.finalRunPr({ issue: 'GEO-9853', ref: 'kettle#53' });
+  ctx.seed.finalRunPR({ issue: 'GEO-9853', ref: 'kettle#53' });
   at('2026-10-21T03:00:00Z');
   const gh = buildStubGitHubFactsRunner({ views: { 'kettle#53': JSON.stringify({ state: 'CLOSED', mergedAt: null, mergeCommit: null }) } });
   const fleet = buildStubFleetClient({ sessions: [{ id: '0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, state: 'done' }] });

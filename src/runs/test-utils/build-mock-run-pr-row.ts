@@ -1,8 +1,8 @@
 import type { HqTables } from '../../db/hq-columns.ts';
 
-export type RunPrRow = HqTables['run_prs'];
+export type RunPRRow = HqTables['run_prs'];
 
-export function buildMockRunPrRow(overrides: Partial<RunPrRow> = {}): RunPrRow {
+export function buildMockRunPRRow(overrides: Partial<RunPRRow> = {}): RunPRRow {
   return {
     ref: 'kettle#1',
     issue: 'GEO-9001',

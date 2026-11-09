@@ -6,5 +6,5 @@ test('it builds a default typed message from a console answer', () => {
 });
 
 test('it applies overrides on top of the defaults', () => {
-  expect(buildMockNewTyped({ text: 'Hinge it.', actor: 'z-delivery' })).toMatchObject({ text: 'Hinge it.', actor: 'z-delivery', to: 'z-invented' });
+  expect(buildMockNewTyped({ text: 'Hinge it.', actor: 'z-delivery' })).toStrictEqual({ to: 'z-invented', toId: null, toName: null, text: 'Hinge it.', source: { kind: 'console', ref: 'descale-kettle', at: null }, actor: 'z-delivery' });
 });

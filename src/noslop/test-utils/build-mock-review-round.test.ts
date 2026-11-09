@@ -24,5 +24,24 @@ test('it builds a default passing round on the first review of a PR', () => {
 });
 
 test('it applies overrides on top of the defaults', () => {
-  expect(buildMockReviewRound({ pr: 9, ok: false, confirm: true })).toMatchObject({ repo: 'widgets', pr: 9, ok: false, confirm: true, kind: 'review' });
+  expect(buildMockReviewRound({ pr: 9, ok: false, confirm: true })).toStrictEqual({
+    repo: 'widgets',
+    pr: 9,
+    kind: 'review',
+    startedAt: '2026-10-14T00:59:00Z',
+    endedAt: '2026-10-14T01:00:00Z',
+    // oxlint-disable-next-line zgeoff/no-abbreviated-names -- ms is the stored noslop_rounds column
+    ms: 60_000,
+    ok: false,
+    head: 'abc1234abc1234abc1234abc1234abc1234abc12',
+    base: null,
+    depth: 'standard',
+    findings: [],
+    failedCalls: 0,
+    conclusion: null,
+    open: [],
+    error: null,
+    sha: 'abc1234',
+    confirm: true,
+  });
 });

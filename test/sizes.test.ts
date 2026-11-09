@@ -1,4 +1,5 @@
-import { afterEach, beforeEach, expect, test } from 'bun:test';
+// oxlint-disable zgeoff/test-beside-module -- the whole-program sizes suite, across every module in src/sizes
+import { expect, onTestFinished, test } from 'bun:test';
 import type { Database } from 'bun:sqlite';
 import invariant from 'tiny-invariant';
 import { z } from 'zod';
@@ -18,24 +19,24 @@ import { sizeStats } from '../src/sizes/size-stats.ts';
 import { sizeText } from '../src/sizes/size-text.ts';
 import { at, freshDb } from './helpers.ts';
 
-let db: Database;
-let cleanup: () => void;
+function setupTest() {
+  const fresh = freshDb();
+  onTestFinished(fresh.cleanup);
+  const db: Database = fresh.db;
 
-beforeEach(() => {
-  ({ db, cleanup } = freshDb());
-  at('2026-10-16T01:00:00Z');
-});
-afterEach(() => cleanup());
-
-const run = (issue: string, size: ReturnType<typeof parseSize> = null) =>
-  addRun(db, { issue, title: 'Invented teapot work', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, size, actor: 'z-delivery' });
-const merge = (issue: string, ...refs: string[]) => {
-  for (const r of refs) {
-    addPr(db, issue, r, 'z-delivery');
-    closePr(db, r, { to: 'merged', actor: 'z-delivery' });
-  }
-  setState(db, issue, 'merged', {}, 'z-delivery');
-};
+  return {
+    db,
+    addRun: (issue: string, size: ReturnType<typeof parseSize> = null) =>
+      addRun(db, { issue, title: 'Invented teapot work', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, size, actor: 'z-delivery' }),
+    mergeRun: (issue: string, ...refs: string[]) => {
+      for (const ref of refs) {
+        addPr(db, issue, ref, 'z-delivery');
+        closePr(db, ref, { to: 'merged', actor: 'z-delivery' });
+      }
+      setState(db, issue, 'merged', {}, 'z-delivery');
+    },
+  };
+}
 
 type Fake = { additions: number; deletions: number; base?: string; was?: string[] } | null;
 function fakeGh(prs: Record<string, Fake>, calls: string[][] = [], heads: string[] = []) {
@@ -81,30 +82,34 @@ test('bands are [low, high); a guess must sit in its band, with both flags or ne
 });
 
 test('a size comes with run add or later with run size, and the change is logged', () => {
-  run('GEO-1', parseSize('L', '3000'));
-  expect(getRun(db, 'GEO-1')).toMatchObject({ size: 'L', size_lines: 3000 });
-  run('GEO-2');
-  setSize(db, 'GEO-2', { size: 'S', lines: 200 }, 'z-triage');
-  expect(getRun(db, 'GEO-2')).toMatchObject({ size: 'S', size_lines: 200 });
-  const ev = db.query(`SELECT actor, from_state, to_state FROM events WHERE action = 'sized'`).get();
-  expect(ev).toEqual({ actor: 'z-triage', from_state: null, to_state: 'S' });
-  expect(() => setSize(db, 'GEO-404', { size: 'S', lines: 1 }, 'z-triage')).toThrow('no run GEO-404');
+  const ctx = setupTest();
+  at('2026-10-16T01:00:00Z');
+  ctx.addRun('GEO-1', parseSize('L', '3000'));
+  expect(getRun(ctx.db, 'GEO-1')).toMatchObject({ size: 'L', size_lines: 3000 });
+  ctx.addRun('GEO-2');
+  setSize(ctx.db, 'GEO-2', { size: 'S', lines: 200 }, 'z-triage');
+  expect(getRun(ctx.db, 'GEO-2')).toMatchObject({ size: 'S', size_lines: 200 });
+  const event = ctx.db.query(`SELECT actor, from_state, to_state FROM events WHERE action = 'sized'`).get();
+  expect(event).toStrictEqual({ actor: 'z-triage', from_state: null, to_state: 'S' });
+  expect(() => setSize(ctx.db, 'GEO-404', { size: 'S', lines: 1 }, 'z-triage')).toThrow('no run GEO-404');
 });
 
 test('guess against actual by band, unsized runs apart, and the share that shipped as a stack', async () => {
-  run('GEO-1', parseSize('L', '3000'));
-  merge('GEO-1', 'kettle#1', 'kettle#2');
-  run('GEO-2', parseSize('S', '300'));
-  merge('GEO-2', 'kettle#3');
-  run('GEO-3');
-  merge('GEO-3', 'teapot#4');
-  run('GEO-4', parseSize('M', '1000'));
-  addPr(db, 'GEO-4', 'kettle#5', 'z-delivery');
-  run('GEO-5', parseSize('M', '1000'));
-  merge('GEO-5', 'kettle#6');
-  addPr(db, 'GEO-5', 'kettle#7', 'z-delivery');
+  const ctx = setupTest();
+  at('2026-10-16T01:00:00Z');
+  ctx.addRun('GEO-1', parseSize('L', '3000'));
+  ctx.mergeRun('GEO-1', 'kettle#1', 'kettle#2');
+  ctx.addRun('GEO-2', parseSize('S', '300'));
+  ctx.mergeRun('GEO-2', 'kettle#3');
+  ctx.addRun('GEO-3');
+  ctx.mergeRun('GEO-3', 'teapot#4');
+  ctx.addRun('GEO-4', parseSize('M', '1000'));
+  addPr(ctx.db, 'GEO-4', 'kettle#5', 'z-delivery');
+  ctx.addRun('GEO-5', parseSize('M', '1000'));
+  ctx.mergeRun('GEO-5', 'kettle#6');
+  addPr(ctx.db, 'GEO-5', 'kettle#7', 'z-delivery');
   at('2026-10-16T02:00:00Z');
-  const runs = mergedRuns(db, '2026-10-16T01:00:00Z', '2026-10-17T00:00:00Z');
+  const runs = mergedRuns(ctx.db, '2026-10-16T01:00:00Z', '2026-10-17T00:00:00Z');
   expect(runs.map((r) => r.issue)).toEqual(['GEO-1', 'GEO-2', 'GEO-3']);
   const gh = fakeGh(
     {
@@ -116,7 +121,8 @@ test('guess against actual by band, unsized runs apart, and the share that shipp
     [],
     ['geo-1-part-1'],
   );
-  const facts = (await prFacts(db, gh, runs.flatMap((r) => r.prs)))!;
+  const facts = await prFacts(ctx.db, gh, runs.flatMap((mergedRun) => mergedRun.prs));
+  invariant(facts !== null);
   expect(facts['kettle#2']).toEqual({ lines: 1000, stacked: true });
   expect(facts['kettle#3']!.stacked).toBe(false);
   expect(facts['teapot#4']!.stacked).toBe(false);
@@ -132,27 +138,34 @@ test('guess against actual by band, unsized runs apart, and the share that shipp
 });
 
 test('merged PR facts are cached; a PR GitHub lacks is left out, and gh failing gives null', async () => {
-  run('GEO-1', parseSize('M', '1000'));
-  merge('GEO-1', 'kettle#1', 'zgeoff/teapot#9');
-  const runs = mergedRuns(db, '2026-10-16T01:00:00Z', '2026-10-17T00:00:00Z');
+  const ctx = setupTest();
+  at('2026-10-16T01:00:00Z');
+  ctx.addRun('GEO-1', parseSize('M', '1000'));
+  ctx.mergeRun('GEO-1', 'kettle#1', 'zgeoff/teapot#9');
+  const runs = mergedRuns(ctx.db, '2026-10-16T01:00:00Z', '2026-10-17T00:00:00Z');
   const calls: string[][] = [];
   const gh = fakeGh({ 'kettle#1': { additions: 10, deletions: 0, base: 'geo-0-part' }, 'teapot#9': null }, calls, ['geo-0-part']);
-  const facts = (await prFacts(db, gh, runs[0]!.prs))!;
-  expect(facts).toEqual({ 'kettle#1': { lines: 10, stacked: true } });
+  const [mergedRun] = runs;
+  invariant(mergedRun);
+  const facts = await prFacts(ctx.db, gh, mergedRun.prs);
+  invariant(facts !== null);
+  expect(facts).toStrictEqual({ 'kettle#1': { lines: 10, stacked: true } });
   expect(sizeStats(runs, facts)).toMatchObject({ unread: 1, stackShare: null });
-  await prFacts(db, gh, runs[0]!.prs);
+  await prFacts(ctx.db, gh, mergedRun.prs);
   expect(calls).toHaveLength(3);
   expect(calls[2]!.at(-1)).not.toContain('name: "kettle"');
   const broken = async () => ({ code: 1, stdout: '', stderr: 'gh: not logged in' });
-  expect(await prFacts(db, broken, [{ ref: 'kettle#7', url: null }])).toBeNull();
+  const brokenFacts = await prFacts(ctx.db, broken, [{ ref: 'kettle#7', url: null }]);
+  expect(brokenFacts).toBeNull();
   expect(sizeText(null).join('\n')).toContain('needs GitHub');
   const half = async (cmd: string[]) => {
     if (cmd.at(-1)!.includes('b0:')) return { code: 1, stdout: JSON.stringify({ data: { b0: null, b1: { pullRequests: { totalCount: 0 } } } }), stderr: '' };
     return fakeGh({ 'kettle#8': { additions: 5, deletions: 0, base: 'geo-8-part' }, 'kettle#9': { additions: 5, deletions: 0, base: 'release/2.0' } })(cmd);
   };
   const two = [{ ref: 'kettle#8', url: null }, { ref: 'kettle#9', url: null }];
-  expect(await prFacts(db, half, two)).toEqual({ 'kettle#9': { lines: 5, stacked: false } });
-  const stored = getMeta(db, 'stats_pr_facts_v2');
+  const halfFacts = await prFacts(ctx.db, half, two);
+  expect(halfFacts).toStrictEqual({ 'kettle#9': { lines: 5, stacked: false } });
+  const stored = getMeta(ctx.db, 'stats_pr_facts_v2');
   invariant(stored !== null);
   const keptFacts = z.record(z.string(), z.unknown()).parse(JSON.parse(stored));
 
@@ -160,10 +173,12 @@ test('merged PR facts are cached; a PR GitHub lacks is left out, and gh failing 
 });
 
 test('a run whose last merge falls outside the window, or a dropped or unfinished run, is left out', () => {
-  run('GEO-1', parseSize('S', '100'));
-  merge('GEO-1', 'kettle#1');
-  expect(mergedRuns(db, '2026-10-16T02:00:00Z', '2026-10-17T00:00:00Z')).toHaveLength(0);
-  expect(mergedRuns(db, '2026-10-16T01:00:00Z', '2026-10-17T00:00:00Z')).toHaveLength(1);
-  setState(db, 'GEO-1', 'dropped', {}, 'z-delivery');
-  expect(mergedRuns(db, '2026-10-16T01:00:00Z', '2026-10-17T00:00:00Z')).toHaveLength(0);
+  const ctx = setupTest();
+  at('2026-10-16T01:00:00Z');
+  ctx.addRun('GEO-1', parseSize('S', '100'));
+  ctx.mergeRun('GEO-1', 'kettle#1');
+  expect(mergedRuns(ctx.db, '2026-10-16T02:00:00Z', '2026-10-17T00:00:00Z')).toHaveLength(0);
+  expect(mergedRuns(ctx.db, '2026-10-16T01:00:00Z', '2026-10-17T00:00:00Z')).toHaveLength(1);
+  setState(ctx.db, 'GEO-1', 'dropped', {}, 'z-delivery');
+  expect(mergedRuns(ctx.db, '2026-10-16T01:00:00Z', '2026-10-17T00:00:00Z')).toHaveLength(0);
 });

@@ -15,5 +15,14 @@ test('it builds a default call', () => {
 });
 
 test('it applies overrides on top of the defaults', () => {
-  expect(buildMockAddInput({ kind: 'proposal', id: 'tidy-docs' })).toMatchObject({ kind: 'proposal', id: 'tidy-docs', title: 'Paint the shed' });
+  expect(buildMockAddInput({ kind: 'proposal', id: 'tidy-docs' })).toStrictEqual({
+    kind: 'proposal',
+    id: 'tidy-docs',
+    title: 'Paint the shed',
+    question: 'Green or grey?',
+    body: 'The shed needs paint. Green or grey? Recommendation: green.',
+    issues: ['GEO-1'],
+    forSession: 'z-delivery',
+    actor: 'z-refine',
+  });
 });

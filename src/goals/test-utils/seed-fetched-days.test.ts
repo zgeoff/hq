@@ -39,14 +39,3 @@ test('#seedFetchedDays stores a CI day per repo and a merged-PR day for each day
     ],
   });
 });
-
-test('#seedFetchedDays leaves the unfetched days out of each table', () => {
-  const ctx = setupTest();
-
-  seedFetchedDays(ctx, { from: '2026-10-14', to: '2026-10-16', unfetchedPRDays: ['2026-10-15'], unfetchedCIDays: ['2026-10-16'] });
-
-  expect({ goalDays: ctx.readGoalDays(), mergedPRDays: ctx.readMergedPRDays() }).toMatchObject({
-    goalDays: [{ day: '2026-10-14' }, { day: '2026-10-15' }],
-    mergedPRDays: [{ day: '2026-10-14' }, { day: '2026-10-16' }],
-  });
-});

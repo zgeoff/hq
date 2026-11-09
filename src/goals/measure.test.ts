@@ -184,14 +184,19 @@ test('ci waste is the minutes in failed or cancelled runs over all minutes', () 
 
 test('it colours the measure when every past day is fetched, though today is not', () => {
   const ctx = setupTest();
-  ctx.seed.fetchedDays({ unfetchedPRDays: ['2026-10-16'] });
+  ctx.seed.fetchedDays({ to: '2026-10-15' });
+  ctx.seed.goalDay({ kind: 'ci', key: 'atc', day: '2026-10-16', at: new Date('2026-09-01T00:00:00Z') });
+  ctx.seed.fetchedDays({ from: '2026-10-17' });
   ctx.seed.ciRun({ id: 1, updated_at: '2026-10-16T03:40:00Z' });
   expect(verdict(DEFAULT_TARGETS.ciwaste, ctx.readMeasures().ciwaste)).toBe('green');
 });
 
 test('a past day not fetched leaves the measure incomplete, with no colour; today never counts', () => {
   const ctx = setupTest();
-  ctx.seed.fetchedDays({ unfetchedPRDays: ['2026-10-16'], unfetchedCIDays: ['2026-10-15'] });
+  ctx.seed.fetchedDays({ to: '2026-10-14' });
+  ctx.seed.mergedPRDay({ day: '2026-10-15', at: '2026-09-01T00:00:00Z' });
+  ctx.seed.goalDay({ kind: 'ci', key: 'atc', day: '2026-10-16', at: new Date('2026-09-01T00:00:00Z') });
+  ctx.seed.fetchedDays({ from: '2026-10-17' });
   ctx.seed.ciRun({ id: 1, updated_at: '2026-10-16T03:40:00Z' });
   const result = ctx.readMeasures();
   expect(result.ciwaste).toMatchObject({ value: 0, missing: 1 });
@@ -203,7 +208,10 @@ test('a past day not fetched leaves the measure incomplete, with no colour; toda
 
 test('it leaves the features measure incomplete, with no colour, when a past day of merged PRs is not fetched', () => {
   const ctx = setupTest();
-  ctx.seed.fetchedDays({ unfetchedPRDays: ['2026-10-15', '2026-10-16'] });
+  ctx.seed.fetchedDays({ to: '2026-10-14' });
+  ctx.seed.goalDay({ kind: 'ci', key: 'atc', day: '2026-10-15', at: new Date('2026-09-01T00:00:00Z') });
+  ctx.seed.goalDay({ kind: 'ci', key: 'atc', day: '2026-10-16', at: new Date('2026-09-01T00:00:00Z') });
+  ctx.seed.fetchedDays({ from: '2026-10-17' });
   ctx.seed.linearIssue({ issue: 'GEO-1', type: 'Feature' });
   ctx.seed.mergedPR({ number: 1, issue: 'GEO-1' });
   expect(ctx.readMeasures().features).toMatchObject({ value: 100, missing: 1 });

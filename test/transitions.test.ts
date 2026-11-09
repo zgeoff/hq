@@ -1,4 +1,5 @@
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+// oxlint-disable zgeoff/test-beside-module -- checks every transition table against the asks, runs and unblock modules that apply it
+import { describe, expect, onTestFinished, test } from 'bun:test';
 import type { Database } from 'bun:sqlite';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -35,13 +36,16 @@ import type { UnblockInput } from '../src/unblock/types.ts';
 import { UNBLOCK_TRANSITIONS } from '../src/unblock-transitions.ts';
 import { NOON_SYDNEY, at, freshDb } from './helpers.ts';
 
-let db: Database;
-let cleanup: () => void;
-beforeEach(() => {
-  ({ db, cleanup } = freshDb());
-  at(NOON_SYDNEY);
-});
-afterEach(() => cleanup());
+function setupTest() {
+  const fresh = freshDb();
+  onTestFinished(fresh.cleanup);
+  const db: Database = fresh.db;
+
+  return {
+    db,
+    addRun: () => addRun(db, { issue: 'GEO-9100', title: 'Wind the clock', place: 'none', session: null, next: 'Start.', gate: null, geoffChat: false, actor: 'z-delivery' }),
+  };
+}
 
 const throwsBadState = (fn: () => void): boolean => {
   try {
@@ -109,71 +113,90 @@ describe('the tables match the checks, pair by pair', () => {
 });
 
 const ask = (): AddInput => ({ kind: 'call', id: 'tea-or-coffee', title: 'Tea or coffee', question: 'Tea or coffee?', body: 'Pick one.', issues: [], forSession: null, actor: 'z-refine' });
-const run = () => addRun(db, { issue: 'GEO-9100', title: 'Wind the clock', place: 'none', session: null, next: 'Start.', gate: null, geoffChat: false, actor: 'z-delivery' });
 
 describe('refusals through the real functions', () => {
   test('answering a queued ask', () => {
-    addAsk(db, ask());
-    expect(() => answerAsk(db, { id: 'tea-or-coffee', kind: undefined, answer: 'tea', actor: 'z-stu' })).toThrow('tea-or-coffee is queued: answered needs open');
+    const ctx = setupTest();
+    at(NOON_SYDNEY);
+    addAsk(ctx.db, ask());
+    expect(() => answerAsk(ctx.db, { id: 'tea-or-coffee', kind: undefined, answer: 'tea', actor: 'z-stu' })).toThrow('tea-or-coffee is queued: answered needs open');
   });
 
   test('applying an open ask', () => {
-    addAsk(db, ask());
-    openAsk(db, { force: false, actor: 'z-stu' });
-    expect(() => applyAsk(db, 'tea-or-coffee', undefined, 'none', null, 'z-stu')).toThrow('open: applied needs answered');
+    const ctx = setupTest();
+    at(NOON_SYDNEY);
+    addAsk(ctx.db, ask());
+    openAsk(ctx.db, { force: false, actor: 'z-stu' });
+    expect(() => applyAsk(ctx.db, 'tea-or-coffee', undefined, 'none', null, 'z-stu')).toThrow('open: applied needs answered');
   });
 
   test('later, skip and close refuse the states the table leaves out', () => {
-    addAsk(db, ask());
-    closeAsk(db, 'tea-or-coffee', undefined, 'moot', 'z-stu');
-    expect(() => laterAsk(db, 'tea-or-coffee', undefined, null, 'z-stu')).toThrow('later needs open or queued');
-    expect(() => skipAsk(db, 'tea-or-coffee', undefined, null, 'z-stu')).toThrow('skipped needs');
-    expect(() => closeAsk(db, 'tea-or-coffee', undefined, 'again', 'z-stu')).toThrow('closed needs');
-    expect(() => openAsk(db, { id: 'tea-or-coffee', force: true, actor: 'z-stu' })).toThrow('only queued or due items open');
+    const ctx = setupTest();
+    at(NOON_SYDNEY);
+    addAsk(ctx.db, ask());
+    closeAsk(ctx.db, 'tea-or-coffee', undefined, 'moot', 'z-stu');
+    expect(() => laterAsk(ctx.db, 'tea-or-coffee', undefined, null, 'z-stu')).toThrow('later needs open or queued');
+    expect(() => skipAsk(ctx.db, 'tea-or-coffee', undefined, null, 'z-stu')).toThrow('skipped needs');
+    expect(() => closeAsk(ctx.db, 'tea-or-coffee', undefined, 'again', 'z-stu')).toThrow('closed needs');
+    expect(() => openAsk(ctx.db, { id: 'tea-or-coffee', force: true, actor: 'z-stu' })).toThrow('only queued or due items open');
   });
 
   test('setting a done run without --reopen', () => {
-    run();
-    setState(db, 'GEO-9100', 'done', {}, 'z-delivery');
-    expect(() => setState(db, 'GEO-9100', 'working', {}, 'z-delivery')).toThrow('GEO-9100 is done: pass --reopen to change it');
-    expect(setState(db, 'GEO-9100', 'working', { reopen: true }, 'z-delivery').state).toBe('working');
+    const ctx = setupTest();
+    at(NOON_SYDNEY);
+    ctx.addRun();
+    setState(ctx.db, 'GEO-9100', 'done', {}, 'z-delivery');
+    expect(() => setState(ctx.db, 'GEO-9100', 'working', {}, 'z-delivery')).toThrow('GEO-9100 is done: pass --reopen to change it');
+    expect(setState(ctx.db, 'GEO-9100', 'working', { reopen: true }, 'z-delivery').state).toBe('working');
   });
 
   test('an open run goes to any state, its own included', () => {
-    run();
-    for (const s of RUN_STATES) expect(setState(db, 'GEO-9100', s, { reopen: s === 'done' || s === 'dropped' }, 'z-delivery').state).toBe(s);
+    const ctx = setupTest();
+    at(NOON_SYDNEY);
+    ctx.addRun();
+    for (const state of RUN_STATES) {
+      expect(setState(ctx.db, 'GEO-9100', state, { reopen: state === 'done' || state === 'dropped' }, 'z-delivery').state).toBe(state);
+    }
   });
 
   test('unmerging an open PR', () => {
-    run();
-    addPr(db, 'GEO-9100', 'hq#901', 'z-delivery');
-    expect(() => unmergePr(db, 'hq#901', 'z-review', null)).toThrow('hq#901 is open, not merged');
+    const ctx = setupTest();
+    at(NOON_SYDNEY);
+    ctx.addRun();
+    addPr(ctx.db, 'GEO-9100', 'hq#901', 'z-delivery');
+    expect(() => unmergePr(ctx.db, 'hq#901', 'z-review', null)).toThrow('hq#901 is open, not merged');
   });
 
   test('final on a merged PR, and unfinal and close', () => {
-    run();
-    addPr(db, 'GEO-9100', 'hq#902', 'z-delivery');
-    closePr(db, 'hq#902', { to: 'merged', actor: 'z-review' });
-    expect(() => finalPr(db, 'hq#902', { sha: 'abcdef1', actor: 'z-delivery' })).toThrow('hq#902 is merged');
-    expect(() => unfinalPr(db, 'hq#902', 'z-delivery', null)).toThrow('hq#902 is merged');
-    expect(() => closePr(db, 'hq#902', { to: 'closed', actor: 'z-review' })).toThrow('hq#902 is merged');
+    const ctx = setupTest();
+    at(NOON_SYDNEY);
+    ctx.addRun();
+    addPr(ctx.db, 'GEO-9100', 'hq#902', 'z-delivery');
+    closePr(ctx.db, 'hq#902', { to: 'merged', actor: 'z-review' });
+    expect(() => finalPr(ctx.db, 'hq#902', { sha: 'abcdef1', actor: 'z-delivery' })).toThrow('hq#902 is merged');
+    expect(() => unfinalPr(ctx.db, 'hq#902', 'z-delivery', null)).toThrow('hq#902 is merged');
+    expect(() => closePr(ctx.db, 'hq#902', { to: 'closed', actor: 'z-review' })).toThrow('hq#902 is merged');
   });
 });
 
 test('an unblock item is added, updated, closed done, and reopened after done or dropped', () => {
-  expect(addUnblock(db, buildKettleInput('Descale the kettle')).result).toBe('added');
-  expect(addUnblock(db, buildKettleInput('Descale the kettle twice')).result).toBe('updated');
-  expect(closeUnblock(db, 'kettle', 'done', null, 'kettle-bot').state).toBe('done');
-  expect(addUnblock(db, buildKettleInput('Descale it again')).result).toBe('reopened');
-  expect(closeUnblock(db, 'kettle', 'dropped', 'moot', 'kettle-bot').state).toBe('dropped');
-  expect(addUnblock(db, buildKettleInput('Descale it once more')).item.state).toBe('open');
+  const ctx = setupTest();
+  at(NOON_SYDNEY);
+  expect(addUnblock(ctx.db, buildKettleInput('Descale the kettle')).result).toBe('added');
+  expect(addUnblock(ctx.db, buildKettleInput('Descale the kettle twice')).result).toBe('updated');
+  expect(closeUnblock(ctx.db, 'kettle', 'done', null, 'kettle-bot').state).toBe('done');
+  expect(addUnblock(ctx.db, buildKettleInput('Descale it again')).result).toBe('reopened');
+  expect(closeUnblock(ctx.db, 'kettle', 'dropped', 'moot', 'kettle-bot').state).toBe('dropped');
+  expect(addUnblock(ctx.db, buildKettleInput('Descale it once more')).item.state).toBe('open');
 });
 
 test('closing an unblock item that is not open is refused, as done or dropped', () => {
-  addUnblock(db, buildKettleInput('Descale the kettle'));
-  closeUnblock(db, 'kettle', 'done', null, 'kettle-bot');
-  expect(() => closeUnblock(db, 'kettle', 'done', null, 'kettle-bot')).toThrow('kettle is done, not open');
-  expect(() => closeUnblock(db, 'kettle', 'dropped', null, 'kettle-bot')).toThrow('kettle is done, not open');
+  const ctx = setupTest();
+  at(NOON_SYDNEY);
+  addUnblock(ctx.db, buildKettleInput('Descale the kettle'));
+  closeUnblock(ctx.db, 'kettle', 'done', null, 'kettle-bot');
+  expect(() => closeUnblock(ctx.db, 'kettle', 'done', null, 'kettle-bot')).toThrow('kettle is done, not open');
+  expect(() => closeUnblock(ctx.db, 'kettle', 'dropped', null, 'kettle-bot')).toThrow('kettle is done, not open');
 });
 
 function buildKettleInput(task: string): UnblockInput {

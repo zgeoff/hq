@@ -17,5 +17,16 @@ test('it builds a default completed CI run', () => {
 });
 
 test('it applies overrides on top of the defaults', () => {
-  expect(buildMockCIRun({ id: 7, conclusion: null, started_at: null })).toMatchObject({ id: 7, conclusion: null, started_at: null, repo: 'atc' });
+  expect(buildMockCIRun({ id: 7, conclusion: null, started_at: null })).toStrictEqual({
+    id: 7,
+    repo: 'atc',
+    path: '.github/workflows/ci.yml',
+    event: 'push',
+    status: 'completed',
+    conclusion: null,
+    attempt: 1,
+    created_at: '2026-10-16T02:00:00Z',
+    started_at: null,
+    updated_at: '2026-10-16T02:10:00Z',
+  });
 });

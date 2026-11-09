@@ -1,8 +1,8 @@
 import { expect, test } from 'bun:test';
-import { buildMockRunPrRow } from './build-mock-run-pr-row.ts';
+import { buildMockRunPRRow } from './build-mock-run-pr-row.ts';
 
 test('it builds a default run PR row', () => {
-  expect(buildMockRunPrRow()).toStrictEqual({
+  expect(buildMockRunPRRow()).toStrictEqual({
     ref: 'kettle#1',
     issue: 'GEO-9001',
     url: null,
@@ -29,7 +29,7 @@ test('it builds a default run PR row', () => {
 });
 
 test('it applies overrides on top of the defaults', () => {
-  expect(buildMockRunPrRow({ ref: 'widgets#7', review_round: 1 })).toStrictEqual({
+  expect(buildMockRunPRRow({ ref: 'widgets#7', review_round: 1 })).toStrictEqual({
     ref: 'widgets#7',
     issue: 'GEO-9001',
     url: null,

@@ -18,5 +18,17 @@ test('it builds a default standard review of a PR head', () => {
 });
 
 test('it applies overrides on top of the defaults', () => {
-  expect(buildMockStoreReview({ review_id: 'r0', head: 'h2' })).toMatchObject({ review_id: 'r0', head: 'h2', repo: 'zgeoff/widgets' });
+  expect(buildMockStoreReview({ review_id: 'r0', head: 'h2' })).toStrictEqual({
+    review_id: 'r0',
+    repo: 'zgeoff/widgets',
+    pull_request: 7,
+    base: 'main',
+    head: 'h2',
+    depth: 'standard',
+    risk_classes: '[]',
+    lenses: '[]',
+    config_hash: 'c1',
+    started_at: '2026-10-01T00:00:00Z',
+    ended_at: '2026-10-01T00:01:00Z',
+  });
 });

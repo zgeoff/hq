@@ -190,7 +190,7 @@ test('it reviews a listed repo\'s PR on noslop though a run already gave it a Co
   const ctx = setupTest();
   const fake = buildFakeRunner();
   ctx.listWidgets();
-  ctx.seed.runPrWithoutRun({ ref: 'widgets#7', issue: 'GEO-1', review_round: 1 });
+  ctx.seed.runPRWithoutRun({ ref: 'widgets#7', issue: 'GEO-1', review_round: 1 });
 
   await expect(runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false })).resolves.toMatchObject({ engine: 'noslop' });
 
@@ -237,7 +237,7 @@ test('it marks the PR on its run reviewed at the head the round read, with no se
   const fake = buildFakeRunner({ noslopReview: { code: 0, stdout: FAKE_REVIEW_JSON.replace('"head":"feat"', `"head":"${FAKE_FULL_SHA}"`), stderr: '' } });
   ctx.listWidgets();
   ctx.seed.run({ issue: 'GEO-9702', title: 'Fit the kettle lid', place: 'local' });
-  ctx.seed.runPr({ issue: 'GEO-9702', ref: 'widgets#7' });
+  ctx.seed.runPR({ issue: 'GEO-9702', ref: 'widgets#7' });
 
   await runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false });
 
@@ -249,7 +249,7 @@ test('it marks the review started but not reviewed when noslop gives no review',
   const fake = buildFakeRunner({ noslopReview: { code: 1, stdout: '', stderr: 'boom' } });
   ctx.listWidgets();
   ctx.seed.run({ issue: 'GEO-9702', title: 'Fit the kettle lid', place: 'local' });
-  ctx.seed.runPr({ issue: 'GEO-9702', ref: 'widgets#7' });
+  ctx.seed.runPR({ issue: 'GEO-9702', ref: 'widgets#7' });
 
   await expect(runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false })).rejects.toMatchObject({ code: 'noslop_failed' });
 
@@ -542,7 +542,7 @@ test('it passes --fixes-only straight to noslop, with no review on record, and r
   ctx.listWidgets();
   ctx.seed.reviewRound({ head: null, special: 'none', findings: [{ id: 'kettle0000000001', lens: 'correctness', severity: 'high', title: 'Kettle never boils' }] });
   ctx.seed.run({ issue: 'GEO-9702', title: 'Fit the kettle lid', place: 'local' });
-  ctx.seed.runPr({ issue: 'GEO-9702', ref: 'widgets#7' });
+  ctx.seed.runPR({ issue: 'GEO-9702', ref: 'widgets#7' });
 
   await expect(runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false, fixesOnly: true })).resolves.toMatchObject({
     fixesOnly: true,
@@ -567,7 +567,7 @@ test('it leaves the head a hand-run --fixes-only run that checked no fix ran on 
   const fake = buildFakeRunner({ noslopReview: { code: 0, stdout: FAKE_REVIEW_JSON.replace('"head":"feat"', `"head":"${FAKE_FULL_SHA}"`), stderr: '' } });
   ctx.listWidgets();
   ctx.seed.run({ issue: 'GEO-9702', title: 'Fit the kettle lid', place: 'local' });
-  ctx.seed.runPr({ issue: 'GEO-9702', ref: 'widgets#7' });
+  ctx.seed.runPR({ issue: 'GEO-9702', ref: 'widgets#7' });
 
   await runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false, fixesOnly: true });
 
@@ -583,7 +583,7 @@ test('it marks the head a hand-run --fixes-only run ran on reviewed when every f
   ] }), stderr: '' } });
   ctx.listWidgets();
   ctx.seed.run({ issue: 'GEO-9702', title: 'Fit the kettle lid', place: 'local' });
-  ctx.seed.runPr({ issue: 'GEO-9702', ref: 'widgets#7' });
+  ctx.seed.runPR({ issue: 'GEO-9702', ref: 'widgets#7' });
 
   await runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false, fixesOnly: true });
 
@@ -598,7 +598,7 @@ test('it leaves the head a hand-run --fixes-only run ran on unmarked when one fi
   ] }), stderr: '' } });
   ctx.listWidgets();
   ctx.seed.run({ issue: 'GEO-9702', title: 'Fit the kettle lid', place: 'local' });
-  ctx.seed.runPr({ issue: 'GEO-9702', ref: 'widgets#7' });
+  ctx.seed.runPR({ issue: 'GEO-9702', ref: 'widgets#7' });
 
   await runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false, fixesOnly: true });
 
@@ -610,7 +610,7 @@ test('it marks the head a fix-checks-only run past the emergency cap ran on revi
   const fake = buildFakeRunner({ noslopReview: { code: 0, stdout: FAKE_REVIEW_JSON.replace('"head":"feat"', `"head":"${FAKE_FULL_SHA}"`), stderr: '' } });
   ctx.setCap('widgets', 1);
   ctx.seed.run({ issue: 'GEO-9702', title: 'Fit the kettle lid', place: 'local' });
-  ctx.seed.runPr({ issue: 'GEO-9702', ref: 'widgets#7' });
+  ctx.seed.runPR({ issue: 'GEO-9702', ref: 'widgets#7' });
   ctx.seed.reviewRound({ head: 'f00dfeedf00dfeedf00dfeedf00dfeedf00dfeed', special: 'none' });
 
   await expect(runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false })).resolves.toMatchObject({ fixesOnly: true, emergencyCap: 1, round: 1 });
@@ -624,7 +624,7 @@ test('it leaves the head a hand-run --fixes-only run past the emergency cap ran 
   const fake = buildFakeRunner({ noslopReview: { code: 0, stdout: FAKE_REVIEW_JSON.replace('"head":"feat"', `"head":"${FAKE_FULL_SHA}"`), stderr: '' } });
   ctx.setCap('widgets', 1);
   ctx.seed.run({ issue: 'GEO-9702', title: 'Fit the kettle lid', place: 'local' });
-  ctx.seed.runPr({ issue: 'GEO-9702', ref: 'widgets#7' });
+  ctx.seed.runPR({ issue: 'GEO-9702', ref: 'widgets#7' });
   ctx.seed.reviewRound({ head: 'f00dfeedf00dfeedf00dfeedf00dfeedf00dfeed', special: 'none' });
 
   await runReview({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7, watch: false, fixesOnly: true });
@@ -714,7 +714,7 @@ test('a push that only moves the base, with the same PR diff, runs fix checks on
   const ctx = setupTest();
   ctx.listWidgets();
   ctx.seed.run({ issue: 'GEO-9702', title: 'Fit the kettle lid', place: 'local' });
-  ctx.seed.runPr({ issue: 'GEO-9702', ref: 'widgets#7' });
+  ctx.seed.runPR({ issue: 'GEO-9702', ref: 'widgets#7' });
   const patchIds = { a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1: 'kettle-diff', b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2: 'kettle-diff' };
   await ctx.reviewAt('a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1', patchIds);
 
@@ -757,7 +757,7 @@ test('a head with the PR diff a --fixes-only run last saw is a round: only a ful
   const ctx = setupTest();
   ctx.listWidgets();
   ctx.seed.run({ issue: 'GEO-9702', title: 'Fit the kettle lid', place: 'local' });
-  ctx.seed.runPr({ issue: 'GEO-9702', ref: 'widgets#7' });
+  ctx.seed.runPR({ issue: 'GEO-9702', ref: 'widgets#7' });
   const patchIds = { a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1: 'kettle-diff', b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2: 'kettle-diff-with-lid', c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3: 'kettle-diff-with-lid' };
   await ctx.reviewAt('a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1', patchIds);
   const fake = buildFakeRunner({
@@ -777,7 +777,7 @@ test('a head that moves between the compare and the run is not marked reviewed, 
   const ctx = setupTest();
   ctx.listWidgets();
   ctx.seed.run({ issue: 'GEO-9702', title: 'Fit the kettle lid', place: 'local' });
-  ctx.seed.runPr({ issue: 'GEO-9702', ref: 'widgets#7' });
+  ctx.seed.runPR({ issue: 'GEO-9702', ref: 'widgets#7' });
   const patchIds = { a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1: 'kettle-diff', b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2: 'kettle-diff', c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3: 'kettle-diff-with-lid' };
   await ctx.reviewAt('a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1', patchIds);
   const fake = buildFakeRunner({
@@ -801,7 +801,7 @@ test('a head that moves between the compare and the run leaves the reviewed mark
   const ctx = setupTest();
   ctx.listWidgets();
   ctx.seed.run({ issue: 'GEO-9702', title: 'Fit the kettle lid', place: 'local' });
-  ctx.seed.runPr({ issue: 'GEO-9702', ref: 'widgets#7' });
+  ctx.seed.runPR({ issue: 'GEO-9702', ref: 'widgets#7' });
   const patchIds = { a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1: 'kettle-diff', b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2: 'kettle-diff', c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3: 'kettle-diff-with-lid' };
   await ctx.reviewAt('a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1', patchIds);
   const fake = buildFakeRunner({

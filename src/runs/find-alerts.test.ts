@@ -24,7 +24,7 @@ test('it raises no FINAL alert for a PR whose review started after the FINAL and
   const ctx = setupTest();
   addRun(ctx.db, { issue: 'GEO-9821', title: 'Invented kettle work', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
   at('2026-10-21T01:00:00Z');
-  ctx.seed.finalRunPr({ issue: 'GEO-9821', ref: 'kettle#21' });
+  ctx.seed.finalRunPR({ issue: 'GEO-9821', ref: 'kettle#21' });
   at('2026-10-21T01:40:00Z');
   reviewStarted(ctx.db, 'kettle#21', 'kettle-review');
   at('2026-10-21T01:55:00Z');
@@ -37,7 +37,7 @@ test('it raises a FINAL alert for a PR with no review after its FINAL', () => {
   const ctx = setupTest();
   addRun(ctx.db, { issue: 'GEO-9822', title: 'Invented kettle work', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
   at('2026-10-21T01:00:00Z');
-  ctx.seed.finalRunPr({ issue: 'GEO-9822', ref: 'kettle#22' });
+  ctx.seed.finalRunPR({ issue: 'GEO-9822', ref: 'kettle#22' });
 
   expect(findAlerts(ctx.db, [], new Map(), new Date('2026-10-21T03:00:00Z'))).toStrictEqual([
     { key: 'pr:kettle#22', fingerprint: 'final:abc1234', issue: 'GEO-9822', line: 'kettle#22 (GEO-9822) final at abc1234 for 120 min, no review [from marker:kettle]' },
@@ -48,7 +48,7 @@ test('it raises a FINAL alert for a PR whose only review came before its FINAL, 
   const ctx = setupTest();
   addRun(ctx.db, { issue: 'GEO-9823', title: 'Invented kettle work', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
   at('2026-10-21T00:30:00Z');
-  ctx.seed.runPr({ issue: 'GEO-9823', ref: 'kettle#23' });
+  ctx.seed.runPR({ issue: 'GEO-9823', ref: 'kettle#23' });
   reviewStarted(ctx.db, 'kettle#23', 'kettle-review');
   at('2026-10-21T00:45:00Z');
   reviewedPr(ctx.db, 'kettle#23', 'def5678', { recheck: false, force: false }, 'kettle-review');
@@ -64,7 +64,7 @@ test('it raises no FINAL alert for a PR with an owner override at its FINAL head
   const ctx = setupTest();
   addRun(ctx.db, { issue: 'GEO-9826', title: 'Invented kettle work', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
   at('2026-10-21T00:45:00Z');
-  ctx.seed.runPr({ issue: 'GEO-9826', ref: 'kettle#26' });
+  ctx.seed.runPR({ issue: 'GEO-9826', ref: 'kettle#26' });
   reviewedPr(ctx.db, 'kettle#26', 'def5678', { recheck: false, force: false }, 'kettle-review');
   reviewedPr(ctx.db, 'kettle#26', 'def5678', { recheck: true, force: false }, 'kettle-review');
   at('2026-10-21T01:00:00Z');
@@ -78,7 +78,7 @@ test('it raises a FINAL alert for a PR whose owner override is at an older head'
   const ctx = setupTest();
   addRun(ctx.db, { issue: 'GEO-9827', title: 'Invented kettle work', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
   at('2026-10-21T01:00:00Z');
-  ctx.seed.finalRunPr({ issue: 'GEO-9827', ref: 'kettle#27' });
+  ctx.seed.finalRunPR({ issue: 'GEO-9827', ref: 'kettle#27' });
   recordPROverride(ctx.db, { repo: 'kettle', pr: 27, head: 'fed9876', source: 'chat:kettle-chat@2026-10-21T00:30:00Z', note: 'Invented: an older head.', actor: 'kettle-bot' });
 
   expect(findAlerts(ctx.db, [], new Map(), new Date('2026-10-21T03:00:00Z'))).toStrictEqual([
@@ -91,7 +91,7 @@ test('it raises no exited alert for a session whose PR passed a review round tha
   const session = '11111111-2222-4333-8444-555555555555';
   addRun(ctx.db, { issue: 'GEO-9824', title: 'Invented kettle work', place: 'imp', session, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
   at('2026-10-21T01:00:00Z');
-  ctx.seed.finalRunPr({ issue: 'GEO-9824', ref: 'kettle#24' });
+  ctx.seed.finalRunPR({ issue: 'GEO-9824', ref: 'kettle#24' });
   at('2026-10-21T01:40:00Z');
   reviewStarted(ctx.db, 'kettle#24', 'kettle-review');
   at('2026-10-21T01:55:00Z');
@@ -105,7 +105,7 @@ test('it raises an exited alert for a session whose PR was reviewed only before 
   const session = '66666666-7777-4888-8999-aaaaaaaaaaaa';
   addRun(ctx.db, { issue: 'GEO-9825', title: 'Invented kettle work', place: 'imp', session, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
   at('2026-10-21T00:30:00Z');
-  ctx.seed.runPr({ issue: 'GEO-9825', ref: 'kettle#25' });
+  ctx.seed.runPR({ issue: 'GEO-9825', ref: 'kettle#25' });
   reviewStarted(ctx.db, 'kettle#25', 'kettle-review');
   at('2026-10-21T00:45:00Z');
   reviewedPr(ctx.db, 'kettle#25', 'def5678', { recheck: false, force: false }, 'kettle-review');
@@ -122,7 +122,7 @@ test('it raises no exited alert for a session whose PR has an owner override at 
   const session = '77777777-8888-4999-8aaa-bbbbbbbbbbbb';
   addRun(ctx.db, { issue: 'GEO-9828', title: 'Invented kettle work', place: 'imp', session, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
   at('2026-10-21T00:45:00Z');
-  ctx.seed.runPr({ issue: 'GEO-9828', ref: 'kettle#28' });
+  ctx.seed.runPR({ issue: 'GEO-9828', ref: 'kettle#28' });
   reviewedPr(ctx.db, 'kettle#28', 'def5678', { recheck: false, force: false }, 'kettle-review');
   reviewedPr(ctx.db, 'kettle#28', 'def5678', { recheck: true, force: false }, 'kettle-review');
   at('2026-10-21T01:00:00Z');
@@ -138,7 +138,7 @@ test('it raises no FINAL alert while the run waits on an open unblock item', () 
   addUnblock(ctx.db, { id: 'u901', task: 'Approve the kettle base layer', minutes: null, unblocks: [], notify: [], actor: 'kettle-review' });
   setState(ctx.db, 'GEO-9831', 'working', { next: 'Agent working.', waitsOn: 'kettle#30 base, waits on u901' }, 'kettle-bot');
   at('2026-10-21T01:00:00Z');
-  ctx.seed.finalRunPr({ issue: 'GEO-9831', ref: 'kettle#31' });
+  ctx.seed.finalRunPR({ issue: 'GEO-9831', ref: 'kettle#31' });
 
   expect(findAlerts(ctx.db, [], new Map(), new Date('2026-10-21T03:00:00Z'))).toStrictEqual([]);
 });
@@ -150,7 +150,7 @@ test('it raises the FINAL alert again once the unblock item the run waits on clo
   closeUnblock(ctx.db, 'u902', 'done', null, 'kettle-review');
   setState(ctx.db, 'GEO-9832', 'working', { next: 'Agent working.', waitsOn: 'waits on u902' }, 'kettle-bot');
   at('2026-10-21T01:00:00Z');
-  ctx.seed.finalRunPr({ issue: 'GEO-9832', ref: 'kettle#32' });
+  ctx.seed.finalRunPR({ issue: 'GEO-9832', ref: 'kettle#32' });
 
   expect(findAlerts(ctx.db, [], new Map(), new Date('2026-10-21T03:00:00Z'))).toStrictEqual([
     { key: 'pr:kettle#32', fingerprint: 'final:abc1234', issue: 'GEO-9832', line: 'kettle#32 (GEO-9832) final at abc1234 for 120 min, no review [from marker:kettle]' },
@@ -163,7 +163,7 @@ test('it raises the FINAL alert for a run whose wait names no open unblock item'
   addUnblock(ctx.db, { id: 'u903', task: 'Approve the kettle base layer', minutes: null, unblocks: [], notify: [], actor: 'kettle-review' });
   setState(ctx.db, 'GEO-9833', 'working', { next: 'Agent working.', waitsOn: 'waits on u9030 and the kettle release' }, 'kettle-bot');
   at('2026-10-21T01:00:00Z');
-  ctx.seed.finalRunPr({ issue: 'GEO-9833', ref: 'kettle#33' });
+  ctx.seed.finalRunPR({ issue: 'GEO-9833', ref: 'kettle#33' });
 
   expect(findAlerts(ctx.db, [], new Map(), new Date('2026-10-21T03:00:00Z'))).toStrictEqual([
     { key: 'pr:kettle#33', fingerprint: 'final:abc1234', issue: 'GEO-9833', line: 'kettle#33 (GEO-9833) final at abc1234 for 120 min, no review [from marker:kettle]' },
@@ -197,7 +197,7 @@ test('it raises no prompt-wait alert for a session waiting past the quiet limit 
   const session = '98510000-0000-4000-8000-000000000001';
   addRun(ctx.db, { issue: 'GEO-9851', title: 'Invented kettle work', place: 'imp', session, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
   at('2026-10-21T01:00:00Z');
-  ctx.seed.finalRunPr({ issue: 'GEO-9851', ref: 'kettle#51' });
+  ctx.seed.finalRunPR({ issue: 'GEO-9851', ref: 'kettle#51' });
   at('2026-10-21T01:10:00Z');
   reviewStarted(ctx.db, 'kettle#51', 'kettle-review');
   at('2026-10-21T01:20:00Z');
@@ -213,7 +213,7 @@ test('it raises the prompt-wait alert for a session waiting past the quiet limit
   const session = '98520000-0000-4000-8000-000000000001';
   addRun(ctx.db, { issue: 'GEO-9852', title: 'Invented kettle work', place: 'imp', session, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
   at('2026-10-21T01:00:00Z');
-  ctx.seed.finalRunPr({ issue: 'GEO-9852', ref: 'kettle#52' });
+  ctx.seed.finalRunPR({ issue: 'GEO-9852', ref: 'kettle#52' });
 
   const activity = new Map([[session, Date.parse('2026-10-21T01:30:00Z')]]);
 
@@ -241,7 +241,7 @@ test('it raises no prompt-wait alert for a helper that carries the run, with no 
   addRun(ctx.db, { issue: 'GEO-9854', title: 'Invented kettle work', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
   setSession(ctx.db, 'GEO-9854', helper, 'kettle-bot', 'add');
   at('2026-10-21T01:00:00Z');
-  ctx.seed.finalRunPr({ issue: 'GEO-9854', ref: 'kettle#54' });
+  ctx.seed.finalRunPR({ issue: 'GEO-9854', ref: 'kettle#54' });
   at('2026-10-21T01:10:00Z');
   reviewStarted(ctx.db, 'kettle#54', 'kettle-review');
   at('2026-10-21T01:20:00Z');
@@ -259,7 +259,7 @@ test('it raises the prompt-wait alert for a helper beside an active main session
   addRun(ctx.db, { issue: 'GEO-9857', title: 'Invented kettle work', place: 'imp', session: main, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
   setSession(ctx.db, 'GEO-9857', helper, 'kettle-bot', 'add');
   at('2026-10-21T01:00:00Z');
-  ctx.seed.finalRunPr({ issue: 'GEO-9857', ref: 'kettle#57' });
+  ctx.seed.finalRunPR({ issue: 'GEO-9857', ref: 'kettle#57' });
   at('2026-10-21T01:10:00Z');
   reviewStarted(ctx.db, 'kettle#57', 'kettle-review');
   at('2026-10-21T01:20:00Z');
@@ -284,7 +284,7 @@ test('it raises no quiet alert for an idle session past the quiet limit whose op
   const session = '98550000-0000-4000-8000-000000000001';
   addRun(ctx.db, { issue: 'GEO-9855', title: 'Invented kettle work', place: 'imp', session, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
   at('2026-10-21T01:00:00Z');
-  ctx.seed.finalRunPr({ issue: 'GEO-9855', ref: 'kettle#55' });
+  ctx.seed.finalRunPR({ issue: 'GEO-9855', ref: 'kettle#55' });
   at('2026-10-21T01:10:00Z');
   reviewStarted(ctx.db, 'kettle#55', 'kettle-review');
   at('2026-10-21T01:20:00Z');
@@ -300,7 +300,7 @@ test('it raises the quiet alert for an idle session past the quiet limit whose o
   const session = '98560000-0000-4000-8000-000000000001';
   addRun(ctx.db, { issue: 'GEO-9856', title: 'Invented kettle work', place: 'imp', session, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
   at('2026-10-21T01:00:00Z');
-  ctx.seed.finalRunPr({ issue: 'GEO-9856', ref: 'kettle#56' });
+  ctx.seed.finalRunPR({ issue: 'GEO-9856', ref: 'kettle#56' });
 
   const activity = new Map([[session, Date.parse('2026-10-21T01:30:00Z')]]);
 
@@ -354,7 +354,7 @@ test('it raises a FINAL alert for a PR whose only override at its FINAL head is 
   const ctx = setupTest();
   addRun(ctx.db, { issue: 'GEO-9828', title: 'Invented kettle work', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
   at('2026-10-21T01:00:00Z');
-  ctx.seed.finalRunPr({ issue: 'GEO-9828', ref: 'kettle#28' });
+  ctx.seed.finalRunPR({ issue: 'GEO-9828', ref: 'kettle#28' });
   recordCICheckOverride(ctx.db, { repo: 'kettle', pr: 28, head: 'abc1234aaaabbbbccccddddeeeeffff00001111', source: 'chat:kettle-chat@2026-10-21T01:30:00Z', note: 'Invented: the preview is meant to be red.', actor: 'kettle-bot', check: 'preview' });
 
   expect(findAlerts(ctx.db, [], new Map(), new Date('2026-10-21T03:00:00Z'))).toStrictEqual([
@@ -367,7 +367,7 @@ test('it raises the exit alert for a build session that left no PR, though its d
   at('2026-10-21T00:00:00Z');
   addRun(ctx.db, { issue: 'GEO-9831', title: 'Design the kettle spout', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', design: 'agent', actor: 'kettle-bot' });
   at('2026-10-21T00:10:00Z');
-  ctx.seed.finalRunPr({ issue: 'GEO-9831', ref: 'kettle#31' });
+  ctx.seed.finalRunPR({ issue: 'GEO-9831', ref: 'kettle#31' });
   at('2026-10-21T00:20:00Z');
   reviewStarted(ctx.db, 'kettle#31', 'kettle-review');
   at('2026-10-21T00:30:00Z');

@@ -102,7 +102,10 @@ test('a green row says so, and the colour follows the unrounded share', () => {
 
 test('a week with days not fetched says so and gets no colour', () => {
   const ctx = setupTest();
-  ctx.seed.fetchedDays({ unfetchedPRDays: ['2026-10-12', '2026-10-13'] });
+  ctx.seed.fetchedDays({ to: '2026-10-11' });
+  ctx.seed.goalDay({ kind: 'ci', key: 'atc', day: '2026-10-12', at: new Date('2026-09-01T00:00:00Z') });
+  ctx.seed.goalDay({ kind: 'ci', key: 'atc', day: '2026-10-13', at: new Date('2026-09-01T00:00:00Z') });
+  ctx.seed.fetchedDays({ from: '2026-10-14' });
   ctx.seed.linearIssue({ issue: 'GEO-1', type: 'Feature' });
   ctx.seed.mergedPR({ merged_at: '2026-10-14T03:00:00Z', issue: 'GEO-1' });
   const text = weeklyText(ctx.db, syd(MON, '17:00'));
@@ -111,7 +114,9 @@ test('a week with days not fetched says so and gets no colour', () => {
 
 test('it says a week with a CI day not fetched has no colour', () => {
   const ctx = setupTest();
-  ctx.seed.fetchedDays({ unfetchedCIDays: ['2026-10-08'] });
+  ctx.seed.fetchedDays({ to: '2026-10-07' });
+  ctx.seed.mergedPRDay({ day: '2026-10-08', at: '2026-09-01T00:00:00Z' });
+  ctx.seed.fetchedDays({ from: '2026-10-09' });
   const text = weeklyText(ctx.db, syd(MON, '17:00'));
   expect(row(text, 'CI minutes wasted')).toContain('| no data (0 CI min, 1 day(s) not fetched) |');
 });

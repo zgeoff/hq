@@ -17,7 +17,7 @@ function setupTest() {
 test('it records the merge commit, tag and ship time of a merged PR', () => {
   const ctx = setupTest();
   ctx.seed.run({ issue: 'GEO-9001' });
-  ctx.seed.mergedRunPr({ issue: 'GEO-9001', ref: 'kettle#1' });
+  ctx.seed.mergedRunPR({ issue: 'GEO-9001', ref: 'kettle#1' });
 
   writeShippedPR(ctx.db, { ref: 'kettle#1', sha: 'c'.repeat(40), tag: 'kettle@1.0.0', at: '2026-10-15T00:00:00Z' });
 
@@ -27,8 +27,8 @@ test('it records the merge commit, tag and ship time of a merged PR', () => {
 test('it leaves the other PRs as they were', () => {
   const ctx = setupTest();
   ctx.seed.run({ issue: 'GEO-9001' });
-  ctx.seed.mergedRunPr({ issue: 'GEO-9001', ref: 'kettle#1' });
-  ctx.seed.mergedRunPr({ issue: 'GEO-9001', ref: 'kettle#2' });
+  ctx.seed.mergedRunPR({ issue: 'GEO-9001', ref: 'kettle#1' });
+  ctx.seed.mergedRunPR({ issue: 'GEO-9001', ref: 'kettle#2' });
 
   writeShippedPR(ctx.db, { ref: 'kettle#1', sha: 'c'.repeat(40), tag: null, at: '2026-10-15T00:00:00Z' });
 

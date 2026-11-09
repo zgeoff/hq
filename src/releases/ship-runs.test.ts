@@ -135,7 +135,7 @@ test('it counts a noslop package at the repo root as changed by any file', async
 test('it ships a tools PR that changes no package at its merge time, with no tag and no release read', async () => {
   const ctx = setupTest();
   ctx.seed.run({ issue: 'GEO-73' });
-  ctx.seed.mergedRunPr({ issue: 'GEO-73', ref: 'tools#7', mergedAt: '2026-10-12T05:06:07Z' });
+  ctx.seed.mergedRunPR({ issue: 'GEO-73', ref: 'tools#7', mergedAt: '2026-10-12T05:06:07Z' });
   setState(ctx.db, 'GEO-73', 'merged', {}, 'z-delivery');
   const run = buildStubSourceGH({ shas: { 'tools#7': buildMockSha(7) }, contains: {}, config: { tools: { packages: { 'packages/alpha': { component: 'alpha' } } } }, files: { 'tools#7': ['docs/readme.md'] } }, ctx.calls);
 
@@ -149,8 +149,8 @@ test('it ships a tools PR that changes no package at its merge time, with no tag
 test('it keeps a PR shipped at its merge with no tag on the next pass, with no gh call for it, while another PR of the run waits', async () => {
   const ctx = setupTest();
   ctx.seed.run({ issue: 'GEO-74' });
-  ctx.seed.mergedRunPr({ issue: 'GEO-74', ref: 'tools#8', mergedAt: '2026-10-12T05:06:07Z' });
-  ctx.seed.mergedRunPr({ issue: 'GEO-74', ref: 'tools#9' });
+  ctx.seed.mergedRunPR({ issue: 'GEO-74', ref: 'tools#8', mergedAt: '2026-10-12T05:06:07Z' });
+  ctx.seed.mergedRunPR({ issue: 'GEO-74', ref: 'tools#9' });
   setState(ctx.db, 'GEO-74', 'merged', {}, 'z-delivery');
   const facts = {
     shas: { 'tools#8': buildMockSha(8), 'tools#9': buildMockSha(9) },
@@ -260,7 +260,7 @@ test.each([
 test('it ships a vers PR at its merge time', async () => {
   const ctx = setupTest();
   ctx.seed.run({ issue: 'GEO-90' });
-  ctx.seed.mergedRunPr({ issue: 'GEO-90', ref: 'vers#4', mergedAt: '2026-10-12T05:06:07Z' });
+  ctx.seed.mergedRunPR({ issue: 'GEO-90', ref: 'vers#4', mergedAt: '2026-10-12T05:06:07Z' });
   setState(ctx.db, 'GEO-90', 'merged', {}, 'z-delivery');
   const run = buildStubSourceGH({ shas: { 'vers#4': buildMockSha(4) }, contains: {} }, ctx.calls);
 
@@ -382,7 +382,7 @@ test('it waits on an hq PR, with no error, when GitHub does not know the clean i
 test('it leaves a run alone that was put in deploy-held after the release that holds its PR', async () => {
   const ctx = setupTest();
   ctx.seed.run({ issue: 'GEO-91' });
-  ctx.seed.mergedRunPr({ issue: 'GEO-91', ref: 'vers#6', mergedAt: '2026-10-12T05:06:07Z' });
+  ctx.seed.mergedRunPR({ issue: 'GEO-91', ref: 'vers#6', mergedAt: '2026-10-12T05:06:07Z' });
   setState(ctx.db, 'GEO-91', 'merged', {}, 'z-delivery');
   setState(ctx.db, 'GEO-91', 'deploy-held', { next: 'Waits on the kettle host to switch.' }, 'z-release');
   const run = buildStubSourceGH({ shas: { 'vers#6': buildMockSha(6) }, contains: {} }, ctx.calls);
@@ -397,7 +397,7 @@ test('it leaves a run alone that was put in deploy-held after the release that h
 test('it ships a run that was put in deploy-held before the release that holds its PR', async () => {
   const ctx = setupTest();
   ctx.seed.run({ issue: 'GEO-92' });
-  ctx.seed.mergedRunPr({ issue: 'GEO-92', ref: 'vers#7', mergedAt: '2026-10-15T05:06:07Z' });
+  ctx.seed.mergedRunPR({ issue: 'GEO-92', ref: 'vers#7', mergedAt: '2026-10-15T05:06:07Z' });
   setState(ctx.db, 'GEO-92', 'merged', {}, 'z-delivery');
   setState(ctx.db, 'GEO-92', 'deploy-held', { next: 'Waits on the kettle release.' }, 'z-release');
   const run = buildStubSourceGH({ shas: { 'vers#7': buildMockSha(7) }, contains: {} }, ctx.calls);
@@ -598,7 +598,7 @@ test('it reads a failed gates file once in a pass for two cloud PRs, records one
 test('it ships a build run whose delivery PR is released while its design pass PR stays open', async () => {
   const ctx = setupTest();
   ctx.seed.run({ issue: 'GEO-79', title: 'Design the kettle spout', design: 'agent', lane: 'cloud' });
-  ctx.seed.runPr({ issue: 'GEO-79', ref: 'tools#13' });
+  ctx.seed.runPR({ issue: 'GEO-79', ref: 'tools#13' });
   setState(ctx.db, 'GEO-79', 'done', { note: 'design settled' }, 'z-delivery');
   createMergedRun(ctx.db, 'GEO-79', ['tools#14']);
   const run = buildStubSourceGH(

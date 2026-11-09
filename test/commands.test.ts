@@ -1,4 +1,6 @@
-import { afterEach, beforeEach, expect, test } from 'bun:test';
+// oxlint-disable zgeoff/test-beside-module -- checks the command registry against the dispatcher in src/cli.ts and every group
+import { expect, onTestFinished, spyOn, test } from 'bun:test';
+import { updateEnv } from '@zgeoff/testing/helpers';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { main } from '../src/cli.ts';
@@ -138,47 +140,44 @@ test('a read-only row is one that never writes: spot checks', () => {
   expect(findCommand('stats', undefined)?.readOnly).toBe(false);
 });
 
-let cleanup: () => void;
-let out: string[];
-const origLog = console.log;
-const origErr = console.error;
-beforeEach(() => {
-  ({ cleanup } = freshDb());
+test('the dispatcher keeps its special cases and its errors', async () => {
+  const ctx = setupTest();
   at(NOON_SYDNEY);
-  process.env['HQ_NOTIFY'] = 'off';
-  process.env['HQ_AS'] = 'z-stu';
-  out = [];
-  console.log = (s: string) => out.push(s);
-  console.error = (s: string) => out.push(s);
-});
-afterEach(() => {
-  console.log = origLog;
-  console.error = origErr;
-  cleanup();
+  expect(await main(['help'])).toBe(0);
+  expect(ctx.out.join('\n')).toBe(HELP);
+  ctx.out.length = 0;
+  expect(await main(['--help'])).toBe(0);
+  expect(ctx.out.join('\n')).toBe(HELP);
+  ctx.out.length = 0;
+  expect(await main(['--version'])).toBe(0);
+  expect(ctx.out.join('\n')).toContain(`hq ${VERSION} (schema v`);
+  ctx.out.length = 0;
+  expect(await main(['no-such-noun'])).toBe(1);
+  expect(ctx.out.join('\n')).toBe('hq: unknown command: no-such-noun. Try hq help');
+  ctx.out.length = 0;
+  expect(await main(['run', 'no-such-verb'])).toBe(1);
+  expect(ctx.out.join('\n')).toBe('hq: unknown command: hq run no-such-verb');
+  ctx.out.length = 0;
+  expect(await main(['call'])).toBe(1);
+  expect(ctx.out.join('\n')).toBe('hq: --command is required');
+  ctx.out.length = 0;
+  expect(await main(['outbox', 'no-such-verb'])).toBe(0);
+  expect(ctx.out.join('\n')).toBe('Outbox empty.');
 });
 
-test('the dispatcher keeps its special cases and its errors', async () => {
-  expect(await main(['help'])).toBe(0);
-  expect(out.join('\n')).toBe(HELP);
-  out = [];
-  expect(await main(['--help'])).toBe(0);
-  expect(out.join('\n')).toBe(HELP);
-  out = [];
-  expect(await main(['--version'])).toBe(0);
-  expect(out.join('\n')).toContain(`hq ${VERSION} (schema v`);
-  out = [];
-  expect(await main(['no-such-noun'])).toBe(1);
-  expect(out.join('\n')).toBe('hq: unknown command: no-such-noun. Try hq help');
-  out = [];
-  expect(await main(['run', 'no-such-verb'])).toBe(1);
-  expect(out.join('\n')).toBe('hq: unknown command: hq run no-such-verb');
-  out = [];
-  expect(await main(['call'])).toBe(1);
-  expect(out.join('\n')).toBe('hq: --command is required');
-  out = [];
-  expect(await main(['outbox', 'no-such-verb'])).toBe(0);
-  expect(out.join('\n')).toBe('Outbox empty.');
-});
+function setupTest() {
+  const fresh = freshDb();
+  onTestFinished(fresh.cleanup);
+  updateEnv('HQ_NOTIFY', 'off');
+  updateEnv('HQ_AS', 'z-stu');
+  const out: string[] = [];
+  const log = spyOn(console, 'log').mockImplementation((line: string) => out.push(line));
+  onTestFinished(() => log.mockRestore());
+  const error = spyOn(console, 'error').mockImplementation((line: string) => out.push(line));
+  onTestFinished(() => error.mockRestore());
+
+  return { out };
+}
 
 // The real entry point, not main() called from a test: a handler must not wait on the module that is running it.
 test('hq run as the entry point answers a command', async () => {

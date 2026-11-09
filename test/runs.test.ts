@@ -1,4 +1,6 @@
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+// oxlint-disable zgeoff/test-beside-module -- the whole-program runs suite, from the board through the event feed and the sweep
+import { describe, expect, onTestFinished, test } from 'bun:test';
+import { updateEnv } from '@zgeoff/testing/helpers';
 import type { Database } from 'bun:sqlite';
 import invariant from 'tiny-invariant';
 import { AtcClient } from '../src/atc/atc-client.ts';
@@ -34,65 +36,53 @@ import { watchlist } from '../src/runs/watchlist.ts';
 import { parseJSON } from '../src/noslop/parse-json.ts';
 import { buildStubFinalGH } from './build-stub-final-gh.ts';
 import { buildStubGitHubFactsRunner } from './build-stub-github-facts-runner.ts';
-import { type FakeAtc, NOON_SYDNEY, at, fakeAtc, freshDb } from './helpers.ts';
+import type { FakeAtcSession } from './helpers.ts';
+import { NOON_SYDNEY, at, fakeAtc } from './helpers.ts';
 import { buildSeeder } from '../src/test-utils/build-seeder.ts';
 import { writeShippedPR } from '../src/releases/write-shipped-pr.ts';
 import { createTestDb } from './create-test-db.ts';
-
-let db: Database;
-let dir: string;
-let cleanup: () => void;
-let atc: FakeAtc | null = null;
 
 const S1 = 'aaaaaaaa-1111-4111-8111-111111111111';
 const S2 = 'bbbbbbbb-2222-4222-8222-222222222222';
 const base = new Date(NOON_SYDNEY).getTime();
 const atMin = (m: number) => at(new Date(base + m * 60_000).toISOString());
-const add = (issue = 'GEO-9001', session: string | null = S1) =>
-  addRun(db, { issue, title: 'Teach the kettle to whistle', place: 'imp', session, next: 'Agent working.', gate: null, geoffChat: false, actor: 'z-delivery' });
-
-beforeEach(() => {
-  ({ db, dir, cleanup } = freshDb());
-  at(NOON_SYDNEY);
-});
-afterEach(() => {
-  atc?.stop();
-  atc = null;
-  cleanup();
-});
 
 describe('the board', () => {
   test('add, relaunch, and resolve by issue or session prefix', () => {
-    expect(add().result).toBe('added');
-    expect(add().result).toBe('noop');
-    setSession(db, 'GEO-9001', S2, 'z-delivery');
-    const r = resolveRun(db, 'aaaaaaaa');
-    expect(r.issue).toBe('GEO-9001');
-    expect(watchlist(db)).toEqual([{ session_id: S2, issue: 'GEO-9001' }]);
+    const ctx = setupTest();
+    expect(ctx.addRun().result).toBe('added');
+    expect(ctx.addRun().result).toBe('noop');
+    setSession(ctx.db, 'GEO-9001', S2, 'z-delivery');
+    const resolved = resolveRun(ctx.db, 'aaaaaaaa');
+    expect(resolved.issue).toBe('GEO-9001');
+    expect(watchlist(ctx.db)).toStrictEqual([{ session_id: S2, issue: 'GEO-9001' }]);
   });
 
   test('a session belongs to one issue', () => {
-    add();
-    expect(() => add('GEO-9002', S1)).toThrow('is on GEO-9001');
+    const ctx = setupTest();
+    ctx.addRun();
+    expect(() => ctx.addRun('GEO-9002', S1)).toThrow('is on GEO-9001');
   });
 
   test('done closes the row, ends the session, and needs --reopen to change', () => {
-    add();
-    setState(db, 'GEO-9001', 'done', { note: 'shipped' }, 'z-delivery');
-    expect(listRuns(db)).toHaveLength(0);
-    expect(watchlist(db)).toEqual([]);
-    expect(() => setState(db, 'GEO-9001', 'working', {}, 'z-delivery')).toThrow('--reopen');
-    expect(setState(db, 'GEO-9001', 'working', { reopen: true }, 'z-delivery').state).toBe('working');
+    const ctx = setupTest();
+    ctx.addRun();
+    setState(ctx.db, 'GEO-9001', 'done', { note: 'shipped' }, 'z-delivery');
+    expect(listRuns(ctx.db)).toHaveLength(0);
+    expect(watchlist(ctx.db)).toStrictEqual([]);
+    expect(() => setState(ctx.db, 'GEO-9001', 'working', {}, 'z-delivery')).toThrow('--reopen');
+    expect(setState(ctx.db, 'GEO-9001', 'working', { reopen: true }, 'z-delivery').state).toBe('working');
   });
 
   test('merged waits on a release; unknown states are refused', () => {
-    add();
-    expect(setState(db, 'GEO-9001', 'merged', { waitsOn: 'widgets 1.2.0 deploy' }, 'z-delivery').waits_on).toBe('widgets 1.2.0 deploy');
-    expect(() => setState(db, 'GEO-9001', 'vibing', {}, 'z-delivery')).toThrow('state must be one of');
+    const ctx = setupTest();
+    ctx.addRun();
+    expect(setState(ctx.db, 'GEO-9001', 'merged', { waitsOn: 'widgets 1.2.0 deploy' }, 'z-delivery').waits_on).toBe('widgets 1.2.0 deploy');
+    expect(() => setState(ctx.db, 'GEO-9001', 'vibing', {}, 'z-delivery')).toThrow('state must be one of');
   });
 
   test('PR refs normalise from URLs and owner/repo forms', () => {
-    expect(normalizePrRef('https://github.com/acme/widgets/pull/12')).toEqual({ ref: 'widgets#12', url: 'https://github.com/acme/widgets/pull/12' });
+    expect(normalizePrRef('https://github.com/acme/widgets/pull/12')).toStrictEqual({ ref: 'widgets#12', url: 'https://github.com/acme/widgets/pull/12' });
     expect(normalizePrRef('acme/widgets#12').ref).toBe('widgets#12');
     expect(() => normalizePrRef('#12')).toThrow('cannot read a PR');
   });
@@ -100,112 +90,121 @@ describe('the board', () => {
 
 describe('reviews: one round plus one re-check', () => {
   test('rounds are counted and a third needs --force', () => {
-    add();
-    addPr(db, 'GEO-9001', 'widgets#12', 'z-delivery');
-    expect(() => reviewedPr(db, 'widgets#12', 'abc1234', { recheck: true, force: false }, 'z-delivery')).toThrow('no first review');
-    expect(reviewedPr(db, 'widgets#12', 'abc1234', { recheck: false, force: false }, 'z-delivery').review_round).toBe(1);
-    expect(() => reviewedPr(db, 'widgets#12', 'def5678', { recheck: false, force: false }, 'z-delivery')).toThrow('use --recheck');
-    expect(reviewedPr(db, 'widgets#12', 'def5678', { recheck: true, force: false }, 'z-delivery').review_round).toBe(2);
-    expect(() => reviewedPr(db, 'widgets#12', 'fff0000', { recheck: true, force: false }, 'z-delivery')).toThrow('third round');
+    const ctx = setupTest();
+    ctx.addRun();
+    addPr(ctx.db, 'GEO-9001', 'widgets#12', 'z-delivery');
+    expect(() => reviewedPr(ctx.db, 'widgets#12', 'abc1234', { recheck: true, force: false }, 'z-delivery')).toThrow('no first review');
+    expect(reviewedPr(ctx.db, 'widgets#12', 'abc1234', { recheck: false, force: false }, 'z-delivery').review_round).toBe(1);
+    expect(() => reviewedPr(ctx.db, 'widgets#12', 'def5678', { recheck: false, force: false }, 'z-delivery')).toThrow('use --recheck');
+    expect(reviewedPr(ctx.db, 'widgets#12', 'def5678', { recheck: true, force: false }, 'z-delivery').review_round).toBe(2);
+    expect(() => reviewedPr(ctx.db, 'widgets#12', 'fff0000', { recheck: true, force: false }, 'z-delivery')).toThrow('third round');
   });
 });
 
 describe('note signals', () => {
   test('the FINAL marker attaches the PR and marks it final', () => {
-    add();
-    const sig = applyNoteSignals(db, 'GEO-9001', 'FINAL widgets#12 abc1234 all green', { source: 'test' });
+    const ctx = setupTest();
+    ctx.addRun();
+    const sig = applyNoteSignals(ctx.db, 'GEO-9001', 'FINAL widgets#12 abc1234 all green', { source: 'test' });
     expect(sig.final).toBe('widgets#12');
-    expect(listRuns(db)[0]!.prs[0]).toMatchObject({ ref: 'widgets#12', final_sha: 'abc1234', final_source: 'marker:test' });
+    expect(listRuns(ctx.db)[0]?.prs[0]).toMatchObject({ ref: 'widgets#12', final_sha: 'abc1234', final_source: 'marker:test' });
   });
 
   test('a note whose final notice cannot be queued is not kept, so the same marker marks it final on a retry', () => {
-    add();
-    db.run("CREATE TEMP TRIGGER refuse_notice BEFORE INSERT ON outbox BEGIN SELECT RAISE(ABORT, 'invented: outbox refused'); END");
-    expect(() => addNote(db, 'GEO-9001', 'FINAL widgets#12 abc1234 all green', { label: null, actor: 'z-delivery' })).toThrow('invented: outbox refused');
-    expect(db.query('SELECT COUNT(*) AS total FROM run_notes').get()).toStrictEqual({ total: 0 });
-    db.run('DROP TRIGGER refuse_notice');
-    addNote(db, 'GEO-9001', 'FINAL widgets#12 abc1234 all green', { label: null, actor: 'z-delivery' });
-    expect(db.query("SELECT topic FROM outbox WHERE topic = 'final:widgets#12'").all()).toStrictEqual([{ topic: 'final:widgets#12' }]);
+    const ctx = setupTest();
+    ctx.addRun();
+    ctx.db.run("CREATE TEMP TRIGGER refuse_notice BEFORE INSERT ON outbox BEGIN SELECT RAISE(ABORT, 'invented: outbox refused'); END");
+    expect(() => addNote(ctx.db, 'GEO-9001', 'FINAL widgets#12 abc1234 all green', { label: null, actor: 'z-delivery' })).toThrow('invented: outbox refused');
+    expect(ctx.db.query('SELECT COUNT(*) AS total FROM run_notes').get()).toStrictEqual({ total: 0 });
+    ctx.db.run('DROP TRIGGER refuse_notice');
+    addNote(ctx.db, 'GEO-9001', 'FINAL widgets#12 abc1234 all green', { label: null, actor: 'z-delivery' });
+    expect(ctx.db.query("SELECT topic FROM outbox WHERE topic = 'final:widgets#12'").all()).toStrictEqual([{ topic: 'final:widgets#12' }]);
   });
 
   test('a note that marks a PR final leaves an event with the note id and the sha', () => {
-    add();
-    const note = addNote(db, 'GEO-9001', 'FINAL widgets#12 abc1234 all green', { label: null, actor: 'z-delivery' });
-    const ev = listEvents(db, 'final');
+    const ctx = setupTest();
+    ctx.addRun();
+    const note = addNote(ctx.db, 'GEO-9001', 'FINAL widgets#12 abc1234 all green', { label: null, actor: 'z-delivery' });
+    const ev = listEvents(ctx.db, 'final');
     expect(ev).toHaveLength(1);
     expect(ev[0]).toMatchObject({ subject_id: 'GEO-9001', actor: 'z-delivery', from_state: null, to_state: 'abc1234' });
     expect(ev.map((event) => parseJSON(event.data))).toStrictEqual([{ ref: 'widgets#12', sha: 'abc1234', source: 'marker:note:z-delivery', note: note.id, given: 'abc1234', resolved: false, reason: 'not resolved in this pass' }]);
-    finalPr(db, 'widgets#12', { sha: 'def5678', actor: 'z-q' });
-    const last = listEvents(db, 'final').at(-1);
+    finalPr(ctx.db, 'widgets#12', { sha: 'def5678', actor: 'z-q' });
+    const last = listEvents(ctx.db, 'final').at(-1);
     invariant(last, 'the second final logged an event');
     expect(last).toMatchObject({ from_state: 'abc1234', to_state: 'def5678' });
     expect(JSON.parse(last.data)).toMatchObject({ source: 'cli:z-q', note: null });
   });
 
   test("today's wording marks the row's only open PR final", () => {
-    add();
-    addPr(db, 'GEO-9001', 'widgets#12', 'z-delivery');
-    expect(applyNoteSignals(db, 'GEO-9001', 'PR #12 is final again at 39f05fe. CI green.', { source: 'test' }).final).toBe('widgets#12');
+    const ctx = setupTest();
+    ctx.addRun();
+    addPr(ctx.db, 'GEO-9001', 'widgets#12', 'z-delivery');
+    expect(applyNoteSignals(ctx.db, 'GEO-9001', 'PR #12 is final again at 39f05fe. CI green.', { source: 'test' }).final).toBe('widgets#12');
   });
 
   test('an opened PR is attached; a merely mentioned one is not', () => {
-    add();
-    applyNoteSignals(db, 'GEO-9001', 'Opened PR https://github.com/acme/widgets/pull/14 for GEO-9001. Rebased after gadgets#3 merged.', { source: 'test' });
-    expect(listRuns(db)[0]!.prs.map((p) => p.ref)).toEqual(['widgets#14']);
+    const ctx = setupTest();
+    ctx.addRun();
+    applyNoteSignals(ctx.db, 'GEO-9001', 'Opened PR https://github.com/acme/widgets/pull/14 for GEO-9001. Rebased after gadgets#3 merged.', { source: 'test' });
+    expect(listRuns(ctx.db)[0]?.prs.map((pr) => pr.ref)).toStrictEqual(['widgets#14']);
   });
 
   test('with two open PRs and no named one, the phrase marks nothing', () => {
-    add();
-    addPr(db, 'GEO-9001', 'widgets#12', 'z-delivery');
-    addPr(db, 'GEO-9001', 'widgets#13', 'z-delivery');
-    expect(applyNoteSignals(db, 'GEO-9001', 'it is final at 39f05fe', { source: 'test' }).final).toBeNull();
+    const ctx = setupTest();
+    ctx.addRun();
+    addPr(ctx.db, 'GEO-9001', 'widgets#12', 'z-delivery');
+    addPr(ctx.db, 'GEO-9001', 'widgets#13', 'z-delivery');
+    expect(applyNoteSignals(ctx.db, 'GEO-9001', 'it is final at 39f05fe', { source: 'test' }).final).toBeNull();
   });
 
   test('a cli note by session prefix lands on the row', () => {
-    add();
-    expect(addNote(db, 'aaaaaaaa', 'checked the kettle', { label: null, actor: 'z-delivery' }).issue).toBe('GEO-9001');
+    const ctx = setupTest();
+    ctx.addRun();
+    expect(addNote(ctx.db, 'aaaaaaaa', 'checked the kettle', { label: null, actor: 'z-delivery' }).issue).toBe('GEO-9001');
   });
 });
 
 describe('reading the event feed', () => {
   test('first run starts at the end; later notes for row sessions are kept once', async () => {
-    atc = fakeAtc(dir, [{ id: S1, name: 'kettle', alive: true, state: 'running' }]);
+    const ctx = setupTest();
+    const atc = ctx.startAtc([{ id: S1, name: 'kettle', alive: true, state: 'running' }]);
     atc.feed.push({ at: base, session: S1, name: 'kettle', kind: 'note', detail: 'old note before hq', label: 'progress' });
-    add();
+    ctx.addRun();
     const c = await AtcClient.open();
     try {
-      const boot = await ingestNotes(db, c, { run: buildStubFinalGH({ commits: 'fault' }, []) });
+      const boot = await ingestNotes(ctx.db, c, { run: buildStubFinalGH({ commits: 'fault' }, []) });
       expect(boot.bootstrapped).toBe(true);
       atc.feed.push({ at: base + 1000, session: S1, name: 'kettle', kind: 'note', detail: 'FINAL widgets#12 abc1234', label: 'progress' });
       atc.feed.push({ at: base + 2000, session: 'cccccccc-0000', name: 'stranger', kind: 'note', detail: 'not ours', label: 'progress' });
       atc.feed.push({ at: base + 3000, session: S1, name: 'kettle', kind: 'turn-done', detail: null });
-      const ingested = await ingestNotes(db, c, { run: buildStubFinalGH({ commits: 'fault' }, []) });
+      const ingested = await ingestNotes(ctx.db, c, { run: buildStubFinalGH({ commits: 'fault' }, []) });
       expect(ingested).toMatchObject({ read: 3, notes: 1, unmatched: 1, finals: ['widgets#12'] });
-      const again = await ingestNotes(db, c, { run: buildStubFinalGH({ commits: 'fault' }, []) });
+      const again = await ingestNotes(ctx.db, c, { run: buildStubFinalGH({ commits: 'fault' }, []) });
       expect(again.notes).toBe(0);
     } finally {
       c.close();
     }
-    expect(notesFor(db, 'GEO-9001', 10)).toHaveLength(1);
+    expect(notesFor(ctx.db, 'GEO-9001', 10)).toHaveLength(1);
   });
 
   test('a sweep ends every gone session, and a working run\'s exit alert repeats from the sweep\'s mark; a session removed by hand raises none', async () => {
+    const ctx = setupTest();
     const BY_HAND = 'dddddddd-4444-4444-8444-444444444444';
     const HANDOFF = 'eeeeeeee-5555-4555-8555-555555555555';
-    const atcFake = fakeAtc(dir, []);
+    ctx.startAtc([]);
     const client = await AtcClient.open();
-    atc = atcFake;
-    add();
-    add('GEO-9002', S2);
-    add('GEO-9003', BY_HAND);
-    setState(db, 'GEO-9002', 'blocked', { waitsOn: 'a gadgets release' }, 'z-delivery');
-    setSession(db, 'GEO-9003', BY_HAND, 'z-delivery', 'remove');
+    ctx.addRun();
+    ctx.addRun('GEO-9002', S2);
+    ctx.addRun('GEO-9003', BY_HAND);
+    setState(ctx.db, 'GEO-9002', 'blocked', { waitsOn: 'a gadgets release' }, 'z-delivery');
+    setSession(ctx.db, 'GEO-9003', BY_HAND, 'z-delivery', 'remove');
     atMin(6);
     try {
-      const afterSweep = await sweepNow(db, client, buildStubGitHubFactsRunner({}), { actor: 'z-delivery', wrapUpDeps: { openClient: () => Promise.reject(new Error('no wrap-up expected')), readImpWork: () => Promise.reject(new Error('no wrap-up expected')), readLocalWork: () => Promise.resolve({ state: 'pushed' as const }) }, log: () => {} });
+      const afterSweep = await sweepNow(ctx.db, client, buildStubGitHubFactsRunner({}), { actor: 'z-delivery', wrapUpDeps: { openClient: () => Promise.reject(new Error('no wrap-up expected')), readImpWork: () => Promise.reject(new Error('no wrap-up expected')), readLocalWork: () => Promise.resolve({ state: 'pushed' as const }) }, log: () => {} });
       atMin(6 + SWEEP_MINUTES.repeatMinutes());
-      const repeatSweep = await sweepNow(db, client, buildStubGitHubFactsRunner({}), { actor: 'z-delivery', wrapUpDeps: { openClient: () => Promise.reject(new Error('no wrap-up expected')), readImpWork: () => Promise.reject(new Error('no wrap-up expected')), readLocalWork: () => Promise.resolve({ state: 'pushed' as const }) }, log: () => {} });
-      expect([afterSweep.sent.map((a) => a.key), repeatSweep.sent.map((a) => a.key), afterSweep.sent[0]?.line]).toEqual([
+      const repeatSweep = await sweepNow(ctx.db, client, buildStubGitHubFactsRunner({}), { actor: 'z-delivery', wrapUpDeps: { openClient: () => Promise.reject(new Error('no wrap-up expected')), readImpWork: () => Promise.reject(new Error('no wrap-up expected')), readLocalWork: () => Promise.resolve({ state: 'pushed' as const }) }, log: () => {} });
+      expect([afterSweep.sent.map((alert) => alert.key), repeatSweep.sent.map((alert) => alert.key), afterSweep.sent[0]?.line]).toStrictEqual([
         [`session:${S1}`],
         [`session:${S1}`],
         'GEO-9001: session aaaaaaaa has exited; wrap it up, or hq run session GEO-9001 aaaaaaaa --remove',
@@ -213,27 +212,27 @@ describe('reading the event feed', () => {
     } finally {
       client.close();
     }
-    expect(db.query('SELECT session_id, active, ended_by FROM run_sessions ORDER BY session_id').all()).toEqual([
+    expect(ctx.db.query('SELECT session_id, active, ended_by FROM run_sessions ORDER BY session_id').all()).toStrictEqual([
       { session_id: S1, active: 0, ended_by: 'sweep' },
       { session_id: S2, active: 0, ended_by: 'sweep' },
       { session_id: BY_HAND, active: 0, ended_by: null },
     ]);
-    setSession(db, 'GEO-9001', 'aaaaaaaa', 'z-delivery', 'remove');
-    expect([findAlerts(db, [], new Map(), new Date(base + 59 * 60_000)), db.query('SELECT ended_by FROM run_sessions WHERE session_id = ?').get(S1)]).toEqual([[], { ended_by: null }]);
-    expect(() => setSession(db, 'GEO-9003', BY_HAND, 'z-delivery', 'remove')).toThrow('no active session');
-    setSession(db, 'GEO-9001', HANDOFF, 'z-delivery');
-    expect(updateGoneRunSessions(db, [], 'z-delivery', new Date(base + 60 * 60_000))).toBe(1);
+    setSession(ctx.db, 'GEO-9001', 'aaaaaaaa', 'z-delivery', 'remove');
+    expect([findAlerts(ctx.db, [], new Map(), new Date(base + 59 * 60_000)), ctx.db.query('SELECT ended_by FROM run_sessions WHERE session_id = ?').get(S1)]).toStrictEqual([[], { ended_by: null }]);
+    expect(() => setSession(ctx.db, 'GEO-9003', BY_HAND, 'z-delivery', 'remove')).toThrow('no active session');
+    setSession(ctx.db, 'GEO-9001', HANDOFF, 'z-delivery');
+    expect(updateGoneRunSessions(ctx.db, [], 'z-delivery', new Date(base + 60 * 60_000))).toBe(1);
     atMin(61);
-    setSession(db, 'GEO-9001', S1, 'z-delivery');
-    expect(findAlerts(db, [{ id: S1, name: 'kettle', alive: true, state: 'running' }], new Map(), new Date(base + 61 * 60_000))).toEqual([]);
+    setSession(ctx.db, 'GEO-9001', S1, 'z-delivery');
+    expect(findAlerts(ctx.db, [{ id: S1, name: 'kettle', alive: true, state: 'running' }], new Map(), new Date(base + 61 * 60_000))).toStrictEqual([]);
     atMin(62);
-    setSession(db, 'GEO-9001', S1, 'z-delivery', 'remove');
-    expect(findAlerts(db, [], new Map(), new Date(base + 62 * 60_000))).toEqual([]);
+    setSession(ctx.db, 'GEO-9001', S1, 'z-delivery', 'remove');
+    expect(findAlerts(ctx.db, [], new Map(), new Date(base + 62 * 60_000))).toStrictEqual([]);
   });
 
   test('a cursor the daemon no longer knows is re-synced to the end', async () => {
     const ctx = setupTest();
-    atc = fakeAtc(ctx.directory, []);
+    ctx.startAtc([]);
     ctx.seed.meta({ key: 'atc_events_cursor', value: 'not-a-cursor' });
     const c = await AtcClient.open();
     try {
@@ -247,7 +246,7 @@ describe('reading the event feed', () => {
 
   test('a cursor past the end (log reset) is caught after three empty reads', async () => {
     const ctx = setupTest();
-    atc = fakeAtc(ctx.directory, []);
+    const atc = ctx.startAtc([]);
     atc.feed.push({ at: base, session: S1, name: 'x', kind: 'turn-done', detail: null });
     const past = Buffer.from(JSON.stringify(['events', 500])).toString('base64url');
     ctx.seed.meta({ key: 'atc_events_cursor', value: past });
@@ -269,76 +268,80 @@ describe('the sweep', () => {
   const alive = (state = 'running') => [{ id: S1, name: 'kettle', alive: true, state }];
 
   test('a final PR with no review for 30 min is flagged once, then after 30 more', () => {
-    add();
-    addPr(db, 'GEO-9001', 'widgets#12', 'z-delivery');
-    finalPr(db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
+    const ctx = setupTest();
+    ctx.addRun();
+    addPr(ctx.db, 'GEO-9001', 'widgets#12', 'z-delivery');
+    finalPr(ctx.db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
     atMin(29);
-    expect(findAlerts(db, alive(), new Map(), new Date(base + 29 * 60_000))).toEqual([]);
+    expect(findAlerts(ctx.db, alive(), new Map(), new Date(base + 29 * 60_000))).toStrictEqual([]);
     atMin(31);
-    let a = findAlerts(db, alive(), new Map(), new Date(base + 31 * 60_000));
-    expect(a[0]!.line).toContain('widgets#12 (GEO-9001) final at abc1234 for 31 min, no review');
-    expect(sweep(db, a, 'hq-lanes').sent).toHaveLength(1);
+    const first = findAlerts(ctx.db, alive(), new Map(), new Date(base + 31 * 60_000));
+    expect(first[0]?.line).toContain('widgets#12 (GEO-9001) final at abc1234 for 31 min, no review');
+    expect(sweep(ctx.db, first, 'hq-lanes').sent).toHaveLength(1);
     atMin(40);
-    a = findAlerts(db, alive(), new Map(), new Date(base + 40 * 60_000));
-    expect(sweep(db, a, 'hq-lanes').sent).toHaveLength(0);
+    const second = findAlerts(ctx.db, alive(), new Map(), new Date(base + 40 * 60_000));
+    expect(sweep(ctx.db, second, 'hq-lanes').sent).toHaveLength(0);
     atMin(62);
-    a = findAlerts(db, alive(), new Map(), new Date(base + 62 * 60_000));
-    expect(sweep(db, a, 'hq-lanes').sent).toHaveLength(1);
-    expect(readOutboxRows(db).filter((row) => row.target !== 'z-review')).toHaveLength(1);
+    const third = findAlerts(ctx.db, alive(), new Map(), new Date(base + 62 * 60_000));
+    expect(sweep(ctx.db, third, 'hq-lanes').sent).toHaveLength(1);
+    expect(readOutboxRows(ctx.db).filter((row) => row.target !== 'z-review')).toHaveLength(1);
   });
 
   test('hq run unfinal clears a stale final: the sweep stops, a new final starts it again', () => {
-    add();
-    addPr(db, 'GEO-9001', 'widgets#12', 'z-delivery');
-    expect(() => unfinalPr(db, 'widgets#12', 'z-delivery', null)).toThrow('has no final mark');
-    finalPr(db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
+    const ctx = setupTest();
+    ctx.addRun();
+    addPr(ctx.db, 'GEO-9001', 'widgets#12', 'z-delivery');
+    expect(() => unfinalPr(ctx.db, 'widgets#12', 'z-delivery', null)).toThrow('has no final mark');
+    finalPr(ctx.db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
     atMin(31);
-    expect(findAlerts(db, alive(), new Map(), new Date(base + 31 * 60_000))).toHaveLength(1);
-    const p = unfinalPr(db, 'widgets#12', 'z-delivery', 'head moved; waits on a release');
-    expect([p.final_sha, p.final_at, p.final_source]).toEqual([null, null, null]);
-    const [ev] = listEvents(db, 'unfinal');
+    expect(findAlerts(ctx.db, alive(), new Map(), new Date(base + 31 * 60_000))).toHaveLength(1);
+    const unfinalled = unfinalPr(ctx.db, 'widgets#12', 'z-delivery', 'head moved; waits on a release');
+    expect([unfinalled.final_sha, unfinalled.final_at, unfinalled.final_source]).toStrictEqual([null, null, null]);
+    const [ev] = listEvents(ctx.db, 'unfinal');
     invariant(ev, 'unfinal logged an event');
     expect(ev.from_state).toBe('abc1234');
     expect(ev.to_state).toBeNull();
     expect(JSON.parse(ev.data)).toMatchObject({ ref: 'widgets#12', reason: 'head moved; waits on a release' });
-    expect(findAlerts(db, alive(), new Map(), new Date(base + 200 * 60_000))).toEqual([]);
-    finalPr(db, 'widgets#12', { sha: 'def5678', actor: 'z-delivery' });
+    expect(findAlerts(ctx.db, alive(), new Map(), new Date(base + 200 * 60_000))).toStrictEqual([]);
+    finalPr(ctx.db, 'widgets#12', { sha: 'def5678', actor: 'z-delivery' });
     atMin(240);
-    expect(findAlerts(db, alive(), new Map(), new Date(base + 240 * 60_000))[0]!.line).toContain('final at def5678');
-    closePr(db, 'widgets#12', { to: 'merged', actor: 'z-delivery' });
-    expect(() => unfinalPr(db, 'widgets#12', 'z-delivery', null)).toThrow('is merged');
+    expect(findAlerts(ctx.db, alive(), new Map(), new Date(base + 240 * 60_000))[0]?.line).toContain('final at def5678');
+    closePr(ctx.db, 'widgets#12', { to: 'merged', actor: 'z-delivery' });
+    expect(() => unfinalPr(ctx.db, 'widgets#12', 'z-delivery', null)).toThrow('is merged');
   });
 
   test('each new final sha tells z-review once; the same sha again tells nothing', () => {
-    add();
-    addPr(db, 'GEO-9001', 'widgets#12', 'z-delivery');
-    finalPr(db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
-    finalPr(db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
-    const first = readOutboxRows(db).filter((row) => row.target === 'z-review');
-    applyNoteSignals(db, 'GEO-9001', 'FINAL widgets#12 def5678', { source: 'atc:s1' });
-    const pending = readOutboxRows(db).filter((row) => row.target === 'z-review' && row.status === 'pending');
+    const ctx = setupTest();
+    ctx.addRun();
+    addPr(ctx.db, 'GEO-9001', 'widgets#12', 'z-delivery');
+    finalPr(ctx.db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
+    finalPr(ctx.db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
+    const first = readOutboxRows(ctx.db).filter((row) => row.target === 'z-review');
+    applyNoteSignals(ctx.db, 'GEO-9001', 'FINAL widgets#12 def5678', { source: 'atc:s1' });
+    const pending = readOutboxRows(ctx.db).filter((row) => row.target === 'z-review' && row.status === 'pending');
 
     expect(first.map((row) => ({ text: row.text, topic: row.topic, status: row.status }))).toStrictEqual([{ text: 'Final: GEO-9001 (widgets#12 at abc1234). Review it, then merge.', topic: 'final:widgets#12', status: 'pending' }]);
     expect(pending.map((row) => ({ text: row.text, topic: row.topic, status: row.status }))).toStrictEqual([{ text: 'Final: GEO-9001 (widgets#12 at def5678). Review it, then merge.', topic: 'final:widgets#12', status: 'pending' }]);
   });
 
   test('unfinal, a merge or a close drops an unsent final notice to z-review', () => {
-    add();
-    addPr(db, 'GEO-9001', 'widgets#12', 'z-delivery');
-    addPr(db, 'GEO-9001', 'widgets#13', 'z-delivery');
-    finalPr(db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
-    finalPr(db, 'widgets#13', { sha: 'abc5678', actor: 'z-delivery' });
-    unfinalPr(db, 'widgets#12', 'z-delivery', null);
-    expect(readOutboxRows(db).filter((row) => row.target === 'z-review').map((row) => row.topic)).toStrictEqual(['final:widgets#13']);
-    closePr(db, 'widgets#13', { to: 'merged', actor: 'z-review' });
-    expect(readOutboxRows(db).filter((row) => row.target === 'z-review')).toStrictEqual([]);
+    const ctx = setupTest();
+    ctx.addRun();
+    addPr(ctx.db, 'GEO-9001', 'widgets#12', 'z-delivery');
+    addPr(ctx.db, 'GEO-9001', 'widgets#13', 'z-delivery');
+    finalPr(ctx.db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
+    finalPr(ctx.db, 'widgets#13', { sha: 'abc5678', actor: 'z-delivery' });
+    unfinalPr(ctx.db, 'widgets#12', 'z-delivery', null);
+    expect(readOutboxRows(ctx.db).filter((row) => row.target === 'z-review').map((row) => row.topic)).toStrictEqual(['final:widgets#13']);
+    closePr(ctx.db, 'widgets#13', { to: 'merged', actor: 'z-review' });
+    expect(readOutboxRows(ctx.db).filter((row) => row.target === 'z-review')).toStrictEqual([]);
   });
 
   test('hq run merged asks GitHub: only MERGED passes; open, closed, odd output and a failed gh refuse', async () => {
     const calls: string[][] = [];
     const gh = (code: number, stdout: string) => async (cmd: string[]) => (calls.push(cmd), { code, stdout, stderr: code ? 'invented failure' : '' });
     await checkMergedOnGitHub(gh(0, '{"state":"MERGED","mergedAt":"2026-10-17T05:00:00Z"}'), 'widgets#12');
-    expect(calls[0]).toEqual(['gh', 'pr', 'view', '12', '-R', 'zgeoff/widgets', '--json', 'state,mergedAt']);
+    expect(calls[0]).toStrictEqual(['gh', 'pr', 'view', '12', '-R', 'zgeoff/widgets', '--json', 'state,mergedAt']);
     await expect(checkMergedOnGitHub(gh(0, '{"state":"OPEN","mergedAt":null}'), 'widgets#12')).rejects.toThrow('widgets#12 is OPEN on GitHub, not merged');
     await expect(checkMergedOnGitHub(gh(0, '{"state":"CLOSED"}'), 'widgets#12')).rejects.toThrow('is CLOSED on GitHub');
     await expect(checkMergedOnGitHub(gh(0, 'not json'), 'widgets#12')).rejects.toThrow('no JSON');
@@ -346,162 +349,174 @@ describe('the sweep', () => {
   });
 
   test('hq run unmerge puts a wrong merged mark back to open and logs it; final and review marks stay', () => {
-    add();
-    addPr(db, 'GEO-9001', 'widgets#12', 'z-delivery');
-    finalPr(db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
-    reviewedPr(db, 'widgets#12', 'abc1234', { recheck: false, force: false }, 'z-review');
-    expect(() => unmergePr(db, 'widgets#12', 'z-review', null)).toThrow('is open, not merged');
-    closePr(db, 'widgets#12', { to: 'merged', actor: 'z-review' });
-    const p = unmergePr(db, 'widgets#12', 'z-review', 'merge failed on a conflict');
-    expect(p).toMatchObject({ state: 'open', merged_at: null, final_sha: 'abc1234', reviewed_sha: 'abc1234' });
-    const [ev] = listEvents(db, 'unmerged');
+    const ctx = setupTest();
+    ctx.addRun();
+    addPr(ctx.db, 'GEO-9001', 'widgets#12', 'z-delivery');
+    finalPr(ctx.db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
+    reviewedPr(ctx.db, 'widgets#12', 'abc1234', { recheck: false, force: false }, 'z-review');
+    expect(() => unmergePr(ctx.db, 'widgets#12', 'z-review', null)).toThrow('is open, not merged');
+    closePr(ctx.db, 'widgets#12', { to: 'merged', actor: 'z-review' });
+    const unmerged = unmergePr(ctx.db, 'widgets#12', 'z-review', 'merge failed on a conflict');
+    expect(unmerged).toMatchObject({ state: 'open', merged_at: null, final_sha: 'abc1234', reviewed_sha: 'abc1234' });
+    const [ev] = listEvents(ctx.db, 'unmerged');
     invariant(ev, 'unmerge logged an event');
     expect(ev).toMatchObject({ from_state: 'merged', to_state: 'open' });
     expect(JSON.parse(ev.data)).toMatchObject({ ref: 'widgets#12', reason: 'merge failed on a conflict' });
 
-    finalPr(db, 'widgets#12', { sha: 'def5678', actor: 'z-delivery' });
+    finalPr(ctx.db, 'widgets#12', { sha: 'def5678', actor: 'z-delivery' });
   });
 
   test('unmerge drops the merge commit and the shipment of the wrong merge, and the event keeps them', () => {
-    add();
-    addPr(db, 'GEO-9001', 'widgets#12', 'z-delivery');
-    closePr(db, 'widgets#12', { to: 'merged', actor: 'z-review' });
-    writeShippedPR(db, { ref: 'widgets#12', sha: 'c'.repeat(40), tag: 'widgets@1.0.0', at: '2026-10-15T00:00:00Z' });
-    expect(unmergePr(db, 'widgets#12', 'z-review', 'merged the wrong branch')).toMatchObject({ state: 'open', merge_sha: null, shipped_tag: null, shipped_at: null });
-    expect(db.query("SELECT json_extract(data, '$.merge_sha') AS sha, json_extract(data, '$.shipped_tag') AS tag, json_extract(data, '$.shipped_at') AS shipped FROM events WHERE action = 'unmerged'").get()).toStrictEqual({ sha: 'c'.repeat(40), tag: 'widgets@1.0.0', shipped: '2026-10-15T00:00:00Z' });
+    const ctx = setupTest();
+    ctx.addRun();
+    addPr(ctx.db, 'GEO-9001', 'widgets#12', 'z-delivery');
+    closePr(ctx.db, 'widgets#12', { to: 'merged', actor: 'z-review' });
+    writeShippedPR(ctx.db, { ref: 'widgets#12', sha: 'c'.repeat(40), tag: 'widgets@1.0.0', at: '2026-10-15T00:00:00Z' });
+    expect(unmergePr(ctx.db, 'widgets#12', 'z-review', 'merged the wrong branch')).toMatchObject({ state: 'open', merge_sha: null, shipped_tag: null, shipped_at: null });
+    expect(ctx.db.query("SELECT json_extract(data, '$.merge_sha') AS sha, json_extract(data, '$.shipped_tag') AS tag, json_extract(data, '$.shipped_at') AS shipped FROM events WHERE action = 'unmerged'").get()).toStrictEqual({ sha: 'c'.repeat(40), tag: 'widgets@1.0.0', shipped: '2026-10-15T00:00:00Z' });
   });
 
   test('a review started recently, or a review of the final head, silences it', () => {
-    add();
-    addPr(db, 'GEO-9001', 'widgets#12', 'z-delivery');
-    finalPr(db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
+    const ctx = setupTest();
+    ctx.addRun();
+    addPr(ctx.db, 'GEO-9001', 'widgets#12', 'z-delivery');
+    finalPr(ctx.db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
     atMin(31);
-    reviewStarted(db, 'widgets#12', 'z-delivery');
-    expect(findAlerts(db, alive(), new Map(), new Date(base + 40 * 60_000))).toEqual([]);
-    reviewedPr(db, 'widgets#12', 'abc1234', { recheck: false, force: false }, 'z-delivery');
-    expect(findAlerts(db, alive(), new Map(), new Date(base + 200 * 60_000))).toEqual([]);
+    reviewStarted(ctx.db, 'widgets#12', 'z-delivery');
+    expect(findAlerts(ctx.db, alive(), new Map(), new Date(base + 40 * 60_000))).toStrictEqual([]);
+    reviewedPr(ctx.db, 'widgets#12', 'abc1234', { recheck: false, force: false }, 'z-delivery');
+    expect(findAlerts(ctx.db, alive(), new Map(), new Date(base + 200 * 60_000))).toStrictEqual([]);
   });
 
   test('a short final sha and a full reviewed sha of the same commit count as reviewed', () => {
-    add();
-    addPr(db, 'GEO-9001', 'widgets#12', 'z-delivery');
-    finalPr(db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
-    reviewedPr(db, 'widgets#12', 'abc1234def5678abc1234def5678abc1234def56', { recheck: false, force: false }, 'z-delivery');
-    expect(findAlerts(db, alive(), new Map(), new Date(base + 31 * 60_000))).toEqual([]);
-    finalPr(db, 'widgets#12', { sha: 'abc1234def', actor: 'z-delivery' });
-    expect(findAlerts(db, alive(), new Map(), new Date(base + 31 * 60_000))).toEqual([]);
+    const ctx = setupTest();
+    ctx.addRun();
+    addPr(ctx.db, 'GEO-9001', 'widgets#12', 'z-delivery');
+    finalPr(ctx.db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
+    reviewedPr(ctx.db, 'widgets#12', 'abc1234def5678abc1234def5678abc1234def56', { recheck: false, force: false }, 'z-delivery');
+    expect(findAlerts(ctx.db, alive(), new Map(), new Date(base + 31 * 60_000))).toStrictEqual([]);
+    finalPr(ctx.db, 'widgets#12', { sha: 'abc1234def', actor: 'z-delivery' });
+    expect(findAlerts(ctx.db, alive(), new Map(), new Date(base + 31 * 60_000))).toStrictEqual([]);
   });
 
   test('a blocked run does not flag its unreviewed final PR', () => {
-    add();
-    addPr(db, 'GEO-9001', 'widgets#12', 'z-delivery');
-    finalPr(db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
-    setState(db, 'GEO-9001', 'blocked', { waitsOn: 'a gadgets release' }, 'z-delivery');
-    expect(findAlerts(db, alive(), new Map(), new Date(base + 31 * 60_000))).toEqual([]);
-    setState(db, 'GEO-9001', 'working', {}, 'z-delivery');
-    expect(findAlerts(db, alive(), new Map(), new Date(base + 31 * 60_000))).toHaveLength(1);
+    const ctx = setupTest();
+    ctx.addRun();
+    addPr(ctx.db, 'GEO-9001', 'widgets#12', 'z-delivery');
+    finalPr(ctx.db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
+    setState(ctx.db, 'GEO-9001', 'blocked', { waitsOn: 'a gadgets release' }, 'z-delivery');
+    expect(findAlerts(ctx.db, alive(), new Map(), new Date(base + 31 * 60_000))).toStrictEqual([]);
+    setState(ctx.db, 'GEO-9001', 'working', {}, 'z-delivery');
+    expect(findAlerts(ctx.db, alive(), new Map(), new Date(base + 31 * 60_000))).toHaveLength(1);
   });
 
   test('a head that moves after the review is flagged as moved', () => {
-    add();
-    addPr(db, 'GEO-9001', 'widgets#12', 'z-delivery');
-    reviewedPr(db, 'widgets#12', 'abc1234', { recheck: false, force: false }, 'z-delivery');
-    finalPr(db, 'widgets#12', { sha: 'def5678', actor: 'z-delivery' });
-    expect(findAlerts(db, alive(), new Map(), new Date(base + 31 * 60_000))[0]!.line).toContain('head moved since your review at abc1234');
+    const ctx = setupTest();
+    ctx.addRun();
+    addPr(ctx.db, 'GEO-9001', 'widgets#12', 'z-delivery');
+    reviewedPr(ctx.db, 'widgets#12', 'abc1234', { recheck: false, force: false }, 'z-delivery');
+    finalPr(ctx.db, 'widgets#12', { sha: 'def5678', actor: 'z-delivery' });
+    expect(findAlerts(ctx.db, alive(), new Map(), new Date(base + 31 * 60_000))[0]?.line).toContain('head moved since your review at abc1234');
   });
 
   test('an exited session whose PR is final and reviewed at its head is not flagged (asleep until its merge window)', () => {
-    add();
+    const ctx = setupTest();
+    ctx.addRun();
     const gone = [{ id: S1, name: 'kettle', alive: false, state: 'exited' }];
-    addPr(db, 'GEO-9001', 'widgets#12', 'z-delivery');
-    expect(findAlerts(db, gone, new Map(), new Date(base))[0]?.line).toContain('has exited');
-    finalPr(db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
-    expect(findAlerts(db, gone, new Map(), new Date(base))[0]?.line).toContain('has exited');
-    reviewedPr(db, 'widgets#12', 'abc1234', { recheck: false, force: false }, 'z-delivery');
-    expect(findAlerts(db, gone, new Map(), new Date(base))).toEqual([]);
+    addPr(ctx.db, 'GEO-9001', 'widgets#12', 'z-delivery');
+    expect(findAlerts(ctx.db, gone, new Map(), new Date(base))[0]?.line).toContain('has exited');
+    finalPr(ctx.db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
+    expect(findAlerts(ctx.db, gone, new Map(), new Date(base))[0]?.line).toContain('has exited');
+    reviewedPr(ctx.db, 'widgets#12', 'abc1234', { recheck: false, force: false }, 'z-delivery');
+    expect(findAlerts(ctx.db, gone, new Map(), new Date(base))).toStrictEqual([]);
 
-    finalPr(db, 'widgets#12', { sha: 'def5678', actor: 'z-delivery' });
-    expect(findAlerts(db, gone, new Map(), new Date(base)).map((a) => a.line).join('\n')).toContain('has exited');
+    finalPr(ctx.db, 'widgets#12', { sha: 'def5678', actor: 'z-delivery' });
+    expect(findAlerts(ctx.db, gone, new Map(), new Date(base)).map((alert) => alert.line).join('\n')).toContain('has exited');
   });
 
   test('an exited session, and a quiet one unless the owner chats with it', () => {
-    add();
-    expect(findAlerts(db, [{ id: S1, name: 'kettle', alive: false, state: 'exited' }], new Map(), new Date(base))[0]!.line).toContain('has exited');
+    const ctx = setupTest();
+    ctx.addRun();
+    expect(findAlerts(ctx.db, [{ id: S1, name: 'kettle', alive: false, state: 'exited' }], new Map(), new Date(base))[0]?.line).toContain('has exited');
     const quiet = new Map([[S1, base - 61 * 60_000]]);
-    expect(findAlerts(db, alive('done'), quiet, new Date(base))[0]!.line).toContain('quiet for 61 min');
-    expect(findAlerts(db, alive('running'), quiet, new Date(base))).toEqual([]);
-    setGeoffChat(db, 'GEO-9001', true, 'z-delivery');
-    expect(findAlerts(db, alive('needs_you'), quiet, new Date(base))).toEqual([]);
+    expect(findAlerts(ctx.db, alive('done'), quiet, new Date(base))[0]?.line).toContain('quiet for 61 min');
+    expect(findAlerts(ctx.db, alive('running'), quiet, new Date(base))).toStrictEqual([]);
+    setGeoffChat(ctx.db, 'GEO-9001', true, 'z-delivery');
+    expect(findAlerts(ctx.db, alive('needs_you'), quiet, new Date(base))).toStrictEqual([]);
   });
 
   test('merged PRs and closed rows are never flagged', () => {
-    add();
-    addPr(db, 'GEO-9001', 'widgets#12', 'z-delivery');
-    finalPr(db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
-    closePr(db, 'widgets#12', { to: 'merged', actor: 'z-delivery' });
-    setState(db, 'GEO-9001', 'merged', { waitsOn: 'release' }, 'z-delivery');
-    expect(findAlerts(db, alive('done'), new Map([[S1, 0]]), new Date(base + 500 * 60_000))).toEqual([]);
+    const ctx = setupTest();
+    ctx.addRun();
+    addPr(ctx.db, 'GEO-9001', 'widgets#12', 'z-delivery');
+    finalPr(ctx.db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
+    closePr(ctx.db, 'widgets#12', { to: 'merged', actor: 'z-delivery' });
+    setState(ctx.db, 'GEO-9001', 'merged', { waitsOn: 'release' }, 'z-delivery');
+    expect(findAlerts(ctx.db, alive('done'), new Map([[S1, 0]]), new Date(base + 500 * 60_000))).toStrictEqual([]);
   });
 });
 
 describe('review fixes', () => {
   test('after a feed reset, notes in the new feed are kept, and old ones are not doubled', async () => {
-    atc = fakeAtc(dir, [{ id: S1, name: 'kettle', alive: true, state: 'running' }]);
-    add();
+    const ctx = setupTest();
+    const atc = ctx.startAtc([{ id: S1, name: 'kettle', alive: true, state: 'running' }]);
+    ctx.addRun();
     const c = await AtcClient.open();
     try {
-      await ingestNotes(db, c, { run: buildStubFinalGH({ commits: 'fault' }, []) });
+      await ingestNotes(ctx.db, c, { run: buildStubFinalGH({ commits: 'fault' }, []) });
       atc.feed.push({ at: base + 1000, session: S1, name: 'kettle', kind: 'note', detail: 'first note', label: 'progress' });
-      const kept = await ingestNotes(db, c, { run: buildStubFinalGH({ commits: 'fault' }, []) });
+      const kept = await ingestNotes(ctx.db, c, { run: buildStubFinalGH({ commits: 'fault' }, []) });
       expect(kept.notes).toBe(1);
       atc.feed.length = 0;
       atc.feed.push({ at: base + 1000, session: S1, name: 'kettle', kind: 'note', detail: 'first note', label: 'progress' });
       atc.feed.push({ at: base + 5000, session: S1, name: 'kettle', kind: 'note', detail: 'second note', label: 'progress' });
 
-      await ingestNotes(db, c, { run: buildStubFinalGH({ commits: 'fault' }, []) });
-      await ingestNotes(db, c, { run: buildStubFinalGH({ commits: 'fault' }, []) });
-      await ingestNotes(db, c, { run: buildStubFinalGH({ commits: 'fault' }, []) });
-      await ingestNotes(db, c, { run: buildStubFinalGH({ commits: 'fault' }, []) });
+      await ingestNotes(ctx.db, c, { run: buildStubFinalGH({ commits: 'fault' }, []) });
+      await ingestNotes(ctx.db, c, { run: buildStubFinalGH({ commits: 'fault' }, []) });
+      await ingestNotes(ctx.db, c, { run: buildStubFinalGH({ commits: 'fault' }, []) });
+      await ingestNotes(ctx.db, c, { run: buildStubFinalGH({ commits: 'fault' }, []) });
     } finally {
       c.close();
     }
-    const texts = notesFor(db, 'GEO-9001', 10).map((note) => note.text);
+    const texts = notesFor(ctx.db, 'GEO-9001', 10).map((note) => note.text);
     expect(texts).toStrictEqual(['second note', 'first note']);
   });
 
   test('an undelivered alert rides along with a new one', () => {
-    add();
-    add('GEO-9002', S2);
-    addPr(db, 'GEO-9001', 'widgets#12', 'z-delivery');
-    finalPr(db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
+    const ctx = setupTest();
+    ctx.addRun();
+    ctx.addRun('GEO-9002', S2);
+    addPr(ctx.db, 'GEO-9001', 'widgets#12', 'z-delivery');
+    finalPr(ctx.db, 'widgets#12', { sha: 'abc1234', actor: 'z-delivery' });
     const alive = [
       { id: S1, name: 'kettle', alive: true, state: 'running' },
       { id: S2, name: 'toaster', alive: true, state: 'running' },
     ];
     atMin(31);
-    sweep(db, findAlerts(db, alive, new Map(), new Date(base + 31 * 60_000)), 'hq-lanes');
+    sweep(ctx.db, findAlerts(ctx.db, alive, new Map(), new Date(base + 31 * 60_000)), 'hq-lanes');
     atMin(36);
     const gone = [alive[0]!, { ...alive[1]!, alive: false, state: 'exited' }];
-    const r = sweep(db, findAlerts(db, gone, new Map(), new Date(base + 36 * 60_000)), 'hq-lanes');
-    expect(r.sent.map((a) => a.key).sort()).toEqual(['pr:widgets#12', `session:${S2}`]);
-    const msgs = readOutboxRows(db).filter((row) => row.target !== 'z-review');
+    const swept = sweep(ctx.db, findAlerts(ctx.db, gone, new Map(), new Date(base + 36 * 60_000)), 'hq-lanes');
+    expect(swept.sent.map((alert) => alert.key).toSorted()).toStrictEqual(['pr:widgets#12', `session:${S2}`]);
+    const msgs = readOutboxRows(ctx.db).filter((row) => row.target !== 'z-review');
     expect(msgs).toHaveLength(1);
     expect(msgs[0]!.text).toContain('widgets#12');
     expect(msgs[0]!.text).toContain('has exited');
   });
 
   test("a note about another repo's PR never marks this row's PR final", () => {
-    add();
-    addPr(db, 'GEO-9001', 'widgets#12', 'z-delivery');
-    expect(applyNoteSignals(db, 'GEO-9001', 'gadgets#99 is final at abc1234', { source: 'test' }).final).toBeNull();
-    expect(listRuns(db)[0]!.prs[0]!.final_sha).toBeNull();
+    const ctx = setupTest();
+    ctx.addRun();
+    addPr(ctx.db, 'GEO-9001', 'widgets#12', 'z-delivery');
+    expect(applyNoteSignals(ctx.db, 'GEO-9001', 'gadgets#99 is final at abc1234', { source: 'test' }).final).toBeNull();
+    expect(listRuns(ctx.db)[0]?.prs[0]?.final_sha).toBeNull();
   });
 });
 
 describe('re-check fixes', () => {
   test('reset recovery reads the whole new feed from its oldest event', async () => {
     const ctx = setupTest();
-    atc = fakeAtc(ctx.directory, [{ id: S1, name: 'kettle', alive: true, state: 'running' }]);
+    const atc = ctx.startAtc([{ id: S1, name: 'kettle', alive: true, state: 'running' }]);
     ctx.seed.run({ issue: 'GEO-9001', title: 'Teach the kettle to whistle', session: S1, actor: 'z-delivery' });
     for (let i = 0; i < 201; i++) atc.feed.push({ at: base + i * 1000, session: S1, name: 'kettle', kind: 'note', detail: `note ${i}`, label: 'progress' });
     ctx.seed.meta({ key: 'atc_events_cursor', value: 'not-a-cursor' });
@@ -517,23 +532,25 @@ describe('re-check fixes', () => {
   });
 
   test('a phrase in a note that names a foreign PR marks nothing', () => {
-    add();
-    addPr(db, 'GEO-9001', 'widgets#12', 'z-delivery');
-    addPr(db, 'GEO-9001', 'widgets#13', 'z-delivery');
-    expect(applyNoteSignals(db, 'GEO-9001', 'Rebased widgets#12. gadgets#99 is final at abc1234', { source: 'test' }).final).toBeNull();
-    expect(listRuns(db)[0]!.prs.every((p) => p.final_sha === null)).toBe(true);
-    expect(applyNoteSignals(db, 'GEO-9001', 'widgets#13 is final at abc1234', { source: 'test' }).final).toBe('widgets#13');
+    const ctx = setupTest();
+    ctx.addRun();
+    addPr(ctx.db, 'GEO-9001', 'widgets#12', 'z-delivery');
+    addPr(ctx.db, 'GEO-9001', 'widgets#13', 'z-delivery');
+    expect(applyNoteSignals(ctx.db, 'GEO-9001', 'Rebased widgets#12. gadgets#99 is final at abc1234', { source: 'test' }).final).toBeNull();
+    expect(listRuns(ctx.db)[0]?.prs.every((pr) => pr.final_sha === null)).toBe(true);
+    expect(applyNoteSignals(ctx.db, 'GEO-9001', 'widgets#13 is final at abc1234', { source: 'test' }).final).toBe('widgets#13');
   });
 
   test('two identical notes in the same second stay two', async () => {
-    atc = fakeAtc(dir, [{ id: S1, name: 'kettle', alive: true, state: 'running' }]);
-    add();
+    const ctx = setupTest();
+    const atc = ctx.startAtc([{ id: S1, name: 'kettle', alive: true, state: 'running' }]);
+    ctx.addRun();
     const c = await AtcClient.open();
     try {
-      await ingestNotes(db, c, { run: buildStubFinalGH({ commits: 'fault' }, []) });
+      await ingestNotes(ctx.db, c, { run: buildStubFinalGH({ commits: 'fault' }, []) });
       atc.feed.push({ at: base + 100, session: S1, name: 'kettle', kind: 'note', detail: 'tick', label: 'progress' });
       atc.feed.push({ at: base + 900, session: S1, name: 'kettle', kind: 'note', detail: 'tick', label: 'progress' });
-      const ticks = await ingestNotes(db, c, { run: buildStubFinalGH({ commits: 'fault' }, []) });
+      const ticks = await ingestNotes(ctx.db, c, { run: buildStubFinalGH({ commits: 'fault' }, []) });
       expect(ticks.notes).toBe(2);
     } finally {
       c.close();
@@ -543,37 +560,41 @@ describe('re-check fixes', () => {
 
 describe('helper sessions', () => {
   test('a helper joins beside the main session; both are watched and swept', () => {
-    add();
-    setSession(db, 'GEO-9001', S2, 'z-delivery', 'add');
-    expect(watchlist(db).map((w) => w.session_id).sort()).toEqual([S1, S2].sort());
+    const ctx = setupTest();
+    ctx.addRun();
+    setSession(ctx.db, 'GEO-9001', S2, 'z-delivery', 'add');
+    expect(watchlist(ctx.db).map((watched) => watched.session_id).toSorted()).toStrictEqual([S1, S2].toSorted());
     const gone = [
       { id: S1, name: 'kettle', alive: true, state: 'running' },
       { id: S2, name: 'helper', alive: false, state: 'exited' },
     ];
-    expect(findAlerts(db, gone, new Map(), new Date(base))[0]!.line).toContain('helper session bbbbbbbb has exited');
+    expect(findAlerts(ctx.db, gone, new Map(), new Date(base))[0]?.line).toContain('helper session bbbbbbbb has exited');
   });
 
   test('a relaunch replaces the main session and keeps the helper', () => {
-    add();
-    setSession(db, 'GEO-9001', S2, 'z-delivery', 'add');
+    const ctx = setupTest();
+    ctx.addRun();
+    setSession(ctx.db, 'GEO-9001', S2, 'z-delivery', 'add');
     const S3 = 'cccccccc-3333-4333-8333-333333333333';
-    setSession(db, 'GEO-9001', S3, 'z-delivery');
-    expect(watchlist(db).map((w) => w.session_id).sort()).toEqual([S2, S3].sort());
+    setSession(ctx.db, 'GEO-9001', S3, 'z-delivery');
+    expect(watchlist(ctx.db).map((watched) => watched.session_id).toSorted()).toStrictEqual([S2, S3].toSorted());
   });
 
   test('remove stops watching a helper; an unknown one is refused', () => {
-    add();
-    setSession(db, 'GEO-9001', S2, 'z-delivery', 'add');
-    setSession(db, 'GEO-9001', 'bbbbbbbb', 'z-delivery', 'remove');
-    expect(watchlist(db).map((w) => w.session_id)).toEqual([S1]);
-    expect(() => setSession(db, 'GEO-9001', 'bbbbbbbb', 'z-delivery', 'remove')).toThrow('no active session');
+    const ctx = setupTest();
+    ctx.addRun();
+    setSession(ctx.db, 'GEO-9001', S2, 'z-delivery', 'add');
+    setSession(ctx.db, 'GEO-9001', 'bbbbbbbb', 'z-delivery', 'remove');
+    expect(watchlist(ctx.db).map((watched) => watched.session_id)).toStrictEqual([S1]);
+    expect(() => setSession(ctx.db, 'GEO-9001', 'bbbbbbbb', 'z-delivery', 'remove')).toThrow('no active session');
   });
 });
 
 test('--add on the current main session keeps it main', () => {
-  add();
-  setSession(db, 'GEO-9001', S1, 'z-delivery', 'add');
-  expect(listRuns(db)[0]!.sessions.find((x) => x.session_id === S1)).toMatchObject({ active: 1, helper: 0 });
+  const ctx = setupTest();
+  ctx.addRun();
+  setSession(ctx.db, 'GEO-9001', S1, 'z-delivery', 'add');
+  expect(listRuns(ctx.db)[0]?.sessions.find((session) => session.session_id === S1)).toMatchObject({ active: 1, helper: 0 });
 });
 
 describe('session ids', () => {
@@ -594,5 +615,22 @@ describe('session ids', () => {
 function setupTest() {
   const fresh = createTestDb();
   at(NOON_SYDNEY);
-  return { db: fresh.db, directory: fresh.dir, seed: buildSeeder(fresh) };
+
+  // fakeAtc assigns HQ_ATC_SOCKET itself, so record the value the preload puts back before it runs.
+  updateEnv('HQ_ATC_SOCKET', process.env['HQ_ATC_SOCKET']);
+  const db: Database = fresh.db;
+
+  return {
+    db,
+    directory: fresh.dir,
+    seed: buildSeeder(fresh),
+    addRun: (issue = 'GEO-9001', session: string | null = S1) =>
+      addRun(db, { issue, title: 'Teach the kettle to whistle', place: 'imp', session, next: 'Agent working.', gate: null, geoffChat: false, actor: 'z-delivery' }),
+    startAtc: (sessions: FakeAtcSession[]) => {
+      const atc = fakeAtc(fresh.dir, sessions);
+      onTestFinished(() => atc.stop());
+
+      return atc;
+    },
+  };
 }

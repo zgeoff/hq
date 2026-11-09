@@ -101,7 +101,7 @@ test('reviews counts open PRs whose review started in the last 24 hours and has 
   at('2026-10-13T00:00:00Z');
   ctx.seed.run({ issue: 'GEO-9601', title: 'Fit the long spout', place: 'imp' });
   for (const ref of ['kettle#41', 'kettle#42', 'kettle#43', 'kettle#44']) {
-    ctx.seed.runPr({ issue: 'GEO-9601', ref });
+    ctx.seed.runPR({ issue: 'GEO-9601', ref });
   }
   at('2026-10-13T00:30:00Z');
   reviewStarted(ctx.db, 'kettle#44', 'kettle-bot');
