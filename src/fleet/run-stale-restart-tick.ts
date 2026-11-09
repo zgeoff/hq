@@ -297,7 +297,7 @@ async function readMessageLookup(pass: StalePass, turn: StaleTurn, asked: Entry)
   try {
     const got = await pass.client.message(row.message_id);
     pass.refresh[turn.entry.name] = { ...asked, answerReadAt: iso(pass.time) };
-    return { kind: 'read', status: got.status, answer: got.answer, answeredAt: got.answeredAt };
+    return { kind: 'read', status: got.status, answer: got.answer ?? null, answeredAt: got.answeredAt ?? null };
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
     logEvent(pass.db, 'hq', 'fleet', 'stale-answer-unread', pass.opts.actor, null, null, { name: session.name, sessionId: session.id, message: row.message_id, error: reason });
