@@ -3,7 +3,7 @@ import { buildMockStoreDisposition } from './build-mock-store-disposition.ts';
 import type { StoreDisposition } from './build-mock-store-disposition.ts';
 import type { RepoDeps } from './types.ts';
 
-export function seedStoreDisposition(deps: RepoDeps, input: Partial<StoreDisposition> = {}): StoreDisposition {
+export function seedDisposition(deps: RepoDeps, input: Partial<StoreDisposition> = {}): StoreDisposition {
   const disposition = buildMockStoreDisposition(input);
   const store = new Database(deps.store);
   try {

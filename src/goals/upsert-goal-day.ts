@@ -1,7 +1,7 @@
 import type { Database } from 'bun:sqlite';
 import { iso } from '../clock/iso.ts';
 
-interface GoalDay {
+export interface GoalDay {
   kind: string;
   key: string;
   day: string;

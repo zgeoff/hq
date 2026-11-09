@@ -168,8 +168,8 @@ test('stored rows of a repo now out of scope stay in the database but count nowh
   await syncGoals(ctx.db, gh(runs, { '2026-10-14': [] }), { from: new Date('2026-10-12T00:00:00Z') });
   ctx.seed.ciRun({ id: 99, repo: 'teapots', path: 'ci.yml', conclusion: 'failure', created_at: '2026-10-14T01:00:00Z', started_at: '2026-10-14T01:00:00Z', updated_at: '2026-10-14T01:30:00Z' });
   ctx.seed.mergedPR({ repo: 'teapots', number: 3, merged_at: '2026-10-14T02:00:00Z', title: 'fix: y', kind: 'fix' });
-  ctx.db.query(`INSERT INTO closed_prs (repo, number, closed_at) VALUES ('teapots', 4, '2026-10-14T03:00:00Z')`).run();
-  ctx.db.query(`INSERT INTO goal_days (kind, key, day, n, at) VALUES ('ci', 'teapots', '2026-10-12', 1, '2026-10-12T23:00:00Z')`).run();
+  ctx.seed.closedPR({ repo: 'teapots', number: 4, closed_at: '2026-10-14T03:00:00Z' });
+  ctx.seed.goalDay({ kind: 'ci', key: 'teapots', day: '2026-10-12', at: new Date('2026-10-12T23:00:00Z') });
   const [, wed] = goalRows(ctx.db, 4).days;
   expect(wed).toMatchObject({ label: 'Wed 14 Oct', ci: { runs: 1, failed: 0, missing: 0 }, merged: 0, closedUnmerged: 0 });
   expect(ctx.db.query(`SELECT COUNT(*) AS count FROM ci_runs WHERE repo = 'teapots'`).get()).toStrictEqual({ count: 1 });
@@ -375,14 +375,14 @@ test('a re-run with a new attempt is classified again; a stored row for an older
   const first = { 9501: jobsOf(job('apply', 'failure', [{ name: 'Apply', conclusion: 'failure' }])) };
   await syncDeploys(ctx.db, jobsGh(first));
   expect(ctx.db.query('SELECT outcome, attempt FROM deploy_runs').all()).toStrictEqual([{ outcome: 'applied_failed', attempt: 1 }]);
-  ctx.db.query(`UPDATE ci_runs SET attempt = 2, status = 'in_progress', conclusion = NULL WHERE id = 9501`).run();
+  ctx.seed.ciRun({ id: 9501, repo: 'cloud', path: DEPLOY.path, created_at: '2026-10-14T00:00:21Z', attempt: 2, status: 'in_progress', conclusion: null });
   const asked: number[] = [];
   const running = await syncDeploys(ctx.db, jobsGh({}, asked));
   expect(running).toMatchObject({ fetched: 0, errors: [] });
   expect(asked).toStrictEqual([]);
   const runningDay = goalRows(ctx.db, 4).days.find((day) => day.deploys?.runs === 1);
   expect(runningDay?.deploys).toMatchObject({ applied_failed: 0, unclassified: 0, running: 1 });
-  ctx.db.query(`UPDATE ci_runs SET status = 'completed', conclusion = 'success' WHERE id = 9501`).run();
+  ctx.seed.ciRun({ id: 9501, repo: 'cloud', path: DEPLOY.path, created_at: '2026-10-14T00:00:21Z', attempt: 2 });
   const completedDay = goalRows(ctx.db, 4).days.find((day) => day.deploys?.runs === 1);
   expect(completedDay?.deploys).toMatchObject({ applied_failed: 0, unclassified: 1 });
   const second = { 9501: jobsOf(job('apply', 'success', [{ name: 'Apply', conclusion: 'success' }])) };
@@ -393,8 +393,7 @@ test('a re-run with a new attempt is classified again; a stored row for an older
 
 test('syncDeploys asks for the attempt hq stored, so a later re-run cannot stand in for it', async () => {
   const ctx = setupTest();
-  ctx.seed.ciRun({ id: 9601, repo: 'cloud', path: DEPLOY.path, created_at: '2026-10-14T00:00:01Z' });
-  ctx.db.query('UPDATE ci_runs SET attempt = 2 WHERE id = 9601').run();
+  ctx.seed.ciRun({ id: 9601, repo: 'cloud', path: DEPLOY.path, created_at: '2026-10-14T00:00:01Z', attempt: 2 });
   const urls: string[] = [];
   const gh: Runner = async (cmd) => {
     urls.push(cmd.find((c) => c.startsWith('repos/'))!);

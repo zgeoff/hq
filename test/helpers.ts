@@ -33,33 +33,6 @@ export function freshDb(): { db: Database; dir: string; path: string; cleanup: (
   return { db, dir, path, cleanup: () => (db.close(), rmSync(dir, { recursive: true, force: true })) };
 }
 
-interface FetchedDaysOptions {
-  repos?: readonly string[];
-  unfetchedPRDays?: readonly string[];
-  unfetchedCIDays?: readonly string[];
-}
-
-export function fetchedDays(db: Database, from = '2026-09-01', to = '2026-11-30', options: FetchedDaysOptions = {}): void {
-  const repos = options.repos ?? ['atc'];
-  const unfetchedPRDays = options.unfetchedPRDays ?? [];
-  const unfetchedCIDays = options.unfetchedCIDays ?? [];
-  const ci = db.query(`INSERT OR IGNORE INTO goal_days (kind, key, day, n, at) VALUES ('ci', ?, ?, 0, '2026-09-01T00:00:00Z')`);
-  const pr = db.query(`INSERT OR IGNORE INTO merged_pr_days (day, n, at) VALUES (?, 0, '2026-09-01T00:00:00Z')`);
-  db.transaction(() => {
-    for (let t = Date.parse(`${from}T00:00:00Z`); t <= Date.parse(`${to}T00:00:00Z`); t += 86_400_000) {
-      const day = new Date(t).toISOString().slice(0, 10);
-      if (!unfetchedCIDays.includes(day)) {
-        for (const repo of repos) {
-          ci.run(repo, day);
-        }
-      }
-      if (!unfetchedPRDays.includes(day)) {
-        pr.run(day);
-      }
-    }
-  })(); // one commit: a commit per row makes each test seconds slower
-}
-
 export const NOON_SYDNEY = '2026-10-14T01:00:00Z';
 export const FOUR_AM_SYDNEY = '2026-10-14T17:00:00Z';
 

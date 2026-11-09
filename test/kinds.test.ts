@@ -138,7 +138,9 @@ test('closed issues page through Linear; PR issues are typed, and an unknown id 
   const closed = await syncClosed(ctx.db, call, new Date('2026-10-11T13:00:00Z'));
   expect(closed).toBe(2);
   expect(z.object({ after: z.string() }).parse(seen[1]).after).toBe('c1');
-  ctx.db.query(`INSERT INTO merged_prs (repo, number, merged_at, title, kind, issue) VALUES ('atc', 1, '2026-10-12T00:00:00Z', 'fix: x', 'fix', 'GEO-5'), ('atc', 2, '2026-10-12T00:00:00Z', 'fix: y', 'fix', 'GEO-404'), ('atc', 3, '2026-10-12T00:00:00Z', 'fix: z', 'fix', 'GEO-1')`).run();
+  ctx.seed.mergedPR({ repo: 'atc', number: 1, merged_at: '2026-10-12T00:00:00Z', title: 'fix: x', kind: 'fix', issue: 'GEO-5' });
+  ctx.seed.mergedPR({ repo: 'atc', number: 2, merged_at: '2026-10-12T00:00:00Z', title: 'fix: y', kind: 'fix', issue: 'GEO-404' });
+  ctx.seed.mergedPR({ repo: 'atc', number: 3, merged_at: '2026-10-12T00:00:00Z', title: 'fix: z', kind: 'fix', issue: 'GEO-1' });
   const typed = await syncPrIssues(ctx.db, call);
   expect(typed).toBe(1);
   expect(ctx.db.query('SELECT issue, type, state FROM linear_issues ORDER BY issue').all()).toStrictEqual([
@@ -215,7 +217,7 @@ test('a gh row hq cannot read records nothing', async () => {
 
 test('Linear ids hq did not ask for are not stored; an inherited type name counts as none', async () => {
   const ctx = setupTest();
-  ctx.db.query(`INSERT INTO merged_prs (repo, number, merged_at, title, kind, issue) VALUES ('atc', 1, '2026-10-12T00:00:00Z', 'fix: x', 'fix', 'GEO-5')`).run();
+  ctx.seed.mergedPR({ repo: 'atc', number: 1, merged_at: '2026-10-12T00:00:00Z', title: 'fix: x', kind: 'fix', issue: 'GEO-5' });
   const call: LinearCall = async () => ({ issues: { nodes: [node('GEO-5', 'Bug'), node('GEO-999', 'Bug')] } });
   await syncPrIssues(ctx.db, call);
   expect(readLinearIssues(ctx.db).map((issue) => issue.issue)).toStrictEqual(['GEO-5']);
@@ -297,7 +299,8 @@ test('merged PRs in a repo not in scope are not stored', async () => {
 test('kindWeeks counts no stored merge of a repo now out of scope', () => {
   const ctx = setupTest();
   at('2026-10-16T01:00:00Z');
-  ctx.db.query(`INSERT INTO merged_prs (repo, number, merged_at, title, kind, issue) VALUES ('atc', 1, '2026-10-14T02:00:00Z', 'fix: x', 'fix', NULL), ('teapots', 2, '2026-10-14T03:00:00Z', 'fix: y', 'fix', NULL)`).run();
+  ctx.seed.mergedPR({ repo: 'atc', number: 1, merged_at: '2026-10-14T02:00:00Z', title: 'fix: x', kind: 'fix' });
+  ctx.seed.mergedPR({ repo: 'teapots', number: 2, merged_at: '2026-10-14T03:00:00Z', title: 'fix: y', kind: 'fix' });
   const [week] = kindWeeks(ctx.db, 1);
   expect(week?.kinds.fix).toBe(1);
   expect(week?.total).toBe(1);
@@ -307,9 +310,7 @@ test('#kindWeeks keeps a stored kind it does not know under its own name, and co
   const ctx = setupTest();
   at('2026-10-16T01:00:00Z');
   await syncDay(ctx.db, ghFake({ '2026-10-14': [{ repo: 'atc', 'n': 1, title: 'fix: an invented fix', at: '2026-10-14T02:00:00Z' }] }), '2026-10-14');
-
-  // A kind kindOf never gives, as a row from an older kindOf or a hand edit holds: syncDay can't store it.
-  ctx.db.query(`INSERT INTO merged_prs (repo, number, merged_at, title, kind, issue) VALUES ('atc', 2, '2026-10-14T03:00:00Z', 'wip: y', 'wip', NULL)`).run();
+  ctx.seed.mergedPR({ repo: 'atc', number: 2, merged_at: '2026-10-14T03:00:00Z', title: 'wip: y', kind: 'wip' });
 
   const [week] = kindWeeks(ctx.db, 1);
   expect(week?.total).toBe(2);

@@ -9,6 +9,7 @@ import { readGhJSON } from './read-gh-json.ts';
 import { NAME } from './name.ts';
 import { toUTCDay } from './to-utc-day.ts';
 import { upsertGoalDay } from './upsert-goal-day.ts';
+import { writeClosedPR } from './write-closed-pr.ts';
 
 const PagesSchema = z.array(z.unknown());
 const PageSchema = z.object({ total_count: z.number().int().safe().min(0), items: z.array(z.unknown()), incomplete_results: z.unknown().optional() });
@@ -49,8 +50,9 @@ export async function syncClosedDay(db: Database, run: Runner, day: string, env?
     }
   }
   db.transaction(() => {
-    const up = db.query('INSERT INTO closed_prs (repo, number, closed_at) VALUES (?, ?, ?) ON CONFLICT (repo, number) DO UPDATE SET closed_at = excluded.closed_at');
-    for (const i of items) up.run(i.repo, i.number, i.closed_at);
+    for (const item of items) {
+      writeClosedPR(db, item);
+    }
     if (toUTCDay(at.getTime()) > day) {
       upsertGoalDay(db, { kind: 'closed', key: '*', day, n: items.length, at });
     }

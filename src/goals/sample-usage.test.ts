@@ -1,7 +1,7 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { mkdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { z } from 'zod';
-import { at, fetchedDays, freshDb } from '../../test/helpers.ts';
+import { at, freshDb } from '../../test/helpers.ts';
 import { overrideEnv } from '../config/override-env.ts';
 import { getUsageCache } from './get-usage-cache.ts';
 import { getUsageDir } from './get-usage-dir.ts';
@@ -22,7 +22,6 @@ function setupTest() {
     }
   });
   at('2026-10-16T07:00:00.000Z');
-  fetchedDays(base.db);
 
   return {
     db: base.db,

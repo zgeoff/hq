@@ -12,7 +12,7 @@ import { sydneyUtc } from '../../morning/sydney-utc.ts';
 import type { Runner } from '../../runner/types.ts';
 import { refreshActionsSpend } from '../refresh-actions-spend.ts';
 import { setTarget } from '../set-target.ts';
-import { at, fetchedDays, freshDb } from '../../../test/helpers.ts';
+import { at, freshDb } from '../../../test/helpers.ts';
 import { owner } from '../../owner.ts';
 import { setForward } from '../../outbox/set-forward.ts';
 import { markOutboxFailed } from '../../outbox/mark-outbox-failed.ts';
@@ -45,7 +45,7 @@ function setupTest() {
 
 test('nothing before 18:00', () => {
   const ctx = setupTest();
-  fetchedDays(ctx.db);
+  ctx.seed.fetchedDays();
   ctx.synced(syd('2026-10-16', '17:40'));
   expect(ctx.tick('2026-10-16', '17:59')).toStrictEqual({ run: null, waiting: null });
   expect(readOutboxRows(ctx.db)).toStrictEqual([]);
@@ -53,7 +53,7 @@ test('nothing before 18:00', () => {
 
 test('at 18:00 one message goes to z-stu: 7 goal lines, 3 throughput lines and the incidents; a second tick sends nothing', () => {
   const ctx = setupTest();
-  fetchedDays(ctx.db);
+  ctx.seed.fetchedDays();
   ctx.synced(syd('2026-10-16', '17:50'));
   const result = ctx.tick('2026-10-16', '18:01');
   expect(result.run).toMatchObject({ job: 'goals-daily', key: '2026-10-16', result: 'queued', detail: null });
@@ -75,7 +75,7 @@ test('at 18:00 one message goes to z-stu: 7 goal lines, 3 throughput lines and t
 
 test('a line carries the colour as words after the emoji', () => {
   const ctx = setupTest();
-  fetchedDays(ctx.db);
+  ctx.seed.fetchedDays();
   ctx.seed.linearIssue({ issue: 'GEO-1', type: 'Feature' });
   ctx.seed.mergedPR({ issue: 'GEO-1' });
   ctx.synced(syd('2026-10-16', '17:50'));
@@ -92,7 +92,7 @@ function makeActionsGh(netAmount: number): Runner {
 
 test('the cost line shows the Actions spend as unknown, with no colour, before any reading', () => {
   const ctx = setupTest();
-  fetchedDays(ctx.db);
+  ctx.seed.fetchedDays();
 
   const line = dailyText(ctx.db, syd('2026-10-16', '18:00')).split('\n').find((text) => text.startsWith('- Cost'));
 
@@ -101,7 +101,7 @@ test('the cost line shows the Actions spend as unknown, with no colour, before a
 
 test('the cost line is green with the Actions spend under the pro-rated budget, beside the Claude usage', async () => {
   const ctx = setupTest();
-  fetchedDays(ctx.db);
+  ctx.seed.fetchedDays();
   await refreshActionsSpend(ctx.db, makeActionsGh(12.5), syd('2026-10-16', '17:50'));
 
   const line = dailyText(ctx.db, syd('2026-10-16', '18:00')).split('\n').find((text) => text.startsWith('- Cost'));
@@ -111,7 +111,7 @@ test('the cost line is green with the Actions spend under the pro-rated budget, 
 
 test('the cost line is red with the Actions spend over the pro-rated budget', async () => {
   const ctx = setupTest();
-  fetchedDays(ctx.db);
+  ctx.seed.fetchedDays();
   await refreshActionsSpend(ctx.db, makeActionsGh(31.07), syd('2026-10-16', '17:50'));
 
   const line = dailyText(ctx.db, syd('2026-10-16', '18:00')).split('\n').find((text) => text.startsWith('- Cost'));
@@ -121,7 +121,7 @@ test('the cost line is red with the Actions spend over the pro-rated budget', as
 
 test('the cost line shows the spend as unknown when gh fails, never $0', async () => {
   const ctx = setupTest();
-  fetchedDays(ctx.db);
+  ctx.seed.fetchedDays();
   await refreshActionsSpend(ctx.db, () => Promise.resolve({ code: 1, stdout: '', stderr: 'HTTP 403' }), syd('2026-10-16', '17:50'));
 
   const line = dailyText(ctx.db, syd('2026-10-16', '18:00')).split('\n').find((text) => text.startsWith('- Cost'));
@@ -132,7 +132,7 @@ test('the cost line shows the spend as unknown when gh fails, never $0', async (
 
 test('a long cost line gives up its middle and keeps the target and colour', async () => {
   const ctx = setupTest();
-  fetchedDays(ctx.db);
+  ctx.seed.fetchedDays();
   ctx.seed.usageSample({ at: '2026-10-16T05:00:00Z', account: 'abcdef012345', five_hour: 99, seven_day: 99 });
   await refreshActionsSpend(ctx.db, makeActionsGh(123_456.78), syd('2026-10-16', '17:50'));
 
@@ -145,7 +145,7 @@ test('a long cost line gives up its middle and keeps the target and colour', asy
 
 test('incidents today list the outages opened today, with minutes', () => {
   const ctx = setupTest();
-  fetchedDays(ctx.db);
+  ctx.seed.fetchedDays();
   ctx.seed.closedOutage({ startedAt: '2026-10-16T03:00:00Z', detectedAt: '2026-10-16T03:01:00Z', endedAt: '2026-10-16T03:05:00Z' });
   ctx.seed.closedOutage({ startedAt: '2026-10-15T03:00:00Z', detectedAt: '2026-10-15T03:01:00Z', endedAt: '2026-10-15T03:20:00Z' });
   for (const minute of [0, 1, 2, 3, 4]) {
@@ -158,7 +158,7 @@ test('incidents today list the outages opened today, with minutes', () => {
 
 test('incidents today list an unready episode beside the outages, one line each', () => {
   const ctx = setupTest();
-  fetchedDays(ctx.db);
+  ctx.seed.fetchedDays();
   ctx.seed.closedOutage({ startedAt: '2026-10-16T03:00:00Z', detectedAt: '2026-10-16T03:01:00Z', endedAt: '2026-10-16T03:05:00Z' });
   ctx.seed.closedUnreadyOutage({ startedAt: '2026-10-16T05:00:00Z', detectedAt: '2026-10-16T05:03:00Z', endedAt: '2026-10-16T05:12:00Z' });
   for (const minute of [0, 1, 2, 3, 4]) {
@@ -171,7 +171,7 @@ test('incidents today list an unready episode beside the outages, one line each'
 
 test('stale goals data makes it wait, and it sends once the data is fresh', () => {
   const ctx = setupTest();
-  fetchedDays(ctx.db);
+  ctx.seed.fetchedDays();
   ctx.synced(syd('2026-10-16', '16:00'));
   expect(ctx.tick('2026-10-16', '18:00')).toStrictEqual({ run: null, waiting: 'goals data 120 min old' });
   expect(readOutboxRows(ctx.db)).toStrictEqual([]);
@@ -183,7 +183,7 @@ test('stale goals data makes it wait, and it sends once the data is fresh', () =
 
 test('goals data that was never synced waits too; 35 minutes old still sends', () => {
   const ctx = setupTest();
-  fetchedDays(ctx.db);
+  ctx.seed.fetchedDays();
   expect(ctx.tick('2026-10-16', '18:00').waiting).toBe('goals data never synced');
   ctx.synced(syd('2026-10-16', '17:25'));
   expect(ctx.tick('2026-10-16', '18:00').run).not.toBeNull();
@@ -191,14 +191,14 @@ test('goals data that was never synced waits too; 35 minutes old still sends', (
 
 test('a day after 18:30 is sent late and marked so', () => {
   const ctx = setupTest();
-  fetchedDays(ctx.db);
+  ctx.seed.fetchedDays();
   ctx.synced(syd('2026-10-17', '18:40'));
   expect(ctx.tick('2026-10-17', '18:45').run).toMatchObject({ detail: 'late' });
 });
 
 test('hq goals daily sends now, once; a dry run sends nothing and writes no job row', () => {
   const ctx = setupTest();
-  fetchedDays(ctx.db);
+  ctx.seed.fetchedDays();
   ctx.synced(syd('2026-10-16', '10:00'));
   const sentAt = syd('2026-10-16', '10:10');
   dailyText(ctx.db, sentAt);
@@ -212,7 +212,7 @@ test('hq goals daily sends now, once; a dry run sends nothing and writes no job 
 
 test('a manual send refuses stale data', () => {
   const ctx = setupTest();
-  fetchedDays(ctx.db);
+  ctx.seed.fetchedDays();
   ctx.synced(syd('2026-10-16', '08:00'));
   expect(() => sendDaily(ctx.db, 'z-stu', syd('2026-10-16', '10:10'))).toThrow('run hq goals sync first');
   expect(readOutboxRows(ctx.db)).toStrictEqual([]);
@@ -220,7 +220,7 @@ test('a manual send refuses stale data', () => {
 
 test('skip leaves a day alone; bad skips are refused', () => {
   const ctx = setupTest();
-  fetchedDays(ctx.db);
+  ctx.seed.fetchedDays();
   ctx.synced(syd('2026-10-16', '17:50'));
   skipDaily(ctx.db, '2026-10-16', 'done by hand', 'z-stu');
   expect(ctx.tick('2026-10-16', '18:00')).toStrictEqual({ run: null, waiting: null });
@@ -232,7 +232,7 @@ test('skip leaves a day alone; bad skips are refused', () => {
 
 test('health is red at 18:31 with no run, quiet before 18:30, green once it ran', () => {
   const ctx = setupTest();
-  fetchedDays(ctx.db);
+  ctx.seed.fetchedDays();
   expect(goalsDailyCheck(ctx.db, syd('2026-10-16', '18:29'))).toBeNull();
   expect(goalsDailyCheck(ctx.db, syd('2026-10-16', '18:31'))).toMatchObject({ key: 'job:goals-daily', ok: false, line: expect.stringContaining('no run today (2026-10-16)') });
   ctx.synced(syd('2026-10-16', '17:50'));
@@ -244,7 +244,7 @@ test('health is red at 18:31 with no run, quiet before 18:30, green once it ran'
 
 test('it still sees a failed message after the owner session is forwarded', () => {
   const ctx = setupTest();
-  fetchedDays(ctx.db);
+  ctx.seed.fetchedDays();
   ctx.synced(syd('2026-10-16', '17:50'));
   ctx.tick('2026-10-16', '18:05');
   setForward(ctx.db, owner(), 'z-other');
@@ -255,7 +255,7 @@ test('it still sees a failed message after the owner session is forwarded', () =
 
 test('health is red for a day whose data stayed stale', () => {
   const ctx = setupTest();
-  fetchedDays(ctx.db);
+  ctx.seed.fetchedDays();
   ctx.synced(syd('2026-10-16', '09:00'));
   ctx.tick('2026-10-16', '18:35');
   expect(goalsDailyCheck(ctx.db, syd('2026-10-16', '18:35'))?.ok).toBe(false);
@@ -263,7 +263,7 @@ test('health is red for a day whose data stayed stale', () => {
 
 test('only a sync without failed fetches counts as fresh: goals_synced_at alone does not', () => {
   const ctx = setupTest();
-  fetchedDays(ctx.db);
+  ctx.seed.fetchedDays();
   setMeta(ctx.db, 'goals_synced_at', iso(syd('2026-10-16', '17:55')));
   expect(ctx.tick('2026-10-16', '18:00').waiting).toBe('goals data never synced');
   ctx.synced(syd('2026-10-16', '17:55'));
@@ -272,7 +272,7 @@ test('only a sync without failed fetches counts as fresh: goals_synced_at alone 
 
 test('stale merged-PR kinds or Linear types hold the check-in even when CI is fresh', () => {
   const ctx = setupTest();
-  fetchedDays(ctx.db);
+  ctx.seed.fetchedDays();
   ctx.synced(syd('2026-10-16', '17:55'));
   setMeta(ctx.db, 'kinds_ok_at', iso(syd('2026-10-16', '10:00')));
   expect(ctx.tick('2026-10-16', '18:00').waiting).toBe('goals data 480 min old');
@@ -285,7 +285,7 @@ test('stale merged-PR kinds or Linear types hold the check-in even when CI is fr
 
 test('the deploy-prod line names holds, no-apply runs and runs not yet classified', () => {
   const ctx = setupTest();
-  fetchedDays(ctx.db, undefined, undefined, { repos: ['atc', 'cloud'] });
+  ctx.seed.fetchedDays({ repos: ['atc', 'cloud'] });
   const add = (id: number, outcome: string | null) => {
     ctx.seed.ciRun({ id, repo: 'cloud', path: '.github/workflows/deploy-prod.yml' });
     if (outcome) {
