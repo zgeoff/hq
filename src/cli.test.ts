@@ -867,7 +867,7 @@ test('it reads the four slots through op and prints the fleet block without a to
   expect(text).toInclude('  slot 1: 5h ?, 7d 40% (resets 21 Oct 00:00Z), read 0 min ago');
   expect(text).toInclude('  slot 4: 5h ?, 7d 60% (resets 24 Oct 00:00Z), read 0 min ago');
   expect(text).not.toInclude('sk-ant-kettle');
-  expect(ctx.db.query('SELECT COUNT(*) AS total FROM slot_usage').get()).toStrictEqual({ total: 4 });
+  expect(readSlotRows(ctx.db, new Date(0), new Date(NOON_SYDNEY))).toHaveLength(4);
 });
 
 test("it reads the broker slot's fleet-vault token in hq capacity broker after a refresh when the proof is more than 24 h old", async () => {
