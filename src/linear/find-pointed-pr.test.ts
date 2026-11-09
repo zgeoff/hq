@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { findPointedPR } from './find-pointed-pr.ts';
+import { findPointedPR, isOwnFixPR } from './find-pointed-pr.ts';
 
 test.each([
   ['a GitHub PR attachment that opened before the issue', '', [{ url: 'https://github.com/zgeoff/widgets/pull/7', openedAt: '2026-10-20T09:00:00Z' }], 'widgets#7'],
@@ -14,5 +14,27 @@ test.each([
   ['an attachment that is not a PR', 'Descale the kettle.', [{ url: 'https://github.com/zgeoff/widgets/issues/7', openedAt: '2026-10-20T09:00:00Z' }], null],
   ['no PR: From in the middle of a line', 'Taken From widgets#7 by hand.', [], null],
 ])('it reads %s', (_case, description, attachments, expected) => {
-  expect(findPointedPR(description, attachments, '2026-10-20T11:54:00Z')).toBe(expected);
+  expect(findPointedPR(description, attachments, '2026-10-20T11:54:00Z', 'GEO-9700')).toBe(expected);
+});
+
+test.each([
+  ['a Fixes line for the issue', 'Fixes GEO-9700', true],
+  ['a Contributes to line for the issue', 'Descale the kettle.\n\nContributes to GEO-9700', true],
+  ['a Related to line for the issue', 'Related to GEO-9700', true],
+  ['a bulleted line for the issue', '- Fixes GEO-9700', true],
+  ['an indented line for the issue', '  Related to GEO-9700', true],
+  ['a line for another issue', 'Fixes GEO-9701', false],
+  ['a line for an issue whose id starts with this one', 'Fixes GEO-97001', false],
+  ['the id only in prose', 'The kettle work from GEO-9700 needs a retry.', false],
+  ['a lowercase id', 'fixes geo-9700', false],
+  ['an empty body', '', false],
+])('#isOwnFixPR reads %s as %p', (_case, body, expected) => {
+  expect(isOwnFixPR(body, 'GEO-9700')).toBe(expected);
+});
+
+test('it skips an attachment whose PR names the issue as its own fix, and counts one whose body does not', () => {
+  const own = { url: 'https://github.com/zgeoff/widgets/pull/7', openedAt: '2026-10-20T09:00:00Z', body: 'Contributes to GEO-9700' };
+  const source = { url: 'https://github.com/zgeoff/widgets/pull/8', openedAt: '2026-10-20T09:00:00Z', body: 'Fixes GEO-9600' };
+
+  expect({ own: findPointedPR('', [own], '2026-10-20T11:54:00Z', 'GEO-9700'), both: findPointedPR('', [own, source], '2026-10-20T11:54:00Z', 'GEO-9700') }).toStrictEqual({ own: null, both: 'widgets#8' });
 });

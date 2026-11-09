@@ -45,7 +45,7 @@ test('it stores the PR attachment that opened before the issue, and skips one th
       ],
       pageInfo: { hasNextPage: false, endCursor: null },
     },
-  }), new Date('2026-10-21T00:00:00Z'), new Date('2026-10-22T00:00:00Z'));
+  }), new Date('2026-10-21T00:00:00Z'), { to: new Date('2026-10-22T00:00:00Z') });
 
   expect(read).toBe(3);
   expect(ctx.db.query('SELECT issue, pr_ref FROM linear_filed ORDER BY issue').all()).toStrictEqual([

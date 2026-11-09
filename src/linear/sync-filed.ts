@@ -3,8 +3,11 @@ import { z } from 'zod';
 import { iso } from '../clock/iso.ts';
 import { now } from '../clock/now.ts';
 import { HqError } from '../errors.ts';
-import { findPointedPR } from './find-pointed-pr.ts';
+import type { Runner } from '../runner/types.ts';
+import { collectEarlierPRAttachments, findExplicitSource, findPRLink, findPointedPR } from './find-pointed-pr.ts';
+import type { PRAttachment } from './find-pointed-pr.ts';
 import { pickFiledSource } from './pick-filed-source.ts';
+import { readPRBody } from './read-pr-body.ts';
 import type { LinearCall } from './types.ts';
 
 const labelSchema = z.object({ name: z.string() });
@@ -22,7 +25,14 @@ const filedNodeSchema = z.object({
 const pageInfoSchema = z.object({ hasNextPage: z.boolean(), endCursor: z.string().nullable() });
 const filedPageSchema = z.object({ issues: z.object({ nodes: z.array(filedNodeSchema), pageInfo: pageInfoSchema }) });
 
-export async function syncFiled(db: Database, call: LinearCall, from: Date, to: Date = now()): Promise<number> {
+interface SyncFiledOptions {
+  to?: Date;
+  run?: Runner | undefined;
+}
+
+export async function syncFiled(db: Database, call: LinearCall, from: Date, options: SyncFiledOptions = {}): Promise<number> {
+  const to = options.to ?? now();
+  const run = options.run;
   const query = `query($after: String, $from: DateTimeOrDuration!, $to: DateTimeOrDuration!) {
     issues(first: 100, after: $after, includeArchived: true, filter: { createdAt: { gte: $from, lt: $to } }) {
       nodes { identifier title createdAt description creator { app } labels { nodes { name } } attachments { nodes { url metadata } } }
@@ -35,16 +45,19 @@ export async function syncFiled(db: Database, call: LinearCall, from: Date, to: 
     const answer = await call(query, { after, from: iso(from), to: iso(to) });
     const issues = filedPageSchema.parse(answer).issues;
     const fetchedAt = iso(to);
-    db.transaction(() => {
-      for (const node of issues.nodes) {
-        const description = node.description ?? '';
-        const labels = node.labels.nodes.map((label) => label.name);
+    const rows: { node: z.infer<typeof filedNodeSchema>; source: string; pointedPR: string | null }[] = [];
+    for (const node of issues.nodes) {
+      const description = node.description ?? '';
+      const labels = node.labels.nodes.map((label) => label.name);
 
-        // A null creator is an issue an integration filed, with no Linear user behind it.
-        const source = pickFiledSource({ title: node.title, description, labels, isBotCreator: node.creator === null || node.creator.app });
-        const attachments = node.attachments.nodes.map((attachment) => ({ url: attachment.url, openedAt: attachment.metadata?.createdAt ?? null }));
-        const pointedPR = findPointedPR(description, attachments, node.createdAt);
-        insert.run(node.identifier, iso(new Date(node.createdAt)), source, pointedPR, fetchedAt);
+      // A null creator is an issue an integration filed, with no Linear user behind it.
+      const source = pickFiledSource({ title: node.title, description, labels, isBotCreator: node.creator === null || node.creator.app });
+      const attachments = await readAttachments(run, node.attachments.nodes, description, node.createdAt);
+      rows.push({ node, source, pointedPR: findPointedPR(description, attachments, node.createdAt, node.identifier) });
+    }
+    db.transaction(() => {
+      for (const row of rows) {
+        insert.run(row.node.identifier, iso(new Date(row.node.createdAt)), row.source, row.pointedPR, fetchedAt);
       }
     }).immediate();
     count += issues.nodes.length;
@@ -54,4 +67,20 @@ export async function syncFiled(db: Database, call: LinearCall, from: Date, to: 
     after = issues.pageInfo.endCursor;
   }
   throw new HqError('linear_failed', 'more than 4,000 filed issues in the window; narrow it');
+}
+
+// Only an attachment that would otherwise count as the source PR costs a GitHub call.
+async function readAttachments(run: Runner | undefined, nodes: readonly z.infer<typeof attachmentSchema>[], description: string, issueCreatedAt: string): Promise<PRAttachment[]> {
+  const attachments: PRAttachment[] = nodes.map((attachment) => ({ url: attachment.url, openedAt: attachment.metadata?.createdAt ?? null }));
+  if (run === undefined || findExplicitSource(description) !== null) {
+    return attachments;
+  }
+  for (const attachment of collectEarlierPRAttachments(attachments, issueCreatedAt)) {
+    const ref = findPRLink(attachment.url);
+    const body = ref === null ? null : await readPRBody(run, ref);
+    if (body !== null) {
+      attachment.body = body;
+    }
+  }
+  return attachments;
 }
