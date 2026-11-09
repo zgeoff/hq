@@ -4,6 +4,7 @@ import { freshDb } from '../../test/helpers.ts';
 import { writeIssues } from '../linear/write-issues.ts';
 import { buildRunSeeder } from './test-utils/build-run-seeder.ts';
 import { closeDoneDesignRuns } from './close-done-design-runs.ts';
+import { reopenRun } from './reopen-run.ts';
 import { readClosedIssueAlerts } from './read-closed-issue-alerts.ts';
 import type { StubFleetAnswers } from '../../test/build-stub-fleet-client.ts';
 import type { ImpWork } from './types.ts';
@@ -109,4 +110,19 @@ test('it still closes the run and asks z-delivery about its sessions when atc fa
   expect(ctx.readOutbox()).toStrictEqual([
     { target: 'z-delivery', text: `GEO-9706: its Design issue is Done in Linear, and the run is done. Unpin and stop session ${PINNED}; hq does not stop a pinned session itself.` },
   ]);
+});
+
+test('it asks z-delivery only once about a session when its run is reopened and closed again', async () => {
+  const ctx = setupTest();
+  ctx.seedDesignRun('GEO-9707');
+  ctx.seed.runSession({ issue: 'GEO-9707', session: PINNED });
+  ctx.seedKettleIssue('GEO-9707', 'completed');
+  const answers = { sessions: [{ id: PINNED, name: 'kettle-design', alive: true, pinned: true, cwd: '/workspace/kettle' }] };
+
+  await ctx.closeDesignRuns(answers);
+  reopenRun(ctx.db, { issue: 'GEO-9707', next: 'Reopened: agent working.', design: { slots: { agent: 2, withGeoff: 1 }, error: null, asked: null }, actor: 'hq-lanes' });
+  const again = await ctx.closeDesignRuns(answers);
+
+  expect(again.issues).toStrictEqual(['GEO-9707']);
+  expect(ctx.readOutbox()).toHaveLength(1);
 });
