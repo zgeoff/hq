@@ -8,9 +8,11 @@ import { freshDb } from '../../test/helpers.ts';
 import { createStoreBackup } from '../noslop/create-store-backup.ts';
 import { withExclusiveLock } from '../review/with-exclusive-lock.ts';
 import type { RunResult } from '../runner/types.ts';
+import { buildSeeder } from '../test-utils/build-seeder.ts';
 import { REKEY_SPECS } from './rekey-specs.ts';
 import type { ArchiveInput } from './run-archive-history.ts';
 import { runArchiveHistory } from './run-archive-history.ts';
+import { buildRepoSeeder } from './test-utils/build-repo-seeder.ts';
 
 // root writes into a read-only folder, so a chmod cannot make a move fail there; Bun 1.4's skipIf
 // takes a boolean and has no in-body skip.
@@ -32,6 +34,7 @@ function setupTest() {
   return {
     ...base,
     store,
+    seed: { ...buildSeeder(base), ...buildRepoSeeder({ store }) },
     archive: (from: string, to: string, extra: Partial<ArchiveInput> = {}) =>
       runArchiveHistory({
         actor: 'z-stu',
@@ -88,16 +91,6 @@ function readBackupNames(dbFile: string): string[] {
   return readdirSync(dirname(dbFile)).filter((name) => name.includes('.bak-'));
 }
 
-function writeStoreDisposition(path: string, pullRequest: number, source: string): void {
-  const store = new Database(path);
-  store.query("INSERT INTO dispositions (repo, finding_id, kind, value, author, author_is_owner, source, at, pull_request) VALUES ('zgeoff/hq', 'f1', 'fixed', 'x', 'a', 1, ?, '2026-10-01T00:00:00Z', ?)").run(source, pullRequest);
-  store.close();
-}
-
-function writeMergedPr(db: Database): void {
-  db.query("INSERT INTO merged_prs (repo, number, merged_at, title, kind) VALUES ('hq', 2, '2026-10-02T00:00:00Z', 'a newer change', 'fix')").run();
-}
-
 function readBackupRepo(path: string | undefined): unknown[] {
   const copy = new Database(path ?? '', { readonly: true });
   try {
@@ -130,7 +123,7 @@ test('it re-keys exactly the listed columns, in both databases', async () => {
 test('it re-keys the cached PR facts of the stats with the rest of hq.db', async () => {
   const ctx = setupTest();
   ctx.createHistoryRows('hq', 0);
-  ctx.db.query("INSERT INTO meta (key, value) VALUES ('stats_pr_facts_v2', ?)").run(JSON.stringify({ 'hq#5': { lines: 40, stacked: false }, 'hq-tools#5': { lines: 3, stacked: true }, 'hq#abc': { lines: 1, stacked: false } }));
+  ctx.seed.meta({ key: 'stats_pr_facts_v2', value: JSON.stringify({ 'hq#5': { lines: 40, stacked: false }, 'hq-tools#5': { lines: 3, stacked: true }, 'hq#abc': { lines: 1, stacked: false } }) });
   await ctx.archive('hq', 'hq-archive');
   expect(ctx.db.query("SELECT value FROM meta WHERE key = 'stats_pr_facts_v2'").get()).toStrictEqual({
     value: JSON.stringify({ 'hq-archive#5': { lines: 40, stacked: false }, 'hq-tools#5': { lines: 3, stacked: true }, 'hq#abc': { lines: 1, stacked: false } }),
@@ -140,7 +133,7 @@ test('it re-keys the cached PR facts of the stats with the rest of hq.db', async
 test('it counts the cached PR facts of the stats on a dry run, and changes nothing', async () => {
   const ctx = setupTest();
   ctx.createHistoryRows('hq', 0);
-  ctx.db.query("INSERT INTO meta (key, value) VALUES ('stats_pr_facts_v2', ?)").run(JSON.stringify({ 'hq#5': { lines: 40, stacked: false }, 'hq#6': { lines: 2, stacked: true }, 'hq-archive#1': { lines: 9, stacked: false } }));
+  ctx.seed.meta({ key: 'stats_pr_facts_v2', value: JSON.stringify({ 'hq#5': { lines: 40, stacked: false }, 'hq#6': { lines: 2, stacked: true }, 'hq-archive#1': { lines: 9, stacked: false } }) });
   {
     const result = await ctx.archive('hq', 'hq-archive', { dryRun: true });
     expect(result.before[0]?.counts.find((count) => count.table === 'meta')).toStrictEqual({ table: 'meta', column: 'value', from: 2, to: 1 });
@@ -152,7 +145,7 @@ test('it counts the cached PR facts of the stats on a dry run, and changes nothi
 test('it refuses a cached PR fact that would repeat a key, names it, and changes nothing', async () => {
   const ctx = setupTest();
   ctx.createHistoryRows('hq', 0);
-  ctx.db.query("INSERT INTO meta (key, value) VALUES ('stats_pr_facts_v2', ?)").run(JSON.stringify({ 'hq#5': { lines: 40, stacked: false }, 'hq-archive#5': { lines: 2, stacked: true } }));
+  ctx.seed.meta({ key: 'stats_pr_facts_v2', value: JSON.stringify({ 'hq#5': { lines: 40, stacked: false }, 'hq-archive#5': { lines: 2, stacked: true } }) });
   {
     const before = readHistoryRows(ctx.db);
     await expect(ctx.archive('hq', 'hq-archive')).rejects.toThrow('meta.stats_pr_facts_v2=hq-archive#5');
@@ -200,7 +193,7 @@ test('it refuses a repeated key in hq.db, names it, and changes nothing', async 
   const ctx = setupTest();
   ctx.createHistoryRows('hq', 0);
   await ctx.archive('hq', 'hq-archive');
-  writeMergedPr(ctx.db);
+  ctx.seed.mergedPR({ repo: 'hq', number: 2, merged_at: '2026-10-02T00:00:00Z', title: 'a newer change', kind: 'fix' });
   {
     const before = { hq: readHistoryRows(ctx.db), backups: readBackupNames(ctx.path) };
     await expect(ctx.archive('hq-archive', 'hq')).rejects.toThrow('merged_prs.repo=hq (number=2)');
@@ -212,7 +205,7 @@ test('it refuses a repeated finding in the store, names it, and changes nothing'
   const ctx = setupTest();
   ctx.createStoreRows('hq', 0);
   await ctx.archive('hq', 'hq-archive');
-  writeStoreDisposition(ctx.store, 1, 's');
+  ctx.seed.disposition({ pull_request: 1 });
   {
     const before = readStoreRows(ctx.store);
     await expect(ctx.archive('hq-archive', 'hq')).rejects.toThrow('dispositions.repo=zgeoff/hq (pull_request=1, finding_id=f1, source=s, at=2026-10-01T00:00:00Z)');
@@ -224,7 +217,7 @@ test('it re-keys back when a new disposition shares a finding id with an archive
   const ctx = setupTest();
   ctx.createStoreRows('hq', 0);
   await ctx.archive('hq', 'hq-archive');
-  writeStoreDisposition(ctx.store, 2, 's');
+  ctx.seed.disposition({ pull_request: 2 });
   await ctx.archive('hq-archive', 'hq');
   expect(readStoreRows(ctx.store)).toMatchObject({ dispositions: [{ repo: 'zgeoff/hq', pull_request: 1 }, { repo: 'zgeoff/hq', pull_request: 2 }] });
 });
@@ -289,7 +282,7 @@ test('it reports a repeated key on a dry run, and still changes nothing', async 
   const ctx = setupTest();
   ctx.createHistoryRows('hq', 0);
   await ctx.archive('hq', 'hq-archive');
-  writeMergedPr(ctx.db);
+  ctx.seed.mergedPR({ repo: 'hq', number: 2, merged_at: '2026-10-02T00:00:00Z', title: 'a newer change', kind: 'fix' });
   {
     const result = await ctx.archive('hq-archive', 'hq', { dryRun: true });
     expect(result.before[0]?.collisions).toStrictEqual(['merged_prs.repo=hq (number=2)']);

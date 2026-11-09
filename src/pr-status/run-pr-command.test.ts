@@ -13,6 +13,7 @@ import { NOON_SYDNEY, at, freshDb } from '../../test/helpers.ts';
 import type { Flags } from '../cli.ts';
 import { runPRCommand } from './run-pr-command.ts';
 import { runCallAnswer } from '../asks/run-call-answer.ts';
+import { buildSeeder } from '../test-utils/build-seeder.ts';
 
 function setupTest() {
   const fresh = freshDb();
@@ -21,6 +22,7 @@ function setupTest() {
   createStubNoslopEnv(fresh.db);
   return {
     db: fresh.db,
+    seed: buildSeeder(fresh),
     fileCall: (id: string, title: string) => {
       addAsk(fresh.db, { kind: 'call', id, title, question: 'Boil?', body: 'Body', issues: [], forSession: null, actor: 'z-kettle' });
       openAsk(fresh.db, { id, force: true, actor: 'z-stu' });
@@ -330,7 +332,7 @@ test('it refuses a next step that gives both a session and --clear', async () =>
 
 test('it shows a gate none plainly, as a PR noslop does not review', async () => {
   const ctx = setupTest();
-  ctx.db.query("INSERT INTO pr_status (repo, pr, head, gate, gate_head, gate_at, updated_at) VALUES ('widgets', 7, NULL, 'none', NULL, '2026-10-14T01:00:00Z', '2026-10-14T01:00:00Z')").run();
+  ctx.seed.prStatus({ head: null, gate: 'none', gate_at: '2026-10-14T01:00:00Z' });
 
   await expect(runPRCommand({ run: ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678').run, db: ctx.db, verb: 'status', rest: ['widgets', '7'], flags: {}, actor: ctx.actor, readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) })).resolves.toStrictEqual({
     data: {
@@ -363,7 +365,7 @@ test('it shows a gate none plainly, as a PR noslop does not review', async () =>
 
 test("it marks a gate recorded at an older head stale once the PR has a new head", async () => {
   const ctx = setupTest();
-  ctx.db.query("INSERT INTO pr_status (repo, pr, head, gate, gate_head, gate_at, updated_at) VALUES ('widgets', 7, 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', 'pass', 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', '2026-10-14T01:00:00Z', '2026-10-14T01:00:00Z')").run();
+  ctx.seed.prStatus({ head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', gate: 'pass', gate_head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', gate_at: '2026-10-14T01:00:00Z' });
 
   await expect(runPRCommand({ run: ctx.headAt('b9c8d7e6f5a40312213f4e5d6c7b8a9087654321').run, db: ctx.db, verb: 'status', rest: ['widgets', '7'], flags: {}, actor: ctx.actor, readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) })).resolves.toStrictEqual({
     data: {
@@ -396,7 +398,7 @@ test("it marks a gate recorded at an older head stale once the PR has a new head
 
 test("it shows a gate recorded at the PR's head now as not stale", async () => {
   const ctx = setupTest();
-  ctx.db.query("INSERT INTO pr_status (repo, pr, head, gate, gate_head, gate_at, updated_at) VALUES ('widgets', 7, 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', 'pass', 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', '2026-10-14T01:00:00Z', '2026-10-14T01:00:00Z')").run();
+  ctx.seed.prStatus({ head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', gate: 'pass', gate_head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', gate_at: '2026-10-14T01:00:00Z' });
 
   await expect(runPRCommand({ run: ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678').run, db: ctx.db, verb: 'status', rest: ['widgets', '7'], flags: {}, actor: ctx.actor, readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) })).resolves.toStrictEqual({
     data: {
@@ -507,7 +509,6 @@ test('it shows a standing override for a PR with no record, in text and in JSON'
   const ctx = setupTest();
   const head = ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678');
   await ctx.override(head, { source: 'chat:kettle-2', note: 'The base moved under the stack.' });
-  ctx.db.query('DELETE FROM pr_status').run();
 
   const shown = await ctx.status(head);
 
@@ -972,7 +973,6 @@ test('it shows a standing CI override for a PR with no record', async () => {
   const ctx = setupTest();
   const head = ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678');
   await ctx.override(head, { source: 'chat:kettle-2', note: 'An intended infra change.', check: ['preview'] });
-  ctx.db.query('DELETE FROM pr_status').run();
 
   const shown = await ctx.status(head);
 

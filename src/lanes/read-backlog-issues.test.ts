@@ -6,6 +6,8 @@ import { freshDb } from '../../test/helpers.ts';
 import { main } from '../cli.ts';
 import { overrideEnv } from '../config/override-env.ts';
 import { resetKey } from '../linear/reset-key.ts';
+import { seedStartedIssue } from '../linear/test-utils/seed-started-issue.ts';
+import { seedStartedPR } from '../linear/test-utils/seed-started-pr.ts';
 import type { LinearCall } from '../linear/types.ts';
 import type { RunResult, Runner } from '../runner/types.ts';
 import { readBacklogIssues } from './read-backlog-issues.ts';
@@ -158,8 +160,8 @@ test('it prints, for hq lanes promotable --json, the promotable Backlog issues o
       inverseRelations: { nodes: [{ type: 'blocks', issue: { identifier: 'GEO-9871', state: { type: 'started' } } }], pageInfo: { hasNextPage: false } },
     },
   ];
-  fresh.db.run("INSERT INTO linear_started (issue, started_at, fetched_at) VALUES ('GEO-9871', '2026-10-10T01:00:00Z', '2026-10-16T01:00:00Z')");
-  fresh.db.run("INSERT INTO linear_started_prs (issue, ref, status, merged_at) VALUES ('GEO-9871', 'kettle#9', 'merged', '2026-10-13T01:00:00Z')");
+  seedStartedIssue(fresh, { issue: 'GEO-9871' });
+  seedStartedPR(fresh, { issue: 'GEO-9871', ref: 'kettle#9', status: 'merged', merged_at: '2026-10-13T01:00:00Z' });
   server.use(
     http.post(LINEAR_GRAPHQL_URL, async (info) => {
       const body: unknown = await info.request.json();

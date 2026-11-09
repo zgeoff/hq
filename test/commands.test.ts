@@ -1,4 +1,6 @@
-import { afterEach, beforeEach, expect, test } from 'bun:test';
+// oxlint-disable zgeoff/test-beside-module -- checks the command registry against the dispatcher in src/cli.ts and every group
+import { expect, onTestFinished, spyOn, test } from 'bun:test';
+import { updateEnv } from '@zgeoff/testing/helpers';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { main } from '../src/cli.ts';
@@ -7,7 +9,7 @@ import { HELP } from '../src/help.ts';
 import { VERSION } from '../src/version.ts';
 import type { Command } from '../src/commands.ts';
 import { COMMANDS } from '../src/commands.ts';
-import { lookup } from '../src/lookup.ts';
+import { findCommand } from '../src/find-command.ts';
 import { renderHelp } from '../src/render-help.ts';
 import { findPath } from '../src/test-utils/find-path.ts';
 import { NOON_SYDNEY, at, freshDb } from './helpers.ts';
@@ -29,11 +31,17 @@ test('--help is generated from the rows: a changed summary shows in the text', (
 });
 
 test('every row resolves through the dispatcher lookup to itself', () => {
-  for (const c of COMMANDS) {
-    for (const noun of c.nouns) {
-      for (const verb of c.verbs ?? []) expect(lookup(noun, verb)).toBe(c);
-      if (c.bare || c.verbs === null) expect(lookup(noun, undefined)).toBe(c);
-      if (c.verbs === null) expect(lookup(noun, 'no-such-verb')).toBe(c);
+  for (const command of COMMANDS) {
+    for (const noun of command.nouns) {
+      for (const verb of command.verbs ?? []) {
+        expect(findCommand(noun, verb)).toBe(command);
+      }
+      if (command.bare || command.verbs === null) {
+        expect(findCommand(noun, undefined)).toBe(command);
+      }
+      if (command.verbs === null) {
+        expect(findCommand(noun, 'no-such-verb')).toBe(command);
+      }
     }
   }
 });
@@ -105,12 +113,12 @@ test('every verb a group function handles has a row, or a catch-all row covers i
     const { verbs, bare } = verbsOf(fn);
     expect(verbs.length, fn).toBeGreaterThan(0);
     for (const verb of verbs) {
-      const c = lookup(noun, verb);
-      expect(c && (c.verbs === null || c.verbs.includes(verb)), `${noun} ${verb}`).toBe(true);
+      const command = findCommand(noun, verb);
+      expect(command && (command.verbs === null || command.verbs.includes(verb)), `${noun} ${verb}`).toBe(true);
     }
     if (bare) {
-      const c = lookup(noun, undefined);
-      expect(c && (c.bare || c.verbs === null), `${noun} with no verb`).toBe(true);
+      const command = findCommand(noun, undefined);
+      expect(command && (command.bare || command.verbs === null), `${noun} with no verb`).toBe(true);
     }
   }
 });
@@ -123,57 +131,53 @@ test('every noun cli.ts used to dispatch has a row', () => {
 });
 
 test('a read-only row is one that never writes: spot checks', () => {
-  const ro = (noun: string, verb?: string) => lookup(noun, verb)!.readOnly;
-  expect(ro('status')).toBe(true);
-  expect(ro('run', 'list')).toBe(true);
-  expect(ro('call', 'list')).toBe(true);
-  expect(ro('run', 'add')).toBe(false);
-  expect(ro('hold')).toBe(false);
-  expect(ro('outbox', 'flush')).toBe(false);
-  expect(ro('stats')).toBe(false);
-});
-
-let cleanup: () => void;
-let out: string[];
-const origLog = console.log;
-const origErr = console.error;
-beforeEach(() => {
-  ({ cleanup } = freshDb());
-  at(NOON_SYDNEY);
-  process.env['HQ_NOTIFY'] = 'off';
-  process.env['HQ_AS'] = 'z-stu';
-  out = [];
-  console.log = (s: string) => out.push(s);
-  console.error = (s: string) => out.push(s);
-});
-afterEach(() => {
-  console.log = origLog;
-  console.error = origErr;
-  cleanup();
+  expect(findCommand('status', undefined)?.readOnly).toBe(true);
+  expect(findCommand('run', 'list')?.readOnly).toBe(true);
+  expect(findCommand('call', 'list')?.readOnly).toBe(true);
+  expect(findCommand('run', 'add')?.readOnly).toBe(false);
+  expect(findCommand('hold', undefined)?.readOnly).toBe(false);
+  expect(findCommand('outbox', 'flush')?.readOnly).toBe(false);
+  expect(findCommand('stats', undefined)?.readOnly).toBe(false);
 });
 
 test('the dispatcher keeps its special cases and its errors', async () => {
+  const ctx = setupTest();
+  at(NOON_SYDNEY);
   expect(await main(['help'])).toBe(0);
-  expect(out.join('\n')).toBe(HELP);
-  out = [];
+  expect(ctx.out.join('\n')).toBe(HELP);
+  ctx.out.length = 0;
   expect(await main(['--help'])).toBe(0);
-  expect(out.join('\n')).toBe(HELP);
-  out = [];
+  expect(ctx.out.join('\n')).toBe(HELP);
+  ctx.out.length = 0;
   expect(await main(['--version'])).toBe(0);
-  expect(out.join('\n')).toContain(`hq ${VERSION} (schema v`);
-  out = [];
+  expect(ctx.out.join('\n')).toContain(`hq ${VERSION} (schema v`);
+  ctx.out.length = 0;
   expect(await main(['no-such-noun'])).toBe(1);
-  expect(out.join('\n')).toBe('hq: unknown command: no-such-noun. Try hq help');
-  out = [];
+  expect(ctx.out.join('\n')).toBe('hq: unknown command: no-such-noun. Try hq help');
+  ctx.out.length = 0;
   expect(await main(['run', 'no-such-verb'])).toBe(1);
-  expect(out.join('\n')).toBe('hq: unknown command: hq run no-such-verb');
-  out = [];
+  expect(ctx.out.join('\n')).toBe('hq: unknown command: hq run no-such-verb');
+  ctx.out.length = 0;
   expect(await main(['call'])).toBe(1);
-  expect(out.join('\n')).toBe('hq: --command is required');
-  out = [];
+  expect(ctx.out.join('\n')).toBe('hq: --command is required');
+  ctx.out.length = 0;
   expect(await main(['outbox', 'no-such-verb'])).toBe(0);
-  expect(out.join('\n')).toBe('Outbox empty.');
+  expect(ctx.out.join('\n')).toBe('Outbox empty.');
 });
+
+function setupTest() {
+  const fresh = freshDb();
+  onTestFinished(fresh.cleanup);
+  updateEnv('HQ_NOTIFY', 'off');
+  updateEnv('HQ_AS', 'z-stu');
+  const out: string[] = [];
+  const log = spyOn(console, 'log').mockImplementation((line: string) => out.push(line));
+  onTestFinished(() => log.mockRestore());
+  const error = spyOn(console, 'error').mockImplementation((line: string) => out.push(line));
+  onTestFinished(() => error.mockRestore());
+
+  return { out };
+}
 
 // The real entry point, not main() called from a test: a handler must not wait on the module that is running it.
 test('hq run as the entry point answers a command', async () => {

@@ -15,7 +15,7 @@ import { setMeta } from './db/set-meta.ts';
 import { readDesignBacklog } from './lanes/read-design-backlog.ts';
 import { readReadySnapshot } from './lanes/read-ready-snapshot.ts';
 import { runFocusCommand } from './focus/run-focus-command.ts';
-import { seedAreaLabels } from '../test/seed-area-labels.ts';
+import { seedAreaLabels } from './focus/test-utils/seed-area-labels.ts';
 import { makeStateCall } from '../test/make-state-call.ts';
 import type { LinearCall } from './linear/types.ts';
 import { runLinearReadyTick } from './run-linear-ready-tick.ts';
@@ -332,7 +332,7 @@ test('it clears the stored label-read error after a good label read', async () =
 test('it keeps the repo checks that hq linear areas stored for the labels still in Linear', async () => {
   const ctx = setupTest();
   const lanes = ['nixie-slice', 'nixie-maintenance', 'atc', 'imp', 'cloud', 'memory', 'flexible', 'cleanup', 'process'].map((name) => buildMockLaneConfig(name));
-  seedAreaLabels(ctx.db, ['teapot', 'kettle'], { teapot: true, kettle: false });
+  seedAreaLabels(ctx, { names: ['teapot', 'kettle'], repoExists: { teapot: true, kettle: false } });
 
   await runLinearReadyTick(ctx.db, { call: makeLabelsCall(makeBacklogCall([]), ['teapot']), run: buildStubGitHubFactsRunner({}), readLanes: () => Promise.resolve(lanes), actor: 'hq-lanes', deadlineMs: 2000 });
 

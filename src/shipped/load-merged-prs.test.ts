@@ -6,6 +6,7 @@ import type { Runner } from '../runner/types.ts';
 import { toErrorMessage } from '../to-error-message.ts';
 import { loadMergedPRs } from './load-merged-prs.ts';
 import { mergedPRsOutputSchema } from './merged-prs-output-schema.ts';
+import { buildSeeder } from '../test-utils/build-seeder.ts';
 
 const THURSDAY = new Date('2026-10-15T02:00:00Z');
 
@@ -13,7 +14,7 @@ function setupTest() {
   const buildSources = (run: Runner) => ({ db: fresh.db, run, call: () => Promise.resolve({}), scripts: '/kettle/scripts' });
   const fresh = freshDb();
   onTestFinished(fresh.cleanup);
-  return { db: fresh.db, buildSources };
+  return { db: fresh.db, buildSources, seed: buildSeeder(fresh) };
 }
 
 test('a week is read a day at a time and merged into what merged-prs.sh weekly prints', async () => {
@@ -187,10 +188,11 @@ test('a kept day in another shape is read again, and the fresh output replaces i
   const ctx = setupTest();
   const fresh = buildMergedDayOutput('2026-10-14', [buildMergedPR({ day: '2026-10-14' })]);
   const stub = buildStubDeliveryRunner({ days: { '2026-10-14': fresh } });
-  ctx.db
-    .query("INSERT INTO shipped_cache (kind, key, body, fetched_at, expires_at) VALUES ('merged-day', '2026-10-14', ?, '2026-10-14T20:00:00Z', NULL)")
-    .run(
-      JSON.stringify({
+  await ctx.seed.cacheEntry({
+    kind: 'merged-day',
+    key: '2026-10-14',
+    fetched_at: '2026-10-14T20:00:00Z',
+    body: JSON.stringify({
         kind: 'daily',
         start: '2026-10-14T00:00:00+11:00',
         end: '2026-10-14T23:59:59+11:00',
@@ -203,7 +205,7 @@ test('a kept day in another shape is read again, and the fresh output replaces i
         prs: [{ repo: 'kettle', number: 41, title: 'Fit the long spout', url: 'https://github.com/zgeoff/kettle/pull/41', mergedAt: '2026-10-14T01:00:00Z', day: '2026-10-14', issue: 9801, added: 10, removed: 2, excludedFiles: [], approximate: false }],
         workflow: [],
       }),
-    );
+  });
 
   await expect(loadMergedPRs(ctx.buildSources(stub.run), 'yesterday', THURSDAY)).resolves.toBe(fresh);
   expect(stub.merged).toStrictEqual([['daily', '2026-10-14']]);

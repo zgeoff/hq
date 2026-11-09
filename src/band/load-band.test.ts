@@ -30,7 +30,7 @@ test('all clear: nothing needs the owner, Nix is up, impd has room, CI passed, a
   writeFileSync(ctx.pacing, JSON.stringify({ imp: { impMib: 2048 }, lanes: { imp: { cleanup: 3 }, local: { flexible: 1 } } }));
   ctx.seed.probeSample({ at: '2026-10-15T00:59:00Z' });
   await ctx.seed.capacitySample({ at: '2026-10-15T00:55:00Z', nonnix_awake_mib: 8192, nonnix_awake_vcpus: 6 });
-  ctx.db.query("INSERT INTO ci_runs (id, repo, path, event, status, conclusion, attempt, created_at, started_at, updated_at) VALUES (1, 'kettle', '.github/workflows/ci.yml', 'push', 'completed', 'success', 1, '2026-10-15T00:00:00Z', '2026-10-15T00:00:00Z', '2026-10-15T00:05:00Z')").run();
+  ctx.seed.ciRun({ id: 1, repo: 'kettle', created_at: '2026-10-15T00:00:00Z', started_at: '2026-10-15T00:00:00Z', updated_at: '2026-10-15T00:05:00Z' });
   await main(['run', 'add', 'GEO-9601', '--title', 'Fit the long spout', '--where', 'imp', '--json']);
   await main(['run', 'lane', 'GEO-9601', 'cleanup', '--json']);
 
@@ -101,7 +101,7 @@ test('reviews counts open PRs whose review started in the last 24 hours and has 
   at('2026-10-13T00:00:00Z');
   ctx.seed.run({ issue: 'GEO-9601', title: 'Fit the long spout', place: 'imp' });
   for (const ref of ['kettle#41', 'kettle#42', 'kettle#43', 'kettle#44']) {
-    ctx.seed.runPr({ issue: 'GEO-9601', ref });
+    ctx.seed.runPR({ issue: 'GEO-9601', ref });
   }
   at('2026-10-13T00:30:00Z');
   reviewStarted(ctx.db, 'kettle#44', 'kettle-bot');
@@ -166,16 +166,16 @@ test.each([
 
 test('a failed push run after a passing one is CI red', async () => {
   const ctx = setupTest();
-  ctx.db.query("INSERT INTO ci_runs (id, repo, path, event, status, conclusion, attempt, created_at, started_at, updated_at) VALUES (1, 'kettle', '.github/workflows/ci.yml', 'push', 'completed', 'success', 1, '2026-10-15T00:00:00Z', '2026-10-15T00:00:00Z', '2026-10-15T00:05:00Z')").run();
-  ctx.db.query("INSERT INTO ci_runs (id, repo, path, event, status, conclusion, attempt, created_at, started_at, updated_at) VALUES (2, 'kettle', '.github/workflows/ci.yml', 'push', 'completed', 'failure', 1, '2026-10-15T00:30:00Z', '2026-10-15T00:30:00Z', '2026-10-15T00:35:00Z')").run();
+  ctx.seed.ciRun({ id: 1, repo: 'kettle', created_at: '2026-10-15T00:00:00Z', started_at: '2026-10-15T00:00:00Z', updated_at: '2026-10-15T00:05:00Z' });
+  ctx.seed.ciRun({ id: 2, repo: 'kettle', conclusion: 'failure', created_at: '2026-10-15T00:30:00Z', started_at: '2026-10-15T00:30:00Z', updated_at: '2026-10-15T00:35:00Z' });
 
   await expect(loadBand(ctx.db, ctx.pacing, new Date('2026-10-15T01:00:00Z')).then((band) => band.segments[3])).resolves.toStrictEqual({ key: 'ci', text: 'CI 1 red', tone: 'alert' });
 });
 
 test('a later passing run of the same workflow clears a failure', async () => {
   const ctx = setupTest();
-  ctx.db.query("INSERT INTO ci_runs (id, repo, path, event, status, conclusion, attempt, created_at, started_at, updated_at) VALUES (2, 'kettle', '.github/workflows/ci.yml', 'push', 'completed', 'failure', 1, '2026-10-15T00:30:00Z', '2026-10-15T00:30:00Z', '2026-10-15T00:35:00Z')").run();
-  ctx.db.query("INSERT INTO ci_runs (id, repo, path, event, status, conclusion, attempt, created_at, started_at, updated_at) VALUES (3, 'kettle', '.github/workflows/ci.yml', 'push', 'completed', 'success', 1, '2026-10-15T00:40:00Z', '2026-10-15T00:40:00Z', '2026-10-15T00:45:00Z')").run();
+  ctx.seed.ciRun({ id: 2, repo: 'kettle', conclusion: 'failure', created_at: '2026-10-15T00:30:00Z', started_at: '2026-10-15T00:30:00Z', updated_at: '2026-10-15T00:35:00Z' });
+  ctx.seed.ciRun({ id: 3, repo: 'kettle', created_at: '2026-10-15T00:40:00Z', started_at: '2026-10-15T00:40:00Z', updated_at: '2026-10-15T00:45:00Z' });
 
   await expect(loadBand(ctx.db, ctx.pacing, new Date('2026-10-15T01:00:00Z')).then((band) => band.segments[3])).resolves.toStrictEqual({ key: 'ci', text: 'CI green', tone: 'ok' });
 });
@@ -186,15 +186,15 @@ test.each([
   ['a passing run of another workflow does not clear a failure', 'failure', { path: '.github/workflows/deploy.yml', event: 'push', status: 'completed', conclusion: 'success' }, { key: 'ci', text: 'CI 1 red', tone: 'alert' }],
 ] as const)('%s', async (_case, earlier, later, segment) => {
   const ctx = setupTest();
-  ctx.db.query("INSERT INTO ci_runs (id, repo, path, event, status, conclusion, attempt, created_at, started_at, updated_at) VALUES (2, 'kettle', '.github/workflows/ci.yml', 'push', 'completed', ?, 1, '2026-10-15T00:10:00Z', '2026-10-15T00:10:00Z', '2026-10-15T00:15:00Z')").run(earlier);
-  ctx.db.query("INSERT INTO ci_runs (id, repo, path, event, status, conclusion, attempt, created_at, started_at, updated_at) VALUES (4, 'kettle', ?, ?, ?, ?, 1, '2026-10-15T00:20:00Z', '2026-10-15T00:20:00Z', '2026-10-15T00:25:00Z')").run(later.path, later.event, later.status, later.conclusion);
+  ctx.seed.ciRun({ id: 2, repo: 'kettle', conclusion: earlier, created_at: '2026-10-15T00:10:00Z', started_at: '2026-10-15T00:10:00Z', updated_at: '2026-10-15T00:15:00Z' });
+  ctx.seed.ciRun({ id: 4, repo: 'kettle', ...later, created_at: '2026-10-15T00:20:00Z', started_at: '2026-10-15T00:20:00Z', updated_at: '2026-10-15T00:25:00Z' });
 
   await expect(loadBand(ctx.db, ctx.pacing, new Date('2026-10-15T01:00:00Z')).then((band) => band.segments[3])).resolves.toStrictEqual(segment);
 });
 
 test('CI stored over 2 hours ago is unknown in amber', async () => {
   const ctx = setupTest();
-  ctx.db.query("INSERT INTO ci_runs (id, repo, path, event, status, conclusion, attempt, created_at, started_at, updated_at) VALUES (1, 'kettle', '.github/workflows/ci.yml', 'push', 'completed', 'success', 1, '2026-10-15T00:00:00Z', '2026-10-15T00:00:00Z', '2026-10-15T00:05:00Z')").run();
+  ctx.seed.ciRun({ id: 1, repo: 'kettle', created_at: '2026-10-15T00:00:00Z', started_at: '2026-10-15T00:00:00Z', updated_at: '2026-10-15T00:05:00Z' });
 
   await expect(loadBand(ctx.db, ctx.pacing, new Date('2026-10-15T03:00:00Z')).then((band) => band.segments[3])).resolves.toStrictEqual({ key: 'ci', text: 'CI ?', tone: 'warn' });
 });

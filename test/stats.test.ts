@@ -16,7 +16,7 @@ import { closePr } from '../src/runs/close-pr.ts';
 import { reviewedPr } from '../src/runs/reviewed-pr.ts';
 import { setState } from '../src/runs/set-state.ts';
 import { unmergePr } from '../src/runs/unmerge-pr.ts';
-import { computeStats } from '../src/stats/compute-stats.ts';
+import { readStats } from '../src/stats/read-stats.ts';
 import { dist } from '../src/stats/dist.ts';
 import { headline } from '../src/stats/headline.ts';
 import { statsText } from '../src/stats/stats-text.ts';
@@ -60,7 +60,7 @@ test('wait on the owner: call queue → answer → apply, and run time waiting o
   ctx.addRun('GEO-2');
   setState(ctx.db, 'GEO-2', 'blocked', { waitsOn: 'a release', waitsOnGeoff: true }, 'z-delivery');
   at('2026-10-16T03:45:00Z');
-  const stats = computeStats(ctx.db, { from: '2026-10-16T01:00:00Z', to: '2026-10-16T03:45:00Z', gh: null });
+  const stats = readStats(ctx.db, { from: '2026-10-16T01:00:00Z', to: '2026-10-16T03:45:00Z', gh: null });
   expect(stats.geoff.queueToAnswer).toMatchObject({ medianMin: 65 });
   expect(stats.geoff.queueToAnswer.n).toBe(1);
   expect(stats.geoff.answerToApply).toMatchObject({ medianMin: 10 });
@@ -80,7 +80,7 @@ test('it counts a wait as exact only from when the explicit flag was set', () =>
   at('2026-10-16T01:20:00Z');
   setState(ctx.db, 'GEO-1', 'working', { waitsOn: null, waitsOnGeoff: false }, 'z-delivery');
 
-  const stats = computeStats(ctx.db, { from: '2026-10-16T01:00:00Z', to: '2026-10-16T01:30:00Z', gh: null });
+  const stats = readStats(ctx.db, { from: '2026-10-16T01:00:00Z', to: '2026-10-16T01:30:00Z', gh: null });
 
   expect([stats.geoff.runGeoffWait.medianMin, stats.geoff.runWaitExactShare]).toStrictEqual([20, 0.5]);
 });
@@ -94,7 +94,7 @@ test('a run blocked on "the owner" counts as waiting on the owner, as one blocke
   ctx.addRun('GEO-2');
   setState(ctx.db, 'GEO-2', 'blocked', { waitsOn: 'the ownership papers' }, 'z-delivery');
   at('2026-10-16T02:00:00Z');
-  const stats = computeStats(ctx.db, { from: '2026-10-16T01:00:00Z', to: '2026-10-16T02:00:00Z', gh: null });
+  const stats = readStats(ctx.db, { from: '2026-10-16T01:00:00Z', to: '2026-10-16T02:00:00Z', gh: null });
   expect(stats.geoff.runGeoffWait.n).toBe(1);
   expect(stats.geoff.runGeoffWait.medianMin).toBe(40);
 });
@@ -116,7 +116,7 @@ test('merged to live, the backlog by repo, review rework and cycle time', () => 
   closePr(ctx.db, 'gadgets#2', { to: 'merged', actor: 'z-delivery' });
   setState(ctx.db, 'GEO-2', 'deploy-held', {}, 'z-delivery');
   at('2026-10-16T04:30:00Z');
-  const stats = computeStats(ctx.db, { from: '2026-10-16T01:00:00Z', to: '2026-10-16T04:30:00Z', gh: null });
+  const stats = readStats(ctx.db, { from: '2026-10-16T01:00:00Z', to: '2026-10-16T04:30:00Z', gh: null });
   expect(stats.live.mergeToDone).toMatchObject({ medianMin: 120 });
   expect(stats.live.mergeToDone.n).toBe(1);
   expect(stats.live.byRepo['widgets']?.n).toBe(1);
@@ -137,7 +137,7 @@ test('it times merged to live from when GitHub merged the PR, not from when hq s
   at('2026-10-16T01:20:00Z');
   setState(ctx.db, 'GEO-1', 'done', {}, 'z-delivery');
 
-  const live = computeStats(ctx.db, { from: '2026-10-16T01:00:00Z', to: '2026-10-16T01:30:00Z', gh: null }).live;
+  const live = readStats(ctx.db, { from: '2026-10-16T01:00:00Z', to: '2026-10-16T01:30:00Z', gh: null }).live;
   expect(live.mergeToDone.n).toBe(1);
   expect(live.mergeToDone.medianMin).toBe(20);
 });
@@ -160,7 +160,7 @@ test('it takes the latest GitHub merge time as the last merge, whatever order hq
   at('2026-10-16T04:00:00Z');
   setState(ctx.db, 'GEO-1', 'done', {}, 'z-delivery');
 
-  const live = computeStats(ctx.db, { from: '2026-10-16T01:00:00Z', to: '2026-10-16T04:10:00Z', gh: null }).live;
+  const live = readStats(ctx.db, { from: '2026-10-16T01:00:00Z', to: '2026-10-16T04:10:00Z', gh: null }).live;
 
   expect([live.mergeToDone.medianMin, live.backlog]).toStrictEqual([60, { total: 1, byRepo: { gadgets: 1 }, oldest: { id: 'GEO-2', ageMin: 80 } }]);
 });
@@ -176,7 +176,7 @@ test('idle capacity counts only while Ready work waited; a stale count is flagge
   ctx.seed.lanesNudge({ at: '2026-10-16T01:21:00Z', slots: 1, eligible: null });
   writeLanesNudgeFollowUp(ctx.db, firstNudge, 0, '2026-10-16T01:31:00Z');
   writeLanesNudgeFollowUp(ctx.db, secondNudge, 2, '2026-10-16T01:41:00Z');
-  const stats = computeStats(ctx.db, { from: '2026-10-16T01:00:00Z', to: '2026-10-16T01:40:00Z', gh: null });
+  const stats = readStats(ctx.db, { from: '2026-10-16T01:00:00Z', to: '2026-10-16T01:40:00Z', gh: null });
   expect(stats.idle).toStrictEqual({ slotMinutesWhileReady: 20, slotMinutesUnknown: 10, staleShare: 0.25, samples: 4, nudges: 3, nudgesConverted: 1, nudgesPending: 1 });
   expect(statsText(stats)).toContain('READY COUNT STALE in 25% of 4 samples: no fresh per-lane Ready report');
 });
@@ -191,14 +191,14 @@ test('a merge that hq run unmerge took back is not counted', () => {
   closePr(ctx.db, 'gadgets#6', { to: 'merged', actor: 'z-review' });
   at('2026-10-16T01:20:00Z');
   unmergePr(ctx.db, 'widgets#5', 'z-review', 'the merge failed on a conflict');
-  const stats = computeStats(ctx.db, { from: '2026-10-16T01:00:00Z', to: '2026-10-16T02:00:00Z', gh: null });
+  const stats = readStats(ctx.db, { from: '2026-10-16T01:00:00Z', to: '2026-10-16T02:00:00Z', gh: null });
   expect(stats.flow).toMatchObject({ mergesSource: 'hq', mergesPerDay: { gadgets: 1 } });
   expect(stats.flow.mergesPerDay['widgets']).toBeUndefined();
 });
 
 test('GitHub merges per day by repo replace the tracked count when given', () => {
   const ctx = setupTest();
-  const stats = computeStats(ctx.db, { from: '2026-10-16T01:00:00Z', to: '2026-10-18T01:00:00Z', gh: [{ repo: 'widgets', mergedAt: '2026-10-16T01:05:00Z' }, { repo: 'widgets', mergedAt: '2026-10-17T02:00:00Z' }, { repo: 'gadgets', mergedAt: '2026-10-16T01:10:00Z' }, { repo: 'gadgets', mergedAt: '2026-10-01T00:00:00Z' }] });
+  const stats = readStats(ctx.db, { from: '2026-10-16T01:00:00Z', to: '2026-10-18T01:00:00Z', gh: [{ repo: 'widgets', mergedAt: '2026-10-16T01:05:00Z' }, { repo: 'widgets', mergedAt: '2026-10-17T02:00:00Z' }, { repo: 'gadgets', mergedAt: '2026-10-16T01:10:00Z' }, { repo: 'gadgets', mergedAt: '2026-10-01T00:00:00Z' }] });
   expect(stats.flow).toMatchObject({ mergesSource: 'github', days: 2, mergesPerDay: { widgets: 1, gadgets: 0.5 } });
 });
 
@@ -208,7 +208,7 @@ test('rows from before the cutoff are left out', () => {
   ctx.addRun('GEO-1');
   setState(ctx.db, 'GEO-1', 'blocked', { waitsOn: 'Geoff' }, 'z-delivery');
   at('2026-10-16T02:00:00Z');
-  const stats = computeStats(ctx.db, { from: '2026-10-14T00:00:00Z', to: '2026-10-16T02:00:00Z', gh: null });
+  const stats = readStats(ctx.db, { from: '2026-10-14T00:00:00Z', to: '2026-10-16T02:00:00Z', gh: null });
   expect(stats.window.from).toBe('2026-10-14T20:00:00Z');
   expect(stats.geoff.runGeoffWait.n).toBe(0);
 });
@@ -246,7 +246,7 @@ test('drop removes a mistaken mark and keeps what it said in the event', () => {
 
 test('the stats output heads the section on waits for the owner "Wait on the owner"', () => {
   const ctx = setupTest();
-  const stats = computeStats(ctx.db, { from: '2026-10-16T01:00:00Z', to: '2026-10-16T01:10:00Z', gh: null });
+  const stats = readStats(ctx.db, { from: '2026-10-16T01:00:00Z', to: '2026-10-16T01:10:00Z', gh: null });
 
   expect(statsText(stats)).toContain('Wait on the owner (z-stu acts: batch, reorder or chase what waits longest)');
 });

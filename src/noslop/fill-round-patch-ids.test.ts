@@ -7,6 +7,7 @@ import { openDb } from '../db/open-db.ts';
 import { realRunner } from '../runner/real-runner.ts';
 import { buildNoslopReport } from './build-noslop-report.ts';
 import { fillRoundPatchIDs } from './fill-round-patch-ids.ts';
+import { buildSeeder } from '../test-utils/build-seeder.ts';
 
 async function setupTest() {
   const base = mkdtempSync(join(tmpdir(), 'hq-fill-patch-'));
@@ -20,8 +21,7 @@ async function setupTest() {
   return {
     db,
     ...repo,
-    addReview: (startedAt: string, head: string, baseSha: string) =>
-      db.query("INSERT INTO noslop_rounds (repo, pr, kind, started_at, ended_at, ms, ok, head, base, findings, failed_calls, open, sha) VALUES ('widgets', 7, 'review', ?, ?, 1, 1, ?, ?, '[]', 0, '[]', 'x')").run(startedAt, startedAt, head, baseSha),
+    seed: buildSeeder({ db }),
   };
 }
 
@@ -35,9 +35,9 @@ test('it gives pre-v45 reviews the patch-id of their PR diff, so the report find
   await ctx.git('checkout', '-q', 'pour');
   await ctx.git('rebase', '-q', 'main');
   const rebased = await ctx.git('rev-parse', 'HEAD');
-  ctx.addReview('2026-10-18T01:00:00Z', first, firstBase);
-  ctx.addReview('2026-10-18T02:00:00Z', rebased, movedBase);
-  ctx.addReview('2026-10-18T03:00:00Z', 'e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1', movedBase);
+  ctx.seed.reviewRound({ startedAt: '2026-10-18T01:00:00Z', endedAt: '2026-10-18T01:00:00Z', head: first, base: firstBase, depth: null });
+  ctx.seed.reviewRound({ startedAt: '2026-10-18T02:00:00Z', endedAt: '2026-10-18T02:00:00Z', head: rebased, base: movedBase, depth: null });
+  ctx.seed.reviewRound({ startedAt: '2026-10-18T03:00:00Z', endedAt: '2026-10-18T03:00:00Z', head: 'e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1', base: movedBase, depth: null });
 
   const filled = await fillRoundPatchIDs({ run: realRunner, db: ctx.db, checkout: () => Promise.resolve(ctx.directory) });
   const stored = ctx.db.query('SELECT patch_id FROM noslop_rounds ORDER BY id').values().flat();
@@ -59,7 +59,7 @@ test('it refuses a --since that is not a time before it reads any round', async 
 test('it leaves the patch-id unread for a repo hq has no checkout of, so a later report tries again', async () => {
   const ctx = await setupTest();
   const head = await ctx.commit({ 'kettle.txt': 'boil\n' }, 'start');
-  ctx.addReview('2026-10-18T01:00:00Z', head, head);
+  ctx.seed.reviewRound({ startedAt: '2026-10-18T01:00:00Z', endedAt: '2026-10-18T01:00:00Z', head, base: head, depth: null });
 
   const filled = await fillRoundPatchIDs({ run: realRunner, db: ctx.db, checkout: () => Promise.reject(new Error('invented: no clone of widgets')) });
 

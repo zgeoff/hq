@@ -8,7 +8,6 @@ import { AskRowSchema } from './ask-row-schema.ts';
 import { parseAskRow as hydrate } from './parse-ask-row.ts';
 import type { Ask, Kind } from './types.ts';
 
-// oxlint-disable-next-line zgeoff/function-verb -- named as its callers use it
 export function nextEligible(db: Database, kind?: Kind, at: Date = now()): Ask | null {
   const t = iso(at);
   const base = kdb(db)

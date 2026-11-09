@@ -2,12 +2,13 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { NOON_SYDNEY, at, freshDb } from '../../test/helpers.ts';
 import { addUnblock } from './add-unblock.ts';
 import { getUnblock } from './get-unblock.ts';
+import { buildSeeder } from '../test-utils/build-seeder.ts';
 
 function setupTest() {
   const fresh = freshDb();
   at(NOON_SYDNEY);
   onTestFinished(fresh.cleanup);
-  return { db: fresh.db };
+  return { db: fresh.db, seed: buildSeeder(fresh) };
 }
 
 test('a refresh that leaves out the kind and the deadline keeps the stored ones', () => {
@@ -23,8 +24,7 @@ test('a refresh that leaves out the kind and the deadline keeps the stored ones'
 
 test('a moved deadline clears the overdue notice, so the new deadline tells the sessions again', () => {
   const ctx = setupTest();
-  addUnblock(ctx.db, { id: 'kettle-release', task: 'Live-check the kettle release', minutes: null, unblocks: [], notify: ['kettle-qa'], actor: 'kettle-triage', kind: 'watch', deadline: '2026-10-14T00:30:00Z' });
-  ctx.db.query("UPDATE unblocks SET overdue_told_at = '2026-10-14T00:40:00Z' WHERE id = 'kettle-release'").run();
+  ctx.seed.overdueToldUnblock({ id: 'kettle-release', task: 'Live-check the kettle release', notify: ['kettle-qa'], kind: 'watch', deadline: '2026-10-14T00:30:00Z' });
 
   addUnblock(ctx.db, { id: 'kettle-release', task: 'Live-check the kettle release', minutes: null, unblocks: [], notify: ['kettle-qa'], actor: 'kettle-triage', deadline: '2026-10-21T00:00:00Z' });
 

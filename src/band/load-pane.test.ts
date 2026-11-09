@@ -41,10 +41,10 @@ test('the pane lists what needs the owner with its links, then Nix, lanes, revie
   const parkLane = await main(['run', 'lane', 'GEO-9602', 'cleanup', '--json']);
   const parkState = await main(['run', 'state', 'GEO-9602', 'blocked', '--waits-on', 'the teapot supplier', '--json']);
   setNow('2026-10-14T00:00:00Z');
-  app.seed.runPr({ issue: 'GEO-9601', ref: 'kettle#41' });
-  app.seed.runPr({ issue: 'GEO-9601', ref: 'https://github.com/zgeoff/kettle/pull/42' });
-  app.seed.mergedRunPr({ issue: 'GEO-9601', ref: 'kettle#43', mergedAt: '2026-10-14T22:00:00Z' });
-  app.seed.mergedRunPr({ issue: 'GEO-9601', ref: 'teapot#7', mergedAt: '2026-10-14T23:00:00Z' });
+  app.seed.runPR({ issue: 'GEO-9601', ref: 'kettle#41' });
+  app.seed.runPR({ issue: 'GEO-9601', ref: 'https://github.com/zgeoff/kettle/pull/42' });
+  app.seed.mergedRunPR({ issue: 'GEO-9601', ref: 'kettle#43', mergedAt: '2026-10-14T22:00:00Z' });
+  app.seed.mergedRunPR({ issue: 'GEO-9601', ref: 'teapot#7', mergedAt: '2026-10-14T23:00:00Z' });
   setNow('2026-10-15T00:10:00Z');
   reviewStarted(fleet, 'kettle#42', 'kettle-bot');
   setNow('2026-10-15T00:20:00Z');

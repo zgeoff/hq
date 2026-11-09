@@ -7,6 +7,7 @@ import { overrideEnv } from '../config/override-env.ts';
 import { makeLinearCaller } from './make-linear-caller.ts';
 import { resetKey } from './reset-key.ts';
 import { syncInReview } from './sync-in-review.ts';
+import { buildSeeder } from '../test-utils/build-seeder.ts';
 
 function setupTest() {
   const fresh = freshDb();
@@ -16,6 +17,7 @@ function setupTest() {
   onTestFinished(overrideEnv('OP_SERVICE_ACCOUNT_TOKEN', 'invented-token'));
   return {
     db: fresh.db,
+    seed: buildSeeder(fresh),
     call: makeLinearCaller(() => Promise.resolve({ code: 0, stdout: 'lin_api_INVENTED\n', stderr: '' })),
     readRows: () => fresh.db.query('SELECT issue, updated_at, fetched_at FROM linear_in_review ORDER BY issue').all(),
   };
@@ -81,7 +83,7 @@ test('it asks Linear for the In Review state by name, 50 issues a page, and foll
 
 test('it rejects when more than 40 pages are In Review, and keeps the earlier rows', async () => {
   const ctx = setupTest();
-  ctx.db.query("INSERT INTO linear_in_review (issue, updated_at, fetched_at) VALUES ('GEO-9800', '2026-10-14T07:00:00Z', '2026-10-15T07:00:00Z')").run();
+  ctx.seed.inReviewIssue({ issue: 'GEO-9800', updatedAt: '2026-10-14T07:00:00Z', fetchedAt: '2026-10-15T07:00:00Z' });
   server.use(http.post(LINEAR_GRAPHQL_URL, () => HttpResponse.json({ data: { issues: { nodes: [], pageInfo: { hasNextPage: true, endCursor: 'c' } } } })));
 
   await expect(syncInReview(ctx.db, ctx.call, new Date('2026-10-16T07:00:00Z'))).rejects.toThrow(/more than 2000 issues In Review/u);

@@ -1,4 +1,5 @@
-import { afterEach, beforeEach, expect, test } from 'bun:test';
+// oxlint-disable zgeoff/test-beside-module -- the whole-program lanes suite, across src/areas, src/lanes and src/capacity
+import { expect, onTestFinished, test } from 'bun:test';
 import type { Database } from 'bun:sqlite';
 import invariant from 'tiny-invariant';
 import { getMeta } from '../src/db/get-meta.ts';
@@ -38,34 +39,30 @@ import { buildReadyIssue } from './build-ready-issue.ts';
 import { createCapacitySample } from './create-capacity-sample.ts';
 import { at, freshDb } from './helpers.ts';
 
-let db: Database;
-let cleanup: () => void;
 const T0 = '2026-10-16T01:00:00Z';
 const atMin = (m: number) => at(new Date(Date.parse(T0) + m * 60_000).toISOString());
 const PACING = { lanes: { imp: { 'nixie-slice': 3, 'nixie-maintenance': 2, atc: 2, imp: 2, cloud: 1 }, local: { flexible: 2 } } };
 const LANES = parseLanes(PACING);
-// oxlint-disable-next-line zgeoff/setup-test-only -- this file's shared beforeEach state is GEO-1318's lint debt
+// oxlint-disable-next-line zgeoff/setup-test-only -- the pacing slots every lane test reads
 const SLOTS = parsePacingSlots(PACING);
 const cap = (freeMib: number) => ({ imp: { freeMib, room: true }, providers: { claude: { room: true, unattended: true, target: 'imp' } } });
-// oxlint-disable-next-line zgeoff/setup-test-only, zgeoff/no-top-level-arrow -- this file's shared beforeEach state is GEO-1318's lint debt
+// oxlint-disable-next-line zgeoff/setup-test-only, zgeoff/no-top-level-arrow -- the capacity reading every tick test passes
 const sample = (freeMib: number) => ({ cap: cap(freeMib), impMib: 2048, error: null, lanes: LANES, slots: SLOTS });
-const run = (issue: string, lane: string | null, place: 'imp' | 'local' = 'imp') =>
-  addRun(db, { issue, title: 'Invented kettle work', place, session: null, next: 'Agent working.', gate: null, geoffChat: false, lane, actor: 'z-delivery' });
 
-beforeEach(() => {
-  ({ db, cleanup } = freshDb());
-  atMin(0);
+function setupTest() {
+  const fresh = freshDb();
+  onTestFinished(fresh.cleanup);
+  const db: Database = fresh.db;
 
-  setCapacitySetting(db, 'nonnixMaxMib', '65536', 'z-delivery');
-  setCapacitySetting(db, 'nonnixMaxVcpus', '1000', 'z-delivery');
-  for (let m = -5; m <= 185; m += 5) {
-    createCapacitySample(db, { at: new Date(Date.parse(T0) + m * 60_000).toISOString().replace('.000Z', 'Z'), nonnixAwakeMib: 0 });
-  }
-});
-afterEach(() => cleanup());
+  return {
+    db,
+    addRun: (issue: string, lane: string | null, place: 'imp' | 'local' = 'imp') =>
+      addRun(db, { issue, title: 'Invented kettle work', place, session: null, next: 'Agent working.', gate: null, geoffChat: false, lane, actor: 'z-delivery' }),
+  };
+}
 
 test('reads the lanes from pacing.json, and refuses a bad config', () => {
-  expect(LANES.map((l) => `${l.place}:${l.name}:${l.size}`)).toEqual(['imp:nixie-slice:3', 'imp:nixie-maintenance:2', 'imp:atc:2', 'imp:imp:2', 'imp:cloud:1', 'local:flexible:2']);
+  expect(LANES.map((lane) => `${lane.place}:${lane.name}:${lane.size}`)).toStrictEqual(['imp:nixie-slice:3', 'imp:nixie-maintenance:2', 'imp:atc:2', 'imp:imp:2', 'imp:cloud:1', 'local:flexible:2']);
   for (const bad of [{}, { lanes: {} }, { lanes: { moon: { a: 1 } } }, { lanes: { imp: { 'Bad Name': 1 } } }, { lanes: { imp: { a: -1 } } }, { lanes: { imp: { a: 1.5 } } }, { lanes: { imp: { a: 1 }, local: { a: 1 } } }, null]) {
     expect(() => parseLanes(bad)).toThrow();
   }
@@ -85,129 +82,164 @@ const HOSTILE_READY: [string, string][] = [
 test.each(HOSTILE_READY)('--lane for Ready refuses %p', (raw, why) => expect(() => parseReady(LANES, raw)).toThrow(why));
 
 test('running counts by lane; a local run with no lane is flexible; a lane note sets the lane', () => {
-  run('GEO-1', 'atc');
-  run('GEO-2', null, 'local');
-  run('GEO-3', null);
-  run('GEO-4', 'atc');
-  setState(db, 'GEO-4', 'merged', {}, 'z-delivery');
-  addRun(db, { issue: 'GEO-5', title: 'Invented', place: 'none', session: null, next: 'x', gate: null, geoffChat: false, actor: 'z-delivery' });
-  addNote(db, 'GEO-3', 'nixie-slice', { label: 'lane', actor: 'z-delivery' });
-  expect(runningByLane(db)).toEqual({ atc: 1, flexible: 1, 'nixie-slice': 1 });
-  setRunLane(db, 'GEO-3', 'cloud', 'z-delivery');
-  expect(runningByLane(db)).toEqual({ atc: 1, flexible: 1, cloud: 1 });
-  expect(() => setRunLane(db, 'GEO-404', 'cloud', 'z-delivery')).toThrow('no run GEO-404');
+  const ctx = setupTest();
+  atMin(0);
+  ctx.addRun('GEO-1', 'atc');
+  ctx.addRun('GEO-2', null, 'local');
+  ctx.addRun('GEO-3', null);
+  ctx.addRun('GEO-4', 'atc');
+  setState(ctx.db, 'GEO-4', 'merged', {}, 'z-delivery');
+  addRun(ctx.db, { issue: 'GEO-5', title: 'Invented', place: 'none', session: null, next: 'x', gate: null, geoffChat: false, actor: 'z-delivery' });
+  addNote(ctx.db, 'GEO-3', 'nixie-slice', { label: 'lane', actor: 'z-delivery' });
+  expect(runningByLane(ctx.db)).toStrictEqual({ atc: 1, flexible: 1, 'nixie-slice': 1 });
+  setRunLane(ctx.db, 'GEO-3', 'cloud', 'z-delivery');
+  expect(runningByLane(ctx.db)).toStrictEqual({ atc: 1, flexible: 1, cloud: 1 });
+  expect(() => setRunLane(ctx.db, 'GEO-404', 'cloud', 'z-delivery')).toThrow('no run GEO-404');
 });
 
 test('a per-lane Ready report also sets the total; a total-only report keeps the per-lane counts and detail', () => {
-  reportLaneReady(db, parseReady(LANES, 'atc=2,flexible=1'), 'z-delivery', { total: 5, skipped: [{ issue: 'GEO-1', reason: 'invented reason' }] });
-  expect(eligibleNow(db)).toEqual({ count: 3, at: T0 });
+  const ctx = setupTest();
+  atMin(0);
+  reportLaneReady(ctx.db, parseReady(LANES, 'atc=2,flexible=1'), 'z-delivery', { total: 5, skipped: [{ issue: 'GEO-1', reason: 'invented reason' }] });
+  expect(eligibleNow(ctx.db)).toStrictEqual({ count: 3, at: T0 });
   atMin(10);
-  reportLaneReady(db, parseReady(LANES, 'cloud=4'), 'z-delivery');
-  expect(eligibleNow(db)).toEqual({ count: 7, at: '2026-10-16T01:10:00Z' });
-  reportLaneReady(db, parseReady(LANES, 'atc=2,flexible=1'), 'z-delivery', { total: 5, skipped: [{ issue: 'GEO-1', reason: 'invented reason' }] });
+  reportLaneReady(ctx.db, parseReady(LANES, 'cloud=4'), 'z-delivery');
+  expect(eligibleNow(ctx.db)).toStrictEqual({ count: 7, at: '2026-10-16T01:10:00Z' });
+  reportLaneReady(ctx.db, parseReady(LANES, 'atc=2,flexible=1'), 'z-delivery', { total: 5, skipped: [{ issue: 'GEO-1', reason: 'invented reason' }] });
   atMin(20);
-  reportReady(db, 9, 'z-delivery');
-  expect(eligibleNow(db)).toEqual({ count: 9, at: '2026-10-16T01:20:00Z' });
-  expect(readReadyByLane(db, 30)).toMatchObject({ atc: { n: 2 }, flexible: { n: 1 }, cloud: { n: 4 } });
-  expect(readySummary(db, 30)).toMatchObject({ total: 5, eligible: 7, skipped: [{ issue: 'GEO-1', reason: 'invented reason' }] });
+  reportReady(ctx.db, 9, 'z-delivery');
+  expect(eligibleNow(ctx.db)).toStrictEqual({ count: 9, at: '2026-10-16T01:20:00Z' });
+  // oxlint-disable-next-line eslint/id-length -- n is readReadyByLane's own field
+  expect(readReadyByLane(ctx.db, 30)).toMatchObject({ atc: { n: 2 }, flexible: { n: 1 }, cloud: { n: 4 } });
+  expect(readySummary(ctx.db, 30)).toMatchObject({ total: 5, eligible: 7, skipped: [{ issue: 'GEO-1', reason: 'invented reason' }] });
 });
 
 test('the total Ready count leaves out a lane count that has gone stale', () => {
-  reportLaneReady(db, parseReady(LANES, 'atc=2'), 'z-delivery');
+  const ctx = setupTest();
+  atMin(0);
+  reportLaneReady(ctx.db, parseReady(LANES, 'atc=2'), 'z-delivery');
   atMin(31);
-  reportLaneReady(db, parseReady(LANES, 'cloud=4'), 'z-delivery');
-  expect(eligibleNow(db)).toEqual({ count: 4, at: '2026-10-16T01:31:00Z' });
+  reportLaneReady(ctx.db, parseReady(LANES, 'cloud=4'), 'z-delivery');
+  expect(eligibleNow(ctx.db)).toStrictEqual({ count: 4, at: '2026-10-16T01:31:00Z' });
 });
 
 test('Ready per lane goes stale after 30 min', () => {
-  reportLaneReady(db, parseReady(LANES, 'atc=2,flexible=0'), 'z-delivery');
-  expect(readReadyByLane(db, 30)).toMatchObject({ atc: { n: 2 }, flexible: { n: 0 } });
+  const ctx = setupTest();
+  atMin(0);
+  reportLaneReady(ctx.db, parseReady(LANES, 'atc=2,flexible=0'), 'z-delivery');
+  // oxlint-disable-next-line eslint/id-length -- n is readReadyByLane's own field
+  expect(readReadyByLane(ctx.db, 30)).toMatchObject({ atc: { n: 2 }, flexible: { n: 0 } });
   atMin(31);
-  expect(readReadyByLane(db, 30)['atc']?.n).toBeNull();
+  expect(readReadyByLane(ctx.db, 30)['atc']?.n).toBeNull();
 });
 
 test('a reported 0 Ready stays fresh for its own, longer window', () => {
-  reportLaneReady(db, parseReady(LANES, 'atc=2,flexible=0'), 'z-delivery');
+  const ctx = setupTest();
+  atMin(0);
+  reportLaneReady(ctx.db, parseReady(LANES, 'atc=2,flexible=0'), 'z-delivery');
   atMin(31);
-  expect(readReadyByLane(db, 30, 180)).toMatchObject({ atc: { n: null }, flexible: { n: 0 } });
+  // oxlint-disable-next-line eslint/id-length -- n is readReadyByLane's own field
+  expect(readReadyByLane(ctx.db, 30, 180)).toMatchObject({ atc: { n: null }, flexible: { n: 0 } });
   atMin(181);
-  expect(readReadyByLane(db, 30, 180)['flexible']?.n).toBeNull();
+  expect(readReadyByLane(ctx.db, 30, 180)['flexible']?.n).toBeNull();
 });
 
 test('the watcher nudges with the picks after 10 min, and again only on a change or after 30 min', () => {
-  setMeta(db, 'lanes_ready_issues', JSON.stringify({ at: T0, eligible: [buildReadyIssue('GEO-21', { priority: 2 }), buildReadyIssue('GEO-22', { priority: 3 })], design: [] }));
-  expect(tick(db, sample(16384), 'hq-lanes').nudged).toBe(false);
+  const ctx = setupTest();
+  atMin(0);
+  setCapacitySetting(ctx.db, 'nonnixMaxMib', '65536', 'z-delivery');
+  setCapacitySetting(ctx.db, 'nonnixMaxVcpus', '1000', 'z-delivery');
+  for (let offsetMin = -5; offsetMin <= 185; offsetMin += 5) {
+    createCapacitySample(ctx.db, { at: new Date(Date.parse(T0) + offsetMin * 60_000).toISOString().replace('.000Z', 'Z'), nonnixAwakeMib: 0 });
+  }
+  setMeta(ctx.db, 'lanes_ready_issues', JSON.stringify({ at: T0, eligible: [buildReadyIssue('GEO-21', { priority: 2 }), buildReadyIssue('GEO-22', { priority: 3 })], design: [] }));
+  expect(tick(ctx.db, sample(16_384), 'hq-lanes').nudged).toBe(false);
   atMin(10);
-  const r = tick(db, sample(16384), 'hq-lanes');
-  expect(r.nudged).toBe(true);
-  expect(readOutboxRows(db)[0]?.text).toBe(
+  const result = tick(ctx.db, sample(16_384), 'hq-lanes');
+  expect(result.nudged).toBe(true);
+  expect(readOutboxRows(ctx.db)[0]?.text).toBe(
     '10 slots free for 10 min (imp 8, local 2). Take, in this order: GEO-21, GEO-22. (hq lanes shows the plan, hq focus the focus; capacity.sh still picks the provider and where it runs, and you write the briefs.)',
   );
   atMin(15);
-  expect(tick(db, sample(16384), 'hq-lanes').why).toContain('nothing changed');
-  run('GEO-21', 'nixie-slice');
+  expect(tick(ctx.db, sample(16_384), 'hq-lanes').why).toContain('nothing changed');
+  ctx.addRun('GEO-21', 'nixie-slice');
   atMin(16);
 
-  expect(tick(db, sample(16_384), 'hq-lanes').nudged).toBe(true);
-  const nudges = readOutboxRows(db).filter((message) => message.text.includes('Take, in this order'));
+  expect(tick(ctx.db, sample(16_384), 'hq-lanes').nudged).toBe(true);
+  const nudges = readOutboxRows(ctx.db).filter((message) => message.text.includes('Take, in this order'));
   expect(nudges).toHaveLength(1);
   expect(nudges[0]?.text).toContain('Take, in this order: GEO-22.');
 });
 
 test('it starts no nudge for a Design issue alone, though the plan names it for the with-geoff lane', () => {
-  setMeta(db, 'lanes_ready_issues', JSON.stringify({ at: T0, eligible: [], design: [buildReadyIssue('GEO-24', { type: 'Design' })] }));
+  const ctx = setupTest();
+  atMin(0);
+  setCapacitySetting(ctx.db, 'nonnixMaxMib', '65536', 'z-delivery');
+  setCapacitySetting(ctx.db, 'nonnixMaxVcpus', '1000', 'z-delivery');
+  for (let offsetMin = -5; offsetMin <= 185; offsetMin += 5) {
+    createCapacitySample(ctx.db, { at: new Date(Date.parse(T0) + offsetMin * 60_000).toISOString().replace('.000Z', 'Z'), nonnixAwakeMib: 0 });
+  }
+  setMeta(ctx.db, 'lanes_ready_issues', JSON.stringify({ at: T0, eligible: [], design: [buildReadyIssue('GEO-24', { type: 'Design' })] }));
   const withDesign = sample(16_384);
-  tick(db, withDesign, 'hq-lanes');
+  tick(ctx.db, withDesign, 'hq-lanes');
   atMin(10);
 
-  const result = tick(db, withDesign, 'hq-lanes');
+  const result = tick(ctx.db, withDesign, 'hq-lanes');
 
-  expect([readSlotPlan(db, withDesign)?.design.withGeoff.next, result.nudged, result.why, readOutboxRows(db)]).toStrictEqual([['GEO-24'], false, '10 slot(s) free, nothing eligible', []]);
+  expect([readSlotPlan(ctx.db, withDesign)?.design.withGeoff.next, result.nudged, result.why, readOutboxRows(ctx.db)]).toStrictEqual([['GEO-24'], false, '10 slot(s) free, nothing eligible', []]);
 });
 
 test('the samples count the slots the plan fills from the first free minute; only the nudge waits', () => {
-  setMeta(db, 'lanes_ready_issues', JSON.stringify({ at: T0, eligible: ['GEO-21', 'GEO-22', 'GEO-23'].map((issue) => buildReadyIssue(issue)), design: [] }));
+  const ctx = setupTest();
+  atMin(0);
+  setCapacitySetting(ctx.db, 'nonnixMaxMib', '65536', 'z-delivery');
+  setCapacitySetting(ctx.db, 'nonnixMaxVcpus', '1000', 'z-delivery');
+  setMeta(ctx.db, 'lanes_ready_issues', JSON.stringify({ at: T0, eligible: ['GEO-21', 'GEO-22', 'GEO-23'].map((issue) => buildReadyIssue(issue)), design: [] }));
   for (const m of [0, 5, 10]) {
     atMin(m);
-    tick(db, { ...sample(0), lanes: LANES, slots: SLOTS }, 'hq-lanes');
+    tick(ctx.db, { ...sample(0), lanes: LANES, slots: SLOTS }, 'hq-lanes');
   }
-  expect(readLanesSamples(db).map((row) => row.slots)).toStrictEqual([2, 2, 2]);
-  expect(idleSlotMinutes(db, 1).slotMinutes).toBe(20);
+  expect(readLanesSamples(ctx.db).map((row) => row.slots)).toStrictEqual([2, 2, 2]);
+  expect(idleSlotMinutes(ctx.db, 1).slotMinutes).toBe(20);
 });
 
 test('impd at its non-Nix line holds the pool\'s imp slots and says why; a stale reading holds them all', () => {
+  const ctx = setupTest();
+  atMin(0);
+  setCapacitySetting(ctx.db, 'nonnixMaxVcpus', '1000', 'z-delivery');
   const reading = { cap: cap(8192), impMib: 2048, error: null, lanes: LANES, slots: SLOTS };
   const readImpFree = () => {
-    const pool = readSlotPlan(db, reading)?.pool;
+    const pool = readSlotPlan(ctx.db, reading)?.pool;
     return [pool?.impFree, pool?.held];
   };
-  db.query('DELETE FROM capacity_samples').run();
-  setCapacitySetting(db, 'nonnixMaxMib', null, 'z-delivery');
-  createCapacitySample(db, { at: T0, nonnixAwakeMib: 14_336 });
+  setCapacitySetting(ctx.db, 'nonnixMaxMib', null, 'z-delivery');
+  createCapacitySample(ctx.db, { at: T0, nonnixAwakeMib: 14_336 });
   expect(readImpFree()).toStrictEqual([1, 'impd at line']);
-  expect(formatLineRoom(loadImpRoom(db, { budgetSlots: 4, impMib: 2048 }))).toBe('impd non-Nix line: 14336/16384 MiB, 0/1000 vCPUs awake; impd budget 14336/1048576 MiB awake, 0 MiB kept for priority imps; 1 imp slot(s) to fill, set by impd at line');
-  createCapacitySample(db, { at: T0, nonnixAwakeMib: 16_384 });
+  expect(formatLineRoom(loadImpRoom(ctx.db, { budgetSlots: 4, impMib: 2048 }))).toBe('impd non-Nix line: 14336/16384 MiB, 0/1000 vCPUs awake; impd budget 14336/1048576 MiB awake, 0 MiB kept for priority imps; 1 imp slot(s) to fill, set by impd at line');
+  createCapacitySample(ctx.db, { at: T0, nonnixAwakeMib: 16_384 });
   expect(readImpFree()).toStrictEqual([0, 'impd at line']);
-  expect(tick(db, reading, 'hq-lanes').slots).toBe(2);
+  expect(tick(ctx.db, reading, 'hq-lanes').slots).toBe(2);
   atMin(16);
   expect(readImpFree()).toStrictEqual([0, 'no fresh impd reading']);
-  expect(formatLineRoom(loadImpRoom(db, { budgetSlots: 4, impMib: 2048 }))).toBe('impd non-Nix line: no fresh reading, so every imp slot is held');
+  expect(formatLineRoom(loadImpRoom(ctx.db, { budgetSlots: 4, impMib: 2048 }))).toBe('impd non-Nix line: no fresh reading, so every imp slot is held');
 });
 
 test('with no lanes in pacing.json, the one imp pool is held under impd\'s non-Nix line too', () => {
-  db.query('DELETE FROM capacity_samples').run();
-  setCapacitySetting(db, 'nonnixMaxMib', null, 'z-delivery');
-  createCapacitySample(db, { at: T0, nonnixAwakeMib: 14_336 });
-  expect(tick(db, { ...sample(8192), lanes: null, slots: null }, 'hq-lanes').slots).toBe(1);
-  createCapacitySample(db, { at: T0, nonnixAwakeMib: 16_384 });
-  expect(tick(db, { ...sample(8192), lanes: null, slots: null }, 'hq-lanes').slots).toBe(0);
+  const ctx = setupTest();
+  atMin(0);
+  setCapacitySetting(ctx.db, 'nonnixMaxVcpus', '1000', 'z-delivery');
+  setCapacitySetting(ctx.db, 'nonnixMaxMib', null, 'z-delivery');
+  createCapacitySample(ctx.db, { at: T0, nonnixAwakeMib: 14_336 });
+  expect(tick(ctx.db, { ...sample(8192), lanes: null, slots: null }, 'hq-lanes').slots).toBe(1);
+  createCapacitySample(ctx.db, { at: T0, nonnixAwakeMib: 16_384 });
+  expect(tick(ctx.db, { ...sample(8192), lanes: null, slots: null }, 'hq-lanes').slots).toBe(0);
 });
 
 test('hq run lane takes two words, one quoted word, or --lane', () => {
-  expect(laneArgs(['GEO-3', 'cloud'], undefined)).toEqual({ key: 'GEO-3', lane: 'cloud' });
-  expect(laneArgs(['GEO-3 cloud'], undefined)).toEqual({ key: 'GEO-3', lane: 'cloud' });
-  expect(laneArgs(['GEO-3'], 'cloud')).toEqual({ key: 'GEO-3', lane: 'cloud' });
-  expect(laneArgs(['GEO-3', 'cloud'], 'cloud')).toEqual({ key: 'GEO-3', lane: 'cloud' });
+  expect(laneArgs(['GEO-3', 'cloud'], undefined)).toStrictEqual({ key: 'GEO-3', lane: 'cloud' });
+  expect(laneArgs(['GEO-3 cloud'], undefined)).toStrictEqual({ key: 'GEO-3', lane: 'cloud' });
+  expect(laneArgs(['GEO-3'], 'cloud')).toStrictEqual({ key: 'GEO-3', lane: 'cloud' });
+  expect(laneArgs(['GEO-3', 'cloud'], 'cloud')).toStrictEqual({ key: 'GEO-3', lane: 'cloud' });
   expect(() => laneArgs(['GEO-3', 'cloud'], 'atc')).toThrow('the lane is given twice');
   expect(() => laneArgs(['GEO-3'], undefined)).toThrow('give the lane');
   expect(() => laneArgs([], 'cloud')).toThrow('give the issue');
@@ -215,68 +247,77 @@ test('hq run lane takes two words, one quoted word, or --lane', () => {
 });
 
 test('a blocked run with no session awake is parked, whatever it waits on: its slot is free until it wakes or moves', () => {
+  const ctx = setupTest();
+  atMin(0);
   const withSession = (issue: string, session: string) =>
-    addRun(db, { issue, title: 'Invented kettle work', place: 'imp', session, next: 'Agent working.', gate: null, geoffChat: false, lane: 'atc', actor: 'z-delivery' });
+    addRun(ctx.db, { issue, title: 'Invented kettle work', place: 'imp', session, next: 'Agent working.', gate: null, geoffChat: false, lane: 'atc', actor: 'z-delivery' });
   withSession('GEO-1', '0000000a-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
   withSession('GEO-2', '0000000b-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
   withSession('GEO-3', '0000000c-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
-  setState(db, 'GEO-1', 'blocked', { waitsOnGeoff: true }, 'z-delivery');
+  setState(ctx.db, 'GEO-1', 'blocked', { waitsOnGeoff: true }, 'z-delivery');
 
-  setState(db, 'GEO-2', 'blocked', { waitsOn: 'a release' }, 'z-delivery');
-  expect(parkedRuns(db)).toStrictEqual([]);
-  expect(runningByLane(db)).toEqual({ atc: 3 });
+  setState(ctx.db, 'GEO-2', 'blocked', { waitsOn: 'a release' }, 'z-delivery');
+  expect(parkedRuns(ctx.db)).toStrictEqual([]);
+  expect(runningByLane(ctx.db)).toStrictEqual({ atc: 3 });
   atMin(1);
   const asleep = { id: '0000000a-aaaa-4aaa-8aaa-aaaaaaaaaaaa', alive: true, lifecycle: { vm: 'asleep' } };
-  recordAwake(db, [asleep, { id: '0000000b-aaaa-4aaa-8aaa-aaaaaaaaaaaa', alive: false }, { id: '0000000c-aaaa-4aaa-8aaa-aaaaaaaaaaaa', alive: true }]);
-  expect(parkedRuns(db)).toEqual([
+  recordAwake(ctx.db, [asleep, { id: '0000000b-aaaa-4aaa-8aaa-aaaaaaaaaaaa', alive: false }, { id: '0000000c-aaaa-4aaa-8aaa-aaaaaaaaaaaa', alive: true }]);
+  expect(parkedRuns(ctx.db)).toStrictEqual([
     { issue: 'GEO-1', lane: 'atc' },
     { issue: 'GEO-2', lane: 'atc' },
   ]);
-  expect(runningByLane(db)).toEqual({ atc: 1 });
-  recordAwake(db, [{ ...asleep, lifecycle: {} }, { id: '0000000c-aaaa-4aaa-8aaa-aaaaaaaaaaaa', alive: true }]);
-  expect(runningByLane(db)).toEqual({ atc: 2 });
-  recordAwake(db, [{ id: '0000000a-aaaa-4aaa-8aaa-aaaaaaaaaaaa', alive: true, lifecycle: { harness: 'suspended' } }, { id: '0000000c-aaaa-4aaa-8aaa-aaaaaaaaaaaa', alive: true }]);
-  expect(runningByLane(db)).toEqual({ atc: 1 });
+  expect(runningByLane(ctx.db)).toStrictEqual({ atc: 1 });
+  recordAwake(ctx.db, [{ ...asleep, lifecycle: {} }, { id: '0000000c-aaaa-4aaa-8aaa-aaaaaaaaaaaa', alive: true }]);
+  expect(runningByLane(ctx.db)).toStrictEqual({ atc: 2 });
+  recordAwake(ctx.db, [{ id: '0000000a-aaaa-4aaa-8aaa-aaaaaaaaaaaa', alive: true, lifecycle: { harness: 'suspended' } }, { id: '0000000c-aaaa-4aaa-8aaa-aaaaaaaaaaaa', alive: true }]);
+  expect(runningByLane(ctx.db)).toStrictEqual({ atc: 1 });
 
-  recordAwake(db, [asleep, { id: '0000000c-aaaa-4aaa-8aaa-aaaaaaaaaaaa', alive: true }]);
+  recordAwake(ctx.db, [asleep, { id: '0000000c-aaaa-4aaa-8aaa-aaaaaaaaaaaa', alive: true }]);
 
-  setState(db, 'GEO-1', 'working', {}, 'z-delivery');
-  expect(parkedRuns(db)).toStrictEqual([
+  setState(ctx.db, 'GEO-1', 'working', {}, 'z-delivery');
+  expect(parkedRuns(ctx.db)).toStrictEqual([
     { issue: 'GEO-1', lane: 'atc' },
     { issue: 'GEO-2', lane: 'atc' },
   ]);
-  setState(db, 'GEO-1', 'blocked', { waitsOnGeoff: true }, 'z-delivery');
-  expect(runningByLane(db)).toEqual({ atc: 1 });
+  setState(ctx.db, 'GEO-1', 'blocked', { waitsOnGeoff: true }, 'z-delivery');
+  expect(runningByLane(ctx.db)).toStrictEqual({ atc: 1 });
   atMin(-1);
-  expect(runningByLane(db)).toEqual({ atc: 3 });
+  expect(runningByLane(ctx.db)).toStrictEqual({ atc: 3 });
 });
 
 test('the sample records the eligible issues the Ready read holds, the hand count while it is stale, and unknown with neither', () => {
-  const eligible = () => readLanesSamples(db).map((row) => ({ eligible: row.eligible, slots: row.slots })).at(-1);
-  setMeta(db, 'lanes_ready_issues', JSON.stringify({ at: T0, eligible: [], design: [] }));
-  tick(db, sample(16384), 'hq-lanes');
+  const ctx = setupTest();
+  atMin(0);
+  setCapacitySetting(ctx.db, 'nonnixMaxMib', '65536', 'z-delivery');
+  setCapacitySetting(ctx.db, 'nonnixMaxVcpus', '1000', 'z-delivery');
+  for (let offsetMin = -5; offsetMin <= 185; offsetMin += 5) {
+    createCapacitySample(ctx.db, { at: new Date(Date.parse(T0) + offsetMin * 60_000).toISOString().replace('.000Z', 'Z'), nonnixAwakeMib: 0 });
+  }
+  const eligible = () => readLanesSamples(ctx.db).map((row) => ({ eligible: row.eligible, slots: row.slots })).at(-1);
+  setMeta(ctx.db, 'lanes_ready_issues', JSON.stringify({ at: T0, eligible: [], design: [] }));
+  tick(ctx.db, sample(16_384), 'hq-lanes');
   expect(eligible()).toStrictEqual({ eligible: 0, slots: 0 });
-  setMeta(db, 'lanes_ready_issues', JSON.stringify({ at: T0, eligible: [buildReadyIssue('GEO-21'), buildReadyIssue('GEO-22')], design: [] }));
+  setMeta(ctx.db, 'lanes_ready_issues', JSON.stringify({ at: T0, eligible: [buildReadyIssue('GEO-21'), buildReadyIssue('GEO-22')], design: [] }));
   atMin(1);
-  tick(db, sample(16384), 'hq-lanes');
+  tick(ctx.db, sample(16_384), 'hq-lanes');
   expect(eligible()).toStrictEqual({ eligible: 2, slots: 2 });
 
-  setMeta(db, 'lanes_ready_issues', null);
+  setMeta(ctx.db, 'lanes_ready_issues', null);
   atMin(2);
-  tick(db, sample(16384), 'hq-lanes');
+  tick(ctx.db, sample(16_384), 'hq-lanes');
   expect(eligible()).toStrictEqual({ eligible: null, slots: 10 });
 
-  reportReady(db, 5, 'z-delivery');
+  reportReady(ctx.db, 5, 'z-delivery');
   atMin(3);
-  tick(db, sample(16384), 'hq-lanes');
+  tick(ctx.db, sample(16_384), 'hq-lanes');
   expect(eligible()?.eligible).toBe(5);
 });
 
 const SK = 'GEO-1=blocked by GEO-9;GEO-2=needs a design call';
 
 test('--skipped reads ISSUE=reason pairs and refuses the rest', () => {
-  expect(parseSkipped(SK)).toEqual([{ issue: 'GEO-1', reason: 'blocked by GEO-9' }, { issue: 'GEO-2', reason: 'needs a design call' }]);
-  expect(parseSkipped("GEO-3=needs the owner's call; ")).toEqual([{ issue: 'GEO-3', reason: "needs the owner's call" }]);
+  expect(parseSkipped(SK)).toStrictEqual([{ issue: 'GEO-1', reason: 'blocked by GEO-9' }, { issue: 'GEO-2', reason: 'needs a design call' }]);
+  expect(parseSkipped("GEO-3=needs the owner's call; ")).toStrictEqual([{ issue: 'GEO-3', reason: "needs the owner's call" }]);
   expect(() => parseSkipped('geo-1=x')).toThrow('no issue like');
   expect(() => parseSkipped('GEO-1=')).toThrow('1 to 200');
   expect(() => parseSkipped('GEO-1')).toThrow('1 to 200');
@@ -290,38 +331,46 @@ test('--skipped reads ISSUE=reason pairs and refuses the rest', () => {
 });
 
 test('the Ready detail is stored with the report, shown while fresh, and flags what is unexplained', () => {
-  reportLaneReady(db, parseReady(LANES, 'atc=0,flexible=0'), 'z-delivery', { total: 53, skipped: parseSkipped(SK) });
-  const detail = getMeta(db, 'lanes_ready_detail');
+  const ctx = setupTest();
+  atMin(0);
+  setCapacitySetting(ctx.db, 'nonnixMaxMib', '65536', 'z-delivery');
+  setCapacitySetting(ctx.db, 'nonnixMaxVcpus', '1000', 'z-delivery');
+  reportLaneReady(ctx.db, parseReady(LANES, 'atc=0,flexible=0'), 'z-delivery', { total: 53, skipped: parseSkipped(SK) });
+  const detail = getMeta(ctx.db, 'lanes_ready_detail');
   invariant(detail !== null);
-  const event = listEvents(db, 'ready-by-lane')[0]?.data;
+  const event = listEvents(ctx.db, 'ready-by-lane')[0]?.data;
   expect(JSON.parse(detail)).toMatchObject({ total: 53, skipped: [{ issue: 'GEO-1' }, { issue: 'GEO-2' }] });
   expect(event).toContain('blocked by GEO-9');
-  const s = readySummary(db, 30)!;
-  expect(s.line).toBe('Ready: 53 total, 0 eligible across lanes, 2 skipped with reasons, 51 unexplained UNEXPLAINED');
-  expect(skippedLines(s)).toEqual(['  GEO-1: blocked by GEO-9', '  GEO-2: needs a design call']);
-  reportLaneReady(db, parseReady(LANES, 'atc=3,flexible=0'), 'z-delivery', { total: 5, skipped: parseSkipped(SK) });
-  expect(readySummary(db, 30)!.line).toBe('Ready: 5 total, 3 eligible across lanes, 2 skipped with reasons, 0 unexplained');
-  expect(dailyText(db, new Date(Date.parse(T0)))).toContain('Ready: 5 total, 3 eligible');
+  const summary = readySummary(ctx.db, 30);
+  invariant(summary);
+  expect(summary.line).toBe('Ready: 53 total, 0 eligible across lanes, 2 skipped with reasons, 51 unexplained UNEXPLAINED');
+  expect(skippedLines(summary)).toStrictEqual(['  GEO-1: blocked by GEO-9', '  GEO-2: needs a design call']);
+  reportLaneReady(ctx.db, parseReady(LANES, 'atc=3,flexible=0'), 'z-delivery', { total: 5, skipped: parseSkipped(SK) });
+  expect(readySummary(ctx.db, 30)?.line).toBe('Ready: 5 total, 3 eligible across lanes, 2 skipped with reasons, 0 unexplained');
+  expect(dailyText(ctx.db, new Date(T0))).toContain('Ready: 5 total, 3 eligible');
   atMin(31);
-  expect(readySummary(db, 30)).toBeNull();
+  expect(readySummary(ctx.db, 30)).toBeNull();
   atMin(32);
-  reportLaneReady(db, parseReady(LANES, 'atc=1'), 'z-delivery');
-  expect(readySummary(db, 30)).toBeNull();
-  expect(skippedLines({ ...s, skipped: parseSkipped(Array.from({ length: 12 }, (_, i) => `GEO-${i + 1}=r`).join(';')) })).toHaveLength(11);
+  reportLaneReady(ctx.db, parseReady(LANES, 'atc=1'), 'z-delivery');
+  expect(readySummary(ctx.db, 30)).toBeNull();
+  const twelveSkipped = parseSkipped(Array.from({ length: 12 }, (_, index) => `GEO-${index + 1}=r`).join(';'));
+  expect(skippedLines({ ...summary, skipped: twelveSkipped })).toHaveLength(11);
 });
 
 test('it frees the lane of a working run whose session is asleep or no longer listed, bar the grace of a session atc has not yet seen', () => {
+  const ctx = setupTest();
+  atMin(0);
   const withSession = (issue: string, session: string) =>
-    addRun(db, { issue, title: 'Invented kettle work', place: 'local', session, next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
+    addRun(ctx.db, { issue, title: 'Invented kettle work', place: 'local', session, next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
   withSession('GEO-7', '0000000e-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
   withSession('GEO-8', '0000000f-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
-  recordAwake(db, [{ id: '0000000f-aaaa-4aaa-8aaa-aaaaaaaaaaaa', alive: true, lifecycle: { vm: 'asleep' } }]);
+  recordAwake(ctx.db, [{ id: '0000000f-aaaa-4aaa-8aaa-aaaaaaaaaaaa', alive: true, lifecycle: { vm: 'asleep' } }]);
 
   // GEO-7's session is new: atc may not list it yet
-  expect(runningByLane(db)).toStrictEqual({ flexible: 1 });
+  expect(runningByLane(ctx.db)).toStrictEqual({ flexible: 1 });
   atMin(6);
-  recordAwake(db, [{ id: '0000000f-aaaa-4aaa-8aaa-aaaaaaaaaaaa', alive: true, lifecycle: { vm: 'asleep' } }]);
-  expect([parkedRuns(db), runningByLane(db)]).toStrictEqual([
+  recordAwake(ctx.db, [{ id: '0000000f-aaaa-4aaa-8aaa-aaaaaaaaaaaa', alive: true, lifecycle: { vm: 'asleep' } }]);
+  expect([parkedRuns(ctx.db), runningByLane(ctx.db)]).toStrictEqual([
     [
       { issue: 'GEO-7', lane: 'flexible' },
       { issue: 'GEO-8', lane: 'flexible' },
@@ -330,96 +379,114 @@ test('it frees the lane of a working run whose session is asleep or no longer li
   ]);
 
   atMin(22);
-  expect(runningByLane(db)).toEqual({ flexible: 2 });
+  expect(runningByLane(ctx.db)).toStrictEqual({ flexible: 2 });
 });
 
 test('a blocked run waiting on the owner whose session is idle 15 min holds no slot', () => {
+  const ctx = setupTest();
+  atMin(0);
   const id = '00000010-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
-  addRun(db, { actor: 'z-delivery', gate: null, geoffChat: false, issue: 'GEO-9', lane: 'flexible', next: 'Agent working.', place: 'local', session: id, title: 'Invented teapot work' });
-  setState(db, 'GEO-9', 'blocked', { waitsOnGeoff: true }, 'z-delivery');
-  recordAwake(db, [{ alive: true, id, state: 'needs_you' }]);
+  addRun(ctx.db, { actor: 'z-delivery', gate: null, geoffChat: false, issue: 'GEO-9', lane: 'flexible', next: 'Agent working.', place: 'local', session: id, title: 'Invented teapot work' });
+  setState(ctx.db, 'GEO-9', 'blocked', { waitsOnGeoff: true }, 'z-delivery');
+  recordAwake(ctx.db, [{ alive: true, id, state: 'needs_you' }]);
   atMin(15);
-  recordAwake(db, [{ alive: true, id, state: 'needs_you' }]);
-  expect(runningByLane(db)).toEqual({ flexible: 0 });
+  recordAwake(ctx.db, [{ alive: true, id, state: 'needs_you' }]);
+  expect(runningByLane(ctx.db)).toStrictEqual({ flexible: 0 });
 });
 
 test('a slot a gone session frees on imp stays held while impd is at its line', () => {
+  const ctx = setupTest();
+  atMin(0);
+  setCapacitySetting(ctx.db, 'nonnixMaxVcpus', '1000', 'z-delivery');
   const reading = { cap: cap(8192), impMib: 2048, error: null, lanes: LANES, slots: SLOTS };
-  addRun(db, { issue: 'GEO-10', title: 'Invented kettle work', place: 'imp', session: '00000011-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
-  db.query('DELETE FROM capacity_samples').run();
-  setCapacitySetting(db, 'nonnixMaxMib', null, 'z-delivery');
+  addRun(ctx.db, { issue: 'GEO-10', title: 'Invented kettle work', place: 'imp', session: '00000011-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
+  setCapacitySetting(ctx.db, 'nonnixMaxMib', null, 'z-delivery');
   atMin(6);
-  createCapacitySample(db, { at: new Date(Date.parse(T0) + 6 * 60_000).toISOString().replace('.000Z', 'Z'), nonnixAwakeMib: 18_432 });
-  recordAwake(db, []);
-  expect([runningByLane(db), readSlotPlan(db, reading)?.pool]).toMatchObject([{ cloud: 0 }, { impRunning: 0, impFree: 0, held: 'impd at line' }]);
+  createCapacitySample(ctx.db, { at: new Date(Date.parse(T0) + 6 * 60_000).toISOString().replace('.000Z', 'Z'), nonnixAwakeMib: 18_432 });
+  recordAwake(ctx.db, []);
+  expect([runningByLane(ctx.db), readSlotPlan(ctx.db, reading)?.pool]).toMatchObject([{ cloud: 0 }, { impRunning: 0, impFree: 0, held: 'impd at line' }]);
 });
 
 test('it parks a run whose awake session is idle 15 min, blocked or working; a turn counts it again', () => {
+  const ctx = setupTest();
+  atMin(0);
   const id = '0000000d-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
-  addRun(db, { actor: 'z-delivery', gate: null, geoffChat: false, issue: 'GEO-4', lane: 'cloud', next: 'Agent working.', place: 'imp', session: id, title: 'Invented teapot work' });
-  setState(db, 'GEO-4', 'blocked', { waitsOnGeoff: true }, 'z-delivery');
-  recordAwake(db, [{ alive: true, id, state: 'needs_you' }]);
-  expect(parkedRuns(db)).toEqual([]);
+  addRun(ctx.db, { actor: 'z-delivery', gate: null, geoffChat: false, issue: 'GEO-4', lane: 'cloud', next: 'Agent working.', place: 'imp', session: id, title: 'Invented teapot work' });
+  setState(ctx.db, 'GEO-4', 'blocked', { waitsOnGeoff: true }, 'z-delivery');
+  recordAwake(ctx.db, [{ alive: true, id, state: 'needs_you' }]);
+  expect(parkedRuns(ctx.db)).toStrictEqual([]);
   atMin(10);
-  recordAwake(db, [{ alive: true, id, state: 'needs_you' }]);
-  expect(parkedRuns(db)).toEqual([]);
+  recordAwake(ctx.db, [{ alive: true, id, state: 'needs_you' }]);
+  expect(parkedRuns(ctx.db)).toStrictEqual([]);
   atMin(15);
-  recordAwake(db, [{ alive: true, id, state: 'done' }]);
-  expect(parkedRuns(db)).toEqual([{ issue: 'GEO-4', lane: 'cloud' }]);
-  expect(runningByLane(db)).toEqual({ cloud: 0 });
+  recordAwake(ctx.db, [{ alive: true, id, state: 'done' }]);
+  expect(parkedRuns(ctx.db)).toStrictEqual([{ issue: 'GEO-4', lane: 'cloud' }]);
+  expect(runningByLane(ctx.db)).toStrictEqual({ cloud: 0 });
   atMin(20);
-  recordAwake(db, [{ alive: true, id, state: 'running' }]);
-  expect(parkedRuns(db)).toEqual([]);
+  recordAwake(ctx.db, [{ alive: true, id, state: 'running' }]);
+  expect(parkedRuns(ctx.db)).toStrictEqual([]);
   atMin(25);
-  recordAwake(db, [{ alive: true, id, state: 'needs_you' }]);
-  expect(parkedRuns(db)).toEqual([]);
+  recordAwake(ctx.db, [{ alive: true, id, state: 'needs_you' }]);
+  expect(parkedRuns(ctx.db)).toStrictEqual([]);
   atMin(40);
-  recordAwake(db, [{ alive: true, id, state: 'needs_you' }]);
-  expect(parkedRuns(db)).toEqual([{ issue: 'GEO-4', lane: 'cloud' }]);
-  setState(db, 'GEO-4', 'working', {}, 'z-delivery');
-  expect(parkedRuns(db)).toStrictEqual([{ issue: 'GEO-4', lane: 'cloud' }]);
+  recordAwake(ctx.db, [{ alive: true, id, state: 'needs_you' }]);
+  expect(parkedRuns(ctx.db)).toStrictEqual([{ issue: 'GEO-4', lane: 'cloud' }]);
+  setState(ctx.db, 'GEO-4', 'working', {}, 'z-delivery');
+  expect(parkedRuns(ctx.db)).toStrictEqual([{ issue: 'GEO-4', lane: 'cloud' }]);
 });
 
 test('an awake session with no atc state still holds its slot, as before', () => {
+  const ctx = setupTest();
+  atMin(0);
   const id = '0000000e-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
-  addRun(db, { actor: 'z-delivery', gate: null, geoffChat: false, issue: 'GEO-5', lane: 'atc', next: 'Agent working.', place: 'imp', session: id, title: 'Invented mug work' });
-  setState(db, 'GEO-5', 'blocked', { waitsOnGeoff: true }, 'z-delivery');
-  recordAwake(db, [{ alive: true, id }]);
+  addRun(ctx.db, { actor: 'z-delivery', gate: null, geoffChat: false, issue: 'GEO-5', lane: 'atc', next: 'Agent working.', place: 'imp', session: id, title: 'Invented mug work' });
+  setState(ctx.db, 'GEO-5', 'blocked', { waitsOnGeoff: true }, 'z-delivery');
+  recordAwake(ctx.db, [{ alive: true, id }]);
   atMin(30);
-  recordAwake(db, [{ alive: true, id }]);
-  expect(parkedRuns(db)).toEqual([]);
+  recordAwake(ctx.db, [{ alive: true, id }]);
+  expect(parkedRuns(ctx.db)).toStrictEqual([]);
 });
 
 test('a turn between two sweeps restarts the idle clock from atc\'s last activity', () => {
+  const ctx = setupTest();
+  atMin(0);
   const id = '0000000f-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
-  addRun(db, { actor: 'z-delivery', gate: null, geoffChat: false, issue: 'GEO-6', lane: 'imp', next: 'Agent working.', place: 'imp', session: id, title: 'Invented saucer work' });
-  setState(db, 'GEO-6', 'blocked', { waitsOnGeoff: true }, 'z-delivery');
-  recordAwake(db, [{ alive: true, id, state: 'needs_you' }]);
+  addRun(ctx.db, { actor: 'z-delivery', gate: null, geoffChat: false, issue: 'GEO-6', lane: 'imp', next: 'Agent working.', place: 'imp', session: id, title: 'Invented saucer work' });
+  setState(ctx.db, 'GEO-6', 'blocked', { waitsOnGeoff: true }, 'z-delivery');
+  recordAwake(ctx.db, [{ alive: true, id, state: 'needs_you' }]);
   atMin(15);
-  recordAwake(db, [{ alive: true, id, state: 'needs_you' }], new Map([[id, Date.parse(T0) + 9 * 60_000]]));
-  expect(parkedRuns(db)).toEqual([]);
+  recordAwake(ctx.db, [{ alive: true, id, state: 'needs_you' }], new Map([[id, Date.parse(T0) + 9 * 60_000]]));
+  expect(parkedRuns(ctx.db)).toStrictEqual([]);
   atMin(24);
-  recordAwake(db, [{ alive: true, id, state: 'needs_you' }], new Map([[id, Date.parse(T0) + 9 * 60_000]]));
-  expect(parkedRuns(db)).toEqual([{ issue: 'GEO-6', lane: 'imp' }]);
+  recordAwake(ctx.db, [{ alive: true, id, state: 'needs_you' }], new Map([[id, Date.parse(T0) + 9 * 60_000]]));
+  expect(parkedRuns(ctx.db)).toStrictEqual([{ issue: 'GEO-6', lane: 'imp' }]);
 });
 
 test('the stale alert names the last Linear read\'s error and gives the hand report as the fallback', () => {
-  reportReady(db, 4, 'z-delivery');
-  setMeta(db, 'lanes_ready_linear_error', 'Linear answered 401: invented failure');
+  const ctx = setupTest();
+  atMin(0);
+  setCapacitySetting(ctx.db, 'nonnixMaxMib', '65536', 'z-delivery');
+  setCapacitySetting(ctx.db, 'nonnixMaxVcpus', '1000', 'z-delivery');
+  reportReady(ctx.db, 4, 'z-delivery');
+  setMeta(ctx.db, 'lanes_ready_linear_error', 'Linear answered 401: invented failure');
 
-  const alerted = checkReadyStale(db, new Date(Date.parse(T0) + 130 * 60_000), 3, 'hq-lanes');
+  const alerted = checkReadyStale(ctx.db, new Date(Date.parse(T0) + 130 * 60_000), 3, 'hq-lanes');
 
   expect(alerted).toBe(true);
 
-  expect(readOutboxRows(db)[0]?.text).toMatchInlineSnapshot(`"Lanes: 3 slot(s) free, and the newest Ready report is 2 h old (2026-10-16T01:00:00Z). The lanes can't tell how much work waits. hq's last read of Ready from Linear failed: Linear answered 401: invented failure. Until hq reads again, z-delivery reports Ready by hand with hq lanes ready --lane name=n,..."`);
+  expect(readOutboxRows(ctx.db)[0]?.text).toMatchInlineSnapshot(`"Lanes: 3 slot(s) free, and the newest Ready report is 2 h old (2026-10-16T01:00:00Z). The lanes can't tell how much work waits. hq's last read of Ready from Linear failed: Linear answered 401: invented failure. Until hq reads again, z-delivery reports Ready by hand with hq lanes ready --lane name=n,..."`);
 });
 
 test('the stale alert says hq has not read Ready from Linear when no read failed', () => {
-  reportReady(db, 4, 'z-delivery');
+  const ctx = setupTest();
+  atMin(0);
+  setCapacitySetting(ctx.db, 'nonnixMaxMib', '65536', 'z-delivery');
+  setCapacitySetting(ctx.db, 'nonnixMaxVcpus', '1000', 'z-delivery');
+  reportReady(ctx.db, 4, 'z-delivery');
 
-  const alerted = checkReadyStale(db, new Date(Date.parse(T0) + 130 * 60_000), 3, 'hq-lanes');
+  const alerted = checkReadyStale(ctx.db, new Date(Date.parse(T0) + 130 * 60_000), 3, 'hq-lanes');
 
   expect(alerted).toBe(true);
 
-  expect(readOutboxRows(db)[0]?.text).toMatchInlineSnapshot(`"Lanes: 3 slot(s) free, and the newest Ready report is 2 h old (2026-10-16T01:00:00Z). The lanes can't tell how much work waits. hq has not read Ready from Linear since then. Until hq reads again, z-delivery reports Ready by hand with hq lanes ready --lane name=n,..."`);
+  expect(readOutboxRows(ctx.db)[0]?.text).toMatchInlineSnapshot(`"Lanes: 3 slot(s) free, and the newest Ready report is 2 h old (2026-10-16T01:00:00Z). The lanes can't tell how much work waits. hq has not read Ready from Linear since then. Until hq reads again, z-delivery reports Ready by hand with hq lanes ready --lane name=n,..."`);
 });

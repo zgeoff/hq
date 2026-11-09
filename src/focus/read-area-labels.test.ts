@@ -1,6 +1,6 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { freshDb } from '../../test/helpers.ts';
-import { seedAreaLabels } from '../../test/seed-area-labels.ts';
+import { seedAreaLabels } from './test-utils/seed-area-labels.ts';
 import { FOCUS_AREAS } from './focus-areas.ts';
 import { readAreaLabels } from './read-area-labels.ts';
 
@@ -18,7 +18,7 @@ test('it falls back to the built-in areas while no read of Linear is stored', ()
 
 test('it reads the stored names instead of the built-in areas once a read is stored', () => {
   const ctx = setupTest();
-  seedAreaLabels(ctx.db, ['teapot']);
+  seedAreaLabels(ctx, { names: ['teapot'] });
 
   expect(readAreaLabels(ctx.db).names).toStrictEqual(['teapot']);
 });

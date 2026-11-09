@@ -15,7 +15,7 @@ import { addNews } from '../../news/add-news.ts';
 import { setAccountLabel } from '../../accounts/set-account-label.ts';
 import type { Runner } from '../../runner/types.ts';
 import { refreshActionsSpend } from '../refresh-actions-spend.ts';
-import { at, fetchedDays, freshDb } from '../../../test/helpers.ts';
+import { at, freshDb } from '../../../test/helpers.ts';
 import { markOutboxFailed } from '../../outbox/mark-outbox-failed.ts';
 import { unsent } from '../../outbox/unsent.ts';
 import { buildSeeder } from '../../test-utils/build-seeder.ts';
@@ -52,7 +52,7 @@ function makeActionsGh(netAmount: number): Runner {
 
 test('nothing before Monday 17:00, and nothing on another day', () => {
   const ctx = setupTest();
-  fetchedDays(ctx.db);
+  ctx.seed.fetchedDays();
   ctx.synced(syd(MON, '16:40'));
   expect(ctx.tick(MON, '16:59')).toStrictEqual({ run: null, waiting: null });
   ctx.synced(syd('2026-10-20', '17:40'));
@@ -63,17 +63,13 @@ test('nothing before Monday 17:00, and nothing on another day', () => {
 
 test('at Monday 17:00 one message goes to z-stu with the table, both weeks and the flags; a second tick sends nothing', () => {
   const ctx = setupTest();
-  fetchedDays(ctx.db);
-  // oxlint-disable-next-line zgeoff/seed-only -- no seed publishes linear_issues
-  const writeIssue = ctx.db.query(`INSERT INTO linear_issues (issue, type, title, state, closed_at, fetched_at) VALUES (?, ?, 't', 'completed', NULL, '2026-10-16T00:00:00Z')`);
-  writeIssue.run('GEO-1', 'Bug');
-  writeIssue.run('GEO-2', 'Feature');
-  // oxlint-disable-next-line zgeoff/seed-only -- no seed publishes merged_prs
-  const writeMergedPR = ctx.db.query(`INSERT INTO merged_prs (repo, number, merged_at, title, kind, issue) VALUES ('atc', ?, ?, 'x: y', 'other', ?)`);
-  writeMergedPR.run(1, '2026-10-14T03:00:00Z', 'GEO-1');
-  writeMergedPR.run(2, '2026-10-15T03:00:00Z', 'GEO-2');
-  writeMergedPR.run(3, '2026-10-08T03:00:00Z', 'GEO-2');
-  writeMergedPR.run(4, '2026-10-19T03:00:00Z', 'GEO-2');
+  ctx.seed.fetchedDays();
+  ctx.seed.linearIssue({ issue: 'GEO-1', type: 'Bug' });
+  ctx.seed.linearIssue({ issue: 'GEO-2', type: 'Feature' });
+  ctx.seed.mergedPR({ number: 1, merged_at: '2026-10-14T03:00:00Z', issue: 'GEO-1' });
+  ctx.seed.mergedPR({ number: 2, merged_at: '2026-10-15T03:00:00Z', issue: 'GEO-2' });
+  ctx.seed.mergedPR({ number: 3, merged_at: '2026-10-08T03:00:00Z', issue: 'GEO-2' });
+  ctx.seed.mergedPR({ number: 4, merged_at: '2026-10-19T03:00:00Z', issue: 'GEO-2' });
   ctx.synced(syd(MON, '16:50'));
   const result = ctx.tick(MON, '17:01');
   expect(result.run).toMatchObject({ job: 'goals-weekly', key: MON, result: 'queued', detail: null });
@@ -97,35 +93,37 @@ test('at Monday 17:00 one message goes to z-stu with the table, both weeks and t
 
 test('a green row says so, and the colour follows the unrounded share', () => {
   const ctx = setupTest();
-  fetchedDays(ctx.db);
-  // oxlint-disable-next-line zgeoff/seed-only -- no seed publishes linear_issues
-  ctx.db.query(`INSERT INTO linear_issues (issue, type, title, state, closed_at, fetched_at) VALUES ('GEO-1', 'Feature', 't', 'completed', NULL, '2026-10-16T00:00:00Z')`).run();
-  // oxlint-disable-next-line zgeoff/seed-only -- no seed publishes merged_prs
-  ctx.db.query(`INSERT INTO merged_prs (repo, number, merged_at, title, kind, issue) VALUES ('atc', 1, '2026-10-14T03:00:00Z', 'x: y', 'other', 'GEO-1')`).run();
+  ctx.seed.fetchedDays();
+  ctx.seed.linearIssue({ issue: 'GEO-1', type: 'Feature' });
+  ctx.seed.mergedPR({ merged_at: '2026-10-14T03:00:00Z', issue: 'GEO-1' });
   const text = weeklyText(ctx.db, syd(MON, '17:00'));
   expect(row(text, 'Feature + Improvement share')).toContain('100% of 1 typed PRs | no data (0 typed PRs) | 🟢 green |');
 });
 
 test('a week with days not fetched says so and gets no colour', () => {
   const ctx = setupTest();
-  fetchedDays(ctx.db);
-  // oxlint-disable-next-line zgeoff/seed-only -- no seed publishes linear_issues
-  ctx.db.query(`INSERT INTO linear_issues (issue, type, title, state, closed_at, fetched_at) VALUES ('GEO-1', 'Feature', 't', 'completed', NULL, '2026-10-16T00:00:00Z')`).run();
-  // oxlint-disable-next-line zgeoff/seed-only -- no seed publishes merged_prs
-  ctx.db.query(`INSERT INTO merged_prs (repo, number, merged_at, title, kind, issue) VALUES ('atc', 1, '2026-10-14T03:00:00Z', 'x: y', 'other', 'GEO-1')`).run();
-  // oxlint-disable-next-line zgeoff/seed-only -- no seed leaves a day unfetched
-  ctx.db.query(`DELETE FROM merged_pr_days WHERE day IN ('2026-10-12', '2026-10-13')`).run();
+  ctx.seed.fetchedDays({ to: '2026-10-11' });
+  ctx.seed.goalDay({ kind: 'ci', key: 'atc', day: '2026-10-12', at: new Date('2026-09-01T00:00:00Z') });
+  ctx.seed.goalDay({ kind: 'ci', key: 'atc', day: '2026-10-13', at: new Date('2026-09-01T00:00:00Z') });
+  ctx.seed.fetchedDays({ from: '2026-10-14' });
+  ctx.seed.linearIssue({ issue: 'GEO-1', type: 'Feature' });
+  ctx.seed.mergedPR({ merged_at: '2026-10-14T03:00:00Z', issue: 'GEO-1' });
   const text = weeklyText(ctx.db, syd(MON, '17:00'));
   expect(row(text, 'Feature + Improvement share')).toContain('100% of 1 typed PRs, 2 day(s) not fetched | no data (0 typed PRs) | – |');
-  // oxlint-disable-next-line zgeoff/seed-only -- no seed leaves a day unfetched
-  ctx.db.query(`DELETE FROM goal_days WHERE day = '2026-10-08'`).run();
-  const unfetched = weeklyText(ctx.db, syd(MON, '17:00'));
-  expect(row(unfetched, 'CI minutes wasted')).toContain('| no data (0 CI min, 1 day(s) not fetched) |');
+});
+
+test('it says a week with a CI day not fetched has no colour', () => {
+  const ctx = setupTest();
+  ctx.seed.fetchedDays({ to: '2026-10-07' });
+  ctx.seed.mergedPRDay({ day: '2026-10-08', at: '2026-09-01T00:00:00Z' });
+  ctx.seed.fetchedDays({ from: '2026-10-09' });
+  const text = weeklyText(ctx.db, syd(MON, '17:00'));
+  expect(row(text, 'CI minutes wasted')).toContain('| no data (0 CI min, 1 day(s) not fetched) |');
 });
 
 test('the downtime row gives outages, the slowest detection and blind minutes, judged on exact durations', () => {
   const ctx = setupTest();
-  fetchedDays(ctx.db);
+  ctx.seed.fetchedDays();
   const t0 = Date.parse('2026-10-14T01:00:00Z');
   const z = (ms: number) => iso(new Date(t0 + ms));
   for (const minute of Array.from({ length: 20 }, (_, offset) => offset - 20)) {
@@ -144,14 +142,13 @@ test('the downtime row gives outages, the slowest detection and blind minutes, j
 
 test('the cost row names an account by its label when set, else by the short key, with CI minutes and no colour', () => {
   const ctx = setupTest();
-  fetchedDays(ctx.db);
+  ctx.seed.fetchedDays();
   ctx.seed.usageSample({ at: '2026-10-13T01:00:00Z', account: 'abcdef012345', five_hour: 10, seven_day: 40 });
   ctx.seed.usageSample({ at: '2026-10-14T01:00:00Z', account: 'abcdef012345', five_hour: 20, seven_day: 71 });
   ctx.seed.usageSample({ at: '2026-10-15T01:00:00Z', account: 'abcdef012345', five_hour: 30, seven_day: 55 });
   ctx.seed.usageSample({ at: '2026-10-15T02:00:00Z', account: '0123456789ab', five_hour: 5, seven_day: 12 });
   ctx.seed.usageSample({ at: '2026-10-07T01:00:00Z', account: 'abcdef012345', five_hour: 1, seven_day: 33 });
-  // oxlint-disable-next-line zgeoff/seed-only -- no seed publishes ci_runs
-  ctx.db.query(`INSERT INTO ci_runs (id, repo, path, event, status, conclusion, attempt, created_at, started_at, updated_at) VALUES (1, 'atc', 'ci.yml', 'push', 'completed', 'success', 1, '2026-10-14T02:00:00Z', '2026-10-14T02:00:00Z', '2026-10-14T03:30:00Z')`).run();
+  ctx.seed.ciRun({ path: 'ci.yml', created_at: '2026-10-14T02:00:00Z', started_at: '2026-10-14T02:00:00Z', updated_at: '2026-10-14T03:30:00Z' });
   let cost = row(weeklyText(ctx.db, syd(MON, '17:00')), 'Cost');
   expect(cost).toContain('012345: 7-day peak 12%, latest 5-hour 5% and 7-day 12% (1 readings)');
   expect(cost).toContain('abcdef: 7-day peak 71%, latest 5-hour 30% and 7-day 55% (3 readings); CI 90 min');
@@ -167,7 +164,7 @@ test('the cost row names an account by its label when set, else by the short key
 
 test('the cost colour is green with the Actions spend under the pro-rated budget, whatever the Claude peaks', async () => {
   const ctx = setupTest();
-  fetchedDays(ctx.db);
+  ctx.seed.fetchedDays();
   ctx.seed.usageSample({ at: '2026-10-13T01:00:00Z', account: 'aaaaaaaaaaaa', five_hour: 10, seven_day: 95 });
   await refreshActionsSpend(ctx.db, makeActionsGh(30.64), syd(MON, '16:45'));
 
@@ -179,7 +176,7 @@ test('the cost colour is green with the Actions spend under the pro-rated budget
 
 test('the cost colour is red with the Actions spend over the pro-rated budget', async () => {
   const ctx = setupTest();
-  fetchedDays(ctx.db);
+  ctx.seed.fetchedDays();
   ctx.seed.usageSample({ at: '2026-10-13T01:00:00Z', account: 'aaaaaaaaaaaa', five_hour: 10, seven_day: 20 });
   await refreshActionsSpend(ctx.db, makeActionsGh(30.66), syd(MON, '16:45'));
 
@@ -191,7 +188,7 @@ test('the cost colour is red with the Actions spend over the pro-rated budget', 
 
 test('the cost row shows the Actions spend as unknown, with no colour, when gh fails', async () => {
   const ctx = setupTest();
-  fetchedDays(ctx.db);
+  ctx.seed.fetchedDays();
   await refreshActionsSpend(ctx.db, () => Promise.resolve({ code: 1, stdout: '', stderr: 'HTTP 403' }), syd(MON, '16:45'));
 
   const cost = row(weeklyText(ctx.db, syd(MON, '17:00')), 'Cost');
@@ -202,7 +199,7 @@ test('the cost row shows the Actions spend as unknown, with no colour, when gh f
 
 test('legacy active readings stay in a mixed week beside the keyed ones', () => {
   const ctx = setupTest();
-  fetchedDays(ctx.db);
+  ctx.seed.fetchedDays();
   ctx.seed.usageSample({ at: '2026-10-13T01:00:00Z', account: 'active', five_hour: 10, seven_day: 95 });
   ctx.seed.usageSample({ at: '2026-10-15T01:00:00Z', account: 'bbbbbbbbbbbb', five_hour: 5, seven_day: 20 });
   const cost = row(weeklyText(ctx.db, syd(MON, '17:00')), 'Cost');
@@ -212,7 +209,7 @@ test('legacy active readings stay in a mixed week beside the keyed ones', () => 
 
 test('the cost row says active account only when a week has no per-account rows', () => {
   const ctx = setupTest();
-  fetchedDays(ctx.db);
+  ctx.seed.fetchedDays();
   const before = row(weeklyText(ctx.db, syd(MON, '17:00')), 'Cost');
   expect(before).toContain('active account only: no readings');
   ctx.seed.usageSample({ at: '2026-10-14T01:00:00Z', account: 'active', five_hour: 20, seven_day: 60 });
@@ -223,7 +220,7 @@ test('the cost row says active account only when a week has no per-account rows'
 
 test('flags are the weekly-flag items since the last weekly, filtered by tag and by time', () => {
   const ctx = setupTest();
-  fetchedDays(ctx.db);
+  ctx.seed.fetchedDays();
   at('2026-10-10T01:00:00Z');
   addNews(ctx.db, { from: 'z-delivery', topic: 'other', text: 'Too old to show.', issue: null, link: null, needsGeoff: false, tag: 'weekly-flag' });
   at('2026-10-15T01:00:00Z');
@@ -246,13 +243,13 @@ test('flags are the weekly-flag items since the last weekly, filtered by tag and
 
 test('with no flags the section says none', () => {
   const ctx = setupTest();
-  fetchedDays(ctx.db);
+  ctx.seed.fetchedDays();
   expect(weeklyText(ctx.db, syd(MON, '17:00'))).toContain('Flags you kept:\nnone\n');
 });
 
 test('stale goals data makes it wait, and it sends once the data is fresh', () => {
   const ctx = setupTest();
-  fetchedDays(ctx.db);
+  ctx.seed.fetchedDays();
   ctx.synced(syd(MON, '15:00'));
   expect(ctx.tick(MON, '17:00')).toStrictEqual({ run: null, waiting: 'goals data 120 min old' });
   expect(readOutboxRows(ctx.db)).toStrictEqual([]);
@@ -264,7 +261,7 @@ test('stale goals data makes it wait, and it sends once the data is fresh', () =
 
 test('data that was never synced waits; a Monday after 17:30 is sent late and marked so', () => {
   const ctx = setupTest();
-  fetchedDays(ctx.db);
+  ctx.seed.fetchedDays();
   expect(ctx.tick(MON, '17:00').waiting).toBe('goals data never synced');
   ctx.synced(syd(MON, '17:40'));
   expect(ctx.tick(MON, '17:45').run).toMatchObject({ detail: 'late' });
@@ -272,7 +269,7 @@ test('data that was never synced waits; a Monday after 17:30 is sent late and ma
 
 test('a dry run is the text alone: nothing sent, no job row; a manual send runs once', () => {
   const ctx = setupTest();
-  fetchedDays(ctx.db);
+  ctx.seed.fetchedDays();
   ctx.synced(syd(MON, '10:00'));
   const sentAt = syd(MON, '10:10');
   weeklyText(ctx.db, sentAt);
@@ -286,7 +283,7 @@ test('a dry run is the text alone: nothing sent, no job row; a manual send runs 
 
 test('a manual send on a Thursday reviews the last complete week and keys on that Monday', () => {
   const ctx = setupTest();
-  fetchedDays(ctx.db);
+  ctx.seed.fetchedDays();
   ctx.synced(syd('2026-10-22', '10:00'));
   expect(sendWeekly(ctx.db, 'z-stu', syd('2026-10-22', '10:10')).key).toBe(MON);
   expect(readOutboxRows(ctx.db)[0]?.text.split('\n')[0]).toBe('Goals weekly, week of 12 Oct:');
@@ -296,7 +293,7 @@ test('a manual send on a Thursday reviews the last complete week and keys on tha
 
 test('skip leaves a Monday alone; bad skips are refused', () => {
   const ctx = setupTest();
-  fetchedDays(ctx.db);
+  ctx.seed.fetchedDays();
   ctx.synced(syd(MON, '16:50'));
   skipWeekly(ctx.db, MON, 'done by hand', 'z-stu');
   expect(ctx.tick(MON, '17:00')).toStrictEqual({ run: null, waiting: null });
@@ -309,7 +306,7 @@ test('skip leaves a Monday alone; bad skips are refused', () => {
 
 test('health is red at 17:31 on a Monday with no run, quiet before 17:30 and on other days, green once it ran', () => {
   const ctx = setupTest();
-  fetchedDays(ctx.db);
+  ctx.seed.fetchedDays();
   expect(goalsWeeklyCheck(ctx.db, syd(MON, '17:29'))).toBeNull();
   expect(goalsWeeklyCheck(ctx.db, syd('2026-10-20', '17:31'))).toBeNull();
   expect(goalsWeeklyCheck(ctx.db, syd(MON, '17:31'))).toMatchObject({ key: 'job:goals-weekly', ok: false, line: expect.stringContaining('no run today (2026-10-19)') });
@@ -322,7 +319,7 @@ test('health is red at 17:31 on a Monday with no run, quiet before 17:30 and on 
 
 test('health still sees a failed message after the owner session is forwarded', () => {
   const ctx = setupTest();
-  fetchedDays(ctx.db);
+  ctx.seed.fetchedDays();
   ctx.synced(syd(MON, '16:50'));
   ctx.tick(MON, '17:05');
   setForward(ctx.db, owner(), 'z-other');
@@ -333,7 +330,7 @@ test('health still sees a failed message after the owner session is forwarded', 
 
 test('health is red for a Monday whose data stayed stale', () => {
   const ctx = setupTest();
-  fetchedDays(ctx.db);
+  ctx.seed.fetchedDays();
   ctx.synced(syd(MON, '09:00'));
   ctx.tick(MON, '17:35');
   expect(goalsWeeklyCheck(ctx.db, syd(MON, '17:35'))?.ok).toBe(false);
@@ -341,13 +338,11 @@ test('health is red for a Monday whose data stayed stale', () => {
 
 test('the deploy-prod row names holds, no-apply runs and runs not yet classified, and gets no colour while any is unclassified', () => {
   const ctx = setupTest();
-  fetchedDays(ctx.db, undefined, undefined, ['atc', 'cloud']);
+  ctx.seed.fetchedDays({ repos: ['atc', 'cloud'] });
   const add = (id: number, outcome: string | null) => {
-    // oxlint-disable-next-line zgeoff/seed-only -- no seed publishes ci_runs
-    ctx.db.query(`INSERT INTO ci_runs (id, repo, path, event, status, conclusion, attempt, created_at, started_at, updated_at) VALUES (?, 'cloud', '.github/workflows/deploy-prod.yml', 'push', 'completed', 'success', 1, '2026-10-14T02:00:00Z', '2026-10-14T02:00:00Z', '2026-10-14T02:10:00Z')`).run(id);
+    ctx.seed.ciRun({ id, repo: 'cloud', path: '.github/workflows/deploy-prod.yml', created_at: '2026-10-14T02:00:00Z', started_at: '2026-10-14T02:00:00Z', updated_at: '2026-10-14T02:10:00Z' });
     if (outcome) {
-      // oxlint-disable-next-line zgeoff/seed-only -- no seed publishes deploy_runs
-      ctx.db.query(`INSERT INTO deploy_runs (run_id, outcome, attempt, fetched_at) VALUES (?, ?, 1, '2026-10-14T03:00:00Z')`).run(id, outcome);
+      ctx.seed.deployRun({ run_id: id, outcome, fetched_at: '2026-10-14T03:00:00Z' });
     }
   };
   for (const id of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]) {
@@ -364,15 +359,13 @@ test('the deploy-prod row names holds, no-apply runs and runs not yet classified
 
 test('the weekly ends with the week\'s refusals and their top reasons, after the flags', () => {
   const ctx = setupTest();
-  fetchedDays(ctx.db);
-  // oxlint-disable-next-line zgeoff/seed-only -- no seed publishes refusals
-  const writeRefusal = ctx.db.query(`INSERT INTO refusals (uuid, at, transcript, subagent, reason, scanned_at) VALUES (?, ?, '/t.jsonl', 0, ?, '2026-10-19T00:00:00Z')`);
-  writeRefusal.run('r1', '2026-10-13T01:00:00Z', 'pushing to main');
-  writeRefusal.run('r2', '2026-10-14T01:00:00Z', 'pushing to main');
-  writeRefusal.run('r3', '2026-10-15T01:00:00Z', 'deleting a branch');
-  writeRefusal.run('r4', '2026-10-15T02:00:00Z', null);
-  writeRefusal.run('r5', '2026-10-08T01:00:00Z', 'last week');
-  writeRefusal.run('r6', '2026-10-19T08:00:00Z', 'this week, not yet reviewed');
+  ctx.seed.fetchedDays();
+  ctx.seed.refusal({ uuid: 'r1', at: '2026-10-13T01:00:00Z', reason: 'pushing to main' });
+  ctx.seed.refusal({ uuid: 'r2', at: '2026-10-14T01:00:00Z', reason: 'pushing to main' });
+  ctx.seed.refusal({ uuid: 'r3', at: '2026-10-15T01:00:00Z', reason: 'deleting a branch' });
+  ctx.seed.refusal({ uuid: 'r4', at: '2026-10-15T02:00:00Z', reason: null });
+  ctx.seed.refusal({ uuid: 'r5', at: '2026-10-08T01:00:00Z', reason: 'last week' });
+  ctx.seed.refusal({ uuid: 'r6', at: '2026-10-19T08:00:00Z', reason: 'this week, not yet reviewed' });
   const text = weeklyText(ctx.db, syd(MON, '17:00'));
   expect(text).toContain('Refusals: 4 (top reasons: pushing to main x2; deleting a branch x1)');
   expect(text.indexOf('Flags you kept:')).toBeLessThan(text.indexOf('Refusals:'));
@@ -380,6 +373,6 @@ test('the weekly ends with the week\'s refusals and their top reasons, after the
 
 test('the weekly says when there were no refusals', () => {
   const ctx = setupTest();
-  fetchedDays(ctx.db);
+  ctx.seed.fetchedDays();
   expect(weeklyText(ctx.db, syd(MON, '17:00'))).toContain('\nRefusals: none\n');
 });

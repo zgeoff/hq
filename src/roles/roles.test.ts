@@ -295,7 +295,7 @@ test('a declared forward needs no meta row, and a meta row wins', () => {
 
 test('no session-name literal sits in src/ outside roles.ts', () => {
   const hits: string[] = [];
-  for (const file of readdirSync(`${import.meta.dir}/..`, { recursive: true, encoding: 'utf8' }).filter((name) => name.endsWith('.ts') && !name.endsWith('.test.ts') && name !== 'roles.ts')) {
+  for (const file of readdirSync(`${import.meta.dir}/..`, { recursive: true, encoding: 'utf8' }).filter((name) => name.endsWith('.ts') && !name.endsWith('.test.ts') && !name.includes('test-utils/') && name !== 'roles.ts')) {
     const code = readFileSync(`${import.meta.dir}/../${file}`, 'utf8').replaceAll(/\/\*[\s\S]*?\*\//gu, '').replaceAll(/\/\/.*$/gmu, '');
     for (const match of code.matchAll(/['"`]z-[a-z]+['"`]/gu)) {
       hits.push(`${file}: ${match[0]}`);

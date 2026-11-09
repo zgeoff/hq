@@ -1,4 +1,4 @@
-import { Database } from 'bun:sqlite';
+import type { Database } from 'bun:sqlite';
 import { expect, onTestFinished, test } from 'bun:test';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -13,6 +13,9 @@ import { readOKReviews } from './read-ok-reviews.ts';
 import { resetIssueFlags } from './reset-issue-flags.ts';
 import { runNoslopReview } from './run-noslop-review.ts';
 import type { NoslopReviewContext } from './run-noslop-review.ts';
+import { createStoreTables } from '../../test/create-history-databases.ts';
+import { buildRepoSeeder } from '../repo/test-utils/build-repo-seeder.ts';
+import { buildSeeder } from '../test-utils/build-seeder.ts';
 
 function readKettleIssue(): ReturnType<LinearCall> {
   return Promise.resolve({ issue: { identifier: 'GEO-12', title: 'Mend the kettle', description: 'It never boils.' } });
@@ -46,6 +49,7 @@ function setupTest() {
   return {
     base,
     db,
+    seed: { ...buildSeeder({ db }), ...buildRepoSeeder({ store: join(base, 'store.sqlite') }) },
     reviewContext: (run: Runner): NoslopReviewContext => ({
       run,
       db,
@@ -284,11 +288,9 @@ test('it counts the failed calls in the stored round', async () => {
 
 test('it records a review noslop stored but could not post to GitHub as a round, with its findings and the failed post', async () => {
   const ctx = setupTest();
-  const store = new Database(join(ctx.base, 'store.sqlite'), { create: true });
   const fake = buildFakeRunner({ noslopReview: { code: 1, stdout: FAKE_REVIEW_JSON, stderr: 'the github reporter failed: HTTP 500' } });
-  store.run('CREATE TABLE reviews (review_id TEXT PRIMARY KEY, repo TEXT NOT NULL, pull_request INTEGER, head TEXT NOT NULL)');
-  store.query('INSERT INTO reviews (review_id, repo, pull_request, head) VALUES (?, ?, ?, ?)').run('r1', 'zgeoff/widgets', 7, 'feat');
-  store.close();
+  createStoreTables(join(ctx.base, 'store.sqlite'));
+  ctx.seed.noslopReview({ review_id: 'r1' });
 
   const result = await runNoslopReview(ctx.reviewContext(fake.run));
 
@@ -307,11 +309,9 @@ test('it records a review noslop stored but could not post to GitHub as a round,
 
 test('it records no review when noslop exits 1 before its store holds the review it printed', async () => {
   const ctx = setupTest();
-  const store = new Database(join(ctx.base, 'store.sqlite'), { create: true });
   const fake = buildFakeRunner({ noslopReview: { code: 1, stdout: FAKE_REVIEW_JSON, stderr: 'the sqlite reporter failed: disk full' } });
-  store.run('CREATE TABLE reviews (review_id TEXT PRIMARY KEY, repo TEXT NOT NULL, pull_request INTEGER, head TEXT NOT NULL)');
-  store.query('INSERT INTO reviews (review_id, repo, pull_request, head) VALUES (?, ?, ?, ?)').run('r0', 'zgeoff/widgets', 7, 'feat');
-  store.close();
+  createStoreTables(join(ctx.base, 'store.sqlite'));
+  ctx.seed.noslopReview({ review_id: 'r0' });
 
   await expect(runNoslopReview(ctx.reviewContext(fake.run))).rejects.toMatchObject({ code: 'noslop_failed' });
 
@@ -329,11 +329,9 @@ test('it records no review when noslop exits 1 and has no store yet', async () =
 
 test('it records no review when noslop exits 1 with output that is no review, even when its store holds one', async () => {
   const ctx = setupTest();
-  const store = new Database(join(ctx.base, 'store.sqlite'), { create: true });
   const fake = buildFakeRunner({ noslopReview: { code: 1, stdout: 'Review done.', stderr: 'the github reporter failed: HTTP 500' } });
-  store.run('CREATE TABLE reviews (review_id TEXT PRIMARY KEY, repo TEXT NOT NULL, pull_request INTEGER, head TEXT NOT NULL)');
-  store.query('INSERT INTO reviews (review_id, repo, pull_request, head) VALUES (?, ?, ?, ?)').run('r1', 'zgeoff/widgets', 7, 'feat');
-  store.close();
+  createStoreTables(join(ctx.base, 'store.sqlite'));
+  ctx.seed.noslopReview({ review_id: 'r1' });
 
   await expect(runNoslopReview(ctx.reviewContext(fake.run))).rejects.toMatchObject({ code: 'noslop_failed' });
 
@@ -407,7 +405,7 @@ test('it records late on a new finding of a later review and leaves it null on t
 test('it still records the review when the late check cannot run git', async () => {
   const ctx = setupTest();
   const fake = buildFakeRunner({ noslopReview: { code: 0, stdout: buildAnchoredReview('bbbb', 'h2'), stderr: '' } });
-  ctx.db.query("INSERT INTO noslop_rounds (repo, pr, kind, started_at, ended_at, ms, ok, head, findings, sha) VALUES ('widgets', 7, 'review', 'a', 'b', 1, 1, 'h1', '[]', 'x')").run();
+  ctx.seed.reviewRound({ head: 'h1', depth: null });
 
   await runNoslopReview(ctx.reviewContext(makeGitlessRunner(fake.run)));
 

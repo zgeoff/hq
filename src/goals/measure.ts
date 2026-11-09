@@ -11,7 +11,7 @@ import { kdb } from '../kdb.ts';
 import { row as goalRow } from './row.ts';
 import { downtime } from '../probe/downtime.ts';
 import { IN_SQL } from '../scope/in-sql.ts';
-import { computeStats } from '../stats/compute-stats.ts';
+import { readStats } from '../stats/read-stats.ts';
 import type { Measure, Measures } from './types.ts';
 
 const UsageSchema = buildRowSchema('usage_samples');
@@ -35,8 +35,8 @@ export function measure(db: Database, from: Date, to: Date, at: Date = now()): M
     ? { value: dt.downMinutes, exact: dt.downMs / 60_000, denominator: dt.samples, unit: 'samples', longest: dt.longestDetectMinutes, longestExact: dt.longestDetectMs / 60_000, outages: dt.outages, blind: dt.blindMinutes, shown: `${dt.downMinutes} min`, detail: `${dt.downMinutes} min down in ${dt.outages} outage(s), slowest caught in ${dt.longestDetectMinutes} min, ${dt.blindMinutes} min not seen by the probe` }
     : { value: null, denominator: 0, unit: 'samples', shown: 'no data', detail: dt.samples ? 'no data: the probe saw the window only blind (the PC offline)' : 'no data: the Nix probe has no samples in the window' };
 
-  const s = computeStats(db, { from: f, to: t, gh: null }).flow;
-  const mustfix = share(pct(s.rechecked, s.reviewed), s.reviewed, 'reviewed runs', `${s.rechecked} of ${s.reviewed} reviewed runs had a must-fix at the first review`);
+  const flow = readStats(db, { from: f, to: t, gh: null }).flow;
+  const mustfix = share(pct(flow.rechecked, flow.reviewed), flow.reviewed, 'reviewed runs', `${flow.rechecked} of ${flow.reviewed} reviewed runs had a must-fix at the first review`);
 
   const latest = runSyncRow(db, kdb(db).selectFrom('usage_samples').selectAll().orderBy('at', 'desc').limit(1).compile(), UsageSchema);
   const inWin = latest ? readWindow(db, latest.account, f, t) : { readings: 0, peak: null };
