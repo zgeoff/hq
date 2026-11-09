@@ -25,6 +25,7 @@ test('it applies its statements to the store and answers an empty success', () =
   const ctx = setupTest();
   createStubNoslopStore(ctx.store, { migrations: ['0001-a'], tables: {} });
 
+  // A noslop store row: hq reads that database but does not own it, so no hq module can write it.
   expect(buildStubStoreQuery(ctx.store, ["INSERT INTO kysely_migration (name, timestamp) VALUES ('0002-b', 'now')"])()).toStrictEqual({ code: 0, stdout: '[]', stderr: '' });
 
   expect(ctx.openStore().query('SELECT name FROM kysely_migration ORDER BY name').all()).toStrictEqual([{ name: '0001-a' }, { name: '0002-b' }]);

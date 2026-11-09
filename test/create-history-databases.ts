@@ -38,6 +38,7 @@ export function createStoreTables(path: string): void {
 }
 
 export function createHistoryRows(db: Database, repo: string, offset: number): void {
+  // Rows of an old history database that no current owner can write: the migration tests upgrade it.
   db.query('INSERT INTO ci_runs (id, repo, path, event, status, attempt, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run(offset + 1, repo, 'ci.yml', 'push', 'completed', 1, AT, AT);
   db.query('INSERT INTO closed_prs (repo, number, closed_at) VALUES (?, ?, ?)').run(repo, offset + 1, AT);
   db.query('INSERT INTO merged_prs (repo, number, merged_at, title, kind) VALUES (?, ?, ?, ?, ?)').run(repo, offset + 2, AT, 'feat: an invented change', 'feat');

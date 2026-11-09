@@ -250,6 +250,7 @@ test('migration v26 adds the item columns after a backup, keeping the rows it ha
     rmSync(base, { recursive: true, force: true });
   });
   migrate(stored, path, false, MIGRATIONS.slice(0, 25));
+  // An old schema that no current owner can write: this migration test builds it by hand.
   stored.query("INSERT INTO unblocks (id, task, added_by, state, added_seq, added_at, updated_at) VALUES ('lid', 'Fit the lid', 'kettle-bot', 'open', 1, 'a', 'a')").run();
 
   expect(migrate(stored, path, true, MIGRATIONS.slice(0, 26))).toContain('.bak-v25-');

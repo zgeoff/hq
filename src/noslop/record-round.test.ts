@@ -8,6 +8,7 @@ import { MIGRATIONS } from '../db/migrations.ts';
 import { openDb } from '../db/open-db.ts';
 import { SCHEMA_VERSION } from '../db/schema-version.ts';
 import { setMeta } from '../db/set-meta.ts';
+import { buildSeeder } from '../test-utils/build-seeder.ts';
 import { recordRound } from './record-round.ts';
 
 function setupTest() {
@@ -19,7 +20,7 @@ function setupTest() {
     rmSync(base, { recursive: true, force: true });
   });
 
-  return { base, db };
+  return { base, db, seed: buildSeeder({ db }) };
 }
 
 test('it creates the noslop rounds table on a fresh database', () => {
@@ -51,6 +52,7 @@ test('it upgrades a v24 database to v25 after taking a backup, leaving full NULL
   const stored = new Database(path, { create: true, strict: true });
   onTestFinished(() => stored.close());
   migrate(stored, path, false, MIGRATIONS.slice(0, 24));
+  // An old-schema database: no current code writes a round the way this version did.
   stored.query("INSERT INTO noslop_rounds (repo, pr, kind, started_at, ended_at, ms, ok, sha) VALUES ('widgets', 7, 'review', 'a', 'b', 1, 1, 'x')").run();
 
   expect(migrate(stored, path, true, MIGRATIONS.slice(0, 25))).toContain('.bak-v24-');
@@ -59,12 +61,14 @@ test('it upgrades a v24 database to v25 after taking a backup, leaving full NULL
   expect(stored.query('SELECT repo, full FROM noslop_rounds').get()).toStrictEqual({ repo: 'widgets', full: null });
 });
 
-test('it refuses a round with a kind or an ok flag the table does not allow', () => {
+test.each([
+  ['a kind the table does not allow', { kind: 'other' }],
+  ['an ok flag the table does not allow', { ok: 2 }],
+  ['a full flag the table does not allow', { full: 2 }],
+])('it refuses a round with %s', (_label, input) => {
   const ctx = setupTest();
 
-  expect(() => ctx.db.query("INSERT INTO noslop_rounds (repo, pr, kind, started_at, ended_at, ms, ok, sha) VALUES ('w', 1, 'other', 'a', 'b', 1, 1, 'x')").run()).toThrow();
-  expect(() => ctx.db.query("INSERT INTO noslop_rounds (repo, pr, kind, started_at, ended_at, ms, ok, sha) VALUES ('w', 1, 'review', 'a', 'b', 1, 2, 'x')").run()).toThrow();
-  expect(() => ctx.db.query("INSERT INTO noslop_rounds (repo, pr, kind, started_at, ended_at, ms, ok, sha, full) VALUES ('w', 1, 'review', 'a', 'b', 1, 1, 'x', 2)").run()).toThrow();
+  expect(() => ctx.seed.roundRowOutsideChecks(input)).toThrow();
 });
 
 test('it upgrades a v32 database to v33 after taking a backup, leaving special and redesign NULL on the rounds it had', () => {
