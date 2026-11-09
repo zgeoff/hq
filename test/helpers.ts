@@ -123,11 +123,14 @@ export function fakeAtc(directory: string, sessions: FakeAtcSession[] = [
     },
     'events.read': (input) => {
       // Like atc: no cursor reads the newest page.
-      const args = z.object({ cursor: z.string().optional(), limit: z.number().optional() }).parse(input);
+      const args = z.object({ cursor: z.string().optional(), from: z.literal('start').optional(), limit: z.number().optional(), session: z.string().optional() }).parse(input);
       const count = args.limit ?? 50;
-      const first = args.cursor === undefined ? Math.max(0, feed.length - count) : readFeedStart(args.cursor);
+      const newest = args.cursor === undefined ? Math.max(0, feed.length - count) : readFeedStart(args.cursor);
+      const first = args.from === 'start' ? 0 : newest;
       const last = Math.max(first, Math.min(feed.length, first + count));
-      const page = feed.slice(first, last).map((event, offset) => Object.assign(structuredClone(event), { cursor: encodeCursor(first + offset + 1) }));
+
+      // Cursors stay positions in the whole trail; the session filter only drops other sessions' rows from the page.
+      const page = feed.slice(first, last).map((event, offset) => Object.assign(structuredClone(event), { cursor: encodeCursor(first + offset + 1) })).filter((event) => !args.session || event.session === args.session);
       return { events: page, cursor: encodeCursor(last), more: last < feed.length };
     },
     'session.spawn': (input) => {

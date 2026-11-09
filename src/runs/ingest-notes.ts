@@ -5,16 +5,15 @@ import { eventsReadSchema } from '../atc/events-read-schema.ts';
 import { getMeta } from '../db/get-meta.ts';
 import { setMeta } from '../db/set-meta.ts';
 import type { Runner } from '../runner/types.ts';
-import { applyNoteSignals } from './apply-note-signals.ts';
 import { cursorIndex } from './cursor-index.ts';
-import { findOpenSession } from './find-open-session.ts';
 import { FROM_START } from './from-start.ts';
 import { makeFinalResolver } from './make-final-resolver.ts';
-import { readFinalClaims } from './read-final-claims.ts';
+import { readFeedFinals } from './read-feed-finals.ts';
+import { readNotePlan } from './read-note-plan.ts';
 import { orchestratorName } from '../wake/orchestrator-name.ts';
 import { sendNoteToOrchestrator } from './send-note-to-orchestrator.ts';
-import type { FeedEvent, FinalClaim, FinalResolutions, IngestResult } from './types.ts';
-import { updateRunTime as touch } from './update-run-time.ts';
+import type { FeedEvent, IngestResult } from './types.ts';
+import { writeNote } from './write-note.ts';
 import { toErrorMessage } from '../to-error-message.ts';
 
 interface IngestOptions {
@@ -60,7 +59,7 @@ export async function ingestNotes(db: Database, client: AtcClient, opts: IngestO
     }
 
     // bun:sqlite runs a transaction synchronously, so GitHub is read before it opens.
-    const resolutions = await resolveFinals(db, r.events, resolveFinal);
+    const resolutions = await readFeedFinals(db, r.events, resolveFinal);
     db.transaction(() => {
       for (const e of r.events) {
         result.read++;
@@ -68,27 +67,21 @@ export async function ingestNotes(db: Database, client: AtcClient, opts: IngestO
         if (sendNoteToOrchestrator(db, e, orchestrator)) {
           result.routed++;
         }
-        const row = findOpenSession(db, e.session);
-        if (row === null) {
+        const notePlan = readNotePlan(db, e);
+        if (notePlan.session === null) {
           result.unmatched++;
           continue;
         }
-        const noteAt = toNoteTime(e);
-        if (hasSameNote(db, e)) {
+        if (notePlan.plan === 'duplicate') {
           continue;
         }
-        const ins = db
-          .query(`INSERT INTO run_notes (issue, session_id, label, text, source, event_key, at) VALUES (?, ?, ?, ?, 'atc', ?, ?) ON CONFLICT (event_key) DO NOTHING`)
-          .run(row.issue, e.session, e.label ?? null, e.detail, `${epoch}:${e.cursor}`, noteAt);
-        if (ins.changes === 0) continue;
-        result.notes++;
-
-        if (row.design_pass === 1) {
-          continue;
+        const written = writeNote(db, e, notePlan.plan, { issue: notePlan.session.issue, epoch, resolutions });
+        if (written.stored) {
+          result.notes++;
         }
-        const sig = applyNoteSignals(db, row.issue, e.detail, { source: `atc:${e.session.slice(0, 8)}`, note: Number(ins.lastInsertRowid), actor: e.name ?? e.session.slice(0, 8), resolutions });
-        if (sig.final) result.finals.push(sig.final);
-        touch(db, row.issue);
+        if (written.final) {
+          result.finals.push(written.final);
+        }
       }
       setMeta(db, CURSOR_KEY, r.cursor);
     }).immediate();
@@ -121,25 +114,4 @@ async function feedEnd(client: AtcClient): Promise<string> {
     if (!r.more) return cursor;
   }
   return cursor!;
-}
-
-function resolveFinals(db: Database, events: FeedEvent[], resolveFinal: (claims: FinalClaim[]) => Promise<FinalResolutions>): Promise<FinalResolutions> {
-  const claims = events.flatMap((event) => {
-    if (event.kind !== 'note' || !event.detail || hasSameNote(db, event)) {
-      return [];
-    }
-    const row = findOpenSession(db, event.session);
-    return row === null || row.design_pass === 1 ? [] : readFinalClaims(db, row.issue, event.detail);
-  });
-  return resolveFinal(claims);
-}
-
-// A feed reset replays a note under a new cursor, so only its session, time and text find it again.
-function hasSameNote(db: Database, event: FeedEvent): boolean {
-  return db.query(`SELECT 1 FROM run_notes WHERE session_id = ? AND at = ? AND text = ?`).get(event.session, toNoteTime(event), event.detail ?? null) !== null;
-}
-
-// Milliseconds are kept: two notes in one second stay two.
-function toNoteTime(event: FeedEvent): string {
-  return new Date(event.at).toISOString();
 }
