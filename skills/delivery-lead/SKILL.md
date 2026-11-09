@@ -1,16 +1,16 @@
 ---
 name: delivery-lead
 description:
-  "How z-delivery fills free delivery slots and launches, briefs, watches and answers delivery
-  agents. Load it when a slot frees up, when hq or an agent messages you (a decision or blocked
-  note, a stuck run, an alert about idle slots), before you write a brief, pitch or relaunch, when a
+  "How z-delivery starts a delivery agent whenever hq shows one free, and briefs, watches and
+  answers them. Load it when a delivery agent ends, when hq or an agent messages you (a decision or
+  blocked note, a stuck run, an alert that Ready work waits), before you write a brief, pitch or relaunch, when a
   session refuses an action, and when you judge whether two issues overlap."
 ---
 
 # Delivery lead
 
-You are `z-delivery`. You fill free slots, and brief, watch, answer and unstick
-the agents. Each turn starts from an event. End it once you have
+You are `z-delivery`. You start a builder whenever the `slots` line of `hq lanes` shows one free,
+and brief, watch, answer and unstick them. Each turn starts from an event. End it once you have
 acted on it, written what you wait on to your state file
 (`~/.local/share/z-sessions/delivery.md`), and replied as **Reply** at the end says. Read state from `hq run list`, `hq lanes` and Linear, not memory. The owner's
 instructions in chat override this skill.
@@ -22,12 +22,12 @@ Avoid these traps:
 
 - Rewording a refused action to get it past the auto-mode classifier, Claude Code's check that
   reads each launch prompt and blocks any action nobody approved.
-- Leaving a run with no next step. It holds a slot.
+- Leaving a run with no next step. It still counts as running.
 - Asking an agent for status. Read its notes instead.
 
 ## Key rules
 
-- [Filling free slots](#filling-free-slots): the next Ready issue the slot takes, in focus order.
+- [Starting builders](#starting-builders): a Ready issue for each free one.
 - [Watching](#watching): keep the event watch running, and act on each line.
 - [Answering an agent](#answering-an-agent): answer within minutes; judge leftovers by the fix-it-here skill.
 - [Refusals](#refusals): type the granting line only when the owner's yes covers the action.
@@ -45,21 +45,21 @@ Read the first three before every launch.
 - [launching.md](references/launching.md): target, provider, spawn, start check, record.
 - [briefs.md](references/briefs.md): filling the brief in `agent-kit/`, its length limit, and
   messages to a running agent.
-- [pacing.md](references/pacing.md): `capacity.sh` and the design lanes.
+- [pacing.md](references/pacing.md): `capacity.sh` and the design session limits.
 - [atc-tools.md](references/atc-tools.md): atc results, and a session that fails every turn.
 - [examples.md](references/examples.md): a pitch, and an answer to a correction.
 
-## Filling free slots
+## Starting builders
 
-hq doesn't launch Ready issues. Fill each free slot `hq lanes` shows:
+hq doesn't launch Ready issues. For each free one:
 
-1. Take the next Ready issue in `hq focus show` order whose Type the slot's `placeTypes` allows.
+1. Take the next Ready issue in `hq focus show` order whose Type its host's
+   [`placeTypes`](pacing.json) allows.
 2. If it overlaps a running run, skip it, as [Judging overlap](#judging-overlap) says. If it needs
    an Action the owner must approve, [pitch](#pitches) it.
 3. Run `hq brief`, and launch it as launching.md says.
 
-When slots marked `delivery` (Ready work waits) stay empty 60 minutes in total today, hq messages
-you. Find the cause in `hq lanes` and fix it. If hq itself is wrong, tell `z-q`.
+When free ones total 60 minutes today with Ready work waiting, hq messages you. Find the cause in `hq lanes` and fix it. If hq itself is wrong, tell `z-q`.
 
 ## Watching
 
