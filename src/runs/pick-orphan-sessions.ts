@@ -33,6 +33,7 @@ export function pickOrphanSessions(facts: OrphanFacts): OrphanSession[] {
   const byID = new Map(facts.sessions.map((session) => [session.id, session]));
   const recorded = facts.runSessions.map((row) => row.sessionID);
   const openActive = facts.runSessions.filter((row) => row.active && row.open).map((row) => row.sessionID);
+  const sweptOpen = facts.runSessions.filter((row) => !row.active && row.open && row.endedBy === 'sweep').map((row) => row.sessionID);
   const ownerChat = facts.runSessions.filter((row) => row.ownerChats).map((row) => row.sessionID);
   const isFromRuns = (session: FleetSession) => isStoredSession(recorded, session.id);
   const findParent = (session: FleetSession) => (session.parent === null || session.parent === undefined ? undefined : byID.get(session.parent));
@@ -54,7 +55,7 @@ export function pickOrphanSessions(facts: OrphanFacts): OrphanSession[] {
       !isStoredSession(openActive, session.id) &&
       !isOwnerChat(session) &&
       !isRecentlyKept(session) &&
-      ((session.state === 'exited' && (isFromRuns(session) || isChildOfKnownSession(session))) || (isAsleepSession(session) && isFromRuns(session))),
+      ((session.state === 'exited' && (isFromRuns(session) || isChildOfKnownSession(session))) || (isAsleepSession(session) && isStoredSession(sweptOpen, session.id))),
   );
   const candidateIDs = new Set(candidates.map((session) => session.id));
   const blocked = findBlockedAncestors(byID, facts.sessions.filter((session) => !candidateIDs.has(session.id)));

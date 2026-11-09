@@ -2,8 +2,6 @@ import { expect, test } from 'bun:test';
 import { isAsleepOfMergedRun } from './is-asleep-of-merged-run.ts';
 import type { AsleepSessionFacts } from './is-asleep-of-merged-run.ts';
 
-const BASE: AsleepSessionFacts = { asleep: true, runState: 'working', merged: 1, open: 0, ageMs: 6 * 60_000, graceMs: 5 * 60_000 };
-
 test.each<[string, Partial<AsleepSessionFacts>, boolean]>([
   ['an asleep session of a working run with every PR merged', {}, true],
   ['the same on a blocked run', { runState: 'blocked' }, true],
@@ -16,5 +14,5 @@ test.each<[string, Partial<AsleepSessionFacts>, boolean]>([
   ['a live-check run', { runState: 'live-check' }, false],
   ['a done run', { runState: 'done' }, false],
 ])('it ends %s: %p', (_name, overrides, expected) => {
-  expect(isAsleepOfMergedRun({ ...BASE, ...overrides })).toBe(expected);
+  expect(isAsleepOfMergedRun({ asleep: true, runState: 'working', merged: 1, open: 0, ageMs: 6 * 60_000, graceMs: 5 * 60_000, ...overrides })).toBe(expected);
 });

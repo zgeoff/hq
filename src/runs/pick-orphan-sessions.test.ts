@@ -9,7 +9,7 @@ test.each([
   const picked = pickOrphanSessions({
     sessions: [{ id: '0000f001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: false, state: 'exited' }],
     fleetNames: new Set(),
-    runSessions: [{ sessionID: '0000f001', issue: 'GEO-601', active: false, open: false, ownerChats: false }],
+    runSessions: [{ sessionID: '0000f001', issue: 'GEO-601', active: false, endedBy: null, open: false, ownerChats: false }],
     lastKeptMs: new Map([['0000f001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', Date.parse(keptAt)]]),
     nowMs: Date.parse('2026-11-07T03:00:00Z'),
   });
@@ -22,8 +22,8 @@ test('it picks an exited session of a closed run with the newest run that record
     sessions: [{ id: '0000f001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: false, state: 'exited' }],
     fleetNames: new Set(),
     runSessions: [
-      { sessionID: '0000f001', issue: 'GEO-601', active: false, open: false, ownerChats: false },
-      { sessionID: '0000f001', issue: 'GEO-603', active: false, open: false, ownerChats: false },
+      { sessionID: '0000f001', issue: 'GEO-601', active: false, endedBy: null, open: false, ownerChats: false },
+      { sessionID: '0000f001', issue: 'GEO-603', active: false, endedBy: null, open: false, ownerChats: false },
     ],
     lastKeptMs: new Map(),
     nowMs: Date.parse('2026-11-07T03:00:00Z'),
@@ -36,7 +36,7 @@ test('it picks an exited session on an imp with the imp as its place', () => {
   const picked = pickOrphanSessions({
     sessions: [{ id: '0000f001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: false, state: 'exited', locator: { targetID: 'imp-kettle' } }],
     fleetNames: new Set(),
-    runSessions: [{ sessionID: '0000f001', issue: 'GEO-601', active: false, open: false, ownerChats: false }],
+    runSessions: [{ sessionID: '0000f001', issue: 'GEO-601', active: false, endedBy: null, open: false, ownerChats: false }],
     lastKeptMs: new Map(),
     nowMs: Date.parse('2026-11-07T03:00:00Z'),
   });
@@ -51,7 +51,7 @@ test.each([
   const picked = pickOrphanSessions({
     sessions: [parent, { id: '0000f003-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-helper', alive: false, state: 'exited', parent: parent.id }],
     fleetNames: new Set(['z-stu']),
-    runSessions: [{ sessionID: '0000f001', issue: 'GEO-601', active: false, open: false, ownerChats: false }],
+    runSessions: [{ sessionID: '0000f001', issue: 'GEO-601', active: false, endedBy: null, open: false, ownerChats: false }],
     lastKeptMs: new Map(),
     nowMs: Date.parse('2026-11-07T03:00:00Z'),
   });
@@ -66,7 +66,7 @@ test.each([
   const picked = pickOrphanSessions({
     sessions: [{ id: '0000f001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: false, state: 'exited' }, session],
     fleetNames: new Set(),
-    runSessions: [{ sessionID: '0000f001', issue: 'GEO-601', active: false, open: false, ownerChats: true }],
+    runSessions: [{ sessionID: '0000f001', issue: 'GEO-601', active: false, endedBy: null, open: false, ownerChats: true }],
     lastKeptMs: new Map(),
     nowMs: Date.parse('2026-11-07T03:00:00Z'),
   });
@@ -74,7 +74,12 @@ test.each([
   expect(picked).toStrictEqual([]);
 });
 
-test('it picks an asleep session that a run recorded, and no other asleep session', () => {
+test.each<[string, { active: boolean; endedBy: string | null; open: boolean }, string[]]>([
+  ['an asleep session the sweep ended on an open run', { active: false, endedBy: 'sweep', open: true }, ['0000f001-aaaa-4aaa-8aaa-aaaaaaaaaaaa']],
+  ['an asleep session of a closed run', { active: false, endedBy: 'sweep', open: false }, []],
+  ['an asleep session the owner removed', { active: false, endedBy: null, open: true }, []],
+  ['an asleep session still active on an open run', { active: true, endedBy: null, open: true }, []],
+])('it picks %s only when the sweep ended it on an open run', (_name, row, expected) => {
   const picked = pickOrphanSessions({
     sessions: [
       { id: '0000f001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: false, state: 'idle', lifecycle: { vm: 'asleep' } },
@@ -82,10 +87,10 @@ test('it picks an asleep session that a run recorded, and no other asleep sessio
       { id: '0000f002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'z-stu', alive: true, state: 'idle' },
     ],
     fleetNames: new Set(['z-stu']),
-    runSessions: [{ sessionID: '0000f001', issue: 'GEO-601', active: false, open: true, ownerChats: false }],
+    runSessions: [{ sessionID: '0000f001', issue: 'GEO-601', ...row, ownerChats: false }],
     lastKeptMs: new Map(),
     nowMs: Date.parse('2026-11-07T03:00:00Z'),
   });
 
-  expect(picked.map((orphan) => orphan.session.id)).toStrictEqual(['0000f001-aaaa-4aaa-8aaa-aaaaaaaaaaaa']);
+  expect(picked.map((orphan) => orphan.session.id)).toStrictEqual(expected);
 });
