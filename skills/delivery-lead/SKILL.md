@@ -45,7 +45,7 @@ Read the first three before every launch.
 - [launching.md](references/launching.md): target, provider, spawn, start check, record.
 - [briefs.md](references/briefs.md): filling the brief in `agent-kit/`, its length limit, and
   messages to a running agent.
-- [pacing.md](references/pacing.md): `capacity.sh` and the design lanes.
+- [pacing.md](references/pacing.md): `capacity.sh` and the design session limits.
 - [atc-tools.md](references/atc-tools.md): atc results, and a session that fails every turn.
 - [examples.md](references/examples.md): a pitch, and an answer to a correction.
 

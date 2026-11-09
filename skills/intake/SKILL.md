@@ -94,9 +94,9 @@ Put design questions in a Triage issue for a design session, never in chat.
 
 When the owner asks you for a design session, ask `z-delivery` to launch it now. Give it the issue,
 filed in Triage first if there is none, and where the owner asked (`chat:$ATC_SESSION_ID`).
-`z-delivery` launches it even when the owner's design slots, the with-geoff lane in
-[pacing](../delivery-lead/references/pacing.md#design-lanes), are full. The request is the owner's
-yes, so offer no choice of slot or of which session goes first.
+`z-delivery` launches it even at the with-geoff limit in
+[pacing](../delivery-lead/references/pacing.md#design-session-limits). The request is the owner's
+yes, so offer no choice of when it starts or of which session goes first.
 
 ## Bugs and requests
 
