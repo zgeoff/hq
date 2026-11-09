@@ -1,7 +1,8 @@
 # Pacing
 
 A session launches only while the imps have memory free and its provider's quota has room. A design
-session also needs room under the limit for its kind. An imp is a cloud machine that runs one session;
+session also needs its kind, agent or with-geoff, to be under its limit, as
+[Design session limits](#design-session-limits) says. An imp is a cloud machine that runs one session;
 a provider is the agent CLI, such as Claude or Codex. `scripts/capacity.sh` reads memory and quotas
 and picks the provider; hq counts design sessions; [pacing.json](../pacing.json) holds the limits.
 
@@ -10,8 +11,8 @@ session. Take Ready issues in the order `hq focus show` prints.
 
 ## Before a launch
 
-1. **Design session:** read the `design:` line in `hq lanes`. Hold when the design sessions of its kind are at their limit, unless the
-   owner asked for a with-geoff session.
+1. **Design session:** read the `design:` line in `hq lanes`. Hold when its kind is at its limit,
+   unless the owner asked for this with-geoff session.
 2. Count the delivery sessions running on this host, from `hq lanes`.
 3. Run `scripts/capacity.sh --size <S|M|L|XL> --local-open <n>`, with the size from
    `hq run show <issue>` (an investigation, or no size: M). For a design session, pass `--design`
@@ -25,14 +26,14 @@ hold it, with no `hq unblock add`.
 
 ## Design session limits
 
-- An agent design session settles a `needs-design` or Design-type issue without the owner. A
-  with-geoff session works through an issue labelled `with-geoff` with the owner.
+- Launch an agent design session to settle a `needs-design` or Design-type issue without the
+  owner, and a with-geoff session to work through an issue labelled `with-geoff` with the owner.
 - When the owner asks for a with-geoff session, launch it even at the with-geoff limit:
   still run `capacity.sh`, and pass `--asked <link to the owner's message>` to `hq run add`. Agent
   design sessions have no override.
 - Right after the launch, run `hq run add --design agent|with-geoff`. Always pass the flag: without
   it, hq counts a Design-type issue against the with-geoff limit.
-- When it ends, `hq run done`. The next `hq run add` on the issue turns it into the delivery run,
+- When the design session ends, run `hq run done`. The next `hq run add` on the issue turns it into the delivery run,
   and `hq run show` keeps the design notes.
 
 ## Reading the output
