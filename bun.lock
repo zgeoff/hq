@@ -30,7 +30,7 @@
         "@types/bun": "latest",
         "@types/react": "19.3.0",
         "@types/react-dom": "19.3.0",
-        "@zgeoff/agent-hooks": "0.2.10",
+        "@zgeoff/agent-hooks": "0.2.11",
         "@zgeoff/chex": "0.2.5",
         "@zgeoff/diet": "0.2.2",
         "@zgeoff/oxlint-config": "0.10.4",
@@ -480,7 +480,7 @@
 
     "@typescript/typescript-win32-x64": ["@typescript/typescript-win32-x64@7.0.2", "", { "os": "win32", "cpu": "x64" }, "sha512-0BQ3HkAHHlKLSp1qRvf3SUhGpGsDuhB/jgFw75guyqbxJqEaS0Cw/VFO8i2nHglJUzQCRtMMR/IBAKE3ETMC4g=="],
 
-    "@zgeoff/agent-hooks": ["@zgeoff/agent-hooks@0.2.10", "", { "bin": { "agent-hooks": "dist/cli.js" } }, "sha512-Z+PKOqlzS30ISC6cT+iva9StXG1Gob/h9vFgaslTOaTZe3tLOHlIt1Z49RjH1bfU3YM4TCGHMxso+i6J9dC9LQ=="],
+    "@zgeoff/agent-hooks": ["@zgeoff/agent-hooks@0.2.11", "", { "bin": { "agent-hooks": "dist/cli.js" } }, "sha512-tm3pN/VHCL++ryz7l9ICupy1c/LNTUe3OlOTFMwAb52T7Mb+dse9qqNG8Ms0bbHp8Rz5PB6uyV2ALoYE/41aSQ=="],
 
     "@zgeoff/chex": ["@zgeoff/chex@0.2.5", "", { "dependencies": { "@zgeoff/std": "0.4.3", "oxc-parser": "0.156.0", "ts-pattern": "5.9.2" }, "bin": { "chex": "src/cli.ts" } }, "sha512-lHyfG2h2YdFQrEsnpQZkxysqBx7X+QXgLstk3QlB0jRcszuqWRoQxJhVSl51UzHDcSxw1SHHdflD5J4btIPeqw=="],
 
