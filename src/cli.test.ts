@@ -12,7 +12,6 @@ import { server } from '../mocks/node.ts';
 import { createStubOp } from '../test/create-stub-op.ts';
 import { NOON_SYDNEY, at, createPushedClone, fakeAtc, freshDb } from '../test/helpers.ts';
 import { readSlotRows } from './capacity/fleet/read-slot-rows.ts';
-import { writeSlotUsage } from './capacity/fleet/write-slot-usage.ts';
 import { writeCapacitySample } from './capacity/write-capacity-sample.ts';
 import { updateEnv } from '@zgeoff/testing/helpers';
 import { main } from './cli.ts';
@@ -36,6 +35,7 @@ import { buildMockSha } from '../test/build-mock-sha.ts';
 import { buildReadyIssue } from '../test/build-ready-issue.ts';
 import { buildStubFinalGH } from '../test/build-stub-final-gh.ts';
 import { buildStubBriefGH } from '../test/build-stub-brief-gh.ts';
+import { buildSeeder } from './test-utils/build-seeder.ts';
 
 function setupTest() {
   const fresh = freshDb();
@@ -52,7 +52,7 @@ function setupTest() {
   const op = createStubOp({ directory: fresh.dir, answers: {} });
   const opSettings = `${fresh.dir}/settings.local.json`;
   updateEnv('HQ_SLOTS_OP_SETTINGS', opSettings);
-  return { db: fresh.db, directory: fresh.dir, bin, lines, op, opSettings };
+  return { db: fresh.db, seed: buildSeeder(fresh), path: fresh.path, directory: fresh.dir, bin, lines, op, opSettings };
 }
 
 test('it reports the plan for an oversized role file in hq state trim --dry-run', async () => {
@@ -607,23 +607,23 @@ test('hq lanes skip sets, lists and drops a skip through the spawned CLI', async
 });
 
 test('hq lanes shows the cause of the empty slots and the minutes by cause for today in its text and in --json slotCauses', async () => {
-  const fresh = freshDb();
-  onTestFinished(fresh.cleanup);
-  mkdirSync(`${fresh.dir}/bin`);
-  writeFileSync(`${fresh.dir}/bin/systemctl`, '#!/bin/sh\nexit 3\n');
-  chmodSync(`${fresh.dir}/bin/systemctl`, 0o755);
-  mkdirSync(`${fresh.dir}/skill/scripts`, { recursive: true });
-  writeFileSync(`${fresh.dir}/skill/scripts/capacity.sh`, `echo '${JSON.stringify({ imp: { freeMib: 0, room: false } })}'\n`);
-  writeFileSync(`${fresh.dir}/skill/pacing.json`, JSON.stringify({ slots: { imp: 0, local: 2 } }));
-  setMeta(fresh.db, 'lanes_ready_issues', JSON.stringify({ at: '2026-10-14T00:55:00Z', eligible: [], design: [] }));
-  setMeta(fresh.db, 'lanes_promotable_focus', JSON.stringify({ at: '2026-10-14T00:50:00Z', count: 3, focus: '[]' }));
-  setMeta(fresh.db, 'lanes_slot_cause_since', JSON.stringify({ cause: 'triage', since: '2026-10-14T00:40:00Z' }));
-  fresh.db.query("INSERT INTO slot_minutes (day, cause, minutes) VALUES ('2026-10-14', 'delivery', 12.4), ('2026-10-14', 'triage', 40.6), ('2026-10-13', 'supply', 99)").run();
+  const ctx = setupTest();
+  writeFileSync(`${ctx.directory}/bin/systemctl`, '#!/bin/sh\nexit 3\n');
+  chmodSync(`${ctx.directory}/bin/systemctl`, 0o755);
+  mkdirSync(`${ctx.directory}/skill/scripts`, { recursive: true });
+  writeFileSync(`${ctx.directory}/skill/scripts/capacity.sh`, `echo '${JSON.stringify({ imp: { freeMib: 0, room: false } })}'\n`);
+  writeFileSync(`${ctx.directory}/skill/pacing.json`, JSON.stringify({ slots: { imp: 0, local: 2 } }));
+  setMeta(ctx.db, 'lanes_ready_issues', JSON.stringify({ at: '2026-10-14T00:55:00Z', eligible: [], design: [] }));
+  setMeta(ctx.db, 'lanes_promotable_focus', JSON.stringify({ at: '2026-10-14T00:50:00Z', count: 3, focus: '[]' }));
+  setMeta(ctx.db, 'lanes_slot_cause_since', JSON.stringify({ cause: 'triage', since: '2026-10-14T00:40:00Z' }));
+  ctx.seed.slotMinutes({ day: '2026-10-14', cause: 'delivery', minutes: 12.4 });
+  ctx.seed.slotMinutes({ day: '2026-10-14', cause: 'triage', minutes: 40.6 });
+  ctx.seed.slotMinutes({ day: '2026-10-13', cause: 'supply', minutes: 99 });
   const hq = async (...args: string[]): Promise<string> => {
     const child = Bun.spawn(['bun', join(import.meta.dir, 'cli.ts'), 'lanes', ...args], {
       stdout: 'pipe',
       stderr: 'pipe',
-      env: { ...process.env, HOME: fresh.dir, HQ_DB: fresh.path, HQ_PROJECTS: `${fresh.dir}/projects`, HQ_CAPACITY: `${fresh.dir}/skill/scripts/capacity.sh`, HQ_NOTIFY: 'off', HQ_NOW: NOON_SYDNEY, HQ_AS: 'z-delivery', PATH: `${fresh.dir}/bin:${process.env['PATH']}` },
+      env: { ...process.env, HOME: ctx.directory, HQ_DB: ctx.path, HQ_PROJECTS: `${ctx.directory}/projects`, HQ_CAPACITY: `${ctx.directory}/skill/scripts/capacity.sh`, HQ_NOTIFY: 'off', HQ_NOW: NOON_SYDNEY, HQ_AS: 'z-delivery', PATH: `${ctx.directory}/bin:${process.env['PATH']}` },
     });
     const [, stdout] = await Promise.all([child.exited, new Response(child.stdout).text()]);
     return stdout;
@@ -742,12 +742,10 @@ test('hq lanes prints the stored cap under the missing slot plan when pacing has
 });
 
 test('hq capacity --json carries the Claude burn hint from the usage samples', async () => {
-  const fresh = freshDb();
-  onTestFinished(fresh.cleanup);
-  const insert = fresh.db.query('INSERT INTO usage_samples (at, account, five_hour, seven_day) VALUES (?, ?, ?, ?)');
-  insert.run('2026-10-14T00:30:00Z', 'kettle01', 10, 20);
-  insert.run('2026-10-14T01:00:00Z', 'kettle01', 12, 22);
-  const child = Bun.spawn(['bun', join(import.meta.dir, 'cli.ts'), 'capacity', 'show', '--json'], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, HOME: fresh.dir, HQ_DB: fresh.path, HQ_NOTIFY: 'off', HQ_NOW: NOON_SYDNEY } });
+  const ctx = setupTest();
+  ctx.seed.usageSample({ at: '2026-10-14T00:30:00Z', account: 'kettle01', five_hour: 10, seven_day: 20 });
+  ctx.seed.usageSample({ at: '2026-10-14T01:00:00Z', account: 'kettle01', five_hour: 12, seven_day: 22 });
+  const child = Bun.spawn(['bun', join(import.meta.dir, 'cli.ts'), 'capacity', 'show', '--json'], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, HOME: ctx.directory, HQ_DB: ctx.path, HQ_NOTIFY: 'off', HQ_NOW: NOON_SYDNEY } });
 
   const [code, stdout] = await Promise.all([child.exited, new Response(child.stdout).text()]);
 
@@ -849,40 +847,27 @@ test('hq capacity says the slot reads are not set up, in text and in --json', as
 });
 
 test('it reads the four slots through op and prints the fleet block without a token for hq capacity --refresh-slots', async () => {
-  const fresh = freshDb();
-  const log = console.log;
-  const lines: string[] = [];
-  const settings = `${fresh.dir}/settings.local.json`;
-  onTestFinished(fresh.cleanup);
-  onTestFinished(overrideEnv('HQ_NOW', NOON_SYDNEY));
-  onTestFinished(overrideEnv('HQ_SLOTS_OP_SETTINGS', settings));
-  onTestFinished(() => (console.log = log));
-  const op = createStubOp({
-    directory: fresh.dir,
-    answers: {
-      'op://fleet/claude-setup-token-1/credential': 'sk-ant-kettle-cli-1',
-      'op://fleet/claude-setup-token-2/credential': 'sk-ant-kettle-cli-2',
-      'op://fleet/claude-setup-token-3/credential': 'sk-ant-kettle-cli-3',
-      'op://fleet/claude-setup-token-4/credential': 'sk-ant-kettle-cli-4',
-    },
+  const ctx = setupTest();
+  ctx.op.writeAnswers({
+    'op://fleet/claude-setup-token-1/credential': 'sk-ant-kettle-cli-1',
+    'op://fleet/claude-setup-token-2/credential': 'sk-ant-kettle-cli-2',
+    'op://fleet/claude-setup-token-3/credential': 'sk-ant-kettle-cli-3',
+    'op://fleet/claude-setup-token-4/credential': 'sk-ant-kettle-cli-4',
   });
-  onTestFinished(overrideEnv('PATH', `${op.bin}:${process.env['PATH']}`));
-  writeFileSync(settings, JSON.stringify({ env: { OP_SERVICE_ACCOUNT_TOKEN: 'ops_kettle-profile-0001' } }));
-  fresh.db.query('INSERT INTO usage_samples (at, account, five_hour, seven_day, five_hour_resets_at, seven_day_resets_at) VALUES (?, ?, ?, ?, ?, ?)').run('2026-10-14T00:55:00Z', 'abcdef012345', 5, 40, null, '2026-10-19T00:00:00Z');
+  writeFileSync(ctx.opSettings, JSON.stringify({ env: { OP_SERVICE_ACCOUNT_TOKEN: 'ops_kettle-profile-0001' } }));
+  ctx.seed.usageSample({ at: '2026-10-14T00:55:00Z', account: 'abcdef012345', five_hour: 5, seven_day: 40, seven_day_resets_at: '2026-10-19T00:00:00Z' });
   slotUsage.set('Bearer sk-ant-kettle-cli-1', { seven: { utilization: 0.4, reset: 1_792_540_800 } });
   slotUsage.set('Bearer sk-ant-kettle-cli-2', { seven: { utilization: 0.4, reset: 1_792_368_000 } });
   slotUsage.set('Bearer sk-ant-kettle-cli-3', { seven: { utilization: 0.4, reset: 1_792_713_600 } });
   slotUsage.set('Bearer sk-ant-kettle-cli-4', { seven: { utilization: 0.6, reset: 1_792_800_000 } });
-  console.log = (line: string) => lines.push(line);
-
   await main(['capacity', '--refresh-slots']);
 
-  const text = lines.join('\n');
+  const text = ctx.lines.join('\n');
   expect(text).toInclude('  slot 2 (active): 5h ?, 7d 40% (resets 19 Oct 00:00Z), read 0 min ago');
   expect(text).toInclude('  slot 1: 5h ?, 7d 40% (resets 21 Oct 00:00Z), read 0 min ago');
   expect(text).toInclude('  slot 4: 5h ?, 7d 60% (resets 24 Oct 00:00Z), read 0 min ago');
   expect(text).not.toInclude('sk-ant-kettle');
-  expect(fresh.db.query('SELECT COUNT(*) AS total FROM slot_usage').get()).toStrictEqual({ total: 4 });
+  expect(ctx.db.query('SELECT COUNT(*) AS total FROM slot_usage').get()).toStrictEqual({ total: 4 });
 });
 
 test("it reads the broker slot's fleet-vault token in hq capacity broker after a refresh when the proof is more than 24 h old", async () => {
@@ -914,8 +899,8 @@ test("it reads the broker slot's fleet-vault token in hq capacity broker after a
 test("it takes a newer login sample on the broker slot's account over the slot read in hq capacity broker", async () => {
   const ctx = setupTest();
   writeBrokerSlot(ctx.db, { slot: '2', proof: 'req-9b0c', note: undefined, actor: 'z-release', at: new Date('2026-10-13T22:00:00Z') });
-  writeSlotUsage(ctx.db, [{ slot: 2, status: '200', five: 20, fiveResetsAt: '2026-10-14T03:00:00Z', seven: 91, sevenResetsAt: '2026-10-18T00:00:00Z' }], 2, new Date('2026-10-14T00:00:00Z'));
-  ctx.db.query('INSERT INTO usage_samples (at, account, five_hour, seven_day, five_hour_resets_at, seven_day_resets_at) VALUES (?, ?, ?, ?, ?, ?)').run('2026-10-14T00:50:00Z', 'abcdef012345', 30, 98, '2026-10-14T03:00:00Z', '2026-10-18T00:00:00Z');
+  ctx.seed.slotUsage({ at: '2026-10-14T00:00:00Z', slot: 2, five: 20, fiveResetsAt: '2026-10-14T03:00:00Z', seven: 91, sevenResetsAt: '2026-10-18T00:00:00Z', workingLanes: 2 });
+  ctx.seed.usageSample({ at: '2026-10-14T00:50:00Z', account: 'abcdef012345', five_hour: 30, seven_day: 98, five_hour_resets_at: '2026-10-14T03:00:00Z', seven_day_resets_at: '2026-10-18T00:00:00Z' });
 
   await main(['capacity', 'broker', '--json']);
   const printed: unknown = JSON.parse(ctx.lines.at(-1) ?? '{}');
@@ -926,8 +911,8 @@ test("it takes a newer login sample on the broker slot's account over the slot r
 test('it keeps the slot read in hq capacity broker when a later capacity sample carries an older usage reading', async () => {
   const ctx = setupTest();
   writeBrokerSlot(ctx.db, { slot: '2', proof: 'req-9b0c', note: undefined, actor: 'z-release', at: new Date('2026-10-13T22:00:00Z') });
-  ctx.db.query('INSERT INTO usage_samples (at, account, five_hour, seven_day, five_hour_resets_at, seven_day_resets_at) VALUES (?, ?, ?, ?, ?, ?)').run('2026-10-14T00:00:00Z', 'abcdef012345', 30, 98, '2026-10-14T03:00:00Z', '2026-10-18T00:00:00Z');
-  writeSlotUsage(ctx.db, [{ slot: 2, status: '200', five: 20, fiveResetsAt: '2026-10-14T03:00:00Z', seven: 91, sevenResetsAt: '2026-10-18T00:00:00Z' }], 2, new Date('2026-10-14T00:17:00Z'));
+  ctx.seed.usageSample({ at: '2026-10-14T00:00:00Z', account: 'abcdef012345', five_hour: 30, seven_day: 98, five_hour_resets_at: '2026-10-14T03:00:00Z', seven_day_resets_at: '2026-10-18T00:00:00Z' });
+  ctx.seed.slotUsage({ at: '2026-10-14T00:17:00Z', slot: 2, five: 20, fiveResetsAt: '2026-10-14T03:00:00Z', seven: 91, sevenResetsAt: '2026-10-18T00:00:00Z', workingLanes: 2 });
   await writeCapacitySample(ctx.db, { at: '2026-10-14T00:25:00Z', impd_budget_mib: null, impd_used_mib: null, impd_committed_mib: null, nonnix_awake_mib: null, nonnix_awake_vcpus: null, nix_awake_mib: null, impd_priority_kept_mib: null, cloud_avail_bytes: null, cloud_total_bytes: null, claude_account: 'abcdef012345', claude_five_hour: 30, claude_seven_day: 98, claude_five_hour_resets_at: '2026-10-14T03:00:00Z', claude_seven_day_resets_at: '2026-10-18T00:00:00Z', claude_at: '2026-10-14T00:00:00Z', ci_minutes_today: null, pc_disk_free_bytes: null, pc_mem_avail_bytes: null, op_account_used: null, op_account_limit: null, op_refused: null, errors: {} });
 
   await main(['capacity', 'broker', '--json']);
