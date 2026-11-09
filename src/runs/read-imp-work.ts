@@ -24,6 +24,9 @@ export const CHECK_SCRIPT = [
 
 const IMP_CALL_MS = 120_000;
 
+// impd answers with this code when it has no RAM to wake the imp; the check fits a later try.
+const RAM_LIMIT_CODE = 'RAM_BUDGET_EXCEEDED';
+
 // atc names a session's imp with the target's prefix and the first 20 letters and digits of the
 // session id, so the imp is the one whose name ends with them.
 export async function readImpWork(run: Runner, sessionID: string, cwd: string | null | undefined): Promise<ImpWork> {
@@ -45,7 +48,8 @@ export async function readImpWork(run: Runner, sessionID: string, cwd: string | 
   }
   const checked = await run(['imp', 'exec', imp.name, '--', 'sh', '-c', CHECK_SCRIPT, 'sh', cwd], { timeoutMs: IMP_CALL_MS });
   if (checked.code !== 0) {
-    return { state: 'unknown', detail: `the check in ${imp.name} exited ${checked.code}: ${firstLine(checked.stderr)}` };
+    const detail = `the check in ${imp.name} exited ${checked.code}: ${firstLine(checked.stderr)}`;
+    return checked.stderr.includes(RAM_LIMIT_CODE) ? { state: 'unknown', detail, retry: true } : { state: 'unknown', detail };
   }
   return summarizeFindings(checked.stdout, imp.name);
 }

@@ -169,11 +169,13 @@ export type FinalResolutions = ReadonlyMap<string, FinalResolution>;
 export type CommitsRead = { kind: 'listed'; shas: string[] } | { kind: 'fault'; reason: string };
 export type CommitRead = { kind: 'found'; sha: string } | { kind: 'missing' } | { kind: 'fault'; reason: string };
 
-export type ImpWork = { state: 'pushed' } | { state: 'unpushed'; detail: string } | { state: 'unknown'; detail: string };
+// retry marks an unknown that a later check can clear, such as impd having no RAM to wake the imp.
+export type ImpWork = { state: 'pushed' } | { state: 'unpushed'; detail: string } | { state: 'unknown'; detail: string; retry?: true };
 
 export interface KeptSession {
   id: string;
   reason: string;
+  retry?: true;
 }
 
 export interface WrapUp {

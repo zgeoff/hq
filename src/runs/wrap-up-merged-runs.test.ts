@@ -1,7 +1,11 @@
 import { expect, mock, onTestFinished, test } from 'bun:test';
+import type { Database } from 'bun:sqlite';
 import { buildStubFleetClient } from '../../test/build-stub-fleet-client.ts';
 import { freshDb } from '../../test/helpers.ts';
 import type { FleetClient, StaleOps } from '../fleet/types.ts';
+import { iso } from '../clock/iso.ts';
+import { now } from '../clock/now.ts';
+import type { ImpWork } from './types.ts';
 import { addPr } from './add-pr.ts';
 import { addRun } from './add-run.ts';
 import { closePr } from './close-pr.ts';
@@ -366,4 +370,112 @@ test('it skips a merged build run whose only merged PR is its design pass PR', a
   const wrapped = await wrapUpMergedRuns(ctx.db, { openClient, readImpWork: () => Promise.reject(new Error('no check expected')), readLocalWork: () => Promise.resolve({ state: 'pushed' as const }) }, { actor: 'sweep' });
 
   expect(wrapped).toStrictEqual([]);
+});
+
+const RAM_SESSION = '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const RAM_UNKNOWN = { state: 'unknown' as const, detail: 'the check in home-0000a001aaaa4aaa8aaa exited 1: imp: RAM_BUDGET_EXCEEDED: not enough 2 MiB pages', retry: true as const };
+
+// A merged imp run whose first wrap-up kept its session because the check hit the RAM limit.
+async function setupRamKeptRun(issue: string) {
+  const ctx = setupTest();
+  addRun(ctx.db, { issue, title: 'Invented kettle descaler', place: 'imp', session: RAM_SESSION, next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
+  addPr(ctx.db, issue, 'kettle#1', 'z-delivery');
+  closePr(ctx.db, 'kettle#1', { to: 'merged', actor: 'z-delivery' });
+  setState(ctx.db, issue, 'merged', {}, 'z-delivery');
+  const fleet = buildStubFleetClient({ sessions: [{ id: RAM_SESSION, name: 'kettle-agent', alive: true, cwd: '/workspace/kettle' }], forgets: { [RAM_SESSION]: [{ forgotten: false, confirmToken: 'token-kettle' }] } });
+  const answers: ImpWork[] = [RAM_UNKNOWN];
+  const deps = {
+    openClient: () => Promise.resolve(fleet.client),
+    readImpWork: () => Promise.resolve(answers.shift() ?? { state: 'unknown' as const, detail: 'no answer scripted' }),
+    readLocalWork: () => Promise.reject(new Error('an imp run checks no local work')),
+  };
+  const first = await wrapUpMergedRuns(ctx.db, deps, { actor: 'sweep' });
+  return { ...ctx, fleet, answers, deps, first };
+}
+
+function ageMerge(db: Database, issue: string, minutes: number): void {
+  db.query("UPDATE events SET at = ? WHERE subject = 'run' AND subject_id = ? AND action = 'state' AND to_state = 'merged'").run(iso(new Date(now().getTime() - minutes * 60_000)), issue);
+}
+
+test('a session whose check hit the RAM limit is forgotten and its imp destroyed once a retry shows all work pushed', async () => {
+  const ctx = await setupRamKeptRun('GEO-9911');
+  ctx.answers.push({ state: 'pushed' });
+
+  const retried = await wrapUpMergedRuns(ctx.db, ctx.deps, { actor: 'sweep' });
+
+  expect(ctx.first[0]?.wrapUp.kept).toStrictEqual([{ id: RAM_SESSION, reason: `the unpushed-work check could not run (${RAM_UNKNOWN.detail}), so the imp stays`, retry: true }]);
+  expect(retried).toStrictEqual([{ issue: 'GEO-9911', wrapUp: { forgotten: [RAM_SESSION], destroyed: [RAM_SESSION], kept: [], failed: [] } }]);
+  expect(ctx.db.query("SELECT action FROM events WHERE subject = 'run' AND subject_id = 'GEO-9911' AND action LIKE 'merged-wrap-up%' ORDER BY seq").all()).toStrictEqual([
+    { action: 'merged-wrap-up' },
+    { action: 'merged-wrap-up-result' },
+    { action: 'merged-wrap-up-retry' },
+    { action: 'merged-wrap-up-result' },
+  ]);
+});
+
+test.each([
+  ['unpushed work', { state: 'unpushed' as const, detail: 'home-0000a001aaaa4aaa8aaa: 3f2a1bc add kettle lid' }],
+  ['a missing working directory', { state: 'unknown' as const, detail: 'the check in home-0000a001aaaa4aaa8aaa exited 1: cd: /workspace/kettle: No such file' }],
+])('a retry that shows %s keeps the session and gets no further retry', async (_name, answer) => {
+  const ctx = await setupRamKeptRun('GEO-9912');
+  ctx.answers.push(answer);
+
+  const retried = await wrapUpMergedRuns(ctx.db, ctx.deps, { actor: 'sweep' });
+  const again = await wrapUpMergedRuns(ctx.db, ctx.deps, { actor: 'sweep' });
+
+  expect(retried[0]?.wrapUp.kept.map((kept) => kept.id)).toStrictEqual([RAM_SESSION]);
+  expect(retried[0]?.wrapUp.forgotten).toStrictEqual([]);
+  expect(again).toStrictEqual([]);
+  expect(ctx.fleet.calls).toStrictEqual([]);
+});
+
+test('a first check that failed for another reason gets no retry', async () => {
+  const ctx = setupTest();
+  addRun(ctx.db, { issue: 'GEO-9913', title: 'Invented kettle descaler', place: 'imp', session: RAM_SESSION, next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
+  addPr(ctx.db, 'GEO-9913', 'kettle#1', 'z-delivery');
+  closePr(ctx.db, 'kettle#1', { to: 'merged', actor: 'z-delivery' });
+  setState(ctx.db, 'GEO-9913', 'merged', {}, 'z-delivery');
+  const fleet = buildStubFleetClient({ sessions: [{ id: RAM_SESSION, name: 'kettle-agent', alive: true, cwd: '/workspace/kettle' }] });
+  const readImpWork = mock(() => Promise.resolve({ state: 'unknown' as const, detail: 'atc gave no working directory for the session' }));
+  const deps = { openClient: () => Promise.resolve(fleet.client), readImpWork, readLocalWork: () => Promise.reject(new Error('no local check')) };
+  await wrapUpMergedRuns(ctx.db, deps, { actor: 'sweep' });
+
+  const again = await wrapUpMergedRuns(ctx.db, deps, { actor: 'sweep' });
+
+  expect(again).toStrictEqual([]);
+  expect(readImpWork).toHaveBeenCalledTimes(1);
+});
+
+test('a retry waits no longer than 10 minutes after the merge', async () => {
+  const ctx = await setupRamKeptRun('GEO-9914');
+  ctx.answers.push({ state: 'pushed' });
+  ageMerge(ctx.db, 'GEO-9914', 11);
+
+  const retried = await wrapUpMergedRuns(ctx.db, ctx.deps, { actor: 'sweep' });
+
+  expect(retried).toStrictEqual([]);
+});
+
+test('a run gets at most 2 retries', async () => {
+  const ctx = await setupRamKeptRun('GEO-9915');
+  ctx.answers.push(RAM_UNKNOWN, RAM_UNKNOWN, { state: 'pushed' });
+
+  const second = await wrapUpMergedRuns(ctx.db, ctx.deps, { actor: 'sweep' });
+  const third = await wrapUpMergedRuns(ctx.db, ctx.deps, { actor: 'sweep' });
+  const fourth = await wrapUpMergedRuns(ctx.db, ctx.deps, { actor: 'sweep' });
+
+  expect(second.map((entry) => entry.issue)).toStrictEqual(['GEO-9915']);
+  expect(third.map((entry) => entry.issue)).toStrictEqual(['GEO-9915']);
+  expect(fourth).toStrictEqual([]);
+  expect(ctx.answers).toStrictEqual([{ state: 'pushed' }]);
+});
+
+test('two sweeps racing for the same retry run it once', async () => {
+  const ctx = await setupRamKeptRun('GEO-9916');
+  ctx.answers.push({ state: 'pushed' });
+
+  const [left, right] = await Promise.all([wrapUpMergedRuns(ctx.db, ctx.deps, { actor: 'sweep-a' }), wrapUpMergedRuns(ctx.db, ctx.deps, { actor: 'sweep-b' })]);
+
+  expect(left.length + right.length).toBe(1);
+  expect(ctx.db.query("SELECT COUNT(*) AS count FROM events WHERE subject_id = 'GEO-9916' AND action = 'merged-wrap-up-retry'").get()).toStrictEqual({ count: 1 });
 });
