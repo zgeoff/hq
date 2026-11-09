@@ -10,10 +10,12 @@ export function buildWrapUpPlan(rootID: string, childIDs: string[], work: ImpWor
   return match(work)
     .with({ state: 'pushed' }, (): WrapUpPlan => ({ kind: 'forget', destroyImp: place === 'imp' }))
     .with({ state: 'unpushed' }, (found) => buildKeepPlan(rootID, childIDs, `${home} holds unpushed work (${found.detail}), so ${stays}`))
-    .with({ state: 'unknown' }, (found) => buildKeepPlan(rootID, childIDs, `the unpushed-work check could not run (${found.detail}), so ${stays}`))
+    .with({ state: 'unknown' }, (found) => buildKeepPlan(rootID, childIDs, `the unpushed-work check could not run (${found.detail}), so ${stays}`, found.retry === true))
     .exhaustive();
 }
 
-function buildKeepPlan(rootID: string, childIDs: string[], reason: string): WrapUpPlan {
-  return { kind: 'keep', kept: [{ id: rootID, reason }, ...childIDs.map((id) => ({ id, reason: 'its parent session stays' }))] };
+// A retry takes the whole tree, since the sub-sessions live in the same imp.
+function buildKeepPlan(rootID: string, childIDs: string[], reason: string, retry = false): WrapUpPlan {
+  const mark = retry ? ({ retry: true } as const) : {};
+  return { kind: 'keep', kept: [{ id: rootID, reason, ...mark }, ...childIDs.map((id) => ({ id, reason: 'its parent session stays', ...mark }))] };
 }

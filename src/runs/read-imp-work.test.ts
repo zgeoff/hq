@@ -180,3 +180,11 @@ test('a stash entry is unpushed work, and the detail gives the count', async () 
 
   expect(work).toStrictEqual({ state: 'unpushed', detail: `home-0000b001aaaa4aaa8aaa: ${clone}: 2 stash entries` });
 });
+
+test('it marks a check that hit the imp RAM limit for a retry', async () => {
+  const imps = buildStubImpRunner({ imps: ['home-0000b001aaaa4aaa8aaa'], exec: { code: 1, stdout: '', stderr: 'imp: RAM_BUDGET_EXCEEDED: not enough 2 MiB pages\n' } });
+
+  const work = await readImpWork(imps.run, '0000b001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', '/workspace/kettle');
+
+  expect(work).toStrictEqual({ state: 'unknown', detail: 'the check in home-0000b001aaaa4aaa8aaa exited 1: imp: RAM_BUDGET_EXCEEDED: not enough 2 MiB pages', retry: true });
+});

@@ -24,14 +24,14 @@ export interface WrapUpDeps {
 // A pass that retries every sweep sets onlyNoteAction, so a retry that changes nothing leaves no
 // note. A pass that checked sessions before the wrap-up sets onlySessions to their full ids, so a
 // session attached since its check stays.
-export type WrapUpOptions = { dryRun: true } | { dryRun?: false; actor: string; onlyNoteAction?: boolean; onlySessions?: readonly string[] };
+export type WrapUpOptions = { dryRun: true; onlySessions?: readonly string[] } | { dryRun?: false; actor: string; onlyNoteAction?: boolean; onlySessions?: readonly string[] };
 
 export async function runWrapUp(db: Database, deps: WrapUpDeps, issue: string, options: WrapUpOptions): Promise<WrapUp> {
   const run = requireRun(db, issue);
 
   // A session id is on one run only, so a session removed by hand is still this run's to forget.
   const rows = db.query('SELECT session_id FROM run_sessions WHERE issue = ? ORDER BY added_at, session_id').all(issue);
-  const only = options.dryRun === true ? null : (options.onlySessions ?? null);
+  const only = options.onlySessions ?? null;
   const ids = rows.map((row) => sessionRowSchema.parse(row).session_id).filter((id) => isAllowed(only, id));
   const wrapUp: WrapUp = { forgotten: [], destroyed: [], kept: [], failed: [] };
   if (run.geoff_chat === 1) {
