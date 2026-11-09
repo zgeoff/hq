@@ -16,12 +16,14 @@ function setupTest() {
 
   return {
     db: fresh.db,
+    pinned: '0000b001-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
     seed,
-    seedKettleIssue: (issue: string, state: 'open' | 'completed') => {
+    addKettleIssue: (issue: string, state: 'open' | 'completed') => {
       writeIssues(fresh.db, [{ issue, type: 'Design', title: 'Invented kettle design', state, closed_at: state === 'open' ? null : '2026-10-21T01:02:03Z' }]);
     },
-    seedDesignRun: (issue: string) => seed.run({ issue, title: 'Invented kettle design', place: 'local', design: 'with-geoff', designSlots: { agent: 2, withGeoff: 1 } }),
-    closeDesignRuns: (answers: StubFleetAnswers, work: ImpWork = { state: 'pushed' }) => {
+    addDesignRun: (issue: string) => seed.run({ issue, title: 'Invented kettle design', place: 'local', design: 'with-geoff', designSlots: { agent: 2, withGeoff: 1 } }),
+    closeDesignRuns: (answers: StubFleetAnswers) => {
+      const work: ImpWork = { state: 'pushed' };
       const fleet = buildStubFleetClient(answers);
       const closed = closeDoneDesignRuns(fresh.db, { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.resolve(work), readLocalWork: () => Promise.resolve(work) }, 'hq-lanes');
       return closed.then((issues) => ({ issues, calls: fleet.calls }));
@@ -31,14 +33,12 @@ function setupTest() {
   };
 }
 
-const PINNED = '0000b001-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
-
 test('it moves a design run whose issue is Done to done, and asks z-delivery once to close its pinned session', async () => {
   const ctx = setupTest();
-  ctx.seedDesignRun('GEO-9701');
-  ctx.seed.runSession({ issue: 'GEO-9701', session: PINNED });
-  ctx.seedKettleIssue('GEO-9701', 'completed');
-  const answers = { sessions: [{ id: PINNED, name: 'kettle-design', alive: true, pinned: true, cwd: '/workspace/kettle' }] };
+  ctx.addDesignRun('GEO-9701');
+  ctx.seed.runSession({ issue: 'GEO-9701', session: ctx.pinned });
+  ctx.addKettleIssue('GEO-9701', 'completed');
+  const answers = { sessions: [{ id: ctx.pinned, name: 'kettle-design', alive: true, pinned: true, cwd: '/workspace/kettle' }] };
 
   const first = await ctx.closeDesignRuns(answers);
   const second = await ctx.closeDesignRuns(answers);
@@ -47,17 +47,17 @@ test('it moves a design run whose issue is Done to done, and asks z-delivery onc
   expect(second).toStrictEqual({ issues: [], calls: [] });
   expect(ctx.readRuns()).toStrictEqual([{ issue: 'GEO-9701', state: 'done', close_note: 'The Design issue is Done in Linear' }]);
   expect(ctx.readOutbox()).toStrictEqual([
-    { target: 'z-delivery', text: `GEO-9701: its Design issue is Done in Linear, and the run is done. Unpin and stop session ${PINNED}; hq does not stop a pinned session itself.` },
+    { target: 'z-delivery', text: `GEO-9701: its Design issue is Done in Linear, and the run is done. Unpin and stop session ${ctx.pinned}; hq does not stop a pinned session itself.` },
   ]);
 });
 
 test('it forgets an unpinned, fully pushed session of a closed design run and asks nobody', async () => {
   const ctx = setupTest();
-  ctx.seedDesignRun('GEO-9702');
-  ctx.seed.runSession({ issue: 'GEO-9702', session: PINNED });
-  ctx.seedKettleIssue('GEO-9702', 'completed');
+  ctx.addDesignRun('GEO-9702');
+  ctx.seed.runSession({ issue: 'GEO-9702', session: ctx.pinned });
+  ctx.addKettleIssue('GEO-9702', 'completed');
 
-  const closed = await ctx.closeDesignRuns({ sessions: [{ id: PINNED, name: 'kettle-design', alive: true, cwd: '/workspace/kettle' }] });
+  const closed = await ctx.closeDesignRuns({ sessions: [{ id: ctx.pinned, name: 'kettle-design', alive: true, cwd: '/workspace/kettle' }] });
 
   expect(closed).toStrictEqual({ issues: ['GEO-9702'], calls: ['unpin 0000b001', 'kill 0000b001', 'unpin 0000b001', 'forget 0000b001'] });
   expect(ctx.readOutbox()).toStrictEqual([]);
@@ -65,11 +65,11 @@ test('it forgets an unpinned, fully pushed session of a closed design run and as
 
 test('it leaves a design run whose issue is open, and its pinned session, alone', async () => {
   const ctx = setupTest();
-  ctx.seedDesignRun('GEO-9703');
-  ctx.seed.runSession({ issue: 'GEO-9703', session: PINNED });
-  ctx.seedKettleIssue('GEO-9703', 'open');
+  ctx.addDesignRun('GEO-9703');
+  ctx.seed.runSession({ issue: 'GEO-9703', session: ctx.pinned });
+  ctx.addKettleIssue('GEO-9703', 'open');
 
-  const closed = await ctx.closeDesignRuns({ sessions: [{ id: PINNED, name: 'kettle-design', alive: true, pinned: true, cwd: '/workspace/kettle' }] });
+  const closed = await ctx.closeDesignRuns({ sessions: [{ id: ctx.pinned, name: 'kettle-design', alive: true, pinned: true, cwd: '/workspace/kettle' }] });
 
   expect(closed).toStrictEqual({ issues: [], calls: [] });
   expect(ctx.readRuns()).toStrictEqual([{ issue: 'GEO-9703', state: 'working', close_note: null }]);
@@ -90,8 +90,8 @@ test('it leaves a build run whose issue is Done to its alert', async () => {
 
 test('it raises no closed-issue alert for a design run it closed', async () => {
   const ctx = setupTest();
-  ctx.seedDesignRun('GEO-9705');
-  ctx.seedKettleIssue('GEO-9705', 'completed');
+  ctx.addDesignRun('GEO-9705');
+  ctx.addKettleIssue('GEO-9705', 'completed');
 
   await ctx.closeDesignRuns({ sessions: [] });
 
@@ -100,24 +100,24 @@ test('it raises no closed-issue alert for a design run it closed', async () => {
 
 test('it still closes the run and asks z-delivery about its sessions when atc fails', async () => {
   const ctx = setupTest();
-  ctx.seedDesignRun('GEO-9706');
-  ctx.seed.runSession({ issue: 'GEO-9706', session: PINNED });
-  ctx.seedKettleIssue('GEO-9706', 'completed');
+  ctx.addDesignRun('GEO-9706');
+  ctx.seed.runSession({ issue: 'GEO-9706', session: ctx.pinned });
+  ctx.addKettleIssue('GEO-9706', 'completed');
   const closed = closeDoneDesignRuns(ctx.db, { openClient: () => Promise.reject(new Error('invented: atc is down')), readImpWork: () => Promise.resolve({ state: 'pushed' }), readLocalWork: () => Promise.resolve({ state: 'pushed' }) }, 'hq-lanes');
 
   await expect(closed).resolves.toStrictEqual(['GEO-9706']);
   expect(ctx.readRuns()).toStrictEqual([{ issue: 'GEO-9706', state: 'done', close_note: 'The Design issue is Done in Linear' }]);
   expect(ctx.readOutbox()).toStrictEqual([
-    { target: 'z-delivery', text: `GEO-9706: its Design issue is Done in Linear, and the run is done. Unpin and stop session ${PINNED}; hq does not stop a pinned session itself.` },
+    { target: 'z-delivery', text: `GEO-9706: its Design issue is Done in Linear, and the run is done. Unpin and stop session ${ctx.pinned}; hq does not stop a pinned session itself.` },
   ]);
 });
 
 test('it asks z-delivery only once about a session when its run is reopened and closed again', async () => {
   const ctx = setupTest();
-  ctx.seedDesignRun('GEO-9707');
-  ctx.seed.runSession({ issue: 'GEO-9707', session: PINNED });
-  ctx.seedKettleIssue('GEO-9707', 'completed');
-  const answers = { sessions: [{ id: PINNED, name: 'kettle-design', alive: true, pinned: true, cwd: '/workspace/kettle' }] };
+  ctx.addDesignRun('GEO-9707');
+  ctx.seed.runSession({ issue: 'GEO-9707', session: ctx.pinned });
+  ctx.addKettleIssue('GEO-9707', 'completed');
+  const answers = { sessions: [{ id: ctx.pinned, name: 'kettle-design', alive: true, pinned: true, cwd: '/workspace/kettle' }] };
 
   await ctx.closeDesignRuns(answers);
   reopenRun(ctx.db, { issue: 'GEO-9707', next: 'Reopened: agent working.', design: { slots: { agent: 2, withGeoff: 1 }, error: null, asked: null }, actor: 'hq-lanes' });

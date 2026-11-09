@@ -2,7 +2,7 @@ import type { Database } from 'bun:sqlite';
 import { z } from 'zod';
 import { readDesignRuns } from '../lanes/read-design-runs.ts';
 import { logEvent } from '../log-event.ts';
-import { enqueue } from '../outbox/enqueue.ts';
+import { enqueueOnce } from '../outbox/enqueue-once.ts';
 import { orchestratorName } from '../wake/orchestrator-name.ts';
 import { pickDoneDesignRuns } from './pick-done-design-runs.ts';
 import { pickSessionsToClose } from './pick-sessions-to-close.ts';
@@ -23,7 +23,7 @@ export async function closeDoneDesignRuns(db: Database, deps: WrapUpDeps, actor:
     const runSessions = SESSIONS.parse(db.query('SELECT session_id FROM run_sessions WHERE issue = ? ORDER BY added_at, session_id').all(issue)).map((row) => row.session_id);
     for (const session of pickSessionsToClose(wrapUp, issue, runSessions)) {
       const seq = logEvent(db, 'run', issue, 'design-done-close-session', actor, null, null, { session });
-      enqueue(db, seq, orchestratorName(), `${issue}: its Design issue is Done in Linear, and the run is done. Unpin and stop session ${session}; hq does not stop a pinned session itself.`, null, `hq-design-done-${issue}-${session}`);
+      enqueueOnce(db, seq, orchestratorName(), `${issue}: its Design issue is Done in Linear, and the run is done. Unpin and stop session ${session}; hq does not stop a pinned session itself.`, `hq-design-done-${issue}-${session}`);
     }
   }
   return closed;

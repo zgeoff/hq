@@ -224,15 +224,13 @@ export async function watchTick(db: Database, d: WatchDeps): Promise<boolean> {
     }
     try {
       const wrapUp = d.steps.wrapUpDeps?.();
-      if (wrapUp) {
-        try {
-          const closed = await step('done design runs', () => closeDoneDesignRuns(db, wrapUp.deps, d.me));
-          if (closed.length > 0) {
-            d.log(`${at()} design runs: closed ${closed.join(', ')}, Done in Linear`);
-          }
-        } finally {
-          wrapUp.close();
+      try {
+        const closed = wrapUp ? await step('done design runs', () => closeDoneDesignRuns(db, wrapUp.deps, d.me)) : [];
+        if (closed.length > 0) {
+          d.log(`${at()} design runs: closed ${closed.join(', ')}, Done in Linear`);
         }
+      } finally {
+        wrapUp?.close();
       }
     } catch (error) {
       d.log(`${at()} design runs failed: ${toErrorMessage(error)}`);
