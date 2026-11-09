@@ -1,6 +1,7 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { at, fetchedDays, freshDb } from '../../test/helpers.ts';
-import { overrideEnv } from '../config/override-env.ts';
+import { updateEnv } from '@zgeoff/testing/helpers';
+import { iso } from '../clock/iso.ts';
 import { addPr } from '../runs/add-pr.ts';
 import { addRun } from '../runs/add-run.ts';
 import { reviewedPr } from '../runs/reviewed-pr.ts';
@@ -12,17 +13,9 @@ import { buildSeeder } from '../test-utils/build-seeder.ts';
 function setupTest() {
   const base = freshDb();
   const db = base.db;
-  const savedCacheHome = process.env['XDG_CACHE_HOME'];
   onTestFinished(base.cleanup);
-  onTestFinished(overrideEnv('HOME', base.dir));
-  delete process.env['XDG_CACHE_HOME'];
-  onTestFinished(() => {
-    if (savedCacheHome === undefined) {
-      delete process.env['XDG_CACHE_HOME'];
-    } else {
-      process.env['XDG_CACHE_HOME'] = savedCacheHome;
-    }
-  });
+  updateEnv('HOME', base.dir);
+  updateEnv('XDG_CACHE_HOME', undefined);
   at('2026-10-16T07:00:00.000Z');
   fetchedDays(db);
   const seedCIRun = (id: number, over: Partial<{ repo: string; path: string; status: string; conclusion: string | null; minutes: number }> = {}) => {
@@ -45,32 +38,6 @@ function setupTest() {
       if (outcome) {
         db.query(`INSERT INTO deploy_runs (run_id, outcome, attempt, fetched_at) VALUES (?, ?, 1, '2026-10-16T05:00:00Z')`).run(id, outcome);
       }
-    },
-    seedOutage: (down: number, detectAfter = 1) => {
-      const startMs = Date.parse('2026-10-16T01:00:00Z');
-      const formatMinute = (min: number) => new Date(startMs + min * 60_000).toISOString().replace('.000', '');
-      for (let minute = -10; minute < down + 10; minute++) {
-        const isDown = minute >= 0 && minute < down;
-        if (isDown) {
-          seed.downProbeSample({ at: formatMinute(minute) });
-        } else {
-          seed.probeSample({ at: formatMinute(minute) });
-        }
-      }
-      seed.closedOutage({ startedAt: formatMinute(0), detectedAt: formatMinute(detectAfter), endedAt: formatMinute(down) });
-    },
-    seedExactOutage: (downSec: number, detectSec: number) => {
-      const startMs = Date.parse('2026-10-16T01:00:00Z');
-      const formatSecond = (sec: number) => new Date(startMs + sec * 1000).toISOString().replace('.000', '');
-      for (let second = -300; second <= downSec + 300; second += 30) {
-        const isDown = second >= 0 && second < downSec;
-        if (isDown) {
-          seed.downProbeSample({ at: formatSecond(second) });
-        } else {
-          seed.probeSample({ at: formatSecond(second) });
-        }
-      }
-      seed.closedOutage({ startedAt: formatSecond(0), detectedAt: formatSecond(detectSec), endedAt: formatSecond(downSec) });
     },
   };
 }
@@ -254,21 +221,51 @@ test('must-fix is first reviews that needed a recheck, of the reviewed runs', ()
 
 test('downtime is green under 15 min and red at 15', () => {
   const ctx = setupTest();
-  ctx.seedOutage(14);
+  const startMs = Date.parse('2026-10-16T01:00:00Z');
+  for (const minute of Array.from({ length: 10 }, (_, offset) => offset - 10)) {
+    ctx.seed.probeSample({ at: iso(new Date(startMs + minute * 60_000)) });
+  }
+  for (const minute of Array.from({ length: 14 }, (_, offset) => offset)) {
+    ctx.seed.downProbeSample({ at: iso(new Date(startMs + minute * 60_000)) });
+  }
+  for (const minute of Array.from({ length: 10 }, (_, offset) => offset + 14)) {
+    ctx.seed.probeSample({ at: iso(new Date(startMs + minute * 60_000)) });
+  }
+  ctx.seed.closedOutage({ startedAt: '2026-10-16T01:00:00Z', detectedAt: '2026-10-16T01:01:00Z', endedAt: '2026-10-16T01:14:00Z' });
   expect(verdict(DEFAULT_TARGETS.downtime, ctx.readMeasures().downtime)).toBe('green');
   expect(ctx.readMeasures().downtime).toMatchObject({ value: 14, shown: '14 min' });
 });
 
 test('downtime is red at 15 minutes', () => {
   const ctx = setupTest();
-  ctx.seedOutage(15);
+  const startMs = Date.parse('2026-10-16T01:00:00Z');
+  for (const minute of Array.from({ length: 10 }, (_, offset) => offset - 10)) {
+    ctx.seed.probeSample({ at: iso(new Date(startMs + minute * 60_000)) });
+  }
+  for (const minute of Array.from({ length: 15 }, (_, offset) => offset)) {
+    ctx.seed.downProbeSample({ at: iso(new Date(startMs + minute * 60_000)) });
+  }
+  for (const minute of Array.from({ length: 10 }, (_, offset) => offset + 15)) {
+    ctx.seed.probeSample({ at: iso(new Date(startMs + minute * 60_000)) });
+  }
+  ctx.seed.closedOutage({ startedAt: '2026-10-16T01:00:00Z', detectedAt: '2026-10-16T01:01:00Z', endedAt: '2026-10-16T01:15:00Z' });
   expect(ctx.readMeasures().downtime.value).toBe(15);
   expect(verdict(DEFAULT_TARGETS.downtime, ctx.readMeasures().downtime)).toBe('red');
 });
 
 test('an outage caught after 6 minutes is red even when it was short', () => {
   const ctx = setupTest();
-  ctx.seedOutage(8, 6);
+  const startMs = Date.parse('2026-10-16T01:00:00Z');
+  for (const minute of Array.from({ length: 10 }, (_, offset) => offset - 10)) {
+    ctx.seed.probeSample({ at: iso(new Date(startMs + minute * 60_000)) });
+  }
+  for (const minute of Array.from({ length: 8 }, (_, offset) => offset)) {
+    ctx.seed.downProbeSample({ at: iso(new Date(startMs + minute * 60_000)) });
+  }
+  for (const minute of Array.from({ length: 10 }, (_, offset) => offset + 8)) {
+    ctx.seed.probeSample({ at: iso(new Date(startMs + minute * 60_000)) });
+  }
+  ctx.seed.closedOutage({ startedAt: '2026-10-16T01:00:00Z', detectedAt: '2026-10-16T01:06:00Z', endedAt: '2026-10-16T01:08:00Z' });
   const result = ctx.readMeasures().downtime;
   expect(result.value).toBe(8);
   expect(result.longest).toBe(6);
@@ -374,7 +371,17 @@ test('cost targets compare the unrounded peak: 79.9 passes under 80', () => {
 
 test('a detection of 5 min 1 s is red, though it shows as 5 min', () => {
   const ctx = setupTest();
-  ctx.seedExactOutage(120, 301);
+  const startMs = Date.parse('2026-10-16T01:00:00Z');
+  for (const second of Array.from({ length: 10 }, (_, offset) => (offset - 10) * 30)) {
+    ctx.seed.probeSample({ at: iso(new Date(startMs + second * 1000)) });
+  }
+  for (const second of [0, 30, 60, 90]) {
+    ctx.seed.downProbeSample({ at: iso(new Date(startMs + second * 1000)) });
+  }
+  for (const second of Array.from({ length: 11 }, (_, offset) => offset * 30 + 120)) {
+    ctx.seed.probeSample({ at: iso(new Date(startMs + second * 1000)) });
+  }
+  ctx.seed.closedOutage({ startedAt: '2026-10-16T01:00:00Z', detectedAt: '2026-10-16T01:05:01Z', endedAt: '2026-10-16T01:02:00Z' });
   const result = ctx.readMeasures().downtime;
   expect(result.longest).toBe(5);
   expect(result.longestExact).toBeCloseTo(301 / 60, 5);
@@ -383,13 +390,33 @@ test('a detection of 5 min 1 s is red, though it shows as 5 min', () => {
 
 test('a detection of exactly 5 min is green', () => {
   const ctx = setupTest();
-  ctx.seedExactOutage(120, 300);
+  const startMs = Date.parse('2026-10-16T01:00:00Z');
+  for (const second of Array.from({ length: 10 }, (_, offset) => (offset - 10) * 30)) {
+    ctx.seed.probeSample({ at: iso(new Date(startMs + second * 1000)) });
+  }
+  for (const second of [0, 30, 60, 90]) {
+    ctx.seed.downProbeSample({ at: iso(new Date(startMs + second * 1000)) });
+  }
+  for (const second of Array.from({ length: 11 }, (_, offset) => offset * 30 + 120)) {
+    ctx.seed.probeSample({ at: iso(new Date(startMs + second * 1000)) });
+  }
+  ctx.seed.closedOutage({ startedAt: '2026-10-16T01:00:00Z', detectedAt: '2026-10-16T01:05:00Z', endedAt: '2026-10-16T01:02:00Z' });
   expect(verdict(DEFAULT_TARGETS.downtime, ctx.readMeasures().downtime)).toBe('green');
 });
 
 test('it counts 14 min 59 s down as green, though it shows as 15 min', () => {
   const ctx = setupTest();
-  ctx.seedExactOutage(14 * 60 + 59, 60);
+  const startMs = Date.parse('2026-10-16T01:00:00Z');
+  for (const second of Array.from({ length: 10 }, (_, offset) => (offset - 10) * 30)) {
+    ctx.seed.probeSample({ at: iso(new Date(startMs + second * 1000)) });
+  }
+  for (const second of Array.from({ length: 30 }, (_, offset) => offset * 30)) {
+    ctx.seed.downProbeSample({ at: iso(new Date(startMs + second * 1000)) });
+  }
+  for (const second of Array.from({ length: 10 }, (_, offset) => offset * 30 + 900)) {
+    ctx.seed.probeSample({ at: iso(new Date(startMs + second * 1000)) });
+  }
+  ctx.seed.closedOutage({ startedAt: '2026-10-16T01:00:00Z', detectedAt: '2026-10-16T01:01:00Z', endedAt: '2026-10-16T01:14:59Z' });
   const result = ctx.readMeasures().downtime;
   expect(result.shown).toBe('15 min');
   expect(result.exact).toBeCloseTo(899 / 60, 5);
@@ -398,7 +425,17 @@ test('it counts 14 min 59 s down as green, though it shows as 15 min', () => {
 
 test('it counts 15 min 0 s down as red', () => {
   const ctx = setupTest();
-  ctx.seedExactOutage(15 * 60, 60);
+  const startMs = Date.parse('2026-10-16T01:00:00Z');
+  for (const second of Array.from({ length: 10 }, (_, offset) => (offset - 10) * 30)) {
+    ctx.seed.probeSample({ at: iso(new Date(startMs + second * 1000)) });
+  }
+  for (const second of Array.from({ length: 30 }, (_, offset) => offset * 30)) {
+    ctx.seed.downProbeSample({ at: iso(new Date(startMs + second * 1000)) });
+  }
+  for (const second of Array.from({ length: 11 }, (_, offset) => offset * 30 + 900)) {
+    ctx.seed.probeSample({ at: iso(new Date(startMs + second * 1000)) });
+  }
+  ctx.seed.closedOutage({ startedAt: '2026-10-16T01:00:00Z', detectedAt: '2026-10-16T01:01:00Z', endedAt: '2026-10-16T01:15:00Z' });
   const result = ctx.readMeasures().downtime;
   expect(result.shown).toBe('15 min');
   expect(verdict(DEFAULT_TARGETS.downtime, result)).toBe('red');

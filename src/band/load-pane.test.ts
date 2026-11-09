@@ -128,8 +128,9 @@ test('with no probe sample in 5 minutes, or a blind newest sample, Nix is unknow
 
 test('an open outage shows Nix down since it started, and an empty fleet says so in each section', async () => {
   const app = setupTest();
-  const base = writeOpenOutage(app);
-  const shown = await loadPane(base, app.pacing, app.consoleURL, app.at);
+  writeFileSync(app.pacing, JSON.stringify({ imp: { impMib: 2048 } }));
+  app.seed.outage({ startedAt: '2026-10-15T00:50:00Z', detectedAt: '2026-10-15T00:53:00Z' });
+  const shown = await loadPane(app.db, app.pacing, app.consoleURL, app.at);
   expect(shown.markdown.split('\n\n')).toStrictEqual([
     '## Needs you (0)\nNothing waits on you.\n[Open the console](http://127.0.0.1:4317/)',
     '## Nix\n**Down** since 11:50 · 0 min down today',
@@ -142,18 +143,7 @@ test('an open outage shows Nix down since it started, and an empty fleet says so
 
 test('a pacing.json hq refuses says why under Lanes, and draws no heat map', async () => {
   const app = setupTest();
-  const base = writeRefusedPacing(app);
-  const shown = await loadPane(base, app.pacing, app.consoleURL, app.at);
+  writeFileSync(app.pacing, JSON.stringify({ lanes: { imp: { 'Bad Teapot': 3 }, local: {} } }));
+  const shown = await loadPane(app.db, app.pacing, app.consoleURL, app.at);
   expect([shown.heat, shown.markdown.split('\n\n')[2]]).toStrictEqual([[], "## Lanes\nhq can't read the lanes: pacing.json: pacing.json lanes: bad lane imp.Bad Teapot"]);
 });
-
-function writeOpenOutage(app: ReturnType<typeof setupTest>): Database {
-  writeFileSync(app.pacing, JSON.stringify({ imp: { impMib: 2048 } }));
-  app.seed.outage({ startedAt: '2026-10-15T00:50:00Z', detectedAt: '2026-10-15T00:53:00Z' });
-  return app.db;
-}
-
-function writeRefusedPacing(app: ReturnType<typeof setupTest>): Database {
-  writeFileSync(app.pacing, JSON.stringify({ lanes: { imp: { 'Bad Teapot': 3 }, local: {} } }));
-  return app.db;
-}
