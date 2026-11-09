@@ -9,10 +9,12 @@ import { readEvents } from '../read-events.ts';
 import { buildMergedWrapUpNews } from './build-merged-wrap-up-news.ts';
 import { CLEANUP_ACTIONS, isCleanupHeld } from './is-cleanup-held.ts';
 import { iso } from '../clock/iso.ts';
-import { RETRY_WINDOW_MS, pickMergedRetry, shouldPostRetryNews } from './pick-merged-retry.ts';
+import { MERGED_RETRY_WINDOW_MS } from './constants.ts';
+import { pickMergedRetry } from './pick-merged-retry.ts';
 import type { MergedRetryFacts } from './pick-merged-retry.ts';
 import { runWrapUp } from './run-wrap-up.ts';
 import type { WrapUpDeps, WrapUpOptions } from './run-wrap-up.ts';
+import { shouldPostRetryNews } from './should-post-retry-news.ts';
 import { SWEEP_ACTOR } from './sweep-actor.ts';
 import { toErrorMessage } from '../to-error-message.ts';
 import type { WrapUp } from './types.ts';
@@ -91,7 +93,7 @@ const RETRY_RUNS = `SELECT r.issue FROM runs r JOIN events merged_event ON merge
 // Only runs merged within the retry window, so a sweep takes no write lock for a run that can no
 // longer retry.
 function listRetryRuns(db: Database): string[] {
-  const cutoff = iso(new Date(now().getTime() - RETRY_WINDOW_MS));
+  const cutoff = iso(new Date(now().getTime() - MERGED_RETRY_WINDOW_MS));
   return db
     .query(RETRY_RUNS)
     .all(cutoff)
@@ -122,22 +124,13 @@ function readRetryFacts(db: Database, issue: string): MergedRetryFacts {
   const mergedRow = merged === null ? null : mergedRowSchema.parse(merged);
   const events = readEvents(db, 'run', issue, ['merged-wrap-up', 'merged-wrap-up-retry', 'merged-wrap-up-result']).filter((event) => event.seq > (mergedRow?.seq ?? 0));
   const result = events.findLast((event) => event.action === 'merged-wrap-up-result');
-  const parsed = result === undefined ? null : resultDataSchema.safeParse(parseJSON(result.data));
   return {
     mergedAtMs: mergedRow === null ? null : Date.parse(mergedRow.at),
     nowMs: now().getTime(),
     retries: events.filter((event) => event.action === 'merged-wrap-up-retry').length,
     claimOpen: events.at(-1)?.action !== 'merged-wrap-up-result',
-    kept: parsed?.success === true ? parsed.data.kept : [],
+    kept: result === undefined ? [] : resultDataSchema.parse(JSON.parse(result.data)).kept,
   };
-}
-
-function parseJSON(text: string): unknown {
-  try {
-    return JSON.parse(text);
-  } catch {
-    return null;
-  }
 }
 
 // The retry claim is an event, so two sweeps cannot take one retry.
