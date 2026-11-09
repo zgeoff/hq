@@ -23,7 +23,7 @@ export async function closeDoneDesignRuns(db: Database, deps: WrapUpDeps, actor:
     const runSessions = SESSIONS.parse(db.query('SELECT session_id FROM run_sessions WHERE issue = ? ORDER BY added_at, session_id').all(issue)).map((row) => row.session_id);
     for (const session of pickSessionsToClose(wrapUp, issue, runSessions)) {
       const seq = logEvent(db, 'run', issue, 'design-done-close-session', actor, null, null, { session });
-      enqueueOnce(db, seq, orchestratorName(), `${issue}: its Design issue is Done in Linear, and the run is done. Unpin and stop session ${session}; hq does not stop a pinned session itself.`, `hq-design-done-${issue}-${session}`);
+      enqueueOnce(db, { eventSeq: seq, target: orchestratorName(), text: `${issue}: its Design issue is Done in Linear, and the run is done. Unpin and stop session ${session}; hq does not stop a pinned session itself.`, idemKey: `hq-design-done-${issue}-${session}` });
     }
   }
   return closed;
