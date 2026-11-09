@@ -55,7 +55,7 @@
     "@zgeoff/agent-hooks": "0.2.10",
     "@zgeoff/chex": "0.2.5",
     "@zgeoff/diet": "0.2.2",
-    "@zgeoff/oxlint-config": "0.10.4",
+    "@zgeoff/oxlint-config": "0.10.5",
     "@zgeoff/rig": "0.2.2",
     "@zgeoff/testing": "0.3.0",
     "knip": "6.44.1",
