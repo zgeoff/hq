@@ -82,9 +82,6 @@ function listRetryRuns(db: Database): string[] {
     .map((row) => issueRowSchema.parse(row).issue);
 }
 
-const mergedRowSchema = z.object({ seq: z.number(), at: z.string() });
-const resultDataSchema = z.object({ kept: z.array(z.object({ id: z.string(), reason: z.string(), retry: z.literal(true).optional() })) });
-
 // The retry claim is an event, so two sweeps cannot take one retry.
 function claimMergedRetry(db: Database, issue: string, actor: string): string[] | null {
   return db
@@ -101,6 +98,10 @@ function claimMergedRetry(db: Database, issue: string, actor: string): string[] 
     })
     .immediate();
 }
+
+const mergedRowSchema = z.object({ seq: z.number(), at: z.string() });
+const keptSessionSchema = z.object({ id: z.string(), reason: z.string(), retry: z.literal(true).optional() });
+const resultDataSchema = z.object({ kept: z.array(keptSessionSchema) });
 
 function readRetryFacts(db: Database, issue: string): MergedRetryFacts {
   const merged = db.query("SELECT seq, at FROM events WHERE subject = 'run' AND subject_id = ? AND action = 'state' AND to_state = 'merged' ORDER BY seq DESC LIMIT 1").get(issue);

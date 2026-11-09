@@ -5,8 +5,10 @@ export interface MergedRetryFacts {
   mergedAtMs: number;
   nowMs: number;
   retries: number;
+
   // The last claim has no result yet, so a pass is still wrapping the run up.
   claimOpen: boolean;
+
   // The sessions the last result kept.
   kept: readonly { id: string; retry?: true | undefined }[];
 }
