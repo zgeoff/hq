@@ -2,6 +2,7 @@ import type { Database } from 'bun:sqlite';
 import { z } from 'zod';
 import { iso } from '../clock/iso.ts';
 import { HqError } from '../errors.ts';
+import { logEvent } from '../log-event.ts';
 import type { Runner } from '../runner/types.ts';
 import { pickFiledSource } from './pick-filed-source.ts';
 import { readPointedPR } from './read-pointed-pr.ts';
@@ -50,7 +51,14 @@ export async function syncFiled(db: Database, call: LinearCall, from: Date, opti
       // A null creator is an issue an integration filed, with no Linear user behind it.
       const source = pickFiledSource({ title: node.title, description, labels, isBotCreator: node.creator === null || node.creator.app });
       const attachments = node.attachments.nodes.map((attachment) => ({ url: attachment.url, openedAt: attachment.metadata?.createdAt ?? null }));
-      const pointedPR = await readPointedPR({ id: node.identifier, description, createdAt: node.createdAt, attachments }, (link) => readPRBody(options.run, link));
+      const pointedPR = await readPointedPR({ id: node.identifier, description, createdAt: node.createdAt, attachments }, async (link) => {
+        const read = await readPRBody(options.run, link);
+        if (read.ok) {
+          return read.body;
+        }
+        logEvent(db, 'hq', `${link.owner}/${link.repo}#${link.number}`, 'pr-body-unread', 'hq', null, null, { issue: node.identifier, reason: read.reason });
+        return null;
+      });
       rows.push({ node, source, pointedPR });
     }
     db.transaction(() => {

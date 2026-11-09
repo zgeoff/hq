@@ -6,15 +6,17 @@ import type { PRLink } from './read-pointed-pr.ts';
 const CALL_MS = 30_000;
 const bodySchema = z.object({ body: z.string() });
 
-export async function readPRBody(run: Runner, link: PRLink): Promise<string | null> {
+export type PRBodyRead = { ok: true; body: string } | { ok: false; reason: string };
+
+export async function readPRBody(run: Runner, link: PRLink): Promise<PRBodyRead> {
   const result = await run(['gh', 'pr', 'view', link.number, '-R', `${link.owner}/${link.repo}`, '--json', 'body'], { env: cleanEnv(), timeoutMs: CALL_MS });
   if (result.code !== 0) {
-    return null;
+    return { ok: false, reason: result.stderr.trim().split('\n')[0] ?? '' };
   }
   try {
     const parsed = bodySchema.safeParse(JSON.parse(result.stdout));
-    return parsed.success ? parsed.data.body : null;
+    return parsed.success ? { ok: true, body: parsed.data.body } : { ok: false, reason: 'gh gave no body field' };
   } catch {
-    return null;
+    return { ok: false, reason: 'gh gave output that is not JSON' };
   }
 }
