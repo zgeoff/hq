@@ -15,6 +15,8 @@ import { syncGoals } from './sync-goals.ts';
 import { syncRunsDay } from './sync-runs-day.ts';
 import type { Runner } from '../runner/types.ts';
 import { at, freshDb } from '../../test/helpers.ts';
+import { seedMergedPR } from '../kinds/test-utils/seed-merged-pr.ts';
+import { seedCIRun } from './test-utils/seed-ci-run.ts';
 import { IN_SCOPE } from '../scope/in-scope.ts';
 
 let db: Database;
@@ -143,7 +145,7 @@ test('the rows: Sydney days and weeks; deploys and log are n/a before their sour
   const r = await syncGoals(db, gh(runs, { '2026-10-14': [{ repo: 'atc', number: 8, closed_at: '2026-10-14T04:00:00Z' }] }), { from: new Date('2026-10-12T00:00:00Z') });
   expect(r.errors).toEqual([]);
   expect(r.runs).toBe(5);
-  db.query(`INSERT INTO merged_prs (repo, number, merged_at, title, kind, issue) VALUES ('atc', 1, '2026-10-14T02:00:00Z', 'fix: x', 'fix', NULL)`).run();
+  seedMergedPR({ db }, { repo: 'atc', number: 1, merged_at: '2026-10-14T02:00:00Z', title: 'fix: x', kind: 'fix' });
   const g = goalRows(db, 4);
   const [tue, wed, thu, fri] = g.days;
   expect(tue).toMatchObject({ label: 'Tue 13 Oct', deploys: null, log: null, ci: { runs: 1, minutes: 20 } });
@@ -158,8 +160,8 @@ test('the rows: Sydney days and weeks; deploys and log are n/a before their sour
 test('stored rows of a repo now out of scope stay in the database but count nowhere', async () => {
   const runs = { 'atc/2026-10-14': [run({ id: 2 })] };
   await syncGoals(db, gh(runs, { '2026-10-14': [] }), { from: new Date('2026-10-12T00:00:00Z') });
-  db.query(`INSERT INTO ci_runs (id, repo, path, event, status, conclusion, attempt, created_at, started_at, updated_at) VALUES (99, 'teapots', 'ci.yml', 'push', 'completed', 'failure', 1, '2026-10-14T01:00:00Z', '2026-10-14T01:00:00Z', '2026-10-14T01:30:00Z')`).run();
-  db.query(`INSERT INTO merged_prs (repo, number, merged_at, title, kind, issue) VALUES ('teapots', 3, '2026-10-14T02:00:00Z', 'fix: y', 'fix', NULL)`).run();
+  seedCIRun({ db }, { id: 99, repo: 'teapots', path: 'ci.yml', conclusion: 'failure', created_at: '2026-10-14T01:00:00Z', started_at: '2026-10-14T01:00:00Z', updated_at: '2026-10-14T01:30:00Z' });
+  seedMergedPR({ db }, { repo: 'teapots', number: 3, merged_at: '2026-10-14T02:00:00Z', title: 'fix: y', kind: 'fix' });
   db.query(`INSERT INTO closed_prs (repo, number, closed_at) VALUES ('teapots', 4, '2026-10-14T03:00:00Z')`).run();
   db.query(`INSERT INTO goal_days (kind, key, day, n, at) VALUES ('ci', 'teapots', '2026-10-12', 1, '2026-10-12T23:00:00Z')`).run();
   const wed = goalRows(db, 4).days[1]!;
@@ -281,15 +283,10 @@ function jobsGh(answers: Record<number, unknown>, asked: number[] = []): Runner 
   };
 }
 
-function storeRun(id: number, over: Partial<{ status: string; conclusion: string | null; created: string }> = {}) {
-  const o = { status: 'completed', conclusion: 'success', created: `2026-10-14T00:00:${String(id % 60).padStart(2, '0')}Z`, ...over };
-  db.query(`INSERT INTO ci_runs (id, repo, path, event, status, conclusion, attempt, created_at, started_at, updated_at) VALUES (?, 'cloud', ?, 'push', ?, ?, 1, ?, ?, ?)`).run(id, DEPLOY.path, o.status, o.conclusion, o.created, o.created, o.created);
-}
-
 test('syncDeploys stores one outcome per completed run and skips one still running', async () => {
-  storeRun(7001);
-  storeRun(7002, { conclusion: 'failure' });
-  storeRun(7003, { status: 'in_progress', conclusion: null });
+  seedCIRun({ db }, { id: 7001, repo: 'cloud', path: DEPLOY.path, created_at: '2026-10-14T00:00:41Z' });
+  seedCIRun({ db }, { id: 7002, repo: 'cloud', path: DEPLOY.path, conclusion: 'failure', created_at: '2026-10-14T00:00:42Z' });
+  seedCIRun({ db }, { id: 7003, repo: 'cloud', path: DEPLOY.path, status: 'in_progress', conclusion: null, created_at: '2026-10-14T00:00:43Z' });
   const asked: number[] = [];
   const answers = {
     7001: jobsOf(job('decide', 'success'), job('apply', 'skipped')),
@@ -312,7 +309,7 @@ test('syncDeploys takes at most 60 a call, oldest first, and counts what is left
   const answers: Record<number, unknown> = {};
   for (let i = 0; i < 65; i++) {
     const id = 8000 + i;
-    storeRun(id, { created: new Date(Date.parse('2026-10-14T00:00:00Z') + (64 - i) * 60_000).toISOString().replace('.000', '') });
+    seedCIRun({ db }, { id, repo: 'cloud', path: DEPLOY.path, created_at: new Date(Date.parse('2026-10-14T00:00:00Z') + (64 - i) * 60_000).toISOString().replace('.000', '') });
     answers[id] = jobsOf(job('apply', 'success'));
   }
   const first = await syncDeploys(db, jobsGh(answers));
@@ -327,9 +324,9 @@ test('syncDeploys takes at most 60 a call, oldest first, and counts what is left
 });
 
 test('an unreadable jobs answer leaves no row and an error, and the next sync tries again', async () => {
-  storeRun(9001);
-  storeRun(9002);
-  storeRun(9003);
+  seedCIRun({ db }, { id: 9001, repo: 'cloud', path: DEPLOY.path, created_at: '2026-10-14T00:00:01Z' });
+  seedCIRun({ db }, { id: 9002, repo: 'cloud', path: DEPLOY.path, created_at: '2026-10-14T00:00:02Z' });
+  seedCIRun({ db }, { id: 9003, repo: 'cloud', path: DEPLOY.path, created_at: '2026-10-14T00:00:03Z' });
   const answers = { 9001: jobsOf(job('apply', 'success')), 9002: { total_count: 'x' } };
   const r = await syncDeploys(db, jobsGh(answers));
   expect(r.fetched).toBe(1);
@@ -357,7 +354,7 @@ test('syncGoals classifies the deploy-prod runs it stored, and reports the error
 });
 
 test('a re-run with a new attempt is classified again; a stored row for an older attempt counts nowhere', async () => {
-  storeRun(9501, { conclusion: 'failure' });
+  seedCIRun({ db }, { id: 9501, repo: 'cloud', path: DEPLOY.path, conclusion: 'failure', created_at: '2026-10-14T00:00:21Z' });
   const first = { 9501: jobsOf(job('apply', 'failure', [{ name: 'Apply', conclusion: 'failure' }])) };
   await syncDeploys(db, jobsGh(first));
   expect(db.query('SELECT outcome, attempt FROM deploy_runs').all()).toEqual([{ outcome: 'applied_failed', attempt: 1 }]);
@@ -374,7 +371,7 @@ test('a re-run with a new attempt is classified again; a stored row for an older
 });
 
 test('syncDeploys asks for the attempt hq stored, so a later re-run cannot stand in for it', async () => {
-  storeRun(9601);
+  seedCIRun({ db }, { id: 9601, repo: 'cloud', path: DEPLOY.path, created_at: '2026-10-14T00:00:01Z' });
   db.query('UPDATE ci_runs SET attempt = 2 WHERE id = 9601').run();
   const urls: string[] = [];
   const gh: Runner = async (cmd) => {
@@ -386,9 +383,9 @@ test('syncDeploys asks for the attempt hq stored, so a later re-run cannot stand
 });
 
 test('a run GitHub no longer has is stored as unknown; an older run that keeps failing does not hold the check-in', async () => {
-  storeRun(9701, { created: '2026-10-01T00:00:00Z' });
-  storeRun(9702, { created: '2026-10-14T00:00:00Z' });
-  storeRun(9703, { created: '2026-10-14T00:00:01Z' });
+  seedCIRun({ db }, { id: 9701, repo: 'cloud', path: DEPLOY.path, created_at: '2026-10-01T00:00:00Z' });
+  seedCIRun({ db }, { id: 9702, repo: 'cloud', path: DEPLOY.path, created_at: '2026-10-14T00:00:00Z' });
+  seedCIRun({ db }, { id: 9703, repo: 'cloud', path: DEPLOY.path, created_at: '2026-10-14T00:00:01Z' });
   const r = await syncDeploys(db, jobsGh({ 9702: 404, 9703: jobsOf(job('apply', 'success')) }), undefined, undefined, 60, new Date('2026-10-10T00:00:00Z'));
   expect(r.errors).toEqual([]);
   expect(r.oldErrors.length).toBe(1);
@@ -401,9 +398,9 @@ test('a run GitHub no longer has is stored as unknown; an older run that keeps f
 
 test('old runs that keep failing cannot take every slot: runs inside the window go first', async () => {
   for (let index = 0; index < 61; index++) {
-    storeRun(9800 + index, { created: `2026-10-01T00:${String(index % 60).padStart(2, '0')}:00Z` });
+    seedCIRun({ db }, { id: 9800 + index, repo: 'cloud', path: DEPLOY.path, created_at: `2026-10-01T00:${String(index % 60).padStart(2, '0')}:00Z` });
   }
-  storeRun(9900, { created: '2026-10-14T00:00:00Z' });
+  seedCIRun({ db }, { id: 9900, repo: 'cloud', path: DEPLOY.path, created_at: '2026-10-14T00:00:00Z' });
   const asked: number[] = [];
   const r = await syncDeploys(db, jobsGh({ 9900: jobsOf(job('apply', 'success')) }, asked), undefined, undefined, 60, new Date('2026-10-10T00:00:00Z'));
   expect(asked[0]).toBe(9900);
