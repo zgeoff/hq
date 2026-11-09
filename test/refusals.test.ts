@@ -264,9 +264,10 @@ test('the caps: input 120, reason 300', async () => {
 });
 
 test('atc names the session and hq run_sessions gives the issue; atc down scans with nulls', async () => {
+  const ctx = setupTest();
   at('2026-10-16T00:00:00Z');
-  buildSeeder({ db }).run({ issue: 'GEO-9', title: 't', place: 'local' });
-  buildSeeder({ db }).runSession({ issue: 'GEO-9', session: 'a0000009-aaaa-4aaa-8aaa-aaaaaaaaaaaa' });
+  ctx.seed.run({ issue: 'GEO-9', title: 't', place: 'local' });
+  ctx.seed.runSession({ issue: 'GEO-9', session: 'a0000009-aaaa-4aaa-8aaa-aaaaaaaaaaaa' });
   file('p/s.jsonl', jl(tu('t1', 'Bash', { command: 'a' }), refused('t1', 'with atc')));
   atc = fakeAtc(dir, [{ id: 'a0000009-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'z-worker', alive: true, state: 'done', agentSessionID: SID }]);
   process.env['HQ_ATC_SOCKET'] = join(dir, 'atc.sock');
@@ -364,3 +365,7 @@ test('redact masks a whole shell-escaped or quoted secret value', () => {
   expect(redact("export 'DB_PASSWORD=correct horse' go")).toBe("export 'DB_PASSWORD=[redacted]' go");
   expect(redact('export DB_PASSWORD="correct horse" go')).toBe('export DB_PASSWORD=[redacted] go');
 });
+
+function setupTest() {
+  return { db, seed: buildSeeder({ db }) };
+}

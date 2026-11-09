@@ -1,5 +1,5 @@
 import { setMeta } from '../set-meta.ts';
-import type { TestDeps } from '../../test-utils/test-deps.ts';
+import type { TestDeps } from '../../test-utils/build-seeder.ts';
 
 interface MetaInput {
   key: string;

@@ -12,7 +12,7 @@ import { seedRunBeforeDesignLanes } from './seed-run-before-design-lanes.ts';
 import { seedRunPr } from './seed-run-pr.ts';
 import { seedRunPrWithoutRun } from './seed-run-pr-without-run.ts';
 import { seedRunSession } from './seed-run-session.ts';
-import type { TestDeps } from '../../test-utils/test-deps.ts';
+import type { TestDeps } from '../../test-utils/build-seeder.ts';
 
 export function buildRunSeeder(deps: TestDeps) {
   return {

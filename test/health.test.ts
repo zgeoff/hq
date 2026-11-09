@@ -176,7 +176,8 @@ test('it never tells z-stu about an oversized state file fixed inside 2 hours', 
 });
 
 test('it does not escalate a state-file problem opened before owners existed', async () => {
-  buildSeeder({ db }).meta({ key: 'health_open', value: JSON.stringify({ 'state-size:kettle.md': { since: '2026-10-13T20:00:00.000Z', line: 'state file kettle.md is 20.0 KB, over its 16 KB limit' } }) });
+  const ctx = setupTest();
+  ctx.seed.meta({ key: 'health_open', value: JSON.stringify({ 'state-size:kettle.md': { since: '2026-10-13T20:00:00.000Z', line: 'state file kettle.md is 20.0 KB, over its 16 KB limit' } }) });
   const over = [{ key: 'state-size:kettle.md', ok: false, line: 'state file kettle.md is 20.0 KB, over its 16 KB limit', owner: { session: 'z-kettle', ask: 'trim it' } }];
 
   const result = await runChecks({ ...probe(world()), stateSizes: () => over }, healthSettings(db), {}, new Date(NOON_SYDNEY));
@@ -339,3 +340,7 @@ test('it reports an oversized state file as a problem but not unknown', async ()
 
   expect([result.checks.filter((check) => !check.ok).map((check) => check.key), result.unknown]).toStrictEqual([['state-size:kettle.md'], []]);
 });
+
+function setupTest() {
+  return { db, seed: buildSeeder({ db }) };
+}

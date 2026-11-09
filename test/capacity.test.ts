@@ -19,7 +19,8 @@ import { kdb } from '../src/kdb.ts';
 import type { Runner } from '../src/runner/types.ts';
 import { orchestratorName } from '../src/wake/orchestrator-name.ts';
 import { FOUR_AM_SYDNEY, NOON_SYDNEY, at, freshDb } from './helpers.ts';
-import { buildSeeder } from '../src/test-utils/build-seeder.ts';
+import { markOutboxSent } from '../src/outbox/mark-outbox-sent.ts';
+import { unsent } from '../src/outbox/unsent.ts';
 
 let db: Database;
 let cleanup: () => void;
@@ -164,7 +165,9 @@ test('a breach must hold two samples to open; one is not enough', async () => {
 test('a clear also needs two good samples, and one message says how long it was open', async () => {
   await sampleAt(world({ nonnix: 18_432 }), minute(0));
   await sampleAt(world({ nonnix: 18_432 }), minute(5));
-  buildSeeder({ db }).sentOutbox();
+  for (const row of unsent(db, true, undefined)) {
+    markOutboxSent(db, row, null);
+  }
   const before = readOutboxRows(db).length;
   await sampleAt(world(), minute(10));
   await sampleAt(world({ nonnix: 18_432 }), minute(15));
@@ -184,7 +187,9 @@ test('a sample with no reading neither opens nor clears, and keeps the count', a
   expect(readOutboxRows(db)).toHaveLength(0);
   await sampleAt(world({ nonnix: 18_432 }), minute(10));
   expect(Object.keys(openAlerts(db))).toEqual(['impd:nonnix']);
-  buildSeeder({ db }).sentOutbox();
+  for (const row of unsent(db, true, undefined)) {
+    markOutboxSent(db, row, null);
+  }
   const before = readOutboxRows(db).length;
   await sampleAt(world(), minute(15));
   await sampleAt(world({ impzBroken: true }), minute(20));
@@ -236,7 +241,9 @@ test('quiet hours: an impd open goes out at once; another alert waits for the fi
   expect(told[0]!.text).toContain('impd:');
   expect(told[0]?.text).not.toContain('cloud:');
   expect(Object.values(openAlerts(db)).map((o) => o.told)).toEqual([true, false]);
-  buildSeeder({ db }).sentOutbox();
+  for (const row of unsent(db, true, undefined)) {
+    markOutboxSent(db, row, null);
+  }
   const morning = new Date(Date.parse(FOUR_AM_SYDNEY) + 3 * 3_600_000);
   await sampleAt(world({ nonnix: 20_000, cloudAvail: 1 }), morning);
   const after = readOutboxRows(db).filter((row) => row.target === owner());
@@ -257,7 +264,9 @@ test('quiet hours: an alert that opens and clears inside them sends nothing; a t
   expect(readOutboxRows(db)).toHaveLength(0);
 
   for (const offset of [20, 25]) { await sampleAt(world({ nonnix: 20_000 }), quiet(offset)); }
-  buildSeeder({ db }).sentOutbox();
+  for (const row of unsent(db, true, undefined)) {
+    markOutboxSent(db, row, null);
+  }
   for (const offset of [30, 35]) { await sampleAt(world(), quiet(offset)); }
   expect(readOutboxRows(db).filter((row) => row.target === owner())).toHaveLength(1);
   await sampleAt(world(), new Date(Date.parse(FOUR_AM_SYDNEY) + 3 * 3_600_000));
@@ -301,7 +310,9 @@ test('an atc outage loses no notice: every open and back-under stays queued, in 
 test('an alert that reopens in quiet hours drops its old held recovery', async () => {
   const q = (m: number) => new Date(Date.parse(FOUR_AM_SYDNEY) + m * 60_000);
   for (const m of [0, 5]) await sampleAt(world({ nonnix: 20_000 }), q(m));
-  buildSeeder({ db }).sentOutbox();
+  for (const row of unsent(db, true, undefined)) {
+    markOutboxSent(db, row, null);
+  }
   for (const offset of [10, 15]) { await sampleAt(world(), q(offset)); }
   for (const offset of [20, 25]) { await sampleAt(world({ nonnix: 20_000 }), q(offset)); }
   const before = readOutboxRows(db).length;

@@ -1,11 +1,9 @@
+import type { TestDeps } from '../../test-utils/build-seeder.ts';
 import { updateRunSessions } from '../update-run-sessions.ts';
-import type { TestDeps } from '../../test-utils/test-deps.ts';
-
-interface NewRunSession {
-  issue: string;
-  session: string;
-}
+import { buildMockNewRunSession } from './build-mock-new-run-session.ts';
+import type { NewRunSession } from './build-mock-new-run-session.ts';
 
 export function seedRunSession(deps: TestDeps, input: Partial<NewRunSession> = {}): void {
-  updateRunSessions(deps.db, input.issue ?? 'GEO-9001', input.session ?? 'a0000001-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+  const newSession = buildMockNewRunSession(input);
+  updateRunSessions(deps.db, newSession.issue, newSession.session);
 }

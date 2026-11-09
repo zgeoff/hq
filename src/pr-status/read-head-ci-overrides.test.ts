@@ -28,7 +28,7 @@ test('it reads the CI overrides recorded at the head, newest record of a check w
 test('it reads no CI override at the head once an override event of the PR holds text that is not JSON', () => {
   const ctx = setupTest();
   recordCICheckOverride(ctx.db, { repo: 'widgets', pr: 7, head: 'b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2', source: 'chat:kettle-1', note: 'An intended infra change.', actor: 'z-kettle', check: 'preview' });
-  ctx.seed.eventWithBrokenData({ subjectID: 'pr:widgets#7', action: 'pr-override', actor: 'z-kettle' });
+  ctx.seed.eventWithBrokenData({ subject_id:'pr:widgets#7', action: 'pr-override', actor: 'z-kettle' });
 
   expect(readHeadCIOverrides(ctx.db, 'widgets', 7, 'b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2')).toStrictEqual([]);
 });

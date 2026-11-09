@@ -285,14 +285,12 @@ test('the validator takes a release session, and the release role lists its hold
 });
 
 test('a declared forward needs no meta row, and a meta row wins', () => {
-  const { db, cleanup } = freshDb();
-  try {
-    expect(forwardOf(db, 'z-refine')).toBe(declaredForwards()['z-refine']!);
-    buildSeeder({ db }).meta({ key: 'outbox_forwards', value: JSON.stringify({ 'z-refine': 'z-other' }) });
-    expect(forwardOf(db, 'z-refine')).toBe('z-other');
-  } finally {
-    cleanup();
-  }
+  const ctx = setupTest();
+  const declared = declaredForwards()['z-refine'];
+  invariant(declared);
+  expect(forwardOf(ctx.db, 'z-refine')).toBe(declared);
+  ctx.seed.meta({ key: 'outbox_forwards', value: JSON.stringify({ 'z-refine': 'z-other' }) });
+  expect(forwardOf(ctx.db, 'z-refine')).toBe('z-other');
 });
 
 test('no session-name literal sits in src/ outside roles.ts', () => {
@@ -315,7 +313,7 @@ function setupTest() {
   onTestFinished(() => {
     console.log = originalLog;
   });
-  return { db: database.db, directory: database.dir, out };
+  return { db: database.db, directory: database.dir, out, seed: buildSeeder(database) };
 }
 
 test('a forward declared in fleet.json cannot be removed by command; a stored one can', () => {

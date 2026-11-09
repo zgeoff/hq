@@ -15,6 +15,9 @@ import { send } from '../src/send/send.ts';
 import type { RunOpts, Runner } from '../src/runner/types.ts';
 import type { FakeAtc } from './helpers.ts';
 import { NOON_SYDNEY, at, fakeAtc, freshDb, requireEnv } from './helpers.ts';
+import { markOutboxFailed } from '../src/outbox/mark-outbox-failed.ts';
+import { markOutboxSent } from '../src/outbox/mark-outbox-sent.ts';
+import { unsent } from '../src/outbox/unsent.ts';
 import { buildSeeder } from '../src/test-utils/build-seeder.ts';
 
 let db: Database;
@@ -65,7 +68,9 @@ test('it leaves a row sent when another flush sent it while this one failed to r
   process.env['HQ_ATC_SOCKET'] = `${dir}/nobody-home.sock`;
   file('tidy-docs');
   const pending = flush(db);
-  buildSeeder({ db }).sentOutbox();
+  for (const row of unsent(db, true, undefined)) {
+    markOutboxSent(db, row, null);
+  }
   const result = await pending;
   expect(result).toMatchObject({ failed: 0, errors: [] });
   expect(db.query('SELECT status, attempts, last_error FROM outbox').all()).toStrictEqual([{ status: 'sent', attempts: 1, last_error: null }]);
@@ -196,7 +201,11 @@ describe('inside an atc session', () => {
     atc = fakeAtc(dir);
     file('tidy-docs');
     const run: Runner = async () => {
-      setTimeout(() => buildSeeder({ db }).sentOutbox(), 300);
+      setTimeout(() => {
+        for (const row of unsent(db, true, undefined)) {
+          markOutboxSent(db, row, null);
+        }
+      }, 300);
       return { code: 0, stdout: '', stderr: '' };
     };
     const r = await send(db, 'all', false, run, 5_000);
@@ -207,9 +216,13 @@ describe('inside an atc session', () => {
   test('a --retry waits for the unit to try a failed row again', async () => {
     atc = fakeAtc(dir);
     file('tidy-docs');
-    buildSeeder({ db }).failedOutbox({ error: 'old' });
+    markOutboxFailed(db, unsent(db, false, undefined), 'old');
     const run: Runner = async () => {
-      setTimeout(() => buildSeeder({ db }).sentOutbox(), 300);
+      setTimeout(() => {
+        for (const row of unsent(db, true, undefined)) {
+          markOutboxSent(db, row, null);
+        }
+      }, 300);
       return { code: 0, stdout: '', stderr: '' };
     };
     expect((await send(db, 'all', true, run, 5_000)).flushed).toMatchObject({ sent: 1, failed: 0, pending: 0 });
@@ -225,7 +238,7 @@ describe('inside an atc session', () => {
 test('a forward sends a retired session\'s messages to its successor, and moves the queued ones', () => {
   const seq = logEvent(db, 'hq', 'probe', 'probe', 'z-q', null, null);
   enqueue(db, seq, 'z-kettle', 'FYI one');
-  buildSeeder({ db }).failedOutbox({ error: 'no live session named z-kettle' });
+  markOutboxFailed(db, unsent(db, false, undefined), 'no live session named z-kettle');
   const seq2 = logEvent(db, 'hq', 'probe', 'probe', 'z-q', null, null);
   enqueue(db, seq2, 'z-kettle', 'FYI two');
   enqueue(db, seq2, 'z-teapot', 'FYI two');
@@ -327,10 +340,10 @@ describe('a command sends only the rows it queued', () => {
   });
 
   test("the watcher's send (flush with no ids) sends every pending and failed row", async () => {
+    const ctx = setupTest();
     atc = fakeAtc(dir);
     foreign('Invented pending note');
-    foreign('Invented failed note');
-    buildSeeder({ db }).failedOutbox({ text: 'Invented failed note' });
+    ctx.seed.failedOutboxItem({ target: 'z-delivery', text: 'Invented failed note' });
     expect(await flush(db, { retryFailed: true })).toMatchObject({ sent: 2, failed: 0 });
     expect(statuses()).toEqual([
       { target: 'z-delivery', status: 'sent' },
@@ -372,3 +385,7 @@ test('the flush asks atc for no answer notice, so no session hears an answer to 
 
   expect(atc.sent[0]?.notice).toBe(false);
 });
+
+function setupTest() {
+  return { db, seed: buildSeeder({ db }) };
+}

@@ -12,7 +12,8 @@ import { windows } from '../src/morning/windows.ts';
 import { at, freshDb } from './helpers.ts';
 import { readOutboxRows } from '../src/outbox/read-outbox-rows.ts';
 import { setForward } from '../src/outbox/set-forward.ts';
-import { buildSeeder } from '../src/test-utils/build-seeder.ts';
+import { markOutboxFailed } from '../src/outbox/mark-outbox-failed.ts';
+import { unsent } from '../src/outbox/unsent.ts';
 
 let db: Database;
 let cleanup: () => void;
@@ -82,7 +83,7 @@ test('hq health: quiet before 08:45, then flags a missing run or a failed send',
   expect(morningCheck(db, syd('2026-10-17', '08:50'))).toMatchObject({ ok: false, line: expect.stringContaining('no run today (2026-10-17)') });
   morningTick(db, 'hq-lanes', syd('2026-10-17', '08:16'));
   expect(morningCheck(db, syd('2026-10-17', '08:50'))!.ok).toBe(true);
-  buildSeeder({ db }).failedOutbox();
+  markOutboxFailed(db, unsent(db, false, undefined), 'invented send failure');
   expect(morningCheck(db, syd('2026-10-17', '08:50'))).toMatchObject({ ok: false, line: expect.stringContaining('failed to send') });
   skipMorning(db, '2026-10-18', 'holiday', 'z-q');
   expect(morningCheck(db, syd('2026-10-18', '10:00'))).toMatchObject({ ok: true, line: expect.stringContaining('skipped') });
@@ -94,7 +95,7 @@ test('hq health: quiet before 08:45, then flags a missing run or a failed send',
 test('it sees a failed morning message queued while the owner session is forwarded', () => {
   setForward(db, 'z-stu', 'z-other');
   morningTick(db, 'hq-lanes', syd('2026-10-17', '08:16'));
-  buildSeeder({ db }).failedOutbox();
+  markOutboxFailed(db, unsent(db, false, undefined), 'invented send failure');
 
   expect(morningCheck(db, syd('2026-10-17', '08:50'))).toMatchObject({ ok: false, line: expect.stringContaining('failed to send') });
 });
@@ -118,7 +119,7 @@ test('it reads the send status of a morning run whose key also names the target'
   setForward(db, 'z-stu', 'z-other');
   morningTick(db, 'hq-lanes', syd('2026-10-17', '08:16'));
   db.query(`UPDATE job_runs SET outbox_key = outbox_key || '-z-stu'`).run();
-  buildSeeder({ db }).failedOutbox();
+  markOutboxFailed(db, unsent(db, false, undefined), 'invented send failure');
 
   expect(recentRuns(db).map((run) => [run.key, run.sent])).toStrictEqual([['2026-10-17', 'failed']]);
 });

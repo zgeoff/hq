@@ -1,16 +1,10 @@
 import { logEvent } from '../log-event.ts';
-import type { TestDeps } from './test-deps.ts';
-
-interface NewEvent {
-  subject: 'ask' | 'unblock' | 'hq' | 'run';
-  subjectID: string;
-  action: string;
-  actor: string;
-  from: string | null;
-  to: string | null;
-  data: Record<string, unknown>;
-}
+import type { TestDeps } from './build-seeder.ts';
+import { buildMockNewEvent } from './build-mock-new-event.ts';
+import type { NewEvent } from './build-mock-new-event.ts';
 
 export function seedEvent(deps: TestDeps, input: Partial<NewEvent> = {}): number {
-  return logEvent(deps.db, input.subject ?? 'hq', input.subjectID ?? 'kettle', input.action ?? 'probe', input.actor ?? 'kettle-bot', input.from ?? null, input.to ?? null, input.data ?? {});
+  const event = buildMockNewEvent(input);
+
+  return logEvent(deps.db, event.subject, event.subjectID, event.action, event.actor, event.from, event.to, event.data);
 }

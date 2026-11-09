@@ -377,8 +377,9 @@ test('a run that changed while GitHub was asked is left alone', async () => {
 });
 
 test('the pass is due every 10 minutes', () => {
+  const ctx = setupTest();
   expect(dueForShipPass(db, T)).toBe(true);
-  buildSeeder({ db }).meta({ key: 'releases_checked_at', value: NOON_SYDNEY });
+  ctx.seed.meta({ key: 'releases_checked_at', value: NOON_SYDNEY });
   expect(dueForShipPass(db, new Date(T.getTime() + 9 * 60_000))).toBe(false);
   expect(dueForShipPass(db, new Date(T.getTime() + 10 * 60_000))).toBe(true);
 });
@@ -400,3 +401,7 @@ test('a live check set to owed while GitHub was asked is honoured', async () => 
   expect((await shipRuns(db, run, T)).moved.map((m) => m.to)).toEqual(['live-check']);
   expect(getRun(db, 'GEO-61')!.state).toBe('live-check');
 });
+
+function setupTest() {
+  return { db, seed: buildSeeder({ db }) };
+}

@@ -1,6 +1,6 @@
 import type { AddRunInput, RunView } from '../types.ts';
 import { seedRun } from './seed-run.ts';
-import type { TestDeps } from '../../test-utils/test-deps.ts';
+import type { TestDeps } from '../../test-utils/build-seeder.ts';
 
 export function seedRunBeforeDesignLanes(deps: TestDeps, input: Partial<AddRunInput> = {}): RunView {
   const run = seedRun(deps, input);

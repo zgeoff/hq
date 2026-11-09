@@ -230,8 +230,9 @@ describe('reading the event feed', () => {
   });
 
   test('a cursor the daemon no longer knows is re-synced to the end', async () => {
+    const ctx = setupTest();
     atc = fakeAtc(dir, []);
-    buildSeeder({ db }).meta({ key: 'atc_events_cursor', value: 'not-a-cursor' });
+    ctx.seed.meta({ key: 'atc_events_cursor', value: 'not-a-cursor' });
     const c = await AtcClient.open();
     try {
       const resynced = await ingestNotes(db, c, { run: buildStubFinalGH({ commits: 'fault' }, []) });
@@ -243,10 +244,11 @@ describe('reading the event feed', () => {
   });
 
   test('a cursor past the end (log reset) is caught after three empty reads', async () => {
+    const ctx = setupTest();
     atc = fakeAtc(dir, []);
     atc.feed.push({ at: base, session: S1, name: 'x', kind: 'turn-done', detail: null });
     const past = Buffer.from(JSON.stringify(['events', 500])).toString('base64url');
-    buildSeeder({ db }).meta({ key: 'atc_events_cursor', value: past });
+    ctx.seed.meta({ key: 'atc_events_cursor', value: past });
     const c = await AtcClient.open();
     try {
       const first = await ingestNotes(db, c, { run: buildStubFinalGH({ commits: 'fault' }, []) });
@@ -496,10 +498,11 @@ describe('review fixes', () => {
 
 describe('re-check fixes', () => {
   test('reset recovery reads the whole new feed from its oldest event', async () => {
+    const ctx = setupTest();
     atc = fakeAtc(dir, [{ id: S1, name: 'kettle', alive: true, state: 'running' }]);
     add();
     for (let i = 0; i < 201; i++) atc.feed.push({ at: base + i * 1000, session: S1, name: 'kettle', kind: 'note', detail: `note ${i}`, label: 'progress' });
-    buildSeeder({ db }).meta({ key: 'atc_events_cursor', value: 'not-a-cursor' });
+    ctx.seed.meta({ key: 'atc_events_cursor', value: 'not-a-cursor' });
     const c = await AtcClient.open();
     try {
       const reset = await ingestNotes(db, c, { run: buildStubFinalGH({ commits: 'fault' }, []) });
@@ -585,3 +588,7 @@ describe('session ids', () => {
     await expect(fullSessionId(list, 'kettle')).rejects.toThrow('must be an atc session id');
   });
 });
+
+function setupTest() {
+  return { db, seed: buildSeeder({ db }) };
+}

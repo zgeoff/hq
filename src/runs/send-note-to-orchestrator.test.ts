@@ -25,10 +25,8 @@ function setupTest() {
       client.close();
     }
   };
-  const seed = buildSeeder(fresh);
-  const rewind = () => seed.meta({ key: 'atc_events_cursor', value: FROM_START });
   const outbox = () => fresh.db.query('SELECT target, text FROM outbox ORDER BY id').all();
-  return { db: fresh.db, kettle, feed: stub.feed, tick, rewind, outbox, seed };
+  return { db: fresh.db, kettle, feed: stub.feed, tick, outbox, seed: buildSeeder(fresh) };
 }
 
 test('a decision note reaches the orchestrator once across two ticks that both read it', async () => {
@@ -38,7 +36,7 @@ test('a decision note reaches the orchestrator once across two ticks that both r
   app.feed.push({ at: Date.parse(NOON_SYDNEY), session: app.kettle, name: 'kettle', kind: 'note', detail: 'descale with vinegar, not citric acid', label: 'decision' });
 
   await app.tick();
-  app.rewind();
+  app.seed.meta({ key: 'atc_events_cursor', value: FROM_START });
   await app.tick();
 
   expect(app.outbox()).toStrictEqual([{ target: 'z-delivery', text: 'decision from GEO-9832 (kettle): descale with vinegar, not citric acid' }]);
@@ -76,7 +74,7 @@ test('two decision notes at the same time each reach the orchestrator once acros
   );
 
   await app.tick();
-  app.rewind();
+  app.seed.meta({ key: 'atc_events_cursor', value: FROM_START });
   await app.tick();
 
   expect(app.outbox()).toStrictEqual([
