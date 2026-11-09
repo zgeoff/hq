@@ -143,6 +143,20 @@ test('it names the session and the commit in the save request and the news', asy
   expect(ctx.db.query('SELECT text FROM news').all()).toStrictEqual([{ text: `z-kettle restarted from main; its old prompt predated ${ctx.staleCommit()}` }]);
 });
 
+test('it posts exactly one news item for a stale restart, the restart line with its reason', async () => {
+  const ctx = setupTest();
+  await ctx.tick(0, [ctx.kettle]);
+  await ctx.tick(121, [ctx.kettle]);
+  ctx.atc.messages.set('m-1', { status: 'answered', answer: 'saved' });
+
+  await ctx.tick(126, [ctx.kettle]);
+
+  expect(readSpawnedNames(ctx.atc)).toStrictEqual(['z-kettle']);
+  expect(ctx.db.query('SELECT from_name, text, tag FROM news').all()).toStrictEqual([
+    { from_name: 'hq-fleet', text: `z-kettle restarted from main; its old prompt predated ${ctx.staleCommit()}`, tag: null },
+  ]);
+});
+
 test.each(['running', 'needs_you'])('it never asks a %s session', async (state) => {
   const ctx = setupTest({ sessions: [{ id: 'id-kettle', name: 'z-kettle', state }] });
 

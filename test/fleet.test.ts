@@ -21,6 +21,7 @@ import type { FleetClient, FleetEntry, FleetSession, RcDeps } from '../src/fleet
 import type { RcState } from '../src/rc/types.ts';
 import type { RunResult } from '../src/runner/types.ts';
 import { getMeta } from '../src/db/get-meta.ts';
+import { listNews } from '../src/news/list-news.ts';
 import { setMeta } from '../src/db/set-meta.ts';
 import { HqError } from '../src/errors.ts';
 import { checkFolderTrust } from '../src/trust/check-folder-trust.ts';
@@ -131,10 +132,53 @@ test('a live session is left alone; a missing one waits out the grace, then spaw
   assert.ok(spawnedID);
   expect(pins).toStrictEqual([spawnedID]);
   expect(wakeList(ctx.db).map((entry) => [entry.session_id, entry.name])).toStrictEqual([[spawnedID, 'z-kettle']]);
-  expect(ctx.outbox()).toStrictEqual([{ target: 'z-stu', text: expect.stringContaining('hq fleet: z-kettle spawned') }]);
+  expect(ctx.outbox()).toStrictEqual([]);
   atMin(15);
   await ensureFleet(ctx.db, client, { dryRun: false, actor: 'hq-fleet', fleet: ctx.fleet });
   expect(spawns).toHaveLength(1);
+});
+
+test('it posts a successful respawn to news and messages nobody', async () => {
+  const ctx = setupTest();
+  const stub = fake([{ id: 'id-teapot', name: 'z-teapot', alive: true }]);
+  await ensureFleet(ctx.db, stub.client, { dryRun: false, actor: 'hq-fleet', fleet: ctx.fleet });
+  atMin(10);
+
+  await ensureFleet(ctx.db, stub.client, { dryRun: false, actor: 'hq-fleet', fleet: ctx.fleet });
+
+  expect(ctx.outbox()).toStrictEqual([]);
+  expect(listNews(ctx.db, { all: true, limit: 10 })).toStrictEqual([
+    expect.objectContaining({ from_name: 'hq-fleet', topic: 'other', text: expect.stringContaining('hq fleet: z-kettle spawned'), needs_geoff: 0 }),
+  ]);
+});
+
+test('it messages the owner and posts no news when a spawn fails', async () => {
+  const ctx = setupTest();
+  const stub = fake([{ id: 'id-teapot', name: 'z-teapot', alive: true }]);
+  const broken: FleetClient = { ...stub.client, spawn: () => Promise.reject(new Error('invented spawn refusal')) };
+  await ensureFleet(ctx.db, stub.client, { dryRun: false, actor: 'hq-fleet', fleet: ctx.fleet });
+  atMin(10);
+
+  await ensureFleet(ctx.db, broken, { dryRun: false, actor: 'hq-fleet', fleet: ctx.fleet });
+
+  expect(ctx.outbox()).toStrictEqual([{ target: 'z-stu', text: 'hq fleet: z-kettle failed: invented spawn refusal.' }]);
+  expect(listNews(ctx.db, { all: true, limit: 10 })).toStrictEqual([]);
+});
+
+test('it messages the owner about the failed step only, and posts the spawned one to news', async () => {
+  const ctx = setupTest();
+  const stub = fake([]);
+  const flaky: FleetClient = {
+    ...stub.client,
+    spawn: (request) => (request.name === 'z-teapot' ? Promise.reject(new Error('invented spawn refusal')) : stub.client.spawn(request)),
+  };
+  await ensureFleet(ctx.db, flaky, { dryRun: false, actor: 'hq-fleet', fleet: ctx.fleet });
+  atMin(10);
+
+  await ensureFleet(ctx.db, flaky, { dryRun: false, actor: 'hq-fleet', fleet: ctx.fleet });
+
+  expect(ctx.outbox()).toStrictEqual([{ target: 'z-stu', text: 'hq fleet: z-teapot failed: invented spawn refusal.' }]);
+  expect(listNews(ctx.db, { all: true, limit: 10 })).toStrictEqual([expect.objectContaining({ text: expect.stringContaining('hq fleet: z-kettle spawned') })]);
 });
 
 test('it reports a failed pin after a spawn, and pins the live session on the next check', async () => {
@@ -149,7 +193,8 @@ test('it reports a failed pin after a spawn, and pins the live session on the ne
   const checked = await ensureFleet(ctx.db, stub.client, { dryRun: false, actor: 'hq-fleet', fleet: ctx.fleet });
 
   expect(spawned[0]).toMatchObject({ name: 'z-kettle', action: 'spawned', detail: expect.stringContaining('the pin failed (invented pin refusal), so the next check pins it again') });
-  expect(ctx.outbox()).toStrictEqual([{ target: 'z-stu', text: expect.stringContaining('the pin failed (invented pin refusal)') }]);
+  expect(ctx.outbox()).toStrictEqual([]);
+  expect(listNews(ctx.db, { all: true, limit: 10 })).toStrictEqual([expect.objectContaining({ text: expect.stringContaining('the pin failed (invented pin refusal)') })]);
   const spawnedID = spawned[0]?.id;
   if (!spawnedID) {
     throw new Error('the spawn step carries no session id');
@@ -225,18 +270,37 @@ test('a recent daemon restart holds spawns; quiet hours hold only the message', 
   expect(spawns).toHaveLength(1);
 });
 
-test('quiet hours: the spawn happens, the message waits for morning', async () => {
+test('it holds the failure message for morning in quiet hours', async () => {
   const ctx = setupTest();
   const { client, spawns } = fake([]);
+  const broken: FleetClient = { ...client, spawn: () => Promise.reject(new Error('invented spawn refusal')) };
   at('2026-10-14T16:00:00Z');
-  await ensureFleet(ctx.db, client, { dryRun: false, actor: 'hq-fleet', fleet: ctx.fleet.slice(1) });
+  await ensureFleet(ctx.db, broken, { dryRun: false, actor: 'hq-fleet', fleet: ctx.fleet.slice(1) });
   at('2026-10-14T16:20:00Z');
-  await ensureFleet(ctx.db, client, { dryRun: false, actor: 'hq-fleet', fleet: ctx.fleet.slice(1) });
-  expect(spawns).toHaveLength(1);
+  await ensureFleet(ctx.db, broken, { dryRun: false, actor: 'hq-fleet', fleet: ctx.fleet.slice(1) });
+  expect(spawns).toHaveLength(0);
   expect(ctx.outbox()).toHaveLength(0);
   at('2026-10-14T20:30:00Z');
   await ensureFleet(ctx.db, client, { dryRun: false, actor: 'hq-fleet', fleet: ctx.fleet.slice(1) });
   expect(ctx.outbox()).toStrictEqual([{ target: 'z-stu', text: expect.stringContaining('(held over quiet hours)') }]);
+});
+
+test('it posts a successful respawn in quiet hours to news and holds nothing for morning', async () => {
+  const ctx = setupTest();
+  const stub = fake([{ id: 'id-teapot', name: 'z-teapot', alive: true }]);
+  at('2026-10-14T16:00:00Z');
+  await ensureFleet(ctx.db, stub.client, { dryRun: false, actor: 'hq-fleet', fleet: ctx.fleet });
+  at('2026-10-14T16:20:00Z');
+
+  await ensureFleet(ctx.db, stub.client, { dryRun: false, actor: 'hq-fleet', fleet: ctx.fleet });
+  const held = getMeta(ctx.db, 'fleet_held');
+  at('2026-10-14T20:30:00Z');
+  await ensureFleet(ctx.db, stub.client, { dryRun: false, actor: 'hq-fleet', fleet: ctx.fleet });
+
+  expect(stub.spawns.map((request) => request.name)).toStrictEqual(['z-kettle']);
+  expect(listNews(ctx.db, { all: true, limit: 10 })).toStrictEqual([expect.objectContaining({ text: expect.stringContaining('hq fleet: z-kettle spawned') })]);
+  expect(held).toBeNull();
+  expect(ctx.outbox()).toStrictEqual([]);
 });
 
 test('malformed prompts fail before any spawn', () => {
@@ -524,7 +588,7 @@ test('a helper that will not start is reported, and the 5-minute check still typ
   f.helperFails();
   const steps = await ensureFleet(ctx.db, f.client, { dryRun: false, actor: 'z-stu', fleet: ctx.rcFleet(), now: ['z-kettle'], rc: f.rc });
   expect(steps.find((x) => x.action === 'spawned')!.detail).toContain('the Remote Control helper did not start (invented systemd failure)');
-  expect(ctx.told().at(-1)).toContain('helper did not start');
+  expect(listNews(ctx.db, { all: true, limit: 10 }).at(-1)?.text).toContain('helper did not start');
   sessions[0]!.state = 'done';
   atMin(5);
   const later = await ctx.ensure(f);

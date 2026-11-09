@@ -12,6 +12,7 @@ import { metaJson } from '../db/meta-json.ts';
 import { setMeta } from '../db/set-meta.ts';
 import { strMap } from '../db/str-map.ts';
 import { HqError } from '../errors.ts';
+import { addNews } from '../news/add-news.ts';
 import { enqueue } from '../outbox/enqueue.ts';
 import { readPrompt } from '../prompts/read-prompt.ts';
 import { cleanEnv } from '../runner/clean-env.ts';
@@ -30,6 +31,7 @@ import { getHome as HOME } from './get-home.ts';
 import { hasStaleOps } from './has-stale-ops.ts';
 import { HELD } from './held.ts';
 import { loadRcPending as rcPending } from './load-rc-pending.ts';
+import { pickStepsToTell } from './pick-steps-to-tell.ts';
 import { recordStaleRestarts } from './record-stale-restarts.ts';
 import { runStaleRestartTick } from './run-stale-restart-tick.ts';
 import type { RestartedSession } from './run-stale-restart-tick.ts';
@@ -44,9 +46,10 @@ export async function ensureFleet(db: Database, client: FleetClient, opts: { dry
   const lease = takeLease(db, opts.actor);
   try {
     const restarted = await tryStaleRestart(db, client, opts);
+    const restartedNames = restarted.map((session) => session.name);
     let steps: EnsureStep[];
     try {
-      steps = await ensureOnce(db, client, { ...opts, now: [...(opts.now ?? []), ...restarted.map((r) => r.name)] });
+      steps = await ensureOnce(db, client, { ...opts, now: [...(opts.now ?? []), ...restartedNames], restarting: new Set(restartedNames) });
     } catch (error) {
       recordStaleRestarts(db, restarted, null, opts.actor);
       throw error;
@@ -98,7 +101,16 @@ function dropLease(db: Database, token: string): void {
 }
 const FLEET_UNPINNED = 'fleet_unpinned';
 
-async function ensureOnce(db: Database, client: FleetClient, opts: { dryRun: boolean; actor: string; fleet?: FleetEntry[]; now?: string[]; rc?: RcDeps }): Promise<EnsureStep[]> {
+interface EnsureOnceOptions {
+  dryRun: boolean;
+  actor: string;
+  fleet?: FleetEntry[];
+  now?: string[];
+  restarting?: ReadonlySet<string>;
+  rc?: RcDeps;
+}
+
+async function ensureOnce(db: Database, client: FleetClient, opts: EnsureOnceOptions): Promise<EnsureStep[]> {
   // A missing name waits before a spawn (a restore after a daemon restart keeps its id); a z- session
   // doesn't sleep for an hour, so a session atc still means to run is taken as dead after that.
   const GRACE_MIN = 10;
@@ -226,12 +238,20 @@ async function ensureOnce(db: Database, client: FleetClient, opts: { dryRun: boo
     const told = steps.filter((step) => !rcReported.has(step) && (step.action === 'spawned' || step.action === 'failed' || step.action === 'duplicates' || step.action === 'remote control'));
     if (!opts.dryRun && told.length) {
       const seq = logEvent(db, 'hq', 'fleet', 'ensured', opts.actor, null, null, { steps: told });
-      const text = `hq fleet: ${told.map(sayStep).join('; ')}.`;
-      for (const u of told.filter((x) => x.urgent)) enqueue(db, logEvent(db, 'hq', 'fleet', 'urgent', opts.actor, null, null, { step: u }), owner(), `hq fleet: ${sayStep(u)}.`);
-      if (isQuiet(startedAt)) {
-        setMeta(db, 'fleet_held', JSON.stringify([...metaJson(db, 'fleet_held', HELD, []), { seq, text }]));
-      } else {
-        enqueue(db, seq, owner(), text);
+      const picked = pickStepsToTell(told, opts.restarting ?? new Set());
+      for (const step of picked.news) {
+        addNews(db, { from: opts.actor, topic: 'other', text: `hq fleet: ${sayStep(step)}.`.replaceAll(/\s*[\r\n]+\s*/gu, ' ').slice(0, 400), issue: null, link: null, needsGeoff: false, tag: 'fleet-respawn' });
+      }
+      for (const urgent of picked.owner.filter((x) => x.urgent)) {
+        enqueue(db, logEvent(db, 'hq', 'fleet', 'urgent', opts.actor, null, null, { step: urgent }), owner(), `hq fleet: ${sayStep(urgent)}.`);
+      }
+      if (picked.owner.length > 0) {
+        const text = `hq fleet: ${picked.owner.map(sayStep).join('; ')}.`;
+        if (isQuiet(startedAt)) {
+          setMeta(db, 'fleet_held', JSON.stringify([...metaJson(db, 'fleet_held', HELD, []), { seq, text }]));
+        } else {
+          enqueue(db, seq, owner(), text);
+        }
       }
     }
     if (!opts.dryRun && !isQuiet(startedAt)) {
