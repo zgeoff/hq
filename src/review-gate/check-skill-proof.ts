@@ -6,7 +6,7 @@ import { OWNER } from '../releases/owner.ts';
 import { collectMissingProof } from './collect-missing-proof.ts';
 import { isBotAuthor } from './is-bot-author.ts';
 import type { ParsedRepo } from '../noslop/parse-lower-repo.ts';
-import { readNixSkillPR } from './read-nix-skill-pr.ts';
+import { probeNixSkillPR } from './probe-nix-skill-pr.ts';
 import { pickSkillProofVerdict } from './pick-skill-proof-verdict.ts';
 import type { SkillProofFacts } from './pick-skill-proof-verdict.ts';
 import type { GateFacts } from './read-gate-facts.ts';
@@ -18,7 +18,7 @@ export async function checkSkillProof(request: PRRequest, parsed: ParsedRepo, fa
   if (parsed.owner !== OWNER) {
     return;
   }
-  const nixSkill = await readNixSkillPR(parsed, facts, readFiles);
+  const nixSkill = await probeNixSkillPR(parsed, facts, readFiles);
   if (nixSkill) {
     return;
   }

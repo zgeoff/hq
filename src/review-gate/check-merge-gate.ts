@@ -30,7 +30,7 @@ import { readNoslopCheck } from '../noslop/read-noslop-check.ts';
 import { readNoslopFindings } from '../noslop/read-noslop-findings.ts';
 import { readOKReviews } from '../noslop/read-ok-reviews.ts';
 import type { OKReviewRecord } from '../noslop/read-ok-reviews.ts';
-import { readNixSkillPR } from './read-nix-skill-pr.ts';
+import { probeNixSkillPR } from './probe-nix-skill-pr.ts';
 import { readPRFiles } from './read-pr-files.ts';
 import { pickNoslopVerdict } from '../noslop/pick-noslop-verdict.ts';
 import { pickOwnerHeldVerdict } from './pick-owner-held-verdict.ts';
@@ -60,7 +60,7 @@ export async function checkMergeGate(request: PRRequest, onHead?: OnGateHead): P
   const readFiles = readFilesOnce(request, parsed);
 
   // Before the owner's hold, so his lgtm never lands on a description that still has to change.
-  const nixSkill = await readNixSkillPR(parsed, facts, readFiles);
+  const nixSkill = await probeNixSkillPR(parsed, facts, readFiles);
   await checkSkillProof(request, parsed, facts, readFiles);
   await checkOwnerHeld(request, parsed, facts, readFiles);
   if (unreviewed !== null) {
