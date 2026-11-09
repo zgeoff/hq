@@ -1318,6 +1318,7 @@ test('it records a review wait with hq run review-wait on the FINAL, and hq run 
   ctx.seed.finalRunPR({ issue: 'GEO-9741', ref: 'kettle#741', sha: 'abc1234' });
 
   const code = await main(['run', 'review-wait', 'kettle#741', '--until', '2026-10-16T01:00:00Z', '--reason', 'the only reviewer is out of quota']);
+  const waited = ctx.lines.join('\n');
   ctx.lines.length = 0;
   await main(['run', 'show', 'GEO-9741']);
   const shownBefore = ctx.lines.join('\n');
@@ -1325,11 +1326,28 @@ test('it records a review wait with hq run review-wait on the FINAL, and hq run 
   at('2026-10-16T01:00:00Z');
   await main(['run', 'show', 'GEO-9741']);
 
-  expect(code).toBe(0);
-  expect(shownBefore).toInclude('  kettle#741 review waits until Fri, 16 Oct, 12:00 (the only reviewer is out of quota)');
+  expect({ code, waited }).toStrictEqual({ code: 0, waited: '| no session | GEO-9741 Invented kettle work [working] | kettle#741 final abc1234 | Agent working. |' });
+  expect(shownBefore).toInclude('  kettle#741 review waits until Fri 16 Oct 12:00 Sydney (the only reviewer is out of quota)');
   expect(ctx.lines.join('\n')).not.toInclude('review waits');
   const stored = requirePR(ctx.db, 'kettle#741');
   expect({ until: stored.review_wait_until, sha: stored.review_wait_sha }).toStrictEqual({ until: '2026-10-16T01:00:00Z', sha: 'abc1234' });
+});
+
+test('it hides a review wait from hq run show once a new FINAL at another head is recorded', async () => {
+  const ctx = setupTest();
+  updateEnv('HQ_AS', 'z-delivery');
+  ctx.seed.run({ issue: 'GEO-9748' });
+  ctx.seed.finalRunPR({ issue: 'GEO-9748', ref: 'kettle#748', sha: 'abc1234' });
+  const code = await main(['run', 'review-wait', 'kettle#748', '--until', '2026-10-16T01:00:00Z', '--reason', 'the only reviewer is out of quota']);
+  const waited = ctx.lines.join('\n');
+  const head = `def56789${buildMockSha(3).slice(8)}`;
+  await main(['run', 'final', 'kettle#748', '--sha', head], buildStubFinalGH({ commits: [head] }, []));
+  ctx.lines.length = 0;
+
+  await main(['run', 'show', 'GEO-9748']);
+
+  expect({ code, waited }).toStrictEqual({ code: 0, waited: '| no session | GEO-9748 Invented kettle work [working] | kettle#748 final abc1234 | Agent working. |' });
+  expect(ctx.lines.join('\n')).toBe(`| no session | GEO-9748 Invented kettle work [working] | kettle#748 final ${head.slice(0, 7)} | Agent working. |`);
 });
 
 test.each([
