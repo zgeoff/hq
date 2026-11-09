@@ -3,12 +3,12 @@ import { logEvent } from '../log-event.ts';
 import { iso } from '../clock/iso.ts';
 import { now } from '../clock/now.ts';
 import { dropTopic } from '../outbox/drop-topic.ts';
-import { checkPr } from '../transitions/check-pr.ts';
+import { checkPR } from '../transitions/check-pr.ts';
 import { clearOwnerWait } from './clear-owner-wait.ts';
-import { normalizePrRef } from './normalize-pr-ref.ts';
-import { requirePR as mustPr } from './require-pr.ts';
+import { normalizePRRef } from './normalize-pr-ref.ts';
+import { requirePR as mustPR } from './require-pr.ts';
 import { REVIEWER } from './reviewer.ts';
-import type { RunPr } from './types.ts';
+import type { RunPR } from './types.ts';
 import { updateMergedRun } from './update-merged-run.ts';
 import { updateRunTime as touch } from './update-run-time.ts';
 
@@ -17,19 +17,19 @@ export interface MergeFacts {
   mergeSha: string | null;
 }
 
-export interface PrClose {
+export interface PRClose {
   to: 'merged' | 'closed';
   actor: string;
   facts?: MergeFacts | undefined;
   supersededBy?: string | undefined;
 }
 
-export function closePr(db: Database, raw: string, close: PrClose): RunPr {
+export function closePR(db: Database, raw: string, close: PRClose): RunPR {
   return db
     .transaction(() => {
-      const { ref } = normalizePrRef(raw);
-      const pr = mustPr(db, ref);
-      checkPr(ref, close.to, pr.state);
+      const ref = normalizePRRef(raw).ref;
+      const pr = mustPR(db, ref);
+      checkPR(ref, close.to, pr.state);
       const t = iso(now());
       const mergedAt = close.to === 'merged' ? (close.facts?.mergedAt ?? t) : null;
       const mergeSha = close.to === 'merged' ? (close.facts?.mergeSha ?? null) : null;
@@ -42,7 +42,7 @@ export function closePr(db: Database, raw: string, close: PrClose): RunPr {
         clearOwnerWait(db, pr.issue, ref, close.actor);
       }
       updateMergedRun(db, pr.issue, close.actor);
-      return mustPr(db, ref);
+      return mustPR(db, ref);
     })
     .immediate();
 }

@@ -7,7 +7,7 @@ import { syncStarted } from './sync-started.ts';
 function setupTest() {
   const fresh = freshDb();
   onTestFinished(fresh.cleanup);
-  return { db: fresh.db, readPrs: () => fresh.db.query('SELECT issue, ref, status, merged_at FROM linear_started_prs ORDER BY issue, ref').all() };
+  return { db: fresh.db, readPRs: () => fresh.db.query('SELECT issue, ref, status, merged_at FROM linear_started_prs ORDER BY issue, ref').all() };
 }
 
 test('it stores each In Progress issue with its PR attachments and replaces them on the next read', async () => {
@@ -21,11 +21,11 @@ test('it stores each In Progress issue with its PR attachments and replaces them
     ],
   );
   await syncStarted(ctx.db, first, at);
-  const stored = ctx.readPrs();
+  const stored = ctx.readPRs();
 
   await syncStarted(ctx.db, makeThroughputLinearCall([], [{ identifier: 'GEO-9802', startedAt: '2026-10-14T08:00:00Z', attachments: [buildGithubAttachment(43, 'closed')] }]), at);
 
-  expect({ stored, replaced: ctx.readPrs() }).toStrictEqual({
+  expect({ stored, replaced: ctx.readPRs() }).toStrictEqual({
     stored: [
       { issue: 'GEO-9801', ref: 'kettle#41', status: 'merged', merged_at: '2026-10-15T01:00:00Z' },
       { issue: 'GEO-9801', ref: 'kettle#42', status: 'open', merged_at: null },
@@ -79,7 +79,7 @@ test('it refuses a 41st page and keeps the last read as it was', async () => {
 
   await expect(syncStarted(ctx.db, call, new Date('2026-10-16T07:00:00Z'))).rejects.toMatchObject({ code: 'linear_failed', message: 'more than 2000 issues In Progress; not recorded' });
   expect(pages).toBe(40);
-  expect({ started: ctx.db.query('SELECT issue FROM linear_started').all(), prs: ctx.readPrs() }).toStrictEqual({
+  expect({ started: ctx.db.query('SELECT issue FROM linear_started').all(), prs: ctx.readPRs() }).toStrictEqual({
     started: [{ issue: 'GEO-9809' }],
     prs: [{ issue: 'GEO-9809', ref: 'kettle#49', status: 'open', merged_at: null }],
   });

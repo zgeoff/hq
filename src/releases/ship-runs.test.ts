@@ -23,7 +23,7 @@ function setupTest() {
     now: new Date(NOON_SYDNEY),
     calls,
     seed: buildSeeder(base),
-    readPr: (ref: string) => base.db.query('SELECT merge_sha, shipped_tag, shipped_at FROM run_prs WHERE ref = ?').get(ref),
+    readPR: (ref: string) => base.db.query('SELECT merge_sha, shipped_tag, shipped_at FROM run_prs WHERE ref = ?').get(ref),
   };
 }
 
@@ -44,7 +44,7 @@ test('it ships a tools PR once the one package it changed has a release holding 
   const result = await shipRuns(ctx.db, run, ctx.now);
 
   expect(result.moved).toStrictEqual([{ issue: 'GEO-70', to: 'live-check', prs: [{ ref: 'tools#5', tag: 'alpha@1.0.0', shipped_at: '2026-10-15T00:00:00Z' }] }]);
-  expect(ctx.readPr('tools#5')).toStrictEqual({ merge_sha: buildMockSha(5), shipped_tag: 'alpha@1.0.0', shipped_at: '2026-10-15T00:00:00Z' });
+  expect(ctx.readPR('tools#5')).toStrictEqual({ merge_sha: buildMockSha(5), shipped_tag: 'alpha@1.0.0', shipped_at: '2026-10-15T00:00:00Z' });
 });
 
 test('it leaves a shipped run alone while a helper added after its merge is still active, and ships it once the helper ends', async () => {
@@ -85,7 +85,7 @@ test('it moves no run whose shipment write failed, and reports the failure', asy
 
   const result = await shipRuns(ctx.db, run, ctx.now);
 
-  expect([result.moved, result.shippedPrs, result.errors]).toStrictEqual([[], 0, ['tools#7: invented: shipment refused']]);
+  expect([result.moved, result.shippedPRs, result.errors]).toStrictEqual([[], 0, ['tools#7: invented: shipment refused']]);
   expect(getRun(ctx.db, 'GEO-72')?.state).toBe('merged');
 });
 
@@ -142,7 +142,7 @@ test('it ships a tools PR that changes no package at its merge time, with no tag
   const result = await shipRuns(ctx.db, run, ctx.now);
 
   expect(result.moved).toStrictEqual([{ issue: 'GEO-73', to: 'live-check', prs: [{ ref: 'tools#7', tag: null, shipped_at: '2026-10-12T05:06:07Z' }] }]);
-  expect(ctx.readPr('tools#7')).toStrictEqual({ merge_sha: buildMockSha(7), shipped_tag: null, shipped_at: '2026-10-12T05:06:07Z' });
+  expect(ctx.readPR('tools#7')).toStrictEqual({ merge_sha: buildMockSha(7), shipped_tag: null, shipped_at: '2026-10-12T05:06:07Z' });
   expect(ctx.calls.filter((call) => call.includes('/releases'))).toStrictEqual([]);
 });
 
@@ -164,8 +164,8 @@ test('it keeps a PR shipped at its merge with no tag on the next pass, with no g
 
   const second = await shipRuns(ctx.db, buildStubSourceGH(facts, calls), ctx.now);
 
-  expect(second.shippedPrs).toBe(0);
-  expect(ctx.readPr('tools#8')).toStrictEqual({ merge_sha: buildMockSha(8), shipped_tag: null, shipped_at: '2026-10-12T05:06:07Z' });
+  expect(second.shippedPRs).toBe(0);
+  expect(ctx.readPR('tools#8')).toStrictEqual({ merge_sha: buildMockSha(8), shipped_tag: null, shipped_at: '2026-10-12T05:06:07Z' });
   expect(calls.filter((call) => call.includes('pulls/8/') || call.includes(`ref=${buildMockSha(8)}`) || call.includes(' 8 -R '))).toStrictEqual([]);
   expect(getRun(ctx.db, 'GEO-74')?.state).toBe('merged');
 });
@@ -201,7 +201,7 @@ test('it records an error and moves nothing when GitHub has no release config fo
   expect(result.moved).toStrictEqual([]);
   expect(result.errors[0]).toContain('tools#9');
   expect(getRun(ctx.db, 'GEO-75')?.state).toBe('merged');
-  expect(ctx.readPr('tools#9')).toStrictEqual({ merge_sha: buildMockSha(9), shipped_tag: null, shipped_at: null });
+  expect(ctx.readPR('tools#9')).toStrictEqual({ merge_sha: buildMockSha(9), shipped_tag: null, shipped_at: null });
 });
 
 test('it records an error when the tools release list cannot be read', async () => {
@@ -237,7 +237,7 @@ test('it waits on an hq PR, with no error, when the installed build does not hol
 
   expect(result.moved).toStrictEqual([]);
   expect(result.errors).toStrictEqual([]);
-  expect(ctx.readPr('hq#31')).toStrictEqual({ merge_sha: buildMockSha(31), shipped_tag: null, shipped_at: null });
+  expect(ctx.readPR('hq#31')).toStrictEqual({ merge_sha: buildMockSha(31), shipped_tag: null, shipped_at: null });
 });
 
 test.each([
@@ -486,7 +486,7 @@ test('it waits on a cloud PR that changes a host-build path while only deployed/
 
   expect(result.moved).toStrictEqual([]);
   expect(result.errors).toStrictEqual([]);
-  expect(ctx.readPr('cloud#45')).toStrictEqual({ merge_sha: buildMockSha(45), shipped_tag: null, shipped_at: null });
+  expect(ctx.readPR('cloud#45')).toStrictEqual({ merge_sha: buildMockSha(45), shipped_tag: null, shipped_at: null });
 });
 
 test('it ships a cloud PR that changes a host-build path in deployed/host once both refs hold its merge', async () => {
@@ -547,7 +547,7 @@ test('it keeps a cloud PR unshipped and records the error when the gates file ca
 
   expect(result.moved).toStrictEqual([]);
   expect(result.errors).toStrictEqual(['cloud: gates of cloud failed (1): gh: Not Found (HTTP 404)']);
-  expect(ctx.readPr('cloud#48')).toStrictEqual({ merge_sha: buildMockSha(48), shipped_tag: null, shipped_at: null });
+  expect(ctx.readPR('cloud#48')).toStrictEqual({ merge_sha: buildMockSha(48), shipped_tag: null, shipped_at: null });
 });
 
 test('it reads the gates file once in a pass for two cloud PRs', async () => {
@@ -589,7 +589,7 @@ test('it reads a failed gates file once in a pass for two cloud PRs, records one
   expect(ctx.calls.filter((call) => call.includes('gates.yml'))).toHaveLength(1);
   expect(result.errors).toStrictEqual(['cloud: gates of cloud failed (1): gh: Not Found (HTTP 404)']);
   expect(result.moved).toStrictEqual([]);
-  expect([ctx.readPr('cloud#51'), ctx.readPr('cloud#52')]).toStrictEqual([
+  expect([ctx.readPR('cloud#51'), ctx.readPR('cloud#52')]).toStrictEqual([
     { merge_sha: buildMockSha(51), shipped_tag: null, shipped_at: null },
     { merge_sha: buildMockSha(52), shipped_tag: null, shipped_at: null },
   ]);

@@ -5,20 +5,20 @@ import { now } from '../clock/now.ts';
 import { HqError } from '../errors.ts';
 import { parseCapUntil } from '../lanes/cap/parse-cap-until.ts';
 import { logEvent } from '../log-event.ts';
-import { normalizePrRef } from './normalize-pr-ref.ts';
+import { normalizePRRef } from './normalize-pr-ref.ts';
 import { pickReviewWait } from './pick-review-wait.ts';
 import type { ReviewWaitRequest } from './pick-review-wait.ts';
-import { requirePR as mustPr } from './require-pr.ts';
-import type { RunPr } from './types.ts';
+import { requirePR as mustPR } from './require-pr.ts';
+import type { RunPR } from './types.ts';
 import { updateRunTime as touch } from './update-run-time.ts';
 
 export type ReviewWaitInput = { clear: true } | { clear: false; until: string | undefined; reason: string | undefined };
 
-export function setReviewWait(db: Database, raw: string, input: ReviewWaitInput, actor: string): RunPr {
+export function setReviewWait(db: Database, raw: string, input: ReviewWaitInput, actor: string): RunPR {
   return db
     .transaction(() => {
-      const ref = normalizePrRef(raw).ref;
-      const pr = mustPr(db, ref);
+      const ref = normalizePRRef(raw).ref;
+      const pr = mustPR(db, ref);
       const at = now();
       const request = buildRequest(input, at);
       const write = pickReviewWait(pr, request);
@@ -32,7 +32,7 @@ export function setReviewWait(db: Database, raw: string, input: ReviewWaitInput,
         .exhaustive();
       logEvent(db, 'run', pr.issue, action, actor, null, null, { ref, sha: write.sha, until: write.until, reason: write.reason });
       touch(db, pr.issue);
-      return mustPr(db, ref);
+      return mustPR(db, ref);
     })
     .immediate();
 }

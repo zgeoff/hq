@@ -46,7 +46,7 @@ import { SOURCES } from './sources.ts';
 import { isHeldPastShip } from './is-held-past-ship.ts';
 import { readHeldAt } from './read-held-at.ts';
 import { readActiveSession } from '../runs/read-active-session.ts';
-import type { PrState, Release, ShipMove, ShipResult, Source } from './types.ts';
+import type { PRState, Release, ShipMove, ShipResult, Source } from './types.ts';
 import { toErrorMessage } from '../to-error-message.ts';
 import { writeShippedPR } from './write-shipped-pr.ts';
 
@@ -55,14 +55,14 @@ const PRViewSchema = z.object({ mergeCommit: z.object({ oid: z.unknown() }).null
 
 export async function shipRuns(db: Database, run: Runner, at: Date = now(), opts: { dryRun?: boolean; readBuild?: () => Build } = {}): Promise<ShipResult> {
   const dryRun = !!opts.dryRun;
-  const res: ShipResult = { dryRun, moved: [], shippedPrs: 0, compares: 0, deferred: 0, held: [], busy: [], errors: [] };
+  const res: ShipResult = { dryRun, moved: [], shippedPRs: 0, compares: 0, deferred: 0, held: [], busy: [], errors: [] };
   const err = (m: string) => res.errors.push(m);
 
   const runs = runSyncQuery(db, kdb(db).selectFrom('runs').selectAll().where('state', 'in', ['merged', 'deploying', 'deploy-held']).orderBy('created_at').compile(), RunSchema);
   const prsOf = (issue: string) => runSyncQuery(db, kdb(db).selectFrom('run_prs').selectAll().where('issue', '=', issue).orderBy('added_at').compile(), RunPRSchema);
 
   const deliveryPRsOf = (issue: string) => prsOf(issue).filter((pr) => pr.design_pass === 0);
-  const states = new Map<string, PrState>();
+  const states = new Map<string, PRState>();
   const candidates: { run: Run; refs: string[] }[] = [];
   for (const r of runs) {
     const prs = deliveryPRsOf(r.issue);
@@ -141,7 +141,7 @@ export async function shipRuns(db: Database, run: Runner, at: Date = now(), opts
     return yes;
   };
 
-  const writeShipped = (state: PrState) => {
+  const writeShipped = (state: PRState) => {
     if (dryRun) return;
     writeShippedPR(db, state);
   };
@@ -188,7 +188,7 @@ export async function shipRuns(db: Database, run: Runner, at: Date = now(), opts
           const shipped = { ...s, tag: found.tag, at: found.at ?? iso(at) };
           writeShipped(shipped);
           Object.assign(s, shipped);
-          res.shippedPrs++;
+          res.shippedPRs++;
         }
       } catch (e) {
         err(`${ref}: ${toErrorMessage(e)}`);

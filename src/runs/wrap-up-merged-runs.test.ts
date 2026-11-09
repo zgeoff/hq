@@ -13,9 +13,9 @@ import { claimHandedInRun } from './claim-handed-in-run.ts';
 import { CLEANUP_ACTIONS } from './is-cleanup-held.ts';
 import { notesFor } from './notes-for.ts';
 import type { ImpWork } from './types.ts';
-import { addPr } from './add-pr.ts';
+import { addPR } from './add-pr.ts';
 import { addRun } from './add-run.ts';
-import { closePr } from './close-pr.ts';
+import { closePR } from './close-pr.ts';
 import { setSession } from './set-session.ts';
 import { setState } from './set-state.ts';
 import { wrapUpMergedRuns } from './wrap-up-merged-runs.ts';
@@ -29,10 +29,10 @@ function setupTest() {
 test.each(['merged', 'live-check', 'deploy-held'])('it wraps up a %s run whose PRs are all merged or closed', async (state) => {
   const ctx = setupTest();
   addRun(ctx.db, { issue: 'GEO-9901', title: 'Invented kettle descaler', place: 'local', session: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
-  addPr(ctx.db, 'GEO-9901', 'kettle#1', 'z-delivery');
-  addPr(ctx.db, 'GEO-9901', 'kettle#2', 'z-delivery');
-  closePr(ctx.db, 'kettle#1', { to: 'merged', actor: 'z-delivery' });
-  closePr(ctx.db, 'kettle#2', { to: 'closed', actor: 'z-delivery' });
+  addPR(ctx.db, 'GEO-9901', 'kettle#1', 'z-delivery');
+  addPR(ctx.db, 'GEO-9901', 'kettle#2', 'z-delivery');
+  closePR(ctx.db, 'kettle#1', { to: 'merged', actor: 'z-delivery' });
+  closePR(ctx.db, 'kettle#2', { to: 'closed', actor: 'z-delivery' });
   setState(ctx.db, 'GEO-9901', state, {}, 'z-delivery');
   const fleet = buildStubFleetClient({ sessions: [{ id: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true }] });
 
@@ -46,8 +46,8 @@ test.each(['merged', 'live-check', 'deploy-held'])('it wraps up a %s run whose P
 test.each(['working', 'blocked', 'done'])('it skips a %s run', async (state) => {
   const ctx = setupTest();
   addRun(ctx.db, { issue: 'GEO-9902', title: 'Invented teapot cosy', place: 'local', session: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
-  addPr(ctx.db, 'GEO-9902', 'teapot#1', 'z-delivery');
-  closePr(ctx.db, 'teapot#1', { to: 'merged', actor: 'z-delivery' });
+  addPR(ctx.db, 'GEO-9902', 'teapot#1', 'z-delivery');
+  closePR(ctx.db, 'teapot#1', { to: 'merged', actor: 'z-delivery' });
   setState(ctx.db, 'GEO-9902', state, {}, 'z-delivery');
   const openClient = mock(() => Promise.reject(new Error('no atc expected')));
 
@@ -60,9 +60,9 @@ test.each(['working', 'blocked', 'done'])('it skips a %s run', async (state) => 
 test('it skips a deploy-held run with an open PR, with no wrap-up note and no news', async () => {
   const ctx = setupTest();
   addRun(ctx.db, { issue: 'GEO-9903', title: 'Invented teapot cosy', place: 'local', session: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
-  addPr(ctx.db, 'GEO-9903', 'teapot#1', 'z-delivery');
-  addPr(ctx.db, 'GEO-9903', 'teapot#2', 'z-delivery');
-  closePr(ctx.db, 'teapot#1', { to: 'merged', actor: 'z-delivery' });
+  addPR(ctx.db, 'GEO-9903', 'teapot#1', 'z-delivery');
+  addPR(ctx.db, 'GEO-9903', 'teapot#2', 'z-delivery');
+  closePR(ctx.db, 'teapot#1', { to: 'merged', actor: 'z-delivery' });
   setState(ctx.db, 'GEO-9903', 'deploy-held', {}, 'z-delivery');
 
   const wrapped = await wrapUpMergedRuns(ctx.db, { openClient: () => Promise.reject(new Error('no atc expected')), readImpWork: () => Promise.reject(new Error('no check expected')), readLocalWork: () => Promise.resolve({ state: 'pushed' as const }) }, { actor: 'sweep' });
@@ -75,8 +75,8 @@ test('it skips a deploy-held run with an open PR, with no wrap-up note and no ne
 test('it wraps a run up once across two passes', async () => {
   const ctx = setupTest();
   addRun(ctx.db, { issue: 'GEO-9904', title: 'Invented kettle descaler', place: 'local', session: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
-  addPr(ctx.db, 'GEO-9904', 'kettle#1', 'z-delivery');
-  closePr(ctx.db, 'kettle#1', { to: 'merged', actor: 'z-delivery' });
+  addPR(ctx.db, 'GEO-9904', 'kettle#1', 'z-delivery');
+  closePR(ctx.db, 'kettle#1', { to: 'merged', actor: 'z-delivery' });
   setState(ctx.db, 'GEO-9904', 'merged', {}, 'z-delivery');
   const fleet = buildStubFleetClient({ sessions: [{ id: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true }] });
   const deps = { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')), readLocalWork: () => Promise.resolve({ state: 'pushed' as const }) };
@@ -92,8 +92,8 @@ test('it wraps a run up once across two passes', async () => {
 test('it wraps a run up again when it went back to working and merged again', async () => {
   const ctx = setupTest();
   addRun(ctx.db, { issue: 'GEO-9905', title: 'Invented kettle descaler', place: 'local', session: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
-  addPr(ctx.db, 'GEO-9905', 'kettle#1', 'z-delivery');
-  closePr(ctx.db, 'kettle#1', { to: 'merged', actor: 'z-delivery' });
+  addPR(ctx.db, 'GEO-9905', 'kettle#1', 'z-delivery');
+  closePR(ctx.db, 'kettle#1', { to: 'merged', actor: 'z-delivery' });
   setState(ctx.db, 'GEO-9905', 'merged', {}, 'z-delivery');
   const fleet = buildStubFleetClient({ sessions: [{ id: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true }] });
   const deps = { openClient: () => Promise.resolve(fleet.client), readImpWork: () => Promise.reject(new Error('a local run checks no imp')), readLocalWork: () => Promise.resolve({ state: 'pushed' as const }) };
@@ -110,8 +110,8 @@ test('it names each kept and each failed session of a run in one report news ite
   const ctx = setupTest();
   addRun(ctx.db, { issue: 'GEO-9906', title: 'Invented kettle descaler', place: 'local', session: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
   setSession(ctx.db, 'GEO-9906', '0000a002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'z-delivery', 'add');
-  addPr(ctx.db, 'GEO-9906', 'kettle#1', 'z-delivery');
-  closePr(ctx.db, 'kettle#1', { to: 'merged', actor: 'z-delivery' });
+  addPR(ctx.db, 'GEO-9906', 'kettle#1', 'z-delivery');
+  closePR(ctx.db, 'kettle#1', { to: 'merged', actor: 'z-delivery' });
   setState(ctx.db, 'GEO-9906', 'merged', {}, 'z-delivery');
   const fleet = buildStubFleetClient({
     sessions: [
@@ -136,8 +136,8 @@ test('it names each kept and each failed session of a run in one report news ite
 test('it adds no news for a run whose sessions were all forgotten', async () => {
   const ctx = setupTest();
   addRun(ctx.db, { issue: 'GEO-9907', title: 'Invented teapot cosy', place: 'local', session: '0000b001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
-  addPr(ctx.db, 'GEO-9907', 'teapot#1', 'z-delivery');
-  closePr(ctx.db, 'teapot#1', { to: 'merged', actor: 'z-delivery' });
+  addPR(ctx.db, 'GEO-9907', 'teapot#1', 'z-delivery');
+  closePR(ctx.db, 'teapot#1', { to: 'merged', actor: 'z-delivery' });
   setState(ctx.db, 'GEO-9907', 'merged', {}, 'z-delivery');
   const fleet = buildStubFleetClient({ sessions: [{ id: '0000b001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'teapot-agent', alive: true }] });
 
@@ -151,8 +151,8 @@ test('it opens one atc client and lists the sessions once for a pass over two ru
   addRun(ctx.db, { issue: 'GEO-9913', title: 'Invented kettle descaler', place: 'local', session: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
   addRun(ctx.db, { issue: 'GEO-9914', title: 'Invented teapot cosy', place: 'local', session: '0000b001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
   for (const [issue, ref] of [['GEO-9913', 'kettle#13'], ['GEO-9914', 'teapot#14']] as const) {
-    addPr(ctx.db, issue, ref, 'z-delivery');
-    closePr(ctx.db, ref, { to: 'merged', actor: 'z-delivery' });
+    addPR(ctx.db, issue, ref, 'z-delivery');
+    closePR(ctx.db, ref, { to: 'merged', actor: 'z-delivery' });
     setState(ctx.db, issue, 'merged', {}, 'z-delivery');
   }
   const fleet = buildStubFleetClient({
@@ -176,8 +176,8 @@ test('it forgets a session removed from the run by hand', async () => {
   addRun(ctx.db, { issue: 'GEO-9908', title: 'Invented kettle descaler', place: 'local', session: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
   setSession(ctx.db, 'GEO-9908', '0000a002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'z-delivery', 'add');
   setSession(ctx.db, 'GEO-9908', '0000a002', 'z-delivery', 'remove');
-  addPr(ctx.db, 'GEO-9908', 'kettle#1', 'z-delivery');
-  closePr(ctx.db, 'kettle#1', { to: 'merged', actor: 'z-delivery' });
+  addPR(ctx.db, 'GEO-9908', 'kettle#1', 'z-delivery');
+  closePR(ctx.db, 'kettle#1', { to: 'merged', actor: 'z-delivery' });
   setState(ctx.db, 'GEO-9908', 'merged', {}, 'z-delivery');
   const fleet = buildStubFleetClient({
     sessions: [
@@ -195,8 +195,8 @@ test('a dry run calls no forget, unpin or destroy and writes no event, note or n
   const ctx = setupTest();
   addRun(ctx.db, { issue: 'GEO-9909', title: 'Invented kettle descaler', place: 'imp', session: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
   setSession(ctx.db, 'GEO-9909', '0000a002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'z-delivery', 'add');
-  addPr(ctx.db, 'GEO-9909', 'kettle#1', 'z-delivery');
-  closePr(ctx.db, 'kettle#1', { to: 'merged', actor: 'z-delivery' });
+  addPR(ctx.db, 'GEO-9909', 'kettle#1', 'z-delivery');
+  closePR(ctx.db, 'kettle#1', { to: 'merged', actor: 'z-delivery' });
   setState(ctx.db, 'GEO-9909', 'merged', {}, 'z-delivery');
   const fleet = buildStubFleetClient({
     sessions: [
@@ -224,8 +224,8 @@ test('a run whose issue is not a Linear key still gets its news and event, and d
   addRun(ctx.db, { issue: 'kettle-10', title: 'Invented kettle descaler', place: 'local', session: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
   addRun(ctx.db, { issue: 'GEO-9910', title: 'Invented teapot cosy', place: 'local', session: '0000b001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
   for (const [issue, ref] of [['kettle-10', 'kettle#10'], ['GEO-9910', 'teapot#10']] as const) {
-    addPr(ctx.db, issue, ref, 'z-delivery');
-    closePr(ctx.db, ref, { to: 'merged', actor: 'z-delivery' });
+    addPR(ctx.db, issue, ref, 'z-delivery');
+    closePR(ctx.db, ref, { to: 'merged', actor: 'z-delivery' });
     setState(ctx.db, issue, 'merged', {}, 'z-delivery');
   }
   const fleet = buildStubFleetClient({
@@ -248,8 +248,8 @@ test('a run whose wrap-up throws is marked wrapped with the failure, and the nex
   addRun(ctx.db, { issue: 'GEO-9911', title: 'Invented kettle descaler', place: 'local', session: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
   addRun(ctx.db, { issue: 'GEO-9912', title: 'Invented teapot cosy', place: 'local', session: '0000b001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
   for (const [issue, ref] of [['GEO-9911', 'kettle#11'], ['GEO-9912', 'teapot#12']] as const) {
-    addPr(ctx.db, issue, ref, 'z-delivery');
-    closePr(ctx.db, ref, { to: 'merged', actor: 'z-delivery' });
+    addPR(ctx.db, issue, ref, 'z-delivery');
+    closePR(ctx.db, ref, { to: 'merged', actor: 'z-delivery' });
     setState(ctx.db, issue, 'merged', {}, 'z-delivery');
   }
 
@@ -273,8 +273,8 @@ test('it records a news write that fails as the run failure, and still wraps up 
   addRun(ctx.db, { issue: 'GEO-9916', title: 'Invented kettle descaler', place: 'local', session: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
   addRun(ctx.db, { issue: 'GEO-9917', title: 'Invented teapot cosy', place: 'local', session: '0000b001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
   for (const [issue, ref] of [['GEO-9916', 'kettle#16'], ['GEO-9917', 'teapot#17']] as const) {
-    addPr(ctx.db, issue, ref, 'z-delivery');
-    closePr(ctx.db, ref, { to: 'merged', actor: 'z-delivery' });
+    addPR(ctx.db, issue, ref, 'z-delivery');
+    closePR(ctx.db, ref, { to: 'merged', actor: 'z-delivery' });
     setState(ctx.db, issue, 'merged', {}, 'z-delivery');
   }
   ctx.db.exec("CREATE TRIGGER kettle_refuses_news BEFORE INSERT ON news WHEN NEW.issue = 'GEO-9916' BEGIN SELECT RAISE(ABORT, 'kettle refuses news'); END");
@@ -301,8 +301,8 @@ test('it records a news write that fails as the run failure, and still wraps up 
 test('it wraps a run up in one pass only when a second pass starts before the first finishes', async () => {
   const ctx = setupTest();
   addRun(ctx.db, { issue: 'GEO-9918', title: 'Invented kettle descaler', place: 'local', session: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
-  addPr(ctx.db, 'GEO-9918', 'kettle#18', 'z-delivery');
-  closePr(ctx.db, 'kettle#18', { to: 'merged', actor: 'z-delivery' });
+  addPR(ctx.db, 'GEO-9918', 'kettle#18', 'z-delivery');
+  closePR(ctx.db, 'kettle#18', { to: 'merged', actor: 'z-delivery' });
   setState(ctx.db, 'GEO-9918', 'merged', {}, 'z-delivery');
   const fleet = buildStubFleetClient({ sessions: [{ id: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, pinned: true }] });
   const opened = Promise.withResolvers<FleetClient & StaleOps>();
@@ -325,8 +325,8 @@ test('it skips a run that another pass claimed after this pass listed it', async
   addRun(ctx.db, { issue: 'GEO-9919', title: 'Invented kettle descaler', place: 'local', session: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
   addRun(ctx.db, { issue: 'GEO-9920', title: 'Invented teapot cosy', place: 'local', session: '0000b001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
   for (const [issue, ref] of [['GEO-9919', 'kettle#19'], ['GEO-9920', 'teapot#20']] as const) {
-    addPr(ctx.db, issue, ref, 'z-delivery');
-    closePr(ctx.db, ref, { to: 'merged', actor: 'z-delivery' });
+    addPR(ctx.db, issue, ref, 'z-delivery');
+    closePR(ctx.db, ref, { to: 'merged', actor: 'z-delivery' });
     setState(ctx.db, issue, 'merged', {}, 'z-delivery');
   }
   const fleet = buildStubFleetClient({
@@ -351,11 +351,11 @@ test('it skips a run that another pass claimed after this pass listed it', async
 test('it wraps up a merged build run whose design pass PR stays open', async () => {
   const ctx = setupTest();
   addRun(ctx.db, { issue: 'GEO-9921', title: 'Design the kettle lid', place: 'local', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', design: 'agent', actor: 'z-delivery' });
-  addPr(ctx.db, 'GEO-9921', 'kettle#21', 'z-delivery');
+  addPR(ctx.db, 'GEO-9921', 'kettle#21', 'z-delivery');
   setState(ctx.db, 'GEO-9921', 'done', { note: 'design settled' }, 'z-delivery');
   addRun(ctx.db, { issue: 'GEO-9921', title: 'Build the kettle lid', place: 'local', session: '0000a021-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Building.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
-  addPr(ctx.db, 'GEO-9921', 'kettle#22', 'z-delivery');
-  closePr(ctx.db, 'kettle#22', { to: 'merged', actor: 'z-delivery' });
+  addPR(ctx.db, 'GEO-9921', 'kettle#22', 'z-delivery');
+  closePR(ctx.db, 'kettle#22', { to: 'merged', actor: 'z-delivery' });
   setState(ctx.db, 'GEO-9921', 'merged', {}, 'z-delivery');
   const fleet = buildStubFleetClient({ sessions: [{ id: '0000a021-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true }] });
 
@@ -367,8 +367,8 @@ test('it wraps up a merged build run whose design pass PR stays open', async () 
 test('it skips a merged build run whose only merged PR is its design pass PR', async () => {
   const ctx = setupTest();
   addRun(ctx.db, { issue: 'GEO-9922', title: 'Design the kettle base', place: 'local', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', design: 'agent', actor: 'z-delivery' });
-  addPr(ctx.db, 'GEO-9922', 'kettle#23', 'z-delivery');
-  closePr(ctx.db, 'kettle#23', { to: 'merged', actor: 'z-delivery' });
+  addPR(ctx.db, 'GEO-9922', 'kettle#23', 'z-delivery');
+  closePR(ctx.db, 'kettle#23', { to: 'merged', actor: 'z-delivery' });
   setState(ctx.db, 'GEO-9922', 'done', { note: 'design settled' }, 'z-delivery');
   addRun(ctx.db, { issue: 'GEO-9922', title: 'Build the kettle base', place: 'local', session: '0000a022-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Building.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
   setState(ctx.db, 'GEO-9922', 'merged', {}, 'z-delivery');
@@ -382,8 +382,8 @@ test('it skips a merged build run whose only merged PR is its design pass PR', a
 test('it forgets a session and destroys its imp once a retry after a RAM-limit failure shows all work pushed', async () => {
   const ctx = setupTest();
   addRun(ctx.db, { issue: 'GEO-9911', title: 'Invented kettle descaler', place: 'imp', session: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
-  addPr(ctx.db, 'GEO-9911', 'kettle#1', 'z-delivery');
-  closePr(ctx.db, 'kettle#1', { to: 'merged', actor: 'z-delivery' });
+  addPR(ctx.db, 'GEO-9911', 'kettle#1', 'z-delivery');
+  closePR(ctx.db, 'kettle#1', { to: 'merged', actor: 'z-delivery' });
   setState(ctx.db, 'GEO-9911', 'merged', {}, 'z-delivery');
   const fleet = buildStubFleetClient({ sessions: [{ id: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, cwd: '/workspace/kettle' }], forgets: { '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa': [{ forgotten: false, confirmToken: 'token-kettle' }] } });
   const ramUnknown = { state: 'unknown' as const, detail: 'the check in home-0000a001aaaa4aaa8aaa exited 1: imp: RAM_BUDGET_EXCEEDED: not enough 2 MiB pages', retry: true as const };
@@ -405,8 +405,8 @@ test.each([
 ])('it keeps the session and gives no further retry when a retry shows %s', async (_name, answer) => {
   const ctx = setupTest();
   addRun(ctx.db, { issue: 'GEO-9912', title: 'Invented kettle descaler', place: 'imp', session: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
-  addPr(ctx.db, 'GEO-9912', 'kettle#1', 'z-delivery');
-  closePr(ctx.db, 'kettle#1', { to: 'merged', actor: 'z-delivery' });
+  addPR(ctx.db, 'GEO-9912', 'kettle#1', 'z-delivery');
+  closePR(ctx.db, 'kettle#1', { to: 'merged', actor: 'z-delivery' });
   setState(ctx.db, 'GEO-9912', 'merged', {}, 'z-delivery');
   const fleet = buildStubFleetClient({ sessions: [{ id: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, cwd: '/workspace/kettle' }], forgets: { '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa': [{ forgotten: false, confirmToken: 'token-kettle' }] } });
   const ramUnknown = { state: 'unknown' as const, detail: 'the check in home-0000a001aaaa4aaa8aaa exited 1: imp: RAM_BUDGET_EXCEEDED: not enough 2 MiB pages', retry: true as const };
@@ -427,8 +427,8 @@ test.each([
 test('it gives no retry when the first check failed for another reason', async () => {
   const ctx = setupTest();
   addRun(ctx.db, { issue: 'GEO-9913', title: 'Invented kettle descaler', place: 'imp', session: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
-  addPr(ctx.db, 'GEO-9913', 'kettle#1', 'z-delivery');
-  closePr(ctx.db, 'kettle#1', { to: 'merged', actor: 'z-delivery' });
+  addPR(ctx.db, 'GEO-9913', 'kettle#1', 'z-delivery');
+  closePR(ctx.db, 'kettle#1', { to: 'merged', actor: 'z-delivery' });
   setState(ctx.db, 'GEO-9913', 'merged', {}, 'z-delivery');
   const fleet = buildStubFleetClient({ sessions: [{ id: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, cwd: '/workspace/kettle' }] });
   const readImpWork = mock(() => Promise.resolve({ state: 'unknown' as const, detail: 'atc gave no working directory for the session' }));
@@ -445,8 +445,8 @@ test('it gives no retry more than 10 minutes after the merge', async () => {
   const ctx = setupTest();
   onTestFinished(overrideEnv('HQ_NOW', '2026-10-22T12:00:00Z'));
   addRun(ctx.db, { issue: 'GEO-9914', title: 'Invented kettle descaler', place: 'imp', session: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
-  addPr(ctx.db, 'GEO-9914', 'kettle#1', 'z-delivery');
-  closePr(ctx.db, 'kettle#1', { to: 'merged', actor: 'z-delivery' });
+  addPR(ctx.db, 'GEO-9914', 'kettle#1', 'z-delivery');
+  closePR(ctx.db, 'kettle#1', { to: 'merged', actor: 'z-delivery' });
   setState(ctx.db, 'GEO-9914', 'merged', {}, 'z-delivery');
   const fleet = buildStubFleetClient({ sessions: [{ id: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, cwd: '/workspace/kettle' }], forgets: { '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa': [{ forgotten: false, confirmToken: 'token-kettle' }] } });
   const ramUnknown = { state: 'unknown' as const, detail: 'the check in home-0000a001aaaa4aaa8aaa exited 1: imp: RAM_BUDGET_EXCEEDED: not enough 2 MiB pages', retry: true as const };
@@ -466,8 +466,8 @@ test('it gives no retry more than 10 minutes after the merge', async () => {
 test('it gives a run at most 2 retries', async () => {
   const ctx = setupTest();
   addRun(ctx.db, { issue: 'GEO-9915', title: 'Invented kettle descaler', place: 'imp', session: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
-  addPr(ctx.db, 'GEO-9915', 'kettle#1', 'z-delivery');
-  closePr(ctx.db, 'kettle#1', { to: 'merged', actor: 'z-delivery' });
+  addPR(ctx.db, 'GEO-9915', 'kettle#1', 'z-delivery');
+  closePR(ctx.db, 'kettle#1', { to: 'merged', actor: 'z-delivery' });
   setState(ctx.db, 'GEO-9915', 'merged', {}, 'z-delivery');
   const fleet = buildStubFleetClient({ sessions: [{ id: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, cwd: '/workspace/kettle' }], forgets: { '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa': [{ forgotten: false, confirmToken: 'token-kettle' }] } });
   const ramUnknown = { state: 'unknown' as const, detail: 'the check in home-0000a001aaaa4aaa8aaa exited 1: imp: RAM_BUDGET_EXCEEDED: not enough 2 MiB pages', retry: true as const };
@@ -489,8 +489,8 @@ test('it gives a run at most 2 retries', async () => {
 test('it runs a retry once when two sweeps race for it', async () => {
   const ctx = setupTest();
   addRun(ctx.db, { issue: 'GEO-9916', title: 'Invented kettle descaler', place: 'imp', session: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
-  addPr(ctx.db, 'GEO-9916', 'kettle#1', 'z-delivery');
-  closePr(ctx.db, 'kettle#1', { to: 'merged', actor: 'z-delivery' });
+  addPR(ctx.db, 'GEO-9916', 'kettle#1', 'z-delivery');
+  closePR(ctx.db, 'kettle#1', { to: 'merged', actor: 'z-delivery' });
   setState(ctx.db, 'GEO-9916', 'merged', {}, 'z-delivery');
   const fleet = buildStubFleetClient({ sessions: [{ id: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, cwd: '/workspace/kettle' }], forgets: { '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa': [{ forgotten: false, confirmToken: 'token-kettle' }] } });
   const ramUnknown = { state: 'unknown' as const, detail: 'the check in home-0000a001aaaa4aaa8aaa exited 1: imp: RAM_BUDGET_EXCEEDED: not enough 2 MiB pages', retry: true as const };
@@ -516,8 +516,8 @@ test('it runs a retry once when two sweeps race for it', async () => {
 test('it gives no retry while a fresh handed-in claim holds the run', async () => {
   const ctx = setupTest();
   addRun(ctx.db, { issue: 'GEO-9921', title: 'Invented kettle descaler', place: 'imp', session: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
-  addPr(ctx.db, 'GEO-9921', 'kettle#1', 'z-delivery');
-  closePr(ctx.db, 'kettle#1', { to: 'merged', actor: 'z-delivery' });
+  addPR(ctx.db, 'GEO-9921', 'kettle#1', 'z-delivery');
+  closePR(ctx.db, 'kettle#1', { to: 'merged', actor: 'z-delivery' });
   setState(ctx.db, 'GEO-9921', 'merged', {}, 'z-delivery');
   const fleet = buildStubFleetClient({ sessions: [{ id: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, cwd: '/workspace/kettle' }], forgets: { '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa': [{ forgotten: false, confirmToken: 'token-kettle' }] } });
   const ramUnknown = { state: 'unknown' as const, detail: 'the check in home-0000a001aaaa4aaa8aaa exited 1: imp: RAM_BUDGET_EXCEEDED: not enough 2 MiB pages', retry: true as const };
@@ -536,8 +536,8 @@ test('it gives no retry while a fresh handed-in claim holds the run', async () =
 test('it adds no news for a retry that keeps the session while another retry remains', async () => {
   const ctx = setupTest();
   addRun(ctx.db, { issue: 'GEO-9922', title: 'Invented kettle descaler', place: 'imp', session: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
-  addPr(ctx.db, 'GEO-9922', 'kettle#1', 'z-delivery');
-  closePr(ctx.db, 'kettle#1', { to: 'merged', actor: 'z-delivery' });
+  addPR(ctx.db, 'GEO-9922', 'kettle#1', 'z-delivery');
+  closePR(ctx.db, 'kettle#1', { to: 'merged', actor: 'z-delivery' });
   setState(ctx.db, 'GEO-9922', 'merged', {}, 'z-delivery');
   const fleet = buildStubFleetClient({ sessions: [{ id: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, cwd: '/workspace/kettle' }] });
   const ramUnknown = { state: 'unknown' as const, detail: 'the check in home-0000a001aaaa4aaa8aaa exited 1: imp: RAM_BUDGET_EXCEEDED: not enough 2 MiB pages', retry: true as const };
@@ -552,8 +552,8 @@ test('it adds no news for a retry that keeps the session while another retry rem
 test('it adds news when the last allowed retry still keeps the session', async () => {
   const ctx = setupTest();
   addRun(ctx.db, { issue: 'GEO-9923', title: 'Invented kettle descaler', place: 'imp', session: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
-  addPr(ctx.db, 'GEO-9923', 'kettle#1', 'z-delivery');
-  closePr(ctx.db, 'kettle#1', { to: 'merged', actor: 'z-delivery' });
+  addPR(ctx.db, 'GEO-9923', 'kettle#1', 'z-delivery');
+  closePR(ctx.db, 'kettle#1', { to: 'merged', actor: 'z-delivery' });
   setState(ctx.db, 'GEO-9923', 'merged', {}, 'z-delivery');
   const fleet = buildStubFleetClient({ sessions: [{ id: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, cwd: '/workspace/kettle' }] });
   const ramUnknown = { state: 'unknown' as const, detail: 'the check in home-0000a001aaaa4aaa8aaa exited 1: imp: RAM_BUDGET_EXCEEDED: not enough 2 MiB pages', retry: true as const };
@@ -569,8 +569,8 @@ test('it adds news when the last allowed retry still keeps the session', async (
 test('it reports a due retry in a dry run, and claims or changes nothing', async () => {
   const ctx = setupTest();
   addRun(ctx.db, { issue: 'GEO-9924', title: 'Invented kettle descaler', place: 'imp', session: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
-  addPr(ctx.db, 'GEO-9924', 'kettle#1', 'z-delivery');
-  closePr(ctx.db, 'kettle#1', { to: 'merged', actor: 'z-delivery' });
+  addPR(ctx.db, 'GEO-9924', 'kettle#1', 'z-delivery');
+  closePR(ctx.db, 'kettle#1', { to: 'merged', actor: 'z-delivery' });
   setState(ctx.db, 'GEO-9924', 'merged', {}, 'z-delivery');
   const fleet = buildStubFleetClient({ sessions: [{ id: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, cwd: '/workspace/kettle' }] });
   const ramUnknown = { state: 'unknown' as const, detail: 'the check in home-0000a001aaaa4aaa8aaa exited 1: imp: RAM_BUDGET_EXCEEDED: not enough 2 MiB pages', retry: true as const };
@@ -592,8 +592,8 @@ test('it reports only the retry-marked session of a run in a dry run', async () 
   const ctx = setupTest();
   addRun(ctx.db, { issue: 'GEO-9925', title: 'Invented kettle descaler', place: 'imp', session: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
   setSession(ctx.db, 'GEO-9925', '0000b001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'z-delivery', 'add');
-  addPr(ctx.db, 'GEO-9925', 'kettle#1', 'z-delivery');
-  closePr(ctx.db, 'kettle#1', { to: 'merged', actor: 'z-delivery' });
+  addPR(ctx.db, 'GEO-9925', 'kettle#1', 'z-delivery');
+  closePR(ctx.db, 'kettle#1', { to: 'merged', actor: 'z-delivery' });
   setState(ctx.db, 'GEO-9925', 'merged', {}, 'z-delivery');
   const fleet = buildStubFleetClient({
     sessions: [
@@ -619,8 +619,8 @@ test('it reports only the retry-marked session of a run in a dry run', async () 
 test('it throws on a merged wrap-up result whose data does not parse', async () => {
   const ctx = setupTest();
   addRun(ctx.db, { issue: 'GEO-9926', title: 'Invented kettle descaler', place: 'imp', session: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'flexible', actor: 'z-delivery' });
-  addPr(ctx.db, 'GEO-9926', 'kettle#1', 'z-delivery');
-  closePr(ctx.db, 'kettle#1', { to: 'merged', actor: 'z-delivery' });
+  addPR(ctx.db, 'GEO-9926', 'kettle#1', 'z-delivery');
+  closePR(ctx.db, 'kettle#1', { to: 'merged', actor: 'z-delivery' });
   setState(ctx.db, 'GEO-9926', 'merged', {}, 'z-delivery');
   const fleet = buildStubFleetClient({ sessions: [{ id: '0000a001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: true, cwd: '/workspace/kettle' }] });
   const ramUnknown = { state: 'unknown' as const, detail: 'the check in home-0000a001aaaa4aaa8aaa exited 1: imp: RAM_BUDGET_EXCEEDED: not enough 2 MiB pages', retry: true as const };

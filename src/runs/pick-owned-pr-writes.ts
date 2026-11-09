@@ -1,21 +1,21 @@
 import { pickRunSession } from './pick-run-session.ts';
 
-interface OwnedPrState {
+interface OwnedPRState {
   session_id: string | null;
   session_by_hand: number;
 }
 
-export interface OwnedPrInput {
-  existing: OwnedPrState | null;
+export interface OwnedPRInput {
+  existing: OwnedPRState | null;
   sessionIDs: readonly string[];
   given: string;
 }
 
-export type OwnedPrWrites = { kind: 'no-session' } | { kind: 'write'; attached: boolean; owner: string; previousOwner: string | null; ownerChanged: boolean };
+export type OwnedPRWrites = { kind: 'no-session' } | { kind: 'write'; attached: boolean; owner: string; previousOwner: string | null; ownerChanged: boolean };
 
 // A PR already on the run keeps its attachment and takes the new owner. A PR the same session
 // already owns by hand needs no write.
-export function pickOwnedPrWrites(input: OwnedPrInput): OwnedPrWrites {
+export function pickOwnedPRWrites(input: OwnedPRInput): OwnedPRWrites {
   const owner = pickRunSession(input.sessionIDs, input.given);
   if (owner === null) {
     return { kind: 'no-session' };

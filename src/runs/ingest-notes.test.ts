@@ -4,7 +4,7 @@ import { NOON_SYDNEY, fakeAtc, freshDb } from '../../test/helpers.ts';
 import { AtcClient } from '../atc/atc-client.ts';
 import { buildStubFinalGH } from '../../test/build-stub-final-gh.ts';
 import { buildMockSha } from '../../test/build-mock-sha.ts';
-import { addPr } from './add-pr.ts';
+import { addPR } from './add-pr.ts';
 import { addRun } from './add-run.ts';
 import { FROM_START } from './from-start.ts';
 import { listRuns } from './list-runs.ts';
@@ -71,7 +71,7 @@ test('it reads the commits of a PR once for several FINAL notes on it', async ()
   const calls: string[] = [];
   const run = buildStubFinalGH({ commits: [early, head] }, calls);
   const base = new Date(NOON_SYDNEY).getTime();
-  addPr(ctx.db, 'GEO-9731', 'kettle#714', 'z-delivery');
+  addPR(ctx.db, 'GEO-9731', 'kettle#714', 'z-delivery');
   await ingestNotes(ctx.db, client, { run });
   ctx.stub.feed.push(
     { at: base + 1000, session: KETTLE, name: 'kettle', kind: 'note', detail: 'FINAL kettle#714 44238662', label: 'progress' },
@@ -92,7 +92,7 @@ test('it reads GitHub nothing for a FINAL note read again after the feed rewinds
   const head = `44238662${buildMockSha(2).slice(8)}`;
   const calls: string[] = [];
   const run = buildStubFinalGH({ commits: [head] }, calls);
-  addPr(ctx.db, 'GEO-9731', 'kettle#714', 'z-delivery');
+  addPR(ctx.db, 'GEO-9731', 'kettle#714', 'z-delivery');
   await ingestNotes(ctx.db, client, { run });
   ctx.stub.feed.push({ at: new Date(NOON_SYDNEY).getTime() + 1000, session: KETTLE, name: 'kettle', kind: 'note', detail: 'FINAL kettle#714 44238662', label: 'progress' });
   await ingestNotes(ctx.db, client, { run });
@@ -110,7 +110,7 @@ test('it records the sha as given and unresolved when the commit list read fails
   ctx.seed.meta({ key: 'atc_events_cursor', value: Buffer.from('{"k":"ev","i":0}').toString('base64url') });
   const client = await openClient();
   const run = buildStubFinalGH({ commits: 'fault' }, []);
-  addPr(ctx.db, 'GEO-9731', 'kettle#714', 'z-delivery');
+  addPR(ctx.db, 'GEO-9731', 'kettle#714', 'z-delivery');
   await ingestNotes(ctx.db, client, { run });
   ctx.stub.feed.push({ at: new Date(NOON_SYDNEY).getTime() + 1000, session: KETTLE, name: 'kettle', kind: 'note', detail: 'FINAL kettle#714 44238662', label: 'progress' });
 
@@ -138,7 +138,7 @@ test('it keeps a FINAL note that names no commit, marks nothing, and tells the o
   const client = await openClient();
   const head = `44238662${buildMockSha(2).slice(8)}`;
   const run = buildStubFinalGH({ commits: [head] }, []);
-  addPr(ctx.db, 'GEO-9731', 'kettle#714', 'z-delivery');
+  addPR(ctx.db, 'GEO-9731', 'kettle#714', 'z-delivery');
   await ingestNotes(ctx.db, client, { run });
   ctx.stub.feed.push({ at: new Date(NOON_SYDNEY).getTime() + 1000, session: KETTLE, name: 'kettle', kind: 'note', detail: 'FINAL kettle#714 4423866e', label: 'progress' });
 
@@ -189,7 +189,7 @@ test('it keeps a late note from the design pass session but marks no build PR fi
   addRun(ctx.db, { issue: 'GEO-9732', title: 'Design the kettle spout', place: 'local', session: KETTLE, next: 'Agent working.', gate: null, geoffChat: false, design: 'agent', actor: 'z-delivery' });
   setState(ctx.db, 'GEO-9732', 'done', { note: 'design settled' }, 'z-delivery');
   addRun(ctx.db, { issue: 'GEO-9732', title: 'Build the kettle spout', place: 'local', session: null, next: 'Building.', gate: null, geoffChat: false, actor: 'z-delivery' });
-  addPr(ctx.db, 'GEO-9732', 'kettle#32', 'z-delivery');
+  addPR(ctx.db, 'GEO-9732', 'kettle#32', 'z-delivery');
   ctx.stub.feed.push({ at: new Date(NOON_SYDNEY).getTime(), session: KETTLE, name: 'kettle', kind: 'note', detail: 'the spout sketch is final at 39f05fe', label: 'progress' });
   ctx.seed.meta({ key: 'atc_events_cursor', value: FROM_START });
   const client = await openClient();
@@ -205,7 +205,7 @@ test('it asks GitHub nothing about a FINAL in a late note from the design pass s
   addRun(ctx.db, { issue: 'GEO-9732', title: 'Design the kettle spout', place: 'local', session: KETTLE, next: 'Agent working.', gate: null, geoffChat: false, design: 'agent', actor: 'z-delivery' });
   setState(ctx.db, 'GEO-9732', 'done', { note: 'design settled' }, 'z-delivery');
   addRun(ctx.db, { issue: 'GEO-9732', title: 'Build the kettle spout', place: 'local', session: null, next: 'Building.', gate: null, geoffChat: false, actor: 'z-delivery' });
-  addPr(ctx.db, 'GEO-9732', 'kettle#32', 'z-delivery');
+  addPR(ctx.db, 'GEO-9732', 'kettle#32', 'z-delivery');
   ctx.stub.feed.push({ at: new Date(NOON_SYDNEY).getTime(), session: KETTLE, name: 'kettle', kind: 'note', detail: 'the spout sketch is final at 39f05fe', label: 'progress' });
   ctx.seed.meta({ key: 'atc_events_cursor', value: FROM_START });
   const client = await openClient();

@@ -8,9 +8,9 @@ import { parseReleases } from '../src/releases/parse-releases.ts';
 import { shipRuns } from '../src/releases/ship-runs.ts';
 import { shippedText } from '../src/releases/shipped-text.ts';
 import type { RunResult, Runner } from '../src/runner/types.ts';
-import { addPr } from '../src/runs/add-pr.ts';
+import { addPR } from '../src/runs/add-pr.ts';
 import { addRun } from '../src/runs/add-run.ts';
-import { closePr } from '../src/runs/close-pr.ts';
+import { closePR } from '../src/runs/close-pr.ts';
 import { getRun } from '../src/runs/get-run.ts';
 import { requirePR } from '../src/runs/require-pr.ts';
 import { setLiveCheck } from '../src/runs/set-live-check.ts';
@@ -56,8 +56,8 @@ function gh(w: World, calls: string[] = []): Runner {
 function mergedRun(issue: string, refs: string[], state: 'merged' | 'deploying' | 'deploy-held' = 'merged') {
   addRun(db, { issue, title: 'Invented kettle work', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, actor: 'z-delivery' });
   for (const ref of refs) {
-    addPr(db, issue, ref, 'z-delivery');
-    closePr(db, ref, { to: 'merged', actor: 'z-delivery' });
+    addPR(db, issue, ref, 'z-delivery');
+    closePR(db, ref, { to: 'merged', actor: 'z-delivery' });
   }
   setState(db, issue, state, {}, 'z-delivery');
 }
@@ -122,7 +122,7 @@ test('state --check and run check set live_check and log it; bad values are refu
 
 test('an open PR, no containing release, or a repo with no source leaves the run alone', async () => {
   mergedRun('GEO-1', ['nixie#5']);
-  addPr(db, 'GEO-1', 'nixie#9', 'z-delivery');
+  addPR(db, 'GEO-1', 'nixie#9', 'z-delivery');
   mergedRun('GEO-2', ['nixie#6']);
   mergedRun('GEO-3', ['dotfiles#1']);
   const w = world({ releases: { nixie: [rel('v1.2.0', '2026-10-16T00:00:00Z')], dotfiles: [rel('v1.0.0', '2026-10-16T00:00:00Z')] }, shas: { 'nixie#5': sha(5), 'nixie#6': sha(6), 'dotfiles#1': sha(1) }, contains: { 'v1.2.0': [sha(5)], 'v1.0.0': [sha(1)] } });
@@ -136,13 +136,13 @@ test('an open PR, no containing release, or a repo with no source leaves the run
 
 test('a closed-unmerged PR is ignored, but one merged PR is required', async () => {
   addRun(db, { issue: 'GEO-4', title: 'Invented kettle work', place: 'imp', session: null, next: 'x', gate: null, geoffChat: false, actor: 'z-delivery' });
-  addPr(db, 'GEO-4', 'nixie#5', 'z-delivery');
-  closePr(db, 'nixie#5', { to: 'closed', actor: 'z-delivery' });
+  addPR(db, 'GEO-4', 'nixie#5', 'z-delivery');
+  closePR(db, 'nixie#5', { to: 'closed', actor: 'z-delivery' });
   setState(db, 'GEO-4', 'merged', {}, 'z-delivery');
   const w = world({ releases: { nixie: [rel('v1.0.0', '2026-10-16T00:00:00Z')] }, shas: { 'nixie#5': sha(5) }, contains: { 'v1.0.0': [sha(5)] } });
   expect((await shipRuns(db, gh(w), T)).moved).toEqual([]);
-  addPr(db, 'GEO-4', 'nixie#6', 'z-delivery');
-  closePr(db, 'nixie#6', { to: 'merged', actor: 'z-delivery' });
+  addPR(db, 'GEO-4', 'nixie#6', 'z-delivery');
+  closePR(db, 'nixie#6', { to: 'merged', actor: 'z-delivery' });
   w.shas['nixie#6'] = sha(6);
   w.contains['v1.0.0'] = [sha(6)];
   expect((await shipRuns(db, gh(w), T)).moved.map((m) => m.issue)).toEqual(['GEO-4']);

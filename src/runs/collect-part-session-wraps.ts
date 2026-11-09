@@ -7,7 +7,7 @@ interface PartSessionRow {
   runState: string;
 }
 
-interface PartPrRow {
+interface PartPRRow {
   issue: string;
   state: string;
   session_id: string | null;
@@ -20,7 +20,7 @@ export interface PartSessionActivity {
 
 export interface PartSessionInput {
   sessions: readonly PartSessionRow[];
-  prs: readonly PartPrRow[];
+  prs: readonly PartPRRow[];
   activity: ReadonlyMap<string, PartSessionActivity>;
   wrapped: ReadonlySet<string>;
   nowMs: number;
@@ -42,7 +42,7 @@ export function collectPartSessionWraps(input: PartSessionInput): PartSessionWra
     .map((session) => ({ issue: session.issue, session_id: session.session_id }));
 }
 
-function isOwnedWorkDone(session: PartSessionRow, prs: readonly PartPrRow[]): boolean {
+function isOwnedWorkDone(session: PartSessionRow, prs: readonly PartPRRow[]): boolean {
   const owned = prs.filter((pr) => pr.issue === session.issue && pr.session_id !== null && isSameSession(pr.session_id, session.session_id));
   return owned.some((pr) => pr.state === 'merged') && owned.every((pr) => pr.state === 'merged' || pr.state === 'closed');
 }

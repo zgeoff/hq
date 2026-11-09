@@ -4,9 +4,9 @@ import type { Database } from 'bun:sqlite';
 import invariant from 'tiny-invariant';
 import { z } from 'zod';
 import { getMeta } from '../src/db/get-meta.ts';
-import { addPr } from '../src/runs/add-pr.ts';
+import { addPR } from '../src/runs/add-pr.ts';
 import { addRun } from '../src/runs/add-run.ts';
-import { closePr } from '../src/runs/close-pr.ts';
+import { closePR } from '../src/runs/close-pr.ts';
 import { getRun } from '../src/runs/get-run.ts';
 import { setState } from '../src/runs/set-state.ts';
 import type { RunOpts } from '../src/runner/types.ts';
@@ -30,8 +30,8 @@ function setupTest() {
       addRun(db, { issue, title: 'Invented teapot work', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, size, actor: 'z-delivery' }),
     mergeRun: (issue: string, ...refs: string[]) => {
       for (const ref of refs) {
-        addPr(db, issue, ref, 'z-delivery');
-        closePr(db, ref, { to: 'merged', actor: 'z-delivery' });
+        addPR(db, issue, ref, 'z-delivery');
+        closePR(db, ref, { to: 'merged', actor: 'z-delivery' });
       }
       setState(db, issue, 'merged', {}, 'z-delivery');
     },
@@ -104,10 +104,10 @@ test('guess against actual by band, unsized runs apart, and the share that shipp
   ctx.addRun('GEO-3');
   ctx.mergeRun('GEO-3', 'teapot#4');
   ctx.addRun('GEO-4', parseSize('M', '1000'));
-  addPr(ctx.db, 'GEO-4', 'kettle#5', 'z-delivery');
+  addPR(ctx.db, 'GEO-4', 'kettle#5', 'z-delivery');
   ctx.addRun('GEO-5', parseSize('M', '1000'));
   ctx.mergeRun('GEO-5', 'kettle#6');
-  addPr(ctx.db, 'GEO-5', 'kettle#7', 'z-delivery');
+  addPR(ctx.db, 'GEO-5', 'kettle#7', 'z-delivery');
   at('2026-10-16T02:00:00Z');
   const runs = mergedRuns(ctx.db, '2026-10-16T01:00:00Z', '2026-10-17T00:00:00Z');
   expect(runs.map((r) => r.issue)).toEqual(['GEO-1', 'GEO-2', 'GEO-3']);

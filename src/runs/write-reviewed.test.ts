@@ -2,7 +2,7 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { z } from 'zod';
 import { NOON_SYDNEY, at, freshDb } from '../../test/helpers.ts';
 import { buildSeeder } from '../test-utils/build-seeder.ts';
-import { reviewedPr } from './reviewed-pr.ts';
+import { reviewedPR } from './reviewed-pr.ts';
 import { writeReviewed } from './write-reviewed.ts';
 
 function setupTest() {
@@ -25,7 +25,7 @@ test('it marks an open PR on a run as reviewed at the head with the next round',
   const ctx = setupTest();
   ctx.seed.run({ issue: 'GEO-9701' });
   ctx.seed.runPR({ issue: 'GEO-9701', ref: 'widgets#7' });
-  reviewedPr(ctx.db, 'widgets#7', 'abc1234', { recheck: false, force: false }, 'kettle-review');
+  reviewedPR(ctx.db, { raw: 'widgets#7', sha: 'abc1234', recheck: false, force: false }, 'kettle-review');
 
   writeReviewed(ctx.db, 'widgets', 7, { head: '0123456789abcdef0123456789abcdef01234567', countsRound: true });
 
@@ -37,8 +37,8 @@ test('it counts a round past round 2, since no round limit applies', () => {
   const ctx = setupTest();
   ctx.seed.run({ issue: 'GEO-9701' });
   ctx.seed.runPR({ issue: 'GEO-9701', ref: 'widgets#7' });
-  reviewedPr(ctx.db, 'widgets#7', 'abc1234', { recheck: false, force: false }, 'kettle-review');
-  reviewedPr(ctx.db, 'widgets#7', 'abc1234', { recheck: true, force: false }, 'kettle-review');
+  reviewedPR(ctx.db, { raw: 'widgets#7', sha: 'abc1234', recheck: false, force: false }, 'kettle-review');
+  reviewedPR(ctx.db, { raw: 'widgets#7', sha: 'abc1234', recheck: true, force: false }, 'kettle-review');
 
   writeReviewed(ctx.db, 'widgets', 7, { head: '0123456789abcdef0123456789abcdef01234567', countsRound: true });
 
@@ -49,7 +49,7 @@ test('it marks the head and keeps the round for a run that does not count as a r
   const ctx = setupTest();
   ctx.seed.run({ issue: 'GEO-9701' });
   ctx.seed.runPR({ issue: 'GEO-9701', ref: 'widgets#7' });
-  reviewedPr(ctx.db, 'widgets#7', 'abc1234', { recheck: false, force: false }, 'kettle-review');
+  reviewedPR(ctx.db, { raw: 'widgets#7', sha: 'abc1234', recheck: false, force: false }, 'kettle-review');
 
   writeReviewed(ctx.db, 'widgets', 7, { head: '0123456789abcdef0123456789abcdef01234567', countsRound: false });
 

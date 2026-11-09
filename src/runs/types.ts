@@ -37,7 +37,7 @@ export interface RunSession {
   design_pass: 0 | 1;
 }
 
-export interface RunPr {
+export interface RunPR {
   ref: string;
   issue: string;
   url: string | null;
@@ -76,7 +76,7 @@ export interface RunNote {
 
 export interface RunView extends Run {
   sessions: RunSession[];
-  prs: RunPr[];
+  prs: RunPR[];
   lastNote: RunNote | null;
 }
 

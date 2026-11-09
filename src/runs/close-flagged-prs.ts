@@ -1,7 +1,7 @@
 import type { Database } from 'bun:sqlite';
 import type { Runner } from '../runner/types.ts';
-import { closePr } from './close-pr.ts';
-import type { GitHubPr } from './parse-github-pr.ts';
+import { closePR } from './close-pr.ts';
+import type { GitHubPR } from './parse-github-pr.ts';
 import { readGitHubPR } from './read-github-pr.ts';
 import { SWEEP_ACTOR } from './sweep-actor.ts';
 import type { Alert } from './types.ts';
@@ -25,10 +25,10 @@ async function closeOne(db: Database, run: Runner, alert: Alert): Promise<boolea
   if (db.query('SELECT 1 FROM run_prs WHERE ref = ? AND state = ?').get(ref, 'open') === null) {
     return false;
   }
-  closePr(db, ref, { to: 'closed', actor: SWEEP_ACTOR });
+  closePR(db, ref, { to: 'closed', actor: SWEEP_ACTOR });
   return false;
 }
 
-function isClosedUnmerged(pr: GitHubPr | { error: string }): boolean {
+function isClosedUnmerged(pr: GitHubPR | { error: string }): boolean {
   return 'state' in pr && pr.state === 'CLOSED';
 }

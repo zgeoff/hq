@@ -1,18 +1,18 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { at, freshDb } from '../../test/helpers.ts';
 import { addRun } from './add-run.ts';
-import { finalPr } from './final-pr.ts';
+import { finalPR } from './final-pr.ts';
 import { findAlerts } from './find-alerts.ts';
 import { recordCICheckOverride } from '../pr-status/record-ci-check-override.ts';
 import { recordPROverride } from '../pr-status/record-pr-override.ts';
 import { reviewStarted } from './review-started.ts';
-import { reviewedPr } from './reviewed-pr.ts';
+import { reviewedPR } from './reviewed-pr.ts';
 import { scheduleFinalReview } from './schedule-final-review.ts';
 import { setReviewWait } from './set-review-wait.ts';
 import { setSession } from './set-session.ts';
 import { buildSeeder } from '../test-utils/build-seeder.ts';
 import { setState } from './set-state.ts';
-import { unfinalPr } from './unfinal-pr.ts';
+import { unfinalPR } from './unfinal-pr.ts';
 import { updateGoneRunSessions } from './update-gone-run-sessions.ts';
 import { addUnblock } from '../unblock/add-unblock.ts';
 import { closeUnblock } from '../unblock/close-unblock.ts';
@@ -31,7 +31,7 @@ test('it raises no FINAL alert for a PR whose review started after the FINAL and
   at('2026-10-21T01:40:00Z');
   reviewStarted(ctx.db, 'kettle#21', 'kettle-review');
   at('2026-10-21T01:55:00Z');
-  reviewedPr(ctx.db, 'kettle#21', 'def5678', { recheck: false, force: false }, 'kettle-review');
+  reviewedPR(ctx.db, { raw: 'kettle#21', sha: 'def5678', recheck: false, force: false }, 'kettle-review');
 
   expect(findAlerts(ctx.db, [], new Map(), new Date('2026-10-21T03:00:00Z'))).toStrictEqual([]);
 });
@@ -54,7 +54,7 @@ test('it raises a FINAL alert for a PR whose only review came before its FINAL, 
   ctx.seed.runPR({ issue: 'GEO-9823', ref: 'kettle#23' });
   reviewStarted(ctx.db, 'kettle#23', 'kettle-review');
   at('2026-10-21T00:45:00Z');
-  reviewedPr(ctx.db, 'kettle#23', 'def5678', { recheck: false, force: false }, 'kettle-review');
+  reviewedPR(ctx.db, { raw: 'kettle#23', sha: 'def5678', recheck: false, force: false }, 'kettle-review');
   at('2026-10-21T01:00:00Z');
   scheduleFinalReview(ctx.db, { ref: 'kettle#23', sha: 'abc1234', source: 'marker:kettle', actor: 'kettle-bot', note: null });
 
@@ -68,8 +68,8 @@ test('it raises no FINAL alert for a PR with an owner override at its FINAL head
   addRun(ctx.db, { issue: 'GEO-9826', title: 'Invented kettle work', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
   at('2026-10-21T00:45:00Z');
   ctx.seed.runPR({ issue: 'GEO-9826', ref: 'kettle#26' });
-  reviewedPr(ctx.db, 'kettle#26', 'def5678', { recheck: false, force: false }, 'kettle-review');
-  reviewedPr(ctx.db, 'kettle#26', 'def5678', { recheck: true, force: false }, 'kettle-review');
+  reviewedPR(ctx.db, { raw: 'kettle#26', sha: 'def5678', recheck: false, force: false }, 'kettle-review');
+  reviewedPR(ctx.db, { raw: 'kettle#26', sha: 'def5678', recheck: true, force: false }, 'kettle-review');
   at('2026-10-21T01:00:00Z');
   scheduleFinalReview(ctx.db, { ref: 'kettle#26', sha: 'abc1234', source: 'marker:kettle', actor: 'kettle-bot', note: null });
   recordPROverride(ctx.db, { repo: 'kettle', pr: 26, head: 'abc1234aaaabbbbccccddddeeeeffff00001111', source: 'chat:kettle-chat@2026-10-21T01:30:00Z', note: 'Invented: the restack kept each fix.', actor: 'kettle-bot' });
@@ -98,7 +98,7 @@ test('it raises no exited alert for a session whose PR passed a review round tha
   at('2026-10-21T01:40:00Z');
   reviewStarted(ctx.db, 'kettle#24', 'kettle-review');
   at('2026-10-21T01:55:00Z');
-  reviewedPr(ctx.db, 'kettle#24', 'def5678', { recheck: false, force: false }, 'kettle-review');
+  reviewedPR(ctx.db, { raw: 'kettle#24', sha: 'def5678', recheck: false, force: false }, 'kettle-review');
 
   expect(findAlerts(ctx.db, [{ id: session, name: 'kettle', alive: false, state: 'exited' }], new Map(), new Date('2026-10-21T03:00:00Z'))).toStrictEqual([]);
 });
@@ -111,7 +111,7 @@ test('it raises an exited alert for a session whose PR was reviewed only before 
   ctx.seed.runPR({ issue: 'GEO-9825', ref: 'kettle#25' });
   reviewStarted(ctx.db, 'kettle#25', 'kettle-review');
   at('2026-10-21T00:45:00Z');
-  reviewedPr(ctx.db, 'kettle#25', 'def5678', { recheck: false, force: false }, 'kettle-review');
+  reviewedPR(ctx.db, { raw: 'kettle#25', sha: 'def5678', recheck: false, force: false }, 'kettle-review');
   at('2026-10-21T01:00:00Z');
   scheduleFinalReview(ctx.db, { ref: 'kettle#25', sha: 'abc1234', source: 'marker:kettle', actor: 'kettle-bot', note: null });
 
@@ -126,8 +126,8 @@ test('it raises no exited alert for a session whose PR has an owner override at 
   addRun(ctx.db, { issue: 'GEO-9828', title: 'Invented kettle work', place: 'imp', session, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
   at('2026-10-21T00:45:00Z');
   ctx.seed.runPR({ issue: 'GEO-9828', ref: 'kettle#28' });
-  reviewedPr(ctx.db, 'kettle#28', 'def5678', { recheck: false, force: false }, 'kettle-review');
-  reviewedPr(ctx.db, 'kettle#28', 'def5678', { recheck: true, force: false }, 'kettle-review');
+  reviewedPR(ctx.db, { raw: 'kettle#28', sha: 'def5678', recheck: false, force: false }, 'kettle-review');
+  reviewedPR(ctx.db, { raw: 'kettle#28', sha: 'def5678', recheck: true, force: false }, 'kettle-review');
   at('2026-10-21T01:00:00Z');
   scheduleFinalReview(ctx.db, { ref: 'kettle#28', sha: 'abc1234', source: 'marker:kettle', actor: 'kettle-bot', note: null });
   recordPROverride(ctx.db, { repo: 'kettle', pr: 28, head: 'abc1234aaaabbbbccccddddeeeeffff00001111', source: 'chat:kettle-chat@2026-10-21T01:30:00Z', note: 'Invented: the restack kept each fix.', actor: 'kettle-bot' });
@@ -204,7 +204,7 @@ test('it raises no prompt-wait alert for a session waiting past the quiet limit 
   at('2026-10-21T01:10:00Z');
   reviewStarted(ctx.db, 'kettle#51', 'kettle-review');
   at('2026-10-21T01:20:00Z');
-  reviewedPr(ctx.db, 'kettle#51', 'abc1234', { recheck: false, force: false }, 'kettle-review');
+  reviewedPR(ctx.db, { raw: 'kettle#51', sha: 'abc1234', recheck: false, force: false }, 'kettle-review');
 
   const activity = new Map([[session, Date.parse('2026-10-21T01:30:00Z')]]);
 
@@ -248,7 +248,7 @@ test('it raises no prompt-wait alert for a helper that carries the run, with no 
   at('2026-10-21T01:10:00Z');
   reviewStarted(ctx.db, 'kettle#54', 'kettle-review');
   at('2026-10-21T01:20:00Z');
-  reviewedPr(ctx.db, 'kettle#54', 'abc1234', { recheck: false, force: false }, 'kettle-review');
+  reviewedPR(ctx.db, { raw: 'kettle#54', sha: 'abc1234', recheck: false, force: false }, 'kettle-review');
 
   const activity = new Map([[helper, Date.parse('2026-10-21T01:30:00Z')]]);
 
@@ -266,7 +266,7 @@ test('it raises the prompt-wait alert for a helper beside an active main session
   at('2026-10-21T01:10:00Z');
   reviewStarted(ctx.db, 'kettle#57', 'kettle-review');
   at('2026-10-21T01:20:00Z');
-  reviewedPr(ctx.db, 'kettle#57', 'abc1234', { recheck: false, force: false }, 'kettle-review');
+  reviewedPR(ctx.db, { raw: 'kettle#57', sha: 'abc1234', recheck: false, force: false }, 'kettle-review');
   const sessions = [
     { id: main, name: 'kettle', alive: true, state: 'running' },
     { id: helper, name: 'kettle helper', alive: true, state: 'needs_you' },
@@ -291,7 +291,7 @@ test('it raises no quiet alert for an idle session past the quiet limit whose op
   at('2026-10-21T01:10:00Z');
   reviewStarted(ctx.db, 'kettle#55', 'kettle-review');
   at('2026-10-21T01:20:00Z');
-  reviewedPr(ctx.db, 'kettle#55', 'abc1234', { recheck: false, force: false }, 'kettle-review');
+  reviewedPR(ctx.db, { raw: 'kettle#55', sha: 'abc1234', recheck: false, force: false }, 'kettle-review');
 
   const activity = new Map([[session, Date.parse('2026-10-21T01:30:00Z')]]);
 
@@ -374,7 +374,7 @@ test('it raises the exit alert for a build session that left no PR, though its d
   at('2026-10-21T00:20:00Z');
   reviewStarted(ctx.db, 'kettle#31', 'kettle-review');
   at('2026-10-21T00:30:00Z');
-  reviewedPr(ctx.db, 'kettle#31', 'abc1234', { recheck: false, force: false }, 'kettle-review');
+  reviewedPR(ctx.db, { raw: 'kettle#31', sha: 'abc1234', recheck: false, force: false }, 'kettle-review');
   setState(ctx.db, 'GEO-9831', 'done', { note: 'design settled' }, 'kettle-bot');
   addRun(ctx.db, { issue: 'GEO-9831', title: 'Build the kettle spout', place: 'imp', session: 'a0000031-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Building.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
 
@@ -419,7 +419,7 @@ test('it raises the FINAL alert again when a new FINAL at another head follows a
   ctx.seed.finalRunPR({ issue: 'GEO-9825', ref: 'kettle#25' });
   setReviewWait(ctx.db, 'kettle#25', { clear: false, until: '2026-10-25T01:00:00Z', reason: 'the only reviewer is out of quota' }, 'kettle-bot');
   at('2026-10-21T02:00:00Z');
-  finalPr(ctx.db, 'kettle#25', { sha: 'def5678', actor: 'kettle-bot' });
+  finalPR(ctx.db, 'kettle#25', { sha: 'def5678', actor: 'kettle-bot' });
 
   expect(findAlerts(ctx.db, [], new Map(), new Date('2026-10-21T04:00:00Z'))).toStrictEqual([
     { key: 'pr:kettle#25', fingerprint: 'final:def5678', issue: 'GEO-9825', line: 'kettle#25 (GEO-9825) final at def5678 for 120 min, no review [from cli:kettle-bot]' },
@@ -433,8 +433,8 @@ test('it raises the FINAL alert again when the FINAL is withdrawn and sent again
   ctx.seed.finalRunPR({ issue: 'GEO-9826', ref: 'kettle#26' });
   setReviewWait(ctx.db, 'kettle#26', { clear: false, until: '2026-10-25T01:00:00Z', reason: 'the only reviewer is out of quota' }, 'kettle-bot');
   at('2026-10-21T02:00:00Z');
-  unfinalPr(ctx.db, 'kettle#26', 'kettle-bot', 'the head needs one more fix');
-  finalPr(ctx.db, 'kettle#26', { sha: 'abc1234', actor: 'kettle-bot' });
+  unfinalPR(ctx.db, 'kettle#26', 'kettle-bot', 'the head needs one more fix');
+  finalPR(ctx.db, 'kettle#26', { sha: 'abc1234', actor: 'kettle-bot' });
 
   expect(findAlerts(ctx.db, [], new Map(), new Date('2026-10-21T04:00:00Z'))).toStrictEqual([
     { key: 'pr:kettle#26', fingerprint: 'final:abc1234', issue: 'GEO-9826', line: 'kettle#26 (GEO-9826) final at abc1234 for 120 min, no review [from cli:kettle-bot]' },

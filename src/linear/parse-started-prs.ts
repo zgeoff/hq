@@ -1,10 +1,10 @@
 import { z } from 'zod';
 
-type StartedPrStatus = 'open' | 'draft' | 'merged' | 'closed';
+type StartedPRStatus = 'open' | 'draft' | 'merged' | 'closed';
 
-export interface StartedPr {
+export interface StartedPR {
   ref: string;
-  status: StartedPrStatus;
+  status: StartedPRStatus;
   mergedAt: string | null;
 }
 
@@ -16,8 +16,8 @@ const metadataSchema = z.object({
   repoName: z.string().nullish(),
 });
 
-export function parseStartedPrs(attachments: readonly unknown[]): StartedPr[] {
-  const prs = new Map<string, StartedPr>();
+export function parseStartedPRs(attachments: readonly unknown[]): StartedPR[] {
+  const prs = new Map<string, StartedPR>();
   for (const raw of attachments) {
     const attachment = attachmentSchema.safeParse(raw);
     const metadata = attachment.success ? metadataSchema.safeParse(attachment.data.metadata) : null;

@@ -1,10 +1,10 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { buildStubGitHubFactsRunner } from '../../test/build-stub-github-facts-runner.ts';
 import { freshDb } from '../../test/helpers.ts';
-import { addPr } from './add-pr.ts';
+import { addPR } from './add-pr.ts';
 import { addRun } from './add-run.ts';
 import { closeFlaggedPRs } from './close-flagged-prs.ts';
-import { closePr } from './close-pr.ts';
+import { closePR } from './close-pr.ts';
 
 function setupTest() {
   const fresh = freshDb();
@@ -18,7 +18,7 @@ test('it marks a flagged PR that GitHub shows closed unmerged closed, by the swe
   const ctx = setupTest();
   const calls: string[] = [];
   addRun(ctx.db, { issue: 'GEO-9841', title: 'Invented kettle work', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
-  addPr(ctx.db, 'GEO-9841', 'kettle#41', 'kettle-bot');
+  addPR(ctx.db, 'GEO-9841', 'kettle#41', 'kettle-bot');
   const gh = buildStubGitHubFactsRunner({ views: { 'kettle#41': JSON.stringify({ state: 'CLOSED', mergedAt: null, mergeCommit: null }) }, calls });
 
   const kept = await closeFlaggedPRs(ctx.db, gh, [
@@ -34,7 +34,7 @@ test('it marks a flagged PR that GitHub shows closed unmerged closed, by the swe
 test('it keeps the alert and leaves the PR open when gh cannot read the PR', async () => {
   const ctx = setupTest();
   addRun(ctx.db, { issue: 'GEO-9842', title: 'Invented kettle work', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
-  addPr(ctx.db, 'GEO-9842', 'kettle#42', 'kettle-bot');
+  addPR(ctx.db, 'GEO-9842', 'kettle#42', 'kettle-bot');
   const gh = buildStubGitHubFactsRunner({ views: {} });
 
   const kept = await closeFlaggedPRs(ctx.db, gh, [
@@ -50,7 +50,7 @@ test('it keeps the alert and leaves the PR open when gh cannot read the PR', asy
 test('it leaves a PR that GitHub shows merged open and flagged, for hq run merged', async () => {
   const ctx = setupTest();
   addRun(ctx.db, { issue: 'GEO-9843', title: 'Invented kettle work', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
-  addPr(ctx.db, 'GEO-9843', 'kettle#43', 'kettle-bot');
+  addPR(ctx.db, 'GEO-9843', 'kettle#43', 'kettle-bot');
   const gh = buildStubGitHubFactsRunner({
     views: { 'kettle#43': JSON.stringify({ state: 'MERGED', mergedAt: '2026-10-20T03:04:05Z', mergeCommit: { oid: '0123456789abcdef0123456789abcdef01234567' } }) },
   });
@@ -70,7 +70,7 @@ test('it keeps a PR alert that GitHub shows open, and never asks gh about an ale
   const ctx = setupTest();
   const calls: string[] = [];
   addRun(ctx.db, { issue: 'GEO-9844', title: 'Invented kettle work', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
-  addPr(ctx.db, 'GEO-9844', 'kettle#44', 'kettle-bot');
+  addPR(ctx.db, 'GEO-9844', 'kettle#44', 'kettle-bot');
   const gh = buildStubGitHubFactsRunner({ views: { 'kettle#44': JSON.stringify({ state: 'OPEN', mergedAt: null, mergeCommit: null }) }, calls });
 
   const kept = await closeFlaggedPRs(ctx.db, gh, [
@@ -88,13 +88,13 @@ test('it keeps a PR alert that GitHub shows open, and never asks gh about an ale
 test('it leaves a PR that someone closed by hand while gh was read as they set it, and drops its alert', async () => {
   const ctx = setupTest();
   addRun(ctx.db, { issue: 'GEO-9845', title: 'Invented kettle work', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
-  addPr(ctx.db, 'GEO-9845', 'kettle#45', 'kettle-bot');
+  addPR(ctx.db, 'GEO-9845', 'kettle#45', 'kettle-bot');
   const gh = buildStubGitHubFactsRunner({ views: { 'kettle#45': JSON.stringify({ state: 'CLOSED', mergedAt: null, mergeCommit: null }) } });
 
   const kept = await closeFlaggedPRs(
     ctx.db,
     async (cmd, opts) => {
-      closePr(ctx.db, 'kettle#45', { to: 'closed', actor: 'kettle-bot' });
+      closePR(ctx.db, 'kettle#45', { to: 'closed', actor: 'kettle-bot' });
       return await gh(cmd, opts);
     },
     [{ key: 'pr:kettle#45', fingerprint: 'final:abc1234', issue: 'GEO-9845', line: 'kettle#45 (GEO-9845) final at abc1234 for 120 min, no review [from marker:kettle]' }],

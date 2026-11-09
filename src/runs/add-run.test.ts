@@ -3,9 +3,9 @@ import { at, freshDb } from '../../test/helpers.ts';
 import { logEvent } from '../log-event.ts';
 import { enqueue } from '../outbox/enqueue.ts';
 import { writeIssues } from '../linear/write-issues.ts';
-import { addPr } from './add-pr.ts';
+import { addPR } from './add-pr.ts';
 import { addRun } from './add-run.ts';
-import { closePr } from './close-pr.ts';
+import { closePR } from './close-pr.ts';
 import { getRun } from './get-run.ts';
 import { readDesignMoves } from './read-design-moves.ts';
 import { setSession } from './set-session.ts';
@@ -117,8 +117,8 @@ test('it keeps the build run working when its session ends with no PR, though th
   const ctx = setupTest();
   at('2026-10-15T20:00:00Z');
   addRun(ctx.db, { issue: 'GEO-9814', title: 'Design the kettle spout', place: 'imp', session: 'a0000014-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', design: 'agent', actor: 'z-delivery' });
-  addPr(ctx.db, 'GEO-9814', 'kettle#61', 'z-delivery');
-  closePr(ctx.db, 'kettle#61', { to: 'merged', actor: 'z-review' });
+  addPR(ctx.db, 'GEO-9814', 'kettle#61', 'z-delivery');
+  closePR(ctx.db, 'kettle#61', { to: 'merged', actor: 'z-review' });
   setState(ctx.db, 'GEO-9814', 'done', { note: 'design settled' }, 'z-delivery');
   addRun(ctx.db, { issue: 'GEO-9814', title: 'Build the kettle spout', place: 'imp', session: 'a0000015-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Building.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
 
@@ -131,12 +131,12 @@ test('it moves the build run to merged on its own PR while the design pass PR st
   const ctx = setupTest();
   at('2026-10-15T20:00:00Z');
   addRun(ctx.db, { issue: 'GEO-9815', title: 'Design the kettle spout', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', design: 'agent', actor: 'z-delivery' });
-  addPr(ctx.db, 'GEO-9815', 'kettle#62', 'z-delivery');
+  addPR(ctx.db, 'GEO-9815', 'kettle#62', 'z-delivery');
   setState(ctx.db, 'GEO-9815', 'done', { note: 'design settled' }, 'z-delivery');
   addRun(ctx.db, { issue: 'GEO-9815', title: 'Build the kettle spout', place: 'imp', session: null, next: 'Building.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });
-  addPr(ctx.db, 'GEO-9815', 'kettle#63', 'z-delivery');
+  addPR(ctx.db, 'GEO-9815', 'kettle#63', 'z-delivery');
 
-  closePr(ctx.db, 'kettle#63', { to: 'merged', actor: 'z-review' });
+  closePR(ctx.db, 'kettle#63', { to: 'merged', actor: 'z-review' });
 
   expect(getRun(ctx.db, 'GEO-9815')?.state).toBe('merged');
 });
@@ -145,7 +145,7 @@ test('it keeps the design pass PRs on the build run, marked as the design pass',
   const ctx = setupTest();
   at('2026-10-15T20:00:00Z');
   addRun(ctx.db, { issue: 'GEO-9816', title: 'Design the kettle spout', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', design: 'agent', actor: 'z-delivery' });
-  addPr(ctx.db, 'GEO-9816', 'kettle#64', 'z-delivery');
+  addPR(ctx.db, 'GEO-9816', 'kettle#64', 'z-delivery');
   setState(ctx.db, 'GEO-9816', 'done', { note: 'design settled' }, 'z-delivery');
 
   const built = addRun(ctx.db, { issue: 'GEO-9816', title: 'Build the kettle spout', place: 'imp', session: null, next: 'Building.', gate: null, geoffChat: false, lane: 'cloud', actor: 'z-delivery' });

@@ -2,8 +2,8 @@ import type { Database } from 'bun:sqlite';
 import { z } from 'zod';
 import { iso } from '../clock/iso.ts';
 import { HqError } from '../errors.ts';
-import { parseStartedPrs } from './parse-started-prs.ts';
-import type { StartedPr } from './parse-started-prs.ts';
+import { parseStartedPRs } from './parse-started-prs.ts';
+import type { StartedPR } from './parse-started-prs.ts';
 import type { LinearCall } from './types.ts';
 import { writeStartedIssue } from './write-started-issue.ts';
 import { writeStartedPR } from './write-started-pr.ts';
@@ -23,7 +23,7 @@ const STARTED_QUERY = `query($after: String) {
 
 // Linear's page size keeps the query under its complexity limit, so 40 pages of 50 hold 2,000 issues.
 export async function syncStarted(db: Database, call: LinearCall, at: Date): Promise<number> {
-  const started: { issue: string; startedAt: string; prs: StartedPr[] }[] = [];
+  const started: { issue: string; startedAt: string; prs: StartedPR[] }[] = [];
   let after: string | null = null;
   for (let page = 0; page < MAX_PAGES; page++) {
     const answer = await call(STARTED_QUERY, { after });
@@ -32,7 +32,7 @@ export async function syncStarted(db: Database, call: LinearCall, at: Date): Pro
       // An issue moved straight into a started state without Linear stamping startedAt is aged from its last update.
       const startedAt = iso(new Date(node.startedAt ?? node.updatedAt));
       const attachments = await readAllAttachments(call, node.identifier, node.attachments ?? null);
-      started.push({ issue: node.identifier, startedAt, prs: parseStartedPrs(attachments) });
+      started.push({ issue: node.identifier, startedAt, prs: parseStartedPRs(attachments) });
     }
     if (!issues.pageInfo.hasNextPage) {
       writeStarted(db, started, at);
@@ -66,7 +66,7 @@ async function readAllAttachments(call: LinearCall, issue: string, first: z.infe
   return nodes;
 }
 
-function writeStarted(db: Database, started: readonly { issue: string; startedAt: string; prs: readonly StartedPr[] }[], at: Date): void {
+function writeStarted(db: Database, started: readonly { issue: string; startedAt: string; prs: readonly StartedPR[] }[], at: Date): void {
   const fetchedAt = iso(at);
   db.transaction(() => {
     db.query('DELETE FROM linear_started').run();

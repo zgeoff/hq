@@ -1,9 +1,9 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { freshDb } from '../../test/helpers.ts';
 import { writeIssues } from '../linear/write-issues.ts';
-import { addPr } from './add-pr.ts';
+import { addPR } from './add-pr.ts';
 import { addRun } from './add-run.ts';
-import { closePr } from './close-pr.ts';
+import { closePR } from './close-pr.ts';
 import { findAlerts } from './find-alerts.ts';
 import { readClosedIssueAlerts } from './read-closed-issue-alerts.ts';
 import { setLiveCheck } from './set-live-check.ts';
@@ -37,12 +37,12 @@ test('it raises nothing for a run whose issue is open in Linear or unknown to hq
 test('it raises nothing for a merged or live-check run on its way to live, owed a check or not, since a Fixes merge closes the issue early', () => {
   const ctx = setupTest();
   ctx.addKettleRun('GEO-9813');
-  addPr(ctx.db, 'GEO-9813', 'kettle#13', 'kettle-bot');
-  closePr(ctx.db, 'kettle#13', { to: 'merged', actor: 'kettle-bot' });
+  addPR(ctx.db, 'GEO-9813', 'kettle#13', 'kettle-bot');
+  closePR(ctx.db, 'kettle#13', { to: 'merged', actor: 'kettle-bot' });
   ctx.closeInLinear('GEO-9813', 'completed');
   ctx.addKettleRun('GEO-9814');
-  addPr(ctx.db, 'GEO-9814', 'kettle#14', 'kettle-bot');
-  closePr(ctx.db, 'kettle#14', { to: 'merged', actor: 'kettle-bot' });
+  addPR(ctx.db, 'GEO-9814', 'kettle#14', 'kettle-bot');
+  closePR(ctx.db, 'kettle#14', { to: 'merged', actor: 'kettle-bot' });
   setState(ctx.db, 'GEO-9814', 'live-check', {}, 'kettle-bot');
   ctx.closeInLinear('GEO-9814', 'completed');
 
@@ -52,8 +52,8 @@ test('it raises nothing for a merged or live-check run on its way to live, owed 
 test('it raises nothing for a merged run blocked on the owner, since he decides when it closes', () => {
   const ctx = setupTest();
   ctx.addKettleRun('GEO-9815');
-  addPr(ctx.db, 'GEO-9815', 'kettle#15', 'kettle-bot');
-  closePr(ctx.db, 'kettle#15', { to: 'merged', actor: 'kettle-bot' });
+  addPR(ctx.db, 'GEO-9815', 'kettle#15', 'kettle-bot');
+  closePR(ctx.db, 'kettle#15', { to: 'merged', actor: 'kettle-bot' });
   setState(ctx.db, 'GEO-9815', 'blocked', { waitsOn: 'the owner picks a kettle colour', waitsOnGeoff: true }, 'kettle-bot');
   ctx.closeInLinear('GEO-9815', 'completed');
 
@@ -63,8 +63,8 @@ test('it raises nothing for a merged run blocked on the owner, since he decides 
 test('it tells a working run whose PR merged to set merged, unlike one blocked on the owner', () => {
   const ctx = setupTest();
   ctx.addKettleRun('GEO-9816');
-  addPr(ctx.db, 'GEO-9816', 'kettle#16', 'kettle-bot');
-  closePr(ctx.db, 'kettle#16', { to: 'merged', actor: 'kettle-bot' });
+  addPR(ctx.db, 'GEO-9816', 'kettle#16', 'kettle-bot');
+  closePR(ctx.db, 'kettle#16', { to: 'merged', actor: 'kettle-bot' });
   setState(ctx.db, 'GEO-9816', 'working', {}, 'kettle-bot');
   ctx.closeInLinear('GEO-9816', 'completed');
 
@@ -83,22 +83,22 @@ test('it tells done from dropped for each closed issue by what the run still owe
   ctx.addKettleRun('GEO-9821');
   ctx.closeInLinear('GEO-9821', 'canceled');
   ctx.addKettleRun('GEO-9822');
-  addPr(ctx.db, 'GEO-9822', 'kettle#22', 'kettle-bot');
-  closePr(ctx.db, 'kettle#22', { to: 'merged', actor: 'kettle-bot' });
+  addPR(ctx.db, 'GEO-9822', 'kettle#22', 'kettle-bot');
+  closePR(ctx.db, 'kettle#22', { to: 'merged', actor: 'kettle-bot' });
   ctx.closeInLinear('GEO-9822', 'canceled');
   ctx.addKettleRun('GEO-9823');
-  addPr(ctx.db, 'GEO-9823', 'kettle#23', 'kettle-bot');
+  addPR(ctx.db, 'GEO-9823', 'kettle#23', 'kettle-bot');
   ctx.closeInLinear('GEO-9823', 'completed');
   ctx.addKettleRun('GEO-9824');
   ctx.closeInLinear('GEO-9824', 'completed');
   ctx.addKettleRun('GEO-9826');
-  addPr(ctx.db, 'GEO-9826', 'kettle#26', 'kettle-bot');
-  closePr(ctx.db, 'kettle#26', { to: 'merged', actor: 'kettle-bot' });
+  addPR(ctx.db, 'GEO-9826', 'kettle#26', 'kettle-bot');
+  closePR(ctx.db, 'kettle#26', { to: 'merged', actor: 'kettle-bot' });
   setLiveCheck(ctx.db, 'GEO-9826', 'none', 'kettle-bot');
   ctx.closeInLinear('GEO-9826', 'completed');
   ctx.addKettleRun('GEO-9827');
-  addPr(ctx.db, 'GEO-9827', 'kettle#27', 'kettle-bot');
-  closePr(ctx.db, 'kettle#27', { to: 'merged', actor: 'kettle-bot' });
+  addPR(ctx.db, 'GEO-9827', 'kettle#27', 'kettle-bot');
+  closePR(ctx.db, 'kettle#27', { to: 'merged', actor: 'kettle-bot' });
   setState(ctx.db, 'GEO-9827', 'blocked', {}, 'kettle-bot');
   ctx.closeInLinear('GEO-9827', 'completed');
 
@@ -153,9 +153,9 @@ test('the sweep\'s alert list carries the closed-issue alert', () => {
 test('it gives the drop for a canceled build run whose only PRs are its design pass PRs', () => {
   const ctx = setupTest();
   addRun(ctx.db, { issue: 'GEO-9852', title: 'Design the kettle spout', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, lane: 'cloud', design: 'agent', actor: 'kettle-bot' });
-  addPr(ctx.db, 'GEO-9852', 'kettle#52', 'kettle-bot');
-  addPr(ctx.db, 'GEO-9852', 'kettle#53', 'kettle-bot');
-  closePr(ctx.db, 'kettle#52', { to: 'merged', actor: 'kettle-bot' });
+  addPR(ctx.db, 'GEO-9852', 'kettle#52', 'kettle-bot');
+  addPR(ctx.db, 'GEO-9852', 'kettle#53', 'kettle-bot');
+  closePR(ctx.db, 'kettle#52', { to: 'merged', actor: 'kettle-bot' });
   setState(ctx.db, 'GEO-9852', 'done', { note: 'design settled' }, 'kettle-bot');
   addRun(ctx.db, { issue: 'GEO-9852', title: 'Build the kettle spout', place: 'imp', session: null, next: 'Building.', gate: null, geoffChat: false, lane: 'cloud', actor: 'kettle-bot' });
   ctx.closeInLinear('GEO-9852', 'canceled');

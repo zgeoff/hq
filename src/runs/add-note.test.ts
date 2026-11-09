@@ -3,9 +3,9 @@ import { buildMockSha } from '../../test/build-mock-sha.ts';
 import { buildStubFinalGH } from '../../test/build-stub-final-gh.ts';
 import { NOON_SYDNEY, at, freshDb } from '../../test/helpers.ts';
 import { addNote } from './add-note.ts';
-import { addPr } from './add-pr.ts';
+import { addPR } from './add-pr.ts';
 import { addRun } from './add-run.ts';
-import { closePr } from './close-pr.ts';
+import { closePR } from './close-pr.ts';
 import { listRuns } from './list-runs.ts';
 import { makeFinalResolver } from './make-final-resolver.ts';
 import { resolveNoteFinals } from './resolve-note-finals.ts';
@@ -34,7 +34,7 @@ test('it keeps the text of a note whose FINAL names no commit and sets no final 
     geoffChat: false,
     actor: 'z-delivery',
   });
-  addPr(ctx.db, 'GEO-9731', 'kettle#714', 'z-delivery');
+  addPR(ctx.db, 'GEO-9731', 'kettle#714', 'z-delivery');
   const text = 'FINAL kettle#714 4423866e all green';
   const resolutions = await resolveNoteFinals(ctx.db, resolveFinal, 'GEO-9731', text);
 
@@ -62,7 +62,7 @@ test('it tells the orchestrator both shas of a note whose FINAL names no commit'
     geoffChat: false,
     actor: 'z-delivery',
   });
-  addPr(ctx.db, 'GEO-9731', 'kettle#714', 'z-delivery');
+  addPR(ctx.db, 'GEO-9731', 'kettle#714', 'z-delivery');
   const text = 'FINAL kettle#714 4423866e all green';
   const resolutions = await resolveNoteFinals(ctx.db, resolveFinal, 'GEO-9731', text);
 
@@ -90,7 +90,7 @@ test('it stores the full sha of a FINAL marker', async () => {
     geoffChat: false,
     actor: 'z-delivery',
   });
-  addPr(ctx.db, 'GEO-9731', 'kettle#714', 'z-delivery');
+  addPR(ctx.db, 'GEO-9731', 'kettle#714', 'z-delivery');
   const text = 'FINAL kettle#714 44238662 all green';
   const resolutions = await resolveNoteFinals(ctx.db, resolveFinal, 'GEO-9731', text);
 
@@ -113,7 +113,7 @@ test('it stores the full sha of a FINAL phrase', async () => {
     geoffChat: false,
     actor: 'z-delivery',
   });
-  addPr(ctx.db, 'GEO-9731', 'kettle#714', 'z-delivery');
+  addPR(ctx.db, 'GEO-9731', 'kettle#714', 'z-delivery');
   const text = 'kettle#714 is final at 44238662';
   const resolutions = await resolveNoteFinals(ctx.db, resolveFinal, 'GEO-9731', text);
 
@@ -136,7 +136,7 @@ test('it sets no final mark for a FINAL phrase of a sha that is no commit of the
     geoffChat: false,
     actor: 'z-delivery',
   });
-  addPr(ctx.db, 'GEO-9731', 'kettle#714', 'z-delivery');
+  addPR(ctx.db, 'GEO-9731', 'kettle#714', 'z-delivery');
   const text = 'kettle#714 is final at 4423866e';
   const resolutions = await resolveNoteFinals(ctx.db, resolveFinal, 'GEO-9731', text);
 
@@ -159,7 +159,7 @@ test('it tells the orchestrator when a FINAL phrase names a sha that is no commi
     geoffChat: false,
     actor: 'z-delivery',
   });
-  addPr(ctx.db, 'GEO-9731', 'kettle#714', 'z-delivery');
+  addPR(ctx.db, 'GEO-9731', 'kettle#714', 'z-delivery');
   const text = 'kettle#714 is final at 4423866e';
   const resolutions = await resolveNoteFinals(ctx.db, resolveFinal, 'GEO-9731', text);
 
@@ -187,7 +187,7 @@ test('it asks GitHub nothing about a FINAL phrase that names a PR of another run
     geoffChat: false,
     actor: 'z-delivery',
   });
-  addPr(ctx.db, 'GEO-9731', 'kettle#714', 'z-delivery');
+  addPR(ctx.db, 'GEO-9731', 'kettle#714', 'z-delivery');
 
   await resolveNoteFinals(ctx.db, resolveFinal, 'GEO-9731', 'toaster#88 is final at 44238662');
 
@@ -208,8 +208,8 @@ test('it tells the orchestrator nothing of a FINAL that names no commit of a mer
     geoffChat: false,
     actor: 'z-delivery',
   });
-  addPr(ctx.db, 'GEO-9731', 'kettle#714', 'z-delivery');
-  closePr(ctx.db, 'kettle#714', { to: 'merged', actor: 'z-review' });
+  addPR(ctx.db, 'GEO-9731', 'kettle#714', 'z-delivery');
+  closePR(ctx.db, 'kettle#714', { to: 'merged', actor: 'z-review' });
   const text = 'FINAL kettle#714 4423866e all green';
   const resolutions = await resolveNoteFinals(ctx.db, resolveFinal, 'GEO-9731', text);
 
@@ -223,7 +223,7 @@ test('it keeps a late note keyed by the design pass session but marks no build P
   addRun(ctx.db, { issue: 'GEO-9733', title: 'Design the kettle lid', place: 'local', session: '00000033-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, design: 'agent', actor: 'z-delivery' });
   setState(ctx.db, 'GEO-9733', 'done', { note: 'design settled' }, 'z-delivery');
   addRun(ctx.db, { issue: 'GEO-9733', title: 'Build the kettle lid', place: 'local', session: null, next: 'Building.', gate: null, geoffChat: false, actor: 'z-delivery' });
-  addPr(ctx.db, 'GEO-9733', 'kettle#33', 'z-delivery');
+  addPR(ctx.db, 'GEO-9733', 'kettle#33', 'z-delivery');
 
   const note = addNote(ctx.db, '00000033', 'the lid sketch is final at 39f05fe', { label: null, actor: 'kettle' });
 
@@ -238,7 +238,7 @@ test('it asks GitHub nothing about a FINAL in a late note keyed by the design pa
   addRun(ctx.db, { issue: 'GEO-9733', title: 'Design the kettle lid', place: 'local', session: '00000033-aaaa-4aaa-8aaa-aaaaaaaaaaaa', next: 'Agent working.', gate: null, geoffChat: false, design: 'agent', actor: 'z-delivery' });
   setState(ctx.db, 'GEO-9733', 'done', { note: 'design settled' }, 'z-delivery');
   addRun(ctx.db, { issue: 'GEO-9733', title: 'Build the kettle lid', place: 'local', session: null, next: 'Building.', gate: null, geoffChat: false, actor: 'z-delivery' });
-  addPr(ctx.db, 'GEO-9733', 'kettle#33', 'z-delivery');
+  addPR(ctx.db, 'GEO-9733', 'kettle#33', 'z-delivery');
 
   await resolveNoteFinals(ctx.db, resolveFinal, '00000033', 'the lid sketch is final at 39f05fe');
 

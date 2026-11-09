@@ -3,7 +3,7 @@ import { expect, onTestFinished, spyOn, test } from 'bun:test';
 import { Database } from 'bun:sqlite';
 import { chmodSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { updateEnv } from '@zgeoff/testing/helpers';
-import { closePr } from '../src/runs/close-pr.ts';
+import { closePR } from '../src/runs/close-pr.ts';
 import { setSession } from '../src/runs/set-session.ts';
 import { requirePR } from '../src/runs/require-pr.ts';
 import { readEvents } from '../src/read-events.ts';
@@ -534,7 +534,7 @@ test('it succeeds and changes nothing when hq run merged names a PR already mark
   const ctx = setupTest();
   await ctx.hq('run', 'add', 'GEO-509', '--title', 'Invented kettle work', '--where', 'none');
   await ctx.hq('run', 'pr', 'GEO-509', 'kettle#11');
-  closePr(ctx.db, 'kettle#11', { to: 'merged', actor: 'hq-github', facts: { mergedAt: '2026-10-20T03:04:05Z', mergeSha: null } });
+  closePR(ctx.db, 'kettle#11', { to: 'merged', actor: 'hq-github', facts: { mergedAt: '2026-10-20T03:04:05Z', mergeSha: null } });
   const before = ctx.db.query("SELECT * FROM run_prs WHERE ref = 'kettle#11'").get();
 
   const again = await ctx.hq('run', 'merged', 'kettle#11');
@@ -548,7 +548,7 @@ test('it still refuses hq run merged for a PR marked closed', async () => {
   const ctx = setupTest();
   await ctx.hq('run', 'add', 'GEO-509', '--title', 'Invented kettle work', '--where', 'none');
   await ctx.hq('run', 'pr', 'GEO-509', 'kettle#12');
-  closePr(ctx.db, 'kettle#12', { to: 'closed', actor: 'hq-github' });
+  closePR(ctx.db, 'kettle#12', { to: 'closed', actor: 'hq-github' });
 
   const bin = `${ctx.directory}/bin`;
   mkdirSync(bin);
@@ -888,7 +888,7 @@ test('hq run ship prints a vers PR shipped at its merge as at merge', async () =
   const ctx = setupTest();
   await ctx.hq('run', 'add', 'GEO-510', '--title', 'Invented kettle work', '--where', 'none');
   await ctx.hq('run', 'pr', 'GEO-510', 'vers#20');
-  closePr(ctx.db, 'vers#20', { to: 'merged', actor: 'hq-github', facts: { mergedAt: '2026-10-20T03:04:05Z', mergeSha: null } });
+  closePR(ctx.db, 'vers#20', { to: 'merged', actor: 'hq-github', facts: { mergedAt: '2026-10-20T03:04:05Z', mergeSha: null } });
   await ctx.hq('run', 'state', 'GEO-510', 'merged');
 
   const bin = `${ctx.directory}/bin`;
@@ -971,7 +971,7 @@ test('hq run tidy --dry-run says what it would do to a merged run and writes no 
   onTestFinished(atc.stop);
   await ctx.hq('run', 'add', 'GEO-514', '--session', '0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', '--title', 'Invented kettle work', '--where', 'none');
   await ctx.hq('run', 'pr', 'GEO-514', 'kettle#14');
-  closePr(ctx.db, 'kettle#14', { to: 'merged', actor: 'hq-github', facts: { mergedAt: '2026-10-20T03:04:05Z', mergeSha: null } });
+  closePR(ctx.db, 'kettle#14', { to: 'merged', actor: 'hq-github', facts: { mergedAt: '2026-10-20T03:04:05Z', mergeSha: null } });
   await ctx.hq('run', 'state', 'GEO-514', 'merged', '--force');
   onTestFinished(overrideEnv('HQ_AS', undefined));
   onTestFinished(overrideEnv('ATC_SESSION_ID', '0000d009-aaaa-4aaa-8aaa-aaaaaaaaaaaa'));
@@ -994,7 +994,7 @@ test('hq run tidy wraps a merged run up, and finds nothing to tidy when it runs 
   onTestFinished(atc.stop);
   await ctx.hq('run', 'add', 'GEO-515', '--session', '0000d001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', '--title', 'Invented kettle work', '--where', 'none');
   await ctx.hq('run', 'pr', 'GEO-515', 'kettle#15');
-  closePr(ctx.db, 'kettle#15', { to: 'merged', actor: 'hq-github', facts: { mergedAt: '2026-10-20T03:04:05Z', mergeSha: null } });
+  closePR(ctx.db, 'kettle#15', { to: 'merged', actor: 'hq-github', facts: { mergedAt: '2026-10-20T03:04:05Z', mergeSha: null } });
   await ctx.hq('run', 'state', 'GEO-515', 'merged', '--force');
   ctx.out.length = 0;
 
@@ -1013,7 +1013,7 @@ test('hq run ship lists a run whose helper is still active as left, and moves no
   const ctx = setupTest();
   await ctx.hq('run', 'add', 'GEO-513', '--title', 'Invented kettle work', '--where', 'none');
   await ctx.hq('run', 'pr', 'GEO-513', 'vers#22');
-  closePr(ctx.db, 'vers#22', { to: 'merged', actor: 'hq-github', facts: { mergedAt: '2026-10-20T03:04:05Z', mergeSha: null } });
+  closePR(ctx.db, 'vers#22', { to: 'merged', actor: 'hq-github', facts: { mergedAt: '2026-10-20T03:04:05Z', mergeSha: null } });
   await ctx.hq('run', 'state', 'GEO-513', 'merged');
   await ctx.hq('run', 'session', 'GEO-513', '513ab0c0-0000-4000-8000-00000000beef', '--add');
 
@@ -1031,7 +1031,7 @@ test('hq run ship lists a run put in deploy-held after its release as left held'
   const ctx = setupTest();
   await ctx.hq('run', 'add', 'GEO-511', '--title', 'Invented kettle work', '--where', 'none');
   await ctx.hq('run', 'pr', 'GEO-511', 'vers#21');
-  closePr(ctx.db, 'vers#21', { to: 'merged', actor: 'hq-github', facts: { mergedAt: '2026-10-10T03:04:05Z', mergeSha: null } });
+  closePR(ctx.db, 'vers#21', { to: 'merged', actor: 'hq-github', facts: { mergedAt: '2026-10-10T03:04:05Z', mergeSha: null } });
   await ctx.hq('run', 'state', 'GEO-511', 'deploy-held', '--next', 'Waits on the kettle host to switch.');
 
   const bin = `${ctx.directory}/bin`;

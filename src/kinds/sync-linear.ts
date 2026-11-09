@@ -7,7 +7,7 @@ import type { LinearCall } from '../linear/types.ts';
 import { syncClosed } from '../linear/sync-closed.ts';
 import { syncFiled } from '../linear/sync-filed.ts';
 import { syncInReview } from '../linear/sync-in-review.ts';
-import { syncPrIssues } from '../linear/sync-pr-issues.ts';
+import { syncPRIssues } from '../linear/sync-pr-issues.ts';
 import { syncStarted } from '../linear/sync-started.ts';
 import { toErrorMessage } from '../to-error-message.ts';
 
@@ -16,7 +16,7 @@ export async function syncLinear(db: Database, call: LinearCall, from: Date, at:
   let typed = 0;
   try {
     closed = await syncClosed(db, call, from, at);
-    typed = await syncPrIssues(db, call);
+    typed = await syncPRIssues(db, call);
     await decideUmbrellaBoxes(db, call, at);
     setMeta(db, 'linear_synced_at', iso(at));
     setMeta(db, 'linear_error', '');

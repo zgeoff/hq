@@ -15,7 +15,7 @@ import type { WrapUpDeps } from './run-wrap-up.ts';
 import { wrapUpRunSafely } from './wrap-up-merged-runs.ts';
 
 const SessionRows = z.array(z.object({ issue: z.string(), session_id: z.string(), helper: z.number(), active: z.number(), design_pass: z.number(), runState: z.string() }));
-const PrRows = z.array(z.object({ issue: z.string(), state: z.string(), session_id: z.string().nullable() }));
+const PRRows = z.array(z.object({ issue: z.string(), state: z.string(), session_id: z.string().nullable() }));
 const WrapEventRows = z.array(z.object({ action: z.string(), at: z.string(), data: z.string() }));
 
 // Sweeps run every 5 minutes by default, and a wrap-up ends within one; a claim that outlives six
@@ -51,7 +51,7 @@ export async function wrapUpPartSessions(
       )
       .all(),
   );
-  const prs = PrRows.parse(db.query('SELECT issue, state, session_id FROM run_prs').all());
+  const prs = PRRows.parse(db.query('SELECT issue, state, session_id FROM run_prs').all());
   const events = WrapEventRows.parse(db.query("SELECT action, at, data FROM events WHERE subject = 'run' AND action IN ('part-wrap-up', 'part-wrap-up-done')").all());
   const wrapped = collectWrappedPartSessions(events.map((row) => toPartWrapEvent(row)), options.nowMs, PART_CLAIM_ABANDONED_MS);
   const activity = new Map<string, PartSessionActivity>();

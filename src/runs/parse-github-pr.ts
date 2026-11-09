@@ -4,7 +4,7 @@ import { HEX40 } from '../releases/hex40.ts';
 import type { RunResult } from '../runner/types.ts';
 import type { MergeFacts } from './close-pr.ts';
 
-export type GitHubPr = { state: 'OPEN' | 'CLOSED' } | ({ state: 'MERGED' } & MergeFacts);
+export type GitHubPR = { state: 'OPEN' | 'CLOSED' } | ({ state: 'MERGED' } & MergeFacts);
 
 const ANSWER = z.object({
   state: z.enum(['OPEN', 'CLOSED', 'MERGED']),
@@ -12,7 +12,7 @@ const ANSWER = z.object({
   mergeCommit: z.object({ oid: z.string() }).nullish(),
 });
 
-export function parseGitHubPR(ref: string, view: RunResult): GitHubPr | { error: string } {
+export function parseGitHubPR(ref: string, view: RunResult): GitHubPR | { error: string } {
   if (view.code !== 0) {
     return { error: `${ref}: can't read it (gh exit ${view.code}): ${(view.stderr || view.stdout).trim().slice(0, 200)}` };
   }

@@ -4,8 +4,8 @@ import { logEvent } from '../log-event.ts';
 import { iso } from '../clock/iso.ts';
 import { now } from '../clock/now.ts';
 import { enqueue } from '../outbox/enqueue.ts';
-import { prAllows } from '../transitions/pr-allows.ts';
-import { requirePR as mustPr } from './require-pr.ts';
+import { isPRActionAllowed } from '../transitions/is-pr-action-allowed.ts';
+import { requirePR as mustPR } from './require-pr.ts';
 import { REVIEWER } from './reviewer.ts';
 import { sameSha } from './same-sha.ts';
 import type { AcceptedFinal, FinalMark } from './types.ts';
@@ -14,14 +14,18 @@ import { updateRunTime as touch } from './update-run-time.ts';
 export function scheduleFinalReview(db: Database, mark: FinalMark): boolean {
   const actor = mark.actor;
   const note = mark.note;
-  const pr = mustPr(db, mark.ref);
+  const pr = mustPR(db, mark.ref);
   const ref = mark.ref;
   const given = mark.sha;
   const resolution = mark.resolution ?? null;
   const source = mark.source;
   const sha = resolution?.kind === 'full' ? resolution.sha : given;
-  if (!prAllows('final', pr.state)) return false;
-  if (sameSha(pr.final_sha, sha)) return false;
+  if (!isPRActionAllowed('final', pr.state)) {
+    return false;
+  }
+  if (sameSha(pr.final_sha, sha)) {
+    return false;
+  }
   const t = iso(now());
   db.query('UPDATE run_prs SET final_sha = ?, final_at = ?, final_source = ?, review_wait_until = NULL, review_wait_sha = NULL, review_wait_reason = NULL, updated_at = ? WHERE ref = ?').run(sha, t, source, t, ref);
   const seq = logEvent(db, 'run', pr.issue, 'final', actor, pr.final_sha, sha, { ref, sha, source, note, ...describeResolution(given, resolution) });
