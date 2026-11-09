@@ -135,6 +135,14 @@ test('a check that exits nonzero gives no answer', async () => {
   expect(work).toStrictEqual({ state: 'unknown', detail: 'the check in home-0000b001aaaa4aaa8aaa exited 124: timed out' });
 });
 
+test('it gives no answer when the check finds the working directory removed', async () => {
+  const imps = buildStubImpRunner({ imps: ['home-0000b001aaaa4aaa8aaa'], exec: { code: 3, stdout: '', stderr: 'workspace gone\n' } });
+
+  const work = await readImpWork(imps.run, '0000b001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', '/workspace/kettle');
+
+  expect(work).toStrictEqual({ state: 'unknown', detail: 'the check in home-0000b001aaaa4aaa8aaa exited 3: workspace gone' });
+});
+
 test('a folder that is no clone gives no answer', async () => {
   const ctx = setupTest();
   const imps = buildStubImpRunner({ imps: ['home-0000b001aaaa4aaa8aaa'] });

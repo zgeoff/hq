@@ -1,19 +1,28 @@
 import { z } from 'zod';
-import type { Runner } from '../runner/types.ts';
+import type { RunResult, Runner } from '../runner/types.ts';
 import type { ImpWork } from './types.ts';
 
 const impListSchema = z.array(z.looseObject({ name: z.string() }));
 
+// A removed local working directory holds no work, so the check says so with its own exit code. A
+// test for a path also fails when a parent can't be searched, so the parent must be searchable.
+const GONE_CODE = 3;
+const GONE_MARKER = 'workspace gone';
+
 // A failed git call exits nonzero: none runs inside a pipe, whose status would be the last command's.
 export const CHECK_SCRIPT = [
   'set -eu',
+  String.raw`if [ ! -e "$1" ] && [ -d "$(dirname "$1")" ] && [ -x "$(dirname "$1")" ]; then echo "${GONE_MARKER}" >&2; exit ${GONE_CODE}; fi`,
   'cd "$1"',
   'trees=$(git worktree list --porcelain) || exit 1',
   String.raw`printf "%s\n" "$trees" | while IFS=' ' read -r key tree; do`,
   '  if [ "$key" != worktree ]; then continue; fi',
-  '  changes=$(git -C "$tree" status --porcelain) || exit 1',
+  '  changes=$(git -C "$tree" status --porcelain --untracked-files=normal)|| exit 1',
   String.raw`  printf "%s\n" "$changes" | while IFS= read -r change; do`,
-  String.raw`    if [ -n "$change" ]; then printf "%s: %s\n" "$tree" "$change"; fi`,
+  '    case "$change" in',
+  `      "?? .scratch/"|"?? .worktrees/"|"") ;;`,
+  String.raw`      *) printf "%s: %s\n" "$tree" "$change" ;;`,
+  '    esac',
   '  done',
   'done',
   'stashes=$(git stash list) || exit 1',
@@ -46,12 +55,19 @@ export async function readImpWork(run: Runner, sessionID: string, cwd: string | 
   if (imp === undefined) {
     return { state: 'unknown', detail: `no imp ends with ${suffix}` };
   }
+
+  // A pushed imp is destroyed, so a missing working directory, such as an unmounted volume, stays an
+  // unknown here.
   const checked = await run(['imp', 'exec', imp.name, '--', 'sh', '-c', CHECK_SCRIPT, 'sh', cwd], { timeoutMs: IMP_CALL_MS });
   if (checked.code !== 0) {
     const detail = `the check in ${imp.name} exited ${checked.code}: ${firstLine(checked.stderr)}`;
     return checked.stderr.includes(RAM_LIMIT_CODE) ? { state: 'unknown', detail, retry: true } : { state: 'unknown', detail };
   }
   return summarizeFindings(checked.stdout, imp.name);
+}
+
+export function isWorkspaceGone(checked: RunResult): boolean {
+  return checked.code === GONE_CODE && checked.stderr.includes(GONE_MARKER);
 }
 
 // The script prints one line per thing it found, so no output means all work is pushed.
