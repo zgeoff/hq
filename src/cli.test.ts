@@ -36,6 +36,7 @@ import { buildMockSha } from '../test/build-mock-sha.ts';
 import { buildReadyIssue } from '../test/build-ready-issue.ts';
 import { buildStubFinalGH } from '../test/build-stub-final-gh.ts';
 import { buildStubBriefGH } from '../test/build-stub-brief-gh.ts';
+import { requirePR } from './runs/require-pr.ts';
 import { buildSeeder } from './test-utils/build-seeder.ts';
 
 function setupTest() {
@@ -1327,7 +1328,8 @@ test('it records a review wait with hq run review-wait on the FINAL, and hq run 
   expect(code).toBe(0);
   expect(shownBefore).toInclude('  kettle#741 review waits until Fri, 16 Oct, 12:00 (the only reviewer is out of quota)');
   expect(ctx.lines.join('\n')).not.toInclude('review waits');
-  expect(ctx.db.query(`SELECT review_wait_until, review_wait_sha FROM run_prs WHERE ref = 'kettle#741'`).get()).toStrictEqual({ review_wait_until: '2026-10-16T01:00:00Z', review_wait_sha: 'abc1234' });
+  const stored = requirePR(ctx.db, 'kettle#741');
+  expect({ until: stored.review_wait_until, sha: stored.review_wait_sha }).toStrictEqual({ until: '2026-10-16T01:00:00Z', sha: 'abc1234' });
 });
 
 test.each([
@@ -1350,7 +1352,7 @@ test.each([
 
   expect(code).toBe(1);
   expect(ctx.lines.join('\n')).toMatch(row.message);
-  expect(ctx.db.query('SELECT ref FROM run_prs WHERE review_wait_until IS NOT NULL').all()).toStrictEqual([]);
+  expect(requirePR(ctx.db, 'kettle#744').review_wait_until).toBeNull();
 });
 
 test('it removes the review wait with hq run review-wait --clear', async () => {
@@ -1363,5 +1365,25 @@ test('it removes the review wait with hq run review-wait --clear', async () => {
   const code = await main(['run', 'review-wait', 'kettle#745', '--clear']);
 
   expect(code).toBe(0);
-  expect(ctx.db.query(`SELECT review_wait_until, review_wait_sha, review_wait_reason FROM run_prs WHERE ref = 'kettle#745'`).get()).toStrictEqual({ review_wait_until: null, review_wait_sha: null, review_wait_reason: null });
+  const stored = requirePR(ctx.db, 'kettle#745');
+  expect({ until: stored.review_wait_until, sha: stored.review_wait_sha, reason: stored.review_wait_reason }).toStrictEqual({ until: null, sha: null, reason: null });
+});
+
+test('it reports the review wait in hq run show --json only while it is active', async () => {
+  const ctx = setupTest();
+  updateEnv('HQ_AS', 'z-delivery');
+  ctx.seed.run({ issue: 'GEO-9746' });
+  ctx.seed.finalRunPR({ issue: 'GEO-9746', ref: 'kettle#746', sha: 'abc1234' });
+  await main(['run', 'review-wait', 'kettle#746', '--until', '2026-10-16T01:00:00Z', '--reason', 'out of quota']);
+
+  ctx.lines.length = 0;
+  await main(['run', 'show', 'GEO-9746', '--json']);
+  const before = ctx.lines.join('\n');
+  ctx.lines.length = 0;
+  at('2026-10-16T01:00:00Z');
+  await main(['run', 'show', 'GEO-9746', '--json']);
+  const after = ctx.lines.join('\n');
+
+  expect(before).toMatch(/"review_wait": \{\s+"until": "2026-10-16T01:00:00Z",\s+"reason": "out of quota"\s+\}/u);
+  expect(after).toInclude('"review_wait": null');
 });

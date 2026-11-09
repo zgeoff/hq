@@ -16,7 +16,7 @@ export type ReviewWaitInput = { clear: true } | { clear: false; until: string | 
 export function setReviewWait(db: Database, raw: string, input: ReviewWaitInput, actor: string): RunPr {
   return db
     .transaction(() => {
-      const { ref } = normalizePrRef(raw);
+      const ref = normalizePrRef(raw).ref;
       const pr = mustPr(db, ref);
       const at = now();
       const request = buildRequest(input, at);
@@ -25,7 +25,8 @@ export function setReviewWait(db: Database, raw: string, input: ReviewWaitInput,
         throw new HqError('bad_state', write.refusal);
       }
       db.query('UPDATE run_prs SET review_wait_until = ?, review_wait_sha = ?, review_wait_reason = ?, updated_at = ? WHERE ref = ?').run(write.until, write.sha, write.reason, iso(at), ref);
-      logEvent(db, 'run', pr.issue, request.kind === 'clear' ? 'review-wait-cleared' : 'review-wait', actor, write.sha, null, { ref, until: write.until, reason: write.reason });
+      const action = request.kind === 'clear' ? 'review-wait-cleared' : 'review-wait';
+      logEvent(db, 'run', pr.issue, action, actor, write.sha, null, { ref, until: write.until, reason: write.reason });
       touch(db, pr.issue);
       return mustPr(db, ref);
     })
