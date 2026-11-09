@@ -12,6 +12,7 @@ import { metaJson } from '../db/meta-json.ts';
 import { setMeta } from '../db/set-meta.ts';
 import { strMap } from '../db/str-map.ts';
 import { HqError } from '../errors.ts';
+import { addNews } from '../news/add-news.ts';
 import { enqueue } from '../outbox/enqueue.ts';
 import { readPrompt } from '../prompts/read-prompt.ts';
 import { cleanEnv } from '../runner/clean-env.ts';
@@ -30,6 +31,7 @@ import { getHome as HOME } from './get-home.ts';
 import { hasStaleOps } from './has-stale-ops.ts';
 import { HELD } from './held.ts';
 import { loadRcPending as rcPending } from './load-rc-pending.ts';
+import { pickStepsToTell } from './pick-steps-to-tell.ts';
 import { recordStaleRestarts } from './record-stale-restarts.ts';
 import { runStaleRestartTick } from './run-stale-restart-tick.ts';
 import type { RestartedSession } from './run-stale-restart-tick.ts';
@@ -226,12 +228,20 @@ async function ensureOnce(db: Database, client: FleetClient, opts: { dryRun: boo
     const told = steps.filter((step) => !rcReported.has(step) && (step.action === 'spawned' || step.action === 'failed' || step.action === 'duplicates' || step.action === 'remote control'));
     if (!opts.dryRun && told.length) {
       const seq = logEvent(db, 'hq', 'fleet', 'ensured', opts.actor, null, null, { steps: told });
-      const text = `hq fleet: ${told.map(sayStep).join('; ')}.`;
-      for (const u of told.filter((x) => x.urgent)) enqueue(db, logEvent(db, 'hq', 'fleet', 'urgent', opts.actor, null, null, { step: u }), owner(), `hq fleet: ${sayStep(u)}.`);
-      if (isQuiet(startedAt)) {
-        setMeta(db, 'fleet_held', JSON.stringify([...metaJson(db, 'fleet_held', HELD, []), { seq, text }]));
-      } else {
-        enqueue(db, seq, owner(), text);
+      const picked = pickStepsToTell(told);
+      for (const step of picked.news) {
+        addNews(db, { from: opts.actor, topic: 'other', text: `hq fleet: ${sayStep(step)}.`.replaceAll(/\s*[\r\n]+\s*/gu, ' ').slice(0, 400), issue: null, link: null, needsGeoff: false, tag: 'fleet-respawn' });
+      }
+      for (const urgent of picked.owner.filter((x) => x.urgent)) {
+        enqueue(db, logEvent(db, 'hq', 'fleet', 'urgent', opts.actor, null, null, { step: urgent }), owner(), `hq fleet: ${sayStep(urgent)}.`);
+      }
+      if (picked.owner.length > 0) {
+        const text = `hq fleet: ${picked.owner.map(sayStep).join('; ')}.`;
+        if (isQuiet(startedAt)) {
+          setMeta(db, 'fleet_held', JSON.stringify([...metaJson(db, 'fleet_held', HELD, []), { seq, text }]));
+        } else {
+          enqueue(db, seq, owner(), text);
+        }
       }
     }
     if (!opts.dryRun && !isQuiet(startedAt)) {
