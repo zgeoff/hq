@@ -1,5 +1,6 @@
 import type { Database } from 'bun:sqlite';
 import { expect, onTestFinished, test } from 'bun:test';
+import { listEvents } from '../src/list-events.ts';
 import { getRun } from '../src/runs/get-run.ts';
 import { createMergedRun } from './create-merged-run.ts';
 import { freshDb } from './helpers.ts';
@@ -20,4 +21,13 @@ test('it writes a merged run whose every PR merged', () => {
     { ref: 'tools#3', state: 'merged' },
     { ref: 'tools#4', state: 'merged' },
   ]);
+});
+
+test('it logs one move of the run to merged', () => {
+  const db = setupTest();
+
+  createMergedRun(db, 'GEO-9902', ['tools#5']);
+
+  const moves = listEvents(db, 'state').filter((event) => event.subject_id === 'GEO-9902' && event.to_state === 'merged');
+  expect(moves).toHaveLength(1);
 });
