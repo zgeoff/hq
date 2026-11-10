@@ -1,8 +1,8 @@
 import { z } from 'zod';
-import { expect, onTestFinished, test } from 'bun:test';
+import { expect, mock, onTestFinished, test } from 'bun:test';
+import { HttpResponse, http } from 'msw';
 import { updateEnv } from '@zgeoff/testing/helpers';
 import invariant from 'tiny-invariant';
-import { buildMockFetch } from '../src/test-utils/build-mock-fetch.ts';
 import { toErrorMessage } from '../src/to-error-message.ts';
 import { issueOf } from '../src/kinds/issue-of.ts';
 import { kindOf } from '../src/kinds/kind-of.ts';
@@ -26,6 +26,8 @@ import type { Runner } from '../src/runner/types.ts';
 import { buildSeeder } from '../src/test-utils/build-seeder.ts';
 import { buildStubGitHubFactsRunner } from './build-stub-github-facts-runner.ts';
 import { at, freshDb } from './helpers.ts';
+import { LINEAR_GRAPHQL_URL } from '../mocks/linear-handlers.ts';
+import { server } from '../mocks/node.ts';
 
 function setupTest() {
   const base = freshDb();
@@ -82,7 +84,7 @@ test('a past day is recorded once; today is fetched each time', async () => {
   expect(ctx.db.query('SELECT kind, issue FROM merged_prs WHERE number = 1').get()).toStrictEqual({ kind: 'fix', issue: 'GEO-1' });
   calls.length = 0;
   await syncKinds(ctx.db, run, { from: new Date('2026-10-14T00:00:00Z'), maxDays: 10 });
-  expect(calls).toEqual(['2026-10-16']);
+  expect(calls).toStrictEqual(['2026-10-16']);
 });
 
 test('maxDays bounds a sync, and the rest is left for later', async () => {
@@ -193,25 +195,28 @@ test('a Linear failure is kept for the text and thrown', async () => {
   expect(linearState(ctx.db)).toStrictEqual({ syncedAt: null, error: 'invented outage' });
 });
 
-test('a gh row hq cannot read records nothing', async () => {
+test.each<[string, unknown]>([
+  ['a number that is a string', { number: 'x', title: 't', closedAt: '2026-10-14T05:00:00Z', repository: { name: 'a' } }],
+  ['a number of 0', { number: 0, title: 't', closedAt: '2026-10-14T05:00:00Z', repository: { name: 'a' } }],
+  ['a negative number', { number: -1, title: 't', closedAt: '2026-10-14T05:00:00Z', repository: { name: 'a' } }],
+  ['a closedAt that is not a time', { number: 1, title: 't', closedAt: 'soon', repository: { name: 'a' } }],
+  ['a closedAt of 0', { number: 1, title: 't', closedAt: '0', repository: { name: 'a' } }],
+  ['a closedAt outside the day', { number: 1, title: 't', closedAt: '2026-10-13T23:00:00Z', repository: { name: 'a' } }],
+  ['a repo name with a path', { number: 1, title: 't', closedAt: '2026-10-14T05:00:00Z', repository: { name: '../a' } }],
+  ['a repo name of ..', { number: 1, title: 't', closedAt: '2026-10-14T05:00:00Z', repository: { name: '..' } }],
+  ['an empty repo name', { number: 1, title: 't', closedAt: '2026-10-14T05:00:00Z', repository: { name: '' } }],
+])('#syncDay rejects a gh row with %s and records nothing', async (_case, row) => {
   const ctx = setupTest();
-  const ok = { number: 1, title: 't', closedAt: '2026-10-14T05:00:00Z', repository: { name: 'a' } };
-  for (const row of [
-    { ...ok, number: 'x' },
-    { ...ok, number: 0 },
-    { ...ok, number: -1 },
-    { ...ok, closedAt: 'soon' },
-    { ...ok, closedAt: '0' },
-    { ...ok, closedAt: '2026-10-13T23:00:00Z' },
-    { ...ok, repository: { name: '../a' } },
-    { ...ok, repository: { name: '..' } },
-    { ...ok, repository: { name: '' } },
-  ]) {
-    const run: Runner = async () => ({ code: 0, stdout: JSON.stringify([row]), stderr: '' });
-    await expect(syncDay(ctx.db, run, '2026-10-14')).rejects.toThrow("can't read");
-  }
-  const notList: Runner = async () => ({ code: 0, stdout: '{}', stderr: '' });
-  await expect(syncDay(ctx.db, notList, '2026-10-14')).rejects.toThrow('did not return a list');
+
+  await expect(syncDay(ctx.db, mock<Runner>(() => Promise.resolve({ code: 0, stdout: JSON.stringify([row]), stderr: '' })), '2026-10-14')).rejects.toThrow("can't read");
+  expect(ctx.db.query('SELECT COUNT(*) AS count FROM merged_prs').get()).toStrictEqual({ count: 0 });
+  expect(ctx.db.query('SELECT COUNT(*) AS count FROM merged_pr_days').get()).toStrictEqual({ count: 0 });
+});
+
+test('#syncDay rejects a gh answer that is not a list and records nothing', async () => {
+  const ctx = setupTest();
+
+  await expect(syncDay(ctx.db, mock<Runner>(() => Promise.resolve({ code: 0, stdout: '{}', stderr: '' })), '2026-10-14')).rejects.toThrow('did not return a list');
   expect(ctx.db.query('SELECT COUNT(*) AS count FROM merged_prs').get()).toStrictEqual({ count: 0 });
   expect(ctx.db.query('SELECT COUNT(*) AS count FROM merged_pr_days').get()).toStrictEqual({ count: 0 });
 });
@@ -227,66 +232,85 @@ test('Linear ids hq did not ask for are not stored; an inherited type name count
   expect(week?.prTypes.none).toBe(1);
 });
 
-test('the key never reaches an error or hq.db, even when Linear echoes it', async () => {
+test('it keeps the key out of an error and hq.db when Linear echoes it in a 400 reply', async () => {
   const ctx = setupTest();
-  const KEY = 'lin_api_INVENTEDdummyKEY0123456789';
   forgetKey();
-  process.env['OP_SERVICE_ACCOUNT_TOKEN'] = 'invented-token';
-  const run: Runner = async () => ({ code: 0, stdout: `${KEY}\n`, stderr: '' });
-  const echo = buildMockFetch(() => Promise.resolve(Response.json({ errors: [{ message: `bad key ${KEY} sent` }, { message: 'also lin_api_OTHERinventedKEY' }] }, { status: 400 })));
-  const down = buildMockFetch(() => Promise.reject(new Error(`socket closed after ${KEY}`)));
-  try {
-    for (const f of [echo, down]) {
-      const err = await syncLinear(ctx.db, makeLinearCaller(run, f), new Date('2026-10-14T00:00:00Z'), { run }).catch((error: unknown) => error);
-      expect(toErrorMessage(err)).not.toContain('lin_api_');
-      expect(linearState(ctx.db).error).not.toContain('lin_api_');
-      expect(JSON.stringify(ctx.db.query('SELECT * FROM meta').all())).not.toContain(KEY);
-    }
-  } finally {
-    delete process.env['OP_SERVICE_ACCOUNT_TOKEN'];
-    forgetKey();
-  }
-  expect(redact(`a ${KEY} b`, KEY)).toBe('a [key] b');
+  onTestFinished(forgetKey);
+  updateEnv('OP_SERVICE_ACCOUNT_TOKEN', 'invented-token');
+  server.use(http.post(LINEAR_GRAPHQL_URL, () => HttpResponse.json({ errors: [{ message: 'bad key lin_api_INVENTEDdummyKEY0123456789 sent' }, { message: 'also lin_api_OTHERinventedKEY' }] }, { status: 400 })));
+  const run = mock<Runner>(() => Promise.resolve({ code: 0, stdout: 'lin_api_INVENTEDdummyKEY0123456789\n', stderr: '' }));
+
+  const err = await syncLinear(ctx.db, makeLinearCaller(run), new Date('2026-10-14T00:00:00Z'), { run }).catch((error: unknown) => error);
+
+  expect(toErrorMessage(err)).not.toContain('lin_api_');
+  expect(linearState(ctx.db).error).not.toContain('lin_api_');
+  expect(JSON.stringify(ctx.db.query('SELECT * FROM meta').all())).not.toContain('lin_api_INVENTEDdummyKEY0123456789');
 });
 
-test('the key is cut from an op failure and a stored title, and a traced fetch is refused', async () => {
+test('it keeps the key out of an error and hq.db when the connection drops', async () => {
   const ctx = setupTest();
-  const KEY = 'lin_api_INVENTEDdummyKEY0123456789';
   forgetKey();
-  process.env['OP_SERVICE_ACCOUNT_TOKEN'] = 'invented-token';
-  try {
-    const caller = makeLinearCaller(() => Promise.resolve({ code: 1, stdout: KEY, stderr: `[ERROR] ${KEY} could not be read` }));
-    const err = await caller('q', {}).catch((error: unknown) => error);
-    expect(toErrorMessage(err)).not.toContain(KEY);
-    process.env['BUN_CONFIG_VERBOSE_FETCH'] = 'curl';
-    const ok: Runner = async () => ({ code: 0, stdout: KEY, stderr: '' });
-    let fetched = false;
-    const tracedFetch = buildMockFetch(() => {
-      fetched = true;
-      return Promise.resolve(new Response('{}'));
-    });
-    await expect(makeLinearCaller(ok, tracedFetch)('q', {})).rejects.toThrow('BUN_CONFIG_VERBOSE_FETCH');
-    expect(fetched).toBe(false);
-  } finally {
-    delete process.env['BUN_CONFIG_VERBOSE_FETCH'];
-    delete process.env['OP_SERVICE_ACCOUNT_TOKEN'];
-    forgetKey();
-  }
-  const call: LinearCall = async () => ({ issues: { nodes: [{ ...node('GEO-1', 'Bug', { completedAt: '2026-10-14T01:00:00Z' }), title: `pasted ${KEY}` }], pageInfo: { hasNextPage: false, endCursor: null } } });
-  await syncClosed(ctx.db, call, new Date('2026-10-14T00:00:00Z'));
-  expect(JSON.stringify(ctx.db.query('SELECT * FROM linear_issues').all())).not.toContain(KEY);
+  onTestFinished(forgetKey);
+  updateEnv('OP_SERVICE_ACCOUNT_TOKEN', 'invented-token');
+  server.use(http.post(LINEAR_GRAPHQL_URL, () => HttpResponse.error()));
+  const run = mock<Runner>(() => Promise.resolve({ code: 0, stdout: 'lin_api_INVENTEDdummyKEY0123456789\n', stderr: '' }));
+
+  const err = await syncLinear(ctx.db, makeLinearCaller(run), new Date('2026-10-14T00:00:00Z'), { run }).catch((error: unknown) => error);
+
+  expect(toErrorMessage(err)).not.toContain('lin_api_');
+  expect(linearState(ctx.db).error).not.toContain('lin_api_');
+  expect(JSON.stringify(ctx.db.query('SELECT * FROM meta').all())).not.toContain('lin_api_INVENTEDdummyKEY0123456789');
+});
+
+test('it redacts the key to a placeholder', () => {
+  expect(redact('a lin_api_INVENTEDdummyKEY0123456789 b', 'lin_api_INVENTEDdummyKEY0123456789')).toBe('a [key] b');
+});
+
+test('it cuts the key from an op failure', async () => {
+  setupTest();
+  forgetKey();
+  onTestFinished(forgetKey);
+  updateEnv('OP_SERVICE_ACCOUNT_TOKEN', 'invented-token');
+  const caller = makeLinearCaller(() => Promise.resolve({ code: 1, stdout: 'lin_api_INVENTEDdummyKEY0123456789', stderr: '[ERROR] lin_api_INVENTEDdummyKEY0123456789 could not be read' }));
+
+  const err = await caller('q', {}).catch((error: unknown) => error);
+
+  expect(toErrorMessage(err)).not.toContain('lin_api_INVENTEDdummyKEY0123456789');
+});
+
+test('it refuses a traced fetch before any request is sent', async () => {
+  setupTest();
+  forgetKey();
+  onTestFinished(forgetKey);
+  updateEnv('OP_SERVICE_ACCOUNT_TOKEN', 'invented-token');
+  updateEnv('BUN_CONFIG_VERBOSE_FETCH', 'curl');
+  const received = mock<(url: string) => void>();
+  server.use(
+    http.post(LINEAR_GRAPHQL_URL, (info) => {
+      received(info.request.url);
+      return HttpResponse.json({ data: {} });
+    }),
+  );
+
+  await expect(makeLinearCaller(() => Promise.resolve({ code: 0, stdout: 'lin_api_INVENTEDdummyKEY0123456789', stderr: '' }))('q', {})).rejects.toThrow('BUN_CONFIG_VERBOSE_FETCH');
+  expect(received).not.toHaveBeenCalled();
+});
+
+test('it cuts the key from a stored title', async () => {
+  const ctx = setupTest();
+  await syncClosed(ctx.db, () => Promise.resolve({ issues: { nodes: [{ ...node('GEO-1', 'Bug', { completedAt: '2026-10-14T01:00:00Z' }), title: 'pasted lin_api_INVENTEDdummyKEY0123456789' }], pageInfo: { hasNextPage: false, endCursor: null } } }), new Date('2026-10-14T00:00:00Z'));
+
+  expect(JSON.stringify(ctx.db.query('SELECT * FROM linear_issues').all())).not.toContain('lin_api_INVENTEDdummyKEY0123456789');
 });
 
 test('a multi-day sync spaces its searches', async () => {
   const ctx = setupTest();
-  process.env['HQ_SEARCH_GAP_MS'] = '40';
-  try {
-    const t0 = Date.now();
-    await syncKinds(ctx.db, ghFake({}), { from: new Date('2026-10-13T00:00:00Z'), maxDays: 3 });
-    expect(Date.now() - t0).toBeGreaterThanOrEqual(75);
-  } finally {
-    process.env['HQ_SEARCH_GAP_MS'] = '0';
-  }
+  updateEnv('HQ_SEARCH_GAP_MS', '40');
+  const startedMs = Date.now();
+
+  await syncKinds(ctx.db, ghFake({}), { from: new Date('2026-10-13T00:00:00Z'), maxDays: 3 });
+
+  expect(Date.now() - startedMs).toBeGreaterThanOrEqual(75);
 });
 
 test('merged PRs in a repo not in scope are not stored', async () => {
