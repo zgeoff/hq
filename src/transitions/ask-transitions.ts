@@ -7,7 +7,7 @@ export const ASK_TRANSITIONS = {
 
   'answered-unopened': { from: ['queued', 'later'], to: 'answered' },
   applied: { from: ['answered'], to: 'applied' },
-  later: { from: ['open', 'queued'], to: 'later' },
+  later: { from: ['open', 'queued', 'later'], to: 'later' },
   skipped: { from: ['open', 'queued', 'answered'], to: 'skipped' },
   closed: { from: ['queued', 'open', 'later', 'skipped', 'answered'], to: 'closed' },
   reasked: { from: ['answered', 'applied', 'skipped', 'closed'], to: 'queued' },
