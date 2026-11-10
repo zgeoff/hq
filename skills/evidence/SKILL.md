@@ -84,6 +84,17 @@ production:
 An item that needs the owner's eyes or hands, before or after the merge, goes on the owner's unblock
 list, as [owner-calls](../owner-calls/SKILL.md) says. It doesn't hold the merge.
 
+At the live check, judge for yourself whether each item for the owner is about a feature the owner
+uses every day, such as Nix's memory. For such an item, the owner's daily use is the evidence, in place
+of something a reader can open and check:
+
+- In the live check's comment, record the item as passed by the owner's daily use, and name the
+  feature.
+- Add no unblock step for it, and send no session a question about it.
+- When you can't tell whether the owner uses the feature every day, add the step as usual.
+
+Keep each step that needs real work from the owner, such as an approval tap, on the unblock list.
+
 ## Record it
 
 Post one Linear comment on the issue for each preview check or live check. Put in it:

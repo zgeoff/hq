@@ -124,7 +124,9 @@ each issue:
    A grant in your start prompt can allow one write outside Nix, such as seeding a vers QA account.
    Make only that write, then delete or reset what you wrote.
 
-3. **Record the evidence** on the issue, as the `evidence` skill says, in one comment.
+3. **Record the evidence** on the issue, as the `evidence` skill says, in one comment. Record an
+   item about a feature the owner uses every day as passed by the owner's daily use. Judge that
+   yourself, as the evidence skill's [Once live](../evidence/SKILL.md#once-live) says.
 4. **Close or hand back:**
    - When every item passed, move the issue to Done with `save_issue`. Then, if `hq run show GEO-n`
      shows the run at `live-check`, run `hq run done GEO-n`. Skip it at any other state.

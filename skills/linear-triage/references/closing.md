@@ -31,6 +31,14 @@ Judge by the `evidence` skill. Take the first case that fits:
 - **An unreproduced one-off** left in Backlog, after 14 days with no new comment or PR: close as
   Canceled, "Not reproduced". Don't flag it.
 
+After you close an issue as Done, close its hq run too: hq's record of the issue's delivery. If
+you skip it, hq raises a stale alert on the run later:
+
+1. Run `hq run show GEO-<n>`. Its first line gives the run's state in brackets, such as
+   `[working]`. Stop when it prints `no run for GEO-<n>`, or the state is `[done]` or `[dropped]`.
+2. Run `hq run done GEO-<n> --note '<the evidence you commented>'`.
+3. Run `hq run sweep`, so hq updates its alerts now.
+
 ## Stalled In Progress issues
 
 No movement on the agent or the PR in 3 days. Find the session with `atc_sessions_list` (its name
