@@ -1,4 +1,5 @@
 import type { Database } from 'bun:sqlite';
+import type { ZSession } from '../../linear/types.ts';
 import type { Role } from '../../roles/role-names.ts';
 import type { Verdict } from '../types.ts';
 
@@ -18,7 +19,7 @@ export interface ThroughputLine {
 
 export type ThroughputReader = (db: Database, from: Date, at: Date) => ThroughputLine;
 
-export type IssueSource = 'owner' | 'design' | 'agent' | 'review' | 'live check' | 'bot';
+export type IssueSource = 'owner' | 'design' | 'agent' | 'review' | 'live check' | 'bot' | ZSession;
 
 export interface FiledIssue {
   issue: string;

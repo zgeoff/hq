@@ -1,11 +1,13 @@
 import type { Database } from 'bun:sqlite';
 import { z } from 'zod';
 import { iso } from '../../clock/iso.ts';
+import { Z_SESSIONS } from '../../linear/z-sessions.ts';
+import { pickIssueSource } from './pick-issue-source.ts';
 import type { FiledIssue } from './types.ts';
 
 const filedRowSchema = z.object({
   issue: z.string(),
-  source: z.enum(['owner', 'design', 'agent', 'live check', 'bot']),
+  source: z.string(),
   pr_ref: z.string().nullable(),
   recorded: z.number(),
 });
@@ -20,5 +22,5 @@ export function readFiledIssues(db: Database, from: Date, at: Date): FiledIssue[
   return z
     .array(filedRowSchema)
     .parse(rows)
-    .map((row) => ({ issue: row.issue, source: row.recorded ? 'review' : row.source, prRef: row.pr_ref }));
+    .map((row) => ({ issue: row.issue, source: pickIssueSource(row.source, row.recorded === 1, Z_SESSIONS), prRef: row.pr_ref }));
 }

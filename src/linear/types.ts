@@ -35,7 +35,12 @@ export interface LinearCommandDeps {
 
 export type Node = z.output<typeof NodeSchema>;
 
-export type FiledSource = 'owner' | 'design' | 'agent' | 'live check' | 'bot';
+declare const zSessionBrand: unique symbol;
+
+// A session name that fleet.json declares. Only the isZSession guard narrows a string to it.
+export type ZSession = string & { readonly [zSessionBrand]: true };
+
+export type FiledSource = 'owner' | 'design' | 'agent' | 'live check' | 'bot' | ZSession;
 
 export type UmbrellaOutcome = 'news' | 'ticked' | 'no_box' | 'ambiguous' | 'gone';
 

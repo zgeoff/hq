@@ -633,4 +633,17 @@ export const MIGRATIONS: string[] = [
     removed_at TEXT
   );
   CREATE INDEX session_jobs_target ON session_jobs (target);`,
+
+  // SQLite can't change a CHECK, so linear_filed is rebuilt without one and every row kept. The source values are checked on read.
+  `CREATE TABLE linear_filed_v55 (
+    issue      TEXT PRIMARY KEY,
+    created_at TEXT NOT NULL,
+    source     TEXT NOT NULL,
+    pr_ref     TEXT,
+    fetched_at TEXT NOT NULL
+  );
+  INSERT INTO linear_filed_v55 (issue, created_at, source, pr_ref, fetched_at) SELECT issue, created_at, source, pr_ref, fetched_at FROM linear_filed;
+  DROP TABLE linear_filed;
+  ALTER TABLE linear_filed_v55 RENAME TO linear_filed;
+  CREATE INDEX linear_filed_created ON linear_filed (created_at);`,
 ];
