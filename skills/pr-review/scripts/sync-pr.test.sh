@@ -117,29 +117,29 @@ export FORK_PIN=fedcba9876543210fedcba9876543210fedcba98
 failures=0
 # expect <name> <exit code> <output prefix>, with the case's variables exported.
 expect() {
-  local out code=0
-  out=$(PATH="$work:$PATH" bash "$here/sync-pr.sh" demo 7 2>&1) || code=$?
-  if [ "$code" = "$2" ] && [[ $out == "$3"* ]]; then
-    echo "ok $1"
-  else
-    echo "FAIL $1: exit $code, output: $out"
-    failures=$((failures + 1))
-  fi
+        local out code=0
+        out=$(PATH="$work:$PATH" bash "$here/sync-pr.sh" demo 7 2>&1) || code=$?
+        if [ "$code" = "$2" ] && [[ $out == "$3"* ]]; then
+                echo "ok $1"
+        else
+                echo "FAIL $1: exit $code, output: $out"
+                failures=$((failures + 1))
+        fi
 }
 
 set_case() {
-  export STATE=OPEN AUTHOR=app/zgeoff-sync-bot BRANCH=repo-sync/zgeoff-tools
-  export FILES='.claude/skills/x/SKILL.md\tmodified' HEAD_BLOB=b1 BASE_BLOB=b1 SOURCE_BLOBS='b1 b0'
-  export HEAD_TEXT=ours SOURCE_TEXT=theirs SKILLS_PIN=0123456789abcdef0123456789abcdef01234567
-  unset BASE_TEXT
+        export STATE=OPEN AUTHOR=app/zgeoff-sync-bot BRANCH=repo-sync/zgeoff-tools
+        export FILES='.claude/skills/x/SKILL.md\tmodified' HEAD_BLOB=b1 BASE_BLOB=b1 SOURCE_BLOBS='b1 b0'
+        export HEAD_TEXT=ours SOURCE_TEXT=theirs SKILLS_PIN=0123456789abcdef0123456789abcdef01234567
+        unset BASE_TEXT
 }
 
 # caller <head ref line> <source ref line>: a workflow caller whose blob differs,
 # and whose base held an older job.
 caller() {
-  export FILES='.github/workflows/pr.yml\tmodified' HEAD_BLOB=pinned
-  export HEAD_TEXT="jobs:\\n  checks:\\n    $1" SOURCE_TEXT="jobs:\\n  checks:\\n    $2"
-  export BASE_TEXT="jobs:\\n  checks:\\n    uses: zgeoff/tools/.github/workflows/old-checks.yml@main"
+        export FILES='.github/workflows/pr.yml\tmodified' HEAD_BLOB=pinned
+        export HEAD_TEXT="jobs:\\n  checks:\\n    $1" SOURCE_TEXT="jobs:\\n  checks:\\n    $2"
+        export BASE_TEXT="jobs:\\n  checks:\\n    uses: zgeoff/tools/.github/workflows/old-checks.yml@main"
 }
 
 set_case
@@ -227,9 +227,9 @@ expect "a synced file whose name holds #, ? and % is read at its own path and re
 # own <path> <base ref> <head ref>: a workflow the repo wrote itself, whose
 # blob differs and whose call to a zgeoff/tools workflow names each ref.
 own() {
-  export FILES="$1\\tmodified" HEAD_BLOB=pinned SOURCE_TEXT=unrelated
-  export BASE_TEXT="on: push\\njobs:\\n  checks:\\n    uses: zgeoff/tools/.github/workflows/bun-checks.yml@$2"
-  export HEAD_TEXT="on: push\\njobs:\\n  checks:\\n    uses: zgeoff/tools/.github/workflows/bun-checks.yml@$3"
+        export FILES="$1\\tmodified" HEAD_BLOB=pinned SOURCE_TEXT=unrelated
+        export BASE_TEXT="on: push\\njobs:\\n  checks:\\n    uses: zgeoff/tools/.github/workflows/bun-checks.yml@$2"
+        export HEAD_TEXT="on: push\\njobs:\\n  checks:\\n    uses: zgeoff/tools/.github/workflows/bun-checks.yml@$3"
 }
 old_pin='1111111111111111111111111111111111111111 # main'
 new_pin='2222222222222222222222222222222222222222 # main'
@@ -258,9 +258,9 @@ expect "a workflow caller pinned to a tools commit that only a fork holds fails"
 # step <base ref> <head ref>: a workflow the repo wrote itself, whose only change
 # moves the ref of a step that uses a zgeoff/tools action, which the sync never pins.
 step() {
-  export FILES='.github/workflows/main.yml\tmodified' HEAD_BLOB=pinned SOURCE_TEXT=unrelated
-  export BASE_TEXT="on: push\\njobs:\\n  checks:\\n    steps:\\n      - uses: zgeoff/tools/actions/setup@$1"
-  export HEAD_TEXT="on: push\\njobs:\\n  checks:\\n    steps:\\n      - uses: zgeoff/tools/actions/setup@$2"
+        export FILES='.github/workflows/main.yml\tmodified' HEAD_BLOB=pinned SOURCE_TEXT=unrelated
+        export BASE_TEXT="on: push\\njobs:\\n  checks:\\n    steps:\\n      - uses: zgeoff/tools/actions/setup@$1"
+        export HEAD_TEXT="on: push\\njobs:\\n  checks:\\n    steps:\\n      - uses: zgeoff/tools/actions/setup@$2"
 }
 
 set_case
@@ -312,8 +312,8 @@ SYNC_PR_SKILLS_REPO="file://$work/no-such-repo" expect "a failed clone of the sk
 # block <head text> <source text>: .claude/skills/blk/SKILL.md, whose blob differs, with the
 # text of the PR head and of tools main.
 block() {
-  export FILES='.claude/skills/blk/SKILL.md\tmodified' HEAD_BLOB=edited
-  export HEAD_TEXT="$1" SOURCE_TEXT="$2"
+        export FILES='.claude/skills/blk/SKILL.md\tmodified' HEAD_BLOB=edited
+        export HEAD_TEXT="$1" SOURCE_TEXT="$2"
 }
 rust='<!-- repo-sync needs ./references/rust.md -->\n\nFor Rust, read [Rust](./references/rust.md).\n\n<!-- repo-sync end -->\n\n'
 kotlin='<!-- repo-sync needs ./references/kotlin.md -->\n\nFor Kotlin, read [Kotlin](./references/kotlin.md).\n\n<!-- repo-sync end -->\n\n'
@@ -392,9 +392,9 @@ SYNC_PR_TOOLS_REPO="file://$work/no-such-repo" expect "a failed clone of the too
 # pkg <base scripts> <head scripts> [head version]: a package.json change, with
 # each side's scripts as JSON object members.
 pkg() {
-  export FILES='package.json\tmodified'
-  export BASE_TEXT="{\"name\": \"demo\", \"version\": \"1.0.0\", \"scripts\": {$1}}"
-  export HEAD_TEXT="{\"name\": \"demo\", \"version\": \"${3:-1.0.0}\", \"scripts\": {$2}}"
+        export FILES='package.json\tmodified'
+        export BASE_TEXT="{\"name\": \"demo\", \"version\": \"1.0.0\", \"scripts\": {$1}}"
+        export HEAD_TEXT="{\"name\": \"demo\", \"version\": \"${3:-1.0.0}\", \"scripts\": {$2}}"
 }
 own='"build": "bun build.ts"'
 tea='"check:tea": "bun scripts/tea.ts"'
