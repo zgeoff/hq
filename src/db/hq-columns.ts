@@ -392,6 +392,17 @@ export const HQ_COLUMNS = {
     live_check: { values: ['owed', 'none'], nullable: true },
     design_lane: 'text?',
   },
+  session_jobs: {
+    id: 'generated',
+    target: 'text',
+    kind: { values: ['every', 'daily', 'at'], nullable: false },
+    spec: 'text',
+    prompt: 'text',
+    added_by: 'text',
+    added_at: 'text',
+    next_at: 'text',
+    removed_at: 'text?',
+  },
   shipped_cache: {
     kind: { values: ['merged-day', 'issue', 'project'], nullable: false },
     key: 'text',

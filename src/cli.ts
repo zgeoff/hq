@@ -259,6 +259,7 @@ import { parseGrantVoidArgs } from './grants/parse-grant-void-args.ts';
 import { recordGrantAction } from './grants/record-grant-action.ts';
 import { voidGrantAction } from './grants/void-grant-action.ts';
 import { updateMarkGrantName } from './grants/update-mark-grant-name.ts';
+import { runJobsCommand } from './jobs/run-jobs-command.ts';
 import { orchestratorName } from './wake/orchestrator-name.ts';
 import { parseWakeFile } from './wake/parse-wake-file.ts';
 import { runWake } from './wake/run-wake.ts';
@@ -534,6 +535,9 @@ const OPTIONS = {
   deadline: { type: 'string' },
   ref: { type: 'string' },
   at: { type: 'string' },
+  every: { type: 'string' },
+  daily: { type: 'string' },
+  prompt: { type: 'string' },
   remote: { type: 'boolean' },
   tag: { type: 'string' },
   apply: { type: 'boolean' },
@@ -2002,6 +2006,7 @@ const GROUPS: Record<string, (context: Ctx) => Promise<Out>> = {
   },
   restart: (c) => restartCommand(c.db, c.flags),
   wake: (c) => wakeCommand(c.db, c.verb, c.rest, c.flags),
+  jobs: (command) => runJobsCommand({ db: command.db, verb: command.verb, rest: command.rest, flags: command.flags, probe: readOwnerProbeDeps() }),
   review: (c) => runReviewCommand(c),
   // oxlint-disable-next-line id-length -- grandfathered handler parameter shared by every entry of this table
   pr: (c) => runPRCommand({ run: realRunner, db: c.db, verb: c.verb, rest: c.rest, flags: c.flags, actor: () => actor(c.db, c.flags), readOwnerSession: () => readOwnerSession(c.db, readOwnerProbeDeps()), readReviewerSession: () => readRoleSession(c.db, readOwnerProbeDeps(), 'reviewer') }),

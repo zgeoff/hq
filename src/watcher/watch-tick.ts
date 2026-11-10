@@ -28,6 +28,7 @@ import { tick } from '../lanes/tick.ts';
 import { runLinearReadyTick } from '../run-linear-ready-tick.ts';
 import { makeAuditedLinearCaller } from '../linear/make-audited-linear-caller.ts';
 import { morningTick } from '../morning/morning-tick.ts';
+import { runSessionJobsTick } from '../jobs/run-session-jobs-tick.ts';
 import { flush } from '../outbox/flush.ts';
 import { takeQueued } from '../outbox/take-queued.ts';
 import { owner } from '../owner.ts';
@@ -277,6 +278,14 @@ export async function watchTick(db: Database, d: WatchDeps): Promise<boolean> {
       }
     } catch (error) {
       d.log(`${at()} weekly audit failed: ${toErrorMessage(error)}`);
+    }
+    try {
+      const fired = runSessionJobsTick(db, d.me);
+      if (fired.length > 0) {
+        d.log(`${at()} session jobs: fired ${fired.map((job) => `${job.id} to ${job.target}`).join(', ')}`);
+      }
+    } catch (error) {
+      d.log(`${at()} session jobs failed: ${toErrorMessage(error)}`);
     }
     try {
       const readSlots = d.steps.slots;

@@ -380,8 +380,23 @@ test('it adds the run_prs review wait columns in v53, keeps the earlier PRs with
   migrate(db, path, false, MIGRATIONS.slice(0, 52));
   db.query("INSERT INTO run_prs (ref, issue, state, added_at, updated_at) VALUES ('kettle#41', 'GEO-501', 'open', '2026-10-14T01:00:00Z', '2026-10-14T01:00:00Z')").run();
 
-  expect(migrate(db, path, true)).not.toBeNull();
+  expect(migrate(db, path, true, MIGRATIONS.slice(0, 53))).not.toBeNull();
   expect(db.query('SELECT ref, review_wait_until, review_wait_sha, review_wait_reason FROM run_prs').all()).toStrictEqual([{ ref: 'kettle#41', review_wait_until: null, review_wait_sha: null, review_wait_reason: null }]);
   expect(db.query('PRAGMA user_version').get()).toStrictEqual({ user_version: 53 });
-  expect(MIGRATIONS).toHaveLength(53);
+});
+
+test('it adds the session_jobs table in v54, and v54 is the newest schema', () => {
+  const base = mkdtempSync(join(tmpdir(), 'hq-migrate-v54-'));
+  const path = join(base, 'hq.db');
+  const db = new Database(path, { create: true, strict: true });
+  onTestFinished(() => rmSync(base, { recursive: true, force: true }));
+  onTestFinished(() => db.close());
+  db.exec('PRAGMA journal_mode = WAL;');
+  migrate(db, path, false, MIGRATIONS.slice(0, 53));
+
+  expect(migrate(db, path, true)).not.toBeNull();
+  db.query("INSERT INTO session_jobs (target, kind, spec, prompt, added_by, added_at, next_at) VALUES ('z-release', 'every', '2h', 'check', 'z-release', '2026-11-10T00:00:00Z', '2026-11-10T02:00:00Z')").run();
+  expect(db.query('SELECT id, target, removed_at FROM session_jobs').all()).toStrictEqual([{ id: 1, target: 'z-release', removed_at: null }]);
+  expect(db.query('PRAGMA user_version').get()).toStrictEqual({ user_version: 54 });
+  expect(MIGRATIONS).toHaveLength(54);
 });
