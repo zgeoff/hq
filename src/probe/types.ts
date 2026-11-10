@@ -31,6 +31,7 @@ export interface Downtime {
   outages: number;
   longestDetectMinutes: number;
   blindMinutes: number;
+  probeStart: string | null;
   downMs: number;
   longestDetectMs: number;
   blindMs: number;

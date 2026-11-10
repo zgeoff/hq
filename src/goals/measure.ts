@@ -10,6 +10,7 @@ import { runSyncRow } from '../db/run-sync-row.ts';
 import { kdb } from '../kdb.ts';
 import { row as goalRow } from './row.ts';
 import { downtime } from '../probe/downtime.ts';
+import { formatProbeNote } from '../probe/format-probe-note.ts';
 import { IN_SQL } from '../scope/in-sql.ts';
 import { readStats } from '../stats/read-stats.ts';
 import type { Measure, Measures } from './types.ts';
@@ -30,9 +31,10 @@ export function measure(db: Database, from: Date, to: Date, at: Date = now()): M
   const deploys: Measure = { ...base, detail: `${base.detail}${side}`, ...(side ? { extra: side } : {}), ...(d?.unclassified ? { unclassified: d.unclassified } : {}), ...(d?.unknown ? { unknown: d.unknown } : {}) };
 
   const dt = downtime(db, from, new Date(t));
-  const seen = dt.samples > 0 && dt.blindMs < Date.parse(t) - from.getTime();
+  const probedMs = Date.parse(t) - (dt.probeStart === null ? from.getTime() : Date.parse(dt.probeStart));
+  const seen = dt.samples > 0 && dt.blindMs < probedMs;
   const downtimeM: Measure = seen
-    ? { value: dt.downMinutes, exact: dt.downMs / 60_000, denominator: dt.samples, unit: 'samples', longest: dt.longestDetectMinutes, longestExact: dt.longestDetectMs / 60_000, outages: dt.outages, blind: dt.blindMinutes, shown: `${dt.downMinutes} min`, detail: `${dt.downMinutes} min down in ${dt.outages} outage(s), slowest caught in ${dt.longestDetectMinutes} min, ${dt.blindMinutes} min not seen by the probe` }
+    ? { value: dt.downMinutes, exact: dt.downMs / 60_000, denominator: dt.samples, unit: 'samples', longest: dt.longestDetectMinutes, longestExact: dt.longestDetectMs / 60_000, outages: dt.outages, blind: dt.blindMinutes, probeStart: dt.probeStart, shown: `${dt.downMinutes} min`, detail: `${dt.downMinutes} min down in ${dt.outages} outage(s), slowest caught in ${dt.longestDetectMinutes} min, ${dt.blindMinutes} min not seen by the probe${dt.probeStart ? ` (${formatProbeNote(dt.probeStart)})` : ''}` }
     : { value: null, denominator: 0, unit: 'samples', shown: 'no data', detail: dt.samples ? 'no data: the probe saw the window only blind (the PC offline)' : 'no data: the Nix probe has no samples in the window' };
 
   const flow = readStats(db, { from: f, to: t, gh: null }).flow;

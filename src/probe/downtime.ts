@@ -6,6 +6,8 @@ import { readCount } from '../db/read-count.ts';
 import { runSyncQuery } from '../db/run-sync-query.ts';
 import { kdb } from '../kdb.ts';
 import { outagesIn } from './outages-in.ts';
+import { pickBlindWindow } from './pick-blind-window.ts';
+import { readFirstSampleAt } from './read-first-sample-at.ts';
 import type { Downtime } from './types.ts';
 
 const GAP_MIN = 2;
@@ -25,8 +27,9 @@ export function downtime(db: Database, from: Date, to: Date): Downtime {
   }
   const covered = coveredMs(db, f, e);
   const total = readCount(db, kdb(db).selectFrom('probe_samples').select((eb) => eb.fn.countAll().as('count')).where('at', '>=', iso(from)).where('at', '<=', iso(to)).compile());
-  const blindMs = Math.max(0, e - f - covered);
-  return { from: iso(from), to: iso(to), samples: total, downMinutes: round(downMs / 60_000), outages: rows.length, longestDetectMinutes: round(longestMs / 60_000), blindMinutes: round(blindMs / 60_000), downMs, longestDetectMs: longestMs, blindMs };
+  const firstAt = readFirstSampleAt(db);
+  const { blindMs, probeStart } = pickBlindWindow({ fromMs: f, toMs: e, firstSampleMs: firstAt === null ? null : Date.parse(firstAt), coveredMs: covered });
+  return { from: iso(from), to: iso(to), samples: total, downMinutes: round(downMs / 60_000), outages: rows.length, longestDetectMinutes: round(longestMs / 60_000), blindMinutes: round(blindMs / 60_000), probeStart, downMs, longestDetectMs: longestMs, blindMs };
 }
 
 const SampleAtSchema = z.object({ at: z.string() });

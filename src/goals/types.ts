@@ -20,6 +20,7 @@ export interface Measure {
   longestExact?: number;
   outages?: number;
   blind?: number;
+  probeStart?: string | null;
   ci?: number;
   unclassified?: number;
 

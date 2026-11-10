@@ -149,6 +149,7 @@ import { skipDaily } from './goals/daily/skip-daily.ts';
 import { FRESH_MIN } from './goals/fresh-min.ts';
 import { goalsAge } from './goals/goals-age.ts';
 import { downtime } from './probe/downtime.ts';
+import { formatProbeNote } from './probe/format-probe-note.ts';
 import { lastReady } from './probe/last-ready.ts';
 import { lastSample } from './probe/last-sample.ts';
 import { openOutage } from './probe/open-outage.ts';
@@ -1519,7 +1520,7 @@ async function probeCommand(db: Database, verb: string | undefined, args: string
         open ? `OPEN outage since ${open.started_at} (detected ${open.detected_at})` : 'no open outage',
         lastReadyRow ? `last ready check: ${lastReadyRow.at} (${lastReadyRow.ready_ok ? 'ready' : 'NOT ready'})` : 'last ready check: none',
         openUnreadyRow ? `OPEN unready since ${openUnreadyRow.started_at} (detected ${openUnreadyRow.detected_at})` : 'no open unready episode',
-        `last ${days} d: ${d.downMinutes} min down in ${d.outages} outage(s), slowest detection ${d.longestDetectMinutes} min, ${d.blindMinutes} min blind, ${d.samples} samples`,
+        `last ${days} d: ${d.downMinutes} min down in ${d.outages} outage(s), slowest detection ${d.longestDetectMinutes} min, ${d.blindMinutes} min blind${d.probeStart ? `, ${formatProbeNote(d.probeStart)}` : ''}, ${d.samples} samples`,
         ...outages.map((o) => `  #${o.id} ${o.started_at} to ${o.ended_at ?? 'now'} (detected ${o.detected_at})`),
         `last ${days} d: ${unready.length} unready episode(s)`,
         ...unready.map((o) => `  #${o.id} ${o.started_at} to ${o.ended_at ?? 'now'} (detected ${o.detected_at})`),
