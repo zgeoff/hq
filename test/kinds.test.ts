@@ -29,14 +29,12 @@ import { at, freshDb } from './helpers.ts';
 import { LINEAR_GRAPHQL_URL } from '../mocks/linear-handlers.ts';
 import { server } from '../mocks/node.ts';
 
-const KEY = 'lin_api_INVENTEDdummyKEY0123456789';
-
 function setupTest() {
   const base = freshDb();
   onTestFinished(base.cleanup);
   updateEnv('HQ_NOW', '2026-10-16T02:00:00Z');
 
-  return { db: base.db, seed: buildSeeder(base) };
+  return { db: base.db, seed: buildSeeder(base), key: 'lin_api_INVENTEDdummyKEY0123456789' };
 }
 
 test.each<[string, ReturnType<typeof kindOf>]>([
@@ -231,64 +229,67 @@ test('Linear ids hq did not ask for are not stored; an inherited type name count
   expect(week?.prTypes.none).toBe(1);
 });
 
-test.each<[string, () => ReturnType<typeof http.post>]>([
-  ['Linear echoes it in a 400 reply', () => http.post(LINEAR_GRAPHQL_URL, () => HttpResponse.json({ errors: [{ message: `bad key ${KEY} sent` }, { message: 'also lin_api_OTHERinventedKEY' }] }, { status: 400 }))],
+test.each<[string, (key: string) => ReturnType<typeof http.post>]>([
+  ['Linear echoes it in a 400 reply', (key) => http.post(LINEAR_GRAPHQL_URL, () => HttpResponse.json({ errors: [{ message: `bad key ${key} sent` }, { message: 'also lin_api_OTHERinventedKEY' }] }, { status: 400 }))],
   ['the connection drops', () => http.post(LINEAR_GRAPHQL_URL, () => HttpResponse.error())],
-])('the key never reaches an error or hq.db when %s', async (_case, buildHandler) => {
+])('it keeps the key out of an error and hq.db when %s', async (_case, buildHandler) => {
   const ctx = setupTest();
   forgetKey();
   onTestFinished(forgetKey);
   updateEnv('OP_SERVICE_ACCOUNT_TOKEN', 'invented-token');
-  server.use(buildHandler());
-  const run: Runner = async () => ({ code: 0, stdout: `${KEY}\n`, stderr: '' });
+  server.use(buildHandler(ctx.key));
+  const run: Runner = () => Promise.resolve({ code: 0, stdout: `${ctx.key}\n`, stderr: '' });
 
   const err = await syncLinear(ctx.db, makeLinearCaller(run), new Date('2026-10-14T00:00:00Z'), { run }).catch((error: unknown) => error);
 
   expect(toErrorMessage(err)).not.toContain('lin_api_');
   expect(linearState(ctx.db).error).not.toContain('lin_api_');
-  expect(JSON.stringify(ctx.db.query('SELECT * FROM meta').all())).not.toContain(KEY);
+  expect(JSON.stringify(ctx.db.query('SELECT * FROM meta').all())).not.toContain(ctx.key);
 });
 
-test('redact replaces the key with a placeholder', () => {
-  expect(redact(`a ${KEY} b`, KEY)).toBe('a [key] b');
+test('it redacts the key to a placeholder', () => {
+  const { key } = setupTest();
+
+  expect(redact(`a ${key} b`, key)).toBe('a [key] b');
 });
 
-test('the key is cut from an op failure', async () => {
+test('it cuts the key from an op failure', async () => {
+  const { key } = setupTest();
   forgetKey();
   onTestFinished(forgetKey);
   updateEnv('OP_SERVICE_ACCOUNT_TOKEN', 'invented-token');
-  const caller = makeLinearCaller(() => Promise.resolve({ code: 1, stdout: KEY, stderr: `[ERROR] ${KEY} could not be read` }));
+  const caller = makeLinearCaller(() => Promise.resolve({ code: 1, stdout: key, stderr: `[ERROR] ${key} could not be read` }));
 
   const err = await caller('q', {}).catch((error: unknown) => error);
 
-  expect(toErrorMessage(err)).not.toContain(KEY);
+  expect(toErrorMessage(err)).not.toContain(key);
 });
 
-test('a traced fetch is refused before any request is sent', async () => {
+test('it refuses a traced fetch before any request is sent', async () => {
+  const { key } = setupTest();
   forgetKey();
   onTestFinished(forgetKey);
   updateEnv('OP_SERVICE_ACCOUNT_TOKEN', 'invented-token');
   updateEnv('BUN_CONFIG_VERBOSE_FETCH', 'curl');
   const requests: string[] = [];
   server.use(
-    http.post(LINEAR_GRAPHQL_URL, ({ request }) => {
-      requests.push(request.url);
+    http.post(LINEAR_GRAPHQL_URL, (info) => {
+      requests.push(info.request.url);
       return HttpResponse.json({ data: {} });
     }),
   );
-  const ok: Runner = async () => ({ code: 0, stdout: KEY, stderr: '' });
 
-  await expect(makeLinearCaller(ok)('q', {})).rejects.toThrow('BUN_CONFIG_VERBOSE_FETCH');
+  await expect(makeLinearCaller(() => Promise.resolve({ code: 0, stdout: key, stderr: '' }))('q', {})).rejects.toThrow('BUN_CONFIG_VERBOSE_FETCH');
   expect(requests).toStrictEqual([]);
 });
 
-test('a stored title has the key cut from it', async () => {
+test('it cuts the key from a stored title', async () => {
   const ctx = setupTest();
-  const call: LinearCall = async () => ({ issues: { nodes: [{ ...node('GEO-1', 'Bug', { completedAt: '2026-10-14T01:00:00Z' }), title: `pasted ${KEY}` }], pageInfo: { hasNextPage: false, endCursor: null } } });
+  const call: LinearCall = async () => ({ issues: { nodes: [{ ...node('GEO-1', 'Bug', { completedAt: '2026-10-14T01:00:00Z' }), title: `pasted ${ctx.key}` }], pageInfo: { hasNextPage: false, endCursor: null } } });
 
   await syncClosed(ctx.db, call, new Date('2026-10-14T00:00:00Z'));
 
-  expect(JSON.stringify(ctx.db.query('SELECT * FROM linear_issues').all())).not.toContain(KEY);
+  expect(JSON.stringify(ctx.db.query('SELECT * FROM linear_issues').all())).not.toContain(ctx.key);
 });
 
 test('a multi-day sync spaces its searches', async () => {
