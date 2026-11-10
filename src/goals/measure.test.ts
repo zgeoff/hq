@@ -301,6 +301,35 @@ test('samples and no outage: zero minutes, green', () => {
   expect(verdict(DEFAULT_TARGETS.downtime, ctx.readMeasures().downtime)).toBe('green');
 });
 
+test('it reads a window the probe saw fully from its start as data, and names the probe start', () => {
+  const ctx = setupTest();
+  const startMs = Date.parse('2026-10-16T02:00:00Z');
+  for (let minute = 0; minute < 120; minute += 1) {
+    ctx.seed.probeSample({ at: iso(new Date(startMs + minute * 60_000)) });
+  }
+  const result = ctx.readMeasures().downtime;
+  expect(result).toStrictEqual({
+    value: 0,
+    exact: 0,
+    denominator: 120,
+    unit: 'samples',
+    longest: 0,
+    longestExact: 0,
+    outages: 0,
+    blind: 179,
+    probeStart: '2026-10-16T02:00:00Z',
+    shown: '0 min',
+    detail: '0 min down in 0 outage(s), slowest caught in 0 min, 179 min not seen by the probe (probe from 16 Oct 02:00Z)',
+  });
+});
+
+test('it names no probe start for a window the probe covered from before it', () => {
+  const ctx = setupTest();
+  ctx.seed.probeSample({ at: '2026-10-14T00:00:00Z' });
+  ctx.seed.probeSample({ at: '2026-10-16T02:00:00Z' });
+  expect(ctx.readMeasures().downtime.detail).not.toContain('probe from');
+});
+
 test('a window the probe saw only blind has no data, never green', () => {
   const ctx = setupTest();
   for (const sampleAt of ['2026-10-16T02:00:00Z', '2026-10-16T02:01:00Z', '2026-10-16T02:02:00Z']) {

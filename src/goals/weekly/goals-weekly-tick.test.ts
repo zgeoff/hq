@@ -137,7 +137,7 @@ test('the downtime row gives outages, the slowest detection and blind minutes, j
   }
   ctx.seed.closedOutage({ startedAt: z(0), detectedAt: z(2 * 60_000), endedAt: z(4 * 60_000) });
   const text = weeklyText(ctx.db, syd(MON, '17:00'));
-  expect(row(text, 'Nix downtime')).toMatch(/^\| Nix downtime \| <15 min a week, each outage caught within 5 min \| 4 min down, 1 outage\(s\), slowest caught in 2 min, [\d.]+ min blind \(\d+ samples\) \| no data \(0 samples\) \| 🟢 green \|$/);
+  expect(row(text, 'Nix downtime')).toMatch(/^\| Nix downtime \| <15 min a week, each outage caught within 5 min \| 4 min down, 1 outage\(s\), slowest caught in 2 min, [\d.]+ min blind, probe from 14 Oct 00:40Z \(\d+ samples\) \| no data \(0 samples\) \| 🟢 green \|$/u);
 });
 
 test('the cost row names an account by its label when set, else by the short key, with CI minutes and no colour', () => {

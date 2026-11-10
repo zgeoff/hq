@@ -12,6 +12,7 @@ import { sydneyUtc } from '../../morning/sydney-utc.ts';
 import { sydney } from '../../morning/sydney.ts';
 import { TZ } from '../../morning/tz.ts';
 import { newsTagged } from '../../news/news-tagged.ts';
+import { formatProbeNote } from '../../probe/format-probe-note.ts';
 import { loadRefusalsSummary as refusalsSummary } from '../../refusals/load-refusals-summary.ts';
 import { GOAL_KEYS } from '../goal-keys.ts';
 import type { GoalKey } from '../goal-keys.ts';
@@ -114,7 +115,7 @@ const cell = (k: GoalKey, m: Measure): string => {
     return `no data (${num(m.denominator)} ${m.unit}${gap})${extra}`;
   }
   if (k === 'downtime') {
-    return `${m.shown} down, ${m.outages ?? 0} outage(s), slowest caught in ${m.longest ?? 0} min, ${m.blind ?? 0} min blind (${num(m.denominator)} ${m.unit})`;
+    return `${m.shown} down, ${m.outages ?? 0} outage(s), slowest caught in ${m.longest ?? 0} min, ${m.blind ?? 0} min blind${m.probeStart ? `, ${formatProbeNote(m.probeStart)}` : ''} (${num(m.denominator)} ${m.unit})`;
   }
   return `${m.shown} of ${num(m.denominator)} ${m.unit}${gap}${extra}`;
 };
