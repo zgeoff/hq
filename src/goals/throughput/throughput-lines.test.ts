@@ -165,6 +165,14 @@ test.each([
   expect(ctx.findLine('Issues')).toBe(expected);
 });
 
+test('it counts a marked filing that z-review recorded as review on the issues line', async () => {
+  const ctx = setupTest();
+  await syncLinear(ctx.db, makeThroughputLinearCall([buildFiledNode('GEO-9801', 'Filed by z-review.\n\n## Outcome\n\nCheck.')]), new Date('2026-10-14T00:00:00Z'), { at: new Date(ctx.now), run: ctx.run });
+  addFollowup(ctx.db, { issue: 'GEO-9801', fromRef: 'widgets#7', actor: 'z-review' });
+
+  expect(ctx.findLine('Issues')).toBe('- Issues: today 1 filed (owner 0, design 0, agent 0, review 1, live check 0, bot 0), 0 closed; target none –');
+});
+
 test('it alerts on an In Progress issue with no run and no PR, or an open run on a closed issue, after 24 hours, and its owner hears once each', async () => {
   const ctx = setupTest();
   const run = (issue: string) => addRun(ctx.db, { issue, title: 'Invented kettle work', place: 'imp', session: null, next: 'Agent working.', gate: null, geoffChat: false, actor: 'z-delivery' });

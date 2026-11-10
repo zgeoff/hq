@@ -9,6 +9,7 @@ interface FiledFacts {
 }
 
 const DESIGN_RECORD_LINK = /^<?https:\/\/(?:linear\.app\/[\w.-]+\/document\/|github\.com\/zgeoff\/hq-private\/)/u;
+
 export function pickFiledSource(facts: FiledFacts): FiledSource {
   const marked = facts.isBotCreator ? null : findMarkedSource(facts.description);
   if (marked !== null) {
@@ -32,8 +33,7 @@ export function pickFiledSource(facts: FiledFacts): FiledSource {
 const FILED_BY_MARK = /^Filed by (?<name>[\w-]+)\.$/u;
 
 function findMarkedSource(description: string): ZSession | 'agent' | null {
-  for (const line of description.split('\n')) {
-    const text = line.trim();
+  for (const text of description.split(/\r?\n/u)) {
     if (text.startsWith('## ')) {
       return null;
     }

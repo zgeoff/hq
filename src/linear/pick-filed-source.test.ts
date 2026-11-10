@@ -15,8 +15,15 @@ test.each([
   ['lower-case mark, not read', 'filed by z-stu.\n\n## Outcome\n\nDescale.', false, 'owner'],
   ['first mark only', 'Filed by z-qa.\nFiled by z-stu.\n\n## Outcome', false, 'z-qa'],
   ['mark over a design link', 'Filed by z-triage.\nFrom design https://linear.app/kettle/document/plan-1a2b', false, 'z-triage'],
+  ['mark over a found-by-agent line', 'Filed by z-stu.\nFound by the GEO-1 agent.\n\n## Outcome', false, 'z-stu'],
+  ['indented mark, not read', '  Filed by z-stu.\n\n## Outcome\n\nDescale.', false, 'owner'],
+  ['mark with a CRLF line end', 'Filed by z-stu.\r\n\r\n## Outcome', false, 'z-stu'],
   ['bot creator with a mark', 'Filed by z-stu.\n\n## Outcome\n\nDescale.', true, 'bot'],
   ['no mark', 'Descale the kettle.', false, 'owner'],
 ] as const)('it picks the source for a %s', (_name, description, isBotCreator, expected) => {
   expect(pickFiledSource({ title: 'Invented kettle work', description, labels: [], isBotCreator })).toBe(expected);
+});
+
+test('it picks the marked session over a live check label', () => {
+  expect(pickFiledSource({ title: 'Invented kettle work', description: 'Filed by z-qa.\n\n## Outcome\n\nDescale.', labels: ['live check'], isBotCreator: false })).toBe('z-qa');
 });
