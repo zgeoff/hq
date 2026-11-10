@@ -16,11 +16,11 @@ test('it records an exemption at the head and says in the news line that hq did 
   const ctx = setupTest();
   const fake = buildFakeRunner({ prFiles: { code: 0, stdout: 'skills/kettle/SKILL.md\nAGENTS.md\n', stderr: '' } });
 
-  await runPRCommand({ run: fake.run, db: ctx.db, verb: 'exempt', rest: ['widgets', '7'], flags: { rule: 'boundary', note: 'The kettle grant covers it.' }, actor: () => Promise.resolve('z-review'), readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) });
+  await runPRCommand({ run: fake.run, db: ctx.db, verb: 'exempt', rest: ['widgets', '7'], flags: { rule: 'rename', note: 'Only renames the kettle skill.' }, actor: () => Promise.resolve('z-review'), readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) });
 
-  expect(readHeadExemption(ctx.db, 'widgets', 7, FAKE_FULL_SHA)).toMatchObject({ rule: 'boundary', note: 'The kettle grant covers it.', files: ['skills/kettle/SKILL.md', 'AGENTS.md'] });
+  expect(readHeadExemption(ctx.db, 'widgets', 7, FAKE_FULL_SHA)).toMatchObject({ rule: 'rename', note: 'Only renames the kettle skill.', files: ['skills/kettle/SKILL.md', 'AGENTS.md'] });
   expect(listNews(ctx.db, { all: true, limit: 10 })).toMatchObject([
-    { from_name: 'z-review', topic: 'merge', text: "z-review exempted widgets#7 at 0123456 from the instruction-file hold under the boundary rule (z-review's call, not proved by hq): skills/kettle/SKILL.md, AGENTS.md. Note: The kettle grant covers it." },
+    { from_name: 'z-review', topic: 'merge', text: "z-review exempted widgets#7 at 0123456 from the instruction-file hold under the rename rule (z-review's call, not proved by hq): skills/kettle/SKILL.md, AGENTS.md. Note: Only renames the kettle skill." },
   ]);
 });
 
@@ -93,6 +93,16 @@ test.each([
   });
 
   expect(listNews(ctx.db, { all: true, limit: 10 })).toStrictEqual([]);
+});
+
+test('it leaves boundary out of the rules its usage text names', async () => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ prFiles: { code: 0, stdout: 'skills/kettle/SKILL.md\n', stderr: '' } });
+
+  await expect(runPRCommand({ run: fake.run, db: ctx.db, verb: 'exempt', rest: ['widgets', '7'], flags: { rule: 'boundary', note: 'Because.' }, actor: () => Promise.resolve('z-review'), readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) })).rejects.toMatchObject({
+    code: 'bad_args',
+    message: 'usage: hq pr exempt <repo> <pr> --rule ci-design-sync|rename|repo-sync|formatting --note <why the rule covers the PR>',
+  });
 });
 
 test('it refuses any actor but z-review', async () => {

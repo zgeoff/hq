@@ -883,7 +883,7 @@ test('it passes an instruction file change on the owner\'s lgtm at the head and 
   expect(fake.of('git')).toStrictEqual([]);
 });
 
-test.each(['boundary', 'ci-design-sync', 'rename', 'repo-sync', 'formatting'] as const)('it passes an instruction file change on z-review\'s %s exemption at the head, reading no diff', async (rule) => {
+test.each(['ci-design-sync', 'rename', 'repo-sync', 'formatting'] as const)('it passes an instruction file change on z-review\'s %s exemption at the head, reading no diff', async (rule) => {
   const ctx = setupTest();
   const fake = buildFakeRunner({ prFiles: { code: 0, stdout: 'skills/kettle/SKILL.md\n', stderr: '' } });
   recordPRExemption(ctx.db, { repo: 'widgets', pr: 7, head: FAKE_FULL_SHA, rule, note: 'Covered by the kettle grant.', files: ['skills/kettle/SKILL.md'], actor: 'z-review' });
@@ -891,6 +891,14 @@ test.each(['boundary', 'ci-design-sync', 'rename', 'repo-sync', 'formatting'] as
   await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).resolves.toMatchObject({ mayMerge: true });
 
   expect(fake.of('git')).toStrictEqual([]);
+});
+
+test('it keeps the owner hold on a stored boundary exemption at the head', async () => {
+  const ctx = setupTest();
+  const fake = buildFakeRunner({ prBody: FAKE_PROOF_BODY, prFiles: { code: 0, stdout: 'skills/kettle/SKILL.md\n', stderr: '' } });
+  logEvent(ctx.db, 'hq', 'pr:widgets#7', 'pr-exempt', 'z-review', null, null, { head: FAKE_FULL_SHA, rule: 'boundary', note: 'Covered by the kettle grant.', files: ['skills/kettle/SKILL.md'] });
+
+  await expect(checkMergeGate({ run: fake.run, db: ctx.db, rawRepo: 'widgets', pr: 7 })).rejects.toMatchObject({ code: 'merge_blocked', message: expect.stringContaining('repo instruction files (skills/kettle/SKILL.md)') });
 });
 
 test('it ignores an exemption at an older head', async () => {
