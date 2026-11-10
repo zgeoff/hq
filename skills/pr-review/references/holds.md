@@ -115,7 +115,8 @@ In zgeoff/hq and zgeoff/hq-private, the gate holds a PR that changes a path list
 `# the owner` in the repo's CODEOWNERS file, as that file stands at the PR's base. In hq the gate
 holds [fleet.json](../../../fleet.json) too. Read hq's list in
 [CODEOWNERS](../../../.github/CODEOWNERS). hq-private's list includes the session docs,
-`docs/sessions*`. Only the owner's lgtm clears this hold.
+`docs/sessions*`. Only the owner's lgtm, or the owner's override recorded with `hq pr override`,
+clears this hold.
 
 In every other repo except zgeoff/nixie-definitions, the gate holds a PR that changes:
 
