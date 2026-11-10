@@ -7,19 +7,21 @@ import { HqError } from '../errors.ts';
 import type { OwnerProbeDeps } from '../pr-status/read-owner-session.ts';
 import { getDeclaredSessions } from '../roles/get-declared-sessions.ts';
 import { roleName } from '../roles/role-name.ts';
-import { buildNextSlot } from './build-next-slot.ts';
-import { parseScheduleFlags } from './parse-schedule.ts';
-import type { ScheduleFlags } from './parse-schedule.ts';
+import { parseJobAdd } from './parse-job-add.ts';
+import type { JobAddFlags } from './parse-job-add.ts';
 import { pickJobAccess } from './pick-job-access.ts';
+import { readJob } from './read-job.ts';
 import { readJobCaller } from './read-job-caller.ts';
+import { readJobs } from './read-jobs.ts';
+import { removeJob } from './remove-job.ts';
 import type { SessionJob } from './types.ts';
-import { readJob, readJobs, removeJob, writeJob } from './write-job.ts';
+import { writeJob } from './write-job.ts';
 
 export interface JobsCommandInput {
   db: Database;
   verb: string | undefined;
   rest: string[];
-  flags: ScheduleFlags & { prompt?: string | undefined };
+  flags: JobAddFlags;
   probe: OwnerProbeDeps;
 }
 
@@ -34,28 +36,13 @@ export function runJobsCommand(input: JobsCommandInput): Promise<Out> {
 }
 
 async function runJobAdd(input: JobsCommandInput): Promise<Out> {
-  const [target] = input.rest;
-  if (target === undefined || target.trim() === '') {
-    throw new HqError('bad_args', 'hq jobs add needs a role, like z-release');
-  }
-  if (!getDeclaredSessions().some((session) => session.name === target)) {
-    throw new HqError('bad_args', `${target} is no declared fleet session`);
-  }
-  const prompt = input.flags.prompt;
-  if (prompt === undefined || prompt.trim() === '') {
-    throw new HqError('bad_args', '--prompt is required');
-  }
-  const parsed = parseScheduleFlags(input.flags);
+  const declared = getDeclaredSessions().map((session) => session.name);
+  const parsed = parseJobAdd({ target: input.rest[0], flags: input.flags, declared, at: now() });
   if (!parsed.ok) {
     throw new HqError('bad_args', parsed.reason);
   }
-  const at = now();
-  const nextAt = buildNextSlot(parsed.schedule, at, at);
-  if (nextAt === null) {
-    throw new HqError('bad_args', `--at ${parsed.value.spec} is already past`);
-  }
-  const actor = await requireJobAccess(input, target);
-  const job = writeJob(input.db, { target, value: parsed.value, prompt, nextAt, actor });
+  const actor = await requireJobAccess(input, parsed.job.target);
+  const job = writeJob(input.db, { ...parsed.job, actor });
   return { data: { job }, text: `Added job ${job.id} for ${job.target}: ${formatSchedule(job)}, first at ${job.next_at}` };
 }
 

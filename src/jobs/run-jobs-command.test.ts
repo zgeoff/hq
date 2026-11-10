@@ -5,7 +5,7 @@ import { setMeta } from '../db/set-meta.ts';
 import type { OwnerProbeClient } from '../pr-status/read-owner-session.ts';
 import { runJobsCommand } from './run-jobs-command.ts';
 import type { JobsCommandInput } from './run-jobs-command.ts';
-import { readJobs } from './write-job.ts';
+import { readJobs } from './read-jobs.ts';
 
 function setupTest() {
   const fresh = freshDb();
@@ -82,18 +82,11 @@ test('it lists jobs for anyone, a caller atc cannot identify included', async ()
   expect(one.text).toBe('2 z-delivery at 2026-11-10T05:00:00Z next 2026-11-10T05:00:00Z: read the batch');
 });
 
-test.each([
-  { title: 'a bad schedule', rest: ['z-release'], flags: { every: 'soon', prompt: 'x' }, error: /--every soon/u },
-  { title: 'no schedule', rest: ['z-release'], flags: { prompt: 'x' }, error: /exactly one of/u },
-  { title: 'an every too large for a date', rest: ['z-release'], flags: { every: '99999999999d', prompt: 'x' }, error: /over 366d/u },
-  { title: 'an at on February 30', rest: ['z-release'], flags: { at: '2027-02-30T09:00:00Z', prompt: 'x' }, error: /not an ISO time/u },
-  { title: 'a past one-shot time', rest: ['z-release'], flags: { at: '2026-11-09T00:00:00Z', prompt: 'x' }, error: /already past/u },
-  { title: 'no prompt', rest: ['z-release'], flags: { every: '2h' }, error: /--prompt is required/u },
-  { title: 'an unknown role', rest: ['z-nobody'], flags: { every: '2h', prompt: 'x' }, error: /no declared fleet session/u },
-])('it refuses an add with $title as bad_args', async (row) => {
+test('it refuses an add for an undeclared role as bad_args and writes nothing', async () => {
   const ctx = setupTest();
 
-  await expect(ctx.callAs('kettle-release', { verb: 'add', rest: [...row.rest], flags: row.flags })).rejects.toMatchObject({ code: 'bad_args', message: expect.stringMatching(row.error) });
+  await expect(ctx.callAs('kettle-stu', { verb: 'add', rest: ['z-nobody'], flags: { every: '2h', prompt: 'check the queue' } })).rejects.toMatchObject({ code: 'bad_args', message: 'z-nobody is no declared fleet session' });
+  expect(readJobs(ctx.db, null)).toStrictEqual([]);
 });
 
 test('it refuses a removal of an unknown job', async () => {

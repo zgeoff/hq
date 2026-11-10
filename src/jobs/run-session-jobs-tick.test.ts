@@ -4,8 +4,10 @@ import { overrideEnv } from '../config/override-env.ts';
 import { flush } from '../outbox/flush.ts';
 import { readOutboxRows } from '../outbox/read-outbox-rows.ts';
 import { readSubjectEvents } from '../read-subject-events.ts';
+import { readJobs } from './read-jobs.ts';
+import { removeJob } from './remove-job.ts';
 import { runSessionJobsTick } from './run-session-jobs-tick.ts';
-import { readJobs, removeJob, writeJob } from './write-job.ts';
+import { writeJob } from './write-job.ts';
 
 function setupTest() {
   const fresh = freshDb();
@@ -30,9 +32,9 @@ test('it fires a due job once into the role inbox, and a second tick in the same
   const second = runSessionJobsTick(ctx.db, 'hq', new Date('2026-11-10T02:08:00Z'));
 
   expect({ early, first, second, texts: ctx.readTexts(), nextAts: ctx.readNextAts() }).toStrictEqual({
-    early: [],
-    first: [{ id: 1, target: 'z-release', slot: '2026-11-10T02:00:00Z' }],
-    second: [],
+    early: { fired: [], skipped: [] },
+    first: { fired: [{ id: 1, target: 'z-release', slot: '2026-11-10T02:00:00Z' }], skipped: [] },
+    second: { fired: [], skipped: [] },
     texts: ['hq job 1: check the release queue'],
     nextAts: ['2026-11-10T04:00:00Z'],
   });
@@ -46,7 +48,7 @@ test('it fires again at the next slot', () => {
 
   const next = runSessionJobsTick(ctx.db, 'hq', new Date('2026-11-10T04:01:00Z'));
 
-  expect(next).toStrictEqual([{ id: 1, target: 'z-release', slot: '2026-11-10T04:00:00Z' }]);
+  expect(next).toStrictEqual({ fired: [{ id: 1, target: 'z-release', slot: '2026-11-10T04:00:00Z' }], skipped: [] });
 });
 
 test('it fires a job once after downtime across several slots, then moves to the next slot after now', () => {
@@ -58,8 +60,8 @@ test('it fires a job once after downtime across several slots, then moves to the
   const after = runSessionJobsTick(ctx.db, 'hq', new Date('2026-11-10T09:15:00Z'));
 
   expect({ caughtUp, after, texts: ctx.readTexts(), nextAts: ctx.readNextAts() }).toStrictEqual({
-    caughtUp: [{ id: 1, target: 'z-release', slot: '2026-11-10T02:00:00Z' }],
-    after: [],
+    caughtUp: { fired: [{ id: 1, target: 'z-release', slot: '2026-11-10T02:00:00Z' }], skipped: [] },
+    after: { fired: [], skipped: [] },
     texts: ['hq job 1: check the release queue'],
     nextAts: ['2026-11-10T10:00:00Z'],
   });
@@ -84,8 +86,8 @@ test('it fires a one-shot job once and ends it', () => {
   const later = runSessionJobsTick(ctx.db, 'hq', new Date('2026-11-10T09:00:00Z'));
 
   expect({ first, later, texts: ctx.readTexts(), remaining: readJobs(ctx.db, null) }).toStrictEqual({
-    first: [{ id: 1, target: 'z-release', slot: '2026-11-10T03:00:00Z' }],
-    later: [],
+    first: { fired: [{ id: 1, target: 'z-release', slot: '2026-11-10T03:00:00Z' }], skipped: [] },
+    later: { fired: [], skipped: [] },
     texts: ['hq job 1: read the deploy result'],
     remaining: [],
   });
@@ -97,12 +99,12 @@ test('it sends nothing for a removed job', () => {
   const job = writeJob(ctx.db, { target: 'z-release', value: { kind: 'every', spec: '2h' }, prompt: 'check the release queue', nextAt: new Date('2026-11-10T02:00:00Z'), actor: 'z-release' });
   removeJob(ctx.db, job.id, 'z-release');
 
-  const fired = runSessionJobsTick(ctx.db, 'hq', new Date('2026-11-10T02:03:00Z'));
+  const tick = runSessionJobsTick(ctx.db, 'hq', new Date('2026-11-10T02:03:00Z'));
 
-  expect({ fired, texts: ctx.readTexts() }).toStrictEqual({ fired: [], texts: [] });
+  expect({ tick, texts: ctx.readTexts() }).toStrictEqual({ tick: { fired: [], skipped: [] }, texts: [] });
 });
 
-test('it fires the good jobs past one whose stored schedule no longer parses, and logs the bad one once', () => {
+test('it fires the good jobs past one whose stored schedule no longer parses, and returns and logs the bad one once', () => {
   const ctx = setupTest();
   at('2026-11-10T00:00:00Z');
   writeJob(ctx.db, { target: 'z-triage', value: { kind: 'every', spec: 'soon' }, prompt: 'sort the inbox', nextAt: new Date('2026-11-10T02:00:00Z'), actor: 'z-triage' });
@@ -112,8 +114,8 @@ test('it fires the good jobs past one whose stored schedule no longer parses, an
   const second = runSessionJobsTick(ctx.db, 'hq', new Date('2026-11-10T04:02:00Z'));
 
   expect({ first, second, badJobEvents: ctx.readJobActions(1) }).toStrictEqual({
-    first: [{ id: 2, target: 'z-release', slot: '2026-11-10T02:00:00Z' }],
-    second: [{ id: 2, target: 'z-release', slot: '2026-11-10T04:00:00Z' }],
+    first: { fired: [{ id: 2, target: 'z-release', slot: '2026-11-10T02:00:00Z' }], skipped: [{ id: 1, target: 'z-triage', reason: '--every soon is not a duration like 30m, 2h or 1d' }] },
+    second: { fired: [{ id: 2, target: 'z-release', slot: '2026-11-10T04:00:00Z' }], skipped: [] },
     badJobEvents: ['job-added', 'job-skipped'],
   });
 });

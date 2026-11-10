@@ -12,7 +12,15 @@ export interface ScheduleValue {
   spec: string;
 }
 
-export type ScheduleParse = { ok: true; value: ScheduleValue; schedule: Schedule } | { ok: false; reason: string };
+export interface NewJob {
+  target: string;
+  value: ScheduleValue;
+  prompt: string;
+  nextAt: Date;
+  actor: string;
+}
+
+export type ScheduleParse ={ ok: true; value: ScheduleValue; schedule: Schedule } | { ok: false; reason: string };
 
 export interface DueJob {
   job: SessionJob;

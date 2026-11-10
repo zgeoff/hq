@@ -1,5 +1,5 @@
 import type { Database } from 'bun:sqlite';
-import { fleetIds } from '../atc/fleet-ids.ts';
+import { findFleetName } from '../atc/find-fleet-name.ts';
 import type { OwnerProbeDeps } from '../pr-status/read-owner-session.ts';
 import { readPeerSession } from '../pr-status/read-role-session.ts';
 import type { JobCaller } from './pick-job-access.ts';
@@ -14,7 +14,9 @@ export async function readJobCaller(db: Database, deps: OwnerProbeDeps): Promise
   if (peer.session === undefined) {
     return { kind: 'unknown', cause: "atc's hello names no caller session, so this daemon predates protocol 11 and cannot say who is asking" };
   }
-  const session = peer.session;
-  const name = Object.entries(fleetIds(db)).find(([, id]) => id !== '' && id === session)?.[0];
-  return name === undefined ? { kind: 'unnamed' } : { kind: 'named', name };
+  if (peer.session === null || peer.session === '') {
+    return { kind: 'unnamed' };
+  }
+  const name = findFleetName(db, peer.session);
+  return name === null ? { kind: 'unnamed' } : { kind: 'named', name };
 }
