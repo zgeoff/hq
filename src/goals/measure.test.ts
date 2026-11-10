@@ -308,8 +308,19 @@ test('it reads a window the probe saw fully from its start as data, and names th
     ctx.seed.probeSample({ at: iso(new Date(startMs + minute * 60_000)) });
   }
   const result = ctx.readMeasures().downtime;
-  expect(result).toMatchObject({ shown: '0 min', probeStart: '2026-10-16T02:00:00Z' });
-  expect(result.detail).toContain('(probe from 16 Oct 02:00Z)');
+  expect(result).toStrictEqual({
+    value: 0,
+    exact: 0,
+    denominator: 120,
+    unit: 'samples',
+    longest: 0,
+    longestExact: 0,
+    outages: 0,
+    blind: 179,
+    probeStart: '2026-10-16T02:00:00Z',
+    shown: '0 min',
+    detail: '0 min down in 0 outage(s), slowest caught in 0 min, 179 min not seen by the probe (probe from 16 Oct 02:00Z)',
+  });
 });
 
 test('it names no probe start for a window the probe covered from before it', () => {

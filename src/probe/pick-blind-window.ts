@@ -12,7 +12,6 @@ interface BlindWindow {
   probeStart: string | null;
 }
 
-// Time before the probe's first sample is unprobed, not blind.
 export function pickBlindWindow(input: BlindWindowInput): BlindWindow {
   const startMs = input.firstSampleMs === null ? input.fromMs : Math.max(input.fromMs, input.firstSampleMs);
   const probeStartsInside = input.firstSampleMs !== null && input.firstSampleMs > input.fromMs && input.firstSampleMs <= input.toMs;

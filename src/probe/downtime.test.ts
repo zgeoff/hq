@@ -56,5 +56,17 @@ test('it gives, for a probe that started before the window, no probe start', () 
 test('it counts every minute as blind for a window with no samples at all', () => {
   const ctx = setupTest();
 
-  expect(ctx.readWeek()).toMatchObject({ blindMinutes: 7 * 24 * 60, probeStart: null });
+  expect(ctx.readWeek()).toStrictEqual({
+    from: '2026-10-12T00:00:00Z',
+    to: '2026-10-19T00:00:00Z',
+    samples: 0,
+    downMinutes: 0,
+    outages: 0,
+    longestDetectMinutes: 0,
+    blindMinutes: 7 * 24 * 60,
+    downMs: 0,
+    longestDetectMs: 0,
+    blindMs: 7 * 24 * 60 * 60_000,
+    probeStart: null,
+  });
 });
