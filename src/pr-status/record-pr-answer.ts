@@ -28,8 +28,6 @@ export function recordPRAnswer(db: Database, input: PRAnswerInput): void {
       answer_at: at,
     });
     const seq = logEvent(db, 'hq', `pr:${input.repo}#${input.pr}`, 'pr-answer', input.actor, null, null, { answer: input.answer, head: input.head, source: input.source, note: input.note });
-    if (input.head !== null) {
-      writeAnswerNotice(db, seq, { record: { kind: input.answer }, repo: input.repo, pr: input.pr, head: input.head, actor: input.actor });
-    }
+    writeAnswerNotice(db, seq, { record: { kind: input.answer }, repo: input.repo, pr: input.pr, head: input.head, actor: input.actor });
   }).immediate();
 }

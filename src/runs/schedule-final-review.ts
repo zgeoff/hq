@@ -4,7 +4,7 @@ import { logEvent } from '../log-event.ts';
 import { iso } from '../clock/iso.ts';
 import { now } from '../clock/now.ts';
 import { enqueue } from '../outbox/enqueue.ts';
-import { upsertPRStatus } from '../pr-status/upsert-pr-status.ts';
+import { recordPRNext } from '../pr-status/record-pr-next.ts';
 import { isPRActionAllowed } from '../transitions/is-pr-action-allowed.ts';
 import { requirePR as mustPR } from './require-pr.ts';
 import { REVIEWER } from './reviewer.ts';
@@ -44,10 +44,7 @@ function writeReviewerNext(db: Database, ref: string, actor: string): void {
   if (parts?.['repo'] === undefined || parts['pr'] === undefined) {
     return;
   }
-  const repo = parts['repo'].toLowerCase();
-  const pr = Number(parts['pr']);
-  upsertPRStatus(db, repo, pr, { next: REVIEWER, next_at: iso(now()) });
-  logEvent(db, 'hq', `pr:${repo}#${pr}`, 'pr-next', actor, null, null, { next: REVIEWER });
+  recordPRNext(db, { repo: parts['repo'].toLowerCase(), pr: Number(parts['pr']) }, REVIEWER, actor);
 }
 
 function describeResolution(given: string, resolution: AcceptedFinal | null): Record<string, unknown> {

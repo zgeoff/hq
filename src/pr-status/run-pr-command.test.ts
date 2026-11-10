@@ -508,7 +508,7 @@ test('it still shows the override once the PR has a new head', async () => {
   expect(shown.text).toInclude('override: at a1b2c3d via chat:kettle-2');
 });
 
-test('it shows a standing override for a PR with no record, in text and in JSON', async () => {
+test('it shows a standing override and the reviewer as next, in text and in JSON, for a PR the owner only overrode', async () => {
   const ctx = setupTest();
   const head = ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678');
   await ctx.override(head, { source: 'chat:kettle-2', note: 'The base moved under the stack.' });
@@ -995,7 +995,7 @@ test('it shows no CI override once the PR has a new head', async () => {
   expect(shown.text).not.toInclude('ci override');
 });
 
-test('it shows a standing CI override for a PR with no record', async () => {
+test('it shows a standing CI override and the reviewer as next, for a PR the owner only overrode', async () => {
   const ctx = setupTest();
   const head = ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678');
   await ctx.override(head, { source: 'chat:kettle-2', note: 'An intended infra change.', check: ['preview'] });
