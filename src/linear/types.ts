@@ -35,9 +35,8 @@ export interface LinearCommandDeps {
 
 export type Node = z.output<typeof NodeSchema>;
 
-export const Z_SESSIONS = ['z-stu', 'z-triage', 'z-review', 'z-delivery', 'z-release', 'z-qa'] as const;
-
-export type ZSession = (typeof Z_SESSIONS)[number];
+// A fleet session name, from fleet.json.
+export type ZSession = string;
 
 export type FiledSource = 'owner' | 'design' | 'agent' | 'live check' | 'bot' | ZSession;
 

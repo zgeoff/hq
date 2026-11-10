@@ -1,4 +1,4 @@
-import { Z_SESSIONS } from './types.ts';
+import { Z_SESSIONS } from './z-sessions.ts';
 import type { FiledSource, ZSession } from './types.ts';
 
 interface FiledFacts {

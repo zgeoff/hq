@@ -385,7 +385,7 @@ test('it adds the run_prs review wait columns in v53 and keeps the earlier PRs w
   expect(db.query('PRAGMA user_version').get()).toStrictEqual({ user_version: 53 });
 });
 
-test('it widens the linear_filed source check in v54, keeps every row, and v54 is the newest schema', () => {
+test('it drops the linear_filed source check in v54, keeps every row, and v54 is the newest schema', () => {
   const base = mkdtempSync(join(tmpdir(), 'hq-migrate-v54-'));
   const path = join(base, 'hq.db');
   const db = new Database(path, { create: true, strict: true });
@@ -400,7 +400,6 @@ test('it widens the linear_filed source check in v54, keeps every row, and v54 i
   expect(db.query('SELECT issue, created_at, source, pr_ref, fetched_at FROM linear_filed').all()).toStrictEqual([{ issue: 'GEO-9801', created_at: '2026-10-14T01:00:00Z', source: 'owner', pr_ref: 'kettle#3', fetched_at: '2026-10-14T02:00:00Z' }]);
   db.query("UPDATE linear_filed SET source = 'z-stu'").run();
   expect(db.query('SELECT source FROM linear_filed').all()).toStrictEqual([{ source: 'z-stu' }]);
-  expect(() => db.query("UPDATE linear_filed SET source = 'z-nobody'").run()).toThrow('CHECK constraint failed');
   expect(db.query('PRAGMA user_version').get()).toStrictEqual({ user_version: 54 });
   expect(MIGRATIONS).toHaveLength(54);
 });

@@ -1,7 +1,7 @@
 import type { Database } from 'bun:sqlite';
 import { z } from 'zod';
 import { iso } from '../../clock/iso.ts';
-import { Z_SESSIONS } from '../../linear/types.ts';
+import { Z_SESSIONS } from '../../linear/z-sessions.ts';
 import { findUnreadLine } from './find-unread-line.ts';
 import { readFiledIssues } from './read-filed-issues.ts';
 import type { IssueSource, ThroughputLine } from './types.ts';
