@@ -257,6 +257,25 @@ test('#laterAsk accepts +4h', () => {
   expect(laterAsk(ctx.db, 'geo-1-paint', 'call', '+4h', 'z-stu').due_at).toBe('2026-10-14T05:00:00Z');
 });
 
+test('#laterAsk puts off again a call whose later hold has ended', () => {
+  const ctx = setupTest();
+  addAsk(ctx.db, buildMockAddInput());
+  laterAsk(ctx.db, 'geo-1-paint', 'call', '+4h', 'z-stu');
+  at('2026-10-14T05:00:00Z');
+
+  expect(laterAsk(ctx.db, 'geo-1-paint', 'call', '2026-10-14T22:00:00Z', 'z-stu')).toMatchObject({ state: 'later', due_at: '2026-10-14T22:00:00Z' });
+});
+
+test('#laterAsk leaves a call it put off again out of the next call until the new time', () => {
+  const ctx = setupTest();
+  addAsk(ctx.db, buildMockAddInput());
+  laterAsk(ctx.db, 'geo-1-paint', 'call', '+4h', 'z-stu');
+  at('2026-10-14T05:00:00Z');
+  laterAsk(ctx.db, 'geo-1-paint', 'call', '2026-10-14T22:00:00Z', 'z-stu');
+
+  expect(nextEligible(ctx.db)).toBeNull();
+});
+
 test('#closeAsk tells the filer and the owner, but not the closer', () => {
   const ctx = setupTest();
   addAsk(ctx.db, buildMockAddInput());

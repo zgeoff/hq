@@ -94,7 +94,7 @@ test.each(collectKeys(UNBLOCK_TRANSITIONS))('#checkUnblock refuses %s from exact
 test("it holds today's moves in the transition tables", () => {
   expect(ASK_TRANSITIONS.answered.from).toStrictEqual(['open']);
   expect(ASK_TRANSITIONS.applied.from).toStrictEqual(['answered']);
-  expect([...ASK_TRANSITIONS.later.from].toSorted()).toStrictEqual(['open', 'queued']);
+  expect([...ASK_TRANSITIONS.later.from].toSorted()).toStrictEqual(['later', 'open', 'queued']);
   expect([...ASK_TRANSITIONS.opened.from].toSorted()).toStrictEqual(['later', 'queued']);
   expect([...RUN_TRANSITIONS.state.from].toSorted()).toStrictEqual(['blocked', 'deploy-held', 'deploying', 'live-check', 'merged', 'working']);
   expect([...RUN_TRANSITIONS.reopen.from].toSorted()).toStrictEqual(['done', 'dropped']);
