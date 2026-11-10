@@ -84,7 +84,7 @@ test('a past day is recorded once; today is fetched each time', async () => {
   expect(ctx.db.query('SELECT kind, issue FROM merged_prs WHERE number = 1').get()).toStrictEqual({ kind: 'fix', issue: 'GEO-1' });
   calls.length = 0;
   await syncKinds(ctx.db, run, { from: new Date('2026-10-14T00:00:00Z'), maxDays: 10 });
-  expect(calls).toEqual(['2026-10-16']);
+  expect(calls).toStrictEqual(['2026-10-16']);
 });
 
 test('maxDays bounds a sync, and the rest is left for later', async () => {
@@ -195,25 +195,28 @@ test('a Linear failure is kept for the text and thrown', async () => {
   expect(linearState(ctx.db)).toStrictEqual({ syncedAt: null, error: 'invented outage' });
 });
 
-test('a gh row hq cannot read records nothing', async () => {
+test.each<[string, unknown]>([
+  ['a number that is a string', { number: 'x', title: 't', closedAt: '2026-10-14T05:00:00Z', repository: { name: 'a' } }],
+  ['a number of 0', { number: 0, title: 't', closedAt: '2026-10-14T05:00:00Z', repository: { name: 'a' } }],
+  ['a negative number', { number: -1, title: 't', closedAt: '2026-10-14T05:00:00Z', repository: { name: 'a' } }],
+  ['a closedAt that is not a time', { number: 1, title: 't', closedAt: 'soon', repository: { name: 'a' } }],
+  ['a closedAt of 0', { number: 1, title: 't', closedAt: '0', repository: { name: 'a' } }],
+  ['a closedAt outside the day', { number: 1, title: 't', closedAt: '2026-10-13T23:00:00Z', repository: { name: 'a' } }],
+  ['a repo name with a path', { number: 1, title: 't', closedAt: '2026-10-14T05:00:00Z', repository: { name: '../a' } }],
+  ['a repo name of ..', { number: 1, title: 't', closedAt: '2026-10-14T05:00:00Z', repository: { name: '..' } }],
+  ['an empty repo name', { number: 1, title: 't', closedAt: '2026-10-14T05:00:00Z', repository: { name: '' } }],
+])('#syncDay rejects a gh row with %s and records nothing', async (_case, row) => {
   const ctx = setupTest();
-  const ok = { number: 1, title: 't', closedAt: '2026-10-14T05:00:00Z', repository: { name: 'a' } };
-  for (const row of [
-    { ...ok, number: 'x' },
-    { ...ok, number: 0 },
-    { ...ok, number: -1 },
-    { ...ok, closedAt: 'soon' },
-    { ...ok, closedAt: '0' },
-    { ...ok, closedAt: '2026-10-13T23:00:00Z' },
-    { ...ok, repository: { name: '../a' } },
-    { ...ok, repository: { name: '..' } },
-    { ...ok, repository: { name: '' } },
-  ]) {
-    const run: Runner = async () => ({ code: 0, stdout: JSON.stringify([row]), stderr: '' });
-    await expect(syncDay(ctx.db, run, '2026-10-14')).rejects.toThrow("can't read");
-  }
-  const notList: Runner = async () => ({ code: 0, stdout: '{}', stderr: '' });
-  await expect(syncDay(ctx.db, notList, '2026-10-14')).rejects.toThrow('did not return a list');
+
+  await expect(syncDay(ctx.db, mock<Runner>(() => Promise.resolve({ code: 0, stdout: JSON.stringify([row]), stderr: '' })), '2026-10-14')).rejects.toThrow("can't read");
+  expect(ctx.db.query('SELECT COUNT(*) AS count FROM merged_prs').get()).toStrictEqual({ count: 0 });
+  expect(ctx.db.query('SELECT COUNT(*) AS count FROM merged_pr_days').get()).toStrictEqual({ count: 0 });
+});
+
+test('#syncDay rejects a gh answer that is not a list and records nothing', async () => {
+  const ctx = setupTest();
+
+  await expect(syncDay(ctx.db, mock<Runner>(() => Promise.resolve({ code: 0, stdout: '{}', stderr: '' })), '2026-10-14')).rejects.toThrow('did not return a list');
   expect(ctx.db.query('SELECT COUNT(*) AS count FROM merged_prs').get()).toStrictEqual({ count: 0 });
   expect(ctx.db.query('SELECT COUNT(*) AS count FROM merged_pr_days').get()).toStrictEqual({ count: 0 });
 });
@@ -302,14 +305,12 @@ test('it cuts the key from a stored title', async () => {
 
 test('a multi-day sync spaces its searches', async () => {
   const ctx = setupTest();
-  process.env['HQ_SEARCH_GAP_MS'] = '40';
-  try {
-    const t0 = Date.now();
-    await syncKinds(ctx.db, ghFake({}), { from: new Date('2026-10-13T00:00:00Z'), maxDays: 3 });
-    expect(Date.now() - t0).toBeGreaterThanOrEqual(75);
-  } finally {
-    process.env['HQ_SEARCH_GAP_MS'] = '0';
-  }
+  updateEnv('HQ_SEARCH_GAP_MS', '40');
+  const startedMs = Date.now();
+
+  await syncKinds(ctx.db, ghFake({}), { from: new Date('2026-10-13T00:00:00Z'), maxDays: 3 });
+
+  expect(Date.now() - startedMs).toBeGreaterThanOrEqual(75);
 });
 
 test('merged PRs in a repo not in scope are not stored', async () => {
