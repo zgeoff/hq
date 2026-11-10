@@ -248,25 +248,25 @@ test.each<[string, (key: string) => ReturnType<typeof http.post>]>([
 });
 
 test('it redacts the key to a placeholder', () => {
-  const { key } = setupTest();
+  const ctx = setupTest();
 
-  expect(redact(`a ${key} b`, key)).toBe('a [key] b');
+  expect(redact(`a ${ctx.key} b`, ctx.key)).toBe('a [key] b');
 });
 
 test('it cuts the key from an op failure', async () => {
-  const { key } = setupTest();
+  const ctx = setupTest();
   forgetKey();
   onTestFinished(forgetKey);
   updateEnv('OP_SERVICE_ACCOUNT_TOKEN', 'invented-token');
-  const caller = makeLinearCaller(() => Promise.resolve({ code: 1, stdout: key, stderr: `[ERROR] ${key} could not be read` }));
+  const caller = makeLinearCaller(() => Promise.resolve({ code: 1, stdout: ctx.key, stderr: `[ERROR] ${ctx.key} could not be read` }));
 
   const err = await caller('q', {}).catch((error: unknown) => error);
 
-  expect(toErrorMessage(err)).not.toContain(key);
+  expect(toErrorMessage(err)).not.toContain(ctx.key);
 });
 
 test('it refuses a traced fetch before any request is sent', async () => {
-  const { key } = setupTest();
+  const ctx = setupTest();
   forgetKey();
   onTestFinished(forgetKey);
   updateEnv('OP_SERVICE_ACCOUNT_TOKEN', 'invented-token');
@@ -279,13 +279,13 @@ test('it refuses a traced fetch before any request is sent', async () => {
     }),
   );
 
-  await expect(makeLinearCaller(() => Promise.resolve({ code: 0, stdout: key, stderr: '' }))('q', {})).rejects.toThrow('BUN_CONFIG_VERBOSE_FETCH');
+  await expect(makeLinearCaller(() => Promise.resolve({ code: 0, stdout: ctx.key, stderr: '' }))('q', {})).rejects.toThrow('BUN_CONFIG_VERBOSE_FETCH');
   expect(requests).toStrictEqual([]);
 });
 
 test('it cuts the key from a stored title', async () => {
   const ctx = setupTest();
-  const call: LinearCall = async () => ({ issues: { nodes: [{ ...node('GEO-1', 'Bug', { completedAt: '2026-10-14T01:00:00Z' }), title: `pasted ${ctx.key}` }], pageInfo: { hasNextPage: false, endCursor: null } } });
+  const call: LinearCall = () => Promise.resolve({ issues: { nodes: [{ ...node('GEO-1', 'Bug', { completedAt: '2026-10-14T01:00:00Z' }), title: `pasted ${ctx.key}` }], pageInfo: { hasNextPage: false, endCursor: null } } });
 
   await syncClosed(ctx.db, call, new Date('2026-10-14T00:00:00Z'));
 
