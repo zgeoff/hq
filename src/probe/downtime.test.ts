@@ -4,23 +4,27 @@ import { freshDb } from '../../test/helpers.ts';
 import { downtime } from './downtime.ts';
 import { buildProbeSeeder } from './test-utils/build-probe-seeder.ts';
 
-const MINUTE_MS = 60_000;
-const WEEK_START = Date.parse('2026-10-12T00:00:00Z');
-const WEEK_END = WEEK_START + 7 * 24 * 60 * MINUTE_MS;
-
 function setupTest() {
   const fresh = freshDb();
   onTestFinished(fresh.cleanup);
+  const minuteMs = 60_000;
+  const weekStart = Date.parse('2026-10-12T00:00:00Z');
+  const weekEnd = weekStart + 7 * 24 * 60 * minuteMs;
 
-  return { db: fresh.db, seed: buildProbeSeeder(fresh), readWeek: () => downtime(fresh.db, new Date(WEEK_START), new Date(WEEK_END)) };
+  return {
+    seed: buildProbeSeeder(fresh),
+    minuteMs,
+    weekStart,
+    readWeek: () => downtime(fresh.db, new Date(weekStart), new Date(weekEnd)),
+  };
 }
 
-test('a week the probe joins mid-window reports blind minutes only for gaps after its first sample', () => {
+test('it reports blind minutes only for gaps after its first sample', () => {
   const ctx = setupTest();
-  const probeStart = WEEK_START + 4 * 24 * 60 * MINUTE_MS;
+  const probeStart = ctx.weekStart + 4 * 24 * 60 * ctx.minuteMs;
   for (let minute = 0; minute < 3 * 24 * 60; minute += 1) {
     if (minute < 60 || minute >= 70) {
-      ctx.seed.probeSample({ at: iso(new Date(probeStart + minute * MINUTE_MS)) });
+      ctx.seed.probeSample({ at: iso(new Date(probeStart + minute * ctx.minuteMs)) });
     }
   }
 
@@ -30,10 +34,10 @@ test('a week the probe joins mid-window reports blind minutes only for gaps afte
   expect(week.probeStart).toBe(iso(new Date(probeStart)));
 });
 
-test('a full week of one-minute samples reports about no blind minutes and no probe start', () => {
+test('it reports, for a full week of one-minute samples, about no blind minutes and no probe start', () => {
   const ctx = setupTest();
   for (let minute = 0; minute < 7 * 24 * 60; minute += 1) {
-    ctx.seed.probeSample({ at: iso(new Date(WEEK_START + minute * MINUTE_MS)) });
+    ctx.seed.probeSample({ at: iso(new Date(ctx.weekStart + minute * ctx.minuteMs)) });
   }
 
   const week = ctx.readWeek();
@@ -42,14 +46,14 @@ test('a full week of one-minute samples reports about no blind minutes and no pr
   expect(week.probeStart).toBeNull();
 });
 
-test('a probe that started before the window gives no probe start', () => {
+test('it gives, for a probe that started before the window, no probe start', () => {
   const ctx = setupTest();
-  ctx.seed.probeSample({ at: iso(new Date(WEEK_START - 3 * 24 * 60 * MINUTE_MS)) });
+  ctx.seed.probeSample({ at: iso(new Date(ctx.weekStart - 3 * 24 * 60 * ctx.minuteMs)) });
 
   expect(ctx.readWeek().probeStart).toBeNull();
 });
 
-test('a window with no samples at all counts every minute as blind', () => {
+test('it counts every minute as blind for a window with no samples at all', () => {
   const ctx = setupTest();
 
   expect(ctx.readWeek()).toMatchObject({ blindMinutes: 7 * 24 * 60, probeStart: null });
