@@ -618,4 +618,17 @@ export const MIGRATIONS: string[] = [
   `ALTER TABLE run_prs ADD COLUMN review_wait_until TEXT;
   ALTER TABLE run_prs ADD COLUMN review_wait_sha TEXT;
   ALTER TABLE run_prs ADD COLUMN review_wait_reason TEXT;`,
+
+  // SQLite can't change a CHECK, so linear_filed is rebuilt with every row kept.
+  `CREATE TABLE linear_filed_v54 (
+    issue      TEXT PRIMARY KEY,
+    created_at TEXT NOT NULL,
+    source     TEXT NOT NULL CHECK (source IN ('owner', 'design', 'agent', 'live check', 'bot', 'z-stu', 'z-triage', 'z-review', 'z-delivery', 'z-release', 'z-qa')),
+    pr_ref     TEXT,
+    fetched_at TEXT NOT NULL
+  );
+  INSERT INTO linear_filed_v54 (issue, created_at, source, pr_ref, fetched_at) SELECT issue, created_at, source, pr_ref, fetched_at FROM linear_filed;
+  DROP TABLE linear_filed;
+  ALTER TABLE linear_filed_v54 RENAME TO linear_filed;
+  CREATE INDEX linear_filed_created ON linear_filed (created_at);`,
 ];

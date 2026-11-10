@@ -370,7 +370,7 @@ test('it adds noslop_rounds.adapter and adapter_source in v52, and keeps the ear
   expect(db.query('PRAGMA user_version').get()).toStrictEqual({ user_version: 52 });
 });
 
-test('it adds the run_prs review wait columns in v53, keeps the earlier PRs with no wait, and v53 is the newest schema', () => {
+test('it adds the run_prs review wait columns in v53 and keeps the earlier PRs with no wait', () => {
   const base = mkdtempSync(join(tmpdir(), 'hq-migrate-v53-'));
   const path = join(base, 'hq.db');
   const db = new Database(path, { create: true, strict: true });
@@ -380,8 +380,27 @@ test('it adds the run_prs review wait columns in v53, keeps the earlier PRs with
   migrate(db, path, false, MIGRATIONS.slice(0, 52));
   db.query("INSERT INTO run_prs (ref, issue, state, added_at, updated_at) VALUES ('kettle#41', 'GEO-501', 'open', '2026-10-14T01:00:00Z', '2026-10-14T01:00:00Z')").run();
 
-  expect(migrate(db, path, true)).not.toBeNull();
+  expect(migrate(db, path, true, MIGRATIONS.slice(0, 53))).not.toBeNull();
   expect(db.query('SELECT ref, review_wait_until, review_wait_sha, review_wait_reason FROM run_prs').all()).toStrictEqual([{ ref: 'kettle#41', review_wait_until: null, review_wait_sha: null, review_wait_reason: null }]);
   expect(db.query('PRAGMA user_version').get()).toStrictEqual({ user_version: 53 });
-  expect(MIGRATIONS).toHaveLength(53);
+});
+
+test('it widens the linear_filed source check in v54, keeps every row, and v54 is the newest schema', () => {
+  const base = mkdtempSync(join(tmpdir(), 'hq-migrate-v54-'));
+  const path = join(base, 'hq.db');
+  const db = new Database(path, { create: true, strict: true });
+  onTestFinished(() => rmSync(base, { recursive: true, force: true }));
+  onTestFinished(() => db.close());
+  db.exec('PRAGMA journal_mode = WAL;');
+  migrate(db, path, false, MIGRATIONS.slice(0, 53));
+  db.query("INSERT INTO linear_filed (issue, created_at, source, pr_ref, fetched_at) VALUES ('GEO-9801', '2026-10-14T01:00:00Z', 'owner', 'kettle#3', '2026-10-14T02:00:00Z')").run();
+  expect(() => db.query("UPDATE linear_filed SET source = 'z-stu'").run()).toThrow('CHECK constraint failed');
+
+  expect(migrate(db, path, true)).not.toBeNull();
+  expect(db.query('SELECT issue, created_at, source, pr_ref, fetched_at FROM linear_filed').all()).toStrictEqual([{ issue: 'GEO-9801', created_at: '2026-10-14T01:00:00Z', source: 'owner', pr_ref: 'kettle#3', fetched_at: '2026-10-14T02:00:00Z' }]);
+  db.query("UPDATE linear_filed SET source = 'z-stu'").run();
+  expect(db.query('SELECT source FROM linear_filed').all()).toStrictEqual([{ source: 'z-stu' }]);
+  expect(() => db.query("UPDATE linear_filed SET source = 'z-nobody'").run()).toThrow('CHECK constraint failed');
+  expect(db.query('PRAGMA user_version').get()).toStrictEqual({ user_version: 54 });
+  expect(MIGRATIONS).toHaveLength(54);
 });

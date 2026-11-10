@@ -35,7 +35,11 @@ export interface LinearCommandDeps {
 
 export type Node = z.output<typeof NodeSchema>;
 
-export type FiledSource = 'owner' | 'design' | 'agent' | 'live check' | 'bot';
+export const Z_SESSIONS = ['z-stu', 'z-triage', 'z-review', 'z-delivery', 'z-release', 'z-qa'] as const;
+
+export type ZSession = (typeof Z_SESSIONS)[number];
+
+export type FiledSource = 'owner' | 'design' | 'agent' | 'live check' | 'bot' | ZSession;
 
 export type UmbrellaOutcome = 'news' | 'ticked' | 'no_box' | 'ambiguous' | 'gone';
 

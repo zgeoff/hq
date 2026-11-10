@@ -1,11 +1,12 @@
 import type { Database } from 'bun:sqlite';
 import { z } from 'zod';
 import { iso } from '../../clock/iso.ts';
+import { Z_SESSIONS } from '../../linear/types.ts';
 import type { FiledIssue } from './types.ts';
 
 const filedRowSchema = z.object({
   issue: z.string(),
-  source: z.enum(['owner', 'design', 'agent', 'live check', 'bot']),
+  source: z.enum(['owner', 'design', 'agent', 'live check', 'bot', ...Z_SESSIONS]),
   pr_ref: z.string().nullable(),
   recorded: z.number(),
 });
