@@ -4,6 +4,7 @@ import { now } from '../clock/now.ts';
 import { config } from '../config/config.ts';
 import { readLocalSetting } from '../config/read-local-setting.ts';
 import { HqError } from '../errors.ts';
+import { getHome } from '../fleet/get-home.ts';
 import type { Runner } from '../runner/types.ts';
 import { KEY_CACHE } from './key-cache.ts';
 import { redact } from './redact.ts';
@@ -74,7 +75,7 @@ async function readKey(run: Runner, recordRead: () => void): Promise<string> {
 
 function readGlobalToken(): string | undefined {
   try {
-    const path = config().HQ_CLAUDE_SETTINGS ?? `${process.env['HOME']}/.claude/settings.json`;
+    const path = config().HQ_CLAUDE_SETTINGS ?? `${getHome()}/.claude/settings.json`;
     const token = ClaudeSettingsSchema.parse(JSON.parse(readFileSync(path, 'utf8'))).env?.['OP_SERVICE_ACCOUNT_TOKEN'];
     return typeof token === 'string' ? token : undefined;
   } catch {

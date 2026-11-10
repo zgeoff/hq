@@ -19,7 +19,7 @@ function setupTest() {
   onTestFinished(() => rmSync(directory, { recursive: true, force: true }));
   const settingsPath = join(directory, 'settings.json');
   updateEnv('HQ_CLAUDE_SETTINGS', settingsPath);
-  return { run, writeSettings: (token: string) => writeFileSync(settingsPath, JSON.stringify({ env: { OP_SERVICE_ACCOUNT_TOKEN: token } })) };
+  return { run, settingsPath };
 }
 
 test.each([
@@ -65,7 +65,7 @@ test('a changed Linear item reference reads 1Password again', async () => {
 
 test('it runs op with the global settings token when the process env holds a different one', async () => {
   const app = setupTest();
-  app.writeSettings('invented-global-token');
+  writeFileSync(app.settingsPath, JSON.stringify({ env: { OP_SERVICE_ACCOUNT_TOKEN: 'invented-global-token' } }));
   const linear = makeLinearCaller(app.run, mock(() => {}));
   await linear('q', {});
 
@@ -74,6 +74,18 @@ test('it runs op with the global settings token when the process env holds a dif
 
 test('it runs op with the process env token when there is no settings file', async () => {
   const app = setupTest();
+  const linear = makeLinearCaller(app.run, mock(() => {}));
+  await linear('q', {});
+
+  expect(app.run.mock.calls.map(([, options]) => options?.env?.['OP_SERVICE_ACCOUNT_TOKEN'])).toStrictEqual(['invented-token']);
+});
+
+test.each([
+  ['holds no token', JSON.stringify({ env: { OTHER_SETTING: 'invented-value' } })],
+  ['is not JSON', 'invented { not json'],
+])('it runs op with the process env token when the settings file %s', async (_case, contents) => {
+  const app = setupTest();
+  writeFileSync(app.settingsPath, contents);
   const linear = makeLinearCaller(app.run, mock(() => {}));
   await linear('q', {});
 
