@@ -95,6 +95,12 @@ An atc restart clears each session's pending wakeup. `z-release` restarts the da
 
 An atc upgrade can leave a session with an old tool list, such as `atc_session_spawn` without an input the new release adds. The session first loads the tool's schema again with ToolSearch, since its conversation keeps the schema it loaded before the upgrade. It asks `z-stu` for a restart only when the input is still missing and `hq health` flags its `atc mcp` process as older than the installed atc build.
 
+## scheduled jobs
+
+A job that lives in a session's own cron ends when hq restarts the session, so hq holds a session's timed jobs and sends each one to the role's inbox when it is due. Add one with `hq jobs add <role> (--every 30m|2h|1d | --daily HH:MMZ | --at ISO) --prompt TEXT`, list them with `hq jobs list [<role>]`, and stop one with `hq jobs remove <id>`. The message reads `hq job <id>: <prompt>` and goes to the role by name, so it reaches the role's current session after a restart.
+
+The watcher checks every 5 minutes, so a job can run up to 5 minutes late, and `--every` takes 5m to 366d. After downtime a repeating job fires once, not once per missed slot, and `--at` jobs end after they fire. Only the role itself or `z-stu` may add or remove its jobs: hq finds the caller from atc's identity socket, never from `--by` or `HQ_AS`. `hq jobs list` is open to anyone.
+
 ## when the classifier refuses a session's own action
 
 The sessions run commands on the owner's computer themselves, which Nix never does, so their own actions meet the auto-mode classifier. When the classifier refuses one, the session stops and asks the owner to approve it running that exact command, naming the command and the refusal reason. The owner's approval in chat clears the refusal. The session never tells the owner to run the command himself, and never reaches the same outcome another way.
