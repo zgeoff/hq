@@ -1,4 +1,7 @@
 import { expect, mock, onTestFinished, test } from 'bun:test';
+import { HttpResponse, http } from 'msw';
+import { LINEAR_GRAPHQL_URL } from '../../mocks/linear-handlers.ts';
+import { server } from '../../mocks/node.ts';
 import { overrideEnv } from '../config/override-env.ts';
 import type { RunResult, Runner } from '../runner/types.ts';
 import { makeLinearCaller } from './make-linear-caller.ts';
@@ -26,6 +29,17 @@ test.each([
   await linear('q', {});
 
   expect([app.run.mock.calls.length, counter.mock.calls.length]).toStrictEqual([count, count]);
+});
+
+test.each([401, 403])('it reads 1Password again after Linear answers %i', async (status) => {
+  const app = setupTest();
+  const linear = makeLinearCaller(app.run, mock(() => {}));
+  onTestFinished(overrideEnv('HQ_NOW', '2026-10-19T00:00:00Z'));
+  server.use(http.post(LINEAR_GRAPHQL_URL, () => HttpResponse.json({ errors: [{ message: 'invented auth refusal' }] }, { status }), { once: true }));
+  await linear('q', {}).catch(() => null);
+  await linear('q', {});
+
+  expect(app.run.mock.calls).toHaveLength(2);
 });
 
 test('a changed Linear item reference reads 1Password again', async () => {
