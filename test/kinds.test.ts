@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { expect, onTestFinished, test } from 'bun:test';
+import { expect, mock, onTestFinished, test } from 'bun:test';
 import { HttpResponse, http } from 'msw';
 import { updateEnv } from '@zgeoff/testing/helpers';
 import invariant from 'tiny-invariant';
@@ -34,7 +34,7 @@ function setupTest() {
   onTestFinished(base.cleanup);
   updateEnv('HQ_NOW', '2026-10-16T02:00:00Z');
 
-  return { db: base.db, seed: buildSeeder(base), key: 'lin_api_INVENTEDdummyKEY0123456789' };
+  return { db: base.db, seed: buildSeeder(base) };
 }
 
 test.each<[string, ReturnType<typeof kindOf>]>([
@@ -229,67 +229,75 @@ test('Linear ids hq did not ask for are not stored; an inherited type name count
   expect(week?.prTypes.none).toBe(1);
 });
 
-test.each<[string, (key: string) => ReturnType<typeof http.post>]>([
-  ['Linear echoes it in a 400 reply', (key) => http.post(LINEAR_GRAPHQL_URL, () => HttpResponse.json({ errors: [{ message: `bad key ${key} sent` }, { message: 'also lin_api_OTHERinventedKEY' }] }, { status: 400 }))],
-  ['the connection drops', () => http.post(LINEAR_GRAPHQL_URL, () => HttpResponse.error())],
-])('it keeps the key out of an error and hq.db when %s', async (_case, buildHandler) => {
+test('it keeps the key out of an error and hq.db when Linear echoes it in a 400 reply', async () => {
   const ctx = setupTest();
   forgetKey();
   onTestFinished(forgetKey);
   updateEnv('OP_SERVICE_ACCOUNT_TOKEN', 'invented-token');
-  server.use(buildHandler(ctx.key));
-  const run: Runner = () => Promise.resolve({ code: 0, stdout: `${ctx.key}\n`, stderr: '' });
+  server.use(http.post(LINEAR_GRAPHQL_URL, () => HttpResponse.json({ errors: [{ message: 'bad key lin_api_INVENTEDdummyKEY0123456789 sent' }, { message: 'also lin_api_OTHERinventedKEY' }] }, { status: 400 })));
+  const run = mock<Runner>(() => Promise.resolve({ code: 0, stdout: 'lin_api_INVENTEDdummyKEY0123456789\n', stderr: '' }));
 
   const err = await syncLinear(ctx.db, makeLinearCaller(run), new Date('2026-10-14T00:00:00Z'), { run }).catch((error: unknown) => error);
 
   expect(toErrorMessage(err)).not.toContain('lin_api_');
   expect(linearState(ctx.db).error).not.toContain('lin_api_');
-  expect(JSON.stringify(ctx.db.query('SELECT * FROM meta').all())).not.toContain(ctx.key);
+  expect(JSON.stringify(ctx.db.query('SELECT * FROM meta').all())).not.toContain('lin_api_INVENTEDdummyKEY0123456789');
 });
 
-test('it redacts the key to a placeholder', () => {
-  const ctx = setupTest();
-
-  expect(redact(`a ${ctx.key} b`, ctx.key)).toBe('a [key] b');
-});
-
-test('it cuts the key from an op failure', async () => {
+test('it keeps the key out of an error and hq.db when the connection drops', async () => {
   const ctx = setupTest();
   forgetKey();
   onTestFinished(forgetKey);
   updateEnv('OP_SERVICE_ACCOUNT_TOKEN', 'invented-token');
-  const caller = makeLinearCaller(() => Promise.resolve({ code: 1, stdout: ctx.key, stderr: `[ERROR] ${ctx.key} could not be read` }));
+  server.use(http.post(LINEAR_GRAPHQL_URL, () => HttpResponse.error()));
+  const run = mock<Runner>(() => Promise.resolve({ code: 0, stdout: 'lin_api_INVENTEDdummyKEY0123456789\n', stderr: '' }));
+
+  const err = await syncLinear(ctx.db, makeLinearCaller(run), new Date('2026-10-14T00:00:00Z'), { run }).catch((error: unknown) => error);
+
+  expect(toErrorMessage(err)).not.toContain('lin_api_');
+  expect(linearState(ctx.db).error).not.toContain('lin_api_');
+  expect(JSON.stringify(ctx.db.query('SELECT * FROM meta').all())).not.toContain('lin_api_INVENTEDdummyKEY0123456789');
+});
+
+test('it redacts the key to a placeholder', () => {
+  expect(redact('a lin_api_INVENTEDdummyKEY0123456789 b', 'lin_api_INVENTEDdummyKEY0123456789')).toBe('a [key] b');
+});
+
+test('it cuts the key from an op failure', async () => {
+  setupTest();
+  forgetKey();
+  onTestFinished(forgetKey);
+  updateEnv('OP_SERVICE_ACCOUNT_TOKEN', 'invented-token');
+  const caller = makeLinearCaller(() => Promise.resolve({ code: 1, stdout: 'lin_api_INVENTEDdummyKEY0123456789', stderr: '[ERROR] lin_api_INVENTEDdummyKEY0123456789 could not be read' }));
 
   const err = await caller('q', {}).catch((error: unknown) => error);
 
-  expect(toErrorMessage(err)).not.toContain(ctx.key);
+  expect(toErrorMessage(err)).not.toContain('lin_api_INVENTEDdummyKEY0123456789');
 });
 
 test('it refuses a traced fetch before any request is sent', async () => {
-  const ctx = setupTest();
+  setupTest();
   forgetKey();
   onTestFinished(forgetKey);
   updateEnv('OP_SERVICE_ACCOUNT_TOKEN', 'invented-token');
   updateEnv('BUN_CONFIG_VERBOSE_FETCH', 'curl');
-  const requests: string[] = [];
+  const received = mock<(url: string) => void>();
   server.use(
     http.post(LINEAR_GRAPHQL_URL, (info) => {
-      requests.push(info.request.url);
+      received(info.request.url);
       return HttpResponse.json({ data: {} });
     }),
   );
 
-  await expect(makeLinearCaller(() => Promise.resolve({ code: 0, stdout: ctx.key, stderr: '' }))('q', {})).rejects.toThrow('BUN_CONFIG_VERBOSE_FETCH');
-  expect(requests).toStrictEqual([]);
+  await expect(makeLinearCaller(() => Promise.resolve({ code: 0, stdout: 'lin_api_INVENTEDdummyKEY0123456789', stderr: '' }))('q', {})).rejects.toThrow('BUN_CONFIG_VERBOSE_FETCH');
+  expect(received).not.toHaveBeenCalled();
 });
 
 test('it cuts the key from a stored title', async () => {
   const ctx = setupTest();
-  const call: LinearCall = () => Promise.resolve({ issues: { nodes: [{ ...node('GEO-1', 'Bug', { completedAt: '2026-10-14T01:00:00Z' }), title: `pasted ${ctx.key}` }], pageInfo: { hasNextPage: false, endCursor: null } } });
+  await syncClosed(ctx.db, () => Promise.resolve({ issues: { nodes: [{ ...node('GEO-1', 'Bug', { completedAt: '2026-10-14T01:00:00Z' }), title: 'pasted lin_api_INVENTEDdummyKEY0123456789' }], pageInfo: { hasNextPage: false, endCursor: null } } }), new Date('2026-10-14T00:00:00Z'));
 
-  await syncClosed(ctx.db, call, new Date('2026-10-14T00:00:00Z'));
-
-  expect(JSON.stringify(ctx.db.query('SELECT * FROM linear_issues').all())).not.toContain(ctx.key);
+  expect(JSON.stringify(ctx.db.query('SELECT * FROM linear_issues').all())).not.toContain('lin_api_INVENTEDdummyKEY0123456789');
 });
 
 test('a multi-day sync spaces its searches', async () => {

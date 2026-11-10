@@ -1,8 +1,8 @@
 import { expect, mock, onTestFinished, test } from 'bun:test';
 import { HttpResponse, http } from 'msw';
+import { updateEnv } from '@zgeoff/testing/helpers';
 import { LINEAR_GRAPHQL_URL } from '../../mocks/linear-handlers.ts';
 import { server } from '../../mocks/node.ts';
-import { overrideEnv } from '../config/override-env.ts';
 import type { RunResult, Runner } from '../runner/types.ts';
 import { makeLinearCaller } from './make-linear-caller.ts';
 import { resetKey } from './reset-key.ts';
@@ -11,8 +11,7 @@ function setupTest() {
   const run = mock<Runner>(() => Promise.resolve<RunResult>({ code: 0, stdout: 'lin_api_INVENTEDkettleKEY0042\n', stderr: '' }));
   resetKey();
   onTestFinished(resetKey);
-  process.env['OP_SERVICE_ACCOUNT_TOKEN'] = 'invented-token';
-  onTestFinished(() => delete process.env['OP_SERVICE_ACCOUNT_TOKEN']);
+  updateEnv('OP_SERVICE_ACCOUNT_TOKEN', 'invented-token');
   return { run };
 }
 
@@ -23,9 +22,9 @@ test.each([
   const app = setupTest();
   const counter = mock(() => {});
   const linear = makeLinearCaller(app.run, counter);
-  onTestFinished(overrideEnv('HQ_NOW', '2026-10-19T00:00:00Z'));
+  updateEnv('HQ_NOW', '2026-10-19T00:00:00Z');
   await linear('q', {});
-  onTestFinished(overrideEnv('HQ_NOW', later));
+  updateEnv('HQ_NOW', later);
   await linear('q', {});
 
   expect([app.run.mock.calls.length, counter.mock.calls.length]).toStrictEqual([count, count]);
@@ -34,7 +33,7 @@ test.each([
 test.each([401, 403])('it reads 1Password again after Linear answers %i', async (status) => {
   const app = setupTest();
   const linear = makeLinearCaller(app.run, mock(() => {}));
-  onTestFinished(overrideEnv('HQ_NOW', '2026-10-19T00:00:00Z'));
+  updateEnv('HQ_NOW', '2026-10-19T00:00:00Z');
   server.use(http.post(LINEAR_GRAPHQL_URL, () => HttpResponse.json({ errors: [{ message: 'invented auth refusal' }] }, { status }), { once: true }));
   await linear('q', {}).catch(() => null);
   await linear('q', {});
@@ -45,10 +44,10 @@ test.each([401, 403])('it reads 1Password again after Linear answers %i', async 
 test('a changed Linear item reference reads 1Password again', async () => {
   const app = setupTest();
   const linear = makeLinearCaller(app.run, mock(() => {}));
-  onTestFinished(overrideEnv('HQ_NOW', '2026-10-19T00:00:00Z'));
-  onTestFinished(overrideEnv('HQ_LINEAR_OP_REF', 'op://kettle/teapot-key/credential'));
+  updateEnv('HQ_NOW', '2026-10-19T00:00:00Z');
+  updateEnv('HQ_LINEAR_OP_REF', 'op://kettle/teapot-key/credential');
   await linear('q', {});
-  onTestFinished(overrideEnv('HQ_LINEAR_OP_REF', 'op://kettle/urn-key/credential'));
+  updateEnv('HQ_LINEAR_OP_REF', 'op://kettle/urn-key/credential');
   await linear('q', {});
 
   expect(app.run.mock.calls.map(([argv]) => argv)).toStrictEqual([
