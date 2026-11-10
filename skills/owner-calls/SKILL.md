@@ -12,14 +12,13 @@ description:
 Some choices belong to the owner alone. Tell those choices from your own, put each one to the
 owner with everything needed to decide it, and act on the answer only once hq has a record of it.
 
-[Terms](#terms) defines the shared words. Once you send a decision or a
-hands-on step, carry on with other work. A line `z-stu` types into your
-session is already on record.
+[Terms](#terms) defines the shared words. Once you send a decision or a hands-on step, carry on
+with other work.
 
 Avoid these traps:
 
 - Asking the owner directly. Every decision goes through one queue.
-- Passing an answer on by message. `hq review gate` and every session read only hq's records.
+- Passing the owner's answer on by message. Other sessions act only on hq's records.
 - Adding a new behaviour to a decision, so that a "yes" also covers it.
 - Sending `z-stu` news. Post it with `hq news add`.
 
@@ -41,7 +40,7 @@ Avoid these traps:
 - **The owner:** the person the fleet works for. An issue with the Linear label `Needs Geoff` waits
   on a decision from the owner. A Design issue with the Linear label `with-geoff` has the owner in
   its design session.
-- **hq:** the CLI that runs the fleet, and the store of its records. `hq --help` lists the commands.
+- **hq:** the CLI that runs the fleet, and the store of its records.
 - **atc:** the tool that runs the sessions and carries messages between them. Send a message to a
   session with `atc_message_send`.
 - **`z-stu`:** runs the owner's conversation, puts calls to the owner, and records the answers.
@@ -109,9 +108,9 @@ Decide anything else yourself, under your grants or the Actions that the issue n
 
 ## Put it to the owner
 
-The owner answers in batches, through one queue: `z-triage` turns each decision of the owner's into a call, and
-`z-stu` puts the call to the owner. Never ask the owner directly. To tell the owner something
-without a decision, such as a deploy hold, send it with the `PushNotification` tool.
+The owner answers in batches, through one queue: `z-triage` turns each decision of the owner's
+into a call, and `z-stu` puts the call to the owner. To tell the owner something without a
+decision, such as a deploy hold, send it with the `PushNotification` tool.
 
 - **Send a decision on the list to `z-triage`** with `atc_message_send`: the question, the options
   and your recommendation. When the decision has an issue, `z-triage` labels it `Needs Geoff`. At
@@ -142,7 +141,8 @@ Message `z-stu` only with what the owner needs to know or do:
 Send decisions and hands-on steps as [Put it to the owner](#put-it-to-the-owner) says, and news
 with `hq news add`.
 
-Reply to `z-stu` with the `answer` tool, in 2 lines at most. Without it, atc sends your whole final
+Reply to a message from `z-stu` with atc's `answer` tool, in 2 lines at most. If you don't, atc
+sends your whole final reply. Report a merge to `z-stu` only when `z-stu` asked about it, in your
 reply.
 
 ## The owner's answers are records
@@ -150,15 +150,18 @@ reply.
 Act only on an answer that hq records. Never pass an answer on to another session by message: the
 gate and every session read only hq's records.
 
-One exception: when the owner types a grant into your session, act on it at once, for that
-session's life. Send the line to `z-stu` with `atc_message_send`, so that `z-stu` records it.
-When Claude Code's permission check blocks an action that the owner already approved in a call or
-a [pitch](../delivery-lead/SKILL.md#pitches), the blocked agent tells `z-stu` with
-`atc_message_send`. `z-stu` types the owner's recorded words from that approval into the agent's
-session, and sends the owner no new call. For an agent that `z-delivery` launched, `z-delivery`
-types the granting line instead, as its [Refusals](../delivery-lead/SKILL.md#refusals) section says.
+Two exceptions:
 
-Every other session records only its own acts:
+- **Act at once on a grant typed into your session,** from the owner or `z-stu`, for that session's
+  life. Then run `hq typed list --session <your atc session id>`. When the line is missing, send it
+  to `z-stu`, so that `z-stu` records it.
+- **Tell `z-stu` when Claude Code's permission check blocks an action the owner approved** in a
+  call or a [pitch](../delivery-lead/SKILL.md#pitches). `z-stu` types the owner's recorded words
+  into your session, and sends the owner no new call. For an agent that `z-delivery` launched,
+  `z-delivery` types the granting line instead, as its
+  [Refusals](../delivery-lead/SKILL.md#refusals) section says.
+
+Every session but `z-stu` records only its own acts:
 
 - **Log each act under a grant:** run `hq grant act <name> --target <issue, PR or command>`. The
   name is the one in your start prompt's "Log it with" line.
