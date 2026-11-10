@@ -3,6 +3,7 @@ import { at, fakeAtc, freshDb } from '../../test/helpers.ts';
 import { overrideEnv } from '../config/override-env.ts';
 import { flush } from '../outbox/flush.ts';
 import { readOutboxRows } from '../outbox/read-outbox-rows.ts';
+import { readSubjectEvents } from '../read-subject-events.ts';
 import { runSessionJobsTick } from './run-session-jobs-tick.ts';
 import { readJobs, removeJob, writeJob } from './write-job.ts';
 
@@ -15,6 +16,7 @@ function setupTest() {
     directory: fresh.dir,
     readTexts: () => readOutboxRows(fresh.db).map((row) => row.text),
     readNextAts: () => readJobs(fresh.db, null).map((job) => job.next_at),
+    readJobActions: (id: number) => readSubjectEvents(fresh.db, 'hq', `job:${id}`).map((event) => event.action),
   };
 }
 
@@ -98,6 +100,22 @@ test('it sends nothing for a removed job', () => {
   const fired = runSessionJobsTick(ctx.db, 'hq', new Date('2026-11-10T02:03:00Z'));
 
   expect({ fired, texts: ctx.readTexts() }).toStrictEqual({ fired: [], texts: [] });
+});
+
+test('it fires the good jobs past one whose stored schedule no longer parses, and logs the bad one once', () => {
+  const ctx = setupTest();
+  at('2026-11-10T00:00:00Z');
+  writeJob(ctx.db, { target: 'z-triage', value: { kind: 'every', spec: 'soon' }, prompt: 'sort the inbox', nextAt: new Date('2026-11-10T02:00:00Z'), actor: 'z-triage' });
+  writeJob(ctx.db, { target: 'z-release', value: { kind: 'every', spec: '2h' }, prompt: 'check the release queue', nextAt: new Date('2026-11-10T02:00:00Z'), actor: 'z-release' });
+
+  const first = runSessionJobsTick(ctx.db, 'hq', new Date('2026-11-10T02:03:00Z'));
+  const second = runSessionJobsTick(ctx.db, 'hq', new Date('2026-11-10T04:02:00Z'));
+
+  expect({ first, second, badJobEvents: ctx.readJobActions(1) }).toStrictEqual({
+    first: [{ id: 2, target: 'z-release', slot: '2026-11-10T02:00:00Z' }],
+    second: [{ id: 2, target: 'z-release', slot: '2026-11-10T04:00:00Z' }],
+    badJobEvents: ['job-added', 'job-skipped'],
+  });
 });
 
 test('it still reaches the role after its session id changes', async () => {

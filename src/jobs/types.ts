@@ -19,3 +19,13 @@ export interface DueJob {
   slot: string;
   nextAt: string | null;
 }
+
+export interface BrokenJob {
+  job: SessionJob;
+  reason: string;
+}
+
+export interface DueJobs {
+  due: DueJob[];
+  broken: BrokenJob[];
+}

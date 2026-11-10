@@ -63,7 +63,7 @@ async function requireJobAccess(input: JobsCommandInput, target: string): Promis
   const caller = await readJobCaller(input.db, input.probe);
   const access = pickJobAccess({ caller, target, owner: roleName('owner') });
   if (!access.allowed) {
-    throw new HqError('forbidden', access.reason);
+    throw new HqError('not_allowed', access.reason);
   }
   invariant(caller.kind === 'named', 'access is granted only to a named caller');
   return caller.name;
