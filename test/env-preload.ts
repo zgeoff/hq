@@ -21,6 +21,8 @@ process.env['REVIEW_DIR'] = join(tmpdir(), 'hq-tests-no-review-dir');
 
 process.env['HQ_SLOTS_OP_SETTINGS'] = join(tmpdir(), 'hq-tests-no-slots-settings', 'settings.local.json');
 
+process.env['HQ_CLAUDE_SETTINGS'] = join(tmpdir(), 'hq-tests-no-claude-settings', 'settings.json');
+
 process.env['HQ_STATE_DIR'] = join(tmpdir(), 'hq-tests-no-state-dir');
 
 // A run from an agent's shell inherits its atc session id, and `hq call answer` then asks the real
