@@ -24,7 +24,9 @@ import { loadActionsSpend } from '../goals/load-actions-spend.ts';
 import { runGrantMarksTick } from '../grants/run-grant-marks-tick.ts';
 import { PROMOTABLE_FOCUS } from '../lanes/promotable-focus.ts';
 import { PROMOTABLE_FOCUS_KEY } from '../lanes/promotable-focus-key.ts';
+import { writeJob } from '../jobs/write-job.ts';
 import { writeIssues } from '../linear/write-issues.ts';
+import { readOutboxRows } from '../outbox/read-outbox-rows.ts';
 import { addRun } from '../runs/add-run.ts';
 import { buildRunSeeder } from '../runs/test-utils/build-run-seeder.ts';
 import { addUnblock } from '../unblock/add-unblock.ts';
@@ -406,6 +408,43 @@ test('it logs the Claude slot read, each problem it met and the news line it add
     '2026-10-15T20:00:00Z Claude slots: slot 3: op read gave no token',
     '2026-10-15T20:00:00Z Claude slots: fleet forecast news line added',
   ]);
+});
+
+test('it fires a due session job into the outbox and logs it', async () => {
+  const ctx = setupTest();
+  const capacity = JSON.stringify({ imp: { freeMib: 0, room: false }, providers: { claude: { room: false, unattended: true, target: 'imp' } } });
+  const answers: Record<string, RunResult> = { op: { code: 0, stdout: 'lin_api_INVENTED\n', stderr: '' } };
+  const run: Runner = (command) => Promise.resolve(answers[command[0] ?? ''] ?? { code: 0, stdout: capacity, stderr: '' });
+  const logs: string[] = [];
+  onTestFinished(overrideEnv('HQ_NOW', '2026-10-15T20:00:00Z'));
+  for (const key of ['kinds_synced_at', 'goals_synced_at', 'goals_ok_at', 'kinds_ok_at', 'linear_synced_at', 'lanes_ready_linear_at']) {
+    setMeta(ctx.db, key, '2026-10-15T20:00:00Z');
+  }
+  writeJob(ctx.db, { target: 'z-release', value: { kind: 'every', spec: '2h' }, prompt: 'check the release queue', nextAt: new Date('2026-10-15T19:00:00Z'), actor: 'z-release' });
+
+  await watchTick(ctx.db, { me: 'hq-lanes', run, log: (line) => logs.push(line), stepMs: 2000, steps: { runs: () => Promise.resolve(), weekly: () => Promise.resolve(false), health: () => Promise.resolve({ opened: [], cleared: [] }) } });
+
+  expect({ texts: readOutboxRows(ctx.db).map((row) => row.text), logs: logs.filter((line) => line.includes('session jobs')) }).toStrictEqual({
+    texts: ['hq job 1: check the release queue'],
+    logs: ['2026-10-15T20:00:00Z session jobs: fired 1 to z-release'],
+  });
+});
+
+test('it logs a session job whose stored schedule no longer parses', async () => {
+  const ctx = setupTest();
+  const capacity = JSON.stringify({ imp: { freeMib: 0, room: false }, providers: { claude: { room: false, unattended: true, target: 'imp' } } });
+  const answers: Record<string, RunResult> = { op: { code: 0, stdout: 'lin_api_INVENTED\n', stderr: '' } };
+  const run: Runner = (command) => Promise.resolve(answers[command[0] ?? ''] ?? { code: 0, stdout: capacity, stderr: '' });
+  const logs: string[] = [];
+  onTestFinished(overrideEnv('HQ_NOW', '2026-10-15T20:00:00Z'));
+  for (const key of ['kinds_synced_at', 'goals_synced_at', 'goals_ok_at', 'kinds_ok_at', 'linear_synced_at', 'lanes_ready_linear_at']) {
+    setMeta(ctx.db, key, '2026-10-15T20:00:00Z');
+  }
+  writeJob(ctx.db, { target: 'z-triage', value: { kind: 'every', spec: 'soon' }, prompt: 'sort the inbox', nextAt: new Date('2026-10-15T19:00:00Z'), actor: 'z-triage' });
+
+  await watchTick(ctx.db, { me: 'hq-lanes', run, log: (line) => logs.push(line), stepMs: 2000, steps: { runs: () => Promise.resolve(), weekly: () => Promise.resolve(false), health: () => Promise.resolve({ opened: [], cleared: [] }) } });
+
+  expect(logs.filter((line) => line.includes('session jobs'))).toStrictEqual(['2026-10-15T20:00:00Z session jobs: skipped 1 for z-triage: --every soon is not a duration like 30m, 2h or 1d']);
 });
 
 test('it hands the Claude slots step the signal its deadline aborts', async () => {

@@ -21,9 +21,9 @@ test.each([
   ['bot creator with a mark', 'Filed by z-stu.\n\n## Outcome\n\nDescale.', true, 'bot'],
   ['no mark', 'Descale the kettle.', false, 'owner'],
 ] as const)('it picks the source for a %s', (_name, description, isBotCreator, expected) => {
-  expect(pickFiledSource({ title: 'Invented kettle work', description, labels: [], isBotCreator })).toBe(expected);
+  expect<string>(pickFiledSource({ title: 'Invented kettle work', description, labels: [], isBotCreator })).toBe(expected);
 });
 
 test('it picks the marked session over a live check label', () => {
-  expect(pickFiledSource({ title: 'Invented kettle work', description: 'Filed by z-qa.\n\n## Outcome\n\nDescale.', labels: ['live check'], isBotCreator: false })).toBe('z-qa');
+  expect<string>(pickFiledSource({ title: 'Invented kettle work', description: 'Filed by z-qa.\n\n## Outcome\n\nDescale.', labels: ['live check'], isBotCreator: false })).toBe('z-qa');
 });

@@ -6,6 +6,8 @@ import type { OwnerProbeDeps } from './read-owner-session.ts';
 
 export type RoleProbe = { verdict: 'match' } | { verdict: 'other' } | { verdict: 'unknown'; cause: string };
 
+export type PeerRead = { kind: 'read'; session: string | null | undefined } | { kind: 'failed'; cause: string };
+
 // Only the caller's session as atc's daemon found it from the kernel counts: never --by, HQ_AS or
 // ATC_SESSION_ID, which are the caller's own words. It must be the id hq fleet recorded for the
 // role; a live session that only shares the role's name is not it.
@@ -15,15 +17,23 @@ export async function readRoleSession(db: Database, deps: OwnerProbeDeps, role: 
   if (recorded === undefined || recorded === '') {
     return { verdict: 'other' };
   }
+  const peer = await readPeerSession(deps);
+  if (peer.kind === 'failed') {
+    return { verdict: 'unknown', cause: peer.cause };
+  }
+  return matchPeerSession(peer.session, recorded);
+}
+
+export async function readPeerSession(deps: OwnerProbeDeps): Promise<PeerRead> {
   try {
     const client = await deps.openClient();
     try {
-      return matchPeerSession(client.peerSession, recorded);
+      return { kind: 'read', session: client.peerSession };
     } finally {
       client.close();
     }
   } catch (error) {
-    return { verdict: 'unknown', cause: error instanceof Error ? error.message : String(error) };
+    return { kind: 'failed', cause: error instanceof Error ? error.message : String(error) };
   }
 }
 

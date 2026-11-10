@@ -619,16 +619,31 @@ export const MIGRATIONS: string[] = [
   ALTER TABLE run_prs ADD COLUMN review_wait_sha TEXT;
   ALTER TABLE run_prs ADD COLUMN review_wait_reason TEXT;`,
 
+  // spec holds the schedule's value: a duration for every, HH:MM UTC for daily, an ISO time for at.
+  // next_at is the next slot to fire; a job with removed_at set never fires again.
+  `CREATE TABLE session_jobs (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    target     TEXT NOT NULL,
+    kind       TEXT NOT NULL CHECK (kind IN ('every', 'daily', 'at')),
+    spec       TEXT NOT NULL,
+    prompt     TEXT NOT NULL,
+    added_by   TEXT NOT NULL,
+    added_at   TEXT NOT NULL,
+    next_at    TEXT NOT NULL,
+    removed_at TEXT
+  );
+  CREATE INDEX session_jobs_target ON session_jobs (target);`,
+
   // SQLite can't change a CHECK, so linear_filed is rebuilt without one and every row kept. The source values are checked on read.
-  `CREATE TABLE linear_filed_v54 (
+  `CREATE TABLE linear_filed_v55 (
     issue      TEXT PRIMARY KEY,
     created_at TEXT NOT NULL,
     source     TEXT NOT NULL,
     pr_ref     TEXT,
     fetched_at TEXT NOT NULL
   );
-  INSERT INTO linear_filed_v54 (issue, created_at, source, pr_ref, fetched_at) SELECT issue, created_at, source, pr_ref, fetched_at FROM linear_filed;
+  INSERT INTO linear_filed_v55 (issue, created_at, source, pr_ref, fetched_at) SELECT issue, created_at, source, pr_ref, fetched_at FROM linear_filed;
   DROP TABLE linear_filed;
-  ALTER TABLE linear_filed_v54 RENAME TO linear_filed;
+  ALTER TABLE linear_filed_v55 RENAME TO linear_filed;
   CREATE INDEX linear_filed_created ON linear_filed (created_at);`,
 ];

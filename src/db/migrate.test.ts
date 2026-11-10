@@ -385,7 +385,7 @@ test('it adds the run_prs review wait columns in v53 and keeps the earlier PRs w
   expect(db.query('PRAGMA user_version').get()).toStrictEqual({ user_version: 53 });
 });
 
-test('it keeps every linear_filed row in v54, and v54 is the newest schema', () => {
+test('it adds the session_jobs table in v54', () => {
   const base = mkdtempSync(join(tmpdir(), 'hq-migrate-v54-'));
   const path = join(base, 'hq.db');
   const db = new Database(path, { create: true, strict: true });
@@ -393,22 +393,37 @@ test('it keeps every linear_filed row in v54, and v54 is the newest schema', () 
   onTestFinished(() => db.close());
   db.exec('PRAGMA journal_mode = WAL;');
   migrate(db, path, false, MIGRATIONS.slice(0, 53));
-  db.query("INSERT INTO linear_filed (issue, created_at, source, pr_ref, fetched_at) VALUES ('GEO-9801', '2026-10-14T01:00:00Z', 'owner', 'kettle#3', '2026-10-14T02:00:00Z')").run();
 
-  expect(migrate(db, path, true)).not.toBeNull();
-  expect(db.query('SELECT issue, created_at, source, pr_ref, fetched_at FROM linear_filed').all()).toStrictEqual([{ issue: 'GEO-9801', created_at: '2026-10-14T01:00:00Z', source: 'owner', pr_ref: 'kettle#3', fetched_at: '2026-10-14T02:00:00Z' }]);
+  expect(migrate(db, path, true, MIGRATIONS.slice(0, 54))).not.toBeNull();
+  db.query("INSERT INTO session_jobs (target, kind, spec, prompt, added_by, added_at, next_at) VALUES ('z-release', 'every', '2h', 'check', 'z-release', '2026-11-10T00:00:00Z', '2026-11-10T02:00:00Z')").run();
+  expect(db.query('SELECT id, target, removed_at FROM session_jobs').all()).toStrictEqual([{ id: 1, target: 'z-release', removed_at: null }]);
   expect(db.query('PRAGMA user_version').get()).toStrictEqual({ user_version: 54 });
-  expect(MIGRATIONS).toHaveLength(54);
 });
 
-test('it stores a session name as a linear_filed source after v54', () => {
-  const base = mkdtempSync(join(tmpdir(), 'hq-migrate-v54-source-'));
+test('it keeps every linear_filed row in v55, and v55 is the newest schema', () => {
+  const base = mkdtempSync(join(tmpdir(), 'hq-migrate-v55-'));
   const path = join(base, 'hq.db');
   const db = new Database(path, { create: true, strict: true });
   onTestFinished(() => rmSync(base, { recursive: true, force: true }));
   onTestFinished(() => db.close());
   db.exec('PRAGMA journal_mode = WAL;');
   migrate(db, path, false, MIGRATIONS.slice(0, 54));
+  db.query("INSERT INTO linear_filed (issue, created_at, source, pr_ref, fetched_at) VALUES ('GEO-9801', '2026-10-14T01:00:00Z', 'owner', 'kettle#3', '2026-10-14T02:00:00Z')").run();
+
+  expect(migrate(db, path, true)).not.toBeNull();
+  expect(db.query('SELECT issue, created_at, source, pr_ref, fetched_at FROM linear_filed').all()).toStrictEqual([{ issue: 'GEO-9801', created_at: '2026-10-14T01:00:00Z', source: 'owner', pr_ref: 'kettle#3', fetched_at: '2026-10-14T02:00:00Z' }]);
+  expect(db.query('PRAGMA user_version').get()).toStrictEqual({ user_version: 55 });
+  expect(MIGRATIONS).toHaveLength(55);
+});
+
+test('it stores a session name as a linear_filed source after v55', () => {
+  const base = mkdtempSync(join(tmpdir(), 'hq-migrate-v55-source-'));
+  const path = join(base, 'hq.db');
+  const db = new Database(path, { create: true, strict: true });
+  onTestFinished(() => rmSync(base, { recursive: true, force: true }));
+  onTestFinished(() => db.close());
+  db.exec('PRAGMA journal_mode = WAL;');
+  migrate(db, path, false, MIGRATIONS.slice(0, 55));
 
   db.query("INSERT INTO linear_filed (issue, created_at, source, pr_ref, fetched_at) VALUES ('GEO-9802', '2026-10-14T01:00:00Z', 'z-stu', NULL, '2026-10-14T02:00:00Z')").run();
 

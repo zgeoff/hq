@@ -7,5 +7,5 @@ test.each([
   ['a session that left the fleet', 'z-retired', false, 'agent'],
   ['a recorded followup with a session mark', 'z-kettle', true, 'review'],
 ] as const)('it picks the issue source for %s', (_name, stored, isRecorded, expected) => {
-  expect(pickIssueSource(stored, isRecorded, ['z-kettle'])).toBe(expected);
+  expect<string>(pickIssueSource(stored, isRecorded, ['z-kettle'])).toBe(expected);
 });

@@ -97,6 +97,7 @@ test('every hq.db column that could name a repo is in the list or outside it on 
   const listed = new Set(REKEY_SPECS.hq.map((spec) => `${spec.table}.${spec.column}`));
 
   // linear_started_prs.ref is outside the agreed list because every Linear read replaces the table.
-  const outsideList = new Set(['followups.from_ref', 'linear_started_prs.ref', 'outbox.target', 'run_prs.url', 'typed.source_ref']);
+  // session_jobs.target is a role name, not a repo.
+  const outsideList = new Set(['followups.from_ref', 'linear_started_prs.ref', 'outbox.target', 'run_prs.url', 'session_jobs.target', 'typed.source_ref']);
   expect(readCandidates(ctx.hq).filter((column) => !listed.has(column) && !outsideList.has(column))).toStrictEqual([]);
 });

@@ -1,3 +1,4 @@
+import { isZSession } from './is-z-session.ts';
 import { Z_SESSIONS } from './z-sessions.ts';
 import type { FiledSource, ZSession } from './types.ts';
 
@@ -39,7 +40,7 @@ function findMarkedSource(description: string): ZSession | 'agent' | null {
     }
     const name = FILED_BY_MARK.exec(text)?.groups?.['name'];
     if (name !== undefined) {
-      return Z_SESSIONS.find((session) => session === name) ?? 'agent';
+      return isZSession(name, Z_SESSIONS) ? name : 'agent';
     }
   }
   return null;

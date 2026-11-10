@@ -37,7 +37,7 @@ Each session acts only in its own role, and passes the rest on:
 - `z-triage` flags an issue for the owner with the `Needs Geoff` label, and its check prepares the call, which `z-stu` puts to him.
 - An agent's `decision` and `blocked` notes reach `z-delivery` through hq. Its FINAL note reaches `z-review`.
 - `z-review` merges every PR, and files each follow-up whose reason holds: the fix is in another repo, or it needs a choice the issue doesn't settle. Nobody else files from a PR. After a merge it tells `z-release`, which takes it to live and hands it to `z-qa`.
-- The owner's answer to a PR is recorded with `hq pr answer`, and the gate reads it. No session relays it.
+- The owner's answer to a PR is recorded with `hq pr answer`, and the gate reads it. An lgtm or an override also sets the PR's next session to `z-review` and queues it a notice to run the gate. No session relays it.
 - A skill fault goes into Triage as an issue that names the rule that should have covered it, and ships as an ordinary PR that the owner approves.
 - Any session asks `z-q` by message for a change to `hq` that makes its work easier.
 
@@ -94,6 +94,12 @@ This repo's compact hook (`.claude/hooks/print-skills.sh`) prints each session's
 An atc restart clears each session's pending wakeup. `z-release` restarts the daemon only with `hq restart`, which detaches itself through `systemd-run` and refuses from 23:00 to 08:00 Sydney time unless the owner is around. What shows he is around is in this file's private half: read `docs/sessions.private.md` in the local hq-private clone (`hq defs` shows where it is) and follow it as part of this doc. `z-release` sends the owner a push notification when it decides to restart. `hq restart` then wakes every session on hq's wake list (`hq wake add` and `hq wake remove` change it), which holds the other `z-` sessions, `z-q` included, and the agents `z-delivery` runs. It tells `z-delivery` to read its start prompt on `main` and its state file again, and to re-arm its event watch. No session writes a loop prompt file. After a restart, each session re-reads its state file and skill. hq's wake message tells a session that runs a `/loop` to check `CronList` and re-arm the loop when its jobs are gone. `z-triage` also saves when it made its loop jobs, and replaces them once they are 6 days old, since Claude Code deletes a recurring job after 7 days and `CronList` shows no creation time.
 
 An atc upgrade can leave a session with an old tool list, such as `atc_session_spawn` without an input the new release adds. The session first loads the tool's schema again with ToolSearch, since its conversation keeps the schema it loaded before the upgrade. It asks `z-stu` for a restart only when the input is still missing and `hq health` flags its `atc mcp` process as older than the installed atc build.
+
+## scheduled jobs
+
+A job that lives in a session's own cron ends when hq restarts the session, so hq holds a session's timed jobs and sends each one to the role's inbox when it is due. Add one with `hq jobs add <role> (--every 30m|2h|1d | --daily HH:MMZ | --at ISO) --prompt TEXT`, list them with `hq jobs list [<role>]`, and stop one with `hq jobs remove <id>`. The message reads `hq job <id>: <prompt>` and goes to the role by name, so it reaches the role's current session after a restart.
+
+The watcher checks every 5 minutes, so a job can run up to 5 minutes late, and `--every` takes 5m to 366d. After downtime a repeating job fires once, not once per missed slot, and `--at` jobs end after they fire. Only the role itself or `z-stu` may add or remove its jobs: hq finds the caller from atc's identity socket, never from `--by` or `HQ_AS`. `hq jobs list` is open to anyone.
 
 ## when the classifier refuses a session's own action
 

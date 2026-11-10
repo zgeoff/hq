@@ -20,8 +20,8 @@ test('it reads the CI overrides recorded at the head, newest record of a check w
   recordCICheckOverride(ctx.db, { repo: 'widgets', pr: 7, head: 'b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2', source: 'chat:kettle-3', note: 'Lint.', actor: 'z-kettle', check: 'lint' });
 
   expect(readHeadCIOverrides(ctx.db, 'widgets', 7, 'b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2')).toStrictEqual([
-    { seq: 2, at: '2026-10-14T01:00:00Z', head: 'b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2', source: 'chat:kettle-2', note: 'Second.', check: 'preview' },
-    { seq: 3, at: '2026-10-14T01:00:00Z', head: 'b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2', source: 'chat:kettle-3', note: 'Lint.', check: 'lint' },
+    { seq: 3, at: '2026-10-14T01:00:00Z', head: 'b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2', source: 'chat:kettle-2', note: 'Second.', check: 'preview' },
+    { seq: 5, at: '2026-10-14T01:00:00Z', head: 'b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2', source: 'chat:kettle-3', note: 'Lint.', check: 'lint' },
   ]);
 });
 
