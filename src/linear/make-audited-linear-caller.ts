@@ -5,5 +5,5 @@ import { makeLinearCaller } from './make-linear-caller.ts';
 import type { LinearCall } from './types.ts';
 
 export function makeAuditedLinearCaller(db: Database, run: Runner): LinearCall {
-  return makeLinearCaller(run, fetch, () => recordOpRead(db, 'linear', 3));
+  return makeLinearCaller(run, () => recordOpRead(db, 'linear', 3));
 }

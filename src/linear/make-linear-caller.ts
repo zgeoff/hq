@@ -10,7 +10,7 @@ import type { LinearCall } from './types.ts';
 
 const LinearAnswer = z.object({ data: z.unknown().optional(), errors: z.array(z.unknown()).optional() });
 
-export function makeLinearCaller(run: Runner, doFetch: typeof fetch = fetch, recordRead: () => void = () => {}): LinearCall {
+export function makeLinearCaller(run: Runner, recordRead: () => void = () => {}): LinearCall {
   return async (query, variables) => {
     // Bun's fetch trace prints request headers, the key among them, to stderr.
     if (process.env['BUN_CONFIG_VERBOSE_FETCH']) {
@@ -20,7 +20,7 @@ export function makeLinearCaller(run: Runner, doFetch: typeof fetch = fetch, rec
     const key = await readKey(run, recordRead);
     let res: Response;
     try {
-      res = await doFetch(API, { method: 'POST', headers: { 'content-type': 'application/json', authorization: key }, body: JSON.stringify({ query, variables }), signal: AbortSignal.timeout(30_000) });
+      res = await fetch(API, { method: 'POST', headers: { 'content-type': 'application/json', authorization: key }, body: JSON.stringify({ query, variables }), signal: AbortSignal.timeout(30_000) });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       throw new HqError('linear_failed', `Linear request failed: ${redact(message, key).slice(0, 200)}`);

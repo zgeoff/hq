@@ -1,8 +1,8 @@
 import { z } from 'zod';
 import { expect, onTestFinished, test } from 'bun:test';
+import { HttpResponse, http } from 'msw';
 import { updateEnv } from '@zgeoff/testing/helpers';
 import invariant from 'tiny-invariant';
-import { buildMockFetch } from '../src/test-utils/build-mock-fetch.ts';
 import { toErrorMessage } from '../src/to-error-message.ts';
 import { issueOf } from '../src/kinds/issue-of.ts';
 import { kindOf } from '../src/kinds/kind-of.ts';
@@ -26,6 +26,10 @@ import type { Runner } from '../src/runner/types.ts';
 import { buildSeeder } from '../src/test-utils/build-seeder.ts';
 import { buildStubGitHubFactsRunner } from './build-stub-github-facts-runner.ts';
 import { at, freshDb } from './helpers.ts';
+import { LINEAR_GRAPHQL_URL } from '../mocks/linear-handlers.ts';
+import { server } from '../mocks/node.ts';
+
+const KEY = 'lin_api_INVENTEDdummyKEY0123456789';
 
 function setupTest() {
   const base = freshDb();
@@ -227,53 +231,63 @@ test('Linear ids hq did not ask for are not stored; an inherited type name count
   expect(week?.prTypes.none).toBe(1);
 });
 
-test('the key never reaches an error or hq.db, even when Linear echoes it', async () => {
+test.each<[string, () => ReturnType<typeof http.post>]>([
+  ['Linear echoes it in a 400 reply', () => http.post(LINEAR_GRAPHQL_URL, () => HttpResponse.json({ errors: [{ message: `bad key ${KEY} sent` }, { message: 'also lin_api_OTHERinventedKEY' }] }, { status: 400 }))],
+  ['the connection drops', () => http.post(LINEAR_GRAPHQL_URL, () => HttpResponse.error())],
+])('the key never reaches an error or hq.db when %s', async (_case, buildHandler) => {
   const ctx = setupTest();
-  const KEY = 'lin_api_INVENTEDdummyKEY0123456789';
   forgetKey();
-  process.env['OP_SERVICE_ACCOUNT_TOKEN'] = 'invented-token';
+  onTestFinished(forgetKey);
+  updateEnv('OP_SERVICE_ACCOUNT_TOKEN', 'invented-token');
+  server.use(buildHandler());
   const run: Runner = async () => ({ code: 0, stdout: `${KEY}\n`, stderr: '' });
-  const echo = buildMockFetch(() => Promise.resolve(Response.json({ errors: [{ message: `bad key ${KEY} sent` }, { message: 'also lin_api_OTHERinventedKEY' }] }, { status: 400 })));
-  const down = buildMockFetch(() => Promise.reject(new Error(`socket closed after ${KEY}`)));
-  try {
-    for (const f of [echo, down]) {
-      const err = await syncLinear(ctx.db, makeLinearCaller(run, f), new Date('2026-10-14T00:00:00Z'), { run }).catch((error: unknown) => error);
-      expect(toErrorMessage(err)).not.toContain('lin_api_');
-      expect(linearState(ctx.db).error).not.toContain('lin_api_');
-      expect(JSON.stringify(ctx.db.query('SELECT * FROM meta').all())).not.toContain(KEY);
-    }
-  } finally {
-    delete process.env['OP_SERVICE_ACCOUNT_TOKEN'];
-    forgetKey();
-  }
+
+  const err = await syncLinear(ctx.db, makeLinearCaller(run), new Date('2026-10-14T00:00:00Z'), { run }).catch((error: unknown) => error);
+
+  expect(toErrorMessage(err)).not.toContain('lin_api_');
+  expect(linearState(ctx.db).error).not.toContain('lin_api_');
+  expect(JSON.stringify(ctx.db.query('SELECT * FROM meta').all())).not.toContain(KEY);
+});
+
+test('redact replaces the key with a placeholder', () => {
   expect(redact(`a ${KEY} b`, KEY)).toBe('a [key] b');
 });
 
-test('the key is cut from an op failure and a stored title, and a traced fetch is refused', async () => {
-  const ctx = setupTest();
-  const KEY = 'lin_api_INVENTEDdummyKEY0123456789';
+test('the key is cut from an op failure', async () => {
   forgetKey();
-  process.env['OP_SERVICE_ACCOUNT_TOKEN'] = 'invented-token';
-  try {
-    const caller = makeLinearCaller(() => Promise.resolve({ code: 1, stdout: KEY, stderr: `[ERROR] ${KEY} could not be read` }));
-    const err = await caller('q', {}).catch((error: unknown) => error);
-    expect(toErrorMessage(err)).not.toContain(KEY);
-    process.env['BUN_CONFIG_VERBOSE_FETCH'] = 'curl';
-    const ok: Runner = async () => ({ code: 0, stdout: KEY, stderr: '' });
-    let fetched = false;
-    const tracedFetch = buildMockFetch(() => {
-      fetched = true;
-      return Promise.resolve(new Response('{}'));
-    });
-    await expect(makeLinearCaller(ok, tracedFetch)('q', {})).rejects.toThrow('BUN_CONFIG_VERBOSE_FETCH');
-    expect(fetched).toBe(false);
-  } finally {
-    delete process.env['BUN_CONFIG_VERBOSE_FETCH'];
-    delete process.env['OP_SERVICE_ACCOUNT_TOKEN'];
-    forgetKey();
-  }
+  onTestFinished(forgetKey);
+  updateEnv('OP_SERVICE_ACCOUNT_TOKEN', 'invented-token');
+  const caller = makeLinearCaller(() => Promise.resolve({ code: 1, stdout: KEY, stderr: `[ERROR] ${KEY} could not be read` }));
+
+  const err = await caller('q', {}).catch((error: unknown) => error);
+
+  expect(toErrorMessage(err)).not.toContain(KEY);
+});
+
+test('a traced fetch is refused before any request is sent', async () => {
+  forgetKey();
+  onTestFinished(forgetKey);
+  updateEnv('OP_SERVICE_ACCOUNT_TOKEN', 'invented-token');
+  updateEnv('BUN_CONFIG_VERBOSE_FETCH', 'curl');
+  const requests: string[] = [];
+  server.use(
+    http.post(LINEAR_GRAPHQL_URL, ({ request }) => {
+      requests.push(request.url);
+      return HttpResponse.json({ data: {} });
+    }),
+  );
+  const ok: Runner = async () => ({ code: 0, stdout: KEY, stderr: '' });
+
+  await expect(makeLinearCaller(ok)('q', {})).rejects.toThrow('BUN_CONFIG_VERBOSE_FETCH');
+  expect(requests).toStrictEqual([]);
+});
+
+test('a stored title has the key cut from it', async () => {
+  const ctx = setupTest();
   const call: LinearCall = async () => ({ issues: { nodes: [{ ...node('GEO-1', 'Bug', { completedAt: '2026-10-14T01:00:00Z' }), title: `pasted ${KEY}` }], pageInfo: { hasNextPage: false, endCursor: null } } });
+
   await syncClosed(ctx.db, call, new Date('2026-10-14T00:00:00Z'));
+
   expect(JSON.stringify(ctx.db.query('SELECT * FROM linear_issues').all())).not.toContain(KEY);
 });
 
