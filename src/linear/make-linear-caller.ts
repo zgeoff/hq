@@ -1,8 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { z } from 'zod';
 import { now } from '../clock/now.ts';
+import { config } from '../config/config.ts';
 import { readLocalSetting } from '../config/read-local-setting.ts';
 import { HqError } from '../errors.ts';
+import { getHome } from '../fleet/get-home.ts';
 import type { Runner } from '../runner/types.ts';
 import { KEY_CACHE } from './key-cache.ts';
 import { redact } from './redact.ts';
@@ -39,6 +41,48 @@ export function makeLinearCaller(run: Runner, recordRead: () => void = () => {})
   };
 }
 
+// A settings file of another shape throws into the same empty catch as an unreadable one.
+const ClaudeSettingsSchema = z.object({ env: z.record(z.string(), z.unknown()).optional() });
+
+async function readKey(run: Runner, recordRead: () => void): Promise<string> {
+  const ITEM = readLocalSetting('HQ_LINEAR_OP_REF');
+  const KEY_TTL_MS = 12 * 3_600_000;
+  if (KEY_CACHE.value && KEY_CACHE.ref === ITEM && now().getTime() < KEY_CACHE.expiresAt) {
+    return KEY_CACHE.value;
+  }
+  const env: Record<string, string | undefined> = { ...process.env };
+
+  // A session's own token can be a profile token that cannot read the Linear key's vault, so the global token comes first.
+  const globalToken = readGlobalToken();
+  if (globalToken) {
+    env['OP_SERVICE_ACCOUNT_TOKEN'] = globalToken;
+  }
+  if (!env['OP_SERVICE_ACCOUNT_TOKEN']) {
+    throw new HqError('no_key', 'no 1Password service-account token (~/.claude/settings.json or env); op-mint global');
+  }
+  const r = await run(['op', 'read', ITEM], { env });
+  recordRead();
+  const v = r.stdout.trim();
+  // op's stderr names the failure, never the secret; keep only its first line.
+  if (r.code !== 0 || !v) {
+    throw new HqError('no_key', `op read ${ITEM} failed (${r.code}): ${redact(r.stderr.trim().split('\n')[0] ?? '', v || null).slice(0, 160)}`);
+  }
+  KEY_CACHE.value = v;
+  KEY_CACHE.ref = ITEM;
+  KEY_CACHE.expiresAt = now().getTime() + KEY_TTL_MS;
+  return v;
+}
+
+function readGlobalToken(): string | undefined {
+  try {
+    const path = config().HQ_CLAUDE_SETTINGS ?? `${getHome()}/.claude/settings.json`;
+    const token = ClaudeSettingsSchema.parse(JSON.parse(readFileSync(path, 'utf8'))).env?.['OP_SERVICE_ACCOUNT_TOKEN'];
+    return typeof token === 'string' ? token : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 async function readJSONBody(res: Response): Promise<unknown> {
   try {
     return await res.json();
@@ -55,36 +99,4 @@ function formatLinearError(error: unknown): string {
     return '';
   }
   return String(parsed.data.message ?? '');
-}
-
-// A settings file of another shape throws into the same empty catch as an unreadable one.
-const ClaudeSettingsSchema = z.object({ env: z.record(z.string(), z.unknown()).optional() });
-
-async function readKey(run: Runner, recordRead: () => void): Promise<string> {
-  const ITEM = readLocalSetting('HQ_LINEAR_OP_REF');
-  const KEY_TTL_MS = 12 * 3_600_000;
-  if (KEY_CACHE.value && KEY_CACHE.ref === ITEM && now().getTime() < KEY_CACHE.expiresAt) {
-    return KEY_CACHE.value;
-  }
-  const env: Record<string, string | undefined> = { ...process.env };
-  if (!env['OP_SERVICE_ACCOUNT_TOKEN']) {
-    try {
-      const token = ClaudeSettingsSchema.parse(JSON.parse(readFileSync(`${process.env['HOME']}/.claude/settings.json`, 'utf8'))).env?.['OP_SERVICE_ACCOUNT_TOKEN'];
-      env['OP_SERVICE_ACCOUNT_TOKEN'] = typeof token === 'string' ? token : undefined;
-    } catch {}
-  }
-  if (!env['OP_SERVICE_ACCOUNT_TOKEN']) {
-    throw new HqError('no_key', 'no 1Password service-account token (env or ~/.claude/settings.json); op-mint global');
-  }
-  const r = await run(['op', 'read', ITEM], { env });
-  recordRead();
-  const v = r.stdout.trim();
-  // op's stderr names the failure, never the secret; keep only its first line.
-  if (r.code !== 0 || !v) {
-    throw new HqError('no_key', `op read ${ITEM} failed (${r.code}): ${redact(r.stderr.trim().split('\n')[0] ?? '', v || null).slice(0, 160)}`);
-  }
-  KEY_CACHE.value = v;
-  KEY_CACHE.ref = ITEM;
-  KEY_CACHE.expiresAt = now().getTime() + KEY_TTL_MS;
-  return v;
 }
