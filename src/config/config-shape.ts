@@ -46,6 +46,7 @@ export const CONFIG_SHAPE = {
   HQ_DB: path(),
   HQ_LIVECHECK_TO: text(),
   HQ_CLAUDE_JSON: path(),
+  HQ_CLAUDE_SETTINGS: path(),
   HQ_ATC_SOCKET: path(),
   HQ_ATC_STATE: path(),
   HQ_REPAIR_BACKUPS: path(),
