@@ -12,15 +12,15 @@ interface FiledFacts {
 const DESIGN_RECORD_LINK = /^<?https:\/\/(?:linear\.app\/[\w.-]+\/document\/|github\.com\/zgeoff\/hq-private\/)/u;
 
 export function pickFiledSource(facts: FiledFacts): FiledSource {
-  const marked = facts.isBotCreator ? null : findMarkedSource(facts.description);
-  if (marked !== null) {
-    return marked;
-  }
   if (facts.description.startsWith('From design ') || DESIGN_RECORD_LINK.test(facts.description)) {
     return 'design';
   }
   if (facts.isBotCreator) {
     return 'bot';
+  }
+  const marked = findMarkedSource(facts.description);
+  if (marked !== null) {
+    return marked;
   }
   if (/Found by the .*? agent/u.test(facts.description)) {
     return 'agent';

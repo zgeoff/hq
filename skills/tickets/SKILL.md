@@ -33,8 +33,8 @@ section](../linear-triage/SKILL.md#flagging) says.
 - [Larger work](#larger-work): read larger-work.md before you groom cross-repo work, an umbrella, a
   cleanup Chore or a document review.
 - [Actions](#actions): write each action the agent may take in the brief, Code delivery included.
-- [Save an issue](#save-an-issue): one `save_issue` call, a patch for a long description, and one
-  check afterwards.
+- [Save an issue](#save-an-issue): a `Filed by` line, one `save_issue` call, a patch for a long
+  description, and one check afterwards.
 
 ## References
 
@@ -152,10 +152,17 @@ Write one line per action, in these forms.
 
 ## Save an issue
 
-- For an issue filed from a design record, make the description's first line `From design <link>,
-  decisions <n>[, <n>]`, so that [inflow.sh](../linear-triage/scripts/inflow.sh) counts it as
-  planned. Add the line when you groom a design-filed issue that lacks it.
-- In that issue's Scope, copy what those decisions settled, word for word: every code block, name,
+- Open each description with these lines, above `## Outcome`, in this order:
+  1. On an issue filed from a design record: `From design <link>, decisions <n>[, <n>]`.
+     [inflow.sh](../linear-triage/scripts/inflow.sh) counts the issue as planned only when this is
+     the first line.
+  2. On each issue you file, a sub-issue you split off included: `Filed by <session>.`. hq counts
+     the issue under the session it names, to show where new work comes from. Use the session name
+     from your start prompt, such as `z-stu`. A subagent uses the name of the session that started
+     it. With no name, write `Filed by agent.`
+- Keep both lines when you rewrite a description. When you groom an issue that lacks the `Filed by`
+  line, leave it out: you didn't file it. Add a missing `From design` line.
+- In a design-filed issue's Scope, copy what those decisions settled, word for word: every code block, name,
   value and example. When a later decision changes it, edit the description. Never add an amending
   comment.
 - Save each issue in one `save_issue` call. Under about 3,000 characters, send the description

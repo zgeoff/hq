@@ -14,7 +14,7 @@ test.each([
   ['mark without the period, not read', 'Filed by z-stu\n\n## Outcome\n\nDescale.', false, 'owner'],
   ['lower-case mark, not read', 'filed by z-stu.\n\n## Outcome\n\nDescale.', false, 'owner'],
   ['first mark only', 'Filed by z-qa.\nFiled by z-stu.\n\n## Outcome', false, 'z-qa'],
-  ['mark over a design link', 'Filed by z-triage.\nFrom design https://linear.app/kettle/document/plan-1a2b', false, 'z-triage'],
+  ['design link over a mark', 'From design https://linear.app/kettle/document/plan-1a2b, decisions 2\nFiled by z-triage.\n\n## Outcome', false, 'design'],
   ['mark over a found-by-agent line', 'Filed by z-stu.\nFound by the GEO-1 agent.\n\n## Outcome', false, 'z-stu'],
   ['indented mark, not read', '  Filed by z-stu.\n\n## Outcome\n\nDescale.', false, 'owner'],
   ['mark with a CRLF line end', 'Filed by z-stu.\r\n\r\n## Outcome', false, 'z-stu'],
