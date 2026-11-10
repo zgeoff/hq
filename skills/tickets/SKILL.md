@@ -29,7 +29,8 @@ section](../linear-triage/SKILL.md#flagging) says.
 - [Sections](#sections): Outcome, Context, Scope, Acceptance, Actions and Agent notes, in that
   order.
 - [Ready](#ready): every section filled, blockers done, work not yet done, no owner-only question.
-- [Larger work](#larger-work): read larger-work.md before you groom work beyond one repo change.
+- [Larger work](#larger-work): read larger-work.md before you groom cross-repo work, an umbrella, a
+  cleanup Chore or a document review.
 - [Actions](#actions): write each action the agent may take in the brief, Code delivery included.
 - [Save an issue](#save-an-issue): one `save_issue` call, a patch for a long description, and one
   check afterwards.
@@ -61,8 +62,8 @@ Write each as a `##` heading, in this order. The Linear templates prefill them.
 
 Then check these:
 
-- For a change someone can see, name a screenshot or a recording as its evidence. The builder adds
-  it to its PR with the `pr-evidence` skill.
+- For a visible change, name a screenshot or a recording as its evidence. The builder adds it with
+  the `pr-evidence` skill.
 - In a Design issue, write `## Questions to settle` in place of Scope. In an Investigation, write
   `## Questions to answer`.
 - Write the title as the outcome, in plain lowercase, no type prefix: "pick clone
@@ -108,12 +109,12 @@ A missing project doesn't block Ready: set one as fields.md says.
 
 Keep feature work in zgeoff/vers, the game repo, in Backlog, and flag it: any vers Feature or Design
 issue, or one that changes game design or player experience. Other vers issues follow the normal
-rules. When unsure, flag it.
+rules. When unsure, treat it as feature work and flag it.
 
 ## Larger work
 
-Read [larger-work.md](references/larger-work.md) before you write or groom repo-wide or cross-repo
-work, an umbrella, a cleanup Chore, or a review of an instruction document.
+Read [larger-work.md](references/larger-work.md) first for each case its
+[References](#references) line names.
 
 ## Actions
 
@@ -150,8 +151,8 @@ Write one line per action, in these forms.
 ## Save an issue
 
 - Open each description with these lines, above `## Outcome`:
-  1. On a design-filed issue: `From design <link>, decisions <n>[, <n>]`, so that
-     [inflow.sh](../linear-triage/scripts/inflow.sh) counts it as planned.
+  1. On a design-filed issue, as the first line: `From design <link>, decisions <n>[, <n>]`.
+     [inflow.sh](../linear-triage/scripts/inflow.sh) reads only line 1 to count it as planned.
   2. On each issue you file: `Filed by <session>.`, with your start prompt's session name, your
      parent session's as a subagent, or `agent`. hq counts the issue under it.
 - Keep both lines in a rewrite. Never add `Filed by` to an issue you didn't file. Add a missing
