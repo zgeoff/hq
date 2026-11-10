@@ -37,7 +37,7 @@ Each session acts only in its own role, and passes the rest on:
 - `z-triage` flags an issue for the owner with the `Needs Geoff` label, and its check prepares the call, which `z-stu` puts to him.
 - An agent's `decision` and `blocked` notes reach `z-delivery` through hq. Its FINAL note reaches `z-review`.
 - `z-review` merges every PR, and files each follow-up whose reason holds: the fix is in another repo, or it needs a choice the issue doesn't settle. Nobody else files from a PR. After a merge it tells `z-release`, which takes it to live and hands it to `z-qa`.
-- The owner's answer to a PR is recorded with `hq pr answer`, and the gate reads it. No session relays it.
+- The owner's answer to a PR is recorded with `hq pr answer`, and the gate reads it. An lgtm or an override also sets the PR's next session to `z-review` and queues it a notice to run the gate. No session relays it.
 - A skill fault goes into Triage as an issue that names the rule that should have covered it, and ships as an ordinary PR that the owner approves.
 - Any session asks `z-q` by message for a change to `hq` that makes its work easier.
 

@@ -209,7 +209,7 @@ function parseCheckFlag(values: readonly string[] | undefined): string | null {
 async function runNext(input: PRCommandInput, ref: PRRef, session: string | undefined): Promise<Out> {
   const actor = await input.actor();
   const holder = requireNextHolder(input.flags, session);
-  await recordPRNext(input.db, ref, holder, actor);
+  recordPRNext(input.db, ref, holder, actor);
   return await refreshWrittenStatus(input, ref);
 }
 
