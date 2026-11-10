@@ -429,6 +429,14 @@ pkg "$own" "not json"
 expect "a package.json that does not parse fails" 1 "no: package.json changes more than the scripts"
 
 set_case
+pkg "$own, $tea" "$own"
+expect "a package.json that removes a declared script fails" 1 "no: package.json changes more than the scripts"
+
+set_case
+pkg "$own, $tea" "$tea"
+expect "a package.json that removes an undeclared script fails" 1 "no: package.json changes more than the scripts"
+
+set_case
 pkg "$own" "$own, $tea, $toast"
 export FILES='package.json\tadded'
 expect "an added package.json fails" 1 "no: package.json is not a target"
