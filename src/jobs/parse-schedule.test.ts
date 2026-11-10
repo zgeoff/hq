@@ -9,8 +9,8 @@ test.each([
   { flags: { daily: '00:00Z' }, expected: { ok: true, value: { kind: 'daily', spec: '00:00Z' }, schedule: { kind: 'daily', minuteOfDay: 0 } } },
   { flags: { at: '2026-11-12T09:00:00Z' }, expected: { ok: true, value: { kind: 'at', spec: '2026-11-12T09:00:00Z' }, schedule: { kind: 'at', atMs: Date.UTC(2026, 10, 12, 9) } } },
   { flags: { at: '2026-11-12T20:00:00+11:00' }, expected: { ok: true, value: { kind: 'at', spec: '2026-11-12T09:00:00Z' }, schedule: { kind: 'at', atMs: Date.UTC(2026, 10, 12, 9) } } },
-])('it parses $flags', ({ flags, expected }) => {
-  expect(parseScheduleFlags(flags)).toStrictEqual(expected);
+])('it parses $flags', (row) => {
+  expect(parseScheduleFlags(row.flags)).toStrictEqual(row.expected);
 });
 
 test.each([
@@ -26,6 +26,6 @@ test.each([
   { title: 'an at without a zone', flags: { at: '2026-11-12T09:00:00' } },
   { title: 'an at that is not a date', flags: { at: '2026-13-45T09:00:00Z' } },
   { title: 'an at in words', flags: { at: 'tomorrow' } },
-])('it refuses $title', ({ flags }) => {
-  expect(parseScheduleFlags(flags)).toStrictEqual({ ok: false, reason: expect.any(String) });
+])('it refuses $title', (row) => {
+  expect(parseScheduleFlags(row.flags)).toStrictEqual({ ok: false, reason: expect.any(String) });
 });

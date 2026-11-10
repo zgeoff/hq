@@ -14,5 +14,6 @@ export function buildNextSlot(schedule: Schedule, anchor: Date, after: Date): Da
   }
   const dayStart = Math.floor(after.getTime() / DAY_MS) * DAY_MS;
   const today = dayStart + schedule.minuteOfDay * 60_000;
-  return new Date(today > after.getTime() ? today : today + DAY_MS);
+  const slotMs = today > after.getTime() ? today : today + DAY_MS;
+  return new Date(slotMs);
 }

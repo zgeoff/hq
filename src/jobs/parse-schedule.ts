@@ -1,10 +1,5 @@
+import { match } from 'ts-pattern';
 import type { ScheduleKind, ScheduleParse } from './types.ts';
-
-const MINUTE_MS = 60_000;
-const DURATION_UNIT_MS = { m: MINUTE_MS, h: 60 * MINUTE_MS, d: 24 * 60 * MINUTE_MS } as const;
-
-// The watcher ticks every 5 minutes, so a shorter period could never fire on its own slots.
-const MIN_EVERY_MS = 5 * MINUTE_MS;
 
 export interface ScheduleFlags {
   every?: string | undefined;
@@ -40,31 +35,47 @@ export function parseSchedule(kind: ScheduleKind, spec: string): ScheduleParse {
   return parseAt(spec);
 }
 
+const MINUTE_MS = 60_000;
+
+// The watcher ticks every 5 minutes, so a shorter period could never fire on its own slots.
+const MIN_EVERY_MS = 5 * MINUTE_MS;
+
 function parseEvery(spec: string): ScheduleParse {
-  const match = /^(\d+)([mhd])$/.exec(spec);
-  const unit = match?.[2];
-  if (match === null || (unit !== 'm' && unit !== 'h' && unit !== 'd')) {
+  const matched = /^(?<count>\d+)(?<unit>[mhd])$/u.exec(spec);
+  const count = matched?.groups?.['count'];
+  const unit = matched?.groups?.['unit'];
+  if (count === undefined || (unit !== 'm' && unit !== 'h' && unit !== 'd')) {
     return { ok: false, reason: `--every ${spec} is not a duration like 30m, 2h or 1d` };
   }
-  const everyMs = Number(match[1]) * DURATION_UNIT_MS[unit];
+  const everyMs = Number(count) * buildUnitMs(unit);
   if (everyMs < MIN_EVERY_MS) {
     return { ok: false, reason: `--every ${spec} is under 5m, the watcher's tick` };
   }
   return { ok: true, value: { kind: 'every', spec }, schedule: { kind: 'every', everyMs } };
 }
 
+function buildUnitMs(unit: 'm' | 'h' | 'd'): number {
+  return match(unit)
+    .with('m', () => MINUTE_MS)
+    .with('h', () => 60 * MINUTE_MS)
+    .with('d', () => 24 * 60 * MINUTE_MS)
+    .exhaustive();
+}
+
 function parseDaily(spec: string): ScheduleParse {
-  const match = /^([01]\d|2[0-3]):([0-5]\d)Z$/.exec(spec);
-  if (match === null) {
+  const matched = /^(?<hour>[01]\d|2[0-3]):(?<minute>[0-5]\d)Z$/u.exec(spec);
+  const hour = matched?.groups?.['hour'];
+  const minute = matched?.groups?.['minute'];
+  if (hour === undefined || minute === undefined) {
     return { ok: false, reason: `--daily ${spec} is not a UTC time like 09:30Z` };
   }
-  return { ok: true, value: { kind: 'daily', spec }, schedule: { kind: 'daily', minuteOfDay: Number(match[1]) * 60 + Number(match[2]) } };
+  return { ok: true, value: { kind: 'daily', spec }, schedule: { kind: 'daily', minuteOfDay: Number(hour) * 60 + Number(minute) } };
 }
 
 function parseAt(spec: string): ScheduleParse {
   const atMs = Date.parse(spec);
-  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})$/.test(spec) || Number.isNaN(atMs)) {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})$/u.test(spec) || Number.isNaN(atMs)) {
     return { ok: false, reason: `--at ${spec} is not an ISO time with a zone, like 2026-11-12T09:00:00Z` };
   }
-  return { ok: true, value: { kind: 'at', spec: new Date(atMs).toISOString().replace(/\.\d{3}Z$/, 'Z') }, schedule: { kind: 'at', atMs } };
+  return { ok: true, value: { kind: 'at', spec: new Date(atMs).toISOString().replace(/\.\d{3}Z$/u, 'Z') }, schedule: { kind: 'at', atMs } };
 }

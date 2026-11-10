@@ -5,7 +5,7 @@ import { setMeta } from '../db/set-meta.ts';
 import type { OwnerProbeClient } from '../pr-status/read-owner-session.ts';
 import { runJobsCommand } from './run-jobs-command.ts';
 import type { JobsCommandInput } from './run-jobs-command.ts';
-import { readJobs } from './session-jobs.ts';
+import { readJobs } from './write-job.ts';
 
 function setupTest() {
   const fresh = freshDb();
@@ -41,7 +41,7 @@ test('it adds a job for a role when the caller is the owner', async () => {
 test('it refuses a job for z-release from another role', async () => {
   const ctx = setupTest();
 
-  await expect(ctx.callAs('kettle-triage', { verb: 'add', rest: ['z-release'], flags: { every: '2h', prompt: 'sneaky' } })).rejects.toThrow(/z-triage may not change the jobs of z-release/);
+  await expect(ctx.callAs('kettle-triage', { verb: 'add', rest: ['z-release'], flags: { every: '2h', prompt: 'sneaky' } })).rejects.toThrow(/z-triage may not change the jobs of z-release/u);
   expect(readJobs(ctx.db, null)).toStrictEqual([]);
 });
 
@@ -50,14 +50,14 @@ test('it refuses a caller that only says it is z-release, whatever its environme
   onTestFinished(overrideEnv('HQ_AS', 'z-release'));
   onTestFinished(overrideEnv('ATC_SESSION_ID', 'kettle-release'));
 
-  await expect(ctx.callAs('kettle-triage', { verb: 'add', rest: ['z-release'], flags: { every: '2h', prompt: 'sneaky' } })).rejects.toThrow(/may not change the jobs/);
+  await expect(ctx.callAs('kettle-triage', { verb: 'add', rest: ['z-release'], flags: { every: '2h', prompt: 'sneaky' } })).rejects.toThrow(/may not change the jobs/u);
 });
 
 test('it refuses a removal from another role and keeps the job', async () => {
   const ctx = setupTest();
   await ctx.callAs('kettle-release', { verb: 'add', rest: ['z-release'], flags: { every: '2h', prompt: 'check the release queue' } });
 
-  await expect(ctx.callAs('kettle-triage', { verb: 'remove', rest: ['1'], flags: {} })).rejects.toThrow(/may not change the jobs of z-release/);
+  await expect(ctx.callAs('kettle-triage', { verb: 'remove', rest: ['1'], flags: {} })).rejects.toThrow(/may not change the jobs of z-release/u);
   expect(readJobs(ctx.db, null)).toHaveLength(1);
 });
 
@@ -83,15 +83,15 @@ test('it lists jobs for anyone, a caller atc cannot identify included', async ()
 });
 
 test.each([
-  { title: 'a bad schedule', rest: ['z-release'], flags: { every: 'soon', prompt: 'x' }, error: /--every soon/ },
-  { title: 'no schedule', rest: ['z-release'], flags: { prompt: 'x' }, error: /exactly one of/ },
-  { title: 'a past one-shot time', rest: ['z-release'], flags: { at: '2026-11-09T00:00:00Z', prompt: 'x' }, error: /already past/ },
-  { title: 'no prompt', rest: ['z-release'], flags: { every: '2h' }, error: /--prompt is required/ },
-  { title: 'an unknown role', rest: ['z-nobody'], flags: { every: '2h', prompt: 'x' }, error: /no declared fleet session/ },
-])('it refuses an add with $title as bad_args', async ({ rest, flags, error }) => {
+  { title: 'a bad schedule', rest: ['z-release'], flags: { every: 'soon', prompt: 'x' }, error: /--every soon/u },
+  { title: 'no schedule', rest: ['z-release'], flags: { prompt: 'x' }, error: /exactly one of/u },
+  { title: 'a past one-shot time', rest: ['z-release'], flags: { at: '2026-11-09T00:00:00Z', prompt: 'x' }, error: /already past/u },
+  { title: 'no prompt', rest: ['z-release'], flags: { every: '2h' }, error: /--prompt is required/u },
+  { title: 'an unknown role', rest: ['z-nobody'], flags: { every: '2h', prompt: 'x' }, error: /no declared fleet session/u },
+])('it refuses an add with $title as bad_args', async (row) => {
   const ctx = setupTest();
 
-  await expect(ctx.callAs('kettle-release', { verb: 'add', rest: [...rest], flags })).rejects.toMatchObject({ code: 'bad_args', message: expect.stringMatching(error) });
+  await expect(ctx.callAs('kettle-release', { verb: 'add', rest: [...row.rest], flags: row.flags })).rejects.toMatchObject({ code: 'bad_args', message: expect.stringMatching(row.error) });
 });
 
 test('it refuses a removal of an unknown job', async () => {

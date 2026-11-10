@@ -5,7 +5,7 @@ import { logEvent } from '../log-event.ts';
 import { enqueue } from '../outbox/enqueue.ts';
 import { forwardOf } from '../outbox/forward-of.ts';
 import { pickDueJobs } from './pick-due-jobs.ts';
-import { readJobs } from './session-jobs.ts';
+import { readJobs } from './write-job.ts';
 
 const JOB = 'session-job';
 
@@ -22,7 +22,9 @@ export function runSessionJobsTick(db: Database, actor: string, at: Date = now()
     .transaction(() => {
       const fired: FiredJob[] = [];
       for (const due of pickDueJobs(readJobs(db, null), at)) {
-        const { job, slot, nextAt } = due;
+        const job = due.job;
+        const slot = due.slot;
+        const nextAt = due.nextAt;
         const key = `${job.id}:${slot}`;
         const seen = db.query('SELECT 1 AS seen FROM job_runs WHERE job = ? AND key = ?').get(JOB, key) !== null;
         if (!seen) {

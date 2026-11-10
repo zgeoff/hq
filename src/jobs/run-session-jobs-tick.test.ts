@@ -4,7 +4,7 @@ import { overrideEnv } from '../config/override-env.ts';
 import { flush } from '../outbox/flush.ts';
 import { readOutboxRows } from '../outbox/read-outbox-rows.ts';
 import { runSessionJobsTick } from './run-session-jobs-tick.ts';
-import { readJobs, removeJob, writeJob } from './session-jobs.ts';
+import { readJobs, removeJob, writeJob } from './write-job.ts';
 
 function setupTest() {
   const fresh = freshDb();
@@ -12,7 +12,7 @@ function setupTest() {
   onTestFinished(overrideEnv('HQ_NOTIFY', undefined));
   return {
     db: fresh.db,
-    dir: fresh.dir,
+    directory: fresh.dir,
     readTexts: () => readOutboxRows(fresh.db).map((row) => row.text),
     readNextAts: () => readJobs(fresh.db, null).map((job) => job.next_at),
   };
@@ -103,7 +103,7 @@ test('it sends nothing for a removed job', () => {
 test('it still reaches the role after its session id changes', async () => {
   const ctx = setupTest();
   const sessions = [{ id: 'kettle-old', name: 'z-release', alive: true, state: 'done' }];
-  const atc = fakeAtc(ctx.dir, sessions);
+  const atc = fakeAtc(ctx.directory, sessions);
   onTestFinished(() => atc.stop());
   at('2026-11-10T00:00:00Z');
   writeJob(ctx.db, { target: 'z-release', value: { kind: 'every', spec: '2h' }, prompt: 'check the release queue', nextAt: new Date('2026-11-10T02:00:00Z'), actor: 'z-release' });
