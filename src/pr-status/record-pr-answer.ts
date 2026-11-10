@@ -4,6 +4,7 @@ import { now } from '../clock/now.ts';
 import { logEvent } from '../log-event.ts';
 import type { PRAnswer } from './types.ts';
 import { upsertPRStatus } from './upsert-pr-status.ts';
+import { writeAnswerNotice } from './write-answer-notice.ts';
 
 export interface PRAnswerInput {
   repo: string;
@@ -26,6 +27,9 @@ export function recordPRAnswer(db: Database, input: PRAnswerInput): void {
       answer_note: input.note,
       answer_at: at,
     });
-    logEvent(db, 'hq', `pr:${input.repo}#${input.pr}`, 'pr-answer', input.actor, null, null, { answer: input.answer, head: input.head, source: input.source, note: input.note });
+    const seq = logEvent(db, 'hq', `pr:${input.repo}#${input.pr}`, 'pr-answer', input.actor, null, null, { answer: input.answer, head: input.head, source: input.source, note: input.note });
+    if (input.head !== null) {
+      writeAnswerNotice(db, seq, { record: { kind: input.answer }, repo: input.repo, pr: input.pr, head: input.head, actor: input.actor });
+    }
   }).immediate();
 }

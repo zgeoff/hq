@@ -82,9 +82,12 @@ test('it shows a changes answer at the head it was given, with its source and no
   });
 });
 
-test.each(['lgtm', 'changes'])('it shows an older %s answer at the head it was given, not as stale, once the PR has a new head', async (answer) => {
+test.each([
+  { answer: 'lgtm', next: 'z-review', nextAt: '2026-10-14T01:00:00Z', nextText: 'z-review (2026-10-14T01:00:00Z)' },
+  { answer: 'changes', next: null, nextAt: null, nextText: 'nobody' },
+])('it shows an older $answer answer at the head it was given, not as stale, once the PR has a new head', async (row) => {
   const ctx = setupTest();
-  await ctx.answer(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), answer, { source: 'chat:kettle-3', note: 'Shorter spout.' });
+  await ctx.answer(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), row.answer, { source: 'chat:kettle-3', note: 'Shorter spout.' });
 
   await expect(runPRCommand({ run: ctx.headAt('b9c8d7e6f5a40312213f4e5d6c7b8a9087654321').run, db: ctx.db, verb: 'status', rest: ['widgets', '7'], flags: {}, actor: ctx.actor, readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) })).resolves.toStrictEqual({
     data: {
@@ -97,13 +100,13 @@ test.each(['lgtm', 'changes'])('it shows an older %s answer at the head it was g
         gateHead: null,
         gateAt: null,
         gateStale: false,
-        answer,
+        answer: row.answer,
         answerHead: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678',
         answerSource: 'chat:kettle-3',
         answerNote: 'Shorter spout.',
         answerAt: '2026-10-14T01:00:00Z',
-        next: null,
-        nextAt: null,
+        next: row.next,
+        nextAt: row.nextAt,
         override: null,
         ciOverrides: [],
         reviewRecords: { mechanical: null, exemption: null },
@@ -111,7 +114,7 @@ test.each(['lgtm', 'changes'])('it shows an older %s answer at the head it was g
         updatedAt: '2026-10-14T01:00:00Z',
       },
     },
-    text: ['widgets#7  head b9c8d7e', 'gate: not recorded', `answer: ${answer} at a1b2c3d via chat:kettle-3 (2026-10-14T01:00:00Z): Shorter spout.`, 'next: nobody'].join('\n'),
+    text: ['widgets#7  head b9c8d7e', 'gate: not recorded', `answer: ${row.answer} at a1b2c3d via chat:kettle-3 (2026-10-14T01:00:00Z): Shorter spout.`, `next: ${row.nextText}`].join('\n'),
   });
 });
 
@@ -241,7 +244,7 @@ test('it logs an event for an answer', async () => {
 
   await ctx.answer(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'lgtm', { source: 'chat:kettle-12' });
 
-  expect(ctx.db.query("SELECT action, actor FROM events WHERE subject_id = 'pr:widgets#7'").all()).toStrictEqual([{ action: 'pr-answer', actor: 'z-kettle' }]);
+  expect(ctx.db.query("SELECT action, actor FROM events WHERE subject_id = 'pr:widgets#7'").all()).toStrictEqual([{ action: 'pr-answer', actor: 'z-kettle' }, { action: 'pr-next', actor: 'z-kettle' }]);
 });
 
 test('it sets who holds the next step, and shows the record against the head gh gives now', async () => {
@@ -513,8 +516,31 @@ test('it shows a standing override for a PR with no record, in text and in JSON'
   const shown = await ctx.status(head);
 
   expect(shown).toStrictEqual({
-    data: { pr: null, acceptedRisks: [], override: { head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', source: 'chat:kettle-2', note: 'The base moved under the stack.', at: '2026-10-14T01:00:00Z' } },
-    text: 'No record for widgets#7.\noverride: at a1b2c3d via chat:kettle-2 (2026-10-14T01:00:00Z): The base moved under the stack.',
+    data: {
+      pr: {
+        repo: 'widgets',
+        pr: 7,
+        head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678',
+        headKnown: true,
+        gate: null,
+        gateHead: null,
+        gateAt: null,
+        gateStale: false,
+        answer: null,
+        answerHead: null,
+        answerSource: null,
+        answerNote: null,
+        answerAt: null,
+        next: 'z-review',
+        nextAt: '2026-10-14T01:00:00Z',
+        override: { head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', source: 'chat:kettle-2', note: 'The base moved under the stack.', at: '2026-10-14T01:00:00Z' },
+        ciOverrides: [],
+        reviewRecords: { mechanical: null, exemption: null },
+        acceptedRisks: [],
+        updatedAt: '2026-10-14T01:00:00Z',
+      },
+    },
+    text: ['widgets#7  head a1b2c3d', 'gate: not recorded', 'answer: none', 'next: z-review (2026-10-14T01:00:00Z)', 'override: at a1b2c3d via chat:kettle-2 (2026-10-14T01:00:00Z): The base moved under the stack.'].join('\n'),
   });
 });
 
@@ -923,8 +949,8 @@ test('it shows a CI override at the head now, and not as the findings override',
       answerSource: 'chat:kettle-1',
       answerNote: null,
       answerAt: '2026-10-14T01:00:00Z',
-      next: null,
-      nextAt: null,
+      next: 'z-review',
+      nextAt: '2026-10-14T01:00:00Z',
       override: null,
       ciOverrides: [{ check: 'preview', head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', source: 'chat:kettle-2', note: 'An intended infra change.', at: '2026-10-14T01:00:00Z' }],
       reviewRecords: { mechanical: null, exemption: null },
@@ -957,8 +983,8 @@ test('it shows no CI override once the PR has a new head', async () => {
       answerSource: 'chat:kettle-1',
       answerNote: null,
       answerAt: '2026-10-14T01:00:00Z',
-      next: null,
-      nextAt: null,
+      next: 'z-review',
+      nextAt: '2026-10-14T01:00:00Z',
       override: null,
       ciOverrides: [],
       reviewRecords: { mechanical: null, exemption: null },
@@ -977,7 +1003,30 @@ test('it shows a standing CI override for a PR with no record', async () => {
   const shown = await ctx.status(head);
 
   expect(shown.text).toInclude('ci override: preview at a1b2c3d via chat:kettle-2');
-  expect(shown.data).toStrictEqual({ pr: null, acceptedRisks: [], ciOverrides: [{ check: 'preview', head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', source: 'chat:kettle-2', note: 'An intended infra change.', at: '2026-10-14T01:00:00Z' }] });
+  expect(shown.data).toStrictEqual({
+    pr: {
+      repo: 'widgets',
+      pr: 7,
+      head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678',
+      headKnown: true,
+      gate: null,
+      gateHead: null,
+      gateAt: null,
+      gateStale: false,
+      answer: null,
+      answerHead: null,
+      answerSource: null,
+      answerNote: null,
+      answerAt: null,
+      next: 'z-review',
+      nextAt: '2026-10-14T01:00:00Z',
+      override: null,
+      ciOverrides: [{ check: 'preview', head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', source: 'chat:kettle-2', note: 'An intended infra change.', at: '2026-10-14T01:00:00Z' }],
+      reviewRecords: { mechanical: null, exemption: null },
+      acceptedRisks: [],
+      updatedAt: '2026-10-14T01:00:00Z',
+    },
+  });
 });
 
 test.each(['console:KET-60', 'call:KET-60'])('it refuses a CI check override from %s even when the picked option grants an override of this PR at this head, and records nothing', async (source) => {
