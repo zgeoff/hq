@@ -1,11 +1,16 @@
 # Example tickets
 
-Shape and detail only; the specifics are invented.
+Copy the shape and the level of detail of these issues. The facts in them are invented. The `Title:`
+line is the issue's title, and the description starts below it. Write the `Filed by` line word for
+word as [Save an issue](../SKILL.md#save-an-issue) gives it, period included, with your own
+session's name.
 
 ## A Ready bug
 
 ```markdown
 Title: reject probability tables that don't sum to 1
+
+Filed by z-triage.
 
 ## Outcome
 
@@ -41,6 +46,8 @@ Tolerance of 1e-9 matches the eval harness.
 
 ```markdown
 Title: redesign the decision model around usable autonomy
+
+Filed by z-stu.
 
 ## Outcome
 
