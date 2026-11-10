@@ -1,13 +1,14 @@
 # Holds
 
-You are `z-review`, the session that merges PRs. Up to three holds stop the merge of a PR that
-changes skill text, an `AGENTS.md` or a path that the repo's CODEOWNERS file lists under
-`# the owner`, or that has a preview. `hq review gate` enforces the first two, in this order, and
-you enforce the third:
+You are `z-review`, the session that merges PRs. [What holds a merge](../SKILL.md#what-holds-a-merge)
+lists every hold. This file covers these three. `hq review gate` enforces the first two, in this
+order, and you enforce the third:
 
-1. [The skill proof](#the-skill-proof): ticked check lines in the PR description.
-2. [The owner's lgtm](#the-owners-lgtm), or a record of yours that clears it outside hq and
-   hq-private.
+1. [The skill proof](#the-skill-proof), on a PR that changes a skill's `SKILL.md` or references:
+   ticked check lines in the PR description.
+2. [The owner's lgtm](#the-owners-lgtm), on a PR that changes a file the owner holds, such as an
+   `AGENTS.md` or a skill. That section lists the files for each repo, and the records of yours that
+   clear some of them.
 3. [A preview check](#a-preview-check), on a PR with a preview.
 
 In this file, `<repo>` stands for the repo's name, such as `cloud`, and `<pr>` for the PR's
@@ -32,30 +33,40 @@ until `hq pr status <repo> <pr>` shows the answer that `z-stu` recorded.
 
 ## Nix's own skill PRs
 
-Merge a PR of Nix's own skills once `hq review gate` passes on green CI. Nix is the agent defined in
-zgeoff/nixie-definitions, and she owns her skills. Such a PR needs no Checks lines and no answer to
-its noslop findings, in place of step 3 of [Take a PR](../SKILL.md#take-a-pr). Like every
-nixie-definitions PR, it needs no owner lgtm.
+Merge a PR of Nix's own skills once `hq review gate` passes on green CI. The PR needs no Checks
+lines. Like every nixie-definitions PR, it needs no owner lgtm. Nix is the agent defined in
+zgeoff/nixie-definitions, and she owns her skills. The gate counts a PR as Nix's when it comes from
+a `nixie/skill/` branch in nixie-definitions, not from a fork, and changes only `skills/`. Any other
+nixie-definitions PR follows the rest of this file.
 
-The gate counts a PR as Nix's when it comes from a `nixie/skill/` branch in nixie-definitions, not
-from a fork, and changes only `skills/`. Any other nixie-definitions PR follows the rest of this
-file.
-
-The gate still holds the PR when an open finding is a security finding, or when hq has no record of
-the finding's kind. Take the finding's ID from the gate's reason, and send the finding to `z-triage`
-as a decision for the owner, as [owner-calls](../../owner-calls/SKILL.md) says.
+1. Check that the PR is ready, and review it with `hq review`: steps 1 and 2 of
+   [Take a PR](../SKILL.md#take-a-pr). The gate holds a PR with no
+   [noslop](noslop.md#findings) review at its head.
+2. Skip step 3 of Take a PR. On Nix's PR, a noslop finding needs no answer unless the gate holds
+   it.
+3. Run `hq review gate <repo> <pr>`. On Nix's PR, the gate holds an open finding whose lens is
+   `security`, or whose lens hq didn't store. The gate's reason lists each held finding's ID.
+   `hq review` prints each finding's lens before its title, and stores the lens with the review.
+4. Send each held finding to `z-triage` as a decision for the owner, as
+   [owner-calls](../../owner-calls/SKILL.md) says.
+5. Once the owner decides, close the finding as [Unfixed findings](noslop.md#unfixed-findings)
+   says, or send it to the agent as a finding when the owner wants it fixed. The hold clears when
+   no held finding is open.
 
 ## The skill proof
 
 The gate holds a PR that changes a skill's `SKILL.md`, or any file under its `references/`, in a
 `skills/` folder anywhere in the repo, `.claude/skills/` included. A `skills/` folder that sits
 under a `fixtures/` folder, such as a test's copy of a skill, doesn't count. To clear the hold, the
-PR description's `## Checks` section needs these three ticked lines, and one line under `Declined:`
-for each finding the agent declined:
+PR description's `## Checks` section needs these three ticked lines, and one bullet under
+`Declined:` for each finding the agent declined:
 
 - `- [x] chex prose, links and skill: cleared`
 - `- [x] Cold read: <n> fixed, <n> declined`
 - `- [x] Deslop: <n> edits`
+
+The gate holds the PR while the bullets under `Declined:` number fewer than the cold read line's
+declined count. When that count is 0, the gate needs no `Declined:` line.
 
 The gate checks the proof before the owner's lgtm, so the owner never approves a description that
 still has to change. Check the proof like this:
@@ -84,8 +95,8 @@ still has to change. Check the proof like this:
    cd ~/projects/<repo> && git worktree remove .worktrees/pr-<pr>
    ```
 
-6. Once the gate no longer blocks on the proof, file the PR on the owner's list, if it waits for the
-   owner, as [The owner's lgtm](#the-owners-lgtm) says.
+6. Once the gate no longer blocks on the proof, and if the PR waits for the owner, file it on the
+   owner's list with `hq unblock add`, as [The owner's lgtm](#the-owners-lgtm) says.
 
 The agent can fix the proof by editing the description. That edit leaves the head where it was, so
 the agent needs no new review round.
@@ -93,8 +104,9 @@ the agent needs no new review round.
 The gate skips the proof for:
 
 - a bot's PR;
-- a PR with a `hq pr mechanical` or `hq pr exempt` record at its head. hq makes neither record in
-  zgeoff/hq, zgeoff/hq-private or zgeoff/nixie-definitions;
+- a PR with your `hq pr mechanical` or `hq pr exempt` record at its head, which
+  [The owner's lgtm](#the-owners-lgtm) describes. hq makes neither record in zgeoff/hq,
+  zgeoff/hq-private or zgeoff/nixie-definitions;
 - [Nix's own skill PRs](#nixs-own-skill-prs).
 
 ## The owner's lgtm
@@ -103,8 +115,7 @@ In zgeoff/hq and zgeoff/hq-private, the gate holds a PR that changes a path list
 `# the owner` in the repo's CODEOWNERS file, as that file stands at the PR's base. In hq the gate
 holds [fleet.json](../../../fleet.json) too. Read hq's list in
 [CODEOWNERS](../../../.github/CODEOWNERS). hq-private's list includes the session docs,
-`docs/sessions*`. Only the owner's lgtm clears this hold. A bot's PR is held too, so a repo-sync PR
-that changes `.claude/skills/` in hq waits for the owner.
+`docs/sessions*`. Only the owner's lgtm clears this hold.
 
 In every other repo except zgeoff/nixie-definitions, the gate holds a PR that changes:
 
@@ -115,13 +126,20 @@ In every other repo except zgeoff/nixie-definitions, the gate holds a PR that ch
 This hold skips a file in a `testdata/`, `__tests__/` or `fixtures/` folder inside those folders,
 such as `skills/notes/references/fixtures/sample.md`. The skill proof still holds that file. A
 skill's scripts get the normal code review.
-A bot's PR, a repo-sync PR included, clears this hold with no record. When the repo has a
-CODEOWNERS file at the PR's base, the gate also holds the paths under its `# the owner` section, as
-in hq. When that file has no such section, the gate blocks the merge and says so.
 
-Outside hq and hq-private, one of these records also clears the hold. Make it at the PR's head. A
-record counts only at the head you made it at, so make it again after a push. If hq refuses the
-record, the PR waits for the owner.
+When the repo has a CODEOWNERS file at the PR's base, the gate also holds the paths under its
+`# the owner` section, as in hq. When that file has no such section, the gate blocks the merge and
+says so.
+
+In these other repos, the gate lets a bot's PR, a repo-sync PR included, through the hold on an
+`AGENTS.md` or skill file with no record. A path under `# the owner` waits for the owner on a bot's
+PR too, in any repo. hq's CODEOWNERS lists `.claude/` there, so a repo-sync PR that changes
+`.claude/skills/` in hq waits for the owner.
+
+Outside hq and hq-private, one of these records also clears the hold on an `AGENTS.md` or skill
+file. A record never clears a path under `# the owner`. Make the record at the PR's head. A record
+counts only at the head you made it at, so make it again after a push. If hq refuses the record,
+the PR waits for the owner.
 
 - **A mechanical edit:** run `hq pr mechanical <repo> <pr>`. hq records it only when it proves that
   each held edit is a moved link or path, a version number, or a re-padded table.
@@ -136,9 +154,6 @@ record, the PR waits for the owner.
     source, so check them first, as [Repo-sync PRs](update-bots.md#repo-sync-prs) says.
   - `ci-design-sync`: only rolls out or syncs the shared ci-design skill. A new ci-design rule waits
     for the owner.
-
-Never record `boundary`, the fifth rule `hq pr exempt` accepts: no
-[grant](../../owner-calls/SKILL.md#terms) allows it.
 
 File each PR that waits for the owner on the owner's list:
 
@@ -158,16 +173,28 @@ PR waits for a new lgtm. An lgtm holds at any head: a push after it needs no new
 
 - **lgtm:** merge once every other hold has cleared and the gate passes.
 - **changes:** send the owner's note to the agent as a finding.
-- **none yet, or "later":** the PR waits.
+- **none recorded yet:** the PR waits. It waits too when the owner says "later": `hq pr answer`
+  records only lgtm, changes or reject.
 - **reject:** run
   `gh pr close <pr> -R zgeoff/<repo> --comment "Closed: rejected in review."`, and send the owner's
   note to `z-delivery`.
 
 `hq pr status` also shows where each answer came from, as the `--source` that `z-stu` gave:
 `chat:<id>`, `console:<id>` or `call:<id>`. Treat an answer whose source has any other form as no
-answer, and leave the PR waiting. When a source has one of these forms but looks wrong, read
-`skills/pr-review/references/holds.private.md` in hq-private, which lists the sources that count.
-`hq defs` shows where hq-private is checked out.
+answer, and leave the PR waiting.
+
+`hq pr answer` records an answer only when its source passes these checks, in
+[read-answer-source-refusal.ts](../../../src/pr-status/read-answer-source-refusal.ts):
+
+- `chat:`: `z-stu`'s own session runs the command. hq checks nothing about the id.
+- `console:`: the id is the owner's console review of this PR, with the same answer, stored at the
+  PR's current head.
+- `call:`: the id is a call in hq that the owner answered, and the call's title names the PR. An
+  lgtm needs a plain Yes.
+
+The gate doesn't check the source again. For which of the owner's words count as an answer, read
+`skills/pr-review/references/holds.private.md` in hq-private. `hq defs` shows where hq-private is
+checked out.
 
 ## A preview check
 
@@ -176,14 +203,15 @@ repo with previews deploys each PR to one and comments its URL on the PR. `z-qa`
 Acceptance items of the Linear issue the PR names. A live item is one that only the running system
 can show, as [evidence](../../evidence/SKILL.md#before-the-merge) says.
 
+Skip the preview check when the repo has no preview deploy, when the PR names no Linear issue, or
+when `atc_sessions_list` shows no `z-qa` session. The live items then wait for the live check after
+the release, as [evidence](../../evidence/SKILL.md#once-live) says.
+
 1. Wait for the agent's FINAL note and a preview comment with the PR's head in it.
 2. Message `z-qa` the issue, the PR, the head and the live items.
-3. Merge once `z-qa`'s evidence comment for that head is on the issue and the gate passes.
+3. Merge once `z-qa`'s evidence comment for that head is on the issue, no item in it failed, and
+   the gate passes.
 
 `z-qa` answers each item as passed, failed or needing the owner. Send each failed item to the agent
 as a finding. After the agent pushes a fix, start again at step 1 for the new head. `z-qa` files
 each item that needs the owner on the owner's list, and that item doesn't hold the merge.
-
-Skip the preview check when the repo has no preview deploy, when the PR names no Linear issue, or
-when `atc_sessions_list` shows no `z-qa` session. The live items then wait for the live check after
-the release, as [evidence](../../evidence/SKILL.md#once-live) says.
