@@ -114,6 +114,8 @@ hq 0.79.0: headquarters for the z- sessions. Every command takes --json.
                                              steer what free lane slots take, from the next tick; terms in priority order, filters in a term joined by ":":
                                              maintenance|roadmap, bug|feature|chore|improvement|investigation, an area, project=<name>, label=<name>, urgent|high+|medium+;
                                              a reserve keeps n slots for an area and lends them while it has nothing eligible
+  hq model [show]                             the model the fleet's sessions and builders launch on, and who set it
+  hq model set <model>                        set the fleet model (fable, opus, or any well-formed name): each session spawn and builder launch uses it from now, and running sessions keep theirs until they restart
 
   hq call|proposal add <id> (--title T --question Q (--body TEXT | --body-file F|-) | --item F|-)
                            [--issues GEO-1,GEO-2] [--for SESSION] [--order N|none]

@@ -11,6 +11,7 @@ import { LINEAR_GRAPHQL_URL, linearIssues } from '../mocks/linear-handlers.ts';
 import { server } from '../mocks/node.ts';
 import { createStubOp } from '../test/create-stub-op.ts';
 import { NOON_SYDNEY, at, createPushedClone, fakeAtc, freshDb } from '../test/helpers.ts';
+import { writeFleetModel } from './model/write-fleet-model.ts';
 import { readSlotRows } from './capacity/fleet/read-slot-rows.ts';
 import { writeCapacitySample } from './capacity/write-capacity-sample.ts';
 import { updateEnv } from '@zgeoff/testing/helpers';
@@ -582,6 +583,47 @@ test('hq focus set, show and clear run through the spawned CLI, with a repeated 
   });
   expect(JSON.parse(cleared.stdout)).toMatchObject({ cleared: true });
   expect(JSON.parse(after.stdout)).toMatchObject({ focus: null });
+});
+
+test('it shows the default fleet model, sets a model and shows it through the spawned hq model', async () => {
+  const fresh = freshDb();
+  onTestFinished(fresh.cleanup);
+  const hq = async (...args: string[]): Promise<{ code: number; stdout: string }> => {
+    const child = Bun.spawn(['bun', join(import.meta.dir, 'cli.ts'), 'model', ...args, '--json'], {
+      stdout: 'pipe',
+      stderr: 'pipe',
+      env: { ...process.env, HOME: fresh.dir, HQ_DB: fresh.path, HQ_NOTIFY: 'off', HQ_NOW: NOON_SYDNEY, HQ_AS: 'z-delivery' },
+    });
+    const [code, stdout] = await Promise.all([child.exited, new Response(child.stdout).text()]);
+    return { code, stdout };
+  };
+
+  const before = await hq();
+  const set = await hq('set', 'opus');
+  const after = await hq();
+  const refused = await hq('set', 'Opus 5');
+
+  expect(JSON.parse(before.stdout)).toMatchObject({ model: 'fable', source: 'default', setAt: null, setBy: null });
+  expect(set.code).toBe(0);
+  expect(JSON.parse(after.stdout)).toMatchObject({ model: 'opus', source: 'set', setAt: NOON_SYDNEY, setBy: 'z-delivery' });
+  expect(refused.code).not.toBe(0);
+});
+
+test('it prints the fleet model in hq capacity, and carries it in --json', async () => {
+  const fresh = freshDb();
+  const log = console.log;
+  const lines: string[] = [];
+  onTestFinished(fresh.cleanup);
+  onTestFinished(overrideEnv('HQ_NOW', NOON_SYDNEY));
+  onTestFinished(() => (console.log = log));
+  console.log = (line: string) => lines.push(line);
+  writeFleetModel(fresh.db, { model: 'opus', actor: 'kettle-owner', at: new Date(NOON_SYDNEY) });
+
+  await main(['capacity']);
+  await main(['capacity', '--json']);
+
+  expect(lines[0]).toInclude('Fleet model: opus (set 2026-10-14T01:00:00Z by kettle-owner)');
+  expect(JSON.parse(lines[1] ?? '{}')).toMatchObject({ model: { model: 'opus', source: 'set', setAt: NOON_SYDNEY, setBy: 'kettle-owner' } });
 });
 
 test('hq lanes skip sets, lists and drops a skip through the spawned CLI', async () => {

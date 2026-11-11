@@ -48,6 +48,7 @@
     "provider": "claude",
     "agent": "claude",
     "target": "imp",
+    "model": "opus",
     "reason": "broker quota unknown, its proof req-4c1d is 3 h old"
   }
 }

@@ -26,6 +26,8 @@ A grant the owner gives in chat holds for that session's life. The session logs 
 
 An atc restart revives each session with the prompt it was first spawned with, so a prompt change on `main` reaches a session only when it starts again. `hq fleet` marks each live session's prompt current, stale or unknown. The hq-fleet timer restarts a session whose prompt has read stale for a while: at a quiet moment it asks the session to save its state, and on its `saved` answer spawns it again from `main`. It never asks a busy session, a session whose own run is deploying, or the owner role, and it tells `z-stu` when it keeps deferring. To start a z- session by hand, stop it, unpin it and forget it, in that order since a pin blocks the forget, then run `hq fleet ensure --now <name>`. When `z-stu`'s own prompt is stale, the owner starts it again, since hq never restarts the owner role.
 
+`hq model` shows the fleet's model and `hq model set <model>` sets it, with no PR: each session `hq fleet ensure` spawns and each builder launch uses it from then on. It starts as `fable`. A session's own `model` in `fleet.json` overrides it. A running session keeps its model until it starts again.
+
 `z-stu` starts with the hq band, which `fleet.json` names in its `pluginDirs`. No other session loads the band. A `z-stu` started any other way runs without it, and `hq fleet` names the mismatch.
 
 ## hand-offs

@@ -39,7 +39,7 @@ test('it reports unknown, never stale, when hq-private is not a checkout', async
 
 test('it reads every session within the budget when the fetch of hq-private is slower than the budget', async () => {
   const ctx = setupTest();
-  const entries = ['z-kettle', 'z-teapot', 'z-mug'].map((name): FleetEntry => ({ name, cwd: ctx.entry.cwd, model: ctx.entry.model, prompt: ctx.entry.prompt, wake: false }));
+  const entries = ['z-kettle', 'z-teapot', 'z-mug'].map((name): FleetEntry => ({ name, cwd: ctx.entry.cwd, prompt: ctx.entry.prompt, wake: false }));
   const repo = ctx.createDefsRepo({ [KETTLE]: '```text\nYou are Kettle.\n```\n' });
   const slow: DriftClient = { prompt: () => readAfterExit('You are Kettle.') };
   Bun.spawnSync(['git', '-C', repo.private, 'config', 'remote.origin.uploadpack', 'sleep 1; git-upload-pack']);

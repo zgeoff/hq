@@ -12,6 +12,7 @@ import { checkRcMarker } from '../src/fleet/check-rc-marker.ts';
 import { claimTyping } from '../src/fleet/claim-typing.ts';
 import { declaredFleet } from '../src/fleet/declared-fleet.ts';
 import { ensureFleet } from '../src/fleet/ensure-fleet.ts';
+import { writeFleetModel } from '../src/model/write-fleet-model.ts';
 import { fleetTrustChecks } from '../src/fleet/fleet-trust-checks.ts';
 import { loadRcPending } from '../src/fleet/load-rc-pending.ts';
 import { RC_PENDING } from '../src/fleet/rc-pending.ts';
@@ -107,6 +108,52 @@ test('the prompt is the one text block of a session-prompt.md, else the whole fi
   ctx.push({ [KETTLE]: '```text\na\n```\n```text\nb\n```\n' });
   resetFetchCache();
   expect(() => readPrompt(kettle.prompt)).toThrow('2 ```text blocks');
+});
+
+test('it spawns a session that declares no model on the fleet model, in the dry run and the real spawn, and follows each change of it', async () => {
+  const ctx = setupTest();
+  const entries = ctx.fleet.map((entry) => ({ name: entry.name, cwd: entry.cwd, prompt: entry.prompt, wake: entry.wake }));
+  const opusStub = fake([]);
+  const fableStub = fake([]);
+  atMin(10);
+  writeFleetModel(ctx.db, { model: 'opus', actor: 'kettle-owner', at: at2() });
+  const onOpus = await ensureFleet(ctx.db, opusStub.client, { dryRun: true, actor: 'hq-fleet', fleet: entries, now: ['z-kettle', 'z-teapot'] });
+  writeFleetModel(ctx.db, { model: 'fable', actor: 'kettle-owner', at: at2() });
+  const onFable = await ensureFleet(ctx.db, fableStub.client, { dryRun: true, actor: 'hq-fleet', fleet: entries, now: ['z-kettle', 'z-teapot'] });
+  writeFleetModel(ctx.db, { model: 'opus', actor: 'kettle-owner', at: at2() });
+  await ensureFleet(ctx.db, opusStub.client, { dryRun: false, actor: 'hq-fleet', fleet: entries, now: ['z-kettle', 'z-teapot'] });
+  writeFleetModel(ctx.db, { model: 'fable', actor: 'kettle-owner', at: at2() });
+  await ensureFleet(ctx.db, fableStub.client, { dryRun: false, actor: 'hq-fleet', fleet: entries, now: ['z-kettle', 'z-teapot'] });
+
+  expect(onOpus.map((step) => [step.name, step.action, step.detail.match(/model [^,]+/u)?.[0]])).toStrictEqual([
+    ['z-kettle', 'would spawn', 'model opus (hq model)'],
+    ['z-teapot', 'would spawn', 'model opus (hq model)'],
+  ]);
+  expect(onFable.map((step) => step.detail.match(/model [^,]+/u)?.[0])).toStrictEqual(['model fable (hq model)', 'model fable (hq model)']);
+  expect(opusStub.spawns.map((spawn) => [spawn.name, spawn.model])).toStrictEqual([
+    ['z-kettle', 'opus'],
+    ['z-teapot', 'opus'],
+  ]);
+  expect(fableStub.spawns.map((spawn) => [spawn.name, spawn.model])).toStrictEqual([
+    ['z-kettle', 'fable'],
+    ['z-teapot', 'fable'],
+  ]);
+});
+
+test('it keeps the model a session declares whatever the fleet model is', async () => {
+  const ctx = setupTest();
+  const [kettle] = ctx.fleet;
+  assert.ok(kettle);
+  const entries = [{ ...kettle, model: 'claude-teapot-5' }];
+  const stub = fake([]);
+  atMin(10);
+  writeFleetModel(ctx.db, { model: 'opus', actor: 'kettle-owner', at: at2() });
+
+  const planned = await ensureFleet(ctx.db, stub.client, { dryRun: true, actor: 'hq-fleet', fleet: entries, now: ['z-kettle'] });
+  await ensureFleet(ctx.db, stub.client, { dryRun: false, actor: 'hq-fleet', fleet: entries, now: ['z-kettle'] });
+
+  expect(planned[0]?.detail).toContain('model claude-teapot-5 (fleet.json)');
+  expect(stub.spawns.map((spawn) => spawn.model)).toStrictEqual(['claude-teapot-5']);
 });
 
 test('a live session is left alone; a missing one waits out the grace, then spawns once, pinned and on the wake list', async () => {

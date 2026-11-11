@@ -82,6 +82,37 @@ test.each([[[]], [['plugins/band']], [['~/plugins/../band']], ['band'], [[7]]])(
   expect(() => validateRoles(table)).toThrow('sessions[0].pluginDirs');
 });
 
+test('it accepts a session with no model, and carries none, so it takes the fleet model', () => {
+  const table = {
+    sessions: [
+      { name: 'z-aa', skills: ['kettle'], cwd: 'defs', wake: true, roles: ['owner'] },
+      { name: 'z-bb', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['orchestrator'] },
+      { name: 'z-cc', skills: ['kettle'], cwd: 'defs', wake: true, roles: ['reviewer'] },
+      { name: 'z-dd', skills: ['kettle'], cwd: 'defs', wake: true, roles: ['qa', 'triage'] },
+    ],
+    forwards: { 'z-old': 'z-dd' },
+  };
+
+  const sessions = validateRoles(table).sessions;
+
+  expect(sessions[0]).not.toHaveProperty('model');
+  expect(sessions[1]).toMatchObject({ model: 'opus' });
+});
+
+test.each([[''], [5], [null], [['opus']]])('it refuses the model %j', (model) => {
+  const table = {
+    sessions: [
+      { name: 'z-aa', skills: ['kettle'], cwd: 'defs', model, wake: true, roles: ['owner'] },
+      { name: 'z-bb', skills: ['kettle'], cwd: 'defs', wake: true, roles: ['orchestrator'] },
+      { name: 'z-cc', skills: ['kettle'], cwd: 'defs', wake: true, roles: ['reviewer'] },
+      { name: 'z-dd', skills: ['kettle'], cwd: 'defs', wake: true, roles: ['qa', 'triage'] },
+    ],
+    forwards: { 'z-old': 'z-dd' },
+  };
+
+  expect(() => validateRoles(table)).toThrow('sessions[0].model');
+});
+
 test('it refuses a repeated session name by name', () => {
   const table = {
     sessions: [
@@ -413,7 +444,7 @@ test('the stale-build check warns when the checkout fleet.json differs from the 
   const dir = mkdtempSync(join(tmpdir(), 'hq-fleet-build-'));
   try {
     const fleetText = readFileSync(join(import.meta.dir, '../../fleet.json'), 'utf8');
-    const sessionSchema = z.looseObject({ model: z.string() });
+    const sessionSchema = z.looseObject({ model: z.string().optional() });
     const changed = z.looseObject({ sessions: z.array(sessionSchema) }).parse(JSON.parse(fleetText));
     const path = join(dir, 'fleet.json');
     for (const s of changed.sessions) {

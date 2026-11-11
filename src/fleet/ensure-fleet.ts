@@ -33,6 +33,7 @@ import { HELD } from './held.ts';
 import { loadRcPending as rcPending } from './load-rc-pending.ts';
 import { pickStepsToTell } from './pick-steps-to-tell.ts';
 import { recordStaleRestarts } from './record-stale-restarts.ts';
+import { readFleetModel } from '../model/read-fleet-model.ts';
 import { runStaleRestartTick } from './run-stale-restart-tick.ts';
 import type { RestartedSession } from './run-stale-restart-tick.ts';
 import type { EnsureStep, FleetClient, FleetEntry, RcDeps, SpawnRequest } from './types.ts';
@@ -118,6 +119,7 @@ async function ensureOnce(db: Database, client: FleetClient, opts: EnsureOnceOpt
   const UNLISTED_GRACE_MIN = 30;
   const startedAt = now();
   const fleet = opts.fleet ?? declaredFleet(db);
+  const fleetModel = readFleetModel(db).model;
   const hurry = new Set(opts.now ?? []);
   const unknown = [...hurry].filter((n) => !fleet.some((e) => e.name === n));
   if (unknown.length) throw new HqError('bad_args', `--now names ${unknown.join(', ')}, not in the declared fleet (${fleet.map((e) => e.name).join(', ')}); nothing spawned`);
@@ -186,13 +188,13 @@ async function ensureOnce(db: Database, client: FleetClient, opts: EnsureOnceOpt
       continue;
     }
     if (opts.dryRun) {
-      steps.push({ name: e.name, action: 'would spawn', detail: `in ${e.cwd}, model ${e.model}, prompt from ${e.prompt} (${prompt.length} chars)${hurry.has(e.name) ? ' (--now)' : ''}` });
+      steps.push({ name: e.name, action: 'would spawn', detail: `in ${e.cwd}, model ${e.model ?? fleetModel} (${e.model === undefined ? 'hq model' : 'fleet.json'}), prompt from ${e.prompt} (${prompt.length} chars)${hurry.has(e.name) ? ' (--now)' : ''}` });
       continue;
     }
     try {
       // One key per gap: a retry or an overlapping run replays the first spawn, never a second.
       missing[e.name] = claimMissing(db, e.name, missing[e.name]!);
-      const id = await createFleetSession(client, e, prompt, `hq-fleet-${e.name}-${missing[e.name]}`);
+      const id = await createFleetSession(client, e, { model: e.model ?? fleetModel, prompt, idempotencyKey: `hq-fleet-${e.name}-${missing[e.name]}` });
       const pinFailure = await pinSession(client, id);
       if (pinFailure) {
         unpinned[e.name] = id;
@@ -310,10 +312,16 @@ async function pinSession(client: FleetClient, id: string): Promise<string | nul
   }
 }
 
+interface FleetLaunch {
+  model: string;
+  prompt: string;
+  idempotencyKey: string;
+}
+
 // Plugin folders go only when the entry declares them, so an atc before 4.15 still spawns every
 // other session.
-async function createFleetSession(client: FleetClient, e: FleetEntry, prompt: string, idempotencyKey: string): Promise<string> {
-  const request: SpawnRequest = { cwd: e.cwd, name: e.name, prompt, model: e.model, agent: 'claude', idempotencyKey, ...(e.pluginDirs ? { pluginDirs: e.pluginDirs } : {}) };
+async function createFleetSession(client: FleetClient, entry: FleetEntry, launch: FleetLaunch): Promise<string> {
+  const request: SpawnRequest = { cwd: entry.cwd, name: entry.name, prompt: launch.prompt, model: launch.model, agent: 'claude', idempotencyKey: launch.idempotencyKey, ...(entry.pluginDirs ? { pluginDirs: entry.pluginDirs } : {}) };
   const spawned = await client.spawn(request);
   return spawned.id;
 }

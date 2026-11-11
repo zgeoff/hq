@@ -11,10 +11,12 @@ trap 'exit 1' HUP INT TERM
 export TMPDIR="$tmp"
 REAL_JQ=$(command -v jq)
 export REAL_JQ
+MODEL_FIXTURE="$fixtures/model.json"
+export MODEL_FIXTURE
 mkdir -p "$tmp/bin" "$tmp/skill/scripts"
 cp "$here/capacity.sh" "$tmp/skill/scripts/capacity.sh"
 cp "$fixtures/pacing.json" "$tmp/skill/pacing.json"
-cat > "$tmp/bin/jq" <<'SH'
+cat >"$tmp/bin/jq" <<'SH'
 #!/bin/sh
 # Keep the actual jq program intact, apart from its wall clock.
 for arg do
@@ -26,22 +28,25 @@ for arg do
 done
 exec "$REAL_JQ" "$@"
 SH
-cat > "$tmp/bin/date" <<'SH'
+cat >"$tmp/bin/date" <<'SH'
 #!/bin/sh
 [ "$#" -eq 1 ] && [ "$1" = +%s ] || exit 1
 printf '%s\n' 1792108800
 SH
-cat > "$tmp/bin/imp" <<'SH'
+cat >"$tmp/bin/imp" <<'SH'
 #!/bin/sh
 [ "$#" -eq 2 ] && [ "$1" = info ] && [ "$2" = --json ] || exit 1
 cat "$IMP_FIXTURE"
 SH
-cat > "$tmp/bin/hq" <<'SH'
+cat >"$tmp/bin/hq" <<'SH'
 #!/bin/sh
-[ "$*" = "capacity broker --json" ] || exit 1
-cat "$HQ_FIXTURE"
+case $* in
+  'capacity broker --json') cat "$HQ_FIXTURE" ;;
+  'model --json') [ -z "${HQ_MODEL_FAIL:-}" ] || exit 1; cat "$MODEL_FIXTURE" ;;
+  *) exit 1 ;;
+esac
 SH
-cat > "$tmp/bin/curl" <<'SH'
+cat >"$tmp/bin/curl" <<'SH'
 #!/bin/sh
 # Only a case that sets ALLOW_CURL and CURL_FIXTURE may call curl; any other call fails the case.
 if [ -z "${ALLOW_CURL:-}" ]; then
@@ -50,7 +55,7 @@ if [ -z "${ALLOW_CURL:-}" ]; then
 fi
 cat "$CURL_FIXTURE"
 SH
-cat > "$tmp/bin/claude" <<'SH'
+cat >"$tmp/bin/claude" <<'SH'
 #!/bin/sh
 [ "$*" = "auth status --json" ] || exit 1
 printf '%s\n' '{"loggedIn": true, "email": "gardener@example.test"}'
@@ -70,28 +75,28 @@ mkdir -p "$HOME/.codex/sessions" "$XDG_CACHE_HOME/z-capacity/claude-usage"
 fail=0
 
 check() { # case, imp fixture, hq broker fixture, this login's Claude cache fixture, script arguments
-  name=$1 IMP_FIXTURE="$fixtures/$2" HQ_FIXTURE="$fixtures/$3"
-  cp "$fixtures/$4" "$per"
-  cp "$fixtures/${PACING_FIXTURE:-pacing.json}" "$tmp/skill/pacing.json"
-  # The stubbed epoch and this mtime match exactly, so the cache is always fresh.
-  touch -d 2026-10-16T00:00:00Z "$per"
-  export IMP_FIXTURE HQ_FIXTURE
-  shift 4
-  : > "$FORBIDDEN_CALLS"
-  if bash "$tmp/skill/scripts/capacity.sh" "$@" \
-      > "$tmp/actual" 2> "$tmp/stderr"; then
-    if diff -u "$fixtures/$name.expected" "$tmp/actual" && [ ! -s "$FORBIDDEN_CALLS" ]; then
-      printf 'ok %s\n' "$name"
-    else
-      printf 'FAIL %s: output differs or an unexpected tool ran\n' "$name"
-      cat "$FORBIDDEN_CALLS"
-      fail=1
-    fi
-  else
-    printf 'FAIL %s: script exited non-zero\n' "$name"
-    cat "$tmp/stderr"
-    fail=1
-  fi
+        name=$1 IMP_FIXTURE="$fixtures/$2" HQ_FIXTURE="$fixtures/$3"
+        cp "$fixtures/$4" "$per"
+        cp "$fixtures/${PACING_FIXTURE:-pacing.json}" "$tmp/skill/pacing.json"
+        # The stubbed epoch and this mtime match exactly, so the cache is always fresh.
+        touch -d 2026-10-16T00:00:00Z "$per"
+        export IMP_FIXTURE HQ_FIXTURE
+        shift 4
+        : >"$FORBIDDEN_CALLS"
+        if bash "$tmp/skill/scripts/capacity.sh" "$@" \
+                >"$tmp/actual" 2>"$tmp/stderr"; then
+                if diff -u "$fixtures/$name.expected" "$tmp/actual" && [ ! -s "$FORBIDDEN_CALLS" ]; then
+                        printf 'ok %s\n' "$name"
+                else
+                        printf 'FAIL %s: output differs or an unexpected tool ran\n' "$name"
+                        cat "$FORBIDDEN_CALLS"
+                        fail=1
+                fi
+        else
+                printf 'FAIL %s: script exited non-zero\n' "$name"
+                cat "$tmp/stderr"
+                fail=1
+        fi
 }
 
 check readout imp-room.json broker-room.json claude-room.json
@@ -111,6 +116,20 @@ check target-local imp-room.json broker-empty.json claude-full.json --size L
 unset PACING_FIXTURE
 cp "$fixtures/pacing.json" "$tmp/skill/pacing.json"
 
+# The fleet model is a Claude model, so a Codex launch carries none.
+cp "$fixtures/codex-room.jsonl" "$HOME/.codex/sessions/codex-room.jsonl"
+PACING_FIXTURE=pacing-codex-first.json
+check size-codex imp-room.json broker-room.json claude-room.json --size S
+unset PACING_FIXTURE
+rm -f "$HOME/.codex/sessions/codex-room.jsonl"
+cp "$fixtures/pacing.json" "$tmp/skill/pacing.json"
+
+# An hq with no model command still gives the launch, with no model in it, and the script does not fail.
+HQ_MODEL_FAIL=1
+export HQ_MODEL_FAIL
+check size-model-unread imp-room.json broker-room.json claude-room.json --size M
+unset HQ_MODEL_FAIL
+
 # A fresh reading of another account is never reused: the active account, with no login here,
 # reads live and finds none.
 rm -f "$per"
@@ -118,25 +137,30 @@ other="$XDG_CACHE_HOME/z-capacity/claude-usage/$(printf '%s' potter@example.test
 cp "$fixtures/claude-room.json" "$other"
 cp "$fixtures/claude-room.json" "$XDG_CACHE_HOME/z-capacity/claude-usage.json"
 touch -d 2026-10-16T00:00:00Z "$other" "$XDG_CACHE_HOME/z-capacity/claude-usage.json"
-IMP_FIXTURE="$fixtures/imp-room.json" HQ_FIXTURE="$fixtures/broker-room.json" bash "$tmp/skill/scripts/capacity.sh" > "$tmp/actual" 2> "$tmp/stderr" || true
+IMP_FIXTURE="$fixtures/imp-room.json" HQ_FIXTURE="$fixtures/broker-room.json" bash "$tmp/skill/scripts/capacity.sh" >"$tmp/actual" 2>"$tmp/stderr" || true
 if [ "$("$REAL_JQ" -r '.providers.claude.local.error // "cached"' "$tmp/actual")" = 'no Claude login on this machine' ]; then
-  printf 'ok another account reading is not reused\n'
+        printf 'ok another account reading is not reused\n'
 else
-  printf 'FAIL another account reading is not reused\n'; cat "$tmp/actual" "$tmp/stderr"; fail=1
+        printf 'FAIL another account reading is not reused\n'
+        cat "$tmp/actual" "$tmp/stderr"
+        fail=1
 fi
 rm -f "$other"
 
 # A live reading (no fresh cache) names its account and keeps a per-account copy.
 rm -f "$XDG_CACHE_HOME/z-capacity/claude-usage.json"
 mkdir -p "$HOME/.claude"
-printf '%s\n' '{"claudeAiOauth": {"accessToken": "fixture-token"}}' > "$HOME/.claude/.credentials.json"
+printf '%s\n' '{"claudeAiOauth": {"accessToken": "fixture-token"}}' >"$HOME/.claude/.credentials.json"
 IMP_FIXTURE="$fixtures/imp-room.json" HQ_FIXTURE="$fixtures/broker-room.json" CURL_FIXTURE="$fixtures/claude-live.json" ALLOW_CURL=1 \
-  bash "$tmp/skill/scripts/capacity.sh" > "$tmp/actual" 2> "$tmp/stderr" || true
-if [ -f "$per" ] && cmp -s "$per" "$XDG_CACHE_HOME/z-capacity/claude-usage.json" \
-    && [ "$("$REAL_JQ" -r '"\(.account) \(.used)"' "$per")" = "$account 55" ] \
-    && ! grep -q fixture-token "$per" && ! grep -q gardener "$per"; then
-  printf 'ok live reading per account\n'
+        bash "$tmp/skill/scripts/capacity.sh" >"$tmp/actual" 2>"$tmp/stderr" || true
+if [ -f "$per" ] && cmp -s "$per" "$XDG_CACHE_HOME/z-capacity/claude-usage.json" &&
+        [ "$("$REAL_JQ" -r '"\(.account) \(.used)"' "$per")" = "$account 55" ] &&
+        ! grep -q fixture-token "$per" && ! grep -q gardener "$per"; then
+        printf 'ok live reading per account\n'
 else
-  printf 'FAIL live reading per account\n'; ls -R "$XDG_CACHE_HOME" 2>&1; cat "$tmp/stderr"; fail=1
+        printf 'FAIL live reading per account\n'
+        ls -R "$XDG_CACHE_HOME" 2>&1
+        cat "$tmp/stderr"
+        fail=1
 fi
 exit "$fail"
