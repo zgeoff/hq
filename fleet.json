@@ -4,7 +4,6 @@
       "name": "z-stu",
       "skills": ["intake", "owner-calls", "tickets", "evidence", "delivery-report"],
       "cwd": "defs",
-      "model": "fable",
       "wake": true,
       "remoteControl": true,
       "pluginDirs": ["~/projects/hq/mods/hq-band"],
@@ -14,7 +13,6 @@
       "name": "z-delivery",
       "skills": ["delivery-lead", "tickets", "fix-it-here", "owner-calls"],
       "cwd": "defs",
-      "model": "fable",
       "wake": false,
       "roles": ["orchestrator"],
       "note": "the foreman; woken by name"
@@ -23,7 +21,6 @@
       "name": "z-release",
       "skills": ["release", "owner-calls", "evidence", "tickets"],
       "cwd": "defs",
-      "model": "fable",
       "wake": true,
       "roles": ["release"],
       "note": "merge to live: releases, deploys, host switches"
@@ -32,7 +29,6 @@
       "name": "z-triage",
       "skills": ["linear-triage", "tickets", "owner-calls", "fix-it-here", "evidence"],
       "cwd": "defs",
-      "model": "fable",
       "wake": true,
       "roles": ["triage"]
     },
@@ -40,7 +36,6 @@
       "name": "z-qa",
       "skills": ["preview-qa", "evidence", "owner-calls"],
       "cwd": "defs",
-      "model": "fable",
       "wake": true,
       "roles": ["qa"],
       "note": "GEO-924"
@@ -49,7 +44,6 @@
       "name": "z-review",
       "skills": ["pr-review", "fix-it-here", "owner-calls", "evidence"],
       "cwd": "defs",
-      "model": "fable",
       "wake": true,
       "roles": ["reviewer"],
       "note": "reviews and merges final PRs (hq#100)"
@@ -58,7 +52,6 @@
       "name": "z-q",
       "skills": [],
       "cwd": "hq",
-      "model": "fable",
       "wake": true,
       "prompt": "main:prompts/z-q.md",
       "roles": ["developer"]

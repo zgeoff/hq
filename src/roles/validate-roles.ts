@@ -37,8 +37,8 @@ export function validateRoles(raw: unknown): RolesTable {
     if (s['cwd'] !== 'defs' && s['cwd'] !== 'hq') {
       return bad(`${at}.cwd`, 'must be defs or hq');
     }
-    if (typeof s['model'] !== 'string' || !s['model']) {
-      return bad(`${at}.model`, 'must be a model name');
+    if (s['model'] !== undefined && (typeof s['model'] !== 'string' || !s['model'])) {
+      return bad(`${at}.model`, 'must be a model name, or left out to use the fleet model (hq model)');
     }
     if (typeof s['wake'] !== 'boolean') {
       return bad(`${at}.wake`, 'must be true or false');
@@ -65,7 +65,7 @@ export function validateRoles(raw: unknown): RolesTable {
     if (!Array.isArray(s['roles'])) {
       return bad(`${at}.roles`, 'must be a list');
     }
-    sessions.push({ name: s['name'], skills, cwd: s['cwd'], model: s['model'], wake: s['wake'], ...(s['remoteControl'] === undefined ? {} : { remoteControl: s['remoteControl'] }), ...(pluginDirs === undefined ? {} : { pluginDirs }), ...(s['prompt'] === undefined ? {} : { prompt: s['prompt'] }), ...(s['note'] === undefined ? {} : { note: s['note'] }), roles: parseRoles(at, s['roles']) });
+    sessions.push({ name: s['name'], skills, cwd: s['cwd'], ...(s['model'] === undefined ? {} : { model: s['model'] }), wake: s['wake'], ...(s['remoteControl'] === undefined ? {} : { remoteControl: s['remoteControl'] }), ...(pluginDirs === undefined ? {} : { pluginDirs }), ...(s['prompt'] === undefined ? {} : { prompt: s['prompt'] }), ...(s['note'] === undefined ? {} : { note: s['note'] }), roles: parseRoles(at, s['roles']) });
   });
   for (const role of SINGLE) {
     const holders = sessions.filter((s) => s.roles.includes(role)).map((s) => s.name);

@@ -25,7 +25,6 @@ function buildFleetEntry(s: DeclaredSession): FleetEntry {
   const entry: FleetEntry = {
     name: s.name,
     cwd: s.cwd === 'defs' ? DEFS() : `${HOME()}/projects/hq`,
-    model: s.model,
     prompt: getPromptSource(s),
     wake: s.wake,
     skills: s.skills,
@@ -34,6 +33,9 @@ function buildFleetEntry(s: DeclaredSession): FleetEntry {
     skill: findRoleSkill(s),
     roles: s.roles,
   };
+  if (s.model !== undefined) {
+    entry.model = s.model;
+  }
   if (s.remoteControl) {
     entry.remoteControl = true;
   }

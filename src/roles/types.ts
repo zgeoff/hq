@@ -7,7 +7,9 @@ export interface DeclaredSession {
 
   skills: readonly string[];
   cwd: 'defs' | 'hq';
-  model: string;
+
+  // The session's own model; absent means the fleet model (hq model).
+  model?: string;
   wake: boolean;
   remoteControl?: boolean;
 

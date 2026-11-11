@@ -6,7 +6,9 @@ import type { Runner } from '../runner/types.ts';
 export interface FleetEntry {
   name: string;
   cwd: string;
-  model: string;
+
+  // The session's own model; absent means the fleet model (hq model).
+  model?: string;
   prompt: string;
   wake: boolean;
   skills?: readonly string[];
