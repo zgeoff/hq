@@ -13,18 +13,30 @@ here=$(cd "$(dirname "$0")" && pwd)
 pacing=$(cat "$here/../pacing.json")
 size="" design=false local_open=0
 while [ $# -gt 0 ]; do
-  case $1 in
-    --size) size=$2; shift 2 ;;
-    --design) design=true; shift ;;
-    --local-open) local_open=$2; shift 2 ;;
-    *) echo "capacity.sh: unknown option $1" >&2; exit 2 ;;
-  esac
+        case $1 in
+        --size)
+                size=$2
+                shift 2
+                ;;
+        --design)
+                design=true
+                shift
+                ;;
+        --local-open)
+                local_open=$2
+                shift 2
+                ;;
+        *)
+                echo "capacity.sh: unknown option $1" >&2
+                exit 2
+                ;;
+        esac
 done
 
 # Each reader prints {used, resetsAt, source} or {error}. used is the highest window, in percent.
 imp_room() {
-  imp info --json 2>/dev/null | jq -c '{budgetMib: .ramBudgetMib, committedMib: .ramCommittedMib}' \
-    || echo '{"error": "imp info failed"}'
+        imp info --json 2>/dev/null | jq -c '{budgetMib: .ramBudgetMib, committedMib: .ramCommittedMib}' ||
+                echo '{"error": "imp info failed"}'
 }
 
 # The usage endpoint rate-limits (429) when a tick tries several launches in a row, so a good
@@ -33,22 +45,28 @@ imp_room() {
 # cached: it still means no room.
 claude_cache="${XDG_CACHE_HOME:-$HOME/.cache}/z-capacity/claude-usage.json"
 claude_usage() {
-  local token out email account="" account_cache=""
-  # The token and `claude auth status` both follow CLAUDE_CONFIG_DIR, so they name one account,
-  # named by a short hash of the login email (never the token).
-  email=$(timeout 10 claude auth status --json 2>/dev/null | jq -r '.email // empty' 2>/dev/null) || true
-  if [ -n "$email" ]; then
-    account=$(printf '%s' "$email" | sha256sum | cut -c1-12)
-    account_cache="${claude_cache%.json}/$account.json"
-  fi
-  if [ -n "$account_cache" ] && [ -f "$account_cache" ] && [ $(( $(date +%s) - $(stat -c %Y "$account_cache") )) -lt 120 ]; then
-    out=$(jq -ce 'select(.used | type == "number") | . + {cached: true}' "$account_cache" 2>/dev/null) && { echo "$out"; return; }
-  fi
-  token=$(jq -r '.claudeAiOauth.accessToken // empty' "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/.credentials.json" 2>/dev/null) || true
-  [ -n "$token" ] || { echo '{"error": "no Claude login on this machine"}'; return; }
-  out=$(curl -sf --max-time 15 https://api.anthropic.com/api/oauth/usage \
-    -H "Authorization: Bearer $token" -H 'anthropic-beta: oauth-2025-04-20' \
-    | jq -c '{fiveHour: .five_hour.utilization, sevenDay: .seven_day.utilization} as $w
+        local token out email account="" account_cache=""
+        # The token and `claude auth status` both follow CLAUDE_CONFIG_DIR, so they name one account,
+        # named by a short hash of the login email (never the token).
+        email=$(timeout 10 claude auth status --json 2>/dev/null | jq -r '.email // empty' 2>/dev/null) || true
+        if [ -n "$email" ]; then
+                account=$(printf '%s' "$email" | sha256sum | cut -c1-12)
+                account_cache="${claude_cache%.json}/$account.json"
+        fi
+        if [ -n "$account_cache" ] && [ -f "$account_cache" ] && [ $(($(date +%s) - $(stat -c %Y "$account_cache"))) -lt 120 ]; then
+                out=$(jq -ce 'select(.used | type == "number") | . + {cached: true}' "$account_cache" 2>/dev/null) && {
+                        echo "$out"
+                        return
+                }
+        fi
+        token=$(jq -r '.claudeAiOauth.accessToken // empty' "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/.credentials.json" 2>/dev/null) || true
+        [ -n "$token" ] || {
+                echo '{"error": "no Claude login on this machine"}'
+                return
+        }
+        out=$(curl -sf --max-time 15 https://api.anthropic.com/api/oauth/usage \
+                -H "Authorization: Bearer $token" -H 'anthropic-beta: oauth-2025-04-20' |
+                jq -c '{fiveHour: .five_hour.utilization, sevenDay: .seven_day.utilization} as $w
       | {fiveHour: .five_hour.resets_at, sevenDay: .seven_day.resets_at} as $r
       | [.five_hour, .seven_day] | map(select(. != null)) | {
         used: (map(.utilization) | max),
@@ -57,33 +75,40 @@ claude_usage() {
         resetsAt: (max_by(.utilization).resets_at),
         source: "oauth usage endpoint (undocumented; active account only)"
       }' 2>/dev/null) || out=""
-  if ! jq -e '.used | type == "number"' <<< "$out" > /dev/null 2>&1; then
-    echo '{"error": "Claude usage endpoint failed"}'; return
-  fi
-  # Each reading names its account and keeps the per-account copy that hq samples for cost.
-  if [ -n "$account" ]; then
-    out=$(jq -c --arg account "$account" '. + {account: $account}' <<< "$out")
-    mkdir -p "${claude_cache%.json}" && printf '%s\n' "$out" > "$account_cache"
-  fi
-  mkdir -p "$(dirname "$claude_cache")" && printf '%s\n' "$out" > "$claude_cache"
-  echo "$out"
+        if ! jq -e '.used | type == "number"' <<<"$out" >/dev/null 2>&1; then
+                echo '{"error": "Claude usage endpoint failed"}'
+                return
+        fi
+        # Each reading names its account and keeps the per-account copy that hq samples for cost.
+        if [ -n "$account" ]; then
+                out=$(jq -c --arg account "$account" '. + {account: $account}' <<<"$out")
+                mkdir -p "${claude_cache%.json}" && printf '%s\n' "$out" >"$account_cache"
+        fi
+        mkdir -p "$(dirname "$claude_cache")" && printf '%s\n' "$out" >"$claude_cache"
+        echo "$out"
 }
 
 # Claude on imp runs on the imp broker's slot, not this machine's login: hq reads that slot's quota
 # every 2 h, and hq builds the reading. With no fresh read, a broker proof under 24 h old still
 # means room (unknown: true).
 broker_usage() {
-  hq capacity broker --json 2>/dev/null | jq -ce '.reading | objects' 2>/dev/null \
-    || echo '{"error": "hq capacity broker failed"}'
+        hq capacity broker --json 2>/dev/null | jq -ce '.reading | objects' 2>/dev/null ||
+                echo '{"error": "hq capacity broker failed"}'
 }
 
 codex_usage() {
-  local file
-  file=$(find ~/.codex/sessions -name '*.jsonl' -mtime -7 -printf '%T@ %p\n' 2>/dev/null \
-    | sort -rn | cut -d' ' -f2- | while read -r f; do grep -q '"rate_limits"' "$f" && { echo "$f"; break; }; done)
-  [ -n "$file" ] || { echo '{"error": "no Codex session log with rate limits in the last 7 days"}'; return; }
-  grep '"rate_limits"' "$file" | tail -1 \
-    | jq -c --arg seen "$(date -u -r "$file" +%FT%TZ)" '
+        local file
+        file=$(find ~/.codex/sessions -name '*.jsonl' -mtime -7 -printf '%T@ %p\n' 2>/dev/null |
+                sort -rn | cut -d' ' -f2- | while read -r f; do grep -q '"rate_limits"' "$f" && {
+                        echo "$f"
+                        break
+                }; done)
+        [ -n "$file" ] || {
+                echo '{"error": "no Codex session log with rate limits in the last 7 days"}'
+                return
+        }
+        grep '"rate_limits"' "$file" | tail -1 |
+                jq -c --arg seen "$(date -u -r "$file" +%FT%TZ)" '
         [.. | objects | select(.rate_limits? != null) | .rate_limits][0]
         | [(.primary // null), (.secondary // null)] | map(select(. != null and .used_percent != null))
         | if length == 0 then {error: "the last Codex session log has no usage windows"} else {
@@ -95,27 +120,28 @@ codex_usage() {
 
 # Runs one reader and passes on its JSON, or an error object when it printed none.
 read_json() {
-  local out
-  out=$("$@" 2>/dev/null) || true
-  if jq -se 'length == 1 and (.[0] | type == "object")' >/dev/null 2>&1 <<<"$out"; then echo "$out"
-  else jq -nc --arg r "$1" '{error: ($r + " printed no usage")}'; fi
+        local out
+        out=$("$@" 2>/dev/null) || true
+        if jq -se 'length == 1 and (.[0] | type == "object")' >/dev/null 2>&1 <<<"$out"; then
+                echo "$out"
+        else jq -nc --arg r "$1" '{error: ($r + " printed no usage")}'; fi
 }
 
 # The fleet's model, for a launch on a Claude agent. No answer leaves it empty: an older hq has no
 # hq model, and the model read never fails the script.
 fleet_model() {
-  hq model --json 2>/dev/null | jq -r '.model | strings' 2>/dev/null || true
+        hq model --json 2>/dev/null | jq -r '.model | strings' 2>/dev/null || true
 }
 model=$(fleet_model)
 
 jq -n \
-  --arg model "$model" \
-  --argjson pacing "$pacing" \
-  --argjson imp "$(read_json imp_room)" \
-  --argjson claude "$(read_json broker_usage)" \
-  --argjson local "$(read_json claude_usage)" \
-  --argjson codex "$(read_json codex_usage)" \
-  --arg size "$size" --argjson design "$design" --argjson localOpen "$local_open" '
+        --arg model "$model" \
+        --argjson pacing "$pacing" \
+        --argjson imp "$(read_json imp_room)" \
+        --argjson claude "$(read_json broker_usage)" \
+        --argjson local "$(read_json claude_usage)" \
+        --argjson codex "$(read_json codex_usage)" \
+        --arg size "$size" --argjson design "$design" --argjson localOpen "$local_open" '
   # The broker slot reads Claude only for imp launches; a Claude that targets this host reads its login.
   {claude: (if $pacing.providers.claude.target == "imp" then $claude else $local end), codex: $codex} as $read
   | ($imp | if .error then . + {room: false} else
