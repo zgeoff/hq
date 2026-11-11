@@ -113,23 +113,30 @@ test('the prompt is the one text block of a session-prompt.md, else the whole fi
 test('it spawns a session that declares no model on the fleet model, in the dry run and the real spawn, and follows each change of it', async () => {
   const ctx = setupTest();
   const entries = ctx.fleet.map((entry) => ({ name: entry.name, cwd: entry.cwd, prompt: entry.prompt, wake: entry.wake }));
-  const stub = fake([]);
+  const opusStub = fake([]);
+  const fableStub = fake([]);
   atMin(10);
   writeFleetModel(ctx.db, { model: 'opus', actor: 'kettle-owner', at: at2() });
-  const onOpus = await ensureFleet(ctx.db, stub.client, { dryRun: true, actor: 'hq-fleet', fleet: entries, now: ['z-kettle', 'z-teapot'] });
+  const onOpus = await ensureFleet(ctx.db, opusStub.client, { dryRun: true, actor: 'hq-fleet', fleet: entries, now: ['z-kettle', 'z-teapot'] });
   writeFleetModel(ctx.db, { model: 'fable', actor: 'kettle-owner', at: at2() });
-  const onFable = await ensureFleet(ctx.db, stub.client, { dryRun: true, actor: 'hq-fleet', fleet: entries, now: ['z-kettle', 'z-teapot'] });
+  const onFable = await ensureFleet(ctx.db, fableStub.client, { dryRun: true, actor: 'hq-fleet', fleet: entries, now: ['z-kettle', 'z-teapot'] });
   writeFleetModel(ctx.db, { model: 'opus', actor: 'kettle-owner', at: at2() });
-  await ensureFleet(ctx.db, stub.client, { dryRun: false, actor: 'hq-fleet', fleet: entries, now: ['z-kettle', 'z-teapot'] });
+  await ensureFleet(ctx.db, opusStub.client, { dryRun: false, actor: 'hq-fleet', fleet: entries, now: ['z-kettle', 'z-teapot'] });
+  writeFleetModel(ctx.db, { model: 'fable', actor: 'kettle-owner', at: at2() });
+  await ensureFleet(ctx.db, fableStub.client, { dryRun: false, actor: 'hq-fleet', fleet: entries, now: ['z-kettle', 'z-teapot'] });
 
   expect(onOpus.map((step) => [step.name, step.action, step.detail.match(/model [^,]+/u)?.[0]])).toStrictEqual([
     ['z-kettle', 'would spawn', 'model opus (hq model)'],
     ['z-teapot', 'would spawn', 'model opus (hq model)'],
   ]);
   expect(onFable.map((step) => step.detail.match(/model [^,]+/u)?.[0])).toStrictEqual(['model fable (hq model)', 'model fable (hq model)']);
-  expect(stub.spawns.map((spawn) => [spawn.name, spawn.model])).toStrictEqual([
+  expect(opusStub.spawns.map((spawn) => [spawn.name, spawn.model])).toStrictEqual([
     ['z-kettle', 'opus'],
     ['z-teapot', 'opus'],
+  ]);
+  expect(fableStub.spawns.map((spawn) => [spawn.name, spawn.model])).toStrictEqual([
+    ['z-kettle', 'fable'],
+    ['z-teapot', 'fable'],
   ]);
 });
 
