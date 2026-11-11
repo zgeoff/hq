@@ -8,7 +8,10 @@ Every launch: a Ready issue, a pitch, a relaunch, a design session or an ad-hoc 
    Code already trusts.
 2. **Provider:** run `scripts/capacity.sh` as pacing.md says, and launch on what it picks, or hold.
    When it returns `launch.target: local`, launch here. An ad-hoc session uses the CLI the owner
-   names, or Claude. Use Opus where offered.
+   names, or Claude. Read the model values that `atc_spawn_options_get` lists for the agent you
+   launch. When they include `fable`, which is Claude Fable 5.2, set `model` to `fable` on the spawn
+   call. Otherwise set `opus` if the agent lists `opus`, and leave `model` out if the agent lists
+   neither.
 3. **Prompt:** run `hq brief <issue>`, as briefs.md says. When you add to it, write as the owner, "I"
    to "you": the classifier reads "the owner" as someone else's claim.
 4. **Launch** with `atc_session_spawn`: `detached: true`, a name that says the outcome ("geo-92
