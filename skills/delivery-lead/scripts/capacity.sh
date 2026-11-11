@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 # Reads the 2 delivery limits (imp room, provider quota) and prints one JSON object. With
 # --size or --design it adds a launch decision: the provider to launch on, or why nothing can
-# launch. hq counts the design lanes, so --design picks only the provider.
+# launch. hq counts the design lanes, so --design picks only the provider. A launch on an agent
+# claude also carries the fleet's model as launch.model, read from hq model --json; with no answer
+# from hq (an older hq), launch.model is left out.
 # Usage: capacity.sh [--size S|M|L|XL | --design] [--local-open <n>]
 #   --local-open   delivery sessions running on this host now (default 0)
-# Reads pacing.json beside this folder. Needs jq, curl, imp and hq. Never prints a key.
+# Reads pacing.json beside this folder. Needs jq, curl, imp and hq (hq model for launch.model). Never prints a key.
 set -euo pipefail
 
 here=$(cd "$(dirname "$0")" && pwd)
@@ -99,7 +101,15 @@ read_json() {
   else jq -nc --arg r "$1" '{error: ($r + " printed no usage")}'; fi
 }
 
+# The fleet's model, for a launch on a Claude agent. No answer leaves it empty: an older hq has no
+# hq model, and the model read never fails the script.
+fleet_model() {
+  hq model --json 2>/dev/null | jq -r '.model | strings' 2>/dev/null || true
+}
+model=$(fleet_model)
+
 jq -n \
+  --arg model "$model" \
   --argjson pacing "$pacing" \
   --argjson imp "$(read_json imp_room)" \
   --argjson claude "$(read_json broker_usage)" \
@@ -127,6 +137,8 @@ jq -n \
         elif $c.target == "imp" and ($c.localFallback // 0) > $localOpen and ($q.local // {room: false}).room then "local"
         else null end;
   # A launch on the imps with an unknown broker quota says why it still has room.
+  # The fleet model is a Claude model, so only a launch on an agent claude carries it.
+  def modelFor($agent): if $agent == "claude" and $model != "" then {model: $model} else {} end;
   def note($p): if place($p) == "imp" and $providers[$p].unknown == true
       then {reason: ("broker quota unknown, its proof " + $providers[$p].proof + " is " + ($providers[$p].proofAgeHours | tostring) + " h old")}
       else {} end;
@@ -137,14 +149,14 @@ jq -n \
       slots: $pacing.slots
     }
   | if $design then . + {launch: (
-      if place("claude") != null then {provider: "claude", agent: $pacing.providers.claude.agent, target: place("claude")} + note("claude")
+      if place("claude") != null then {provider: "claude", agent: $pacing.providers.claude.agent, target: place("claude")} + modelFor($pacing.providers.claude.agent) + note("claude")
       elif $providers.claude.room then {provider: null, reason: "no imp room"}
       else {provider: null, reason: "Claude is at its quota threshold"} end)}
     elif $size != "" then . + {launch: (
       ($pacing.routes[$size] // error("unknown size " + $size)) as $route
       | [$route[] | select($providers[.].unattended and ($providers[.].room or ($providers[.].local // {room: false}).room))] as $open
       | [$open[] | select(place(.) != null)][0] as $pick
-      | if $pick then {size: $size, provider: $pick, agent: $pacing.providers[$pick].agent, target: place($pick)} + note($pick)
+      | if $pick then {size: $size, provider: $pick, agent: $pacing.providers[$pick].agent, target: place($pick)} + modelFor($pacing.providers[$pick].agent) + note($pick)
         elif ($open | length) > 0 then {size: $size, provider: null,
           reason: "no imp room"}
         else {size: $size, provider: null, reason: ("no provider on the " + $size + " route has room for unattended work")} end)}

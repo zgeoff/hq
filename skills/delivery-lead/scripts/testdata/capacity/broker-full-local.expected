@@ -46,6 +46,7 @@
     "size": "L",
     "provider": "claude",
     "agent": "claude",
-    "target": "local"
+    "target": "local",
+    "model": "opus"
   }
 }

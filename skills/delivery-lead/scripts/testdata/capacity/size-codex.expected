@@ -1,0 +1,53 @@
+{
+  "checkedAt": "2026-10-16T00:00:00Z",
+  "imp": {
+    "budgetMib": 8192,
+    "committedMib": 4096,
+    "freeMib": 4096,
+    "room": true
+  },
+  "providers": {
+    "codex": {
+      "used": 10,
+      "resetsAt": "2026-10-17T01:20:00Z",
+      "source": "last local Codex session log, ",
+      "threshold": 80,
+      "unattended": true,
+      "target": "local",
+      "room": true
+    },
+    "claude": {
+      "slot": 1,
+      "proof": "req-4c1d",
+      "proofAgeHours": 5,
+      "used": 40,
+      "resetsAt": "2026-10-16T04:00:00Z",
+      "source": "hq slot read of the imp broker slot 1, 2026-10-15T23:00:00Z",
+      "threshold": 95,
+      "unattended": true,
+      "target": "imp",
+      "room": true,
+      "local": {
+        "used": 40,
+        "windows": {
+          "fiveHour": 40,
+          "sevenDay": 25
+        },
+        "resetsAt": "2026-10-16T04:00:00Z",
+        "source": "fixture cache",
+        "cached": true,
+        "room": true
+      }
+    }
+  },
+  "slots": {
+    "imp": 2,
+    "local": 2
+  },
+  "launch": {
+    "size": "S",
+    "provider": "codex",
+    "agent": "codex",
+    "target": "local"
+  }
+}

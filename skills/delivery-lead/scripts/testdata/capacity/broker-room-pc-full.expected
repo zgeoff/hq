@@ -46,6 +46,7 @@
     "size": "L",
     "provider": "claude",
     "agent": "claude",
-    "target": "imp"
+    "target": "imp",
+    "model": "opus"
   }
 }

@@ -11,6 +11,8 @@ trap 'exit 1' HUP INT TERM
 export TMPDIR="$tmp"
 REAL_JQ=$(command -v jq)
 export REAL_JQ
+MODEL_FIXTURE="$fixtures/model.json"
+export MODEL_FIXTURE
 mkdir -p "$tmp/bin" "$tmp/skill/scripts"
 cp "$here/capacity.sh" "$tmp/skill/scripts/capacity.sh"
 cp "$fixtures/pacing.json" "$tmp/skill/pacing.json"
@@ -38,8 +40,11 @@ cat "$IMP_FIXTURE"
 SH
 cat > "$tmp/bin/hq" <<'SH'
 #!/bin/sh
-[ "$*" = "capacity broker --json" ] || exit 1
-cat "$HQ_FIXTURE"
+case $* in
+  'capacity broker --json') cat "$HQ_FIXTURE" ;;
+  'model --json') [ -z "${HQ_MODEL_FAIL:-}" ] || exit 1; cat "$MODEL_FIXTURE" ;;
+  *) exit 1 ;;
+esac
 SH
 cat > "$tmp/bin/curl" <<'SH'
 #!/bin/sh
@@ -110,6 +115,20 @@ PACING_FIXTURE=pacing-claude-local.json
 check target-local imp-room.json broker-empty.json claude-full.json --size L
 unset PACING_FIXTURE
 cp "$fixtures/pacing.json" "$tmp/skill/pacing.json"
+
+# The fleet model is a Claude model, so a Codex launch carries none.
+cp "$fixtures/codex-room.jsonl" "$HOME/.codex/sessions/codex-room.jsonl"
+PACING_FIXTURE=pacing-codex-first.json
+check size-codex imp-room.json broker-room.json claude-room.json --size S
+unset PACING_FIXTURE
+rm -f "$HOME/.codex/sessions/codex-room.jsonl"
+cp "$fixtures/pacing.json" "$tmp/skill/pacing.json"
+
+# An hq with no model command still gives the launch, with no model in it, and the script does not fail.
+HQ_MODEL_FAIL=1
+export HQ_MODEL_FAIL
+check size-model-unread imp-room.json broker-room.json claude-room.json --size M
+unset HQ_MODEL_FAIL
 
 # A fresh reading of another account is never reused: the active account, with no login here,
 # reads live and finds none.
