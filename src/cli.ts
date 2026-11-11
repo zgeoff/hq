@@ -363,6 +363,10 @@ import { readSlotCause } from './lanes/read-slot-cause.ts';
 import { readSlotMinutes } from './lanes/read-slot-minutes.ts';
 import rulesTable from '../lanes.json';
 import { runFocusCommand } from './focus/run-focus-command.ts';
+import { buildFleetModelData } from './model/build-fleet-model-data.ts';
+import { formatFleetModel } from './model/format-fleet-model.ts';
+import { readFleetModel } from './model/read-fleet-model.ts';
+import { runModelCommand } from './model/run-model-command.ts';
 import { runLinearCommand } from './linear/run-linear-command.ts';
 import { mergedRuns } from './sizes/merged-runs.ts';
 import { parseSize } from './sizes/parse-size.ts';
@@ -949,7 +953,8 @@ async function capacityCommand(db: Database, verb: string | undefined, args: str
       const pacing = await loadPacing(pacingPath());
       const hint = readCapacityHint(db, pacing.claudeLaunchPct ?? 95, now());
       const fleet = await readCapacityFleet(db, buildFleetIO(), now(), flags['refresh-slots'] === true);
-      return { data: { sample: reading, hint, settings: capacitySettings(db), open, fleet: { ...fleet.view, problems: fleet.problems } }, text: [...lines, ...formatCapacityHint(hint), ...formatFleetView(fleet.view), ...fleet.problems.map((problem) => `  ! ${problem}`)].join('\n') };
+      const fleetModel = readFleetModel(db);
+      return { data: { sample: reading, hint, settings: capacitySettings(db), open, fleet: { ...fleet.view, problems: fleet.problems }, model: buildFleetModelData(fleetModel) }, text: [...lines, formatFleetModel(fleetModel), ...formatCapacityHint(hint), ...formatFleetView(fleet.view), ...fleet.problems.map((problem) => `  ! ${problem}`)].join('\n') };
     })
     .with('sample', async () => {
       const r = await capacityTick(db, await actor(db, flags));
@@ -2020,6 +2025,7 @@ const GROUPS: Record<string, (context: Ctx) => Promise<Out>> = {
     return context.verb === undefined || context.verb === 'status' || context.verb === 'log' ? withStaleBuild(out, checkLanesBuild((path) => readFileSync(path, 'utf8'))) : out;
   },
   focus: async (context) => runFocusCommand({ db: context.db, call: makeAuditedLinearCaller(context.db, context.run), actor: await actor(context.db, context.flags), at: now(), verb: context.verb, rest: context.rest, reserves: context.flags.reserve ?? [] }),
+  model: async (context) => runModelCommand({ db: context.db, actor: await actor(context.db, context.flags), at: now(), verb: context.verb, rest: context.rest }),
   stats: (c) => statsCommand(c.db, c.flags),
   answers: (c) => Promise.resolve(runAnswersCommand(c.db, c.flags)),
   grant: (c) => runGrantCommand(c.db, c.verb, c.rest, c.flags),
