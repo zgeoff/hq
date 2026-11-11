@@ -132,7 +132,8 @@ read_json() {
 fleet_model() {
         hq model --json 2>/dev/null | jq -r '.model | strings' 2>/dev/null || true
 }
-model=$(fleet_model)
+model=""
+if [ -n "$size" ] || [ "$design" = true ]; then model=$(fleet_model); fi
 
 jq -n \
         --arg model "$model" \
