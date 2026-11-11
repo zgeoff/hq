@@ -9,9 +9,9 @@ Every launch: a Ready issue, a pitch, a relaunch, a design session or an ad-hoc 
 2. **Provider:** run `scripts/capacity.sh` as pacing.md says, and launch on what it picks, or hold.
    When it returns `launch.target: local`, launch here. An ad-hoc session uses the CLI the owner
    names, or Claude. Set `model` in `atc_session_spawn` to `launch.model` from the `capacity.sh`
-   result. When the result has no `launch.model`, leave `model` out. The exception is an ad-hoc
-   session on Claude whose result has no `launch.model`. For that session, run `hq model --json`
-   and set `model` to its `model` field.
+   result. When the result has no `launch.model`, leave `model` out. For an ad-hoc session on a
+   CLI other than Claude, always leave `model` out. For an ad-hoc session on Claude whose result
+   has no `launch.model`, run `hq model --json` and set `model` to its `model` field.
 3. **Prompt:** run `hq brief <issue>`, as briefs.md says. When you add to it, write as the owner, "I"
    to "you": the classifier reads "the owner" as someone else's claim.
 4. **Launch** with `atc_session_spawn`: `detached: true`, a name that says the outcome ("geo-92
