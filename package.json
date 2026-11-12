@@ -54,7 +54,7 @@
     "@types/bun": "latest",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
-    "@zgeoff/agent-hooks": "0.2.11",
+    "@zgeoff/agent-hooks": "0.2.12",
     "@zgeoff/chex": "0.3.2",
     "@zgeoff/diet": "0.2.2",
     "@zgeoff/oxlint-config": "0.10.7",
