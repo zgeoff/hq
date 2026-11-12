@@ -1,5 +1,6 @@
 import { fmtMin } from './fmt-min.ts';
 import { formatPct as pct } from './format-pct.ts';
+import { roleName } from '../roles/role-name.ts';
 import { THIN } from './thin.ts';
 import type { Dist, Oldest, Stats } from './types.ts';
 
@@ -15,7 +16,7 @@ export function statsText(s: Stats): string {
   return [
     `hq stats ${s.window.from} → ${s.window.to} (rows from before ${s.window.cutoff} left out)`,
     '',
-    'Wait on the owner (z-stu acts: batch, reorder or chase what waits longest)',
+    `Wait on the owner (${roleName('owner')} acts: batch, reorder or chase what waits longest)`,
     `  call/proposal queued → answered: ${d(g.queueToAnswer)}; oldest waiting: ${old(g.oldestQueued)}`,
     `  answered → applied:              ${d(g.answerToApply)}; oldest unapplied: ${old(g.oldestUnapplied)}`,
     `  unblock item added → done:       ${d(g.unblockAddedToDone)}; oldest open: ${old(g.oldestUnblock)}`,

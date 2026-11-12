@@ -1,6 +1,7 @@
 import type { AnswerSourceRequest } from './read-answer-source-refusal.ts';
 import { hasPRName } from './has-pr-name.ts';
 import { isPlainYes } from './is-plain-yes.ts';
+import { roleName } from '../roles/role-name.ts';
 
 export interface CallEvidence {
   title: string;
@@ -13,7 +14,7 @@ export function judgeCallAnswer(request: AnswerSourceRequest, evidence: CallEvid
     return `${request.source} is not a call in hq`;
   }
   if (evidence.answer === null) {
-    return `${request.source} has no owner answer for its current round, in the console or by \`hq call answer\` from the owner's session (z-stu), as atc finds the caller`;
+    return `${request.source} has no owner answer for its current round, in the console or by \`hq call answer\` from the owner's session (${roleName('owner')}), as atc finds the caller`;
   }
   if (!hasPRName(evidence.title, request.ref)) {
     return `${request.source} does not name ${request.ref.slug}#${request.ref.pr} in the title the owner answered`;

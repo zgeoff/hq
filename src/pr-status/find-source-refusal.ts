@@ -9,6 +9,7 @@ import { findChatRefusal } from './find-chat-refusal.ts';
 import { findCurrentOwnerAnswer } from './find-current-owner-answer.ts';
 import { hasPRName } from './has-pr-name.ts';
 import { isPlainYes } from './is-plain-yes.ts';
+import { roleName } from '../roles/role-name.ts';
 
 type OwnerAction = { action: 'override'; check?: string } | { action: 'accept-risk'; finding: string };
 
@@ -42,7 +43,7 @@ const CallRowSchema = z.object({ title: z.string() });
 const AnswerDataSchema = z.object({ answer: z.string(), title: z.string().optional() });
 
 // --by and HQ_AS are the caller's own words, so only a console answer or an `hq call answer` that
-// atc placed in z-stu's session is the owner's.
+// atc placed in the owner's session is the owner's.
 function findCallRefusal(db: Database, check: CallCheck): string | null {
   const call = CallRowSchema.nullable().parse(db.query("SELECT title FROM asks WHERE id = ? AND kind = 'call'").get(check.id));
   if (call === null) {
@@ -50,7 +51,7 @@ function findCallRefusal(db: Database, check: CallCheck): string | null {
   }
   const answer = findCurrentOwnerAnswer(db, check.id);
   if (answer === null) {
-    return `${check.source} has no owner answer for its current round, in the console or by \`hq call answer\` from the owner's session (z-stu), as atc finds the caller`;
+    return `${check.source} has no owner answer for its current round, in the console or by \`hq call answer\` from the owner's session (${roleName('owner')}), as atc finds the caller`;
   }
   const data = AnswerDataSchema.parse(JSON.parse(answer.data));
   const options = readRoundOptions(db, check.id, answer.seq);
