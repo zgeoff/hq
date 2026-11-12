@@ -130,8 +130,9 @@ async function ensureOnce(db: Database, client: FleetClient, opts: EnsureOnceOpt
 
   const unpinned = metaJson(db, FLEET_UNPINNED, strMap, {});
 
-  // A retired name that forwards to a declared one keeps its recorded id, so a rename spawns no second session.
-  const retiredIds = (name: string) => Object.keys(known).filter((recorded) => recorded !== name && forwardOf(db, recorded) === name).map((recorded) => known[recorded]);
+  // Until a renamed session's id is recorded under its declared name, the id recorded under the
+  // retired name that forwards to it stands in, so the rename spawns no second session.
+  const retiredIds = (name: string) => (known[name] === undefined ? Object.keys(known).filter((recorded) => recorded !== name && forwardOf(db, recorded) === name).map((recorded) => known[recorded]) : []);
   const knownIds = (name: string) => [...new Set([known[name], ...retiredIds(name), ...wakeList(db).filter((wake) => wake.name === name).map((wake) => wake.session_id)].filter((id): id is string => id !== undefined && id !== ''))];
   // atc writes this record when a restart ends; the restore runs around then.
   let restartAt: number | null = null;

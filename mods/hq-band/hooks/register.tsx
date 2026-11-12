@@ -86,7 +86,7 @@ export function register(on: On): void {
 }
 
 // The fleet name hq fleet last saw under this atc session's id; none outside atc.
-// hq's roles table, not a name, says which session is the owner's, so a rename needs no change here.
+// A hooks module can't import fleet.json, which sits outside the plugin's folder, so hq whois gives the roles.
 async function probeOwnerSession($: EngineInterface): Promise<boolean> {
   const id = await $.env.get('ATC_SESSION_ID');
   const whoisAnswer = id === undefined || id === '' ? null : await runHq($, ['whois', id, '--json']);

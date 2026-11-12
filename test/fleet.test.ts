@@ -398,6 +398,17 @@ test('it spawns no second session for one still under a retired name that forwar
   expect(stub.spawns).toHaveLength(0);
 });
 
+test('it adopts no session under a retired name once the declared name has its own recorded id', async () => {
+  const ctx = setupTest();
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-kettle': 'id-gone', 'z-oldkettle': 'id-old' }));
+  setMeta(ctx.db, 'outbox_forwards', JSON.stringify({ 'z-oldkettle': 'z-kettle' }));
+  const stub = fake([{ id: 'id-old', name: 'z-oldkettle', alive: true }]);
+
+  const steps = await ensureFleet(ctx.db, stub.client, { dryRun: false, actor: 'hq-fleet', fleet: ctx.fleet.slice(0, 1) });
+
+  expect(steps).toStrictEqual([{ name: 'z-kettle', action: 'waiting', detail: expect.stringContaining('its known id is not in atc') }]);
+});
+
 test('it records the id of a session still under a retired name against the declared name it forwards to', async () => {
   const ctx = setupTest();
   setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-oldkettle': 'id-k' }));
