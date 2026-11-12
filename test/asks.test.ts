@@ -31,13 +31,13 @@ test('#addAsk files a queued call and tells the owner', () => {
   const added = addAsk(ctx.db, buildMockAddInput());
   expect(added.result).toBe('added');
   expect(added.ask.state).toBe('queued');
-  expect(readOutboxRows(ctx.db).map((row) => row.target)).toStrictEqual(['z-stu']);
+  expect(readOutboxRows(ctx.db).map((row) => row.target)).toStrictEqual(['stu']);
   expect(readOutboxRows(ctx.db)[0]?.text).toContain('call ready: geo-1-paint');
 });
 
 test('#addAsk sends nothing when the owner files its own item', () => {
   const ctx = setupTest();
-  addAsk(ctx.db, buildMockAddInput({ actor: 'z-stu' }));
+  addAsk(ctx.db, buildMockAddInput({ actor: 'stu' }));
   expect(readOutboxRows(ctx.db)).toStrictEqual([]);
 });
 
@@ -45,12 +45,12 @@ test('#addAsk does nothing for the same id and question again, even once answere
   const ctx = setupTest();
   addAsk(ctx.db, buildMockAddInput());
   expect(addAsk(ctx.db, buildMockAddInput()).result).toBe('noop');
-  openAsk(ctx.db, { force: false, actor: 'z-stu' });
-  answerAsk(ctx.db, { id: 'geo-1-paint', kind: 'call', answer: 'green, obviously', actor: 'z-stu' });
+  openAsk(ctx.db, { force: false, actor: 'stu' });
+  answerAsk(ctx.db, { id: 'geo-1-paint', kind: 'call', answer: 'green, obviously', actor: 'stu' });
   const again = addAsk(ctx.db, buildMockAddInput({ body: 'reworded body, same question' }));
   expect(again.result).toBe('noop');
   expect(again.ask.state).toBe('answered');
-  expect(readOutboxRows(ctx.db).filter((row) => row.target === 'z-stu')).toHaveLength(1);
+  expect(readOutboxRows(ctx.db).filter((row) => row.target === 'stu')).toHaveLength(1);
 });
 
 test('#addAsk keeps the id and sends nothing when an issue joins a shared call', () => {
@@ -65,9 +65,9 @@ test('#addAsk keeps the id and sends nothing when an issue joins a shared call',
 test('#addAsk starts a new round for a new question on a settled id', () => {
   const ctx = setupTest();
   addAsk(ctx.db, buildMockAddInput());
-  openAsk(ctx.db, { force: false, actor: 'z-stu' });
-  answerAsk(ctx.db, { id: 'geo-1-paint', kind: 'call', answer: 'green', actor: 'z-stu' });
-  applyAsk(ctx.db, 'geo-1-paint', 'call', 'typed:z-delivery', null, 'z-stu');
+  openAsk(ctx.db, { force: false, actor: 'stu' });
+  answerAsk(ctx.db, { id: 'geo-1-paint', kind: 'call', answer: 'green', actor: 'stu' });
+  applyAsk(ctx.db, 'geo-1-paint', 'call', 'typed:z-delivery', null, 'stu');
   const added = addAsk(ctx.db, buildMockAddInput({ question: 'Gloss or matte?' }));
   expect(added.result).toBe('reasked');
   expect(added.ask).toMatchObject({ state: 'queued', round: 2, answer: null });
@@ -76,8 +76,8 @@ test('#addAsk starts a new round for a new question on a settled id', () => {
 test('#addAsk never sends the same question back once it was answered and closed', () => {
   const ctx = setupTest();
   addAsk(ctx.db, buildMockAddInput());
-  openAsk(ctx.db, { force: false, actor: 'z-stu' });
-  answerAsk(ctx.db, { id: 'geo-1-paint', kind: 'call', answer: 'green', actor: 'z-stu' });
+  openAsk(ctx.db, { force: false, actor: 'stu' });
+  answerAsk(ctx.db, { id: 'geo-1-paint', kind: 'call', answer: 'green', actor: 'stu' });
   closeAsk(ctx.db, 'geo-1-paint', 'call', 'settled elsewhere', 'z-refine');
   const added = addAsk(ctx.db, buildMockAddInput());
   expect(added.result).toBe('noop');
@@ -88,9 +88,9 @@ test('#addAsk never sends the same question back once it was answered and closed
 test('#addAsk starts a new round for an answered then skipped call, and keeps the old answer in the log', () => {
   const ctx = setupTest();
   addAsk(ctx.db, buildMockAddInput());
-  openAsk(ctx.db, { force: false, actor: 'z-stu' });
-  answerAsk(ctx.db, { id: 'geo-1-paint', kind: 'call', answer: 'green', actor: 'z-stu' });
-  skipAsk(ctx.db, 'geo-1-paint', 'call', 'issue changed', 'z-stu');
+  openAsk(ctx.db, { force: false, actor: 'stu' });
+  answerAsk(ctx.db, { id: 'geo-1-paint', kind: 'call', answer: 'green', actor: 'stu' });
+  skipAsk(ctx.db, 'geo-1-paint', 'call', 'issue changed', 'stu');
   const added = addAsk(ctx.db, buildMockAddInput());
   expect(added.result).toBe('requeued');
   expect(added.ask).toMatchObject({ state: 'queued', round: 2, answer: null });
@@ -102,7 +102,7 @@ test('#addAsk starts a new round for an answered then skipped call, and keeps th
 test('#addAsk returns a skipped call to the queue when it is re-added', () => {
   const ctx = setupTest();
   addAsk(ctx.db, buildMockAddInput());
-  skipAsk(ctx.db, 'geo-1-paint', 'call', 'issue changed', 'z-stu');
+  skipAsk(ctx.db, 'geo-1-paint', 'call', 'issue changed', 'stu');
   expect(nextEligible(ctx.db)).toBeNull();
   expect(addAsk(ctx.db, buildMockAddInput()).result).toBe('requeued');
   expect(nextEligible(ctx.db)?.id).toBe('geo-1-paint');
@@ -120,7 +120,7 @@ test('#addAsk drops the recommendation when a changed question starts a new roun
   const ctx = setupTest();
   applyAskItem(ctx.db, { kind: 'call', id: 'geo-1-paint', issues: ['GEO-1'], forSession: null, actor: 'z-refine' }, parseItemInput('call', JSON.stringify({ title: 'Paint the shed', question: 'Green or grey?', stuView: 'Grey hides the dirt.', options: [{ label: 'Green', effect: 'Green.' }, { label: 'Grey', effect: 'Grey.', recommended: true }] })), 'Green or grey?');
   openAsk(ctx.db, { id: 'geo-1-paint', force: true, actor: 'z-refine' });
-  answerAsk(ctx.db, { id: 'geo-1-paint', kind: 'call', answer: 'Grey', actor: 'z-stu' });
+  answerAsk(ctx.db, { id: 'geo-1-paint', kind: 'call', answer: 'Grey', actor: 'stu' });
   addAsk(ctx.db, buildMockAddInput({ title: 'Paint the fence', question: 'One coat or two?', body: 'One coat or two?' }));
   expect(getAsk(ctx.db, 'geo-1-paint')).toMatchObject({ question: 'One coat or two?', stu_view: null, item: null });
 });
@@ -135,8 +135,8 @@ test('#addAsk drops the structured fields when a free-text re-add changes the te
 test('#addAsk drops the structured fields when a free-text re-add asks a new question', () => {
   const ctx = setupTest();
   applyAskItem(ctx.db, { kind: 'call', id: 'geo-1-paint', issues: ['GEO-1'], forSession: null, actor: 'z-refine' }, parseItemInput('call', JSON.stringify({ title: 'Paint the shed', question: 'Green or grey?', options: [{ label: 'Green', effect: 'Green.' }, { label: 'Grey', effect: 'Grey.' }] })), 'Green or grey?');
-  openAsk(ctx.db, { force: false, actor: 'z-stu' });
-  answerAsk(ctx.db, { id: 'geo-1-paint', kind: 'call', answer: 'Green', actor: 'z-stu' });
+  openAsk(ctx.db, { force: false, actor: 'stu' });
+  answerAsk(ctx.db, { id: 'geo-1-paint', kind: 'call', answer: 'Green', actor: 'stu' });
   addAsk(ctx.db, buildMockAddInput({ question: 'Which green?' }));
   expect(getAsk(ctx.db, 'geo-1-paint')).toMatchObject({ state: 'queued', question: 'Which green?', item: null });
 });
@@ -151,7 +151,7 @@ test('#addAsk keeps the structured fields when a re-add changes only the order',
 test('#addAsk keeps the question the owner saw on an open item', () => {
   const ctx = setupTest();
   addAsk(ctx.db, buildMockAddInput());
-  openAsk(ctx.db, { force: false, actor: 'z-stu' });
+  openAsk(ctx.db, { force: false, actor: 'stu' });
   const added = addAsk(ctx.db, buildMockAddInput({ question: 'Something else?' }));
   expect(added.result).toBe('noop');
   expect(getAsk(ctx.db, 'geo-1-paint')?.question).toBe('Green or grey?');
@@ -168,8 +168,8 @@ test('#openAsk keeps one item open at a time across calls and proposals', () => 
   const ctx = setupTest();
   addAsk(ctx.db, buildMockAddInput());
   addAsk(ctx.db, buildMockAddInput({ kind: 'proposal', id: 'tidy-docs', actor: 'z-steward' }));
-  openAsk(ctx.db, { force: false, actor: 'z-stu' });
-  expect(() => openAsk(ctx.db, { force: true, actor: 'z-stu' })).toThrow('is open with the owner');
+  openAsk(ctx.db, { force: false, actor: 'stu' });
+  expect(() => openAsk(ctx.db, { force: true, actor: 'stu' })).toThrow('is open with the owner');
   expect(waitReasons(ctx.db)).toContain('open: geo-1-paint');
 });
 
@@ -190,30 +190,30 @@ test('#openAsk opens the oldest item first', () => {
   addAsk(ctx.db, buildMockAddInput());
   at('2026-10-14T01:05:00Z');
   addAsk(ctx.db, buildMockAddInput({ id: 'geo-2-fence' }));
-  expect(openAsk(ctx.db, { force: false, actor: 'z-stu' }).id).toBe('geo-1-paint');
+  expect(openAsk(ctx.db, { force: false, actor: 'stu' }).id).toBe('geo-1-paint');
 });
 
 test('#openAsk refuses from 03:00 to 07:00 Sydney unless forced', () => {
   const ctx = setupTest();
   addAsk(ctx.db, buildMockAddInput());
   at(FOUR_AM_SYDNEY);
-  expect(() => openAsk(ctx.db, { force: false, actor: 'z-stu' })).toThrow('quiet hours');
-  expect(openAsk(ctx.db, { force: true, actor: 'z-stu' }).state).toBe('open');
+  expect(() => openAsk(ctx.db, { force: false, actor: 'stu' })).toThrow('quiet hours');
+  expect(openAsk(ctx.db, { force: true, actor: 'stu' }).state).toBe('open');
 });
 
 test('#openAsk refuses while a hold is set', () => {
   const ctx = setupTest();
   addAsk(ctx.db, buildMockAddInput());
-  ctx.seed.meta({ key: 'hold', value: JSON.stringify({ reason: 'mid-intake', since: NOON_SYDNEY, by: 'z-stu' }) });
-  expect(() => openAsk(ctx.db, { force: false, actor: 'z-stu' })).toThrow('held: mid-intake');
+  ctx.seed.meta({ key: 'hold', value: JSON.stringify({ reason: 'mid-intake', since: NOON_SYDNEY, by: 'stu' }) });
+  expect(() => openAsk(ctx.db, { force: false, actor: 'stu' })).toThrow('held: mid-intake');
   expect(waitReasons(ctx.db)).toStrictEqual(['held: mid-intake']);
 });
 
 test('#answerAsk keeps the exact words and tells the filer, with no grant', () => {
   const ctx = setupTest();
   addAsk(ctx.db, buildMockAddInput());
-  openAsk(ctx.db, { force: false, actor: 'z-stu' });
-  const answered = answerAsk(ctx.db, { id: 'geo-1-paint', kind: 'call', answer: '  green — the  dark one ', actor: 'z-stu' });
+  openAsk(ctx.db, { force: false, actor: 'stu' });
+  const answered = answerAsk(ctx.db, { id: 'geo-1-paint', kind: 'call', answer: '  green — the  dark one ', actor: 'stu' });
   expect(answered.answer).toBe('  green — the  dark one ');
   const note = readOutboxRows(ctx.db).at(-1);
   expect(note?.target).toBe('z-triage');
@@ -224,27 +224,27 @@ test('#answerAsk keeps the exact words and tells the filer, with no grant', () =
 test('#answerAsk tells the filer that the owner answered, with the exact notice text', () => {
   const ctx = setupTest();
   addAsk(ctx.db, buildMockAddInput());
-  openAsk(ctx.db, { force: false, actor: 'z-stu' });
-  answerAsk(ctx.db, { id: 'geo-1-paint', kind: 'call', answer: 'green', actor: 'z-stu' });
+  openAsk(ctx.db, { force: false, actor: 'stu' });
+  answerAsk(ctx.db, { id: 'geo-1-paint', kind: 'call', answer: 'green', actor: 'stu' });
 
-  expect(readOutboxRows(ctx.db).at(-1)?.text).toBe('FYI call geo-1-paint answered by the owner: "green". This note carries no grant: z-stu applies the answer.');
+  expect(readOutboxRows(ctx.db).at(-1)?.text).toBe('FYI call geo-1-paint answered by the owner: "green". This note carries no grant: stu applies the answer.');
 });
 
 test('#applyAsk needs an answer first and a known target', () => {
   const ctx = setupTest();
   addAsk(ctx.db, buildMockAddInput());
-  openAsk(ctx.db, { force: false, actor: 'z-stu' });
-  expect(() => applyAsk(ctx.db, 'geo-1-paint', 'call', 'none', null, 'z-stu')).toThrow('needs answered');
-  answerAsk(ctx.db, { id: 'geo-1-paint', kind: 'call', answer: 'green', actor: 'z-stu' });
-  expect(() => applyAsk(ctx.db, 'geo-1-paint', 'call', 'slack', null, 'z-stu')).toThrow('--to must be');
-  expect(applyAsk(ctx.db, 'geo-1-paint', 'call', 'linear:GEO-1', 'commented', 'z-stu').applied_to).toBe('linear:GEO-1');
+  openAsk(ctx.db, { force: false, actor: 'stu' });
+  expect(() => applyAsk(ctx.db, 'geo-1-paint', 'call', 'none', null, 'stu')).toThrow('needs answered');
+  answerAsk(ctx.db, { id: 'geo-1-paint', kind: 'call', answer: 'green', actor: 'stu' });
+  expect(() => applyAsk(ctx.db, 'geo-1-paint', 'call', 'slack', null, 'stu')).toThrow('--to must be');
+  expect(applyAsk(ctx.db, 'geo-1-paint', 'call', 'linear:GEO-1', 'commented', 'stu').applied_to).toBe('linear:GEO-1');
 });
 
 test('#laterAsk defaults to the next 07:00 Sydney, and the item reopens when due', () => {
   const ctx = setupTest();
   addAsk(ctx.db, buildMockAddInput());
-  openAsk(ctx.db, { force: false, actor: 'z-stu' });
-  const later = laterAsk(ctx.db, 'geo-1-paint', 'call', null, 'z-stu');
+  openAsk(ctx.db, { force: false, actor: 'stu' });
+  const later = laterAsk(ctx.db, 'geo-1-paint', 'call', null, 'stu');
   expect(later.due_at).toBe('2026-10-14T20:00:00Z');
   expect(nextEligible(ctx.db)).toBeNull();
   at('2026-10-14T20:00:00Z');
@@ -254,26 +254,26 @@ test('#laterAsk defaults to the next 07:00 Sydney, and the item reopens when due
 test('#laterAsk accepts +4h', () => {
   const ctx = setupTest();
   addAsk(ctx.db, buildMockAddInput());
-  expect(laterAsk(ctx.db, 'geo-1-paint', 'call', '+4h', 'z-stu').due_at).toBe('2026-10-14T05:00:00Z');
+  expect(laterAsk(ctx.db, 'geo-1-paint', 'call', '+4h', 'stu').due_at).toBe('2026-10-14T05:00:00Z');
 });
 
 test('#laterAsk puts off again a call whose later hold has ended', () => {
   const ctx = setupTest();
   addAsk(ctx.db, buildMockAddInput());
-  laterAsk(ctx.db, 'geo-1-paint', 'call', '+4h', 'z-stu');
+  laterAsk(ctx.db, 'geo-1-paint', 'call', '+4h', 'stu');
   at('2026-10-14T05:00:00Z');
   const due = getAsk(ctx.db, 'geo-1-paint');
   invariant(due);
 
-  expect(laterAsk(ctx.db, 'geo-1-paint', 'call', '2026-10-14T22:00:00Z', 'z-stu')).toStrictEqual({ ...due, state: 'later', due_at: '2026-10-14T22:00:00Z', updated_at: '2026-10-14T05:00:00Z' });
+  expect(laterAsk(ctx.db, 'geo-1-paint', 'call', '2026-10-14T22:00:00Z', 'stu')).toStrictEqual({ ...due, state: 'later', due_at: '2026-10-14T22:00:00Z', updated_at: '2026-10-14T05:00:00Z' });
 });
 
 test('#laterAsk leaves a call it put off again out of the next call until the new time', () => {
   const ctx = setupTest();
   addAsk(ctx.db, buildMockAddInput());
-  laterAsk(ctx.db, 'geo-1-paint', 'call', '+4h', 'z-stu');
+  laterAsk(ctx.db, 'geo-1-paint', 'call', '+4h', 'stu');
   at('2026-10-14T05:00:00Z');
-  laterAsk(ctx.db, 'geo-1-paint', 'call', '2026-10-14T22:00:00Z', 'z-stu');
+  laterAsk(ctx.db, 'geo-1-paint', 'call', '2026-10-14T22:00:00Z', 'stu');
 
   expect(nextEligible(ctx.db)).toBeNull();
 });
@@ -281,10 +281,10 @@ test('#laterAsk leaves a call it put off again out of the next call until the ne
 test('#closeAsk tells the filer and the owner, but not the closer', () => {
   const ctx = setupTest();
   addAsk(ctx.db, buildMockAddInput());
-  openAsk(ctx.db, { force: false, actor: 'z-stu' });
+  openAsk(ctx.db, { force: false, actor: 'stu' });
   closeAsk(ctx.db, 'geo-1-paint', 'call', 'issue lost Needs Geoff', 'z-refine');
   const last = readOutboxRows(ctx.db).at(-1);
-  expect(last?.target).toBe('z-stu');
+  expect(last?.target).toBe('stu');
   expect(last?.text).toContain('it was open with the owner, so tell them it is settled');
   expect(() => closeAsk(ctx.db, 'geo-1-paint', 'call', 'again', 'z-refine')).toThrow('is closed');
 });
@@ -292,27 +292,27 @@ test('#closeAsk tells the filer and the owner, but not the closer', () => {
 test('it logs every transition in the event log', () => {
   const ctx = setupTest();
   addAsk(ctx.db, buildMockAddInput());
-  openAsk(ctx.db, { force: false, actor: 'z-stu' });
-  answerAsk(ctx.db, { id: 'geo-1-paint', kind: 'call', answer: 'green', actor: 'z-stu' });
-  applyAsk(ctx.db, 'geo-1-paint', 'call', 'none', null, 'z-stu');
+  openAsk(ctx.db, { force: false, actor: 'stu' });
+  answerAsk(ctx.db, { id: 'geo-1-paint', kind: 'call', answer: 'green', actor: 'stu' });
+  applyAsk(ctx.db, 'geo-1-paint', 'call', 'none', null, 'stu');
   const actions = readSubjectEvents(ctx.db, 'ask', 'geo-1-paint').map((event) => event.action);
   expect(actions).toStrictEqual(['added', 'opened', 'answered', 'applied']);
 });
 
-test('#queueReminder tells z-stu once after 07:00 about a proposal filed in quiet hours', () => {
+test('#queueReminder tells stu once after 07:00 about a proposal filed in quiet hours', () => {
   const ctx = setupTest();
   at('2026-10-14T18:00:00Z');
   addAsk(ctx.db, buildMockAddInput({ kind: 'proposal', id: 'tidy-docs', actor: 'z-steward' }));
   expect(queueReminder(ctx.db, 'hq-lanes').reminded).toBeNull();
   at('2026-10-14T20:05:00Z');
   expect(queueReminder(ctx.db, 'hq-lanes').reminded).toBe('tidy-docs');
-  expect(readOutboxRows(ctx.db).at(-1)?.target).toBe('z-stu');
+  expect(readOutboxRows(ctx.db).at(-1)?.target).toBe('stu');
   expect(readOutboxRows(ctx.db).at(-1)?.text).toContain('Open it with: hq open');
   at('2026-10-14T20:10:00Z');
   expect(queueReminder(ctx.db, 'hq-lanes').reminded).toBeNull();
 });
 
-test('#queueReminder sends no reminder for an item z-stu heard about while it could open', () => {
+test('#queueReminder sends no reminder for an item stu heard about while it could open', () => {
   const ctx = setupTest();
   addAsk(ctx.db, buildMockAddInput());
   expect(queueReminder(ctx.db, 'hq-lanes').why).toContain('already told');
@@ -320,8 +320,8 @@ test('#queueReminder sends no reminder for an item z-stu heard about while it co
 
 test('#queueReminder announces a later item that falls due at 07:00', () => {
   const ctx = setupTest();
-  addAsk(ctx.db, buildMockAddInput({ actor: 'z-stu' }));
-  laterAsk(ctx.db, 'geo-1-paint', 'call', null, 'z-stu');
+  addAsk(ctx.db, buildMockAddInput({ actor: 'stu' }));
+  laterAsk(ctx.db, 'geo-1-paint', 'call', null, 'stu');
   at('2026-10-14T20:05:00Z');
   expect(queueReminder(ctx.db, 'hq-lanes').reminded).toBe('geo-1-paint');
 });
@@ -332,7 +332,7 @@ test('#queueReminder sends nothing while an item is open', () => {
   addAsk(ctx.db, buildMockAddInput({ id: 'a', actor: 'z-refine' }));
   addAsk(ctx.db, buildMockAddInput({ id: 'b', actor: 'z-refine' }));
   at('2026-10-14T20:05:00Z');
-  openAsk(ctx.db, { id: 'a', force: false, actor: 'z-stu' });
+  openAsk(ctx.db, { id: 'a', force: false, actor: 'stu' });
   expect(queueReminder(ctx.db, 'hq-lanes').why).toContain('open: a');
 });
 
@@ -351,7 +351,7 @@ test.each([
 
 test('#queueReminder still announces when a hold is released within the same second as the add', () => {
   const ctx = setupTest();
-  ctx.seed.meta({ key: 'hold', value: '{"reason":"x","since":"","by":"z-stu"}' });
+  ctx.seed.meta({ key: 'hold', value: '{"reason":"x","since":"","by":"stu"}' });
   at('2026-10-14T01:00:00.100Z');
   addAsk(ctx.db, buildMockAddInput({ actor: 'z-refine' }));
   setMeta(ctx.db, 'hold', null);
@@ -363,7 +363,7 @@ test('#queueReminder still announces when a hold is released within the same sec
 test('#addAsk adds a new issue to an open shared call even when the question text changed', () => {
   const ctx = setupTest();
   addAsk(ctx.db, buildMockAddInput());
-  openAsk(ctx.db, { force: false, actor: 'z-stu' });
+  openAsk(ctx.db, { force: false, actor: 'stu' });
   const added = addAsk(ctx.db, buildMockAddInput({ question: 'Green or grey, for both sheds?', issues: ['GEO-1', 'GEO-2'] }));
   expect(added.result).toBe('noop');
   expect(added.ask).toMatchObject({ state: 'open', question: 'Green or grey?', issues: ['GEO-1', 'GEO-2'] });

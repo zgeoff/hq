@@ -22,7 +22,7 @@ to each other.
 
 ## Meet the crew
 
-### Stu · `z-stu`
+### Stu · `stu`
 
 The front desk, and the only session the owner talks to. Stu hears the owner, asks one question at
 a time, and carries each answer to the session that needs it. Nothing ships without the right yes.

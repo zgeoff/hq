@@ -188,26 +188,26 @@ test('release ends a hold early; bad holds are refused', () => {
   expect(releaseLanes(db, 'z-delivery')).toBe(false);
 });
 
-test('a Ready report over 2 h old with a free slot alerts z-stu once per stale spell; a new report starts a new spell', () => {
+test('it alerts stu once per stale spell for a Ready report over 2 h old with a free slot; a new report starts a new spell', () => {
   atMin(-180);
   reportReady(db, 4, 'z-delivery');
   atMin(0);
   tick(db, sample(16_384), 'hq-lanes');
-  const toOwner = readOutboxRows(db).filter((row) => row.target === 'z-stu');
+  const toOwner = readOutboxRows(db).filter((row) => row.target === 'stu');
   expect(toOwner).toHaveLength(1);
   expect(toOwner[0]?.text).toContain('8 slot(s) free, and the newest Ready report is 3 h old');
   atMin(5);
   tick(db, sample(16_384), 'hq-lanes');
-  expect(readOutboxRows(db).filter((row) => row.target === 'z-stu')).toHaveLength(1);
+  expect(readOutboxRows(db).filter((row) => row.target === 'stu')).toHaveLength(1);
   reportReady(db, 2, 'z-delivery');
   atMin(100);
   tick(db, sample(16_384), 'hq-lanes');
-  expect(readOutboxRows(db).filter((row) => row.target === 'z-stu')).toHaveLength(1);
+  expect(readOutboxRows(db).filter((row) => row.target === 'stu')).toHaveLength(1);
 
   createCapacitySample(db, { at: new Date(Date.parse(NOON_SYDNEY) + 125 * 60_000).toISOString().replace('.000Z', 'Z'), nonnixAwakeMib: 0 });
   atMin(126);
   tick(db, sample(16_384), 'hq-lanes');
-  expect(readOutboxRows(db).filter((row) => row.target === 'z-stu')).toHaveLength(2);
+  expect(readOutboxRows(db).filter((row) => row.target === 'stu')).toHaveLength(2);
 });
 
 test('a fresh Ready report, full lanes, a failed reading or no report at all sends no stale alert', () => {
@@ -220,7 +220,7 @@ test('a fresh Ready report, full lanes, a failed reading or no report at all sen
   reportReady(db, 4, 'z-delivery');
   atMin(60);
   tick(db, sample(16_384), 'hq-lanes');
-  expect(readOutboxRows(db).filter((row) => row.target === 'z-stu')).toStrictEqual([]);
+  expect(readOutboxRows(db).filter((row) => row.target === 'stu')).toStrictEqual([]);
 });
 
 test('the stale alert is due once the report is past 2 h, not at the next whole minute', () => {
@@ -239,6 +239,6 @@ test('quiet hours hold the stale alert until the first look after them', () => {
 
   const noon = new Date(Date.parse(FOUR_AM_SYDNEY) + 8 * 60 * 60_000);
   expect(checkReadyStale(db, noon, 3, 'hq-lanes')).toBe(true);
-  expect(readOutboxRows(db).map((row) => row.target)).toStrictEqual(['z-stu']);
+  expect(readOutboxRows(db).map((row) => row.target)).toStrictEqual(['stu']);
   expect(readOutboxRows(db)[0]?.text).toContain('3 slot(s) free');
 });

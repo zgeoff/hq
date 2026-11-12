@@ -169,7 +169,7 @@ function setupTest() {
   const fresh = freshDb();
   onTestFinished(fresh.cleanup);
   updateEnv('HQ_NOTIFY', 'off');
-  updateEnv('HQ_AS', 'z-stu');
+  updateEnv('HQ_AS', 'stu');
   const out: string[] = [];
   const log = spyOn(console, 'log').mockImplementation((line: string) => out.push(line));
   onTestFinished(() => log.mockRestore());
@@ -183,7 +183,7 @@ function setupTest() {
 test('hq run as the entry point answers a command', async () => {
   const { dir, cleanup: done } = freshDb();
   try {
-    const env = { ...process.env, HQ_DB: join(dir, 'entry.db'), HQ_NOTIFY: 'off', HQ_AS: 'z-stu' };
+    const env = { ...process.env, HQ_DB: join(dir, 'entry.db'), HQ_NOTIFY: 'off', HQ_AS: 'stu' };
     const p = Bun.spawn(['bun', join(root, 'src/cli.ts'), 'status', '--json'], { env, stdout: 'pipe', stderr: 'pipe' });
     const timer = setTimeout(() => p.kill(), 20_000);
     const text = await new Response(p.stdout).text();

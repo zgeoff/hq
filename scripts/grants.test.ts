@@ -432,14 +432,14 @@ test.each([
     cpSync(join(ctx.fixture, path), join(ctx.dir, path), { recursive: true });
   }
   {
-    const path = join(ctx.dir, 'grants/z-stu.yaml');
+    const path = join(ctx.dir, 'grants/stu.yaml');
     const source = readFileSync(path, 'utf8');
     expect(source).toContain('{still-ask}');
     writeFileSync(path, source.replace('{still-ask}', 'deleting or rewriting my data, or a security change'));
     {
       const result = ctx.run(args);
       expect(result.exitCode).toBe(1);
-      expect(result.stderr.toString()).toContain('grants/z-stu.yaml[3].note: use {still-ask}');
+      expect(result.stderr.toString()).toContain('grants/stu.yaml[3].note: use {still-ask}');
       expect(result.stdout.toString()).toBe('');
     }
   }
@@ -515,6 +515,31 @@ function setupPrivateTest(shared = false) {
     };
   }
 }
+
+test('it keeps, with --private, the grants file of a retired name that fleet.json forwards to the prompt\'s session', () => {
+  const ctx = setupPrivateTest();
+  const kept = readFileSync(join(ctx.privateDir, 'grants/stu.yaml'), 'utf8');
+  rmSync(join(ctx.privateDir, 'grants/stu.yaml'));
+  writeFileSync(join(ctx.privateDir, 'grants/z-oldkite.yaml'), kept);
+  const fleetPath = join(ctx.dir, 'fleet.json');
+  writeFileSync(fleetPath, readFileSync(fleetPath, 'utf8').replace(/\n\}\s*$/u, ',\n  "forwards": { "z-oldkite": "stu" }\n}\n'));
+
+  const result = ctx.runPrivate();
+
+  expect([result.exitCode, result.stderr.toString()]).toStrictEqual([0, '']);
+});
+
+test('it refuses, with --private, a prompt whose session has no grants file and no forwarded one', () => {
+  const ctx = setupPrivateTest();
+  const kept = readFileSync(join(ctx.privateDir, 'grants/stu.yaml'), 'utf8');
+  rmSync(join(ctx.privateDir, 'grants/stu.yaml'));
+  writeFileSync(join(ctx.privateDir, 'grants/z-oldkite.yaml'), kept);
+
+  const result = ctx.runPrivate();
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stderr.toString()).toContain('no grants/stu.yaml for this prompt');
+});
 
 test('with --private it passes on matching files in both trees', () => {
   const result = setupPrivateTest().runPrivate();
@@ -1136,7 +1161,7 @@ test('it refuses with --private a prompt that lists a skill fleet.json lacks, wi
   const result = ctx.runPrivate();
   expect(result.exitCode).toBe(1);
   expect(result.stderr.toString()).toBe(
-    "grants: hq-private: skills/intake/references/session-prompt.md: the prompt lists skills [intake, owner-calls, kite-report] but fleet.json lists [intake, owner-calls] for z-stu; make the prompt's skill bullets match fleet.json's skills for z-stu, or change fleet.json\n",
+    "grants: hq-private: skills/intake/references/session-prompt.md: the prompt lists skills [intake, owner-calls, kite-report] but fleet.json lists [intake, owner-calls] for stu; make the prompt's skill bullets match fleet.json's skills for stu, or change fleet.json\n",
   );
 });
 
@@ -1146,7 +1171,7 @@ test('it refuses with --private a prompt that misses a skill fleet.json lists', 
   writeFileSync(fleetPath, readFileSync(fleetPath, 'utf8').replace('"owner-calls"]', '"owner-calls", "kite-report"]'));
   const result = ctx.runPrivate();
   expect(result.exitCode).toBe(1);
-  expect(result.stderr.toString()).toContain('lists skills [intake, owner-calls] but fleet.json lists [intake, owner-calls, kite-report] for z-stu');
+  expect(result.stderr.toString()).toContain('lists skills [intake, owner-calls] but fleet.json lists [intake, owner-calls, kite-report] for stu');
 });
 
 test('it refuses with --private a prompt that lists the skills in another order', () => {
@@ -1161,13 +1186,13 @@ test('it refuses with --private a prompt that lists the skills in another order'
   );
   const result = ctx.runPrivate();
   expect(result.exitCode).toBe(1);
-  expect(result.stderr.toString()).toContain('lists skills [owner-calls, intake] but fleet.json lists [intake, owner-calls] for z-stu');
+  expect(result.stderr.toString()).toContain('lists skills [owner-calls, intake] but fleet.json lists [intake, owner-calls] for stu');
 });
 
 test('it refuses with --private a prompt with no owner in fleet.json', () => {
   const ctx = setupPrivateTest();
   const fleetPath = join(ctx.dir, 'fleet.json');
-  writeFileSync(fleetPath, readFileSync(fleetPath, 'utf8').replace('{ "name": "z-stu", "skills": ["intake", "owner-calls"] },', ''));
+  writeFileSync(fleetPath, readFileSync(fleetPath, 'utf8').replace('{ "name": "stu", "skills": ["intake", "owner-calls"] },', ''));
   const result = ctx.runPrivate();
   expect(result.exitCode).toBe(1);
   expect(result.stderr.toString()).toContain('skills/intake/references/session-prompt.md: no session in fleet.json whose first skill is intake');
@@ -1194,7 +1219,7 @@ test('it refuses with --private an extra skill that follows a blank line in the 
   );
   const result = ctx.runPrivate();
   expect(result.exitCode).toBe(1);
-  expect(result.stderr.toString()).toContain('lists skills [intake, owner-calls, kite-report] but fleet.json lists [intake, owner-calls] for z-stu');
+  expect(result.stderr.toString()).toContain('lists skills [intake, owner-calls, kite-report] but fleet.json lists [intake, owner-calls] for stu');
 });
 
 test('it regenerates with --private and no --check though a skill list mismatches fleet.json', () => {

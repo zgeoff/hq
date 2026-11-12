@@ -218,20 +218,20 @@ test('a cap below the pool free slots takes the difference off the free slots an
   const ctx = setupTest();
   await ctx.seed.readyIssues(ctx.readySeeds);
   ctx.addLocalRun('GEO-9805');
-  setMeta(ctx.db, 'lanes_cap', JSON.stringify({ cap: 2, until: null, reason: 'quota', by: 'z-stu', at: '2026-10-15T19:00:00Z' }));
+  setMeta(ctx.db, 'lanes_cap', JSON.stringify({ cap: 2, until: null, reason: 'quota', by: 'stu', at: '2026-10-15T19:00:00Z' }));
 
   const plan = readSlotPlan(ctx.db, ctx.sample);
 
   expect(plan?.pool.free).toBe(1);
   expect(plan?.plan?.picks.map((pick) => pick.issue)).toStrictEqual(['GEO-9801']);
-  expect(plan?.cap).toStrictEqual({ cap: 2, until: null, reason: 'quota', by: 'z-stu', working: 1, limitedBy: 'cap', workingFrom: 'runs' });
+  expect(plan?.cap).toStrictEqual({ cap: 2, until: null, reason: 'quota', by: 'stu', working: 1, limitedBy: 'cap', workingFrom: 'runs' });
 });
 
 test('a cap above the pool free slots leaves the pool in charge', async () => {
   const ctx = setupTest();
   await ctx.seed.readyIssues(ctx.readySeeds);
   ctx.addLocalRun('GEO-9805');
-  setMeta(ctx.db, 'lanes_cap', JSON.stringify({ cap: 9, until: null, reason: null, by: 'z-stu', at: '2026-10-15T19:00:00Z' }));
+  setMeta(ctx.db, 'lanes_cap', JSON.stringify({ cap: 9, until: null, reason: null, by: 'stu', at: '2026-10-15T19:00:00Z' }));
 
   const plan = readSlotPlan(ctx.db, ctx.sample);
 
@@ -242,7 +242,7 @@ test('a cap above the pool free slots leaves the pool in charge', async () => {
 test('a cap of zero frees no slot and picks nothing', async () => {
   const ctx = setupTest();
   await ctx.seed.readyIssues(ctx.readySeeds);
-  setMeta(ctx.db, 'lanes_cap', JSON.stringify({ cap: 0, until: null, reason: 'freeze', by: 'z-stu', at: '2026-10-15T19:00:00Z' }));
+  setMeta(ctx.db, 'lanes_cap', JSON.stringify({ cap: 0, until: null, reason: 'freeze', by: 'stu', at: '2026-10-15T19:00:00Z' }));
 
   const plan = readSlotPlan(ctx.db, ctx.sample);
 
@@ -254,7 +254,7 @@ test('a cap whose time has passed no longer limits the slots', async () => {
   const ctx = setupTest();
   at('2026-10-15T20:00:00Z');
   await ctx.seed.readyIssues(ctx.readySeeds);
-  setMeta(ctx.db, 'lanes_cap', JSON.stringify({ cap: 0, until: '2026-10-15T19:30:00Z', reason: 'freeze', by: 'z-stu', at: '2026-10-15T19:00:00Z' }));
+  setMeta(ctx.db, 'lanes_cap', JSON.stringify({ cap: 0, until: '2026-10-15T19:30:00Z', reason: 'freeze', by: 'stu', at: '2026-10-15T19:00:00Z' }));
 
   const plan = readSlotPlan(ctx.db, ctx.sample, new Date('2026-10-15T20:00:00Z'));
 

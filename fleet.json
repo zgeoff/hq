@@ -1,7 +1,7 @@
 {
   "sessions": [
     {
-      "name": "z-stu",
+      "name": "stu",
       "skills": ["intake", "owner-calls", "tickets", "evidence", "delivery-report"],
       "cwd": "defs",
       "wake": true,
@@ -57,5 +57,5 @@
       "roles": ["developer"]
     }
   ],
-  "forwards": { "z-refine": "z-triage", "z-steward": "z-triage" }
+  "forwards": { "z-refine": "z-triage", "z-steward": "z-triage", "z-stu": "stu" }
 }

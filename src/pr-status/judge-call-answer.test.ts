@@ -15,7 +15,7 @@ test('it takes a plain Yes on a call that names the PR, and any owner answer for
 
 test.each([
   ['no call', null, 'call:KET-50 is not a call in hq'],
-  ['no owner answer', { title: 'lgtm widgets#7?', answer: null }, "call:KET-50 has no owner answer for its current round, in the console or by `hq call answer` from the owner's session (z-stu), as atc finds the caller"],
+  ['no owner answer', { title: 'lgtm widgets#7?', answer: null }, "call:KET-50 has no owner answer for its current round, in the console or by `hq call answer` from the owner's session (stu), as atc finds the caller"],
   ['a call for another PR', { title: 'lgtm teapots#7?', answer: 'Yes' }, 'call:KET-50 does not name zgeoff/widgets#7 in the title the owner answered'],
   ['an answer that is not a plain Yes', { title: 'lgtm widgets#7?', answer: 'Yes, but not yet' }, 'the owner\'s answer to call:KET-50 is not a plain yes: "Yes, but not yet"'],
 ])('it refuses lgtm with %s', (_label, evidence, why) => {

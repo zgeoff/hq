@@ -1,5 +1,5 @@
 import type { Database } from 'bun:sqlite';
-import { fleetIds } from '../../atc/fleet-ids.ts';
+import { readKnownFleetIDs } from '../../atc/read-known-fleet-ids.ts';
 import type { OwnerProbeDeps } from '../../pr-status/read-owner-session.ts';
 import { roleName } from '../../roles/role-name.ts';
 
@@ -22,7 +22,7 @@ function pickCapCaller(db: Database, peerSession: string | null | undefined): Ca
   if (peerSession === undefined) {
     return { kind: 'unknown', cause: "atc's hello names no caller session, so this daemon predates protocol 11 and cannot say who is asking" };
   }
-  const recorded = fleetIds(db);
+  const recorded = readKnownFleetIDs(db);
   const owner = roleName('owner');
   const delivery = roleName('orchestrator');
   if (peerSession === null || peerSession === '') {

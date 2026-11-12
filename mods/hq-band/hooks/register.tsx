@@ -4,10 +4,9 @@ import type { BandReading, PaneDetail, PaneHeatRow, PaneReading } from '../types
 import { isHeatList } from './is-heat-list';
 import { isSegmentList } from './is-segment-list';
 
-// The band is z-stu's alone. In any other session, or when hq can't say whose session this is,
-// both hooks pass straight through: no timer, no process after the first, nothing drawn.
+// The band draws only in the session that holds the owner role. In any other session, or when hq can't say
+// whose session this is, both hooks pass straight through: no timer, no process after the first, nothing drawn.
 const LIVE = atom({ plugin: 'hq-band', key: 'live' } as const, false);
-const OWNER = 'z-stu';
 const PANE = atom({ plugin: 'hq-band', key: 'pane' } as const, null);
 const PANE_ID = 'hq';
 const READING = atom({ plugin: 'hq-band', key: 'reading' } as const, null);
@@ -18,8 +17,8 @@ export function register(on: On): void {
   on('session.start', async ($, e, next) => {
     const result = await next(e);
     try {
-      const name = await loadSessionName($);
-      if (name === OWNER) {
+      const isOwner = await probeOwnerSession($);
+      if (isOwner) {
         await update($, LIVE, () => true);
         await refreshAll($);
         $.clock.every(REFRESH_MS, () => refreshAll($));
@@ -87,10 +86,12 @@ export function register(on: On): void {
 }
 
 // The fleet name hq fleet last saw under this atc session's id; none outside atc.
-async function loadSessionName($: EngineInterface): Promise<string | null> {
+// A hooks module can't import fleet.json, which sits outside the plugin's folder, so hq whois gives the roles.
+async function probeOwnerSession($: EngineInterface): Promise<boolean> {
   const id = await $.env.get('ATC_SESSION_ID');
   const whoisAnswer = id === undefined || id === '' ? null : await runHq($, ['whois', id, '--json']);
-  return typeof whoisAnswer?.['name'] === 'string' ? whoisAnswer['name'] : null;
+  const roles = whoisAnswer?.['roles'];
+  return Array.isArray(roles) && roles.includes('owner');
 }
 
 const TIMEOUT_MS = 10_000;

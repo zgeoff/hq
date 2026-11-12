@@ -30,7 +30,7 @@ test('a console answer is a source when hq holds its call, proposal or unblock i
     { kind: 'console', ref: 'descale-kettle', at: null },
   ]);
   expect(() => parseSource(db, 'console:no-such-kettle')).toThrow('no call, proposal or unblock item no-such-kettle in hq');
-  const typed = addTyped(db, { to: 'z-triage', toId: null, toName: null, text: 'Descale it.', source: parseSource(db, 'console:descale-kettle'), actor: 'z-stu' });
+  const typed = addTyped(db, { to: 'z-triage', toId: null, toName: null, text: 'Descale it.', source: parseSource(db, 'console:descale-kettle'), actor: 'stu' });
   expect([typed.source_kind, typed.source_ref, typedSource(typed)]).toStrictEqual(['console', 'descale-kettle', 'console:descale-kettle']);
 });
 
@@ -50,7 +50,7 @@ const HOSTILE: [string, string][] = [
   ['call:../asks', '--source must be'],
   ['CALL:kettle-colour', '--source must be'],
   ['geoff', '--source must be'],
-  ['chat:z-stu@2026-10-16T00:00:00Z', '--source must be'],
+  ['chat:stu@2026-10-16T00:00:00Z', '--source must be'],
   [`chat:${STU}`, '--source must be'],
   [`chat:${STU}@yesterday`, 'must be a time'],
   [`chat:${STU}@10/16/2026`, 'must be a time'],
@@ -66,11 +66,11 @@ test.each(HOSTILE)('refuses the source %p', (raw, why) => {
 
 test('logs the full text, target and source; lists newest first, by name, id or id prefix', () => {
   const text = 'Yes to the red kettle.\nAnd hinge the lid.';
-  addTyped(db, { to: 'z-triage', toId: TRIAGE, toName: 'z-triage', text, source: parseSource(db, 'call:kettle-colour'), actor: 'z-stu' });
+  addTyped(db, { to: 'z-triage', toId: TRIAGE, toName: 'z-triage', text, source: parseSource(db, 'call:kettle-colour'), actor: 'stu' });
   at('2026-10-16T01:05:00Z');
-  const b = addTyped(db, { to: 'z-delivery', toId: null, toName: null, text: 'Ship it.', source: parseSource(db, `chat:${STU}@2026-10-16T01:04:00Z`), actor: 'z-stu' });
-  expect(b).toMatchObject({ to_session: 'z-delivery', to_id: null, source_kind: 'chat', source_ref: STU, source_at: '2026-10-16T01:04:00Z', typed_by: 'z-stu', at: '2026-10-16T01:05:00Z' });
-  expect(typedSource(b)).toBe(`chat:${STU}@2026-10-16T01:04:00Z`);
+  const chat = addTyped(db, { to: 'z-delivery', toId: null, toName: null, text: 'Ship it.', source: parseSource(db, `chat:${STU}@2026-10-16T01:04:00Z`), actor: 'stu' });
+  expect(chat).toMatchObject({ to_session: 'z-delivery', to_id: null, source_kind: 'chat', source_ref: STU, source_at: '2026-10-16T01:04:00Z', typed_by: 'stu', at: '2026-10-16T01:05:00Z' });
+  expect(typedSource(chat)).toBe(`chat:${STU}@2026-10-16T01:04:00Z`);
   expect(listTyped(db, { session: null, limit: 50 }).map((t) => t.id)).toEqual([2, 1]);
   for (const s of ['z-triage', 'Z-TRIAGE', TRIAGE, '2a33c24b']) expect(listTyped(db, { session: s, limit: 50 })).toEqual([expect.objectContaining({ id: 1, text })]);
   expect(listTyped(db, { session: 'z-delivery', limit: 50 }).map((t) => t.id)).toEqual([2]);
@@ -79,7 +79,7 @@ test('logs the full text, target and source; lists newest first, by name, id or 
   expect(() => listTyped(db, { session: null, limit: 0 })).toThrow('--limit');
   expect(() => listTyped(db, { session: null, limit: -5 })).toThrow('--limit');
   const lost = '9f8e7d6c-0000-4000-8000-000000000003';
-  addTyped(db, { to: lost, toId: null, toName: null, text: 'Invented.', source: parseSource(db, 'call:kettle-colour'), actor: 'z-stu' });
+  addTyped(db, { to: lost, toId: null, toName: null, text: 'Invented.', source: parseSource(db, 'call:kettle-colour'), actor: 'stu' });
   expect(listTyped(db, { session: '9f8e7d6c', limit: 50 })).toEqual([expect.objectContaining({ id: 3, to_session: lost })]);
   const ev = listEvents(db, 'typed');
   expect(ev.slice(0, 2).map((event) => parseJSON(event.data))).toStrictEqual([{ to: 'z-triage', source: 'call:kettle-colour' }, { to: 'z-delivery', source: `chat:${STU}` }]);
@@ -87,6 +87,6 @@ test('logs the full text, target and source; lists newest first, by name, id or 
 
 test('an empty target or text is refused', () => {
   const source = parseSource(db, 'call:kettle-colour');
-  expect(() => addTyped(db, { to: ' ', toId: null, toName: null, text: 'x', source, actor: 'z-stu' })).toThrow('--to');
-  expect(() => addTyped(db, { to: 'z-triage', toId: null, toName: null, text: '  \n', source, actor: 'z-stu' })).toThrow('--text');
+  expect(() => addTyped(db, { to: ' ', toId: null, toName: null, text: 'x', source, actor: 'stu' })).toThrow('--to');
+  expect(() => addTyped(db, { to: 'z-triage', toId: null, toName: null, text: '  \n', source, actor: 'stu' })).toThrow('--text');
 });

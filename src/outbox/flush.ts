@@ -1,6 +1,6 @@
 import type { Database } from 'bun:sqlite';
 import { AtcClient } from '../atc/atc-client.ts';
-import { fleetIds } from '../atc/fleet-ids.ts';
+import { readKnownFleetIDs } from '../atc/read-known-fleet-ids.ts';
 import { now } from '../clock/now.ts';
 import { config } from '../config/config.ts';
 import { buildRowSchema } from '../db/build-row-schema.ts';
@@ -28,7 +28,7 @@ export async function flush(db: Database, opts: { retryFailed?: boolean; ids?: n
     result.skipped = true;
     return result;
   }
-  const known = fleetIds(db);
+  const known = readKnownFleetIDs(db);
   let client: AtcClient;
   try {
     client = await AtcClient.open();

@@ -11,9 +11,9 @@ function setupTest() {
 test('#seedMorningRunKeyedToTarget stores a queued morning run, and input overrides apply', () => {
   const ctx = setupTest();
 
-  seedMorningRunKeyedToTarget(ctx, { key: '2026-10-18', outbox_key: 'hq-ev4-z-stu' });
+  seedMorningRunKeyedToTarget(ctx, { key: '2026-10-18', outbox_key: 'hq-ev4-stu' });
 
-  expect(ctx.readRuns()).toStrictEqual([{ job: 'morning-reports', key: '2026-10-18', at: '2026-10-16T22:16:00Z', result: 'queued', detail: null, outbox_key: 'hq-ev4-z-stu' }]);
+  expect(ctx.readRuns()).toStrictEqual([{ job: 'morning-reports', key: '2026-10-18', at: '2026-10-16T22:16:00Z', result: 'queued', detail: null, outbox_key: 'hq-ev4-stu' }]);
 });
 
 test('#seedMorningRunKeyedToTarget refuses a second run for the same day', () => {

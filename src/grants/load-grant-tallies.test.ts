@@ -40,7 +40,7 @@ test('each named grant lists its actions in the window, one line each, and an un
 test('a voided action leaves the count and the actions list and shows struck out with its reason, who voided it and when', async () => {
   const db = setupTest();
   at(NOON_SYDNEY);
-  setMeta(db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'teapot-bot': 'kettle-2' }));
+  setMeta(db, 'fleet_ids', JSON.stringify({ 'stu': 'kettle-1', 'teapot-bot': 'kettle-2' }));
   createGrantMark(db, { text: 'kettle PRs merge on green CI', ref: 'kettle#3', at: null, name: 'kettle-merges', actor: 'kettle-bot' });
   recordGrantAction(db, { grant: 'kettle-merges', target: 'kettle#8', note: null, actor: 'teapot-bot' });
   recordGrantAction(db, { grant: 'kettle-merges', target: 'kettle#9', note: null, actor: 'teapot-bot' });
@@ -56,7 +56,7 @@ test('a voided action leaves the count and the actions list and shows struck out
 test('a grant whose only action is voided keeps its mark, which cannot be dropped', async () => {
   const db = setupTest();
   at(NOON_SYDNEY);
-  setMeta(db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1' }));
+  setMeta(db, 'fleet_ids', JSON.stringify({ 'stu': 'kettle-1' }));
   const mark = createGrantMark(db, { text: 'kettle PRs merge on green CI', ref: null, at: null, name: 'kettle-merges', actor: 'kettle-bot' });
   recordGrantAction(db, { grant: 'kettle-merges', target: 'kettle#8', note: null, actor: 'teapot-bot' });
   await voidGrantAction({ db, args: { id: 1, reason: 'wrong PR' }, probe: { openClient: () => Promise.resolve({ peerSession: 'kettle-1', close: () => {} }) }, clock: () => new Date('2026-10-14T03:00:00Z') });
@@ -67,7 +67,7 @@ test('a grant whose only action is voided keeps its mark, which cannot be droppe
 test('a grant whose only action is voided keeps its name, which cannot be changed', async () => {
   const db = setupTest();
   at(NOON_SYDNEY);
-  setMeta(db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1' }));
+  setMeta(db, 'fleet_ids', JSON.stringify({ 'stu': 'kettle-1' }));
   const mark = createGrantMark(db, { text: 'kettle PRs merge on green CI', ref: null, at: null, name: 'kettle-merges', actor: 'kettle-bot' });
   recordGrantAction(db, { grant: 'kettle-merges', target: 'kettle#8', note: null, actor: 'teapot-bot' });
   await voidGrantAction({ db, args: { id: 1, reason: 'wrong PR' }, probe: { openClient: () => Promise.resolve({ peerSession: 'kettle-1', close: () => {} }) }, clock: () => new Date('2026-10-14T03:00:00Z') });

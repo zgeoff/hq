@@ -18,7 +18,7 @@ turn once you have acted on the event, written what you wait on to your state fi
 skill.
 
 [owner-calls](../owner-calls/SKILL.md#terms) defines the fleet's terms: a call, a pitch, a grant,
-Nix, `with-geoff`, your role's private file, and the `z-` sessions such as `z-q`, `z-triage` and `z-stu`. An agent
+Nix, `with-geoff`, your role's private file, and the fleet sessions such as `z-q`, `z-triage` and `stu`. An agent
 sends a FINAL note, one that starts `FINAL`, when its task is done.
 
 Avoid these traps:
@@ -105,7 +105,7 @@ Before you message an agent that has sent no FINAL note, read briefs.md's messag
   with the reason.
 - **It needs a choice:** answer it if the issue, the brief or the owner's earlier answers settle it.
   When [owner-calls](../owner-calls/SKILL.md#what-only-the-owner-decides) lists the choice as the
-  owner's, send it to `z-triage` with the agent's session, so that `z-stu` types the answer there.
+  owner's, send it to `z-triage` with the agent's session, so that `stu` types the answer there.
   Tell the agent to carry on with the rest. Decide any other choice yourself.
 - **It asks to run a migration:** let it run one that only inserts rows, adds tables or columns, or
   fills in columns it added, once it gives you the path of its backup of that database. Send

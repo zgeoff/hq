@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
 import { formatConsoleAnswer } from './format-console-answer.ts';
 
-test('it stores the label and note as z-stu set, the note verbatim', () => {
+test('it stores the label and note as stu set, the note verbatim', () => {
   expect(formatConsoleAnswer('Yes, mint them', '')).toBe('Yes, mint them');
   expect(formatConsoleAnswer('', '  Only on weekdays.\nNot Sundays. ')).toBe('  Only on weekdays.\nNot Sundays. ');
   expect(formatConsoleAnswer('Not yet', 'Ask again on Monday.')).toBe('Not yet | Ask again on Monday.');

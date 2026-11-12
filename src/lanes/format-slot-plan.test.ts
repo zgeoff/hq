@@ -80,7 +80,7 @@ test('hq lanes prints the cap line with its until, reason and working count', ()
     eligible: null,
     design: { countsError: null, agent: { open: 0, slots: 2, next: [] }, withGeoff: { open: 0, slots: 1, next: [], asked: [] } },
     skipped: [],
-    cap: { cap: 7, until: '2026-10-18T21:00:00Z', reason: 'weekend pacing', by: 'z-stu', working: 6, limitedBy: 'cap', workingFrom: 'sessions' },
+    cap: { cap: 7, until: '2026-10-18T21:00:00Z', reason: 'weekend pacing', by: 'stu', working: 6, limitedBy: 'cap', workingFrom: 'sessions' },
   };
 
   expect(formatSlotPlan(slotPlan, new Date('2026-10-15T20:07:00Z'))).toContain('cap: 7 until Mon 08:00 Sydney (weekend pacing), 6 working');
@@ -95,7 +95,7 @@ test('hq lanes prints a cap with no until or reason, and says when the working c
     eligible: null,
     design: { countsError: null, agent: { open: 0, slots: 2, next: [] }, withGeoff: { open: 0, slots: 1, next: [], asked: [] } },
     skipped: [],
-    cap: { cap: 7, until: null, reason: null, by: 'z-stu', working: 6, limitedBy: 'cap', workingFrom: 'runs' },
+    cap: { cap: 7, until: null, reason: null, by: 'stu', working: 6, limitedBy: 'cap', workingFrom: 'runs' },
   };
 
   expect(formatSlotPlan(slotPlan, new Date('2026-10-15T20:07:00Z'))).toContain('cap: 7, 6 working (counted by run: the atc reading is stale)');
@@ -110,7 +110,7 @@ test('the nudge says the cap holds the rest of the pool free slots', () => {
     eligible: 1,
     design: { countsError: null, agent: { open: 0, slots: 2, next: [] }, withGeoff: { open: 0, slots: 1, next: [], asked: [] } },
     skipped: [],
-    cap: { cap: 7, until: null, reason: null, by: 'z-stu', working: 6, limitedBy: 'cap', workingFrom: 'sessions' },
+    cap: { cap: 7, until: null, reason: null, by: 'stu', working: 6, limitedBy: 'cap', workingFrom: 'sessions' },
   };
 
   expect(formatSlotNudge(slotPlan, 12)).toInclude('1 slot free for 12 min (imp 0, local 7; the cap of 7 holds the rest)');

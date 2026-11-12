@@ -198,6 +198,33 @@ test('it refuses an upper-case session name', () => {
   expect(() => validateRoles(table)).toThrow('sessions[0].name');
 });
 
+test('it accepts a session name without the z- prefix, and a retired z- name forwarding to it', () => {
+  const table = {
+    sessions: [
+      { name: 'aa', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['owner'] },
+      { name: 'z-bb', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['orchestrator'] },
+      { name: 'z-cc', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['reviewer'] },
+      { name: 'z-dd', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['qa', 'triage'] },
+    ],
+    forwards: { 'z-aa': 'aa' },
+  };
+
+  expect(validateRoles(table)).toMatchObject({ sessions: [{ name: 'aa' }, { name: 'z-bb' }, { name: 'z-cc' }, { name: 'z-dd' }], forwards: { 'z-aa': 'aa' } });
+});
+
+test('it refuses a session name with a prefix other than z-', () => {
+  const table = {
+    sessions: [
+      { name: 'y-aa', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['owner'] },
+      { name: 'z-bb', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['orchestrator'] },
+      { name: 'z-cc', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['reviewer'] },
+      { name: 'z-dd', skills: ['kettle'], cwd: 'defs', model: 'opus', wake: true, roles: ['qa', 'triage'] },
+    ],
+  };
+
+  expect(() => validateRoles(table)).toThrow('sessions[0].name must match ^(z-)?[a-z]+$');
+});
+
 test('it refuses a cwd outside defs', () => {
   const table = {
     sessions: [

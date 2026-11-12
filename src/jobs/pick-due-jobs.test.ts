@@ -11,7 +11,7 @@ test.each([
   },
   {
     title: 'a daily job once after two days down, next at tomorrow',
-    jobs: [{ id: 1, target: 'z-delivery', kind: 'daily', spec: '09:30Z', prompt: 'run the nightly batch', added_by: 'z-stu', added_at: '2026-11-08T00:00:00Z', next_at: '2026-11-08T09:30:00Z', removed_at: null }] satisfies SessionJob[],
+    jobs: [{ id: 1, target: 'z-delivery', kind: 'daily', spec: '09:30Z', prompt: 'run the nightly batch', added_by: 'stu', added_at: '2026-11-08T00:00:00Z', next_at: '2026-11-08T09:30:00Z', removed_at: null }] satisfies SessionJob[],
     at: '2026-11-10T12:00:00Z',
     expected: [{ id: 1, slot: '2026-11-08T09:30:00Z', nextAt: '2026-11-11T09:30:00Z' }],
   },
@@ -31,7 +31,7 @@ test.each([
     title: 'every job due at once, each with its own slot',
     jobs: [
       { id: 1, target: 'z-release', kind: 'every', spec: '2h', prompt: 'check the release queue', added_by: 'z-release', added_at: '2026-11-10T00:00:00Z', next_at: '2026-11-10T02:00:00Z', removed_at: null },
-      { id: 2, target: 'z-delivery', kind: 'daily', spec: '09:30Z', prompt: 'run the nightly batch', added_by: 'z-stu', added_at: '2026-11-09T00:00:00Z', next_at: '2026-11-10T09:30:00Z', removed_at: null },
+      { id: 2, target: 'z-delivery', kind: 'daily', spec: '09:30Z', prompt: 'run the nightly batch', added_by: 'stu', added_at: '2026-11-09T00:00:00Z', next_at: '2026-11-10T09:30:00Z', removed_at: null },
       { id: 3, target: 'z-triage', kind: 'at', spec: '2026-11-10T11:00:00Z', prompt: 'sort the inbox', added_by: 'z-triage', added_at: '2026-11-10T00:00:00Z', next_at: '2026-11-10T11:00:00Z', removed_at: null },
     ] satisfies SessionJob[],
     at: '2026-11-10T10:00:00Z',

@@ -1,6 +1,6 @@
 # Launching a helper session
 
-For a session another role starts for one job, such as `z-stu`'s PR walk or `z-release`'s atc
+For a session another role starts for one job, such as `stu`'s PR walk or `z-release`'s atc
 upgrade. Delivery agents launch through `z-delivery` instead.
 
 1. Write the brief as the owner, "I" to "you": the auto-mode classifier reads "the owner" as someone

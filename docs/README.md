@@ -7,7 +7,7 @@ for how they hand work to each other.
   features the crew leans on.
 - [sessions.md](./sessions.md): the sessions' roles, schedules, hand-offs and state files.
 - [start-prompts.md](./start-prompts.md): the shape of a session's start prompt and its grants.
-- [hq-band.md](./hq-band.md): the status band above `z-stu`'s prompt.
+- [hq-band.md](./hq-band.md): the status band above `stu`'s prompt.
 - [skill-development/](./skill-development/): notes for writing the crew's skills.
 - [CHANGELOG.md](../CHANGELOG.md): each hq release.
 - [REQUESTS.md](../REQUESTS.md): who asked for each hq feature, and where it stands.

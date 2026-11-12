@@ -9,8 +9,8 @@ Restart only with `hq restart`: it gives each session a turn afterwards, and `sy
 in one.
 
 `hq restart` refuses between 23:00 and 08:00 Sydney time without `--force`, and the upgrade session
-runs it. Before you launch in those hours, check that the owner is around: `z-stu`'s transcript in
-atc shows a line the owner typed there in the last 30 minutes (not an atc message), or `z-stu` types
+runs it. Before you launch in those hours, check that the owner is around: `stu`'s transcript in
+atc shows a line the owner typed there in the last 30 minutes (not an atc message), or `stu` types
 into your session that the owner says they are around. If the owner is around, add this line to the
 brief's Steps: "The owner is around: add --force to hq restart." If not, launch at 08:00.
 

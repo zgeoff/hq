@@ -1,6 +1,6 @@
 # noslop
 
-noslop is a review bot. It reviews every repo that `hq noslop` lists, and `z-stu` keeps the list.
+noslop is a review bot. It reviews every repo that `hq noslop` lists, and `stu` keeps the list.
 Run it with `hq review`, judge each answer, and merge once `hq review gate` passes. Never also run
 Codex on these repos.
 
@@ -37,7 +37,7 @@ The agent's final reply lists what it left unfixed. For each: check the reason a
 every finding left unanswered too.
 
 `accepted-risk` needs the owner. Message the finding to `z-triage` as a decision with your
-recommendation, and hold the merge. Once the owner answers, ask `z-stu` to record
+recommendation, and hold the merge. Once the owner answers, ask `stu` to record
 `hq pr accept-risk <repo> <pr> <finding-id> --source <source> --note '<why>'`; the gate counts it
 open until then. `skills/pr-review/references/noslop.private.md` in hq-private (`hq defs` shows
 where) says which answers count and how to cite them.
@@ -52,7 +52,7 @@ head).
 `hq noslop` shows each repo's emergency cap, off by default. Past it, `hq review` runs only fix
 calls, and the gate passes once every finding is answered and confirmed. A push past the cap with no
 `fixed` answer leaves noslop's last review on the old head, so the gate holds until the owner
-overrides or `z-stu` lifts the cap. A PR that hits the cap means noslop keeps finding new
+overrides or `stu` lifts the cap. A PR that hits the cap means noslop keeps finding new
 things: post it with
 `hq news add --topic other --text "<repo>#<pr> hit the noslop cap" --link <PR URL>`.
 
@@ -63,13 +63,13 @@ A finding is closed by a confirmed fix, `not-a-defect`, `deferred GEO-<n>`, or t
 owner's recorded `accepted-risk`. If the head moves while the gate runs, review the new head and run it
 again.
 
-When the owner says to merge anyway, in an answer that counts, ask `z-stu` to record
+When the owner says to merge anyway, in an answer that counts, ask `stu` to record
 `hq pr override <repo> <pr> --source <source> --note '<why>'`. It passes every open finding, never
 red CI. A session's approval or your own judgement is no override.
 
 ## When noslop fails
 
-Hold the merge and message `z-stu` the error; it can switch noslop off for the repo. Never run Codex
+Hold the merge and message `stu` the error; it can switch noslop off for the repo. Never run Codex
 in its place.
 
 ## zgeoff/noslop-config

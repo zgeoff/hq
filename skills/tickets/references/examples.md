@@ -47,7 +47,7 @@ Tolerance of 1e-9 matches the eval harness.
 ```markdown
 Title: redesign the decision model around usable autonomy
 
-Filed by z-stu.
+Filed by stu.
 
 ## Outcome
 

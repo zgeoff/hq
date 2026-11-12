@@ -149,9 +149,9 @@ test('the issues line splits filings by source', async () => {
 
 test.each([
   [
-    'z-stu, z-triage and z-review',
-    ['Filed by z-stu.\n\n## Outcome\n\nDescale.', 'Filed by z-stu.\n\n## Outcome\n\nRinse.', 'Filed by z-triage.\n\n## Outcome\n\nSort.', 'Filed by z-review.\n\n## Outcome\n\nCheck.', 'Descale the kettle.'],
-    '- Issues: today 5 filed (owner 1, design 0, agent 0, review 0, live check 0, bot 0, z-stu 2, z-triage 1, z-review 1), 0 closed; target none –',
+    'stu, z-triage and z-review',
+    ['Filed by stu.\n\n## Outcome\n\nDescale.', 'Filed by stu.\n\n## Outcome\n\nRinse.', 'Filed by z-triage.\n\n## Outcome\n\nSort.', 'Filed by z-review.\n\n## Outcome\n\nCheck.', 'Descale the kettle.'],
+    '- Issues: today 5 filed (owner 1, design 0, agent 0, review 0, live check 0, bot 0, stu 2, z-triage 1, z-review 1), 0 closed; target none –',
   ],
   [
     'z-delivery, z-release, z-qa and a non-z name',

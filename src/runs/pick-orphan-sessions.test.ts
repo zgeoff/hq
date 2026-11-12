@@ -45,12 +45,12 @@ test('it picks an exited session on an imp with the imp as its place', () => {
 });
 
 test.each([
-  ['a pinned fleet session', { id: '0000f002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'z-stu', alive: true, state: 'done', pinned: true }],
+  ['a pinned fleet session', { id: '0000f002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'stu', alive: true, state: 'done', pinned: true }],
   ['a pinned session of a closed run', { id: '0000f001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: false, state: 'exited', pinned: true }],
 ])('it never picks an exited child of %s', (_name, parent) => {
   const picked = pickOrphanSessions({
     sessions: [parent, { id: '0000f003-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-helper', alive: false, state: 'exited', parent: parent.id }],
-    fleetNames: new Set(['z-stu']),
+    fleetNames: new Set(['stu']),
     runSessions: [{ sessionID: '0000f001', issue: 'GEO-601', active: false, endedBy: null, open: false, ownerChats: false }],
     lastKeptMs: new Map(),
     nowMs: Date.parse('2026-11-07T03:00:00Z'),
@@ -84,9 +84,9 @@ test.each<[string, { active: boolean; endedBy: string | null; open: boolean }, s
     sessions: [
       { id: '0000f001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-agent', alive: false, state: 'idle', lifecycle: { vm: 'asleep' } },
       { id: '0000f003-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'kettle-helper', alive: false, state: 'idle', lifecycle: { vm: 'asleep' }, parent: '0000f002-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
-      { id: '0000f002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'z-stu', alive: true, state: 'idle' },
+      { id: '0000f002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'stu', alive: true, state: 'idle' },
     ],
-    fleetNames: new Set(['z-stu']),
+    fleetNames: new Set(['stu']),
     runSessions: [{ sessionID: '0000f001', issue: 'GEO-601', ...row, ownerChats: false }],
     lastKeptMs: new Map(),
     nowMs: Date.parse('2026-11-07T03:00:00Z'),

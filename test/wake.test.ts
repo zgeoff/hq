@@ -31,7 +31,7 @@ const last: RestartRecord = { runID: 'run-1', code: 0, restored: 4, total: 4, in
 const sessions = [
   { id: 'id-delivery', name: 'z-delivery', alive: true, state: 'done' },
   { id: 'id-helper', name: 'helper', alive: true, state: 'done' },
-  { id: 'id-stu', name: 'z-stu', alive: true, state: 'done' },
+  { id: 'id-stu', name: 'stu', alive: true, state: 'done' },
   { id: 'id-gone', name: 'z-old', alive: false, state: 'exited' },
 ];
 
@@ -54,18 +54,18 @@ afterEach(() => {
 });
 
 test('reads the old wake-sessions.txt format', () => {
-  expect(parseWakeFile('# comment\nid-a z-triage\n\nid-b  z-stu  extra words\n')).toEqual([
+  expect(parseWakeFile('# comment\nid-a z-triage\n\nid-b  stu  extra words\n')).toStrictEqual([
     { id: 'id-a', name: 'z-triage' },
-    { id: 'id-b', name: 'z-stu extra words' },
+    { id: 'id-b', name: 'stu extra words' },
   ]);
 });
 
 test('plans the orchestrator, the interrupted, then the live listed; once each', () => {
-  const plan = planWake(last, sessions, [{ id: 'id-stu', name: 'z-stu' }, { id: 'id-helper', name: 'helper' }, { id: 'id-gone', name: 'z-old' }], 'z-delivery');
+  const plan = planWake(last, sessions, [{ id: 'id-stu', name: 'stu' }, { id: 'id-helper', name: 'helper' }, { id: 'id-gone', name: 'z-old' }], 'z-delivery');
   expect(plan.messages.map((m) => [m.name, m.reason])).toEqual([
     ['z-delivery', 'orchestrator'],
     ['helper', 'interrupted'],
-    ['z-stu', 'background'],
+    ['stu', 'background'],
   ]);
   const [first] = plan.messages;
   expect(first?.text).toContain('Read your start prompt as it stands on main and your state file again, re-arm the event watch');
@@ -82,19 +82,19 @@ test('a missing orchestrator is reported, not guessed', () => {
 });
 
 test('wake list add, update, remove', () => {
-  expect(wakeAdd(db, { id: 'id-stu', name: 'z-stu' }, null, 'z-q').result).toBe('added');
-  expect(wakeAdd(db, { id: 'id-stu', name: 'z-stu' }, null, 'z-q').result).toBe('noop');
-  expect(wakeAdd(db, { id: 'id-stu', name: 'z-stu' }, 'main thread', 'z-q').result).toBe('updated');
-  expect(wakeRemove(db, 'z-stu', 'z-q').session_id).toBe('id-stu');
+  expect(wakeAdd(db, { id: 'id-stu', name: 'stu' }, null, 'z-q').result).toBe('added');
+  expect(wakeAdd(db, { id: 'id-stu', name: 'stu' }, null, 'z-q').result).toBe('noop');
+  expect(wakeAdd(db, { id: 'id-stu', name: 'stu' }, 'main thread', 'z-q').result).toBe('updated');
+  expect(wakeRemove(db, 'stu', 'z-q').session_id).toBe('id-stu');
   expect(wakeList(db)).toEqual([]);
 });
 
 test('runWake sends through atc with the old keys; a second run sends nothing new', async () => {
   await Bun.write(`${dir}/restarts/last.json`, JSON.stringify(last));
   atc = fakeAtc(dir, sessions);
-  wakeAdd(db, { id: 'id-stu', name: 'z-stu' }, null, 'z-q');
+  wakeAdd(db, { id: 'id-stu', name: 'stu' }, null, 'z-q');
   const r = await runWake(db, { dryRun: false, waitMs: 0, actor: 'z-q' });
-  expect(r.sent.map((s) => s.name)).toEqual(['z-delivery', 'helper', 'z-stu']);
+  expect(r.sent.map((sent) => sent.name)).toStrictEqual(['z-delivery', 'helper', 'stu']);
   expect(atc.sent.every((m) => m.from === 'orchestrator')).toBe(true);
   await runWake(db, { dryRun: false, waitMs: 0, actor: 'z-q' });
   expect(atc.sent).toHaveLength(3);

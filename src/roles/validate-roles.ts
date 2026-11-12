@@ -5,7 +5,7 @@ import { ROLE_NAMES } from './role-names.ts';
 import { SINGLE } from './single.ts';
 import type { DeclaredSession, RolesTable } from './types.ts';
 
-const NAME = /^z-[a-z]+$/;
+const NAME = /^(?:z-)?[a-z]+$/u;
 const SLUG = /^[a-z][a-z0-9-]*$/;
 
 const bad = (field: string, why: string): never => {
@@ -24,7 +24,7 @@ export function validateRoles(raw: unknown): RolesTable {
     const at = `sessions[${i}]`;
     if (!isObj(s)) return bad(at, 'must be an object');
     if (typeof s['name'] !== 'string' || !NAME.test(s['name'])) {
-      return bad(`${at}.name`, 'must match ^z-[a-z]+$');
+      return bad(`${at}.name`, 'must match ^(z-)?[a-z]+$');
     }
     if (names.has(s['name'])) {
       return bad(`${at}.name`, `${s['name']} is declared twice`);
@@ -77,7 +77,9 @@ export function validateRoles(raw: unknown): RolesTable {
       return bad('forwards', 'must be an object');
     }
     for (const [from, to] of Object.entries(raw['forwards'])) {
-      if (!NAME.test(from)) bad(`forwards.${from}`, 'must be a name matching ^z-[a-z]+$');
+      if (!NAME.test(from)) {
+        bad(`forwards.${from}`, 'must be a name matching ^(z-)?[a-z]+$');
+      }
       if (typeof to !== 'string' || !names.has(to)) {
         return bad(`forwards.${from}`, `must point to a declared session (got ${JSON.stringify(to)})`);
       }

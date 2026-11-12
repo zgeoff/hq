@@ -81,3 +81,12 @@ test('it gives the cause when atc cannot answer', async () => {
 
   expect(probe).toStrictEqual({ verdict: 'unknown', cause: 'connect ENOENT /run/teapot.sock' });
 });
+
+test("it matches the owner's session recorded under its retired name, before hq fleet ensure records the new one", async () => {
+  const ctx = setupTest();
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1' }));
+
+  const probe = await readRoleSession(ctx.db, { openClient: () => Promise.resolve(ctx.client('kettle-1')) }, 'owner');
+
+  expect(probe).toStrictEqual({ verdict: 'match' });
+});

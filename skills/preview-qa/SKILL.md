@@ -52,7 +52,7 @@ production, or anything signed in as the owner, only under a grant in your start
 ## Terms
 
 hq, atc, Nix, nixie, a grant, a hands-on step, your role's private file and each `z-` session, such
-as `z-review`, `z-release` and `z-stu`, are defined in
+as `z-review`, `z-release` and `stu`, are defined in
 [owner-calls](../owner-calls/SKILL.md#terms). Terms of this skill:
 
 - **A live item:** an item in the issue's Acceptance section that only the running app can show.

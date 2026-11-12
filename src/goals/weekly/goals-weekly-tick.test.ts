@@ -61,7 +61,7 @@ test('nothing before Monday 17:00, and nothing on another day', () => {
   expect(readOutboxRows(ctx.db)).toStrictEqual([]);
 });
 
-test('at Monday 17:00 one message goes to z-stu with the table, both weeks and the flags; a second tick sends nothing', () => {
+test('it sends stu one message at Monday 17:00 with the table, both weeks and the flags; a second tick sends nothing', () => {
   const ctx = setupTest();
   ctx.seed.fetchedDays();
   ctx.seed.linearIssue({ issue: 'GEO-1', type: 'Bug' });
@@ -75,7 +75,7 @@ test('at Monday 17:00 one message goes to z-stu with the table, both weeks and t
   expect(result.run).toMatchObject({ job: 'goals-weekly', key: MON, result: 'queued', detail: null });
   expect(readOutboxRows(ctx.db)).toHaveLength(1);
   const [message] = readOutboxRows(ctx.db);
-  expect(message).toMatchObject({ target: 'z-stu', status: 'pending', topic: 'job:goals-weekly:2026-10-19' });
+  expect(message).toMatchObject({ target: 'stu', status: 'pending', topic: 'job:goals-weekly:2026-10-19' });
   const text = message?.text ?? '';
   const lines = text.split('\n');
   expect(lines[0]).toBe('Goals weekly, week of 12 Oct:');
@@ -155,7 +155,7 @@ test('the cost row names an account by its label when set, else by the short key
   expect(cost).toContain('abcdef: 7-day peak 33%, latest 5-hour 1% and 7-day 33% (1 readings); CI 0 min');
   expect(cost.endsWith('| – |')).toBe(true);
   expect(cost).toContain('| <=$50 a month on Actions | Actions spend unknown; ');
-  setAccountLabel(ctx.db, 'abcdef012345', 'work', 'z-stu');
+  setAccountLabel(ctx.db, 'abcdef012345', 'work', 'stu');
   cost = row(weeklyText(ctx.db, syd(MON, '17:00')), 'Cost');
   expect(cost).toContain('work: 7-day peak 71%');
   expect(cost).not.toContain('abcdef:');
@@ -234,9 +234,9 @@ test('flags are the weekly-flag items since the last weekly, filtered by tag and
   expect(first).not.toContain('Too old');
   expect(first).not.toContain('A different tag');
   at('2026-10-21T01:00:00Z');
-  addNews(ctx.db, { from: 'z-stu', topic: 'other', text: 'Late flag.', issue: null, link: null, needsGeoff: false, tag: 'weekly-flag' });
+  addNews(ctx.db, { from: 'stu', topic: 'other', text: 'Late flag.', issue: null, link: null, needsGeoff: false, tag: 'weekly-flag' });
   const next = weeklyText(ctx.db, syd('2026-10-26', '17:00'));
-  expect(next).toContain('Flags you kept:\n- Late flag. (z-stu, Wed 12:00)\n\n');
+  expect(next).toContain('Flags you kept:\n- Late flag. (stu, Wed 12:00)\n\n');
   expect(next).not.toContain('kettle');
   expect(weeklyText(ctx.db, syd('2026-11-02', '17:00'))).toContain('Flags you kept:\n- Late flag.');
 });
@@ -275,8 +275,8 @@ test('a dry run is the text alone: nothing sent, no job row; a manual send runs 
   weeklyText(ctx.db, sentAt);
   expect(readOutboxRows(ctx.db)).toStrictEqual([]);
   expect(ctx.db.query('SELECT COUNT(*) AS count FROM job_runs').get()).toStrictEqual({ count: 0 });
-  expect(sendWeekly(ctx.db, 'z-stu', sentAt)).toMatchObject({ result: 'queued', detail: 'manual', key: MON });
-  expect(() => sendWeekly(ctx.db, 'z-stu', sentAt)).toThrow('already ran');
+  expect(sendWeekly(ctx.db, 'stu', sentAt)).toMatchObject({ result: 'queued', detail: 'manual', key: MON });
+  expect(() => sendWeekly(ctx.db, 'stu', sentAt)).toThrow('already ran');
   expect(ctx.tick(MON, '17:00')).toStrictEqual({ run: null, waiting: null });
   expect(readOutboxRows(ctx.db)).toHaveLength(1);
 });
@@ -285,9 +285,9 @@ test('a manual send on a Thursday reviews the last complete week and keys on tha
   const ctx = setupTest();
   ctx.seed.fetchedDays();
   ctx.synced(syd('2026-10-22', '10:00'));
-  expect(sendWeekly(ctx.db, 'z-stu', syd('2026-10-22', '10:10')).key).toBe(MON);
+  expect(sendWeekly(ctx.db, 'stu', syd('2026-10-22', '10:10')).key).toBe(MON);
   expect(readOutboxRows(ctx.db)[0]?.text.split('\n')[0]).toBe('Goals weekly, week of 12 Oct:');
-  const stale = () => sendWeekly(ctx.db, 'z-stu', syd('2026-11-05', '10:10'));
+  const stale = () => sendWeekly(ctx.db, 'stu', syd('2026-11-05', '10:10'));
   expect(stale).toThrow('run hq goals sync first');
 });
 
@@ -295,13 +295,13 @@ test('skip leaves a Monday alone; bad skips are refused', () => {
   const ctx = setupTest();
   ctx.seed.fetchedDays();
   ctx.synced(syd(MON, '16:50'));
-  skipWeekly(ctx.db, MON, 'done by hand', 'z-stu');
+  skipWeekly(ctx.db, MON, 'done by hand', 'stu');
   expect(ctx.tick(MON, '17:00')).toStrictEqual({ run: null, waiting: null });
   expect(readOutboxRows(ctx.db)).toStrictEqual([]);
-  expect(() => skipWeekly(ctx.db, MON, 'again', 'z-stu')).toThrow('already ran');
-  expect(() => skipWeekly(ctx.db, '2026-02-30', 'x', 'z-stu')).toThrow('Sydney Monday');
-  expect(() => skipWeekly(ctx.db, '2026-10-20', 'x', 'z-stu')).toThrow('not a Monday');
-  expect(() => skipWeekly(ctx.db, '2026-10-26', ' ', 'z-stu')).toThrow('--reason');
+  expect(() => skipWeekly(ctx.db, MON, 'again', 'stu')).toThrow('already ran');
+  expect(() => skipWeekly(ctx.db, '2026-02-30', 'x', 'stu')).toThrow('Sydney Monday');
+  expect(() => skipWeekly(ctx.db, '2026-10-20', 'x', 'stu')).toThrow('not a Monday');
+  expect(() => skipWeekly(ctx.db, '2026-10-26', ' ', 'stu')).toThrow('--reason');
 });
 
 test('health is red at 17:31 on a Monday with no run, quiet before 17:30 and on other days, green once it ran', () => {

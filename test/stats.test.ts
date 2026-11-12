@@ -47,11 +47,11 @@ test('wait on the owner: call queue → answer → apply, and run time waiting o
   const ctx = setupTest();
   addAsk(ctx.db, { kind: 'call', id: 'kettle-colour', title: 'Kettle colour', question: 'Red or blue?', body: 'Invented.', issues: [], forSession: null, actor: 'z-triage' });
   at('2026-10-16T01:05:00Z');
-  openAsk(ctx.db, { kind: 'call', id: 'kettle-colour', force: true, actor: 'z-stu' });
+  openAsk(ctx.db, { kind: 'call', id: 'kettle-colour', force: true, actor: 'stu' });
   at('2026-10-16T02:05:00Z');
-  answerAsk(ctx.db, { id: 'kettle-colour', kind: 'call', answer: 'Blue.', actor: 'z-stu' });
+  answerAsk(ctx.db, { id: 'kettle-colour', kind: 'call', answer: 'Blue.', actor: 'stu' });
   at('2026-10-16T02:15:00Z');
-  applyAsk(ctx.db, 'kettle-colour', 'call', 'linear:GEO-1', 'done', 'z-stu');
+  applyAsk(ctx.db, 'kettle-colour', 'call', 'linear:GEO-1', 'done', 'stu');
 
   ctx.addRun('GEO-1');
   setState(ctx.db, 'GEO-1', 'blocked', { waitsOn: "Geoff's yes" }, 'z-delivery');
@@ -248,5 +248,5 @@ test('the stats output heads the section on waits for the owner "Wait on the own
   const ctx = setupTest();
   const stats = readStats(ctx.db, { from: '2026-10-16T01:00:00Z', to: '2026-10-16T01:10:00Z', gh: null });
 
-  expect(statsText(stats)).toContain('Wait on the owner (z-stu acts: batch, reorder or chase what waits longest)');
+  expect(statsText(stats)).toContain('Wait on the owner (stu acts: batch, reorder or chase what waits longest)');
 });

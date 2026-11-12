@@ -5,9 +5,9 @@ hq 0.79.0: headquarters for the z- sessions. Every command takes --json.
   hq capabilities [--json] [--require X.Y.Z]  commands, JSON shapes, version; --require fails if hq is older
   hq open [id] [--force]                      open the next call or proposal (one at a time)
   hq hold --reason TEXT | hq release          hold the queue, or let it go
-  hq band                                     the fleet in one line: needs you, Nix, lanes, CI, reviews (the z-stu band reads --json)
-  hq pane                                     the detail behind the band: needs you with links, Nix today, lanes, reviews, shipped today, news (z-stu's /hq pane reads --json)
-  hq whois <session-id>                       the declared fleet name hq fleet last saw under a session id
+  hq band                                     the fleet in one line: needs you, Nix, lanes, CI, reviews (the owner's band reads --json)
+  hq pane                                     the detail behind the band: needs you with links, Nix today, lanes, reviews, shipped today, news (the owner's /hq pane reads --json)
+  hq whois <session-id>                       the declared fleet name and roles hq fleet last saw under a session id
   hq pins                                     pinned atc sessions, longest idle first
   hq console [--port N]                       a local page to answer calls, proposals and to-dos (prints a one-use login link in your own terminal)
   hq console login                            ask the running console to print a new one-use login link on its own terminal
@@ -55,9 +55,9 @@ hq 0.79.0: headquarters for the z- sessions. Every command takes --json.
   hq brief check <file> [--json]              measure a finished brief in a file, the prompt alone, in bytes as hq brief counts them; over 4000 refuses with the count
   hq goals [--days 14] | hq goals sync [--days 14]   team goals per Sydney day and week: cloud deploy-prod runs, z-delivery DEPLOY/HOLD, CI runs, failures, cancels, re-runs and minutes, PRs merged and closed unmerged
   hq goals targets | hq goals target <goal> <op> <value> | <goal> none   the 7 goals' targets (bugs, features, deploys, downtime, ciwaste, mustfix, cost); op is one of < <= >= >; none clears
-  hq goals weekly [--dry-run] | hq goals weekly skip [DATE] --reason T   the Monday 17:00 Sydney goals review to z-stu: print it, send it now, or leave a Monday alone
+  hq goals weekly [--dry-run] | hq goals weekly skip [DATE] --reason T   the Monday 17:00 Sydney goals review to the owner: print it, send it now, or leave a Monday alone
   hq goals account [KEY NAME|none]           name a Claude usage account (KEY is 12 hex characters; NAME a slug of 24 characters at most); with no arguments lists the names
-  hq goals daily [--dry-run] | hq goals daily skip [DATE] --reason T   the 18:00 Sydney goals check-in to z-stu: print it, send it now, or leave a day alone
+  hq goals daily [--dry-run] | hq goals daily skip [DATE] --reason T   the 18:00 Sydney goals check-in to the owner: print it, send it now, or leave a day alone
   hq defs [status] | hq defs setup hq|private | hq defs check [hq] | hq defs use hq | hq defs sync   where the fleet's skills (hq-defs) and start prompts (hq-private) come from; sync fast-forwards both (the watcher does it each tick)
   hq repo archive-history <from> <to> [--dry-run]   move the history of one repo name to another in hq.db and noslop's store (hq hq-archive, and back); backs both up first, refuses on a repeated key or a running noslop
   hq morning [status] | hq morning skip [--date YYYY-MM-DD] --reason T | hq morning tick   the 08:15 Sydney morning-reports job
@@ -88,11 +88,11 @@ hq 0.79.0: headquarters for the z- sessions. Every command takes --json.
   hq slots broker [N --proof ID [--note TEXT]]  the Claude slot (1-4) the imp broker runs on; N records it with the request or spawn id that proved it
   hq health [check]                          read-only checks on this PC: units, restart loops, disk, memory, atc, watcher
   hq health settings | set KEY [VALUE]       thresholds (no VALUE: back to the default)
-  hq health tick                             one watcher step: ask a problem's owning session to fix it, tell z-stu about the rest and any still open 2 hours later, file news for cleared ones
+  hq health tick                             one watcher step: ask a problem's owning session to fix it, tell the owner about the rest and any still open 2 hours later, file news for cleared ones
   hq state trim <role> [--dry-run]            move the oldest '## Log' entries of a role's state file to this month's archive until it is under three quarters of its size limit; --dry-run only reports
   hq news [--all] [--limit N]                unread items for the owner, grouped by topic
   hq news add --topic merge|release|deploy|fix|report|other --text T [--from S] [--issue GEO-n] [--link URL] [--tag SLUG] [--needs-geoff]
-                                             file one line; only --needs-geoff messages z-stu
+                                             file one line; only --needs-geoff messages the owner
   hq news read --upto N                      mark items up to N read
   hq outbox [drop ID]                        unsent messages; drop one
   hq outbox forward FROM TO | forward FROM --remove | forwards   send a retired session's messages to its successor

@@ -37,7 +37,7 @@ function setupTest() {
     seed: { ...buildSeeder(base), ...buildRepoSeeder({ store }) },
     archive: (from: string, to: string, extra: Partial<ArchiveInput> = {}) =>
       runArchiveHistory({
-        actor: 'z-stu',
+        actor: 'stu',
         createBackup: createStoreBackup,
         db: base.db,
         dbFile: base.path,
@@ -466,7 +466,7 @@ test('it logs one event naming both repos and the backups', async () => {
   {
     const result = await ctx.archive('hq', 'hq-archive');
     expect(ctx.db.query("SELECT actor, from_state, to_state, data FROM events WHERE action = 'archive-history'").all()).toMatchObject([
-      { actor: 'z-stu', from_state: 'hq', to_state: 'hq-archive', data: expect.stringContaining(result.backups[0] ?? '') },
+      { actor: 'stu', from_state: 'hq', to_state: 'hq-archive', data: expect.stringContaining(result.backups[0] ?? '') },
     ]);
   }
 });

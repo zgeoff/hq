@@ -15,11 +15,11 @@ const KEY = 'abcdef012345';
 
 test('a name is shown for a key, else the first 6 characters of it', () => {
   expect(accountName(accountLabels(db), KEY)).toBe('abcdef');
-  expect(setAccountLabel(db, KEY, 'work', 'z-stu')).toBe('work');
+  expect(setAccountLabel(db, KEY, 'work', 'stu')).toBe('work');
   expect(accountName(accountLabels(db), KEY)).toBe('work');
   expect(accountName(accountLabels(db), 'active')).toBe('active');
   expect(db.query("SELECT action, from_state, to_state FROM events WHERE action = 'account'").all()).toEqual([{ action: 'account', from_state: null, to_state: 'work' }]);
-  expect(setAccountLabel(db, KEY, 'none', 'z-stu')).toBeNull();
+  expect(setAccountLabel(db, KEY, 'none', 'stu')).toBeNull();
   expect(accountLabels(db)).toEqual({});
 });
 
@@ -49,12 +49,12 @@ test.each([
   [KEY, '日本'],
   [KEY, "x'); DROP TABLE meta;--"],
 ])('a hostile key %j or name %j is refused', (key, name) => {
-  expect(() => setAccountLabel(db, key, name, 'z-stu')).toThrow();
+  expect(() => setAccountLabel(db, key, name, 'stu')).toThrow();
   expect(accountLabels(db)).toEqual({});
 });
 
 test.each([[KEY, 'a'], [KEY, 'a'.repeat(24)], [KEY, 'work-2'], ['000000000000', 'x1']])('key %j name %j is accepted', (key, name) => {
-  expect(setAccountLabel(db, key, name, 'z-stu')).toBe(name);
+  expect(setAccountLabel(db, key, name, 'stu')).toBe(name);
 });
 
 test('a stored map with bad entries shows only the good ones', () => {

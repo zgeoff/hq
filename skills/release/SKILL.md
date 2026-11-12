@@ -168,7 +168,7 @@ Never echo a secret value. Record what changed in your state file and in `hq new
 - `z-qa` for live checks.
 - `z-delivery` for a fix or a lint rollout.
 - `z-triage` for a decision the owner makes.
-- `z-stu` only for something urgent, such as a failed restore: the same `hq news add`, with
+- `stu` only for something urgent, such as a failed restore: the same `hq news add`, with
   `--needs-geoff`.
 - For a step that needs the owner's hands, run
   `hq unblock add --task '<what the owner does>' --done-when <issue:GEO-n|pr:repo#n|release:repo>`.

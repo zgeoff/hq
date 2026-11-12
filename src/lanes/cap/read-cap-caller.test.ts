@@ -12,16 +12,16 @@ function setupTest() {
 
 test("it finds the owner by the session atc found for the caller's process", async () => {
   const ctx = setupTest();
-  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'z-delivery': 'kettle-2' }));
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'stu': 'kettle-1', 'z-delivery': 'kettle-2' }));
 
   const caller = await readCapCaller(ctx.db, { openClient: () => Promise.resolve({ peerSession: 'kettle-1', close: () => {} }) });
 
-  expect(caller).toStrictEqual({ kind: 'owner', by: 'z-stu' });
+  expect(caller).toStrictEqual({ kind: 'owner', by: 'stu' });
 });
 
 test('it finds the delivery lead by its recorded session', async () => {
   const ctx = setupTest();
-  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'z-delivery': 'kettle-2' }));
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'stu': 'kettle-1', 'z-delivery': 'kettle-2' }));
 
   const caller = await readCapCaller(ctx.db, { openClient: () => Promise.resolve({ peerSession: 'kettle-2', close: () => {} }) });
 
@@ -30,9 +30,9 @@ test('it finds the delivery lead by its recorded session', async () => {
 
 test("it ignores the caller's own claim of who it is", async () => {
   const ctx = setupTest();
-  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'z-delivery': 'kettle-2' }));
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'stu': 'kettle-1', 'z-delivery': 'kettle-2' }));
   onTestFinished(overrideEnv('ATC_SESSION_ID', 'kettle-1'));
-  onTestFinished(overrideEnv('HQ_AS', 'z-stu'));
+  onTestFinished(overrideEnv('HQ_AS', 'stu'));
 
   const caller = await readCapCaller(ctx.db, { openClient: () => Promise.resolve({ peerSession: 'kettle-9', close: () => {} }) });
 
@@ -41,7 +41,7 @@ test("it ignores the caller's own claim of who it is", async () => {
 
 test('it finds no one when atc places the caller in no session', async () => {
   const ctx = setupTest();
-  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1' }));
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'stu': 'kettle-1' }));
 
   const caller = await readCapCaller(ctx.db, { openClient: () => Promise.resolve({ peerSession: null, close: () => {} }) });
 
@@ -70,4 +70,13 @@ test('it reports unknown when the daemon names no caller session', async () => {
   const caller = await readCapCaller(ctx.db, { openClient: () => Promise.resolve({ peerSession: undefined, close: () => {} }) });
 
   expect(caller).toStrictEqual({ kind: 'unknown', cause: "atc's hello names no caller session, so this daemon predates protocol 11 and cannot say who is asking" });
+});
+
+test('it finds the owner by the session recorded under its retired name, before hq fleet ensure records the new one', async () => {
+  const ctx = setupTest();
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1' }));
+
+  const caller = await readCapCaller(ctx.db, { openClient: () => Promise.resolve({ peerSession: 'kettle-1', close: () => {} }) });
+
+  expect(caller).toStrictEqual({ kind: 'owner', by: 'stu' });
 });

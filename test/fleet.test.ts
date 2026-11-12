@@ -208,7 +208,7 @@ test('it messages the owner and posts no news when a spawn fails', async () => {
 
   await ensureFleet(ctx.db, broken, { dryRun: false, actor: 'hq-fleet', fleet: ctx.fleet });
 
-  expect(ctx.outbox()).toStrictEqual([{ target: 'z-stu', text: 'hq fleet: z-kettle failed: invented spawn refusal.' }]);
+  expect(ctx.outbox()).toStrictEqual([{ target: 'stu', text: 'hq fleet: z-kettle failed: invented spawn refusal.' }]);
   expect(listNews(ctx.db, { all: true, limit: 10 })).toStrictEqual([]);
 });
 
@@ -224,7 +224,7 @@ test('it messages the owner about the failed step only, and posts the spawned on
 
   await ensureFleet(ctx.db, flaky, { dryRun: false, actor: 'hq-fleet', fleet: ctx.fleet });
 
-  expect(ctx.outbox()).toStrictEqual([{ target: 'z-stu', text: 'hq fleet: z-teapot failed: invented spawn refusal.' }]);
+  expect(ctx.outbox()).toStrictEqual([{ target: 'stu', text: 'hq fleet: z-teapot failed: invented spawn refusal.' }]);
   expect(listNews(ctx.db, { all: true, limit: 10 })).toStrictEqual([expect.objectContaining({ text: expect.stringContaining('hq fleet: z-kettle spawned') })]);
 });
 
@@ -329,7 +329,7 @@ test('it holds the failure message for morning in quiet hours', async () => {
   expect(ctx.outbox()).toHaveLength(0);
   at('2026-10-14T20:30:00Z');
   await ensureFleet(ctx.db, client, { dryRun: false, actor: 'hq-fleet', fleet: ctx.fleet.slice(1) });
-  expect(ctx.outbox()).toStrictEqual([{ target: 'z-stu', text: expect.stringContaining('(held over quiet hours)') }]);
+  expect(ctx.outbox()).toStrictEqual([{ target: 'stu', text: expect.stringContaining('(held over quiet hours)') }]);
 });
 
 test('it posts a successful respawn in quiet hours to news and holds nothing for morning', async () => {
@@ -386,6 +386,40 @@ test('a renamed live session or an asleep one is not duplicated; a bad list spaw
   expect(stub.requests.map((request) => request.method)).not.toContain('session.spawn');
 });
 
+test('it spawns no second session for one still under a retired name that forwards to a declared one', async () => {
+  const ctx = setupTest();
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-oldkettle': 'id-k' }));
+  setMeta(ctx.db, 'outbox_forwards', JSON.stringify({ 'z-oldkettle': 'z-kettle' }));
+  const stub = fake([{ id: 'id-k', name: 'z-oldkettle', alive: true }]);
+
+  const steps = await ensureFleet(ctx.db, stub.client, { dryRun: false, actor: 'hq-fleet', fleet: ctx.fleet.slice(0, 1) });
+
+  expect(steps).toStrictEqual([{ name: 'z-kettle', action: 'ok', detail: 'id-k, now named z-oldkettle; hq spawns none', id: 'id-k' }]);
+  expect(stub.spawns).toHaveLength(0);
+});
+
+test('it adopts no session under a retired name once the declared name has its own recorded id', async () => {
+  const ctx = setupTest();
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-kettle': 'id-gone', 'z-oldkettle': 'id-old' }));
+  setMeta(ctx.db, 'outbox_forwards', JSON.stringify({ 'z-oldkettle': 'z-kettle' }));
+  const stub = fake([{ id: 'id-old', name: 'z-oldkettle', alive: true }]);
+
+  const steps = await ensureFleet(ctx.db, stub.client, { dryRun: false, actor: 'hq-fleet', fleet: ctx.fleet.slice(0, 1) });
+
+  expect(steps).toStrictEqual([{ name: 'z-kettle', action: 'waiting', detail: expect.stringContaining('its known id is not in atc') }]);
+});
+
+test('it records the id of a session still under a retired name against the declared name it forwards to', async () => {
+  const ctx = setupTest();
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-oldkettle': 'id-k' }));
+  setMeta(ctx.db, 'outbox_forwards', JSON.stringify({ 'z-oldkettle': 'z-kettle' }));
+  const stub = fake([{ id: 'id-k', name: 'z-oldkettle', alive: true }]);
+
+  await ensureFleet(ctx.db, stub.client, { dryRun: false, actor: 'hq-fleet', fleet: ctx.fleet.slice(0, 1) });
+
+  expect(JSON.parse(getMeta(ctx.db, 'fleet_ids') ?? '{}')).toStrictEqual({ 'z-oldkettle': 'id-k', 'z-kettle': 'id-k' });
+});
+
 test('a known id missing from the list waits 30 minutes, and comes back without a spawn', async () => {
   const ctx = setupTest();
   const sessions: FleetSession[] = [{ id: 'id-k', name: 'z-kettle', alive: true }];
@@ -407,14 +441,14 @@ test('a known id missing from the list waits 30 minutes, and comes back without 
 test('remove retires a declared name: ensure skips it and its wake entry goes; restore takes it back', async () => {
   const ctx = setupTest();
   wakeAdd(ctx.db, { id: 'id-release', name: 'z-release' }, null, 'z-q');
-  expect(retireName(ctx.db, 'z-release', 'z-stu', true)).toStrictEqual({ changed: true, wakeRemoved: 1 });
+  expect(retireName(ctx.db, 'z-release', 'stu', true)).toStrictEqual({ changed: true, wakeRemoved: 1 });
   expect(declaredFleet(ctx.db).map((entry) => entry.name)).not.toContain('z-release');
   expect(wakeList(ctx.db)).toHaveLength(0);
-  expect(retireName(ctx.db, 'z-release', 'z-stu', true).changed).toBe(false);
-  expect(() => retireName(ctx.db, 'z-refine', 'z-stu', true)).toThrow('not a declared fleet name');
-  expect(retireName(ctx.db, 'z-release', 'z-stu', false).changed).toBe(true);
+  expect(retireName(ctx.db, 'z-release', 'stu', true).changed).toBe(false);
+  expect(() => retireName(ctx.db, 'z-refine', 'stu', true)).toThrow('not a declared fleet name');
+  expect(retireName(ctx.db, 'z-release', 'stu', false).changed).toBe(true);
   expect(declaredFleet(ctx.db).map((entry) => entry.name)).toContain('z-release');
-  expect(declaredFleet(ctx.db).map((entry) => entry.name)).toStrictEqual(['z-stu', 'z-delivery', 'z-release', 'z-triage', 'z-qa', 'z-review', 'z-q']);
+  expect(declaredFleet(ctx.db).map((entry) => entry.name)).toStrictEqual(['stu', 'z-delivery', 'z-release', 'z-triage', 'z-qa', 'z-review', 'z-q']);
 });
 
 test('a role prompt comes from origin/main: a working-tree edit is ignored, a merge is picked up, a missing file is refused', () => {
@@ -502,7 +536,7 @@ test('--now spawns a forgotten session at once, for the named session only', asy
   const ctx = setupTest();
   const { client, spawns } = fake([]);
   wakeAdd(ctx.db, { id: 'id-kettle-forgotten', name: 'z-kettle' }, null, 'z-q');
-  const steps = await ensureFleet(ctx.db, client, { dryRun: false, actor: 'z-stu', fleet: ctx.fleet, now: ['z-kettle'] });
+  const steps = await ensureFleet(ctx.db, client, { dryRun: false, actor: 'stu', fleet: ctx.fleet, now: ['z-kettle'] });
   expect(steps.map((s) => s.action)).toEqual(['spawned', 'waiting']);
   expect(steps[0]!.detail).toContain('(--now)');
   expect(spawns.map((s) => s.name)).toEqual(['z-kettle']);
@@ -516,7 +550,7 @@ test('--now never spawns a second session: a live one by name or by known id sta
     { id: 'id-teapot', name: 'z-teapot-renamed', alive: true },
   ]);
   wakeAdd(ctx.db, { id: 'id-teapot', name: 'z-teapot' }, null, 'z-q');
-  const steps = await ensureFleet(ctx.db, client, { dryRun: false, actor: 'z-stu', fleet: ctx.fleet, now: ['z-kettle', 'z-teapot'] });
+  const steps = await ensureFleet(ctx.db, client, { dryRun: false, actor: 'stu', fleet: ctx.fleet, now: ['z-kettle', 'z-teapot'] });
   expect(steps.map((s) => s.action)).toEqual(['ok', 'ok']);
   expect(spawns).toHaveLength(0);
 });
@@ -524,7 +558,7 @@ test('--now never spawns a second session: a live one by name or by known id sta
 test('--now refuses a name outside the declared fleet and spawns nothing', async () => {
   const ctx = setupTest();
   const { client, spawns } = fake([]);
-  await expect(ensureFleet(ctx.db, client, { dryRun: false, actor: 'z-stu', fleet: ctx.fleet, now: ['z-kettle', 'z-saucer'] })).rejects.toThrow('--now names z-saucer, not in the declared fleet');
+  await expect(ensureFleet(ctx.db, client, { dryRun: false, actor: 'stu', fleet: ctx.fleet, now: ['z-kettle', 'z-saucer'] })).rejects.toThrow('--now names z-saucer, not in the declared fleet');
   expect(spawns).toHaveLength(0);
 });
 
@@ -545,26 +579,26 @@ test('fleet ensure runs one at a time: an overlapping run is refused and spawns 
     pin: async () => {},
   };
   const one = ctx.fleet.slice(0, 1);
-  const firstRun = ensureFleet(ctx.db, client, { dryRun: false, actor: 'z-stu', fleet: one, now: ['z-kettle'] });
+  const firstRun = ensureFleet(ctx.db, client, { dryRun: false, actor: 'stu', fleet: one, now: ['z-kettle'] });
   await inSpawn.promise;
-  await expect(ensureFleet(ctx.db, client, { dryRun: false, actor: 'hq-fleet', fleet: one, now: ['z-kettle'] })).rejects.toThrow('another hq fleet ensure is running (z-stu)');
+  await expect(ensureFleet(ctx.db, client, { dryRun: false, actor: 'hq-fleet', fleet: one, now: ['z-kettle'] })).rejects.toThrow('another hq fleet ensure is running (stu)');
   const dryRunSteps = await ensureFleet(ctx.db, client, { dryRun: true, actor: 'z-q', fleet: one });
   expect(dryRunSteps[0]).toBeDefined();
   release();
   await firstRun;
   expect(spawned).toHaveLength(1);
   const boom: FleetClient = { ...client, sessions: async () => { throw new Error('invented outage'); } };
-  await expect(ensureFleet(ctx.db, boom, { dryRun: false, actor: 'z-stu', fleet: one })).rejects.toThrow('invented outage');
-  await ensureFleet(ctx.db, client, { dryRun: false, actor: 'z-stu', fleet: one });
+  await expect(ensureFleet(ctx.db, boom, { dryRun: false, actor: 'stu', fleet: one })).rejects.toThrow('invented outage');
+  await ensureFleet(ctx.db, client, { dryRun: false, actor: 'stu', fleet: one });
 });
 
 test('a lease left by a crashed run expires', async () => {
   const ctx = setupTest();
   const { client } = fake([]);
   ctx.seed.meta({ key: 'fleet_ensure_lease', value: JSON.stringify({ token: 'old', by: 'hq-fleet', until: Date.now() - 1 }) });
-  await ensureFleet(ctx.db, client, { dryRun: false, actor: 'z-stu', fleet: ctx.fleet });
+  await ensureFleet(ctx.db, client, { dryRun: false, actor: 'stu', fleet: ctx.fleet });
   ctx.seed.meta({ key: 'fleet_ensure_lease', value: JSON.stringify({ token: 'live', by: 'hq-fleet', until: Date.now() + 60_000 }) });
-  await expect(ensureFleet(ctx.db, client, { dryRun: false, actor: 'z-stu', fleet: ctx.fleet })).rejects.toThrow('another hq fleet ensure is running (hq-fleet)');
+  await expect(ensureFleet(ctx.db, client, { dryRun: false, actor: 'stu', fleet: ctx.fleet })).rejects.toThrow('another hq fleet ensure is running (hq-fleet)');
 });
 
 test('claimMissing keeps the first stored start', () => {
@@ -605,16 +639,16 @@ function buildKettle(state?: string): FleetSession[] {
   return [{ id: 'id-k', name: 'z-kettle', alive: true, ...toExactOptional({ state }) }];
 }
 
-test('only z-stu has Remote Control turned on in the declared fleet', () => {
+test('it turns Remote Control on only for stu in the declared fleet', () => {
   setupTest();
-  expect(declaredFleet().filter((e) => e.remoteControl).map((e) => e.name)).toEqual(['z-stu']);
+  expect(declaredFleet().filter((entry) => entry.remoteControl).map((entry) => entry.name)).toStrictEqual(['stu']);
 });
 
 test('a spawn marks the session and starts the helper unit through the runner', async () => {
   const ctx = setupTest();
   const sessions: FleetSession[] = [];
   const f = rcFake(sessions);
-  await ensureFleet(ctx.db, f.client, { dryRun: false, actor: 'z-stu', fleet: ctx.rcFleet(), now: ['z-kettle'], rc: f.rc });
+  await ensureFleet(ctx.db, f.client, { dryRun: false, actor: 'stu', fleet: ctx.rcFleet(), now: ['z-kettle'], rc: f.rc });
   const id = sessions[0]!.id;
   expect(ctx.pending()).toStrictEqual({ 'z-kettle': { id, since: NOON_SYDNEY } });
   expect(f.cmds).toHaveLength(1);
@@ -633,7 +667,7 @@ test('a helper that will not start is reported, and the 5-minute check still typ
   const sessions: FleetSession[] = [];
   const f = rcFake(sessions, [OFF, ON]);
   f.helperFails();
-  const steps = await ensureFleet(ctx.db, f.client, { dryRun: false, actor: 'z-stu', fleet: ctx.rcFleet(), now: ['z-kettle'], rc: f.rc });
+  const steps = await ensureFleet(ctx.db, f.client, { dryRun: false, actor: 'stu', fleet: ctx.rcFleet(), now: ['z-kettle'], rc: f.rc });
   expect(steps.find((x) => x.action === 'spawned')!.detail).toContain('the Remote Control helper did not start (invented systemd failure)');
   expect(listNews(ctx.db, { all: true, limit: 10 }).at(-1)?.text).toContain('helper did not start');
   sessions[0]!.state = 'done';
@@ -647,7 +681,7 @@ test('a dry run, an entry without the flag, or a run without Remote Control deps
   const ctx = setupTest();
   const sessions: FleetSession[] = [];
   const f = rcFake(sessions);
-  await ensureFleet(ctx.db, f.client, { dryRun: false, actor: 'z-stu', fleet: ctx.fleet, now: ['z-kettle'], rc: f.rc });
+  await ensureFleet(ctx.db, f.client, { dryRun: false, actor: 'stu', fleet: ctx.fleet, now: ['z-kettle'], rc: f.rc });
   expect(ctx.pending()).toStrictEqual({});
   expect(f.cmds).toEqual([]);
   const [spawned] = sessions;
@@ -709,7 +743,7 @@ test('already on: nothing typed, and it says so', async () => {
   expect(ctx.pending()).toStrictEqual({});
 });
 
-test('unknown: nothing typed, and the line tells z-stu to type it by hand', async () => {
+test('it types nothing for unknown, and the line tells stu to type it by hand', async () => {
   const ctx = setupTest();
   const f = rcFake(buildKettle('done'), [UNKNOWN]);
   ctx.mark();
@@ -825,7 +859,7 @@ test('the helper and the 5-minute check on one marker type once between them', a
   expect(claimTyping(ctx.db, 'z-kettle', 'id-k', at2())).toBe(false);
 });
 
-test('the helper loops until the session is done, then types and tells z-stu through the outbox', async () => {
+test('it loops the helper until the session is done, then types and tells stu through the outbox', async () => {
   const ctx = setupTest();
   const sessions = buildKettle('running');
   const f = rcFake(sessions, [OFF, ON]);
@@ -946,7 +980,7 @@ test("an entry's plugin folders go to atc's spawn; an entry without them sends n
   ]);
 });
 
-test('only z-stu loads the hq band in the declared fleet', () => {
+test('it loads the hq band only for stu in the declared fleet', () => {
   setupTest();
-  expect(declaredFleet().filter((e) => e.pluginDirs).map((e) => [e.name, e.pluginDirs])).toEqual([['z-stu', ['~/projects/hq/mods/hq-band']]]);
+  expect(declaredFleet().filter((entry) => entry.pluginDirs).map((entry) => [entry.name, entry.pluginDirs])).toStrictEqual([['stu', ['~/projects/hq/mods/hq-band']]]);
 });

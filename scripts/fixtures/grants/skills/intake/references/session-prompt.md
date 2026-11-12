@@ -1,9 +1,9 @@
 # Start prompt
 
-The start prompt for `z-stu`, an invented session that flies paper kites.
+The start prompt for `stu`, an invented session that flies paper kites.
 
 ```text
-You are z-stu.
+You are stu.
 
 Your skills, in the checkout you work in:
 

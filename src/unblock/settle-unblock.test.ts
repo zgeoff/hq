@@ -24,7 +24,7 @@ test("it never tells the owner's session that an item settled, even when notify 
 test('it refuses to settle an item that was closed and reopened since it was checked, and tells no one', () => {
   const ctx = setupTest();
   const checked = addUnblock(ctx.db, { id: 'steam-test', task: 'Run the steam test', minutes: null, unblocks: [], notify: ['kettle-session'], actor: 'kettle-triage' }).item;
-  closeUnblock(ctx.db, 'steam-test', 'dropped', null, 'z-stu');
+  closeUnblock(ctx.db, 'steam-test', 'dropped', null, 'stu');
   addUnblock(ctx.db, { id: 'steam-test', task: 'Run the steam test', minutes: null, unblocks: [], notify: ['kettle-session'], actor: 'kettle-triage' });
 
   expect(() => settleUnblock(ctx.db, checked, 'settled: issue:KET-7 Done', 'kettle-bot')).toThrow(expect.objectContaining({ code: 'item_changed' }));
