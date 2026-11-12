@@ -1,5 +1,5 @@
 import type { Database } from 'bun:sqlite';
-import { fleetIds } from '../atc/fleet-ids.ts';
+import { readKnownFleetIDs } from '../atc/read-known-fleet-ids.ts';
 import { roleName } from '../roles/role-name.ts';
 import type { SingleRole } from '../roles/types.ts';
 import type { OwnerProbeDeps } from './read-owner-session.ts';
@@ -12,7 +12,7 @@ export type PeerRead = { kind: 'read'; session: string | null | undefined } | { 
 // ATC_SESSION_ID, which are the caller's own words. It must be the id hq fleet recorded for the
 // role; a live session that only shares the role's name is not it.
 export async function readRoleSession(db: Database, deps: OwnerProbeDeps, role: SingleRole): Promise<RoleProbe> {
-  const recorded = fleetIds(db)[roleName(role)];
+  const recorded = readKnownFleetIDs(db)[roleName(role)];
 
   if (recorded === undefined || recorded === '') {
     return { verdict: 'other' };

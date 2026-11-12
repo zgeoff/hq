@@ -42,7 +42,7 @@ Send nothing between midnight and 04:00.
 
 Each grant gives the session one permission and its limit, both in the grant's `note`. Its YAML file and the prompt both live in hq-private, so a grant change is one hq-private PR.
 
-1. Edit `grants/<session name>.yaml` in hq-private, such as `grants/z-lantern.yaml`.
+1. Edit `grants/<session name>.yaml` in hq-private, such as `grants/z-lantern.yaml`. For a renamed session, keep the file under the old name and forward the old name to the new one in `fleet.json`. Each grant's name starts with the file's session name, and hq stores those names.
 2. From the root of an hq checkout, run `bun scripts/grants.ts --private <path to the hq-private checkout>`. `hq defs` prints that path. Expect `grants: wrote <n> files`.
 3. Run the same command with `--check` before you commit. Expect `grants: <n> files match`.
 

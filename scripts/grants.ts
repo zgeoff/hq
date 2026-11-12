@@ -380,6 +380,7 @@ function renderSessionGrants(file: string, body: string, block: RegExpExecArray,
 
 interface RenderContext {
   data: StillAsk;
+  forwards: Record<string, string>;
   grantsBySession: Map<string, Grant[]>;
   sessions: Set<string>;
 }
@@ -389,7 +390,8 @@ function renderSession(file: string, body: string, context: RenderContext): stri
     return undefined;
   }
   const blocks = [...body.matchAll(TEXT_BLOCK)];
-  const session = /The start prompt for `(?<name>(?:z-)?[a-z][a-z0-9-]*)`/u.exec(body)?.groups?.['name'];
+  const named = /The start prompt for `(?<name>(?:z-)?[a-z][a-z0-9-]*)`/u.exec(body)?.groups?.['name'];
+  const session = named === undefined ? undefined : pickGrantsSession(named, context);
   const withGrants = blocks.filter((block) => NEW_FORM.test(block.groups?.['content'] ?? '') || RETIRED_FORM.test(block.groups?.['content'] ?? ''));
   if (withGrants.length === 0) {
     return undefined;
@@ -406,6 +408,15 @@ function renderSession(file: string, body: string, context: RenderContext): stri
     grants: getSessionGrants(file, session, context),
     session,
   });
+}
+
+// Grant names start with the grants file's session, and they are stored in hq's database, so a
+// renamed session keeps the grants file of the retired name that fleet.json forwards to it.
+function pickGrantsSession(named: string, context: RenderContext): string {
+  if (context.grantsBySession.has(named)) {
+    return named;
+  }
+  return Object.keys(context.forwards).find((retired) => context.forwards[retired] === named && context.grantsBySession.has(retired)) ?? named;
 }
 
 function getSessionGrants(file: string, session: string, context: RenderContext): Grant[] {
@@ -567,6 +578,15 @@ function parseFleetSession(entry: unknown, where: string): FleetSession {
   return { name: row['name'], prompt: typeof row['prompt'] === 'string' ? row['prompt'] : undefined, skills };
 }
 
+function readForwards(path: string): Record<string, string> {
+  if (!existsSync(path)) {
+    return {};
+  }
+  const parsed: unknown = JSON.parse(readFileSync(path, 'utf8'));
+  const forwards = isRecord(parsed) ? parsed['forwards'] : undefined;
+  return isRecord(forwards) ? Object.fromEntries(Object.entries(forwards).filter((entry): entry is [string, string] => typeof entry[1] === 'string')) : {};
+}
+
 function readFleet(path: string): FleetSession[] {
   if (!existsSync(path)) {
     throw new Error(`--fleet ${path}: no such file`);
@@ -637,7 +657,7 @@ function runTrees(trees: Trees, check: boolean, today: string, fleetPath: string
   for (const file of data.sites.keys()) {
     requireSite(file, trees, held, data);
   }
-  const generated = renderTrees(trees, held, { data, grantsBySession, sessions });
+  const generated = renderTrees(trees, held, { data, forwards: readForwards(fleetPath), grantsBySession, sessions });
   if (check && trees.all.length > 1) {
     withTree(trees.prompts, () => checkPromptSkills(trees.prompts, fleetPath));
   }

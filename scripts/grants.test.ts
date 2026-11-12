@@ -516,6 +516,31 @@ function setupPrivateTest(shared = false) {
   }
 }
 
+test('it keeps, with --private, the grants file of a retired name that fleet.json forwards to the prompt\'s session', () => {
+  const ctx = setupPrivateTest();
+  const kept = readFileSync(join(ctx.privateDir, 'grants/stu.yaml'), 'utf8');
+  rmSync(join(ctx.privateDir, 'grants/stu.yaml'));
+  writeFileSync(join(ctx.privateDir, 'grants/z-oldkite.yaml'), kept);
+  const fleetPath = join(ctx.dir, 'fleet.json');
+  writeFileSync(fleetPath, readFileSync(fleetPath, 'utf8').replace(/\n\}\s*$/u, ',\n  "forwards": { "z-oldkite": "stu" }\n}\n'));
+
+  const result = ctx.runPrivate();
+
+  expect([result.exitCode, result.stderr.toString()]).toStrictEqual([0, '']);
+});
+
+test('it refuses, with --private, a prompt whose session has no grants file and no forwarded one', () => {
+  const ctx = setupPrivateTest();
+  const kept = readFileSync(join(ctx.privateDir, 'grants/stu.yaml'), 'utf8');
+  rmSync(join(ctx.privateDir, 'grants/stu.yaml'));
+  writeFileSync(join(ctx.privateDir, 'grants/z-oldkite.yaml'), kept);
+
+  const result = ctx.runPrivate();
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stderr.toString()).toContain('no grants/stu.yaml for this prompt');
+});
+
 test('with --private it passes on matching files in both trees', () => {
   const result = setupPrivateTest().runPrivate();
   expect(result.stderr.toString()).toBe('');

@@ -71,3 +71,12 @@ test('it reports unknown when the daemon names no caller session', async () => {
 
   expect(caller).toStrictEqual({ kind: 'unknown', cause: "atc's hello names no caller session, so this daemon predates protocol 11 and cannot say who is asking" });
 });
+
+test('it finds the owner by the session recorded under its retired name, before hq fleet ensure records the new one', async () => {
+  const ctx = setupTest();
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1' }));
+
+  const caller = await readCapCaller(ctx.db, { openClient: () => Promise.resolve({ peerSession: 'kettle-1', close: () => {} }) });
+
+  expect(caller).toStrictEqual({ kind: 'owner', by: 'stu' });
+});
